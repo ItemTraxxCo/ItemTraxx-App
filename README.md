@@ -24,7 +24,7 @@ ItemTraxx is built with scalability and security in mind.
 - **Real-Time Tracking:** Immediate updates on checkouts and returns  
 - **Reports & Analytics:** Usage statistics and audit logs for compliance    
 - **Flag Lost/Damaged Items:** Keep your inventory accurate  
-- **Overdue Alerts:** Notify users about overdue assets  
+- **Overdue Alerts:** Shows a pop-up notification for overdue items  
 
 ---
 
@@ -70,7 +70,7 @@ See [SECURITY.md](SECURITY.md) for reporting instructions.
 ---
 
 ## 8. About ItemTraxx Co
-ItemTraxx Co is dedicated to providing innovative software solutions for organizations seeking reliable asset management and operational efficiency.  
+ItemTraxx Co is dedicated to providing innovative software solutions, seeking reliable asset management and operational efficiency.  
 
 ---
 

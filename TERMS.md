@@ -57,3 +57,7 @@ These terms are governed by the laws of the applicable jurisdiction of ItemTraxx
 
 ## 14. Contact
 For questions about these Terms of Service, contact ItemTraxx Co.
+
+---
+
+**© 2026 ItemTraxx Co. All rights reserved.**

@@ -42,3 +42,7 @@ In no event shall ItemTraxx Co be liable for any damages arising from the use or
 
 ## 8. Governing Law
 This license shall be governed by and interpreted under the laws of the applicable jurisdiction of ItemTraxx Co.
+
+---
+
+**© 2026 ItemTraxx Co. All rights reserved.**

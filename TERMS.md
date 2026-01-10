@@ -11,7 +11,7 @@ ItemTraxx is a digital platform used by schools, businesses, and individual user
 
 ## 3. Eligibility
 You must have permission from ItemTraxx Co. to be allowed to use this service.  
-Accounts are managed by thr ItemTraxx Co internal team.
+Accounts are managed by the ItemTraxx Co internal team.
 
 ## 4. User Responsibilities
 You agree to:

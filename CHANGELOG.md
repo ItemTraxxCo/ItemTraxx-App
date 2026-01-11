@@ -10,7 +10,8 @@ This project adheres to **Semantic Versioning (SemVer)** where possible.
 
 ## Documentation Links
 - [README.md](README.md) – Product overview and details  
-- [LICENSE.md](LICENSE.md) – Legal ownership and usage rights  
+- [LICENSE.md](LICENSE.md) – Legal ownership and usage rights
+- [Legal](LEGAL.md) - Legal overview and governing documents
 - [TERMS.md](TERMS.md) – Terms of service for users  
 - [PRIVACY.md](PRIVACY.md) – Privacy policy and data handling  
 - [SECURITY.md](SECURITY.md) – Security reporting and guidelines  

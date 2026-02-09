@@ -59,8 +59,8 @@ All rights reserved under [LICENSE.md](LICENSE.md).
 For assistance and more, please contact:
 
 **ItemTraxx Co**  
-Email: email to be added soon    
-Website: to be added soon
+Email: support@itemtraxx.com    
+Website: itemtraxx.com
 
 ---
 

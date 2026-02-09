@@ -56,7 +56,7 @@ These terms may be updated from time to time. Continued use of ItemTraxx means y
 These terms are governed by the laws of the applicable jurisdiction of ItemTraxx Co.
 
 ## 14. Contact
-For questions about these Terms of Service, contact ItemTraxx Co.
+For questions about these Terms of Service, contact support@itemtraxx.com
 
 ---
 

@@ -23,6 +23,13 @@ This project adheres to **Semantic Versioning)** where possible.
 - Development for ItemTraxx has started, with core backend functionality being our first priority and major step forward in developement. Archetechture such as tables, user permissions, security, edge functions, etc. are currently being worked on and created.
 - After backend functionality is completed and thuroughly tested, developement for the frontend (UI/UX) will begin shortly.
 ---
+### 2/9/2026 Development Upate
+
+- Most backend development has been completed
+- Main focus us now frontend and UI/UX
+- Progress is steady, some sprints
+- Lots of debugging 
+---
 
 ##### You have reached the bottom of the changelog.
 ---

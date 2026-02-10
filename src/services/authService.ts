@@ -85,12 +85,13 @@ export const initAuthListener = () => {
 export const tenantLogin = async (accessCode: string, password: string) => {
   const functionName = getTenantLoginFunctionName();
   const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
+  const isPublishableKey = anonKey?.startsWith("sb_publishable_") ?? false;
   const { data, error } = await supabase.functions.invoke(functionName, {
     body: { access_code: accessCode },
     headers: anonKey
       ? {
           apikey: anonKey,
-          Authorization: `Bearer ${anonKey}`,
+          ...(isPublishableKey ? {} : { Authorization: `Bearer ${anonKey}` }),
         }
       : undefined,
   });

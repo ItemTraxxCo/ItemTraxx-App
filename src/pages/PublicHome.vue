@@ -21,6 +21,10 @@
         </label>
         <p class="muted support-note">
           Trouble signing in? Contact support at, support@itemtraxx.com.
+          By using this software, you agree to our
+          <a href="https://github.com/ItemTraxxCo/ItemTraxx-App/blob/0f72d932d351748df43e6691d8b1449a429ac217/TERMS.md" target="_blank" rel="noreferrer">terms and conditions</a>
+          and
+          <a href="https://github.com/ItemTraxxCo/ItemTraxx-App/blob/0f72d932d351748df43e6691d8b1449a429ac217/PRIVACY.md" target="_blank" rel="noreferrer">privacy policy</a>.
         </p>
         <div class="form-actions">
           <button type="submit" :disabled="isLoading">Sign in</button>

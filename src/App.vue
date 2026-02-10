@@ -42,7 +42,7 @@ import { getAuthState } from "./store/authState";
 const auth = getAuthState();
 const router = useRouter();
 const menuOpen = ref(false);
-const theme = ref<"light" | "dark">("dark");
+const theme = ref<"light" | "dark">("light");
 
 const themeLabel = computed(() =>
   theme.value === "dark" ? "Light Mode" : "Dark Mode"
@@ -79,7 +79,7 @@ onMounted(() => {
   if (saved === "light" || saved === "dark") {
     applyTheme(saved);
   } else {
-    applyTheme("dark");
+    applyTheme("light");
   }
 });
 </script>

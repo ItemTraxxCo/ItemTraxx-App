@@ -22,6 +22,24 @@ export type GearLog = {
   student: { first_name: string; last_name: string; student_id: string } | null;
 };
 
+const getFunctionErrorMessage = async (
+  error: unknown,
+  fallback: string
+) => {
+  const context = (error as { context?: Response })?.context;
+  if (!context) {
+    return fallback;
+  }
+  try {
+    const payload = (await context.json()) as
+      | { error?: string; message?: string }
+      | null;
+    return payload?.error || payload?.message || fallback;
+  } catch {
+    return fallback;
+  }
+};
+
 export const fetchGear = async () => {
   const { data, error } = await supabase
     .from("gear")
@@ -43,24 +61,36 @@ export const createGear = async (payload: {
   status: string;
   notes?: string;
 }) => {
-  const { data, error } = await supabase
-    .from("gear")
-    .insert({
-      tenant_id: payload.tenant_id,
-      name: payload.name,
-      barcode: payload.barcode,
-      serial_number: payload.serial_number ?? null,
-      status: payload.status,
-      notes: payload.notes ?? null,
-    })
-    .select("id, tenant_id, name, barcode, serial_number, status, notes")
-    .single();
-
-  if (error) {
-    throw new Error("Unable to create gear.");
+  const { data: sessionData } = await supabase.auth.getSession();
+  const session = sessionData.session ?? null;
+  if (!session?.access_token) {
+    throw new Error("Unauthorized.");
   }
 
-  return data as GearItem;
+  const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
+  const { data, error } = await supabase.functions.invoke("admin-gear-mutate", {
+    body: {
+      action: "create",
+      payload: {
+        tenant_id: payload.tenant_id,
+        name: payload.name,
+        barcode: payload.barcode,
+        serial_number: payload.serial_number ?? null,
+        status: payload.status,
+        notes: payload.notes ?? null,
+      },
+    },
+    headers: {
+      Authorization: `Bearer ${session.access_token}`,
+      apikey: anonKey ?? "",
+    },
+  });
+
+  if (error) {
+    throw new Error(await getFunctionErrorMessage(error, "Unable to create gear."));
+  }
+
+  return (data as { data: GearItem }).data;
 };
 
 export const updateGear = async (payload: {
@@ -70,29 +100,58 @@ export const updateGear = async (payload: {
   status: string;
   notes?: string;
 }) => {
-  const { data, error } = await supabase
-    .from("gear")
-    .update({
-      name: payload.name,
-      barcode: payload.barcode,
-      status: payload.status,
-      notes: payload.notes ?? null,
-    })
-    .eq("id", payload.id)
-    .select("id, tenant_id, name, barcode, serial_number, status, notes")
-    .single();
-
-  if (error) {
-    throw new Error("Unable to update gear.");
+  const { data: sessionData } = await supabase.auth.getSession();
+  const session = sessionData.session ?? null;
+  if (!session?.access_token) {
+    throw new Error("Unauthorized.");
   }
 
-  return data as GearItem;
+  const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
+  const { data, error } = await supabase.functions.invoke("admin-gear-mutate", {
+    body: {
+      action: "update",
+      payload: {
+        id: payload.id,
+        name: payload.name,
+        barcode: payload.barcode,
+        status: payload.status,
+        notes: payload.notes ?? null,
+      },
+    },
+    headers: {
+      Authorization: `Bearer ${session.access_token}`,
+      apikey: anonKey ?? "",
+    },
+  });
+
+  if (error) {
+    throw new Error(await getFunctionErrorMessage(error, "Unable to update gear."));
+  }
+
+  return (data as { data: GearItem }).data;
 };
 
 export const deleteGear = async (id: string) => {
-  const { error } = await supabase.from("gear").delete().eq("id", id);
+  const { data: sessionData } = await supabase.auth.getSession();
+  const session = sessionData.session ?? null;
+  if (!session?.access_token) {
+    throw new Error("Unauthorized.");
+  }
+
+  const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
+  const { error } = await supabase.functions.invoke("admin-gear-mutate", {
+    body: {
+      action: "delete",
+      payload: { id },
+    },
+    headers: {
+      Authorization: `Bearer ${session.access_token}`,
+      apikey: anonKey ?? "",
+    },
+  });
+
   if (error) {
-    throw new Error("Unable to remove gear.");
+    throw new Error(await getFunctionErrorMessage(error, "Unable to remove gear."));
   }
 };
 

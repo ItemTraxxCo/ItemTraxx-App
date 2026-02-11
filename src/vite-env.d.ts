@@ -8,6 +8,8 @@ interface ImportMetaEnv {
   readonly VITE_LOGO_URL?: string;
   readonly VITE_TERMS_URL?: string;
   readonly VITE_PRIVACY_URL?: string;
+  readonly VITE_GIT_COMMIT?: string;
+  readonly VITE_STATUS_FUNCTION?: string;
 }
 
 interface ImportMeta {

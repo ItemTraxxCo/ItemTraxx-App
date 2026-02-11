@@ -2,7 +2,7 @@
   <div class="page">
     <h1>Gear Management</h1>
     <p>Add and manage gear.</p>
-    <p3> Ability to export gear data to PDF and CSV coming soon.</p3>
+    <p class="muted">Ability to export gear data to PDF and CSV coming soon.</p>
 
     <div class="card">
       <h2>Add Gear</h2>
@@ -27,6 +27,10 @@
       </form>
       <p v-if="error" class="error">{{ error }}</p>
       <p v-if="success" class="success">{{ success }}</p>
+    </div>
+    <div v-if="toastMessage" class="toast">
+      <div class="toast-title">{{ toastTitle }}</div>
+      <div class="toast-body">{{ toastMessage }}</div>
     </div>
 
     <div class="card">
@@ -143,6 +147,8 @@ const isLoading = ref(false);
 const isSaving = ref(false);
 const error = ref("");
 const success = ref("");
+const toastTitle = ref("");
+const toastMessage = ref("");
 
 const name = ref("");
 const barcode = ref("");
@@ -159,8 +165,36 @@ const statusOptions = [
 const editingId = ref<string | null>(null);
 const editName = ref("");
 const editBarcode = ref("");
-const editStatus = ref(statusOptions[0]);
+const editStatus = ref(statusOptions[0] ?? "available");
 const editNotes = ref("");
+let toastTimer: number | null = null;
+
+const showToast = (title: string, message: string) => {
+  toastTitle.value = title;
+  toastMessage.value = message;
+  if (toastTimer) {
+    window.clearTimeout(toastTimer);
+  }
+  toastTimer = window.setTimeout(() => {
+    toastTitle.value = "";
+    toastMessage.value = "";
+    toastTimer = null;
+  }, 4000);
+};
+
+const showDuplicateBarcodeToast = () => {
+  showToast(
+    "Unable to add item.",
+    "Check barcode and make sure it does not match another item's barcode."
+  );
+};
+
+const showInputLimitToast = () => {
+  showToast(
+    "Input limit reached.",
+    "One or more fields are too long. Shorten the item details and try again."
+  );
+};
 
 const loadGear = async () => {
   isLoading.value = true;
@@ -195,10 +229,19 @@ const handleCreate = async () => {
 
   if (inputError) {
     error.value = inputError;
+    showInputLimitToast();
     return;
   }
   if (!name.value.trim() || !barcode.value.trim()) {
     error.value = "Name and barcode are required.";
+    return;
+  }
+  const normalizedBarcode = barcode.value.trim().toLowerCase();
+  const isDuplicateBarcode = gear.value.some(
+    (item) => item.barcode.trim().toLowerCase() === normalizedBarcode
+  );
+  if (isDuplicateBarcode) {
+    showDuplicateBarcodeToast();
     return;
   }
 
@@ -233,6 +276,15 @@ const handleCreate = async () => {
     success.value = "Gear added.";
   } catch (err) {
     error.value = err instanceof Error ? err.message : "Unable to create gear.";
+    const message = err instanceof Error ? err.message.toLowerCase() : "";
+    if (message.includes("duplicate") || message.includes("already")) {
+      showDuplicateBarcodeToast();
+    } else if (
+      message.includes("invalid request") ||
+      message.includes("characters or less")
+    ) {
+      showInputLimitToast();
+    }
   } finally {
     isSaving.value = false;
   }
@@ -250,7 +302,7 @@ const cancelEdit = () => {
   editingId.value = null;
   editName.value = "";
   editBarcode.value = "";
-  editStatus.value = statusOptions[0];
+  editStatus.value = statusOptions[0] ?? "available";
   editNotes.value = "";
 };
 
@@ -270,6 +322,7 @@ const saveEdit = async (id: string) => {
 
   if (inputError) {
     error.value = inputError;
+    showInputLimitToast();
     return;
   }
   if (!editName.value.trim() || !editBarcode.value.trim()) {
@@ -297,6 +350,13 @@ const saveEdit = async (id: string) => {
     cancelEdit();
   } catch (err) {
     error.value = err instanceof Error ? err.message : "Unable to update gear.";
+    const message = err instanceof Error ? err.message.toLowerCase() : "";
+    if (
+      message.includes("invalid request") ||
+      message.includes("characters or less")
+    ) {
+      showInputLimitToast();
+    }
   } finally {
     isSaving.value = false;
   }

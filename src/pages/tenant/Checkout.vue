@@ -1,7 +1,15 @@
 <template>
   <div class="page">
     <div class="page-header">
-      <h1>ItemTraxx</h1>
+      <h1 class="brand-title">
+        <img
+          v-if="logoUrl"
+          class="brand-logo"
+          :src="logoUrl"
+          alt="ItemTraxx logo"
+        />
+        ItemTraxx
+      </h1>
     </div>
     <p>Student checkout and return</p>
     <div class="card">
@@ -125,6 +133,7 @@ const lastSummary = ref("");
 const toastMessage = ref("");
 const toastStatus = ref<"Success" | "Failed">("Success");
 const barcodeField = ref<HTMLInputElement | null>(null);
+const logoUrl = import.meta.env.VITE_LOGO_URL as string | undefined;
 
 
 const loadStudent = async () => {

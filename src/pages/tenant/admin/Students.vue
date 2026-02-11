@@ -26,6 +26,10 @@
       <p v-if="error" class="error">{{ error }}</p>
       <p v-if="success" class="success">{{ success }}</p>
     </div>
+    <div v-if="toastMessage" class="toast">
+      <div class="toast-title">{{ toastTitle }}</div>
+      <div class="toast-body">{{ toastMessage }}</div>
+    </div>
 
     <div class="card">
       <h2>Students</h2>
@@ -138,10 +142,40 @@ const showDetails = ref(false);
 const detailsLoading = ref(false);
 const details = ref<StudentDetails | null>(null);
 const selected = ref<StudentItem | null>(null);
+const toastTitle = ref("");
+const toastMessage = ref("");
 
 const firstName = ref("");
 const lastName = ref("");
 const studentId = ref("");
+let toastTimer: number | null = null;
+
+const showToast = (title: string, message: string) => {
+  toastTitle.value = title;
+  toastMessage.value = message;
+  if (toastTimer) {
+    window.clearTimeout(toastTimer);
+  }
+  toastTimer = window.setTimeout(() => {
+    toastTitle.value = "";
+    toastMessage.value = "";
+    toastTimer = null;
+  }, 4000);
+};
+
+const showDuplicateStudentToast = () => {
+  showToast(
+    "Unable to add student.",
+    "Check student ID number and make sure it does not match another student's ID number."
+  );
+};
+
+const showInputLimitToast = () => {
+  showToast(
+    "Input limit reached.",
+    "One or more fields are too long. Shorten the student details and try again."
+  );
+};
 
 const loadStudents = async () => {
   isLoading.value = true;
@@ -171,10 +205,19 @@ const handleCreate = async () => {
     firstSanitized.error || lastSanitized.error || studentSanitized.error;
   if (inputError) {
     error.value = inputError;
+    showInputLimitToast();
     return;
   }
   if (!firstName.value.trim() || !lastName.value.trim() || !studentId.value.trim()) {
     error.value = "First name, last name, and student ID are required.";
+    return;
+  }
+  const normalizedStudentId = studentId.value.trim().toLowerCase();
+  const isDuplicateStudentId = students.value.some(
+    (item) => item.student_id.trim().toLowerCase() === normalizedStudentId
+  );
+  if (isDuplicateStudentId) {
+    showDuplicateStudentToast();
     return;
   }
 
@@ -206,6 +249,15 @@ const handleCreate = async () => {
     success.value = "Student added.";
   } catch (err) {
     error.value = err instanceof Error ? err.message : "Unable to create student.";
+    const message = err instanceof Error ? err.message.toLowerCase() : "";
+    if (message.includes("duplicate") || message.includes("already")) {
+      showDuplicateStudentToast();
+    } else if (
+      message.includes("invalid request") ||
+      message.includes("characters or less")
+    ) {
+      showInputLimitToast();
+    }
   } finally {
     isSaving.value = false;
   }

@@ -3,7 +3,7 @@ import { supabase } from "./supabaseClient";
 type CheckoutReturnPayload = {
   student_id: string;
   gear_barcodes: string[];
-  action_type: "checkout" | "return" | "auto";
+  action_type: "checkout" | "return" | "auto" | "admin_return";
 };
 
 export const submitCheckoutReturn = async (

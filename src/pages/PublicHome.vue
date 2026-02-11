@@ -46,11 +46,15 @@
       <div class="toast-title">Loading...</div>
       <div class="toast-body">Signing you in.</div>
     </div>
+    <div v-if="toastMessage" class="toast">
+      <div class="toast-title">Limit reached.</div>
+      <div class="toast-body">{{ toastMessage }}</div>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref } from "vue";
+import { onUnmounted, ref } from "vue";
 import { useRouter } from "vue-router";
 import { tenantLogin } from "../services/authService";
 
@@ -59,6 +63,7 @@ const accessCode = ref("");
 const password = ref("");
 const error = ref("");
 const isLoading = ref(false);
+const toastMessage = ref("");
 const superAdminAccessCode = import.meta.env
   .VITE_SUPER_ADMIN_ACCESS_CODE as string | undefined;
 const logoUrl = import.meta.env.VITE_LOGO_URL as string | undefined;
@@ -68,6 +73,19 @@ const termsUrl =
 const privacyUrl =
   import.meta.env.VITE_PRIVACY_URL ||
   "https://github.com/ItemTraxxCo/ItemTraxx-App/blob/main/PRIVACY.md";
+let toastTimer: number | null = null;
+
+const showLimiterUnavailableToast = () => {
+  toastMessage.value =
+    "Login unavailable. Please try again later.";
+  if (toastTimer) {
+    window.clearTimeout(toastTimer);
+  }
+  toastTimer = window.setTimeout(() => {
+    toastMessage.value = "";
+    toastTimer = null;
+  }, 4000);
+};
 
 const handleTenantLogin = async () => {
   error.value = "";
@@ -83,9 +101,21 @@ const handleTenantLogin = async () => {
     await tenantLogin(accessCode.value.trim(), password.value);
     await router.push("/tenant/checkout");
   } catch (err) {
+    if (err instanceof Error && err.message === "LIMITER_UNAVAILABLE") {
+      error.value = "";
+      showLimiterUnavailableToast();
+      return;
+    }
     error.value = err instanceof Error ? err.message : "Sign in failed.";
   } finally {
     isLoading.value = false;
   }
 };
+
+onUnmounted(() => {
+  if (toastTimer) {
+    window.clearTimeout(toastTimer);
+    toastTimer = null;
+  }
+});
 </script>

@@ -96,7 +96,29 @@ export const tenantLogin = async (accessCode: string, password: string) => {
       : undefined,
   });
 
-  if (error || !data?.auth_email) {
+  if (error) {
+    const context = (error as { context?: Response }).context;
+    if (context) {
+      const status = context.status;
+      let apiError = "";
+      try {
+        const parsed = (await context.json()) as
+          | { error?: string; message?: string }
+          | null;
+        apiError = parsed?.error ?? parsed?.message ?? "";
+      } catch {
+        apiError = "";
+      }
+
+      if (status === 503 && apiError === "Rate limit check failed") {
+        throw new Error("LIMITER_UNAVAILABLE");
+      }
+    }
+
+    throw new Error("Invalid tenant access code.");
+  }
+
+  if (!data?.auth_email) {
     throw new Error("Invalid tenant access code.");
   }
 

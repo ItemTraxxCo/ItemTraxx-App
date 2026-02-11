@@ -286,6 +286,29 @@ textarea {
   justify-content: center;
 }
 
+.menu-button-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.menu-alert {
+  position: absolute;
+  right: 44px;
+  top: -4px;
+  width: 16px;
+  height: 16px;
+  border-radius: 999px;
+  background: #f5b700;
+  color: #000000;
+  font-size: 0.7rem;
+  font-weight: 800;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(0, 0, 0, 0.3);
+}
+
 .menu-icon {
   display: inline-flex;
   flex-direction: column;
@@ -330,6 +353,43 @@ textarea {
 
 .menu-item.danger {
   color: #d83a3a;
+}
+
+.status-warning {
+  color: #b88300;
+  font-size: 0.8rem;
+  line-height: 1.25;
+  padding-top: 0.3rem;
+}
+
+.menu-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.status-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 999px;
+  display: inline-block;
+  border: 1px solid rgba(0, 0, 0, 0.2);
+}
+
+.status-ok {
+  background: #17a34a;
+}
+
+.status-warn {
+  background: #d97706;
+}
+
+.status-down {
+  background: #dc2626;
+}
+
+.status-unknown {
+  background: #6b7280;
 }
 
 .input-row {

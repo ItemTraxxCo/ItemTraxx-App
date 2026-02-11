@@ -14,6 +14,24 @@ export type StudentDetails = {
   lastReturn: { action_time: string; gear_name: string | null } | null;
 };
 
+const getFunctionErrorMessage = async (
+  error: unknown,
+  fallback: string
+) => {
+  const context = (error as { context?: Response })?.context;
+  if (!context) {
+    return fallback;
+  }
+  try {
+    const payload = (await context.json()) as
+      | { error?: string; message?: string }
+      | null;
+    return payload?.error || payload?.message || fallback;
+  } catch {
+    return fallback;
+  }
+};
+
 export const fetchStudents = async () => {
   const { data, error } = await supabase
     .from("students")
@@ -33,28 +51,62 @@ export const createStudent = async (payload: {
   last_name: string;
   student_id: string;
 }) => {
-  const { data, error } = await supabase
-    .from("students")
-    .insert({
-      tenant_id: payload.tenant_id,
-      first_name: payload.first_name,
-      last_name: payload.last_name,
-      student_id: payload.student_id,
-    })
-    .select("id, tenant_id, first_name, last_name, student_id")
-    .single();
-
-  if (error) {
-    throw new Error("Unable to create student.");
+  const { data: sessionData } = await supabase.auth.getSession();
+  const session = sessionData.session ?? null;
+  if (!session?.access_token) {
+    throw new Error("Unauthorized.");
   }
 
-  return data as StudentItem;
+  const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
+  const { data, error } = await supabase.functions.invoke(
+    "admin-student-mutate",
+    {
+      body: {
+        action: "create",
+        payload: {
+          tenant_id: payload.tenant_id,
+          first_name: payload.first_name,
+          last_name: payload.last_name,
+          student_id: payload.student_id,
+        },
+      },
+      headers: {
+        Authorization: `Bearer ${session.access_token}`,
+        apikey: anonKey ?? "",
+      },
+    }
+  );
+
+  if (error) {
+    throw new Error(
+      await getFunctionErrorMessage(error, "Unable to create student.")
+    );
+  }
+
+  return (data as { data: StudentItem }).data;
 };
 
 export const deleteStudent = async (id: string) => {
-  const { error } = await supabase.from("students").delete().eq("id", id);
+  const { data: sessionData } = await supabase.auth.getSession();
+  const session = sessionData.session ?? null;
+  if (!session?.access_token) {
+    throw new Error("Unauthorized.");
+  }
+
+  const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
+  const { error } = await supabase.functions.invoke("admin-student-mutate", {
+    body: {
+      action: "delete",
+      payload: { id },
+    },
+    headers: {
+      Authorization: `Bearer ${session.access_token}`,
+      apikey: anonKey ?? "",
+    },
+  });
+
   if (error) {
-    throw new Error("Unable to remove student.");
+    throw new Error(await getFunctionErrorMessage(error, "Unable to remove student."));
   }
 };
 

@@ -45,7 +45,7 @@ serve(async (req) => {
     if (!originAllowed) {
       return new Response("Origin not allowed", { status: 403, headers });
     }
-    return new Response(null, { headers });
+    return new Response("ok", { headers });
   }
 
   if (hasOrigin && !originAllowed) {
@@ -80,27 +80,21 @@ serve(async (req) => {
       return jsonResponse(401, { error: "Unauthorized" });
     }
 
-    const { data: callerProfile, error: profileError } = await userClient
+    const { data: profile, error: profileError } = await userClient
       .from("profiles")
       .select("tenant_id, role")
       .eq("id", user.id)
       .single();
 
-    const callerRole = callerProfile?.role;
-    if (
-      profileError ||
-      !callerProfile?.tenant_id ||
-      !callerRole ||
-      !["tenant_user", "tenant_admin"].includes(callerRole)
-    ) {
+    if (profileError || !profile?.tenant_id || profile.role !== "tenant_admin") {
       return jsonResponse(403, { error: "Access denied" });
     }
 
     const { data: rateLimit, error: rateLimitError } = await userClient.rpc(
       "consume_rate_limit",
       {
-        p_scope: "tenant",
-        p_limit: 10,
+        p_scope: "admin",
+        p_limit: 20,
         p_window_seconds: 60,
       }
     );
@@ -116,113 +110,73 @@ serve(async (req) => {
       });
     }
 
-    const { student_id, gear_barcodes, action_type } = await req.json();
-    if (!Array.isArray(gear_barcodes) || gear_barcodes.length === 0 || gear_barcodes.length > 100) {
+    const { action, payload } = await req.json();
+    if (typeof action !== "string" || typeof payload !== "object" || !payload) {
       return jsonResponse(400, { error: "Invalid request" });
-    }
-
-    if (!["checkout", "return", "auto", "admin_return"].includes(action_type)) {
-      return jsonResponse(400, { error: "Invalid action type" });
-    }
-
-    const isAdminReturn = action_type === "admin_return";
-    if (isAdminReturn && callerRole !== "tenant_admin") {
-      return jsonResponse(403, { error: "Access denied" });
     }
 
     const adminClient = createClient(supabaseUrl, serviceKey, {
       auth: { persistSession: false },
     });
 
-    let student: { id: string; tenant_id: string } | null = null;
-
-    if (!isAdminReturn) {
-      if (typeof student_id !== "string" || !student_id.trim()) {
+    if (action === "create") {
+      const { first_name, last_name, student_id } = payload as Record<string, unknown>;
+      const normalizedFirstName =
+        typeof first_name === "string" ? first_name.trim() : "";
+      const normalizedLastName = typeof last_name === "string" ? last_name.trim() : "";
+      const normalizedStudentId =
+        typeof student_id === "string" ? student_id.trim() : "";
+      if (
+        !normalizedFirstName ||
+        normalizedFirstName.length > 80 ||
+        !normalizedLastName ||
+        normalizedLastName.length > 80 ||
+        !normalizedStudentId ||
+        normalizedStudentId.length > 32
+      ) {
         return jsonResponse(400, { error: "Invalid request" });
       }
 
-      const { data: studentData, error: studentError } = await adminClient
+      const { data, error } = await adminClient
         .from("students")
-        .select("id, tenant_id")
-        .eq("student_id", student_id.trim())
-        .eq("tenant_id", callerProfile.tenant_id)
-        .single();
-
-      if (studentError || !studentData?.id || !studentData.tenant_id) {
-        return jsonResponse(404, { error: "Student not found." });
-      }
-
-      student = studentData;
-    }
-
-    let processed = 0;
-
-    for (const rawBarcode of gear_barcodes) {
-      if (typeof rawBarcode !== "string") continue;
-      const barcode = rawBarcode.trim();
-      if (!barcode || barcode.length > 64) continue;
-
-      const { data: gear } = await adminClient
-        .from("gear")
-        .select("id, tenant_id, checked_out_by")
-        .eq("barcode", barcode)
-        .eq("tenant_id", callerProfile.tenant_id)
-        .single();
-
-      if (!gear) continue;
-
-      if (isAdminReturn) {
-        if (!gear.checked_out_by) continue;
-
-        await adminClient
-          .from("gear")
-          .update({
-            checked_out_by: null,
-            checked_out_at: null,
-            status: "available",
-          })
-          .eq("id", gear.id)
-          .eq("tenant_id", callerProfile.tenant_id);
-
-        await adminClient.from("gear_logs").insert({
-          gear_id: gear.id,
-          action_type: "admin_return",
-          checked_out_by: gear.checked_out_by,
-          tenant_id: callerProfile.tenant_id,
-        });
-
-        processed += 1;
-        continue;
-      }
-
-      const isCheckout = !gear.checked_out_by;
-      const isReturn = gear.checked_out_by === student!.id;
-
-      if (!isCheckout && !isReturn) continue;
-
-      await adminClient
-        .from("gear")
-        .update({
-          checked_out_by: isCheckout ? student!.id : null,
-          checked_out_at: isCheckout ? new Date().toISOString() : null,
-          status: isCheckout ? "checked_out" : "available",
+        .insert({
+          tenant_id: profile.tenant_id,
+          first_name: normalizedFirstName,
+          last_name: normalizedLastName,
+          student_id: normalizedStudentId,
         })
-        .eq("id", gear.id)
-        .eq("tenant_id", callerProfile.tenant_id);
+        .select("id, tenant_id, first_name, last_name, student_id")
+        .single();
 
-      await adminClient.from("gear_logs").insert({
-        gear_id: gear.id,
-        action_type: isCheckout ? "checkout" : "return",
-        checked_out_by: student!.id,
-        tenant_id: callerProfile.tenant_id,
-      });
+      if (error || !data) {
+        return jsonResponse(400, { error: "Unable to create student." });
+      }
 
-      processed += 1;
+      return jsonResponse(200, { data });
     }
 
-    return jsonResponse(200, { success: true, processed });
+    if (action === "delete") {
+      const { id } = payload as Record<string, unknown>;
+      if (typeof id !== "string" || !id.trim()) {
+        return jsonResponse(400, { error: "Invalid request" });
+      }
+
+      const { error } = await adminClient
+        .from("students")
+        .delete()
+        .eq("id", id)
+        .eq("tenant_id", profile.tenant_id);
+
+      if (error) {
+        return jsonResponse(400, { error: "Unable to remove student." });
+      }
+
+      return jsonResponse(200, { success: true });
+    }
+
+    return jsonResponse(400, { error: "Invalid action" });
   } catch (error) {
-    console.error("checkoutReturn function error", {
+    console.error("admin-student-mutate function error", {
       message: error instanceof Error ? error.message : "Unknown error",
       stack: error instanceof Error ? error.stack : undefined,
     });

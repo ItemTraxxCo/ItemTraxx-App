@@ -2,7 +2,7 @@
   <div class="page">
     <h1>Gear Logs</h1>
     <p>View checkout and return history.</p>
-        <p3> Ability to export logs data to PDF and CSV coming soon.</p3>
+    <p class="muted">Ability to export logs data to PDF and CSV coming soon.</p>
 
     <div class="card">
       <p v-if="isLoading" class="muted">Loading logs...</p>

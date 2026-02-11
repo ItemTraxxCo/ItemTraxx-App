@@ -2,7 +2,7 @@
   <div class="page">
     <h1>Student Management</h1>
     <p>Add students and view details.</p>
-        <p3> Ability to export student data to PDF and CSV coming soon.</p3>
+    <p class="muted">Ability to export student data to PDF and CSV coming soon.</p>
 
     <div class="card">
       <h2>Add Student</h2>

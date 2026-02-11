@@ -2,8 +2,9 @@
   <div class="page">
     <h1 class="brand-title">
       <img
+        v-if="logoUrl"
         class="brand-logo"
-        src="https://mlaspkufocikfcbjgpof.supabase.co/storage/v1/object/public/assets/ItemTraxx_m_Logo.png"
+        :src="logoUrl"
         alt="ItemTraxx logo"
       />
       ItemTraxx
@@ -13,18 +14,26 @@
       <form class="form" @submit.prevent="handleTenantLogin">
         <label>
           Access Code
-          <input v-model="accessCode" type="text" placeholder="Enter access code" />
+          <input
+            v-model="accessCode"
+            type="text"
+            placeholder="Enter access code"
+            autocomplete="off"
+            autocapitalize="off"
+            autocorrect="off"
+            spellcheck="false"
+          />
         </label>
         <label>
           Password
           <input v-model="password" type="password" placeholder="Enter password" />
         </label>
         <p class="muted support-note">
-          Trouble signing in? Contact support at, support@itemtraxx.com.
+          Trouble signing in? Contact support at support@itemtraxx.com.
           By using this software, you agree to our
-          <a href="https://github.com/ItemTraxxCo/ItemTraxx-App/blob/0f72d932d351748df43e6691d8b1449a429ac217/TERMS.md" target="_blank" rel="noreferrer">terms and conditions</a>
+          <a :href="termsUrl" target="_blank" rel="noreferrer">terms and conditions</a>
           and
-          <a href="https://github.com/ItemTraxxCo/ItemTraxx-App/blob/0f72d932d351748df43e6691d8b1449a429ac217/PRIVACY.md" target="_blank" rel="noreferrer">privacy policy</a>.
+          <a :href="privacyUrl" target="_blank" rel="noreferrer">privacy policy</a>.
         </p>
         <div class="form-actions">
           <button type="submit" :disabled="isLoading">Sign in</button>
@@ -52,6 +61,13 @@ const error = ref("");
 const isLoading = ref(false);
 const superAdminAccessCode = import.meta.env
   .VITE_SUPER_ADMIN_ACCESS_CODE as string | undefined;
+const logoUrl = import.meta.env.VITE_LOGO_URL as string | undefined;
+const termsUrl =
+  import.meta.env.VITE_TERMS_URL ||
+  "https://github.com/ItemTraxxCo/ItemTraxx-App/blob/main/TERMS.md";
+const privacyUrl =
+  import.meta.env.VITE_PRIVACY_URL ||
+  "https://github.com/ItemTraxxCo/ItemTraxx-App/blob/main/PRIVACY.md";
 
 const handleTenantLogin = async () => {
   error.value = "";

@@ -22,6 +22,15 @@ export type GearLog = {
   student: { first_name: string; last_name: string; student_id: string } | null;
 };
 
+type MaybeRelation<T> = T | T[] | null;
+
+const pickRelation = <T>(value: MaybeRelation<T>): T | null => {
+  if (Array.isArray(value)) {
+    return value[0] ?? null;
+  }
+  return value ?? null;
+};
+
 const getFunctionErrorMessage = async (
   error: unknown,
   fallback: string
@@ -178,5 +187,31 @@ export const fetchGearLogs = async () => {
     throw new Error("Unable to load gear logs.");
   }
 
-  return (data ?? []) as GearLog[];
+  const rows = (data ?? []) as Array<{
+    id: string;
+    tenant_id: string;
+    gear_id: string;
+    checked_out_by: string | null;
+    action_type: string;
+    action_time: string;
+    performed_by: string | null;
+    gear: MaybeRelation<{ name: string; barcode: string }>;
+    student: MaybeRelation<{
+      first_name: string;
+      last_name: string;
+      student_id: string;
+    }>;
+  }>;
+
+  return rows.map((row) => ({
+    id: row.id,
+    tenant_id: row.tenant_id,
+    gear_id: row.gear_id,
+    checked_out_by: row.checked_out_by,
+    action_type: row.action_type,
+    action_time: row.action_time,
+    performed_by: row.performed_by,
+    gear: pickRelation(row.gear),
+    student: pickRelation(row.student),
+  }));
 };

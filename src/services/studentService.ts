@@ -14,6 +14,15 @@ export type StudentDetails = {
   lastReturn: { action_time: string; gear_name: string | null } | null;
 };
 
+type MaybeRelation<T> = T | T[] | null;
+
+const pickRelation = <T>(value: MaybeRelation<T>): T | null => {
+  if (Array.isArray(value)) {
+    return value[0] ?? null;
+  }
+  return value ?? null;
+};
+
 const getFunctionErrorMessage = async (
   error: unknown,
   fallback: string
@@ -144,17 +153,23 @@ export const fetchStudentDetails = async (studentUuid: string) => {
     throw new Error("Unable to load student details.");
   }
 
-  const lastCheckout = lastCheckoutData?.[0]
+  const checkoutRow = (lastCheckoutData?.[0] ?? null) as
+    | { action_time: string; gear: MaybeRelation<{ name: string }> }
+    | null;
+  const lastCheckout = checkoutRow
     ? {
-        action_time: lastCheckoutData[0].action_time,
-        gear_name: lastCheckoutData[0].gear?.name ?? null,
+        action_time: checkoutRow.action_time,
+        gear_name: pickRelation(checkoutRow.gear)?.name ?? null,
       }
     : null;
 
-  const lastReturn = lastReturnData?.[0]
+  const returnRow = (lastReturnData?.[0] ?? null) as
+    | { action_time: string; gear: MaybeRelation<{ name: string }> }
+    | null;
+  const lastReturn = returnRow
     ? {
-        action_time: lastReturnData[0].action_time,
-        gear_name: lastReturnData[0].gear?.name ?? null,
+        action_time: returnRow.action_time,
+        gear_name: pickRelation(returnRow.gear)?.name ?? null,
       }
     : null;
 

@@ -2,7 +2,7 @@
   <div class="page">
     <h1>User Admins</h1>
     <p>Create user admin accounts for this user.</p>
-        <p3> Ability to export user admin data to PDF and CSV coming soon.</p3>
+    <p class="muted">Ability to export user admin data to PDF and CSV coming soon.</p>
 
 
     <div class="card">
@@ -187,7 +187,7 @@ const handleCreate = async () => {
     await logAdminAction({
       action_type: "create_admin",
       entity_type: "tenant_admin",
-      entity_id: result?.user_id ?? null,
+      entity_id: result?.user_id ?? undefined,
       metadata: {
         email: sanitizedEmail.value,
       },

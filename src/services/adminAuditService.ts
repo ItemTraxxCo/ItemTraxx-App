@@ -12,7 +12,12 @@ export type AdminAuditLog = {
   actor_profile?: { auth_email: string | null } | null;
 };
 
-export const fetchAdminAuditLogs = async () => {
+type ActorProfileRow = {
+  id: string;
+  auth_email: string | null;
+};
+
+export const fetchAdminAuditLogs = async (): Promise<AdminAuditLog[]> => {
   const { data, error } = await supabase
     .from("admin_audit_logs")
     .select(
@@ -48,8 +53,9 @@ export const fetchAdminAuditLogs = async () => {
     return logs;
   }
 
-  const emailById = new Map(
-    (profiles ?? []).map((row) => [row.id, row.auth_email])
+  const profileRows = (profiles ?? []) as ActorProfileRow[];
+  const emailById = new Map<string, string | null>(
+    profileRows.map((row) => [row.id, row.auth_email])
   );
 
   return logs.map((log) => ({

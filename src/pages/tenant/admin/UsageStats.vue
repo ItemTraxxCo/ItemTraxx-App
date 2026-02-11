@@ -2,7 +2,7 @@
   <div class="page">
     <h1>Usage Statistics</h1>
     <p>Recent activity and inventory summary.</p>
-        <p3> Ability to export usage data to PDF and CSV coming soon.</p3>
+    <p class="muted">Ability to export usage data to PDF and CSV coming soon.</p>
 
     <div class="card">
       <p v-if="isLoading" class="muted">Loading statistics...</p>

@@ -2,7 +2,7 @@
   <div class="page">
     <h1>Admin Audit Logs</h1>
     <p>Track admin actions.</p>
-        <p3> Ability to export admin audit logs data to PDF and CSV coming soon.</p3>
+    <p class="muted">Ability to export admin audit logs data to PDF and CSV coming soon.</p>
 
     <div class="card">
       <p v-if="isLoading" class="muted">Loading logs...</p>

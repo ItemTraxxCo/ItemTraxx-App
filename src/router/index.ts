@@ -2,6 +2,8 @@ import { createRouter, createWebHistory } from "vue-router";
 import type { RouteRecordRaw } from "vue-router";
 import { getAuthState } from "../store/authState";
 
+const ADMIN_VERIFICATION_TTL_MS = 15 * 60 * 1000;
+
 const routes: RouteRecordRaw[] = [
   {
     path: "/",
@@ -164,6 +166,17 @@ const router = createRouter({
   routes,
 });
 
+const hasFreshAdminVerification = (adminVerifiedAt: string | null) => {
+  if (!adminVerifiedAt) {
+    return false;
+  }
+  const verifiedAtMs = Date.parse(adminVerifiedAt);
+  if (Number.isNaN(verifiedAtMs)) {
+    return false;
+  }
+  return Date.now() - verifiedAtMs <= ADMIN_VERIFICATION_TTL_MS;
+};
+
 router.beforeEach((to) => {
   const meta = to.meta as {
     public?: boolean;
@@ -191,6 +204,13 @@ router.beforeEach((to) => {
 
   if (meta?.requiresRole && auth.role !== meta.requiresRole) {
     return { name: "public-home" };
+  }
+
+  if (
+    meta?.requiresRole === "tenant_admin" &&
+    !hasFreshAdminVerification(auth.adminVerifiedAt)
+  ) {
+    return { name: "tenant-admin-login" };
   }
 
   if (

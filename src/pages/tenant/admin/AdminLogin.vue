@@ -29,11 +29,12 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from "vue";
+import { onMounted, ref } from "vue";
 import { RouterLink, useRouter } from "vue-router";
 import { adminLogin } from "../../../services/authService";
 import { logAdminAction } from "../../../services/auditLogService";
 import { useTurnstile } from "../../../composables/useTurnstile";
+import { clearAdminVerification } from "../../../store/authState";
 
 const router = useRouter();
 const email = ref("");
@@ -85,4 +86,8 @@ const handleAdminLogin = async () => {
     isLoading.value = false;
   }
 };
+
+onMounted(() => {
+  clearAdminVerification();
+});
 </script>

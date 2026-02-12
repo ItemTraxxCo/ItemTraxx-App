@@ -33,18 +33,30 @@
       </RouterLink>
     </div>
     <div class="admin-actions">
-      <RouterLink class="link" to="/tenant/checkout">Return to checkout</RouterLink>
+      <button type="button" class="link" @click="returnToCheckout">
+        Return to checkout
+      </button>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed } from "vue";
-import { RouterLink } from "vue-router";
-import { getAuthState } from "../../../store/authState";
+import { RouterLink, useRouter } from "vue-router";
+import {
+  clearAdminVerification,
+  getAuthState,
+} from "../../../store/authState";
 
 const adminEmail = computed(() => {
   const auth = getAuthState();
   return auth.email ?? "Admin";
 });
+
+const router = useRouter();
+
+const returnToCheckout = async () => {
+  clearAdminVerification();
+  await router.replace("/tenant/checkout");
+};
 </script>

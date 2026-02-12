@@ -14,6 +14,7 @@ export type AuthState = {
   isAdmin: boolean;
   isSuperAdmin: boolean;
   hasSecondaryAuth: boolean;
+  adminVerifiedAt: string | null;
 };
 
 const defaultState: AuthState = {
@@ -28,6 +29,7 @@ const defaultState: AuthState = {
   isAdmin: false,
   isSuperAdmin: false,
   hasSecondaryAuth: false,
+  adminVerifiedAt: null,
 };
 
 const authState = reactive<AuthState>({ ...defaultState });
@@ -47,6 +49,14 @@ export const setTenantContext = (tenantId: string | null) => {
 
 export const setSecondaryAuth = (value: boolean) => {
   authState.hasSecondaryAuth = value;
+};
+
+export const markAdminVerified = () => {
+  authState.adminVerifiedAt = new Date().toISOString();
+};
+
+export const clearAdminVerification = () => {
+  authState.adminVerifiedAt = null;
 };
 
 export const clearAuthState = (markInitialized = false) => {

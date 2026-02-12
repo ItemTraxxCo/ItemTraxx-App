@@ -1,8 +1,10 @@
 import { supabase } from "./supabaseClient";
 import { invokeEdgeFunction } from "./edgeFunctionClient";
 import {
+  clearAdminVerification,
   clearAuthState,
   getAuthState,
+  markAdminVerified,
   setAuthStateFromBackend,
   setSecondaryAuth,
   setTenantContext,
@@ -155,6 +157,7 @@ export const adminLogin = async (email: string, password: string) => {
   if (!current.tenantContextId) {
     setTenantContext(current.sessionTenantId ?? null);
   }
+  markAdminVerified();
 };
 
 export const superAdminLogin = async (email: string, password: string) => {
@@ -179,5 +182,6 @@ export const superAdminLogin = async (email: string, password: string) => {
 
 export const signOut = async () => {
   await supabase.auth.signOut();
+  clearAdminVerification();
   clearAuthState();
 };

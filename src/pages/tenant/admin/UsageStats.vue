@@ -11,7 +11,7 @@
       <p v-if="isLoading" class="muted">Loading statistics...</p>
       <div v-else class="stats-grid">
         <div class="stat-card">
-          <h3>Total gear</h3>
+          <h3>Total items</h3>
           <p class="stat-value">{{ stats?.totalGear ?? 0 }}</p>
         </div>
         <div class="stat-card">

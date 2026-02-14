@@ -78,7 +78,7 @@
                 <span class="muted">({{ gear.barcode }})</span>
               </li>
             </ul>
-            <p v-else class="muted">No gear currently checked out.</p>
+            <p v-else class="muted">No items currently checked out.</p>
           </div>
 
           <div>
@@ -165,14 +165,14 @@ const showToast = (title: string, message: string) => {
 const showDuplicateStudentToast = () => {
   showToast(
     "Unable to add student.",
-    "Check student ID number and make sure it does not match another student's ID number."
+    "Check student ID number and make sure it does not match another student's ID number. If you believe this is an error, please contact support with the student detils that you want to add"
   );
 };
 
 const showInputLimitToast = () => {
   showToast(
     "Input limit reached.",
-    "One or more fields are too long. Shorten the student details and try again."
+    "One or more fields are too long. Shorten the field that is too long and try again."
   );
 };
 
@@ -182,7 +182,7 @@ const loadStudents = async () => {
   try {
     students.value = await fetchStudents();
   } catch (err) {
-    error.value = err instanceof Error ? err.message : "Unable to load students.";
+    error.value = err instanceof Error ? err.message : "Unable to load students. Please sign out completeley and sign back in.";
   } finally {
     isLoading.value = false;
   }
@@ -222,7 +222,7 @@ const handleCreate = async () => {
 
   const auth = getAuthState();
   if (!auth.tenantContextId) {
-    error.value = "Missing tenant context.";
+    error.value = "Missing tenant context. Please sign out completeley and sign back in.";
     return;
   }
 
@@ -247,7 +247,7 @@ const handleCreate = async () => {
     studentId.value = "";
     success.value = "Student added.";
   } catch (err) {
-    error.value = err instanceof Error ? err.message : "Unable to create student.";
+    error.value = err instanceof Error ? err.message : "Unable to create student. If you belive this is an error, please contact support.";
     const message = err instanceof Error ? err.message.toLowerCase() : "";
     if (message.includes("duplicate") || message.includes("already")) {
       showDuplicateStudentToast();
@@ -276,7 +276,7 @@ const openDetails = async (item: StudentItem) => {
   try {
     details.value = await fetchStudentDetails(item.id);
   } catch (err) {
-    error.value = err instanceof Error ? err.message : "Unable to load details.";
+    error.value = err instanceof Error ? err.message : "Unable to load details. Please sign out completeley and sign back in.";
     details.value = null;
   } finally {
     detailsLoading.value = false;
@@ -301,7 +301,7 @@ const formatTime = (value: string) => {
 
 const removeStudent = async (item: StudentItem) => {
   const confirmed = window.confirm(
-    `Remove student "${item.first_name} ${item.last_name}"? This cannot be undone.`
+    `Remove student "${item.first_name} ${item.last_name}"? This action cannot be undone.`
   );
   if (!confirmed) return;
   error.value = "";
@@ -319,7 +319,7 @@ const removeStudent = async (item: StudentItem) => {
     students.value = students.value.filter((row) => row.id !== item.id);
     success.value = "Student removed.";
   } catch (err) {
-    error.value = err instanceof Error ? err.message : "Unable to remove student.";
+    error.value = err instanceof Error ? err.message : "Unable to remove student. Please sign out completeley and sign back in.";
   } finally {
     isSaving.value = false;
   }

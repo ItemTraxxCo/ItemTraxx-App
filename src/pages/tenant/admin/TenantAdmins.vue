@@ -110,7 +110,7 @@ const loadAdmins = async () => {
   try {
     admins.value = await fetchTenantAdmins();
   } catch (err) {
-    error.value = err instanceof Error ? err.message : "Unable to load tenant admins.";
+    error.value = err instanceof Error ? err.message : "Unable to load tenant admins. Please sign out completeley and sign back in.";
   } finally {
     isLoading.value = false;
   }
@@ -132,7 +132,7 @@ const handleVerify = async () => {
   try {
     const auth = getAuthState();
     if (!auth.email) {
-      throw new Error("Unable to verify admin.");
+      throw new Error("Unable to verify admin. Please check your passowrd and try again.");
     }
 
     const { error: signInError } = await supabase.auth.signInWithPassword({
@@ -141,7 +141,7 @@ const handleVerify = async () => {
     });
 
     if (signInError) {
-      throw new Error("Invalid credentials.");
+      throw new Error("Invalid credentials. Please check your password and try again.");
     }
 
     await refreshAuthFromSession();
@@ -149,7 +149,7 @@ const handleVerify = async () => {
     success.value = "Password verified. You can create a new admin.";
   } catch (err) {
     isVerified.value = false;
-    error.value = err instanceof Error ? err.message : "Invalid credentials.";
+    error.value = err instanceof Error ? err.message : "Invalid credentials. Please check your password and try again.";
   } finally {
     isVerifying.value = false;
   }
@@ -171,7 +171,7 @@ const handleCreate = async () => {
   }
 
   if (!sanitizedEmail.value || !password.value) {
-    error.value = "Enter all required fields.";
+    error.value = "Please enter all required fields.";
     return;
   }
 
@@ -193,13 +193,13 @@ const handleCreate = async () => {
       },
     });
 
-    success.value = "Tenant admin created.";
+    success.value = "User admin created.";
     email.value = "";
     password.value = "";
     await loadAdmins();
   } catch (err) {
     error.value =
-      err instanceof Error ? err.message : "Unable to create admin.";
+      err instanceof Error ? err.message : "Unable to create admin. Please sign out completeley and sign back in.";
   } finally {
     isSubmitting.value = false;
   }

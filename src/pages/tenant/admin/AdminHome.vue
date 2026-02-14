@@ -9,8 +9,8 @@
       <p>Welcome, {{ adminEmail }}</p>
     <div class="admin-grid">
       <RouterLink class="admin-card" to="/tenant/admin/gear">
-        <h2>Gear Management</h2>
-        <p>Manage inventory, barcodes, and status.</p>
+        <h2>Item Management</h2>
+        <p>Manage items, barcodes, and status.</p>
       </RouterLink>
       <RouterLink class="admin-card" to="/tenant/admin/students">
         <h2>Student Management</h2>
@@ -18,11 +18,11 @@
       </RouterLink>
       <RouterLink class="admin-card" to="/tenant/admin/logs">
         <h2>Gear Logs</h2>
-        <p>Audit checkout and return activity.</p>
+        <p>View checkout and return activity.</p>
       </RouterLink>
       <RouterLink class="admin-card" to="/tenant/admin/return">
         <h2>Quick Return</h2>
-        <p>Quick return items without student a barcode.</p>
+        <p>Quick return items without student a id.</p>
       </RouterLink>
       <RouterLink class="admin-card" to="/tenant/admin/stats">
         <h2>Usage Stats</h2>
@@ -30,7 +30,7 @@
       </RouterLink>
       <RouterLink class="admin-card" to="/tenant/admin/audit-logs">
         <h2>Admin Audit Logs</h2>
-        <p>Track admin actions for this user.</p>
+        <p>Track admin actions.</p>
       </RouterLink>
       <RouterLink class="admin-card" to="/tenant/admin/admins">
         <h2>Admin management</h2>

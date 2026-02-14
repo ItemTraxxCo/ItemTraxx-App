@@ -161,7 +161,7 @@ const loadStudent = async () => {
   } catch (err) {
     student.value = null;
     checkedOutGear.value = [];
-    error.value = err instanceof Error ? err.message : "Student not found.";
+    error.value = err instanceof Error ? err.message : "Student not found. Please check the student ID and try again.";
   } finally {
     isStudentLoading.value = false;
   }
@@ -187,7 +187,7 @@ const addBarcode = async () => {
     barcodes.value = [...barcodes.value, gear];
     barcodeInput.value = "";
   } catch (err) {
-    error.value = err instanceof Error ? err.message : "Invalid barcode.";
+    error.value = err instanceof Error ? err.message : "Invalid barcode. Please check the barcode and try again.";
   } finally {
     isBarcodeLoading.value = false;
   }
@@ -223,7 +223,7 @@ const submit = async () => {
   try {
     toastStatus.value = "Processing";
     toastTitle.value = "Transaction processing...";
-    toastMessage.value = "Please wait while your transaction is submitted.";
+    toastMessage.value = "Please wait while your transaction is processed.";
 
     if (barcodeInput.value.trim()) {
       await addBarcode();
@@ -231,7 +231,7 @@ const submit = async () => {
     if (!studentId.value.trim() || barcodes.value.length === 0) {
       error.value = "Enter a student ID and at least one barcode.";
       toastStatus.value = "Failed";
-      toastTitle.value = "Transaction failed.";
+      toastTitle.value = "Transaction failed. Please try again.";
       toastMessage.value = error.value;
       return;
     }
@@ -241,7 +241,7 @@ const submit = async () => {
       if (!student.value) {
         toastStatus.value = "Failed";
         toastTitle.value = "Transaction failed.";
-        toastMessage.value = error.value || "Unable to load student.";
+        toastMessage.value = error.value || "Unable to load student. Please sign out completeley and sign back in.";
         return;
       }
     }
@@ -282,7 +282,7 @@ const submit = async () => {
   } catch (err) {
     error.value = err instanceof Error ? err.message : "Request failed.";
     toastStatus.value = "Failed";
-    toastTitle.value = "Transaction complete (Failed).";
+    toastTitle.value = "Transaction complete (Failed). Please sign out completeley and sign back in.";
     toastMessage.value = error.value;
     window.setTimeout(() => {
       toastTitle.value = "";

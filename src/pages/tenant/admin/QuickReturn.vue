@@ -123,12 +123,12 @@ const submitReturn = async () => {
         barcodes: barcodes.value.map((item) => item.barcode),
       },
     });
-    success.value = "Return completed.";
+    success.value = "Quick return completed.";
     lastSummary.value = `Processed ${barcodes.value.length} item(s).`;
     barcodes.value = [];
     barcodeInput.value = "";
   } catch (err) {
-    error.value = err instanceof Error ? err.message : "Request failed.";
+    error.value = err instanceof Error ? err.message : "Request failed. Please try again.";
   } finally {
     isSubmitting.value = false;
   }

@@ -3,7 +3,7 @@
     <div class="page-nav-left">
       <RouterLink class="button-link" to="/tenant/admin">Return to admin panel</RouterLink>
     </div>
-    <h1>Gear Logs</h1>
+    <h1>Item Logs</h1>
     <p>View checkout and return history.</p>
     <p class="muted">Ability to export logs data to PDF and CSV coming soon.</p>
 
@@ -13,7 +13,7 @@
         <input
           v-model="searchQuery"
           type="text"
-          placeholder="Search by action, student, gear name, or barcode"
+          placeholder="Search by action, student, item name, or barcode"
         />
       </label>
       <p class="muted">Showing {{ filteredLogs.length }} of {{ logs.length }} log entries.</p>
@@ -87,7 +87,7 @@ const loadLogs = async () => {
   try {
     logs.value = await fetchGearLogs();
   } catch (err) {
-    error.value = err instanceof Error ? err.message : "Unable to load logs.";
+    error.value = err instanceof Error ? err.message : "Unable to load logs. Please sign out completeley and sign back in.";
   } finally {
     isLoading.value = false;
   }

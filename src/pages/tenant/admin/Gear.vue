@@ -84,7 +84,7 @@
               <span
                 class="serial-number"
                 :class="{ dim: editingId === item.id }"
-                title="To edit the serial number, contact support@itemtraxx.com."
+                title="To edit the serial number, please contact support@itemtraxx.com with the current item serial number and what you would lke to change it to."
               >
                 {{ item.serial_number || "-" }}
               </span>
@@ -204,14 +204,14 @@ const showToast = (title: string, message: string) => {
 const showDuplicateBarcodeToast = () => {
   showToast(
     "Unable to add item.",
-    "Check barcode and make sure it does not match another item's barcode."
+    "Check barcode and make sure it does not match another item's barcode. If you belive this is an error, please contact support."
   );
 };
 
 const showInputLimitToast = () => {
   showToast(
     "Input limit reached.",
-    "One or more fields are too long. Shorten the item details and try again."
+    "One or more fields are too long. Shorten the field that is too long and try again."
   );
 };
 
@@ -221,7 +221,7 @@ const loadGear = async () => {
   try {
     gear.value = await fetchGear();
   } catch (err) {
-    error.value = err instanceof Error ? err.message : "Unable to load gear.";
+    error.value = err instanceof Error ? err.message : "Unable to load gear. Please sign out completeley and sign back in.";
   } finally {
     isLoading.value = false;
   }
@@ -252,7 +252,7 @@ const handleCreate = async () => {
     return;
   }
   if (!name.value.trim() || !barcode.value.trim()) {
-    error.value = "Name and barcode are required.";
+    error.value = "Name and barcode fields cannot be blank.";
     return;
   }
   const normalizedBarcode = barcode.value.trim().toLowerCase();
@@ -266,7 +266,7 @@ const handleCreate = async () => {
 
   const auth = getAuthState();
   if (!auth.tenantContextId) {
-    error.value = "Missing tenant context.";
+    error.value = "Missing tenant context. Please sign out completeley and sign back in.";
     return;
   }
 
@@ -292,7 +292,7 @@ const handleCreate = async () => {
     barcode.value = "";
     serialNumber.value = "";
     notes.value = "";
-    success.value = "Gear added.";
+    success.value = "Item added.";
   } catch (err) {
     error.value = err instanceof Error ? err.message : "Unable to create gear.";
     const message = err instanceof Error ? err.message.toLowerCase() : "";
@@ -345,7 +345,7 @@ const saveEdit = async (id: string) => {
     return;
   }
   if (!editName.value.trim() || !editBarcode.value.trim()) {
-    error.value = "Name and barcode are required.";
+    error.value = "Name and barcode fields cannot be blank.";
     return;
   }
   isSaving.value = true;
@@ -365,10 +365,10 @@ const saveEdit = async (id: string) => {
       metadata: { name: updated.name, barcode: updated.barcode },
     });
     gear.value = gear.value.map((item) => (item.id === id ? updated : item));
-    success.value = "Gear updated.";
+    success.value = "Item updated.";
     cancelEdit();
   } catch (err) {
-    error.value = err instanceof Error ? err.message : "Unable to update gear.";
+    error.value = err instanceof Error ? err.message : "Unable to update item.";
     const message = err instanceof Error ? err.message.toLowerCase() : "";
     if (
       message.includes("invalid request") ||
@@ -383,7 +383,7 @@ const saveEdit = async (id: string) => {
 
 const removeGear = async (item: GearItem) => {
   const confirmed = window.confirm(
-    `Remove gear "${item.name}"? This cannot be undone.`
+    `Remove item "${item.name}"? This action cannot be undone.`
   );
   if (!confirmed) return;
   error.value = "";
@@ -399,9 +399,9 @@ const removeGear = async (item: GearItem) => {
       metadata: { name: item.name, barcode: item.barcode },
     });
     gear.value = gear.value.filter((row) => row.id !== item.id);
-    success.value = "Gear removed.";
+    success.value = "Item removed.";
   } catch (err) {
-    error.value = err instanceof Error ? err.message : "Unable to remove gear.";
+    error.value = err instanceof Error ? err.message : "Unable to remove item. Please try again.";
   } finally {
     isSaving.value = false;
   }

@@ -51,7 +51,7 @@
       <div class="toast-body">Signing you in.</div>
     </div>
     <div v-if="toastMessage" class="toast">
-      <div class="toast-title">Limit reached.</div>
+      <div class="toast-title">Rate Limit reached. Please try again later.</div>
       <div class="toast-body">{{ toastMessage }}</div>
     </div>
   </div>

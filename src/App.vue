@@ -1,6 +1,6 @@
 <template>
   <div class="app-shell">
-    <div class="top-menu">
+    <div v-if="showTopMenu" class="top-menu">
       <div class="menu-button-wrap">
         <span v-if="isOutdated" class="menu-alert" aria-hidden="true">!</span>
         <button type="button" class="menu-button" @click="toggleMenu" aria-label="Open menu">
@@ -59,7 +59,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from "vue";
-import { useRouter } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
 import { Analytics } from "@vercel/analytics/vue";
 import { SpeedInsights } from "@vercel/speed-insights/vue";
 import { signOut } from "./services/authService";
@@ -68,6 +68,7 @@ import { getAuthState } from "./store/authState";
 
 const auth = getAuthState();
 const router = useRouter();
+const route = useRoute();
 const menuOpen = ref(false);
 const theme = ref<"light" | "dark">("light");
 const appVersion = import.meta.env.VITE_GIT_COMMIT || "n/a";
@@ -87,6 +88,7 @@ const GITHUB_HEAD_COMMIT_API =
 const themeLabel = computed(() =>
   theme.value === "dark" ? "Light Mode" : "Dark Mode"
 );
+const showTopMenu = computed(() => route.name !== "public-home");
 
 const applyTheme = (next: "light" | "dark") => {
   theme.value = next;

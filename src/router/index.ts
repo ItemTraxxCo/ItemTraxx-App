@@ -12,6 +12,12 @@ const routes: RouteRecordRaw[] = [
     meta: { public: true },
   },
   {
+    path: "/login",
+    name: "public-login",
+    component: () => import("../pages/Login.vue"),
+    meta: { public: true },
+  },
+  {
     path: "/tenant",
     name: "tenant-home",
     redirect: "/tenant/checkout",

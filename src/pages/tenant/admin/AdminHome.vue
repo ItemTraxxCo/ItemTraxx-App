@@ -32,10 +32,6 @@
         <h2>Admin Audit Logs</h2>
         <p>Track admin actions.</p>
       </RouterLink>
-      <RouterLink class="admin-card" to="/tenant/admin/admins">
-        <h2>Admin management</h2>
-        <p>Create and manage admin accounts for this user.</p>
-      </RouterLink>
     </div>
   </div>
 </template>

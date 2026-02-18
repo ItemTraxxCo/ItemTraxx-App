@@ -3,6 +3,7 @@ import type { RouteRecordRaw } from "vue-router";
 import { getAuthState } from "../store/authState";
 
 const ADMIN_VERIFICATION_TTL_MS = 15 * 60 * 1000;
+const SUPER_VERIFICATION_TTL_MS = 15 * 60 * 1000;
 
 const routes: RouteRecordRaw[] = [
   {
@@ -15,6 +16,12 @@ const routes: RouteRecordRaw[] = [
     path: "/login",
     name: "public-login",
     component: () => import("../pages/Login.vue"),
+    meta: { public: true },
+  },
+  {
+    path: "/reset-password",
+    name: "public-reset-password",
+    component: () => import("../pages/ResetPassword.vue"),
     meta: { public: true },
   },
   {
@@ -149,6 +156,36 @@ const routes: RouteRecordRaw[] = [
     },
   },
   {
+    path: "/super-admin/gear",
+    name: "super-admin-gear",
+    component: () => import("../pages/super/SuperGear.vue"),
+    meta: {
+      requiresSession: true,
+      requiresRole: "super_admin",
+      requiresSuperAuth: true,
+    },
+  },
+  {
+    path: "/super-admin/students",
+    name: "super-admin-students",
+    component: () => import("../pages/super/SuperStudents.vue"),
+    meta: {
+      requiresSession: true,
+      requiresRole: "super_admin",
+      requiresSuperAuth: true,
+    },
+  },
+  {
+    path: "/super-admin/logs",
+    name: "super-admin-logs",
+    component: () => import("../pages/super/SuperLogs.vue"),
+    meta: {
+      requiresSession: true,
+      requiresRole: "super_admin",
+      requiresSuperAuth: true,
+    },
+  },
+  {
     path: "/:pathMatch(.*)*",
     name: "not-found",
     component: () => import("../pages/NotFound.vue"),
@@ -170,6 +207,17 @@ const hasFreshAdminVerification = (adminVerifiedAt: string | null) => {
     return false;
   }
   return Date.now() - verifiedAtMs <= ADMIN_VERIFICATION_TTL_MS;
+};
+
+const hasFreshSuperVerification = (superVerifiedAt: string | null) => {
+  if (!superVerifiedAt) {
+    return false;
+  }
+  const verifiedAtMs = Date.parse(superVerifiedAt);
+  if (Number.isNaN(verifiedAtMs)) {
+    return false;
+  }
+  return Date.now() - verifiedAtMs <= SUPER_VERIFICATION_TTL_MS;
 };
 
 router.beforeEach((to) => {
@@ -218,6 +266,13 @@ router.beforeEach((to) => {
   }
 
   if (meta?.requiresSuperAuth && !auth.hasSecondaryAuth) {
+    return { name: "super-auth" };
+  }
+
+  if (
+    meta?.requiresSuperAuth &&
+    !hasFreshSuperVerification(auth.superVerifiedAt)
+  ) {
     return { name: "super-auth" };
   }
 

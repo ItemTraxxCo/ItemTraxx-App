@@ -15,6 +15,12 @@ type ProfileRow = {
   role: "tenant_user" | "tenant_admin" | "super_admin" | null;
   tenant_id: string | null;
   auth_email: string | null;
+  is_active?: boolean | null;
+};
+
+type TenantRow = {
+  id: string;
+  status: "active" | "suspended" | null;
 };
 
 const getTenantLoginFunctionName = () =>
@@ -23,7 +29,7 @@ const getTenantLoginFunctionName = () =>
 const fetchProfile = async (userId: string): Promise<ProfileRow | null> => {
   const { data, error } = await supabase
     .from("profiles")
-    .select("id, role, tenant_id, auth_email")
+    .select("id, role, tenant_id, auth_email, is_active")
     .eq("id", userId)
     .single();
 
@@ -32,6 +38,31 @@ const fetchProfile = async (userId: string): Promise<ProfileRow | null> => {
   }
 
   return data as ProfileRow;
+};
+
+const fetchTenantStatus = async (tenantId: string): Promise<TenantRow | null> => {
+  const { data, error } = await supabase
+    .from("tenants")
+    .select("id, status")
+    .eq("id", tenantId)
+    .single();
+
+  if (error) return null;
+  return data as TenantRow;
+};
+
+const handleSuspendedTenantSession = async (profile: ProfileRow | null) => {
+  if (!profile?.tenant_id || !["tenant_user", "tenant_admin"].includes(profile.role ?? "")) {
+    return false;
+  }
+  const tenant = await fetchTenantStatus(profile.tenant_id);
+  if (tenant?.status === "suspended") {
+    await supabase.auth.signOut();
+    clearAdminVerification();
+    clearAuthState(true);
+    return true;
+  }
+  return false;
 };
 
 export const refreshAuthFromSession = async () => {
@@ -46,7 +77,13 @@ export const refreshAuthFromSession = async () => {
   const email = data.session.user.email ?? null;
   const signedInAt = data.session.user.last_sign_in_at ?? null;
   const profile = await fetchProfile(userId);
+  const isSuspended = await handleSuspendedTenantSession(profile);
+  if (isSuspended) {
+    return;
+  }
   const current = getAuthState();
+  const isSameUser = current.userId === userId;
+  const isSuperRole = profile?.role === "super_admin";
 
   setAuthStateFromBackend({
     isInitialized: true,
@@ -58,7 +95,10 @@ export const refreshAuthFromSession = async () => {
     sessionTenantId: profile?.tenant_id ?? null,
     tenantContextId:
       current.tenantContextId ?? profile?.tenant_id ?? null,
-    hasSecondaryAuth: current.hasSecondaryAuth ?? false,
+    hasSecondaryAuth:
+      isSameUser && isSuperRole ? current.hasSecondaryAuth ?? false : false,
+    superVerifiedAt:
+      isSameUser && isSuperRole ? current.superVerifiedAt ?? null : null,
   });
 };
 
@@ -69,7 +109,13 @@ export const initAuthListener = () => {
       return;
     }
     const profile = await fetchProfile(session.user.id);
+    const isSuspended = await handleSuspendedTenantSession(profile);
+    if (isSuspended) {
+      return;
+    }
     const current = getAuthState();
+    const isSameUser = current.userId === session.user.id;
+    const isSuperRole = profile?.role === "super_admin";
     setAuthStateFromBackend({
       isInitialized: true,
       isAuthenticated: true,
@@ -80,7 +126,10 @@ export const initAuthListener = () => {
       sessionTenantId: profile?.tenant_id ?? null,
       tenantContextId:
         current.tenantContextId ?? profile?.tenant_id ?? null,
-      hasSecondaryAuth: current.hasSecondaryAuth ?? false,
+      hasSecondaryAuth:
+        isSameUser && isSuperRole ? current.hasSecondaryAuth ?? false : false,
+      superVerifiedAt:
+        isSameUser && isSuperRole ? current.superVerifiedAt ?? null : null,
     });
   });
 };
@@ -108,6 +157,9 @@ export const tenantLogin = async (
     }
     if (result.status === 403 && result.error === "Turnstile verification failed") {
       throw new Error("TURNSTILE_FAILED");
+    }
+    if (result.status === 403 && result.error === "Tenant disabled") {
+      throw new Error("TENANT_DISABLED");
     }
     throw new Error("Invalid tenant access code.");
   }
@@ -143,10 +195,22 @@ export const adminLogin = async (email: string, password: string) => {
   }
 
   await refreshAuthFromSession();
+  const profile = await fetchProfile(getAuthState().userId ?? "");
   const current = getAuthState();
   if (current.role !== "tenant_admin") {
     await signOut();
     throw new Error("Access denied.");
+  }
+  if (profile && profile.is_active === false) {
+    await signOut();
+    throw new Error("Access denied.");
+  }
+  if (profile?.tenant_id) {
+    const tenant = await fetchTenantStatus(profile.tenant_id);
+    if (tenant?.status === "suspended") {
+      await signOut();
+      throw new Error("Tenant disabled.");
+    }
   }
 
   if (priorTenantContextId && current.sessionTenantId !== priorTenantContextId) {

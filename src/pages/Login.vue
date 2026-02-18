@@ -162,6 +162,11 @@ const handleTenantLogin = async () => {
       error.value = "Security check failed. Please try again.";
       return;
     }
+    if (err instanceof Error && err.message === "TENANT_DISABLED") {
+      error.value = "";
+      showToast("Access blocked", "Tenant is disabled. Access is blocked.");
+      return;
+    }
     const errorMessage = err instanceof Error ? err.message : "Sign in failed.";
     if (isCredentialFailure(errorMessage)) {
       error.value = "";

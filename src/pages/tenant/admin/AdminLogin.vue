@@ -16,12 +16,19 @@
         <label v-if="turnstileSiteKey">
           Security Check
           <div :ref="setTurnstileContainerRef"></div>
+          <p class="muted turnstile-help">Complete security check to enable sign in.</p>
         </label>
         <div class="form-actions">
-          <button type="submit" class="button-primary" :disabled="isLoading">Sign in</button>
+          <button type="submit" class="button-primary" :disabled="!canSubmit">
+            Sign in
+          </button>
         </div>
       </form>
       <p v-if="error" class="error">{{ error }}</p>
+    </div>
+    <div v-if="toastMessage" class="toast">
+      <div class="toast-title">{{ toastTitle }}</div>
+      <div class="toast-body">{{ toastMessage }}</div>
     </div>
 
     <RouterLink class="link" to="/tenant/checkout">Back to checkout</RouterLink>
@@ -29,7 +36,7 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref } from "vue";
+import { computed, onMounted, onUnmounted, ref } from "vue";
 import { RouterLink, useRouter } from "vue-router";
 import { adminLogin } from "../../../services/authService";
 import { logAdminAction } from "../../../services/auditLogService";
@@ -41,6 +48,8 @@ const email = ref("");
 const password = ref("");
 const error = ref("");
 const isLoading = ref(false);
+const toastTitle = ref("");
+const toastMessage = ref("");
 const turnstileSiteKey = import.meta.env.VITE_TURNSTILE_SITE_KEY as
   | string
   | undefined;
@@ -62,32 +71,129 @@ const setTurnstileContainerRef = (
   }
   turnstileContainerRef.value = null;
 };
+let toastTimer: number | null = null;
+
+const canSubmit = computed(() => {
+  if (isLoading.value) return false;
+  if (!email.value.trim() || !password.value.trim()) return false;
+  if (turnstileSiteKey && !turnstileToken.value) return false;
+  return true;
+});
+
+const devLog = (message: string, data?: Record<string, unknown>) => {
+  if (!import.meta.env.DEV) return;
+  // Keep logs high-level to avoid sensitive data exposure.
+  console.debug(`[admin-login] ${message}`, data ?? {});
+};
+
+const showToast = (title: string, message: string) => {
+  toastTitle.value = title;
+  toastMessage.value = message;
+  if (toastTimer) {
+    window.clearTimeout(toastTimer);
+  }
+  toastTimer = window.setTimeout(() => {
+    toastTitle.value = "";
+    toastMessage.value = "";
+    toastTimer = null;
+  }, 4000);
+};
 
 const handleAdminLogin = async () => {
+  devLog("submit_click_received", {
+    hasEmail: !!email.value.trim(),
+    hasPassword: !!password.value.trim(),
+    hasTurnstileKey: !!turnstileSiteKey,
+    hasTurnstileToken: !!turnstileToken.value,
+  });
   error.value = "";
+  if (!email.value.trim() || !password.value.trim()) {
+    devLog("submit_blocked_empty_fields");
+    showToast("Sign in blocked", "Enter email and password to continue.");
+    return;
+  }
+  if (turnstileSiteKey && !turnstileToken.value) {
+    devLog("submit_blocked_turnstile_missing");
+    error.value = "Complete the security check and try again.";
+    showToast("Security check required", "Complete the security check and try again.");
+    return;
+  }
   isLoading.value = true;
   try {
-    if (turnstileSiteKey && !turnstileToken.value) {
-      error.value = "Complete the security check and try again.";
-      return;
-    }
+    devLog("auth_request_start");
     await adminLogin(email.value.trim(), password.value);
+    devLog("auth_request_success");
     await logAdminAction({
       action_type: "admin_login",
       metadata: { email: email.value.trim() },
     });
     await router.push("/tenant/admin");
   } catch (err) {
-    error.value = err instanceof Error ? err.message : "Sign in failed.";
-  } finally {
-    if (turnstileSiteKey) {
-      resetTurnstile();
+    devLog("auth_request_failed");
+    const message = err instanceof Error ? err.message : "Sign in failed.";
+    if (message === "Invalid credentials.") {
+      error.value = "Invalid admin credentials.";
+      showToast("Sign in failed", "Invalid admin credentials.");
+    } else if (message === "Access denied.") {
+      error.value = "Access denied for this tenant admin panel.";
+      showToast("Access denied", "This account cannot access the admin panel.");
+    } else {
+      error.value = "Sign in failed. Please try again.";
+      showToast("Sign in failed", "Please try again.");
     }
+  } finally {
     isLoading.value = false;
+    if (turnstileSiteKey) {
+      try {
+        resetTurnstile();
+      } catch (turnstileError) {
+        devLog("turnstile_reset_failed");
+        console.error("Failed to reset admin Turnstile widget:", turnstileError);
+      }
+    }
   }
 };
 
 onMounted(() => {
   clearAdminVerification();
 });
+
+onUnmounted(() => {
+  if (toastTimer) {
+    window.clearTimeout(toastTimer);
+    toastTimer = null;
+  }
+});
 </script>
+
+<style scoped>
+.turnstile-help {
+  margin-top: 0.35rem;
+  font-size: 0.78rem;
+}
+
+.toast {
+  position: fixed;
+  right: 1rem;
+  bottom: 1rem;
+  min-width: 230px;
+  max-width: 340px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  padding: 0.75rem 0.85rem;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.18);
+  z-index: 1000;
+}
+
+.toast-title {
+  font-weight: 700;
+  font-size: 0.9rem;
+}
+
+.toast-body {
+  margin-top: 0.2rem;
+  font-size: 0.84rem;
+  color: var(--muted);
+}
+</style>

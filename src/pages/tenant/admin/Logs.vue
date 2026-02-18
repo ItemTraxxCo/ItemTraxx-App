@@ -5,7 +5,7 @@
     </div>
     <h1>Item Logs</h1>
     <p>View checkout and return history.</p>
-    <p class="muted">Ability to export logs data to PDF and CSV coming soon.</p>
+    <p class="muted">Export filtered logs to CSV or PDF.</p>
 
     <div class="card">
       <label>
@@ -16,6 +16,10 @@
           placeholder="Search by action, student, item name, or barcode"
         />
       </label>
+      <div class="form-actions">
+        <button type="button" @click="exportCsv">Export CSV</button>
+        <button type="button" @click="exportPdf">Export PDF</button>
+      </div>
       <p class="muted">Showing {{ filteredLogs.length }} of {{ logs.length }} log entries.</p>
       <p v-if="isLoading" class="muted">Loading logs...</p>
       <table v-else class="table">
@@ -59,6 +63,7 @@
 import { computed, onMounted, ref } from "vue";
 import { RouterLink } from "vue-router";
 import { fetchGearLogs, type GearLog } from "../../../services/gearService";
+import { exportRowsToCsv, exportRowsToPdf } from "../../../services/exportService";
 
 const logs = ref<GearLog[]>([]);
 const isLoading = ref(false);
@@ -91,6 +96,34 @@ const loadLogs = async () => {
   } finally {
     isLoading.value = false;
   }
+};
+
+const exportRows = computed(() =>
+  filteredLogs.value.map((log) => ({
+    action_time: formatTime(log.action_time),
+    action_type: log.action_type,
+    student: log.student
+      ? `${log.student.last_name}, ${log.student.first_name} (${log.student.student_id})`
+      : "",
+    item: log.gear ? `${log.gear.name} (${log.gear.barcode})` : "",
+  }))
+);
+
+const exportCsv = () => {
+  exportRowsToCsv(
+    `gear-logs-${new Date().toISOString().slice(0, 10)}.csv`,
+    ["action_time", "action_type", "student", "item"],
+    exportRows.value
+  );
+};
+
+const exportPdf = () => {
+  exportRowsToPdf(
+    `gear-logs-${new Date().toISOString().slice(0, 10)}.pdf`,
+    "Gear Logs Export",
+    ["action_time", "action_type", "student", "item"],
+    exportRows.value
+  );
 };
 
 const formatTime = (value: string) => {

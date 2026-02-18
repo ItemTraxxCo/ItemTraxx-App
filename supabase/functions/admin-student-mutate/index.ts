@@ -129,6 +129,24 @@ serve(async (req) => {
       auth: { persistSession: false },
     });
 
+    const { data: maintenanceRow } = await adminClient
+      .from("app_runtime_config")
+      .select("value")
+      .eq("key", "maintenance_mode")
+      .maybeSingle();
+    const maintenanceValue =
+      maintenanceRow?.value && typeof maintenanceRow.value === "object"
+        ? (maintenanceRow.value as Record<string, unknown>)
+        : {};
+    if (maintenanceValue.enabled === true) {
+      return jsonResponse(503, {
+        error:
+          typeof maintenanceValue.message === "string" && maintenanceValue.message.trim()
+            ? maintenanceValue.message.trim()
+            : "Maintenance mode enabled.",
+      });
+    }
+
     if (action === "create") {
       const { first_name, last_name, student_id } = payload as Record<string, unknown>;
       const normalizedFirstName =

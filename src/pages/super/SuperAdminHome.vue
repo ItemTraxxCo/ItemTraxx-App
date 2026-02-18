@@ -64,6 +64,32 @@
         </div>
 
         <div>
+          <h3>Maintenance Mode</h3>
+          <p class="muted">Blocks tenant logins and write actions while enabled.</p>
+          <label>
+            Enabled
+            <select v-model="maintenanceEnabled">
+              <option :value="false">false</option>
+              <option :value="true">true</option>
+            </select>
+          </label>
+          <label>
+            Message
+            <input
+              v-model="maintenanceMessage"
+              type="text"
+              maxlength="180"
+              placeholder="Scheduled maintenance in progress."
+            />
+          </label>
+          <div class="form-actions">
+            <button type="button" class="button-primary" :disabled="isSaving" @click="saveMaintenanceMode">
+              Save Maintenance Mode
+            </button>
+          </div>
+        </div>
+
+        <div>
           <h3>Alert Rules</h3>
           <label>
             Name
@@ -289,6 +315,8 @@ const error = ref("");
 const toastTitle = ref("");
 const toastMessage = ref("");
 const statusOverrideMode = ref("auto");
+const maintenanceEnabled = ref(false);
+const maintenanceMessage = ref("Scheduled maintenance in progress.");
 const alertName = ref("");
 const alertMetricKey = ref("overdue_items");
 const alertThreshold = ref(5);
@@ -331,6 +359,15 @@ const loadDashboard = async () => {
   if (typeof statusOverride.mode === "string") {
     statusOverrideMode.value = statusOverride.mode;
   }
+  const maintenance = (data.runtime_config?.maintenance_mode ?? {}) as {
+    enabled?: boolean;
+    message?: string;
+  };
+  maintenanceEnabled.value = maintenance.enabled === true;
+  maintenanceMessage.value =
+    typeof maintenance.message === "string" && maintenance.message.trim()
+      ? maintenance.message
+      : "Scheduled maintenance in progress.";
 };
 
 const loadControlCenter = async () => {
@@ -361,6 +398,26 @@ const saveStatusOverride = async () => {
     await loadAll();
   } catch (err) {
     showToast("Save failed", err instanceof Error ? err.message : "Unable to save status override.");
+  } finally {
+    isSaving.value = false;
+  }
+};
+
+const saveMaintenanceMode = async () => {
+  isSaving.value = true;
+  try {
+    await setRuntimeConfig({
+      key: "maintenance_mode",
+      value: {
+        enabled: maintenanceEnabled.value,
+        message: maintenanceMessage.value.trim() || "Scheduled maintenance in progress.",
+        updated_at: new Date().toISOString(),
+      },
+    });
+    showToast("Saved", "Maintenance mode updated.");
+    await loadAll();
+  } catch (err) {
+    showToast("Save failed", err instanceof Error ? err.message : "Unable to save maintenance mode.");
   } finally {
     isSaving.value = false;
   }

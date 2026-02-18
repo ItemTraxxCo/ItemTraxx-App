@@ -197,6 +197,9 @@ export const tenantLogin = async (
   });
 
   if (!result.ok) {
+    if (result.status === 503 && result.error.toLowerCase().includes("maintenance")) {
+      throw new Error("MAINTENANCE_MODE");
+    }
     if (result.status === 503 && result.error === "Rate limit check failed") {
       throw new Error("LIMITER_UNAVAILABLE");
     }

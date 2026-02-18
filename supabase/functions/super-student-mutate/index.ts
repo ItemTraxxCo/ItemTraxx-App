@@ -142,7 +142,7 @@ serve(async (req) => {
 
       let query = adminClient
         .from("students")
-        .select("id, tenant_id, first_name, last_name, student_id, created_at")
+        .select("id, tenant_id, first_name, last_name, student_id, email, created_at")
         .order("created_at", { ascending: false })
         .limit(500);
 
@@ -151,7 +151,7 @@ serve(async (req) => {
       }
       if (search) {
         query = query.or(
-          `first_name.ilike.%${search}%,last_name.ilike.%${search}%,student_id.ilike.%${search}%`
+          `first_name.ilike.%${search}%,last_name.ilike.%${search}%,student_id.ilike.%${search}%,email.ilike.%${search}%`
         );
       }
 
@@ -170,6 +170,7 @@ serve(async (req) => {
       const lastName = typeof input.last_name === "string" ? input.last_name.trim() : "";
       const studentId =
         typeof input.student_id === "string" ? input.student_id.trim() : "";
+      const email = typeof input.email === "string" ? input.email.trim() : "";
 
       if (!tenantId || !firstName || !lastName || !studentId) {
         return jsonResponse(400, { error: "Invalid request" });
@@ -182,8 +183,9 @@ serve(async (req) => {
           first_name: firstName,
           last_name: lastName,
           student_id: studentId,
+          email: email || null,
         })
-        .select("id, tenant_id, first_name, last_name, student_id, created_at")
+        .select("id, tenant_id, first_name, last_name, student_id, email, created_at")
         .single();
 
       if (error || !data) {
@@ -209,7 +211,7 @@ serve(async (req) => {
         .from("students")
         .update({ first_name: firstName, last_name: lastName, student_id: studentId })
         .eq("id", id)
-        .select("id, tenant_id, first_name, last_name, student_id, created_at")
+        .select("id, tenant_id, first_name, last_name, student_id, email, created_at")
         .single();
 
       if (error || !data) {

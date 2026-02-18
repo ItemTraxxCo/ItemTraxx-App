@@ -89,12 +89,14 @@ const submit = () => {
 
 .stepup-modal {
   width: min(480px, 92vw);
-  background: var(--card-background, #ffffff);
-  border: 1px solid rgba(10, 24, 40, 0.12);
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
   border-radius: 12px;
   padding: 1rem;
   display: grid;
   gap: 0.75rem;
+  box-shadow: 0 14px 32px rgba(0, 0, 0, 0.22);
 }
 
 .actions {

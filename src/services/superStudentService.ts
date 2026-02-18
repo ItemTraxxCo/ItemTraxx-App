@@ -7,6 +7,7 @@ export type SuperStudentItem = {
   first_name: string;
   last_name: string;
   student_id: string;
+  email?: string | null;
   created_at: string;
 };
 
@@ -52,6 +53,7 @@ export const createSuperStudent = async (payload: {
   first_name: string;
   last_name: string;
   student_id: string;
+  email?: string;
 }) =>
   callSuperStudent<SuperStudentItem>({
     action: "create",

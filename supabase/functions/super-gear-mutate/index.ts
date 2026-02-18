@@ -18,6 +18,7 @@ const ALLOWED_GEAR_STATUSES = new Set([
   "checked_out",
   "damaged",
   "lost",
+  "in_repair",
   "retired",
   "in_studio_only",
 ]);

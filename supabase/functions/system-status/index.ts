@@ -164,6 +164,32 @@ serve(async (req) => {
       .select("key, value, updated_at")
       .eq("key", "broadcast_message")
       .maybeSingle();
+    const { data: maintenanceRow } = await adminClient
+      .from("app_runtime_config")
+      .select("value, updated_at")
+      .eq("key", "maintenance_mode")
+      .maybeSingle();
+
+    let maintenance: {
+      enabled: boolean;
+      message: string;
+      updated_at: string;
+    } | null = null;
+
+    if (maintenanceRow?.value && typeof maintenanceRow.value === "object") {
+      const value = maintenanceRow.value as Record<string, unknown>;
+      maintenance = {
+        enabled: value.enabled === true,
+        message:
+          typeof value.message === "string" && value.message.trim()
+            ? value.message.trim()
+            : "Maintenance in progress.",
+        updated_at:
+          typeof value.updated_at === "string" && value.updated_at
+            ? value.updated_at
+            : maintenanceRow.updated_at ?? new Date().toISOString(),
+      };
+    }
 
     if (!broadcastError && broadcastRow?.value && typeof broadcastRow.value === "object") {
       const value = broadcastRow.value as Record<string, unknown>;
@@ -224,6 +250,7 @@ serve(async (req) => {
         incident_io: incidentCheck,
       },
       broadcast,
+      maintenance,
       incident_summary: incidentSummary,
       duration_ms: Date.now() - startedAt,
       checked_at: new Date().toISOString(),

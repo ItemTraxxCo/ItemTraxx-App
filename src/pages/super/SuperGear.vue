@@ -18,7 +18,7 @@
         <label>Name<input v-model="formName" type="text" /></label>
         <label>Barcode<input v-model="formBarcode" type="text" /></label>
         <label>Serial Number<input v-model="formSerial" type="text" /></label>
-        <label>Status<select v-model="formStatus"><option value="available">available</option><option value="checked_out">checked_out</option><option value="damaged">damaged</option><option value="lost">lost</option><option value="retired">retired</option><option value="in_studio_only">in_studio_only</option></select></label>
+        <label>Status<select v-model="formStatus"><option value="available">available</option><option value="checked_out">checked_out</option><option value="damaged">damaged</option><option value="lost">lost</option><option value="in_repair">in_repair</option><option value="retired">retired</option><option value="in_studio_only">in_studio_only</option></select></label>
         <label>Notes<textarea v-model="formNotes" rows="3" /></label>
         <div class="form-actions"><button type="submit" class="button-primary" :disabled="isSaving">Create</button></div>
       </form>
@@ -30,6 +30,10 @@
         <select v-model="tenantFilter" @change="loadGear"><option value="all">all tenants</option><option v-for="t in tenants" :key="t.id" :value="t.id">{{ t.name }}</option></select>
         <input v-model="search" type="text" placeholder="Search" />
         <button type="button" @click="loadGear">Search</button>
+      </div>
+      <div class="form-actions">
+        <button type="button" @click="exportCsv">Export CSV</button>
+        <button type="button" @click="exportPdf">Export PDF</button>
       </div>
       <p v-if="isLoading" class="muted">Loading gear...</p>
       <p v-else-if="error" class="error">{{ error }}</p>
@@ -55,7 +59,7 @@
       <form class="form" @submit.prevent="saveEdit">
         <label>Name<input v-model="editName" type="text" /></label>
         <label>Barcode<input v-model="editBarcode" type="text" /></label>
-        <label>Status<select v-model="editStatus"><option value="available">available</option><option value="checked_out">checked_out</option><option value="damaged">damaged</option><option value="lost">lost</option><option value="retired">retired</option><option value="in_studio_only">in_studio_only</option></select></label>
+        <label>Status<select v-model="editStatus"><option value="available">available</option><option value="checked_out">checked_out</option><option value="damaged">damaged</option><option value="lost">lost</option><option value="in_repair">in_repair</option><option value="retired">retired</option><option value="in_studio_only">in_studio_only</option></select></label>
         <label>Notes<textarea v-model="editNotes" rows="3" /></label>
         <div class="form-actions"><button type="submit" class="button-primary" :disabled="isSaving">Save</button><button type="button" @click="cancelEdit">Cancel</button></div>
       </form>
@@ -73,6 +77,7 @@ import { RouterLink } from "vue-router";
 import StepUpModal from "../../components/StepUpModal.vue";
 import { createSuperGear, deleteSuperGear, listSuperGear, updateSuperGear, type SuperGearItem } from "../../services/superGearService";
 import { listTenants, type SuperTenant } from "../../services/superTenantService";
+import { exportRowsToCsv, exportRowsToPdf } from "../../services/exportService";
 
 const tenants = ref<SuperTenant[]>([]);
 const gear = ref<SuperGearItem[]>([]);
@@ -128,6 +133,37 @@ const loadGear = async () => {
   } finally {
     isLoading.value = false;
   }
+};
+
+const exportCsv = () => {
+  exportRowsToCsv(
+    `super-gear-${new Date().toISOString().slice(0, 10)}.csv`,
+    ["tenant", "name", "barcode", "serial_number", "status", "notes"],
+    gear.value.map((item) => ({
+      tenant: tenantNameById.value.get(item.tenant_id) || item.tenant_id,
+      name: item.name,
+      barcode: item.barcode,
+      serial_number: item.serial_number,
+      status: item.status,
+      notes: item.notes,
+    }))
+  );
+};
+
+const exportPdf = () => {
+  exportRowsToPdf(
+    `super-gear-${new Date().toISOString().slice(0, 10)}.pdf`,
+    "Super Gear Export",
+    ["tenant", "name", "barcode", "serial_number", "status", "notes"],
+    gear.value.map((item) => ({
+      tenant: tenantNameById.value.get(item.tenant_id) || item.tenant_id,
+      name: item.name,
+      barcode: item.barcode,
+      serial_number: item.serial_number,
+      status: item.status,
+      notes: item.notes,
+    }))
+  );
 };
 
 const handleCreate = async () => {

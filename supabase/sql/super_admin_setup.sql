@@ -87,6 +87,7 @@ create table if not exists public.tenant_policies (
   max_admins int,
   max_students int,
   max_gear int,
+  checkout_due_hours int not null default 72,
   barcode_pattern text,
   updated_by uuid references auth.users(id) on delete set null,
   updated_at timestamptz not null default now()
@@ -119,3 +120,16 @@ create table if not exists public.tenant_security_controls (
   updated_by uuid references auth.users(id) on delete set null,
   updated_at timestamptz not null default now()
 );
+
+create table if not exists public.gear_status_history (
+  id uuid primary key default gen_random_uuid(),
+  tenant_id uuid not null references public.tenants(id) on delete cascade,
+  gear_id uuid not null references public.gear(id) on delete cascade,
+  status text not null,
+  note text,
+  changed_by uuid references auth.users(id) on delete set null,
+  changed_at timestamptz not null default now()
+);
+
+create index if not exists idx_gear_status_history_tenant_changed_at
+  on public.gear_status_history (tenant_id, changed_at desc);

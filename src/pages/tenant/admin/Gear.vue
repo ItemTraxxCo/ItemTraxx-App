@@ -5,7 +5,7 @@
     </div>
     <h1>Gear Management</h1>
     <p>Add and manage gear.</p>
-    <p class="muted">Ability to export gear data to PDF and CSV coming soon.</p>
+    <p class="muted">Export gear data to CSV or PDF from the list section.</p>
 
     <div class="card">
       <h2>Add Gear</h2>
@@ -47,6 +47,10 @@
 
     <div class="card">
       <h2>Gear List</h2>
+      <div class="form-actions">
+        <button type="button" @click="exportCsv">Export CSV</button>
+        <button type="button" @click="exportPdf">Export PDF</button>
+      </div>
       <p v-if="isLoading" class="muted">Loading gear...</p>
       <table v-else class="table">
         <thead>
@@ -158,6 +162,7 @@ import { getAuthState } from "../../../store/authState";
 import { logAdminAction } from "../../../services/auditLogService";
 import { enforceAdminRateLimit } from "../../../services/rateLimitService";
 import { createGear, deleteGear, fetchGear, updateGear, type GearItem } from "../../../services/gearService";
+import { exportRowsToCsv, exportRowsToPdf } from "../../../services/exportService";
 import { sanitizeInput } from "../../../utils/inputSanitizer";
 
 const gear = ref<GearItem[]>([]);
@@ -177,6 +182,7 @@ const statusOptions = [
   "checked_out",
   "damaged",
   "lost",
+  "in_repair",
   "retired",
   "in_studio_only",
 ];
@@ -225,6 +231,23 @@ const loadGear = async () => {
   } finally {
     isLoading.value = false;
   }
+};
+
+const exportCsv = () => {
+  exportRowsToCsv(
+    `gear-${new Date().toISOString().slice(0, 10)}.csv`,
+    ["name", "barcode", "serial_number", "status", "notes"],
+    gear.value
+  );
+};
+
+const exportPdf = () => {
+  exportRowsToPdf(
+    `gear-${new Date().toISOString().slice(0, 10)}.pdf`,
+    "Gear Export",
+    ["name", "barcode", "serial_number", "status", "notes"],
+    gear.value
+  );
 };
 
 const handleCreate = async () => {

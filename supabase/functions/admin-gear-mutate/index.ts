@@ -18,6 +18,7 @@ const ALLOWED_GEAR_STATUSES = new Set([
   "checked_out",
   "damaged",
   "lost",
+  "in_repair",
   "retired",
   "in_studio_only",
 ]);
@@ -138,6 +139,24 @@ serve(async (req) => {
       auth: { persistSession: false },
     });
 
+    const { data: maintenanceRow } = await adminClient
+      .from("app_runtime_config")
+      .select("value")
+      .eq("key", "maintenance_mode")
+      .maybeSingle();
+    const maintenanceValue =
+      maintenanceRow?.value && typeof maintenanceRow.value === "object"
+        ? (maintenanceRow.value as Record<string, unknown>)
+        : {};
+    if (maintenanceValue.enabled === true) {
+      return jsonResponse(503, {
+        error:
+          typeof maintenanceValue.message === "string" && maintenanceValue.message.trim()
+            ? maintenanceValue.message.trim()
+            : "Maintenance mode enabled.",
+      });
+    }
+
     if (action === "create") {
       const { name, barcode, serial_number, status, notes } = payload as Record<string, unknown>;
       const normalizedName = typeof name === "string" ? name.trim() : "";
@@ -176,6 +195,16 @@ serve(async (req) => {
         return jsonResponse(400, { error: "Unable to create gear." });
       }
 
+      if (normalizedStatus !== "available" && normalizedStatus !== "checked_out") {
+        await adminClient.from("gear_status_history").insert({
+          tenant_id: profile.tenant_id,
+          gear_id: data.id,
+          status: normalizedStatus,
+          note: normalizedNotes || null,
+          changed_by: user.id,
+        });
+      }
+
       return jsonResponse(200, { data });
     }
 
@@ -199,6 +228,13 @@ serve(async (req) => {
         return jsonResponse(400, { error: "Invalid request" });
       }
 
+      const { data: existingGear } = await adminClient
+        .from("gear")
+        .select("status")
+        .eq("id", normalizedId)
+        .eq("tenant_id", profile.tenant_id)
+        .single();
+
       const { data, error } = await adminClient
         .from("gear")
         .update({
@@ -214,6 +250,20 @@ serve(async (req) => {
 
       if (error || !data) {
         return jsonResponse(400, { error: "Unable to update gear." });
+      }
+
+      if (
+        existingGear?.status !== normalizedStatus &&
+        normalizedStatus !== "available" &&
+        normalizedStatus !== "checked_out"
+      ) {
+        await adminClient.from("gear_status_history").insert({
+          tenant_id: profile.tenant_id,
+          gear_id: data.id,
+          status: normalizedStatus,
+          note: normalizedNotes || null,
+          changed_by: user.id,
+        });
       }
 
       return jsonResponse(200, { data });

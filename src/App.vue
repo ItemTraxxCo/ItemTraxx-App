@@ -1,30 +1,61 @@
 <template>
-  <div class="app-shell">
+  <div class="app-shell" :class="{ 'with-top-banners': topBannerRowCount > 0 }" :style="appShellStyle">
+    <div
+      v-if="showMaintenanceBanner"
+      class="maintenance-top-banner"
+      role="alert"
+      aria-live="assertive"
+    >
+      <strong>Maintenance Mode</strong>
+      <span>{{ maintenanceMessage }}</span>
+    </div>
     <div
       v-if="activeBroadcast && showBroadcast"
-      class="broadcast-banner"
-      :class="`broadcast-${activeBroadcast.level}`"
+      class="broadcast-top-banner"
       role="status"
       aria-live="polite"
+      :style="broadcastBannerStyle"
     >
       <div class="broadcast-content">
         <strong class="broadcast-title">Broadcast</strong>
         <span class="broadcast-message">{{ activeBroadcast.message }}</span>
       </div>
-      <button type="button" class="broadcast-dismiss" @click="dismissBroadcast">
+      <button
+        type="button"
+        class="broadcast-dismiss"
+        aria-label="Dismiss broadcast"
+        @click="dismissBroadcast"
+      >
+        ×
+      </button>
+    </div>
+    <div
+      v-if="incidentBanner && showIncidentBanner"
+      class="broadcast-banner incident-banner"
+      :class="incidentBanner.level === 'down' ? 'broadcast-critical' : 'broadcast-warning'"
+      :style="incidentBannerStyle"
+      role="status"
+      aria-live="polite"
+    >
+      <div class="broadcast-content">
+        <strong class="broadcast-title">System Notice</strong>
+        <span class="broadcast-message">{{ incidentBanner.message }}</span>
+      </div>
+      <button type="button" class="broadcast-dismiss" @click="dismissIncidentBanner">
         Dismiss
       </button>
     </div>
-    <div v-if="showTopMenu" class="top-menu">
+    <div v-if="showTopMenu" class="top-menu" :style="topMenuStyle">
       <div class="menu-button-wrap">
+        <div v-if="showNotificationBell" class="menu-notification">
+          <NotificationBell />
+        </div>
         <span v-if="isOutdated" class="menu-alert" aria-hidden="true">!</span>
         <button type="button" class="menu-button" @click="toggleMenu" aria-label="Open menu">
-        <span class="menu-icon" aria-hidden="true">
-          <span></span>
-          <span></span>
-          <span></span>
-        </span>
-      </button>
+          <svg class="menu-icon" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M5 7.5h14M5 12h14M5 16.5h14" />
+          </svg>
+        </button>
       </div>
       <div v-if="menuOpen" class="menu-dropdown">
         <button type="button" class="menu-item" @click="toggleTheme">
@@ -80,6 +111,7 @@ import { SpeedInsights } from "@vercel/speed-insights/vue";
 import { signOut } from "./services/authService";
 import { getEdgeFunctionsBaseUrl } from "./services/edgeFunctionClient";
 import { getAuthState } from "./store/authState";
+import NotificationBell from "./components/NotificationBell.vue";
 
 const auth = getAuthState();
 const router = useRouter();
@@ -93,8 +125,17 @@ type BroadcastPayload = {
   message: string;
   level: BroadcastLevel;
 };
+type IncidentBanner = {
+  id: string;
+  message: string;
+  level: "degraded" | "down";
+};
 const activeBroadcast = ref<BroadcastPayload | null>(null);
 const dismissedBroadcastId = ref(localStorage.getItem("itemtraxx-broadcast-dismissed") || "");
+const incidentBanner = ref<IncidentBanner | null>(null);
+const dismissedIncidentId = ref(localStorage.getItem("itemtraxx-incident-dismissed") || "");
+const maintenanceEnabled = ref(false);
+const maintenanceMessage = ref("Maintenance in progress.");
 const statusLabel = ref("Unknown");
 const statusClass = ref<"status-ok" | "status-warn" | "status-down" | "status-unknown">(
   "status-unknown"
@@ -112,11 +153,43 @@ const themeLabel = computed(() =>
   theme.value === "dark" ? "Light Mode" : "Dark Mode"
 );
 const showTopMenu = computed(() => route.name !== "public-home");
-const showBroadcast = computed(() => {
+const showNotificationBell = computed(() => {
   if (!auth.isAuthenticated) return false;
+  if (auth.role !== "tenant_user" && auth.role !== "tenant_admin") return false;
+  return route.path.startsWith("/tenant");
+});
+const showBroadcast = computed(() => {
   if (!activeBroadcast.value) return false;
   return dismissedBroadcastId.value !== activeBroadcast.value.id;
 });
+const showIncidentBanner = computed(() => {
+  if (!auth.isAuthenticated) return false;
+  if (!incidentBanner.value) return false;
+  return dismissedIncidentId.value !== incidentBanner.value.id;
+});
+const showMaintenanceBanner = computed(() => maintenanceEnabled.value);
+const topBannerRowCount = computed(() => {
+  let rows = 0;
+  if (showMaintenanceBanner.value) rows += 1;
+  if (showBroadcast.value && activeBroadcast.value) rows += 1;
+  return rows;
+});
+const topOffsetPx = computed(() => {
+  if (topBannerRowCount.value === 0) return "0px";
+  return `${topBannerRowCount.value * 56 + 18}px`;
+});
+const appShellStyle = computed(() => ({
+  "--top-banner-offset": topOffsetPx.value,
+}) as Record<string, string>);
+const topMenuStyle = computed(() => ({
+  top: `calc(1rem + ${topOffsetPx.value})`,
+}));
+const incidentBannerStyle = computed(() => ({
+  top: `calc(1rem + ${topOffsetPx.value})`,
+}));
+const broadcastBannerStyle = computed(() => ({
+  top: showMaintenanceBanner.value ? "56px" : "0",
+}));
 
 const applyTheme = (next: "light" | "dark") => {
   theme.value = next;
@@ -158,6 +231,12 @@ const dismissBroadcast = () => {
   localStorage.setItem("itemtraxx-broadcast-dismissed", activeBroadcast.value.id);
 };
 
+const dismissIncidentBanner = () => {
+  if (!incidentBanner.value) return;
+  dismissedIncidentId.value = incidentBanner.value.id;
+  localStorage.setItem("itemtraxx-incident-dismissed", incidentBanner.value.id);
+};
+
 const refreshSystemStatus = async () => {
   const functionsBaseUrl = getEdgeFunctionsBaseUrl();
   if (!functionsBaseUrl) {
@@ -185,6 +264,13 @@ const refreshSystemStatus = async () => {
         level?: string;
         updated_at?: string;
       };
+      maintenance?: {
+        enabled?: boolean;
+        message?: string;
+        updated_at?: string;
+      };
+      incident_summary?: string;
+      checked_at?: string;
     };
 
     const broadcast = payload.broadcast;
@@ -205,20 +291,53 @@ const refreshSystemStatus = async () => {
       activeBroadcast.value = null;
     }
 
+    if (payload.maintenance?.enabled) {
+      maintenanceEnabled.value = true;
+      maintenanceMessage.value =
+        typeof payload.maintenance.message === "string" && payload.maintenance.message.trim()
+          ? payload.maintenance.message.trim()
+          : "Maintenance in progress.";
+    } else {
+      maintenanceEnabled.value = false;
+    }
+
     if (response.ok && payload.status === "operational") {
       statusLabel.value = "Running";
       statusClass.value = "status-ok";
+      incidentBanner.value = null;
       return;
     }
 
     if (response.status >= 500 || payload.status === "down") {
       statusLabel.value = "Down";
       statusClass.value = "status-down";
+      const incidentId =
+        (payload.checked_at && String(payload.checked_at)) ||
+        `${payload.status}-${payload.incident_summary || "down"}`;
+      incidentBanner.value = {
+        id: incidentId,
+        message:
+          typeof payload.incident_summary === "string" && payload.incident_summary
+            ? payload.incident_summary
+            : "A system outage has been detected.",
+        level: "down",
+      };
       return;
     }
 
     statusLabel.value = "Degraded";
     statusClass.value = "status-warn";
+    const incidentId =
+      (payload.checked_at && String(payload.checked_at)) ||
+      `${payload.status}-${payload.incident_summary || "degraded"}`;
+    incidentBanner.value = {
+      id: incidentId,
+      message:
+        typeof payload.incident_summary === "string" && payload.incident_summary
+          ? payload.incident_summary
+          : "A system incident or maintenance event is active.",
+      level: "degraded",
+    };
   } catch {
     statusLabel.value = "Unknown";
     statusClass.value = "status-unknown";

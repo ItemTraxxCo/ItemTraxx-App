@@ -5,7 +5,7 @@
     </div>
     <h1>Student Management</h1>
     <p>Add students and view details.</p>
-    <p class="muted">Ability to export student data to PDF and CSV coming soon.</p>
+    <p class="muted">Export students to CSV or PDF from the table section.</p>
 
     <div class="card">
       <h2>Add Student</h2>
@@ -36,6 +36,10 @@
 
     <div class="card">
       <h2>Students</h2>
+      <div class="form-actions">
+        <button type="button" @click="exportCsv">Export CSV</button>
+        <button type="button" @click="exportPdf">Export PDF</button>
+      </div>
       <p v-if="isLoading" class="muted">Loading students...</p>
       <table v-else class="table">
         <thead>
@@ -130,6 +134,7 @@ import {
 } from "../../../services/studentService";
 import { logAdminAction } from "../../../services/auditLogService";
 import { enforceAdminRateLimit } from "../../../services/rateLimitService";
+import { exportRowsToCsv, exportRowsToPdf } from "../../../services/exportService";
 import { sanitizeInput } from "../../../utils/inputSanitizer";
 
 const students = ref<StudentItem[]>([]);
@@ -186,6 +191,23 @@ const loadStudents = async () => {
   } finally {
     isLoading.value = false;
   }
+};
+
+const exportCsv = () => {
+  exportRowsToCsv(
+    `students-${new Date().toISOString().slice(0, 10)}.csv`,
+    ["first_name", "last_name", "student_id"],
+    students.value
+  );
+};
+
+const exportPdf = () => {
+  exportRowsToPdf(
+    `students-${new Date().toISOString().slice(0, 10)}.pdf`,
+    "Student Export",
+    ["first_name", "last_name", "student_id"],
+    students.value
+  );
 };
 
 

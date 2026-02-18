@@ -32,6 +32,10 @@
         <h2>Admin Audit Logs</h2>
         <p>Track admin actions.</p>
       </RouterLink>
+      <RouterLink class="admin-card" to="/tenant/admin/item-status">
+        <h2>Item Status Tracking</h2>
+        <p>Track lost, damaged, repair statuses and overdue reminder settings.</p>
+      </RouterLink>
     </div>
   </div>
 </template>

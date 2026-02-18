@@ -167,6 +167,11 @@ const handleTenantLogin = async () => {
       showToast("Access blocked", "Tenant is disabled. Access is blocked.");
       return;
     }
+    if (err instanceof Error && err.message === "MAINTENANCE_MODE") {
+      error.value = "";
+      showToast("Maintenance mode", "Sign in is temporarily unavailable. Please try again later.");
+      return;
+    }
     const errorMessage = err instanceof Error ? err.message : "Sign in failed.";
     if (isCredentialFailure(errorMessage)) {
       error.value = "";

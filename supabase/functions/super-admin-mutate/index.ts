@@ -385,6 +385,84 @@ serve(async (req) => {
       });
     }
 
+    if (action === "update_admin_email") {
+      const next = payload as Record<string, unknown>;
+      const id = typeof next.id === "string" ? next.id.trim() : "";
+      const authEmail = typeof next.auth_email === "string" ? next.auth_email.trim() : "";
+
+      if (!id || !authEmail || authEmail.length > 320) {
+        return jsonResponse(400, { error: "Invalid request" });
+      }
+
+      const { data: current, error: currentError } = await adminClient
+        .from("profiles")
+        .select("id, tenant_id, auth_email, role, is_active, created_at")
+        .eq("id", id)
+        .eq("role", "tenant_admin")
+        .single();
+
+      if (currentError || !current) {
+        return jsonResponse(400, { error: "Unable to find tenant admin." });
+      }
+
+      const { data: existingProfile } = await adminClient
+        .from("profiles")
+        .select("id, role")
+        .eq("auth_email", authEmail)
+        .maybeSingle();
+
+      if (existingProfile && existingProfile.id !== id) {
+        return jsonResponse(409, {
+          error: "An account with this email already exists. Use a different email.",
+        });
+      }
+
+      const { error: authUpdateError } = await adminClient.auth.admin.updateUserById(id, {
+        email: authEmail,
+        email_confirm: true,
+      });
+      if (authUpdateError) {
+        return jsonResponse(400, {
+          error: authUpdateError.message || "Unable to update auth email.",
+        });
+      }
+
+      const { data: updated, error: profileUpdateError } = await adminClient
+        .from("profiles")
+        .update({ auth_email: authEmail })
+        .eq("id", id)
+        .eq("role", "tenant_admin")
+        .select("id, tenant_id, auth_email, role, is_active, created_at")
+        .single();
+
+      if (profileUpdateError || !updated) {
+        return jsonResponse(400, { error: "Unable to update tenant admin email." });
+      }
+
+      let tenantName: string | null = null;
+      if (updated.tenant_id) {
+        const { data: tenant } = await adminClient
+          .from("tenants")
+          .select("name")
+          .eq("id", updated.tenant_id)
+          .single();
+        tenantName = tenant?.name ?? null;
+      }
+
+      await writeAudit("update_tenant_admin_email", "profile", updated.id, {
+        previous_auth_email: current.auth_email,
+        auth_email: updated.auth_email,
+      });
+
+      return jsonResponse(200, {
+        data: {
+          ...updated,
+          is_active: updated.is_active !== false,
+          tenant_name: tenantName,
+        },
+      });
+    }
+
     if (action === "send_reset") {
       const next = payload as Record<string, unknown>;
       const authEmail = typeof next.auth_email === "string" ? next.auth_email.trim() : "";

@@ -15,6 +15,7 @@ type SuperAdminAction =
   | "list_tenant_admins"
   | "create_tenant_admin"
   | "set_admin_status"
+  | "update_admin_email"
   | "send_reset";
 
 type SuperAdminRequest = {
@@ -76,5 +77,14 @@ export const setTenantAdminStatus = async (payload: {
 export const sendTenantAdminReset = async (payload: { auth_email: string }) =>
   callSuperAdmin<{ success: boolean }>({
     action: "send_reset",
+    payload,
+  });
+
+export const updateTenantAdminEmail = async (payload: {
+  id: string;
+  auth_email: string;
+}) =>
+  callSuperAdmin<SuperTenantAdmin>({
+    action: "update_admin_email",
     payload,
   });

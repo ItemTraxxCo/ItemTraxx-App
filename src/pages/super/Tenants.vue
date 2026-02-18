@@ -79,41 +79,43 @@
         </thead>
         <tbody>
           <tr v-for="tenant in tenants" :key="tenant.id">
-            <td>
-              <input
-                v-if="editingId === tenant.id"
-                v-model="editName"
-                type="text"
-                placeholder="Tenant name"
-              />
-              <span v-else>{{ tenant.name }}</span>
-            </td>
-            <td>
-              <input
-                v-if="editingId === tenant.id"
-                v-model="editAccessCode"
-                type="text"
-                placeholder="Access code"
-              />
-              <span v-else>{{ tenant.access_code }}</span>
-            </td>
+            <td>{{ tenant.name }}</td>
+            <td>{{ tenant.access_code }}</td>
             <td>{{ toTenantStatusLabel(tenant.status) }}</td>
             <td>{{ tenant.primary_admin_email || "-" }}</td>
             <td>{{ formatDate(tenant.created_at) }}</td>
-            <td>
-              <button v-if="editingId !== tenant.id" type="button" @click="startEdit(tenant)">Edit</button>
-              <button v-if="editingId === tenant.id" type="button" @click="saveEdit">Save</button>
-              <button v-if="editingId === tenant.id" type="button" @click="cancelEdit">Cancel</button>
+            <td class="actions-cell">
+              <button type="button" @click="openEditModal(tenant)">Edit</button>
               <button type="button" :disabled="isSaving" @click="openStatusModal(tenant)">
                 {{ tenant.status === "active" ? "Disable" : "Reactivate" }}
-              </button>
-              <button type="button" :disabled="isSaving" @click="sendTenantReset(tenant)">
-                Send Reset Link
               </button>
             </td>
           </tr>
         </tbody>
       </table>
+    </div>
+
+    <div v-if="editModalVisible" class="modal-backdrop" @click.self="closeEditModal">
+      <div class="modal">
+        <h2>Edit Tenant</h2>
+        <form class="form" @submit.prevent="saveEdit">
+          <label>
+            Name
+            <input v-model="editName" type="text" placeholder="Tenant name" />
+          </label>
+          <label>
+            Access Code
+            <input v-model="editAccessCode" type="text" placeholder="Access code" />
+          </label>
+          <div class="form-actions">
+            <button type="button" :disabled="isSaving" @click="sendEditTenantReset">
+              Send Reset Link
+            </button>
+            <button type="submit" class="button-primary" :disabled="isSaving">Save</button>
+            <button type="button" @click="closeEditModal">Cancel</button>
+          </div>
+        </form>
+      </div>
     </div>
 
     <div v-if="toastMessage" class="toast">
@@ -158,7 +160,8 @@ const createAccessCode = ref("");
 const createAuthEmail = ref("");
 const createPassword = ref("");
 const createStatusLabel = ref<"active" | "disabled">("active");
-const editingId = ref<string | null>(null);
+const editTenantId = ref<string | null>(null);
+const editModalVisible = ref(false);
 const editName = ref("");
 const editAccessCode = ref("");
 const toastTitle = ref("");
@@ -243,20 +246,22 @@ const handleCreate = async () => {
   }
 };
 
-const startEdit = (tenant: SuperTenant) => {
-  editingId.value = tenant.id;
+const openEditModal = (tenant: SuperTenant) => {
+  editTenantId.value = tenant.id;
   editName.value = tenant.name;
   editAccessCode.value = tenant.access_code;
+  editModalVisible.value = true;
 };
 
-const cancelEdit = () => {
-  editingId.value = null;
+const closeEditModal = () => {
+  editModalVisible.value = false;
+  editTenantId.value = null;
   editName.value = "";
   editAccessCode.value = "";
 };
 
 const saveEdit = async () => {
-  if (!editingId.value) return;
+  if (!editTenantId.value) return;
   if (!editName.value.trim() || !editAccessCode.value.trim()) {
     showToast("Invalid input", "Enter tenant name and access code.");
     return;
@@ -265,17 +270,33 @@ const saveEdit = async () => {
   isSaving.value = true;
   try {
     const updated = await updateTenant({
-      id: editingId.value,
+      id: editTenantId.value,
       name: editName.value.trim(),
       access_code: editAccessCode.value.trim(),
     });
     tenants.value = tenants.value.map((tenant) =>
       tenant.id === updated.id ? updated : tenant
     );
-    cancelEdit();
+    closeEditModal();
     showToast("Tenant updated", "Tenant details were updated.");
   } catch (err) {
     showToast("Update failed", err instanceof Error ? err.message : "Unable to update tenant.");
+  } finally {
+    isSaving.value = false;
+  }
+};
+
+const sendEditTenantReset = async () => {
+  if (!editTenantId.value) return;
+  isSaving.value = true;
+  try {
+    const data = await sendPrimaryAdminReset({ tenant_id: editTenantId.value });
+    showToast("Reset sent", `Password reset sent to ${data.auth_email}.`);
+  } catch (err) {
+    showToast(
+      "Reset failed",
+      err instanceof Error ? err.message : "Unable to send reset link."
+    );
   } finally {
     isSaving.value = false;
   }
@@ -332,22 +353,35 @@ const confirmStatusChange = async (payload: {
   }
 };
 
-const sendTenantReset = async (tenant: SuperTenant) => {
-  isSaving.value = true;
-  try {
-    const data = await sendPrimaryAdminReset({ tenant_id: tenant.id });
-    showToast("Reset sent", `Password reset sent to ${data.auth_email}.`);
-  } catch (err) {
-    showToast(
-      "Reset failed",
-      err instanceof Error ? err.message : "Unable to send reset link."
-    );
-  } finally {
-    isSaving.value = false;
-  }
-};
-
 onMounted(() => {
   void loadTenants();
 });
 </script>
+
+<style scoped>
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(5, 10, 20, 0.52);
+  display: grid;
+  place-items: center;
+  z-index: 80;
+  padding: 1rem;
+}
+
+.modal {
+  width: min(520px, 100%);
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.24);
+  padding: 1rem;
+}
+
+.actions-cell {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+</style>

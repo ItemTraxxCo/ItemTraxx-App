@@ -18,6 +18,7 @@
         <label>First Name<input v-model="formFirstName" type="text" /></label>
         <label>Last Name<input v-model="formLastName" type="text" /></label>
         <label>Student ID<input v-model="formStudentId" type="text" /></label>
+        <label>Email<input v-model="formEmail" type="email" placeholder="student@email.com" /></label>
         <div class="form-actions"><button type="submit" class="button-primary" :disabled="isSaving">Create</button></div>
       </form>
     </div>
@@ -29,13 +30,18 @@
         <input v-model="search" type="text" placeholder="Search" />
         <button type="button" @click="loadStudents">Search</button>
       </div>
+      <div class="form-actions">
+        <button type="button" @click="exportCsv">Export CSV</button>
+        <button type="button" @click="exportPdf">Export PDF</button>
+      </div>
       <p v-if="isLoading" class="muted">Loading students...</p>
       <p v-else-if="error" class="error">{{ error }}</p>
       <table v-else class="table">
-        <thead><tr><th>Name</th><th>Tenant</th><th>Student ID</th><th>Actions</th></tr></thead>
+        <thead><tr><th>Name</th><th>Email</th><th>Tenant</th><th>Student ID</th><th>Actions</th></tr></thead>
         <tbody>
           <tr v-for="item in students" :key="item.id">
             <td>{{ item.first_name }} {{ item.last_name }}</td>
+            <td>{{ item.email || "-" }}</td>
             <td>{{ tenantNameById.get(item.tenant_id) || item.tenant_id }}</td>
             <td>{{ item.student_id }}</td>
             <td>
@@ -69,6 +75,7 @@ import { RouterLink } from "vue-router";
 import StepUpModal from "../../components/StepUpModal.vue";
 import { createSuperStudent, deleteSuperStudent, listSuperStudents, updateSuperStudent, type SuperStudentItem } from "../../services/superStudentService";
 import { listTenants, type SuperTenant } from "../../services/superTenantService";
+import { exportRowsToCsv, exportRowsToPdf } from "../../services/exportService";
 
 const tenants = ref<SuperTenant[]>([]);
 const students = ref<SuperStudentItem[]>([]);
@@ -81,6 +88,7 @@ const formTenantId = ref("");
 const formFirstName = ref("");
 const formLastName = ref("");
 const formStudentId = ref("");
+const formEmail = ref("");
 const editItem = ref<SuperStudentItem | null>(null);
 const editFirstName = ref("");
 const editLastName = ref("");
@@ -121,6 +129,35 @@ const loadStudents = async () => {
   }
 };
 
+const exportCsv = () => {
+  exportRowsToCsv(
+    `super-students-${new Date().toISOString().slice(0, 10)}.csv`,
+    ["tenant", "first_name", "last_name", "student_id", "email"],
+    students.value.map((item) => ({
+      tenant: tenantNameById.value.get(item.tenant_id) || item.tenant_id,
+      first_name: item.first_name,
+      last_name: item.last_name,
+      student_id: item.student_id,
+      email: item.email || "",
+    }))
+  );
+};
+
+const exportPdf = () => {
+  exportRowsToPdf(
+    `super-students-${new Date().toISOString().slice(0, 10)}.pdf`,
+    "Super Students Export",
+    ["tenant", "first_name", "last_name", "student_id", "email"],
+    students.value.map((item) => ({
+      tenant: tenantNameById.value.get(item.tenant_id) || item.tenant_id,
+      first_name: item.first_name,
+      last_name: item.last_name,
+      student_id: item.student_id,
+      email: item.email || "",
+    }))
+  );
+};
+
 const handleCreate = async () => {
   if (!formTenantId.value || !formFirstName.value.trim() || !formLastName.value.trim() || !formStudentId.value.trim()) {
     showToast("Invalid input", "All fields are required.");
@@ -133,11 +170,13 @@ const handleCreate = async () => {
       first_name: formFirstName.value.trim(),
       last_name: formLastName.value.trim(),
       student_id: formStudentId.value.trim(),
+      email: formEmail.value.trim(),
     });
     students.value = [created, ...students.value];
     formFirstName.value = "";
     formLastName.value = "";
     formStudentId.value = "";
+    formEmail.value = "";
     showToast("Created", "Student created.");
   } catch (err) {
     showToast("Create failed", err instanceof Error ? err.message : "Unable to create student.");

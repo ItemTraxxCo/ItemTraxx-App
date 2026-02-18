@@ -20,6 +20,7 @@
         <input v-model="search" type="text" placeholder="Search logs" />
         <button type="button" @click="loadLogs">Search</button>
         <button type="button" @click="exportCsv">Export CSV</button>
+        <button type="button" @click="exportPdf">Export PDF</button>
       </div>
 
       <p v-if="isLoading" class="muted">Loading logs...</p>
@@ -52,6 +53,7 @@ import { onMounted, ref } from "vue";
 import { RouterLink } from "vue-router";
 import { listSuperLogs, type SuperLogEntry } from "../../services/superLogsService";
 import { listTenants, type SuperTenant } from "../../services/superTenantService";
+import { exportRowsToCsv, exportRowsToPdf } from "../../services/exportService";
 
 const tenants = ref<SuperTenant[]>([]);
 const rows = ref<SuperLogEntry[]>([]);
@@ -126,27 +128,29 @@ const exportCsv = () => {
     showToast("Export", "No rows to export.");
     return;
   }
-  const header = ["time", "tenant", "action", "gear_name", "gear_barcode", "student"];
-  const lines = rows.value.map((row) => [
-    row.action_time,
-    row.tenant?.name ?? row.tenant_id,
-    row.action_type,
-    row.gear?.name ?? "",
-    row.gear?.barcode ?? "",
-    row.student ? `${row.student.first_name} ${row.student.last_name} (${row.student.student_id})` : "",
-  ]);
-  const csv = [header, ...lines]
-    .map((line) =>
-      line.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(",")
-    )
-    .join("\n");
-  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `super-logs-page-${page.value}.csv`;
-  a.click();
-  URL.revokeObjectURL(url);
+  exportRowsToCsv(`super-logs-page-${page.value}.csv`, ["time", "tenant", "action", "gear_name", "gear_barcode", "student"], rows.value.map((row) => ({
+    time: formatDateTime(row.action_time),
+    tenant: row.tenant?.name ?? row.tenant_id,
+    action: row.action_type,
+    gear_name: row.gear?.name ?? "",
+    gear_barcode: row.gear?.barcode ?? "",
+    student: row.student ? `${row.student.first_name} ${row.student.last_name} (${row.student.student_id})` : "",
+  })));
+};
+
+const exportPdf = () => {
+  if (!rows.value.length) {
+    showToast("Export", "No rows to export.");
+    return;
+  }
+  exportRowsToPdf(`super-logs-page-${page.value}.pdf`, "Super Logs Export", ["time", "tenant", "action", "gear_name", "gear_barcode", "student"], rows.value.map((row) => ({
+    time: formatDateTime(row.action_time),
+    tenant: row.tenant?.name ?? row.tenant_id,
+    action: row.action_type,
+    gear_name: row.gear?.name ?? "",
+    gear_barcode: row.gear?.barcode ?? "",
+    student: row.student ? `${row.student.first_name} ${row.student.last_name} (${row.student.student_id})` : "",
+  })));
 };
 
 onMounted(async () => {

@@ -29,9 +29,7 @@
           Losing track of where stuff goes? ItemTraxx is the right service for you.
         </p>
         <p class="hero-description">
-          ItemTraxx is the next inventory tracking system. Modern, sleek, and secure. Our
-          goal is to remove your inventory tracking issues by making it as simple as possible,
-          while also providing advanced capabilities and enhanced security.
+          Closed beta now live. Contact us to get early access and start mastering your inventory with ItemTraxx's streamlined checkout, returns, and admin management.
         </p>
         <div class="hero-actions">
           <a

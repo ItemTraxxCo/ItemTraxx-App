@@ -313,6 +313,55 @@ textarea {
   align-items: flex-end;
 }
 
+.broadcast-banner {
+  position: fixed;
+  top: 1rem;
+  left: 1rem;
+  z-index: 1001;
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  max-width: min(720px, calc(100vw - 6rem));
+  padding: 0.75rem 0.9rem;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.18);
+}
+
+.broadcast-content {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.broadcast-title {
+  font-size: 0.8rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.broadcast-message {
+  font-size: 0.92rem;
+}
+
+.broadcast-dismiss {
+  margin-left: auto;
+  white-space: nowrap;
+}
+
+.broadcast-info {
+  border-color: rgba(31, 111, 235, 0.5);
+}
+
+.broadcast-warning {
+  border-color: rgba(247, 176, 31, 0.6);
+}
+
+.broadcast-critical {
+  border-color: rgba(210, 38, 38, 0.7);
+}
+
 .menu-button {
   width: 40px;
   height: 36px;

@@ -1,5 +1,20 @@
 <template>
   <div class="app-shell">
+    <div
+      v-if="activeBroadcast && showBroadcast"
+      class="broadcast-banner"
+      :class="`broadcast-${activeBroadcast.level}`"
+      role="status"
+      aria-live="polite"
+    >
+      <div class="broadcast-content">
+        <strong class="broadcast-title">Broadcast</strong>
+        <span class="broadcast-message">{{ activeBroadcast.message }}</span>
+      </div>
+      <button type="button" class="broadcast-dismiss" @click="dismissBroadcast">
+        Dismiss
+      </button>
+    </div>
     <div v-if="showTopMenu" class="top-menu">
       <div class="menu-button-wrap">
         <span v-if="isOutdated" class="menu-alert" aria-hidden="true">!</span>
@@ -72,6 +87,14 @@ const route = useRoute();
 const menuOpen = ref(false);
 const theme = ref<"light" | "dark">("light");
 const appVersion = import.meta.env.VITE_GIT_COMMIT || "n/a";
+type BroadcastLevel = "info" | "warning" | "critical";
+type BroadcastPayload = {
+  id: string;
+  message: string;
+  level: BroadcastLevel;
+};
+const activeBroadcast = ref<BroadcastPayload | null>(null);
+const dismissedBroadcastId = ref(localStorage.getItem("itemtraxx-broadcast-dismissed") || "");
 const statusLabel = ref("Unknown");
 const statusClass = ref<"status-ok" | "status-warn" | "status-down" | "status-unknown">(
   "status-unknown"
@@ -89,6 +112,11 @@ const themeLabel = computed(() =>
   theme.value === "dark" ? "Light Mode" : "Dark Mode"
 );
 const showTopMenu = computed(() => route.name !== "public-home");
+const showBroadcast = computed(() => {
+  if (!auth.isAuthenticated) return false;
+  if (!activeBroadcast.value) return false;
+  return dismissedBroadcastId.value !== activeBroadcast.value.id;
+});
 
 const applyTheme = (next: "light" | "dark") => {
   theme.value = next;
@@ -124,6 +152,12 @@ const reloadApp = () => {
   window.location.reload();
 };
 
+const dismissBroadcast = () => {
+  if (!activeBroadcast.value) return;
+  dismissedBroadcastId.value = activeBroadcast.value.id;
+  localStorage.setItem("itemtraxx-broadcast-dismissed", activeBroadcast.value.id);
+};
+
 const refreshSystemStatus = async () => {
   const functionsBaseUrl = getEdgeFunctionsBaseUrl();
   if (!functionsBaseUrl) {
@@ -145,7 +179,31 @@ const refreshSystemStatus = async () => {
 
     const payload = (await response.json().catch(() => ({}))) as {
       status?: string;
+      broadcast?: {
+        enabled?: boolean;
+        message?: string;
+        level?: string;
+        updated_at?: string;
+      };
     };
+
+    const broadcast = payload.broadcast;
+    if (broadcast?.enabled && typeof broadcast.message === "string" && broadcast.message.trim()) {
+      const level: BroadcastLevel =
+        broadcast.level === "warning" || broadcast.level === "critical"
+          ? broadcast.level
+          : "info";
+      const broadcastId = typeof broadcast.updated_at === "string" && broadcast.updated_at
+        ? broadcast.updated_at
+        : broadcast.message.trim();
+      activeBroadcast.value = {
+        id: broadcastId,
+        message: broadcast.message.trim(),
+        level,
+      };
+    } else {
+      activeBroadcast.value = null;
+    }
 
     if (response.ok && payload.status === "operational") {
       statusLabel.value = "Running";

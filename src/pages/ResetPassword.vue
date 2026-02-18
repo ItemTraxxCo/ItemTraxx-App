@@ -31,7 +31,7 @@
       </form>
       <p v-if="error" class="error">{{ error }}</p>
       <p v-if="success" class="muted">
-        Password updated successfully. You can now sign in.
+        Password updated successfully. Redirecting back to login in {{ redirectCountdown }}...
       </p>
       <RouterLink class="link" to="/login">Back to login</RouterLink>
     </div>
@@ -39,7 +39,7 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref } from "vue";
+import { onMounted, onUnmounted, ref } from "vue";
 import { RouterLink, useRouter } from "vue-router";
 import { supabase } from "../services/supabaseClient";
 
@@ -50,6 +50,8 @@ const error = ref("");
 const isLoading = ref(false);
 const isReady = ref(false);
 const success = ref(false);
+const redirectCountdown = ref(5);
+let redirectTimer: number | null = null;
 
 const checkRecoverySession = async () => {
   const attempt = async () => {
@@ -92,9 +94,20 @@ const handleReset = async () => {
     }
     success.value = true;
     await supabase.auth.signOut();
-    window.setTimeout(() => {
-      void router.push("/login");
-    }, 900);
+    redirectCountdown.value = 5;
+    if (redirectTimer) {
+      window.clearInterval(redirectTimer);
+    }
+    redirectTimer = window.setInterval(() => {
+      redirectCountdown.value -= 1;
+      if (redirectCountdown.value <= 0) {
+        if (redirectTimer) {
+          window.clearInterval(redirectTimer);
+          redirectTimer = null;
+        }
+        void router.push("/login");
+      }
+    }, 1000);
   } finally {
     isLoading.value = false;
   }
@@ -104,6 +117,13 @@ onMounted(async () => {
   await checkRecoverySession();
   if (!isReady.value) {
     error.value = "Invalid or expired reset link. Request a new reset email.";
+  }
+});
+
+onUnmounted(() => {
+  if (redirectTimer) {
+    window.clearInterval(redirectTimer);
+    redirectTimer = null;
   }
 });
 </script>

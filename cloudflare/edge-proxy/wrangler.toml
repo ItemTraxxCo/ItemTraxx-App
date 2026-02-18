@@ -6,4 +6,4 @@ compatibility_date = "2026-02-11"
 # Comma-separated origins allowed to call this proxy.
 ALLOWED_ORIGINS = "https://itemtraxx.com,https://www.itemtraxx.com,http://localhost:5173,http://localhost:5174"
 # Optional hard allowlist of function names (comma-separated).
-ALLOWED_FUNCTIONS = "tenant-login,checkoutReturn,create-tenant-admin,admin-gear-mutate,admin-student-mutate,system-status,super-tenant-mutate,super-admin-mutate,super-dashboard,super-gear-mutate,super-student-mutate,super-logs-query"
+ALLOWED_FUNCTIONS = "tenant-login,checkoutReturn,create-tenant-admin,admin-gear-mutate,admin-student-mutate,system-status,super-tenant-mutate,super-admin-mutate,super-dashboard,super-gear-mutate,super-student-mutate,super-logs-query,super-ops"

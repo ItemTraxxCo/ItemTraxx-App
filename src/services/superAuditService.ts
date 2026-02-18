@@ -18,6 +18,39 @@ export type SuperDashboard = {
   suspended_tenants: number;
   tenant_admins_count: number;
   recent_actions: SuperAuditLog[];
+  tenant_metrics: Array<{
+    tenant_id: string;
+    tenant_name: string;
+    gear_total: number;
+    students_total: number;
+    active_checkouts: number;
+    overdue_items: number;
+    transactions_7d: number;
+  }>;
+  alert_events: Array<{
+    id: string;
+    name: string;
+    metric_key: string;
+    threshold: number;
+    current: number;
+    severity: "warn" | "critical";
+  }>;
+  runtime_config: Record<string, unknown>;
+  pending_approvals: Array<{
+    id: string;
+    action_type: string;
+    status: string;
+    created_at: string;
+    requested_by: string;
+  }>;
+  jobs: Array<{
+    id: string;
+    job_type: string;
+    status: string;
+    details: Record<string, unknown>;
+    created_at: string;
+    updated_at: string;
+  }>;
 };
 
 const getAccessToken = async () => {

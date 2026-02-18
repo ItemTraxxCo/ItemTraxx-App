@@ -152,6 +152,37 @@ serve(async (req) => {
     let incidentStatus: "operational" | "degraded" | "down" = "operational";
     let incidentSummary = "not configured";
     let incidentCheck: "ok" | "warn" | "unavailable" = "unavailable";
+    let broadcast: {
+      enabled: boolean;
+      message: string;
+      level: "info" | "warning" | "critical";
+      updated_at: string;
+    } | null = null;
+
+    const { data: broadcastRow, error: broadcastError } = await adminClient
+      .from("app_runtime_config")
+      .select("key, value, updated_at")
+      .eq("key", "broadcast_message")
+      .maybeSingle();
+
+    if (!broadcastError && broadcastRow?.value && typeof broadcastRow.value === "object") {
+      const value = broadcastRow.value as Record<string, unknown>;
+      const enabled = value.enabled === true;
+      const message = typeof value.message === "string" ? value.message.trim() : "";
+      const level =
+        value.level === "warning" || value.level === "critical" ? value.level : "info";
+      if (enabled && message) {
+        broadcast = {
+          enabled: true,
+          message,
+          level,
+          updated_at:
+            typeof value.updated_at === "string" && value.updated_at
+              ? value.updated_at
+              : broadcastRow.updated_at ?? new Date().toISOString(),
+        };
+      }
+    }
 
     if (incidentWidgetUrl) {
       try {
@@ -192,6 +223,7 @@ serve(async (req) => {
         db: "ok",
         incident_io: incidentCheck,
       },
+      broadcast,
       incident_summary: incidentSummary,
       duration_ms: Date.now() - startedAt,
       checked_at: new Date().toISOString(),

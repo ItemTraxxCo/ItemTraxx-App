@@ -64,3 +64,58 @@ create policy "super_admin_insert_super_admin_audit_logs"
 -- Optional helper index for dashboard/action history
 create index if not exists idx_super_admin_audit_logs_created_at
   on public.super_admin_audit_logs (created_at desc);
+
+create table if not exists public.app_runtime_config (
+  key text primary key,
+  value jsonb not null default '{}'::jsonb,
+  updated_by uuid references auth.users(id) on delete set null,
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists public.super_alert_rules (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  metric_key text not null,
+  threshold numeric not null,
+  is_enabled boolean not null default true,
+  created_by uuid references auth.users(id) on delete set null,
+  created_at timestamptz not null default now()
+);
+
+create table if not exists public.tenant_policies (
+  tenant_id uuid primary key references public.tenants(id) on delete cascade,
+  max_admins int,
+  max_students int,
+  max_gear int,
+  barcode_pattern text,
+  updated_by uuid references auth.users(id) on delete set null,
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists public.super_approvals (
+  id uuid primary key default gen_random_uuid(),
+  action_type text not null,
+  payload jsonb not null,
+  requested_by uuid not null references auth.users(id) on delete cascade,
+  approved_by uuid references auth.users(id) on delete set null,
+  status text not null default 'pending',
+  created_at timestamptz not null default now(),
+  decided_at timestamptz
+);
+
+create table if not exists public.super_jobs (
+  id uuid primary key default gen_random_uuid(),
+  job_type text not null,
+  status text not null default 'queued',
+  details jsonb not null default '{}'::jsonb,
+  created_by uuid references auth.users(id) on delete set null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists public.tenant_security_controls (
+  tenant_id uuid primary key references public.tenants(id) on delete cascade,
+  force_reauth_after timestamptz,
+  updated_by uuid references auth.users(id) on delete set null,
+  updated_at timestamptz not null default now()
+);

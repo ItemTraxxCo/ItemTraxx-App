@@ -186,6 +186,16 @@ const routes: RouteRecordRaw[] = [
     },
   },
   {
+    path: "/super-admin/broadcasts",
+    name: "super-admin-broadcasts",
+    component: () => import("../pages/super/Broadcasts.vue"),
+    meta: {
+      requiresSession: true,
+      requiresRole: "super_admin",
+      requiresSuperAuth: true,
+    },
+  },
+  {
     path: "/:pathMatch(.*)*",
     name: "not-found",
     component: () => import("../pages/NotFound.vue"),

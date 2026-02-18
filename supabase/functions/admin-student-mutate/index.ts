@@ -90,6 +90,16 @@ serve(async (req) => {
       return jsonResponse(403, { error: "Access denied" });
     }
 
+    const { data: tenantStatusRow } = await userClient
+      .from("tenants")
+      .select("status")
+      .eq("id", profile.tenant_id)
+      .single();
+
+    if (tenantStatusRow?.status === "suspended") {
+      return jsonResponse(403, { error: "Tenant disabled" });
+    }
+
     const { data: rateLimit, error: rateLimitError } = await userClient.rpc(
       "consume_rate_limit",
       {

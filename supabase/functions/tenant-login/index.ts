@@ -266,12 +266,16 @@ serve(async (req) => {
 
     const { data: tenant, error: tenantError } = await adminClient
       .from("tenants")
-      .select("id")
+      .select("id, status")
       .eq("access_code", normalizedAccessCode)
       .single();
 
     if (tenantError || !tenant?.id) {
       return jsonResponse(401, { error: "Invalid access code" });
+    }
+
+    if (tenant.status === "suspended") {
+      return jsonResponse(403, { error: "Tenant disabled" });
     }
 
     const { data: profiles, error: profileError } = await adminClient

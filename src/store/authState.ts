@@ -14,6 +14,7 @@ export type AuthState = {
   isAdmin: boolean;
   isSuperAdmin: boolean;
   hasSecondaryAuth: boolean;
+  superVerifiedAt: string | null;
   adminVerifiedAt: string | null;
 };
 
@@ -29,6 +30,7 @@ const defaultState: AuthState = {
   isAdmin: false,
   isSuperAdmin: false,
   hasSecondaryAuth: false,
+  superVerifiedAt: null,
   adminVerifiedAt: null,
 };
 
@@ -49,6 +51,7 @@ export const setTenantContext = (tenantId: string | null) => {
 
 export const setSecondaryAuth = (value: boolean) => {
   authState.hasSecondaryAuth = value;
+  authState.superVerifiedAt = value ? new Date().toISOString() : null;
 };
 
 export const markAdminVerified = () => {

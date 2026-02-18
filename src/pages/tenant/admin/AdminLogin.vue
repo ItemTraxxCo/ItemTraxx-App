@@ -134,6 +134,9 @@ const handleAdminLogin = async () => {
     if (message === "Invalid credentials.") {
       error.value = "Invalid admin credentials.";
       showToast("Sign in failed", "Invalid admin credentials.");
+    } else if (message === "Tenant disabled.") {
+      error.value = "Tenant is disabled. Access is blocked.";
+      showToast("Access blocked", "Tenant is disabled. Access is blocked.");
     } else if (message === "Access denied.") {
       error.value = "Access denied for this tenant admin panel.";
       showToast("Access denied", "This account cannot access the admin panel.");

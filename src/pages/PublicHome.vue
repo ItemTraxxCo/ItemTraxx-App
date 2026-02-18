@@ -284,6 +284,10 @@ const faqItems = [
     a: "Please contact support at support@itemtraxx.com to suggest any features you'd like to see.",
   },
   {
+    q: "Is this the same as ItemTrax or Item Traxx?",
+    a: "Yes. If you searched for ItemTrax or Item Traxx, this is the official ItemTraxx site.",
+  },
+  {
     q: "Is there a limit to how many items, transactions, and students I can have?",
     a: "No, there are no limits to the number of items, transactions, or students you can have in ItemTraxx. Our system is designed to scale with your needs, so you can manage as much inventory as you require without worrying about hitting any limits.",
   },

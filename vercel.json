@@ -5,7 +5,7 @@
       "headers": [
         {
           "key": "Content-Security-Policy",
-          "value": "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; script-src 'self' https://challenges.cloudflare.com https://va.vercel-scripts.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://mlaspkufocikfcbjgpof.supabase.co; font-src 'self' data:; connect-src 'self' https://mlaspkufocikfcbjgpof.supabase.co https://itemtraxx-edge-proxy.itemtraxx-co.workers.dev https://api.github.com https://va.vercel-scripts.com https://vitals.vercel-insights.com https://challenges.cloudflare.com; frame-src https://challenges.cloudflare.com; worker-src 'self' blob:; manifest-src 'self'; form-action 'self';"
+          "value": "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; script-src 'self' https://challenges.cloudflare.com https://va.vercel-scripts.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: https://mlaspkufocikfcbjgpof.supabase.co; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self' https://mlaspkufocikfcbjgpof.supabase.co https://itemtraxx-edge-proxy.itemtraxx-co.workers.dev https://api.github.com https://va.vercel-scripts.com https://vitals.vercel-insights.com https://challenges.cloudflare.com; frame-src https://challenges.cloudflare.com; worker-src 'self' blob:; manifest-src 'self'; form-action 'self';"
         },
         {
           "key": "Referrer-Policy",

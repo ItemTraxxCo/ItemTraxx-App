@@ -110,7 +110,7 @@
         <div v-if="isOutdated" class="menu-item status-warning">
           Version outdated, refresh to update.
         </div>
-        <a class="menu-item" href="mailto:suport@itemtraxx.com">
+        <a class="menu-item" href="mailto:support@itemtraxx.com">
           Contact Support
         </a>
         <a

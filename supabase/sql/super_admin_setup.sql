@@ -147,6 +147,51 @@ alter table if exists public.students
 alter table if exists public.students
   add column if not exists deleted_by uuid references auth.users(id) on delete set null;
 
+alter table if exists public.students
+  add column if not exists username text;
+
+do $$
+begin
+  if exists (
+    select 1
+    from information_schema.columns c
+    where c.table_schema = 'public'
+      and c.table_name = 'students'
+      and c.column_name = 'first_name'
+  ) and exists (
+    select 1
+    from information_schema.columns c
+    where c.table_schema = 'public'
+      and c.table_name = 'students'
+      and c.column_name = 'last_name'
+  ) then
+    execute $q$
+      update public.students
+      set username = trim(concat_ws(' ', first_name, last_name))
+      where username is null or username = ''
+    $q$;
+  end if;
+end $$;
+
+alter table if exists public.students
+  alter column username set not null;
+
+alter table if exists public.students
+  drop constraint if exists students_student_id_format_check;
+
+alter table if exists public.students
+  add constraint students_student_id_format_check
+  check (student_id ~ '^[0-9]{4}[A-Z]{2}$');
+
+alter table if exists public.students
+  drop column if exists email;
+
+alter table if exists public.students
+  drop column if exists first_name;
+
+alter table if exists public.students
+  drop column if exists last_name;
+
 create index if not exists idx_gear_tenant_deleted_at
   on public.gear (tenant_id, deleted_at);
 
@@ -162,3 +207,12 @@ alter table if exists public.tenant_policies
 
 alter table if exists public.tenant_policies
   add column if not exists escalation_level_3_hours int not null default 240;
+
+alter table if exists public.tenant_policies
+  add column if not exists feature_flags jsonb not null default '{
+    "enable_notifications": true,
+    "enable_bulk_item_import": true,
+    "enable_bulk_student_tools": true,
+    "enable_status_tracking": true,
+    "enable_barcode_generator": true
+  }'::jsonb;

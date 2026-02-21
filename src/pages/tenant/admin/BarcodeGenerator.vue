@@ -6,9 +6,10 @@
     </div>
 
     <h1>Bulk Barcode PDF Generator</h1>
-    <p>Enter one barcode per line, add a message, then generate and download.</p>
+    <p v-if="!featureEnabled" class="error">Barcode generator is disabled for this tenant.</p>
+    <p v-else>Enter one barcode per line, add a message, then generate and download.</p>
 
-    <div class="card">
+    <div v-if="featureEnabled" class="card">
       <form class="form" @submit.prevent="generateBarcodes">
         <label>
           Barcodes (one per line)
@@ -46,14 +47,16 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from "vue";
+import { onMounted, ref } from "vue";
 import { RouterLink } from "vue-router";
 import { downloadBarcodePdf } from "../../../services/barcodePdfService";
+import { fetchTenantSettings } from "../../../services/adminOpsService";
 
 const barcodeInput = ref("");
 const messageInput = ref("");
 const generatedBarcodes = ref<string[]>([]);
 const error = ref("");
+const featureEnabled = ref(true);
 
 const normalizeBarcodes = (raw: string) => {
   const lines = raw
@@ -81,4 +84,13 @@ const downloadPdf = () => {
     error.value = err instanceof Error ? err.message : "Unable to generate PDF.";
   }
 };
+
+onMounted(async () => {
+  try {
+    const settings = await fetchTenantSettings();
+    featureEnabled.value = settings.feature_flags.enable_barcode_generator;
+  } catch {
+    featureEnabled.value = true;
+  }
+});
 </script>

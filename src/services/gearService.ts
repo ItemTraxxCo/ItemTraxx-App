@@ -20,7 +20,7 @@ export type GearLog = {
   action_time: string;
   performed_by: string | null;
   gear: { name: string; barcode: string } | null;
-  student: { first_name: string; last_name: string; student_id: string } | null;
+  student: { username: string; student_id: string } | null;
 };
 
 type MaybeRelation<T> = T | T[] | null;
@@ -187,7 +187,7 @@ export const fetchGearLogs = async () => {
         action_time,
         performed_by,
         gear:gear_id ( name, barcode ),
-        student:checked_out_by ( first_name, last_name, student_id )
+        student:checked_out_by ( username, student_id )
       `
     )
     .order("action_time", { ascending: false })
@@ -207,8 +207,7 @@ export const fetchGearLogs = async () => {
     performed_by: string | null;
     gear: MaybeRelation<{ name: string; barcode: string }>;
     student: MaybeRelation<{
-      first_name: string;
-      last_name: string;
+      username: string;
       student_id: string;
     }>;
   }>;

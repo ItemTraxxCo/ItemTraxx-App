@@ -9,6 +9,14 @@ export type SuperTenant = {
   created_at: string;
   primary_admin_profile_id?: string | null;
   primary_admin_email?: string | null;
+  checkout_due_hours?: number;
+  feature_flags?: {
+    enable_notifications?: boolean;
+    enable_bulk_item_import?: boolean;
+    enable_bulk_student_tools?: boolean;
+    enable_status_tracking?: boolean;
+    enable_barcode_generator?: boolean;
+  };
 };
 
 type SuperTenantAction =

@@ -13,6 +13,252 @@ type RateLimitResult = {
   retry_after_seconds: number | null;
 };
 
+const CODENAME_PREFIXES = [
+  "Nova",
+  "Echo",
+  "Atlas",
+  "Pixel",
+  "Orbit",
+  "Scout",
+  "Comet",
+  "Lumen",
+  "Aster",
+  "Vivid",
+  "Aero",
+  "Blaze",
+  "Cobalt",
+  "Delta",
+  "Falcon",
+  "Glint",
+  "Helix",
+  "Indigo",
+  "Jade",
+  "Lynx",
+  "Mosaic",
+  "Nimbus",
+  "Onyx",
+  "Prism",
+  "Quartz",
+  "Raven",
+  "Solar",
+  "Topaz",
+  "Vector",
+  "Willow",
+  "Zephyr",
+  "Beacon",
+  "Cosmo",
+  "Dawn",
+  "Ember",
+  "Frost",
+  "Gale",
+  "Horizon",
+  "Jet",
+  "Lagoon",
+  "Laser",
+  "Lotus",
+  "Lunar",
+  "Neon",
+  "Ocean",
+  "Opal",
+  "Pioneer",
+  "Rocket",
+  "Saffron",
+  "Terra",
+  "Auric",
+  "Boreal",
+  "Cascade",
+  "Cipher",
+  "Crimson",
+  "Draco",
+  "Emberly",
+  "Fable",
+  "Galaxy",
+  "Haven",
+  "Ion",
+  "Krypton",
+  "Lucid",
+  "Mirage",
+  "Noble",
+  "Obsidian",
+  "Parallax",
+  "Radiant",
+  "Sierra",
+  "Tempest",
+  "Unity",
+  "Verdant",
+  "Warden",
+  "Yukon",
+  "Zenith",
+  "Aurora",
+  "Brisk",
+  "Cadence",
+  "Dynamo",
+  "Element",
+  "Flux",
+  "Garnet",
+  "Helio",
+  "Jovian",
+  "Kepler",
+  "Lattice",
+  "Matrix",
+  "Nexus",
+  "Orion",
+];
+
+const CODENAME_SUFFIXES = [
+  "Fox",
+  "Pine",
+  "Wave",
+  "Maple",
+  "River",
+  "Spark",
+  "Drift",
+  "Cedar",
+  "Birch",
+  "Stone",
+  "Oak",
+  "Trail",
+  "Brook",
+  "Field",
+  "Grove",
+  "Vale",
+  "Summit",
+  "Harbor",
+  "Ridge",
+  "Meadow",
+  "Glade",
+  "Bay",
+  "Cliff",
+  "Falls",
+  "Peak",
+  "Dune",
+  "Creek",
+  "Forest",
+  "Lake",
+  "Shore",
+  "Spruce",
+  "Elm",
+  "Sage",
+  "Anchor",
+  "Bluff",
+  "Branch",
+  "Cloud",
+  "Coast",
+  "Copper",
+  "Cove",
+  "Delta",
+  "Eagle",
+  "Fern",
+  "Flame",
+  "Fjord",
+  "Glacier",
+  "Hawk",
+  "Island",
+  "Jasper",
+  "Valley",
+  "Arbor",
+  "Badge",
+  "Beacon",
+  "Briar",
+  "Canopy",
+  "Cascade",
+  "Chime",
+  "Comet",
+  "Compass",
+  "Crescent",
+  "Crossing",
+  "Current",
+  "Dawn",
+  "Echo",
+  "Ember",
+  "Estuary",
+  "Evergreen",
+  "Flint",
+  "Frontier",
+  "Glow",
+  "Grove",
+  "Harbor",
+  "Horizon",
+  "Jetty",
+  "Juniper",
+  "Kernel",
+  "Lantern",
+  "Ledge",
+  "Marina",
+  "Moraine",
+  "Nectar",
+  "Nook",
+  "Orchard",
+  "Pass",
+  "Pond",
+  "Port",
+  "Quarry",
+  "Raptor",
+  "Rift",
+  "Roost",
+  "Signal",
+  "Sound",
+  "Spire",
+  "Station",
+  "Tide",
+  "Vista",
+  "Wharf",
+  "Yard",
+  "Yarrow",
+  "Zeal",
+];
+
+const randomDigits = (len: number) =>
+  Array.from({ length: len }, () => Math.floor(Math.random() * 10)).join("");
+
+const randomLetters = (len: number) =>
+  Array.from({ length: len }, () =>
+    String.fromCharCode(65 + Math.floor(Math.random() * 26))
+  ).join("");
+
+const generateStudentId = () => `${randomDigits(4)}${randomLetters(2)}`;
+
+const generateUsername = () => {
+  const prefix =
+    CODENAME_PREFIXES[Math.floor(Math.random() * CODENAME_PREFIXES.length)];
+  const suffix =
+    CODENAME_SUFFIXES[Math.floor(Math.random() * CODENAME_SUFFIXES.length)];
+  const token = `${randomLetters(2)}${randomDigits(4)}`;
+  return `${prefix}${suffix}${token}`;
+};
+
+const buildUniqueStudentIdentity = async (
+  adminClient: ReturnType<typeof createClient>,
+  tenantId: string
+) => {
+  for (let attempt = 0; attempt < 12; attempt += 1) {
+    const candidateStudentId = generateStudentId();
+    const candidateUsername = generateUsername();
+    const { data: conflictStudentId } = await adminClient
+      .from("students")
+      .select("id")
+      .eq("tenant_id", tenantId)
+      .eq("student_id", candidateStudentId)
+      .limit(1)
+      .maybeSingle();
+    if (conflictStudentId?.id) {
+      continue;
+    }
+    const { data: conflictUsername } = await adminClient
+      .from("students")
+      .select("id")
+      .eq("tenant_id", tenantId)
+      .eq("username", candidateUsername)
+      .limit(1)
+      .maybeSingle();
+    if (conflictUsername?.id) {
+      continue;
+    }
+    return { studentId: candidateStudentId, username: candidateUsername };
+  }
+  throw new Error("Unable to generate a unique student identity.");
+};
+
 const resolveCorsHeaders = (req: Request) => {
   const origin = req.headers.get("Origin");
   const allowedOrigins = (Deno.env.get("ITX_ALLOWED_ORIGINS") ?? "")
@@ -150,7 +396,7 @@ serve(async (req) => {
     if (action === "list_deleted") {
       const { data, error } = await adminClient
         .from("students")
-        .select("id, tenant_id, first_name, last_name, student_id")
+        .select("id, tenant_id, username, student_id")
         .eq("tenant_id", profile.tenant_id)
         .not("deleted_at", "is", null)
         .order("deleted_at", { ascending: false })
@@ -164,32 +410,52 @@ serve(async (req) => {
     }
 
     if (action === "create") {
-      const { first_name, last_name, student_id } = payload as Record<string, unknown>;
-      const normalizedFirstName =
-        typeof first_name === "string" ? first_name.trim() : "";
-      const normalizedLastName = typeof last_name === "string" ? last_name.trim() : "";
-      const normalizedStudentId =
-        typeof student_id === "string" ? student_id.trim() : "";
-      if (
-        !normalizedFirstName ||
-        normalizedFirstName.length > 80 ||
-        !normalizedLastName ||
-        normalizedLastName.length > 80 ||
-        !normalizedStudentId ||
-        normalizedStudentId.length > 32
-      ) {
-        return jsonResponse(400, { error: "Invalid request" });
+      const payloadRecord = payload as Record<string, unknown>;
+      const providedStudentId =
+        typeof payloadRecord.student_id === "string"
+          ? payloadRecord.student_id.trim().toUpperCase()
+          : "";
+      const providedUsername =
+        typeof payloadRecord.username === "string"
+          ? payloadRecord.username.trim()
+          : "";
+      const hasValidProvidedId = /^[0-9]{4}[A-Z]{2}$/.test(providedStudentId);
+      const hasValidProvidedUsername =
+        providedUsername.length >= 4 && providedUsername.length <= 40;
+      let studentId = hasValidProvidedId ? providedStudentId : "";
+      let username = hasValidProvidedUsername ? providedUsername : "";
+
+      if (studentId && username) {
+        const { data: existingConflict } = await adminClient
+          .from("students")
+          .select("id")
+          .eq("tenant_id", profile.tenant_id)
+          .or(`student_id.eq.${studentId},username.eq.${username}`)
+          .limit(1)
+          .maybeSingle();
+        if (existingConflict?.id) {
+          studentId = "";
+          username = "";
+        }
+      }
+
+      if (!studentId || !username) {
+        const generatedIdentity = await buildUniqueStudentIdentity(
+          adminClient,
+          profile.tenant_id
+        );
+        studentId = generatedIdentity.studentId;
+        username = generatedIdentity.username;
       }
 
       const { data, error } = await adminClient
         .from("students")
         .insert({
           tenant_id: profile.tenant_id,
-          first_name: normalizedFirstName,
-          last_name: normalizedLastName,
-          student_id: normalizedStudentId,
+          username,
+          student_id: studentId,
         })
-        .select("id, tenant_id, first_name, last_name, student_id")
+        .select("id, tenant_id, username, student_id")
         .single();
 
       if (error || !data) {
@@ -197,6 +463,148 @@ serve(async (req) => {
       }
 
       return jsonResponse(200, { data });
+    }
+
+    if (action === "bulk_create") {
+      const payloadRecord = payload as Record<string, unknown>;
+      const rows = Array.isArray(payloadRecord.rows)
+        ? (payloadRecord.rows as Array<Record<string, unknown>>)
+        : [];
+
+      if (!rows.length || rows.length > 500) {
+        return jsonResponse(400, { error: "Provide between 1 and 500 rows." });
+      }
+
+      const inserted: Array<{
+        id: string;
+        tenant_id: string;
+        username: string;
+        student_id: string;
+      }> = [];
+      const skipped: Array<{ row: number; reason: string }> = [];
+      const seenIds = new Set<string>();
+      const seenUsernames = new Set<string>();
+
+      const normalizedRows = rows.map((row, index) => {
+        const username =
+          typeof row.username === "string" ? row.username.trim() : "";
+        const studentId =
+          typeof row.student_id === "string"
+            ? row.student_id.trim().toUpperCase()
+            : "";
+
+        return { row: index + 1, username, studentId };
+      });
+
+      const requestedIds = normalizedRows
+        .map((row) => row.studentId)
+        .filter((value) => /^[0-9]{4}[A-Z]{2}$/.test(value));
+      const requestedUsernames = normalizedRows
+        .map((row) => row.username)
+        .filter((value) => value.length >= 4 && value.length <= 40);
+
+      const [existingByIdResult, existingByUsernameResult] = await Promise.all([
+        requestedIds.length
+          ? adminClient
+              .from("students")
+              .select("student_id")
+              .eq("tenant_id", profile.tenant_id)
+              .in("student_id", requestedIds)
+          : Promise.resolve({ data: [], error: null }),
+        requestedUsernames.length
+          ? adminClient
+              .from("students")
+              .select("username")
+              .eq("tenant_id", profile.tenant_id)
+              .in("username", requestedUsernames)
+          : Promise.resolve({ data: [], error: null }),
+      ]);
+
+      if (existingByIdResult.error || existingByUsernameResult.error) {
+        return jsonResponse(400, { error: "Unable to validate student rows." });
+      }
+
+      const existingIds = new Set(
+        ((existingByIdResult.data ?? []) as Array<{ student_id: string }>).map((row) =>
+          row.student_id.toUpperCase()
+        )
+      );
+      const existingUsernames = new Set(
+        ((existingByUsernameResult.data ?? []) as Array<{ username: string }>).map((row) =>
+          row.username.toLowerCase()
+        )
+      );
+
+      for (const row of normalizedRows) {
+        const hasValidId = /^[0-9]{4}[A-Z]{2}$/.test(row.studentId);
+        const hasValidUsername = row.username.length >= 4 && row.username.length <= 40;
+        let studentId = hasValidId ? row.studentId : "";
+        let username = hasValidUsername ? row.username : "";
+
+        if (
+          studentId &&
+          (existingIds.has(studentId) || seenIds.has(studentId))
+        ) {
+          skipped.push({ row: row.row, reason: "Student ID already exists." });
+          continue;
+        }
+
+        if (
+          username &&
+          (existingUsernames.has(username.toLowerCase()) ||
+            seenUsernames.has(username.toLowerCase()))
+        ) {
+          skipped.push({ row: row.row, reason: "Username already exists." });
+          continue;
+        }
+
+        if (!studentId || !username) {
+          try {
+            const generated = await buildUniqueStudentIdentity(
+              adminClient,
+              profile.tenant_id
+            );
+            studentId = generated.studentId;
+            username = generated.username;
+          } catch {
+            skipped.push({ row: row.row, reason: "Unable to generate identity." });
+            continue;
+          }
+        }
+
+        const { data, error } = await adminClient
+          .from("students")
+          .insert({
+            tenant_id: profile.tenant_id,
+            username,
+            student_id: studentId,
+          })
+          .select("id, tenant_id, username, student_id")
+          .single();
+
+        if (error || !data) {
+          skipped.push({ row: row.row, reason: "Insert failed." });
+          continue;
+        }
+
+        inserted.push(data as {
+          id: string;
+          tenant_id: string;
+          username: string;
+          student_id: string;
+        });
+        seenIds.add(studentId);
+        seenUsernames.add(username.toLowerCase());
+      }
+
+      return jsonResponse(200, {
+        data: {
+          inserted_count: inserted.length,
+          skipped_count: skipped.length,
+          inserted,
+          skipped,
+        },
+      });
     }
 
     if (action === "delete") {
@@ -265,7 +673,7 @@ serve(async (req) => {
         .eq("id", normalizedId)
         .eq("tenant_id", profile.tenant_id)
         .not("deleted_at", "is", null)
-        .select("id, tenant_id, first_name, last_name, student_id")
+        .select("id, tenant_id, username, student_id")
         .single();
 
       if (error || !data) {

@@ -27,6 +27,12 @@ type TenantRow = {
   primary_admin_profile_id?: string | null;
 };
 
+type TenantPolicyRow = {
+  tenant_id: string;
+  checkout_due_hours: number | null;
+  feature_flags: Record<string, unknown> | null;
+};
+
 const isMissingStatusColumn = (error: RpcError | null | undefined) =>
   !!error &&
   error.code === "42703" &&
@@ -43,6 +49,14 @@ const isMissingIsActiveColumn = (error: RpcError | null | undefined) =>
   (error.message ?? "").toLowerCase().includes("is_active");
 
 const lower = (value: string | null | undefined) => (value ?? "").toLowerCase();
+
+const defaultFeatureFlags = () => ({
+  enable_notifications: true,
+  enable_bulk_item_import: true,
+  enable_bulk_student_tools: true,
+  enable_status_tracking: true,
+  enable_barcode_generator: true,
+});
 
 const resolveCorsHeaders = (req: Request) => {
   const origin = req.headers.get("Origin");
@@ -204,6 +218,7 @@ serve(async (req) => {
 
     const enrichTenants = async (rows: TenantRow[]) => {
       if (!rows.length) return [];
+      const tenantIds = Array.from(new Set(rows.map((row) => row.id)));
       const ids = Array.from(
         new Set(
           rows
@@ -211,23 +226,29 @@ serve(async (req) => {
             .filter((value): value is string => !!value)
         )
       );
-      if (!ids.length) {
-        return rows.map((row) => ({
-          ...row,
-          status: row.status ?? "active",
-          primary_admin_email: null,
-        }));
-      }
-
-      const { data: profileRows } = await adminClient
-        .from("profiles")
-        .select("id, auth_email")
-        .in("id", ids);
+      const [profileRowsResult, policyRowsResult] = await Promise.all([
+        ids.length
+          ? adminClient.from("profiles").select("id, auth_email").in("id", ids)
+          : Promise.resolve({ data: [], error: null }),
+        adminClient
+          .from("tenant_policies")
+          .select("tenant_id, checkout_due_hours, feature_flags")
+          .in("tenant_id", tenantIds),
+      ]);
 
       const emailById = new Map(
-        ((profileRows ?? []) as Array<{ id: string; auth_email: string | null }>).map(
-          (item) => [item.id, item.auth_email]
-        )
+        (
+          (profileRowsResult.data ?? []) as Array<{
+            id: string;
+            auth_email: string | null;
+          }>
+        ).map((item) => [item.id, item.auth_email])
+      );
+      const policyByTenant = new Map(
+        ((policyRowsResult.data ?? []) as TenantPolicyRow[]).map((item) => [
+          item.tenant_id,
+          item,
+        ])
       );
 
       return rows.map((row) => ({
@@ -236,6 +257,12 @@ serve(async (req) => {
         primary_admin_email: row.primary_admin_profile_id
           ? emailById.get(row.primary_admin_profile_id) ?? null
           : null,
+        checkout_due_hours:
+          typeof policyByTenant.get(row.id)?.checkout_due_hours === "number"
+            ? policyByTenant.get(row.id)?.checkout_due_hours
+            : 72,
+        feature_flags:
+          policyByTenant.get(row.id)?.feature_flags ?? defaultFeatureFlags(),
       }));
     };
 

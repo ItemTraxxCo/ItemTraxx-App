@@ -13,6 +13,81 @@ type RateLimitResult = {
   retry_after_seconds: number | null;
 };
 
+const CODENAME_PREFIXES = [
+  "Nova",
+  "Echo",
+  "Atlas",
+  "Pixel",
+  "Orbit",
+  "Scout",
+  "Comet",
+  "Lumen",
+  "Aster",
+  "Vivid",
+];
+
+const CODENAME_SUFFIXES = [
+  "Fox",
+  "Pine",
+  "Wave",
+  "Maple",
+  "River",
+  "Spark",
+  "Drift",
+  "Cedar",
+  "Birch",
+  "Stone",
+];
+
+const randomDigits = (len: number) =>
+  Array.from({ length: len }, () => Math.floor(Math.random() * 10)).join("");
+
+const randomLetters = (len: number) =>
+  Array.from({ length: len }, () =>
+    String.fromCharCode(65 + Math.floor(Math.random() * 26))
+  ).join("");
+
+const generateStudentId = () => `${randomDigits(4)}${randomLetters(2)}`;
+
+const generateUsername = () => {
+  const prefix =
+    CODENAME_PREFIXES[Math.floor(Math.random() * CODENAME_PREFIXES.length)];
+  const suffix =
+    CODENAME_SUFFIXES[Math.floor(Math.random() * CODENAME_SUFFIXES.length)];
+  return `${prefix}${suffix}${randomDigits(2)}`;
+};
+
+const buildUniqueStudentIdentity = async (
+  adminClient: ReturnType<typeof createClient>,
+  tenantId: string
+) => {
+  for (let attempt = 0; attempt < 12; attempt += 1) {
+    const studentId = generateStudentId();
+    const username = generateUsername();
+    const { data: existingId } = await adminClient
+      .from("students")
+      .select("id")
+      .eq("tenant_id", tenantId)
+      .eq("student_id", studentId)
+      .limit(1)
+      .maybeSingle();
+    if (existingId?.id) continue;
+
+    const { data: existingUsername } = await adminClient
+      .from("students")
+      .select("id")
+      .eq("tenant_id", tenantId)
+      .eq("username", username)
+      .limit(1)
+      .maybeSingle();
+    if (existingUsername?.id) continue;
+
+    return { studentId, username };
+  }
+
+  throw new Error("Unable to generate student identity.");
+};
+
 const resolveCorsHeaders = (req: Request) => {
   const origin = req.headers.get("Origin");
   const allowedOrigins = (Deno.env.get("ITX_ALLOWED_ORIGINS") ?? "")
@@ -142,7 +217,7 @@ serve(async (req) => {
 
       let query = adminClient
         .from("students")
-        .select("id, tenant_id, first_name, last_name, student_id, email, created_at")
+        .select("id, tenant_id, username, student_id, created_at")
         .order("created_at", { ascending: false })
         .limit(500);
 
@@ -151,7 +226,7 @@ serve(async (req) => {
       }
       if (search) {
         query = query.or(
-          `first_name.ilike.%${search}%,last_name.ilike.%${search}%,student_id.ilike.%${search}%,email.ilike.%${search}%`
+          `username.ilike.%${search}%,student_id.ilike.%${search}%`
         );
       }
 
@@ -165,27 +240,50 @@ serve(async (req) => {
     if (action === "create") {
       const input = payload as Record<string, unknown>;
       const tenantId = typeof input.tenant_id === "string" ? input.tenant_id.trim() : "";
-      const firstName =
-        typeof input.first_name === "string" ? input.first_name.trim() : "";
-      const lastName = typeof input.last_name === "string" ? input.last_name.trim() : "";
-      const studentId =
-        typeof input.student_id === "string" ? input.student_id.trim() : "";
-      const email = typeof input.email === "string" ? input.email.trim() : "";
+      const providedStudentId =
+        typeof input.student_id === "string"
+          ? input.student_id.trim().toUpperCase()
+          : "";
+      const providedUsername =
+        typeof input.username === "string" ? input.username.trim() : "";
 
-      if (!tenantId || !firstName || !lastName || !studentId) {
+      if (!tenantId) {
         return jsonResponse(400, { error: "Invalid request" });
+      }
+      const hasValidProvidedId = /^[0-9]{4}[A-Z]{2}$/.test(providedStudentId);
+      const hasValidProvidedUsername =
+        providedUsername.length >= 4 && providedUsername.length <= 40;
+      let studentId = hasValidProvidedId ? providedStudentId : "";
+      let username = hasValidProvidedUsername ? providedUsername : "";
+
+      if (studentId && username) {
+        const { data: existingConflict } = await adminClient
+          .from("students")
+          .select("id")
+          .eq("tenant_id", tenantId)
+          .or(`student_id.eq.${studentId},username.eq.${username}`)
+          .limit(1)
+          .maybeSingle();
+        if (existingConflict?.id) {
+          studentId = "";
+          username = "";
+        }
+      }
+
+      if (!studentId || !username) {
+        const generated = await buildUniqueStudentIdentity(adminClient, tenantId);
+        studentId = generated.studentId;
+        username = generated.username;
       }
 
       const { data, error } = await adminClient
         .from("students")
         .insert({
           tenant_id: tenantId,
-          first_name: firstName,
-          last_name: lastName,
+          username,
           student_id: studentId,
-          email: email || null,
         })
-        .select("id, tenant_id, first_name, last_name, student_id, email, created_at")
+        .select("id, tenant_id, username, student_id, created_at")
         .single();
 
       if (error || !data) {
@@ -197,21 +295,14 @@ serve(async (req) => {
     if (action === "update") {
       const input = payload as Record<string, unknown>;
       const id = typeof input.id === "string" ? input.id.trim() : "";
-      const firstName =
-        typeof input.first_name === "string" ? input.first_name.trim() : "";
-      const lastName = typeof input.last_name === "string" ? input.last_name.trim() : "";
-      const studentId =
-        typeof input.student_id === "string" ? input.student_id.trim() : "";
-
-      if (!id || !firstName || !lastName || !studentId) {
+      if (!id) {
         return jsonResponse(400, { error: "Invalid request" });
       }
 
       const { data, error } = await adminClient
         .from("students")
-        .update({ first_name: firstName, last_name: lastName, student_id: studentId })
+        .select("id, tenant_id, username, student_id, created_at")
         .eq("id", id)
-        .select("id, tenant_id, first_name, last_name, student_id, email, created_at")
         .single();
 
       if (error || !data) {

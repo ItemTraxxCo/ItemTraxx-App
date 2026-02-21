@@ -4,10 +4,8 @@ import { supabase } from "./supabaseClient";
 export type SuperStudentItem = {
   id: string;
   tenant_id: string;
-  first_name: string;
-  last_name: string;
+  username: string;
   student_id: string;
-  email?: string | null;
   created_at: string;
 };
 
@@ -50,22 +48,15 @@ export const listSuperStudents = async (tenantId = "all", search = "") =>
 
 export const createSuperStudent = async (payload: {
   tenant_id: string;
-  first_name: string;
-  last_name: string;
-  student_id: string;
-  email?: string;
+  username?: string;
+  student_id?: string;
 }) =>
   callSuperStudent<SuperStudentItem>({
     action: "create",
     payload,
   });
 
-export const updateSuperStudent = async (payload: {
-  id: string;
-  first_name: string;
-  last_name: string;
-  student_id: string;
-}) =>
+export const updateSuperStudent = async (payload: { id: string }) =>
   callSuperStudent<SuperStudentItem>({
     action: "update",
     payload,

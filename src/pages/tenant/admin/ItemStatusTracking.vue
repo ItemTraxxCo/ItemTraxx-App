@@ -2,43 +2,13 @@
   <div class="page">
     <div class="page-nav-left">
       <RouterLink class="button-link" to="/tenant/admin">Return to admin panel</RouterLink>
-      <button type="button" class="button-link" :disabled="isSaving" @click="saveDueLimit">
-        Save Due Limit
-      </button>
-      <button type="button" class="button-link" :disabled="isSaving" @click="sendRemindersNow">
-        Send Overdue Email Reminders
-      </button>
     </div>
 
     <h1>Item Status Tracking</h1>
-    <p>Track statuses other than available and checked_out.</p>
+    <p v-if="!featureEnabled" class="error">Item status tracking is disabled for this tenant.</p>
+    <p v-else>Track statuses other than available and checked_out.</p>
 
-    <div class="card">
-      <h2>Overdue reminder settings</h2>
-      <div class="form-grid-2">
-        <label>
-          Checkout due time limit (hours)
-          <input v-model.number="dueHours" type="number" min="1" max="720" />
-        </label>
-        <label>
-          Escalation level 1 (hours)
-          <input v-model.number="escalationLevel1" type="number" min="1" max="720" />
-        </label>
-        <label>
-          Escalation level 2 (hours)
-          <input v-model.number="escalationLevel2" type="number" min="1" max="720" />
-        </label>
-        <label>
-          Escalation level 3 (hours)
-          <input v-model.number="escalationLevel3" type="number" min="1" max="720" />
-        </label>
-      </div>
-      <p class="muted">
-        Reminders are sent for checked_out items older than due limit. Escalation levels control notice severity.
-      </p>
-    </div>
-
-    <div class="card">
+    <div v-if="featureEnabled" class="card">
       <h2>Current flagged items</h2>
       <div class="form-grid-2">
         <label>
@@ -99,7 +69,7 @@
       </div>
     </div>
 
-    <div class="card">
+    <div v-if="featureEnabled" class="card">
       <h2>Status history</h2>
       <table class="table">
         <thead>
@@ -139,28 +109,23 @@
 import { computed, onMounted, onUnmounted, ref } from "vue";
 import { RouterLink } from "vue-router";
 import {
+  fetchTenantSettings,
   fetchStatusTracking,
-  saveDuePolicy,
-  sendOverdueReminders,
   type StatusHistoryItem,
   type StatusTrackedItem,
 } from "../../../services/adminOpsService";
 import { exportRowsToCsv, exportRowsToPdf } from "../../../services/exportService";
 
-const dueHours = ref(72);
-const escalationLevel1 = ref(120);
-const escalationLevel2 = ref(168);
-const escalationLevel3 = ref(240);
 const flaggedItems = ref<StatusTrackedItem[]>([]);
 const history = ref<StatusHistoryItem[]>([]);
 const isLoading = ref(false);
-const isSaving = ref(false);
 const toastTitle = ref("");
 const toastMessage = ref("");
 const searchQuery = ref("");
 const statusFilter = ref("all");
 const dateFrom = ref("");
 const dateTo = ref("");
+const featureEnabled = ref(true);
 let toastTimer: number | null = null;
 
 const withinDateRange = (value: string) => {
@@ -218,57 +183,16 @@ const formatDate = (value: string) => {
   return date.toLocaleString();
 };
 
-const normalizeEscalations = () => {
-  dueHours.value = Math.max(1, Math.floor(Number(dueHours.value) || 72));
-  escalationLevel1.value = Math.max(dueHours.value, Math.floor(Number(escalationLevel1.value) || 120));
-  escalationLevel2.value = Math.max(escalationLevel1.value + 1, Math.floor(Number(escalationLevel2.value) || 168));
-  escalationLevel3.value = Math.max(escalationLevel2.value + 1, Math.floor(Number(escalationLevel3.value) || 240));
-};
-
 const loadStatusTracking = async () => {
   isLoading.value = true;
   try {
     const payload = await fetchStatusTracking();
-    dueHours.value = payload.due_hours;
-    escalationLevel1.value = payload.escalation_level_1_hours;
-    escalationLevel2.value = payload.escalation_level_2_hours;
-    escalationLevel3.value = payload.escalation_level_3_hours;
     flaggedItems.value = payload.flagged_items;
     history.value = payload.history;
   } catch (err) {
     showToast("Load failed", err instanceof Error ? err.message : "Unable to load status tracking.");
   } finally {
     isLoading.value = false;
-  }
-};
-
-const saveDueLimit = async () => {
-  isSaving.value = true;
-  normalizeEscalations();
-  try {
-    await saveDuePolicy(
-      dueHours.value,
-      escalationLevel1.value,
-      escalationLevel2.value,
-      escalationLevel3.value
-    );
-    showToast("Saved", "Due time and escalation levels updated.");
-  } catch (err) {
-    showToast("Save failed", err instanceof Error ? err.message : "Unable to save due time limit.");
-  } finally {
-    isSaving.value = false;
-  }
-};
-
-const sendRemindersNow = async () => {
-  isSaving.value = true;
-  try {
-    const result = await sendOverdueReminders();
-    showToast("Reminders sent", `Sent ${result.sent}/${result.recipients} reminder emails.`);
-  } catch (err) {
-    showToast("Reminder failed", err instanceof Error ? err.message : "Unable to send reminders.");
-  } finally {
-    isSaving.value = false;
   }
 };
 
@@ -319,7 +243,17 @@ const exportHistoryPdf = () => {
 };
 
 onMounted(() => {
-  void loadStatusTracking();
+  void (async () => {
+    try {
+      const settings = await fetchTenantSettings();
+      featureEnabled.value = settings.feature_flags.enable_status_tracking;
+    } catch {
+      featureEnabled.value = true;
+    }
+    if (featureEnabled.value) {
+      await loadStatusTracking();
+    }
+  })();
 });
 
 onUnmounted(() => {

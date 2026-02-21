@@ -15,11 +15,18 @@
       <h2>Create Student</h2>
       <form class="form" @submit.prevent="handleCreate">
         <label>Tenant<select v-model="formTenantId"><option value="">Select tenant</option><option v-for="t in tenants" :key="t.id" :value="t.id">{{ t.name }}</option></select></label>
-        <label>First Name<input v-model="formFirstName" type="text" /></label>
-        <label>Last Name<input v-model="formLastName" type="text" /></label>
-        <label>Student ID<input v-model="formStudentId" type="text" /></label>
-        <label>Email<input v-model="formEmail" type="email" placeholder="student@email.com" /></label>
-        <div class="form-actions"><button type="submit" class="button-primary" :disabled="isSaving">Create</button></div>
+        <label>
+          Username
+          <input v-model="previewUsername" type="text" readonly title="If you need to change this, contact support." />
+        </label>
+        <label>
+          Student ID
+          <input v-model="previewStudentId" type="text" readonly title="If you need to change this, contact support." />
+        </label>
+        <div class="form-actions">
+          <button type="button" @click="regenerateIdentity">Regenerate</button>
+          <button type="submit" class="button-primary" :disabled="isSaving">Create</button>
+        </div>
       </form>
     </div>
 
@@ -37,15 +44,15 @@
       <p v-if="isLoading" class="muted">Loading students...</p>
       <p v-else-if="error" class="error">{{ error }}</p>
       <table v-else class="table">
-        <thead><tr><th>Name</th><th>Email</th><th>Tenant</th><th>Student ID</th><th>Actions</th></tr></thead>
+        <thead><tr><th>Username</th><th>Tenant</th><th>Student ID</th><th>Actions</th></tr></thead>
         <tbody>
           <tr v-for="item in students" :key="item.id">
-            <td>{{ item.first_name }} {{ item.last_name }}</td>
-            <td>{{ item.email || "-" }}</td>
+            <td>{{ item.username }}</td>
             <td>{{ tenantNameById.get(item.tenant_id) || item.tenant_id }}</td>
             <td>{{ item.student_id }}</td>
             <td>
               <button type="button" @click="startEdit(item)">Edit</button>
+              <span class="button-spacer"></span>
               <button type="button" @click="requestDelete(item)">Delete</button>
             </td>
           </tr>
@@ -55,11 +62,17 @@
 
     <div v-if="editItem" class="card">
       <h2>Edit Student</h2>
-      <form class="form" @submit.prevent="saveEdit">
-        <label>First Name<input v-model="editFirstName" type="text" /></label>
-        <label>Last Name<input v-model="editLastName" type="text" /></label>
-        <label>Student ID<input v-model="editStudentId" type="text" /></label>
-        <div class="form-actions"><button type="submit" class="button-primary" :disabled="isSaving">Save</button><button type="button" @click="cancelEdit">Cancel</button></div>
+      <p class="muted">Student identifiers are locked. If you need to change them, contact support.</p>
+      <form class="form">
+        <label>
+          Username
+          <input v-model="editUsername" type="text" readonly title="If you need to change this, contact support." />
+        </label>
+        <label>
+          Student ID
+          <input v-model="editStudentId" type="text" readonly title="If you need to change this, contact support." />
+        </label>
+        <div class="form-actions"><button type="button" @click="cancelEdit">Close</button></div>
       </form>
     </div>
 
@@ -73,9 +86,10 @@
 import { computed, onMounted, ref } from "vue";
 import { RouterLink } from "vue-router";
 import StepUpModal from "../../components/StepUpModal.vue";
-import { createSuperStudent, deleteSuperStudent, listSuperStudents, updateSuperStudent, type SuperStudentItem } from "../../services/superStudentService";
+import { createSuperStudent, deleteSuperStudent, listSuperStudents, type SuperStudentItem } from "../../services/superStudentService";
 import { listTenants, type SuperTenant } from "../../services/superTenantService";
 import { exportRowsToCsv, exportRowsToPdf } from "../../services/exportService";
+import { generateStudentIdentity } from "../../utils/studentIdentity";
 
 const tenants = ref<SuperTenant[]>([]);
 const students = ref<SuperStudentItem[]>([]);
@@ -85,13 +99,10 @@ const isLoading = ref(false);
 const isSaving = ref(false);
 const error = ref("");
 const formTenantId = ref("");
-const formFirstName = ref("");
-const formLastName = ref("");
-const formStudentId = ref("");
-const formEmail = ref("");
+const previewUsername = ref("");
+const previewStudentId = ref("");
 const editItem = ref<SuperStudentItem | null>(null);
-const editFirstName = ref("");
-const editLastName = ref("");
+const editUsername = ref("");
 const editStudentId = ref("");
 const toastTitle = ref("");
 const toastMessage = ref("");
@@ -101,6 +112,12 @@ const deleteTarget = ref<SuperStudentItem | null>(null);
 let toastTimer: number | null = null;
 
 const tenantNameById = computed(() => new Map(tenants.value.map((t) => [t.id, t.name])));
+
+const regenerateIdentity = () => {
+  const identity = generateStudentIdentity();
+  previewUsername.value = identity.username;
+  previewStudentId.value = identity.studentId;
+};
 
 const showToast = (title: string, message: string) => {
   toastTitle.value = title;
@@ -132,13 +149,11 @@ const loadStudents = async () => {
 const exportCsv = () => {
   exportRowsToCsv(
     `super-students-${new Date().toISOString().slice(0, 10)}.csv`,
-    ["tenant", "first_name", "last_name", "student_id", "email"],
+    ["tenant", "username", "student_id"],
     students.value.map((item) => ({
       tenant: tenantNameById.value.get(item.tenant_id) || item.tenant_id,
-      first_name: item.first_name,
-      last_name: item.last_name,
+      username: item.username,
       student_id: item.student_id,
-      email: item.email || "",
     }))
   );
 };
@@ -147,36 +162,31 @@ const exportPdf = () => {
   exportRowsToPdf(
     `super-students-${new Date().toISOString().slice(0, 10)}.pdf`,
     "Super Students Export",
-    ["tenant", "first_name", "last_name", "student_id", "email"],
+    ["tenant", "username", "student_id"],
     students.value.map((item) => ({
       tenant: tenantNameById.value.get(item.tenant_id) || item.tenant_id,
-      first_name: item.first_name,
-      last_name: item.last_name,
+      username: item.username,
       student_id: item.student_id,
-      email: item.email || "",
     }))
   );
 };
 
 const handleCreate = async () => {
-  if (!formTenantId.value || !formFirstName.value.trim() || !formLastName.value.trim() || !formStudentId.value.trim()) {
-    showToast("Invalid input", "All fields are required.");
+  if (!formTenantId.value) {
+    showToast("Invalid input", "Tenant is required.");
     return;
   }
   isSaving.value = true;
   try {
     const created = await createSuperStudent({
       tenant_id: formTenantId.value,
-      first_name: formFirstName.value.trim(),
-      last_name: formLastName.value.trim(),
-      student_id: formStudentId.value.trim(),
-      email: formEmail.value.trim(),
+      username: previewUsername.value,
+      student_id: previewStudentId.value,
     });
     students.value = [created, ...students.value];
-    formFirstName.value = "";
-    formLastName.value = "";
-    formStudentId.value = "";
-    formEmail.value = "";
+    previewUsername.value = created.username;
+    previewStudentId.value = created.student_id;
+    regenerateIdentity();
     showToast("Created", "Student created.");
   } catch (err) {
     showToast("Create failed", err instanceof Error ? err.message : "Unable to create student.");
@@ -187,41 +197,19 @@ const handleCreate = async () => {
 
 const startEdit = (item: SuperStudentItem) => {
   editItem.value = item;
-  editFirstName.value = item.first_name;
-  editLastName.value = item.last_name;
+  editUsername.value = item.username;
   editStudentId.value = item.student_id;
 };
 
 const cancelEdit = () => {
   editItem.value = null;
-  editFirstName.value = "";
-  editLastName.value = "";
+  editUsername.value = "";
   editStudentId.value = "";
-};
-
-const saveEdit = async () => {
-  if (!editItem.value) return;
-  isSaving.value = true;
-  try {
-    const updated = await updateSuperStudent({
-      id: editItem.value.id,
-      first_name: editFirstName.value.trim(),
-      last_name: editLastName.value.trim(),
-      student_id: editStudentId.value.trim(),
-    });
-    students.value = students.value.map((item) => (item.id === updated.id ? updated : item));
-    cancelEdit();
-    showToast("Saved", "Student updated.");
-  } catch (err) {
-    showToast("Update failed", err instanceof Error ? err.message : "Unable to update student.");
-  } finally {
-    isSaving.value = false;
-  }
 };
 
 const requestDelete = (item: SuperStudentItem) => {
   deleteTarget.value = item;
-  stepUpMessage.value = `Type CONFIRM and enter super password to delete ${item.first_name} ${item.last_name}.`;
+  stepUpMessage.value = `Type CONFIRM and enter super password to delete ${item.username}.`;
   stepUpVisible.value = true;
 };
 
@@ -250,7 +238,15 @@ const confirmDelete = async (payload: { superPassword: string; confirmPhrase: st
 };
 
 onMounted(async () => {
+  regenerateIdentity();
   await loadTenants();
   await loadStudents();
 });
 </script>
+
+<style scoped>
+.button-spacer {
+  display: inline-block;
+  width: 0.5rem;
+}
+</style>

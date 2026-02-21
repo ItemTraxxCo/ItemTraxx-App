@@ -27,11 +27,20 @@
       <p v-else-if="error" class="error">{{ error }}</p>
       <template v-else>
         <ul class="notif-list">
+          <li v-if="overdueCount > 0" class="notif-item notif-warn">
+            {{ overdueCount }} overdue checkout{{ overdueCount === 1 ? "" : "s" }} (limit:
+            {{ checkoutDueHours }}h).
+          </li>
           <li v-if="maintenanceEnabled" class="notif-item notif-critical">
             Maintenance mode is enabled.
           </li>
-          <li v-if="overdueCount > 0" class="notif-item notif-warn">
-            {{ overdueCount }} overdue item{{ overdueCount === 1 ? "" : "s" }} (limit {{ dueHours }}h).
+          <li
+            v-for="update in updates"
+            :key="update.id"
+            class="notif-item"
+            :class="update.level === 'critical' ? 'notif-critical' : update.level === 'warning' ? 'notif-warn' : ''"
+          >
+            <strong>{{ update.title }}:</strong> {{ update.message }}
           </li>
           <li v-if="flaggedCount > 0" class="notif-item notif-warn">
             {{ flaggedCount }} item{{ flaggedCount === 1 ? "" : "s" }} need status follow-up.
@@ -57,15 +66,27 @@ import { fetchTenantNotifications, type StatusHistoryItem } from "../services/ad
 const isOpen = ref(false);
 const isLoading = ref(false);
 const error = ref("");
-const overdueCount = ref(0);
 const flaggedCount = ref(0);
-const dueHours = ref(72);
+const overdueCount = ref(0);
+const checkoutDueHours = ref(72);
 const maintenanceEnabled = ref(false);
+const updates = ref<
+  Array<{
+    id: string;
+    title: string;
+    message: string;
+    level: "info" | "warning" | "critical";
+  }>
+>([]);
 const recentEvents = ref<StatusHistoryItem[]>([]);
 let pollTimer: number | null = null;
 
 const unreadCount = computed(
-  () => overdueCount.value + flaggedCount.value + (maintenanceEnabled.value ? 1 : 0)
+  () =>
+    flaggedCount.value +
+    overdueCount.value +
+    updates.value.length +
+    (maintenanceEnabled.value ? 1 : 0)
 );
 
 const loadNotifications = async () => {
@@ -73,10 +94,20 @@ const loadNotifications = async () => {
   error.value = "";
   try {
     const payload = await fetchTenantNotifications();
-    overdueCount.value = payload.overdue_count;
+    if (payload.feature_flags?.enable_notifications === false) {
+      flaggedCount.value = 0;
+      overdueCount.value = 0;
+      checkoutDueHours.value = 72;
+      maintenanceEnabled.value = false;
+      updates.value = [];
+      recentEvents.value = [];
+      return;
+    }
     flaggedCount.value = payload.flagged_count;
-    dueHours.value = payload.due_hours;
+    overdueCount.value = payload.overdue_count;
+    checkoutDueHours.value = payload.checkout_due_hours;
     maintenanceEnabled.value = payload.maintenance?.enabled === true;
+    updates.value = payload.updates.slice(0, 3);
     recentEvents.value = payload.recent_status_events.slice(0, 4);
   } catch (err) {
     error.value = err instanceof Error ? err.message : "Unable to load notifications.";

@@ -13,6 +13,23 @@ type RateLimitResult = {
   retry_after_seconds: number | null;
 };
 
+type RuntimeUpdateItem = {
+  id: string;
+  title: string;
+  message: string;
+  level: "info" | "warning" | "critical";
+  created_at: string;
+  link_url: string | null;
+};
+
+type TenantFeatureFlags = {
+  enable_notifications: boolean;
+  enable_bulk_item_import: boolean;
+  enable_bulk_student_tools: boolean;
+  enable_status_tracking: boolean;
+  enable_barcode_generator: boolean;
+};
+
 const TRACKED_STATUSES = new Set(["damaged", "lost", "in_repair", "retired", "in_studio_only"]);
 const ALLOWED_GEAR_STATUSES = new Set([
   "available",
@@ -23,11 +40,6 @@ const ALLOWED_GEAR_STATUSES = new Set([
   "retired",
   "in_studio_only",
 ]);
-
-const DEFAULT_DUE_HOURS = 72;
-const DEFAULT_ESC_1 = 120;
-const DEFAULT_ESC_2 = 168;
-const DEFAULT_ESC_3 = 240;
 
 type RpcError = {
   code?: string;
@@ -43,6 +55,42 @@ const isMissingColumn = (error: RpcError | null | undefined, column: string) =>
   !!error &&
   error.code === "42703" &&
   (error.message ?? "").toLowerCase().includes(column.toLowerCase());
+
+const defaultFeatureFlags = (): TenantFeatureFlags => ({
+  enable_notifications: true,
+  enable_bulk_item_import: true,
+  enable_bulk_student_tools: true,
+  enable_status_tracking: true,
+  enable_barcode_generator: true,
+});
+
+const normalizeFeatureFlags = (value: unknown): TenantFeatureFlags => {
+  if (!value || typeof value !== "object") return defaultFeatureFlags();
+  const payload = value as Record<string, unknown>;
+  const fallback = defaultFeatureFlags();
+  return {
+    enable_notifications:
+      typeof payload.enable_notifications === "boolean"
+        ? payload.enable_notifications
+        : fallback.enable_notifications,
+    enable_bulk_item_import:
+      typeof payload.enable_bulk_item_import === "boolean"
+        ? payload.enable_bulk_item_import
+        : fallback.enable_bulk_item_import,
+    enable_bulk_student_tools:
+      typeof payload.enable_bulk_student_tools === "boolean"
+        ? payload.enable_bulk_student_tools
+        : fallback.enable_bulk_student_tools,
+    enable_status_tracking:
+      typeof payload.enable_status_tracking === "boolean"
+        ? payload.enable_status_tracking
+        : fallback.enable_status_tracking,
+    enable_barcode_generator:
+      typeof payload.enable_barcode_generator === "boolean"
+        ? payload.enable_barcode_generator
+        : fallback.enable_barcode_generator,
+  };
+};
 
 const resolveCorsHeaders = (req: Request) => {
   const origin = req.headers.get("Origin");
@@ -77,58 +125,6 @@ const resolveMaintenance = (value: unknown) => {
   };
 };
 
-const parsePositiveInt = (value: unknown, fallback: number) => {
-  const parsed = Number(value);
-  if (!Number.isFinite(parsed) || parsed <= 0) {
-    return fallback;
-  }
-  return Math.floor(parsed);
-};
-
-const normalizeEscalationPolicy = (
-  dueHours: number,
-  level1: number,
-  level2: number,
-  level3: number
-) => {
-  const normalizedDue = parsePositiveInt(dueHours, DEFAULT_DUE_HOURS);
-  const normalizedLevel1 = Math.max(parsePositiveInt(level1, DEFAULT_ESC_1), normalizedDue);
-  const normalizedLevel2 = Math.max(parsePositiveInt(level2, DEFAULT_ESC_2), normalizedLevel1 + 1);
-  const normalizedLevel3 = Math.max(parsePositiveInt(level3, DEFAULT_ESC_3), normalizedLevel2 + 1);
-  return {
-    due_hours: normalizedDue,
-    escalation_level_1_hours: normalizedLevel1,
-    escalation_level_2_hours: normalizedLevel2,
-    escalation_level_3_hours: normalizedLevel3,
-  };
-};
-
-const sendReminderEmail = async (
-  apiKey: string,
-  from: string,
-  to: string,
-  subject: string,
-  html: string
-) => {
-  const response = await fetch("https://api.resend.com/emails", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      from,
-      to,
-      subject,
-      html,
-    }),
-  });
-
-  if (!response.ok) {
-    const text = await response.text();
-    throw new Error(text || "Unable to send email.");
-  }
-};
 
 serve(async (req) => {
   const { hasOrigin, originAllowed, headers } = resolveCorsHeaders(req);
@@ -223,63 +219,87 @@ serve(async (req) => {
 
     const tenantId = profile.tenant_id as string;
 
-    const duePolicySelect =
-      "checkout_due_hours, escalation_level_1_hours, escalation_level_2_hours, escalation_level_3_hours";
+    const [maintenanceRuntimeResult, updateRuntimeResult] = await Promise.all([
+      adminClient
+        .from("app_runtime_config")
+        .select("value")
+        .eq("key", "maintenance_mode")
+        .maybeSingle(),
+      adminClient
+        .from("app_runtime_config")
+        .select("value")
+        .eq("key", "tenant_updates")
+        .maybeSingle(),
+    ]);
+    const maintenance = resolveMaintenance(maintenanceRuntimeResult.data?.value);
 
-    const loadPolicy = async () => {
-      const duePolicyResult = await adminClient
-        .from("tenant_policies")
-        .select(duePolicySelect)
-        .eq("tenant_id", tenantId)
-        .maybeSingle();
-
-      if (
-        duePolicyResult.error &&
-        (isMissingColumn(duePolicyResult.error as RpcError, "escalation_level_1_hours") ||
-          isMissingColumn(duePolicyResult.error as RpcError, "escalation_level_2_hours") ||
-          isMissingColumn(duePolicyResult.error as RpcError, "escalation_level_3_hours"))
-      ) {
-        const fallback = await adminClient
-          .from("tenant_policies")
-          .select("checkout_due_hours")
-          .eq("tenant_id", tenantId)
-          .maybeSingle();
-        const dueHours = parsePositiveInt(
-          fallback.data?.checkout_due_hours,
-          DEFAULT_DUE_HOURS
-        );
-        return normalizeEscalationPolicy(dueHours, DEFAULT_ESC_1, DEFAULT_ESC_2, DEFAULT_ESC_3);
-      }
-
-      const normalized = normalizeEscalationPolicy(
-        duePolicyResult.data?.checkout_due_hours,
-        duePolicyResult.data?.escalation_level_1_hours,
-        duePolicyResult.data?.escalation_level_2_hours,
-        duePolicyResult.data?.escalation_level_3_hours
-      );
-      return normalized;
-    };
-
-    const { data: maintenanceRow } = await adminClient
-      .from("app_runtime_config")
-      .select("value")
-      .eq("key", "maintenance_mode")
+    let checkoutDueHours = 72;
+    let featureFlags = defaultFeatureFlags();
+    const tenantPolicyResult = await adminClient
+      .from("tenant_policies")
+      .select("checkout_due_hours, feature_flags")
+      .eq("tenant_id", tenantId)
       .maybeSingle();
-    const maintenance = resolveMaintenance(maintenanceRow?.value);
+
+    if (!tenantPolicyResult.error && tenantPolicyResult.data) {
+      if (typeof tenantPolicyResult.data.checkout_due_hours === "number") {
+        checkoutDueHours = Math.min(
+          720,
+          Math.max(1, Math.round(tenantPolicyResult.data.checkout_due_hours))
+        );
+      }
+      featureFlags = normalizeFeatureFlags(tenantPolicyResult.data.feature_flags);
+    }
+
+    let tenantUpdates: RuntimeUpdateItem[] = [];
+    const updateRuntimeValue = updateRuntimeResult.data?.value;
+    if (updateRuntimeValue && typeof updateRuntimeValue === "object") {
+      const payload = updateRuntimeValue as Record<string, unknown>;
+      const enabled = payload.enabled !== false;
+      if (enabled && Array.isArray(payload.items)) {
+        tenantUpdates = payload.items
+          .filter((item) => item && typeof item === "object")
+          .map((item, index) => {
+            const row = item as Record<string, unknown>;
+            const message = typeof row.message === "string" ? row.message.trim() : "";
+            const title = typeof row.title === "string" ? row.title.trim() : "";
+            if (!message) return null;
+            const level =
+              row.level === "warning" || row.level === "critical"
+                ? row.level
+                : "info";
+            const createdAt =
+              typeof row.created_at === "string" && row.created_at
+                ? row.created_at
+                : new Date().toISOString();
+            const id =
+              typeof row.id === "string" && row.id
+                ? row.id
+                : `${createdAt}-${index}`;
+            return {
+              id,
+              title: title || "Product update",
+              message,
+              level,
+              created_at: createdAt,
+              link_url:
+                typeof row.link_url === "string" && row.link_url.trim()
+                  ? row.link_url.trim()
+                  : null,
+            } as RuntimeUpdateItem;
+          })
+          .filter((item): item is RuntimeUpdateItem => !!item)
+          .slice(0, 5);
+      }
+    }
 
     if (action === "get_notifications") {
-      const [overdueCountResult, statusCountResult, recentStatusResult, policy] =
+      const dueCutoffIso = new Date(
+        Date.now() - checkoutDueHours * 60 * 60 * 1000
+      ).toISOString();
+
+      const [statusCountResult, recentStatusResult, overdueCountResult] =
         await Promise.all([
-          adminClient
-            .from("gear")
-            .select("id", { count: "exact", head: true })
-            .eq("tenant_id", tenantId)
-            .eq("status", "checked_out")
-            .is("deleted_at", null)
-            .lt(
-              "checked_out_at",
-              new Date(Date.now() - DEFAULT_DUE_HOURS * 60 * 60 * 1000).toISOString()
-            ),
           adminClient
             .from("gear")
             .select("id", { count: "exact", head: true })
@@ -292,30 +312,81 @@ serve(async (req) => {
             .eq("tenant_id", tenantId)
             .order("changed_at", { ascending: false })
             .limit(8),
-          loadPolicy(),
+          adminClient
+            .from("gear")
+            .select("id", { count: "exact", head: true })
+            .eq("tenant_id", tenantId)
+            .is("deleted_at", null)
+            .not("checked_out_by", "is", null)
+            .lte("checked_out_at", dueCutoffIso),
         ]);
-
-      const dueCutoffIso = new Date(
-        Date.now() - policy.due_hours * 60 * 60 * 1000
-      ).toISOString();
-      const { count: overdueCount, error: overdueError } = await adminClient
-        .from("gear")
-        .select("id", { count: "exact", head: true })
-        .eq("tenant_id", tenantId)
-        .eq("status", "checked_out")
-        .is("deleted_at", null)
-        .lt("checked_out_at", dueCutoffIso);
 
       return jsonResponse(200, {
         data: {
-          overdue_count: overdueError ? 0 : overdueCount ?? overdueCountResult.count ?? 0,
+          overdue_count: overdueCountResult.error ? 0 : overdueCountResult.count ?? 0,
           flagged_count: statusCountResult.error ? 0 : statusCountResult.count ?? 0,
-          due_hours: policy.due_hours,
-          escalation_level_1_hours: policy.escalation_level_1_hours,
-          escalation_level_2_hours: policy.escalation_level_2_hours,
-          escalation_level_3_hours: policy.escalation_level_3_hours,
           maintenance,
           recent_status_events: recentStatusResult.error ? [] : recentStatusResult.data ?? [],
+          updates: tenantUpdates,
+          checkout_due_hours: checkoutDueHours,
+          feature_flags: featureFlags,
+        },
+      });
+    }
+
+    if (action === "get_tenant_settings") {
+      if (profile.role !== "tenant_admin") {
+        return jsonResponse(403, { error: "Access denied" });
+      }
+
+      return jsonResponse(200, {
+        data: {
+          checkout_due_hours: checkoutDueHours,
+          feature_flags: featureFlags,
+        },
+      });
+    }
+
+    if (action === "update_tenant_settings") {
+      if (profile.role !== "tenant_admin") {
+        return jsonResponse(403, { error: "Access denied" });
+      }
+
+      const next = (payload ?? {}) as Record<string, unknown>;
+      const checkoutDueHoursRaw = Number(next.checkout_due_hours);
+      if (!Number.isFinite(checkoutDueHoursRaw)) {
+        return jsonResponse(400, { error: "Invalid checkout due hours." });
+      }
+
+      const checkoutDueHoursNext = Math.min(
+        720,
+        Math.max(1, Math.round(checkoutDueHoursRaw))
+      );
+
+      const row = {
+        tenant_id: tenantId,
+        checkout_due_hours: checkoutDueHoursNext,
+        updated_by: user.id,
+        updated_at: new Date().toISOString(),
+      };
+
+      const { data, error } = await adminClient
+        .from("tenant_policies")
+        .upsert(row, { onConflict: "tenant_id" })
+        .select("checkout_due_hours, feature_flags")
+        .single();
+
+      if (error || !data) {
+        return jsonResponse(400, { error: "Unable to save tenant settings." });
+      }
+
+      return jsonResponse(200, {
+        data: {
+          checkout_due_hours:
+            typeof data.checkout_due_hours === "number"
+              ? data.checkout_due_hours
+              : checkoutDueHoursNext,
+          feature_flags: normalizeFeatureFlags(data.feature_flags),
         },
       });
     }
@@ -325,7 +396,7 @@ serve(async (req) => {
         return jsonResponse(403, { error: "Access denied" });
       }
 
-      const [flaggedResult, policy, historyBaseResult] = await Promise.all([
+      const [flaggedResult, historyBaseResult] = await Promise.all([
         adminClient
           .from("gear")
           .select("id, name, barcode, serial_number, status, notes, updated_at, created_at")
@@ -334,7 +405,6 @@ serve(async (req) => {
           .not("status", "in", "(available,checked_out)")
           .order("updated_at", { ascending: false })
           .limit(400),
-        loadPolicy(),
         adminClient
           .from("gear_status_history")
           .select("id, gear_id, status, note, changed_at, changed_by")
@@ -455,230 +525,8 @@ serve(async (req) => {
 
       return jsonResponse(200, {
         data: {
-          due_hours: policy.due_hours,
-          escalation_level_1_hours: policy.escalation_level_1_hours,
-          escalation_level_2_hours: policy.escalation_level_2_hours,
-          escalation_level_3_hours: policy.escalation_level_3_hours,
           flagged_items: flaggedItems,
           history,
-        },
-      });
-    }
-
-    if (action === "set_due_policy") {
-      if (profile.role !== "tenant_admin") {
-        return jsonResponse(403, { error: "Access denied" });
-      }
-      const policy = normalizeEscalationPolicy(
-        (payload ?? {}).checkout_due_hours,
-        (payload ?? {}).escalation_level_1_hours,
-        (payload ?? {}).escalation_level_2_hours,
-        (payload ?? {}).escalation_level_3_hours
-      );
-      if (policy.due_hours < 1 || policy.due_hours > 24 * 30) {
-        return jsonResponse(400, { error: "Invalid due time limit." });
-      }
-
-      const { data, error } = await adminClient
-        .from("tenant_policies")
-        .upsert(
-          {
-            tenant_id: tenantId,
-            checkout_due_hours: policy.due_hours,
-            escalation_level_1_hours: policy.escalation_level_1_hours,
-            escalation_level_2_hours: policy.escalation_level_2_hours,
-            escalation_level_3_hours: policy.escalation_level_3_hours,
-            updated_by: user.id,
-            updated_at: new Date().toISOString(),
-          },
-          { onConflict: "tenant_id" }
-        )
-        .select(duePolicySelect)
-        .single();
-
-      if (error || !data) {
-        return jsonResponse(400, { error: "Unable to save due time limit." });
-      }
-
-      return jsonResponse(200, { data });
-    }
-
-    if (action === "send_overdue_reminders") {
-      if (profile.role !== "tenant_admin") {
-        return jsonResponse(403, { error: "Access denied" });
-      }
-
-      const policy = await loadPolicy();
-
-      const { data: overdueRows, error: overdueError } = await adminClient
-        .from("gear")
-        .select(
-          "id, name, barcode, checked_out_at, student:checked_out_by(first_name, last_name, student_id, email)"
-        )
-        .eq("tenant_id", tenantId)
-        .eq("status", "checked_out")
-        .is("deleted_at", null)
-        .lt(
-          "checked_out_at",
-          new Date(Date.now() - policy.due_hours * 60 * 60 * 1000).toISOString()
-        )
-        .limit(500);
-
-      if (overdueError) {
-        return jsonResponse(400, { error: "Unable to load overdue items." });
-      }
-
-      const grouped = new Map<
-        string,
-        {
-          student_name: string;
-          student_id: string;
-          max_level: number;
-          items: Array<{ name: string; barcode: string; checked_out_at: string | null; level: number }>;
-        }
-      >();
-
-      for (const row of (overdueRows ?? []) as Array<{
-        name: string;
-        barcode: string;
-        checked_out_at: string | null;
-        student:
-          | {
-              first_name: string;
-              last_name: string;
-              student_id: string;
-              email?: string | null;
-            }
-          | Array<{
-              first_name: string;
-              last_name: string;
-              student_id: string;
-              email?: string | null;
-            }>
-          | null;
-      }>) {
-        const student = Array.isArray(row.student) ? row.student[0] ?? null : row.student;
-        const email = (student?.email ?? "").trim().toLowerCase();
-        if (!email) {
-          continue;
-        }
-
-        const checkedOutAtMs = row.checked_out_at ? Date.parse(row.checked_out_at) : NaN;
-        const hoursOverdue = Number.isNaN(checkedOutAtMs)
-          ? policy.due_hours
-          : Math.max(0, (Date.now() - checkedOutAtMs) / (1000 * 60 * 60));
-        const level =
-          hoursOverdue >= policy.escalation_level_3_hours
-            ? 3
-            : hoursOverdue >= policy.escalation_level_2_hours
-            ? 2
-            : hoursOverdue >= policy.escalation_level_1_hours
-            ? 1
-            : 0;
-
-        if (!grouped.has(email)) {
-          grouped.set(email, {
-            student_name: `${student?.first_name ?? ""} ${student?.last_name ?? ""}`.trim(),
-            student_id: student?.student_id ?? "",
-            max_level: level,
-            items: [],
-          });
-        }
-
-        const bucket = grouped.get(email);
-        if (bucket) {
-          bucket.max_level = Math.max(bucket.max_level, level);
-          bucket.items.push({
-            name: row.name,
-            barcode: row.barcode,
-            checked_out_at: row.checked_out_at,
-            level,
-          });
-        }
-      }
-
-      if (!grouped.size) {
-        return jsonResponse(200, {
-          data: {
-            sent: 0,
-            recipients: 0,
-            due_hours: policy.due_hours,
-            escalation_level_1_hours: policy.escalation_level_1_hours,
-            escalation_level_2_hours: policy.escalation_level_2_hours,
-            escalation_level_3_hours: policy.escalation_level_3_hours,
-          },
-        });
-      }
-
-      const resendApiKey = Deno.env.get("ITX_RESEND_API_KEY") ?? "";
-      const emailFrom = Deno.env.get("ITX_EMAIL_FROM") ?? "support@itemtraxx.com";
-
-      if (!resendApiKey) {
-        return jsonResponse(400, {
-          error:
-            "Email provider is not configured. Set ITX_RESEND_API_KEY to send reminders.",
-        });
-      }
-
-      let sent = 0;
-      const escalationStats = { level_1: 0, level_2: 0, level_3: 0 };
-
-      for (const [email, studentData] of grouped) {
-        const subjectPrefix =
-          studentData.max_level >= 3
-            ? "Final notice"
-            : studentData.max_level === 2
-            ? "Second notice"
-            : studentData.max_level === 1
-            ? "Reminder"
-            : "Overdue notice";
-
-        const itemRows = studentData.items
-          .map((item) => {
-            const dateLabel = item.checked_out_at
-              ? new Date(item.checked_out_at).toLocaleString()
-              : "unknown time";
-            return `<li>${item.name} (${item.barcode}) - checked out ${dateLabel}</li>`;
-          })
-          .join("");
-
-        const html = `
-          <p>Hello ${studentData.student_name || "Student"},</p>
-          <p>${subjectPrefix}: the following item(s) are overdue.</p>
-          <ul>${itemRows}</ul>
-          <p>Due limit: ${policy.due_hours} hours.</p>
-          <p>Please return these items as soon as possible.</p>
-        `;
-
-        try {
-          await sendReminderEmail(
-            resendApiKey,
-            emailFrom,
-            email,
-            `${subjectPrefix} - ItemTraxx overdue item`,
-            html
-          );
-          sent += 1;
-          if (studentData.max_level === 1) escalationStats.level_1 += 1;
-          if (studentData.max_level === 2) escalationStats.level_2 += 1;
-          if (studentData.max_level >= 3) escalationStats.level_3 += 1;
-        } catch (emailError) {
-          console.error("overdue reminder send failed", {
-            email,
-            message: emailError instanceof Error ? emailError.message : "Unknown error",
-          });
-        }
-      }
-
-      return jsonResponse(200, {
-        data: {
-          sent,
-          recipients: grouped.size,
-          due_hours: policy.due_hours,
-          escalation_level_1_hours: policy.escalation_level_1_hours,
-          escalation_level_2_hours: policy.escalation_level_2_hours,
-          escalation_level_3_hours: policy.escalation_level_3_hours,
-          escalation_recipients: escalationStats,
         },
       });
     }

@@ -1,7 +1,8 @@
 <template>
-  <div class="app-shell" :class="{ 'with-top-banners': topBannerRowCount > 0 }" :style="appShellStyle">
+  <div class="app-shell" :class="{ 'with-top-banners': hasTopBanners }" :style="appShellStyle">
     <div
       v-if="showMaintenanceBanner"
+      ref="maintenanceBannerRef"
       class="maintenance-top-banner"
       role="alert"
       aria-live="assertive"
@@ -34,6 +35,7 @@
     </div>
     <div
       v-if="activeBroadcast && showBroadcast"
+      ref="broadcastBannerRef"
       class="broadcast-top-banner"
       role="status"
       aria-live="polite"
@@ -136,13 +138,13 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, watch } from "vue";
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { Analytics } from "@vercel/analytics/vue";
 import { SpeedInsights } from "@vercel/speed-insights/vue";
 import { signOut } from "./services/authService";
 import { getEdgeFunctionsBaseUrl } from "./services/edgeFunctionClient";
-import { getAuthState } from "./store/authState";
+import { clearAdminVerification, getAuthState } from "./store/authState";
 import NotificationBell from "./components/NotificationBell.vue";
 
 const auth = getAuthState();
@@ -167,6 +169,10 @@ const activeBroadcast = ref<BroadcastPayload | null>(null);
 const dismissedBroadcastId = ref(localStorage.getItem("itemtraxx-broadcast-dismissed") || "");
 const incidentBanner = ref<IncidentBanner | null>(null);
 const dismissedIncidentId = ref(localStorage.getItem("itemtraxx-incident-dismissed") || "");
+const maintenanceBannerRef = ref<HTMLElement | null>(null);
+const broadcastBannerRef = ref<HTMLElement | null>(null);
+const maintenanceBannerHeight = ref(0);
+const broadcastBannerHeight = ref(0);
 const maintenanceEnabled = ref(false);
 const maintenanceMessage = ref("Maintenance in progress.");
 const statusLabel = ref("Unknown");
@@ -236,15 +242,11 @@ const incidentSlaLine = computed(() => {
   if (Number.isNaN(checked.getTime())) return slaTarget;
   return `${slaTarget} Last checked ${checked.toLocaleTimeString()}.`;
 });
-const topBannerRowCount = computed(() => {
-  let rows = 0;
-  if (showMaintenanceBanner.value) rows += 1;
-  if (showBroadcast.value && activeBroadcast.value) rows += 1;
-  return rows;
-});
+const hasTopBanners = computed(() => showMaintenanceBanner.value || (showBroadcast.value && !!activeBroadcast.value));
 const topOffsetPx = computed(() => {
-  if (topBannerRowCount.value === 0) return "0px";
-  return `${topBannerRowCount.value * 56 + 18}px`;
+  const total = maintenanceBannerHeight.value + broadcastBannerHeight.value;
+  if (total <= 0) return "0px";
+  return `${total}px`;
 });
 const appShellStyle = computed(() => ({
   "--top-banner-offset": topOffsetPx.value,
@@ -256,8 +258,17 @@ const incidentBannerStyle = computed(() => ({
   top: `calc(1rem + ${topOffsetPx.value})`,
 }));
 const broadcastBannerStyle = computed(() => ({
-  top: showMaintenanceBanner.value ? "56px" : "0",
+  top: showMaintenanceBanner.value ? `${maintenanceBannerHeight.value}px` : "0px",
 }));
+
+const measureTopBanners = () => {
+  maintenanceBannerHeight.value = showMaintenanceBanner.value
+    ? (maintenanceBannerRef.value?.offsetHeight ?? 0)
+    : 0;
+  broadcastBannerHeight.value = showBroadcast.value && activeBroadcast.value
+    ? (broadcastBannerRef.value?.offsetHeight ?? 0)
+    : 0;
+};
 
 const applyTheme = (next: "light" | "dark") => {
   theme.value = next;
@@ -307,8 +318,8 @@ const runIdleLogout = async () => {
   }
   isIdleLogoutRunning.value = true;
   try {
-    await signOut();
-    await router.replace("/tenant/admin-login");
+    clearAdminVerification();
+    await router.replace("/tenant/checkout");
   } finally {
     isIdleLogoutRunning.value = false;
   }
@@ -511,13 +522,26 @@ onMounted(() => {
   for (const eventName of adminActivityEvents) {
     window.addEventListener(eventName, handleAdminActivity, { passive: true });
   }
+  window.addEventListener("resize", measureTopBanners);
   resetAdminIdleTimer();
+  void nextTick(() => {
+    measureTopBanners();
+  });
 });
 
 watch(
   () => [route.path, auth.isAuthenticated, auth.role] as const,
   () => {
     resetAdminIdleTimer();
+  }
+);
+
+watch(
+  () => [showMaintenanceBanner.value, showBroadcast.value, activeBroadcast.value?.message] as const,
+  () => {
+    void nextTick(() => {
+      measureTopBanners();
+    });
   }
 );
 
@@ -534,5 +558,6 @@ onUnmounted(() => {
     window.clearInterval(versionTimer);
     versionTimer = null;
   }
+  window.removeEventListener("resize", measureTopBanners);
 });
 </script>

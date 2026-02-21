@@ -33,7 +33,7 @@
             <td>{{ row.tenant?.name || row.tenant_id }}</td>
             <td>{{ row.action_type }}</td>
             <td>{{ row.gear?.name || "-" }} ({{ row.gear?.barcode || "-" }})</td>
-            <td>{{ row.student ? `${row.student.first_name} ${row.student.last_name} (${row.student.student_id})` : "-" }}</td>
+            <td>{{ row.student ? `${row.student.username} (${row.student.student_id})` : "-" }}</td>
           </tr>
         </tbody>
       </table>
@@ -134,7 +134,7 @@ const exportCsv = () => {
     action: row.action_type,
     item_name: row.gear?.name ?? "",
     item_barcode: row.gear?.barcode ?? "",
-    student: row.student ? `${row.student.first_name} ${row.student.last_name} (${row.student.student_id})` : "",
+    student: row.student ? `${row.student.username} (${row.student.student_id})` : "",
   })));
 };
 
@@ -149,7 +149,7 @@ const exportPdf = () => {
     action: row.action_type,
     item_name: row.gear?.name ?? "",
     item_barcode: row.gear?.barcode ?? "",
-    student: row.student ? `${row.student.first_name} ${row.student.last_name} (${row.student.student_id})` : "",
+    student: row.student ? `${row.student.username} (${row.student.student_id})` : "",
   })));
 };
 

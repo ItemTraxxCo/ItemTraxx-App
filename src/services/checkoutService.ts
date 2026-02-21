@@ -38,8 +38,7 @@ export const submitCheckoutReturn = async (
 
 export type StudentSummary = {
   id: string;
-  first_name: string;
-  last_name: string;
+  username: string;
   student_id: string;
 };
 
@@ -73,7 +72,7 @@ export const fetchStudentByStudentId = async (studentId: string) => {
   const { data, error } = await withTimeout(
     supabase
       .from("students")
-      .select("id, first_name, last_name, student_id")
+      .select("id, username, student_id")
       .eq("student_id", studentId)
       .is("deleted_at", null)
       .single(),

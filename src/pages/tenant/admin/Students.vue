@@ -11,27 +11,40 @@
       <h2>Add Student</h2>
       <form class="form" @submit.prevent="handleCreate">
         <label>
-          First name
-          <input v-model="firstName" type="text" placeholder="First name" />
-        </label>
-        <label>
-          Last name
-          <input v-model="lastName" type="text" placeholder="Last name" />
+          Username
+          <input
+            v-model="usernamePreview"
+            type="text"
+            readonly
+            title="If you need to change this, contact support."
+          />
         </label>
         <label>
           Student ID
-          <input v-model="studentId" type="text" placeholder="Student ID" />
+          <input
+            v-model="studentIdPreview"
+            type="text"
+            readonly
+            title="If you need to change this, contact support."
+          />
         </label>
         <div class="form-actions">
+          <button type="button" @click="regenerateIdentity">Regenerate</button>
           <button type="submit" class="button-primary" :disabled="isSaving">Add student</button>
         </div>
       </form>
       <p v-if="error" class="error">{{ error }}</p>
       <p v-if="success" class="success">{{ success }}</p>
     </div>
+
     <div v-if="toastMessage" class="toast">
       <div class="toast-title">{{ toastTitle }}</div>
       <div class="toast-body">{{ toastMessage }}</div>
+      <div v-if="toastActionLabel" class="toast-actions">
+        <button type="button" class="toast-action-button" @click="runToastAction">
+          {{ toastActionLabel }}
+        </button>
+      </div>
     </div>
 
     <div class="card">
@@ -42,7 +55,7 @@
           <input
             v-model="searchQuery"
             type="text"
-            placeholder="Search by first name, last name, or student ID"
+            placeholder="Search by username or student ID"
           />
         </label>
       </div>
@@ -55,18 +68,18 @@
       <table v-else class="table">
         <thead>
           <tr>
-            <th>Name</th>
+            <th>Username</th>
             <th>Student ID</th>
             <th>Details</th>
           </tr>
         </thead>
         <tbody>
           <tr v-for="item in filteredStudents" :key="item.id">
-            <td>{{ item.last_name }}, {{ item.first_name }}</td>
+            <td>{{ item.username }}</td>
             <td>{{ item.student_id }}</td>
             <td>
               <div class="admin-actions">
-                <button type="button" class="dot-button" @click="openDetails(item)">...</button>
+                <button type="button" @click="openDetails(item)">Details</button>
               </div>
             </td>
           </tr>
@@ -81,14 +94,14 @@
       <table v-else class="table">
         <thead>
           <tr>
-            <th>Name</th>
+            <th>Username</th>
             <th>Student ID</th>
             <th></th>
           </tr>
         </thead>
         <tbody>
           <tr v-for="item in filteredArchivedStudents" :key="item.id">
-            <td>{{ item.last_name }}, {{ item.first_name }}</td>
+            <td>{{ item.username }}</td>
             <td>{{ item.student_id }}</td>
             <td>
               <button type="button" class="link" :disabled="isSaving" @click="handleRestore(item)">
@@ -103,10 +116,63 @@
       </table>
     </div>
 
+    <div v-if="featureFlags.enable_bulk_student_tools" class="card">
+      <h2>Bulk Student Tools</h2>
+      <p class="muted">Generate identities in bulk and import them in one action.</p>
+      <div class="form-grid-2">
+        <label>
+          Generate count
+          <input v-model.number="bulkGenerateCount" type="number" min="1" max="200" />
+        </label>
+      </div>
+      <div class="form-actions">
+        <button type="button" @click="generateBulkRows">Generate identities</button>
+      </div>
+
+      <div class="form-actions">
+        <button
+          type="button"
+          class="button-primary"
+          :disabled="isSaving || bulkRows.length === 0"
+          @click="runBulkImport"
+        >
+          Import Generated Rows
+        </button>
+      </div>
+
+      <p class="muted" v-if="bulkRows.length">
+        Generated rows ready: {{ bulkRows.length }}
+      </p>
+    </div>
+
     <div v-if="showDetails" class="modal-backdrop">
       <div class="modal">
-        <h2>{{ selected?.first_name }} {{ selected?.last_name }}</h2>
+        <h2>Student details</h2>
+        <p class="muted">View username, student ID, and checkout history.</p>
+        <h3>{{ selected?.username }}</h3>
         <p class="muted">Student ID: {{ selected?.student_id }}</p>
+        <div class="form-grid-2">
+          <label>
+            Username
+            <input
+              class="identity-readonly"
+              :value="selected?.username || ''"
+              type="text"
+              readonly
+              title="If you need to change this, contact support."
+            />
+          </label>
+          <label>
+            Student ID
+            <input
+              class="identity-readonly"
+              :value="selected?.student_id || ''"
+              type="text"
+              readonly
+              title="If you need to change this, contact support."
+            />
+          </label>
+        </div>
 
         <p v-if="detailsLoading" class="muted">Loading details...</p>
         <div v-else>
@@ -154,6 +220,7 @@ import { computed, onMounted, onUnmounted, ref } from "vue";
 import { RouterLink } from "vue-router";
 import { getAuthState } from "../../../store/authState";
 import {
+  bulkCreateStudents,
   createStudent,
   deleteStudent,
   fetchDeletedStudents,
@@ -163,10 +230,11 @@ import {
   type StudentDetails,
   type StudentItem,
 } from "../../../services/studentService";
+import { fetchTenantSettings } from "../../../services/adminOpsService";
 import { logAdminAction } from "../../../services/auditLogService";
 import { enforceAdminRateLimit } from "../../../services/rateLimitService";
 import { exportRowsToCsv, exportRowsToPdf } from "../../../services/exportService";
-import { sanitizeInput } from "../../../utils/inputSanitizer";
+import { generateStudentIdentity } from "../../../utils/studentIdentity";
 
 const students = ref<StudentItem[]>([]);
 const archivedStudents = ref<StudentItem[]>([]);
@@ -181,16 +249,26 @@ const details = ref<StudentDetails | null>(null);
 const selected = ref<StudentItem | null>(null);
 const toastTitle = ref("");
 const toastMessage = ref("");
+const toastActionLabel = ref("");
+const toastAction = ref<(() => Promise<void>) | null>(null);
 
-const firstName = ref("");
-const lastName = ref("");
-const studentId = ref("");
+const usernamePreview = ref("");
+const studentIdPreview = ref("");
 const searchQuery = ref("");
+const featureFlags = ref({
+  enable_notifications: true,
+  enable_bulk_item_import: true,
+  enable_bulk_student_tools: true,
+  enable_status_tracking: true,
+  enable_barcode_generator: true,
+});
+const bulkGenerateCount = ref(20);
+const bulkRows = ref<Array<{ username: string; student_id: string }>>([]);
 let toastTimer: number | null = null;
 
 const matchesSearch = (item: StudentItem, query: string) => {
   if (!query) return true;
-  const haystack = `${item.first_name} ${item.last_name} ${item.student_id}`.toLowerCase();
+  const haystack = `${item.username} ${item.student_id}`.toLowerCase();
   return haystack.includes(query);
 };
 
@@ -207,6 +285,8 @@ const filteredArchivedStudents = computed(() => {
 const showToast = (title: string, message: string) => {
   toastTitle.value = title;
   toastMessage.value = message;
+  toastActionLabel.value = "";
+  toastAction.value = null;
   if (toastTimer) {
     window.clearTimeout(toastTimer);
   }
@@ -217,17 +297,40 @@ const showToast = (title: string, message: string) => {
   }, 4000);
 };
 
+const showToastWithAction = (
+  title: string,
+  message: string,
+  actionLabel: string,
+  action: () => Promise<void>
+) => {
+  toastTitle.value = title;
+  toastMessage.value = message;
+  toastActionLabel.value = actionLabel;
+  toastAction.value = action;
+  if (toastTimer) {
+    window.clearTimeout(toastTimer);
+  }
+  toastTimer = window.setTimeout(() => {
+    toastTitle.value = "";
+    toastMessage.value = "";
+    toastActionLabel.value = "";
+    toastAction.value = null;
+    toastTimer = null;
+  }, 7000);
+};
+
+const runToastAction = async () => {
+  if (!toastAction.value) return;
+  const action = toastAction.value;
+  toastAction.value = null;
+  toastActionLabel.value = "";
+  await action();
+};
+
 const showDuplicateStudentToast = () => {
   showToast(
     "Unable to add student.",
-    "Check student ID number and make sure it does not match another student's ID number. If you believe this is an error, please contact support with the student detils that you want to add"
-  );
-};
-
-const showInputLimitToast = () => {
-  showToast(
-    "Input limit reached.",
-    "One or more fields are too long. Shorten the field that is too long and try again."
+    "Check student ID number and make sure it does not match another student's ID number. If you believe this is an error, contact support with the student details you want to add."
   );
 };
 
@@ -255,10 +358,48 @@ const loadStudents = async () => {
   await loadArchivedStudents();
 };
 
+const regenerateIdentity = () => {
+  const next = generateStudentIdentity();
+  usernamePreview.value = next.username;
+  studentIdPreview.value = next.studentId;
+};
+
+const generateBulkRows = () => {
+  const count = Math.min(200, Math.max(1, Math.round(Number(bulkGenerateCount.value) || 0)));
+  bulkGenerateCount.value = count;
+  bulkRows.value = Array.from({ length: count }, () => generateStudentIdentity()).map((row) => ({
+    username: row.username,
+    student_id: row.studentId,
+  }));
+};
+
+const runBulkImport = async () => {
+  if (!bulkRows.value.length) {
+    showToast("No rows to import.", "Generate rows first.");
+    return;
+  }
+  error.value = "";
+  success.value = "";
+  isSaving.value = true;
+  try {
+    await enforceAdminRateLimit();
+    const result = await bulkCreateStudents(bulkRows.value);
+    students.value = [...result.inserted, ...students.value];
+    success.value = `Imported ${result.inserted_count} student(s).`;
+    showToast("Bulk import complete", `Imported ${result.inserted_count}, skipped ${result.skipped_count}.`);
+    bulkRows.value = [];
+  } catch (err) {
+    error.value = err instanceof Error ? err.message : "Unable to import students.";
+    showToast("Import failed", error.value);
+  } finally {
+    isSaving.value = false;
+  }
+};
+
 const exportCsv = () => {
   exportRowsToCsv(
     `students-${new Date().toISOString().slice(0, 10)}.csv`,
-    ["first_name", "last_name", "student_id"],
+    ["username", "student_id"],
     filteredStudents.value
   );
 };
@@ -267,7 +408,7 @@ const exportPdf = () => {
   exportRowsToPdf(
     `students-${new Date().toISOString().slice(0, 10)}.pdf`,
     "Student Export",
-    ["first_name", "last_name", "student_id"],
+    ["username", "student_id"],
     filteredStudents.value
   );
 };
@@ -275,32 +416,6 @@ const exportPdf = () => {
 const handleCreate = async () => {
   error.value = "";
   success.value = "";
-  const firstSanitized = sanitizeInput(firstName.value, { maxLen: 80 });
-  const lastSanitized = sanitizeInput(lastName.value, { maxLen: 80 });
-  const studentSanitized = sanitizeInput(studentId.value, { maxLen: 32 });
-
-  firstName.value = firstSanitized.value;
-  lastName.value = lastSanitized.value;
-  studentId.value = studentSanitized.value;
-
-  const inputError = firstSanitized.error || lastSanitized.error || studentSanitized.error;
-  if (inputError) {
-    error.value = inputError;
-    showInputLimitToast();
-    return;
-  }
-  if (!firstName.value.trim() || !lastName.value.trim() || !studentId.value.trim()) {
-    error.value = "First name, last name, and student ID are required.";
-    return;
-  }
-  const normalizedStudentId = studentId.value.trim().toLowerCase();
-  const isDuplicateStudentId = students.value.some(
-    (item) => item.student_id.trim().toLowerCase() === normalizedStudentId
-  );
-  if (isDuplicateStudentId) {
-    showDuplicateStudentToast();
-    return;
-  }
 
   const auth = getAuthState();
   if (!auth.tenantContextId) {
@@ -313,9 +428,8 @@ const handleCreate = async () => {
     await enforceAdminRateLimit();
     const created = await createStudent({
       tenant_id: auth.tenantContextId,
-      first_name: firstName.value.trim(),
-      last_name: lastName.value.trim(),
-      student_id: studentId.value.trim(),
+      username: usernamePreview.value,
+      student_id: studentIdPreview.value,
     });
     await logAdminAction({
       action_type: "student_create",
@@ -324,25 +438,35 @@ const handleCreate = async () => {
       metadata: { student_id: created.student_id },
     });
     students.value = [created, ...students.value];
-    firstName.value = "";
-    lastName.value = "";
-    studentId.value = "";
+    usernamePreview.value = created.username;
+    studentIdPreview.value = created.student_id;
+    regenerateIdentity();
     success.value = "Student added.";
   } catch (err) {
     error.value = err instanceof Error ? err.message : "Unable to create student. If you belive this is an error, please contact support.";
-    const message = err instanceof Error ? err.message.toLowerCase() : "";
-    if (message.includes("duplicate") || message.includes("already")) {
-      showDuplicateStudentToast();
-    } else if (message.includes("invalid request") || message.includes("characters or less")) {
-      showInputLimitToast();
-    }
+    showDuplicateStudentToast();
   } finally {
     isSaving.value = false;
   }
 };
 
 onMounted(() => {
-  void loadStudents();
+  regenerateIdentity();
+  void (async () => {
+    try {
+      const settings = await fetchTenantSettings();
+      featureFlags.value = settings.feature_flags;
+    } catch {
+      featureFlags.value = {
+        enable_notifications: true,
+        enable_bulk_item_import: true,
+        enable_bulk_student_tools: true,
+        enable_status_tracking: true,
+        enable_barcode_generator: true,
+      };
+    }
+    await loadStudents();
+  })();
 });
 
 const openDetails = async (item: StudentItem) => {
@@ -381,7 +505,7 @@ const formatTime = (value: string) => {
 };
 
 const removeStudent = async (item: StudentItem) => {
-  const confirmed = window.confirm(`Archive student "${item.first_name} ${item.last_name}"? You can restore them later.`);
+  const confirmed = window.confirm(`Archive student "${item.username}"? You can restore them later.`);
   if (!confirmed) return;
   error.value = "";
   success.value = "";
@@ -398,6 +522,14 @@ const removeStudent = async (item: StudentItem) => {
     students.value = students.value.filter((row) => row.id !== item.id);
     archivedStudents.value = [item, ...archivedStudents.value];
     success.value = "Student archived.";
+    showToastWithAction(
+      "Student archived",
+      `${item.username} was archived.`,
+      "Undo",
+      async () => {
+        await handleRestore(item);
+      }
+    );
   } catch (err) {
     error.value = err instanceof Error ? err.message : "Unable to archive student. Please sign out completeley and sign back in.";
   } finally {
@@ -443,3 +575,42 @@ onUnmounted(() => {
   }
 });
 </script>
+
+<style scoped>
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(10, 14, 25, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  z-index: 1000;
+}
+
+.modal {
+  width: min(680px, 100%);
+  max-height: 90vh;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  padding: 1rem;
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.24);
+}
+
+.modal h3 {
+  margin-top: 0.25rem;
+  margin-bottom: 0.5rem;
+}
+
+.modal .admin-actions {
+  margin-top: 0.75rem;
+}
+
+.identity-readonly {
+  width: auto;
+  min-width: 120px;
+  max-width: 100%;
+}
+</style>

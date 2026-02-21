@@ -248,10 +248,18 @@ serve(async (req) => {
         max_admins: typeof next.max_admins === "number" ? next.max_admins : null,
         max_students: typeof next.max_students === "number" ? next.max_students : null,
         max_gear: typeof next.max_gear === "number" ? next.max_gear : null,
+        checkout_due_hours:
+          typeof next.checkout_due_hours === "number"
+            ? Math.min(720, Math.max(1, Math.round(next.checkout_due_hours)))
+            : 72,
         barcode_pattern:
           typeof next.barcode_pattern === "string" && next.barcode_pattern.trim()
             ? next.barcode_pattern.trim()
             : null,
+        feature_flags:
+          next.feature_flags && typeof next.feature_flags === "object"
+            ? (next.feature_flags as Record<string, unknown>)
+            : {},
         updated_by: user.id,
         updated_at: new Date().toISOString(),
       };
@@ -259,10 +267,44 @@ serve(async (req) => {
       const { data, error } = await adminClient
         .from("tenant_policies")
         .upsert(row, { onConflict: "tenant_id" })
-        .select("tenant_id, max_admins, max_students, max_gear, barcode_pattern")
+        .select(
+          "tenant_id, max_admins, max_students, max_gear, checkout_due_hours, barcode_pattern, feature_flags"
+        )
         .single();
 
       if (error || !data) {
+        const message = (error?.message ?? "").toLowerCase();
+        if (error?.code === "42703" && message.includes("feature_flags")) {
+          const { data: fallbackData, error: fallbackError } = await adminClient
+            .from("tenant_policies")
+            .upsert(
+              {
+                tenant_id: tenantId,
+                max_admins: row.max_admins,
+                max_students: row.max_students,
+                max_gear: row.max_gear,
+                checkout_due_hours: row.checkout_due_hours,
+                barcode_pattern: row.barcode_pattern,
+                updated_by: row.updated_by,
+                updated_at: row.updated_at,
+              },
+              { onConflict: "tenant_id" }
+            )
+            .select(
+              "tenant_id, max_admins, max_students, max_gear, checkout_due_hours, barcode_pattern"
+            )
+            .single();
+          if (fallbackError || !fallbackData) {
+            return jsonResponse(400, { error: "Unable to save tenant policy." });
+          }
+          await writeAudit(
+            "set_tenant_policy",
+            "tenant_policy",
+            tenantId,
+            fallbackData as Record<string, unknown>
+          );
+          return jsonResponse(200, { data: fallbackData });
+        }
         return jsonResponse(400, { error: "Unable to save tenant policy." });
       }
 

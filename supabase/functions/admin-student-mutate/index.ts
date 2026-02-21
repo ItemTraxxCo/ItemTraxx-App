@@ -208,21 +208,37 @@ const CODENAME_SUFFIXES = [
   "Zeal",
 ];
 
+const secureRandomInt = (maxExclusive: number): number => {
+  if (!Number.isInteger(maxExclusive) || maxExclusive <= 0) {
+    throw new Error("maxExclusive must be a positive integer");
+  }
+  const uint32Range = 0x1_0000_0000;
+  const maxAllowed = Math.floor(uint32Range / maxExclusive) * maxExclusive;
+  const buffer = new Uint32Array(1);
+  while (true) {
+    crypto.getRandomValues(buffer);
+    const value = buffer[0];
+    if (value < maxAllowed) {
+      return value % maxExclusive;
+    }
+  }
+};
+
 const randomDigits = (len: number) =>
-  Array.from({ length: len }, () => Math.floor(Math.random() * 10)).join("");
+  Array.from({ length: len }, () => secureRandomInt(10)).join("");
 
 const randomLetters = (len: number) =>
   Array.from({ length: len }, () =>
-    String.fromCharCode(65 + Math.floor(Math.random() * 26))
+    String.fromCharCode(65 + secureRandomInt(26))
   ).join("");
 
 const generateStudentId = () => `${randomDigits(4)}${randomLetters(2)}`;
 
 const generateUsername = () => {
   const prefix =
-    CODENAME_PREFIXES[Math.floor(Math.random() * CODENAME_PREFIXES.length)];
+    CODENAME_PREFIXES[secureRandomInt(CODENAME_PREFIXES.length)];
   const suffix =
-    CODENAME_SUFFIXES[Math.floor(Math.random() * CODENAME_SUFFIXES.length)];
+    CODENAME_SUFFIXES[secureRandomInt(CODENAME_SUFFIXES.length)];
   const token = `${randomLetters(2)}${randomDigits(4)}`;
   return `${prefix}${suffix}${token}`;
 };

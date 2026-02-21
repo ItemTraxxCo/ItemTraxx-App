@@ -10,7 +10,7 @@ export type SuperLogEntry = {
   action_time: string;
   performed_by: string | null;
   gear: { id: string; name: string; barcode: string } | null;
-  student: { id: string; first_name: string; last_name: string; student_id: string } | null;
+  student: { id: string; username: string; student_id: string } | null;
   tenant: { id: string; name: string } | null;
 };
 

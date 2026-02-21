@@ -195,7 +195,7 @@ serve(async (req) => {
       studentIds.length
         ? adminClient
             .from("students")
-            .select("id, first_name, last_name, student_id")
+            .select("id, username, student_id")
             .in("id", studentIds)
         : Promise.resolve({ data: [], error: null }),
       tenantIds.length
@@ -212,8 +212,7 @@ serve(async (req) => {
       (
         (studentResult.data ?? []) as Array<{
           id: string;
-          first_name: string;
-          last_name: string;
+          username: string;
           student_id: string;
         }>
       ).map((item) => [item.id, item])
@@ -238,8 +237,7 @@ serve(async (req) => {
           row.action_type,
           row.gear?.name,
           row.gear?.barcode,
-          row.student?.first_name,
-          row.student?.last_name,
+          row.student?.username,
           row.student?.student_id,
           row.tenant?.name,
         ]

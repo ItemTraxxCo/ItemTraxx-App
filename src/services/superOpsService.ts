@@ -112,6 +112,26 @@ export const forceTenantReauth = async (payload: { tenant_id: string }) =>
     payload,
   });
 
+export const setTenantPolicy = async (payload: {
+  tenant_id: string;
+  checkout_due_hours: number;
+  feature_flags: {
+    enable_notifications: boolean;
+    enable_bulk_item_import: boolean;
+    enable_bulk_student_tools: boolean;
+    enable_status_tracking: boolean;
+    enable_barcode_generator: boolean;
+  };
+}) =>
+  callSuperOps<{
+    tenant_id: string;
+    checkout_due_hours: number;
+    feature_flags: Record<string, unknown>;
+  }>({
+    action: "set_tenant_policy",
+    payload,
+  });
+
 export const approveRequest = async (payload: { id: string }) =>
   callSuperOps<SuperApproval>({
     action: "approve_request",

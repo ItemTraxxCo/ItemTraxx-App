@@ -4,8 +4,7 @@ import { invokeEdgeFunction } from "./edgeFunctionClient";
 export type StudentItem = {
   id: string;
   tenant_id: string;
-  first_name: string;
-  last_name: string;
+  username: string;
   student_id: string;
 };
 
@@ -36,7 +35,7 @@ const getAccessToken = async () => {
 export const fetchStudents = async () => {
   const { data, error } = await supabase
     .from("students")
-    .select("id, tenant_id, first_name, last_name, student_id")
+    .select("id, tenant_id, username, student_id")
     .is("deleted_at", null)
     .order("created_at", { ascending: false });
 
@@ -71,9 +70,8 @@ export const fetchDeletedStudents = async () => {
 
 export const createStudent = async (payload: {
   tenant_id: string;
-  first_name: string;
-  last_name: string;
-  student_id: string;
+  username?: string;
+  student_id?: string;
 }) => {
   const accessToken = await getAccessToken();
 
@@ -86,9 +84,8 @@ export const createStudent = async (payload: {
         action: "create",
         payload: {
           tenant_id: payload.tenant_id,
-          first_name: payload.first_name,
-          last_name: payload.last_name,
-          student_id: payload.student_id,
+          username: payload.username ?? "",
+          student_id: payload.student_id ?? "",
         },
       },
     }
@@ -99,6 +96,39 @@ export const createStudent = async (payload: {
   }
 
   return result.data?.data as StudentItem;
+};
+
+export const bulkCreateStudents = async (
+  rows: Array<{ username?: string; student_id?: string }>
+) => {
+  const accessToken = await getAccessToken();
+
+  const result = await invokeEdgeFunction<{
+    data: {
+      inserted_count: number;
+      skipped_count: number;
+      inserted: StudentItem[];
+      skipped: Array<{ row: number; reason: string }>;
+    };
+  }>("admin-student-mutate", {
+    method: "POST",
+    accessToken,
+    body: {
+      action: "bulk_create",
+      payload: { rows },
+    },
+  });
+
+  if (!result.ok) {
+    throw new Error(result.error || "Unable to import students.");
+  }
+
+  return result.data?.data as {
+    inserted_count: number;
+    skipped_count: number;
+    inserted: StudentItem[];
+    skipped: Array<{ row: number; reason: string }>;
+  };
 };
 
 export const deleteStudent = async (id: string) => {

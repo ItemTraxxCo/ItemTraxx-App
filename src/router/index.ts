@@ -142,6 +142,17 @@ const routes: RouteRecordRaw[] = [
     },
   },
   {
+    path: "/tenant/admin/settings",
+    name: "tenant-admin-settings",
+    component: () => import("../pages/tenant/admin/Settings.vue"),
+    meta: {
+      requiresSession: true,
+      requiresTenant: true,
+      requiresRole: "tenant_admin",
+      requiresTenantMatch: true,
+    },
+  },
+  {
     path: "/tenant/admin/gear-import",
     name: "tenant-admin-gear-import",
     component: () => import("../pages/tenant/admin/GearImport.vue"),

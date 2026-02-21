@@ -6,9 +6,10 @@
     </div>
 
     <h1>Bulk Item Import Wizard</h1>
-    <p>Paste CSV rows, preview parsed entries, then import items in one action.</p>
+    <p v-if="!featureEnabled" class="error">Bulk item import is disabled for this tenant.</p>
+    <p v-else>Paste CSV rows, preview parsed entries, then import items in one action.</p>
 
-    <div class="card">
+    <div v-if="featureEnabled" class="card">
       <h2>Step 1: Paste CSV</h2>
       <p class="muted">Format: <code>name,barcode,serial_number,notes</code>. Header row is optional. Status is set to <code>available</code> automatically.</p>
       <div class="form-actions import-template-actions">
@@ -29,7 +30,7 @@
       </div>
     </div>
 
-    <div class="card" v-if="parsedRows.length">
+    <div class="card" v-if="featureEnabled && parsedRows.length">
       <h2>Step 2: Preview</h2>
       <p class="muted">Ready: {{ parsedRows.length }} rows | Skipped in parse: {{ parseSkipped.length }}</p>
       <table class="table">
@@ -58,7 +59,7 @@
       </div>
     </div>
 
-    <div class="card" v-if="parseSkipped.length">
+    <div class="card" v-if="featureEnabled && parseSkipped.length">
       <h2>Parse Skipped Rows</h2>
       <ul>
         <li v-for="(item, index) in parseSkipped" :key="`parse-${index}`">
@@ -72,7 +73,7 @@
       </div>
     </div>
 
-    <div class="card" v-if="importResult">
+    <div class="card" v-if="featureEnabled && importResult">
       <h2>Import Result</h2>
       <p>
         Inserted: <strong>{{ importResult.inserted }}</strong>
@@ -99,9 +100,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from "vue";
+import { onMounted, ref } from "vue";
 import { RouterLink } from "vue-router";
-import { bulkImportGear } from "../../../services/adminOpsService";
+import { bulkImportGear, fetchTenantSettings } from "../../../services/adminOpsService";
 import { logAdminAction } from "../../../services/auditLogService";
 import { enforceAdminRateLimit } from "../../../services/rateLimitService";
 
@@ -119,6 +120,7 @@ const parseSkipped = ref<Array<{ barcode: string; reason: string }>>([]);
 const isImporting = ref(false);
 const error = ref("");
 const success = ref("");
+const featureEnabled = ref(true);
 const importResult = ref<{
   inserted: number;
   skipped: number;
@@ -305,6 +307,15 @@ const handleCsvFileSelect = async (event: Event) => {
     }
   }
 };
+
+onMounted(async () => {
+  try {
+    const settings = await fetchTenantSettings();
+    featureEnabled.value = settings.feature_flags.enable_bulk_item_import;
+  } catch {
+    featureEnabled.value = true;
+  }
+});
 </script>
 
 <style scoped>

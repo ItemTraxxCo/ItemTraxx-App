@@ -558,6 +558,8 @@ onBeforeUnmount(() => {
   justify-content: center;
   border-radius: 10px;
   padding: 0.72rem 1.2rem;
+  box-sizing: border-box;
+  max-width: 100%;
   font-weight: 700;
   border: 1px solid transparent;
   transition: transform 0.15s ease, filter 0.2s ease;
@@ -943,6 +945,7 @@ onBeforeUnmount(() => {
 
   .hero-actions,
   .final-cta-actions {
+    width: 100%;
     flex-direction: column;
     align-items: stretch;
   }
@@ -1006,10 +1009,19 @@ onBeforeUnmount(() => {
   }
 
   .trust-strip {
-    width: 100%;
+    display: flex;
+    box-sizing: border-box;
+    width: auto;
+    max-width: 100%;
     justify-content: center;
-    flex-wrap: wrap;
-    border-radius: 12px;
+    flex-wrap: nowrap;
+    border-radius: 999px;
+    padding: 0.5rem 0.78rem;
+    gap: 0.8rem;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    margin-left: auto;
+    margin-right: auto;
   }
 
 }

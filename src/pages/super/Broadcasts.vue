@@ -47,6 +47,41 @@
       <p class="muted" v-if="lastUpdated">Last updated: {{ formatDateTime(lastUpdated) }}</p>
     </div>
 
+    <div class="card">
+      <h2>Tenant Notification Update</h2>
+      <form class="form" @submit.prevent="saveTenantUpdate">
+        <label>
+          Title
+          <input v-model="updateTitle" type="text" maxlength="80" placeholder="What changed?" />
+        </label>
+        <label>
+          Message
+          <textarea
+            v-model="updateMessage"
+            rows="3"
+            maxlength="240"
+            placeholder="Short update shown in tenant notification bell."
+          />
+        </label>
+        <label>
+          Severity
+          <select v-model="updateLevel">
+            <option value="info">info</option>
+            <option value="warning">warning</option>
+            <option value="critical">critical</option>
+          </select>
+        </label>
+        <label>
+          Optional link
+          <input v-model="updateLinkUrl" type="url" placeholder="https://statuspage.incident.io/itemtraxx-status" />
+        </label>
+        <div class="form-actions">
+          <button type="submit" class="button-primary" :disabled="isSaving">Publish Update</button>
+          <button type="button" :disabled="isSaving" @click="clearTenantUpdates">Clear Updates</button>
+        </div>
+      </form>
+    </div>
+
     <div v-if="toastMessage" class="toast">
       <div class="toast-title">{{ toastTitle }}</div>
       <div class="toast-body">{{ toastMessage }}</div>
@@ -66,6 +101,10 @@ const isSaving = ref(false);
 const lastUpdated = ref("");
 const toastTitle = ref("");
 const toastMessage = ref("");
+const updateTitle = ref("");
+const updateMessage = ref("");
+const updateLevel = ref<"info" | "warning" | "critical">("info");
+const updateLinkUrl = ref("");
 let toastTimer: number | null = null;
 
 const showToast = (title: string, body: string) => {
@@ -148,6 +187,63 @@ const clearBroadcast = async () => {
     showToast("Disabled", "Broadcast disabled.");
   } catch (err) {
     showToast("Action failed", err instanceof Error ? err.message : "Unable to disable broadcast.");
+  } finally {
+    isSaving.value = false;
+  }
+};
+
+const saveTenantUpdate = async () => {
+  if (!updateMessage.value.trim()) {
+    showToast("Invalid input", "Enter an update message.");
+    return;
+  }
+
+  isSaving.value = true;
+  try {
+    const nowIso = new Date().toISOString();
+    await setRuntimeConfig({
+      key: "tenant_updates",
+      value: {
+        enabled: true,
+        items: [
+          {
+            id: nowIso,
+            title: updateTitle.value.trim() || "Product update",
+            message: updateMessage.value.trim(),
+            level: updateLevel.value,
+            link_url: updateLinkUrl.value.trim() || null,
+            created_at: nowIso,
+          },
+        ],
+        updated_at: nowIso,
+      },
+    });
+    showToast("Published", "Tenant notification update published.");
+    updateTitle.value = "";
+    updateMessage.value = "";
+    updateLevel.value = "info";
+    updateLinkUrl.value = "";
+  } catch (err) {
+    showToast("Save failed", err instanceof Error ? err.message : "Unable to publish update.");
+  } finally {
+    isSaving.value = false;
+  }
+};
+
+const clearTenantUpdates = async () => {
+  isSaving.value = true;
+  try {
+    await setRuntimeConfig({
+      key: "tenant_updates",
+      value: {
+        enabled: false,
+        items: [],
+        updated_at: new Date().toISOString(),
+      },
+    });
+    showToast("Cleared", "Tenant notification updates cleared.");
+  } catch (err) {
+    showToast("Action failed", err instanceof Error ? err.message : "Unable to clear tenant updates.");
   } finally {
     isSaving.value = false;
   }

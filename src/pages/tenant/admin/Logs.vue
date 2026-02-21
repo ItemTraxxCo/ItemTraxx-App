@@ -56,8 +56,7 @@
             <td>{{ log.action_type }}</td>
             <td>
               <span v-if="log.student">
-                {{ log.student.last_name }}, {{ log.student.first_name }}
-                ({{ log.student.student_id }})
+                {{ log.student.username }} ({{ log.student.student_id }})
               </span>
               <span v-else class="muted">-</span>
             </td>
@@ -119,7 +118,7 @@ const filteredLogs = computed(() => {
 
     const action = (log.action_type || "").toLowerCase();
     const student = log.student
-      ? `${log.student.first_name} ${log.student.last_name} ${log.student.student_id}`.toLowerCase()
+      ? `${log.student.username} ${log.student.student_id}`.toLowerCase()
       : "";
     const gear = log.gear ? `${log.gear.name} ${log.gear.barcode}`.toLowerCase() : "";
     return action.includes(query) || student.includes(query) || gear.includes(query);
@@ -143,7 +142,7 @@ const exportRows = computed(() =>
     action_time: formatTime(log.action_time),
     action_type: log.action_type,
     student: log.student
-      ? `${log.student.last_name}, ${log.student.first_name} (${log.student.student_id})`
+      ? `${log.student.username} (${log.student.student_id})`
       : "",
     item: log.gear ? `${log.gear.name} (${log.gear.barcode})` : "",
   }))

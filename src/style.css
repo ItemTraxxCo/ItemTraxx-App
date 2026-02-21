@@ -478,7 +478,7 @@ textarea {
   right: 0;
   z-index: 1100;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 0.55rem;
   min-height: 56px;
   padding: 0.75rem 1rem;
@@ -507,9 +507,13 @@ textarea {
 
 .maintenance-top-banner span,
 .broadcast-top-banner .broadcast-message {
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.broadcast-top-banner .broadcast-dismiss {
+  margin-top: 0.05rem;
 }
 
 .incident-banner {
@@ -767,6 +771,22 @@ textarea {
 
 .toast-body {
   white-space: pre-line;
+}
+
+.toast-actions {
+  margin-top: 0.55rem;
+  display: flex;
+  gap: 0.45rem;
+}
+
+.toast-action-button {
+  border: 1px solid rgba(0, 0, 0, 0.35);
+  background: rgba(255, 255, 255, 0.55);
+  color: #111827;
+  border-radius: 8px;
+  padding: 0.25rem 0.55rem;
+  font-size: 0.78rem;
+  font-weight: 600;
 }
 
 .checkout-item-row {

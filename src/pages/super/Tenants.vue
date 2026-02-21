@@ -107,6 +107,31 @@
             Access Code
             <input v-model="editAccessCode" type="text" placeholder="Access code" />
           </label>
+          <label>
+            Checkout due limit (hours)
+            <input v-model.number="editCheckoutDueHours" type="number" min="1" max="720" />
+          </label>
+          <h3>Feature Flags</h3>
+          <label>
+            <input v-model="editFeatureFlags.enable_notifications" type="checkbox" />
+            Notifications
+          </label>
+          <label>
+            <input v-model="editFeatureFlags.enable_bulk_item_import" type="checkbox" />
+            Bulk item import
+          </label>
+          <label>
+            <input v-model="editFeatureFlags.enable_bulk_student_tools" type="checkbox" />
+            Bulk student tools
+          </label>
+          <label>
+            <input v-model="editFeatureFlags.enable_status_tracking" type="checkbox" />
+            Item status tracking
+          </label>
+          <label>
+            <input v-model="editFeatureFlags.enable_barcode_generator" type="checkbox" />
+            Barcode generator
+          </label>
           <div class="form-actions">
             <button type="button" :disabled="isSaving" @click="sendEditTenantReset">
               Send Reset Link
@@ -138,6 +163,7 @@
 import { onMounted, ref } from "vue";
 import { RouterLink } from "vue-router";
 import StepUpModal from "../../components/StepUpModal.vue";
+import { setTenantPolicy } from "../../services/superOpsService";
 import {
   createTenant,
   fromTenantStatusLabel,
@@ -164,6 +190,14 @@ const editTenantId = ref<string | null>(null);
 const editModalVisible = ref(false);
 const editName = ref("");
 const editAccessCode = ref("");
+const editCheckoutDueHours = ref(72);
+const editFeatureFlags = ref({
+  enable_notifications: true,
+  enable_bulk_item_import: true,
+  enable_bulk_student_tools: true,
+  enable_status_tracking: true,
+  enable_barcode_generator: true,
+});
 const toastTitle = ref("");
 const toastMessage = ref("");
 const statusModalVisible = ref(false);
@@ -250,6 +284,17 @@ const openEditModal = (tenant: SuperTenant) => {
   editTenantId.value = tenant.id;
   editName.value = tenant.name;
   editAccessCode.value = tenant.access_code;
+  editCheckoutDueHours.value =
+    typeof tenant.checkout_due_hours === "number"
+      ? tenant.checkout_due_hours
+      : 72;
+  editFeatureFlags.value = {
+    enable_notifications: tenant.feature_flags?.enable_notifications !== false,
+    enable_bulk_item_import: tenant.feature_flags?.enable_bulk_item_import !== false,
+    enable_bulk_student_tools: tenant.feature_flags?.enable_bulk_student_tools !== false,
+    enable_status_tracking: tenant.feature_flags?.enable_status_tracking !== false,
+    enable_barcode_generator: tenant.feature_flags?.enable_barcode_generator !== false,
+  };
   editModalVisible.value = true;
 };
 
@@ -258,12 +303,21 @@ const closeEditModal = () => {
   editTenantId.value = null;
   editName.value = "";
   editAccessCode.value = "";
+  editCheckoutDueHours.value = 72;
 };
 
 const saveEdit = async () => {
   if (!editTenantId.value) return;
   if (!editName.value.trim() || !editAccessCode.value.trim()) {
     showToast("Invalid input", "Enter tenant name and access code.");
+    return;
+  }
+  if (
+    !Number.isFinite(editCheckoutDueHours.value) ||
+    editCheckoutDueHours.value < 1 ||
+    editCheckoutDueHours.value > 720
+  ) {
+    showToast("Invalid input", "Checkout due limit must be between 1 and 720 hours.");
     return;
   }
 
@@ -277,6 +331,12 @@ const saveEdit = async () => {
     tenants.value = tenants.value.map((tenant) =>
       tenant.id === updated.id ? updated : tenant
     );
+    await setTenantPolicy({
+      tenant_id: editTenantId.value,
+      checkout_due_hours: Math.round(editCheckoutDueHours.value),
+      feature_flags: editFeatureFlags.value,
+    });
+    await loadTenants();
     closeEditModal();
     showToast("Tenant updated", "Tenant details were updated.");
   } catch (err) {

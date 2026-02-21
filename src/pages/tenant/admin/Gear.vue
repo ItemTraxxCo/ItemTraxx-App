@@ -44,6 +44,11 @@
     <div v-if="toastMessage" class="toast">
       <div class="toast-title">{{ toastTitle }}</div>
       <div class="toast-body">{{ toastMessage }}</div>
+      <div v-if="toastActionLabel" class="toast-actions">
+        <button type="button" class="toast-action-button" @click="runToastAction">
+          {{ toastActionLabel }}
+        </button>
+      </div>
     </div>
 
     <div class="card">
@@ -87,70 +92,118 @@
         </thead>
         <tbody>
           <tr v-for="item in filteredGear" :key="item.id">
+            <td>{{ item.name }}</td>
+            <td>{{ item.barcode }}</td>
             <td>
-              <span v-if="editingId !== item.id">{{ item.name }}</span>
-              <input v-else v-model="editName" type="text" placeholder="Name" />
-            </td>
-            <td>
-              <span v-if="editingId !== item.id">{{ item.barcode }}</span>
-              <input v-else v-model="editBarcode" type="text" placeholder="Barcode" />
-            </td>
-            <td>
-              <span
-                class="serial-number"
-                :class="{ dim: editingId === item.id }"
-                title="To edit the serial number, please contact support@itemtraxx.com with the current item serial number and what you would lke to change it to."
-              >
+              <span class="serial-number">
                 {{ item.serial_number || "-" }}
               </span>
             </td>
+            <td>{{ item.status }}</td>
+            <td class="gear-notes-cell">{{ item.notes || "-" }}</td>
             <td>
-              <span v-if="editingId !== item.id">{{ item.status }}</span>
-              <select v-else v-model="editStatus">
-                <option v-if="editStatus === 'checked_out'" value="checked_out" disabled>
-                  checked_out (managed by checkout)
-                </option>
-                <option v-for="option in editableStatusOptions" :key="option" :value="option">
-                  {{ option }}
-                </option>
-              </select>
-            </td>
-            <td class="gear-notes-cell">
-              <span v-if="editingId !== item.id">{{ item.notes || "-" }}</span>
-              <div v-else>
-                <textarea
-                  v-model="editNotes"
-                  class="gear-notes-input"
-                  rows="3"
-                  maxlength="500"
-                  placeholder="Notes"
-                ></textarea>
-                <div class="muted form-help-row">
-                  <span>Character limit 500</span>
-                  <span>{{ editNotes.length }}/500</span>
-                </div>
-              </div>
-            </td>
-            <td :class="{ 'edit-actions-cell': editingId === item.id }">
               <div class="admin-actions">
-                <button
-                  v-if="editingId !== item.id"
-                  type="button"
-                  class="link"
-                  @click="startEdit(item)"
-                >
-                  Edit
-                </button>
-                <div v-else class="admin-actions">
-                  <button type="button" class="link" @click="saveEdit(item.id)">Save</button>
-                  <button type="button" class="link" @click="cancelEdit">Cancel</button>
-                  <button type="button" class="link" @click="removeGear(item)">Archive</button>
-                </div>
+                <button type="button" class="link" @click="openDetails(item)">Details</button>
               </div>
             </td>
           </tr>
         </tbody>
       </table>
+    </div>
+
+    <div v-if="showDetailsModal && selectedGear" class="modal-backdrop">
+      <div class="modal">
+        <h2>Item details</h2>
+        <div class="form-grid-2">
+          <label>
+            Name
+            <input
+              v-if="isModalEditing"
+              v-model="editName"
+              type="text"
+              placeholder="Name"
+            />
+            <input v-else :value="selectedGear.name" type="text" readonly />
+          </label>
+          <label>
+            Barcode
+            <input
+              v-if="isModalEditing"
+              v-model="editBarcode"
+              type="text"
+              placeholder="Barcode"
+            />
+            <input v-else :value="selectedGear.barcode" type="text" readonly />
+          </label>
+          <label>
+            Serial Number
+            <input
+              :value="selectedGear.serial_number || '-'"
+              type="text"
+              readonly
+              title="To edit the serial number, contact support@itemtraxx.com with the current serial number and requested change."
+            />
+          </label>
+          <label>
+            Status
+            <select v-if="isModalEditing" v-model="editStatus">
+              <option v-if="editStatus === 'checked_out'" value="checked_out" disabled>
+                checked_out (managed by checkout)
+              </option>
+              <option v-for="option in editableStatusOptions" :key="option" :value="option">
+                {{ option }}
+              </option>
+            </select>
+            <input v-else :value="selectedGear.status" type="text" readonly />
+          </label>
+        </div>
+
+        <label>
+          Notes
+          <textarea
+            v-if="isModalEditing"
+            v-model="editNotes"
+            class="gear-notes-input"
+            rows="3"
+            maxlength="500"
+            placeholder="Notes"
+          ></textarea>
+          <textarea
+            v-else
+            :value="selectedGear.notes || '-'"
+            class="gear-notes-input"
+            rows="3"
+            readonly
+          ></textarea>
+          <div class="muted form-help-row">
+            <span>Character limit 500</span>
+            <span>{{ (isModalEditing ? editNotes : selectedGear.notes || '').length }}/500</span>
+          </div>
+        </label>
+
+        <div class="admin-actions">
+          <button
+            v-if="!isModalEditing"
+            type="button"
+            class="link"
+            @click="startEdit(selectedGear)"
+          >
+            Edit item
+          </button>
+          <template v-else>
+            <button type="button" class="link" :disabled="isSaving" @click="saveModalEdit">
+              Save
+            </button>
+            <button type="button" class="link" :disabled="isSaving" @click="cancelEdit">
+              Cancel edit
+            </button>
+          </template>
+          <button type="button" class="link" :disabled="isSaving" @click="removeGear(selectedGear)">
+            Archive item
+          </button>
+          <button type="button" class="link" @click="closeDetails">Close</button>
+        </div>
+      </div>
     </div>
 
     <div class="card">
@@ -213,6 +266,11 @@ const error = ref("");
 const success = ref("");
 const toastTitle = ref("");
 const toastMessage = ref("");
+const toastActionLabel = ref("");
+const toastAction = ref<(() => Promise<void>) | null>(null);
+const showDetailsModal = ref(false);
+const selectedGear = ref<GearItem | null>(null);
+const isModalEditing = ref(false);
 
 const name = ref("");
 const barcode = ref("");
@@ -230,7 +288,6 @@ const statusOptions = [
   "in_studio_only",
 ];
 const editableStatusOptions = statusOptions.filter((option) => option !== "checked_out");
-const editingId = ref<string | null>(null);
 const editName = ref("");
 const editBarcode = ref("");
 const editStatus = ref(statusOptions[0] ?? "available");
@@ -263,6 +320,8 @@ const filteredGear = computed(() => {
 const showToast = (title: string, message: string) => {
   toastTitle.value = title;
   toastMessage.value = message;
+  toastActionLabel.value = "";
+  toastAction.value = null;
   if (toastTimer) {
     window.clearTimeout(toastTimer);
   }
@@ -271,6 +330,36 @@ const showToast = (title: string, message: string) => {
     toastMessage.value = "";
     toastTimer = null;
   }, 4000);
+};
+
+const showToastWithAction = (
+  title: string,
+  message: string,
+  actionLabel: string,
+  action: () => Promise<void>
+) => {
+  toastTitle.value = title;
+  toastMessage.value = message;
+  toastActionLabel.value = actionLabel;
+  toastAction.value = action;
+  if (toastTimer) {
+    window.clearTimeout(toastTimer);
+  }
+  toastTimer = window.setTimeout(() => {
+    toastTitle.value = "";
+    toastMessage.value = "";
+    toastActionLabel.value = "";
+    toastAction.value = null;
+    toastTimer = null;
+  }, 7000);
+};
+
+const runToastAction = async () => {
+  if (!toastAction.value) return;
+  const callback = toastAction.value;
+  toastAction.value = null;
+  toastActionLabel.value = "";
+  await callback();
 };
 
 const showDuplicateBarcodeToast = () => {
@@ -285,6 +374,22 @@ const showInputLimitToast = () => {
     "Input limit reached.",
     "One or more fields are too long. Shorten the field that is too long and try again."
   );
+};
+
+const openDetails = (item: GearItem) => {
+  selectedGear.value = item;
+  showDetailsModal.value = true;
+  isModalEditing.value = false;
+};
+
+const closeDetails = () => {
+  showDetailsModal.value = false;
+  selectedGear.value = null;
+  isModalEditing.value = false;
+  editName.value = "";
+  editBarcode.value = "";
+  editStatus.value = statusOptions[0] ?? "available";
+  editNotes.value = "";
 };
 
 const loadArchivedGear = async () => {
@@ -408,7 +513,7 @@ const handleCreate = async () => {
 };
 
 const startEdit = (item: GearItem) => {
-  editingId.value = item.id;
+  isModalEditing.value = true;
   editName.value = item.name;
   editBarcode.value = item.barcode;
   editStatus.value = item.status;
@@ -416,11 +521,12 @@ const startEdit = (item: GearItem) => {
 };
 
 const cancelEdit = () => {
-  editingId.value = null;
-  editName.value = "";
-  editBarcode.value = "";
-  editStatus.value = statusOptions[0] ?? "available";
-  editNotes.value = "";
+  if (!selectedGear.value) return;
+  isModalEditing.value = false;
+  editName.value = selectedGear.value.name;
+  editBarcode.value = selectedGear.value.barcode;
+  editStatus.value = selectedGear.value.status;
+  editNotes.value = selectedGear.value.notes ?? "";
 };
 
 const saveEdit = async (id: string) => {
@@ -448,6 +554,7 @@ const saveEdit = async (id: string) => {
   isSaving.value = true;
   try {
     await enforceAdminRateLimit();
+    const previousStatus = selectedGear.value?.status ?? "";
     const updated = await updateGear({
       id,
       name: editName.value.trim(),
@@ -462,8 +569,33 @@ const saveEdit = async (id: string) => {
       metadata: { name: updated.name, barcode: updated.barcode },
     });
     gear.value = gear.value.map((item) => (item.id === id ? updated : item));
+    selectedGear.value = updated;
     success.value = "Item updated.";
-    cancelEdit();
+    isModalEditing.value = false;
+    if (previousStatus && previousStatus !== updated.status) {
+      showToastWithAction(
+        "Item updated",
+        `Status changed to ${updated.status}.`,
+        "Undo status",
+        async () => {
+          await enforceAdminRateLimit();
+          const reverted = await updateGear({
+            id: updated.id,
+            name: updated.name,
+            barcode: updated.barcode,
+            status: previousStatus,
+            notes: updated.notes ?? "",
+          });
+          gear.value = gear.value.map((item) =>
+            item.id === reverted.id ? reverted : item
+          );
+          if (selectedGear.value?.id === reverted.id) {
+            selectedGear.value = reverted;
+          }
+          success.value = "Status reverted.";
+        }
+      );
+    }
   } catch (err) {
     error.value = err instanceof Error ? err.message : "Unable to update item.";
     const message = err instanceof Error ? err.message.toLowerCase() : "";
@@ -493,11 +625,22 @@ const removeGear = async (item: GearItem) => {
     gear.value = gear.value.filter((row) => row.id !== item.id);
     archivedGear.value = [item, ...archivedGear.value];
     success.value = "Item archived.";
+    showToastWithAction("Item archived", `${item.name} was archived.`, "Undo", async () => {
+      await handleRestore(item);
+    });
+    if (selectedGear.value?.id === item.id) {
+      closeDetails();
+    }
   } catch (err) {
     error.value = err instanceof Error ? err.message : "Unable to archive item. Please try again.";
   } finally {
     isSaving.value = false;
   }
+};
+
+const saveModalEdit = async () => {
+  if (!selectedGear.value) return;
+  await saveEdit(selectedGear.value.id);
 };
 
 const handleRestore = async (item: GearItem) => {
@@ -534,3 +677,60 @@ onUnmounted(() => {
   }
 });
 </script>
+
+<style scoped>
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(10, 14, 25, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  z-index: 1000;
+}
+
+.modal {
+  width: min(900px, calc(100vw - 2rem));
+  max-width: 100%;
+  max-height: 90vh;
+  overflow: auto;
+  overflow-x: hidden;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  padding: 1.25rem;
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.24);
+}
+
+.modal .form-grid-2 {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  row-gap: 0.95rem;
+  column-gap: 1.6rem;
+}
+
+.modal label {
+  display: block;
+  margin-bottom: 0.7rem;
+}
+
+.modal label input,
+.modal label select,
+.modal label textarea {
+  width: 100%;
+  box-sizing: border-box;
+  margin-top: 0.35rem;
+}
+
+.modal .admin-actions {
+  margin-top: 0.95rem;
+  gap: 0.55rem;
+  flex-wrap: wrap;
+}
+
+@media (max-width: 760px) {
+  .modal .form-grid-2 {
+    grid-template-columns: 1fr;
+  }
+}
+</style>

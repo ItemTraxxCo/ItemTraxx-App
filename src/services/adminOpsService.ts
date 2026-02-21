@@ -24,20 +24,43 @@ export type StatusHistoryItem = {
 export type TenantNotificationPayload = {
   overdue_count: number;
   flagged_count: number;
-  due_hours: number;
-  escalation_level_1_hours: number;
-  escalation_level_2_hours: number;
-  escalation_level_3_hours: number;
+  checkout_due_hours: number;
+  updates: Array<{
+    id: string;
+    title: string;
+    message: string;
+    level: "info" | "warning" | "critical";
+    created_at: string;
+    link_url: string | null;
+  }>;
+  feature_flags: {
+    enable_notifications: boolean;
+    enable_bulk_item_import: boolean;
+    enable_bulk_student_tools: boolean;
+    enable_status_tracking: boolean;
+    enable_barcode_generator: boolean;
+  };
   maintenance: { enabled: boolean; message: string } | null;
   recent_status_events: StatusHistoryItem[];
+};
+
+export type TenantSettingsPayload = {
+  checkout_due_hours: number;
+  feature_flags: {
+    enable_notifications: boolean;
+    enable_bulk_item_import: boolean;
+    enable_bulk_student_tools: boolean;
+    enable_status_tracking: boolean;
+    enable_barcode_generator: boolean;
+  };
 };
 
 type AdminOpsAction =
   | "get_notifications"
   | "get_status_tracking"
-  | "set_due_policy"
-  | "send_overdue_reminders"
-  | "bulk_import_gear";
+  | "bulk_import_gear"
+  | "get_tenant_settings"
+  | "update_tenant_settings";
 
 const getAccessToken = async () => {
   const { data, error } = await supabase.auth.getSession();
@@ -71,44 +94,17 @@ const callAdminOps = async <TData>(
 export const fetchTenantNotifications = async () =>
   callAdminOps<TenantNotificationPayload>("get_notifications");
 
+export const fetchTenantSettings = async () =>
+  callAdminOps<TenantSettingsPayload>("get_tenant_settings");
+
+export const updateTenantSettings = async (payload: { checkout_due_hours: number }) =>
+  callAdminOps<TenantSettingsPayload>("update_tenant_settings", payload);
+
 export const fetchStatusTracking = async () =>
   callAdminOps<{
-    due_hours: number;
-    escalation_level_1_hours: number;
-    escalation_level_2_hours: number;
-    escalation_level_3_hours: number;
     flagged_items: StatusTrackedItem[];
     history: StatusHistoryItem[];
   }>("get_status_tracking");
-
-export const saveDuePolicy = async (
-  checkoutDueHours: number,
-  escalationLevel1Hours: number,
-  escalationLevel2Hours: number,
-  escalationLevel3Hours: number
-) =>
-  callAdminOps<{
-    checkout_due_hours: number;
-    escalation_level_1_hours: number;
-    escalation_level_2_hours: number;
-    escalation_level_3_hours: number;
-  }>("set_due_policy", {
-    checkout_due_hours: checkoutDueHours,
-    escalation_level_1_hours: escalationLevel1Hours,
-    escalation_level_2_hours: escalationLevel2Hours,
-    escalation_level_3_hours: escalationLevel3Hours,
-  });
-
-export const sendOverdueReminders = async () =>
-  callAdminOps<{
-    sent: number;
-    recipients: number;
-    due_hours: number;
-    escalation_level_1_hours: number;
-    escalation_level_2_hours: number;
-    escalation_level_3_hours: number;
-    escalation_recipients?: { level_1: number; level_2: number; level_3: number };
-  }>("send_overdue_reminders");
 
 export const bulkImportGear = async (
   rows: Array<{

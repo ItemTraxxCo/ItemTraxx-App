@@ -120,6 +120,7 @@ This project adheres to **Semantic Versioning** where possible.
 - Added undo-capable toast actions for safer archive/status operations.
 - Fixed CodeQL insecure-randomness findings by replacing `Math.random()` with CSPRNG-based generation (`crypto.getRandomValues`) in student identity generators (frontend + edge functions).
 - Applied support contact consistency fixes.
+- Performed latest dependency maintenance update.
 
 ---
 

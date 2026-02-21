@@ -1,6 +1,6 @@
 # ItemTraxx
 
-Last updated: 2026-02-09
+Last updated: 2026-02-21
 
 **ItemTraxx** is a secure, cloud-based asset and equipment management platform developed by ItemTraxx Co for schools, businesses, and public organizations. This document provides an overview of the product, its features, technology stack, and links to official documentation.
 
@@ -30,10 +30,11 @@ ItemTraxx is built with scalability and security in mind.
 
 ## 3. Tech Stack
 ItemTraxx is built using modern web technologies:  
-- Frontend: React, TailwindCSS, Vue 3, JavaScript  
-- Backend: Node.js, Supabase  
-- Database: PostgreSQL
-- Hosting: Vercel Core Platform and Security  
+- Frontend: Vue 3, Vite, TypeScript, scoped CSS, HTML  
+- Backend: Supabase (PostgreSQL, Auth, Edge Functions)  
+- Security & Access: Cloudflare Turnstile, Cloudflare Worker edge proxy, CSP/security headers  
+- Observability: Vercel Web Analytics, Vercel Speed Insights  
+- Hosting & Delivery: Vercel  
 
 ---
 

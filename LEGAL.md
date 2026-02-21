@@ -1,6 +1,6 @@
 # Legal Notice
 
-Last updated: 2026-01-10
+Last updated: 2026-02-21
 
 This Legal Notice provides an overview of the legal documents that govern the use, access, and operation of **ItemTraxx**, a product owned and operated by **ItemTraxx Co**.
 
@@ -66,12 +66,20 @@ For legal questions or concerns, users should consult a qualified legal professi
 
 ---
 
-## 6. Contact
+## 6. Service-Level Expectations
+
+ItemTraxx Co does not guarantee uninterrupted, error-free, or always-available service, including 100% uptime.
+
+All service availability terms, warranties, and limitation of liability are defined in [TERMS.md](TERMS.md), which controls in the event of any conflict.
+
+---
+
+## 7. Contact
 
 For legal inquiries related to ItemTraxx, contact:
 
 **ItemTraxx Co**  
-Email: to be added soon
+Email: support@itemtraxx.com
 
 ---
 

@@ -1,6 +1,6 @@
 # Security Policy
 
-Last updated: 2026-02-09
+Last updated: 2026-02-21
 
 ItemTraxx Co ("we", "our", or "us") is committed to maintaining the security and integrity of ItemTraxx. This document describes how to report security issues and how we handle them.
 
@@ -32,6 +32,11 @@ Once a security issue is reported, we will:
 
 We aim to resolve critical vulnerabilities as quickly as possible.
 
+Response targets:
+- Initial acknowledgment: within 72 hours
+- Severity triage target: within 5 business days
+- Critical issue remediation target: expedited as soon as practical after validation
+
 ---
 
 ## 3. Safe Reporting Guidelines
@@ -48,14 +53,29 @@ We maintain regular security updates and patches to ensure ItemTraxx remains sec
 Users are encouraged to keep the app updated to the latest version.
 See [Changelog](CHANGELOG.md) for latest version and updates
 
+Supported versions:
+- Latest production deployment on `main`: fully supported
+- Previous production deployment: limited short-term support during rollout
+- Older deployments/branches: best effort only
+
 ---
 
-## 5. Disclaimer
+## 5. Platform Security Controls
+ItemTraxx includes layered controls such as:
+- Content Security Policy (CSP) and additional security headers
+- Cloudflare Turnstile verification on protected login flows
+- Edge proxy controls and function allowlisting
+- Role-based access controls and route guards
+- Audit logging for privileged actions
+
+---
+
+## 6. Disclaimer
 ItemTraxx Co is not responsible for vulnerabilities introduced by third-party software or misconfigured systems outside our control.
 
 ---
 
-## 6. Contact
+## 7. Contact
 For security issues or concerns, contact:
 
 **ItemTraxx Co**  

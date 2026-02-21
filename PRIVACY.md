@@ -1,6 +1,6 @@
 # Privacy Policy
 
-Last updated: 2026-02-09
+Last updated: 2026-02-21
 
 ItemTraxx Co ("we", "our", or "us") respects your privacy and is committed to protecting your personal data. This Privacy Policy explains how we collect, use, and safeguard your information when you use ItemTraxx.
 
@@ -46,11 +46,23 @@ However, no system is completely secure, and we cannot guarantee absolute protec
 We retain your data only as long as necessary to provide the service and meet legal requirements.  
 Upon account deletion or service termination, your data will be securely removed unless required otherwise by law.
 
+Retention defaults:
+- Active tenant data: retained while tenant account is active.
+- Archived records (soft-deleted): retained until permanently removed by authorized personnel or policy.
+- Security and audit logs: retained based on operational and legal requirements.
+- Backup copies: may persist for a limited backup window before automatic rotation.
+
 ---
 
-## 6. Third-Party Services
+## 6. Subprocessors and Third-Party Services
 We may use third-party services for hosting, analytics, or communication. These services follow strict privacy guidelines.  
 We are not responsible for the privacy practices of these third-party providers.
+
+Current core providers include:
+- Supabase (database, auth, edge functions)
+- Vercel (hosting, web analytics, speed insights)
+- Cloudflare (edge proxy, security controls, Turnstile)
+- Resend (transactional email delivery, where configured)
 
 ---
 

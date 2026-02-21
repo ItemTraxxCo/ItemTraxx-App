@@ -124,6 +124,15 @@ This project adheres to **Semantic Versioning** where possible.
 
 ---
 
+### 2/21/2026 Development Update
+
+- Performed dependency upgrade pass and updated frontend/build packages to latest compatible versions.
+- Upgraded core dependencies including Supabase JS, Vue, Zod, Vite, Vue TSC, TypeScript node typings, and Vite Vue plugin.
+- Kept `vue-router` on `v4.x` for current compatibility with Vercel Analytics and Speed Insights peer dependency requirements.
+- Regenerated lockfile and validated with clean security audit and successful production build output.
+
+---
+
 ##### You have reached the bottom of the changelog.
 ---
 

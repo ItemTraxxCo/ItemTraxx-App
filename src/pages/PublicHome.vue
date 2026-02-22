@@ -230,8 +230,7 @@
         >
           Status
         </a>
-        <a :href="privacyUrl" target="_blank" rel="noreferrer">Privacy Policy</a>
-        <a :href="termsUrl" target="_blank" rel="noreferrer">Legal</a>
+        <a :href="legalUrl" target="_blank" rel="noreferrer">Legal</a>
       </div>
     </footer>
 
@@ -246,12 +245,9 @@ import adminUiImage from "../assets/landing/admin_ui.png";
 import checkoutReturnUiImage from "../assets/landing/checkout_return_ui.png";
 import { getEdgeFunctionsBaseUrl } from "../services/edgeFunctionClient";
 
-const termsUrl =
-  import.meta.env.VITE_TERMS_URL ||
-  "https://github.com/ItemTraxxCo/ItemTraxx-App/blob/main/TERMS.md";
-const privacyUrl =
-  import.meta.env.VITE_PRIVACY_URL ||
-  "https://github.com/ItemTraxxCo/ItemTraxx-App/blob/main/PRIVACY.md";
+const legalUrl =
+  import.meta.env.VITE_LEGAL_URL ||
+  "https://www.itemtraxx.com/legal";
 const statusFunctionName = import.meta.env.VITE_STATUS_FUNCTION || "system-status";
 const statusLabel = ref("Unknown");
 const statusClass = ref<"status-ok" | "status-warn" | "status-down" | "status-unknown">(

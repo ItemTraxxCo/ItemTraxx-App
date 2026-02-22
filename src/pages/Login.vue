@@ -35,9 +35,7 @@
         <p class="muted support-note">
           Trouble signing in? Contact support at support@itemtraxx.com.
           By using this software, you agree to our
-          <a :href="termsUrl" target="_blank" rel="noreferrer">terms and conditions</a>
-          and
-          <a :href="privacyUrl" target="_blank" rel="noreferrer">privacy policy</a>.
+          <a :href="legalUrl" target="_blank" rel="noreferrer">legal terms and policies</a>.
         </p>
         <div class="form-actions">
           <button type="submit" class="button-primary" :disabled="isLoading">
@@ -75,12 +73,9 @@ const toastMessage = ref("");
 const superAdminAccessCode = import.meta.env
   .VITE_SUPER_ADMIN_ACCESS_CODE as string | undefined;
 const logoUrl = import.meta.env.VITE_LOGO_URL as string | undefined;
-const termsUrl =
-  import.meta.env.VITE_TERMS_URL ||
-  "https://github.com/ItemTraxxCo/ItemTraxx-App/blob/main/TERMS.md";
-const privacyUrl =
-  import.meta.env.VITE_PRIVACY_URL ||
-  "https://github.com/ItemTraxxCo/ItemTraxx-App/blob/main/PRIVACY.md";
+const legalUrl =
+  import.meta.env.VITE_LEGAL_URL ||
+  "https://www.itemtraxx.com/legal";
 const turnstileSiteKey = import.meta.env.VITE_TURNSTILE_SITE_KEY as
   | string
   | undefined;

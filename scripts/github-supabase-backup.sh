@@ -101,6 +101,7 @@ BACKUP_REPO_DIR="$WORK_DIR/backup-repo"
 BACKUP_REPO_URL_PRIMARY="https://x-access-token:${BACKUP_TOKEN}@github.com/${BACKUP_REPO}.git"
 BACKUP_REPO_URL_FALLBACK="https://${BACKUP_GIT_USERNAME}:${BACKUP_TOKEN}@github.com/${BACKUP_REPO}.git"
 BACKUP_REPO_URL="$BACKUP_REPO_URL_PRIMARY"
+BACKUP_API_URL="https://api.github.com/repos/${BACKUP_REPO}"
 
 echo "Validating GitHub backup target access (${BACKUP_REPO})..."
 GITHUB_REPO_CHECK_CODE="$(
@@ -124,8 +125,12 @@ fi
 echo "Pushing encrypted backup to ${BACKUP_REPO}..."
 if ! git ls-remote --exit-code --heads "$BACKUP_REPO_URL" "$BACKUP_BRANCH" >/dev/null 2>&1; then
   DEFAULT_REMOTE_BRANCH="$(
-    git ls-remote --symref "$BACKUP_REPO_URL" HEAD \
-      | awk '/^ref:/ {sub("refs/heads/", "", $2); print $2; exit}'
+    curl -sS \
+      -H "Authorization: Bearer ${BACKUP_TOKEN}" \
+      -H "Accept: application/vnd.github+json" \
+      "${BACKUP_API_URL}" \
+      | sed -n 's/.*"default_branch"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' \
+      | head -n1
   )"
   if [ -n "$DEFAULT_REMOTE_BRANCH" ]; then
     echo "Branch '$BACKUP_BRANCH' not found. Falling back to remote default branch '$DEFAULT_REMOTE_BRANCH'."
@@ -136,14 +141,25 @@ if ! git ls-remote --exit-code --heads "$BACKUP_REPO_URL" "$BACKUP_BRANCH" >/dev
   fi
 fi
 
-git clone --depth 1 --branch "$BACKUP_BRANCH" "$BACKUP_REPO_URL" "$BACKUP_REPO_DIR"
+TARGET_DIR="backups/$YEAR/$MONTH/$DAY"
+API_UPLOAD_MODE="false"
 
-TARGET_DIR="$BACKUP_REPO_DIR/backups/$YEAR/$MONTH/$DAY"
-mkdir -p "$TARGET_DIR"
-cp "$OUT_DIR/$ENCRYPTED_NAME" "$TARGET_DIR/"
-cp "$OUT_DIR/$CHECKSUM_NAME" "$TARGET_DIR/"
+if ! git clone --depth 1 --branch "$BACKUP_BRANCH" "$BACKUP_REPO_URL" "$BACKUP_REPO_DIR"; then
+  echo "Git clone failed, switching to GitHub Contents API upload mode."
+  API_UPLOAD_MODE="true"
+fi
 
-cat > "$TARGET_DIR/${BACKUP_PREFIX}_${TIMESTAMP_UTC}.metadata.json" <<EOF
+if [ "$API_UPLOAD_MODE" = "false" ]; then
+  TARGET_ABS_DIR="$BACKUP_REPO_DIR/$TARGET_DIR"
+else
+  TARGET_ABS_DIR="$WORK_DIR/api-stage/$TARGET_DIR"
+fi
+
+mkdir -p "$TARGET_ABS_DIR"
+cp "$OUT_DIR/$ENCRYPTED_NAME" "$TARGET_ABS_DIR/"
+cp "$OUT_DIR/$CHECKSUM_NAME" "$TARGET_ABS_DIR/"
+
+cat > "$TARGET_ABS_DIR/${BACKUP_PREFIX}_${TIMESTAMP_UTC}.metadata.json" <<EOF
 {
   "timestamp_utc": "${TIMESTAMP_UTC}",
   "format": "pg_dump custom + schema SQL",
@@ -152,10 +168,48 @@ cat > "$TARGET_DIR/${BACKUP_PREFIX}_${TIMESTAMP_UTC}.metadata.json" <<EOF
 }
 EOF
 
+if [ "$API_UPLOAD_MODE" = "true" ]; then
+  upload_file() {
+    local file_path="$1"
+    local remote_path="$2"
+    local b64
+    b64="$(base64 -w 0 "$file_path")"
+    local payload
+    payload="$(python3 - <<PY
+import json
+print(json.dumps({
+  "message": "backup: ${BACKUP_PREFIX} ${TIMESTAMP_UTC} UTC",
+  "branch": "${BACKUP_BRANCH}",
+  "content": "${b64}"
+}))
+PY
+)"
+    local code
+    code="$(curl -sS -o /tmp/itemtraxx_backup_api_resp.json -w "%{http_code}" \
+      -X PUT \
+      -H "Authorization: Bearer ${BACKUP_TOKEN}" \
+      -H "Accept: application/vnd.github+json" \
+      -H "Content-Type: application/json" \
+      "${BACKUP_API_URL}/contents/${remote_path}" \
+      --data "$payload")"
+    if [ "$code" -lt 200 ] || [ "$code" -ge 300 ]; then
+      echo "GitHub API upload failed for ${remote_path} (HTTP ${code})" >&2
+      cat /tmp/itemtraxx_backup_api_resp.json >&2
+      exit 1
+    fi
+  }
+
+  upload_file "$TARGET_ABS_DIR/$ENCRYPTED_NAME" "$TARGET_DIR/$ENCRYPTED_NAME"
+  upload_file "$TARGET_ABS_DIR/$CHECKSUM_NAME" "$TARGET_DIR/$CHECKSUM_NAME"
+  upload_file "$TARGET_ABS_DIR/${BACKUP_PREFIX}_${TIMESTAMP_UTC}.metadata.json" "$TARGET_DIR/${BACKUP_PREFIX}_${TIMESTAMP_UTC}.metadata.json"
+  echo "Backup complete: ${ENCRYPTED_NAME} (uploaded via GitHub API)"
+  exit 0
+fi
+
 pushd "$BACKUP_REPO_DIR" >/dev/null
 git config user.name "itemtraxx-backup-bot"
 git config user.email "support@itemtraxx.com"
-git add "backups/$YEAR/$MONTH/$DAY"
+git add "$TARGET_DIR"
 if git diff --cached --quiet; then
   echo "No backup changes to commit."
   exit 0

@@ -66,6 +66,11 @@ These terms are governed by the laws of the applicable jurisdiction of ItemTraxx
 ## 16. Contact
 For questions about these Terms of Service, contact support@itemtraxx.com
 
+## 17. Legal
+For full legal terms and policies, visit:
+
+[itemtraxx.com/legal](https://itemtraxx.com/legal)
+
 ---
 
 **© 2026 ItemTraxx Co. All rights reserved.**

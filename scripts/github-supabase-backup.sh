@@ -14,7 +14,9 @@ require_env "SUPABASE_BACKUP_REPO"
 require_env "SUPABASE_BACKUP_REPO_TOKEN"
 require_env "SUPABASE_BACKUP_ENCRYPTION_PASSPHRASE"
 
-BACKUP_BRANCH="${SUPABASE_BACKUP_REPO_BRANCH:-main}"
+BACKUP_REPO="$(printf '%s' "$SUPABASE_BACKUP_REPO" | xargs)"
+BACKUP_TOKEN="$(printf '%s' "$SUPABASE_BACKUP_REPO_TOKEN" | xargs)"
+BACKUP_BRANCH="$(printf '%s' "${SUPABASE_BACKUP_REPO_BRANCH:-main}" | xargs)"
 BACKUP_PREFIX="${SUPABASE_BACKUP_PREFIX:-supabase}"
 USE_DOCKER_PG_DUMP="${SUPABASE_BACKUP_USE_DOCKER_PG_DUMP:-false}"
 PG_DUMP_DOCKER_TAG="${SUPABASE_BACKUP_PG_DUMP_TAG:-17}"
@@ -95,9 +97,21 @@ openssl enc -aes-256-cbc -pbkdf2 -salt \
 sha256sum "$OUT_DIR/$ENCRYPTED_NAME" > "$OUT_DIR/$CHECKSUM_NAME"
 
 BACKUP_REPO_DIR="$WORK_DIR/backup-repo"
-BACKUP_REPO_URL="https://x-access-token:${SUPABASE_BACKUP_REPO_TOKEN}@github.com/${SUPABASE_BACKUP_REPO}.git"
+BACKUP_REPO_URL="https://x-access-token:${BACKUP_TOKEN}@github.com/${BACKUP_REPO}.git"
 
-echo "Pushing encrypted backup to ${SUPABASE_BACKUP_REPO}..."
+echo "Validating GitHub backup target access (${BACKUP_REPO})..."
+GITHUB_REPO_CHECK_CODE="$(
+  curl -sS -o /dev/null -w "%{http_code}" \
+    -H "Authorization: Bearer ${BACKUP_TOKEN}" \
+    "https://api.github.com/repos/${BACKUP_REPO}"
+)"
+if [ "$GITHUB_REPO_CHECK_CODE" != "200" ]; then
+  echo "Backup repo access check failed (HTTP ${GITHUB_REPO_CHECK_CODE}) for ${BACKUP_REPO}." >&2
+  echo "Verify SUPABASE_BACKUP_REPO and SUPABASE_BACKUP_REPO_TOKEN secrets." >&2
+  exit 1
+fi
+
+echo "Pushing encrypted backup to ${BACKUP_REPO}..."
 if ! git ls-remote --exit-code --heads "$BACKUP_REPO_URL" "$BACKUP_BRANCH" >/dev/null 2>&1; then
   DEFAULT_REMOTE_BRANCH="$(
     git ls-remote --symref "$BACKUP_REPO_URL" HEAD \

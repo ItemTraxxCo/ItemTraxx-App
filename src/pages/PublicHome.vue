@@ -10,7 +10,7 @@
       <div class="header-actions">
         <a
           class="status-badge"
-          href="https://statuspage.incident.io/itemtraxx-status"
+          href="https://status.itemtraxx.com/"
           target="_blank"
           rel="noreferrer"
           aria-label="Open system status page"
@@ -239,7 +239,7 @@
       <div class="footer-links">
         <a href="mailto:support@itemtraxx.com">Support</a>
         <a
-          href="https://statuspage.incident.io/itemtraxx-status"
+          href="https://status.itemtraxx.com/"
           target="_blank"
           rel="noreferrer"
         >

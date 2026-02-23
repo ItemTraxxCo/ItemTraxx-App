@@ -23,7 +23,7 @@
         <div class="maintenance-fullscreen-actions">
           <a
             class="button-link"
-            href="https://statuspage.incident.io/itemtraxx-status"
+            href="https://status.itemtraxx.com/"
             target="_blank"
             rel="noreferrer"
           >
@@ -69,7 +69,7 @@
       </div>
       <a
         class="broadcast-link"
-        href="https://statuspage.incident.io/itemtraxx-status"
+        href="https://status.itemtraxx.com/"
         target="_blank"
         rel="noreferrer"
       >
@@ -125,7 +125,7 @@
         </a>
         <a
           class="menu-item muted menu-status" role="menuitem"
-          href="https://statuspage.incident.io/itemtraxx-status"
+          href="https://status.itemtraxx.com/"
           target="_blank"
           rel="noreferrer"
         >

@@ -17,10 +17,9 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Install PostgreSQL client
+      - name: Verify Docker availability
         run: |
-          sudo apt-get update
-          sudo apt-get install -y postgresql-client-17
+          docker --version
 
       - name: Run encrypted daily backup
         env:
@@ -31,4 +30,6 @@ jobs:
           SUPABASE_BACKUP_ENCRYPTION_PASSPHRASE: ${{ secrets.SUPABASE_BACKUP_ENCRYPTION_PASSPHRASE }}
           SUPABASE_BACKUP_REPO_BRANCH: ${{ secrets.SUPABASE_BACKUP_REPO_BRANCH }}
           SUPABASE_BACKUP_PREFIX: itemtraxx_prod
+          SUPABASE_BACKUP_USE_DOCKER_PG_DUMP: "true"
+          SUPABASE_BACKUP_PG_DUMP_TAG: "17"
         run: ./scripts/github-supabase-backup.sh

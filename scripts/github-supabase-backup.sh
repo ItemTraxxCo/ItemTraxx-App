@@ -16,6 +16,8 @@ require_env "SUPABASE_BACKUP_ENCRYPTION_PASSPHRASE"
 
 BACKUP_BRANCH="${SUPABASE_BACKUP_REPO_BRANCH:-main}"
 BACKUP_PREFIX="${SUPABASE_BACKUP_PREFIX:-supabase}"
+USE_DOCKER_PG_DUMP="${SUPABASE_BACKUP_USE_DOCKER_PG_DUMP:-false}"
+PG_DUMP_DOCKER_TAG="${SUPABASE_BACKUP_PG_DUMP_TAG:-17}"
 TIMESTAMP_UTC="$(date -u +"%Y-%m-%d_%H-%M-%S")"
 YEAR="$(date -u +"%Y")"
 MONTH="$(date -u +"%m")"
@@ -37,23 +39,36 @@ ARCHIVE_NAME="${BACKUP_PREFIX}_${TIMESTAMP_UTC}.tar.gz"
 ENCRYPTED_NAME="${ARCHIVE_NAME}.enc"
 CHECKSUM_NAME="${ENCRYPTED_NAME}.sha256"
 
+run_pg_dump() {
+  local db_url="$1"
+  shift
+
+  if [ "$USE_DOCKER_PG_DUMP" = "true" ]; then
+    docker run --rm \
+      -v "$RAW_DIR:$RAW_DIR" \
+      "postgres:${PG_DUMP_DOCKER_TAG}" \
+      pg_dump "$@" "$db_url"
+    return
+  fi
+
+  pg_dump "$@" "$db_url"
+}
+
 dump_database() {
   local db_url="$1"
 
-  pg_dump \
+  run_pg_dump "$db_url" \
     --no-owner \
     --no-privileges \
     --format=custom \
     --compress=9 \
-    --file "$RAW_DIR/$CUSTOM_DUMP_NAME" \
-    "$db_url"
+    --file "$RAW_DIR/$CUSTOM_DUMP_NAME"
 
-  pg_dump \
+  run_pg_dump "$db_url" \
     --no-owner \
     --no-privileges \
     --schema-only \
-    --file "$RAW_DIR/$SCHEMA_SQL_NAME" \
-    "$db_url"
+    --file "$RAW_DIR/$SCHEMA_SQL_NAME"
 }
 
 echo "Creating Postgres dumps..."

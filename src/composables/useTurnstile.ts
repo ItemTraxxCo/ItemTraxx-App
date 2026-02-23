@@ -30,13 +30,7 @@ const ensureTurnstileScript = () => {
       `script[src="${TURNSTILE_SCRIPT_SRC}"]`
     );
     if (existingScript) {
-      existingScript.addEventListener("load", () => resolve(), { once: true });
-      existingScript.addEventListener(
-        "error",
-        () => reject(new Error("Failed to load Turnstile script.")),
-        { once: true }
-      );
-      return;
+      existingScript.remove();
     }
 
     const script = document.createElement("script");

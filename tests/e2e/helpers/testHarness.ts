@@ -1,7 +1,7 @@
 import type { Page } from "@playwright/test";
 
 export const mockSystemStatus = async (page: Page) => {
-  await page.route("**/functions/system-status", async (route) => {
+  await page.route(/\/functions(?:\/v1)?\/system-status(?:\?.*)?$/, async (route) => {
     await route.fulfill({
       status: 200,
       contentType: "application/json",
@@ -17,7 +17,7 @@ export const mockSystemStatus = async (page: Page) => {
 };
 
 export const mockAdminOps = async (page: Page) => {
-  await page.route("**/functions/admin-ops", async (route) => {
+  await page.route(/\/functions(?:\/v1)?\/admin-ops(?:\?.*)?$/, async (route) => {
     const request = route.request();
     if (request.method() !== "POST") {
       await route.fulfill({
@@ -75,7 +75,7 @@ export const mockAdminOps = async (page: Page) => {
 };
 
 export const mockSuperDashboard = async (page: Page) => {
-  await page.route("**/functions/super-dashboard", async (route) => {
+  await page.route(/\/functions(?:\/v1)?\/super-dashboard(?:\?.*)?$/, async (route) => {
     await route.fulfill({
       status: 200,
       contentType: "application/json",

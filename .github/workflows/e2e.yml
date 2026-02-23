@@ -1,11 +1,14 @@
 name: E2E Tests
 
+permissions:
+  contents: read
+
 on:
   pull_request:
   push:
     branches:
       - main
-      - Building-Frontend-1
+      - preview
 
 jobs:
   e2e:

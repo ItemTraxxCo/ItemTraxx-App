@@ -8,8 +8,28 @@ create index if not exists idx_profiles_tenant_role_active
 create index if not exists idx_profiles_auth_email
   on public.profiles (auth_email);
 
-create index if not exists idx_gear_tenant_status_deleted
-  on public.gear (tenant_id, status, deleted_at, updated_at desc);
+do $$
+begin
+  if exists (
+    select 1
+    from information_schema.columns
+    where table_schema = 'public'
+      and table_name = 'gear'
+      and column_name = 'updated_at'
+  ) then
+    execute 'create index if not exists idx_gear_tenant_status_deleted on public.gear (tenant_id, status, deleted_at, updated_at desc)';
+  elsif exists (
+    select 1
+    from information_schema.columns
+    where table_schema = 'public'
+      and table_name = 'gear'
+      and column_name = 'created_at'
+  ) then
+    execute 'create index if not exists idx_gear_tenant_status_deleted on public.gear (tenant_id, status, deleted_at, created_at desc)';
+  else
+    execute 'create index if not exists idx_gear_tenant_status_deleted on public.gear (tenant_id, status, deleted_at)';
+  end if;
+end $$;
 
 create index if not exists idx_gear_tenant_barcode
   on public.gear (tenant_id, barcode);

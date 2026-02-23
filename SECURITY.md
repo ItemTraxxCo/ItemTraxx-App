@@ -83,4 +83,11 @@ Email: support@itemtraxx.com
 
 ---
 
+## 8. Legal
+For full legal terms and policies, visit:
+
+[itemtraxx.com/legal](https://itemtraxx.com/legal)
+
+---
+
 **© 2026 ItemTraxx Co. All rights reserved.**

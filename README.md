@@ -54,6 +54,7 @@ All official documentation is shown here:
 ## 5. Legal
 By using ItemTraxx, you agree to our [Terms of Service](TERMS.md) and [Privacy Policy](PRIVACY.md).  
 All rights reserved under [LICENSE.md](LICENSE.md).
+Official legal hub: [itemtraxx.com/legal](https://itemtraxx.com/legal)
 
 ---
 

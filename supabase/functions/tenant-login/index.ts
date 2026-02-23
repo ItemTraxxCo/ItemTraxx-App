@@ -167,7 +167,7 @@ const resolveCorsHeaders = (req: Request) => {
 
   const hasOrigin = !!origin;
   const originAllowed =
-    !hasOrigin || (hasOrigin && allowedOrigins.includes(origin as string));
+    hasOrigin && allowedOrigins.includes(origin as string);
 
   const headers =
     hasOrigin && originAllowed

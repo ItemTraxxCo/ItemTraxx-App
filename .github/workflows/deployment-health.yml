@@ -17,17 +17,48 @@ jobs:
       - name: Check site and security headers
         run: |
           set -euo pipefail
+          BROWSER_UA="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36"
+
+          check_headers() {
+            local url="$1"
+            echo "== $url"
+            local headers
+            headers="$(curl -sSI --http1.1 \
+              --retry 3 \
+              --retry-delay 2 \
+              --retry-all-errors \
+              -A "$BROWSER_UA" \
+              -H "Accept: text/html,application/xhtml+xml" \
+              -H "Accept-Language: en-US,en;q=0.9" \
+              "$url")"
+
+            local status
+            status="$(printf "%s\n" "$headers" | awk 'NR==1 {print $2}')"
+            if [ -z "$status" ]; then
+              echo "Missing HTTP status for $url"
+              exit 1
+            fi
+            if [ "$status" -ge 400 ]; then
+              echo "HTTP $status for $url"
+              printf "%s\n" "$headers"
+              exit 1
+            fi
+
+            printf "%s\n" "$headers" | grep -i "content-security-policy" >/dev/null
+            printf "%s\n" "$headers" | grep -i "strict-transport-security" >/dev/null
+          }
+
           for u in \
             "https://itemtraxx.com" \
             "https://www.itemtraxx.com" \
             "https://itemtraxx.com/login" \
             "https://itemtraxx.com/tenant/checkout"; do
-            echo "== $u"
-            curl -fsSI "$u" | grep -i "content-security-policy" >/dev/null
-            curl -fsSI "$u" | grep -i "strict-transport-security" >/dev/null
+            check_headers "$u"
           done
 
       - name: Check status endpoint
         run: |
           set -euo pipefail
-          curl -fsS "https://itemtraxx-edge-proxy.itemtraxx-co.workers.dev/functions/system-status" | head -c 300
+          curl -fsS "https://itemtraxx-edge-proxy.itemtraxx-co.workers.dev/functions/system-status" \
+            -H "Origin: https://itemtraxx.com" \
+            | head -c 300

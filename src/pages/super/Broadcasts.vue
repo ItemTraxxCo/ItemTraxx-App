@@ -73,7 +73,7 @@
         </label>
         <label>
           Optional link
-          <input v-model="updateLinkUrl" type="url" placeholder="https://statuspage.incident.io/itemtraxx-status" />
+          <input v-model="updateLinkUrl" type="url" placeholder="https://status.itemtraxx.com/" />
         </label>
         <div class="form-actions">
           <button type="submit" class="button-primary" :disabled="isSaving">Publish Update</button>

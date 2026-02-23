@@ -1,5 +1,6 @@
 <template>
   <div class="landing-page">
+    <a class="skip-link" href="#landing-main">Skip to main content</a>
     <div class="bg-orb orb-one" aria-hidden="true"></div>
     <div class="bg-orb orb-two" aria-hidden="true"></div>
     <div class="bg-orb orb-three" aria-hidden="true"></div>
@@ -22,7 +23,7 @@
       </div>
     </header>
 
-    <main class="container">
+    <main id="landing-main" class="container">
       <section class="hero-section reveal">
         <h1>ItemTraxx</h1>
         <p class="hero-subtext">
@@ -189,13 +190,21 @@
             <button
               type="button"
               class="faq-toggle"
+              :id="`faq-toggle-${index}`"
               :aria-expanded="openFaqIndex === index"
+              :aria-controls="`faq-answer-${index}`"
               @click="toggleFaq(index)"
             >
               {{ item.q }}
               <span class="faq-symbol" aria-hidden="true">+</span>
             </button>
-            <div class="faq-answer" :class="{ 'is-open': openFaqIndex === index }">
+            <div
+              :id="`faq-answer-${index}`"
+              class="faq-answer"
+              :class="{ 'is-open': openFaqIndex === index }"
+              role="region"
+              :aria-labelledby="`faq-toggle-${index}`"
+            >
               <p>{{ item.a }}</p>
             </div>
           </article>
@@ -399,6 +408,24 @@ onBeforeUnmount(() => {
   color: #ffffff;
   position: relative;
   overflow: hidden;
+}
+
+.skip-link {
+  position: absolute;
+  left: 1rem;
+  top: 0.75rem;
+  transform: translateY(-180%);
+  background: #0b1324;
+  color: #fff;
+  padding: 0.5rem 0.75rem;
+  border-radius: 8px;
+  font-weight: 600;
+  z-index: 30;
+  transition: transform 0.2s ease;
+}
+
+.skip-link:focus-visible {
+  transform: translateY(0);
 }
 
 .container {

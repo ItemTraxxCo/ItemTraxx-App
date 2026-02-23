@@ -39,11 +39,16 @@ const isMissingRelation = (error: PostgrestError | null, relation: string) =>
 
 serve(async (req) => {
   const { hasOrigin, originAllowed, headers } = resolveCorsHeaders(req);
+  const requestId = req.headers.get("x-request-id") ?? crypto.randomUUID();
 
   const jsonResponse = (status: number, body: Record<string, unknown>) =>
     new Response(JSON.stringify(body), {
       status,
-      headers: { ...headers, "Content-Type": "application/json" },
+      headers: {
+        ...headers,
+        "Content-Type": "application/json",
+        "x-request-id": requestId,
+      },
     });
 
   if (req.method === "OPTIONS") {
@@ -234,6 +239,7 @@ serve(async (req) => {
     });
   } catch (error) {
     console.error("super-dashboard function error", {
+      request_id: requestId,
       message: error instanceof Error ? error.message : "Unknown error",
       stack: error instanceof Error ? error.stack : undefined,
     });

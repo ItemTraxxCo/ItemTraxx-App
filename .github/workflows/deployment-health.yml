@@ -1,0 +1,33 @@
+name: Deployment Health
+
+permissions:
+  contents: read
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "15 * * * *"
+
+jobs:
+  health-check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Check site and security headers
+        run: |
+          set -euo pipefail
+          for u in \
+            "https://itemtraxx.com" \
+            "https://www.itemtraxx.com" \
+            "https://itemtraxx.com/login" \
+            "https://itemtraxx.com/tenant/checkout"; do
+            echo "== $u"
+            curl -fsSI "$u" | grep -i "content-security-policy" >/dev/null
+            curl -fsSI "$u" | grep -i "strict-transport-security" >/dev/null
+          done
+
+      - name: Check status endpoint
+        run: |
+          set -euo pipefail
+          curl -fsS "https://itemtraxx-edge-proxy.itemtraxx-co.workers.dev/functions/system-status" | head -c 300

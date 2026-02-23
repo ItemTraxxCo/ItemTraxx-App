@@ -424,8 +424,8 @@ const exportCsv = () => {
   );
 };
 
-const exportPdf = () => {
-  exportRowsToPdf(
+const exportPdf = async () => {
+  await exportRowsToPdf(
     `gear-${new Date().toISOString().slice(0, 10)}.pdf`,
     "Item Export",
     ["name", "barcode", "serial_number", "status", "notes"],

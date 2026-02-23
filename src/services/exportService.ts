@@ -1,6 +1,3 @@
-import jsPDF from "jspdf";
-import autoTable from "jspdf-autotable";
-
 type ExportRow = Record<string, string | number | null | undefined>;
 
 const escapeCsvCell = (value: string) => {
@@ -35,12 +32,16 @@ export const exportRowsToCsv = (
   URL.revokeObjectURL(link.href);
 };
 
-export const exportRowsToPdf = (
+export const exportRowsToPdf = async (
   filename: string,
   title: string,
   headers: string[],
   rows: ExportRow[]
 ) => {
+  const [{ default: jsPDF }, { default: autoTable }] = await Promise.all([
+    import("jspdf"),
+    import("jspdf-autotable"),
+  ]);
   const doc = new jsPDF({ orientation: "landscape" });
   doc.setFontSize(14);
   doc.text(title, 14, 14);

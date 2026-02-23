@@ -1,5 +1,6 @@
 import { invokeEdgeFunction } from "./edgeFunctionClient";
 import { supabase } from "./supabaseClient";
+import type { EdgeEnvelope } from "../types/edgeContracts";
 
 export type SuperLogEntry = {
   id: string;
@@ -30,7 +31,7 @@ export const listSuperLogs = async (payload: {
   page_size?: number;
 }) => {
   const accessToken = await getAccessToken();
-  const result = await invokeEdgeFunction<{
+  const result = await invokeEdgeFunction<EdgeEnvelope<SuperLogEntry[]> & {
     data?: SuperLogEntry[];
     page?: number;
     page_size?: number;

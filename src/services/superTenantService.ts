@@ -1,5 +1,6 @@
 import { invokeEdgeFunction } from "./edgeFunctionClient";
 import { supabase } from "./supabaseClient";
+import type { EdgeEnvelope, SuperTenantAction } from "../types/edgeContracts";
 
 export type SuperTenant = {
   id: string;
@@ -19,14 +20,6 @@ export type SuperTenant = {
   };
 };
 
-type SuperTenantAction =
-  | "list_tenants"
-  | "create_tenant"
-  | "update_tenant"
-  | "set_tenant_status"
-  | "send_primary_admin_reset"
-  | "set_primary_admin";
-
 type SuperTenantRequest = {
   action: SuperTenantAction;
   payload: Record<string, unknown>;
@@ -42,7 +35,7 @@ const getAccessToken = async () => {
 
 const callSuperTenant = async <TData>(payload: SuperTenantRequest) => {
   const accessToken = await getAccessToken();
-  const result = await invokeEdgeFunction<{ data?: TData }, SuperTenantRequest>(
+  const result = await invokeEdgeFunction<EdgeEnvelope<TData>, SuperTenantRequest>(
     "super-tenant-mutate",
     {
       method: "POST",

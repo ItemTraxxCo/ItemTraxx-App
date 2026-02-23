@@ -138,12 +138,12 @@ const exportCsv = () => {
   })));
 };
 
-const exportPdf = () => {
+const exportPdf = async () => {
   if (!rows.value.length) {
     showToast("Export", "No rows to export.");
     return;
   }
-  exportRowsToPdf(`super-logs-page-${page.value}.pdf`, "Super Logs Export", ["time", "tenant", "action", "item_name", "item_barcode", "student"], rows.value.map((row) => ({
+  await exportRowsToPdf(`super-logs-page-${page.value}.pdf`, "Super Logs Export", ["time", "tenant", "action", "item_name", "item_barcode", "student"], rows.value.map((row) => ({
     time: formatDateTime(row.action_time),
     tenant: row.tenant?.name ?? row.tenant_id,
     action: row.action_type,

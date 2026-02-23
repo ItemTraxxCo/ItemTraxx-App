@@ -1,6 +1,14 @@
 <template>
   <div class="notif-wrap">
-    <button type="button" class="notif-button" @click="toggleOpen" aria-label="Notifications">
+    <button
+      type="button"
+      class="notif-button"
+      @click="toggleOpen"
+      aria-label="Notifications"
+      aria-haspopup="dialog"
+      :aria-expanded="isOpen"
+      aria-controls="tenant-notifications-panel"
+    >
       <svg class="notif-icon" viewBox="0 0 24 24" aria-hidden="true">
         <path
           d="M12 3a4 4 0 0 0-4 4v1.2c0 1.2-.4 2.3-1.2 3.2L5 13.5V16h14v-2.5l-1.8-2.1A4.8 4.8 0 0 1 16 8.2V7a4 4 0 0 0-4-4Z"
@@ -21,7 +29,13 @@
       <span v-if="unreadCount > 0" class="notif-badge">{{ unreadCount > 9 ? "9+" : unreadCount }}</span>
     </button>
 
-    <div v-if="isOpen" class="notif-dropdown">
+    <div
+      v-if="isOpen"
+      id="tenant-notifications-panel"
+      class="notif-dropdown"
+      role="dialog"
+      aria-label="Tenant notifications"
+    >
       <div class="notif-header">Notifications</div>
       <p v-if="isLoading" class="muted">Loading notifications...</p>
       <p v-else-if="error" class="error">{{ error }}</p>

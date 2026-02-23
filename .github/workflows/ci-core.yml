@@ -1,0 +1,53 @@
+name: CI Core
+
+permissions:
+  contents: read
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - preview
+
+concurrency:
+  group: ci-core-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Verify env parity
+        run: bash ./scripts/check-env-parity.sh
+
+      - name: Build
+        run: npm run build
+
+      - name: Check bundle budget
+        run: npm run perf:budget
+
+      - name: Generate perf report
+        run: npm run perf:report
+
+      - name: Upload perf report artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: perf-report
+          path: artifacts/perf-report.json
+          if-no-files-found: error

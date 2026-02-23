@@ -77,9 +77,9 @@ const generateBarcodes = () => {
   generatedBarcodes.value = parsed;
 };
 
-const downloadPdf = () => {
+const downloadPdf = async () => {
   try {
-    downloadBarcodePdf(generatedBarcodes.value, messageInput.value);
+    await downloadBarcodePdf(generatedBarcodes.value, messageInput.value);
   } catch (err) {
     error.value = err instanceof Error ? err.message : "Unable to generate PDF.";
   }

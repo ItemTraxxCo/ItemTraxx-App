@@ -173,11 +173,16 @@ const resolveCorsHeaders = (req: Request) => {
 
 serve(async (req) => {
   const { origin, hasOrigin, originAllowed, headers } = resolveCorsHeaders(req);
+  const requestId = req.headers.get("x-request-id") ?? crypto.randomUUID();
 
   const jsonResponse = (status: number, body: Record<string, unknown>) =>
     new Response(JSON.stringify(body), {
       status,
-      headers: { ...headers, "Content-Type": "application/json" },
+      headers: {
+        ...headers,
+        "Content-Type": "application/json",
+        "x-request-id": requestId,
+      },
     });
 
   if (req.method === "OPTIONS") {
@@ -347,6 +352,7 @@ serve(async (req) => {
     const message = error instanceof Error ? error.message : "Unknown error";
     const stack = error instanceof Error ? error.stack : undefined;
     console.error("tenant-login function error", {
+      request_id: requestId,
       message,
       stack,
       origin: origin ?? null,

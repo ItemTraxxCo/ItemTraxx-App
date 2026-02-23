@@ -38,9 +38,11 @@ Only encrypted artifacts are committed to the backup repository.
 ## Runtime notes
 
 - The workflow runs `pg_dump` via Docker image `postgres:17` to avoid client/server version mismatch on GitHub runners.
+- Backup retention is set to 365 days (1 year) by default in workflow env.
 - Optional script env toggles:
   - `SUPABASE_BACKUP_USE_DOCKER_PG_DUMP` (default: `false`)
   - `SUPABASE_BACKUP_PG_DUMP_TAG` (default: `17`)
+  - `SUPABASE_BACKUP_RETENTION_DAYS` (default: `365`)
 
 ## Restore basics
 

@@ -35,6 +35,13 @@ Only encrypted artifacts are committed to the backup repository.
 6. `SUPABASE_BACKUP_REPO_BRANCH` (optional)
    - Defaults to `main` if omitted.
 
+## Runtime notes
+
+- The workflow runs `pg_dump` via Docker image `postgres:17` to avoid client/server version mismatch on GitHub runners.
+- Optional script env toggles:
+  - `SUPABASE_BACKUP_USE_DOCKER_PG_DUMP` (default: `false`)
+  - `SUPABASE_BACKUP_PG_DUMP_TAG` (default: `17`)
+
 ## Restore basics
 
 1. Download `.enc` and `.sha256` from backup repo.

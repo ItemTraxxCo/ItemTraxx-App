@@ -119,15 +119,22 @@
           <p>Simple UI keeps everything minimal, sleek, and easy to navigate confusion free.</p>
         </div>
         <div class="feature-mockup">
-          <img
-            class="feature-image"
-            :src="checkoutReturnUiImage"
-            alt="Checkout and return interface preview"
-            loading="lazy"
-            decoding="async"
-            width="1600"
-            height="810"
-          />
+          <picture>
+            <source
+              type="image/webp"
+              :srcset="`${checkoutReturnUiImage800} 800w, ${checkoutReturnUiImage1200} 1200w, ${checkoutReturnUiImage1600} 1600w`"
+              sizes="(max-width: 900px) 92vw, 760px"
+            />
+            <img
+              class="feature-image"
+              :src="checkoutReturnUiImage"
+              alt="Checkout and return interface preview"
+              loading="lazy"
+              decoding="async"
+              width="1600"
+              height="810"
+            />
+          </picture>
         </div>
       </section>
 
@@ -151,15 +158,22 @@
           </p>
         </div>
         <div class="feature-mockup">
-          <img
-            class="feature-image"
-            :src="adminUiImage"
-            alt="Admin panel interface preview"
-            loading="lazy"
-            decoding="async"
-            width="1600"
-            height="934"
-          />
+          <picture>
+            <source
+              type="image/webp"
+              :srcset="`${adminUiImage800} 800w, ${adminUiImage1200} 1200w, ${adminUiImage1600} 1600w`"
+              sizes="(max-width: 900px) 92vw, 760px"
+            />
+            <img
+              class="feature-image"
+              :src="adminUiImage"
+              alt="Admin panel interface preview"
+              loading="lazy"
+              decoding="async"
+              width="1600"
+              height="934"
+            />
+          </picture>
         </div>
       </section>
 
@@ -257,13 +271,18 @@ import { onBeforeUnmount, onMounted, ref } from "vue";
 import { RouterLink } from "vue-router";
 import { track } from "@vercel/analytics";
 import adminUiImage from "../assets/landing/admin_ui.png";
+import adminUiImage800 from "../assets/landing/admin_ui-800.webp";
+import adminUiImage1200 from "../assets/landing/admin_ui-1200.webp";
+import adminUiImage1600 from "../assets/landing/admin_ui-1600.webp";
 import checkoutReturnUiImage from "../assets/landing/checkout_return_ui.png";
-import { getEdgeFunctionsBaseUrl } from "../services/edgeFunctionClient";
+import checkoutReturnUiImage800 from "../assets/landing/checkout_return_ui-800.webp";
+import checkoutReturnUiImage1200 from "../assets/landing/checkout_return_ui-1200.webp";
+import checkoutReturnUiImage1600 from "../assets/landing/checkout_return_ui-1600.webp";
+import { fetchSystemStatus } from "../services/systemStatusService";
 
 const legalUrl =
   import.meta.env.VITE_LEGAL_URL ||
   "https://www.itemtraxx.com/legal";
-const statusFunctionName = import.meta.env.VITE_STATUS_FUNCTION || "system-status";
 const statusLabel = ref("Unknown");
 const statusClass = ref<"status-ok" | "status-warn" | "status-down" | "status-unknown">(
   "status-unknown",
@@ -318,56 +337,85 @@ const trackCta = (
 
 let observer: IntersectionObserver | null = null;
 let statusTimer: number | null = null;
+let prefetchTimer: number | null = null;
+
+const scheduleIdle = (callback: () => void, timeout = 1200) => {
+  if (typeof window.requestIdleCallback === "function") {
+    const idleId = window.requestIdleCallback(callback, { timeout });
+    return () => window.cancelIdleCallback(idleId);
+  }
+  const timerId = window.setTimeout(callback, timeout);
+  return () => window.clearTimeout(timerId);
+};
+
+let cancelIdlePrefetch: (() => void) | null = null;
+
+const prefetchPrimaryRoutes = () => {
+  void import("./Login.vue");
+  void import("./tenant/Checkout.vue");
+  void import("./tenant/admin/AdminLogin.vue");
+};
 
 const refreshSystemStatus = async () => {
-  const functionsBaseUrl = getEdgeFunctionsBaseUrl();
-  if (!functionsBaseUrl) {
+  const response = await fetchSystemStatus();
+  if (!response) {
     statusLabel.value = "Unknown";
     statusClass.value = "status-unknown";
     return;
   }
 
-  const controller = new AbortController();
-  const timeoutId = window.setTimeout(() => controller.abort(), 3500);
-  try {
-    const response = await fetch(`${functionsBaseUrl}/${statusFunctionName}`, {
-      method: "GET",
-      signal: controller.signal,
-    });
-
-    const payload = (await response.json().catch(() => ({}))) as {
-      status?: string;
-    };
-
-    if (response.ok && payload.status === "operational") {
-      statusLabel.value = "Running";
-      statusClass.value = "status-ok";
-      return;
-    }
-
-    if (response.status >= 500 || payload.status === "down") {
-      statusLabel.value = "Down";
-      statusClass.value = "status-down";
-      return;
-    }
-
-    statusLabel.value = "Degraded";
-    statusClass.value = "status-warn";
-  } catch {
-    statusLabel.value = "Unknown";
-    statusClass.value = "status-unknown";
-  } finally {
-    window.clearTimeout(timeoutId);
+  if (response.ok && response.payload.status === "operational") {
+    statusLabel.value = "Running";
+    statusClass.value = "status-ok";
+    return;
   }
+
+  if (response.status >= 500 || response.payload.status === "down") {
+    statusLabel.value = "Down";
+    statusClass.value = "status-down";
+    return;
+  }
+
+  statusLabel.value = "Degraded";
+  statusClass.value = "status-warn";
+};
+
+const startStatusPolling = () => {
+  if (statusTimer || document.visibilityState === "hidden") {
+    return;
+  }
+  statusTimer = window.setInterval(() => {
+    void refreshSystemStatus();
+  }, 60_000);
+};
+
+const stopStatusPolling = () => {
+  if (!statusTimer) {
+    return;
+  }
+  window.clearInterval(statusTimer);
+  statusTimer = null;
+};
+
+const handleVisibilityChange = () => {
+  if (document.visibilityState === "hidden") {
+    stopStatusPolling();
+    return;
+  }
+  void refreshSystemStatus();
+  startStatusPolling();
 };
 
 onMounted(() => {
   const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   const revealElements = document.querySelectorAll<HTMLElement>(".reveal");
   void refreshSystemStatus();
-  statusTimer = window.setInterval(() => {
-    void refreshSystemStatus();
-  }, 60_000);
+  startStatusPolling();
+  document.addEventListener("visibilitychange", handleVisibilityChange);
+  cancelIdlePrefetch = scheduleIdle(prefetchPrimaryRoutes, 1400);
+  prefetchTimer = window.setTimeout(() => {
+    prefetchPrimaryRoutes();
+  }, 3000);
 
   if (prefersReducedMotion) {
     revealElements.forEach((el) => el.classList.add("is-visible"));
@@ -393,9 +441,17 @@ onBeforeUnmount(() => {
   observer?.disconnect();
   observer = null;
   if (statusTimer) {
-    window.clearInterval(statusTimer);
-    statusTimer = null;
+    stopStatusPolling();
   }
+  if (prefetchTimer) {
+    window.clearTimeout(prefetchTimer);
+    prefetchTimer = null;
+  }
+  if (cancelIdlePrefetch) {
+    cancelIdlePrefetch();
+    cancelIdlePrefetch = null;
+  }
+  document.removeEventListener("visibilitychange", handleVisibilityChange);
 });
 </script>
 

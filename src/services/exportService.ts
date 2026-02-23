@@ -39,7 +39,7 @@ export const exportRowsToPdf = async (
   rows: ExportRow[]
 ) => {
   const [{ default: jsPDF }, { default: autoTable }] = await Promise.all([
-    import("jspdf"),
+    import("jspdf/dist/jspdf.es.min.js"),
     import("jspdf-autotable"),
   ]);
   const doc = new jsPDF({ orientation: "landscape" });

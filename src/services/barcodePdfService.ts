@@ -21,7 +21,7 @@ export const downloadBarcodePdf = async (barcodes: string[], message: string) =>
   }
 
   const [{ default: jsPDF }, { default: JsBarcode }] = await Promise.all([
-    import("jspdf"),
+    import("jspdf/dist/jspdf.es.min.js"),
     import("jsbarcode"),
   ]);
 

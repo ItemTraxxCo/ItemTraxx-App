@@ -8,12 +8,21 @@ const maxPublicHomeBytes = 20 * 1024;
 
 const files = readdirSync(assetsDir);
 const findAssetSize = (prefix) => {
-  const file = files.find((name) => name.startsWith(prefix) && name.endsWith(".js"));
-  if (!file) return null;
-  return {
-    name: file,
-    size: statSync(join(assetsDir, file)).size,
-  };
+  const candidates = files
+    .filter((name) => name.startsWith(prefix) && name.endsWith(".js"))
+    .map((name) => {
+      const stats = statSync(join(assetsDir, name));
+      return {
+        name,
+        size: stats.size,
+        mtimeMs: stats.mtimeMs,
+      };
+    })
+    .sort((a, b) => b.mtimeMs - a.mtimeMs || b.size - a.size);
+
+  if (!candidates.length) return null;
+  const [asset] = candidates;
+  return { name: asset.name, size: asset.size };
 };
 
 const mainChunk = findAssetSize("index-");

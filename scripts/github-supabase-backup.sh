@@ -37,21 +37,36 @@ ARCHIVE_NAME="${BACKUP_PREFIX}_${TIMESTAMP_UTC}.tar.gz"
 ENCRYPTED_NAME="${ARCHIVE_NAME}.enc"
 CHECKSUM_NAME="${ENCRYPTED_NAME}.sha256"
 
-echo "Creating Postgres dumps..."
-pg_dump \
-  --no-owner \
-  --no-privileges \
-  --format=custom \
-  --compress=9 \
-  --file "$RAW_DIR/$CUSTOM_DUMP_NAME" \
-  "$SUPABASE_BACKUP_DATABASE_URL"
+dump_database() {
+  local db_url="$1"
 
-pg_dump \
-  --no-owner \
-  --no-privileges \
-  --schema-only \
-  --file "$RAW_DIR/$SCHEMA_SQL_NAME" \
-  "$SUPABASE_BACKUP_DATABASE_URL"
+  pg_dump \
+    --no-owner \
+    --no-privileges \
+    --format=custom \
+    --compress=9 \
+    --file "$RAW_DIR/$CUSTOM_DUMP_NAME" \
+    "$db_url"
+
+  pg_dump \
+    --no-owner \
+    --no-privileges \
+    --schema-only \
+    --file "$RAW_DIR/$SCHEMA_SQL_NAME" \
+    "$db_url"
+}
+
+echo "Creating Postgres dumps..."
+if ! dump_database "$SUPABASE_BACKUP_DATABASE_URL"; then
+  if [ -n "${SUPABASE_BACKUP_DATABASE_URL_FALLBACK:-}" ]; then
+    echo "Primary database URL failed. Retrying with fallback URL..."
+    rm -f "$RAW_DIR/$CUSTOM_DUMP_NAME" "$RAW_DIR/$SCHEMA_SQL_NAME"
+    dump_database "$SUPABASE_BACKUP_DATABASE_URL_FALLBACK"
+  else
+    echo "Primary database URL failed and no fallback URL is configured." >&2
+    exit 1
+  fi
+fi
 
 echo "Packaging backup..."
 tar -C "$RAW_DIR" -czf "$OUT_DIR/$ARCHIVE_NAME" .

@@ -98,6 +98,20 @@ BACKUP_REPO_DIR="$WORK_DIR/backup-repo"
 BACKUP_REPO_URL="https://x-access-token:${SUPABASE_BACKUP_REPO_TOKEN}@github.com/${SUPABASE_BACKUP_REPO}.git"
 
 echo "Pushing encrypted backup to ${SUPABASE_BACKUP_REPO}..."
+if ! git ls-remote --exit-code --heads "$BACKUP_REPO_URL" "$BACKUP_BRANCH" >/dev/null 2>&1; then
+  DEFAULT_REMOTE_BRANCH="$(
+    git ls-remote --symref "$BACKUP_REPO_URL" HEAD \
+      | awk '/^ref:/ {sub("refs/heads/", "", $2); print $2; exit}'
+  )"
+  if [ -n "$DEFAULT_REMOTE_BRANCH" ]; then
+    echo "Branch '$BACKUP_BRANCH' not found. Falling back to remote default branch '$DEFAULT_REMOTE_BRANCH'."
+    BACKUP_BRANCH="$DEFAULT_REMOTE_BRANCH"
+  else
+    echo "Unable to resolve backup branch '$BACKUP_BRANCH' and no remote default branch found." >&2
+    exit 1
+  fi
+fi
+
 git clone --depth 1 --branch "$BACKUP_BRANCH" "$BACKUP_REPO_URL" "$BACKUP_REPO_DIR"
 
 TARGET_DIR="$BACKUP_REPO_DIR/backups/$YEAR/$MONTH/$DAY"
@@ -118,6 +132,10 @@ pushd "$BACKUP_REPO_DIR" >/dev/null
 git config user.name "itemtraxx-backup-bot"
 git config user.email "support@itemtraxx.com"
 git add "backups/$YEAR/$MONTH/$DAY"
+if git diff --cached --quiet; then
+  echo "No backup changes to commit."
+  exit 0
+fi
 git commit -m "backup: ${BACKUP_PREFIX} ${TIMESTAMP_UTC} UTC"
 git push origin "$BACKUP_BRANCH"
 popd >/dev/null

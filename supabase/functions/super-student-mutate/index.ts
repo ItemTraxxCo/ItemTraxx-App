@@ -203,13 +203,15 @@ serve(async (req) => {
       }
     );
 
-    if (!rateLimitError) {
-      const rateLimitResult = rateLimit as RateLimitResult;
-      if (!rateLimitResult.allowed) {
-        return jsonResponse(429, {
-          error: "Rate limit exceeded, please try again in a minute.",
-        });
-      }
+    if (rateLimitError) {
+      return jsonResponse(500, { error: "Rate limit check failed" });
+    }
+
+    const rateLimitResult = rateLimit as RateLimitResult;
+    if (!rateLimitResult.allowed) {
+      return jsonResponse(429, {
+        error: "Rate limit exceeded, please try again in a minute.",
+      });
     }
 
     const { action, payload } = await req.json();

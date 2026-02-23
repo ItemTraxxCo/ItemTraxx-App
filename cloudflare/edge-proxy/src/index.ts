@@ -22,7 +22,7 @@ const parseCsv = (value?: string) =>
 
 const withCorsHeaders = (origin: string | null, allowedOrigins: string[]) => {
   const originAllowed =
-    !origin || allowedOrigins.length === 0 || allowedOrigins.includes(origin);
+    !!origin && (allowedOrigins.length === 0 || allowedOrigins.includes(origin));
   const headers = originAllowed
     ? { ...BASE_CORS_HEADERS, ...(origin ? { "Access-Control-Allow-Origin": origin } : {}) }
     : { ...BASE_CORS_HEADERS };

@@ -442,14 +442,23 @@ serve(async (req) => {
       let username = hasValidProvidedUsername ? providedUsername : "";
 
       if (studentId && username) {
-        const { data: existingConflict } = await adminClient
-          .from("students")
-          .select("id")
-          .eq("tenant_id", profile.tenant_id)
-          .or(`student_id.eq.${studentId},username.eq.${username}`)
-          .limit(1)
-          .maybeSingle();
-        if (existingConflict?.id) {
+        const [idConflictResult, usernameConflictResult] = await Promise.all([
+          adminClient
+            .from("students")
+            .select("id")
+            .eq("tenant_id", profile.tenant_id)
+            .eq("student_id", studentId)
+            .limit(1)
+            .maybeSingle(),
+          adminClient
+            .from("students")
+            .select("id")
+            .eq("tenant_id", profile.tenant_id)
+            .eq("username", username)
+            .limit(1)
+            .maybeSingle(),
+        ]);
+        if (idConflictResult.data?.id || usernameConflictResult.data?.id) {
           studentId = "";
           username = "";
         }

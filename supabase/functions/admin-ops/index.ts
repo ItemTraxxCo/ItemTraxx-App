@@ -176,7 +176,7 @@ serve(async (req) => {
 
     const { data: profile, error: profileError } = await userClient
       .from("profiles")
-      .select("tenant_id, role")
+      .select("tenant_id, role, is_active")
       .eq("id", user.id)
       .single();
 
@@ -185,6 +185,9 @@ serve(async (req) => {
     }
 
     if (profile.role !== "tenant_admin" && profile.role !== "tenant_user") {
+      return jsonResponse(403, { error: "Access denied" });
+    }
+    if (profile.role === "tenant_admin" && profile.is_active === false) {
       return jsonResponse(403, { error: "Access denied" });
     }
 
@@ -218,6 +221,12 @@ serve(async (req) => {
     });
 
     const tenantId = profile.tenant_id as string;
+    const { data: tenantStatus } = await userClient
+      .from("tenants")
+      .select("status")
+      .eq("id", tenantId)
+      .maybeSingle();
+    const isTenantSuspended = tenantStatus?.status === "suspended";
 
     const [maintenanceRuntimeResult, updateRuntimeResult] = await Promise.all([
       adminClient
@@ -350,6 +359,9 @@ serve(async (req) => {
     if (action === "update_tenant_settings") {
       if (profile.role !== "tenant_admin") {
         return jsonResponse(403, { error: "Access denied" });
+      }
+      if (isTenantSuspended) {
+        return jsonResponse(403, { error: "Tenant disabled" });
       }
 
       const next = (payload ?? {}) as Record<string, unknown>;
@@ -535,6 +547,9 @@ serve(async (req) => {
       if (profile.role !== "tenant_admin") {
         return jsonResponse(403, { error: "Access denied" });
       }
+      if (isTenantSuspended) {
+        return jsonResponse(403, { error: "Tenant disabled" });
+      }
 
       const rawRows = Array.isArray((payload as Record<string, unknown>)?.rows)
         ? ((payload as Record<string, unknown>).rows as Array<Record<string, unknown>>)
@@ -674,9 +689,6 @@ serve(async (req) => {
       message: error instanceof Error ? error.message : "Unknown error",
       stack: error instanceof Error ? error.stack : undefined,
     });
-    return new Response(JSON.stringify({ error: "Request failed" }), {
-      status: 500,
-      headers: { "Content-Type": "application/json" },
-    });
+    return jsonResponse(500, { error: "Request failed" });
   }
 });

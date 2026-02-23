@@ -286,10 +286,6 @@ serve(async (req) => {
         query = query.eq("status", status);
       }
 
-      if (search) {
-        query = query.or(`name.ilike.%${search}%,access_code.ilike.%${search}%`);
-      }
-
       const { data, error } = await query;
       if (error) {
         if (!isMissingStatusColumn(error as RpcError) && !isMissingPrimaryAdminColumn(error as RpcError)) {
@@ -302,12 +298,6 @@ serve(async (req) => {
           .order("created_at", { ascending: false })
           .limit(300);
 
-        if (search) {
-          fallbackQuery = fallbackQuery.or(
-            `name.ilike.%${search}%,access_code.ilike.%${search}%`
-          );
-        }
-
         const { data: fallbackData, error: fallbackError } = await fallbackQuery;
         if (fallbackError) {
           return jsonResponse(400, { error: "Unable to load tenants." });
@@ -319,10 +309,36 @@ serve(async (req) => {
           primary_admin_profile_id: null,
         }));
 
-        return jsonResponse(200, { data: await enrichTenants(normalized) });
+        const enriched = await enrichTenants(normalized);
+        if (!search) {
+          return jsonResponse(200, { data: enriched });
+        }
+        const normalizedSearch = search.toLowerCase();
+        return jsonResponse(200, {
+          data: enriched.filter((row) => {
+            const name = typeof row.name === "string" ? row.name.toLowerCase() : "";
+            const code =
+              typeof row.access_code === "string" ? row.access_code.toLowerCase() : "";
+            return (
+              name.includes(normalizedSearch) || code.includes(normalizedSearch)
+            );
+          }),
+        });
       }
 
-      return jsonResponse(200, { data: await enrichTenants((data ?? []) as TenantRow[]) });
+      const enriched = await enrichTenants((data ?? []) as TenantRow[]);
+      if (!search) {
+        return jsonResponse(200, { data: enriched });
+      }
+      const normalizedSearch = search.toLowerCase();
+      return jsonResponse(200, {
+        data: enriched.filter((row) => {
+          const name = typeof row.name === "string" ? row.name.toLowerCase() : "";
+          const code =
+            typeof row.access_code === "string" ? row.access_code.toLowerCase() : "";
+          return name.includes(normalizedSearch) || code.includes(normalizedSearch);
+        }),
+      });
     }
 
     if (action === "create_tenant") {

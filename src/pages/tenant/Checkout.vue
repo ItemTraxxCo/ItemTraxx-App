@@ -154,59 +154,10 @@ const receipt = ref<{
 
 const downloadReceiptPdf = async () => {
   if (!receipt.value) return;
-  const [{ default: jsPDF }] = await Promise.all([import("jspdf")]);
-  const doc = new jsPDF({ unit: "pt", format: "letter" });
-  const pageWidth = doc.internal.pageSize.getWidth();
-  let y = 50;
-  const left = 50;
-  const right = pageWidth - 50;
-
-  const row = (label: string, value: string) => {
-    doc.setFont("helvetica", "bold");
-    doc.text(label, left, y);
-    doc.setFont("helvetica", "normal");
-    doc.text(value, left + 120, y);
-    y += 18;
-  };
-
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(16);
-  doc.text("ItemTraxx Transaction Receipt", left, y);
-  y += 26;
-  doc.setFontSize(11);
-  row("Time", new Date(receipt.value.timestamp).toLocaleString());
-  row("Student", receipt.value.studentUsername);
-  row("Student ID", receipt.value.studentId);
-  row("Operator", receipt.value.operatorEmail);
-  row("Tenant ID", receipt.value.tenantId ?? "Unknown");
-  row("Checkouts", String(receipt.value.checkouts));
-  row("Returns", String(receipt.value.returns));
-
-  y += 8;
-  doc.setFont("helvetica", "bold");
-  doc.text("Items", left, y);
-  y += 14;
-
-  doc.setFont("helvetica", "normal");
-  for (const item of receipt.value.items) {
-    const line = `${item.name} (${item.barcode}) — ${item.action}`;
-    const wrapped = doc.splitTextToSize(line, right - left);
-    doc.text(wrapped, left, y);
-    y += wrapped.length * 14 + 4;
-    if (y > 700) {
-      doc.addPage();
-      y = 50;
-    }
-  }
-
-  y += 10;
-  const footer =
-    "Please review this receipt for accuracy. If anything appears incorrect, contact support@itemtraxx.com.";
-  doc.setFont("helvetica", "italic");
-  doc.setFontSize(10);
-  doc.text(doc.splitTextToSize(footer, right - left), left, y);
-
-  doc.save(`transaction-receipt-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-")}.pdf`);
+  const [{ downloadTransactionReceiptPdf }] = await Promise.all([
+    import("../../services/receiptPdfService"),
+  ]);
+  await downloadTransactionReceiptPdf(receipt.value);
 };
 
 

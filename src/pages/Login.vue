@@ -58,7 +58,7 @@
 </template>
 
 <script setup lang="ts">
-import { onUnmounted, ref } from "vue";
+import { onMounted, onUnmounted, ref } from "vue";
 import { useRouter } from "vue-router";
 import { tenantLogin } from "../services/authService";
 import { useTurnstile } from "../composables/useTurnstile";
@@ -98,6 +98,22 @@ const setTurnstileContainerRef = (
   turnstileContainerRef.value = null;
 };
 let toastTimer: number | null = null;
+let prefetchTimer: number | null = null;
+let cancelIdlePrefetch: (() => void) | null = null;
+
+const prefetchTenantRoutes = () => {
+  void import("./tenant/Checkout.vue");
+  void import("./tenant/admin/AdminLogin.vue");
+};
+
+const scheduleIdle = (callback: () => void, timeout = 1200) => {
+  if (typeof window.requestIdleCallback === "function") {
+    const idleId = window.requestIdleCallback(callback, { timeout });
+    return () => window.cancelIdleCallback(idleId);
+  }
+  const timerId = window.setTimeout(callback, timeout);
+  return () => window.clearTimeout(timerId);
+};
 
 const showToast = (title: string, message: string) => {
   toastTitle.value = title;
@@ -191,5 +207,20 @@ onUnmounted(() => {
     window.clearTimeout(toastTimer);
     toastTimer = null;
   }
+  if (prefetchTimer) {
+    window.clearTimeout(prefetchTimer);
+    prefetchTimer = null;
+  }
+  if (cancelIdlePrefetch) {
+    cancelIdlePrefetch();
+    cancelIdlePrefetch = null;
+  }
+});
+
+onMounted(() => {
+  cancelIdlePrefetch = scheduleIdle(prefetchTenantRoutes, 1000);
+  prefetchTimer = window.setTimeout(() => {
+    prefetchTenantRoutes();
+  }, 2500);
 });
 </script>

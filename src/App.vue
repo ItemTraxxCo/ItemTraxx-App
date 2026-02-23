@@ -1,5 +1,6 @@
 <template>
   <div class="app-shell" :class="{ 'with-top-banners': hasTopBanners }" :style="appShellStyle">
+    <div v-if="isRouteNavigating" class="route-progress" aria-hidden="true"></div>
     <div
       v-if="showMaintenanceBanner"
       ref="maintenanceBannerRef"
@@ -140,20 +141,28 @@
       <button type="button" class="button-primary" @click="reloadApp">Reload</button>
     </div>
     <router-view v-else />
-    <Analytics />
-    <SpeedInsights />
+    <Analytics v-if="showTelemetry" />
+    <SpeedInsights v-if="showTelemetry" />
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
+import { computed, defineAsyncComponent, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
-import { Analytics } from "@vercel/analytics/vue";
-import { SpeedInsights } from "@vercel/speed-insights/vue";
 import { signOut } from "./services/authService";
-import { getEdgeFunctionsBaseUrl } from "./services/edgeFunctionClient";
+import { fetchSystemStatus } from "./services/systemStatusService";
 import { clearAdminVerification, getAuthState } from "./store/authState";
 import NotificationBell from "./components/NotificationBell.vue";
+
+const Analytics = defineAsyncComponent(async () => {
+  const module = await import("@vercel/analytics/vue");
+  return module.Analytics;
+});
+
+const SpeedInsights = defineAsyncComponent(async () => {
+  const module = await import("@vercel/speed-insights/vue");
+  return module.SpeedInsights;
+});
 
 const auth = getAuthState();
 const router = useRouter();
@@ -189,10 +198,15 @@ const statusClass = ref<"status-ok" | "status-warn" | "status-down" | "status-un
 );
 const isOutdated = ref(false);
 const latestVersion = ref<string | null>(null);
-const statusFunctionName = import.meta.env.VITE_STATUS_FUNCTION || "system-status";
+const showTelemetry = ref(false);
+const isRouteNavigating = ref(false);
 let statusTimer: number | null = null;
 let versionTimer: number | null = null;
 let adminIdleTimer: number | null = null;
+let deferredStatusTimer: number | null = null;
+let deferredVersionTimer: number | null = null;
+let deferredTelemetryTimer: number | null = null;
+let routeProgressTimer: number | null = null;
 const isIdleLogoutRunning = ref(false);
 
 const ADMIN_IDLE_TIMEOUT_MINUTES = Number(import.meta.env.VITE_ADMIN_IDLE_TIMEOUT_MINUTES || 20);
@@ -368,117 +382,89 @@ const dismissIncidentBanner = () => {
 };
 
 const refreshSystemStatus = async () => {
-  const functionsBaseUrl = getEdgeFunctionsBaseUrl();
-  if (!functionsBaseUrl) {
+  const response = await fetchSystemStatus();
+  if (!response) {
     statusLabel.value = "Unknown";
     statusClass.value = "status-unknown";
     return;
   }
 
-  const controller = new AbortController();
-  const timeoutId = window.setTimeout(() => controller.abort(), 3500);
-  try {
-    const response = await fetch(
-      `${functionsBaseUrl}/${statusFunctionName}`,
-      {
-        method: "GET",
-        signal: controller.signal,
-      }
-    );
-
-    const payload = (await response.json().catch(() => ({}))) as {
-      status?: string;
-      broadcast?: {
-        enabled?: boolean;
-        message?: string;
-        level?: string;
-        updated_at?: string;
-      };
-      maintenance?: {
-        enabled?: boolean;
-        message?: string;
-        updated_at?: string;
-      };
-      incident_summary?: string;
-      checked_at?: string;
+  const payload = response.payload;
+  const broadcast = payload.broadcast;
+  if (broadcast?.enabled && typeof broadcast.message === "string" && broadcast.message.trim()) {
+    const level: BroadcastLevel =
+      broadcast.level === "warning" || broadcast.level === "critical"
+        ? broadcast.level
+        : "info";
+    const broadcastId = typeof broadcast.updated_at === "string" && broadcast.updated_at
+      ? broadcast.updated_at
+      : broadcast.message.trim();
+    activeBroadcast.value = {
+      id: broadcastId,
+      message: broadcast.message.trim(),
+      level,
     };
+  } else {
+    activeBroadcast.value = null;
+  }
 
-    const broadcast = payload.broadcast;
-    if (broadcast?.enabled && typeof broadcast.message === "string" && broadcast.message.trim()) {
-      const level: BroadcastLevel =
-        broadcast.level === "warning" || broadcast.level === "critical"
-          ? broadcast.level
-          : "info";
-      const broadcastId = typeof broadcast.updated_at === "string" && broadcast.updated_at
-        ? broadcast.updated_at
-        : broadcast.message.trim();
-      activeBroadcast.value = {
-        id: broadcastId,
-        message: broadcast.message.trim(),
-        level,
-      };
-    } else {
-      activeBroadcast.value = null;
-    }
+  if (payload.maintenance?.enabled) {
+    maintenanceEnabled.value = true;
+    maintenanceMessage.value =
+      typeof payload.maintenance.message === "string" && payload.maintenance.message.trim()
+        ? payload.maintenance.message.trim()
+        : "Maintenance in progress.";
+  } else {
+    maintenanceEnabled.value = false;
+  }
 
-    if (payload.maintenance?.enabled) {
-      maintenanceEnabled.value = true;
-      maintenanceMessage.value =
-        typeof payload.maintenance.message === "string" && payload.maintenance.message.trim()
-          ? payload.maintenance.message.trim()
-          : "Maintenance in progress.";
-    } else {
-      maintenanceEnabled.value = false;
-    }
+  if (response.ok && payload.status === "operational") {
+    statusLabel.value = "Running";
+    statusClass.value = "status-ok";
+    incidentBanner.value = null;
+    return;
+  }
 
-    if (response.ok && payload.status === "operational") {
-      statusLabel.value = "Running";
-      statusClass.value = "status-ok";
-      incidentBanner.value = null;
-      return;
-    }
-
-    if (response.status >= 500 || payload.status === "down") {
-      statusLabel.value = "Down";
-      statusClass.value = "status-down";
-      const incidentId =
-        (payload.checked_at && String(payload.checked_at)) ||
-        `${payload.status}-${payload.incident_summary || "down"}`;
-      incidentBanner.value = {
-        id: incidentId,
-        message:
-          typeof payload.incident_summary === "string" && payload.incident_summary
-            ? payload.incident_summary
-            : "A system outage has been detected.",
-        level: "down",
-        checkedAt: payload.checked_at,
-      };
-      return;
-    }
-
-    statusLabel.value = "Degraded";
-    statusClass.value = "status-warn";
+  if (response.status >= 500 || payload.status === "down") {
+    statusLabel.value = "Down";
+    statusClass.value = "status-down";
     const incidentId =
       (payload.checked_at && String(payload.checked_at)) ||
-      `${payload.status}-${payload.incident_summary || "degraded"}`;
+      `${payload.status}-${payload.incident_summary || "down"}`;
     incidentBanner.value = {
       id: incidentId,
       message:
         typeof payload.incident_summary === "string" && payload.incident_summary
           ? payload.incident_summary
-          : "A system incident or maintenance event is active.",
-      level: "degraded",
+          : "A system outage has been detected.",
+      level: "down",
       checkedAt: payload.checked_at,
     };
-  } catch {
-    statusLabel.value = "Unknown";
-    statusClass.value = "status-unknown";
-  } finally {
-    window.clearTimeout(timeoutId);
+    return;
   }
+
+  statusLabel.value = "Degraded";
+  statusClass.value = "status-warn";
+  const incidentId =
+    (payload.checked_at && String(payload.checked_at)) ||
+    `${payload.status}-${payload.incident_summary || "degraded"}`;
+  incidentBanner.value = {
+    id: incidentId,
+    message:
+      typeof payload.incident_summary === "string" && payload.incident_summary
+        ? payload.incident_summary
+        : "A system incident or maintenance event is active.",
+    level: "degraded",
+    checkedAt: payload.checked_at,
+  };
 };
 
 const refreshVersionStatus = async () => {
+  if (!auth.isAuthenticated) {
+    isOutdated.value = false;
+    latestVersion.value = null;
+    return;
+  }
   if (!appVersion || appVersion === "n/a") {
     isOutdated.value = false;
     return;
@@ -512,6 +498,49 @@ const refreshVersionStatus = async () => {
   }
 };
 
+const scheduleLowPriorityTask = (task: () => void, delayMs = 300) =>
+  window.setTimeout(task, delayMs);
+
+const startStatusPolling = () => {
+  if (statusTimer || document.visibilityState === "hidden") return;
+  statusTimer = window.setInterval(() => {
+    void refreshSystemStatus();
+  }, 60_000);
+};
+
+const stopStatusPolling = () => {
+  if (!statusTimer) return;
+  window.clearInterval(statusTimer);
+  statusTimer = null;
+};
+
+const startVersionPolling = () => {
+  if (!auth.isAuthenticated || versionTimer) return;
+  versionTimer = window.setInterval(() => {
+    void refreshVersionStatus();
+  }, 120_000);
+};
+
+const stopVersionPolling = () => {
+  if (!versionTimer) return;
+  window.clearInterval(versionTimer);
+  versionTimer = null;
+};
+
+const handlePageVisibilityChange = () => {
+  if (document.visibilityState === "hidden") {
+    stopStatusPolling();
+    stopVersionPolling();
+    return;
+  }
+  void refreshSystemStatus();
+  startStatusPolling();
+  if (auth.isAuthenticated) {
+    void refreshVersionStatus();
+    startVersionPolling();
+  }
+};
+
 onMounted(() => {
   const saved = localStorage.getItem("itemtraxx-theme");
   if (saved === "light" || saved === "dark") {
@@ -519,18 +548,22 @@ onMounted(() => {
   } else {
     applyTheme("light");
   }
-  void refreshSystemStatus();
-  void refreshVersionStatus();
-  statusTimer = window.setInterval(() => {
+  deferredStatusTimer = scheduleLowPriorityTask(() => {
     void refreshSystemStatus();
-  }, 60_000);
-  versionTimer = window.setInterval(() => {
+    startStatusPolling();
+  }, 250);
+  deferredVersionTimer = scheduleLowPriorityTask(() => {
     void refreshVersionStatus();
-  }, 120_000);
+    startVersionPolling();
+  }, 750);
+  deferredTelemetryTimer = scheduleLowPriorityTask(() => {
+    showTelemetry.value = true;
+  }, 1800);
   for (const eventName of adminActivityEvents) {
     window.addEventListener(eventName, handleAdminActivity, { passive: true });
   }
   window.addEventListener("resize", measureTopBanners);
+  document.addEventListener("visibilitychange", handlePageVisibilityChange);
   resetAdminIdleTimer();
   void nextTick(() => {
     measureTopBanners();
@@ -538,9 +571,37 @@ onMounted(() => {
 });
 
 watch(
+  () => route.fullPath,
+  () => {
+    isRouteNavigating.value = true;
+    if (routeProgressTimer) {
+      window.clearTimeout(routeProgressTimer);
+    }
+    routeProgressTimer = window.setTimeout(() => {
+      isRouteNavigating.value = false;
+      routeProgressTimer = null;
+    }, 280);
+  }
+);
+
+watch(
   () => [route.path, auth.isAuthenticated, auth.role] as const,
   () => {
     resetAdminIdleTimer();
+  }
+);
+
+watch(
+  () => auth.isAuthenticated,
+  () => {
+    if (auth.isAuthenticated) {
+      void refreshVersionStatus();
+      startVersionPolling();
+      return;
+    }
+    stopVersionPolling();
+    isOutdated.value = false;
+    latestVersion.value = null;
   }
 );
 
@@ -559,13 +620,26 @@ onUnmounted(() => {
     window.removeEventListener(eventName, handleAdminActivity);
   }
   if (statusTimer) {
-    window.clearInterval(statusTimer);
-    statusTimer = null;
+    stopStatusPolling();
   }
-  if (versionTimer) {
-    window.clearInterval(versionTimer);
-    versionTimer = null;
+  stopVersionPolling();
+  if (deferredStatusTimer) {
+    window.clearTimeout(deferredStatusTimer);
+    deferredStatusTimer = null;
   }
+  if (deferredVersionTimer) {
+    window.clearTimeout(deferredVersionTimer);
+    deferredVersionTimer = null;
+  }
+  if (deferredTelemetryTimer) {
+    window.clearTimeout(deferredTelemetryTimer);
+    deferredTelemetryTimer = null;
+  }
+  if (routeProgressTimer) {
+    window.clearTimeout(routeProgressTimer);
+    routeProgressTimer = null;
+  }
+  document.removeEventListener("visibilitychange", handlePageVisibilityChange);
   window.removeEventListener("resize", measureTopBanners);
 });
 </script>

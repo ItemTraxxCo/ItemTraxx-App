@@ -35,11 +35,17 @@ jobs:
       - name: Verify env parity
         run: bash ./scripts/check-env-parity.sh
 
+      - name: Clean dist
+        run: rm -rf dist artifacts
+
       - name: Build
         run: npm run build
 
       - name: Check bundle budget
         run: npm run perf:budget
+
+      - name: Check image budget
+        run: npm run perf:images
 
       - name: Generate perf report
         run: npm run perf:report

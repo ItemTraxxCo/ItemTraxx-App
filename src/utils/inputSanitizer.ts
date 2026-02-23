@@ -1,5 +1,3 @@
-import { z } from "zod";
-
 type SanitizeOptions = {
   maxLen: number;
 };
@@ -9,18 +7,18 @@ const blockedPattern =
 
 export const sanitizeInput = (value: string, options: SanitizeOptions) => {
   const trimmed = value.trim();
-  const schema = z
-    .string()
-    .max(options.maxLen, `Input must be ${options.maxLen} characters or less.`)
-    .refine((val) => !blockedPattern.test(val), {
-      message: "Input contains blocked characters or keywords.",
-    });
 
-  const result = schema.safeParse(trimmed);
-  if (!result.success) {
+  if (trimmed.length > options.maxLen) {
     return {
       value: trimmed.slice(0, options.maxLen),
-      error: result.error.issues[0]?.message ?? "Invalid input.",
+      error: `Input must be ${options.maxLen} characters or less.`,
+    };
+  }
+
+  if (blockedPattern.test(trimmed)) {
+    return {
+      value: trimmed,
+      error: "Input contains blocked characters or keywords.",
     };
   }
 

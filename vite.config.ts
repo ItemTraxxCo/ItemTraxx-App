@@ -34,9 +34,9 @@ export default defineConfig({
           if (id.includes("node_modules")) {
             if (id.includes("@supabase/supabase-js")) return "vendor-supabase";
             if (id.includes("vue") || id.includes("vue-router")) return "vendor-vue";
-            if (id.includes("jspdf") || id.includes("html2canvas") || id.includes("jsbarcode")) {
-              return "vendor-pdf";
-            }
+            if (id.includes("jspdf-autotable")) return "vendor-jspdf-autotable";
+            if (id.includes("jspdf")) return "vendor-jspdf";
+            if (id.includes("jsbarcode")) return "vendor-jsbarcode";
           }
           return undefined;
         },

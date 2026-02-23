@@ -1,6 +1,6 @@
 # Changelog
 
-Last updated (year-month-day): 2026-02-21
+Last updated (year-month-day): 2026-02-23
 
 All notable changes to **ItemTraxx** will be documented in this file. This includes new features, improvements, bug fixes, and other updates.
 
@@ -130,6 +130,49 @@ This project adheres to **Semantic Versioning** where possible.
 - Upgraded core dependencies including Supabase JS, Vue, Zod, Vite, Vue TSC, TypeScript node typings, and Vite Vue plugin.
 - Kept `vue-router` on `v4.x` for current compatibility with Vercel Analytics and Speed Insights peer dependency requirements.
 - Regenerated lockfile and validated with clean security audit and successful production build output.
+
+---
+
+### 2/22/2026 Development Update
+
+- Added unified legal agreement route/page and updated legal experience copy/style.
+- Shipped expanded Playwright E2E coverage (auth edge cases, suspended tenant flows, super-admin flows, export actions, and mobile viewport checks).
+- Added CI hardening workflows and gates: core build checks, environment parity checks, deployment health probes, and workflow permission tightening.
+- Added security automation and governance assets: SBOM generation/upload, security gate workflow integration, and API contract alignment for edge actions.
+- Completed broad hardening pass across RBAC/RLS/security controls and stricter edge auth fail-closed behavior.
+- Added observability/incident readiness documentation: request correlation guidance, alerting playbook, runbook checklist, and failure drill package.
+- Added accessibility pass improvements targeting WCAG 2.2 AA semantics and keyboard behavior.
+- Added database tuning/governance artifacts including index baselines, conditional index migration safety, query-plan guidance, and data-retention lifecycle SQL.
+- Improved deployment health handling for Cloudflare challenge scenarios to reduce false-negative CI failures.
+- Updated status links to `https://status.itemtraxx.com/` across app/docs.
+
+---
+
+### 2/23/2026 Development Update
+
+- Added fully automated Supabase backup pipeline via GitHub Actions with encrypted artifacts and private repo push.
+- Iterated backup reliability hardening:
+  - fallback DB URL support
+  - PostgreSQL 17-compatible dump execution via Docker
+  - auto-detected backup repo branch
+  - GitHub token/repo preflight validation
+  - HTTPS auth fallback formats
+  - GitHub API upload fallback
+- Updated backup cadence to run twice daily.
+- Added one-year retention cleanup policy for backup artifacts.
+- Added scheduled dependency automation with grouped Dependabot updates for npm packages and GitHub Actions.
+- Completed frontend performance optimization pass:
+  - shared cached `system-status` service with stale-while-revalidate behavior
+  - visibility-aware polling (pause/resume on tab hide/show)
+  - deferred telemetry mount for faster startup
+  - responsive landing media (`webp` variants + `picture/srcset`)
+  - expanded preconnect/dns-prefetch hints
+  - lightweight route transition progress indicator
+  - idle route prefetch on public/login flows
+  - export/PDF code-path isolation and lazy service split
+  - CI image-budget checks plus deterministic bundle-budget checks
+  - runtime perf telemetry capture for route/navigation timing
+- Removed `zod` from the client input sanitizer path and replaced with lightweight native validation checks to reduce frontend overhead.
 
 ---
 

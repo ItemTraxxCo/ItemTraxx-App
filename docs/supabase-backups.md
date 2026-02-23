@@ -23,13 +23,16 @@ Only encrypted artifacts are committed to the backup repository.
 1. `SUPABASE_BACKUP_DATABASE_URL`
    - Postgres connection string for the Supabase database.
    - Prefer a dedicated backup user with least privilege required for dump.
-2. `SUPABASE_BACKUP_REPO`
+2. `SUPABASE_BACKUP_DATABASE_URL_FALLBACK` (optional but recommended)
+   - Fallback Postgres URI used when the primary host is unreachable from GitHub runners.
+   - Recommended: Supabase Session Pooler connection string (IPv4-friendly).
+3. `SUPABASE_BACKUP_REPO`
    - Format: `ItemTraxxCo/<private-backup-repo-name>`
-3. `SUPABASE_BACKUP_REPO_TOKEN`
+4. `SUPABASE_BACKUP_REPO_TOKEN`
    - GitHub PAT with write access to the private backup repo only.
-4. `SUPABASE_BACKUP_ENCRYPTION_PASSPHRASE`
+5. `SUPABASE_BACKUP_ENCRYPTION_PASSPHRASE`
    - Strong passphrase used for backup encryption.
-5. `SUPABASE_BACKUP_REPO_BRANCH` (optional)
+6. `SUPABASE_BACKUP_REPO_BRANCH` (optional)
    - Defaults to `main` if omitted.
 
 ## Restore basics

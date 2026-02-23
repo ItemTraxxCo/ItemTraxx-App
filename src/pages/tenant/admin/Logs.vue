@@ -156,8 +156,8 @@ const exportCsv = () => {
   );
 };
 
-const exportPdf = () => {
-  exportRowsToPdf(
+const exportPdf = async () => {
+  await exportRowsToPdf(
     `item-logs-${new Date().toISOString().slice(0, 10)}.pdf`,
     "Item Logs Export",
     ["action_time", "action_type", "student", "item"],

@@ -204,8 +204,8 @@ const exportFlaggedCsv = () => {
   );
 };
 
-const exportFlaggedPdf = () => {
-  exportRowsToPdf(
+const exportFlaggedPdf = async () => {
+  await exportRowsToPdf(
     `item-status-${new Date().toISOString().slice(0, 10)}.pdf`,
     "Item Status Tracking",
     ["name", "barcode", "status", "updated_at", "notes"],
@@ -227,8 +227,8 @@ const exportHistoryCsv = () => {
   );
 };
 
-const exportHistoryPdf = () => {
-  exportRowsToPdf(
+const exportHistoryPdf = async () => {
+  await exportRowsToPdf(
     `item-status-history-${new Date().toISOString().slice(0, 10)}.pdf`,
     "Item Status History",
     ["changed_at", "item", "barcode", "status", "note"],

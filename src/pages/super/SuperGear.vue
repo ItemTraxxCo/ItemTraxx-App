@@ -166,8 +166,8 @@ const exportCsv = () => {
   );
 };
 
-const exportPdf = () => {
-  exportRowsToPdf(
+const exportPdf = async () => {
+  await exportRowsToPdf(
     `super-gear-${new Date().toISOString().slice(0, 10)}.pdf`,
     "Super Item Export",
     ["tenant", "name", "barcode", "serial_number", "status", "notes"],

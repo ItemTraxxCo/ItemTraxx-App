@@ -12,7 +12,9 @@
     "test:e2e:ui": "playwright test --ui",
     "security:audit": "bash ./scripts/security-audit.sh",
     "security:gate": "npm audit --audit-level=high && npm run security:audit",
-    "security:sbom": "bash ./scripts/generate-sbom.sh"
+    "security:sbom": "bash ./scripts/generate-sbom.sh",
+    "perf:budget": "node ./scripts/check-bundle-budget.mjs",
+    "perf:report": "node ./scripts/perf-report.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.97.0",

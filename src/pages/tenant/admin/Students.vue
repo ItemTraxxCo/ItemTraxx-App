@@ -404,8 +404,8 @@ const exportCsv = () => {
   );
 };
 
-const exportPdf = () => {
-  exportRowsToPdf(
+const exportPdf = async () => {
+  await exportRowsToPdf(
     `students-${new Date().toISOString().slice(0, 10)}.pdf`,
     "Student Export",
     ["username", "student_id"],

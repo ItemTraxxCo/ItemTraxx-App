@@ -158,8 +158,8 @@ const exportCsv = () => {
   );
 };
 
-const exportPdf = () => {
-  exportRowsToPdf(
+const exportPdf = async () => {
+  await exportRowsToPdf(
     `super-students-${new Date().toISOString().slice(0, 10)}.pdf`,
     "Super Students Export",
     ["tenant", "username", "student_id"],

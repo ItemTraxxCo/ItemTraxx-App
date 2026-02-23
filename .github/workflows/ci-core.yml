@@ -37,3 +37,17 @@ jobs:
 
       - name: Build
         run: npm run build
+
+      - name: Check bundle budget
+        run: npm run perf:budget
+
+      - name: Generate perf report
+        run: npm run perf:report
+
+      - name: Upload perf report artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: perf-report
+          path: artifacts/perf-report.json
+          if-no-files-found: error

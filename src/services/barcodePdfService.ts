@@ -1,7 +1,7 @@
-import jsPDF from "jspdf";
-import JsBarcode from "jsbarcode";
-
-const createBarcodeCanvas = (value: string) => {
+const createBarcodeCanvas = (
+  value: string,
+  JsBarcode: (element: HTMLCanvasElement, text: string, options?: unknown) => void
+) => {
   const canvas = document.createElement("canvas");
   JsBarcode(canvas, value, {
     format: "CODE128",
@@ -15,10 +15,15 @@ const createBarcodeCanvas = (value: string) => {
   return canvas;
 };
 
-export const downloadBarcodePdf = (barcodes: string[], message: string) => {
+export const downloadBarcodePdf = async (barcodes: string[], message: string) => {
   if (!barcodes.length) {
     throw new Error("No barcodes to export.");
   }
+
+  const [{ default: jsPDF }, { default: JsBarcode }] = await Promise.all([
+    import("jspdf"),
+    import("jsbarcode"),
+  ]);
 
   const pdf = new jsPDF({ unit: "pt", format: "letter" });
   const pageWidth = pdf.internal.pageSize.getWidth();
@@ -53,7 +58,10 @@ export const downloadBarcodePdf = (barcodes: string[], message: string) => {
     pdf.setFontSize(8.5);
     pdf.text(barcode, x + labelWidth / 2, y + 14, { align: "center" });
 
-    const canvas = createBarcodeCanvas(barcode);
+    const canvas = createBarcodeCanvas(
+      barcode,
+      JsBarcode as (element: HTMLCanvasElement, text: string, options?: unknown) => void
+    );
     const barcodeWidth = Math.min(targetBarcodeWidth, labelWidth - 14);
     const barcodeHeight = targetBarcodeHeight;
     const barcodeX = x + (labelWidth - barcodeWidth) / 2;

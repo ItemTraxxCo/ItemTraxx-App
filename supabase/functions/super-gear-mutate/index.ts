@@ -159,17 +159,33 @@ serve(async (req) => {
       if (tenantId && tenantId !== "all") {
         query = query.eq("tenant_id", tenantId);
       }
-      if (search) {
-        query = query.or(
-          `name.ilike.%${search}%,barcode.ilike.%${search}%,serial_number.ilike.%${search}%`
-        );
-      }
-
       const { data, error } = await query;
       if (error) {
         return jsonResponse(400, { error: "Unable to load items." });
       }
-      return jsonResponse(200, { data: data ?? [] });
+      const rows = (data ?? []) as Array<{
+        id: string;
+        tenant_id: string;
+        name: string;
+        barcode: string;
+        serial_number: string | null;
+        status: string;
+        notes: string | null;
+      }>;
+      if (!search) {
+        return jsonResponse(200, { data: rows });
+      }
+      const normalized = search.toLowerCase();
+      return jsonResponse(200, {
+        data: rows.filter((row) => {
+          const serial = row.serial_number?.toLowerCase() ?? "";
+          return (
+            row.name.toLowerCase().includes(normalized) ||
+            row.barcode.toLowerCase().includes(normalized) ||
+            serial.includes(normalized)
+          );
+        }),
+      });
     }
 
     if (action === "create") {

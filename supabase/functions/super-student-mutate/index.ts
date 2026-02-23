@@ -240,17 +240,28 @@ serve(async (req) => {
       if (tenantId && tenantId !== "all") {
         query = query.eq("tenant_id", tenantId);
       }
-      if (search) {
-        query = query.or(
-          `username.ilike.%${search}%,student_id.ilike.%${search}%`
-        );
-      }
-
       const { data, error } = await query;
       if (error) {
         return jsonResponse(400, { error: "Unable to load students." });
       }
-      return jsonResponse(200, { data: data ?? [] });
+      const rows = (data ?? []) as Array<{
+        id: string;
+        tenant_id: string;
+        username: string;
+        student_id: string;
+        created_at: string;
+      }>;
+      if (!search) {
+        return jsonResponse(200, { data: rows });
+      }
+      const normalized = search.toLowerCase();
+      return jsonResponse(200, {
+        data: rows.filter(
+          (row) =>
+            row.username.toLowerCase().includes(normalized) ||
+            row.student_id.toLowerCase().includes(normalized)
+        ),
+      });
     }
 
     if (action === "create") {
@@ -273,14 +284,23 @@ serve(async (req) => {
       let username = hasValidProvidedUsername ? providedUsername : "";
 
       if (studentId && username) {
-        const { data: existingConflict } = await adminClient
-          .from("students")
-          .select("id")
-          .eq("tenant_id", tenantId)
-          .or(`student_id.eq.${studentId},username.eq.${username}`)
-          .limit(1)
-          .maybeSingle();
-        if (existingConflict?.id) {
+        const [idConflictResult, usernameConflictResult] = await Promise.all([
+          adminClient
+            .from("students")
+            .select("id")
+            .eq("tenant_id", tenantId)
+            .eq("student_id", studentId)
+            .limit(1)
+            .maybeSingle(),
+          adminClient
+            .from("students")
+            .select("id")
+            .eq("tenant_id", tenantId)
+            .eq("username", username)
+            .limit(1)
+            .maybeSingle(),
+        ]);
+        if (idConflictResult.data?.id || usernameConflictResult.data?.id) {
           studentId = "";
           username = "";
         }

@@ -6,10 +6,10 @@
       <h2>Extra info</h2>
       <h3> Please attach a screenshot of this page to your support request.</h3>
       <p class="muted">Path: {{ route.fullPath }}</p>
-      <p class="muted">Signed in: {{ auth.isAuthenticated ? "Yes" : "No" }}</p>
-      <p class="muted">Tenant ID: {{ auth.tenantContextId || "-" }}</p>
-      <p class="muted">Role: {{ auth.role || "-" }}</p>
-      <p class="muted">User: {{ auth.email || "-" }}</p>
+      <p v-if="showDiagnosticInfo" class="muted">Signed in: {{ auth.isAuthenticated ? "Yes" : "No" }}</p>
+      <p v-if="showDiagnosticInfo" class="muted">Tenant ID: {{ auth.tenantContextId || "-" }}</p>
+      <p v-if="showDiagnosticInfo" class="muted">Role: {{ auth.role || "-" }}</p>
+      <p v-if="showDiagnosticInfo" class="muted">User: {{ auth.email || "-" }}</p>
       <p class="muted">Local time: {{ now }}</p>
       <p class="muted">Session age: {{ sessionAge }}</p>
       <div class="admin-actions">
@@ -37,6 +37,7 @@ const auth = getAuthState();
 const route = useRoute();
 const router = useRouter();
 const now = ref("");
+const showDiagnosticInfo = import.meta.env.DEV;
 
 const refreshNow = () => {
   now.value = new Date().toLocaleString();

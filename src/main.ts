@@ -2,7 +2,6 @@ import { createApp } from "vue";
 import "./style.css";
 import App from "./App.vue";
 import router from "./router";
-import { initAuthListener, refreshAuthFromSession } from "./services/authService";
 import {
   clearAuthState,
   getAuthState,
@@ -11,7 +10,6 @@ import {
   setSecondaryAuth,
   setTenantContext,
 } from "./store/authState";
-import { TimeoutError, withTimeout } from "./services/asyncUtils";
 
 declare global {
   interface Window {
@@ -89,6 +87,8 @@ const attachE2EControls = () => {
 const bootstrap = async () => {
   const isE2ETestMode = import.meta.env.VITE_E2E_TEST_UTILS === "true";
   if (!isE2ETestMode) {
+    const [{ initAuthListener, refreshAuthFromSession }, { TimeoutError, withTimeout }] =
+      await Promise.all([import("./services/authService"), import("./services/asyncUtils")]);
     try {
       await withTimeout(
         refreshAuthFromSession(),

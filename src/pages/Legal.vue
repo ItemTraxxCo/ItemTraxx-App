@@ -245,6 +245,7 @@ h2 {
 p,
 li {
   color: var(--text);
+  font-size: 0.8rem;
   line-height: 1.65;
 }
 

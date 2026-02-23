@@ -47,6 +47,7 @@ All official documentation is shown here:
 - [Privacy Policy](PRIVACY.md) – How we collect, store, and protect data.  
 - [Security Guidelines](SECURITY.md) – Reporting vulnerabilities and secure use.  
 - [Changelog](CHANGELOG.md) – Track updates and new features.
+- [Supabase Backups](docs/supabase-backups.md) – Daily encrypted database backup automation via GitHub Actions.
 
 ---
 

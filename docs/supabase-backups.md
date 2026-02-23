@@ -1,0 +1,50 @@
+# Supabase Backup Automation (GitHub Actions)
+
+This project includes a daily automated backup workflow:
+
+- Workflow: `.github/workflows/supabase-backup.yml`
+- Script: `scripts/github-supabase-backup.sh`
+- Schedule: daily at `06:35 UTC`
+- Output: encrypted backup artifacts pushed to a private GitHub repo
+
+## What gets backed up
+
+Each run creates:
+
+1. Postgres custom-format dump (`.dump`) with schema + data.
+2. Schema-only SQL dump (`_schema.sql`).
+3. `tar.gz` package of both files.
+4. AES-256 encrypted artifact (`.tar.gz.enc`) + SHA-256 checksum.
+
+Only encrypted artifacts are committed to the backup repository.
+
+## Required GitHub secrets (in this app repo)
+
+1. `SUPABASE_BACKUP_DATABASE_URL`
+   - Postgres connection string for the Supabase database.
+   - Prefer a dedicated backup user with least privilege required for dump.
+2. `SUPABASE_BACKUP_REPO`
+   - Format: `ItemTraxxCo/<private-backup-repo-name>`
+3. `SUPABASE_BACKUP_REPO_TOKEN`
+   - GitHub PAT with write access to the private backup repo only.
+4. `SUPABASE_BACKUP_ENCRYPTION_PASSPHRASE`
+   - Strong passphrase used for backup encryption.
+5. `SUPABASE_BACKUP_REPO_BRANCH` (optional)
+   - Defaults to `main` if omitted.
+
+## Restore basics
+
+1. Download `.enc` and `.sha256` from backup repo.
+2. Verify checksum:
+   - `sha256sum -c <file>.sha256`
+3. Decrypt:
+   - `openssl enc -d -aes-256-cbc -pbkdf2 -in <file>.enc -out backup.tar.gz -pass env:SUPABASE_BACKUP_ENCRYPTION_PASSPHRASE`
+4. Extract:
+   - `tar -xzf backup.tar.gz`
+5. Restore custom dump:
+   - `pg_restore --clean --if-exists --no-owner --no-privileges -d <target_db_url> <file>.dump`
+
+## Notes
+
+- This flow backs up database schema + data.
+- Supabase Storage objects are not included in this workflow.

@@ -13,11 +13,6 @@ type RateLimitResult = {
   retry_after_seconds: number | null;
 };
 
-type RpcError = {
-  code?: string;
-  message?: string;
-};
-
 const lower = (value: string | null | undefined) => (value ?? "").toLowerCase();
 
 const resolveCorsHeaders = (req: Request) => {
@@ -105,7 +100,11 @@ serve(async (req) => {
       return jsonResponse(403, { error: "Access denied" });
     }
 
-    const { data: rateLimit, error: rateLimitError } = await userClient.rpc(
+    const adminClient = createClient(supabaseUrl, serviceKey, {
+      auth: { persistSession: false },
+    });
+
+    const { data: rateLimit, error: rateLimitError } = await adminClient.rpc(
       "consume_rate_limit",
       {
         p_scope: "super_admin",
@@ -115,33 +114,20 @@ serve(async (req) => {
     );
 
     if (rateLimitError) {
-      const rpcError = rateLimitError as RpcError;
-      const isLegacyUnauthorizedLimiter =
-        rpcError.code === "P0001" &&
-        (rpcError.message ?? "").toLowerCase().includes("unauthorized");
-      if (!isLegacyUnauthorizedLimiter) {
-        return jsonResponse(500, { error: "Rate limit check failed" });
-      }
-      console.warn(
-        "super-admin-mutate rate limit check bypassed due to legacy consume_rate_limit auth constraints"
-      );
-    } else {
-      const rateLimitResult = rateLimit as RateLimitResult;
-      if (!rateLimitResult.allowed) {
-        return jsonResponse(429, {
-          error: "Rate limit exceeded, please try again in a minute.",
-        });
-      }
+      return jsonResponse(500, { error: "Rate limit check failed" });
+    }
+
+    const rateLimitResult = rateLimit as RateLimitResult;
+    if (!rateLimitResult.allowed) {
+      return jsonResponse(429, {
+        error: "Rate limit exceeded, please try again in a minute.",
+      });
     }
 
     const { action, payload } = await req.json();
     if (typeof action !== "string" || typeof payload !== "object" || !payload) {
       return jsonResponse(400, { error: "Invalid request" });
     }
-
-    const adminClient = createClient(supabaseUrl, serviceKey, {
-      auth: { persistSession: false },
-    });
 
     const writeAudit = async (
       actionType: string,

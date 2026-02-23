@@ -94,6 +94,9 @@ const resolveClientIp = (req: Request) => {
 };
 
 const resolveAikidoBypassConfig = () => {
+  const bypassEnabled =
+    (Deno.env.get("ITX_AIKIDO_TURNSTILE_BYPASS_ENABLED") ?? "").toLowerCase() ===
+    "true";
   const allowedIps = new Set(
     (Deno.env.get("ITX_AIKIDO_ALLOWED_IPS") ?? "")
       .split(",")
@@ -103,18 +106,21 @@ const resolveAikidoBypassConfig = () => {
   const userAgentNeedle = (Deno.env.get("ITX_AIKIDO_USER_AGENT_NEEDLE") ?? "")
     .trim()
     .toLowerCase();
-  return { allowedIps, userAgentNeedle };
+  return { bypassEnabled, allowedIps, userAgentNeedle };
 };
 
 const isAikidoTurnstileBypassRequest = (req: Request) => {
-  const { allowedIps, userAgentNeedle } = resolveAikidoBypassConfig();
-  if (!allowedIps.size || !userAgentNeedle) return false;
+  const { bypassEnabled, allowedIps, userAgentNeedle } = resolveAikidoBypassConfig();
+  if (!bypassEnabled || !allowedIps.size || !userAgentNeedle) return false;
 
   const clientIp = resolveClientIp(req);
   if (!clientIp || !allowedIps.has(clientIp)) return false;
 
   const userAgent = (req.headers.get("user-agent") ?? "").toLowerCase();
-  return userAgent.includes(userAgentNeedle);
+  const scanAgentHeader = (req.headers.get("aikido-scan-agent") ?? "").toLowerCase();
+  const hasExpectedAgent =
+    userAgent.includes(userAgentNeedle) || scanAgentHeader.includes(userAgentNeedle);
+  return hasExpectedAgent;
 };
 
 const verifyTurnstileToken = async (
@@ -229,7 +235,10 @@ serve(async (req) => {
           return jsonResponse(403, { error: "Turnstile verification failed" });
         }
       } else {
-        console.info("tenant-login bypassed turnstile for Aikido scan traffic");
+        console.info("tenant-login bypassed turnstile for vetted Aikido scan traffic", {
+          request_id: requestId,
+          client_ip: resolveClientIp(req) || "unknown",
+        });
       }
     }
 

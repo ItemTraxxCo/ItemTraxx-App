@@ -13,11 +13,6 @@ type RateLimitResult = {
   retry_after_seconds: number | null;
 };
 
-type RpcError = {
-  code?: string;
-  message?: string;
-};
-
 type TenantRow = {
   id: string;
   name: string;
@@ -33,17 +28,22 @@ type TenantPolicyRow = {
   feature_flags: Record<string, unknown> | null;
 };
 
-const isMissingStatusColumn = (error: RpcError | null | undefined) =>
+type PgError = {
+  code?: string;
+  message?: string;
+};
+
+const isMissingStatusColumn = (error: PgError | null | undefined) =>
   !!error &&
   error.code === "42703" &&
   (error.message ?? "").toLowerCase().includes("status");
 
-const isMissingPrimaryAdminColumn = (error: RpcError | null | undefined) =>
+const isMissingPrimaryAdminColumn = (error: PgError | null | undefined) =>
   !!error &&
   error.code === "42703" &&
   (error.message ?? "").toLowerCase().includes("primary_admin_profile_id");
 
-const isMissingIsActiveColumn = (error: RpcError | null | undefined) =>
+const isMissingIsActiveColumn = (error: PgError | null | undefined) =>
   !!error &&
   error.code === "42703" &&
   (error.message ?? "").toLowerCase().includes("is_active");
@@ -162,7 +162,11 @@ serve(async (req) => {
       return jsonResponse(403, { error: "Access denied" });
     }
 
-    const { data: rateLimit, error: rateLimitError } = await userClient.rpc(
+    const adminClient = createClient(supabaseUrl, serviceKey, {
+      auth: { persistSession: false },
+    });
+
+    const { data: rateLimit, error: rateLimitError } = await adminClient.rpc(
       "consume_rate_limit",
       {
         p_scope: "super_admin",
@@ -172,33 +176,20 @@ serve(async (req) => {
     );
 
     if (rateLimitError) {
-      const rpcError = rateLimitError as RpcError;
-      const isLegacyUnauthorizedLimiter =
-        rpcError.code === "P0001" &&
-        (rpcError.message ?? "").toLowerCase().includes("unauthorized");
-      if (!isLegacyUnauthorizedLimiter) {
-        return jsonResponse(500, { error: "Rate limit check failed" });
-      }
-      console.warn(
-        "super-tenant-mutate rate limit check bypassed due to legacy consume_rate_limit auth constraints"
-      );
-    } else {
-      const rateLimitResult = rateLimit as RateLimitResult;
-      if (!rateLimitResult.allowed) {
-        return jsonResponse(429, {
-          error: "Rate limit exceeded, please try again in a minute.",
-        });
-      }
+      return jsonResponse(500, { error: "Rate limit check failed" });
+    }
+
+    const rateLimitResult = rateLimit as RateLimitResult;
+    if (!rateLimitResult.allowed) {
+      return jsonResponse(429, {
+        error: "Rate limit exceeded, please try again in a minute.",
+      });
     }
 
     const { action, payload } = await req.json();
     if (typeof action !== "string" || typeof payload !== "object" || !payload) {
       return jsonResponse(400, { error: "Invalid request" });
     }
-
-    const adminClient = createClient(supabaseUrl, serviceKey, {
-      auth: { persistSession: false },
-    });
 
     const writeAudit = async (
       actionType: string,
@@ -288,7 +279,7 @@ serve(async (req) => {
 
       const { data, error } = await query;
       if (error) {
-        if (!isMissingStatusColumn(error as RpcError) && !isMissingPrimaryAdminColumn(error as RpcError)) {
+        if (!isMissingStatusColumn(error as PgError) && !isMissingPrimaryAdminColumn(error as PgError)) {
           return jsonResponse(400, { error: "Unable to load tenants." });
         }
 
@@ -383,7 +374,7 @@ serve(async (req) => {
         .single();
 
       if (error || !data) {
-        if (!isMissingStatusColumn(error as RpcError)) {
+        if (!isMissingStatusColumn(error as PgError)) {
           return jsonResponse(400, { error: "Unable to create tenant." });
         }
 
@@ -455,7 +446,7 @@ serve(async (req) => {
         .single();
 
       if (insertWithIsActive.error) {
-        if (!isMissingIsActiveColumn(insertWithIsActive.error as RpcError)) {
+        if (!isMissingIsActiveColumn(insertWithIsActive.error as PgError)) {
           await adminClient.auth.admin.deleteUser(userId);
           await adminClient.from("tenants").delete().eq("id", data.id);
           return jsonResponse(400, { error: "Unable to create tenant admin profile." });
@@ -489,7 +480,7 @@ serve(async (req) => {
           .update({ primary_admin_profile_id: createdProfileId })
           .eq("id", data.id);
 
-        if (updateTenantPrimary.error && !isMissingPrimaryAdminColumn(updateTenantPrimary.error as RpcError)) {
+        if (updateTenantPrimary.error && !isMissingPrimaryAdminColumn(updateTenantPrimary.error as PgError)) {
           await adminClient.auth.admin.deleteUser(userId);
           await adminClient.from("profiles").delete().eq("id", createdProfileId);
           await adminClient.from("tenants").delete().eq("id", data.id);
@@ -581,7 +572,7 @@ serve(async (req) => {
         .single();
 
       if (error || !data) {
-        if (isMissingStatusColumn(error as RpcError)) {
+        if (isMissingStatusColumn(error as PgError)) {
           return jsonResponse(400, {
             error:
               "Tenant status is not enabled yet. Run the latest database migration.",
@@ -684,7 +675,7 @@ serve(async (req) => {
         .single();
 
       if (error || !data) {
-        if (isMissingPrimaryAdminColumn(error as RpcError)) {
+        if (isMissingPrimaryAdminColumn(error as PgError)) {
           return jsonResponse(400, {
             error:
               "Primary admin field is not enabled yet. Run the latest database migration.",

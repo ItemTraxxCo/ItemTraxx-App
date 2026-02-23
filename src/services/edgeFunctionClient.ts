@@ -53,6 +53,13 @@ const getDefaultHeaders = (accessToken?: string) => {
   return headers;
 };
 
+const createRequestId = () => {
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
+    return crypto.randomUUID();
+  }
+  return `itx-${Date.now()}-${Math.floor(performance.now() * 1000)}`;
+};
+
 const EDGE_FUNCTION_TIMEOUT_MS = 10000;
 
 const isInvalidJwtError = (payload: unknown) => {
@@ -85,6 +92,7 @@ const requestEdgeFunction = async <TData = unknown, TBody = unknown>(
 
   const method = options.method ?? "POST";
   const headers = getDefaultHeaders(accessTokenOverride ?? options.accessToken);
+  headers["x-request-id"] = createRequestId();
   const init: RequestInit = { method, headers };
 
   if (options.body !== undefined) {

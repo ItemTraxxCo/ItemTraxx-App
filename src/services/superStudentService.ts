@@ -1,5 +1,6 @@
 import { invokeEdgeFunction } from "./edgeFunctionClient";
 import { supabase } from "./supabaseClient";
+import type { EdgeEnvelope, SuperStudentAction } from "../types/edgeContracts";
 
 export type SuperStudentItem = {
   id: string;
@@ -8,8 +9,6 @@ export type SuperStudentItem = {
   student_id: string;
   created_at: string;
 };
-
-type SuperStudentAction = "list" | "create" | "update" | "delete";
 
 type SuperStudentRequest = {
   action: SuperStudentAction;
@@ -24,7 +23,7 @@ const getAccessToken = async () => {
 
 const callSuperStudent = async <TData>(payload: SuperStudentRequest) => {
   const accessToken = await getAccessToken();
-  const result = await invokeEdgeFunction<{ data?: TData }, SuperStudentRequest>(
+  const result = await invokeEdgeFunction<EdgeEnvelope<TData>, SuperStudentRequest>(
     "super-student-mutate",
     {
       method: "POST",

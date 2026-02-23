@@ -1,5 +1,6 @@
 import { invokeEdgeFunction } from "./edgeFunctionClient";
 import { supabase } from "./supabaseClient";
+import type { EdgeEnvelope, SuperAdminAction } from "../types/edgeContracts";
 
 export type SuperTenantAdmin = {
   id: string;
@@ -10,13 +11,6 @@ export type SuperTenantAdmin = {
   created_at: string;
   tenant_name?: string;
 };
-
-type SuperAdminAction =
-  | "list_tenant_admins"
-  | "create_tenant_admin"
-  | "set_admin_status"
-  | "update_admin_email"
-  | "send_reset";
 
 type SuperAdminRequest = {
   action: SuperAdminAction;
@@ -33,7 +27,7 @@ const getAccessToken = async () => {
 
 const callSuperAdmin = async <TData>(payload: SuperAdminRequest) => {
   const accessToken = await getAccessToken();
-  const result = await invokeEdgeFunction<{ data?: TData }, SuperAdminRequest>(
+  const result = await invokeEdgeFunction<EdgeEnvelope<TData>, SuperAdminRequest>(
     "super-admin-mutate",
     {
       method: "POST",

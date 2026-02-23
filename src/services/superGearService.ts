@@ -1,5 +1,6 @@
 import { invokeEdgeFunction } from "./edgeFunctionClient";
 import { supabase } from "./supabaseClient";
+import type { EdgeEnvelope, SuperGearAction } from "../types/edgeContracts";
 
 export type SuperGearItem = {
   id: string;
@@ -10,8 +11,6 @@ export type SuperGearItem = {
   status: string;
   notes: string | null;
 };
-
-type SuperGearAction = "list" | "create" | "update" | "delete";
 
 type SuperGearRequest = {
   action: SuperGearAction;
@@ -26,7 +25,7 @@ const getAccessToken = async () => {
 
 const callSuperGear = async <TData>(payload: SuperGearRequest) => {
   const accessToken = await getAccessToken();
-  const result = await invokeEdgeFunction<{ data?: TData }, SuperGearRequest>(
+  const result = await invokeEdgeFunction<EdgeEnvelope<TData>, SuperGearRequest>(
     "super-gear-mutate",
     {
       method: "POST",

@@ -1,5 +1,6 @@
 import { invokeEdgeFunction } from "./edgeFunctionClient";
 import { supabase } from "./supabaseClient";
+import type { AdminOpsAction, EdgeEnvelope, TenantFeatureFlags } from "../types/edgeContracts";
 
 export type StatusTrackedItem = {
   id: string;
@@ -33,34 +34,15 @@ export type TenantNotificationPayload = {
     created_at: string;
     link_url: string | null;
   }>;
-  feature_flags: {
-    enable_notifications: boolean;
-    enable_bulk_item_import: boolean;
-    enable_bulk_student_tools: boolean;
-    enable_status_tracking: boolean;
-    enable_barcode_generator: boolean;
-  };
+  feature_flags: TenantFeatureFlags;
   maintenance: { enabled: boolean; message: string } | null;
   recent_status_events: StatusHistoryItem[];
 };
 
 export type TenantSettingsPayload = {
   checkout_due_hours: number;
-  feature_flags: {
-    enable_notifications: boolean;
-    enable_bulk_item_import: boolean;
-    enable_bulk_student_tools: boolean;
-    enable_status_tracking: boolean;
-    enable_barcode_generator: boolean;
-  };
+  feature_flags: TenantFeatureFlags;
 };
-
-type AdminOpsAction =
-  | "get_notifications"
-  | "get_status_tracking"
-  | "bulk_import_gear"
-  | "get_tenant_settings"
-  | "update_tenant_settings";
 
 const getAccessToken = async () => {
   const { data, error } = await supabase.auth.getSession();
@@ -75,7 +57,7 @@ const callAdminOps = async <TData>(
   payload: Record<string, unknown> = {}
 ) => {
   const accessToken = await getAccessToken();
-  const result = await invokeEdgeFunction<{ data?: TData }, { action: string; payload: Record<string, unknown> }>(
+  const result = await invokeEdgeFunction<EdgeEnvelope<TData>, { action: string; payload: Record<string, unknown> }>(
     "admin-ops",
     {
       method: "POST",

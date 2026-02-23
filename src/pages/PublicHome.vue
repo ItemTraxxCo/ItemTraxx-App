@@ -123,6 +123,9 @@
             :src="checkoutReturnUiImage"
             alt="Checkout and return interface preview"
             loading="lazy"
+            decoding="async"
+            width="1600"
+            height="810"
           />
         </div>
       </section>
@@ -152,6 +155,9 @@
             :src="adminUiImage"
             alt="Admin panel interface preview"
             loading="lazy"
+            decoding="async"
+            width="1600"
+            height="934"
           />
         </div>
       </section>

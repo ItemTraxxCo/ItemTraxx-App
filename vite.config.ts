@@ -27,6 +27,22 @@ const gitCommit = (() => {
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [vue()],
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes("node_modules")) {
+            if (id.includes("@supabase/supabase-js")) return "vendor-supabase";
+            if (id.includes("vue") || id.includes("vue-router")) return "vendor-vue";
+            if (id.includes("jspdf") || id.includes("html2canvas") || id.includes("jsbarcode")) {
+              return "vendor-pdf";
+            }
+          }
+          return undefined;
+        },
+      },
+    },
+  },
   define: {
     "import.meta.env.VITE_GIT_COMMIT": JSON.stringify(gitCommit),
   },

@@ -14,6 +14,40 @@ type TurnstileApi = {
   remove: (widgetId?: string) => void;
 };
 
+const TURNSTILE_SCRIPT_SRC = "https://challenges.cloudflare.com/turnstile/v0/api.js";
+let turnstileScriptPromise: Promise<void> | null = null;
+
+const ensureTurnstileScript = () => {
+  if (window.turnstile) {
+    return Promise.resolve();
+  }
+  if (turnstileScriptPromise) {
+    return turnstileScriptPromise;
+  }
+
+  turnstileScriptPromise = new Promise<void>((resolve, reject) => {
+    const existingScript = document.querySelector<HTMLScriptElement>(
+      `script[src="${TURNSTILE_SCRIPT_SRC}"]`
+    );
+    if (existingScript) {
+      existingScript.remove();
+    }
+
+    const script = document.createElement("script");
+    script.src = TURNSTILE_SCRIPT_SRC;
+    script.async = true;
+    script.defer = true;
+    script.onload = () => resolve();
+    script.onerror = () => reject(new Error("Failed to load Turnstile script."));
+    document.head.appendChild(script);
+  }).catch((error) => {
+    turnstileScriptPromise = null;
+    throw error;
+  });
+
+  return turnstileScriptPromise;
+};
+
 export const useTurnstile = (siteKey?: string) => {
   const containerRef = ref<HTMLElement | null>(null);
   const token = ref("");
@@ -71,15 +105,21 @@ export const useTurnstile = (siteKey?: string) => {
     if (!siteKey) {
       return;
     }
-    mountWidget();
-    if (!widgetId) {
-      bootTimer = window.setInterval(() => {
+    void ensureTurnstileScript()
+      .then(() => {
         mountWidget();
-        if (widgetId) {
-          clearBootTimer();
+        if (!widgetId) {
+          bootTimer = window.setInterval(() => {
+            mountWidget();
+            if (widgetId) {
+              clearBootTimer();
+            }
+          }, 250);
         }
-      }, 250);
-    }
+      })
+      .catch(() => {
+        token.value = "";
+      });
   });
 
   onUnmounted(() => {

@@ -72,8 +72,10 @@ jobs:
             exit 1
           fi
 
-          if [ "$PASS_COUNT" -eq 0 ]; then
-            echo "All URL checks were Cloudflare-challenged; unable to validate headers from CI."
+          if [ "$PASS_COUNT" -eq 0 ] && [ "$CHALLENGE_SKIPS" -gt 0 ]; then
+            echo "All URL checks were Cloudflare-challenged; skipping header assertions in CI."
+          elif [ "$PASS_COUNT" -eq 0 ]; then
+            echo "No successful header checks completed."
             exit 1
           fi
 

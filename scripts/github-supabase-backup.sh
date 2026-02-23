@@ -21,6 +21,7 @@ BACKUP_PREFIX="${SUPABASE_BACKUP_PREFIX:-supabase}"
 BACKUP_GIT_USERNAME="$(printf '%s' "${SUPABASE_BACKUP_GIT_USERNAME:-mmango10}" | xargs)"
 USE_DOCKER_PG_DUMP="${SUPABASE_BACKUP_USE_DOCKER_PG_DUMP:-false}"
 PG_DUMP_DOCKER_TAG="${SUPABASE_BACKUP_PG_DUMP_TAG:-17}"
+BACKUP_RETENTION_DAYS="${SUPABASE_BACKUP_RETENTION_DAYS:-365}"
 TIMESTAMP_UTC="$(date -u +"%Y-%m-%d_%H-%M-%S")"
 YEAR="$(date -u +"%Y")"
 MONTH="$(date -u +"%m")"
@@ -55,6 +56,95 @@ run_pg_dump() {
   fi
 
   pg_dump "$@" "$db_url"
+}
+
+cleanup_backup_retention() {
+  if ! [[ "$BACKUP_RETENTION_DAYS" =~ ^[0-9]+$ ]] || [ "$BACKUP_RETENTION_DAYS" -le 0 ]; then
+    echo "Skipping retention cleanup: invalid SUPABASE_BACKUP_RETENTION_DAYS='$BACKUP_RETENTION_DAYS'."
+    return
+  fi
+
+  echo "Applying backup retention: keep last ${BACKUP_RETENTION_DAYS} day(s)..."
+  local tree_json
+  tree_json="$(mktemp)"
+  local tree_code
+  tree_code="$(
+    curl -sS -o "$tree_json" -w "%{http_code}" \
+      -H "Authorization: Bearer ${BACKUP_TOKEN}" \
+      -H "Accept: application/vnd.github+json" \
+      "${BACKUP_API_URL}/git/trees/${BACKUP_BRANCH}?recursive=1"
+  )"
+  if [ "$tree_code" -ne 200 ]; then
+    echo "Retention cleanup skipped: unable to read repo tree (HTTP ${tree_code})."
+    rm -f "$tree_json"
+    return
+  fi
+
+  local expired_list
+  expired_list="$(mktemp)"
+  python3 - "$tree_json" "$BACKUP_RETENTION_DAYS" > "$expired_list" <<'PY'
+import datetime
+import json
+import re
+import sys
+
+tree_path = sys.argv[1]
+retention_days = int(sys.argv[2])
+cutoff = datetime.datetime.utcnow().date() - datetime.timedelta(days=retention_days)
+pattern = re.compile(r"^backups/(\d{4})/(\d{2})/(\d{2})/.+")
+
+with open(tree_path, "r", encoding="utf-8") as fh:
+    payload = json.load(fh)
+
+for entry in payload.get("tree", []):
+    if entry.get("type") != "blob":
+        continue
+    path = entry.get("path", "")
+    m = pattern.match(path)
+    if not m:
+        continue
+    try:
+        backup_date = datetime.date(int(m.group(1)), int(m.group(2)), int(m.group(3)))
+    except ValueError:
+        continue
+    if backup_date < cutoff:
+        sha = entry.get("sha")
+        if sha:
+            print(f"{path}\t{sha}")
+PY
+
+  local removed=0
+  while IFS=$'\t' read -r path sha; do
+    [ -z "$path" ] && continue
+    local payload
+    payload="$(python3 - <<PY
+import json
+print(json.dumps({
+  "message": "retention: remove expired backup artifact",
+  "branch": "${BACKUP_BRANCH}",
+  "sha": "${sha}",
+}))
+PY
+)"
+    local delete_code
+    delete_code="$(
+      curl -sS -o /tmp/itemtraxx_backup_delete_resp.json -w "%{http_code}" \
+        -X DELETE \
+        -H "Authorization: Bearer ${BACKUP_TOKEN}" \
+        -H "Accept: application/vnd.github+json" \
+        -H "Content-Type: application/json" \
+        "${BACKUP_API_URL}/contents/${path}" \
+        --data "$payload"
+    )"
+    if [ "$delete_code" -ge 200 ] && [ "$delete_code" -lt 300 ]; then
+      removed=$((removed + 1))
+    else
+      echo "Retention delete failed for ${path} (HTTP ${delete_code})."
+    fi
+  done < "$expired_list"
+
+  rm -f "$expired_list" "$tree_json"
+  echo "Retention cleanup complete. Removed ${removed} expired file(s)."
 }
 
 dump_database() {
@@ -202,6 +292,7 @@ PY
   upload_file "$TARGET_ABS_DIR/$ENCRYPTED_NAME" "$TARGET_DIR/$ENCRYPTED_NAME"
   upload_file "$TARGET_ABS_DIR/$CHECKSUM_NAME" "$TARGET_DIR/$CHECKSUM_NAME"
   upload_file "$TARGET_ABS_DIR/${BACKUP_PREFIX}_${TIMESTAMP_UTC}.metadata.json" "$TARGET_DIR/${BACKUP_PREFIX}_${TIMESTAMP_UTC}.metadata.json"
+  cleanup_backup_retention
   echo "Backup complete: ${ENCRYPTED_NAME} (uploaded via GitHub API)"
   exit 0
 fi
@@ -218,4 +309,5 @@ git commit -m "backup: ${BACKUP_PREFIX} ${TIMESTAMP_UTC} UTC"
 git push origin "$BACKUP_BRANCH"
 popd >/dev/null
 
+cleanup_backup_retention
 echo "Backup complete: ${ENCRYPTED_NAME}"

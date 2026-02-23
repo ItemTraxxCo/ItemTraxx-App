@@ -32,4 +32,5 @@ jobs:
           SUPABASE_BACKUP_PREFIX: itemtraxx_prod
           SUPABASE_BACKUP_USE_DOCKER_PG_DUMP: "true"
           SUPABASE_BACKUP_PG_DUMP_TAG: "17"
+          SUPABASE_BACKUP_RETENTION_DAYS: "365"
         run: ./scripts/github-supabase-backup.sh

@@ -39,6 +39,7 @@
 import { computed, onMounted, onUnmounted, ref } from "vue";
 import { RouterLink, useRouter } from "vue-router";
 import { adminLogin } from "../../../services/authService";
+import { touchTenantAdminSession } from "../../../services/adminOpsService";
 import { logAdminAction } from "../../../services/auditLogService";
 import { useTurnstile } from "../../../composables/useTurnstile";
 import { clearAdminVerification } from "../../../store/authState";
@@ -127,6 +128,14 @@ const handleAdminLogin = async () => {
       action_type: "admin_login",
       metadata: { email: email.value.trim() },
     });
+    try {
+      await touchTenantAdminSession();
+    } catch (sessionErr) {
+      const message = sessionErr instanceof Error ? sessionErr.message : "";
+      if (!message.includes("Session controls unavailable")) {
+        throw sessionErr;
+      }
+    }
     await router.push("/tenant/admin");
   } catch (err) {
     devLog("auth_request_failed");

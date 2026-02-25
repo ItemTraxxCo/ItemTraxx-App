@@ -1,6 +1,7 @@
 import { invokeEdgeFunction } from "./edgeFunctionClient";
 import { supabase } from "./supabaseClient";
 import type { AdminOpsAction, EdgeEnvelope, TenantFeatureFlags } from "../types/edgeContracts";
+import { getOrCreateDeviceSession } from "../utils/deviceSession";
 
 export type StatusTrackedItem = {
   id: string;
@@ -44,6 +45,16 @@ export type TenantSettingsPayload = {
   feature_flags: TenantFeatureFlags;
 };
 
+export type TenantSessionItem = {
+  id: string;
+  device_id: string;
+  device_label: string | null;
+  user_agent: string | null;
+  created_at: string;
+  last_seen_at: string;
+  is_current: boolean;
+};
+
 const getAccessToken = async () => {
   const { data, error } = await supabase.auth.getSession();
   if (error || !data.session?.access_token) {
@@ -57,12 +68,20 @@ const callAdminOps = async <TData>(
   payload: Record<string, unknown> = {}
 ) => {
   const accessToken = await getAccessToken();
+  const { deviceId, deviceLabel } = getOrCreateDeviceSession();
   const result = await invokeEdgeFunction<EdgeEnvelope<TData>, { action: string; payload: Record<string, unknown> }>(
     "admin-ops",
     {
       method: "POST",
       accessToken,
-      body: { action, payload },
+      body: {
+        action,
+        payload: {
+          ...payload,
+          device_id: deviceId,
+          device_label: deviceLabel,
+        },
+      },
     }
   );
 
@@ -103,3 +122,18 @@ export const bulkImportGear = async (
     inserted_items: StatusTrackedItem[];
     skipped_rows: Array<{ barcode: string; reason: string }>;
   }>("bulk_import_gear", { rows });
+
+export const touchTenantAdminSession = async () =>
+  callAdminOps<{ ok: boolean }>("touch_session");
+
+export const validateTenantAdminSession = async () =>
+  callAdminOps<{ valid: boolean }>("validate_session");
+
+export const listTenantAdminSessions = async () =>
+  callAdminOps<{ sessions: TenantSessionItem[] }>("list_sessions");
+
+export const revokeTenantAdminSession = async (sessionId: string) =>
+  callAdminOps<{ revoked: boolean }>("revoke_session", { session_id: sessionId });
+
+export const revokeAllTenantAdminSessions = async (signOutCurrent = false) =>
+  callAdminOps<{ revoked: number }>("revoke_all_sessions", { sign_out_current: signOutCurrent });

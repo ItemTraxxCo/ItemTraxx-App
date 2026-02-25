@@ -3,7 +3,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const baseCorsHeaders = {
   "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
+    "authorization, x-client-info, apikey, content-type, x-request-id",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
   Vary: "Origin",
 };
@@ -30,6 +30,29 @@ const resolveCorsHeaders = (req: Request) => {
       : { ...baseCorsHeaders };
 
   return { hasOrigin, originAllowed, headers };
+};
+
+const isLocalhostMaintenanceBypassRequest = (req: Request) => {
+  if ((Deno.env.get("ITX_ALLOW_LOCALHOST_MAINTENANCE_BYPASS") ?? "").toLowerCase() !== "true") {
+    return false;
+  }
+  const origin = req.headers.get("origin");
+  if (!origin) return false;
+  try {
+    const hostname = new URL(origin).hostname.toLowerCase();
+    if (hostname === "localhost" || hostname === "127.0.0.1" || hostname === "0.0.0.0") {
+      return true;
+    }
+    if (hostname.startsWith("192.168.") || hostname.startsWith("10.")) {
+      return true;
+    }
+    const match172 = hostname.match(/^172\.(\d{1,3})\./);
+    if (!match172) return false;
+    const secondOctet = Number(match172[1]);
+    return Number.isFinite(secondOctet) && secondOctet >= 16 && secondOctet <= 31;
+  } catch {
+    return false;
+  }
 };
 
 serve(async (req) => {
@@ -153,7 +176,7 @@ serve(async (req) => {
       maintenanceRow?.value && typeof maintenanceRow.value === "object"
         ? (maintenanceRow.value as Record<string, unknown>)
         : {};
-    if (maintenanceValue.enabled === true) {
+    if (maintenanceValue.enabled === true && !isLocalhostMaintenanceBypassRequest(req)) {
       return jsonResponse(503, {
         error:
           typeof maintenanceValue.message === "string" && maintenanceValue.message.trim()

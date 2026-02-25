@@ -150,6 +150,10 @@
 import { computed, defineAsyncComponent, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { signOut } from "./services/authService";
+import {
+  touchTenantAdminSession,
+  validateTenantAdminSession,
+} from "./services/adminOpsService";
 import { fetchSystemStatus } from "./services/systemStatusService";
 import { clearAdminVerification, getAuthState } from "./store/authState";
 import NotificationBell from "./components/NotificationBell.vue";
@@ -207,7 +211,9 @@ let deferredStatusTimer: number | null = null;
 let deferredVersionTimer: number | null = null;
 let deferredTelemetryTimer: number | null = null;
 let routeProgressTimer: number | null = null;
+let adminSessionTimer: number | null = null;
 const isIdleLogoutRunning = ref(false);
+const isAdminSessionCheckRunning = ref(false);
 
 const ADMIN_IDLE_TIMEOUT_MINUTES = Number(import.meta.env.VITE_ADMIN_IDLE_TIMEOUT_MINUTES || 20);
 const ADMIN_IDLE_TIMEOUT_MS =
@@ -222,6 +228,23 @@ const themeLabel = computed(() =>
   theme.value === "dark" ? "Light Mode" : "Dark Mode"
 );
 const showTopMenu = computed(() => route.name !== "public-home");
+const isLocalDevMaintenanceBypass = computed(() => {
+  if (import.meta.env.DEV !== true) return false;
+  if ((import.meta.env.VITE_DEV_MAINTENANCE_BYPASS ?? "true") !== "true") return false;
+  const host = window.location.hostname.toLowerCase();
+  if (host === "localhost" || host === "127.0.0.1" || host === "0.0.0.0") {
+    return true;
+  }
+  if (host.startsWith("192.168.") || host.startsWith("10.")) {
+    return true;
+  }
+  const match172 = host.match(/^172\.(\d{1,3})\./);
+  if (match172) {
+    const secondOctet = Number(match172[1]);
+    return Number.isFinite(secondOctet) && secondOctet >= 16 && secondOctet <= 31;
+  }
+  return false;
+});
 const isTenantAdminArea = computed(() => {
   if (route.path === "/tenant/admin-login") return false;
   return route.path.startsWith("/tenant/admin");
@@ -240,8 +263,11 @@ const showIncidentBanner = computed(() => {
   if (!incidentBanner.value) return false;
   return dismissedIncidentId.value !== incidentBanner.value.id;
 });
-const showMaintenanceBanner = computed(() => maintenanceEnabled.value);
+const showMaintenanceBanner = computed(
+  () => maintenanceEnabled.value && !isLocalDevMaintenanceBypass.value
+);
 const showMaintenanceOverlay = computed(() => {
+  if (isLocalDevMaintenanceBypass.value) return false;
   if (!maintenanceEnabled.value) return false;
   const routeName = String(route.name || "");
   if (routeName === "public-home" || routeName === "not-found" || routeName === "super-auth") {
@@ -345,6 +371,55 @@ const runIdleLogout = async () => {
   } finally {
     isIdleLogoutRunning.value = false;
   }
+};
+
+const stopAdminSessionPolling = () => {
+  if (!adminSessionTimer) return;
+  window.clearInterval(adminSessionTimer);
+  adminSessionTimer = null;
+};
+
+const handleAdminSessionRevoked = async () => {
+  clearAdminVerification();
+  if (route.path !== "/tenant/admin-login") {
+    await router.replace("/tenant/admin-login");
+  }
+};
+
+const runAdminSessionCheck = async () => {
+  if (isAdminSessionCheckRunning.value) return;
+  if (!auth.isAuthenticated || auth.role !== "tenant_admin" || !isTenantAdminArea.value) {
+    stopAdminSessionPolling();
+    return;
+  }
+  isAdminSessionCheckRunning.value = true;
+  try {
+    const validation = await validateTenantAdminSession();
+    if (!validation.valid) {
+      await handleAdminSessionRevoked();
+      return;
+    }
+    await touchTenantAdminSession();
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "";
+    if (message === "Session revoked") {
+      await handleAdminSessionRevoked();
+    }
+  } finally {
+    isAdminSessionCheckRunning.value = false;
+  }
+};
+
+const startAdminSessionPolling = () => {
+  if (!auth.isAuthenticated || auth.role !== "tenant_admin" || !isTenantAdminArea.value) {
+    stopAdminSessionPolling();
+    return;
+  }
+  void runAdminSessionCheck();
+  if (adminSessionTimer) return;
+  adminSessionTimer = window.setInterval(() => {
+    void runAdminSessionCheck();
+  }, 45_000);
 };
 
 const resetAdminIdleTimer = () => {
@@ -565,6 +640,7 @@ onMounted(() => {
   window.addEventListener("resize", measureTopBanners);
   document.addEventListener("visibilitychange", handlePageVisibilityChange);
   resetAdminIdleTimer();
+  startAdminSessionPolling();
   void nextTick(() => {
     measureTopBanners();
   });
@@ -588,6 +664,7 @@ watch(
   () => [route.path, auth.isAuthenticated, auth.role] as const,
   () => {
     resetAdminIdleTimer();
+    startAdminSessionPolling();
   }
 );
 
@@ -597,9 +674,11 @@ watch(
     if (auth.isAuthenticated) {
       void refreshVersionStatus();
       startVersionPolling();
+      startAdminSessionPolling();
       return;
     }
     stopVersionPolling();
+    stopAdminSessionPolling();
     isOutdated.value = false;
     latestVersion.value = null;
   }
@@ -639,6 +718,7 @@ onUnmounted(() => {
     window.clearTimeout(routeProgressTimer);
     routeProgressTimer = null;
   }
+  stopAdminSessionPolling();
   document.removeEventListener("visibilitychange", handlePageVisibilityChange);
   window.removeEventListener("resize", measureTopBanners);
 });

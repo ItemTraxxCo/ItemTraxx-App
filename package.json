@@ -24,8 +24,8 @@
     "jsbarcode": "^3.12.3",
     "jspdf": "^4.2.0",
     "jspdf-autotable": "^5.0.7",
-    "supabase": "^2.76.12",
-    "vue": "^3.5.28",
+    "supabase": "^2.76.15",
+    "vue": "^3.5.29",
     "vue-router": "^4.6.4"
   },
   "devDependencies": {

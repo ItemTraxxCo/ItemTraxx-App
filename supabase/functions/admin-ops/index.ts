@@ -30,6 +30,12 @@ type TenantFeatureFlags = {
   enable_barcode_generator: boolean;
 };
 
+type DeviceSessionContext = {
+  deviceId: string | null;
+  deviceLabel: string | null;
+  userAgent: string | null;
+};
+
 const TRACKED_STATUSES = new Set(["damaged", "lost", "in_repair", "retired", "in_studio_only"]);
 const ALLOWED_GEAR_STATUSES = new Set([
   "available",
@@ -124,6 +130,25 @@ const resolveMaintenance = (value: unknown) => {
         : "Maintenance in progress.",
   };
 };
+
+const sanitizeText = (value: unknown, maxLen: number) => {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  return trimmed.slice(0, maxLen);
+};
+
+const resolveDeviceSessionContext = (
+  payload: Record<string, unknown>,
+  req: Request
+): DeviceSessionContext => ({
+  deviceId: sanitizeText(payload.device_id, 128),
+  deviceLabel: sanitizeText(payload.device_label, 160),
+  userAgent: sanitizeText(req.headers.get("user-agent"), 255),
+});
+
+const isMissingSessionTable = (error: RpcError | null | undefined) =>
+  isMissingRelation(error, "tenant_admin_sessions");
 
 
 serve(async (req) => {
@@ -220,6 +245,14 @@ serve(async (req) => {
     if (typeof action !== "string") {
       return jsonResponse(400, { error: "Invalid request" });
     }
+    const payloadRecord =
+      payload && typeof payload === "object" ? (payload as Record<string, unknown>) : {};
+    const isSessionAction =
+      action === "touch_session" ||
+      action === "validate_session" ||
+      action === "list_sessions" ||
+      action === "revoke_session" ||
+      action === "revoke_all_sessions";
 
     const adminClient = createClient(supabaseUrl, serviceKey, {
       auth: { persistSession: false },
@@ -232,6 +265,92 @@ serve(async (req) => {
       .eq("id", tenantId)
       .maybeSingle();
     const isTenantSuspended = tenantStatus?.status === "suspended";
+    const deviceSession = resolveDeviceSessionContext(payloadRecord, req);
+
+    const findActiveSession = async () => {
+      if (!deviceSession.deviceId) {
+        return { exists: false as const, relationMissing: false };
+      }
+      const { data, error } = await adminClient
+        .from("tenant_admin_sessions")
+        .select("id")
+        .eq("tenant_id", tenantId)
+        .eq("profile_id", user.id)
+        .eq("device_id", deviceSession.deviceId)
+        .is("revoked_at", null)
+        .limit(1)
+        .maybeSingle();
+      if (error) {
+        if (isMissingSessionTable(error as RpcError)) {
+          return { exists: false as const, relationMissing: true as const };
+        }
+        throw new Error("Unable to validate admin session.");
+      }
+      return { exists: !!data, relationMissing: false as const };
+    };
+
+    const touchCurrentSession = async () => {
+      if (!deviceSession.deviceId) {
+        return { ok: false as const, relationMissing: false as const, reason: "missing_device" };
+      }
+      const now = new Date().toISOString();
+      const { data: existing, error: existingError } = await adminClient
+        .from("tenant_admin_sessions")
+        .select("id")
+        .eq("tenant_id", tenantId)
+        .eq("profile_id", user.id)
+        .eq("device_id", deviceSession.deviceId)
+        .is("revoked_at", null)
+        .limit(1)
+        .maybeSingle();
+      if (existingError) {
+        if (isMissingSessionTable(existingError as RpcError)) {
+          return { ok: false as const, relationMissing: true as const, reason: "missing_table" };
+        }
+        throw new Error("Unable to register admin session.");
+      }
+
+      if (existing?.id) {
+        const { error: updateError } = await adminClient
+          .from("tenant_admin_sessions")
+          .update({
+            last_seen_at: now,
+            device_label: deviceSession.deviceLabel,
+            user_agent: deviceSession.userAgent,
+          })
+          .eq("id", existing.id);
+        if (updateError) {
+          throw new Error("Unable to update admin session.");
+        }
+      } else {
+        const { error: insertError } = await adminClient
+          .from("tenant_admin_sessions")
+          .insert({
+            tenant_id: tenantId,
+            profile_id: user.id,
+            device_id: deviceSession.deviceId,
+            device_label: deviceSession.deviceLabel,
+            user_agent: deviceSession.userAgent,
+            created_at: now,
+            last_seen_at: now,
+          });
+        if (insertError) {
+          if (isMissingSessionTable(insertError as RpcError)) {
+            return { ok: false as const, relationMissing: true as const, reason: "missing_table" };
+          }
+          throw new Error("Unable to register admin session.");
+        }
+      }
+
+      return { ok: true as const, relationMissing: false as const, reason: "ok" };
+    };
+
+    if (profile.role === "tenant_admin" && !isSessionAction) {
+      const activeSession = await findActiveSession();
+      if (!activeSession.relationMissing && !activeSession.exists) {
+        return jsonResponse(401, { error: "Session revoked" });
+      }
+    }
 
     const [maintenanceRuntimeResult, updateRuntimeResult] = await Promise.all([
       adminClient
@@ -369,7 +488,7 @@ serve(async (req) => {
         return jsonResponse(403, { error: "Tenant disabled" });
       }
 
-      const next = (payload ?? {}) as Record<string, unknown>;
+      const next = payloadRecord;
       const checkoutDueHoursRaw = Number(next.checkout_due_hours);
       if (!Number.isFinite(checkoutDueHoursRaw)) {
         return jsonResponse(400, { error: "Invalid checkout due hours." });
@@ -548,6 +667,155 @@ serve(async (req) => {
       });
     }
 
+    if (action === "touch_session") {
+      if (profile.role !== "tenant_admin") {
+        return jsonResponse(403, { error: "Access denied" });
+      }
+      const touch = await touchCurrentSession();
+      if (touch.relationMissing) {
+        return jsonResponse(400, {
+          error: "Session controls unavailable. Run latest SQL setup.",
+        });
+      }
+      if (!touch.ok) {
+        return jsonResponse(400, { error: "Device session is required." });
+      }
+      return jsonResponse(200, { data: { ok: true } });
+    }
+
+    if (action === "validate_session") {
+      if (profile.role !== "tenant_admin") {
+        return jsonResponse(403, { error: "Access denied" });
+      }
+      if (!deviceSession.deviceId) {
+        return jsonResponse(400, { error: "Device session is required." });
+      }
+      const activeSession = await findActiveSession();
+      if (activeSession.relationMissing) {
+        return jsonResponse(400, {
+          error: "Session controls unavailable. Run latest SQL setup.",
+        });
+      }
+      if (!activeSession.exists) {
+        return jsonResponse(200, { data: { valid: false } });
+      }
+      const touch = await touchCurrentSession();
+      if (!touch.ok && !touch.relationMissing) {
+        return jsonResponse(400, { error: "Unable to refresh admin session." });
+      }
+      return jsonResponse(200, { data: { valid: true } });
+    }
+
+    if (action === "list_sessions") {
+      if (profile.role !== "tenant_admin") {
+        return jsonResponse(403, { error: "Access denied" });
+      }
+      const { data, error } = await adminClient
+        .from("tenant_admin_sessions")
+        .select("id, device_id, device_label, user_agent, created_at, last_seen_at")
+        .eq("tenant_id", tenantId)
+        .eq("profile_id", user.id)
+        .is("revoked_at", null)
+        .order("last_seen_at", { ascending: false })
+        .limit(100);
+      if (error) {
+        if (isMissingSessionTable(error as RpcError)) {
+          return jsonResponse(400, {
+            error: "Session controls unavailable. Run latest SQL setup.",
+          });
+        }
+        return jsonResponse(400, { error: "Unable to load active devices." });
+      }
+      const rows = (data ?? []) as Array<{
+        id: string;
+        device_id: string;
+        device_label: string | null;
+        user_agent: string | null;
+        created_at: string;
+        last_seen_at: string;
+      }>;
+      return jsonResponse(200, {
+        data: {
+          sessions: rows.map((row) => ({
+            ...row,
+            is_current: !!deviceSession.deviceId && row.device_id === deviceSession.deviceId,
+          })),
+        },
+      });
+    }
+
+    if (action === "revoke_session") {
+      if (profile.role !== "tenant_admin") {
+        return jsonResponse(403, { error: "Access denied" });
+      }
+      if (isTenantSuspended) {
+        return jsonResponse(403, { error: "Tenant disabled" });
+      }
+      const sessionId = sanitizeText(payloadRecord.session_id, 128);
+      if (!sessionId) {
+        return jsonResponse(400, { error: "Session id is required." });
+      }
+      const { data: revokedRows, error } = await adminClient
+        .from("tenant_admin_sessions")
+        .update({
+          revoked_at: new Date().toISOString(),
+          revoked_by: user.id,
+        })
+        .eq("id", sessionId)
+        .eq("tenant_id", tenantId)
+        .eq("profile_id", user.id)
+        .is("revoked_at", null)
+        .select("id");
+      if (error) {
+        if (isMissingSessionTable(error as RpcError)) {
+          return jsonResponse(400, {
+            error: "Session controls unavailable. Run latest SQL setup.",
+          });
+        }
+        return jsonResponse(400, { error: "Unable to revoke session." });
+      }
+      if (!revokedRows?.length) {
+        return jsonResponse(404, { error: "Session not found." });
+      }
+      return jsonResponse(200, { data: { revoked: true } });
+    }
+
+    if (action === "revoke_all_sessions") {
+      if (profile.role !== "tenant_admin") {
+        return jsonResponse(403, { error: "Access denied" });
+      }
+      if (isTenantSuspended) {
+        return jsonResponse(403, { error: "Tenant disabled" });
+      }
+      const signOutCurrent = payloadRecord.sign_out_current === true;
+      let query = adminClient
+        .from("tenant_admin_sessions")
+        .update({
+          revoked_at: new Date().toISOString(),
+          revoked_by: user.id,
+        })
+        .eq("tenant_id", tenantId)
+        .eq("profile_id", user.id)
+        .is("revoked_at", null);
+      if (!signOutCurrent && deviceSession.deviceId) {
+        query = query.neq("device_id", deviceSession.deviceId);
+      }
+      const { data, error } = await query.select("id");
+      if (error) {
+        if (isMissingSessionTable(error as RpcError)) {
+          return jsonResponse(400, {
+            error: "Session controls unavailable. Run latest SQL setup.",
+          });
+        }
+        return jsonResponse(400, { error: "Unable to revoke sessions." });
+      }
+      return jsonResponse(200, {
+        data: {
+          revoked: (data ?? []).length,
+        },
+      });
+    }
+
     if (action === "bulk_import_gear") {
       if (profile.role !== "tenant_admin") {
         return jsonResponse(403, { error: "Access denied" });
@@ -556,8 +824,8 @@ serve(async (req) => {
         return jsonResponse(403, { error: "Tenant disabled" });
       }
 
-      const rawRows = Array.isArray((payload as Record<string, unknown>)?.rows)
-        ? ((payload as Record<string, unknown>).rows as Array<Record<string, unknown>>)
+      const rawRows = Array.isArray(payloadRecord.rows)
+        ? (payloadRecord.rows as Array<Record<string, unknown>>)
         : [];
 
       if (!rawRows.length || rawRows.length > 1000) {

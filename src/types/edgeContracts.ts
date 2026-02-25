@@ -35,4 +35,9 @@ export type AdminOpsAction =
   | "get_status_tracking"
   | "bulk_import_gear"
   | "get_tenant_settings"
-  | "update_tenant_settings";
+  | "update_tenant_settings"
+  | "touch_session"
+  | "validate_session"
+  | "list_sessions"
+  | "revoke_session"
+  | "revoke_all_sessions";

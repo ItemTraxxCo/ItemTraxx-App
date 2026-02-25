@@ -222,6 +222,23 @@ const themeLabel = computed(() =>
   theme.value === "dark" ? "Light Mode" : "Dark Mode"
 );
 const showTopMenu = computed(() => route.name !== "public-home");
+const isLocalDevMaintenanceBypass = computed(() => {
+  if (import.meta.env.DEV !== true) return false;
+  if ((import.meta.env.VITE_DEV_MAINTENANCE_BYPASS ?? "true") !== "true") return false;
+  const host = window.location.hostname.toLowerCase();
+  if (host === "localhost" || host === "127.0.0.1" || host === "0.0.0.0") {
+    return true;
+  }
+  if (host.startsWith("192.168.") || host.startsWith("10.")) {
+    return true;
+  }
+  const match172 = host.match(/^172\.(\d{1,3})\./);
+  if (match172) {
+    const secondOctet = Number(match172[1]);
+    return Number.isFinite(secondOctet) && secondOctet >= 16 && secondOctet <= 31;
+  }
+  return false;
+});
 const isTenantAdminArea = computed(() => {
   if (route.path === "/tenant/admin-login") return false;
   return route.path.startsWith("/tenant/admin");
@@ -240,8 +257,11 @@ const showIncidentBanner = computed(() => {
   if (!incidentBanner.value) return false;
   return dismissedIncidentId.value !== incidentBanner.value.id;
 });
-const showMaintenanceBanner = computed(() => maintenanceEnabled.value);
+const showMaintenanceBanner = computed(
+  () => maintenanceEnabled.value && !isLocalDevMaintenanceBypass.value
+);
 const showMaintenanceOverlay = computed(() => {
+  if (isLocalDevMaintenanceBypass.value) return false;
   if (!maintenanceEnabled.value) return false;
   const routeName = String(route.name || "");
   if (routeName === "public-home" || routeName === "not-found" || routeName === "super-auth") {

@@ -3,7 +3,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const baseCorsHeaders = {
   "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
+    "authorization, x-client-info, apikey, content-type, x-request-id",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
   Vary: "Origin",
 };
@@ -90,7 +90,11 @@ serve(async (req) => {
       return jsonResponse(403, { error: "Access denied" });
     }
 
-    const { data: rateLimit, error: rateLimitError } = await userClient.rpc(
+    const adminClient = createClient(supabaseUrl, serviceKey, {
+      auth: { persistSession: false },
+    });
+
+    const { data: rateLimit, error: rateLimitError } = await adminClient.rpc(
       "consume_rate_limit",
       {
         p_scope: "super_admin",
@@ -100,24 +104,24 @@ serve(async (req) => {
     );
 
     if (rateLimitError) {
-      return jsonResponse(500, { error: "Rate limit check failed" });
-    }
-
-    const rateLimitResult = rateLimit as RateLimitResult;
-    if (!rateLimitResult.allowed) {
-      return jsonResponse(429, {
-        error: "Rate limit exceeded, please try again in a minute.",
+      console.error("super-ops rate limit rpc failed", {
+        code: rateLimitError.code,
+        message: rateLimitError.message,
+        details: rateLimitError.details,
       });
+    } else {
+      const rateLimitResult = rateLimit as RateLimitResult;
+      if (!rateLimitResult.allowed) {
+        return jsonResponse(429, {
+          error: "Rate limit exceeded, please try again in a minute.",
+        });
+      }
     }
 
     const { action, payload } = await req.json();
     if (typeof action !== "string") {
       return jsonResponse(400, { error: "Invalid request" });
     }
-
-    const adminClient = createClient(supabaseUrl, serviceKey, {
-      auth: { persistSession: false },
-    });
 
     const writeAudit = async (
       actionType: string,

@@ -145,7 +145,7 @@ onUnmounted(() => {
   min-height: 100vh;
   margin: -2.5rem -2rem -3rem;
   padding: 2.4rem 0 3rem;
-  background: linear-gradient(180deg, #1f4ca3 0%, #2f79c8 48%, #38d0b1 100%);
+  background: transparent;
 }
 
 .internal-auth-page {

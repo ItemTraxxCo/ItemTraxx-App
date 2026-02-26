@@ -161,7 +161,7 @@ const send = async () => {
       turnstile_token: turnstileToken.value ?? "",
       website: website.value,
     });
-    success.value = "Request sent. Our sales team will follow up shortly.";
+    success.value = "Request sent. You will receive a confirmation email from support@itemtraxx.com confirming that we have received your request within 24hr. Our sales team will follow up shortly after. Thank you for your interest in ItemTraxx!";
     details.value = "";
     website.value = "";
   } catch (err) {

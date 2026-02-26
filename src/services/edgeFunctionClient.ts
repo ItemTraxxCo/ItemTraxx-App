@@ -63,12 +63,6 @@ const createRequestId = () => {
 
 const EDGE_FUNCTION_TIMEOUT_MS = 10000;
 
-const isInvalidJwtError = (payload: unknown) => {
-  const parsed = payload as { error?: string; message?: string } | null;
-  const message = (parsed?.error ?? parsed?.message ?? "").toLowerCase();
-  return message.includes("invalid jwt");
-};
-
 const isTenantDisabledError = (payload: unknown) => {
   const parsed = payload as { error?: string; message?: string } | null;
   const message = (parsed?.error ?? parsed?.message ?? "").toLowerCase();
@@ -169,24 +163,24 @@ export const invokeEdgeFunction = async <TData = unknown, TBody = unknown>(
   functionName: string,
   options: EdgeFunctionOptions<TBody> = {}
 ): Promise<EdgeFunctionResult<TData>> => {
-  const first = await requestEdgeFunction<TData, TBody>(functionName, options);
+  let current = await requestEdgeFunction<TData, TBody>(functionName, options);
   const method = options.method ?? "POST";
 
   if (
     method === "GET" &&
-    first.status === 0 &&
-    first.error.toLowerCase().includes("timed out")
+    current.status === 0 &&
+    current.error.toLowerCase().includes("timed out")
   ) {
     return requestEdgeFunction<TData, TBody>(functionName, options);
   }
 
-  if (first.status === 401 && options.accessToken) {
+  if (current.status === 401 && options.accessToken) {
     // Retry once with a freshly refreshed session token.
     // Some upstream paths return generic 401 "Unauthorized" instead of "Invalid JWT".
     const { data, error } = await supabase.auth.refreshSession();
     const refreshedToken = data.session?.access_token;
     if (!error && refreshedToken) {
-      return requestEdgeFunction<TData, TBody>(
+      current = await requestEdgeFunction<TData, TBody>(
         functionName,
         options,
         refreshedToken
@@ -194,14 +188,13 @@ export const invokeEdgeFunction = async <TData = unknown, TBody = unknown>(
     }
   }
 
-  // If proxy rejects a valid user call with Invalid JWT, retry direct Supabase endpoint once.
+  // If proxy still rejects super-admin calls after refresh, retry direct Supabase endpoint once.
   // This isolates worker header/forwarding mismatches without breaking tenant/admin flows.
   const usingProxy = !!(import.meta.env.VITE_EDGE_PROXY_URL as string | undefined)?.trim();
   if (
     usingProxy &&
     functionName.startsWith("super-") &&
-    first.status === 401 &&
-    isInvalidJwtError({ error: first.error })
+    current.status === 401
   ) {
     const directBaseUrl = getDirectFunctionsBaseUrl();
     if (directBaseUrl) {
@@ -217,5 +210,5 @@ export const invokeEdgeFunction = async <TData = unknown, TBody = unknown>(
     }
   }
 
-  return first;
+  return current;
 };

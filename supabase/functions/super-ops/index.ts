@@ -53,7 +53,8 @@ serve(async (req) => {
   }
 
   try {
-    const authHeader = req.headers.get("authorization");
+    const authHeader =
+      req.headers.get("x-itx-user-jwt") ?? req.headers.get("authorization");
     if (!authHeader) {
       return jsonResponse(401, { error: "Unauthorized" });
     }

@@ -53,14 +53,24 @@ const getFunctionName = (pathname: string) => {
   return segments[1] ?? "";
 };
 
-const sanitizeRequestHeaders = (request: Request, anonKey: string, requestId: string) => {
+const sanitizeRequestHeaders = (
+  request: Request,
+  anonKey: string,
+  requestId: string,
+  functionName: string
+) => {
   const headers = new Headers();
   headers.set("x-request-id", requestId);
   headers.set("apikey", anonKey);
   headers.set("Content-Type", request.headers.get("Content-Type") ?? "application/json");
-  const auth = request.headers.get("Authorization");
-  if (auth) {
-    headers.set("Authorization", auth);
+  const incomingAuth = request.headers.get("Authorization");
+  if (functionName === "super-ops" && incomingAuth) {
+    // Route super-ops user JWT through a custom header and keep gateway auth bound to anon key.
+    // This avoids gateway-level JWT validation mismatches while function validates token explicitly.
+    headers.set("x-itx-user-jwt", incomingAuth);
+    headers.set("Authorization", `Bearer ${anonKey}`);
+  } else if (incomingAuth) {
+    headers.set("Authorization", incomingAuth);
   }
   const clientInfo = request.headers.get("x-client-info");
   if (clientInfo) {
@@ -113,7 +123,8 @@ export default {
     const proxiedHeaders = sanitizeRequestHeaders(
       request,
       env.SUPABASE_ANON_KEY,
-      requestId
+      requestId,
+      functionName
     );
     const init: RequestInit = {
       method: request.method,

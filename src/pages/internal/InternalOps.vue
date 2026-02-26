@@ -1,7 +1,6 @@
 <template>
   <div class="page">
     <div class="page-nav-left">
-      <RouterLink class="button-link" to="/super-admin">Back to Super Admin</RouterLink>
       <button type="button" @click="loadSnapshot(true)" :disabled="isLoading">
         {{ isLoading ? "Refreshing..." : "Refresh now" }}
       </button>
@@ -99,7 +98,6 @@
 
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from "vue";
-import { RouterLink } from "vue-router";
 import { getInternalOpsSnapshot, type InternalOpsSnapshot } from "../../services/superOpsService";
 
 const snapshot = ref<InternalOpsSnapshot | null>(null);

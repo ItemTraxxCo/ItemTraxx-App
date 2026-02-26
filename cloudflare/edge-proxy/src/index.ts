@@ -11,6 +11,11 @@ const BASE_CORS_HEADERS = {
   "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
   Vary: "Origin",
 };
+const DEFAULT_ALLOWED_ORIGINS = [
+  "https://itemtraxx.com",
+  "https://www.itemtraxx.com",
+  "https://internal.itemtraxx.com",
+];
 
 const trimTrailingSlash = (value: string) => value.replace(/\/+$/, "");
 
@@ -71,7 +76,9 @@ export default {
     const requestId =
       request.headers.get("x-request-id") ??
       (typeof crypto?.randomUUID === "function" ? crypto.randomUUID() : "itx-edge-request");
-    const allowedOrigins = parseCsv(env.ALLOWED_ORIGINS);
+    const allowedOrigins = Array.from(
+      new Set([...DEFAULT_ALLOWED_ORIGINS, ...parseCsv(env.ALLOWED_ORIGINS)])
+    );
     const { originAllowed, headers } = withCorsHeaders(origin, allowedOrigins);
 
     if (request.method === "OPTIONS") {

@@ -180,12 +180,9 @@ export const invokeEdgeFunction = async <TData = unknown, TBody = unknown>(
     return requestEdgeFunction<TData, TBody>(functionName, options);
   }
 
-  if (
-    first.status === 401 &&
-    isInvalidJwtError({ error: first.error }) &&
-    options.accessToken
-  ) {
+  if (first.status === 401 && options.accessToken) {
     // Retry once with a freshly refreshed session token.
+    // Some upstream paths return generic 401 "Unauthorized" instead of "Invalid JWT".
     const { data, error } = await supabase.auth.refreshSession();
     const refreshedToken = data.session?.access_token;
     if (!error && refreshedToken) {

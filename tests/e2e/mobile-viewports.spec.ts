@@ -10,7 +10,7 @@ test.describe("Mobile viewport coverage", () => {
 
   test("landing CTA buttons stay visible on mobile", async ({ page }) => {
     await page.goto("/");
-    await expect(page.getByRole("link", { name: "Contact Sales" }).first()).toBeVisible();
+    await expect(page.getByRole("link", { name: "Pricing" }).first()).toBeVisible();
     await expect(page.getByRole("link", { name: "Request Demo" }).first()).toBeVisible();
   });
 

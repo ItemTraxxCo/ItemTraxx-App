@@ -4,12 +4,18 @@ import { getAuthState } from "../store/authState";
 
 const ADMIN_VERIFICATION_TTL_MS = 15 * 60 * 1000;
 const SUPER_VERIFICATION_TTL_MS = 15 * 60 * 1000;
+const isInternalHostRuntime = () =>
+  typeof window !== "undefined" &&
+  window.location.hostname === "internal.itemtraxx.com";
 
 const routes: RouteRecordRaw[] = [
   {
     path: "/",
     name: "public-home",
-    component: () => import("../pages/PublicHome.vue"),
+    component: () =>
+      isInternalHostRuntime()
+        ? import("../pages/internal/InternalOps.vue")
+        : import("../pages/PublicHome.vue"),
     meta: { public: true },
   },
   {
@@ -189,8 +195,9 @@ const routes: RouteRecordRaw[] = [
     meta: { public: true },
   },
   {
-    path: "/internal/auth",
+    path: "/auth",
     name: "internal-auth",
+    alias: ["/internal/auth"],
     component: () => import("../pages/super/SuperAuth.vue"),
     meta: { public: true },
   },
@@ -339,8 +346,7 @@ router.beforeEach((to) => {
     requiresSuperAuth?: boolean;
   };
 
-  const isInternalHost =
-    typeof window !== "undefined" && window.location.hostname === "internal.itemtraxx.com";
+  const isInternalHost = isInternalHostRuntime();
 
   if (isInternalHost && to.name === "public-home") {
     const auth = getAuthState();
@@ -353,7 +359,7 @@ router.beforeEach((to) => {
     if (!auth.hasSecondaryAuth || !hasFreshSuperVerification(auth.superVerifiedAt)) {
       return { name: "internal-auth" };
     }
-    return { name: "internal-ops" };
+    return true;
   }
 
   if (meta?.public) return true;

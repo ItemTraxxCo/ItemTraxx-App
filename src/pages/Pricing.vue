@@ -62,10 +62,7 @@
           </ul>
           <p class="onboarding">1st Year Onboarding Fee: Contact for pricing (starts at $1,500.00)</p>
           <p class="enterprise-note">
-            For full enterprise pricing (quote for more than 7 schools) and multi-district scope, contact
-            <a href="mailto:support@itemtraxx.com?subject=Enterprise%20Pricing%20Request%20-%20ItemTraxx">
-              support@itemtraxx.com
-            </a>.
+            For full enterprise pricing (quote for more than 7 schools) and multi-district scope, use the contact sales button above.
           </p>
         </article>
       </section>

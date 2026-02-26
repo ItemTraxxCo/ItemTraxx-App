@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import type { PostgrestError } from "https://esm.sh/@supabase/supabase-js@2";
+import { getRequestId, logError } from "../_shared/observability.ts";
 
 const baseCorsHeaders = {
   "Access-Control-Allow-Headers":
@@ -37,9 +38,20 @@ const isMissingRelation = (error: PostgrestError | null, relation: string) =>
   error.code === "42P01" &&
   error.message.toLowerCase().includes(relation.toLowerCase());
 
+type TenantMetricRow = {
+  tenant_id: string;
+  tenant_name: string;
+  gear_total: number;
+  students_total: number;
+  active_checkouts: number;
+  overdue_items: number;
+  transactions_7d: number;
+  computed_at?: string;
+};
+
 serve(async (req) => {
   const { hasOrigin, originAllowed, headers } = resolveCorsHeaders(req);
-  const requestId = req.headers.get("x-request-id") ?? crypto.randomUUID();
+  const requestId = getRequestId(req);
 
   const jsonResponse = (status: number, body: Record<string, unknown>) =>
     new Response(JSON.stringify(body), {
@@ -189,22 +201,41 @@ serve(async (req) => {
       ? {}
       : Object.fromEntries((runtimeResult.data ?? []).map((item) => [item.key, item.value]));
 
-    const tenantMetrics: Array<{
-      tenant_id: string;
-      tenant_name: string;
-      gear_total: number;
-      students_total: number;
-      active_checkouts: number;
-      overdue_items: number;
-      transactions_7d: number;
-    }> = [];
+    let tenantMetrics: TenantMetricRow[] = [];
+
+    const tenantMetricsResult = await adminClient
+      .from("super_reporting_tenant_metrics")
+      .select(
+        "tenant_id, tenant_name, gear_total, students_total, active_checkouts, overdue_items, transactions_7d, computed_at"
+      )
+      .order("tenant_name", { ascending: true });
+    if (!tenantMetricsResult.error) {
+      tenantMetrics = (tenantMetricsResult.data ?? []) as TenantMetricRow[];
+    } else if (
+      !isMissingRelation(tenantMetricsResult.error, "super_reporting_tenant_metrics")
+    ) {
+      logError(
+        "super-dashboard tenant metrics query failed",
+        requestId,
+        tenantMetricsResult.error
+      );
+    }
 
     const alerts: Array<{ id: string; name: string; metric_key: string; threshold: number; current: number; severity: "warn" | "critical" }> = [];
     const aggregate = {
       suspended_tenants: suspendedTenants,
-      overdue_items: 0,
-      active_checkouts: 0,
-      transactions_7d: 0,
+      overdue_items: tenantMetrics.reduce(
+        (acc, metric) => acc + Number(metric.overdue_items ?? 0),
+        0
+      ),
+      active_checkouts: tenantMetrics.reduce(
+        (acc, metric) => acc + Number(metric.active_checkouts ?? 0),
+        0
+      ),
+      transactions_7d: tenantMetrics.reduce(
+        (acc, metric) => acc + Number(metric.transactions_7d ?? 0),
+        0
+      ),
     };
 
     if (!alertRulesResult.error) {
@@ -238,11 +269,7 @@ serve(async (req) => {
       },
     });
   } catch (error) {
-    console.error("super-dashboard function error", {
-      request_id: requestId,
-      message: error instanceof Error ? error.message : "Unknown error",
-      stack: error instanceof Error ? error.stack : undefined,
-    });
+    logError("super-dashboard function error", requestId, error);
     return jsonResponse(500, { error: "Request failed" });
   }
 });

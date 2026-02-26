@@ -1,0 +1,28 @@
+name: Async Job Worker
+
+permissions:
+  contents: read
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "*/10 * * * *"
+
+jobs:
+  process-jobs:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Process async jobs
+        env:
+          ITX_JOB_WORKER_SECRET: ${{ secrets.ITX_JOB_WORKER_SECRET }}
+        run: |
+          set -euo pipefail
+          curl -fsS \
+            -X POST "https://itemtraxx-edge-proxy.itemtraxx-co.workers.dev/functions/job-worker" \
+            -H "Origin: https://itemtraxx.com" \
+            -H "Authorization: Bearer ${ITX_JOB_WORKER_SECRET}" \
+            -H "Content-Type: application/json" \
+            --data '{"limit": 30, "run_reporting_refresh": true}' \
+            | head -c 500

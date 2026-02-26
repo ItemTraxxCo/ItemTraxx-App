@@ -9,6 +9,7 @@ type EdgeFunctionResult<TData> = {
   status: number;
   data: TData | null;
   error: string;
+  requestId?: string;
 };
 import { supabase } from "./supabaseClient";
 import { clearAdminVerification, clearAuthState } from "../store/authState";
@@ -120,6 +121,7 @@ const requestEdgeFunction = async <TData = unknown, TBody = unknown>(
     }
 
     const payload = parsed as { error?: string; message?: string } | null;
+    const requestId = response.headers.get("x-request-id") ?? headers["x-request-id"];
 
     if (!response.ok) {
       if (isTenantDisabledError(payload)) {
@@ -132,6 +134,7 @@ const requestEdgeFunction = async <TData = unknown, TBody = unknown>(
         status: response.status,
         data: null,
         error: payload?.error || payload?.message || "Request failed.",
+        requestId,
       };
     }
 
@@ -140,6 +143,7 @@ const requestEdgeFunction = async <TData = unknown, TBody = unknown>(
       status: response.status,
       data: (parsed as TData) ?? null,
       error: "",
+      requestId,
     };
   } catch (error) {
     if (error instanceof DOMException && error.name === "AbortError") {
@@ -148,6 +152,7 @@ const requestEdgeFunction = async <TData = unknown, TBody = unknown>(
         status: 0,
         data: null,
         error: "Request timed out. Please try again.",
+        requestId: headers["x-request-id"],
       };
     }
     return {
@@ -155,6 +160,7 @@ const requestEdgeFunction = async <TData = unknown, TBody = unknown>(
       status: 0,
       data: null,
       error: "Network request failed.",
+      requestId: headers["x-request-id"],
     };
   }
 };

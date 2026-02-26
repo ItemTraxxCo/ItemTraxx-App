@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { getRequestId, logError, logInfo } from "../_shared/observability.ts";
 
 const baseCorsHeaders = {
   "Access-Control-Allow-Headers":
@@ -103,27 +104,9 @@ const verifyTurnstileToken = async (
   return !!result.success;
 };
 
-const sendResendEmail = async (
-  apiKey: string,
-  payload: Record<string, unknown>
-) => {
-  const response = await fetch("https://api.resend.com/emails", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(payload),
-  });
-  if (!response.ok) {
-    const text = await response.text().catch(() => "");
-    throw new Error(`Email send failed: ${response.status} ${text}`);
-  }
-};
-
 serve(async (req) => {
   const { hasOrigin, originAllowed, headers } = resolveCorsHeaders(req);
-  const requestId = req.headers.get("x-request-id") ?? crypto.randomUUID();
+  const requestId = getRequestId(req);
 
   const jsonResponse = (status: number, body: Record<string, unknown>) =>
     new Response(JSON.stringify({ ok: status < 400, ...body }), {
@@ -157,14 +140,13 @@ serve(async (req) => {
     const turnstileSecret =
       Deno.env.get("ITX_TURNSTILE_SECRET") ??
       Deno.env.get("ITX_TURNSTILE_SECRET_KEY");
-    const resendApiKey = Deno.env.get("ITX_RESEND_API_KEY");
     const supportEmail = Deno.env.get("ITX_SUPPORT_EMAIL") ?? "support@itemtraxx.com";
     const fromEmail =
       Deno.env.get("ITX_EMAIL_FROM") ??
       Deno.env.get("ITX_RESEND_FROM") ??
       "ItemTraxx Sales <support@itemtraxx.com>";
 
-    if (!supabaseUrl || !publishableKey || !serviceKey || !turnstileSecret || !resendApiKey) {
+    if (!supabaseUrl || !publishableKey || !serviceKey || !turnstileSecret) {
       return jsonResponse(500, { error: "Server misconfiguration." });
     }
 
@@ -257,30 +239,32 @@ serve(async (req) => {
       return jsonResponse(400, { error: "Unable to save sales request." });
     }
 
-    const enterpriseLine =
-      plan === "enterprise" ? `\nNumber of schools: ${schoolsCount}` : "";
-    await sendResendEmail(resendApiKey, {
-      from: fromEmail,
-      to: [supportEmail],
-      subject: `Contact Sales Request - ${organization}`,
-      reply_to: replyEmail,
-      text: `A new sales request was submitted.\n\nPlan: ${planLabel}\nName: ${name}\nOrganization: ${organization}\nReply email: ${replyEmail}${enterpriseLine}\n\nDetails:\n${details || "(none provided)"}\n\nLead ID: ${lead.id}`,
+    const { error: enqueueError } = await adminClient.rpc("enqueue_async_job", {
+      p_job_type: "contact_sales_email",
+      p_payload: {
+        lead_id: lead.id,
+        plan_label: planLabel,
+        plan_key: plan,
+        schools_count: plan === "enterprise" ? schoolsCount : null,
+        name,
+        organization,
+        reply_email: replyEmail,
+        details: details || null,
+        support_email: supportEmail,
+        from_email: fromEmail,
+      },
+      p_priority: 25,
+      p_max_attempts: 5,
     });
+    if (enqueueError) {
+      logError("contact-sales-submit enqueue failed", requestId, enqueueError);
+      return jsonResponse(500, { error: "Unable to queue follow-up email." });
+    }
 
-    await sendResendEmail(resendApiKey, {
-      from: fromEmail,
-      to: [replyEmail],
-      subject: "We received your ItemTraxx sales request.",
-      text: `Hi ${name},\n\nThanks for contacting the ItemTraxx Sales Team. We've received your request and will follow up with a quote for your selected plan within 2 business days.\n\nRequest summary:\nPlan: ${planLabel}${enterpriseLine}\nOrganization: ${organization}\n\nIf you need to add anything else, feel free to reply to this email.\nHave a great day,\n\n- ItemTraxx Sales\n${supportEmail}\n\nIf you don't hear from us within 2 business days, please check your spam folder or contact us at ${supportEmail}`,
-    });
-
+    logInfo("contact-sales-submit accepted", requestId, { lead_id: lead.id, plan });
     return jsonResponse(200, { data: { lead_id: lead.id } });
   } catch (error) {
-    console.error("contact-sales-submit error", {
-      request_id: requestId,
-      message: error instanceof Error ? error.message : "Unknown error",
-      stack: error instanceof Error ? error.stack : undefined,
-    });
+    logError("contact-sales-submit error", requestId, error);
     return jsonResponse(500, { error: "Request failed." });
   }
 });

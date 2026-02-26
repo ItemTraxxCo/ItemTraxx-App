@@ -117,6 +117,54 @@ export type InternalOpsSnapshot = {
     invoice_sent: number;
     invoice_paid: number;
   };
+  lead_funnel: {
+    waiting_for_quote: number;
+    quote_generated: number;
+    quote_sent: number;
+    quote_converted_to_invoice: number;
+    invoice_sent: number;
+    invoice_paid: number;
+  };
+  traffic_by_hour: Array<{
+    hour: string;
+    checkout: number;
+    return: number;
+  }>;
+  sla: {
+    median_latency_ms: number | null;
+    p95_latency_ms: number | null;
+    error_rate_percent: number;
+    probe_latency_ms: number | null;
+  };
+  needs_attention: Array<{
+    key: string;
+    level: "high" | "medium" | "low";
+    title: string;
+    count: number;
+    route: string;
+  }>;
+  customer_health: {
+    total_customers: number;
+    awaiting_payment: number;
+    canceling: number;
+    paid_late: number;
+    paid_on_time: number;
+    no_status: number;
+  };
+  recent_audit: Array<{
+    id: string;
+    actor_email: string | null;
+    action_type: string;
+    target_type: string | null;
+    target_id: string | null;
+    created_at: string;
+  }>;
+  search_index: Array<{
+    id: string;
+    label: string;
+    type: "page" | "tenant" | "customer" | "lead";
+    route: string;
+  }>;
   runtime: Record<string, unknown>;
   recent_events: InternalOpsEvent[];
 };

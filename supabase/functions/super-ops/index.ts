@@ -61,30 +61,32 @@ serve(async (req) => {
     // Prefer ITX_* secrets, but fall back to Supabase default injected env vars.
     const supabaseUrl =
       Deno.env.get("ITX_SUPABASE_URL") ?? Deno.env.get("SUPABASE_URL");
-    const publishableKey =
-      Deno.env.get("ITX_PUBLISHABLE_KEY") ?? Deno.env.get("SUPABASE_ANON_KEY");
     const serviceKey =
       Deno.env.get("ITX_SECRET_KEY") ?? Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 
-    if (!supabaseUrl || !publishableKey || !serviceKey) {
+    if (!supabaseUrl || !serviceKey) {
       return jsonResponse(500, { error: "Server misconfiguration" });
     }
 
-    const userClient = createClient(supabaseUrl, publishableKey, {
-      global: { headers: { Authorization: authHeader } },
+    const adminClient = createClient(supabaseUrl, serviceKey, {
       auth: { persistSession: false },
     });
+
+    const accessToken = authHeader.replace(/^Bearer\s+/i, "").trim();
+    if (!accessToken) {
+      return jsonResponse(401, { error: "Unauthorized" });
+    }
 
     const {
       data: { user },
       error: authError,
-    } = await userClient.auth.getUser();
+    } = await adminClient.auth.getUser(accessToken);
 
     if (authError || !user) {
       return jsonResponse(401, { error: "Unauthorized" });
     }
 
-    const { data: profile, error: profileError } = await userClient
+    const { data: profile, error: profileError } = await adminClient
       .from("profiles")
       .select("role, auth_email")
       .eq("id", user.id)
@@ -93,10 +95,6 @@ serve(async (req) => {
     if (profileError || profile?.role !== "super_admin") {
       return jsonResponse(403, { error: "Access denied" });
     }
-
-    const adminClient = createClient(supabaseUrl, serviceKey, {
-      auth: { persistSession: false },
-    });
 
     const { data: rateLimit, error: rateLimitError } = await adminClient.rpc(
       "consume_rate_limit",

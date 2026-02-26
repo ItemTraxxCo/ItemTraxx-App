@@ -188,27 +188,5 @@ export const invokeEdgeFunction = async <TData = unknown, TBody = unknown>(
     }
   }
 
-  // If proxy still rejects super-admin calls after refresh, retry direct Supabase endpoint once.
-  // This isolates worker header/forwarding mismatches without breaking tenant/admin flows.
-  const usingProxy = !!(import.meta.env.VITE_EDGE_PROXY_URL as string | undefined)?.trim();
-  if (
-    usingProxy &&
-    functionName.startsWith("super-") &&
-    current.status === 401
-  ) {
-    const directBaseUrl = getDirectFunctionsBaseUrl();
-    if (directBaseUrl) {
-      const refreshed = await supabase.auth.refreshSession();
-      const fallbackToken =
-        refreshed.data.session?.access_token ?? options.accessToken;
-      return requestEdgeFunction<TData, TBody>(
-        functionName,
-        options,
-        fallbackToken,
-        directBaseUrl
-      );
-    }
-  }
-
   return current;
 };

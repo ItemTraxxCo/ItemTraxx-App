@@ -198,7 +198,7 @@ const routes: RouteRecordRaw[] = [
     path: "/auth",
     name: "internal-auth",
     alias: ["/internal/auth"],
-    component: () => import("../pages/super/SuperAuth.vue"),
+    component: () => import("../pages/internal/InternalAuth.vue"),
     meta: { public: true },
   },
   {

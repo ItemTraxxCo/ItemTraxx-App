@@ -26,6 +26,7 @@
         <article class="card plan-card">
           <h2>ItemTraxx Core Plan</h2>
           <p class="price">$1,250.00<span>/year</span></p>
+          <p class="price-note">Listed price excludes the 1st year onboarding fee.</p>
           <ul>
             <li>Up to 3 schools within the district</li>
             <li>Unlimited staff accounts</li>
@@ -39,6 +40,7 @@
         <article class="card plan-card plan-highlight">
           <h2>ItemTraxx Growth Plan</h2>
           <p class="price">$3,500.00<span>/year</span></p>
+          <p class="price-note">Listed price excludes the 1st year onboarding fee.</p>
           <ul>
             <li>Up to 6 schools within the district</li>
             <li>Unlimited staff accounts</li>
@@ -125,16 +127,27 @@ import { RouterLink } from "vue-router";
 <style scoped>
 .pricing-shell {
   min-height: 100vh;
-  margin: -2.5rem -2rem -3rem;
+  width: 100vw;
+  max-width: none;
+  position: relative;
+  left: 50%;
+  right: 50%;
+  margin-left: -50vw;
+  margin-right: -50vw;
+  margin-top: -2.5rem;
+  margin-bottom: -3rem;
   padding: 2.1rem 0 3.2rem;
   background: linear-gradient(180deg, #1f4ca3 0%, #38d0b1 100%);
   color: #ffffff;
-  position: relative;
-  overflow: hidden;
+  overflow-x: clip;
+  overflow-y: hidden;
 }
 
 .pricing-page {
   max-width: 1140px;
+  width: 100%;
+  box-sizing: border-box;
+  padding-inline: clamp(1.1rem, 3vw, 1.75rem);
   position: relative;
   z-index: 2;
 }
@@ -271,6 +284,12 @@ import { RouterLink } from "vue-router";
   color: rgba(7, 23, 43, 0.82);
 }
 
+.price-note {
+  margin: 0 0 0.8rem;
+  font-size: 0.84rem;
+  color: rgba(7, 23, 43, 0.72);
+}
+
 .plan-card ul {
   margin: 0;
   padding-left: 1.1rem;
@@ -355,8 +374,13 @@ import { RouterLink } from "vue-router";
 
 @media (max-width: 980px) {
   .pricing-shell {
-    margin: -2rem -1.2rem -2.4rem;
+    margin-top: -2.5rem;
+    margin-bottom: -3rem;
     padding: 1.6rem 0 2.6rem;
+  }
+
+  .pricing-page {
+    padding-inline: 1.1rem;
   }
 
   .plan-grid {

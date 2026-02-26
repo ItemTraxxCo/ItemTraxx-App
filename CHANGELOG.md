@@ -222,6 +222,18 @@ This project adheres to **Semantic Versioning** where possible.
 
 - Completed UI refinement pass for super-admin Sales Leads table/modal density and readability.
 - Added lead-state filtering and workflow ergonomics to keep open/closed/customer-converted pipelines clean.
+- Fixed CI regressions on preview:
+  - patched high-severity Rollup advisory by moving to secure `rollup@4.59.0`
+  - updated mobile E2E landing assertion from old "Contact Sales" CTA to current "Pricing" CTA
+- Improved mobile pricing page rendering:
+  - removed side gutters/white borders with full-bleed layout adjustments
+  - fixed right-edge tile overflow on small viewports
+  - added consistent horizontal content padding for pricing tiles/text
+- Added pricing clarity copy under Core and Growth plan prices:
+  - "Listed price excludes the 1st year onboarding fee."
+- Refreshed lockfile dependency set after local update run:
+  - Supabase JS family updates (`@supabase/*` 2.97.x -> 2.98.0)
+  - `@types/node` update to latest patch release in lockfile
 
 ---
 

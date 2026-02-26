@@ -58,9 +58,13 @@ serve(async (req) => {
       return jsonResponse(401, { error: "Unauthorized" });
     }
 
-    const supabaseUrl = Deno.env.get("ITX_SUPABASE_URL");
-    const publishableKey = Deno.env.get("ITX_PUBLISHABLE_KEY");
-    const serviceKey = Deno.env.get("ITX_SECRET_KEY");
+    // Prefer ITX_* secrets, but fall back to Supabase default injected env vars.
+    const supabaseUrl =
+      Deno.env.get("ITX_SUPABASE_URL") ?? Deno.env.get("SUPABASE_URL");
+    const publishableKey =
+      Deno.env.get("ITX_PUBLISHABLE_KEY") ?? Deno.env.get("SUPABASE_ANON_KEY");
+    const serviceKey =
+      Deno.env.get("ITX_SECRET_KEY") ?? Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 
     if (!supabaseUrl || !publishableKey || !serviceKey) {
       return jsonResponse(500, { error: "Server misconfiguration" });

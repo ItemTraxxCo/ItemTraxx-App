@@ -1,0 +1,21 @@
+name: Synthetic Journeys
+
+permissions:
+  contents: read
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0,30 * * * *"
+
+jobs:
+  synthetic-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Run production synthetic smoke checks
+        run: bash ./scripts/synthetic-smoke.sh

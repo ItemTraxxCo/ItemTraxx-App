@@ -65,10 +65,10 @@ const sanitizeRequestHeaders = (
   headers.set("Content-Type", request.headers.get("Content-Type") ?? "application/json");
   const incomingAuth = request.headers.get("Authorization");
   if (functionName === "super-ops" && incomingAuth) {
-    // Route super-ops user JWT through a custom header and keep gateway auth bound to anon key.
-    // This avoids gateway-level JWT validation mismatches while function validates token explicitly.
+    // Preserve the user JWT for Supabase gateway verification and also forward it in a custom
+    // header so the function can explicitly validate and inspect the same token.
     headers.set("x-itx-user-jwt", incomingAuth);
-    headers.set("Authorization", `Bearer ${anonKey}`);
+    headers.set("Authorization", incomingAuth);
   } else if (incomingAuth) {
     headers.set("Authorization", incomingAuth);
   }

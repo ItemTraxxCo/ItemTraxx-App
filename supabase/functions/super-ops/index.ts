@@ -689,6 +689,149 @@ serve(async (req) => {
       return jsonResponse(200, { data: { entry: data } });
     }
 
+    if (action === "get_internal_ops_snapshot") {
+      const nowIso = new Date().toISOString();
+      const since15mIso = new Date(Date.now() - 15 * 60 * 1000).toISOString();
+      const since24hIso = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+
+      const [
+        recentLogsResult,
+        queueRowsResult,
+        leadsResult,
+        runtimeConfigResult,
+      ] = await Promise.all([
+        adminClient
+          .from("gear_logs")
+          .select("tenant_id, gear_id, checked_out_by, action_type, action_time")
+          .in("action_type", ["checkout", "return"])
+          .gte("action_time", since24hIso)
+          .order("action_time", { ascending: false })
+          .limit(400),
+        adminClient
+          .from("async_jobs")
+          .select("status, created_at")
+          .order("created_at", { ascending: false })
+          .limit(500),
+        adminClient
+          .from("sales_leads")
+          .select("id, lead_state, stage, created_at")
+          .order("created_at", { ascending: false })
+          .limit(500),
+        adminClient
+          .from("app_runtime_config")
+          .select("key, value")
+          .in("key", ["maintenance_mode", "broadcast_message"]),
+      ]);
+
+      if (recentLogsResult.error) {
+        return jsonResponse(400, { error: "Unable to load recent traffic logs." });
+      }
+      if (queueRowsResult.error) {
+        return jsonResponse(400, { error: "Unable to load async jobs." });
+      }
+      if (leadsResult.error) {
+        return jsonResponse(400, { error: "Unable to load lead metrics." });
+      }
+
+      const recentLogs = recentLogsResult.data ?? [];
+      const logs15m = recentLogs.filter((row) => row.action_time >= since15mIso);
+      const checkout15m = logs15m.filter((row) => row.action_type === "checkout").length;
+      const return15m = logs15m.filter((row) => row.action_type === "return").length;
+      const activeTenants15m = new Set(logs15m.map((row) => row.tenant_id)).size;
+
+      const queueRows = queueRowsResult.data ?? [];
+      const queueSummary = {
+        queued: queueRows.filter((row) => row.status === "queued").length,
+        processing: queueRows.filter((row) => row.status === "processing").length,
+        completed: queueRows.filter((row) => row.status === "completed").length,
+        failed: queueRows.filter((row) => row.status === "failed").length,
+      };
+
+      const leads = leadsResult.data ?? [];
+      const leadSummary = {
+        open: leads.filter((row) => row.lead_state === "open").length,
+        closed: leads.filter((row) => row.lead_state === "closed").length,
+        converted: leads.filter((row) => row.lead_state === "converted_to_customer").length,
+        waiting_for_quote: leads.filter((row) => row.stage === "waiting_for_quote").length,
+        quote_sent: leads.filter((row) => row.stage === "quote_sent").length,
+        invoice_sent: leads.filter((row) => row.stage === "invoice_sent").length,
+        invoice_paid: leads.filter((row) => row.stage === "invoice_paid").length,
+      };
+
+      const tenantIds = Array.from(
+        new Set(recentLogs.map((row) => row.tenant_id).filter((value): value is string => !!value))
+      );
+      const gearIds = Array.from(
+        new Set(recentLogs.map((row) => row.gear_id).filter((value): value is string => !!value))
+      );
+      const studentIds = Array.from(
+        new Set(recentLogs.map((row) => row.checked_out_by).filter((value): value is string => !!value))
+      );
+
+      const [tenantRowsResult, gearRowsResult, studentRowsResult] = await Promise.all([
+        tenantIds.length
+          ? adminClient.from("tenants").select("id, name").in("id", tenantIds)
+          : Promise.resolve({ data: [], error: null }),
+        gearIds.length
+          ? adminClient.from("gear").select("id, name, barcode").in("id", gearIds)
+          : Promise.resolve({ data: [], error: null }),
+        studentIds.length
+          ? adminClient.from("students").select("id, username, student_id").in("id", studentIds)
+          : Promise.resolve({ data: [], error: null }),
+      ]);
+
+      const tenantMap = new Map(
+        (tenantRowsResult.data ?? []).map((tenant) => [tenant.id as string, tenant.name as string])
+      );
+      const gearMap = new Map(
+        (gearRowsResult.data ?? []).map((gear) => [
+          gear.id as string,
+          { name: gear.name as string | null, barcode: gear.barcode as string | null },
+        ])
+      );
+      const studentMap = new Map(
+        (studentRowsResult.data ?? []).map((student) => [
+          student.id as string,
+          { username: student.username as string | null, student_id: student.student_id as string | null },
+        ])
+      );
+
+      const recentEvents = recentLogs.slice(0, 40).map((row) => {
+        const gear = row.gear_id ? gearMap.get(row.gear_id) : null;
+        const student = row.checked_out_by ? studentMap.get(row.checked_out_by) : null;
+        return {
+          tenant_id: row.tenant_id,
+          tenant_name: row.tenant_id ? tenantMap.get(row.tenant_id) ?? "Unknown tenant" : "Unknown tenant",
+          action_type: row.action_type,
+          action_time: row.action_time,
+          gear_name: gear?.name ?? null,
+          gear_barcode: gear?.barcode ?? null,
+          student_username: student?.username ?? null,
+          student_id: student?.student_id ?? null,
+        };
+      });
+
+      const runtimeConfig = Object.fromEntries(
+        (runtimeConfigResult.data ?? []).map((item) => [item.key, item.value])
+      );
+
+      return jsonResponse(200, {
+        data: {
+          checked_at: nowIso,
+          traffic: {
+            checkout_15m: checkout15m,
+            return_15m: return15m,
+            active_tenants_15m: activeTenants15m,
+            events_24h: recentLogs.length,
+          },
+          queue: queueSummary,
+          leads: leadSummary,
+          runtime: runtimeConfig,
+          recent_events: recentEvents,
+        },
+      });
+    }
+
     return jsonResponse(400, { error: "Invalid action" });
   } catch (error) {
     console.error("super-ops function error", {

@@ -272,7 +272,15 @@ const showMaintenanceOverlay = computed(() => {
   if (isLocalDevMaintenanceBypass.value) return false;
   if (!maintenanceEnabled.value) return false;
   const routeName = String(route.name || "");
-  if (routeName === "public-home" || routeName === "not-found" || routeName === "super-auth") {
+  if (
+    routeName === "public-home" ||
+    routeName === "not-found" ||
+    routeName === "super-auth" ||
+    routeName === "internal-auth"
+  ) {
+    return false;
+  }
+  if (routeName.startsWith("internal-")) {
     return false;
   }
   return !routeName.startsWith("super-admin-");

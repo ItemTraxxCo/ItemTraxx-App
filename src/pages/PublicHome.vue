@@ -33,13 +33,13 @@
           Closed beta now live. Contact us to get early access and start mastering your inventory with ItemTraxx's streamlined checkout, returns, and admin management.
         </p>
         <div class="hero-actions">
-          <a
+          <RouterLink
             class="hero-button hero-button-dark"
-            href="mailto:support@itemtraxx.com"
-            @click="trackCta('contact_sales', 'hero')"
+            to="/pricing"
+            @click="trackCta('view_pricing', 'hero')"
           >
-            Contact Sales
-          </a>
+            Pricing
+          </RouterLink>
           <a
             class="hero-button hero-button-light"
             href="mailto:support@itemtraxx.com?subject=Request%20Demo%20-%20ItemTraxx"
@@ -237,13 +237,13 @@
           >
             Go to Login
           </RouterLink>
-          <a
+          <RouterLink
             class="hero-button hero-button-light"
-            href="mailto:support@itemtraxx.com"
-            @click="trackCta('contact_sales', 'final_cta')"
+            to="/pricing"
+            @click="trackCta('view_pricing', 'final_cta')"
           >
-            Contact Sales
-          </a>
+            Pricing
+          </RouterLink>
         </div>
       </section>
     </main>
@@ -329,7 +329,7 @@ const toggleFaq = (index: number) => {
 };
 
 const trackCta = (
-  cta: "contact_sales" | "request_demo" | "go_to_login",
+  cta: "view_pricing" | "request_demo" | "go_to_login",
   location: "hero" | "final_cta",
 ) => {
   track("landing_cta_click", { cta, location });

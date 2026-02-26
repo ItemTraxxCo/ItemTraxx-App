@@ -31,6 +31,18 @@ const routes: RouteRecordRaw[] = [
     meta: { public: true },
   },
   {
+    path: "/pricing",
+    name: "public-pricing",
+    component: () => import("../pages/Pricing.vue"),
+    meta: { public: true },
+  },
+  {
+    path: "/contact-sales",
+    name: "public-contact-sales",
+    component: () => import("../pages/ContactSales.vue"),
+    meta: { public: true },
+  },
+  {
     path: "/tenant",
     name: "tenant-home",
     redirect: "/tenant/checkout",
@@ -240,6 +252,26 @@ const routes: RouteRecordRaw[] = [
     path: "/super-admin/broadcasts",
     name: "super-admin-broadcasts",
     component: () => import("../pages/super/Broadcasts.vue"),
+    meta: {
+      requiresSession: true,
+      requiresRole: "super_admin",
+      requiresSuperAuth: true,
+    },
+  },
+  {
+    path: "/super-admin/sales-leads",
+    name: "super-admin-sales-leads",
+    component: () => import("../pages/super/SalesLeads.vue"),
+    meta: {
+      requiresSession: true,
+      requiresRole: "super_admin",
+      requiresSuperAuth: true,
+    },
+  },
+  {
+    path: "/super-admin/customers",
+    name: "super-admin-customers",
+    component: () => import("../pages/super/Customers.vue"),
     meta: {
       requiresSession: true,
       requiresRole: "super_admin",

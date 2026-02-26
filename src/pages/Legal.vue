@@ -142,8 +142,25 @@
             terms unless canceled before the renewal date under the applicable cancellation window.
           </li>
           <li>
+            <strong>Renewal cycle and payment terms:</strong> Plans renew annually. Unless
+            otherwise agreed in writing, invoice payment terms are Net 15.
+          </li>
+          <li>
             <strong>Late payment:</strong> ItemTraxx Co may suspend or restrict service access for
             overdue balances and may apply lawful late fees or collection costs where permitted. Suspension for non payment does not relieve the customer of payment obligations.
+          </li>
+          <li>
+            <strong>All plans cancellation policy:</strong> Cancellation stops renewal and no refund
+            is provided for unused time. Service remains active through the end of the current
+            billing cycle. After the final billing cycle ends, customer data is archived for one
+            (1) year, then permanently deleted from ItemTraxx systems.
+          </li>
+          <li>
+            <strong>Between-plan movement protocol:</strong> Plan upgrades are allowed at any time
+            and billing is prorated for the remainder of the current billing cycle. Plan
+            downgrades are also allowed at any time; credit is issued for the unused portion of
+            the current billing cycle, and downgraded plan limits and restrictions take effect at
+            the start of the next billing cycle.
           </li>
         </ul>
       </section>
@@ -154,9 +171,10 @@
           Violations of this policy may result in account restriction, tenant suspension, or
           termination of service access. Upon termination, all license rights end immediately. 
           Either party may terminate the subscription at the end of the applicable subscription 
-          term in accordance with the agreed cancellation window. Upon termination, customer 
-          data will be retained for a reasonable period to allow export, after which it may 
-          be deleted in accordance with ItemTraxx Co data retention practices.
+          term in accordance with the agreed cancellation window. Upon termination, customer data
+          will be archived for one (1) year to allow export and records handling, after which it
+          will be permanently deleted in accordance with ItemTraxx Co data retention practices. To
+          export archived data, contact <a href="mailto:support@itemtraxx.com">support@itemtraxx.com</a>.
 
 
         </p>
@@ -192,6 +210,11 @@
         <p>
           ItemTraxx Co may revise this legal document from time to time. Continued use of the
           service after updates means you accept the revised terms.
+        </p>
+        <p>
+          For material changes that affect pricing, renewal terms, or core subscription rights,
+          ItemTraxx Co will provide at least thirty (30) days notice before such changes take
+          effect for the next renewal term.
         </p>
       </section>
 

@@ -1,6 +1,6 @@
 # Changelog
 
-Last updated (year-month-day): 2026-02-23
+Last updated (year-month-day): 2026-02-26
 
 All notable changes to **ItemTraxx** will be documented in this file. This includes new features, improvements, bug fixes, and other updates.
 
@@ -173,6 +173,55 @@ This project adheres to **Semantic Versioning** where possible.
   - CI image-budget checks plus deterministic bundle-budget checks
   - runtime perf telemetry capture for route/navigation timing
 - Removed `zod` from the client input sanitizer path and replaced with lightweight native validation checks to reduce frontend overhead.
+
+---
+
+### 2/24/2026 Development Update
+
+- Fixed edge CORS header behavior for stricter request compatibility.
+- Added localhost/private-network maintenance bypass behavior for development environments.
+- Added tenant-admin device session controls:
+  - active device listing in tenant settings
+  - revoke selected device
+  - revoke all other devices
+  - server-enforced session validation/touch checks
+  - automatic tenant-admin re-auth redirect when a device session is revoked
+- Added SQL support for tenant admin session persistence and indexing.
+
+---
+
+### 2/25/2026 Development Update
+
+- Added public pricing experience:
+  - new `/pricing` route/page
+  - landing page CTA update from Contact Sales to Pricing
+  - pricing FAQ and onboarding/billing detail sections
+  - legal-policy link integrations
+- Added public contact-sales workflow:
+  - new `/contact-sales` route/page with required lead fields
+  - enterprise-specific schools input
+  - anti-spam protections (Turnstile + honeypot + server-side rate limit)
+  - support inbox delivery + requester auto-reply
+- Added `contact-sales-submit` edge function and Cloudflare allowlist update.
+- Added sales data model and governance SQL:
+  - `sales_leads` lifecycle fields and constraints
+  - `customer_status_logs` invoice/payment tracking table
+  - RLS policies and indexes
+- Expanded super-admin sales operations:
+  - Sales Leads page with staged workflow controls
+  - close-lead and move-to-customers actions
+  - Customers page with latest status rollup
+  - per-invoice status history entries (`paid_on_time`, `paid_late`, `awaiting_payment`, `canceling`)
+  - lead/customer detail modals and action tooling
+- Added super-admin navigation links for Sales Leads and Customers across super pages.
+- Added support in contact-sales function for existing secret naming (`ITX_TURNSTILE_SECRET`, `ITX_EMAIL_FROM`) with fallback compatibility.
+
+---
+
+### 2/26/2026 Development Update
+
+- Completed UI refinement pass for super-admin Sales Leads table/modal density and readability.
+- Added lead-state filtering and workflow ergonomics to keep open/closed/customer-converted pipelines clean.
 
 ---
 

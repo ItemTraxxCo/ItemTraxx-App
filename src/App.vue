@@ -227,7 +227,9 @@ const GITHUB_HEAD_COMMIT_API =
 const themeLabel = computed(() =>
   theme.value === "dark" ? "Light Mode" : "Dark Mode"
 );
-const showTopMenu = computed(() => route.name !== "public-home");
+const showTopMenu = computed(
+  () => route.name !== "public-home" && route.name !== "public-pricing"
+);
 const isLocalDevMaintenanceBypass = computed(() => {
   if (import.meta.env.DEV !== true) return false;
   if ((import.meta.env.VITE_DEV_MAINTENANCE_BYPASS ?? "true") !== "true") return false;

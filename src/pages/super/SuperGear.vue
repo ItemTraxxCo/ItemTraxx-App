@@ -6,6 +6,8 @@
       <RouterLink class="button-link" to="/super-admin/students">All Students</RouterLink>
       <RouterLink class="button-link" to="/super-admin/logs">All Logs</RouterLink>
       <RouterLink class="button-link" to="/super-admin/broadcasts">Broadcasts</RouterLink>
+      <RouterLink class="button-link" to="/super-admin/sales-leads">Sales Leads</RouterLink>
+      <RouterLink class="button-link" to="/super-admin/customers">Customers</RouterLink>
     </div>
 
     <h1>All Items</h1>

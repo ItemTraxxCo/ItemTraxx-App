@@ -39,6 +39,7 @@
       <RouterLink class="button-link" to="/super-admin/broadcasts">Broadcasts</RouterLink>
       <RouterLink class="button-link" to="/super-admin/sales-leads">Sales Leads</RouterLink>
       <RouterLink class="button-link" to="/super-admin/customers">Customers</RouterLink>
+      <RouterLink class="button-link" to="/internal">Internal Ops</RouterLink>
     </nav>
 
     <div class="card">

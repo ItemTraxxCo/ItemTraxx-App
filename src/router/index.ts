@@ -4,12 +4,18 @@ import { getAuthState } from "../store/authState";
 
 const ADMIN_VERIFICATION_TTL_MS = 15 * 60 * 1000;
 const SUPER_VERIFICATION_TTL_MS = 15 * 60 * 1000;
+const isInternalHostRuntime = () =>
+  typeof window !== "undefined" &&
+  window.location.hostname === "internal.itemtraxx.com";
 
 const routes: RouteRecordRaw[] = [
   {
     path: "/",
     name: "public-home",
-    component: () => import("../pages/PublicHome.vue"),
+    component: () =>
+      isInternalHostRuntime()
+        ? import("../pages/internal/InternalOps.vue")
+        : import("../pages/PublicHome.vue"),
     meta: { public: true },
   },
   {
@@ -189,6 +195,23 @@ const routes: RouteRecordRaw[] = [
     meta: { public: true },
   },
   {
+    path: "/auth",
+    name: "internal-auth",
+    alias: ["/internal/auth"],
+    component: () => import("../pages/super/SuperAuth.vue"),
+    meta: { public: true },
+  },
+  {
+    path: "/internal",
+    name: "internal-ops",
+    component: () => import("../pages/internal/InternalOps.vue"),
+    meta: {
+      requiresSession: true,
+      requiresRole: "super_admin",
+      requiresSuperAuth: true,
+    },
+  },
+  {
     path: "/super-admin",
     name: "super-admin-home",
     component: () => import("../pages/super/SuperAdminHome.vue"),
@@ -323,6 +346,22 @@ router.beforeEach((to) => {
     requiresSuperAuth?: boolean;
   };
 
+  const isInternalHost = isInternalHostRuntime();
+
+  if (isInternalHost && to.name === "public-home") {
+    const auth = getAuthState();
+    if (!auth.isInitialized) {
+      return false;
+    }
+    if (!auth.isAuthenticated || auth.role !== "super_admin") {
+      return { name: "internal-auth" };
+    }
+    if (!auth.hasSecondaryAuth || !hasFreshSuperVerification(auth.superVerifiedAt)) {
+      return { name: "internal-auth" };
+    }
+    return true;
+  }
+
   if (meta?.public) return true;
 
   const auth = getAuthState();
@@ -359,14 +398,18 @@ router.beforeEach((to) => {
   }
 
   if (meta?.requiresSuperAuth && !auth.hasSecondaryAuth) {
-    return { name: "super-auth" };
+    return to.path.startsWith("/internal")
+      ? { name: "internal-auth" }
+      : { name: "super-auth" };
   }
 
   if (
     meta?.requiresSuperAuth &&
     !hasFreshSuperVerification(auth.superVerifiedAt)
   ) {
-    return { name: "super-auth" };
+    return to.path.startsWith("/internal")
+      ? { name: "internal-auth" }
+      : { name: "super-auth" };
   }
 
   return true;

@@ -83,6 +83,44 @@ export type CustomerRecord = {
   status_logs: CustomerStatusLog[];
 };
 
+export type InternalOpsEvent = {
+  tenant_id: string | null;
+  tenant_name: string;
+  action_type: "checkout" | "return";
+  action_time: string;
+  gear_name: string | null;
+  gear_barcode: string | null;
+  student_username: string | null;
+  student_id: string | null;
+};
+
+export type InternalOpsSnapshot = {
+  checked_at: string;
+  traffic: {
+    checkout_15m: number;
+    return_15m: number;
+    active_tenants_15m: number;
+    events_24h: number;
+  };
+  queue: {
+    queued: number;
+    processing: number;
+    completed: number;
+    failed: number;
+  };
+  leads: {
+    open: number;
+    closed: number;
+    converted: number;
+    waiting_for_quote: number;
+    quote_sent: number;
+    invoice_sent: number;
+    invoice_paid: number;
+  };
+  runtime: Record<string, unknown>;
+  recent_events: InternalOpsEvent[];
+};
+
 type SuperOpsAction =
   | "get_control_center"
   | "set_runtime_config"
@@ -97,7 +135,8 @@ type SuperOpsAction =
   | "close_sales_lead"
   | "move_sales_lead_to_customer"
   | "list_customers"
-  | "add_customer_status_entry";
+  | "add_customer_status_entry"
+  | "get_internal_ops_snapshot";
 
 type SuperOpsRequest = {
   action: SuperOpsAction;
@@ -249,4 +288,10 @@ export const addCustomerStatusEntry = async (payload: {
   callSuperOps<{ entry: CustomerStatusLog }>({
     action: "add_customer_status_entry",
     payload,
+  });
+
+export const getInternalOpsSnapshot = async () =>
+  callSuperOps<InternalOpsSnapshot>({
+    action: "get_internal_ops_snapshot",
+    payload: {},
   });

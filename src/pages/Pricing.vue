@@ -14,7 +14,7 @@
 
       <h1>ItemTraxx Pricing</h1>
       <p class="muted">
-        Annual subscriptions by district size. All plans include onboarding fees in year one.
+        Annual subscriptions by district size. All plans are subject to onboarding fees in year one.
       </p>
       <div class="pricing-actions">
         <RouterLink class="pricing-contact-button" to="/contact-sales">
@@ -34,7 +34,7 @@
             <li>Checkout and return system</li>
             <li>Standard support (72-hour response time)</li>
           </ul>
-          <p class="onboarding">1st Year Onboarding Fee: $750.00</p>
+          <p class="onboarding">+1st Year Onboarding Fee: $750.00</p>
         </article>
 
         <article class="card plan-card plan-highlight">
@@ -48,7 +48,7 @@
             <li>Checkout and return system</li>
             <li>Standard support (72-hour response time)</li>
           </ul>
-          <p class="onboarding">1st Year Onboarding Fee: $1,250.00</p>
+          <p class="onboarding">+1st Year Onboarding Fee: $1,250.00</p>
         </article>
 
         <article class="card plan-card">
@@ -62,7 +62,7 @@
             <li>Checkout and return system</li>
             <li>Priority support (24-hour response time)</li>
           </ul>
-          <p class="onboarding">1st Year Onboarding Fee: Contact for pricing (starts at $1,500.00)</p>
+          <p class="onboarding">+1st Year Onboarding Fee: Contact for pricing (starts at $1,500.00)</p>
           <p class="enterprise-note">
             For full enterprise pricing (quote for more than 7 schools) and multi-district scope, use the contact sales button above.
           </p>
@@ -75,7 +75,7 @@
           <li><strong>Are plans annual or monthly?</strong> All plans are annual subscriptions.</li>
           <li><strong>When is onboarding charged?</strong> Onboarding is a one-time fee in year one only.</li>
           <li><strong>Can we move between plans?</strong> Yes. Upgrades are prorated; downgrades apply next billing cycle.</li>
-          <li><strong>How do we request a formal quote?</strong> Use Contact Sales and we will provide a district quote.</li>
+          <li><strong>How do we request a formal quote?</strong> Use the Contact Sales button above and we will provide an official quote.</li>
         </ul>
       </section>
 
@@ -106,7 +106,7 @@
         <ul>
           <li>All plans are billed annually.</li>
           <li>Applicable taxes and government fees are not included in listed pricing.</li>
-          <li>Onboarding fee applies only to year one (1) of subscription.</li>
+          <li>Onboarding fee applies only to year one (1) of subscription and is required.</li>
           <li>Renewal terms and final scope are confirmed in the signed agreement.</li>
           <li>
             Full subscription policies:

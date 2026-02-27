@@ -51,7 +51,7 @@
         <div class="trust-strip" aria-label="Key product benefits">
           <span>Secure auth</span>
           <span>Audit logs</span>
-          <span>Fast checkouts</span>
+          <span>Fast transactions</span>
         </div>
       </section>
 
@@ -86,7 +86,7 @@
               </svg>
             </div>
             <h3>Scan and transact</h3>
-            <p>Checkout and returns are processed with clear status and low-friction workflows.</p>
+            <p>Checkout and returns are processed with clear status and low-friction workflows built to keep up with your needs.</p>
           </article>
           <article class="step-card reveal reveal-delay-3">
             <div class="step-icon" aria-hidden="true">
@@ -116,7 +116,7 @@
             </span>
             <h3>Simple usage</h3>
           </div>
-          <p>Simple UI keeps everything minimal, sleek, and easy to navigate confusion free.</p>
+          <p>Simple UI keeps everything minimal, sleek, and easy to navigate, confusion free.</p>
         </div>
         <div class="feature-mockup">
           <picture>
@@ -228,7 +228,7 @@
       <div class="section-divider" aria-hidden="true"></div>
       <section class="final-cta reveal">
         <h2>Ready to simplify inventory tracking?</h2>
-        <p>Get started with ItemTraxx and streamline checkout, returns, and admin control.</p>
+        <p>Get started with ItemTraxx and streamline your inventory management.</p>
         <div class="final-cta-actions">
           <RouterLink
             class="hero-button hero-button-dark"

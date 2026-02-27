@@ -447,6 +447,89 @@ textarea {
   gap: 0.6rem;
 }
 
+.version-update-fullscreen {
+  position: fixed;
+  inset: 0;
+  z-index: 1245;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  background:
+    radial-gradient(85% 60% at 18% 14%, rgba(25, 194, 168, 0.22) 0%, rgba(25, 194, 168, 0) 100%),
+    radial-gradient(70% 55% at 88% 86%, rgba(25, 67, 155, 0.22) 0%, rgba(25, 67, 155, 0) 100%),
+    rgba(7, 13, 24, 0.72);
+  backdrop-filter: blur(6px);
+}
+
+.version-update-card {
+  width: min(560px, 100%);
+  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  background: rgba(15, 28, 49, 0.78);
+  box-shadow: 0 24px 48px rgba(0, 0, 0, 0.38);
+  color: #ffffff;
+  padding: 1.2rem 1.15rem;
+}
+
+.version-update-eyebrow {
+  margin: 0 0 0.45rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #8be6d6;
+}
+
+.version-update-card h2 {
+  margin: 0;
+  font-size: 1.45rem;
+  line-height: 1.22;
+}
+
+.version-update-card p {
+  margin: 0.7rem 0 0;
+  color: rgba(255, 255, 255, 0.94);
+  line-height: 1.55;
+}
+
+.version-update-meta {
+  margin-top: 0.8rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.version-update-meta span {
+  display: inline-flex;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  background: rgba(255, 255, 255, 0.08);
+  padding: 0.2rem 0.5rem;
+  font-size: 0.78rem;
+}
+
+.version-update-button {
+  margin-top: 0.95rem;
+  width: 100%;
+  min-height: 46px;
+  font-size: 0.97rem;
+  font-weight: 700;
+}
+
+@media (max-width: 640px) {
+  .version-update-fullscreen {
+    padding: 1.15rem;
+  }
+
+  .version-update-card {
+    width: 100%;
+    max-width: 500px;
+    box-sizing: border-box;
+    border-radius: 16px;
+    padding: 1rem 0.95rem;
+  }
+}
+
 @keyframes maintenance-orb-a {
   0% {
     transform: translate(0vw, 0vh) scale(1);

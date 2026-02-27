@@ -35,6 +35,28 @@
       </div>
     </div>
     <div
+      v-if="showVersionOverlay && !showMaintenanceOverlay"
+      class="version-update-fullscreen"
+      role="alertdialog"
+      aria-live="assertive"
+      aria-modal="true"
+    >
+      <div class="version-update-card">
+        <p class="version-update-eyebrow">Update Available</p>
+        <h2>A new version of ItemTraxx is available.</h2>
+        <p>
+          A newer release is available. Please click the update button to load the latest version.
+        </p>
+        <div class="version-update-meta">
+          <span>Current: {{ appVersion }}</span>
+          <span v-if="latestVersion">Latest: {{ latestVersion }}</span>
+        </div>
+        <button type="button" class="button-primary version-update-button" @click="reloadApp">
+          Update
+        </button>
+      </div>
+    </div>
+    <div
       v-if="activeBroadcast && showBroadcast"
       ref="broadcastBannerRef"
       class="broadcast-top-banner"
@@ -202,6 +224,7 @@ const statusClass = ref<"status-ok" | "status-warn" | "status-down" | "status-un
 );
 const isOutdated = ref(false);
 const latestVersion = ref<string | null>(null);
+const forceUpdateOverlay = ref(false);
 const showTelemetry = ref(false);
 const isRouteNavigating = ref(false);
 let statusTimer: number | null = null;
@@ -285,6 +308,7 @@ const showMaintenanceOverlay = computed(() => {
   }
   return !routeName.startsWith("super-admin-");
 });
+const showVersionOverlay = computed(() => isOutdated.value || forceUpdateOverlay.value);
 const incidentBannerTitle = computed(() => {
   if (!incidentBanner.value) return "System Notice";
   return incidentBanner.value.level === "down" ? "System Outage" : "System Degraded";
@@ -545,11 +569,6 @@ const refreshSystemStatus = async () => {
 };
 
 const refreshVersionStatus = async () => {
-  if (!auth.isAuthenticated) {
-    isOutdated.value = false;
-    latestVersion.value = null;
-    return;
-  }
   if (!appVersion || appVersion === "n/a") {
     isOutdated.value = false;
     return;
@@ -600,7 +619,7 @@ const stopStatusPolling = () => {
 };
 
 const startVersionPolling = () => {
-  if (!auth.isAuthenticated || versionTimer) return;
+  if (versionTimer || document.visibilityState === "hidden") return;
   versionTimer = window.setInterval(() => {
     void refreshVersionStatus();
   }, 120_000);
@@ -620,13 +639,14 @@ const handlePageVisibilityChange = () => {
   }
   void refreshSystemStatus();
   startStatusPolling();
-  if (auth.isAuthenticated) {
-    void refreshVersionStatus();
-    startVersionPolling();
-  }
+  void refreshVersionStatus();
+  startVersionPolling();
 };
 
 onMounted(() => {
+  forceUpdateOverlay.value =
+    import.meta.env.DEV &&
+    new URLSearchParams(window.location.search).get("force-update-overlay") === "1";
   const saved = localStorage.getItem("itemtraxx-theme");
   if (saved === "light" || saved === "dark") {
     applyTheme(saved);
@@ -682,15 +702,10 @@ watch(
   () => auth.isAuthenticated,
   () => {
     if (auth.isAuthenticated) {
-      void refreshVersionStatus();
-      startVersionPolling();
       startAdminSessionPolling();
       return;
     }
-    stopVersionPolling();
     stopAdminSessionPolling();
-    isOutdated.value = false;
-    latestVersion.value = null;
   }
 );
 

@@ -1,6 +1,6 @@
 # Changelog
 
-Last updated (year-month-day): 2026-02-26
+Last updated (year-month-day): 2026-02-27
 
 All notable changes to **ItemTraxx** will be documented in this file. This includes new features, improvements, bug fixes, and other updates.
 
@@ -234,6 +234,9 @@ This project adheres to **Semantic Versioning** where possible.
 - Refreshed lockfile dependency set after local update run:
   - Supabase JS family updates (`@supabase/*` 2.97.x -> 2.98.0)
   - `@types/node` update to latest patch release in lockfile
+- Updated enterprise pricing contact information on the public pricing page.
+- Improved contact-sales submission success messaging to clearly confirm follow-up email delivery.
+- Added observability/reliability foundations including async jobs, reporting views, and synthetic monitoring support.
 
 ---
 

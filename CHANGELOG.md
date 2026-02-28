@@ -225,6 +225,7 @@ This project adheres to **Semantic Versioning** where possible.
 - Fixed CI regressions on preview:
   - patched high-severity Rollup advisory by moving to secure `rollup@4.59.0`
   - updated mobile E2E landing assertion from old "Contact Sales" CTA to current "Pricing" CTA
+- Hardened mobile E2E assertions to be resilient to landing-page trust-strip copy updates.
 - Improved mobile pricing page rendering:
   - removed side gutters/white borders with full-bleed layout adjustments
   - fixed right-edge tile overflow on small viewports
@@ -237,6 +238,13 @@ This project adheres to **Semantic Versioning** where possible.
 - Updated enterprise pricing contact information on the public pricing page.
 - Improved contact-sales submission success messaging to clearly confirm follow-up email delivery.
 - Added observability/reliability foundations including async jobs, reporting views, and synthetic monitoring support.
+
+---
+
+### 2/27/2026 Development Update
+
+- Added a global refresh-required overlay to block outdated client versions and prompt users to reload before continuing.
+- Updated GitHub Actions dependencies by bumping `actions/upload-artifact` to `v7`.
 
 ---
 

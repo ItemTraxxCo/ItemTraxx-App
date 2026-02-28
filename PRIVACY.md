@@ -1,6 +1,6 @@
 # Privacy Policy
 
-Last updated: 2026-02-21
+Last updated: 2026-02-21 (year-month-day)
 
 ItemTraxx Co ("we", "our", or "us") respects your privacy and is committed to protecting your personal data. This Privacy Policy explains how we collect, use, and safeguard your information when you use ItemTraxx.
 

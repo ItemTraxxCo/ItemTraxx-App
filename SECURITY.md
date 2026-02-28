@@ -1,6 +1,6 @@
 # Security Policy
 
-Last updated: 2026-02-21
+Last updated: 2026-02-21 (year-month-day)
 
 ItemTraxx Co ("we", "our", or "us") is committed to maintaining the security and integrity of ItemTraxx. This document describes how to report security issues and how we handle them.
 

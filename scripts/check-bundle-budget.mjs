@@ -1,7 +1,17 @@
 import { readdirSync, statSync } from "node:fs";
-import { join } from "node:path";
+import { isAbsolute, resolve, sep } from "node:path";
 
-const assetsDir = "dist/assets";
+const assetsDir = resolve("dist/assets");
+const SAFE_ASSET_NAME_RE = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
+
+const resolveSafeAssetPath = (assetName) => {
+  // Aikido/SAST hardening: only allow simple filenames emitted by the bundler.
+  if (isAbsolute(assetName) || !SAFE_ASSET_NAME_RE.test(assetName)) {
+    throw new Error(`Refusing suspicious asset name: ${assetName}`);
+  }
+  // Avoid dynamic path resolution on untrusted input; we only accept basename-like names above.
+  return `${assetsDir}${sep}${assetName}`;
+};
 
 const maxMainBytes = 40 * 1024;
 const maxPublicHomeBytes = 20 * 1024;
@@ -11,7 +21,7 @@ const findAssetSize = (prefix) => {
   const candidates = files
     .filter((name) => name.startsWith(prefix) && name.endsWith(".js"))
     .map((name) => {
-      const stats = statSync(join(assetsDir, name));
+      const stats = statSync(resolveSafeAssetPath(name));
       return {
         name,
         size: stats.size,

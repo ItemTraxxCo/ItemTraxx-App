@@ -1,6 +1,6 @@
 # Changelog
 
-Last updated (year-month-day): 2026-02-27
+Last updated: 2026-02-27 (year-month-day)
 
 All notable changes to **ItemTraxx** will be documented in this file. This includes new features, improvements, bug fixes, and other updates.
 

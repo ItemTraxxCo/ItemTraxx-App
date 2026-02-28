@@ -11,6 +11,9 @@
         <p>
           This Agreement is entered into between ItemTraxx Co, a California company, and the organization purchasing and using the service.
         </p>
+        <p>
+          Last updated: Febuary 28, 2026. We may update this document from time to time. Continued use of the service after updates means you accept the revised terms.
+        </p>
       </header>
 
       <section>

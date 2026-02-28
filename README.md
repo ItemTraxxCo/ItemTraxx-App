@@ -1,6 +1,6 @@
 # ItemTraxx
 
-Last updated: 2026-02-21
+Last updated: 2026-02-21 (year-month-day)
 
 **ItemTraxx** is a secure, cloud-based asset and equipment management platform developed by ItemTraxx Co for schools, businesses, and public organizations. This document provides an overview of the product, its features, technology stack, and links to official documentation.
 

@@ -26,6 +26,8 @@ type TenantRow = {
 
 const getTenantLoginFunctionName = () =>
   import.meta.env.VITE_TENANT_LOGIN_FUNCTION || "tenant-login";
+const getLoginNotifyFunctionName = () =>
+  import.meta.env.VITE_LOGIN_NOTIFY_FUNCTION || "login-notify";
 
 const AUTH_QUERY_TIMEOUT_MS = 7000;
 
@@ -218,6 +220,7 @@ export const tenantLogin = async (
   }
 
   let signInError: unknown = null;
+  let accessToken: string | null = null;
   try {
     const signIn = await withTimeout(
       supabase.auth.signInWithPassword({
@@ -228,6 +231,7 @@ export const tenantLogin = async (
       "Sign in timed out."
     );
     signInError = signIn.error;
+    accessToken = signIn.data.session?.access_token ?? null;
   } catch (requestError) {
     if (requestError instanceof TimeoutError) {
       throw new Error("Sign in timed out. Please try again.");
@@ -242,6 +246,23 @@ export const tenantLogin = async (
   await refreshAuthFromSession();
   const current = getAuthState();
   setTenantContext(current.sessionTenantId ?? null);
+
+  if (accessToken) {
+    const loginNotifyFunctionName = getLoginNotifyFunctionName();
+    void invokeEdgeFunction(loginNotifyFunctionName, {
+      method: "POST",
+      accessToken,
+      body: {},
+    }).then((result) => {
+      if (!result.ok) {
+        console.warn("login notification enqueue failed", {
+          status: result.status,
+          error: result.error,
+          requestId: result.requestId,
+        });
+      }
+    });
+  }
 };
 
 export const adminLogin = async (email: string, password: string) => {

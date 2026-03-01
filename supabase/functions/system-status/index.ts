@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { isKillSwitchEnabled, isLocalhostBypassRequest } from "../_shared/killSwitch.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Headers":
@@ -48,7 +49,9 @@ type IncidentWidgetPayload = {
   scheduled_maintenances?: unknown[];
 };
 
-const resolveIncidentStatus = (payload: IncidentWidgetPayload) => {
+const resolveIncidentStatus = (
+  payload: IncidentWidgetPayload
+): { status: "operational" | "degraded" | "down"; summary: string } => {
   const ongoing = payload.ongoing_incidents ?? [];
   const inProgressMaintenances = payload.in_progress_maintenances ?? [];
   const scheduledMaintenances = payload.scheduled_maintenances ?? [];
@@ -152,6 +155,7 @@ serve(async (req) => {
     let incidentStatus: "operational" | "degraded" | "down" = "operational";
     let incidentSummary = "not configured";
     let incidentCheck: "ok" | "warn" | "unavailable" = "unavailable";
+    const killSwitchActive = isKillSwitchEnabled() && !isLocalhostBypassRequest(req);
     let broadcast: {
       enabled: boolean;
       message: string;
@@ -242,12 +246,22 @@ serve(async (req) => {
       }
     }
 
+    if (killSwitchActive) {
+      incidentStatus = "down";
+      incidentSummary = "global killswitch enabled";
+      incidentCheck = "warn";
+    }
+
     return jsonResponse(200, {
       status: incidentStatus,
       checks: {
         config: "ok",
         db: "ok",
         incident_io: incidentCheck,
+      },
+      kill_switch: {
+        enabled: killSwitchActive,
+        message: "Unfortunately ItemTraxx is currently unavailable.",
       },
       broadcast,
       maintenance,
@@ -261,6 +275,10 @@ serve(async (req) => {
       checks: {
         config: "ok",
         db: "failed",
+      },
+      kill_switch: {
+        enabled: false,
+        message: "Unfortunately ItemTraxx is currently unavailable.",
       },
       duration_ms: Date.now() - startedAt,
       checked_at: new Date().toISOString(),

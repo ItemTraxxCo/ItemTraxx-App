@@ -3,6 +3,7 @@ export interface Env {
   SUPABASE_ANON_KEY: string;
   ALLOWED_ORIGINS?: string;
   ALLOWED_FUNCTIONS?: string;
+  ITX_ITEMTRAXX_KILLSWITCH_ENABLED?: string;
 }
 
 const BASE_CORS_HEADERS = {
@@ -24,6 +25,25 @@ const parseCsv = (value?: string) =>
     .split(",")
     .map((item) => item.trim())
     .filter((item) => item.length > 0);
+
+const isLocalhostOrigin = (origin: string | null) => {
+  if (!origin) return false;
+  try {
+    const hostname = new URL(origin).hostname.toLowerCase();
+    if (hostname === "localhost" || hostname === "127.0.0.1" || hostname === "0.0.0.0") {
+      return true;
+    }
+    if (hostname.startsWith("192.168.") || hostname.startsWith("10.")) {
+      return true;
+    }
+    const match172 = hostname.match(/^172\.(\d{1,3})\./);
+    if (!match172) return false;
+    const secondOctet = Number(match172[1]);
+    return Number.isFinite(secondOctet) && secondOctet >= 16 && secondOctet <= 31;
+  } catch {
+    return false;
+  }
+};
 
 const withCorsHeaders = (origin: string | null, allowedOrigins: string[]) => {
   const originAllowed =
@@ -117,6 +137,12 @@ export default {
     const functionName = getFunctionName(url.pathname);
     if (!functionName) {
       return buildError(404, "Not found", headers, requestId);
+    }
+
+    const killSwitchEnabled =
+      (env.ITX_ITEMTRAXX_KILLSWITCH_ENABLED ?? "").toLowerCase() === "true";
+    if (killSwitchEnabled && functionName !== "system-status" && !isLocalhostOrigin(origin)) {
+      return buildError(503, "Unfortunately ItemTraxx is currently unavailable.", headers, requestId);
     }
 
     const allowedFunctions = parseCsv(env.ALLOWED_FUNCTIONS);

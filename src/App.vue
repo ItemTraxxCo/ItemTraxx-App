@@ -11,7 +11,33 @@
       <strong>Maintenance Mode</strong>
       <span>{{ maintenanceMessage }}</span>
     </div>
-    <div v-if="showMaintenanceOverlay" class="maintenance-fullscreen" role="alertdialog" aria-live="assertive">
+    <div
+      v-if="showKillSwitchOverlay"
+      class="maintenance-fullscreen"
+      role="alertdialog"
+      aria-live="assertive"
+      aria-modal="true"
+    >
+      <div class="maintenance-fullscreen-card">
+        <h2>ItemTraxx Temporarily Unavailable</h2>
+        <p>{{ killSwitchMessage }}</p>
+        <p>
+          We are actively working to restore access. Please check the live status page for updates.
+        </p>
+        <div class="maintenance-fullscreen-actions">
+          <a
+            class="button-link"
+            href="https://status.itemtraxx.com/"
+            target="_blank"
+            rel="noreferrer"
+          >
+            View Live Status
+          </a>
+          <button type="button" class="button-primary" @click="reloadApp">Refresh</button>
+        </div>
+      </div>
+    </div>
+    <div v-else-if="showMaintenanceOverlay" class="maintenance-fullscreen" role="alertdialog" aria-live="assertive">
       <div class="maintenance-fullscreen-card">
         <h2>Maintenance in Progress</h2>
         <p>
@@ -218,6 +244,8 @@ const maintenanceBannerHeight = ref(0);
 const broadcastBannerHeight = ref(0);
 const maintenanceEnabled = ref(false);
 const maintenanceMessage = ref("Maintenance in progress.");
+const killSwitchEnabled = ref(false);
+const killSwitchMessage = ref("Unfortunately ItemTraxx is currently unavailable.");
 const statusLabel = ref("Unknown");
 const statusClass = ref<"status-ok" | "status-warn" | "status-down" | "status-unknown">(
   "status-unknown"
@@ -307,6 +335,10 @@ const showMaintenanceOverlay = computed(() => {
     return false;
   }
   return !routeName.startsWith("super-admin-");
+});
+const showKillSwitchOverlay = computed(() => {
+  if (isLocalDevMaintenanceBypass.value) return false;
+  return killSwitchEnabled.value;
 });
 const showVersionOverlay = computed(() => isOutdated.value || forceUpdateOverlay.value);
 const incidentBannerTitle = computed(() => {
@@ -499,6 +531,15 @@ const refreshSystemStatus = async () => {
   }
 
   const payload = response.payload;
+  if (payload.kill_switch?.enabled === true) {
+    killSwitchEnabled.value = true;
+    killSwitchMessage.value =
+      typeof payload.kill_switch.message === "string" && payload.kill_switch.message.trim()
+        ? payload.kill_switch.message.trim()
+        : "Unfortunately ItemTraxx is currently unavailable.";
+  } else {
+    killSwitchEnabled.value = false;
+  }
   const broadcast = payload.broadcast;
   if (broadcast?.enabled && typeof broadcast.message === "string" && broadcast.message.trim()) {
     const level: BroadcastLevel =
@@ -609,7 +650,7 @@ const startStatusPolling = () => {
   if (statusTimer || document.visibilityState === "hidden") return;
   statusTimer = window.setInterval(() => {
     void refreshSystemStatus();
-  }, 60_000);
+  }, 300_000);
 };
 
 const stopStatusPolling = () => {
@@ -695,6 +736,16 @@ watch(
   () => {
     resetAdminIdleTimer();
     startAdminSessionPolling();
+  }
+);
+
+watch(
+  () => [killSwitchEnabled.value, route.path] as const,
+  ([enabled, path]) => {
+    if (!enabled || isLocalDevMaintenanceBypass.value) return;
+    if (path !== "/") {
+      void router.replace("/");
+    }
   }
 );
 

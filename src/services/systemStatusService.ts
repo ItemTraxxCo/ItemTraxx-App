@@ -13,6 +13,10 @@ export type SystemStatusPayload = {
     message?: string;
     updated_at?: string;
   };
+  kill_switch?: {
+    enabled?: boolean;
+    message?: string;
+  };
   incident_summary?: string;
   checked_at?: string;
 };

@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { isKillSwitchWriteBlocked } from "../_shared/killSwitch.ts";
 import { getRequestId, logError, logInfo } from "../_shared/observability.ts";
 
 const baseCorsHeaders = {
@@ -63,6 +64,10 @@ serve(async (req) => {
 
   if (hasOrigin && !originAllowed) {
     return jsonResponse(403, { error: "Origin not allowed" });
+  }
+
+  if (isKillSwitchWriteBlocked(req)) {
+    return jsonResponse(503, { error: "Unfortunately ItemTraxx is currently unavailable." });
   }
 
   if (req.method !== "POST") {

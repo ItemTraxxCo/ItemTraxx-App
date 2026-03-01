@@ -259,3 +259,9 @@ All changes documented here are subject to company internal guidelines and versi
 - feat: automate changelog updates and improve last updated formatting in documents.
 
 ---
+
+### 3/1/2026 Development Update
+
+- feat(auth): enqueue tenant login notification emails via async worker.
+
+---

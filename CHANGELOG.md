@@ -260,6 +260,7 @@ Changes are dated based on the default timezone: America/Los_Angeles
 - feat(ops): add production kill switch with localhost bypass and 5-min polling.
 - fix(ops): stabilize async worker auth and public status function access.
 - deps(deps-dev): bump @types/node in the npm-and-yarn group.
+- fix(changelog): preserve file structure and use Pacific-time dating in auto-updates.
 
 ---
 

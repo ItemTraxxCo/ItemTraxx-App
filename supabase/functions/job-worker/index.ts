@@ -62,6 +62,14 @@ const resolveCorsHeaders = (req: Request) => {
   return { hasOrigin, originAllowed, headers };
 };
 
+const parseBearerToken = (value: string) => value.trim().replace(/^Bearer\s+/i, "").trim();
+
+const isAuthorizedWorkerRequest = (authorizationHeader: string, workerSecret: string) => {
+  const providedToken = parseBearerToken(authorizationHeader);
+  const expectedToken = parseBearerToken(workerSecret);
+  return !!providedToken && !!expectedToken && providedToken === expectedToken;
+};
+
 const sendResendEmail = async (
   apiKey: string,
   payload: Record<string, unknown>,
@@ -174,7 +182,7 @@ serve(async (req) => {
     if (!supabaseUrl || !serviceKey || !workerSecret || !resendApiKey) {
       return jsonResponse(500, { error: "Server misconfiguration." });
     }
-    if (workerAuth !== `Bearer ${workerSecret}`) {
+    if (!isAuthorizedWorkerRequest(workerAuth, workerSecret)) {
       return jsonResponse(401, { error: "Unauthorized" });
     }
 

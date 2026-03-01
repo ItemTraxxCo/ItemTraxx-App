@@ -23,6 +23,18 @@ type ContactSalesPayload = {
   from_email: string;
 };
 
+type LoginNotificationPayload = {
+  user_id: string;
+  tenant_id: string;
+  tenant_name: string;
+  to_email: string;
+  from_email: string;
+  support_email: string;
+  login_time_iso: string;
+  device_browser: string;
+  ip_address: string | null;
+};
+
 const baseCorsHeaders = {
   "Access-Control-Allow-Headers":
     "authorization, x-client-info, apikey, content-type, x-request-id",
@@ -92,6 +104,29 @@ const processContactSalesEmail = async (
     subject: "We received your ItemTraxx sales request.",
     text:
       `Hi ${payload.name},\n\nThanks for contacting the ItemTraxx Sales Team. We've received your request and will follow up with a quote for your selected plan within 2 business days.\n\nRequest summary:\nPlan: ${payload.plan_label}${schoolsLine}\nOrganization: ${payload.organization}\n\nIf you need to add anything else, feel free to reply to this email.\nHave a great day,\n\n- ItemTraxx Sales\n${payload.support_email}\n\nIf you don't hear from us within 2 business days, please check your spam folder or contact us at ${payload.support_email}`,
+  });
+};
+
+const processLoginNotificationEmail = async (
+  resendApiKey: string,
+  payload: LoginNotificationPayload,
+) => {
+  const loginTime = new Date(payload.login_time_iso);
+  const loginTimeLabel = Number.isNaN(loginTime.getTime())
+    ? payload.login_time_iso
+    : `${loginTime.toISOString()} (UTC)`;
+
+  await sendResendEmail(resendApiKey, {
+    from: payload.from_email,
+    to: [payload.to_email],
+    subject: `New ItemTraxx Login - ${payload.tenant_name}`,
+    text:
+      `A new login to your ItemTraxx account was detected.\n\n` +
+      `Tenant: ${payload.tenant_name}\n` +
+      `Login time: ${loginTimeLabel}\n` +
+      `Device/Browser: ${payload.device_browser || "Unknown"}\n` +
+      `IP Address: ${payload.ip_address ?? "Unavailable"}\n\n` +
+      `If this wasn't you, contact support immediately at ${payload.support_email}.`,
   });
 };
 
@@ -169,6 +204,11 @@ serve(async (req) => {
           await processContactSalesEmail(
             resendApiKey,
             job.payload as ContactSalesPayload,
+          );
+        } else if (job.job_type === "login_notification_email") {
+          await processLoginNotificationEmail(
+            resendApiKey,
+            job.payload as LoginNotificationPayload,
           );
         } else if (job.job_type === "refresh_reporting_views") {
           await adminClient.rpc("refresh_super_reporting_views");

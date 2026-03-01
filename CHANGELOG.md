@@ -1,10 +1,10 @@
 # Changelog
 
-Last updated: 2026-02-27 (year-month-day)
+Last updated (year-month-day): 2026-03-01
 
 All notable changes to **ItemTraxx** will be documented in this file. This includes new features, improvements, bug fixes, and other updates.
 
-This project adheres to **Semantic Versioning** where possible.
+Changes are dated based on the default timezone: America/Los_Angeles
 
 ---
 
@@ -248,12 +248,6 @@ This project adheres to **Semantic Versioning** where possible.
 
 ---
 
-##### You have reached the bottom of the changelog.
----
-
-**© 2026 ItemTraxx Co. All rights reserved.**
-All changes documented here are subject to company internal guidelines and versioning standards.
-
 ### 2/28/2026 Development Update
 
 - feat: automate changelog updates and improve last updated formatting in documents.
@@ -268,3 +262,9 @@ All changes documented here are subject to company internal guidelines and versi
 - deps(deps-dev): bump @types/node in the npm-and-yarn group.
 
 ---
+
+##### You have reached the bottom of the changelog.
+---
+
+**© 2026 ItemTraxx Co. All rights reserved.**
+All changes documented here are subject to company internal guidelines and versioning standards.

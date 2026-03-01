@@ -33,6 +33,7 @@ jobs:
         env:
           GITHUB_EVENT_BEFORE: ${{ github.event.before }}
           GITHUB_SHA: ${{ github.sha }}
+          CHANGELOG_TIMEZONE: America/Los_Angeles
         run: node ./scripts/update-changelog-from-commits.mjs
 
       - name: Commit and push CHANGELOG

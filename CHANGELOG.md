@@ -265,5 +265,6 @@ All changes documented here are subject to company internal guidelines and versi
 - feat(auth): enqueue tenant login notification emails via async worker.
 - feat(ops): add production kill switch with localhost bypass and 5-min polling.
 - fix(ops): stabilize async worker auth and public status function access.
+- deps(deps-dev): bump @types/node in the npm-and-yarn group.
 
 ---

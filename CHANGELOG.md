@@ -263,5 +263,6 @@ All changes documented here are subject to company internal guidelines and versi
 ### 3/1/2026 Development Update
 
 - feat(auth): enqueue tenant login notification emails via async worker.
+- feat(ops): add production kill switch with localhost bypass and 5-min polling.
 
 ---

@@ -224,6 +224,18 @@ button:focus-visible {
   transform: translateY(-1px);
 }
 
+.maintenance-fullscreen .button-link {
+  background: #000000;
+  border-color: #000000;
+  color: #ffffff;
+}
+
+:root[data-theme="dark"] .maintenance-fullscreen .button-link {
+  background: #ffffff;
+  border-color: #ffffff;
+  color: #000000;
+}
+
 .table {
   width: 100%;
   border-collapse: collapse;

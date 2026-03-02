@@ -1,6 +1,6 @@
 # Changelog
 
-Last updated (year-month-day): 2026-03-02
+Last updated (year-month-day): 2026-03-01
 
 All notable changes to **ItemTraxx** will be documented in this file. This includes new features, improvements, bug fixes, and other updates.
 
@@ -282,6 +282,9 @@ Changes are dated based on the default timezone: America/Los_Angeles
 - Added branded, standardized HTML templates for Supabase auth emails (signup confirmation, invite, magic link, password reset/change, email/phone change, identity link/unlink, MFA enroll/unenroll, reauth code).
 - Improved contact-sales submission success messaging to clearly confirm follow-up email delivery.
 - Added observability/reliability foundations including async jobs, reporting views, and synthetic monitoring support.
+- feat(auth,tenant): onboarding, offline queue sync, and auth/email hardening.
+- fix changelog.
+- fix(ci): unbreak bundle budget gate and admin heading e2e selector.
 
 ---
 

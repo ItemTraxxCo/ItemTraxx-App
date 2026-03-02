@@ -112,12 +112,14 @@
 </template>
 
 <script setup lang="ts">
-import { nextTick, ref } from "vue";
+import { nextTick, onMounted, onUnmounted, ref } from "vue";
 import {
   fetchCheckedOutGear,
   fetchGearByBarcode,
+  getBufferedCheckoutCount,
   fetchStudentByStudentId,
   submitCheckoutReturn,
+  syncBufferedCheckoutQueue,
   type GearSummary,
   type StudentSummary,
 } from "../../services/checkoutService";
@@ -141,6 +143,7 @@ const toastStatus = ref<"Success" | "Failed" | "Processing">("Success");
 const barcodeField = ref<HTMLInputElement | null>(null);
 const logoUrl = import.meta.env.VITE_LOGO_URL as string | undefined;
 const toastTitle = ref("");
+const syncInFlight = ref(false);
 const receipt = ref<{
   timestamp: string;
   studentUsername: string;
@@ -151,6 +154,28 @@ const receipt = ref<{
   returns: number;
   items: Array<{ name: string; barcode: string; action: "checkout" | "return" }>;
 } | null>(null);
+
+const syncOfflineBuffer = async (showWhenNoOps = false) => {
+  if (syncInFlight.value) return;
+  if (!navigator.onLine) return;
+  syncInFlight.value = true;
+  try {
+    const result = await syncBufferedCheckoutQueue();
+    if (result.processed > 0) {
+      toastStatus.value = "Success";
+      toastTitle.value = "Offline transactions synced.";
+      toastMessage.value = `${result.processed} buffered transaction(s) sent.`;
+      return;
+    }
+    if (showWhenNoOps && result.remaining === 0) {
+      toastStatus.value = "Success";
+      toastTitle.value = "No buffered transactions.";
+      toastMessage.value = "Everything is up to date.";
+    }
+  } finally {
+    syncInFlight.value = false;
+  }
+};
 
 const downloadReceiptPdf = async () => {
   if (!receipt.value) return;
@@ -283,11 +308,25 @@ const submit = async () => {
       }
     }
 
-    await submitCheckoutReturn({
+    const submitResult = await submitCheckoutReturn({
       student_id: studentId.value.trim(),
       gear_barcodes: barcodes.value.map((item) => item.barcode),
       action_type: "auto",
     });
+    if (submitResult.buffered) {
+      const bufferedCount = submitResult.queuedCount;
+      success.value = "";
+      receipt.value = null;
+      barcodes.value = [];
+      barcodeInput.value = "";
+      studentId.value = "";
+      student.value = null;
+      checkedOutGear.value = [];
+      toastStatus.value = "Processing";
+      toastTitle.value = "Saved offline.";
+      toastMessage.value = `No connection. Transaction was buffered and will auto-sync when you're online. Buffered: ${bufferedCount}`;
+      return;
+    }
     const studentSnapshot = student.value;
     const itemsSnapshot = barcodes.value.map((item) => {
       const wasReturn = checkedOutGear.value.some(
@@ -338,4 +377,23 @@ const submit = async () => {
     isSubmitting.value = false;
   }
 };
+
+const handleOnline = () => {
+  void syncOfflineBuffer(false);
+};
+
+onMounted(() => {
+  window.addEventListener("online", handleOnline);
+  const buffered = getBufferedCheckoutCount();
+  if (buffered > 0) {
+    toastStatus.value = "Processing";
+    toastTitle.value = "Buffered transactions detected.";
+    toastMessage.value = `${buffered} transaction(s) pending sync.`;
+  }
+  void syncOfflineBuffer(false);
+});
+
+onUnmounted(() => {
+  window.removeEventListener("online", handleOnline);
+});
 </script>

@@ -1,5 +1,6 @@
 import { supabase } from "./supabaseClient";
 import { invokeEdgeFunction } from "./edgeFunctionClient";
+import { getAuthState } from "../store/authState";
 
 export type StudentItem = {
   id: string;
@@ -32,10 +33,20 @@ const getAccessToken = async () => {
   return session.access_token;
 };
 
+const getTenantContextId = () => {
+  const tenantId = getAuthState().tenantContextId;
+  if (!tenantId) {
+    throw new Error("Missing tenant context.");
+  }
+  return tenantId;
+};
+
 export const fetchStudents = async () => {
+  const tenantId = getTenantContextId();
   const { data, error } = await supabase
     .from("students")
     .select("id, tenant_id, username, student_id")
+    .eq("tenant_id", tenantId)
     .is("deleted_at", null)
     .order("created_at", { ascending: false });
 
@@ -171,9 +182,11 @@ export const restoreStudent = async (id: string) => {
 };
 
 export const fetchStudentDetails = async (studentUuid: string) => {
+  const tenantId = getTenantContextId();
   const { data: checkedOutGear, error: gearError } = await supabase
     .from("gear")
     .select("id, name, barcode")
+    .eq("tenant_id", tenantId)
     .is("deleted_at", null)
     .eq("checked_out_by", studentUuid);
 
@@ -184,6 +197,7 @@ export const fetchStudentDetails = async (studentUuid: string) => {
   const { data: lastCheckoutData, error: checkoutError } = await supabase
     .from("gear_logs")
     .select("action_time, gear:gear_id ( name )")
+    .eq("tenant_id", tenantId)
     .eq("checked_out_by", studentUuid)
     .eq("action_type", "checkout")
     .order("action_time", { ascending: false })
@@ -196,6 +210,7 @@ export const fetchStudentDetails = async (studentUuid: string) => {
   const { data: lastReturnData, error: returnError } = await supabase
     .from("gear_logs")
     .select("action_time, gear:gear_id ( name )")
+    .eq("tenant_id", tenantId)
     .eq("checked_out_by", studentUuid)
     .eq("action_type", "return")
     .order("action_time", { ascending: false })

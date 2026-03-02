@@ -155,6 +155,15 @@
         <button type="button" class="menu-item" role="menuitem" @click="openAdminPanel">
           Open Admin Panel
         </button>
+        <button
+          v-if="canReplayOnboarding"
+          type="button"
+          class="menu-item"
+          role="menuitem"
+          @click="openOnboardingTour"
+        >
+          Take tour again
+        </button>
         <button type="button" class="menu-item danger" role="menuitem" @click="logoutTenant">
           Log Out User
         </button>
@@ -172,6 +181,13 @@
         <a class="menu-item" role="menuitem" href="mailto:support@itemtraxx.com">
           Contact Support
         </a>
+        <div
+          class="menu-item muted menu-offline-queue"
+          role="menuitem"
+          :title="offlineQueueTooltip"
+        >
+          Offline Queue: {{ offlineQueueCount }}
+        </div>
         <a
           class="menu-item muted menu-status" role="menuitem"
           href="https://status.itemtraxx.com/"
@@ -189,6 +205,12 @@
       <button type="button" class="button-primary" @click="reloadApp">Reload</button>
     </div>
     <router-view v-else />
+    <OnboardingModal
+      :visible="showOnboardingModal"
+      :variant="onboardingVariant"
+      @close="handleOnboardingClose"
+      @complete="handleOnboardingComplete"
+    />
     <Analytics v-if="showTelemetry" />
     <SpeedInsights v-if="showTelemetry" />
   </div>
@@ -202,6 +224,14 @@ import {
   touchTenantAdminSession,
   validateTenantAdminSession,
 } from "./services/adminOpsService";
+import { getBufferedCheckoutCount } from "./services/checkoutService";
+import OnboardingModal from "./components/OnboardingModal.vue";
+import {
+  hasCompletedOnboarding,
+  markOnboardingCompleted,
+  resetOnboarding,
+  type TenantOnboardingRole,
+} from "./services/onboardingService";
 import { fetchSystemStatus } from "./services/systemStatusService";
 import { clearAdminVerification, getAuthState } from "./store/authState";
 import NotificationBell from "./components/NotificationBell.vue";
@@ -263,8 +293,14 @@ let deferredVersionTimer: number | null = null;
 let deferredTelemetryTimer: number | null = null;
 let routeProgressTimer: number | null = null;
 let adminSessionTimer: number | null = null;
+let offlineQueueTimer: number | null = null;
 const isIdleLogoutRunning = ref(false);
 const isAdminSessionCheckRunning = ref(false);
+const showOnboardingModal = ref(false);
+const onboardingRole = ref<TenantOnboardingRole>("tenant_user");
+const onboardingVariant = ref<"tenant_checkout" | "tenant_admin">("tenant_checkout");
+const onboardingEvaluationDone = ref(false);
+const offlineQueueCount = ref(0);
 
 const ADMIN_IDLE_TIMEOUT_MINUTES = Number(import.meta.env.VITE_ADMIN_IDLE_TIMEOUT_MINUTES || 20);
 const ADMIN_IDLE_TIMEOUT_MS =
@@ -280,6 +316,17 @@ const themeLabel = computed(() =>
 );
 const showTopMenu = computed(
   () => route.name !== "public-home" && route.name !== "public-pricing"
+);
+const currentTenantOnboardingRole = computed<TenantOnboardingRole | null>(() => {
+  if (!auth.isAuthenticated) return null;
+  if (auth.role === "tenant_user" || auth.role === "tenant_admin") {
+    return auth.role;
+  }
+  return null;
+});
+const isOnTenantRoute = computed(() => route.path.startsWith("/tenant"));
+const canReplayOnboarding = computed(
+  () => !!currentTenantOnboardingRole.value && isOnTenantRoute.value
 );
 const isLocalDevMaintenanceBypass = computed(() => {
   if (import.meta.env.DEV !== true) return false;
@@ -305,6 +352,7 @@ const isTenantAdminArea = computed(() => {
 const showNotificationBell = computed(() => {
   if (!auth.isAuthenticated) return false;
   if (auth.role !== "tenant_user" && auth.role !== "tenant_admin") return false;
+  if (route.path === "/tenant/admin-login") return false;
   return route.path.startsWith("/tenant");
 });
 const showBroadcast = computed(() => {
@@ -374,6 +422,14 @@ const incidentBannerStyle = computed(() => ({
 const broadcastBannerStyle = computed(() => ({
   top: showMaintenanceBanner.value ? `${maintenanceBannerHeight.value}px` : "0px",
 }));
+const offlineQueueTooltip = computed(
+  () =>
+    "Offline Queue stores checkout/return requests when internet is unavailable and auto-syncs them when connection is restored."
+);
+
+const refreshOfflineQueueCount = () => {
+  offlineQueueCount.value = getBufferedCheckoutCount();
+};
 
 const measureTopBanners = () => {
   maintenanceBannerHeight.value = showMaintenanceBanner.value
@@ -399,6 +455,18 @@ const toggleMenu = () => {
   menuOpen.value = !menuOpen.value;
 };
 
+const openOnboardingTour = () => {
+  if (!currentTenantOnboardingRole.value) return;
+  resetOnboarding(currentTenantOnboardingRole.value);
+  onboardingRole.value = currentTenantOnboardingRole.value;
+  onboardingVariant.value = route.path.startsWith("/tenant/admin")
+    ? "tenant_admin"
+    : "tenant_checkout";
+  onboardingEvaluationDone.value = true;
+  showOnboardingModal.value = true;
+  menuOpen.value = false;
+};
+
 const openAdminPanel = async () => {
   menuOpen.value = false;
   await router.push("/tenant/admin-login");
@@ -416,6 +484,44 @@ const logoutTenant = async () => {
 
 const reloadApp = () => {
   window.location.reload();
+};
+
+const completeOnboarding = () => {
+  markOnboardingCompleted(onboardingRole.value);
+  onboardingEvaluationDone.value = true;
+  showOnboardingModal.value = false;
+};
+
+const handleOnboardingClose = () => {
+  completeOnboarding();
+};
+
+const handleOnboardingComplete = () => {
+  completeOnboarding();
+};
+
+const evaluateOnboardingVisibility = () => {
+  const role = currentTenantOnboardingRole.value;
+  if (!auth.isInitialized || !auth.isAuthenticated || !role) {
+    showOnboardingModal.value = false;
+    onboardingEvaluationDone.value = false;
+    return;
+  }
+  if (!isOnTenantRoute.value) {
+    showOnboardingModal.value = false;
+    return;
+  }
+  onboardingRole.value = role;
+  onboardingVariant.value = route.path.startsWith("/tenant/admin")
+    ? "tenant_admin"
+    : "tenant_checkout";
+  if (onboardingEvaluationDone.value) {
+    return;
+  }
+  if (!hasCompletedOnboarding(role)) {
+    showOnboardingModal.value = true;
+  }
+  onboardingEvaluationDone.value = true;
 };
 
 const clearAdminIdleTimer = () => {
@@ -460,12 +566,20 @@ const runAdminSessionCheck = async () => {
   }
   isAdminSessionCheckRunning.value = true;
   try {
+    try {
+      await touchTenantAdminSession();
+    } catch {
+      // Best-effort keepalive; validation below is authoritative.
+    }
     const validation = await validateTenantAdminSession();
     if (!validation.valid) {
-      await handleAdminSessionRevoked();
-      return;
+      // One short retry to avoid false negatives during immediate post-login propagation.
+      await new Promise((resolve) => window.setTimeout(resolve, 250));
+      const retryValidation = await validateTenantAdminSession();
+      if (!retryValidation.valid) {
+        await handleAdminSessionRevoked();
+      }
     }
-    await touchTenantAdminSession();
   } catch (error) {
     const message = error instanceof Error ? error.message : "";
     if (message === "Session revoked") {
@@ -684,6 +798,12 @@ const handlePageVisibilityChange = () => {
   startVersionPolling();
 };
 
+const handleStorageChange = (event: StorageEvent) => {
+  if (!event.key || event.key.startsWith("itemtraxx:checkout-offline-buffer:")) {
+    refreshOfflineQueueCount();
+  }
+};
+
 onMounted(() => {
   forceUpdateOverlay.value =
     import.meta.env.DEV &&
@@ -708,10 +828,16 @@ onMounted(() => {
   for (const eventName of adminActivityEvents) {
     window.addEventListener(eventName, handleAdminActivity, { passive: true });
   }
+  window.addEventListener("storage", handleStorageChange);
+  refreshOfflineQueueCount();
+  offlineQueueTimer = window.setInterval(() => {
+    refreshOfflineQueueCount();
+  }, 3000);
   window.addEventListener("resize", measureTopBanners);
   document.addEventListener("visibilitychange", handlePageVisibilityChange);
   resetAdminIdleTimer();
   startAdminSessionPolling();
+  evaluateOnboardingVisibility();
   void nextTick(() => {
     measureTopBanners();
   });
@@ -736,6 +862,7 @@ watch(
   () => {
     resetAdminIdleTimer();
     startAdminSessionPolling();
+    evaluateOnboardingVisibility();
   }
 );
 
@@ -754,9 +881,12 @@ watch(
   () => {
     if (auth.isAuthenticated) {
       startAdminSessionPolling();
+      evaluateOnboardingVisibility();
       return;
     }
     stopAdminSessionPolling();
+    showOnboardingModal.value = false;
+    onboardingEvaluationDone.value = false;
   }
 );
 
@@ -794,8 +924,13 @@ onUnmounted(() => {
     window.clearTimeout(routeProgressTimer);
     routeProgressTimer = null;
   }
+  if (offlineQueueTimer) {
+    window.clearInterval(offlineQueueTimer);
+    offlineQueueTimer = null;
+  }
   stopAdminSessionPolling();
   document.removeEventListener("visibilitychange", handlePageVisibilityChange);
+  window.removeEventListener("storage", handleStorageChange);
   window.removeEventListener("resize", measureTopBanners);
 });
 </script>

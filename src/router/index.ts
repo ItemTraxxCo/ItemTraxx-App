@@ -31,6 +31,12 @@ const routes: RouteRecordRaw[] = [
     meta: { public: true },
   },
   {
+    path: "/forgot-password",
+    name: "public-forgot-password",
+    component: () => import("../pages/ForgotPassword.vue"),
+    meta: { public: true },
+  },
+  {
     path: "/legal",
     name: "public-legal",
     component: () => import("../pages/Legal.vue"),

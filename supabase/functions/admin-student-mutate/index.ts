@@ -235,13 +235,15 @@ const randomLetters = (len: number) =>
 
 const generateStudentId = () => `${randomDigits(4)}${randomLetters(2)}`;
 
+const normalizeNameToken = (token: string) => token.slice(0, 6);
+
 const generateUsername = () => {
   const prefix =
-    CODENAME_PREFIXES[secureRandomInt(CODENAME_PREFIXES.length)];
+    CODENAME_PREFIXES[secureRandomInt(CODENAME_PREFIXES.length)] ?? "Nova";
   const suffix =
-    CODENAME_SUFFIXES[secureRandomInt(CODENAME_SUFFIXES.length)];
-  const token = `${randomLetters(2)}${randomDigits(4)}`;
-  return `${prefix}${suffix}${token}`;
+    CODENAME_SUFFIXES[secureRandomInt(CODENAME_SUFFIXES.length)] ?? "Fox";
+  // Keep usernames short and readable: NameNameNNN
+  return `${normalizeNameToken(prefix)}${normalizeNameToken(suffix)}${randomDigits(3)}`;
 };
 
 const buildUniqueStudentIdentity = async (

@@ -280,6 +280,26 @@ verify_jwt = false
 # Uses ITX_JOB_WORKER_SECRET header auth, not Supabase JWT auth.
 verify_jwt = false
 
+[functions.admin-ops]
+# Auth is validated inside function via auth.getUser(authHeader).
+verify_jwt = false
+
+[functions.login-notify]
+# Auth is validated inside function via adminClient.auth.getUser(accessToken).
+verify_jwt = false
+
+[functions.admin-student-mutate]
+# Auth is validated inside function via userClient.auth.getUser(authHeader).
+verify_jwt = false
+
+[functions.super-student-mutate]
+# Function performs explicit super-admin auth checks internally.
+verify_jwt = false
+
+[functions.checkoutReturn]
+# Auth is validated inside function via userClient.auth.getUser(authHeader).
+verify_jwt = false
+
 # This hook runs before a token is issued and allows you to add additional claims based on the authentication method used.
 # [auth.hook.custom_access_token]
 # enabled = true

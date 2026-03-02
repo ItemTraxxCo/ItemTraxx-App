@@ -41,6 +41,94 @@ const normalizeIp = (req: Request) => {
   return forwardedFirst || cfIp || null;
 };
 
+const sendResendEmail = async (
+  apiKey: string,
+  payload: Record<string, unknown>,
+) => {
+  const response = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    const text = await response.text().catch(() => "");
+    throw new Error(`Email send failed: ${response.status} ${text}`);
+  }
+};
+
+const escapeHtml = (value: string) =>
+  value
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
+
+const buildLoginNotificationHtml = (payload: {
+  tenantName: string;
+  supportEmail: string;
+  loginTimeLabel: string;
+  deviceBrowser: string;
+  ipAddress: string | null;
+}) => {
+  const tenantName = escapeHtml(payload.tenantName);
+  const supportEmail = escapeHtml(payload.supportEmail);
+  const deviceBrowser = escapeHtml(payload.deviceBrowser || "Unknown");
+  const ipAddress = escapeHtml(payload.ipAddress ?? "Unavailable");
+  const loginTime = escapeHtml(payload.loginTimeLabel);
+
+  return `<!doctype html>
+<html>
+  <body style="margin:0;padding:0;background:#f4f6fb;font-family:Arial,Helvetica,sans-serif;color:#1f2937;">
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f4f6fb;padding:24px 12px;">
+      <tr>
+        <td align="center">
+          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:560px;background:#ffffff;border:1px solid #e5e7eb;border-radius:12px;overflow:hidden;">
+            <tr>
+              <td style="padding:20px 24px;background:linear-gradient(180deg,#1f4ca3 0%,#38d0b1 100%);color:#ffffff;">
+                <h1 style="margin:0;font-size:20px;line-height:1.3;">ItemTraxx</h1>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:24px;">
+                <h2 style="margin:0 0 12px 0;font-size:22px;line-height:1.3;color:#111827;">New Login Detected</h2>
+                <p style="margin:0 0 14px 0;font-size:15px;line-height:1.6;color:#374151;">
+                  A new login to your ItemTraxx account was detected.
+                </p>
+                <p style="margin:0 0 14px 0;font-size:15px;line-height:1.7;color:#374151;">
+                  <strong>Tenant:</strong> ${tenantName}<br />
+                  <strong>Login time:</strong> ${loginTime}<br />
+                  <strong>Device/Browser:</strong> ${deviceBrowser}<br />
+                  <strong>IP Address:</strong> ${ipAddress}
+                </p>
+                <p style="margin:0;font-size:14px;line-height:1.6;color:#6b7280;">
+                  If this wasn't you, please contact support immediately.
+                </p>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:16px 24px;border-top:1px solid #e5e7eb;background:#f9fafb;">
+                <p style="margin:0;font-size:12px;line-height:1.6;color:#6b7280;">
+                  Contact support:
+                  <a href="mailto:${supportEmail}" style="color:#19439b;text-decoration:none;">${supportEmail}</a>
+                </p>
+                <p style="margin:6px 0 0 0;font-size:12px;line-height:1.6;color:#9ca3af;">
+                  &copy; 2026 ItemTraxx Co. All rights reserved.
+                </p>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>`;
+};
+
 serve(async (req) => {
   const { hasOrigin, originAllowed, headers } = resolveCorsHeaders(req);
   const requestId = getRequestId(req);
@@ -87,10 +175,11 @@ serve(async (req) => {
 
     const supabaseUrl = Deno.env.get("ITX_SUPABASE_URL") ?? Deno.env.get("SUPABASE_URL");
     const serviceKey = Deno.env.get("ITX_SECRET_KEY") ?? Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    const resendApiKey = Deno.env.get("ITX_RESEND_API_KEY");
     const supportEmail = Deno.env.get("ITX_SUPPORT_EMAIL") ?? "support@itemtraxx.com";
     const fromEmail = Deno.env.get("ITX_EMAIL_FROM") ?? "ItemTraxx <noreply@itemtraxx.com>";
 
-    if (!supabaseUrl || !serviceKey) {
+    if (!supabaseUrl || !serviceKey || !resendApiKey) {
       return jsonResponse(500, { error: "Server misconfiguration" });
     }
 
@@ -137,62 +226,35 @@ serve(async (req) => {
     }
 
     const now = Date.now();
-    const throttleCutoffIso = new Date(now - 15 * 60_000).toISOString();
-    const { count: recentCount, error: recentError } = await adminClient
-      .from("async_jobs")
-      .select("id", { count: "exact", head: true })
-      .eq("job_type", "login_notification_email")
-      .gte("created_at", throttleCutoffIso)
-      .in("status", ["queued", "processing", "completed"])
-      .filter("payload->>user_id", "eq", user.id);
-
-    if (recentError) {
-      logError("login-notify throttle lookup failed", requestId, recentError, {
-        user_id: user.id,
-      });
-      return jsonResponse(500, { error: "Unable to process notification" });
-    }
-
-    if ((recentCount ?? 0) > 0) {
-      return jsonResponse(200, {
-        data: {
-          queued: false,
-          skipped: true,
-          reason: "throttled",
-        },
-      });
-    }
-
     const loginTimeIso = new Date(now).toISOString();
+    const loginTime = new Date(loginTimeIso);
+    const loginTimeLabel = Number.isNaN(loginTime.getTime())
+      ? loginTimeIso
+      : `${loginTime.toISOString()} (UTC)`;
     const deviceInfo = req.headers.get("user-agent") ?? "Unknown device/browser";
     const clientIp = normalizeIp(req);
 
-    const { error: enqueueError } = await adminClient.rpc("enqueue_async_job", {
-      p_job_type: "login_notification_email",
-      p_payload: {
-        user_id: user.id,
-        tenant_id: tenant.id,
-        tenant_name: tenant.name,
-        to_email: recipientEmail,
-        from_email: fromEmail,
-        support_email: supportEmail,
-        login_time_iso: loginTimeIso,
-        device_browser: deviceInfo,
-        ip_address: clientIp,
-      },
-      p_priority: 40,
-      p_max_attempts: 5,
+    await sendResendEmail(resendApiKey, {
+      from: fromEmail,
+      to: [recipientEmail],
+      subject: `New ItemTraxx Login - ${tenant.name}`,
+      html: buildLoginNotificationHtml({
+        tenantName: tenant.name,
+        supportEmail,
+        loginTimeLabel,
+        deviceBrowser: deviceInfo,
+        ipAddress: clientIp,
+      }),
+      text:
+        `A new login to your ItemTraxx account was detected.\n\n` +
+        `Tenant: ${tenant.name}\n` +
+        `Login time: ${loginTimeLabel}\n` +
+        `Device/Browser: ${deviceInfo || "Unknown"}\n` +
+        `IP Address: ${clientIp ?? "Unavailable"}\n\n` +
+        `If this wasn't you, contact support immediately at ${supportEmail}.`,
     });
 
-    if (enqueueError) {
-      logError("login-notify enqueue failed", requestId, enqueueError, {
-        user_id: user.id,
-        tenant_id: tenant.id,
-      });
-      return jsonResponse(500, { error: "Unable to queue login notification" });
-    }
-
-    logInfo("login-notify queued", requestId, {
+    logInfo("login-notify sent", requestId, {
       user_id: user.id,
       tenant_id: tenant.id,
       tenant_name: tenant.name,
@@ -200,8 +262,7 @@ serve(async (req) => {
 
     return jsonResponse(200, {
       data: {
-        queued: true,
-        throttled: false,
+        sent: true,
       },
     });
   } catch (error) {

@@ -29,26 +29,104 @@ const getTenantLoginFunctionName = () =>
 const getLoginNotifyFunctionName = () =>
   import.meta.env.VITE_LOGIN_NOTIFY_FUNCTION || "login-notify";
 
-const AUTH_QUERY_TIMEOUT_MS = 7000;
+const AUTH_QUERY_TIMEOUT_MS = 15000;
+
+const withRetry = async <T>(
+  fn: () => Promise<T>,
+  attempts = 2,
+  delayMs = 250
+): Promise<T> => {
+  let lastError: unknown = null;
+  for (let index = 0; index < attempts; index += 1) {
+    try {
+      return await fn();
+    } catch (error) {
+      lastError = error;
+      if (index + 1 >= attempts) {
+        throw error;
+      }
+      await new Promise((resolve) => window.setTimeout(resolve, delayMs));
+    }
+  }
+  throw lastError;
+};
+
+const toKnownRole = (value: unknown): ProfileRow["role"] => {
+  if (value === "tenant_user" || value === "tenant_admin" || value === "super_admin") {
+    return value;
+  }
+  return null;
+};
+
+const fetchCurrentRoleAndTenant = async () => {
+  const [roleResult, tenantResult] = await Promise.all([
+    withRetry(
+      () =>
+        withTimeout(
+          supabase.rpc("current_user_role"),
+          AUTH_QUERY_TIMEOUT_MS,
+          "Role lookup timed out."
+        ),
+      2
+    ),
+    withRetry(
+      () =>
+        withTimeout(
+          supabase.rpc("current_tenant_id"),
+          AUTH_QUERY_TIMEOUT_MS,
+          "Tenant lookup timed out."
+        ),
+      2
+    ),
+  ]);
+
+  return {
+    role: toKnownRole(roleResult.data),
+    tenantId:
+      typeof tenantResult.data === "string" && tenantResult.data.trim()
+        ? tenantResult.data
+        : null,
+  };
+};
 
 const fetchProfile = async (userId: string): Promise<ProfileRow | null> => {
   let data: unknown = null;
   let error: unknown = null;
   try {
-    const response = await withTimeout(
-      supabase
-        .from("profiles")
-        .select("id, role, tenant_id, auth_email, is_active")
-        .eq("id", userId)
-        .single(),
-      AUTH_QUERY_TIMEOUT_MS,
-      "Profile lookup timed out."
+    const response = await withRetry(
+      () =>
+        withTimeout(
+          supabase
+            .from("profiles")
+            .select("id, role, tenant_id, auth_email, is_active")
+            .eq("id", userId)
+            .single(),
+          AUTH_QUERY_TIMEOUT_MS,
+          "Profile lookup timed out."
+        ),
+      2
     );
     data = response.data;
     error = response.error;
   } catch (requestError) {
     console.error("Profile lookup failed:", requestError);
-    return null;
+    try {
+      // Fallback path when direct profile select is flaky/timeouts: use definer RPCs.
+      const { role, tenantId } = await fetchCurrentRoleAndTenant();
+      if (!role && !tenantId) {
+        return null;
+      }
+      return {
+        id: userId,
+        role,
+        tenant_id: tenantId,
+        auth_email: null,
+        is_active: null,
+      };
+    } catch (fallbackError) {
+      console.error("Profile fallback lookup failed:", fallbackError);
+      return null;
+    }
   }
 
   if (error) {
@@ -62,14 +140,18 @@ const fetchTenantStatus = async (tenantId: string): Promise<TenantRow | null> =>
   let data: unknown = null;
   let error: unknown = null;
   try {
-    const response = await withTimeout(
-      supabase
-        .from("tenants")
-        .select("id, status")
-        .eq("id", tenantId)
-        .single(),
-      AUTH_QUERY_TIMEOUT_MS,
-      "Tenant status lookup timed out."
+    const response = await withRetry(
+      () =>
+        withTimeout(
+          supabase
+            .from("tenants")
+            .select("id, status")
+            .eq("id", tenantId)
+            .single(),
+          AUTH_QUERY_TIMEOUT_MS,
+          "Tenant status lookup timed out."
+        ),
+      2
     );
     data = response.data;
     error = response.error;
@@ -130,7 +212,10 @@ export const refreshAuthFromSession = async () => {
   }
   const current = getAuthState();
   const isSameUser = current.userId === userId;
-  const isSuperRole = profile?.role === "super_admin";
+  const resolvedRole = profile?.role ?? (isSameUser ? current.role : null);
+  const resolvedSessionTenantId =
+    profile?.tenant_id ?? (isSameUser ? current.sessionTenantId : null);
+  const isSuperRole = resolvedRole === "super_admin";
 
   setAuthStateFromBackend({
     isInitialized: true,
@@ -138,10 +223,10 @@ export const refreshAuthFromSession = async () => {
     userId,
     email,
     signedInAt,
-    role: profile?.role ?? null,
-    sessionTenantId: profile?.tenant_id ?? null,
+    role: resolvedRole,
+    sessionTenantId: resolvedSessionTenantId,
     tenantContextId:
-      current.tenantContextId ?? profile?.tenant_id ?? null,
+      current.tenantContextId ?? resolvedSessionTenantId ?? null,
     hasSecondaryAuth:
       isSameUser && isSuperRole ? current.hasSecondaryAuth ?? false : false,
     superVerifiedAt:
@@ -162,17 +247,20 @@ export const initAuthListener = () => {
     }
     const current = getAuthState();
     const isSameUser = current.userId === session.user.id;
-    const isSuperRole = profile?.role === "super_admin";
+    const resolvedRole = profile?.role ?? (isSameUser ? current.role : null);
+    const resolvedSessionTenantId =
+      profile?.tenant_id ?? (isSameUser ? current.sessionTenantId : null);
+    const isSuperRole = resolvedRole === "super_admin";
     setAuthStateFromBackend({
       isInitialized: true,
       isAuthenticated: true,
       userId: session.user.id,
       email: session.user.email ?? null,
       signedInAt: session.user.last_sign_in_at ?? null,
-      role: profile?.role ?? null,
-      sessionTenantId: profile?.tenant_id ?? null,
+      role: resolvedRole,
+      sessionTenantId: resolvedSessionTenantId,
       tenantContextId:
-        current.tenantContextId ?? profile?.tenant_id ?? null,
+        current.tenantContextId ?? resolvedSessionTenantId ?? null,
       hasSecondaryAuth:
         isSameUser && isSuperRole ? current.hasSecondaryAuth ?? false : false,
       superVerifiedAt:
@@ -255,7 +343,7 @@ export const tenantLogin = async (
       body: {},
     }).then((result) => {
       if (!result.ok) {
-        console.warn("login notification enqueue failed", {
+        console.warn("login notification send failed", {
           status: result.status,
           error: result.error,
           requestId: result.requestId,
@@ -268,6 +356,9 @@ export const tenantLogin = async (
 export const adminLogin = async (email: string, password: string) => {
   const priorTenantContextId = getAuthState().tenantContextId;
   let error: unknown = null;
+  let signedInUser:
+    | { id: string; email?: string | null; last_sign_in_at?: string | null }
+    | null = null;
   try {
     const signIn = await withTimeout(
       supabase.auth.signInWithPassword({
@@ -278,6 +369,10 @@ export const adminLogin = async (email: string, password: string) => {
       "Sign in timed out."
     );
     error = signIn.error;
+    signedInUser =
+      (signIn.data.user as { id: string; email?: string | null; last_sign_in_at?: string | null } | null) ??
+      (signIn.data.session?.user as { id: string; email?: string | null; last_sign_in_at?: string | null } | null) ??
+      null;
   } catch (requestError) {
     if (requestError instanceof TimeoutError) {
       throw new Error("Sign in timed out. Please try again.");
@@ -285,14 +380,33 @@ export const adminLogin = async (email: string, password: string) => {
     throw requestError;
   }
 
-  if (error) {
+  if (error || !signedInUser?.id) {
     throw new Error("Invalid credentials.");
   }
 
-  await refreshAuthFromSession();
-  const profile = await fetchProfile(getAuthState().userId ?? "");
   const current = getAuthState();
-  if (current.role !== "tenant_admin") {
+  let profile = await fetchProfile(signedInUser.id);
+  let fallbackRole: ProfileRow["role"] = null;
+  let fallbackTenantId: string | null = null;
+  let resolvedRole = profile?.role ?? null;
+  let resolvedTenantId = profile?.tenant_id ?? null;
+
+  if (!resolvedRole || !resolvedTenantId) {
+    try {
+      const fallback = await fetchCurrentRoleAndTenant();
+      fallbackRole = fallback.role;
+      fallbackTenantId = fallback.tenantId;
+      resolvedRole = resolvedRole ?? fallbackRole ?? null;
+      resolvedTenantId = resolvedTenantId ?? fallbackTenantId ?? null;
+    } catch {
+      // Ignore fallback failure and continue with best available values.
+    }
+  }
+
+  if (!resolvedRole) {
+    resolvedRole = current.role ?? null;
+  }
+  if (resolvedRole !== "tenant_admin") {
     await signOut();
     throw new Error("Access denied.");
   }
@@ -300,21 +414,39 @@ export const adminLogin = async (email: string, password: string) => {
     await signOut();
     throw new Error("Access denied.");
   }
-  if (profile?.tenant_id) {
-    const tenant = await fetchTenantStatus(profile.tenant_id);
+  if (resolvedTenantId) {
+    const tenant = await fetchTenantStatus(resolvedTenantId);
     if (tenant?.status === "suspended") {
       await signOut();
       throw new Error("Tenant disabled.");
     }
   }
 
-  if (priorTenantContextId && current.sessionTenantId !== priorTenantContextId) {
+  if (
+    priorTenantContextId &&
+    resolvedTenantId &&
+    resolvedTenantId !== priorTenantContextId
+  ) {
     await signOut();
     throw new Error("Access denied.");
   }
 
-  if (!current.tenantContextId) {
-    setTenantContext(current.sessionTenantId ?? null);
+  const finalTenantId = resolvedTenantId ?? current.sessionTenantId ?? fallbackTenantId ?? null;
+  setAuthStateFromBackend({
+    isInitialized: true,
+    isAuthenticated: true,
+    userId: signedInUser.id,
+    email: signedInUser.email ?? null,
+    signedInAt: signedInUser.last_sign_in_at ?? null,
+    role: resolvedRole,
+    sessionTenantId: finalTenantId,
+    tenantContextId: current.tenantContextId ?? finalTenantId ?? null,
+    hasSecondaryAuth: false,
+    superVerifiedAt: null,
+  });
+
+  if (!getAuthState().tenantContextId) {
+    setTenantContext(finalTenantId);
   }
   markAdminVerified();
 };

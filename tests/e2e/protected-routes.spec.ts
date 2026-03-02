@@ -20,7 +20,7 @@ test.describe("Protected route smoke tests", () => {
     await setTenantAdminSession(page);
 
     await navigateApp(page, "/tenant/admin");
-    await expect(page.getByRole("heading", { name: "Admin Panel" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Admin Panel", exact: true })).toBeVisible();
     await expect(page.getByRole("link", { name: "Item Status Tracking" })).toBeVisible();
 
     await navigateApp(page, "/tenant/admin/item-status");

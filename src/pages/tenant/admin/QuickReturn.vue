@@ -111,11 +111,19 @@ const submitReturn = async () => {
 
   isSubmitting.value = true;
   try {
-    await submitCheckoutReturn({
+    const submitResult = await submitCheckoutReturn({
       student_id: "",
       gear_barcodes: barcodes.value.map((item) => item.barcode),
       action_type: "admin_return",
     });
+    if (submitResult.buffered) {
+      success.value = "";
+      lastSummary.value = "";
+      error.value = `No connection. Return request buffered for auto-sync. Buffered: ${submitResult.queuedCount}`;
+      barcodes.value = [];
+      barcodeInput.value = "";
+      return;
+    }
     await logAdminAction({
       action_type: "quick_return",
       metadata: {

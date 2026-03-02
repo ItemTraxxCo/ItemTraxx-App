@@ -1,4 +1,5 @@
 import { supabase } from "./supabaseClient";
+import { getAuthState } from "../store/authState";
 
 export type AdminAuditLog = {
   id: string;
@@ -18,6 +19,11 @@ type ActorProfileRow = {
 };
 
 export const fetchAdminAuditLogs = async (): Promise<AdminAuditLog[]> => {
+  const tenantId = getAuthState().tenantContextId;
+  if (!tenantId) {
+    throw new Error("Missing tenant context.");
+  }
+
   const { data, error } = await supabase
     .from("admin_audit_logs")
     .select(
@@ -32,6 +38,7 @@ export const fetchAdminAuditLogs = async (): Promise<AdminAuditLog[]> => {
         created_at
       `
     )
+    .eq("tenant_id", tenantId)
     .order("created_at", { ascending: false })
     .limit(200);
 

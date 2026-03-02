@@ -124,19 +124,16 @@ const handleAdminLogin = async () => {
     devLog("auth_request_start");
     await adminLogin(email.value.trim(), password.value);
     devLog("auth_request_success");
-    await logAdminAction({
+    await router.push("/tenant/admin");
+    void logAdminAction({
       action_type: "admin_login",
       metadata: { email: email.value.trim() },
+    }).catch(() => {
+      // Audit logging is best-effort and should not block admin sign in.
     });
-    try {
-      await touchTenantAdminSession();
-    } catch (sessionErr) {
-      const message = sessionErr instanceof Error ? sessionErr.message : "";
-      if (!message.includes("Session controls unavailable")) {
-        throw sessionErr;
-      }
-    }
-    await router.push("/tenant/admin");
+    void touchTenantAdminSession().catch(() => {
+      // Session controls are best-effort and should not block access.
+    });
   } catch (err) {
     devLog("auth_request_failed");
     const message = err instanceof Error ? err.message : "Sign in failed.";

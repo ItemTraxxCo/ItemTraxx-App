@@ -89,6 +89,69 @@ const sendResendEmail = async (
   }
 };
 
+const escapeHtml = (value: string) =>
+  value
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
+
+const buildLoginNotificationHtml = (payload: LoginNotificationPayload, loginTimeLabel: string) => {
+  const tenantName = escapeHtml(payload.tenant_name);
+  const supportEmail = escapeHtml(payload.support_email);
+  const deviceBrowser = escapeHtml(payload.device_browser || "Unknown");
+  const ipAddress = escapeHtml(payload.ip_address ?? "Unavailable");
+  const loginTime = escapeHtml(loginTimeLabel);
+
+  return `<!doctype html>
+<html>
+  <body style="margin:0;padding:0;background:#f4f6fb;font-family:Arial,Helvetica,sans-serif;color:#1f2937;">
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f4f6fb;padding:24px 12px;">
+      <tr>
+        <td align="center">
+          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:560px;background:#ffffff;border:1px solid #e5e7eb;border-radius:12px;overflow:hidden;">
+            <tr>
+              <td style="padding:20px 24px;background:linear-gradient(180deg,#1f4ca3 0%,#38d0b1 100%);color:#ffffff;">
+                <h1 style="margin:0;font-size:20px;line-height:1.3;">ItemTraxx</h1>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:24px;">
+                <h2 style="margin:0 0 12px 0;font-size:22px;line-height:1.3;color:#111827;">New Login Detected</h2>
+                <p style="margin:0 0 14px 0;font-size:15px;line-height:1.6;color:#374151;">
+                  A new login to your ItemTraxx account was detected.
+                </p>
+                <p style="margin:0 0 14px 0;font-size:15px;line-height:1.7;color:#374151;">
+                  <strong>Tenant:</strong> ${tenantName}<br />
+                  <strong>Login time:</strong> ${loginTime}<br />
+                  <strong>Device/Browser:</strong> ${deviceBrowser}<br />
+                  <strong>IP Address:</strong> ${ipAddress}
+                </p>
+                <p style="margin:0;font-size:14px;line-height:1.6;color:#6b7280;">
+                  If this wasn't you, please contact support immediately.
+                </p>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:16px 24px;border-top:1px solid #e5e7eb;background:#f9fafb;">
+                <p style="margin:0;font-size:12px;line-height:1.6;color:#6b7280;">
+                  Contact support:
+                  <a href="mailto:${supportEmail}" style="color:#19439b;text-decoration:none;">${supportEmail}</a>
+                </p>
+                <p style="margin:6px 0 0 0;font-size:12px;line-height:1.6;color:#9ca3af;">
+                  &copy; 2026 ItemTraxx Co. All rights reserved.
+                </p>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>`;
+};
+
 const processContactSalesEmail = async (
   resendApiKey: string,
   payload: ContactSalesPayload,
@@ -129,6 +192,7 @@ const processLoginNotificationEmail = async (
     from: payload.from_email,
     to: [payload.to_email],
     subject: `New ItemTraxx Login - ${payload.tenant_name}`,
+    html: buildLoginNotificationHtml(payload, loginTimeLabel),
     text:
       `A new login to your ItemTraxx account was detected.\n\n` +
       `Tenant: ${payload.tenant_name}\n` +

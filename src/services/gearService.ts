@@ -1,5 +1,6 @@
 import { supabase } from "./supabaseClient";
 import { invokeEdgeFunction } from "./edgeFunctionClient";
+import { getAuthState } from "../store/authState";
 
 export type GearItem = {
   id: string;
@@ -41,10 +42,20 @@ const getAccessToken = async () => {
   return session.access_token;
 };
 
+const getTenantContextId = () => {
+  const tenantId = getAuthState().tenantContextId;
+  if (!tenantId) {
+    throw new Error("Missing tenant context.");
+  }
+  return tenantId;
+};
+
 export const fetchGear = async () => {
+  const tenantId = getTenantContextId();
   const { data, error } = await supabase
     .from("gear")
     .select("id, tenant_id, name, barcode, serial_number, status, notes")
+    .eq("tenant_id", tenantId)
     .is("deleted_at", null)
     .order("created_at", { ascending: false });
 
@@ -175,6 +186,7 @@ export const restoreGear = async (id: string) => {
 };
 
 export const fetchGearLogs = async () => {
+  const tenantId = getTenantContextId();
   const { data, error } = await supabase
     .from("gear_logs")
     .select(
@@ -190,6 +202,7 @@ export const fetchGearLogs = async () => {
         student:checked_out_by ( username, student_id )
       `
     )
+    .eq("tenant_id", tenantId)
     .order("action_time", { ascending: false })
     .limit(200);
 

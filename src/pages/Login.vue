@@ -1,5 +1,12 @@
 <template>
   <div class="page">
+    <div class="page-nav-left">
+      <RouterLink class="pricing-back-link" to="/" aria-label="Return to home">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M15 5 8 12l7 7" />
+        </svg>
+      </RouterLink>
+    </div>
     <h1 class="brand-title">
       <img
         v-if="logoUrl"
@@ -33,7 +40,7 @@
           <div :ref="setTurnstileContainerRef"></div>
         </label>
         <p class="muted support-note">
-          Trouble signing in? Contact support at support@itemtraxx.com.
+          Trouble signing in? Contact our support team by clicking the menu in the top right and then "Contact Support".
           By using this software, you agree to our
           <a :href="legalUrl" target="_blank" rel="noreferrer">legal terms and policies</a>.
         </p>
@@ -41,6 +48,9 @@
           <button type="submit" class="button-primary" :disabled="isLoading">
             Sign in
           </button>
+        </div>
+        <div class="login-secondary-actions">
+          <RouterLink class="link-button" to="/forgot-password">Forgot password?</RouterLink>
         </div>
       </form>
 
@@ -59,7 +69,7 @@
 
 <script setup lang="ts">
 import { onMounted, onUnmounted, ref } from "vue";
-import { useRouter } from "vue-router";
+import { RouterLink, useRouter } from "vue-router";
 import { tenantLogin } from "../services/authService";
 import { useTurnstile } from "../composables/useTurnstile";
 
@@ -224,3 +234,60 @@ onMounted(() => {
   }, 2500);
 });
 </script>
+
+<style scoped>
+.pricing-back-link {
+  width: 2.4rem;
+  height: 2.4rem;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  background: rgba(7, 23, 43, 0.24);
+  color: #ffffff;
+  text-decoration: none;
+  transition: transform 0.16s ease, border-color 0.16s ease, background 0.16s ease;
+}
+
+.pricing-back-link:hover {
+  text-decoration: none;
+  transform: translateY(-1px);
+  border-color: rgba(255, 255, 255, 0.6);
+  background: rgba(7, 23, 43, 0.34);
+}
+
+.pricing-back-link svg {
+  width: 1.2rem;
+  height: 1.2rem;
+  stroke: currentColor;
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  fill: none;
+}
+
+.login-secondary-actions {
+  margin-top: 0.6rem;
+}
+
+.link-button {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  color: var(--link-color);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.link-button:hover {
+  text-decoration: underline;
+  transform: none;
+}
+
+.link-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  text-decoration: none;
+}
+</style>

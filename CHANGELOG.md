@@ -261,6 +261,19 @@ Changes are dated based on the default timezone: America/Los_Angeles
 
 ---
 
+### 2/27/2026 Development Update
+
+- Added a global refresh-required overlay to block outdated client versions and prompt users to reload before continuing.
+- Updated GitHub Actions dependencies by bumping `actions/upload-artifact` to `v7`.
+
+---
+
+### 2/28/2026 Development Update
+
+- feat: automate changelog updates and improve last updated formatting in documents.
+
+---
+
 ### 3/1/2026 Development Update
 
 - Added account recovery UX improvements:
@@ -285,24 +298,6 @@ Changes are dated based on the default timezone: America/Los_Angeles
 - feat(auth,tenant): onboarding, offline queue sync, and auth/email hardening.
 - fix changelog.
 - fix(ci): unbreak bundle budget gate and admin heading e2e selector.
-
----
-
-### 2/27/2026 Development Update
-
-- Added a global refresh-required overlay to block outdated client versions and prompt users to reload before continuing.
-- Updated GitHub Actions dependencies by bumping `actions/upload-artifact` to `v7`.
-
----
-
-### 2/28/2026 Development Update
-
-- feat: automate changelog updates and improve last updated formatting in documents.
-
----
-
-### 3/1/2026 Development Update
-
 - feat(auth): enqueue tenant login notification emails via async worker.
 - feat(ops): add production kill switch with localhost bypass and 5-min polling.
 - fix(ops): stabilize async worker auth and public status function access.

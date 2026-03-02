@@ -258,6 +258,28 @@ Changes are dated based on the default timezone: America/Los_Angeles
   - Supabase JS family updates (`@supabase/*` 2.97.x -> 2.98.0)
   - `@types/node` update to latest patch release in lockfile
 - Updated enterprise pricing contact information on the public pricing page.
+
+---
+
+### 3/1/2026 Development Update
+
+- Added account recovery UX improvements:
+  - new `/forgot-password` route/page and login shortcut link
+  - reset-flow copy and spacing refinements
+- Added first-time onboarding modal system for tenant flows:
+  - 5-step onboarding experiences for checkout/admin contexts
+  - one-time local completion tracking with replay via top-right menu (`Take tour`)
+  - route-context-aware onboarding variant selection
+- Added offline transaction buffering and reconnect sync for checkout/returns:
+  - local offline queue storage with automatic retry on reconnect
+  - buffered-transaction status messaging in checkout/admin quick return flows
+  - top-menu offline queue indicator with explanatory tooltip
+- Updated student identity generation to shorter username format (`NameNameNNN`) across frontend and edge generation paths.
+- Fixed edge function auth/gateway behavior for tenant operations by deploying with `--no-verify-jwt` where function-level auth validation is enforced.
+- Updated login notification delivery architecture:
+  - moved `login-notify` from async-job enqueue to direct email send
+  - added branded HTML “New Login Detected” email template with plaintext fallback
+- Added branded, standardized HTML templates for Supabase auth emails (signup confirmation, invite, magic link, password reset/change, email/phone change, identity link/unlink, MFA enroll/unenroll, reauth code).
 - Improved contact-sales submission success messaging to clearly confirm follow-up email delivery.
 - Added observability/reliability foundations including async jobs, reporting views, and synthetic monitoring support.
 

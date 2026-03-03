@@ -1,6 +1,6 @@
 # Changelog
 
-Last updated (year-month-day): 2026-03-01
+Last updated (year-month-day): 2026-03-02
 
 All notable changes to **ItemTraxx** will be documented in this file. This includes new features, improvements, bug fixes, and other updates.
 
@@ -218,28 +218,6 @@ Changes are dated based on the default timezone: America/Los_Angeles
 
 ---
 
-### 3/2/2026 Development Update
-
-- Added account recovery UX improvements:
-  - new `/forgot-password` route/page and login shortcut link
-  - reset-flow copy and spacing refinements
-- Added first-time onboarding modal system for tenant flows:
-  - 5-step onboarding experiences for checkout/admin contexts
-  - one-time local completion tracking with replay via top-right menu (`Take tour`)
-  - route-context-aware onboarding variant selection
-- Added offline transaction buffering and reconnect sync for checkout/returns:
-  - local offline queue storage with automatic retry on reconnect
-  - buffered-transaction status messaging in checkout/admin quick return flows
-  - top-menu offline queue indicator with explanatory tooltip
-- Updated student identity generation to shorter username format (`NameNameNNN`) across frontend and edge generation paths.
-- Fixed edge function auth/gateway behavior for tenant operations by deploying with `--no-verify-jwt` where function-level auth validation is enforced.
-- Updated login notification delivery architecture:
-  - moved `login-notify` from async-job enqueue to direct email send
-  - added branded HTML “New Login Detected” email template with plaintext fallback
-- Added branded, standardized HTML templates for Supabase auth emails (signup confirmation, invite, magic link, password reset/change, email/phone change, identity link/unlink, MFA enroll/unenroll, reauth code).
-
----
-
 ### 2/26/2026 Development Update
 
 - Completed UI refinement pass for super-admin Sales Leads table/modal density and readability.
@@ -303,6 +281,26 @@ Changes are dated based on the default timezone: America/Los_Angeles
 - fix(ops): stabilize async worker auth and public status function access.
 - deps(deps-dev): bump @types/node in the npm-and-yarn group.
 - fix(changelog): preserve file structure and use Pacific-time dating in auto-updates.
+
+---
+
+### 3/2/2026 Development Update
+
+- Added operational and engineering documentation set under `/docs`:
+  - incident response guide
+  - network troubleshooting guide (including DNS sinkhole diagnosis)
+  - support playbook
+  - release checklist
+  - tenant-admin performance guide
+  - onboarding feature spec
+  - offline queue design
+  - email templates guide
+  - tenant auth issues runbook
+  - edge function deployment runbook
+- Added architecture documentation under `/docs/architecture`:
+  - high-level system overview spanning frontend, edge proxy/functions, and Supabase domains
+  - request flow diagrams for tenant login, checkout/return + offline sync, tenant admin ops, and super/internal async processing
+  - CI/CD, security boundary, and combined end-to-end architecture diagrams
 
 ---
 

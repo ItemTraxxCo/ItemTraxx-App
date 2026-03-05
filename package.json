@@ -37,5 +37,8 @@
     "typescript": "~5.9.3",
     "vite": "^7.3.1",
     "vue-tsc": "^3.2.5"
+  },
+  "overrides": {
+    "tar": "^7.5.10"
   }
 }

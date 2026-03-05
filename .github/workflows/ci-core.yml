@@ -56,4 +56,4 @@ jobs:
         with:
           name: perf-report
           path: artifacts/perf-report.json
-          if-no-files-found: error
+          if-no-files-found: ignore

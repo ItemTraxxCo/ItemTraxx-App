@@ -2,7 +2,7 @@
 set -euo pipefail
 
 echo "[security] npm audit (moderate+)"
-npm audit --audit-level=moderate
+node ./scripts/npm-audit-gate.mjs
 
 echo "[security] scanning for unsafe dynamic code execution patterns"
 if rg -n "\\beval\\(|new Function\\(" src supabase cloudflare >/tmp/itemtraxx-security-patterns.txt; then

@@ -1,7 +1,7 @@
 import { invokeEdgeFunction } from "./edgeFunctionClient";
-import { supabase } from "./supabaseClient";
 import type { AdminOpsAction, EdgeEnvelope, TenantFeatureFlags } from "../types/edgeContracts";
 import { getOrCreateDeviceSession } from "../utils/deviceSession";
+import { getFreshAccessToken } from "./sessionAccessToken";
 
 export type StatusTrackedItem = {
   id: string;
@@ -56,11 +56,7 @@ export type TenantSessionItem = {
 };
 
 const getAccessToken = async () => {
-  const { data, error } = await supabase.auth.getSession();
-  if (error || !data.session?.access_token) {
-    throw new Error("Unauthorized");
-  }
-  return data.session.access_token;
+  return getFreshAccessToken();
 };
 
 const callAdminOps = async <TData>(

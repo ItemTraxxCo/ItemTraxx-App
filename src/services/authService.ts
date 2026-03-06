@@ -35,6 +35,15 @@ const getLoginNotifyFunctionName = () =>
   import.meta.env.VITE_LOGIN_NOTIFY_FUNCTION || "login-notify";
 
 const AUTH_QUERY_TIMEOUT_MS = 15000;
+const DISTRICT_HANDOFF_MARKER_KEY = "itemtraxx:district-handoff-at";
+
+const clearLocalSession = async () => {
+  try {
+    await supabase.auth.signOut({ scope: "local" });
+  } catch {
+    // Ignore local storage cleanup failures during handoff.
+  }
+};
 
 const withRetry = async <T>(
   fn: () => Promise<T>,
@@ -402,6 +411,7 @@ export const tenantLogin = async (
     !!refreshToken;
 
   if (shouldCrossHostRedirect) {
+    await clearLocalSession();
     return {
       districtId: null,
       districtSlug: data.district_slug?.trim() ?? null,
@@ -458,10 +468,26 @@ export const consumeDistrictSessionHandoff = async () => {
     return false;
   }
 
-  await supabase.auth.setSession({
+  await clearLocalSession();
+
+  const { data, error } = await supabase.auth.setSession({
     access_token: accessToken,
     refresh_token: refreshToken,
   });
+
+  if (error || !data.session?.access_token) {
+    await clearLocalSession();
+    throw new Error("Unable to complete district sign-in.");
+  }
+
+  try {
+    window.sessionStorage.setItem(
+      DISTRICT_HANDOFF_MARKER_KEY,
+      String(Date.now())
+    );
+  } catch {
+    // Ignore sessionStorage failures.
+  }
 
   params.delete("itx_at");
   params.delete("itx_rt");

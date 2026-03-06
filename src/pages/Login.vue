@@ -70,7 +70,7 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted, ref } from "vue";
 import { RouterLink, useRouter } from "vue-router";
-import { tenantLogin } from "../services/authService";
+import { createDistrictSessionHandoff, tenantLogin } from "../services/authService";
 import { useTurnstile } from "../composables/useTurnstile";
 import { buildDistrictAppHandoffUrl } from "../services/districtService";
 import { getDistrictState } from "../store/districtState";
@@ -178,12 +178,16 @@ const handleTenantLogin = async () => {
       session.accessToken &&
       session.refreshToken
     ) {
+      const handoffCode = await createDistrictSessionHandoff(
+        session.districtSlug,
+        session.accessToken,
+        session.refreshToken
+      );
       window.location.assign(
         buildDistrictAppHandoffUrl(
           session.districtSlug,
           "/tenant/checkout",
-          session.accessToken,
-          session.refreshToken
+          handoffCode
         )
       );
       return;

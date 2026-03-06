@@ -38,12 +38,12 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from "vue";
 import { RouterLink, useRouter } from "vue-router";
-import { adminLogin } from "../../../services/authService";
+import { adminLogin, createDistrictSessionHandoff } from "../../../services/authService";
 import { touchTenantAdminSession } from "../../../services/adminOpsService";
 import { logAdminAction } from "../../../services/auditLogService";
 import { useTurnstile } from "../../../composables/useTurnstile";
 import { clearAdminVerification } from "../../../store/authState";
-import { buildDistrictAppUrl } from "../../../services/districtService";
+import { buildDistrictAppHandoffUrl } from "../../../services/districtService";
 import { getDistrictState } from "../../../store/districtState";
 
 const router = useRouter();
@@ -127,9 +127,19 @@ const handleAdminLogin = async () => {
     devLog("auth_request_start");
     const session = await adminLogin(email.value.trim(), password.value);
     devLog("auth_request_success");
-    if (!districtHost.isDistrictHost && session?.districtSlug) {
+    if (
+      !districtHost.isDistrictHost &&
+      session?.districtSlug &&
+      session.accessToken &&
+      session.refreshToken
+    ) {
       const targetPath = session.role === "district_admin" ? "/district" : "/tenant/admin";
-      window.location.assign(buildDistrictAppUrl(session.districtSlug, targetPath));
+      const handoffCode = await createDistrictSessionHandoff(
+        session.districtSlug,
+        session.accessToken,
+        session.refreshToken
+      );
+      window.location.assign(buildDistrictAppHandoffUrl(session.districtSlug, targetPath, handoffCode));
       return;
     }
     await router.push(session?.role === "district_admin" ? "/district" : "/tenant/admin");

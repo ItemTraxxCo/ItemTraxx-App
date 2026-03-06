@@ -288,6 +288,10 @@ verify_jwt = false
 # Auth is validated inside function via adminClient.auth.getUser(accessToken).
 verify_jwt = false
 
+[functions.district-handoff]
+# Root-host login creates/consumes one-time district handoff codes; auth is verified inside.
+verify_jwt = false
+
 [functions.admin-student-mutate]
 # Auth is validated inside function via userClient.auth.getUser(authHeader).
 verify_jwt = false

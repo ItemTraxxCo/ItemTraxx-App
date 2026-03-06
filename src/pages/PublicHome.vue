@@ -295,7 +295,7 @@ const faqItems = [
   },
   {
     q: "Does ItemTraxx keep a transaction history?",
-    a: "Yes, ItemTraxx keeps a detailed transaction history that logs every checkout, return, and inventory change. This allows you to track who has what items, when they were taken, and when they were returned.",
+    a: "Yes, ItemTraxx keeps a detailed transaction history that logs every checkout, return, and inventory change. This allows you to track who has what items, when they were taken, and when they were returned. ItemTraxx retains all transaction logs and audit logs for as long as your account is active and then 1 year. after account deactivation.",
   },
   {
     q: "Is this a fit for schools and small teams?",

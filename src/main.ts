@@ -16,6 +16,7 @@ import {
   initAuthListener,
   refreshAuthFromSession,
 } from "./services/authService";
+import { touchTenantAdminSession } from "./services/adminOpsService";
 import { TimeoutError, withTimeout } from "./services/asyncUtils";
 import {
   captureInitialPerfMetrics,
@@ -156,7 +157,7 @@ const mountApp = () => {
 };
 
 const bootstrap = async () => {
-  await consumeDistrictSessionHandoff();
+  const consumedDistrictHandoff = await consumeDistrictSessionHandoff();
   await initializeDistrictContext();
   const isE2ETestMode = import.meta.env.VITE_E2E_TEST_UTILS === "true";
   const canMountFirst = isE2ETestMode || isPublicBootstrapPath();
@@ -167,9 +168,19 @@ const bootstrap = async () => {
     }
     mountApp();
     void initializeAuth();
+    if (consumedDistrictHandoff) {
+      void touchTenantAdminSession().catch(() => {
+        // Best-effort session registration after district handoff.
+      });
+    }
     return;
   }
   await initializeAuth();
+  if (consumedDistrictHandoff) {
+    void touchTenantAdminSession().catch(() => {
+      // Best-effort session registration after district handoff.
+    });
+  }
   mountApp();
 };
 

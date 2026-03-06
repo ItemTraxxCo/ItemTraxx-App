@@ -351,9 +351,9 @@ const isTenantAdminArea = computed(() => {
 });
 const showNotificationBell = computed(() => {
   if (!auth.isAuthenticated) return false;
-  if (auth.role !== "tenant_user" && auth.role !== "tenant_admin") return false;
+  if (auth.role !== "tenant_admin") return false;
   if (route.path === "/tenant/admin-login") return false;
-  return route.path.startsWith("/tenant");
+  return route.path.startsWith("/tenant/admin") || route.path.startsWith("/district");
 });
 const showBroadcast = computed(() => {
   if (!activeBroadcast.value) return false;

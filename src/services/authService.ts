@@ -33,6 +33,8 @@ const getTenantLoginFunctionName = () =>
   import.meta.env.VITE_TENANT_LOGIN_FUNCTION || "tenant-login";
 const getLoginNotifyFunctionName = () =>
   import.meta.env.VITE_LOGIN_NOTIFY_FUNCTION || "login-notify";
+const getDistrictHandoffFunctionName = () =>
+  import.meta.env.VITE_DISTRICT_HANDOFF_FUNCTION || "district-handoff";
 
 const AUTH_QUERY_TIMEOUT_MS = 15000;
 const DISTRICT_HANDOFF_MARKER_KEY = "itemtraxx:district-handoff-at";
@@ -411,7 +413,6 @@ export const tenantLogin = async (
     !!refreshToken;
 
   if (shouldCrossHostRedirect) {
-    await clearLocalSession();
     return {
       districtId: null,
       districtSlug: data.district_slug?.trim() ?? null,
@@ -461,18 +462,46 @@ export const consumeDistrictSessionHandoff = async () => {
     ? window.location.hash.slice(1)
     : window.location.hash;
   const params = new URLSearchParams(hash);
+  const handoffCode = params.get("itx_hc");
   const accessToken = params.get("itx_at");
   const refreshToken = params.get("itx_rt");
 
-  if (!accessToken || !refreshToken) {
+  if (!handoffCode && (!accessToken || !refreshToken)) {
     return false;
   }
 
   await clearLocalSession();
 
+  let finalAccessToken = accessToken;
+  let finalRefreshToken = refreshToken;
+
+  if (handoffCode) {
+    const result = await invokeEdgeFunction<
+      { access_token?: string; refresh_token?: string },
+      { action: "consume"; code: string }
+    >(getDistrictHandoffFunctionName(), {
+      method: "POST",
+      body: {
+        action: "consume",
+        code: handoffCode,
+      },
+    });
+
+    if (!result.ok || !result.data?.access_token || !result.data?.refresh_token) {
+      throw new Error("Unable to complete district sign-in.");
+    }
+
+    finalAccessToken = result.data.access_token;
+    finalRefreshToken = result.data.refresh_token;
+  }
+
+  if (!finalAccessToken || !finalRefreshToken) {
+    throw new Error("Unable to complete district sign-in.");
+  }
+
   const { data, error } = await supabase.auth.setSession({
-    access_token: accessToken,
-    refresh_token: refreshToken,
+    access_token: finalAccessToken,
+    refresh_token: finalRefreshToken,
   });
 
   if (error || !data.session?.access_token) {
@@ -489,6 +518,7 @@ export const consumeDistrictSessionHandoff = async () => {
     // Ignore sessionStorage failures.
   }
 
+  params.delete("itx_hc");
   params.delete("itx_at");
   params.delete("itx_rt");
   const nextHash = params.toString();
@@ -497,10 +527,38 @@ export const consumeDistrictSessionHandoff = async () => {
   return true;
 };
 
+export const createDistrictSessionHandoff = async (
+  districtSlug: string,
+  accessToken: string,
+  refreshToken: string
+) => {
+  const result = await invokeEdgeFunction<
+    { code?: string },
+    { action: "create"; district_slug: string; refresh_token: string }
+  >(getDistrictHandoffFunctionName(), {
+    method: "POST",
+    accessToken,
+    body: {
+      action: "create",
+      district_slug: districtSlug,
+      refresh_token: refreshToken,
+    },
+  });
+
+  if (!result.ok || !result.data?.code) {
+    throw new Error("Unable to prepare district sign-in.");
+  }
+
+  await clearLocalSession();
+  return result.data.code;
+};
+
 export const adminLogin = async (email: string, password: string) => {
   const priorTenantContextId = getAuthState().tenantContextId;
   const districtHost = getDistrictState();
   let error: unknown = null;
+  let accessToken: string | null = null;
+  let refreshToken: string | null = null;
   let signedInUser:
     | { id: string; email?: string | null; last_sign_in_at?: string | null }
     | null = null;
@@ -514,6 +572,8 @@ export const adminLogin = async (email: string, password: string) => {
       "Sign in timed out."
     );
     error = signIn.error;
+    accessToken = signIn.data.session?.access_token ?? null;
+    refreshToken = signIn.data.session?.refresh_token ?? null;
     signedInUser =
       (signIn.data.user as { id: string; email?: string | null; last_sign_in_at?: string | null } | null) ??
       (signIn.data.session?.user as { id: string; email?: string | null; last_sign_in_at?: string | null } | null) ??
@@ -618,6 +678,8 @@ export const adminLogin = async (email: string, password: string) => {
     tenantId: finalTenantId,
     districtId: resolvedDistrictId ?? null,
     districtSlug,
+    accessToken,
+    refreshToken,
   };
 };
 

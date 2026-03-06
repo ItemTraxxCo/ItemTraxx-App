@@ -124,13 +124,11 @@ export const buildDistrictAppUrl = (slug: string, path: string) => {
 export const buildDistrictAppHandoffUrl = (
   slug: string,
   path: string,
-  accessToken: string,
-  refreshToken: string
+  handoffCode: string
 ) => {
   const url = new URL(buildDistrictAppUrl(slug, path));
   url.hash = new URLSearchParams({
-    itx_at: accessToken,
-    itx_rt: refreshToken,
+    itx_hc: handoffCode,
   }).toString();
   return url.toString();
 };

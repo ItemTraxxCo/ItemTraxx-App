@@ -1,6 +1,7 @@
 import { createRouter, createWebHistory } from "vue-router";
 import type { RouteRecordRaw } from "vue-router";
 import { getAuthState } from "../store/authState";
+import { getDistrictState } from "../store/districtState";
 
 const ADMIN_VERIFICATION_TTL_MS = 15 * 60 * 1000;
 const SUPER_VERIFICATION_TTL_MS = 15 * 60 * 1000;
@@ -81,6 +82,15 @@ const routes: RouteRecordRaw[] = [
       requiresTenant: true,
       requiresRole: "tenant_admin",
       requiresTenantMatch: true,
+    },
+  },
+  {
+    path: "/district",
+    name: "district-admin-home",
+    component: () => import("../pages/district/DistrictAdminHome.vue"),
+    meta: {
+      requiresSession: true,
+      requiresRole: "district_admin",
     },
   },
   {
@@ -238,6 +248,26 @@ const routes: RouteRecordRaw[] = [
     },
   },
   {
+    path: "/super-admin/districts",
+    name: "super-admin-districts",
+    component: () => import("../pages/super/Districts.vue"),
+    meta: {
+      requiresSession: true,
+      requiresRole: "super_admin",
+      requiresSuperAuth: true,
+    },
+  },
+  {
+    path: "/super-admin/districts/:id",
+    name: "super-admin-district-detail",
+    component: () => import("../pages/super/DistrictDetail.vue"),
+    meta: {
+      requiresSession: true,
+      requiresRole: "super_admin",
+      requiresSuperAuth: true,
+    },
+  },
+  {
     path: "/super-admin/admins",
     name: "super-admin-admins",
     component: () => import("../pages/super/Admins.vue"),
@@ -368,6 +398,11 @@ router.beforeEach((to) => {
     return true;
   }
 
+  const district = getDistrictState();
+  if (district.isDistrictHost && !district.districtId && to.name !== "not-found") {
+    return { name: "not-found" };
+  }
+
   if (meta?.public) return true;
 
   const auth = getAuthState();
@@ -375,11 +410,24 @@ router.beforeEach((to) => {
     return false;
   }
 
+  if (
+    auth.isAuthenticated &&
+    auth.role === "district_admin" &&
+    hasFreshAdminVerification(auth.adminVerifiedAt) &&
+    (to.name === "public-home" || to.name === "tenant-admin-login")
+  ) {
+    return { name: "district-admin-home" };
+  }
+
   if (meta?.requiresSession && !auth.isAuthenticated) {
     return { name: "public-home" };
   }
 
   if (meta?.requiresTenant && !auth.tenantContextId) {
+    return { name: "public-home" };
+  }
+
+  if (district.isDistrictHost && meta?.requiresSession && !district.districtId) {
     return { name: "public-home" };
   }
 
@@ -395,10 +443,27 @@ router.beforeEach((to) => {
   }
 
   if (
+    meta?.requiresRole === "district_admin" &&
+    !hasFreshAdminVerification(auth.adminVerifiedAt)
+  ) {
+    return { name: "tenant-admin-login" };
+  }
+
+  if (
     meta?.requiresTenantMatch &&
     auth.sessionTenantId &&
     auth.tenantContextId &&
     auth.sessionTenantId !== auth.tenantContextId
+  ) {
+    return { name: "public-home" };
+  }
+
+  if (
+    district.isDistrictHost &&
+    district.districtId &&
+    auth.isAuthenticated &&
+    auth.districtContextId &&
+    auth.districtContextId !== district.districtId
   ) {
     return { name: "public-home" };
   }

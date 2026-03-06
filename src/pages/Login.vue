@@ -72,8 +72,11 @@ import { onMounted, onUnmounted, ref } from "vue";
 import { RouterLink, useRouter } from "vue-router";
 import { tenantLogin } from "../services/authService";
 import { useTurnstile } from "../composables/useTurnstile";
+import { buildDistrictAppHandoffUrl } from "../services/districtService";
+import { getDistrictState } from "../store/districtState";
 
 const router = useRouter();
+const district = getDistrictState();
 const accessCode = ref("");
 const password = ref("");
 const error = ref("");
@@ -164,11 +167,27 @@ const handleTenantLogin = async () => {
       error.value = "Complete the security check and try again.";
       return;
     }
-    await tenantLogin(
+    const session = await tenantLogin(
       accessCode.value.trim(),
       password.value,
       turnstileToken.value || undefined
     );
+    if (
+      !district.isDistrictHost &&
+      session?.districtSlug &&
+      session.accessToken &&
+      session.refreshToken
+    ) {
+      window.location.assign(
+        buildDistrictAppHandoffUrl(
+          session.districtSlug,
+          "/tenant/checkout",
+          session.accessToken,
+          session.refreshToken
+        )
+      );
+      return;
+    }
     await router.push("/tenant/checkout");
   } catch (err) {
     if (err instanceof Error && err.message === "LIMITER_UNAVAILABLE") {

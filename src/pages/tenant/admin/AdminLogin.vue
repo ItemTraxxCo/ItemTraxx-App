@@ -43,8 +43,11 @@ import { touchTenantAdminSession } from "../../../services/adminOpsService";
 import { logAdminAction } from "../../../services/auditLogService";
 import { useTurnstile } from "../../../composables/useTurnstile";
 import { clearAdminVerification } from "../../../store/authState";
+import { buildDistrictAppUrl } from "../../../services/districtService";
+import { getDistrictState } from "../../../store/districtState";
 
 const router = useRouter();
+const districtHost = getDistrictState();
 const email = ref("");
 const password = ref("");
 const error = ref("");
@@ -122,9 +125,14 @@ const handleAdminLogin = async () => {
   isLoading.value = true;
   try {
     devLog("auth_request_start");
-    await adminLogin(email.value.trim(), password.value);
+    const session = await adminLogin(email.value.trim(), password.value);
     devLog("auth_request_success");
-    await router.push("/tenant/admin");
+    if (!districtHost.isDistrictHost && session?.districtSlug) {
+      const targetPath = session.role === "district_admin" ? "/district" : "/tenant/admin";
+      window.location.assign(buildDistrictAppUrl(session.districtSlug, targetPath));
+      return;
+    }
+    await router.push(session?.role === "district_admin" ? "/district" : "/tenant/admin");
     void logAdminAction({
       action_type: "admin_login",
       metadata: { email: email.value.trim() },

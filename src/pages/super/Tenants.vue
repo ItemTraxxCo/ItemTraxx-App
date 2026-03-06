@@ -2,6 +2,7 @@
   <div class="page">
     <div class="page-nav-left">
       <RouterLink class="button-link" to="/super-admin">Return to Super Admin</RouterLink>
+      <RouterLink class="button-link" to="/super-admin/districts">Districts</RouterLink>
       <RouterLink class="button-link" to="/super-admin/admins">Tenant Admins</RouterLink>
       <RouterLink class="button-link" to="/super-admin/gear">All Items</RouterLink>
       <RouterLink class="button-link" to="/super-admin/students">All Students</RouterLink>
@@ -45,6 +46,15 @@
             <option value="disabled">disabled</option>
           </select>
         </label>
+        <label>
+          District
+          <select v-model="createDistrictId">
+            <option value="">No district</option>
+            <option v-for="district in activeDistricts" :key="district.id" :value="district.id">
+              {{ district.name }} ({{ district.slug }})
+            </option>
+          </select>
+        </label>
         <div class="form-actions">
           <button type="submit" class="button-primary" :disabled="isSaving">Create Tenant</button>
         </div>
@@ -63,6 +73,7 @@
           <option value="all">all</option>
           <option value="active">active</option>
           <option value="disabled">disabled</option>
+          <option value="archived">archived</option>
         </select>
       </label>
 
@@ -72,6 +83,7 @@
         <thead>
           <tr>
             <th>Name</th>
+            <th>District</th>
             <th>Access Code</th>
             <th>Status</th>
             <th>Primary Admin</th>
@@ -82,6 +94,7 @@
         <tbody>
           <tr v-for="tenant in tenants" :key="tenant.id">
             <td>{{ tenant.name }}</td>
+            <td>{{ tenant.district_slug || tenant.district_name || "-" }}</td>
             <td>{{ tenant.access_code }}</td>
             <td>{{ toTenantStatusLabel(tenant.status) }}</td>
             <td>{{ tenant.primary_admin_email || "-" }}</td>
@@ -89,7 +102,13 @@
             <td class="actions-cell">
               <button type="button" @click="openEditModal(tenant)">Edit</button>
               <button type="button" :disabled="isSaving" @click="openStatusModal(tenant)">
-                {{ tenant.status === "active" ? "Disable" : "Reactivate" }}
+                {{
+                  tenant.status === "active"
+                    ? "Disable"
+                    : tenant.status === "suspended"
+                      ? "Reactivate"
+                      : "Restore"
+                }}
               </button>
             </td>
           </tr>
@@ -108,6 +127,15 @@
           <label>
             Access Code
             <input v-model="editAccessCode" type="text" placeholder="Access code" />
+          </label>
+          <label>
+            District
+            <select v-model="editDistrictId">
+              <option value="">No district</option>
+              <option v-for="district in activeDistricts" :key="district.id" :value="district.id">
+                {{ district.name }} ({{ district.slug }})
+              </option>
+            </select>
           </label>
           <label>
             Checkout due limit (hours)
@@ -162,36 +190,41 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref } from "vue";
+import { computed, onMounted, ref } from "vue";
 import { RouterLink } from "vue-router";
 import StepUpModal from "../../components/StepUpModal.vue";
 import { setTenantPolicy } from "../../services/superOpsService";
 import {
   createTenant,
   fromTenantStatusLabel,
+  listDistricts,
   listTenants,
   sendPrimaryAdminReset,
   setTenantStatus,
   toTenantStatusLabel,
   updateTenant,
+  type SuperDistrict,
   type SuperTenant,
 } from "../../services/superTenantService";
 
 const tenants = ref<SuperTenant[]>([]);
+const districts = ref<SuperDistrict[]>([]);
 const isLoading = ref(false);
 const isSaving = ref(false);
 const error = ref("");
 const search = ref("");
-const statusFilterLabel = ref<"all" | "active" | "disabled">("all");
+const statusFilterLabel = ref<"all" | "active" | "disabled" | "archived">("all");
 const createName = ref("");
 const createAccessCode = ref("");
 const createAuthEmail = ref("");
 const createPassword = ref("");
 const createStatusLabel = ref<"active" | "disabled">("active");
+const createDistrictId = ref("");
 const editTenantId = ref<string | null>(null);
 const editModalVisible = ref(false);
 const editName = ref("");
 const editAccessCode = ref("");
+const editDistrictId = ref("");
 const editCheckoutDueHours = ref(72);
 const editFeatureFlags = ref({
   enable_notifications: true,
@@ -206,8 +239,12 @@ const statusModalVisible = ref(false);
 const statusModalTitle = ref("");
 const statusModalMessage = ref("");
 const statusModalConfirmLabel = ref("Confirm");
-const statusTarget = ref<{ id: string; name: string; nextStatus: "active" | "suspended" } | null>(null);
+const statusTarget = ref<{ id: string; name: string; nextStatus: "active" | "suspended" | "archived" } | null>(null);
 let toastTimer: number | null = null;
+
+const activeDistricts = computed(() =>
+  districts.value.filter((district) => district.is_active !== false)
+);
 
 const showToast = (title: string, message: string) => {
   toastTitle.value = title;
@@ -242,6 +279,14 @@ const loadTenants = async () => {
   }
 };
 
+const loadDistrictOptions = async () => {
+  try {
+    districts.value = await listDistricts("");
+  } catch {
+    districts.value = [];
+  }
+};
+
 const handleCreate = async () => {
   if (
     !createName.value.trim() ||
@@ -259,6 +304,9 @@ const handleCreate = async () => {
     showToast("Invalid input", "Tenant admin password must be at least 8 characters.");
     return;
   }
+  const selectedDistrict = activeDistricts.value.find(
+    (district) => district.id === createDistrictId.value
+  );
   isSaving.value = true;
   try {
     const created = await createTenant({
@@ -267,6 +315,8 @@ const handleCreate = async () => {
       auth_email: createAuthEmail.value.trim().toLowerCase(),
       password: createPassword.value,
       status: fromTenantStatusLabel(createStatusLabel.value),
+      district_name: selectedDistrict?.name || undefined,
+      district_slug: selectedDistrict?.slug || undefined,
     });
     tenants.value = [created, ...tenants.value];
     createName.value = "";
@@ -274,6 +324,7 @@ const handleCreate = async () => {
     createAuthEmail.value = "";
     createPassword.value = "";
     createStatusLabel.value = "active";
+    createDistrictId.value = "";
     showToast("Tenant created", "Tenant and tenant admin login were created successfully.");
   } catch (err) {
     showToast("Create failed", err instanceof Error ? err.message : "Unable to create tenant.");
@@ -286,6 +337,7 @@ const openEditModal = (tenant: SuperTenant) => {
   editTenantId.value = tenant.id;
   editName.value = tenant.name;
   editAccessCode.value = tenant.access_code;
+  editDistrictId.value = tenant.district_id ?? "";
   editCheckoutDueHours.value =
     typeof tenant.checkout_due_hours === "number"
       ? tenant.checkout_due_hours
@@ -305,6 +357,7 @@ const closeEditModal = () => {
   editTenantId.value = null;
   editName.value = "";
   editAccessCode.value = "";
+  editDistrictId.value = "";
   editCheckoutDueHours.value = 72;
 };
 
@@ -314,6 +367,9 @@ const saveEdit = async () => {
     showToast("Invalid input", "Enter tenant name and access code.");
     return;
   }
+  const selectedDistrict = activeDistricts.value.find(
+    (district) => district.id === editDistrictId.value
+  );
   if (
     !Number.isFinite(editCheckoutDueHours.value) ||
     editCheckoutDueHours.value < 1 ||
@@ -329,6 +385,8 @@ const saveEdit = async () => {
       id: editTenantId.value,
       name: editName.value.trim(),
       access_code: editAccessCode.value.trim(),
+      district_name: selectedDistrict?.name || undefined,
+      district_slug: selectedDistrict?.slug || undefined,
     });
     tenants.value = tenants.value.map((tenant) =>
       tenant.id === updated.id ? updated : tenant
@@ -417,6 +475,7 @@ const confirmStatusChange = async (payload: {
 
 onMounted(() => {
   void loadTenants();
+  void loadDistrictOptions();
 });
 </script>
 

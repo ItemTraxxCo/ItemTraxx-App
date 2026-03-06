@@ -5,6 +5,9 @@
     <div class="card">
       <h2>Extra info</h2>
       <h3> Please attach a screenshot of this page to your support request.</h3>
+      <p v-if="district.isDistrictHost && !district.districtId" class="muted">
+        This district URL is not recognized. Check the district slug or contact support.
+      </p>
       <p class="muted">Path: {{ route.fullPath }}</p>
       <p v-if="showDiagnosticInfo" class="muted">Signed in: {{ auth.isAuthenticated ? "Yes" : "No" }}</p>
       <p v-if="showDiagnosticInfo" class="muted">Tenant ID: {{ auth.tenantContextId || "-" }}</p>
@@ -32,8 +35,10 @@
 import { computed, onMounted, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { getAuthState } from "../store/authState";
+import { getDistrictState } from "../store/districtState";
 
 const auth = getAuthState();
+const district = getDistrictState();
 const route = useRoute();
 const router = useRouter();
 const now = ref("");

@@ -1,15 +1,17 @@
 import { invokeEdgeFunction } from "./edgeFunctionClient";
-import { supabase } from "./supabaseClient";
+import { getFreshAccessToken } from "./sessionAccessToken";
 import type { EdgeEnvelope, SuperAdminAction } from "../types/edgeContracts";
 
 export type SuperTenantAdmin = {
   id: string;
   tenant_id: string;
+  district_id?: string;
   auth_email: string;
-  role: "tenant_admin";
+  role: "tenant_admin" | "district_admin";
   is_active: boolean;
   created_at: string;
   tenant_name?: string;
+  district_name?: string;
 };
 
 type SuperAdminRequest = {
@@ -17,13 +19,7 @@ type SuperAdminRequest = {
   payload: Record<string, unknown>;
 };
 
-const getAccessToken = async () => {
-  const { data, error } = await supabase.auth.getSession();
-  if (error || !data.session?.access_token) {
-    throw new Error("Unauthorized");
-  }
-  return data.session.access_token;
-};
+const getAccessToken = getFreshAccessToken;
 
 const callSuperAdmin = async <TData>(payload: SuperAdminRequest) => {
   const accessToken = await getAccessToken();
@@ -43,16 +39,23 @@ const callSuperAdmin = async <TData>(payload: SuperAdminRequest) => {
   return result.data?.data as TData;
 };
 
-export const listTenantAdmins = async (search = "", tenantId = "all") =>
+export const listTenantAdmins = async (
+  search = "",
+  tenantId = "all",
+  adminScope: "tenant" | "district" = "tenant",
+  districtId = "all"
+) =>
   callSuperAdmin<SuperTenantAdmin[]>({
     action: "list_tenant_admins",
-    payload: { search, tenant_id: tenantId },
+    payload: { search, tenant_id: tenantId, district_id: districtId, admin_scope: adminScope },
   });
 
 export const createTenantAdmin = async (payload: {
-  tenant_id: string;
+  tenant_id?: string;
+  district_id?: string;
   auth_email: string;
   password: string;
+  admin_scope?: "tenant" | "district";
 }) =>
   callSuperAdmin<SuperTenantAdmin>({
     action: "create_tenant_admin",
@@ -62,13 +65,17 @@ export const createTenantAdmin = async (payload: {
 export const setTenantAdminStatus = async (payload: {
   id: string;
   is_active: boolean;
+  admin_scope?: "tenant" | "district";
 }) =>
   callSuperAdmin<SuperTenantAdmin>({
     action: "set_admin_status",
     payload,
   });
 
-export const sendTenantAdminReset = async (payload: { auth_email: string }) =>
+export const sendTenantAdminReset = async (payload: {
+  auth_email: string;
+  admin_scope?: "tenant" | "district";
+}) =>
   callSuperAdmin<{ success: boolean }>({
     action: "send_reset",
     payload,
@@ -77,6 +84,7 @@ export const sendTenantAdminReset = async (payload: { auth_email: string }) =>
 export const updateTenantAdminEmail = async (payload: {
   id: string;
   auth_email: string;
+  admin_scope?: "tenant" | "district";
 }) =>
   callSuperAdmin<SuperTenantAdmin>({
     action: "update_admin_email",

@@ -6,17 +6,23 @@ import {
   clearAuthState,
   getAuthState,
   markAdminVerified,
+  setDistrictContext,
   setAuthStateFromBackend,
   setSecondaryAuth,
   setTenantContext,
 } from "./store/authState";
-import { initAuthListener, refreshAuthFromSession } from "./services/authService";
+import {
+  consumeDistrictSessionHandoff,
+  initAuthListener,
+  refreshAuthFromSession,
+} from "./services/authService";
 import { TimeoutError, withTimeout } from "./services/asyncUtils";
 import {
   captureInitialPerfMetrics,
   markRouteNavigationEnd,
   markRouteNavigationStart,
 } from "./services/perfTelemetry";
+import { initializeDistrictContext } from "./services/districtService";
 
 declare global {
   interface Window {
@@ -46,6 +52,7 @@ const attachE2EControls = () => {
         role: "tenant_user",
         sessionTenantId: tenantId,
         tenantContextId: tenantId,
+        districtContextId: null,
         hasSecondaryAuth: false,
         superVerifiedAt: null,
       });
@@ -61,6 +68,7 @@ const attachE2EControls = () => {
         role: "tenant_admin",
         sessionTenantId: tenantId,
         tenantContextId: tenantId,
+        districtContextId: null,
         hasSecondaryAuth: false,
         superVerifiedAt: null,
       });
@@ -77,6 +85,7 @@ const attachE2EControls = () => {
         role: "super_admin",
         sessionTenantId: null,
         tenantContextId: null,
+        districtContextId: null,
         hasSecondaryAuth: true,
       });
       setSecondaryAuth(true);
@@ -84,6 +93,7 @@ const attachE2EControls = () => {
     clearSession() {
       clearAuthState(true);
       setTenantContext(null);
+      setDistrictContext(null);
     },
     async navigate(path: string) {
       await router.push(path);
@@ -146,6 +156,8 @@ const mountApp = () => {
 };
 
 const bootstrap = async () => {
+  await consumeDistrictSessionHandoff();
+  await initializeDistrictContext();
   const isE2ETestMode = import.meta.env.VITE_E2E_TEST_UTILS === "true";
   const canMountFirst = isE2ETestMode || isPublicBootstrapPath();
   if (canMountFirst) {

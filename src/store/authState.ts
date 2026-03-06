@@ -1,6 +1,6 @@
 import { reactive } from "vue";
 
-export type UserRole = "tenant_user" | "tenant_admin" | "super_admin";
+export type UserRole = "tenant_user" | "tenant_admin" | "district_admin" | "super_admin";
 
 export type AuthState = {
   isInitialized: boolean;
@@ -11,7 +11,9 @@ export type AuthState = {
   role: UserRole | null;
   sessionTenantId: string | null;
   tenantContextId: string | null;
+  districtContextId: string | null;
   isAdmin: boolean;
+  isDistrictAdmin: boolean;
   isSuperAdmin: boolean;
   hasSecondaryAuth: boolean;
   superVerifiedAt: string | null;
@@ -27,7 +29,9 @@ const defaultState: AuthState = {
   role: null,
   sessionTenantId: null,
   tenantContextId: null,
+  districtContextId: null,
   isAdmin: false,
+  isDistrictAdmin: false,
   isSuperAdmin: false,
   hasSecondaryAuth: false,
   superVerifiedAt: null,
@@ -41,12 +45,17 @@ export const getAuthState = (): AuthState => authState;
 export const setAuthStateFromBackend = (next: Partial<AuthState>) => {
   Object.assign(authState, next, {
     isAdmin: next.role === "tenant_admin",
+    isDistrictAdmin: next.role === "district_admin",
     isSuperAdmin: next.role === "super_admin",
   });
 };
 
 export const setTenantContext = (tenantId: string | null) => {
   authState.tenantContextId = tenantId;
+};
+
+export const setDistrictContext = (districtId: string | null) => {
+  authState.districtContextId = districtId;
 };
 
 export const setSecondaryAuth = (value: boolean) => {

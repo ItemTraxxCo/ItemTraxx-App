@@ -6,22 +6,27 @@ import {
   clearAuthState,
   getAuthState,
   markAdminVerified,
+  setDistrictContext,
   setAuthStateFromBackend,
   setSecondaryAuth,
   setTenantContext,
 } from "../store/authState";
+import { getDistrictState } from "../store/districtState";
+import { lookupDistrictById } from "./districtService";
 
 type ProfileRow = {
   id: string;
-  role: "tenant_user" | "tenant_admin" | "super_admin" | null;
+  role: "tenant_user" | "tenant_admin" | "district_admin" | "super_admin" | null;
   tenant_id: string | null;
+  district_id?: string | null;
   auth_email: string | null;
   is_active?: boolean | null;
 };
 
 type TenantRow = {
   id: string;
-  status: "active" | "suspended" | null;
+  status: "active" | "suspended" | "archived" | null;
+  district_id?: string | null;
 };
 
 const getTenantLoginFunctionName = () =>
@@ -52,7 +57,12 @@ const withRetry = async <T>(
 };
 
 const toKnownRole = (value: unknown): ProfileRow["role"] => {
-  if (value === "tenant_user" || value === "tenant_admin" || value === "super_admin") {
+  if (
+    value === "tenant_user" ||
+    value === "tenant_admin" ||
+    value === "district_admin" ||
+    value === "super_admin"
+  ) {
     return value;
   }
   return null;
@@ -98,7 +108,7 @@ const fetchProfile = async (userId: string): Promise<ProfileRow | null> => {
         withTimeout(
           supabase
             .from("profiles")
-            .select("id, role, tenant_id, auth_email, is_active")
+            .select("id, role, tenant_id, district_id, auth_email, is_active")
             .eq("id", userId)
             .single(),
           AUTH_QUERY_TIMEOUT_MS,
@@ -120,6 +130,7 @@ const fetchProfile = async (userId: string): Promise<ProfileRow | null> => {
         id: userId,
         role,
         tenant_id: tenantId,
+        district_id: null,
         auth_email: null,
         is_active: null,
       };
@@ -136,7 +147,7 @@ const fetchProfile = async (userId: string): Promise<ProfileRow | null> => {
   return data as ProfileRow;
 };
 
-const fetchTenantStatus = async (tenantId: string): Promise<TenantRow | null> => {
+const fetchTenantContext = async (tenantId: string): Promise<TenantRow | null> => {
   let data: unknown = null;
   let error: unknown = null;
   try {
@@ -145,7 +156,7 @@ const fetchTenantStatus = async (tenantId: string): Promise<TenantRow | null> =>
         withTimeout(
           supabase
             .from("tenants")
-            .select("id, status")
+            .select("id, status, district_id")
             .eq("id", tenantId)
             .single(),
           AUTH_QUERY_TIMEOUT_MS,
@@ -164,12 +175,31 @@ const fetchTenantStatus = async (tenantId: string): Promise<TenantRow | null> =>
   return data as TenantRow;
 };
 
+const resolveEffectiveDistrictId = async (profile: ProfileRow | null) => {
+  if (profile?.district_id) {
+    return profile.district_id;
+  }
+  if (!profile?.tenant_id) {
+    return null;
+  }
+  const tenant = await fetchTenantContext(profile.tenant_id);
+  return tenant?.district_id ?? null;
+};
+
+const resolveDistrictSlug = async (districtId: string | null) => {
+  if (!districtId) {
+    return null;
+  }
+  const district = await lookupDistrictById(districtId);
+  return district?.slug?.trim() || null;
+};
+
 const handleSuspendedTenantSession = async (profile: ProfileRow | null) => {
   if (!profile?.tenant_id || !["tenant_user", "tenant_admin"].includes(profile.role ?? "")) {
     return false;
   }
-  const tenant = await fetchTenantStatus(profile.tenant_id);
-  if (tenant?.status === "suspended") {
+  const tenant = await fetchTenantContext(profile.tenant_id);
+  if (tenant?.status && tenant.status !== "active") {
     await supabase.auth.signOut();
     clearAdminVerification();
     clearAuthState(true);
@@ -206,6 +236,7 @@ export const refreshAuthFromSession = async () => {
   const email = data.session.user.email ?? null;
   const signedInAt = data.session.user.last_sign_in_at ?? null;
   const profile = await fetchProfile(userId);
+  const effectiveDistrictId = await resolveEffectiveDistrictId(profile);
   const isSuspended = await handleSuspendedTenantSession(profile);
   if (isSuspended) {
     return;
@@ -227,6 +258,50 @@ export const refreshAuthFromSession = async () => {
     sessionTenantId: resolvedSessionTenantId,
     tenantContextId:
       current.tenantContextId ?? resolvedSessionTenantId ?? null,
+    districtContextId:
+      effectiveDistrictId ?? (isSameUser ? current.districtContextId : null) ?? null,
+    hasSecondaryAuth:
+      isSameUser && isSuperRole ? current.hasSecondaryAuth ?? false : false,
+    superVerifiedAt:
+      isSameUser && isSuperRole ? current.superVerifiedAt ?? null : null,
+  });
+};
+
+const syncAuthStateFromListener = async (
+  session: {
+    user: { id: string; email?: string | null; last_sign_in_at?: string | null };
+  } | null
+) => {
+  if (!session) {
+    clearAuthState(true);
+    return;
+  }
+
+  const profile = await fetchProfile(session.user.id);
+  const effectiveDistrictId = await resolveEffectiveDistrictId(profile);
+  const isSuspended = await handleSuspendedTenantSession(profile);
+  if (isSuspended) {
+    return;
+  }
+
+  const current = getAuthState();
+  const isSameUser = current.userId === session.user.id;
+  const resolvedRole = profile?.role ?? (isSameUser ? current.role : null);
+  const resolvedSessionTenantId =
+    profile?.tenant_id ?? (isSameUser ? current.sessionTenantId : null);
+  const isSuperRole = resolvedRole === "super_admin";
+
+  setAuthStateFromBackend({
+    isInitialized: true,
+    isAuthenticated: true,
+    userId: session.user.id,
+    email: session.user.email ?? null,
+    signedInAt: session.user.last_sign_in_at ?? null,
+    role: resolvedRole,
+    sessionTenantId: resolvedSessionTenantId,
+    tenantContextId: current.tenantContextId ?? resolvedSessionTenantId ?? null,
+    districtContextId:
+      effectiveDistrictId ?? (isSameUser ? current.districtContextId : null) ?? null,
     hasSecondaryAuth:
       isSameUser && isSuperRole ? current.hasSecondaryAuth ?? false : false,
     superVerifiedAt:
@@ -235,37 +310,20 @@ export const refreshAuthFromSession = async () => {
 };
 
 export const initAuthListener = () => {
-  supabase.auth.onAuthStateChange(async (_event, session) => {
-    if (!session) {
-      clearAuthState(true);
-      return;
-    }
-    const profile = await fetchProfile(session.user.id);
-    const isSuspended = await handleSuspendedTenantSession(profile);
-    if (isSuspended) {
-      return;
-    }
-    const current = getAuthState();
-    const isSameUser = current.userId === session.user.id;
-    const resolvedRole = profile?.role ?? (isSameUser ? current.role : null);
-    const resolvedSessionTenantId =
-      profile?.tenant_id ?? (isSameUser ? current.sessionTenantId : null);
-    const isSuperRole = resolvedRole === "super_admin";
-    setAuthStateFromBackend({
-      isInitialized: true,
-      isAuthenticated: true,
-      userId: session.user.id,
-      email: session.user.email ?? null,
-      signedInAt: session.user.last_sign_in_at ?? null,
-      role: resolvedRole,
-      sessionTenantId: resolvedSessionTenantId,
-      tenantContextId:
-        current.tenantContextId ?? resolvedSessionTenantId ?? null,
-      hasSecondaryAuth:
-        isSameUser && isSuperRole ? current.hasSecondaryAuth ?? false : false,
-      superVerifiedAt:
-        isSameUser && isSuperRole ? current.superVerifiedAt ?? null : null,
-    });
+  supabase.auth.onAuthStateChange((_event, session) => {
+    window.setTimeout(() => {
+      void syncAuthStateFromListener(
+        session
+          ? {
+              user: {
+                id: session.user.id,
+                email: session.user.email ?? null,
+                last_sign_in_at: session.user.last_sign_in_at ?? null,
+              },
+            }
+          : null
+      );
+    }, 0);
   });
 };
 
@@ -275,14 +333,17 @@ export const tenantLogin = async (
   turnstileToken?: string
 ) => {
   const functionName = getTenantLoginFunctionName();
-  const result = await invokeEdgeFunction<{ auth_email?: string }, {
+  const district = getDistrictState();
+  const result = await invokeEdgeFunction<{ auth_email?: string; district_slug?: string | null }, {
     access_code: string;
     turnstile_token?: string;
+    district_slug?: string;
   }>(functionName, {
     method: "POST",
     body: {
       access_code: accessCode,
       ...(turnstileToken ? { turnstile_token: turnstileToken } : {}),
+      ...(district.isDistrictHost && district.slug ? { district_slug: district.slug } : {}),
     },
   });
 
@@ -309,6 +370,7 @@ export const tenantLogin = async (
 
   let signInError: unknown = null;
   let accessToken: string | null = null;
+  let refreshToken: string | null = null;
   try {
     const signIn = await withTimeout(
       supabase.auth.signInWithPassword({
@@ -320,6 +382,7 @@ export const tenantLogin = async (
     );
     signInError = signIn.error;
     accessToken = signIn.data.session?.access_token ?? null;
+    refreshToken = signIn.data.session?.refresh_token ?? null;
   } catch (requestError) {
     if (requestError instanceof TimeoutError) {
       throw new Error("Sign in timed out. Please try again.");
@@ -331,9 +394,28 @@ export const tenantLogin = async (
     throw new Error("Invalid credentials.");
   }
 
+  const shouldCrossHostRedirect =
+    !district.isDistrictHost &&
+    typeof data.district_slug === "string" &&
+    !!data.district_slug.trim() &&
+    !!accessToken &&
+    !!refreshToken;
+
+  if (shouldCrossHostRedirect) {
+    return {
+      districtId: null,
+      districtSlug: data.district_slug?.trim() ?? null,
+      accessToken,
+      refreshToken,
+    };
+  }
+
   await refreshAuthFromSession();
   const current = getAuthState();
   setTenantContext(current.sessionTenantId ?? null);
+  const districtSlug =
+    (typeof data.district_slug === "string" && data.district_slug.trim()) ||
+    (await resolveDistrictSlug(current.districtContextId));
 
   if (accessToken) {
     const loginNotifyFunctionName = getLoginNotifyFunctionName();
@@ -351,10 +433,47 @@ export const tenantLogin = async (
       }
     });
   }
+
+  return {
+    districtId: current.districtContextId ?? null,
+    districtSlug: districtSlug || null,
+    accessToken,
+    refreshToken,
+  };
+};
+
+export const consumeDistrictSessionHandoff = async () => {
+  if (typeof window === "undefined" || !window.location.hash) {
+    return false;
+  }
+
+  const hash = window.location.hash.startsWith("#")
+    ? window.location.hash.slice(1)
+    : window.location.hash;
+  const params = new URLSearchParams(hash);
+  const accessToken = params.get("itx_at");
+  const refreshToken = params.get("itx_rt");
+
+  if (!accessToken || !refreshToken) {
+    return false;
+  }
+
+  await supabase.auth.setSession({
+    access_token: accessToken,
+    refresh_token: refreshToken,
+  });
+
+  params.delete("itx_at");
+  params.delete("itx_rt");
+  const nextHash = params.toString();
+  const nextUrl = `${window.location.pathname}${window.location.search}${nextHash ? `#${nextHash}` : ""}`;
+  window.history.replaceState({}, document.title, nextUrl);
+  return true;
 };
 
 export const adminLogin = async (email: string, password: string) => {
   const priorTenantContextId = getAuthState().tenantContextId;
+  const districtHost = getDistrictState();
   let error: unknown = null;
   let signedInUser:
     | { id: string; email?: string | null; last_sign_in_at?: string | null }
@@ -390,8 +509,9 @@ export const adminLogin = async (email: string, password: string) => {
   let fallbackTenantId: string | null = null;
   let resolvedRole = profile?.role ?? null;
   let resolvedTenantId = profile?.tenant_id ?? null;
+  let resolvedDistrictId = profile?.district_id ?? null;
 
-  if (!resolvedRole || !resolvedTenantId) {
+  if (!resolvedRole || (!resolvedTenantId && !resolvedDistrictId)) {
     try {
       const fallback = await fetchCurrentRoleAndTenant();
       fallbackRole = fallback.role;
@@ -406,7 +526,7 @@ export const adminLogin = async (email: string, password: string) => {
   if (!resolvedRole) {
     resolvedRole = current.role ?? null;
   }
-  if (resolvedRole !== "tenant_admin") {
+  if (resolvedRole !== "tenant_admin" && resolvedRole !== "district_admin") {
     await signOut();
     throw new Error("Access denied.");
   }
@@ -414,21 +534,34 @@ export const adminLogin = async (email: string, password: string) => {
     await signOut();
     throw new Error("Access denied.");
   }
-  if (resolvedTenantId) {
-    const tenant = await fetchTenantStatus(resolvedTenantId);
-    if (tenant?.status === "suspended") {
+  if (resolvedRole === "tenant_admin" && resolvedTenantId) {
+    const tenant = await fetchTenantContext(resolvedTenantId);
+    if (tenant?.status && tenant.status !== "active") {
       await signOut();
       throw new Error("Tenant disabled.");
     }
+    resolvedDistrictId = resolvedDistrictId ?? tenant?.district_id ?? null;
   }
 
   if (
+    resolvedRole === "tenant_admin" &&
     priorTenantContextId &&
     resolvedTenantId &&
     resolvedTenantId !== priorTenantContextId
   ) {
     await signOut();
     throw new Error("Access denied.");
+  }
+
+  if (districtHost.isDistrictHost) {
+    if (!districtHost.districtId) {
+      await signOut();
+      throw new Error("This district URL is not configured.");
+    }
+    if (!resolvedDistrictId || resolvedDistrictId !== districtHost.districtId) {
+      await signOut();
+      throw new Error("Access denied.");
+    }
   }
 
   const finalTenantId = resolvedTenantId ?? current.sessionTenantId ?? fallbackTenantId ?? null;
@@ -441,14 +574,25 @@ export const adminLogin = async (email: string, password: string) => {
     role: resolvedRole,
     sessionTenantId: finalTenantId,
     tenantContextId: current.tenantContextId ?? finalTenantId ?? null,
+    districtContextId: resolvedDistrictId ?? current.districtContextId ?? null,
     hasSecondaryAuth: false,
     superVerifiedAt: null,
   });
 
-  if (!getAuthState().tenantContextId) {
+  if (resolvedRole === "tenant_admin" && !getAuthState().tenantContextId) {
     setTenantContext(finalTenantId);
   }
+  if (resolvedRole === "district_admin") {
+    setDistrictContext(resolvedDistrictId ?? null);
+  }
   markAdminVerified();
+  const districtSlug = await resolveDistrictSlug(resolvedDistrictId ?? null);
+  return {
+    role: resolvedRole,
+    tenantId: finalTenantId,
+    districtId: resolvedDistrictId ?? null,
+    districtSlug,
+  };
 };
 
 export const superAdminLogin = async (email: string, password: string) => {
@@ -488,4 +632,5 @@ export const signOut = async () => {
   await supabase.auth.signOut();
   clearAdminVerification();
   clearAuthState(true);
+  setDistrictContext(null);
 };

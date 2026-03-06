@@ -36,6 +36,15 @@ type LoginNotificationPayload = {
   ip_address: string | null;
 };
 
+type DistrictSupportPayload = {
+  district_id: string;
+  requester_email: string | null;
+  requester_name: string | null;
+  subject: string;
+  message: string;
+  priority: "low" | "normal" | "high" | "urgent";
+};
+
 const baseCorsHeaders = {
   "Access-Control-Allow-Headers":
     "authorization, x-client-info, apikey, content-type, x-request-id",
@@ -203,6 +212,30 @@ const processLoginNotificationEmail = async (
   });
 };
 
+const processDistrictSupportEmail = async (
+  resendApiKey: string,
+  payload: DistrictSupportPayload,
+  supportEmail: string,
+  fromEmail: string,
+) => {
+  const requesterEmail = payload.requester_email ?? "Unavailable";
+  const requesterName = payload.requester_name ?? "District admin";
+  await sendResendEmail(resendApiKey, {
+    from: fromEmail,
+    to: [supportEmail],
+    reply_to: payload.requester_email ? payload.requester_email : undefined,
+    subject: `District Support Request - ${payload.subject}`,
+    text:
+      `A district support request was submitted.\n\n` +
+      `District ID: ${payload.district_id}\n` +
+      `Requester: ${requesterName}\n` +
+      `Requester Email: ${requesterEmail}\n` +
+      `Priority: ${payload.priority}\n` +
+      `Subject: ${payload.subject}\n\n` +
+      `${payload.message}`,
+  });
+};
+
 serve(async (req) => {
   const { hasOrigin, originAllowed, headers } = resolveCorsHeaders(req);
   const requestId = getRequestId(req);
@@ -241,6 +274,11 @@ serve(async (req) => {
     const serviceKey = Deno.env.get("ITX_SECRET_KEY");
     const workerSecret = Deno.env.get("ITX_JOB_WORKER_SECRET");
     const resendApiKey = Deno.env.get("ITX_RESEND_API_KEY");
+    const supportEmail = Deno.env.get("ITX_SUPPORT_EMAIL") ?? "support@itemtraxx.com";
+    const fromEmail =
+      Deno.env.get("ITX_EMAIL_FROM") ??
+      Deno.env.get("ITX_RESEND_FROM") ??
+      "ItemTraxx Support <support@itemtraxx.com>";
     const workerAuth = req.headers.get("authorization") ?? "";
 
     if (!supabaseUrl || !serviceKey || !workerSecret || !resendApiKey) {
@@ -286,6 +324,13 @@ serve(async (req) => {
           await processLoginNotificationEmail(
             resendApiKey,
             job.payload as LoginNotificationPayload,
+          );
+        } else if (job.job_type === "district_support_email") {
+          await processDistrictSupportEmail(
+            resendApiKey,
+            job.payload as DistrictSupportPayload,
+            supportEmail,
+            fromEmail,
           );
         } else if (job.job_type === "refresh_reporting_views") {
           await adminClient.rpc("refresh_super_reporting_views");

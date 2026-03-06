@@ -269,7 +269,7 @@ serve(async (req) => {
       .select("status")
       .eq("id", tenantId)
       .maybeSingle();
-    const isTenantSuspended = tenantStatus?.status === "suspended";
+    const isTenantSuspended = !!tenantStatus?.status && tenantStatus.status !== "active";
     const deviceSession = resolveDeviceSessionContext(payloadRecord, req);
 
     const findActiveSession = async () => {

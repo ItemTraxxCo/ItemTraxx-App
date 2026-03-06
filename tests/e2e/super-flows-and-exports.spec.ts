@@ -30,7 +30,8 @@ test.describe("Super admin flows and export actions", () => {
     await expect(page.getByRole("heading", { name: "Tenant Management" })).toBeVisible();
 
     await navigateApp(page, "/super-admin/admins");
-    await expect(page.getByRole("heading", { name: "Tenant Admin Management" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Admin Management" })).toBeVisible();
+    await expect(page.getByText("Create and manage tenant and district admins.")).toBeVisible();
 
     await navigateApp(page, "/super-admin/gear");
     await expect(page.getByRole("button", { name: "Export CSV" })).toBeVisible();

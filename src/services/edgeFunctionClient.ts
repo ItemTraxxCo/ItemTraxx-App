@@ -71,6 +71,20 @@ const createRequestId = () => {
 };
 
 const EDGE_FUNCTION_TIMEOUT_MS = 10000;
+const DISTRICT_HANDOFF_MARKER_KEY = "itemtraxx:district-handoff-at";
+const DISTRICT_HANDOFF_GRACE_MS = 60_000;
+
+const isRecentDistrictHandoff = () => {
+  if (typeof window === "undefined") return false;
+  try {
+    const raw = window.sessionStorage.getItem(DISTRICT_HANDOFF_MARKER_KEY);
+    if (!raw) return false;
+    const value = Number(raw);
+    return Number.isFinite(value) && Date.now() - value < DISTRICT_HANDOFF_GRACE_MS;
+  } catch {
+    return false;
+  }
+};
 
 const isTenantDisabledError = (payload: unknown) => {
   const parsed = payload as { error?: string; message?: string } | null;
@@ -189,14 +203,16 @@ export const invokeEdgeFunction = async <TData = unknown, TBody = unknown>(
   if (current.status === 401 && options.accessToken) {
     // Retry once with a freshly refreshed session token.
     // Some upstream paths return generic 401 "Unauthorized" instead of "Invalid JWT".
-    const { data, error } = await supabase.auth.refreshSession();
-    const refreshedToken = data.session?.access_token;
-    if (!error && refreshedToken) {
-      current = await requestEdgeFunction<TData, TBody>(
-        functionName,
-        options,
-        refreshedToken
-      );
+    if (!isRecentDistrictHandoff()) {
+      const { data, error } = await supabase.auth.refreshSession();
+      const refreshedToken = data.session?.access_token;
+      if (!error && refreshedToken) {
+        current = await requestEdgeFunction<TData, TBody>(
+          functionName,
+          options,
+          refreshedToken
+        );
+      }
     }
   }
 

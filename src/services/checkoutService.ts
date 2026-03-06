@@ -1,6 +1,7 @@
 import { supabase } from "./supabaseClient";
 import { invokeEdgeFunction } from "./edgeFunctionClient";
 import { withTimeout } from "./asyncUtils";
+import { getFreshAccessToken } from "./sessionAccessToken";
 
 type CheckoutReturnPayload = {
   student_id: string;
@@ -68,17 +69,12 @@ const queueCheckoutPayload = (payload: CheckoutReturnPayload, error: string | nu
 };
 
 const executeCheckoutReturn = async (payload: CheckoutReturnPayload) => {
-  const { data: sessionData } = await supabase.auth.getSession();
-  const session = sessionData.session ?? null;
-
-  if (!session?.access_token) {
-    throw new Error("Unauthorized.");
-  }
+  const accessToken = await getFreshAccessToken();
 
   const result = await invokeEdgeFunction("checkoutReturn", {
     method: "POST",
     body: payload,
-    accessToken: session.access_token,
+    accessToken,
   });
 
   if (!result.ok) {

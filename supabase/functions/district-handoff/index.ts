@@ -87,38 +87,30 @@ serve(async (req) => {
     });
 
     if (action === "create") {
-      const authHeader = req.headers.get("authorization");
-      if (!authHeader) {
-        return jsonResponse(401, { error: "Unauthorized" }, headers);
-      }
-
-      const refreshToken =
-        typeof body?.refresh_token === "string" ? body.refresh_token.trim() : "";
+      const authEmail =
+        typeof body?.auth_email === "string" ? body.auth_email.trim().toLowerCase() : "";
+      const password =
+        typeof body?.password === "string" ? body.password : "";
       const districtSlug =
         typeof body?.district_slug === "string" ? body.district_slug.trim().toLowerCase() : "";
 
-      if (!refreshToken || !districtSlug) {
+      if (!authEmail || !password || !districtSlug) {
         return jsonResponse(400, { error: "Invalid request" }, headers);
       }
 
-      const accessToken = authHeader.replace(/^Bearer\s+/i, "").trim();
-      if (!accessToken) {
-        return jsonResponse(401, { error: "Unauthorized" }, headers);
-      }
-
       const userClient = createClient(supabaseUrl, publishableKey, {
-        global: { headers: { Authorization: authHeader } },
         auth: { persistSession: false },
       });
 
-      const {
-        data: { user },
-        error: authError,
-      } = await userClient.auth.getUser();
+      const signIn = await userClient.auth.signInWithPassword({
+        email: authEmail,
+        password,
+      });
 
-      if (authError || !user) {
-        return jsonResponse(401, { error: "Unauthorized" }, headers);
+      if (signIn.error || !signIn.data.user?.id) {
+        return jsonResponse(401, { error: "Invalid credentials" }, headers);
       }
+      const user = signIn.data.user;
 
       const { data: district, error: districtError } = await adminClient
         .from("districts")
@@ -143,8 +135,8 @@ serve(async (req) => {
         code_hash: codeHash,
         user_id: user.id,
         district_slug: districtSlug,
-        access_token: accessToken,
-        refresh_token: refreshToken,
+        auth_email: authEmail,
+        password,
         expires_at: expiresAt,
       });
 
@@ -155,6 +147,108 @@ serve(async (req) => {
       return jsonResponse(200, { code, expires_at: expiresAt }, headers);
     }
 
+    if (action === "create_admin") {
+      const email =
+        typeof body?.email === "string" ? body.email.trim().toLowerCase() : "";
+      const password =
+        typeof body?.password === "string" ? body.password : "";
+
+      if (!email || !password) {
+        return jsonResponse(400, { error: "Invalid request" }, headers);
+      }
+
+      const userClient = createClient(supabaseUrl, publishableKey, {
+        auth: { persistSession: false },
+      });
+
+      const signIn = await userClient.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (signIn.error || !signIn.data.user?.id) {
+        return jsonResponse(401, { error: "Invalid credentials" }, headers);
+      }
+
+      const user = signIn.data.user;
+      const { data: profile } = await adminClient
+        .from("profiles")
+        .select("role, tenant_id, district_id, is_active")
+        .eq("id", user.id)
+        .single();
+
+      const role = profile?.role;
+      if ((role !== "tenant_admin" && role !== "district_admin") || profile?.is_active === false) {
+        return jsonResponse(403, { error: "Access denied" }, headers);
+      }
+
+      let districtSlug = typeof profile?.district_id === "string" ? "" : "";
+      if (typeof profile?.district_id === "string" && profile.district_id) {
+        const { data: district } = await adminClient
+          .from("districts")
+          .select("slug, is_active")
+          .eq("id", profile.district_id)
+          .single();
+        if (district?.slug && district.is_active !== false) {
+          districtSlug = district.slug;
+        }
+      }
+
+      if (!districtSlug && typeof profile?.tenant_id === "string" && profile.tenant_id) {
+        const { data: tenant } = await adminClient
+          .from("tenants")
+          .select("district_id, status")
+          .eq("id", profile.tenant_id)
+          .single();
+        if (tenant?.status && tenant.status !== "active") {
+          return jsonResponse(403, { error: "Tenant disabled" }, headers);
+        }
+        if (tenant?.district_id) {
+          const { data: district } = await adminClient
+            .from("districts")
+            .select("slug, is_active")
+            .eq("id", tenant.district_id)
+            .single();
+          if (district?.slug && district.is_active !== false) {
+            districtSlug = district.slug;
+          }
+        }
+      }
+
+      if (!districtSlug) {
+        return jsonResponse(404, { error: "District not found" }, headers);
+      }
+
+      const code = randomCode();
+      const codeHash = await sha256(code);
+      const expiresAt = new Date(Date.now() + 5 * 60 * 1000).toISOString();
+
+      await adminClient
+        .from("district_session_handoffs")
+        .delete()
+        .eq("user_id", user.id);
+
+      const { error: insertError } = await adminClient.from("district_session_handoffs").insert({
+        code_hash: codeHash,
+        user_id: user.id,
+        district_slug: districtSlug,
+        auth_email: email,
+        password,
+        expires_at: expiresAt,
+      });
+
+      if (insertError) {
+        return jsonResponse(500, { error: "Unable to create handoff" }, headers);
+      }
+
+      return jsonResponse(200, {
+        code,
+        district_slug: districtSlug,
+        role,
+        expires_at: expiresAt,
+      }, headers);
+    }
+
     if (action === "consume") {
       const code = typeof body?.code === "string" ? body.code.trim() : "";
       if (!code) {
@@ -162,40 +256,40 @@ serve(async (req) => {
       }
 
       const codeHash = await sha256(code);
-      const nowIso = new Date().toISOString();
       const { data: row, error: selectError } = await adminClient
         .from("district_session_handoffs")
-        .select("id, district_slug, access_token, refresh_token, expires_at, consumed_at")
+        .select("id, district_slug, auth_email, password, expires_at")
         .eq("code_hash", codeHash)
-        .is("consumed_at", null)
         .single();
 
       if (
         selectError ||
         !row?.id ||
-        !row.access_token ||
-        !row.refresh_token ||
+        !row.auth_email ||
+        !row.password ||
         !row.expires_at ||
         new Date(row.expires_at).getTime() <= Date.now()
       ) {
         return jsonResponse(410, { error: "Handoff expired" }, headers);
       }
 
-      const { error: consumeError } = await adminClient
-        .from("district_session_handoffs")
-        .update({ consumed_at: nowIso })
-        .eq("id", row.id)
-        .is("consumed_at", null);
+      const userClient = createClient(supabaseUrl, publishableKey, {
+        auth: { persistSession: false },
+      });
+      const signIn = await userClient.auth.signInWithPassword({
+        email: row.auth_email,
+        password: row.password,
+      });
 
-      if (consumeError) {
-        return jsonResponse(409, { error: "Handoff already used" }, headers);
+      if (signIn.error || !signIn.data.session?.access_token || !signIn.data.session?.refresh_token) {
+        return jsonResponse(401, { error: "Unable to complete sign-in" }, headers);
       }
 
       return jsonResponse(
         200,
         {
-          access_token: row.access_token,
-          refresh_token: row.refresh_token,
+          access_token: signIn.data.session.access_token,
+          refresh_token: signIn.data.session.refresh_token,
           district_slug: row.district_slug,
         },
         headers

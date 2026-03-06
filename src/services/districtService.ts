@@ -25,7 +25,7 @@ type DistrictLookupRow = {
   id: string;
   name: string;
   slug?: string | null;
-  status?: string | null;
+  is_active?: boolean | null;
 };
 
 export const resolveDistrictHost = (
@@ -83,18 +83,16 @@ export const resolveDistrictHost = (
 };
 
 const lookupDistrictBySlug = async (slug: string) => {
-  const { data, error } = await supabase
-    .from("districts")
-    .select("id, name, status")
-    .eq("slug", slug)
-    .single();
+  const { data, error } = await supabase.rpc("resolve_public_district_by_slug", {
+    input_slug: slug,
+  });
 
   if (error) {
     return null;
   }
 
-  const district = data as DistrictLookupRow | null;
-  if (!district?.id || district.status === "archived") {
+  const district = Array.isArray(data) ? (data[0] as DistrictLookupRow | undefined) : null;
+  if (!district?.id || district.is_active === false) {
     return null;
   }
 
@@ -102,18 +100,16 @@ const lookupDistrictBySlug = async (slug: string) => {
 };
 
 export const lookupDistrictById = async (districtId: string) => {
-  const { data, error } = await supabase
-    .from("districts")
-    .select("id, name, slug, status")
-    .eq("id", districtId)
-    .single();
+  const { data, error } = await supabase.rpc("resolve_public_district_by_id", {
+    input_id: districtId,
+  });
 
   if (error) {
     return null;
   }
 
-  const district = data as DistrictLookupRow | null;
-  if (!district?.id || district.status === "archived") {
+  const district = Array.isArray(data) ? (data[0] as DistrictLookupRow | undefined) : null;
+  if (!district?.id || district.is_active === false) {
     return null;
   }
 

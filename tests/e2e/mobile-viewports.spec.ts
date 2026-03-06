@@ -16,9 +16,10 @@ test.describe("Mobile viewport coverage", () => {
 
   test("trust strip remains fully visible on mobile", async ({ page }) => {
     await page.goto("/");
-    await expect(page.getByText("Secure auth")).toBeVisible();
-    await expect(page.getByText("Audit logs")).toBeVisible();
-    // Keep this resilient to copy tweaks while still validating mobile visibility.
-    await expect(page.locator(".trust-strip > span").nth(2)).toBeVisible();
+    const trustStripItems = page.locator(".trust-strip > span");
+    await expect(trustStripItems.filter({ hasText: "Secure auth" })).toBeVisible();
+    await expect(trustStripItems.filter({ hasText: "Audit logs" })).toBeVisible();
+    // Keep this resilient to copy tweaks while still validating the third badge stays on-screen.
+    await expect(trustStripItems.nth(2)).toBeVisible();
   });
 });

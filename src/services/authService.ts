@@ -379,6 +379,21 @@ export const tenantLogin = async (
     throw new Error("Invalid tenant access code.");
   }
 
+  const shouldCrossHostRedirect =
+    !district.isDistrictHost &&
+    typeof data.district_slug === "string" &&
+    !!data.district_slug.trim();
+
+  if (shouldCrossHostRedirect) {
+    return {
+      districtId: null,
+      districtSlug: data.district_slug?.trim() ?? null,
+      authEmail: data.auth_email,
+      accessToken: null,
+      refreshToken: null,
+    };
+  }
+
   let signInError: unknown = null;
   let accessToken: string | null = null;
   let refreshToken: string | null = null;
@@ -403,22 +418,6 @@ export const tenantLogin = async (
 
   if (signInError) {
     throw new Error("Invalid credentials.");
-  }
-
-  const shouldCrossHostRedirect =
-    !district.isDistrictHost &&
-    typeof data.district_slug === "string" &&
-    !!data.district_slug.trim() &&
-    !!accessToken &&
-    !!refreshToken;
-
-  if (shouldCrossHostRedirect) {
-    return {
-      districtId: null,
-      districtSlug: data.district_slug?.trim() ?? null,
-      accessToken,
-      refreshToken,
-    };
   }
 
   await refreshAuthFromSession();
@@ -529,19 +528,19 @@ export const consumeDistrictSessionHandoff = async () => {
 
 export const createDistrictSessionHandoff = async (
   districtSlug: string,
-  accessToken: string,
-  refreshToken: string
+  authEmail: string,
+  password: string
 ) => {
   const result = await invokeEdgeFunction<
     { code?: string },
-    { action: "create"; district_slug: string; refresh_token: string }
+    { action: "create"; district_slug: string; auth_email: string; password: string }
   >(getDistrictHandoffFunctionName(), {
     method: "POST",
-    accessToken,
     body: {
       action: "create",
       district_slug: districtSlug,
-      refresh_token: refreshToken,
+      auth_email: authEmail,
+      password,
     },
   });
 
@@ -551,6 +550,42 @@ export const createDistrictSessionHandoff = async (
 
   await clearLocalSession();
   return result.data.code;
+};
+
+export const createDistrictAdminSessionHandoff = async (
+  email: string,
+  password: string
+) => {
+  const result = await invokeEdgeFunction<
+    { code?: string; district_slug?: string; role?: "tenant_admin" | "district_admin" },
+    { action: "create_admin"; email: string; password: string }
+  >(getDistrictHandoffFunctionName(), {
+    method: "POST",
+    body: {
+      action: "create_admin",
+      email,
+      password,
+    },
+  });
+
+  if (!result.ok || !result.data?.code || !result.data?.district_slug || !result.data?.role) {
+    if (!result.ok && result.error === "Tenant disabled") {
+      throw new Error("Tenant disabled.");
+    }
+    if (!result.ok && result.error === "Access denied") {
+      throw new Error("Access denied.");
+    }
+    if (!result.ok && result.error === "Invalid credentials") {
+      throw new Error("Invalid credentials.");
+    }
+    throw new Error("Unable to prepare district sign-in.");
+  }
+
+  return {
+    code: result.data.code,
+    districtSlug: result.data.district_slug,
+    role: result.data.role,
+  };
 };
 
 export const adminLogin = async (email: string, password: string) => {

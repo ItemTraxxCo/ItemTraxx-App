@@ -175,13 +175,12 @@ const handleTenantLogin = async () => {
     if (
       !district.isDistrictHost &&
       session?.districtSlug &&
-      session.accessToken &&
-      session.refreshToken
+      session.authEmail
     ) {
       const handoffCode = await createDistrictSessionHandoff(
         session.districtSlug,
-        session.accessToken,
-        session.refreshToken
+        session.authEmail,
+        password.value
       );
       window.location.assign(
         buildDistrictAppHandoffUrl(

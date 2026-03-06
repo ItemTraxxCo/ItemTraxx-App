@@ -18,8 +18,11 @@ type TenantRow = {
   id: string;
   name: string;
   access_code: string;
-  status?: "active" | "suspended";
+  status?: "active" | "suspended" | "archived";
   created_at: string;
+  district_id?: string | null;
+  district_name?: string | null;
+  district_slug?: string | null;
   primary_admin_profile_id?: string | null;
 };
 
@@ -27,6 +30,31 @@ type TenantPolicyRow = {
   tenant_id: string;
   checkout_due_hours: number | null;
   feature_flags: Record<string, unknown> | null;
+};
+
+type DistrictRow = {
+  id: string;
+  name: string;
+  slug: string;
+  support_email?: string | null;
+  contact_name?: string | null;
+  is_active?: boolean;
+  created_at?: string;
+  subscription_plan?: "starter" | "standard" | "enterprise" | null;
+  billing_status?: "draft" | "active" | "past_due" | "canceled" | null;
+  renewal_date?: string | null;
+  billing_email?: string | null;
+  invoice_reference?: string | null;
+};
+
+type TenantMetricRow = {
+  tenant_id: string;
+  tenant_name: string;
+  gear_total: number;
+  students_total: number;
+  active_checkouts: number;
+  overdue_items: number;
+  transactions_7d: number;
 };
 
 type PgError = {
@@ -49,7 +77,39 @@ const isMissingIsActiveColumn = (error: PgError | null | undefined) =>
   error.code === "42703" &&
   (error.message ?? "").toLowerCase().includes("is_active");
 
+const isMissingDistrictIdColumn = (error: PgError | null | undefined) =>
+  !!error &&
+  error.code === "42703" &&
+  (error.message ?? "").toLowerCase().includes("district_id");
+
+const isMissingDistrictsTable = (error: PgError | null | undefined) =>
+  !!error &&
+  error.code === "42P01" &&
+  (error.message ?? "").toLowerCase().includes("districts");
+
 const lower = (value: string | null | undefined) => (value ?? "").toLowerCase();
+
+const normalizeDistrictSlug = (value: string | null | undefined) =>
+  (value ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9-]/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "");
+
+const normalizeDistrictName = (value: string | null | undefined) => (value ?? "").trim();
+const normalizeOptionalText = (value: string | null | undefined) => {
+  const trimmed = (value ?? "").trim();
+  return trimmed.length ? trimmed : null;
+};
+const isValidDistrictPlan = (
+  value: unknown
+): value is "starter" | "standard" | "enterprise" =>
+  value === "starter" || value === "standard" || value === "enterprise";
+const isValidDistrictBillingStatus = (
+  value: unknown
+): value is "draft" | "active" | "past_due" | "canceled" =>
+  value === "draft" || value === "active" || value === "past_due" || value === "canceled";
 
 const defaultFeatureFlags = () => ({
   enable_notifications: true,
@@ -86,8 +146,8 @@ const resolveResetRedirectTo = (req: Request) => {
   return `${origin.replace(/\/+$/, "")}/login`;
 };
 
-const isValidStatus = (value: unknown): value is "active" | "suspended" =>
-  value === "active" || value === "suspended";
+const isValidStatus = (value: unknown): value is "active" | "suspended" | "archived" =>
+  value === "active" || value === "suspended" || value === "archived";
 
 const verifySuperPassword = async (
   supabaseUrl: string,
@@ -100,6 +160,92 @@ const verifySuperPassword = async (
   });
   const { error } = await authClient.auth.signInWithPassword({ email, password });
   return !error;
+};
+
+const ensureDistrict = async (
+  adminClient: ReturnType<typeof createClient>,
+  districtSlug: string,
+  districtName: string
+) => {
+  const slug = normalizeDistrictSlug(districtSlug);
+  const name = normalizeDistrictName(districtName);
+  if (!slug) {
+    return { districtId: null, error: "District slug is required." };
+  }
+  if (!name) {
+    return { districtId: null, error: "District name is required when assigning a district." };
+  }
+
+  const { data: existing, error: existingError } = await adminClient
+    .from("districts")
+    .select("id, name")
+    .eq("slug", slug)
+    .maybeSingle();
+
+  if (existingError) {
+    if (isMissingDistrictsTable(existingError as PgError)) {
+      return {
+        districtId: null,
+        error: "District foundation is not enabled yet. Run the latest database migration.",
+      };
+    }
+    return { districtId: null, error: "Unable to load district." };
+  }
+
+  if (existing?.id) {
+    if (existing.name !== name) {
+      const { error: updateError } = await adminClient
+        .from("districts")
+        .update({ name, updated_at: new Date().toISOString() })
+        .eq("id", existing.id);
+      if (updateError) {
+        return { districtId: null, error: "Unable to update district." };
+      }
+    }
+    return { districtId: existing.id, error: null };
+  }
+
+  const { data: created, error: createError } = await adminClient
+    .from("districts")
+    .insert({
+      name,
+      slug,
+    })
+    .select("id")
+    .single();
+
+  if (createError || !created?.id) {
+    return { districtId: null, error: "Unable to create district." };
+  }
+
+  return { districtId: created.id, error: null };
+};
+
+const enrichDistricts = async (
+  adminClient: ReturnType<typeof createClient>,
+  rows: DistrictRow[]
+) => {
+  if (!rows.length) return [];
+
+  const districtIds = rows.map((row) => row.id);
+  const { data: tenantCounts, error: tenantCountsError } = await adminClient
+    .from("tenants")
+    .select("district_id")
+    .in("district_id", districtIds);
+
+  const countsByDistrict = new Map<string, number>();
+  if (!tenantCountsError) {
+    for (const row of (tenantCounts ?? []) as Array<{ district_id: string | null }>) {
+      if (!row.district_id) continue;
+      countsByDistrict.set(row.district_id, (countsByDistrict.get(row.district_id) ?? 0) + 1);
+    }
+  }
+
+  return rows.map((row) => ({
+    ...row,
+    is_active: row.is_active !== false,
+    tenants_count: countsByDistrict.get(row.id) ?? 0,
+  }));
 };
 
 serve(async (req) => {
@@ -181,14 +327,17 @@ serve(async (req) => {
     );
 
     if (rateLimitError) {
-      return jsonResponse(500, { error: "Rate limit check failed" });
-    }
-
-    const rateLimitResult = rateLimit as RateLimitResult;
-    if (!rateLimitResult.allowed) {
-      return jsonResponse(429, {
-        error: "Rate limit exceeded, please try again in a minute.",
+      console.warn("super-tenant-mutate rate limit unavailable", {
+        message: rateLimitError.message,
+        code: (rateLimitError as { code?: string }).code,
       });
+    } else {
+      const rateLimitResult = rateLimit as RateLimitResult;
+      if (!rateLimitResult.allowed) {
+        return jsonResponse(429, {
+          error: "Rate limit exceeded, please try again in a minute.",
+        });
+      }
     }
 
     const { action, payload } = await req.json();
@@ -222,7 +371,12 @@ serve(async (req) => {
             .filter((value): value is string => !!value)
         )
       );
-      const [profileRowsResult, policyRowsResult] = await Promise.all([
+      const districtIds = Array.from(
+        new Set(
+          rows.map((row) => row.district_id).filter((value): value is string => !!value)
+        )
+      );
+      const [profileRowsResult, policyRowsResult, districtRowsResult] = await Promise.all([
         ids.length
           ? adminClient.from("profiles").select("id, auth_email").in("id", ids)
           : Promise.resolve({ data: [], error: null }),
@@ -230,6 +384,9 @@ serve(async (req) => {
           .from("tenant_policies")
           .select("tenant_id, checkout_due_hours, feature_flags")
           .in("tenant_id", tenantIds),
+        districtIds.length
+          ? adminClient.from("districts").select("id, name, slug").in("id", districtIds)
+          : Promise.resolve({ data: [], error: null }),
       ]);
 
       const emailById = new Map(
@@ -246,10 +403,15 @@ serve(async (req) => {
           item,
         ])
       );
+      const districtById = new Map(
+        ((districtRowsResult.data ?? []) as DistrictRow[]).map((item) => [item.id, item])
+      );
 
       return rows.map((row) => ({
         ...row,
         status: row.status ?? "active",
+        district_name: row.district_id ? districtById.get(row.district_id)?.name ?? null : null,
+        district_slug: row.district_id ? districtById.get(row.district_id)?.slug ?? null : null,
         primary_admin_email: row.primary_admin_profile_id
           ? emailById.get(row.primary_admin_profile_id) ?? null
           : null,
@@ -274,7 +436,7 @@ serve(async (req) => {
 
       let query = adminClient
         .from("tenants")
-        .select("id, name, access_code, status, created_at, primary_admin_profile_id")
+        .select("id, name, access_code, status, created_at, district_id, primary_admin_profile_id")
         .order("created_at", { ascending: false })
         .limit(300);
 
@@ -284,7 +446,11 @@ serve(async (req) => {
 
       const { data, error } = await query;
       if (error) {
-        if (!isMissingStatusColumn(error as PgError) && !isMissingPrimaryAdminColumn(error as PgError)) {
+        if (
+          !isMissingStatusColumn(error as PgError) &&
+          !isMissingPrimaryAdminColumn(error as PgError) &&
+          !isMissingDistrictIdColumn(error as PgError)
+        ) {
           return jsonResponse(400, { error: "Unable to load tenants." });
         }
 
@@ -302,6 +468,7 @@ serve(async (req) => {
         const normalized = ((fallbackData ?? []) as Array<TenantRow>).map((row) => ({
           ...row,
           status: "active",
+          district_id: null,
           primary_admin_profile_id: null,
         }));
 
@@ -315,8 +482,15 @@ serve(async (req) => {
             const name = typeof row.name === "string" ? row.name.toLowerCase() : "";
             const code =
               typeof row.access_code === "string" ? row.access_code.toLowerCase() : "";
+            const districtName =
+              typeof row.district_name === "string" ? row.district_name.toLowerCase() : "";
+            const districtSlug =
+              typeof row.district_slug === "string" ? row.district_slug.toLowerCase() : "";
             return (
-              name.includes(normalizedSearch) || code.includes(normalizedSearch)
+              name.includes(normalizedSearch) ||
+              code.includes(normalizedSearch) ||
+              districtName.includes(normalizedSearch) ||
+              districtSlug.includes(normalizedSearch)
             );
           }),
         });
@@ -332,8 +506,273 @@ serve(async (req) => {
           const name = typeof row.name === "string" ? row.name.toLowerCase() : "";
           const code =
             typeof row.access_code === "string" ? row.access_code.toLowerCase() : "";
-          return name.includes(normalizedSearch) || code.includes(normalizedSearch);
+          const districtName =
+            typeof row.district_name === "string" ? row.district_name.toLowerCase() : "";
+          const districtSlug =
+            typeof row.district_slug === "string" ? row.district_slug.toLowerCase() : "";
+          return (
+            name.includes(normalizedSearch) ||
+            code.includes(normalizedSearch) ||
+            districtName.includes(normalizedSearch) ||
+            districtSlug.includes(normalizedSearch)
+          );
         }),
+      });
+    }
+
+    if (action === "list_districts") {
+      const search =
+        typeof (payload as Record<string, unknown>).search === "string"
+          ? ((payload as Record<string, unknown>).search as string).trim().toLowerCase()
+          : "";
+
+      const { data, error } = await adminClient
+        .from("districts")
+        .select("id, name, slug, support_email, contact_name, is_active, created_at, subscription_plan, billing_status, renewal_date, billing_email, invoice_reference")
+        .order("created_at", { ascending: false })
+        .limit(300);
+
+      if (error) {
+        if (isMissingDistrictsTable(error as PgError)) {
+          return jsonResponse(400, {
+            error: "District foundation is not enabled yet. Run the latest database migration.",
+          });
+        }
+        return jsonResponse(400, { error: "Unable to load districts." });
+      }
+
+      const enriched = await enrichDistricts(adminClient, (data ?? []) as DistrictRow[]);
+      if (!search) {
+        return jsonResponse(200, { data: enriched });
+      }
+
+      return jsonResponse(200, {
+        data: enriched.filter((row) => {
+          const name = (row.name ?? "").toLowerCase();
+          const slug = (row.slug ?? "").toLowerCase();
+          const supportEmail = (row.support_email ?? "").toLowerCase();
+          return (
+            name.includes(search) || slug.includes(search) || supportEmail.includes(search)
+          );
+        }),
+      });
+    }
+
+    if (action === "create_district") {
+      const next = payload as Record<string, unknown>;
+      const name = typeof next.name === "string" ? normalizeDistrictName(next.name) : "";
+      const slug = typeof next.slug === "string" ? normalizeDistrictSlug(next.slug) : "";
+      const supportEmail =
+        typeof next.support_email === "string" ? next.support_email.trim().toLowerCase() : "";
+      const contactName =
+        typeof next.contact_name === "string" ? normalizeDistrictName(next.contact_name) : "";
+      const subscriptionPlan = next.subscription_plan;
+      const billingStatus = next.billing_status;
+      const renewalDate =
+        typeof next.renewal_date === "string" ? normalizeOptionalText(next.renewal_date) : null;
+      const billingEmail =
+        typeof next.billing_email === "string"
+          ? normalizeOptionalText(next.billing_email)?.toLowerCase() ?? null
+          : null;
+      const invoiceReference =
+        typeof next.invoice_reference === "string"
+          ? normalizeOptionalText(next.invoice_reference)
+          : null;
+
+      if (!name || !slug) {
+        return jsonResponse(400, { error: "District name and slug are required." });
+      }
+      if (subscriptionPlan != null && subscriptionPlan !== "" && !isValidDistrictPlan(subscriptionPlan)) {
+        return jsonResponse(400, { error: "Invalid subscription plan." });
+      }
+      if (billingStatus != null && billingStatus !== "" && !isValidDistrictBillingStatus(billingStatus)) {
+        return jsonResponse(400, { error: "Invalid billing status." });
+      }
+
+      const { data, error } = await adminClient
+        .from("districts")
+        .insert({
+          name,
+          slug,
+          support_email: supportEmail || null,
+          contact_name: contactName || null,
+          subscription_plan: isValidDistrictPlan(subscriptionPlan) ? subscriptionPlan : null,
+          billing_status: isValidDistrictBillingStatus(billingStatus) ? billingStatus : null,
+          renewal_date: renewalDate,
+          billing_email: billingEmail,
+          invoice_reference: invoiceReference,
+        })
+        .select("id, name, slug, support_email, contact_name, is_active, created_at, subscription_plan, billing_status, renewal_date, billing_email, invoice_reference")
+        .single();
+
+      if (error || !data) {
+        if (isMissingDistrictsTable(error as PgError)) {
+          return jsonResponse(400, {
+            error: "District foundation is not enabled yet. Run the latest database migration.",
+          });
+        }
+        return jsonResponse(400, { error: "Unable to create district." });
+      }
+
+      await writeAudit("create_district", "district", data.id, {
+        district_name: data.name,
+        district_slug: data.slug,
+      });
+
+      return jsonResponse(200, { data: (await enrichDistricts(adminClient, [data as DistrictRow]))[0] });
+    }
+
+    if (action === "update_district") {
+      const next = payload as Record<string, unknown>;
+      const id = typeof next.id === "string" ? next.id.trim() : "";
+      const name = typeof next.name === "string" ? normalizeDistrictName(next.name) : "";
+      const slug = typeof next.slug === "string" ? normalizeDistrictSlug(next.slug) : "";
+      const supportEmail =
+        typeof next.support_email === "string" ? next.support_email.trim().toLowerCase() : "";
+      const contactName =
+        typeof next.contact_name === "string" ? normalizeDistrictName(next.contact_name) : "";
+      const isActive = next.is_active !== false;
+      const subscriptionPlan = next.subscription_plan;
+      const billingStatus = next.billing_status;
+      const renewalDate =
+        typeof next.renewal_date === "string" ? normalizeOptionalText(next.renewal_date) : null;
+      const billingEmail =
+        typeof next.billing_email === "string"
+          ? normalizeOptionalText(next.billing_email)?.toLowerCase() ?? null
+          : null;
+      const invoiceReference =
+        typeof next.invoice_reference === "string"
+          ? normalizeOptionalText(next.invoice_reference)
+          : null;
+
+      if (!id || !name || !slug) {
+        return jsonResponse(400, { error: "District id, name, and slug are required." });
+      }
+      if (subscriptionPlan != null && subscriptionPlan !== "" && !isValidDistrictPlan(subscriptionPlan)) {
+        return jsonResponse(400, { error: "Invalid subscription plan." });
+      }
+      if (billingStatus != null && billingStatus !== "" && !isValidDistrictBillingStatus(billingStatus)) {
+        return jsonResponse(400, { error: "Invalid billing status." });
+      }
+
+      const { data, error } = await adminClient
+        .from("districts")
+        .update({
+          name,
+          slug,
+          support_email: supportEmail || null,
+          contact_name: contactName || null,
+          is_active: isActive,
+          subscription_plan: isValidDistrictPlan(subscriptionPlan) ? subscriptionPlan : null,
+          billing_status: isValidDistrictBillingStatus(billingStatus) ? billingStatus : null,
+          renewal_date: renewalDate,
+          billing_email: billingEmail,
+          invoice_reference: invoiceReference,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", id)
+        .select("id, name, slug, support_email, contact_name, is_active, created_at, subscription_plan, billing_status, renewal_date, billing_email, invoice_reference")
+        .single();
+
+      if (error || !data) {
+        if (isMissingDistrictsTable(error as PgError)) {
+          return jsonResponse(400, {
+            error: "District foundation is not enabled yet. Run the latest database migration.",
+          });
+        }
+        return jsonResponse(400, { error: "Unable to update district." });
+      }
+
+      await writeAudit("update_district", "district", data.id, {
+        district_name: data.name,
+        district_slug: data.slug,
+        is_active: data.is_active ?? true,
+        subscription_plan: data.subscription_plan ?? null,
+        billing_status: data.billing_status ?? null,
+      });
+
+      return jsonResponse(200, { data: (await enrichDistricts(adminClient, [data as DistrictRow]))[0] });
+    }
+
+    if (action === "get_district_details") {
+      const next = payload as Record<string, unknown>;
+      const id = typeof next.id === "string" ? next.id.trim() : "";
+      if (!id) {
+        return jsonResponse(400, { error: "District id is required." });
+      }
+
+      const { data: district, error: districtError } = await adminClient
+        .from("districts")
+        .select("id, name, slug, support_email, contact_name, is_active, created_at, subscription_plan, billing_status, renewal_date, billing_email, invoice_reference")
+        .eq("id", id)
+        .single();
+
+      if (districtError || !district) {
+        if (isMissingDistrictsTable(districtError as PgError)) {
+          return jsonResponse(400, {
+            error: "District foundation is not enabled yet. Run the latest database migration.",
+          });
+        }
+        return jsonResponse(404, { error: "District not found." });
+      }
+
+      const tenantRowsResult = await adminClient
+        .from("tenants")
+        .select("id, name, access_code, status, created_at, district_id, primary_admin_profile_id")
+        .eq("district_id", id)
+        .order("created_at", { ascending: false });
+
+      if (tenantRowsResult.error && !isMissingDistrictIdColumn(tenantRowsResult.error as PgError)) {
+        return jsonResponse(400, { error: "Unable to load district tenants." });
+      }
+
+      const tenants = await enrichTenants((tenantRowsResult.data ?? []) as TenantRow[]);
+      const tenantIds = tenants.map((tenant) => tenant.id);
+      let metrics: TenantMetricRow[] = [];
+
+      if (tenantIds.length) {
+        const metricsResult = await adminClient
+          .from("super_reporting_tenant_metrics")
+          .select(
+            "tenant_id, tenant_name, gear_total, students_total, active_checkouts, overdue_items, transactions_7d"
+          )
+          .in("tenant_id", tenantIds);
+        if (!metricsResult.error) {
+          metrics = (metricsResult.data ?? []) as TenantMetricRow[];
+        }
+      }
+
+      const usage = metrics.reduce(
+        (acc, item) => ({
+          gear_total: acc.gear_total + Number(item.gear_total ?? 0),
+          students_total: acc.students_total + Number(item.students_total ?? 0),
+          active_checkouts: acc.active_checkouts + Number(item.active_checkouts ?? 0),
+          overdue_items: acc.overdue_items + Number(item.overdue_items ?? 0),
+          transactions_7d: acc.transactions_7d + Number(item.transactions_7d ?? 0),
+        }),
+        {
+          gear_total: 0,
+          students_total: 0,
+          active_checkouts: 0,
+          overdue_items: 0,
+          transactions_7d: 0,
+        }
+      );
+
+      const { data: supportRequestRows } = await adminClient
+        .from("district_support_requests")
+        .select("id, requester_email, requester_name, subject, message, priority, status, created_at")
+        .eq("district_id", id)
+        .order("created_at", { ascending: false })
+        .limit(50);
+
+      return jsonResponse(200, {
+        data: {
+          district: (await enrichDistricts(adminClient, [district as DistrictRow]))[0],
+          tenants,
+          support_requests: supportRequestRows ?? [],
+          usage,
+        },
       });
     }
 
@@ -346,6 +785,10 @@ serve(async (req) => {
         typeof next.auth_email === "string" ? next.auth_email.trim().toLowerCase() : "";
       const password = typeof next.password === "string" ? next.password : "";
       const status = next.status;
+      const districtSlug =
+        typeof next.district_slug === "string" ? normalizeDistrictSlug(next.district_slug) : "";
+      const districtName =
+        typeof next.district_name === "string" ? normalizeDistrictName(next.district_name) : "";
 
       if (
         !name ||
@@ -358,6 +801,20 @@ serve(async (req) => {
         !isValidStatus(status)
       ) {
         return jsonResponse(400, { error: "Invalid request" });
+      }
+      if ((districtSlug && !districtName) || (!districtSlug && districtName)) {
+        return jsonResponse(400, {
+          error: "District name and slug must both be provided when assigning a district.",
+        });
+      }
+
+      let districtId: string | null = null;
+      if (districtSlug && districtName) {
+        const districtResult = await ensureDistrict(adminClient, districtSlug, districtName);
+        if (districtResult.error) {
+          return jsonResponse(400, { error: districtResult.error });
+        }
+        districtId = districtResult.districtId;
       }
 
       const { data: existingProfile } = await adminClient
@@ -374,12 +831,15 @@ serve(async (req) => {
 
       const { data, error } = await adminClient
         .from("tenants")
-        .insert({ name, access_code: accessCode, status })
-        .select("id, name, access_code, status, created_at, primary_admin_profile_id")
+        .insert({ name, access_code: accessCode, status, district_id: districtId })
+        .select("id, name, access_code, status, created_at, district_id, primary_admin_profile_id")
         .single();
 
       if (error || !data) {
-        if (!isMissingStatusColumn(error as PgError)) {
+        if (
+          !isMissingStatusColumn(error as PgError) &&
+          !isMissingDistrictIdColumn(error as PgError)
+        ) {
           return jsonResponse(400, { error: "Unable to create tenant." });
         }
 
@@ -396,6 +856,7 @@ serve(async (req) => {
         const fallbackResponse = {
           ...fallbackData,
           status: "active",
+          district_id: null,
           primary_admin_profile_id: null,
         } as TenantRow;
 
@@ -496,12 +957,13 @@ serve(async (req) => {
       await writeAudit("create_tenant", "tenant", data.id, {
         tenant_name: data.name,
         status: data.status,
+        district_slug: districtSlug || null,
         tenant_admin_email: authEmail,
       });
 
       const { data: finalTenant } = await adminClient
         .from("tenants")
-        .select("id, name, access_code, status, created_at, primary_admin_profile_id")
+        .select("id, name, access_code, status, created_at, district_id, primary_admin_profile_id")
         .eq("id", data.id)
         .single();
 
@@ -516,24 +978,48 @@ serve(async (req) => {
       const name = typeof next.name === "string" ? next.name.trim() : "";
       const accessCode =
         typeof next.access_code === "string" ? next.access_code.trim() : "";
+      const districtSlug =
+        typeof next.district_slug === "string" ? normalizeDistrictSlug(next.district_slug) : "";
+      const districtName =
+        typeof next.district_name === "string" ? normalizeDistrictName(next.district_name) : "";
 
       if (!id || !name || name.length > 120 || !accessCode || accessCode.length > 64) {
         return jsonResponse(400, { error: "Invalid request" });
       }
+      if ((districtSlug && !districtName) || (!districtSlug && districtName)) {
+        return jsonResponse(400, {
+          error: "District name and slug must both be provided when assigning a district.",
+        });
+      }
+
+      let districtId: string | null = null;
+      if (districtSlug && districtName) {
+        const districtResult = await ensureDistrict(adminClient, districtSlug, districtName);
+        if (districtResult.error) {
+          return jsonResponse(400, { error: districtResult.error });
+        }
+        districtId = districtResult.districtId;
+      }
 
       const { data, error } = await adminClient
         .from("tenants")
-        .update({ name, access_code: accessCode })
+        .update({ name, access_code: accessCode, district_id: districtId })
         .eq("id", id)
-        .select("id, name, access_code, status, created_at, primary_admin_profile_id")
+        .select("id, name, access_code, status, created_at, district_id, primary_admin_profile_id")
         .single();
 
       if (error || !data) {
+        if (isMissingDistrictIdColumn(error as PgError)) {
+          return jsonResponse(400, {
+            error: "District foundation is not enabled yet. Run the latest database migration.",
+          });
+        }
         return jsonResponse(400, { error: "Unable to update tenant." });
       }
 
       await writeAudit("update_tenant", "tenant", data.id, {
         tenant_name: data.name,
+        district_slug: districtSlug || null,
       });
 
       return jsonResponse(200, { data: (await enrichTenants([data as TenantRow]))[0] });
@@ -573,7 +1059,7 @@ serve(async (req) => {
         .from("tenants")
         .update({ status })
         .eq("id", id)
-        .select("id, name, access_code, status, created_at, primary_admin_profile_id")
+        .select("id, name, access_code, status, created_at, district_id, primary_admin_profile_id")
         .single();
 
       if (error || !data) {
@@ -587,7 +1073,11 @@ serve(async (req) => {
       }
 
       await writeAudit(
-        status === "suspended" ? "suspend_tenant" : "reactivate_tenant",
+        status === "suspended"
+          ? "suspend_tenant"
+          : status === "archived"
+            ? "archive_tenant"
+            : "reactivate_tenant",
         "tenant",
         data.id,
         { tenant_name: data.name, status: data.status }
@@ -676,7 +1166,7 @@ serve(async (req) => {
         .from("tenants")
         .update({ primary_admin_profile_id: profileId })
         .eq("id", tenantId)
-        .select("id, name, access_code, status, created_at, primary_admin_profile_id")
+        .select("id, name, access_code, status, created_at, district_id, primary_admin_profile_id")
         .single();
 
       if (error || !data) {

@@ -130,7 +130,7 @@ serve(async (req) => {
       .eq("id", callerProfile.tenant_id)
       .single();
 
-    if (tenantStatusRow?.status === "suspended") {
+    if (tenantStatusRow?.status && tenantStatusRow.status !== "active") {
       return jsonResponse(403, { error: "Tenant disabled" });
     }
 

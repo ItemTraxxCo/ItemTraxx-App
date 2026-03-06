@@ -16,6 +16,8 @@ const DEFAULT_ALLOWED_ORIGINS = [
   "https://itemtraxx.com",
   "https://www.itemtraxx.com",
   "https://internal.itemtraxx.com",
+  "https://app.itemtraxx.com",
+  "https://*.app.itemtraxx.com",
 ];
 
 const trimTrailingSlash = (value: string) => value.replace(/\/+$/, "");
@@ -45,9 +47,41 @@ const isLocalhostOrigin = (origin: string | null) => {
   }
 };
 
+const matchesWildcardOrigin = (origin: string, candidate: string) => {
+  if (!candidate.includes("*")) {
+    return false;
+  }
+
+  try {
+    const originUrl = new URL(origin);
+    const candidateUrl = new URL(candidate);
+    if (originUrl.protocol !== candidateUrl.protocol) {
+      return false;
+    }
+
+    const suffix = candidateUrl.hostname.replace("*.", "");
+    const hostname = originUrl.hostname.toLowerCase();
+    return hostname !== suffix && hostname.endsWith(`.${suffix}`);
+  } catch {
+    return false;
+  }
+};
+
+const isAllowedOrigin = (origin: string | null, allowedOrigins: string[]) => {
+  if (!origin) {
+    return false;
+  }
+
+  if (isLocalhostOrigin(origin)) {
+    return true;
+  }
+
+  return allowedOrigins.some((candidate) => candidate === origin || matchesWildcardOrigin(origin, candidate));
+};
+
 const withCorsHeaders = (origin: string | null, allowedOrigins: string[]) => {
   const originAllowed =
-    !!origin && (allowedOrigins.length === 0 || allowedOrigins.includes(origin));
+    !!origin && (allowedOrigins.length === 0 || isAllowedOrigin(origin, allowedOrigins));
   const headers = originAllowed
     ? { ...BASE_CORS_HEADERS, ...(origin ? { "Access-Control-Allow-Origin": origin } : {}) }
     : { ...BASE_CORS_HEADERS };

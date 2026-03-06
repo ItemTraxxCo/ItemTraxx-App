@@ -229,7 +229,7 @@ serve(async (req) => {
   }
 
   try {
-    const { access_code, turnstile_token } = await req.json();
+    const { access_code, turnstile_token, district_slug } = await req.json();
     if (
       typeof access_code !== "string" ||
       !access_code.trim() ||
@@ -237,6 +237,12 @@ serve(async (req) => {
     ) {
       return jsonResponse(400, { error: "Invalid request" });
     }
+    const normalizedDistrictSlug =
+      typeof district_slug === "string" &&
+      district_slug.trim() &&
+      district_slug.trim().length <= 63
+        ? district_slug.trim().toLowerCase()
+        : null;
 
     const turnstileSecret = Deno.env.get("ITX_TURNSTILE_SECRET") ?? "";
     const bypassTurnstileForAikido = isAikidoTurnstileBypassRequest(req);
@@ -348,17 +354,36 @@ serve(async (req) => {
       });
     }
 
-    const { data: tenant, error: tenantError } = await adminClient
+    let districtId: string | null = null;
+    if (normalizedDistrictSlug) {
+      const { data: district, error: districtError } = await adminClient
+        .from("districts")
+        .select("id, is_active")
+        .eq("slug", normalizedDistrictSlug)
+        .maybeSingle();
+
+      if (districtError || !district?.id || district.is_active === false) {
+        return jsonResponse(401, { error: "Invalid access code" });
+      }
+      districtId = district.id;
+    }
+
+    let tenantQuery = adminClient
       .from("tenants")
-      .select("id, status")
-      .eq("access_code", normalizedAccessCode)
-      .single();
+      .select("id, status, district_id")
+      .eq("access_code", normalizedAccessCode);
+
+    if (districtId) {
+      tenantQuery = tenantQuery.eq("district_id", districtId);
+    }
+
+    const { data: tenant, error: tenantError } = await tenantQuery.single();
 
     if (tenantError || !tenant?.id) {
       return jsonResponse(401, { error: "Invalid access code" });
     }
 
-    if (tenant.status === "suspended") {
+    if (tenant.status !== "active") {
       return jsonResponse(403, { error: "Tenant disabled" });
     }
 
@@ -379,7 +404,23 @@ serve(async (req) => {
       return jsonResponse(401, { error: "Unauthorized" });
     }
 
-    return jsonResponse(200, { auth_email: selectedProfile.auth_email });
+    let resolvedDistrictSlug = normalizedDistrictSlug;
+    if (!resolvedDistrictSlug && tenant.district_id) {
+      const { data: district } = await adminClient
+        .from("districts")
+        .select("slug")
+        .eq("id", tenant.district_id)
+        .maybeSingle();
+      resolvedDistrictSlug =
+        typeof district?.slug === "string" && district.slug.trim()
+          ? district.slug.trim().toLowerCase()
+          : null;
+    }
+
+    return jsonResponse(200, {
+      auth_email: selectedProfile.auth_email,
+      district_slug: resolvedDistrictSlug,
+    });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
     const stack = error instanceof Error ? error.stack : undefined;

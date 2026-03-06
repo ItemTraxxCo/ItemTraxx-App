@@ -10,7 +10,7 @@ export type TenantFeatureFlags = {
   enable_barcode_generator: boolean;
 };
 
-export type TenantStatus = "active" | "suspended";
+export type TenantStatus = "active" | "suspended" | "archived";
 
 export type SuperTenantAction =
   | "list_tenants"
@@ -18,7 +18,11 @@ export type SuperTenantAction =
   | "update_tenant"
   | "set_tenant_status"
   | "send_primary_admin_reset"
-  | "set_primary_admin";
+  | "set_primary_admin"
+  | "list_districts"
+  | "create_district"
+  | "update_district"
+  | "get_district_details";
 
 export type SuperAdminAction =
   | "list_tenant_admins"

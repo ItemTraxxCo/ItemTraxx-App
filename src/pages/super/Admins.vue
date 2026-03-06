@@ -11,18 +11,25 @@
       <RouterLink class="button-link" to="/super-admin/customers">Customers</RouterLink>
     </div>
 
-    <h1>Tenant Admin Management</h1>
-    <p>Create and manage tenant admins.</p>
+    <h1>Admin Management</h1>
+    <p>Create and manage tenant and district admins.</p>
 
     <div class="card">
-      <h2>Create Tenant Admin</h2>
+      <h2>Create Admin</h2>
       <form class="form" @submit.prevent="handleCreate">
         <label>
-          Tenant
-          <select v-model="createTenantId">
-            <option value="">Select tenant</option>
-            <option v-for="tenant in tenants" :key="tenant.id" :value="tenant.id">
-              {{ tenant.name }} ({{ tenant.status === "suspended" ? "disabled" : "active" }})
+          Admin Scope
+          <select v-model="adminScope">
+            <option value="tenant">tenant</option>
+            <option value="district">district</option>
+          </select>
+        </label>
+        <label>
+          {{ adminScope === "tenant" ? "Tenant" : "District" }}
+          <select v-model="createTargetId">
+            <option value="">Select {{ adminScope }}</option>
+            <option v-for="target in targets" :key="target.id" :value="target.id">
+              {{ formatTargetLabel(target) }}
             </option>
           </select>
         </label>
@@ -41,12 +48,12 @@
     </div>
 
     <div class="card">
-      <h2>Tenant Admin List</h2>
+      <h2>Admin List</h2>
       <div class="input-row">
         <input v-model="search" type="text" placeholder="Search by email" />
         <button type="button" @click="loadAdmins">Search</button>
       </div>
-      <label>
+      <label v-if="adminScope === 'tenant'">
         Filter tenant
         <select v-model="tenantFilter" @change="loadAdmins">
           <option value="all">all</option>
@@ -61,8 +68,8 @@
       <table v-else class="table">
         <thead>
           <tr>
-            <th>Email</th>
-            <th>Tenant</th>
+           <th>Email</th>
+            <th>{{ adminScope === "tenant" ? "Tenant" : "District" }}</th>
             <th>Status</th>
             <th>Created</th>
             <th>Actions</th>
@@ -71,7 +78,7 @@
         <tbody>
           <tr v-for="admin in admins" :key="admin.id">
             <td>{{ admin.auth_email }}</td>
-            <td>{{ admin.tenant_name || admin.tenant_id }}</td>
+            <td>{{ adminScope === "tenant" ? admin.tenant_name || admin.tenant_id : admin.district_name || admin.district_id }}</td>
             <td>{{ admin.is_active ? "active" : "disabled" }}</td>
             <td>{{ formatDate(admin.created_at) }}</td>
             <td class="actions-cell">
@@ -96,7 +103,12 @@
           <div class="form-actions">
             <button type="submit" class="button-primary" :disabled="isSaving">Save Email</button>
             <button type="button" :disabled="isSaving" @click="sendEditReset">Send Reset Link</button>
-            <button type="button" :disabled="isSaving" @click="setEditAsPrimary">
+            <button
+              v-if="adminScope === 'tenant'"
+              type="button"
+              :disabled="isSaving"
+              @click="setEditAsPrimary"
+            >
               Set Primary
             </button>
             <button type="button" :disabled="isSaving" @click="toggleEditStatus">
@@ -116,7 +128,7 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import { RouterLink } from "vue-router";
 import {
   createTenantAdmin,
@@ -126,16 +138,24 @@ import {
   updateTenantAdminEmail,
   type SuperTenantAdmin,
 } from "../../services/superAdminService";
-import { listTenants, setPrimaryAdmin, type SuperTenant } from "../../services/superTenantService";
+import {
+  listDistricts,
+  listTenants,
+  setPrimaryAdmin,
+  type SuperDistrict,
+  type SuperTenant,
+} from "../../services/superTenantService";
 
 const tenants = ref<SuperTenant[]>([]);
+const districts = ref<SuperDistrict[]>([]);
 const admins = ref<SuperTenantAdmin[]>([]);
 const isLoading = ref(false);
 const isSaving = ref(false);
 const error = ref("");
 const search = ref("");
 const tenantFilter = ref("all");
-const createTenantId = ref("");
+const adminScope = ref<"tenant" | "district">("tenant");
+const createTargetId = ref("");
 const createEmail = ref("");
 const createPassword = ref("");
 const toastTitle = ref("");
@@ -143,6 +163,9 @@ const toastMessage = ref("");
 const editModalVisible = ref(false);
 const editTarget = ref<SuperTenantAdmin | null>(null);
 const editEmail = ref("");
+const targets = computed<Array<SuperTenant | SuperDistrict>>(() =>
+  adminScope.value === "tenant" ? tenants.value : districts.value
+);
 let toastTimer: number | null = null;
 
 const showToast = (title: string, message: string) => {
@@ -164,6 +187,15 @@ const formatDate = (value: string) => {
   return date.toLocaleDateString();
 };
 
+const formatTargetLabel = (target: SuperTenant | SuperDistrict) => {
+  if (adminScope.value === "tenant") {
+    const tenant = target as SuperTenant;
+    return `${tenant.name} (${tenant.status === "suspended" ? "disabled" : tenant.status})`;
+  }
+  const district = target as SuperDistrict;
+  return `${district.name} (${district.slug || "-"})`;
+};
+
 const loadTenants = async () => {
   try {
     tenants.value = await listTenants("", "all");
@@ -172,38 +204,53 @@ const loadTenants = async () => {
   }
 };
 
+const loadDistricts = async () => {
+  try {
+    districts.value = await listDistricts("");
+  } catch {
+    // Keep page usable even if district list fails.
+  }
+};
+
 const loadAdmins = async () => {
   isLoading.value = true;
   error.value = "";
   try {
-    admins.value = await listTenantAdmins(search.value.trim(), tenantFilter.value);
+    admins.value = await listTenantAdmins(
+      search.value.trim(),
+      adminScope.value === "tenant" ? tenantFilter.value : "all",
+      adminScope.value
+    );
   } catch (err) {
-    error.value = err instanceof Error ? err.message : "Unable to load tenant admins.";
+    error.value = err instanceof Error ? err.message : "Unable to load admins.";
   } finally {
     isLoading.value = false;
   }
 };
 
 const handleCreate = async () => {
-  if (!createTenantId.value || !createEmail.value.trim() || !createPassword.value.trim()) {
-    showToast("Invalid input", "Select tenant, email, and password.");
+  if (!createTargetId.value || !createEmail.value.trim() || !createPassword.value.trim()) {
+    showToast("Invalid input", `Select ${adminScope.value}, email, and password.`);
     return;
   }
 
   isSaving.value = true;
   try {
     const created = await createTenantAdmin({
-      tenant_id: createTenantId.value,
+      ...(adminScope.value === "tenant"
+        ? { tenant_id: createTargetId.value }
+        : { district_id: createTargetId.value }),
       auth_email: createEmail.value.trim(),
       password: createPassword.value,
+      admin_scope: adminScope.value,
     });
     admins.value = [created, ...admins.value];
-    createTenantId.value = "";
+    createTargetId.value = "";
     createEmail.value = "";
     createPassword.value = "";
-    showToast("Tenant admin created", "Tenant admin account was created.");
+    showToast("Admin created", `${adminScope.value} admin account was created.`);
   } catch (err) {
-    showToast("Create failed", err instanceof Error ? err.message : "Unable to create tenant admin.");
+    showToast("Create failed", err instanceof Error ? err.message : "Unable to create admin.");
   } finally {
     isSaving.value = false;
   }
@@ -226,7 +273,7 @@ const toggleEditStatus = async () => {
   const current = editTarget.value;
   const nextStatus = !current.is_active;
   const confirmed = window.confirm(
-    `${nextStatus ? "Enable" : "Disable"} tenant admin ${current.auth_email}?`
+    `${nextStatus ? "Enable" : "Disable"} ${adminScope.value} admin ${current.auth_email}?`
   );
   if (!confirmed) return;
 
@@ -235,12 +282,13 @@ const toggleEditStatus = async () => {
     const updated = await setTenantAdminStatus({
       id: current.id,
       is_active: nextStatus,
+      admin_scope: adminScope.value,
     });
     admins.value = admins.value.map((item) => (item.id === updated.id ? updated : item));
     editTarget.value = updated;
     editEmail.value = updated.auth_email;
     showToast(
-      nextStatus ? "Tenant admin enabled" : "Tenant admin disabled",
+      nextStatus ? "Admin enabled" : "Admin disabled",
       `${updated.auth_email} is now ${nextStatus ? "active" : "disabled"}.`
     );
   } catch (err) {
@@ -253,7 +301,7 @@ const toggleEditStatus = async () => {
 const sendReset = async (authEmail: string) => {
   isSaving.value = true;
   try {
-    await sendTenantAdminReset({ auth_email: authEmail });
+    await sendTenantAdminReset({ auth_email: authEmail, admin_scope: adminScope.value });
     showToast("Reset sent", `Password reset flow triggered for ${authEmail}.`);
   } catch (err) {
     showToast("Reset failed", err instanceof Error ? err.message : "Unable to send reset.");
@@ -279,13 +327,14 @@ const saveEditEmail = async () => {
     const updated = await updateTenantAdminEmail({
       id: editTarget.value.id,
       auth_email: nextEmail,
+      admin_scope: adminScope.value,
     });
     admins.value = admins.value.map((item) => (item.id === updated.id ? updated : item));
     editTarget.value = updated;
     editEmail.value = updated.auth_email;
-    showToast("Tenant admin updated", "Tenant admin email was updated.");
+    showToast("Admin updated", "Admin email was updated.");
   } catch (err) {
-    showToast("Update failed", err instanceof Error ? err.message : "Unable to update tenant admin.");
+    showToast("Update failed", err instanceof Error ? err.message : "Unable to update admin.");
   } finally {
     isSaving.value = false;
   }
@@ -312,6 +361,13 @@ const setEditAsPrimary = async () => {
 
 onMounted(() => {
   void loadTenants();
+  void loadDistricts();
+  void loadAdmins();
+});
+
+watch(adminScope, () => {
+  tenantFilter.value = "all";
+  createTargetId.value = "";
   void loadAdmins();
 });
 </script>

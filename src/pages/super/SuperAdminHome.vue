@@ -30,19 +30,57 @@
       </div>
     </div>
 
-    <nav class="page-nav-left">
-      <RouterLink class="button-link" to="/super-admin/tenants">Tenants</RouterLink>
-      <RouterLink class="button-link" to="/super-admin/admins">Tenant Admins</RouterLink>
-      <RouterLink class="button-link" to="/super-admin/gear">All Items</RouterLink>
-      <RouterLink class="button-link" to="/super-admin/students">All Students</RouterLink>
-      <RouterLink class="button-link" to="/super-admin/logs">All Logs</RouterLink>
-      <RouterLink class="button-link" to="/super-admin/broadcasts">Broadcasts</RouterLink>
-      <RouterLink class="button-link" to="/super-admin/sales-leads">Sales Leads</RouterLink>
-      <RouterLink class="button-link" to="/super-admin/customers">Customers</RouterLink>
-      <RouterLink class="button-link" to="/internal">Internal Ops</RouterLink>
-    </nav>
+    <div class="section-grid">
+      <section class="card section-card">
+        <div class="section-header">
+          <h2>Tenant Operations</h2>
+          <p class="muted">Manage districts, tenants, and delegated admins.</p>
+        </div>
+        <div class="section-links">
+          <RouterLink class="button-link" to="/super-admin/districts">Districts</RouterLink>
+          <RouterLink class="button-link" to="/super-admin/tenants">Tenants</RouterLink>
+          <RouterLink class="button-link" to="/super-admin/admins">Admins</RouterLink>
+        </div>
+      </section>
 
-    <div class="card">
+      <section class="card section-card">
+        <div class="section-header">
+          <h2>Inventory Data</h2>
+          <p class="muted">Inspect global item, student, and transaction data.</p>
+        </div>
+        <div class="section-links">
+          <RouterLink class="button-link" to="/super-admin/gear">All Items</RouterLink>
+          <RouterLink class="button-link" to="/super-admin/students">All Students</RouterLink>
+          <RouterLink class="button-link" to="/super-admin/logs">All Logs</RouterLink>
+          <RouterLink class="button-link" to="/super-admin/broadcasts">Broadcasts</RouterLink>
+        </div>
+      </section>
+
+      <section class="card section-card">
+        <div class="section-header">
+          <h2>Commercial</h2>
+          <p class="muted">Track pipeline, customers, and account health.</p>
+        </div>
+        <div class="section-links">
+          <RouterLink class="button-link" to="/super-admin/sales-leads">Sales Leads</RouterLink>
+          <RouterLink class="button-link" to="/super-admin/customers">Customers</RouterLink>
+        </div>
+      </section>
+
+      <section class="card section-card">
+        <div class="section-header">
+          <h2>Platform Controls</h2>
+          <p class="muted">Runtime overrides, approvals, jobs, and internal ops.</p>
+        </div>
+        <div class="section-links">
+          <a class="button-link" href="#control-center">Control Center</a>
+          <a class="button-link" href="#recent-jobs">Recent Jobs</a>
+          <RouterLink class="button-link" to="/internal">Internal Ops</RouterLink>
+        </div>
+      </section>
+    </div>
+
+    <div id="control-center" class="card">
       <h2>Control Center</h2>
       <p class="muted">Configure runtime settings, alert rules, and emergency actions.</p>
 
@@ -261,7 +299,7 @@
       </table>
     </div>
 
-    <div class="card">
+    <div id="recent-jobs" class="card">
       <h2>Recent jobs</h2>
       <table class="table">
         <thead>
@@ -503,6 +541,35 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
+.section-grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  margin: 1rem 0;
+}
+
+.section-card {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.section-header {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.section-header h2 {
+  margin: 0;
+}
+
+.section-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
 .control-grid {
   display: grid;
   gap: 1rem;

@@ -1,15 +1,23 @@
 <template>
-  <div class="page">
-    <div class="page-nav-left">
-      <RouterLink class="button-link" to="/tenant/admin">Return to Admin Panel</RouterLink>
-      <RouterLink class="button-link" to="/tenant/checkout">Return to Checkout</RouterLink>
+  <div class="page admin-shell">
+    <div class="admin-hero">
+      <div class="page-nav-left">
+        <RouterLink class="button-link" to="/tenant/admin">Return to Admin Panel</RouterLink>
+        <RouterLink class="button-link" to="/tenant/checkout">Return to Checkout</RouterLink>
+      </div>
+
+      <h1>Bulk Barcode PDF Generator</h1>
+      <p v-if="!featureEnabled" class="error">Barcode generator is disabled for this tenant.</p>
+      <p v-else class="admin-hero-copy">Enter one barcode per line, add a message, then generate and download.</p>
     </div>
 
-    <h1>Bulk Barcode PDF Generator</h1>
-    <p v-if="!featureEnabled" class="error">Barcode generator is disabled for this tenant.</p>
-    <p v-else>Enter one barcode per line, add a message, then generate and download.</p>
-
-    <div v-if="featureEnabled" class="card">
+    <div v-if="featureEnabled" class="card admin-section-card">
+      <div class="admin-section-header">
+        <div>
+          <h2>Generate Labels</h2>
+          <p class="admin-section-copy">Create printable barcodes with a consistent note below each label.</p>
+        </div>
+      </div>
       <form class="form" @submit.prevent="generateBarcodes">
         <label>
           Barcodes (one per line)

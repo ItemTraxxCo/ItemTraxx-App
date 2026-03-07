@@ -1,14 +1,34 @@
 <template>
-  <div class="page">
-    <div class="page-nav-left">
-      <RouterLink class="button-link" to="/tenant/admin">Return to admin panel</RouterLink>
+  <div class="page admin-shell">
+    <div class="admin-hero">
+      <div class="page-nav-left">
+        <RouterLink class="button-link" to="/tenant/admin">Return to admin panel</RouterLink>
+      </div>
+      <h1>Student Management</h1>
+      <p class="admin-hero-copy">Add students, review details, and manage archived records.</p>
+      <div class="admin-summary-grid">
+        <div class="admin-summary-card">
+          <strong>{{ students.length }}</strong>
+          <span>Active students</span>
+        </div>
+        <div class="admin-summary-card">
+          <strong>{{ archivedStudents.length }}</strong>
+          <span>Archived students</span>
+        </div>
+        <div class="admin-summary-card">
+          <strong>{{ filteredStudents.length }}</strong>
+          <span>Visible in table</span>
+        </div>
+      </div>
     </div>
-    <h1>Student Management</h1>
-    <p>Add students and view details.</p>
-    <p class="muted">Export students to CSV or PDF from the table section.</p>
 
-    <div class="card">
-      <h2>Add Student</h2>
+    <div class="card admin-section-card">
+      <div class="admin-section-header">
+        <div>
+          <h2>Add Student</h2>
+          <p class="admin-section-copy">Generate a new student identity and add it to this tenant.</p>
+        </div>
+      </div>
       <form class="form" @submit.prevent="handleCreate">
         <label>
           Username
@@ -47,8 +67,17 @@
       </div>
     </div>
 
-    <div class="card">
-      <h2>Students</h2>
+    <div class="card admin-section-card">
+      <div class="admin-section-header">
+        <div>
+          <h2>Students</h2>
+          <p class="admin-section-copy">Search, export, and inspect student records from one table.</p>
+        </div>
+        <div class="admin-toolbar-actions">
+          <button type="button" @click="exportCsv">Export CSV</button>
+          <button type="button" @click="exportPdf">Export PDF</button>
+        </div>
+      </div>
       <div class="form-grid-2">
         <label>
           Search students
@@ -59,13 +88,10 @@
           />
         </label>
       </div>
-      <div class="form-actions">
-        <button type="button" @click="exportCsv">Export CSV</button>
-        <button type="button" @click="exportPdf">Export PDF</button>
-      </div>
       <p class="muted">Showing {{ filteredStudents.length }} of {{ students.length }} students.</p>
       <p v-if="isLoading" class="muted">Loading students...</p>
-      <table v-else class="table">
+      <div v-else class="table-wrap">
+      <table class="table">
         <thead>
           <tr>
             <th>Username</th>
@@ -85,13 +111,19 @@
           </tr>
         </tbody>
       </table>
+      </div>
     </div>
 
-    <div class="card">
-      <h2>Archived Students</h2>
-      <p class="muted">Archived students can be restored at any time.</p>
+    <div class="card admin-section-card">
+      <div class="admin-section-header">
+        <div>
+          <h2>Archived Students</h2>
+          <p class="admin-section-copy">Archived students can be restored at any time.</p>
+        </div>
+      </div>
       <p v-if="isLoadingArchived" class="muted">Loading archived students...</p>
-      <table v-else class="table">
+      <div v-else class="table-wrap">
+      <table class="table">
         <thead>
           <tr>
             <th>Username</th>
@@ -114,11 +146,16 @@
           </tr>
         </tbody>
       </table>
+      </div>
     </div>
 
-    <div v-if="featureFlags.enable_bulk_student_tools" class="card">
-      <h2>Bulk Student Tools</h2>
-      <p class="muted">Generate identities in bulk and import them in one action.</p>
+    <div v-if="featureFlags.enable_bulk_student_tools" class="card admin-section-card">
+      <div class="admin-section-header">
+        <div>
+          <h2>Bulk Student Tools</h2>
+          <p class="admin-section-copy">Generate identities in bulk and import them in one action.</p>
+        </div>
+      </div>
       <div class="form-grid-2">
         <label>
           Generate count

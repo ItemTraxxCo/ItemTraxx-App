@@ -1,22 +1,47 @@
 <template>
   <div class="page">
-    <div class="page-nav-left">
-      <RouterLink class="button-link" to="/super-admin">Return to Super Admin</RouterLink>
-      <RouterLink class="button-link" to="/super-admin/districts">Districts</RouterLink>
-      <RouterLink class="button-link" to="/super-admin/admins">Tenant Admins</RouterLink>
-      <RouterLink class="button-link" to="/super-admin/gear">All Items</RouterLink>
-      <RouterLink class="button-link" to="/super-admin/students">All Students</RouterLink>
-      <RouterLink class="button-link" to="/super-admin/logs">All Logs</RouterLink>
-      <RouterLink class="button-link" to="/super-admin/broadcasts">Broadcasts</RouterLink>
-      <RouterLink class="button-link" to="/super-admin/sales-leads">Sales Leads</RouterLink>
-      <RouterLink class="button-link" to="/super-admin/customers">Customers</RouterLink>
+    <div class="super-page-header">
+      <div>
+        <div class="page-nav-left">
+          <RouterLink class="button-link" to="/super-admin">Control Center</RouterLink>
+          <RouterLink class="button-link" to="/super-admin/districts">Districts</RouterLink>
+          <RouterLink class="button-link" to="/super-admin/admins">Admins</RouterLink>
+        </div>
+        <h1>Tenant Management</h1>
+        <p>Create tenants, assign districts, and manage lifecycle changes without leaving this page.</p>
+      </div>
+      <div class="page-nav-left super-page-links">
+        <RouterLink class="button-link" to="/super-admin/gear">All Items</RouterLink>
+        <RouterLink class="button-link" to="/super-admin/students">All Students</RouterLink>
+        <RouterLink class="button-link" to="/super-admin/logs">All Logs</RouterLink>
+      </div>
     </div>
 
-    <h1>Tenant Management</h1>
-    <p>Create and manage tenant lifecycle.</p>
+    <div class="admin-grid tenant-stats">
+      <div class="stat-card">
+        <h3>Total tenants</h3>
+        <p class="stat-value">{{ tenants.length }}</p>
+      </div>
+      <div class="stat-card">
+        <h3>Active</h3>
+        <p class="stat-value">{{ activeTenantCount }}</p>
+      </div>
+      <div class="stat-card">
+        <h3>Disabled</h3>
+        <p class="stat-value">{{ disabledTenantCount }}</p>
+      </div>
+      <div class="stat-card">
+        <h3>District linked</h3>
+        <p class="stat-value">{{ districtLinkedTenantCount }}</p>
+      </div>
+    </div>
 
-    <div class="card">
-      <h2>Create Tenant</h2>
+    <div class="section-grid">
+      <div class="card section-card">
+        <div class="section-heading">
+          <h2>Create Tenant</h2>
+          <p class="muted">Provision tenant access and attach it to an active district.</p>
+        </div>
       <form class="form" @submit.prevent="handleCreate">
         <label>
           Name
@@ -59,61 +84,67 @@
           <button type="submit" class="button-primary" :disabled="isSaving">Create Tenant</button>
         </div>
       </form>
-    </div>
-
-    <div class="card">
-      <h2>Tenant List</h2>
-      <div class="input-row">
-        <input v-model="search" type="text" placeholder="Search by tenant name or access code" />
-        <button type="button" @click="loadTenants">Search</button>
       </div>
-      <label>
-        Filter status
-        <select v-model="statusFilterLabel" @change="loadTenants">
-          <option value="all">all</option>
-          <option value="active">active</option>
-          <option value="disabled">disabled</option>
-          <option value="archived">archived</option>
-        </select>
-      </label>
 
-      <p v-if="isLoading" class="muted">Loading tenants...</p>
-      <p v-else-if="error" class="error">{{ error }}</p>
-      <table v-else class="table">
-        <thead>
-          <tr>
-            <th>Name</th>
-            <th>District</th>
-            <th>Access Code</th>
-            <th>Status</th>
-            <th>Primary Admin</th>
-            <th>Created</th>
-            <th>Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="tenant in tenants" :key="tenant.id">
-            <td>{{ tenant.name }}</td>
-            <td>{{ tenant.district_slug || tenant.district_name || "-" }}</td>
-            <td>{{ tenant.access_code }}</td>
-            <td>{{ toTenantStatusLabel(tenant.status) }}</td>
-            <td>{{ tenant.primary_admin_email || "-" }}</td>
-            <td>{{ formatDate(tenant.created_at) }}</td>
-            <td class="actions-cell">
-              <button type="button" @click="openEditModal(tenant)">Edit</button>
-              <button type="button" :disabled="isSaving" @click="openStatusModal(tenant)">
-                {{
-                  tenant.status === "active"
-                    ? "Disable"
-                    : tenant.status === "suspended"
-                      ? "Reactivate"
-                      : "Restore"
-                }}
-              </button>
-            </td>
-          </tr>
-        </tbody>
-      </table>
+      <div class="card section-card">
+        <div class="section-heading">
+          <h2>Tenant List</h2>
+          <p class="muted">Search, filter, edit, and change tenant status from one table.</p>
+        </div>
+        <div class="filter-toolbar">
+          <div class="input-row">
+            <input v-model="search" type="text" placeholder="Search by tenant name or access code" />
+            <button type="button" @click="loadTenants">Search</button>
+          </div>
+          <label class="filter-select">
+            Filter status
+            <select v-model="statusFilterLabel" @change="loadTenants">
+              <option value="all">all</option>
+              <option value="active">active</option>
+              <option value="disabled">disabled</option>
+              <option value="archived">archived</option>
+            </select>
+          </label>
+        </div>
+
+        <p v-if="isLoading" class="muted">Loading tenants...</p>
+        <p v-else-if="error" class="error">{{ error }}</p>
+        <table v-else class="table">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>District</th>
+              <th>Access Code</th>
+              <th>Status</th>
+              <th>Primary Admin</th>
+              <th>Created</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="tenant in tenants" :key="tenant.id">
+              <td>{{ tenant.name }}</td>
+              <td>{{ tenant.district_slug || tenant.district_name || "-" }}</td>
+              <td>{{ tenant.access_code }}</td>
+              <td>{{ toTenantStatusLabel(tenant.status) }}</td>
+              <td>{{ tenant.primary_admin_email || "-" }}</td>
+              <td>{{ formatDate(tenant.created_at) }}</td>
+              <td class="actions-cell">
+                <button type="button" @click="openEditModal(tenant)">Edit</button>
+                <button type="button" :disabled="isSaving" @click="openStatusModal(tenant)">
+                  {{
+                    tenant.status === "active"
+                      ? "Disable"
+                      : tenant.status === "suspended"
+                        ? "Reactivate"
+                        : "Restore"
+                  }}
+                </button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
     </div>
 
     <div v-if="editModalVisible" class="modal-backdrop" @click.self="closeEditModal">
@@ -244,6 +275,13 @@ let toastTimer: number | null = null;
 
 const activeDistricts = computed(() =>
   districts.value.filter((district) => district.is_active !== false)
+);
+const activeTenantCount = computed(() => tenants.value.filter((tenant) => tenant.status === "active").length);
+const disabledTenantCount = computed(() =>
+  tenants.value.filter((tenant) => tenant.status === "suspended").length
+);
+const districtLinkedTenantCount = computed(() =>
+  tenants.value.filter((tenant) => !!tenant.district_id).length
 );
 
 const showToast = (title: string, message: string) => {
@@ -480,6 +518,54 @@ onMounted(() => {
 </script>
 
 <style scoped>
+.super-page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.super-page-links {
+  justify-content: flex-end;
+}
+
+.tenant-stats {
+  margin-top: 1rem;
+}
+
+.section-grid {
+  display: grid;
+  grid-template-columns: minmax(300px, 340px) minmax(0, 1fr);
+  gap: 1rem;
+  align-items: start;
+}
+
+.section-card {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.section-heading h2 {
+  margin: 0;
+}
+
+.section-heading p {
+  margin: 0.35rem 0 0;
+}
+
+.filter-toolbar {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+  align-items: end;
+}
+
+.filter-select {
+  min-width: 180px;
+}
+
 .modal-backdrop {
   position: fixed;
   inset: 0;
@@ -504,5 +590,19 @@ onMounted(() => {
   display: flex;
   flex-wrap: wrap;
   gap: 0.5rem;
+}
+
+@media (max-width: 900px) {
+  .super-page-header {
+    flex-direction: column;
+  }
+
+  .super-page-links {
+    justify-content: flex-start;
+  }
+
+  .section-grid {
+    grid-template-columns: 1fr;
+  }
 }
 </style>

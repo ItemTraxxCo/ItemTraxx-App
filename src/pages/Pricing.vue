@@ -2,28 +2,36 @@
   <div class="pricing-shell">
     <div class="pricing-orb orb-one" aria-hidden="true"></div>
     <div class="pricing-orb orb-two" aria-hidden="true"></div>
-    <div class="pricing-orb orb-three" aria-hidden="true"></div>
-    <div class="page pricing-page">
-      <div class="page-nav-left">
+    <div class="grid-noise" aria-hidden="true"></div>
+
+    <div class="pricing-page">
+      <div class="page-nav-left pricing-top-nav">
         <RouterLink class="pricing-back-link" to="/" aria-label="Return to home">
           <svg viewBox="0 0 24 24" aria-hidden="true">
             <path d="M15 5 8 12l7 7" />
           </svg>
         </RouterLink>
+        <span class="pricing-breadcrumb"> </span>
       </div>
 
-      <h1>ItemTraxx Pricing</h1>
-      <p class="muted">
-        Annual subscriptions by district size. All plans are subject to onboarding fees in year one.
-      </p>
-      <div class="pricing-actions">
-        <RouterLink class="pricing-contact-button" to="/contact-sales">
-          Contact Sales
-        </RouterLink>
-      </div>
+      <section class="pricing-hero">
+        <p class="pricing-eyebrow">Pricing</p>
+        <h1>Simple annual pricing for teams of any size.</h1>
+        <p class="pricing-lead">
+          Annual subscriptions by district size. All plans are subject to onboarding fees in year one.
+        </p>
+        <div class="pricing-actions">
+          <RouterLink class="pricing-contact-button" to="/contact-sales">
+            Contact Sales
+          </RouterLink>
+          <RouterLink class="pricing-secondary-button" to="/login">
+            Go to Login
+          </RouterLink>
+        </div>
+      </section>
 
       <section class="plan-grid" aria-label="Pricing plans">
-        <article class="card plan-card">
+        <article class="plan-card">
           <h2>ItemTraxx Core Plan</h2>
           <p class="price">$1,250.00<span>/year</span></p>
           <p class="price-note">Listed price excludes the 1st year onboarding fee.</p>
@@ -37,7 +45,7 @@
           <p class="onboarding">+1st Year Onboarding Fee: $750.00</p>
         </article>
 
-        <article class="card plan-card plan-highlight">
+        <article class="plan-card plan-highlight">
           <h2>ItemTraxx Growth Plan</h2>
           <p class="price">$3,500.00<span>/year</span></p>
           <p class="price-note">Listed price excludes the 1st year onboarding fee.</p>
@@ -51,7 +59,7 @@
           <p class="onboarding">+1st Year Onboarding Fee: $1,250.00</p>
         </article>
 
-        <article class="card plan-card">
+        <article class="plan-card">
           <h2>ItemTraxx Enterprise Plan</h2>
           <p class="price">Contact for pricing</p>
           <p class="starting">Starts at $4,500.00 (excluding 1st year fees)</p>
@@ -69,7 +77,7 @@
         </article>
       </section>
 
-      <section class="card billing-card">
+      <section class="billing-card">
         <h2>Pricing FAQ</h2>
         <ul>
           <li><strong>Are plans annual or monthly?</strong> All plans are annual subscriptions.</li>
@@ -79,7 +87,7 @@
         </ul>
       </section>
 
-      <section class="card billing-card">
+      <section class="billing-card">
         <h2>What Onboarding Includes</h2>
         <ul class="onboarding-includes-list">
           <li>
@@ -101,7 +109,7 @@
         </ul>
       </section>
 
-      <section class="card billing-card">
+      <section class="billing-card">
         <h2>Billing Terms</h2>
         <ul>
           <li>All plans are billed annually.</li>
@@ -127,29 +135,39 @@ import { RouterLink } from "vue-router";
 <style scoped>
 .pricing-shell {
   min-height: 100vh;
-  width: 100vw;
-  max-width: none;
   position: relative;
-  left: 50%;
-  right: 50%;
-  margin-left: -50vw;
-  margin-right: -50vw;
   margin-top: -2.5rem;
   margin-bottom: -3rem;
-  padding: 2.1rem 0 3.2rem;
-  background: linear-gradient(180deg, #1f4ca3 0%, #38d0b1 100%);
+  margin-left: -2rem;
+  margin-right: -2rem;
+  padding: 2rem 0 3.2rem;
+  background:
+    radial-gradient(circle at top left, rgba(25, 194, 168, 0.14), transparent 22%),
+    radial-gradient(circle at 82% 18%, rgba(25, 67, 155, 0.2), transparent 28%),
+    linear-gradient(180deg, #10161f 0%, #090d14 100%);
   color: #ffffff;
-  overflow-x: clip;
-  overflow-y: hidden;
+  overflow-x: hidden;
 }
 
 .pricing-page {
-  max-width: 1140px;
-  width: 100%;
+  max-width: 1240px;
+  width: min(92%, 1240px);
+  margin: 0 auto;
   box-sizing: border-box;
-  padding-inline: clamp(1.1rem, 3vw, 1.75rem);
   position: relative;
   z-index: 2;
+}
+
+.grid-noise {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.025) 1px, transparent 1px);
+  background-size: 36px 36px;
+  mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.55), transparent 92%);
+  opacity: 0.16;
 }
 
 .pricing-back-link {
@@ -159,8 +177,8 @@ import { RouterLink } from "vue-router";
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border: 1px solid rgba(255, 255, 255, 0.28);
-  background: rgba(7, 23, 43, 0.24);
+  border: 1px solid rgba(77, 97, 122, 0.4);
+  background: linear-gradient(180deg, rgba(31, 40, 54, 0.94) 0%, rgba(17, 23, 32, 0.98) 100%);
   color: #ffffff;
   text-decoration: none;
   transition: transform 0.16s ease, border-color 0.16s ease, background 0.16s ease;
@@ -169,8 +187,9 @@ import { RouterLink } from "vue-router";
 .pricing-back-link:hover {
   text-decoration: none;
   transform: translateY(-1px);
-  border-color: rgba(255, 255, 255, 0.6);
-  background: rgba(7, 23, 43, 0.34);
+  border-color: rgba(39, 196, 172, 0.58);
+  background: linear-gradient(180deg, rgba(29, 66, 75, 0.98) 0%, rgba(16, 37, 48, 1) 100%);
+  box-shadow: 0 16px 32px rgba(25, 194, 168, 0.14);
 }
 
 .pricing-back-link svg {
@@ -186,108 +205,173 @@ import { RouterLink } from "vue-router";
 .pricing-orb {
   position: absolute;
   border-radius: 999px;
-  filter: blur(30px);
-  opacity: 0.26;
+  filter: blur(44px);
+  opacity: 0.36;
   pointer-events: none;
 }
 
 .orb-one {
   width: 320px;
   height: 320px;
-  top: 90px;
+  top: 60px;
   left: -100px;
-  background: rgba(129, 178, 255, 0.7);
+  background: rgba(25, 194, 168, 0.26);
 }
 
 .orb-two {
-  width: 270px;
-  height: 270px;
-  top: 420px;
+  width: 340px;
+  height: 340px;
+  top: 360px;
   right: -70px;
-  background: rgba(92, 224, 200, 0.75);
+  background: rgba(25, 67, 155, 0.26);
 }
 
-.orb-three {
-  width: 360px;
-  height: 360px;
-  bottom: 110px;
-  left: 16%;
-  background: rgba(77, 137, 255, 0.46);
+.pricing-top-nav {
+  margin-bottom: 1rem;
+}
+
+.pricing-breadcrumb {
+  color: rgba(225, 232, 240, 0.72);
+  font-size: 0.95rem;
+}
+
+.pricing-hero {
+  border: 1px solid rgba(74, 92, 116, 0.34);
+  background: linear-gradient(180deg, rgba(20, 27, 37, 0.94) 0%, rgba(12, 17, 24, 0.98) 100%);
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.22);
+  border-radius: 28px;
+  padding: 2.6rem;
+}
+
+.pricing-eyebrow {
+  margin: 0 0 0.9rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: rgba(214, 237, 233, 0.72);
+}
+
+.pricing-hero h1 {
+  margin: 0;
+  font-size: clamp(2.7rem, 5vw, 5rem);
+  line-height: 0.98;
+  letter-spacing: -0.06em;
+}
+
+.pricing-lead {
+  margin: 1.25rem 0 0;
+  max-width: 42rem;
+  font-size: 1.1rem;
+  line-height: 1.75;
+  color: rgba(222, 229, 238, 0.76);
 }
 
 .pricing-actions {
-  margin-top: 0.9rem;
-  margin-bottom: 0.3rem;
+  margin-top: 1.6rem;
+  display: flex;
+  gap: 0.9rem;
+  flex-wrap: wrap;
 }
 
 .pricing-contact-button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.38);
-  background: rgba(7, 23, 43, 0.35);
-  color: #ffffff;
+  min-height: 2.4rem;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  background-image: linear-gradient(90deg, #19c2a8 0%, #19439b 100%);
+  background-repeat: no-repeat;
+  background-size: 100% 100%;
+  background-origin: border-box;
+  color: #f7fbff;
   font-weight: 700;
   text-decoration: none;
-  padding: 0.58rem 1.05rem;
-  transition: transform 0.16s ease, background 0.16s ease, border-color 0.16s ease;
+  padding: 0.45rem 0.95rem;
+  transition: transform 0.16s ease, background 0.16s ease, border-color 0.16s ease, box-shadow 0.16s ease;
 }
 
 .pricing-contact-button:hover {
   text-decoration: none;
   transform: translateY(-1px);
-  background: rgba(7, 23, 43, 0.5);
-  border-color: rgba(255, 255, 255, 0.58);
+  background-image: linear-gradient(90deg, #22ccb1 0%, #2357bf 100%);
+  box-shadow: 0 16px 32px rgba(25, 67, 155, 0.18);
+}
+
+.pricing-secondary-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.4rem;
+  border-radius: 10px;
+  border: 1px solid rgba(77, 97, 122, 0.4);
+  background: linear-gradient(180deg, rgba(31, 40, 54, 0.94) 0%, rgba(17, 23, 32, 0.98) 100%);
+  color: #f5f7fb;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  font-weight: 700;
+  text-decoration: none;
+  padding: 0.45rem 0.95rem;
+  transition: transform 0.16s ease, background 0.16s ease, border-color 0.16s ease, box-shadow 0.16s ease;
+}
+
+.pricing-secondary-button:hover {
+  text-decoration: none;
+  transform: translateY(-1px);
+  border-color: rgba(39, 196, 172, 0.58);
+  background: linear-gradient(180deg, rgba(29, 66, 75, 0.98) 0%, rgba(16, 37, 48, 1) 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(115, 255, 233, 0.08),
+    0 16px 32px rgba(25, 194, 168, 0.14);
 }
 
 .plan-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 1rem;
-  margin-top: 1rem;
+  gap: 1.2rem;
+  margin-top: 1.6rem;
 }
 
 .plan-card {
   display: flex;
   flex-direction: column;
-  border-radius: 14px;
-  border: 1px solid rgba(255, 255, 255, 0.4);
-  background: rgba(255, 255, 255, 0.32);
-  backdrop-filter: blur(6px);
-  box-shadow: none;
+  border-radius: 22px;
+  padding: 1.6rem;
+  border: 1px solid rgba(74, 92, 116, 0.34);
+  background: linear-gradient(180deg, rgba(20, 27, 37, 0.94) 0%, rgba(12, 17, 24, 0.98) 100%);
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.22);
 }
 
 .plan-card h2 {
   margin: 0;
   font-size: 1.2rem;
-  color: #06172f;
+  color: #f5f7fb;
 }
 
 .price {
   margin: 0.65rem 0 0.4rem;
   font-size: 1.7rem;
   font-weight: 700;
-  color: #06172f;
+  color: #f5f7fb;
 }
 
 .price span {
   margin-left: 0.25rem;
   font-size: 0.92rem;
   font-weight: 500;
-  color: rgba(7, 23, 43, 0.75);
+  color: rgba(222, 229, 238, 0.72);
 }
 
 .starting {
   margin: 0 0 0.7rem;
   font-size: 0.9rem;
-  color: rgba(7, 23, 43, 0.82);
+  color: rgba(222, 229, 238, 0.78);
 }
 
 .price-note {
   margin: 0 0 0.8rem;
   font-size: 0.84rem;
-  color: rgba(7, 23, 43, 0.72);
+  color: rgba(222, 229, 238, 0.68);
 }
 
 .plan-card ul {
@@ -295,52 +379,54 @@ import { RouterLink } from "vue-router";
   padding-left: 1.1rem;
   display: grid;
   gap: 0.45rem;
-  color: rgba(7, 23, 43, 0.85);
+  color: rgba(222, 229, 238, 0.8);
 }
 
 .onboarding {
   margin: 0.9rem 0 0;
   padding-top: 0.8rem;
-  border-top: 1px solid rgba(14, 45, 88, 0.18);
+  border-top: 1px solid rgba(74, 92, 116, 0.24);
   font-weight: 600;
   font-size: 0.92rem;
-  color: #06172f;
+  color: #f5f7fb;
 }
 
 .enterprise-note {
   margin: 0.65rem 0 0;
   font-size: 0.88rem;
-  color: rgba(7, 23, 43, 0.82);
+  color: rgba(222, 229, 238, 0.78);
 }
 
 .enterprise-note a {
-  color: #0a2a5f;
+  color: #89efe1;
   font-weight: 700;
   text-decoration: underline;
   text-underline-offset: 2px;
 }
 
 .enterprise-note a:hover {
-  color: #061b3f;
+  color: #b9fff5;
 }
 
 .plan-highlight {
-  border-color: rgba(255, 255, 255, 0.34);
-  box-shadow: 0 10px 28px rgba(6, 23, 47, 0.18);
+  border-color: rgba(25, 194, 168, 0.3);
+  box-shadow:
+    0 18px 44px rgba(0, 0, 0, 0.24),
+    inset 0 0 0 1px rgba(25, 194, 168, 0.14);
 }
 
 .billing-card {
-  margin-top: 1rem;
-  border-radius: 14px;
-  border: 1px solid rgba(255, 255, 255, 0.4);
-  background: rgba(255, 255, 255, 0.32);
-  backdrop-filter: blur(6px);
-  box-shadow: none;
+  margin-top: 1.2rem;
+  border-radius: 22px;
+  padding: 1.6rem;
+  border: 1px solid rgba(74, 92, 116, 0.34);
+  background: linear-gradient(180deg, rgba(20, 27, 37, 0.94) 0%, rgba(12, 17, 24, 0.98) 100%);
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.22);
 }
 
 .billing-card h2 {
   margin-top: 0;
-  color: #06172f;
+  color: #f5f7fb;
 }
 
 .billing-card ul {
@@ -348,7 +434,7 @@ import { RouterLink } from "vue-router";
   padding-left: 1.1rem;
   display: grid;
   gap: 0.45rem;
-  color: rgba(7, 23, 43, 0.85);
+  color: rgba(222, 229, 238, 0.8);
 }
 
 .onboarding-includes-list {
@@ -358,18 +444,18 @@ import { RouterLink } from "vue-router";
 .enterprise-onboarding-row {
   margin-top: 0.2rem;
   padding-top: 0.8rem;
-  border-top: 1px dashed rgba(6, 27, 63, 0.35);
+  border-top: 1px dashed rgba(74, 92, 116, 0.35);
 }
 
 .billing-card a {
-  color: #0a2a5f;
+  color: #89efe1;
   font-weight: 700;
   text-decoration: underline;
   text-underline-offset: 2px;
 }
 
 .billing-card a:hover {
-  color: #061b3f;
+  color: #b9fff5;
 }
 
 @media (max-width: 980px) {
@@ -380,7 +466,7 @@ import { RouterLink } from "vue-router";
   }
 
   .pricing-page {
-    padding-inline: 1.1rem;
+    width: min(100%, calc(100% - 1.5rem));
   }
 
   .plan-grid {

@@ -85,6 +85,7 @@ const submit = () => {
   display: grid;
   place-items: center;
   z-index: 60;
+  padding: 1rem;
 }
 
 .stepup-modal {
@@ -103,5 +104,28 @@ const submit = () => {
   display: flex;
   gap: 0.5rem;
   justify-content: flex-end;
+}
+
+@media (max-width: 640px) {
+  .stepup-overlay {
+    padding: 0.75rem;
+  }
+
+  .stepup-modal {
+    box-sizing: border-box;
+    width: calc(100vw - 1.5rem);
+    max-width: 480px;
+    max-height: calc(100dvh - 1.5rem);
+    overflow-x: hidden;
+  }
+
+  .actions {
+    flex-direction: column-reverse;
+    align-items: stretch;
+  }
+
+  .actions > * {
+    width: 100%;
+  }
 }
 </style>

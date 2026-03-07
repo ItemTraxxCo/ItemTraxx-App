@@ -59,6 +59,45 @@ const getAccessToken = async () => {
   return getFreshAccessToken();
 };
 
+const requestCache = new Map<
+  string,
+  {
+    expiresAt: number;
+    data: unknown;
+  }
+>();
+
+const requestInflight = new Map<string, Promise<unknown>>();
+
+const withCachedAdminOp = async <TData>(
+  key: string,
+  ttlMs: number,
+  loader: () => Promise<TData>
+) => {
+  const now = Date.now();
+  const cached = requestCache.get(key);
+  if (cached && cached.expiresAt > now) {
+    return cached.data as TData;
+  }
+
+  const inflight = requestInflight.get(key);
+  if (inflight) {
+    return (await inflight) as TData;
+  }
+
+  const pending = loader()
+    .then((data) => {
+      requestCache.set(key, { data, expiresAt: Date.now() + ttlMs });
+      return data;
+    })
+    .finally(() => {
+      requestInflight.delete(key);
+    });
+
+  requestInflight.set(key, pending);
+  return (await pending) as TData;
+};
+
 const callAdminOps = async <TData>(
   action: AdminOpsAction,
   payload: Record<string, unknown> = {}
@@ -89,7 +128,9 @@ const callAdminOps = async <TData>(
 };
 
 export const fetchTenantNotifications = async () =>
-  callAdminOps<TenantNotificationPayload>("get_notifications");
+  withCachedAdminOp("get_notifications", 15_000, () =>
+    callAdminOps<TenantNotificationPayload>("get_notifications")
+  );
 
 export const fetchTenantSettings = async () =>
   callAdminOps<TenantSettingsPayload>("get_tenant_settings");
@@ -120,10 +161,14 @@ export const bulkImportGear = async (
   }>("bulk_import_gear", { rows });
 
 export const touchTenantAdminSession = async () =>
-  callAdminOps<{ ok: boolean }>("touch_session");
+  withCachedAdminOp("touch_session", 20_000, () =>
+    callAdminOps<{ ok: boolean }>("touch_session")
+  );
 
 export const validateTenantAdminSession = async () =>
-  callAdminOps<{ valid: boolean }>("validate_session");
+  withCachedAdminOp("validate_session", 5_000, () =>
+    callAdminOps<{ valid: boolean }>("validate_session")
+  );
 
 export const listTenantAdminSessions = async () =>
   callAdminOps<{ sessions: TenantSessionItem[] }>("list_sessions");

@@ -16,13 +16,25 @@ const routes: RouteRecordRaw[] = [
     component: () =>
       isInternalHostRuntime()
         ? import("../pages/internal/InternalOps.vue")
-        : import("../pages/PublicHome.vue"),
+        : import("../pages/LandingPageNew.vue"),
+    meta: { public: true },
+  },
+  {
+    path: "/landing-old",
+    name: "public-home-old",
+    component: () => import("../pages/PublicHome.vue"),
     meta: { public: true },
   },
   {
     path: "/login",
     name: "public-login",
     component: () => import("../pages/Login.vue"),
+    meta: { public: true },
+  },
+  {
+    path: "/landing-new",
+    name: "public-home-new",
+    component: () => import("../pages/LandingPageNew.vue"),
     meta: { public: true },
   },
   {

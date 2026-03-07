@@ -273,4 +273,43 @@ onUnmounted(() => {
   align-items: center;
   gap: 0.5rem;
 }
+
+@media (max-width: 640px) {
+  .onboarding-overlay {
+    padding: 0.75rem;
+  }
+
+  .onboarding-modal {
+    box-sizing: border-box;
+    width: calc(100vw - 1.5rem);
+    max-width: 560px;
+    max-height: calc(100dvh - 1.5rem);
+    padding: 0.9rem;
+    overflow-x: hidden;
+  }
+
+  .onboarding-header {
+    align-items: flex-start;
+  }
+
+  .onboarding-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .onboarding-nav {
+    width: 100%;
+    justify-content: stretch;
+  }
+
+  .onboarding-nav > * {
+    flex: 1 1 0;
+  }
+
+  .onboarding-actions > .button-primary,
+  .onboarding-actions > button,
+  .onboarding-actions > a {
+    width: 100%;
+  }
+}
 </style>

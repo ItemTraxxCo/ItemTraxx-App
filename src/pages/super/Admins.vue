@@ -1,21 +1,47 @@
 <template>
   <div class="page">
-    <div class="page-nav-left">
-      <RouterLink class="button-link" to="/super-admin">Return to Super Admin</RouterLink>
-      <RouterLink class="button-link" to="/super-admin/tenants">Tenants</RouterLink>
-      <RouterLink class="button-link" to="/super-admin/gear">All Items</RouterLink>
-      <RouterLink class="button-link" to="/super-admin/students">All Students</RouterLink>
-      <RouterLink class="button-link" to="/super-admin/logs">All Logs</RouterLink>
-      <RouterLink class="button-link" to="/super-admin/broadcasts">Broadcasts</RouterLink>
-      <RouterLink class="button-link" to="/super-admin/sales-leads">Sales Leads</RouterLink>
-      <RouterLink class="button-link" to="/super-admin/customers">Customers</RouterLink>
+    <div class="super-page-header">
+      <div>
+        <div class="page-nav-left">
+          <RouterLink class="button-link" to="/super-admin">Control Center</RouterLink>
+          <RouterLink class="button-link" to="/super-admin/tenants">Tenants</RouterLink>
+          <RouterLink class="button-link" to="/super-admin/districts">Districts</RouterLink>
+        </div>
+        <h1>Admin Management</h1>
+        <p>Manage tenant and district admins from one place, with scope-aware filters and actions.</p>
+      </div>
+      <div class="page-nav-left super-page-links">
+        <RouterLink class="button-link" to="/super-admin/gear">All Items</RouterLink>
+        <RouterLink class="button-link" to="/super-admin/students">All Students</RouterLink>
+        <RouterLink class="button-link" to="/super-admin/logs">All Logs</RouterLink>
+      </div>
     </div>
 
-    <h1>Admin Management</h1>
-    <p>Create and manage tenant and district admins.</p>
+    <div class="admin-grid admin-stats">
+      <div class="stat-card">
+        <h3>Total admins</h3>
+        <p class="stat-value">{{ admins.length }}</p>
+      </div>
+      <div class="stat-card">
+        <h3>Tenant admins</h3>
+        <p class="stat-value">{{ tenantAdminCount }}</p>
+      </div>
+      <div class="stat-card">
+        <h3>District admins</h3>
+        <p class="stat-value">{{ districtAdminCount }}</p>
+      </div>
+      <div class="stat-card">
+        <h3>Disabled</h3>
+        <p class="stat-value">{{ disabledAdminCount }}</p>
+      </div>
+    </div>
 
-    <div class="card">
-      <h2>Create Admin</h2>
+    <div class="section-grid">
+      <div class="card section-card">
+        <div class="section-heading">
+          <h2>Create Admin</h2>
+          <p class="muted">Pick a scope first, then target the tenant or district directly.</p>
+        </div>
       <form class="form" @submit.prevent="handleCreate">
         <label>
           Admin Scope
@@ -45,51 +71,64 @@
           <button type="submit" class="button-primary" :disabled="isSaving">Create Tenant Admin</button>
         </div>
       </form>
-    </div>
-
-    <div class="card">
-      <h2>Admin List</h2>
-      <div class="input-row">
-        <input v-model="search" type="text" placeholder="Search by email" />
-        <button type="button" @click="loadAdmins">Search</button>
       </div>
-      <label v-if="adminScope === 'tenant'">
-        Filter tenant
-        <select v-model="tenantFilter" @change="loadAdmins">
-          <option value="all">all</option>
-          <option v-for="tenant in tenants" :key="tenant.id" :value="tenant.id">
-            {{ tenant.name }}
-          </option>
-        </select>
-      </label>
 
-      <p v-if="isLoading" class="muted">Loading tenant admins...</p>
-      <p v-else-if="error" class="error">{{ error }}</p>
-      <table v-else class="table">
-        <thead>
-          <tr>
-           <th>Email</th>
-            <th>{{ adminScope === "tenant" ? "Tenant" : "District" }}</th>
-            <th>Status</th>
-            <th>Created</th>
-            <th>Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="admin in admins" :key="admin.id">
-            <td>{{ admin.auth_email }}</td>
-            <td>{{ adminScope === "tenant" ? admin.tenant_name || admin.tenant_id : admin.district_name || admin.district_id }}</td>
-            <td>{{ admin.is_active ? "active" : "disabled" }}</td>
-            <td>{{ formatDate(admin.created_at) }}</td>
-            <td class="actions-cell">
-              <button type="button" @click="openEditModal(admin)">Edit</button>
-            </td>
-          </tr>
-          <tr v-if="admins.length === 0">
-            <td colspan="5" class="muted">No tenant admins found.</td>
-          </tr>
-        </tbody>
-      </table>
+      <div class="card section-card">
+        <div class="section-heading">
+          <h2>Admin List</h2>
+          <p class="muted">Use the scope filter to switch between tenant and district operators.</p>
+        </div>
+        <div class="filter-toolbar">
+          <div class="input-row">
+            <input v-model="search" type="text" placeholder="Search by email" />
+            <button type="button" @click="loadAdmins">Search</button>
+          </div>
+          <label class="filter-select">
+            Scope
+            <select v-model="adminScope">
+              <option value="tenant">tenant</option>
+              <option value="district">district</option>
+            </select>
+          </label>
+          <label v-if="adminScope === 'tenant'" class="filter-select">
+            Filter tenant
+            <select v-model="tenantFilter" @change="loadAdmins">
+              <option value="all">all</option>
+              <option v-for="tenant in tenants" :key="tenant.id" :value="tenant.id">
+                {{ tenant.name }}
+              </option>
+            </select>
+          </label>
+        </div>
+
+        <p v-if="isLoading" class="muted">Loading tenant admins...</p>
+        <p v-else-if="error" class="error">{{ error }}</p>
+        <table v-else class="table">
+          <thead>
+            <tr>
+              <th>Email</th>
+              <th>{{ adminScope === "tenant" ? "Tenant" : "District" }}</th>
+              <th>Status</th>
+              <th>Created</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="admin in admins" :key="admin.id">
+              <td>{{ admin.auth_email }}</td>
+              <td>{{ adminScope === "tenant" ? admin.tenant_name || admin.tenant_id : admin.district_name || admin.district_id }}</td>
+              <td>{{ admin.is_active ? "active" : "disabled" }}</td>
+              <td>{{ formatDate(admin.created_at) }}</td>
+              <td class="actions-cell">
+                <button type="button" @click="openEditModal(admin)">Edit</button>
+              </td>
+            </tr>
+            <tr v-if="admins.length === 0">
+              <td colspan="5" class="muted">No tenant admins found.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
     </div>
 
     <div v-if="editModalVisible" class="modal-backdrop" @click.self="closeEditModal">
@@ -165,6 +204,15 @@ const editTarget = ref<SuperTenantAdmin | null>(null);
 const editEmail = ref("");
 const targets = computed<Array<SuperTenant | SuperDistrict>>(() =>
   adminScope.value === "tenant" ? tenants.value : districts.value
+);
+const tenantAdminCount = computed(() =>
+  admins.value.filter((admin) => !!admin.tenant_id).length
+);
+const districtAdminCount = computed(() =>
+  admins.value.filter((admin) => !!admin.district_id).length
+);
+const disabledAdminCount = computed(() =>
+  admins.value.filter((admin) => !admin.is_active).length
 );
 let toastTimer: number | null = null;
 
@@ -373,6 +421,54 @@ watch(adminScope, () => {
 </script>
 
 <style scoped>
+.super-page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.super-page-links {
+  justify-content: flex-end;
+}
+
+.admin-stats {
+  margin-top: 1rem;
+}
+
+.section-grid {
+  display: grid;
+  grid-template-columns: minmax(300px, 340px) minmax(0, 1fr);
+  gap: 1rem;
+  align-items: start;
+}
+
+.section-card {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.section-heading h2 {
+  margin: 0;
+}
+
+.section-heading p {
+  margin: 0.35rem 0 0;
+}
+
+.filter-toolbar {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+  align-items: end;
+}
+
+.filter-select {
+  min-width: 180px;
+}
+
 .actions-cell {
   display: flex;
   flex-wrap: wrap;
@@ -403,5 +499,19 @@ watch(adminScope, () => {
   display: flex;
   flex-wrap: wrap;
   gap: 0.5rem;
+}
+
+@media (max-width: 900px) {
+  .super-page-header {
+    flex-direction: column;
+  }
+
+  .super-page-links {
+    justify-content: flex-start;
+  }
+
+  .section-grid {
+    grid-template-columns: 1fr;
+  }
 }
 </style>

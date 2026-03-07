@@ -1,34 +1,35 @@
 <template>
-  <div class="internal-auth-shell">
-    <div class="page internal-auth-page">
-      <h1>ItemTraxx Internal Access</h1>
-      <p class="muted">
-        Sign in with your existing super admin account to access internal operations.
-      </p>
-
-      <div class="card internal-auth-card">
-        <form class="form" @submit.prevent="handleInternalLogin">
-          <label>
-            Email
-            <input v-model="email" type="email" placeholder="Enter email" />
-          </label>
-          <label>
-            Password
-            <input v-model="password" type="password" placeholder="Enter password" />
-          </label>
-          <label v-if="turnstileSiteKey">
-            Security Check
-            <div :ref="setTurnstileContainerRef"></div>
-            <p class="muted turnstile-help">Complete security check to continue.</p>
-          </label>
-          <div class="form-actions">
-            <button type="submit" class="button-primary" :disabled="!canSubmit">
-              Enter Internal Console
-            </button>
-          </div>
-        </form>
-        <p v-if="error" class="error">{{ error }}</p>
+  <div class="internal-auth-shell" :class="`theme-${themeMode}`">
+    <div class="internal-auth-panel">
+      <div class="internal-auth-copy">
+        <p class="internal-auth-kicker">Internal Console</p>
+        <h1>ItemTraxx Internal Access</h1>
+        <p class="internal-auth-subtitle">
+          Sign in with your existing super admin account to access internal operations.
+        </p>
       </div>
+
+      <form class="form internal-auth-form" @submit.prevent="handleInternalLogin">
+        <label>
+          Email
+          <input v-model="email" type="email" placeholder="Enter email" />
+        </label>
+        <label>
+          Password
+          <input v-model="password" type="password" placeholder="Enter password" />
+        </label>
+        <label v-if="turnstileSiteKey">
+          Security Check
+          <div :ref="setTurnstileContainerRef"></div>
+          <p class="muted turnstile-help">Complete security check to continue.</p>
+        </label>
+        <div class="form-actions">
+          <button type="submit" class="button-primary" :disabled="!canSubmit">
+            Enter Internal Console
+          </button>
+        </div>
+      </form>
+      <p v-if="error" class="error">{{ error }}</p>
     </div>
 
     <div v-if="toastMessage" class="toast">
@@ -39,7 +40,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onUnmounted, ref } from "vue";
+import { computed, onMounted, onUnmounted, ref } from "vue";
 import { useRouter } from "vue-router";
 import { superAdminLogin } from "../../services/authService";
 import { useTurnstile } from "../../composables/useTurnstile";
@@ -51,6 +52,7 @@ const error = ref("");
 const isLoading = ref(false);
 const toastTitle = ref("");
 const toastMessage = ref("");
+const themeMode = ref<"light" | "dark">("dark");
 const turnstileSiteKey = import.meta.env.VITE_TURNSTILE_SITE_KEY as string | undefined;
 const {
   containerRef: turnstileContainerRef,
@@ -71,6 +73,7 @@ const setTurnstileContainerRef = (el: Element | { $el?: Element } | null) => {
 };
 
 let toastTimer: number | null = null;
+let themeObserver: MutationObserver | null = null;
 
 const canSubmit = computed(() => {
   if (isLoading.value) return false;
@@ -132,10 +135,27 @@ const handleInternalLogin = async () => {
   }
 };
 
+onMounted(() => {
+  const syncTheme = () => {
+    themeMode.value =
+      document.documentElement.getAttribute("data-theme") === "light" ? "light" : "dark";
+  };
+  syncTheme();
+  themeObserver = new MutationObserver(syncTheme);
+  themeObserver.observe(document.documentElement, {
+    attributes: true,
+    attributeFilter: ["data-theme"],
+  });
+});
+
 onUnmounted(() => {
   if (toastTimer) {
     window.clearTimeout(toastTimer);
     toastTimer = null;
+  }
+  if (themeObserver) {
+    themeObserver.disconnect();
+    themeObserver = null;
   }
 });
 </script>
@@ -143,29 +163,57 @@ onUnmounted(() => {
 <style scoped>
 .internal-auth-shell {
   min-height: 100vh;
-  margin: -2.5rem -2rem -3rem;
-  padding: 2.4rem 0 3rem;
-  background: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  background:
+    radial-gradient(circle at top, rgba(25, 194, 168, 0.16), transparent 34%),
+    radial-gradient(circle at bottom right, rgba(25, 67, 155, 0.18), transparent 38%),
+    linear-gradient(180deg, #11151c 0%, #090c12 100%);
 }
 
-.internal-auth-page {
-  max-width: 720px;
+.internal-auth-shell.theme-light {
+  background:
+    radial-gradient(circle at top, rgba(25, 194, 168, 0.16), transparent 30%),
+    radial-gradient(circle at bottom right, rgba(25, 67, 155, 0.14), transparent 34%),
+    linear-gradient(180deg, #eef5f8 0%, #dde7ee 100%);
 }
 
-.internal-auth-card {
-  background: rgba(255, 255, 255, 0.14);
-  border: 1px solid rgba(255, 255, 255, 0.32);
-  backdrop-filter: blur(6px);
+.internal-auth-panel {
+  width: min(100%, 34rem);
+  padding: 1.8rem 1.9rem 2rem;
+  border-radius: 24px;
+  border: 1px solid color-mix(in srgb, var(--border) 72%, var(--accent) 28%);
+  background:
+    radial-gradient(circle at top right, color-mix(in srgb, var(--accent) 10%, transparent 90%), transparent 28%),
+    linear-gradient(180deg, color-mix(in srgb, var(--surface) 94%, transparent 6%) 0%, color-mix(in srgb, var(--surface-2) 92%, transparent 8%) 100%);
+  box-shadow: 0 24px 48px rgba(0, 0, 0, 0.18);
+}
+
+.internal-auth-kicker {
+  margin: 0 0 0.8rem;
+  font-size: 0.82rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.internal-auth-copy h1 {
+  margin: 0;
+}
+
+.internal-auth-subtitle {
+  margin: 1rem 0 1.8rem;
+  color: var(--muted);
+}
+
+.internal-auth-form input {
+  min-height: 3.6rem;
 }
 
 .turnstile-help {
   margin-top: 0.35rem;
   font-size: 0.78rem;
-}
-
-@media (max-width: 900px) {
-  .internal-auth-shell {
-    margin: -2rem -1.2rem -2.4rem;
-  }
 }
 </style>

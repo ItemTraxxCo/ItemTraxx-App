@@ -1,13 +1,24 @@
 <template>
-  <div class="page">
-    <div class="page-nav-left">
-      <RouterLink class="button-link" to="/tenant/admin">Return to admin panel</RouterLink>
+  <div class="page admin-shell">
+    <div class="admin-hero">
+      <div class="page-nav-left">
+        <RouterLink class="button-link" to="/tenant/admin">Return to admin panel</RouterLink>
+      </div>
+      <h1>Item Logs</h1>
+      <p class="admin-hero-copy">Filter checkout and return activity, then export the current view.</p>
     </div>
-    <h1>Item Logs</h1>
-    <p>View checkout and return history.</p>
-    <p class="muted">Export filtered logs to CSV or PDF.</p>
 
-    <div class="card">
+    <div class="card admin-section-card">
+      <div class="admin-section-header">
+        <div>
+          <h2>History</h2>
+          <p class="admin-section-copy">Search by action, student, item, or date range.</p>
+        </div>
+        <div class="admin-toolbar-actions">
+          <button type="button" @click="exportCsv">Export CSV</button>
+          <button type="button" @click="exportPdf">Export PDF</button>
+        </div>
+      </div>
       <div class="form-grid-2">
         <label>
           Search logs
@@ -35,13 +46,10 @@
           <input v-model="dateTo" type="date" />
         </label>
       </div>
-      <div class="form-actions">
-        <button type="button" @click="exportCsv">Export CSV</button>
-        <button type="button" @click="exportPdf">Export PDF</button>
-      </div>
       <p class="muted">Showing {{ filteredLogs.length }} of {{ logs.length }} log entries.</p>
       <p v-if="isLoading" class="muted">Loading logs...</p>
-      <table v-else class="table">
+      <div v-else class="table-wrap">
+      <table class="table">
         <thead>
           <tr>
             <th>Time</th>
@@ -72,6 +80,7 @@
           </tr>
         </tbody>
       </table>
+      </div>
       <p v-if="error" class="error">{{ error }}</p>
     </div>
   </div>

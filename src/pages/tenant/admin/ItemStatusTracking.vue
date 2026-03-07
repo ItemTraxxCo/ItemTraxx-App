@@ -1,15 +1,25 @@
 <template>
-  <div class="page">
-    <div class="page-nav-left">
-      <RouterLink class="button-link" to="/tenant/admin">Return to admin panel</RouterLink>
+  <div class="page admin-shell">
+    <div class="admin-hero">
+      <div class="page-nav-left">
+        <RouterLink class="button-link" to="/tenant/admin">Return to admin panel</RouterLink>
+      </div>
+      <h1>Item Status Tracking</h1>
+      <p v-if="!featureEnabled" class="error">Item status tracking is disabled for this tenant.</p>
+      <p v-else class="admin-hero-copy">Track damaged, lost, repair, retired, and studio-only inventory states.</p>
     </div>
 
-    <h1>Item Status Tracking</h1>
-    <p v-if="!featureEnabled" class="error">Item status tracking is disabled for this tenant.</p>
-    <p v-else>Track statuses other than available and checked_out.</p>
-
-    <div v-if="featureEnabled" class="card">
-      <h2>Current flagged items</h2>
+    <div v-if="featureEnabled" class="card admin-section-card">
+      <div class="admin-section-header">
+        <div>
+          <h2>Current Flagged Items</h2>
+          <p class="admin-section-copy">Filter by status, date range, and free-text search.</p>
+        </div>
+        <div class="admin-toolbar-actions">
+          <button type="button" @click="exportFlaggedCsv">Export CSV</button>
+          <button type="button" @click="exportFlaggedPdf">Export PDF</button>
+        </div>
+      </div>
       <div class="form-grid-2">
         <label>
           Search
@@ -40,7 +50,8 @@
         </label>
       </div>
       <p v-if="isLoading" class="muted">Loading status tracking...</p>
-      <table v-else class="table">
+      <div v-else class="table-wrap">
+      <table class="table">
         <thead>
           <tr>
             <th>Name</th>
@@ -63,14 +74,21 @@
           </tr>
         </tbody>
       </table>
-      <div class="form-actions">
-        <button type="button" @click="exportFlaggedCsv">Export CSV</button>
-        <button type="button" @click="exportFlaggedPdf">Export PDF</button>
       </div>
     </div>
 
-    <div v-if="featureEnabled" class="card">
-      <h2>Status history</h2>
+    <div v-if="featureEnabled" class="card admin-section-card">
+      <div class="admin-section-header">
+        <div>
+          <h2>Status History</h2>
+          <p class="admin-section-copy">Review chronological status changes for tenant inventory.</p>
+        </div>
+        <div class="admin-toolbar-actions">
+          <button type="button" @click="exportHistoryCsv">Export CSV</button>
+          <button type="button" @click="exportHistoryPdf">Export PDF</button>
+        </div>
+      </div>
+      <div class="table-wrap">
       <table class="table">
         <thead>
           <tr>
@@ -92,9 +110,6 @@
           </tr>
         </tbody>
       </table>
-      <div class="form-actions">
-        <button type="button" @click="exportHistoryCsv">Export CSV</button>
-        <button type="button" @click="exportHistoryPdf">Export PDF</button>
       </div>
     </div>
 

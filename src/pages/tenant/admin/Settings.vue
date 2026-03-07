@@ -1,20 +1,36 @@
 <template>
-  <div class="page">
-    <div class="page-nav-left">
-      <RouterLink class="button-link" to="/tenant/admin">Return to admin panel</RouterLink>
+  <div class="page admin-shell">
+    <div class="admin-hero">
+      <div class="page-nav-left">
+        <RouterLink class="button-link" to="/tenant/admin">Return to admin panel</RouterLink>
+      </div>
+      <h1>Settings</h1>
+      <p class="admin-hero-copy">Configure checkout defaults and manage active admin sessions from one place.</p>
+      <div class="admin-summary-grid">
+        <div class="admin-summary-card">
+          <strong>{{ checkoutDueHours }}</strong>
+          <span>Due window (hours)</span>
+        </div>
+        <div class="admin-summary-card">
+          <strong>{{ sessions.length }}</strong>
+          <span>Active devices</span>
+        </div>
+      </div>
     </div>
 
-    <h1>Tenant Settings</h1>
-    <p>Configure tenant checkout defaults and review enabled features.</p>
-
-    <div class="card">
-      <h2>Checkout Policy</h2>
+    <div class="card admin-section-card">
+      <div class="admin-section-header">
+        <div>
+          <h2>Checkout Policy</h2>
+          <p class="admin-section-copy">Set the default checkout due window.</p>
+        </div>
+      </div>
       <form class="form" @submit.prevent="handleSave">
         <label>
           Checkout due limit (hours)
           <input v-model.number="checkoutDueHours" type="number" min="1" max="720" step="1" />
         </label>
-        <p class="muted">Used for overdue notifications across tenant views.</p>
+        <p class="muted">This value is used for overdue notifications.</p>
         <div class="form-actions">
           <button type="submit" class="button-primary" :disabled="isSaving">Save settings</button>
           <button type="button" :disabled="isSaving" @click="loadSettings">Reload</button>
@@ -24,9 +40,13 @@
       <p v-if="success" class="success">{{ success }}</p>
     </div>
 
-    <div class="card">
-      <h2>Active Devices</h2>
-      <p class="muted">Review active tenant admin sessions and remotely sign out devices.</p>
+    <div class="card admin-section-card">
+      <div class="admin-section-header">
+        <div>
+          <h2>Active Devices</h2>
+          <p class="admin-section-copy">Review active sessions for your account and remotely sign out devices.</p>
+        </div>
+      </div>
       <div class="table-wrap">
         <table class="table">
           <thead>

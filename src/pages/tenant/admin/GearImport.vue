@@ -1,17 +1,23 @@
 <template>
-  <div class="page">
-    <div class="page-nav-left">
-      <RouterLink class="button-link" to="/tenant/admin">Return to admin panel</RouterLink>
-      <RouterLink class="button-link" to="/tenant/admin/gear">Return to items</RouterLink>
+  <div class="page admin-shell">
+    <div class="admin-hero">
+      <div class="page-nav-left">
+        <RouterLink class="button-link" to="/tenant/admin">Return to admin panel</RouterLink>
+        <RouterLink class="button-link" to="/tenant/admin/gear">Return to items</RouterLink>
+      </div>
+
+      <h1>Bulk Item Import Wizard</h1>
+      <p v-if="!featureEnabled" class="error">Bulk item import is disabled for this tenant.</p>
+      <p v-else class="admin-hero-copy">Paste CSV rows, preview parsed entries, then import items in one action.</p>
     </div>
 
-    <h1>Bulk Item Import Wizard</h1>
-    <p v-if="!featureEnabled" class="error">Bulk item import is disabled for this tenant.</p>
-    <p v-else>Paste CSV rows, preview parsed entries, then import items in one action.</p>
-
-    <div v-if="featureEnabled" class="card">
-      <h2>Step 1: Paste CSV</h2>
-      <p class="muted">Format: <code>name,barcode,serial_number,notes</code>. Header row is optional. Status is set to <code>available</code> automatically.</p>
+    <div v-if="featureEnabled" class="card admin-section-card">
+      <div class="admin-section-header">
+        <div>
+          <h2>Step 1: Paste CSV</h2>
+          <p class="admin-section-copy">Format: <code>name,barcode,serial_number,notes</code>. Header row is optional. Status is set to <code>available</code> automatically.</p>
+        </div>
+      </div>
       <div class="form-actions import-template-actions">
         <button type="button" @click="downloadTemplate">Download Template CSV</button>
       </div>
@@ -30,9 +36,14 @@
       </div>
     </div>
 
-    <div class="card" v-if="featureEnabled && parsedRows.length">
-      <h2>Step 2: Preview</h2>
-      <p class="muted">Ready: {{ parsedRows.length }} rows | Skipped in parse: {{ parseSkipped.length }}</p>
+    <div class="card admin-section-card" v-if="featureEnabled && parsedRows.length">
+      <div class="admin-section-header">
+        <div>
+          <h2>Step 2: Preview</h2>
+          <p class="admin-section-copy">Ready: {{ parsedRows.length }} rows | Skipped in parse: {{ parseSkipped.length }}</p>
+        </div>
+      </div>
+      <div class="table-wrap">
       <table class="table">
         <thead>
           <tr>
@@ -51,6 +62,7 @@
           </tr>
         </tbody>
       </table>
+      </div>
       <p v-if="parsedRows.length > 200" class="muted">Showing first 200 rows in preview.</p>
       <div class="form-actions">
         <button type="button" class="button-primary" :disabled="isImporting" @click="runImport">
@@ -59,8 +71,13 @@
       </div>
     </div>
 
-    <div class="card" v-if="featureEnabled && parseSkipped.length">
-      <h2>Parse Skipped Rows</h2>
+    <div class="card admin-section-card" v-if="featureEnabled && parseSkipped.length">
+      <div class="admin-section-header">
+        <div>
+          <h2>Parse Skipped Rows</h2>
+          <p class="admin-section-copy">Rows missing required data are listed here for review.</p>
+        </div>
+      </div>
       <ul>
         <li v-for="(item, index) in parseSkipped" :key="`parse-${index}`">
           {{ item.barcode }} — {{ item.reason }}
@@ -73,8 +90,13 @@
       </div>
     </div>
 
-    <div class="card" v-if="featureEnabled && importResult">
-      <h2>Import Result</h2>
+    <div class="card admin-section-card" v-if="featureEnabled && importResult">
+      <div class="admin-section-header">
+        <div>
+          <h2>Import Result</h2>
+          <p class="admin-section-copy">Review inserted rows and any rows skipped during import.</p>
+        </div>
+      </div>
       <p>
         Inserted: <strong>{{ importResult.inserted }}</strong>
         | Skipped: <strong>{{ importResult.skipped }}</strong>

@@ -578,6 +578,9 @@ export const createDistrictAdminSessionHandoff = async (
     if (!result.ok && result.error === "Invalid credentials") {
       throw new Error("Invalid credentials.");
     }
+    if (!result.ok && result.error === "District not found") {
+      throw new Error("No district assignment.");
+    }
     throw new Error("Unable to prepare district sign-in.");
   }
 

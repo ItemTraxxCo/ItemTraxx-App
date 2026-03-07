@@ -1,13 +1,20 @@
 <template>
-  <div class="page">
-    <div class="page-nav-left">
-      <RouterLink class="button-link" to="/tenant/admin">Return to admin panel</RouterLink>
+  <div class="page admin-shell">
+    <div class="admin-hero">
+      <div class="page-nav-left">
+        <RouterLink class="button-link" to="/tenant/admin">Return to admin panel</RouterLink>
+      </div>
+      <h1>Admin Audit Logs</h1>
+      <p class="admin-hero-copy">Review admin actions and search the tenant audit trail.</p>
     </div>
-    <h1>Admin Audit Logs</h1>
-    <p>Track admin actions.</p>
-    <p class="muted">Ability to export admin audit logs data to PDF and CSV coming soon.</p>
 
-    <div class="card">
+    <div class="card admin-section-card">
+      <div class="admin-section-header">
+        <div>
+          <h2>Audit Trail</h2>
+          <p class="admin-section-copy">Search by admin, action, entity, or metadata.</p>
+        </div>
+      </div>
       <label>
         Search logs
         <input
@@ -18,7 +25,8 @@
       </label>
       <p class="muted">Showing {{ filteredLogs.length }} of {{ logs.length }} log entries.</p>
       <p v-if="isLoading" class="muted">Loading logs...</p>
-      <table v-else class="table">
+      <div v-else class="table-wrap">
+      <table class="table">
         <thead>
           <tr>
             <th>Time</th>
@@ -47,6 +55,7 @@
           </tr>
         </tbody>
       </table>
+      </div>
       <p v-if="error" class="error">{{ error }}</p>
     </div>
 

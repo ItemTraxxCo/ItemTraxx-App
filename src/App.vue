@@ -1,5 +1,5 @@
 <template>
-  <div class="app-shell" :class="{ 'with-top-banners': hasTopBanners }" :style="appShellStyle">
+  <div class="app-shell" :class="{ 'with-top-banners': hasTopBanners, 'route-shell-auth': isFullBleedRoute }" :style="appShellStyle">
     <div v-if="isRouteNavigating" class="route-progress" aria-hidden="true"></div>
     <div
       v-if="showMaintenanceBanner"
@@ -217,7 +217,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, defineAsyncComponent, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
+import { computed, defineAsyncComponent, nextTick, onMounted, onUnmounted, ref, watch, watchEffect } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { signOut } from "./services/authService";
 import {
@@ -313,6 +313,15 @@ const GITHUB_HEAD_COMMIT_API =
 
 const themeLabel = computed(() =>
   theme.value === "dark" ? "Light Mode" : "Dark Mode"
+);
+const isFullBleedRoute = computed(
+  () =>
+    route.path === "/login" ||
+    route.path === "/forgot-password" ||
+    route.path === "/tenant/admin-login" ||
+    route.path === "/super-auth" ||
+    route.path === "/internal-auth" ||
+    route.path === "/reset-password"
 );
 const showTopMenu = computed(
   () => route.name !== "public-home" && route.name !== "public-pricing"
@@ -413,6 +422,11 @@ const topOffsetPx = computed(() => {
 const appShellStyle = computed(() => ({
   "--top-banner-offset": topOffsetPx.value,
 }) as Record<string, string>);
+
+watchEffect(() => {
+  document.documentElement.classList.toggle("auth-route-active", isFullBleedRoute.value);
+  document.body.classList.toggle("auth-route-active", isFullBleedRoute.value);
+});
 const topMenuStyle = computed(() => ({
   top: `calc(1rem + ${topOffsetPx.value})`,
 }));

@@ -19,7 +19,7 @@
         </label>
 
         <div class="form-actions">
-          <button type="submit" class="button-primary" :disabled="isLoading">
+          <button type="submit" class="button-primary forgot-submit-button" :disabled="isLoading">
             {{ isLoading ? "Sending..." : "Send reset link" }}
           </button>
         </div>
@@ -78,7 +78,34 @@ const sendResetEmail = async () => {
 
 <style scoped>
 .back-link {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   margin-top: 1rem;
+  padding: 0;
+  text-decoration: none;
+  font-weight: 500;
+  color: color-mix(in srgb, var(--accent) 70%, #7b8cff 30%);
+  transition:
+    color 0.2s ease,
+    transform 0.15s ease;
+}
+
+.back-link:hover {
+  text-decoration: underline;
+  transform: translateY(-1px);
+  color: color-mix(in srgb, var(--accent) 78%, #7b8cff 22%);
+}
+
+.forgot-submit-button {
+  width: 100%;
+  min-height: 3rem;
+  border-radius: 999px;
+  background:
+    linear-gradient(90deg,
+      color-mix(in srgb, var(--accent) 88%, #3dc8ff 12%) 0%,
+      color-mix(in srgb, var(--button-primary-bg) 72%, #4f5dff 28%) 100%);
+  border-color: transparent;
+  box-shadow: 0 14px 28px rgba(25, 194, 168, 0.18);
 }
 </style>

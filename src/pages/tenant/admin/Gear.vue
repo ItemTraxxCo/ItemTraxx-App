@@ -1,15 +1,35 @@
 <template>
-  <div class="page">
-    <div class="page-nav-left">
-      <RouterLink class="button-link" to="/tenant/admin">Return to admin panel</RouterLink>
-      <RouterLink class="button-link" to="/tenant/admin/gear-import">Bulk item import wizard</RouterLink>
+  <div class="page admin-shell">
+    <div class="admin-hero">
+      <div class="page-nav-left">
+        <RouterLink class="button-link" to="/tenant/admin">Return to admin panel</RouterLink>
+        <RouterLink class="button-link" to="/tenant/admin/gear-import">Bulk item import wizard</RouterLink>
+      </div>
+      <h1>Item Management</h1>
+      <p class="admin-hero-copy">Add inventory, update item status, and review archived gear without jumping between views.</p>
+      <div class="admin-summary-grid">
+        <div class="admin-summary-card">
+          <strong>{{ gear.length }}</strong>
+          <span>Active items</span>
+        </div>
+        <div class="admin-summary-card">
+          <strong>{{ archivedGear.length }}</strong>
+          <span>Archived items</span>
+        </div>
+        <div class="admin-summary-card">
+          <strong>{{ filteredGear.length }}</strong>
+          <span>Visible in table</span>
+        </div>
+      </div>
     </div>
-    <h1>Item Management</h1>
-    <p>Add and manage items.</p>
-    <p class="muted">Export item data to CSV or PDF from the list section.</p>
 
-    <div class="card">
-      <h2>Add Item</h2>
+    <div class="card admin-section-card">
+      <div class="admin-section-header">
+        <div>
+          <h2>Add Item</h2>
+          <p class="admin-section-copy">Create a new inventory record with barcode, serial number, and notes.</p>
+        </div>
+      </div>
       <form class="form" @submit.prevent="handleCreate">
         <label>
           Name
@@ -51,8 +71,17 @@
       </div>
     </div>
 
-    <div class="card">
-      <h2>Item List</h2>
+    <div class="card admin-section-card">
+      <div class="admin-section-header">
+        <div>
+          <h2>Item List</h2>
+          <p class="admin-section-copy">Search and filter gear, then export or open item details.</p>
+        </div>
+        <div class="admin-toolbar-actions">
+          <button type="button" @click="exportCsv">Export CSV</button>
+          <button type="button" @click="exportPdf">Export PDF</button>
+        </div>
+      </div>
       <div class="form-grid-2">
         <label>
           Search items
@@ -72,13 +101,10 @@
           </select>
         </label>
       </div>
-      <div class="form-actions">
-        <button type="button" @click="exportCsv">Export CSV</button>
-        <button type="button" @click="exportPdf">Export PDF</button>
-      </div>
       <p class="muted">Showing {{ filteredGear.length }} of {{ gear.length }} items.</p>
       <p v-if="isLoading" class="muted">Loading items...</p>
-      <table v-else class="table">
+      <div v-else class="table-wrap">
+      <table class="table">
         <thead>
           <tr>
             <th>Name</th>
@@ -109,6 +135,7 @@
           </tr>
         </tbody>
       </table>
+      </div>
     </div>
 
     <div v-if="showDetailsModal && selectedGear" class="modal-backdrop">
@@ -206,11 +233,16 @@
       </div>
     </div>
 
-    <div class="card">
-      <h2>Archived Items</h2>
-      <p class="muted">Archived items can be restored when needed.</p>
+    <div class="card admin-section-card">
+      <div class="admin-section-header">
+        <div>
+          <h2>Archived Items</h2>
+          <p class="admin-section-copy">Archived items can be restored when needed.</p>
+        </div>
+      </div>
       <p v-if="isLoadingArchived" class="muted">Loading archived items...</p>
-      <table v-else class="table">
+      <div v-else class="table-wrap">
+      <table class="table">
         <thead>
           <tr>
             <th>Name</th>
@@ -235,6 +267,7 @@
           </tr>
         </tbody>
       </table>
+      </div>
     </div>
   </div>
 </template>

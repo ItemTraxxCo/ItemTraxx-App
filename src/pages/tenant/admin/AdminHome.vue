@@ -1,12 +1,20 @@
 <template>
-    <div class="page">
-      <div class="page-nav-left">
+    <div class="page admin-shell">
+      <div class="admin-hero">
+        <div class="admin-toolbar">
+          <div class="page-nav-left">
         <button type="button" class="button-link" @click="returnToCheckout">
           Return to checkout
         </button>
+          </div>
+          <div class="muted">Signed in as {{ adminEmail }}</div>
+        </div>
+        <h1>Admin Panel</h1>
+        <p class="admin-hero-copy">
+          Manage inventory, students, returns, reporting, and tenant controls from one workspace.
+        </p>
       </div>
-      <h1>Admin Panel</h1>
-      <p>Welcome, {{ adminEmail }}</p>
+
     <div class="admin-grid">
       <RouterLink class="admin-card" to="/tenant/admin/gear">
         <h2>Item Management</h2>
@@ -45,8 +53,8 @@
         <p>Generate and download barcode label PDFs with custom messages.</p>
       </RouterLink>
       <RouterLink class="admin-card" to="/tenant/admin/settings">
-        <h2>Tenant Settings</h2>
-        <p>Manage checkout policy defaults and review tenant feature flags.</p>
+        <h2>Settings</h2>
+        <p>Manage checkout policy defaults and review signed in devices.</p>
       </RouterLink>
     </div>
   </div>

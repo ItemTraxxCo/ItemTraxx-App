@@ -1,13 +1,20 @@
 <template>
-  <div class="page">
-    <div class="page-nav-left">
-      <RouterLink class="button-link" to="/tenant/admin">Return to admin panel</RouterLink>
+  <div class="page admin-shell">
+    <div class="admin-hero">
+      <div class="page-nav-left">
+        <RouterLink class="button-link" to="/tenant/admin">Return to admin panel</RouterLink>
+      </div>
+      <h1>Usage Statistics</h1>
+      <p class="admin-hero-copy">Review recent activity and inventory totals across the tenant.</p>
     </div>
-    <h1>Usage Statistics</h1>
-    <p>Recent activity and inventory summary.</p>
-    <p class="muted">Ability to export usage data to PDF and CSV coming soon.</p>
 
-    <div class="card">
+    <div class="card admin-section-card">
+      <div class="admin-section-header">
+        <div>
+          <h2>Overview</h2>
+          <p class="admin-section-copy">PDF and CSV export can be added later without changing this layout.</p>
+        </div>
+      </div>
       <p v-if="isLoading" class="muted">Loading statistics...</p>
       <div v-else class="stats-grid">
         <div class="stat-card">

@@ -1,12 +1,26 @@
 <template>
-  <div class="page">
-    <div class="page-nav-left">
-      <RouterLink class="button-link" to="/tenant/admin">Return to admin panel</RouterLink>
+  <div class="page admin-shell">
+    <div class="admin-hero">
+      <div class="page-nav-left">
+        <RouterLink class="button-link" to="/tenant/admin">Return to admin panel</RouterLink>
+      </div>
+      <h1>Quick Return</h1>
+      <p class="admin-hero-copy">Return items by barcode without loading a student record.</p>
+      <div class="admin-summary-grid">
+        <div class="admin-summary-card">
+          <strong>{{ barcodes.length }}</strong>
+          <span>Queued items</span>
+        </div>
+      </div>
     </div>
-    <h1>Quick Return</h1>
-    <p>Return items by barcode.</p>
 
-    <div class="card">
+    <div class="card admin-section-card">
+      <div class="admin-section-header">
+        <div>
+          <h2>Return Queue</h2>
+          <p class="admin-section-copy">Scan or enter barcodes, review the queue, then complete the return.</p>
+        </div>
+      </div>
       <label>
         Item barcode
         <div class="input-row">
@@ -24,7 +38,7 @@
       </label>
       <p class="muted">Press Enter or click “Add barcode” to add.</p>
       <div v-if="barcodes.length" class="list">
-        <p>Items</p>
+        <p class="checkout-subheading">Items</p>
         <ul>
           <li v-for="item in barcodes" :key="item.barcode">
             {{ item.name }}

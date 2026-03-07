@@ -1,7 +1,7 @@
 <template>
-  <div class="page">
-    <div class="page-header">
-      <h1 class="brand-title">
+  <div class="page checkout-page">
+    <div class="page-header checkout-page-header">
+      <h1 class="brand-title checkout-brand-title">
         <img
           v-if="logoUrl"
           class="brand-logo"
@@ -11,11 +11,13 @@
         ItemTraxx
       </h1>
     </div>
-    <p>Student checkout and return</p>
-    <div class="card">
+
+    <p class="checkout-page-copy">Student checkout and return</p>
+
+    <div class="card checkout-card">
       <label>
         Student ID
-        <div class="input-row">
+        <div class="input-row checkout-input-row">
           <input
             v-model="studentId"
             type="text"
@@ -24,7 +26,7 @@
           />
           <button
             type="button"
-            class="link"
+            class="button-primary checkout-inline-button"
             :disabled="isStudentLoading"
             @click="loadStudent"
           >
@@ -32,15 +34,16 @@
           </button>
         </div>
       </label>
-      <p v-if="isStudentLoading" class="muted">Loading student...</p>
-      <div v-if="student" class="panel">
+      <p v-if="isStudentLoading" class="muted checkout-status-note">Loading student...</p>
+
+      <div v-if="student" class="checkout-student-summary">
         <p>
           <strong>{{ student.username }}</strong>
           <span class="muted"> ID: {{ student.student_id }}</span>
         </p>
         <div v-if="checkedOutGear.length">
-          <p>Currently checked out</p>
-          <ul>
+          <p class="checkout-subheading">Currently checked out</p>
+          <ul class="checkout-inline-list">
             <li v-for="item in checkedOutGear" :key="item.id">
               {{ item.name }}
             </li>
@@ -48,10 +51,11 @@
         </div>
         <p v-else class="muted">No items currently checked out.</p>
       </div>
+
       <div v-if="student">
         <label>
           Item barcode
-          <div class="input-row">
+          <div class="input-row checkout-input-row">
             <input
               ref="barcodeField"
               v-model="barcodeInput"
@@ -61,7 +65,7 @@
             />
             <button
               type="button"
-              class="link"
+              class="button-primary checkout-inline-button"
               :disabled="isBarcodeLoading"
               @click="addBarcode"
             >
@@ -69,10 +73,11 @@
             </button>
           </div>
         </label>
-        <p class="muted">Press Enter or click “Add barcode” to add.</p>
-        <div v-if="barcodes.length" class="list">
-          <p>Items</p>
-          <ul>
+        <p class="muted checkout-status-note">Press Enter or click “Add barcode” to add.</p>
+
+        <div v-if="barcodes.length" class="checkout-list">
+          <p class="checkout-subheading">Items</p>
+          <ul class="checkout-inline-list">
             <li v-for="item in barcodes" :key="item.barcode" class="checkout-item-row">
               {{ item.name }}
               <span class="muted">({{ item.barcode }})</span>
@@ -89,12 +94,14 @@
             </li>
           </ul>
         </div>
-        <div class="actions">
-          <button type="button" class="button-primary" :disabled="isSubmitting" @click="submit">
-            Complete Transaction
+
+        <div class="actions checkout-actions">
+          <button type="button" class="button-primary checkout-submit-button" :disabled="isSubmitting" @click="submit">
+            Complete transaction
           </button>
         </div>
       </div>
+
       <p v-else class="muted">Enter a student ID to begin.</p>
       <p v-if="error" class="error">{{ error }}</p>
       <p v-if="success" class="success">{{ success }}</p>
@@ -397,3 +404,118 @@ onUnmounted(() => {
   window.removeEventListener("online", handleOnline);
 });
 </script>
+
+<style scoped>
+.checkout-page {
+  display: grid;
+  gap: 0.9rem;
+}
+
+.checkout-page-header {
+  margin-bottom: 0;
+}
+
+.checkout-brand-title {
+  color: inherit;
+}
+
+.checkout-page-copy {
+  margin: 0;
+  color: var(--muted);
+  font-size: 1rem;
+}
+
+.checkout-card {
+  background:
+    radial-gradient(circle at top right, color-mix(in srgb, var(--accent) 10%, transparent 90%), transparent 30%),
+    linear-gradient(180deg, color-mix(in srgb, var(--surface) 94%, transparent 6%) 0%, color-mix(in srgb, var(--surface-2) 92%, transparent 8%) 100%);
+  border-color: color-mix(in srgb, var(--border) 74%, var(--accent) 26%);
+}
+
+.checkout-input-row {
+  gap: 0.55rem;
+  align-items: center;
+}
+
+.checkout-input-row input {
+  height: 2.2rem;
+  min-height: 2.2rem;
+  padding: 0 0.72rem;
+  border-radius: 12px;
+  border: 1px solid color-mix(in srgb, var(--border) 72%, var(--accent) 28%);
+  background: color-mix(in srgb, var(--surface) 88%, transparent 12%);
+  font-size: 0.92rem;
+  line-height: 1.1;
+}
+
+.checkout-inline-button {
+  min-width: 7rem;
+  min-height: 2.2rem;
+  padding: 0.36rem 0.8rem;
+  border-radius: 12px;
+  white-space: nowrap;
+}
+
+.checkout-status-note {
+  margin-top: 0.7rem;
+}
+
+.checkout-student-panel {
+  margin-top: 1rem;
+  border-radius: 16px;
+  border: 1px solid color-mix(in srgb, var(--border) 78%, var(--accent) 22%);
+  background: color-mix(in srgb, var(--surface) 94%, transparent 6%);
+}
+
+.checkout-subheading {
+  margin-bottom: 0.45rem;
+  font-weight: 700;
+}
+
+.checkout-list {
+  margin-top: 1rem;
+}
+
+.checkout-inline-list {
+  margin: 0.55rem 0 0;
+  padding-left: 1.6rem;
+}
+
+.checkout-item-row {
+  width: fit-content;
+  max-width: 100%;
+  margin: 0.35rem 0;
+}
+
+.checkout-item-name {
+  font-weight: 600;
+}
+
+.checkout-item-row .tag,
+.checkout-item-row .chip-button {
+  margin-left: 0.5rem;
+}
+
+.checkout-actions {
+  margin-top: 1rem;
+}
+
+.checkout-submit-button {
+  min-height: 2.35rem;
+  padding-inline: 1rem;
+  border-radius: 12px;
+}
+
+@media (max-width: 760px) {
+  .checkout-input-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+
+  .checkout-inline-button,
+  .checkout-submit-button {
+    width: 100%;
+  }
+}
+</style>

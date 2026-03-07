@@ -15,7 +15,7 @@ const resolveSafeAssetPath = (assetName) => {
 
 // Increased after district routing/auth handoff additions moved a small amount of
 // shared code into the main entry chunk. Keep a guardrail while avoiding false CI failures.
-const maxMainBytes = 53 * 1024;
+const maxMainBytes = 56 * 1024;
 const maxPublicHomeBytes = 20 * 1024;
 
 const files = readdirSync(assetsDir);

@@ -10,7 +10,7 @@
       <RouterLink class="brand-mark" to="/">ItemTraxx Co</RouterLink>
       <nav class="landing-nav" aria-label="Primary">
         <RouterLink to="/pricing">Pricing</RouterLink>
-        <a href="mailto:support@itemtraxx.com">Support</a>
+        <RouterLink to="/contact-support">Support</RouterLink>
         <a
           class="status-pill"
           href="https://status.itemtraxx.com/"
@@ -26,8 +26,8 @@
     </header>
 
     <main id="landing-new-main" class="shell landing-main">
-      <section class="hero-grid reveal">
-        <div class="hero-copy">
+      <section class="hero-grid reveal reveal-up">
+        <div class="hero-copy reveal reveal-left">
           <p class="eyebrow">Closed beta now live | Individual plans now available</p>
           <h1>ItemTraxx</h1>
           <p class="hero-body">
@@ -39,13 +39,13 @@
           </p>
           <div class="hero-actions">
             <RouterLink class="cta-primary" to="/pricing" @click="trackCta('pricing', 'hero')">Pricing</RouterLink>
-            <a
+            <RouterLink
               class="cta-secondary"
-              href="mailto:support@itemtraxx.com?subject=Request%20Demo%20-%20ItemTraxx"
+              to="/contact-sales?intent=demo"
               @click="trackCta('demo', 'hero')"
             >
               Request Demo
-            </a>
+            </RouterLink>
           </div>
           <ul class="hero-points" aria-label="Key product benefits">
             <li>Secure sign-ins and protected admin access</li>
@@ -55,7 +55,7 @@
         </div>
 
         <div class="hero-showcase">
-          <article class="showcase-card showcase-primary reveal reveal-delay-1">
+          <article class="showcase-card showcase-primary reveal reveal-right reveal-delay-1">
             <div class="showcase-header">
               <p class="showcase-label">{{ rotatingShowcase.label }}</p>
               <span class="showcase-pill">{{ rotatingShowcase.pill }}</span>
@@ -67,7 +67,7 @@
             </ul>
           </article>
 
-          <article class="showcase-card showcase-secondary reveal reveal-delay-2">
+          <article class="showcase-card showcase-secondary reveal reveal-up reveal-delay-2">
             <p class="showcase-label">Checkout and return preview</p>
             <picture>
               <source
@@ -89,8 +89,8 @@
         </div>
       </section>
 
-      <section class="feature-band reveal">
-        <div class="feature-band-copy">
+      <section class="feature-band reveal reveal-up">
+        <div class="feature-band-copy reveal reveal-left">
           <p class="eyebrow">Simple usage</p>
           <h2>Simple UI keeps everything minimal, sleek, and easy to navigate.</h2>
           <p>
@@ -100,9 +100,10 @@
             <li>Fast sign in and transaction flow</li>
             <li>Low-friction checkout and return experience</li>
             <li>Clean operator-facing workflow design</li>
+            <li>Light and dark appearance modes available</li>
           </ul>
         </div>
-        <div class="feature-band-visual">
+        <div class="feature-band-visual reveal reveal-right reveal-delay-1">
           <picture>
             <source
               type="image/webp"
@@ -122,16 +123,16 @@
         </div>
       </section>
 
-      <section class="ops-grid reveal">
-        <article class="ops-panel reveal reveal-delay-1">
+      <section class="ops-grid reveal reveal-up">
+        <article class="ops-panel reveal reveal-left reveal-delay-1">
           <p class="eyebrow">Easy management</p>
           <h3>Management workflows without the spreadsheet sprawl.</h3>
           <p>
-            With many useful features such as item management, student management, transaction logs,
+            With many useful features such as item management, user management, transaction logs,
             and more, keeping track of inventory has never been easier.
           </p>
         </article>
-        <article class="ops-panel reveal reveal-delay-2">
+        <article class="ops-panel reveal reveal-up reveal-delay-2">
           <p class="eyebrow">Why it matters</p>
           <h3>Master your inventory.</h3>
           <p>
@@ -139,17 +140,18 @@
             taken, when it was returned, and what items are currently out.
           </p>
         </article>
-        <article class="ops-panel reveal reveal-delay-2">
+        <article class="ops-panel reveal reveal-right reveal-delay-3">
           <p class="eyebrow">Fit</p>
-          <h3>Built for teams and organizations of any size.</h3>
+          <h3>Built for teams, organizations, and individual users.</h3>
           <p>
-            ItemTraxx is flexible and scalable, making it a fit for schools, smaller teams, and
-            larger organizations that need cleaner inventory operations.
+            ItemTraxx is flexible and scalable, making it a fit for schools, smaller and larger teams, and
+            organizations of any size that need cleaner inventory operations. We also offer individual plans 
+            for single-user use.
           </p>
         </article>
       </section>
 
-      <section class="faq-section reveal">
+      <section class="faq-section reveal reveal-up">
         <div class="faq-header">
           <p class="eyebrow">Frequently asked questions</p>
           <h2>Answers to the common stuff.</h2>
@@ -180,7 +182,7 @@
         </div>
       </section>
 
-      <section class="final-strip reveal">
+      <section class="final-strip reveal reveal-up">
         <div>
           <p class="eyebrow">Ready to simplify inventory tracking?</p>
           <h2>Get started with ItemTraxx and streamline your inventory management.</h2>
@@ -196,7 +198,7 @@
     <footer class="landing-footer shell">
       <p class="footer-brand">ItemTraxx Co</p>
       <div class="footer-links">
-        <a href="mailto:support@itemtraxx.com">Support</a>
+        <RouterLink to="/contact-support">Support</RouterLink>
         <a href="https://status.itemtraxx.com/" target="_blank" rel="noreferrer">Status</a>
         <a :href="legalUrl" target="_blank" rel="noreferrer">Legal</a>
       </div>
@@ -291,28 +293,28 @@ const faqItems = [
     a: 'Yes, ItemTraxx keeps a detailed transaction history that logs every checkout, return, and inventory change. This allows you to track who has what items, when they were taken, and when they were returned.',
   },
   {
-    q: 'Is this a fit for schools and small teams?',
-    a: 'Yes, ItemTraxx is designed to be flexible and scalable, making it a great fit for schools, small teams, and even larger organizations.',
+    q: 'Is ItemTraxx suitable for my school/team/organization?',
+    a: 'Yes, ItemTraxx is designed to be flexible and scalable, making it a great fit for schools, small teams, larger organizations, and individual users.',
   },
   {
     q: 'How do I request a demo?',
-    a: 'You can request a demo by contacting our support team at support@itemtraxx.com.',
+    a: 'You can request a demo by clicking the "Request Demo" button at the top of this page and submitting the demo request form',
   },
   {
     q: 'I found a bug, how do I report it?',
-    a: 'Please contact support at support@itemtraxx.com to report any bugs or issues you encounter.',
+    a: 'Please report it by contacting support to report any bugs or issues you encounter.',
   },
   {
     q: 'I want to suggest a feature, how can I do that?',
-    a: 'Please contact support at support@itemtraxx.com to suggest any features you would like to see.',
+    a: 'Please use the contact support links to suggest any features you would like to see.',
   },
   {
     q: 'Is this the same as ItemTrax or Item Traxx?',
-    a: 'Yes. If you searched for ItemTrax or Item Traxx, this is the official ItemTraxx site.',
+    a: 'Yes. If you searched for ItemTrax or Item Traxx, this is the official ItemTraxx website.',
   },
   {
-    q: 'Is there a limit to how many items, transactions, and students I can have?',
-    a: 'No, there are no limits to the number of items, transactions, or students you can have in ItemTraxx. The system is designed to scale with your needs.',
+    q: 'Is there a limit to how many items, transactions, and members I can have?',
+    a: 'No, there are no limits to the number of items, transactions, or members you can have in ItemTraxx. The system is designed to scale with your needs.',
   },
 ];
 
@@ -379,6 +381,7 @@ const handleVisibilityChange = () => {
 };
 
 onMounted(() => {
+  window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
   void refreshSystemStatus();
   startStatusPolling();
   document.addEventListener('visibilitychange', handleVisibilityChange);
@@ -598,22 +601,54 @@ onBeforeUnmount(() => {
 }
 
 .hero-grid,
+.hero-copy,
+.showcase-card,
 .feature-band,
+.feature-band-copy,
+.feature-band-visual,
 .final-strip,
-.ops-grid {
+.ops-grid,
+.ops-panel,
+.faq-section {
   opacity: 0;
-  transform: translateY(22px);
-  transition: opacity 0.55s ease, transform 0.55s ease;
+  filter: blur(12px);
+  transition:
+    opacity 0.8s cubic-bezier(0.22, 1, 0.36, 1),
+    transform 0.8s cubic-bezier(0.22, 1, 0.36, 1),
+    filter 0.8s cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: opacity, transform, filter;
+}
+
+.reveal-up {
+  transform: translateY(42px) scale(0.985);
+}
+
+.reveal-left {
+  transform: translateX(-48px) scale(0.985);
+}
+
+.reveal-right {
+  transform: translateX(48px) scale(0.985);
 }
 
 .reveal.is-visible {
   opacity: 1;
   transform: translateY(0);
+  filter: blur(0);
 }
 
-.reveal-delay-1 { transition-delay: 0.08s; }
-.reveal-delay-2 { transition-delay: 0.16s; }
-.reveal-delay-3 { transition-delay: 0.24s; }
+.reveal.is-visible.reveal-left,
+.reveal.is-visible.reveal-right {
+  transform: translateX(0) scale(1);
+}
+
+.reveal.is-visible.reveal-up {
+  transform: translateY(0) scale(1);
+}
+
+.reveal-delay-1 { transition-delay: 0.14s; }
+.reveal-delay-2 { transition-delay: 0.28s; }
+.reveal-delay-3 { transition-delay: 0.42s; }
 
 .hero-grid {
   display: grid;

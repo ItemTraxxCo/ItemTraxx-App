@@ -124,7 +124,31 @@ const storySlides = [
     kicker: "Built for anyone",
     title: "Seamlessly track your inventory regardless of team size.",
     body: "From administrative overview to daily checkouts, every flow stays scoped to your user, fully secure."
-  }
+  },
+  {
+    kicker: "Designed for simplicity",
+    title: "Manage items without complicated systems.",
+    body: "Quick checkouts, clear logs, and simple dashboards help your team stay organized without slowing anyone down."
+  },
+  {
+    kicker: "Support you can actually count on",
+    title: "Our team is here to help whenever you need us.",
+    body: "Whether you have a question about setup, need help with a workflow, or just want to share feedback, we're always ready to chat."
+  },
+  {
+    kicker: "Made for busy teams",
+    title: "Handle daily checkouts in seconds.",
+    body: "Fast workflows keep lines moving while still recording every transaction and user."
+  },
+  {
+    kicker: "Secure and reliable",
+    title: "Your data is safe with us.",
+    body: "We use industry best practices to keep your data secure, and we're always here to help if you need us."
+  },
+  {kicker: "Operational clarity",
+  title: "Every checkout tracked. Every return recorded.",
+  body: "Detailed logs give administrators full insight into inventory activity."
+},
 ] as const;
 const activeStoryIndex = ref(0);
 const themeMode = ref<"light" | "dark">("dark");
@@ -251,7 +275,7 @@ const handleTenantLogin = async () => {
     }
     if (err instanceof Error && err.message === "TENANT_DISABLED") {
       error.value = "";
-      showToast("Access blocked", "Tenant is disabled. Access is blocked.");
+      showToast("Access blocked, please contact support", "Your user is disabled. Access is blocked. Please contact support for assistance.");
       return;
     }
     if (err instanceof Error && err.message === "MAINTENANCE_MODE") {
@@ -272,7 +296,7 @@ const handleTenantLogin = async () => {
       try {
         resetTurnstile();
       } catch (turnstileError) {
-        console.error("Failed to reset Turnstile widget:", turnstileError);
+        console.error("Please reload the page. Failed to reset Turnstile widget:", turnstileError);
       }
     }
   }

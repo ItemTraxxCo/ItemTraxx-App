@@ -1,26 +1,32 @@
 <template>
   <div class="page contact-sales-page">
     <div class="page-nav-left">
-      <RouterLink class="button-link" to="/pricing">Return to pricing</RouterLink>
+      <RouterLink class="button-link" :to="returnPath">{{ returnLabel }}</RouterLink>
     </div>
 
-    <h1>Contact Sales</h1>
-    <p class="muted">Send your request and our team will respond from support@itemtraxx.com.</p>
+    <h1>{{ pageTitle }}</h1>
+    <p class="muted">{{ pageLead }}</p>
 
     <section class="card">
       <form class="form" @submit.prevent="handleSend">
-        <label>
+        <label v-if="!isDemoIntent">
           Please Select Plan
           <select v-model="plan" required>
-            <option value="core">ItemTraxx Core Plan</option>
-            <option value="growth">ItemTraxx Growth Plan</option>
-            <option value="enterprise">ItemTraxx Enterprise Plan</option>
+            <option value="district_core">ItemTraxx District Core Plan</option>
+            <option value="district_growth">ItemTraxx District Growth Plan</option>
+            <option value="district_enterprise">ItemTraxx District Enterprise Plan</option>
+            <option value="organization_starter">ItemTraxx Organization Starter Plan</option>
+            <option value="organization_scale">ItemTraxx Organization Scale Plan</option>
+            <option value="organization_enterprise">ItemTraxx Organization Enterprise Plan</option>
+            <option value="individual_yearly">ItemTraxx Individual Yearly Plan</option>
+            <option value="individual_monthly">ItemTraxx Individual Monthly Plan</option>
+            <option value="other">Other</option>
           </select>
         </label>
 
-        <label v-if="plan === 'enterprise'">
-          Number of schools (7 or above)
-          <input v-model.number="schoolCount" type="number" min="1" step="1" placeholder="Enter number of schools" />
+        <label v-if="requiresUnits">
+          {{ unitsLabel }}
+          <input v-model.number="schoolCount" type="number" min="1" step="1" :placeholder="unitsPlaceholder" />
         </label>
 
         <label>
@@ -35,13 +41,13 @@
         </label>
 
         <label>
-          Organization
+          Organization (Leave blank if you are inquiring for the individual plans)
           <input
             v-model.trim="organization"
             type="text"
-            required
+            :required="requiresOrganization"
             maxlength="160"
-            placeholder="School, district, or organization"
+            :placeholder="organizationPlaceholder"
           />
         </label>
 
@@ -82,7 +88,7 @@
 
         <div class="form-actions">
           <button type="submit" class="button-primary" :disabled="isSending || !canSubmit">
-            {{ isSending ? "Sending..." : "Send" }}
+            {{ isSending ? "Sending..." : submitLabel }}
           </button>
         </div>
       </form>
@@ -94,13 +100,24 @@
 
 <script setup lang="ts">
 import { computed, ref } from "vue";
-import { RouterLink } from "vue-router";
+import { RouterLink, useRoute } from "vue-router";
 import { useTurnstile } from "../composables/useTurnstile";
 import { submitContactSalesLead } from "../services/contactSalesService";
 
-type PlanId = "core" | "growth" | "enterprise";
+type PlanId =
+  | "district_core"
+  | "district_growth"
+  | "district_enterprise"
+  | "organization_starter"
+  | "organization_scale"
+  | "organization_enterprise"
+  | "individual_yearly"
+  | "individual_monthly"
+  | "other";
 
-const plan = ref<PlanId>("core");
+const route = useRoute();
+
+const plan = ref<PlanId>("district_core");
 const fullName = ref("");
 const organization = ref("");
 const schoolCount = ref<number | null>(null);
@@ -117,6 +134,18 @@ const {
   reset: resetTurnstile,
 } = useTurnstile(turnstileSiteKey);
 
+const isDemoIntent = computed(() => route.query.intent === "demo");
+
+const pageTitle = computed(() => (isDemoIntent.value ? "Request a Demo" : "Contact Sales"));
+const pageLead = computed(() =>
+  isDemoIntent.value
+    ? "Send your demo request and our team will respond from support@itemtraxx.com to schedule next steps."
+    : "Send your request and our team will respond from support@itemtraxx.com."
+);
+const submitLabel = computed(() => (isDemoIntent.value ? "Request Demo" : "Send"));
+const returnPath = computed(() => (isDemoIntent.value ? "/" : "/pricing"));
+const returnLabel = computed(() => (isDemoIntent.value ? "Return to website" : "Return to pricing"));
+
 const setTurnstileContainerRef = (
   el: Element | { $el?: Element } | null
 ) => {
@@ -132,10 +161,39 @@ const setTurnstileContainerRef = (
 };
 
 const canSubmit = computed(() => {
-  if (!fullName.value || !organization.value || !replyEmail.value) return false;
-  if (plan.value === "enterprise" && (!schoolCount.value || schoolCount.value < 1)) return false;
+  if (!fullName.value || !replyEmail.value) return false;
+  if (requiresOrganization.value && !organization.value) return false;
+  if (requiresUnits.value && (!schoolCount.value || schoolCount.value < 1)) return false;
   if (turnstileSiteKey && !turnstileToken.value) return false;
   return true;
+});
+
+const effectivePlan = computed<PlanId>(() => (isDemoIntent.value ? "other" : plan.value));
+
+const requiresOrganization = computed(
+  () => !isDemoIntent.value && !["individual_yearly", "individual_monthly", "other"].includes(effectivePlan.value)
+);
+
+const requiresUnits = computed(
+  () => effectivePlan.value === "district_enterprise" || effectivePlan.value === "organization_enterprise"
+);
+
+const unitsLabel = computed(() =>
+  effectivePlan.value === "district_enterprise"
+    ? "Number of schools (7 or above)"
+    : "Number of locations or teams (7 or above)"
+);
+
+const unitsPlaceholder = computed(() =>
+  effectivePlan.value === "district_enterprise" ? "Enter number of schools" : "Enter number of locations or teams"
+);
+
+const organizationPlaceholder = computed(() => {
+  if (isDemoIntent.value) return "School, district, or organization (optional)";
+  if (effectivePlan.value.startsWith("district_")) return "District name";
+  if (effectivePlan.value.startsWith("organization_")) return "Organization or team name";
+  if (effectivePlan.value.startsWith("individual_")) return "Optional";
+  return "School, district, organization, or leave blank";
 });
 
 const handleSend = () => {
@@ -152,16 +210,19 @@ const send = async () => {
   isSending.value = true;
   try {
     await submitContactSalesLead({
-      plan: plan.value,
-      schools_count: plan.value === "enterprise" ? schoolCount.value : null,
+      plan: effectivePlan.value,
+      schools_count: requiresUnits.value ? schoolCount.value : null,
       name: fullName.value,
       organization: organization.value,
       reply_email: replyEmail.value,
       details: details.value,
       turnstile_token: turnstileToken.value ?? "",
       website: website.value,
+      intent: isDemoIntent.value ? "demo" : "sales",
     });
-    success.value = "Request sent. You will receive a confirmation email from support@itemtraxx.com confirming that we have received your request within 24hr. Our sales team will follow up shortly after. Thank you for your interest in ItemTraxx!";
+    success.value = isDemoIntent.value
+      ? "Demo request sent. You will receive a confirmation email from support@itemtraxx.com within 24 hours. Our team will follow up shortly to schedule next steps."
+      : "Request sent. You will receive a confirmation email from support@itemtraxx.com confirming that we have received your request within 24hr. Our sales team will follow up shortly after. Thank you for your interest in ItemTraxx!";
     details.value = "";
     website.value = "";
   } catch (err) {

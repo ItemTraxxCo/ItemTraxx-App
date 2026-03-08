@@ -144,7 +144,7 @@ const pageLead = computed(() =>
 );
 const submitLabel = computed(() => (isDemoIntent.value ? "Request Demo" : "Send"));
 const returnPath = computed(() => (isDemoIntent.value ? "/" : "/pricing"));
-const returnLabel = computed(() => (isDemoIntent.value ? "Return to website" : "Return to pricing"));
+const returnLabel = computed(() => (isDemoIntent.value ? "Back" : "Back"));
 
 const setTurnstileContainerRef = (
   el: Element | { $el?: Element } | null

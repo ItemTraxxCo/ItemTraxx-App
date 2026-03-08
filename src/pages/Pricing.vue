@@ -34,7 +34,7 @@
 
       <section class="pricing-section">
         <div class="pricing-section-header">
-          <p class="pricing-section-eyebrow">District category</p>
+          <p class="pricing-section-eyebrow">School District category</p>
           <h2>School District Pricing</h2>
           <p>
             Annual subscription pricing is based on the
@@ -44,7 +44,7 @@
 
         <section class="plan-grid" aria-label="District pricing plans">
           <article class="plan-card">
-            <h3>ItemTraxx Core Plan</h3>
+            <h3>ItemTraxx School District Core Plan</h3>
             <p class="plan-meta">1-3 schools in district</p>
             <p class="price">$1,250.00<span>/year</span></p>
             <p class="price-note">Listed price excludes the 1st year onboarding fee.</p>
@@ -59,7 +59,7 @@
           </article>
 
           <article class="plan-card plan-highlight">
-            <h3>ItemTraxx Growth Plan</h3>
+            <h3>ItemTraxx School District Growth Plan</h3>
             <p class="plan-meta">4-6 schools in district</p>
             <p class="price">$3,500.00<span>/year</span></p>
             <p class="price-note">Listed price excludes the 1st year onboarding fee.</p>
@@ -74,19 +74,19 @@
           </article>
 
           <article class="plan-card">
-            <h3>ItemTraxx Enterprise Plan</h3>
+            <h3>ItemTraxx School District Enterprise Plan</h3>
             <p class="plan-meta">7+ schools in district</p>
             <p class="price">Contact for pricing</p>
-            <p class="starting">Formula = $4,500 + (# of schools − 7) × $900 / year</p>
+            <p class="starting">Starts at $4,500/year</p>
             <ul>
-              <li>Base coverage for the first 7 schools within the district</li>
+              <li>Coverage for 7+ schools within the district</li>
               <li>Unlimited staff accounts</li>
               <li>Item tracking and status visibility</li>
               <li>Checkout and return system</li>
               <li>Priority support (24-hour response time)</li>
             </ul>
             <p class="onboarding">
-              +1st Year Onboarding Fee: Contact for pricing ( Starts at $1,500.00)
+              +1st Year Onboarding Fee: Contact for pricing (Starts at $1,500.00)
             </p>
             <p class="enterprise-note">
               For full enterprise pricing (quote for more than 7 schools) and multi-district scope,
@@ -101,45 +101,51 @@
           <p class="pricing-section-eyebrow">Organization category</p>
           <h2>Organization Pricing</h2>
           <p>
-            For non-school district teams, pricing is based on the number of locations or operating units.
-            Onboarding is billed seperatly in year one (1) only.
+            For organizations, pricing is based on the number of locations or operating units.
+            Onboarding is billed separately in year one (1) only.
           </p>
         </div>
 
         <section class="plan-grid" aria-label="Organization pricing plans">
           <article class="plan-card">
-            <h3>Starter</h3>
+            <h3>ItemTraxx Organization Starter Plan</h3>
             <p class="plan-meta">1-3 locations or teams</p>
             <p class="price">$1,250.00<span>/year</span></p>
             <ul>
-              <li>Designed for smaller organizations and single-site operations</li>
-              <li>Checkout and return workflows for shared inventory</li>
-              <li>Staff access and core reporting</li>
+              <li>Up to 3 locations or teams within your organization</li>
+              <li>Unlimited staff accounts</li>
+              <li>Item tracking and status visibility</li>
+              <li>Checkout and return system</li>
+              <li>Standard support (72-hour response time)</li>
             </ul>
-            <p class="onboarding">Onboarding Fee: $500.00 / year</p>
+            <p class="onboarding">+1st Year Onboarding Fee: $500.00 / year</p>
           </article>
 
           <article class="plan-card plan-highlight">
-            <h3>Scale</h3>
-            <p class="plan-meta">4-7 locations or teams</p>
+            <h3>ItemTraxx Organization Scale Plan</h3>
+            <p class="plan-meta">4-6 locations or teams</p>
             <p class="price">$3,500.00<span>/year</span></p>
             <ul>
-              <li>Built for growing organizations with multiple operating units</li>
-              <li>District-style control across locations and teams</li>
-              <li>Expanded setup and support coverage</li>
+              <li>Up to 6 locations or teams within your organization</li>
+              <li>Unlimited staff accounts</li>
+              <li>Item tracking and status visibility</li>
+              <li>Checkout and return system</li>
+              <li>Standard support (72-hour response time)</li>
             </ul>
-            <p class="onboarding">Onboarding Fee: $1,000.00 / year</p>
+            <p class="onboarding">+1st Year Onboarding Fee: $1,000.00 / year</p>
           </article>
 
           <article class="plan-card">
-            <h3>Enterprise</h3>
+            <h3>ItemTraxx Organization Enterprise Plan</h3>
             <p class="plan-meta">7+ locations or teams</p>
             <p class="price">Contact for pricing</p>
-            <p class="starting">Formula = $4,500 + (# of units − 7) × $900 / year</p>
+            <p class="starting">Starts at $4,500/year</p>
             <ul>
-              <li>For large multi-site organizations with custom rollout needs</li>
-              <li>Priority operational support and enterprise coordination</li>
-              <li>Units = max # of locations or teams</li>
+              <li>Customized solution for large-scale organizations requiring 7+ locations or teams</li>
+              <li>Unlimited staff accounts</li>
+              <li>Item tracking and status visibility</li>
+              <li>Checkout and return system</li>
+              <li>Priority support (24-hour response time)</li>
             </ul>
             <p class="onboarding">
               +1st Year Onboarding Fee: Contact for pricing (starts at $500.00)
@@ -163,7 +169,7 @@
 
         <section class="plan-grid plan-grid-two" aria-label="Individual pricing plans">
           <article class="plan-card">
-            <h3>Individual Yearly</h3>
+            <h3>ItemTraxx Individual Yearly Plan</h3>
             <p class="plan-meta">Single-user plan</p>
             <p class="price">$70.00<span>/year</span></p>
             <ul>
@@ -175,7 +181,7 @@
           </article>
 
           <article class="plan-card">
-            <h3>Individual Monthly</h3>
+            <h3>ItemTraxx Individual Monthly Plan</h3>
             <p class="plan-meta">Single-user plan</p>
             <p class="price">$7.00<span>/month</span></p>
             <ul>
@@ -196,9 +202,13 @@
         <h2>Pricing FAQ</h2>
         <ul>
           <li><strong>Are plans annual or monthly?</strong> District and organization plans are annual. Individual plans are available annually or monthly.</li>
-          <li><strong>When is onboarding charged?</strong> Onboarding is a one-time fee in year one only.</li>
-          <li><strong>Can we move between plans?</strong> Yes. Upgrades are prorated; downgrades apply next billing cycle.</li>
+          <li><strong>When is onboarding charged?</strong> Onboarding is a one-time fee in year one (1) only and is required for all new customers.</li>
+          <li><strong>Can we move between plans?</strong> Yes. Upgrades are prorated; downgrades apply next billing cycle. Contact support for details.</li>
           <li><strong>How do we request a formal quote?</strong> Use the Contact Sales button above and we will provide an official quote.</li>
+          <li><strong>How are plans billed?</strong> Plans are billed annually or monthly, depending on the plan selected via invoice.</li>
+          <li><strong>What payment methods do you accept?</strong> We accept payment via credit card or ACH bank transfer. Contact sales for details.</li>
+          <li><strong>What happens if you dont pay an invoice?</strong> If an invoice is not paid by the due date, a late fee may be applied, 
+            and the account may be subject to suspension or cancellation. These terms apply to all customers. See legal terms for more information.</li>
         </ul>
       </section>
 
@@ -255,6 +265,7 @@
           <li>Applicable taxes and government fees are not included in listed pricing.</li>
           <li>Onboarding fee applies only to year one (1) of District and Organization subscription plans and is required.</li>
           <li>Renewal terms and final scope are confirmed in the signed agreement.</li>
+          <li>Overdue invoices may result in reminder notices, service suspension, or collection efforts where permitted by law.</li>
           <li>
             Full subscription policies:
             <a href="https://www.itemtraxx.com/legal" target="_blank" rel="noreferrer">
@@ -617,7 +628,7 @@ import { RouterLink } from "vue-router";
 }
 
 .pricing-section-divider span {
-  width: min(220px, 32vw);
+  width: min(6767px, 32vw);
   height: 1px;
   border-radius: 999px;
   background: linear-gradient(

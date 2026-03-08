@@ -35,7 +35,7 @@
       <section class="pricing-section">
         <div class="pricing-section-header">
           <p class="pricing-section-eyebrow">District category</p>
-          <h2>District Pricing</h2>
+          <h2>School District Pricing</h2>
           <p>
             Annual subscription pricing is based on the
             number of schools in the district, with onboarding billed separately in year one (1) only.

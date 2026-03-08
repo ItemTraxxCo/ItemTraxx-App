@@ -20,25 +20,27 @@ type TurnstileVerifyResult = {
   "error-codes"?: string[];
 };
 
-type ContactPayload = {
-  plan?:
-    | "district_core"
-    | "district_growth"
-    | "district_enterprise"
-    | "organization_starter"
-    | "organization_scale"
-    | "organization_enterprise"
-    | "individual_yearly"
-    | "individual_monthly"
-    | "other";
-  schools_count?: number | null;
+type SupportPayload = {
   name?: string;
-  organization?: string;
   reply_email?: string;
-  details?: string;
+  subject?: string;
+  category?: "general" | "bug" | "billing" | "access" | "feature" | "other";
+  message?: string;
   turnstile_token?: string;
   website?: string;
-  intent?: "sales" | "demo";
+  attachments?: Array<{
+    filename?: string;
+    content_type?: string;
+    content_base64?: string;
+    size_bytes?: number;
+  }>;
+};
+
+type NormalizedAttachment = {
+  filename: string;
+  content_type: string;
+  content_base64: string;
+  size_bytes: number;
 };
 
 const normalizeText = (value: unknown, max = 5000) => {
@@ -47,18 +49,14 @@ const normalizeText = (value: unknown, max = 5000) => {
 };
 
 const isEmail = (value: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
-const SALES_PLAN_LABELS = {
-  district_core: "ItemTraxx District Core Plan",
-  district_growth: "ItemTraxx District Growth Plan",
-  district_enterprise: "ItemTraxx District Enterprise Plan",
-  organization_starter: "ItemTraxx Organization Starter Plan",
-  organization_scale: "ItemTraxx Organization Scale Plan",
-  organization_enterprise: "ItemTraxx Organization Enterprise Plan",
-  individual_yearly: "ItemTraxx Individual Yearly Plan",
-  individual_monthly: "ItemTraxx Individual Monthly Plan",
-  other: "Other",
-} as const;
-type SalesPlanKey = keyof typeof SALES_PLAN_LABELS;
+const base64Pattern = /^[A-Za-z0-9+/]+={0,2}$/;
+const isImageContentType = (value: string) =>
+  ["image/png", "image/jpeg", "image/webp", "image/gif"].includes(value);
+const estimateBase64DecodedBytes = (value: string) => {
+  const normalized = value.replace(/\s+/g, "");
+  const padding = normalized.endsWith("==") ? 2 : normalized.endsWith("=") ? 1 : 0;
+  return Math.floor((normalized.length * 3) / 4) - padding;
+};
 
 const toHex = (bytes: Uint8Array) =>
   Array.from(bytes)
@@ -101,7 +99,7 @@ const resolveCorsHeaders = (req: Request) => {
 const verifyTurnstileToken = async (
   secret: string,
   token: string,
-  remoteIp: string
+  remoteIp: string,
 ) => {
   const params = new URLSearchParams();
   params.set("secret", secret);
@@ -116,13 +114,10 @@ const verifyTurnstileToken = async (
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body: params.toString(),
-    }
+    },
   );
 
-  if (!response.ok) {
-    return false;
-  }
-
+  if (!response.ok) return false;
   const result = (await response.json()) as TurnstileVerifyResult;
   return !!result.success;
 };
@@ -171,57 +166,63 @@ serve(async (req) => {
     const fromEmail =
       Deno.env.get("ITX_EMAIL_FROM") ??
       Deno.env.get("ITX_RESEND_FROM") ??
-      "ItemTraxx Sales <support@itemtraxx.com>";
+      "ItemTraxx Support <support@itemtraxx.com>";
 
     if (!supabaseUrl || !publishableKey || !serviceKey || !turnstileSecret) {
       return jsonResponse(500, { error: "Server misconfiguration." });
     }
 
-    const body = (await req.json()) as ContactPayload;
-    const plan = body.plan as SalesPlanKey | undefined;
-    const planLabel = plan ? SALES_PLAN_LABELS[plan] : null;
+    const body = (await req.json()) as SupportPayload;
     const name = normalizeText(body.name, 120);
-    const organization = normalizeText(body.organization, 160);
     const replyEmail = normalizeText(body.reply_email, 254).toLowerCase();
-    const details = normalizeText(body.details, 2500);
-    const schoolsCountRaw = Number(body.schools_count);
-    const schoolsCount = Number.isFinite(schoolsCountRaw) && schoolsCountRaw > 0
-      ? Math.round(schoolsCountRaw)
-      : null;
+    const subject = normalizeText(body.subject, 160);
+    const category = normalizeText(body.category, 40).toLowerCase();
+    const message = normalizeText(body.message, 3000);
     const website = normalizeText(body.website, 120);
-    const intent = body.intent === "demo" ? "demo" : "sales";
     const turnstileToken = normalizeText(body.turnstile_token, 4000);
+    const attachmentsRaw = Array.isArray(body.attachments) ? body.attachments : [];
+    const attachments: NormalizedAttachment[] = attachmentsRaw.map((attachment, index) => {
+      const filename = normalizeText(attachment.filename, 120) || `attachment-${index + 1}`;
+      const contentType = normalizeText(attachment.content_type, 80).toLowerCase();
+      const contentBase64 = normalizeText(attachment.content_base64, 8_000_000).replace(/\s+/g, "");
+      const sizeBytesRaw = Number(attachment.size_bytes);
+      const sizeBytes = Number.isFinite(sizeBytesRaw) && sizeBytesRaw > 0
+        ? Math.round(sizeBytesRaw)
+        : estimateBase64DecodedBytes(contentBase64);
+      return {
+        filename,
+        content_type: contentType,
+        content_base64: contentBase64,
+        size_bytes: sizeBytes,
+      };
+    });
 
     if (website) {
       return jsonResponse(200, { data: { accepted: true } });
     }
 
-    if (!plan || !(plan in SALES_PLAN_LABELS)) {
-      return jsonResponse(400, { error: "Invalid plan." });
+    if (!name || !replyEmail || !isEmail(replyEmail) || !subject || !message) {
+      return jsonResponse(400, { error: "Name, valid email, subject, and message are required." });
     }
-    if (!name || !replyEmail || !isEmail(replyEmail)) {
-      return jsonResponse(400, { error: "Name and valid email are required." });
-    }
-    const organizationRequired = !["individual_yearly", "individual_monthly", "other"].includes(plan);
-    if (organizationRequired && !organization) {
-      return jsonResponse(400, { error: "Organization is required for this plan." });
-    }
-    if (
-      (plan === "district_enterprise" || plan === "organization_enterprise") &&
-      !schoolsCount
-    ) {
-      return jsonResponse(
-        400,
-        {
-          error:
-            plan === "district_enterprise"
-              ? "Number of schools is required for district enterprise."
-              : "Number of locations or teams is required for organization enterprise.",
-        },
-      );
+    if (!["general", "bug", "billing", "access", "feature", "other"].includes(category)) {
+      return jsonResponse(400, { error: "Invalid category." });
     }
     if (!turnstileToken) {
       return jsonResponse(400, { error: "Security check required." });
+    }
+    if (attachments.length > 2) {
+      return jsonResponse(400, { error: "Attach up to 2 images." });
+    }
+    for (const attachment of attachments) {
+      if (!isImageContentType(attachment.content_type)) {
+        return jsonResponse(400, { error: "Only PNG, JPG, WEBP, and GIF attachments are allowed." });
+      }
+      if (!attachment.content_base64 || !base64Pattern.test(attachment.content_base64)) {
+        return jsonResponse(400, { error: "Attachment data is invalid." });
+      }
+      if (attachment.size_bytes > 4 * 1024 * 1024) {
+        return jsonResponse(400, { error: "Each image must be 4 MB or smaller." });
+      }
     }
 
     const adminClient = createClient(supabaseUrl, serviceKey, {
@@ -236,10 +237,10 @@ serve(async (req) => {
       "consume_rate_limit_prelogin",
       {
         p_key: fingerprint,
-        p_scope: "contact_sales_submit",
+        p_scope: "contact_support_submit",
         p_limit: 5,
         p_window_seconds: 3600,
-      }
+      },
     );
     if (rateLimitError) {
       return jsonResponse(500, { error: "Rate limit check failed." });
@@ -254,62 +255,30 @@ serve(async (req) => {
       return jsonResponse(403, { error: "Security check failed." });
     }
 
-    const ipHash = clientIp ? await hashString(clientIp) : null;
-    const userAgent = normalizeText(req.headers.get("user-agent"), 255) || null;
-
-    const { data: lead, error: insertError } = await adminClient
-      .from("sales_leads")
-      .insert({
-        plan,
-        schools_count:
-          plan === "district_enterprise" || plan === "organization_enterprise"
-            ? schoolsCount
-            : null,
-        name,
-        organization: organization || null,
-        reply_email: replyEmail,
-        details: details || null,
-        source: "pricing_page",
-        ip_hash: ipHash,
-        user_agent: userAgent,
-      })
-      .select("id")
-      .single();
-
-    if (insertError || !lead) {
-      return jsonResponse(400, { error: "Unable to save sales request." });
-    }
-
     const { error: enqueueError } = await adminClient.rpc("enqueue_async_job", {
-      p_job_type: "contact_sales_email",
+      p_job_type: "contact_support_email",
       p_payload: {
-        lead_id: lead.id,
-        plan_label: planLabel,
-        plan_key: plan,
-        schools_count:
-          plan === "district_enterprise" || plan === "organization_enterprise"
-            ? schoolsCount
-            : null,
         name,
-        organization: organization || "Not provided",
         reply_email: replyEmail,
-        details: details || null,
+        subject,
+        category,
+        message,
+        attachments,
         support_email: supportEmail,
         from_email: fromEmail,
-        intent,
       },
-      p_priority: 25,
+      p_priority: 20,
       p_max_attempts: 5,
     });
     if (enqueueError) {
-      logError("contact-sales-submit enqueue failed", requestId, enqueueError);
+      logError("contact-support-submit enqueue failed", requestId, enqueueError);
       return jsonResponse(500, { error: "Unable to queue follow-up email." });
     }
 
-    logInfo("contact-sales-submit accepted", requestId, { lead_id: lead.id, plan, intent });
-    return jsonResponse(200, { data: { lead_id: lead.id } });
+    logInfo("contact-support-submit accepted", requestId, { category });
+    return jsonResponse(200, { data: { accepted: true } });
   } catch (error) {
-    logError("contact-sales-submit error", requestId, error);
+    logError("contact-support-submit error", requestId, error);
     return jsonResponse(500, { error: "Request failed." });
   }
 });

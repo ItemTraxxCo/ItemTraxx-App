@@ -276,6 +276,10 @@ verify_jwt = false
 # Public contact form endpoint with turnstile/rate-limit controls.
 verify_jwt = false
 
+[functions.contact-support-submit]
+# Public support form endpoint with turnstile/rate-limit controls.
+verify_jwt = false
+
 [functions.job-worker]
 # Uses ITX_JOB_WORKER_SECRET header auth, not Supabase JWT auth.
 verify_jwt = false

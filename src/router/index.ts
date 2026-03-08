@@ -68,6 +68,12 @@ const routes: RouteRecordRaw[] = [
     meta: { public: true },
   },
   {
+    path: "/contact-support",
+    name: "public-contact-support",
+    component: () => import("../pages/ContactSupport.vue"),
+    meta: { public: true },
+  },
+  {
     path: "/tenant",
     name: "tenant-home",
     redirect: "/tenant/checkout",
@@ -360,6 +366,19 @@ const routes: RouteRecordRaw[] = [
 const router = createRouter({
   history: createWebHistory(),
   routes,
+  scrollBehavior(to, _from, savedPosition) {
+    if (savedPosition) {
+      return savedPosition;
+    }
+    if (to.hash) {
+      return {
+        el: to.hash,
+        top: 88,
+        behavior: "smooth",
+      };
+    }
+    return { top: 0, left: 0 };
+  },
 });
 
 const hasFreshAdminVerification = (adminVerifiedAt: string | null) => {

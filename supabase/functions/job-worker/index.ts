@@ -14,12 +14,38 @@ type AsyncJobRow = {
 type ContactSalesPayload = {
   lead_id: string;
   plan_label: string;
-  plan_key: "core" | "growth" | "enterprise";
+  plan_key:
+    | "district_core"
+    | "district_growth"
+    | "district_enterprise"
+    | "organization_starter"
+    | "organization_scale"
+    | "organization_enterprise"
+    | "individual_yearly"
+    | "individual_monthly"
+    | "other";
   schools_count: number | null;
   name: string;
   organization: string;
   reply_email: string;
   details: string | null;
+  support_email: string;
+  from_email: string;
+  intent?: "sales" | "demo";
+};
+
+type SupportRequestPayload = {
+  name: string;
+  reply_email: string;
+  subject: string;
+  category: "general" | "bug" | "billing" | "access" | "feature" | "other";
+  message: string;
+  attachments?: Array<{
+    filename: string;
+    content_type: string;
+    content_base64: string;
+    size_bytes: number;
+  }>;
   support_email: string;
   from_email: string;
 };
@@ -161,30 +187,164 @@ const buildLoginNotificationHtml = (payload: LoginNotificationPayload, loginTime
 </html>`;
 };
 
+const buildContactSalesInternalHtml = (payload: ContactSalesPayload) => {
+  const planLabel = escapeHtml(payload.plan_label);
+  const name = escapeHtml(payload.name);
+  const organization = escapeHtml(payload.organization);
+  const replyEmail = escapeHtml(payload.reply_email);
+  const details = escapeHtml(payload.details ?? "(none provided)").replaceAll("\n", "<br />");
+  const supportEmail = escapeHtml(payload.support_email);
+  const schoolsLine =
+    (payload.plan_key === "district_enterprise" || payload.plan_key === "organization_enterprise") &&
+      payload.schools_count
+      ? `<p style="margin:0 0 14px 0;font-size:15px;line-height:1.6;color:#374151;"><strong>${
+          payload.plan_key === "district_enterprise" ? "Number of schools" : "Number of locations or teams"
+        }:</strong> ${payload.schools_count}</p>`
+      : "";
+
+  return `<!doctype html>
+<html>
+  <body style="margin:0;padding:0;background:#f4f6fb;font-family:Arial,Helvetica,sans-serif;color:#1f2937;">
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f4f6fb;padding:24px 12px;">
+      <tr>
+        <td align="center">
+          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:560px;background:#ffffff;border:1px solid #e5e7eb;border-radius:12px;overflow:hidden;">
+            <tr>
+              <td style="padding:20px 24px;background:linear-gradient(180deg,#1f4ca3 0%,#38d0b1 100%);color:#ffffff;">
+                <h1 style="margin:0;font-size:20px;line-height:1.3;">ItemTraxx</h1>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:24px;">
+                <h2 style="margin:0 0 12px 0;font-size:22px;line-height:1.3;color:#111827;">${payload.intent === "demo" ? "New Demo Request" : "New Sales Inquiry"}</h2>
+                <p style="margin:0 0 14px 0;font-size:15px;line-height:1.6;color:#374151;">
+                  ${payload.intent === "demo" ? "A new demo request was submitted through the ItemTraxx site." : "A new sales inquiry was submitted through the ItemTraxx pricing/contact flow."}
+                </p>
+                <p style="margin:0 0 14px 0;font-size:15px;line-height:1.7;color:#374151;">
+                  <strong>Plan:</strong> ${planLabel}<br />
+                  <strong>Name:</strong> ${name}<br />
+                  <strong>Organization:</strong> ${organization}<br />
+                  <strong>Reply email:</strong> ${replyEmail}<br />
+                  <strong>Lead ID:</strong> ${escapeHtml(payload.lead_id)}
+                </p>
+                ${schoolsLine}
+                <p style="margin:0 0 10px 0;font-size:15px;line-height:1.6;color:#374151;"><strong>Details</strong></p>
+                <div style="padding:14px 16px;background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;font-size:14px;line-height:1.7;color:#374151;">${details}</div>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:16px 24px;border-top:1px solid #e5e7eb;background:#f9fafb;">
+                <p style="margin:0;font-size:12px;line-height:1.6;color:#6b7280;">
+                  Reply contact:
+                  <a href="mailto:${replyEmail}" style="color:#19439b;text-decoration:none;">${replyEmail}</a>
+                </p>
+                <p style="margin:6px 0 0 0;font-size:12px;line-height:1.6;color:#9ca3af;">
+                  Need help? Contact
+                  <a href="mailto:${supportEmail}" style="color:#19439b;text-decoration:none;">${supportEmail}</a>
+                </p>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>`;
+};
+
+const buildContactSalesConfirmationHtml = (payload: ContactSalesPayload) => {
+  const planLabel = escapeHtml(payload.plan_label);
+  const name = escapeHtml(payload.name);
+  const organization = escapeHtml(payload.organization);
+  const supportEmail = escapeHtml(payload.support_email);
+  const schoolsLine =
+    (payload.plan_key === "district_enterprise" || payload.plan_key === "organization_enterprise") &&
+      payload.schools_count
+      ? `<p style="margin:0 0 14px 0;font-size:15px;line-height:1.6;color:#374151;"><strong>${
+          payload.plan_key === "district_enterprise" ? "Number of schools" : "Number of locations or teams"
+        }:</strong> ${payload.schools_count}</p>`
+      : "";
+
+  return `<!doctype html>
+<html>
+  <body style="margin:0;padding:0;background:#f4f6fb;font-family:Arial,Helvetica,sans-serif;color:#1f2937;">
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f4f6fb;padding:24px 12px;">
+      <tr>
+        <td align="center">
+          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:560px;background:#ffffff;border:1px solid #e5e7eb;border-radius:12px;overflow:hidden;">
+            <tr>
+              <td style="padding:20px 24px;background:linear-gradient(180deg,#1f4ca3 0%,#38d0b1 100%);color:#ffffff;">
+                <h1 style="margin:0;font-size:20px;line-height:1.3;">ItemTraxx</h1>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:24px;">
+                <h2 style="margin:0 0 12px 0;font-size:22px;line-height:1.3;color:#111827;">${payload.intent === "demo" ? "We Received Your Demo Request" : "We Received Your Sales Inquiry"}</h2>
+                <p style="margin:0 0 14px 0;font-size:15px;line-height:1.6;color:#374151;">
+                  Hi ${name},
+                </p>
+                <p style="margin:0 0 14px 0;font-size:15px;line-height:1.6;color:#374151;">
+                  Thanks for contacting the ItemTraxx team. ${payload.intent === "demo" ? "We received your demo request and will follow up to schedule next steps within 2 business days." : "We received your request and will follow up with a quote within 2 business days."}
+                </p>
+                <p style="margin:0 0 14px 0;font-size:15px;line-height:1.7;color:#374151;">
+                  <strong>Plan:</strong> ${planLabel}<br />
+                  <strong>Organization:</strong> ${organization}
+                </p>
+                ${schoolsLine}
+                <p style="margin:0;font-size:14px;line-height:1.6;color:#6b7280;">
+                  If you need to add anything else, you can reply directly to this email.
+                </p>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:16px 24px;border-top:1px solid #e5e7eb;background:#f9fafb;">
+                <p style="margin:0;font-size:12px;line-height:1.6;color:#6b7280;">
+                  Need help? Contact
+                  <a href="mailto:${supportEmail}" style="color:#19439b;text-decoration:none;">${supportEmail}</a>
+                </p>
+                <p style="margin:6px 0 0 0;font-size:12px;line-height:1.6;color:#9ca3af;">
+                  If you do not hear from us within 2 business days, check spam or contact support directly.
+                </p>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>`;
+};
+
 const processContactSalesEmail = async (
   resendApiKey: string,
   payload: ContactSalesPayload,
 ) => {
+  const organizationLine = payload.organization
+    ? `\nOrganization: ${payload.organization}`
+    : "\nOrganization: (not provided)";
   const schoolsLine =
-    payload.plan_key === "enterprise" && payload.schools_count
-      ? `\nNumber of schools: ${payload.schools_count}`
+    (payload.plan_key === "district_enterprise" || payload.plan_key === "organization_enterprise") &&
+      payload.schools_count
+      ? `\n${
+          payload.plan_key === "district_enterprise" ? "Number of schools" : "Number of locations or teams"
+        }: ${payload.schools_count}`
       : "";
 
   await sendResendEmail(resendApiKey, {
     from: payload.from_email,
     to: [payload.support_email],
-    subject: `Contact Sales Request - ${payload.organization}`,
+    subject: `${payload.intent === "demo" ? "Demo Request" : "Contact Sales Request"} - ${payload.organization || payload.name}`,
     reply_to: payload.reply_email,
     text:
-      `A new sales request was submitted.\n\nPlan: ${payload.plan_label}\nName: ${payload.name}\nOrganization: ${payload.organization}\nReply email: ${payload.reply_email}${schoolsLine}\n\nDetails:\n${payload.details ?? "(none provided)"}\n\nLead ID: ${payload.lead_id}`,
+      `A new ${payload.intent === "demo" ? "demo" : "sales"} request was submitted.\n\nPlan: ${payload.plan_label}\nName: ${payload.name}${organizationLine}\nReply email: ${payload.reply_email}${schoolsLine}\n\nDetails:\n${payload.details ?? "(none provided)"}\n\nLead ID: ${payload.lead_id}`,
   });
 
   await sendResendEmail(resendApiKey, {
     from: payload.from_email,
     to: [payload.reply_email],
-    subject: "We received your ItemTraxx sales request.",
+    subject: payload.intent === "demo" ? "We received your ItemTraxx demo request." : "We received your ItemTraxx sales request.",
     text:
-      `Hi ${payload.name},\n\nThanks for contacting the ItemTraxx Sales Team. We've received your request and will follow up with a quote for your selected plan within 2 business days.\n\nRequest summary:\nPlan: ${payload.plan_label}${schoolsLine}\nOrganization: ${payload.organization}\n\nIf you need to add anything else, feel free to reply to this email.\nHave a great day,\n\n- ItemTraxx Sales\n${payload.support_email}\n\nIf you don't hear from us within 2 business days, please check your spam folder or contact us at ${payload.support_email}`,
+      `Hi ${payload.name},\n\n${payload.intent === "demo" ? "Thanks for requesting an ItemTraxx demo. We've received your request and will follow up to schedule next steps within 2 business days." : "Thanks for contacting the ItemTraxx Sales Team. We've received your request and will follow up with a quote for your selected plan within 2 business days."}\n\nRequest summary:\nPlan: ${payload.plan_label}${schoolsLine}${organizationLine}\n\nIf you need to add anything else, feel free to reply to this email.\nHave a great day,\n\n- ItemTraxx ${payload.intent === "demo" ? "Team" : "Sales"}\n${payload.support_email}\n\nIf you don't hear from us within 2 business days, please check your spam folder or contact us at ${payload.support_email}`,
   });
 };
 
@@ -212,6 +372,234 @@ const processLoginNotificationEmail = async (
   });
 };
 
+const buildDistrictSupportHtml = (payload: DistrictSupportPayload, supportEmail: string) => {
+  const requesterEmail = escapeHtml(payload.requester_email ?? "Unavailable");
+  const requesterName = escapeHtml(payload.requester_name ?? "District admin");
+  const subject = escapeHtml(payload.subject);
+  const message = escapeHtml(payload.message).replaceAll("\n", "<br />");
+  const districtId = escapeHtml(payload.district_id);
+  const priority = escapeHtml(payload.priority);
+  const safeSupportEmail = escapeHtml(supportEmail);
+
+  return `<!doctype html>
+<html>
+  <body style="margin:0;padding:0;background:#f4f6fb;font-family:Arial,Helvetica,sans-serif;color:#1f2937;">
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f4f6fb;padding:24px 12px;">
+      <tr>
+        <td align="center">
+          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:560px;background:#ffffff;border:1px solid #e5e7eb;border-radius:12px;overflow:hidden;">
+            <tr>
+              <td style="padding:20px 24px;background:linear-gradient(180deg,#1f4ca3 0%,#38d0b1 100%);color:#ffffff;">
+                <h1 style="margin:0;font-size:20px;line-height:1.3;">ItemTraxx</h1>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:24px;">
+                <h2 style="margin:0 0 12px 0;font-size:22px;line-height:1.3;color:#111827;">District Support Request</h2>
+                <p style="margin:0 0 14px 0;font-size:15px;line-height:1.6;color:#374151;">
+                  A district admin submitted a support request through the district workspace.
+                </p>
+                <p style="margin:0 0 14px 0;font-size:15px;line-height:1.7;color:#374151;">
+                  <strong>District ID:</strong> ${districtId}<br />
+                  <strong>Requester:</strong> ${requesterName}<br />
+                  <strong>Requester Email:</strong> ${requesterEmail}<br />
+                  <strong>Priority:</strong> ${priority}<br />
+                  <strong>Subject:</strong> ${subject}
+                </p>
+                <p style="margin:0 0 10px 0;font-size:15px;line-height:1.6;color:#374151;"><strong>Message</strong></p>
+                <div style="padding:14px 16px;background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;font-size:14px;line-height:1.7;color:#374151;">${message}</div>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:16px 24px;border-top:1px solid #e5e7eb;background:#f9fafb;">
+                <p style="margin:0;font-size:12px;line-height:1.6;color:#6b7280;">
+                  Reply contact:
+                  <a href="mailto:${requesterEmail}" style="color:#19439b;text-decoration:none;">${requesterEmail}</a>
+                </p>
+                <p style="margin:6px 0 0 0;font-size:12px;line-height:1.6;color:#9ca3af;">
+                  Need help? Contact
+                  <a href="mailto:${safeSupportEmail}" style="color:#19439b;text-decoration:none;">${safeSupportEmail}</a>
+                </p>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>`;
+};
+
+const buildSupportRequestInternalHtml = (payload: SupportRequestPayload) => {
+  const name = escapeHtml(payload.name);
+  const replyEmail = escapeHtml(payload.reply_email);
+  const subject = escapeHtml(payload.subject);
+  const category = escapeHtml(payload.category);
+  const message = escapeHtml(payload.message).replaceAll("\n", "<br />");
+  const supportEmail = escapeHtml(payload.support_email);
+  const attachmentSummary = payload.attachments?.length
+    ? `<p style="margin:14px 0 0 0;font-size:14px;line-height:1.6;color:#6b7280;"><strong>Attachments:</strong> ${payload.attachments.length} image${payload.attachments.length === 1 ? "" : "s"} included.</p>`
+    : "";
+
+  return `<!doctype html>
+<html>
+  <body style="margin:0;padding:0;background:#f4f6fb;font-family:Arial,Helvetica,sans-serif;color:#1f2937;">
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f4f6fb;padding:24px 12px;">
+      <tr>
+        <td align="center">
+          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:560px;background:#ffffff;border:1px solid #e5e7eb;border-radius:12px;overflow:hidden;">
+            <tr>
+              <td style="padding:20px 24px;background:linear-gradient(180deg,#1f4ca3 0%,#38d0b1 100%);color:#ffffff;">
+                <h1 style="margin:0;font-size:20px;line-height:1.3;">ItemTraxx</h1>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:24px;">
+                <h2 style="margin:0 0 12px 0;font-size:22px;line-height:1.3;color:#111827;">New Support Request</h2>
+                <p style="margin:0 0 14px 0;font-size:15px;line-height:1.6;color:#374151;">
+                  A new support request was submitted through the ItemTraxx support form.
+                </p>
+                <p style="margin:0 0 14px 0;font-size:15px;line-height:1.7;color:#374151;">
+                  <strong>Name:</strong> ${name}<br />
+                  <strong>Reply email:</strong> ${replyEmail}<br />
+                  <strong>Category:</strong> ${category}<br />
+                  <strong>Subject:</strong> ${subject}
+                </p>
+                <p style="margin:0 0 10px 0;font-size:15px;line-height:1.6;color:#374151;"><strong>Message</strong></p>
+                <div style="padding:14px 16px;background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;font-size:14px;line-height:1.7;color:#374151;">${message}</div>
+                ${attachmentSummary}
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:16px 24px;border-top:1px solid #e5e7eb;background:#f9fafb;">
+                <p style="margin:0;font-size:12px;line-height:1.6;color:#6b7280;">
+                  Reply contact:
+                  <a href="mailto:${replyEmail}" style="color:#19439b;text-decoration:none;">${replyEmail}</a>
+                </p>
+                <p style="margin:6px 0 0 0;font-size:12px;line-height:1.6;color:#9ca3af;">
+                  Need help? Contact
+                  <a href="mailto:${supportEmail}" style="color:#19439b;text-decoration:none;">${supportEmail}</a>
+                </p>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>`;
+};
+
+const buildSupportRequestConfirmationHtml = (payload: SupportRequestPayload) => {
+  const name = escapeHtml(payload.name);
+  const subject = escapeHtml(payload.subject);
+  const category = escapeHtml(payload.category);
+  const supportEmail = escapeHtml(payload.support_email);
+  const attachmentSummary = payload.attachments?.length
+    ? `<p style="margin:0 0 14px 0;font-size:15px;line-height:1.6;color:#374151;">We also received ${payload.attachments.length} image attachment${payload.attachments.length === 1 ? "" : "s"} with your request.</p>`
+    : "";
+
+  return `<!doctype html>
+<html>
+  <body style="margin:0;padding:0;background:#f4f6fb;font-family:Arial,Helvetica,sans-serif;color:#1f2937;">
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f4f6fb;padding:24px 12px;">
+      <tr>
+        <td align="center">
+          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:560px;background:#ffffff;border:1px solid #e5e7eb;border-radius:12px;overflow:hidden;">
+            <tr>
+              <td style="padding:20px 24px;background:linear-gradient(180deg,#1f4ca3 0%,#38d0b1 100%);color:#ffffff;">
+                <h1 style="margin:0;font-size:20px;line-height:1.3;">ItemTraxx</h1>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:24px;">
+                <h2 style="margin:0 0 12px 0;font-size:22px;line-height:1.3;color:#111827;">We Received Your Support Request</h2>
+                <p style="margin:0 0 14px 0;font-size:15px;line-height:1.6;color:#374151;">Hi ${name},</p>
+                <p style="margin:0 0 14px 0;font-size:15px;line-height:1.6;color:#374151;">
+                  We received your support request and will respond as soon as possible.
+                </p>
+                <p style="margin:0 0 14px 0;font-size:15px;line-height:1.7;color:#374151;">
+                  <strong>Category:</strong> ${category}<br />
+                  <strong>Subject:</strong> ${subject}
+                </p>
+                ${attachmentSummary}
+                <p style="margin:0;font-size:14px;line-height:1.6;color:#6b7280;">
+                  If you need to add anything else, reply directly to this email.
+                </p>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:16px 24px;border-top:1px solid #e5e7eb;background:#f9fafb;">
+                <p style="margin:0;font-size:12px;line-height:1.6;color:#6b7280;">
+                  Need help? Contact
+                  <a href="mailto:${supportEmail}" style="color:#19439b;text-decoration:none;">${supportEmail}</a>
+                </p>
+                <p style="margin:6px 0 0 0;font-size:12px;line-height:1.6;color:#9ca3af;">
+                  © 2026 ItemTraxx Co. All rights reserved.
+                </p>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>`;
+};
+
+const processSupportRequestEmail = async (
+  resendApiKey: string,
+  payload: SupportRequestPayload,
+) => {
+  const attachments = (payload.attachments ?? []).slice(0, 2).map((attachment) => ({
+    filename: attachment.filename,
+    content: attachment.content_base64,
+    content_type: attachment.content_type,
+  }));
+  await sendResendEmail(resendApiKey, {
+    from: payload.from_email,
+    to: [payload.support_email],
+    reply_to: payload.reply_email,
+    subject: `Support Request - ${payload.subject}`,
+    html: buildSupportRequestInternalHtml(payload),
+    attachments,
+    text:
+      `A new support request was submitted.
+
+` +
+      `Name: ${payload.name}
+` +
+      `Reply email: ${payload.reply_email}
+` +
+      `Category: ${payload.category}
+` +
+      `Subject: ${payload.subject}
+
+` +
+      `${payload.message}` +
+      (attachments.length ? `\n\nAttachments: ${attachments.length} image file(s) included.` : ""),
+  });
+
+  await sendResendEmail(resendApiKey, {
+    from: payload.from_email,
+    to: [payload.reply_email],
+    subject: 'We received your ItemTraxx support request.',
+    html: buildSupportRequestConfirmationHtml(payload),
+    text:
+      `Hi ${payload.name},
+
+We received your support request and will respond as soon as possible.
+
+Category: ${payload.category}
+Subject: ${payload.subject}
+
+If you need to add anything else, reply directly to this email.
+
+- ItemTraxx Support
+${payload.support_email}`,
+  });
+};
+
 const processDistrictSupportEmail = async (
   resendApiKey: string,
   payload: DistrictSupportPayload,
@@ -225,6 +613,7 @@ const processDistrictSupportEmail = async (
     to: [supportEmail],
     reply_to: payload.requester_email ? payload.requester_email : undefined,
     subject: `District Support Request - ${payload.subject}`,
+    html: buildDistrictSupportHtml(payload, supportEmail),
     text:
       `A district support request was submitted.\n\n` +
       `District ID: ${payload.district_id}\n` +
@@ -331,6 +720,11 @@ serve(async (req) => {
             job.payload as DistrictSupportPayload,
             supportEmail,
             fromEmail,
+          );
+        } else if (job.job_type === "contact_support_email") {
+          await processSupportRequestEmail(
+            resendApiKey,
+            job.payload as SupportRequestPayload,
           );
         } else if (job.job_type === "refresh_reporting_views") {
           await adminClient.rpc("refresh_super_reporting_views");

@@ -186,9 +186,9 @@
         <div v-if="isOutdated" class="menu-item status-warning" role="menuitem">
           Version outdated, refresh to update.
         </div>
-        <a class="menu-item" role="menuitem" href="mailto:support@itemtraxx.com">
+        <RouterLink class="menu-item" role="menuitem" to="/contact-support" @click="menuOpen = false">
           Contact Support
-        </a>
+        </RouterLink>
         <div
           class="menu-item muted menu-offline-queue"
           role="menuitem"

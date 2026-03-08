@@ -40,13 +40,13 @@
           >
             Pricing
           </RouterLink>
-          <a
+          <RouterLink
             class="hero-button hero-button-light"
-            href="mailto:support@itemtraxx.com?subject=Request%20Demo%20-%20ItemTraxx"
+            to="/contact-sales?intent=demo"
             @click="trackCta('request_demo', 'hero')"
           >
             Request Demo
-          </a>
+          </RouterLink>
         </div>
         <div class="trust-strip" aria-label="Key product benefits">
           <span>Secure auth</span>
@@ -251,7 +251,7 @@
     <footer class="site-footer">
       <p class="footer-brand">ItemTraxx Co</p>
       <div class="footer-links">
-        <a href="mailto:support@itemtraxx.com">Support</a>
+        <RouterLink to="/contact-support">Support</RouterLink>
         <a
           href="https://status.itemtraxx.com/"
           target="_blank"
@@ -303,7 +303,7 @@ const faqItems = [
   },
   {
     q: "How do I request a demo?",
-    a: "You can request a demo by contacting our support team at support@itemtraxx.com.",
+    a: 'You can request a demo by clicking the "Request Demo" button and submitting the demo request form.',
   },
   {
     q: "I found a bug, how do I report it?",

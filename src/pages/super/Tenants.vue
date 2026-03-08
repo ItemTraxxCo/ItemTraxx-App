@@ -34,62 +34,22 @@
         <h3>District linked</h3>
         <p class="stat-value">{{ districtLinkedTenantCount }}</p>
       </div>
+      <div class="stat-card">
+        <h3>Individual</h3>
+        <p class="stat-value">{{ individualTenantCount }}</p>
+      </div>
     </div>
 
     <div class="section-grid">
       <div class="card section-card">
         <div class="section-heading">
-          <h2>Create Tenant</h2>
-          <p class="muted">Provision tenant access and attach it to an active district.</p>
-        </div>
-      <form class="form" @submit.prevent="handleCreate">
-        <label>
-          Name
-          <input v-model="createName" type="text" placeholder="Tenant name" />
-        </label>
-        <label>
-          Access Code
-          <input v-model="createAccessCode" type="text" placeholder="Access code" />
-        </label>
-        <label>
-          Tenant Admin Email
-          <input v-model="createAuthEmail" type="email" placeholder="admin@tenant.com" />
-        </label>
-        <label>
-          Tenant Admin Password
-          <input
-            v-model="createPassword"
-            type="password"
-            placeholder="Minimum 8 characters"
-            autocomplete="off"
-          />
-        </label>
-        <label>
-          Status
-          <select v-model="createStatusLabel">
-            <option value="active">active</option>
-            <option value="disabled">disabled</option>
-          </select>
-        </label>
-        <label>
-          District
-          <select v-model="createDistrictId">
-            <option value="">No district</option>
-            <option v-for="district in activeDistricts" :key="district.id" :value="district.id">
-              {{ district.name }} ({{ district.slug }})
-            </option>
-          </select>
-        </label>
-        <div class="form-actions">
-          <button type="submit" class="button-primary" :disabled="isSaving">Create Tenant</button>
-        </div>
-      </form>
-      </div>
-
-      <div class="card section-card">
-        <div class="section-heading">
-          <h2>Tenant List</h2>
-          <p class="muted">Search, filter, edit, and change tenant status from one table.</p>
+          <div>
+            <h2>Tenant List</h2>
+            <p class="muted">Search, filter, edit, and change tenant status from one table.</p>
+          </div>
+          <button type="button" class="button-primary" @click="createModalVisible = true">
+            Create New Tenant
+          </button>
         </div>
         <div class="filter-toolbar">
           <div class="input-row">
@@ -109,41 +69,117 @@
 
         <p v-if="isLoading" class="muted">Loading tenants...</p>
         <p v-else-if="error" class="error">{{ error }}</p>
-        <table v-else class="table">
-          <thead>
-            <tr>
-              <th>Name</th>
-              <th>District</th>
-              <th>Access Code</th>
-              <th>Status</th>
-              <th>Primary Admin</th>
-              <th>Created</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="tenant in tenants" :key="tenant.id">
-              <td>{{ tenant.name }}</td>
-              <td>{{ tenant.district_slug || tenant.district_name || "-" }}</td>
-              <td>{{ tenant.access_code }}</td>
-              <td>{{ toTenantStatusLabel(tenant.status) }}</td>
-              <td>{{ tenant.primary_admin_email || "-" }}</td>
-              <td>{{ formatDate(tenant.created_at) }}</td>
-              <td class="actions-cell">
-                <button type="button" @click="openEditModal(tenant)">Edit</button>
-                <button type="button" :disabled="isSaving" @click="openStatusModal(tenant)">
-                  {{
-                    tenant.status === "active"
-                      ? "Disable"
-                      : tenant.status === "suspended"
-                        ? "Reactivate"
-                        : "Restore"
-                  }}
-                </button>
-              </td>
-            </tr>
-          </tbody>
-        </table>
+        <div v-else class="table-wrap tenant-table-wrap">
+          <table class="table tenant-table">
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Type</th>
+                <th>Plan</th>
+                <th>District</th>
+                <th>Access Code</th>
+                <th>Status</th>
+                <th>Primary Admin</th>
+                <th>Created</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="tenant in tenants" :key="tenant.id">
+                <td>{{ tenant.name }}</td>
+                <td>{{ formatAccountCategory(tenant.account_category) }}</td>
+                <td>{{ formatPlanCode(tenant.plan_code) }}</td>
+                <td>{{ tenant.district_slug || tenant.district_name || "-" }}</td>
+                <td>{{ tenant.access_code }}</td>
+                <td>{{ toTenantStatusLabel(tenant.status) }}</td>
+                <td>{{ tenant.primary_admin_email || "-" }}</td>
+                <td>{{ formatDate(tenant.created_at) }}</td>
+                <td class="actions-cell">
+                  <button type="button" @click="openEditModal(tenant)">Edit</button>
+                  <button type="button" :disabled="isSaving" @click="openStatusModal(tenant)">
+                    {{
+                      tenant.status === "active"
+                        ? "Disable"
+                        : tenant.status === "suspended"
+                          ? "Reactivate"
+                          : "Restore"
+                    }}
+                  </button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div v-if="createModalVisible" class="modal-backdrop" @click.self="closeCreateModal">
+      <div class="modal">
+        <h2>Create Tenant</h2>
+        <p class="muted modal-copy">Provision tenant access and attach it to an active district.</p>
+        <form class="form" @submit.prevent="handleCreate">
+          <label>
+            Name
+            <input v-model="createName" type="text" placeholder="Tenant name" />
+          </label>
+          <label>
+            Access Code
+            <input v-model="createAccessCode" type="text" placeholder="Access code" />
+          </label>
+          <label>
+            Tenant Admin Email
+            <input v-model="createAuthEmail" type="email" placeholder="admin@tenant.com" />
+          </label>
+          <label>
+            Tenant Admin Password
+            <input
+              v-model="createPassword"
+              type="password"
+              placeholder="Minimum 8 characters"
+              autocomplete="off"
+            />
+          </label>
+          <label>
+            Account Type
+            <select v-model="createAccountCategory">
+              <option value="organization">Organization</option>
+              <option value="district">District</option>
+              <option value="individual">Individual</option>
+            </select>
+          </label>
+          <label>
+            Plan
+            <select v-model="createPlanCode">
+              <option
+                v-for="option in createPlanOptions"
+                :key="option.value"
+                :value="option.value"
+              >
+                {{ option.label }}
+              </option>
+            </select>
+          </label>
+          <label>
+            Status
+            <select v-model="createStatusLabel">
+              <option value="active">active</option>
+              <option value="disabled">disabled</option>
+            </select>
+          </label>
+          <label v-if="createAccountCategory !== 'individual'">
+            District
+            <select v-model="createDistrictId">
+              <option value="">No district</option>
+              <option v-for="district in activeDistricts" :key="district.id" :value="district.id">
+                {{ district.name }} ({{ district.slug }})
+              </option>
+            </select>
+          </label>
+          <div class="form-actions">
+            <button type="submit" class="button-primary" :disabled="isSaving">Create Tenant</button>
+            <button type="button" @click="closeCreateModal">Cancel</button>
+          </div>
+        </form>
       </div>
     </div>
 
@@ -160,6 +196,26 @@
             <input v-model="editAccessCode" type="text" placeholder="Access code" />
           </label>
           <label>
+            Account Type
+            <select v-model="editAccountCategory">
+              <option value="organization">Organization</option>
+              <option value="district">District</option>
+              <option value="individual">Individual</option>
+            </select>
+          </label>
+          <label>
+            Plan
+            <select v-model="editPlanCode">
+              <option
+                v-for="option in editPlanOptions"
+                :key="option.value"
+                :value="option.value"
+              >
+                {{ option.label }}
+              </option>
+            </select>
+          </label>
+          <label v-if="editAccountCategory !== 'individual'">
             District
             <select v-model="editDistrictId">
               <option value="">No district</option>
@@ -221,7 +277,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import { RouterLink } from "vue-router";
 import StepUpModal from "../../components/StepUpModal.vue";
 import { setTenantPolicy } from "../../services/superOpsService";
@@ -249,15 +305,32 @@ const createName = ref("");
 const createAccessCode = ref("");
 const createAuthEmail = ref("");
 const createPassword = ref("");
+const createAccountCategory = ref<"organization" | "district" | "individual">("organization");
+const createPlanCode = ref<
+  "core" | "growth" | "starter" | "scale" | "enterprise" | "individual_yearly" | "individual_monthly"
+>("starter");
 const createStatusLabel = ref<"active" | "disabled">("active");
 const createDistrictId = ref("");
+const createModalVisible = ref(false);
 const editTenantId = ref<string | null>(null);
 const editModalVisible = ref(false);
 const editName = ref("");
 const editAccessCode = ref("");
+const editAccountCategory = ref<"organization" | "district" | "individual">("organization");
+const editPlanCode = ref<
+  "core" | "growth" | "starter" | "scale" | "enterprise" | "individual_yearly" | "individual_monthly"
+>("starter");
 const editDistrictId = ref("");
 const editCheckoutDueHours = ref(72);
 const editFeatureFlags = ref({
+  enable_notifications: true,
+  enable_bulk_item_import: true,
+  enable_bulk_student_tools: true,
+  enable_status_tracking: true,
+  enable_barcode_generator: true,
+});
+const initialEditCheckoutDueHours = ref(72);
+const initialEditFeatureFlags = ref({
   enable_notifications: true,
   enable_bulk_item_import: true,
   enable_bulk_student_tools: true,
@@ -283,6 +356,53 @@ const disabledTenantCount = computed(() =>
 const districtLinkedTenantCount = computed(() =>
   tenants.value.filter((tenant) => !!tenant.district_id).length
 );
+const individualTenantCount = computed(
+  () => tenants.value.filter((tenant) => tenant.account_category === "individual").length
+);
+
+const planOptionsByCategory = {
+  district: [
+    { value: "core", label: "Core" },
+    { value: "growth", label: "Growth" },
+    { value: "enterprise", label: "Enterprise" },
+  ],
+  organization: [
+    { value: "starter", label: "Starter" },
+    { value: "scale", label: "Scale" },
+    { value: "enterprise", label: "Enterprise" },
+  ],
+  individual: [
+    { value: "individual_yearly", label: "Individual Yearly" },
+    { value: "individual_monthly", label: "Individual Monthly" },
+  ],
+} as const;
+
+const createPlanOptions = computed(() => planOptionsByCategory[createAccountCategory.value]);
+const editPlanOptions = computed(() => planOptionsByCategory[editAccountCategory.value]);
+
+const formatAccountCategory = (value: SuperTenant["account_category"]) =>
+  value === "individual" ? "Individual" : value === "district" ? "District" : "Organization";
+
+const formatPlanCode = (value: SuperTenant["plan_code"]) => {
+  switch (value) {
+    case "core":
+      return "Core";
+    case "growth":
+      return "Growth";
+    case "starter":
+      return "Starter";
+    case "scale":
+      return "Scale";
+    case "enterprise":
+      return "Enterprise";
+    case "individual_yearly":
+      return "Individual Yearly";
+    case "individual_monthly":
+      return "Individual Monthly";
+    default:
+      return "-";
+  }
+};
 
 const showToast = (title: string, message: string) => {
   toastTitle.value = title;
@@ -353,16 +473,23 @@ const handleCreate = async () => {
       auth_email: createAuthEmail.value.trim().toLowerCase(),
       password: createPassword.value,
       status: fromTenantStatusLabel(createStatusLabel.value),
-      district_name: selectedDistrict?.name || undefined,
-      district_slug: selectedDistrict?.slug || undefined,
+      account_category: createAccountCategory.value,
+      plan_code: createPlanCode.value,
+      district_name:
+        createAccountCategory.value !== "individual" ? selectedDistrict?.name || undefined : undefined,
+      district_slug:
+        createAccountCategory.value !== "individual" ? selectedDistrict?.slug || undefined : undefined,
     });
     tenants.value = [created, ...tenants.value];
     createName.value = "";
     createAccessCode.value = "";
     createAuthEmail.value = "";
     createPassword.value = "";
+    createAccountCategory.value = "organization";
+    createPlanCode.value = "starter";
     createStatusLabel.value = "active";
     createDistrictId.value = "";
+    createModalVisible.value = false;
     showToast("Tenant created", "Tenant and tenant admin login were created successfully.");
   } catch (err) {
     showToast("Create failed", err instanceof Error ? err.message : "Unable to create tenant.");
@@ -371,10 +498,35 @@ const handleCreate = async () => {
   }
 };
 
+const closeCreateModal = () => {
+  createModalVisible.value = false;
+  createName.value = "";
+  createAccessCode.value = "";
+  createAuthEmail.value = "";
+  createPassword.value = "";
+  createAccountCategory.value = "organization";
+  createPlanCode.value = "starter";
+  createStatusLabel.value = "active";
+  createDistrictId.value = "";
+};
+
 const openEditModal = (tenant: SuperTenant) => {
   editTenantId.value = tenant.id;
   editName.value = tenant.name;
   editAccessCode.value = tenant.access_code;
+  editAccountCategory.value =
+    tenant.account_category === "individual"
+      ? "individual"
+      : tenant.account_category === "district"
+        ? "district"
+        : "organization";
+  editPlanCode.value =
+    tenant.plan_code ??
+    (tenant.account_category === "individual"
+      ? "individual_yearly"
+      : tenant.account_category === "district"
+        ? "core"
+        : "starter");
   editDistrictId.value = tenant.district_id ?? "";
   editCheckoutDueHours.value =
     typeof tenant.checkout_due_hours === "number"
@@ -387,6 +539,8 @@ const openEditModal = (tenant: SuperTenant) => {
     enable_status_tracking: tenant.feature_flags?.enable_status_tracking !== false,
     enable_barcode_generator: tenant.feature_flags?.enable_barcode_generator !== false,
   };
+  initialEditCheckoutDueHours.value = editCheckoutDueHours.value;
+  initialEditFeatureFlags.value = { ...editFeatureFlags.value };
   editModalVisible.value = true;
 };
 
@@ -395,8 +549,18 @@ const closeEditModal = () => {
   editTenantId.value = null;
   editName.value = "";
   editAccessCode.value = "";
+  editAccountCategory.value = "organization";
+  editPlanCode.value = "starter";
   editDistrictId.value = "";
   editCheckoutDueHours.value = 72;
+  initialEditCheckoutDueHours.value = 72;
+  initialEditFeatureFlags.value = {
+    enable_notifications: true,
+    enable_bulk_item_import: true,
+    enable_bulk_student_tools: true,
+    enable_status_tracking: true,
+    enable_barcode_generator: true,
+  };
 };
 
 const saveEdit = async () => {
@@ -423,17 +587,26 @@ const saveEdit = async () => {
       id: editTenantId.value,
       name: editName.value.trim(),
       access_code: editAccessCode.value.trim(),
-      district_name: selectedDistrict?.name || undefined,
-      district_slug: selectedDistrict?.slug || undefined,
+      account_category: editAccountCategory.value,
+      plan_code: editPlanCode.value,
+      district_name:
+        editAccountCategory.value !== "individual" ? selectedDistrict?.name || undefined : undefined,
+      district_slug:
+        editAccountCategory.value !== "individual" ? selectedDistrict?.slug || undefined : undefined,
     });
     tenants.value = tenants.value.map((tenant) =>
       tenant.id === updated.id ? updated : tenant
     );
-    await setTenantPolicy({
-      tenant_id: editTenantId.value,
-      checkout_due_hours: Math.round(editCheckoutDueHours.value),
-      feature_flags: editFeatureFlags.value,
-    });
+    const policyChanged =
+      Math.round(editCheckoutDueHours.value) !== initialEditCheckoutDueHours.value ||
+      JSON.stringify(editFeatureFlags.value) !== JSON.stringify(initialEditFeatureFlags.value);
+    if (policyChanged) {
+      await setTenantPolicy({
+        tenant_id: editTenantId.value,
+        checkout_due_hours: Math.round(editCheckoutDueHours.value),
+        feature_flags: editFeatureFlags.value,
+      });
+    }
     await loadTenants();
     closeEditModal();
     showToast("Tenant updated", "Tenant details were updated.");
@@ -515,9 +688,29 @@ onMounted(() => {
   void loadTenants();
   void loadDistrictOptions();
 });
+
+watch(createAccountCategory, (value) => {
+  createPlanCode.value =
+    value === "individual" ? "individual_yearly" : value === "district" ? "core" : "starter";
+  if (value === "individual") {
+    createDistrictId.value = "";
+  }
+});
+
+watch(editAccountCategory, (value) => {
+  editPlanCode.value =
+    value === "individual" ? "individual_yearly" : value === "district" ? "core" : "starter";
+  if (value === "individual") {
+    editDistrictId.value = "";
+  }
+});
 </script>
 
 <style scoped>
+.page {
+  max-width: 1360px;
+}
+
 .super-page-header {
   display: flex;
   justify-content: space-between;
@@ -536,7 +729,7 @@ onMounted(() => {
 
 .section-grid {
   display: grid;
-  grid-template-columns: minmax(300px, 340px) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr);
   gap: 1rem;
   align-items: start;
 }
@@ -566,6 +759,45 @@ onMounted(() => {
   min-width: 180px;
 }
 
+.modal-copy {
+  margin: -0.4rem 0 0.25rem;
+}
+
+.tenant-table-wrap {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-bottom: 0.25rem;
+}
+
+.tenant-table {
+  min-width: 0;
+  margin-top: 0;
+}
+
+.tenant-table td,
+.tenant-table th {
+  vertical-align: top;
+}
+
+.tenant-table td:nth-child(1),
+.tenant-table td:nth-child(4),
+.tenant-table td:nth-child(7) {
+  min-width: 8.5rem;
+  word-break: break-word;
+}
+
+.tenant-table td:nth-child(5),
+.tenant-table th:nth-child(5) {
+  white-space: nowrap;
+}
+
+.tenant-table td:nth-child(8),
+.tenant-table th:nth-child(8) {
+  white-space: nowrap;
+}
+
 .modal-backdrop {
   position: fixed;
   inset: 0;
@@ -590,6 +822,7 @@ onMounted(() => {
   display: flex;
   flex-wrap: wrap;
   gap: 0.5rem;
+  white-space: nowrap;
 }
 
 @media (max-width: 900px) {
@@ -599,10 +832,6 @@ onMounted(() => {
 
   .super-page-links {
     justify-content: flex-start;
-  }
-
-  .section-grid {
-    grid-template-columns: 1fr;
   }
 }
 </style>

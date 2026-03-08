@@ -42,6 +42,16 @@ export type TenantNotificationPayload = {
 
 export type TenantSettingsPayload = {
   checkout_due_hours: number;
+  account_category: "organization" | "district" | "individual" | null;
+  plan_code:
+    | "core"
+    | "growth"
+    | "starter"
+    | "scale"
+    | "enterprise"
+    | "individual_yearly"
+    | "individual_monthly"
+    | null;
   feature_flags: TenantFeatureFlags;
 };
 

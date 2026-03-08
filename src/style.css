@@ -12,6 +12,7 @@
   color-scheme: dark;
   color: #f9f9f7;
   background-color: #0c1016;
+  --page-bg: #0c1016;
   --surface: #131922;
   --surface-2: #1a2230;
   --border: rgba(255, 255, 255, 0.12);
@@ -30,6 +31,7 @@
   color-scheme: light;
   color: #000000;
   background-color: #f9f9f7;
+  --page-bg: #f9f9f7;
   --surface: #ffffff;
   --surface-2: #f1f3f0;
   --border: rgba(0, 0, 0, 0.08);
@@ -53,12 +55,16 @@ a:hover {
   text-decoration: underline;
 }
 
+html {
+  background-color: var(--page-bg);
+}
+
 body {
   margin: 0;
   display: flex;
   min-width: 320px;
   min-height: 100vh;
-  background-color: inherit;
+  background-color: var(--page-bg);
   color: inherit;
 }
 
@@ -66,6 +72,11 @@ html.auth-route-active,
 body.auth-route-active {
   background: #090c12;
   overflow: hidden;
+}
+
+html.marketing-route-active,
+body.marketing-route-active {
+  background: #090d14;
 }
 
 html[data-theme="light"].auth-route-active,
@@ -177,9 +188,21 @@ button:focus-visible {
   overflow: hidden;
 }
 
+.app-shell.route-shell-marketing {
+  margin: -2.5rem -2rem -3rem;
+  min-height: 100vh;
+  padding: 0;
+  overflow-x: hidden;
+  background: #090d14;
+}
+
 @media (max-width: 640px) {
   .app-shell.route-shell-auth {
     margin: -2.5rem -2rem 0;
+  }
+
+  .app-shell.route-shell-marketing {
+    margin: -2.5rem -2rem -3rem;
   }
 }
 

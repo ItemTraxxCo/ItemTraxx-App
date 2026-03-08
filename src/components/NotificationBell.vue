@@ -103,8 +103,11 @@ const unreadCount = computed(
     (maintenanceEnabled.value ? 1 : 0)
 );
 
-const loadNotifications = async () => {
-  isLoading.value = true;
+const loadNotifications = async (showLoading = true) => {
+  if (document.visibilityState === "hidden") return;
+  if (showLoading) {
+    isLoading.value = true;
+  }
   error.value = "";
   try {
     const payload = await fetchTenantNotifications();
@@ -126,8 +129,32 @@ const loadNotifications = async () => {
   } catch (err) {
     error.value = err instanceof Error ? err.message : "Unable to load notifications.";
   } finally {
-    isLoading.value = false;
+    if (showLoading) {
+      isLoading.value = false;
+    }
   }
+};
+
+const startPolling = () => {
+  if (pollTimer) return;
+  pollTimer = window.setInterval(() => {
+    void loadNotifications(false);
+  }, 90_000);
+};
+
+const stopPolling = () => {
+  if (!pollTimer) return;
+  window.clearInterval(pollTimer);
+  pollTimer = null;
+};
+
+const handleVisibilityChange = () => {
+  if (document.visibilityState === "hidden") {
+    stopPolling();
+    return;
+  }
+  void loadNotifications(false);
+  startPolling();
 };
 
 const toggleOpen = () => {
@@ -139,16 +166,13 @@ const toggleOpen = () => {
 
 onMounted(() => {
   void loadNotifications();
-  pollTimer = window.setInterval(() => {
-    void loadNotifications();
-  }, 60_000);
+  startPolling();
+  document.addEventListener("visibilitychange", handleVisibilityChange);
 });
 
 onUnmounted(() => {
-  if (pollTimer) {
-    window.clearInterval(pollTimer);
-    pollTimer = null;
-  }
+  stopPolling();
+  document.removeEventListener("visibilitychange", handleVisibilityChange);
 });
 </script>
 

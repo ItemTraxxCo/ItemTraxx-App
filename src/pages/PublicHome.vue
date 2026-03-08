@@ -350,7 +350,20 @@ const scheduleIdle = (callback: () => void, timeout = 1200) => {
 
 let cancelIdlePrefetch: (() => void) | null = null;
 
+const shouldPrefetchPrimaryRoutes = () => {
+  const connection = (navigator as Navigator & {
+    connection?: { saveData?: boolean; effectiveType?: string };
+  }).connection;
+  if (connection?.saveData) {
+    return false;
+  }
+  return connection?.effectiveType !== "slow-2g" && connection?.effectiveType !== "2g";
+};
+
 const prefetchPrimaryRoutes = () => {
+  if (!shouldPrefetchPrimaryRoutes() || document.visibilityState === "hidden") {
+    return;
+  }
   void import("./Login.vue");
   void import("./tenant/Checkout.vue");
   void import("./tenant/admin/AdminLogin.vue");

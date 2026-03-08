@@ -29,6 +29,16 @@ type TenantRow = {
 type TenantPolicyRow = {
   tenant_id: string;
   checkout_due_hours: number | null;
+  account_category?: "organization" | "district" | "individual" | null;
+  plan_code?:
+    | "core"
+    | "growth"
+    | "starter"
+    | "scale"
+    | "enterprise"
+    | "individual_yearly"
+    | "individual_monthly"
+    | null;
   feature_flags: Record<string, unknown> | null;
 };
 
@@ -81,6 +91,11 @@ const isMissingDistrictIdColumn = (error: PgError | null | undefined) =>
   !!error &&
   error.code === "42703" &&
   (error.message ?? "").toLowerCase().includes("district_id");
+
+const isMissingFeatureFlagsColumn = (error: PgError | null | undefined) =>
+  !!error &&
+  error.code === "42703" &&
+  (error.message ?? "").toLowerCase().includes("feature_flags");
 
 const isMissingDistrictsTable = (error: PgError | null | undefined) =>
   !!error &&
@@ -148,6 +163,29 @@ const resolveResetRedirectTo = (req: Request) => {
 
 const isValidStatus = (value: unknown): value is "active" | "suspended" | "archived" =>
   value === "active" || value === "suspended" || value === "archived";
+
+const isValidTenantAccountCategory = (
+  value: unknown
+): value is "organization" | "district" | "individual" =>
+  value === "organization" || value === "district" || value === "individual";
+
+const isValidTenantPlanCode = (
+  value: unknown
+): value is
+  | "core"
+  | "growth"
+  | "starter"
+  | "scale"
+  | "enterprise"
+  | "individual_yearly"
+  | "individual_monthly" =>
+  value === "core" ||
+  value === "growth" ||
+  value === "starter" ||
+  value === "scale" ||
+  value === "enterprise" ||
+  value === "individual_yearly" ||
+  value === "individual_monthly";
 
 const verifySuperPassword = async (
   supabaseUrl: string,
@@ -376,18 +414,34 @@ serve(async (req) => {
           rows.map((row) => row.district_id).filter((value): value is string => !!value)
         )
       );
-      const [profileRowsResult, policyRowsResult, districtRowsResult] = await Promise.all([
+      const [profileRowsResult, rawPolicyRowsResult, districtRowsResult] = await Promise.all([
         ids.length
           ? adminClient.from("profiles").select("id, auth_email").in("id", ids)
           : Promise.resolve({ data: [], error: null }),
         adminClient
           .from("tenant_policies")
-          .select("tenant_id, checkout_due_hours, feature_flags")
+          .select("tenant_id, checkout_due_hours, account_category, plan_code, feature_flags")
           .in("tenant_id", tenantIds),
         districtIds.length
           ? adminClient.from("districts").select("id, name, slug").in("id", districtIds)
           : Promise.resolve({ data: [], error: null }),
       ]);
+
+      let policyRowsResult = rawPolicyRowsResult;
+      if (isMissingFeatureFlagsColumn(rawPolicyRowsResult.error as PgError)) {
+        const fallbackPolicyRowsResult = await adminClient
+          .from("tenant_policies")
+          .select("tenant_id, checkout_due_hours, account_category, plan_code")
+          .in("tenant_id", tenantIds);
+
+        policyRowsResult = {
+          data: (fallbackPolicyRowsResult.data ?? []).map((item) => ({
+            ...item,
+            feature_flags: null,
+          })),
+          error: fallbackPolicyRowsResult.error,
+        };
+      }
 
       const emailById = new Map(
         (
@@ -419,6 +473,13 @@ serve(async (req) => {
           typeof policyByTenant.get(row.id)?.checkout_due_hours === "number"
             ? policyByTenant.get(row.id)?.checkout_due_hours
             : 72,
+        account_category:
+          policyByTenant.get(row.id)?.account_category === "individual"
+            ? "individual"
+            : policyByTenant.get(row.id)?.account_category === "district"
+              ? "district"
+            : "organization",
+        plan_code: policyByTenant.get(row.id)?.plan_code ?? null,
         feature_flags:
           policyByTenant.get(row.id)?.feature_flags ?? defaultFeatureFlags(),
       }));
@@ -785,6 +846,10 @@ serve(async (req) => {
         typeof next.auth_email === "string" ? next.auth_email.trim().toLowerCase() : "";
       const password = typeof next.password === "string" ? next.password : "";
       const status = next.status;
+      const accountCategory = isValidTenantAccountCategory(next.account_category)
+        ? next.account_category
+        : "organization";
+      const planCode = isValidTenantPlanCode(next.plan_code) ? next.plan_code : null;
       const districtSlug =
         typeof next.district_slug === "string" ? normalizeDistrictSlug(next.district_slug) : "";
       const districtName =
@@ -806,6 +871,19 @@ serve(async (req) => {
         return jsonResponse(400, {
           error: "District name and slug must both be provided when assigning a district.",
         });
+      }
+      if (
+        (accountCategory === "individual" &&
+          !(!planCode || planCode === "individual_yearly" || planCode === "individual_monthly")) ||
+        (accountCategory === "district" &&
+          !(!planCode || planCode === "core" || planCode === "growth" || planCode === "enterprise")) ||
+        (accountCategory === "organization" &&
+          !(!planCode || planCode === "starter" || planCode === "scale" || planCode === "enterprise"))
+      ) {
+        return jsonResponse(400, { error: "Invalid plan for tenant account category." });
+      }
+      if (accountCategory === "individual" && (districtSlug || districtName)) {
+        return jsonResponse(400, { error: "Individual accounts cannot be assigned to a district." });
       }
 
       let districtId: string | null = null;
@@ -954,9 +1032,51 @@ serve(async (req) => {
         }
       }
 
+      let tenantPolicyResult = await adminClient
+        .from("tenant_policies")
+        .upsert(
+          {
+            tenant_id: data.id,
+            checkout_due_hours: 72,
+            account_category: accountCategory,
+            plan_code: planCode,
+            feature_flags: defaultFeatureFlags(),
+            updated_by: user.id,
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: "tenant_id" }
+        );
+
+      if (isMissingFeatureFlagsColumn(tenantPolicyResult.error as PgError)) {
+        tenantPolicyResult = await adminClient
+          .from("tenant_policies")
+          .upsert(
+            {
+              tenant_id: data.id,
+              checkout_due_hours: 72,
+              account_category: accountCategory,
+              plan_code: planCode,
+              updated_by: user.id,
+              updated_at: new Date().toISOString(),
+            },
+            { onConflict: "tenant_id" }
+          );
+      }
+
+      if (tenantPolicyResult.error) {
+        await adminClient.auth.admin.deleteUser(userId);
+        if (createdProfileId) {
+          await adminClient.from("profiles").delete().eq("id", createdProfileId);
+        }
+        await adminClient.from("tenants").delete().eq("id", data.id);
+        return jsonResponse(400, { error: "Unable to create tenant policy." });
+      }
+
       await writeAudit("create_tenant", "tenant", data.id, {
         tenant_name: data.name,
         status: data.status,
+        account_category: accountCategory,
+        plan_code: planCode,
         district_slug: districtSlug || null,
         tenant_admin_email: authEmail,
       });
@@ -978,6 +1098,10 @@ serve(async (req) => {
       const name = typeof next.name === "string" ? next.name.trim() : "";
       const accessCode =
         typeof next.access_code === "string" ? next.access_code.trim() : "";
+      const accountCategory = isValidTenantAccountCategory(next.account_category)
+        ? next.account_category
+        : "organization";
+      const planCode = isValidTenantPlanCode(next.plan_code) ? next.plan_code : null;
       const districtSlug =
         typeof next.district_slug === "string" ? normalizeDistrictSlug(next.district_slug) : "";
       const districtName =
@@ -990,6 +1114,19 @@ serve(async (req) => {
         return jsonResponse(400, {
           error: "District name and slug must both be provided when assigning a district.",
         });
+      }
+      if (
+        (accountCategory === "individual" &&
+          !(!planCode || planCode === "individual_yearly" || planCode === "individual_monthly")) ||
+        (accountCategory === "district" &&
+          !(!planCode || planCode === "core" || planCode === "growth" || planCode === "enterprise")) ||
+        (accountCategory === "organization" &&
+          !(!planCode || planCode === "starter" || planCode === "scale" || planCode === "enterprise"))
+      ) {
+        return jsonResponse(400, { error: "Invalid plan for tenant account category." });
+      }
+      if (accountCategory === "individual" && (districtSlug || districtName)) {
+        return jsonResponse(400, { error: "Individual accounts cannot be assigned to a district." });
       }
 
       let districtId: string | null = null;
@@ -1017,8 +1154,27 @@ serve(async (req) => {
         return jsonResponse(400, { error: "Unable to update tenant." });
       }
 
+      const { error: policyError } = await adminClient
+        .from("tenant_policies")
+        .upsert(
+          {
+            tenant_id: id,
+            account_category: accountCategory,
+            plan_code: planCode,
+            updated_by: user.id,
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: "tenant_id" }
+        );
+
+      if (policyError) {
+        return jsonResponse(400, { error: "Unable to update tenant plan details." });
+      }
+
       await writeAudit("update_tenant", "tenant", data.id, {
         tenant_name: data.name,
+        account_category: accountCategory,
+        plan_code: planCode,
         district_slug: districtSlug || null,
       });
 

@@ -12,10 +12,46 @@
           <span>Due window (hours)</span>
         </div>
         <div class="admin-summary-card">
+          <strong>{{ accountCategoryLabel }}</strong>
+          <span>Account category</span>
+        </div>
+        <div class="admin-summary-card">
+          <strong>{{ planLabel }}</strong>
+          <span>Plan</span>
+        </div>
+        <div class="admin-summary-card">
           <strong>{{ sessions.length }}</strong>
           <span>Active devices</span>
         </div>
       </div>
+    </div>
+
+    <div class="card admin-section-card">
+      <div class="admin-section-header">
+        <div>
+          <h2>Account Overview</h2>
+          <p class="admin-section-copy">Review how this workspace is classified for billing and support.</p>
+        </div>
+      </div>
+      <div class="admin-summary-grid">
+        <div class="admin-summary-card">
+          <strong>{{ accountCategoryLabel }}</strong>
+          <span>Workspace type</span>
+        </div>
+        <div class="admin-summary-card">
+          <strong>{{ planLabel }}</strong>
+          <span>Assigned plan</span>
+        </div>
+      </div>
+      <p class="muted">
+        {{
+          accountCategory === "individual"
+            ? "This account uses the root ItemTraxx workspace and is not attached to a district subdomain."
+            : accountCategory === "organization"
+              ? "Organization and district-linked accounts inherit their routing and billing context from tenant configuration."
+              : "Account plan metadata has not been configured for this tenant yet."
+        }}
+      </p>
     </div>
 
     <div class="card admin-section-card">
@@ -129,6 +165,17 @@ const isSaving = ref(false);
 const error = ref("");
 const success = ref("");
 const checkoutDueHours = ref(72);
+const accountCategory = ref<"organization" | "district" | "individual" | null>(null);
+const planCode = ref<
+  | "core"
+  | "growth"
+  | "starter"
+  | "scale"
+  | "enterprise"
+  | "individual_yearly"
+  | "individual_monthly"
+  | null
+>(null);
 const sessions = ref<TenantSessionItem[]>([]);
 const selectedSessionId = ref("");
 const isSessionSaving = ref(false);
@@ -153,7 +200,47 @@ const showToast = (title: string, message: string) => {
 
 const applySettings = (settings: TenantSettingsPayload) => {
   checkoutDueHours.value = settings.checkout_due_hours;
+  accountCategory.value =
+    settings.account_category === "individual"
+      ? "individual"
+      : settings.account_category === "district"
+        ? "district"
+      : settings.account_category === "organization"
+        ? "organization"
+        : null;
+  planCode.value = settings.plan_code ?? null;
 };
+
+const accountCategoryLabel = computed(() =>
+  accountCategory.value === "individual"
+    ? "Individual"
+    : accountCategory.value === "district"
+      ? "District"
+    : accountCategory.value === "organization"
+      ? "Organization"
+      : "Unavailable"
+);
+
+const planLabel = computed(() => {
+  switch (planCode.value) {
+    case "core":
+      return "Core";
+    case "growth":
+      return "Growth";
+    case "starter":
+      return "Starter";
+    case "scale":
+      return "Scale";
+    case "enterprise":
+      return "Enterprise";
+    case "individual_yearly":
+      return "Individual Yearly";
+    case "individual_monthly":
+      return "Individual Monthly";
+    default:
+      return "Unavailable";
+  }
+});
 
 const removableSessions = computed(() =>
   sessions.value.filter((session) => !session.is_current)

@@ -1,25 +1,36 @@
 <template>
   <div class="legal-page">
     <main class="legal-container">
+      <div class="page-nav-left legal-top-nav">
+        <RouterLink class="legal-back-link" to="/" aria-label="Return to home">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M15 5 8 12l7 7" />
+          </svg>
+        </RouterLink>
+        <span class="legal-breadcrumb"></span>
+      </div>
+
       <header class="legal-header">
         <h1>ItemTraxx Subscription Agreement and Policies</h1>
         <p>
-          Effective date: February 21, 2026. This document combines the ItemTraxx legal terms,
+          Effective date: March 21, 2026. This document combines the ItemTraxx legal terms,
           software license, privacy policy, and security guidelines into one official legal
           reference.
         </p>
         <p>
-          This Agreement is entered into between ItemTraxx Co, a California company, and the organization purchasing and using the service.
+          This Agreement is entered into between ItemTraxx Co, a California company, and the organization, 
+          district, team, or individual purchasing and using the service.
         </p>
         <p>
-          Last updated: Febuary 28, 2026. We may update this document from time to time. Continued use of the service after updates means you accept the revised terms.
+          Last updated: March 07, 2026. ItemTraxx may update this document from time to time. Continued use of 
+          the service after updates means you accept the revised terms.
         </p>
       </header>
 
       <section>
         <h2>1. Agreement and Scope</h2>
         <p>
-          By accessing or using ItemTraxx, you agree to this legal agreement and policy document.
+          By accessing, using ItemTraxx, you agree to this legal agreement and policy document.
           If you do not agree, do not use the service. ItemTraxx is provided for inventory and
           asset tracking workflows used by schools, businesses, and authorized organizations.
 
@@ -32,7 +43,7 @@
         <p>
           ItemTraxx provides tenant-based access to checkout/return workflows, administrative tools,
           audit logs, and related operational features. Access is permission-based and may be
-          created, suspended, or removed by ItemTraxx Co or an authorized administrator.
+          created, suspended, or removed by ItemTraxx Co or an authorized administrator at any time.
         </p>
       </section>
 
@@ -43,7 +54,7 @@
           <li>Provide accurate information and keep credentials confidential.</li>
           <li>Do not attempt unauthorized access or service disruption.</li>
           <li>Do not use ItemTraxx for illegal, abusive, or fraudulent activity.</li>
-          <li>ItemTraxx Co may suspend or terminate access for violations or misuse.</li>
+          <li>ItemTraxx Co may suspend or terminate access for violations of this agreement or misuse.</li>
         </ul>
       </section>
 
@@ -51,7 +62,7 @@
         <h2>4. License and Intellectual Property</h2>
         <p>
           ItemTraxx and all related source code, documentation, design, branding, and assets are
-          proprietary to ItemTraxx Co. You receive a limited right to use the software for its
+          proprietary to ItemTraxx Co. A California company. You receive a limited right to use the software for its
           intended purpose. You may not copy, modify, redistribute, reverse engineer, decompile,
           disassemble, sublicense, or commercially exploit the software without prior written
           approval from ItemTraxx Co.
@@ -61,7 +72,7 @@
       <section>
         <h2>5. Data Ownership and Processing</h2>
         <p>
-          You retain ownership of data your organization inputs into ItemTraxx. You grant ItemTraxx
+          You retain ownership of data your organization, district, school, team, individual inputs into ItemTraxx. You grant ItemTraxx
           Co permission to host, process, and secure that data as required to operate the service.
           We do not sell or rent personal information.
         </p>
@@ -74,12 +85,12 @@
         <h2>6. Privacy Policy</h2>
         <p>ItemTraxx may process the following categories of information:</p>
         <ul>
-          <li>Account information (organization, role, authentication-related data)</li>
-          <li>Usage and audit activity data</li>
-          <li>Device/browser technical information</li>
-          <li>Inventory and transaction records entered by authorized users</li>
+          <li>Account information (organization, school, district, team, role, authentication-related data)</li>
+          <li>Usage data and audit activity data</li>
+          <li>Device and browser and technical information</li>
+          <li>Inventory and transaction records</li>
         </ul>
-        <p>Data is used to provide and improve the service, secure accounts, and meet legal obligations.</p>
+        <p>Your data is used to provide and improve the service and secure accounts.</p>
         <p>
           Data is retained only as necessary for service operations, contractual requirements, and
           legal compliance. Certain backup and audit records may persist for limited operational
@@ -95,8 +106,8 @@
         </p>
         <p>
           If you discover a potential vulnerability, report it responsibly to
-          <a href="mailto:support@itemtraxx.com">support@itemtraxx.com</a> with reproduction steps.
-          Do not publicly disclose security issues before mitigation.
+          <a href="mailto:support@itemtraxx.com">support@itemtraxx.com</a> with reproduction steps and attachments (if available).
+          If you discover a potential vulnerability, you must never publicly disclose it without prior written coordination and written consent with ItemTraxx Co.
         </p>
         <p>
           Target response windows:
@@ -113,7 +124,7 @@
         <p>
           ItemTraxx is provided on an "as is" and "as available" basis. ItemTraxx Co does not
           guarantee uninterrupted, error-free, or always-available service, and does not guarantee
-          100% uptime.
+          100% uptime. Service availability may be affected by maintenance, updates, or unforeseen issues.
         </p>
         <p>
           To the fullest extent permitted by law, ItemTraxx Co disclaims warranties and is not
@@ -121,7 +132,9 @@
           inability to use the service.
         </p>
         <p>
-          The total liability of ItemTraxx Co arising out of or related to this Agreement shall not exceed the total fees paid by the customer to ItemTraxx Co during the twelve (12) months preceding the event giving rise to the claim.
+          The total liability of ItemTraxx Co arising out of or related to this Agreement shall not exceed 
+          the total fees paid by the customer to ItemTraxx Co during the twelve (12) months preceding the 
+          event giving rise to the claim.
         </p>
       </section>
 
@@ -145,25 +158,48 @@
             terms unless canceled before the renewal date under the applicable cancellation window.
           </li>
           <li>
-            <strong>Renewal cycle and payment terms:</strong> Plans renew annually. Unless
+            <strong>Renewal cycle and payment terms:</strong> Plans renew annually for School District and Organization plans. 
+            Individual plans are billed annually or monthly based on the plan selected by the customer at time of purchase. Unless
             otherwise agreed in writing, invoice payment terms are Net 15.
           </li>
           <li>
             <strong>Late payment:</strong> ItemTraxx Co may suspend or restrict service access for
-            overdue balances and may apply lawful late fees or collection costs where permitted. Suspension for non payment does not relieve the customer of payment obligations.
+            overdue balances and may apply lawful late fees or collection costs where permitted. 
+            Account suspension/disabling for non payment does not relieve the customer of payment obligations.
           </li>
           <li>
-            <strong>All plans cancellation policy:</strong> Cancellation stops renewal and no refund
-            is provided for unused time. Service remains active through the end of the current
-            billing cycle. After the final billing cycle ends, customer data is archived for one
-            (1) year, then permanently deleted from ItemTraxx systems.
+            <strong>Overdue balances:</strong> Invoices are due according to the payment terms
+            stated on the invoice. If payment is not received within the stated payment period, the
+            account may be considered overdue. ItemTraxx Co may send reminder notices and may
+            suspend or restrict service access for accounts with overdue balances until payment is
+            received.
+          </li>
+          <li>
+            <strong>Collections:</strong> If an account remains unpaid for an extended period,
+            ItemTraxx Co may pursue lawful collection of outstanding balances, including applicable
+            collection costs where permitted by law.
+          </li>
+          <li>
+            <strong>Cancellation:</strong> Customers may cancel their subscription by providing
+            written notice at least fifteen (15) days before the renewal date. Cancellation will take effect at the end of the
+            current subscription term billing cycle. Access to the service will continue until the end of the paid
+            subscription period billing cycle, after which access may be suspended or terminated. After the final
+            billing cycle ends, customer data is archived for one (1) year, then permanently deleted
+            from ItemTraxx systems. Cancellation requests must be submitted via contact support or
+            email to
+            <a href="mailto:support@itemtraxx.com">support@itemtraxx.com</a>.
+          </li>
+          <li>
+            <strong>No partial refunds:</strong> Because subscriptions provide access for a fixed
+            term, cancellations do not result in partial refunds for unused time unless required by
+            law or agreed in writing from ItemTraxx Co.
           </li>
           <li>
             <strong>Between-plan movement protocol:</strong> Plan upgrades are allowed at any time
             and billing is prorated for the remainder of the current billing cycle. Plan
-            downgrades are also allowed at any time; credit is issued for the unused portion of
-            the current billing cycle, and downgraded plan limits and restrictions take effect at
-            the start of the next billing cycle.
+            downgrades are also allowed at any time and restrictions of the new plan apply at the start 
+            of the next billing cycle; credit is issued for the unused portion of the current billing 
+            cycle, and downgraded plan limits and restrictions take effect at the start of the next billing cycle.
           </li>
         </ul>
       </section>
@@ -171,15 +207,12 @@
       <section>
         <h2>10. Restrictions, Enforcement, and Termination</h2>
         <p>
-          Violations of this policy may result in account restriction, tenant suspension, or
-          termination of service access. Upon termination, all license rights end immediately. 
-          Either party may terminate the subscription at the end of the applicable subscription 
+          Violations of this policy may result in account restriction, account suspension, or
+          account termination of service access. Upon termination, all license rights end immediately. 
+          Customers may terminate the subscription at the end of the applicable subscription 
           term in accordance with the agreed cancellation window. Upon termination, customer data
-          will be archived for one (1) year to allow export and records handling, after which it
-          will be permanently deleted in accordance with ItemTraxx Co data retention practices. To
-          export archived data, contact <a href="mailto:support@itemtraxx.com">support@itemtraxx.com</a>.
-
-
+          will be archived for one (1) year after which it will be permanently deleted in accordance 
+          with ItemTraxx Co data retention practices.
         </p>
       </section>
 
@@ -212,11 +245,11 @@
         <h2>14. Changes to This Document</h2>
         <p>
           ItemTraxx Co may revise this legal document from time to time. Continued use of the
-          service after updates means you accept the revised terms.
+          service after updates to this document means you accept the revised terms, except for material changes described below.
         </p>
         <p>
           For material changes that affect pricing, renewal terms, or core subscription rights,
-          ItemTraxx Co will provide at least thirty (30) days notice before such changes take
+          ItemTraxx Co will provide at least fourteen (14) days notice before such changes take
           effect for the next renewal term.
         </p>
       </section>
@@ -224,13 +257,17 @@
       <section>
         <h2>15. Contact</h2>
         <p>
-          Legal, privacy, and security inquiries:
+          For legal, privacy, and security inquiries, please contact:
           <a href="mailto:support@itemtraxx.com">support@itemtraxx.com</a>
         </p>
       </section>
     </main>
   </div>
 </template>
+
+<script setup lang="ts">
+import { RouterLink } from "vue-router";
+</script>
 
 <style scoped>
 .legal-page {
@@ -246,6 +283,47 @@
   border-radius: 16px;
   padding: 1.5rem;
   box-shadow: 0 12px 32px rgba(3, 10, 28, 0.14);
+}
+
+.legal-top-nav {
+  display: flex;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.legal-back-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--accent) 22%, var(--border));
+  background: color-mix(in srgb, var(--card) 78%, var(--surface) 22%);
+  color: var(--text);
+  transition:
+    transform 160ms ease,
+    border-color 160ms ease,
+    box-shadow 180ms ease,
+    background-color 180ms ease;
+}
+
+.legal-back-link svg {
+  width: 1.1rem;
+  height: 1.1rem;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.9;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.legal-back-link:hover,
+.legal-back-link:focus-visible {
+  transform: translateY(-1px);
+  border-color: color-mix(in srgb, var(--accent) 60%, transparent);
+  background: color-mix(in srgb, var(--accent) 16%, var(--card) 84%);
+  box-shadow: 0 10px 28px color-mix(in srgb, var(--accent) 18%, transparent);
 }
 
 .legal-header h1 {

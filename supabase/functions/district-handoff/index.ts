@@ -216,7 +216,16 @@ serve(async (req) => {
       }
 
       if (!districtSlug) {
-        return jsonResponse(404, { error: "District not found" }, headers);
+        return jsonResponse(
+          200,
+          {
+            code: null,
+            district_slug: null,
+            role,
+            root_only: true,
+          },
+          headers
+        );
       }
 
       const code = randomCode();

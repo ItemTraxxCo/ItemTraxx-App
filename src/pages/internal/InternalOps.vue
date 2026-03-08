@@ -332,6 +332,13 @@ const viewFlags = ref<ViewFlags>({ ...DEFAULT_VIEW_FLAGS });
 let pollTimer: number | null = null;
 let toastTimer: number | null = null;
 
+const stopPolling = () => {
+  if (pollTimer !== null) {
+    window.clearInterval(pollTimer);
+    pollTimer = null;
+  }
+};
+
 const showToast = (title: string, message: string) => {
   toastTitle.value = title;
   toastMessage.value = message;
@@ -556,10 +563,22 @@ const saveCurrentPreset = () => {
 };
 
 const startPolling = () => {
-  if (pollTimer !== null) window.clearInterval(pollTimer);
+  if (document.visibilityState === "hidden") return;
+  stopPolling();
   pollTimer = window.setInterval(() => {
-    void loadSnapshot();
-  }, 15000);
+    if (document.visibilityState === "visible") {
+      void loadSnapshot();
+    }
+  }, 15_000);
+};
+
+const handleVisibilityChange = () => {
+  if (document.visibilityState === "hidden") {
+    stopPolling();
+    return;
+  }
+  void loadSnapshot();
+  startPolling();
 };
 
 onMounted(async () => {
@@ -567,10 +586,12 @@ onMounted(async () => {
   applyPreset("default");
   await loadSnapshot();
   startPolling();
+  document.addEventListener("visibilitychange", handleVisibilityChange);
 });
 
 onUnmounted(() => {
-  if (pollTimer !== null) window.clearInterval(pollTimer);
+  stopPolling();
+  document.removeEventListener("visibilitychange", handleVisibilityChange);
   if (toastTimer !== null) window.clearTimeout(toastTimer);
 });
 </script>

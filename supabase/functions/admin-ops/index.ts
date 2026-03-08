@@ -373,20 +373,37 @@ serve(async (req) => {
 
     let checkoutDueHours = 72;
     let featureFlags = defaultFeatureFlags();
-    const tenantPolicyResult = await adminClient
+    let tenantPolicyResult = await adminClient
       .from("tenant_policies")
-      .select("checkout_due_hours, feature_flags")
+      .select("checkout_due_hours, account_category, plan_code, feature_flags")
       .eq("tenant_id", tenantId)
       .maybeSingle();
 
-    if (!tenantPolicyResult.error && tenantPolicyResult.data) {
-      if (typeof tenantPolicyResult.data.checkout_due_hours === "number") {
+    if (isMissingColumn(tenantPolicyResult.error, "feature_flags")) {
+      const fallbackTenantPolicyResult = await adminClient
+        .from("tenant_policies")
+        .select("checkout_due_hours, account_category, plan_code")
+        .eq("tenant_id", tenantId)
+        .maybeSingle();
+
+      tenantPolicyResult = {
+        data: fallbackTenantPolicyResult.data
+          ? { ...fallbackTenantPolicyResult.data, feature_flags: null }
+          : null,
+        error: fallbackTenantPolicyResult.error,
+      };
+    }
+
+    const tenantPolicy = tenantPolicyResult.data;
+
+    if (!tenantPolicyResult.error && tenantPolicy) {
+      if (typeof tenantPolicy.checkout_due_hours === "number") {
         checkoutDueHours = Math.min(
           720,
-          Math.max(1, Math.round(tenantPolicyResult.data.checkout_due_hours))
+          Math.max(1, Math.round(tenantPolicy.checkout_due_hours))
         );
       }
-      featureFlags = normalizeFeatureFlags(tenantPolicyResult.data.feature_flags);
+      featureFlags = normalizeFeatureFlags(tenantPolicy.feature_flags);
     }
 
     let tenantUpdates: RuntimeUpdateItem[] = [];
@@ -480,6 +497,15 @@ serve(async (req) => {
       return jsonResponse(200, {
         data: {
           checkout_due_hours: checkoutDueHours,
+          account_category:
+            tenantPolicy?.account_category === "individual"
+              ? "individual"
+              : tenantPolicy?.account_category === "district"
+                ? "district"
+                : tenantPolicy?.account_category === "organization"
+                  ? "organization"
+                  : null,
+          plan_code: tenantPolicy?.plan_code ?? null,
           feature_flags: featureFlags,
         },
       });
@@ -511,11 +537,28 @@ serve(async (req) => {
         updated_at: new Date().toISOString(),
       };
 
-      const { data, error } = await adminClient
+      let settingsResult = await adminClient
         .from("tenant_policies")
         .upsert(row, { onConflict: "tenant_id" })
-        .select("checkout_due_hours, feature_flags")
+        .select("checkout_due_hours, account_category, plan_code, feature_flags")
         .single();
+
+      if (isMissingColumn(settingsResult.error, "feature_flags")) {
+        const fallbackSettingsResult = await adminClient
+          .from("tenant_policies")
+          .upsert(row, { onConflict: "tenant_id" })
+          .select("checkout_due_hours, account_category, plan_code")
+          .single();
+
+        settingsResult = {
+          data: fallbackSettingsResult.data
+            ? { ...fallbackSettingsResult.data, feature_flags: null }
+            : null,
+          error: fallbackSettingsResult.error,
+        };
+      }
+
+      const { data, error } = settingsResult;
 
       if (error || !data) {
         return jsonResponse(400, { error: "Unable to save tenant settings." });
@@ -527,6 +570,15 @@ serve(async (req) => {
             typeof data.checkout_due_hours === "number"
               ? data.checkout_due_hours
               : checkoutDueHoursNext,
+          account_category:
+            data.account_category === "individual"
+              ? "individual"
+              : data.account_category === "district"
+                ? "district"
+                : data.account_category === "organization"
+                  ? "organization"
+                  : null,
+          plan_code: data.plan_code ?? null,
           feature_flags: normalizeFeatureFlags(data.feature_flags),
         },
       });

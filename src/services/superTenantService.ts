@@ -14,6 +14,16 @@ export type SuperTenant = {
   primary_admin_profile_id?: string | null;
   primary_admin_email?: string | null;
   checkout_due_hours?: number;
+  account_category?: "organization" | "district" | "individual";
+  plan_code?:
+    | "core"
+    | "growth"
+    | "starter"
+    | "scale"
+    | "enterprise"
+    | "individual_yearly"
+    | "individual_monthly"
+    | null;
   feature_flags?: {
     enable_notifications?: boolean;
     enable_bulk_item_import?: boolean;
@@ -104,6 +114,47 @@ type SuperTenantRequest = {
 
 const getAccessToken = getFreshAccessToken;
 
+const OPTION_CACHE_TTL_MS = 30_000;
+const optionCache = new Map<string, { expiresAt: number; value: unknown }>();
+const optionInflight = new Map<string, Promise<unknown>>();
+
+const withCachedOptions = async <TData>(key: string, loader: () => Promise<TData>) => {
+  const cached = optionCache.get(key);
+  if (cached && cached.expiresAt > Date.now()) {
+    return cached.value as TData;
+  }
+
+  const pending = optionInflight.get(key);
+  if (pending) {
+    return pending as Promise<TData>;
+  }
+
+  const next = loader()
+    .then((value) => {
+      optionCache.set(key, { expiresAt: Date.now() + OPTION_CACHE_TTL_MS, value });
+      return value;
+    })
+    .finally(() => {
+      optionInflight.delete(key);
+    });
+
+  optionInflight.set(key, next as Promise<unknown>);
+  return next;
+};
+
+const invalidateOptionCaches = (...prefixes: string[]) => {
+  for (const key of Array.from(optionCache.keys())) {
+    if (prefixes.some((prefix) => key.startsWith(prefix))) {
+      optionCache.delete(key);
+    }
+  }
+  for (const key of Array.from(optionInflight.keys())) {
+    if (prefixes.some((prefix) => key.startsWith(prefix))) {
+      optionInflight.delete(key);
+    }
+  }
+};
+
 const callSuperTenant = async <TData>(payload: SuperTenantRequest) => {
   const accessToken = await getAccessToken();
   const result = await invokeEdgeFunction<EdgeEnvelope<TData>, SuperTenantRequest>(
@@ -128,11 +179,21 @@ export const toTenantStatusLabel = (status: SuperTenant["status"]) =>
 export const fromTenantStatusLabel = (label: "active" | "disabled" | "archived") =>
   label === "disabled" ? "suspended" : label;
 
-export const listTenants = async (search = "", status = "all") =>
-  callSuperTenant<SuperTenant[]>({
-    action: "list_tenants",
-    payload: { search, status },
-  });
+export const listTenants = async (search = "", status = "all") => {
+  const normalizedSearch = search.trim();
+  const cacheKey = `tenants:${status}:${normalizedSearch.toLowerCase()}`;
+  const loader = () =>
+    callSuperTenant<SuperTenant[]>({
+      action: "list_tenants",
+      payload: { search: normalizedSearch, status },
+    });
+
+  if (!normalizedSearch && status === "all") {
+    return withCachedOptions(cacheKey, loader);
+  }
+
+  return loader();
+};
 
 export const createTenant = async (payload: {
   name: string;
@@ -140,24 +201,48 @@ export const createTenant = async (payload: {
   auth_email: string;
   password: string;
   status: "active" | "suspended" | "archived";
+  account_category?: "organization" | "district" | "individual";
+  plan_code?:
+    | "core"
+    | "growth"
+    | "starter"
+    | "scale"
+    | "enterprise"
+    | "individual_yearly"
+    | "individual_monthly";
   district_name?: string;
   district_slug?: string;
 }) =>
   callSuperTenant<SuperTenant>({
     action: "create_tenant",
     payload,
+  }).then((value) => {
+    invalidateOptionCaches("tenants:");
+    return value;
   });
 
 export const updateTenant = async (payload: {
   id: string;
   name: string;
   access_code: string;
+  account_category?: "organization" | "district" | "individual";
+  plan_code?:
+    | "core"
+    | "growth"
+    | "starter"
+    | "scale"
+    | "enterprise"
+    | "individual_yearly"
+    | "individual_monthly";
   district_name?: string;
   district_slug?: string;
 }) =>
   callSuperTenant<SuperTenant>({
     action: "update_tenant",
     payload,
+  }).then((value) => {
+    invalidateOptionCaches("tenants:");
+    return value;
   });
 
 export const setTenantStatus = async (payload: {
@@ -169,6 +254,9 @@ export const setTenantStatus = async (payload: {
   callSuperTenant<SuperTenant>({
     action: "set_tenant_status",
     payload,
+  }).then((value) => {
+    invalidateOptionCaches("tenants:");
+    return value;
   });
 
 export const sendPrimaryAdminReset = async (payload: { tenant_id: string }) =>
@@ -186,11 +274,21 @@ export const setPrimaryAdmin = async (payload: {
     payload,
   });
 
-export const listDistricts = async (search = "") =>
-  callSuperTenant<SuperDistrict[]>({
-    action: "list_districts",
-    payload: { search },
-  });
+export const listDistricts = async (search = "") => {
+  const normalizedSearch = search.trim();
+  const cacheKey = `districts:${normalizedSearch.toLowerCase()}`;
+  const loader = () =>
+    callSuperTenant<SuperDistrict[]>({
+      action: "list_districts",
+      payload: { search: normalizedSearch },
+    });
+
+  if (!normalizedSearch) {
+    return withCachedOptions(cacheKey, loader);
+  }
+
+  return loader();
+};
 
 export const createDistrict = async (payload: {
   name: string;
@@ -206,6 +304,9 @@ export const createDistrict = async (payload: {
   callSuperTenant<SuperDistrict>({
     action: "create_district",
     payload,
+  }).then((value) => {
+    invalidateOptionCaches("districts:", "tenants:");
+    return value;
   });
 
 export const updateDistrict = async (payload: {
@@ -224,6 +325,9 @@ export const updateDistrict = async (payload: {
   callSuperTenant<SuperDistrict>({
     action: "update_district",
     payload,
+  }).then((value) => {
+    invalidateOptionCaches("districts:", "tenants:");
+    return value;
   });
 
 export const getDistrictDetails = async (districtId: string) =>

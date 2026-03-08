@@ -16,9 +16,11 @@
 
       <section class="pricing-hero">
         <p class="pricing-eyebrow">Pricing</p>
-        <h1>Simple annual pricing for teams of any size.</h1>
+        <h1>Simple pricing for teams of any size.</h1>
         <p class="pricing-lead">
-          Annual subscriptions by district size. All plans are subject to onboarding fees in year one.
+          Clear plan options for districts, organizations, and individual plans. Contact sales 
+          for custom quotes, multi-district pricing, or any questions about which plan is right
+            for you.
         </p>
         <div class="pricing-actions">
           <RouterLink class="pricing-contact-button" to="/contact-sales">
@@ -30,57 +32,170 @@
         </div>
       </section>
 
-      <section class="plan-grid" aria-label="Pricing plans">
-        <article class="plan-card">
-          <h2>ItemTraxx Core Plan</h2>
-          <p class="price">$1,250.00<span>/year</span></p>
-          <p class="price-note">Listed price excludes the 1st year onboarding fee.</p>
-          <ul>
-            <li>Up to 3 schools within the district</li>
-            <li>Unlimited staff accounts</li>
-            <li>Item tracking and status visibility</li>
-            <li>Checkout and return system</li>
-            <li>Standard support (72-hour response time)</li>
-          </ul>
-          <p class="onboarding">+1st Year Onboarding Fee: $750.00</p>
-        </article>
-
-        <article class="plan-card plan-highlight">
-          <h2>ItemTraxx Growth Plan</h2>
-          <p class="price">$3,500.00<span>/year</span></p>
-          <p class="price-note">Listed price excludes the 1st year onboarding fee.</p>
-          <ul>
-            <li>Up to 6 schools within the district</li>
-            <li>Unlimited staff accounts</li>
-            <li>Item tracking and status visibility</li>
-            <li>Checkout and return system</li>
-            <li>Standard support (72-hour response time)</li>
-          </ul>
-          <p class="onboarding">+1st Year Onboarding Fee: $1,250.00</p>
-        </article>
-
-        <article class="plan-card">
-          <h2>ItemTraxx Enterprise Plan</h2>
-          <p class="price">Contact for pricing</p>
-          <p class="starting">Starts at $4,500.00 (excluding 1st year fees)</p>
-          <ul>
-            <li>Base coverage for first 7 schools within the district</li>
-            <li>Unlimited staff accounts</li>
-            <li>Item tracking and status visibility</li>
-            <li>Checkout and return system</li>
-            <li>Priority support (24-hour response time)</li>
-          </ul>
-          <p class="onboarding">+1st Year Onboarding Fee: Contact for pricing (starts at $1,500.00)</p>
-          <p class="enterprise-note">
-            For full enterprise pricing (quote for more than 7 schools) and multi-district scope, use the contact sales button above.
+      <section class="pricing-section">
+        <div class="pricing-section-header">
+          <p class="pricing-section-eyebrow">District category</p>
+          <h2>District Pricing</h2>
+          <p>
+            Annual subscription pricing is based on the
+            number of schools in the district, with onboarding billed separately in year one (1) only.
           </p>
-        </article>
+        </div>
+
+        <section class="plan-grid" aria-label="District pricing plans">
+          <article class="plan-card">
+            <h3>ItemTraxx Core Plan</h3>
+            <p class="plan-meta">1-3 schools in district</p>
+            <p class="price">$1,250.00<span>/year</span></p>
+            <p class="price-note">Listed price excludes the 1st year onboarding fee.</p>
+            <ul>
+              <li>Up to 3 schools within the district</li>
+              <li>Unlimited staff accounts</li>
+              <li>Item tracking and status visibility</li>
+              <li>Checkout and return system</li>
+              <li>Standard support (72-hour response time)</li>
+            </ul>
+            <p class="onboarding">+1st Year Onboarding Fee: $750.00</p>
+          </article>
+
+          <article class="plan-card plan-highlight">
+            <h3>ItemTraxx Growth Plan</h3>
+            <p class="plan-meta">4-6 schools in district</p>
+            <p class="price">$3,500.00<span>/year</span></p>
+            <p class="price-note">Listed price excludes the 1st year onboarding fee.</p>
+            <ul>
+              <li>Up to 6 schools within the district</li>
+              <li>Unlimited staff accounts</li>
+              <li>Item tracking and status visibility</li>
+              <li>Checkout and return system</li>
+              <li>Standard support (72-hour response time)</li>
+            </ul>
+            <p class="onboarding">+1st Year Onboarding Fee: $1,250.00</p>
+          </article>
+
+          <article class="plan-card">
+            <h3>ItemTraxx Enterprise Plan</h3>
+            <p class="plan-meta">7+ schools in district</p>
+            <p class="price">Contact for pricing</p>
+            <p class="starting">Formula = $4,500 + (# of schools − 7) × $900 / year</p>
+            <ul>
+              <li>Base coverage for the first 7 schools within the district</li>
+              <li>Unlimited staff accounts</li>
+              <li>Item tracking and status visibility</li>
+              <li>Checkout and return system</li>
+              <li>Priority support (24-hour response time)</li>
+            </ul>
+            <p class="onboarding">
+              +1st Year Onboarding Fee: Contact for pricing ( Starts at $1,500.00)
+            </p>
+            <p class="enterprise-note">
+              For full enterprise pricing (quote for more than 7 schools) and multi-district scope,
+              use the contact sales button above.
+            </p>
+          </article>
+        </section>
       </section>
+
+      <section class="pricing-section">
+        <div class="pricing-section-header">
+          <p class="pricing-section-eyebrow">Organization category</p>
+          <h2>Organization Pricing</h2>
+          <p>
+            For non-school district teams, pricing is based on the number of locations or operating units.
+            Onboarding is billed seperatly in year one (1) only.
+          </p>
+        </div>
+
+        <section class="plan-grid" aria-label="Organization pricing plans">
+          <article class="plan-card">
+            <h3>Starter</h3>
+            <p class="plan-meta">1-3 locations or teams</p>
+            <p class="price">$1,250.00<span>/year</span></p>
+            <ul>
+              <li>Designed for smaller organizations and single-site operations</li>
+              <li>Checkout and return workflows for shared inventory</li>
+              <li>Staff access and core reporting</li>
+            </ul>
+            <p class="onboarding">Onboarding Fee: $500.00 / year</p>
+          </article>
+
+          <article class="plan-card plan-highlight">
+            <h3>Scale</h3>
+            <p class="plan-meta">4-7 locations or teams</p>
+            <p class="price">$3,500.00<span>/year</span></p>
+            <ul>
+              <li>Built for growing organizations with multiple operating units</li>
+              <li>District-style control across locations and teams</li>
+              <li>Expanded setup and support coverage</li>
+            </ul>
+            <p class="onboarding">Onboarding Fee: $1,000.00 / year</p>
+          </article>
+
+          <article class="plan-card">
+            <h3>Enterprise</h3>
+            <p class="plan-meta">7+ locations or teams</p>
+            <p class="price">Contact for pricing</p>
+            <p class="starting">Formula = $4,500 + (# of units − 7) × $900 / year</p>
+            <ul>
+              <li>For large multi-site organizations with custom rollout needs</li>
+              <li>Priority operational support and enterprise coordination</li>
+              <li>Units = max # of locations or teams</li>
+            </ul>
+            <p class="onboarding">
+              +1st Year Onboarding Fee: Contact for pricing (starts at $500.00)
+            </p>
+            <p class="enterprise-note">
+              For full enterprise pricing (quote for more than 7 locations or teams), use the
+              contact sales button above.
+            </p>
+          </article>
+        </section>
+      </section>
+
+      <section class="pricing-section">
+        <div class="pricing-section-header">
+          <p class="pricing-section-eyebrow">Individual category</p>
+          <h2>Individual Pricing</h2>
+          <p>
+            For single operators who need ItemTraxx without an organization or district structure.
+          </p>
+        </div>
+
+        <section class="plan-grid plan-grid-two" aria-label="Individual pricing plans">
+          <article class="plan-card">
+            <h3>Individual Yearly</h3>
+            <p class="plan-meta">Single-user plan</p>
+            <p class="price">$70.00<span>/year</span></p>
+            <ul>
+              <li>Single-user access on the main ItemTraxx app</li>
+              <li>Simple personal inventory tracking workflow</li>
+              <li>Invoice-based billing</li>
+            </ul>
+            <p class="onboarding">Onboarding not available</p>
+          </article>
+
+          <article class="plan-card">
+            <h3>Individual Monthly</h3>
+            <p class="plan-meta">Single-user plan</p>
+            <p class="price">$7.00<span>/month</span></p>
+            <ul>
+              <li>Month-to-month version of the individual plan</li>
+              <li>Single-user access on the main ItemTraxx app</li>
+              <li>Invoice-based billing</li>
+            </ul>
+            <p class="onboarding">Onboarding not available</p>
+          </article>
+        </section>
+      </section>
+
+      <div class="pricing-section-divider" aria-hidden="true">
+        <span></span>
+      </div>
 
       <section class="billing-card">
         <h2>Pricing FAQ</h2>
         <ul>
-          <li><strong>Are plans annual or monthly?</strong> All plans are annual subscriptions.</li>
+          <li><strong>Are plans annual or monthly?</strong> District and organization plans are annual. Individual plans are available annually or monthly.</li>
           <li><strong>When is onboarding charged?</strong> Onboarding is a one-time fee in year one only.</li>
           <li><strong>Can we move between plans?</strong> Yes. Upgrades are prorated; downgrades apply next billing cycle.</li>
           <li><strong>How do we request a formal quote?</strong> Use the Contact Sales button above and we will provide an official quote.</li>
@@ -91,20 +206,44 @@
         <h2>What Onboarding Includes</h2>
         <ul class="onboarding-includes-list">
           <li>
-            <strong>Core and Growth Plans:</strong>
+            <strong>District Core and Growth Plans:</strong>
             The onboarding fee is a one-time charge during year one and includes hassle-free
             addition of items and students (you provide inventory and existing records, and we
-            complete setup for you), a custom onboarding call (1-2 hours) covering product
+            complete setup for you), a custom onboarding call covering product
             features, account setup (logins), and live Q&A/help, plus a dedicated Slack support
-            channel during the first 3 months of use with a 24-hour response SLA.
+            channel during the first three (3) months of use with a 24-hour response SLA for the first
+            three (3) months of use, after that moves to 72-hour response SLA.
           </li>
           <li class="enterprise-onboarding-row">
-            <strong>Enterprise Plan:</strong>
+            <strong>District Enterprise Plan:</strong>
             The onboarding fee is a one-time charge during year one and includes hassle-free
             addition of items and students (you provide inventory and existing records, and we
-            complete setup for you), a custom onboarding call (1-2 hours) covering product
+            complete setup for you), a custom onboarding call covering product
             features, account setup (logins), and live Q&A/help, plus a dedicated Slack support
             channel with a 24-hour response SLA active throughout the full subscription term.
+          </li>
+          <li class="enterprise-onboarding-row">
+            <strong>Organization Starter and Scale Plans:</strong>
+            The onboarding fee is a one-time charge during year one and includes hassle-free
+            addition of items and members (you provide inventory and existing records, and we
+            complete setup for you), a custom onboarding call covering product
+            features, account setup (logins), and live Q&A/help, plus a dedicated Slack support
+            channel during the first three (3) months of use with a 24-hour response SLA for the first
+            three (3) months of use, after that moves to 72-hour response SLA.
+          </li>
+          <li class="enterprise-onboarding-row">
+            <strong>Organization Enterprise Plan:</strong>
+            The onboarding fee is a one-time charge during year one and includes hassle-free
+            addition of items and members (you provide inventory and existing records, and we
+            complete setup for you), a custom onboarding call covering product
+            features, account setup (logins), and live Q&A/help, plus a dedicated Slack support
+            channel with a 24-hour response SLA active throughout the full subscription term.
+          </li>
+          <li class="enterprise-onboarding-row">
+            <strong>Individual Plans:</strong>
+            Onboarding is not available for Individual Yearly or Individual Monthly plans. Individual
+            Yeary and Individual Monthly plans have regular access to our support team via email with a 
+            72-hour response SLA.
           </li>
         </ul>
       </section>
@@ -112,9 +251,9 @@
       <section class="billing-card">
         <h2>Billing Terms</h2>
         <ul>
-          <li>All plans are billed annually.</li>
+          <li>District and organization plans are billed annually. Individual plans are available annually or monthly.</li>
           <li>Applicable taxes and government fees are not included in listed pricing.</li>
-          <li>Onboarding fee applies only to year one (1) of subscription and is required.</li>
+          <li>Onboarding fee applies only to year one (1) of District and Organization subscription plans and is required.</li>
           <li>Renewal terms and final scope are confirmed in the signed agreement.</li>
           <li>
             Full subscription policies:
@@ -325,6 +464,38 @@ import { RouterLink } from "vue-router";
     0 16px 32px rgba(25, 194, 168, 0.14);
 }
 
+.pricing-section {
+  margin-top: 1.75rem;
+}
+
+.pricing-section-header {
+  max-width: 52rem;
+  margin-bottom: 1rem;
+}
+
+.pricing-section-eyebrow {
+  margin: 0 0 0.45rem;
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: rgba(214, 237, 233, 0.68);
+}
+
+.pricing-section-header h2 {
+  margin: 0;
+  font-size: clamp(1.8rem, 2.8vw, 2.4rem);
+  line-height: 1.05;
+  letter-spacing: -0.04em;
+  color: #f7fbff;
+}
+
+.pricing-section-header p {
+  margin: 0.8rem 0 0;
+  line-height: 1.7;
+  color: rgba(222, 229, 238, 0.74);
+}
+
 .plan-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -346,6 +517,21 @@ import { RouterLink } from "vue-router";
   margin: 0;
   font-size: 1.2rem;
   color: #f5f7fb;
+}
+
+.plan-card h3 {
+  margin: 0;
+  font-size: 1.2rem;
+  color: #f5f7fb;
+}
+
+.plan-meta {
+  margin: 0.4rem 0 0;
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(137, 239, 225, 0.78);
 }
 
 .price {
@@ -424,6 +610,27 @@ import { RouterLink } from "vue-router";
   box-shadow: 0 18px 44px rgba(0, 0, 0, 0.22);
 }
 
+.pricing-section-divider {
+  margin-top: 2rem;
+  display: flex;
+  justify-content: center;
+}
+
+.pricing-section-divider span {
+  width: min(220px, 32vw);
+  height: 1px;
+  border-radius: 999px;
+  background: linear-gradient(
+    90deg,
+    rgba(25, 194, 168, 0) 0%,
+    rgba(25, 194, 168, 0.55) 20%,
+    rgba(68, 111, 207, 0.62) 50%,
+    rgba(25, 194, 168, 0.55) 80%,
+    rgba(25, 194, 168, 0) 100%
+  );
+  box-shadow: 0 0 28px rgba(25, 194, 168, 0.12);
+}
+
 .billing-card h2 {
   margin-top: 0;
   color: #f5f7fb;
@@ -470,6 +677,16 @@ import { RouterLink } from "vue-router";
   }
 
   .plan-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.plan-grid-two {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+@media (max-width: 980px) {
+  .plan-grid-two {
     grid-template-columns: 1fr;
   }
 }

@@ -557,7 +557,12 @@ export const createDistrictAdminSessionHandoff = async (
   password: string
 ) => {
   const result = await invokeEdgeFunction<
-    { code?: string; district_slug?: string; role?: "tenant_admin" | "district_admin" },
+    {
+      code?: string | null;
+      district_slug?: string | null;
+      role?: "tenant_admin" | "district_admin";
+      root_only?: boolean;
+    },
     { action: "create_admin"; email: string; password: string }
   >(getDistrictHandoffFunctionName(), {
     method: "POST",
@@ -567,6 +572,15 @@ export const createDistrictAdminSessionHandoff = async (
       password,
     },
   });
+
+  if (result.ok && result.data?.root_only) {
+    return {
+      code: null,
+      districtSlug: null,
+      role: result.data.role ?? "tenant_admin",
+      rootOnly: true,
+    };
+  }
 
   if (!result.ok || !result.data?.code || !result.data?.district_slug || !result.data?.role) {
     if (!result.ok && result.error === "Tenant disabled") {
@@ -588,6 +602,7 @@ export const createDistrictAdminSessionHandoff = async (
     code: result.data.code,
     districtSlug: result.data.district_slug,
     role: result.data.role,
+    rootOnly: false,
   };
 };
 

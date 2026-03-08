@@ -288,7 +288,10 @@ serve(async (req) => {
 
       if (error || !data) {
         const message = (error?.message ?? "").toLowerCase();
-        if (error?.code === "42703" && message.includes("feature_flags")) {
+        if (
+          error?.code === "42703" &&
+          (message.includes("feature_flags") || message.includes("account_category") || message.includes("plan_code"))
+        ) {
           const { data: fallbackData, error: fallbackError } = await adminClient
             .from("tenant_policies")
             .upsert(

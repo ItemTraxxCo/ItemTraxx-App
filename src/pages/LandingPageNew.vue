@@ -28,14 +28,14 @@
     <main id="landing-new-main" class="shell landing-main">
       <section class="hero-grid reveal">
         <div class="hero-copy">
-          <p class="eyebrow">Closed beta now live | Individual plans coming soon</p>
+          <p class="eyebrow">Closed beta now live | Individual plans now available</p>
           <h1>ItemTraxx</h1>
           <p class="hero-body">
             Losing track of where stuff goes? ItemTraxx is the right service for you.
           </p>
           <p class="hero-support">
             Contact us to get early access and start mastering your inventory with ItemTraxx's
-            streamlined checkout, returns, and admin management.
+            streamlined checkout, returns, and admin management. Regular subscription terms apply.
           </p>
           <div class="hero-actions">
             <RouterLink class="cta-primary" to="/pricing" @click="trackCta('pricing', 'hero')">Pricing</RouterLink>
@@ -143,7 +143,7 @@
           <p class="eyebrow">Fit</p>
           <h3>Built for teams and organizations of any size.</h3>
           <p>
-            The product is flexible and scalable, making it a fit for schools, smaller teams, and
+            ItemTraxx is flexible and scalable, making it a fit for schools, smaller teams, and
             larger organizations that need cleaner inventory operations.
           </p>
         </article>
@@ -418,7 +418,7 @@ onBeforeUnmount(() => {
 .landing-new {
   position: relative;
   min-height: 100vh;
-  margin: -2.5rem -2rem -3rem;
+  margin: 0;
   padding: 1.35rem 0 4rem;
   overflow: hidden;
   color: #f5f7fb;
@@ -501,11 +501,12 @@ onBeforeUnmount(() => {
 
 .brand-mark {
   font-family: Helvetica, "Helvetica Neue", Arial, sans-serif;
-  font-size: 1.8rem;
+  font-size: 1.4rem;
   font-weight: 700;
-  letter-spacing: -0.05em;
+  letter-spacing: -0.03em;
   color: #f6f7fb;
   text-decoration: none;
+  white-space: nowrap;
 }
 
 .landing-nav {
@@ -539,6 +540,7 @@ onBeforeUnmount(() => {
   gap: 0.55rem;
   background: rgba(255, 255, 255, 0.05);
   border: 1px solid rgba(255, 255, 255, 0.08);
+  white-space: nowrap;
 }
 
 .nav-cta,
@@ -932,21 +934,60 @@ onBeforeUnmount(() => {
 }
 
 @media (max-width: 720px) {
-  .landing-new {
-    margin: -2.5rem -1rem -3rem;
-  }
-
   .shell {
     width: min(100%, calc(100% - 1.5rem));
   }
 
   .landing-header {
-    align-items: flex-start;
-    flex-direction: column;
+    align-items: center;
+    flex-direction: row;
+    gap: 0.7rem;
+    padding: 0.35rem 0 1.25rem;
   }
 
   .landing-nav {
-    width: 100%;
+    flex: 1;
+    justify-content: flex-end;
+    flex-wrap: nowrap;
+    gap: 0.5rem;
+    min-width: 0;
+    overflow-x: auto;
+    scrollbar-width: none;
+    padding-left: 0.15rem;
+  }
+
+  .landing-nav::-webkit-scrollbar {
+    display: none;
+  }
+
+  .brand-mark {
+    font-size: 1.15rem;
+    flex-shrink: 0;
+  }
+
+  .landing-nav a,
+  .status-pill,
+  .nav-cta {
+    font-size: 0.74rem;
+  }
+
+  .status-pill,
+  .nav-cta,
+  .cta-secondary,
+  .cta-primary {
+    min-height: 1.7rem;
+    padding: 0.26rem 0.58rem;
+    border-radius: 999px;
+  }
+
+  .status-pill {
+    gap: 0.38rem;
+    padding-inline: 0.52rem 0.62rem;
+  }
+
+  .status-dot {
+    width: 0.45rem;
+    height: 0.45rem;
   }
 
   .landing-footer {

@@ -9,10 +9,20 @@
           </div>
           <div class="muted">Signed in as {{ adminEmail }}</div>
         </div>
-        <h1>Admin Panel</h1>
+      <h1>Admin Panel</h1>
         <p class="admin-hero-copy">
           Manage inventory, students, returns, reporting, and tenant controls from one workspace.
         </p>
+        <div class="admin-summary-grid">
+          <div class="admin-summary-card">
+            <strong>{{ accountCategoryLabel }}</strong>
+            <span>Account category</span>
+          </div>
+          <div class="admin-summary-card">
+            <strong>{{ planLabel }}</strong>
+            <span>Plan</span>
+          </div>
+        </div>
       </div>
 
     <div class="admin-grid">
@@ -61,7 +71,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive } from "vue";
+import { computed, onMounted, reactive, ref } from "vue";
 import { RouterLink, useRouter } from "vue-router";
 import {
   clearAdminVerification,
@@ -80,8 +90,48 @@ const featureFlags = reactive({
   enable_status_tracking: true,
   enable_barcode_generator: true,
 });
+const accountCategory = ref<"organization" | "district" | "individual" | null>(null);
+const planCode = ref<
+  | "core"
+  | "growth"
+  | "starter"
+  | "scale"
+  | "enterprise"
+  | "individual_yearly"
+  | "individual_monthly"
+  | null
+>(null);
 
 const router = useRouter();
+const accountCategoryLabel = computed(() =>
+  accountCategory.value === "individual"
+    ? "Individual"
+    : accountCategory.value === "district"
+      ? "District"
+    : accountCategory.value === "organization"
+      ? "Organization"
+      : "Unavailable"
+);
+const planLabel = computed(() => {
+  switch (planCode.value) {
+    case "core":
+      return "Core";
+    case "growth":
+      return "Growth";
+    case "starter":
+      return "Starter";
+    case "scale":
+      return "Scale";
+    case "enterprise":
+      return "Enterprise";
+    case "individual_yearly":
+      return "Individual Yearly";
+    case "individual_monthly":
+      return "Individual Monthly";
+    default:
+      return "Unavailable";
+  }
+});
 
 const returnToCheckout = async () => {
   clearAdminVerification();
@@ -92,6 +142,15 @@ onMounted(async () => {
   try {
     const settings = await fetchTenantSettings();
     Object.assign(featureFlags, settings.feature_flags);
+    accountCategory.value =
+      settings.account_category === "individual"
+        ? "individual"
+        : settings.account_category === "district"
+          ? "district"
+        : settings.account_category === "organization"
+          ? "organization"
+          : null;
+    planCode.value = settings.plan_code ?? null;
   } catch {
     // Keep defaults if tenant settings cannot be loaded.
   }

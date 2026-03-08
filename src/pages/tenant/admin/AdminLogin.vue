@@ -147,12 +147,14 @@ const handleAdminLogin = async () => {
           email.value.trim(),
           password.value
         );
-        const targetPath =
-          handoff.role === "district_admin" ? "/district" : "/tenant/admin";
-        window.location.assign(
-          buildDistrictAppHandoffUrl(handoff.districtSlug, targetPath, handoff.code)
-        );
-        return;
+        if (!handoff.rootOnly && handoff.code && handoff.districtSlug) {
+          const targetPath =
+            handoff.role === "district_admin" ? "/district" : "/tenant/admin";
+          window.location.assign(
+            buildDistrictAppHandoffUrl(handoff.districtSlug, targetPath, handoff.code)
+          );
+          return;
+        }
       } catch (handoffError) {
         const handoffMessage =
           handoffError instanceof Error ? handoffError.message : "";

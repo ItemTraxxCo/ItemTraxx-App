@@ -1,5 +1,13 @@
 <template>
-  <div class="app-shell" :class="{ 'with-top-banners': hasTopBanners, 'route-shell-auth': isFullBleedRoute }" :style="appShellStyle">
+  <div
+    class="app-shell"
+    :class="{
+      'with-top-banners': hasTopBanners,
+      'route-shell-auth': isFullBleedRoute,
+      'route-shell-marketing': isMarketingFullBleedRoute,
+    }"
+    :style="appShellStyle"
+  >
     <div v-if="isRouteNavigating" class="route-progress" aria-hidden="true"></div>
     <div
       v-if="showMaintenanceBanner"
@@ -323,6 +331,12 @@ const isFullBleedRoute = computed(
     route.path === "/internal-auth" ||
     route.path === "/reset-password"
 );
+const isMarketingFullBleedRoute = computed(
+  () => route.path === "/" || route.path === "/landing-new"
+);
+const isDarkChromeRoute = computed(
+  () => route.path === "/" || route.path === "/landing-new" || route.path === "/pricing"
+);
 const showTopMenu = computed(
   () => route.name !== "public-home" && route.name !== "public-pricing"
 );
@@ -423,9 +437,26 @@ const appShellStyle = computed(() => ({
   "--top-banner-offset": topOffsetPx.value,
 }) as Record<string, string>);
 
+const updateBrowserChromeColor = () => {
+  const themeColorMeta = document.querySelector('meta[name="theme-color"]');
+  if (!themeColorMeta) return;
+
+  let color = theme.value === "dark" ? "#0c1016" : "#f9f9f7";
+  if (isFullBleedRoute.value) {
+    color = theme.value === "dark" ? "#090c12" : "#e8eef3";
+  } else if (isDarkChromeRoute.value) {
+    color = "#090d14";
+  }
+
+  themeColorMeta.setAttribute("content", color);
+};
+
 watchEffect(() => {
   document.documentElement.classList.toggle("auth-route-active", isFullBleedRoute.value);
   document.body.classList.toggle("auth-route-active", isFullBleedRoute.value);
+  document.documentElement.classList.toggle("marketing-route-active", isDarkChromeRoute.value);
+  document.body.classList.toggle("marketing-route-active", isDarkChromeRoute.value);
+  updateBrowserChromeColor();
 });
 const topMenuStyle = computed(() => ({
   top: `calc(1rem + ${topOffsetPx.value})`,
@@ -458,6 +489,7 @@ const applyTheme = (next: "light" | "dark") => {
   theme.value = next;
   document.documentElement.setAttribute("data-theme", next);
   localStorage.setItem("itemtraxx-theme", next);
+  updateBrowserChromeColor();
 };
 
 const toggleTheme = () => {
@@ -804,12 +836,16 @@ const handlePageVisibilityChange = () => {
   if (document.visibilityState === "hidden") {
     stopStatusPolling();
     stopVersionPolling();
+    stopAdminSessionPolling();
     return;
   }
+  resetAdminIdleTimer();
+  startAdminSessionPolling();
   void refreshSystemStatus();
   startStatusPolling();
   void refreshVersionStatus();
   startVersionPolling();
+  refreshOfflineQueueCount();
 };
 
 const handleStorageChange = (event: StorageEvent) => {
@@ -846,7 +882,7 @@ onMounted(() => {
   refreshOfflineQueueCount();
   offlineQueueTimer = window.setInterval(() => {
     refreshOfflineQueueCount();
-  }, 3000);
+  }, 10000);
   window.addEventListener("resize", measureTopBanners);
   document.addEventListener("visibilitychange", handlePageVisibilityChange);
   resetAdminIdleTimer();

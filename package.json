@@ -18,14 +18,14 @@
     "perf:report": "node ./scripts/perf-report.mjs"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.97.0",
+    "@supabase/supabase-js": "^2.99.0",
     "@vercel/analytics": "^1.6.1",
     "@vercel/speed-insights": "^1.3.1",
     "jsbarcode": "^3.12.3",
     "jspdf": "^4.2.0",
     "jspdf-autotable": "^5.0.7",
     "supabase": "^2.77.0",
-    "vue": "^3.5.29",
+    "vue": "^3.5.30",
     "vue-router": "^4.6.4"
   },
   "devDependencies": {

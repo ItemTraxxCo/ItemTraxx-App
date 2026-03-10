@@ -50,7 +50,11 @@
           <ul class="hero-points" aria-label="Key product benefits">
             <li>Secure sign-ins and protected admin access</li>
             <li>Clear transaction history and audit visibility</li>
-            <li>Fast checkout and return workflows</li>
+            <li>Smooth checkout and return workflows</li>
+            <li>Easy item and user management features</li>
+            <li>Designed for teams, organizations, and individual users</li>
+            <li>Built to scale with your inventory and operations</li>
+            <li>Avoid common inventory management fails</li>
           </ul>
         </div>
 

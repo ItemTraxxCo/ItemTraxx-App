@@ -1,86 +1,72 @@
 # Legal Notice
 
-Last updated: 2026-02-21 (year-month-day)
+Last updated: 2026-03-10 (year-month-day)
 
-This Legal Notice provides an overview of the legal documents that govern the use, access, and operation of **ItemTraxx**, a product owned and operated by **ItemTraxx Co**.
+This Legal Notice provides a high-level summary of the legal materials associated with **ItemTraxx**, a product owned and operated by **ItemTraxx Co**.
 
-This document is for informational purposes only and does not replace or override any individual legal document listed below.
-
----
-
-## 1. Ownership
-
-ItemTraxx is owned, developed, and maintained by **ItemTraxx Co**.
-
-All intellectual property rights, including but not limited to software, branding, documentation, and design, are the exclusive property of ItemTraxx Co unless otherwise stated.
+This document is informational only. It is intended to help readers locate the current governing legal materials, but it does not replace the live legal terms published by ItemTraxx Co.
 
 ---
 
-## 2. Governing Legal Documents
+## 1. Legal Source of Record
+The current legal terms, policies, and notices for the hosted ItemTraxx service are published at:
 
-Use of ItemTraxx is governed by the following documents. By accessing or using ItemTraxx, users agree to be bound by all applicable documents.
+[itemtraxx.com/legal](https://itemtraxx.com/legal)
+
+If any repository copy, summary, or historical file differs from the live legal page, the live legal page controls for use of the hosted service.
+
+---
+
+## 2. Repository Legal Documents
+This repository includes supporting legal and governance documents for reference:
 
 ### License
-- **LICENSE.md**  
-Defines ownership, usage restrictions, and limitations related to the ItemTraxx source code and software.
+- [`LICENSE.md`](LICENSE.md)  
+Describes the proprietary software and source-code usage restrictions applicable to ItemTraxx materials owned by ItemTraxx Co.
 
-### Terms of Service
-- **TERMS.md**  
-Outlines acceptable use, user responsibilities, limitations of liability, and service conditions.
+### Terms
+- [`TERMS.md`](TERMS.md)  
+Points to the live legal terms published on the ItemTraxx website.
 
 ### Privacy Policy
-- **PRIVACY.md**  
-Explains how data is collected, stored, used, and protected when using ItemTraxx.
+- [`PRIVACY.md`](PRIVACY.md)  
+Explains how ItemTraxx handles personal and operational data.
 
 ### Security Policy
-- **SECURITY.md**  
-Describes how to report security vulnerabilities and how ItemTraxx Co handles security issues.
+- [`SECURITY.md`](SECURITY.md)  
+Explains how to report security issues and vulnerabilities.
+
+### Changelog
+- [`CHANGELOG.md`](CHANGELOG.md)  
+Tracks product and engineering changes, but is not itself a legal document.
 
 ---
 
-## 3. Document Hierarchy
+## 3. Ownership
+ItemTraxx, including its software, branding, design, documentation, and related materials, is owned by **ItemTraxx Co** unless otherwise stated.
 
-In the event of a conflict:
-1. Terms of Service take precedence  
-2. Privacy Policy applies to data handling  
-3. License governs software usage  
-4. This Legal Notice serves as a reference only  
+Third-party and open-source components used within ItemTraxx remain subject to their own licenses and terms.
 
 ---
 
-## 4. Changes to Legal Documents
+## 4. Changes to Legal Materials
+ItemTraxx Co may update legal terms, policies, notices, and related documentation from time to time.
 
-ItemTraxx Co reserves the right to update or modify any legal document at any time.
-
-Changes will be reflected in the respective file and may be referenced in the CHANGELOG.md when appropriate.
-
-Continued use of ItemTraxx after changes are made constitutes acceptance of the updated terms.
+Updates may appear in repository documents, on the website legal hub, or both. Continued use of ItemTraxx after updated terms are published constitutes acceptance of those updated terms to the extent permitted by law.
 
 ---
 
-## 5. Disclaimer
-
-This document does not constitute legal advice.
-
-For legal questions or concerns, users should consult a qualified legal professional.
+## 5. Service and Warranty Notice
+Unless otherwise expressly stated in the governing legal terms, ItemTraxx is provided on an "as is" and "as available" basis. Service availability, warranty disclaimers, liability limitations, billing terms, cancellation terms, and related obligations are governed by the applicable live legal materials.
 
 ---
 
-## 6. Service-Level Expectations
-
-ItemTraxx Co does not guarantee uninterrupted, error-free, or always-available service, including 100% uptime.
-
-All service availability terms, warranties, and limitation of liability are defined in [TERMS.md](TERMS.md), which controls in the event of any conflict.
-
----
-
-## 7. Contact
-
+## 6. Contact
 For legal inquiries related to ItemTraxx, contact:
 
 **ItemTraxx Co**  
-Email: support@itemtraxx.com
+Email: `support@itemtraxx.com`
 
 ---
 
-© 2026 ItemTraxx Co. All rights reserved.
+**© 2026 ItemTraxx Co. All rights reserved.**

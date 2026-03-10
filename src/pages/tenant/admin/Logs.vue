@@ -54,7 +54,7 @@
           <tr>
             <th>Time</th>
             <th>Action</th>
-            <th>Student</th>
+            <th>Borrower</th>
             <th>Item</th>
           </tr>
         </thead>

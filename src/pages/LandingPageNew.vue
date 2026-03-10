@@ -263,7 +263,7 @@ const showcaseVariants: ShowcaseVariant[] = [
     label: 'Admin control',
     pill: 'Management',
     title: 'Admin workflows that stay simple as inventory grows.',
-    body: 'Students, gear, logs, and settings stay in one system so admins can manage more without the interface turning into a mess.',
+    body: 'Borrowers, gear, logs, and settings stay in one system so admins can manage more without the interface turning into a mess.',
     points: ['Manage students and items', 'Review logs and audits', 'Keep settings and administrative actions in one place'],
   },
   {

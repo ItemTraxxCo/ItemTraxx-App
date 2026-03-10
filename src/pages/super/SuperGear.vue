@@ -3,7 +3,7 @@
     <div class="page-nav-left">
       <RouterLink class="button-link" to="/super-admin">Return to Super Admin</RouterLink>
       <RouterLink class="button-link" to="/super-admin/tenants">Tenants</RouterLink>
-      <RouterLink class="button-link" to="/super-admin/students">All Students</RouterLink>
+      <RouterLink class="button-link" to="/super-admin/students">All Borrowers</RouterLink>
       <RouterLink class="button-link" to="/super-admin/logs">All Logs</RouterLink>
       <RouterLink class="button-link" to="/super-admin/broadcasts">Broadcasts</RouterLink>
       <RouterLink class="button-link" to="/super-admin/sales-leads">Sales Leads</RouterLink>

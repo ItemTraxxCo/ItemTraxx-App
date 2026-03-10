@@ -4,7 +4,7 @@
       <RouterLink class="button-link" to="/super-admin">Return to Super Admin</RouterLink>
       <RouterLink class="button-link" to="/super-admin/tenants">Tenants</RouterLink>
       <RouterLink class="button-link" to="/super-admin/gear">All Items</RouterLink>
-      <RouterLink class="button-link" to="/super-admin/students">All Students</RouterLink>
+      <RouterLink class="button-link" to="/super-admin/students">All Borrowers</RouterLink>
       <RouterLink class="button-link" to="/super-admin/broadcasts">Broadcasts</RouterLink>
       <RouterLink class="button-link" to="/super-admin/sales-leads">Sales Leads</RouterLink>
       <RouterLink class="button-link" to="/super-admin/customers">Customers</RouterLink>
@@ -28,7 +28,7 @@
       <p v-if="isLoading" class="muted">Loading logs...</p>
       <p v-else-if="error" class="error">{{ error }}</p>
       <table v-else class="table">
-        <thead><tr><th>Time</th><th>Tenant</th><th>Action</th><th>Item</th><th>Student</th></tr></thead>
+        <thead><tr><th>Time</th><th>Tenant</th><th>Action</th><th>Item</th><th>Borrower</th></tr></thead>
         <tbody>
           <tr v-for="row in rows" :key="row.id">
             <td>{{ formatDateTime(row.action_time) }}</td>

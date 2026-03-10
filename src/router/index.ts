@@ -17,79 +17,79 @@ const routes: RouteRecordRaw[] = [
       isInternalHostRuntime()
         ? import("../pages/internal/InternalOps.vue")
         : import("../pages/LandingPageNew.vue"),
-    meta: { public: true },
+    meta: { public: true, title: "ItemTraxx Inventory Tracking" },
   },
   {
     path: "/landing-old",
     name: "public-home-old",
     component: () => import("../pages/PublicHome.vue"),
-    meta: { public: true },
+    meta: { public: true, title: "Legacy Landing | ItemTraxx" },
   },
   {
     path: "/login",
     name: "public-login",
     component: () => import("../pages/Login.vue"),
-    meta: { public: true },
+    meta: { public: true, title: "Login | ItemTraxx" },
   },
   {
     path: "/landing-new",
     name: "public-home-new",
     component: () => import("../pages/LandingPageNew.vue"),
-    meta: { public: true },
+    meta: { public: true, title: "ItemTraxx Inventory Tracking" },
   },
   {
     path: "/reset-password",
     name: "public-reset-password",
     component: () => import("../pages/ResetPassword.vue"),
-    meta: { public: true },
+    meta: { public: true, title: "Reset Password | ItemTraxx" },
   },
   {
     path: "/forgot-password",
     name: "public-forgot-password",
     component: () => import("../pages/ForgotPassword.vue"),
-    meta: { public: true },
+    meta: { public: true, title: "Forgot Password | ItemTraxx" },
   },
   {
     path: "/legal",
     name: "public-legal",
     component: () => import("../pages/Legal.vue"),
-    meta: { public: true },
+    meta: { public: true, title: "Legal | ItemTraxx" },
   },
   {
     path: "/pricing",
     name: "public-pricing",
     component: () => import("../pages/Pricing.vue"),
-    meta: { public: true },
+    meta: { public: true, title: "Pricing | ItemTraxx" },
   },
   {
     path: "/contact-sales",
     name: "public-contact-sales",
     component: () => import("../pages/ContactSales.vue"),
-    meta: { public: true },
+    meta: { public: true, title: "Contact Sales | ItemTraxx" },
   },
   {
     path: "/contact-support",
     name: "public-contact-support",
     component: () => import("../pages/ContactSupport.vue"),
-    meta: { public: true },
+    meta: { public: true, title: "Contact Support | ItemTraxx" },
   },
   {
     path: "/tenant",
     name: "tenant-home",
     redirect: "/tenant/checkout",
-    meta: { requiresSession: true, requiresTenant: true },
+    meta: { requiresSession: true, requiresTenant: true, title: "Tenant | ItemTraxx" },
   },
   {
     path: "/tenant/checkout",
     name: "tenant-checkout",
     component: () => import("../pages/tenant/Checkout.vue"),
-    meta: { requiresSession: true, requiresTenant: true },
+    meta: { requiresSession: true, requiresTenant: true, title: "Checkout | ItemTraxx" },
   },
   {
     path: "/tenant/admin-login",
     name: "tenant-admin-login",
     component: () => import("../pages/tenant/admin/AdminLogin.vue"),
-    meta: { requiresSession: true, requiresTenant: true },
+    meta: { requiresSession: true, requiresTenant: true, title: "Admin | ItemTraxx" },
   },
   {
     path: "/tenant/admin",
@@ -100,6 +100,8 @@ const routes: RouteRecordRaw[] = [
       requiresTenant: true,
       requiresRole: "tenant_admin",
       requiresTenantMatch: true,
+    
+      title: "Admin | ItemTraxx",
     },
   },
   {
@@ -109,6 +111,8 @@ const routes: RouteRecordRaw[] = [
     meta: {
       requiresSession: true,
       requiresRole: "district_admin",
+    
+      title: "District Admin | ItemTraxx",
     },
   },
   {
@@ -120,6 +124,8 @@ const routes: RouteRecordRaw[] = [
       requiresTenant: true,
       requiresRole: "tenant_admin",
       requiresTenantMatch: true,
+    
+      title: "Admin Borrowers | ItemTraxx",
     },
   },
   {
@@ -131,6 +137,8 @@ const routes: RouteRecordRaw[] = [
       requiresTenant: true,
       requiresRole: "tenant_admin",
       requiresTenantMatch: true,
+    
+      title: "Admin Gear | ItemTraxx",
     },
   },
   {
@@ -142,6 +150,8 @@ const routes: RouteRecordRaw[] = [
       requiresTenant: true,
       requiresRole: "tenant_admin",
       requiresTenantMatch: true,
+    
+      title: "Admin Logs | ItemTraxx",
     },
   },
   {
@@ -153,6 +163,8 @@ const routes: RouteRecordRaw[] = [
       requiresTenant: true,
       requiresRole: "tenant_admin",
       requiresTenantMatch: true,
+    
+      title: "Quick Return | ItemTraxx",
     },
   },
   {
@@ -164,6 +176,8 @@ const routes: RouteRecordRaw[] = [
       requiresTenant: true,
       requiresRole: "tenant_admin",
       requiresTenantMatch: true,
+    
+      title: "Usage Stats | ItemTraxx",
     },
   },
   {
@@ -175,6 +189,8 @@ const routes: RouteRecordRaw[] = [
       requiresTenant: true,
       requiresRole: "tenant_admin",
       requiresTenantMatch: true,
+    
+      title: "Audit Logs | ItemTraxx",
     },
   },
   {
@@ -186,6 +202,8 @@ const routes: RouteRecordRaw[] = [
       requiresTenant: true,
       requiresRole: "tenant_admin",
       requiresTenantMatch: true,
+    
+      title: "Item Status | ItemTraxx",
     },
   },
   {
@@ -197,6 +215,8 @@ const routes: RouteRecordRaw[] = [
       requiresTenant: true,
       requiresRole: "tenant_admin",
       requiresTenantMatch: true,
+    
+      title: "Barcode Generator | ItemTraxx",
     },
   },
   {
@@ -208,6 +228,8 @@ const routes: RouteRecordRaw[] = [
       requiresTenant: true,
       requiresRole: "tenant_admin",
       requiresTenantMatch: true,
+    
+      title: "Admin Settings | ItemTraxx",
     },
   },
   {
@@ -219,6 +241,8 @@ const routes: RouteRecordRaw[] = [
       requiresTenant: true,
       requiresRole: "tenant_admin",
       requiresTenantMatch: true,
+    
+      title: "Gear Import | ItemTraxx",
     },
   },
 
@@ -226,14 +250,14 @@ const routes: RouteRecordRaw[] = [
     path: "/super-auth",
     name: "super-auth",
     component: () => import("../pages/super/SuperAuth.vue"),
-    meta: { public: true },
+    meta: { public: true, title: "Super Admin Login | ItemTraxx" },
   },
   {
     path: "/auth",
     name: "internal-auth",
     alias: ["/internal/auth"],
     component: () => import("../pages/internal/InternalAuth.vue"),
-    meta: { public: true },
+    meta: { public: true, title: "Internal Login | ItemTraxx" },
   },
   {
     path: "/internal",
@@ -243,6 +267,8 @@ const routes: RouteRecordRaw[] = [
       requiresSession: true,
       requiresRole: "super_admin",
       requiresSuperAuth: true,
+    
+      title: "Internal Ops | ItemTraxx",
     },
   },
   {
@@ -253,6 +279,8 @@ const routes: RouteRecordRaw[] = [
       requiresSession: true,
       requiresRole: "super_admin",
       requiresSuperAuth: true,
+    
+      title: "Super Admin | ItemTraxx",
     },
   },
   {
@@ -263,6 +291,8 @@ const routes: RouteRecordRaw[] = [
       requiresSession: true,
       requiresRole: "super_admin",
       requiresSuperAuth: true,
+    
+      title: "Super Admin Tenants | ItemTraxx",
     },
   },
   {
@@ -273,6 +303,8 @@ const routes: RouteRecordRaw[] = [
       requiresSession: true,
       requiresRole: "super_admin",
       requiresSuperAuth: true,
+    
+      title: "Super Admin Districts | ItemTraxx",
     },
   },
   {
@@ -283,6 +315,8 @@ const routes: RouteRecordRaw[] = [
       requiresSession: true,
       requiresRole: "super_admin",
       requiresSuperAuth: true,
+    
+      title: "District Detail | ItemTraxx",
     },
   },
   {
@@ -293,6 +327,8 @@ const routes: RouteRecordRaw[] = [
       requiresSession: true,
       requiresRole: "super_admin",
       requiresSuperAuth: true,
+    
+      title: "Super Admin Admins | ItemTraxx",
     },
   },
   {
@@ -303,6 +339,8 @@ const routes: RouteRecordRaw[] = [
       requiresSession: true,
       requiresRole: "super_admin",
       requiresSuperAuth: true,
+    
+      title: "Super Admin Gear | ItemTraxx",
     },
   },
   {
@@ -313,6 +351,8 @@ const routes: RouteRecordRaw[] = [
       requiresSession: true,
       requiresRole: "super_admin",
       requiresSuperAuth: true,
+    
+      title: "Super Admin Borrowers | ItemTraxx",
     },
   },
   {
@@ -323,6 +363,8 @@ const routes: RouteRecordRaw[] = [
       requiresSession: true,
       requiresRole: "super_admin",
       requiresSuperAuth: true,
+    
+      title: "Super Admin Logs | ItemTraxx",
     },
   },
   {
@@ -333,6 +375,8 @@ const routes: RouteRecordRaw[] = [
       requiresSession: true,
       requiresRole: "super_admin",
       requiresSuperAuth: true,
+    
+      title: "Broadcasts | ItemTraxx",
     },
   },
   {
@@ -343,6 +387,8 @@ const routes: RouteRecordRaw[] = [
       requiresSession: true,
       requiresRole: "super_admin",
       requiresSuperAuth: true,
+    
+      title: "Sales Leads | ItemTraxx",
     },
   },
   {
@@ -353,13 +399,15 @@ const routes: RouteRecordRaw[] = [
       requiresSession: true,
       requiresRole: "super_admin",
       requiresSuperAuth: true,
+    
+      title: "Customers | ItemTraxx",
     },
   },
   {
     path: "/:pathMatch(.*)*",
     name: "not-found",
     component: () => import("../pages/NotFound.vue"),
-    meta: { public: true },
+    meta: { public: true, title: "Not Found | ItemTraxx" },
   },
 ];
 
@@ -411,6 +459,7 @@ router.beforeEach((to) => {
     requiresRole?: string;
     requiresTenantMatch?: boolean;
     requiresSuperAuth?: boolean;
+    title?: string;
   };
 
   const isInternalHost = isInternalHostRuntime();
@@ -515,6 +564,13 @@ router.beforeEach((to) => {
   }
 
   return true;
+});
+
+router.afterEach((to) => {
+  const title = typeof to.meta.title === "string" ? to.meta.title : "ItemTraxx";
+  if (typeof document !== "undefined") {
+    document.title = title;
+  }
 });
 
 export default router;

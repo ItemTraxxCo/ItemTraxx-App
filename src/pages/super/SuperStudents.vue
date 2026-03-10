@@ -10,11 +10,11 @@
       <RouterLink class="button-link" to="/super-admin/customers">Customers</RouterLink>
     </div>
 
-    <h1>All Students</h1>
+    <h1>All Borrowers</h1>
     <p>Cross-tenant student management.</p>
 
     <div class="card">
-      <h2>Create Student</h2>
+      <h2>Create Borrower</h2>
       <form class="form" @submit.prevent="handleCreate">
         <label>Tenant<select v-model="formTenantId"><option value="">Select tenant</option><option v-for="t in tenants" :key="t.id" :value="t.id">{{ t.name }}</option></select></label>
         <label>
@@ -33,7 +33,7 @@
     </div>
 
     <div class="card">
-      <h2>Student List</h2>
+      <h2>Borrower List</h2>
       <div class="input-row">
         <select v-model="tenantFilter" @change="loadStudents"><option value="all">all tenants</option><option v-for="t in tenants" :key="t.id" :value="t.id">{{ t.name }}</option></select>
         <input v-model="search" type="text" placeholder="Search" />
@@ -63,7 +63,7 @@
     </div>
 
     <div v-if="editItem" class="card">
-      <h2>Edit Student</h2>
+      <h2>Edit Borrower</h2>
       <p class="muted">Student identifiers are locked. If you need to change them, contact support.</p>
       <form class="form">
         <label>
@@ -80,7 +80,7 @@
 
     <div v-if="toastMessage" class="toast"><div class="toast-title">{{ toastTitle }}</div><div class="toast-body">{{ toastMessage }}</div></div>
 
-    <StepUpModal :visible="stepUpVisible" title="Delete Student" :message="stepUpMessage" confirm-label="Delete" @cancel="closeStepUp" @confirm="confirmDelete" />
+    <StepUpModal :visible="stepUpVisible" title="Delete Borrower" :message="stepUpMessage" confirm-label="Delete" @cancel="closeStepUp" @confirm="confirmDelete" />
   </div>
 </template>
 
@@ -163,7 +163,7 @@ const exportCsv = () => {
 const exportPdf = async () => {
   await exportRowsToPdf(
     `super-students-${new Date().toISOString().slice(0, 10)}.pdf`,
-    "Super Students Export",
+    "Super Borrowers Export",
     ["tenant", "username", "student_id"],
     students.value.map((item) => ({
       tenant: tenantNameById.value.get(item.tenant_id) || item.tenant_id,
@@ -189,7 +189,7 @@ const handleCreate = async () => {
     previewUsername.value = created.username;
     previewStudentId.value = created.student_id;
     regenerateIdentity();
-    showToast("Created", "Student created.");
+    showToast("Created", "Borrower created.");
   } catch (err) {
     showToast("Create failed", err instanceof Error ? err.message : "Unable to create student.");
   } finally {
@@ -230,7 +230,7 @@ const confirmDelete = async (payload: { superPassword: string; confirmPhrase: st
       confirm_phrase: payload.confirmPhrase,
     });
     students.value = students.value.filter((item) => item.id !== deleteTarget.value!.id);
-    showToast("Deleted", "Student deleted.");
+    showToast("Deleted", "Borrower deleted.");
     closeStepUp();
   } catch (err) {
     showToast("Delete failed", err instanceof Error ? err.message : "Unable to delete student.");

@@ -5,7 +5,7 @@
       <RouterLink class="button-link" to="/super-admin/tenants">Tenants</RouterLink>
       <RouterLink class="button-link" to="/super-admin/admins">Tenant Admins</RouterLink>
       <RouterLink class="button-link" to="/super-admin/gear">All Items</RouterLink>
-      <RouterLink class="button-link" to="/super-admin/students">All Students</RouterLink>
+      <RouterLink class="button-link" to="/super-admin/students">All Borrowers</RouterLink>
       <RouterLink class="button-link" to="/super-admin/logs">All Logs</RouterLink>
       <RouterLink class="button-link" to="/super-admin/sales-leads">Sales Leads</RouterLink>
       <RouterLink class="button-link" to="/super-admin/customers">Customers</RouterLink>

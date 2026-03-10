@@ -77,7 +77,7 @@
             <span class="section-link-meta">Global inventory catalogue</span>
           </RouterLink>
           <RouterLink class="section-link" to="/super-admin/students">
-            <span class="section-link-title">All Students</span>
+            <span class="section-link-title">All Borrowers</span>
             <span class="section-link-meta">Cross-tenant student records</span>
           </RouterLink>
           <RouterLink class="section-link" to="/super-admin/logs">
@@ -320,7 +320,7 @@
             <tr>
               <th>Tenant</th>
               <th>Items</th>
-              <th>Students</th>
+              <th>Borrowers</th>
               <th>Active Checkouts</th>
               <th>Overdue</th>
               <th>Transactions (7d)</th>

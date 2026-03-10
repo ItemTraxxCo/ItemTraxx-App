@@ -203,7 +203,7 @@
               <th>Action</th>
               <th>Item</th>
               <th>Barcode</th>
-              <th>Student</th>
+              <th>Borrower</th>
             </tr>
           </thead>
           <tbody>

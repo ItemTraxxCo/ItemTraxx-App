@@ -105,7 +105,7 @@ const tenantAdminSteps: OnboardingStep[] = [
   },
   {
     title: "Manage students",
-    body: "Use the Students page to add, import, and review student information.",
+    body: "Use the Borrowers page to add, import, and review borrower records.",
   },
   {
     title: "Track item and activity",

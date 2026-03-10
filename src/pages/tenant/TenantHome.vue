@@ -1,7 +1,7 @@
 <template>
   <div class="page">
-    <h1>User</h1>
-    <p>User home</p>
+    <h1>Borrower</h1>
+    <p>Borrower home</p>
     <nav class="nav">
       <RouterLink to="/tenant/checkout">Checkout</RouterLink>
       <RouterLink to="/tenant/admin">Admin</RouterLink>

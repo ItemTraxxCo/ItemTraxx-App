@@ -1,6 +1,6 @@
 # Changelog
 
-Last updated (year-month-day): 2026-03-04
+Last updated (year-month-day): 2026-03-10
 
 All notable changes to **ItemTraxx** will be documented in this file. This includes new features, improvements, bug fixes, and other updates.
 
@@ -294,6 +294,81 @@ Changes are dated based on the default timezone: America/Los_Angeles
   - high-level system overview spanning frontend, edge proxy/functions, and Supabase domains
   - request flow diagrams for tenant login, checkout/return + offline sync, tenant admin ops, and super/internal async processing
   - CI/CD, security boundary, and combined end-to-end architecture diagrams
+
+---
+
+### 3/3/2026 Development Update
+
+- Performed dependency maintenance update (`supabase`, Vue/tooling group) with green CI validation.
+
+---
+
+### 3/4/2026 Development Update
+
+- Completed cleanup/security maintenance:
+  - normalized docs structure and CI artifact handling
+  - allowlisted the known unreachable `dompurify` advisory in the security gate
+  - overrode `tar` to `7.5.10` to clear the high-severity audit advisory
+
+---
+
+### 3/5/2026 Development Update
+
+- Completed the first major district-separation rollout:
+  - district-scoped app routing and public district lookup support
+  - district management and admin tooling in super admin
+  - district session handoff foundation for root-host to district-host sign-in
+- Added and updated test coverage for super-admin and district flows.
+- Applied additional dependency/security maintenance (`dompurify`, `supabase`) and bundle-budget adjustments required for the new routing/auth work.
+- Improved tenant-admin session handling and related auth/session coordination.
+- Updated public-home transaction history handling to include retention-policy details.
+
+---
+
+### 3/6/2026 Development Update
+
+- Enabled row-level security on remaining internal helper tables related to data retention and rate limiting.
+- Began the large UI rollout:
+  - redesigned auth flows and marketing surfaces into the new visual system
+  - introduced the new landing page concept and supporting page refinements
+
+---
+
+### 3/7/2026 Development Update
+
+- Completed broad UI and platform rollout:
+  - promoted the redesigned landing page direction and refreshed major auth/admin surfaces
+  - added first-class individual-plan support across pricing, super admin, and tenant admin
+  - converted `Contact Sales`, `Request Demo`, and `Contact Support` into form-driven flows
+- Compressed landing screenshots and updated CI/E2E checks to match the new landing/admin copy and visuals.
+- Performed platform cleanup/performance pass:
+  - reduced background request churn
+  - tightened polling behavior
+  - cached repeated super-admin option loads
+
+---
+
+### 3/8/2026 Development Update
+
+- Refined public commercial/legal flows:
+  - improved demo-request behavior
+  - updated billing/legal wording and related pricing guidance
+
+---
+
+### 3/9/2026 Development Update
+
+- Performed dependency maintenance update (`supabase` and Vue group).
+- Hardened district auth/bootstrap behavior:
+  - removed plaintext password persistence from district handoff records
+  - fixed district-route bootstrap and router-init blank-page cases
+  - improved district refresh/reload reliability for protected routes
+
+---
+
+### 3/10/2026 Development Update
+
+- Enhanced new landing-page hero copy/feature wording.
 
 ---
 

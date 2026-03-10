@@ -438,7 +438,7 @@ router.beforeEach((to) => {
 
   const auth = getAuthState();
   if (!auth.isInitialized) {
-    return false;
+    return true;
   }
 
   if (

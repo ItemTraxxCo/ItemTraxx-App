@@ -24,13 +24,13 @@
     "jsbarcode": "^3.12.3",
     "jspdf": "^4.2.0",
     "jspdf-autotable": "^5.0.7",
-    "supabase": "^2.77.0",
+    "supabase": "^2.77.1",
     "vue": "^3.5.30",
     "vue-router": "^4.6.4"
   },
   "devDependencies": {
     "@playwright/test": "^1.58.2",
-    "@types/node": "^25.3.3",
+    "@types/node": "^25.4.0",
     "@vitejs/plugin-vue": "^6.0.4",
     "@vue/tsconfig": "^0.9.0",
     "rollup": "^4.59.0",

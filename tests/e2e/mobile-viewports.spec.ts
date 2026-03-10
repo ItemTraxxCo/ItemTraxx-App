@@ -19,6 +19,6 @@ test.describe("Mobile viewport coverage", () => {
     const heroPoints = page.locator(".hero-points li");
     await expect(heroPoints.filter({ hasText: "Secure sign-ins and protected admin access" })).toBeVisible();
     await expect(heroPoints.filter({ hasText: "Clear transaction history and audit visibility" })).toBeVisible();
-    await expect(heroPoints.filter({ hasText: "Fast checkout and return workflows" })).toBeVisible();
+    await expect(heroPoints.filter({ hasText: "Smooth checkout and return workflows" })).toBeVisible();
   });
 });

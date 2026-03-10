@@ -4,7 +4,7 @@
       <div class="page-nav-left">
         <RouterLink class="button-link" to="/tenant/admin">Return to admin panel</RouterLink>
       </div>
-      <h1>Student Management</h1>
+      <h1>Borrower Management</h1>
       <p class="admin-hero-copy">Add students, review details, and manage archived records.</p>
       <div class="admin-summary-grid">
         <div class="admin-summary-card">
@@ -25,7 +25,7 @@
     <div class="card admin-section-card">
       <div class="admin-section-header">
         <div>
-          <h2>Add Student</h2>
+          <h2>Add Borrower</h2>
           <p class="admin-section-copy">Generate a new student identity and add it to this tenant.</p>
         </div>
       </div>
@@ -70,7 +70,7 @@
     <div class="card admin-section-card">
       <div class="admin-section-header">
         <div>
-          <h2>Students</h2>
+          <h2>Borrowers</h2>
           <p class="admin-section-copy">Search, export, and inspect student records from one table.</p>
         </div>
         <div class="admin-toolbar-actions">
@@ -88,7 +88,7 @@
           />
         </label>
       </div>
-      <p class="muted">Showing {{ filteredStudents.length }} of {{ students.length }} students.</p>
+      <p class="muted">Showing {{ filteredStudents.length }} of {{ students.length }} borrowers.</p>
       <p v-if="isLoading" class="muted">Loading students...</p>
       <div v-else class="table-wrap">
       <table class="table">
@@ -117,7 +117,7 @@
     <div class="card admin-section-card">
       <div class="admin-section-header">
         <div>
-          <h2>Archived Students</h2>
+          <h2>Archived Borrowers</h2>
           <p class="admin-section-copy">Archived students can be restored at any time.</p>
         </div>
       </div>
@@ -152,7 +152,7 @@
     <div v-if="featureFlags.enable_bulk_student_tools" class="card admin-section-card">
       <div class="admin-section-header">
         <div>
-          <h2>Bulk Student Tools</h2>
+          <h2>Bulk Borrower Tools</h2>
           <p class="admin-section-copy">Generate identities in bulk and import them in one action.</p>
         </div>
       </div>
@@ -184,7 +184,7 @@
 
     <div v-if="showDetails" class="modal-backdrop">
       <div class="modal">
-        <h2>Student details</h2>
+        <h2>Borrower details</h2>
         <p class="muted">View username, student ID, and checkout history.</p>
         <h3>{{ selected?.username }}</h3>
         <p class="muted">Student ID: {{ selected?.student_id }}</p>
@@ -444,7 +444,7 @@ const exportCsv = () => {
 const exportPdf = async () => {
   await exportRowsToPdf(
     `students-${new Date().toISOString().slice(0, 10)}.pdf`,
-    "Student Export",
+    "Borrower Export",
     ["username", "student_id"],
     filteredStudents.value
   );
@@ -478,7 +478,7 @@ const handleCreate = async () => {
     usernamePreview.value = created.username;
     studentIdPreview.value = created.student_id;
     regenerateIdentity();
-    success.value = "Student added.";
+    success.value = "Borrower added.";
   } catch (err) {
     error.value = err instanceof Error ? err.message : "Unable to create student. If you belive this is an error, please contact support.";
     showDuplicateStudentToast();
@@ -558,9 +558,9 @@ const removeStudent = async (item: StudentItem) => {
     });
     students.value = students.value.filter((row) => row.id !== item.id);
     archivedStudents.value = [item, ...archivedStudents.value];
-    success.value = "Student archived.";
+    success.value = "Borrower archived.";
     showToastWithAction(
-      "Student archived",
+      "Borrower archived",
       `${item.username} was archived.`,
       "Undo",
       async () => {
@@ -597,7 +597,7 @@ const handleRestore = async (item: StudentItem) => {
     });
     archivedStudents.value = archivedStudents.value.filter((row) => row.id !== item.id);
     students.value = [restored, ...students.value];
-    success.value = "Student restored.";
+    success.value = "Borrower restored.";
   } catch (err) {
     error.value = err instanceof Error ? err.message : "Unable to restore student.";
   } finally {

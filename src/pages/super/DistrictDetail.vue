@@ -32,7 +32,7 @@
           <p class="stat-value">{{ detail.usage.gear_total }}</p>
         </div>
         <div class="stat-card">
-          <h3>Students</h3>
+          <h3>Borrowers</h3>
           <p class="stat-value">{{ detail.usage.students_total }}</p>
         </div>
         <div class="stat-card">
@@ -84,7 +84,7 @@
             <tr>
               <th>Tenant</th>
               <th>Items</th>
-              <th>Students</th>
+              <th>Borrowers</th>
               <th>Active Checkouts</th>
               <th>Overdue</th>
               <th>Transactions (7d)</th>
@@ -116,7 +116,7 @@
               <th>Action</th>
               <th>Item</th>
               <th>Barcode</th>
-              <th>Student</th>
+              <th>Borrower</th>
             </tr>
           </thead>
           <tbody>

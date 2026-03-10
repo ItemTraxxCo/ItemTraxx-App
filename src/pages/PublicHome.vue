@@ -72,7 +72,7 @@
               </svg>
             </div>
             <h3>Sign in</h3>
-            <p>Users access their tenant quickly and securely with controlled authentication.</p>
+            <p>Borrowers access their tenant quickly and securely with controlled authentication.</p>
           </article>
           <article class="step-card reveal reveal-delay-2">
             <div class="step-icon" aria-hidden="true">

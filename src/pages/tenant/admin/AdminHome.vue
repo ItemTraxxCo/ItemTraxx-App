@@ -11,7 +11,7 @@
         </div>
       <h1>Admin Panel</h1>
         <p class="admin-hero-copy">
-          Manage inventory, students, returns, reporting, and tenant controls from one workspace.
+          Manage inventory, borrowers, returns, reporting, and tenant controls from one workspace.
         </p>
         <div class="admin-summary-grid">
           <div class="admin-summary-card">
@@ -31,8 +31,8 @@
         <p>Manage items, barcodes, and status.</p>
       </RouterLink>
       <RouterLink class="admin-card" to="/tenant/admin/students">
-        <h2>Student Management</h2>
-        <p>Manage students and view checkout history.</p>
+        <h2>Borrower Management</h2>
+        <p>Manage borrowers and view checkout history.</p>
       </RouterLink>
       <RouterLink class="admin-card" to="/tenant/admin/logs">
         <h2>Item Logs</h2>

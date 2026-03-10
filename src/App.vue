@@ -207,10 +207,11 @@
         </a>
       </div>
     </div>
-    <div v-if="!auth.isInitialized" class="page">
-      <h1>bye bye 👋</h1>
-      <p>Please press Cmd+shift+R (macOS), or Ctrl+Shift+R (Windows) to finish signing out.</p>
-      <button type="button" class="button-primary" @click="reloadApp">Reload</button>
+    <div v-if="!auth.isInitialized" class="page auth-loading-page">
+      <div class="auth-loading-card">
+        <h1>Loading ItemTraxx</h1>
+        <p>Restoring your session and district context.</p>
+      </div>
     </div>
     <router-view v-else />
     <OnboardingModal

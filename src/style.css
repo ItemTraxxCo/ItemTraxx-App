@@ -232,6 +232,39 @@ button:focus-visible {
   margin: 0 auto;
 }
 
+.auth-loading-page {
+  min-height: 100vh;
+  max-width: none;
+  display: grid;
+  place-items: center;
+  padding: 2rem 1.25rem;
+  background:
+    radial-gradient(circle at 18% 18%, rgba(25, 194, 168, 0.18), transparent 30%),
+    radial-gradient(circle at 82% 22%, rgba(30, 89, 214, 0.2), transparent 28%),
+    #090d14;
+}
+
+.auth-loading-card {
+  width: min(100%, 28rem);
+  border: 1px solid rgba(83, 214, 197, 0.2);
+  border-radius: 24px;
+  padding: 1.75rem 1.5rem;
+  background: rgba(11, 18, 31, 0.82);
+  box-shadow: 0 28px 56px rgba(0, 0, 0, 0.28);
+  text-align: center;
+}
+
+.auth-loading-card h1 {
+  margin: 0 0 0.65rem;
+  color: #f4f7fb;
+  font-size: clamp(1.8rem, 4vw, 2.35rem);
+}
+
+.auth-loading-card p {
+  margin: 0;
+  color: rgba(230, 236, 245, 0.72);
+}
+
 .admin-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));

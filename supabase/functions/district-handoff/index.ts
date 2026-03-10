@@ -107,10 +107,16 @@ serve(async (req) => {
         password,
       });
 
-      if (signIn.error || !signIn.data.user?.id) {
+      if (
+        signIn.error ||
+        !signIn.data.user?.id ||
+        !signIn.data.session?.access_token ||
+        !signIn.data.session?.refresh_token
+      ) {
         return jsonResponse(401, { error: "Invalid credentials" }, headers);
       }
       const user = signIn.data.user;
+      const session = signIn.data.session;
 
       const { data: district, error: districtError } = await adminClient
         .from("districts")
@@ -136,7 +142,8 @@ serve(async (req) => {
         user_id: user.id,
         district_slug: districtSlug,
         auth_email: authEmail,
-        password,
+        access_token: session.access_token,
+        refresh_token: session.refresh_token,
         expires_at: expiresAt,
       });
 
@@ -166,11 +173,17 @@ serve(async (req) => {
         password,
       });
 
-      if (signIn.error || !signIn.data.user?.id) {
+      if (
+        signIn.error ||
+        !signIn.data.user?.id ||
+        !signIn.data.session?.access_token ||
+        !signIn.data.session?.refresh_token
+      ) {
         return jsonResponse(401, { error: "Invalid credentials" }, headers);
       }
 
       const user = signIn.data.user;
+      const session = signIn.data.session;
       const { data: profile } = await adminClient
         .from("profiles")
         .select("role, tenant_id, district_id, is_active")
@@ -242,7 +255,8 @@ serve(async (req) => {
         user_id: user.id,
         district_slug: districtSlug,
         auth_email: email,
-        password,
+        access_token: session.access_token,
+        refresh_token: session.refresh_token,
         expires_at: expiresAt,
       });
 
@@ -267,38 +281,28 @@ serve(async (req) => {
       const codeHash = await sha256(code);
       const { data: row, error: selectError } = await adminClient
         .from("district_session_handoffs")
-        .select("id, district_slug, auth_email, password, expires_at")
+        .select("id, district_slug, access_token, refresh_token, expires_at")
         .eq("code_hash", codeHash)
         .single();
 
       if (
         selectError ||
         !row?.id ||
-        !row.auth_email ||
-        !row.password ||
+        !row.access_token ||
+        !row.refresh_token ||
         !row.expires_at ||
         new Date(row.expires_at).getTime() <= Date.now()
       ) {
         return jsonResponse(410, { error: "Handoff expired" }, headers);
       }
 
-      const userClient = createClient(supabaseUrl, publishableKey, {
-        auth: { persistSession: false },
-      });
-      const signIn = await userClient.auth.signInWithPassword({
-        email: row.auth_email,
-        password: row.password,
-      });
-
-      if (signIn.error || !signIn.data.session?.access_token || !signIn.data.session?.refresh_token) {
-        return jsonResponse(401, { error: "Unable to complete sign-in" }, headers);
-      }
+      await adminClient.from("district_session_handoffs").delete().eq("id", row.id);
 
       return jsonResponse(
         200,
         {
-          access_token: signIn.data.session.access_token,
-          refresh_token: signIn.data.session.refresh_token,
+          access_token: row.access_token,
+          refresh_token: row.refresh_token,
           district_slug: row.district_slug,
         },
         headers

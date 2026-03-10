@@ -11,6 +11,7 @@ import {
   setSecondaryAuth,
   setTenantContext,
 } from "./store/authState";
+import { getDistrictState } from "./store/districtState";
 import {
   consumeDistrictSessionHandoff,
   initAuthListener,
@@ -159,11 +160,13 @@ const mountApp = () => {
 const bootstrap = async () => {
   const consumedDistrictHandoff = await consumeDistrictSessionHandoff();
   await initializeDistrictContext();
+  const districtContext = getDistrictState();
   const isE2ETestMode = import.meta.env.VITE_E2E_TEST_UTILS === "true";
-  const canMountFirst = isE2ETestMode || isPublicBootstrapPath();
+  const canMountFirst =
+    isE2ETestMode || isPublicBootstrapPath() || districtContext.isDistrictHost;
   if (canMountFirst) {
     // Avoid flashing the temporary logout screen during normal public-route bootstrap.
-    if (!isE2ETestMode) {
+    if (!isE2ETestMode && isPublicBootstrapPath()) {
       clearAuthState(true);
     }
     mountApp();

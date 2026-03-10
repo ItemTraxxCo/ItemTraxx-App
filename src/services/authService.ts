@@ -469,7 +469,12 @@ export const consumeDistrictSessionHandoff = async () => {
     return false;
   }
 
-  await clearLocalSession();
+  params.delete("itx_hc");
+  params.delete("itx_at");
+  params.delete("itx_rt");
+  const nextHash = params.toString();
+  const nextUrl = `${window.location.pathname}${window.location.search}${nextHash ? `#${nextHash}` : ""}`;
+  window.history.replaceState({}, document.title, nextUrl);
 
   let finalAccessToken = accessToken;
   let finalRefreshToken = refreshToken;
@@ -487,6 +492,12 @@ export const consumeDistrictSessionHandoff = async () => {
     });
 
     if (!result.ok || !result.data?.access_token || !result.data?.refresh_token) {
+      if (result.status === 410) {
+        const { data: sessionData } = await supabase.auth.getSession();
+        if (sessionData.session?.access_token && sessionData.session?.refresh_token) {
+          return false;
+        }
+      }
       throw new Error("Unable to complete district sign-in.");
     }
 
@@ -497,6 +508,8 @@ export const consumeDistrictSessionHandoff = async () => {
   if (!finalAccessToken || !finalRefreshToken) {
     throw new Error("Unable to complete district sign-in.");
   }
+
+  await clearLocalSession();
 
   const { data, error } = await supabase.auth.setSession({
     access_token: finalAccessToken,
@@ -516,13 +529,6 @@ export const consumeDistrictSessionHandoff = async () => {
   } catch {
     // Ignore sessionStorage failures.
   }
-
-  params.delete("itx_hc");
-  params.delete("itx_at");
-  params.delete("itx_rt");
-  const nextHash = params.toString();
-  const nextUrl = `${window.location.pathname}${window.location.search}${nextHash ? `#${nextHash}` : ""}`;
-  window.history.replaceState({}, document.title, nextUrl);
   return true;
 };
 

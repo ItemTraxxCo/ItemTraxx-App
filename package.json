@@ -15,7 +15,10 @@
     "security:sbom": "bash ./scripts/generate-sbom.sh",
     "perf:budget": "node ./scripts/check-bundle-budget.mjs",
     "perf:images": "node ./scripts/check-image-budget.mjs",
-    "perf:report": "node ./scripts/perf-report.mjs"
+    "perf:report": "node ./scripts/perf-report.mjs",
+    "docs:edge-schemas": "node ./scripts/generate-edge-schemas.mjs",
+    "docs:edge-openapi": "node ./scripts/generate-edge-schemas.mjs",
+    "docs:edge-reference": "node ./scripts/generate-edge-reference.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.99.0",
@@ -26,7 +29,8 @@
     "jspdf-autotable": "^5.0.7",
     "supabase": "2.78.0",
     "vue": "^3.5.30",
-    "vue-router": "^4.6.4"
+    "vue-router": "^4.6.4",
+    "zod": "^4.3.6"
   },
   "devDependencies": {
     "@playwright/test": "^1.58.2",
@@ -36,7 +40,8 @@
     "rollup": "^4.59.0",
     "typescript": "~5.9.3",
     "vite": "^7.3.1",
-    "vue-tsc": "^3.2.5"
+    "vue-tsc": "^3.2.5",
+    "zod-to-json-schema": "^3.25.1"
   },
   "overrides": {
     "tar": "^7.5.10",

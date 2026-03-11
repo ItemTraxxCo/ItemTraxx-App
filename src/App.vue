@@ -27,7 +27,7 @@
       aria-modal="true"
     >
       <div class="maintenance-fullscreen-card">
-        <h2>ItemTraxx Temporarily Unavailable</h2>
+        <h2>ItemTraxx is Currently Unavailable</h2>
         <p>{{ killSwitchMessage }}</p>
         <p>
           We are actively working to restore access. Please check the live status page for updates.
@@ -47,13 +47,13 @@
     </div>
     <div v-else-if="showMaintenanceOverlay" class="maintenance-fullscreen" role="alertdialog" aria-live="assertive">
       <div class="maintenance-fullscreen-card">
-        <h2>Maintenance in Progress</h2>
+        <h2>Maintenance currently in Progress</h2>
         <p>
-          ItemTraxx is temporarily unavailable while we apply updates and stability improvements.
+          ItemTraxx is currently unavailable while we apply updates and complete maintenance.
         </p>
         <p>
           Please try again shortly. Your data is safe and we will restore full access as soon as
-          maintenance is complete.
+          maintenance is complete. Please check the live status page for updates and estimated completion time. 
         </p>
         <div class="maintenance-fullscreen-actions">
           <a
@@ -282,9 +282,9 @@ const broadcastBannerRef = ref<HTMLElement | null>(null);
 const maintenanceBannerHeight = ref(0);
 const broadcastBannerHeight = ref(0);
 const maintenanceEnabled = ref(false);
-const maintenanceMessage = ref("Maintenance in progress.");
+const maintenanceMessage = ref("Maintenance currentlyin progress.");
 const killSwitchEnabled = ref(false);
-const killSwitchMessage = ref("Unfortunately ItemTraxx is currently unavailable.");
+const killSwitchMessage = ref("Unfortunately ItemTraxx is currently unavailable. We apologize for any inconvenience and are working to restore access as soon as possible.");
 const statusLabel = ref("Unknown");
 const statusClass = ref<"status-ok" | "status-warn" | "status-down" | "status-unknown">(
   "status-unknown"
@@ -697,7 +697,7 @@ const refreshSystemStatus = async () => {
     killSwitchMessage.value =
       typeof payload.kill_switch.message === "string" && payload.kill_switch.message.trim()
         ? payload.kill_switch.message.trim()
-        : "Unfortunately ItemTraxx is currently unavailable.";
+        : "Unfortunately ItemTraxx is currently unavailable. We apologize for any inconvenience and are working to restore access as soon as possible.";
   } else {
     killSwitchEnabled.value = false;
   }
@@ -724,7 +724,7 @@ const refreshSystemStatus = async () => {
     maintenanceMessage.value =
       typeof payload.maintenance.message === "string" && payload.maintenance.message.trim()
         ? payload.maintenance.message.trim()
-        : "Maintenance in progress.";
+        : "Maintenance currently in progress.";
   } else {
     maintenanceEnabled.value = false;
   }

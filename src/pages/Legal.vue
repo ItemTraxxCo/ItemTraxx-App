@@ -257,8 +257,8 @@
       <section>
         <h2>15. Contact</h2>
         <p>
-          For legal, privacy, and security inquiries, please contact:
-          <a href="mailto:support@itemtraxx.com">support@itemtraxx.com</a>
+          For legal, privacy, and security inquiries, please
+          <a href="https://www.itemtraxx.com/contact-support" target="_blank" rel="noreferrer noopener">contact support here</a>
         </p>
       </section>
     </main>

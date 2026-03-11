@@ -45,3 +45,10 @@ export type AdminOpsAction =
   | "list_sessions"
   | "revoke_session"
   | "revoke_all_sessions";
+
+export type TenantAdminManageAction =
+  | "list_tenant_admins"
+  | "create_tenant_admin"
+  | "set_admin_status"
+  | "update_admin_email"
+  | "send_tenant_admin_reset";

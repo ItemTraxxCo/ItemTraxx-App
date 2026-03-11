@@ -8,10 +8,10 @@
 
       <div class="admin-login-content">
         <div class="admin-login-copy">
-          <p class="admin-login-kicker">User Admin Access</p>
+          <p class="admin-login-kicker">Tenant Admin Access</p>
           <h1>Admin sign in</h1>
           <p class="admin-login-subtitle">
-            Use your admin email and password to manage students, gear, logs, and your user settings.
+            Use your admin email and password to manage borrowers, gear, logs, and your tenant admin settings.
           </p>
         </div>
 

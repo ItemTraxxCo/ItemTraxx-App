@@ -218,6 +218,10 @@ otp_expiry = 3600
 # host = "smtp.sendgrid.net"
 # port = 587
 # user = "apikey"
+
+[functions.tenant-admin-mutate]
+# Auth is validated inside function via userClient.auth.getUser(authHeader).
+verify_jwt = false
 # pass = "env(SENDGRID_API_KEY)"
 # admin_email = "admin@email.com"
 # sender_name = "Admin"

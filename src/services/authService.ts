@@ -521,6 +521,20 @@ export const consumeDistrictSessionHandoff = async () => {
     throw new Error("Unable to complete district sign-in.");
   }
 
+  void invokeEdgeFunction(getLoginNotifyFunctionName(), {
+    method: "POST",
+    accessToken: finalAccessToken,
+    body: {},
+  }).then((result) => {
+    if (!result.ok) {
+      console.warn("login notification send failed", {
+        status: result.status,
+        error: result.error,
+        requestId: result.requestId,
+      });
+    }
+  });
+
   try {
     window.sessionStorage.setItem(
       DISTRICT_HANDOFF_MARKER_KEY,

@@ -89,7 +89,7 @@ const routes: RouteRecordRaw[] = [
     path: "/tenant/admin-login",
     name: "tenant-admin-login",
     component: () => import("../pages/tenant/admin/AdminLogin.vue"),
-    meta: { requiresSession: true, requiresTenant: true, title: "Admin | ItemTraxx" },
+    meta: { public: true, title: "Admin | ItemTraxx" },
   },
   {
     path: "/tenant/admin",
@@ -230,6 +230,19 @@ const routes: RouteRecordRaw[] = [
       requiresTenantMatch: true,
     
       title: "Admin Settings | ItemTraxx",
+    },
+  },
+  {
+    path: "/tenant/admin/admins",
+    name: "tenant-admin-admins",
+    component: () => import("../pages/tenant/admin/Admins.vue"),
+    meta: {
+      requiresSession: true,
+      requiresTenant: true,
+      requiresRole: "tenant_admin",
+      requiresTenantMatch: true,
+
+      title: "Admin Access | ItemTraxx",
     },
   },
   {

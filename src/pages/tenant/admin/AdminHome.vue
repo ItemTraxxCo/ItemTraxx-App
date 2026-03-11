@@ -38,6 +38,10 @@
         <h2>Item Logs</h2>
         <p>View checkout and return activity.</p>
       </RouterLink>
+      <RouterLink class="admin-card" to="/tenant/admin/admins">
+        <h2>Admin Access</h2>
+        <p>Manage tenant admin accounts and password resets.</p>
+      </RouterLink>
       <RouterLink class="admin-card" to="/tenant/admin/return">
         <h2>Quick Return</h2>
         <p>Quick return items without student a id.</p>

@@ -32,6 +32,7 @@
           <h2>Account Overview</h2>
           <p class="admin-section-copy">Review how this workspace is classified for billing and support.</p>
         </div>
+        <RouterLink class="button-link" to="/tenant/admin/admins">Admin Access</RouterLink>
       </div>
       <div class="admin-summary-grid">
         <div class="admin-summary-card">

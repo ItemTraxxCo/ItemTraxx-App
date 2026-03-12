@@ -57,3 +57,15 @@ jobs:
           name: perf-report
           path: artifacts/perf-report.json
           if-no-files-found: ignore
+
+  notify-slack-on-failure:
+    needs: build-and-verify
+    if: ${{ always() && needs.build-and-verify.result == 'failure' }}
+    uses: ./.github/workflows/slack-notify-failure.yml
+    with:
+      workflow_name: CI Core
+      job_name: build-and-verify
+      run_url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+      ref_name: ${{ github.ref_name }}
+      sha: ${{ github.sha }}
+    secrets: inherit

@@ -1,0 +1,85 @@
+name: Slack Notify Failure
+
+on:
+  workflow_call:
+    inputs:
+      workflow_name:
+        required: true
+        type: string
+      job_name:
+        required: true
+        type: string
+      run_url:
+        required: true
+        type: string
+      ref_name:
+        required: true
+        type: string
+      sha:
+        required: true
+        type: string
+    secrets:
+      SLACK_WEBHOOK_URL:
+        required: true
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send Slack failure notification
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          WORKFLOW_NAME: ${{ inputs.workflow_name }}
+          JOB_NAME: ${{ inputs.job_name }}
+          RUN_URL: ${{ inputs.run_url }}
+          REF_NAME: ${{ inputs.ref_name }}
+          SHA: ${{ inputs.sha }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          SHORT_SHA="$(printf '%s' "$SHA" | cut -c1-7)"
+          PAYLOAD="$(cat <<EOF
+          {
+            "text": "GitHub Actions failure",
+            "blocks": [
+              {
+                "type": "header",
+                "text": {
+                  "type": "plain_text",
+                  "text": ":x: GitHub Actions failure"
+                }
+              },
+              {
+                "type": "section",
+                "fields": [
+                  {
+                    "type": "mrkdwn",
+                    "text": "*Workflow:*\n$WORKFLOW_NAME"
+                  },
+                  {
+                    "type": "mrkdwn",
+                    "text": "*Job:*\n$JOB_NAME"
+                  },
+                  {
+                    "type": "mrkdwn",
+                    "text": "*Branch:*\n$REF_NAME"
+                  },
+                  {
+                    "type": "mrkdwn",
+                    "text": "*Commit:*\n$SHORT_SHA"
+                  }
+                ]
+              },
+              {
+                "type": "section",
+                "text": {
+                  "type": "mrkdwn",
+                  "text": "*Repository:* $REPOSITORY\n*Run:* <$RUN_URL|Open failing run>"
+                }
+              }
+            ]
+          }
+          EOF
+          )"
+          curl -fsSL -X POST "$SLACK_WEBHOOK_URL" \
+            -H "Content-Type: application/json" \
+            --data "$PAYLOAD"

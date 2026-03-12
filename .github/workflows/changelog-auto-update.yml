@@ -49,3 +49,15 @@ jobs:
           git add CHANGELOG.md
           git commit -m "chore(changelog): auto-update from main commits [skip ci]"
           git push origin HEAD:main
+
+  notify-slack-on-failure:
+    needs: update-changelog
+    if: ${{ always() && needs.update-changelog.result == 'failure' }}
+    uses: ./.github/workflows/slack-notify-failure.yml
+    with:
+      workflow_name: Changelog Auto Update
+      job_name: update-changelog
+      run_url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+      ref_name: ${{ github.ref_name }}
+      sha: ${{ github.sha }}
+    secrets: inherit

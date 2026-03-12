@@ -45,3 +45,15 @@ jobs:
           name: sbom
           path: artifacts/sbom.cdx.json
           if-no-files-found: error
+
+  notify-slack-on-failure:
+    needs: security-audit
+    if: ${{ always() && needs.security-audit.result == 'failure' }}
+    uses: ./.github/workflows/slack-notify-failure.yml
+    with:
+      workflow_name: Security Audit
+      job_name: security-audit
+      run_url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+      ref_name: ${{ github.ref_name }}
+      sha: ${{ github.sha }}
+    secrets: inherit

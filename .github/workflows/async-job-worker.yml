@@ -26,3 +26,15 @@ jobs:
             -H "Content-Type: application/json" \
             --data '{"limit": 30, "run_reporting_refresh": true}' \
             | head -c 500
+
+  notify-slack-on-failure:
+    needs: process-jobs
+    if: ${{ always() && needs.process-jobs.result == 'failure' }}
+    uses: ./.github/workflows/slack-notify-failure.yml
+    with:
+      workflow_name: Async Job Worker
+      job_name: process-jobs
+      run_url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+      ref_name: ${{ github.ref_name }}
+      sha: ${{ github.sha }}
+    secrets: inherit

@@ -6,6 +6,8 @@
 # https://github.com/actions/labeler
 
 name: Labeler
+
+permissions: {}
 on: [pull_request_target]
 
 jobs:
@@ -20,3 +22,15 @@ jobs:
     - uses: actions/labeler@v6
       with:
         repo-token: "${{ secrets.GITHUB_TOKEN }}"
+
+  notify-slack-on-failure:
+    needs: label
+    if: ${{ always() && needs.label.result == 'failure' }}
+    uses: ./.github/workflows/slack-notify-failure.yml
+    with:
+      workflow_name: Labeler
+      job_name: label
+      run_url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+      ref_name: ${{ github.ref_name }}
+      sha: ${{ github.sha }}
+    secrets: inherit

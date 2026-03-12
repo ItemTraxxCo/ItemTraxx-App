@@ -87,3 +87,15 @@ jobs:
           curl -fsS "https://itemtraxx-edge-proxy.itemtraxx-co.workers.dev/functions/system-status" \
             -H "Origin: https://itemtraxx.com" \
             | head -c 300
+
+  notify-slack-on-failure:
+    needs: health-check
+    if: ${{ always() && needs.health-check.result == 'failure' }}
+    uses: ./.github/workflows/slack-notify-failure.yml
+    with:
+      workflow_name: Deployment Health
+      job_name: health-check
+      run_url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+      ref_name: ${{ github.ref_name }}
+      sha: ${{ github.sha }}
+    secrets: inherit

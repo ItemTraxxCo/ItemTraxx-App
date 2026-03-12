@@ -19,3 +19,15 @@ jobs:
 
       - name: Run production synthetic smoke checks
         run: bash ./scripts/synthetic-smoke.sh
+
+  notify-slack-on-failure:
+    needs: synthetic-smoke
+    if: ${{ always() && needs.synthetic-smoke.result == 'failure' }}
+    uses: ./.github/workflows/slack-notify-failure.yml
+    with:
+      workflow_name: Synthetic Journeys
+      job_name: synthetic-smoke
+      run_url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+      ref_name: ${{ github.ref_name }}
+      sha: ${{ github.sha }}
+    secrets: inherit

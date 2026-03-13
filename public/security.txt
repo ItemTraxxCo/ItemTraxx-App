@@ -1,0 +1,5 @@
+Contact: mailto:support@itemtraxx.com
+Canonical: https://itemtraxx.com/.well-known/security.txt
+Policy: https://itemtraxx.com/legal
+Preferred-Languages: en
+Expires: 2027-03-12T00:00:00.000Z

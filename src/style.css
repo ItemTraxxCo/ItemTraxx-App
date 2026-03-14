@@ -178,10 +178,6 @@ button:focus-visible {
   text-align: left;
 }
 
-.app-shell.with-top-banners {
-  padding-top: var(--top-banner-offset);
-}
-
 .app-shell.route-shell-auth {
   margin: -2.5rem -2rem 0;
   min-height: 100vh;
@@ -196,6 +192,19 @@ button:focus-visible {
   background: #090d14;
 }
 
+.app-shell.route-shell-banner-bleed.with-top-banners {
+  margin-top: -2.5rem;
+}
+
+.app-shell.with-top-banners .pricing-shell {
+  margin-top: 0;
+  padding-top: 1.5rem;
+}
+
+.app-shell.with-top-banners .contact-sales-page {
+  padding-top: 0.5rem;
+}
+
 @media (max-width: 640px) {
   .app-shell.route-shell-auth {
     margin: -2.5rem -2rem 0;
@@ -203,6 +212,10 @@ button:focus-visible {
 
   .app-shell.route-shell-marketing {
     margin: -2.5rem -2rem -3rem;
+  }
+
+  .app-shell.with-top-banners .pricing-shell {
+    padding-top: 1.1rem;
   }
 }
 
@@ -587,10 +600,8 @@ textarea {
 }
 
 .maintenance-top-banner {
-  position: fixed;
+  position: sticky;
   top: 0;
-  left: 0;
-  right: 0;
   z-index: 1100;
   display: flex;
   align-items: center;
@@ -601,6 +612,13 @@ textarea {
   color: #fff5f5;
   border-bottom: 1px solid rgba(255, 255, 255, 0.2);
   font-size: 0.92rem;
+}
+
+.app-shell.route-shell-banner-bleed .maintenance-top-banner,
+.app-shell.route-shell-banner-bleed .broadcast-top-banner,
+.app-shell.route-shell-banner-bleed .incident-banner {
+  margin-left: -2rem;
+  margin-right: -2rem;
 }
 
 .maintenance-top-banner strong {
@@ -730,6 +748,13 @@ textarea {
   .maintenance-fullscreen .button-link,
   .maintenance-fullscreen .button-primary {
     width: 100%;
+  }
+
+  .app-shell.route-shell-banner-bleed .maintenance-top-banner,
+  .app-shell.route-shell-banner-bleed .broadcast-top-banner,
+  .app-shell.route-shell-banner-bleed .incident-banner {
+    margin-left: -2rem;
+    margin-right: -2rem;
   }
 }
 
@@ -863,9 +888,8 @@ textarea {
 }
 
 .broadcast-top-banner {
-  position: fixed;
-  left: 0;
-  right: 0;
+  position: sticky;
+  top: 0;
   z-index: 1100;
   display: flex;
   align-items: flex-start;
@@ -907,7 +931,15 @@ textarea {
 }
 
 .incident-banner {
-  top: 4.8rem;
+  position: sticky;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 1095;
+  max-width: none;
+  margin: 0;
+  border-radius: 0;
+  box-shadow: none;
 }
 
 .broadcast-content {

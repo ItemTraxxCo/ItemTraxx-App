@@ -4,7 +4,7 @@
       <section class="login-story-panel">
         <header class="story-header">
           <div class="story-brand">ItemTraxx</div>
-          <RouterLink class="story-back-link" to="/">Back to website</RouterLink>
+          <RouterLink class="story-back-link" to="/">Back</RouterLink>
         </header>
 
         <div class="story-copy-wrap">

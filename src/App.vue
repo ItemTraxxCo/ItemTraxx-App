@@ -5,6 +5,7 @@
       'with-top-banners': hasTopBanners,
       'route-shell-auth': isFullBleedRoute,
       'route-shell-marketing': isMarketingFullBleedRoute,
+      'route-shell-banner-bleed': isBannerBleedRoute,
     }"
     :style="appShellStyle"
   >
@@ -113,6 +114,7 @@
     </div>
     <div
       v-if="incidentBanner && showIncidentBanner"
+      ref="incidentBannerRef"
       class="broadcast-banner incident-banner"
       :class="incidentBanner.level === 'down' ? 'broadcast-critical' : 'broadcast-warning'"
       :style="incidentBannerStyle"
@@ -279,8 +281,10 @@ const incidentBanner = ref<IncidentBanner | null>(null);
 const dismissedIncidentId = ref(localStorage.getItem("itemtraxx-incident-dismissed") || "");
 const maintenanceBannerRef = ref<HTMLElement | null>(null);
 const broadcastBannerRef = ref<HTMLElement | null>(null);
+const incidentBannerRef = ref<HTMLElement | null>(null);
 const maintenanceBannerHeight = ref(0);
 const broadcastBannerHeight = ref(0);
+const incidentBannerHeight = ref(0);
 const maintenanceEnabled = ref(false);
 const maintenanceMessage = ref("Maintenance currentlyin progress.");
 const killSwitchEnabled = ref(false);
@@ -334,6 +338,13 @@ const isFullBleedRoute = computed(
 );
 const isMarketingFullBleedRoute = computed(
   () => route.path === "/" || route.path === "/landing-new"
+);
+const isBannerBleedRoute = computed(
+  () =>
+    route.path === "/legal" ||
+    route.path === "/pricing" ||
+    route.path === "/contact-sales" ||
+    route.path === "/contact-support"
 );
 const isDarkChromeRoute = computed(
   () => route.path === "/" || route.path === "/landing-new" || route.path === "/pricing"
@@ -428,9 +439,13 @@ const incidentSlaLine = computed(() => {
   if (Number.isNaN(checked.getTime())) return slaTarget;
   return `${slaTarget} Last checked ${checked.toLocaleTimeString()}.`;
 });
-const hasTopBanners = computed(() => showMaintenanceBanner.value || (showBroadcast.value && !!activeBroadcast.value));
+const hasTopBanners = computed(() =>
+  showMaintenanceBanner.value ||
+  (showBroadcast.value && !!activeBroadcast.value) ||
+  showIncidentBanner.value
+);
 const topOffsetPx = computed(() => {
-  const total = maintenanceBannerHeight.value + broadcastBannerHeight.value;
+  const total = maintenanceBannerHeight.value + broadcastBannerHeight.value + incidentBannerHeight.value;
   if (total <= 0) return "0px";
   return `${total}px`;
 });
@@ -463,10 +478,10 @@ const topMenuStyle = computed(() => ({
   top: `calc(1rem + ${topOffsetPx.value})`,
 }));
 const incidentBannerStyle = computed(() => ({
-  top: `calc(1rem + ${topOffsetPx.value})`,
+  top: "0px",
 }));
 const broadcastBannerStyle = computed(() => ({
-  top: showMaintenanceBanner.value ? `${maintenanceBannerHeight.value}px` : "0px",
+  top: "0px",
 }));
 const offlineQueueTooltip = computed(
   () =>
@@ -483,6 +498,9 @@ const measureTopBanners = () => {
     : 0;
   broadcastBannerHeight.value = showBroadcast.value && activeBroadcast.value
     ? (broadcastBannerRef.value?.offsetHeight ?? 0)
+    : 0;
+  incidentBannerHeight.value = showIncidentBanner.value && incidentBanner.value
+    ? (incidentBannerRef.value?.offsetHeight ?? 0)
     : 0;
 };
 

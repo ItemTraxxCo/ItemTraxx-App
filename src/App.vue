@@ -230,7 +230,7 @@
 <script setup lang="ts">
 import { computed, defineAsyncComponent, nextTick, onMounted, onUnmounted, ref, watch, watchEffect } from "vue";
 import { useRoute, useRouter } from "vue-router";
-import { signOut } from "./services/authService";
+import { getPostSignOutUrl, signOut } from "./services/authService";
 import {
   touchTenantAdminSession,
   validateTenantAdminSession,
@@ -543,8 +543,13 @@ const logoutTenant = async () => {
     return;
   }
   menuOpen.value = false;
+  const nextUrl = getPostSignOutUrl();
   await signOut();
-  await router.push("/");
+  if (nextUrl.startsWith("http")) {
+    window.location.assign(nextUrl);
+    return;
+  }
+  await router.push(nextUrl);
 };
 
 const reloadApp = () => {

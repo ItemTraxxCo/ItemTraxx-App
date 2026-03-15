@@ -13,11 +13,16 @@
 <script setup lang="ts">
 import { RouterLink } from "vue-router";
 import { useRouter } from "vue-router";
-import { signOut } from "../../services/authService";
+import { getPostSignOutUrl, signOut } from "../../services/authService";
 
 const router = useRouter();
 const handleSignOut = async () => {
+  const nextUrl = getPostSignOutUrl();
   await signOut();
-  await router.push("/");
+  if (nextUrl.startsWith("http")) {
+    window.location.assign(nextUrl);
+    return;
+  }
+  await router.push(nextUrl);
 };
 </script>

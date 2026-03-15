@@ -150,7 +150,7 @@ const handleAdminLogin = async () => {
         if (!handoff.rootOnly && handoff.code && handoff.districtSlug) {
           const targetPath =
             handoff.role === "district_admin" ? "/district" : "/tenant/admin";
-          window.location.assign(
+          window.location.replace(
             buildDistrictAppHandoffUrl(handoff.districtSlug, targetPath, handoff.code)
           );
           return;

@@ -122,6 +122,21 @@ const sendResendEmail = async (
     const text = await response.text().catch(() => "");
     throw new Error(`Email send failed: ${response.status} ${text}`);
   }
+
+  await new Promise((resolve) => setTimeout(resolve, 1000));
+};
+
+const sendSlackWebhook = async (webhookUrl: string, text: string) => {
+  const response = await fetch(webhookUrl, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ text }),
+  });
+
+  if (!response.ok) {
+    const body = await response.text().catch(() => "");
+    throw new Error(`Slack notification failed: ${response.status} ${body}`);
+  }
 };
 
 const escapeHtml = (value: string) =>
@@ -318,6 +333,7 @@ const buildContactSalesConfirmationHtml = (payload: ContactSalesPayload) => {
 const processContactSalesEmail = async (
   resendApiKey: string,
   payload: ContactSalesPayload,
+  slackWebhookUrl?: string,
 ) => {
   const organizationLine = payload.organization
     ? `\nOrganization: ${payload.organization}`
@@ -335,14 +351,34 @@ const processContactSalesEmail = async (
     to: [payload.support_email],
     subject: `${payload.intent === "demo" ? "Demo Request" : "Contact Sales Request"} - ${payload.organization || payload.name}`,
     reply_to: payload.reply_email,
+    html: buildContactSalesInternalHtml(payload),
     text:
       `A new ${payload.intent === "demo" ? "demo" : "sales"} request was submitted.\n\nPlan: ${payload.plan_label}\nName: ${payload.name}${organizationLine}\nReply email: ${payload.reply_email}${schoolsLine}\n\nDetails:\n${payload.details ?? "(none provided)"}\n\nLead ID: ${payload.lead_id}`,
   });
+
+  if (slackWebhookUrl) {
+    const detailsPreview = (payload.details ?? "(none provided)").slice(0, 400);
+    const slackText =
+      `New ${payload.intent === "demo" ? "demo request" : "sales inquiry"} submitted\n` +
+      `Plan: ${payload.plan_label}\n` +
+      `Name: ${payload.name}\n` +
+      `Organization: ${payload.organization}\n` +
+      `Reply email: ${payload.reply_email}` +
+      schoolsLine +
+      `\nLead ID: ${payload.lead_id}\n` +
+      `Details: ${detailsPreview}`;
+    try {
+      await sendSlackWebhook(slackWebhookUrl, slackText);
+    } catch (error) {
+      logError("contact sales slack notify failed", payload.lead_id, error);
+    }
+  }
 
   await sendResendEmail(resendApiKey, {
     from: payload.from_email,
     to: [payload.reply_email],
     subject: payload.intent === "demo" ? "We received your ItemTraxx demo request." : "We received your ItemTraxx sales request.",
+    html: buildContactSalesConfirmationHtml(payload),
     text:
       `Hi ${payload.name},\n\n${payload.intent === "demo" ? "Thanks for requesting an ItemTraxx demo. We've received your request and will follow up to schedule next steps within 2 business days." : "Thanks for contacting the ItemTraxx Sales Team. We've received your request and will follow up with a quote for your selected plan within 2 business days."}\n\nRequest summary:\nPlan: ${payload.plan_label}${schoolsLine}${organizationLine}\n\nIf you need to add anything else, feel free to reply to this email.\nHave a great day,\n\n- ItemTraxx ${payload.intent === "demo" ? "Team" : "Sales"}\n${payload.support_email}\n\nIf you don't hear from us within 2 business days, please check your spam folder or contact us at ${payload.support_email}`,
   });
@@ -550,6 +586,7 @@ const buildSupportRequestConfirmationHtml = (payload: SupportRequestPayload) => 
 const processSupportRequestEmail = async (
   resendApiKey: string,
   payload: SupportRequestPayload,
+  slackWebhookUrl?: string,
 ) => {
   const attachments = (payload.attachments ?? []).slice(0, 2).map((attachment) => ({
     filename: attachment.filename,
@@ -579,6 +616,22 @@ const processSupportRequestEmail = async (
       `${payload.message}` +
       (attachments.length ? `\n\nAttachments: ${attachments.length} image file(s) included.` : ""),
   });
+
+  if (slackWebhookUrl) {
+    const slackText =
+      `New support inquiry submitted\n` +
+      `Category: ${payload.category}\n` +
+      `Subject: ${payload.subject}\n` +
+      `Name: ${payload.name}\n` +
+      `Reply email: ${payload.reply_email}\n` +
+      `Attachments: ${attachments.length}\n` +
+      `Message: ${payload.message.slice(0, 400)}`;
+    try {
+      await sendSlackWebhook(slackWebhookUrl, slackText);
+    } catch (error) {
+      logError("support inquiry slack notify failed", payload.subject, error);
+    }
+  }
 
   await sendResendEmail(resendApiKey, {
     from: payload.from_email,
@@ -663,6 +716,14 @@ serve(async (req) => {
     const serviceKey = Deno.env.get("ITX_SECRET_KEY");
     const workerSecret = Deno.env.get("ITX_JOB_WORKER_SECRET");
     const resendApiKey = Deno.env.get("ITX_RESEND_API_KEY");
+    const salesSlackWebhookUrl =
+      Deno.env.get("ITX_SALES_SLACK_WEBHOOK_URL")?.trim() ||
+      Deno.env.get("ITX_SLACK_WEBHOOK_URL")?.trim() ||
+      "";
+    const supportSlackWebhookUrl =
+      Deno.env.get("ITX_SUPPORT_SLACK_WEBHOOK_URL")?.trim() ||
+      Deno.env.get("ITX_SLACK_WEBHOOK_URL")?.trim() ||
+      "";
     const supportEmail = Deno.env.get("ITX_SUPPORT_EMAIL") ?? "support@itemtraxx.com";
     const fromEmail =
       Deno.env.get("ITX_EMAIL_FROM") ??
@@ -708,6 +769,7 @@ serve(async (req) => {
           await processContactSalesEmail(
             resendApiKey,
             job.payload as ContactSalesPayload,
+            salesSlackWebhookUrl || undefined,
           );
         } else if (job.job_type === "login_notification_email") {
           await processLoginNotificationEmail(
@@ -725,6 +787,7 @@ serve(async (req) => {
           await processSupportRequestEmail(
             resendApiKey,
             job.payload as SupportRequestPayload,
+            supportSlackWebhookUrl || undefined,
           );
         } else if (job.job_type === "refresh_reporting_views") {
           await adminClient.rpc("refresh_super_reporting_views");

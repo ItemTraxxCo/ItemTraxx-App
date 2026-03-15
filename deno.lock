@@ -20,23 +20,30 @@
   "workspace": {
     "packageJson": {
       "dependencies": [
-        "npm:@supabase/supabase-js@^2.95.3",
-        "npm:@types/node@^24.10.1",
-        "npm:@vercel/analytics@^1.6.1",
-        "npm:@vercel/speed-insights@^1.3.1",
-        "npm:@vitejs/plugin-vue@^6.0.1",
-        "npm:@vue/tsconfig@~0.8.1",
+        "npm:@playwright/test@^1.58.2",
+        "npm:@supabase/supabase-js@^2.99.1",
+        "npm:@types/node@^25.5.0",
+        "npm:@vercel/analytics@^2.0.1",
+        "npm:@vercel/speed-insights@2",
+        "npm:@vitejs/plugin-vue@^6.0.5",
+        "npm:@vue/tsconfig@0.9",
         "npm:jsbarcode@^3.12.3",
         "npm:jspdf-autotable@^5.0.7",
         "npm:jspdf@^4.2.0",
-        "npm:supabase@^2.76.10",
+        "npm:rollup@^4.59.0",
+        "npm:supabase@2.78.1",
         "npm:typescript@~5.9.3",
-        "npm:vite@^7.2.4",
+        "npm:vite@8",
         "npm:vue-router@^4.6.4",
-        "npm:vue-tsc@^3.1.4",
-        "npm:vue@^3.5.24",
-        "npm:zod@^3.23.8"
-      ]
+        "npm:vue-tsc@^3.2.5",
+        "npm:vue@^3.5.30",
+        "npm:zod-to-json-schema@^3.25.1",
+        "npm:zod@^4.3.6"
+      ],
+      "overrides": {
+        "tar": "^7.5.10",
+        "tar@<=7.5.11": "7.5.11"
+      }
     }
   }
 }

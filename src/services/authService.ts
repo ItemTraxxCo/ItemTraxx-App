@@ -12,7 +12,7 @@ import {
   setTenantContext,
 } from "../store/authState";
 import { getDistrictState } from "../store/districtState";
-import { lookupDistrictById } from "./districtService";
+import { lookupDistrictById, resolveDistrictHost } from "./districtService";
 
 type ProfileRow = {
   id: string;
@@ -794,4 +794,33 @@ export const signOut = async () => {
   clearAdminVerification();
   clearAuthState(true);
   setDistrictContext(null);
+};
+
+export const getPostSignOutUrl = () => {
+  if (typeof window === "undefined") {
+    return "/login";
+  }
+
+  const { host, isDistrictHost } = resolveDistrictHost(window.location.hostname);
+  const normalizedHost = host.trim().toLowerCase();
+  if (!normalizedHost) {
+    return "/login";
+  }
+
+  if (
+    normalizedHost === "itemtraxx.com" ||
+    normalizedHost === "www.itemtraxx.com" ||
+    normalizedHost === "localhost" ||
+    normalizedHost === "127.0.0.1" ||
+    normalizedHost === "0.0.0.0" ||
+    normalizedHost.endsWith(".localhost")
+  ) {
+    return "/login";
+  }
+
+  if (isDistrictHost || normalizedHost !== "app.itemtraxx.com") {
+    return "https://itemtraxx.com/login";
+  }
+
+  return "/login";
 };

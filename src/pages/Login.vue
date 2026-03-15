@@ -247,7 +247,7 @@ const handleTenantLogin = async () => {
         session.authEmail,
         password.value
       );
-      window.location.assign(
+      window.location.replace(
         buildDistrictAppHandoffUrl(
           session.districtSlug,
           "/tenant/checkout",

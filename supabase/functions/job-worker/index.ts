@@ -351,6 +351,7 @@ const processContactSalesEmail = async (
     to: [payload.support_email],
     subject: `${payload.intent === "demo" ? "Demo Request" : "Contact Sales Request"} - ${payload.organization || payload.name}`,
     reply_to: payload.reply_email,
+    html: buildContactSalesInternalHtml(payload),
     text:
       `A new ${payload.intent === "demo" ? "demo" : "sales"} request was submitted.\n\nPlan: ${payload.plan_label}\nName: ${payload.name}${organizationLine}\nReply email: ${payload.reply_email}${schoolsLine}\n\nDetails:\n${payload.details ?? "(none provided)"}\n\nLead ID: ${payload.lead_id}`,
   });
@@ -377,6 +378,7 @@ const processContactSalesEmail = async (
     from: payload.from_email,
     to: [payload.reply_email],
     subject: payload.intent === "demo" ? "We received your ItemTraxx demo request." : "We received your ItemTraxx sales request.",
+    html: buildContactSalesConfirmationHtml(payload),
     text:
       `Hi ${payload.name},\n\n${payload.intent === "demo" ? "Thanks for requesting an ItemTraxx demo. We've received your request and will follow up to schedule next steps within 2 business days." : "Thanks for contacting the ItemTraxx Sales Team. We've received your request and will follow up with a quote for your selected plan within 2 business days."}\n\nRequest summary:\nPlan: ${payload.plan_label}${schoolsLine}${organizationLine}\n\nIf you need to add anything else, feel free to reply to this email.\nHave a great day,\n\n- ItemTraxx ${payload.intent === "demo" ? "Team" : "Sales"}\n${payload.support_email}\n\nIf you don't hear from us within 2 business days, please check your spam folder or contact us at ${payload.support_email}`,
   });

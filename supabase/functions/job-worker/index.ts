@@ -122,6 +122,8 @@ const sendResendEmail = async (
     const text = await response.text().catch(() => "");
     throw new Error(`Email send failed: ${response.status} ${text}`);
   }
+
+  await new Promise((resolve) => setTimeout(resolve, 1000));
 };
 
 const sendSlackWebhook = async (webhookUrl: string, text: string) => {

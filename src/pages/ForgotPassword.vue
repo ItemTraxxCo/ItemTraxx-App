@@ -1,7 +1,7 @@
 <template>
   <div class="page">
     <h1>Forgot Password</h1>
-    <p>Enter your account email and we'll send a reset link. If your account is registered to the email you enter, you will receive an email with a link to reset your password shortly. The link will expire in 60 minutes and is only valid for one use.</p>
+    <p>Enter your account email and we'll send a reset link. If your account is registered to the email you enter, you will receive an email with a link to reset your password shortly. The link will expire in 60 minutes and is only valid for one use. If you do not receive a password reset email, please reach out to our support team.</p>
 
     <div class="card">
       <form class="form" @submit.prevent="sendResetEmail">

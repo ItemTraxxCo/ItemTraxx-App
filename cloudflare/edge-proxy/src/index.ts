@@ -18,6 +18,7 @@ const DEFAULT_ALLOWED_ORIGINS = [
   "https://internal.itemtraxx.com",
   "https://app.itemtraxx.com",
   "https://*.app.itemtraxx.com",
+  "https://*.vercel.app",
 ];
 
 const trimTrailingSlash = (value: string) => value.replace(/\/+$/, "");

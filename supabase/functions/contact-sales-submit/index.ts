@@ -277,6 +277,7 @@ serve(async (req) => {
       .single();
 
     if (insertError || !lead) {
+      logError("contact-sales-submit insert failed", requestId, insertError ?? "missing lead row");
       return jsonResponse(400, { error: "Unable to save sales request." });
     }
 

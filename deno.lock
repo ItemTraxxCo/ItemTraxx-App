@@ -21,7 +21,7 @@
     "packageJson": {
       "dependencies": [
         "npm:@playwright/test@^1.58.2",
-        "npm:@supabase/supabase-js@^2.99.1",
+        "npm:@supabase/supabase-js@^2.99.2",
         "npm:@types/node@^25.5.0",
         "npm:@vercel/analytics@^2.0.1",
         "npm:@vercel/speed-insights@2",
@@ -29,13 +29,13 @@
         "npm:@vue/tsconfig@0.9",
         "npm:jsbarcode@^3.12.3",
         "npm:jspdf-autotable@^5.0.7",
-        "npm:jspdf@^4.2.0",
+        "npm:jspdf@^4.2.1",
         "npm:rollup@^4.59.0",
-        "npm:supabase@2.78.1",
+        "npm:supabase@2.81.0",
         "npm:typescript@~5.9.3",
         "npm:vite@8",
         "npm:vue-router@^4.6.4",
-        "npm:vue-tsc@^3.2.5",
+        "npm:vue-tsc@^3.2.6",
         "npm:vue@^3.5.30",
         "npm:zod-to-json-schema@^3.25.1",
         "npm:zod@^4.3.6"

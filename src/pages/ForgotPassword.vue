@@ -1,9 +1,11 @@
 <template>
-  <div class="page">
-    <h1>Forgot Password</h1>
-    <p>Enter your account email and we'll send a reset link. If your account is registered to the email you enter, you will receive an email with a link to reset your password shortly. The link will expire in 60 minutes and is only valid for one use.</p>
+  <div class="forgot-shell" :class="`theme-${themeMode}`">
+    <div class="forgot-panel">
+      <div class="forgot-copy">
+        <h1>Forgot Password</h1>
+        <p class="forgot-subtitle">Enter your account email and we'll send a reset link. If your account is registered to the email you enter, you will receive an email with a link to reset your password shortly. The link will expire in 60 minutes and is only valid for one use. If you do not receive a password reset email, please reach out to our support team.</p>
+      </div>
 
-    <div class="card">
       <form class="form" @submit.prevent="sendResetEmail">
         <label>
           Account Email
@@ -26,7 +28,7 @@
       </form>
 
       <p v-if="error" class="error">{{ error }}</p>
-      <p v-if="success" class="muted">
+      <p v-if="success" class="muted forgot-success">
         Password reset link sent. Check your inbox and follow the link to continue. The link will expire in 60 minutes. If you don't receive the email, check your spam folder or try again.
       </p>
 
@@ -36,7 +38,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from "vue";
+import { onMounted, onUnmounted, ref } from "vue";
 import { RouterLink } from "vue-router";
 import { supabase } from "../services/supabaseClient";
 
@@ -44,6 +46,8 @@ const email = ref("");
 const error = ref("");
 const success = ref(false);
 const isLoading = ref(false);
+const themeMode = ref<"light" | "dark">("dark");
+let themeObserver: MutationObserver | null = null;
 
 const sendResetEmail = async () => {
   error.value = "";
@@ -74,9 +78,70 @@ const sendResetEmail = async () => {
     isLoading.value = false;
   }
 };
+
+onMounted(() => {
+  themeMode.value = document.documentElement.getAttribute("data-theme") === "light" ? "light" : "dark";
+  themeObserver = new MutationObserver(() => {
+    themeMode.value = document.documentElement.getAttribute("data-theme") === "light" ? "light" : "dark";
+  });
+  themeObserver.observe(document.documentElement, {
+    attributes: true,
+    attributeFilter: ["data-theme"],
+  });
+});
+
+onUnmounted(() => {
+  if (themeObserver) {
+    themeObserver.disconnect();
+    themeObserver = null;
+  }
+});
 </script>
 
 <style scoped>
+.forgot-shell {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  background:
+    radial-gradient(circle at top, rgba(25, 194, 168, 0.16), transparent 34%),
+    radial-gradient(circle at bottom right, rgba(25, 67, 155, 0.18), transparent 38%),
+    linear-gradient(180deg, #11151c 0%, #090c12 100%);
+}
+
+.forgot-shell.theme-light {
+  background:
+    radial-gradient(circle at top, rgba(25, 194, 168, 0.16), transparent 30%),
+    radial-gradient(circle at bottom right, rgba(25, 67, 155, 0.14), transparent 34%),
+    linear-gradient(180deg, #eef5f8 0%, #dde7ee 100%);
+}
+
+.forgot-panel {
+  width: min(100%, 34rem);
+  padding: 1.8rem 1.9rem 2rem;
+  border-radius: 24px;
+  border: 1px solid color-mix(in srgb, var(--border) 72%, var(--accent) 28%);
+  background:
+    radial-gradient(circle at top right, color-mix(in srgb, var(--accent) 10%, transparent 90%), transparent 28%),
+    linear-gradient(180deg, color-mix(in srgb, var(--surface) 94%, transparent 6%) 0%, color-mix(in srgb, var(--surface-2) 92%, transparent 8%) 100%);
+  box-shadow: 0 24px 48px rgba(0, 0, 0, 0.18);
+}
+
+.forgot-copy h1 {
+  margin: 0;
+}
+
+.forgot-subtitle {
+  margin: 1rem 0 1.8rem;
+  color: var(--muted);
+}
+
+.forgot-success {
+  margin-top: 1rem;
+}
+
 .back-link {
   display: inline-flex;
   align-items: center;

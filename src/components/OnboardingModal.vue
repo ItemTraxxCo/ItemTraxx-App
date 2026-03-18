@@ -7,29 +7,31 @@
     :aria-label="`ItemTraxx onboarding step ${currentStepIndex + 1} of ${steps.length}`"
   >
     <div class="onboarding-modal">
-      <div class="onboarding-header">
-        <p class="onboarding-step-label">Step {{ currentStepIndex + 1 }} of {{ steps.length }}</p>
-        <button
-          ref="closeButtonRef"
-          type="button"
-          class="onboarding-close"
-          aria-label="Close onboarding"
-          @click="emitClose"
-        >
-          ×
-        </button>
-      </div>
+      <div class="onboarding-content">
+        <div class="onboarding-header">
+          <p class="onboarding-step-label">Step {{ currentStepIndex + 1 }} of {{ steps.length }}</p>
+          <button
+            ref="closeButtonRef"
+            type="button"
+            class="onboarding-close"
+            aria-label="Close onboarding"
+            @click="emitClose"
+          >
+            ×
+          </button>
+        </div>
 
-      <h3>{{ currentStep.title }}</h3>
-      <p class="muted onboarding-body">{{ currentStep.body }}</p>
+        <h3>{{ currentStep.title }}</h3>
+        <p class="muted onboarding-body">{{ currentStep.body }}</p>
 
-      <div class="onboarding-progress" aria-hidden="true">
-        <span
-          v-for="(_, idx) in steps"
-          :key="idx"
-          class="onboarding-dot"
-          :class="{ active: idx === currentStepIndex }"
-        ></span>
+        <div class="onboarding-progress" aria-hidden="true">
+          <span
+            v-for="(_, idx) in steps"
+            :key="idx"
+            class="onboarding-dot"
+            :class="{ active: idx === currentStepIndex }"
+          ></span>
+        </div>
       </div>
 
       <div class="onboarding-actions">
@@ -211,8 +213,18 @@ onUnmounted(() => {
   color: var(--text);
   padding: 1rem;
   box-shadow: 0 18px 40px rgba(0, 0, 0, 0.28);
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: 0.8rem;
+  min-height: 320px;
+}
+
+.onboarding-content {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 0.8rem;
+  min-height: 0;
 }
 
 .onboarding-header {
@@ -242,12 +254,14 @@ onUnmounted(() => {
 
 .onboarding-body {
   margin-top: -0.15rem;
+  flex: 1 1 auto;
 }
 
 .onboarding-progress {
   display: flex;
   align-items: center;
   gap: 0.4rem;
+  margin-top: auto;
 }
 
 .onboarding-dot {
@@ -266,6 +280,8 @@ onUnmounted(() => {
   align-items: center;
   justify-content: space-between;
   gap: 0.8rem;
+  margin-top: auto;
+  padding-top: 0.25rem;
 }
 
 .onboarding-nav {

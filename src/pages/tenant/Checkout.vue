@@ -22,18 +22,22 @@
             v-model="studentId"
             type="text"
             placeholder="Enter student ID"
+            :disabled="studentLookupCooldownSeconds > 0"
             @keyup.enter="loadStudent"
           />
           <button
             type="button"
             class="button-primary checkout-inline-button"
-            :disabled="isStudentLoading"
+            :disabled="isStudentLoading || studentLookupCooldownSeconds > 0"
             @click="loadStudent"
           >
             Load student
           </button>
         </div>
       </label>
+      <p v-if="studentLookupCooldownSeconds > 0" class="muted checkout-rate-limit-note">
+        Try again in {{ studentLookupCooldownSeconds }} second{{ studentLookupCooldownSeconds === 1 ? "" : "s" }}.
+      </p>
       <p v-if="isStudentLoading" class="muted checkout-status-note">Loading student...</p>
 
       <div v-if="student" class="checkout-student-summary">
@@ -130,7 +134,10 @@ import {
   type GearSummary,
   type StudentSummary,
 } from "../../services/checkoutService";
-import { enforceTenantLookupRateLimit } from "../../services/rateLimitService";
+import {
+  enforceTenantLookupRateLimit,
+  getTenantLookupCooldownRemainingMs,
+} from "../../services/rateLimitService";
 import { sanitizeInput } from "../../utils/inputSanitizer";
 import { getAuthState } from "../../store/authState";
 
@@ -151,6 +158,8 @@ const barcodeField = ref<HTMLInputElement | null>(null);
 const logoUrl = import.meta.env.VITE_LOGO_URL as string | undefined;
 const toastTitle = ref("");
 const syncInFlight = ref(false);
+const studentLookupCooldownSeconds = ref(0);
+let studentLookupCooldownTimer: number | null = null;
 const receipt = ref<{
   timestamp: string;
   studentUsername: string;
@@ -161,6 +170,27 @@ const receipt = ref<{
   returns: number;
   items: Array<{ name: string; barcode: string; action: "checkout" | "return" }>;
 } | null>(null);
+
+const updateStudentLookupCooldown = () => {
+  const remainingMs = getTenantLookupCooldownRemainingMs();
+  studentLookupCooldownSeconds.value = remainingMs > 0 ? Math.ceil(remainingMs / 1000) : 0;
+
+  if (studentLookupCooldownSeconds.value === 0 && studentLookupCooldownTimer !== null) {
+    window.clearInterval(studentLookupCooldownTimer);
+    studentLookupCooldownTimer = null;
+  }
+};
+
+const ensureStudentLookupCooldownTimer = () => {
+  updateStudentLookupCooldown();
+  if (studentLookupCooldownSeconds.value === 0 || studentLookupCooldownTimer !== null) {
+    return;
+  }
+
+  studentLookupCooldownTimer = window.setInterval(() => {
+    updateStudentLookupCooldown();
+  }, 250);
+};
 
 const syncOfflineBuffer = async (showWhenNoOps = false) => {
   if (syncInFlight.value) return;
@@ -206,15 +236,22 @@ const loadStudent = async () => {
     error.value = "Enter a student ID.";
     return;
   }
+  if (studentLookupCooldownSeconds.value > 0) {
+    error.value = `Rate limit reached. Wait ${studentLookupCooldownSeconds.value} second${studentLookupCooldownSeconds.value === 1 ? "" : "s"} and try again.`;
+    ensureStudentLookupCooldownTimer();
+    return;
+  }
   isStudentLoading.value = true;
   try {
     await enforceTenantLookupRateLimit();
+    updateStudentLookupCooldown();
     const studentRow = await fetchStudentByStudentId(studentId.value.trim());
     student.value = studentRow;
     checkedOutGear.value = await fetchCheckedOutGear(studentRow.id);
     await nextTick();
     barcodeField.value?.focus();
   } catch (err) {
+    ensureStudentLookupCooldownTimer();
     student.value = null;
     checkedOutGear.value = [];
     error.value = err instanceof Error ? err.message : "Student not found. Please check the student ID and try again.";
@@ -391,6 +428,8 @@ const handleOnline = () => {
 
 onMounted(() => {
   window.addEventListener("online", handleOnline);
+  updateStudentLookupCooldown();
+  ensureStudentLookupCooldownTimer();
   const buffered = getBufferedCheckoutCount();
   if (buffered > 0) {
     toastStatus.value = "Processing";
@@ -402,6 +441,10 @@ onMounted(() => {
 
 onUnmounted(() => {
   window.removeEventListener("online", handleOnline);
+  if (studentLookupCooldownTimer !== null) {
+    window.clearInterval(studentLookupCooldownTimer);
+    studentLookupCooldownTimer = null;
+  }
 });
 </script>
 
@@ -458,6 +501,11 @@ onUnmounted(() => {
 
 .checkout-status-note {
   margin-top: 0.7rem;
+}
+
+.checkout-rate-limit-note {
+  margin-top: 0.45rem;
+  min-height: 1.2rem;
 }
 
 .checkout-student-panel {

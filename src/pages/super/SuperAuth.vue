@@ -15,10 +15,14 @@
           Password
           <input v-model="password" type="password" placeholder="Enter password" />
         </label>
-        <label v-if="turnstileSiteKey">
+        <label>
           Security Check
-          <div :ref="setTurnstileContainerRef"></div>
-          <p class="muted turnstile-help">Complete security check to enable verification.</p>
+          <div v-if="hasTurnstileSiteKey" :ref="setTurnstileContainerRef"></div>
+          <p v-if="turnstileStatusMessage" :class="turnstileStatusClass">{{ turnstileStatusMessage }}</p>
+          <p class="muted turnstile-help">
+            <template v-if="hasTurnstileSiteKey">Complete security check to enable verification.</template>
+            <template v-else>Turnstile is configured through `VITE_TURNSTILE_SITE_KEY` and requires a dev server restart after env changes.</template>
+          </p>
         </label>
         <div class="form-actions">
           <button type="submit" class="button-primary" :disabled="!canSubmit">Verify</button>
@@ -47,12 +51,12 @@ const isLoading = ref(false);
 const toastTitle = ref("");
 const toastMessage = ref("");
 const themeMode = ref<"light" | "dark">("dark");
-const turnstileSiteKey = import.meta.env.VITE_TURNSTILE_SITE_KEY as
-  | string
-  | undefined;
+const turnstileSiteKey = (import.meta.env.VITE_TURNSTILE_SITE_KEY as string | undefined)?.trim();
+const hasTurnstileSiteKey = !!turnstileSiteKey;
 const {
   containerRef: turnstileContainerRef,
   token: turnstileToken,
+  loadError: turnstileLoadError,
   reset: resetTurnstile,
 } = useTurnstile(turnstileSiteKey);
 const setTurnstileContainerRef = (
@@ -71,9 +75,22 @@ const setTurnstileContainerRef = (
 let toastTimer: number | null = null;
 let themeObserver: MutationObserver | null = null;
 
+const turnstileStatusMessage = computed(() => {
+  if (!hasTurnstileSiteKey) {
+    return "Turnstile site key is missing in the current frontend runtime.";
+  }
+  return turnstileLoadError.value || "";
+});
+
+const turnstileStatusClass = computed(() =>
+  turnstileStatusMessage.value ? "error turnstile-error" : "muted turnstile-help"
+);
+
 const canSubmit = computed(() => {
   if (isLoading.value) return false;
   if (!email.value.trim() || !password.value.trim()) return false;
+  if (!hasTurnstileSiteKey) return false;
+  if (turnstileLoadError.value) return false;
   if (turnstileSiteKey && !turnstileToken.value) return false;
   return true;
 });
@@ -95,6 +112,16 @@ const handleSuperAdminLogin = async () => {
   error.value = "";
   if (!email.value.trim() || !password.value.trim()) {
     showToast("Verification blocked", "Enter email and password to continue.");
+    return;
+  }
+  if (!hasTurnstileSiteKey) {
+    error.value = "Security check is unavailable because the Turnstile site key is missing.";
+    showToast("Security check unavailable", "Restart the dev server after restoring the Turnstile site key.");
+    return;
+  }
+  if (turnstileLoadError.value) {
+    error.value = turnstileLoadError.value;
+    showToast("Security check unavailable", "Refresh the page and try again.");
     return;
   }
   if (turnstileSiteKey && !turnstileToken.value) {
@@ -211,5 +238,11 @@ onUnmounted(() => {
 .turnstile-help {
   margin-top: 0.35rem;
   font-size: 0.78rem;
+}
+
+.turnstile-error {
+  margin-top: 0.5rem;
+  margin-bottom: 0;
+  font-size: 0.82rem;
 }
 </style>

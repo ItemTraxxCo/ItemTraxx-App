@@ -24,7 +24,14 @@ const tenantPlanCodeSchema = z.enum([
   "individual_yearly",
   "individual_monthly",
 ]);
-const districtSubscriptionPlanSchema = z.enum(["starter", "standard", "enterprise"]);
+const districtSubscriptionPlanSchema = z.enum([
+  "district_core",
+  "district_growth",
+  "district_enterprise",
+  "organization_starter",
+  "organization_scale",
+  "organization_enterprise",
+]);
 const districtBillingStatusSchema = z.enum(["draft", "active", "past_due", "canceled"]);
 
 const adminOpsDevicePayloadSchema = z.object({

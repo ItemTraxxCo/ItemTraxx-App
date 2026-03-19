@@ -1,0 +1,49 @@
+name: Vercel Analytics Report
+
+permissions:
+  contents: read
+
+on:
+  schedule:
+    # Every Monday at 9am UTC
+    - cron: "0 9 * * 1"
+  workflow_dispatch:
+    inputs:
+      period:
+        description: "Analytics period (e.g., 7d, 14d, 30d)"
+        required: false
+        default: "7d"
+
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Run Vercel Analytics Agent
+        env:
+          VERCEL_API_TOKEN: ${{ secrets.VERCEL_API_TOKEN }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+          VERCEL_TEAM_ID: ${{ secrets.VERCEL_TEAM_ID }}
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          ANALYTICS_PERIOD: ${{ inputs.period || '7d' }}
+        run: node scripts/vercel-analytics-agent.mjs
+
+  notify-failure:
+    needs: analyze
+    if: failure()
+    uses: ./.github/workflows/slack-notify-failure.yml
+    with:
+      workflow_name: "Vercel Analytics Report"
+      job_name: "analyze"
+      run_url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+      ref_name: ${{ github.ref_name }}
+      sha: ${{ github.sha }}
+    secrets:
+      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}

@@ -105,6 +105,18 @@ const attachE2EControls = () => {
 
 const PUBLIC_BOOTSTRAP_PATHS = new Set(["/", "/login", "/legal", "/reset-password"]);
 
+const redirectCanonicalHost = () => {
+  if (typeof window === "undefined") return false;
+  const hostname = window.location.hostname.toLowerCase();
+  if (hostname !== "www.itemtraxx.com") {
+    return false;
+  }
+  const target = new URL(window.location.href);
+  target.hostname = "itemtraxx.com";
+  window.location.replace(target.toString());
+  return true;
+};
+
 const isPublicBootstrapPath = () => {
   const path = window.location.pathname || "/";
   if (PUBLIC_BOOTSTRAP_PATHS.has(path)) {
@@ -158,6 +170,9 @@ const mountApp = () => {
 };
 
 const bootstrap = async () => {
+  if (redirectCanonicalHost()) {
+    return;
+  }
   const consumedDistrictHandoff = await consumeDistrictSessionHandoff();
   await initializeDistrictContext();
   const districtContext = getDistrictState();

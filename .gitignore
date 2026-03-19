@@ -32,3 +32,4 @@ artifacts/
 
 # Supabase CLI temp files
 supabase/.temp/
+.agent.md

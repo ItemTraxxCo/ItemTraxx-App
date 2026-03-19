@@ -33,3 +33,5 @@ artifacts/
 # Supabase CLI temp files
 supabase/.temp/
 .agent.md
+.github/copilot-instructions.md
+.github/agents/Main Developer.agent.md

@@ -496,20 +496,59 @@ router.beforeEach((to) => {
     return { name: "not-found" };
   }
 
-  if (meta?.public) return true;
-
   const auth = getAuthState();
-  if (!auth.isInitialized) {
-    return true;
+
+  // Redirect authenticated users away from home page to their appropriate dashboard
+  // Note: We only redirect from public-home, not public-login, so users can still
+  // access the login page to switch accounts if needed
+  if (
+    auth.isInitialized &&
+    auth.isAuthenticated &&
+    to.name === "public-home"
+  ) {
+    // For district hosts, verify user belongs to this district before redirecting
+    if (
+      district.isDistrictHost &&
+      district.districtId &&
+      auth.districtContextId &&
+      auth.districtContextId !== district.districtId
+    ) {
+      // User is logged in but belongs to a different district - let them see public page
+      // They may want to log out and log in with a different account
+      if (meta?.public) return true;
+    }
+
+    // Redirect based on role
+    if (auth.role === "super_admin") {
+      if (auth.hasSecondaryAuth && hasFreshSuperVerification(auth.superVerifiedAt)) {
+        return { name: "super-admin-home" };
+      }
+      return { name: "super-auth" };
+    }
+
+    if (auth.role === "district_admin") {
+      if (hasFreshAdminVerification(auth.adminVerifiedAt)) {
+        return { name: "district-admin-home" };
+      }
+      return { name: "tenant-admin-login" };
+    }
+
+    if (auth.role === "tenant_admin") {
+      if (hasFreshAdminVerification(auth.adminVerifiedAt)) {
+        return { name: "tenant-admin-home" };
+      }
+      return { name: "tenant-admin-login" };
+    }
+
+    if (auth.role === "tenant_user" && auth.tenantContextId) {
+      return { name: "tenant-checkout" };
+    }
   }
 
-  if (
-    auth.isAuthenticated &&
-    auth.role === "district_admin" &&
-    hasFreshAdminVerification(auth.adminVerifiedAt) &&
-    (to.name === "public-home" || to.name === "tenant-admin-login")
-  ) {
-    return { name: "district-admin-home" };
+  if (meta?.public) return true;
+
+  if (!auth.isInitialized) {
+    return true;
   }
 
   if (meta?.requiresSession && !auth.isAuthenticated) {

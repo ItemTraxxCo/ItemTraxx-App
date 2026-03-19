@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { sendLoggedResendEmail } from "../_shared/emailDeliveryLog.ts";
 import { isKillSwitchWriteBlocked } from "../_shared/killSwitch.ts";
 import { getRequestId, logError, logInfo } from "../_shared/observability.ts";
 
@@ -41,25 +42,6 @@ const normalizeIp = (req: Request) => {
   return forwardedFirst || cfIp || null;
 };
 
-const sendResendEmail = async (
-  apiKey: string,
-  payload: Record<string, unknown>,
-) => {
-  const response = await fetch("https://api.resend.com/emails", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(payload),
-  });
-
-  if (!response.ok) {
-    const text = await response.text().catch(() => "");
-    throw new Error(`Email send failed: ${response.status} ${text}`);
-  }
-};
-
 const escapeHtml = (value: string) =>
   value
     .replaceAll("&", "&amp;")
@@ -69,13 +51,15 @@ const escapeHtml = (value: string) =>
     .replaceAll("'", "&#39;");
 
 const buildLoginNotificationHtml = (payload: {
-  tenantName: string;
+  accountName: string;
+  accountLabel: string;
   supportEmail: string;
   loginTimeLabel: string;
   deviceBrowser: string;
   ipAddress: string | null;
 }) => {
-  const tenantName = escapeHtml(payload.tenantName);
+  const accountName = escapeHtml(payload.accountName);
+  const accountLabel = escapeHtml(payload.accountLabel);
   const supportEmail = escapeHtml(payload.supportEmail);
   const deviceBrowser = escapeHtml(payload.deviceBrowser || "Unknown");
   const ipAddress = escapeHtml(payload.ipAddress ?? "Unavailable");
@@ -100,7 +84,7 @@ const buildLoginNotificationHtml = (payload: {
                   A new login to your ItemTraxx account was detected.
                 </p>
                 <p style="margin:0 0 14px 0;font-size:15px;line-height:1.7;color:#374151;">
-                  <strong>Tenant:</strong> ${tenantName}<br />
+                  <strong>${accountLabel}:</strong> ${accountName}<br />
                   <strong>Login time:</strong> ${loginTime}<br />
                   <strong>Device/Browser:</strong> ${deviceBrowser}<br />
                   <strong>IP Address:</strong> ${ipAddress}
@@ -198,26 +182,57 @@ serve(async (req) => {
 
     const { data: profile, error: profileError } = await adminClient
       .from("profiles")
-      .select("tenant_id, role, auth_email")
+      .select("tenant_id, district_id, role, auth_email")
       .eq("id", user.id)
       .single();
 
-    if (profileError || !profile?.tenant_id) {
+    if (profileError || !profile?.role) {
       return jsonResponse(403, { error: "Access denied" });
     }
 
-    if (profile.role !== "tenant_user" && profile.role !== "tenant_admin") {
+    if (
+      profile.role !== "tenant_user" &&
+      profile.role !== "tenant_admin" &&
+      profile.role !== "district_admin" &&
+      profile.role !== "super_admin"
+    ) {
       return jsonResponse(403, { error: "Access denied" });
     }
 
-    const { data: tenant, error: tenantError } = await adminClient
-      .from("tenants")
-      .select("id, name")
-      .eq("id", profile.tenant_id)
-      .single();
+    let accountName = "ItemTraxx";
+    let accountLabel = "Account";
+    let accountId = user.id;
 
-    if (tenantError || !tenant?.id) {
-      return jsonResponse(400, { error: "Unable to resolve tenant" });
+    if ((profile.role === "tenant_user" || profile.role === "tenant_admin") && profile.tenant_id) {
+      const { data: tenant, error: tenantError } = await adminClient
+        .from("tenants")
+        .select("id, name")
+        .eq("id", profile.tenant_id)
+        .single();
+
+      if (tenantError || !tenant?.id) {
+        return jsonResponse(400, { error: "Unable to resolve tenant" });
+      }
+      accountName = tenant.name;
+      accountLabel = "Tenant";
+      accountId = tenant.id;
+    } else if (profile.role === "district_admin" && profile.district_id) {
+      const { data: district, error: districtError } = await adminClient
+        .from("districts")
+        .select("id, name")
+        .eq("id", profile.district_id)
+        .single();
+      if (districtError || !district?.id) {
+        return jsonResponse(400, { error: "Unable to resolve district" });
+      }
+      accountName = district.name;
+      accountLabel = "District";
+      accountId = district.id;
+    } else if (profile.role === "super_admin") {
+      accountName = "Super Admin Control Center";
+      accountLabel = "Workspace";
+    } else {
+      return jsonResponse(403, { error: "Access denied" });
     }
 
     const recipientEmail = profile.auth_email ?? user.email ?? "";
@@ -234,12 +249,14 @@ serve(async (req) => {
     const deviceInfo = req.headers.get("user-agent") ?? "Unknown device/browser";
     const clientIp = normalizeIp(req);
 
-    await sendResendEmail(resendApiKey, {
+    const subject = `New ItemTraxx Login - ${accountName}`;
+    await sendLoggedResendEmail(adminClient, resendApiKey, {
       from: fromEmail,
       to: [recipientEmail],
-      subject: `New ItemTraxx Login - ${tenant.name}`,
+      subject,
       html: buildLoginNotificationHtml({
-        tenantName: tenant.name,
+        accountName,
+        accountLabel,
         supportEmail,
         loginTimeLabel,
         deviceBrowser: deviceInfo,
@@ -247,17 +264,35 @@ serve(async (req) => {
       }),
       text:
         `A new login to your ItemTraxx account was detected.\n\n` +
-        `Tenant: ${tenant.name}\n` +
+        `${accountLabel}: ${accountName}\n` +
         `Login time: ${loginTimeLabel}\n` +
         `Device/Browser: ${deviceInfo || "Unknown"}\n` +
         `IP Address: ${clientIp ?? "Unavailable"}\n\n` +
         `If this wasn't you, contact support immediately at ${supportEmail}.`,
+    }, {
+      emailType: "login_notification",
+      recipientEmail,
+      subject,
+      requestContext: {
+        function_name: "login-notify",
+        request_id: requestId,
+      },
+      triggeredByUserId: user.id,
+      tenantId: profile.tenant_id ?? null,
+      districtId: profile.district_id ?? null,
+      metadata: {
+        role: profile.role,
+        account_id: accountId,
+        account_name: accountName,
+        account_label: accountLabel,
+      },
     });
 
     logInfo("login-notify sent", requestId, {
       user_id: user.id,
-      tenant_id: tenant.id,
-      tenant_name: tenant.name,
+      account_id: accountId,
+      account_name: accountName,
+      role: profile.role,
     });
 
     return jsonResponse(200, {

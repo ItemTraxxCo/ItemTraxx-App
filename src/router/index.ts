@@ -74,6 +74,12 @@ const routes: RouteRecordRaw[] = [
     meta: { public: true, title: "Contact Support | ItemTraxx" },
   },
   {
+    path: "/about",
+    name: "public-about",
+    component: () => import("../pages/About.vue"),
+    meta: { public: true, title: "About | ItemTraxx" },
+  },
+  {
     path: "/tenant",
     name: "tenant-home",
     redirect: "/tenant/checkout",

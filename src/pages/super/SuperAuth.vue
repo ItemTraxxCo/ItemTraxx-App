@@ -3,29 +3,59 @@
     <div class="super-auth-panel">
       <div class="super-auth-copy">
         <p class="super-auth-kicker">Restricted Access</p>
-        <h1>Super Admin Verification</h1>
-        <p class="super-auth-subtitle">Secondary authentication required before entering the control center.</p>
+        <h1>{{ isCodeStep ? 'Email Verification' : 'Super Admin Verification' }}</h1>
+        <p class="super-auth-subtitle">
+          <template v-if="isCodeStep">
+            Check your email for a 6-digit verification code to continue.
+          </template>
+          <template v-else>
+            Enter your super admin credentials to start verification.
+          </template>
+        </p>
       </div>
-      <form class="form super-auth-form" @submit.prevent="handleSuperAdminLogin">
+
+      <form v-if="!isCodeStep" class="form super-auth-form" @submit.prevent="handleCredentialSubmit">
         <label>
           Email
-          <input v-model="email" type="email" placeholder="Enter email" />
+          <input v-model="email" type="email" placeholder="Enter email" autocomplete="username" />
         </label>
         <label>
           Password
-          <input v-model="password" type="password" placeholder="Enter password" />
+          <input v-model="password" type="password" placeholder="Enter password" autocomplete="current-password" />
         </label>
         <label>
           Security Check
           <div v-if="hasTurnstileSiteKey" :ref="setTurnstileContainerRef"></div>
           <p v-if="turnstileStatusMessage" :class="turnstileStatusClass">{{ turnstileStatusMessage }}</p>
           <p class="muted turnstile-help">
-            <template v-if="hasTurnstileSiteKey">Complete security check to enable verification.</template>
+            <template v-if="hasTurnstileSiteKey">Complete security check to enable sign in.</template>
             <template v-else>Turnstile is configured through `VITE_TURNSTILE_SITE_KEY` and requires a dev server restart after env changes.</template>
           </p>
         </label>
         <div class="form-actions">
-          <button type="submit" class="button-primary" :disabled="!canSubmit">Verify</button>
+          <button type="submit" class="button-primary" :disabled="!canSubmitCredentials">Sign in</button>
+        </div>
+      </form>
+
+      <form v-else class="form super-auth-form" @submit.prevent="handleCodeSubmit">
+        <p class="verification-copy">
+          Code sent to <strong>{{ verificationEmailLabel }}</strong>.
+        </p>
+        <label>
+          Verification Code
+          <input
+            v-model="verificationCode"
+            type="text"
+            inputmode="numeric"
+            autocomplete="one-time-code"
+            placeholder="Enter 6-digit code"
+            maxlength="6"
+          />
+        </label>
+        <div class="form-actions verification-actions">
+          <button type="submit" class="button-primary" :disabled="!canSubmitCode">Verify Code</button>
+          <button type="button" class="button-link" :disabled="isLoading" @click="handleResendCode">Resend code</button>
+          <button type="button" class="button-link" :disabled="isLoading" @click="handleStartOver">Start over</button>
         </div>
       </form>
       <p v-if="error" class="error">{{ error }}</p>
@@ -40,14 +70,26 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from "vue";
 import { useRouter } from "vue-router";
-import { superAdminLogin } from "../../services/authService";
+import {
+  clearPendingSuperAdminVerificationEmail,
+  getPendingSuperAdminVerificationEmail,
+  signOut,
+  superAdminLogin,
+  resendSuperAdminEmailChallenge,
+  verifySuperAdminEmailChallenge,
+} from "../../services/authService";
 import { useTurnstile } from "../../composables/useTurnstile";
+import { getAuthState } from "../../store/authState";
 
 const router = useRouter();
+const auth = getAuthState();
 const email = ref("");
 const password = ref("");
+const verificationCode = ref("");
+const verificationEmail = ref<string | null>(null);
 const error = ref("");
 const isLoading = ref(false);
+const isCodeStep = ref(false);
 const toastTitle = ref("");
 const toastMessage = ref("");
 const themeMode = ref<"light" | "dark">("dark");
@@ -59,9 +101,7 @@ const {
   loadError: turnstileLoadError,
   reset: resetTurnstile,
 } = useTurnstile(turnstileSiteKey);
-const setTurnstileContainerRef = (
-  el: Element | { $el?: Element } | null
-) => {
+const setTurnstileContainerRef = (el: Element | { $el?: Element } | null) => {
   if (el instanceof HTMLElement) {
     turnstileContainerRef.value = el;
     return;
@@ -86,14 +126,21 @@ const turnstileStatusClass = computed(() =>
   turnstileStatusMessage.value ? "error turnstile-error" : "muted turnstile-help"
 );
 
-const canSubmit = computed(() => {
+const canSubmitCredentials = computed(() => {
   if (isLoading.value) return false;
   if (!email.value.trim() || !password.value.trim()) return false;
   if (!hasTurnstileSiteKey) return false;
   if (turnstileLoadError.value) return false;
-  if (turnstileSiteKey && !turnstileToken.value) return false;
+  if (!turnstileToken.value) return false;
   return true;
 });
+
+const canSubmitCode = computed(() => {
+  if (isLoading.value) return false;
+  return /^\d{6}$/.test(verificationCode.value.trim());
+});
+
+const verificationEmailLabel = computed(() => verificationEmail.value || auth.email || "your email");
 
 const showToast = (title: string, message: string) => {
   toastTitle.value = title;
@@ -108,7 +155,13 @@ const showToast = (title: string, message: string) => {
   }, 4000);
 };
 
-const handleSuperAdminLogin = async () => {
+const enableCodeStep = (nextEmail: string | null) => {
+  isCodeStep.value = true;
+  verificationEmail.value = nextEmail;
+  verificationCode.value = "";
+};
+
+const handleCredentialSubmit = async () => {
   error.value = "";
   if (!email.value.trim() || !password.value.trim()) {
     showToast("Verification blocked", "Enter email and password to continue.");
@@ -124,7 +177,7 @@ const handleSuperAdminLogin = async () => {
     showToast("Security check unavailable", "Refresh the page and try again.");
     return;
   }
-  if (turnstileSiteKey && !turnstileToken.value) {
+  if (!turnstileToken.value) {
     error.value = "Complete the security check and try again.";
     showToast("Security check required", "Complete the security check and try again.");
     return;
@@ -132,8 +185,9 @@ const handleSuperAdminLogin = async () => {
 
   isLoading.value = true;
   try {
-    await superAdminLogin(email.value.trim(), password.value);
-    await router.push("/super-admin");
+    const result = await superAdminLogin(email.value.trim(), password.value);
+    enableCodeStep(result.email ?? email.value.trim());
+    showToast("Code sent", "Check your email for the verification code.");
   } catch (err) {
     const message = err instanceof Error ? err.message : "Sign in failed.";
     if (message === "Invalid credentials.") {
@@ -143,25 +197,67 @@ const handleSuperAdminLogin = async () => {
       error.value = "Access denied.";
       showToast("Access denied", "This account cannot access super admin.");
     } else {
-      error.value = "Verification failed. Please try again.";
-      showToast("Verification failed", "Please try again.");
+      error.value = message || "Verification failed. Please try again.";
+      showToast("Verification failed", error.value);
     }
   } finally {
     isLoading.value = false;
-    if (turnstileSiteKey) {
-      try {
-        resetTurnstile();
-      } catch (turnstileError) {
-        console.error("Failed to reset super auth Turnstile widget:", turnstileError);
-      }
+    try {
+      resetTurnstile();
+    } catch (turnstileError) {
+      console.error("Failed to reset super auth Turnstile widget:", turnstileError);
     }
   }
 };
 
+const handleCodeSubmit = async () => {
+  error.value = "";
+  if (!/^\d{6}$/.test(verificationCode.value.trim())) {
+    error.value = "Enter the 6-digit verification code.";
+    return;
+  }
+
+  isLoading.value = true;
+  try {
+    await verifySuperAdminEmailChallenge(verificationCode.value.trim());
+    await router.push("/super-admin");
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Verification failed.";
+    error.value = message;
+    showToast("Verification failed", message);
+  } finally {
+    isLoading.value = false;
+  }
+};
+
+const handleResendCode = async () => {
+  error.value = "";
+  isLoading.value = true;
+  try {
+    const result = await resendSuperAdminEmailChallenge();
+    enableCodeStep(result.email ?? verificationEmail.value);
+    showToast("Code sent", "A new verification code was emailed.");
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Unable to resend code.";
+    error.value = message;
+    showToast("Resend failed", message);
+  } finally {
+    isLoading.value = false;
+  }
+};
+
+const handleStartOver = async () => {
+  clearPendingSuperAdminVerificationEmail();
+  await signOut();
+  isCodeStep.value = false;
+  verificationCode.value = "";
+  verificationEmail.value = null;
+  password.value = "";
+};
+
 onMounted(() => {
   const syncTheme = () => {
-    themeMode.value =
-      document.documentElement.getAttribute("data-theme") === "light" ? "light" : "dark";
+    themeMode.value = document.documentElement.getAttribute("data-theme") === "light" ? "light" : "dark";
   };
   syncTheme();
   themeObserver = new MutationObserver(syncTheme);
@@ -169,6 +265,11 @@ onMounted(() => {
     attributes: true,
     attributeFilter: ["data-theme"],
   });
+
+  const pendingEmail = getPendingSuperAdminVerificationEmail();
+  if (pendingEmail || (auth.isAuthenticated && auth.role === "super_admin" && !auth.hasSecondaryAuth)) {
+    enableCodeStep(pendingEmail ?? auth.email);
+  }
 });
 
 onUnmounted(() => {
@@ -233,6 +334,16 @@ onUnmounted(() => {
 
 .super-auth-form input {
   min-height: 3.6rem;
+}
+
+.verification-copy {
+  margin: 0 0 1rem;
+  color: var(--muted);
+}
+
+.verification-actions {
+  flex-wrap: wrap;
+  gap: 0.75rem;
 }
 
 .turnstile-help {

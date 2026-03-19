@@ -1,5 +1,6 @@
 import { supabase } from "./supabaseClient";
 import { invokeEdgeFunction } from "./edgeFunctionClient";
+import { getFreshAccessToken } from "./sessionAccessToken";
 import { TimeoutError, withTimeout } from "./asyncUtils";
 import {
   clearAdminVerification,
@@ -38,6 +39,112 @@ const getDistrictHandoffFunctionName = () =>
 
 const AUTH_QUERY_TIMEOUT_MS = 15000;
 const DISTRICT_HANDOFF_MARKER_KEY = "itemtraxx:district-handoff-at";
+const SUPER_ADMIN_2FA_FUNCTION = import.meta.env.VITE_SUPER_ADMIN_2FA_FUNCTION || "super-auth-verify";
+const SUPER_ADMIN_2FA_PENDING_EMAIL_KEY = "itemtraxx:super-admin-2fa-email";
+
+const sendLoginNotification = (accessToken: string | null) => {
+  if (!accessToken) return;
+  const loginNotifyFunctionName = getLoginNotifyFunctionName();
+  void invokeEdgeFunction(loginNotifyFunctionName, {
+    method: "POST",
+    accessToken,
+    body: {},
+  }).then((result) => {
+    if (!result.ok) {
+      console.warn("login notification send failed", {
+        status: result.status,
+        error: result.error,
+        requestId: result.requestId,
+      });
+    }
+  });
+};
+
+
+const setPendingSuperAdminVerificationEmail = (email: string | null) => {
+  if (typeof window === "undefined") return;
+  try {
+    if (email) {
+      window.sessionStorage.setItem(SUPER_ADMIN_2FA_PENDING_EMAIL_KEY, email);
+    } else {
+      window.sessionStorage.removeItem(SUPER_ADMIN_2FA_PENDING_EMAIL_KEY);
+    }
+  } catch {
+    // Ignore sessionStorage failures.
+  }
+};
+
+export const getPendingSuperAdminVerificationEmail = () => {
+  if (typeof window === "undefined") return null;
+  try {
+    return window.sessionStorage.getItem(SUPER_ADMIN_2FA_PENDING_EMAIL_KEY);
+  } catch {
+    return null;
+  }
+};
+
+export const clearPendingSuperAdminVerificationEmail = () => {
+  setPendingSuperAdminVerificationEmail(null);
+};
+
+const startSuperAdminEmailChallenge = async (accessToken: string) => {
+  const result = await invokeEdgeFunction<{ challenge_started?: boolean; email?: string | null }>(
+    SUPER_ADMIN_2FA_FUNCTION,
+    {
+      method: "POST",
+      accessToken,
+      body: { action: "start_email_challenge" },
+    }
+  );
+
+  if (!result.ok || !result.data?.challenge_started) {
+    throw new Error(result.error || "Unable to send verification code.");
+  }
+
+  const recipientEmail = result.data.email ?? null;
+  setPendingSuperAdminVerificationEmail(recipientEmail);
+  return { email: recipientEmail };
+};
+
+export const resendSuperAdminEmailChallenge = async () => {
+  const accessToken = await getFreshAccessToken();
+  const result = await invokeEdgeFunction<{ challenge_started?: boolean; email?: string | null }>(
+    SUPER_ADMIN_2FA_FUNCTION,
+    {
+      method: "POST",
+      accessToken,
+      body: { action: "resend_email_challenge" },
+    }
+  );
+
+  if (!result.ok || !result.data?.challenge_started) {
+    throw new Error(result.error || "Unable to send verification code.");
+  }
+
+  const recipientEmail = result.data.email ?? null;
+  setPendingSuperAdminVerificationEmail(recipientEmail);
+  return { email: recipientEmail };
+};
+
+export const verifySuperAdminEmailChallenge = async (code: string) => {
+  const accessToken = await getFreshAccessToken();
+  const result = await invokeEdgeFunction<{ verified?: boolean }>(SUPER_ADMIN_2FA_FUNCTION, {
+    method: "POST",
+    accessToken,
+    body: {
+      action: "verify_email_challenge",
+      payload: { code },
+    },
+  });
+
+  if (!result.ok || !result.data?.verified) {
+    throw new Error(result.error || "Unable to verify code.");
+  }
+
+  setSecondaryAuth(true);
+  sendLoginNotification(accessToken);
+  clearPendingSuperAdminVerificationEmail();
+};
 
 const clearLocalSession = async () => {
   try {
@@ -427,22 +534,7 @@ export const tenantLogin = async (
     (typeof data.district_slug === "string" && data.district_slug.trim()) ||
     (await resolveDistrictSlug(current.districtContextId));
 
-  if (accessToken) {
-    const loginNotifyFunctionName = getLoginNotifyFunctionName();
-    void invokeEdgeFunction(loginNotifyFunctionName, {
-      method: "POST",
-      accessToken,
-      body: {},
-    }).then((result) => {
-      if (!result.ok) {
-        console.warn("login notification send failed", {
-          status: result.status,
-          error: result.error,
-          requestId: result.requestId,
-        });
-      }
-    });
-  }
+  sendLoginNotification(accessToken);
 
   return {
     districtId: current.districtContextId ?? null,
@@ -521,19 +613,7 @@ export const consumeDistrictSessionHandoff = async () => {
     throw new Error("Unable to complete district sign-in.");
   }
 
-  void invokeEdgeFunction(getLoginNotifyFunctionName(), {
-    method: "POST",
-    accessToken: finalAccessToken,
-    body: {},
-  }).then((result) => {
-    if (!result.ok) {
-      console.warn("login notification send failed", {
-        status: result.status,
-        error: result.error,
-        requestId: result.requestId,
-      });
-    }
-  });
+  sendLoginNotification(finalAccessToken);
 
   try {
     window.sessionStorage.setItem(
@@ -745,6 +825,7 @@ export const adminLogin = async (email: string, password: string) => {
     setDistrictContext(resolvedDistrictId ?? null);
   }
   markAdminVerified();
+  sendLoginNotification(accessToken);
   const districtSlug = await resolveDistrictSlug(resolvedDistrictId ?? null);
   return {
     role: resolvedRole,
@@ -758,6 +839,7 @@ export const adminLogin = async (email: string, password: string) => {
 
 export const superAdminLogin = async (email: string, password: string) => {
   let error: unknown = null;
+  let accessToken: string | null = null;
   try {
     const signIn = await withTimeout(
       supabase.auth.signInWithPassword({
@@ -768,6 +850,7 @@ export const superAdminLogin = async (email: string, password: string) => {
       "Sign in timed out."
     );
     error = signIn.error;
+    accessToken = signIn.data.session?.access_token ?? null;
   } catch (requestError) {
     if (requestError instanceof TimeoutError) {
       throw new Error("Sign in timed out. Please try again.");
@@ -775,7 +858,7 @@ export const superAdminLogin = async (email: string, password: string) => {
     throw requestError;
   }
 
-  if (error) {
+  if (error || !accessToken) {
     throw new Error("Invalid credentials.");
   }
 
@@ -786,12 +869,17 @@ export const superAdminLogin = async (email: string, password: string) => {
     throw new Error("Access denied.");
   }
 
-  setSecondaryAuth(true);
+  setSecondaryAuth(false);
+  const challenge = await startSuperAdminEmailChallenge(accessToken);
+  return {
+    email: challenge.email,
+  };
 };
 
 export const signOut = async () => {
   await supabase.auth.signOut();
   clearAdminVerification();
+  clearPendingSuperAdminVerificationEmail();
   clearAuthState(true);
   setDistrictContext(null);
 };

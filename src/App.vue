@@ -243,8 +243,10 @@ import {
   resetOnboarding,
   type TenantOnboardingRole,
 } from "./services/onboardingService";
+import { buildDistrictAppUrl, lookupDistrictById, resolveDistrictHost } from "./services/districtService";
 import { fetchSystemStatus } from "./services/systemStatusService";
 import { clearAdminVerification, getAuthState } from "./store/authState";
+import { getDistrictState } from "./store/districtState";
 import NotificationBell from "./components/NotificationBell.vue";
 
 const Analytics = defineAsyncComponent(async () => {
@@ -258,6 +260,7 @@ const SpeedInsights = defineAsyncComponent(async () => {
 });
 
 const auth = getAuthState();
+const district = getDistrictState();
 const router = useRouter();
 const route = useRoute();
 const menuOpen = ref(false);
@@ -550,6 +553,80 @@ const logoutTenant = async () => {
     return;
   }
   await router.push(nextUrl);
+};
+
+const hasFreshAdminVerification = (verifiedAt: string | null) => {
+  if (!verifiedAt) return false;
+  const verifiedAtMs = Date.parse(verifiedAt);
+  if (Number.isNaN(verifiedAtMs)) return false;
+  return Date.now() - verifiedAtMs <= 15 * 60 * 1000;
+};
+
+const hasFreshSuperVerification = (verifiedAt: string | null) => {
+  if (!verifiedAt) return false;
+  const verifiedAtMs = Date.parse(verifiedAt);
+  if (Number.isNaN(verifiedAtMs)) return false;
+  return Date.now() - verifiedAtMs <= 15 * 60 * 1000;
+};
+
+let publicHomeRedirectInFlight = false;
+const maybeRedirectAuthenticatedPublicHome = async () => {
+  if (publicHomeRedirectInFlight) return;
+  if (route.name !== "public-home") return;
+  if (!auth.isInitialized || !auth.isAuthenticated) return;
+
+  if (
+    district.isDistrictHost &&
+    district.districtId &&
+    auth.districtContextId &&
+    auth.districtContextId !== district.districtId
+  ) {
+    return;
+  }
+
+  let targetPath: string | null = null;
+  if (auth.role === "super_admin") {
+    targetPath =
+      auth.hasSecondaryAuth && hasFreshSuperVerification(auth.superVerifiedAt)
+        ? "/super-admin"
+        : "/super-auth";
+  } else if (auth.role === "district_admin") {
+    targetPath = hasFreshAdminVerification(auth.adminVerifiedAt)
+      ? "/district"
+      : "/tenant/admin-login";
+  } else if (auth.role === "tenant_admin") {
+    targetPath = hasFreshAdminVerification(auth.adminVerifiedAt)
+      ? "/tenant/admin"
+      : "/tenant/admin-login";
+  } else if (auth.role === "tenant_user" && auth.tenantContextId) {
+    targetPath = "/tenant/checkout";
+  }
+
+  if (!targetPath) return;
+
+  publicHomeRedirectInFlight = true;
+  try {
+    const currentHost = resolveDistrictHost(window.location.hostname);
+    const shouldCrossHostRedirect =
+      !currentHost.isDistrictHost &&
+      auth.role !== "super_admin" &&
+      !!auth.districtContextId;
+
+    if (shouldCrossHostRedirect) {
+      const resolvedDistrict = await lookupDistrictById(auth.districtContextId as string);
+      const districtSlug = resolvedDistrict?.slug?.trim().toLowerCase();
+      if (districtSlug) {
+        window.location.replace(buildDistrictAppUrl(districtSlug, targetPath));
+        return;
+      }
+    }
+
+    if (route.path !== targetPath) {
+      await router.replace(targetPath);
+    }
+  } finally {
+    publicHomeRedirectInFlight = false;
+  }
 };
 
 const reloadApp = () => {
@@ -937,6 +1014,7 @@ watch(
     resetAdminIdleTimer();
     startAdminSessionPolling();
     evaluateOnboardingVisibility();
+    void maybeRedirectAuthenticatedPublicHome();
   }
 );
 
@@ -956,11 +1034,31 @@ watch(
     if (auth.isAuthenticated) {
       startAdminSessionPolling();
       evaluateOnboardingVisibility();
+      void maybeRedirectAuthenticatedPublicHome();
       return;
     }
     stopAdminSessionPolling();
     showOnboardingModal.value = false;
     onboardingEvaluationDone.value = false;
+  }
+);
+
+watch(
+  () =>
+    [
+      route.name,
+      auth.isInitialized,
+      auth.isAuthenticated,
+      auth.role,
+      auth.districtContextId,
+      auth.adminVerifiedAt,
+      auth.hasSecondaryAuth,
+      auth.superVerifiedAt,
+      district.isDistrictHost,
+      district.districtId,
+    ] as const,
+  () => {
+    void maybeRedirectAuthenticatedPublicHome();
   }
 );
 

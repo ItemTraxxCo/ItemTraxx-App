@@ -572,7 +572,7 @@ const hasFreshSuperVerification = (verifiedAt: string | null) => {
 let publicHomeRedirectInFlight = false;
 const maybeRedirectAuthenticatedPublicHome = async () => {
   if (publicHomeRedirectInFlight) return;
-  if (route.name !== "public-home") return;
+  if (route.path !== "/" && route.path !== "/landing-new") return;
   if (!auth.isInitialized || !auth.isAuthenticated) return;
 
   if (
@@ -989,6 +989,7 @@ onMounted(() => {
   resetAdminIdleTimer();
   startAdminSessionPolling();
   evaluateOnboardingVisibility();
+  void maybeRedirectAuthenticatedPublicHome();
   void nextTick(() => {
     measureTopBanners();
   });

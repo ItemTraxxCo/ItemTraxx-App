@@ -372,6 +372,69 @@ Changes are dated based on the default timezone: America/Los_Angeles
 
 ---
 
+### 3/11/2026 Development Update
+
+- Added CodeQL security analysis workflow with repo-managed configuration and Slack alerting integration.
+- Implemented CI alerting to notify Slack on workflow failures.
+- Improved CI permissions and workflow stability with explicit permission declarations.
+- Performed dependency maintenance update (npm and yarn group).
+- Held Vercel packages below vulnerable major versions.
+
+---
+
+### 3/12/2026 Development Update
+
+- Added `security.txt` disclosure file for security vulnerability reporting guidance.
+
+---
+
+### 3/13/2026 Development Update
+
+- Performed dependency maintenance update (npm and yarn group with 5 updates).
+
+---
+
+### 3/14/2026 Development Update
+
+- Fixed UI layout issue where top banners were removed from document flow on public pages.
+- Ensured consistent banner positioning across public experience.
+- Completed database/backend updates, scheduled maintenance
+
+---
+
+### 3/15/2026 Development Update
+
+- Performed comprehensive bugfix round including auth, email, and UI refinements:
+  - Fixed auth sign-out to redirect to root login from custom hosts (district subdomains).
+  - Fixed district handoff redirects to preserve same-tab navigation behavior.
+- Applied styled HTML email templates for sales inquiry sends.
+- Implemented email send throttling (1 req/sec) in background worker to prevent rate-limiting issues.
+- Added Slack notification routing for inquiry/sales contact alerts.
+- Updated `.gitignore` to exclude Supabase CLI temporary files.
+
+---
+
+### 3/17/2026 Development Update
+
+- Fixed edge proxy to allow Vercel preview origins for deploy preview compatibility.
+- Updated forgot-password reset email instructions to include support contact information.
+- Improved checkout onboarding and auth UI refinements.
+- Fixed sales request submission by updating Supabase dependencies and addressing dependency conflicts.
+- Performed dependency maintenance update (npm and yarn group with 4 updates).
+
+---
+
+### 3/18/2026 Development Update
+
+- Enhanced Turnstile integration with improved error handling and user feedback on verification failures.
+- Updated login flow to automatically redirect authenticated users to client area (preventing manual navigation to login).
+- Added auth domain canonicalization to redirect `www` subdomain to apex domain before bootstrap.
+- Implemented immediate redirect on home mount for already-logged-in users.
+- Added performance telemetry and RUM (Real User Monitoring) ingestion documentation.
+- Updated `.gitignore` to exclude system-generated files and artifacts.
+
+---
+
 ##### You have reached the bottom of the changelog.
 ---
 

@@ -1,0 +1,21 @@
+- generic [ref=e3]:
+  - button "Open menu" [ref=e7] [cursor=pointer]:
+    - img [ref=e8]
+  - generic [ref=e11]:
+    - generic [ref=e12]:
+      - paragraph [ref=e13]: Restricted Access
+      - heading "Super Admin Verification" [level=1] [ref=e14]
+      - paragraph [ref=e15]: Secondary authentication required before entering the control center.
+    - generic [ref=e16]:
+      - generic [ref=e17]:
+        - text: Email
+        - textbox "Email" [ref=e18]:
+          - /placeholder: Enter email
+      - generic [ref=e19]:
+        - text: Password
+        - textbox "Password" [ref=e20]:
+          - /placeholder: Enter password
+      - generic [ref=e21]:
+        - text: Security Check
+        - paragraph [ref=e22]: Complete security check to enable verification.
+      - button "Verify" [disabled] [ref=e24] [cursor=pointer]

@@ -52,6 +52,7 @@ export const useTurnstile = (siteKey?: string) => {
   const containerRef = ref<HTMLElement | null>(null);
   const token = ref("");
   const isReady = ref(false);
+  const loadError = ref("");
   let widgetId: string | null = null;
   let bootTimer: number | null = null;
 
@@ -72,20 +73,27 @@ export const useTurnstile = (siteKey?: string) => {
       return;
     }
 
-    widgetId = api.render(containerRef.value, {
-      sitekey: siteKey,
-      theme: "auto",
-      callback: (nextToken) => {
-        token.value = nextToken;
-      },
-      "expired-callback": () => {
-        token.value = "";
-      },
-      "error-callback": () => {
-        token.value = "";
-      },
-    });
-    isReady.value = true;
+    try {
+      widgetId = api.render(containerRef.value, {
+        sitekey: siteKey,
+        theme: "auto",
+        callback: (nextToken) => {
+          token.value = nextToken;
+          loadError.value = "";
+        },
+        "expired-callback": () => {
+          token.value = "";
+        },
+        "error-callback": () => {
+          token.value = "";
+          loadError.value = "Security check failed to load correctly. Refresh and try again.";
+        },
+      });
+      isReady.value = true;
+      loadError.value = "";
+    } catch {
+      loadError.value = "Unable to initialize the security check. Refresh and try again.";
+    }
   };
 
   const reset = () => {
@@ -105,13 +113,20 @@ export const useTurnstile = (siteKey?: string) => {
     if (!siteKey) {
       return;
     }
+    loadError.value = "";
     void ensureTurnstileScript()
       .then(() => {
         mountWidget();
         if (!widgetId) {
+          let attempts = 0;
           bootTimer = window.setInterval(() => {
             mountWidget();
             if (widgetId) {
+              clearBootTimer();
+            }
+            attempts += 1;
+            if (!widgetId && attempts >= 20) {
+              loadError.value = "Security check did not finish loading. Refresh and try again.";
               clearBootTimer();
             }
           }, 250);
@@ -119,6 +134,7 @@ export const useTurnstile = (siteKey?: string) => {
       })
       .catch(() => {
         token.value = "";
+        loadError.value = "Unable to load the security check. Check your connection and try again.";
       });
   });
 
@@ -134,6 +150,7 @@ export const useTurnstile = (siteKey?: string) => {
     containerRef: containerRef as Ref<HTMLElement | null>,
     token,
     isReady,
+    loadError,
     reset,
   };
 };

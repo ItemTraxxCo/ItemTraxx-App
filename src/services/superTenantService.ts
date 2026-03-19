@@ -42,7 +42,14 @@ export type SuperDistrict = {
   is_active: boolean;
   created_at: string;
   tenants_count?: number;
-  subscription_plan?: "starter" | "standard" | "enterprise" | null;
+  subscription_plan?:
+    | "district_core"
+    | "district_growth"
+    | "district_enterprise"
+    | "organization_starter"
+    | "organization_scale"
+    | "organization_enterprise"
+    | null;
   billing_status?: "draft" | "active" | "past_due" | "canceled" | null;
   renewal_date?: string | null;
   billing_email?: string | null;
@@ -295,7 +302,13 @@ export const createDistrict = async (payload: {
   slug: string;
   support_email?: string;
   contact_name?: string;
-  subscription_plan?: "starter" | "standard" | "enterprise";
+  subscription_plan?:
+    | "district_core"
+    | "district_growth"
+    | "district_enterprise"
+    | "organization_starter"
+    | "organization_scale"
+    | "organization_enterprise";
   billing_status?: "draft" | "active" | "past_due" | "canceled";
   renewal_date?: string;
   billing_email?: string;
@@ -316,7 +329,13 @@ export const updateDistrict = async (payload: {
   support_email?: string;
   contact_name?: string;
   is_active: boolean;
-  subscription_plan?: "starter" | "standard" | "enterprise";
+  subscription_plan?:
+    | "district_core"
+    | "district_growth"
+    | "district_enterprise"
+    | "organization_starter"
+    | "organization_scale"
+    | "organization_enterprise";
   billing_status?: "draft" | "active" | "past_due" | "canceled";
   renewal_date?: string;
   billing_email?: string;

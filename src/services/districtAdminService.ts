@@ -9,7 +9,14 @@ export type DistrictAdminDashboard = {
     support_email?: string | null;
     contact_name?: string | null;
     is_active: boolean;
-    subscription_plan?: "starter" | "standard" | "enterprise" | null;
+    subscription_plan?:
+      | "district_core"
+      | "district_growth"
+      | "district_enterprise"
+      | "organization_starter"
+      | "organization_scale"
+      | "organization_enterprise"
+      | null;
     billing_status?: "draft" | "active" | "past_due" | "canceled" | null;
     renewal_date?: string | null;
     billing_email?: string | null;

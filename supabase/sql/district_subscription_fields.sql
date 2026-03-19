@@ -18,7 +18,17 @@ alter table if exists public.districts
 
 alter table if exists public.districts
   add constraint districts_subscription_plan_check
-  check (subscription_plan in ('core', 'growth', 'enterprise') or subscription_plan is null);
+  check (
+    subscription_plan in (
+      'district_core',
+      'district_growth',
+      'district_enterprise',
+      'organization_starter',
+      'organization_scale',
+      'organization_enterprise'
+    )
+    or subscription_plan is null
+  );
 
 alter table if exists public.districts
   drop constraint if exists districts_billing_status_check;

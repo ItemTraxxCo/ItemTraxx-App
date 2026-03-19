@@ -32,9 +32,13 @@
           Subscription Plan
           <select v-model="createSubscriptionPlan">
             <option value="">Unset</option>
-            <option value="starter">starter</option>
-            <option value="standard">standard</option>
-            <option value="enterprise">enterprise</option>
+            <option
+              v-for="plan in districtPlanOptions"
+              :key="plan.value"
+              :value="plan.value"
+            >
+              {{ plan.label }}
+            </option>
           </select>
         </label>
         <label>
@@ -74,42 +78,79 @@
 
       <p v-if="isLoading" class="muted">Loading districts...</p>
       <p v-else-if="error" class="error">{{ error }}</p>
-      <table v-else class="table">
-        <thead>
-          <tr>
-            <th>Name</th>
-            <th>Slug</th>
-            <th>URL Preview</th>
-            <th>Tenants</th>
-            <th>Status</th>
-            <th>Plan</th>
-            <th>Support</th>
-            <th>Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="district in districts" :key="district.id">
-            <td>{{ district.name }}</td>
-            <td>{{ district.slug }}</td>
-            <td>{{ districtUrlPreview(district.slug) }}</td>
-            <td>{{ district.tenants_count ?? 0 }}</td>
-            <td>{{ district.is_active ? "active" : "inactive" }}</td>
-            <td>{{ district.subscription_plan || "-" }}</td>
-            <td>{{ district.support_email || district.contact_name || "-" }}</td>
-            <td class="actions-cell">
-              <RouterLink class="button-link" :to="`/super-admin/districts/${district.id}`">
-                Open
-              </RouterLink>
-              <button type="button" @click="openEditModal(district)">Edit</button>
-            </td>
-          </tr>
-        </tbody>
-      </table>
+      <div v-else class="districts-list-shell">
+        <div class="districts-list-summary muted">{{ districts.length }} district{{ districts.length === 1 ? "" : "s" }}</div>
+        <div class="table-wrap districts-table-wrap">
+          <table class="table districts-table">
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Slug</th>
+                <th>URL Preview</th>
+                <th>Tenants</th>
+                <th>Status</th>
+                <th>Plan</th>
+                <th>Support</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="district in districts" :key="district.id" class="district-row">
+                <td data-label="Name" class="district-cell-primary">
+                  <span class="district-name">{{ district.name }}</span>
+                </td>
+                <td data-label="Slug">
+                  <code class="district-code">{{ district.slug }}</code>
+                </td>
+                <td data-label="URL Preview">
+                  <span class="district-url">{{ districtUrlPreview(district.slug) }}</span>
+                </td>
+                <td data-label="Tenants">
+                  <span class="district-badge">{{ district.tenants_count ?? 0 }}</span>
+                </td>
+                <td data-label="Status">
+                  <span class="district-status-pill" :class="district.is_active ? 'is-active' : 'is-inactive'">
+                    {{ district.is_active ? "active" : "inactive" }}
+                  </span>
+                </td>
+                <td data-label="Plan">
+                  <span class="district-plan">{{ getDistrictPlanLabel(district.subscription_plan) }}</span>
+                </td>
+                <td data-label="Support">
+                  <span class="district-support">{{ district.support_email || district.contact_name || "-" }}</span>
+                </td>
+                <td data-label="Actions" class="actions-cell district-actions-cell">
+                  <RouterLink class="button-link" :to="`/super-admin/districts/${district.id}`">
+                    Open
+                  </RouterLink>
+                  <button type="button" class="button-primary" @click="openEditModal(district)">Edit</button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
 
-    <div v-if="editModalVisible" class="modal-backdrop" @click.self="closeEditModal">
-      <div class="modal">
-        <h2>Edit District</h2>
+    <div
+      v-if="editModalVisible"
+      class="district-edit-overlay"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Edit district"
+      @click.self="closeEditModal"
+    >
+      <div class="district-edit-modal">
+        <div class="district-edit-header">
+          <div>
+            <p class="district-edit-kicker">District Editor</p>
+            <h2>Edit District</h2>
+          </div>
+          <button type="button" class="district-edit-close" aria-label="Close edit dialog" @click="closeEditModal">
+            ×
+          </button>
+        </div>
+        <p class="muted district-edit-copy">Update district details, billing metadata, and status without leaving the list view.</p>
         <form class="form" @submit.prevent="saveEdit">
           <label>
             Name
@@ -131,9 +172,13 @@
             Subscription Plan
             <select v-model="editSubscriptionPlan">
               <option value="">Unset</option>
-              <option value="starter">starter</option>
-              <option value="standard">standard</option>
-              <option value="enterprise">enterprise</option>
+              <option
+                v-for="plan in districtPlanOptions"
+                :key="plan.value"
+                :value="plan.value"
+              >
+                {{ plan.label }}
+              </option>
             </select>
           </label>
           <label>
@@ -199,7 +244,15 @@ const createName = ref("");
 const createSlug = ref("");
 const createSupportEmail = ref("");
 const createContactName = ref("");
-const createSubscriptionPlan = ref<"" | "starter" | "standard" | "enterprise">("");
+const createSubscriptionPlan = ref<
+  | ""
+  | "district_core"
+  | "district_growth"
+  | "district_enterprise"
+  | "organization_starter"
+  | "organization_scale"
+  | "organization_enterprise"
+>("");
 const createBillingStatus = ref<"" | "draft" | "active" | "past_due" | "canceled">("");
 const createRenewalDate = ref("");
 const createBillingEmail = ref("");
@@ -210,7 +263,15 @@ const editName = ref("");
 const editSlug = ref("");
 const editSupportEmail = ref("");
 const editContactName = ref("");
-const editSubscriptionPlan = ref<"" | "starter" | "standard" | "enterprise">("");
+const editSubscriptionPlan = ref<
+  | ""
+  | "district_core"
+  | "district_growth"
+  | "district_enterprise"
+  | "organization_starter"
+  | "organization_scale"
+  | "organization_enterprise"
+>("");
 const editBillingStatus = ref<"" | "draft" | "active" | "past_due" | "canceled">("");
 const editRenewalDate = ref("");
 const editBillingEmail = ref("");
@@ -219,6 +280,15 @@ const editIsActive = ref(true);
 const toastTitle = ref("");
 const toastMessage = ref("");
 let toastTimer: number | null = null;
+
+const districtPlanOptions = [
+  { value: "district_core", label: "ItemTraxx School District Core Plan" },
+  { value: "district_growth", label: "ItemTraxx School District Growth Plan" },
+  { value: "district_enterprise", label: "ItemTraxx School District Enterprise Plan" },
+  { value: "organization_starter", label: "ItemTraxx Organization Starter Plan" },
+  { value: "organization_scale", label: "ItemTraxx Organization Scale Plan" },
+  { value: "organization_enterprise", label: "ItemTraxx Organization Enterprise Plan" },
+] as const;
 
 const normalizeSlug = (value: string) =>
   value
@@ -238,6 +308,9 @@ const showToast = (title: string, message: string) => {
     toastTimer = null;
   }, 4000);
 };
+
+const getDistrictPlanLabel = (value: string | null | undefined) =>
+  districtPlanOptions.find((plan) => plan.value === value)?.label ?? value ?? "-";
 
 const districtUrlPreview = (slug: string) => `https://${slug}.app.itemtraxx.com`;
 
@@ -362,3 +435,265 @@ onMounted(() => {
   void loadDistricts();
 });
 </script>
+
+<style scoped>
+.districts-list-shell {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.districts-list-summary {
+  font-size: 0.88rem;
+}
+
+.districts-table-wrap {
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--surface) 94%, transparent 6%) 0%, color-mix(in srgb, var(--surface-2) 92%, transparent 8%) 100%);
+  overflow: auto;
+}
+
+.districts-table {
+  margin-top: 0;
+  table-layout: fixed;
+  min-width: 980px;
+}
+
+.districts-table th,
+.districts-table td {
+  padding: 0.85rem 0.75rem;
+  vertical-align: top;
+  overflow-wrap: anywhere;
+}
+
+.districts-table th:nth-child(1) {
+  width: 15%;
+}
+
+.districts-table th:nth-child(2) {
+  width: 10%;
+}
+
+.districts-table th:nth-child(3) {
+  width: 18%;
+}
+
+.districts-table th:nth-child(4) {
+  width: 7%;
+}
+
+.districts-table th:nth-child(5) {
+  width: 9%;
+}
+
+.districts-table th:nth-child(6) {
+  width: 21%;
+}
+
+.districts-table th:nth-child(7) {
+  width: 12%;
+}
+
+.districts-table th:nth-child(8) {
+  width: 8%;
+}
+
+.district-row:hover {
+  background: color-mix(in srgb, var(--surface) 78%, var(--accent) 22%);
+}
+
+.district-cell-primary {
+  font-weight: 600;
+}
+
+.district-name {
+  display: block;
+}
+
+.district-code {
+  font-size: 0.86rem;
+  padding: 0.2rem 0.38rem;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--surface-2) 82%, transparent 18%);
+}
+
+.district-url,
+.district-plan,
+.district-support {
+  display: block;
+}
+
+.district-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 2rem;
+  min-height: 2rem;
+  padding: 0 0.55rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent) 16%, transparent 84%);
+  font-weight: 700;
+}
+
+.district-status-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.28rem 0.6rem;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  font-size: 0.82rem;
+  text-transform: capitalize;
+}
+
+.district-status-pill.is-active {
+  background: color-mix(in srgb, var(--accent) 14%, transparent 86%);
+  border-color: color-mix(in srgb, var(--accent) 42%, var(--border) 58%);
+}
+
+.district-status-pill.is-inactive {
+  background: color-mix(in srgb, #c96b5d 14%, transparent 86%);
+  border-color: color-mix(in srgb, #c96b5d 40%, var(--border) 60%);
+}
+
+.district-actions-cell {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.district-edit-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: grid;
+  place-items: center;
+  padding: 1.25rem;
+  background: rgba(7, 10, 16, 0.68);
+  backdrop-filter: blur(6px);
+}
+
+.district-edit-modal {
+  width: min(760px, 100%);
+  max-height: min(88vh, 920px);
+  overflow: auto;
+  border-radius: 24px;
+  border: 1px solid color-mix(in srgb, var(--border) 72%, var(--accent) 28%);
+  background:
+    radial-gradient(circle at top right, color-mix(in srgb, var(--accent) 10%, transparent 90%), transparent 28%),
+    linear-gradient(180deg, color-mix(in srgb, var(--surface) 96%, transparent 4%) 0%, color-mix(in srgb, var(--surface-2) 94%, transparent 6%) 100%);
+  box-shadow: 0 28px 60px rgba(0, 0, 0, 0.28);
+  padding: 1.35rem 1.35rem 1.5rem;
+}
+
+.district-edit-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.district-edit-header h2 {
+  margin: 0;
+}
+
+.district-edit-kicker {
+  margin: 0 0 0.35rem;
+  font-size: 0.76rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.district-edit-copy {
+  margin: 0.65rem 0 1.1rem;
+  max-width: 48rem;
+}
+
+.district-edit-close {
+  width: 2.25rem;
+  min-width: 2.25rem;
+  height: 2.25rem;
+  min-height: 2.25rem;
+  border-radius: 999px;
+  padding: 0;
+  font-size: 1.2rem;
+  line-height: 1;
+}
+
+@media (max-width: 860px) {
+  .districts-table {
+    min-width: 0;
+  }
+
+  .districts-table thead {
+    display: none;
+  }
+
+  .districts-table,
+  .districts-table tbody,
+  .districts-table tr,
+  .districts-table td {
+    display: block;
+    width: 100%;
+  }
+
+  .districts-table tbody {
+    padding: 0.4rem;
+  }
+
+  .district-row {
+    margin-bottom: 0.75rem;
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    background: color-mix(in srgb, var(--surface) 90%, transparent 10%);
+    overflow: hidden;
+  }
+
+  .districts-table td {
+    display: grid;
+    grid-template-columns: minmax(7rem, 8.5rem) minmax(0, 1fr);
+    gap: 0.75rem;
+    padding: 0.75rem 0.9rem;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .districts-table td:last-child {
+    border-bottom: 0;
+  }
+
+  .districts-table td::before {
+    content: attr(data-label);
+    color: var(--muted);
+    font-size: 0.8rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+  }
+
+  .district-actions-cell {
+    justify-content: flex-start;
+  }
+}
+
+@media (max-width: 640px) {
+  .district-edit-overlay {
+    padding: 0.75rem;
+  }
+
+  .district-edit-modal {
+    padding: 1rem;
+    border-radius: 18px;
+  }
+
+  .district-edit-header {
+    align-items: center;
+  }
+
+  .districts-table td {
+    grid-template-columns: 1fr;
+    gap: 0.35rem;
+  }
+}
+</style>

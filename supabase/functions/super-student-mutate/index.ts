@@ -212,14 +212,17 @@ serve(async (req) => {
     );
 
     if (rateLimitError) {
-      return jsonResponse(500, { error: "Rate limit check failed" });
-    }
-
-    const rateLimitResult = rateLimit as RateLimitResult;
-    if (!rateLimitResult.allowed) {
-      return jsonResponse(429, {
-        error: "Rate limit exceeded, please try again in a minute.",
+      console.warn("super-student-mutate rate limit unavailable", {
+        message: rateLimitError.message,
+        code: (rateLimitError as { code?: string }).code,
       });
+    } else {
+      const rateLimitResult = rateLimit as RateLimitResult;
+      if (!rateLimitResult.allowed) {
+        return jsonResponse(429, {
+          error: "Rate limit exceeded, please try again in a minute.",
+        });
+      }
     }
 
     const { action, payload } = await req.json();

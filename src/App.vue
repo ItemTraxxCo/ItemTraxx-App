@@ -340,7 +340,7 @@ const isFullBleedRoute = computed(
     route.path === "/reset-password"
 );
 const isMarketingFullBleedRoute = computed(
-  () => route.path === "/" || route.path === "/landing-new"
+  () => route.path === "/" || route.path === "/landing-new" || route.path === "/about"
 );
 const isBannerBleedRoute = computed(
   () =>
@@ -353,7 +353,10 @@ const isDarkChromeRoute = computed(
   () => route.path === "/" || route.path === "/landing-new" || route.path === "/pricing"
 );
 const showTopMenu = computed(
-  () => route.name !== "public-home" && route.name !== "public-pricing"
+  () =>
+    route.name !== "public-home" &&
+    route.name !== "public-pricing" &&
+    route.name !== "public-about"
 );
 const currentTenantOnboardingRole = computed<TenantOnboardingRole | null>(() => {
   if (!auth.isAuthenticated) return null;
@@ -572,7 +575,7 @@ const hasFreshSuperVerification = (verifiedAt: string | null) => {
 let publicHomeRedirectInFlight = false;
 const maybeRedirectAuthenticatedPublicHome = async () => {
   if (publicHomeRedirectInFlight) return;
-  if (route.path !== "/" && route.path !== "/landing-new") return;
+  if (route.path !== "/" && route.path !== "/landing-new" && route.path !== "/about") return;
   if (!auth.isInitialized || !auth.isAuthenticated) return;
 
   if (

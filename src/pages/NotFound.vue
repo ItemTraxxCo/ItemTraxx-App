@@ -17,7 +17,7 @@
       <p class="muted">Session age: {{ sessionAge }}</p>
       <div class="admin-actions">
         <button type="button" class="link" @click="goBack">Go back</button>
-        <button type="button" class="link" @click="goCheckout">Return to checkout</button>
+        <button type="button" class="link" @click="goHome">Go back to home</button>
         <button
           v-if="auth.isAuthenticated"
           type="button"
@@ -63,8 +63,8 @@ const goBack = () => {
   router.back();
 };
 
-const goCheckout = () => {
-  router.push("/tenant/checkout");
+const goHome = () => {
+  router.push("/");
 };
 
 const goAdmin = () => {

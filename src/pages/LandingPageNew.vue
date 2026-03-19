@@ -205,6 +205,8 @@
         <RouterLink to="/contact-support">Support</RouterLink>
         <a href="https://status.itemtraxx.com/" target="_blank" rel="noreferrer">Status</a>
         <a :href="legalUrl" target="_blank" rel="noreferrer">Legal</a>
+        <RouterLink to="/about">About</RouterLink>
+        <a href="https://github.com/ItemTraxxCo" target="_blank" rel="noreferrer">GitHub</a>
       </div>
     </footer>
   </div>

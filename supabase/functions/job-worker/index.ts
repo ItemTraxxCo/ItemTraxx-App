@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createClient, type SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { sendLoggedResendEmail } from "../_shared/emailDeliveryLog.ts";
 import { isKillSwitchWriteBlocked } from "../_shared/killSwitch.ts";
 import { getRequestId, logError, logInfo } from "../_shared/observability.ts";
 
@@ -71,6 +72,13 @@ type DistrictSupportPayload = {
   priority: "low" | "normal" | "high" | "urgent";
 };
 
+type SuperAdminTwoFactorPayload = {
+  to_email: string;
+  code: string;
+  support_email: string;
+  from_email: string;
+};
+
 const baseCorsHeaders = {
   "Access-Control-Allow-Headers":
     "authorization, x-client-info, apikey, content-type, x-request-id",
@@ -105,24 +113,36 @@ const isAuthorizedWorkerRequest = (authorizationHeader: string, workerSecret: st
   return !!providedToken && !!expectedToken && providedToken === expectedToken;
 };
 
-const sendResendEmail = async (
+const sendTrackedResendEmail = async (
+  adminClient: SupabaseClient,
   apiKey: string,
   payload: Record<string, unknown>,
+  context: {
+    emailType: string;
+    recipientEmail: string;
+    subject: string;
+    requestId: string;
+    jobId: string;
+    tenantId?: string | null;
+    districtId?: string | null;
+    triggeredByUserId?: string | null;
+    metadata?: Record<string, unknown> | null;
+  },
 ) => {
-  const response = await fetch("https://api.resend.com/emails", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
+  await sendLoggedResendEmail(adminClient, apiKey, payload, {
+    emailType: context.emailType,
+    recipientEmail: context.recipientEmail,
+    subject: context.subject,
+    requestContext: {
+      function_name: "job-worker",
+      request_id: context.requestId,
     },
-    body: JSON.stringify(payload),
+    triggeredByUserId: context.triggeredByUserId ?? null,
+    jobId: context.jobId,
+    tenantId: context.tenantId ?? null,
+    districtId: context.districtId ?? null,
+    metadata: context.metadata ?? null,
   });
-
-  if (!response.ok) {
-    const text = await response.text().catch(() => "");
-    throw new Error(`Email send failed: ${response.status} ${text}`);
-  }
-
   await new Promise((resolve) => setTimeout(resolve, 1000));
 };
 
@@ -187,6 +207,58 @@ const buildLoginNotificationHtml = (payload: LoginNotificationPayload, loginTime
               <td style="padding:16px 24px;border-top:1px solid #e5e7eb;background:#f9fafb;">
                 <p style="margin:0;font-size:12px;line-height:1.6;color:#6b7280;">
                   Contact support:
+                  <a href="mailto:${supportEmail}" style="color:#19439b;text-decoration:none;">${supportEmail}</a>
+                </p>
+                <p style="margin:6px 0 0 0;font-size:12px;line-height:1.6;color:#9ca3af;">
+                  &copy; 2026 ItemTraxx Co. All rights reserved.
+                </p>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>`;
+};
+
+const buildSuperAdminTwoFactorHtml = (payload: SuperAdminTwoFactorPayload) => {
+  const supportEmail = escapeHtml(payload.support_email);
+  const code = escapeHtml(payload.code);
+
+  return `<!doctype html>
+<html>
+  <body style="margin:0;padding:0;background:#f4f6fb;font-family:Arial,Helvetica,sans-serif;color:#1f2937;">
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f4f6fb;padding:24px 12px;">
+      <tr>
+        <td align="center">
+          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:560px;background:#ffffff;border:1px solid #e5e7eb;border-radius:12px;overflow:hidden;">
+            <tr>
+              <td style="padding:20px 24px;background:linear-gradient(180deg,#1f4ca3 0%,#38d0b1 100%);color:#ffffff;">
+                <h1 style="margin:0;font-size:20px;line-height:1.3;">ItemTraxx</h1>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:24px;">
+                <h2 style="margin:0 0 12px 0;font-size:22px;line-height:1.3;color:#111827;">Your Verification Code</h2>
+                <p style="margin:0 0 14px 0;font-size:15px;line-height:1.6;color:#374151;">
+                  Use the following 6-digit verification code to finish signing in to ItemTraxx super admin.
+                </p>
+                <div style="margin:0 0 18px 0;padding:16px 18px;border-radius:12px;background:#f9fafb;border:1px solid #e5e7eb;font-size:28px;line-height:1.2;font-weight:700;letter-spacing:0.22em;color:#111827;text-align:center;">
+                  ${code}
+                </div>
+                <p style="margin:0 0 14px 0;font-size:14px;line-height:1.6;color:#6b7280;">
+                  This code expires in 10 minutes and can only be used once.
+                </p>
+                <p style="margin:0;font-size:14px;line-height:1.6;color:#6b7280;">
+                  If you did not attempt to sign in, contact support immediately.
+                </p>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:16px 24px;border-top:1px solid #e5e7eb;background:#f9fafb;">
+                <p style="margin:0;font-size:12px;line-height:1.6;color:#6b7280;">
+                  Need help? Contact
                   <a href="mailto:${supportEmail}" style="color:#19439b;text-decoration:none;">${supportEmail}</a>
                 </p>
                 <p style="margin:6px 0 0 0;font-size:12px;line-height:1.6;color:#9ca3af;">
@@ -331,8 +403,11 @@ const buildContactSalesConfirmationHtml = (payload: ContactSalesPayload) => {
 };
 
 const processContactSalesEmail = async (
+  adminClient: SupabaseClient,
   resendApiKey: string,
   payload: ContactSalesPayload,
+  jobId: string,
+  requestId: string,
   slackWebhookUrl?: string,
 ) => {
   const organizationLine = payload.organization
@@ -346,14 +421,28 @@ const processContactSalesEmail = async (
         }: ${payload.schools_count}`
       : "";
 
-  await sendResendEmail(resendApiKey, {
+  const internalSubject = `${payload.intent === "demo" ? "Demo Request" : "Contact Sales Request"} - ${payload.organization || payload.name}`;
+  await sendTrackedResendEmail(adminClient, resendApiKey, {
     from: payload.from_email,
     to: [payload.support_email],
-    subject: `${payload.intent === "demo" ? "Demo Request" : "Contact Sales Request"} - ${payload.organization || payload.name}`,
+    subject: internalSubject,
     reply_to: payload.reply_email,
     html: buildContactSalesInternalHtml(payload),
     text:
       `A new ${payload.intent === "demo" ? "demo" : "sales"} request was submitted.\n\nPlan: ${payload.plan_label}\nName: ${payload.name}${organizationLine}\nReply email: ${payload.reply_email}${schoolsLine}\n\nDetails:\n${payload.details ?? "(none provided)"}\n\nLead ID: ${payload.lead_id}`,
+  }, {
+    emailType: "contact_sales_internal",
+    recipientEmail: payload.support_email,
+    subject: internalSubject,
+    requestId,
+    jobId,
+    metadata: {
+      lead_id: payload.lead_id,
+      intent: payload.intent ?? "sales",
+      plan_key: payload.plan_key,
+      plan_label: payload.plan_label,
+      direction: "internal",
+    },
   });
 
   if (slackWebhookUrl) {
@@ -374,29 +463,47 @@ const processContactSalesEmail = async (
     }
   }
 
-  await sendResendEmail(resendApiKey, {
+  const confirmationSubject = payload.intent === "demo" ? "We received your ItemTraxx demo request." : "We received your ItemTraxx sales request.";
+  await sendTrackedResendEmail(adminClient, resendApiKey, {
     from: payload.from_email,
     to: [payload.reply_email],
-    subject: payload.intent === "demo" ? "We received your ItemTraxx demo request." : "We received your ItemTraxx sales request.",
+    subject: confirmationSubject,
     html: buildContactSalesConfirmationHtml(payload),
     text:
       `Hi ${payload.name},\n\n${payload.intent === "demo" ? "Thanks for requesting an ItemTraxx demo. We've received your request and will follow up to schedule next steps within 2 business days." : "Thanks for contacting the ItemTraxx Sales Team. We've received your request and will follow up with a quote for your selected plan within 2 business days."}\n\nRequest summary:\nPlan: ${payload.plan_label}${schoolsLine}${organizationLine}\n\nIf you need to add anything else, feel free to reply to this email.\nHave a great day,\n\n- ItemTraxx ${payload.intent === "demo" ? "Team" : "Sales"}\n${payload.support_email}\n\nIf you don't hear from us within 2 business days, please check your spam folder or contact us at ${payload.support_email}`,
+  }, {
+    emailType: "contact_sales_confirmation",
+    recipientEmail: payload.reply_email,
+    subject: confirmationSubject,
+    requestId,
+    jobId,
+    metadata: {
+      lead_id: payload.lead_id,
+      intent: payload.intent ?? "sales",
+      plan_key: payload.plan_key,
+      plan_label: payload.plan_label,
+      direction: "confirmation",
+    },
   });
 };
 
 const processLoginNotificationEmail = async (
+  adminClient: SupabaseClient,
   resendApiKey: string,
   payload: LoginNotificationPayload,
+  jobId: string,
+  requestId: string,
 ) => {
   const loginTime = new Date(payload.login_time_iso);
   const loginTimeLabel = Number.isNaN(loginTime.getTime())
     ? payload.login_time_iso
     : `${loginTime.toISOString()} (UTC)`;
 
-  await sendResendEmail(resendApiKey, {
+  const subject = `New ItemTraxx Login - ${payload.tenant_name}`;
+  await sendTrackedResendEmail(adminClient, resendApiKey, {
     from: payload.from_email,
     to: [payload.to_email],
-    subject: `New ItemTraxx Login - ${payload.tenant_name}`,
+    subject,
     html: buildLoginNotificationHtml(payload, loginTimeLabel),
     text:
       `A new login to your ItemTraxx account was detected.\n\n` +
@@ -405,6 +512,46 @@ const processLoginNotificationEmail = async (
       `Device/Browser: ${payload.device_browser || "Unknown"}\n` +
       `IP Address: ${payload.ip_address ?? "Unavailable"}\n\n` +
       `If this wasn't you, contact support immediately at ${payload.support_email}.`,
+  }, {
+    emailType: "login_notification",
+    recipientEmail: payload.to_email,
+    subject,
+    requestId,
+    jobId,
+    triggeredByUserId: payload.user_id,
+    tenantId: payload.tenant_id,
+    metadata: {
+      tenant_name: payload.tenant_name,
+    },
+  });
+};
+
+const processSuperAdminTwoFactorEmail = async (
+  adminClient: SupabaseClient,
+  resendApiKey: string,
+  payload: SuperAdminTwoFactorPayload,
+  jobId: string,
+  requestId: string,
+) => {
+  const subject = "Your ItemTraxx verification code";
+  await sendTrackedResendEmail(adminClient, resendApiKey, {
+    from: payload.from_email,
+    to: [payload.to_email],
+    subject,
+    html: buildSuperAdminTwoFactorHtml(payload),
+    text:
+      `Your ItemTraxx verification code is: ${payload.code}\n\n` +
+      `This code expires in 10 minutes and can only be used once.\n\n` +
+      `If you did not attempt to sign in, contact ${payload.support_email} immediately.`,
+  }, {
+    emailType: "super_admin_2fa",
+    recipientEmail: payload.to_email,
+    subject,
+    requestId,
+    jobId,
+    metadata: {
+      purpose: "super_admin_login",
+    },
   });
 };
 
@@ -584,8 +731,11 @@ const buildSupportRequestConfirmationHtml = (payload: SupportRequestPayload) => 
 };
 
 const processSupportRequestEmail = async (
+  adminClient: SupabaseClient,
   resendApiKey: string,
   payload: SupportRequestPayload,
+  jobId: string,
+  requestId: string,
   slackWebhookUrl?: string,
 ) => {
   const attachments = (payload.attachments ?? []).slice(0, 2).map((attachment) => ({
@@ -593,11 +743,12 @@ const processSupportRequestEmail = async (
     content: attachment.content_base64,
     content_type: attachment.content_type,
   }));
-  await sendResendEmail(resendApiKey, {
+  const internalSubject = `Support Request - ${payload.subject}`;
+  await sendTrackedResendEmail(adminClient, resendApiKey, {
     from: payload.from_email,
     to: [payload.support_email],
     reply_to: payload.reply_email,
-    subject: `Support Request - ${payload.subject}`,
+    subject: internalSubject,
     html: buildSupportRequestInternalHtml(payload),
     attachments,
     text:
@@ -615,6 +766,17 @@ const processSupportRequestEmail = async (
 ` +
       `${payload.message}` +
       (attachments.length ? `\n\nAttachments: ${attachments.length} image file(s) included.` : ""),
+  }, {
+    emailType: "support_internal",
+    recipientEmail: payload.support_email,
+    subject: internalSubject,
+    requestId,
+    jobId,
+    metadata: {
+      category: payload.category,
+      direction: "internal",
+      attachment_count: attachments.length,
+    },
   });
 
   if (slackWebhookUrl) {
@@ -633,10 +795,11 @@ const processSupportRequestEmail = async (
     }
   }
 
-  await sendResendEmail(resendApiKey, {
+  const confirmationSubject = "We received your ItemTraxx support request.";
+  await sendTrackedResendEmail(adminClient, resendApiKey, {
     from: payload.from_email,
     to: [payload.reply_email],
-    subject: 'We received your ItemTraxx support request.',
+    subject: confirmationSubject,
     html: buildSupportRequestConfirmationHtml(payload),
     text:
       `Hi ${payload.name},
@@ -650,22 +813,37 @@ If you need to add anything else, reply directly to this email.
 
 - ItemTraxx Support
 ${payload.support_email}`,
+  }, {
+    emailType: "support_confirmation",
+    recipientEmail: payload.reply_email,
+    subject: confirmationSubject,
+    requestId,
+    jobId,
+    metadata: {
+      category: payload.category,
+      direction: "confirmation",
+      attachment_count: attachments.length,
+    },
   });
 };
 
 const processDistrictSupportEmail = async (
+  adminClient: SupabaseClient,
   resendApiKey: string,
   payload: DistrictSupportPayload,
   supportEmail: string,
   fromEmail: string,
+  jobId: string,
+  requestId: string,
 ) => {
   const requesterEmail = payload.requester_email ?? "Unavailable";
   const requesterName = payload.requester_name ?? "District admin";
-  await sendResendEmail(resendApiKey, {
+  const subject = `District Support Request - ${payload.subject}`;
+  await sendTrackedResendEmail(adminClient, resendApiKey, {
     from: fromEmail,
     to: [supportEmail],
     reply_to: payload.requester_email ? payload.requester_email : undefined,
-    subject: `District Support Request - ${payload.subject}`,
+    subject,
     html: buildDistrictSupportHtml(payload, supportEmail),
     text:
       `A district support request was submitted.\n\n` +
@@ -675,6 +853,18 @@ const processDistrictSupportEmail = async (
       `Priority: ${payload.priority}\n` +
       `Subject: ${payload.subject}\n\n` +
       `${payload.message}`,
+  }, {
+    emailType: "district_support_internal",
+    recipientEmail: supportEmail,
+    subject,
+    requestId,
+    jobId,
+    districtId: payload.district_id,
+    metadata: {
+      priority: payload.priority,
+      requester_email: payload.requester_email,
+      requester_name: payload.requester_name,
+    },
   });
 };
 
@@ -767,26 +957,46 @@ serve(async (req) => {
       try {
         if (job.job_type === "contact_sales_email") {
           await processContactSalesEmail(
+            adminClient,
             resendApiKey,
             job.payload as ContactSalesPayload,
+            job.id,
+            requestId,
             salesSlackWebhookUrl || undefined,
           );
         } else if (job.job_type === "login_notification_email") {
           await processLoginNotificationEmail(
+            adminClient,
             resendApiKey,
             job.payload as LoginNotificationPayload,
+            job.id,
+            requestId,
+          );
+        } else if (job.job_type === "super_admin_2fa_email") {
+          await processSuperAdminTwoFactorEmail(
+            adminClient,
+            resendApiKey,
+            job.payload as SuperAdminTwoFactorPayload,
+            job.id,
+            requestId,
           );
         } else if (job.job_type === "district_support_email") {
           await processDistrictSupportEmail(
+            adminClient,
             resendApiKey,
             job.payload as DistrictSupportPayload,
             supportEmail,
             fromEmail,
+            job.id,
+            requestId,
           );
         } else if (job.job_type === "contact_support_email") {
           await processSupportRequestEmail(
+            adminClient,
             resendApiKey,
             job.payload as SupportRequestPayload,
+            job.id,
+            requestId,
             supportSlackWebhookUrl || undefined,
           );
         } else if (job.job_type === "refresh_reporting_views") {

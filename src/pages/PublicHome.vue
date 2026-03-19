@@ -260,6 +260,7 @@
           Status
         </a>
         <a :href="legalUrl" target="_blank" rel="noreferrer">Legal</a>
+        <RouterLink to="/about">About</RouterLink>
       </div>
     </footer>
 

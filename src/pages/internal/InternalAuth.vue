@@ -3,20 +3,25 @@
     <div class="internal-auth-panel">
       <div class="internal-auth-copy">
         <p class="internal-auth-kicker">Internal Console</p>
-        <h1>ItemTraxx Internal Access</h1>
+        <h1>{{ isCodeStep ? 'Email Verification' : 'ItemTraxx Internal Access' }}</h1>
         <p class="internal-auth-subtitle">
-          Sign in with your existing super admin account to access internal operations.
+          <template v-if="isCodeStep">
+            Check your email for a 6-digit verification code to continue into internal operations.
+          </template>
+          <template v-else>
+            Sign in with your existing super admin account to access internal operations.
+          </template>
         </p>
       </div>
 
-      <form class="form internal-auth-form" @submit.prevent="handleInternalLogin">
+      <form v-if="!isCodeStep" class="form internal-auth-form" @submit.prevent="handleCredentialSubmit">
         <label>
           Email
-          <input v-model="email" type="email" placeholder="Enter email" />
+          <input v-model="email" type="email" placeholder="Enter email" autocomplete="username" />
         </label>
         <label>
           Password
-          <input v-model="password" type="password" placeholder="Enter password" />
+          <input v-model="password" type="password" placeholder="Enter password" autocomplete="current-password" />
         </label>
         <label v-if="turnstileSiteKey">
           Security Check
@@ -24,9 +29,31 @@
           <p class="muted turnstile-help">Complete security check to continue.</p>
         </label>
         <div class="form-actions">
-          <button type="submit" class="button-primary" :disabled="!canSubmit">
-            Enter Internal Console
+          <button type="submit" class="button-primary" :disabled="!canSubmitCredentials">
+            Send Verification Code
           </button>
+        </div>
+      </form>
+
+      <form v-else class="form internal-auth-form" @submit.prevent="handleCodeSubmit">
+        <p class="verification-copy">
+          Code sent to <strong>{{ verificationEmailLabel }}</strong>.
+        </p>
+        <label>
+          Verification Code
+          <input
+            v-model="verificationCode"
+            type="text"
+            inputmode="numeric"
+            autocomplete="one-time-code"
+            placeholder="Enter 6-digit code"
+            maxlength="6"
+          />
+        </label>
+        <div class="form-actions verification-actions">
+          <button type="submit" class="button-primary" :disabled="!canSubmitCode">Verify Code</button>
+          <button type="button" class="button-link" :disabled="isLoading" @click="handleResendCode">Resend code</button>
+          <button type="button" class="button-link" :disabled="isLoading" @click="handleStartOver">Start over</button>
         </div>
       </form>
       <p v-if="error" class="error">{{ error }}</p>
@@ -42,14 +69,26 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from "vue";
 import { useRouter } from "vue-router";
-import { superAdminLogin } from "../../services/authService";
+import {
+  clearPendingSuperAdminVerificationEmail,
+  getPendingSuperAdminVerificationEmail,
+  resendSuperAdminEmailChallenge,
+  signOut,
+  superAdminLogin,
+  verifySuperAdminEmailChallenge,
+} from "../../services/authService";
 import { useTurnstile } from "../../composables/useTurnstile";
+import { getAuthState } from "../../store/authState";
 
 const router = useRouter();
+const auth = getAuthState();
 const email = ref("");
 const password = ref("");
+const verificationCode = ref("");
+const verificationEmail = ref<string | null>(null);
 const error = ref("");
 const isLoading = ref(false);
+const isCodeStep = ref(false);
 const toastTitle = ref("");
 const toastMessage = ref("");
 const themeMode = ref<"light" | "dark">("dark");
@@ -75,12 +114,19 @@ const setTurnstileContainerRef = (el: Element | { $el?: Element } | null) => {
 let toastTimer: number | null = null;
 let themeObserver: MutationObserver | null = null;
 
-const canSubmit = computed(() => {
+const canSubmitCredentials = computed(() => {
   if (isLoading.value) return false;
   if (!email.value.trim() || !password.value.trim()) return false;
   if (turnstileSiteKey && !turnstileToken.value) return false;
   return true;
 });
+
+const canSubmitCode = computed(() => {
+  if (isLoading.value) return false;
+  return /^\d{6}$/.test(verificationCode.value.trim());
+});
+
+const verificationEmailLabel = computed(() => verificationEmail.value || auth.email || "your email");
 
 const showToast = (title: string, message: string) => {
   toastTitle.value = title;
@@ -95,7 +141,13 @@ const showToast = (title: string, message: string) => {
   }, 4000);
 };
 
-const handleInternalLogin = async () => {
+const enableCodeStep = (nextEmail: string | null) => {
+  isCodeStep.value = true;
+  verificationEmail.value = nextEmail;
+  verificationCode.value = "";
+};
+
+const handleCredentialSubmit = async () => {
   error.value = "";
   if (!email.value.trim() || !password.value.trim()) {
     showToast("Sign-in blocked", "Enter email and password to continue.");
@@ -109,8 +161,9 @@ const handleInternalLogin = async () => {
 
   isLoading.value = true;
   try {
-    await superAdminLogin(email.value.trim(), password.value);
-    await router.push("/");
+    const result = await superAdminLogin(email.value.trim(), password.value);
+    enableCodeStep(result.email ?? email.value.trim());
+    showToast("Code sent", "Check your email for the verification code.");
   } catch (err) {
     const message = err instanceof Error ? err.message : "Sign in failed.";
     if (message === "Invalid credentials.") {
@@ -120,8 +173,8 @@ const handleInternalLogin = async () => {
       error.value = "Access denied.";
       showToast("Access denied", "This account cannot access internal operations.");
     } else {
-      error.value = "Sign in failed. Please try again.";
-      showToast("Sign in failed", "Please try again.");
+      error.value = message || "Sign in failed. Please try again.";
+      showToast("Sign in failed", error.value);
     }
   } finally {
     isLoading.value = false;
@@ -135,6 +188,51 @@ const handleInternalLogin = async () => {
   }
 };
 
+const handleCodeSubmit = async () => {
+  error.value = "";
+  if (!/^\d{6}$/.test(verificationCode.value.trim())) {
+    error.value = "Enter the 6-digit verification code.";
+    return;
+  }
+
+  isLoading.value = true;
+  try {
+    await verifySuperAdminEmailChallenge(verificationCode.value.trim());
+    await router.push("/internal");
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Verification failed.";
+    error.value = message;
+    showToast("Verification failed", message);
+  } finally {
+    isLoading.value = false;
+  }
+};
+
+const handleResendCode = async () => {
+  error.value = "";
+  isLoading.value = true;
+  try {
+    const result = await resendSuperAdminEmailChallenge();
+    enableCodeStep(result.email ?? verificationEmail.value);
+    showToast("Code sent", "A new verification code was emailed.");
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Unable to resend code.";
+    error.value = message;
+    showToast("Resend failed", message);
+  } finally {
+    isLoading.value = false;
+  }
+};
+
+const handleStartOver = async () => {
+  clearPendingSuperAdminVerificationEmail();
+  await signOut();
+  isCodeStep.value = false;
+  verificationCode.value = "";
+  verificationEmail.value = null;
+  password.value = "";
+};
+
 onMounted(() => {
   const syncTheme = () => {
     themeMode.value =
@@ -146,6 +244,11 @@ onMounted(() => {
     attributes: true,
     attributeFilter: ["data-theme"],
   });
+
+  const pendingEmail = getPendingSuperAdminVerificationEmail();
+  if (pendingEmail || (auth.isAuthenticated && auth.role === "super_admin" && !auth.hasSecondaryAuth)) {
+    enableCodeStep(pendingEmail ?? auth.email);
+  }
 });
 
 onUnmounted(() => {
@@ -210,6 +313,16 @@ onUnmounted(() => {
 
 .internal-auth-form input {
   min-height: 3.6rem;
+}
+
+.verification-copy {
+  margin: 0 0 1rem;
+  color: var(--muted);
+}
+
+.verification-actions {
+  flex-wrap: wrap;
+  gap: 0.75rem;
 }
 
 .turnstile-help {

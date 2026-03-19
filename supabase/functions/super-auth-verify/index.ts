@@ -1,0 +1,433 @@
+import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
+import { createClient, type SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { sendLoggedResendEmail } from "../_shared/emailDeliveryLog.ts";
+import { isKillSwitchWriteBlocked } from "../_shared/killSwitch.ts";
+import { getRequestId, logError, logInfo } from "../_shared/observability.ts";
+
+const baseCorsHeaders = {
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type, x-request-id",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+  Vary: "Origin",
+};
+
+const CHALLENGE_TTL_MS = 10 * 60 * 1000;
+const RESEND_COOLDOWN_MS = 60 * 1000;
+const MAX_ATTEMPTS = 5;
+
+type RateLimitResult = {
+  allowed: boolean;
+  retry_after_seconds: number | null;
+};
+
+type StartAction = { action: "start_email_challenge" };
+type VerifyAction = { action: "verify_email_challenge"; payload?: { code?: string } };
+type ResendAction = { action: "resend_email_challenge" };
+type RequestBody = StartAction | VerifyAction | ResendAction;
+
+type ChallengeRow = {
+  id: string;
+  user_id: string;
+  email: string;
+  code_hash: string;
+  purpose: string;
+  expires_at: string;
+  used_at: string | null;
+  attempt_count: number;
+  created_at: string;
+};
+
+const resolveCorsHeaders = (req: Request) => {
+  const origin = req.headers.get("Origin");
+  const allowedOrigins = (Deno.env.get("ITX_ALLOWED_ORIGINS") ?? "")
+    .split(",")
+    .map((item) => item.trim())
+    .filter((item) => item.length > 0);
+
+  const hasOrigin = !!origin;
+  const originAllowed = !hasOrigin || (hasOrigin && allowedOrigins.includes(origin as string));
+
+  const headers =
+    hasOrigin && originAllowed
+      ? { ...baseCorsHeaders, "Access-Control-Allow-Origin": origin as string }
+      : { ...baseCorsHeaders };
+
+  return { hasOrigin, originAllowed, headers };
+};
+
+const normalizeText = (value: unknown, max = 500) => {
+  if (typeof value !== "string") return "";
+  return value.trim().slice(0, max);
+};
+
+const parseAuthToken = (req: Request) => {
+  const raw = req.headers.get("authorization") ?? "";
+  return raw.replace(/^Bearer\s+/i, "").trim();
+};
+
+const createCode = () => String(Math.floor(100000 + Math.random() * 900000));
+
+const digest = async (value: string) => {
+  const encoded = new TextEncoder().encode(value);
+  const hash = await crypto.subtle.digest("SHA-256", encoded);
+  return Array.from(new Uint8Array(hash))
+    .map((byte) => byte.toString(16).padStart(2, "0"))
+    .join("");
+};
+
+const escapeHtml = (value: string) =>
+  value
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
+
+const buildSuperAdminTwoFactorHtml = (payload: { code: string; support_email: string }) => {
+  const supportEmail = escapeHtml(payload.support_email);
+  const code = escapeHtml(payload.code);
+
+  return `<!doctype html>
+<html>
+  <body style="margin:0;padding:0;background:#f4f6fb;font-family:Arial,Helvetica,sans-serif;color:#1f2937;">
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f4f6fb;padding:24px 12px;">
+      <tr>
+        <td align="center">
+          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:560px;background:#ffffff;border:1px solid #e5e7eb;border-radius:12px;overflow:hidden;">
+            <tr>
+              <td style="padding:20px 24px;background:linear-gradient(180deg,#1f4ca3 0%,#38d0b1 100%);color:#ffffff;">
+                <h1 style="margin:0;font-size:20px;line-height:1.3;">ItemTraxx</h1>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:24px;">
+                <h2 style="margin:0 0 12px 0;font-size:22px;line-height:1.3;color:#111827;">Your Verification Code</h2>
+                <p style="margin:0 0 14px 0;font-size:15px;line-height:1.6;color:#374151;">
+                  Use the following 6-digit verification code to finish signing in to ItemTraxx super admin.
+                </p>
+                <div style="margin:0 0 18px 0;padding:16px 18px;border-radius:12px;background:#f9fafb;border:1px solid #e5e7eb;font-size:28px;line-height:1.2;font-weight:700;letter-spacing:0.22em;color:#111827;text-align:center;">
+                  ${code}
+                </div>
+                <p style="margin:0 0 14px 0;font-size:14px;line-height:1.6;color:#6b7280;">
+                  This code expires in 10 minutes and can only be used once.
+                </p>
+                <p style="margin:0;font-size:14px;line-height:1.6;color:#6b7280;">
+                  If you did not attempt to sign in, contact support immediately.
+                </p>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:16px 24px;border-top:1px solid #e5e7eb;background:#f9fafb;">
+                <p style="margin:0;font-size:12px;line-height:1.6;color:#6b7280;">
+                  Need help? Contact
+                  <a href="mailto:${supportEmail}" style="color:#19439b;text-decoration:none;">${supportEmail}</a>
+                </p>
+                <p style="margin:6px 0 0 0;font-size:12px;line-height:1.6;color:#9ca3af;">
+                  &copy; 2026 ItemTraxx Co. All rights reserved.
+                </p>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>`;
+};
+
+const sendSuperAdminTwoFactorEmail = async (
+  adminClient: SupabaseClient,
+  resendApiKey: string,
+  context: {
+    requestId: string;
+    triggeredByUserId: string;
+    resend: boolean;
+  },
+  payload: { to_email: string; code: string; support_email: string; from_email: string },
+) => {
+  const subject = "Your ItemTraxx verification code";
+  await sendLoggedResendEmail(adminClient, resendApiKey, {
+    from: payload.from_email,
+    to: payload.to_email,
+    subject,
+    html: buildSuperAdminTwoFactorHtml({ code: payload.code, support_email: payload.support_email }),
+    text: `Your ItemTraxx verification code is ${payload.code}. It expires in 10 minutes. If you did not attempt to sign in, contact ${payload.support_email}.`,
+  }, {
+    emailType: "super_admin_2fa",
+    recipientEmail: payload.to_email,
+    subject,
+    requestContext: {
+      function_name: "super-auth-verify",
+      request_id: context.requestId,
+    },
+    triggeredByUserId: context.triggeredByUserId,
+    metadata: {
+      purpose: "super_admin_login",
+      resend: context.resend,
+    },
+  });
+};
+
+serve(async (req) => {
+  const { hasOrigin, originAllowed, headers } = resolveCorsHeaders(req);
+  const requestId = getRequestId(req);
+
+  const jsonResponse = (status: number, body: Record<string, unknown>) =>
+    new Response(JSON.stringify({ ok: status < 400, ...body }), {
+      status,
+      headers: {
+        ...headers,
+        "Content-Type": "application/json",
+        "x-request-id": requestId,
+      },
+    });
+
+  if (req.method === "OPTIONS") {
+    if (!originAllowed) return new Response("Origin not allowed", { status: 403, headers });
+    return new Response("ok", { headers });
+  }
+
+  if (hasOrigin && !originAllowed) {
+    return jsonResponse(403, { error: "Origin not allowed" });
+  }
+
+  if (isKillSwitchWriteBlocked(req)) {
+    return jsonResponse(503, { error: "Unfortunately ItemTraxx is currently unavailable." });
+  }
+
+  if (req.method !== "POST") {
+    return jsonResponse(405, { error: "Method not allowed" });
+  }
+
+  try {
+    const authToken = parseAuthToken(req);
+    if (!authToken) {
+      return jsonResponse(401, { error: "Unauthorized" });
+    }
+
+    const supabaseUrl = Deno.env.get("ITX_SUPABASE_URL");
+    const publishableKey = Deno.env.get("ITX_PUBLISHABLE_KEY");
+    const serviceKey = Deno.env.get("ITX_SECRET_KEY");
+    const supportEmail = Deno.env.get("ITX_SUPPORT_EMAIL") ?? "support@itemtraxx.com";
+    const fromEmail =
+      Deno.env.get("ITX_EMAIL_FROM") ??
+      Deno.env.get("ITX_RESEND_FROM") ??
+      "ItemTraxx Security <support@itemtraxx.com>";
+    const resendApiKey = Deno.env.get("ITX_RESEND_API_KEY");
+
+    if (!supabaseUrl || !publishableKey || !serviceKey || !resendApiKey) {
+      return jsonResponse(500, { error: "Server misconfiguration" });
+    }
+
+    const userClient = createClient(supabaseUrl, publishableKey, {
+      global: { headers: { Authorization: `Bearer ${authToken}` } },
+      auth: { persistSession: false },
+    });
+    const adminClient = createClient(supabaseUrl, serviceKey, {
+      auth: { persistSession: false },
+    });
+
+    const {
+      data: { user },
+      error: userError,
+    } = await userClient.auth.getUser();
+
+    if (userError || !user) {
+      return jsonResponse(401, { error: "Unauthorized" });
+    }
+
+    const { data: profile, error: profileError } = await userClient
+      .from("profiles")
+      .select("role, auth_email")
+      .eq("id", user.id)
+      .single();
+
+    if (profileError || profile?.role !== "super_admin") {
+      return jsonResponse(403, { error: "Access denied" });
+    }
+
+    const { data: rateLimit, error: rateLimitError } = await adminClient.rpc("consume_rate_limit", {
+      p_scope: "super_admin_2fa",
+      p_limit: 10,
+      p_window_seconds: 600,
+    });
+    if (!rateLimitError) {
+      const rateLimitResult = rateLimit as RateLimitResult;
+      if (!rateLimitResult.allowed) {
+        return jsonResponse(429, { error: "Too many requests. Please try again shortly." });
+      }
+    }
+
+    const body = (await req.json().catch(() => ({}))) as RequestBody;
+    if (!body || typeof body !== "object" || typeof body.action !== "string") {
+      return jsonResponse(400, { error: "Invalid request" });
+    }
+
+    const writeAudit = async (actionType: string, metadata: Record<string, unknown>) => {
+      await adminClient.from("super_admin_audit_logs").insert({
+        actor_id: user.id,
+        actor_email: profile.auth_email ?? user.email ?? null,
+        action_type: actionType,
+        target_type: "super_admin_auth",
+        target_id: user.id,
+        metadata,
+      });
+    };
+
+    if (body.action === "start_email_challenge" || body.action === "resend_email_challenge") {
+      const { data: latestChallenge } = await adminClient
+        .from("super_admin_email_challenges")
+        .select("id, created_at, used_at, expires_at")
+        .eq("user_id", user.id)
+        .eq("purpose", "super_admin_login")
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (
+        latestChallenge?.created_at &&
+        !latestChallenge.used_at &&
+        Date.now() - Date.parse(latestChallenge.created_at) < RESEND_COOLDOWN_MS
+      ) {
+        return jsonResponse(429, { error: "A code was just sent. Please wait before requesting another." });
+      }
+
+      const recipientEmail = profile.auth_email ?? user.email ?? "";
+      if (!recipientEmail) {
+        return jsonResponse(400, { error: "Missing recipient email." });
+      }
+
+      const code = createCode();
+      const codeHash = await digest(`${user.id}:${code}`);
+      const expiresAt = new Date(Date.now() + CHALLENGE_TTL_MS).toISOString();
+
+      await adminClient
+        .from("super_admin_email_challenges")
+        .update({ used_at: new Date().toISOString() })
+        .eq("user_id", user.id)
+        .eq("purpose", "super_admin_login")
+        .is("used_at", null);
+
+      const { error: insertError } = await adminClient
+        .from("super_admin_email_challenges")
+        .insert({
+          user_id: user.id,
+          email: recipientEmail,
+          purpose: "super_admin_login",
+          code_hash: codeHash,
+          expires_at: expiresAt,
+        });
+
+      if (insertError) {
+        logError("super-auth-verify challenge insert failed", requestId, insertError, { user_id: user.id });
+        return jsonResponse(500, { error: "Unable to start verification." });
+      }
+
+      await sendSuperAdminTwoFactorEmail(adminClient, resendApiKey, {
+        requestId,
+        triggeredByUserId: user.id,
+        resend: body.action === "resend_email_challenge",
+      }, {
+        to_email: recipientEmail,
+        code,
+        support_email: supportEmail,
+        from_email: fromEmail,
+      });
+
+      await writeAudit(
+        body.action === "resend_email_challenge" ? "super_admin_2fa_resent" : "super_admin_2fa_started",
+        { expires_at: expiresAt },
+      );
+      logInfo("super-auth-verify challenge started", requestId, { user_id: user.id });
+      return jsonResponse(200, {
+        challenge_started: true,
+        email: recipientEmail,
+        expires_at: expiresAt,
+      });
+    }
+
+    if (body.action === "verify_email_challenge") {
+      const code = normalizeText(body.payload?.code, 12).replace(/\s+/g, "");
+      if (!/^\d{6}$/.test(code)) {
+        return jsonResponse(400, { error: "Enter a valid 6-digit code." });
+      }
+
+      const { data: challenge, error: challengeError } = await adminClient
+        .from("super_admin_email_challenges")
+        .select("id, user_id, email, code_hash, purpose, expires_at, used_at, attempt_count, created_at")
+        .eq("user_id", user.id)
+        .eq("purpose", "super_admin_login")
+        .is("used_at", null)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (challengeError) {
+        logError("super-auth-verify challenge lookup failed", requestId, challengeError, { user_id: user.id });
+        return jsonResponse(500, { error: "Unable to verify code." });
+      }
+
+      const activeChallenge = challenge as ChallengeRow | null;
+      if (!activeChallenge) {
+        return jsonResponse(400, { error: "No active verification code. Request a new code." });
+      }
+      if (Date.parse(activeChallenge.expires_at) <= Date.now()) {
+        await adminClient
+          .from("super_admin_email_challenges")
+          .update({ used_at: new Date().toISOString() })
+          .eq("id", activeChallenge.id);
+        return jsonResponse(400, { error: "Verification code expired. Request a new code." });
+      }
+      if (activeChallenge.attempt_count >= MAX_ATTEMPTS) {
+        await adminClient
+          .from("super_admin_email_challenges")
+          .update({ used_at: new Date().toISOString() })
+          .eq("id", activeChallenge.id);
+        return jsonResponse(400, { error: "Verification code locked. Request a new code." });
+      }
+
+      const submittedHash = await digest(`${user.id}:${code}`);
+      if (submittedHash !== activeChallenge.code_hash) {
+        const nextAttempts = activeChallenge.attempt_count + 1;
+        await adminClient
+          .from("super_admin_email_challenges")
+          .update({
+            attempt_count: nextAttempts,
+            last_attempt_at: new Date().toISOString(),
+            ...(nextAttempts >= MAX_ATTEMPTS ? { used_at: new Date().toISOString() } : {}),
+          })
+          .eq("id", activeChallenge.id);
+        await writeAudit("super_admin_2fa_failed", { attempt_count: nextAttempts });
+        return jsonResponse(400, {
+          error: nextAttempts >= MAX_ATTEMPTS
+            ? "Verification code locked. Request a new code."
+            : "Invalid verification code.",
+        });
+      }
+
+      await adminClient
+        .from("super_admin_email_challenges")
+        .update({
+          used_at: new Date().toISOString(),
+          last_attempt_at: new Date().toISOString(),
+        })
+        .eq("id", activeChallenge.id);
+
+      await writeAudit("super_admin_2fa_verified", {});
+      logInfo("super-auth-verify challenge verified", requestId, { user_id: user.id });
+      return jsonResponse(200, { verified: true });
+    }
+
+    return jsonResponse(400, { error: "Invalid action" });
+  } catch (error) {
+    logError("super-auth-verify error", requestId, error);
+    return new Response(JSON.stringify({ ok: false, error: "Request failed." }), {
+      status: 500,
+      headers: {
+        ...headers,
+        "Content-Type": "application/json",
+        "x-request-id": requestId,
+      },
+    });
+  }
+});

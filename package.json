@@ -18,7 +18,8 @@
     "perf:report": "node ./scripts/perf-report.mjs",
     "docs:edge-schemas": "node ./scripts/generate-edge-schemas.mjs",
     "docs:edge-openapi": "node ./scripts/generate-edge-schemas.mjs",
-    "docs:edge-reference": "node ./scripts/generate-edge-reference.mjs"
+    "docs:edge-reference": "node ./scripts/generate-edge-reference.mjs",
+    "analytics:report": "node ./scripts/vercel-analytics-agent.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.99.2",

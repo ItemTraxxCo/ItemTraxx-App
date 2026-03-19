@@ -35,3 +35,4 @@ supabase/.temp/
 .agent.md
 .github/copilot-instructions.md
 .github/agents/Main Developer.agent.md
+DOCUMENTATION_COMPLETION_CHECKLIST.md

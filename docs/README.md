@@ -23,6 +23,7 @@ This directory contains operational, security, architecture, and testing documen
 - `docs/runbooks/kill-switch.md` — Production kill-switch behavior and usage.
 - `docs/runbooks/create-tenant.md` — Current super-admin tenant creation process and verification checklist.
 - `docs/runbooks/new-developer-onboarding.md` — Full step-by-step onboarding procedure and deploy model.
+- `docs/runbooks/maintenance-checklist.md` — Routine weekly, monthly, quarterly, and post-deploy maintenance tasks.
 
 ## Product and Feature Specs
 - `docs/onboarding-feature-spec.md` — First-sign-in onboarding behavior and constraints.

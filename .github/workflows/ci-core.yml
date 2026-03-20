@@ -15,7 +15,19 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  slack-notify-start:
+    uses: ./.github/workflows/slack-notify-status.yml
+    with:
+      mode: start
+      workflow_name: CI Core
+      job_name: build-and-verify
+      run_url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+      ref_name: ${{ github.ref_name }}
+      sha: ${{ github.sha }}
+    secrets: inherit
+
   build-and-verify:
+    needs: slack-notify-start
     runs-on: ubuntu-latest
     timeout-minutes: 20
 
@@ -58,14 +70,20 @@ jobs:
           path: artifacts/perf-report.json
           if-no-files-found: ignore
 
-  notify-slack-on-failure:
-    needs: build-and-verify
-    if: ${{ always() && needs.build-and-verify.result == 'failure' }}
-    uses: ./.github/workflows/slack-notify-failure.yml
+  slack-notify-finish:
+    needs:
+      - slack-notify-start
+      - build-and-verify
+    if: ${{ always() && needs.build-and-verify.result != 'skipped' }}
+    uses: ./.github/workflows/slack-notify-status.yml
     with:
+      mode: finish
       workflow_name: CI Core
       job_name: build-and-verify
       run_url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
       ref_name: ${{ github.ref_name }}
       sha: ${{ github.sha }}
+      status: ${{ needs.build-and-verify.result }}
+      slack_channel_id: ${{ needs.slack-notify-start.outputs.slack_channel_id }}
+      slack_message_ts: ${{ needs.slack-notify-start.outputs.slack_message_ts }}
     secrets: inherit

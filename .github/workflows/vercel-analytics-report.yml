@@ -15,7 +15,19 @@ on:
         default: "7d"
 
 jobs:
+  slack-notify-start:
+    uses: ./.github/workflows/slack-notify-status.yml
+    with:
+      mode: start
+      workflow_name: Vercel Analytics Report
+      job_name: analyze
+      run_url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+      ref_name: ${{ github.ref_name }}
+      sha: ${{ github.sha }}
+    secrets: inherit
+
   analyze:
+    needs: slack-notify-start
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -35,15 +47,20 @@ jobs:
           ANALYTICS_PERIOD: ${{ inputs.period || '7d' }}
         run: node scripts/vercel-analytics-agent.mjs
 
-  notify-failure:
-    needs: analyze
-    if: failure()
-    uses: ./.github/workflows/slack-notify-failure.yml
+  slack-notify-finish:
+    needs:
+      - slack-notify-start
+      - analyze
+    if: ${{ always() && needs.analyze.result != 'skipped' }}
+    uses: ./.github/workflows/slack-notify-status.yml
     with:
-      workflow_name: "Vercel Analytics Report"
-      job_name: "analyze"
+      mode: finish
+      workflow_name: Vercel Analytics Report
+      job_name: analyze
       run_url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
       ref_name: ${{ github.ref_name }}
       sha: ${{ github.sha }}
-    secrets:
-      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+      status: ${{ needs.analyze.result }}
+      slack_channel_id: ${{ needs.slack-notify-start.outputs.slack_channel_id }}
+      slack_message_ts: ${{ needs.slack-notify-start.outputs.slack_message_ts }}
+    secrets: inherit

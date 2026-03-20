@@ -1,0 +1,242 @@
+name: Slack Notify Status
+
+permissions: {}
+
+on:
+  workflow_call:
+    inputs:
+      mode:
+        required: true
+        type: string
+      workflow_name:
+        required: true
+        type: string
+      job_name:
+        required: true
+        type: string
+      run_url:
+        required: true
+        type: string
+      ref_name:
+        required: true
+        type: string
+      sha:
+        required: true
+        type: string
+      status:
+        required: false
+        type: string
+      slack_channel_id:
+        required: false
+        type: string
+      slack_message_ts:
+        required: false
+        type: string
+    outputs:
+      slack_channel_id:
+        description: Slack channel used for the status message.
+        value: ${{ jobs.notify_start.outputs.slack_channel_id }}
+      slack_message_ts:
+        description: Slack timestamp for the posted status message.
+        value: ${{ jobs.notify_start.outputs.slack_message_ts }}
+    secrets:
+      SLACK_BOT_TOKEN:
+        required: false
+      SLACK_CHANNEL_ID:
+        required: false
+      SLACK_WEBHOOK_URL:
+        required: false
+
+jobs:
+  notify_start:
+    if: ${{ inputs.mode == 'start' }}
+    runs-on: ubuntu-latest
+    outputs:
+      slack_channel_id: ${{ steps.post.outputs.channel_id }}
+      slack_message_ts: ${{ steps.post.outputs.message_ts }}
+    steps:
+      - name: Post Slack start notification
+        id: post
+        env:
+          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+          SLACK_CHANNEL_ID: ${{ secrets.SLACK_CHANNEL_ID }}
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          WORKFLOW_NAME: ${{ inputs.workflow_name }}
+          JOB_NAME: ${{ inputs.job_name }}
+          RUN_URL: ${{ inputs.run_url }}
+          REF_NAME: ${{ inputs.ref_name }}
+          SHA: ${{ inputs.sha }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+
+          if [ -n "${SLACK_BOT_TOKEN:-}" ] && [ -n "${SLACK_CHANNEL_ID:-}" ]; then
+            PAYLOAD="$(jq -n \
+              --arg channel "$SLACK_CHANNEL_ID" \
+              --arg workflow "$WORKFLOW_NAME" \
+              --arg job "$JOB_NAME" \
+              --arg branch "$REF_NAME" \
+              --arg commit "${SHA:0:7}" \
+              --arg repo "$REPOSITORY" \
+              --arg run_url "$RUN_URL" \
+              '{
+                channel: $channel,
+                text: "GitHub Actions run started",
+                blocks: [
+                  {
+                    type: "header",
+                    text: {
+                      type: "plain_text",
+                      text: "GitHub Actions run started"
+                    }
+                  },
+                  {
+                    type: "section",
+                    fields: [
+                      { type: "mrkdwn", text: ("*Workflow:*\n" + $workflow) },
+                      { type: "mrkdwn", text: ("*Job:*\n" + $job) },
+                      { type: "mrkdwn", text: ("*Branch:*\n" + $branch) },
+                      { type: "mrkdwn", text: ("*Commit:*\n" + $commit) }
+                    ]
+                  },
+                  {
+                    type: "section",
+                    text: {
+                      type: "mrkdwn",
+                      text: ("*Repository:* " + $repo + "\n*Run:* <" + $run_url + "|Open run>\n*Status:* In progress")
+                    }
+                  }
+                ]
+              }')"
+            RESPONSE="$(curl -fsSL https://slack.com/api/chat.postMessage \
+              -H "Authorization: Bearer ${SLACK_BOT_TOKEN}" \
+              -H "Content-Type: application/json; charset=utf-8" \
+              --data "$PAYLOAD")"
+            OK="$(printf '%s' "$RESPONSE" | jq -r '.ok')"
+            if [ "$OK" != "true" ]; then
+              echo "$RESPONSE"
+              exit 1
+            fi
+            echo "channel_id=$(printf '%s' "$RESPONSE" | jq -r '.channel // empty')" >> "$GITHUB_OUTPUT"
+            echo "message_ts=$(printf '%s' "$RESPONSE" | jq -r '.ts // empty')" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          if [ -n "${SLACK_WEBHOOK_URL:-}" ]; then
+            PAYLOAD="$(jq -n \
+              --arg workflow "$WORKFLOW_NAME" \
+              --arg job "$JOB_NAME" \
+              --arg branch "$REF_NAME" \
+              --arg commit "${SHA:0:7}" \
+              '{text: ("GitHub Actions run started: " + $workflow + " / " + $job + " on " + $branch + " (" + $commit + ")")}')"
+            curl -fsSL -X POST "$SLACK_WEBHOOK_URL" \
+              -H "Content-Type: application/json" \
+              --data "$PAYLOAD"
+          else
+            echo "No Slack secrets configured; skipping start notification."
+          fi
+
+  notify_finish:
+    if: ${{ inputs.mode == 'finish' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send Slack finish notification
+        env:
+          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          WORKFLOW_NAME: ${{ inputs.workflow_name }}
+          JOB_NAME: ${{ inputs.job_name }}
+          RUN_URL: ${{ inputs.run_url }}
+          REF_NAME: ${{ inputs.ref_name }}
+          SHA: ${{ inputs.sha }}
+          STATUS: ${{ inputs.status || 'completed' }}
+          MESSAGE_TS: ${{ inputs.slack_message_ts }}
+          MESSAGE_CHANNEL_ID: ${{ inputs.slack_channel_id }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+
+          STATUS_LOWER="$(printf '%s' "$STATUS" | tr '[:upper:]' '[:lower:]')"
+          case "$STATUS_LOWER" in
+            success)
+              STATUS_LABEL='Succeeded'
+              ;;
+            failure)
+              STATUS_LABEL='Failed'
+              ;;
+            cancelled)
+              STATUS_LABEL='Cancelled'
+              ;;
+            *)
+              STATUS_LABEL='Completed'
+              ;;
+          esac
+
+          if [ -n "${SLACK_BOT_TOKEN:-}" ] && [ -n "${MESSAGE_CHANNEL_ID:-}" ] && [ -n "${MESSAGE_TS:-}" ]; then
+            PAYLOAD="$(jq -n \
+              --arg channel "$MESSAGE_CHANNEL_ID" \
+              --arg ts "$MESSAGE_TS" \
+              --arg workflow "$WORKFLOW_NAME" \
+              --arg job "$JOB_NAME" \
+              --arg branch "$REF_NAME" \
+              --arg commit "${SHA:0:7}" \
+              --arg repo "$REPOSITORY" \
+              --arg run_url "$RUN_URL" \
+              --arg status_label "$STATUS_LABEL" \
+              '{
+                channel: $channel,
+                ts: $ts,
+                text: ("GitHub Actions run " + ($status_label | ascii_downcase)),
+                blocks: [
+                  {
+                    type: "header",
+                    text: {
+                      type: "plain_text",
+                      text: ("GitHub Actions run " + ($status_label | ascii_downcase))
+                    }
+                  },
+                  {
+                    type: "section",
+                    fields: [
+                      { type: "mrkdwn", text: ("*Workflow:*\n" + $workflow) },
+                      { type: "mrkdwn", text: ("*Job:*\n" + $job) },
+                      { type: "mrkdwn", text: ("*Branch:*\n" + $branch) },
+                      { type: "mrkdwn", text: ("*Commit:*\n" + $commit) }
+                    ]
+                  },
+                  {
+                    type: "section",
+                    text: {
+                      type: "mrkdwn",
+                      text: ("*Repository:* " + $repo + "\n*Run:* <" + $run_url + "|Open run>\n*Status:* " + $status_label)
+                    }
+                  }
+                ]
+              }')"
+            RESPONSE="$(curl -fsSL https://slack.com/api/chat.update \
+              -H "Authorization: Bearer ${SLACK_BOT_TOKEN}" \
+              -H "Content-Type: application/json; charset=utf-8" \
+              --data "$PAYLOAD")"
+            OK="$(printf '%s' "$RESPONSE" | jq -r '.ok')"
+            if [ "$OK" != "true" ]; then
+              echo "$RESPONSE"
+              exit 1
+            fi
+            exit 0
+          fi
+
+          if [ -n "${SLACK_WEBHOOK_URL:-}" ]; then
+            PAYLOAD="$(jq -n \
+              --arg workflow "$WORKFLOW_NAME" \
+              --arg job "$JOB_NAME" \
+              --arg branch "$REF_NAME" \
+              --arg commit "${SHA:0:7}" \
+              --arg run_url "$RUN_URL" \
+              --arg status_label "$STATUS_LABEL" \
+              '{text: ("GitHub Actions run " + ($status_label | ascii_downcase) + ": " + $workflow + " / " + $job + " on " + $branch + " (" + $commit + ") — " + $run_url)}')"
+            curl -fsSL -X POST "$SLACK_WEBHOOK_URL" \
+              -H "Content-Type: application/json" \
+              --data "$PAYLOAD"
+          else
+            echo "No Slack secrets configured; skipping finish notification."
+          fi

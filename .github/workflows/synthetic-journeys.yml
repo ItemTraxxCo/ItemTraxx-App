@@ -9,7 +9,19 @@ on:
     - cron: "0,30 * * * *"
 
 jobs:
+  slack-notify-start:
+    uses: ./.github/workflows/slack-notify-status.yml
+    with:
+      mode: start
+      workflow_name: Synthetic Journeys
+      job_name: synthetic-smoke
+      run_url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+      ref_name: ${{ github.ref_name }}
+      sha: ${{ github.sha }}
+    secrets: inherit
+
   synthetic-smoke:
+    needs: slack-notify-start
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
@@ -20,14 +32,20 @@ jobs:
       - name: Run production synthetic smoke checks
         run: bash ./scripts/synthetic-smoke.sh
 
-  notify-slack-on-failure:
-    needs: synthetic-smoke
-    if: ${{ always() && needs.synthetic-smoke.result == 'failure' }}
-    uses: ./.github/workflows/slack-notify-failure.yml
+  slack-notify-finish:
+    needs:
+      - slack-notify-start
+      - synthetic-smoke
+    if: ${{ always() && needs.synthetic-smoke.result != 'skipped' }}
+    uses: ./.github/workflows/slack-notify-status.yml
     with:
+      mode: finish
       workflow_name: Synthetic Journeys
       job_name: synthetic-smoke
       run_url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
       ref_name: ${{ github.ref_name }}
       sha: ${{ github.sha }}
+      status: ${{ needs.synthetic-smoke.result }}
+      slack_channel_id: ${{ needs.slack-notify-start.outputs.slack_channel_id }}
+      slack_message_ts: ${{ needs.slack-notify-start.outputs.slack_message_ts }}
     secrets: inherit

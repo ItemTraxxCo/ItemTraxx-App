@@ -36,13 +36,22 @@ Required:
 - `CLOUDFLARE_API_TOKEN`
 - `CLOUDFLARE_ACCOUNT_ID`
 
-### Slack failure alerting
+### Slack notifications
 
-Already used elsewhere in the repo:
+Required for basic Slack posting:
 
 - `SLACK_WEBHOOK_URL`
 
-If a deploy job fails and Slack alerts are configured correctly, Slack will receive a failure notification.
+Required for live status updates in the same Slack message:
+
+- `SLACK_BOT_TOKEN`
+- `SLACK_CHANNEL_ID`
+
+If only `SLACK_WEBHOOK_URL` is configured:
+
+- Slack still receives notifications
+- but each update is a separate message
+- and Slack messages cannot be updated in place
 
 ## 3. Workflow Files
 
@@ -317,3 +326,9 @@ Use local terminal deploys only when:
 - GitHub Actions is unavailable
 - you are doing controlled testing
 - you are handling an emergency under a runbook
+
+
+## Slack Live Status Notifications
+- Add `SLACK_BOT_TOKEN` and `SLACK_CHANNEL_ID` as GitHub Actions repository secrets to enable start and completion updates in the same Slack message.
+- Keep `SLACK_WEBHOOK_URL` if you want a fallback path, but webhook-only mode cannot update an existing Slack message in place.
+- The Slack bot token must have the `chat:write` scope for the target channel.

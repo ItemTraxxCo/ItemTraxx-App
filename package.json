@@ -19,7 +19,9 @@
     "docs:edge-schemas": "node ./scripts/generate-edge-schemas.mjs",
     "docs:edge-openapi": "node ./scripts/generate-edge-schemas.mjs",
     "docs:edge-reference": "node ./scripts/generate-edge-reference.mjs",
-    "analytics:report": "node ./scripts/vercel-analytics-agent.mjs"
+    "analytics:report": "node ./scripts/vercel-analytics-agent.mjs",
+    "deploy:supabase:functions": "python3 ./scripts/deploy-supabase-functions.py",
+    "deploy:cloudflare:worker": "bash ./scripts/deploy-cloudflare-worker.sh"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.99.3",

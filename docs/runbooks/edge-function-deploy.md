@@ -1,38 +1,81 @@
 # Runbook: Edge Function Deploy
 
 ## Purpose
+
 Deploy Supabase edge functions safely and verify auth behavior.
 
 ## Preconditions
-- Supabase CLI installed and authenticated.
-- Correct project ref selected.
-- Required secrets set in Supabase project.
 
-## Deploy Commands
+- Supabase CLI installed.
+- Supabase CLI authenticated.
+- Correct project ref known if the local CLI is not already linked.
+- Required Supabase secrets already set in the target project.
+
+## Preferred Manual Deploy Commands
+
+From the repo root, deploy all tracked functions:
+
 ```bash
-# deploy a single function
-supabase functions deploy <function_name>
+npm run deploy:supabase:functions
+```
 
-# deploy function with JWT verification disabled at gateway
-# use only if function performs auth validation internally
+Deploy only specific functions:
+
+```bash
+npm run deploy:supabase:functions -- tenant-login login-notify
+```
+
+Call the deploy script directly:
+
+```bash
+python3 ./scripts/deploy-supabase-functions.py tenant-login login-notify
+```
+
+Target a specific project ref explicitly:
+
+```bash
+SUPABASE_PROJECT_REF=<project-ref> python3 ./scripts/deploy-supabase-functions.py tenant-login
+```
+
+## How The Repo Deploy Script Works
+
+File:
+
+- `scripts/deploy-supabase-functions.py`
+
+Behavior:
+
+- discovers tracked functions under `supabase/functions/`
+- reads `supabase/config.toml`
+- automatically adds `--no-verify-jwt` for functions configured with `verify_jwt = false`
+- can deploy all functions or only the names you pass in
+
+## Legacy Direct CLI Commands
+
+These still work when needed.
+
+```bash
+supabase functions deploy <function_name>
+```
+
+```bash
 supabase functions deploy <function_name> --no-verify-jwt
 ```
 
-## Typical Functions
-- `admin-ops`
-- `admin-student-mutate`
-- `checkoutReturn`
-- `login-notify`
+Use the repo deploy script unless you have a specific reason not to.
 
 ## Post-Deploy Verification
+
 1. Confirm deploy output shows success.
-2. Hit function through app flow, not only direct curl.
-3. Check for expected auth behavior:
-   - protected endpoints reject missing/invalid tokens
-   - valid tenant flows return 2xx
-4. Confirm no spike in 401/500 in logs.
+2. Hit the function through the app flow, not only direct curl.
+3. Check expected auth behavior:
+- protected endpoints reject missing or invalid tokens
+- valid tenant flows return 2xx
+4. Confirm there is no spike in 401 or 500 responses.
 
 ## Rollback Strategy
-1. Re-deploy last known good function revision from git.
-2. Re-run smoke tests for affected route.
-3. Update incident/status notes if user impact occurred.
+
+1. Check out the last known good revision.
+2. Re-deploy the affected function or functions.
+3. Re-run smoke tests for the affected route.
+4. Update incident or status communication if users were impacted.

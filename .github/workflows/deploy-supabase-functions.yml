@@ -1,0 +1,69 @@
+name: Deploy Supabase Functions
+
+permissions:
+  contents: read
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'supabase/functions/**'
+      - 'supabase/config.toml'
+      - 'scripts/deploy-supabase-functions.py'
+      - '.github/workflows/deploy-supabase-functions.yml'
+  workflow_dispatch:
+    inputs:
+      functions:
+        description: 'Optional space-separated function names to deploy. Leave blank to deploy all functions.'
+        required: false
+        default: ''
+
+concurrency:
+  group: deploy-supabase-functions-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: production
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Deploy functions
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+          REQUESTED_FUNCTIONS: ${{ github.event.inputs.functions || '' }}
+        run: |
+          set -euo pipefail
+          if [ -n "$REQUESTED_FUNCTIONS" ]; then
+            python3 ./scripts/deploy-supabase-functions.py --project-ref "$SUPABASE_PROJECT_REF" $REQUESTED_FUNCTIONS
+          else
+            python3 ./scripts/deploy-supabase-functions.py --project-ref "$SUPABASE_PROJECT_REF"
+          fi
+
+  notify-slack-on-failure:
+    needs: deploy
+    if: ${{ always() && needs.deploy.result == 'failure' }}
+    uses: ./.github/workflows/slack-notify-failure.yml
+    with:
+      workflow_name: Deploy Supabase Functions
+      job_name: deploy
+      run_url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+      ref_name: ${{ github.ref_name }}
+      sha: ${{ github.sha }}
+    secrets: inherit

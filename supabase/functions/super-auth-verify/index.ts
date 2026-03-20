@@ -3,6 +3,13 @@ import { createClient, type SupabaseClient } from "https://esm.sh/@supabase/supa
 import { sendLoggedResendEmail } from "../_shared/emailDeliveryLog.ts";
 import { isKillSwitchWriteBlocked } from "../_shared/killSwitch.ts";
 import { getRequestId, logError, logInfo } from "../_shared/observability.ts";
+import {
+  enforcePreloginRateLimit,
+  hashString,
+  resolveClientFingerprint,
+  resolveClientIp,
+  verifyTurnstileToken,
+} from "../_shared/preloginGuards.ts";
 
 const baseCorsHeaders = {
   "Access-Control-Allow-Headers":
@@ -20,10 +27,14 @@ type RateLimitResult = {
   retry_after_seconds: number | null;
 };
 
+type StartPasswordLoginAction = {
+  action: "start_password_login";
+  payload?: { email?: string; password?: string; turnstile_token?: string };
+};
 type StartAction = { action: "start_email_challenge" };
 type VerifyAction = { action: "verify_email_challenge"; payload?: { code?: string } };
 type ResendAction = { action: "resend_email_challenge" };
-type RequestBody = StartAction | VerifyAction | ResendAction;
+type RequestBody = StartPasswordLoginAction | StartAction | VerifyAction | ResendAction;
 
 type ChallengeRow = {
   id: string;
@@ -200,14 +211,15 @@ serve(async (req) => {
   }
 
   try {
-    const authToken = parseAuthToken(req);
-    if (!authToken) {
-      return jsonResponse(401, { error: "Unauthorized" });
+    const body = (await req.json().catch(() => ({}))) as RequestBody;
+    if (!body || typeof body !== "object" || typeof body.action !== "string") {
+      return jsonResponse(400, { error: "Invalid request" });
     }
 
     const supabaseUrl = Deno.env.get("ITX_SUPABASE_URL");
     const publishableKey = Deno.env.get("ITX_PUBLISHABLE_KEY");
     const serviceKey = Deno.env.get("ITX_SECRET_KEY");
+    const turnstileSecret = Deno.env.get("ITX_TURNSTILE_SECRET") ?? "";
     const supportEmail = Deno.env.get("ITX_SUPPORT_EMAIL") ?? "support@itemtraxx.com";
     const fromEmail =
       Deno.env.get("ITX_EMAIL_FROM") ??
@@ -219,11 +231,158 @@ serve(async (req) => {
       return jsonResponse(500, { error: "Server misconfiguration" });
     }
 
-    const userClient = createClient(supabaseUrl, publishableKey, {
-      global: { headers: { Authorization: `Bearer ${authToken}` } },
+    const adminClient = createClient(supabaseUrl, serviceKey, {
       auth: { persistSession: false },
     });
-    const adminClient = createClient(supabaseUrl, serviceKey, {
+
+    if (body.action === "start_password_login") {
+      const email = normalizeText(body.payload?.email, 320).toLowerCase();
+      const password = typeof body.payload?.password === "string" ? body.payload.password : "";
+      const turnstileToken = normalizeText(body.payload?.turnstile_token, 4096);
+      if (!email || !password || !turnstileToken) {
+        return jsonResponse(400, { error: "Invalid request" });
+      }
+      if (!turnstileSecret) {
+        return jsonResponse(500, { error: "Server misconfiguration" });
+      }
+
+      const origin = req.headers.get("Origin");
+      const clientIp = resolveClientIp(req);
+      const clientFingerprint = resolveClientFingerprint(req, origin);
+      const emailHash = await hashString(email);
+
+      const perClientLimit = await enforcePreloginRateLimit(
+        adminClient,
+        clientFingerprint,
+        `super-admin-login-client-${clientFingerprint}`,
+        10,
+        600
+      );
+      if (!perClientLimit.ok) {
+        if (perClientLimit.error) {
+          logError("super-auth-verify prelogin rate limit failed", requestId, perClientLimit.error, {
+            scope: `super-admin-login-client-${clientFingerprint}`,
+          });
+          return jsonResponse(503, { error: "Rate limit check failed" });
+        }
+        return jsonResponse(429, { error: "Too many requests. Please try again shortly." });
+      }
+
+      const perEmailLimit = await enforcePreloginRateLimit(
+        adminClient,
+        `${clientFingerprint}-${emailHash.slice(0, 16)}`,
+        `super-admin-login-email-${emailHash.slice(0, 12)}`,
+        5,
+        600
+      );
+      if (!perEmailLimit.ok) {
+        if (perEmailLimit.error) {
+          logError("super-auth-verify prelogin rate limit failed", requestId, perEmailLimit.error, {
+            scope: `super-admin-login-email-${emailHash.slice(0, 12)}`,
+          });
+          return jsonResponse(503, { error: "Rate limit check failed" });
+        }
+        return jsonResponse(429, { error: "Too many requests. Please try again shortly." });
+      }
+
+      const turnstileValid = await verifyTurnstileToken(
+        turnstileSecret,
+        turnstileToken,
+        clientIp,
+        "super-auth-verify start_password_login"
+      );
+      if (!turnstileValid) {
+        return jsonResponse(403, { error: "Turnstile verification failed" });
+      }
+
+      const loginClient = createClient(supabaseUrl, publishableKey, {
+        auth: { persistSession: false },
+      });
+      const signIn = await loginClient.auth.signInWithPassword({ email, password });
+      const session = signIn.data.session;
+      const signedInUser = signIn.data.user ?? session?.user ?? null;
+      if (signIn.error || !session?.access_token || !session.refresh_token || !signedInUser?.id) {
+        return jsonResponse(401, { error: "Invalid credentials" });
+      }
+
+      const { data: profile } = await adminClient
+        .from("profiles")
+        .select("role, auth_email")
+        .eq("id", signedInUser.id)
+        .single();
+
+      if (profile?.role !== "super_admin") {
+        return jsonResponse(403, { error: "Access denied" });
+      }
+
+      const recipientEmail = profile.auth_email ?? signedInUser.email ?? "";
+      if (!recipientEmail) {
+        return jsonResponse(400, { error: "Missing recipient email." });
+      }
+
+      const code = createCode();
+      const codeHash = await digest(`${signedInUser.id}:${code}`);
+      const expiresAt = new Date(Date.now() + CHALLENGE_TTL_MS).toISOString();
+
+      await adminClient
+        .from("super_admin_email_challenges")
+        .update({ used_at: new Date().toISOString() })
+        .eq("user_id", signedInUser.id)
+        .eq("purpose", "super_admin_login")
+        .is("used_at", null);
+
+      const { error: insertError } = await adminClient
+        .from("super_admin_email_challenges")
+        .insert({
+          user_id: signedInUser.id,
+          email: recipientEmail,
+          purpose: "super_admin_login",
+          code_hash: codeHash,
+          expires_at: expiresAt,
+        });
+
+      if (insertError) {
+        logError("super-auth-verify challenge insert failed", requestId, insertError, { user_id: signedInUser.id });
+        return jsonResponse(500, { error: "Unable to start verification." });
+      }
+
+      await sendSuperAdminTwoFactorEmail(adminClient, resendApiKey, {
+        requestId,
+        triggeredByUserId: signedInUser.id,
+        resend: false,
+      }, {
+        to_email: recipientEmail,
+        code,
+        support_email: supportEmail,
+        from_email: fromEmail,
+      });
+
+      await adminClient.from("super_admin_audit_logs").insert({
+        actor_id: signedInUser.id,
+        actor_email: recipientEmail,
+        action_type: "super_admin_2fa_started",
+        target_type: "super_admin_auth",
+        target_id: signedInUser.id,
+        metadata: { expires_at: expiresAt, via: "password_login" },
+      });
+
+      logInfo("super-auth-verify password login challenge started", requestId, { user_id: signedInUser.id });
+      return jsonResponse(200, {
+        challenge_started: true,
+        email: recipientEmail,
+        expires_at: expiresAt,
+        access_token: session.access_token,
+        refresh_token: session.refresh_token,
+      });
+    }
+
+    const authToken = parseAuthToken(req);
+    if (!authToken) {
+      return jsonResponse(401, { error: "Unauthorized" });
+    }
+
+    const userClient = createClient(supabaseUrl, publishableKey, {
+      global: { headers: { Authorization: `Bearer ${authToken}` } },
       auth: { persistSession: false },
     });
 
@@ -256,11 +415,6 @@ serve(async (req) => {
       if (!rateLimitResult.allowed) {
         return jsonResponse(429, { error: "Too many requests. Please try again shortly." });
       }
-    }
-
-    const body = (await req.json().catch(() => ({}))) as RequestBody;
-    if (!body || typeof body !== "object" || typeof body.action !== "string") {
-      return jsonResponse(400, { error: "Invalid request" });
     }
 
     const writeAudit = async (actionType: string, metadata: Record<string, unknown>) => {

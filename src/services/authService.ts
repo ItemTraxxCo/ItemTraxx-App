@@ -87,25 +87,6 @@ export const clearPendingSuperAdminVerificationEmail = () => {
   setPendingSuperAdminVerificationEmail(null);
 };
 
-const startSuperAdminEmailChallenge = async (accessToken: string) => {
-  const result = await invokeEdgeFunction<{ challenge_started?: boolean; email?: string | null }>(
-    SUPER_ADMIN_2FA_FUNCTION,
-    {
-      method: "POST",
-      accessToken,
-      body: { action: "start_email_challenge" },
-    }
-  );
-
-  if (!result.ok || !result.data?.challenge_started) {
-    throw new Error(result.error || "Unable to send verification code.");
-  }
-
-  const recipientEmail = result.data.email ?? null;
-  setPendingSuperAdminVerificationEmail(recipientEmail);
-  return { email: recipientEmail };
-};
-
 export const resendSuperAdminEmailChallenge = async () => {
   const accessToken = await getFreshAccessToken();
   const result = await invokeEdgeFunction<{ challenge_started?: boolean; email?: string | null }>(
@@ -152,6 +133,23 @@ const clearLocalSession = async () => {
   } catch {
     // Ignore local storage cleanup failures during handoff.
   }
+};
+
+const setSessionFromTokens = async (accessToken: string, refreshToken: string) => {
+  const sessionResult = await withTimeout(
+    supabase.auth.setSession({
+      access_token: accessToken,
+      refresh_token: refreshToken,
+    }),
+    AUTH_QUERY_TIMEOUT_MS,
+    "Sign in timed out."
+  );
+
+  if (sessionResult.error || !sessionResult.data.session?.access_token) {
+    throw new Error("Invalid credentials.");
+  }
+
+  return sessionResult.data.session;
 };
 
 const withRetry = async <T>(
@@ -491,16 +489,6 @@ export const tenantLogin = async (
     typeof data.district_slug === "string" &&
     !!data.district_slug.trim();
 
-  if (shouldCrossHostRedirect) {
-    return {
-      districtId: null,
-      districtSlug: data.district_slug?.trim() ?? null,
-      authEmail: data.auth_email,
-      accessToken: null,
-      refreshToken: null,
-    };
-  }
-
   let signInError: unknown = null;
   let accessToken: string | null = null;
   let refreshToken: string | null = null;
@@ -534,7 +522,9 @@ export const tenantLogin = async (
     (typeof data.district_slug === "string" && data.district_slug.trim()) ||
     (await resolveDistrictSlug(current.districtContextId));
 
-  sendLoginNotification(accessToken);
+  if (!shouldCrossHostRedirect) {
+    sendLoginNotification(accessToken);
+  }
 
   return {
     districtId: current.districtContextId ?? null,
@@ -554,14 +544,18 @@ export const consumeDistrictSessionHandoff = async () => {
     : window.location.hash;
   const params = new URLSearchParams(hash);
   const handoffCode = params.get("itx_hc");
+  const emailOtp = params.get("itx_eo");
+  const emailForOtp = params.get("itx_em");
   const accessToken = params.get("itx_at");
   const refreshToken = params.get("itx_rt");
 
-  if (!handoffCode && (!accessToken || !refreshToken)) {
+  if (!handoffCode && (!emailOtp || !emailForOtp) && (!accessToken || !refreshToken)) {
     return false;
   }
 
   params.delete("itx_hc");
+  params.delete("itx_eo");
+  params.delete("itx_em");
   params.delete("itx_at");
   params.delete("itx_rt");
   const nextHash = params.toString();
@@ -571,7 +565,24 @@ export const consumeDistrictSessionHandoff = async () => {
   let finalAccessToken = accessToken;
   let finalRefreshToken = refreshToken;
 
-  if (handoffCode) {
+  if (emailOtp && emailForOtp) {
+    const verifyResult = await supabase.auth.verifyOtp({
+      email: emailForOtp,
+      token: emailOtp,
+      type: "magiclink",
+    });
+
+    if (
+      verifyResult.error ||
+      !verifyResult.data.session?.access_token ||
+      !verifyResult.data.session.refresh_token
+    ) {
+      throw new Error("Unable to complete district sign-in.");
+    }
+
+    finalAccessToken = verifyResult.data.session.access_token;
+    finalRefreshToken = verifyResult.data.session.refresh_token;
+  } else if (handoffCode) {
     const result = await invokeEdgeFunction<
       { access_token?: string; refresh_token?: string },
       { action: "consume"; code: string }
@@ -628,61 +639,76 @@ export const consumeDistrictSessionHandoff = async () => {
 
 export const createDistrictSessionHandoff = async (
   districtSlug: string,
-  authEmail: string,
-  password: string
+  accessToken: string
 ) => {
   const result = await invokeEdgeFunction<
-    { code?: string },
-    { action: "create"; district_slug: string; auth_email: string; password: string }
+    { email_otp?: string; email?: string },
+    { action: "create"; district_slug: string }
   >(getDistrictHandoffFunctionName(), {
     method: "POST",
+    accessToken,
     body: {
       action: "create",
       district_slug: districtSlug,
-      auth_email: authEmail,
-      password,
     },
   });
 
-  if (!result.ok || !result.data?.code) {
+  if (!result.ok || !result.data?.email_otp || !result.data?.email) {
     throw new Error("Unable to prepare district sign-in.");
   }
 
   await clearLocalSession();
-  return result.data.code;
+  return {
+    emailOtp: result.data.email_otp,
+    email: result.data.email,
+  };
 };
 
 export const createDistrictAdminSessionHandoff = async (
   email: string,
-  password: string
+  password: string,
+  turnstileToken: string
 ) => {
   const result = await invokeEdgeFunction<
     {
-      code?: string | null;
       district_slug?: string | null;
       role?: "tenant_admin" | "district_admin";
       root_only?: boolean;
+      access_token?: string | null;
+      refresh_token?: string | null;
+      email_otp?: string | null;
+      email?: string | null;
     },
-    { action: "create_admin"; email: string; password: string }
+    { action: "create_admin"; email: string; password: string; turnstile_token: string }
   >(getDistrictHandoffFunctionName(), {
     method: "POST",
     body: {
       action: "create_admin",
       email,
       password,
+      turnstile_token: turnstileToken,
     },
   });
 
   if (result.ok && result.data?.root_only) {
     return {
-      code: null,
       districtSlug: null,
       role: result.data.role ?? "tenant_admin",
       rootOnly: true,
+      accessToken: result.data.access_token ?? null,
+      refreshToken: result.data.refresh_token ?? null,
+      emailOtp: null,
+      email: result.data.email ?? email,
     };
   }
 
-  if (!result.ok || !result.data?.code || !result.data?.district_slug || !result.data?.role) {
+  if (
+    !result.ok ||
+    !result.data?.email_otp ||
+    !result.data?.email ||
+    !result.data?.district_slug ||
+    !result.data?.role
+  ) {
     if (!result.ok && result.error === "Tenant disabled") {
       throw new Error("Tenant disabled.");
     }
@@ -699,46 +725,24 @@ export const createDistrictAdminSessionHandoff = async (
   }
 
   return {
-    code: result.data.code,
     districtSlug: result.data.district_slug,
     role: result.data.role,
     rootOnly: false,
+    accessToken: null,
+    refreshToken: null,
+    emailOtp: result.data.email_otp,
+    email: result.data.email,
   };
 };
 
-export const adminLogin = async (email: string, password: string) => {
+export const adminLoginWithSession = async (accessToken: string, refreshToken: string) => {
   const priorTenantContextId = getAuthState().tenantContextId;
   const districtHost = getDistrictState();
-  let error: unknown = null;
-  let accessToken: string | null = null;
-  let refreshToken: string | null = null;
-  let signedInUser:
-    | { id: string; email?: string | null; last_sign_in_at?: string | null }
-    | null = null;
-  try {
-    const signIn = await withTimeout(
-      supabase.auth.signInWithPassword({
-        email,
-        password,
-      }),
-      AUTH_QUERY_TIMEOUT_MS,
-      "Sign in timed out."
-    );
-    error = signIn.error;
-    accessToken = signIn.data.session?.access_token ?? null;
-    refreshToken = signIn.data.session?.refresh_token ?? null;
-    signedInUser =
-      (signIn.data.user as { id: string; email?: string | null; last_sign_in_at?: string | null } | null) ??
-      (signIn.data.session?.user as { id: string; email?: string | null; last_sign_in_at?: string | null } | null) ??
-      null;
-  } catch (requestError) {
-    if (requestError instanceof TimeoutError) {
-      throw new Error("Sign in timed out. Please try again.");
-    }
-    throw requestError;
-  }
-
-  if (error || !signedInUser?.id) {
+  const session = await setSessionFromTokens(accessToken, refreshToken);
+  const signedInUser =
+    (session.user as { id: string; email?: string | null; last_sign_in_at?: string | null } | null) ??
+    null;
+  if (!signedInUser?.id) {
     throw new Error("Invalid credentials.");
   }
 
@@ -837,31 +841,38 @@ export const adminLogin = async (email: string, password: string) => {
   };
 };
 
-export const superAdminLogin = async (email: string, password: string) => {
-  let error: unknown = null;
-  let accessToken: string | null = null;
-  try {
-    const signIn = await withTimeout(
-      supabase.auth.signInWithPassword({
+export const superAdminLogin = async (
+  email: string,
+  password: string,
+  turnstileToken: string
+) => {
+  const result = await invokeEdgeFunction<{
+    challenge_started?: boolean;
+    email?: string | null;
+    access_token?: string | null;
+    refresh_token?: string | null;
+  }>(SUPER_ADMIN_2FA_FUNCTION, {
+    method: "POST",
+    body: {
+      action: "start_password_login",
+      payload: {
         email,
         password,
-      }),
-      AUTH_QUERY_TIMEOUT_MS,
-      "Sign in timed out."
-    );
-    error = signIn.error;
-    accessToken = signIn.data.session?.access_token ?? null;
-  } catch (requestError) {
-    if (requestError instanceof TimeoutError) {
-      throw new Error("Sign in timed out. Please try again.");
-    }
-    throw requestError;
+        turnstile_token: turnstileToken,
+      },
+    },
+  });
+
+  if (
+    !result.ok ||
+    !result.data?.challenge_started ||
+    !result.data.access_token ||
+    !result.data.refresh_token
+  ) {
+    throw new Error(result.error || "Unable to send verification code.");
   }
 
-  if (error || !accessToken) {
-    throw new Error("Invalid credentials.");
-  }
-
+  await setSessionFromTokens(result.data.access_token, result.data.refresh_token);
   await refreshAuthFromSession();
   const current = getAuthState();
   if (current.role !== "super_admin") {
@@ -870,7 +881,8 @@ export const superAdminLogin = async (email: string, password: string) => {
   }
 
   setSecondaryAuth(false);
-  const challenge = await startSuperAdminEmailChallenge(accessToken);
+  const challenge = { email: result.data.email ?? email };
+  setPendingSuperAdminVerificationEmail(challenge.email);
   return {
     email: challenge.email,
   };

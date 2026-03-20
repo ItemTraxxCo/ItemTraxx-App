@@ -1,5 +1,29 @@
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import {
+  enforcePreloginRateLimit,
+  hashString,
+  resolveClientFingerprint,
+  resolveClientIp,
+  verifyTurnstileToken,
+} from "../_shared/preloginGuards.ts";
+
+type ProfileRow = {
+  role: string | null;
+  tenant_id: string | null;
+  district_id: string | null;
+  is_active: boolean | null;
+};
+
+type DistrictLookupRow = {
+  slug: string | null;
+  is_active: boolean | null;
+};
+
+type TenantLookupRow = {
+  district_id: string | null;
+  status: string | null;
+};
 
 const baseCorsHeaders = {
   "Access-Control-Allow-Headers":
@@ -37,22 +61,6 @@ const resolveCorsHeaders = (req: Request) => {
   return { hasOrigin, originAllowed, headers };
 };
 
-const encodeBase64Url = (bytes: Uint8Array) =>
-  btoa(String.fromCharCode(...bytes))
-    .replace(/\+/g, "-")
-    .replace(/\//g, "_")
-    .replace(/=+$/g, "");
-
-const randomCode = () => encodeBase64Url(crypto.getRandomValues(new Uint8Array(24)));
-
-const sha256 = async (value: string) => {
-  const encoded = new TextEncoder().encode(value);
-  const digest = await crypto.subtle.digest("SHA-256", encoded);
-  return Array.from(new Uint8Array(digest))
-    .map((byte) => byte.toString(16).padStart(2, "0"))
-    .join("");
-};
-
 serve(async (req) => {
   const { hasOrigin, originAllowed, headers } = resolveCorsHeaders(req);
 
@@ -86,92 +94,195 @@ serve(async (req) => {
       auth: { persistSession: false },
     });
 
-    if (action === "create") {
-      const authEmail =
-        typeof body?.auth_email === "string" ? body.auth_email.trim().toLowerCase() : "";
-      const password =
-        typeof body?.password === "string" ? body.password : "";
-      const districtSlug =
-        typeof body?.district_slug === "string" ? body.district_slug.trim().toLowerCase() : "";
+    const resolveDistrictSlugForProfile = async (
+      profile: ProfileRow | null,
+    ): Promise<string | { error: "Tenant disabled" } | null> => {
+      if (typeof profile?.district_id === "string" && profile.district_id) {
+        const { data: district } = await adminClient
+          .from("districts")
+          .select("slug, is_active")
+          .eq("id", profile.district_id)
+          .single<DistrictLookupRow>();
+        if (district?.slug && district.is_active !== false) {
+          return district.slug;
+        }
+      }
 
-      if (!authEmail || !password || !districtSlug) {
+      if (typeof profile?.tenant_id === "string" && profile.tenant_id) {
+        const { data: tenant } = await adminClient
+          .from("tenants")
+          .select("district_id, status")
+          .eq("id", profile.tenant_id)
+          .single<TenantLookupRow>();
+
+        if (tenant?.status && tenant.status !== "active") {
+          return { error: "Tenant disabled" };
+        }
+
+        if (tenant?.district_id) {
+          const { data: district } = await adminClient
+            .from("districts")
+            .select("slug, is_active")
+            .eq("id", tenant.district_id)
+            .single<DistrictLookupRow>();
+          if (district?.slug && district.is_active !== false) {
+            return district.slug;
+          }
+        }
+      }
+
+      return null;
+    };
+
+    if (action === "create") {
+      const districtSlug =
+        typeof body?.district_slug === "string"
+          ? body.district_slug.trim().toLowerCase()
+          : "";
+      const authHeader = req.headers.get("authorization") ?? "";
+      const accessToken = authHeader.replace(/^Bearer\s+/i, "").trim();
+
+      if (!accessToken || !districtSlug) {
         return jsonResponse(400, { error: "Invalid request" }, headers);
       }
 
       const userClient = createClient(supabaseUrl, publishableKey, {
+        global: { headers: { Authorization: `Bearer ${accessToken}` } },
         auth: { persistSession: false },
       });
+      const {
+        data: { user },
+        error: userError,
+      } = await userClient.auth.getUser();
 
-      const signIn = await userClient.auth.signInWithPassword({
-        email: authEmail,
-        password,
-      });
+      if (userError || !user?.id || !user.email) {
+        return jsonResponse(401, { error: "Unauthorized" }, headers);
+      }
+
+      const { data: profile } = await adminClient
+        .from("profiles")
+        .select("role, tenant_id, district_id, is_active")
+        .eq("id", user.id)
+        .single<ProfileRow>();
 
       if (
-        signIn.error ||
-        !signIn.data.user?.id ||
-        !signIn.data.session?.access_token ||
-        !signIn.data.session?.refresh_token
+        (profile?.role !== "tenant_user" && profile?.role !== "tenant_admin") ||
+        profile?.is_active === false
       ) {
-        return jsonResponse(401, { error: "Invalid credentials" }, headers);
+        return jsonResponse(403, { error: "Access denied" }, headers);
       }
-      const user = signIn.data.user;
-      const session = signIn.data.session;
 
-      const { data: district, error: districtError } = await adminClient
-        .from("districts")
-        .select("slug, is_active")
-        .eq("slug", districtSlug)
-        .single();
-
-      if (districtError || !district?.slug || district.is_active === false) {
+      const resolvedDistrictSlug = await resolveDistrictSlugForProfile(profile ?? null);
+      if (
+        typeof resolvedDistrictSlug === "object" &&
+        resolvedDistrictSlug?.error === "Tenant disabled"
+      ) {
+        return jsonResponse(403, { error: "Tenant disabled" }, headers);
+      }
+      if (!resolvedDistrictSlug || resolvedDistrictSlug !== districtSlug) {
         return jsonResponse(404, { error: "District not found" }, headers);
       }
 
-      const code = randomCode();
-      const codeHash = await sha256(code);
-      const expiresAt = new Date(Date.now() + 5 * 60 * 1000).toISOString();
-
-      await adminClient
-        .from("district_session_handoffs")
-        .delete()
-        .eq("user_id", user.id);
-
-      const { error: insertError } = await adminClient.from("district_session_handoffs").insert({
-        code_hash: codeHash,
-        user_id: user.id,
-        district_slug: districtSlug,
-        auth_email: authEmail,
-        access_token: session.access_token,
-        refresh_token: session.refresh_token,
-        expires_at: expiresAt,
+      const magicLink = await adminClient.auth.admin.generateLink({
+        type: "magiclink",
+        email: user.email,
       });
 
-      if (insertError) {
+      if (magicLink.error || !magicLink.data.properties.email_otp) {
         return jsonResponse(500, { error: "Unable to create handoff" }, headers);
       }
 
-      return jsonResponse(200, { code, expires_at: expiresAt }, headers);
+      return jsonResponse(
+        200,
+        {
+          email_otp: magicLink.data.properties.email_otp,
+          email: user.email,
+        },
+        headers,
+      );
     }
 
     if (action === "create_admin") {
       const email =
         typeof body?.email === "string" ? body.email.trim().toLowerCase() : "";
-      const password =
-        typeof body?.password === "string" ? body.password : "";
+      const password = typeof body?.password === "string" ? body.password : "";
+      const turnstileToken =
+        typeof body?.turnstile_token === "string"
+          ? body.turnstile_token.trim()
+          : "";
 
-      if (!email || !password) {
+      if (!email || !password || !turnstileToken) {
         return jsonResponse(400, { error: "Invalid request" }, headers);
+      }
+
+      const turnstileSecret = Deno.env.get("ITX_TURNSTILE_SECRET") ?? "";
+      if (!turnstileSecret) {
+        return jsonResponse(500, { error: "Server misconfiguration" }, headers);
+      }
+
+      const origin = req.headers.get("Origin");
+      const clientIp = resolveClientIp(req);
+      const emailHash = await hashString(email);
+      const clientFingerprint = resolveClientFingerprint(req, origin);
+
+      const perClientLimit = await enforcePreloginRateLimit(
+        adminClient,
+        clientFingerprint,
+        `district-admin-login-client-${clientFingerprint}`,
+        15,
+        60,
+      );
+      if (!perClientLimit.ok) {
+        if (perClientLimit.error) {
+          console.error("district-handoff create_admin rate limit failed", {
+            scope: `district-admin-login-client-${clientFingerprint}`,
+            message: perClientLimit.error.message,
+          });
+          return jsonResponse(503, { error: "Rate limit check failed" }, headers);
+        }
+        return jsonResponse(
+          429,
+          { error: "Rate limit exceeded, please try again in a minute." },
+          headers,
+        );
+      }
+
+      const perEmailLimit = await enforcePreloginRateLimit(
+        adminClient,
+        `${clientFingerprint}-${emailHash.slice(0, 16)}`,
+        `district-admin-login-email-${emailHash.slice(0, 12)}`,
+        8,
+        60,
+      );
+      if (!perEmailLimit.ok) {
+        if (perEmailLimit.error) {
+          console.error("district-handoff create_admin rate limit failed", {
+            scope: `district-admin-login-email-${emailHash.slice(0, 12)}`,
+            message: perEmailLimit.error.message,
+          });
+          return jsonResponse(503, { error: "Rate limit check failed" }, headers);
+        }
+        return jsonResponse(
+          429,
+          { error: "Rate limit exceeded, please try again in a minute." },
+          headers,
+        );
+      }
+
+      const turnstileValid = await verifyTurnstileToken(
+        turnstileSecret,
+        turnstileToken,
+        clientIp,
+        "district-handoff create_admin",
+      );
+      if (!turnstileValid) {
+        return jsonResponse(403, { error: "Turnstile verification failed" }, headers);
       }
 
       const userClient = createClient(supabaseUrl, publishableKey, {
         auth: { persistSession: false },
       });
-
-      const signIn = await userClient.auth.signInWithPassword({
-        email,
-        password,
-      });
+      const signIn = await userClient.auth.signInWithPassword({ email, password });
 
       if (
         signIn.error ||
@@ -188,125 +299,59 @@ serve(async (req) => {
         .from("profiles")
         .select("role, tenant_id, district_id, is_active")
         .eq("id", user.id)
-        .single();
+        .single<ProfileRow>();
 
       const role = profile?.role;
-      if ((role !== "tenant_admin" && role !== "district_admin") || profile?.is_active === false) {
+      if (
+        (role !== "tenant_admin" && role !== "district_admin") ||
+        profile?.is_active === false
+      ) {
         return jsonResponse(403, { error: "Access denied" }, headers);
       }
 
-      let districtSlug = typeof profile?.district_id === "string" ? "" : "";
-      if (typeof profile?.district_id === "string" && profile.district_id) {
-        const { data: district } = await adminClient
-          .from("districts")
-          .select("slug, is_active")
-          .eq("id", profile.district_id)
-          .single();
-        if (district?.slug && district.is_active !== false) {
-          districtSlug = district.slug;
-        }
+      const resolvedDistrictSlug = await resolveDistrictSlugForProfile(profile ?? null);
+      if (
+        typeof resolvedDistrictSlug === "object" &&
+        resolvedDistrictSlug?.error === "Tenant disabled"
+      ) {
+        return jsonResponse(403, { error: "Tenant disabled" }, headers);
       }
 
-      if (!districtSlug && typeof profile?.tenant_id === "string" && profile.tenant_id) {
-        const { data: tenant } = await adminClient
-          .from("tenants")
-          .select("district_id, status")
-          .eq("id", profile.tenant_id)
-          .single();
-        if (tenant?.status && tenant.status !== "active") {
-          return jsonResponse(403, { error: "Tenant disabled" }, headers);
-        }
-        if (tenant?.district_id) {
-          const { data: district } = await adminClient
-            .from("districts")
-            .select("slug, is_active")
-            .eq("id", tenant.district_id)
-            .single();
-          if (district?.slug && district.is_active !== false) {
-            districtSlug = district.slug;
-          }
-        }
-      }
-
-      if (!districtSlug) {
+      if (!resolvedDistrictSlug) {
         return jsonResponse(
           200,
           {
-            code: null,
-            district_slug: null,
+            access_token: session.access_token,
+            refresh_token: session.refresh_token,
             role,
             root_only: true,
           },
-          headers
+          headers,
         );
       }
 
-      const code = randomCode();
-      const codeHash = await sha256(code);
-      const expiresAt = new Date(Date.now() + 5 * 60 * 1000).toISOString();
-
-      await adminClient
-        .from("district_session_handoffs")
-        .delete()
-        .eq("user_id", user.id);
-
-      const { error: insertError } = await adminClient.from("district_session_handoffs").insert({
-        code_hash: codeHash,
-        user_id: user.id,
-        district_slug: districtSlug,
-        auth_email: email,
-        access_token: session.access_token,
-        refresh_token: session.refresh_token,
-        expires_at: expiresAt,
+      const magicLink = await adminClient.auth.admin.generateLink({
+        type: "magiclink",
+        email,
       });
-
-      if (insertError) {
+      if (magicLink.error || !magicLink.data.properties.email_otp) {
         return jsonResponse(500, { error: "Unable to create handoff" }, headers);
       }
-
-      return jsonResponse(200, {
-        code,
-        district_slug: districtSlug,
-        role,
-        expires_at: expiresAt,
-      }, headers);
-    }
-
-    if (action === "consume") {
-      const code = typeof body?.code === "string" ? body.code.trim() : "";
-      if (!code) {
-        return jsonResponse(400, { error: "Invalid request" }, headers);
-      }
-
-      const codeHash = await sha256(code);
-      const { data: row, error: selectError } = await adminClient
-        .from("district_session_handoffs")
-        .select("id, district_slug, access_token, refresh_token, expires_at")
-        .eq("code_hash", codeHash)
-        .single();
-
-      if (
-        selectError ||
-        !row?.id ||
-        !row.access_token ||
-        !row.refresh_token ||
-        !row.expires_at ||
-        new Date(row.expires_at).getTime() <= Date.now()
-      ) {
-        return jsonResponse(410, { error: "Handoff expired" }, headers);
-      }
-
-      await adminClient.from("district_session_handoffs").delete().eq("id", row.id);
 
       return jsonResponse(
         200,
         {
-          access_token: row.access_token,
-          refresh_token: row.refresh_token,
-          district_slug: row.district_slug,
+          email_otp: magicLink.data.properties.email_otp,
+          email,
+          district_slug: resolvedDistrictSlug,
+          role,
         },
-        headers
+        headers,
       );
+    }
+
+    if (action === "consume") {
+      return jsonResponse(410, { error: "Handoff expired" }, headers);
     }
 
     return jsonResponse(400, { error: "Invalid action" }, headers);

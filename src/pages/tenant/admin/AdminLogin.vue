@@ -50,7 +50,7 @@
 import { computed, onMounted, onUnmounted, ref } from "vue";
 import { RouterLink, useRouter } from "vue-router";
 import {
-  adminLogin,
+  adminLoginWithSession,
   createDistrictAdminSessionHandoff,
 } from "../../../services/authService";
 import { touchTenantAdminSession } from "../../../services/adminOpsService";
@@ -58,10 +58,8 @@ import { logAdminAction } from "../../../services/auditLogService";
 import { useTurnstile } from "../../../composables/useTurnstile";
 import { clearAdminVerification } from "../../../store/authState";
 import { buildDistrictAppHandoffUrl } from "../../../services/districtService";
-import { getDistrictState } from "../../../store/districtState";
 
 const router = useRouter();
-const districtHost = getDistrictState();
 const themeMode = ref<"light" | "dark">("dark");
 const email = ref("");
 const password = ref("");
@@ -141,29 +139,23 @@ const handleAdminLogin = async () => {
   isLoading.value = true;
   try {
     devLog("auth_request_start");
-    if (!districtHost.isDistrictHost) {
-      try {
-        const handoff = await createDistrictAdminSessionHandoff(
-          email.value.trim(),
-          password.value
-        );
-        if (!handoff.rootOnly && handoff.code && handoff.districtSlug) {
-          const targetPath =
-            handoff.role === "district_admin" ? "/district" : "/tenant/admin";
-          window.location.replace(
-            buildDistrictAppHandoffUrl(handoff.districtSlug, targetPath, handoff.code)
-          );
-          return;
-        }
-      } catch (handoffError) {
-        const handoffMessage =
-          handoffError instanceof Error ? handoffError.message : "";
-        if (handoffMessage !== "No district assignment.") {
-          throw handoffError;
-        }
-      }
+    const handoff = await createDistrictAdminSessionHandoff(
+      email.value.trim(),
+      password.value,
+      turnstileToken.value ?? ""
+    );
+    if (!handoff.rootOnly && handoff.code && handoff.districtSlug) {
+      const targetPath =
+        handoff.role === "district_admin" ? "/district" : "/tenant/admin";
+      window.location.replace(
+        buildDistrictAppHandoffUrl(handoff.districtSlug, targetPath, handoff.code)
+      );
+      return;
     }
-    const session = await adminLogin(email.value.trim(), password.value);
+    if (!handoff.accessToken || !handoff.refreshToken) {
+      throw new Error("Unable to prepare district sign-in.");
+    }
+    const session = await adminLoginWithSession(handoff.accessToken, handoff.refreshToken);
     devLog("auth_request_success");
     await router.push(session?.role === "district_admin" ? "/district" : "/tenant/admin");
     void logAdminAction({

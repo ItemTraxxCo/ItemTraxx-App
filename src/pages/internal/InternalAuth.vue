@@ -161,7 +161,11 @@ const handleCredentialSubmit = async () => {
 
   isLoading.value = true;
   try {
-    const result = await superAdminLogin(email.value.trim(), password.value);
+    const result = await superAdminLogin(
+      email.value.trim(),
+      password.value,
+      turnstileToken.value ?? ""
+    );
     enableCodeStep(result.email ?? email.value.trim());
     showToast("Code sent", "Check your email for the verification code.");
   } catch (err) {

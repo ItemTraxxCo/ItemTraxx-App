@@ -1,5 +1,12 @@
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import {
+  enforcePreloginRateLimit,
+  hashString,
+  resolveClientFingerprint,
+  resolveClientIp,
+  verifyTurnstileToken,
+} from "../_shared/preloginGuards.ts";
 
 const baseCorsHeaders = {
   "Access-Control-Allow-Headers":
@@ -159,9 +166,67 @@ serve(async (req) => {
         typeof body?.email === "string" ? body.email.trim().toLowerCase() : "";
       const password =
         typeof body?.password === "string" ? body.password : "";
+      const turnstileToken =
+        typeof body?.turnstile_token === "string" ? body.turnstile_token.trim() : "";
 
-      if (!email || !password) {
+      if (!email || !password || !turnstileToken) {
         return jsonResponse(400, { error: "Invalid request" }, headers);
+      }
+
+      const turnstileSecret = Deno.env.get("ITX_TURNSTILE_SECRET") ?? "";
+      if (!turnstileSecret) {
+        return jsonResponse(500, { error: "Server misconfiguration" }, headers);
+      }
+
+      const origin = req.headers.get("Origin");
+      const clientIp = resolveClientIp(req);
+      const emailHash = await hashString(email);
+      const clientFingerprint = resolveClientFingerprint(req, origin);
+
+      const perClientLimit = await enforcePreloginRateLimit(
+        adminClient,
+        clientFingerprint,
+        `district-admin-login-client-${clientFingerprint}`,
+        15,
+        60
+      );
+      if (!perClientLimit.ok) {
+        if (perClientLimit.error) {
+          console.error("district-handoff create_admin rate limit failed", {
+            scope: `district-admin-login-client-${clientFingerprint}`,
+            message: perClientLimit.error.message,
+          });
+          return jsonResponse(503, { error: "Rate limit check failed" }, headers);
+        }
+        return jsonResponse(429, { error: "Rate limit exceeded, please try again in a minute." }, headers);
+      }
+
+      const perEmailLimit = await enforcePreloginRateLimit(
+        adminClient,
+        `${clientFingerprint}-${emailHash.slice(0, 16)}`,
+        `district-admin-login-email-${emailHash.slice(0, 12)}`,
+        8,
+        60
+      );
+      if (!perEmailLimit.ok) {
+        if (perEmailLimit.error) {
+          console.error("district-handoff create_admin rate limit failed", {
+            scope: `district-admin-login-email-${emailHash.slice(0, 12)}`,
+            message: perEmailLimit.error.message,
+          });
+          return jsonResponse(503, { error: "Rate limit check failed" }, headers);
+        }
+        return jsonResponse(429, { error: "Rate limit exceeded, please try again in a minute." }, headers);
+      }
+
+      const turnstileValid = await verifyTurnstileToken(
+        turnstileSecret,
+        turnstileToken,
+        clientIp,
+        "district-handoff create_admin"
+      );
+      if (!turnstileValid) {
+        return jsonResponse(403, { error: "Turnstile verification failed" }, headers);
       }
 
       const userClient = createClient(supabaseUrl, publishableKey, {
@@ -232,8 +297,8 @@ serve(async (req) => {
         return jsonResponse(
           200,
           {
-            code: null,
-            district_slug: null,
+            access_token: session.access_token,
+            refresh_token: session.refresh_token,
             role,
             root_only: true,
           },

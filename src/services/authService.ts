@@ -87,25 +87,6 @@ export const clearPendingSuperAdminVerificationEmail = () => {
   setPendingSuperAdminVerificationEmail(null);
 };
 
-const startSuperAdminEmailChallenge = async (accessToken: string) => {
-  const result = await invokeEdgeFunction<{ challenge_started?: boolean; email?: string | null }>(
-    SUPER_ADMIN_2FA_FUNCTION,
-    {
-      method: "POST",
-      accessToken,
-      body: { action: "start_email_challenge" },
-    }
-  );
-
-  if (!result.ok || !result.data?.challenge_started) {
-    throw new Error(result.error || "Unable to send verification code.");
-  }
-
-  const recipientEmail = result.data.email ?? null;
-  setPendingSuperAdminVerificationEmail(recipientEmail);
-  return { email: recipientEmail };
-};
-
 export const resendSuperAdminEmailChallenge = async () => {
   const accessToken = await getFreshAccessToken();
   const result = await invokeEdgeFunction<{ challenge_started?: boolean; email?: string | null }>(
@@ -152,6 +133,23 @@ const clearLocalSession = async () => {
   } catch {
     // Ignore local storage cleanup failures during handoff.
   }
+};
+
+const setSessionFromTokens = async (accessToken: string, refreshToken: string) => {
+  const sessionResult = await withTimeout(
+    supabase.auth.setSession({
+      access_token: accessToken,
+      refresh_token: refreshToken,
+    }),
+    AUTH_QUERY_TIMEOUT_MS,
+    "Sign in timed out."
+  );
+
+  if (sessionResult.error || !sessionResult.data.session?.access_token) {
+    throw new Error("Invalid credentials.");
+  }
+
+  return sessionResult.data.session;
 };
 
 const withRetry = async <T>(
@@ -654,7 +652,8 @@ export const createDistrictSessionHandoff = async (
 
 export const createDistrictAdminSessionHandoff = async (
   email: string,
-  password: string
+  password: string,
+  turnstileToken: string
 ) => {
   const result = await invokeEdgeFunction<
     {
@@ -662,14 +661,17 @@ export const createDistrictAdminSessionHandoff = async (
       district_slug?: string | null;
       role?: "tenant_admin" | "district_admin";
       root_only?: boolean;
+      access_token?: string | null;
+      refresh_token?: string | null;
     },
-    { action: "create_admin"; email: string; password: string }
+    { action: "create_admin"; email: string; password: string; turnstile_token: string }
   >(getDistrictHandoffFunctionName(), {
     method: "POST",
     body: {
       action: "create_admin",
       email,
       password,
+      turnstile_token: turnstileToken,
     },
   });
 
@@ -679,6 +681,8 @@ export const createDistrictAdminSessionHandoff = async (
       districtSlug: null,
       role: result.data.role ?? "tenant_admin",
       rootOnly: true,
+      accessToken: result.data.access_token ?? null,
+      refreshToken: result.data.refresh_token ?? null,
     };
   }
 
@@ -703,42 +707,19 @@ export const createDistrictAdminSessionHandoff = async (
     districtSlug: result.data.district_slug,
     role: result.data.role,
     rootOnly: false,
+    accessToken: null,
+    refreshToken: null,
   };
 };
 
-export const adminLogin = async (email: string, password: string) => {
+export const adminLoginWithSession = async (accessToken: string, refreshToken: string) => {
   const priorTenantContextId = getAuthState().tenantContextId;
   const districtHost = getDistrictState();
-  let error: unknown = null;
-  let accessToken: string | null = null;
-  let refreshToken: string | null = null;
-  let signedInUser:
-    | { id: string; email?: string | null; last_sign_in_at?: string | null }
-    | null = null;
-  try {
-    const signIn = await withTimeout(
-      supabase.auth.signInWithPassword({
-        email,
-        password,
-      }),
-      AUTH_QUERY_TIMEOUT_MS,
-      "Sign in timed out."
-    );
-    error = signIn.error;
-    accessToken = signIn.data.session?.access_token ?? null;
-    refreshToken = signIn.data.session?.refresh_token ?? null;
-    signedInUser =
-      (signIn.data.user as { id: string; email?: string | null; last_sign_in_at?: string | null } | null) ??
-      (signIn.data.session?.user as { id: string; email?: string | null; last_sign_in_at?: string | null } | null) ??
-      null;
-  } catch (requestError) {
-    if (requestError instanceof TimeoutError) {
-      throw new Error("Sign in timed out. Please try again.");
-    }
-    throw requestError;
-  }
-
-  if (error || !signedInUser?.id) {
+  const session = await setSessionFromTokens(accessToken, refreshToken);
+  const signedInUser =
+    (session.user as { id: string; email?: string | null; last_sign_in_at?: string | null } | null) ??
+    null;
+  if (!signedInUser?.id) {
     throw new Error("Invalid credentials.");
   }
 
@@ -837,31 +818,38 @@ export const adminLogin = async (email: string, password: string) => {
   };
 };
 
-export const superAdminLogin = async (email: string, password: string) => {
-  let error: unknown = null;
-  let accessToken: string | null = null;
-  try {
-    const signIn = await withTimeout(
-      supabase.auth.signInWithPassword({
+export const superAdminLogin = async (
+  email: string,
+  password: string,
+  turnstileToken: string
+) => {
+  const result = await invokeEdgeFunction<{
+    challenge_started?: boolean;
+    email?: string | null;
+    access_token?: string | null;
+    refresh_token?: string | null;
+  }>(SUPER_ADMIN_2FA_FUNCTION, {
+    method: "POST",
+    body: {
+      action: "start_password_login",
+      payload: {
         email,
         password,
-      }),
-      AUTH_QUERY_TIMEOUT_MS,
-      "Sign in timed out."
-    );
-    error = signIn.error;
-    accessToken = signIn.data.session?.access_token ?? null;
-  } catch (requestError) {
-    if (requestError instanceof TimeoutError) {
-      throw new Error("Sign in timed out. Please try again.");
-    }
-    throw requestError;
+        turnstile_token: turnstileToken,
+      },
+    },
+  });
+
+  if (
+    !result.ok ||
+    !result.data?.challenge_started ||
+    !result.data.access_token ||
+    !result.data.refresh_token
+  ) {
+    throw new Error(result.error || "Unable to send verification code.");
   }
 
-  if (error || !accessToken) {
-    throw new Error("Invalid credentials.");
-  }
-
+  await setSessionFromTokens(result.data.access_token, result.data.refresh_token);
   await refreshAuthFromSession();
   const current = getAuthState();
   if (current.role !== "super_admin") {
@@ -870,7 +858,8 @@ export const superAdminLogin = async (email: string, password: string) => {
   }
 
   setSecondaryAuth(false);
-  const challenge = await startSuperAdminEmailChallenge(accessToken);
+  const challenge = { email: result.data.email ?? email };
+  setPendingSuperAdminVerificationEmail(challenge.email);
   return {
     email: challenge.email,
   };

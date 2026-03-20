@@ -70,6 +70,22 @@ jobs:
         run: |
           set -euo pipefail
 
+          send_webhook_fallback() {
+            if [ -n "${SLACK_WEBHOOK_URL:-}" ]; then
+              PAYLOAD="$(jq -n \
+                --arg workflow "$WORKFLOW_NAME" \
+                --arg job "$JOB_NAME" \
+                --arg branch "$REF_NAME" \
+                --arg commit "${SHA:0:7}" \
+                '{text: ("GitHub Actions run started: " + $workflow + " / " + $job + " on " + $branch + " (" + $commit + ")")}')"
+              curl -fsSL -X POST "$SLACK_WEBHOOK_URL" \
+                -H "Content-Type: application/json" \
+                --data "$PAYLOAD"
+            else
+              echo "No Slack secrets configured; skipping start notification."
+            fi
+          }
+
           if [ -n "${SLACK_BOT_TOKEN:-}" ] && [ -n "${SLACK_CHANNEL_ID:-}" ]; then
             PAYLOAD="$(jq -n \
               --arg channel "$SLACK_CHANNEL_ID" \
@@ -114,27 +130,16 @@ jobs:
               --data "$PAYLOAD")"
             OK="$(printf '%s' "$RESPONSE" | jq -r '.ok')"
             if [ "$OK" != "true" ]; then
-              echo "$RESPONSE"
-              exit 1
+              echo "Slack bot post failed, falling back to webhook: $RESPONSE"
+              send_webhook_fallback
+              exit 0
             fi
             echo "channel_id=$(printf '%s' "$RESPONSE" | jq -r '.channel // empty')" >> "$GITHUB_OUTPUT"
             echo "message_ts=$(printf '%s' "$RESPONSE" | jq -r '.ts // empty')" >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
-          if [ -n "${SLACK_WEBHOOK_URL:-}" ]; then
-            PAYLOAD="$(jq -n \
-              --arg workflow "$WORKFLOW_NAME" \
-              --arg job "$JOB_NAME" \
-              --arg branch "$REF_NAME" \
-              --arg commit "${SHA:0:7}" \
-              '{text: ("GitHub Actions run started: " + $workflow + " / " + $job + " on " + $branch + " (" + $commit + ")")}')"
-            curl -fsSL -X POST "$SLACK_WEBHOOK_URL" \
-              -H "Content-Type: application/json" \
-              --data "$PAYLOAD"
-          else
-            echo "No Slack secrets configured; skipping start notification."
-          fi
+          send_webhook_fallback
 
   notify_finish:
     if: ${{ inputs.mode == 'finish' }}
@@ -155,6 +160,24 @@ jobs:
           REPOSITORY: ${{ github.repository }}
         run: |
           set -euo pipefail
+
+          send_webhook_fallback() {
+            if [ -n "${SLACK_WEBHOOK_URL:-}" ]; then
+              PAYLOAD="$(jq -n \
+                --arg workflow "$WORKFLOW_NAME" \
+                --arg job "$JOB_NAME" \
+                --arg branch "$REF_NAME" \
+                --arg commit "${SHA:0:7}" \
+                --arg run_url "$RUN_URL" \
+                --arg status_label "$STATUS_LABEL" \
+                '{text: ("GitHub Actions run " + ($status_label | ascii_downcase) + ": " + $workflow + " / " + $job + " on " + $branch + " (" + $commit + ") — " + $run_url)}')"
+              curl -fsSL -X POST "$SLACK_WEBHOOK_URL" \
+                -H "Content-Type: application/json" \
+                --data "$PAYLOAD"
+            else
+              echo "No Slack secrets configured; skipping finish notification."
+            fi
+          }
 
           STATUS_LOWER="$(printf '%s' "$STATUS" | tr '[:upper:]' '[:lower:]')"
           case "$STATUS_LOWER" in
@@ -219,24 +242,11 @@ jobs:
               --data "$PAYLOAD")"
             OK="$(printf '%s' "$RESPONSE" | jq -r '.ok')"
             if [ "$OK" != "true" ]; then
-              echo "$RESPONSE"
-              exit 1
+              echo "Slack bot update failed, falling back to webhook: $RESPONSE"
+              send_webhook_fallback
+              exit 0
             fi
             exit 0
           fi
 
-          if [ -n "${SLACK_WEBHOOK_URL:-}" ]; then
-            PAYLOAD="$(jq -n \
-              --arg workflow "$WORKFLOW_NAME" \
-              --arg job "$JOB_NAME" \
-              --arg branch "$REF_NAME" \
-              --arg commit "${SHA:0:7}" \
-              --arg run_url "$RUN_URL" \
-              --arg status_label "$STATUS_LABEL" \
-              '{text: ("GitHub Actions run " + ($status_label | ascii_downcase) + ": " + $workflow + " / " + $job + " on " + $branch + " (" + $commit + ") — " + $run_url)}')"
-            curl -fsSL -X POST "$SLACK_WEBHOOK_URL" \
-              -H "Content-Type: application/json" \
-              --data "$PAYLOAD"
-          else
-            echo "No Slack secrets configured; skipping finish notification."
-          fi
+          send_webhook_fallback

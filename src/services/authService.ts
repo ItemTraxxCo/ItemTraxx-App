@@ -544,18 +544,16 @@ export const consumeDistrictSessionHandoff = async () => {
     : window.location.hash;
   const params = new URLSearchParams(hash);
   const handoffCode = params.get("itx_hc");
-  const emailOtp = params.get("itx_eo");
-  const emailForOtp = params.get("itx_em");
+  const tokenHash = params.get("itx_th");
   const accessToken = params.get("itx_at");
   const refreshToken = params.get("itx_rt");
 
-  if (!handoffCode && (!emailOtp || !emailForOtp) && (!accessToken || !refreshToken)) {
+  if (!handoffCode && !tokenHash && (!accessToken || !refreshToken)) {
     return false;
   }
 
   params.delete("itx_hc");
-  params.delete("itx_eo");
-  params.delete("itx_em");
+  params.delete("itx_th");
   params.delete("itx_at");
   params.delete("itx_rt");
   const nextHash = params.toString();
@@ -565,10 +563,9 @@ export const consumeDistrictSessionHandoff = async () => {
   let finalAccessToken = accessToken;
   let finalRefreshToken = refreshToken;
 
-  if (emailOtp && emailForOtp) {
+  if (tokenHash) {
     const verifyResult = await supabase.auth.verifyOtp({
-      email: emailForOtp,
-      token: emailOtp,
+      token_hash: tokenHash,
       type: "magiclink",
     });
 
@@ -642,7 +639,7 @@ export const createDistrictSessionHandoff = async (
   accessToken: string
 ) => {
   const result = await invokeEdgeFunction<
-    { email_otp?: string; email?: string },
+    { hashed_token?: string },
     { action: "create"; district_slug: string }
   >(getDistrictHandoffFunctionName(), {
     method: "POST",
@@ -653,14 +650,13 @@ export const createDistrictSessionHandoff = async (
     },
   });
 
-  if (!result.ok || !result.data?.email_otp || !result.data?.email) {
+  if (!result.ok || !result.data?.hashed_token) {
     throw new Error("Unable to prepare district sign-in.");
   }
 
   await clearLocalSession();
   return {
-    emailOtp: result.data.email_otp,
-    email: result.data.email,
+    tokenHash: result.data.hashed_token,
   };
 };
 
@@ -676,8 +672,7 @@ export const createDistrictAdminSessionHandoff = async (
       root_only?: boolean;
       access_token?: string | null;
       refresh_token?: string | null;
-      email_otp?: string | null;
-      email?: string | null;
+      hashed_token?: string | null;
     },
     { action: "create_admin"; email: string; password: string; turnstile_token: string }
   >(getDistrictHandoffFunctionName(), {
@@ -697,15 +692,13 @@ export const createDistrictAdminSessionHandoff = async (
       rootOnly: true,
       accessToken: result.data.access_token ?? null,
       refreshToken: result.data.refresh_token ?? null,
-      emailOtp: null,
-      email: result.data.email ?? email,
+      tokenHash: null,
     };
   }
 
   if (
     !result.ok ||
-    !result.data?.email_otp ||
-    !result.data?.email ||
+    !result.data?.hashed_token ||
     !result.data?.district_slug ||
     !result.data?.role
   ) {
@@ -730,8 +723,7 @@ export const createDistrictAdminSessionHandoff = async (
     rootOnly: false,
     accessToken: null,
     refreshToken: null,
-    emailOtp: result.data.email_otp,
-    email: result.data.email,
+    tokenHash: result.data.hashed_token,
   };
 };
 

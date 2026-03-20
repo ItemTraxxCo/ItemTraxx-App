@@ -126,7 +126,7 @@ export const buildDistrictAppHandoffUrl = (
   path: string,
   handoff:
     | { handoffCode: string }
-    | { emailOtp: string; email: string }
+    | { tokenHash: string }
 ) => {
   const url = new URL(buildDistrictAppUrl(slug, path));
   const params =
@@ -135,8 +135,7 @@ export const buildDistrictAppHandoffUrl = (
           itx_hc: handoff.handoffCode,
         })
       : new URLSearchParams({
-          itx_eo: handoff.emailOtp,
-          itx_em: handoff.email,
+          itx_th: handoff.tokenHash,
         });
   url.hash = params.toString();
   return url.toString();

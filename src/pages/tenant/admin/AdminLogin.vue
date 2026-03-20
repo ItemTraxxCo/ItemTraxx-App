@@ -144,13 +144,12 @@ const handleAdminLogin = async () => {
       password.value,
       turnstileToken.value ?? ""
     );
-    if (!handoff.rootOnly && handoff.emailOtp && handoff.email && handoff.districtSlug) {
+    if (!handoff.rootOnly && handoff.tokenHash && handoff.districtSlug) {
       const targetPath =
         handoff.role === "district_admin" ? "/district" : "/tenant/admin";
       window.location.replace(
         buildDistrictAppHandoffUrl(handoff.districtSlug, targetPath, {
-          emailOtp: handoff.emailOtp,
-          email: handoff.email,
+          tokenHash: handoff.tokenHash,
         })
       );
       return;

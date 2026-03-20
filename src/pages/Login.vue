@@ -251,8 +251,7 @@ const handleTenantLogin = async () => {
           session.districtSlug,
           "/tenant/checkout",
           {
-            emailOtp: handoffCode.emailOtp,
-            email: handoffCode.email,
+            tokenHash: handoffCode.tokenHash,
           }
         )
       );

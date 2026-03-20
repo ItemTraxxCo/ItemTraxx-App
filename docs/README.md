@@ -19,6 +19,7 @@ This directory contains operational, security, architecture, and testing documen
 - `docs/runbooks/tenant-auth-issues.md` — Tenant auth/login/401 troubleshooting.
 - `docs/runbooks/edge-function-deploy.md` — Safe edge function deployment and verification.
 - `docs/runbooks/kill-switch.md` — Production kill-switch behavior and usage.
+- `docs/runbooks/create-tenant.md` — Current super-admin tenant creation process and verification checklist.
 
 ## Product and Feature Specs
 - `docs/onboarding-feature-spec.md` — First-sign-in onboarding behavior and constraints.

@@ -9,7 +9,19 @@ on:
     - cron: "15 * * * *"
 
 jobs:
+  slack-notify-start:
+    uses: ./.github/workflows/slack-notify-status.yml
+    with:
+      mode: start
+      workflow_name: Deployment Health
+      job_name: health-check
+      run_url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+      ref_name: ${{ github.ref_name }}
+      sha: ${{ github.sha }}
+    secrets: inherit
+
   health-check:
+    needs: slack-notify-start
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
@@ -88,14 +100,20 @@ jobs:
             -H "Origin: https://itemtraxx.com" \
             | head -c 300
 
-  notify-slack-on-failure:
-    needs: health-check
-    if: ${{ always() && needs.health-check.result == 'failure' }}
-    uses: ./.github/workflows/slack-notify-failure.yml
+  slack-notify-finish:
+    needs:
+      - slack-notify-start
+      - health-check
+    if: ${{ always() && needs.health-check.result != 'skipped' }}
+    uses: ./.github/workflows/slack-notify-status.yml
     with:
+      mode: finish
       workflow_name: Deployment Health
       job_name: health-check
       run_url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
       ref_name: ${{ github.ref_name }}
       sha: ${{ github.sha }}
+      status: ${{ needs.health-check.result }}
+      slack_channel_id: ${{ needs.slack-notify-start.outputs.slack_channel_id }}
+      slack_message_ts: ${{ needs.slack-notify-start.outputs.slack_message_ts }}
     secrets: inherit

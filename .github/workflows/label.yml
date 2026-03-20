@@ -11,8 +11,19 @@ permissions: {}
 on: [pull_request_target]
 
 jobs:
-  label:
+  slack-notify-start:
+    uses: ./.github/workflows/slack-notify-status.yml
+    with:
+      mode: start
+      workflow_name: Labeler
+      job_name: label
+      run_url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+      ref_name: ${{ github.ref_name }}
+      sha: ${{ github.sha }}
+    secrets: inherit
 
+  label:
+    needs: slack-notify-start
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -23,14 +34,20 @@ jobs:
       with:
         repo-token: "${{ secrets.GITHUB_TOKEN }}"
 
-  notify-slack-on-failure:
-    needs: label
-    if: ${{ always() && needs.label.result == 'failure' }}
-    uses: ./.github/workflows/slack-notify-failure.yml
+  slack-notify-finish:
+    needs:
+      - slack-notify-start
+      - label
+    if: ${{ always() && needs.label.result != 'skipped' }}
+    uses: ./.github/workflows/slack-notify-status.yml
     with:
+      mode: finish
       workflow_name: Labeler
       job_name: label
       run_url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
       ref_name: ${{ github.ref_name }}
       sha: ${{ github.sha }}
+      status: ${{ needs.label.result }}
+      slack_channel_id: ${{ needs.slack-notify-start.outputs.slack_channel_id }}
+      slack_message_ts: ${{ needs.slack-notify-start.outputs.slack_message_ts }}
     secrets: inherit

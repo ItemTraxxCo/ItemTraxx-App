@@ -15,7 +15,19 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  slack-notify-start:
+    uses: ./.github/workflows/slack-notify-status.yml
+    with:
+      mode: start
+      workflow_name: Security Audit
+      job_name: security-audit
+      run_url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+      ref_name: ${{ github.ref_name }}
+      sha: ${{ github.sha }}
+    secrets: inherit
+
   security-audit:
+    needs: slack-notify-start
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
@@ -46,14 +58,20 @@ jobs:
           path: artifacts/sbom.cdx.json
           if-no-files-found: error
 
-  notify-slack-on-failure:
-    needs: security-audit
-    if: ${{ always() && needs.security-audit.result == 'failure' }}
-    uses: ./.github/workflows/slack-notify-failure.yml
+  slack-notify-finish:
+    needs:
+      - slack-notify-start
+      - security-audit
+    if: ${{ always() && needs.security-audit.result != 'skipped' }}
+    uses: ./.github/workflows/slack-notify-status.yml
     with:
+      mode: finish
       workflow_name: Security Audit
       job_name: security-audit
       run_url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
       ref_name: ${{ github.ref_name }}
       sha: ${{ github.sha }}
+      status: ${{ needs.security-audit.result }}
+      slack_channel_id: ${{ needs.slack-notify-start.outputs.slack_channel_id }}
+      slack_message_ts: ${{ needs.slack-notify-start.outputs.slack_message_ts }}
     secrets: inherit

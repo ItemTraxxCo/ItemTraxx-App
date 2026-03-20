@@ -24,7 +24,19 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  slack-notify-start:
+    uses: ./.github/workflows/slack-notify-status.yml
+    with:
+      mode: start
+      workflow_name: Deploy Supabase Functions
+      job_name: deploy
+      run_url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+      ref_name: ${{ github.ref_name }}
+      sha: ${{ github.sha }}
+    secrets: inherit
+
   deploy:
+    needs: slack-notify-start
     runs-on: ubuntu-latest
     timeout-minutes: 30
     environment: production
@@ -56,14 +68,20 @@ jobs:
             python3 ./scripts/deploy-supabase-functions.py --project-ref "$SUPABASE_PROJECT_REF"
           fi
 
-  notify-slack-on-failure:
-    needs: deploy
-    if: ${{ always() && needs.deploy.result == 'failure' }}
-    uses: ./.github/workflows/slack-notify-failure.yml
+  slack-notify-finish:
+    needs:
+      - slack-notify-start
+      - deploy
+    if: ${{ always() && needs.deploy.result != 'skipped' }}
+    uses: ./.github/workflows/slack-notify-status.yml
     with:
+      mode: finish
       workflow_name: Deploy Supabase Functions
       job_name: deploy
       run_url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
       ref_name: ${{ github.ref_name }}
       sha: ${{ github.sha }}
+      status: ${{ needs.deploy.result }}
+      slack_channel_id: ${{ needs.slack-notify-start.outputs.slack_channel_id }}
+      slack_message_ts: ${{ needs.slack-notify-start.outputs.slack_message_ts }}
     secrets: inherit

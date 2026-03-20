@@ -9,7 +9,19 @@ on:
     - cron: "35 6,18 * * *"
 
 jobs:
+  slack-notify-start:
+    uses: ./.github/workflows/slack-notify-status.yml
+    with:
+      mode: start
+      workflow_name: Supabase Backup
+      job_name: backup
+      run_url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+      ref_name: ${{ github.ref_name }}
+      sha: ${{ github.sha }}
+    secrets: inherit
+
   backup:
+    needs: slack-notify-start
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
@@ -35,14 +47,20 @@ jobs:
           SUPABASE_BACKUP_RETENTION_DAYS: "365"
         run: ./scripts/github-supabase-backup.sh
 
-  notify-slack-on-failure:
-    needs: backup
-    if: ${{ always() && needs.backup.result == 'failure' }}
-    uses: ./.github/workflows/slack-notify-failure.yml
+  slack-notify-finish:
+    needs:
+      - slack-notify-start
+      - backup
+    if: ${{ always() && needs.backup.result != 'skipped' }}
+    uses: ./.github/workflows/slack-notify-status.yml
     with:
+      mode: finish
       workflow_name: Supabase Backup
       job_name: backup
       run_url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
       ref_name: ${{ github.ref_name }}
       sha: ${{ github.sha }}
+      status: ${{ needs.backup.result }}
+      slack_channel_id: ${{ needs.slack-notify-start.outputs.slack_channel_id }}
+      slack_message_ts: ${{ needs.slack-notify-start.outputs.slack_message_ts }}
     secrets: inherit

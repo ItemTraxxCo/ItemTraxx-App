@@ -240,18 +240,20 @@ const handleTenantLogin = async () => {
     if (
       !district.isDistrictHost &&
       session?.districtSlug &&
-      session.authEmail
+      session.accessToken
     ) {
       const handoffCode = await createDistrictSessionHandoff(
         session.districtSlug,
-        session.authEmail,
-        password.value
+        session.accessToken
       );
       window.location.replace(
         buildDistrictAppHandoffUrl(
           session.districtSlug,
           "/tenant/checkout",
-          handoffCode
+          {
+            emailOtp: handoffCode.emailOtp,
+            email: handoffCode.email,
+          }
         )
       );
       return;

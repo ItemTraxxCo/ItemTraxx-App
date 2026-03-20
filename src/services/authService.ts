@@ -489,16 +489,6 @@ export const tenantLogin = async (
     typeof data.district_slug === "string" &&
     !!data.district_slug.trim();
 
-  if (shouldCrossHostRedirect) {
-    return {
-      districtId: null,
-      districtSlug: data.district_slug?.trim() ?? null,
-      authEmail: data.auth_email,
-      accessToken: null,
-      refreshToken: null,
-    };
-  }
-
   let signInError: unknown = null;
   let accessToken: string | null = null;
   let refreshToken: string | null = null;
@@ -532,7 +522,9 @@ export const tenantLogin = async (
     (typeof data.district_slug === "string" && data.district_slug.trim()) ||
     (await resolveDistrictSlug(current.districtContextId));
 
-  sendLoginNotification(accessToken);
+  if (!shouldCrossHostRedirect) {
+    sendLoginNotification(accessToken);
+  }
 
   return {
     districtId: current.districtContextId ?? null,
@@ -552,14 +544,18 @@ export const consumeDistrictSessionHandoff = async () => {
     : window.location.hash;
   const params = new URLSearchParams(hash);
   const handoffCode = params.get("itx_hc");
+  const emailOtp = params.get("itx_eo");
+  const emailForOtp = params.get("itx_em");
   const accessToken = params.get("itx_at");
   const refreshToken = params.get("itx_rt");
 
-  if (!handoffCode && (!accessToken || !refreshToken)) {
+  if (!handoffCode && (!emailOtp || !emailForOtp) && (!accessToken || !refreshToken)) {
     return false;
   }
 
   params.delete("itx_hc");
+  params.delete("itx_eo");
+  params.delete("itx_em");
   params.delete("itx_at");
   params.delete("itx_rt");
   const nextHash = params.toString();
@@ -569,7 +565,24 @@ export const consumeDistrictSessionHandoff = async () => {
   let finalAccessToken = accessToken;
   let finalRefreshToken = refreshToken;
 
-  if (handoffCode) {
+  if (emailOtp && emailForOtp) {
+    const verifyResult = await supabase.auth.verifyOtp({
+      email: emailForOtp,
+      token: emailOtp,
+      type: "magiclink",
+    });
+
+    if (
+      verifyResult.error ||
+      !verifyResult.data.session?.access_token ||
+      !verifyResult.data.session.refresh_token
+    ) {
+      throw new Error("Unable to complete district sign-in.");
+    }
+
+    finalAccessToken = verifyResult.data.session.access_token;
+    finalRefreshToken = verifyResult.data.session.refresh_token;
+  } else if (handoffCode) {
     const result = await invokeEdgeFunction<
       { access_token?: string; refresh_token?: string },
       { action: "consume"; code: string }
@@ -626,28 +639,29 @@ export const consumeDistrictSessionHandoff = async () => {
 
 export const createDistrictSessionHandoff = async (
   districtSlug: string,
-  authEmail: string,
-  password: string
+  accessToken: string
 ) => {
   const result = await invokeEdgeFunction<
-    { code?: string },
-    { action: "create"; district_slug: string; auth_email: string; password: string }
+    { email_otp?: string; email?: string },
+    { action: "create"; district_slug: string }
   >(getDistrictHandoffFunctionName(), {
     method: "POST",
+    accessToken,
     body: {
       action: "create",
       district_slug: districtSlug,
-      auth_email: authEmail,
-      password,
     },
   });
 
-  if (!result.ok || !result.data?.code) {
+  if (!result.ok || !result.data?.email_otp || !result.data?.email) {
     throw new Error("Unable to prepare district sign-in.");
   }
 
   await clearLocalSession();
-  return result.data.code;
+  return {
+    emailOtp: result.data.email_otp,
+    email: result.data.email,
+  };
 };
 
 export const createDistrictAdminSessionHandoff = async (
@@ -657,12 +671,13 @@ export const createDistrictAdminSessionHandoff = async (
 ) => {
   const result = await invokeEdgeFunction<
     {
-      code?: string | null;
       district_slug?: string | null;
       role?: "tenant_admin" | "district_admin";
       root_only?: boolean;
       access_token?: string | null;
       refresh_token?: string | null;
+      email_otp?: string | null;
+      email?: string | null;
     },
     { action: "create_admin"; email: string; password: string; turnstile_token: string }
   >(getDistrictHandoffFunctionName(), {
@@ -677,16 +692,23 @@ export const createDistrictAdminSessionHandoff = async (
 
   if (result.ok && result.data?.root_only) {
     return {
-      code: null,
       districtSlug: null,
       role: result.data.role ?? "tenant_admin",
       rootOnly: true,
       accessToken: result.data.access_token ?? null,
       refreshToken: result.data.refresh_token ?? null,
+      emailOtp: null,
+      email: result.data.email ?? email,
     };
   }
 
-  if (!result.ok || !result.data?.code || !result.data?.district_slug || !result.data?.role) {
+  if (
+    !result.ok ||
+    !result.data?.email_otp ||
+    !result.data?.email ||
+    !result.data?.district_slug ||
+    !result.data?.role
+  ) {
     if (!result.ok && result.error === "Tenant disabled") {
       throw new Error("Tenant disabled.");
     }
@@ -703,12 +725,13 @@ export const createDistrictAdminSessionHandoff = async (
   }
 
   return {
-    code: result.data.code,
     districtSlug: result.data.district_slug,
     role: result.data.role,
     rootOnly: false,
     accessToken: null,
     refreshToken: null,
+    emailOtp: result.data.email_otp,
+    email: result.data.email,
   };
 };
 

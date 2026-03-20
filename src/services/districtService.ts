@@ -124,12 +124,21 @@ export const buildDistrictAppUrl = (slug: string, path: string) => {
 export const buildDistrictAppHandoffUrl = (
   slug: string,
   path: string,
-  handoffCode: string
+  handoff:
+    | { handoffCode: string }
+    | { emailOtp: string; email: string }
 ) => {
   const url = new URL(buildDistrictAppUrl(slug, path));
-  url.hash = new URLSearchParams({
-    itx_hc: handoffCode,
-  }).toString();
+  const params =
+    "handoffCode" in handoff
+      ? new URLSearchParams({
+          itx_hc: handoff.handoffCode,
+        })
+      : new URLSearchParams({
+          itx_eo: handoff.emailOtp,
+          itx_em: handoff.email,
+        });
+  url.hash = params.toString();
   return url.toString();
 };
 

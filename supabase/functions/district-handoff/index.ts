@@ -195,8 +195,7 @@ serve(async (req) => {
       return jsonResponse(
         200,
         {
-          email_otp: magicLink.data.properties.email_otp,
-          email: user.email,
+          hashed_token: magicLink.data.properties.hashed_token,
         },
         headers,
       );
@@ -341,8 +340,7 @@ serve(async (req) => {
       return jsonResponse(
         200,
         {
-          email_otp: magicLink.data.properties.email_otp,
-          email,
+          hashed_token: magicLink.data.properties.hashed_token,
           district_slug: resolvedDistrictSlug,
           role,
         },

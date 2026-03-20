@@ -77,7 +77,23 @@ jobs:
                 --arg job "$JOB_NAME" \
                 --arg branch "$REF_NAME" \
                 --arg commit "${SHA:0:7}" \
-                '{text: ("GitHub Actions run started: " + $workflow + " / " + $job + " on " + $branch + " (" + $commit + ")")}')"
+                --arg run_url "$RUN_URL" \
+                --arg repo "$REPOSITORY" \
+                '{
+                  text: ("GitHub Actions run started: " + $workflow + " / " + $job),
+                  attachments: [
+                    {
+                      color: "#d4a017",
+                      fields: [
+                        { title: "Status", value: "In progress", short: true },
+                        { title: "Commit", value: ($commit + " (" + $branch + ")"), short: true },
+                        { title: "Workflow", value: ("<" + $run_url + "|" + $workflow + " / " + $job + ">"), short: false },
+                        { title: "Repository", value: $repo, short: false }
+                      ],
+                      footer: "GitHub Actions"
+                    }
+                  ]
+                }')"
               curl -fsSL -X POST "$SLACK_WEBHOOK_URL" \
                 -H "Content-Type: application/json" \
                 --data "$PAYLOAD"
@@ -98,29 +114,16 @@ jobs:
               '{
                 channel: $channel,
                 text: "GitHub Actions run started",
-                blocks: [
+                attachments: [
                   {
-                    type: "header",
-                    text: {
-                      type: "plain_text",
-                      text: "GitHub Actions run started"
-                    }
-                  },
-                  {
-                    type: "section",
+                    color: "#d4a017",
                     fields: [
-                      { type: "mrkdwn", text: ("*Workflow:*\n" + $workflow) },
-                      { type: "mrkdwn", text: ("*Job:*\n" + $job) },
-                      { type: "mrkdwn", text: ("*Branch:*\n" + $branch) },
-                      { type: "mrkdwn", text: ("*Commit:*\n" + $commit) }
-                    ]
-                  },
-                  {
-                    type: "section",
-                    text: {
-                      type: "mrkdwn",
-                      text: ("*Repository:* " + $repo + "\n*Run:* <" + $run_url + "|Open run>\n*Status:* In progress")
-                    }
+                      { title: "Status", value: "In progress", short: true },
+                      { title: "Commit", value: ($commit + " (" + $branch + ")"), short: true },
+                      { title: "Workflow", value: ("<" + $run_url + "|" + $workflow + " / " + $job + ">"), short: false },
+                      { title: "Repository", value: $repo, short: false }
+                    ],
+                    footer: "GitHub Actions"
                   }
                 ]
               }')"
@@ -170,7 +173,28 @@ jobs:
                 --arg commit "${SHA:0:7}" \
                 --arg run_url "$RUN_URL" \
                 --arg status_label "$STATUS_LABEL" \
-                '{text: ("GitHub Actions run " + ($status_label | ascii_downcase) + ": " + $workflow + " / " + $job + " on " + $branch + " (" + $commit + ") — " + $run_url)}')"
+                --arg repo "$REPOSITORY" \
+                '{
+                  text: ("GitHub Actions run " + ($status_label | ascii_downcase) + ": " + $workflow + " / " + $job),
+                  attachments: [
+                    {
+                      color: (
+                        if ($status_label == "Succeeded") then "#2eb67d"
+                        elif ($status_label == "Failed") then "#e01e5a"
+                        elif ($status_label == "Cancelled") then "#9ca3af"
+                        else "#d4a017"
+                        end
+                      ),
+                      fields: [
+                        { title: "Status", value: $status_label, short: true },
+                        { title: "Commit", value: ($commit + " (" + $branch + ")"), short: true },
+                        { title: "Workflow", value: ("<" + $run_url + "|" + $workflow + " / " + $job + ">"), short: false },
+                        { title: "Repository", value: $repo, short: false }
+                      ],
+                      footer: "GitHub Actions"
+                    }
+                  ]
+                }')"
               curl -fsSL -X POST "$SLACK_WEBHOOK_URL" \
                 -H "Content-Type: application/json" \
                 --data "$PAYLOAD"
@@ -210,29 +234,22 @@ jobs:
                 channel: $channel,
                 ts: $ts,
                 text: ("GitHub Actions run " + ($status_label | ascii_downcase)),
-                blocks: [
+                attachments: [
                   {
-                    type: "header",
-                    text: {
-                      type: "plain_text",
-                      text: ("GitHub Actions run " + ($status_label | ascii_downcase))
-                    }
-                  },
-                  {
-                    type: "section",
+                    color: (
+                      if ($status_label == "Succeeded") then "#2eb67d"
+                      elif ($status_label == "Failed") then "#e01e5a"
+                      elif ($status_label == "Cancelled") then "#9ca3af"
+                      else "#d4a017"
+                      end
+                    ),
                     fields: [
-                      { type: "mrkdwn", text: ("*Workflow:*\n" + $workflow) },
-                      { type: "mrkdwn", text: ("*Job:*\n" + $job) },
-                      { type: "mrkdwn", text: ("*Branch:*\n" + $branch) },
-                      { type: "mrkdwn", text: ("*Commit:*\n" + $commit) }
-                    ]
-                  },
-                  {
-                    type: "section",
-                    text: {
-                      type: "mrkdwn",
-                      text: ("*Repository:* " + $repo + "\n*Run:* <" + $run_url + "|Open run>\n*Status:* " + $status_label)
-                    }
+                      { title: "Status", value: $status_label, short: true },
+                      { title: "Commit", value: ($commit + " (" + $branch + ")"), short: true },
+                      { title: "Workflow", value: ("<" + $run_url + "|" + $workflow + " / " + $job + ">"), short: false },
+                      { title: "Repository", value: $repo, short: false }
+                    ],
+                    footer: "GitHub Actions"
                   }
                 ]
               }')"

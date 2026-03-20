@@ -577,8 +577,18 @@ export const consumeDistrictSessionHandoff = async () => {
       throw new Error("Unable to complete district sign-in.");
     }
 
-    finalAccessToken = verifyResult.data.session.access_token;
-    finalRefreshToken = verifyResult.data.session.refresh_token;
+    sendLoginNotification(verifyResult.data.session.access_token);
+
+    try {
+      window.sessionStorage.setItem(
+        DISTRICT_HANDOFF_MARKER_KEY,
+        String(Date.now())
+      );
+    } catch {
+      // Ignore sessionStorage failures.
+    }
+
+    return true;
   } else if (handoffCode) {
     const result = await invokeEdgeFunction<
       { access_token?: string; refresh_token?: string },

@@ -61,7 +61,11 @@
             </label>
 
             <div class="form-actions">
-              <button type="submit" class="button-primary login-submit-button" :disabled="isLoading">
+              <button
+                type="submit"
+                class="button-primary login-submit-button"
+                :disabled="!canSubmit || isLoading"
+              >
                 Sign in
               </button>
             </div>
@@ -89,7 +93,7 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref } from "vue";
+import { computed, onMounted, onUnmounted, ref } from "vue";
 import { RouterLink, useRouter } from "vue-router";
 import { createDistrictSessionHandoff, tenantLogin } from "../services/authService";
 import { useTurnstile } from "../composables/useTurnstile";
@@ -161,6 +165,12 @@ const {
   token: turnstileToken,
   reset: resetTurnstile,
 } = useTurnstile(turnstileSiteKey);
+const canSubmit = computed(() => {
+  const hasAccessCode = accessCode.value.trim().length > 0;
+  const hasPassword = password.value.length > 0;
+  const hasTurnstile = !turnstileSiteKey || Boolean(turnstileToken.value);
+  return hasAccessCode && hasPassword && hasTurnstile;
+});
 const setTurnstileContainerRef = (
   el: Element | { $el?: Element } | null
 ) => {
@@ -662,6 +672,14 @@ onMounted(() => {
   border-color: transparent;
   color: #f8fbff;
   box-shadow: 0 16px 28px rgba(25, 67, 155, 0.24);
+}
+
+.login-submit-button:disabled {
+  background: #8d99b8;
+  border-color: #8d99b8;
+  color: rgba(248, 251, 255, 0.92);
+  box-shadow: none;
+  cursor: not-allowed;
 }
 
 .login-submit-button:hover:not(:disabled) {

@@ -102,7 +102,6 @@
           </p>
           <ul class="feature-checks">
             <li>Fast sign in and transaction flow</li>
-            <li>Low-friction checkout and return experience</li>
             <li>Clean operator-facing workflow design</li>
             <li>Light and dark appearance modes available</li>
           </ul>

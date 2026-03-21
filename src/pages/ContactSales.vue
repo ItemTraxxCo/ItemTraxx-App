@@ -41,7 +41,7 @@
         </label>
 
         <label>
-          Organization (Leave blank if you are inquiring for the individual plans)
+          School, organization, district, or team (Leave blank if you are inquiring for the individual plans)
           <input
             v-model.trim="organization"
             type="text"

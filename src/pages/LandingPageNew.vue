@@ -28,7 +28,7 @@
     <main id="landing-new-main" class="shell landing-main">
       <section class="hero-grid reveal reveal-up">
         <div class="hero-copy reveal reveal-left">
-          <p class="eyebrow">Individual plans now available</p>
+          <p class="eyebrow">Individual plans available</p>
           <h1>ItemTraxx</h1>
           <p class="hero-body">
             Losing track of where stuff goes? ItemTraxx is the right service for you.

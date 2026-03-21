@@ -174,7 +174,13 @@
         >
           Take tour again
         </button>
-        <button type="button" class="menu-item danger" role="menuitem" @click="logoutTenant">
+        <button
+          v-if="showLogoutUserAction"
+          type="button"
+          class="menu-item danger"
+          role="menuitem"
+          @click="logoutTenant"
+        >
           Log Out User
         </button>
         <a
@@ -358,6 +364,7 @@ const showTopMenu = computed(
     route.name !== "public-pricing" &&
     route.name !== "public-about"
 );
+const showLogoutUserAction = computed(() => route.path !== "/login");
 const currentTenantOnboardingRole = computed<TenantOnboardingRole | null>(() => {
   if (!auth.isAuthenticated) return null;
   if (auth.role === "tenant_user" || auth.role === "tenant_admin") {

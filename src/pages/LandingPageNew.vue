@@ -102,7 +102,6 @@
           </p>
           <ul class="feature-checks">
             <li>Fast sign in and transaction flow</li>
-            <li>Low-friction checkout and return experience</li>
             <li>Clean operator-facing workflow design</li>
             <li>Light and dark appearance modes available</li>
           </ul>
@@ -202,6 +201,7 @@
     <footer class="landing-footer shell">
       <p class="footer-brand">ItemTraxx Co</p>
       <div class="footer-links">
+        <span class="footer-version">v{{ appVersion }}</span>
         <RouterLink to="/contact-support">Support</RouterLink>
         <a href="https://status.itemtraxx.com/" target="_blank" rel="noreferrer">Status</a>
         <a :href="legalUrl" target="_blank" rel="noreferrer">Legal</a>
@@ -226,6 +226,7 @@ import checkoutReturnUiImage1200 from '../assets/landing/checkout_return_ui-1200
 import checkoutReturnUiImage1600 from '../assets/landing/checkout_return_ui-1600.webp';
 import { fetchSystemStatus } from '../services/systemStatusService';
 
+const appVersion = import.meta.env.VITE_GIT_COMMIT || "n/a";
 const legalUrl =
   import.meta.env.VITE_APP_URL && String(import.meta.env.VITE_APP_URL).startsWith('http')
     ? `${String(import.meta.env.VITE_APP_URL).replace(/\/$/, '')}/legal`
@@ -950,6 +951,7 @@ onBeforeUnmount(() => {
   flex-wrap: wrap;
 }
 
+.footer-version,
 .footer-links a {
   color: rgba(216, 224, 235, 0.76);
   text-decoration: none;

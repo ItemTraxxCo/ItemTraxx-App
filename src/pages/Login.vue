@@ -29,6 +29,7 @@
 
       <section class="login-form-panel">
         <div class="login-form-wrap">
+          <RouterLink class="story-back-link compact-back-link" to="/">Back</RouterLink>
           <h1>Sign in</h1>
           <p class="login-panel-copy">Use your ItemTraxx access code and password to enter your ItemTraxx app.</p>
 
@@ -505,6 +506,12 @@ onMounted(() => {
   box-shadow: 0 10px 20px rgba(25, 194, 168, 0.14);
 }
 
+.compact-back-link {
+  display: none;
+  margin: 0 0 1.1rem;
+  width: fit-content;
+}
+
 .story-copy-wrap {
   flex: 1;
   display: flex;
@@ -704,6 +711,10 @@ onMounted(() => {
 
   .login-form-wrap {
     width: min(100%, 36rem);
+  }
+
+  .compact-back-link {
+    display: inline-flex;
   }
 }
 

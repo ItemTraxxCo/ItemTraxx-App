@@ -211,7 +211,49 @@ git rev-parse --show-toplevel
 
 The command must print the full path to the cloned repo.
 
-## 6. Install Repository Dependencies
+## 6. Switch To Your Personal Developer Branch
+
+Each developer should work from their own long-lived branch named:
+
+```text
+dev/<github-username>
+```
+
+Examples:
+
+- `dev/mmango10`
+- `dev/leotheoeo`
+
+1. Fetch remote branches:
+
+```bash
+git fetch origin
+```
+
+2. If your personal branch already exists on GitHub, switch to it:
+
+```bash
+git checkout dev/<github-username>
+```
+
+3. If it does not exist yet, create it from `preview` and push it:
+
+```bash
+git checkout preview
+git pull origin preview
+git checkout -b dev/<github-username>
+git push -u origin dev/<github-username>
+```
+
+4. Confirm you are now on your personal branch:
+
+```bash
+git branch --show-current
+```
+
+Do not do normal development work directly on `main` or `preview`.
+
+## 7. Install Repository Dependencies
 
 From the repo root, run:
 
@@ -221,7 +263,7 @@ npm install
 
 Do not continue until `npm install` completes successfully.
 
-## 7. Create The Local Environment File
+## 8. Create The Local Environment File
 
 1. Copy the sample environment file.
 
@@ -252,7 +294,7 @@ At minimum, verify these keys exist in `.env`:
 
 If `.env` changes later, restart the dev server after editing it.
 
-## 8. Verify The Repository Builds Cleanly
+## 9. Verify The Repository Builds Cleanly
 
 From the repo root, run these commands in order.
 
@@ -263,7 +305,7 @@ npm run perf:budget
 
 If either command fails, stop and resolve that failure before continuing.
 
-## 9. Run The App Locally
+## 10. Run The App Locally
 
 1. Start the dev server.
 
@@ -279,7 +321,7 @@ npm run dev
 4. Confirm the login page loads.
 5. Confirm there is no immediate console or terminal crash.
 
-## 10. Optional Local Verification Commands
+## 11. Optional Local Verification Commands
 
 These are the standard validation commands developers should know.
 
@@ -309,7 +351,7 @@ npm run security:gate
 
 Do not run all of these blindly on every small change. Use them when the change justifies it.
 
-## 11. Current Git Workflow
+## 12. Current Git Workflow
 
 The current repo uses GitHub plus branch-based collaboration.
 
@@ -327,43 +369,59 @@ git status
 git fetch origin
 ```
 
-3. Switch to the integration branch currently used by the team.
+3. Switch to your personal developer branch.
 
 ```bash
-git checkout preview
+git checkout dev/<github-username>
 ```
 
-4. Pull the latest remote commits.
+4. Pull the latest remote commits for your branch.
 
 ```bash
-git pull origin preview
+git pull origin dev/<github-username>
 ```
 
-5. Create a feature branch from `preview`.
+5. Merge the latest shared integration changes into your branch.
 
 ```bash
-git checkout -b <your-branch-name>
+git merge origin/preview
 ```
 
-Use a clear branch name.
+6. If you are using short-lived task branches, create one from your personal branch.
+
+```bash
+git checkout -b <your-task-branch-name>
+```
+
+If you are not using short-lived task branches, you can work directly on your personal developer branch.
 
 ### Push a branch
 
+If you are working directly on your personal developer branch:
+
 ```bash
-git push -u origin <your-branch-name>
+git push
+```
+
+If you are working on a short-lived task branch:
+
+```bash
+git push -u origin <your-task-branch-name>
 ```
 
 ### Open a pull request
 
-Open the PR against the branch your team is currently using as the integration target.
+If your team uses one long-lived personal branch per developer, open the PR from:
 
-At the time of writing, that branch is usually:
+- `dev/<github-username>`
+
+into:
 
 - `preview`
 
-If the team changes its branching model later, update this document.
+If you are using a short-lived task branch, open the PR from that task branch into `preview`.
 
-## 12. Automatic Deploys In GitHub Actions
+## 13. Automatic Deploys In GitHub Actions
 
 The repo now includes GitHub Actions workflows for infrastructure deploys.
 
@@ -397,7 +455,7 @@ Automatic deploys only work if the required GitHub repository secrets already ex
 
 If a deploy workflow fails because a secret is missing, the fix is in GitHub repository settings, not in the app code.
 
-## 13. Manual Deploys From Any Machine
+## 14. Manual Deploys From Any Machine
 
 These commands are repo-relative. They do not depend on `/Users/dennisfrenkel` or any other single developer home directory.
 
@@ -449,7 +507,7 @@ These commands work from any machine that has:
 - the required CLI installed
 - the required auth already configured
 
-## 14. When To Use Automatic Deploys Vs Manual Deploys
+## 15. When To Use Automatic Deploys Vs Manual Deploys
 
 ### Use automatic deploys when
 
@@ -464,7 +522,7 @@ These commands work from any machine that has:
 - GitHub Actions is unavailable
 - you are performing an emergency rollback or hotfix under an approved process
 
-## 15. SQL Migrations Are Still Separate
+## 16. SQL Migrations Are Still Separate
 
 Supabase function deploy automation does not automatically apply SQL migrations.
 
@@ -475,7 +533,7 @@ That means:
 
 If a change depends on SQL schema updates, those migration steps must be called out clearly in the PR and deployment notes.
 
-## 16. Minimum New-Developer Smoke Test
+## 17. Minimum New-Developer Smoke Test
 
 Every newly onboarded developer should complete this smoke test after setup.
 
@@ -493,7 +551,7 @@ Every newly onboarded developer should complete this smoke test after setup.
 
 If any item fails, stop and resolve it before assigning production-impacting work.
 
-## 17. What The Team Lead Must Hand The New Developer
+## 18. What The Team Lead Must Hand The New Developer
 
 The team lead must provide all of the following directly.
 
@@ -508,7 +566,7 @@ The team lead must provide all of the following directly.
 
 Do not expect a new developer to infer any of this.
 
-## 18. Common Setup Failures
+## 19. Common Setup Failures
 
 ### `npm install` fails
 
@@ -547,7 +605,7 @@ Check:
 - the branch/path trigger conditions were met
 - the changed code is actually part of the deploy target
 
-## 19. Current Files Related To Deploy And Onboarding
+## 20. Current Files Related To Deploy And Onboarding
 
 Key files in this repo:
 
@@ -557,7 +615,7 @@ Key files in this repo:
 - `scripts/deploy-cloudflare-worker.sh`
 - `docs/runbooks/new-developer-onboarding.md`
 
-## 20. Final Onboarding Completion Criteria
+## 21. Final Onboarding Completion Criteria
 
 A developer is fully onboarded only when all of the following are true.
 

@@ -189,13 +189,55 @@ Confirm repo root:
 git rev-parse --show-toplevel
 ```
 
-## 9. Install Project Dependencies
+## 9. Switch To Your Personal Developer Branch
+
+Each developer should work from their own long-lived branch named:
+
+```text
+dev/<github-username>
+```
+
+Examples:
+
+- `dev/mmango10`
+- `dev/leotheoeo`
+
+1. Fetch remote branches:
+
+```bash
+git fetch origin
+```
+
+2. If your personal branch already exists on GitHub, switch to it:
+
+```bash
+git checkout dev/<github-username>
+```
+
+3. If it does not exist yet, create it from `preview` and push it:
+
+```bash
+git checkout preview
+git pull origin preview
+git checkout -b dev/<github-username>
+git push -u origin dev/<github-username>
+```
+
+4. Confirm you are now on your personal branch:
+
+```bash
+git branch --show-current
+```
+
+Do not do normal development work directly on `main` or `preview`.
+
+## 10. Install Project Dependencies
 
 ```bash
 npm install
 ```
 
-## 10. Create The Local Environment File
+## 11. Create The Local Environment File
 
 ```bash
 cp .env.example .env
@@ -205,14 +247,14 @@ Then open `.env` and fill in the values provided securely by the team lead.
 
 Do not commit `.env`.
 
-## 11. Verify Local Build
+## 12. Verify Local Build
 
 ```bash
 npm run build
 npm run perf:budget
 ```
 
-## 12. Run The App Locally
+## 13. Run The App Locally
 
 ```bash
 npm run dev
@@ -228,30 +270,75 @@ Confirm:
 - login page loads
 - no immediate terminal crash
 
-## 13. Current Git Workflow
+## 14. Current Git Workflow
 
-Start from the shared integration branch:
+### Start a new task
+
+1. Make sure your local repo is clean.
+
+```bash
+git status
+```
+
+2. Fetch the latest refs.
 
 ```bash
 git fetch origin
-git checkout preview
-git pull origin preview
-git checkout -b your-branch-name
 ```
 
-When ready:
+3. Switch to your personal developer branch.
 
 ```bash
-git add .
-git commit -m "describe your change"
-git push -u origin your-branch-name
+git checkout dev/<github-username>
 ```
 
-Then open a PR into:
+4. Pull the latest remote commits for your branch.
+
+```bash
+git pull origin dev/<github-username>
+```
+
+5. Merge the latest shared integration changes into your branch.
+
+```bash
+git merge origin/preview
+```
+
+6. If you are using short-lived task branches, create one from your personal branch.
+
+```bash
+git checkout -b <your-task-branch-name>
+```
+
+If you are not using short-lived task branches, you can work directly on your personal developer branch.
+
+### Push a branch
+
+If you are working directly on your personal developer branch:
+
+```bash
+git push
+```
+
+If you are working on a short-lived task branch:
+
+```bash
+git push -u origin <your-task-branch-name>
+```
+
+### Open a pull request
+
+If your team uses one long-lived personal branch per developer, open the PR from:
+
+- `dev/<github-username>`
+
+into:
 
 - `preview`
 
-## 14. Manual Deploys From Windows/WSL2
+If you are using a short-lived task branch, open the PR from that task branch into `preview`.
+
+## 15. Manual Deploys From Windows/WSL2
 
 If the developer has deploy access, run these from the repo root inside WSL2.
 
@@ -269,7 +356,7 @@ npm run deploy:cloudflare:worker
 
 These do not depend on Dennis-specific local paths.
 
-## 15. Windows-Specific Notes
+## 16. Windows-Specific Notes
 
 1. Prefer WSL2 over PowerShell for repo work.
 2. Prefer storing the repo in the Linux filesystem, not `/mnt/c/...`.
@@ -281,7 +368,7 @@ These do not depend on Dennis-specific local paths.
 git config --global core.autocrlf input
 ```
 
-## 16. Minimum Smoke Test
+## 17. Minimum Smoke Test
 
 A new Windows developer is onboarded only when all of these work:
 

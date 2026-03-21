@@ -18,7 +18,7 @@
         <p class="pricing-eyebrow">Pricing</p>
         <h1>Simple pricing for teams of any size.</h1>
         <p class="pricing-lead">
-          Clear plan options for districts, organizations, and individual plans. Contact sales 
+          Clear plan options for districts, cheezit, and individual plans. Contact sales 
           for custom quotes, multi-district pricing, or any questions about which plan is right
             for you.
         </p>

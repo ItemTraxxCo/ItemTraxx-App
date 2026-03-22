@@ -29,6 +29,7 @@
 
       <section class="login-form-panel">
         <div class="login-form-wrap">
+          <RouterLink class="story-back-link compact-back-link" to="/">Back</RouterLink>
           <h1>Sign in</h1>
           <p class="login-panel-copy">Use your ItemTraxx access code and password to enter your ItemTraxx app.</p>
 
@@ -60,7 +61,11 @@
             </label>
 
             <div class="form-actions">
-              <button type="submit" class="button-primary login-submit-button" :disabled="isLoading">
+              <button
+                type="submit"
+                class="button-primary login-submit-button"
+                :disabled="!canSubmit || isLoading"
+              >
                 Sign in
               </button>
             </div>
@@ -88,7 +93,7 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref } from "vue";
+import { computed, onMounted, onUnmounted, ref } from "vue";
 import { RouterLink, useRouter } from "vue-router";
 import { createDistrictSessionHandoff, tenantLogin } from "../services/authService";
 import { useTurnstile } from "../composables/useTurnstile";
@@ -160,6 +165,12 @@ const {
   token: turnstileToken,
   reset: resetTurnstile,
 } = useTurnstile(turnstileSiteKey);
+const canSubmit = computed(() => {
+  const hasAccessCode = accessCode.value.trim().length > 0;
+  const hasPassword = password.value.length > 0;
+  const hasTurnstile = !turnstileSiteKey || Boolean(turnstileToken.value);
+  return hasAccessCode && hasPassword && hasTurnstile;
+});
 const setTurnstileContainerRef = (
   el: Element | { $el?: Element } | null
 ) => {
@@ -505,6 +516,12 @@ onMounted(() => {
   box-shadow: 0 10px 20px rgba(25, 194, 168, 0.14);
 }
 
+.compact-back-link {
+  display: none;
+  margin: 0 0 1.1rem;
+  width: fit-content;
+}
+
 .story-copy-wrap {
   flex: 1;
   display: flex;
@@ -657,6 +674,14 @@ onMounted(() => {
   box-shadow: 0 16px 28px rgba(25, 67, 155, 0.24);
 }
 
+.login-submit-button:disabled {
+  background: #8d99b8;
+  border-color: #8d99b8;
+  color: rgba(248, 251, 255, 0.92);
+  box-shadow: none;
+  cursor: not-allowed;
+}
+
 .login-submit-button:hover:not(:disabled) {
   background-image: linear-gradient(90deg, #22ccb1 0%, #2357bf 100%);
 }
@@ -704,6 +729,10 @@ onMounted(() => {
 
   .login-form-wrap {
     width: min(100%, 36rem);
+  }
+
+  .compact-back-link {
+    display: inline-flex;
   }
 }
 

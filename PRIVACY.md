@@ -57,7 +57,7 @@ We may disclose or make data available in the following circumstances:
 - **Legal or Safety Reasons:** When required by law, legal process, or to investigate fraud, abuse, security incidents, or policy violations
 - **Business Protection:** To protect the rights, property, systems, users, customers, or operations of ItemTraxx Co
 
-Where applicable, access is limited by role, tenant, district, or administrative scope.
+Where applicable, access is limited by role, user, district, or administrative scope.
 
 ---
 
@@ -84,13 +84,17 @@ Retention may vary depending on customer configuration, legal requirements, supp
 ---
 
 ## 7. Third-Party Services and Infrastructure
-ItemTraxx currently relies on third-party services that may process or store data on our behalf, including:
+ItemTraxx currently relies on third-party services that may process or store data on our behalf, including but not limited to:
 
-- **Supabase** — database, authentication, storage, and edge functions
-- **Vercel** — hosting, deployment, web analytics, and speed insights
-- **Cloudflare** — edge proxying, bot/security checks, and Turnstile verification
-- **GitHub** — source control, automation, and engineering workflows
-- **Resend** — transactional email delivery, where configured
+- **Supabase** — managed Postgres database, authentication, object storage, and edge-function execution
+- **Vercel** — frontend hosting, deployments, web analytics, and speed insights
+- **Cloudflare** — DNS, edge proxying, request filtering, bot/security protections, and Turnstile verification
+- **GitHub** — source control, pull requests, CI/CD automation, workflow logs, artifacts, and backup-repository storage used for encrypted operational backups
+- **Slack** — internal operational notifications and engineering/deployment alert delivery
+- **Aikido Security** — repository and application security scanning, vulnerability monitoring, and security issue reporting
+- **Resend** — transactional email delivery, where configured for login, support, sales, or administrative communications
+- **Sentry** — application error monitoring, tracing, and privacy-configured session replay where enabled
+- **incident.io** — external incident/status data source used by the public system-status experience, where configured
 
 These providers operate under their own terms and privacy practices. We use them as part of operating the service.
 
@@ -130,7 +134,7 @@ We may update this Privacy Policy from time to time. Updates become effective wh
 ## 12. Contact
 For privacy questions or data-related inquiries, contact:
 
-**ItemTraxx Co**  
+Contact Support Via Website: [itemtraxx.com/contact-support](https://itemtraxx.com/contact-support)
 Email: `support@itemtraxx.com`
 
 ---

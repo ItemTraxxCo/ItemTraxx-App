@@ -1,7 +1,7 @@
 <template>
   <div class="page contact-sales-page">
     <div class="page-nav-left">
-      <RouterLink class="button-link" to="/">Return to website</RouterLink>
+      <RouterLink class="button-link" to="/">Back</RouterLink>
     </div>
 
     <h1>Contact Support</h1>

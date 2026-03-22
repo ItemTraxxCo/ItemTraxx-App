@@ -1,8 +1,8 @@
 # Proprietary Software License
 
-Last updated: 2026-03-10 (year-month-day)
+Last updated: 2026-03-21 (year-month-day)
 
-**ItemTraxx**  
+**ItemTraxx Co**  
 Copyright (c) 2026 ItemTraxx Co  
 All rights reserved.
 

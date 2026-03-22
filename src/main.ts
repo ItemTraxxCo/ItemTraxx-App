@@ -152,7 +152,15 @@ const initializeAuth = async () => {
   initAuthListener();
 };
 
-const mountApp = () => {
+const initializeSentry = async (app: ReturnType<typeof createApp>) => {
+  if (!import.meta.env.VITE_SENTRY_DSN?.trim()) {
+    return;
+  }
+  const { initializeSentry: initializeSentryMonitoring } = await import("./services/sentry");
+  await initializeSentryMonitoring(app, router);
+};
+
+const mountApp = async () => {
   markRouteNavigationStart();
   router.beforeEach((_to, _from, next) => {
     markRouteNavigationStart();
@@ -163,6 +171,7 @@ const mountApp = () => {
   });
 
   const app = createApp(App);
+  await initializeSentry(app);
   app.use(router);
   app.mount("#app");
   captureInitialPerfMetrics();
@@ -184,7 +193,7 @@ const bootstrap = async () => {
     if (!isE2ETestMode && isPublicBootstrapPath()) {
       clearAuthState(true);
     }
-    mountApp();
+    await mountApp();
     void initializeAuth();
     if (consumedDistrictHandoff) {
       void touchTenantAdminSession().catch(() => {
@@ -199,7 +208,7 @@ const bootstrap = async () => {
       // Best-effort session registration after district handoff.
     });
   }
-  mountApp();
+  await mountApp();
 };
 
 bootstrap();

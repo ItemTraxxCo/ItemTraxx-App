@@ -15,7 +15,7 @@ They are intended to:
 
 - provide a repeatable deploy path
 - centralize deploy credentials in GitHub secrets
-- allow deploys without any Dennis-specific local path
+- allow deploys without any single-developer local path
 - keep a normal audit trail in GitHub Actions
 
 ## 2. Required GitHub Secrets
@@ -57,11 +57,11 @@ If only `SLACK_WEBHOOK_URL` is configured:
 
 Supabase functions workflow:
 
-- `/Users/dennisfrenkel/Documents/ItemTraxx/itemtraxx-code/.github/workflows/deploy-supabase-functions.yml`
+- `.github/workflows/deploy-supabase-functions.yml`
 
 Cloudflare worker workflow:
 
-- `/Users/dennisfrenkel/Documents/ItemTraxx/itemtraxx-code/.github/workflows/deploy-cloudflare-worker.yml`
+- `.github/workflows/deploy-cloudflare-worker.yml`
 
 ## 4. When These Workflows Run Automatically
 
@@ -305,7 +305,7 @@ npm run deploy:supabase:functions -- tenant-login login-notify
 npm run deploy:cloudflare:worker
 ```
 
-These do not depend on `/Users/dennisfrenkel`.
+These do not depend on any single developer home directory.
 
 ## 12. Recommended First Verification
 

@@ -10,9 +10,9 @@ Use the super admin tenant management page:
 
 The create flow is handled by:
 
-- `/Users/dennisfrenkel/Documents/ItemTraxx/itemtraxx-code/src/pages/super/Tenants.vue`
-- `/Users/dennisfrenkel/Documents/ItemTraxx/itemtraxx-code/src/services/superTenantService.ts`
-- `/Users/dennisfrenkel/Documents/ItemTraxx/itemtraxx-code/supabase/functions/super-tenant-mutate/index.ts`
+- `src/pages/super/Tenants.vue`
+- `src/services/superTenantService.ts`
+- `supabase/functions/super-tenant-mutate/index.ts`
 
 Backend action:
 

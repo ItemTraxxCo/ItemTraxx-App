@@ -24,6 +24,7 @@
     "deploy:cloudflare:worker": "bash ./scripts/deploy-cloudflare-worker.sh"
   },
   "dependencies": {
+    "@sentry/vue": "^10.45.0",
     "@supabase/supabase-js": "^2.99.3",
     "@vercel/analytics": "^2.0.1",
     "@vercel/speed-insights": "^2.0.0",

@@ -78,7 +78,7 @@ ItemTraxx Co is not responsible for vulnerabilities introduced by third-party so
 ## 7. Contact
 For security issues or concerns, contact:
 
-**ItemTraxx Co**  
+Contact Support Via Website: [itemtraxx.com/contact-support](https://itemtraxx.com/contact-support)
 Email: support@itemtraxx.com
 
 ---

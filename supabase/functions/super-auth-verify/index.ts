@@ -312,7 +312,7 @@ serve(async (req) => {
         .single();
 
       if (profile?.role !== "super_admin") {
-        return jsonResponse(403, { error: "Access denied" });
+        return jsonResponse(401, { error: "Invalid credentials" });
       }
 
       const recipientEmail = profile.auth_email ?? signedInUser.email ?? "";

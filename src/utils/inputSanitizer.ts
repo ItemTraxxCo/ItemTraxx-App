@@ -2,6 +2,7 @@ type SanitizeOptions = {
   maxLen: number;
 };
 
+// UX-only input shaping for obvious formatting mistakes. Security enforcement must happen server-side.
 const blockedPattern =
   /(\bselect\b|\binsert\b|\bupdate\b|\bdelete\b|\bdrop\b|\btruncate\b|\balter\b|\bcreate\b|--|;|\/\*|\*\/)/i;
 

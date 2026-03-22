@@ -43,6 +43,10 @@ const attachE2EControls = () => {
     return;
   }
 
+  if (import.meta.env.PROD) {
+    throw new Error("VITE_E2E_TEST_UTILS cannot be enabled in production.");
+  }
+
   window.__itemtraxxTest = {
     setTenantUserSession(tenantId = "tenant-e2e") {
       setAuthStateFromBackend({

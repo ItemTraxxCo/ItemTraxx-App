@@ -305,7 +305,7 @@ serve(async (req) => {
         (role !== "tenant_admin" && role !== "district_admin") ||
         profile?.is_active === false
       ) {
-        return jsonResponse(403, { error: "Access denied" }, headers);
+        return jsonResponse(401, { error: "Invalid credentials" }, headers);
       }
 
       const resolvedDistrictSlug = await resolveDistrictSlugForProfile(profile ?? null);

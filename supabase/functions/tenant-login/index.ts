@@ -117,6 +117,7 @@ const isLocalhostMaintenanceBypassRequest = (req: Request) => {
 };
 
 const resolveAikidoBypassConfig = () => {
+  const environment = (Deno.env.get("ITX_ENVIRONMENT") ?? "").trim().toLowerCase();
   const bypassEnabled =
     (Deno.env.get("ITX_AIKIDO_TURNSTILE_BYPASS_ENABLED") ?? "").toLowerCase() ===
     "true";
@@ -129,12 +130,17 @@ const resolveAikidoBypassConfig = () => {
   const userAgentNeedle = (Deno.env.get("ITX_AIKIDO_USER_AGENT_NEEDLE") ?? "")
     .trim()
     .toLowerCase();
-  return { bypassEnabled, allowedIps, userAgentNeedle };
+  const bypassEnvironmentAllowed =
+    environment === "development" || environment === "staging";
+  return { bypassEnabled, allowedIps, userAgentNeedle, bypassEnvironmentAllowed };
 };
 
 const isAikidoTurnstileBypassRequest = (req: Request) => {
-  const { bypassEnabled, allowedIps, userAgentNeedle } = resolveAikidoBypassConfig();
-  if (!bypassEnabled || !allowedIps.size || !userAgentNeedle) return false;
+  const { bypassEnabled, allowedIps, userAgentNeedle, bypassEnvironmentAllowed } =
+    resolveAikidoBypassConfig();
+  if (!bypassEnabled || !bypassEnvironmentAllowed || !allowedIps.size || !userAgentNeedle) {
+    return false;
+  }
 
   const clientIp = resolveClientIp(req);
   if (!clientIp || !allowedIps.has(clientIp)) return false;

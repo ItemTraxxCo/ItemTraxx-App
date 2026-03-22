@@ -2,7 +2,7 @@
 
 Last updated: 2026-03-10 (year-month-day)
 
-**ItemTraxx** is a cloud-based inventory, checkout, and administrative control platform built for schools, districts, organizations, and individual operators. It supports root-domain access on `itemtraxx.com`, district-routed workspaces on `*.app.itemtraxx.com`, and role-based admin tooling across tenant, district, and super-admin surfaces.
+**ItemTraxx** is a cloud-based inventory, checkout, and administrative control platform built for schools, districts, organizations, and individual operators. It supports root-domain access on `itemtraxx.com`, custom-routed workspaces on `*.app.itemtraxx.com`, and role-based admin tooling across user, admin, and district surfacing.
 
 ---
 
@@ -19,13 +19,13 @@ ItemTraxx is designed to manage real-world gear and inventory workflows without 
 ---
 
 ## 2. Core Capabilities
-- **Checkout and Return:** Fast barcode-based transaction flows with offline-aware handling
-- **Inventory Management:** Track active, archived, lost, damaged, and returned assets
-- **Student and User Management:** Maintain student rosters, admin access, and tenant-level controls
-- **District Separation:** Route users to district-specific workspaces on `*.app.itemtraxx.com` when applicable
-- **Reporting and Auditability:** Usage reports, audit logs, and operational history for admins
-- **Support and Intake Flows:** Built-in sales, demo, and support submission forms with styled transactional emails
-- **Plan Support:** District, organization, and individual pricing structures reflected on the pricing page
+- **Checkout and Return:** Fast barcode-based transaction flows with offline-aware handling for an uninterrupted experience
+- **Inventory Management:** Track active, archived, lost, damaged, and returned assets/items with full transparency 
+- **Student and User Management:** Maintain borrower rosters, admin access, and tenant-level controls
+- **Custom Separation:** Route users to custom-specific workspaces on `*.app.itemtraxx.com` when applicable
+- **Reporting and Auditability:** Usage reports, audit logs, and operational history for admins 
+- **Support and Intake Flows:** Built-in sales, demo, and support submission forms with styled transactional emails for maximizing communication
+- **Plan Support:** School, organization, and individual pricing structures reflected on the pricing page
 
 ---
 
@@ -33,18 +33,17 @@ ItemTraxx is designed to manage real-world gear and inventory workflows without 
 ItemTraxx currently supports multiple operating roles:
 
 - **Tenant Admin:** Manages inventory, students, settings, and tenant reporting
-- **District Admin:** Oversees district-linked tenants and district-level operations
-- **Super Admin:** Manages districts, tenants, admins, plans, and platform controls
+- **District Admin:** Oversees district-linked tenants and district-level operations (indev)
 - **Individual / Root-Domain Accounts:** Non-district usage on `itemtraxx.com` without district routing
 
 ---
 
 ## 4. Tech Stack
-- **Frontend:** Vue 3, Vite, TypeScript, scoped CSS
-- **Backend:** Supabase (PostgreSQL, Auth, Edge Functions)
-- **Edge and Security:** Cloudflare Turnstile, Cloudflare Worker edge proxy, CSP/security headers
+- **Frontend:** Vue 3, Vite, TypeScript, scoped CSS, and HTML
+- **Backend:** Supabase (PostgreSQL, Auth, Edge Functions) on AWS
+- **Edge and Security:** Cloudflare Turnstile, Cloudflare Worker edge proxy, CSP/security headers, Cloudflare DNS
 - **Hosting and Delivery:** Vercel, GitHub
-- **Observability:** Vercel Web Analytics, Vercel Speed Insights
+- **Observability:** Vercel Web Analytics, Vercel Speed Insights, Sentry Error Monitoring, Google Analytics
 
 ---
 
@@ -66,15 +65,15 @@ Primary documentation index:
 - [`LICENSE.md`](LICENSE.md) — License and ownership
 - [`PRIVACY.md`](PRIVACY.md) — Privacy policy
 - [`SECURITY.md`](SECURITY.md) — Security reporting guidance
-- [`TERMS.md`](TERMS.md) — Pointer to the live legal terms
+- [`TERMS.md`](TERMS.md) — Pointer to legal terms of use
 - Live legal hub: [itemtraxx.com/legal](https://itemtraxx.com/legal)
 
 ---
 
 ## 7. Support
-- Website: [itemtraxx.com](https://itemtraxx.com)
-- Legal: [itemtraxx.com/legal](https://itemtraxx.com/legal)
-- Support: `support@itemtraxx.com`
+- Contact Support Via Website: [itemtraxx.com/contact-support](https://itemtraxx.com/contact-support)
+- Legal and Terms: [itemtraxx.com/legal](https://itemtraxx.com/legal)
+- Support Email: `support@itemtraxx.com`
 
 ---
 
@@ -84,3 +83,4 @@ This repository contains both the current production-facing surfaces and preserv
 ---
 
 **© 2026 ItemTraxx Co. All rights reserved.**
+Empowering organizations with secure and efficient asset management.

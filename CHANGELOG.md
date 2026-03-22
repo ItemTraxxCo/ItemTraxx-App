@@ -16,13 +16,6 @@ Changes are dated based on the default timezone: America/Los_Angeles
 - [PRIVACY.md](PRIVACY.md) – Privacy policy and data handling
 - [SECURITY.md](SECURITY.md) – Security reporting and guidelines
 
----
-
-## Release Tags
-- `v0.1.0-beta` — Initial frontend beta release and core tenant/admin workflows.
-- `v0.2.0-beta` — Security hardening, proxy/Turnstile rollout, analytics, and admin UX stabilization.
-- `v0.3.0-beta` — Super admin operations expansion, broadcast/status tooling, and advanced tenant controls.
-- `v0.4.0-beta` — Identity hardening, tenant-side UX improvements, and CodeQL security fixes.
 
 ---
 
@@ -418,9 +411,6 @@ Changes are dated based on the default timezone: America/Los_Angeles
 
 - Fixed edge proxy to allow Vercel preview origins for deploy preview compatibility.
 - Updated forgot-password reset email instructions to include support contact information.
-- Improved checkout onboarding and auth UI refinements.
-- Fixed sales request submission by updating Supabase dependencies and addressing dependency conflicts.
-- Performed dependency maintenance update (npm and yarn group with 4 updates).
 
 ---
 
@@ -432,6 +422,51 @@ Changes are dated based on the default timezone: America/Los_Angeles
 - Implemented immediate redirect on home mount for already-logged-in users.
 - Added performance telemetry and RUM (Real User Monitoring) ingestion documentation.
 - Updated `.gitignore` to exclude system-generated files and artifacts.
+
+---
+
+### 3/19/2026 Development Update
+
+- Completed a production security remediation pass:
+  - enforced server-side Turnstile validation on privileged auth paths
+  - removed raw token persistence from district handoff flows
+  - reviewed and corrected production auth settings, DB grants/policies, and storage ACLs
+  - removed an orphaned remote `create-tenant` edge function
+  - completed live validation of the remediated findings
+- Added an operations maintenance checklist runbook for recurring DevOps and security hygiene.
+
+---
+
+### 3/20/2026 Development Update
+
+- Upgraded GitHub Actions Slack notifications:
+  - added live run start/finish status reporting
+  - matched deployment-style colored status attachments in Slack
+  - added webhook fallback when bot-token posting is unavailable
+- Pinned third-party GitHub Actions to immutable commit SHAs for CI supply-chain hardening.
+- Expanded developer onboarding docs:
+  - added a Windows/WSL2 onboarding guide
+  - documented the personal dev-branch workflow (`dev/<github-username>`)
+
+---
+
+### 3/21/2026 Development Update
+
+- Added Sentry monitoring with environment-driven frontend configuration.
+- Added privacy-safe Sentry session replay for enhanced error monitoring
+- Lazy-loaded Sentry bootstrap and Replay integration to preserve frontend bundle budgets and keep CI green.
+- Updated public/login UX:
+  - added app version display to the landing-page footer
+  - added a compact-height `/login` back button when the story panel is hidden
+  - hid the top-right `Log Out User` action on `/login`
+  - disabled and greyed the `Sign in` button until credentials and Turnstile are ready, and kept it disabled during submit
+- Applied small public-page copy/navigation refinements on Contact Sales, Contact Support, and the landing page.
+- Completed checkout onboarding and auth UI refinements.
+- Fixed sales request submission by updating Supabase dependencies and addressing dependency conflicts.
+- Performed dependency maintenance update (npm and yarn group with 4 updates).
+- Adjusted status label on org readme.md file
+- Performed routine documentation updates
+
 
 ---
 

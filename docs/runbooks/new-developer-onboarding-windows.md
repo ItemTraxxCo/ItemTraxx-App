@@ -354,7 +354,7 @@ npm run deploy:supabase:functions
 npm run deploy:cloudflare:worker
 ```
 
-These do not depend on Dennis-specific local paths.
+These do not depend on any single developer local path.
 
 ## 16. Windows-Specific Notes
 

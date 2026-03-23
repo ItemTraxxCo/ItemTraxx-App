@@ -1,5 +1,5 @@
 import { execSync } from "node:child_process";
-import { defineConfig } from "vite";
+import { defineConfig, loadEnv } from "vite";
 import vue from "@vitejs/plugin-vue";
 
 const VERSION_REPO_URL = "https://github.com/ItemTraxxCo/ItemTraxx-App";
@@ -25,25 +25,37 @@ const gitCommit = (() => {
 })();
 
 // https://vite.dev/config/
-export default defineConfig({
-  plugins: [vue()],
-  build: {
-    rollupOptions: {
-      output: {
-        manualChunks(id) {
-          if (id.includes("node_modules")) {
-            if (id.includes("@supabase/supabase-js")) return "vendor-supabase";
-            if (id.includes("vue") || id.includes("vue-router")) return "vendor-vue";
-            if (id.includes("jspdf-autotable")) return "vendor-jspdf-autotable";
-            if (id.includes("jspdf")) return "vendor-jspdf";
-            if (id.includes("jsbarcode")) return "vendor-jsbarcode";
-          }
-          return undefined;
+export default defineConfig(({ mode, command }) => {
+  const env = loadEnv(mode, process.cwd(), "");
+
+  if (
+    command === "build" &&
+    mode === "production" &&
+    env.VITE_E2E_TEST_UTILS === "true"
+  ) {
+    throw new Error("VITE_E2E_TEST_UTILS cannot be enabled for production builds.");
+  }
+
+  return {
+    plugins: [vue()],
+    build: {
+      rollupOptions: {
+        output: {
+          manualChunks(id) {
+            if (id.includes("node_modules")) {
+              if (id.includes("@supabase/supabase-js")) return "vendor-supabase";
+              if (id.includes("vue") || id.includes("vue-router")) return "vendor-vue";
+              if (id.includes("jspdf-autotable")) return "vendor-jspdf-autotable";
+              if (id.includes("jspdf")) return "vendor-jspdf";
+              if (id.includes("jsbarcode")) return "vendor-jsbarcode";
+            }
+            return undefined;
+          },
         },
       },
     },
-  },
-  define: {
-    "import.meta.env.VITE_GIT_COMMIT": JSON.stringify(gitCommit),
-  },
+    define: {
+      "import.meta.env.VITE_GIT_COMMIT": JSON.stringify(gitCommit),
+    },
+  };
 });

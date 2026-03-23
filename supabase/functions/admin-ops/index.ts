@@ -352,7 +352,12 @@ serve(async (req) => {
 
     if (profile.role === "tenant_admin" && !isSessionAction) {
       const activeSession = await findActiveSession();
-      if (!activeSession.relationMissing && !activeSession.exists) {
+      if (activeSession.relationMissing) {
+        return jsonResponse(503, {
+          error: "Session controls unavailable. Run latest SQL setup.",
+        });
+      }
+      if (!activeSession.exists) {
         return jsonResponse(401, { error: "Session revoked" });
       }
     }
@@ -730,7 +735,7 @@ serve(async (req) => {
       }
       const touch = await touchCurrentSession();
       if (touch.relationMissing) {
-        return jsonResponse(400, {
+        return jsonResponse(503, {
           error: "Session controls unavailable. Run latest SQL setup.",
         });
       }
@@ -749,7 +754,7 @@ serve(async (req) => {
       }
       const activeSession = await findActiveSession();
       if (activeSession.relationMissing) {
-        return jsonResponse(400, {
+        return jsonResponse(503, {
           error: "Session controls unavailable. Run latest SQL setup.",
         });
       }

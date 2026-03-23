@@ -14,14 +14,14 @@ This is the quick procedure to enable or disable the production kill switch.
 1. Set Supabase function secret to `true`:
 
 ```bash
-cd /Users/dennisfrenkel/Documents/ItemTraxx/itemtraxx-code
+cd "$(git rev-parse --show-toplevel)"
 supabase secrets set ITX_ITEMTRAXX_KILLSWITCH_ENABLED=true
 ```
 
 2. Deploy Cloudflare worker with kill switch enabled:
 
 ```bash
-cd /Users/dennisfrenkel/Documents/ItemTraxx/itemtraxx-code/cloudflare/edge-proxy
+cd "$(git rev-parse --show-toplevel)/cloudflare/edge-proxy"
 wrangler deploy --var ITX_ITEMTRAXX_KILLSWITCH_ENABLED:true
 ```
 
@@ -30,14 +30,14 @@ wrangler deploy --var ITX_ITEMTRAXX_KILLSWITCH_ENABLED:true
 1. Set Supabase function secret to `false`:
 
 ```bash
-cd /Users/dennisfrenkel/Documents/ItemTraxx/itemtraxx-code
+cd "$(git rev-parse --show-toplevel)"
 supabase secrets set ITX_ITEMTRAXX_KILLSWITCH_ENABLED=false
 ```
 
 2. Deploy Cloudflare worker with kill switch disabled:
 
 ```bash
-cd /Users/dennisfrenkel/Documents/ItemTraxx/itemtraxx-code/cloudflare/edge-proxy
+cd "$(git rev-parse --show-toplevel)/cloudflare/edge-proxy"
 wrangler deploy --var ITX_ITEMTRAXX_KILLSWITCH_ENABLED:false
 ```
 

@@ -16,7 +16,7 @@ By the end of this onboarding, the developer will be able to:
 - build and validate the repo locally
 - understand the current branch and pull request workflow
 - understand how automatic deploys work
-- manually deploy Supabase functions and the Cloudflare worker from any machine without using a Dennis-specific home-directory path
+- manually deploy Supabase functions and the Cloudflare worker from any machine without using a machine-specific home-directory path
 
 ## 2. Access Checklist Before Touching The Repo
 
@@ -457,7 +457,7 @@ If a deploy workflow fails because a secret is missing, the fix is in GitHub rep
 
 ## 14. Manual Deploys From Any Machine
 
-These commands are repo-relative. They do not depend on `/Users/dennisfrenkel` or any other single developer home directory.
+These commands are repo-relative. They do not depend on any single developer home directory.
 
 ### Manual Supabase function deploy
 

@@ -294,6 +294,10 @@ verify_jwt = false
 # Public support form endpoint with turnstile/rate-limit controls.
 verify_jwt = false
 
+[functions.client-error-report]
+# Public client-side fatal error reporting endpoint with rate-limit controls.
+verify_jwt = false
+
 [functions.job-worker]
 # Uses ITX_JOB_WORKER_SECRET header auth, not Supabase JWT auth.
 verify_jwt = false

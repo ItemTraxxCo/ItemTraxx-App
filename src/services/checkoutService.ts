@@ -2,6 +2,7 @@ import { supabase } from "./supabaseClient";
 import { invokeEdgeFunction } from "./edgeFunctionClient";
 import { withTimeout } from "./asyncUtils";
 import { getFreshAccessToken } from "./sessionAccessToken";
+import { edgeFunctionError } from "./appErrors";
 
 type CheckoutReturnPayload = {
   student_id: string;
@@ -81,7 +82,7 @@ const executeCheckoutReturn = async (payload: CheckoutReturnPayload) => {
     if (result.status === 429) {
       throw new Error("Rate limit exceeded, please try again in a minute.");
     }
-    throw new Error(result.error || "Request failed.");
+    throw edgeFunctionError(result, "Request failed.");
   }
 };
 

@@ -1,6 +1,7 @@
 import { invokeEdgeFunction } from "./edgeFunctionClient";
 import { getFreshAccessToken } from "./sessionAccessToken";
 import type { EdgeEnvelope, SuperTenantAction } from "../types/edgeContracts";
+import { edgeFunctionError } from "./appErrors";
 
 export type SuperTenant = {
   id: string;
@@ -174,7 +175,7 @@ const callSuperTenant = async <TData>(payload: SuperTenantRequest) => {
   );
 
   if (!result.ok) {
-    throw new Error(result.error || "Super tenant request failed.");
+    throw edgeFunctionError(result, "Super tenant request failed.");
   }
 
   return result.data?.data as TData;

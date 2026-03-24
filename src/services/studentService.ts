@@ -1,6 +1,7 @@
 import { supabase } from "./supabaseClient";
 import { invokeEdgeFunction } from "./edgeFunctionClient";
 import { getAuthState } from "../store/authState";
+import { edgeFunctionError, unauthorizedError, missingContextError } from "./appErrors";
 
 export type StudentItem = {
   id: string;
@@ -28,7 +29,7 @@ const getAccessToken = async () => {
   const { data: sessionData } = await supabase.auth.getSession();
   const session = sessionData.session ?? null;
   if (!session?.access_token) {
-    throw new Error("Unauthorized.");
+    throw unauthorizedError();
   }
   return session.access_token;
 };
@@ -36,7 +37,7 @@ const getAccessToken = async () => {
 const getTenantContextId = () => {
   const tenantId = getAuthState().tenantContextId;
   if (!tenantId) {
-    throw new Error("Missing tenant context.");
+    throw missingContextError("Missing tenant context.");
   }
   return tenantId;
 };
@@ -73,7 +74,7 @@ export const fetchDeletedStudents = async () => {
   );
 
   if (!result.ok) {
-    throw new Error(result.error || "Unable to load archived students.");
+    throw edgeFunctionError(result, "Unable to load archived students.");
   }
 
   return (result.data?.data ?? []) as StudentItem[];
@@ -103,7 +104,7 @@ export const createStudent = async (payload: {
   );
 
   if (!result.ok) {
-    throw new Error(result.error || "Unable to create student.");
+    throw edgeFunctionError(result, "Unable to create student.");
   }
 
   return result.data?.data as StudentItem;
@@ -131,7 +132,7 @@ export const bulkCreateStudents = async (
   });
 
   if (!result.ok) {
-    throw new Error(result.error || "Unable to import students.");
+    throw edgeFunctionError(result, "Unable to import students.");
   }
 
   return result.data?.data as {
@@ -155,7 +156,7 @@ export const deleteStudent = async (id: string) => {
   });
 
   if (!result.ok) {
-    throw new Error(result.error || "Unable to remove student.");
+    throw edgeFunctionError(result, "Unable to remove student.");
   }
 };
 
@@ -175,7 +176,7 @@ export const restoreStudent = async (id: string) => {
   );
 
   if (!result.ok) {
-    throw new Error(result.error || "Unable to restore student.");
+    throw edgeFunctionError(result, "Unable to restore student.");
   }
 
   return result.data?.data as StudentItem;

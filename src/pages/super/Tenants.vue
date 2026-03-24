@@ -278,8 +278,12 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
-import { RouterLink } from "vue-router";
+import { RouterLink, useRouter } from "vue-router";
 import StepUpModal from "../../components/StepUpModal.vue";
+import {
+  handleSuperAdminUnauthorized,
+  isUnauthorizedError,
+} from "../../services/authErrorHandling";
 import { setTenantPolicy } from "../../services/superOpsService";
 import {
   createTenant,
@@ -294,6 +298,7 @@ import {
   type SuperTenant,
 } from "../../services/superTenantService";
 
+const router = useRouter();
 const tenants = ref<SuperTenant[]>([]);
 const districts = ref<SuperDistrict[]>([]);
 const isLoading = ref(false);
@@ -431,6 +436,11 @@ const loadTenants = async () => {
         : fromTenantStatusLabel(statusFilterLabel.value);
     tenants.value = await listTenants(search.value.trim(), status);
   } catch (err) {
+    if (isUnauthorizedError(err)) {
+      error.value = "Your session expired. Sign in again.";
+      await handleSuperAdminUnauthorized(router);
+      return;
+    }
     error.value = err instanceof Error ? err.message : "Unable to load tenants.";
   } finally {
     isLoading.value = false;

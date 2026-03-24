@@ -1,4 +1,5 @@
 import { invokeEdgeFunction } from "./edgeFunctionClient";
+import { edgeFunctionError } from "./appErrors";
 
 type ContactSalesPayload = {
   plan:
@@ -37,7 +38,7 @@ export const submitContactSalesLead = async (payload: ContactSalesPayload) => {
   );
 
   if (!result.ok || !result.data?.ok) {
-    throw new Error(result.error || result.data?.error || "Unable to send sales request.");
+    throw edgeFunctionError(result, result.data?.error || "Unable to send sales request.");
   }
 
   return result.data.data ?? null;

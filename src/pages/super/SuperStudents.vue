@@ -86,13 +86,18 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
-import { RouterLink } from "vue-router";
+import { RouterLink, useRouter } from "vue-router";
 import StepUpModal from "../../components/StepUpModal.vue";
+import {
+  handleSuperAdminUnauthorized,
+  isUnauthorizedError,
+} from "../../services/authErrorHandling";
 import { createSuperStudent, deleteSuperStudent, listSuperStudents, type SuperStudentItem } from "../../services/superStudentService";
 import { listTenants, type SuperTenant } from "../../services/superTenantService";
 import { exportRowsToCsv, exportRowsToPdf } from "../../services/exportService";
 import { generateStudentIdentity } from "../../utils/studentIdentity";
 
+const router = useRouter();
 const tenants = ref<SuperTenant[]>([]);
 const students = ref<SuperStudentItem[]>([]);
 const tenantFilter = ref("all");
@@ -133,7 +138,16 @@ const showToast = (title: string, message: string) => {
 };
 
 const loadTenants = async () => {
-  tenants.value = await listTenants("", "all");
+  try {
+    tenants.value = await listTenants("", "all");
+  } catch (err) {
+    if (isUnauthorizedError(err)) {
+      error.value = "Your session expired. Sign in again.";
+      await handleSuperAdminUnauthorized(router);
+      return;
+    }
+    throw err;
+  }
 };
 
 const loadStudents = async () => {
@@ -142,6 +156,11 @@ const loadStudents = async () => {
   try {
     students.value = await listSuperStudents(tenantFilter.value, search.value.trim());
   } catch (err) {
+    if (isUnauthorizedError(err)) {
+      error.value = "Your session expired. Sign in again.";
+      await handleSuperAdminUnauthorized(router);
+      return;
+    }
     error.value = err instanceof Error ? err.message : "Unable to load students.";
   } finally {
     isLoading.value = false;
@@ -239,10 +258,12 @@ const confirmDelete = async (payload: { superPassword: string; confirmPhrase: st
   }
 };
 
-onMounted(async () => {
+onMounted(() => {
   regenerateIdentity();
-  await loadTenants();
-  await loadStudents();
+  void (async () => {
+    await loadTenants();
+    await loadStudents();
+  })();
 });
 </script>
 

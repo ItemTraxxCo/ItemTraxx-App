@@ -228,6 +228,7 @@
       @close="handleOnboardingClose"
       @complete="handleOnboardingComplete"
     />
+    <FatalErrorToast />
     <Analytics v-if="showTelemetry" />
     <SpeedInsights v-if="showTelemetry" />
   </div>
@@ -253,11 +254,20 @@ import { buildDistrictAppUrl, lookupDistrictById, resolveDistrictHost } from "./
 import { fetchSystemStatus } from "./services/systemStatusService";
 import { clearAdminVerification, getAuthState } from "./store/authState";
 import { getDistrictState } from "./store/districtState";
-import NotificationBell from "./components/NotificationBell.vue";
 
 const Analytics = defineAsyncComponent(async () => {
   const module = await import("@vercel/analytics/vue");
   return module.Analytics;
+});
+
+const NotificationBell = defineAsyncComponent(async () => {
+  const module = await import("./components/NotificationBell.vue");
+  return module.default;
+});
+
+const FatalErrorToast = defineAsyncComponent(async () => {
+  const module = await import("./components/FatalErrorToast.vue");
+  return module.default;
 });
 
 const SpeedInsights = defineAsyncComponent(async () => {

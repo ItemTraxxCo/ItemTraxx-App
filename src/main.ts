@@ -176,6 +176,12 @@ const mountApp = async () => {
 
   const app = createApp(App);
   await initializeSentry(app);
+  const { installClientDiagnostics } = await import("./services/clientDiagnostics");
+  installClientDiagnostics();
+  const { installGlobalErrorHandling } = await import("./services/globalErrorHandling");
+  installGlobalErrorHandling(app);
+  const { installAppErrorRecovery } = await import("./services/appErrorRecovery");
+  installAppErrorRecovery(router);
   app.use(router);
   app.mount("#app");
   captureInitialPerfMetrics();

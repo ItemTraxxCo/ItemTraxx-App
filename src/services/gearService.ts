@@ -1,6 +1,7 @@
 import { supabase } from "./supabaseClient";
 import { invokeEdgeFunction } from "./edgeFunctionClient";
 import { getAuthState } from "../store/authState";
+import { edgeFunctionError, unauthorizedError, missingContextError } from "./appErrors";
 
 export type GearItem = {
   id: string;
@@ -37,7 +38,7 @@ const getAccessToken = async () => {
   const { data: sessionData } = await supabase.auth.getSession();
   const session = sessionData.session ?? null;
   if (!session?.access_token) {
-    throw new Error("Unauthorized.");
+    throw unauthorizedError();
   }
   return session.access_token;
 };
@@ -45,7 +46,7 @@ const getAccessToken = async () => {
 const getTenantContextId = () => {
   const tenantId = getAuthState().tenantContextId;
   if (!tenantId) {
-    throw new Error("Missing tenant context.");
+    throw missingContextError("Missing tenant context.");
   }
   return tenantId;
 };
@@ -79,7 +80,7 @@ export const fetchDeletedGear = async () => {
   });
 
   if (!result.ok) {
-    throw new Error(result.error || "Unable to load archived items.");
+    throw edgeFunctionError(result, "Unable to load archived items.");
   }
 
   return (result.data?.data ?? []) as GearItem[];
@@ -112,7 +113,7 @@ export const createGear = async (payload: {
   });
 
   if (!result.ok) {
-    throw new Error(result.error || "Unable to create item.");
+    throw edgeFunctionError(result, "Unable to create item.");
   }
 
   return result.data?.data as GearItem;
@@ -143,7 +144,7 @@ export const updateGear = async (payload: {
   });
 
   if (!result.ok) {
-    throw new Error(result.error || "Unable to update item.");
+    throw edgeFunctionError(result, "Unable to update item.");
   }
 
   return result.data?.data as GearItem;
@@ -162,7 +163,7 @@ export const deleteGear = async (id: string) => {
   });
 
   if (!result.ok) {
-    throw new Error(result.error || "Unable to remove item.");
+    throw edgeFunctionError(result, "Unable to remove item.");
   }
 };
 
@@ -179,7 +180,7 @@ export const restoreGear = async (id: string) => {
   });
 
   if (!result.ok) {
-    throw new Error(result.error || "Unable to restore item.");
+    throw edgeFunctionError(result, "Unable to restore item.");
   }
 
   return result.data?.data as GearItem;

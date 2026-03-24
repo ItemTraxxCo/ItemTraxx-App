@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-03-11T05:39:00.289Z",
+  "generated_at": "2026-03-24T00:44:00.134Z",
   "source": {
     "contracts": "/src/types/edgeContracts.ts",
     "validators": "/src/types/edgeSchemas.mjs"
@@ -1498,9 +1498,12 @@
                 "subscription_plan": {
                   "type": "string",
                   "enum": [
-                    "starter",
-                    "standard",
-                    "enterprise"
+                    "district_core",
+                    "district_growth",
+                    "district_enterprise",
+                    "organization_starter",
+                    "organization_scale",
+                    "organization_enterprise"
                   ]
                 },
                 "billing_status": {
@@ -1574,9 +1577,12 @@
                 "subscription_plan": {
                   "type": "string",
                   "enum": [
-                    "starter",
-                    "standard",
-                    "enterprise"
+                    "district_core",
+                    "district_growth",
+                    "district_enterprise",
+                    "organization_starter",
+                    "organization_scale",
+                    "organization_enterprise"
                   ]
                 },
                 "billing_status": {
@@ -2440,9 +2446,12 @@
                       {
                         "type": "string",
                         "enum": [
-                          "starter",
-                          "standard",
-                          "enterprise"
+                          "district_core",
+                          "district_growth",
+                          "district_enterprise",
+                          "organization_starter",
+                          "organization_scale",
+                          "organization_enterprise"
                         ]
                       },
                       {
@@ -2561,9 +2570,12 @@
                     {
                       "type": "string",
                       "enum": [
-                        "starter",
-                        "standard",
-                        "enterprise"
+                        "district_core",
+                        "district_growth",
+                        "district_enterprise",
+                        "organization_starter",
+                        "organization_scale",
+                        "organization_enterprise"
                       ]
                     },
                     {
@@ -2681,9 +2693,12 @@
                     {
                       "type": "string",
                       "enum": [
-                        "starter",
-                        "standard",
-                        "enterprise"
+                        "district_core",
+                        "district_growth",
+                        "district_enterprise",
+                        "organization_starter",
+                        "organization_scale",
+                        "organization_enterprise"
                       ]
                     },
                     {
@@ -2804,9 +2819,12 @@
                         {
                           "type": "string",
                           "enum": [
-                            "starter",
-                            "standard",
-                            "enterprise"
+                            "district_core",
+                            "district_growth",
+                            "district_enterprise",
+                            "organization_starter",
+                            "organization_scale",
+                            "organization_enterprise"
                           ]
                         },
                         {
@@ -6440,9 +6458,12 @@
                     {
                       "type": "string",
                       "enum": [
-                        "starter",
-                        "standard",
-                        "enterprise"
+                        "district_core",
+                        "district_growth",
+                        "district_enterprise",
+                        "organization_starter",
+                        "organization_scale",
+                        "organization_enterprise"
                       ]
                     },
                     {

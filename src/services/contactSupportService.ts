@@ -1,4 +1,5 @@
 import { invokeEdgeFunction } from "./edgeFunctionClient";
+import { edgeFunctionError } from "./appErrors";
 
 export type ContactSupportPayload = {
   name: string;
@@ -32,7 +33,7 @@ export const submitContactSupportRequest = async (payload: ContactSupportPayload
   );
 
   if (!result.ok || !result.data?.ok) {
-    throw new Error(result.error || result.data?.error || "Unable to send support request.");
+    throw edgeFunctionError(result, result.data?.error || "Unable to send support request.");
   }
 
   return result.data.data ?? null;

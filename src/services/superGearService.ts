@@ -1,7 +1,7 @@
 import { invokeEdgeFunction } from "./edgeFunctionClient";
-import { supabase } from "./supabaseClient";
+import { getFreshAccessToken } from "./sessionAccessToken";
 import type { EdgeEnvelope, SuperGearAction } from "../types/edgeContracts";
-import { edgeFunctionError, unauthorizedError } from "./appErrors";
+import { edgeFunctionError } from "./appErrors";
 
 export type SuperGearItem = {
   id: string;
@@ -18,11 +18,7 @@ type SuperGearRequest = {
   payload: Record<string, unknown>;
 };
 
-const getAccessToken = async () => {
-  const { data, error } = await supabase.auth.getSession();
-  if (error || !data.session?.access_token) throw unauthorizedError();
-  return data.session.access_token;
-};
+const getAccessToken = getFreshAccessToken;
 
 const callSuperGear = async <TData>(payload: SuperGearRequest) => {
   const accessToken = await getAccessToken();

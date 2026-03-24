@@ -1,5 +1,6 @@
 import { invokeEdgeFunction } from "./edgeFunctionClient";
 import { supabase } from "./supabaseClient";
+import { edgeFunctionError, unauthorizedError } from "./appErrors";
 
 export type SuperAuditLog = {
   id: string;
@@ -56,7 +57,7 @@ export type SuperDashboard = {
 const getAccessToken = async () => {
   const { data, error } = await supabase.auth.getSession();
   if (error || !data.session?.access_token) {
-    throw new Error("Unauthorized");
+    throw unauthorizedError();
   }
   return data.session.access_token;
 };
@@ -72,7 +73,7 @@ export const fetchSuperDashboard = async () => {
   );
 
   if (!result.ok) {
-    throw new Error(result.error || "Unable to load super dashboard.");
+    throw edgeFunctionError(result, "Unable to load super dashboard.");
   }
 
   return result.data?.data as SuperDashboard;

@@ -1,5 +1,6 @@
 import { invokeEdgeFunction } from "./edgeFunctionClient";
 import { supabase } from "./supabaseClient";
+import { edgeFunctionError, unauthorizedError } from "./appErrors";
 
 export type DistrictAdminDashboard = {
   district: {
@@ -96,7 +97,7 @@ const getAccessToken = async () => {
 
   const { data, error } = await supabase.auth.getSession();
   if (error || !data.session?.access_token) {
-    throw new Error("Unauthorized");
+    throw unauthorizedError();
   }
   return data.session.access_token;
 };
@@ -112,7 +113,7 @@ export const getDistrictAdminDashboard = async () => {
   );
 
   if (!result.ok) {
-    throw new Error(result.error || "Unable to load district dashboard.");
+    throw edgeFunctionError(result, "Unable to load district dashboard.");
   }
 
   return result.data?.data as DistrictAdminDashboard;
@@ -139,7 +140,7 @@ const callDistrictAdminMutate = async <TData>(payload: DistrictAdminMutateReques
   );
 
   if (!result.ok) {
-    throw new Error(result.error || "District admin request failed.");
+    throw edgeFunctionError(result, "District admin request failed.");
   }
 
   return result.data?.data as TData;

@@ -1,6 +1,7 @@
 import { invokeEdgeFunction } from "./edgeFunctionClient";
 import { getFreshAccessToken } from "./sessionAccessToken";
 import type { EdgeEnvelope, SuperAdminAction } from "../types/edgeContracts";
+import { edgeFunctionError } from "./appErrors";
 
 export type SuperTenantAdmin = {
   id: string;
@@ -33,7 +34,7 @@ const callSuperAdmin = async <TData>(payload: SuperAdminRequest) => {
   );
 
   if (!result.ok) {
-    throw new Error(result.error || "Super admin request failed.");
+    throw edgeFunctionError(result, "Super admin request failed.");
   }
 
   return result.data?.data as TData;

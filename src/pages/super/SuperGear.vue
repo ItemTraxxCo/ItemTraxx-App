@@ -86,12 +86,17 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
-import { RouterLink } from "vue-router";
+import { RouterLink, useRouter } from "vue-router";
 import StepUpModal from "../../components/StepUpModal.vue";
+import {
+  handleSuperAdminUnauthorized,
+  isUnauthorizedError,
+} from "../../services/authErrorHandling";
 import { createSuperGear, deleteSuperGear, listSuperGear, updateSuperGear, type SuperGearItem } from "../../services/superGearService";
 import { listTenants, type SuperTenant } from "../../services/superTenantService";
 import { exportRowsToCsv, exportRowsToPdf } from "../../services/exportService";
 
+const router = useRouter();
 const tenants = ref<SuperTenant[]>([]);
 const gear = ref<SuperGearItem[]>([]);
 const tenantFilter = ref("all");
@@ -138,7 +143,16 @@ const showToast = (title: string, message: string) => {
 };
 
 const loadTenants = async () => {
-  tenants.value = await listTenants("", "all");
+  try {
+    tenants.value = await listTenants("", "all");
+  } catch (err) {
+    if (isUnauthorizedError(err)) {
+      error.value = "Your session expired. Sign in again.";
+      await handleSuperAdminUnauthorized(router);
+      return;
+    }
+    throw err;
+  }
 };
 
 const loadGear = async () => {
@@ -147,6 +161,11 @@ const loadGear = async () => {
   try {
     gear.value = await listSuperGear(tenantFilter.value, search.value.trim());
   } catch (err) {
+    if (isUnauthorizedError(err)) {
+      error.value = "Your session expired. Sign in again.";
+      await handleSuperAdminUnauthorized(router);
+      return;
+    }
     error.value = err instanceof Error ? err.message : "Unable to load items.";
   } finally {
     isLoading.value = false;
@@ -306,8 +325,10 @@ const confirmStepUp = async (payload: { superPassword: string; confirmPhrase: st
   }
 };
 
-onMounted(async () => {
-  await loadTenants();
-  await loadGear();
+onMounted(() => {
+  void (async () => {
+    await loadTenants();
+    await loadGear();
+  })();
 });
 </script>

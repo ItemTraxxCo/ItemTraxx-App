@@ -1,4 +1,5 @@
 import { supabase } from "./supabaseClient";
+import { unauthorizedError } from "./appErrors";
 
 export const getFreshAccessToken = async () => {
   const refreshed = await supabase.auth.refreshSession();
@@ -9,7 +10,7 @@ export const getFreshAccessToken = async () => {
 
   const { data, error } = await supabase.auth.getSession();
   if (error || !data.session?.access_token) {
-    throw new Error("Unauthorized");
+    throw unauthorizedError();
   }
 
   return data.session.access_token;

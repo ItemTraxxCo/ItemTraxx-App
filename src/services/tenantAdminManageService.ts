@@ -1,6 +1,7 @@
 import { invokeEdgeFunction } from "./edgeFunctionClient";
 import { getFreshAccessToken } from "./sessionAccessToken";
 import type { EdgeEnvelope, TenantAdminManageAction } from "../types/edgeContracts";
+import { edgeFunctionError } from "./appErrors";
 
 export type TenantManagedAdmin = {
   id: string;
@@ -29,7 +30,7 @@ const callTenantAdminManage = async <TData>(payload: TenantAdminManageRequest) =
   );
 
   if (!result.ok) {
-    throw new Error(result.error || "Tenant admin request failed.");
+    throw edgeFunctionError(result, "Tenant admin request failed.");
   }
 
   return result.data?.data as TData;

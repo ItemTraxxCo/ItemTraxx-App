@@ -1,6 +1,7 @@
 import { invokeEdgeFunction } from "./edgeFunctionClient";
 import { supabase } from "./supabaseClient";
 import type { EdgeEnvelope } from "../types/edgeContracts";
+import { edgeFunctionError, unauthorizedError } from "./appErrors";
 
 export type SuperLogEntry = {
   id: string;
@@ -17,7 +18,7 @@ export type SuperLogEntry = {
 
 const getAccessToken = async () => {
   const { data, error } = await supabase.auth.getSession();
-  if (error || !data.session?.access_token) throw new Error("Unauthorized");
+  if (error || !data.session?.access_token) throw unauthorizedError();
   return data.session.access_token;
 };
 
@@ -43,7 +44,7 @@ export const listSuperLogs = async (payload: {
   });
 
   if (!result.ok) {
-    throw new Error(result.error || "Unable to load logs.");
+    throw edgeFunctionError(result, "Unable to load logs.");
   }
 
   return {

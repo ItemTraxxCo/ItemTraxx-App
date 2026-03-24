@@ -52,11 +52,16 @@
 
 <script setup lang="ts">
 import { onMounted, ref } from "vue";
-import { RouterLink } from "vue-router";
+import { RouterLink, useRouter } from "vue-router";
+import {
+  handleSuperAdminUnauthorized,
+  isUnauthorizedError,
+} from "../../services/authErrorHandling";
 import { listSuperLogs, type SuperLogEntry } from "../../services/superLogsService";
 import { listTenants, type SuperTenant } from "../../services/superTenantService";
 import { exportRowsToCsv, exportRowsToPdf } from "../../services/exportService";
 
+const router = useRouter();
 const tenants = ref<SuperTenant[]>([]);
 const rows = ref<SuperLogEntry[]>([]);
 const tenantFilter = ref("all");
@@ -90,7 +95,16 @@ const formatDateTime = (value: string) => {
 };
 
 const loadTenants = async () => {
-  tenants.value = await listTenants("", "all");
+  try {
+    tenants.value = await listTenants("", "all");
+  } catch (err) {
+    if (isUnauthorizedError(err)) {
+      error.value = "Your session expired. Sign in again.";
+      await handleSuperAdminUnauthorized(router);
+      return;
+    }
+    throw err;
+  }
 };
 
 const loadLogs = async () => {
@@ -108,6 +122,11 @@ const loadLogs = async () => {
     });
     rows.value = result.rows;
   } catch (err) {
+    if (isUnauthorizedError(err)) {
+      error.value = "Your session expired. Sign in again.";
+      await handleSuperAdminUnauthorized(router);
+      return;
+    }
     error.value = err instanceof Error ? err.message : "Unable to load logs.";
   } finally {
     isLoading.value = false;
@@ -155,8 +174,10 @@ const exportPdf = async () => {
   })));
 };
 
-onMounted(async () => {
-  await loadTenants();
-  await loadLogs();
+onMounted(() => {
+  void (async () => {
+    await loadTenants();
+    await loadLogs();
+  })();
 });
 </script>

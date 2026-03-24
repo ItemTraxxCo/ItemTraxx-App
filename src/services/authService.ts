@@ -14,6 +14,7 @@ import {
 } from "../store/authState";
 import { getDistrictState } from "../store/districtState";
 import { lookupDistrictById, resolveDistrictHost } from "./districtService";
+import { edgeFunctionError } from "./appErrors";
 
 type ProfileRow = {
   id: string;
@@ -99,7 +100,7 @@ export const resendSuperAdminEmailChallenge = async () => {
   );
 
   if (!result.ok || !result.data?.challenge_started) {
-    throw new Error(result.error || "Unable to send verification code.");
+    throw edgeFunctionError(result, "Unable to send verification code.");
   }
 
   const recipientEmail = result.data.email ?? null;
@@ -119,7 +120,7 @@ export const verifySuperAdminEmailChallenge = async (code: string) => {
   });
 
   if (!result.ok || !result.data?.verified) {
-    throw new Error(result.error || "Unable to verify code.");
+    throw edgeFunctionError(result, "Unable to verify code.");
   }
 
   setSecondaryAuth(true);
@@ -871,7 +872,7 @@ export const superAdminLogin = async (
     !result.data.access_token ||
     !result.data.refresh_token
   ) {
-    throw new Error(result.error || "Unable to send verification code.");
+    throw edgeFunctionError(result, "Unable to send verification code.");
   }
 
   await setSessionFromTokens(result.data.access_token, result.data.refresh_token);

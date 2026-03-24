@@ -2,6 +2,7 @@ import { invokeEdgeFunction } from "./edgeFunctionClient";
 import type { AdminOpsAction, EdgeEnvelope, TenantFeatureFlags } from "../types/edgeContracts";
 import { getOrCreateDeviceSession } from "../utils/deviceSession";
 import { getFreshAccessToken } from "./sessionAccessToken";
+import { edgeFunctionError } from "./appErrors";
 
 export type StatusTrackedItem = {
   id: string;
@@ -131,7 +132,7 @@ const callAdminOps = async <TData>(
   );
 
   if (!result.ok) {
-    throw new Error(result.error || "Request failed.");
+    throw edgeFunctionError(result, "Request failed.");
   }
 
   return result.data?.data as TData;

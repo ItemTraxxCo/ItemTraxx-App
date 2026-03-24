@@ -168,7 +168,11 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
-import { RouterLink } from "vue-router";
+import { RouterLink, useRouter } from "vue-router";
+import {
+  handleSuperAdminUnauthorized,
+  isUnauthorizedError,
+} from "../../services/authErrorHandling";
 import {
   createTenantAdmin,
   listTenantAdmins,
@@ -185,6 +189,7 @@ import {
   type SuperTenant,
 } from "../../services/superTenantService";
 
+const router = useRouter();
 const tenants = ref<SuperTenant[]>([]);
 const districts = ref<SuperDistrict[]>([]);
 const admins = ref<SuperTenantAdmin[]>([]);
@@ -247,7 +252,12 @@ const formatTargetLabel = (target: SuperTenant | SuperDistrict) => {
 const loadTenants = async () => {
   try {
     tenants.value = await listTenants("", "all");
-  } catch {
+  } catch (err) {
+    if (isUnauthorizedError(err)) {
+      error.value = "Your session expired. Sign in again.";
+      await handleSuperAdminUnauthorized(router);
+      return;
+    }
     // Keep page usable even if tenant list fails.
   }
 };

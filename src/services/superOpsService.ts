@@ -1,5 +1,6 @@
 import { invokeEdgeFunction } from "./edgeFunctionClient";
 import { supabase } from "./supabaseClient";
+import { edgeFunctionError, unauthorizedError } from "./appErrors";
 
 export type RuntimeConfigMap = Record<string, unknown>;
 
@@ -201,7 +202,7 @@ const getAccessToken = async () => {
 
   const { data, error } = await supabase.auth.getSession();
   if (error || !data.session?.access_token) {
-    throw new Error("Unauthorized");
+    throw unauthorizedError();
   }
   return data.session.access_token;
 };
@@ -218,7 +219,7 @@ const callSuperOps = async <TData>(payload: SuperOpsRequest) => {
   );
 
   if (!result.ok) {
-    throw new Error(result.error || "Super ops request failed.");
+    throw edgeFunctionError(result, "Super ops request failed.");
   }
 
   return result.data?.data as TData;

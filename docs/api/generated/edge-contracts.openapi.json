@@ -1925,9 +1925,12 @@
                   "subscription_plan": {
                     "type": "string",
                     "enum": [
-                      "starter",
-                      "standard",
-                      "enterprise"
+                      "district_core",
+                      "district_growth",
+                      "district_enterprise",
+                      "organization_starter",
+                      "organization_scale",
+                      "organization_enterprise"
                     ]
                   },
                   "billing_status": {
@@ -2001,9 +2004,12 @@
                   "subscription_plan": {
                     "type": "string",
                     "enum": [
-                      "starter",
-                      "standard",
-                      "enterprise"
+                      "district_core",
+                      "district_growth",
+                      "district_enterprise",
+                      "organization_starter",
+                      "organization_scale",
+                      "organization_enterprise"
                     ]
                   },
                   "billing_status": {
@@ -2867,9 +2873,12 @@
                         {
                           "type": "string",
                           "enum": [
-                            "starter",
-                            "standard",
-                            "enterprise"
+                            "district_core",
+                            "district_growth",
+                            "district_enterprise",
+                            "organization_starter",
+                            "organization_scale",
+                            "organization_enterprise"
                           ]
                         },
                         {
@@ -2988,9 +2997,12 @@
                       {
                         "type": "string",
                         "enum": [
-                          "starter",
-                          "standard",
-                          "enterprise"
+                          "district_core",
+                          "district_growth",
+                          "district_enterprise",
+                          "organization_starter",
+                          "organization_scale",
+                          "organization_enterprise"
                         ]
                       },
                       {
@@ -3108,9 +3120,12 @@
                       {
                         "type": "string",
                         "enum": [
-                          "starter",
-                          "standard",
-                          "enterprise"
+                          "district_core",
+                          "district_growth",
+                          "district_enterprise",
+                          "organization_starter",
+                          "organization_scale",
+                          "organization_enterprise"
                         ]
                       },
                       {
@@ -3231,9 +3246,12 @@
                           {
                             "type": "string",
                             "enum": [
-                              "starter",
-                              "standard",
-                              "enterprise"
+                              "district_core",
+                              "district_growth",
+                              "district_enterprise",
+                              "organization_starter",
+                              "organization_scale",
+                              "organization_enterprise"
                             ]
                           },
                           {
@@ -6867,9 +6885,12 @@
                       {
                         "type": "string",
                         "enum": [
-                          "starter",
-                          "standard",
-                          "enterprise"
+                          "district_core",
+                          "district_growth",
+                          "district_enterprise",
+                          "organization_starter",
+                          "organization_scale",
+                          "organization_enterprise"
                         ]
                       },
                       {

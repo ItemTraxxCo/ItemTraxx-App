@@ -12,6 +12,7 @@ ROOT = Path(__file__).resolve().parents[1]
 SUPABASE_DIR = ROOT / "supabase"
 FUNCTIONS_DIR = SUPABASE_DIR / "functions"
 CONFIG_PATH = SUPABASE_DIR / "config.toml"
+LOCAL_SUPABASE_CLI = ROOT / "node_modules" / ".bin" / "supabase"
 SECTION_RE = re.compile(r"^\[functions\.([A-Za-z0-9_-]+)\]\s*$")
 VERIFY_FALSE_RE = re.compile(r"^verify_jwt\s*=\s*false\s*$", re.IGNORECASE)
 
@@ -51,6 +52,12 @@ def run(cmd: list[str], cwd: Path) -> None:
         raise SystemExit(completed.returncode)
 
 
+def supabase_cli() -> str:
+    if LOCAL_SUPABASE_CLI.exists():
+        return str(LOCAL_SUPABASE_CLI)
+    return "supabase"
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Deploy Supabase Edge Functions from this repo.")
     parser.add_argument("functions", nargs="*", help="Specific function names to deploy. Defaults to all repo functions.")
@@ -74,8 +81,10 @@ def main() -> int:
     print(f"[deploy] repo root: {ROOT}")
     print(f"[deploy] target project: {args.project_ref or 'using current Supabase CLI link state'}")
 
+    cli = supabase_cli()
+
     for function_name in requested:
-        cmd = ["supabase", "functions", "deploy", function_name]
+        cmd = [cli, "functions", "deploy", function_name]
         if args.project_ref:
             cmd.extend(["--project-ref", args.project_ref])
         if verify_jwt_flags.get(function_name, False):

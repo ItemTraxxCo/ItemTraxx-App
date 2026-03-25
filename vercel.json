@@ -58,7 +58,7 @@
   ],
   "rewrites": [
     {
-      "source": "^/(?!assets/|cf-fonts/|cdn-cgi/|.*\\.[^/]+$)(.*)$",
+      "source": "/((?!assets/|cf-fonts/|cdn-cgi/|.*\\.[^/]+$).*)",
       "destination": "/index.html"
     }
   ],

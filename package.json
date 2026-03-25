@@ -45,7 +45,8 @@
     "typescript": "~5.9.3",
     "vite": "^8.0.2",
     "vue-tsc": "^3.2.6",
-    "zod-to-json-schema": "^3.25.1"
+    "zod-to-json-schema": "^3.25.1",
+    "wrangler": "^4.77.0"
   },
   "overrides": {
     "tar": "^7.5.10",

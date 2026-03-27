@@ -474,7 +474,7 @@ export const tenantLogin = async (
   };
 };
 
-export const consumeDistrictSessionHandoff = async () => {
+export const consumeDistrictSessionHandoff = async (): Promise<false | { accessToken: string; refreshToken: string }> => {
   if (typeof window === "undefined" || !window.location.hash) {
     return false;
   }
@@ -517,12 +517,15 @@ export const consumeDistrictSessionHandoff = async () => {
       throw new Error("Unable to complete district sign-in.");
     }
 
+    const verifiedAccessToken = verifyResult.data.session.access_token;
+    const verifiedRefreshToken = verifyResult.data.session.refresh_token;
+
     await exchangeHttpSession({
-      access_token: verifyResult.data.session.access_token,
-      refresh_token: verifyResult.data.session.refresh_token,
+      access_token: verifiedAccessToken,
+      refresh_token: verifiedRefreshToken,
     });
     await clearLocalSession();
-    sendLoginNotification(verifyResult.data.session.access_token);
+    sendLoginNotification(verifiedAccessToken);
 
     try {
       window.sessionStorage.setItem(
@@ -533,7 +536,7 @@ export const consumeDistrictSessionHandoff = async () => {
       // Ignore sessionStorage failures.
     }
 
-    return true;
+    return { accessToken: verifiedAccessToken, refreshToken: verifiedRefreshToken };
   } else if (handoffCode) {
     const result = await invokeEdgeFunction<
       { access_token?: string; refresh_token?: string },
@@ -580,7 +583,7 @@ export const consumeDistrictSessionHandoff = async () => {
   } catch {
     // Ignore sessionStorage failures.
   }
-  return true;
+  return { accessToken: finalAccessToken, refreshToken: finalRefreshToken };
 };
 
 export const createDistrictSessionHandoff = async (districtSlug: string) => {

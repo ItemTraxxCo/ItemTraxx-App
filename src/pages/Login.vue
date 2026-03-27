@@ -239,15 +239,8 @@ const handleTenantLogin = async () => {
       password.value,
       turnstileToken.value || undefined
     );
-    if (
-      !district.isDistrictHost &&
-      session?.districtSlug &&
-      session.accessToken
-    ) {
-      const handoffCode = await createDistrictSessionHandoff(
-        session.districtSlug,
-        session.accessToken
-      );
+    if (!district.isDistrictHost && session?.districtSlug) {
+      const handoffCode = await createDistrictSessionHandoff(session.districtSlug);
       window.location.replace(
         buildDistrictAppHandoffUrl(
           session.districtSlug,

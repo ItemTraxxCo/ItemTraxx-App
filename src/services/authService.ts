@@ -585,16 +585,12 @@ export const consumeDistrictSessionHandoff = async () => {
   return true;
 };
 
-export const createDistrictSessionHandoff = async (
-  districtSlug: string,
-  accessToken: string
-) => {
+export const createDistrictSessionHandoff = async (districtSlug: string) => {
   const result = await invokeEdgeFunction<
     { hashed_token?: string },
     { action: "create"; district_slug: string }
   >(getDistrictHandoffFunctionName(), {
     method: "POST",
-    accessToken,
     body: {
       action: "create",
       district_slug: districtSlug,

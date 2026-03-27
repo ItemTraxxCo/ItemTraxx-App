@@ -104,12 +104,21 @@ const matchesWildcardOrigin = (origin: string, candidate: string) => {
 
   try {
     const originUrl = new URL(origin);
-    const candidateUrl = new URL(candidate);
-    if (originUrl.protocol !== candidateUrl.protocol) {
+    const protocolMatch = candidate.match(/^(https?:)\/\//i);
+    if (!protocolMatch) {
+      return false;
+    }
+    const candidateProtocol = protocolMatch[1].toLowerCase();
+    if (originUrl.protocol.toLowerCase() !== candidateProtocol) {
       return false;
     }
 
-    const suffix = candidateUrl.hostname.replace("*.", "");
+    const candidateHost = candidate.slice(protocolMatch[0].length).split("/")[0]?.toLowerCase() ?? "";
+    if (!candidateHost.startsWith("*.")) {
+      return false;
+    }
+
+    const suffix = candidateHost.slice(2);
     const hostname = originUrl.hostname.toLowerCase();
     return hostname !== suffix && hostname.endsWith(`.${suffix}`);
   } catch {
@@ -131,8 +140,8 @@ const isAllowedOrigin = (origin: string | null, allowedOrigins: string[]) => {
 
 const withCorsHeaders = (origin: string | null, allowedOrigins: string[]) => {
   const originAllowed =
-    !!origin && (allowedOrigins.length === 0 || isAllowedOrigin(origin, allowedOrigins));
-  const headers = originAllowed
+    !origin || allowedOrigins.length === 0 || isAllowedOrigin(origin, allowedOrigins);
+  const headers = origin && originAllowed
     ? { ...BASE_CORS_HEADERS, ...(origin ? { "Access-Control-Allow-Origin": origin } : {}) }
     : { ...BASE_CORS_HEADERS };
   return { originAllowed, headers };

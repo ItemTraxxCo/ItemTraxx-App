@@ -13,6 +13,7 @@ import {
 } from "./store/authState";
 import { getDistrictState } from "./store/districtState";
 import {
+  adminLoginWithSession,
   consumeDistrictSessionHandoff,
   initAuthListener,
   refreshAuthFromSession,
@@ -219,8 +220,26 @@ const bootstrap = async () => {
     }
     return;
   }
-  await initializeAuth();
-  if (consumedDistrictHandoff) {
+  if (consumedDistrictHandoff && isAdminBootstrapPath()) {
+    try {
+      const session = await adminLoginWithSession(
+        consumedDistrictHandoff.accessToken,
+        consumedDistrictHandoff.refreshToken
+      );
+      if (session.role === "tenant_admin") {
+        try {
+          await touchTenantAdminSession();
+        } catch {
+          // Best-effort session registration after district handoff.
+        }
+      }
+    } catch {
+      await initializeAuth();
+    }
+  } else {
+    await initializeAuth();
+  }
+  if (consumedDistrictHandoff && !isAdminBootstrapPath()) {
     if (getAuthState().role === "tenant_admin" || getAuthState().role === "district_admin") {
       markAdminVerified();
     }

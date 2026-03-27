@@ -1,4 +1,4 @@
-import { supabase } from "./supabaseClient";
+import { authenticatedSelect } from "./authenticatedDataClient";
 import { invokeEdgeFunction } from "./edgeFunctionClient";
 import { withTimeout } from "./asyncUtils";
 import { edgeFunctionError } from "./appErrors";
@@ -151,57 +151,53 @@ export type GearSummary = {
 };
 
 export const fetchGearByBarcode = async (barcode: string) => {
-  const { data, error } = await withTimeout(
-    supabase
-      .from("gear")
-      .select("id, name, barcode, status")
-      .eq("barcode", barcode)
-      .is("deleted_at", null)
-      .single(),
+  const rows = await withTimeout(
+    authenticatedSelect<GearSummary[]>("gear", {
+      select: "id,name,barcode,status",
+      barcode: `eq.${barcode}`,
+      deleted_at: "is.null",
+      limit: "1",
+    }),
     LOOKUP_TIMEOUT_MS,
     "Barcode lookup timed out."
   );
 
-  if (error) {
+  if (!rows?.length) {
     throw new Error("Invalid barcode.");
   }
 
-  return data as GearSummary;
+  return rows[0] as GearSummary;
 };
 
 export const fetchStudentByStudentId = async (studentId: string) => {
-  const { data, error } = await withTimeout(
-    supabase
-      .from("students")
-      .select("id, username, student_id")
-      .eq("student_id", studentId)
-      .is("deleted_at", null)
-      .single(),
+  const rows = await withTimeout(
+    authenticatedSelect<StudentSummary[]>("students", {
+      select: "id,username,student_id",
+      student_id: `eq.${studentId}`,
+      deleted_at: "is.null",
+      limit: "1",
+    }),
     LOOKUP_TIMEOUT_MS,
     "Student lookup timed out."
   );
 
-  if (error) {
+  if (!rows?.length) {
     throw new Error("Student not found.");
   }
 
-  return data as StudentSummary;
+  return rows[0] as StudentSummary;
 };
 
 export const fetchCheckedOutGear = async (studentUuid: string) => {
-  const { data, error } = await withTimeout(
-    supabase
-      .from("gear")
-      .select("id, name, barcode, status")
-      .eq("checked_out_by", studentUuid)
-      .is("deleted_at", null),
+  const rows = await withTimeout(
+    authenticatedSelect<GearSummary[]>("gear", {
+      select: "id,name,barcode,status",
+      checked_out_by: `eq.${studentUuid}`,
+      deleted_at: "is.null",
+    }),
     LOOKUP_TIMEOUT_MS,
     "Checked out items lookup timed out."
   );
 
-  if (error) {
-    throw new Error("Unable to load items.");
-  }
-
-  return (data ?? []) as GearSummary[];
+  return (rows ?? []) as GearSummary[];
 };

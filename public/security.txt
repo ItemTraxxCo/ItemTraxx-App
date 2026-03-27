@@ -3,3 +3,12 @@ Canonical: https://itemtraxx.com/.well-known/security.txt
 Policy: https://itemtraxx.com/legal
 Preferred-Languages: en
 Expires: 2027-03-12T00:00:00.000Z
+
+#   ___ _                 _____
+#  |_ _| |_ ___ _ __ ___ |_   _| __ __ ___  __
+#   | || __/ _ \\ '_ ` _ \\  | || '__/ _` \\ \\/ /
+#   | || ||  __/ | | | | | | || | | (_| |>  <
+#  |___|\\__\\___|_| |_| |_| |_||_|  \\__,_/_/\\_\\
+#
+#  ItemTraxx Co
+#  Inventory. Accountability. Control.

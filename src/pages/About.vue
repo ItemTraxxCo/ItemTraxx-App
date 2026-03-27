@@ -84,12 +84,15 @@
         </div>
       </section>
 
+      <PublicFooter />
+
     </main>
   </div>
 </template>
 
 <script setup lang="ts">
 import { RouterLink } from 'vue-router';
+import PublicFooter from "../components/PublicFooter.vue";
 
 const storyParagraphs = [
   'ItemTraxx started as the kind of idea most people would brush off. In our broadcast class, gear kept going missing, and my broadcast teacher jokingly told me to build an app to track it.',

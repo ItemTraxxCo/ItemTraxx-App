@@ -106,12 +106,15 @@
       <p v-if="error" class="error">{{ error }}</p>
       <p v-if="success" class="success">{{ success }}</p>
     </section>
+
+    <PublicFooter />
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed, ref } from "vue";
 import { RouterLink } from "vue-router";
+import PublicFooter from "../components/PublicFooter.vue";
 import { useTurnstile } from "../composables/useTurnstile";
 import { submitContactSupportRequest } from "../services/contactSupportService";
 

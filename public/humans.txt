@@ -1,14 +1,9 @@
-User-agent: *
-Allow: /
+/* TEAM */
+ItemTraxx Co
+https://itemtraxx.com
 
-Disallow: /tenant
-Disallow: /tenant/
-Disallow: /super-admin
-Disallow: /super-admin/
-Disallow: /super-auth
-Disallow: /reset-password
-
-Sitemap: https://www.itemtraxx.com/sitemap.xml
+/* SITE */
+Built for inventory accountability, hassle-free operations, and clear workflows.
 
 #   ___ _                 _____
 #  |_ _| |_ ___ _ __ ___ |_   _| __ __ ___  __

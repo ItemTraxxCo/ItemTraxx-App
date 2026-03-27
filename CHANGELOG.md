@@ -1,6 +1,6 @@
 # Changelog
 
-Last updated (year-month-day): 2026-03-23
+Last updated (year-month-day): 2026-03-26
 
 All notable changes to **ItemTraxx** will be documented in this file. This includes new features, improvements, bug fixes, and other updates.
 
@@ -15,6 +15,30 @@ Changes are dated based on the default timezone: America/Los_Angeles
 - [TERMS.md](TERMS.md) – Terms of service for users
 - [PRIVACY.md](PRIVACY.md) – Privacy policy and data handling
 - [SECURITY.md](SECURITY.md) – Security reporting and guidelines
+
+---
+
+### 3/26/2026 Development Update
+
+- Improved GitHub Actions operations coverage:
+  - added a new `Schedule Watchdog` workflow to detect stale scheduled runs and alert Slack
+  - staggered scheduled workflow timings to reduce scheduler collisions for `Async Job Worker`, `Synthetic Journeys`, and `Deployment Health`
+  - restored `Supabase Backup` to its production schedule
+- Expanded workflow documentation:
+  - added dedicated runbooks for each GitHub Actions workflow
+  - updated central workflow, alerting, async-job, and backup docs to reflect the current schedules and watchdog behavior
+- Refined tenant-admin and checkout copy across the app:
+  - shifted multiple user-facing references from `student` to `borrower`
+  - clarified support/help text, error states, and export descriptions across checkout, logs, quick return, gear import, item status tracking, and related admin pages
+- Expanded public-site content and navigation:
+  - added a new `/security` page with ItemTraxx-specific security practices and reporting guidance
+  - added a new `/changelog` page that renders the repository changelog in a styled public layout
+  - added the shared public footer to `/contact-support`, `/about`, `/security`, `/legal`, and `/pricing`
+  - expanded public footer links to include `Pricing` and `Changelog`
+- Added small source-file easter eggs:
+  - easter egg text-logo comments in `robots.txt`, `security.txt`, `.well-known/security.txt`, and `index.html`
+  - added `humans.txt` file with a text-logo easter egg and team credits
+  - added a subtle text-logo easter egg to the 404 page
 
 ---
 

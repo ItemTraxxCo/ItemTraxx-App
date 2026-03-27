@@ -613,6 +613,7 @@ export const createDistrictAdminSessionHandoff = async (
   password: string,
   turnstileToken: string
 ) => {
+  const district = getDistrictState();
   const result = await invokeEdgeFunction<
     {
       district_slug?: string | null;
@@ -622,7 +623,13 @@ export const createDistrictAdminSessionHandoff = async (
       refresh_token?: string | null;
       hashed_token?: string | null;
     },
-    { action: "create_admin"; email: string; password: string; turnstile_token: string }
+    {
+      action: "create_admin";
+      email: string;
+      password: string;
+      turnstile_token: string;
+      current_district_slug?: string;
+    }
   >(getDistrictHandoffFunctionName(), {
     method: "POST",
     body: {
@@ -630,6 +637,7 @@ export const createDistrictAdminSessionHandoff = async (
       email,
       password,
       turnstile_token: turnstileToken,
+      current_district_slug: district.isDistrictHost ? district.slug ?? undefined : undefined,
     },
   });
 

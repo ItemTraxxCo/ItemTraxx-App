@@ -218,7 +218,7 @@
     <div v-if="!auth.isInitialized" class="page auth-loading-page">
       <div class="auth-loading-card">
         <h1>Loading ItemTraxx</h1>
-        <p>Restoring your session. Please wait...</p>
+        <p>Loading your session. Please wait...</p>
       </div>
     </div>
     <router-view v-else />

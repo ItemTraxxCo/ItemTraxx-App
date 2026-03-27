@@ -551,11 +551,8 @@ router.beforeEach((to) => {
       return { name: "tenant-admin-login" };
     }
 
-    if (auth.role === "tenant_admin") {
-      if (hasFreshAdminVerification(auth.adminVerifiedAt)) {
-        return { name: "tenant-admin-home" };
-      }
-      return { name: "tenant-admin-login" };
+    if (auth.role === "tenant_admin" && auth.tenantContextId) {
+      return { name: "tenant-checkout" };
     }
 
     if (auth.role === "tenant_user" && auth.tenantContextId) {

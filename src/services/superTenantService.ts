@@ -1,5 +1,4 @@
 import { invokeEdgeFunction } from "./edgeFunctionClient";
-import { getFreshAccessToken } from "./sessionAccessToken";
 import type { EdgeEnvelope, SuperTenantAction } from "../types/edgeContracts";
 import { edgeFunctionError } from "./appErrors";
 
@@ -120,8 +119,6 @@ type SuperTenantRequest = {
   payload: Record<string, unknown>;
 };
 
-const getAccessToken = getFreshAccessToken;
-
 const OPTION_CACHE_TTL_MS = 30_000;
 const optionCache = new Map<string, { expiresAt: number; value: unknown }>();
 const optionInflight = new Map<string, Promise<unknown>>();
@@ -164,12 +161,10 @@ const invalidateOptionCaches = (...prefixes: string[]) => {
 };
 
 const callSuperTenant = async <TData>(payload: SuperTenantRequest) => {
-  const accessToken = await getAccessToken();
   const result = await invokeEdgeFunction<EdgeEnvelope<TData>, SuperTenantRequest>(
     "super-tenant-mutate",
     {
       method: "POST",
-      accessToken,
       body: payload,
     }
   );

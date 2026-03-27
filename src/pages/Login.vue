@@ -109,8 +109,6 @@ const error = ref("");
 const isLoading = ref(false);
 const toastTitle = ref("");
 const toastMessage = ref("");
-const superAdminAccessCode = import.meta.env
-  .VITE_SUPER_ADMIN_ACCESS_CODE as string | undefined;
 const legalUrl =
   import.meta.env.VITE_LEGAL_URL ||
   "https://www.itemtraxx.com/legal";
@@ -232,13 +230,6 @@ const handleTenantLogin = async () => {
   error.value = "";
   isLoading.value = true;
   try {
-    if (
-      superAdminAccessCode &&
-      accessCode.value.trim() === superAdminAccessCode
-    ) {
-      await router.push("/super-auth");
-      return;
-    }
     if (turnstileSiteKey && !turnstileToken.value) {
       error.value = "Complete the security check and try again.";
       return;
@@ -248,15 +239,8 @@ const handleTenantLogin = async () => {
       password.value,
       turnstileToken.value || undefined
     );
-    if (
-      !district.isDistrictHost &&
-      session?.districtSlug &&
-      session.accessToken
-    ) {
-      const handoffCode = await createDistrictSessionHandoff(
-        session.districtSlug,
-        session.accessToken
-      );
+    if (!district.isDistrictHost && session?.districtSlug) {
+      const handoffCode = await createDistrictSessionHandoff(session.districtSlug);
       window.location.replace(
         buildDistrictAppHandoffUrl(
           session.districtSlug,
@@ -296,6 +280,11 @@ const handleTenantLogin = async () => {
       return;
     }
     const errorMessage = err instanceof Error ? err.message : "Sign in failed.";
+    if (errorMessage === "Admin verification required.") {
+      error.value = "";
+      showToast("Admin verification required", "Please sign in again to continue.");
+      return;
+    }
     if (isCredentialFailure(errorMessage)) {
       error.value = "";
       showToast("Sign in failed.", errorMessage);

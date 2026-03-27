@@ -1,7 +1,7 @@
-import { supabase } from "./supabaseClient";
 import { invokeEdgeFunction } from "./edgeFunctionClient";
+import { authenticatedSelect } from "./authenticatedDataClient";
 import { getAuthState } from "../store/authState";
-import { edgeFunctionError, unauthorizedError, missingContextError } from "./appErrors";
+import { edgeFunctionError, missingContextError } from "./appErrors";
 
 export type GearItem = {
   id: string;
@@ -34,15 +34,6 @@ const pickRelation = <T>(value: MaybeRelation<T>): T | null => {
   return value ?? null;
 };
 
-const getAccessToken = async () => {
-  const { data: sessionData } = await supabase.auth.getSession();
-  const session = sessionData.session ?? null;
-  if (!session?.access_token) {
-    throw unauthorizedError();
-  }
-  return session.access_token;
-};
-
 const getTenantContextId = () => {
   const tenantId = getAuthState().tenantContextId;
   if (!tenantId) {
@@ -53,26 +44,17 @@ const getTenantContextId = () => {
 
 export const fetchGear = async () => {
   const tenantId = getTenantContextId();
-  const { data, error } = await supabase
-    .from("gear")
-    .select("id, tenant_id, name, barcode, serial_number, status, notes")
-    .eq("tenant_id", tenantId)
-    .is("deleted_at", null)
-    .order("created_at", { ascending: false });
-
-  if (error) {
-    throw new Error("Unable to load items.");
-  }
-
-  return (data ?? []) as GearItem[];
+  return (await authenticatedSelect<GearItem[]>("gear", {
+    select: "id,tenant_id,name,barcode,serial_number,status,notes",
+    tenant_id: `eq.${tenantId}`,
+    deleted_at: "is.null",
+    order: "created_at.desc",
+  })) ?? [];
 };
 
 export const fetchDeletedGear = async () => {
-  const accessToken = await getAccessToken();
-
   const result = await invokeEdgeFunction<{ data: GearItem[] }>("admin-gear-mutate", {
     method: "POST",
-    accessToken,
     body: {
       action: "list_deleted",
       payload: {},
@@ -94,11 +76,8 @@ export const createGear = async (payload: {
   status: string;
   notes?: string;
 }) => {
-  const accessToken = await getAccessToken();
-
   const result = await invokeEdgeFunction<{ data: GearItem }>("admin-gear-mutate", {
     method: "POST",
-    accessToken,
     body: {
       action: "create",
       payload: {
@@ -126,11 +105,8 @@ export const updateGear = async (payload: {
   status: string;
   notes?: string;
 }) => {
-  const accessToken = await getAccessToken();
-
   const result = await invokeEdgeFunction<{ data: GearItem }>("admin-gear-mutate", {
     method: "POST",
-    accessToken,
     body: {
       action: "update",
       payload: {
@@ -151,11 +127,8 @@ export const updateGear = async (payload: {
 };
 
 export const deleteGear = async (id: string) => {
-  const accessToken = await getAccessToken();
-
   const result = await invokeEdgeFunction("admin-gear-mutate", {
     method: "POST",
-    accessToken,
     body: {
       action: "delete",
       payload: { id },
@@ -168,11 +141,8 @@ export const deleteGear = async (id: string) => {
 };
 
 export const restoreGear = async (id: string) => {
-  const accessToken = await getAccessToken();
-
   const result = await invokeEdgeFunction<{ data: GearItem }>("admin-gear-mutate", {
     method: "POST",
-    accessToken,
     body: {
       action: "restore",
       payload: { id },
@@ -188,30 +158,26 @@ export const restoreGear = async (id: string) => {
 
 export const fetchGearLogs = async () => {
   const tenantId = getTenantContextId();
-  const { data, error } = await supabase
-    .from("gear_logs")
-    .select(
-      `
-        id,
-        tenant_id,
-        gear_id,
-        checked_out_by,
-        action_type,
-        action_time,
-        performed_by,
-        gear:gear_id ( name, barcode ),
-        student:checked_out_by ( username, student_id )
-      `
-    )
-    .eq("tenant_id", tenantId)
-    .order("action_time", { ascending: false })
-    .limit(200);
-
-  if (error) {
-    throw new Error("Unable to load item logs.");
-  }
-
-  const rows = (data ?? []) as Array<{
+  const rows = ((await authenticatedSelect<Array<{
+    id: string;
+    tenant_id: string;
+    gear_id: string;
+    checked_out_by: string | null;
+    action_type: string;
+    action_time: string;
+    performed_by: string | null;
+    gear: MaybeRelation<{ name: string; barcode: string }>;
+    student: MaybeRelation<{
+      username: string;
+      student_id: string;
+    }>;
+  }>>("gear_logs", {
+    select:
+      "id,tenant_id,gear_id,checked_out_by,action_type,action_time,performed_by,gear:gear_id(name,barcode),student:checked_out_by(username,student_id)",
+    tenant_id: `eq.${tenantId}`,
+    order: "action_time.desc",
+    limit: "200",
+  })) ?? []) as Array<{
     id: string;
     tenant_id: string;
     gear_id: string;

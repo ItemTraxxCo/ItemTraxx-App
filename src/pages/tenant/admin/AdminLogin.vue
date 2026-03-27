@@ -184,6 +184,9 @@ const handleAdminLogin = async () => {
     } else if (message === "No district assignment.") {
       error.value = "This admin account is not assigned to a district.";
       showToast("No district assigned", "This admin account is not assigned to a district.");
+    } else if (message === "Admin verification required.") {
+      error.value = "Admin verification failed. Sign in again.";
+      showToast("Admin verification required", "Please sign in again to continue.");
     } else {
       error.value = "Sign in failed. Please try again.";
       showToast("Sign in failed", "Please try again.");

@@ -10,6 +10,7 @@ import {
   resolveClientIp,
   verifyTurnstileToken,
 } from "../_shared/preloginGuards.ts";
+import { registerPrivilegedStepUp } from "../_shared/privilegedStepUp.ts";
 
 const baseCorsHeaders = {
   "Access-Control-Allow-Headers":
@@ -566,6 +567,13 @@ serve(async (req) => {
           last_attempt_at: new Date().toISOString(),
         })
         .eq("id", activeChallenge.id);
+
+      await registerPrivilegedStepUp(adminClient, {
+        userId: user.id,
+        roleScope: "super_admin",
+        authToken,
+        source: "super_admin_email_challenge",
+      });
 
       await writeAudit("super_admin_2fa_verified", {});
       logInfo("super-auth-verify challenge verified", requestId, { user_id: user.id });

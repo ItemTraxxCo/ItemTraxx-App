@@ -6,7 +6,7 @@
       <h2>Extra info</h2>
       <h3> Please attach a screenshot of this page to your support request.</h3>
       <p v-if="district.isDistrictHost && !district.districtId" class="muted">
-        This district URL is not recognized. Check the district slug or contact support.
+        This URL is not recognized. Check the url or contact support.
       </p>
       <p class="muted">Path: {{ route.fullPath }}</p>
       <p v-if="showDiagnosticInfo" class="muted">Signed in: {{ auth.isAuthenticated ? "Yes" : "No" }}</p>
@@ -15,6 +15,15 @@
       <p v-if="showDiagnosticInfo" class="muted">User: {{ auth.email || "-" }}</p>
       <p class="muted">Local time: {{ now }}</p>
       <p class="muted">Session age: {{ sessionAge }}</p>
+      <pre class="easter-egg" aria-hidden="true">
+  ___ _                 _____
+ |_ _| |_ ___ _ __ ___ |_   _| __ __ ___  __
+  | || __/ _ \ '_ ` _ \  | || '__/ _` \ \/ /
+  | || ||  __/ | | | | | | || | | (_| |>  <
+ |___|\__\___|_| |_| |_| |_||_|  \__,_/_/\_\
+
+  ItemTraxx Co
+      </pre>
       <div class="admin-actions">
         <button type="button" class="link" @click="goBack">Go back</button>
         <button type="button" class="link" @click="goHome">Go back to home</button>
@@ -73,3 +82,14 @@ const goAdmin = () => {
 
 onMounted(refreshNow);
 </script>
+
+<style scoped>
+.easter-egg {
+  margin: 1.25rem 0 0;
+  color: color-mix(in srgb, currentColor 68%, transparent);
+  font-size: 0.72rem;
+  line-height: 1.15;
+  white-space: pre;
+  user-select: none;
+}
+</style>

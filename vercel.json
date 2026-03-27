@@ -58,6 +58,22 @@
   ],
   "rewrites": [
     {
+      "source": "/functions/(.*)",
+      "destination": "https://itemtraxx-edge-proxy.itemtraxx-co.workers.dev/functions/$1"
+    },
+    {
+      "source": "/auth/session/(.*)",
+      "destination": "https://itemtraxx-edge-proxy.itemtraxx-co.workers.dev/auth/session/$1"
+    },
+    {
+      "source": "/rest/v1/(.*)",
+      "destination": "https://itemtraxx-edge-proxy.itemtraxx-co.workers.dev/rest/v1/$1"
+    },
+    {
+      "source": "/rpc/(.*)",
+      "destination": "https://itemtraxx-edge-proxy.itemtraxx-co.workers.dev/rpc/$1"
+    },
+    {
       "source": "/((?!assets/|cf-fonts/|cdn-cgi/|.*\\.[^/]+$).*)",
       "destination": "/index.html"
     }

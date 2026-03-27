@@ -80,6 +80,18 @@ const routes: RouteRecordRaw[] = [
     meta: { public: true, title: "About | ItemTraxx" },
   },
   {
+    path: "/security",
+    name: "public-security",
+    component: () => import("../pages/SecurityPage.vue"),
+    meta: { public: true, title: "Security | ItemTraxx" },
+  },
+  {
+    path: "/changelog",
+    name: "public-changelog",
+    component: () => import("../pages/ChangelogPage.vue"),
+    meta: { public: true, title: "Changelog | ItemTraxx" },
+  },
+  {
     path: "/tenant",
     name: "tenant-home",
     redirect: "/tenant/checkout",

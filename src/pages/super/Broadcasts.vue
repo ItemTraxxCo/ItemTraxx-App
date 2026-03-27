@@ -12,7 +12,7 @@
     </div>
 
     <h1>Broadcasts</h1>
-    <p>Push a message banner to all signed-in users until they dismiss it.</p>
+    <p>Push a message banner to all users until they dismiss it.</p>
 
     <div class="card">
       <h2>Broadcast Message</h2>

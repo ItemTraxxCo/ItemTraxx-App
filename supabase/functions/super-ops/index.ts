@@ -1,6 +1,10 @@
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { isKillSwitchWriteBlocked } from "../_shared/killSwitch.ts";
+import {
+  hasPrivilegedStepUp,
+  isMissingPrivilegedStepUpTable,
+} from "../_shared/privilegedStepUp.ts";
 
 const baseCorsHeaders = {
   "Access-Control-Allow-Headers":
@@ -100,6 +104,24 @@ serve(async (req) => {
 
     if (profileError || profile?.role !== "super_admin") {
       return jsonResponse(403, { error: "Access denied" });
+    }
+
+    try {
+      const hasStepUp = await hasPrivilegedStepUp(adminClient, {
+        userId: user.id,
+        roleScope: "super_admin",
+        authToken: accessToken,
+      });
+      if (!hasStepUp) {
+        return jsonResponse(403, { error: "Super admin verification required." });
+      }
+    } catch (error) {
+      if (isMissingPrivilegedStepUpTable(error as { code?: string; message?: string })) {
+        return jsonResponse(503, {
+          error: "Privileged verification controls unavailable. Run latest SQL setup.",
+        });
+      }
+      throw error;
     }
 
     const { data: rateLimit, error: rateLimitError } = await adminClient.rpc(

@@ -372,7 +372,11 @@ const showTopMenu = computed(
   () =>
     route.name !== "public-home" &&
     route.name !== "public-pricing" &&
-    route.name !== "public-about"
+    route.name !== "public-about" &&
+    route.name !== "public-security" &&
+    route.name !== "public-changelog" &&
+    route.name !== "public-legal" &&
+    route.name !== "public-contact-support"
 );
 const showLogoutUserAction = computed(() => route.path !== "/login");
 const currentTenantOnboardingRole = computed<TenantOnboardingRole | null>(() => {

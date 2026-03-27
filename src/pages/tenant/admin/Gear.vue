@@ -168,7 +168,7 @@
               :value="selectedGear.serial_number || '-'"
               type="text"
               readonly
-              title="To edit the serial number, contact support@itemtraxx.com with the current serial number and requested change."
+              title="To edit the serial number, contact support with the current serial number, barcode, and requested change."
             />
           </label>
           <label>
@@ -442,7 +442,7 @@ const loadGear = async () => {
   try {
     gear.value = await fetchGear();
   } catch (err) {
-    error.value = err instanceof Error ? err.message : "Unable to load items. Please sign out completeley and sign back in.";
+    error.value = err instanceof Error ? err.message : "Unable to load items. Please sign out completeley and sign back in. If the issue persists, contact support.";
   } finally {
     isLoading.value = false;
   }

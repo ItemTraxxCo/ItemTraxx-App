@@ -2,12 +2,25 @@
   <div class="legal-page">
     <main class="legal-container">
       <div class="page-nav-left legal-top-nav">
-        <RouterLink class="legal-back-link" to="/" aria-label="Return to home">
-          <svg viewBox="0 0 24 24" aria-hidden="true">
-            <path d="M15 5 8 12l7 7" />
-          </svg>
-        </RouterLink>
-        <span class="legal-breadcrumb"></span>
+        <div class="legal-top-nav-left">
+          <RouterLink class="legal-back-link" to="/" aria-label="Return to home">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M15 5 8 12l7 7" />
+            </svg>
+          </RouterLink>
+          <span class="legal-breadcrumb"></span>
+        </div>
+        <button
+          type="button"
+          class="legal-theme-toggle"
+          :aria-label="themeMode === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'"
+          @click="toggleTheme"
+        >
+          <span class="legal-theme-toggle-label">{{ themeMode === "dark" ? "Dark" : "Light" }}</span>
+          <span class="legal-theme-toggle-track" :data-theme="themeMode">
+            <span class="legal-theme-toggle-thumb"></span>
+          </span>
+        </button>
       </div>
 
       <header class="legal-header">
@@ -261,12 +274,43 @@
           <a href="https://www.itemtraxx.com/contact-support" target="_blank" rel="noreferrer noopener">contact support here</a>
         </p>
       </section>
+
+      <PublicFooter />
     </main>
   </div>
 </template>
 
 <script setup lang="ts">
+import { onBeforeUnmount, onMounted, ref } from "vue";
 import { RouterLink } from "vue-router";
+import PublicFooter from "../components/PublicFooter.vue";
+
+const themeMode = ref<"light" | "dark">("light");
+let themeObserver: MutationObserver | null = null;
+
+const syncThemeMode = () => {
+  themeMode.value = document.documentElement.getAttribute("data-theme") === "dark" ? "dark" : "light";
+};
+
+const toggleTheme = () => {
+  const next = themeMode.value === "dark" ? "light" : "dark";
+  document.documentElement.setAttribute("data-theme", next);
+  localStorage.setItem("itemtraxx-theme", next);
+  themeMode.value = next;
+};
+
+onMounted(() => {
+  syncThemeMode();
+  themeObserver = new MutationObserver(syncThemeMode);
+  themeObserver.observe(document.documentElement, {
+    attributes: true,
+    attributeFilter: ["data-theme"],
+  });
+});
+
+onBeforeUnmount(() => {
+  themeObserver?.disconnect();
+});
 </script>
 
 <style scoped>
@@ -288,7 +332,13 @@ import { RouterLink } from "vue-router";
 .legal-top-nav {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   margin-bottom: 1rem;
+}
+
+.legal-top-nav-left {
+  display: flex;
+  align-items: center;
 }
 
 .legal-back-link {
@@ -326,6 +376,65 @@ import { RouterLink } from "vue-router";
   box-shadow: 0 10px 28px color-mix(in srgb, var(--accent) 18%, transparent);
 }
 
+.legal-theme-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.38rem 0.45rem 0.38rem 0.8rem;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--accent) 18%, var(--border));
+  background: color-mix(in srgb, var(--card) 84%, var(--surface) 16%);
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+  transition:
+    transform 160ms ease,
+    border-color 160ms ease,
+    box-shadow 180ms ease,
+    background-color 180ms ease;
+}
+
+.legal-theme-toggle:hover,
+.legal-theme-toggle:focus-visible {
+  transform: translateY(-1px);
+  border-color: color-mix(in srgb, var(--accent) 45%, transparent);
+  box-shadow: 0 10px 28px color-mix(in srgb, var(--accent) 16%, transparent);
+}
+
+.legal-theme-toggle-label {
+  font-size: 0.86rem;
+  font-weight: 600;
+}
+
+.legal-theme-toggle-track {
+  display: inline-flex;
+  align-items: center;
+  width: 2.5rem;
+  height: 1.45rem;
+  padding: 0.14rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--muted) 42%, transparent);
+  transition: background-color 160ms ease;
+}
+
+.legal-theme-toggle-track[data-theme="dark"] {
+  background: color-mix(in srgb, var(--accent) 54%, transparent);
+}
+
+.legal-theme-toggle-thumb {
+  width: 1.05rem;
+  height: 1.05rem;
+  border-radius: 999px;
+  background: #fff;
+  box-shadow: 0 4px 10px rgba(4, 10, 22, 0.18);
+  transform: translateX(0);
+  transition: transform 160ms ease;
+}
+
+.legal-theme-toggle-track[data-theme="dark"] .legal-theme-toggle-thumb {
+  transform: translateX(1.03rem);
+}
+
 .legal-header h1 {
   margin: 0;
   font-size: clamp(1.7rem, 3.6vw, 2.4rem);
@@ -360,5 +469,20 @@ ul {
 
 a {
   color: var(--accent);
+}
+
+@media (max-width: 640px) {
+  .legal-top-nav {
+    gap: 0.75rem;
+    align-items: flex-start;
+  }
+
+  .legal-theme-toggle {
+    padding-left: 0.65rem;
+  }
+
+  .legal-theme-toggle-label {
+    font-size: 0.8rem;
+  }
 }
 </style>

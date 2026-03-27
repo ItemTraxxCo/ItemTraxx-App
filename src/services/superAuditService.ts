@@ -1,5 +1,4 @@
 import { invokeEdgeFunction } from "./edgeFunctionClient";
-import { getFreshAccessToken } from "./sessionAccessToken";
 import { edgeFunctionError } from "./appErrors";
 
 export type SuperAuditLog = {
@@ -54,15 +53,11 @@ export type SuperDashboard = {
   }>;
 };
 
-const getAccessToken = getFreshAccessToken;
-
 export const fetchSuperDashboard = async () => {
-  const accessToken = await getAccessToken();
   const result = await invokeEdgeFunction<{ data?: SuperDashboard }>(
     "super-dashboard",
     {
       method: "GET",
-      accessToken,
     }
   );
 

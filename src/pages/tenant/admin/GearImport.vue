@@ -7,8 +7,8 @@
       </div>
 
       <h1>Bulk Item Import Wizard</h1>
-      <p v-if="!featureEnabled" class="error">Bulk item import is disabled for this tenant.</p>
-      <p v-else class="admin-hero-copy">Paste CSV rows, preview parsed entries, then import items in one action.</p>
+      <p v-if="!featureEnabled" class="error">Bulk item import is disabled.</p>
+      <p v-else class="admin-hero-copy">Paste CSV rows, preview parsed entries, then import items in one click.</p>
     </div>
 
     <div v-if="featureEnabled" class="card admin-section-card">

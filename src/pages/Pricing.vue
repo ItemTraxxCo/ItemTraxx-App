@@ -274,12 +274,15 @@
           </li>
         </ul>
       </section>
+
+      <PublicFooter />
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { RouterLink } from "vue-router";
+import PublicFooter from "../components/PublicFooter.vue";
 </script>
 
 <style scoped>

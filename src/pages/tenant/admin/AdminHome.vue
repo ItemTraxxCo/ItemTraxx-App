@@ -44,11 +44,11 @@
       </RouterLink>
       <RouterLink class="admin-card" to="/tenant/admin/return">
         <h2>Quick Return</h2>
-        <p>Quick return items without student a id.</p>
+        <p>Quick return items without a borrower ID.</p>
       </RouterLink>
       <RouterLink class="admin-card" to="/tenant/admin/stats">
         <h2>Usage Stats</h2>
-        <p>View recent usage and inventory activity.</p>
+        <p>View recent usage statistics and inventory activity.</p>
       </RouterLink>
       <RouterLink class="admin-card" to="/tenant/admin/audit-logs">
         <h2>Admin Audit Logs</h2>
@@ -56,7 +56,7 @@
       </RouterLink>
       <RouterLink v-if="featureFlags.enable_status_tracking" class="admin-card" to="/tenant/admin/item-status">
         <h2>Item Status Tracking</h2>
-        <p>Track lost, damaged, and repair statuses.</p>
+        <p>Track lost, damaged, and repair statuses on items.</p>
       </RouterLink>
       <RouterLink v-if="featureFlags.enable_bulk_item_import" class="admin-card" to="/tenant/admin/gear-import">
         <h2>Bulk Item Import</h2>
@@ -64,11 +64,11 @@
       </RouterLink>
       <RouterLink v-if="featureFlags.enable_barcode_generator" class="admin-card" to="/tenant/admin/barcodes">
         <h2>Bulk Barcode Generator</h2>
-        <p>Generate and download barcode label PDFs with custom messages.</p>
+        <p>Generate and download barcode labels with custom messages.</p>
       </RouterLink>
       <RouterLink class="admin-card" to="/tenant/admin/settings">
         <h2>Settings</h2>
-        <p>Manage checkout policy defaults and review signed in devices.</p>
+        <p>Manage checkout policy and view signed in devices.</p>
       </RouterLink>
     </div>
   </div>

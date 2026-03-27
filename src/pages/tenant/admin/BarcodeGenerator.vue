@@ -6,7 +6,7 @@
         <RouterLink class="button-link" to="/tenant/checkout">Return to Checkout</RouterLink>
       </div>
 
-      <h1>Bulk Barcode PDF Generator</h1>
+      <h1>Bulk Barcode Generator</h1>
       <p v-if="!featureEnabled" class="error">Barcode generator is disabled for this tenant.</p>
       <p v-else class="admin-hero-copy">Enter one barcode per line, add a message, then generate and download.</p>
     </div>

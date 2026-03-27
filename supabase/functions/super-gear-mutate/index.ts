@@ -1,6 +1,10 @@
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { isKillSwitchWriteBlocked } from "../_shared/killSwitch.ts";
+import {
+  hasPrivilegedStepUp,
+  isMissingPrivilegedStepUpTable,
+} from "../_shared/privilegedStepUp.ts";
 
 const baseCorsHeaders = {
   "Access-Control-Allow-Headers":
@@ -85,6 +89,7 @@ serve(async (req) => {
     if (!authHeader) {
       return jsonResponse(401, { error: "Unauthorized" });
     }
+    const authToken = authHeader.replace(/^Bearer\s+/i, "").trim();
 
     const supabaseUrl = Deno.env.get("ITX_SUPABASE_URL");
     const publishableKey = Deno.env.get("ITX_PUBLISHABLE_KEY");
@@ -118,6 +123,28 @@ serve(async (req) => {
       return jsonResponse(403, { error: "Access denied" });
     }
 
+    const adminClient = createClient(supabaseUrl, serviceKey, {
+      auth: { persistSession: false },
+    });
+
+    try {
+      const hasStepUp = await hasPrivilegedStepUp(adminClient, {
+        userId: user.id,
+        roleScope: "super_admin",
+        authToken,
+      });
+      if (!hasStepUp) {
+        return jsonResponse(403, { error: "Super admin verification required." });
+      }
+    } catch (error) {
+      if (isMissingPrivilegedStepUpTable(error as { code?: string; message?: string })) {
+        return jsonResponse(503, {
+          error: "Privileged verification controls unavailable. Run latest SQL setup.",
+        });
+      }
+      throw error;
+    }
+
     const { data: rateLimit, error: rateLimitError } = await userClient.rpc(
       "consume_rate_limit",
       {
@@ -142,10 +169,6 @@ serve(async (req) => {
     if (typeof action !== "string" || typeof payload !== "object" || !payload) {
       return jsonResponse(400, { error: "Invalid request" });
     }
-
-    const adminClient = createClient(supabaseUrl, serviceKey, {
-      auth: { persistSession: false },
-    });
 
     if (action === "list") {
       const tenantId =

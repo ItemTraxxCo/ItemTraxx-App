@@ -26,17 +26,20 @@ const getDirectFunctionsBaseUrl = () => {
 
 export const getEdgeFunctionsBaseUrl = () => {
   const proxyUrl = import.meta.env.VITE_EDGE_PROXY_URL as string | undefined;
+  const trimmedProxyUrl = proxyUrl?.trim();
   const useProxyInDevSetting = (
     import.meta.env.VITE_USE_EDGE_PROXY_IN_DEV as string | undefined
   )?.trim();
-  const shouldUseProxyInDev =
-    useProxyInDevSetting === "false" ? false : !!proxyUrl?.trim();
+  const shouldUseProxyInDev = useProxyInDevSetting === "false" ? false : !!trimmedProxyUrl;
 
+  if (!import.meta.env.DEV && trimmedProxyUrl) {
+    return `${trimTrailingSlash(trimmedProxyUrl)}/functions`;
+  }
   if (!import.meta.env.DEV) {
     return "/functions";
   }
-  if (shouldUseProxyInDev && proxyUrl?.trim()) {
-    return `${trimTrailingSlash(proxyUrl)}/functions`;
+  if (shouldUseProxyInDev && trimmedProxyUrl) {
+    return `${trimTrailingSlash(trimmedProxyUrl)}/functions`;
   }
   return getDirectFunctionsBaseUrl();
 };

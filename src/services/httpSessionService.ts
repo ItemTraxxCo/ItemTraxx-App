@@ -29,11 +29,13 @@ const getEdgeProxyOrigin = () => {
 };
 
 export const getHttpSessionBaseUrl = () => {
+  const proxyOrigin = getEdgeProxyOrigin();
+  if (!import.meta.env.DEV && proxyOrigin) {
+    return `${proxyOrigin}/auth/session`;
+  }
   if (!import.meta.env.DEV) {
     return "/auth/session";
   }
-
-  const proxyOrigin = getEdgeProxyOrigin();
   if (proxyOrigin) {
     return `${proxyOrigin}/auth/session`;
   }

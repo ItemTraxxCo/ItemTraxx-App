@@ -130,11 +130,9 @@ export const verifySuperAdminEmailChallenge = async (code: string) => {
 };
 
 const clearLocalSession = async () => {
-  try {
-    await supabase.auth.signOut({ scope: "local" });
-  } catch {
-    // Ignore local storage cleanup failures during handoff.
-  }
+  // Browser session persistence is disabled in the Supabase client, so temporary
+  // sign-in sessions remain in memory only. Avoid calling signOut here because it
+  // can revoke the freshly exchanged server-managed session.
 };
 
 const withRetry = async <T>(

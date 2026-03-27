@@ -10,7 +10,7 @@ Performs scheduled production health checks against the public app and status en
 ## Behavior
 - Checks key public URLs for successful responses and required security headers
 - Tolerates Cloudflare challenge responses for non-browser CI requests
-- Calls the `system-status` function through the Cloudflare edge proxy
+- Calls the production `system-status` function directly for the backend JSON probe
 - Sends Slack start/finish notifications
 
 ## Failure Handling

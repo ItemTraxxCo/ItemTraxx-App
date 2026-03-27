@@ -8,10 +8,10 @@ Detects stale scheduled workflows and alerts when expected scheduled runs stop h
 - Manual: `workflow_dispatch`
 
 ## Monitored Workflows and Thresholds
-- `Async Job Worker` — 30 minutes
-- `Synthetic Journeys` — 90 minutes
-- `Deployment Health` — 120 minutes
-- `Supabase Backup` — 14 hours
+- `Async Job Worker` — 60 minutes
+- `Synthetic Journeys` — 180 minutes
+- `Deployment Health` — 240 minutes
+- `Supabase Backup` — 24 hours
 
 ## Required Secrets
 - `GITHUB_TOKEN` (provided automatically)

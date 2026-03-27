@@ -2,7 +2,7 @@
 set -euo pipefail
 
 BASE_URL="${1:-https://itemtraxx.com}"
-EDGE_URL="${2:-https://itemtraxx-edge-proxy.itemtraxx-co.workers.dev/functions}"
+EDGE_URL="${2:-https://edge.itemtraxx.com/functions}"
 
 BROWSER_UA="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36"
 

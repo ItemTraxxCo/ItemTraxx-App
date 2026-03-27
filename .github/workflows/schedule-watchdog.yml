@@ -13,6 +13,8 @@ jobs:
   check-stale-schedules:
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    env:
+      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
     steps:
       - name: Check scheduled workflow freshness
         id: watchdog
@@ -82,9 +84,8 @@ jobs:
           echo "All scheduled workflows are within freshness thresholds."
 
       - name: Send Slack watchdog alert
-        if: ${{ failure() && steps.watchdog.outputs.stale == 'true' && secrets.SLACK_WEBHOOK_URL != '' }}
+        if: ${{ failure() && steps.watchdog.outputs.stale == 'true' && env.SLACK_WEBHOOK_URL != '' }}
         env:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           REPORT: ${{ steps.watchdog.outputs.report }}
           REPOSITORY: ${{ github.repository }}

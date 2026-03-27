@@ -43,7 +43,7 @@ wrangler deploy --var ITX_ITEMTRAXX_KILLSWITCH_ENABLED:false
 
 ## Verification
 
-- Check `https://itemtraxx-edge-proxy.itemtraxx-co.workers.dev/functions/system-status` and confirm:
+- Check `https://edge.itemtraxx.com/functions/system-status` and confirm:
   - `kill_switch.enabled: true` when enabled.
   - `kill_switch.enabled: false` when disabled.
 - UI checks status every 5 minutes; hard refresh to see changes immediately.

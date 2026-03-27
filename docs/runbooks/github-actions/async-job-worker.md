@@ -12,9 +12,9 @@ Runs the production async job worker on a schedule or manually.
 - Slack secrets if notifications are desired
 
 ## Behavior
-- Calls `https://edge.itemtraxx.com/functions/job-worker`
+- Calls `https://mlaspkufocikfcbjgpof.supabase.co/functions/v1/job-worker`
 - Sends `{"limit":30,"run_reporting_refresh":true}`
 - Uses the shared Slack status workflow for start/finish notifications
 
 ## Failure Handling
-Check the `process-jobs` step first. Common failures are invalid worker secret, edge proxy outage, or job-worker function errors.
+Check the `process-jobs` step first. Common failures are invalid worker secret or job-worker function errors.

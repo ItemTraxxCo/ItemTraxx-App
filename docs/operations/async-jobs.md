@@ -13,6 +13,7 @@ ItemTraxx now includes an async background job pipeline for non-blocking tasks:
 - Reporting materialized view + refresh RPC: `supabase/sql/reporting_views.sql`
 - Worker edge function: `supabase/functions/job-worker/index.ts`
 - Worker scheduler: `.github/workflows/async-job-worker.yml`
+- Worker schedule: `3,13,23,33,43,53 * * * *` (every 10 minutes at staggered odd offsets, UTC)
 
 ## Required Secrets
 

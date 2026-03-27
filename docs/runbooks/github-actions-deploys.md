@@ -2,10 +2,19 @@
 
 This runbook explains how to use the two infrastructure deploy workflows in this repository.
 
+For dedicated workflow-by-workflow runbooks, see:
+
+- `docs/runbooks/github-actions/README.md`
+
 Workflows covered:
 
 - `Deploy Supabase Functions`
 - `Deploy Cloudflare Worker`
+- `Async Job Worker`
+- `Synthetic Journeys`
+- `Deployment Health`
+- `Supabase Backup`
+- `Schedule Watchdog`
 
 ## 1. Purpose
 
@@ -63,7 +72,25 @@ Cloudflare worker workflow:
 
 - `.github/workflows/deploy-cloudflare-worker.yml`
 
-## 4. When These Workflows Run Automatically
+Scheduled operations workflows:
+
+- `.github/workflows/async-job-worker.yml`
+- `.github/workflows/synthetic-journeys.yml`
+- `.github/workflows/deployment-health.yml`
+- `.github/workflows/supabase-backup.yml`
+- `.github/workflows/schedule-watchdog.yml`
+
+## 4. Scheduled Workflow Times
+
+These workflows are intentionally staggered to odd-minute offsets in UTC to reduce collisions and scheduler bunching.
+
+- `Async Job Worker`: `3,13,23,33,43,53 * * * *`
+- `Synthetic Journeys`: `7,37 * * * *`
+- `Deployment Health`: `29 * * * *`
+- `Supabase Backup`: `35 6,18 * * *`
+- `Schedule Watchdog`: `11,26,41,56 * * * *`
+
+## 5. When These Workflows Run Automatically
 
 ### `Deploy Supabase Functions`
 
@@ -82,7 +109,7 @@ This workflow runs automatically on push to `main` when any of these paths chang
 - `scripts/deploy-cloudflare-worker.sh`
 - `.github/workflows/deploy-cloudflare-worker.yml`
 
-## 5. How To Run The Workflows Manually
+## 6. How To Run The Workflows Manually
 
 Both workflows support manual execution through GitHub Actions.
 
@@ -129,7 +156,7 @@ tenant-login login-notify job-worker
 
 This workflow does not require any manual input.
 
-## 6. What Each Workflow Actually Does
+## 7. What Each Workflow Actually Does
 
 ### `Deploy Supabase Functions`
 
@@ -137,7 +164,7 @@ The workflow:
 
 1. checks out the repository
 2. sets up Python
-3. installs the Supabase CLI
+3. installs repo dependencies with `npm ci`
 4. reads `SUPABASE_ACCESS_TOKEN`
 5. reads `SUPABASE_PROJECT_REF`
 6. runs:
@@ -161,7 +188,7 @@ The workflow:
 
 1. checks out the repository
 2. sets up Node
-3. installs Wrangler
+3. installs repo dependencies with `npm ci`
 4. reads `CLOUDFLARE_API_TOKEN`
 5. reads `CLOUDFLARE_ACCOUNT_ID`
 6. runs:
@@ -174,9 +201,9 @@ That script:
 
 - finds the repo root dynamically
 - changes into `cloudflare/edge-proxy`
-- runs `npx wrangler deploy`
+- runs the repo-pinned `wrangler` CLI via `npx wrangler deploy`
 
-## 7. How To Read The Workflow Result
+## 8. How To Read The Workflow Result
 
 ### Successful result
 
@@ -198,7 +225,7 @@ If the workflow fails:
 
 Do not re-run blindly without reading the failing step.
 
-## 8. Common Failure Cases
+## 9. Common Failure Cases
 
 ### Supabase: missing or invalid access token
 
@@ -218,6 +245,19 @@ Check:
 Symptoms:
 
 - project not found
+
+### Schedule watchdog alert
+
+Symptoms:
+
+- Slack alert from `Schedule Watchdog`
+- stale scheduled workflow warning in Actions
+
+Check:
+
+- whether GitHub scheduled runs were delayed or dropped
+- whether the referenced workflow still has a valid `schedule` trigger
+- whether the last successful run on `main` is older than the watchdog threshold
 - deploy targets the wrong project
 
 Check:

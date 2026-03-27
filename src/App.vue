@@ -218,7 +218,7 @@
     <div v-if="!auth.isInitialized" class="page auth-loading-page">
       <div class="auth-loading-card">
         <h1>Loading ItemTraxx</h1>
-        <p>Restoring your session and district context.</p>
+        <p>Restoring your session. Please wait...</p>
       </div>
     </div>
     <router-view v-else />
@@ -618,11 +618,10 @@ const maybeRedirectAuthenticatedPublicHome = async () => {
     targetPath = hasFreshAdminVerification(auth.adminVerifiedAt)
       ? "/district"
       : "/tenant/admin-login";
-  } else if (auth.role === "tenant_admin") {
-    targetPath = hasFreshAdminVerification(auth.adminVerifiedAt)
-      ? "/tenant/admin"
-      : "/tenant/admin-login";
-  } else if (auth.role === "tenant_user" && auth.tenantContextId) {
+  } else if (
+    (auth.role === "tenant_admin" || auth.role === "tenant_user") &&
+    auth.tenantContextId
+  ) {
     targetPath = "/tenant/checkout";
   }
 

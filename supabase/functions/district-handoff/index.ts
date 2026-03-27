@@ -209,6 +209,10 @@ serve(async (req) => {
         typeof body?.turnstile_token === "string"
           ? body.turnstile_token.trim()
           : "";
+      const currentDistrictSlug =
+        typeof body?.current_district_slug === "string"
+          ? body.current_district_slug.trim().toLowerCase()
+          : "";
 
       if (!email || !password || !turnstileToken) {
         return jsonResponse(400, { error: "Invalid request" }, headers);
@@ -316,7 +320,7 @@ serve(async (req) => {
         return jsonResponse(403, { error: "Tenant disabled" }, headers);
       }
 
-      if (!resolvedDistrictSlug) {
+      if (!resolvedDistrictSlug || (currentDistrictSlug && currentDistrictSlug === resolvedDistrictSlug)) {
         return jsonResponse(
           200,
           {

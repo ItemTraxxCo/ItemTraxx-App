@@ -228,7 +228,7 @@ const appendCookie = (
     `Max-Age=${maxAgeSeconds}`,
     "HttpOnly",
     "Secure",
-    "SameSite=Lax",
+    "SameSite=None",
   ];
   const domain = env.SESSION_COOKIE_DOMAIN?.trim();
   if (domain) {
@@ -244,7 +244,7 @@ const clearCookie = (headers: Headers, name: string, env: Env) => {
     "Max-Age=0",
     "HttpOnly",
     "Secure",
-    "SameSite=Lax",
+    "SameSite=None",
   ];
   const domain = env.SESSION_COOKIE_DOMAIN?.trim();
   if (domain) {

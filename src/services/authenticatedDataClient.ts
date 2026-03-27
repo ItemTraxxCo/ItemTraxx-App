@@ -13,10 +13,13 @@ const getProxyOrigin = () => {
 };
 
 const getBaseUrl = () => {
+  const origin = getProxyOrigin();
+  if (!import.meta.env.DEV && origin) {
+    return origin;
+  }
   if (!import.meta.env.DEV) {
     return "";
   }
-  const origin = getProxyOrigin();
   if (!origin) {
     throw new Error("Missing edge proxy configuration for authenticated data requests.");
   }

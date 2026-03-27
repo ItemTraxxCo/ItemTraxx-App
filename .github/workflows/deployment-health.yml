@@ -96,7 +96,7 @@ jobs:
       - name: Check status endpoint
         run: |
           set -euo pipefail
-          curl -fsS "https://itemtraxx-edge-proxy.itemtraxx-co.workers.dev/functions/system-status" \
+          curl -fsS "https://edge.itemtraxx.com/functions/system-status" \
             -H "Origin: https://itemtraxx.com" \
             | head -c 300
 

@@ -12,7 +12,7 @@ Runs the production async job worker on a schedule or manually.
 - Slack secrets if notifications are desired
 
 ## Behavior
-- Calls `https://itemtraxx-edge-proxy.itemtraxx-co.workers.dev/functions/job-worker`
+- Calls `https://edge.itemtraxx.com/functions/job-worker`
 - Sends `{"limit":30,"run_reporting_refresh":true}`
 - Uses the shared Slack status workflow for start/finish notifications
 

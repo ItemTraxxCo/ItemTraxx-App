@@ -2,7 +2,7 @@
 set -euo pipefail
 
 SITE_BASE="${1:-https://itemtraxx.com}"
-EDGE_BASE="${2:-https://itemtraxx-edge-proxy.itemtraxx-co.workers.dev}"
+EDGE_BASE="${2:-https://edge.itemtraxx.com}"
 
 for path in / /login /tenant/checkout /super-auth; do
   url="${SITE_BASE}${path}"

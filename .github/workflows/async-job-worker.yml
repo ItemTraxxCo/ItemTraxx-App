@@ -32,7 +32,7 @@ jobs:
         run: |
           set -euo pipefail
           curl -fsS \
-            -X POST "https://itemtraxx-edge-proxy.itemtraxx-co.workers.dev/functions/job-worker" \
+            -X POST "https://edge.itemtraxx.com/functions/job-worker" \
             -H "Origin: https://itemtraxx.com" \
             -H "Authorization: Bearer ${ITX_JOB_WORKER_SECRET}" \
             -H "Content-Type: application/json" \

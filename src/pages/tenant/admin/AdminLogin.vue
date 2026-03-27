@@ -158,6 +158,9 @@ const handleAdminLogin = async () => {
       throw new Error("Unable to prepare district sign-in.");
     }
     const session = await adminLoginWithSession(handoff.accessToken, handoff.refreshToken);
+    if (session?.role === "tenant_admin") {
+      await touchTenantAdminSession();
+    }
     devLog("auth_request_success");
     await router.push(session?.role === "district_admin" ? "/district" : "/tenant/admin");
     void logAdminAction({

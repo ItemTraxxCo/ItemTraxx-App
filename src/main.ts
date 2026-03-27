@@ -129,6 +129,11 @@ const isPublicBootstrapPath = () => {
   return false;
 };
 
+const isAdminBootstrapPath = () => {
+  const path = window.location.pathname || "/";
+  return path.startsWith("/tenant/admin") || path === "/district";
+};
+
 const initializeAuth = async () => {
   const isE2ETestMode = import.meta.env.VITE_E2E_TEST_UTILS === "true";
   if (isE2ETestMode) {
@@ -196,8 +201,10 @@ const bootstrap = async () => {
   await initializeDistrictContext();
   const districtContext = getDistrictState();
   const isE2ETestMode = import.meta.env.VITE_E2E_TEST_UTILS === "true";
+  const shouldPreloadAdminSession = consumedDistrictHandoff && isAdminBootstrapPath();
   const canMountFirst =
-    isE2ETestMode || isPublicBootstrapPath() || districtContext.isDistrictHost;
+    !shouldPreloadAdminSession &&
+    (isE2ETestMode || isPublicBootstrapPath() || districtContext.isDistrictHost);
   if (canMountFirst) {
     // Avoid flashing the temporary logout screen during normal public-route bootstrap.
     if (!isE2ETestMode && isPublicBootstrapPath()) {
@@ -214,9 +221,16 @@ const bootstrap = async () => {
   }
   await initializeAuth();
   if (consumedDistrictHandoff) {
-    void touchTenantAdminSession().catch(() => {
-      // Best-effort session registration after district handoff.
-    });
+    if (getAuthState().role === "tenant_admin" || getAuthState().role === "district_admin") {
+      markAdminVerified();
+    }
+    if (getAuthState().role === "tenant_admin") {
+      try {
+        await touchTenantAdminSession();
+      } catch {
+        // Best-effort session registration after district handoff.
+      }
+    }
   }
   await mountApp();
 };

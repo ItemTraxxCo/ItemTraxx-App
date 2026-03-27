@@ -5,14 +5,14 @@
         <RouterLink class="button-link" to="/tenant/admin">Return to admin panel</RouterLink>
       </div>
       <h1>Item Logs</h1>
-      <p class="admin-hero-copy">Filter checkout and return activity, then export the current view.</p>
+      <p class="admin-hero-copy">Filter checkout and return activity, then export the current view to PDF and CSV.</p>
     </div>
 
     <div class="card admin-section-card">
       <div class="admin-section-header">
         <div>
           <h2>History</h2>
-          <p class="admin-section-copy">Search by action, student, item, or date range.</p>
+          <p class="admin-section-copy">Search by action, borrower, item, or date range.</p>
         </div>
         <div class="admin-toolbar-actions">
           <button type="button" @click="exportCsv">Export CSV</button>
@@ -25,7 +25,7 @@
           <input
             v-model="searchQuery"
             type="text"
-            placeholder="Search by action, student, item name, or barcode"
+            placeholder="Search by action, borrower, item name, or barcode"
           />
         </label>
         <label>
@@ -76,7 +76,7 @@
             </td>
           </tr>
           <tr v-if="!filteredLogs.length">
-            <td colspan="4" class="muted">No logs match your search.</td>
+            <td colspan="4" class="muted">No logs match your search. If you believe this is an error, please contact support.</td>
           </tr>
         </tbody>
       </table>

@@ -8,3 +8,4 @@ ALLOWED_ORIGINS = "https://itemtraxx.com,https://www.itemtraxx.com,https://inter
 # Optional hard allowlist of function names (comma-separated).
 ALLOWED_FUNCTIONS = "tenant-login,checkoutReturn,create-tenant-admin,admin-gear-mutate,admin-student-mutate,admin-ops,system-status,super-tenant-mutate,super-admin-mutate,super-dashboard,super-gear-mutate,super-student-mutate,super-logs-query,super-ops,district-dashboard,district-admin-mutate,contact-sales-submit,contact-support-submit,job-worker,login-notify,super-auth-verify,district-handoff,tenant-admin-mutate"
 ITX_ITEMTRAXX_KILLSWITCH_ENABLED = "false"
+SESSION_COOKIE_DOMAIN = ".itemtraxx.com"

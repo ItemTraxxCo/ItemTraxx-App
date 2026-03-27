@@ -1,0 +1,114 @@
+name: Schedule Watchdog
+
+permissions:
+  actions: read
+  contents: read
+
+on:
+  schedule:
+    - cron: "11,26,41,56 * * * *"
+  workflow_dispatch:
+
+jobs:
+  check-stale-schedules:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check scheduled workflow freshness
+        id: watchdog
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+
+          API_BASE="https://api.github.com/repos/${REPOSITORY}"
+          CURRENT_EPOCH="$(date -u +%s)"
+          STALE_REPORT=""
+
+          check_workflow() {
+            local workflow_file="$1"
+            local workflow_name="$2"
+            local max_age_seconds="$3"
+
+            local response
+            response="$(curl -fsSL \
+              -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+              -H "Accept: application/vnd.github+json" \
+              "${API_BASE}/actions/workflows/${workflow_file}/runs?event=schedule&branch=main&status=completed&per_page=20")"
+
+            local latest_success
+            latest_success="$(printf '%s' "$response" | jq -r '
+              .workflow_runs
+              | map(select(.conclusion == "success"))
+              | sort_by(.created_at)
+              | reverse
+              | .[0].created_at // empty
+            ')"
+
+            if [ -z "$latest_success" ]; then
+              STALE_REPORT="${STALE_REPORT}\n- ${workflow_name}: no successful scheduled runs found"
+              return
+            fi
+
+            local latest_epoch age_minutes max_age_minutes
+            latest_epoch="$(python3 -c 'from datetime import datetime; import sys; print(int(datetime.fromisoformat(sys.argv[1].replace("Z", "+00:00")).timestamp()))' "$latest_success")"
+            age_minutes="$(( (CURRENT_EPOCH - latest_epoch) / 60 ))"
+            max_age_minutes="$(( max_age_seconds / 60 ))"
+
+            if [ $(( CURRENT_EPOCH - latest_epoch )) -gt "$max_age_seconds" ]; then
+              STALE_REPORT="${STALE_REPORT}\n- ${workflow_name}: last successful scheduled run was ${age_minutes} minutes ago (threshold ${max_age_minutes} minutes)"
+            fi
+          }
+
+          check_workflow "async-job-worker.yml" "Async Job Worker" 1800
+          check_workflow "synthetic-journeys.yml" "Synthetic Journeys" 5400
+          check_workflow "deployment-health.yml" "Deployment Health" 7200
+          check_workflow "supabase-backup.yml" "Supabase Backup" 50400
+
+          if [ -n "$STALE_REPORT" ]; then
+            {
+              echo "stale=true"
+              echo "report<<EOF"
+              printf '%b\n' "$STALE_REPORT"
+              echo "EOF"
+            } >> "$GITHUB_OUTPUT"
+            echo "Detected stale scheduled workflows:"
+            printf '%b\n' "$STALE_REPORT"
+            exit 1
+          fi
+
+          echo "stale=false" >> "$GITHUB_OUTPUT"
+          echo "All scheduled workflows are within freshness thresholds."
+
+      - name: Send Slack watchdog alert
+        if: ${{ failure() && steps.watchdog.outputs.stale == 'true' && secrets.SLACK_WEBHOOK_URL != '' }}
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          REPORT: ${{ steps.watchdog.outputs.report }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          PAYLOAD="$(jq -n \
+            --arg run_url "$RUN_URL" \
+            --arg repo "$REPOSITORY" \
+            --arg report "$REPORT" \
+            '{
+              text: "Scheduled workflow watchdog alert",
+              attachments: [
+                {
+                  color: "#e01e5a",
+                  fields: [
+                    { title: "Status", value: "Stale scheduled workflows detected", short: false },
+                    { title: "Repository", value: $repo, short: false },
+                    { title: "Run", value: ("<" + $run_url + "|Open watchdog run>"), short: false },
+                    { title: "Details", value: $report, short: false }
+                  ],
+                  footer: "GitHub Actions"
+                }
+              ]
+            }')"
+          curl -fsSL -X POST "$SLACK_WEBHOOK_URL" \
+            -H "Content-Type: application/json" \
+            --data "$PAYLOAD"

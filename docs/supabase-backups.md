@@ -4,7 +4,7 @@ This project includes a daily automated backup workflow:
 
 - Workflow: `.github/workflows/supabase-backup.yml`
 - Script: `scripts/github-supabase-backup.sh`
-- Schedule: daily at `06:35 UTC`
+- Schedule: daily at `06:35 UTC` and `18:35 UTC`
 - Output: encrypted backup artifacts pushed to a private GitHub repo
 
 ## What gets backed up

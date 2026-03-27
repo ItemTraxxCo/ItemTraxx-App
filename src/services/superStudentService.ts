@@ -1,5 +1,4 @@
 import { invokeEdgeFunction } from "./edgeFunctionClient";
-import { getFreshAccessToken } from "./sessionAccessToken";
 import type { EdgeEnvelope, SuperStudentAction } from "../types/edgeContracts";
 import { edgeFunctionError } from "./appErrors";
 
@@ -16,15 +15,11 @@ type SuperStudentRequest = {
   payload: Record<string, unknown>;
 };
 
-const getAccessToken = getFreshAccessToken;
-
 const callSuperStudent = async <TData>(payload: SuperStudentRequest) => {
-  const accessToken = await getAccessToken();
   const result = await invokeEdgeFunction<EdgeEnvelope<TData>, SuperStudentRequest>(
     "super-student-mutate",
     {
       method: "POST",
-      accessToken,
       body: payload,
     }
   );

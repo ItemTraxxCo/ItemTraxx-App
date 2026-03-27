@@ -6,7 +6,7 @@ permissions:
 on:
   workflow_dispatch:
   schedule:
-    - cron: "0,30 * * * *"
+    - cron: "7,37 * * * *"
 
 jobs:
   slack-notify-start:

@@ -1,6 +1,5 @@
 import { invokeEdgeFunction } from "./edgeFunctionClient";
-import { supabase } from "./supabaseClient";
-import { edgeFunctionError, unauthorizedError } from "./appErrors";
+import { edgeFunctionError } from "./appErrors";
 
 export type RuntimeConfigMap = Record<string, unknown>;
 
@@ -192,28 +191,11 @@ type SuperOpsRequest = {
   payload: Record<string, unknown>;
 };
 
-const getAccessToken = async () => {
-  // Force a token refresh first so super-admin/internal flows do not send stale JWTs.
-  const refreshed = await supabase.auth.refreshSession();
-  const refreshedToken = refreshed.data.session?.access_token;
-  if (!refreshed.error && refreshedToken) {
-    return refreshedToken;
-  }
-
-  const { data, error } = await supabase.auth.getSession();
-  if (error || !data.session?.access_token) {
-    throw unauthorizedError();
-  }
-  return data.session.access_token;
-};
-
 const callSuperOps = async <TData>(payload: SuperOpsRequest) => {
-  const accessToken = await getAccessToken();
   const result = await invokeEdgeFunction<{ data?: TData }, SuperOpsRequest>(
     "super-ops",
     {
       method: "POST",
-      accessToken,
       body: payload,
     }
   );

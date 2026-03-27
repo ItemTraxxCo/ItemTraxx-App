@@ -11,7 +11,7 @@
       </div>
       <h1>Admin Access</h1>
       <p class="admin-hero-copy">
-        Manage tenant admin accounts for this workspace. Primary admins can invite new admins,
+        Manage tenant admin accounts for this tenant. Only primary admins can invite new admins,
         reset access, and disable or re-enable existing admin accounts.
       </p>
       <div class="admin-summary-grid">
@@ -50,13 +50,13 @@
         <div>
           <h2>Create Tenant Admin</h2>
           <p class="admin-section-copy">
-            Invite a new admin for this tenant by email. They will receive a password setup link.
+            Invite a new admin for this tenant by email. They will receive a setup link with further instructions.
           </p>
         </div>
       </div>
       <form class="form" @submit.prevent="handleCreate">
         <label>
-          Admin email
+          Email
           <input v-model="createEmail" type="email" placeholder="admin@tenant.com" />
         </label>
         <div class="form-actions">

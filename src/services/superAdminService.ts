@@ -1,5 +1,4 @@
 import { invokeEdgeFunction } from "./edgeFunctionClient";
-import { getFreshAccessToken } from "./sessionAccessToken";
 import type { EdgeEnvelope, SuperAdminAction } from "../types/edgeContracts";
 import { edgeFunctionError } from "./appErrors";
 
@@ -20,15 +19,11 @@ type SuperAdminRequest = {
   payload: Record<string, unknown>;
 };
 
-const getAccessToken = getFreshAccessToken;
-
 const callSuperAdmin = async <TData>(payload: SuperAdminRequest) => {
-  const accessToken = await getAccessToken();
   const result = await invokeEdgeFunction<EdgeEnvelope<TData>, SuperAdminRequest>(
     "super-admin-mutate",
     {
       method: "POST",
-      accessToken,
       body: payload,
     }
   );

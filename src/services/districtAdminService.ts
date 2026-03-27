@@ -1,6 +1,5 @@
 import { invokeEdgeFunction } from "./edgeFunctionClient";
-import { supabase } from "./supabaseClient";
-import { edgeFunctionError, unauthorizedError } from "./appErrors";
+import { edgeFunctionError } from "./appErrors";
 
 export type DistrictAdminDashboard = {
   district: {
@@ -88,27 +87,11 @@ export type DistrictAdminDashboard = {
 
 export type DistrictAdminTenant = DistrictAdminDashboard["tenants"][number];
 
-const getAccessToken = async () => {
-  const refreshed = await supabase.auth.refreshSession();
-  const refreshedToken = refreshed.data.session?.access_token;
-  if (!refreshed.error && refreshedToken) {
-    return refreshedToken;
-  }
-
-  const { data, error } = await supabase.auth.getSession();
-  if (error || !data.session?.access_token) {
-    throw unauthorizedError();
-  }
-  return data.session.access_token;
-};
-
 export const getDistrictAdminDashboard = async () => {
-  const accessToken = await getAccessToken();
   const result = await invokeEdgeFunction<{ data?: DistrictAdminDashboard }>(
     "district-dashboard",
     {
       method: "GET",
-      accessToken,
     }
   );
 
@@ -129,12 +112,10 @@ type DistrictAdminMutateRequest = {
 };
 
 const callDistrictAdminMutate = async <TData>(payload: DistrictAdminMutateRequest) => {
-  const accessToken = await getAccessToken();
   const result = await invokeEdgeFunction<{ data?: TData }, DistrictAdminMutateRequest>(
     "district-admin-mutate",
     {
       method: "POST",
-      accessToken,
       body: payload,
     }
   );

@@ -1,7 +1,6 @@
 import { supabase } from "./supabaseClient";
 import { invokeEdgeFunction } from "./edgeFunctionClient";
 import { withTimeout } from "./asyncUtils";
-import { getFreshAccessToken } from "./sessionAccessToken";
 import { edgeFunctionError } from "./appErrors";
 
 type CheckoutReturnPayload = {
@@ -70,12 +69,10 @@ const queueCheckoutPayload = (payload: CheckoutReturnPayload, error: string | nu
 };
 
 const executeCheckoutReturn = async (payload: CheckoutReturnPayload) => {
-  const accessToken = await getFreshAccessToken();
 
   const result = await invokeEdgeFunction("checkoutReturn", {
     method: "POST",
     body: payload,
-    accessToken,
   });
 
   if (!result.ok) {

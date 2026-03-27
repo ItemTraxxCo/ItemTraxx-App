@@ -1,7 +1,7 @@
-import { supabase } from "./supabaseClient";
 import { invokeEdgeFunction } from "./edgeFunctionClient";
+import { authenticatedSelect } from "./authenticatedDataClient";
 import { getAuthState } from "../store/authState";
-import { edgeFunctionError, unauthorizedError, missingContextError } from "./appErrors";
+import { edgeFunctionError, missingContextError } from "./appErrors";
 
 export type StudentItem = {
   id: string;
@@ -25,15 +25,6 @@ const pickRelation = <T>(value: MaybeRelation<T>): T | null => {
   return value ?? null;
 };
 
-const getAccessToken = async () => {
-  const { data: sessionData } = await supabase.auth.getSession();
-  const session = sessionData.session ?? null;
-  if (!session?.access_token) {
-    throw unauthorizedError();
-  }
-  return session.access_token;
-};
-
 const getTenantContextId = () => {
   const tenantId = getAuthState().tenantContextId;
   if (!tenantId) {
@@ -44,28 +35,19 @@ const getTenantContextId = () => {
 
 export const fetchStudents = async () => {
   const tenantId = getTenantContextId();
-  const { data, error } = await supabase
-    .from("students")
-    .select("id, tenant_id, username, student_id")
-    .eq("tenant_id", tenantId)
-    .is("deleted_at", null)
-    .order("created_at", { ascending: false });
-
-  if (error) {
-    throw new Error("Unable to load students.");
-  }
-
-  return (data ?? []) as StudentItem[];
+  return (await authenticatedSelect<StudentItem[]>("students", {
+    select: "id,tenant_id,username,student_id",
+    tenant_id: `eq.${tenantId}`,
+    deleted_at: "is.null",
+    order: "created_at.desc",
+  })) ?? [];
 };
 
 export const fetchDeletedStudents = async () => {
-  const accessToken = await getAccessToken();
-
   const result = await invokeEdgeFunction<{ data: StudentItem[] }>(
     "admin-student-mutate",
     {
       method: "POST",
-      accessToken,
       body: {
         action: "list_deleted",
         payload: {},
@@ -85,13 +67,10 @@ export const createStudent = async (payload: {
   username?: string;
   student_id?: string;
 }) => {
-  const accessToken = await getAccessToken();
-
   const result = await invokeEdgeFunction<{ data: StudentItem }>(
     "admin-student-mutate",
     {
       method: "POST",
-      accessToken,
       body: {
         action: "create",
         payload: {
@@ -113,8 +92,6 @@ export const createStudent = async (payload: {
 export const bulkCreateStudents = async (
   rows: Array<{ username?: string; student_id?: string }>
 ) => {
-  const accessToken = await getAccessToken();
-
   const result = await invokeEdgeFunction<{
     data: {
       inserted_count: number;
@@ -124,7 +101,6 @@ export const bulkCreateStudents = async (
     };
   }>("admin-student-mutate", {
     method: "POST",
-    accessToken,
     body: {
       action: "bulk_create",
       payload: { rows },
@@ -144,11 +120,8 @@ export const bulkCreateStudents = async (
 };
 
 export const deleteStudent = async (id: string) => {
-  const accessToken = await getAccessToken();
-
   const result = await invokeEdgeFunction("admin-student-mutate", {
     method: "POST",
-    accessToken,
     body: {
       action: "delete",
       payload: { id },
@@ -161,13 +134,10 @@ export const deleteStudent = async (id: string) => {
 };
 
 export const restoreStudent = async (id: string) => {
-  const accessToken = await getAccessToken();
-
   const result = await invokeEdgeFunction<{ data: StudentItem }>(
     "admin-student-mutate",
     {
       method: "POST",
-      accessToken,
       body: {
         action: "restore",
         payload: { id },
@@ -184,42 +154,30 @@ export const restoreStudent = async (id: string) => {
 
 export const fetchStudentDetails = async (studentUuid: string) => {
   const tenantId = getTenantContextId();
-  const { data: checkedOutGear, error: gearError } = await supabase
-    .from("gear")
-    .select("id, name, barcode")
-    .eq("tenant_id", tenantId)
-    .is("deleted_at", null)
-    .eq("checked_out_by", studentUuid);
+  const checkedOutGear = await authenticatedSelect<Array<{ id: string; name: string; barcode: string }>>("gear", {
+    select: "id,name,barcode",
+    tenant_id: `eq.${tenantId}`,
+    deleted_at: "is.null",
+    checked_out_by: `eq.${studentUuid}`,
+  });
 
-  if (gearError) {
-    throw new Error("Unable to load student details.");
-  }
+  const lastCheckoutData = await authenticatedSelect<Array<{ action_time: string; gear: { name: string }[] | { name: string } | null }>>("gear_logs", {
+    select: "action_time,gear:gear_id(name)",
+    tenant_id: `eq.${tenantId}`,
+    checked_out_by: `eq.${studentUuid}`,
+    action_type: "eq.checkout",
+    order: "action_time.desc",
+    limit: "1",
+  });
 
-  const { data: lastCheckoutData, error: checkoutError } = await supabase
-    .from("gear_logs")
-    .select("action_time, gear:gear_id ( name )")
-    .eq("tenant_id", tenantId)
-    .eq("checked_out_by", studentUuid)
-    .eq("action_type", "checkout")
-    .order("action_time", { ascending: false })
-    .limit(1);
-
-  if (checkoutError) {
-    throw new Error("Unable to load student details.");
-  }
-
-  const { data: lastReturnData, error: returnError } = await supabase
-    .from("gear_logs")
-    .select("action_time, gear:gear_id ( name )")
-    .eq("tenant_id", tenantId)
-    .eq("checked_out_by", studentUuid)
-    .eq("action_type", "return")
-    .order("action_time", { ascending: false })
-    .limit(1);
-
-  if (returnError) {
-    throw new Error("Unable to load student details.");
-  }
+  const lastReturnData = await authenticatedSelect<Array<{ action_time: string; gear: { name: string }[] | { name: string } | null }>>("gear_logs", {
+    select: "action_time,gear:gear_id(name)",
+    tenant_id: `eq.${tenantId}`,
+    checked_out_by: `eq.${studentUuid}`,
+    action_type: "eq.return",
+    order: "action_time.desc",
+    limit: "1",
+  });
 
   const checkoutRow = (lastCheckoutData?.[0] ?? null) as
     | { action_time: string; gear: MaybeRelation<{ name: string }> }

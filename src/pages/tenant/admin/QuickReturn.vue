@@ -5,7 +5,7 @@
         <RouterLink class="button-link" to="/tenant/admin">Return to admin panel</RouterLink>
       </div>
       <h1>Quick Return</h1>
-      <p class="admin-hero-copy">Return items by barcode without loading a student record.</p>
+      <p class="admin-hero-copy">Return items by barcode without needing a borrower ID.</p>
       <div class="admin-summary-grid">
         <div class="admin-summary-card">
           <strong>{{ barcodes.length }}</strong>
@@ -32,11 +32,11 @@
             @keyup.enter="addBarcode"
           />
           <button type="button" class="link" :disabled="isBarcodeLoading" @click="addBarcode">
-            Add barcode
+            Add item
           </button>
         </div>
       </label>
-      <p class="muted">Press Enter or click “Add barcode” to add.</p>
+      <p class="muted">Press Enter or click “Add item” to add.</p>
       <div v-if="barcodes.length" class="list">
         <p class="checkout-subheading">Items</p>
         <ul>
@@ -51,7 +51,7 @@
       </div>
       <div class="actions">
         <button type="button" class="button-primary" :disabled="isSubmitting" @click="submitReturn">
-          Complete Return
+          Complete Quick Return
         </button>
       </div>
 

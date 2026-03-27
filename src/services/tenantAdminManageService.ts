@@ -1,5 +1,4 @@
 import { invokeEdgeFunction } from "./edgeFunctionClient";
-import { getFreshAccessToken } from "./sessionAccessToken";
 import type { EdgeEnvelope, TenantAdminManageAction } from "../types/edgeContracts";
 import { edgeFunctionError } from "./appErrors";
 
@@ -19,12 +18,10 @@ type TenantAdminManageRequest = {
 };
 
 const callTenantAdminManage = async <TData>(payload: TenantAdminManageRequest) => {
-  const accessToken = await getFreshAccessToken();
   const result = await invokeEdgeFunction<EdgeEnvelope<TData>, TenantAdminManageRequest>(
     "tenant-admin-mutate",
     {
       method: "POST",
-      accessToken,
       body: payload,
     }
   );

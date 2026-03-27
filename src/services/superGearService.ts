@@ -1,5 +1,4 @@
 import { invokeEdgeFunction } from "./edgeFunctionClient";
-import { getFreshAccessToken } from "./sessionAccessToken";
 import type { EdgeEnvelope, SuperGearAction } from "../types/edgeContracts";
 import { edgeFunctionError } from "./appErrors";
 
@@ -18,15 +17,11 @@ type SuperGearRequest = {
   payload: Record<string, unknown>;
 };
 
-const getAccessToken = getFreshAccessToken;
-
 const callSuperGear = async <TData>(payload: SuperGearRequest) => {
-  const accessToken = await getAccessToken();
   const result = await invokeEdgeFunction<EdgeEnvelope<TData>, SuperGearRequest>(
     "super-gear-mutate",
     {
       method: "POST",
-      accessToken,
       body: payload,
     }
   );

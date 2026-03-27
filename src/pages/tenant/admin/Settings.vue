@@ -47,10 +47,10 @@
       <p class="muted">
         {{
           accountCategory === "individual"
-            ? "This account uses the root ItemTraxx workspace and is not attached to a district subdomain."
+            ? "This account uses the root ItemTraxx url and is not attached to a custom subdomain."
             : accountCategory === "organization"
-              ? "Organization and district-linked accounts inherit their routing and billing context from tenant configuration."
-              : "Account plan metadata has not been configured for this tenant yet."
+              ? "Organization-linked accounts inherit their routing and billing context from tenant configuration."
+              : "Account plan metadata has not been configured for this tenant yet. If you believe this is an error, please contact support to resolve this."
         }}
       </p>
     </div>

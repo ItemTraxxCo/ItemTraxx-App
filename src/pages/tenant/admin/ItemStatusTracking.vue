@@ -5,8 +5,8 @@
         <RouterLink class="button-link" to="/tenant/admin">Return to admin panel</RouterLink>
       </div>
       <h1>Item Status Tracking</h1>
-      <p v-if="!featureEnabled" class="error">Item status tracking is disabled for this tenant.</p>
-      <p v-else class="admin-hero-copy">Track damaged, lost, repair, retired, and studio-only inventory states.</p>
+      <p v-if="!featureEnabled" class="error">Item status tracking is disabled.</p>
+      <p v-else class="admin-hero-copy">Track damaged, lost, repair and retired inventory states.</p>
     </div>
 
     <div v-if="featureEnabled" class="card admin-section-card">
@@ -81,7 +81,7 @@
       <div class="admin-section-header">
         <div>
           <h2>Status History</h2>
-          <p class="admin-section-copy">Review chronological status changes for tenant inventory.</p>
+          <p class="admin-section-copy">Review chronological status changes for inventory.</p>
         </div>
         <div class="admin-toolbar-actions">
           <button type="button" @click="exportHistoryCsv">Export CSV</button>
@@ -106,7 +106,7 @@
             <td>{{ event.note || "-" }}</td>
           </tr>
           <tr v-if="filteredHistory.length === 0">
-            <td colspan="4" class="muted">No status history found.</td>
+            <td colspan="4" class="muted">No status history found. If you believe this is an error, please contact support.</td>
           </tr>
         </tbody>
       </table>

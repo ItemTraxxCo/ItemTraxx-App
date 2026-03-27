@@ -76,7 +76,7 @@
       <div class="card section-card">
         <div class="section-heading">
           <h2>Admin List</h2>
-          <p class="muted">Use the scope filter to switch between tenant and district operators.</p>
+          <p class="muted">Use the scope filter to switch between tenant and district/org operators.</p>
         </div>
         <div class="filter-toolbar">
           <div class="input-row">

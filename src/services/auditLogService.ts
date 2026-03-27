@@ -1,4 +1,4 @@
-import { supabase } from "./supabaseClient";
+import { authenticatedInsert } from "./authenticatedDataClient";
 import { getAuthState } from "../store/authState";
 
 export type AuditLogPayload = {
@@ -14,7 +14,7 @@ export const logAdminAction = async (payload: AuditLogPayload) => {
     throw new Error("Missing tenant context.");
   }
 
-  const { error } = await supabase.from("admin_audit_logs").insert({
+  await authenticatedInsert("admin_audit_logs", {
     tenant_id: auth.tenantContextId,
     actor_id: auth.userId,
     action_type: payload.action_type,
@@ -22,8 +22,4 @@ export const logAdminAction = async (payload: AuditLogPayload) => {
     entity_id: payload.entity_id ?? null,
     metadata: payload.metadata ?? null,
   });
-
-  if (error) {
-    throw new Error("Unable to write audit log.");
-  }
 };

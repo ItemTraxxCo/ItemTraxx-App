@@ -1,7 +1,6 @@
 import { invokeEdgeFunction } from "./edgeFunctionClient";
 import type { AdminOpsAction, EdgeEnvelope, TenantFeatureFlags } from "../types/edgeContracts";
 import { getOrCreateDeviceSession } from "../utils/deviceSession";
-import { getFreshAccessToken } from "./sessionAccessToken";
 import { edgeFunctionError } from "./appErrors";
 
 export type StatusTrackedItem = {
@@ -66,10 +65,6 @@ export type TenantSessionItem = {
   is_current: boolean;
 };
 
-const getAccessToken = async () => {
-  return getFreshAccessToken();
-};
-
 const requestCache = new Map<
   string,
   {
@@ -113,13 +108,11 @@ const callAdminOps = async <TData>(
   action: AdminOpsAction,
   payload: Record<string, unknown> = {}
 ) => {
-  const accessToken = await getAccessToken();
   const { deviceId, deviceLabel } = getOrCreateDeviceSession();
   const result = await invokeEdgeFunction<EdgeEnvelope<TData>, { action: string; payload: Record<string, unknown> }>(
     "admin-ops",
     {
       method: "POST",
-      accessToken,
       body: {
         action,
         payload: {

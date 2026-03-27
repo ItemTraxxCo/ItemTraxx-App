@@ -1,5 +1,4 @@
 import { invokeEdgeFunction } from "./edgeFunctionClient";
-import { getFreshAccessToken } from "./sessionAccessToken";
 import type { EdgeEnvelope } from "../types/edgeContracts";
 import { edgeFunctionError } from "./appErrors";
 
@@ -16,8 +15,6 @@ export type SuperLogEntry = {
   tenant: { id: string; name: string } | null;
 };
 
-const getAccessToken = getFreshAccessToken;
-
 export const listSuperLogs = async (payload: {
   tenant_id?: string;
   action_type?: string;
@@ -27,7 +24,6 @@ export const listSuperLogs = async (payload: {
   page?: number;
   page_size?: number;
 }) => {
-  const accessToken = await getAccessToken();
   const result = await invokeEdgeFunction<EdgeEnvelope<SuperLogEntry[]> & {
     data?: SuperLogEntry[];
     page?: number;
@@ -35,7 +31,6 @@ export const listSuperLogs = async (payload: {
     count?: number;
   }>("super-logs-query", {
     method: "POST",
-    accessToken,
     body: { payload },
   });
 

@@ -1,6 +1,5 @@
 import { supabase } from "./supabaseClient";
 import { invokeEdgeFunction } from "./edgeFunctionClient";
-import { getFreshAccessToken } from "./sessionAccessToken";
 import { TimeoutError, withTimeout } from "./asyncUtils";
 import {
   clearAdminVerification,
@@ -15,6 +14,13 @@ import {
 import { getDistrictState } from "../store/districtState";
 import { lookupDistrictById, resolveDistrictHost } from "./districtService";
 import { edgeFunctionError } from "./appErrors";
+import { registerPrivilegedAdminStepUp } from "./privilegedStepUpService";
+import {
+  clearHttpSession,
+  exchangeHttpSession,
+  fetchHttpSessionSummary,
+} from "./httpSessionService";
+import { authenticatedRpc, authenticatedSelect } from "./authenticatedDataClient";
 
 type ProfileRow = {
   id: string;
@@ -89,12 +95,10 @@ export const clearPendingSuperAdminVerificationEmail = () => {
 };
 
 export const resendSuperAdminEmailChallenge = async () => {
-  const accessToken = await getFreshAccessToken();
   const result = await invokeEdgeFunction<{ challenge_started?: boolean; email?: string | null }>(
     SUPER_ADMIN_2FA_FUNCTION,
     {
       method: "POST",
-      accessToken,
       body: { action: "resend_email_challenge" },
     }
   );
@@ -109,10 +113,8 @@ export const resendSuperAdminEmailChallenge = async () => {
 };
 
 export const verifySuperAdminEmailChallenge = async (code: string) => {
-  const accessToken = await getFreshAccessToken();
   const result = await invokeEdgeFunction<{ verified?: boolean }>(SUPER_ADMIN_2FA_FUNCTION, {
     method: "POST",
-    accessToken,
     body: {
       action: "verify_email_challenge",
       payload: { code },
@@ -124,7 +126,6 @@ export const verifySuperAdminEmailChallenge = async (code: string) => {
   }
 
   setSecondaryAuth(true);
-  sendLoginNotification(accessToken);
   clearPendingSuperAdminVerificationEmail();
 };
 
@@ -134,23 +135,6 @@ const clearLocalSession = async () => {
   } catch {
     // Ignore local storage cleanup failures during handoff.
   }
-};
-
-const setSessionFromTokens = async (accessToken: string, refreshToken: string) => {
-  const sessionResult = await withTimeout(
-    supabase.auth.setSession({
-      access_token: accessToken,
-      refresh_token: refreshToken,
-    }),
-    AUTH_QUERY_TIMEOUT_MS,
-    "Sign in timed out."
-  );
-
-  if (sessionResult.error || !sessionResult.data.session?.access_token) {
-    throw new Error("Invalid credentials.");
-  }
-
-  return sessionResult.data.session;
 };
 
 const withRetry = async <T>(
@@ -190,7 +174,7 @@ const fetchCurrentRoleAndTenant = async () => {
     withRetry(
       () =>
         withTimeout(
-          supabase.rpc("current_user_role"),
+          authenticatedRpc<string | null>("current_user_role", {}),
           AUTH_QUERY_TIMEOUT_MS,
           "Role lookup timed out."
         ),
@@ -199,7 +183,7 @@ const fetchCurrentRoleAndTenant = async () => {
     withRetry(
       () =>
         withTimeout(
-          supabase.rpc("current_tenant_id"),
+          authenticatedRpc<string | null>("current_tenant_id", {}),
           AUTH_QUERY_TIMEOUT_MS,
           "Tenant lookup timed out."
         ),
@@ -208,11 +192,8 @@ const fetchCurrentRoleAndTenant = async () => {
   ]);
 
   return {
-    role: toKnownRole(roleResult.data),
-    tenantId:
-      typeof tenantResult.data === "string" && tenantResult.data.trim()
-        ? tenantResult.data
-        : null,
+    role: toKnownRole(roleResult),
+    tenantId: typeof tenantResult === "string" && tenantResult.trim() ? tenantResult : null,
   };
 };
 
@@ -223,18 +204,18 @@ const fetchProfile = async (userId: string): Promise<ProfileRow | null> => {
     const response = await withRetry(
       () =>
         withTimeout(
-          supabase
-            .from("profiles")
-            .select("id, role, tenant_id, district_id, auth_email, is_active")
-            .eq("id", userId)
-            .single(),
+          authenticatedSelect<ProfileRow[]>("profiles", {
+            select: "id,role,tenant_id,district_id,auth_email,is_active",
+            id: `eq.${userId}`,
+            limit: "1",
+          }),
           AUTH_QUERY_TIMEOUT_MS,
           "Profile lookup timed out."
         ),
       2
     );
-    data = response.data;
-    error = response.error;
+    data = response?.[0] ?? null;
+    error = null;
   } catch (requestError) {
     console.error("Profile lookup failed:", requestError);
     try {
@@ -271,18 +252,18 @@ const fetchTenantContext = async (tenantId: string): Promise<TenantRow | null> =
     const response = await withRetry(
       () =>
         withTimeout(
-          supabase
-            .from("tenants")
-            .select("id, status, district_id")
-            .eq("id", tenantId)
-            .single(),
+          authenticatedSelect<TenantRow[]>("tenants", {
+            select: "id,status,district_id",
+            id: `eq.${tenantId}`,
+            limit: "1",
+          }),
           AUTH_QUERY_TIMEOUT_MS,
           "Tenant status lookup timed out."
         ),
       2
     );
-    data = response.data;
-    error = response.error;
+    data = response?.[0] ?? null;
+    error = null;
   } catch (requestError) {
     console.error("Tenant status lookup failed:", requestError);
     return null;
@@ -311,6 +292,56 @@ const resolveDistrictSlug = async (districtId: string | null) => {
   return district?.slug?.trim() || null;
 };
 
+const applySessionSummary = async (
+  summary: Awaited<ReturnType<typeof fetchHttpSessionSummary>>
+) => {
+  if (!summary.authenticated || !summary.user) {
+    clearAuthState(true);
+    return;
+  }
+
+  const profile: ProfileRow | null = summary.profile
+    ? {
+        id: summary.user.id,
+        role: summary.profile.role,
+        tenant_id: summary.profile.tenant_id,
+        district_id: summary.profile.district_id,
+        auth_email: summary.profile.auth_email,
+        is_active: summary.profile.is_active,
+      }
+    : null;
+
+  const effectiveDistrictId = await resolveEffectiveDistrictId(profile);
+  const isSuspended = await handleSuspendedTenantSession(profile);
+  if (isSuspended) {
+    return;
+  }
+
+  const current = getAuthState();
+  const isSameUser = current.userId === summary.user.id;
+  const resolvedRole = profile?.role ?? (isSameUser ? current.role : null);
+  const resolvedSessionTenantId =
+    profile?.tenant_id ?? (isSameUser ? current.sessionTenantId : null);
+  const isSuperRole = resolvedRole === "super_admin";
+
+  setAuthStateFromBackend({
+    isInitialized: true,
+    isAuthenticated: true,
+    userId: summary.user.id,
+    email: summary.user.email ?? null,
+    signedInAt: summary.user.last_sign_in_at ?? null,
+    role: resolvedRole,
+    sessionTenantId: resolvedSessionTenantId,
+    tenantContextId: current.tenantContextId ?? resolvedSessionTenantId ?? null,
+    districtContextId:
+      effectiveDistrictId ?? (isSameUser ? current.districtContextId : null) ?? null,
+    hasSecondaryAuth:
+      isSameUser && isSuperRole ? current.hasSecondaryAuth ?? false : false,
+    superVerifiedAt:
+      isSameUser && isSuperRole ? current.superVerifiedAt ?? null : null,
+  });
+};
+
 const handleSuspendedTenantSession = async (profile: ProfileRow | null) => {
   if (!profile?.tenant_id || !["tenant_user", "tenant_admin"].includes(profile.role ?? "")) {
     return false;
@@ -326,122 +357,23 @@ const handleSuspendedTenantSession = async (profile: ProfileRow | null) => {
 };
 
 export const refreshAuthFromSession = async () => {
-  let data: Awaited<ReturnType<typeof supabase.auth.getSession>>["data"] | null =
-    null;
-  let error: Awaited<ReturnType<typeof supabase.auth.getSession>>["error"] | null =
-    null;
   try {
-    const response = await withTimeout(
-      supabase.auth.getSession(),
+    const summary = await withTimeout(
+      fetchHttpSessionSummary(),
       AUTH_QUERY_TIMEOUT_MS,
       "Session refresh timed out."
     );
-    data = response.data;
-    error = response.error;
+    await applySessionSummary(summary);
   } catch (requestError) {
     console.error("Session refresh failed:", requestError);
     clearAuthState(true);
-    return;
   }
-
-  if (error || !data.session) {
-    clearAuthState(true);
-    return;
-  }
-
-  const userId = data.session.user.id;
-  const email = data.session.user.email ?? null;
-  const signedInAt = data.session.user.last_sign_in_at ?? null;
-  const profile = await fetchProfile(userId);
-  const effectiveDistrictId = await resolveEffectiveDistrictId(profile);
-  const isSuspended = await handleSuspendedTenantSession(profile);
-  if (isSuspended) {
-    return;
-  }
-  const current = getAuthState();
-  const isSameUser = current.userId === userId;
-  const resolvedRole = profile?.role ?? (isSameUser ? current.role : null);
-  const resolvedSessionTenantId =
-    profile?.tenant_id ?? (isSameUser ? current.sessionTenantId : null);
-  const isSuperRole = resolvedRole === "super_admin";
-
-  setAuthStateFromBackend({
-    isInitialized: true,
-    isAuthenticated: true,
-    userId,
-    email,
-    signedInAt,
-    role: resolvedRole,
-    sessionTenantId: resolvedSessionTenantId,
-    tenantContextId:
-      current.tenantContextId ?? resolvedSessionTenantId ?? null,
-    districtContextId:
-      effectiveDistrictId ?? (isSameUser ? current.districtContextId : null) ?? null,
-    hasSecondaryAuth:
-      isSameUser && isSuperRole ? current.hasSecondaryAuth ?? false : false,
-    superVerifiedAt:
-      isSameUser && isSuperRole ? current.superVerifiedAt ?? null : null,
-  });
-};
-
-const syncAuthStateFromListener = async (
-  session: {
-    user: { id: string; email?: string | null; last_sign_in_at?: string | null };
-  } | null
-) => {
-  if (!session) {
-    clearAuthState(true);
-    return;
-  }
-
-  const profile = await fetchProfile(session.user.id);
-  const effectiveDistrictId = await resolveEffectiveDistrictId(profile);
-  const isSuspended = await handleSuspendedTenantSession(profile);
-  if (isSuspended) {
-    return;
-  }
-
-  const current = getAuthState();
-  const isSameUser = current.userId === session.user.id;
-  const resolvedRole = profile?.role ?? (isSameUser ? current.role : null);
-  const resolvedSessionTenantId =
-    profile?.tenant_id ?? (isSameUser ? current.sessionTenantId : null);
-  const isSuperRole = resolvedRole === "super_admin";
-
-  setAuthStateFromBackend({
-    isInitialized: true,
-    isAuthenticated: true,
-    userId: session.user.id,
-    email: session.user.email ?? null,
-    signedInAt: session.user.last_sign_in_at ?? null,
-    role: resolvedRole,
-    sessionTenantId: resolvedSessionTenantId,
-    tenantContextId: current.tenantContextId ?? resolvedSessionTenantId ?? null,
-    districtContextId:
-      effectiveDistrictId ?? (isSameUser ? current.districtContextId : null) ?? null,
-    hasSecondaryAuth:
-      isSameUser && isSuperRole ? current.hasSecondaryAuth ?? false : false,
-    superVerifiedAt:
-      isSameUser && isSuperRole ? current.superVerifiedAt ?? null : null,
-  });
 };
 
 export const initAuthListener = () => {
-  supabase.auth.onAuthStateChange((_event, session) => {
-    window.setTimeout(() => {
-      void syncAuthStateFromListener(
-        session
-          ? {
-              user: {
-                id: session.user.id,
-                email: session.user.email ?? null,
-                last_sign_in_at: session.user.last_sign_in_at ?? null,
-              },
-            }
-          : null
-      );
-    }, 0);
-  });
+  // Cookie-backed sessions are restored through /auth/session/me during bootstrap.
+  // Keep the listener disabled so transient in-memory Supabase auth state does not
+  // overwrite the server-managed session view.
 };
 
 export const tenantLogin = async (
@@ -516,6 +448,15 @@ export const tenantLogin = async (
     throw new Error("Invalid credentials.");
   }
 
+  if (!accessToken || !refreshToken) {
+    throw new Error("Invalid credentials.");
+  }
+
+  await exchangeHttpSession({
+    access_token: accessToken,
+    refresh_token: refreshToken,
+  });
+  await clearLocalSession();
   await refreshAuthFromSession();
   const current = getAuthState();
   setTenantContext(current.sessionTenantId ?? null);
@@ -578,6 +519,11 @@ export const consumeDistrictSessionHandoff = async () => {
       throw new Error("Unable to complete district sign-in.");
     }
 
+    await exchangeHttpSession({
+      access_token: verifyResult.data.session.access_token,
+      refresh_token: verifyResult.data.session.refresh_token,
+    });
+    await clearLocalSession();
     sendLoginNotification(verifyResult.data.session.access_token);
 
     try {
@@ -620,17 +566,11 @@ export const consumeDistrictSessionHandoff = async () => {
     throw new Error("Unable to complete district sign-in.");
   }
 
-  await clearLocalSession();
-
-  const { data, error } = await supabase.auth.setSession({
+  await exchangeHttpSession({
     access_token: finalAccessToken,
     refresh_token: finalRefreshToken,
   });
-
-  if (error || !data.session?.access_token) {
-    await clearLocalSession();
-    throw new Error("Unable to complete district sign-in.");
-  }
+  await clearLocalSession();
 
   sendLoginNotification(finalAccessToken);
 
@@ -741,16 +681,28 @@ export const createDistrictAdminSessionHandoff = async (
 export const adminLoginWithSession = async (accessToken: string, refreshToken: string) => {
   const priorTenantContextId = getAuthState().tenantContextId;
   const districtHost = getDistrictState();
-  const session = await setSessionFromTokens(accessToken, refreshToken);
-  const signedInUser =
-    (session.user as { id: string; email?: string | null; last_sign_in_at?: string | null } | null) ??
-    null;
-  if (!signedInUser?.id) {
+  await exchangeHttpSession({
+    access_token: accessToken,
+    refresh_token: refreshToken,
+  });
+  await clearLocalSession();
+
+  const sessionSummary = await fetchHttpSessionSummary();
+  if (!sessionSummary.authenticated || !sessionSummary.user) {
     throw new Error("Invalid credentials.");
   }
 
   const current = getAuthState();
-  let profile = await fetchProfile(signedInUser.id);
+  let profile = sessionSummary.profile
+    ? {
+        id: sessionSummary.user.id,
+        role: sessionSummary.profile.role,
+        tenant_id: sessionSummary.profile.tenant_id,
+        district_id: sessionSummary.profile.district_id,
+        auth_email: sessionSummary.profile.auth_email,
+        is_active: sessionSummary.profile.is_active,
+      }
+    : await fetchProfile(sessionSummary.user.id);
   let fallbackRole: ProfileRow["role"] = null;
   let fallbackTenantId: string | null = null;
   let resolvedRole = profile?.role ?? null;
@@ -814,9 +766,9 @@ export const adminLoginWithSession = async (accessToken: string, refreshToken: s
   setAuthStateFromBackend({
     isInitialized: true,
     isAuthenticated: true,
-    userId: signedInUser.id,
-    email: signedInUser.email ?? null,
-    signedInAt: signedInUser.last_sign_in_at ?? null,
+    userId: sessionSummary.user.id,
+    email: sessionSummary.user.email ?? null,
+    signedInAt: sessionSummary.user.last_sign_in_at ?? null,
     role: resolvedRole,
     sessionTenantId: finalTenantId,
     tenantContextId: current.tenantContextId ?? finalTenantId ?? null,
@@ -830,6 +782,13 @@ export const adminLoginWithSession = async (accessToken: string, refreshToken: s
   }
   if (resolvedRole === "district_admin") {
     setDistrictContext(resolvedDistrictId ?? null);
+  }
+
+  try {
+    await registerPrivilegedAdminStepUp();
+  } catch (error) {
+    await signOut();
+    throw error;
   }
   markAdminVerified();
   sendLoginNotification(accessToken);
@@ -875,7 +834,11 @@ export const superAdminLogin = async (
     throw edgeFunctionError(result, "Unable to send verification code.");
   }
 
-  await setSessionFromTokens(result.data.access_token, result.data.refresh_token);
+  await exchangeHttpSession({
+    access_token: result.data.access_token,
+    refresh_token: result.data.refresh_token,
+  });
+  await clearLocalSession();
   await refreshAuthFromSession();
   const current = getAuthState();
   if (current.role !== "super_admin") {
@@ -892,6 +855,11 @@ export const superAdminLogin = async (
 };
 
 export const signOut = async () => {
+  try {
+    await clearHttpSession();
+  } catch {
+    // Ignore cookie logout failures during the migration window.
+  }
   await supabase.auth.signOut();
   clearAdminVerification();
   clearPendingSuperAdminVerificationEmail();

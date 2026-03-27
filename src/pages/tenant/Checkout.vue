@@ -16,12 +16,12 @@
 
     <div class="card checkout-card">
       <label>
-        Student ID
+        Borrower ID
         <div class="input-row checkout-input-row">
           <input
             v-model="studentId"
             type="text"
-            placeholder="Enter student ID"
+            placeholder="Enter borrower ID"
             :disabled="studentLookupCooldownSeconds > 0"
             @keyup.enter="loadStudent"
           />
@@ -31,14 +31,14 @@
             :disabled="isStudentLoading || studentLookupCooldownSeconds > 0"
             @click="loadStudent"
           >
-            Load student
+            Load borrower
           </button>
         </div>
       </label>
       <p v-if="studentLookupCooldownSeconds > 0" class="muted checkout-rate-limit-note">
         Try again in {{ studentLookupCooldownSeconds }} second{{ studentLookupCooldownSeconds === 1 ? "" : "s" }}.
       </p>
-      <p v-if="isStudentLoading" class="muted checkout-status-note">Loading student...</p>
+      <p v-if="isStudentLoading" class="muted checkout-status-note">Loading borrower...</p>
 
       <div v-if="student" class="checkout-student-summary">
         <p>
@@ -322,9 +322,9 @@ const submit = async () => {
       await addBarcode();
     }
     if (!studentId.value.trim() || barcodes.value.length === 0) {
-      error.value = "Enter a student ID and at least one barcode.";
+      error.value = "Enter a borrower ID and at least one barcode.";
       toastStatus.value = "Failed";
-      toastTitle.value = "Transaction failed. Please try again.";
+      toastTitle.value = "Transaction failed. Please try again. If issue persists, sign out completeley and sign back in. If issue still persists, contact support.";
       toastMessage.value = error.value;
       return;
     }
@@ -334,7 +334,7 @@ const submit = async () => {
       if (!student.value) {
         toastStatus.value = "Failed";
         toastTitle.value = "Transaction failed.";
-        toastMessage.value = error.value || "Unable to load student. Please sign out completeley and sign back in.";
+        toastMessage.value = error.value || "Unable to load borrower. Please sign out completeley and sign back in. If issue persists, contact support.";
         return;
       }
     }
@@ -368,7 +368,7 @@ const submit = async () => {
       checkedOutGear.value = [];
       toastStatus.value = "Processing";
       toastTitle.value = "Saved offline.";
-      toastMessage.value = `No connection. Transaction was buffered and will auto-sync when you're online. Buffered: ${bufferedCount}`;
+      toastMessage.value = `No connection. Transaction was buffered and will auto-sync to ItemTraxx Servers when you're online. Buffered: ${bufferedCount}`;
       return;
     }
     const studentSnapshot = student.value;
@@ -411,7 +411,7 @@ const submit = async () => {
   } catch (err) {
     error.value = err instanceof Error ? err.message : "Request failed.";
     toastStatus.value = "Failed";
-    toastTitle.value = "Transaction complete (Failed). Please sign out completeley and sign back in.";
+    toastTitle.value = "Transaction complete (Failed). Please sign out completeley and sign back in. If issue still persists, contact support.";
     toastMessage.value = error.value;
     window.setTimeout(() => {
       toastTitle.value = "";

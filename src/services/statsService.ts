@@ -1,4 +1,4 @@
-import { supabase } from "./supabaseClient";
+import { authenticatedCount } from "./authenticatedDataClient";
 
 export type UsageStats = {
   totalGear: number;
@@ -10,15 +10,7 @@ export type UsageStats = {
   returns30d: number;
 };
 
-const countTable = async (table: string, filter?: (q: any) => any) => {
-  let query = supabase.from(table).select("id", { count: "exact", head: true });
-  if (filter) query = filter(query);
-  const { count, error } = await query;
-  if (error || count === null) {
-    throw new Error("Unable to load statistics.");
-  }
-  return count;
-};
+const countTable = async (table: string, query: Record<string, string> = {}) => authenticatedCount(table, query);
 
 export const fetchUsageStats = async (): Promise<UsageStats> => {
   const now = new Date();
@@ -36,19 +28,11 @@ export const fetchUsageStats = async (): Promise<UsageStats> => {
   ] = await Promise.all([
     countTable("gear"),
     countTable("students"),
-    countTable("gear", (q) => q.not("checked_out_by", "is", null)),
-    countTable("gear_logs", (q) =>
-      q.eq("action_type", "checkout").gte("action_time", since7)
-    ),
-    countTable("gear_logs", (q) =>
-      q.eq("action_type", "return").gte("action_time", since7)
-    ),
-    countTable("gear_logs", (q) =>
-      q.eq("action_type", "checkout").gte("action_time", since30)
-    ),
-    countTable("gear_logs", (q) =>
-      q.eq("action_type", "return").gte("action_time", since30)
-    ),
+    countTable("gear", { checked_out_by: "not.is.null" }),
+    countTable("gear_logs", { action_type: "eq.checkout", action_time: `gte.${since7}` }),
+    countTable("gear_logs", { action_type: "eq.return", action_time: `gte.${since7}` }),
+    countTable("gear_logs", { action_type: "eq.checkout", action_time: `gte.${since30}` }),
+    countTable("gear_logs", { action_type: "eq.return", action_time: `gte.${since30}` }),
   ]);
 
   return {

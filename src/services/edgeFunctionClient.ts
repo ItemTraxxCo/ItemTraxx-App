@@ -32,10 +32,10 @@ export const getEdgeFunctionsBaseUrl = () => {
   const shouldUseProxyInDev =
     useProxyInDevSetting === "false" ? false : !!proxyUrl?.trim();
 
-  if (import.meta.env.DEV && !shouldUseProxyInDev) {
-    return getDirectFunctionsBaseUrl();
+  if (!import.meta.env.DEV) {
+    return "/functions";
   }
-  if (proxyUrl?.trim()) {
+  if (shouldUseProxyInDev && proxyUrl?.trim()) {
     return `${trimTrailingSlash(proxyUrl)}/functions`;
   }
   return getDirectFunctionsBaseUrl();
@@ -44,7 +44,7 @@ export const getEdgeFunctionsBaseUrl = () => {
 const getDefaultHeaders = (accessToken?: string) => {
   const headers: Record<string, string> = {};
   const proxyUrl = import.meta.env.VITE_EDGE_PROXY_URL as string | undefined;
-  const isUsingProxy = !!proxyUrl?.trim();
+  const isUsingProxy = !import.meta.env.DEV || !!proxyUrl?.trim();
 
   if (accessToken) {
     headers.Authorization = `Bearer ${accessToken}`;
@@ -110,6 +110,7 @@ const requestEdgeFunction = async <TData = unknown, TBody = unknown>(
     try {
       response = await fetch(`${baseUrl}/${functionName}`, {
         ...init,
+        credentials: "include",
         signal: controller.signal,
       });
     } finally {

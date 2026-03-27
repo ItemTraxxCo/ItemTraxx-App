@@ -22,7 +22,7 @@
           <p class="stat-value">{{ stats?.totalGear ?? 0 }}</p>
         </div>
         <div class="stat-card">
-          <h3>Total students</h3>
+          <h3>Total borrowers</h3>
           <p class="stat-value">{{ stats?.totalStudents ?? 0 }}</p>
         </div>
         <div class="stat-card">

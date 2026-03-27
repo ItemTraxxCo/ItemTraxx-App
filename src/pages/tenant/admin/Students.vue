@@ -9,11 +9,11 @@
       <div class="admin-summary-grid">
         <div class="admin-summary-card">
           <strong>{{ students.length }}</strong>
-          <span>Active students</span>
+          <span>Active borrowers</span>
         </div>
         <div class="admin-summary-card">
           <strong>{{ archivedStudents.length }}</strong>
-          <span>Archived students</span>
+          <span>Archived borrowers</span>
         </div>
         <div class="admin-summary-card">
           <strong>{{ filteredStudents.length }}</strong>
@@ -26,7 +26,7 @@
       <div class="admin-section-header">
         <div>
           <h2>Add Borrower</h2>
-          <p class="admin-section-copy">Generate a new student identity and add it to this tenant.</p>
+          <p class="admin-section-copy">Generate a new borrower identity and add it to this tenant.</p>
         </div>
       </div>
       <form class="form" @submit.prevent="handleCreate">
@@ -50,7 +50,7 @@
         </label>
         <div class="form-actions">
           <button type="button" @click="regenerateIdentity">Regenerate</button>
-          <button type="submit" class="button-primary" :disabled="isSaving">Add student</button>
+          <button type="submit" class="button-primary" :disabled="isSaving">Add borrower</button>
         </div>
       </form>
       <p v-if="error" class="error">{{ error }}</p>
@@ -71,7 +71,7 @@
       <div class="admin-section-header">
         <div>
           <h2>Borrowers</h2>
-          <p class="admin-section-copy">Search, export, and inspect student records from one table.</p>
+          <p class="admin-section-copy">Search, export, and inspect borrower records from one table.</p>
         </div>
         <div class="admin-toolbar-actions">
           <button type="button" @click="exportCsv">Export CSV</button>
@@ -80,7 +80,7 @@
       </div>
       <div class="form-grid-2">
         <label>
-          Search students
+          Search borrowers
           <input
             v-model="searchQuery"
             type="text"
@@ -95,7 +95,7 @@
         <thead>
           <tr>
             <th>Username</th>
-            <th>Student ID</th>
+            <th>Borrower ID</th>
             <th>Details</th>
           </tr>
         </thead>
@@ -118,16 +118,16 @@
       <div class="admin-section-header">
         <div>
           <h2>Archived Borrowers</h2>
-          <p class="admin-section-copy">Archived students can be restored at any time.</p>
+          <p class="admin-section-copy">Archived borrowers can be restored at any time.</p>
         </div>
       </div>
-      <p v-if="isLoadingArchived" class="muted">Loading archived students...</p>
+      <p v-if="isLoadingArchived" class="muted">Loading archived borrowers...</p>
       <div v-else class="table-wrap">
       <table class="table">
         <thead>
           <tr>
             <th>Username</th>
-            <th>Student ID</th>
+            <th>Borrower ID</th>
             <th></th>
           </tr>
         </thead>
@@ -185,9 +185,9 @@
     <div v-if="showDetails" class="modal-backdrop">
       <div class="modal">
         <h2>Borrower details</h2>
-        <p class="muted">View username, student ID, and checkout history.</p>
+        <p class="muted">View username, borrower ID, and checkout history.</p>
         <h3>{{ selected?.username }}</h3>
-        <p class="muted">Student ID: {{ selected?.student_id }}</p>
+        <p class="muted">Borrower ID: {{ selected?.student_id }}</p>
         <div class="form-grid-2">
           <label>
             Username
@@ -200,7 +200,7 @@
             />
           </label>
           <label>
-            Student ID
+            Borrower ID
             <input
               class="identity-readonly"
               :value="selected?.student_id || ''"
@@ -366,8 +366,8 @@ const runToastAction = async () => {
 
 const showDuplicateStudentToast = () => {
   showToast(
-    "Unable to add student.",
-    "Check student ID number and make sure it does not match another student's ID number. If you believe this is an error, contact support with the student details you want to add."
+    "Unable to add borrower.",
+    "Check borrower ID number and make sure it does not match another borrower's ID number. If you believe this is an error, contact support with the borrower details you want to add."
   );
 };
 
@@ -388,7 +388,7 @@ const loadStudents = async () => {
   try {
     students.value = await fetchStudents();
   } catch (err) {
-    error.value = err instanceof Error ? err.message : "Unable to load students. Please sign out completeley and sign back in.";
+    error.value = err instanceof Error ? err.message : "Unable to load borrowers. Please sign out completeley and sign back in. If issue persists, contact support.";
   } finally {
     isLoading.value = false;
   }
@@ -518,7 +518,7 @@ const openDetails = async (item: StudentItem) => {
   try {
     details.value = await fetchStudentDetails(item.id);
   } catch (err) {
-    error.value = err instanceof Error ? err.message : "Unable to load details. Please sign out completeley and sign back in.";
+    error.value = err instanceof Error ? err.message : "Unable to load details. Please sign out completeley and sign back in. If issue persists, contact support.";
     details.value = null;
   } finally {
     detailsLoading.value = false;
@@ -568,7 +568,7 @@ const removeStudent = async (item: StudentItem) => {
       }
     );
   } catch (err) {
-    error.value = err instanceof Error ? err.message : "Unable to archive student. Please sign out completeley and sign back in.";
+    error.value = err instanceof Error ? err.message : "Unable to archive borrower. Please sign out completeley and sign back in. If issue persists, contact support.";
   } finally {
     isSaving.value = false;
   }
@@ -599,7 +599,7 @@ const handleRestore = async (item: StudentItem) => {
     students.value = [restored, ...students.value];
     success.value = "Borrower restored.";
   } catch (err) {
-    error.value = err instanceof Error ? err.message : "Unable to restore student.";
+    error.value = err instanceof Error ? err.message : "Unable to restore borrower. If you believe this is an error, contact support.";
   } finally {
     isSaving.value = false;
   }

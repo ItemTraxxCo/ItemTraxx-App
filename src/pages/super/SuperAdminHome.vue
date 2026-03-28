@@ -14,6 +14,7 @@
         <RouterLink class="button-link" to="/super-admin/tenants">Tenants</RouterLink>
         <RouterLink class="button-link" to="/super-admin/admins">Admins</RouterLink>
         <RouterLink class="button-link" to="/internal">Internal Ops</RouterLink>
+        <button type="button" class="button-link" @click="handleSignOut">Sign out</button>
       </div>
     </div>
 
@@ -402,8 +403,6 @@
         </table>
       </section>
     </div>
-
-    <button type="button" class="link" @click="handleSignOut">Sign out</button>
 
     <div v-if="toastMessage" class="toast">
       <div class="toast-title">{{ toastTitle }}</div>

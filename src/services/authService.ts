@@ -790,7 +790,7 @@ export const adminLoginWithSession = async (accessToken: string, refreshToken: s
   }
 
   try {
-    await registerPrivilegedAdminStepUp();
+    await registerPrivilegedAdminStepUp(accessToken);
   } catch (error) {
     await signOut();
     throw error;

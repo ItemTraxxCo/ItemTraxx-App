@@ -5,6 +5,8 @@ export interface Env {
   ALLOWED_FUNCTIONS?: string;
   ITX_ITEMTRAXX_KILLSWITCH_ENABLED?: string;
   SESSION_COOKIE_DOMAIN?: string;
+  SENTRY_DSN?: string;
+  SENTRY_ENVIRONMENT?: string;
 }
 
 const ACCESS_COOKIE_NAME = "itx_session";
@@ -73,6 +75,136 @@ type ProfileRow = {
 };
 
 const trimTrailingSlash = (value: string) => value.replace(/\/+$/, "");
+
+const parseSentryDsn = (dsn?: string | null) => {
+  if (!dsn) return null;
+  try {
+    const url = new URL(dsn);
+    const publicKey = url.username;
+    const projectId = url.pathname.replace(/^\/+/, "");
+    if (!publicKey || !projectId) return null;
+    return {
+      publicKey,
+      projectId,
+      storeUrl: `${url.protocol}//${url.host}/api/${projectId}/envelope/`,
+    };
+  } catch {
+    return null;
+  }
+};
+
+const buildSentryEnvelope = (dsn: NonNullable<ReturnType<typeof parseSentryDsn>>, event: Record<string, unknown>) => {
+  const eventId = crypto.randomUUID().replace(/-/g, "");
+  const envelopeHeaders = JSON.stringify({
+    event_id: eventId,
+    sent_at: new Date().toISOString(),
+  });
+  const itemHeaders = JSON.stringify({ type: "event" });
+  const payload = JSON.stringify({
+    event_id: eventId,
+    timestamp: Math.floor(Date.now() / 1000),
+    platform: "javascript",
+    logger: "itemtraxx-edge-proxy",
+    ...event,
+  });
+  return `${envelopeHeaders}
+${itemHeaders}
+${payload}`;
+};
+
+const reportWorkerEvent = async (env: Env, event: Record<string, unknown>) => {
+  const sentry = parseSentryDsn(env.SENTRY_DSN?.trim());
+  if (!sentry) return;
+
+  const envelope = buildSentryEnvelope(sentry, event);
+  await fetch(sentry.storeUrl, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/x-sentry-envelope",
+      "X-Sentry-Auth": `Sentry sentry_version=7, sentry_client=itemtraxx-edge-proxy/1.0, sentry_key=${sentry.publicKey}`,
+    },
+    body: envelope,
+  }).catch(() => undefined);
+};
+
+const reportWorkerException = (
+  env: Env,
+  request: Request,
+  requestId: string,
+  error: unknown,
+  extra: Record<string, unknown> = {}
+) => {
+  const message = error instanceof Error ? error.message : String(error);
+  return reportWorkerEvent(env, {
+    level: "error",
+    environment: env.SENTRY_ENVIRONMENT?.trim() || "production",
+    request: {
+      url: request.url,
+      method: request.method,
+      headers: {
+        origin: request.headers.get("origin") ?? undefined,
+      },
+    },
+    tags: {
+      runtime: "cloudflare-worker",
+    },
+    extra: {
+      requestId,
+      ...extra,
+    },
+    exception: {
+      values: [
+        {
+          type: error instanceof Error ? error.name : "WorkerError",
+          value: message,
+        },
+      ],
+    },
+  });
+};
+
+const reportWorkerHttpFailure = (
+  env: Env,
+  request: Request,
+  requestId: string,
+  status: number,
+  message: string,
+  extra: Record<string, unknown> = {}
+) =>
+  reportWorkerEvent(env, {
+    level: status >= 500 ? "error" : "warning",
+    environment: env.SENTRY_ENVIRONMENT?.trim() || "production",
+    request: {
+      url: request.url,
+      method: request.method,
+      headers: {
+        origin: request.headers.get("origin") ?? undefined,
+      },
+    },
+    tags: {
+      runtime: "cloudflare-worker",
+      status: String(status),
+    },
+    extra: {
+      requestId,
+      ...extra,
+    },
+    message,
+  });
+
+const maybeReportWorkerResponse = (
+  env: Env,
+  request: Request,
+  requestId: string,
+  response: Response,
+  ctx: ExecutionContext,
+  extra: Record<string, unknown> = {}
+) => {
+  if (response.status < 500) return;
+  ctx.waitUntil(
+    reportWorkerHttpFailure(env, request, requestId, response.status, `Worker request failed with status ${response.status}.`, extra)
+  );
+};
 
 const parseCsv = (value?: string) =>
   (value ?? "")
@@ -718,7 +850,7 @@ const handleSessionRequest = async (
 };
 
 export default {
-  async fetch(request: Request, env: Env): Promise<Response> {
+  async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
     const origin = request.headers.get("Origin");
     const requestId =
@@ -729,46 +861,61 @@ export default {
     );
     const { originAllowed, headers } = withCorsHeaders(origin, allowedOrigins);
 
-    if (request.method === "OPTIONS") {
-      if (!originAllowed) {
-        return new Response("Origin not allowed", { status: 403, headers });
+    try {
+      if (request.method === "OPTIONS") {
+        if (!originAllowed) {
+          return new Response("Origin not allowed", { status: 403, headers });
+        }
+        return new Response("ok", { headers });
       }
-      return new Response("ok", { headers });
-    }
 
-    if (!originAllowed) {
-      return buildError(403, "Origin not allowed", headers, requestId);
-    }
+      if (!originAllowed) {
+        return buildError(403, "Origin not allowed", headers, requestId);
+      }
 
-    if (!env.SUPABASE_URL || !env.SUPABASE_ANON_KEY) {
-      return buildError(500, "Proxy misconfiguration", headers, requestId);
-    }
+      if (!env.SUPABASE_URL || !env.SUPABASE_ANON_KEY) {
+        const response = buildError(500, "Proxy misconfiguration", headers, requestId);
+        maybeReportWorkerResponse(env, request, requestId, response, ctx, { type: "proxy_misconfiguration" });
+        return response;
+      }
 
-    const sessionAction = getSessionAction(url.pathname);
-    if (sessionAction) {
-      return handleSessionRequest(request, env, headers, requestId, sessionAction);
-    }
+      const sessionAction = getSessionAction(url.pathname);
+      if (sessionAction) {
+        const response = await handleSessionRequest(request, env, headers, requestId, sessionAction);
+        maybeReportWorkerResponse(env, request, requestId, response, ctx, { type: "session", action: sessionAction });
+        return response;
+      }
 
-    if (isRestProxyPath(url.pathname) || isRpcProxyPath(url.pathname)) {
-      return proxySupabaseApiRequest(request, env, headers, requestId, url.pathname);
-    }
+      if (isRestProxyPath(url.pathname) || isRpcProxyPath(url.pathname)) {
+        const response = await proxySupabaseApiRequest(request, env, headers, requestId, url.pathname);
+        maybeReportWorkerResponse(env, request, requestId, response, ctx, { type: isRpcProxyPath(url.pathname) ? "rpc" : "rest", path: url.pathname });
+        return response;
+      }
 
-    const functionName = getFunctionName(url.pathname);
-    if (!functionName) {
-      return buildError(404, "Not found", headers, requestId);
-    }
+      const functionName = getFunctionName(url.pathname);
+      if (!functionName) {
+        return buildError(404, "Not found", headers, requestId);
+      }
 
-    const killSwitchEnabled =
-      (env.ITX_ITEMTRAXX_KILLSWITCH_ENABLED ?? "").toLowerCase() === "true";
-    if (killSwitchEnabled && functionName !== "system-status" && !isLocalhostOrigin(origin)) {
-      return buildError(503, "Unfortunately ItemTraxx is currently unavailable.", headers, requestId);
-    }
+      const killSwitchEnabled =
+        (env.ITX_ITEMTRAXX_KILLSWITCH_ENABLED ?? "").toLowerCase() === "true";
+      if (killSwitchEnabled && functionName !== "system-status" && !isLocalhostOrigin(origin)) {
+        const response = buildError(503, "Unfortunately ItemTraxx is currently unavailable.", headers, requestId);
+        maybeReportWorkerResponse(env, request, requestId, response, ctx, { type: "kill_switch", functionName });
+        return response;
+      }
 
-    const allowedFunctions = parseCsv(env.ALLOWED_FUNCTIONS);
-    if (allowedFunctions.length > 0 && !allowedFunctions.includes(functionName)) {
-      return buildError(403, "Function not allowed", headers, requestId);
-    }
+      const allowedFunctions = parseCsv(env.ALLOWED_FUNCTIONS);
+      if (allowedFunctions.length > 0 && !allowedFunctions.includes(functionName)) {
+        return buildError(403, "Function not allowed", headers, requestId);
+      }
 
-    return proxyFunctionRequest(request, env, headers, requestId, functionName);
+      const response = await proxyFunctionRequest(request, env, headers, requestId, functionName);
+      maybeReportWorkerResponse(env, request, requestId, response, ctx, { type: "function", functionName });
+      return response;
+    } catch (error) {
+      ctx.waitUntil(reportWorkerException(env, request, requestId, error));
+      return buildError(500, "Internal worker error", headers, requestId);
+    }
   },
 };

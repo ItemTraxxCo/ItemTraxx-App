@@ -1,3 +1,5 @@
+import { captureHandledRequestFailure } from "./sentry";
+
 export type HttpSessionSummary = {
   authenticated: boolean;
   user: {
@@ -57,7 +59,17 @@ const requestHttpSession = async <TData>(
   });
 
   if (!response.ok) {
-    throw new Error(`Session request failed (${response.status}).`);
+    const message = `Session request failed (${response.status}).`;
+    void captureHandledRequestFailure({
+      area: "http_session",
+      name: action,
+      path: `/auth/session/${action}`,
+      method: init?.method ?? "GET",
+      status: response.status,
+      message,
+      requestId: response.headers.get("x-request-id") ?? undefined,
+    });
+    throw new Error(message);
   }
 
   return (await response.json()) as TData;

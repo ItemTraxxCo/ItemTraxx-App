@@ -79,6 +79,12 @@ body.marketing-route-active {
   background: #090d14;
 }
 
+body.marketing-route-active #app {
+  min-height: 100vh;
+  min-height: 100dvh;
+  background: #090d14;
+}
+
 html[data-theme="light"].auth-route-active,
 body.auth-route-active {
   background: #e8eef3;
@@ -185,11 +191,22 @@ button:focus-visible {
 }
 
 .app-shell.route-shell-marketing {
+  position: relative;
   margin: -2.5rem -2rem -3rem;
   min-height: 100vh;
+  min-height: 100dvh;
   padding: 0;
   overflow-x: hidden;
   background: #090d14;
+}
+
+.app-shell.route-shell-marketing::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background: #090d14;
+  pointer-events: none;
 }
 
 .app-shell.route-shell-banner-bleed.with-top-banners {

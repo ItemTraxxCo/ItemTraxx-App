@@ -28,7 +28,7 @@
     <main id="landing-new-main" class="shell landing-main">
       <section class="hero-grid reveal reveal-up">
         <div class="hero-copy reveal reveal-left">
-          <p class="eyebrow">Individual plans available</p>
+          <p class="eyebrow">Inventory tracking made simple</p>
           <h1>ItemTraxx</h1>
           <p class="hero-body">
             Losing track of where stuff goes? ItemTraxx is the right service for you.
@@ -207,7 +207,7 @@
         <RouterLink to="/security">Security</RouterLink>
         <RouterLink to="/changelog">Changelog</RouterLink>
         <a href="https://status.itemtraxx.com/" target="_blank" rel="noreferrer">Status</a>
-        <a :href="legalUrl" target="_blank" rel="noreferrer">Legal</a>
+        <RouterLink to="/legal">Legal</RouterLink>
         <RouterLink to="/about">About</RouterLink>
         <a href="https://github.com/ItemTraxxCo" target="_blank" rel="noreferrer">GitHub</a>
       </div>
@@ -230,11 +230,6 @@ import checkoutReturnUiImage1600 from '../assets/landing/checkout_return_ui-1600
 import { fetchSystemStatus } from '../services/systemStatusService';
 
 const appVersion = import.meta.env.VITE_GIT_COMMIT || "n/a";
-const legalUrl =
-  import.meta.env.VITE_APP_URL && String(import.meta.env.VITE_APP_URL).startsWith('http')
-    ? `${String(import.meta.env.VITE_APP_URL).replace(/\/$/, '')}/legal`
-    : 'https://www.itemtraxx.com/legal';
-
 type ShowcaseVariant = {
   label: string;
   pill: string;

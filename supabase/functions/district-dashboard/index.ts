@@ -161,6 +161,7 @@ serve(async (req) => {
     created_at: string;
     primary_admin_profile_id?: string | null;
   }>;
+  const tenantIds = tenants.map((tenant) => tenant.id).filter(Boolean);
 
   const profileIds = tenants
     .map((tenant) => tenant.primary_admin_profile_id)
@@ -187,7 +188,7 @@ serve(async (req) => {
     )
     .in(
       "tenant_id",
-      tenants.map((tenant) => tenant.id)
+      tenantIds
     );
 
   const tenantMetrics = ((metricRows ?? []) as Array<Record<string, number | string>>).map((row) => ({
@@ -228,7 +229,7 @@ serve(async (req) => {
         .gte("action_time", since24hIso)
         .order("action_time", { ascending: false })
         .limit(400)
-    : { data: [] as Array<Record<string, string | null>>, error: null };
+    : { data: [] as Array<Record<string, string | null>> };
 
   const traffic = {
     checkout_24h: (recentLogs ?? []).filter((row) => row.action_type === "checkout").length,

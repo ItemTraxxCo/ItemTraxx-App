@@ -1,3 +1,5 @@
+import { captureHandledRequestFailure } from "./sentry";
+
 const trimTrailingSlash = (value: string) => value.replace(/\/+$/, "");
 
 const getProxyOrigin = () => {
@@ -37,7 +39,17 @@ const request = async (path: string, init: RequestInit = {}) => {
   });
 
   if (!response.ok) {
-    throw new Error(`Authenticated data request failed (${response.status}).`);
+    const message = `Authenticated data request failed (${response.status}).`;
+    void captureHandledRequestFailure({
+      area: "authenticated_data",
+      name: path,
+      path,
+      method: init.method ?? "GET",
+      status: response.status,
+      message,
+      requestId: response.headers.get("x-request-id") ?? undefined,
+    });
+    throw new Error(message);
   }
 
   return response;

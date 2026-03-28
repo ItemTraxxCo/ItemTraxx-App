@@ -79,6 +79,80 @@ const isExpectedUnauthorizedAuthEvent = (event: {
   return event.environment === "development" || isLocalDevelopmentUrl(event.request?.url);
 };
 
+
+
+type HandledRequestFailure = {
+  area: "edge_function" | "authenticated_data" | "http_session";
+  name: string;
+  path: string;
+  method: string;
+  status: number;
+  message: string;
+  requestId?: string;
+};
+
+const CRITICAL_EDGE_FUNCTIONS = new Set([
+  "super-dashboard",
+  "district-dashboard",
+  "admin-ops",
+  "privileged-step-up",
+  "district-handoff",
+  "tenant-login",
+  "super-auth-verify",
+  "checkoutReturn",
+]);
+
+const CRITICAL_DATA_PATH_PATTERNS = [
+  /^\/rest\/v1\/(profiles|students|gear|admin_audit_logs|audit_logs)/i,
+  /^\/rest\/v1\/rpc\/(consume_rate_limit)/i,
+  /^\/auth\/session\/(exchange|refresh)/i,
+];
+
+const shouldCaptureHandledRequestFailure = (failure: HandledRequestFailure) => {
+  if (failure.status >= 500) {
+    return true;
+  }
+
+  if (failure.area === "edge_function") {
+    if ((failure.status === 401 || failure.status === 403 || failure.status === 429) &&
+      CRITICAL_EDGE_FUNCTIONS.has(failure.name)) {
+      return true;
+    }
+    return false;
+  }
+
+  if ((failure.status === 401 || failure.status === 403 || failure.status === 429) &&
+    CRITICAL_DATA_PATH_PATTERNS.some((pattern) => pattern.test(failure.path))) {
+    return true;
+  }
+
+  return false;
+};
+
+export const captureHandledRequestFailure = async (failure: HandledRequestFailure) => {
+  if (!SENTRY_DSN || !shouldCaptureHandledRequestFailure(failure)) {
+    return;
+  }
+
+  const Sentry = await import("@sentry/vue");
+  const error = new Error(failure.message || `Handled request failure (${failure.status}).`);
+  error.name = "HandledRequestFailure";
+
+  Sentry.captureException(error, {
+    tags: {
+      handled_request: "true",
+      request_area: failure.area,
+      request_name: failure.name,
+      request_method: failure.method,
+      request_status: String(failure.status),
+    },
+    level: failure.status >= 500 ? "error" : "warning",
+    extra: {
+      path: failure.path,
+      requestId: failure.requestId,
+    },
+  });
+};
 export const initializeSentry = async (app: App, router: Router) => {
   if (!SENTRY_DSN) {
     return;

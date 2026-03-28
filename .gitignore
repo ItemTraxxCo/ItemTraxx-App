@@ -36,3 +36,6 @@ supabase/.temp/
 .github/copilot-instructions.md
 .github/agents/Main Developer.agent.md
 DOCUMENTATION_COMPLETION_CHECKLIST.md
+
+# Added by ggshield
+.cache_ggshield

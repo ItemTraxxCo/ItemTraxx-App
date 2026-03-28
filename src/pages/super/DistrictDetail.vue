@@ -185,7 +185,11 @@
             <input v-model="createAdminPassword" type="password" placeholder="Temporary password" />
           </label>
           <div class="form-actions">
-            <button type="submit" class="button-primary" :disabled="isSavingAdmins">
+            <button
+              type="submit"
+              class="button-primary"
+              :disabled="isSavingAdmins || !createAdminEmail.trim() || createAdminPassword.length < 8"
+            >
               Create District Admin
             </button>
           </div>
@@ -342,6 +346,10 @@ const loadDistrictAdmins = async () => {
 const createDistrictAdmin = async () => {
   const districtId = String(route.params.id || "").trim();
   if (!districtId || !createAdminEmail.value.trim() || !createAdminPassword.value.trim()) {
+    return;
+  }
+  if (createAdminPassword.value.length < 8) {
+    error.value = "Temporary password must be at least 8 characters.";
     return;
   }
   isSavingAdmins.value = true;

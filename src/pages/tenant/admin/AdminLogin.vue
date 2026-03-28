@@ -20,9 +20,15 @@
              
             <input v-model="email" type="email" placeholder="Enter email" />
           </label>
-          <label>
+          <label class="admin-password-field">
              
             <input v-model="password" type="password" placeholder="Enter password" />
+            <RouterLink
+              class="link-button admin-password-help-link"
+              :to="{ path: '/forgot-password', query: { email: email.trim(), from: 'admin-login' } }"
+            >
+              Forgot password?
+            </RouterLink>
           </label>
           <label v-if="turnstileSiteKey" class="admin-security-check">
             Security Check
@@ -388,9 +394,27 @@ onUnmounted(() => {
   font-size: 1.02rem;
 }
 
+.admin-password-field {
+  position: relative;
+}
+
+.admin-password-help-link {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 0.45rem);
+  font-size: 0.82rem;
+  color: color-mix(in srgb, var(--admin-login-copy) 84%, var(--accent) 16%);
+  text-decoration: none;
+}
+
+.admin-password-help-link:hover {
+  color: var(--admin-login-heading);
+  text-decoration: underline;
+}
+
 .admin-security-check {
   display: block;
-  margin-top: 0.6rem;
+  margin-top: 1.6rem;
 }
 
 .admin-login-submit {

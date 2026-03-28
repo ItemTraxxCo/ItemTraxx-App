@@ -32,22 +32,39 @@
         Password reset link sent. Check your inbox and follow the link to continue. The link will expire in 60 minutes. If you don't receive the email, check your spam folder or try again.
       </p>
 
-      <RouterLink class="link back-link" to="/login">Back to login</RouterLink>
+      <RouterLink class="link back-link" :to="backLinkTarget">{{ backLinkLabel }}</RouterLink>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref } from "vue";
-import { RouterLink } from "vue-router";
+import { computed, onMounted, onUnmounted, ref } from "vue";
+import { RouterLink, useRoute } from "vue-router";
 import { supabase } from "../services/supabaseClient";
 
+const route = useRoute();
 const email = ref("");
 const error = ref("");
 const success = ref(false);
 const isLoading = ref(false);
 const themeMode = ref<"light" | "dark">("dark");
 let themeObserver: MutationObserver | null = null;
+
+const backLinkTarget = computed(() =>
+  route.query.from === "admin-login"
+    ? "/tenant/admin-login"
+    : route.query.from === "super-auth"
+      ? "/super-auth"
+      : "/login"
+);
+
+const backLinkLabel = computed(() =>
+  route.query.from === "admin-login"
+    ? "Back to admin login"
+    : route.query.from === "super-auth"
+      ? "Back to super admin login"
+      : "Back to login"
+);
 
 const sendResetEmail = async () => {
   error.value = "";
@@ -80,6 +97,10 @@ const sendResetEmail = async () => {
 };
 
 onMounted(() => {
+  const presetEmail = typeof route.query.email === "string" ? route.query.email.trim() : "";
+  if (presetEmail) {
+    email.value = presetEmail;
+  }
   themeMode.value = document.documentElement.getAttribute("data-theme") === "light" ? "light" : "dark";
   themeObserver = new MutationObserver(() => {
     themeMode.value = document.documentElement.getAttribute("data-theme") === "light" ? "light" : "dark";

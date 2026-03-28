@@ -17,7 +17,7 @@
       <section class="changelog-hero">
         <p class="changelog-eyebrow">ItemTraxx Product changelog</p>
         <h1>Recent ItemTraxx product and engineering changes.</h1>
-        <p v-if="lastUpdated" class="changelog-lead">Last updated: {{ lastUpdated }}</p>
+        <p v-if="lastUpdated" class="changelog-lead">Last updated (year-month-day): {{ lastUpdated }}</p>
       </section>
 
       <section v-if="intro.length" class="changelog-card changelog-intro-card">
@@ -37,7 +37,7 @@
 
       <section class="changelog-entries">
         <article v-for="entry in entries" :key="entry.title" class="changelog-card changelog-entry-card">
-          <p class="changelog-section-label">Development Update</p>
+          <p class="changelog-section-label">Changelog</p>
           <h2>{{ entry.title }}</h2>
           <ul class="changelog-list">
             <li v-for="item in entry.items" :key="item.title + item.body">
@@ -156,12 +156,13 @@ const entries = computed<ChangelogEntry[]>(() => {
   position: relative;
   min-height: 100vh;
   min-height: 100dvh;
-  width: 100vw;
-  margin-left: calc(50% - 50vw);
+  width: 100%;
+  max-width: 100%;
+  margin-left: 0;
   padding: 2rem 0 3.5rem;
   background-color: #0a1120;
   color: #f5f7fb;
-  overflow-x: clip;
+  overflow-x: hidden;
 }
 
 .changelog-page::before {
@@ -311,6 +312,10 @@ const entries = computed<ChangelogEntry[]>(() => {
   padding: 1.5rem;
 }
 
+.changelog-intro-card {
+  margin-bottom: 1rem;
+}
+
 .changelog-links-grid,
 .changelog-entries {
   display: grid;
@@ -376,7 +381,7 @@ const entries = computed<ChangelogEntry[]>(() => {
   }
 
   .changelog-container {
-    width: min(100% - 1rem, 1120px);
+    width: min(1120px, calc(100% - 1rem));
   }
 
   .changelog-card,

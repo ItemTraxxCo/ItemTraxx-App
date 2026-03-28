@@ -366,7 +366,12 @@ const isBannerBleedRoute = computed(
     route.path === "/contact-support"
 );
 const isDarkChromeRoute = computed(
-  () => route.path === "/" || route.path === "/landing-new" || route.path === "/pricing"
+  () =>
+    route.path === "/" ||
+    route.path === "/landing-new" ||
+    route.path === "/pricing" ||
+    route.path === "/security" ||
+    route.path === "/changelog"
 );
 const showTopMenu = computed(
   () =>

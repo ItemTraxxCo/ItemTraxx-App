@@ -250,12 +250,16 @@ const securityApproach = [
   position: relative;
   min-height: 100vh;
   min-height: 100dvh;
-  width: 100vw;
-  margin-left: calc(50% - 50vw);
-  padding: 2rem 0 3.5rem;
+  width: 100%;
+  max-width: 100%;
+  margin-left: 0;
+  padding:
+    calc(2rem + env(safe-area-inset-top, 0px))
+    0
+    calc(3.5rem + env(safe-area-inset-bottom, 0px));
   background-color: #0a1120;
   color: #f5f7fb;
-  overflow-x: clip;
+  overflow-x: hidden;
 }
 
 .security-page::before {
@@ -420,6 +424,8 @@ const securityApproach = [
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  box-sizing: border-box;
+  max-width: 100%;
   min-height: 2.5rem;
   padding: 0.55rem 1rem;
   border-radius: 999px;
@@ -522,11 +528,11 @@ const securityApproach = [
 
 @media (max-width: 640px) {
   .security-page {
-    padding-top: 1.25rem;
+    padding-top: calc(1.25rem + env(safe-area-inset-top, 0px));
   }
 
   .security-container {
-    width: min(100% - 1rem, 1120px);
+    width: min(1120px, calc(100% - 1rem));
   }
 
   .security-card,
@@ -543,6 +549,7 @@ const securityApproach = [
   .security-primary-link,
   .security-secondary-link {
     width: 100%;
+    max-width: 100%;
   }
 }
 </style>

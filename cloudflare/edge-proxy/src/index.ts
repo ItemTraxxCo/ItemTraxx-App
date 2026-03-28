@@ -479,7 +479,13 @@ const proxySupabaseApiRequest = async (
   upstreamPath: string
 ) => {
   const cookies = parseCookies(request);
-  const upstreamUrl = buildSupabaseUrl(env, `${upstreamPath}${new URL(request.url).search}`);
+  const normalizedUpstreamPath = isRpcProxyPath(upstreamPath)
+    ? `/rest/v1${upstreamPath}`
+    : upstreamPath;
+  const upstreamUrl = buildSupabaseUrl(
+    env,
+    `${normalizedUpstreamPath}${new URL(request.url).search}`
+  );
   const requestBody = request.method === "GET" || request.method === "HEAD" ? undefined : await request.clone().text();
   const invoke = async (sessionAccessToken?: string | null) => {
     const proxiedHeaders = sanitizeUpstreamHeaders(

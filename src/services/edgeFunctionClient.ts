@@ -13,6 +13,7 @@ type EdgeFunctionResult<TData> = {
 };
 import { supabase } from "./supabaseClient";
 import { clearAdminVerification, clearAuthState } from "../store/authState";
+import { captureHandledRequestFailure } from "./sentry";
 
 const trimTrailingSlash = (value: string) => value.replace(/\/+$/, "");
 
@@ -135,11 +136,21 @@ const requestEdgeFunction = async <TData = unknown, TBody = unknown>(
         clearAdminVerification();
         clearAuthState(true);
       }
+      const errorMessage = payload?.error || payload?.message || "Request failed.";
+      void captureHandledRequestFailure({
+        area: "edge_function",
+        name: functionName,
+        path: `/functions/${functionName}`,
+        method,
+        status: response.status,
+        message: errorMessage,
+        requestId,
+      });
       return {
         ok: false,
         status: response.status,
         data: null,
-        error: payload?.error || payload?.message || "Request failed.",
+        error: errorMessage,
         requestId,
       };
     }

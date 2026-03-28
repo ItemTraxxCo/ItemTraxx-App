@@ -277,6 +277,12 @@ const addBarcode = async () => {
   isBarcodeLoading.value = true;
   try {
     const gear = await fetchGearByBarcode(value);
+    const isCurrentBorrowerReturn = checkedOutGear.value.some(
+      (item) => item.barcode === gear.barcode
+    );
+    if (gear.status === "checked_out" && !isCurrentBorrowerReturn) {
+      throw new Error("Item already checked out.");
+    }
     barcodes.value = [...barcodes.value, gear];
     barcodeInput.value = "";
   } catch (err) {

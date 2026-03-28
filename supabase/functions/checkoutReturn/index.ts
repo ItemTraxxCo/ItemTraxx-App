@@ -213,6 +213,7 @@ serve(async (req) => {
     }
 
     let processed = 0;
+    const skippedBarcodes: string[] = [];
 
     for (const rawBarcode of gear_barcodes) {
       if (typeof rawBarcode !== "string") continue;
@@ -227,12 +228,15 @@ serve(async (req) => {
         .is("deleted_at", null)
         .single();
 
-      if (!gear) continue;
+      if (!gear) {
+        skippedBarcodes.push(barcode);
+        continue;
+      }
 
       if (isAdminReturn) {
         if (!gear.checked_out_by) continue;
 
-        await adminClient
+        const { data: updatedGear, error: updateError } = await adminClient
           .from("gear")
           .update({
             checked_out_by: null,
@@ -240,7 +244,15 @@ serve(async (req) => {
             status: "available",
           })
           .eq("id", gear.id)
-          .eq("tenant_id", callerProfile.tenant_id);
+          .eq("tenant_id", callerProfile.tenant_id)
+          .not("checked_out_by", "is", null)
+          .select("id")
+          .maybeSingle();
+
+        if (updateError || !updatedGear?.id) {
+          skippedBarcodes.push(barcode);
+          continue;
+        }
 
         await adminClient.from("gear_logs").insert({
           gear_id: gear.id,
@@ -256,9 +268,12 @@ serve(async (req) => {
       const isCheckout = !gear.checked_out_by;
       const isReturn = gear.checked_out_by === student!.id;
 
-      if (!isCheckout && !isReturn) continue;
+      if (!isCheckout && !isReturn) {
+        skippedBarcodes.push(barcode);
+        continue;
+      }
 
-      await adminClient
+      const updateBuilder = adminClient
         .from("gear")
         .update({
           checked_out_by: isCheckout ? student!.id : null,
@@ -267,6 +282,17 @@ serve(async (req) => {
         })
         .eq("id", gear.id)
         .eq("tenant_id", callerProfile.tenant_id);
+
+      const { data: updatedGear, error: updateError } = await (isCheckout
+        ? updateBuilder.is("checked_out_by", null)
+        : updateBuilder.eq("checked_out_by", student!.id))
+        .select("id")
+        .maybeSingle();
+
+      if (updateError || !updatedGear?.id) {
+        skippedBarcodes.push(barcode);
+        continue;
+      }
 
       await adminClient.from("gear_logs").insert({
         gear_id: gear.id,
@@ -278,7 +304,7 @@ serve(async (req) => {
       processed += 1;
     }
 
-    return jsonResponse(200, { success: true, processed });
+    return jsonResponse(200, { success: true, processed, skipped_barcodes: skippedBarcodes });
   } catch (error) {
     console.error("checkoutReturn function error", {
       message: error instanceof Error ? error.message : "Unknown error",

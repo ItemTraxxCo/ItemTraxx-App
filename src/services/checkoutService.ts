@@ -14,6 +14,12 @@ type SubmitCheckoutReturnResult = {
   queuedCount: number;
 };
 
+type CheckoutReturnResponse = {
+  success: boolean;
+  processed: number;
+  skipped_barcodes?: string[];
+};
+
 type BufferedCheckoutItem = {
   id: string;
   payload: CheckoutReturnPayload;
@@ -69,8 +75,7 @@ const queueCheckoutPayload = (payload: CheckoutReturnPayload, error: string | nu
 };
 
 const executeCheckoutReturn = async (payload: CheckoutReturnPayload) => {
-
-  const result = await invokeEdgeFunction("checkoutReturn", {
+  const result = await invokeEdgeFunction<CheckoutReturnResponse>("checkoutReturn", {
     method: "POST",
     body: payload,
   });
@@ -81,6 +86,17 @@ const executeCheckoutReturn = async (payload: CheckoutReturnPayload) => {
     }
     throw edgeFunctionError(result, "Request failed.");
   }
+
+  const skippedBarcodes = result.data?.skipped_barcodes ?? [];
+  if (skippedBarcodes.length > 0) {
+    const label =
+      skippedBarcodes.length === 1
+        ? `Item ${skippedBarcodes[0]} is already checked out or no longer available.`
+        : `${skippedBarcodes.length} item(s) are already checked out or no longer available.`;
+    throw new Error(`${label} Refresh and try again.`);
+  }
+
+  return result.data;
 };
 
 export const submitCheckoutReturn = async (

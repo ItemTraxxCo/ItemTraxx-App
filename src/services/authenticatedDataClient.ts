@@ -48,7 +48,11 @@ const requestJson = async <TData>(path: string, init: RequestInit = {}) => {
   if (response.status === 204) {
     return null as TData;
   }
-  return (await response.json()) as TData;
+  const text = await response.text();
+  if (!text.trim()) {
+    return null as TData;
+  }
+  return JSON.parse(text) as TData;
 };
 
 export const authenticatedSelect = async <TData>(

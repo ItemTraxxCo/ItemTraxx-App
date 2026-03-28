@@ -19,9 +19,15 @@
           Email
           <input v-model="email" type="email" placeholder="Enter email" autocomplete="username" />
         </label>
-        <label>
+        <label class="super-password-field">
           Password
           <input v-model="password" type="password" placeholder="Enter password" autocomplete="current-password" />
+          <RouterLink
+            class="link-button super-password-help-link"
+            :to="{ path: '/forgot-password', query: { email: email.trim(), from: 'super-auth' } }"
+          >
+            Forgot password?
+          </RouterLink>
         </label>
         <label>
           Security Check
@@ -69,7 +75,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from "vue";
-import { useRouter } from "vue-router";
+import { RouterLink, useRouter } from "vue-router";
 import {
   clearPendingSuperAdminVerificationEmail,
   getPendingSuperAdminVerificationEmail,
@@ -338,6 +344,28 @@ onUnmounted(() => {
 
 .super-auth-form input {
   min-height: 3.6rem;
+}
+
+.super-password-field {
+  position: relative;
+}
+
+.super-password-help-link {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 0.45rem);
+  font-size: 0.82rem;
+  color: color-mix(in srgb, var(--muted) 82%, var(--accent) 18%);
+  text-decoration: none;
+}
+
+.super-password-help-link:hover {
+  color: var(--text);
+  text-decoration: underline;
+}
+
+.super-password-field + label {
+  margin-top: 1.6rem;
 }
 
 .verification-copy {

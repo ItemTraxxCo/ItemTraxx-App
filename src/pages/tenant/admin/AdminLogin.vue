@@ -177,9 +177,11 @@ const handleAdminLogin = async () => {
     }).catch(() => {
       // Audit logging is best-effort and should not block admin sign in.
     });
-    void touchTenantAdminSession().catch(() => {
-      // Session controls are best-effort and should not block access.
-    });
+    if (session?.role === "tenant_admin") {
+      void touchTenantAdminSession().catch(() => {
+        // Session controls are best-effort and should not block access.
+      });
+    }
   } catch (err) {
     devLog("auth_request_failed");
     const message = err instanceof Error ? err.message : "Sign in failed.";

@@ -30,7 +30,11 @@
             <p class="muted turnstile-help">Complete security check to enable sign in.</p>
           </label>
           <div class="form-actions">
-            <button type="submit" class="button-primary admin-login-submit" :disabled="!canSubmit">
+            <button
+              type="submit"
+              class="button-primary admin-login-submit"
+              :disabled="!canSubmit || isLoading"
+            >
               Sign in
             </button>
           </div>
@@ -39,6 +43,10 @@
       </div>
     </section>
 
+    <div v-if="isLoading" class="toast toast-persist">
+      <div class="toast-title">Loading...</div>
+      <div class="toast-body">Signing you in.</div>
+    </div>
     <div v-if="toastMessage" class="toast">
       <div class="toast-title">{{ toastTitle }}</div>
       <div class="toast-body">{{ toastMessage }}</div>
@@ -395,6 +403,14 @@ onUnmounted(() => {
   border-color: transparent;
   color: #f8fbff;
   box-shadow: 0 16px 28px rgba(25, 67, 155, 0.24);
+}
+
+.admin-login-submit:disabled {
+  background: #8d99b8;
+  border-color: #8d99b8;
+  color: rgba(248, 251, 255, 0.92);
+  box-shadow: none;
+  cursor: not-allowed;
 }
 
 .admin-login-submit:hover:not(:disabled) {

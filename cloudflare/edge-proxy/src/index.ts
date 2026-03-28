@@ -15,14 +15,16 @@ const REFRESH_TOKEN_MAX_AGE_SECONDS = 60 * 60 * 24 * 30;
 
 const BASE_CORS_HEADERS = {
   "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-request-id",
+    "authorization, x-client-info, apikey, content-type, x-request-id, prefer",
   "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
   "Access-Control-Allow-Credentials": "true",
+  "Access-Control-Expose-Headers": "content-range, content-profile, x-request-id",
   Vary: "Origin",
 };
 const DEFAULT_ALLOWED_ORIGINS = [
   "https://itemtraxx.com",
   "https://www.itemtraxx.com",
+  "https://*.itemtraxx.com",
   "https://internal.itemtraxx.com",
   "https://app.itemtraxx.com",
   "https://*.app.itemtraxx.com",

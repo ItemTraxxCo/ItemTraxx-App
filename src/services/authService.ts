@@ -37,16 +37,32 @@ type TenantRow = {
   district_id?: string | null;
 };
 
+const normalizeFunctionTarget = (value: string | undefined, fallback: string) => {
+  const trimmed = value?.trim();
+  if (!trimmed) return fallback;
+  try {
+    const url = new URL(trimmed);
+    const segments = url.pathname.split("/").filter(Boolean);
+    return segments[segments.length - 1] || fallback;
+  } catch {
+    const segments = trimmed.split("/").filter(Boolean);
+    return segments[segments.length - 1] || fallback;
+  }
+};
+
 const getTenantLoginFunctionName = () =>
-  import.meta.env.VITE_TENANT_LOGIN_FUNCTION || "tenant-login";
+  normalizeFunctionTarget(import.meta.env.VITE_TENANT_LOGIN_FUNCTION, "tenant-login");
 const getLoginNotifyFunctionName = () =>
-  import.meta.env.VITE_LOGIN_NOTIFY_FUNCTION || "login-notify";
+  normalizeFunctionTarget(import.meta.env.VITE_LOGIN_NOTIFY_FUNCTION, "login-notify");
 const getDistrictHandoffFunctionName = () =>
-  import.meta.env.VITE_DISTRICT_HANDOFF_FUNCTION || "district-handoff";
+  normalizeFunctionTarget(import.meta.env.VITE_DISTRICT_HANDOFF_FUNCTION, "district-handoff");
 
 const AUTH_QUERY_TIMEOUT_MS = 15000;
 const DISTRICT_HANDOFF_MARKER_KEY = "itemtraxx:district-handoff-at";
-const SUPER_ADMIN_2FA_FUNCTION = import.meta.env.VITE_SUPER_ADMIN_2FA_FUNCTION || "super-auth-verify";
+const SUPER_ADMIN_2FA_FUNCTION = normalizeFunctionTarget(
+  import.meta.env.VITE_SUPER_ADMIN_2FA_FUNCTION,
+  "super-auth-verify"
+);
 const SUPER_ADMIN_2FA_PENDING_EMAIL_KEY = "itemtraxx:super-admin-2fa-email";
 
 const sendLoginNotification = (accessToken: string | null) => {
@@ -125,6 +141,13 @@ export const verifySuperAdminEmailChallenge = async (code: string) => {
     throw edgeFunctionError(result, "Unable to verify code.");
   }
 
+  setSecondaryAuth(true);
+  await refreshAuthFromSession();
+  const current = getAuthState();
+  if (current.role !== "super_admin") {
+    await signOut();
+    throw new Error("Access denied.");
+  }
   setSecondaryAuth(true);
   clearPendingSuperAdminVerificationEmail();
 };

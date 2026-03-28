@@ -1,4 +1,4 @@
-import { supabase } from "./supabaseClient";
+import { authenticatedSelect } from "./authenticatedDataClient";
 import { getAuthState } from "../store/authState";
 
 export type AdminAuditLog = {
@@ -24,43 +24,32 @@ export const fetchAdminAuditLogs = async (): Promise<AdminAuditLog[]> => {
     throw new Error("Missing tenant context.");
   }
 
-  const { data, error } = await supabase
-    .from("admin_audit_logs")
-    .select(
-      `
-        id,
-        tenant_id,
-        actor_id,
-        action_type,
-        entity_type,
-        entity_id,
-        metadata,
-        created_at
-      `
-    )
-    .eq("tenant_id", tenantId)
-    .order("created_at", { ascending: false })
-    .limit(200);
+  const data = await authenticatedSelect<AdminAuditLog[]>("admin_audit_logs", {
+    select: "id,tenant_id,actor_id,action_type,entity_type,entity_id,metadata,created_at",
+    tenant_id: `eq.${tenantId}`,
+    order: "created_at.desc",
+    limit: "200",
+  }).catch(() => null);
 
-  if (error) {
+  if (!data) {
     throw new Error("Unable to load admin audit logs.");
   }
 
-  const logs = (data ?? []) as AdminAuditLog[];
+  const logs = data ?? [];
 
   const actorIds = Array.from(new Set(logs.map((log) => log.actor_id)));
   if (actorIds.length === 0) return logs;
 
-  const { data: profiles, error: profileError } = await supabase
-    .from("profiles")
-    .select("id, auth_email")
-    .in("id", actorIds);
+  const profiles = await authenticatedSelect<ActorProfileRow[]>("profiles", {
+    select: "id,auth_email",
+    id: `in.(${actorIds.join(",")})`,
+  }).catch(() => null);
 
-  if (profileError) {
+  if (!profiles) {
     return logs;
   }
 
-  const profileRows = (profiles ?? []) as ActorProfileRow[];
+  const profileRows = profiles ?? [];
   const emailById = new Map<string, string | null>(
     profileRows.map((row) => [row.id, row.auth_email])
   );

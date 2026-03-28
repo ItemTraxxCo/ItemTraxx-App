@@ -259,7 +259,7 @@
         >
           Status
         </a>
-        <a :href="legalUrl" target="_blank" rel="noreferrer">Legal</a>
+        <RouterLink to="/legal">Legal</RouterLink>
         <RouterLink to="/about">About</RouterLink>
       </div>
     </footer>
@@ -281,9 +281,6 @@ import checkoutReturnUiImage1200 from "../assets/landing/checkout_return_ui-1200
 import checkoutReturnUiImage1600 from "../assets/landing/checkout_return_ui-1600.webp";
 import { fetchSystemStatus } from "../services/systemStatusService";
 
-const legalUrl =
-  import.meta.env.VITE_LEGAL_URL ||
-  "https://www.itemtraxx.com/legal";
 const statusLabel = ref("Unknown");
 const statusClass = ref<"status-ok" | "status-warn" | "status-down" | "status-unknown">(
   "status-unknown",

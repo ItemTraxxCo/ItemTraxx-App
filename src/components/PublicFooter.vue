@@ -29,7 +29,7 @@ const appVersion = import.meta.env.VITE_GIT_COMMIT || "n/a";
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
-  color: rgba(216, 224, 235, 0.76);
+  color: inherit;
 }
 
 .footer-brand {
@@ -47,12 +47,18 @@ const appVersion = import.meta.env.VITE_GIT_COMMIT || "n/a";
 
 .footer-version,
 .footer-links a {
-  color: rgba(216, 224, 235, 0.76);
+  color: inherit;
+  opacity: 0.78;
   text-decoration: none;
 }
 
+.footer-brand {
+  opacity: 0.88;
+}
+
 .footer-links a:hover {
-  color: #eafffb;
+  color: var(--link-color);
+  opacity: 1;
 }
 
 @media (max-width: 720px) {

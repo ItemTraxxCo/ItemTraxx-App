@@ -135,6 +135,10 @@ const routes: RouteRecordRaw[] = [
   },
   {
     path: "/tenant/admin/students",
+    redirect: "/tenant/admin/borrowers",
+  },
+  {
+    path: "/tenant/admin/borrowers",
     name: "tenant-admin-students",
     component: () => import("../pages/tenant/admin/Students.vue"),
     meta: {
@@ -143,7 +147,7 @@ const routes: RouteRecordRaw[] = [
       requiresRole: "tenant_admin",
       requiresTenantMatch: true,
     
-      title: "Admin Borrowers | ItemTraxx",
+      title: "Borrower Management | ItemTraxx",
     },
   },
   {

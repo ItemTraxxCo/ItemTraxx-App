@@ -30,7 +30,7 @@
         <h2>Item Management</h2>
         <p>Manage items, barcodes, and status.</p>
       </RouterLink>
-      <RouterLink class="admin-card" to="/tenant/admin/students">
+      <RouterLink class="admin-card" to="/tenant/admin/borrowers">
         <h2>Borrower Management</h2>
         <p>Manage borrowers and view checkout history.</p>
       </RouterLink>

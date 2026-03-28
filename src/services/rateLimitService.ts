@@ -1,4 +1,4 @@
-import { supabase } from "./supabaseClient";
+import { authenticatedRpc } from "./authenticatedDataClient";
 
 type RateLimitResult = {
   allowed: boolean;
@@ -58,17 +58,16 @@ const consumeRateLimit = async (
   limit: number,
   windowSeconds: number
 ) => {
-  const { data, error } = await supabase.rpc("consume_rate_limit", {
-    p_scope: scope,
-    p_limit: limit,
-    p_window_seconds: windowSeconds,
-  });
-
-  if (error) {
+  try {
+    const data = await authenticatedRpc<RateLimitResult>("consume_rate_limit", {
+      p_scope: scope,
+      p_limit: limit,
+      p_window_seconds: windowSeconds,
+    });
+    return data;
+  } catch {
     throw new Error("Rate limit check failed.");
   }
-
-  return data as RateLimitResult;
 };
 
 export const enforceTenantTxnRateLimit = async () => {

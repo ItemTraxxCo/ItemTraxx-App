@@ -1,6 +1,7 @@
 <template>
   <div class="legal-page">
-    <main class="legal-container">
+    <main class="legal-shell">
+      <div class="legal-container">
       <div class="page-nav-left legal-top-nav">
         <div class="legal-top-nav-left">
           <RouterLink class="legal-back-link" to="/" aria-label="Return to home">
@@ -274,9 +275,12 @@
           <a href="https://www.itemtraxx.com/contact-support" target="_blank" rel="noreferrer noopener">contact support here</a>
         </p>
       </section>
-
-      <PublicFooter />
+      </div>
     </main>
+
+    <div class="legal-footer-wrap">
+      <PublicFooter />
+    </div>
   </div>
 </template>
 
@@ -319,9 +323,15 @@ onBeforeUnmount(() => {
   padding: 2rem 1rem 3rem;
 }
 
+.legal-shell,
+.legal-footer-wrap {
+}
+
+.legal-footer-wrap {
+  margin-top: 2.25rem;
+}
+
 .legal-container {
-  max-width: 920px;
-  margin: 0 auto;
   background: var(--card);
   border: 1px solid var(--border);
   border-radius: 16px;

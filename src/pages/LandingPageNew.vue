@@ -189,7 +189,7 @@
         <div>
           <p class="eyebrow">Ready to simplify inventory tracking?</p>
           <h2>Get started with ItemTraxx and streamline your inventory management.</h2>
-          <p>Get started with ItemTraxx today.</p>
+          <p>Simplify your inventory management with ItemTraxx today.</p>
           <div class="final-actions">
             <RouterLink class="cta-primary" to="/login" @click="trackCta('login', 'final')">Go to Login</RouterLink>
             <RouterLink class="cta-secondary" to="/pricing" @click="trackCta('pricing', 'final')">Pricing</RouterLink>
@@ -198,23 +198,9 @@
       </section>
     </main>
 
-    <footer class="landing-footer shell">
-      <p class="footer-brand">©2026 ItemTraxx Co</p>
-      <div class="footer-links">
-        <span class="footer-version">v{{ appVersion }}</span>
-        <RouterLink to="/login">Login</RouterLink>
-        <RouterLink to="/pricing">Pricing</RouterLink>
-        <RouterLink to="/contact-support">Support</RouterLink>
-        <RouterLink to="/contact-sales">Contact Sales</RouterLink>
-        <RouterLink to="/forgot-password">Forgot Password</RouterLink>
-        <RouterLink to="/security">Security</RouterLink>
-        <RouterLink to="/changelog">Changelog</RouterLink>
-        <a href="https://status.itemtraxx.com/" target="_blank" rel="noreferrer">Status</a>
-        <RouterLink to="/legal">Legal</RouterLink>
-        <RouterLink to="/about">About</RouterLink>
-        <a href="https://github.com/ItemTraxxCo" target="_blank" rel="noreferrer">GitHub</a>
-      </div>
-    </footer>
+    <div class="landing-footer shell">
+      <PublicFooter />
+    </div>
   </div>
 </template>
 
@@ -231,8 +217,8 @@ import checkoutReturnUiImage800 from '../assets/landing/checkout_return_ui-800.w
 import checkoutReturnUiImage1200 from '../assets/landing/checkout_return_ui-1200.webp';
 import checkoutReturnUiImage1600 from '../assets/landing/checkout_return_ui-1600.webp';
 import { fetchSystemStatus } from '../services/systemStatusService';
+import PublicFooter from "../components/PublicFooter.vue";
 
-const appVersion = import.meta.env.VITE_GIT_COMMIT || "n/a";
 type ShowcaseVariant = {
   label: string;
   pill: string;
@@ -931,35 +917,14 @@ onBeforeUnmount(() => {
 
 .landing-footer {
   margin-top: 3.6rem;
-  padding: 0.8rem 0 0;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
+  padding: 1rem 0 0;
   color: rgba(216, 224, 235, 0.76);
 }
 
-.footer-brand {
-  margin: 0;
-  font-weight: 700;
-  letter-spacing: -0.03em;
-}
-
-.footer-links {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-  flex-wrap: wrap;
-}
-
-.footer-version,
-.footer-links a {
-  color: rgba(216, 224, 235, 0.76);
-  text-decoration: none;
-}
-
-.footer-links a:hover {
-  color: #eafffb;
+.landing-footer :deep(.public-footer) {
+  width: 100%;
+  margin-top: 0;
+  color: inherit;
 }
 
 @media (max-width: 1100px) {
@@ -1037,13 +1002,13 @@ onBeforeUnmount(() => {
   .landing-footer {
     align-items: flex-start;
     flex-direction: column;
-    gap: 0.8rem;
+    gap: 1rem;
   }
 
-  .footer-links {
-    align-items: flex-start;
-    flex-direction: column;
-    gap: 0.55rem;
+  .footer-grid {
+    width: 100%;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1.2rem 1.8rem;
   }
 
   .hero-copy,

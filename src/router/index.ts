@@ -56,6 +56,18 @@ const routes: RouteRecordRaw[] = [
     meta: { public: true, title: "Legal | ItemTraxx" },
   },
   {
+    path: "/privacy",
+    name: "public-privacy",
+    component: () => import("../pages/PrivacyPage.vue"),
+    meta: { public: true, title: "Privacy | ItemTraxx" },
+  },
+  {
+    path: "/cookies",
+    name: "public-cookies",
+    component: () => import("../pages/CookiesPage.vue"),
+    meta: { public: true, title: "Cookies | ItemTraxx" },
+  },
+  {
     path: "/pricing",
     name: "public-pricing",
     component: () => import("../pages/Pricing.vue"),
@@ -90,6 +102,24 @@ const routes: RouteRecordRaw[] = [
     name: "public-changelog",
     component: () => import("../pages/ChangelogPage.vue"),
     meta: { public: true, title: "Changelog | ItemTraxx" },
+  },
+  {
+    path: "/trust",
+    name: "public-trust",
+    component: () => import("../pages/TrustPage.vue"),
+    meta: { public: true, title: "Trust | ItemTraxx" },
+  },
+  {
+    path: "/faq",
+    name: "public-faq",
+    component: () => import("../pages/FaqPage.vue"),
+    meta: { public: true, title: "FAQ | ItemTraxx" },
+  },
+  {
+    path: "/accessibility",
+    name: "public-accessibility",
+    component: () => import("../pages/AccessibilityPage.vue"),
+    meta: { public: true, title: "Accessibility | ItemTraxx" },
   },
   {
     path: "/tenant",

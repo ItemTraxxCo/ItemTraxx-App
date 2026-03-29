@@ -439,6 +439,11 @@ const isTenantAdminArea = computed(() => {
   if (route.path === "/tenant/admin-login") return false;
   return route.path.startsWith("/tenant/admin");
 });
+const shouldTrackTenantAdminSession = computed(() => {
+  if (!auth.isAuthenticated || auth.role !== "tenant_admin") return false;
+  if (route.path === "/tenant/admin-login") return false;
+  return true;
+});
 const showNotificationBell = computed(() => {
   if (!auth.isAuthenticated) return false;
   if (auth.role !== "tenant_admin") return false;
@@ -819,16 +824,9 @@ const startSessionHeartbeat = () => {
   }, 30_000);
 };
 
-const handleAdminSessionRevoked = async () => {
-  clearAdminVerification();
-  if (route.path !== "/tenant/admin-login") {
-    await router.replace("/tenant/admin-login");
-  }
-};
-
 const runAdminSessionCheck = async () => {
   if (isAdminSessionCheckRunning.value) return;
-  if (!auth.isAuthenticated || auth.role !== "tenant_admin" || !isTenantAdminArea.value) {
+  if (!shouldTrackTenantAdminSession.value) {
     stopAdminSessionPolling();
     return;
   }
@@ -845,13 +843,13 @@ const runAdminSessionCheck = async () => {
       await new Promise((resolve) => window.setTimeout(resolve, 250));
       const retryValidation = await validateTenantAdminSession();
       if (!retryValidation.valid) {
-        await handleAdminSessionRevoked();
+        handleSessionTermination();
       }
     }
   } catch (error) {
     const message = error instanceof Error ? error.message : "";
     if (message === "Session revoked") {
-      await handleAdminSessionRevoked();
+      handleSessionTermination();
     }
   } finally {
     isAdminSessionCheckRunning.value = false;
@@ -859,7 +857,7 @@ const runAdminSessionCheck = async () => {
 };
 
 const startAdminSessionPolling = () => {
-  if (!auth.isAuthenticated || auth.role !== "tenant_admin" || !isTenantAdminArea.value) {
+  if (!shouldTrackTenantAdminSession.value || sessionTermination.visible) {
     stopAdminSessionPolling();
     return;
   }

@@ -32,6 +32,33 @@ export const mockAdminOps = async (page: Page) => {
       | undefined;
     const action = body?.action || "";
 
+    if (action === "touch_session") {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ data: { ok: true } }),
+      });
+      return;
+    }
+
+    if (action === "validate_session") {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ data: { valid: true } }),
+      });
+      return;
+    }
+
+    if (action === "list_sessions") {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ data: { sessions: [] } }),
+      });
+      return;
+    }
+
     if (action === "get_tenant_settings") {
       await route.fulfill({
         status: 200,

@@ -23,6 +23,7 @@ import {
 } from "./httpSessionService";
 import { authenticatedRpc, authenticatedSelect } from "./authenticatedDataClient";
 import { rotateDeviceSession } from "../utils/deviceSession";
+import { touchTenantAdminSession } from "./adminOpsService";
 
 type ProfileRow = {
   id: string;
@@ -481,11 +482,14 @@ export const tenantLogin = async (
     refresh_token: refreshToken,
   });
   await clearLocalSession();
-  await refreshAuthFromSession();
-  const current = getAuthState();
-  if (current.role === "tenant_admin") {
+  const sessionSummary = await fetchHttpSessionSummary();
+  const summaryRole = sessionSummary.profile?.role ?? null;
+  if (summaryRole === "tenant_admin") {
     rotateDeviceSession();
+    await touchTenantAdminSession();
   }
+  await applySessionSummary(sessionSummary);
+  const current = getAuthState();
   setTenantContext(current.sessionTenantId ?? null);
   const districtSlug =
     (typeof data.district_slug === "string" && data.district_slug.trim()) ||
@@ -797,6 +801,19 @@ export const adminLoginWithSession = async (accessToken: string, refreshToken: s
   }
 
   const finalTenantId = resolvedTenantId ?? current.sessionTenantId ?? fallbackTenantId ?? null;
+
+  try {
+    await registerPrivilegedAdminStepUp(accessToken);
+  } catch (error) {
+    await signOut();
+    throw error;
+  }
+
+  if (resolvedRole === "tenant_admin") {
+    rotateDeviceSession();
+    await touchTenantAdminSession();
+  }
+
   setAuthStateFromBackend({
     isInitialized: true,
     isAuthenticated: true,
@@ -818,12 +835,6 @@ export const adminLoginWithSession = async (accessToken: string, refreshToken: s
     setDistrictContext(resolvedDistrictId ?? null);
   }
 
-  try {
-    await registerPrivilegedAdminStepUp(accessToken);
-  } catch (error) {
-    await signOut();
-    throw error;
-  }
   markAdminVerified();
   sendLoginNotification(accessToken);
   const districtSlug = await resolveDistrictSlug(resolvedDistrictId ?? null);

@@ -26,6 +26,7 @@ import {
   markRouteNavigationStart,
 } from "./services/perfTelemetry";
 import { initializeDistrictContext } from "./services/districtService";
+import { rotateDeviceSession } from "./utils/deviceSession";
 
 declare global {
   interface Window {
@@ -244,6 +245,7 @@ const bootstrap = async () => {
       markAdminVerified();
     }
     if (getAuthState().role === "tenant_admin") {
+      rotateDeviceSession();
       try {
         await touchTenantAdminSession();
       } catch {

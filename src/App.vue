@@ -92,6 +92,22 @@
       </div>
     </div>
     <div
+      v-if="sessionTermination.visible && !showMaintenanceOverlay && !showKillSwitchOverlay"
+      class="version-update-fullscreen"
+      role="alertdialog"
+      aria-live="assertive"
+      aria-modal="true"
+    >
+      <div class="version-update-card">
+        <p class="version-update-eyebrow">Session Ended</p>
+        <h2>{{ sessionTermination.title }}</h2>
+        <p>{{ sessionTermination.message }}</p>
+        <button type="button" class="button-primary version-update-button" @click="signInAgain">
+          Sign in again
+        </button>
+      </div>
+    </div>
+    <div
       v-if="activeBroadcast && showBroadcast"
       ref="broadcastBannerRef"
       class="broadcast-top-banner"
@@ -252,8 +268,11 @@ import {
 } from "./services/onboardingService";
 import { buildDistrictAppUrl, lookupDistrictById, resolveDistrictHost } from "./services/districtService";
 import { fetchSystemStatus } from "./services/systemStatusService";
-import { clearAdminVerification, getAuthState } from "./store/authState";
+import { fetchHttpSessionSummary } from "./services/httpSessionService";
+import { clearAdminVerification, clearAuthState, getAuthState } from "./store/authState";
 import { getDistrictState } from "./store/districtState";
+import { clearSessionTermination, getSessionTerminationState, showSessionTermination } from "./store/sessionTermination";
+import { resolveRecoveryRouteFromPath } from "./services/appErrorRecovery";
 
 const Analytics = defineAsyncComponent(async () => {
   const module = await import("@vercel/analytics/vue");
@@ -326,13 +345,17 @@ let deferredTelemetryTimer: number | null = null;
 let routeProgressTimer: number | null = null;
 let adminSessionTimer: number | null = null;
 let offlineQueueTimer: number | null = null;
+let sessionHeartbeatTimer: number | null = null;
+let sessionTerminationRedirectTimer: number | null = null;
 const isIdleLogoutRunning = ref(false);
 const isAdminSessionCheckRunning = ref(false);
+const isSessionHeartbeatRunning = ref(false);
 const showOnboardingModal = ref(false);
 const onboardingRole = ref<TenantOnboardingRole>("tenant_user");
 const onboardingVariant = ref<"tenant_checkout" | "tenant_admin">("tenant_checkout");
 const onboardingEvaluationDone = ref(false);
 const offlineQueueCount = ref(0);
+const sessionTermination = getSessionTerminationState();
 
 const ADMIN_IDLE_TIMEOUT_MINUTES = Number(import.meta.env.VITE_ADMIN_IDLE_TIMEOUT_MINUTES || 20);
 const ADMIN_IDLE_TIMEOUT_MS =
@@ -513,7 +536,8 @@ watchEffect(() => {
   updateBrowserChromeColor();
 });
 const topMenuStyle = computed(() => ({
-  top: `calc(1rem + ${topOffsetPx.value})`,
+  top: `calc(1rem + env(safe-area-inset-top, 0px) + ${topOffsetPx.value})`,
+  right: "calc(1rem + env(safe-area-inset-right, 0px))",
 }));
 const incidentBannerStyle = computed(() => ({
   top: "0px",
@@ -667,6 +691,17 @@ const reloadApp = () => {
   window.location.reload();
 };
 
+const signInAgain = async () => {
+  const recoveryRoute = sessionTermination.recoveryRoute ?? resolveRecoveryRouteFromPath(route.path);
+  if (sessionTerminationRedirectTimer) {
+    window.clearTimeout(sessionTerminationRedirectTimer);
+    sessionTerminationRedirectTimer = null;
+  }
+  clearSessionTermination();
+  menuOpen.value = false;
+  await router.replace(recoveryRoute);
+};
+
 const completeOnboarding = () => {
   markOnboardingCompleted(onboardingRole.value);
   onboardingEvaluationDone.value = true;
@@ -730,6 +765,58 @@ const stopAdminSessionPolling = () => {
   if (!adminSessionTimer) return;
   window.clearInterval(adminSessionTimer);
   adminSessionTimer = null;
+};
+
+const stopSessionHeartbeat = () => {
+  if (!sessionHeartbeatTimer) return;
+  window.clearInterval(sessionHeartbeatTimer);
+  sessionHeartbeatTimer = null;
+};
+
+const handleSessionTermination = () => {
+  clearAuthState(true);
+  clearAdminVerification();
+  menuOpen.value = false;
+  const recoveryRoute = resolveRecoveryRouteFromPath(route.path);
+  showSessionTermination(recoveryRoute);
+  if (sessionTerminationRedirectTimer) {
+    window.clearTimeout(sessionTerminationRedirectTimer);
+  }
+  sessionTerminationRedirectTimer = window.setTimeout(() => {
+    sessionTerminationRedirectTimer = null;
+    void signInAgain();
+  }, 5000);
+};
+
+const runSessionHeartbeat = async () => {
+  if (isSessionHeartbeatRunning.value) return;
+  if (!auth.isAuthenticated) {
+    stopSessionHeartbeat();
+    return;
+  }
+  isSessionHeartbeatRunning.value = true;
+  try {
+    const summary = await fetchHttpSessionSummary();
+    if (!summary.authenticated) {
+      handleSessionTermination();
+    }
+  } catch {
+    // Ignore transient heartbeat failures. Protected requests still trigger recovery.
+  } finally {
+    isSessionHeartbeatRunning.value = false;
+  }
+};
+
+const startSessionHeartbeat = () => {
+  if (!auth.isAuthenticated || sessionTermination.visible) {
+    stopSessionHeartbeat();
+    return;
+  }
+  void runSessionHeartbeat();
+  if (sessionHeartbeatTimer) return;
+  sessionHeartbeatTimer = window.setInterval(() => {
+    void runSessionHeartbeat();
+  }, 30_000);
 };
 
 const handleAdminSessionRevoked = async () => {
@@ -972,10 +1059,12 @@ const handlePageVisibilityChange = () => {
     stopStatusPolling();
     stopVersionPolling();
     stopAdminSessionPolling();
+    stopSessionHeartbeat();
     return;
   }
   resetAdminIdleTimer();
   startAdminSessionPolling();
+  startSessionHeartbeat();
   void refreshSystemStatus();
   startStatusPolling();
   void refreshVersionStatus();
@@ -1022,6 +1111,7 @@ onMounted(() => {
   document.addEventListener("visibilitychange", handlePageVisibilityChange);
   resetAdminIdleTimer();
   startAdminSessionPolling();
+  startSessionHeartbeat();
   evaluateOnboardingVisibility();
   void maybeRedirectAuthenticatedPublicHome();
   void nextTick(() => {
@@ -1048,6 +1138,7 @@ watch(
   () => {
     resetAdminIdleTimer();
     startAdminSessionPolling();
+    startSessionHeartbeat();
     evaluateOnboardingVisibility();
     void maybeRedirectAuthenticatedPublicHome();
   }
@@ -1068,11 +1159,13 @@ watch(
   () => {
     if (auth.isAuthenticated) {
       startAdminSessionPolling();
+      startSessionHeartbeat();
       evaluateOnboardingVisibility();
       void maybeRedirectAuthenticatedPublicHome();
       return;
     }
     stopAdminSessionPolling();
+    stopSessionHeartbeat();
     showOnboardingModal.value = false;
     onboardingEvaluationDone.value = false;
   }
@@ -1131,11 +1224,16 @@ onUnmounted(() => {
     window.clearTimeout(routeProgressTimer);
     routeProgressTimer = null;
   }
+  if (sessionTerminationRedirectTimer) {
+    window.clearTimeout(sessionTerminationRedirectTimer);
+    sessionTerminationRedirectTimer = null;
+  }
   if (offlineQueueTimer) {
     window.clearInterval(offlineQueueTimer);
     offlineQueueTimer = null;
   }
   stopAdminSessionPolling();
+  stopSessionHeartbeat();
   document.removeEventListener("visibilitychange", handlePageVisibilityChange);
   window.removeEventListener("storage", handleStorageChange);
   window.removeEventListener("resize", measureTopBanners);

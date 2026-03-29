@@ -683,7 +683,7 @@ import PublicFooter from "../components/PublicFooter.vue";
   .pricing-shell {
     margin-top: -2.5rem;
     margin-bottom: -3rem;
-    padding: 1.6rem 0 2.6rem;
+    padding: calc(1.25rem + env(safe-area-inset-top, 0px)) 0 2.6rem;
   }
 
   .pricing-page {

@@ -356,7 +356,7 @@ const isFullBleedRoute = computed(
     route.path === "/reset-password"
 );
 const isMarketingFullBleedRoute = computed(
-  () => route.path === "/" || route.path === "/landing-new" || route.path === "/about"
+  () => route.path === "/" || route.path === "/landing-new"
 );
 const isBannerBleedRoute = computed(
   () =>
@@ -487,16 +487,22 @@ const appShellStyle = computed(() => ({
 
 const updateBrowserChromeColor = () => {
   const themeColorMeta = document.querySelector('meta[name="theme-color"]');
+  const appleStatusBarMeta = document.querySelector('meta[name="apple-mobile-web-app-status-bar-style"]');
   if (!themeColorMeta) return;
 
   let color = theme.value === "dark" ? "#0c1016" : "#f9f9f7";
+  let appleStatusBarStyle = theme.value === "dark" ? "black-translucent" : "default";
+
   if (isFullBleedRoute.value) {
-    color = theme.value === "dark" ? "#090c12" : "#e8eef3";
+    color = theme.value === "dark" ? "#090c12" : "#f9f9f7";
+    appleStatusBarStyle = theme.value === "dark" ? "black-translucent" : "default";
   } else if (isDarkChromeRoute.value) {
     color = "#090d14";
+    appleStatusBarStyle = "black-translucent";
   }
 
   themeColorMeta.setAttribute("content", color);
+  appleStatusBarMeta?.setAttribute("content", appleStatusBarStyle);
 };
 
 watchEffect(() => {

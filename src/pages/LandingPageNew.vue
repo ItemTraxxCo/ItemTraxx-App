@@ -202,8 +202,11 @@
       <p class="footer-brand">©2026 ItemTraxx Co</p>
       <div class="footer-links">
         <span class="footer-version">v{{ appVersion }}</span>
+        <RouterLink to="/login">Login</RouterLink>
         <RouterLink to="/pricing">Pricing</RouterLink>
         <RouterLink to="/contact-support">Support</RouterLink>
+        <RouterLink to="/contact-sales">Contact Sales</RouterLink>
+        <RouterLink to="/forgot-password">Forgot Password</RouterLink>
         <RouterLink to="/security">Security</RouterLink>
         <RouterLink to="/changelog">Changelog</RouterLink>
         <a href="https://status.itemtraxx.com/" target="_blank" rel="noreferrer">Status</a>
@@ -504,7 +507,7 @@ onBeforeUnmount(() => {
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
-  padding: 0.6rem 0 1.8rem;
+  padding: calc(0.6rem + env(safe-area-inset-top, 0px)) 0 1.8rem;
 }
 
 .brand-mark {
@@ -983,7 +986,7 @@ onBeforeUnmount(() => {
     align-items: center;
     flex-direction: row;
     gap: 0.7rem;
-    padding: 0.35rem 0 1.25rem;
+    padding: calc(0.35rem + env(safe-area-inset-top, 0px)) 0 1.25rem;
   }
 
   .landing-nav {

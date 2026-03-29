@@ -71,7 +71,8 @@ body {
 html.auth-route-active,
 body.auth-route-active {
   background: #090c12;
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 
 html.marketing-route-active,
@@ -86,12 +87,12 @@ body.marketing-route-active #app {
 }
 
 html[data-theme="light"].auth-route-active,
-body.auth-route-active {
+html[data-theme="light"] body.auth-route-active {
   background: #e8eef3;
 }
 
 html[data-theme="dark"].auth-route-active,
-body.auth-route-active {
+html[data-theme="dark"] body.auth-route-active {
   background: #090c12;
 }
 
@@ -187,7 +188,9 @@ button:focus-visible {
 .app-shell.route-shell-auth {
   margin: -2.5rem -2rem 0;
   min-height: 100vh;
-  overflow: hidden;
+  min-height: 100dvh;
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 
 .app-shell.route-shell-marketing {
@@ -612,7 +615,7 @@ textarea {
 
 .top-menu {
   position: fixed;
-  top: 1rem;
+  top: calc(1rem + env(safe-area-inset-top, 0px));
   right: 1rem;
   z-index: 1000;
   display: flex;
@@ -894,7 +897,7 @@ textarea {
 
 .broadcast-banner {
   position: fixed;
-  top: 1rem;
+  top: calc(1rem + env(safe-area-inset-top, 0px));
   left: 1rem;
   z-index: 1001;
   display: flex;

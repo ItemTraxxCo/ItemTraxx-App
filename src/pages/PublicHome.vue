@@ -536,7 +536,7 @@ onBeforeUnmount(() => {
 
 .site-header {
   position: fixed;
-  top: var(--top-banner-offset, 0px);
+  top: calc(var(--top-banner-offset, 0px) + env(safe-area-inset-top, 0px));
   left: 50%;
   transform: translateX(-50%);
   z-index: 20;

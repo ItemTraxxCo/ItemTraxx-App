@@ -11,6 +11,7 @@ import {
   setSecondaryAuth,
   setTenantContext,
 } from "../store/authState";
+import { clearSessionTermination } from "../store/sessionTermination";
 import { getDistrictState } from "../store/districtState";
 import { lookupDistrictById, resolveDistrictHost } from "./districtService";
 import { edgeFunctionError } from "./appErrors";
@@ -21,6 +22,7 @@ import {
   fetchHttpSessionSummary,
 } from "./httpSessionService";
 import { authenticatedRpc, authenticatedSelect } from "./authenticatedDataClient";
+import { rotateDeviceSession } from "../utils/deviceSession";
 
 type ProfileRow = {
   id: string;
@@ -361,6 +363,7 @@ const applySessionSummary = async (
     superVerifiedAt:
       isSameUser && isSuperRole ? current.superVerifiedAt ?? null : null,
   });
+  clearSessionTermination();
 };
 
 const handleSuspendedTenantSession = async (profile: ProfileRow | null) => {
@@ -480,6 +483,9 @@ export const tenantLogin = async (
   await clearLocalSession();
   await refreshAuthFromSession();
   const current = getAuthState();
+  if (current.role === "tenant_admin") {
+    rotateDeviceSession();
+  }
   setTenantContext(current.sessionTenantId ?? null);
   const districtSlug =
     (typeof data.district_slug === "string" && data.district_slug.trim()) ||

@@ -273,6 +273,7 @@ import { clearAdminVerification, clearAuthState, getAuthState } from "./store/au
 import { getDistrictState } from "./store/districtState";
 import { clearSessionTermination, getSessionTerminationState, showSessionTermination } from "./store/sessionTermination";
 import { resolveRecoveryRouteFromPath } from "./services/appErrorRecovery";
+import { getOrCreateDeviceSession } from "./utils/deviceSession";
 
 const Analytics = defineAsyncComponent(async () => {
   const module = await import("@vercel/analytics/vue");
@@ -347,6 +348,7 @@ let adminSessionTimer: number | null = null;
 let offlineQueueTimer: number | null = null;
 let sessionHeartbeatTimer: number | null = null;
 let sessionTerminationRedirectTimer: number | null = null;
+let authSessionEpoch = 0;
 const isIdleLogoutRunning = ref(false);
 const isAdminSessionCheckRunning = ref(false);
 const isSessionHeartbeatRunning = ref(false);
@@ -659,10 +661,11 @@ const maybeRedirectAuthenticatedPublicHome = async () => {
     targetPath = hasFreshAdminVerification(auth.adminVerifiedAt)
       ? "/district"
       : "/tenant/admin-login";
-  } else if (
-    (auth.role === "tenant_admin" || auth.role === "tenant_user") &&
-    auth.tenantContextId
-  ) {
+  } else if (auth.role === "tenant_admin" && auth.tenantContextId) {
+    targetPath = hasFreshAdminVerification(auth.adminVerifiedAt)
+      ? "/tenant/checkout"
+      : "/login";
+  } else if (auth.role === "tenant_user" && auth.tenantContextId) {
     targetPath = "/tenant/checkout";
   }
 
@@ -813,9 +816,14 @@ const runSessionHeartbeat = async () => {
     stopSessionHeartbeat();
     return;
   }
+  const epoch = authSessionEpoch;
+  const userId = auth.userId;
   isSessionHeartbeatRunning.value = true;
   try {
     const summary = await fetchHttpSessionSummary();
+    if (epoch !== authSessionEpoch || userId !== auth.userId) {
+      return;
+    }
     if (!summary.authenticated) {
       handleSessionTermination();
     }
@@ -848,6 +856,9 @@ const runAdminSessionCheck = async () => {
     stopAdminSessionPolling();
     return;
   }
+  const epoch = authSessionEpoch;
+  const userId = auth.userId;
+  const deviceId = getOrCreateDeviceSession().deviceId;
   isAdminSessionCheckRunning.value = true;
   try {
     try {
@@ -855,18 +866,35 @@ const runAdminSessionCheck = async () => {
     } catch {
       // Best-effort keepalive; validation below is authoritative.
     }
+    if (epoch !== authSessionEpoch || userId !== auth.userId || deviceId !== getOrCreateDeviceSession().deviceId) {
+      return;
+    }
     const validation = await validateTenantAdminSession();
+    if (epoch !== authSessionEpoch || userId !== auth.userId || deviceId !== getOrCreateDeviceSession().deviceId) {
+      return;
+    }
     if (!validation.valid) {
       // One short retry to avoid false negatives during immediate post-login propagation.
       await new Promise((resolve) => window.setTimeout(resolve, 250));
+      if (epoch !== authSessionEpoch || userId !== auth.userId || deviceId !== getOrCreateDeviceSession().deviceId) {
+        return;
+      }
       const retryValidation = await validateTenantAdminSession();
+      if (epoch !== authSessionEpoch || userId !== auth.userId || deviceId !== getOrCreateDeviceSession().deviceId) {
+        return;
+      }
       if (!retryValidation.valid) {
         handleSessionTermination();
       }
     }
   } catch (error) {
     const message = error instanceof Error ? error.message : "";
-    if (message === "Session revoked") {
+    if (
+      message === "Session revoked" &&
+      epoch === authSessionEpoch &&
+      userId === auth.userId &&
+      deviceId === getOrCreateDeviceSession().deviceId
+    ) {
       handleSessionTermination();
     }
   } finally {
@@ -1186,6 +1214,14 @@ watch(
     onboardingEvaluationDone.value = false;
   }
 );
+
+watch(
+  () => [auth.isAuthenticated, auth.userId, auth.adminVerifiedAt, auth.superVerifiedAt] as const,
+  () => {
+    authSessionEpoch += 1;
+  }
+);
+
 
 watch(
   () => sessionTermination.visible,

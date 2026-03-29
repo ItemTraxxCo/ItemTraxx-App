@@ -483,8 +483,16 @@ export const tenantLogin = async (
   });
   await clearLocalSession();
   const sessionSummary = await fetchHttpSessionSummary();
-  const summaryRole = sessionSummary.profile?.role ?? null;
-  if (summaryRole === "tenant_admin") {
+  let shouldRegisterTenantAdminSession = sessionSummary.profile?.role === "tenant_admin";
+  if (!shouldRegisterTenantAdminSession) {
+    try {
+      const fallback = await fetchCurrentRoleAndTenant();
+      shouldRegisterTenantAdminSession = fallback.role === "tenant_admin";
+    } catch {
+      // Ignore fallback failures; applySessionSummary will still restore best-effort auth state.
+    }
+  }
+  if (shouldRegisterTenantAdminSession) {
     rotateDeviceSession();
     await touchTenantAdminSession();
   }

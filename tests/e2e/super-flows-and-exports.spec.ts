@@ -39,7 +39,7 @@ test.describe("Super admin flows and export actions", () => {
     await expect(page.getByRole("button", { name: "Export CSV" })).toBeVisible();
     await expect(page.getByRole("button", { name: "Export PDF" })).toBeVisible();
 
-    await navigateApp(page, "/super-admin/students");
+    await navigateApp(page, "/super-admin/borrowers");
     await expect(page.getByRole("button", { name: "Export CSV" })).toBeVisible();
     await expect(page.getByRole("button", { name: "Export PDF" })).toBeVisible();
 

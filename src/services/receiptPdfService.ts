@@ -31,8 +31,8 @@ export const downloadTransactionReceiptPdf = async (receipt: TransactionReceipt)
   y += 26;
   doc.setFontSize(11);
   row("Time", new Date(receipt.timestamp).toLocaleString());
-  row("Student", receipt.studentUsername);
-  row("Student ID", receipt.studentId);
+  row("Borrower", receipt.studentUsername);
+  row("Borrower ID", receipt.studentId);
   row("Operator", receipt.operatorEmail);
   row("Tenant ID", receipt.tenantId ?? "Unknown");
   row("Checkouts", String(receipt.checkouts));

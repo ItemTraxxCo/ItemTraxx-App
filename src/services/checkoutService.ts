@@ -202,11 +202,11 @@ export const fetchStudentByStudentId = async (studentId: string) => {
       limit: "1",
     }),
     LOOKUP_TIMEOUT_MS,
-    "Student lookup timed out."
+    "Borrower lookup timed out."
   );
 
   if (!rows?.length) {
-    throw new Error("Student not found.");
+    throw new Error("Borrower not found.");
   }
 
   return rows[0] as StudentSummary;

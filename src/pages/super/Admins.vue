@@ -12,7 +12,7 @@
       </div>
       <div class="page-nav-left super-page-links">
         <RouterLink class="button-link" to="/super-admin/gear">All Items</RouterLink>
-        <RouterLink class="button-link" to="/super-admin/students">All Borrowers</RouterLink>
+        <RouterLink class="button-link" to="/super-admin/borrowers">All Borrowers</RouterLink>
         <RouterLink class="button-link" to="/super-admin/logs">All Logs</RouterLink>
       </div>
     </div>

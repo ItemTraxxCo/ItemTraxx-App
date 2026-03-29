@@ -379,7 +379,7 @@ const routes: RouteRecordRaw[] = [
     },
   },
   {
-    path: "/super-admin/students",
+    path: "/super-admin/borrowers",
     name: "super-admin-students",
     component: () => import("../pages/super/SuperStudents.vue"),
     meta: {
@@ -389,6 +389,10 @@ const routes: RouteRecordRaw[] = [
     
       title: "Super Admin Borrowers | ItemTraxx",
     },
+  },
+  {
+    path: "/super-admin/students",
+    redirect: "/super-admin/borrowers",
   },
   {
     path: "/super-admin/logs",

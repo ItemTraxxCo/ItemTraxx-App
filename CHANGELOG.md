@@ -1,6 +1,6 @@
 # Changelog
 
-Last updated (year-month-day): 2026-03-28
+Last updated (year-month-day): 2026-03-29
 
 All notable changes to **ItemTraxx** will be documented in this file. This includes new features, improvements, bug fixes, and other updates.
 
@@ -15,6 +15,19 @@ Changes are dated based on the default timezone: America/Los_Angeles
 - [TERMS.md](TERMS.md) – Terms of service for users
 - [PRIVACY.md](PRIVACY.md) – Privacy policy and data handling
 - [SECURITY.md](SECURITY.md) – Security reporting and guidelines
+
+---
+
+### 3/29/2026 Development Update
+
+- Completed a user-facing borrower terminology pass without renaming backend schema or internal models:
+  - updated visible `student` wording to `borrower` across checkout, tenant admin, super admin, onboarding, receipts, logs, and related surfaced errors
+  - kept database tables, function names, route names, and internal service/type names stable to avoid migration risk
+- Updated super-admin borrower navigation:
+  - changed the visible route from `/super-admin/students` to `/super-admin/borrowers`
+  - added redirect compatibility from the old super-admin borrower path
+  - updated super-admin links and E2E coverage to use the new visible route
+- Refined public-site copy on pricing, about, and landing page surfaces to keep external terminology consistent with the borrower wording cleanup.
 
 ---
 

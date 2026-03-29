@@ -83,8 +83,8 @@ const tenantUserSteps: OnboardingStep[] = [
     body: "This is your fast lane for checking gear in and out.",
   },
   {
-    title: "Scan or enter a student ID",
-    body: "Start each transaction by entering the student's ID so ItemTraxx, and you know who is receiving gear.",
+    title: "Scan or enter a borrower ID",
+    body: "Start each transaction by entering the borrower's ID so ItemTraxx, and you know who is receiving gear.",
   },
   {
     title: "Scan item barcodes",
@@ -103,10 +103,10 @@ const tenantUserSteps: OnboardingStep[] = [
 const tenantAdminSteps: OnboardingStep[] = [
   {
     title: "Welcome to the admin panel",
-    body: "This area gives you control over students, gear, logs, and admin-level operations of your app.",
+    body: "This area gives you control over borrowers, gear, logs, and admin-level operations of your app.",
   },
   {
-    title: "Manage students",
+    title: "Manage borrowers",
     body: "Use the Borrowers page to add, import, and review borrower records.",
   },
   {

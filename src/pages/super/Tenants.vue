@@ -12,7 +12,7 @@
       </div>
       <div class="page-nav-left super-page-links">
         <RouterLink class="button-link" to="/super-admin/gear">All Items</RouterLink>
-        <RouterLink class="button-link" to="/super-admin/students">All Borrowers</RouterLink>
+        <RouterLink class="button-link" to="/super-admin/borrowers">All Borrowers</RouterLink>
         <RouterLink class="button-link" to="/super-admin/logs">All Logs</RouterLink>
       </div>
     </div>
@@ -239,7 +239,7 @@
           </label>
           <label>
             <input v-model="editFeatureFlags.enable_bulk_student_tools" type="checkbox" />
-            Bulk student tools
+            Bulk borrower tools
           </label>
           <label>
             <input v-model="editFeatureFlags.enable_status_tracking" type="checkbox" />

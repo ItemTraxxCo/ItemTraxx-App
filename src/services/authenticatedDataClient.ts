@@ -1,3 +1,4 @@
+import { AppError, unauthorizedError } from "./appErrors";
 import { captureHandledRequestFailure } from "./sentry";
 
 const trimTrailingSlash = (value: string) => value.replace(/\/+$/, "");
@@ -39,7 +40,16 @@ const request = async (path: string, init: RequestInit = {}) => {
   });
 
   if (!response.ok) {
-    const message = `Authenticated data request failed (${response.status}).`;
+    let message = `Authenticated data request failed (${response.status}).`;
+    try {
+      const text = await response.text();
+      if (text.trim()) {
+        const parsed = JSON.parse(text) as { message?: string; error?: string; code?: string };
+        message = parsed.message?.trim() || parsed.error?.trim() || message;
+      }
+    } catch {
+      // Keep the fallback message when the error body is empty or non-JSON.
+    }
     void captureHandledRequestFailure({
       area: "authenticated_data",
       name: path,
@@ -49,7 +59,16 @@ const request = async (path: string, init: RequestInit = {}) => {
       message,
       requestId: response.headers.get("x-request-id") ?? undefined,
     });
-    throw new Error(message);
+    if (response.status === 401) {
+      throw unauthorizedError();
+    }
+    if (response.status === 403 && /permission denied/i.test(message)) {
+      throw unauthorizedError();
+    }
+    throw new AppError("REQUEST_FAILED", message, {
+      status: response.status,
+      reportToSentry: response.status >= 500,
+    });
   }
 
   return response;

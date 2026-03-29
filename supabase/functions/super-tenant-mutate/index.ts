@@ -103,10 +103,38 @@ const isMissingDistrictIdColumn = (error: PgError | null | undefined) =>
   error.code === "42703" &&
   (error.message ?? "").toLowerCase().includes("district_id");
 
+const isMissingNamedColumn = (
+  error: PgError | null | undefined,
+  column: string
+) => {
+  if (!error) return false;
+  const message = (error.message ?? "").toLowerCase();
+  return (
+    message.includes(column.toLowerCase()) &&
+    (error.code === "42703" || error.code === "PGRST204" || message.includes("schema cache"))
+  );
+};
+
 const isMissingFeatureFlagsColumn = (error: PgError | null | undefined) =>
+  isMissingNamedColumn(error, "feature_flags");
+
+const isMissingAccountCategoryColumn = (error: PgError | null | undefined) =>
+  isMissingNamedColumn(error, "account_category");
+
+const isMissingPlanCodeColumn = (error: PgError | null | undefined) =>
+  isMissingNamedColumn(error, "plan_code");
+
+const isTenantPolicyAccountCategoryConstraintError = (
+  error: PgError | null | undefined
+) =>
   !!error &&
-  error.code === "42703" &&
-  (error.message ?? "").toLowerCase().includes("feature_flags");
+  (error.code === "23514" || error.code === "P0001") &&
+  (error.message ?? "").toLowerCase().includes("tenant_policies_account_category_check");
+
+const isTenantPolicyPlanCodeConstraintError = (error: PgError | null | undefined) =>
+  !!error &&
+  (error.code === "23514" || error.code === "P0001") &&
+  (error.message ?? "").toLowerCase().includes("tenant_policies_plan_code_check");
 
 const isMissingDistrictsTable = (error: PgError | null | undefined) =>
   !!error &&
@@ -297,6 +325,77 @@ const ensureDistrict = async (
   }
 
   return { districtId: created.id, error: null };
+};
+
+type TenantPolicyUpsertInput = {
+  tenant_id: string;
+  checkout_due_hours?: number;
+  account_category?: "organization" | "district" | "individual" | null;
+  plan_code?:
+    | "core"
+    | "growth"
+    | "starter"
+    | "scale"
+    | "enterprise"
+    | "individual_yearly"
+    | "individual_monthly"
+    | null;
+  feature_flags?: Record<string, unknown> | null;
+  updated_by: string;
+  updated_at: string;
+};
+
+const upsertTenantPolicy = async (
+  adminClient: ReturnType<typeof createClient>,
+  policy: TenantPolicyUpsertInput
+) => {
+  const buildPayload = (options: {
+    includeAccountCategory: boolean;
+    includePlanCode: boolean;
+    includeFeatureFlags: boolean;
+  }) => ({
+    tenant_id: policy.tenant_id,
+    checkout_due_hours: policy.checkout_due_hours ?? 72,
+    ...(options.includeAccountCategory ? { account_category: policy.account_category ?? null } : {}),
+    ...(options.includePlanCode ? { plan_code: policy.plan_code ?? null } : {}),
+    ...(options.includeFeatureFlags ? { feature_flags: policy.feature_flags ?? null } : {}),
+    updated_by: policy.updated_by,
+    updated_at: policy.updated_at,
+  });
+
+  let includeAccountCategory = true;
+  let includePlanCode = true;
+  let includeFeatureFlags = true;
+
+  for (;;) {
+    const result = await adminClient.from("tenant_policies").upsert(
+      buildPayload({ includeAccountCategory, includePlanCode, includeFeatureFlags }),
+      { onConflict: "tenant_id" }
+    );
+
+    if (!result.error) return result;
+    if (includeFeatureFlags && isMissingFeatureFlagsColumn(result.error as PgError)) {
+      includeFeatureFlags = false;
+      continue;
+    }
+    if (
+      includeAccountCategory &&
+      (isMissingAccountCategoryColumn(result.error as PgError) ||
+        isTenantPolicyAccountCategoryConstraintError(result.error as PgError))
+    ) {
+      includeAccountCategory = false;
+      continue;
+    }
+    if (
+      includePlanCode &&
+      (isMissingPlanCodeColumn(result.error as PgError) ||
+        isTenantPolicyPlanCodeConstraintError(result.error as PgError))
+    ) {
+      includePlanCode = false;
+      continue;
+    }
+    return result;
+  }
 };
 
 const enrichDistricts = async (
@@ -1250,44 +1349,35 @@ serve(async (req) => {
         }
       }
 
-      let tenantPolicyResult = await adminClient
-        .from("tenant_policies")
-        .upsert(
-          {
-            tenant_id: data.id,
-            checkout_due_hours: 72,
-            account_category: accountCategory,
-            plan_code: planCode,
-            feature_flags: defaultFeatureFlags(),
-            updated_by: user.id,
-            updated_at: new Date().toISOString(),
-          },
-          { onConflict: "tenant_id" }
-        );
-
-      if (isMissingFeatureFlagsColumn(tenantPolicyResult.error as PgError)) {
-        tenantPolicyResult = await adminClient
-          .from("tenant_policies")
-          .upsert(
-            {
-              tenant_id: data.id,
-              checkout_due_hours: 72,
-              account_category: accountCategory,
-              plan_code: planCode,
-              updated_by: user.id,
-              updated_at: new Date().toISOString(),
-            },
-            { onConflict: "tenant_id" }
-          );
-      }
+      const tenantPolicyResult = await upsertTenantPolicy(adminClient, {
+        tenant_id: data.id,
+        checkout_due_hours: 72,
+        account_category: accountCategory,
+        plan_code: planCode,
+        feature_flags: defaultFeatureFlags(),
+        updated_by: user.id,
+        updated_at: new Date().toISOString(),
+      });
 
       if (tenantPolicyResult.error) {
+        console.error("super-tenant-mutate tenant policy create failed", {
+          code: tenantPolicyResult.error.code,
+          message: tenantPolicyResult.error.message,
+          details: tenantPolicyResult.error.details,
+          hint: tenantPolicyResult.error.hint,
+          accountCategory,
+          planCode,
+          tenantId: data.id,
+        });
         await adminClient.auth.admin.deleteUser(userId);
         if (createdProfileId) {
           await adminClient.from("profiles").delete().eq("id", createdProfileId);
         }
         await adminClient.from("tenants").delete().eq("id", data.id);
-        return jsonResponse(400, { error: "Unable to create tenant policy." });
+        return jsonResponse(400, {
+          error: tenantPolicyResult.error.message || "Unable to create tenant policy.",
+          code: tenantPolicyResult.error.code || null,
+        });
       }
 
       await writeAudit("create_tenant", "tenant", data.id, {
@@ -1372,21 +1462,28 @@ serve(async (req) => {
         return jsonResponse(400, { error: "Unable to update tenant." });
       }
 
-      const { error: policyError } = await adminClient
-        .from("tenant_policies")
-        .upsert(
-          {
-            tenant_id: id,
-            account_category: accountCategory,
-            plan_code: planCode,
-            updated_by: user.id,
-            updated_at: new Date().toISOString(),
-          },
-          { onConflict: "tenant_id" }
-        );
+      const { error: policyError } = await upsertTenantPolicy(adminClient, {
+        tenant_id: id,
+        account_category: accountCategory,
+        plan_code: planCode,
+        updated_by: user.id,
+        updated_at: new Date().toISOString(),
+      });
 
       if (policyError) {
-        return jsonResponse(400, { error: "Unable to update tenant plan details." });
+        console.error("super-tenant-mutate tenant policy update failed", {
+          code: policyError.code,
+          message: policyError.message,
+          details: policyError.details,
+          hint: policyError.hint,
+          accountCategory,
+          planCode,
+          tenantId: id,
+        });
+        return jsonResponse(400, {
+          error: policyError.message || "Unable to update tenant plan details.",
+          code: policyError.code || null,
+        });
       }
 
       await writeAudit("update_tenant", "tenant", data.id, {

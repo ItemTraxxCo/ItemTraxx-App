@@ -415,6 +415,10 @@ const teamMembers = [
 }
 
 @media (max-width: 900px) {
+  .about-page {
+    padding-top: calc(1.25rem + env(safe-area-inset-top, 0px));
+  }
+
   .about-grid,
   .about-grid-compact,
   .team-grid {

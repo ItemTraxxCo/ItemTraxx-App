@@ -393,7 +393,7 @@ const entries = computed<ChangelogEntry[]>(() => {
 
 @media (max-width: 640px) {
   .changelog-page {
-    padding-top: 1.25rem;
+    padding-top: calc(1.25rem + env(safe-area-inset-top, 0px));
   }
 
   .changelog-container {

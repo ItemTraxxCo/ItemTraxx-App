@@ -362,6 +362,7 @@ const ADMIN_IDLE_TIMEOUT_MS =
   Number.isFinite(ADMIN_IDLE_TIMEOUT_MINUTES) && ADMIN_IDLE_TIMEOUT_MINUTES > 0
     ? ADMIN_IDLE_TIMEOUT_MINUTES * 60 * 1000
     : 20 * 60 * 1000;
+const IS_E2E_TEST_MODE = import.meta.env.VITE_E2E_TEST_UTILS === "true";
 
 const GITHUB_HEAD_COMMIT_API =
   "https://api.github.com/repos/ItemTraxxCo/ItemTraxx-App/commits/main";
@@ -806,6 +807,7 @@ const handleSessionTermination = () => {
 };
 
 const runSessionHeartbeat = async () => {
+  if (IS_E2E_TEST_MODE) return;
   if (isSessionHeartbeatRunning.value) return;
   if (!auth.isAuthenticated) {
     stopSessionHeartbeat();
@@ -825,6 +827,10 @@ const runSessionHeartbeat = async () => {
 };
 
 const startSessionHeartbeat = () => {
+  if (IS_E2E_TEST_MODE) {
+    stopSessionHeartbeat();
+    return;
+  }
   if (!auth.isAuthenticated || sessionTermination.visible) {
     stopSessionHeartbeat();
     return;
@@ -1178,6 +1184,20 @@ watch(
     stopSessionHeartbeat();
     showOnboardingModal.value = false;
     onboardingEvaluationDone.value = false;
+  }
+);
+
+watch(
+  () => sessionTermination.visible,
+  (visible) => {
+    if (!visible && sessionTerminationRedirectTimer) {
+      window.clearTimeout(sessionTerminationRedirectTimer);
+      sessionTerminationRedirectTimer = null;
+    }
+    if (visible) {
+      stopAdminSessionPolling();
+      stopSessionHeartbeat();
+    }
   }
 );
 

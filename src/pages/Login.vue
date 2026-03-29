@@ -103,7 +103,6 @@ import { createDistrictSessionHandoff, tenantLogin } from "../services/authServi
 import { useTurnstile } from "../composables/useTurnstile";
 import { buildDistrictAppHandoffUrl } from "../services/districtService";
 import { getDistrictState } from "../store/districtState";
-import { touchTenantAdminSession } from "../services/adminOpsService";
 
 const router = useRouter();
 const district = getDistrictState();
@@ -257,9 +256,6 @@ const handleTenantLogin = async () => {
       return;
     }
     await router.push("/tenant/checkout");
-    void touchTenantAdminSession().catch(() => {
-      // Best-effort session registration for tenant_admin accounts using checkout flow.
-    });
   } catch (err) {
     if (err instanceof Error && err.message === "LIMITER_UNAVAILABLE") {
       error.value = "";

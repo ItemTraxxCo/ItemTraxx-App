@@ -274,7 +274,7 @@ serve(async (req) => {
 
     const findActiveSession = async () => {
       if (!deviceSession.deviceId) {
-        return { exists: false as const, relationMissing: false };
+        return { exists: false as const, relationMissing: false, revoked: false as const };
       }
       const { data, error } = await adminClient
         .from("tenant_admin_sessions")
@@ -287,11 +287,32 @@ serve(async (req) => {
         .maybeSingle();
       if (error) {
         if (isMissingSessionTable(error as RpcError)) {
-          return { exists: false as const, relationMissing: true as const };
+          return { exists: false as const, relationMissing: true as const, revoked: false as const };
         }
         throw new Error("Unable to validate admin session.");
       }
-      return { exists: !!data, relationMissing: false as const };
+      if (data?.id) {
+        return { exists: true as const, relationMissing: false as const, revoked: false as const };
+      }
+
+      const { data: revokedRow, error: revokedError } = await adminClient
+        .from("tenant_admin_sessions")
+        .select("id")
+        .eq("tenant_id", tenantId)
+        .eq("profile_id", user.id)
+        .eq("device_id", deviceSession.deviceId)
+        .not("revoked_at", "is", null)
+        .order("revoked_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (revokedError) {
+        if (isMissingSessionTable(revokedError as RpcError)) {
+          return { exists: false as const, relationMissing: true as const, revoked: false as const };
+        }
+        throw new Error("Unable to validate admin session.");
+      }
+
+      return { exists: false as const, relationMissing: false as const, revoked: !!revokedRow?.id };
     };
 
     const touchCurrentSession = async () => {
@@ -328,6 +349,13 @@ serve(async (req) => {
           throw new Error("Unable to update admin session.");
         }
       } else {
+        const activeSession = await findActiveSession();
+        if (activeSession.relationMissing) {
+          return { ok: false as const, relationMissing: true as const, reason: "missing_table" };
+        }
+        if (activeSession.revoked) {
+          return { ok: false as const, relationMissing: false as const, reason: "revoked" };
+        }
         const { error: insertError } = await adminClient
           .from("tenant_admin_sessions")
           .insert({
@@ -358,6 +386,9 @@ serve(async (req) => {
         });
       }
       if (!activeSession.exists) {
+        if (activeSession.revoked) {
+          return jsonResponse(401, { error: "Session revoked" });
+        }
         return jsonResponse(401, { error: "Session revoked" });
       }
     }
@@ -740,6 +771,9 @@ serve(async (req) => {
         });
       }
       if (!touch.ok) {
+        if (touch.reason === "revoked") {
+          return jsonResponse(401, { error: "Session revoked" });
+        }
         return jsonResponse(400, { error: "Device session is required." });
       }
       return jsonResponse(200, { data: { ok: true } });

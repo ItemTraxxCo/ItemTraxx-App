@@ -95,7 +95,7 @@ const handleReset = async () => {
       return;
     }
     success.value = true;
-    await supabase.auth.signOut();
+    await supabase.auth.signOut({ scope: "local" });
   } finally {
     isLoading.value = false;
   }

@@ -369,7 +369,7 @@ const handleSuspendedTenantSession = async (profile: ProfileRow | null) => {
   }
   const tenant = await fetchTenantContext(profile.tenant_id);
   if (tenant?.status && tenant.status !== "active") {
-    await supabase.auth.signOut();
+    await supabase.auth.signOut({ scope: "local" });
     clearAdminVerification();
     clearAuthState(true);
     return true;
@@ -888,7 +888,7 @@ export const signOut = async () => {
   } catch {
     // Ignore cookie logout failures during the migration window.
   }
-  await supabase.auth.signOut();
+  await supabase.auth.signOut({ scope: "local" });
   clearAdminVerification();
   clearPendingSuperAdminVerificationEmail();
   clearAuthState(true);

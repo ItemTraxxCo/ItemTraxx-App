@@ -3,15 +3,16 @@
     <section class="admin-login-panel">
       <div class="admin-login-topbar">
         <div class="admin-login-brand">ItemTraxx</div>
-        <RouterLink class="admin-login-back" to="/tenant/checkout">Back to checkout</RouterLink>
+        <RouterLink class="admin-login-back" to="/tenant/checkout">Back</RouterLink>
       </div>
 
       <div class="admin-login-content">
         <div class="admin-login-copy">
-          <p class="admin-login-kicker">Tenant Admin Access</p>
+          <p class="admin-login-kicker">Tenant Admin or District/Organization Admin Access</p>
           <h1>Admin sign in</h1>
           <p class="admin-login-subtitle">
-            Use your admin email and password to manage borrowers, gear, logs, and your tenant admin settings.
+            Use your admin email and password to sign in. This is the correct sign in page for 
+            tenant-level admins and district/organization admins.
           </p>
         </div>
 
@@ -271,10 +272,12 @@ onUnmounted(() => {
   --admin-login-back-bg: rgba(255, 255, 255, 0.08);
   --admin-login-back-text: #f8f7ff;
   min-height: 100vh;
+  min-height: 100dvh;
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 2rem;
+  overflow-y: auto;
   background: var(--admin-login-page-bg);
 }
 
@@ -300,7 +303,7 @@ onUnmounted(() => {
 
 .admin-login-panel {
   width: min(100%, 54rem);
-  min-height: min(42rem, calc(100vh - 4rem));
+  min-height: min(42rem, calc(100dvh - 4rem));
   display: grid;
   grid-template-rows: auto 1fr;
   padding: 1.8rem 1.9rem 2rem;

@@ -1,8 +1,8 @@
 # Privacy Policy
 
-Last updated: 2026-03-10 (year-month-day)
+Last updated: 2026-03-29 (year-month-day)
 
-ItemTraxx Co ("we", "our", or "us") provides ItemTraxx, a cloud-based inventory, checkout, and administrative management platform. This Privacy Policy explains what information we collect, how we use it, how we share it, and the choices available to users and customers.
+ItemTraxx Co ("we", "our", or "us") provides ItemTraxx, a cloud-based inventory, checkout, borrower-management, and administrative operations platform. This Privacy Policy explains what information we collect, how we use it, how we share it, and the choices available to users and customers.
 
 ---
 
@@ -11,24 +11,24 @@ This Privacy Policy applies to:
 
 - `itemtraxx.com`
 - district-routed workspaces on `*.app.itemtraxx.com`
-- related product pages such as pricing, legal, support, sales, and request-demo forms
+- related public product pages such as pricing, legal, privacy, security, changelog, support, and sales pages
 - operational emails and support communications sent through ItemTraxx
 
-If your access to ItemTraxx is provided by a school, district, business, or other organization, that organization may also control certain account, inventory, and user data in its workspace.
+If your access to ItemTraxx is provided by a school, district, business, or other organization, that organization may also control certain account, inventory, and borrower-related data inside its workspace.
 
 ---
 
 ## 2. Information We Collect
 We may collect the following categories of information:
 
-- **Account Information:** Name, email address, role, tenant or district assignment, organization name, and authentication-related account metadata
-- **Operational Data:** Inventory records, item status, barcodes, student or user identifiers, checkout and return history, audit logs, and admin actions
-- **Usage Data:** App interactions, page usage, timestamps, route access, and operational events generated while using the service
-- **Device and Technical Data:** Browser type, operating system, approximate device metadata, IP-derived network/security context, and security validation signals
-- **Communications Data:** Messages submitted through contact support, contact sales, request demo, and district support workflows, including optional attachments where supported
-- **Transactional Data:** Plan metadata, billing-related plan classification, and onboarding/support request metadata used to manage service delivery
+- **Account Information:** Name, email address, role, tenant or district assignment, organization name, authentication metadata, and session/device metadata used to secure access
+- **Operational Data:** Inventory records, item status, barcodes, borrower identifiers, borrower profile details entered by customer admins, checkout and return history, audit logs, and administrative actions
+- **Usage Data:** App interactions, page usage, timestamps, route access, workflow activity, and operational events generated while using the service
+- **Device and Technical Data:** Browser type, operating system, approximate device metadata, IP-derived network and security context, request identifiers, and verification or abuse-prevention signals
+- **Communications Data:** Messages submitted through contact support, contact sales, password-reset, and related support workflows, including optional attachments where supported
+- **Transactional Data:** Plan metadata, billing-related plan classification, subscription records, and onboarding or support request metadata used to manage service delivery
 
-We do not intentionally collect more information than is reasonably necessary to operate the service.
+We do not intentionally collect more information than is reasonably necessary to operate, secure, and support the service.
 
 ---
 
@@ -36,12 +36,12 @@ We do not intentionally collect more information than is reasonably necessary to
 We use collected information to:
 
 - provide, secure, and maintain ItemTraxx
-- authenticate users and manage sessions, roles, and access controls
-- process checkouts, returns, inventory updates, and related reporting
+- authenticate users and manage sessions, roles, device activity, and access controls
+- process checkouts, returns, inventory updates, borrower records, and related reporting
 - route users to the correct tenant or district environment where applicable
-- respond to support, demo, sales, and operational inquiries
+- respond to support, sales, password-reset, and operational inquiries
 - send transactional emails and service-related communications
-- monitor performance, diagnose issues, and improve reliability
+- monitor performance, diagnose issues, detect abuse, and improve reliability
 - enforce platform rules, security controls, and rate limits
 - comply with legal obligations and protect the rights, safety, and integrity of ItemTraxx Co, customers, and users
 
@@ -53,16 +53,16 @@ We do **not** sell personal information.
 We may disclose or make data available in the following circumstances:
 
 - **Within a customer workspace:** Authorized tenant admins, district admins, and super admins may be able to view or manage data relevant to their role and scope
-- **Service Providers:** We use third-party providers that help us host, secure, analyze, and operate the service
+- **Service Providers:** We use third-party providers that help us host, secure, monitor, analyze, and operate the service
 - **Legal or Safety Reasons:** When required by law, legal process, or to investigate fraud, abuse, security incidents, or policy violations
 - **Business Protection:** To protect the rights, property, systems, users, customers, or operations of ItemTraxx Co
 
-Where applicable, access is limited by role, user, district, or administrative scope.
+Where applicable, access is limited by role, user, tenant, district, or administrative scope.
 
 ---
 
 ## 5. Data Security
-We use reasonable technical and organizational safeguards intended to protect information, including role-based access controls, authentication controls, infrastructure protections, and service-level security features.
+We use reasonable technical and organizational safeguards intended to protect information, including role-based access controls, authentication controls, session controls, infrastructure protections, request filtering, audit visibility, and service-level security features.
 
 No system is guaranteed to be completely secure. Users and customers should also protect account credentials, access devices, and administrative permissions.
 
@@ -76,32 +76,31 @@ Typical retention expectations include:
 - **Active workspace data:** retained while the applicable tenant, district, or account remains active
 - **Archived or soft-deleted operational records:** retained until removed by authorized process or policy
 - **Audit, security, and operational logs:** retained according to service, security, and compliance needs
-- **Support, demo, and sales inquiries:** retained as needed for follow-up, customer service, and business records
+- **Support and sales inquiries:** retained as needed for follow-up, customer service, and business records
 - **Backups:** may persist for a limited backup and rotation period before aging out
 
 Retention may vary depending on customer configuration, legal requirements, support needs, or operational necessity.
 
 ---
 
-## 7. Third-Party Services and Infrastructure
-ItemTraxx currently relies on third-party services that may process or store data on our behalf, including but not limited to:
+## 7. Service Providers and Infrastructure Categories
+ItemTraxx relies on third-party infrastructure and service providers to operate the platform. Depending on the feature in use, those providers may process or store data on our behalf in categories such as:
 
-- **Supabase** — managed Postgres database, authentication, object storage, and edge-function execution
-- **Vercel** — frontend hosting, deployments, web analytics, and speed insights
-- **Cloudflare** — DNS, edge proxying, request filtering, bot/security protections, and Turnstile verification
-- **GitHub** — source control, pull requests, CI/CD automation, workflow logs, artifacts, and backup-repository storage used for encrypted operational backups
-- **Slack** — internal operational notifications and engineering/deployment alert delivery
-- **Aikido Security** — repository and application security scanning, vulnerability monitoring, and security issue reporting
-- **Resend** — transactional email delivery, where configured for login, support, sales, or administrative communications
-- **Sentry** — application error monitoring, tracing, and privacy-configured session replay where enabled
-- **incident.io** — external incident/status data source used by the public system-status experience, where configured
+- cloud hosting, deployment, and application delivery
+- database, authentication, and storage infrastructure
+- DNS, edge security, and request filtering
+- transactional email delivery and account-recovery communications
+- monitoring, error reporting, analytics, and operational diagnostics
+- source control, CI/CD, backup automation, and engineering workflow tooling
+- internal operational alerting, incident coordination, and support workflows
+- security scanning, vulnerability monitoring, and security operations support
 
-These providers operate under their own terms and privacy practices. We use them as part of operating the service.
+These providers operate under their own terms and privacy practices. We use them as part of operating, securing, and supporting the service.
 
 ---
 
-## 8. Support, Sales, and Demo Requests
-If you contact us through a support, sales, or request-demo form, we may retain the information you provide in order to:
+## 8. Support and Sales Requests
+If you contact us through a support or sales workflow, we may retain the information you provide in order to:
 
 - respond to your inquiry
 - track follow-up or resolution
@@ -113,7 +112,7 @@ If image attachments are supported in a support workflow, those attachments are 
 ---
 
 ## 9. Children and School Use
-ItemTraxx may be used in school environments. We do not knowingly collect personal information directly from children in a manner inconsistent with applicable law. In school or organization-managed environments, the applicable institution or account owner may control the collection and management of operational data within its workspace.
+ItemTraxx may be used in school environments. We do not knowingly collect personal information directly from children in a manner inconsistent with applicable law. In school- or organization-managed environments, the applicable institution or account owner may control the collection and management of operational and borrower-related data within its workspace.
 
 ---
 
@@ -134,7 +133,7 @@ We may update this Privacy Policy from time to time. Updates become effective wh
 ## 12. Contact
 For privacy questions or data-related inquiries, contact:
 
-Contact Support Via Website: [itemtraxx.com/contact-support](https://itemtraxx.com/contact-support)
+Contact Support via Website: [itemtraxx.com/contact-support](https://itemtraxx.com/contact-support)
 Email: `support@itemtraxx.com`
 
 ---

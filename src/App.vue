@@ -382,7 +382,17 @@ const isFullBleedRoute = computed(
     route.path === "/reset-password"
 );
 const isMarketingFullBleedRoute = computed(
-  () => route.path === "/" || route.path === "/landing-new"
+  () =>
+    route.path === "/" ||
+    route.path === "/landing-new" ||
+    route.path === "/about" ||
+    route.path === "/security" ||
+    route.path === "/changelog" ||
+    route.path === "/privacy" ||
+    route.path === "/cookies" ||
+    route.path === "/trust" ||
+    route.path === "/faq" ||
+    route.path === "/accessibility"
 );
 const isBannerBleedRoute = computed(
   () =>
@@ -395,9 +405,14 @@ const isDarkChromeRoute = computed(
   () =>
     route.path === "/" ||
     route.path === "/landing-new" ||
+    route.path === "/about" ||
     route.path === "/pricing" ||
     route.path === "/security" ||
-    route.path === "/changelog"
+    route.path === "/changelog" ||
+    route.path === "/privacy" ||
+    route.path === "/cookies" ||
+    route.path === "/trust" ||
+    route.path === "/faq"
 );
 const showTopMenu = computed(
   () =>
@@ -406,6 +421,11 @@ const showTopMenu = computed(
     route.name !== "public-about" &&
     route.name !== "public-security" &&
     route.name !== "public-changelog" &&
+    route.name !== "public-privacy" &&
+    route.name !== "public-cookies" &&
+    route.name !== "public-trust" &&
+    route.name !== "public-faq" &&
+    route.name !== "public-accessibility" &&
     route.name !== "public-legal" &&
     route.name !== "public-contact-support"
 );

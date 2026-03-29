@@ -205,6 +205,7 @@ const bootstrap = async () => {
   const isE2ETestMode = import.meta.env.VITE_E2E_TEST_UTILS === "true";
   const shouldPreloadAdminSession = consumedDistrictHandoff && isAdminBootstrapPath();
   const canMountFirst =
+    !consumedDistrictHandoff &&
     !shouldPreloadAdminSession &&
     (isE2ETestMode || isPublicBootstrapPath() || districtContext.isDistrictHost);
   if (canMountFirst) {
@@ -214,11 +215,6 @@ const bootstrap = async () => {
     }
     await mountApp();
     void initializeAuth();
-    if (consumedDistrictHandoff) {
-      void touchTenantAdminSession().catch(() => {
-        // Best-effort session registration after district handoff.
-      });
-    }
     return;
   }
   if (consumedDistrictHandoff && isAdminBootstrapPath()) {

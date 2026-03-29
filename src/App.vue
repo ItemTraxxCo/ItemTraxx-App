@@ -698,12 +698,24 @@ const reloadApp = () => {
 
 const signInAgain = async () => {
   const recoveryRoute = sessionTermination.recoveryRoute ?? resolveRecoveryRouteFromPath(route.path);
+  const nextUrl =
+    route.path.startsWith("/super-admin") || route.path.startsWith("/internal")
+      ? null
+      : getPostSignOutUrl();
   if (sessionTerminationRedirectTimer) {
     window.clearTimeout(sessionTerminationRedirectTimer);
     sessionTerminationRedirectTimer = null;
   }
   clearSessionTermination();
   menuOpen.value = false;
+  if (nextUrl) {
+    if (nextUrl.startsWith("http")) {
+      window.location.assign(nextUrl);
+      return;
+    }
+    await router.replace(nextUrl);
+    return;
+  }
   await router.replace(recoveryRoute);
 };
 

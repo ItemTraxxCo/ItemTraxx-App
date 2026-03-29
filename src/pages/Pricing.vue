@@ -293,7 +293,7 @@ import PublicFooter from "../components/PublicFooter.vue";
   margin-bottom: -3rem;
   margin-left: -2rem;
   margin-right: -2rem;
-  padding: 2rem 0 3.2rem;
+  padding: calc(2rem + env(safe-area-inset-top, 0px)) 0 3.2rem;
   background:
     radial-gradient(circle at top left, rgba(25, 194, 168, 0.14), transparent 22%),
     radial-gradient(circle at 82% 18%, rgba(25, 67, 155, 0.2), transparent 28%),

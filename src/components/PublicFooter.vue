@@ -2,12 +2,15 @@
   <footer class="public-footer">
     <div class="footer-brand-block">
       <p class="footer-brand">©2026 ItemTraxx Co</p>
+      <span class="footer-env footer-version">{{ releaseChannel }}</span>
       <span class="footer-version">v-{{ appVersion }}</span>
+
     </div>
     <div class="footer-grid">
       <div class="footer-column">
         <p class="footer-heading">Product</p>
         <RouterLink to="/login">Login</RouterLink>
+        <RouterLink to="/tenant/admin-login">Admin Login</RouterLink>
         <RouterLink to="/pricing">Pricing</RouterLink>
         <RouterLink to="/contact-sales">Contact Sales</RouterLink>
         <RouterLink to="/forgot-password">Forgot Password</RouterLink>
@@ -38,6 +41,20 @@
 import { RouterLink } from "vue-router";
 
 const appVersion = import.meta.env.VITE_GIT_COMMIT || "n/a";
+const runtimeEnvironment = (
+  import.meta.env.VITE_SENTRY_ENVIRONMENT ||
+  import.meta.env.MODE ||
+  ""
+).trim().toLowerCase();
+
+const releaseChannel =
+  runtimeEnvironment === "production"
+    ? "Production"
+    : runtimeEnvironment === "preview"
+      ? "Preview"
+      : runtimeEnvironment === "beta"
+        ? "Beta"
+        : "Development";
 </script>
 
 <style scoped>

@@ -15,7 +15,7 @@ const resolveSafeAssetPath = (assetName) => {
 
 // Increased after adding more shared admin session and device metadata logic.
 // Keep the guardrail while allowing the small shared-runtime growth that followed.
-const maxMainBytes = 64 * 1024;
+const maxMainBytes = 65 * 1024;
 const maxPublicHomeBytes = 20 * 1024;
 
 const files = readdirSync(assetsDir);

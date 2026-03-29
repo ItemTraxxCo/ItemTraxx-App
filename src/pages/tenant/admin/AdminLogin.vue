@@ -68,12 +68,10 @@ import {
   adminLoginWithSession,
   createDistrictAdminSessionHandoff,
 } from "../../../services/authService";
-import { touchTenantAdminSession } from "../../../services/adminOpsService";
 import { logAdminAction } from "../../../services/auditLogService";
 import { useTurnstile } from "../../../composables/useTurnstile";
 import { clearAdminVerification } from "../../../store/authState";
 import { buildDistrictAppHandoffUrl } from "../../../services/districtService";
-import { rotateDeviceSession } from "../../../utils/deviceSession";
 
 const router = useRouter();
 const themeMode = ref<"light" | "dark">("dark");
@@ -174,10 +172,6 @@ const handleAdminLogin = async () => {
       throw new Error("Unable to prepare district sign-in.");
     }
     const session = await adminLoginWithSession(handoff.accessToken, handoff.refreshToken);
-    if (session?.role === "tenant_admin") {
-      rotateDeviceSession();
-      await touchTenantAdminSession();
-    }
     devLog("auth_request_success");
     await router.push(session?.role === "district_admin" ? "/district" : "/tenant/admin");
     void logAdminAction({
@@ -186,11 +180,6 @@ const handleAdminLogin = async () => {
     }).catch(() => {
       // Audit logging is best-effort and should not block admin sign in.
     });
-    if (session?.role === "tenant_admin") {
-      void touchTenantAdminSession().catch(() => {
-        // Session controls are best-effort and should not block access.
-      });
-    }
   } catch (err) {
     devLog("auth_request_failed");
     const message = err instanceof Error ? err.message : "Sign in failed.";

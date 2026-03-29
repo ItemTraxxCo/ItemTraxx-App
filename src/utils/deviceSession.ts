@@ -34,3 +34,11 @@ export const getOrCreateDeviceSession = () => {
 
   return { deviceId, deviceLabel };
 };
+
+export const rotateDeviceSession = () => {
+  const deviceId = createDeviceId();
+  const deviceLabel = detectDeviceLabel();
+  localStorage.setItem(DEVICE_ID_KEY, deviceId);
+  localStorage.setItem(DEVICE_LABEL_KEY, deviceLabel);
+  return { deviceId, deviceLabel };
+};

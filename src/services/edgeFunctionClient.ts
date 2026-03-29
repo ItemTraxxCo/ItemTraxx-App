@@ -132,7 +132,7 @@ const requestEdgeFunction = async <TData = unknown, TBody = unknown>(
 
     if (!response.ok) {
       if (isTenantDisabledError(payload)) {
-        await supabase.auth.signOut();
+        await supabase.auth.signOut({ scope: "local" });
         clearAdminVerification();
         clearAuthState(true);
       }

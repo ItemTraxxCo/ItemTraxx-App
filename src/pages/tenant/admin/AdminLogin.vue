@@ -73,6 +73,7 @@ import { logAdminAction } from "../../../services/auditLogService";
 import { useTurnstile } from "../../../composables/useTurnstile";
 import { clearAdminVerification } from "../../../store/authState";
 import { buildDistrictAppHandoffUrl } from "../../../services/districtService";
+import { rotateDeviceSession } from "../../../utils/deviceSession";
 
 const router = useRouter();
 const themeMode = ref<"light" | "dark">("dark");
@@ -174,6 +175,7 @@ const handleAdminLogin = async () => {
     }
     const session = await adminLoginWithSession(handoff.accessToken, handoff.refreshToken);
     if (session?.role === "tenant_admin") {
+      rotateDeviceSession();
       await touchTenantAdminSession();
     }
     devLog("auth_request_success");

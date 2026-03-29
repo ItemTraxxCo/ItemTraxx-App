@@ -141,11 +141,11 @@ const customerSegments = [
 const operatingModel = [
   {
     title: 'Support-first setup',
-    description: 'Sales, support, and onboarding are handled directly instead of through self-serve setup sprawl.',
+    description: 'Sales, support, and onboarding are handled directly instead of through self-serve setup sprawl. We value direct relationships with our customers and hands-on support over self-serve scale for its own sake.',
   },
   {
     title: 'Invoice-based billing',
-    description: 'District, organization, and individual plans are managed with direct billing workflows.',
+    description: 'District, organization, and individual plans are managed with direct billing workflows via our invoice system.',
   },
   {
     title: 'Controlled rollouts',
@@ -153,14 +153,14 @@ const operatingModel = [
   },
   {
     title: 'Real-world product iteration',
-    description: 'ItemTraxx is built on real-world usage feedback, not generic feature requests.',
+    description: 'ItemTraxx is built on real-world usage feedback, not generic feature requests. We focus on solving problems that come up in actual operations instead of building for hypothetical use cases.',
   },
 ];
 
 const teamMembers = [
   {
     name: 'Dennis Frenkel',
-    role: 'Owner and CEO',
+    role: 'Founder and CEO',
     bio: 'Bio coming soon.',
   },
   {
@@ -170,8 +170,8 @@ const teamMembers = [
   },
     {
     name: 'Cheezit',
-    role: 'team dog and morale officer',
-    bio: 'Likes watermelon.',
+    role: 'Team dog and morale officer',
+    bio: 'Avid watermelon enjoyer.',
   },
 ];
 </script>

@@ -9,7 +9,9 @@ test.describe("Public surfaces", () => {
   test("loads landing page with primary sections", async ({ page }) => {
     await page.goto("/");
     await expect(page.getByRole("heading", { name: "ItemTraxx", exact: true })).toBeVisible();
-    await expect(page.getByRole("link", { name: "Login", exact: true })).toBeVisible();
+    await expect(
+      page.getByRole("navigation", { name: "Primary" }).getByRole("link", { name: "Login", exact: true }),
+    ).toBeVisible();
     await expect(page.getByRole("heading", { name: "Answers to the common stuff." })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Get started with ItemTraxx and streamline your inventory management." })).toBeVisible();
   });

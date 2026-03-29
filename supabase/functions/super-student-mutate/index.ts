@@ -109,7 +109,7 @@ const buildUniqueStudentIdentity = async (
     return { studentId, username };
   }
 
-  throw new Error("Unable to generate student identity.");
+  throw new Error("Unable to generate borrower identity.");
 };
 
 const resolveCorsHeaders = (req: Request) => {

@@ -218,7 +218,7 @@
           <li>
             <strong>District Core and Growth Plans:</strong>
             The onboarding fee is a one-time charge during year one and includes hassle-free
-            addition of items and students (you provide inventory and existing records, and we
+            addition of items and borrowers (you provide inventory and existing records, and we
             complete setup for you), a custom onboarding call covering product
             features, account setup (logins), and live Q&A/help, plus a dedicated Slack support
             channel during the first three (3) months of use with a 24-hour response SLA for the first
@@ -227,7 +227,7 @@
           <li class="enterprise-onboarding-row">
             <strong>District Enterprise Plan:</strong>
             The onboarding fee is a one-time charge during year one and includes hassle-free
-            addition of items and students (you provide inventory and existing records, and we
+            addition of items and borrowers (you provide inventory and existing records, and we
             complete setup for you), a custom onboarding call covering product
             features, account setup (logins), and live Q&A/help, plus a dedicated Slack support
             channel with a 24-hour response SLA active throughout the full subscription term.

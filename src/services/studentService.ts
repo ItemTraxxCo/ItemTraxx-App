@@ -56,7 +56,7 @@ export const fetchDeletedStudents = async () => {
   );
 
   if (!result.ok) {
-    throw edgeFunctionError(result, "Unable to load archived students.");
+    throw edgeFunctionError(result, "Unable to load archived borrowers.");
   }
 
   return (result.data?.data ?? []) as StudentItem[];
@@ -83,7 +83,7 @@ export const createStudent = async (payload: {
   );
 
   if (!result.ok) {
-    throw edgeFunctionError(result, "Unable to create student.");
+    throw edgeFunctionError(result, "Unable to create borrower.");
   }
 
   return result.data?.data as StudentItem;
@@ -108,7 +108,7 @@ export const bulkCreateStudents = async (
   });
 
   if (!result.ok) {
-    throw edgeFunctionError(result, "Unable to import students.");
+    throw edgeFunctionError(result, "Unable to import borrowers.");
   }
 
   return result.data?.data as {
@@ -129,7 +129,7 @@ export const deleteStudent = async (id: string) => {
   });
 
   if (!result.ok) {
-    throw edgeFunctionError(result, "Unable to remove student.");
+    throw edgeFunctionError(result, "Unable to remove borrower.");
   }
 };
 
@@ -146,7 +146,7 @@ export const restoreStudent = async (id: string) => {
   );
 
   if (!result.ok) {
-    throw edgeFunctionError(result, "Unable to restore student.");
+    throw edgeFunctionError(result, "Unable to restore borrower.");
   }
 
   return result.data?.data as StudentItem;

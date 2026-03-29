@@ -4,7 +4,7 @@
       <RouterLink class="button-link" to="/super-admin">Return to Super Admin</RouterLink>
       <RouterLink class="button-link" to="/super-admin/tenants">Tenants</RouterLink>
       <RouterLink class="button-link" to="/super-admin/gear">All Items</RouterLink>
-      <RouterLink class="button-link" to="/super-admin/students">All Borrowers</RouterLink>
+      <RouterLink class="button-link" to="/super-admin/borrowers">All Borrowers</RouterLink>
       <RouterLink class="button-link" to="/super-admin/broadcasts">Broadcasts</RouterLink>
       <RouterLink class="button-link" to="/super-admin/sales-leads">Sales Leads</RouterLink>
       <RouterLink class="button-link" to="/super-admin/customers">Customers</RouterLink>
@@ -149,13 +149,13 @@ const exportCsv = () => {
     showToast("Export", "No rows to export.");
     return;
   }
-  exportRowsToCsv(`super-logs-page-${page.value}.csv`, ["time", "tenant", "action", "item_name", "item_barcode", "student"], rows.value.map((row) => ({
+  exportRowsToCsv(`super-logs-page-${page.value}.csv`, ["time", "tenant", "action", "item_name", "item_barcode", "borrower"], rows.value.map((row) => ({
     time: formatDateTime(row.action_time),
     tenant: row.tenant?.name ?? row.tenant_id,
     action: row.action_type,
     item_name: row.gear?.name ?? "",
     item_barcode: row.gear?.barcode ?? "",
-    student: row.student ? `${row.student.username} (${row.student.student_id})` : "",
+    borrower: row.student ? `${row.student.username} (${row.student.student_id})` : "",
   })));
 };
 
@@ -164,13 +164,13 @@ const exportPdf = async () => {
     showToast("Export", "No rows to export.");
     return;
   }
-  await exportRowsToPdf(`super-logs-page-${page.value}.pdf`, "Super Logs Export", ["time", "tenant", "action", "item_name", "item_barcode", "student"], rows.value.map((row) => ({
+  await exportRowsToPdf(`super-logs-page-${page.value}.pdf`, "Super Logs Export", ["time", "tenant", "action", "item_name", "item_barcode", "borrower"], rows.value.map((row) => ({
     time: formatDateTime(row.action_time),
     tenant: row.tenant?.name ?? row.tenant_id,
     action: row.action_type,
     item_name: row.gear?.name ?? "",
     item_barcode: row.gear?.barcode ?? "",
-    student: row.student ? `${row.student.username} (${row.student.student_id})` : "",
+    borrower: row.student ? `${row.student.username} (${row.student.student_id})` : "",
   })));
 };
 

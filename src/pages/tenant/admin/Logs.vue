@@ -150,7 +150,7 @@ const exportRows = computed(() =>
   filteredLogs.value.map((log) => ({
     action_time: formatTime(log.action_time),
     action_type: log.action_type,
-    student: log.student
+    borrower: log.student
       ? `${log.student.username} (${log.student.student_id})`
       : "",
     item: log.gear ? `${log.gear.name} (${log.gear.barcode})` : "",
@@ -160,7 +160,7 @@ const exportRows = computed(() =>
 const exportCsv = () => {
   exportRowsToCsv(
     `item-logs-${new Date().toISOString().slice(0, 10)}.csv`,
-    ["action_time", "action_type", "student", "item"],
+    ["action_time", "action_type", "borrower", "item"],
     exportRows.value
   );
 };
@@ -169,7 +169,7 @@ const exportPdf = async () => {
   await exportRowsToPdf(
     `item-logs-${new Date().toISOString().slice(0, 10)}.pdf`,
     "Item Logs Export",
-    ["action_time", "action_type", "student", "item"],
+    ["action_time", "action_type", "borrower", "item"],
     exportRows.value
   );
 };

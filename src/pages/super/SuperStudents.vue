@@ -11,7 +11,7 @@
     </div>
 
     <h1>All Borrowers</h1>
-    <p>Cross-tenant student management.</p>
+    <p>Cross-tenant borrower management.</p>
 
     <div class="card">
       <h2>Create Borrower</h2>
@@ -22,7 +22,7 @@
           <input v-model="previewUsername" type="text" readonly title="If you need to change this, contact support." />
         </label>
         <label>
-          Student ID
+          Borrower ID
           <input v-model="previewStudentId" type="text" readonly title="If you need to change this, contact support." />
         </label>
         <div class="form-actions">
@@ -43,10 +43,10 @@
         <button type="button" @click="exportCsv">Export CSV</button>
         <button type="button" @click="exportPdf">Export PDF</button>
       </div>
-      <p v-if="isLoading" class="muted">Loading students...</p>
+      <p v-if="isLoading" class="muted">Loading borrowers...</p>
       <p v-else-if="error" class="error">{{ error }}</p>
       <table v-else class="table">
-        <thead><tr><th>Username</th><th>Tenant</th><th>Student ID</th><th>Actions</th></tr></thead>
+        <thead><tr><th>Username</th><th>Tenant</th><th>Borrower ID</th><th>Actions</th></tr></thead>
         <tbody>
           <tr v-for="item in students" :key="item.id">
             <td>{{ item.username }}</td>
@@ -64,14 +64,14 @@
 
     <div v-if="editItem" class="card">
       <h2>Edit Borrower</h2>
-      <p class="muted">Student identifiers are locked. If you need to change them, contact support.</p>
+      <p class="muted">Borrower identifiers are locked. If you need to change them, contact support.</p>
       <form class="form">
         <label>
           Username
           <input v-model="editUsername" type="text" readonly title="If you need to change this, contact support." />
         </label>
         <label>
-          Student ID
+          Borrower ID
           <input v-model="editStudentId" type="text" readonly title="If you need to change this, contact support." />
         </label>
         <div class="form-actions"><button type="button" @click="cancelEdit">Close</button></div>
@@ -161,7 +161,7 @@ const loadStudents = async () => {
       await handleSuperAdminUnauthorized(router);
       return;
     }
-    error.value = err instanceof Error ? err.message : "Unable to load students.";
+    error.value = err instanceof Error ? err.message : "Unable to load borrowers.";
   } finally {
     isLoading.value = false;
   }
@@ -210,7 +210,7 @@ const handleCreate = async () => {
     regenerateIdentity();
     showToast("Created", "Borrower created.");
   } catch (err) {
-    showToast("Create failed", err instanceof Error ? err.message : "Unable to create student.");
+    showToast("Create failed", err instanceof Error ? err.message : "Unable to create borrower.");
   } finally {
     isSaving.value = false;
   }
@@ -252,7 +252,7 @@ const confirmDelete = async (payload: { superPassword: string; confirmPhrase: st
     showToast("Deleted", "Borrower deleted.");
     closeStepUp();
   } catch (err) {
-    showToast("Delete failed", err instanceof Error ? err.message : "Unable to delete student.");
+    showToast("Delete failed", err instanceof Error ? err.message : "Unable to delete borrower.");
   } finally {
     isSaving.value = false;
   }

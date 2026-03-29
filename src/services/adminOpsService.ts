@@ -75,6 +75,11 @@ const requestCache = new Map<
 
 const requestInflight = new Map<string, Promise<unknown>>();
 
+const getAdminOpCacheKey = (action: string) => {
+  const { deviceId } = getOrCreateDeviceSession();
+  return `${action}:${deviceId}`;
+};
+
 const withCachedAdminOp = async <TData>(
   key: string,
   ttlMs: number,
@@ -165,12 +170,12 @@ export const bulkImportGear = async (
   }>("bulk_import_gear", { rows });
 
 export const touchTenantAdminSession = async () =>
-  withCachedAdminOp("touch_session", 20_000, () =>
+  withCachedAdminOp(getAdminOpCacheKey("touch_session"), 20_000, () =>
     callAdminOps<{ ok: boolean }>("touch_session")
   );
 
 export const validateTenantAdminSession = async () =>
-  withCachedAdminOp("validate_session", 5_000, () =>
+  withCachedAdminOp(getAdminOpCacheKey("validate_session"), 5_000, () =>
     callAdminOps<{ valid: boolean }>("validate_session")
   );
 

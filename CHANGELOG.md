@@ -28,6 +28,20 @@ Changes are dated based on the default timezone: America/Los_Angeles
   - added redirect compatibility from the old super-admin borrower path
   - updated super-admin links and E2E coverage to use the new visible route
 - Refined public-site copy on pricing, about, and landing page surfaces to keep external terminology consistent with the borrower wording cleanup.
+- Expanded public trust and policy surfaces:
+  - added new public pages for `/privacy`, `/trust`, `/faq`, `/accessibility`, and `/cookies`
+  - refreshed `PRIVACY.md` to match current product language and operational behavior
+  - added shared footer links for privacy, trust, FAQ, cookies, accessibility, admin login, and login
+  - moved the legal-page footer out of the content card and aligned landing page with the shared footer
+- Improved public-route layout and mobile-safe behavior:
+  - fixed safe-area top spacing on `/changelog`, `/pricing`, `/contact-sales`, `/contact-support`, `/about`, and related trust pages
+  - corrected full-bleed background shell behavior on trust-style routes so gradients span the full window width
+  - cleaned up accessibility page tile spacing and footer separation
+  - hid the top-right `Log Out User` action on public routes that do not require authentication
+- Improved public docs and help content:
+  - fixed `/changelog` documentation links so internal policy pages open correctly on production and markdown docs fall back to GitHub
+  - expanded the FAQ with setup, usage, pricing, support, security, and mobile workflow questions
+  - corrected the 404 page wordmark to use the proper `ItemTraxx` spelling
 
 ---
 

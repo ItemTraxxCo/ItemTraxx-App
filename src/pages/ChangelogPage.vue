@@ -92,6 +92,22 @@ const intro = computed(() => {
     .filter((line) => line !== "---");
 });
 
+const DOC_LINK_ROUTE_MAP: Record<string, string> = {
+  "README.md": "https://github.com/ItemTraxxCo/ItemTraxx-App/blob/main/README.md",
+  "LICENSE.md": "https://github.com/ItemTraxxCo/ItemTraxx-App/blob/main/LICENSE.md",
+  "LEGAL.md": "/legal",
+  "TERMS.md": "/legal",
+  "PRIVACY.md": "/privacy",
+  "SECURITY.md": "/security",
+};
+
+const normalizeDocHref = (href: string) => {
+  if (/^https?:\/\//.test(href)) return href;
+  const mapped = DOC_LINK_ROUTE_MAP[href];
+  if (mapped) return mapped;
+  return `https://github.com/ItemTraxxCo/ItemTraxx-App/blob/main/${href}`;
+};
+
 const docLinks = computed<DocLink[]>(() => {
   const start = lines.findIndex((line) => line.trim() === "## Documentation Links");
   if (start === -1) return [];
@@ -105,7 +121,7 @@ const docLinks = computed<DocLink[]>(() => {
     const match = line.match(/^- \[(.+?)\]\((.+?)\)\s+[–-]\s+(.+)$/);
     if (!match) continue;
     const [, title, href, description] = match;
-    result.push({ title, href, description });
+    result.push({ title, href: normalizeDocHref(href), description });
   }
   return result;
 });
@@ -159,7 +175,7 @@ const entries = computed<ChangelogEntry[]>(() => {
   width: 100%;
   max-width: 100%;
   margin-left: 0;
-  padding: 2rem 0 3.5rem;
+  padding: calc(2rem + env(safe-area-inset-top, 0px)) 0 3.5rem;
   background-color: #0a1120;
   color: #f5f7fb;
   overflow-x: hidden;

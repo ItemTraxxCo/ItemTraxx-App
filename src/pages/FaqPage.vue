@@ -86,22 +86,59 @@ const faqGroups = [
         q: "Is ItemTraxx self-serve?",
         a: "Core setup and onboarding are still support-led. That keeps account setup, routing, and operational expectations cleaner for customers.",
       },
+      {
+        q: "Who is ItemTraxx for?",
+        a: "ItemTraxx is built for schools, districts, teams, organizations, and individual users who need cleaner inventory checkout, return, and oversight workflows.",
+      },
     ],
   },
   {
     title: "Product Use",
     items: [
       {
+        q: "What kinds of items can I track?",
+        a: "ItemTraxx is intended for shared inventory such as gear, tools, equipment, and other assets that move between people, rooms, or teams.",
+      },
+      {
         q: "Does ItemTraxx keep transaction history?",
         a: "Yes. Checkout, return, and related administrative activity are retained so teams can review who had what item and when it moved.",
       },
+      {
+        q: "Can multiple people use the same tenant?",
+        a: "Yes. ItemTraxx supports shared operational use with role-based access so the right people can check out inventory or manage admin workflows.",
+      },
+      {
+        q: "Can admins manage borrowers and gear separately?",
+        a: "Yes. Borrower management, inventory management, logs, and other admin workflows are separated into dedicated operational pages.",
+      },
+      {
+        q: "What happens if an item is already checked out?",
+        a: "ItemTraxx is designed to prevent conflicting checkout state. If an item is already assigned to another borrower, it should not be available for a second checkout until it is returned.",
+      },
+      {
+        q: "Does ItemTraxx work on mobile?",
+        a: "Yes. ItemTraxx is designed to work across modern desktop and mobile environments, including operator flows that need to be usable on smaller screens.",
+      },
+    ],
+  },
+  {
+    title: "Plans and Access",
+    items: [
       {
         q: "Can it work for schools and small teams?",
         a: "Yes. ItemTraxx is designed for school programs, classrooms, districts, teams, and other environments where shared gear moves constantly.",
       },
       {
-        q: "Can admins manage borrowers and gear separately?",
-        a: "Yes. Borrower management, inventory management, logs, and other admin workflows are separated into dedicated operational pages.",
+        q: "Can I use ItemTraxx as an individual user?",
+        a: "Yes. ItemTraxx also supports individual use, in addition to district and organization plans.",
+      },
+      {
+        q: "How does pricing work?",
+        a: "Pricing is organized around district, organization, and individual use. The pricing page explains the plan categories, and contact sales can help with fit or quotes.",
+      },
+      {
+        q: "Can I request a demo before committing?",
+        a: "Yes. Use Contact Sales or the demo request flow to ask for a walkthrough or planning conversation.",
       },
     ],
   },
@@ -113,8 +150,12 @@ const faqGroups = [
         a: "Use Contact Support. Include the issue details, what you were trying to do, and any screenshots or context that help reproduction.",
       },
       {
+        q: "How do I get help with login or account access issues?",
+        a: "Use Contact Support and include the account context, device, browser, and the point where the issue occurred so support can triage it faster.",
+      },
+      {
         q: "Where can I review security and privacy information?",
-        a: "Use the Trust, Security, Privacy, and Legal pages. Those pages collect the current public material for operational and policy review.",
+        a: "Use the Trust, Security, Privacy, Legal, Cookies, and Accessibility pages. Those pages collect the current public material for operational and policy review.",
       },
       {
         q: "Where can I check whether ItemTraxx is currently up?",

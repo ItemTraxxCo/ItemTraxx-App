@@ -429,7 +429,7 @@ const showTopMenu = computed(
     route.name !== "public-legal" &&
     route.name !== "public-contact-support"
 );
-const showLogoutUserAction = computed(() => route.path !== "/login");
+const showLogoutUserAction = computed(() => auth.isAuthenticated && !Boolean(route.meta.public) && route.path !== "/login");
 const currentTenantOnboardingRole = computed<TenantOnboardingRole | null>(() => {
   if (!auth.isAuthenticated) return null;
   if (auth.role === "tenant_user" || auth.role === "tenant_admin") {

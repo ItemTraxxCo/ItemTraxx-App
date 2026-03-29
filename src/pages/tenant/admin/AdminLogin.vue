@@ -164,6 +164,8 @@ const handleAdminLogin = async () => {
       window.location.replace(
         buildDistrictAppHandoffUrl(handoff.districtSlug, targetPath, {
           tokenHash: handoff.tokenHash,
+          loginMethod: "password",
+          loginLocation: "admin_login",
         })
       );
       return;
@@ -171,7 +173,10 @@ const handleAdminLogin = async () => {
     if (!handoff.accessToken || !handoff.refreshToken) {
       throw new Error("Unable to prepare district sign-in.");
     }
-    const session = await adminLoginWithSession(handoff.accessToken, handoff.refreshToken);
+    const session = await adminLoginWithSession(handoff.accessToken, handoff.refreshToken, {
+      loginMethod: "password",
+      loginLocation: "admin_login",
+    });
     devLog("auth_request_success");
     await router.push(session?.role === "district_admin" ? "/district" : "/tenant/admin");
     void logAdminAction({

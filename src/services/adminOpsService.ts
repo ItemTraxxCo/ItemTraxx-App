@@ -60,9 +60,16 @@ export type TenantSessionItem = {
   device_id: string;
   device_label: string | null;
   user_agent: string | null;
+  login_method: "password" | "magic_link" | "session_handoff" | null;
+  login_location: "regular_login" | "admin_login" | null;
   created_at: string;
   last_seen_at: string;
   is_current: boolean;
+};
+
+export type TenantAdminSessionTouchOptions = {
+  loginMethod?: TenantSessionItem["login_method"];
+  loginLocation?: TenantSessionItem["login_location"];
 };
 
 const requestCache = new Map<
@@ -75,9 +82,9 @@ const requestCache = new Map<
 
 const requestInflight = new Map<string, Promise<unknown>>();
 
-const getAdminOpCacheKey = (action: string) => {
+const getAdminOpCacheKey = (action: string, suffix = "") => {
   const { deviceId } = getOrCreateDeviceSession();
-  return `${action}:${deviceId}`;
+  return `${action}:${deviceId}:${suffix}`;
 };
 
 const withCachedAdminOp = async <TData>(
@@ -169,9 +176,20 @@ export const bulkImportGear = async (
     skipped_rows: Array<{ barcode: string; reason: string }>;
   }>("bulk_import_gear", { rows });
 
-export const touchTenantAdminSession = async () =>
-  withCachedAdminOp(getAdminOpCacheKey("touch_session"), 20_000, () =>
-    callAdminOps<{ ok: boolean }>("touch_session")
+export const touchTenantAdminSession = async (
+  options: TenantAdminSessionTouchOptions = {}
+) =>
+  withCachedAdminOp(
+    getAdminOpCacheKey(
+      "touch_session",
+      `${options.loginMethod ?? "none"}:${options.loginLocation ?? "none"}`
+    ),
+    20_000,
+    () =>
+      callAdminOps<{ ok: boolean }>("touch_session", {
+        login_method: options.loginMethod,
+        login_location: options.loginLocation,
+      })
   );
 
 export const validateTenantAdminSession = async () =>

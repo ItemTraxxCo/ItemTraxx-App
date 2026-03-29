@@ -125,8 +125,8 @@ export const buildDistrictAppHandoffUrl = (
   slug: string,
   path: string,
   handoff:
-    | { handoffCode: string }
-    | { tokenHash: string }
+    | { handoffCode: string; loginMethod?: string; loginLocation?: string }
+    | { tokenHash: string; loginMethod?: string; loginLocation?: string }
 ) => {
   const url = new URL(buildDistrictAppUrl(slug, path));
   const params =
@@ -137,6 +137,12 @@ export const buildDistrictAppHandoffUrl = (
       : new URLSearchParams({
           itx_th: handoff.tokenHash,
         });
+  if (handoff.loginMethod) {
+    params.set("itx_lm", handoff.loginMethod);
+  }
+  if (handoff.loginLocation) {
+    params.set("itx_ll", handoff.loginLocation);
+  }
   url.hash = params.toString();
   return url.toString();
 };

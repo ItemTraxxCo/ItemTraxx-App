@@ -221,11 +221,18 @@ const bootstrap = async () => {
     try {
       const session = await adminLoginWithSession(
         consumedDistrictHandoff.accessToken,
-        consumedDistrictHandoff.refreshToken
+        consumedDistrictHandoff.refreshToken,
+        {
+          loginMethod: consumedDistrictHandoff.loginMethod,
+          loginLocation: consumedDistrictHandoff.loginLocation,
+        }
       );
       if (session.role === "tenant_admin") {
         try {
-          await touchTenantAdminSession();
+          await touchTenantAdminSession({
+            loginMethod: consumedDistrictHandoff.loginMethod,
+            loginLocation: consumedDistrictHandoff.loginLocation,
+          });
         } catch {
           // Best-effort session registration after district handoff.
         }
@@ -243,7 +250,10 @@ const bootstrap = async () => {
     if (getAuthState().role === "tenant_admin") {
       rotateDeviceSession();
       try {
-        await touchTenantAdminSession();
+        await touchTenantAdminSession({
+          loginMethod: consumedDistrictHandoff.loginMethod,
+          loginLocation: consumedDistrictHandoff.loginLocation,
+        });
       } catch {
         // Best-effort session registration after district handoff.
       }

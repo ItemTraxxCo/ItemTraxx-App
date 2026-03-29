@@ -13,9 +13,9 @@ const resolveSafeAssetPath = (assetName) => {
   return `${assetsDir}${sep}${assetName}`;
 };
 
-// Increased after adding more shared public-navigation and route-chrome logic.
+// Increased after adding more shared admin session and device metadata logic.
 // Keep the guardrail while allowing the small shared-runtime growth that followed.
-const maxMainBytes = 61 * 1024;
+const maxMainBytes = 62 * 1024;
 const maxPublicHomeBytes = 20 * 1024;
 
 const files = readdirSync(assetsDir);

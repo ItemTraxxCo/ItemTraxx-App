@@ -494,7 +494,10 @@ export const tenantLogin = async (
   }
   if (shouldRegisterTenantAdminSession) {
     rotateDeviceSession();
-    await touchTenantAdminSession();
+    await touchTenantAdminSession({
+      loginMethod: "password",
+      loginLocation: "regular_login",
+    });
   }
   await applySessionSummary(sessionSummary);
   const current = getAuthState();
@@ -515,7 +518,15 @@ export const tenantLogin = async (
   };
 };
 
-export const consumeDistrictSessionHandoff = async (): Promise<false | { accessToken: string; refreshToken: string }> => {
+export const consumeDistrictSessionHandoff = async (): Promise<
+  | false
+  | {
+      accessToken: string;
+      refreshToken: string;
+      loginMethod: "password" | "magic_link" | "session_handoff" | null;
+      loginLocation: "regular_login" | "admin_login" | null;
+    }
+> => {
   if (typeof window === "undefined" || !window.location.hash) {
     return false;
   }
@@ -528,6 +539,18 @@ export const consumeDistrictSessionHandoff = async (): Promise<false | { accessT
   const tokenHash = params.get("itx_th");
   const accessToken = params.get("itx_at");
   const refreshToken = params.get("itx_rt");
+  const rawLoginMethod = params.get("itx_lm");
+  const rawLoginLocation = params.get("itx_ll");
+  const loginMethod =
+    rawLoginMethod === "password" ||
+    rawLoginMethod === "magic_link" ||
+    rawLoginMethod === "session_handoff"
+      ? rawLoginMethod
+      : null;
+  const loginLocation =
+    rawLoginLocation === "regular_login" || rawLoginLocation === "admin_login"
+      ? rawLoginLocation
+      : null;
 
   if (!handoffCode && !tokenHash && (!accessToken || !refreshToken)) {
     return false;
@@ -537,6 +560,8 @@ export const consumeDistrictSessionHandoff = async (): Promise<false | { accessT
   params.delete("itx_th");
   params.delete("itx_at");
   params.delete("itx_rt");
+  params.delete("itx_lm");
+  params.delete("itx_ll");
   const nextHash = params.toString();
   const nextUrl = `${window.location.pathname}${window.location.search}${nextHash ? `#${nextHash}` : ""}`;
   window.history.replaceState({}, document.title, nextUrl);
@@ -577,7 +602,12 @@ export const consumeDistrictSessionHandoff = async (): Promise<false | { accessT
       // Ignore sessionStorage failures.
     }
 
-    return { accessToken: verifiedAccessToken, refreshToken: verifiedRefreshToken };
+    return {
+      accessToken: verifiedAccessToken,
+      refreshToken: verifiedRefreshToken,
+      loginMethod,
+      loginLocation,
+    };
   } else if (handoffCode) {
     const result = await invokeEdgeFunction<
       { access_token?: string; refresh_token?: string },
@@ -624,7 +654,12 @@ export const consumeDistrictSessionHandoff = async (): Promise<false | { accessT
   } catch {
     // Ignore sessionStorage failures.
   }
-  return { accessToken: finalAccessToken, refreshToken: finalRefreshToken };
+  return {
+    accessToken: finalAccessToken,
+    refreshToken: finalRefreshToken,
+    loginMethod,
+    loginLocation,
+  };
 };
 
 export const createDistrictSessionHandoff = async (districtSlug: string) => {
@@ -724,7 +759,14 @@ export const createDistrictAdminSessionHandoff = async (
   };
 };
 
-export const adminLoginWithSession = async (accessToken: string, refreshToken: string) => {
+export const adminLoginWithSession = async (
+  accessToken: string,
+  refreshToken: string,
+  sessionTouchOptions: {
+    loginMethod?: "password" | "magic_link" | "session_handoff" | null;
+    loginLocation?: "regular_login" | "admin_login" | null;
+  } = {}
+) => {
   const priorTenantContextId = getAuthState().tenantContextId;
   const districtHost = getDistrictState();
   await exchangeHttpSession({
@@ -819,7 +861,10 @@ export const adminLoginWithSession = async (accessToken: string, refreshToken: s
 
   if (resolvedRole === "tenant_admin") {
     rotateDeviceSession();
-    await touchTenantAdminSession();
+    await touchTenantAdminSession({
+      loginMethod: sessionTouchOptions.loginMethod ?? "password",
+      loginLocation: sessionTouchOptions.loginLocation ?? "admin_login",
+    });
   }
 
   setAuthStateFromBackend({

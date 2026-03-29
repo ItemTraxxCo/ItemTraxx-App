@@ -250,6 +250,8 @@ const handleTenantLogin = async () => {
           "/tenant/checkout",
           {
             tokenHash: handoffCode.tokenHash,
+            loginMethod: "password",
+            loginLocation: "regular_login",
           }
         )
       );

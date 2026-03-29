@@ -180,7 +180,7 @@ const teamMembers = [
 .about-page {
   position: relative;
   min-height: 100vh;
-  padding: 2rem 0 3.5rem;
+  padding: calc(2rem + env(safe-area-inset-top, 0px)) 0 3.5rem;
   background:
     radial-gradient(circle at 15% 18%, rgba(36, 214, 196, 0.16), transparent 36%),
     radial-gradient(circle at 82% 12%, rgba(27, 83, 184, 0.18), transparent 33%),

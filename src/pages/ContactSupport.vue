@@ -272,6 +272,7 @@ const send = async () => {
 <style scoped>
 .contact-sales-page {
   max-width: 860px;
+  padding-top: calc(2rem + env(safe-area-inset-top, 0px));
 }
 
 .honeypot {

@@ -1,5 +1,6 @@
 import type { Router } from "vue-router";
 import { clearAuthState } from "../store/authState";
+import { showSessionTermination } from "../store/sessionTermination";
 
 type RecoverableAppErrorDetail = {
   code: string;
@@ -9,9 +10,7 @@ type RecoverableAppErrorDetail = {
 const EVENT_NAME = "itemtraxx:recoverable-app-error";
 let lastRecoveryAt = 0;
 
-const resolveRecoveryRoute = (router: Router) => {
-  const currentPath = router.currentRoute.value.path;
-
+export const resolveRecoveryRouteFromPath = (currentPath: string) => {
   if (currentPath.startsWith("/internal")) {
     return { name: "internal-auth" as const };
   }
@@ -26,6 +25,8 @@ const resolveRecoveryRoute = (router: Router) => {
   }
   return { name: "public-login" as const, query: { reason: "session-expired" } };
 };
+
+const resolveRecoveryRoute = (router: Router) => resolveRecoveryRouteFromPath(router.currentRoute.value.path);
 
 export const dispatchRecoverableAppError = (detail: RecoverableAppErrorDetail) => {
   if (typeof window === "undefined") {
@@ -54,6 +55,6 @@ export const installAppErrorRecovery = (router: Router) => {
 
     lastRecoveryAt = now;
     clearAuthState(true);
-    void router.replace(resolveRecoveryRoute(router));
+    showSessionTermination(resolveRecoveryRoute(router));
   });
 };

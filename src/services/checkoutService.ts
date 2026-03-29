@@ -2,11 +2,14 @@ import { authenticatedSelect } from "./authenticatedDataClient";
 import { invokeEdgeFunction } from "./edgeFunctionClient";
 import { withTimeout } from "./asyncUtils";
 import { edgeFunctionError } from "./appErrors";
+import { getOrCreateDeviceSession } from "../utils/deviceSession";
 
 type CheckoutReturnPayload = {
   student_id: string;
   gear_barcodes: string[];
   action_type: "checkout" | "return" | "auto" | "admin_return";
+  device_id?: string;
+  device_label?: string;
 };
 
 type SubmitCheckoutReturnResult = {
@@ -75,9 +78,14 @@ const queueCheckoutPayload = (payload: CheckoutReturnPayload, error: string | nu
 };
 
 const executeCheckoutReturn = async (payload: CheckoutReturnPayload) => {
+  const { deviceId, deviceLabel } = getOrCreateDeviceSession();
   const result = await invokeEdgeFunction<CheckoutReturnResponse>("checkoutReturn", {
     method: "POST",
-    body: payload,
+    body: {
+      ...payload,
+      device_id: deviceId,
+      device_label: deviceLabel,
+    },
   });
 
   if (!result.ok) {

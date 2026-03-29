@@ -249,18 +249,28 @@
     </main>
 
     <footer class="site-footer">
-      <p class="footer-brand">ItemTraxx Co</p>
-      <div class="footer-links">
-        <RouterLink to="/contact-support">Support</RouterLink>
-        <a
-          href="https://status.itemtraxx.com/"
-          target="_blank"
-          rel="noreferrer"
-        >
-          Status
-        </a>
-        <RouterLink to="/legal">Legal</RouterLink>
-        <RouterLink to="/about">About</RouterLink>
+      <div class="footer-brand-block">
+        <p class="footer-brand">ItemTraxx Co</p>
+      </div>
+      <div class="footer-grid">
+        <div class="footer-column">
+          <p class="footer-heading">Support</p>
+          <RouterLink to="/contact-support">Support</RouterLink>
+          <a
+            href="https://status.itemtraxx.com/"
+            target="_blank"
+            rel="noreferrer"
+          >
+            Status
+          </a>
+        </div>
+        <div class="footer-column">
+          <p class="footer-heading">Company</p>
+          <RouterLink to="/legal">Legal</RouterLink>
+          <RouterLink to="/privacy">Privacy</RouterLink>
+        <RouterLink to="/accessibility">Accessibility</RouterLink>
+          <RouterLink to="/about">About</RouterLink>
+        </div>
       </div>
     </footer>
 
@@ -939,11 +949,19 @@ onBeforeUnmount(() => {
   width: min(1180px, 92%);
   margin: 5.7rem auto 0;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
+  gap: 2rem;
   color: rgba(21, 26, 41, 0.95);
   position: relative;
   z-index: 2;
+}
+
+.footer-brand-block {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  min-width: 10rem;
 }
 
 .footer-brand {
@@ -952,13 +970,30 @@ onBeforeUnmount(() => {
   font-weight: 700;
 }
 
-.footer-links {
+.footer-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem 2.5rem;
+}
+
+.footer-column {
   display: flex;
-  gap: 1rem;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.45rem;
   font-size: 0.84rem;
 }
 
-.footer-links a {
+.footer-heading {
+  margin: 0 0 0.2rem;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  opacity: 0.55;
+}
+
+.footer-column a {
   color: rgba(17, 26, 45, 0.95);
 }
 
@@ -1094,14 +1129,14 @@ onBeforeUnmount(() => {
     width: min(560px, 92%);
     flex-direction: column;
     align-items: flex-start;
-    gap: 0.8rem;
+    gap: 1rem;
     margin-top: 4.4rem;
   }
 
-  .footer-links {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 0.5rem;
+  .footer-grid {
+    width: 100%;
+    grid-template-columns: 1fr;
+    gap: 1rem;
   }
 
   .trust-strip {

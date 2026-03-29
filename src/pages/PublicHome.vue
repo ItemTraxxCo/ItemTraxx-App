@@ -153,7 +153,7 @@
             <h3>Easy management</h3>
           </div>
           <p>
-            With many useful features such as item management, student management,
+            With many useful features such as item management, borrower management,
             transaction logs, etc. keeping track of inventory has never been easier.
           </p>
         </div>
@@ -316,8 +316,8 @@ const faqItems = [
     a: "Yes. If you searched for ItemTrax or Item Traxx, this is the official ItemTraxx site.",
   },
   {
-    q: "Is there a limit to how many items, transactions, and students I can have?",
-    a: "No, there are no limits to the number of items, transactions, or students you can have in ItemTraxx. Our system is designed to scale with your needs, so you can manage as much inventory as you require without worrying about hitting any limits.",
+    q: "Is there a limit to how many items, transactions, and borrowers I can have?",
+    a: "No, there are no limits to the number of items, transactions, or borrowers you can have in ItemTraxx. Our system is designed to scale with your needs, so you can manage as much inventory as you require without worrying about hitting any limits.",
   },
 ];
 const openFaqIndex = ref<number | null>(null);

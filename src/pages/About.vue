@@ -122,7 +122,7 @@ const values = [
 const customerSegments = [
   {
     title: 'Schools and classrooms',
-    description: 'Track shared gear cleanly across students, staff, and media or production environments.',
+    description: 'Track shared gear cleanly across borrowers, staff, and media or production environments.',
   },
   {
     title: 'Districts and multi-site groups',

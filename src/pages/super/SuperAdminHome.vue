@@ -70,16 +70,16 @@
       <section class="card section-card">
         <div class="section-header">
           <h2>Inventory Data</h2>
-          <p class="muted">Inspect global item, student, and transaction data.</p>
+          <p class="muted">Inspect global item, borrower, and transaction data.</p>
         </div>
         <div class="section-links">
           <RouterLink class="section-link" to="/super-admin/gear">
             <span class="section-link-title">All Items</span>
             <span class="section-link-meta">Global inventory catalogue</span>
           </RouterLink>
-          <RouterLink class="section-link" to="/super-admin/students">
+          <RouterLink class="section-link" to="/super-admin/borrowers">
             <span class="section-link-title">All Borrowers</span>
-            <span class="section-link-meta">Cross-tenant student records</span>
+            <span class="section-link-meta">Cross-tenant borrower records</span>
           </RouterLink>
           <RouterLink class="section-link" to="/super-admin/logs">
             <span class="section-link-title">All Logs</span>

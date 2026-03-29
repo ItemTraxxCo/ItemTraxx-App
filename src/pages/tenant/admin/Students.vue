@@ -5,7 +5,7 @@
         <RouterLink class="button-link" to="/tenant/admin">Return to admin panel</RouterLink>
       </div>
       <h1>Borrower Management</h1>
-      <p class="admin-hero-copy">Add students, review details, and manage archived records.</p>
+      <p class="admin-hero-copy">Add borrowers, review details, and manage archived records.</p>
       <div class="admin-summary-grid">
         <div class="admin-summary-card">
           <strong>{{ students.length }}</strong>
@@ -40,7 +40,7 @@
           />
         </label>
         <label>
-          Student ID
+          Borrower ID
           <input
             v-model="studentIdPreview"
             type="text"
@@ -84,12 +84,12 @@
           <input
             v-model="searchQuery"
             type="text"
-            placeholder="Search by username or student ID"
+            placeholder="Search by username or borrower ID"
           />
         </label>
       </div>
       <p class="muted">Showing {{ filteredStudents.length }} of {{ students.length }} borrowers.</p>
-      <p v-if="isLoading" class="muted">Loading students...</p>
+      <p v-if="isLoading" class="muted">Loading borrowers...</p>
       <div v-else class="table-wrap">
       <table class="table">
         <thead>
@@ -142,7 +142,7 @@
             </td>
           </tr>
           <tr v-if="filteredArchivedStudents.length === 0">
-            <td colspan="3" class="muted">No archived students.</td>
+            <td colspan="3" class="muted">No archived borrowers.</td>
           </tr>
         </tbody>
       </table>
@@ -244,7 +244,7 @@
         </div>
 
         <div class="admin-actions">
-          <button type="button" class="link" @click="removeSelected">Archive student</button>
+          <button type="button" class="link" @click="removeSelected">Archive borrower</button>
           <button type="button" class="link" @click="closeDetails">Close</button>
         </div>
       </div>
@@ -367,7 +367,7 @@ const runToastAction = async () => {
 const showDuplicateStudentToast = () => {
   showToast(
     "Unable to add borrower.",
-    "Check borrower ID number and make sure it does not match another borrower's ID number. If you believe this is an error, contact support with the borrower details you want to add."
+    "Check borrower ID number and make sure it does not match another borrower's ID number. If you believe this is an error, contact support with the current borrower details and the details you want to add."
   );
 };
 
@@ -422,11 +422,11 @@ const runBulkImport = async () => {
     await enforceAdminRateLimit();
     const result = await bulkCreateStudents(bulkRows.value);
     students.value = [...result.inserted, ...students.value];
-    success.value = `Imported ${result.inserted_count} student(s).`;
+    success.value = `Imported ${result.inserted_count} borrower(s).`;
     showToast("Bulk import complete", `Imported ${result.inserted_count}, skipped ${result.skipped_count}.`);
     bulkRows.value = [];
   } catch (err) {
-    error.value = err instanceof Error ? err.message : "Unable to import students.";
+    error.value = err instanceof Error ? err.message : "Unable to import borrowers. Please try again. If the issue persists, contact support.";
     showToast("Import failed", error.value);
   } finally {
     isSaving.value = false;
@@ -435,7 +435,7 @@ const runBulkImport = async () => {
 
 const exportCsv = () => {
   exportRowsToCsv(
-    `students-${new Date().toISOString().slice(0, 10)}.csv`,
+    `borrowers-${new Date().toISOString().slice(0, 10)}.csv`,
     ["username", "student_id"],
     filteredStudents.value
   );
@@ -443,7 +443,7 @@ const exportCsv = () => {
 
 const exportPdf = async () => {
   await exportRowsToPdf(
-    `students-${new Date().toISOString().slice(0, 10)}.pdf`,
+    `borrowers-${new Date().toISOString().slice(0, 10)}.pdf`,
     "Borrower Export",
     ["username", "student_id"],
     filteredStudents.value
@@ -456,7 +456,7 @@ const handleCreate = async () => {
 
   const auth = getAuthState();
   if (!auth.tenantContextId) {
-    error.value = "Missing tenant context. Please sign out completeley and sign back in.";
+    error.value = "Missing user context. Please sign out completeley and sign back in.";
     return;
   }
 
@@ -480,7 +480,7 @@ const handleCreate = async () => {
     regenerateIdentity();
     success.value = "Borrower added.";
   } catch (err) {
-    error.value = err instanceof Error ? err.message : "Unable to create student. If you belive this is an error, please contact support.";
+    error.value = err instanceof Error ? err.message : "Unable to create borrower. Please try again. If the issue persists, contact support.";
     showDuplicateStudentToast();
   } finally {
     isSaving.value = false;
@@ -542,7 +542,7 @@ const formatTime = (value: string) => {
 };
 
 const removeStudent = async (item: StudentItem) => {
-  const confirmed = window.confirm(`Archive student "${item.username}"? You can restore them later.`);
+  const confirmed = window.confirm(`Archive borrower "${item.username}"? You can restore them later if needed.`);
   if (!confirmed) return;
   error.value = "";
   success.value = "";

@@ -12,7 +12,7 @@
       </h1>
     </div>
 
-    <p class="checkout-page-copy">Student checkout and return</p>
+    <p class="checkout-page-copy">Checkout and return</p>
 
     <div class="card checkout-card">
       <label>
@@ -106,7 +106,7 @@
         </div>
       </div>
 
-      <p v-else class="muted">Enter a student ID to begin.</p>
+      <p v-else class="muted">Enter a borrower ID to begin.</p>
       <p v-if="error" class="error">{{ error }}</p>
       <p v-if="success" class="success">{{ success }}</p>
       <div v-if="toastMessage" class="toast" :class="{ 'toast-persist': toastStatus === 'Processing' }">
@@ -233,7 +233,7 @@ const loadStudent = async () => {
     return;
   }
   if (!studentId.value.trim()) {
-    error.value = "Enter a student ID.";
+    error.value = "Enter a borrower ID.";
     return;
   }
   if (studentLookupCooldownSeconds.value > 0) {
@@ -254,7 +254,7 @@ const loadStudent = async () => {
     ensureStudentLookupCooldownTimer();
     student.value = null;
     checkedOutGear.value = [];
-    error.value = err instanceof Error ? err.message : "Student not found. Please check the student ID and try again.";
+    error.value = err instanceof Error ? err.message : "Borrower not found. Please check the borrower ID and try again.";
   } finally {
     isStudentLoading.value = false;
   }

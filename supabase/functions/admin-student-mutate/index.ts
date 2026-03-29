@@ -275,7 +275,7 @@ const buildUniqueStudentIdentity = async (
     }
     return { studentId: candidateStudentId, username: candidateUsername };
   }
-  throw new Error("Unable to generate a unique student identity.");
+  throw new Error("Unable to generate a unique borrower identity.");
 };
 
 const resolveCorsHeaders = (req: Request) => {
@@ -600,7 +600,7 @@ serve(async (req) => {
           studentId &&
           (existingIds.has(studentId) || seenIds.has(studentId))
         ) {
-          skipped.push({ row: row.row, reason: "Student ID already exists." });
+          skipped.push({ row: row.row, reason: "Borrower ID already exists." });
           continue;
         }
 

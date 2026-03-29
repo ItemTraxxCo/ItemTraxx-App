@@ -35,6 +35,8 @@ type DeviceSessionContext = {
   deviceId: string | null;
   deviceLabel: string | null;
   userAgent: string | null;
+  loginMethod: "password" | "magic_link" | "session_handoff" | null;
+  loginLocation: "regular_login" | "admin_login" | null;
 };
 
 const TRACKED_STATUSES = new Set(["damaged", "lost", "in_repair", "retired", "in_studio_only"]);
@@ -139,6 +141,14 @@ const sanitizeText = (value: unknown, maxLen: number) => {
   return trimmed.slice(0, maxLen);
 };
 
+const sanitizeLoginMethod = (value: unknown): DeviceSessionContext["loginMethod"] =>
+  value === "password" || value === "magic_link" || value === "session_handoff"
+    ? value
+    : null;
+
+const sanitizeLoginLocation = (value: unknown): DeviceSessionContext["loginLocation"] =>
+  value === "regular_login" || value === "admin_login" ? value : null;
+
 const resolveDeviceSessionContext = (
   payload: Record<string, unknown>,
   req: Request
@@ -146,10 +156,15 @@ const resolveDeviceSessionContext = (
   deviceId: sanitizeText(payload.device_id, 128),
   deviceLabel: sanitizeText(payload.device_label, 160),
   userAgent: sanitizeText(req.headers.get("user-agent"), 255),
+  loginMethod: sanitizeLoginMethod(payload.login_method),
+  loginLocation: sanitizeLoginLocation(payload.login_location),
 });
 
 const isMissingSessionTable = (error: RpcError | null | undefined) =>
   isMissingRelation(error, "tenant_admin_sessions");
+
+const isMissingSessionMetadataColumn = (error: RpcError | null | undefined) =>
+  isMissingColumn(error, "login_method") || isMissingColumn(error, "login_location");
 
 
 serve(async (req) => {
@@ -337,16 +352,34 @@ serve(async (req) => {
       }
 
       if (existing?.id) {
+        const baseUpdate = {
+          last_seen_at: now,
+          device_label: deviceSession.deviceLabel,
+          user_agent: deviceSession.userAgent,
+        };
+        const metadataUpdate = {
+          ...baseUpdate,
+          ...(deviceSession.loginMethod ? { login_method: deviceSession.loginMethod } : {}),
+          ...(deviceSession.loginLocation ? { login_location: deviceSession.loginLocation } : {}),
+        };
+        const shouldTryMetadataUpdate =
+          !!deviceSession.loginMethod || !!deviceSession.loginLocation;
         const { error: updateError } = await adminClient
           .from("tenant_admin_sessions")
-          .update({
-            last_seen_at: now,
-            device_label: deviceSession.deviceLabel,
-            user_agent: deviceSession.userAgent,
-          })
+          .update(shouldTryMetadataUpdate ? metadataUpdate : baseUpdate)
           .eq("id", existing.id);
         if (updateError) {
-          throw new Error("Unable to update admin session.");
+          if (shouldTryMetadataUpdate && isMissingSessionMetadataColumn(updateError as RpcError)) {
+            const { error: fallbackUpdateError } = await adminClient
+              .from("tenant_admin_sessions")
+              .update(baseUpdate)
+              .eq("id", existing.id);
+            if (fallbackUpdateError) {
+              throw new Error("Unable to update admin session.");
+            }
+          } else {
+            throw new Error("Unable to update admin session.");
+          }
         }
       } else {
         const activeSession = await findActiveSession();
@@ -356,22 +389,39 @@ serve(async (req) => {
         if (activeSession.revoked) {
           return { ok: false as const, relationMissing: false as const, reason: "revoked" };
         }
+        const baseInsert = {
+          tenant_id: tenantId,
+          profile_id: user.id,
+          device_id: deviceSession.deviceId,
+          device_label: deviceSession.deviceLabel,
+          user_agent: deviceSession.userAgent,
+          created_at: now,
+          last_seen_at: now,
+        };
+        const metadataInsert = {
+          ...baseInsert,
+          ...(deviceSession.loginMethod ? { login_method: deviceSession.loginMethod } : {}),
+          ...(deviceSession.loginLocation ? { login_location: deviceSession.loginLocation } : {}),
+        };
+        const shouldTryMetadataInsert =
+          !!deviceSession.loginMethod || !!deviceSession.loginLocation;
         const { error: insertError } = await adminClient
           .from("tenant_admin_sessions")
-          .insert({
-            tenant_id: tenantId,
-            profile_id: user.id,
-            device_id: deviceSession.deviceId,
-            device_label: deviceSession.deviceLabel,
-            user_agent: deviceSession.userAgent,
-            created_at: now,
-            last_seen_at: now,
-          });
+          .insert(shouldTryMetadataInsert ? metadataInsert : baseInsert);
         if (insertError) {
           if (isMissingSessionTable(insertError as RpcError)) {
             return { ok: false as const, relationMissing: true as const, reason: "missing_table" };
           }
-          throw new Error("Unable to register admin session.");
+          if (shouldTryMetadataInsert && isMissingSessionMetadataColumn(insertError as RpcError)) {
+            const { error: fallbackInsertError } = await adminClient
+              .from("tenant_admin_sessions")
+              .insert(baseInsert);
+            if (fallbackInsertError) {
+              throw new Error("Unable to register admin session.");
+            }
+          } else {
+            throw new Error("Unable to register admin session.");
+          }
         }
       }
 
@@ -806,14 +856,37 @@ serve(async (req) => {
       if (profile.role !== "tenant_admin") {
         return jsonResponse(403, { error: "Access denied" });
       }
-      const { data, error } = await adminClient
+      let sessionQuery: {
+        data: Array<{
+          id: string;
+          device_id: string;
+          device_label: string | null;
+          user_agent: string | null;
+          login_method?: "password" | "magic_link" | "session_handoff" | null;
+          login_location?: "regular_login" | "admin_login" | null;
+          created_at: string;
+          last_seen_at: string;
+        }> | null;
+        error: RpcError | null;
+      } = await adminClient
         .from("tenant_admin_sessions")
-        .select("id, device_id, device_label, user_agent, created_at, last_seen_at")
+        .select("id, device_id, device_label, user_agent, login_method, login_location, created_at, last_seen_at")
         .eq("tenant_id", tenantId)
         .eq("profile_id", user.id)
         .is("revoked_at", null)
         .order("last_seen_at", { ascending: false })
         .limit(100);
+      if (sessionQuery.error && isMissingSessionMetadataColumn(sessionQuery.error as RpcError)) {
+        sessionQuery = await adminClient
+          .from("tenant_admin_sessions")
+          .select("id, device_id, device_label, user_agent, created_at, last_seen_at")
+          .eq("tenant_id", tenantId)
+          .eq("profile_id", user.id)
+          .is("revoked_at", null)
+          .order("last_seen_at", { ascending: false })
+          .limit(100);
+      }
+      const { data, error } = sessionQuery;
       if (error) {
         if (isMissingSessionTable(error as RpcError)) {
           return jsonResponse(400, {
@@ -827,13 +900,24 @@ serve(async (req) => {
         device_id: string;
         device_label: string | null;
         user_agent: string | null;
+        login_method?: "password" | "magic_link" | "session_handoff" | null;
+        login_location?: "regular_login" | "admin_login" | null;
         created_at: string;
         last_seen_at: string;
       }>;
+      const dedupedRows = new Map<string, (typeof rows)[number]>();
+      for (const row of rows) {
+        const dedupeKey = row.device_id || row.id;
+        if (!dedupedRows.has(dedupeKey)) {
+          dedupedRows.set(dedupeKey, row);
+        }
+      }
       return jsonResponse(200, {
         data: {
-          sessions: rows.map((row) => ({
+          sessions: Array.from(dedupedRows.values()).map((row) => ({
             ...row,
+            login_method: row.login_method ?? null,
+            login_location: row.login_location ?? null,
             is_current: !!deviceSession.deviceId && row.device_id === deviceSession.deviceId,
           })),
         },

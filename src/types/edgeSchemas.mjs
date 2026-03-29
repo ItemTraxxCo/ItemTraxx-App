@@ -33,10 +33,14 @@ const districtSubscriptionPlanSchema = z.enum([
   "organization_enterprise",
 ]);
 const districtBillingStatusSchema = z.enum(["draft", "active", "past_due", "canceled"]);
+const tenantAdminLoginMethodSchema = z.enum(["password", "magic_link", "session_handoff"]);
+const tenantAdminLoginLocationSchema = z.enum(["regular_login", "admin_login"]);
 
 const adminOpsDevicePayloadSchema = z.object({
   device_id: z.string().min(1),
   device_label: z.string().min(1),
+  login_method: tenantAdminLoginMethodSchema.optional(),
+  login_location: tenantAdminLoginLocationSchema.optional(),
 });
 
 const tenantSettingsSchema = z.object({
@@ -100,6 +104,8 @@ const tenantSessionSchema = z.object({
   device_id: z.string(),
   device_label: z.string().nullable(),
   user_agent: z.string().nullable(),
+  login_method: tenantAdminLoginMethodSchema.nullable(),
+  login_location: tenantAdminLoginLocationSchema.nullable(),
   created_at: z.string(),
   last_seen_at: z.string(),
   is_current: z.boolean(),

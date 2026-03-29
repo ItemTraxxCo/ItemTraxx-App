@@ -89,6 +89,8 @@
           <thead>
             <tr>
               <th>Device</th>
+              <th>Login method</th>
+              <th>Login location</th>
               <th>Last seen</th>
               <th>Signed in</th>
               <th>Status</th>
@@ -97,12 +99,14 @@
           <tbody>
             <tr v-for="session in sessions" :key="session.id">
               <td>{{ session.device_label || "Unknown device" }}</td>
+              <td>{{ formatLoginMethod(session.login_method) }}</td>
+              <td>{{ formatLoginLocation(session.login_location) }}</td>
               <td>{{ formatDate(session.last_seen_at) }}</td>
               <td>{{ formatDate(session.created_at) }}</td>
               <td>{{ session.is_current ? "Current" : "Active" }}</td>
             </tr>
             <tr v-if="!sessions.length">
-              <td colspan="4" class="muted">No active sessions found.</td>
+              <td colspan="6" class="muted">No active sessions found.</td>
             </tr>
           </tbody>
         </table>
@@ -211,6 +215,22 @@ const applySettings = (settings: TenantSettingsPayload) => {
         : null;
   planCode.value = settings.plan_code ?? null;
 };
+
+const formatLoginMethod = (value: TenantSessionItem["login_method"]) =>
+  value === "password"
+    ? "Password"
+    : value === "magic_link"
+      ? "Magic link"
+      : value === "session_handoff"
+        ? "Session handoff"
+        : "Unknown";
+
+const formatLoginLocation = (value: TenantSessionItem["login_location"]) =>
+  value === "regular_login"
+    ? "Regular login"
+    : value === "admin_login"
+      ? "Admin sign in"
+      : "Unknown";
 
 const accountCategoryLabel = computed(() =>
   accountCategory.value === "individual"

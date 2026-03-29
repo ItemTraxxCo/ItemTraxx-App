@@ -1,6 +1,6 @@
 # Changelog
 
-Last updated (year-month-day): 2026-03-26
+Last updated (year-month-day): 2026-03-28
 
 All notable changes to **ItemTraxx** will be documented in this file. This includes new features, improvements, bug fixes, and other updates.
 
@@ -15,6 +15,59 @@ Changes are dated based on the default timezone: America/Los_Angeles
 - [TERMS.md](TERMS.md) – Terms of service for users
 - [PRIVACY.md](PRIVACY.md) – Privacy policy and data handling
 - [SECURITY.md](SECURITY.md) – Security reporting and guidelines
+
+---
+
+### 3/28/2026 Development Update
+
+- Hardened tenant-admin session revocation and re-login behavior (major auth/security fixes):
+  - enforced revoked tenant-admin sessions on checkout and return mutations
+  - ensured local sign-out only signs out the current device instead of all devices
+  - added a terminated-session fullscreen recovery prompt with auto-redirect fallback
+  - fixed stale-session race conditions that could reopen terminated-session loops after re-login
+  - stabilized revoked-device re-login across checkout bootstrap, district handoff, and root-route redirects
+- Improved active device management in tenant admin settings:
+  - added login method and login location to active device session records
+  - improved active device list accuracy by deduping active rows by device id
+- Expanded observability:
+  - fixed sentry reporting for auth failures and edge function errors by adding missing Sentry initialization 
+  and error capture calls in key auth and edge function paths
+  - explicitly report handled critical auth/control failures and backend `5xx` failures to Sentry from the frontend
+  - added Cloudflare Worker-side Sentry reporting for worker exceptions and worker-observed `5xx` proxy failures
+- Fixed checkout/admin reliability issues:
+  - blocked double-checkout of the same item by multiple borrowers
+  - surfaced an immediate `Item already checked out.` message and blocked duplicate adds in checkout
+- Refined mobile/public UX:
+  - fixed standalone iPhone safe-area and top-chrome issues on public and authenticated pages
+  - restored scrolling on login, tenant-admin login, and super-admin auth pages for short/mobile screens
+  - expanded footer/login navigation and public mobile polish
+- Updated CI and automated coverage:
+  - added Playwright regression coverage for tenant-admin device revocation and re-login flows
+  - hardened protected-route auth E2E helpers to handle admin-session controls
+  - adjusted bundle-budget thresholds to reflect shared runtime growth from the new auth/session logic
+
+---
+
+### 3/27/2026 Development Update
+
+- Completed the edge-cookie auth migration:
+  - moved web session auth to edge-managed cookies through the custom edge proxy
+  - fixed cookie exchange, custom edge origin routing, CSP allowances, and preview handoff behavior
+  - preserved exchanged sessions after login and stabilized refresh/reload behavior for protected pages
+- Hardened tenant-admin, district-admin, and super-admin auth flows:
+  - routed tenant admins to checkout after sign-in
+  - moved checkout/admin reads and rate-limit checks onto the cookie-backed authenticated data path
+  - stabilized tenant-admin bootstrap, district-admin handoff, super-admin verification, stats, audit logs, and dashboard access
+- Improved admin tooling and routes:
+  - changed borrower management from `/tenant/admin/students` to `/tenant/admin/borrowers`
+  - added redirect compatibility from the old borrower route
+  - updated the borrower page title to `Borrower Management | ItemTraxx`
+  - added reset-password links to tenant-admin and super-admin sign-in flows
+  - moved the super-admin sign-out action to the top of the dashboard
+- Expanded public trust and support pages:
+  - added the public `/security` page
+  - added the public `/changelog` page
+  - refined related footer/navigation behavior across public routes
 
 ---
 

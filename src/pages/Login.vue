@@ -70,6 +70,10 @@
               </button>
             </div>
 
+            <p class="admin-login-note">
+              Admin? <RouterLink to="/tenant/admin-login">Go to admin sign in</RouterLink>
+            </p>
+
             <p class="muted support-note">
               Trouble signing in? Contact our support team from the top-right menu. By using this software, you agree to our
               <a :href="legalUrl" target="_blank" rel="noreferrer">legal terms and policies</a>.
@@ -377,13 +381,14 @@ onMounted(() => {
   --login-help-link-hover: color-mix(in srgb, var(--accent) 82%, white 18%);
   --login-support: rgba(226, 223, 236, 0.68);
   --login-support-link: #d9d0ff;
-  height: 100vh;
   min-height: 100vh;
+  min-height: 100dvh;
   width: 100%;
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 0;
+  overflow-y: auto;
   background: var(--login-page-bg);
 }
 
@@ -429,13 +434,13 @@ onMounted(() => {
 
 .login-split-panel {
   width: 100%;
-  height: 100vh;
   min-height: 100vh;
+  min-height: 100dvh;
   display: grid;
   grid-template-columns: minmax(24rem, 1.02fr) minmax(24rem, 0.9fr);
   gap: 0;
   border-radius: 0;
-  overflow: hidden;
+  overflow: visible;
   background: transparent;
   box-shadow: none;
 }
@@ -673,6 +678,21 @@ onMounted(() => {
 
 .login-submit-button:hover:not(:disabled) {
   background-image: linear-gradient(90deg, #22ccb1 0%, #2357bf 100%);
+}
+
+.admin-login-note {
+  margin: 0.15rem 0 0;
+  font-size: 0.9rem;
+  color: var(--login-copy);
+}
+
+.admin-login-note a {
+  color: var(--login-help-link);
+  font-weight: 600;
+}
+
+.admin-login-note a:hover {
+  color: var(--login-help-link-hover);
 }
 
 .support-note {

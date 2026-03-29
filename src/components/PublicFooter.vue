@@ -3,8 +3,11 @@
     <p class="footer-brand">©2026 ItemTraxx Co</p>
     <div class="footer-links">
       <span class="footer-version">v{{ appVersion }}</span>
+      <RouterLink to="/login">Login</RouterLink>
       <RouterLink to="/pricing">Pricing</RouterLink>
       <RouterLink to="/contact-support">Support</RouterLink>
+      <RouterLink to="/contact-sales">Contact Sales</RouterLink>
+      <RouterLink to="/forgot-password">Forgot Password</RouterLink>
       <RouterLink to="/security">Security</RouterLink>
       <RouterLink to="/changelog">Changelog</RouterLink>
       <a href="https://status.itemtraxx.com/" target="_blank" rel="noreferrer">Status</a>

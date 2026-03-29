@@ -297,10 +297,12 @@ onUnmounted(() => {
 <style scoped>
 .super-auth-shell {
   min-height: 100vh;
+  min-height: 100dvh;
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 2rem;
+  overflow-y: auto;
   background:
     radial-gradient(circle at top, rgba(25, 194, 168, 0.16), transparent 34%),
     radial-gradient(circle at bottom right, rgba(25, 67, 155, 0.18), transparent 38%),

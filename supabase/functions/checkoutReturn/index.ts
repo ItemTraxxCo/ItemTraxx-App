@@ -9,6 +9,13 @@ const baseCorsHeaders = {
   Vary: "Origin",
 };
 
+const sanitizeText = (value: unknown, maxLen: number) => {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  return trimmed.slice(0, maxLen);
+};
+
 type RateLimitResult = {
   allowed: boolean;
   retry_after_seconds: number | null;
@@ -154,7 +161,7 @@ serve(async (req) => {
       });
     }
 
-    const { student_id, gear_barcodes, action_type } = await req.json();
+    const { student_id, gear_barcodes, action_type, device_id } = await req.json();
     if (!Array.isArray(gear_barcodes) || gear_barcodes.length === 0 || gear_barcodes.length > 100) {
       return jsonResponse(400, { error: "Invalid request" });
     }
@@ -163,14 +170,40 @@ serve(async (req) => {
       return jsonResponse(400, { error: "Invalid action type" });
     }
 
+    const adminClient = createClient(supabaseUrl, serviceKey, {
+      auth: { persistSession: false },
+    });
+
     const isAdminReturn = action_type === "admin_return";
     if (isAdminReturn && callerRole !== "tenant_admin") {
       return jsonResponse(403, { error: "Access denied" });
     }
 
-    const adminClient = createClient(supabaseUrl, serviceKey, {
-      auth: { persistSession: false },
-    });
+    if (callerRole === "tenant_admin") {
+      const deviceId = sanitizeText(device_id, 128);
+      if (!deviceId) {
+        return jsonResponse(401, { error: "Session revoked" });
+      }
+
+      const { data: activeAdminSession, error: activeAdminSessionError } = await adminClient
+        .from("tenant_admin_sessions")
+        .select("id")
+        .eq("tenant_id", callerProfile.tenant_id)
+        .eq("profile_id", user.id)
+        .eq("device_id", deviceId)
+        .is("revoked_at", null)
+        .limit(1)
+        .maybeSingle();
+
+      if (activeAdminSessionError) {
+        console.error("checkoutReturn tenant_admin session lookup failed", activeAdminSessionError);
+        return jsonResponse(500, { error: "Request failed" });
+      }
+
+      if (!activeAdminSession?.id) {
+        return jsonResponse(401, { error: "Session revoked" });
+      }
+    }
 
     const { data: maintenanceRow } = await adminClient
       .from("app_runtime_config")

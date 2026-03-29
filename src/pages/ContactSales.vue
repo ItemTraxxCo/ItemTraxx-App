@@ -246,6 +246,12 @@ const send = async () => {
   padding-top: calc(2rem + env(safe-area-inset-top, 0px));
 }
 
+@media (max-width: 720px) {
+  .contact-sales-page {
+    padding-top: calc(1.25rem + env(safe-area-inset-top, 0px));
+  }
+}
+
 .honeypot {
   position: absolute;
   left: -9999px;

@@ -102,7 +102,7 @@ const requestEdgeFunction = async <TData = unknown, TBody = unknown>(
   headers["x-request-id"] = createRequestId();
   const init: RequestInit = { method, headers };
 
-  if (options.body !== undefined) {
+  if (options.body !== undefined && method !== "GET") {
     headers["Content-Type"] = "application/json";
     init.body = JSON.stringify(options.body);
   }

@@ -98,6 +98,12 @@ const routes: RouteRecordRaw[] = [
     meta: { public: true, title: "Security | ItemTraxx" },
   },
   {
+    path: "/report-security-issue",
+    name: "public-report-security-issue",
+    component: () => import("../pages/ReportSecurityIssuePage.vue"),
+    meta: { public: true, title: "Report Security Issue | ItemTraxx" },
+  },
+  {
     path: "/changelog",
     name: "public-changelog",
     component: () => import("../pages/ChangelogPage.vue"),

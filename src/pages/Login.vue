@@ -218,15 +218,21 @@ const showToast = (title: string, message: string) => {
   }, 4000);
 };
 
-const isCredentialFailure = (message: string) => {
+const getTenantSignInErrorMessage = (message: string) => {
   const normalized = message.trim().toLowerCase();
-  return (
+  if (
     normalized.includes("invalid tenant access code") ||
     normalized.includes("invalid access code") ||
     normalized.includes("invalid credentials") ||
     normalized.includes("invalid password") ||
     normalized === "unauthorized"
-  );
+  ) {
+    return "Invalid access code or password.";
+  }
+  if (normalized.includes("timed out")) {
+    return "Sign in timed out. Please try again.";
+  }
+  return null;
 };
 
 const handleTenantLogin = async () => {
@@ -273,7 +279,7 @@ const handleTenantLogin = async () => {
     }
     if (err instanceof Error && err.message === "TENANT_DISABLED") {
       error.value = "";
-      showToast("Access blocked, please contact support", "Your user is disabled. Access is blocked. Please contact support for assistance.");
+      showToast("Access blocked", "This account cannot sign in right now. Please contact support.");
       return;
     }
     if (err instanceof Error && err.message === "MAINTENANCE_MODE") {
@@ -287,9 +293,10 @@ const handleTenantLogin = async () => {
       showToast("Admin verification required", "Please sign in again to continue.");
       return;
     }
-    if (isCredentialFailure(errorMessage)) {
+    const signInErrorMessage = getTenantSignInErrorMessage(errorMessage);
+    if (signInErrorMessage) {
       error.value = "";
-      showToast("Sign in failed.", errorMessage);
+      showToast("Sign in failed.", signInErrorMessage);
       return;
     }
     error.value = errorMessage;

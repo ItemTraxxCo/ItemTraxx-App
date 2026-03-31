@@ -299,6 +299,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
+import { toUserFacingErrorMessage } from "../../services/appErrors";
 import {
   createDistrictSupportRequest,
   getDistrictAdminDashboard,
@@ -377,7 +378,7 @@ const loadDashboard = async () => {
   try {
     dashboard.value = await getDistrictAdminDashboard();
   } catch (err) {
-    error.value = err instanceof Error ? err.message : "Unable to load district dashboard.";
+    error.value = toUserFacingErrorMessage(err, "Unable to load district dashboard.");
   } finally {
     isLoading.value = false;
   }
@@ -410,7 +411,7 @@ const saveTenantEdit = async () => {
     success.value = "Tenant updated.";
     closeEditModal();
   } catch (err) {
-    error.value = err instanceof Error ? err.message : "Unable to update tenant.";
+    error.value = toUserFacingErrorMessage(err, "Unable to update tenant.");
   } finally {
     isSaving.value = false;
   }
@@ -430,7 +431,7 @@ const toggleTenantStatus = async (tenant: DistrictAdminTenant) => {
     success.value =
       updated.status === "active" ? "Tenant restored." : "Tenant disabled.";
   } catch (err) {
-    error.value = err instanceof Error ? err.message : "Unable to update tenant status.";
+    error.value = toUserFacingErrorMessage(err, "Unable to update tenant status.");
   } finally {
     isSaving.value = false;
   }
@@ -446,7 +447,7 @@ const archiveTenant = async (tenant: DistrictAdminTenant) => {
     upsertTenant(updated);
     success.value = "Tenant archived.";
   } catch (err) {
-    error.value = err instanceof Error ? err.message : "Unable to archive tenant.";
+    error.value = toUserFacingErrorMessage(err, "Unable to archive tenant.");
   } finally {
     isSaving.value = false;
   }
@@ -475,7 +476,7 @@ const submitSupportRequest = async () => {
     supportPriority.value = "normal";
     success.value = "Support request sent.";
   } catch (err) {
-    error.value = err instanceof Error ? err.message : "Unable to send support request.";
+    error.value = toUserFacingErrorMessage(err, "Unable to send support request.");
   } finally {
     isSaving.value = false;
   }
@@ -487,7 +488,7 @@ const resetPrimaryAdmin = async (tenant: DistrictAdminTenant) => {
     await sendDistrictTenantPrimaryAdminReset({ tenant_id: tenant.id });
     success.value = "Primary admin reset email sent.";
   } catch (err) {
-    error.value = err instanceof Error ? err.message : "Unable to send reset.";
+    error.value = toUserFacingErrorMessage(err, "Unable to send reset.");
   } finally {
     isSaving.value = false;
   }

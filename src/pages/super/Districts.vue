@@ -228,6 +228,7 @@
 <script setup lang="ts">
 import { onMounted, ref } from "vue";
 import { RouterLink } from "vue-router";
+import { toUserFacingErrorMessage } from "../../services/appErrors";
 import {
   createDistrict,
   listDistricts,
@@ -320,7 +321,7 @@ const loadDistricts = async () => {
   try {
     districts.value = await listDistricts(search.value.trim());
   } catch (err) {
-    error.value = err instanceof Error ? err.message : "Unable to load districts.";
+    error.value = toUserFacingErrorMessage(err, "Unable to load districts.");
   } finally {
     isLoading.value = false;
   }
@@ -359,7 +360,7 @@ const handleCreate = async () => {
     createInvoiceReference.value = "";
     showToast("District created", "District foundation record created successfully.");
   } catch (err) {
-    showToast("Create failed", err instanceof Error ? err.message : "Unable to create district.");
+    showToast("Create failed", toUserFacingErrorMessage(err, "Unable to create district."));
   } finally {
     isSaving.value = false;
   }
@@ -425,7 +426,7 @@ const saveEdit = async () => {
     closeEditModal();
     showToast("District updated", "District record updated successfully.");
   } catch (err) {
-    showToast("Update failed", err instanceof Error ? err.message : "Unable to update district.");
+    showToast("Update failed", toUserFacingErrorMessage(err, "Unable to update district."));
   } finally {
     isSaving.value = false;
   }

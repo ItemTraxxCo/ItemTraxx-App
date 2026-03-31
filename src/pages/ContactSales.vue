@@ -91,6 +91,9 @@
             {{ isSending ? "Sending..." : submitLabel }}
           </button>
         </div>
+        <p class="submit-legal-note">
+          By sending, you agree to <RouterLink to="/legal">Legal</RouterLink>.
+        </p>
       </form>
       <p v-if="error" class="error">{{ error }}</p>
       <p v-if="success" class="success">{{ success }}</p>
@@ -103,6 +106,7 @@ import { computed, ref } from "vue";
 import { RouterLink, useRoute } from "vue-router";
 import { useTurnstile } from "../composables/useTurnstile";
 import { submitContactSalesLead } from "../services/contactSalesService";
+import { toUserFacingErrorMessage } from "../services/appErrors";
 
 type PlanId =
   | "district_core"
@@ -226,7 +230,7 @@ const send = async () => {
     details.value = "";
     website.value = "";
   } catch (err) {
-    error.value = err instanceof Error ? err.message : "Unable to send request.";
+    error.value = toUserFacingErrorMessage(err, "Unable to send request.");
   } finally {
     isSending.value = false;
     if (turnstileSiteKey) {
@@ -259,5 +263,12 @@ const send = async () => {
   width: 1px;
   height: 1px;
   overflow: hidden;
+}
+
+.submit-legal-note {
+  margin: 0.4rem 0 0;
+  color: inherit;
+  opacity: 0.72;
+  font-size: 0.92rem;
 }
 </style>

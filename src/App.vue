@@ -387,6 +387,7 @@ const isMarketingFullBleedRoute = computed(
     route.path === "/landing-new" ||
     route.path === "/about" ||
     route.path === "/security" ||
+    route.path === "/report-security-issue" ||
     route.path === "/changelog" ||
     route.path === "/privacy" ||
     route.path === "/cookies" ||
@@ -408,6 +409,7 @@ const isDarkChromeRoute = computed(
     route.path === "/about" ||
     route.path === "/pricing" ||
     route.path === "/security" ||
+    route.path === "/report-security-issue" ||
     route.path === "/changelog" ||
     route.path === "/privacy" ||
     route.path === "/cookies" ||
@@ -420,6 +422,7 @@ const showTopMenu = computed(
     route.name !== "public-pricing" &&
     route.name !== "public-about" &&
     route.name !== "public-security" &&
+    route.name !== "public-report-security-issue" &&
     route.name !== "public-changelog" &&
     route.name !== "public-privacy" &&
     route.name !== "public-cookies" &&

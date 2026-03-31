@@ -19,6 +19,7 @@
         <p class="footer-heading">Support</p>
         <RouterLink to="/contact-support">Support</RouterLink>
         <RouterLink to="/security">Security</RouterLink>
+        <RouterLink to="/report-security-issue">Report Security Issue</RouterLink>
         <RouterLink to="/trust">Trust</RouterLink>
         <RouterLink to="/changelog">Changelog</RouterLink>
         <RouterLink to="/faq">FAQ</RouterLink>

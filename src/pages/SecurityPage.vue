@@ -27,7 +27,7 @@
           .
         </p>
         <div class="security-hero-actions">
-          <RouterLink class="security-primary-link" to="/contact-support">Report a security issue</RouterLink>
+          <RouterLink class="security-primary-link" to="/report-security-issue">Report a security issue</RouterLink>
           <a class="security-secondary-link" href="https://itemtraxx.com/.well-known/security.txt" target="_blank" rel="noreferrer">View security.txt</a>
         </div>
       </section>
@@ -104,13 +104,15 @@
           <h2>How to report a security issue.</h2>
           <p>
             If you believe you found a security issue in ItemTraxx, report it through
-            <RouterLink to="/contact-support">Contact Support</RouterLink>
+            <RouterLink to="/report-security-issue">the security issue reporting page</RouterLink>
             or email
             <a href="mailto:support@itemtraxx.com">support@itemtraxx.com</a>.
           </p>
           <p>
-            Current reporting guidance, response expectations, and contact details are published in
+            Contact details are published in
             <a href="https://itemtraxx.com/.well-known/security.txt" target="_blank" rel="noreferrer">security.txt</a>.
+            Reporting guidance is available on
+            <RouterLink to="/report-security-issue">the security issue reporting page</RouterLink>.
           </p>
           <p class="security-note">
             ItemTraxx does not currently claim third-party compliance certifications on this page.

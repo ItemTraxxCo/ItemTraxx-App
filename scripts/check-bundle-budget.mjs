@@ -12,11 +12,10 @@ const resolveSafeAssetPath = (assetName) => {
   // Avoid dynamic path resolution on untrusted input; we only accept basename-like names above.
   return `${assetsDir}${sep}${assetName}`;
 };
-
-// Increased after adding more shared admin session and device metadata logic.
-// Keep the guardrail while allowing the small shared-runtime growth that followed.
-const maxMainBytes = 65 * 1024;
-const maxPublicHomeBytes = 20 * 1024;
+// Bundle budget thresholds (5 MiB each)
+// DO NOT UPDATE THESE WITHOUT DISCUSSING WITH THE TEAM FIRST.
+const maxMainBytes = 5 * 1024 * 1024;
+const maxPublicHomeBytes = 5 * 1024 * 1024;
 
 const files = readdirSync(assetsDir);
 const findAssetSize = (prefix) => {

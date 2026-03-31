@@ -90,5 +90,73 @@ export const isUnauthorizedError = (error: unknown) =>
     ? error.code === "UNAUTHORIZED"
     : error instanceof Error && ["unauthorized", "unauthorized."].includes(error.message.trim().toLowerCase());
 
+
+export const toUserFacingErrorMessage = (error: unknown, fallbackMessage: string) => {
+  const rawMessage = error instanceof Error ? error.message.trim() : "";
+  const normalized = rawMessage.toLowerCase();
+
+  if (!rawMessage) return fallbackMessage;
+
+  if (error instanceof AppError) {
+    if (error.code === "UNAUTHORIZED") return "Your session expired. Sign in again.";
+    if (error.code === "RATE_LIMIT") return "Too many requests right now. Please try again in a moment.";
+    if (error.code === "NETWORK") return "Network issue. Check your connection and try again.";
+    if (error.code === "TIMEOUT") return "Request timed out. Please try again.";
+    if (error.code === "TENANT_DISABLED") return "This account cannot be used right now. Please contact support.";
+    if (error.code === "REQUEST_FAILED") {
+      if (normalized.includes("invalid barcode")) return "Invalid barcode. Please check it and try again.";
+      if (normalized.includes("borrower not found")) return "Borrower not found. Please check the borrower ID and try again.";
+      if (normalized.includes("missing tenant context")) return "Your session is missing required account information. Sign in again.";
+      if (normalized.includes("rate limit")) return "Too many requests right now. Please try again in a moment.";
+      if (normalized.includes("timed out")) return "Request timed out. Please try again.";
+      return fallbackMessage;
+    }
+  }
+
+  if (normalized === "unauthorized" || normalized === "unauthorized.") {
+    return "Your session expired. Sign in again.";
+  }
+  if (normalized.includes("network request failed")) {
+    return "Network issue. Check your connection and try again.";
+  }
+  if (normalized.includes("timed out")) {
+    return "Request timed out. Please try again.";
+  }
+  if (normalized.includes("rate limit") || normalized.includes("too many requests")) {
+    return "Too many requests right now. Please try again in a moment.";
+  }
+  if (normalized.includes("tenant disabled")) {
+    return "This account cannot be used right now. Please contact support.";
+  }
+  if (normalized.includes("invalid barcode")) {
+    return "Invalid barcode. Please check it and try again.";
+  }
+  if (normalized.includes("borrower not found")) {
+    return "Borrower not found. Please check the borrower ID and try again.";
+  }
+  if (
+    normalized.includes("session revoked") ||
+    normalized.includes("session terminated") ||
+    normalized.includes("session expired")
+  ) {
+    return "Your session expired. Sign in again.";
+  }
+  if (normalized.includes("missing tenant context")) {
+    return "Your session is missing required account information. Sign in again.";
+  }
+  if (
+    normalized.startsWith("unable to ") ||
+    normalized.startsWith("failed to ") ||
+    normalized.includes("schema cache") ||
+    normalized.includes("pgrst") ||
+    normalized.includes("column") ||
+    normalized.includes("constraint")
+  ) {
+    return fallbackMessage;
+  }
+
+  return rawMessage;
+};
+
 export const shouldReportError = (error: unknown) =>
   error instanceof AppError ? error.reportToSentry : true;

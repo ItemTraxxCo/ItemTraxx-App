@@ -102,6 +102,9 @@
             {{ isSending ? "Sending..." : "Send" }}
           </button>
         </div>
+        <p class="submit-legal-note">
+          By sending, you agree to <RouterLink to="/legal">Legal</RouterLink>.
+        </p>
       </form>
       <p v-if="error" class="error">{{ error }}</p>
       <p v-if="success" class="success">{{ success }}</p>
@@ -117,6 +120,7 @@ import { RouterLink } from "vue-router";
 import PublicFooter from "../components/PublicFooter.vue";
 import { useTurnstile } from "../composables/useTurnstile";
 import { submitContactSupportRequest } from "../services/contactSupportService";
+import { toUserFacingErrorMessage } from "../services/appErrors";
 
 type Category = "general" | "bug" | "billing" | "access" | "feature";
 type SupportAttachment = {
@@ -219,7 +223,7 @@ const handleAttachmentChange = async (event: Event) => {
   try {
     attachments.value = await Promise.all(files.map((file) => fileToAttachment(file)));
   } catch (err) {
-    error.value = err instanceof Error ? err.message : "Unable to process attachments.";
+    error.value = toUserFacingErrorMessage(err, "Unable to process attachments.");
     if (attachmentsInput.value) attachmentsInput.value.value = "";
     attachments.value = [];
   }
@@ -255,7 +259,7 @@ const send = async () => {
     attachments.value = [];
     if (attachmentsInput.value) attachmentsInput.value.value = "";
   } catch (err) {
-    error.value = err instanceof Error ? err.message : "Unable to send request.";
+    error.value = toUserFacingErrorMessage(err, "Unable to send request.");
   } finally {
     isSending.value = false;
     if (turnstileSiteKey) {
@@ -299,5 +303,12 @@ const send = async () => {
   display: flex;
   justify-content: space-between;
   gap: 0.75rem;
+}
+
+.submit-legal-note {
+  margin: 0.4rem 0 0;
+  color: inherit;
+  opacity: 0.72;
+  font-size: 0.92rem;
 }
 </style>

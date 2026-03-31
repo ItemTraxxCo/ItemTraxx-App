@@ -283,6 +283,7 @@ import {
   type SuperTenantAdmin,
 } from "../../services/superAdminService";
 import { getDistrictDetails, type SuperDistrictDetail } from "../../services/superTenantService";
+import { toUserFacingErrorMessage } from "../../services/appErrors";
 
 const route = useRoute();
 const detail = ref<SuperDistrictDetail | null>(null);
@@ -326,7 +327,7 @@ const loadDetail = async () => {
   try {
     detail.value = await getDistrictDetails(districtId);
   } catch (err) {
-    error.value = err instanceof Error ? err.message : "Unable to load district.";
+    error.value = toUserFacingErrorMessage(err, "Unable to load district.");
   } finally {
     isLoading.value = false;
   }
@@ -364,7 +365,7 @@ const createDistrictAdmin = async () => {
     createAdminEmail.value = "";
     createAdminPassword.value = "";
   } catch (err) {
-    error.value = err instanceof Error ? err.message : "Unable to create district admin.";
+    error.value = toUserFacingErrorMessage(err, "Unable to create district admin.");
   } finally {
     isSavingAdmins.value = false;
   }
@@ -375,7 +376,7 @@ const sendReset = async (authEmail: string) => {
   try {
     await sendTenantAdminReset({ auth_email: authEmail, admin_scope: "district" });
   } catch (err) {
-    error.value = err instanceof Error ? err.message : "Unable to send reset.";
+    error.value = toUserFacingErrorMessage(err, "Unable to send reset.");
   } finally {
     isSavingAdmins.value = false;
   }
@@ -393,7 +394,7 @@ const toggleAdminStatus = async (admin: SuperTenantAdmin) => {
       item.id === updated.id ? updated : item
     );
   } catch (err) {
-    error.value = err instanceof Error ? err.message : "Unable to update district admin.";
+    error.value = toUserFacingErrorMessage(err, "Unable to update district admin.");
   } finally {
     isSavingAdmins.value = false;
   }

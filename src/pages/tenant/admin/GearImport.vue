@@ -127,6 +127,7 @@ import { RouterLink } from "vue-router";
 import { bulkImportGear, fetchTenantSettings } from "../../../services/adminOpsService";
 import { logAdminAction } from "../../../services/auditLogService";
 import { enforceAdminRateLimit } from "../../../services/rateLimitService";
+import { toUserFacingErrorMessage } from "../../../services/appErrors";
 
 type ImportRow = {
   name: string;
@@ -305,7 +306,7 @@ const runImport = async () => {
 
     success.value = `Import complete. Added ${result.inserted} items.`;
   } catch (err) {
-    error.value = err instanceof Error ? err.message : "Unable to import rows.";
+    error.value = toUserFacingErrorMessage(err, "Unable to import rows.");
   } finally {
     isImporting.value = false;
   }

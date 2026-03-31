@@ -60,6 +60,7 @@ import {
 import { listSuperLogs, type SuperLogEntry } from "../../services/superLogsService";
 import { listTenants, type SuperTenant } from "../../services/superTenantService";
 import { exportRowsToCsv, exportRowsToPdf } from "../../services/exportService";
+import { toUserFacingErrorMessage } from "../../services/appErrors";
 
 const router = useRouter();
 const tenants = ref<SuperTenant[]>([]);
@@ -127,7 +128,7 @@ const loadLogs = async () => {
       await handleSuperAdminUnauthorized(router);
       return;
     }
-    error.value = err instanceof Error ? err.message : "Unable to load logs.";
+    error.value = toUserFacingErrorMessage(err, "Unable to load logs.");
   } finally {
     isLoading.value = false;
   }

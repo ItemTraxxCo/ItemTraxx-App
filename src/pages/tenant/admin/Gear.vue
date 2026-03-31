@@ -289,6 +289,7 @@ import {
 } from "../../../services/gearService";
 import { exportRowsToCsv, exportRowsToPdf } from "../../../services/exportService";
 import { sanitizeInput } from "../../../utils/inputSanitizer";
+import { toUserFacingErrorMessage } from "../../../services/appErrors";
 
 const gear = ref<GearItem[]>([]);
 const archivedGear = ref<GearItem[]>([]);
@@ -533,7 +534,7 @@ const handleCreate = async () => {
     notes.value = "";
     success.value = "Item added.";
   } catch (err) {
-    error.value = err instanceof Error ? err.message : "Unable to create item.";
+    error.value = toUserFacingErrorMessage(err, "Unable to create item.");
     const message = err instanceof Error ? err.message.toLowerCase() : "";
     if (message.includes("duplicate") || message.includes("already")) {
       showDuplicateBarcodeToast();
@@ -630,7 +631,7 @@ const saveEdit = async (id: string) => {
       );
     }
   } catch (err) {
-    error.value = err instanceof Error ? err.message : "Unable to update item.";
+    error.value = toUserFacingErrorMessage(err, "Unable to update item.");
     const message = err instanceof Error ? err.message.toLowerCase() : "";
     if (message.includes("invalid request") || message.includes("characters or less")) {
       showInputLimitToast();

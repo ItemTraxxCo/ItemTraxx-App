@@ -416,6 +416,7 @@ import { onMounted, onUnmounted, ref } from "vue";
 import { RouterLink, useRouter } from "vue-router";
 import { signOut } from "../../services/authService";
 import { fetchSuperDashboard, type SuperDashboard } from "../../services/superAuditService";
+import { toUserFacingErrorMessage } from "../../services/appErrors";
 import {
   approveRequest,
   forceTenantReauth,
@@ -500,7 +501,7 @@ const loadAll = async () => {
   try {
     await Promise.all([loadDashboard(), loadControlCenter()]);
   } catch (err) {
-    error.value = err instanceof Error ? err.message : "Unable to load dashboard.";
+    error.value = toUserFacingErrorMessage(err, "Unable to load dashboard.");
   } finally {
     isLoading.value = false;
   }
@@ -516,7 +517,7 @@ const saveStatusOverride = async () => {
     showToast("Saved", "System status override was updated.");
     await loadAll();
   } catch (err) {
-    showToast("Save failed", err instanceof Error ? err.message : "Unable to save status override.");
+    showToast("Save failed", toUserFacingErrorMessage(err, "Unable to save status override."));
   } finally {
     isSaving.value = false;
   }
@@ -536,7 +537,7 @@ const saveMaintenanceMode = async () => {
     showToast("Saved", "Maintenance mode updated.");
     await loadAll();
   } catch (err) {
-    showToast("Save failed", err instanceof Error ? err.message : "Unable to save maintenance mode.");
+    showToast("Save failed", toUserFacingErrorMessage(err, "Unable to save maintenance mode."));
   } finally {
     isSaving.value = false;
   }
@@ -562,7 +563,7 @@ const saveAlertRule = async () => {
     showToast("Saved", "Alert rule saved.");
     await loadAll();
   } catch (err) {
-    showToast("Save failed", err instanceof Error ? err.message : "Unable to save alert rule.");
+    showToast("Save failed", toUserFacingErrorMessage(err, "Unable to save alert rule."));
   } finally {
     isSaving.value = false;
   }
@@ -582,7 +583,7 @@ const forceTenantSignOut = async () => {
     showToast("Done", "Tenant sessions were invalidated.");
     await loadAll();
   } catch (err) {
-    showToast("Action failed", err instanceof Error ? err.message : "Unable to force tenant re-login.");
+    showToast("Action failed", toUserFacingErrorMessage(err, "Unable to force tenant re-login."));
   } finally {
     isSaving.value = false;
   }
@@ -595,7 +596,7 @@ const approve = async (id: string) => {
     showToast("Approved", "Request approved.");
     await loadAll();
   } catch (err) {
-    showToast("Approval failed", err instanceof Error ? err.message : "Unable to approve request.");
+    showToast("Approval failed", toUserFacingErrorMessage(err, "Unable to approve request."));
   } finally {
     isSaving.value = false;
   }

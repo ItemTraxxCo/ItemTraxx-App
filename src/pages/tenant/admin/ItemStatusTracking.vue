@@ -130,6 +130,7 @@ import {
   type StatusTrackedItem,
 } from "../../../services/adminOpsService";
 import { exportRowsToCsv, exportRowsToPdf } from "../../../services/exportService";
+import { toUserFacingErrorMessage } from "../../../services/appErrors";
 
 const flaggedItems = ref<StatusTrackedItem[]>([]);
 const history = ref<StatusHistoryItem[]>([]);
@@ -205,7 +206,7 @@ const loadStatusTracking = async () => {
     flaggedItems.value = payload.flagged_items;
     history.value = payload.history;
   } catch (err) {
-    showToast("Load failed", err instanceof Error ? err.message : "Unable to load status tracking.");
+    showToast("Load failed", toUserFacingErrorMessage(err, "Unable to load status tracking."));
   } finally {
     isLoading.value = false;
   }

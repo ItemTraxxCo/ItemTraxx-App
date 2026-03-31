@@ -1,6 +1,6 @@
 # Privacy Policy
 
-Last updated: 2026-03-29 (year-month-day)
+Last updated: 2026-03-31 (year-month-day)
 
 ItemTraxx Co ("we", "our", or "us") provides ItemTraxx, a cloud-based inventory, checkout, borrower-management, and administrative operations platform. This Privacy Policy explains what information we collect, how we use it, how we share it, and the choices available to users and customers.
 
@@ -10,7 +10,7 @@ ItemTraxx Co ("we", "our", or "us") provides ItemTraxx, a cloud-based inventory,
 This Privacy Policy applies to:
 
 - `itemtraxx.com`
-- district-routed workspaces on `*.app.itemtraxx.com`
+- custom-routed workspaces on `*.app.itemtraxx.com`
 - related public product pages such as pricing, legal, privacy, security, changelog, support, and sales pages
 - operational emails and support communications sent through ItemTraxx
 
@@ -21,7 +21,7 @@ If your access to ItemTraxx is provided by a school, district, business, or othe
 ## 2. Information We Collect
 We may collect the following categories of information:
 
-- **Account Information:** Name, email address, role, tenant or district assignment, organization name, authentication metadata, and session/device metadata used to secure access
+- **Account Information:** Name, email address, role, tenant or role assignment, organization name, authentication metadata, and session/device metadata used to secure access
 - **Operational Data:** Inventory records, item status, barcodes, borrower identifiers, borrower profile details entered by customer admins, checkout and return history, audit logs, and administrative actions
 - **Usage Data:** App interactions, page usage, timestamps, route access, workflow activity, and operational events generated while using the service
 - **Device and Technical Data:** Browser type, operating system, approximate device metadata, IP-derived network and security context, request identifiers, and verification or abuse-prevention signals
@@ -42,7 +42,7 @@ We use collected information to:
 - respond to support, sales, password-reset, and operational inquiries
 - send transactional emails and service-related communications
 - monitor performance, diagnose issues, detect abuse, and improve reliability
-- enforce platform rules, security controls, and rate limits
+- enforce platform rules, security controls, rate limits, and anti-abuse measures
 - comply with legal obligations and protect the rights, safety, and integrity of ItemTraxx Co, customers, and users
 
 ---
@@ -53,11 +53,11 @@ We do **not** sell personal information.
 We may disclose or make data available in the following circumstances:
 
 - **Within a customer workspace:** Authorized tenant admins, district admins, and super admins may be able to view or manage data relevant to their role and scope
-- **Service Providers:** We use third-party providers that help us host, secure, monitor, analyze, and operate the service
+- **Service Providers:** ItemTraxx uses third-party providers that help us host, secure, monitor, analyze, and operate the service
 - **Legal or Safety Reasons:** When required by law, legal process, or to investigate fraud, abuse, security incidents, or policy violations
 - **Business Protection:** To protect the rights, property, systems, users, customers, or operations of ItemTraxx Co
 
-Where applicable, access is limited by role, user, tenant, district, or administrative scope.
+Where applicable, access is limited by role, user, tenant, organization, or administrative scope.
 
 ---
 

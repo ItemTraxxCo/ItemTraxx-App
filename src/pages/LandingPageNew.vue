@@ -888,6 +888,12 @@ onBeforeUnmount(() => {
   cursor: pointer;
 }
 
+.faq-toggle:hover,
+.faq-toggle:focus-visible {
+  background: linear-gradient(180deg, rgba(24, 33, 46, 0.98) 0%, rgba(14, 20, 29, 0.98) 100%);
+  box-shadow: none;
+}
+
 .faq-symbol {
   font-size: 1.4rem;
   color: rgba(126, 232, 219, 0.9);

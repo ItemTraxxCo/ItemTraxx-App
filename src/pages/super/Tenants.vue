@@ -285,6 +285,7 @@ import {
   isUnauthorizedError,
 } from "../../services/authErrorHandling";
 import { setTenantPolicy } from "../../services/superOpsService";
+import { toUserFacingErrorMessage } from "../../services/appErrors";
 import {
   createTenant,
   fromTenantStatusLabel,
@@ -441,7 +442,7 @@ const loadTenants = async () => {
       await handleSuperAdminUnauthorized(router);
       return;
     }
-    error.value = err instanceof Error ? err.message : "Unable to load tenants.";
+    error.value = toUserFacingErrorMessage(err, "Unable to load tenants.");
   } finally {
     isLoading.value = false;
   }
@@ -502,7 +503,7 @@ const handleCreate = async () => {
     createModalVisible.value = false;
     showToast("Tenant created", "Tenant and tenant admin login were created successfully.");
   } catch (err) {
-    showToast("Create failed", err instanceof Error ? err.message : "Unable to create tenant.");
+    showToast("Create failed", toUserFacingErrorMessage(err, "Unable to create tenant."));
   } finally {
     isSaving.value = false;
   }
@@ -621,7 +622,7 @@ const saveEdit = async () => {
     closeEditModal();
     showToast("Tenant updated", "Tenant details were updated.");
   } catch (err) {
-    showToast("Update failed", err instanceof Error ? err.message : "Unable to update tenant.");
+    showToast("Update failed", toUserFacingErrorMessage(err, "Unable to update tenant."));
   } finally {
     isSaving.value = false;
   }
@@ -636,7 +637,7 @@ const sendEditTenantReset = async () => {
   } catch (err) {
     showToast(
       "Reset failed",
-      err instanceof Error ? err.message : "Unable to send reset link."
+      toUserFacingErrorMessage(err, "Unable to send reset link.")
     );
   } finally {
     isSaving.value = false;
@@ -687,7 +688,7 @@ const confirmStatusChange = async (payload: {
   } catch (err) {
     showToast(
       "Status update failed",
-      err instanceof Error ? err.message : "Unable to update tenant status."
+      toUserFacingErrorMessage(err, "Unable to update tenant status.")
     );
   } finally {
     isSaving.value = false;

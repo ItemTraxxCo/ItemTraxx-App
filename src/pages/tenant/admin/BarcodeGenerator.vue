@@ -59,6 +59,7 @@ import { onMounted, ref } from "vue";
 import { RouterLink } from "vue-router";
 import { downloadBarcodePdf } from "../../../services/barcodePdfService";
 import { fetchTenantSettings } from "../../../services/adminOpsService";
+import { toUserFacingErrorMessage } from "../../../services/appErrors";
 
 const barcodeInput = ref("");
 const messageInput = ref("");
@@ -89,7 +90,7 @@ const downloadPdf = async () => {
   try {
     await downloadBarcodePdf(generatedBarcodes.value, messageInput.value);
   } catch (err) {
-    error.value = err instanceof Error ? err.message : "Unable to generate PDF.";
+    error.value = toUserFacingErrorMessage(err, "Unable to generate PDF.");
   }
 };
 

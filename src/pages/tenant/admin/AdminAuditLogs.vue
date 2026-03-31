@@ -66,6 +66,7 @@
 import { computed, onMounted, ref } from "vue";
 import { RouterLink } from "vue-router";
 import { fetchAdminAuditLogs, type AdminAuditLog } from "../../../services/adminAuditService";
+import { toUserFacingErrorMessage } from "../../../services/appErrors";
 
 const logs = ref<AdminAuditLog[]>([]);
 const isLoading = ref(false);
@@ -98,7 +99,7 @@ const loadLogs = async () => {
   try {
     logs.value = await fetchAdminAuditLogs();
   } catch (err) {
-    error.value = err instanceof Error ? err.message : "Unable to load logs.";
+    error.value = toUserFacingErrorMessage(err, "Unable to load logs.");
   } finally {
     isLoading.value = false;
   }

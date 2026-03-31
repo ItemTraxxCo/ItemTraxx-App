@@ -201,14 +201,14 @@ const handleCredentialSubmit = async () => {
   } catch (err) {
     const message = err instanceof Error ? err.message : "Sign in failed.";
     if (message === "Invalid credentials.") {
-      error.value = "Invalid super admin credentials.";
-      showToast("Verification failed", "Invalid super admin credentials.");
+      error.value = "Invalid email or password.";
+      showToast("Verification failed", "Invalid email or password.");
     } else if (message === "Access denied.") {
-      error.value = "Access denied.";
-      showToast("Access denied", "This account cannot access super admin.");
+      error.value = "This account does not have super admin access.";
+      showToast("Access denied", "This account does not have super admin access.");
     } else {
-      error.value = message || "Verification failed. Please try again.";
-      showToast("Verification failed", error.value);
+      error.value = "Unable to sign in. Please try again.";
+      showToast("Verification failed", "Unable to sign in. Please try again.");
     }
   } finally {
     isLoading.value = false;
@@ -233,8 +233,11 @@ const handleCodeSubmit = async () => {
     await router.push("/super-admin");
   } catch (err) {
     const message = err instanceof Error ? err.message : "Verification failed.";
-    error.value = message;
-    showToast("Verification failed", message);
+    const userMessage = message.toLowerCase().includes("verify") || message.toLowerCase().includes("code")
+      ? "Invalid or expired verification code."
+      : "Unable to verify code. Please try again.";
+    error.value = userMessage;
+    showToast("Verification failed", userMessage);
   } finally {
     isLoading.value = false;
   }
@@ -248,9 +251,8 @@ const handleResendCode = async () => {
     enableCodeStep(result.email ?? verificationEmail.value);
     showToast("Code sent", "A new verification code was emailed.");
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Unable to resend code.";
-    error.value = message;
-    showToast("Resend failed", message);
+    error.value = "Unable to resend the verification code right now. Please try again.";
+    showToast("Resend failed", "Unable to resend the verification code right now. Please try again.");
   } finally {
     isLoading.value = false;
   }

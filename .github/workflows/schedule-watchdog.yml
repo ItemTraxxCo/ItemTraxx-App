@@ -63,7 +63,7 @@ jobs:
             fi
           }
 
-          check_workflow "async-job-worker.yml" "Async Job Worker" 3600
+          check_workflow "async-job-worker.yml" "Async Job Worker" 7200
           check_workflow "synthetic-journeys.yml" "Synthetic Journeys" 10800
           check_workflow "deployment-health.yml" "Deployment Health" 14400
           check_workflow "supabase-backup.yml" "Supabase Backup" 86400

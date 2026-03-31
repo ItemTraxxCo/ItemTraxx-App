@@ -96,6 +96,7 @@ import { createSuperStudent, deleteSuperStudent, listSuperStudents, type SuperSt
 import { listTenants, type SuperTenant } from "../../services/superTenantService";
 import { exportRowsToCsv, exportRowsToPdf } from "../../services/exportService";
 import { generateStudentIdentity } from "../../utils/studentIdentity";
+import { toUserFacingErrorMessage } from "../../services/appErrors";
 
 const router = useRouter();
 const tenants = ref<SuperTenant[]>([]);
@@ -161,7 +162,7 @@ const loadStudents = async () => {
       await handleSuperAdminUnauthorized(router);
       return;
     }
-    error.value = err instanceof Error ? err.message : "Unable to load borrowers.";
+    error.value = toUserFacingErrorMessage(err, "Unable to load borrowers.");
   } finally {
     isLoading.value = false;
   }
@@ -210,7 +211,7 @@ const handleCreate = async () => {
     regenerateIdentity();
     showToast("Created", "Borrower created.");
   } catch (err) {
-    showToast("Create failed", err instanceof Error ? err.message : "Unable to create borrower.");
+    showToast("Create failed", toUserFacingErrorMessage(err, "Unable to create borrower."));
   } finally {
     isSaving.value = false;
   }
@@ -252,7 +253,7 @@ const confirmDelete = async (payload: { superPassword: string; confirmPhrase: st
     showToast("Deleted", "Borrower deleted.");
     closeStepUp();
   } catch (err) {
-    showToast("Delete failed", err instanceof Error ? err.message : "Unable to delete borrower.");
+    showToast("Delete failed", toUserFacingErrorMessage(err, "Unable to delete borrower."));
   } finally {
     isSaving.value = false;
   }

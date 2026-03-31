@@ -95,6 +95,7 @@
 import { onMounted, onUnmounted, ref } from "vue";
 import { RouterLink } from "vue-router";
 import { getControlCenter, setRuntimeConfig } from "../../services/superOpsService";
+import { toUserFacingErrorMessage } from "../../services/appErrors";
 
 const message = ref("");
 const level = ref<"info" | "warning" | "critical">("info");
@@ -138,7 +139,7 @@ const loadCurrent = async () => {
     enabled.value = raw.enabled === true;
     lastUpdated.value = typeof raw.updated_at === "string" ? raw.updated_at : "";
   } catch (err) {
-    showToast("Load failed", err instanceof Error ? err.message : "Unable to load broadcast settings.");
+    showToast("Load failed", toUserFacingErrorMessage(err, "Unable to load broadcast settings."));
   }
 };
 
@@ -163,7 +164,7 @@ const saveBroadcast = async () => {
     lastUpdated.value = nowIso;
     showToast("Saved", "Broadcast settings updated.");
   } catch (err) {
-    showToast("Save failed", err instanceof Error ? err.message : "Unable to save broadcast settings.");
+    showToast("Save failed", toUserFacingErrorMessage(err, "Unable to save broadcast settings."));
   } finally {
     isSaving.value = false;
   }
@@ -188,7 +189,7 @@ const clearBroadcast = async () => {
     lastUpdated.value = nowIso;
     showToast("Disabled", "Broadcast disabled.");
   } catch (err) {
-    showToast("Action failed", err instanceof Error ? err.message : "Unable to disable broadcast.");
+    showToast("Action failed", toUserFacingErrorMessage(err, "Unable to disable broadcast."));
   } finally {
     isSaving.value = false;
   }
@@ -226,7 +227,7 @@ const saveTenantUpdate = async () => {
     updateLevel.value = "info";
     updateLinkUrl.value = "";
   } catch (err) {
-    showToast("Save failed", err instanceof Error ? err.message : "Unable to publish update.");
+    showToast("Save failed", toUserFacingErrorMessage(err, "Unable to publish update."));
   } finally {
     isSaving.value = false;
   }
@@ -245,7 +246,7 @@ const clearTenantUpdates = async () => {
     });
     showToast("Cleared", "Tenant notification updates cleared.");
   } catch (err) {
-    showToast("Action failed", err instanceof Error ? err.message : "Unable to clear tenant updates.");
+    showToast("Action failed", toUserFacingErrorMessage(err, "Unable to clear tenant updates."));
   } finally {
     isSaving.value = false;
   }

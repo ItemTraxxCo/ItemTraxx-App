@@ -91,7 +91,7 @@ const handleReset = async () => {
       password: newPassword.value,
     });
     if (updateError) {
-      error.value = updateError.message || "Unable to update password.";
+      error.value = "Unable to update password. Request a new reset link and try again.";
       return;
     }
     success.value = true;

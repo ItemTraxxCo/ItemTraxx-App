@@ -56,6 +56,7 @@
 import { onMounted, ref } from "vue";
 import { RouterLink } from "vue-router";
 import { fetchUsageStats, type UsageStats } from "../../../services/statsService";
+import { toUserFacingErrorMessage } from "../../../services/appErrors";
 
 const stats = ref<UsageStats | null>(null);
 const isLoading = ref(false);
@@ -67,7 +68,7 @@ const loadStats = async () => {
   try {
     stats.value = await fetchUsageStats();
   } catch (err) {
-    error.value = err instanceof Error ? err.message : "Unable to load stats.";
+    error.value = toUserFacingErrorMessage(err, "Unable to load stats.");
   } finally {
     isLoading.value = false;
   }

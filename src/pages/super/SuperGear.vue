@@ -95,6 +95,7 @@ import {
 import { createSuperGear, deleteSuperGear, listSuperGear, updateSuperGear, type SuperGearItem } from "../../services/superGearService";
 import { listTenants, type SuperTenant } from "../../services/superTenantService";
 import { exportRowsToCsv, exportRowsToPdf } from "../../services/exportService";
+import { toUserFacingErrorMessage } from "../../services/appErrors";
 
 const router = useRouter();
 const tenants = ref<SuperTenant[]>([]);
@@ -166,7 +167,7 @@ const loadGear = async () => {
       await handleSuperAdminUnauthorized(router);
       return;
     }
-    error.value = err instanceof Error ? err.message : "Unable to load items.";
+    error.value = toUserFacingErrorMessage(err, "Unable to load items.");
   } finally {
     isLoading.value = false;
   }
@@ -225,7 +226,7 @@ const handleCreate = async () => {
     formNotes.value = "";
     showToast("Created", "Item created.");
   } catch (err) {
-    showToast("Create failed", err instanceof Error ? err.message : "Unable to create item.");
+    showToast("Create failed", toUserFacingErrorMessage(err, "Unable to create item."));
   } finally {
     isSaving.value = false;
   }
@@ -272,7 +273,7 @@ const saveEdit = async () => {
     cancelEdit();
     showToast("Saved", "Item updated.");
   } catch (err) {
-    showToast("Update failed", err instanceof Error ? err.message : "Unable to update item.");
+    showToast("Update failed", toUserFacingErrorMessage(err, "Unable to update item."));
   } finally {
     isSaving.value = false;
   }
@@ -319,7 +320,7 @@ const confirmStepUp = async (payload: { superPassword: string; confirmPhrase: st
     }
     closeStepUp();
   } catch (err) {
-    showToast("Action failed", err instanceof Error ? err.message : "Action failed.");
+    showToast("Action failed", toUserFacingErrorMessage(err, "Action failed."));
   } finally {
     isSaving.value = false;
   }

@@ -148,6 +148,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from "vue";
 import { RouterLink } from "vue-router";
+import { toUserFacingErrorMessage } from "../../../services/appErrors";
 import {
   createTenantManagedAdmin,
   listTenantManagedAdmins,
@@ -203,7 +204,7 @@ const loadAdmins = async () => {
     canManageAdmins.value = data.can_manage_admins;
     primaryAdminProfileId.value = data.primary_admin_profile_id;
   } catch (err) {
-    error.value = err instanceof Error ? err.message : "Unable to load tenant admins.";
+    error.value = toUserFacingErrorMessage(err, "Unable to load tenant admins.");
   } finally {
     isLoading.value = false;
   }
@@ -222,7 +223,7 @@ const handleCreate = async () => {
     showToast("Admin invited", "Password setup email sent to the new tenant admin.");
     await loadAdmins();
   } catch (err) {
-    showToast("Create failed", err instanceof Error ? err.message : "Unable to invite tenant admin.");
+    showToast("Create failed", toUserFacingErrorMessage(err, "Unable to invite tenant admin."));
   } finally {
     isSaving.value = false;
   }
@@ -254,7 +255,7 @@ const saveEditEmail = async () => {
     showToast("Email updated", "Tenant admin email was updated.");
     closeEditModal();
   } catch (err) {
-    showToast("Update failed", err instanceof Error ? err.message : "Unable to update tenant admin email.");
+    showToast("Update failed", toUserFacingErrorMessage(err, "Unable to update tenant admin email."));
   } finally {
     isSaving.value = false;
   }
@@ -272,7 +273,7 @@ const toggleEditStatus = async () => {
     showToast(updated.is_active ? "Admin enabled" : "Admin disabled", "Tenant admin status updated.");
     closeEditModal();
   } catch (err) {
-    showToast("Status update failed", err instanceof Error ? err.message : "Unable to update tenant admin status.");
+    showToast("Status update failed", toUserFacingErrorMessage(err, "Unable to update tenant admin status."));
   } finally {
     isSaving.value = false;
   }
@@ -286,7 +287,7 @@ const sendEditReset = async () => {
     showToast("Reset sent", "Password reset email sent to the tenant admin.");
     closeEditModal();
   } catch (err) {
-    showToast("Reset failed", err instanceof Error ? err.message : "Unable to send reset email.");
+    showToast("Reset failed", toUserFacingErrorMessage(err, "Unable to send reset email."));
   } finally {
     isSaving.value = false;
   }

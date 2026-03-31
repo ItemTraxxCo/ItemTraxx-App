@@ -135,6 +135,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
 import { RouterLink } from "vue-router";
+import { toUserFacingErrorMessage } from "../../services/appErrors";
 import {
   closeSalesLead,
   listSalesLeads,
@@ -236,7 +237,7 @@ const saveStage = async (leadId: string) => {
     stageDrafts.value[leadId] = updated.stage;
     success.value = "Lead stage updated.";
   } catch (err) {
-    error.value = err instanceof Error ? err.message : "Unable to update lead stage.";
+    error.value = toUserFacingErrorMessage(err, "Unable to update lead stage.");
   } finally {
     isSavingStageId.value = "";
   }
@@ -256,7 +257,7 @@ const closeLead = async (leadId: string) => {
     stageDrafts.value[leadId] = response.lead.stage;
     success.value = "Lead closed.";
   } catch (err) {
-    error.value = err instanceof Error ? err.message : "Unable to close lead.";
+    error.value = toUserFacingErrorMessage(err, "Unable to close lead.");
   } finally {
     isSavingStageId.value = "";
   }
@@ -276,7 +277,7 @@ const moveToCustomers = async (leadId: string) => {
     stageDrafts.value[leadId] = response.lead.stage;
     success.value = "Lead moved to customers.";
   } catch (err) {
-    error.value = err instanceof Error ? err.message : "Unable to move lead.";
+    error.value = toUserFacingErrorMessage(err, "Unable to move lead.");
   } finally {
     isSavingStageId.value = "";
   }

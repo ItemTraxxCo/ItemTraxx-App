@@ -156,6 +156,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from "vue";
 import { RouterLink } from "vue-router";
+import { toUserFacingErrorMessage } from "../../../services/appErrors";
 import {
   fetchTenantSettings,
   listTenantAdminSessions,
@@ -283,7 +284,7 @@ const loadSessions = async () => {
       selectedSessionId.value = "";
     }
   } catch (err) {
-    sessionError.value = err instanceof Error ? err.message : "Unable to load sessions.";
+    sessionError.value = toUserFacingErrorMessage(err, "Unable to load sessions.");
   }
 };
 
@@ -294,7 +295,7 @@ const loadSettings = async () => {
     const settings = await fetchTenantSettings();
     applySettings(settings);
   } catch (err) {
-    error.value = err instanceof Error ? err.message : "Unable to load tenant settings.";
+    error.value = toUserFacingErrorMessage(err, "Unable to load tenant settings.");
   }
 };
 
@@ -314,7 +315,7 @@ const handleSave = async () => {
     success.value = "Settings saved.";
     showToast("Saved", "Tenant settings updated.");
   } catch (err) {
-    error.value = err instanceof Error ? err.message : "Unable to save tenant settings.";
+    error.value = toUserFacingErrorMessage(err, "Unable to save tenant settings.");
     showToast("Save failed", error.value);
   } finally {
     isSaving.value = false;
@@ -333,7 +334,7 @@ const handleSignOutSelected = async () => {
     showToast("Session revoked", "Selected device has been signed out.");
     await loadSessions();
   } catch (err) {
-    sessionError.value = err instanceof Error ? err.message : "Unable to sign out selected device.";
+    sessionError.value = toUserFacingErrorMessage(err, "Unable to sign out selected device.");
   } finally {
     isSessionSaving.value = false;
   }
@@ -350,7 +351,7 @@ const handleSignOutAllOthers = async () => {
     showToast("Sessions revoked", "All other devices have been signed out.");
     await loadSessions();
   } catch (err) {
-    sessionError.value = err instanceof Error ? err.message : "Unable to sign out all other devices.";
+    sessionError.value = toUserFacingErrorMessage(err, "Unable to sign out all other devices.");
   } finally {
     isSessionSaving.value = false;
   }

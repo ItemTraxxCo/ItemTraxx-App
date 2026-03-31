@@ -140,6 +140,7 @@ import {
 } from "../../services/rateLimitService";
 import { sanitizeInput } from "../../utils/inputSanitizer";
 import { getAuthState } from "../../store/authState";
+import { toUserFacingErrorMessage } from "../../services/appErrors";
 
 const isStudentLoading = ref(false);
 const isBarcodeLoading = ref(false);
@@ -254,7 +255,7 @@ const loadStudent = async () => {
     ensureStudentLookupCooldownTimer();
     student.value = null;
     checkedOutGear.value = [];
-    error.value = err instanceof Error ? err.message : "Borrower not found. Please check the borrower ID and try again.";
+    error.value = toUserFacingErrorMessage(err, "Borrower not found. Please check the borrower ID and try again.");
   } finally {
     isStudentLoading.value = false;
   }
@@ -286,7 +287,7 @@ const addBarcode = async () => {
     barcodes.value = [...barcodes.value, gear];
     barcodeInput.value = "";
   } catch (err) {
-    error.value = err instanceof Error ? err.message : "Invalid barcode. Please check the barcode and try again.";
+    error.value = toUserFacingErrorMessage(err, "Invalid barcode. Please check it and try again.");
   } finally {
     isBarcodeLoading.value = false;
   }
@@ -415,7 +416,7 @@ const submit = async () => {
       toastMessage.value = "";
     }, 9000);
   } catch (err) {
-    error.value = err instanceof Error ? err.message : "Request failed.";
+    error.value = toUserFacingErrorMessage(err, "Request failed.");
     toastStatus.value = "Failed";
     toastTitle.value = "Transaction complete (Failed). Please sign out completeley and sign back in. If issue still persists, contact support.";
     toastMessage.value = error.value;

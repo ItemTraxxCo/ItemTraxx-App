@@ -71,6 +71,7 @@ import { RouterLink } from "vue-router";
 import { fetchGearByBarcode, submitCheckoutReturn, type GearSummary } from "../../../services/checkoutService";
 import { logAdminAction } from "../../../services/auditLogService";
 import { sanitizeInput } from "../../../utils/inputSanitizer";
+import { toUserFacingErrorMessage } from "../../../services/appErrors";
 
 const barcodeInput = ref("");
 const barcodes = ref<GearSummary[]>([]);
@@ -102,7 +103,7 @@ const addBarcode = async () => {
     barcodes.value = [...barcodes.value, gear];
     barcodeInput.value = "";
   } catch (err) {
-    error.value = err instanceof Error ? err.message : "Invalid barcode.";
+    error.value = toUserFacingErrorMessage(err, "Invalid barcode. Please check it and try again.");
   } finally {
     isBarcodeLoading.value = false;
   }
@@ -150,7 +151,7 @@ const submitReturn = async () => {
     barcodes.value = [];
     barcodeInput.value = "";
   } catch (err) {
-    error.value = err instanceof Error ? err.message : "Request failed. Please try again.";
+    error.value = toUserFacingErrorMessage(err, "Request failed. Please try again.");
   } finally {
     isSubmitting.value = false;
   }

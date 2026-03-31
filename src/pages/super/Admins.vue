@@ -181,6 +181,7 @@ import {
   updateTenantAdminEmail,
   type SuperTenantAdmin,
 } from "../../services/superAdminService";
+import { toUserFacingErrorMessage } from "../../services/appErrors";
 import {
   listDistricts,
   listTenants,
@@ -280,7 +281,7 @@ const loadAdmins = async () => {
       adminScope.value
     );
   } catch (err) {
-    error.value = err instanceof Error ? err.message : "Unable to load admins.";
+    error.value = toUserFacingErrorMessage(err, "Unable to load admins.");
   } finally {
     isLoading.value = false;
   }
@@ -308,7 +309,7 @@ const handleCreate = async () => {
     createPassword.value = "";
     showToast("Admin created", `${adminScope.value} admin account was created.`);
   } catch (err) {
-    showToast("Create failed", err instanceof Error ? err.message : "Unable to create admin.");
+    showToast("Create failed", toUserFacingErrorMessage(err, "Unable to create admin."));
   } finally {
     isSaving.value = false;
   }
@@ -350,7 +351,7 @@ const toggleEditStatus = async () => {
       `${updated.auth_email} is now ${nextStatus ? "active" : "disabled"}.`
     );
   } catch (err) {
-    showToast("Status update failed", err instanceof Error ? err.message : "Unable to update admin status.");
+    showToast("Status update failed", toUserFacingErrorMessage(err, "Unable to update admin status."));
   } finally {
     isSaving.value = false;
   }
@@ -362,7 +363,7 @@ const sendReset = async (authEmail: string) => {
     await sendTenantAdminReset({ auth_email: authEmail, admin_scope: adminScope.value });
     showToast("Reset sent", `Password reset flow triggered for ${authEmail}.`);
   } catch (err) {
-    showToast("Reset failed", err instanceof Error ? err.message : "Unable to send reset.");
+    showToast("Reset failed", toUserFacingErrorMessage(err, "Unable to send reset."));
   } finally {
     isSaving.value = false;
   }
@@ -392,7 +393,7 @@ const saveEditEmail = async () => {
     editEmail.value = updated.auth_email;
     showToast("Admin updated", "Admin email was updated.");
   } catch (err) {
-    showToast("Update failed", err instanceof Error ? err.message : "Unable to update admin.");
+    showToast("Update failed", toUserFacingErrorMessage(err, "Unable to update admin."));
   } finally {
     isSaving.value = false;
   }
@@ -406,7 +407,7 @@ const setAsPrimary = async (admin: SuperTenantAdmin) => {
     await setPrimaryAdmin({ tenant_id: admin.tenant_id, profile_id: admin.id });
     showToast("Primary admin updated", `${admin.auth_email} is now the primary admin.`);
   } catch (err) {
-    showToast("Update failed", err instanceof Error ? err.message : "Unable to set primary admin.");
+    showToast("Update failed", toUserFacingErrorMessage(err, "Unable to set primary admin."));
   } finally {
     isSaving.value = false;
   }

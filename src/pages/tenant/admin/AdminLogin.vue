@@ -189,17 +189,20 @@ const handleAdminLogin = async () => {
     devLog("auth_request_failed");
     const message = err instanceof Error ? err.message : "Sign in failed.";
     if (message === "Invalid credentials.") {
-      error.value = "Invalid admin credentials.";
-      showToast("Sign in failed", "Invalid admin credentials.");
+      error.value = "Invalid email or password.";
+      showToast("Sign in failed", "Invalid email or password.");
     } else if (message === "Tenant disabled.") {
-      error.value = "Tenant is disabled. Access is blocked.";
-      showToast("Access blocked", "Tenant is disabled. Access is blocked.");
+      error.value = "This account cannot sign in right now. Please contact support.";
+      showToast("Access blocked", "This account cannot sign in right now. Please contact support.");
     } else if (message === "Access denied.") {
-      error.value = "Access denied for this tenant admin panel.";
-      showToast("Access denied", "This account cannot access the admin panel.");
+      error.value = "This account does not have admin access.";
+      showToast("Access denied", "This account does not have admin access.");
     } else if (message === "No district assignment.") {
-      error.value = "This admin account is not assigned to a district.";
-      showToast("No district assigned", "This admin account is not assigned to a district.");
+      error.value = "This admin account is not assigned to a district yet.";
+      showToast("Not assigned", "This admin account is not assigned to a district yet.");
+    } else if (message === "Unable to prepare district sign-in." || message === "Unable to complete district sign-in.") {
+      error.value = "Unable to finish sign in. Please try again.";
+      showToast("Sign in failed", "Unable to finish sign in. Please try again.");
     } else if (message === "Admin verification required.") {
       error.value = "Admin verification failed. Sign in again.";
       showToast("Admin verification required", "Please sign in again to continue.");

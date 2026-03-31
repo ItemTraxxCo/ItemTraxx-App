@@ -84,13 +84,13 @@ const sendResetEmail = async () => {
     });
 
     if (resetError) {
-      error.value = resetError.message || "Unable to send reset link.";
+      error.value = "Unable to send reset link right now. Please try again.";
       return;
     }
 
     success.value = true;
   } catch (requestError) {
-    error.value = requestError instanceof Error ? requestError.message : "Unable to send reset link.";
+    error.value = "Unable to send reset link right now. Please try again.";
   } finally {
     isLoading.value = false;
   }

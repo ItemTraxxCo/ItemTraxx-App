@@ -106,6 +106,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
 import { RouterLink } from "vue-router";
+import { toUserFacingErrorMessage } from "../../services/appErrors";
 import {
   addCustomerStatusEntry,
   listCustomers,
@@ -157,7 +158,7 @@ const loadCustomers = async () => {
     const response = await listCustomers({ search: search.value, limit: 200 });
     customers.value = response.customers ?? [];
   } catch (err) {
-    error.value = err instanceof Error ? err.message : "Unable to load customers.";
+    error.value = toUserFacingErrorMessage(err, "Unable to load customers.");
   } finally {
     isLoading.value = false;
   }
@@ -202,7 +203,7 @@ const addStatusEntry = async () => {
     success.value = "Status entry added.";
     invoiceIdDraft.value = "";
   } catch (err) {
-    error.value = err instanceof Error ? err.message : "Unable to add status entry.";
+    error.value = toUserFacingErrorMessage(err, "Unable to add status entry.");
   } finally {
     isSaving.value = false;
   }

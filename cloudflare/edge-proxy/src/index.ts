@@ -681,7 +681,10 @@ const proxyFunctionRequest = async (
     const init: RequestInit = {
       method: request.method,
       headers: proxiedHeaders,
-      body: request.method === "GET" ? undefined : await request.clone().text(),
+      body:
+        request.method === "GET" || request.method === "HEAD"
+          ? undefined
+          : await request.clone().text(),
     };
 
     return fetch(supabaseFunctionUrl, init);

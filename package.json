@@ -24,14 +24,14 @@
     "deploy:cloudflare:worker": "bash ./scripts/deploy-cloudflare-worker.sh"
   },
   "dependencies": {
-    "@sentry/vue": "^10.46.0",
-    "@supabase/supabase-js": "^2.100.1",
+    "@sentry/vue": "^10.47.0",
+    "@supabase/supabase-js": "^2.101.0",
     "@vercel/analytics": "^2.0.1",
     "@vercel/speed-insights": "^2.0.0",
     "jsbarcode": "^3.12.3",
     "jspdf": "^4.2.1",
     "jspdf-autotable": "^5.0.7",
-    "supabase": "2.84.4",
+    "supabase": "2.84.5",
     "vue": "^3.5.31",
     "vue-router": "^4.6.4",
     "zod": "^4.3.6"
@@ -41,12 +41,12 @@
     "@types/node": "^25.5.0",
     "@vitejs/plugin-vue": "^6.0.5",
     "@vue/tsconfig": "^0.9.1",
-    "rollup": "^4.60.0",
+    "rollup": "^4.60.1",
     "typescript": "~6.0.2",
     "vite": "^8.0.3",
     "vue-tsc": "^3.2.6",
     "zod-to-json-schema": "^3.25.2",
-    "wrangler": "^4.78.0"
+    "wrangler": "^4.79.0"
   },
   "overrides": {
     "tar": "^7.5.10",

@@ -25,19 +25,19 @@
   },
   "dependencies": {
     "@sentry/vue": "^10.47.0",
-    "@supabase/supabase-js": "^2.101.0",
+    "@supabase/supabase-js": "^2.101.1",
     "@vercel/analytics": "^2.0.1",
     "@vercel/speed-insights": "^2.0.0",
     "jsbarcode": "^3.12.3",
     "jspdf": "^4.2.1",
     "jspdf-autotable": "^5.0.7",
-    "supabase": "2.84.5",
+    "supabase": "2.84.6",
     "vue": "^3.5.31",
     "vue-router": "^4.6.4",
     "zod": "^4.3.6"
   },
   "devDependencies": {
-    "@playwright/test": "^1.58.2",
+    "@playwright/test": "^1.59.0",
     "@types/node": "^25.5.0",
     "@vitejs/plugin-vue": "^6.0.5",
     "@vue/tsconfig": "^0.9.1",

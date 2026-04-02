@@ -13,6 +13,8 @@
         <RouterLink to="/tenant/admin-login">Admin Login</RouterLink>
         <RouterLink to="/pricing">Pricing</RouterLink>
         <RouterLink to="/contact-sales">Contact Sales</RouterLink>
+        <RouterLink to="/request-demo">Request Demo</RouterLink>
+        <RouterLink to="/getting-started">Getting Started</RouterLink>
         <RouterLink to="/forgot-password">Forgot Password</RouterLink>
       </div>
       <div class="footer-column">
@@ -27,6 +29,7 @@
       </div>
       <div class="footer-column">
         <p class="footer-heading">Company</p>
+        <RouterLink to="/contact">Contact</RouterLink>
         <RouterLink to="/legal">Legal</RouterLink>
         <RouterLink to="/privacy">Privacy</RouterLink>
         <RouterLink to="/cookies">Cookies</RouterLink>

@@ -80,10 +80,34 @@ const routes: RouteRecordRaw[] = [
     meta: { public: true, title: "Contact Sales | ItemTraxx" },
   },
   {
+    path: "/request-demo",
+    name: "public-request-demo",
+    component: () => import("../pages/RequestDemoPage.vue"),
+    meta: { public: true, title: "Request Demo | ItemTraxx" },
+  },
+  {
     path: "/contact-support",
     name: "public-contact-support",
     component: () => import("../pages/ContactSupport.vue"),
     meta: { public: true, title: "Contact Support | ItemTraxx" },
+  },
+  {
+    path: "/contact",
+    name: "public-contact",
+    component: () => import("../pages/ContactPage.vue"),
+    meta: { public: true, title: "Contact | ItemTraxx" },
+  },
+  {
+    path: "/status/:pathMatch(.*)*",
+    name: "public-status-redirect",
+    component: { template: "<div></div>" },
+    beforeEnter: () => {
+      if (typeof window !== "undefined") {
+        window.location.replace("https://status.itemtraxx.com/");
+      }
+      return false;
+    },
+    meta: { public: true, title: "Redirecting to ItemTraxx Statuspage | ItemTraxx" },
   },
   {
     path: "/about",
@@ -120,6 +144,12 @@ const routes: RouteRecordRaw[] = [
     name: "public-faq",
     component: () => import("../pages/FaqPage.vue"),
     meta: { public: true, title: "FAQ | ItemTraxx" },
+  },
+  {
+    path: "/getting-started",
+    name: "public-getting-started",
+    component: () => import("../pages/GettingStartedPage.vue"),
+    meta: { public: true, title: "Getting Started | ItemTraxx" },
   },
   {
     path: "/accessibility",

@@ -42,7 +42,7 @@
           </RouterLink>
           <RouterLink
             class="hero-button hero-button-light"
-            to="/contact-sales?intent=demo"
+            to="/request-demo"
             @click="trackCta('request_demo', 'hero')"
           >
             Request Demo

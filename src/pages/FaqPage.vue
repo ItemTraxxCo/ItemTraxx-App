@@ -138,7 +138,7 @@ const faqGroups = [
       },
       {
         q: "Can I request a demo before committing?",
-        a: "Yes. Use Contact Sales or the demo request flow to ask for a walkthrough or planning conversation.",
+        a: "Yes. Use Contact Sales or Request Demo to ask for a walkthrough or planning conversation.",
       },
     ],
   },

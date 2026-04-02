@@ -94,7 +94,7 @@ const getTorchSupport = (track: MediaStreamTrack | null) => {
 };
 
 const chooseStatus = (metrics: FrameMetrics, hasDetection: boolean): ScannerStatus => {
-  if (metrics.brightness < 34) return "low_light";
+  if (metrics.brightness < 20) return "low_light";
   if (metrics.glareRatio > 0.26) return "glare";
   if (metrics.sharpness < 8) return "blurry";
   return hasDetection ? "success" : "unscannable";

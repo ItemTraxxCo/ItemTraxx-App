@@ -189,16 +189,8 @@ const previewStyle = computed(() => {
 
 @media (min-width: 1100px) {
   .scanner-modal-backdrop-lab {
-    justify-content: flex-start;
-    padding: 1.25rem calc(40vw + 1.5rem) 1.25rem 1.25rem;
-    background:
-      linear-gradient(90deg, rgba(5, 10, 18, 0.78) 0%, rgba(5, 10, 18, 0.7) 48%, rgba(5, 10, 18, 0.18) 74%, rgba(5, 10, 18, 0.02) 100%);
+    background: rgba(5, 10, 18, 0.58);
     backdrop-filter: blur(12px);
-  }
-
-  .scanner-modal-backdrop-lab .scanner-modal-card {
-    width: min(760px, calc(60vw - 3rem));
-    margin-left: max(0px, calc((100vw - 1240px) / 2));
   }
 }
 

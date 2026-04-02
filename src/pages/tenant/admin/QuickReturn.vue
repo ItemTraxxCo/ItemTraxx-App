@@ -35,6 +35,14 @@
             Add item
           </button>
         </div>
+        <button
+          type="button"
+          class="button-secondary quick-return-camera-button"
+          :disabled="isBarcodeLoading"
+          @click="scannerOpen = true"
+        >
+          Use device camera to scan barcode
+        </button>
       </label>
       <p class="muted">Press Enter or click “Add item” to add.</p>
       <div v-if="barcodes.length" class="list">
@@ -62,16 +70,26 @@
       </div>
     </div>
 
+    <CameraBarcodeScannerModal
+      v-model="scannerOpen"
+      mode="admin_quick_return"
+      title="Scan item barcode"
+      :auto-close-on-scan="false"
+      @scanned="handleScannerScan"
+    />
+
   </div>
 </template>
 
 <script setup lang="ts">
 import { onMounted, ref } from "vue";
 import { RouterLink } from "vue-router";
+import CameraBarcodeScannerModal from "../../../components/CameraBarcodeScannerModal.vue";
 import { fetchGearByBarcode, submitCheckoutReturn, type GearSummary } from "../../../services/checkoutService";
 import { logAdminAction } from "../../../services/auditLogService";
 import { sanitizeInput } from "../../../utils/inputSanitizer";
 import { toUserFacingErrorMessage } from "../../../services/appErrors";
+import type { ScannerScanEvent } from "../../../types/cameraScanner";
 
 const barcodeInput = ref("");
 const barcodes = ref<GearSummary[]>([]);
@@ -82,6 +100,7 @@ const isSubmitting = ref(false);
 const error = ref("");
 const success = ref("");
 const lastSummary = ref("");
+const scannerOpen = ref(false);
 
 const addBarcode = async () => {
   const sanitized = sanitizeInput(barcodeInput.value, { maxLen: 64 });
@@ -111,6 +130,11 @@ const addBarcode = async () => {
 
 const removeBarcode = (code: string) => {
   barcodes.value = barcodes.value.filter((item) => item.barcode !== code);
+};
+
+const handleScannerScan = async (event: ScannerScanEvent) => {
+  barcodeInput.value = event.value;
+  await addBarcode();
 };
 
 const submitReturn = async () => {
@@ -161,3 +185,9 @@ onMounted(() => {
   barcodeField.value?.focus();
 });
 </script>
+
+<style scoped>
+.quick-return-camera-button {
+  margin-top: 0.7rem;
+}
+</style>

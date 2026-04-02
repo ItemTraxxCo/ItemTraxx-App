@@ -41,7 +41,7 @@
             <RouterLink class="cta-primary" to="/pricing" @click="trackCta('pricing', 'hero')">Pricing</RouterLink>
             <RouterLink
               class="cta-secondary"
-              to="/contact-sales?intent=demo"
+              to="/request-demo"
               @click="trackCta('demo', 'hero')"
             >
               Request Demo

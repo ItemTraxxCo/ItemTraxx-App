@@ -34,6 +34,14 @@
             Load borrower
           </button>
         </div>
+        <button
+          type="button"
+          class="button-secondary checkout-camera-button"
+          :disabled="studentLookupCooldownSeconds > 0"
+          @click="borrowerScannerOpen = true"
+        >
+          Use device camera to scan barcode
+        </button>
       </label>
       <p v-if="studentLookupCooldownSeconds > 0" class="muted checkout-rate-limit-note">
         Try again in {{ studentLookupCooldownSeconds }} second{{ studentLookupCooldownSeconds === 1 ? "" : "s" }}.
@@ -76,6 +84,14 @@
               Add barcode
             </button>
           </div>
+          <button
+            type="button"
+            class="button-secondary checkout-camera-button"
+            :disabled="isBarcodeLoading"
+            @click="itemScannerOpen = true"
+          >
+            Use device camera to scan barcode
+          </button>
         </label>
         <p class="muted checkout-status-note">Press Enter or click “Add barcode” to add.</p>
 
@@ -118,12 +134,27 @@
           </button>
         </div>
       </div>
+
+      <CameraBarcodeScannerModal
+        v-model="borrowerScannerOpen"
+        mode="borrower"
+        title="Scan borrower barcode"
+        @scanned="handleBorrowerScan"
+      />
+      <CameraBarcodeScannerModal
+        v-model="itemScannerOpen"
+        mode="checkout_item"
+        title="Scan item barcode"
+        :auto-close-on-scan="false"
+        @scanned="handleItemScan"
+      />
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { nextTick, onMounted, onUnmounted, ref } from "vue";
+import CameraBarcodeScannerModal from "../../components/CameraBarcodeScannerModal.vue";
 import {
   fetchCheckedOutGear,
   fetchGearByBarcode,
@@ -141,6 +172,7 @@ import {
 import { sanitizeInput } from "../../utils/inputSanitizer";
 import { getAuthState } from "../../store/authState";
 import { toUserFacingErrorMessage } from "../../services/appErrors";
+import type { ScannerScanEvent } from "../../types/cameraScanner";
 
 const isStudentLoading = ref(false);
 const isBarcodeLoading = ref(false);
@@ -156,6 +188,8 @@ const lastSummary = ref("");
 const toastMessage = ref("");
 const toastStatus = ref<"Success" | "Failed" | "Processing">("Success");
 const barcodeField = ref<HTMLInputElement | null>(null);
+const borrowerScannerOpen = ref(false);
+const itemScannerOpen = ref(false);
 const logoUrl = import.meta.env.VITE_LOGO_URL as string | undefined;
 const toastTitle = ref("");
 const syncInFlight = ref(false);
@@ -261,6 +295,12 @@ const loadStudent = async () => {
   }
 };
 
+const handleBorrowerScan = async (event: ScannerScanEvent) => {
+  studentId.value = event.value;
+  await nextTick();
+  await loadStudent();
+};
+
 const addBarcode = async () => {
   const sanitized = sanitizeInput(barcodeInput.value, { maxLen: 64 });
   barcodeInput.value = sanitized.value;
@@ -291,6 +331,12 @@ const addBarcode = async () => {
   } finally {
     isBarcodeLoading.value = false;
   }
+};
+
+const handleItemScan = async (event: ScannerScanEvent) => {
+  barcodeInput.value = event.value;
+  await nextTick();
+  await addBarcode();
 };
 
 const removeBarcode = (code: string) => {
@@ -510,6 +556,10 @@ onUnmounted(() => {
   margin-top: 0.7rem;
 }
 
+.checkout-camera-button {
+  margin-top: 0.7rem;
+}
+
 .checkout-rate-limit-note {
   margin-top: 0.45rem;
   min-height: 1.2rem;
@@ -570,6 +620,10 @@ onUnmounted(() => {
 
   .checkout-inline-button,
   .checkout-submit-button {
+    width: 100%;
+  }
+
+  .checkout-camera-button {
     width: 100%;
   }
 }

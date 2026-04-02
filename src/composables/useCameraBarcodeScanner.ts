@@ -94,7 +94,7 @@ const getTorchSupport = (track: MediaStreamTrack | null) => {
 };
 
 const chooseStatus = (metrics: FrameMetrics, hasDetection: boolean): ScannerStatus => {
-  if (metrics.brightness < 34) return "low_light";
+  if (metrics.brightness < 20) return "low_light";
   if (metrics.glareRatio > 0.26) return "glare";
   if (metrics.sharpness < 8) return "blurry";
   return hasDetection ? "success" : "unscannable";
@@ -104,6 +104,7 @@ export const useCameraBarcodeScanner = (options: UseCameraBarcodeScannerOptions)
   const isOpen = ref(false);
   const isStarting = ref(false);
   const permissionDenied = ref(false);
+  const usingRearCamera = ref(true);
   const errorMessage = ref("");
   const status = ref<ScannerStatus>("unscannable");
   const statusMessageText = ref(statusMessage("unscannable"));
@@ -126,7 +127,6 @@ export const useCameraBarcodeScanner = (options: UseCameraBarcodeScannerOptions)
   let scanTimer: number | null = null;
   let devices: string[] = [];
   let deviceIndex = 0;
-  let usingRearCamera = true;
   let canvas: HTMLCanvasElement | null = null;
   let context: CanvasRenderingContext2D | null = null;
   let lastScanValue = "";
@@ -430,7 +430,7 @@ export const useCameraBarcodeScanner = (options: UseCameraBarcodeScannerOptions)
       const constraints: MediaStreamConstraints = {
         video: devices[deviceIndex]
           ? { deviceId: { exact: devices[deviceIndex] } }
-          : { facingMode: usingRearCamera ? { ideal: "environment" } : { ideal: "user" } },
+          : { facingMode: usingRearCamera.value ? { ideal: "environment" } : { ideal: "user" } },
         audio: false,
       };
       stream = await navigator.mediaDevices.getUserMedia(constraints);
@@ -485,7 +485,7 @@ export const useCameraBarcodeScanner = (options: UseCameraBarcodeScannerOptions)
     if (devices.length > 1) {
       deviceIndex = (deviceIndex + 1) % devices.length;
     } else {
-      usingRearCamera = !usingRearCamera;
+      usingRearCamera.value = !usingRearCamera.value;
     }
     await startCamera();
   };
@@ -518,6 +518,7 @@ export const useCameraBarcodeScanner = (options: UseCameraBarcodeScannerOptions)
     statusMessageText,
     currentDetection,
     previewBox,
+    usingRearCamera,
     torchEnabled,
     videoRef,
     capabilities,

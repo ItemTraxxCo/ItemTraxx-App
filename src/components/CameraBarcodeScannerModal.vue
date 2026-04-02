@@ -17,15 +17,17 @@
 
         <div class="scanner-preview-shell">
           <div class="scanner-preview-frame">
-            <video ref="videoRef" class="scanner-video" playsinline muted autoplay></video>
-            <div class="scanner-crosshair" aria-hidden="true"></div>
-            <div
-              v-if="previewStyle"
-              class="scanner-detection-box"
-              :class="`scanner-detection-${currentStatus}`"
-              :style="previewStyle"
-              aria-hidden="true"
-            ></div>
+            <div class="scanner-preview-visuals">
+              <video ref="videoRef" class="scanner-video" playsinline muted autoplay></video>
+              <div class="scanner-crosshair" aria-hidden="true"></div>
+              <div
+                v-if="previewStyle"
+                class="scanner-detection-box"
+                :class="`scanner-detection-${currentStatus}`"
+                :style="previewStyle"
+                aria-hidden="true"
+              ></div>
+            </div>
             <div v-if="isStarting" class="scanner-overlay-message">Starting camera...</div>
             <div v-else-if="errorMessage" class="scanner-overlay-message scanner-overlay-error">
               {{ errorMessage }}
@@ -254,6 +256,12 @@ const previewStyle = computed(() => {
   border: 1px solid rgba(118, 143, 181, 0.16);
   background: #04070d;
   min-height: min(52vh, 420px);
+}
+
+.scanner-preview-visuals {
+  position: absolute;
+  inset: 0;
+  transform: scaleX(-1);
 }
 
 .scanner-video {

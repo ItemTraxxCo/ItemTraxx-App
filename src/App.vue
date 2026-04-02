@@ -395,6 +395,7 @@ const isMarketingFullBleedRoute = computed(
     route.path === "/trust" ||
     route.path === "/faq" ||
     route.path === "/getting-started" ||
+    route.path === "/itemscanner" ||
     route.path === "/accessibility"
 );
 const isBannerBleedRoute = computed(
@@ -419,7 +420,8 @@ const isDarkChromeRoute = computed(
     route.path === "/contact" ||
     route.path === "/trust" ||
     route.path === "/faq" ||
-    route.path === "/getting-started"
+    route.path === "/getting-started" ||
+    route.path === "/itemscanner"
 );
 const showTopMenu = computed(
   () =>
@@ -436,6 +438,7 @@ const showTopMenu = computed(
     route.name !== "public-faq" &&
     route.name !== "public-accessibility" &&
     route.name !== "public-getting-started" &&
+    route.name !== "public-itemscanner" &&
     route.name !== "public-legal" &&
     route.name !== "public-request-demo" &&
     route.name !== "public-contact-support"

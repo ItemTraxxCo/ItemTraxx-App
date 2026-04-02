@@ -38,6 +38,13 @@
         <label>
           Barcode
           <input v-model="barcode" type="text" placeholder="Barcode" />
+          <button
+            type="button"
+            class="button-secondary gear-camera-button"
+            @click="openScanner('admin_item_create')"
+          >
+            Use device camera to scan barcode
+          </button>
         </label>
         <label>
           Serial number
@@ -161,6 +168,14 @@
               placeholder="Barcode"
             />
             <input v-else :value="selectedGear.barcode" type="text" readonly />
+            <button
+              v-if="isModalEditing"
+              type="button"
+              class="button-secondary gear-camera-button"
+              @click="openScanner('admin_item_edit')"
+            >
+              Use device camera to scan barcode
+            </button>
           </label>
           <label>
             Serial Number
@@ -269,12 +284,21 @@
       </table>
       </div>
     </div>
+
+    <CameraBarcodeScannerModal
+      v-model="scannerOpen"
+      :mode="scannerMode"
+      :title="scannerTitle"
+      :auto-close-on-scan="false"
+      @scanned="handleScannerScan"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from "vue";
 import { RouterLink } from "vue-router";
+import CameraBarcodeScannerModal from "../../../components/CameraBarcodeScannerModal.vue";
 import { getAuthState } from "../../../store/authState";
 import { logAdminAction } from "../../../services/auditLogService";
 import { enforceAdminRateLimit } from "../../../services/rateLimitService";
@@ -290,6 +314,7 @@ import {
 import { exportRowsToCsv, exportRowsToPdf } from "../../../services/exportService";
 import { sanitizeInput } from "../../../utils/inputSanitizer";
 import { toUserFacingErrorMessage } from "../../../services/appErrors";
+import type { ScannerMode, ScannerScanEvent } from "../../../types/cameraScanner";
 
 const gear = ref<GearItem[]>([]);
 const archivedGear = ref<GearItem[]>([]);
@@ -326,7 +351,13 @@ const editName = ref("");
 const editBarcode = ref("");
 const editStatus = ref(statusOptions[0] ?? "available");
 const editNotes = ref("");
+const scannerOpen = ref(false);
+const scannerMode = ref<ScannerMode>("admin_item_create");
 let toastTimer: number | null = null;
+
+const scannerTitle = computed(() =>
+  scannerMode.value === "admin_item_edit" ? "Scan item barcode for edit" : "Scan item barcode"
+);
 
 const filteredGear = computed(() => {
   const query = searchQuery.value.trim().toLowerCase();
@@ -401,6 +432,11 @@ const showDuplicateBarcodeToast = () => {
     "Unable to add item.",
     "Check barcode and make sure it does not match another item's barcode. If you belive this is an error, please contact support."
   );
+};
+
+const openScanner = (mode: ScannerMode) => {
+  scannerMode.value = mode;
+  scannerOpen.value = true;
 };
 
 const showInputLimitToast = () => {
@@ -700,6 +736,14 @@ const handleRestore = async (item: GearItem) => {
   }
 };
 
+const handleScannerScan = (event: ScannerScanEvent) => {
+  if (scannerMode.value === "admin_item_edit") {
+    editBarcode.value = event.value;
+    return;
+  }
+  barcode.value = event.value;
+};
+
 onMounted(() => {
   void loadGear();
 });
@@ -760,6 +804,10 @@ onUnmounted(() => {
   margin-top: 0.95rem;
   gap: 0.55rem;
   flex-wrap: wrap;
+}
+
+.gear-camera-button {
+  margin-top: 0.7rem;
 }
 
 @media (max-width: 760px) {

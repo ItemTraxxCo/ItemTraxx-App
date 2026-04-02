@@ -152,6 +152,12 @@ const routes: RouteRecordRaw[] = [
     meta: { public: true, title: "Getting Started | ItemTraxx" },
   },
   {
+    path: "/itemscanner",
+    name: "public-itemscanner",
+    component: () => import("../pages/ItemScannerPage.vue"),
+    meta: { public: true, title: "Item Scanner Lab | ItemTraxx" },
+  },
+  {
     path: "/accessibility",
     name: "public-accessibility",
     component: () => import("../pages/AccessibilityPage.vue"),

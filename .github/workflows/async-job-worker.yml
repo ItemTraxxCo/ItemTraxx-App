@@ -1,6 +1,7 @@
 name: Async Job Worker
 
 permissions:
+  actions: read
   contents: read
 
 on:

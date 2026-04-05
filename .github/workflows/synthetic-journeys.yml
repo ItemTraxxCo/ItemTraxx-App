@@ -1,6 +1,7 @@
 name: Synthetic Journeys
 
 permissions:
+  actions: read
   contents: read
 
 on:

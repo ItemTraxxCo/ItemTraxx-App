@@ -731,7 +731,6 @@ export const createDistrictAdminSessionHandoff = async (
   if (
     !result.ok ||
     !result.data?.hashed_token ||
-    !result.data?.district_slug ||
     !result.data?.role
   ) {
     if (!result.ok && result.error === "Tenant disabled") {

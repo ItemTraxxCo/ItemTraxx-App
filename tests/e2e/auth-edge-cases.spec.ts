@@ -83,4 +83,12 @@ test.describe("Auth edge cases", () => {
     await expect(page).toHaveURL(/\/tenant\/checkout$/);
     await expect(page).not.toHaveURL(/\/login$/);
   });
+
+  test("authenticated tenant admin on public home redirects to checkout instead of login", async ({ page }) => {
+    await page.goto("/");
+    await setTenantAdminSession(page, "tenant-e2e");
+    await navigateApp(page, "/");
+    await expect(page).toHaveURL(/\/tenant\/checkout$/);
+    await expect(page).not.toHaveURL(/\/login$/);
+  });
 });

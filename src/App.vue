@@ -723,9 +723,7 @@ const maybeRedirectAuthenticatedPublicHome = async () => {
       ? "/district"
       : "/tenant/admin-login";
   } else if (auth.role === "tenant_admin" && auth.tenantContextId) {
-    targetPath = hasFreshAdminVerification(auth.adminVerifiedAt)
-      ? "/tenant/checkout"
-      : "/login";
+    targetPath = "/tenant/checkout";
   } else if (auth.role === "tenant_user" && auth.tenantContextId) {
     targetPath = "/tenant/checkout";
   }

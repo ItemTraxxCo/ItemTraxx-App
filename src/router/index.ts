@@ -632,10 +632,7 @@ router.beforeEach((to) => {
     }
 
     if (auth.role === "tenant_admin" && auth.tenantContextId) {
-      if (hasFreshAdminVerification(auth.adminVerifiedAt)) {
-        return { name: "tenant-checkout" };
-      }
-      return { name: "public-login" };
+      return { name: "tenant-checkout" };
     }
 
     if (auth.role === "tenant_user" && auth.tenantContextId) {

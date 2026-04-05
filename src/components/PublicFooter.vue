@@ -13,6 +13,8 @@
         <RouterLink to="/tenant/admin-login">Admin Login</RouterLink>
         <RouterLink to="/pricing">Pricing</RouterLink>
         <RouterLink to="/contact-sales">Contact Sales</RouterLink>
+        <RouterLink to="/request-demo">Request Demo</RouterLink>
+        <RouterLink to="/getting-started">Getting Started</RouterLink>
         <RouterLink to="/forgot-password">Forgot Password</RouterLink>
       </div>
       <div class="footer-column">
@@ -27,6 +29,7 @@
       </div>
       <div class="footer-column">
         <p class="footer-heading">Company</p>
+        <RouterLink to="/contact">Contact</RouterLink>
         <RouterLink to="/legal">Legal</RouterLink>
         <RouterLink to="/privacy">Privacy</RouterLink>
         <RouterLink to="/cookies">Cookies</RouterLink>
@@ -47,9 +50,15 @@ const runtimeEnvironment = (
   import.meta.env.MODE ||
   ""
 ).trim().toLowerCase();
+const runtimeHostname =
+  typeof window !== "undefined" ? window.location.hostname.trim().toLowerCase() : "";
+const isDevHost =
+  runtimeHostname === "dev.itemtraxx.com" || runtimeHostname.endsWith(".dev.itemtraxx.com");
 
 const releaseChannel =
-  runtimeEnvironment === "production"
+  isDevHost
+    ? "Development"
+    : runtimeEnvironment === "production"
     ? "Production"
     : runtimeEnvironment === "preview"
       ? "Preview"

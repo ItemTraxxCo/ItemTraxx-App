@@ -107,6 +107,11 @@ begin
 end;
 $$;
 
+revoke all on function public.enqueue_async_job(text, jsonb, integer, timestamptz, integer) from public;
+revoke all on function public.claim_async_jobs(uuid, integer) from public;
+grant execute on function public.enqueue_async_job(text, jsonb, integer, timestamptz, integer) to service_role;
+grant execute on function public.claim_async_jobs(uuid, integer) to service_role;
+
 alter table public.async_jobs enable row level security;
 
 drop policy if exists "super_admin_select_async_jobs" on public.async_jobs;

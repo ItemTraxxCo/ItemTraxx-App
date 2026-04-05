@@ -6,6 +6,7 @@ import {
   isMissingPrivilegedStepUpTable,
   registerPrivilegedStepUp,
 } from "../_shared/privilegedStepUp.ts";
+import { isAllowedOrigin, parseAllowedOrigins } from "../_shared/cors.ts";
 
 const baseCorsHeaders = {
   "Access-Control-Allow-Headers":
@@ -16,13 +17,10 @@ const baseCorsHeaders = {
 
 const resolveCorsHeaders = (req: Request) => {
   const origin = req.headers.get("Origin");
-  const allowedOrigins = (Deno.env.get("ITX_ALLOWED_ORIGINS") ?? "")
-    .split(",")
-    .map((item) => item.trim())
-    .filter(Boolean);
+  const allowedOrigins = parseAllowedOrigins(Deno.env.get("ITX_ALLOWED_ORIGINS"));
 
   const hasOrigin = !!origin;
-  const originAllowed = !hasOrigin || allowedOrigins.includes(origin as string);
+  const originAllowed = !hasOrigin || isAllowedOrigin(origin as string, allowedOrigins);
   const headers =
     hasOrigin && originAllowed
       ? { ...baseCorsHeaders, "Access-Control-Allow-Origin": origin as string }

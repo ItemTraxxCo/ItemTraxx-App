@@ -49,11 +49,13 @@ const requestHttpSession = async <TData>(
   action: string,
   init?: RequestInit
 ): Promise<TData> => {
+  const isMutation = (init?.method ?? "GET").toUpperCase() !== "GET";
   const response = await fetch(`${getHttpSessionBaseUrl()}/${action}`, {
     ...init,
     credentials: "include",
     headers: {
       "Content-Type": "application/json",
+      ...(isMutation ? { "x-itx-session-request": "1" } : {}),
       ...(init?.headers ?? {}),
     },
   });

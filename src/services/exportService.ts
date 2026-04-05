@@ -1,10 +1,11 @@
 type ExportRow = Record<string, string | number | null | undefined>;
 
 const escapeCsvCell = (value: string) => {
-  if (/[",\n]/.test(value)) {
-    return `"${value.replace(/"/g, '""')}"`;
+  const prefixedValue = /^[=+\-@]/.test(value) ? `'${value}` : value;
+  if (/[",\n]/.test(prefixedValue)) {
+    return `"${prefixedValue.replace(/"/g, '""')}"`;
   }
-  return value;
+  return prefixedValue;
 };
 
 const normalizeValue = (value: string | number | null | undefined) =>

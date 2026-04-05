@@ -359,12 +359,19 @@ const onboardingEvaluationDone = ref(false);
 const offlineQueueCount = ref(0);
 const sessionTermination = getSessionTerminationState();
 
-const ADMIN_IDLE_TIMEOUT_MINUTES = Number(import.meta.env.VITE_ADMIN_IDLE_TIMEOUT_MINUTES || 20);
-const ADMIN_IDLE_TIMEOUT_MS =
-  Number.isFinite(ADMIN_IDLE_TIMEOUT_MINUTES) && ADMIN_IDLE_TIMEOUT_MINUTES > 0
-    ? ADMIN_IDLE_TIMEOUT_MINUTES * 60 * 1000
-    : 20 * 60 * 1000;
 const IS_E2E_TEST_MODE = import.meta.env.VITE_E2E_TEST_UTILS === "true";
+const DEFAULT_ADMIN_IDLE_TIMEOUT_MINUTES = 20;
+const MIN_ADMIN_IDLE_TIMEOUT_MINUTES = 5;
+const parsedAdminIdleTimeoutMinutes = Number(
+  import.meta.env.VITE_ADMIN_IDLE_TIMEOUT_MINUTES || DEFAULT_ADMIN_IDLE_TIMEOUT_MINUTES
+);
+const effectiveAdminIdleTimeoutMinutes =
+  Number.isFinite(parsedAdminIdleTimeoutMinutes) && parsedAdminIdleTimeoutMinutes > 0
+    ? IS_E2E_TEST_MODE
+      ? parsedAdminIdleTimeoutMinutes
+      : Math.max(parsedAdminIdleTimeoutMinutes, MIN_ADMIN_IDLE_TIMEOUT_MINUTES)
+    : DEFAULT_ADMIN_IDLE_TIMEOUT_MINUTES;
+const ADMIN_IDLE_TIMEOUT_MS = effectiveAdminIdleTimeoutMinutes * 60 * 1000;
 
 const GITHUB_HEAD_COMMIT_API =
   "https://api.github.com/repos/ItemTraxxCo/ItemTraxx-App/commits/main";
@@ -372,7 +379,26 @@ const GITHUB_HEAD_COMMIT_API =
 const isDevSubdomainHost = computed(() => {
   if (typeof window === "undefined") return false;
   const hostname = window.location.hostname.toLowerCase();
-  return hostname === "dev.itemtraxx.com" || hostname.endsWith(".dev.itemtraxx.com");
+  if (hostname === "dev.itemtraxx.com" || hostname.endsWith(".dev.itemtraxx.com")) {
+    return true;
+  }
+  if (
+    hostname === "localhost" ||
+    hostname === "127.0.0.1" ||
+    hostname === "0.0.0.0" ||
+    hostname.endsWith(".localhost")
+  ) {
+    return true;
+  }
+  if (hostname.startsWith("192.168.") || hostname.startsWith("10.")) {
+    return true;
+  }
+  const match172 = hostname.match(/^172\.(\d{1,3})\./);
+  if (match172) {
+    const secondOctet = Number(match172[1]);
+    return Number.isFinite(secondOctet) && secondOctet >= 16 && secondOctet <= 31;
+  }
+  return false;
 });
 
 const themeLabel = computed(() =>
@@ -482,10 +508,11 @@ const isTenantAdminArea = computed(() => {
   if (route.path === "/tenant/admin-login") return false;
   return route.path.startsWith("/tenant/admin");
 });
+const isAdminIdleLogoutEnabled = computed(() => !isDevSubdomainHost.value);
 const shouldTrackTenantAdminSession = computed(() => {
   if (!auth.isAuthenticated || auth.role !== "tenant_admin") return false;
   if (route.path === "/tenant/admin-login") return false;
-  return true;
+  return isTenantAdminArea.value;
 });
 const showNotificationBell = computed(() => {
   if (!auth.isAuthenticated) return false;
@@ -704,9 +731,7 @@ const maybeRedirectAuthenticatedPublicHome = async () => {
       ? "/district"
       : "/tenant/admin-login";
   } else if (auth.role === "tenant_admin" && auth.tenantContextId) {
-    targetPath = hasFreshAdminVerification(auth.adminVerifiedAt)
-      ? "/tenant/checkout"
-      : "/login";
+    targetPath = "/tenant/checkout";
   } else if (auth.role === "tenant_user" && auth.tenantContextId) {
     targetPath = "/tenant/checkout";
   }
@@ -740,6 +765,16 @@ const maybeRedirectAuthenticatedPublicHome = async () => {
 
 const reloadApp = () => {
   window.location.reload();
+};
+
+const buildDebugCheckoutPath = (reason: string) => {
+  if (!isDevSubdomainHost.value) {
+    return "/tenant/checkout";
+  }
+  const params = new URLSearchParams(window.location.search);
+  params.set("itx_dbg_redirect", reason);
+  const query = params.toString();
+  return `/tenant/checkout${query ? `?${query}` : ""}`;
 };
 
 const signInAgain = async () => {
@@ -812,13 +847,14 @@ const clearAdminIdleTimer = () => {
 
 const runIdleLogout = async () => {
   if (isIdleLogoutRunning.value) return;
+  if (!isAdminIdleLogoutEnabled.value) return;
   if (!auth.isAuthenticated || auth.role !== "tenant_admin" || !isTenantAdminArea.value) {
     return;
   }
   isIdleLogoutRunning.value = true;
   try {
     clearAdminVerification();
-    await router.replace("/tenant/checkout");
+    await router.replace(buildDebugCheckoutPath("admin_idle"));
   } finally {
     isIdleLogoutRunning.value = false;
   }
@@ -958,6 +994,9 @@ const startAdminSessionPolling = () => {
 
 const resetAdminIdleTimer = () => {
   clearAdminIdleTimer();
+  if (!isAdminIdleLogoutEnabled.value) {
+    return;
+  }
   if (!auth.isAuthenticated || auth.role !== "tenant_admin" || !isTenantAdminArea.value) {
     return;
   }

@@ -14,10 +14,23 @@ const resolveBuildCommit = (env: Record<string, string>) => {
   }
 };
 
+const resolveBuildBranch = (env: Record<string, string>) => {
+  const vercelBranch = env.VERCEL_GIT_COMMIT_REF?.trim();
+  if (vercelBranch) {
+    return vercelBranch;
+  }
+  try {
+    return execSync("git rev-parse --abbrev-ref HEAD").toString().trim();
+  } catch {
+    return "n/a";
+  }
+};
+
 // https://vite.dev/config/
 export default defineConfig(({ mode, command }) => {
   const env = loadEnv(mode, process.cwd(), "");
   const gitCommit = resolveBuildCommit(env);
+  const gitBranch = resolveBuildBranch(env);
 
   if (
     command === "build" &&
@@ -47,6 +60,7 @@ export default defineConfig(({ mode, command }) => {
     },
     define: {
       "import.meta.env.VITE_GIT_COMMIT": JSON.stringify(gitCommit),
+      "import.meta.env.VITE_GIT_BRANCH": JSON.stringify(gitBranch),
     },
   };
 });

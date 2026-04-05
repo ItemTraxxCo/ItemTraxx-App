@@ -20,6 +20,41 @@ export type AuthState = {
   adminVerifiedAt: string | null;
 };
 
+const ADMIN_VERIFICATION_STORAGE_KEY = "itemtraxx:admin-verification";
+
+type PersistedAdminVerification = {
+  userId: string;
+  verifiedAt: string;
+};
+
+const readPersistedAdminVerification = (): PersistedAdminVerification | null => {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.sessionStorage.getItem(ADMIN_VERIFICATION_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Partial<PersistedAdminVerification>;
+    if (typeof parsed.userId !== "string" || typeof parsed.verifiedAt !== "string") {
+      return null;
+    }
+    return { userId: parsed.userId, verifiedAt: parsed.verifiedAt };
+  } catch {
+    return null;
+  }
+};
+
+const writePersistedAdminVerification = (value: PersistedAdminVerification | null) => {
+  if (typeof window === "undefined") return;
+  try {
+    if (!value) {
+      window.sessionStorage.removeItem(ADMIN_VERIFICATION_STORAGE_KEY);
+      return;
+    }
+    window.sessionStorage.setItem(ADMIN_VERIFICATION_STORAGE_KEY, JSON.stringify(value));
+  } catch {
+    // Ignore sessionStorage failures.
+  }
+};
+
 const defaultState: AuthState = {
   isInitialized: false,
   isAuthenticated: false,
@@ -63,12 +98,26 @@ export const setSecondaryAuth = (value: boolean) => {
   authState.superVerifiedAt = value ? new Date().toISOString() : null;
 };
 
+export const getPersistedAdminVerification = (userId: string | null) => {
+  if (!userId) return null;
+  const persisted = readPersistedAdminVerification();
+  if (!persisted || persisted.userId !== userId) {
+    return null;
+  }
+  return persisted.verifiedAt;
+};
+
 export const markAdminVerified = () => {
-  authState.adminVerifiedAt = new Date().toISOString();
+  const verifiedAt = new Date().toISOString();
+  authState.adminVerifiedAt = verifiedAt;
+  if (authState.userId) {
+    writePersistedAdminVerification({ userId: authState.userId, verifiedAt });
+  }
 };
 
 export const clearAdminVerification = () => {
   authState.adminVerifiedAt = null;
+  writePersistedAdminVerification(null);
 };
 
 export const clearAuthState = (markInitialized = false) => {

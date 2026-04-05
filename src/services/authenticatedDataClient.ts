@@ -29,7 +29,15 @@ const getBaseUrl = () => {
   return origin;
 };
 
-const request = async (path: string, init: RequestInit = {}) => {
+type AuthenticatedRequestOptions = {
+  suppressUnauthorizedRecovery?: boolean;
+};
+
+const request = async (
+  path: string,
+  init: RequestInit = {},
+  options: AuthenticatedRequestOptions = {}
+) => {
   const response = await fetch(`${getBaseUrl()}${path}`, {
     ...init,
     credentials: "include",
@@ -60,9 +68,21 @@ const request = async (path: string, init: RequestInit = {}) => {
       requestId: response.headers.get("x-request-id") ?? undefined,
     });
     if (response.status === 401) {
+      if (options.suppressUnauthorizedRecovery) {
+        throw new AppError("UNAUTHORIZED", "Your session expired. Sign in again.", {
+          status: 401,
+          reportToSentry: false,
+        });
+      }
       throw unauthorizedError();
     }
     if (response.status === 403 && /permission denied/i.test(message)) {
+      if (options.suppressUnauthorizedRecovery) {
+        throw new AppError("UNAUTHORIZED", "Your session expired. Sign in again.", {
+          status: 403,
+          reportToSentry: false,
+        });
+      }
       throw unauthorizedError();
     }
     throw new AppError("REQUEST_FAILED", message, {
@@ -74,8 +94,12 @@ const request = async (path: string, init: RequestInit = {}) => {
   return response;
 };
 
-const requestJson = async <TData>(path: string, init: RequestInit = {}) => {
-  const response = await request(path, init);
+const requestJson = async <TData>(
+  path: string,
+  init: RequestInit = {},
+  options: AuthenticatedRequestOptions = {}
+) => {
+  const response = await request(path, init, options);
   if (response.status === 204) {
     return null as TData;
   }
@@ -89,17 +113,25 @@ const requestJson = async <TData>(path: string, init: RequestInit = {}) => {
 export const authenticatedSelect = async <TData>(
   table: string,
   query: Record<string, string>,
-  options: { prefer?: string; method?: "GET" | "HEAD" } = {}
+  options: {
+    prefer?: string;
+    method?: "GET" | "HEAD";
+    suppressUnauthorizedRecovery?: boolean;
+  } = {}
 ) => {
   const search = new URLSearchParams(query);
   const headers: Record<string, string> = {};
   if (options.prefer) {
     headers.Prefer = options.prefer;
   }
-  return requestJson<TData>(`/rest/v1/${table}?${search.toString()}`, {
-    method: options.method ?? "GET",
-    headers,
-  });
+  return requestJson<TData>(
+    `/rest/v1/${table}?${search.toString()}`,
+    {
+      method: options.method ?? "GET",
+      headers,
+    },
+    { suppressUnauthorizedRecovery: options.suppressUnauthorizedRecovery }
+  );
 };
 
 export const authenticatedInsert = async <TData>(
@@ -122,15 +154,20 @@ export const authenticatedInsert = async <TData>(
 
 export const authenticatedRpc = async <TData>(
   fn: string,
-  payload: Record<string, unknown>
+  payload: Record<string, unknown>,
+  options: AuthenticatedRequestOptions = {}
 ) => {
-  return requestJson<TData>(`/rpc/${fn}`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
+  return requestJson<TData>(
+    `/rpc/${fn}`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
     },
-    body: JSON.stringify(payload),
-  });
+    options
+  );
 };
 
 export const authenticatedCount = async (table: string, query: Record<string, string>) => {

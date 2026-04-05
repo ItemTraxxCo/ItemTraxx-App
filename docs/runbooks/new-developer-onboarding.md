@@ -289,6 +289,12 @@ At minimum, verify these keys exist in `.env`:
 - `VITE_PRIVACY_URL`
 - `ITX_ALLOWED_ORIGINS`
 
+For local development, `ITX_ALLOWED_ORIGINS` should usually include only the local Vite origins, for example:
+
+- `http://localhost:5173,http://localhost:5174`
+
+Do not copy the production/shared value into local `.env` unless you are intentionally reproducing shared-environment CORS behavior.
+
 4. Save `.env`.
 5. Do not commit `.env`.
 

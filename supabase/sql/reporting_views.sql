@@ -60,3 +60,6 @@ begin
   refresh materialized view public.super_reporting_tenant_metrics;
 end;
 $$;
+
+revoke all on function public.refresh_super_reporting_views() from public;
+grant execute on function public.refresh_super_reporting_views() to service_role;

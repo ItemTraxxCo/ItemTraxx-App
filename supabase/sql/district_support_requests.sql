@@ -30,6 +30,7 @@ create policy "district_admin_select_own_support_requests"
         and p.role = 'district_admin'
         and p.district_id = district_support_requests.district_id
     )
+    and public.has_recent_privileged_step_up('district_admin')
     or exists (
       select 1
       from public.profiles p

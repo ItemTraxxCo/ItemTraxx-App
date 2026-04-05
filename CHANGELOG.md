@@ -1,6 +1,6 @@
 # Changelog
 
-Last updated (year-month-day): 2026-04-01
+Last updated (year-month-day): 2026-04-05
 
 All notable changes to **ItemTraxx** will be documented in this file. This includes new features, improvements, bug fixes, and other updates.
 
@@ -15,6 +15,38 @@ Changes are dated based on the default timezone: America/Los_Angeles
 - [TERMS.md](TERMS.md) – Terms of service for users
 - [PRIVACY.md](PRIVACY.md) – Privacy policy and data handling
 - [SECURITY.md](SECURITY.md) – Security reporting and guidelines
+
+---
+
+### 4/5/2026 Development Update
+
+- Completed a follow-up security hardening and verification pass:
+  - patched prelogin/public abuse controls to trust Cloudflare `cf-connecting-ip` only and stop using spoofable `x-forwarded-for` / `x-real-ip` headers for rate limiting and client fingerprinting
+  - centralized trusted client-IP extraction in shared Supabase function helpers and applied it across tenant login, district handoff, super-auth verification, client error reporting, contact sales, contact support, and login notification flows
+  - verified the previously remediated worker secret timing-safe comparison and fail-closed password reset redirect handling remained in place after the latest audit rerun
+- Improved shared development environment behavior on dev subdomains:
+  - suppressed the outdated-version overlay and GitHub main-head freshness check on `*.dev.itemtraxx.com` hosts so branch-bound dev environments no longer appear falsely stale
+  - updated the shared public footer so `dev.itemtraxx.com` and `*.dev.itemtraxx.com` display `Development` instead of `Production`
+- Re-ran the security audit after remediation and confirmed no new code-level vulnerabilities in the accessible repository/config scope; remaining items are runtime verification tasks around live DB grant state and Cloudflare WAF/ruleset visibility.
+
+---
+
+### 4/4/2026 Development Update
+
+- Completed a targeted security remediation pass based on the April 4 audit report:
+  - removed credentialed `*.vercel.app` trust from the Cloudflare edge proxy CORS allowlist
+  - reworked super-admin verification so password login no longer creates a live browser session before email verification succeeds
+  - replaced super-admin verification-code generation with CSPRNG-backed code generation
+  - neutralized spreadsheet formula injection in CSV exports
+- Hardened direct-boundary authorization and RPC exposure:
+  - added explicit revoke/grant protection for sensitive `SECURITY DEFINER` RPCs used by async jobs and reporting refreshes
+  - added DB-side recent-step-up helpers tied to the current session binding
+  - updated tenant-admin and district-admin direct write boundaries so recent admin verification is enforced server-side, not only in the router
+- Reduced sensitive token/reporting exposure and improved verification tooling:
+  - stopped client fatal-error reports from including URL hash fragments
+  - cleared recovery-hash fragments from the reset-password route after session recovery is established
+  - added a repeatable DB privilege verification script for sensitive RPC grants
+  - generated and archived the security audit report as a PDF for internal review
 
 ---
 

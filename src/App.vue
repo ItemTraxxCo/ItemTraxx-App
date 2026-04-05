@@ -369,6 +369,11 @@ const IS_E2E_TEST_MODE = import.meta.env.VITE_E2E_TEST_UTILS === "true";
 const GITHUB_HEAD_COMMIT_API =
   "https://api.github.com/repos/ItemTraxxCo/ItemTraxx-App/commits/main";
 
+const isDevSubdomainHost = computed(() => {
+  if (typeof window === "undefined") return false;
+  return window.location.hostname.endsWith(".dev.itemtraxx.com");
+});
+
 const themeLabel = computed(() =>
   theme.value === "dark" ? "Light Mode" : "Dark Mode"
 );
@@ -520,7 +525,9 @@ const showKillSwitchOverlay = computed(() => {
   if (isLocalDevMaintenanceBypass.value) return false;
   return killSwitchEnabled.value;
 });
-const showVersionOverlay = computed(() => isOutdated.value || forceUpdateOverlay.value);
+const showVersionOverlay = computed(
+  () => !isDevSubdomainHost.value && (isOutdated.value || forceUpdateOverlay.value)
+);
 const incidentBannerTitle = computed(() => {
   if (!incidentBanner.value) return "System Notice";
   return incidentBanner.value.level === "down" ? "System Outage" : "System Degraded";
@@ -1070,6 +1077,12 @@ const refreshSystemStatus = async () => {
 };
 
 const refreshVersionStatus = async () => {
+  if (isDevSubdomainHost.value) {
+    isOutdated.value = false;
+    latestVersion.value = null;
+    return;
+  }
+
   if (!appVersion || appVersion === "n/a") {
     isOutdated.value = false;
     return;

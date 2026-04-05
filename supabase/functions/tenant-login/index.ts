@@ -1,5 +1,7 @@
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { isAllowedOrigin, parseAllowedOrigins } from "../_shared/cors.ts";
+import { resolveClientFingerprint, resolveClientIp } from "../_shared/preloginGuards.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Headers":
@@ -29,38 +31,8 @@ const hashString = async (value: string) => {
   return toHex(new Uint8Array(digest));
 };
 
-const normalizeScopePart = (value: string, fallback: string, maxLen = 32) => {
-  const normalized = value
-    .toLowerCase()
-    .replace(/[^a-z0-9_-]/g, "-")
-    .replace(/-+/g, "-")
-    .replace(/^-|-$/g, "");
-  if (!normalized) {
-    return fallback;
-  }
-  return normalized.slice(0, maxLen);
-};
-
-const resolveClientFingerprint = (req: Request, origin: string | null) => {
-  const forwardedFor = req.headers.get("x-forwarded-for") ?? "";
-  const firstForwardedIp = forwardedFor.split(",")[0]?.trim() ?? "";
-  const connectingIp = req.headers.get("cf-connecting-ip")?.trim() ?? "";
-  const realIp = req.headers.get("x-real-ip")?.trim() ?? "";
-  const ipCandidate = firstForwardedIp || connectingIp || realIp;
-
-  if (ipCandidate) {
-    return `ip-${normalizeScopePart(ipCandidate, "unknown-ip", 24)}`;
-  }
-
-  if (origin) {
-    return `origin-${normalizeScopePart(origin, "unknown-origin", 24)}`;
-  }
-
-  return "unknown-client";
-};
-
 const enforceRateLimit = async (
-  client: ReturnType<typeof createClient>,
+  client: any,
   key: string,
   scope: string,
   limit: number,
@@ -83,14 +55,6 @@ const enforceRateLimit = async (
   }
 
   return { ok: true as const, error: null };
-};
-
-const resolveClientIp = (req: Request) => {
-  const forwardedFor = req.headers.get("x-forwarded-for") ?? "";
-  const firstForwardedIp = forwardedFor.split(",")[0]?.trim() ?? "";
-  const connectingIp = req.headers.get("cf-connecting-ip")?.trim() ?? "";
-  const realIp = req.headers.get("x-real-ip")?.trim() ?? "";
-  return firstForwardedIp || connectingIp || realIp || "";
 };
 
 const isLocalhostMaintenanceBypassRequest = (req: Request) => {
@@ -189,14 +153,11 @@ const verifyTurnstileToken = async (
 const resolveCorsHeaders = (req: Request) => {
   const origin = req.headers.get("Origin");
   const allowedOriginsEnv = Deno.env.get("ITX_ALLOWED_ORIGINS") ?? "";
-  const allowedOrigins = allowedOriginsEnv
-    .split(",")
-    .map((item) => item.trim())
-    .filter((item) => item.length > 0);
+  const allowedOrigins = parseAllowedOrigins(allowedOriginsEnv);
 
   const hasOrigin = !!origin;
   const originAllowed =
-    hasOrigin && allowedOrigins.includes(origin as string);
+    hasOrigin && isAllowedOrigin(origin as string, allowedOrigins);
 
   const headers =
     hasOrigin && originAllowed
@@ -328,7 +289,7 @@ serve(async (req) => {
     if (!perClientLimit.ok) {
       if (perClientLimit.error) {
         console.error("tenant-login rate limit check failed", {
-          message: perClientLimit.error.message,
+          message: (perClientLimit.error as { message?: string } | null)?.message ?? null,
           scope: perClientScope,
           origin: origin ?? null,
         });
@@ -349,7 +310,7 @@ serve(async (req) => {
     if (!perAccessLimit.ok) {
       if (perAccessLimit.error) {
         console.error("tenant-login rate limit check failed", {
-          message: perAccessLimit.error.message,
+          message: (perAccessLimit.error as { message?: string } | null)?.message ?? null,
           scope: perClientAccessScope,
           origin: origin ?? null,
         });

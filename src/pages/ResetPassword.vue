@@ -64,10 +64,16 @@ const checkRecoverySession = async () => {
   // Give Supabase a moment to parse recovery hash tokens from URL.
   if (await attempt()) {
     isReady.value = true;
+    if (window.location.hash) {
+      window.history.replaceState({}, document.title, `${window.location.pathname}${window.location.search}`);
+    }
     return;
   }
   await new Promise((resolve) => window.setTimeout(resolve, 250));
   isReady.value = await attempt();
+  if (isReady.value && window.location.hash) {
+    window.history.replaceState({}, document.title, `${window.location.pathname}${window.location.search}`);
+  }
 };
 
 const handleReset = async () => {

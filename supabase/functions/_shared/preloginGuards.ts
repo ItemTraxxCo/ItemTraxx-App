@@ -1,9 +1,11 @@
-import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
-
 type RateLimitResult = {
   allowed: boolean;
   retry_after_seconds: number | null;
 };
+
+type RateLimitError = {
+  message?: string;
+} | null;
 
 type TurnstileVerifyResult = {
   success: boolean;
@@ -34,11 +36,13 @@ const normalizeScopePart = (value: string, fallback: string, maxLen = 32) => {
 };
 
 export const resolveClientIp = (req: Request) => {
-  const forwardedFor = req.headers.get("x-forwarded-for") ?? "";
-  const firstForwardedIp = forwardedFor.split(",")[0]?.trim() ?? "";
   const connectingIp = req.headers.get("cf-connecting-ip")?.trim() ?? "";
-  const realIp = req.headers.get("x-real-ip")?.trim() ?? "";
-  return firstForwardedIp || connectingIp || realIp || "";
+  if (connectingIp) return connectingIp;
+
+  // Do not trust x-real-ip or x-forwarded-for on public/prelogin handlers unless
+  // the upstream proxy chain is explicitly validated. For requests that do not
+  // arrive through Cloudflare, fall back to non-IP client fingerprinting instead.
+  return "";
 };
 
 export const resolveClientFingerprint = (req: Request, origin: string | null) => {
@@ -56,7 +60,7 @@ export const resolveClientFingerprint = (req: Request, origin: string | null) =>
 };
 
 export const enforcePreloginRateLimit = async (
-  client: SupabaseClient,
+  client: any,
   key: string,
   scope: string,
   limit: number,
@@ -70,15 +74,15 @@ export const enforcePreloginRateLimit = async (
   });
 
   if (error) {
-    return { ok: false as const, error };
+    return { ok: false as const, error: error as RateLimitError };
   }
 
   const result = data as RateLimitResult;
   if (!result.allowed) {
-    return { ok: false as const, error: null };
+    return { ok: false as const, error: null as RateLimitError };
   }
 
-  return { ok: true as const, error: null };
+  return { ok: true as const, error: null as RateLimitError };
 };
 
 export const verifyTurnstileToken = async (

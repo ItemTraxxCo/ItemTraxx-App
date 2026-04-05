@@ -2,6 +2,8 @@ import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { isKillSwitchWriteBlocked } from "../_shared/killSwitch.ts";
 import { getRequestId, logError, logInfo } from "../_shared/observability.ts";
+import { isAllowedOrigin, parseAllowedOrigins } from "../_shared/cors.ts";
+import { resolveClientIp } from "../_shared/preloginGuards.ts";
 
 const baseCorsHeaders = {
   "Access-Control-Allow-Headers":
@@ -71,24 +73,13 @@ const hashString = async (value: string) => {
   return toHex(new Uint8Array(digest));
 };
 
-const resolveClientIp = (req: Request) => {
-  const forwardedFor = req.headers.get("x-forwarded-for") ?? "";
-  const firstForwardedIp = forwardedFor.split(",")[0]?.trim() ?? "";
-  const connectingIp = req.headers.get("cf-connecting-ip")?.trim() ?? "";
-  const realIp = req.headers.get("x-real-ip")?.trim() ?? "";
-  return firstForwardedIp || connectingIp || realIp || "";
-};
-
 const resolveCorsHeaders = (req: Request) => {
   const origin = req.headers.get("Origin");
-  const allowedOrigins = (Deno.env.get("ITX_ALLOWED_ORIGINS") ?? "")
-    .split(",")
-    .map((item) => item.trim())
-    .filter((item) => item.length > 0);
+  const allowedOrigins = parseAllowedOrigins(Deno.env.get("ITX_ALLOWED_ORIGINS"));
 
   const hasOrigin = !!origin;
   const originAllowed =
-    !hasOrigin || (hasOrigin && allowedOrigins.includes(origin as string));
+    !hasOrigin || (hasOrigin && isAllowedOrigin(origin as string, allowedOrigins));
 
   const headers =
     hasOrigin && originAllowed

@@ -32,3 +32,40 @@ for each row
 execute function public.touch_privileged_session_stepups_updated_at();
 
 alter table public.privileged_session_stepups enable row level security;
+
+create or replace function public.current_session_binding_key()
+returns text
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select
+    case
+      when coalesce(auth.jwt() ->> 'session_id', '') <> ''
+        then 'session:' || (auth.jwt() ->> 'session_id')
+      else null
+    end;
+$$;
+
+create or replace function public.has_recent_privileged_step_up(p_role_scope text)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select exists (
+    select 1
+    from public.privileged_session_stepups s
+    where s.user_id = auth.uid()
+      and s.role_scope = p_role_scope
+      and s.binding_key = public.current_session_binding_key()
+      and s.expires_at > now()
+  );
+$$;
+
+revoke all on function public.current_session_binding_key() from public, anon, authenticated;
+revoke all on function public.has_recent_privileged_step_up(text) from public, anon, authenticated;
+grant execute on function public.current_session_binding_key() to authenticated, service_role;
+grant execute on function public.has_recent_privileged_step_up(text) to authenticated, service_role;

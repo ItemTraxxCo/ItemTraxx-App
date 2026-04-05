@@ -7,6 +7,7 @@ import {
   resolveClientIp,
   verifyTurnstileToken,
 } from "../_shared/preloginGuards.ts";
+import { isAllowedOrigin, parseAllowedOrigins } from "../_shared/cors.ts";
 
 type ProfileRow = {
   role: string | null;
@@ -44,14 +45,11 @@ const jsonResponse = (
 
 const resolveCorsHeaders = (req: Request) => {
   const origin = req.headers.get("Origin");
-  const allowedOrigins = (Deno.env.get("ITX_ALLOWED_ORIGINS") ?? "")
-    .split(",")
-    .map((item) => item.trim())
-    .filter((item) => item.length > 0);
+  const allowedOrigins = parseAllowedOrigins(Deno.env.get("ITX_ALLOWED_ORIGINS"));
 
   const hasOrigin = !!origin;
   const originAllowed =
-    !hasOrigin || (hasOrigin && allowedOrigins.includes(origin as string));
+    !hasOrigin || (hasOrigin && isAllowedOrigin(origin as string, allowedOrigins));
 
   const headers =
     hasOrigin && originAllowed
@@ -320,19 +318,6 @@ serve(async (req) => {
         return jsonResponse(403, { error: "Tenant disabled" }, headers);
       }
 
-      if (!resolvedDistrictSlug || (currentDistrictSlug && currentDistrictSlug === resolvedDistrictSlug)) {
-        return jsonResponse(
-          200,
-          {
-            access_token: session.access_token,
-            refresh_token: session.refresh_token,
-            role,
-            root_only: true,
-          },
-          headers,
-        );
-      }
-
       const magicLink = await adminClient.auth.admin.generateLink({
         type: "magiclink",
         email,
@@ -345,7 +330,7 @@ serve(async (req) => {
         200,
         {
           hashed_token: magicLink.data.properties.hashed_token,
-          district_slug: resolvedDistrictSlug,
+          district_slug: resolvedDistrictSlug ?? currentDistrictSlug ?? null,
           role,
         },
         headers,

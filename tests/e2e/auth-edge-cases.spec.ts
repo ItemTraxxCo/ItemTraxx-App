@@ -87,6 +87,8 @@ test.describe("Auth edge cases", () => {
   test("authenticated tenant admin on public home redirects to checkout instead of login", async ({ page }) => {
     await page.goto("/");
     await setTenantAdminSession(page, "tenant-e2e");
+    await navigateApp(page, "/about");
+    await expect(page).toHaveURL(/\/about$/);
     await navigateApp(page, "/");
     await expect(page).toHaveURL(/\/tenant\/checkout$/);
     await expect(page).not.toHaveURL(/\/login$/);
@@ -138,5 +140,25 @@ test.describe("Auth edge cases", () => {
     await page.waitForTimeout(6000);
     await expect(page).toHaveURL(/\/tenant\/admin$/);
     await expect(page).not.toHaveURL(/\/tenant\/checkout$/);
+  });
+
+  test("tenant admin dev hosts disable idle logout behavior", async ({ page }) => {
+    await page.route(/\/functions(?:\/v1)?\/admin-ops(?:\?.*)?$/, async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ data: { valid: true, ok: true } }),
+      });
+    });
+
+    await page.goto("/");
+    await setTenantAdminSession(page, "tenant-e2e");
+    await page.evaluate(() => {
+      window.history.replaceState({}, "", "/tenant/admin");
+    });
+    await page.reload();
+    await expect(page).toHaveURL(/\/tenant\/admin$/);
+    await page.waitForTimeout(3500);
+    await expect(page).toHaveURL(/\/tenant\/admin$/);
   });
 });

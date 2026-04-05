@@ -861,10 +861,14 @@ export const adminLoginWithSession = async (
 
   if (resolvedRole === "tenant_admin") {
     rotateDeviceSession();
-    await touchTenantAdminSession({
-      loginMethod: sessionTouchOptions.loginMethod ?? "password",
-      loginLocation: sessionTouchOptions.loginLocation ?? "admin_login",
-    });
+    try {
+      await touchTenantAdminSession({
+        loginMethod: sessionTouchOptions.loginMethod ?? "password",
+        loginLocation: sessionTouchOptions.loginLocation ?? "admin_login",
+      });
+    } catch {
+      // Session tracking is best-effort and must not block successful admin sign-in.
+    }
   }
 
   setAuthStateFromBackend({

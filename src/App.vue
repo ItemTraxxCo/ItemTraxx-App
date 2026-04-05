@@ -767,6 +767,16 @@ const reloadApp = () => {
   window.location.reload();
 };
 
+const buildDebugCheckoutPath = (reason: string) => {
+  if (!isDevSubdomainHost.value) {
+    return "/tenant/checkout";
+  }
+  const params = new URLSearchParams(window.location.search);
+  params.set("itx_dbg_redirect", reason);
+  const query = params.toString();
+  return `/tenant/checkout${query ? `?${query}` : ""}`;
+};
+
 const signInAgain = async () => {
   const recoveryRoute = sessionTermination.recoveryRoute ?? resolveRecoveryRouteFromPath(route.path);
   const nextUrl =
@@ -844,7 +854,7 @@ const runIdleLogout = async () => {
   isIdleLogoutRunning.value = true;
   try {
     clearAdminVerification();
-    await router.replace("/tenant/checkout");
+    await router.replace(buildDebugCheckoutPath("admin_idle"));
   } finally {
     isIdleLogoutRunning.value = false;
   }

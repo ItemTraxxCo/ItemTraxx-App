@@ -139,7 +139,13 @@ const planLabel = computed(() => {
 
 const returnToCheckout = async () => {
   clearAdminVerification();
-  await router.replace("/tenant/checkout");
+  const debugQuery =
+    typeof window !== "undefined" &&
+    (window.location.hostname === "dev.itemtraxx.com" ||
+      window.location.hostname.endsWith(".dev.itemtraxx.com"))
+      ? { itx_dbg_redirect: "admin_home_button" }
+      : undefined;
+  await router.replace(debugQuery ? { path: "/tenant/checkout", query: debugQuery } : "/tenant/checkout");
 };
 
 onMounted(async () => {

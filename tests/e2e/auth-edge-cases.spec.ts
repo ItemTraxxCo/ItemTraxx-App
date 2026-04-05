@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { mockSystemStatus, navigateApp } from "./helpers/testHarness";
+import { mockSystemStatus, navigateApp, setTenantAdminSession } from "./helpers/testHarness";
 
 test.describe("Auth edge cases", () => {
   test.beforeEach(async ({ page }) => {
@@ -52,6 +52,33 @@ test.describe("Auth edge cases", () => {
     await page.goto("/tenant/checkout");
     await expect(page).toHaveURL(/\/tenant\/checkout$/);
 
+    await page.reload();
+    await expect(page).toHaveURL(/\/tenant\/checkout$/);
+    await expect(page).not.toHaveURL(/\/login$/);
+  });
+
+  test("tenant admin on checkout is not logged out by admin-session validation", async ({ page }) => {
+    await page.route(/\/functions(?:\/v1)?\/admin-ops(?:\?.*)?$/, async (route) => {
+      const body = (route.request().postDataJSON() as { action?: string }) ?? {};
+      if (body.action === "validate_session") {
+        await route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: JSON.stringify({ data: { valid: false } }),
+        });
+        return;
+      }
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ data: { ok: true } }),
+      });
+    });
+
+    await page.goto("/");
+    await setTenantAdminSession(page, "tenant-e2e");
+    await navigateApp(page, "/tenant/checkout");
+    await expect(page).toHaveURL(/\/tenant\/checkout$/);
     await page.reload();
     await expect(page).toHaveURL(/\/tenant\/checkout$/);
     await expect(page).not.toHaveURL(/\/login$/);

@@ -504,7 +504,7 @@ const isTenantAdminArea = computed(() => {
 const shouldTrackTenantAdminSession = computed(() => {
   if (!auth.isAuthenticated || auth.role !== "tenant_admin") return false;
   if (route.path === "/tenant/admin-login") return false;
-  return true;
+  return isTenantAdminArea.value;
 });
 const showNotificationBell = computed(() => {
   if (!auth.isAuthenticated) return false;

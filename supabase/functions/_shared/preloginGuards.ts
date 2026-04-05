@@ -91,34 +91,59 @@ export const verifyTurnstileToken = async (
   remoteIp: string,
   logContext: string
 ) => {
-  const params = new URLSearchParams();
-  params.set("secret", secret);
-  params.set("response", token);
-  if (remoteIp) {
-    params.set("remoteip", remoteIp);
-  }
-
-  const response = await fetch(
-    "https://challenges.cloudflare.com/turnstile/v0/siteverify",
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: params.toString(),
+  const submitVerification = async (ip?: string) => {
+    const params = new URLSearchParams();
+    params.set("secret", secret);
+    params.set("response", token);
+    if (ip) {
+      params.set("remoteip", ip);
     }
-  );
 
-  if (!response.ok) {
-    console.error(`${logContext} turnstile verification request failed`, {
-      status: response.status,
-    });
-    return false;
+    const response = await fetch(
+      "https://challenges.cloudflare.com/turnstile/v0/siteverify",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: params.toString(),
+      }
+    );
+
+    if (!response.ok) {
+      console.error(`${logContext} turnstile verification request failed`, {
+        status: response.status,
+        usedRemoteIp: Boolean(ip),
+      });
+      return null;
+    }
+
+    return (await response.json()) as TurnstileVerifyResult;
+  };
+
+  const initialResult = await submitVerification(remoteIp || undefined);
+  if (initialResult?.success) {
+    return true;
   }
 
-  const result = (await response.json()) as TurnstileVerifyResult;
-  if (!result.success) {
+  if (remoteIp) {
+    const fallbackResult = await submitVerification();
+    if (fallbackResult?.success) {
+      console.warn(`${logContext} turnstile verification succeeded after retry without remote IP`);
+      return true;
+    }
+    if (fallbackResult) {
+      console.error(`${logContext} turnstile verification failed`, {
+        errorCodes: fallbackResult["error-codes"] ?? [],
+        retriedWithoutRemoteIp: true,
+      });
+      return false;
+    }
+  }
+
+  if (initialResult) {
     console.error(`${logContext} turnstile verification failed`, {
-      errorCodes: result["error-codes"] ?? [],
+      errorCodes: initialResult["error-codes"] ?? [],
+      retriedWithoutRemoteIp: false,
     });
   }
-  return !!result.success;
+  return false;
 };

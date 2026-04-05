@@ -4,7 +4,7 @@
       <p class="footer-brand">©2026 ItemTraxx Co</p>
       <span class="footer-env footer-version">{{ releaseChannel }}</span>
       <span class="footer-version">v-{{ appVersion }}</span>
-
+      <span v-if="showBranchName" class="footer-version footer-branch">{{ appBranch }}</span>
     </div>
     <div class="footer-grid">
       <div class="footer-column">
@@ -45,6 +45,7 @@
 import { RouterLink } from "vue-router";
 
 const appVersion = import.meta.env.VITE_GIT_COMMIT || "n/a";
+const appBranch = import.meta.env.VITE_GIT_BRANCH || "n/a";
 const runtimeEnvironment = (
   import.meta.env.VITE_SENTRY_ENVIRONMENT ||
   import.meta.env.MODE ||
@@ -65,6 +66,8 @@ const releaseChannel =
       : runtimeEnvironment === "beta"
         ? "Beta"
         : "Development";
+
+const showBranchName = !!appBranch && appBranch !== "n/a" && appBranch !== "main";
 </script>
 
 <style scoped>
@@ -123,6 +126,10 @@ const releaseChannel =
 
 .footer-brand {
   opacity: 0.88;
+}
+
+.footer-branch {
+  font-size: 0.84rem;
 }
 
 .footer-column a:hover {

@@ -190,6 +190,7 @@ const mountApp = async () => {
   const { installAppErrorRecovery } = await import("./services/appErrorRecovery");
   installAppErrorRecovery(router);
   app.use(router);
+  await router.isReady();
   app.mount("#app");
   captureInitialPerfMetrics();
   attachE2EControls();
@@ -225,6 +226,9 @@ const bootstrap = async () => {
         {
           loginMethod: consumedDistrictHandoff.loginMethod,
           loginLocation: consumedDistrictHandoff.loginLocation,
+          skipExchange: true,
+          skipLoginNotification: true,
+          preExchangedSessionSummary: consumedDistrictHandoff.sessionSummary,
         }
       );
       if (session.role === "tenant_admin") {

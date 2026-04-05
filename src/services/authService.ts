@@ -5,6 +5,7 @@ import {
   clearAdminVerification,
   clearAuthState,
   getAuthState,
+  getPersistedAdminVerification,
   markAdminVerified,
   setDistrictContext,
   setAuthStateFromBackend,
@@ -20,6 +21,7 @@ import {
   clearHttpSession,
   exchangeHttpSession,
   fetchHttpSessionSummary,
+  type HttpSessionSummary,
 } from "./httpSessionService";
 import { authenticatedRpc, authenticatedSelect } from "./authenticatedDataClient";
 import { rotateDeviceSession } from "../utils/deviceSession";
@@ -212,7 +214,9 @@ const fetchCurrentRoleAndTenant = async () => {
     withRetry(
       () =>
         withTimeout(
-          authenticatedRpc<string | null>("current_user_role", {}),
+          authenticatedRpc<string | null>("current_user_role", {}, {
+            suppressUnauthorizedRecovery: true,
+          }),
           AUTH_QUERY_TIMEOUT_MS,
           "Role lookup timed out."
         ),
@@ -221,7 +225,9 @@ const fetchCurrentRoleAndTenant = async () => {
     withRetry(
       () =>
         withTimeout(
-          authenticatedRpc<string | null>("current_tenant_id", {}),
+          authenticatedRpc<string | null>("current_tenant_id", {}, {
+            suppressUnauthorizedRecovery: true,
+          }),
           AUTH_QUERY_TIMEOUT_MS,
           "Tenant lookup timed out."
         ),
@@ -246,6 +252,8 @@ const fetchProfile = async (userId: string): Promise<ProfileRow | null> => {
             select: "id,role,tenant_id,district_id,auth_email,is_active",
             id: `eq.${userId}`,
             limit: "1",
+          }, {
+            suppressUnauthorizedRecovery: true,
           }),
           AUTH_QUERY_TIMEOUT_MS,
           "Profile lookup timed out."
@@ -294,6 +302,8 @@ const fetchTenantContext = async (tenantId: string): Promise<TenantRow | null> =
             select: "id,status,district_id",
             id: `eq.${tenantId}`,
             limit: "1",
+          }, {
+            suppressUnauthorizedRecovery: true,
           }),
           AUTH_QUERY_TIMEOUT_MS,
           "Tenant status lookup timed out."
@@ -362,6 +372,11 @@ const applySessionSummary = async (
     profile?.tenant_id ?? (isSameUser ? current.sessionTenantId : null);
   const isSuperRole = resolvedRole === "super_admin";
 
+  const persistedAdminVerifiedAt =
+    resolvedRole === "tenant_admin" || resolvedRole === "district_admin"
+      ? getPersistedAdminVerification(summary.user.id)
+      : null;
+
   setAuthStateFromBackend({
     isInitialized: true,
     isAuthenticated: true,
@@ -377,6 +392,8 @@ const applySessionSummary = async (
       isSameUser && isSuperRole ? current.hasSecondaryAuth ?? false : false,
     superVerifiedAt:
       isSameUser && isSuperRole ? current.superVerifiedAt ?? null : null,
+    adminVerifiedAt:
+      (isSameUser ? current.adminVerifiedAt : null) ?? persistedAdminVerifiedAt ?? null,
   });
   clearSessionTermination();
 };
@@ -491,12 +508,15 @@ export const tenantLogin = async (
     throw new Error("Invalid credentials.");
   }
 
-  await exchangeHttpSession({
+  const exchangedSessionSummary = await exchangeHttpSession({
     access_token: accessToken,
     refresh_token: refreshToken,
   });
   await clearLocalSession();
-  const sessionSummary = await fetchHttpSessionSummary();
+  const sessionSummary =
+    exchangedSessionSummary?.authenticated && exchangedSessionSummary?.user
+      ? exchangedSessionSummary
+      : await fetchHttpSessionSummary();
   let shouldRegisterTenantAdminSession = sessionSummary.profile?.role === "tenant_admin";
   if (!shouldRegisterTenantAdminSession) {
     try {
@@ -508,10 +528,14 @@ export const tenantLogin = async (
   }
   if (shouldRegisterTenantAdminSession) {
     rotateDeviceSession();
-    await touchTenantAdminSession({
-      loginMethod: "password",
-      loginLocation: "regular_login",
-    });
+    try {
+      await touchTenantAdminSession({
+        loginMethod: "password",
+        loginLocation: "regular_login",
+      });
+    } catch {
+      // Session tracking is best-effort and must not block successful login.
+    }
   }
   await applySessionSummary(sessionSummary);
   const current = getAuthState();
@@ -537,6 +561,7 @@ export const consumeDistrictSessionHandoff = async (): Promise<
   | {
       accessToken: string;
       refreshToken: string;
+      sessionSummary: HttpSessionSummary | null;
       loginMethod: "password" | "magic_link" | "session_handoff" | null;
       loginLocation: "regular_login" | "admin_login" | null;
     }
@@ -600,7 +625,7 @@ export const consumeDistrictSessionHandoff = async (): Promise<
     const verifiedAccessToken = verifyResult.data.session.access_token;
     const verifiedRefreshToken = verifyResult.data.session.refresh_token;
 
-    await exchangeHttpSession({
+    const exchangedSessionSummary = await exchangeHttpSession({
       access_token: verifiedAccessToken,
       refresh_token: verifiedRefreshToken,
     });
@@ -619,6 +644,7 @@ export const consumeDistrictSessionHandoff = async (): Promise<
     return {
       accessToken: verifiedAccessToken,
       refreshToken: verifiedRefreshToken,
+      sessionSummary: exchangedSessionSummary ?? null,
       loginMethod,
       loginLocation,
     };
@@ -652,7 +678,7 @@ export const consumeDistrictSessionHandoff = async (): Promise<
     throw new Error("Unable to complete district sign-in.");
   }
 
-  await exchangeHttpSession({
+  const exchangedSessionSummary = await exchangeHttpSession({
     access_token: finalAccessToken,
     refresh_token: finalRefreshToken,
   });
@@ -671,6 +697,7 @@ export const consumeDistrictSessionHandoff = async (): Promise<
   return {
     accessToken: finalAccessToken,
     refreshToken: finalRefreshToken,
+    sessionSummary: exchangedSessionSummary ?? null,
     loginMethod,
     loginLocation,
   };
@@ -762,15 +789,22 @@ export const adminLoginWithSession = async (
   sessionTouchOptions: {
     loginMethod?: "password" | "magic_link" | "session_handoff" | null;
     loginLocation?: "regular_login" | "admin_login" | null;
+    skipExchange?: boolean;
+    skipLoginNotification?: boolean;
+    preExchangedSessionSummary?: HttpSessionSummary | null;
   } = {}
 ) => {
   const priorTenantContextId = getAuthState().tenantContextId;
   const districtHost = getDistrictState();
-  const exchangedSessionSummary = await exchangeHttpSession({
-    access_token: accessToken,
-    refresh_token: refreshToken,
-  });
-  await clearLocalSession();
+  const exchangedSessionSummary = sessionTouchOptions.skipExchange
+    ? sessionTouchOptions.preExchangedSessionSummary ?? null
+    : await exchangeHttpSession({
+        access_token: accessToken,
+        refresh_token: refreshToken,
+      });
+  if (!sessionTouchOptions.skipExchange) {
+    await clearLocalSession();
+  }
 
   const sessionSummary =
     exchangedSessionSummary?.authenticated && exchangedSessionSummary?.user
@@ -861,10 +895,14 @@ export const adminLoginWithSession = async (
 
   if (resolvedRole === "tenant_admin") {
     rotateDeviceSession();
-    await touchTenantAdminSession({
-      loginMethod: sessionTouchOptions.loginMethod ?? "password",
-      loginLocation: sessionTouchOptions.loginLocation ?? "admin_login",
-    });
+    try {
+      await touchTenantAdminSession({
+        loginMethod: sessionTouchOptions.loginMethod ?? "password",
+        loginLocation: sessionTouchOptions.loginLocation ?? "admin_login",
+      });
+    } catch {
+      // Session tracking is best-effort and must not block successful admin sign-in.
+    }
   }
 
   setAuthStateFromBackend({
@@ -889,7 +927,9 @@ export const adminLoginWithSession = async (
   }
 
   markAdminVerified();
-  sendLoginNotification(accessToken);
+  if (!sessionTouchOptions.skipLoginNotification) {
+    sendLoginNotification(accessToken);
+  }
   const districtSlug = await resolveDistrictSlug(resolvedDistrictId ?? null);
   return {
     role: resolvedRole,

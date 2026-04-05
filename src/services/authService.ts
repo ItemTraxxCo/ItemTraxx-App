@@ -499,12 +499,15 @@ export const tenantLogin = async (
     throw new Error("Invalid credentials.");
   }
 
-  await exchangeHttpSession({
+  const exchangedSessionSummary = await exchangeHttpSession({
     access_token: accessToken,
     refresh_token: refreshToken,
   });
   await clearLocalSession();
-  const sessionSummary = await fetchHttpSessionSummary();
+  const sessionSummary =
+    exchangedSessionSummary?.authenticated && exchangedSessionSummary?.user
+      ? exchangedSessionSummary
+      : await fetchHttpSessionSummary();
   let shouldRegisterTenantAdminSession = sessionSummary.profile?.role === "tenant_admin";
   if (!shouldRegisterTenantAdminSession) {
     try {
@@ -516,10 +519,14 @@ export const tenantLogin = async (
   }
   if (shouldRegisterTenantAdminSession) {
     rotateDeviceSession();
-    await touchTenantAdminSession({
-      loginMethod: "password",
-      loginLocation: "regular_login",
-    });
+    try {
+      await touchTenantAdminSession({
+        loginMethod: "password",
+        loginLocation: "regular_login",
+      });
+    } catch {
+      // Session tracking is best-effort and must not block successful login.
+    }
   }
   await applySessionSummary(sessionSummary);
   const current = getAuthState();

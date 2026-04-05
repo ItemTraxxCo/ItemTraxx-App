@@ -766,13 +766,16 @@ export const adminLoginWithSession = async (
 ) => {
   const priorTenantContextId = getAuthState().tenantContextId;
   const districtHost = getDistrictState();
-  await exchangeHttpSession({
+  const exchangedSessionSummary = await exchangeHttpSession({
     access_token: accessToken,
     refresh_token: refreshToken,
   });
   await clearLocalSession();
 
-  const sessionSummary = await fetchHttpSessionSummary();
+  const sessionSummary =
+    exchangedSessionSummary?.authenticated && exchangedSessionSummary?.user
+      ? exchangedSessionSummary
+      : await fetchHttpSessionSummary();
   if (!sessionSummary.authenticated || !sessionSummary.user) {
     throw new Error("Invalid credentials.");
   }

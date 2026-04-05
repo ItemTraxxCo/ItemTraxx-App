@@ -508,6 +508,7 @@ const isTenantAdminArea = computed(() => {
   if (route.path === "/tenant/admin-login") return false;
   return route.path.startsWith("/tenant/admin");
 });
+const isAdminIdleLogoutEnabled = computed(() => !isDevSubdomainHost.value);
 const shouldTrackTenantAdminSession = computed(() => {
   if (!auth.isAuthenticated || auth.role !== "tenant_admin") return false;
   if (route.path === "/tenant/admin-login") return false;
@@ -836,6 +837,7 @@ const clearAdminIdleTimer = () => {
 
 const runIdleLogout = async () => {
   if (isIdleLogoutRunning.value) return;
+  if (!isAdminIdleLogoutEnabled.value) return;
   if (!auth.isAuthenticated || auth.role !== "tenant_admin" || !isTenantAdminArea.value) {
     return;
   }
@@ -982,6 +984,9 @@ const startAdminSessionPolling = () => {
 
 const resetAdminIdleTimer = () => {
   clearAdminIdleTimer();
+  if (!isAdminIdleLogoutEnabled.value) {
+    return;
+  }
   if (!auth.isAuthenticated || auth.role !== "tenant_admin" || !isTenantAdminArea.value) {
     return;
   }

@@ -11,6 +11,7 @@ import {
   verifyTurnstileToken,
 } from "../_shared/preloginGuards.ts";
 import { registerPrivilegedStepUp } from "../_shared/privilegedStepUp.ts";
+import { isAllowedOrigin, parseAllowedOrigins } from "../_shared/cors.ts";
 
 const baseCorsHeaders = {
   "Access-Control-Allow-Headers":
@@ -32,9 +33,12 @@ type StartPasswordLoginAction = {
   action: "start_password_login";
   payload?: { email?: string; password?: string; turnstile_token?: string };
 };
-type StartAction = { action: "start_email_challenge" };
-type VerifyAction = { action: "verify_email_challenge"; payload?: { code?: string } };
-type ResendAction = { action: "resend_email_challenge" };
+type StartAction = { action: "start_email_challenge"; payload?: { challenge_token?: string } };
+type VerifyAction = {
+  action: "verify_email_challenge";
+  payload?: { code?: string; challenge_token?: string };
+};
+type ResendAction = { action: "resend_email_challenge"; payload?: { challenge_token?: string } };
 type RequestBody = StartPasswordLoginAction | StartAction | VerifyAction | ResendAction;
 
 type ChallengeRow = {
@@ -49,15 +53,28 @@ type ChallengeRow = {
   created_at: string;
 };
 
+type PendingSuperAdminSession = {
+  user_id: string;
+  email: string;
+  access_token: string;
+  refresh_token: string;
+  issued_at: string;
+  purpose: "super_admin_login";
+};
+
+type SuperAdminContext = {
+  userId: string;
+  userEmail: string | null;
+  authToken: string;
+  pendingSession: PendingSuperAdminSession | null;
+};
+
 const resolveCorsHeaders = (req: Request) => {
   const origin = req.headers.get("Origin");
-  const allowedOrigins = (Deno.env.get("ITX_ALLOWED_ORIGINS") ?? "")
-    .split(",")
-    .map((item) => item.trim())
-    .filter((item) => item.length > 0);
+  const allowedOrigins = parseAllowedOrigins(Deno.env.get("ITX_ALLOWED_ORIGINS"));
 
   const hasOrigin = !!origin;
-  const originAllowed = !hasOrigin || (hasOrigin && allowedOrigins.includes(origin as string));
+  const originAllowed = !hasOrigin || (hasOrigin && isAllowedOrigin(origin as string, allowedOrigins));
 
   const headers =
     hasOrigin && originAllowed
@@ -77,7 +94,71 @@ const parseAuthToken = (req: Request) => {
   return raw.replace(/^Bearer\s+/i, "").trim();
 };
 
-const createCode = () => String(Math.floor(100000 + Math.random() * 900000));
+const createCode = () => {
+  const bytes = new Uint32Array(1);
+  crypto.getRandomValues(bytes);
+  return String(100000 + (bytes[0] % 900000)).padStart(6, "0");
+};
+
+const base64UrlEncode = (bytes: Uint8Array) =>
+  btoa(String.fromCharCode(...bytes))
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/g, "");
+
+const base64UrlDecode = (value: string) => {
+  const normalized = value.replace(/-/g, "+").replace(/_/g, "/");
+  const padding = "=".repeat((4 - (normalized.length % 4)) % 4);
+  const raw = atob(`${normalized}${padding}`);
+  return Uint8Array.from(raw, (char) => char.charCodeAt(0));
+};
+
+const createChallengeKey = async (secret: string) => {
+  const keyMaterial = await crypto.subtle.digest(
+    "SHA-256",
+    new TextEncoder().encode(`itemtraxx-super-admin-challenge:${secret}`)
+  );
+  return crypto.subtle.importKey("raw", keyMaterial, { name: "AES-GCM" }, false, ["encrypt", "decrypt"]);
+};
+
+const sealChallengeToken = async (secret: string, payload: PendingSuperAdminSession) => {
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const key = await createChallengeKey(secret);
+  const ciphertext = await crypto.subtle.encrypt(
+    { name: "AES-GCM", iv },
+    key,
+    new TextEncoder().encode(JSON.stringify(payload))
+  );
+  const packed = new Uint8Array(iv.length + ciphertext.byteLength);
+  packed.set(iv, 0);
+  packed.set(new Uint8Array(ciphertext), iv.length);
+  return base64UrlEncode(packed);
+};
+
+const openChallengeToken = async (secret: string, token: string) => {
+  const packed = base64UrlDecode(token);
+  if (packed.length <= 12) {
+    throw new Error("Invalid challenge token");
+  }
+  const iv = packed.slice(0, 12);
+  const ciphertext = packed.slice(12);
+  const key = await createChallengeKey(secret);
+  const plaintext = await crypto.subtle.decrypt({ name: "AES-GCM", iv }, key, ciphertext);
+  const payload = JSON.parse(new TextDecoder().decode(plaintext)) as PendingSuperAdminSession;
+  if (
+    !payload?.user_id ||
+    !payload?.email ||
+    !payload?.access_token ||
+    !payload?.refresh_token ||
+    payload.purpose !== "super_admin_login"
+  ) {
+    throw new Error("Invalid challenge token");
+  }
+  if (Date.now() - Date.parse(payload.issued_at) > CHALLENGE_TTL_MS) {
+    throw new Error("Expired challenge token");
+  }
+  return payload;
+};
 
 const digest = async (value: string) => {
   const encoded = new TextEncoder().encode(value);
@@ -178,6 +259,72 @@ const sendSuperAdminTwoFactorEmail = async (
       resend: context.resend,
     },
   });
+};
+
+const resolveSuperAdminContext = async (params: {
+  adminClient: SupabaseClient;
+  supabaseUrl: string;
+  publishableKey: string;
+  serviceKey: string;
+  authToken: string;
+  challengeToken: string;
+}) => {
+  const { adminClient, supabaseUrl, publishableKey, serviceKey, authToken, challengeToken } = params;
+
+  if (challengeToken) {
+    const pendingSession = await openChallengeToken(serviceKey, challengeToken);
+    const { data: profile } = await adminClient
+      .from("profiles")
+      .select("role, auth_email")
+      .eq("id", pendingSession.user_id)
+      .single();
+
+    if (profile?.role !== "super_admin") {
+      throw new Error("Access denied");
+    }
+
+    return {
+      userId: pendingSession.user_id,
+      userEmail: profile.auth_email ?? pendingSession.email,
+      authToken: pendingSession.access_token,
+      pendingSession,
+    } satisfies SuperAdminContext;
+  }
+
+  if (!authToken) {
+    throw new Error("Unauthorized");
+  }
+
+  const userClient = createClient(supabaseUrl, publishableKey, {
+    global: { headers: { Authorization: `Bearer ${authToken}` } },
+    auth: { persistSession: false },
+  });
+
+  const {
+    data: { user },
+    error: userError,
+  } = await userClient.auth.getUser();
+
+  if (userError || !user) {
+    throw new Error("Unauthorized");
+  }
+
+  const { data: profile, error: profileError } = await userClient
+    .from("profiles")
+    .select("role, auth_email")
+    .eq("id", user.id)
+    .single();
+
+  if (profileError || profile?.role !== "super_admin") {
+    throw new Error("Access denied");
+  }
+
+  return {
+    userId: user.id,
+    userEmail: profile.auth_email ?? user.email ?? null,
+    authToken,
+    pendingSession: null,
+  } satisfies SuperAdminContext;
 };
 
 serve(async (req) => {
@@ -321,6 +468,15 @@ serve(async (req) => {
         return jsonResponse(400, { error: "Missing recipient email." });
       }
 
+      const challengeToken = await sealChallengeToken(serviceKey, {
+        user_id: signedInUser.id,
+        email: recipientEmail,
+        access_token: session.access_token,
+        refresh_token: session.refresh_token,
+        issued_at: new Date().toISOString(),
+        purpose: "super_admin_login",
+      });
+
       const code = createCode();
       const codeHash = await digest(`${signedInUser.id}:${code}`);
       const expiresAt = new Date(Date.now() + CHALLENGE_TTL_MS).toISOString();
@@ -372,38 +528,32 @@ serve(async (req) => {
         challenge_started: true,
         email: recipientEmail,
         expires_at: expiresAt,
-        access_token: session.access_token,
-        refresh_token: session.refresh_token,
+        challenge_token: challengeToken,
       });
     }
 
     const authToken = parseAuthToken(req);
-    if (!authToken) {
+    const challengeToken = normalizeText((body.payload as { challenge_token?: string } | undefined)?.challenge_token, 8192);
+
+    let context: SuperAdminContext;
+    try {
+      context = await resolveSuperAdminContext({
+        adminClient,
+        supabaseUrl,
+        publishableKey,
+        serviceKey,
+        authToken,
+        challengeToken,
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unauthorized";
+      if (message === "Access denied") {
+        return jsonResponse(403, { error: "Access denied" });
+      }
+      if (message === "Expired challenge token" || message === "Invalid challenge token") {
+        return jsonResponse(401, { error: "Verification session expired. Sign in again." });
+      }
       return jsonResponse(401, { error: "Unauthorized" });
-    }
-
-    const userClient = createClient(supabaseUrl, publishableKey, {
-      global: { headers: { Authorization: `Bearer ${authToken}` } },
-      auth: { persistSession: false },
-    });
-
-    const {
-      data: { user },
-      error: userError,
-    } = await userClient.auth.getUser();
-
-    if (userError || !user) {
-      return jsonResponse(401, { error: "Unauthorized" });
-    }
-
-    const { data: profile, error: profileError } = await userClient
-      .from("profiles")
-      .select("role, auth_email")
-      .eq("id", user.id)
-      .single();
-
-    if (profileError || profile?.role !== "super_admin") {
-      return jsonResponse(403, { error: "Access denied" });
     }
 
     const { data: rateLimit, error: rateLimitError } = await adminClient.rpc("consume_rate_limit", {
@@ -420,11 +570,11 @@ serve(async (req) => {
 
     const writeAudit = async (actionType: string, metadata: Record<string, unknown>) => {
       await adminClient.from("super_admin_audit_logs").insert({
-        actor_id: user.id,
-        actor_email: profile.auth_email ?? user.email ?? null,
+        actor_id: context.userId,
+        actor_email: context.userEmail,
         action_type: actionType,
         target_type: "super_admin_auth",
-        target_id: user.id,
+        target_id: context.userId,
         metadata,
       });
     };
@@ -433,7 +583,7 @@ serve(async (req) => {
       const { data: latestChallenge } = await adminClient
         .from("super_admin_email_challenges")
         .select("id, created_at, used_at, expires_at")
-        .eq("user_id", user.id)
+        .eq("user_id", context.userId)
         .eq("purpose", "super_admin_login")
         .order("created_at", { ascending: false })
         .limit(1)
@@ -447,26 +597,26 @@ serve(async (req) => {
         return jsonResponse(429, { error: "A code was just sent. Please wait before requesting another." });
       }
 
-      const recipientEmail = profile.auth_email ?? user.email ?? "";
+      const recipientEmail = context.userEmail ?? "";
       if (!recipientEmail) {
         return jsonResponse(400, { error: "Missing recipient email." });
       }
 
       const code = createCode();
-      const codeHash = await digest(`${user.id}:${code}`);
+      const codeHash = await digest(`${context.userId}:${code}`);
       const expiresAt = new Date(Date.now() + CHALLENGE_TTL_MS).toISOString();
 
       await adminClient
         .from("super_admin_email_challenges")
         .update({ used_at: new Date().toISOString() })
-        .eq("user_id", user.id)
+        .eq("user_id", context.userId)
         .eq("purpose", "super_admin_login")
         .is("used_at", null);
 
       const { error: insertError } = await adminClient
         .from("super_admin_email_challenges")
         .insert({
-          user_id: user.id,
+          user_id: context.userId,
           email: recipientEmail,
           purpose: "super_admin_login",
           code_hash: codeHash,
@@ -474,13 +624,13 @@ serve(async (req) => {
         });
 
       if (insertError) {
-        logError("super-auth-verify challenge insert failed", requestId, insertError, { user_id: user.id });
+        logError("super-auth-verify challenge insert failed", requestId, insertError, { user_id: context.userId });
         return jsonResponse(500, { error: "Unable to start verification." });
       }
 
       await sendSuperAdminTwoFactorEmail(adminClient, resendApiKey, {
         requestId,
-        triggeredByUserId: user.id,
+        triggeredByUserId: context.userId,
         resend: body.action === "resend_email_challenge",
       }, {
         to_email: recipientEmail,
@@ -493,11 +643,12 @@ serve(async (req) => {
         body.action === "resend_email_challenge" ? "super_admin_2fa_resent" : "super_admin_2fa_started",
         { expires_at: expiresAt },
       );
-      logInfo("super-auth-verify challenge started", requestId, { user_id: user.id });
+      logInfo("super-auth-verify challenge started", requestId, { user_id: context.userId });
       return jsonResponse(200, {
         challenge_started: true,
         email: recipientEmail,
         expires_at: expiresAt,
+        ...(challengeToken ? { challenge_token: challengeToken } : {}),
       });
     }
 
@@ -510,7 +661,7 @@ serve(async (req) => {
       const { data: challenge, error: challengeError } = await adminClient
         .from("super_admin_email_challenges")
         .select("id, user_id, email, code_hash, purpose, expires_at, used_at, attempt_count, created_at")
-        .eq("user_id", user.id)
+        .eq("user_id", context.userId)
         .eq("purpose", "super_admin_login")
         .is("used_at", null)
         .order("created_at", { ascending: false })
@@ -518,7 +669,7 @@ serve(async (req) => {
         .maybeSingle();
 
       if (challengeError) {
-        logError("super-auth-verify challenge lookup failed", requestId, challengeError, { user_id: user.id });
+        logError("super-auth-verify challenge lookup failed", requestId, challengeError, { user_id: context.userId });
         return jsonResponse(500, { error: "Unable to verify code." });
       }
 
@@ -541,7 +692,7 @@ serve(async (req) => {
         return jsonResponse(400, { error: "Verification code locked. Request a new code." });
       }
 
-      const submittedHash = await digest(`${user.id}:${code}`);
+      const submittedHash = await digest(`${context.userId}:${code}`);
       if (submittedHash !== activeChallenge.code_hash) {
         const nextAttempts = activeChallenge.attempt_count + 1;
         await adminClient
@@ -569,15 +720,19 @@ serve(async (req) => {
         .eq("id", activeChallenge.id);
 
       await registerPrivilegedStepUp(adminClient, {
-        userId: user.id,
+        userId: context.userId,
         roleScope: "super_admin",
-        authToken,
+        authToken: context.authToken,
         source: "super_admin_email_challenge",
       });
 
       await writeAudit("super_admin_2fa_verified", {});
-      logInfo("super-auth-verify challenge verified", requestId, { user_id: user.id });
-      return jsonResponse(200, { verified: true });
+      logInfo("super-auth-verify challenge verified", requestId, { user_id: context.userId });
+      return jsonResponse(200, {
+        verified: true,
+        access_token: context.pendingSession?.access_token ?? null,
+        refresh_token: context.pendingSession?.refresh_token ?? null,
+      });
     }
 
     return jsonResponse(400, { error: "Invalid action" });

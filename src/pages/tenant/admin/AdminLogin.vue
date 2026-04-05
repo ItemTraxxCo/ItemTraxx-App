@@ -63,9 +63,8 @@
 
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from "vue";
-import { RouterLink, useRouter } from "vue-router";
+import { RouterLink } from "vue-router";
 import {
-  adminLoginWithSession,
   createDistrictAdminSessionHandoff,
 } from "../../../services/authService";
 import { logAdminAction } from "../../../services/auditLogService";
@@ -73,7 +72,6 @@ import { useTurnstile } from "../../../composables/useTurnstile";
 import { clearAdminVerification } from "../../../store/authState";
 import { buildDistrictAppHandoffUrl } from "../../../services/districtService";
 
-const router = useRouter();
 const themeMode = ref<"light" | "dark">("dark");
 const email = ref("");
 const password = ref("");
@@ -158,27 +156,19 @@ const handleAdminLogin = async () => {
       password.value,
       turnstileToken.value ?? ""
     );
-    if (!handoff.rootOnly && handoff.tokenHash && handoff.districtSlug) {
-      const targetPath =
-        handoff.role === "district_admin" ? "/district" : "/tenant/admin";
-      window.location.replace(
-        buildDistrictAppHandoffUrl(handoff.districtSlug, targetPath, {
-          tokenHash: handoff.tokenHash,
-          loginMethod: "password",
-          loginLocation: "admin_login",
-        })
-      );
-      return;
-    }
-    if (!handoff.accessToken || !handoff.refreshToken) {
+    if (!handoff.tokenHash || !handoff.districtSlug) {
       throw new Error("Unable to prepare district sign-in.");
     }
-    const session = await adminLoginWithSession(handoff.accessToken, handoff.refreshToken, {
-      loginMethod: "password",
-      loginLocation: "admin_login",
-    });
+    const targetPath =
+      handoff.role === "district_admin" ? "/district" : "/tenant/admin";
     devLog("auth_request_success");
-    await router.push(session?.role === "district_admin" ? "/district" : "/tenant/admin");
+    window.location.replace(
+      buildDistrictAppHandoffUrl(handoff.districtSlug, targetPath, {
+        tokenHash: handoff.tokenHash,
+        loginMethod: "password",
+        loginLocation: "admin_login",
+      })
+    );
     void logAdminAction({
       action_type: "admin_login",
       metadata: { email: email.value.trim() },

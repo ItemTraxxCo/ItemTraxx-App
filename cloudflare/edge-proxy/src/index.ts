@@ -3,6 +3,7 @@ export interface Env {
   SUPABASE_ANON_KEY: string;
   ALLOWED_ORIGINS?: string;
   ALLOWED_FUNCTIONS?: string;
+  TRUST_LOCAL_ORIGINS?: string;
   ITX_ITEMTRAXX_KILLSWITCH_ENABLED?: string;
   SESSION_COOKIE_DOMAIN?: string;
   SENTRY_DSN?: string;
@@ -17,7 +18,7 @@ const REFRESH_TOKEN_MAX_AGE_SECONDS = 60 * 60 * 24 * 30;
 
 const BASE_CORS_HEADERS = {
   "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-request-id, prefer",
+    "authorization, x-client-info, apikey, content-type, x-request-id, prefer, x-itx-session-request",
   "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
   "Access-Control-Allow-Credentials": "true",
   "Access-Control-Expose-Headers": "content-range, content-profile, x-request-id",
@@ -30,7 +31,6 @@ const DEFAULT_ALLOWED_ORIGINS = [
   "https://internal.itemtraxx.com",
   "https://app.itemtraxx.com",
   "https://*.app.itemtraxx.com",
-  "https://*.vercel.app",
 ];
 
 type SessionCookies = {
@@ -260,25 +260,40 @@ const matchesWildcardOrigin = (origin: string, candidate: string) => {
   }
 };
 
-const isAllowedOrigin = (origin: string | null, allowedOrigins: string[]) => {
+const shouldTrustLocalOrigins = (env: Env) =>
+  (env.TRUST_LOCAL_ORIGINS ?? "").trim().toLowerCase() === "true";
+
+const isAllowedOrigin = (origin: string | null, allowedOrigins: string[], env: Env) => {
   if (!origin) {
     return false;
   }
 
-  if (isLocalhostOrigin(origin)) {
+  if (shouldTrustLocalOrigins(env) && isLocalhostOrigin(origin)) {
     return true;
   }
 
   return allowedOrigins.some((candidate) => candidate === origin || matchesWildcardOrigin(origin, candidate));
 };
 
-const withCorsHeaders = (origin: string | null, allowedOrigins: string[]) => {
+const withCorsHeaders = (origin: string | null, allowedOrigins: string[], env: Env) => {
   const originAllowed =
-    !origin || allowedOrigins.length === 0 || isAllowedOrigin(origin, allowedOrigins);
+    !origin || allowedOrigins.length === 0 || isAllowedOrigin(origin, allowedOrigins, env);
   const headers = origin && originAllowed
     ? { ...BASE_CORS_HEADERS, ...(origin ? { "Access-Control-Allow-Origin": origin } : {}) }
     : { ...BASE_CORS_HEADERS };
   return { originAllowed, headers };
+};
+
+const resolveRequestOrigin = (request: Request) => {
+  const origin = request.headers.get("Origin");
+  if (origin) return origin;
+  const referer = request.headers.get("Referer");
+  if (!referer) return null;
+  try {
+    return new URL(referer).origin;
+  } catch {
+    return null;
+  }
 };
 
 const buildError = (
@@ -830,20 +845,44 @@ const handleSessionLogout = async (
   return buildJson(200, { ok: true }, headers, requestId, responseHeaders);
 };
 
+const validateSessionMutationRequest = (
+  request: Request,
+  env: Env,
+  allowedOrigins: string[],
+  headers: Record<string, string>,
+  requestId: string
+) => {
+  const requestOrigin = resolveRequestOrigin(request);
+  if (!requestOrigin || !isAllowedOrigin(requestOrigin, allowedOrigins, env)) {
+    return buildError(403, "Origin not allowed", headers, requestId);
+  }
+  if (request.headers.get("x-itx-session-request") !== "1") {
+    return buildError(400, "Invalid session request", headers, requestId);
+  }
+  return null;
+};
+
 const handleSessionRequest = async (
   request: Request,
   env: Env,
   headers: Record<string, string>,
   requestId: string,
-  action: string
+  action: string,
+  allowedOrigins: string[]
 ) => {
   if (action === "exchange" && request.method === "POST") {
+    const error = validateSessionMutationRequest(request, env, allowedOrigins, headers, requestId);
+    if (error) return error;
     return handleSessionExchange(request, env, headers, requestId);
   }
   if (action === "refresh" && request.method === "POST") {
+    const error = validateSessionMutationRequest(request, env, allowedOrigins, headers, requestId);
+    if (error) return error;
     return handleSessionRefresh(request, env, headers, requestId);
   }
   if (action === "logout" && request.method === "POST") {
+    const error = validateSessionMutationRequest(request, env, allowedOrigins, headers, requestId);
+    if (error) return error;
     return handleSessionLogout(request, env, headers, requestId);
   }
   if (action === "me" && request.method === "GET") {
@@ -862,7 +901,7 @@ export default {
     const allowedOrigins = Array.from(
       new Set([...DEFAULT_ALLOWED_ORIGINS, ...parseCsv(env.ALLOWED_ORIGINS)])
     );
-    const { originAllowed, headers } = withCorsHeaders(origin, allowedOrigins);
+    const { originAllowed, headers } = withCorsHeaders(origin, allowedOrigins, env);
 
     try {
       if (request.method === "OPTIONS") {
@@ -884,7 +923,7 @@ export default {
 
       const sessionAction = getSessionAction(url.pathname);
       if (sessionAction) {
-        const response = await handleSessionRequest(request, env, headers, requestId, sessionAction);
+        const response = await handleSessionRequest(request, env, headers, requestId, sessionAction, allowedOrigins);
         maybeReportWorkerResponse(env, request, requestId, response, ctx, { type: "session", action: sessionAction });
         return response;
       }

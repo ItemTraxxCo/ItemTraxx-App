@@ -112,10 +112,12 @@ to authenticated
 using (
   public.current_user_role() = 'tenant_admin'
   and tenant_id = public.current_tenant_id()
+  and public.has_recent_privileged_step_up('tenant_admin')
 )
 with check (
   public.current_user_role() = 'tenant_admin'
   and tenant_id = public.current_tenant_id()
+  and public.has_recent_privileged_step_up('tenant_admin')
 );
 
 drop policy if exists "super_admin_all_students" on public.students;
@@ -146,10 +148,12 @@ to authenticated
 using (
   public.current_user_role() = 'tenant_admin'
   and tenant_id = public.current_tenant_id()
+  and public.has_recent_privileged_step_up('tenant_admin')
 )
 with check (
   public.current_user_role() = 'tenant_admin'
   and tenant_id = public.current_tenant_id()
+  and public.has_recent_privileged_step_up('tenant_admin')
 );
 
 drop policy if exists "super_admin_all_gear" on public.gear;
@@ -180,6 +184,7 @@ to authenticated
 with check (
   public.current_user_role() = 'tenant_admin'
   and tenant_id = public.current_tenant_id()
+  and public.has_recent_privileged_step_up('tenant_admin')
 );
 
 drop policy if exists "super_admin_all_gear_logs" on public.gear_logs;
@@ -210,6 +215,7 @@ to authenticated
 with check (
   public.current_user_role() = 'tenant_admin'
   and tenant_id = public.current_tenant_id()
+  and public.has_recent_privileged_step_up('tenant_admin')
 );
 
 drop policy if exists "super_admin_all_admin_audit_logs" on public.admin_audit_logs;
@@ -240,10 +246,12 @@ to authenticated
 using (
   public.current_user_role() = 'tenant_admin'
   and tenant_id = public.current_tenant_id()
+  and public.has_recent_privileged_step_up('tenant_admin')
 )
 with check (
   public.current_user_role() = 'tenant_admin'
   and tenant_id = public.current_tenant_id()
+  and public.has_recent_privileged_step_up('tenant_admin')
 );
 
 drop policy if exists "super_admin_all_tenant_policies" on public.tenant_policies;
@@ -294,6 +302,7 @@ to authenticated
 with check (
   public.current_user_role() = 'tenant_admin'
   and tenant_id = public.current_tenant_id()
+  and public.has_recent_privileged_step_up('tenant_admin')
 );
 
 drop policy if exists "super_admin_all_gear_status_history" on public.gear_status_history;

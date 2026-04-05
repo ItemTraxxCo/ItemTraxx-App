@@ -15,6 +15,15 @@ export type FatalErrorReportDraft = {
 const truncate = (value: string | undefined, max: number) =>
   (value ?? "").trim().slice(0, max);
 
+const getSafePageUrl = () => {
+  if (typeof window === "undefined") return "";
+  try {
+    return `${window.location.origin}${window.location.pathname}${window.location.search}`;
+  } catch {
+    return window.location.pathname || "";
+  }
+};
+
 export const sendClientErrorReport = async (draft: FatalErrorReportDraft) => {
   const auth = getAuthState();
   const district = getDistrictState();
@@ -30,7 +39,7 @@ export const sendClientErrorReport = async (draft: FatalErrorReportDraft) => {
       stack: truncate(draft.stack, 6000),
       context: truncate(draft.context, 400),
       page: {
-        url: typeof window !== "undefined" ? window.location.href : "",
+        url: getSafePageUrl(),
         user_agent: typeof navigator !== "undefined" ? navigator.userAgent : "",
         environment: import.meta.env.VITE_SENTRY_ENVIRONMENT || import.meta.env.MODE,
         release: import.meta.env.VITE_GIT_COMMIT || "n/a",

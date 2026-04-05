@@ -77,6 +77,7 @@
 import { computed, onMounted, onUnmounted, ref } from "vue";
 import { RouterLink, useRouter } from "vue-router";
 import {
+  getPendingSuperAdminChallengeToken,
   clearPendingSuperAdminVerificationEmail,
   getPendingSuperAdminVerificationEmail,
   signOut,
@@ -279,7 +280,11 @@ onMounted(() => {
   });
 
   const pendingEmail = getPendingSuperAdminVerificationEmail();
-  if (pendingEmail || (auth.isAuthenticated && auth.role === "super_admin" && !auth.hasSecondaryAuth)) {
+  const pendingChallengeToken = getPendingSuperAdminChallengeToken();
+  if (
+    (pendingEmail && pendingChallengeToken) ||
+    (auth.isAuthenticated && auth.role === "super_admin" && !auth.hasSecondaryAuth)
+  ) {
     enableCodeStep(pendingEmail ?? auth.email);
   }
 });

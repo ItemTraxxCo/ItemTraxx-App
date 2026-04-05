@@ -3,6 +3,7 @@ import { createClient, type SupabaseClient } from "https://esm.sh/@supabase/supa
 import { sendLoggedResendEmail } from "../_shared/emailDeliveryLog.ts";
 import { isKillSwitchWriteBlocked } from "../_shared/killSwitch.ts";
 import { getRequestId, logError, logInfo } from "../_shared/observability.ts";
+import { isAllowedOrigin, parseAllowedOrigins } from "../_shared/cors.ts";
 
 type AsyncJobRow = {
   id: string;
@@ -88,14 +89,11 @@ const baseCorsHeaders = {
 
 const resolveCorsHeaders = (req: Request) => {
   const origin = req.headers.get("Origin");
-  const allowedOrigins = (Deno.env.get("ITX_ALLOWED_ORIGINS") ?? "")
-    .split(",")
-    .map((item) => item.trim())
-    .filter((item) => item.length > 0);
+  const allowedOrigins = parseAllowedOrigins(Deno.env.get("ITX_ALLOWED_ORIGINS"));
 
   const hasOrigin = !!origin;
   const originAllowed =
-    !hasOrigin || (hasOrigin && allowedOrigins.includes(origin as string));
+    !hasOrigin || (hasOrigin && isAllowedOrigin(origin as string, allowedOrigins));
 
   const headers =
     hasOrigin && originAllowed
@@ -107,10 +105,23 @@ const resolveCorsHeaders = (req: Request) => {
 
 const parseBearerToken = (value: string) => value.trim().replace(/^Bearer\s+/i, "").trim();
 
+const timingSafeEqual = (left: string, right: string) => {
+  const leftBytes = new TextEncoder().encode(left);
+  const rightBytes = new TextEncoder().encode(right);
+  const maxLength = Math.max(leftBytes.length, rightBytes.length);
+  let diff = leftBytes.length ^ rightBytes.length;
+
+  for (let index = 0; index < maxLength; index += 1) {
+    diff |= (leftBytes[index] ?? 0) ^ (rightBytes[index] ?? 0);
+  }
+
+  return diff === 0;
+};
+
 const isAuthorizedWorkerRequest = (authorizationHeader: string, workerSecret: string) => {
   const providedToken = parseBearerToken(authorizationHeader);
   const expectedToken = parseBearerToken(workerSecret);
-  return !!providedToken && !!expectedToken && providedToken === expectedToken;
+  return !!providedToken && !!expectedToken && timingSafeEqual(providedToken, expectedToken);
 };
 
 const sendTrackedResendEmail = async (

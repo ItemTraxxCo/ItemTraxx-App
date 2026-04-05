@@ -5,6 +5,7 @@ import {
   hasPrivilegedStepUp,
   isMissingPrivilegedStepUpTable,
 } from "../_shared/privilegedStepUp.ts";
+import { isAllowedOrigin, parseAllowedOrigins } from "../_shared/cors.ts";
 
 const baseCorsHeaders = {
   "Access-Control-Allow-Headers":
@@ -22,14 +23,11 @@ const lower = (value: string | null | undefined) => (value ?? "").toLowerCase();
 
 const resolveCorsHeaders = (req: Request) => {
   const origin = req.headers.get("Origin");
-  const allowedOrigins = (Deno.env.get("ITX_ALLOWED_ORIGINS") ?? "")
-    .split(",")
-    .map((item) => item.trim())
-    .filter((item) => item.length > 0);
+  const allowedOrigins = parseAllowedOrigins(Deno.env.get("ITX_ALLOWED_ORIGINS"));
 
   const hasOrigin = !!origin;
   const originAllowed =
-    !hasOrigin || (hasOrigin && allowedOrigins.includes(origin as string));
+    !hasOrigin || (hasOrigin && isAllowedOrigin(origin as string, allowedOrigins));
 
   const headers =
     hasOrigin && originAllowed
@@ -42,9 +40,8 @@ const resolveCorsHeaders = (req: Request) => {
 const resolveResetRedirectTo = (req: Request) => {
   const configured = (Deno.env.get("ITX_PASSWORD_RESET_REDIRECT_URL") ?? "").trim();
   if (configured) return configured;
-  const origin = (req.headers.get("origin") ?? "").trim();
-  if (!origin) return undefined;
-  return `${origin.replace(/\/+$/, "")}/tenant/admin-login`;
+  console.error("tenant-admin-mutate missing ITX_PASSWORD_RESET_REDIRECT_URL");
+  return null;
 };
 
 const randomPassword = () => `${crypto.randomUUID()}-Aa1!`;
@@ -314,9 +311,16 @@ serve(async (req) => {
       }
 
       const redirectTo = resolveResetRedirectTo(req);
+      if (!redirectTo) {
+        await adminClient.from("profiles").delete().eq("id", userId);
+        await adminClient.auth.admin.deleteUser(userId);
+        return jsonResponse(500, {
+          error: "Password reset redirect is not configured.",
+        });
+      }
       const { error: resetError } = await adminClient.auth.resetPasswordForEmail(
         authEmail,
-        redirectTo ? { redirectTo } : undefined
+        { redirectTo }
       );
 
       if (resetError) {
@@ -478,9 +482,14 @@ serve(async (req) => {
       }
 
       const redirectTo = resolveResetRedirectTo(req);
+      if (!redirectTo) {
+        return jsonResponse(500, {
+          error: "Password reset redirect is not configured.",
+        });
+      }
       const { error: resetError } = await adminClient.auth.resetPasswordForEmail(
         target.auth_email,
-        redirectTo ? { redirectTo } : undefined
+        { redirectTo }
       );
 
       if (resetError) {

@@ -66,7 +66,8 @@ const SUPER_ADMIN_2FA_FUNCTION = normalizeFunctionTarget(
   import.meta.env.VITE_SUPER_ADMIN_2FA_FUNCTION,
   "super-auth-verify"
 );
-const SUPER_ADMIN_2FA_PENDING_EMAIL_KEY = "itemtraxx:super-admin-2fa-email";
+let pendingSuperAdminVerificationEmail: string | null = null;
+let pendingSuperAdminChallengeToken: string | null = null;
 
 const sendLoginNotification = (accessToken: string | null) => {
   if (!accessToken) return;
@@ -88,37 +89,32 @@ const sendLoginNotification = (accessToken: string | null) => {
 
 
 const setPendingSuperAdminVerificationEmail = (email: string | null) => {
-  if (typeof window === "undefined") return;
-  try {
-    if (email) {
-      window.sessionStorage.setItem(SUPER_ADMIN_2FA_PENDING_EMAIL_KEY, email);
-    } else {
-      window.sessionStorage.removeItem(SUPER_ADMIN_2FA_PENDING_EMAIL_KEY);
-    }
-  } catch {
-    // Ignore sessionStorage failures.
-  }
+  pendingSuperAdminVerificationEmail = email;
 };
 
-export const getPendingSuperAdminVerificationEmail = () => {
-  if (typeof window === "undefined") return null;
-  try {
-    return window.sessionStorage.getItem(SUPER_ADMIN_2FA_PENDING_EMAIL_KEY);
-  } catch {
-    return null;
-  }
+const setPendingSuperAdminChallengeToken = (challengeToken: string | null) => {
+  pendingSuperAdminChallengeToken = challengeToken;
 };
+
+export const getPendingSuperAdminChallengeToken = () => pendingSuperAdminChallengeToken;
+
+export const getPendingSuperAdminVerificationEmail = () => pendingSuperAdminVerificationEmail;
 
 export const clearPendingSuperAdminVerificationEmail = () => {
   setPendingSuperAdminVerificationEmail(null);
+  setPendingSuperAdminChallengeToken(null);
 };
 
 export const resendSuperAdminEmailChallenge = async () => {
+  const challengeToken = getPendingSuperAdminChallengeToken();
+  if (!challengeToken) {
+    throw new Error("Verification session expired. Sign in again.");
+  }
   const result = await invokeEdgeFunction<{ challenge_started?: boolean; email?: string | null }>(
     SUPER_ADMIN_2FA_FUNCTION,
     {
       method: "POST",
-      body: { action: "resend_email_challenge" },
+      body: { action: "resend_email_challenge", payload: { challenge_token: challengeToken } },
     }
   );
 
@@ -132,18 +128,36 @@ export const resendSuperAdminEmailChallenge = async () => {
 };
 
 export const verifySuperAdminEmailChallenge = async (code: string) => {
-  const result = await invokeEdgeFunction<{ verified?: boolean }>(SUPER_ADMIN_2FA_FUNCTION, {
+  const challengeToken = getPendingSuperAdminChallengeToken();
+  if (!challengeToken) {
+    throw new Error("Verification session expired. Sign in again.");
+  }
+
+  const result = await invokeEdgeFunction<{
+    verified?: boolean;
+    access_token?: string | null;
+    refresh_token?: string | null;
+  }>(SUPER_ADMIN_2FA_FUNCTION, {
     method: "POST",
     body: {
       action: "verify_email_challenge",
-      payload: { code },
+      payload: { code, challenge_token: challengeToken },
     },
   });
 
-  if (!result.ok || !result.data?.verified) {
+  if (
+    !result.ok ||
+    !result.data?.verified ||
+    !result.data.access_token ||
+    !result.data.refresh_token
+  ) {
     throw edgeFunctionError(result, "Unable to verify code.");
   }
 
+  await exchangeHttpSession({
+    access_token: result.data.access_token,
+    refresh_token: result.data.refresh_token,
+  });
   setSecondaryAuth(true);
   await refreshAuthFromSession();
   const current = getAuthState();
@@ -694,9 +708,6 @@ export const createDistrictAdminSessionHandoff = async (
     {
       district_slug?: string | null;
       role?: "tenant_admin" | "district_admin";
-      root_only?: boolean;
-      access_token?: string | null;
-      refresh_token?: string | null;
       hashed_token?: string | null;
     },
     {
@@ -716,17 +727,6 @@ export const createDistrictAdminSessionHandoff = async (
       current_district_slug: district.isDistrictHost ? district.slug ?? undefined : undefined,
     },
   });
-
-  if (result.ok && result.data?.root_only) {
-    return {
-      districtSlug: null,
-      role: result.data.role ?? "tenant_admin",
-      rootOnly: true,
-      accessToken: result.data.access_token ?? null,
-      refreshToken: result.data.refresh_token ?? null,
-      tokenHash: null,
-    };
-  }
 
   if (
     !result.ok ||
@@ -752,9 +752,6 @@ export const createDistrictAdminSessionHandoff = async (
   return {
     districtSlug: result.data.district_slug,
     role: result.data.role,
-    rootOnly: false,
-    accessToken: null,
-    refreshToken: null,
     tokenHash: result.data.hashed_token,
   };
 };
@@ -909,8 +906,7 @@ export const superAdminLogin = async (
   const result = await invokeEdgeFunction<{
     challenge_started?: boolean;
     email?: string | null;
-    access_token?: string | null;
-    refresh_token?: string | null;
+    challenge_token?: string | null;
   }>(SUPER_ADMIN_2FA_FUNCTION, {
     method: "POST",
     body: {
@@ -926,25 +922,15 @@ export const superAdminLogin = async (
   if (
     !result.ok ||
     !result.data?.challenge_started ||
-    !result.data.access_token ||
-    !result.data.refresh_token
+    !result.data.challenge_token
   ) {
     throw edgeFunctionError(result, "Unable to send verification code.");
   }
 
-  await exchangeHttpSession({
-    access_token: result.data.access_token,
-    refresh_token: result.data.refresh_token,
-  });
   await clearLocalSession();
-  await refreshAuthFromSession();
-  const current = getAuthState();
-  if (current.role !== "super_admin") {
-    await signOut();
-    throw new Error("Access denied.");
-  }
-
   setSecondaryAuth(false);
+  clearAuthState(true);
+  setPendingSuperAdminChallengeToken(result.data.challenge_token);
   const challenge = { email: result.data.email ?? email };
   setPendingSuperAdminVerificationEmail(challenge.email);
   return {

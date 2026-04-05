@@ -213,7 +213,9 @@ const fetchCurrentRoleAndTenant = async () => {
     withRetry(
       () =>
         withTimeout(
-          authenticatedRpc<string | null>("current_user_role", {}),
+          authenticatedRpc<string | null>("current_user_role", {}, {
+            suppressUnauthorizedRecovery: true,
+          }),
           AUTH_QUERY_TIMEOUT_MS,
           "Role lookup timed out."
         ),
@@ -222,7 +224,9 @@ const fetchCurrentRoleAndTenant = async () => {
     withRetry(
       () =>
         withTimeout(
-          authenticatedRpc<string | null>("current_tenant_id", {}),
+          authenticatedRpc<string | null>("current_tenant_id", {}, {
+            suppressUnauthorizedRecovery: true,
+          }),
           AUTH_QUERY_TIMEOUT_MS,
           "Tenant lookup timed out."
         ),
@@ -247,6 +251,8 @@ const fetchProfile = async (userId: string): Promise<ProfileRow | null> => {
             select: "id,role,tenant_id,district_id,auth_email,is_active",
             id: `eq.${userId}`,
             limit: "1",
+          }, {
+            suppressUnauthorizedRecovery: true,
           }),
           AUTH_QUERY_TIMEOUT_MS,
           "Profile lookup timed out."
@@ -295,6 +301,8 @@ const fetchTenantContext = async (tenantId: string): Promise<TenantRow | null> =
             select: "id,status,district_id",
             id: `eq.${tenantId}`,
             limit: "1",
+          }, {
+            suppressUnauthorizedRecovery: true,
           }),
           AUTH_QUERY_TIMEOUT_MS,
           "Tenant status lookup timed out."

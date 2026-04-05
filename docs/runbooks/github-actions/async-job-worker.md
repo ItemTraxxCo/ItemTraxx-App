@@ -15,6 +15,7 @@ Runs the production async job worker on a schedule or manually.
 - Calls `https://mlaspkufocikfcbjgpof.supabase.co/functions/v1/job-worker`
 - Sends `{"limit":30,"run_reporting_refresh":true}`
 - Uses the shared Slack status workflow for start/finish notifications
+- When the global kill switch is active, the worker now short-circuits with a 200 response and skips processing/refresh to avoid noisy workflow failures.
 
 ## Failure Handling
 Check the `process-jobs` step first. Common failures are invalid worker secret or job-worker function errors.

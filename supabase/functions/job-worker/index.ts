@@ -904,10 +904,6 @@ serve(async (req) => {
     return jsonResponse(403, { error: "Origin not allowed" });
   }
 
-  if (isKillSwitchWriteBlocked(req)) {
-    return jsonResponse(503, { error: "Unfortunately ItemTraxx is currently unavailable." });
-  }
-
   if (req.method !== "POST") {
     return jsonResponse(405, { error: "Method not allowed" });
   }
@@ -943,6 +939,23 @@ serve(async (req) => {
       limit?: number;
       run_reporting_refresh?: boolean;
     };
+
+    if (isKillSwitchWriteBlocked(req)) {
+      logInfo("job-worker skipped due to kill switch", requestId, {
+        run_reporting_refresh: body.run_reporting_refresh === true,
+      });
+      return jsonResponse(200, {
+        data: {
+          claimed: 0,
+          completed: 0,
+          failed: 0,
+          reporting_refreshed: false,
+        },
+        kill_switch_active: true,
+        message: "Job worker skipped because kill switch is active.",
+      });
+    }
+
     const limit = Math.max(1, Math.min(50, Number(body.limit ?? 20) || 20));
     const workerId = crypto.randomUUID();
 

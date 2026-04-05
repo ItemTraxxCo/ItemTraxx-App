@@ -190,6 +190,7 @@ const mountApp = async () => {
   const { installAppErrorRecovery } = await import("./services/appErrorRecovery");
   installAppErrorRecovery(router);
   app.use(router);
+  await router.isReady();
   app.mount("#app");
   captureInitialPerfMetrics();
   attachE2EControls();

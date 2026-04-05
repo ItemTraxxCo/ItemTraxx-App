@@ -359,12 +359,19 @@ const onboardingEvaluationDone = ref(false);
 const offlineQueueCount = ref(0);
 const sessionTermination = getSessionTerminationState();
 
-const ADMIN_IDLE_TIMEOUT_MINUTES = Number(import.meta.env.VITE_ADMIN_IDLE_TIMEOUT_MINUTES || 20);
-const ADMIN_IDLE_TIMEOUT_MS =
-  Number.isFinite(ADMIN_IDLE_TIMEOUT_MINUTES) && ADMIN_IDLE_TIMEOUT_MINUTES > 0
-    ? ADMIN_IDLE_TIMEOUT_MINUTES * 60 * 1000
-    : 20 * 60 * 1000;
 const IS_E2E_TEST_MODE = import.meta.env.VITE_E2E_TEST_UTILS === "true";
+const DEFAULT_ADMIN_IDLE_TIMEOUT_MINUTES = 20;
+const MIN_ADMIN_IDLE_TIMEOUT_MINUTES = 5;
+const parsedAdminIdleTimeoutMinutes = Number(
+  import.meta.env.VITE_ADMIN_IDLE_TIMEOUT_MINUTES || DEFAULT_ADMIN_IDLE_TIMEOUT_MINUTES
+);
+const effectiveAdminIdleTimeoutMinutes =
+  Number.isFinite(parsedAdminIdleTimeoutMinutes) && parsedAdminIdleTimeoutMinutes > 0
+    ? IS_E2E_TEST_MODE
+      ? parsedAdminIdleTimeoutMinutes
+      : Math.max(parsedAdminIdleTimeoutMinutes, MIN_ADMIN_IDLE_TIMEOUT_MINUTES)
+    : DEFAULT_ADMIN_IDLE_TIMEOUT_MINUTES;
+const ADMIN_IDLE_TIMEOUT_MS = effectiveAdminIdleTimeoutMinutes * 60 * 1000;
 
 const GITHUB_HEAD_COMMIT_API =
   "https://api.github.com/repos/ItemTraxxCo/ItemTraxx-App/commits/main";

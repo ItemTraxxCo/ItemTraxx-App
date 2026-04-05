@@ -91,4 +91,52 @@ test.describe("Auth edge cases", () => {
     await expect(page).toHaveURL(/\/tenant\/checkout$/);
     await expect(page).not.toHaveURL(/\/login$/);
   });
+
+  test("tenant admin does not bounce from admin home to checkout immediately", async ({ page }) => {
+    await page.route(/\/functions(?:\/v1)?\/admin-ops(?:\?.*)?$/, async (route) => {
+      const body = (route.request().postDataJSON() as { action?: string }) ?? {};
+      if (body.action === "validate_session") {
+        await route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: JSON.stringify({ data: { valid: true } }),
+        });
+        return;
+      }
+      if (body.action === "get_tenant_settings") {
+        await route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: JSON.stringify({
+            data: {
+              checkout_due_hours: 48,
+              account_category: "organization",
+              plan_code: "core",
+              feature_flags: {
+                enable_notifications: true,
+                enable_bulk_item_import: true,
+                enable_bulk_student_tools: true,
+                enable_status_tracking: true,
+                enable_barcode_generator: true,
+              },
+            },
+          }),
+        });
+        return;
+      }
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ data: { ok: true } }),
+      });
+    });
+
+    await page.goto("/");
+    await setTenantAdminSession(page, "tenant-e2e");
+    await navigateApp(page, "/tenant/admin");
+    await expect(page).toHaveURL(/\/tenant\/admin$/);
+    await page.waitForTimeout(6000);
+    await expect(page).toHaveURL(/\/tenant\/admin$/);
+    await expect(page).not.toHaveURL(/\/tenant\/checkout$/);
+  });
 });

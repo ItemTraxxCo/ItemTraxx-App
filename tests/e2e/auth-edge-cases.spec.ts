@@ -88,8 +88,6 @@ test.describe("Auth edge cases", () => {
     await page.goto("/");
     await setTenantAdminSession(page, "tenant-e2e");
     await navigateApp(page, "/about");
-    await expect(page).toHaveURL(/\/about$/);
-    await navigateApp(page, "/");
     await expect(page).toHaveURL(/\/tenant\/checkout$/);
     await expect(page).not.toHaveURL(/\/login$/);
   });

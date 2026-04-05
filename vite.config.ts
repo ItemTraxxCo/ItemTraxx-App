@@ -2,31 +2,22 @@ import { execSync } from "node:child_process";
 import { defineConfig, loadEnv } from "vite";
 import vue from "@vitejs/plugin-vue";
 
-const VERSION_REPO_URL = "https://github.com/ItemTraxxCo/ItemTraxx-App";
-
-const gitCommit = (() => {
-  try {
-    const lsRemote = execSync(`git ls-remote ${VERSION_REPO_URL} HEAD`)
-      .toString()
-      .trim();
-    const fullHash = lsRemote.split(/\s+/)[0] ?? "";
-    if (fullHash.length >= 7) {
-      return fullHash.slice(0, 7);
-    }
-  } catch {
-    // fallback to local repo hash below
+const resolveBuildCommit = (env: Record<string, string>) => {
+  const vercelCommit = env.VERCEL_GIT_COMMIT_SHA?.trim();
+  if (vercelCommit) {
+    return vercelCommit.slice(0, 7);
   }
-
   try {
     return execSync("git rev-parse --short HEAD").toString().trim();
   } catch {
     return "n/a";
   }
-})();
+};
 
 // https://vite.dev/config/
 export default defineConfig(({ mode, command }) => {
   const env = loadEnv(mode, process.cwd(), "");
+  const gitCommit = resolveBuildCommit(env);
 
   if (
     command === "build" &&

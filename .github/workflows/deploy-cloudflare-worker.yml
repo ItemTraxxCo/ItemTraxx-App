@@ -1,6 +1,7 @@
 name: Deploy Cloudflare Worker
 
 permissions:
+  actions: read
   contents: read
 
 on:

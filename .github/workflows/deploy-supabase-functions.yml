@@ -1,6 +1,7 @@
 name: Deploy Supabase Functions
 
 permissions:
+  actions: read
   contents: read
 
 on:

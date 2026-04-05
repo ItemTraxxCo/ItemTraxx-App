@@ -1,6 +1,7 @@
 name: Vercel Analytics Report
 
 permissions:
+  actions: read
   contents: read
 
 on:

@@ -1,6 +1,7 @@
 name: CI Core
 
 permissions:
+  actions: read
   contents: read
 
 on:

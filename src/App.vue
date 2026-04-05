@@ -371,7 +371,8 @@ const GITHUB_HEAD_COMMIT_API =
 
 const isDevSubdomainHost = computed(() => {
   if (typeof window === "undefined") return false;
-  return window.location.hostname.endsWith(".dev.itemtraxx.com");
+  const hostname = window.location.hostname.toLowerCase();
+  return hostname === "dev.itemtraxx.com" || hostname.endsWith(".dev.itemtraxx.com");
 });
 
 const themeLabel = computed(() =>

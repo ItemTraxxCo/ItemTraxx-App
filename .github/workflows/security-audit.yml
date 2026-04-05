@@ -1,6 +1,7 @@
 name: Security Audit
 
 permissions:
+  actions: read
   contents: read
 
 on:

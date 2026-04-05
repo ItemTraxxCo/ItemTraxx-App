@@ -756,32 +756,6 @@ export const createDistrictAdminSessionHandoff = async (
   };
 };
 
-export const completeTenantAdminTokenHashLogin = async (
-  tokenHash: string,
-  sessionTouchOptions: {
-    loginMethod?: "password" | "magic_link" | "session_handoff" | null;
-    loginLocation?: "regular_login" | "admin_login" | null;
-  } = {}
-) => {
-  const verifyResult = await supabase.auth.verifyOtp({
-    token_hash: tokenHash,
-    type: "magiclink",
-  });
-
-  if (
-    verifyResult.error ||
-    !verifyResult.data.session?.access_token ||
-    !verifyResult.data.session.refresh_token
-  ) {
-    throw new Error("Unable to complete district sign-in.");
-  }
-
-  return adminLoginWithSession(
-    verifyResult.data.session.access_token,
-    verifyResult.data.session.refresh_token,
-    sessionTouchOptions
-  );
-};
 
 export const adminLoginWithSession = async (
   accessToken: string,

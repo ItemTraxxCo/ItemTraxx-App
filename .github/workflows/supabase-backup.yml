@@ -1,6 +1,7 @@
 name: Supabase Backup
 
 permissions:
+  actions: read
   contents: read
 
 on:

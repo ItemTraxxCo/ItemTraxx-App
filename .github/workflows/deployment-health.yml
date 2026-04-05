@@ -1,6 +1,7 @@
 name: Deployment Health
 
 permissions:
+  actions: read
   contents: read
 
 on:

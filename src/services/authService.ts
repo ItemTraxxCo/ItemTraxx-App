@@ -21,6 +21,7 @@ import {
   clearHttpSession,
   exchangeHttpSession,
   fetchHttpSessionSummary,
+  type HttpSessionSummary,
 } from "./httpSessionService";
 import { authenticatedRpc, authenticatedSelect } from "./authenticatedDataClient";
 import { rotateDeviceSession } from "../utils/deviceSession";
@@ -560,6 +561,7 @@ export const consumeDistrictSessionHandoff = async (): Promise<
   | {
       accessToken: string;
       refreshToken: string;
+      sessionSummary: HttpSessionSummary | null;
       loginMethod: "password" | "magic_link" | "session_handoff" | null;
       loginLocation: "regular_login" | "admin_login" | null;
     }
@@ -623,7 +625,7 @@ export const consumeDistrictSessionHandoff = async (): Promise<
     const verifiedAccessToken = verifyResult.data.session.access_token;
     const verifiedRefreshToken = verifyResult.data.session.refresh_token;
 
-    await exchangeHttpSession({
+    const exchangedSessionSummary = await exchangeHttpSession({
       access_token: verifiedAccessToken,
       refresh_token: verifiedRefreshToken,
     });
@@ -642,6 +644,7 @@ export const consumeDistrictSessionHandoff = async (): Promise<
     return {
       accessToken: verifiedAccessToken,
       refreshToken: verifiedRefreshToken,
+      sessionSummary: exchangedSessionSummary ?? null,
       loginMethod,
       loginLocation,
     };
@@ -675,7 +678,7 @@ export const consumeDistrictSessionHandoff = async (): Promise<
     throw new Error("Unable to complete district sign-in.");
   }
 
-  await exchangeHttpSession({
+  const exchangedSessionSummary = await exchangeHttpSession({
     access_token: finalAccessToken,
     refresh_token: finalRefreshToken,
   });
@@ -694,6 +697,7 @@ export const consumeDistrictSessionHandoff = async (): Promise<
   return {
     accessToken: finalAccessToken,
     refreshToken: finalRefreshToken,
+    sessionSummary: exchangedSessionSummary ?? null,
     loginMethod,
     loginLocation,
   };
@@ -785,15 +789,22 @@ export const adminLoginWithSession = async (
   sessionTouchOptions: {
     loginMethod?: "password" | "magic_link" | "session_handoff" | null;
     loginLocation?: "regular_login" | "admin_login" | null;
+    skipExchange?: boolean;
+    skipLoginNotification?: boolean;
+    preExchangedSessionSummary?: HttpSessionSummary | null;
   } = {}
 ) => {
   const priorTenantContextId = getAuthState().tenantContextId;
   const districtHost = getDistrictState();
-  const exchangedSessionSummary = await exchangeHttpSession({
-    access_token: accessToken,
-    refresh_token: refreshToken,
-  });
-  await clearLocalSession();
+  const exchangedSessionSummary = sessionTouchOptions.skipExchange
+    ? sessionTouchOptions.preExchangedSessionSummary ?? null
+    : await exchangeHttpSession({
+        access_token: accessToken,
+        refresh_token: refreshToken,
+      });
+  if (!sessionTouchOptions.skipExchange) {
+    await clearLocalSession();
+  }
 
   const sessionSummary =
     exchangedSessionSummary?.authenticated && exchangedSessionSummary?.user
@@ -916,7 +927,9 @@ export const adminLoginWithSession = async (
   }
 
   markAdminVerified();
-  sendLoginNotification(accessToken);
+  if (!sessionTouchOptions.skipLoginNotification) {
+    sendLoginNotification(accessToken);
+  }
   const districtSlug = await resolveDistrictSlug(resolvedDistrictId ?? null);
   return {
     role: resolvedRole,

@@ -225,6 +225,9 @@ const bootstrap = async () => {
         {
           loginMethod: consumedDistrictHandoff.loginMethod,
           loginLocation: consumedDistrictHandoff.loginLocation,
+          skipExchange: true,
+          skipLoginNotification: true,
+          preExchangedSessionSummary: consumedDistrictHandoff.sessionSummary,
         }
       );
       if (session.role === "tenant_admin") {

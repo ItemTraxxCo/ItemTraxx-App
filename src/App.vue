@@ -372,7 +372,26 @@ const GITHUB_HEAD_COMMIT_API =
 const isDevSubdomainHost = computed(() => {
   if (typeof window === "undefined") return false;
   const hostname = window.location.hostname.toLowerCase();
-  return hostname === "dev.itemtraxx.com" || hostname.endsWith(".dev.itemtraxx.com");
+  if (hostname === "dev.itemtraxx.com" || hostname.endsWith(".dev.itemtraxx.com")) {
+    return true;
+  }
+  if (
+    hostname === "localhost" ||
+    hostname === "127.0.0.1" ||
+    hostname === "0.0.0.0" ||
+    hostname.endsWith(".localhost")
+  ) {
+    return true;
+  }
+  if (hostname.startsWith("192.168.") || hostname.startsWith("10.")) {
+    return true;
+  }
+  const match172 = hostname.match(/^172\.(\d{1,3})\./);
+  if (match172) {
+    const secondOctet = Number(match172[1]);
+    return Number.isFinite(secondOctet) && secondOctet >= 16 && secondOctet <= 31;
+  }
+  return false;
 });
 
 const themeLabel = computed(() =>

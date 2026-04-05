@@ -65,6 +65,7 @@
 import { computed, onMounted, onUnmounted, ref } from "vue";
 import { RouterLink } from "vue-router";
 import {
+  completeTenantAdminTokenHashLogin,
   createDistrictAdminSessionHandoff,
 } from "../../../services/authService";
 import { logAdminAction } from "../../../services/auditLogService";
@@ -156,7 +157,19 @@ const handleAdminLogin = async () => {
       password.value,
       turnstileToken.value ?? ""
     );
-    if (!handoff.tokenHash || !handoff.districtSlug) {
+    if (!handoff.tokenHash) {
+      throw new Error("Unable to prepare district sign-in.");
+    }
+    if (handoff.role === "tenant_admin" && !handoff.districtSlug) {
+      await completeTenantAdminTokenHashLogin(handoff.tokenHash, {
+        loginMethod: "password",
+        loginLocation: "admin_login",
+      });
+      devLog("auth_request_success_local_tenant_admin");
+      window.location.replace("/tenant/admin");
+      return;
+    }
+    if (!handoff.districtSlug) {
       throw new Error("Unable to prepare district sign-in.");
     }
     const targetPath =

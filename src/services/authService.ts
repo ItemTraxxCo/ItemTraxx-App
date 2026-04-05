@@ -5,6 +5,7 @@ import {
   clearAdminVerification,
   clearAuthState,
   getAuthState,
+  getPersistedAdminVerification,
   markAdminVerified,
   setDistrictContext,
   setAuthStateFromBackend,
@@ -362,6 +363,11 @@ const applySessionSummary = async (
     profile?.tenant_id ?? (isSameUser ? current.sessionTenantId : null);
   const isSuperRole = resolvedRole === "super_admin";
 
+  const persistedAdminVerifiedAt =
+    resolvedRole === "tenant_admin" || resolvedRole === "district_admin"
+      ? getPersistedAdminVerification(summary.user.id)
+      : null;
+
   setAuthStateFromBackend({
     isInitialized: true,
     isAuthenticated: true,
@@ -377,6 +383,8 @@ const applySessionSummary = async (
       isSameUser && isSuperRole ? current.hasSecondaryAuth ?? false : false,
     superVerifiedAt:
       isSameUser && isSuperRole ? current.superVerifiedAt ?? null : null,
+    adminVerifiedAt:
+      (isSameUser ? current.adminVerifiedAt : null) ?? persistedAdminVerifiedAt ?? null,
   });
   clearSessionTermination();
 };

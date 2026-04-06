@@ -28,6 +28,16 @@ Changes are dated based on the default timezone: America/Los_Angeles
   - suppressed the outdated-version overlay and GitHub main-head freshness check on `*.dev.itemtraxx.com` hosts so branch-bound dev environments no longer appear falsely stale
   - updated the shared public footer so `dev.itemtraxx.com` and `*.dev.itemtraxx.com` display `Development` instead of `Production`
 - Re-ran the security audit after remediation and confirmed no new code-level vulnerabilities in the accessible repository/config scope; remaining items are runtime verification tasks around live DB grant state and Cloudflare WAF/ruleset visibility.
+- Stabilized tenant and tenant-admin auth flows on shared dev/preview deployments:
+  - fixed tenant-admin local handoff bootstrap so non-district tenant admins can complete admin sign-in on root/dev hosts without being bounced back to checkout
+  - removed the duplicate cookie-session exchange during admin token-hash handoff bootstrap
+  - delayed app mount until the router is ready so startup redirects no longer run against an unready route during admin handoff
+  - persisted tenant/district admin verification across refresh and stopped protected bootstrap lookups from forcing global logout on transient unauthorized responses
+  - limited tenant-admin session polling and idle enforcement to real admin contexts, and disabled the admin idle logout behavior on dev hosts
+- Cleaned up development and CI behavior:
+  - removed temporary admin checkout debug redirect query parameters after the auth investigation was completed
+  - hid outdated-version prompts on all non-`main` builds, including preview deployments
+  - updated Playwright auth edge-case coverage so E2E expectations match the current tenant-admin public-route redirect behavior
 
 ---
 

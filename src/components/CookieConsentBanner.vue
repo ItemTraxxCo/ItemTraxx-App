@@ -39,7 +39,8 @@ defineEmits<{
   position: fixed;
   left: 50%;
   bottom: 1rem;
-  width: min(1100px, calc(100vw - 1rem));
+  width: min(1100px, calc(100vw - 2rem));
+  box-sizing: border-box;
   transform: translateX(-50%);
   z-index: 1200;
   display: flex;
@@ -91,8 +92,13 @@ defineEmits<{
 
 @media (max-width: 760px) {
   .cookie-consent-banner {
+    left: 0.75rem;
+    right: 0.75rem;
+    bottom: 0.75rem;
+    width: auto;
     flex-direction: column;
     align-items: stretch;
+    transform: none;
   }
 
   .cookie-consent-actions {

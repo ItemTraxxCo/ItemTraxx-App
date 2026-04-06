@@ -1,51 +1,15 @@
-# Docs Index
+# Documentation
 
-This directory contains operational, security, architecture, and testing documentation for ItemTraxx.
+Most technical, operational, security, onboarding, and deployment documentation has been moved to a private internal repository for authorized team members.
 
-## Architecture
-- `docs/architecture/system-overview.md` — High-level frontend/edge/database architecture and request flows.
+This public repository intentionally keeps only product-facing and policy-facing documentation such as:
 
-## Incidents and Operations
-- `docs/incident-response.md` — Incident process, roles, communication cadence, and closure checklist.
-- `docs/network-troubleshooting.md` — DNS/firewall/sinkhole troubleshooting commands and escalation flow.
-- `docs/support-playbook.md` — Support triage workflow, intake requirements, and escalation criteria.
-- `docs/release-checklist.md` — Pre-merge, deploy, smoke-test, and rollback checks.
-- `docs/operations/alerting-playbook.md` — Alerting and operational response guidance.
-- `docs/operations/async-jobs.md` — Async job architecture and worker operations.
-- `docs/operations/rollback-workflow.md` — Rollback procedures.
-- `docs/supabase-backups.md` — Backup automation and restore context.
+- `README.md`
+- `CHANGELOG.md`
+- `LICENSE.md`
+- `LEGAL.md`
+- `PRIVACY.md`
+- `TERMS.md`
+- `SECURITY.md`
 
-## Runbooks
-- `docs/runbooks/tenant-auth-issues.md` — Tenant auth/login/401 troubleshooting.
-- `docs/runbooks/edge-function-deploy.md` — Safe edge function deployment and verification.
-- `docs/runbooks/cloudflare-worker-deploy.md` — Manual Cloudflare worker deployment and verification.
-- `docs/runbooks/github-actions-deploys.md` — How to run and troubleshoot the GitHub deploy workflows.
-- `docs/runbooks/github-actions/README.md` — Dedicated runbooks for each GitHub Actions workflow.
-- `docs/runbooks/kill-switch.md` — Production kill-switch behavior and usage.
-- `docs/runbooks/create-tenant.md` — Current super-admin tenant creation process and verification checklist.
-- `docs/runbooks/new-developer-onboarding.md` — Full step-by-step onboarding procedure and deploy model.
-- `docs/runbooks/new-developer-onboarding-windows.md` — Windows and WSL2 onboarding procedure for new developers.
-- `docs/runbooks/maintenance-checklist.md` — Routine weekly, monthly, quarterly, and post-deploy maintenance tasks.
-
-## Product and Feature Specs
-- `docs/onboarding-feature-spec.md` — First-sign-in onboarding behavior and constraints.
-- `docs/offline-queue-design.md` — Offline transaction queue and reconnect sync design.
-- `docs/email-templates-guide.md` — Transactional email template structure and checks.
-- `docs/tenant-admin-performance-guide.md` — Tenant admin performance tuning guidance.
-
-## Security and Governance
-- `docs/security/security-phase2-hardening.md` — Security hardening changes.
-- `docs/security/rbac-threat-model-2026-02-23.md` — RBAC threat model.
-- `docs/governance/data-governance-lifecycle.md` — Data lifecycle and governance.
-- `docs/api/edge-api-contracts.md` — Edge API contracts.
-
-## Testing and Quality
-- `docs/testing/e2e-expansion-2026-02-23.md` — E2E coverage expansion notes.
-- `docs/accessibility/wcag-2.2-aa-pass-2026-02-23.md` — Accessibility pass summary.
-- `docs/performance/frontend-performance-pass-2026-02-23.md` — Frontend performance pass.
-- `docs/performance/database-tuning-2026-02-23.md` — Database performance tuning notes.
-
-## Historical Incident Files
-- `docs/incidents/archive/runbook.md`
-- `docs/incidents/archive/oncall-checklist.md`
-- `docs/incidents/archive/failure-injection-drills.md`
+If you need internal engineering or runbook documentation, use the private ItemTraxx internal docs repository.

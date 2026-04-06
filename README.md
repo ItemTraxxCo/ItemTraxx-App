@@ -47,16 +47,14 @@ ItemTraxx currently supports multiple operating roles:
 
 ---
 
-## 5. Operations and Docs
-Primary documentation index:
+## 5. Documentation
+Public documentation in this repository is intentionally limited to product, legal, and security-facing material. Internal engineering runbooks, architecture notes, API contracts, onboarding docs, and operational procedures are maintained in a private internal documentation repository.
 
-- [`docs/README.md`](docs/README.md) — Central docs index
-- [`docs/architecture/system-overview.md`](docs/architecture/system-overview.md) — System architecture and request flows
-- [`docs/release-checklist.md`](docs/release-checklist.md) — Release and rollback process
-- [`docs/network-troubleshooting.md`](docs/network-troubleshooting.md) — DNS / firewall / sinkhole troubleshooting
-- [`docs/support-playbook.md`](docs/support-playbook.md) — Support triage and escalation guidance
-- [`docs/runbooks/edge-function-deploy.md`](docs/runbooks/edge-function-deploy.md) — Edge function deployment workflow
-- [`docs/runbooks/tenant-auth-issues.md`](docs/runbooks/tenant-auth-issues.md) — Auth and login troubleshooting
+For public-facing repository context, see:
+
+- [`README.md`](README.md) — Product overview and repository context
+- [`CHANGELOG.md`](CHANGELOG.md) — Product and engineering change history
+- [`docs/README.md`](docs/README.md) — Public documentation notice
 
 ---
 

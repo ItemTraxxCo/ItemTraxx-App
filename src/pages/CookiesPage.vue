@@ -18,9 +18,9 @@
         <p class="cookies-eyebrow">ItemTraxx cookies notice</p>
         <h1>How ItemTraxx uses cookies and similar browser storage.</h1>
         <p class="cookies-lead">
-          ItemTraxx uses a limited set of cookies and browser storage features to keep sign-in flows,
-          session security, basic diagnostics, and essential product behavior working correctly.
-          This page explains the categories we rely on today.
+          ItemTraxx uses cookies and similar browser storage for secure sign-in, anti-abuse controls,
+          product telemetry, and diagnostics. Essential cookies stay on because the app cannot work
+          securely without them; analytics and diagnostics are only enabled after consent.
         </p>
       </section>
 
@@ -30,6 +30,30 @@
           <h2>Required for sign-in and secure app use.</h2>
           <ul class="cookies-list">
             <li v-for="item in essentialCookies" :key="item.title">
+              <strong>{{ item.title }}</strong>
+              <span>{{ item.description }}</span>
+            </li>
+          </ul>
+        </article>
+
+        <article class="cookies-card">
+          <p class="cookies-section-label">Analytics</p>
+          <h2>Used to understand product usage and performance.</h2>
+          <ul class="cookies-list">
+            <li v-for="item in analyticsCookies" :key="item.title">
+              <strong>{{ item.title }}</strong>
+              <span>{{ item.description }}</span>
+            </li>
+          </ul>
+        </article>
+      </section>
+
+      <section class="cookies-grid cookies-grid-compact">
+        <article class="cookies-card">
+          <p class="cookies-section-label">Diagnostics</p>
+          <h2>Used to detect errors and investigate reliability issues.</h2>
+          <ul class="cookies-list">
+            <li v-for="item in diagnosticsCookies" :key="item.title">
               <strong>{{ item.title }}</strong>
               <span>{{ item.description }}</span>
             </li>
@@ -100,6 +124,32 @@ const essentialCookies = [
   },
 ];
 
+const analyticsCookies = [
+  {
+    title: "Vercel Analytics",
+    description:
+      "Used on public and app pages to measure navigation, page usage, and selected product interaction events after consent.",
+  },
+  {
+    title: "Speed Insights",
+    description:
+      "Used to understand frontend performance and page responsiveness across real user sessions after consent.",
+  },
+];
+
+const diagnosticsCookies = [
+  {
+    title: "Sentry error monitoring",
+    description:
+      "Used to capture application errors, failed requests, and runtime diagnostics after consent so reliability issues can be investigated.",
+  },
+  {
+    title: "Sentry Replay when enabled",
+    description:
+      "If replay sampling is enabled in the active environment, browser session replay data may be collected after consent for debugging and incident investigation.",
+  },
+];
+
 const operationalCookies = [
   {
     title: "Theme and interface state",
@@ -107,9 +157,9 @@ const operationalCookies = [
       "Used to remember interface preferences such as light or dark mode and a small amount of non-sensitive UI state.",
   },
   {
-    title: "Basic diagnostics",
+    title: "Device and workflow state",
     description:
-      "Used to help identify broken requests, auth failures, or important product issues when they occur.",
+      "Used for onboarding completion, device labeling, dismissed notices, offline checkout buffering, and similar product state that improves usability.",
   },
   {
     title: "Reliability and abuse protection",
@@ -120,14 +170,14 @@ const operationalCookies = [
 
 const limitations = [
   {
-    title: "Not an ad-tracking page",
+    title: "No advertising trackers",
     description:
-      "ItemTraxx is not built around advertising profiles or broad cross-site tracking behavior.",
+      "ItemTraxx is not built around ad networks, remarketing pixels, or advertising profile building.",
   },
   {
-    title: "Minimal by product need",
+    title: "Limited by product need",
     description:
-      "The goal is to use only the browser storage needed for secure authentication, product function, and operational quality.",
+      "The goal is to use only the browser storage needed for secure authentication, product function, telemetry, and operational quality.",
   },
   {
     title: "May change as the product evolves",

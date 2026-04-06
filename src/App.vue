@@ -244,6 +244,11 @@
       @close="handleOnboardingClose"
       @complete="handleOnboardingComplete"
     />
+    <CookieConsentBanner
+      v-if="showCookieConsentBanner && !showMaintenanceOverlay && !showKillSwitchOverlay"
+      @essential-only="acceptEssentialCookiesOnly"
+      @accept-all="acceptAllCookies"
+    />
     <FatalErrorToast />
     <Analytics v-if="showTelemetry" />
     <SpeedInsights v-if="showTelemetry" />
@@ -260,6 +265,7 @@ import {
 } from "./services/adminOpsService";
 import { getBufferedCheckoutCount } from "./services/checkoutService";
 import OnboardingModal from "./components/OnboardingModal.vue";
+import CookieConsentBanner from "./components/CookieConsentBanner.vue";
 import {
   hasCompletedOnboarding,
   markOnboardingCompleted,
@@ -274,6 +280,7 @@ import { getDistrictState } from "./store/districtState";
 import { clearSessionTermination, getSessionTerminationState, showSessionTermination } from "./store/sessionTermination";
 import { resolveRecoveryRouteFromPath } from "./services/appErrorRecovery";
 import { getOrCreateDeviceSession } from "./utils/deviceSession";
+import { allowsAnalytics, hasCookieConsent, readCookieConsent, writeCookieConsent, type CookieConsentState } from "./services/cookieConsentService";
 
 const Analytics = defineAsyncComponent(async () => {
   const module = await import("@vercel/analytics/vue");
@@ -336,13 +343,13 @@ const isOutdated = ref(false);
 const latestVersion = ref<string | null>(null);
 const forceUpdateOverlay = ref(false);
 const showTelemetry = ref(false);
+const cookieConsent = ref<CookieConsentState | null>(null);
 const isRouteNavigating = ref(false);
 let statusTimer: number | null = null;
 let versionTimer: number | null = null;
 let adminIdleTimer: number | null = null;
 let deferredStatusTimer: number | null = null;
 let deferredVersionTimer: number | null = null;
-let deferredTelemetryTimer: number | null = null;
 let routeProgressTimer: number | null = null;
 let adminSessionTimer: number | null = null;
 let offlineQueueTimer: number | null = null;
@@ -377,6 +384,23 @@ const GITHUB_HEAD_COMMIT_API =
   "https://api.github.com/repos/ItemTraxxCo/ItemTraxx-App/commits/main";
 const appBranch = (import.meta.env.VITE_GIT_BRANCH || "n/a").trim();
 const isNonMainBuild = appBranch !== "" && appBranch !== "n/a" && appBranch !== "main";
+
+const showCookieConsentBanner = computed(() => !hasCookieConsent(cookieConsent.value));
+
+const syncCookieConsent = () => {
+  cookieConsent.value = readCookieConsent();
+  showTelemetry.value = allowsAnalytics(cookieConsent.value);
+};
+
+const acceptEssentialCookiesOnly = () => {
+  writeCookieConsent("essential");
+  syncCookieConsent();
+};
+
+const acceptAllCookies = () => {
+  writeCookieConsent("all");
+  syncCookieConsent();
+};
 
 const isDevSubdomainHost = computed(() => {
   if (typeof window === "undefined") return false;
@@ -1199,6 +1223,13 @@ const handleStorageChange = (event: StorageEvent) => {
   if (!event.key || event.key.startsWith("itemtraxx:checkout-offline-buffer:")) {
     refreshOfflineQueueCount();
   }
+  if (!event.key || event.key === "itemtraxx-cookie-consent") {
+    syncCookieConsent();
+  }
+};
+
+const handleCookieConsentChange = () => {
+  syncCookieConsent();
 };
 
 onMounted(() => {
@@ -1219,13 +1250,12 @@ onMounted(() => {
     void refreshVersionStatus();
     startVersionPolling();
   }, 750);
-  deferredTelemetryTimer = scheduleLowPriorityTask(() => {
-    showTelemetry.value = true;
-  }, 1800);
+  syncCookieConsent();
   for (const eventName of adminActivityEvents) {
     window.addEventListener(eventName, handleAdminActivity, { passive: true });
   }
   window.addEventListener("storage", handleStorageChange);
+  window.addEventListener("itemtraxx:cookie-consent", handleCookieConsentChange);
   refreshOfflineQueueCount();
   offlineQueueTimer = window.setInterval(() => {
     refreshOfflineQueueCount();
@@ -1361,10 +1391,6 @@ onUnmounted(() => {
     window.clearTimeout(deferredVersionTimer);
     deferredVersionTimer = null;
   }
-  if (deferredTelemetryTimer) {
-    window.clearTimeout(deferredTelemetryTimer);
-    deferredTelemetryTimer = null;
-  }
   if (routeProgressTimer) {
     window.clearTimeout(routeProgressTimer);
     routeProgressTimer = null;
@@ -1380,6 +1406,7 @@ onUnmounted(() => {
   stopAdminSessionPolling();
   stopSessionHeartbeat();
   document.removeEventListener("visibilitychange", handlePageVisibilityChange);
+  window.removeEventListener("itemtraxx:cookie-consent", handleCookieConsentChange);
   window.removeEventListener("storage", handleStorageChange);
   window.removeEventListener("resize", measureTopBanners);
 });

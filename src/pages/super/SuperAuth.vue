@@ -21,7 +21,32 @@
         </label>
         <label class="super-password-field">
           Password
-          <input v-model="password" type="password" placeholder="Enter password" autocomplete="current-password" />
+          <span class="super-password-input-wrap">
+            <input
+              v-model="password"
+              :type="showPassword ? 'text' : 'password'"
+              placeholder="Enter password"
+              autocomplete="current-password"
+            />
+            <button
+              type="button"
+              class="super-password-visibility-toggle"
+              :aria-label="showPassword ? 'Hide password' : 'Show password'"
+              :aria-pressed="showPassword"
+              @click="showPassword = !showPassword"
+            >
+              <svg v-if="showPassword" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M3 3l18 18" />
+                <path d="M10.58 10.58a2 2 0 102.84 2.84" />
+                <path d="M9.88 5.09A10.94 10.94 0 0112 4c5 0 9.27 3.11 11 8-0.69 1.94-1.91 3.61-3.5 4.85" />
+                <path d="M6.61 6.61C4.62 7.9 3.06 9.76 2 12c1.73 4.89 6 8 10 8a9.88 9.88 0 004.23-.93" />
+              </svg>
+              <svg v-else viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M2 12s3.5-8 10-8 10 8 10 8-3.5 8-10 8-10-8-10-8z" />
+                <circle cx="12" cy="12" r="3" />
+              </svg>
+            </button>
+          </span>
           <RouterLink
             class="link-button super-password-help-link"
             :to="{ path: '/forgot-password', query: { email: email.trim(), from: 'super-auth' } }"
@@ -92,6 +117,7 @@ const router = useRouter();
 const auth = getAuthState();
 const email = ref("");
 const password = ref("");
+const showPassword = ref(false);
 const verificationCode = ref("");
 const verificationEmail = ref<string | null>(null);
 const error = ref("");
@@ -357,6 +383,53 @@ onUnmounted(() => {
 
 .super-password-field {
   position: relative;
+}
+
+.super-password-input-wrap {
+  position: relative;
+  display: block;
+}
+
+.super-password-field input {
+  padding-right: 4.25rem;
+}
+
+.super-password-visibility-toggle {
+  position: absolute;
+  top: 50%;
+  right: 1rem;
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: color-mix(in srgb, var(--muted) 82%, var(--text) 18%);
+  cursor: pointer;
+}
+
+.super-password-visibility-toggle:hover {
+  color: var(--text);
+  transform: translateY(-50%);
+}
+
+.super-password-visibility-toggle:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 999px;
+}
+
+.super-password-visibility-toggle svg {
+  width: 1.1rem;
+  height: 1.1rem;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 .super-password-help-link {

@@ -58,7 +58,7 @@ jobs:
         if: matrix.language == 'javascript-typescript'
         uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6
         with:
-          node-version: 20
+          node-version: 20.19.0
           cache: npm
 
       - name: Install dependencies

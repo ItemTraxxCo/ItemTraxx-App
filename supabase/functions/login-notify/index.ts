@@ -193,9 +193,9 @@ serve(async (req) => {
       return jsonResponse(403, { error: "Access denied" });
     }
 
-    let accountName = "ItemTraxx";
-    let accountLabel = "Account";
-    let accountId = user.id;
+    let accountName: string;
+    let accountLabel: string;
+    let accountId: string;
 
     if ((profile.role === "tenant_user" || profile.role === "tenant_admin") && profile.tenant_id) {
       const { data: tenant, error: tenantError } = await adminClient
@@ -225,6 +225,7 @@ serve(async (req) => {
     } else if (profile.role === "super_admin") {
       accountName = "Super Admin Control Center";
       accountLabel = "Workspace";
+      accountId = user.id;
     } else {
       return jsonResponse(403, { error: "Access denied" });
     }

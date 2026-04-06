@@ -243,7 +243,6 @@ const fetchCurrentRoleAndTenant = async () => {
 
 const fetchProfile = async (userId: string): Promise<ProfileRow | null> => {
   let data: unknown = null;
-  let error: unknown = null;
   try {
     const response = await withRetry(
       () =>
@@ -261,7 +260,6 @@ const fetchProfile = async (userId: string): Promise<ProfileRow | null> => {
       2
     );
     data = response?.[0] ?? null;
-    error = null;
   } catch (requestError) {
     console.error("Profile lookup failed:", requestError);
     try {
@@ -284,16 +282,11 @@ const fetchProfile = async (userId: string): Promise<ProfileRow | null> => {
     }
   }
 
-  if (error) {
-    return null;
-  }
-
   return data as ProfileRow;
 };
 
 const fetchTenantContext = async (tenantId: string): Promise<TenantRow | null> => {
   let data: unknown = null;
-  let error: unknown = null;
   try {
     const response = await withRetry(
       () =>
@@ -311,13 +304,11 @@ const fetchTenantContext = async (tenantId: string): Promise<TenantRow | null> =
       2
     );
     data = response?.[0] ?? null;
-    error = null;
   } catch (requestError) {
     console.error("Tenant status lookup failed:", requestError);
     return null;
   }
 
-  if (error) return null;
   return data as TenantRow;
 };
 

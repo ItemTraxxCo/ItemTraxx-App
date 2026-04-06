@@ -279,7 +279,7 @@ const withCorsHeaders = (origin: string | null, allowedOrigins: string[], env: E
   const originAllowed =
     !origin || allowedOrigins.length === 0 || isAllowedOrigin(origin, allowedOrigins, env);
   const headers = origin && originAllowed
-    ? { ...BASE_CORS_HEADERS, ...(origin ? { "Access-Control-Allow-Origin": origin } : {}) }
+    ? { ...BASE_CORS_HEADERS, "Access-Control-Allow-Origin": origin }
     : { ...BASE_CORS_HEADERS };
   return { originAllowed, headers };
 };

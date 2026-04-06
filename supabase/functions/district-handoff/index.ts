@@ -295,7 +295,6 @@ serve(async (req) => {
       }
 
       const user = signIn.data.user;
-      const session = signIn.data.session;
       const { data: profile } = await adminClient
         .from("profiles")
         .select("role, tenant_id, district_id, is_active")

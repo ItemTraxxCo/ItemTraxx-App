@@ -1,6 +1,7 @@
 import type { App } from "vue";
 import type { Router } from "vue-router";
 import { shouldReportError } from "./appErrors";
+import { allowsDiagnostics, allowsSessionReplay, readCookieConsent } from "./cookieConsentService";
 
 const SENTRY_DSN = import.meta.env.VITE_SENTRY_DSN?.trim();
 const SENTRY_ENVIRONMENT = import.meta.env.VITE_SENTRY_ENVIRONMENT || import.meta.env.MODE;
@@ -17,6 +18,8 @@ const SENTRY_ENABLE_LOGS = (import.meta.env.VITE_SENTRY_ENABLE_LOGS ?? "true") !
 const replayEnabled =
   (Number.isFinite(SENTRY_REPLAY_SESSION_SAMPLE_RATE) && SENTRY_REPLAY_SESSION_SAMPLE_RATE > 0) ||
   (Number.isFinite(SENTRY_REPLAY_ON_ERROR_SAMPLE_RATE) && SENTRY_REPLAY_ON_ERROR_SAMPLE_RATE > 0);
+
+let sentryInitialized = false;
 
 const getTracePropagationTargets = () => {
   const targets: Array<string | RegExp> = ["localhost"];
@@ -36,7 +39,7 @@ const getTracePropagationTargets = () => {
 };
 
 const loadSentryReplay = async () => {
-  if (!SENTRY_DSN || !replayEnabled) {
+  if (!SENTRY_DSN || !replayEnabled || !allowsSessionReplay(readCookieConsent())) {
     return;
   }
 
@@ -130,7 +133,7 @@ const shouldCaptureHandledRequestFailure = (failure: HandledRequestFailure) => {
 };
 
 export const captureHandledRequestFailure = async (failure: HandledRequestFailure) => {
-  if (!SENTRY_DSN || !shouldCaptureHandledRequestFailure(failure)) {
+  if (!SENTRY_DSN || !sentryInitialized || !shouldCaptureHandledRequestFailure(failure)) {
     return;
   }
 
@@ -154,7 +157,7 @@ export const captureHandledRequestFailure = async (failure: HandledRequestFailur
   });
 };
 export const initializeSentry = async (app: App, router: Router) => {
-  if (!SENTRY_DSN) {
+  if (!SENTRY_DSN || sentryInitialized || !allowsDiagnostics(readCookieConsent())) {
     return;
   }
 
@@ -199,5 +202,6 @@ export const initializeSentry = async (app: App, router: Router) => {
     },
   });
 
+  sentryInitialized = true;
   void loadSentryReplay();
 };

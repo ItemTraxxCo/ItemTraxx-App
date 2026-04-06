@@ -18,6 +18,7 @@ import {
   initAuthListener,
   refreshAuthFromSession,
 } from "./services/authService";
+import { allowsDiagnostics, readCookieConsent } from "./services/cookieConsentService";
 import { touchTenantAdminSession } from "./services/adminOpsService";
 import { TimeoutError, withTimeout } from "./services/asyncUtils";
 import {
@@ -164,11 +165,22 @@ const initializeAuth = async () => {
 };
 
 const initializeSentry = async (app: ReturnType<typeof createApp>) => {
-  if (!import.meta.env.VITE_SENTRY_DSN?.trim()) {
+  if (!import.meta.env.VITE_SENTRY_DSN?.trim() || !allowsDiagnostics(readCookieConsent())) {
     return;
   }
   const { initializeSentry: initializeSentryMonitoring } = await import("./services/sentry");
   await initializeSentryMonitoring(app, router);
+};
+
+const bindConsentDrivenMonitoring = (app: ReturnType<typeof createApp>) => {
+  const maybeEnableDiagnostics = () => {
+    if (!allowsDiagnostics(readCookieConsent())) {
+      return;
+    }
+    void initializeSentry(app);
+  };
+
+  window.addEventListener("itemtraxx:cookie-consent", maybeEnableDiagnostics);
 };
 
 const mountApp = async () => {
@@ -192,6 +204,7 @@ const mountApp = async () => {
   app.use(router);
   await router.isReady();
   app.mount("#app");
+  bindConsentDrivenMonitoring(app);
   captureInitialPerfMetrics();
   attachE2EControls();
 };

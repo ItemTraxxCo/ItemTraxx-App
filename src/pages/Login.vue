@@ -49,7 +49,31 @@
 
             <label class="password-field">
                
-              <input v-model="password" type="password" placeholder="Enter password" />
+              <span class="password-input-wrap">
+                <input
+                  v-model="password"
+                  :type="showPassword ? 'text' : 'password'"
+                  placeholder="Enter password"
+                />
+                <button
+                  type="button"
+                  class="password-visibility-toggle"
+                  :aria-label="showPassword ? 'Hide password' : 'Show password'"
+                  :aria-pressed="showPassword"
+                  @click="showPassword = !showPassword"
+                >
+                  <svg v-if="showPassword" viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M3 3l18 18" />
+                    <path d="M10.58 10.58a2 2 0 102.84 2.84" />
+                    <path d="M9.88 5.09A10.94 10.94 0 0112 4c5 0 9.27 3.11 11 8-0.69 1.94-1.91 3.61-3.5 4.85" />
+                    <path d="M6.61 6.61C4.62 7.9 3.06 9.76 2 12c1.73 4.89 6 8 10 8a9.88 9.88 0 004.23-.93" />
+                  </svg>
+                  <svg v-else viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M2 12s3.5-8 10-8 10 8 10 8-3.5 8-10 8-10-8-10-8z" />
+                    <circle cx="12" cy="12" r="3" />
+                  </svg>
+                </button>
+              </span>
               <RouterLink class="link-button password-help-link" to="/forgot-password">
                 Forgot password?
               </RouterLink>
@@ -108,6 +132,7 @@ const router = useRouter();
 const district = getDistrictState();
 const accessCode = ref("");
 const password = ref("");
+const showPassword = ref(false);
 const error = ref("");
 const isLoading = ref(false);
 const toastTitle = ref("");
@@ -636,6 +661,53 @@ onMounted(() => {
 
 .password-field {
   position: relative;
+}
+
+.password-input-wrap {
+  position: relative;
+  display: block;
+}
+
+.password-field input {
+  padding-right: 4.25rem;
+}
+
+.password-visibility-toggle {
+  position: absolute;
+  top: 50%;
+  right: 1rem;
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: color-mix(in srgb, var(--login-copy) 78%, white 22%);
+  cursor: pointer;
+}
+
+.password-visibility-toggle:hover {
+  color: var(--login-heading);
+  transform: translateY(-50%);
+}
+
+.password-visibility-toggle:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 999px;
+}
+
+.password-visibility-toggle svg {
+  width: 1.1rem;
+  height: 1.1rem;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 .password-help-link {

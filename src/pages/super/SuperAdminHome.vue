@@ -13,6 +13,7 @@
         <RouterLink class="button-link" to="/super-admin/districts">Districts</RouterLink>
         <RouterLink class="button-link" to="/super-admin/tenants">Tenants</RouterLink>
         <RouterLink class="button-link" to="/super-admin/admins">Admins</RouterLink>
+        <RouterLink class="button-link" to="/super-admin/super-admins">Super Admins</RouterLink>
         <RouterLink class="button-link" to="/super-admin/support-requests">Support Requests</RouterLink>
         <RouterLink class="button-link" to="/internal">Internal Ops</RouterLink>
         <button type="button" class="button-link" @click="handleSignOut">Sign out</button>
@@ -64,6 +65,10 @@
           <RouterLink class="section-link" to="/super-admin/admins">
             <span class="section-link-title">Admins</span>
             <span class="section-link-meta">Tenant and district operators</span>
+          </RouterLink>
+          <RouterLink class="section-link" to="/super-admin/super-admins">
+            <span class="section-link-title">Super Admins</span>
+            <span class="section-link-meta">Privileged operator accounts</span>
           </RouterLink>
         </div>
       </section>

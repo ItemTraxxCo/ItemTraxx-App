@@ -437,39 +437,43 @@ onMounted(() => {
 
 .status-open {
   color: #1d4ed8;
-  background: #dbeafe;
+  background: color-mix(in srgb, #dbeafe 82%, var(--surface) 18%);
 }
 
 .status-in_progress {
   color: #92400e;
-  background: #fef3c7;
+  background: color-mix(in srgb, #fef3c7 82%, var(--surface) 18%);
 }
 
 .status-resolved {
   color: #166534;
-  background: #dcfce7;
+  background: color-mix(in srgb, #dcfce7 82%, var(--surface) 18%);
 }
 
 .status-spam {
   color: #7f1d1d;
-  background: #fee2e2;
+  background: color-mix(in srgb, #fee2e2 82%, var(--surface) 18%);
 }
 
 .modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(15, 23, 42, 0.42);
-  display: grid;
-  place-items: center;
-  padding: 1.25rem;
+  background: color-mix(in srgb, #0f172a 34%, transparent);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 2.5rem 1.25rem;
   z-index: 30;
+  overflow-y: auto;
 }
 
 .modal-card {
-  width: min(1040px, 100%);
-  max-height: calc(100vh - 2.5rem);
+  width: min(920px, 100%);
+  max-height: min(82vh, 760px);
   overflow: auto;
-  background: white;
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid color-mix(in srgb, var(--text) 10%, transparent);
   border-radius: 24px;
   padding: 1.5rem;
   box-shadow: 0 24px 70px rgba(15, 23, 42, 0.24);
@@ -513,15 +517,15 @@ onMounted(() => {
 }
 
 .attachment-card {
-  border: 1px solid #d8dee8;
+  border: 1px solid color-mix(in srgb, var(--text) 12%, transparent);
   border-radius: 18px;
   overflow: hidden;
-  background: #f8fafc;
+  background: color-mix(in srgb, var(--surface) 88%, var(--surface-2) 12%);
 }
 
 .attachment-preview-link {
   display: block;
-  background: #e2e8f0;
+  background: color-mix(in srgb, var(--surface-2) 88%, var(--text) 12%);
 }
 
 .attachment-preview {
@@ -546,10 +550,10 @@ onMounted(() => {
 }
 
 .event-item {
-  border: 1px solid #d8dee8;
+  border: 1px solid color-mix(in srgb, var(--text) 12%, transparent);
   border-radius: 16px;
   padding: 0.9rem 1rem;
-  background: #fcfdff;
+  background: color-mix(in srgb, var(--surface) 86%, var(--surface-2) 14%);
 }
 
 .event-header {
@@ -563,8 +567,8 @@ onMounted(() => {
   margin: 0.6rem 0 0;
   padding: 0.75rem;
   border-radius: 12px;
-  background: #0f172a;
-  color: #e2e8f0;
+  background: color-mix(in srgb, var(--surface-2) 70%, #020617 30%);
+  color: color-mix(in srgb, var(--text) 92%, white 8%);
   overflow: auto;
   font-size: 0.85rem;
 }
@@ -585,6 +589,8 @@ onMounted(() => {
   }
 
   .modal-card {
+    width: 100%;
+    max-height: calc(100vh - 5rem);
     padding: 1rem;
     border-radius: 18px;
   }

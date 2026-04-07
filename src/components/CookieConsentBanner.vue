@@ -1,8 +1,8 @@
 <template>
   <Teleport to="body">
-    <div class="cookie-consent-banner" role="dialog" aria-live="polite" aria-label="Cookie preferences">
+    <div class="cookie-consent-banner" role="region" aria-live="polite" aria-labelledby="cookie-consent-title">
       <div class="cookie-consent-copy">
-        <p class="cookie-consent-eyebrow">Cookie Preferences</p>
+        <p id="cookie-consent-title" class="cookie-consent-eyebrow">Cookie Preferences</p>
         <p>
           ItemTraxx uses essential cookies for sign-in and security. We also use analytics tools to
           understand site usage and performance. See <RouterLink to="/cookies">Cookies</RouterLink> for details.
@@ -13,10 +13,10 @@
         </p>
       </div>
       <div class="cookie-consent-actions">
-        <button type="button" class="button-link cookie-consent-secondary" @click="$emit('essential-only')">
+        <button type="button" class="button-link cookie-consent-secondary" aria-label="Accept essential cookies only" @click="$emit('essential-only')">
           Essential only
         </button>
-        <button type="button" class="button-primary cookie-consent-primary" @click="$emit('accept-all')">
+        <button type="button" class="button-primary cookie-consent-primary" aria-label="Accept all cookies" @click="$emit('accept-all')">
           Accept all
         </button>
       </div>
@@ -25,7 +25,6 @@
 </template>
 
 <script setup lang="ts">
-import { Teleport } from "vue";
 import { RouterLink } from "vue-router";
 
 defineEmits<{

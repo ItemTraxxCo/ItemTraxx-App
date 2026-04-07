@@ -18,11 +18,11 @@
 
         <form class="form admin-login-form" @submit.prevent="handleAdminLogin">
           <label>
-             
+            Email
             <input v-model="email" type="email" placeholder="Enter email" />
           </label>
           <label class="admin-password-field">
-             
+            <span class="admin-password-label">Password</span>
             <span class="admin-password-input-wrap">
               <input
                 v-model="password"

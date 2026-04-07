@@ -12,7 +12,7 @@ type TurnstileVerifyResult = {
   "error-codes"?: string[];
 };
 
-const toHex = (bytes: Uint8Array) =>
+export const toHex = (bytes: Uint8Array) =>
   Array.from(bytes)
     .map((byte) => byte.toString(16).padStart(2, "0"))
     .join("");

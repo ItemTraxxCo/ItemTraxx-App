@@ -12,7 +12,7 @@ with gear_counts as (
     count(*) filter (
       where g.deleted_at is null
         and g.status = 'checked_out'
-        and g.created_at <= now() - interval '14 days'
+        and g.checked_out_at <= now() - interval '14 days'
     ) as overdue_items
   from public.gear g
   group by g.tenant_id

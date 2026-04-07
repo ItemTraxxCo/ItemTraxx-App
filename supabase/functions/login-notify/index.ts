@@ -95,7 +95,7 @@ const buildLoginNotificationHtml = (payload: {
                   <a href="mailto:${supportEmail}" style="color:#19439b;text-decoration:none;">${supportEmail}</a>
                 </p>
                 <p style="margin:6px 0 0 0;font-size:12px;line-height:1.6;color:#9ca3af;">
-                  &copy; 2026 ItemTraxx Co. All rights reserved.
+                  © 2026 ItemTraxx Co. All rights reserved.
                 </p>
               </td>
             </tr>
@@ -235,12 +235,9 @@ serve(async (req) => {
       return jsonResponse(200, { data: { queued: false, skipped: true, reason: "missing_recipient" } });
     }
 
-    const now = Date.now();
-    const loginTimeIso = new Date(now).toISOString();
-    const loginTime = new Date(loginTimeIso);
-    const loginTimeLabel = Number.isNaN(loginTime.getTime())
-      ? loginTimeIso
-      : `${loginTime.toISOString()} (UTC)`;
+    const loginTime = new Date();
+    const loginTimeIso = loginTime.toISOString();
+    const loginTimeLabel = `${loginTimeIso} (UTC)`;
     const deviceInfo = req.headers.get("user-agent") ?? "Unknown device/browser";
     const clientIp = normalizeIp(req);
 

@@ -1,60 +1,19 @@
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { isAllowedOrigin, parseAllowedOrigins } from "../_shared/cors.ts";
-import { resolveClientFingerprint, resolveClientIp } from "../_shared/preloginGuards.ts";
+import {
+  enforcePreloginRateLimit,
+  hashString,
+  resolveClientFingerprint,
+  resolveClientIp,
+  verifyTurnstileToken,
+} from "../_shared/preloginGuards.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Headers":
     "authorization, x-client-info, apikey, content-type, x-request-id",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
   Vary: "Origin",
-};
-
-type RateLimitResult = {
-  allowed: boolean;
-  retry_after_seconds: number | null;
-};
-
-type TurnstileVerifyResult = {
-  success: boolean;
-  "error-codes"?: string[];
-};
-
-const toHex = (bytes: Uint8Array) =>
-  Array.from(bytes)
-    .map((byte) => byte.toString(16).padStart(2, "0"))
-    .join("");
-
-const hashString = async (value: string) => {
-  const encoded = new TextEncoder().encode(value);
-  const digest = await crypto.subtle.digest("SHA-256", encoded);
-  return toHex(new Uint8Array(digest));
-};
-
-const enforceRateLimit = async (
-  client: any,
-  key: string,
-  scope: string,
-  limit: number,
-  windowSeconds: number
-) => {
-  const { data, error } = await client.rpc("consume_rate_limit_prelogin", {
-    p_key: key,
-    p_scope: scope,
-    p_limit: limit,
-    p_window_seconds: windowSeconds,
-  });
-
-  if (error) {
-    return { ok: false as const, error };
-  }
-
-  const result = data as RateLimitResult;
-  if (!result.allowed) {
-    return { ok: false as const, error: null };
-  }
-
-  return { ok: true as const, error: null };
 };
 
 const isLocalhostMaintenanceBypassRequest = (req: Request) => {
@@ -114,68 +73,6 @@ const isAikidoTurnstileBypassRequest = (req: Request) => {
   const hasExpectedAgent =
     userAgent.includes(userAgentNeedle) || scanAgentHeader.includes(userAgentNeedle);
   return hasExpectedAgent;
-};
-
-const verifyTurnstileToken = async (
-  secret: string,
-  token: string,
-  remoteIp: string
-) => {
-  const submitVerification = async (ip?: string) => {
-    const params = new URLSearchParams();
-    params.set("secret", secret);
-    params.set("response", token);
-    if (ip) {
-      params.set("remoteip", ip);
-    }
-
-    const response = await fetch(
-      "https://challenges.cloudflare.com/turnstile/v0/siteverify",
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: params.toString(),
-      }
-    );
-
-    if (!response.ok) {
-      console.error("tenant-login turnstile verification request failed", {
-        status: response.status,
-        usedRemoteIp: Boolean(ip),
-      });
-      return null;
-    }
-
-    return (await response.json()) as TurnstileVerifyResult;
-  };
-
-  const initialResult = await submitVerification(remoteIp || undefined);
-  if (initialResult?.success) {
-    return true;
-  }
-
-  if (remoteIp) {
-    const fallbackResult = await submitVerification();
-    if (fallbackResult?.success) {
-      console.warn("tenant-login turnstile verification succeeded after retry without remote IP");
-      return true;
-    }
-    if (fallbackResult) {
-      console.error("tenant-login turnstile verification failed", {
-        errorCodes: fallbackResult["error-codes"] ?? [],
-        retriedWithoutRemoteIp: true,
-      });
-      return false;
-    }
-  }
-
-  if (initialResult) {
-    console.error("tenant-login turnstile verification failed", {
-      errorCodes: initialResult["error-codes"] ?? [],
-      retriedWithoutRemoteIp: false,
-    });
-  }
-  return false;
 };
 
 const resolveCorsHeaders = (req: Request) => {
@@ -253,7 +150,8 @@ serve(async (req) => {
         const isTurnstileValid = await verifyTurnstileToken(
           turnstileSecret,
           turnstile_token.trim(),
-          resolveClientIp(req)
+          resolveClientIp(req),
+          "tenant-login"
         );
         if (!isTurnstileValid) {
           return jsonResponse(403, { error: "Turnstile verification failed" });
@@ -307,7 +205,7 @@ serve(async (req) => {
     // Two throttles:
     // 1) per-client to prevent one actor exhausting global login capacity
     // 2) per-client-per-access-code to slow targeted brute force attempts
-    const perClientLimit = await enforceRateLimit(
+    const perClientLimit = await enforcePreloginRateLimit(
       adminClient,
       clientFingerprint,
       perClientScope,
@@ -328,7 +226,7 @@ serve(async (req) => {
       });
     }
 
-    const perAccessLimit = await enforceRateLimit(
+    const perAccessLimit = await enforcePreloginRateLimit(
       adminClient,
       `${clientFingerprint}-${accessCodeHash.slice(0, 16)}`,
       perClientAccessScope,

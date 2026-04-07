@@ -18,6 +18,13 @@ Changes are dated based on the default timezone: America/Los_Angeles
 
 ---
 
+### 4/6/2026 Development Update
+
+- Moved internal engineering and operational documentation into the private internal docs repository and reduced public documentation exposure.
+- Strengthened audit-log integrity and hardened support attachment handling to improve security and operational trust.
+
+---
+
 ### 4/5/2026 Development Update
 
 - Improved security, authentication reliability, and development environment behavior.

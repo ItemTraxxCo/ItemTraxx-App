@@ -45,6 +45,11 @@ type NormalizedAttachment = {
   size_bytes: number;
 };
 
+type DetectedAttachmentType = {
+  contentType: "image/png" | "image/jpeg" | "image/webp" | "image/gif";
+  extension: "png" | "jpg" | "webp" | "gif";
+};
+
 const normalizeText = (value: unknown, max = 5000) => {
   if (typeof value !== "string") return "";
   return value.trim().slice(0, max);
@@ -52,12 +57,72 @@ const normalizeText = (value: unknown, max = 5000) => {
 
 const isEmail = (value: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 const base64Pattern = /^[A-Za-z0-9+/]+={0,2}$/;
-const isImageContentType = (value: string) =>
-  ["image/png", "image/jpeg", "image/webp", "image/gif"].includes(value);
 const estimateBase64DecodedBytes = (value: string) => {
   const normalized = value.replace(/\s+/g, "");
   const padding = normalized.endsWith("==") ? 2 : normalized.endsWith("=") ? 1 : 0;
   return Math.floor((normalized.length * 3) / 4) - padding;
+};
+
+const decodeBase64 = (value: string) => {
+  const binary = atob(value);
+  const bytes = new Uint8Array(binary.length);
+  for (let index = 0; index < binary.length; index += 1) {
+    bytes[index] = binary.charCodeAt(index);
+  }
+  return bytes;
+};
+
+const detectAttachmentType = (bytes: Uint8Array): DetectedAttachmentType | null => {
+  if (
+    bytes.length >= 8 &&
+    bytes[0] === 0x89 &&
+    bytes[1] === 0x50 &&
+    bytes[2] === 0x4e &&
+    bytes[3] === 0x47 &&
+    bytes[4] === 0x0d &&
+    bytes[5] === 0x0a &&
+    bytes[6] === 0x1a &&
+    bytes[7] === 0x0a
+  ) {
+    return { contentType: "image/png", extension: "png" };
+  }
+
+  if (
+    bytes.length >= 3 &&
+    bytes[0] === 0xff &&
+    bytes[1] === 0xd8 &&
+    bytes[2] === 0xff
+  ) {
+    return { contentType: "image/jpeg", extension: "jpg" };
+  }
+
+  if (
+    bytes.length >= 6 &&
+    bytes[0] === 0x47 &&
+    bytes[1] === 0x49 &&
+    bytes[2] === 0x46 &&
+    bytes[3] === 0x38 &&
+    (bytes[4] === 0x37 || bytes[4] === 0x39) &&
+    bytes[5] === 0x61
+  ) {
+    return { contentType: "image/gif", extension: "gif" };
+  }
+
+  if (
+    bytes.length >= 12 &&
+    bytes[0] === 0x52 &&
+    bytes[1] === 0x49 &&
+    bytes[2] === 0x46 &&
+    bytes[3] === 0x46 &&
+    bytes[8] === 0x57 &&
+    bytes[9] === 0x45 &&
+    bytes[10] === 0x42 &&
+    bytes[11] === 0x50
+  ) {
+    return { contentType: "image/webp", extension: "webp" };
+  }
+
+  return null;
 };
 
 const toHex = (bytes: Uint8Array) =>
@@ -172,21 +237,7 @@ serve(async (req) => {
     const website = normalizeText(body.website, 120);
     const turnstileToken = normalizeText(body.turnstile_token, 4000);
     const attachmentsRaw = Array.isArray(body.attachments) ? body.attachments : [];
-    const attachments: NormalizedAttachment[] = attachmentsRaw.map((attachment, index) => {
-      const filename = normalizeText(attachment.filename, 120) || `attachment-${index + 1}`;
-      const contentType = normalizeText(attachment.content_type, 80).toLowerCase();
-      const contentBase64 = normalizeText(attachment.content_base64, 8_000_000).replace(/\s+/g, "");
-      const sizeBytesRaw = Number(attachment.size_bytes);
-      const sizeBytes = Number.isFinite(sizeBytesRaw) && sizeBytesRaw > 0
-        ? Math.round(sizeBytesRaw)
-        : estimateBase64DecodedBytes(contentBase64);
-      return {
-        filename,
-        content_type: contentType,
-        content_base64: contentBase64,
-        size_bytes: sizeBytes,
-      };
-    });
+    const attachments: NormalizedAttachment[] = [];
 
     if (website) {
       return jsonResponse(200, { data: { accepted: true } });
@@ -201,19 +252,42 @@ serve(async (req) => {
     if (!turnstileToken) {
       return jsonResponse(400, { error: "Security check required." });
     }
-    if (attachments.length > 2) {
+    if (attachmentsRaw.length > 2) {
       return jsonResponse(400, { error: "Attach up to 2 images." });
     }
-    for (const attachment of attachments) {
-      if (!isImageContentType(attachment.content_type)) {
-        return jsonResponse(400, { error: "Only PNG, JPG, WEBP, and GIF attachments are allowed." });
-      }
-      if (!attachment.content_base64 || !base64Pattern.test(attachment.content_base64)) {
+    for (const [index, attachment] of attachmentsRaw.entries()) {
+      const contentBase64 = normalizeText(attachment.content_base64, 8_000_000).replace(/\s+/g, "");
+      if (!contentBase64 || !base64Pattern.test(contentBase64)) {
         return jsonResponse(400, { error: "Attachment data is invalid." });
       }
-      if (attachment.size_bytes > 4 * 1024 * 1024) {
+
+      const estimatedSize = estimateBase64DecodedBytes(contentBase64);
+      if (estimatedSize > 4 * 1024 * 1024) {
         return jsonResponse(400, { error: "Each image must be 4 MB or smaller." });
       }
+
+      let bytes: Uint8Array;
+      try {
+        bytes = decodeBase64(contentBase64);
+      } catch {
+        return jsonResponse(400, { error: "Attachment data is invalid." });
+      }
+
+      if (bytes.length === 0 || bytes.length > 4 * 1024 * 1024) {
+        return jsonResponse(400, { error: "Each image must be 4 MB or smaller." });
+      }
+
+      const detectedType = detectAttachmentType(bytes);
+      if (!detectedType) {
+        return jsonResponse(400, { error: "Only PNG, JPG, WEBP, and GIF attachments are allowed." });
+      }
+
+      attachments.push({
+        filename: `support-attachment-${index + 1}.${detectedType.extension}`,
+        content_type: detectedType.contentType,
+        content_base64: contentBase64,
+        size_bytes: bytes.length,
+      });
     }
 
     const adminClient = createClient(supabaseUrl, serviceKey, {

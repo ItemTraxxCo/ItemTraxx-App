@@ -34,8 +34,8 @@
             Losing track of where stuff goes? ItemTraxx is the right service for you.
           </p>
           <p class="hero-support">
-            Contact us to get early access and start mastering your inventory with ItemTraxx's
-            streamlined checkout, returns, and admin management. Regular subscription terms apply.
+            Contact us to start mastering your inventory with ItemTraxx's
+            streamlined checkout, returns, and admin management.
           </p>
           <div class="hero-actions">
             <RouterLink class="cta-primary" to="/pricing" @click="trackCta('pricing', 'hero')">Pricing</RouterLink>
@@ -50,7 +50,6 @@
           <ul class="hero-points" aria-label="Key product benefits">
             <li>Secure sign-ins and protected admin access</li>
             <li>Clear transaction history and audit visibility</li>
-            <li>Smooth checkout and return workflows</li>
             <li>Easy item and user management features</li>
             <li>Designed for teams, organizations, and individual users</li>
             <li>Built to scale with your inventory and operations</li>

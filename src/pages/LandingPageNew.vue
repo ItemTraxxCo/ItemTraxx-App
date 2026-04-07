@@ -7,7 +7,9 @@
     <div class="grid-noise" aria-hidden="true"></div>
 
     <header class="landing-header shell">
-      <RouterLink class="brand-mark" to="/">ItemTraxx Co</RouterLink>
+      <RouterLink class="brand-mark" to="/">
+        <img class="brand-mark-full" :src="brandLogoUrl" alt="ItemTraxx Co" />
+      </RouterLink>
       <nav class="landing-nav" aria-label="Primary">
         <RouterLink to="/pricing">Pricing</RouterLink>
         <RouterLink to="/contact-support">Support</RouterLink>
@@ -204,7 +206,7 @@
 </template>
 
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, onUnmounted, ref } from 'vue';
 import { RouterLink } from 'vue-router';
 import { trackAnalyticsEvent } from "../services/analyticsService";
 import adminUiImage from '../assets/landing/admin_ui.png';
@@ -217,6 +219,15 @@ import checkoutReturnUiImage1200 from '../assets/landing/checkout_return_ui-1200
 import checkoutReturnUiImage1600 from '../assets/landing/checkout_return_ui-1600.webp';
 import { fetchSystemStatus } from '../services/systemStatusService';
 import PublicFooter from "../components/PublicFooter.vue";
+
+const lightBrandLogoUrl = import.meta.env.VITE_BRAND_LOGO_LIGHT_URL as string | undefined;
+const darkBrandLogoUrl = import.meta.env.VITE_BRAND_LOGO_DARK_URL as string | undefined;
+const themeMode = ref<"light" | "dark">("dark");
+const brandLogoUrl = computed(() =>
+  themeMode.value === "light"
+    ? lightBrandLogoUrl || darkBrandLogoUrl || ""
+    : darkBrandLogoUrl || lightBrandLogoUrl || ""
+);
 
 type ShowcaseVariant = {
   label: string;
@@ -350,6 +361,7 @@ const refreshSystemStatus = async () => {
 
 let observer: IntersectionObserver | null = null;
 let statusTimer: number | null = null;
+let themeObserver: MutationObserver | null = null;
 
 const startStatusPolling = () => {
   if (statusTimer || document.visibilityState === 'hidden') return;
@@ -374,6 +386,15 @@ const handleVisibilityChange = () => {
 };
 
 onMounted(() => {
+  const syncTheme = () => {
+    themeMode.value = document.documentElement.getAttribute('data-theme') === 'light' ? 'light' : 'dark';
+  };
+  syncTheme();
+  themeObserver = new MutationObserver(syncTheme);
+  themeObserver.observe(document.documentElement, {
+    attributes: true,
+    attributeFilter: ['data-theme'],
+  });
   window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
   void refreshSystemStatus();
   startStatusPolling();
@@ -407,6 +428,13 @@ onBeforeUnmount(() => {
   observer = null;
   stopStatusPolling();
   document.removeEventListener('visibilitychange', handleVisibilityChange);
+});
+
+onUnmounted(() => {
+  if (themeObserver) {
+    themeObserver.disconnect();
+    themeObserver = null;
+  }
 });
 </script>
 
@@ -496,13 +524,18 @@ onBeforeUnmount(() => {
 }
 
 .brand-mark {
-  font-family: Helvetica, "Helvetica Neue", Arial, sans-serif;
-  font-size: 1.4rem;
-  font-weight: 700;
-  letter-spacing: -0.03em;
-  color: #f6f7fb;
+  display: inline-flex;
+  align-items: center;
   text-decoration: none;
-  white-space: nowrap;
+}
+
+.brand-mark-full {
+  height: 4.5rem;
+  width: auto;
+  object-fit: contain;
+  flex-shrink: 0;
+  display: block;
+  transform: translateY(-2px);
 }
 
 .landing-nav {
@@ -975,8 +1008,11 @@ onBeforeUnmount(() => {
   }
 
   .brand-mark {
-    font-size: 1.15rem;
     flex-shrink: 0;
+  }
+
+  .brand-mark-full {
+    height: 3rem;
   }
 
   .landing-nav a,

@@ -515,6 +515,17 @@ const routes: RouteRecordRaw[] = [
     },
   },
   {
+    path: "/super-admin/support-requests",
+    name: "super-admin-support-requests",
+    component: () => import("../pages/super/SupportRequests.vue"),
+    meta: {
+      requiresSession: true,
+      requiresRole: "super_admin",
+      requiresSuperAuth: true,
+      title: "Support Requests | ItemTraxx",
+    },
+  },
+  {
     path: "/:pathMatch(.*)*",
     name: "not-found",
     component: () => import("../pages/NotFound.vue"),

@@ -19,7 +19,7 @@ export type ContactSupportPayload = {
 
 type ContactSupportResponse = {
   ok: boolean;
-  data?: { accepted: boolean };
+  data?: { accepted: boolean; request_id?: string };
   error?: string;
 };
 

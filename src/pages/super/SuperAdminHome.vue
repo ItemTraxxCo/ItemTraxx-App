@@ -13,6 +13,7 @@
         <RouterLink class="button-link" to="/super-admin/districts">Districts</RouterLink>
         <RouterLink class="button-link" to="/super-admin/tenants">Tenants</RouterLink>
         <RouterLink class="button-link" to="/super-admin/admins">Admins</RouterLink>
+        <RouterLink class="button-link" to="/super-admin/support-requests">Support Requests</RouterLink>
         <RouterLink class="button-link" to="/internal">Internal Ops</RouterLink>
         <button type="button" class="button-link" @click="handleSignOut">Sign out</button>
       </div>
@@ -98,6 +99,10 @@
           <p class="muted">Track pipeline, customers, and account health.</p>
         </div>
         <div class="section-links">
+          <RouterLink class="section-link" to="/super-admin/support-requests">
+            <span class="section-link-title">Support Requests</span>
+            <span class="section-link-meta">Inbox, attachments, and operator notes</span>
+          </RouterLink>
           <RouterLink class="section-link" to="/super-admin/sales-leads">
             <span class="section-link-title">Sales Leads</span>
             <span class="section-link-meta">Pipeline and inbound interest</span>

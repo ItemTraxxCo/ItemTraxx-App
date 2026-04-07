@@ -220,14 +220,8 @@ import checkoutReturnUiImage1600 from '../assets/landing/checkout_return_ui-1600
 import { fetchSystemStatus } from '../services/systemStatusService';
 import PublicFooter from "../components/PublicFooter.vue";
 
-const lightBrandLogoUrl = import.meta.env.VITE_BRAND_LOGO_LIGHT_URL as string | undefined;
-const darkBrandLogoUrl = import.meta.env.VITE_BRAND_LOGO_DARK_URL as string | undefined;
 const themeMode = ref<"light" | "dark">("dark");
-const brandLogoUrl = computed(() =>
-  themeMode.value === "light"
-    ? lightBrandLogoUrl || darkBrandLogoUrl || ""
-    : darkBrandLogoUrl || lightBrandLogoUrl || ""
-);
+const brandLogoUrl = computed(() => import.meta.env.VITE_BRAND_LOGO_DARK_URL || "");
 
 type ShowcaseVariant = {
   label: string;

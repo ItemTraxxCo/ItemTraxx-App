@@ -53,6 +53,8 @@ create policy "super_admin_insert_super_admin_audit_logs"
   for insert
   to authenticated
   with check (
+    actor_id = auth.uid()
+    and
     exists (
       select 1
       from public.profiles p

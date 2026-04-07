@@ -1,6 +1,6 @@
 # Changelog
 
-Last updated (year-month-day): 2026-04-06
+Last updated (year-month-day): 2026-04-07
 
 This public changelog summarizes notable ItemTraxx product, reliability, security, and experience updates at a high level. Detailed internal engineering and operational notes are maintained separately.
 
@@ -17,6 +17,11 @@ Changes are dated based on the default timezone: America/Los_Angeles
 - [SECURITY.md](SECURITY.md) – Security reporting and guidelines
 
 ---
+
+### 4/7/2026 Development Update
+
+- Added super-admin tools for support request visibility and super-admin account management.
+- Improved branding configuration so header logos are controlled and displayed correctly.
 
 ### 4/6/2026 Development Update
 

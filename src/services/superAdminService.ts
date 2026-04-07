@@ -14,6 +14,14 @@ export type SuperTenantAdmin = {
   district_name?: string;
 };
 
+export type SuperAdminAccount = {
+  id: string;
+  auth_email: string;
+  role: "super_admin";
+  is_active: boolean;
+  created_at: string;
+};
+
 type SuperAdminRequest = {
   action: SuperAdminAction;
   payload: Record<string, unknown>;
@@ -84,5 +92,46 @@ export const updateTenantAdminEmail = async (payload: {
 }) =>
   callSuperAdmin<SuperTenantAdmin>({
     action: "update_admin_email",
+    payload,
+  });
+
+export const listSuperAdmins = async (search = "") =>
+  callSuperAdmin<SuperAdminAccount[]>({
+    action: "list_super_admins",
+    payload: { search },
+  });
+
+export const createSuperAdmin = async (payload: {
+  auth_email: string;
+  password: string;
+}) =>
+  callSuperAdmin<SuperAdminAccount>({
+    action: "create_super_admin",
+    payload,
+  });
+
+export const setSuperAdminStatus = async (payload: {
+  id: string;
+  is_active: boolean;
+}) =>
+  callSuperAdmin<SuperAdminAccount>({
+    action: "set_super_admin_status",
+    payload,
+  });
+
+export const updateSuperAdminEmail = async (payload: {
+  id: string;
+  auth_email: string;
+}) =>
+  callSuperAdmin<SuperAdminAccount>({
+    action: "update_super_admin_email",
+    payload,
+  });
+
+export const sendSuperAdminReset = async (payload: {
+  auth_email: string;
+}) =>
+  callSuperAdmin<{ success: boolean }>({
+    action: "send_super_admin_reset",
     payload,
   });

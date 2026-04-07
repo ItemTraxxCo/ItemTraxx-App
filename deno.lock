@@ -20,10 +20,10 @@
   "workspace": {
     "packageJson": {
       "dependencies": [
-        "npm:@playwright/test@^1.58.2",
+        "npm:@playwright/test@^1.59.1",
         "npm:@sentry/vue@^10.47.0",
-        "npm:@supabase/supabase-js@^2.101.0",
-        "npm:@types/node@^25.5.0",
+        "npm:@supabase/supabase-js@^2.101.1",
+        "npm:@types/node@^25.5.2",
         "npm:@vercel/analytics@^2.0.1",
         "npm:@vercel/speed-insights@2",
         "npm:@vitejs/plugin-vue@^6.0.5",
@@ -32,13 +32,13 @@
         "npm:jspdf-autotable@^5.0.7",
         "npm:jspdf@^4.2.1",
         "npm:rollup@^4.60.1",
-        "npm:supabase@2.84.5",
+        "npm:supabase@2.85.0",
         "npm:typescript@~6.0.2",
-        "npm:vite@^8.0.3",
+        "npm:vite@^8.0.5",
         "npm:vue-router@^4.6.4",
         "npm:vue-tsc@^3.2.6",
-        "npm:vue@^3.5.31",
-        "npm:wrangler@^4.79.0",
+        "npm:vue@^3.5.32",
+        "npm:wrangler@^4.80.0",
         "npm:zod-to-json-schema@^3.25.2",
         "npm:zod@^4.3.6"
       ],

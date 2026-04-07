@@ -276,6 +276,39 @@ serve(async (req) => {
       return jsonResponse(200, { data: mapped });
     }
 
+    if (action === "list_super_admins") {
+      const search =
+        typeof (payload as Record<string, unknown>).search === "string"
+          ? ((payload as Record<string, unknown>).search as string).trim()
+          : "";
+
+      let query = adminClient
+        .from("profiles")
+        .select("id, auth_email, role, is_active, created_at")
+        .eq("role", "super_admin")
+        .order("created_at", { ascending: false })
+        .limit(100);
+
+      if (search) {
+        query = query.ilike("auth_email", `%${search}%`);
+      }
+
+      const { data, error } = await query;
+      if (error) {
+        return jsonResponse(400, { error: "Unable to load super admins." });
+      }
+
+      return jsonResponse(200, {
+        data: (data ?? []).map((item) => ({
+          id: item.id,
+          auth_email: item.auth_email ?? "",
+          role: "super_admin",
+          is_active: item.is_active !== false,
+          created_at: item.created_at,
+        })),
+      });
+    }
+
     if (action === "create_tenant_admin") {
       const next = payload as Record<string, unknown>;
       const tenantId = typeof next.tenant_id === "string" ? next.tenant_id.trim() : "";
@@ -413,6 +446,95 @@ serve(async (req) => {
       });
     }
 
+    if (action === "create_super_admin") {
+      const next = payload as Record<string, unknown>;
+      const authEmail = typeof next.auth_email === "string" ? next.auth_email.trim() : "";
+      const password = typeof next.password === "string" ? next.password : "";
+
+      if (!authEmail || authEmail.length > 320 || password.length < 8) {
+        return jsonResponse(400, { error: "Invalid request" });
+      }
+
+      const { data: existingProfile } = await adminClient
+        .from("profiles")
+        .select("id, role")
+        .eq("auth_email", authEmail)
+        .maybeSingle();
+
+      if (existingProfile?.role === "super_admin") {
+        return jsonResponse(409, {
+          error: "A super admin with this email already exists.",
+        });
+      }
+      if (existingProfile) {
+        return jsonResponse(409, {
+          error: "This email is already assigned to another account.",
+        });
+      }
+
+      const { data: authResult, error: createUserError } = await adminClient.auth.admin.createUser({
+        email: authEmail,
+        password,
+        email_confirm: true,
+      });
+
+      if (createUserError || !authResult.user?.id) {
+        const message = lower(createUserError?.message);
+        if (
+          message.includes("already") ||
+          message.includes("registered") ||
+          message.includes("exists")
+        ) {
+          return jsonResponse(409, {
+            error: "An account with this email already exists.",
+          });
+        }
+        if (message.includes("password")) {
+          return jsonResponse(400, {
+            error: "Password does not meet requirements. Use a stronger password and try again.",
+          });
+        }
+        return jsonResponse(400, {
+          error: createUserError?.message || "Unable to create auth user.",
+        });
+      }
+
+      const userId = authResult.user.id;
+      const { data: createdProfile, error: insertProfileError } = await adminClient
+        .from("profiles")
+        .insert({
+          id: userId,
+          tenant_id: null,
+          district_id: null,
+          auth_email: authEmail,
+          role: "super_admin",
+          is_active: true,
+        })
+        .select("id, auth_email, role, is_active, created_at")
+        .single();
+
+      if (insertProfileError || !createdProfile) {
+        await adminClient.auth.admin.deleteUser(userId);
+        return jsonResponse(400, {
+          error: insertProfileError?.message || "Unable to create super admin profile.",
+        });
+      }
+
+      await writeAudit("create_super_admin", "profile", createdProfile.id, {
+        auth_email: createdProfile.auth_email,
+      });
+
+      return jsonResponse(200, {
+        data: {
+          id: createdProfile.id,
+          auth_email: createdProfile.auth_email ?? "",
+          role: "super_admin",
+          is_active: createdProfile.is_active !== false,
+          created_at: createdProfile.created_at,
+        },
+      });
+    }
+
     if (action === "set_admin_status") {
       const next = payload as Record<string, unknown>;
       const id = typeof next.id === "string" ? next.id.trim() : "";
@@ -477,6 +599,74 @@ serve(async (req) => {
           is_active: updated.is_active !== false,
           tenant_name: tenantName,
           district_name: districtName,
+        },
+      });
+    }
+
+    if (action === "set_super_admin_status") {
+      const next = payload as Record<string, unknown>;
+      const id = typeof next.id === "string" ? next.id.trim() : "";
+      const isActive = next.is_active;
+
+      if (!id || typeof isActive !== "boolean") {
+        return jsonResponse(400, { error: "Invalid request" });
+      }
+      if (id === user.id && !isActive) {
+        return jsonResponse(400, { error: "You cannot disable your own super admin account." });
+      }
+
+      const { data: current, error: currentError } = await adminClient
+        .from("profiles")
+        .select("id, auth_email, is_active")
+        .eq("id", id)
+        .eq("role", "super_admin")
+        .single();
+
+      if (currentError || !current) {
+        return jsonResponse(400, { error: "Unable to find super admin." });
+      }
+
+      if (!isActive && current.is_active !== false) {
+        const { count, error: countError } = await adminClient
+          .from("profiles")
+          .select("id", { count: "exact", head: true })
+          .eq("role", "super_admin")
+          .eq("is_active", true);
+
+        if (countError) {
+          return jsonResponse(400, { error: "Unable to validate super admin status change." });
+        }
+        if ((count ?? 0) <= 1) {
+          return jsonResponse(400, { error: "At least one active super admin must remain." });
+        }
+      }
+
+      const { data: updated, error: updateError } = await adminClient
+        .from("profiles")
+        .update({ is_active: isActive })
+        .eq("id", id)
+        .eq("role", "super_admin")
+        .select("id, auth_email, role, is_active, created_at")
+        .single();
+
+      if (updateError || !updated) {
+        return jsonResponse(400, { error: "Unable to update super admin status." });
+      }
+
+      await writeAudit(
+        isActive ? "enable_super_admin" : "disable_super_admin",
+        "profile",
+        updated.id,
+        { auth_email: updated.auth_email },
+      );
+
+      return jsonResponse(200, {
+        data: {
+          id: updated.id,
+          auth_email: updated.auth_email ?? "",
+          role: "super_admin",
+          is_active: updated.is_active !== false,
+          created_at: updated.created_at,
         },
       });
     }
@@ -579,6 +769,76 @@ serve(async (req) => {
       });
     }
 
+    if (action === "update_super_admin_email") {
+      const next = payload as Record<string, unknown>;
+      const id = typeof next.id === "string" ? next.id.trim() : "";
+      const authEmail = typeof next.auth_email === "string" ? next.auth_email.trim() : "";
+
+      if (!id || !authEmail || authEmail.length > 320) {
+        return jsonResponse(400, { error: "Invalid request" });
+      }
+
+      const { data: current, error: currentError } = await adminClient
+        .from("profiles")
+        .select("id, auth_email, role, is_active, created_at")
+        .eq("id", id)
+        .eq("role", "super_admin")
+        .single();
+
+      if (currentError || !current) {
+        return jsonResponse(400, { error: "Unable to find super admin." });
+      }
+
+      const { data: existingProfile } = await adminClient
+        .from("profiles")
+        .select("id, role")
+        .eq("auth_email", authEmail)
+        .maybeSingle();
+
+      if (existingProfile && existingProfile.id !== id) {
+        return jsonResponse(409, {
+          error: "An account with this email already exists. Use a different email.",
+        });
+      }
+
+      const { error: authUpdateError } = await adminClient.auth.admin.updateUserById(id, {
+        email: authEmail,
+        email_confirm: true,
+      });
+      if (authUpdateError) {
+        return jsonResponse(400, {
+          error: authUpdateError.message || "Unable to update auth email.",
+        });
+      }
+
+      const { data: updated, error: profileUpdateError } = await adminClient
+        .from("profiles")
+        .update({ auth_email: authEmail })
+        .eq("id", id)
+        .eq("role", "super_admin")
+        .select("id, auth_email, role, is_active, created_at")
+        .single();
+
+      if (profileUpdateError || !updated) {
+        return jsonResponse(400, { error: "Unable to update super admin email." });
+      }
+
+      await writeAudit("update_super_admin_email", "profile", updated.id, {
+        previous_auth_email: current.auth_email,
+        auth_email: updated.auth_email,
+      });
+
+      return jsonResponse(200, {
+        data: {
+          id: updated.id,
+          auth_email: updated.auth_email ?? "",
+          role: "super_admin",
+          is_active: updated.is_active !== false,
+          created_at: updated.created_at,
+        },
+      });
+    }
+
     if (action === "send_reset") {
       const next = payload as Record<string, unknown>;
       const authEmail = typeof next.auth_email === "string" ? next.auth_email.trim() : "";
@@ -613,6 +873,33 @@ serve(async (req) => {
         { auth_email: authEmail }
       );
 
+      return jsonResponse(200, { data: { success: true } });
+    }
+
+    if (action === "send_super_admin_reset") {
+      const next = payload as Record<string, unknown>;
+      const authEmail = typeof next.auth_email === "string" ? next.auth_email.trim() : "";
+      if (!authEmail) {
+        return jsonResponse(400, { error: "Invalid request" });
+      }
+
+      const redirectTo = resolveResetRedirectTo(req);
+      if (!redirectTo) {
+        return jsonResponse(500, {
+          error: "Password reset redirect is not configured.",
+        });
+      }
+      const { error: resetError } = await adminClient.auth.resetPasswordForEmail(
+        authEmail,
+        { redirectTo }
+      );
+      if (resetError) {
+        return jsonResponse(400, {
+          error: `Unable to send password reset. ${resetError.message}`,
+        });
+      }
+
+      await writeAudit("send_super_admin_reset", "profile", null, { auth_email: authEmail });
       return jsonResponse(200, { data: { success: true } });
     }
 

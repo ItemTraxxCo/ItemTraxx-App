@@ -19,6 +19,8 @@ type RateLimitResult = {
   retry_after_seconds: number | null;
 };
 
+type SupportRequestStatus = "open" | "in_progress" | "resolved" | "spam";
+
 const resolveCorsHeaders = (req: Request) => {
   const origin = req.headers.get("Origin");
   const allowedOrigins = parseAllowedOrigins(Deno.env.get("ITX_ALLOWED_ORIGINS"));
@@ -165,6 +167,91 @@ serve(async (req) => {
         target_id: targetId,
         metadata,
       });
+    };
+
+    const writeSupportRequestEvent = async (
+      supportRequestId: string,
+      eventType: string,
+      metadata: Record<string, unknown> | null = null,
+    ) => {
+      await adminClient.from("support_request_events").insert({
+        support_request_id: supportRequestId,
+        actor_id: user.id,
+        actor_email: profile.auth_email ?? user.email ?? null,
+        event_type: eventType,
+        metadata,
+      });
+    };
+
+    const buildSupportRequestDetail = async (supportRequestId: string) => {
+      const { data: request, error: requestError } = await adminClient
+        .from("support_requests")
+        .select(
+          "id, requester_name, reply_email, subject, category, message, source, status, assigned_to, internal_notes, created_at, updated_at"
+        )
+        .eq("id", supportRequestId)
+        .single();
+
+      if (requestError || !request) {
+        return { error: "Support request not found.", data: null };
+      }
+
+      const [{ data: attachments, error: attachmentsError }, { data: events, error: eventsError }] =
+        await Promise.all([
+          adminClient
+            .from("support_request_attachments")
+            .select(
+              "id, original_filename, stored_filename, content_type, size_bytes, storage_bucket, storage_path"
+            )
+            .eq("support_request_id", supportRequestId)
+            .order("created_at", { ascending: true }),
+          adminClient
+            .from("support_request_events")
+            .select("id, actor_id, actor_email, event_type, metadata, created_at")
+            .eq("support_request_id", supportRequestId)
+            .order("created_at", { ascending: true }),
+        ]);
+
+      if (attachmentsError || eventsError) {
+        return { error: "Unable to load support request details.", data: null };
+      }
+
+      let assignedToEmail: string | null = null;
+      if (request.assigned_to) {
+        const { data: assignedProfile } = await adminClient
+          .from("profiles")
+          .select("auth_email")
+          .eq("id", request.assigned_to)
+          .single();
+        assignedToEmail = assignedProfile?.auth_email ?? null;
+      }
+
+      const signedAttachments = await Promise.all(
+        (attachments ?? []).map(async (attachment) => {
+          const { data: signedData, error: signedError } = await adminClient.storage
+            .from(attachment.storage_bucket)
+            .createSignedUrl(attachment.storage_path, 60 * 60);
+
+          return {
+            id: attachment.id,
+            original_filename: attachment.original_filename,
+            stored_filename: attachment.stored_filename,
+            content_type: attachment.content_type,
+            size_bytes: attachment.size_bytes,
+            signed_url: signedError ? null : signedData?.signedUrl ?? null,
+          };
+        }),
+      );
+
+      return {
+        error: null,
+        data: {
+          ...request,
+          assigned_to_email: assignedToEmail,
+          attachments: signedAttachments,
+          events: events ?? [],
+        },
+      };
     };
 
     if (action === "get_control_center") {
@@ -458,6 +545,156 @@ serve(async (req) => {
 
       await writeAudit("approve_request", "approval", id, {});
       return jsonResponse(200, { data });
+    }
+
+    if (action === "list_support_requests") {
+      const next = (payload ?? {}) as Record<string, unknown>;
+      const search = typeof next.search === "string" ? next.search.trim() : "";
+      const status = typeof next.status === "string" ? next.status.trim() : "";
+      const limitRaw = Number(next.limit);
+      const limit = Number.isFinite(limitRaw)
+        ? Math.min(200, Math.max(1, Math.round(limitRaw)))
+        : 100;
+      const allowedStatuses = new Set<SupportRequestStatus>([
+        "open",
+        "in_progress",
+        "resolved",
+        "spam",
+      ]);
+
+      let query = adminClient
+        .from("support_requests")
+        .select(
+          "id, requester_name, reply_email, subject, category, status, created_at, updated_at, assigned_to"
+        )
+        .order("created_at", { ascending: false })
+        .limit(limit);
+
+      if (status && allowedStatuses.has(status as SupportRequestStatus)) {
+        query = query.eq("status", status);
+      }
+
+      if (search) {
+        query = query.or(
+          `requester_name.ilike.%${search}%,reply_email.ilike.%${search}%,subject.ilike.%${search}%,message.ilike.%${search}%`
+        );
+      }
+
+      const { data, error } = await query;
+      if (error) {
+        return jsonResponse(400, { error: "Unable to load support requests." });
+      }
+
+      return jsonResponse(200, { data: { requests: data ?? [] } });
+    }
+
+    if (action === "get_support_request") {
+      const next = (payload ?? {}) as Record<string, unknown>;
+      const supportRequestId =
+        typeof next.support_request_id === "string" ? next.support_request_id.trim() : "";
+      if (!supportRequestId) {
+        return jsonResponse(400, { error: "Invalid request" });
+      }
+
+      const detail = await buildSupportRequestDetail(supportRequestId);
+      if (detail.error || !detail.data) {
+        return jsonResponse(400, { error: detail.error ?? "Unable to load support request." });
+      }
+
+      return jsonResponse(200, { data: { request: detail.data } });
+    }
+
+    if (action === "update_support_request") {
+      const next = (payload ?? {}) as Record<string, unknown>;
+      const supportRequestId =
+        typeof next.support_request_id === "string" ? next.support_request_id.trim() : "";
+      const status = typeof next.status === "string" ? next.status.trim() as SupportRequestStatus : undefined;
+      const internalNotes =
+        typeof next.internal_notes === "string" ? next.internal_notes.trim().slice(0, 4000) : undefined;
+      const assignToMe = next.assign_to_me === true;
+      const clearAssignment = next.clear_assignment === true;
+      const allowedStatuses = new Set<SupportRequestStatus>([
+        "open",
+        "in_progress",
+        "resolved",
+        "spam",
+      ]);
+
+      if (!supportRequestId) {
+        return jsonResponse(400, { error: "Invalid request" });
+      }
+      if (status && !allowedStatuses.has(status)) {
+        return jsonResponse(400, { error: "Invalid support request status." });
+      }
+      if (assignToMe && clearAssignment) {
+        return jsonResponse(400, { error: "Invalid assignment request." });
+      }
+
+      const { data: existing, error: existingError } = await adminClient
+        .from("support_requests")
+        .select("id, status, internal_notes, assigned_to")
+        .eq("id", supportRequestId)
+        .single();
+
+      if (existingError || !existing) {
+        return jsonResponse(400, { error: "Support request not found." });
+      }
+
+      const updates: Record<string, unknown> = {};
+      const eventMetadata: Record<string, unknown> = {};
+
+      if (status && status !== existing.status) {
+        updates.status = status;
+        eventMetadata.status = { from: existing.status, to: status };
+      }
+
+      if (internalNotes !== undefined && internalNotes !== (existing.internal_notes ?? "")) {
+        updates.internal_notes = internalNotes || null;
+        eventMetadata.internal_notes_updated = true;
+      }
+
+      if (assignToMe && existing.assigned_to !== user.id) {
+        updates.assigned_to = user.id;
+        eventMetadata.assignment = {
+          from: existing.assigned_to,
+          to: user.id,
+        };
+      } else if (clearAssignment && existing.assigned_to !== null) {
+        updates.assigned_to = null;
+        eventMetadata.assignment = {
+          from: existing.assigned_to,
+          to: null,
+        };
+      }
+
+      if (Object.keys(updates).length === 0) {
+        const detail = await buildSupportRequestDetail(supportRequestId);
+        if (detail.error || !detail.data) {
+          return jsonResponse(400, { error: detail.error ?? "Unable to load support request." });
+        }
+        return jsonResponse(200, { data: { request: detail.data } });
+      }
+
+      updates.updated_at = new Date().toISOString();
+
+      const { error: updateError } = await adminClient
+        .from("support_requests")
+        .update(updates)
+        .eq("id", supportRequestId);
+
+      if (updateError) {
+        return jsonResponse(400, { error: "Unable to update support request." });
+      }
+
+      await writeSupportRequestEvent(supportRequestId, "updated", eventMetadata);
+      await writeAudit("update_support_request", "support_request", supportRequestId, eventMetadata);
+
+      const detail = await buildSupportRequestDetail(supportRequestId);
+      if (detail.error || !detail.data) {
+        return jsonResponse(400, { error: detail.error ?? "Unable to load support request." });
+      }
+
+      return jsonResponse(200, { data: { request: detail.data } });
     }
 
     if (action === "list_sales_leads") {

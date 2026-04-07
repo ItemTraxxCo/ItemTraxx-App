@@ -3,7 +3,11 @@
     <div class="login-split-panel">
       <section class="login-story-panel">
         <header class="story-header">
-          <div class="story-brand">ItemTraxx</div>
+          <img
+            class="story-brand-logo"
+            :src="brandLogoUrl"
+            alt="ItemTraxx Co"
+          />
           <RouterLink class="story-back-link" to="/">Back</RouterLink>
         </header>
 
@@ -137,6 +141,8 @@ const error = ref("");
 const isLoading = ref(false);
 const toastTitle = ref("");
 const toastMessage = ref("");
+const lightBrandLogoUrl = import.meta.env.VITE_BRAND_LOGO_LIGHT_URL as string | undefined;
+const darkBrandLogoUrl = import.meta.env.VITE_BRAND_LOGO_DARK_URL as string | undefined;
 const legalUrl =
   import.meta.env.VITE_LEGAL_URL ||
   "https://www.itemtraxx.com/legal";
@@ -183,6 +189,11 @@ const storySlides = [
 ] as const;
 const activeStoryIndex = ref(0);
 const themeMode = ref<"light" | "dark">("dark");
+const brandLogoUrl = computed(() =>
+  themeMode.value === "light"
+    ? lightBrandLogoUrl || darkBrandLogoUrl || ""
+    : darkBrandLogoUrl || lightBrandLogoUrl || ""
+);
 const turnstileSiteKey = import.meta.env.VITE_TURNSTILE_SITE_KEY as
   | string
   | undefined;
@@ -512,12 +523,12 @@ onMounted(() => {
   gap: 1rem;
 }
 
-.story-brand {
-  font-family: Helvetica, "Helvetica Neue", Arial, sans-serif;
-  font-size: 2rem;
-  font-weight: 700;
-  letter-spacing: -0.05em;
-  color: var(--login-story-brand);
+.story-brand-logo {
+  height: 3.8rem;
+  width: auto;
+  object-fit: contain;
+  display: block;
+  transform: translateY(-2px);
 }
 
 .story-back-link {

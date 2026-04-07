@@ -7,6 +7,8 @@ interface ImportMetaEnv {
   readonly VITE_EDGE_PROXY_URL?: string;
   readonly VITE_TENANT_LOGIN_FUNCTION?: string;
   readonly VITE_LOGO_URL?: string;
+  readonly VITE_BRAND_LOGO_LIGHT_URL?: string;
+  readonly VITE_BRAND_LOGO_DARK_URL?: string;
   readonly VITE_TERMS_URL?: string;
   readonly VITE_PRIVACY_URL?: string;
   readonly VITE_LEGAL_URL?: string;

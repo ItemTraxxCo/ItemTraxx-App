@@ -7,7 +7,9 @@
     <div class="grid-noise" aria-hidden="true"></div>
 
     <header class="landing-header shell">
-      <RouterLink class="brand-mark" to="/">ItemTraxx Co</RouterLink>
+      <RouterLink class="brand-mark" to="/">
+        <img class="brand-mark-full" :src="brandLogoUrl" alt="ItemTraxx Co" />
+      </RouterLink>
       <nav class="landing-nav" aria-label="Primary">
         <RouterLink to="/pricing">Pricing</RouterLink>
         <RouterLink to="/contact-support">Support</RouterLink>
@@ -34,8 +36,8 @@
             Losing track of where stuff goes? ItemTraxx is the right service for you.
           </p>
           <p class="hero-support">
-            Contact us to get early access and start mastering your inventory with ItemTraxx's
-            streamlined checkout, returns, and admin management. Regular subscription terms apply.
+            Contact us to start mastering your inventory with ItemTraxx's
+            streamlined checkout, returns, and admin management.
           </p>
           <div class="hero-actions">
             <RouterLink class="cta-primary" to="/pricing" @click="trackCta('pricing', 'hero')">Pricing</RouterLink>
@@ -50,7 +52,6 @@
           <ul class="hero-points" aria-label="Key product benefits">
             <li>Secure sign-ins and protected admin access</li>
             <li>Clear transaction history and audit visibility</li>
-            <li>Smooth checkout and return workflows</li>
             <li>Easy item and user management features</li>
             <li>Designed for teams, organizations, and individual users</li>
             <li>Built to scale with your inventory and operations</li>
@@ -205,7 +206,7 @@
 </template>
 
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, onUnmounted, ref } from 'vue';
 import { RouterLink } from 'vue-router';
 import { trackAnalyticsEvent } from "../services/analyticsService";
 import adminUiImage from '../assets/landing/admin_ui.png';
@@ -218,6 +219,9 @@ import checkoutReturnUiImage1200 from '../assets/landing/checkout_return_ui-1200
 import checkoutReturnUiImage1600 from '../assets/landing/checkout_return_ui-1600.webp';
 import { fetchSystemStatus } from '../services/systemStatusService';
 import PublicFooter from "../components/PublicFooter.vue";
+
+const themeMode = ref<"light" | "dark">("dark");
+const brandLogoUrl = computed(() => import.meta.env.VITE_BRAND_LOGO_DARK_URL || "");
 
 type ShowcaseVariant = {
   label: string;
@@ -351,6 +355,7 @@ const refreshSystemStatus = async () => {
 
 let observer: IntersectionObserver | null = null;
 let statusTimer: number | null = null;
+let themeObserver: MutationObserver | null = null;
 
 const startStatusPolling = () => {
   if (statusTimer || document.visibilityState === 'hidden') return;
@@ -375,6 +380,15 @@ const handleVisibilityChange = () => {
 };
 
 onMounted(() => {
+  const syncTheme = () => {
+    themeMode.value = document.documentElement.getAttribute('data-theme') === 'light' ? 'light' : 'dark';
+  };
+  syncTheme();
+  themeObserver = new MutationObserver(syncTheme);
+  themeObserver.observe(document.documentElement, {
+    attributes: true,
+    attributeFilter: ['data-theme'],
+  });
   window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
   void refreshSystemStatus();
   startStatusPolling();
@@ -408,6 +422,13 @@ onBeforeUnmount(() => {
   observer = null;
   stopStatusPolling();
   document.removeEventListener('visibilitychange', handleVisibilityChange);
+});
+
+onUnmounted(() => {
+  if (themeObserver) {
+    themeObserver.disconnect();
+    themeObserver = null;
+  }
 });
 </script>
 
@@ -497,13 +518,18 @@ onBeforeUnmount(() => {
 }
 
 .brand-mark {
-  font-family: Helvetica, "Helvetica Neue", Arial, sans-serif;
-  font-size: 1.4rem;
-  font-weight: 700;
-  letter-spacing: -0.03em;
-  color: #f6f7fb;
+  display: inline-flex;
+  align-items: center;
   text-decoration: none;
-  white-space: nowrap;
+}
+
+.brand-mark-full {
+  height: 4.5rem;
+  width: auto;
+  object-fit: contain;
+  flex-shrink: 0;
+  display: block;
+  transform: translateY(-2px);
 }
 
 .landing-nav {
@@ -976,8 +1002,11 @@ onBeforeUnmount(() => {
   }
 
   .brand-mark {
-    font-size: 1.15rem;
     flex-shrink: 0;
+  }
+
+  .brand-mark-full {
+    height: 3rem;
   }
 
   .landing-nav a,

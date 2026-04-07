@@ -26,10 +26,15 @@ export type SuperTenantAction =
 
 export type SuperAdminAction =
   | "list_tenant_admins"
+  | "list_super_admins"
   | "create_tenant_admin"
+  | "create_super_admin"
   | "set_admin_status"
+  | "set_super_admin_status"
   | "update_admin_email"
-  | "send_reset";
+  | "update_super_admin_email"
+  | "send_reset"
+  | "send_super_admin_reset";
 
 export type SuperGearAction = "list" | "create" | "update" | "delete";
 export type SuperStudentAction = "list" | "create" | "update" | "delete";

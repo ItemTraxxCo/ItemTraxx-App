@@ -39,16 +39,24 @@ type SupportPayload = {
 };
 
 type NormalizedAttachment = {
-  filename: string;
+  original_filename: string | null;
+  stored_filename: string;
+  storage_extension: DetectedAttachmentType["extension"];
   content_type: string;
   content_base64: string;
   size_bytes: number;
+  bytes: Uint8Array;
 };
 
 type DetectedAttachmentType = {
   contentType: "image/png" | "image/jpeg" | "image/webp" | "image/gif";
   extension: "png" | "jpg" | "webp" | "gif";
 };
+
+const UUID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const SAFE_STORAGE_PATH_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\/[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\.(png|jpg|webp|gif)$/i;
 
 const normalizeText = (value: unknown, max = 5000) => {
   if (typeof value !== "string") return "";
@@ -134,6 +142,30 @@ const hashString = async (value: string) => {
   const encoded = new TextEncoder().encode(value);
   const digest = await crypto.subtle.digest("SHA-256", encoded);
   return toHex(new Uint8Array(digest));
+};
+
+const SUPPORT_ATTACHMENT_BUCKET = "support-request-attachments";
+
+const buildSafeStoragePath = (
+  requestId: string,
+  extension: DetectedAttachmentType["extension"],
+) => {
+  if (!UUID_PATTERN.test(requestId)) {
+    throw new Error("Invalid support request id for storage path.");
+  }
+
+  const objectName = `${crypto.randomUUID()}.${extension}`;
+  const [basename, suffix] = objectName.split(".");
+  if (!UUID_PATTERN.test(basename) || suffix !== extension) {
+    throw new Error("Unable to generate safe storage object name.");
+  }
+
+  const storagePath = `${requestId}/${objectName}`;
+  if (!SAFE_STORAGE_PATH_PATTERN.test(storagePath)) {
+    throw new Error("Generated storage path failed validation.");
+  }
+
+  return storagePath;
 };
 
 const resolveCorsHeaders = (req: Request) => {
@@ -283,10 +315,13 @@ serve(async (req) => {
       }
 
       attachments.push({
-        filename: `support-attachment-${index + 1}.${detectedType.extension}`,
+        original_filename: normalizeText(attachment.filename, 120) || null,
+        stored_filename: `${crypto.randomUUID()}.${detectedType.extension}`,
+        storage_extension: detectedType.extension,
         content_type: detectedType.contentType,
         content_base64: contentBase64,
         size_bytes: bytes.length,
+        bytes,
       });
     }
 
@@ -320,6 +355,95 @@ serve(async (req) => {
       return jsonResponse(403, { error: "Security check failed." });
     }
 
+    const { data: supportRequest, error: supportRequestError } = await adminClient
+      .from("support_requests")
+      .insert({
+        requester_name: name,
+        reply_email: replyEmail,
+        subject,
+        category,
+        message,
+        source: "public_form",
+        status: "open",
+      })
+      .select("id")
+      .single();
+
+    if (supportRequestError || !supportRequest?.id) {
+      logError("contact-support-submit support request insert failed", requestId, supportRequestError);
+      return jsonResponse(500, { error: "Unable to save support request." });
+    }
+
+    const uploadedPaths: string[] = [];
+    const attachmentRows = [];
+    try {
+      for (const attachment of attachments) {
+        const storagePath = buildSafeStoragePath(
+          supportRequest.id,
+          attachment.storage_extension,
+        );
+        if (storagePath.includes('..')) {
+          throw new Error('Invalid storage path');
+        }
+        const uploadResult = await adminClient.storage
+          .from(SUPPORT_ATTACHMENT_BUCKET)
+          .upload(storagePath, attachment.bytes, {
+            contentType: attachment.content_type,
+            upsert: false,
+          });
+
+        if (uploadResult.error) {
+          throw uploadResult.error;
+        }
+
+        uploadedPaths.push(storagePath);
+        attachmentRows.push({
+          support_request_id: supportRequest.id,
+          storage_bucket: SUPPORT_ATTACHMENT_BUCKET,
+          storage_path: storagePath,
+          original_filename: attachment.original_filename,
+          stored_filename: attachment.stored_filename,
+          content_type: attachment.content_type,
+          size_bytes: attachment.size_bytes,
+        });
+      }
+
+      if (attachmentRows.length > 0) {
+        const { error: attachmentInsertError } = await adminClient
+          .from("support_request_attachments")
+          .insert(attachmentRows);
+        if (attachmentInsertError) {
+          throw attachmentInsertError;
+        }
+      }
+
+      const { error: eventInsertError } = await adminClient
+        .from("support_request_events")
+        .insert({
+          support_request_id: supportRequest.id,
+          actor_id: null,
+          actor_email: replyEmail,
+          event_type: "submitted",
+          metadata: {
+            source: "public_form",
+            attachment_count: attachments.length,
+          },
+        });
+
+      if (eventInsertError) {
+        throw eventInsertError;
+      }
+    } catch (persistenceError) {
+      logError("contact-support-submit attachment persistence failed", requestId, persistenceError);
+      for (const path of uploadedPaths) {
+        await adminClient.storage.from(SUPPORT_ATTACHMENT_BUCKET).remove([path]);
+      }
+      await adminClient.from("support_request_attachments").delete().eq("support_request_id", supportRequest.id);
+      await adminClient.from("support_request_events").delete().eq("support_request_id", supportRequest.id);
+      await adminClient.from("support_requests").delete().eq("id", supportRequest.id);
+      return jsonResponse(500, { error: "Unable to save support request." });
+    }
+
     const { error: enqueueError } = await adminClient.rpc("enqueue_async_job", {
       p_job_type: "contact_support_email",
       p_payload: {
@@ -328,7 +452,12 @@ serve(async (req) => {
         subject,
         category,
         message,
-        attachments,
+        attachments: attachments.map((attachment) => ({
+          filename: attachment.stored_filename,
+          content_type: attachment.content_type,
+          content_base64: attachment.content_base64,
+          size_bytes: attachment.size_bytes,
+        })),
         support_email: supportEmail,
         from_email: fromEmail,
       },
@@ -340,8 +469,12 @@ serve(async (req) => {
       return jsonResponse(500, { error: "Unable to queue follow-up email." });
     }
 
-    logInfo("contact-support-submit accepted", requestId, { category });
-    return jsonResponse(200, { data: { accepted: true } });
+    logInfo("contact-support-submit accepted", requestId, {
+      category,
+      support_request_id: supportRequest.id,
+      attachment_count: attachments.length,
+    });
+    return jsonResponse(200, { data: { accepted: true, request_id: supportRequest.id } });
   } catch (error) {
     logError("contact-support-submit error", requestId, error);
     return jsonResponse(500, { error: "Request failed." });

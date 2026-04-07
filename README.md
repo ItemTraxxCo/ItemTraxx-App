@@ -1,6 +1,6 @@
 # ItemTraxx
 
-Last updated: 2026-03-10 (year-month-day)
+Last updated: 2026-04-7 (year-month-day)
 
 **ItemTraxx** is a cloud-based inventory, checkout, and administrative control platform built for schools, districts, organizations, and individual operators. It supports root-domain access on `itemtraxx.com`, custom-routed workspaces on `*.app.itemtraxx.com`, and role-based admin tooling across user, admin, and district surfacing.
 

@@ -169,6 +169,47 @@ export type InternalOpsSnapshot = {
   recent_events: InternalOpsEvent[];
 };
 
+export type SupportRequestStatus = "open" | "in_progress" | "resolved" | "spam";
+
+export type SupportRequestListItem = {
+  id: string;
+  requester_name: string;
+  reply_email: string;
+  subject: string;
+  category: "general" | "bug" | "billing" | "access" | "feature" | "other";
+  status: SupportRequestStatus;
+  created_at: string;
+  updated_at: string;
+  assigned_to: string | null;
+};
+
+export type SupportRequestAttachment = {
+  id: string;
+  original_filename: string | null;
+  stored_filename: string;
+  content_type: string;
+  size_bytes: number;
+  signed_url: string | null;
+};
+
+export type SupportRequestEvent = {
+  id: string;
+  actor_id: string | null;
+  actor_email: string | null;
+  event_type: string;
+  metadata: Record<string, unknown> | null;
+  created_at: string;
+};
+
+export type SupportRequestDetail = SupportRequestListItem & {
+  message: string;
+  source: string;
+  internal_notes: string | null;
+  assigned_to_email: string | null;
+  attachments: SupportRequestAttachment[];
+  events: SupportRequestEvent[];
+};
+
 type SuperOpsAction =
   | "get_control_center"
   | "set_runtime_config"
@@ -177,6 +218,9 @@ type SuperOpsAction =
   | "set_tenant_force_reauth"
   | "create_approval"
   | "approve_request"
+  | "list_support_requests"
+  | "get_support_request"
+  | "update_support_request"
   | "list_sales_leads"
   | "set_sales_lead_stage"
   | "delete_sales_lead"
@@ -270,6 +314,34 @@ export const setTenantPolicy = async (payload: {
 export const approveRequest = async (payload: { id: string }) =>
   callSuperOps<SuperApproval>({
     action: "approve_request",
+    payload,
+  });
+
+export const listSupportRequests = async (payload: {
+  search?: string;
+  status?: SupportRequestStatus | "";
+  limit?: number;
+} = {}) =>
+  callSuperOps<{ requests: SupportRequestListItem[] }>({
+    action: "list_support_requests",
+    payload,
+  });
+
+export const getSupportRequest = async (payload: { support_request_id: string }) =>
+  callSuperOps<{ request: SupportRequestDetail }>({
+    action: "get_support_request",
+    payload,
+  });
+
+export const updateSupportRequest = async (payload: {
+  support_request_id: string;
+  status?: SupportRequestStatus;
+  internal_notes?: string;
+  assign_to_me?: boolean;
+  clear_assignment?: boolean;
+}) =>
+  callSuperOps<{ request: SupportRequestDetail }>({
+    action: "update_support_request",
     payload,
   });
 

@@ -3,10 +3,10 @@ import { isAbsolute, resolve, sep } from "node:path";
 
 const assetsDir = resolve("dist/assets");
 const reportPath = resolve("artifacts/perf-report.json");
-const SAFE_ASSET_NAME_RE = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
+const SAFE_ASSET_NAME_RE = /^[A-Za-z0-9_][A-Za-z0-9._-]*$/;
 
 const resolveSafeAssetPath = (assetName) => {
-  // Aikido/SAST hardening: only allow simple filenames emitted by the bundler.
+  // Aikido/SAST hardening: only allow simple bundler-emitted basenames, including helper chunks that may start with an underscore.
   if (isAbsolute(assetName) || !SAFE_ASSET_NAME_RE.test(assetName)) {
     throw new Error(`Refusing suspicious asset name: ${assetName}`);
   }

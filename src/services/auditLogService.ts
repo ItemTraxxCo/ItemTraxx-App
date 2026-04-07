@@ -10,8 +10,8 @@ export type AuditLogPayload = {
 
 export const logAdminAction = async (payload: AuditLogPayload) => {
   const auth = getAuthState();
-  if (!auth.tenantContextId) {
-    throw new Error("Missing tenant context.");
+  if (!auth.tenantContextId || !auth.userId) {
+    throw new Error("Missing authenticated audit context.");
   }
 
   await authenticatedInsert("admin_audit_logs", {

@@ -214,6 +214,7 @@ for insert
 to authenticated
 with check (
   public.current_user_role() = 'tenant_admin'
+  and actor_id = auth.uid()
   and tenant_id = public.current_tenant_id()
   and public.has_recent_privileged_step_up('tenant_admin')
 );
@@ -224,7 +225,10 @@ on public.admin_audit_logs
 for all
 to authenticated
 using (public.current_user_role() = 'super_admin')
-with check (public.current_user_role() = 'super_admin');
+with check (
+  public.current_user_role() = 'super_admin'
+  and actor_id = auth.uid()
+);
 
 -- tenant policies
 

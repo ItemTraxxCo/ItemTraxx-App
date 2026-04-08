@@ -3,7 +3,11 @@
     <div
       v-if="modelValue"
       class="scanner-modal-backdrop"
-      :class="{ 'scanner-modal-backdrop-lab': labPreview }"
+      :class="{
+        'scanner-modal-backdrop-lab': labPreview,
+        'scanner-theme-light': themeMode === 'light',
+        'scanner-theme-dark': themeMode === 'dark',
+      }"
       @click.self="handleClose"
     >
       <div class="scanner-modal-card" role="dialog" aria-modal="true" :aria-label="title">
@@ -115,7 +119,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onUnmounted, watch } from "vue";
+import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import { useCameraBarcodeScanner } from "../composables/useCameraBarcodeScanner";
 import type { ScannerHistoryItem, ScannerMode, ScannerScanEvent, ScannerStatus, ScannerStatusEvent } from "../types/cameraScanner";
 
@@ -196,6 +200,14 @@ const scanHistoryItems = computed(() => {
   return props.scanHistoryItems ?? [];
 });
 
+const themeMode = ref<"light" | "dark">("dark");
+let themeObserver: MutationObserver | null = null;
+
+const syncTheme = () => {
+  if (typeof document === "undefined") return;
+  themeMode.value = document.documentElement.getAttribute("data-theme") === "light" ? "light" : "dark";
+};
+
 watch(
   () => props.modelValue,
   (next) => {
@@ -227,8 +239,21 @@ const statusLabel = computed(() => {
   }
 });
 
+onMounted(() => {
+  syncTheme();
+  if (typeof document !== "undefined") {
+    themeObserver = new MutationObserver(syncTheme);
+    themeObserver.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ["data-theme"],
+    });
+  }
+});
+
 onUnmounted(() => {
   clearCloseTimer();
+  themeObserver?.disconnect();
+  themeObserver = null;
 });
 
 const previewStyle = computed(() => {
@@ -271,7 +296,7 @@ const previewStyle = computed(() => {
   backdrop-filter: blur(16px);
 }
 
-:global(:root[data-theme="light"]) .scanner-modal-backdrop {
+.scanner-modal-backdrop.scanner-theme-light {
   --scanner-backdrop: rgba(232, 238, 243, 0.74);
   --scanner-card-bg: linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(241, 243, 240, 0.99) 100%);
   --scanner-card-text: #0f1724;

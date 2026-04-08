@@ -3,6 +3,7 @@ export interface Env {
   SUPABASE_ANON_KEY: string;
   ALLOWED_ORIGINS?: string;
   ALLOWED_FUNCTIONS?: string;
+  PENTEST_PROXY_TOKEN?: string;
   TRUST_LOCAL_ORIGINS?: string;
   ITX_ITEMTRAXX_KILLSWITCH_ENABLED?: string;
   SESSION_COOKIE_DOMAIN?: string;
@@ -15,10 +16,12 @@ const REFRESH_COOKIE_NAME = "itx_refresh";
 const REFRESH_GRANT_TYPE = "refresh_token";
 const ACCESS_TOKEN_MAX_AGE_SECONDS = 60 * 60;
 const REFRESH_TOKEN_MAX_AGE_SECONDS = 60 * 60 * 24 * 30;
+const PENTEST_HOSTNAME = "edge-pentest.itemtraxx.com";
+const PENTEST_TOKEN_HEADER = "x-itx-pentest-token";
 
 const BASE_CORS_HEADERS = {
   "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-request-id, prefer, x-itx-session-request",
+    `authorization, x-client-info, apikey, content-type, x-request-id, prefer, x-itx-session-request, ${PENTEST_TOKEN_HEADER}`,
   "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
   "Access-Control-Allow-Credentials": "true",
   "Access-Control-Expose-Headers": "content-range, content-profile, x-request-id",
@@ -298,6 +301,14 @@ const resolveRequestOrigin = (request: Request) => {
   } catch {
     return null;
   }
+};
+
+const isPentestHost = (url: URL) => url.hostname.toLowerCase() === PENTEST_HOSTNAME;
+
+const hasValidPentestToken = (request: Request, env: Env) => {
+  const expected = env.PENTEST_PROXY_TOKEN?.trim();
+  if (!expected) return false;
+  return request.headers.get(PENTEST_TOKEN_HEADER) === expected;
 };
 
 const buildError = (
@@ -936,6 +947,10 @@ export default {
     const { originAllowed, headers } = withCorsHeaders(origin, allowedOrigins, env);
 
     try {
+      if (isPentestHost(url) && !hasValidPentestToken(request, env)) {
+        return buildError(403, "Pentest token required", headers, requestId);
+      }
+
       if (request.method === "OPTIONS") {
         if (!originAllowed) {
           return new Response("Origin not allowed", { status: 403, headers });

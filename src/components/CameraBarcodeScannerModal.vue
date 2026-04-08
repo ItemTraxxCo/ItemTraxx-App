@@ -80,12 +80,12 @@
             <p class="scanner-status-copy">{{ statusMessageText }}</p>
           </div>
           <span class="scanner-helper-text">
-            make sure barcode is clearly visible, there are no glares, and well lit.
+            Make sure the barcode is clearly visible, there are no glares, and well lit.
           </span>
         </div>
 
         <div v-if="props.mode !== 'borrower' && currentDetection" class="scanner-detected-card">
-          <strong>Scanned barcode</strong>
+          <strong>Current barcode</strong>
           <span>{{ currentDetection.value }}</span>
         </div>
 

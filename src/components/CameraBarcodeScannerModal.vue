@@ -53,6 +53,7 @@
               Flip camera
             </button>
             <button
+              v-if="props.autoAcceptOnScan === false"
               type="button"
               class="button-primary"
               :disabled="!hasActiveCandidate"
@@ -76,21 +77,37 @@
           </span>
         </div>
       </div>
+        <div v-if="currentDetection" class="scanner-detected-card">
+          <strong>Scanned barcode</strong>
+          <span>{{ currentDetection.value }}</span>
+        </div>
+
+        <div v-if="scanHistoryItems.length" class="scanner-history-card">
+          <strong>Scanned items</strong>
+          <ul class="scanner-history-list">
+            <li v-for="item in scanHistoryItems" :key="item.id">
+              <span>{{ item.label }}</span>
+              <span class="scanner-history-value">{{ item.value }}</span>
+            </li>
+          </ul>
+        </div>
     </div>
   </Teleport>
 </template>
 
 <script setup lang="ts">
-import { computed, watch } from "vue";
+import { computed, onUnmounted, watch } from "vue";
 import { useCameraBarcodeScanner } from "../composables/useCameraBarcodeScanner";
-import type { ScannerMode, ScannerScanEvent, ScannerStatus, ScannerStatusEvent } from "../types/cameraScanner";
+import type { ScannerHistoryItem, ScannerMode, ScannerScanEvent, ScannerStatus, ScannerStatusEvent } from "../types/cameraScanner";
 
 const props = defineProps<{
   modelValue: boolean;
   mode: ScannerMode;
   title: string;
   autoCloseOnScan?: boolean;
+  autoAcceptOnScan?: boolean;
   labPreview?: boolean;
+  scanHistoryItems?: ScannerHistoryItem[];
 }>();
 
 const emit = defineEmits<{
@@ -117,11 +134,15 @@ const {
   manualConfirm,
 } = useCameraBarcodeScanner({
   mode: () => props.mode,
-  autoAccept: () => props.autoCloseOnScan !== false,
+  autoAccept: () => props.autoAcceptOnScan !== false,
   onScanned: (event) => {
     emit("scanned", event);
     if (props.autoCloseOnScan !== false) {
-      emit("update:modelValue", false);
+      clearCloseTimer();
+      closeTimer = window.setTimeout(() => {
+        closeTimer = null;
+        emit("update:modelValue", false);
+      }, AUTO_CLOSE_DELAY_MS);
     }
   },
   onStatus: (event) => {
@@ -130,16 +151,34 @@ const {
 });
 void videoRef;
 
+const AUTO_CLOSE_DELAY_MS = 520;
+let closeTimer: number | null = null;
+
+const clearCloseTimer = () => {
+  if (closeTimer !== null) {
+    window.clearTimeout(closeTimer);
+    closeTimer = null;
+  }
+};
+
 const handleClose = () => {
+  clearCloseTimer();
   emit("update:modelValue", false);
 };
+
+const scanHistoryItems = computed(() => {
+  if (props.mode === "borrower") return [];
+  return props.scanHistoryItems ?? [];
+});
 
 watch(
   () => props.modelValue,
   (next) => {
     if (next) {
+      clearCloseTimer();
       void open();
     } else {
+      clearCloseTimer();
       close();
     }
   },
@@ -161,6 +200,10 @@ const statusLabel = computed(() => {
     default:
       return "Barcode not readable";
   }
+});
+
+onUnmounted(() => {
+  clearCloseTimer();
 });
 
 const previewStyle = computed(() => {
@@ -432,4 +475,49 @@ const previewStyle = computed(() => {
     height: min(44vh, 360px);
   }
 }
+
+.scanner-detected-card,
+.scanner-history-card {
+  margin-top: 1rem;
+  border-radius: 18px;
+  border: 1px solid rgba(118, 143, 181, 0.16);
+  background: rgba(9, 17, 31, 0.68);
+  padding: 0.9rem 1rem;
+}
+
+.scanner-detected-card strong,
+.scanner-history-card strong {
+  display: block;
+  margin-bottom: 0.45rem;
+  font-size: 0.85rem;
+  color: rgba(194, 206, 223, 0.88);
+}
+
+.scanner-detected-card span {
+  display: block;
+  font-family: ui-monospace, SFMono-Regular, SFMono-Regular, Consolas, monospace;
+  font-size: 1rem;
+  word-break: break-word;
+}
+
+.scanner-history-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.55rem;
+}
+
+.scanner-history-list li {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.8rem;
+  font-size: 0.95rem;
+}
+
+.scanner-history-value {
+  color: rgba(194, 206, 223, 0.72);
+  font-family: ui-monospace, SFMono-Regular, SFMono-Regular, Consolas, monospace;
+}
+
 </style>

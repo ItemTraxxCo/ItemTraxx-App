@@ -37,3 +37,9 @@ export type ScannerCapabilityState = {
   flashlightSupported: boolean;
   canFlipCamera: boolean;
 };
+
+export type ScannerHistoryItem = {
+  id: string;
+  label: string;
+  value: string;
+};

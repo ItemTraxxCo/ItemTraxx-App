@@ -46,7 +46,7 @@
           </div>
 
           <div class="scanner-controls">
-            <button type="button" class="button-secondary" @click="handleClose">Close camera</button>
+            <button type="button" class="button-primary scanner-close-button" @click="handleClose">Close camera</button>
             <button
               type="button"
               class="button-secondary"
@@ -490,10 +490,29 @@ const previewStyle = computed(() => {
 .scanner-controls .button-secondary {
   min-height: 2.55rem;
 }
+
+.scanner-close-button {
+  box-shadow: 0 10px 24px color-mix(in srgb, var(--accent, #2563eb) 24%, transparent 76%);
+}
+
 .scanner-controls .button-secondary {
   color: var(--scanner-card-text);
   background: color-mix(in srgb, var(--scanner-panel-bg) 86%, var(--surface, #fff) 14%);
   border-color: var(--scanner-panel-border);
+}
+
+.scanner-controls button:disabled {
+  cursor: not-allowed;
+  opacity: 1;
+}
+
+.scanner-controls .button-secondary:disabled,
+.scanner-controls .button-primary:disabled {
+  color: color-mix(in srgb, var(--scanner-card-text) 38%, transparent 62%);
+  background: color-mix(in srgb, var(--scanner-panel-bg) 52%, var(--scanner-card-bg) 48%);
+  border-color: color-mix(in srgb, var(--scanner-panel-border) 56%, transparent 44%);
+  box-shadow: none;
+  filter: saturate(0.45);
 }
 
 

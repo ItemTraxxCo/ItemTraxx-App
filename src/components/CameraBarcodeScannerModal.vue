@@ -253,9 +253,13 @@ const previewStyle = computed(() => {
   --scanner-panel-border: rgba(118, 143, 181, 0.16);
   --scanner-icon-bg: rgba(9, 17, 31, 0.58);
   --scanner-icon-border: rgba(140, 157, 189, 0.24);
+  --scanner-eyebrow: rgba(194, 206, 223, 0.72);
+  --scanner-frame-bg: #04070d;
+  --scanner-frame-border: rgba(118, 143, 181, 0.16);
   --scanner-status-bg: rgba(14, 23, 35, 0.9);
   --scanner-status-border: rgba(118, 143, 181, 0.14);
   --scanner-overlay-bg: rgba(7, 12, 20, 0.8);
+  --scanner-overlay-error-bg: rgba(59, 16, 18, 0.82);
   position: fixed;
   inset: 0;
   z-index: 2200;
@@ -277,9 +281,13 @@ const previewStyle = computed(() => {
   --scanner-panel-border: rgba(15, 23, 36, 0.12);
   --scanner-icon-bg: rgba(255, 255, 255, 0.88);
   --scanner-icon-border: rgba(15, 23, 36, 0.12);
+  --scanner-eyebrow: rgba(15, 23, 36, 0.58);
+  --scanner-frame-bg: rgba(245, 247, 250, 0.98);
+  --scanner-frame-border: rgba(15, 23, 36, 0.12);
   --scanner-status-bg: rgba(255, 255, 255, 0.92);
   --scanner-status-border: rgba(15, 23, 36, 0.12);
   --scanner-overlay-bg: rgba(255, 255, 255, 0.88);
+  --scanner-overlay-error-bg: rgba(127, 29, 29, 0.9);
 }
 
 @media (min-width: 1100px) {
@@ -312,7 +320,7 @@ const previewStyle = computed(() => {
   letter-spacing: 0.16em;
   font-size: 0.72rem;
   font-weight: 700;
-  color: rgba(194, 206, 223, 0.72);
+  color: var(--scanner-eyebrow);
 }
 
 .scanner-modal-header h2 {
@@ -340,8 +348,8 @@ const previewStyle = computed(() => {
   position: relative;
   overflow: hidden;
   border-radius: 22px;
-  border: 1px solid rgba(118, 143, 181, 0.16);
-  background: #04070d;
+  border: 1px solid var(--scanner-frame-border);
+  background: var(--scanner-frame-bg);
   min-height: min(52vh, 420px);
 }
 
@@ -444,7 +452,7 @@ const previewStyle = computed(() => {
 }
 
 .scanner-overlay-error {
-  background: rgba(59, 16, 18, 0.82);
+  background: var(--scanner-overlay-error-bg);
 }
 
 .scanner-controls {
@@ -558,24 +566,5 @@ const previewStyle = computed(() => {
   word-break: break-word;
 }
 
-.scanner-history-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: grid;
-  gap: 0.55rem;
-}
-
-.scanner-history-list li {
-  display: flex;
-  justify-content: space-between;
-  gap: 0.8rem;
-  font-size: 0.95rem;
-}
-
-.scanner-history-value {
-  color: var(--scanner-muted);
-  font-family: ui-monospace, SFMono-Regular, SFMono-Regular, Consolas, monospace;
-}
 
 </style>

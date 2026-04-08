@@ -17,3 +17,8 @@ SENTRY_ENVIRONMENT = "production"
 pattern = "edge.itemtraxx.com"
 zone_name = "itemtraxx.com"
 custom_domain = true
+[[routes]]
+pattern = "edge-pentest.itemtraxx.com"
+zone_name = "itemtraxx.com"
+custom_domain = true
+

@@ -549,6 +549,33 @@ const maybeRefreshSession = async (
   return { session: refreshed, headers };
 };
 
+type RequestWithCf = Request & {
+  cf?: {
+    city?: string;
+    region?: string;
+    regionCode?: string;
+    country?: string;
+  };
+};
+
+const sanitizeGeoHeaderValue = (value: string | null | undefined, maxLen: number) => {
+  if (!value) return null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  return trimmed.slice(0, maxLen);
+};
+
+const applyApproxLocationHeaders = (headers: Headers, request: Request) => {
+  const cf = (request as RequestWithCf).cf;
+  const city = sanitizeGeoHeaderValue(cf?.city, 80);
+  const region = sanitizeGeoHeaderValue(cf?.region ?? cf?.regionCode, 80);
+  const country = sanitizeGeoHeaderValue(cf?.country, 80);
+
+  if (city) headers.set('x-itx-geo-city', city);
+  if (region) headers.set('x-itx-geo-region', region);
+  if (country) headers.set('x-itx-geo-country', country);
+};
+
 const sanitizeRequestHeaders = (
   request: Request,
   anonKey: string,
@@ -584,6 +611,7 @@ const sanitizeRequestHeaders = (
   if (connectingIp) {
     headers.set("cf-connecting-ip", connectingIp);
   }
+  applyApproxLocationHeaders(headers, request);
   return headers;
 };
 

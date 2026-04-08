@@ -62,6 +62,7 @@ export type TenantSessionItem = {
   user_agent: string | null;
   login_method: "password" | "magic_link" | "session_handoff" | null;
   login_location: "regular_login" | "admin_login" | null;
+  general_location: string | null;
   created_at: string;
   last_seen_at: string;
   is_current: boolean;

@@ -1,6 +1,6 @@
 # Privacy Policy
 
-Last updated: 2026-03-31 (year-month-day)
+Last updated: 2026-04-07 (year-month-day)
 
 ItemTraxx Co ("we", "our", or "us") provides ItemTraxx, a cloud-based inventory, checkout, borrower-management, and administrative operations platform. This Privacy Policy explains what information we collect, how we use it, how we share it, and the choices available to users and customers.
 
@@ -24,7 +24,7 @@ We may collect the following categories of information:
 - **Account Information:** Name, email address, role, tenant or role assignment, organization name, authentication metadata, and session/device metadata used to secure access
 - **Operational Data:** Inventory records, item status, barcodes, borrower identifiers, borrower profile details entered by customer admins, checkout and return history, audit logs, and administrative actions
 - **Usage Data:** App interactions, page usage, timestamps, route access, workflow activity, and operational events generated while using the service
-- **Device and Technical Data:** Browser type, operating system, approximate device metadata, IP-derived network and security context, request identifiers, and verification or abuse-prevention signals
+- **Device and Technical Data:** Browser type, operating system, approximate device metadata, IP-derived network and security context, approximate IP-based location used for account security and session review, request identifiers, and verification or abuse-prevention signals
 - **Communications Data:** Messages submitted through contact support, contact sales, password-reset, and related support workflows, including optional attachments where supported
 - **Transactional Data:** Plan metadata, billing-related plan classification, subscription records, and onboarding or support request metadata used to manage service delivery
 
@@ -36,7 +36,7 @@ We do not intentionally collect more information than is reasonably necessary to
 We use collected information to:
 
 - provide, secure, and maintain ItemTraxx
-- authenticate users and manage sessions, roles, device activity, and access controls
+- authenticate users and manage sessions, roles, device activity, approximate session location, and access controls
 - process checkouts, returns, inventory updates, borrower records, and related reporting
 - route users to the correct tenant or district environment where applicable
 - respond to support, sales, password-reset, and operational inquiries

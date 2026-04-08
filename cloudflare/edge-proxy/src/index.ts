@@ -27,10 +27,14 @@ const BASE_CORS_HEADERS = {
 const DEFAULT_ALLOWED_ORIGINS = [
   "https://itemtraxx.com",
   "https://www.itemtraxx.com",
-  "https://*.itemtraxx.com",
+  "https://status.itemtraxx.com",
   "https://internal.itemtraxx.com",
   "https://app.itemtraxx.com",
-  "https://*.app.itemtraxx.com",
+  "https://dennis.dev.itemtraxx.com",
+  "https://leo.dev.itemtraxx.com",
+  "https://testdist.app.itemtraxx.com",
+  "https://dev.itemtraxx.com",
+  "https://preview.itemtraxx.com",
 ];
 
 type SessionCookies = {

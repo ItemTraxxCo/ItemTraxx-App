@@ -60,7 +60,7 @@
               Flip camera
             </button>
             <button
-              v-if="props.autoAcceptOnScan === false"
+              v-if="!props.autoAcceptOnScan"
               type="button"
               class="button-primary"
               :disabled="!hasActiveCandidate"
@@ -108,7 +108,7 @@ import { computed, onUnmounted, watch } from "vue";
 import { useCameraBarcodeScanner } from "../composables/useCameraBarcodeScanner";
 import type { ScannerHistoryItem, ScannerMode, ScannerScanEvent, ScannerStatus, ScannerStatusEvent } from "../types/cameraScanner";
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   modelValue: boolean;
   mode: ScannerMode;
   title: string;
@@ -116,7 +116,12 @@ const props = defineProps<{
   autoAcceptOnScan?: boolean;
   labPreview?: boolean;
   scanHistoryItems?: ScannerHistoryItem[];
-}>();
+}>(), {
+  autoCloseOnScan: true,
+  autoAcceptOnScan: true,
+  labPreview: false,
+  scanHistoryItems: () => [],
+});
 
 const emit = defineEmits<{
   "update:modelValue": [value: boolean];
@@ -142,10 +147,10 @@ const {
   manualConfirm,
 } = useCameraBarcodeScanner({
   mode: () => props.mode,
-  autoAccept: () => props.autoAcceptOnScan !== false,
+  autoAccept: () => props.autoAcceptOnScan,
   onScanned: (event) => {
     emit("scanned", event);
-    if (props.autoCloseOnScan !== false) {
+    if (props.autoCloseOnScan) {
       clearCloseTimer();
       closeTimer = window.setTimeout(() => {
         closeTimer = null;

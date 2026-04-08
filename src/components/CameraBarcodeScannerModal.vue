@@ -90,11 +90,22 @@
         </div>
 
         <div v-if="scanHistoryItems.length" class="scanner-history-card">
-          <strong>Scanned items</strong>
-          <ul class="scanner-history-list">
-            <li v-for="item in scanHistoryItems" :key="item.id">
-              <span>{{ item.label }}</span>
-              <span class="scanner-history-value">{{ item.value }}</span>
+          <p class="checkout-subheading">Items</p>
+          <ul class="checkout-inline-list">
+            <li v-for="item in scanHistoryItems" :key="item.id" class="checkout-item-row">
+              {{ item.label }}
+              <span class="muted">({{ item.value }})</span>
+              <span v-if="item.tagLabel" class="tag" :class="item.tagClass">
+                {{ item.tagLabel }}
+              </span>
+              <button
+                v-if="item.removable"
+                type="button"
+                class="chip-button"
+                @click="emit('removeHistoryItem', item.id)"
+              >
+                Remove
+              </button>
             </li>
           </ul>
         </div>
@@ -127,6 +138,7 @@ const emit = defineEmits<{
   "update:modelValue": [value: boolean];
   scanned: [event: ScannerScanEvent];
   status: [event: ScannerStatusEvent];
+  removeHistoryItem: [id: string];
 }>();
 
 const {

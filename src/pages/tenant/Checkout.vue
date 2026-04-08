@@ -148,6 +148,7 @@
         :auto-close-on-scan="false"
         :scan-history-items="itemScannerHistory"
         @scanned="handleItemScan"
+        @remove-history-item="removeBarcode"
       />
     </div>
   </div>
@@ -197,11 +198,17 @@ const syncInFlight = ref(false);
 const studentLookupCooldownSeconds = ref(0);
 let studentLookupCooldownTimer: number | null = null;
 const itemScannerHistory = computed<ScannerHistoryItem[]>(() =>
-  barcodes.value.map((item) => ({
-    id: item.barcode,
-    label: item.name,
-    value: item.barcode,
-  }))
+  barcodes.value.map((item) => {
+    const isReturn = checkedOutGear.value.some((checkedOutItem) => checkedOutItem.barcode === item.barcode);
+    return {
+      id: item.barcode,
+      label: item.name,
+      value: item.barcode,
+      tagLabel: isReturn ? "Return" : "Checkout",
+      tagClass: isReturn ? "tag-return" : "tag-checkout",
+      removable: true,
+    };
+  })
 );
 
 const receipt = ref<{

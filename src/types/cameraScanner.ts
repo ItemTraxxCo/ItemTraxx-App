@@ -42,4 +42,7 @@ export type ScannerHistoryItem = {
   id: string;
   label: string;
   value: string;
+  tagLabel?: string;
+  tagClass?: string;
+  removable?: boolean;
 };

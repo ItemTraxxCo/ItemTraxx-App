@@ -978,7 +978,14 @@ export const signOut = async () => {
   } catch {
     // Ignore cookie logout failures during the migration window.
   }
-  await supabase.auth.signOut({ scope: "local" });
+  try {
+    await supabase.auth.signOut({ scope: "local" });
+  } catch (error) {
+    const message = error instanceof Error ? error.message.toLowerCase() : "";
+    if (!message.includes("session_not_found")) {
+      throw error;
+    }
+  }
   clearAdminVerification();
   clearPendingSuperAdminVerificationEmail();
   clearAuthState(true);

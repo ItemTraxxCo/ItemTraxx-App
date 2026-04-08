@@ -22,6 +22,7 @@ Changes are dated based on the default timezone: America/Los_Angeles
 
 - Added super-admin tools for support request visibility and super-admin account management.
 - Improved branding configuration so header logos are controlled and displayed correctly.
+- Refined barcode-scanner behavior, theme handling, session visibility, and receipt branding across checkout and admin flows.
 
 ### 4/6/2026 Development Update
 

@@ -32,6 +32,13 @@
             <div v-else-if="errorMessage" class="scanner-overlay-message scanner-overlay-error">
               {{ errorMessage }}
             </div>
+            <div
+              v-if="props.mode === 'borrower' && currentDetection"
+              class="scanner-inline-detection"
+            >
+              <strong>Scanned borrower ID</strong>
+              <span>{{ currentDetection.value }}</span>
+            </div>
           </div>
 
           <div class="scanner-controls">
@@ -76,8 +83,8 @@
             make sure barcode is clearly visible, there are no glares, and well lit.
           </span>
         </div>
-      </div>
-        <div v-if="currentDetection" class="scanner-detected-card">
+
+        <div v-if="props.mode !== 'borrower' && currentDetection" class="scanner-detected-card">
           <strong>Scanned barcode</strong>
           <span>{{ currentDetection.value }}</span>
         </div>
@@ -91,6 +98,7 @@
             </li>
           </ul>
         </div>
+      </div>
     </div>
   </Teleport>
 </template>
@@ -219,6 +227,18 @@ const previewStyle = computed(() => {
 
 <style scoped>
 .scanner-modal-backdrop {
+  --scanner-backdrop: rgba(5, 10, 18, 0.68);
+  --scanner-card-bg: linear-gradient(180deg, rgba(15, 22, 34, 0.97) 0%, rgba(10, 15, 24, 0.99) 100%);
+  --scanner-card-text: #f4f7fb;
+  --scanner-card-border: rgba(118, 143, 181, 0.18);
+  --scanner-muted: rgba(224, 232, 242, 0.72);
+  --scanner-panel-bg: rgba(9, 17, 31, 0.68);
+  --scanner-panel-border: rgba(118, 143, 181, 0.16);
+  --scanner-icon-bg: rgba(9, 17, 31, 0.58);
+  --scanner-icon-border: rgba(140, 157, 189, 0.24);
+  --scanner-status-bg: rgba(14, 23, 35, 0.9);
+  --scanner-status-border: rgba(118, 143, 181, 0.14);
+  --scanner-overlay-bg: rgba(7, 12, 20, 0.8);
   position: fixed;
   inset: 0;
   z-index: 2200;
@@ -226,13 +246,28 @@ const previewStyle = computed(() => {
   align-items: center;
   justify-content: center;
   padding: 1rem;
-  background: rgba(5, 10, 18, 0.68);
+  background: var(--scanner-backdrop);
   backdrop-filter: blur(16px);
+}
+
+:global(:root[data-theme="light"]) .scanner-modal-backdrop {
+  --scanner-backdrop: rgba(232, 238, 243, 0.74);
+  --scanner-card-bg: linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(241, 243, 240, 0.99) 100%);
+  --scanner-card-text: #0f1724;
+  --scanner-card-border: rgba(15, 23, 36, 0.1);
+  --scanner-muted: rgba(15, 23, 36, 0.68);
+  --scanner-panel-bg: rgba(255, 255, 255, 0.86);
+  --scanner-panel-border: rgba(15, 23, 36, 0.12);
+  --scanner-icon-bg: rgba(255, 255, 255, 0.88);
+  --scanner-icon-border: rgba(15, 23, 36, 0.12);
+  --scanner-status-bg: rgba(255, 255, 255, 0.92);
+  --scanner-status-border: rgba(15, 23, 36, 0.12);
+  --scanner-overlay-bg: rgba(255, 255, 255, 0.88);
 }
 
 @media (min-width: 1100px) {
   .scanner-modal-backdrop-lab {
-    background: rgba(5, 10, 18, 0.58);
+    background: color-mix(in srgb, var(--scanner-backdrop) 88%, transparent 12%);
     backdrop-filter: blur(12px);
   }
 }
@@ -240,9 +275,9 @@ const previewStyle = computed(() => {
 .scanner-modal-card {
   width: min(820px, calc(100vw - 2rem));
   border-radius: 24px;
-  border: 1px solid rgba(118, 143, 181, 0.18);
-  background: linear-gradient(180deg, rgba(15, 22, 34, 0.97) 0%, rgba(10, 15, 24, 0.99) 100%);
-  color: #f4f7fb;
+  border: 1px solid var(--scanner-card-border);
+  background: var(--scanner-card-bg);
+  color: var(--scanner-card-text);
   box-shadow: 0 28px 80px rgba(3, 8, 18, 0.36);
   padding: 1.25rem;
 }
@@ -272,8 +307,8 @@ const previewStyle = computed(() => {
   width: 2.4rem;
   height: 2.4rem;
   border-radius: 999px;
-  border: 1px solid rgba(140, 157, 189, 0.24);
-  background: rgba(9, 17, 31, 0.58);
+  border: 1px solid var(--scanner-icon-border);
+  background: var(--scanner-icon-bg);
   color: inherit;
   font-size: 1.35rem;
 }
@@ -386,8 +421,8 @@ const previewStyle = computed(() => {
   inset: auto 1rem 1rem 1rem;
   border-radius: 12px;
   padding: 0.7rem 0.9rem;
-  background: rgba(7, 12, 20, 0.8);
-  color: #f4f7fb;
+  background: var(--scanner-overlay-bg);
+  color: var(--scanner-card-text);
   font-weight: 600;
 }
 
@@ -405,6 +440,12 @@ const previewStyle = computed(() => {
 .scanner-controls .button-secondary {
   min-height: 2.55rem;
 }
+.scanner-controls .button-secondary {
+  color: var(--scanner-card-text);
+  background: color-mix(in srgb, var(--scanner-panel-bg) 86%, var(--surface, #fff) 14%);
+  border-color: var(--scanner-panel-border);
+}
+
 
 .scanner-status-row {
   display: flex;
@@ -426,8 +467,8 @@ const previewStyle = computed(() => {
   border-radius: 999px;
   padding: 0.55rem 0.85rem;
   font-weight: 700;
-  background: rgba(14, 23, 35, 0.9);
-  border: 1px solid rgba(118, 143, 181, 0.14);
+  background: var(--scanner-status-bg);
+  border: 1px solid var(--scanner-status-border);
 }
 
 .scanner-status-dot {
@@ -439,7 +480,7 @@ const previewStyle = computed(() => {
 
 .scanner-status-copy {
   margin: 0;
-  color: rgba(224, 232, 242, 0.72);
+  color: var(--scanner-muted);
   font-size: 0.92rem;
   line-height: 1.45;
 }
@@ -459,7 +500,7 @@ const previewStyle = computed(() => {
 }
 
 .scanner-helper-text {
-  color: rgba(224, 232, 242, 0.72);
+  color: var(--scanner-muted);
   font-size: 0.92rem;
   line-height: 1.5;
 }
@@ -480,8 +521,8 @@ const previewStyle = computed(() => {
 .scanner-history-card {
   margin-top: 1rem;
   border-radius: 18px;
-  border: 1px solid rgba(118, 143, 181, 0.16);
-  background: rgba(9, 17, 31, 0.68);
+  border: 1px solid var(--scanner-panel-border);
+  background: var(--scanner-panel-bg);
   padding: 0.9rem 1rem;
 }
 
@@ -490,7 +531,7 @@ const previewStyle = computed(() => {
   display: block;
   margin-bottom: 0.45rem;
   font-size: 0.85rem;
-  color: rgba(194, 206, 223, 0.88);
+  color: color-mix(in srgb, var(--scanner-card-text) 82%, transparent 18%);
 }
 
 .scanner-detected-card span {
@@ -516,7 +557,7 @@ const previewStyle = computed(() => {
 }
 
 .scanner-history-value {
-  color: rgba(194, 206, 223, 0.72);
+  color: var(--scanner-muted);
   font-family: ui-monospace, SFMono-Regular, SFMono-Regular, Consolas, monospace;
 }
 

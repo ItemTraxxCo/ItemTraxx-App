@@ -206,3 +206,10 @@ export const revokeTenantAdminSession = async (sessionId: string) =>
 
 export const revokeAllTenantAdminSessions = async (signOutCurrent = false) =>
   callAdminOps<{ revoked: number }>("revoke_all_sessions", { sign_out_current: signOutCurrent });
+
+export const revokeCurrentTenantAdminSession = async () => {
+  const data = await callAdminOps<{ sessions: TenantSessionItem[] }>("list_sessions");
+  const currentSession = data.sessions?.find((session) => session.is_current);
+  if (!currentSession) return { revoked: false };
+  return callAdminOps<{ revoked: boolean }>("revoke_session", { session_id: currentSession.id });
+};

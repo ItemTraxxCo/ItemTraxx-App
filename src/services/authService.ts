@@ -25,7 +25,7 @@ import {
 } from "./httpSessionService";
 import { authenticatedRpc, authenticatedSelect } from "./authenticatedDataClient";
 import { rotateDeviceSession } from "../utils/deviceSession";
-import { touchTenantAdminSession } from "./adminOpsService";
+import { revokeCurrentTenantAdminSession, touchTenantAdminSession } from "./adminOpsService";
 
 type ProfileRow = {
   id: string;
@@ -973,6 +973,17 @@ export const superAdminLogin = async (
 };
 
 export const signOut = async () => {
+  const current = getAuthState();
+  const shouldRevokeTenantAdminSession = current.role === "tenant_admin" && !!current.adminVerifiedAt;
+
+  if (shouldRevokeTenantAdminSession) {
+    try {
+      await revokeCurrentTenantAdminSession();
+    } catch {
+      // Ignore device-session revocation failures during sign-out.
+    }
+  }
+
   try {
     await clearHttpSession();
   } catch {

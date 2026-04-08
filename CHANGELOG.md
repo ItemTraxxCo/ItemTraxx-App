@@ -1,6 +1,6 @@
 # Changelog
 
-Last updated (year-month-day): 2026-04-07
+Last updated (year-month-day): 2026-04-08
 
 This public changelog summarizes notable ItemTraxx product, reliability, security, and experience updates at a high level. Detailed internal engineering and operational notes are maintained separately.
 
@@ -17,6 +17,10 @@ Changes are dated based on the default timezone: America/Los_Angeles
 - [SECURITY.md](SECURITY.md) – Security reporting and guidelines
 
 ---
+
+### 4/8/2026 Development Update
+
+- Tightened cross-origin access controls by moving to a narrower allowlist for approved ItemTraxx web origins and local development.
 
 ### 4/7/2026 Development Update
 

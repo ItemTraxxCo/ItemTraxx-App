@@ -8,7 +8,6 @@
       'route-shell-confirmation': isSubmitConfirmationRoute,
       'route-shell-banner-bleed': isBannerBleedRoute,
     }"
-    :style="appShellStyle"
   >
     <div v-if="isRouteNavigating" class="route-progress" aria-hidden="true"></div>
     <div
@@ -114,7 +113,6 @@
       class="broadcast-top-banner"
       role="status"
       aria-live="polite"
-      :style="broadcastBannerStyle"
     >
       <div class="broadcast-content">
         <strong class="broadcast-title">Broadcast</strong>
@@ -134,7 +132,6 @@
       ref="incidentBannerRef"
       class="broadcast-banner incident-banner"
       :class="incidentBanner.level === 'down' ? 'broadcast-critical' : 'broadcast-warning'"
-      :style="incidentBannerStyle"
       role="status"
       aria-live="polite"
     >
@@ -155,7 +152,7 @@
         x
       </button>
     </div>
-    <div v-if="showTopMenu" class="top-menu" :style="topMenuStyle">
+    <div v-if="showTopMenu" class="top-menu">
       <div class="menu-button-wrap">
         <div v-if="showNotificationBell" class="menu-notification">
           <NotificationBell />
@@ -605,14 +602,6 @@ const hasTopBanners = computed(() =>
   (showBroadcast.value && !!activeBroadcast.value) ||
   showIncidentBanner.value
 );
-const topOffsetPx = computed(() => {
-  const total = maintenanceBannerHeight.value + broadcastBannerHeight.value + incidentBannerHeight.value;
-  if (total <= 0) return "0px";
-  return `${total}px`;
-});
-const appShellStyle = computed(() => ({
-  "--top-banner-offset": topOffsetPx.value,
-}) as Record<string, string>);
 
 const updateBrowserChromeColor = () => {
   const themeColorMeta = document.querySelector('meta[name="theme-color"]');
@@ -646,16 +635,6 @@ watchEffect(() => {
   document.body.classList.toggle("confirmation-route-active", isSubmitConfirmationRoute.value);
   updateBrowserChromeColor();
 });
-const topMenuStyle = computed(() => ({
-  top: `calc(1rem + env(safe-area-inset-top, 0px) + ${topOffsetPx.value})`,
-  right: "calc(1rem + env(safe-area-inset-right, 0px))",
-}));
-const incidentBannerStyle = computed(() => ({
-  top: "0px",
-}));
-const broadcastBannerStyle = computed(() => ({
-  top: "0px",
-}));
 const offlineQueueTooltip = computed(
   () =>
     "Offline Queue stores checkout/return requests when internet is unavailable and auto-syncs them when connection is restored."

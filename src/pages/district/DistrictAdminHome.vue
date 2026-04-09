@@ -65,10 +65,10 @@
         <h2>Traffic (24h)</h2>
         <div class="bar-grid">
           <div v-for="bucket in dashboard.traffic_by_hour.slice(-12)" :key="bucket.hour" class="bar-cell">
-            <div class="bar-stack">
-              <div class="bar bar-checkout" :style="{ height: `${calcBarHeight(bucket.checkout)}px` }"></div>
-              <div class="bar bar-return" :style="{ height: `${calcBarHeight(bucket.return)}px` }"></div>
-            </div>
+            <svg class="bar-stack" viewBox="0 0 100 128" preserveAspectRatio="none" aria-hidden="true">
+              <rect class="bar bar-checkout" x="8" :y="128 - calcBarHeight(bucket.checkout)" width="38" :height="calcBarHeight(bucket.checkout)" rx="12" ry="12" />
+              <rect class="bar bar-return" x="54" :y="128 - calcBarHeight(bucket.return)" width="38" :height="calcBarHeight(bucket.return)" rx="12" ry="12" />
+            </svg>
             <small>{{ formatHour(bucket.hour) }}</small>
           </div>
         </div>
@@ -553,8 +553,6 @@ onMounted(() => {
 }
 
 .bar {
-  width: 45%;
-  border-radius: 999px 999px 0 0;
 }
 
 .bar-checkout {

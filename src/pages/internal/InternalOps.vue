@@ -169,10 +169,10 @@
       <p class="muted">Hourly checkouts vs returns.</p>
       <div class="bar-grid">
         <div v-for="bucket in lastTrafficBuckets" :key="bucket.hour" class="bar-cell">
-          <div class="bar-stack">
-            <div class="bar bar-checkout" :style="{ height: `${calcBarHeight(bucket.checkout)}px` }"></div>
-            <div class="bar bar-return" :style="{ height: `${calcBarHeight(bucket.return)}px` }"></div>
-          </div>
+          <svg class="bar-stack" viewBox="0 0 18 76" preserveAspectRatio="none" aria-hidden="true">
+            <rect class="bar bar-checkout" x="0" :y="76 - calcBarHeight(bucket.checkout)" width="8" :height="calcBarHeight(bucket.checkout)" rx="5" ry="5" />
+            <rect class="bar bar-return" x="10" :y="76 - calcBarHeight(bucket.return)" width="8" :height="calcBarHeight(bucket.return)" rx="5" ry="5" />
+          </svg>
           <small>{{ formatHour(bucket.hour) }}</small>
         </div>
       </div>
@@ -184,9 +184,9 @@
       <div class="funnel-list">
         <div v-for="stage in funnelRows" :key="stage.key" class="funnel-row">
           <span>{{ stage.label }}</span>
-          <div class="funnel-track">
-            <div class="funnel-fill" :style="{ width: `${funnelWidth(stage.value)}%` }"></div>
-          </div>
+          <svg class="funnel-track" viewBox="0 0 100 10" preserveAspectRatio="none" aria-hidden="true">
+            <rect class="funnel-fill" x="0" y="0" :width="funnelWidth(stage.value)" height="10" rx="5" ry="5" />
+          </svg>
           <strong>{{ stage.value }}</strong>
         </div>
       </div>
@@ -724,8 +724,6 @@ onUnmounted(() => {
 }
 
 .bar {
-  width: 8px;
-  border-radius: 5px 5px 0 0;
 }
 
 .bar-checkout {
@@ -749,6 +747,7 @@ onUnmounted(() => {
 }
 
 .funnel-track {
+  width: 100%;
   height: 10px;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.15);

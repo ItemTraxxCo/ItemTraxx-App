@@ -275,7 +275,7 @@ button:focus-visible {
 
 .route-progress {
   position: fixed;
-  top: var(--top-banner-offset, 0px);
+  top: 0;
   left: 0;
   width: 100%;
   height: 3px;
@@ -650,7 +650,7 @@ textarea {
 .top-menu {
   position: fixed;
   top: calc(1rem + env(safe-area-inset-top, 0px));
-  right: 1rem;
+  right: calc(1rem + env(safe-area-inset-right, 0px));
   z-index: 1000;
   display: flex;
   flex-direction: column;

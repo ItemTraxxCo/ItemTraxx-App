@@ -79,18 +79,19 @@
         </p>
       </form>
       <p v-if="error" class="error">{{ error }}</p>
-      <p v-if="success" class="success">{{ success }}</p>
     </section>
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed, ref } from "vue";
-import { RouterLink } from "vue-router";
+import { RouterLink, useRouter } from "vue-router";
 import { useTurnstile } from "../composables/useTurnstile";
 import { toUserFacingErrorMessage } from "../services/appErrors";
 import { submitContactSalesLead } from "../services/contactSalesService";
+import { saveSubmissionConfirmation } from "../services/submissionConfirmation";
 
+const router = useRouter();
 const fullName = ref("");
 const organization = ref("");
 const replyEmail = ref("");
@@ -98,7 +99,6 @@ const details = ref("");
 const website = ref("");
 const isSending = ref(false);
 const error = ref("");
-const success = ref("");
 const turnstileSiteKey = import.meta.env.VITE_TURNSTILE_SITE_KEY as string | undefined;
 const {
   containerRef: turnstileContainerRef,
@@ -130,14 +130,13 @@ const handleSend = () => {
 
 const send = async () => {
   error.value = "";
-  success.value = "";
   if (!canSubmit.value || (turnstileSiteKey && !turnstileToken.value)) {
     error.value = "Complete required fields and security check.";
     return;
   }
   isSending.value = true;
   try {
-    await submitContactSalesLead({
+    const response = await submitContactSalesLead({
       plan: "other",
       name: fullName.value,
       organization: organization.value,
@@ -147,10 +146,21 @@ const send = async () => {
       website: website.value,
       intent: "demo",
     });
-    success.value =
-      "Demo request sent. You will receive a confirmation email from support@itemtraxx.com within 24 hours. Our team will follow up shortly to schedule next steps.";
-    details.value = "";
-    website.value = "";
+
+    saveSubmissionConfirmation({
+      kind: "Demo request",
+      title: "Demo request sent.",
+      lead: "Your demo request was submitted. We will follow up from support@itemtraxx.com to schedule next steps.",
+      submittedAt: new Date().toISOString(),
+      referenceId: response?.lead_id ?? null,
+      fields: [
+        { label: "Reply email", value: replyEmail.value },
+        { label: "Name", value: fullName.value },
+        { label: "Organization", value: organization.value },
+      ],
+    });
+
+    await router.push({ name: "public-submit-confirmation" });
   } catch (err) {
     error.value = toUserFacingErrorMessage(err, "Unable to send demo request.");
   } finally {

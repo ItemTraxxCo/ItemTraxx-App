@@ -7,6 +7,7 @@ create table if not exists public.tenant_admin_sessions (
   user_agent text null,
   login_method text null,
   login_location text null,
+  general_location text null,
   created_at timestamptz not null default now(),
   last_seen_at timestamptz not null default now(),
   revoked_at timestamptz null,
@@ -18,6 +19,9 @@ alter table public.tenant_admin_sessions
 
 alter table public.tenant_admin_sessions
   add column if not exists login_location text null;
+
+alter table public.tenant_admin_sessions
+  add column if not exists general_location text null;
 
 create index if not exists tenant_admin_sessions_tenant_profile_active_idx
   on public.tenant_admin_sessions (tenant_id, profile_id, last_seen_at desc)

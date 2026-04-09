@@ -90,7 +90,8 @@
             <tr>
               <th>Device</th>
               <th>Login method</th>
-              <th>Login location</th>
+              <th>Login flow</th>
+              <th>Location</th>
               <th>Last seen</th>
               <th>Signed in</th>
               <th>Status</th>
@@ -101,12 +102,13 @@
               <td>{{ session.device_label || "Unknown device" }}</td>
               <td>{{ formatLoginMethod(session.login_method) }}</td>
               <td>{{ formatLoginLocation(session.login_location) }}</td>
+              <td>{{ formatGeneralLocation(session.general_location) }}</td>
               <td>{{ formatDate(session.last_seen_at) }}</td>
               <td>{{ formatDate(session.created_at) }}</td>
               <td>{{ session.is_current ? "Current" : "Active" }}</td>
             </tr>
             <tr v-if="!sessions.length">
-              <td colspan="6" class="muted">No active sessions found.</td>
+              <td colspan="7" class="muted">No active sessions found.</td>
             </tr>
           </tbody>
         </table>
@@ -232,6 +234,9 @@ const formatLoginLocation = (value: TenantSessionItem["login_location"]) =>
     : value === "admin_login"
       ? "Admin sign in"
       : "Unknown";
+
+const formatGeneralLocation = (value: TenantSessionItem["general_location"]) =>
+  value?.trim() ? value : "Unknown";
 
 const accountCategoryLabel = computed(() =>
   accountCategory.value === "individual"

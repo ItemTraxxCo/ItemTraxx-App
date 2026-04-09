@@ -101,10 +101,10 @@
         <ul>
           <li>Account information (organization, school, district, team, role, authentication-related data)</li>
           <li>Usage data and audit activity data</li>
-          <li>Device and browser and technical information</li>
+          <li>Device, browser, technical information, and approximate IP-based location used for session security</li>
           <li>Inventory and transaction records</li>
         </ul>
-        <p>Your data is used to provide and improve the service and secure accounts.</p>
+        <p>Your data is used to provide and improve the service, secure accounts, and show approximate session location in account security views.</p>
         <p>
           Data is retained only as necessary for service operations, contractual requirements, and
           legal compliance. Certain backup and audit records may persist for limited operational

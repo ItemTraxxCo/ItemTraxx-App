@@ -3,6 +3,7 @@ export interface Env {
   SUPABASE_ANON_KEY: string;
   ALLOWED_ORIGINS?: string;
   ALLOWED_FUNCTIONS?: string;
+  PENTEST_PROXY_TOKEN?: string;
   TRUST_LOCAL_ORIGINS?: string;
   ITX_ITEMTRAXX_KILLSWITCH_ENABLED?: string;
   SESSION_COOKIE_DOMAIN?: string;
@@ -15,10 +16,12 @@ const REFRESH_COOKIE_NAME = "itx_refresh";
 const REFRESH_GRANT_TYPE = "refresh_token";
 const ACCESS_TOKEN_MAX_AGE_SECONDS = 60 * 60;
 const REFRESH_TOKEN_MAX_AGE_SECONDS = 60 * 60 * 24 * 30;
+const PENTEST_HOSTNAME = "edge-pentest.itemtraxx.com";
+const PENTEST_TOKEN_HEADER = "x-itx-pentest-token";
 
 const BASE_CORS_HEADERS = {
   "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-request-id, prefer, x-itx-session-request",
+    `authorization, x-client-info, apikey, content-type, x-request-id, prefer, x-itx-session-request, ${PENTEST_TOKEN_HEADER}`,
   "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
   "Access-Control-Allow-Credentials": "true",
   "Access-Control-Expose-Headers": "content-range, content-profile, x-request-id",
@@ -27,10 +30,14 @@ const BASE_CORS_HEADERS = {
 const DEFAULT_ALLOWED_ORIGINS = [
   "https://itemtraxx.com",
   "https://www.itemtraxx.com",
-  "https://*.itemtraxx.com",
+  "https://status.itemtraxx.com",
   "https://internal.itemtraxx.com",
   "https://app.itemtraxx.com",
-  "https://*.app.itemtraxx.com",
+  "https://dennis.dev.itemtraxx.com",
+  "https://leo.dev.itemtraxx.com",
+  "https://testdist.app.itemtraxx.com",
+  "https://dev.itemtraxx.com",
+  "https://preview.itemtraxx.com",
 ];
 
 type SessionCookies = {
@@ -296,6 +303,14 @@ const resolveRequestOrigin = (request: Request) => {
   }
 };
 
+const isPentestHost = (url: URL) => url.hostname.toLowerCase() === PENTEST_HOSTNAME;
+
+const hasValidPentestToken = (request: Request, env: Env) => {
+  const expected = env.PENTEST_PROXY_TOKEN?.trim();
+  if (!expected) return false;
+  return request.headers.get(PENTEST_TOKEN_HEADER) === expected;
+};
+
 const buildError = (
   status: number,
   message: string,
@@ -549,6 +564,33 @@ const maybeRefreshSession = async (
   return { session: refreshed, headers };
 };
 
+type RequestWithCf = Request & {
+  cf?: {
+    city?: string;
+    region?: string;
+    regionCode?: string;
+    country?: string;
+  };
+};
+
+const sanitizeGeoHeaderValue = (value: string | null | undefined, maxLen: number) => {
+  if (!value) return null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  return trimmed.slice(0, maxLen);
+};
+
+const applyApproxLocationHeaders = (headers: Headers, request: Request) => {
+  const cf = (request as RequestWithCf).cf;
+  const city = sanitizeGeoHeaderValue(cf?.city, 80);
+  const region = sanitizeGeoHeaderValue(cf?.region ?? cf?.regionCode, 80);
+  const country = sanitizeGeoHeaderValue(cf?.country, 80);
+
+  if (city) headers.set('x-itx-geo-city', city);
+  if (region) headers.set('x-itx-geo-region', region);
+  if (country) headers.set('x-itx-geo-country', country);
+};
+
 const sanitizeRequestHeaders = (
   request: Request,
   anonKey: string,
@@ -584,6 +626,7 @@ const sanitizeRequestHeaders = (
   if (connectingIp) {
     headers.set("cf-connecting-ip", connectingIp);
   }
+  applyApproxLocationHeaders(headers, request);
   return headers;
 };
 
@@ -904,6 +947,10 @@ export default {
     const { originAllowed, headers } = withCorsHeaders(origin, allowedOrigins, env);
 
     try {
+      if (isPentestHost(url) && !hasValidPentestToken(request, env)) {
+        return buildError(403, "Pentest token required", headers, requestId);
+      }
+
       if (request.method === "OPTIONS") {
         if (!originAllowed) {
           return new Response("Origin not allowed", { status: 403, headers });

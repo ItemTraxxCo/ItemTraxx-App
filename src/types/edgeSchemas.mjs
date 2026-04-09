@@ -106,6 +106,7 @@ const tenantSessionSchema = z.object({
   user_agent: z.string().nullable(),
   login_method: tenantAdminLoginMethodSchema.nullable(),
   login_location: tenantAdminLoginLocationSchema.nullable(),
+  general_location: z.string().nullable(),
   created_at: z.string(),
   last_seen_at: z.string(),
   is_current: z.boolean(),

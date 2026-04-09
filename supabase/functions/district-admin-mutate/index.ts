@@ -35,6 +35,15 @@ const resolveResetRedirectTo = (req: Request) => {
   return null;
 };
 
+const isMissingUpdatedAtColumn = (error: { code?: string; message?: string } | null | undefined) => {
+  if (!error) return false;
+  const message = (error.message ?? "").toLowerCase();
+  return (
+    (error.code === "42703" || error.code === "PGRST204" || message.includes("schema cache")) &&
+    message.includes("updated_at")
+  );
+};
+
 serve(async (req) => {
   const { hasOrigin, originAllowed, headers } = resolveCorsHeaders(req);
 
@@ -214,7 +223,7 @@ serve(async (req) => {
         return jsonResponse(404, { error: "Tenant not found." });
       }
 
-      const { error: updateError } = await adminClient
+      let { error: updateError } = await adminClient
         .from("tenants")
         .update({
           name,
@@ -223,6 +232,18 @@ serve(async (req) => {
         })
         .eq("id", tenantId)
         .eq("district_id", profile.district_id);
+
+      if (isMissingUpdatedAtColumn(updateError)) {
+        const fallbackResult = await adminClient
+          .from("tenants")
+          .update({
+            name,
+            access_code: accessCode,
+          })
+          .eq("id", tenantId)
+          .eq("district_id", profile.district_id);
+        updateError = fallbackResult.error;
+      }
 
       if (updateError) {
         return jsonResponse(400, { error: updateError.message || "Unable to update tenant." });
@@ -254,7 +275,7 @@ serve(async (req) => {
         return jsonResponse(404, { error: "Tenant not found." });
       }
 
-      const { error: updateError } = await adminClient
+      let { error: updateError } = await adminClient
         .from("tenants")
         .update({
           status,
@@ -262,6 +283,17 @@ serve(async (req) => {
         })
         .eq("id", tenantId)
         .eq("district_id", profile.district_id);
+
+      if (isMissingUpdatedAtColumn(updateError)) {
+        const fallbackResult = await adminClient
+          .from("tenants")
+          .update({
+            status,
+          })
+          .eq("id", tenantId)
+          .eq("district_id", profile.district_id);
+        updateError = fallbackResult.error;
+      }
 
       if (updateError) {
         return jsonResponse(400, { error: updateError.message || "Unable to update tenant status." });

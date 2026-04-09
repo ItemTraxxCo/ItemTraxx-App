@@ -6,7 +6,7 @@ preview_urls = false
 
 [vars]
 # Comma-separated origins allowed to call this proxy.
-ALLOWED_ORIGINS = "https://itemtraxx.com,https://www.itemtraxx.com,https://*.itemtraxx.com,https://internal.itemtraxx.com,https://app.itemtraxx.com,https://*.app.itemtraxx.com"
+ALLOWED_ORIGINS = "https://itemtraxx.com,https://www.itemtraxx.com,https://status.itemtraxx.com,https://internal.itemtraxx.com,https://app.itemtraxx.com,https://dennis.dev.itemtraxx.com,https://leo.dev.itemtraxx.com,https://testdist.app.itemtraxx.com,https://dev.itemtraxx.com,https://preview.itemtraxx.com,https://pentest.app.itemtraxx.com"
 TRUST_LOCAL_ORIGINS = "false"
 # Optional hard allowlist of function names (comma-separated).
 ALLOWED_FUNCTIONS = "tenant-login,checkoutReturn,create-tenant-admin,admin-gear-mutate,admin-student-mutate,admin-ops,system-status,super-tenant-mutate,super-admin-mutate,super-dashboard,super-gear-mutate,super-student-mutate,super-logs-query,super-ops,district-dashboard,district-admin-mutate,contact-sales-submit,contact-support-submit,job-worker,login-notify,super-auth-verify,district-handoff,tenant-admin-mutate,privileged-step-up"
@@ -17,3 +17,8 @@ SENTRY_ENVIRONMENT = "production"
 pattern = "edge.itemtraxx.com"
 zone_name = "itemtraxx.com"
 custom_domain = true
+[[routes]]
+pattern = "edge-pentest.itemtraxx.com"
+zone_name = "itemtraxx.com"
+custom_domain = true
+

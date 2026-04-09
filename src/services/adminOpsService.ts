@@ -62,6 +62,7 @@ export type TenantSessionItem = {
   user_agent: string | null;
   login_method: "password" | "magic_link" | "session_handoff" | null;
   login_location: "regular_login" | "admin_login" | null;
+  general_location: string | null;
   created_at: string;
   last_seen_at: string;
   is_current: boolean;
@@ -205,3 +206,10 @@ export const revokeTenantAdminSession = async (sessionId: string) =>
 
 export const revokeAllTenantAdminSessions = async (signOutCurrent = false) =>
   callAdminOps<{ revoked: number }>("revoke_all_sessions", { sign_out_current: signOutCurrent });
+
+export const revokeCurrentTenantAdminSession = async () => {
+  const data = await callAdminOps<{ sessions: TenantSessionItem[] }>("list_sessions");
+  const currentSession = data.sessions?.find((session) => session.is_current);
+  if (!currentSession) return { revoked: false };
+  return callAdminOps<{ revoked: boolean }>("revoke_session", { session_id: currentSession.id });
+};

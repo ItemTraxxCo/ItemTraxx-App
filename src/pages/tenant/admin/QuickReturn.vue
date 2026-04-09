@@ -75,6 +75,7 @@
       mode="admin_quick_return"
       title="Scan item barcode"
       :auto-close-on-scan="false"
+      :scan-history-items="scannerHistory"
       @scanned="handleScannerScan"
     />
 
@@ -82,14 +83,14 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref } from "vue";
+import { computed, onMounted, ref } from "vue";
 import { RouterLink } from "vue-router";
 import CameraBarcodeScannerModal from "../../../components/CameraBarcodeScannerModal.vue";
 import { fetchGearByBarcode, submitCheckoutReturn, type GearSummary } from "../../../services/checkoutService";
 import { logAdminAction } from "../../../services/auditLogService";
 import { sanitizeInput } from "../../../utils/inputSanitizer";
 import { toUserFacingErrorMessage } from "../../../services/appErrors";
-import type { ScannerScanEvent } from "../../../types/cameraScanner";
+import type { ScannerHistoryItem, ScannerScanEvent } from "../../../types/cameraScanner";
 
 const barcodeInput = ref("");
 const barcodes = ref<GearSummary[]>([]);
@@ -101,6 +102,14 @@ const error = ref("");
 const success = ref("");
 const lastSummary = ref("");
 const scannerOpen = ref(false);
+
+const scannerHistory = computed<ScannerHistoryItem[]>(() =>
+  barcodes.value.map((item) => ({
+    id: item.barcode,
+    label: item.name,
+    value: item.barcode,
+  }))
+);
 
 const addBarcode = async () => {
   const sanitized = sanitizeInput(barcodeInput.value, { maxLen: 64 });

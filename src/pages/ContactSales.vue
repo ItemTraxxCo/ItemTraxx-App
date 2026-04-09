@@ -205,6 +205,7 @@ const handleSend = () => {
 };
 
 const send = async () => {
+  if (isSending.value) return;
   error.value = "";
   if (!canSubmit.value || (turnstileSiteKey && !turnstileToken.value)) {
     error.value = "Complete required fields and security check.";

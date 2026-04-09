@@ -7,7 +7,7 @@
         <p class="submit-confirmation-eyebrow">Submission received</p>
         <div class="submit-confirmation-copy">
           <h1>Thanks for reaching out.</h1>
-          <p>If a follow-up is needed, our team will respond to the email address you provided.</p>
+          <p>Our team will review your submission and get back to you as soon as possible.</p>
         </div>
 
         <div class="submit-confirmation-actions">
@@ -117,6 +117,13 @@ html[data-theme="light"] .submit-confirmation-page-shell {
 .submit-confirmation-copy {
   display: grid;
   gap: 0.7rem;
+}
+
+.submit-confirmation-copy h1 {
+  margin: 0;
+  font-size: clamp(1.7rem, 3.6vw, 2.1rem);
+  line-height: 1.08;
+  letter-spacing: -0.02em;
 }
 
 .submit-confirmation-copy p {

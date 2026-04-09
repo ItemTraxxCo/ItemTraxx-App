@@ -164,7 +164,7 @@ const operationalCookies = [
   {
     title: "Reliability and abuse protection",
     description:
-      "Some browser storage and request-layer controls are used to support rate limiting, anti-abuse, platform stability, and platform security.",
+      "Some browser storage and request-layer controls are used to support rate limiting, anti-abuse, platform stability, platform security, and approximate IP-based session location for device history.",
   },
 ];
 

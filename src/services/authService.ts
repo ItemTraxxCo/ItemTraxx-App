@@ -25,7 +25,7 @@ import {
 } from "./httpSessionService";
 import { authenticatedRpc, authenticatedSelect } from "./authenticatedDataClient";
 import { rotateDeviceSession } from "../utils/deviceSession";
-import { touchTenantAdminSession } from "./adminOpsService";
+import { revokeCurrentTenantAdminSession, touchTenantAdminSession } from "./adminOpsService";
 
 type ProfileRow = {
   id: string;
@@ -973,12 +973,30 @@ export const superAdminLogin = async (
 };
 
 export const signOut = async () => {
+  const current = getAuthState();
+  const shouldRevokeTenantAdminSession = current.role === "tenant_admin" && !!current.adminVerifiedAt;
+
+  if (shouldRevokeTenantAdminSession) {
+    try {
+      await revokeCurrentTenantAdminSession();
+    } catch {
+      // Ignore device-session revocation failures during sign-out.
+    }
+  }
+
   try {
     await clearHttpSession();
   } catch {
     // Ignore cookie logout failures during the migration window.
   }
-  await supabase.auth.signOut({ scope: "local" });
+  try {
+    await supabase.auth.signOut({ scope: "local" });
+  } catch (error) {
+    const message = error instanceof Error ? error.message.toLowerCase() : "";
+    if (!message.includes("session_not_found")) {
+      throw error;
+    }
+  }
   clearAdminVerification();
   clearPendingSuperAdminVerificationEmail();
   clearAuthState(true);

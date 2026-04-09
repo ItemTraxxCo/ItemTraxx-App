@@ -355,7 +355,9 @@ const upsertTenantPolicy = async (
     checkout_due_hours: policy.checkout_due_hours ?? 72,
     ...(options.includeAccountCategory ? { account_category: policy.account_category ?? null } : {}),
     ...(options.includePlanCode ? { plan_code: policy.plan_code ?? null } : {}),
-    ...(options.includeFeatureFlags ? { feature_flags: policy.feature_flags ?? null } : {}),
+    ...(options.includeFeatureFlags && policy.feature_flags !== undefined
+      ? { feature_flags: policy.feature_flags ?? defaultFeatureFlags() }
+      : {}),
     updated_by: policy.updated_by,
     updated_at: policy.updated_at,
   });

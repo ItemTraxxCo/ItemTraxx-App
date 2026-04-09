@@ -32,12 +32,33 @@ type TenantFeatureFlags = {
   enable_barcode_generator: boolean;
 };
 
+type TenantPolicyRow = {
+  checkout_due_hours: number | null;
+  account_category: "organization" | "district" | "individual" | null;
+  plan_code:
+    | "core"
+    | "growth"
+    | "starter"
+    | "scale"
+    | "enterprise"
+    | "individual_yearly"
+    | "individual_monthly"
+    | null;
+  feature_flags: unknown;
+};
+
+type TenantPolicyResult = {
+  data: TenantPolicyRow | null;
+  error: RpcError | null;
+};
+
 type DeviceSessionContext = {
   deviceId: string | null;
   deviceLabel: string | null;
   userAgent: string | null;
   loginMethod: "password" | "magic_link" | "session_handoff" | null;
   loginLocation: "regular_login" | "admin_login" | null;
+  generalLocation: string | null;
 };
 
 const TRACKED_STATUSES = new Set(["damaged", "lost", "in_repair", "retired", "in_studio_only"]);
@@ -147,6 +168,50 @@ const sanitizeLoginMethod = (value: unknown): DeviceSessionContext["loginMethod"
 const sanitizeLoginLocation = (value: unknown): DeviceSessionContext["loginLocation"] =>
   value === "regular_login" || value === "admin_login" ? value : null;
 
+const TITLE_CASE_SKIP_WORDS = new Set(["and", "or", "of", "the", "in"]);
+
+const toTitleCase = (value: string) =>
+  value
+    .toLowerCase()
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((part, index) => {
+      if (part.length <= 3) return part.toUpperCase();
+      if (index > 0 && TITLE_CASE_SKIP_WORDS.has(part)) return part;
+      return part.charAt(0).toUpperCase() + part.slice(1);
+    })
+    .join(" ");
+
+const sanitizeGeoHeader = (value: string | null, maxLen: number) => {
+  if (!value) return null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  return trimmed.slice(0, maxLen);
+};
+
+const resolveGeneralLocation = (req: Request) => {
+  const city = sanitizeGeoHeader(req.headers.get("x-itx-geo-city"), 80);
+  const region = sanitizeGeoHeader(req.headers.get("x-itx-geo-region"), 80);
+  const country = sanitizeGeoHeader(req.headers.get("x-itx-geo-country"), 80);
+
+  if (!city && !region && !country) return null;
+
+  const locationParts = city && region
+    ? [city, region]
+    : city && country
+      ? [city, country]
+      : region && country
+        ? [region, country]
+        : [city ?? region ?? country ?? ""];
+
+  const formatted = locationParts
+    .map((part) => toTitleCase(part))
+    .filter(Boolean)
+    .join(", ");
+
+  return formatted || null;
+};
+
 const resolveDeviceSessionContext = (
   payload: Record<string, unknown>,
   req: Request
@@ -156,13 +221,16 @@ const resolveDeviceSessionContext = (
   userAgent: sanitizeText(req.headers.get("user-agent"), 255),
   loginMethod: sanitizeLoginMethod(payload.login_method),
   loginLocation: sanitizeLoginLocation(payload.login_location),
+  generalLocation: resolveGeneralLocation(req),
 });
 
 const isMissingSessionTable = (error: RpcError | null | undefined) =>
   isMissingRelation(error, "tenant_admin_sessions");
 
 const isMissingSessionMetadataColumn = (error: RpcError | null | undefined) =>
-  isMissingColumn(error, "login_method") || isMissingColumn(error, "login_location");
+  isMissingColumn(error, "login_method") ||
+  isMissingColumn(error, "login_location") ||
+  isMissingColumn(error, "general_location");
 
 
 serve(async (req) => {
@@ -359,9 +427,10 @@ serve(async (req) => {
           ...baseUpdate,
           ...(deviceSession.loginMethod ? { login_method: deviceSession.loginMethod } : {}),
           ...(deviceSession.loginLocation ? { login_location: deviceSession.loginLocation } : {}),
+          ...(deviceSession.generalLocation ? { general_location: deviceSession.generalLocation } : {}),
         };
         const shouldTryMetadataUpdate =
-          !!deviceSession.loginMethod || !!deviceSession.loginLocation;
+          !!deviceSession.loginMethod || !!deviceSession.loginLocation || !!deviceSession.generalLocation;
         const { error: updateError } = await adminClient
           .from("tenant_admin_sessions")
           .update(shouldTryMetadataUpdate ? metadataUpdate : baseUpdate)
@@ -400,9 +469,10 @@ serve(async (req) => {
           ...baseInsert,
           ...(deviceSession.loginMethod ? { login_method: deviceSession.loginMethod } : {}),
           ...(deviceSession.loginLocation ? { login_location: deviceSession.loginLocation } : {}),
+          ...(deviceSession.generalLocation ? { general_location: deviceSession.generalLocation } : {}),
         };
         const shouldTryMetadataInsert =
-          !!deviceSession.loginMethod || !!deviceSession.loginLocation;
+          !!deviceSession.loginMethod || !!deviceSession.loginLocation || !!deviceSession.generalLocation;
         const { error: insertError } = await adminClient
           .from("tenant_admin_sessions")
           .insert(shouldTryMetadataInsert ? metadataInsert : baseInsert);
@@ -457,11 +527,11 @@ serve(async (req) => {
 
     let checkoutDueHours = 72;
     let featureFlags = defaultFeatureFlags();
-    let tenantPolicyResult = await adminClient
+    let tenantPolicyResult: TenantPolicyResult = await adminClient
       .from("tenant_policies")
       .select("checkout_due_hours, account_category, plan_code, feature_flags")
       .eq("tenant_id", tenantId)
-      .maybeSingle();
+      .maybeSingle() as unknown as TenantPolicyResult;
 
     if (isMissingColumn(tenantPolicyResult.error, "feature_flags")) {
       const fallbackTenantPolicyResult = await adminClient
@@ -621,11 +691,11 @@ serve(async (req) => {
         updated_at: new Date().toISOString(),
       };
 
-      let settingsResult = await adminClient
+      let settingsResult: TenantPolicyResult = await adminClient
         .from("tenant_policies")
         .upsert(row, { onConflict: "tenant_id" })
         .select("checkout_due_hours, account_category, plan_code, feature_flags")
-        .single();
+        .single() as unknown as TenantPolicyResult;
 
       if (isMissingColumn(settingsResult.error, "feature_flags")) {
         const fallbackSettingsResult = await adminClient
@@ -862,13 +932,14 @@ serve(async (req) => {
           user_agent: string | null;
           login_method?: "password" | "magic_link" | "session_handoff" | null;
           login_location?: "regular_login" | "admin_login" | null;
+          general_location?: string | null;
           created_at: string;
           last_seen_at: string;
         }> | null;
         error: RpcError | null;
       } = await adminClient
         .from("tenant_admin_sessions")
-        .select("id, device_id, device_label, user_agent, login_method, login_location, created_at, last_seen_at")
+        .select("id, device_id, device_label, user_agent, login_method, login_location, general_location, created_at, last_seen_at")
         .eq("tenant_id", tenantId)
         .eq("profile_id", user.id)
         .is("revoked_at", null)
@@ -900,6 +971,7 @@ serve(async (req) => {
         user_agent: string | null;
         login_method?: "password" | "magic_link" | "session_handoff" | null;
         login_location?: "regular_login" | "admin_login" | null;
+        general_location?: string | null;
         created_at: string;
         last_seen_at: string;
       }>;
@@ -916,6 +988,7 @@ serve(async (req) => {
             ...row,
             login_method: row.login_method ?? null,
             login_location: row.login_location ?? null,
+            general_location: row.general_location ?? null,
             is_current: !!deviceSession.deviceId && row.device_id === deviceSession.deviceId,
           })),
         },

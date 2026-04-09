@@ -36,6 +36,50 @@ const parseAuthToken = (req: Request) => {
 
 const normalizeIp = (req: Request) => resolveClientIp(req) || null;
 
+const TITLE_CASE_SKIP_WORDS = new Set(["and", "or", "of", "the", "in"]);
+
+const toTitleCase = (value: string) =>
+  value
+    .toLowerCase()
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((part, index) => {
+      if (part.length <= 3) return part.toUpperCase();
+      if (index > 0 && TITLE_CASE_SKIP_WORDS.has(part)) return part;
+      return part.charAt(0).toUpperCase() + part.slice(1);
+    })
+    .join(" ");
+
+const sanitizeGeoHeader = (value: string | null, maxLen: number) => {
+  if (!value) return null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  return trimmed.slice(0, maxLen);
+};
+
+const resolveGeneralLocation = (req: Request) => {
+  const city = sanitizeGeoHeader(req.headers.get("x-itx-geo-city"), 80);
+  const region = sanitizeGeoHeader(req.headers.get("x-itx-geo-region"), 80);
+  const country = sanitizeGeoHeader(req.headers.get("x-itx-geo-country"), 80);
+
+  if (!city && !region && !country) return null;
+
+  const locationParts = city && region
+    ? [city, region]
+    : city && country
+      ? [city, country]
+      : region && country
+        ? [region, country]
+        : [city ?? region ?? country ?? ""];
+
+  const formatted = locationParts
+    .map((part) => toTitleCase(part))
+    .filter(Boolean)
+    .join(", ");
+
+  return formatted || null;
+};
+
 const escapeHtml = (value: string) =>
   value
     .replaceAll("&", "&amp;")
@@ -51,12 +95,14 @@ const buildLoginNotificationHtml = (payload: {
   loginTimeLabel: string;
   deviceBrowser: string;
   ipAddress: string | null;
+  generalLocation: string | null;
 }) => {
   const accountName = escapeHtml(payload.accountName);
   const accountLabel = escapeHtml(payload.accountLabel);
   const supportEmail = escapeHtml(payload.supportEmail);
   const deviceBrowser = escapeHtml(payload.deviceBrowser || "Unknown");
   const ipAddress = escapeHtml(payload.ipAddress ?? "Unavailable");
+  const generalLocation = escapeHtml(payload.generalLocation ?? "Unavailable");
   const loginTime = escapeHtml(payload.loginTimeLabel);
 
   return `<!doctype html>
@@ -81,6 +127,7 @@ const buildLoginNotificationHtml = (payload: {
                   <strong>${accountLabel}:</strong> ${accountName}<br />
                   <strong>Login time:</strong> ${loginTime}<br />
                   <strong>Device/Browser:</strong> ${deviceBrowser}<br />
+                  <strong>Approximate location:</strong> ${generalLocation}<br />
                   <strong>IP Address:</strong> ${ipAddress}
                 </p>
                 <p style="margin:0;font-size:14px;line-height:1.6;color:#6b7280;">
@@ -243,6 +290,7 @@ serve(async (req) => {
       : `${loginTime.toISOString()} (UTC)`;
     const deviceInfo = req.headers.get("user-agent") ?? "Unknown device/browser";
     const clientIp = normalizeIp(req);
+    const generalLocation = resolveGeneralLocation(req);
 
     const subject = `New ItemTraxx Login - ${accountName}`;
     await sendLoggedResendEmail(adminClient, resendApiKey, {
@@ -256,6 +304,7 @@ serve(async (req) => {
         loginTimeLabel,
         deviceBrowser: deviceInfo,
         ipAddress: clientIp,
+        generalLocation,
       }),
       text:
         `A new login to your ItemTraxx account was detected.\n\n` +

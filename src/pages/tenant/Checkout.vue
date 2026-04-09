@@ -146,14 +146,16 @@
         mode="checkout_item"
         title="Scan item barcode"
         :auto-close-on-scan="false"
+        :scan-history-items="itemScannerHistory"
         @scanned="handleItemScan"
+        @remove-history-item="removeBarcode"
       />
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { nextTick, onMounted, onUnmounted, ref } from "vue";
+import { computed, nextTick, onMounted, onUnmounted, ref } from "vue";
 import CameraBarcodeScannerModal from "../../components/CameraBarcodeScannerModal.vue";
 import {
   fetchCheckedOutGear,
@@ -172,7 +174,7 @@ import {
 import { sanitizeInput } from "../../utils/inputSanitizer";
 import { getAuthState } from "../../store/authState";
 import { toUserFacingErrorMessage } from "../../services/appErrors";
-import type { ScannerScanEvent } from "../../types/cameraScanner";
+import type { ScannerHistoryItem, ScannerScanEvent } from "../../types/cameraScanner";
 
 const isStudentLoading = ref(false);
 const isBarcodeLoading = ref(false);
@@ -195,6 +197,20 @@ const toastTitle = ref("");
 const syncInFlight = ref(false);
 const studentLookupCooldownSeconds = ref(0);
 let studentLookupCooldownTimer: number | null = null;
+const itemScannerHistory = computed<ScannerHistoryItem[]>(() =>
+  barcodes.value.map((item) => {
+    const isReturn = checkedOutGear.value.some((checkedOutItem) => checkedOutItem.barcode === item.barcode);
+    return {
+      id: item.barcode,
+      label: item.name,
+      value: item.barcode,
+      tagLabel: isReturn ? "Return" : "Checkout",
+      tagClass: isReturn ? "tag-return" : "tag-checkout",
+      removable: true,
+    };
+  })
+);
+
 const receipt = ref<{
   timestamp: string;
   studentUsername: string;

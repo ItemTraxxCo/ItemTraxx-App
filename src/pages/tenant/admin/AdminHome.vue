@@ -4,7 +4,7 @@
         <div class="admin-toolbar">
           <div class="page-nav-left">
         <button type="button" class="button-link" @click="returnToCheckout">
-          Return to checkout
+          Exit admin panel and return to checkout
         </button>
           </div>
           <div class="muted">Signed in as {{ adminEmail }}</div>

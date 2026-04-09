@@ -138,7 +138,6 @@
           </form>
 
           <p v-if="error" class="error">{{ error }}</p>
-          <p v-if="success" class="success">{{ success }}</p>
         </section>
 
         <section class="security-report-side">
@@ -186,11 +185,12 @@
 
 <script setup lang="ts">
 import { computed, ref } from "vue";
-import { RouterLink } from "vue-router";
+import { RouterLink, useRouter } from "vue-router";
 import PublicFooter from "../components/PublicFooter.vue";
 import { useTurnstile } from "../composables/useTurnstile";
 import { submitContactSupportRequest } from "../services/contactSupportService";
 import { toUserFacingErrorMessage } from "../services/appErrors";
+import { saveSubmissionConfirmation } from "../services/submissionConfirmation";
 
 type SupportAttachment = {
   filename: string;
@@ -199,6 +199,7 @@ type SupportAttachment = {
   size_bytes: number;
 };
 
+const router = useRouter();
 const fullName = ref("");
 const replyEmail = ref("");
 const summary = ref("");
@@ -210,12 +211,10 @@ const attachments = ref<SupportAttachment[]>([]);
 const attachmentsInput = ref<HTMLInputElement | null>(null);
 const isSending = ref(false);
 const error = ref("");
-const success = ref("");
 const turnstileSiteKey = import.meta.env.VITE_TURNSTILE_SITE_KEY as string | undefined;
 const {
   containerRef: turnstileContainerRef,
   token: turnstileToken,
-  reset: resetTurnstile,
 } = useTurnstile(turnstileSiteKey);
 
 const setTurnstileContainerRef = (
@@ -305,7 +304,6 @@ const handleSend = () => {
 
 const send = async () => {
   error.value = "";
-  success.value = "";
   if (!canSubmit.value || (turnstileSiteKey && !turnstileToken.value)) {
     error.value = "Complete required fields and security check.";
     return;
@@ -321,7 +319,7 @@ const send = async () => {
       .filter(Boolean)
       .join("\n");
 
-    await submitContactSupportRequest({
+    const response = await submitContactSupportRequest({
       name: fullName.value,
       reply_email: replyEmail.value,
       subject: `[Security Report] ${summary.value}`,
@@ -332,14 +330,22 @@ const send = async () => {
       attachments: attachments.value,
     });
 
-    success.value = "Security report sent. You will receive a confirmation email from support@itemtraxx.com shortly.";
-    summary.value = "";
-    affectedArea.value = "";
-    details.value = "";
-    website.value = "";
-    attachments.value = [];
-    if (attachmentsInput.value) attachmentsInput.value.value = "";
-    resetTurnstile();
+    saveSubmissionConfirmation({
+      kind: "Security report",
+      title: "Security report sent.",
+      lead: "Your security report was submitted privately. We will follow up from support@itemtraxx.com after review.",
+      submittedAt: new Date().toISOString(),
+      referenceId: response?.request_id ?? null,
+      fields: [
+        { label: "Reply email", value: replyEmail.value },
+        { label: "Name", value: fullName.value },
+        { label: "Severity", value: severity.value },
+        { label: "Summary", value: summary.value },
+        ...(affectedArea.value ? [{ label: "Affected area", value: affectedArea.value }] : []),
+      ],
+    });
+
+    await router.push({ name: "public-submit-confirmation" });
   } catch (err) {
     error.value = toUserFacingErrorMessage(err, "Unable to send security report.");
   } finally {

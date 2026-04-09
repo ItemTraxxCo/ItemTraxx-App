@@ -5,6 +5,7 @@
       'with-top-banners': hasTopBanners,
       'route-shell-auth': isFullBleedRoute,
       'route-shell-marketing': isMarketingFullBleedRoute,
+      'route-shell-confirmation': isSubmitConfirmationRoute,
       'route-shell-banner-bleed': isBannerBleedRoute,
     }"
     :style="appShellStyle"
@@ -456,6 +457,7 @@ const isMarketingFullBleedRoute = computed(
     route.path === "/itemscanner" ||
     route.path === "/accessibility"
 );
+const isSubmitConfirmationRoute = computed(() => route.path === "/submitconfirmation");
 const isBannerBleedRoute = computed(
   () =>
     route.path === "/legal" ||
@@ -499,7 +501,8 @@ const showTopMenu = computed(
     route.name !== "public-itemscanner" &&
     route.name !== "public-legal" &&
     route.name !== "public-request-demo" &&
-    route.name !== "public-contact-support"
+    route.name !== "public-contact-support" &&
+    route.name !== "public-submit-confirmation"
 );
 const showLogoutUserAction = computed(() => auth.isAuthenticated && !Boolean(route.meta.public) && route.path !== "/login");
 const currentTenantOnboardingRole = computed<TenantOnboardingRole | null>(() => {
@@ -622,6 +625,9 @@ const updateBrowserChromeColor = () => {
   if (isFullBleedRoute.value) {
     color = theme.value === "dark" ? "#090c12" : "#f9f9f7";
     appleStatusBarStyle = theme.value === "dark" ? "black-translucent" : "default";
+  } else if (isSubmitConfirmationRoute.value) {
+    color = theme.value === "dark" ? "#090c12" : "#eef5f8";
+    appleStatusBarStyle = theme.value === "dark" ? "black-translucent" : "default";
   } else if (isDarkChromeRoute.value) {
     color = "#090d14";
     appleStatusBarStyle = "black-translucent";
@@ -636,6 +642,8 @@ watchEffect(() => {
   document.body.classList.toggle("auth-route-active", isFullBleedRoute.value);
   document.documentElement.classList.toggle("marketing-route-active", isDarkChromeRoute.value);
   document.body.classList.toggle("marketing-route-active", isDarkChromeRoute.value);
+  document.documentElement.classList.toggle("confirmation-route-active", isSubmitConfirmationRoute.value);
+  document.body.classList.toggle("confirmation-route-active", isSubmitConfirmationRoute.value);
   updateBrowserChromeColor();
 });
 const topMenuStyle = computed(() => ({

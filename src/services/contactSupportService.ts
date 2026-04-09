@@ -32,9 +32,9 @@ export const submitContactSupportRequest = async (payload: ContactSupportPayload
     }
   );
 
-  if (!result.ok || !result.data?.ok) {
+  if (!result.ok || !result.data?.ok || !result.data.data?.accepted) {
     throw edgeFunctionError(result, result.data?.error || "Unable to send support request.");
   }
 
-  return result.data.data ?? null;
+  return result.data.data;
 };

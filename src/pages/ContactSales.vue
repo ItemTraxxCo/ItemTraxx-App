@@ -96,17 +96,17 @@
         </p>
       </form>
       <p v-if="error" class="error">{{ error }}</p>
-      <p v-if="success" class="success">{{ success }}</p>
     </section>
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed, ref } from "vue";
-import { RouterLink, useRoute } from "vue-router";
+import { RouterLink, useRoute, useRouter } from "vue-router";
 import { useTurnstile } from "../composables/useTurnstile";
 import { submitContactSalesLead } from "../services/contactSalesService";
 import { toUserFacingErrorMessage } from "../services/appErrors";
+import { saveSubmissionConfirmation } from "../services/submissionConfirmation";
 
 type PlanId =
   | "district_core"
@@ -120,6 +120,7 @@ type PlanId =
   | "other";
 
 const route = useRoute();
+const router = useRouter();
 
 const plan = ref<PlanId>("district_core");
 const fullName = ref("");
@@ -130,7 +131,6 @@ const details = ref("");
 const website = ref("");
 const isSending = ref(false);
 const error = ref("");
-const success = ref("");
 const turnstileSiteKey = import.meta.env.VITE_TURNSTILE_SITE_KEY as string | undefined;
 const {
   containerRef: turnstileContainerRef,
@@ -206,14 +206,13 @@ const handleSend = () => {
 
 const send = async () => {
   error.value = "";
-  success.value = "";
   if (!canSubmit.value || (turnstileSiteKey && !turnstileToken.value)) {
     error.value = "Complete required fields and security check.";
     return;
   }
   isSending.value = true;
   try {
-    await submitContactSalesLead({
+    const response = await submitContactSalesLead({
       plan: effectivePlan.value,
       schools_count: requiresUnits.value ? schoolCount.value : null,
       name: fullName.value,
@@ -224,11 +223,24 @@ const send = async () => {
       website: website.value,
       intent: isDemoIntent.value ? "demo" : "sales",
     });
-    success.value = isDemoIntent.value
-      ? "Demo request sent. You will receive a confirmation email from support@itemtraxx.com within 24 hours. Our team will follow up shortly to schedule next steps."
-      : "Request sent. You will receive a confirmation email from support@itemtraxx.com confirming that we have received your request within 24hr. Our sales team will follow up shortly after. Thank you for your interest in ItemTraxx!";
-    details.value = "";
-    website.value = "";
+
+    saveSubmissionConfirmation({
+      kind: isDemoIntent.value ? "Demo request" : "Sales request",
+      title: isDemoIntent.value ? "Demo request sent." : "Sales request sent.",
+      lead: isDemoIntent.value
+        ? "Your demo request was submitted. We will follow up from support@itemtraxx.com to schedule next steps."
+        : "Your sales request was submitted. We will follow up from support@itemtraxx.com with next steps.",
+      submittedAt: new Date().toISOString(),
+      referenceId: response?.lead_id ?? null,
+      fields: [
+        { label: "Reply email", value: replyEmail.value },
+        { label: "Name", value: fullName.value },
+        ...(organization.value ? [{ label: "Organization", value: organization.value }] : []),
+        { label: "Plan", value: isDemoIntent.value ? "Demo request" : effectivePlan.value.replaceAll("_", " ") },
+      ],
+    });
+
+    await router.push({ name: "public-submit-confirmation" });
   } catch (err) {
     error.value = toUserFacingErrorMessage(err, "Unable to send request.");
   } finally {

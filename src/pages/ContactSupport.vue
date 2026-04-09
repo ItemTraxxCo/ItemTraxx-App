@@ -107,7 +107,6 @@
         </p>
       </form>
       <p v-if="error" class="error">{{ error }}</p>
-      <p v-if="success" class="success">{{ success }}</p>
     </section>
 
     <PublicFooter />
@@ -116,11 +115,12 @@
 
 <script setup lang="ts">
 import { computed, ref } from "vue";
-import { RouterLink } from "vue-router";
+import { RouterLink, useRouter } from "vue-router";
 import PublicFooter from "../components/PublicFooter.vue";
 import { useTurnstile } from "../composables/useTurnstile";
 import { submitContactSupportRequest } from "../services/contactSupportService";
 import { toUserFacingErrorMessage } from "../services/appErrors";
+import { saveSubmissionConfirmation } from "../services/submissionConfirmation";
 
 type Category = "general" | "bug" | "billing" | "access" | "feature";
 type SupportAttachment = {
@@ -130,6 +130,7 @@ type SupportAttachment = {
   size_bytes: number;
 };
 
+const router = useRouter();
 const fullName = ref("");
 const replyEmail = ref("");
 const category = ref<Category | "other">("general");
@@ -140,7 +141,6 @@ const attachments = ref<SupportAttachment[]>([]);
 const attachmentsInput = ref<HTMLInputElement | null>(null);
 const isSending = ref(false);
 const error = ref("");
-const success = ref("");
 const turnstileSiteKey = import.meta.env.VITE_TURNSTILE_SITE_KEY as string | undefined;
 const {
   containerRef: turnstileContainerRef,
@@ -235,14 +235,13 @@ const handleSend = () => {
 
 const send = async () => {
   error.value = "";
-  success.value = "";
   if (!canSubmit.value || (turnstileSiteKey && !turnstileToken.value)) {
     error.value = "Complete required fields and security check.";
     return;
   }
   isSending.value = true;
   try {
-    await submitContactSupportRequest({
+    const response = await submitContactSupportRequest({
       name: fullName.value,
       reply_email: replyEmail.value,
       subject: subject.value,
@@ -252,12 +251,22 @@ const send = async () => {
       website: website.value,
       attachments: attachments.value,
     });
-    success.value = "Request sent. You will receive a confirmation email from support@itemtraxx.com shortly. Our team will follow up as soon as possible.";
-    subject.value = "";
-    message.value = "";
-    website.value = "";
-    attachments.value = [];
-    if (attachmentsInput.value) attachmentsInput.value.value = "";
+
+    saveSubmissionConfirmation({
+      kind: "Support request",
+      title: "Support request sent.",
+      lead: "Your support request was submitted. We will follow up from support@itemtraxx.com as soon as possible.",
+      submittedAt: new Date().toISOString(),
+      referenceId: response?.request_id ?? null,
+      fields: [
+        { label: "Reply email", value: replyEmail.value },
+        { label: "Name", value: fullName.value },
+        { label: "Category", value: category.value },
+        { label: "Subject", value: subject.value },
+      ],
+    });
+
+    await router.push({ name: "public-submit-confirmation" });
   } catch (err) {
     error.value = toUserFacingErrorMessage(err, "Unable to send request.");
   } finally {

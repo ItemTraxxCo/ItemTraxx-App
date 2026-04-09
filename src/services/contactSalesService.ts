@@ -37,9 +37,9 @@ export const submitContactSalesLead = async (payload: ContactSalesPayload) => {
     }
   );
 
-  if (!result.ok || !result.data?.ok) {
+  if (!result.ok || !result.data?.ok || !result.data.data?.lead_id) {
     throw edgeFunctionError(result, result.data?.error || "Unable to send sales request.");
   }
 
-  return result.data.data ?? null;
+  return result.data.data;
 };

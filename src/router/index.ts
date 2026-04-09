@@ -98,6 +98,12 @@ const routes: RouteRecordRaw[] = [
     meta: { public: true, title: "Contact | ItemTraxx" },
   },
   {
+    path: "/submitconfirmation",
+    name: "public-submit-confirmation",
+    component: () => import("../pages/SubmitConfirmation.vue"),
+    meta: { public: true, title: "Submission Received | ItemTraxx" },
+  },
+  {
     path: "/status/:pathMatch(.*)*",
     name: "public-status-redirect",
     component: { template: "<div></div>" },

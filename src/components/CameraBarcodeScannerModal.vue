@@ -24,13 +24,18 @@
             <div class="scanner-preview-visuals">
               <video ref="videoRef" class="scanner-video" playsinline muted autoplay></video>
               <div class="scanner-crosshair" aria-hidden="true"></div>
-              <div
-                v-if="previewStyle"
-                class="scanner-detection-box"
-                :class="`scanner-detection-${currentStatus}`"
-                :style="previewStyle"
-                aria-hidden="true"
-              ></div>
+              <svg v-if="previewBox" class="scanner-detection-layer" aria-hidden="true" viewBox="0 0 100 100" preserveAspectRatio="none">
+                <rect
+                  class="scanner-detection-box"
+                  :class="`scanner-detection-${currentStatus}`"
+                  :x="previewBox.x"
+                  :y="previewBox.y"
+                  :width="previewBox.width"
+                  :height="previewBox.height"
+                  rx="14"
+                  ry="14"
+                />
+              </svg>
             </div>
             <div v-if="isStarting" class="scanner-overlay-message">Starting camera...</div>
             <div v-else-if="errorMessage" class="scanner-overlay-message scanner-overlay-error">
@@ -256,15 +261,6 @@ onUnmounted(() => {
   themeObserver = null;
 });
 
-const previewStyle = computed(() => {
-  if (!previewBox.value) return null;
-  return {
-    left: `${previewBox.value.x}px`,
-    top: `${previewBox.value.y}px`,
-    width: `${previewBox.value.width}px`,
-    height: `${previewBox.value.height}px`,
-  };
-});
 </script>
 
 <style scoped>
@@ -422,8 +418,15 @@ const previewStyle = computed(() => {
   top: 20px;
 }
 
-.scanner-detection-box {
+.scanner-detection-layer {
   position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.scanner-detection-box {
   border: 3px solid #59dca3;
   border-radius: 14px;
   background: rgba(255, 255, 255, 0.02);

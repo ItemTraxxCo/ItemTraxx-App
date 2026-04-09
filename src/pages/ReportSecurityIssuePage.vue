@@ -390,6 +390,12 @@ const avoidList = [
 
 <style scoped>
 .security-report-page {
+  --report-input-bg: rgba(8, 14, 26, 0.82);
+  --report-input-border: rgba(112, 138, 180, 0.3);
+  --report-input-text: #f5f7fb;
+  --report-input-placeholder: rgba(188, 198, 214, 0.62);
+  --report-input-focus: rgba(25, 194, 168, 0.55);
+  --report-select-arrow: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23d7e2f2' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
   position: relative;
   min-height: 100vh;
   min-height: 100dvh;
@@ -399,6 +405,15 @@ const avoidList = [
   background-color: #0a1120;
   color: #f5f7fb;
   overflow-x: hidden;
+}
+
+:global(html[data-theme="light"]) .security-report-page {
+  --report-input-bg: rgba(255, 255, 255, 0.94);
+  --report-input-border: rgba(148, 163, 184, 0.34);
+  --report-input-text: #0f172a;
+  --report-input-placeholder: rgba(71, 85, 105, 0.68);
+  --report-input-focus: rgba(25, 67, 155, 0.36);
+  --report-select-arrow: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%230f172a' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
 }
 
 .security-report-page::before {
@@ -554,6 +569,74 @@ const avoidList = [
 
 .security-report-page a {
   color: #7de7d6;
+}
+
+.security-report-form-card label {
+  display: grid;
+  gap: 0.48rem;
+  font-weight: 600;
+  color: rgba(236, 241, 248, 0.92);
+}
+
+:global(html[data-theme="light"]) .security-report-form-card label {
+  color: #122033;
+}
+
+.security-report-form-card input:not(.honeypot),
+.security-report-form-card select,
+.security-report-form-card textarea {
+  width: 100%;
+  box-sizing: border-box;
+  border-radius: 14px;
+  border: 1px solid var(--report-input-border);
+  background: var(--report-input-bg);
+  color: var(--report-input-text);
+  padding: 0.85rem 0.95rem;
+  font: inherit;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.02);
+  transition: border-color 160ms ease, box-shadow 160ms ease, background-color 160ms ease;
+}
+
+.security-report-form-card input:not(.honeypot)::placeholder,
+.security-report-form-card textarea::placeholder {
+  color: var(--report-input-placeholder);
+}
+
+.security-report-form-card textarea {
+  resize: vertical;
+  min-height: 10rem;
+}
+
+.security-report-form-card select {
+  appearance: none;
+  background-image: var(--report-select-arrow);
+  background-repeat: no-repeat;
+  background-position: right 0.9rem center;
+  padding-right: 2.5rem;
+}
+
+.security-report-form-card input:not(.honeypot):focus,
+.security-report-form-card select:focus,
+.security-report-form-card textarea:focus {
+  outline: none;
+  border-color: var(--report-input-focus);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--report-input-focus) 32%, transparent);
+}
+
+.security-report-form-card input[type="file"] {
+  padding: 0.75rem;
+}
+
+.security-report-form-card input[type="file"]::file-selector-button {
+  margin-right: 0.8rem;
+  border: 1px solid var(--report-input-border);
+  border-radius: 999px;
+  padding: 0.45rem 0.8rem;
+  background: rgba(25, 194, 168, 0.12);
+  color: inherit;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
 }
 
 .security-report-legal-note {

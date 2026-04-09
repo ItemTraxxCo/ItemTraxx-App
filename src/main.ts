@@ -3,6 +3,7 @@ import "./style.css";
 import App from "./App.vue";
 import router from "./router";
 import {
+  clearAdminVerification,
   clearAuthState,
   getAuthState,
   markAdminVerified,
@@ -33,8 +34,9 @@ declare global {
   interface Window {
     __itemtraxxTest?: {
       setTenantUserSession: (tenantId?: string) => void;
-      setTenantAdminSession: (tenantId?: string) => void;
-      setSuperAdminSession: () => void;
+      setTenantAdminSession: (tenantId?: string, options?: { verified?: boolean }) => void;
+      setDistrictAdminSession: (districtId?: string, options?: { verified?: boolean }) => void;
+      setSuperAdminSession: (options?: { verified?: boolean }) => void;
       clearSession: () => void;
       navigate: (path: string) => Promise<void>;
     };
@@ -67,7 +69,7 @@ const attachE2EControls = () => {
       });
       setTenantContext(tenantId);
     },
-    setTenantAdminSession(tenantId = "tenant-e2e") {
+    setTenantAdminSession(tenantId = "tenant-e2e", options = { verified: true }) {
       setAuthStateFromBackend({
         isInitialized: true,
         isAuthenticated: true,
@@ -82,9 +84,36 @@ const attachE2EControls = () => {
         superVerifiedAt: null,
       });
       setTenantContext(tenantId);
+      setDistrictContext(null);
+      if (options.verified === false) {
+        clearAdminVerification();
+        return;
+      }
       markAdminVerified();
     },
-    setSuperAdminSession() {
+    setDistrictAdminSession(districtId = "district-e2e", options = { verified: true }) {
+      setAuthStateFromBackend({
+        isInitialized: true,
+        isAuthenticated: true,
+        userId: "user-e2e-district-admin",
+        email: "district.admin@example.com",
+        signedInAt: new Date().toISOString(),
+        role: "district_admin",
+        sessionTenantId: null,
+        tenantContextId: null,
+        districtContextId: districtId,
+        hasSecondaryAuth: false,
+        superVerifiedAt: null,
+      });
+      setTenantContext(null);
+      setDistrictContext(districtId);
+      if (options.verified === false) {
+        clearAdminVerification();
+        return;
+      }
+      markAdminVerified();
+    },
+    setSuperAdminSession(options = { verified: true }) {
       setAuthStateFromBackend({
         isInitialized: true,
         isAuthenticated: true,
@@ -95,9 +124,11 @@ const attachE2EControls = () => {
         sessionTenantId: null,
         tenantContextId: null,
         districtContextId: null,
-        hasSecondaryAuth: true,
+        hasSecondaryAuth: options.verified !== false,
       });
-      setSecondaryAuth(true);
+      setTenantContext(null);
+      setDistrictContext(null);
+      setSecondaryAuth(options.verified !== false);
     },
     clearSession() {
       clearAuthState(true);

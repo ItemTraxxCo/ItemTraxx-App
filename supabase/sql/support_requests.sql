@@ -16,8 +16,12 @@ create table if not exists public.support_requests (
 create table if not exists public.support_request_attachments (
   id uuid primary key default gen_random_uuid(),
   support_request_id uuid not null references public.support_requests(id) on delete cascade,
-  storage_bucket text not null default 'support-request-attachments',
-  storage_path text not null unique,
+  storage_bucket text not null default 'support-request-attachments'
+    check (storage_bucket = 'support-request-attachments'),
+  storage_path text not null unique
+    check (
+      storage_path ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}/[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\.(png|jpg|webp|gif)$'
+    ),
   original_filename text,
   stored_filename text not null,
   content_type text not null,
@@ -46,6 +50,22 @@ create index if not exists support_request_attachments_request_idx
 
 create index if not exists support_request_events_request_idx
   on public.support_request_events (support_request_id, created_at asc);
+
+alter table public.support_request_attachments
+  drop constraint if exists support_request_attachments_storage_bucket_check;
+
+alter table public.support_request_attachments
+  add constraint support_request_attachments_storage_bucket_check
+  check (storage_bucket = 'support-request-attachments');
+
+alter table public.support_request_attachments
+  drop constraint if exists support_request_attachments_storage_path_check;
+
+alter table public.support_request_attachments
+  add constraint support_request_attachments_storage_path_check
+  check (
+    storage_path ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}/[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\.(png|jpg|webp|gif)$'
+  );
 
 create or replace function public.touch_support_requests_updated_at()
 returns trigger

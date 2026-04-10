@@ -21,6 +21,117 @@ type RateLimitResult = {
 
 type SupportRequestStatus = "open" | "in_progress" | "resolved" | "spam";
 
+const SUPPORT_ATTACHMENT_BUCKET = "support-request-attachments";
+const UUID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const SAFE_SUPPORT_ATTACHMENT_EXTENSION_PATTERN = /^(png|jpg|webp|gif)$/i;
+
+type SupportAttachmentRecord = {
+  id: string;
+  original_filename: string | null;
+  stored_filename: string;
+  content_type: string;
+  size_bytes: number;
+  storage_bucket: string | null;
+  storage_path: string | null;
+};
+
+type SafeSupportAttachmentPathParts = {
+  requestIdSegment: string;
+  fileIdSegment: string;
+  extensionSegment: string;
+};
+
+const getSafeSupportAttachmentPathParts = (attachment: {
+  storage_bucket: string | null;
+  storage_path: string | null;
+}): SafeSupportAttachmentPathParts | null => {
+  if (attachment.storage_bucket !== SUPPORT_ATTACHMENT_BUCKET) {
+    return null;
+  }
+  if (typeof attachment.storage_path !== "string") {
+    return null;
+  }
+  if (
+    attachment.storage_path.includes("../") ||
+    attachment.storage_path.includes("..\\") ||
+    attachment.storage_path.startsWith("/") ||
+    attachment.storage_path.startsWith("\\")
+  ) {
+    return null;
+  }
+  const normalizedPath = attachment.storage_path.trim();
+  const pathSegments = normalizedPath.split("/");
+  if (pathSegments.length !== 2) {
+    return null;
+  }
+
+  const [requestIdSegment, fileNameSegment] = pathSegments;
+  if (!UUID_PATTERN.test(requestIdSegment)) {
+    return null;
+  }
+
+  const fileNameSegments = fileNameSegment.split(".");
+  if (fileNameSegments.length !== 2) {
+    return null;
+  }
+
+  const [fileIdSegment, extensionSegment] = fileNameSegments;
+  if (!UUID_PATTERN.test(fileIdSegment) || !SAFE_SUPPORT_ATTACHMENT_EXTENSION_PATTERN.test(extensionSegment)) {
+    return null;
+  }
+
+  return {
+    requestIdSegment,
+    fileIdSegment,
+    extensionSegment: extensionSegment.toLowerCase(),
+  };
+};
+
+const toSignedAttachmentResult = (
+  attachment: Pick<
+    SupportAttachmentRecord,
+    "id" | "original_filename" | "stored_filename" | "content_type" | "size_bytes"
+  >,
+  signedUrl: string | null,
+) => ({
+  id: attachment.id,
+  original_filename: attachment.original_filename,
+  stored_filename: attachment.stored_filename,
+  content_type: attachment.content_type,
+  size_bytes: attachment.size_bytes,
+  signed_url: signedUrl,
+});
+
+const createSafeSupportAttachmentSignedUrl = async (
+  adminClient: ReturnType<typeof createClient>,
+  rawStoragePath: string | null,
+  expiresInSeconds: number,
+) => {
+  if (typeof rawStoragePath !== "string") {
+    return { data: null, error: new Error("Invalid storage path.") };
+  }
+
+  const safePathParts = getSafeSupportAttachmentPathParts({
+    storage_bucket: SUPPORT_ATTACHMENT_BUCKET,
+    storage_path: rawStoragePath,
+  });
+  if (!safePathParts) {
+    return { data: null, error: new Error("Invalid storage path.") };
+  }
+
+  const canonicalStoragePath =
+    `${safePathParts.requestIdSegment}/` +
+    `${safePathParts.fileIdSegment}.${safePathParts.extensionSegment}`;
+  if (canonicalStoragePath.includes("../") || canonicalStoragePath.includes("..\\")) {
+    return { data: null, error: new Error("Invalid storage path.") };
+  }
+
+  return adminClient.storage
+    .from(SUPPORT_ATTACHMENT_BUCKET)
+    .createSignedUrl(canonicalStoragePath, expiresInSeconds);
+};
+
 const resolveCorsHeaders = (req: Request) => {
   const origin = req.headers.get("Origin");
   const allowedOrigins = parseAllowedOrigins(Deno.env.get("ITX_ALLOWED_ORIGINS"));
@@ -227,19 +338,22 @@ serve(async (req) => {
       }
 
       const signedAttachments = await Promise.all(
-        (attachments ?? []).map(async (attachment) => {
-          const { data: signedData, error: signedError } = await adminClient.storage
-            .from(attachment.storage_bucket)
-            .createSignedUrl(attachment.storage_path, 60 * 60);
+        ((attachments ?? []) as SupportAttachmentRecord[]).map(async (attachment) => {
+          if (!getSafeSupportAttachmentPathParts(attachment)) {
+            return toSignedAttachmentResult(attachment, null);
+          }
 
-          return {
-            id: attachment.id,
-            original_filename: attachment.original_filename,
-            stored_filename: attachment.stored_filename,
-            content_type: attachment.content_type,
-            size_bytes: attachment.size_bytes,
-            signed_url: signedError ? null : signedData?.signedUrl ?? null,
-          };
+          const { data: signedData, error: signedError } =
+            await createSafeSupportAttachmentSignedUrl(
+              adminClient,
+              attachment.storage_path,
+              60 * 60,
+            );
+
+          return toSignedAttachmentResult(
+            attachment,
+            signedError ? null : signedData?.signedUrl ?? null,
+          );
         }),
       );
 

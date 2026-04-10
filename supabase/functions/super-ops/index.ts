@@ -228,6 +228,9 @@ serve(async (req) => {
 
       const signedAttachments = await Promise.all(
         (attachments ?? []).map(async (attachment) => {
+          if (attachment.storage_path.includes('..')) {
+            throw new Error("Invalid storage path.");
+          }
           const { data: signedData, error: signedError } = await adminClient.storage
             .from(attachment.storage_bucket)
             .createSignedUrl(attachment.storage_path, 60 * 60);

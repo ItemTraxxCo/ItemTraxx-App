@@ -6,7 +6,7 @@
 
     <h1>Request a Demo</h1>
     <p class="muted">
-      Send a demo request and our team will follow up from support@itemtraxx.com to schedule next
+      Send a demo request and our team will follow up within 48 hours to schedule next
       steps.
     </p>
 
@@ -71,11 +71,11 @@
 
         <div class="form-actions">
           <button type="submit" class="button-primary" :disabled="isSending || !canSubmit">
-            {{ isSending ? "Sending..." : "Request Demo" }}
+            {{ isSending ? "Sending..." : "Send Demo Request" }}
           </button>
         </div>
         <p class="submit-legal-note">
-          By sending, you agree to <RouterLink to="/legal">Legal</RouterLink>.
+          By clicking Send Demo Request, you agree to our <RouterLink to="/privacy">Privacy Policy</RouterLink> and <RouterLink to="/legal">Terms of Service</RouterLink>.
         </p>
       </form>
       <p v-if="error" class="error">{{ error }}</p>

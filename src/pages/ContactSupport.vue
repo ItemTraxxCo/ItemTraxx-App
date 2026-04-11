@@ -425,6 +425,22 @@ onUnmounted(() => {
   box-shadow: 0 1px 3px color-mix(in srgb, #000 10%, transparent);
 }
 
+.support-form input[type="file"] {
+  padding: 0.75rem;
+}
+
+.support-form input[type="file"]::file-selector-button {
+  margin-right: 0.8rem;
+  border: 1px solid var(--report-input-border);
+  border-radius: 999px;
+  padding: 0.45rem 0.8rem;
+  background: rgba(25, 194, 168, 0.12);
+  color: inherit;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
 @media (max-width: 720px) {
   .contact-sales-page {
     padding-top: calc(1.25rem + env(safe-area-inset-top, 0px));

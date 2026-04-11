@@ -35,9 +35,22 @@
         </div>
       </section>
 
+      <section class="changelog-version-strip" aria-label="Latest build version">
+        <p class="changelog-version-label">Latest version</p>
+        <p class="changelog-version-lead">Please make sure your ItemTraxx is updated.</p>
+        <p class="changelog-version-value">Current release version: {{ appVersion }}</p>
+        <p class="changelog-version-meta">
+          {{ releaseChannel }}
+          <span v-if="showBranchName"> • {{ appBranch }}</span>
+        </p>
+      </section>
+
+      <div class="changelog-version-divider" aria-hidden="true"></div>
+      <p class="changelog-entries-kicker">Recent Changes</p>
+
       <section class="changelog-entries">
         <article v-for="entry in entries" :key="entry.title" class="changelog-card changelog-entry-card">
-          <p class="changelog-section-label">Changelog</p>
+          <p class="changelog-section-label"></p>
           <h2>{{ entry.title }}</h2>
           <ul class="changelog-list">
             <li v-for="item in entry.items" :key="item.title + item.body">
@@ -76,6 +89,31 @@ type ChangelogEntry = {
 };
 
 const lines = changelogRaw.split(/\r?\n/);
+const appVersion = import.meta.env.VITE_GIT_COMMIT || "n/a";
+const appBranch = import.meta.env.VITE_GIT_BRANCH || "n/a";
+const runtimeEnvironment = (
+  import.meta.env.VITE_SENTRY_ENVIRONMENT ||
+  import.meta.env.MODE ||
+  ""
+).trim().toLowerCase();
+const runtimeHostname =
+  typeof window !== "undefined" ? window.location.hostname.trim().toLowerCase() : "";
+const isDevHost =
+  runtimeHostname === "dev.itemtraxx.com" || runtimeHostname.endsWith(".dev.itemtraxx.com");
+
+const releaseChannel =
+  isDevHost
+    ? "Development"
+    : runtimeEnvironment === "production"
+    ? "Production"
+    : runtimeEnvironment === "preview"
+      ? "Preview"
+      : runtimeEnvironment === "beta"
+        ? "Beta"
+        : "Development";
+
+const showBranchName = !!appBranch && appBranch !== "n/a" && appBranch !== "main";
+
 const lastUpdated = computed(() => {
   const line = lines.find((entry) => entry.startsWith("Last updated (year-month-day):"));
   return line ? line.split(":").slice(1).join(":").trim() : "";
@@ -366,6 +404,58 @@ const entries = computed<ChangelogEntry[]>(() => {
 
 .changelog-entries {
   margin-top: 1rem;
+}
+
+.changelog-version-strip {
+  margin-top: 1rem;
+  margin-bottom: 1rem;
+  padding: 0.85rem 1rem;
+  border-radius: 1rem;
+  border: 1px solid rgba(112, 138, 180, 0.16);
+  background: linear-gradient(180deg, rgba(18, 26, 41, 0.9), rgba(11, 18, 31, 0.86));
+}
+
+.changelog-version-label {
+  margin: 0;
+  font-size: 0.72rem;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+  color: #8be6d6;
+}
+
+.changelog-version-lead {
+  margin: 0.16rem 0 0.08rem;
+  font-size: 0.78rem;
+  line-height: 1.35;
+  color: rgba(231, 236, 245, 0.74);
+}
+
+.changelog-version-value {
+  margin: 0.12rem 0 0;
+  font-size: 0.96rem;
+  font-weight: 700;
+  color: #f5f7fb;
+}
+
+.changelog-version-meta {
+  margin: 0.2rem 0 0;
+  font-size: 0.82rem;
+  color: rgba(231, 236, 245, 0.78);
+}
+
+.changelog-version-divider {
+  height: 3px;
+  margin: 1.75rem 0 1.95rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, #ffffff 48%, rgba(255, 255, 255, 0.8));
+}
+
+.changelog-entries-kicker {
+  margin: 0 0 0.65rem;
+  font-size: 0.78rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #8be6d6;
 }
 
 .changelog-list {

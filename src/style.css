@@ -78,6 +78,7 @@ body.auth-route-active {
 html.marketing-route-active,
 body.marketing-route-active {
   background: #090d14;
+  overflow-x: hidden;
 }
 
 body.marketing-route-active #app {
@@ -201,6 +202,7 @@ button:focus-visible {
 
 #app {
   width: 100%;
+  box-sizing: border-box;
   margin: 0 auto;
   padding: 2.5rem 2rem 3rem;
   text-align: left;

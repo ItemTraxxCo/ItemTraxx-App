@@ -381,12 +381,23 @@ onUnmounted(() => {
 
 .sales-section {
   margin-bottom: 0.6rem;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
 }
 
 .sales-form {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 1rem 1.2rem;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.sales-form > * {
+  min-width: 0;
+  max-width: 100%;
 }
 
 .field {
@@ -419,10 +430,21 @@ onUnmounted(() => {
 }
 
 .sales-form :is(input, select, textarea) {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
   box-shadow: 0 1px 3px color-mix(in srgb, #000 10%, transparent);
 }
 
-@media (max-width: 720px) {
+.sales-form select {
+  min-inline-size: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 900px) {
   .contact-sales-page {
     padding-top: calc(1.25rem + env(safe-area-inset-top, 0px));
   }
@@ -440,8 +462,16 @@ onUnmounted(() => {
   }
 
   .sales-form {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
     gap: 0.85rem;
+  }
+
+  .field-name,
+  .field-reply-email,
+  .field-plan,
+  .field-organization,
+  .field-full {
+    grid-column: 1 / -1;
   }
 }
 

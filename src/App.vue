@@ -199,9 +199,8 @@
         </button>
         <a
           class="menu-item muted" role="menuitem"
-          href="https://github.com/ItemTraxxCo/ItemTraxx-App"
-          target="_blank"
-          rel="noreferrer"
+          href="/changelog"
+          @click="menuOpen = false"
         >
           Version: <strong>{{ appVersion }}</strong>
         </a>

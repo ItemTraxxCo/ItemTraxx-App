@@ -133,7 +133,7 @@
               </button>
             </div>
             <p class="security-report-legal-note">
-              By sending, you agree to <RouterLink to="/legal">Legal</RouterLink>.
+                        By clicking Send Security Report, you agree to our <RouterLink to="/privacy">Privacy Policy</RouterLink> and <RouterLink to="/legal">Terms of Service</RouterLink>.
             </p>
           </form>
 

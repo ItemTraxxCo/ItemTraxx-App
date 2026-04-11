@@ -92,7 +92,7 @@
           </button>
         </div>
         <p class="submit-legal-note">
-          By sending, you agree to <RouterLink to="/legal">Legal</RouterLink>.
+          By clicking Submit Sales Request, you agree to our <RouterLink to="/privacy">Privacy Policy</RouterLink> and <RouterLink to="/legal">Terms of Service</RouterLink>.
         </p>
       </form>
       <p v-if="error" class="error">{{ error }}</p>
@@ -146,7 +146,7 @@ const pageLead = computed(() =>
     ? "Send your demo request and our team will respond from support@itemtraxx.com to schedule next steps."
     : "Send your request and our team will respond from support@itemtraxx.com."
 );
-const submitLabel = computed(() => (isDemoIntent.value ? "Request Demo" : "Send"));
+const submitLabel = computed(() => (isDemoIntent.value ? "Request Demo" : "Submit Sales Request"));
 const returnPath = computed(() => (isDemoIntent.value ? "/" : "/pricing"));
 const returnLabel = computed(() => (isDemoIntent.value ? "Back" : "Back"));
 

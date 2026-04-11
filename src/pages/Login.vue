@@ -103,7 +103,9 @@
             </p>
 
             <p class="muted support-note">
-              Trouble signing in? Contact our support team from the top-right menu. By using this software, you agree to our
+              Trouble signing in? Contact our support team from the top-right menu for help.
+              <br />
+              By using this software, you agree to our
               <a :href="legalUrl" target="_blank" rel="noreferrer">legal terms and policies</a>.
             </p>
           </form>

@@ -294,6 +294,7 @@ onUnmounted(() => {
 
 .contact-card-wide {
   width: 100%;
+  box-sizing: border-box;
 }
 
 @media (max-width: 900px) {

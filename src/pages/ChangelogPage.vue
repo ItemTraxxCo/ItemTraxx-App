@@ -6,7 +6,7 @@
 
     <main class="changelog-container">
       <div class="page-nav-left changelog-top-nav">
-        <RouterLink class="changelog-back-link" to="/" aria-label="Return to home">
+        <RouterLink class="changelog-back-link" to="/" aria-label="Return to home" @click.prevent="$router.back()">
           <svg viewBox="0 0 24 24" aria-hidden="true">
             <path d="M15 5 8 12l7 7" />
           </svg>
@@ -297,7 +297,7 @@ const entries = computed<ChangelogEntry[]>(() => {
   margin: 0;
   max-width: 100%;
   line-height: 1.05;
-  font-size: clamp(2.2rem, 5.6vw, 3.8rem);
+  font-size: clamp(1.4rem, 3vw, 2.4rem);
   padding-right: 1.1rem;
 }
 

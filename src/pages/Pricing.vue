@@ -6,7 +6,7 @@
 
     <div class="pricing-page">
       <div class="page-nav-left pricing-top-nav">
-        <RouterLink class="pricing-back-link" to="/" aria-label="Return to home">
+        <RouterLink class="pricing-back-link" to="/" aria-label="Return to home" @click.prevent="$router.back()">
           <svg viewBox="0 0 24 24" aria-hidden="true">
             <path d="M15 5 8 12l7 7" />
           </svg>
@@ -407,7 +407,7 @@ import PublicFooter from "../components/PublicFooter.vue";
 
 .pricing-hero h1 {
   margin: 0;
-  font-size: clamp(2.7rem, 5vw, 5rem);
+  font-size: clamp(1.4rem, 3vw, 2.4rem);
   line-height: 0.98;
   letter-spacing: -0.06em;
 }

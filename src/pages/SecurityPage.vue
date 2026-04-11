@@ -1,12 +1,12 @@
 <template>
-  <div class="security-page">
-    <div class="security-orb security-orb-one" aria-hidden="true"></div>
-    <div class="security-orb security-orb-two" aria-hidden="true"></div>
-    <div class="grid-noise" aria-hidden="true"></div>
+  <div class="page security-page">
+    <RouterLink class="brand-mark" to="/" aria-label="ItemTraxx home">
+      <img v-if="brandLogoUrl" class="brand-mark-full" :src="brandLogoUrl" alt="ItemTraxx Co" />
+    </RouterLink>
 
     <main class="security-container">
       <div class="page-nav-left security-top-nav">
-        <RouterLink class="security-back-link" to="/" aria-label="Return to home">
+        <RouterLink class="security-back-link" to="/" aria-label="Return to home" @click.prevent="$router.back()">
           <svg viewBox="0 0 24 24" aria-hidden="true">
             <path d="M15 5 8 12l7 7" />
           </svg>
@@ -33,7 +33,7 @@
       </section>
 
       <section class="security-grid">
-        <article class="security-card security-card-wide">
+        <article class="security-card security-card-wide security-outline-only">
           <p class="security-section-label">Access and Identity</p>
           <h2>Protected sign-in flows and scoped access.</h2>
           <ul class="security-list">
@@ -44,7 +44,7 @@
           </ul>
         </article>
 
-        <article class="security-card">
+        <article class="security-card security-outline-only">
           <p class="security-section-label">Traffic and Request Controls</p>
           <h2>Traffic filtered before it even reaches our servers.</h2>
           <ul class="security-list">
@@ -57,7 +57,7 @@
       </section>
 
       <section class="security-grid security-grid-compact">
-        <article class="security-card">
+        <article class="security-card security-outline-only">
           <p class="security-section-label">Data and Auditability</p>
           <h2>User separation and operational traceability for maximum security and ease of use.</h2>
           <ul class="security-list">
@@ -68,7 +68,7 @@
           </ul>
         </article>
 
-        <article class="security-card">
+        <article class="security-card security-outline-only">
           <p class="security-section-label">Operations</p>
           <h2>Backups, monitoring, and deployment guardrails.</h2>
           <ul class="security-list">
@@ -132,8 +132,19 @@
 </template>
 
 <script setup lang="ts">
+import { computed, onMounted, onUnmounted, ref } from "vue";
 import { RouterLink } from "vue-router";
 import PublicFooter from "../components/PublicFooter.vue";
+
+const lightBrandLogoUrl = import.meta.env.VITE_BRAND_LOGO_LIGHT_URL as string | undefined;
+const darkBrandLogoUrl = import.meta.env.VITE_BRAND_LOGO_DARK_URL as string | undefined;
+const themeMode = ref<"light" | "dark">("dark");
+const brandLogoUrl = computed(() =>
+  themeMode.value === "light"
+    ? lightBrandLogoUrl || darkBrandLogoUrl || ""
+    : darkBrandLogoUrl || lightBrandLogoUrl || ""
+);
+let themeObserver: MutationObserver | null = null;
 
 const accessControls = [
   {
@@ -245,66 +256,50 @@ const securityApproach = [
       "Security issues can be reported through the published support and disclosure channels, and the engineering workflow includes documented remediation and follow-up practices.",
   },
 ];
+
+onMounted(() => {
+  const syncTheme = () => {
+    themeMode.value = document.documentElement.getAttribute("data-theme") === "light" ? "light" : "dark";
+  };
+
+  syncTheme();
+  themeObserver = new MutationObserver(syncTheme);
+  themeObserver.observe(document.documentElement, {
+    attributes: true,
+    attributeFilter: ["data-theme"],
+  });
+});
+
+onUnmounted(() => {
+  if (themeObserver) {
+    themeObserver.disconnect();
+    themeObserver = null;
+  }
+});
 </script>
 
 <style scoped>
 .security-page {
-  position: relative;
-  min-height: 100vh;
-  min-height: 100dvh;
-  width: 100%;
-  max-width: 100%;
-  margin-left: 0;
-  padding:
-    calc(2rem + env(safe-area-inset-top, 0px))
-    0
-    calc(3.5rem + env(safe-area-inset-bottom, 0px));
-  background-color: #0a1120;
-  color: #f5f7fb;
-  overflow-x: hidden;
+  max-width: 1120px;
+  padding-top: calc(2rem + env(safe-area-inset-top, 0px));
 }
 
-.security-page::before {
-  content: "";
-  position: fixed;
-  inset: 0;
-  z-index: 0;
-  background:
-    radial-gradient(circle at 14% 18%, rgba(25, 194, 168, 0.16), transparent 34%),
-    radial-gradient(circle at 83% 10%, rgba(25, 67, 155, 0.18), transparent 31%),
-    linear-gradient(180deg, #09111f 0%, #0d1524 48%, #0a1120 100%);
-  pointer-events: none;
+.brand-mark {
+  display: inline-flex;
+  align-items: center;
+  text-decoration: none;
+  margin-bottom: 0.45rem;
 }
 
-.security-orb {
-  position: absolute;
-  border-radius: 999px;
-  filter: blur(40px);
-  opacity: 0.38;
-  pointer-events: none;
-}
-
-.security-orb-one {
-  width: 20rem;
-  height: 20rem;
-  top: 5rem;
-  left: -6rem;
-  background: rgba(30, 202, 183, 0.24);
-}
-
-.security-orb-two {
-  width: 24rem;
-  height: 24rem;
-  top: 9rem;
-  right: -8rem;
-  background: rgba(38, 104, 226, 0.2);
+.brand-mark-full {
+  height: 5.8rem;
+  width: auto;
+  object-fit: contain;
+  display: block;
 }
 
 .security-container {
-  position: relative;
-  z-index: 1;
-  width: min(1120px, calc(100% - 2rem));
-  margin: 0 auto;
+  width: 100%;
 }
 
 .security-top-nav {
@@ -318,60 +313,51 @@ const securityApproach = [
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 2.75rem;
-  height: 2.75rem;
+  width: 2.4rem;
+  height: 2.4rem;
   border-radius: 999px;
-  border: 1px solid rgba(136, 154, 184, 0.28);
-  background: rgba(10, 17, 31, 0.72);
-  color: #f5f7fb;
-  transition: border-color 160ms ease, transform 160ms ease;
+  border: 1px solid rgba(77, 97, 122, 0.4);
+  background: linear-gradient(180deg, rgba(31, 40, 54, 0.46) 0%, rgba(17, 23, 32, 0.34) 100%);
+  backdrop-filter: blur(2px);
+  color: #ffffff;
+  text-decoration: none;
+  transition: transform 0.16s ease, border-color 0.16s ease, background 0.16s ease;
 }
 
 .security-back-link:hover {
-  border-color: rgba(56, 208, 177, 0.55);
-  transform: translateX(-1px);
+  text-decoration: none;
+  transform: translateY(-1px);
+  border-color: rgba(39, 196, 172, 0.58);
+  background: linear-gradient(180deg, rgba(29, 66, 75, 0.62) 0%, rgba(16, 37, 48, 0.54) 100%);
+  box-shadow: 0 16px 32px rgba(25, 194, 168, 0.14);
 }
 
 .security-back-link svg {
-  width: 1.1rem;
-  height: 1.1rem;
+  width: 1.2rem;
+  height: 1.2rem;
   stroke: currentColor;
-  stroke-width: 2;
+  stroke-width: 2.2;
   fill: none;
   stroke-linecap: round;
   stroke-linejoin: round;
 }
 
 .security-breadcrumb {
-  font-size: 0.88rem;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: #89a4c5;
+  color: color-mix(in srgb, var(--text) 72%, transparent);
+  font-size: 0.95rem;
 }
 
 .security-hero,
 .security-card,
 .security-tool-card {
-  position: relative;
-  overflow: hidden;
-  border: 1px solid rgba(112, 138, 180, 0.16);
-  background: linear-gradient(180deg, rgba(18, 26, 41, 0.95), rgba(11, 18, 31, 0.92));
-  box-shadow: 0 28px 64px rgba(5, 10, 18, 0.34);
-}
-
-.security-hero::after,
-.security-card::after,
-.security-tool-card::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(120deg, rgba(255, 255, 255, 0.04), transparent 46%);
-  pointer-events: none;
+  border: 1px solid color-mix(in srgb, var(--border) 0%, transparent);
+  background: transparent;
+  box-shadow: none;
 }
 
 .security-hero {
   padding: clamp(2rem, 4vw, 3.2rem);
-  border-radius: 2rem;
+  border-radius: 1.4rem;
   margin-bottom: 1.5rem;
 }
 
@@ -382,7 +368,7 @@ const securityApproach = [
   font-size: 0.76rem;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: #8be6d6;
+  color: color-mix(in srgb, var(--text) 64%, var(--accent) 36%);
 }
 
 .security-hero h1,
@@ -395,7 +381,7 @@ const securityApproach = [
 .security-hero h1 {
   max-width: 100%;
   padding-right: 1.1rem;
-  font-size: clamp(2.2rem, 5.8vw, 3.9rem);
+  font-size: clamp(1.4rem, 3vw, 2.4rem);
 }
 
 .security-lead,
@@ -404,7 +390,7 @@ const securityApproach = [
 .security-stack-header p,
 .security-list span,
 .security-disclosure a {
-  color: rgba(231, 236, 245, 0.82);
+  color: color-mix(in srgb, var(--text) 84%, transparent);
 }
 
 .security-lead {
@@ -442,9 +428,9 @@ const securityApproach = [
 }
 
 .security-secondary-link {
-  border: 1px solid rgba(136, 154, 184, 0.26);
-  background: rgba(10, 17, 31, 0.56);
-  color: #f5f7fb;
+  border: 1px solid color-mix(in srgb, var(--border) 72%, transparent);
+  background: color-mix(in srgb, var(--surface-2) 64%, transparent);
+  color: inherit;
 }
 
 .security-primary-link:hover,
@@ -465,8 +451,14 @@ const securityApproach = [
 
 .security-card,
 .security-tool-card {
-  border-radius: 1.6rem;
+  border-radius: 1rem;
   padding: 1.6rem;
+}
+
+.security-outline-only {
+  border: 1px solid color-mix(in srgb, var(--border) 58%, transparent);
+  background: transparent;
+  box-shadow: none;
 }
 
 .security-card-wide {
@@ -487,17 +479,17 @@ const securityApproach = [
 }
 
 .security-list strong {
-  color: #f5f7fb;
+  color: inherit;
   font-size: 1rem;
 }
 
 .security-stack {
   margin-top: 1rem;
-  border: 1px solid rgba(112, 138, 180, 0.16);
-  border-radius: 2rem;
+  border: 1px solid color-mix(in srgb, var(--border) 58%, transparent);
+  border-radius: 1rem;
   padding: clamp(1.5rem, 3vw, 2rem);
-  background: linear-gradient(180deg, rgba(15, 22, 34, 0.9), rgba(10, 16, 28, 0.88));
-  box-shadow: 0 24px 54px rgba(5, 10, 18, 0.28);
+  background: transparent;
+  box-shadow: none;
 }
 
 .security-stack-header {
@@ -517,7 +509,7 @@ const securityApproach = [
 
 .security-note {
   margin-top: 1rem;
-  color: #8be6d6;
+  color: color-mix(in srgb, var(--text) 84%, transparent);
 }
 
 @media (max-width: 980px) {
@@ -533,15 +525,12 @@ const securityApproach = [
     padding-top: calc(1.25rem + env(safe-area-inset-top, 0px));
   }
 
-  .security-container {
-    width: min(1120px, calc(100% - 1rem));
+  .brand-mark {
+    margin-bottom: 0.25rem;
   }
 
-  .security-card,
-  .security-tool-card,
-  .security-hero,
-  .security-stack {
-    border-radius: 1.4rem;
+  .brand-mark-full {
+    height: 3.9rem;
   }
 
   .security-hero-actions {

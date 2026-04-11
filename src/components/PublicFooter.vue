@@ -72,8 +72,14 @@ const showBranchName = !!appBranch && appBranch !== "n/a" && appBranch !== "main
 
 <style scoped>
 .public-footer {
+  width: min(1280px, 92vw);
   margin-top: 3.6rem;
+  margin-left: auto;
+  margin-right: auto;
   padding: 1rem 0 0;
+  position: relative;
+  left: 50%;
+  transform: translateX(-50%);
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
@@ -151,6 +157,10 @@ const showBranchName = !!appBranch && appBranch !== "n/a" && appBranch !== "main
 }
 
 @media (max-width: 640px) {
+  .public-footer {
+    width: min(1280px, calc(100vw - 1.5rem));
+  }
+
   .footer-grid {
     grid-template-columns: 1fr;
     gap: 1rem;

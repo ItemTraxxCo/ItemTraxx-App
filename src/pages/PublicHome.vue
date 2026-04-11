@@ -758,7 +758,7 @@ onBeforeUnmount(() => {
 
 .step-card {
   border-radius: 14px;
-  border: 1px solid rgba(255, 255, 255, 0.24);
+  border: 2px solid rgba(255, 255, 255, 0.24);
   background: rgba(255, 255, 255, 0.22);
   backdrop-filter: blur(6px);
   padding: 1.1rem;
@@ -868,7 +868,7 @@ onBeforeUnmount(() => {
 
 .glass-panel {
   border-radius: 16px;
-  border: 1px solid rgba(255, 255, 255, 0.22);
+  border: 2px solid rgba(255, 255, 255, 0.22);
   background: rgba(255, 255, 255, 0.22);
   box-shadow: 0 8px 20px rgba(0, 0, 0, 0.12);
   backdrop-filter: blur(6px);
@@ -883,7 +883,7 @@ onBeforeUnmount(() => {
 
 .faq-item {
   border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.28);
+  border: 2px solid rgba(255, 255, 255, 0.28);
   background: rgba(255, 255, 255, 0.2);
   padding: 0.2rem 0.95rem;
 }

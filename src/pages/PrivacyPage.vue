@@ -1,12 +1,12 @@
 <template>
-  <div class="privacy-page">
-    <div class="privacy-orb privacy-orb-one" aria-hidden="true"></div>
-    <div class="privacy-orb privacy-orb-two" aria-hidden="true"></div>
-    <div class="grid-noise" aria-hidden="true"></div>
+  <div class="page privacy-page">
+    <RouterLink class="brand-mark" to="/" aria-label="ItemTraxx home">
+      <img v-if="brandLogoUrl" class="brand-mark-full" :src="brandLogoUrl" alt="ItemTraxx Co" />
+    </RouterLink>
 
     <main class="privacy-container">
       <div class="page-nav-left privacy-top-nav">
-        <RouterLink class="privacy-back-link" to="/" aria-label="Return to home">
+        <RouterLink class="privacy-back-link" to="/" aria-label="Return to home" @click.prevent="$router.back()">
           <svg viewBox="0 0 24 24" aria-hidden="true">
             <path d="M15 5 8 12l7 7" />
           </svg>
@@ -79,13 +79,16 @@
         </article>
       </section>
 
-      <PublicFooter />
     </main>
+
+    <div class="privacy-footer-wrap">
+      <PublicFooter />
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, onMounted, onUnmounted, ref } from "vue";
 import { RouterLink } from "vue-router";
 import PublicFooter from "../components/PublicFooter.vue";
 import privacyRaw from "../../PRIVACY.md?raw";
@@ -104,6 +107,16 @@ type InlineToken =
   | { type: "code"; text: string }
   | { type: "strong"; text: string }
   | { type: "link"; text: string; href: string };
+
+const lightBrandLogoUrl = import.meta.env.VITE_BRAND_LOGO_LIGHT_URL as string | undefined;
+const darkBrandLogoUrl = import.meta.env.VITE_BRAND_LOGO_DARK_URL as string | undefined;
+const themeMode = ref<"light" | "dark">("dark");
+const brandLogoUrl = computed(() =>
+  themeMode.value === "light"
+    ? lightBrandLogoUrl || darkBrandLogoUrl || ""
+    : darkBrandLogoUrl || lightBrandLogoUrl || ""
+);
+let themeObserver: MutationObserver | null = null;
 
 const lines = privacyRaw.split(/\r?\n/);
 
@@ -194,66 +207,58 @@ const tokenizeInline = (text: string): InlineToken[] => {
 
   return tokens.length ? tokens : [{ type: "text", text }];
 };
+
+onMounted(() => {
+  const syncTheme = () => {
+    themeMode.value = document.documentElement.getAttribute("data-theme") === "light" ? "light" : "dark";
+  };
+
+  syncTheme();
+  themeObserver = new MutationObserver(syncTheme);
+  themeObserver.observe(document.documentElement, {
+    attributes: true,
+    attributeFilter: ["data-theme"],
+  });
+});
+
+onUnmounted(() => {
+  if (themeObserver) {
+    themeObserver.disconnect();
+    themeObserver = null;
+  }
+});
 </script>
 
 <style scoped>
 .privacy-page {
-  position: relative;
-  min-height: 100vh;
-  min-height: 100dvh;
-  width: 100%;
-  max-width: 100%;
-  margin-left: 0;
-  padding:
-    calc(2rem + env(safe-area-inset-top, 0px))
-    0
-    calc(3.5rem + env(safe-area-inset-bottom, 0px));
-  background-color: #0a1120;
-  color: #f5f7fb;
-  overflow-x: hidden;
+  max-width: 1120px;
+  padding-top: calc(2rem + env(safe-area-inset-top, 0px));
 }
 
-.privacy-page::before {
-  content: "";
-  position: fixed;
-  inset: 0;
-  z-index: 0;
-  background:
-    radial-gradient(circle at 14% 18%, rgba(25, 194, 168, 0.16), transparent 34%),
-    radial-gradient(circle at 83% 10%, rgba(25, 67, 155, 0.18), transparent 31%),
-    linear-gradient(180deg, #09111f 0%, #0d1524 48%, #0a1120 100%);
-  pointer-events: none;
+.brand-mark {
+  display: inline-flex;
+  align-items: center;
+  text-decoration: none;
+  margin-bottom: 0.45rem;
 }
 
-.privacy-orb {
-  position: absolute;
-  border-radius: 999px;
-  filter: blur(40px);
-  opacity: 0.38;
-  pointer-events: none;
-}
-
-.privacy-orb-one {
-  width: 20rem;
-  height: 20rem;
-  top: 5rem;
-  left: -6rem;
-  background: rgba(30, 202, 183, 0.24);
-}
-
-.privacy-orb-two {
-  width: 24rem;
-  height: 24rem;
-  top: 9rem;
-  right: -8rem;
-  background: rgba(38, 104, 226, 0.2);
+.brand-mark-full {
+  height: 5.8rem;
+  width: auto;
+  object-fit: contain;
+  display: block;
 }
 
 .privacy-container {
+  width: 100%;
+}
+
+.privacy-footer-wrap {
+  width: min(1280px, 92%);
+  margin-left: auto;
+  margin-right: auto;
   position: relative;
-  z-index: 1;
-  width: min(1120px, calc(100% - 2rem));
-  margin: 0 auto;
+  z-index: 2;
 }
 
 .privacy-top-nav {
@@ -267,14 +272,22 @@ const tokenizeInline = (text: string): InlineToken[] => {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 2.6rem;
-  height: 2.6rem;
+  width: 2.4rem;
+  height: 2.4rem;
   border-radius: 999px;
-  border: 1px solid rgba(140, 157, 189, 0.24);
-  background: rgba(9, 17, 31, 0.58);
-  color: #f5f7fb;
+  border: 1px solid rgba(77, 97, 122, 0.4);
+  background: linear-gradient(180deg, rgba(31, 40, 54, 0.46) 0%, rgba(17, 23, 32, 0.34) 100%);
+  color: #ffffff;
   text-decoration: none;
-  backdrop-filter: blur(18px);
+  backdrop-filter: blur(2px);
+  transition: transform 0.16s ease, border-color 0.16s ease, background 0.16s ease;
+}
+
+.privacy-back-link:hover {
+  transform: translateY(-1px);
+  border-color: rgba(39, 196, 172, 0.58);
+  background: linear-gradient(180deg, rgba(29, 66, 75, 0.62) 0%, rgba(16, 37, 48, 0.54) 100%);
+  box-shadow: 0 16px 32px rgba(25, 194, 168, 0.14);
 }
 
 .privacy-back-link svg {
@@ -294,22 +307,21 @@ const tokenizeInline = (text: string): InlineToken[] => {
   letter-spacing: 0.22em;
   font-size: 0.74rem;
   font-weight: 700;
-  color: rgba(155, 231, 220, 0.78);
+  color: color-mix(in srgb, var(--text) 64%, var(--accent) 36%);
 }
 
 .privacy-hero {
   margin-bottom: 1.75rem;
   padding: 1.7rem 1.6rem;
-  border-radius: 1.6rem;
-  border: 1px solid rgba(120, 136, 169, 0.18);
-  background: rgba(13, 21, 36, 0.72);
-  box-shadow: 0 28px 80px rgba(3, 8, 18, 0.38);
-  backdrop-filter: blur(18px);
+  border-radius: 1rem;
+  border: 2px solid color-mix(in srgb, var(--border) 58%, transparent);
+  background: transparent;
+  box-shadow: none;
 }
 
 .privacy-hero h1 {
   margin: 0.55rem 0 0.85rem;
-  font-size: clamp(2.2rem, 4vw, 3.6rem);
+  font-size: clamp(1.4rem, 3vw, 2.4rem);
   line-height: 0.96;
   letter-spacing: -0.05em;
 }
@@ -318,7 +330,7 @@ const tokenizeInline = (text: string): InlineToken[] => {
 .privacy-intro p,
 .privacy-content p,
 .privacy-list li {
-  color: rgba(230, 236, 247, 0.82);
+  color: color-mix(in srgb, var(--text) 84%, transparent);
   line-height: 1.72;
 }
 
@@ -335,11 +347,10 @@ const tokenizeInline = (text: string): InlineToken[] => {
 
 .privacy-card {
   padding: 1.4rem 1.35rem;
-  border-radius: 1.35rem;
-  border: 1px solid rgba(120, 136, 169, 0.18);
-  background: rgba(13, 21, 36, 0.72);
-  box-shadow: 0 28px 80px rgba(3, 8, 18, 0.28);
-  backdrop-filter: blur(18px);
+  border-radius: 1rem;
+  border: 2px solid color-mix(in srgb, var(--border) 58%, transparent);
+  background: transparent;
+  box-shadow: none;
 }
 
 .privacy-card h2 {
@@ -354,15 +365,15 @@ const tokenizeInline = (text: string): InlineToken[] => {
 }
 
 .privacy-content :deep(a) {
-  color: #7de7d6;
+  color: color-mix(in srgb, var(--text) 62%, var(--accent) 38%);
 }
 
 .privacy-content :deep(code),
 .privacy-intro :deep(code) {
   padding: 0.12rem 0.34rem;
   border-radius: 0.38rem;
-  background: rgba(255, 255, 255, 0.08);
-  color: #f5f7fb;
+  background: color-mix(in srgb, var(--surface-2) 72%, transparent);
+  color: var(--text);
   font-size: 0.92em;
 }
 
@@ -371,8 +382,12 @@ const tokenizeInline = (text: string): InlineToken[] => {
     padding-top: calc(1.25rem + env(safe-area-inset-top, 0px));
   }
 
-  .privacy-container {
-    width: min(100%, calc(100% - 1.25rem));
+  .brand-mark {
+    margin-bottom: 0.25rem;
+  }
+
+  .brand-mark-full {
+    height: 3.9rem;
   }
 
   .privacy-hero,

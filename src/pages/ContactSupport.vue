@@ -99,11 +99,11 @@
 
         <div class="form-actions">
           <button type="submit" class="button-primary" :disabled="isSending || !canSubmit">
-            {{ isSending ? "Sending..." : "Send" }}
+            {{ isSending ? "Sending..." : "Submit Support Request" }}
           </button>
         </div>
         <p class="submit-legal-note">
-          By sending, you agree to <RouterLink to="/legal">Legal</RouterLink>.
+          By clicking Submit Support Request, you agree to our <RouterLink to="/privacy">Privacy Policy</RouterLink> and <RouterLink to="/legal">Terms of Service</RouterLink>.
         </p>
       </form>
       <p v-if="error" class="error">{{ error }}</p>

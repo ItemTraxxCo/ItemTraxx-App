@@ -19,7 +19,7 @@
       </div>
       <div class="footer-column">
         <p class="footer-heading">Support</p>
-        <RouterLink to="/contact-support">Support</RouterLink>
+        <RouterLink to="/contact-support">Contact Support</RouterLink>
         <RouterLink to="/security">Security</RouterLink>
         <RouterLink to="/report-security-issue">Report Security Issue</RouterLink>
         <RouterLink to="/trust">Trust</RouterLink>

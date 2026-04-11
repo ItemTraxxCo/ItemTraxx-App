@@ -24,21 +24,27 @@
         </button>
       </div>
 
-      <header class="legal-header">
-        <h1>ItemTraxx Subscription Agreement and Policies</h1>
-        <p>
-          Effective date: March 21, 2026. This document combines the ItemTraxx legal terms,
-          software license, privacy policy, and security guidelines into one official legal
-          reference.
-        </p>
-        <p>
-          This Agreement is entered into between ItemTraxx Co, a California company, and the organization, 
-          district, team, or individual purchasing and using the service.
-        </p>
-        <p>
-          Last updated: March 07, 2026. ItemTraxx may update this document from time to time. Continued use of 
-          the service after updates means you accept the revised terms.
-        </p>
+      <header class="legal-header"> 
+    <h1>ItemTraxx Subscription Agreement and Policies</h1>
+
+    <p><strong>Effective Date:</strong> March 21, 2026</p>
+    <p><strong>Last Updated:</strong> April 11, 2026</p>
+
+  <p>
+  This document combines the ItemTraxx legal terms, software license, privacy policy,
+  and security guidelines into one official legal reference.
+</p>
+
+<p>
+  This Agreement is entered into between ItemTraxx Co, a California company, and the
+  organization, district, team, or individual purchasing or using the service.
+</p>
+
+<p>
+  ItemTraxx may update this document from time to time. The "Last Updated" date reflects
+  the most recent changes. Continued use of the service after an update becomes effective
+  constitutes acceptance of the revised terms.
+</p> 
       </header>
 
       <section>

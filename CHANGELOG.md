@@ -1,6 +1,6 @@
 # Changelog
 
-Last updated (year-month-day): 2026-04-08
+Last updated (year-month-day): 2026-04-11
 
 This public changelog summarizes notable ItemTraxx product, reliability, security, and experience updates at a high level. Detailed internal engineering and operational notes are maintained separately.
 
@@ -15,6 +15,27 @@ Changes are dated based on the default timezone: America/Los_Angeles
 - [TERMS.md](TERMS.md) – Terms of service for users
 - [PRIVACY.md](PRIVACY.md) – Privacy policy and data handling
 - [SECURITY.md](SECURITY.md) – Security reporting and guidelines
+
+---
+
+### 4/11/2026 Development Update
+
+- Refined public-page layouts, spacing, and overflow handling across additional responsive states.
+- Added more polished public theme controls and improved changelog presentation.
+
+---
+
+### 4/10/2026 Development Update
+
+- Completed another security hardening pass for public-facing request handling and file-path safety.
+- Continued product polish, legal-note updates, and maintenance improvements.
+
+---
+
+### 4/9/2026 Development Update
+
+- Added a cleaner public submission-confirmation experience for inbound request forms.
+- Improved public-form reliability, security posture, and visual consistency.
 
 ---
 

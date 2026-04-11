@@ -431,7 +431,6 @@ const themeLabel = computed(() =>
 const isFullBleedRoute = computed(
   () =>
     route.path === "/login" ||
-    route.path === "/forgot-password" ||
     route.path === "/tenant/admin-login" ||
     route.path === "/super-auth" ||
     route.path === "/internal-auth" ||
@@ -441,43 +440,35 @@ const isMarketingFullBleedRoute = computed(
   () =>
     route.path === "/" ||
     route.path === "/landing-new" ||
-    route.path === "/about" ||
-    route.path === "/security" ||
-    route.path === "/report-security-issue" ||
     route.path === "/changelog" ||
-    route.path === "/privacy" ||
-    route.path === "/cookies" ||
-    route.path === "/contact" ||
-    route.path === "/trust" ||
-    route.path === "/faq" ||
-    route.path === "/getting-started" ||
-    route.path === "/itemscanner" ||
-    route.path === "/accessibility"
+    route.path === "/itemscanner"
 );
 const isSubmitConfirmationRoute = computed(() => route.path === "/submitconfirmation");
 const isBannerBleedRoute = computed(
   () =>
     route.path === "/legal" ||
+    route.path === "/security" ||
+    route.path === "/trust" ||
+    route.path === "/faq" ||
+    route.path === "/contact" ||
+    route.path === "/privacy" ||
+    route.path === "/cookies" ||
+    route.path === "/accessibility" ||
+    route.path === "/about" ||
     route.path === "/pricing" ||
+    route.path === "/forgot-password" ||
     route.path === "/contact-sales" ||
     route.path === "/request-demo" ||
-    route.path === "/contact-support"
+    route.path === "/contact-support" ||
+    route.path === "/report-security-issue" ||
+    route.path === "/getting-started"
 );
 const isDarkChromeRoute = computed(
   () =>
     route.path === "/" ||
     route.path === "/landing-new" ||
-    route.path === "/about" ||
     route.path === "/pricing" ||
-    route.path === "/security" ||
-    route.path === "/report-security-issue" ||
     route.path === "/changelog" ||
-    route.path === "/privacy" ||
-    route.path === "/cookies" ||
-    route.path === "/contact" ||
-    route.path === "/trust" ||
-    route.path === "/faq" ||
-    route.path === "/getting-started" ||
     route.path === "/itemscanner"
 );
 const showTopMenu = computed(
@@ -497,7 +488,9 @@ const showTopMenu = computed(
     route.name !== "public-getting-started" &&
     route.name !== "public-itemscanner" &&
     route.name !== "public-legal" &&
+    route.name !== "public-forgot-password" &&
     route.name !== "public-request-demo" &&
+    route.name !== "public-contact-sales" &&
     route.name !== "public-contact-support" &&
     route.name !== "public-submit-confirmation"
 );

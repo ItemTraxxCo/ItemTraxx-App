@@ -1,17 +1,17 @@
 <template>
-  <div class="getting-started-page">
-    <div class="getting-started-orb getting-started-orb-one" aria-hidden="true"></div>
-    <div class="getting-started-orb getting-started-orb-two" aria-hidden="true"></div>
-    <div class="grid-noise" aria-hidden="true"></div>
-
+  <div class="page getting-started-page">
     <main class="getting-started-container">
+      <RouterLink class="brand-mark" to="/" aria-label="ItemTraxx home">
+        <img v-if="brandLogoUrl" class="brand-mark-full" :src="brandLogoUrl" alt="ItemTraxx Co" />
+      </RouterLink>
+
       <div class="page-nav-left getting-started-top-nav">
-        <RouterLink class="getting-started-back-link" to="/" aria-label="Return to home">
+        <RouterLink class="getting-started-back-link" to="/" aria-label="Return to home" @click.prevent="$router.back()">
           <svg viewBox="0 0 24 24" aria-hidden="true">
             <path d="M15 5 8 12l7 7" />
           </svg>
         </RouterLink>
-        <span class="getting-started-breadcrumb">Getting Started</span>
+        <span class="getting-started-breadcrumb"> </span>
       </div>
 
       <section class="getting-started-hero">
@@ -128,97 +128,109 @@
 </template>
 
 <script setup lang="ts">
+import { computed, onMounted, onUnmounted, ref } from "vue";
 import { RouterLink } from "vue-router";
 import PublicFooter from "../components/PublicFooter.vue";
+
+const lightBrandLogoUrl = import.meta.env.VITE_BRAND_LOGO_LIGHT_URL as string | undefined;
+const darkBrandLogoUrl = import.meta.env.VITE_BRAND_LOGO_DARK_URL as string | undefined;
+const themeMode = ref<"light" | "dark">("dark");
+const brandLogoUrl = computed(() =>
+  themeMode.value === "light"
+    ? lightBrandLogoUrl || darkBrandLogoUrl || ""
+    : darkBrandLogoUrl || lightBrandLogoUrl || ""
+);
+let themeObserver: MutationObserver | null = null;
+
+onMounted(() => {
+  const syncTheme = () => {
+    themeMode.value = document.documentElement.getAttribute("data-theme") === "light" ? "light" : "dark";
+  };
+  syncTheme();
+  themeObserver = new MutationObserver(syncTheme);
+  themeObserver.observe(document.documentElement, {
+    attributes: true,
+    attributeFilter: ["data-theme"],
+  });
+});
+
+onUnmounted(() => {
+  if (themeObserver) {
+    themeObserver.disconnect();
+    themeObserver = null;
+  }
+});
 </script>
 
 <style scoped>
 .getting-started-page {
-  position: relative;
-  min-height: 100vh;
-  min-height: 100dvh;
-  overflow: clip;
-  background:
-    radial-gradient(circle at top left, rgba(25, 194, 168, 0.18), transparent 30%),
-    radial-gradient(circle at bottom right, rgba(25, 67, 155, 0.22), transparent 38%),
-    linear-gradient(180deg, #0e1420 0%, #0a0f18 100%);
-  color: #f3f6fb;
-}
-
-.getting-started-orb {
-  position: absolute;
-  border-radius: 999px;
-  filter: blur(70px);
-  opacity: 0.22;
-  pointer-events: none;
-}
-
-.getting-started-orb-one {
-  top: 5rem;
-  left: -3rem;
-  width: 16rem;
-  height: 16rem;
-  background: rgba(25, 194, 168, 0.36);
-}
-
-.getting-started-orb-two {
-  right: -4rem;
-  top: 18rem;
-  width: 20rem;
-  height: 20rem;
-  background: rgba(25, 67, 155, 0.34);
+  max-width: 1080px;
+  padding-top: calc(2rem + env(safe-area-inset-top, 0px));
 }
 
 .getting-started-container {
-  position: relative;
-  z-index: 1;
-  width: min(1120px, calc(100vw - 2rem));
-  margin: 0 auto;
-  padding: calc(1.4rem + env(safe-area-inset-top, 0px)) 0 3.5rem;
+  width: 100%;
+}
+
+.brand-mark {
+  display: inline-flex;
+  align-items: center;
+  text-decoration: none;
+  margin-bottom: 0.45rem;
+}
+
+.brand-mark-full {
+  height: 5.8rem;
+  width: auto;
+  object-fit: contain;
+  display: block;
 }
 
 .getting-started-top-nav {
-  margin-bottom: 1.5rem;
+  margin-bottom: 1rem;
 }
 
 .getting-started-back-link {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 2.75rem;
-  height: 2.75rem;
+  width: 2.4rem;
+  height: 2.4rem;
   border-radius: 999px;
-  border: 1px solid rgba(142, 163, 193, 0.18);
-  background: rgba(10, 15, 24, 0.68);
-  color: inherit;
+  border: 1px solid rgba(77, 97, 122, 0.4);
+  background: linear-gradient(180deg, rgba(31, 40, 54, 0.46) 0%, rgba(17, 23, 32, 0.34) 100%);
+  backdrop-filter: blur(2px);
+  color: #ffffff;
+  text-decoration: none;
+  transition: transform 0.16s ease, border-color 0.16s ease, background 0.16s ease;
+}
+
+.getting-started-back-link:hover {
+  text-decoration: none;
+  transform: translateY(-1px);
+  border-color: rgba(39, 196, 172, 0.58);
+  background: linear-gradient(180deg, rgba(29, 66, 75, 0.62) 0%, rgba(16, 37, 48, 0.54) 100%);
+  box-shadow: 0 16px 32px rgba(25, 194, 168, 0.14);
 }
 
 .getting-started-back-link svg {
-  width: 1.25rem;
-  height: 1.25rem;
+  width: 1.2rem;
+  height: 1.2rem;
   fill: none;
   stroke: currentColor;
-  stroke-width: 1.8;
+  stroke-width: 2.2;
   stroke-linecap: round;
   stroke-linejoin: round;
 }
 
 .getting-started-breadcrumb {
-  margin-left: 0.8rem;
-  font-size: 0.9rem;
-  color: rgba(230, 238, 248, 0.72);
-}
-
-.getting-started-hero,
-.getting-started-card {
-  border-radius: 28px;
-  border: 1px solid rgba(118, 143, 181, 0.16);
-  background: linear-gradient(180deg, rgba(15, 22, 34, 0.94) 0%, rgba(10, 15, 24, 0.98) 100%);
-  box-shadow: 0 28px 80px rgba(3, 8, 18, 0.28);
+  color: rgba(225, 232, 240, 0.72);
+  font-size: 0.95rem;
 }
 
 .getting-started-hero {
-  padding: 2rem;
+  display: grid;
+  gap: 0.65rem;
   margin-bottom: 1.4rem;
 }
 
@@ -229,7 +241,8 @@ import PublicFooter from "../components/PublicFooter.vue";
   font-weight: 700;
   letter-spacing: 0.16em;
   text-transform: uppercase;
-  color: rgba(194, 206, 223, 0.7);
+  color: inherit;
+  opacity: 0.72;
 }
 
 .getting-started-hero h1,
@@ -240,14 +253,15 @@ import PublicFooter from "../components/PublicFooter.vue";
 
 .getting-started-hero h1 {
   max-width: 14ch;
-  font-size: clamp(2.3rem, 5vw, 4.4rem);
+  font-size: clamp(1.4rem, 3vw, 2.4rem);
   line-height: 0.98;
 }
 
 .getting-started-lead {
   max-width: 64ch;
   margin: 1rem 0 0;
-  color: rgba(226, 233, 242, 0.78);
+  color: inherit;
+  opacity: 0.82;
   line-height: 1.72;
 }
 
@@ -293,7 +307,13 @@ import PublicFooter from "../components/PublicFooter.vue";
 }
 
 .getting-started-card {
-  padding: 1.6rem;
+  padding: 0;
+}
+
+.getting-started-grid .getting-started-card {
+  border: 1.2px solid color-mix(in srgb, var(--border) 78%, transparent);
+  border-radius: 14px;
+  padding: 1rem;
 }
 
 .getting-started-list {
@@ -315,12 +335,19 @@ import PublicFooter from "../components/PublicFooter.vue";
 
 .getting-started-list span,
 .getting-started-help p {
-  color: rgba(224, 232, 242, 0.76);
+  color: inherit;
+  opacity: 0.82;
   line-height: 1.68;
 }
 
 .getting-started-help {
   margin-top: 1.25rem;
+  padding-top: 1rem;
+  border-top: 1px solid color-mix(in srgb, var(--border) 78%, transparent);
+}
+
+.getting-started-page :deep(.public-footer) {
+  margin-top: 5rem;
 }
 
 @media (max-width: 900px) {
@@ -328,22 +355,19 @@ import PublicFooter from "../components/PublicFooter.vue";
   .getting-started-grid-lower {
     grid-template-columns: 1fr;
   }
-
-  .getting-started-container {
-    width: min(100vw - 1.2rem, 1120px);
-  }
 }
 
 @media (max-width: 640px) {
-  .getting-started-container {
-    padding-top: calc(1.2rem + env(safe-area-inset-top, 0px));
-    padding-bottom: 3rem;
+  .getting-started-page {
+    padding-top: calc(1.25rem + env(safe-area-inset-top, 0px));
   }
 
-  .getting-started-hero,
-  .getting-started-card {
-    padding: 1.2rem;
-    border-radius: 22px;
+  .brand-mark {
+    margin-bottom: 0.25rem;
+  }
+
+  .brand-mark-full {
+    height: 3.9rem;
   }
 
   .getting-started-hero h1 {

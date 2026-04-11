@@ -4,7 +4,7 @@
       <div class="legal-container">
       <div class="page-nav-left legal-top-nav">
         <div class="legal-top-nav-left">
-          <RouterLink class="legal-back-link" to="/" aria-label="Return to home">
+          <RouterLink class="legal-back-link" to="/" aria-label="Return to home" @click.prevent="$router.back()">
             <svg viewBox="0 0 24 24" aria-hidden="true">
               <path d="M15 5 8 12l7 7" />
             </svg>
@@ -323,20 +323,23 @@ onBeforeUnmount(() => {
   padding: 2rem 1rem 3rem;
 }
 
-.legal-shell,
 .legal-footer-wrap {
-}
-
-.legal-footer-wrap {
+  width: min(1280px, 92%);
+  margin-left: auto;
+  margin-right: auto;
+  position: relative;
+  z-index: 2;
   margin-top: 2.25rem;
+  padding-top: 0.85rem;
+  border-top: 3px solid color-mix(in srgb, var(--border) 72%, transparent);
 }
 
 .legal-container {
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: 16px;
+  background: transparent;
+  border: none;
+  border-radius: 0;
   padding: 1.5rem;
-  box-shadow: 0 12px 32px rgba(3, 10, 28, 0.14);
+  box-shadow: none;
 }
 
 .legal-top-nav {

@@ -11,6 +11,7 @@
         :aria-label="themeMode === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'"
         @click="toggleTheme"
       >
+        <span class="footer-theme-toggle-kicker">Theme</span>
         <span class="footer-theme-toggle-label">{{ themeMode === "dark" ? "Dark" : "Light" }}</span>
         <span class="footer-theme-toggle-track" :data-theme="themeMode">
           <span class="footer-theme-toggle-thumb"></span>
@@ -196,6 +197,24 @@ onUnmounted(() => {
 .footer-theme-toggle:hover,
 .footer-theme-toggle:focus-visible {
   transform: translateY(-1px);
+}
+
+button.footer-theme-toggle:hover:not(:disabled) {
+  background-color: transparent;
+  border-color: transparent;
+  box-shadow: none;
+}
+
+.footer-theme-toggle:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--accent) 62%, transparent);
+  outline-offset: 3px;
+}
+
+.footer-theme-toggle-kicker {
+  font-size: 0.68rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  opacity: 0.62;
 }
 
 .footer-theme-toggle-label {

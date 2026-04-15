@@ -1,12 +1,12 @@
 <template>
-  <div class="about-page">
-    <div class="about-orb about-orb-one" aria-hidden="true"></div>
-    <div class="about-orb about-orb-two" aria-hidden="true"></div>
-    <div class="grid-noise" aria-hidden="true"></div>
+  <div class="page about-page">
+    <RouterLink class="brand-mark" to="/" aria-label="ItemTraxx home">
+      <img v-if="brandLogoUrl" class="brand-mark-full" :src="brandLogoUrl" alt="ItemTraxx Co" />
+    </RouterLink>
 
     <main class="about-container">
       <div class="page-nav-left about-top-nav">
-        <RouterLink class="about-back-link" to="/" aria-label="Return to home">
+        <RouterLink class="about-back-link" to="/" aria-label="Return to home" @click.prevent="$router.back()">
           <svg viewBox="0 0 24 24" aria-hidden="true">
             <path d="M15 5 8 12l7 7" />
           </svg>
@@ -91,8 +91,19 @@
 </template>
 
 <script setup lang="ts">
+import { computed, onMounted, onUnmounted, ref } from 'vue';
 import { RouterLink } from 'vue-router';
 import PublicFooter from "../components/PublicFooter.vue";
+
+const lightBrandLogoUrl = import.meta.env.VITE_BRAND_LOGO_LIGHT_URL as string | undefined;
+const darkBrandLogoUrl = import.meta.env.VITE_BRAND_LOGO_DARK_URL as string | undefined;
+const themeMode = ref<"light" | "dark">("dark");
+const brandLogoUrl = computed(() =>
+  themeMode.value === "light"
+    ? lightBrandLogoUrl || darkBrandLogoUrl || ""
+    : darkBrandLogoUrl || lightBrandLogoUrl || ""
+);
+let themeObserver: MutationObserver | null = null;
 
 const storyParagraphs = [
   'ItemTraxx started as the kind of idea most people would brush off. In our broadcast class, gear kept going missing, and my broadcast teacher jokingly told me to build an app to track it.',
@@ -174,50 +185,50 @@ const teamMembers = [
     bio: 'Avid watermelon enjoyer.',
   },
 ];
+
+onMounted(() => {
+  const syncTheme = () => {
+    themeMode.value = document.documentElement.getAttribute("data-theme") === "light" ? "light" : "dark";
+  };
+
+  syncTheme();
+  themeObserver = new MutationObserver(syncTheme);
+  themeObserver.observe(document.documentElement, {
+    attributes: true,
+    attributeFilter: ["data-theme"],
+  });
+});
+
+onUnmounted(() => {
+  if (themeObserver) {
+    themeObserver.disconnect();
+    themeObserver = null;
+  }
+});
 </script>
 
 <style scoped>
 .about-page {
-  position: relative;
-  min-height: 100vh;
-  padding: calc(2rem + env(safe-area-inset-top, 0px)) 0 3.5rem;
-  background:
-    radial-gradient(circle at 15% 18%, rgba(36, 214, 196, 0.16), transparent 36%),
-    radial-gradient(circle at 82% 12%, rgba(27, 83, 184, 0.18), transparent 33%),
-    linear-gradient(180deg, #09111f 0%, #0d1524 48%, #0a1120 100%);
-  color: #f5f7fb;
-  overflow: hidden;
+  max-width: 1120px;
+  padding-top: calc(2rem + env(safe-area-inset-top, 0px));
 }
 
-.about-orb {
-  position: absolute;
-  border-radius: 999px;
-  filter: blur(40px);
-  opacity: 0.38;
-  pointer-events: none;
+.brand-mark {
+  display: inline-flex;
+  align-items: center;
+  text-decoration: none;
+  margin-bottom: 0.45rem;
 }
 
-.about-orb-one {
-  width: 20rem;
-  height: 20rem;
-  top: 5rem;
-  left: -6rem;
-  background: rgba(30, 202, 183, 0.24);
-}
-
-.about-orb-two {
-  width: 24rem;
-  height: 24rem;
-  top: 9rem;
-  right: -8rem;
-  background: rgba(38, 104, 226, 0.2);
+.brand-mark-full {
+  height: 5.8rem;
+  width: auto;
+  object-fit: contain;
+  display: block;
 }
 
 .about-container {
-  position: relative;
-  z-index: 1;
-  width: min(1120px, calc(100% - 2rem));
-  margin: 0 auto;
+  width: 100%;
 }
 
 .about-top-nav {
@@ -228,23 +239,25 @@ const teamMembers = [
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 2.75rem;
-  height: 2.75rem;
+  width: 2.4rem;
+  height: 2.4rem;
   border-radius: 999px;
-  border: 1px solid rgba(136, 154, 184, 0.28);
-  background: rgba(10, 17, 31, 0.72);
-  color: #f5f7fb;
-  transition: border-color 160ms ease, transform 160ms ease;
+  border: 1px solid rgba(77, 97, 122, 0.4);
+  background: linear-gradient(180deg, rgba(31, 40, 54, 0.46) 0%, rgba(17, 23, 32, 0.34) 100%);
+  color: #ffffff;
+  transition: transform 0.16s ease, border-color 0.16s ease, background 0.16s ease;
 }
 
 .about-back-link:hover {
-  border-color: rgba(56, 208, 177, 0.55);
-  transform: translateX(-1px);
+  transform: translateY(-1px);
+  border-color: rgba(39, 196, 172, 0.58);
+  background: linear-gradient(180deg, rgba(29, 66, 75, 0.62) 0%, rgba(16, 37, 48, 0.54) 100%);
+  box-shadow: 0 16px 32px rgba(25, 194, 168, 0.14);
 }
 
 .about-back-link svg {
-  width: 1.1rem;
-  height: 1.1rem;
+  width: 1rem;
+  height: 1rem;
   stroke: currentColor;
   stroke-width: 2;
   fill: none;
@@ -254,16 +267,15 @@ const teamMembers = [
 
 .about-hero,
 .about-card,
+.about-team,
 .team-card {
-  position: relative;
-  overflow: hidden;
-  border: 1px solid rgba(112, 138, 180, 0.16);
-  background: linear-gradient(180deg, rgba(18, 26, 41, 0.95), rgba(11, 18, 31, 0.92));
-  box-shadow: 0 28px 64px rgba(5, 10, 18, 0.34);
+  border: 2px solid color-mix(in srgb, var(--border) 58%, transparent);
+  background: transparent;
+  box-shadow: none;
 }
 
 .about-hero {
-  border-radius: 2rem;
+  border-radius: 1rem;
   padding: 2.4rem;
   margin-bottom: 1.5rem;
 }
@@ -275,14 +287,14 @@ const teamMembers = [
   font-size: 0.76rem;
   letter-spacing: 0.18em;
   text-transform: uppercase;
-  color: #89a4c5;
+  color: color-mix(in srgb, var(--text) 64%, var(--accent) 36%);
 }
 
 .about-hero h1,
 .about-card h2,
 .about-team-header h2 {
   margin: 0;
-  font-size: clamp(2rem, 4vw, 3.4rem);
+  font-size: clamp(1.4rem, 3vw, 2.4rem);
   line-height: 1.05;
   letter-spacing: -0.04em;
 }
@@ -297,7 +309,7 @@ const teamMembers = [
 .about-team-header p,
 .team-card p {
   margin: 1rem 0 0;
-  color: rgba(231, 236, 245, 0.82);
+  color: color-mix(in srgb, var(--text) 84%, transparent);
   line-height: 1.7;
 }
 
@@ -329,9 +341,9 @@ const teamMembers = [
 
 .about-secondary,
 .about-link-grid a {
-  border: 1px solid rgba(136, 154, 184, 0.26);
-  background: rgba(11, 18, 31, 0.6);
-  color: #f5f7fb;
+  border: 2px solid color-mix(in srgb, var(--border) 72%, transparent);
+  background: color-mix(in srgb, var(--surface-2) 68%, transparent);
+  color: inherit;
 }
 
 .about-primary:hover,
@@ -353,7 +365,7 @@ const teamMembers = [
 
 .about-card,
 .about-team {
-  border-radius: 1.6rem;
+  border-radius: 1rem;
 }
 
 .about-card {
@@ -374,19 +386,18 @@ const teamMembers = [
 }
 
 .about-list strong {
-  color: #f5f7fb;
+  color: inherit;
 }
 
 .about-list span {
-  color: rgba(231, 236, 245, 0.78);
+  color: color-mix(in srgb, var(--text) 84%, transparent);
   line-height: 1.65;
 }
 
 .about-team {
-  margin: 1.4rem 0;
+  margin: 1.4rem 0 6.5rem;
   padding: 1.8rem;
-  background: linear-gradient(180deg, rgba(17, 27, 45, 0.94), rgba(10, 17, 31, 0.92));
-  border: 1px solid rgba(112, 138, 180, 0.16);
+  background: transparent;
 }
 
 .about-team-header {
@@ -419,6 +430,14 @@ const teamMembers = [
     padding-top: calc(1.25rem + env(safe-area-inset-top, 0px));
   }
 
+  .brand-mark {
+    margin-bottom: 0.25rem;
+  }
+
+  .brand-mark-full {
+    height: 3.9rem;
+  }
+
   .about-grid,
   .about-grid-compact,
   .team-grid {
@@ -431,6 +450,7 @@ const teamMembers = [
 
   .about-team {
     padding: 1.4rem;
+    margin-bottom: 4rem;
   }
 }
 </style>

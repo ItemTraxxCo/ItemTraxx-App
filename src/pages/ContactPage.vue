@@ -1,12 +1,12 @@
 <template>
-  <div class="contact-page">
-    <div class="contact-orb contact-orb-one" aria-hidden="true"></div>
-    <div class="contact-orb contact-orb-two" aria-hidden="true"></div>
-    <div class="grid-noise" aria-hidden="true"></div>
+  <div class="page contact-page">
+    <RouterLink class="brand-mark" to="/" aria-label="ItemTraxx home">
+      <img v-if="brandLogoUrl" class="brand-mark-full" :src="brandLogoUrl" alt="ItemTraxx Co" />
+    </RouterLink>
 
     <main class="contact-container">
       <div class="page-nav-left contact-top-nav">
-        <RouterLink class="contact-back-link" to="/" aria-label="Return to home">
+        <RouterLink class="contact-back-link" to="/" aria-label="Return to home" @click.prevent="$router.back()">
           <svg viewBox="0 0 24 24" aria-hidden="true">
             <path d="M15 5 8 12l7 7" />
           </svg>
@@ -54,8 +54,19 @@
 </template>
 
 <script setup lang="ts">
+import { computed, onMounted, onUnmounted, ref } from "vue";
 import { RouterLink } from "vue-router";
 import PublicFooter from "../components/PublicFooter.vue";
+
+const lightBrandLogoUrl = import.meta.env.VITE_BRAND_LOGO_LIGHT_URL as string | undefined;
+const darkBrandLogoUrl = import.meta.env.VITE_BRAND_LOGO_DARK_URL as string | undefined;
+const themeMode = ref<"light" | "dark">("dark");
+const brandLogoUrl = computed(() =>
+  themeMode.value === "light"
+    ? lightBrandLogoUrl || darkBrandLogoUrl || ""
+    : darkBrandLogoUrl || lightBrandLogoUrl || ""
+);
+let themeObserver: MutationObserver | null = null;
 
 const contactOptions = [
   {
@@ -99,70 +110,54 @@ const contactOptions = [
       "Best for responsible disclosure and security-related findings.",
       "Use it instead of the normal support form when the report is security-related.",
     ],
-    cta: "Open security report",
+    cta: "Open security reporting",
     to: "/report-security-issue",
   },
 ];
+
+onMounted(() => {
+  const syncTheme = () => {
+    themeMode.value = document.documentElement.getAttribute("data-theme") === "light" ? "light" : "dark";
+  };
+
+  syncTheme();
+  themeObserver = new MutationObserver(syncTheme);
+  themeObserver.observe(document.documentElement, {
+    attributes: true,
+    attributeFilter: ["data-theme"],
+  });
+});
+
+onUnmounted(() => {
+  if (themeObserver) {
+    themeObserver.disconnect();
+    themeObserver = null;
+  }
+});
 </script>
 
 <style scoped>
 .contact-page {
-  position: relative;
-  min-height: 100vh;
-  min-height: 100dvh;
-  width: 100%;
-  max-width: 100%;
-  margin-left: 0;
-  padding:
-    calc(2rem + env(safe-area-inset-top, 0px))
-    0
-    calc(3.5rem + env(safe-area-inset-bottom, 0px));
-  background-color: #0a1120;
-  color: #f5f7fb;
-  overflow-x: hidden;
+  max-width: 1120px;
+  padding-top: calc(2rem + env(safe-area-inset-top, 0px));
 }
 
-.contact-page::before {
-  content: "";
-  position: fixed;
-  inset: 0;
-  z-index: 0;
-  background:
-    radial-gradient(circle at 14% 18%, rgba(25, 194, 168, 0.16), transparent 34%),
-    radial-gradient(circle at 83% 10%, rgba(25, 67, 155, 0.18), transparent 31%),
-    linear-gradient(180deg, #09111f 0%, #0d1524 48%, #0a1120 100%);
-  pointer-events: none;
+.brand-mark {
+  display: inline-flex;
+  align-items: center;
+  text-decoration: none;
+  margin-bottom: 0.45rem;
 }
 
-.contact-orb {
-  position: absolute;
-  border-radius: 999px;
-  filter: blur(40px);
-  opacity: 0.38;
-  pointer-events: none;
-}
-
-.contact-orb-one {
-  width: 20rem;
-  height: 20rem;
-  top: 5rem;
-  left: -6rem;
-  background: rgba(30, 202, 183, 0.24);
-}
-
-.contact-orb-two {
-  width: 24rem;
-  height: 24rem;
-  top: 9rem;
-  right: -8rem;
-  background: rgba(38, 104, 226, 0.2);
+.brand-mark-full {
+  height: 5.8rem;
+  width: auto;
+  object-fit: contain;
+  display: block;
 }
 
 .contact-container {
-  position: relative;
-  z-index: 1;
-  width: min(1120px, calc(100% - 2rem));
-  margin: 0 auto;
+  width: 100%;
 }
 
 .contact-top-nav {
@@ -176,14 +171,22 @@ const contactOptions = [
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 2.6rem;
-  height: 2.6rem;
+  width: 2.4rem;
+  height: 2.4rem;
   border-radius: 999px;
-  border: 1px solid rgba(140, 157, 189, 0.24);
-  background: rgba(9, 17, 31, 0.58);
-  color: #f5f7fb;
+  border: 1px solid rgba(77, 97, 122, 0.4);
+  background: linear-gradient(180deg, rgba(31, 40, 54, 0.46) 0%, rgba(17, 23, 32, 0.34) 100%);
+  color: #ffffff;
   text-decoration: none;
-  backdrop-filter: blur(18px);
+  backdrop-filter: blur(2px);
+  transition: transform 0.16s ease, border-color 0.16s ease, background 0.16s ease;
+}
+
+.contact-back-link:hover {
+  transform: translateY(-1px);
+  border-color: rgba(39, 196, 172, 0.58);
+  background: linear-gradient(180deg, rgba(29, 66, 75, 0.62) 0%, rgba(16, 37, 48, 0.54) 100%);
+  box-shadow: 0 16px 32px rgba(25, 194, 168, 0.14);
 }
 
 .contact-back-link svg {
@@ -203,15 +206,15 @@ const contactOptions = [
   letter-spacing: 0.22em;
   font-size: 0.74rem;
   font-weight: 700;
-  color: rgba(155, 231, 220, 0.78);
+  color: color-mix(in srgb, var(--text) 64%, var(--accent) 36%);
 }
 
 .contact-hero,
 .contact-card {
-  border-radius: 28px;
-  border: 1px solid rgba(118, 143, 181, 0.16);
-  background: linear-gradient(180deg, rgba(15, 22, 34, 0.94) 0%, rgba(10, 15, 24, 0.98) 100%);
-  box-shadow: 0 28px 80px rgba(3, 8, 18, 0.28);
+  border-radius: 1rem;
+  border: 2px solid color-mix(in srgb, var(--border) 58%, transparent);
+  background: transparent;
+  box-shadow: none;
 }
 
 .contact-hero {
@@ -226,14 +229,14 @@ const contactOptions = [
 
 .contact-hero h1 {
   max-width: 14ch;
-  font-size: clamp(2.3rem, 5vw, 4.4rem);
+  font-size: clamp(1.4rem, 3vw, 2.4rem);
   line-height: 0.98;
 }
 
 .contact-lead {
   max-width: 64ch;
   margin: 1rem 0 0;
-  color: rgba(226, 233, 242, 0.78);
+  color: color-mix(in srgb, var(--text) 84%, transparent);
   line-height: 1.72;
 }
 
@@ -253,28 +256,45 @@ const contactOptions = [
   gap: 0.7rem;
   margin: 1.1rem 0 0;
   padding-left: 1.1rem;
-  color: rgba(224, 232, 242, 0.76);
+  color: color-mix(in srgb, var(--text) 84%, transparent);
   line-height: 1.68;
 }
 
 .contact-link {
   display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.3rem;
+  padding: 0.45rem 0.9rem;
   margin-top: 1.2rem;
-  color: #8de9dc;
+  border-radius: 999px;
+  border: 2px solid color-mix(in srgb, var(--border) 72%, transparent);
+  background: color-mix(in srgb, var(--surface-2) 68%, transparent);
+  color: color-mix(in srgb, var(--text) 62%, var(--accent) 38%);
   text-decoration: none;
-  font-weight: 700;
+  font-weight: 600;
+  transition: transform 0.16s ease, border-color 0.16s ease, background 0.16s ease;
 }
 
 .contact-link:hover {
-  color: #c6fbf4;
+  transform: translateY(-1px);
+  border-color: color-mix(in srgb, var(--accent) 48%, var(--border) 52%);
+  background: color-mix(in srgb, var(--surface-2) 52%, var(--accent) 8%);
+}
+
+.contact-link:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--accent) 62%, transparent);
+  outline-offset: 2px;
 }
 
 .contact-notes {
   margin-top: 1.25rem;
+  margin-bottom: 1.25rem;
 }
 
 .contact-card-wide {
   width: 100%;
+  box-sizing: border-box;
 }
 
 @media (max-width: 900px) {
@@ -285,20 +305,21 @@ const contactOptions = [
 
 @media (max-width: 640px) {
   .contact-page {
-    padding:
-      calc(1.25rem + env(safe-area-inset-top, 0px))
-      0
-      calc(3rem + env(safe-area-inset-bottom, 0px));
+    padding-top: calc(1.25rem + env(safe-area-inset-top, 0px));
   }
 
-  .contact-container {
-    width: min(100vw - 1.2rem, 1120px);
+  .brand-mark {
+    margin-bottom: 0.25rem;
+  }
+
+  .brand-mark-full {
+    height: 3.9rem;
   }
 
   .contact-hero,
   .contact-card {
     padding: 1.2rem;
-    border-radius: 22px;
+    border-radius: 1rem;
   }
 
   .contact-hero h1 {

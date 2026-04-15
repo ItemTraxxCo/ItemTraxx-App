@@ -19,7 +19,7 @@ import {
   initAuthListener,
   refreshAuthFromSession,
 } from "./services/authService";
-import { allowsDiagnostics, readCookieConsent } from "./services/cookieConsentService";
+import { allowsAnalytics, allowsDiagnostics, readCookieConsent } from "./services/cookieConsentService";
 import { touchTenantAdminSession } from "./services/adminOpsService";
 import { TimeoutError, withTimeout } from "./services/asyncUtils";
 import {
@@ -203,6 +203,16 @@ const initializeSentry = async (app: ReturnType<typeof createApp>) => {
   await initializeSentryMonitoring(app, router);
 };
 
+const initializePostHog = async () => {  
+  console.log('token:', import.meta.env.VITE_POSTHOG_PROJECT_TOKEN)  
+  console.log('analytics allowed:', allowsAnalytics(readCookieConsent()))
+  if (!import.meta.env.VITE_POSTHOG_PROJECT_TOKEN?.trim() || !allowsAnalytics(readCookieConsent())) {
+    return;
+  }
+  const { initPostHog } = await import("./services/posthogService");
+  initPostHog();
+};
+
 const bindConsentDrivenMonitoring = (app: ReturnType<typeof createApp>) => {
   const maybeEnableDiagnostics = () => {
     if (!allowsDiagnostics(readCookieConsent())) {
@@ -211,7 +221,15 @@ const bindConsentDrivenMonitoring = (app: ReturnType<typeof createApp>) => {
     void initializeSentry(app);
   };
 
+  const maybeEnableAnalytics = () => {
+    if (!allowsAnalytics(readCookieConsent())) {
+      return;
+    }
+    void initializePostHog();
+  };
+
   window.addEventListener("itemtraxx:cookie-consent", maybeEnableDiagnostics);
+  window.addEventListener("itemtraxx:cookie-consent", maybeEnableAnalytics);
 };
 
 const mountApp = async () => {
@@ -226,10 +244,19 @@ const mountApp = async () => {
 
   const app = createApp(App);
   await initializeSentry(app);
+  await initializePostHog();
   const { installClientDiagnostics } = await import("./services/clientDiagnostics");
   installClientDiagnostics();
   const { installGlobalErrorHandling } = await import("./services/globalErrorHandling");
   installGlobalErrorHandling(app);
+  const { capturePostHogException } = await import("./services/posthogService");
+  const existingErrorHandler = app.config.errorHandler;
+  app.config.errorHandler = (error, instance, info) => {
+    capturePostHogException(error);
+    if (existingErrorHandler) {
+      existingErrorHandler(error, instance, info);
+    }
+  };
   const { installAppErrorRecovery } = await import("./services/appErrorRecovery");
   installAppErrorRecovery(router);
   app.use(router);

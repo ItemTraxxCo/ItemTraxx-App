@@ -128,6 +128,7 @@ import { bulkImportGear, fetchTenantSettings } from "../../../services/adminOpsS
 import { logAdminAction } from "../../../services/auditLogService";
 import { enforceAdminRateLimit } from "../../../services/rateLimitService";
 import { toUserFacingErrorMessage } from "../../../services/appErrors";
+import { capturePostHogEvent } from "../../../services/posthogService";
 
 type ImportRow = {
   name: string;
@@ -304,6 +305,10 @@ const runImport = async () => {
       },
     });
 
+    capturePostHogEvent("gear_bulk_import_completed", {
+      inserted: result.inserted,
+      skipped: result.skipped,
+    });
     success.value = `Import complete. Added ${result.inserted} items.`;
   } catch (err) {
     error.value = toUserFacingErrorMessage(err, "Unable to import rows.");

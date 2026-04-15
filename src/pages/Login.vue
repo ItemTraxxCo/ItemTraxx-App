@@ -33,6 +33,12 @@
 
       <section class="login-form-panel">
         <div class="login-form-wrap">
+          <img
+            v-if="brandLogoUrl"
+            class="compact-brand-logo"
+            :src="brandLogoUrl"
+            alt="ItemTraxx Co"
+          />
           <RouterLink class="story-back-link compact-back-link" to="/">Back</RouterLink>
           <h1>Sign in</h1>
           <p class="login-panel-copy">Use your ItemTraxx access code and password to enter your ItemTraxx app.</p>
@@ -133,6 +139,8 @@ import { createDistrictSessionHandoff, tenantLogin } from "../services/authServi
 import { useTurnstile } from "../composables/useTurnstile";
 import { buildDistrictAppHandoffUrl } from "../services/districtService";
 import { getDistrictState } from "../store/districtState";
+import { getAuthState } from "../store/authState";
+import { capturePostHogEvent, identifyPostHogUser } from "../services/posthogService";
 
 const router = useRouter();
 const district = getDistrictState();
@@ -286,6 +294,11 @@ const handleTenantLogin = async () => {
       password.value,
       turnstileToken.value || undefined
     );
+    const auth = getAuthState();
+    if (auth.userId) {
+      identifyPostHogUser(auth.userId, { email: auth.email ?? undefined, role: auth.role ?? undefined });
+    }
+    capturePostHogEvent("tenant_login_succeeded", { login_method: "password" });
     if (!district.isDistrictHost && session?.districtSlug) {
       const handoffCode = await createDistrictSessionHandoff(session.districtSlug);
       window.location.replace(
@@ -335,8 +348,10 @@ const handleTenantLogin = async () => {
     if (signInErrorMessage) {
       error.value = "";
       showToast("Sign in failed.", signInErrorMessage);
+      capturePostHogEvent("tenant_login_failed", { error_type: errorMessage });
       return;
     }
+    capturePostHogEvent("tenant_login_failed", { error_type: errorMessage });
     error.value = errorMessage;
   } finally {
     isLoading.value = false;
@@ -637,6 +652,14 @@ onMounted(() => {
   width: min(100%, 34rem);
 }
 
+.compact-brand-logo {
+  display: none;
+  height: 3.2rem;
+  width: auto;
+  object-fit: contain;
+  margin: 0 0 0.85rem;
+}
+
 .login-form-wrap h1 {
   margin: 0;
   font-size: clamp(2.6rem, 4.5vw, 4rem);
@@ -828,6 +851,10 @@ onMounted(() => {
 
   .login-form-wrap {
     width: min(100%, 36rem);
+  }
+
+  .compact-brand-logo {
+    display: block;
   }
 
   .compact-back-link {

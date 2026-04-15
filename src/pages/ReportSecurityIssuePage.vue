@@ -1,30 +1,60 @@
 <template>
-  <div class="security-report-page">
-    <div class="security-report-orb security-report-orb-one" aria-hidden="true"></div>
-    <div class="security-report-orb security-report-orb-two" aria-hidden="true"></div>
-    <div class="grid-noise" aria-hidden="true"></div>
-
+  <div class="page security-report-page">
     <main class="security-report-container">
+      <RouterLink class="brand-mark" to="/" aria-label="ItemTraxx home">
+        <img v-if="brandLogoUrl" class="brand-mark-full" :src="brandLogoUrl" alt="ItemTraxx Co" />
+      </RouterLink>
+
       <div class="page-nav-left security-report-top-nav">
-        <RouterLink class="security-report-back-link" to="/security" aria-label="Return to security page">
+        <RouterLink class="security-report-back-link" to="/security" aria-label="Return to security page" @click.prevent="$router.back()">
           <svg viewBox="0 0 24 24" aria-hidden="true">
             <path d="M15 5 8 12l7 7" />
           </svg>
         </RouterLink>
-        <span class="security-report-breadcrumb">Report Security Issue</span>
+        <span class="security-report-breadcrumb"> </span>
       </div>
 
       <section class="security-report-hero">
         <p class="security-report-eyebrow">Security reporting</p>
         <h1>Report a security issue privately.</h1>
         <p class="security-report-lead">
-          Use this page to submit a dedicated security report. For confirmed or suspected security issues,
-          include clear reproduction details and limit testing to the minimum needed to verify the issue.
+          Found a possible vulnerability? Share a concise report with steps to reproduce and expected impact.
+          Keep testing limited to what is necessary to verify the issue safely.
+        </p>
+      </section>
+
+      <section class="security-report-guidance-card">
+        <p class="security-report-section-label">How to report clearly</p>
+        <h2>What helps us verify quickly.</h2>
+        <div class="security-report-guidance-grid">
+          <div>
+            <h3>Include</h3>
+            <ul class="security-report-list">
+              <li v-for="item in reportContents" :key="item.title">
+                <strong>{{ item.title }}</strong>
+                <span>{{ item.description }}</span>
+              </li>
+            </ul>
+          </div>
+          <div>
+            <h3>Avoid</h3>
+            <ul class="security-report-list">
+              <li v-for="item in avoidList" :key="item.title">
+                <strong>{{ item.title }}</strong>
+                <span>{{ item.description }}</span>
+              </li>
+            </ul>
+          </div>
+        </div>
+        <p class="security-report-reference">
+          Public disclosure contact reference:
+          <a href="https://itemtraxx.com/.well-known/security.txt" target="_blank" rel="noreferrer">security.txt</a>.
+          If your issue is not security-related, use <RouterLink to="/contact-support">Contact Support</RouterLink>.
         </p>
       </section>
 
       <section class="security-report-layout">
-        <section class="security-report-card security-report-form-card">
+        <section class="security-report-form-card">
           <p class="security-report-section-label">Submission</p>
           <h2>Send us something you found.</h2>
 
@@ -115,7 +145,7 @@
             <label v-if="turnstileSiteKey">
               Security Check
               <div :ref="setTurnstileContainerRef"></div>
-              <p class="muted">Complete the security check to enable send.</p>
+              <p class="muted security-note">Complete the security check to enable send.</p>
             </label>
 
             <input
@@ -133,48 +163,11 @@
               </button>
             </div>
             <p class="security-report-legal-note">
-                        By clicking Send Security Report, you agree to our <RouterLink to="/privacy">Privacy Policy</RouterLink> and <RouterLink to="/legal">Terms of Service</RouterLink>.
+              By clicking Send Security Report, you agree to our <RouterLink to="/privacy">Privacy Policy</RouterLink> and <RouterLink to="/legal">Terms of Service</RouterLink>.
             </p>
           </form>
 
           <p v-if="error" class="error">{{ error }}</p>
-        </section>
-
-        <section class="security-report-side">
-          <article class="security-report-card">
-            <p class="security-report-section-label">Include</p>
-            <h2>What to send.</h2>
-            <ul class="security-report-list">
-              <li v-for="item in reportContents" :key="item.title">
-                <strong>{{ item.title }}</strong>
-                <span>{{ item.description }}</span>
-              </li>
-            </ul>
-          </article>
-
-          <article class="security-report-card">
-            <p class="security-report-section-label">Avoid</p>
-            <h2>What not to do.</h2>
-            <ul class="security-report-list">
-              <li v-for="item in avoidList" :key="item.title">
-                <strong>{{ item.title }}</strong>
-                <span>{{ item.description }}</span>
-              </li>
-            </ul>
-          </article>
-
-          <article class="security-report-card">
-            <p class="security-report-section-label">Reference</p>
-            <h2>Current disclosure reference.</h2>
-            <p>
-              The current public reporting reference is
-              <a href="https://itemtraxx.com/.well-known/security.txt" target="_blank" rel="noreferrer">security.txt</a>.
-            </p>
-            <p>
-              If your issue is not security-related, use <RouterLink to="/contact-support">Contact Support</RouterLink>
-              instead.
-            </p>
-          </article>
         </section>
       </section>
 
@@ -184,7 +177,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, onMounted, onUnmounted, ref } from "vue";
 import { RouterLink, useRouter } from "vue-router";
 import PublicFooter from "../components/PublicFooter.vue";
 import { useTurnstile } from "../composables/useTurnstile";
@@ -211,11 +204,21 @@ const attachments = ref<SupportAttachment[]>([]);
 const attachmentsInput = ref<HTMLInputElement | null>(null);
 const isSending = ref(false);
 const error = ref("");
+const lightBrandLogoUrl = import.meta.env.VITE_BRAND_LOGO_LIGHT_URL as string | undefined;
+const darkBrandLogoUrl = import.meta.env.VITE_BRAND_LOGO_DARK_URL as string | undefined;
+const themeMode = ref<"light" | "dark">("dark");
+const brandLogoUrl = computed(() =>
+  themeMode.value === "light"
+    ? lightBrandLogoUrl || darkBrandLogoUrl || ""
+    : darkBrandLogoUrl || lightBrandLogoUrl || ""
+);
 const turnstileSiteKey = import.meta.env.VITE_TURNSTILE_SITE_KEY as string | undefined;
 const {
   containerRef: turnstileContainerRef,
   token: turnstileToken,
+  reset: resetTurnstile,
 } = useTurnstile(turnstileSiteKey);
+let themeObserver: MutationObserver | null = null;
 
 const setTurnstileContainerRef = (
   el: Element | { $el?: Element } | null
@@ -350,6 +353,13 @@ const send = async () => {
     error.value = toUserFacingErrorMessage(err, "Unable to send security report.");
   } finally {
     isSending.value = false;
+    if (turnstileSiteKey) {
+      try {
+        resetTurnstile();
+      } catch {
+        // no-op
+      }
+    }
   }
 };
 
@@ -374,114 +384,91 @@ const reportContents = [
 
 const avoidList = [
   {
-    title: "No public disclosure first",
-    description: "Do not post suspected security issues publicly before ItemTraxx has had a chance to review them.",
+    title: "Do not post publicly first",
+    description: "Please report privately and give us time to investigate before public disclosure.",
   },
   {
     title: "Do not access unrelated data",
-    description: "Limit testing to the minimum needed to verify the issue. Do not browse, export, or retain unrelated user data.",
+    description: "Verify only what you need. Do not browse, download, or retain data unrelated to your finding.",
   },
   {
     title: "Do not disrupt service",
-    description: "Avoid destructive testing, denial-of-service behavior, or actions that could interrupt real users.",
+    description: "Avoid destructive testing or high-volume traffic that could impact real users.",
   },
 ];
+
+onMounted(() => {
+  const syncTheme = () => {
+    themeMode.value = document.documentElement.getAttribute("data-theme") === "light" ? "light" : "dark";
+  };
+  syncTheme();
+  themeObserver = new MutationObserver(syncTheme);
+  themeObserver.observe(document.documentElement, {
+    attributes: true,
+    attributeFilter: ["data-theme"],
+  });
+});
+
+onUnmounted(() => {
+  if (themeObserver) {
+    themeObserver.disconnect();
+    themeObserver = null;
+  }
+});
 </script>
 
 <style scoped>
 .security-report-page {
-  --report-input-bg: rgba(8, 14, 26, 0.82);
-  --report-input-border: rgba(112, 138, 180, 0.3);
-  --report-input-text: #f5f7fb;
-  --report-input-placeholder: rgba(188, 198, 214, 0.62);
-  --report-input-focus: rgba(25, 194, 168, 0.55);
-  --report-select-arrow: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23d7e2f2' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
-  position: relative;
-  min-height: 100vh;
-  min-height: 100dvh;
-  width: 100%;
-  max-width: 100%;
-  padding: calc(2rem + env(safe-area-inset-top, 0px)) 0 calc(3.5rem + env(safe-area-inset-bottom, 0px));
-  background-color: #0a1120;
-  color: #f5f7fb;
-  overflow-x: hidden;
-}
-
-:global(html[data-theme="light"]) .security-report-page {
-  --report-input-bg: rgba(255, 255, 255, 0.94);
-  --report-input-border: rgba(148, 163, 184, 0.34);
-  --report-input-text: #0f172a;
-  --report-input-placeholder: rgba(71, 85, 105, 0.68);
-  --report-input-focus: rgba(25, 67, 155, 0.36);
-  --report-select-arrow: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%230f172a' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
-}
-
-.security-report-page::before {
-  content: "";
-  position: fixed;
-  inset: 0;
-  z-index: 0;
-  background:
-    radial-gradient(circle at 14% 18%, rgba(25, 194, 168, 0.16), transparent 34%),
-    radial-gradient(circle at 83% 10%, rgba(25, 67, 155, 0.18), transparent 31%),
-    linear-gradient(180deg, #09111f 0%, #0d1524 48%, #0a1120 100%);
-  pointer-events: none;
-}
-
-.security-report-orb {
-  position: absolute;
-  border-radius: 999px;
-  filter: blur(40px);
-  opacity: 0.38;
-  pointer-events: none;
-}
-
-.security-report-orb-one {
-  width: 20rem;
-  height: 20rem;
-  top: 5rem;
-  left: -6rem;
-  background: rgba(30, 202, 183, 0.24);
-}
-
-.security-report-orb-two {
-  width: 24rem;
-  height: 24rem;
-  top: 9rem;
-  right: -8rem;
-  background: rgba(38, 104, 226, 0.2);
+  max-width: 1080px;
+  padding-top: calc(2rem + env(safe-area-inset-top, 0px));
 }
 
 .security-report-container {
-  position: relative;
-  z-index: 1;
-  width: min(1120px, calc(100% - 2rem));
-  margin: 0 auto;
+  width: 100%;
+}
+
+.brand-mark {
+  display: inline-flex;
+  align-items: center;
+  text-decoration: none;
+  margin-bottom: 0.45rem;
+}
+
+.brand-mark-full {
+  height: 5.8rem;
+  width: auto;
+  object-fit: contain;
+  display: block;
 }
 
 .security-report-top-nav {
   display: flex;
   align-items: center;
   gap: 0.9rem;
-  margin-bottom: 1.25rem;
+  margin-bottom: 1rem;
 }
 
 .security-report-back-link {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 2.75rem;
-  height: 2.75rem;
+  width: 2.4rem;
+  height: 2.4rem;
   border-radius: 999px;
-  border: 1px solid rgba(136, 154, 184, 0.28);
-  background: rgba(10, 17, 31, 0.72);
+  border: 1px solid rgba(77, 97, 122, 0.4);
+  background: linear-gradient(180deg, rgba(31, 40, 54, 0.46) 0%, rgba(17, 23, 32, 0.34) 100%);
+  backdrop-filter: blur(2px);
   color: #f5f7fb;
-  transition: border-color 160ms ease, transform 160ms ease;
+  text-decoration: none;
+  transition: transform 0.16s ease, border-color 0.16s ease, background 0.16s ease;
 }
 
 .security-report-back-link:hover {
-  border-color: rgba(56, 208, 177, 0.55);
-  transform: translateX(-1px);
+  text-decoration: none;
+  transform: translateY(-1px);
+  border-color: rgba(39, 196, 172, 0.58);
+  background: linear-gradient(180deg, rgba(29, 66, 75, 0.62) 0%, rgba(16, 37, 48, 0.54) 100%);
+  box-shadow: 0 16px 32px rgba(25, 194, 168, 0.14);
 }
 
 .security-report-back-link svg {
@@ -501,58 +488,70 @@ const avoidList = [
   font-weight: 700;
   letter-spacing: 0.22em;
   text-transform: uppercase;
-  color: rgba(168, 183, 212, 0.72);
-}
-
-.security-report-hero,
-.security-report-card {
-  position: relative;
-  overflow: hidden;
-  border-radius: 1.8rem;
-  border: 1px solid rgba(112, 138, 180, 0.16);
-  background: linear-gradient(180deg, rgba(17, 27, 45, 0.94), rgba(10, 17, 31, 0.92));
-  box-shadow: 0 22px 54px rgba(4, 8, 20, 0.32);
+  color: inherit;
+  opacity: 0.72;
 }
 
 .security-report-hero {
-  padding: 1.9rem;
+  display: grid;
+  gap: 0.65rem;
+  margin-bottom: 1rem;
 }
 
 .security-report-hero h1,
-.security-report-card h2 {
-  margin: 0.65rem 0 0.9rem;
-  font-size: clamp(1.75rem, 4vw, 3.2rem);
+.security-report-form-card h2,
+.security-report-guidance-card h2 {
+  margin: 0;
+  font-size: clamp(1.4rem, 3vw, 2.4rem);
   line-height: 1.06;
   letter-spacing: -0.05em;
 }
 
-.security-report-card h2 {
+.security-report-form-card h2,
+.security-report-guidance-card h2 {
   font-size: clamp(1.2rem, 2vw, 1.75rem);
 }
 
 .security-report-lead,
-.security-report-card p,
+.security-report-form-card p,
+.security-report-guidance-card p,
 .security-report-list span {
   margin: 0;
-  color: rgba(231, 236, 245, 0.78);
+  color: inherit;
+  opacity: 0.82;
   line-height: 1.7;
 }
 
 .security-report-layout {
-  display: grid;
-  grid-template-columns: minmax(0, 1.25fr) minmax(18rem, 0.9fr);
-  gap: 1rem;
-  margin-top: 1rem;
+  display: block;
 }
 
-.security-report-form-card,
-.security-report-side {
+.security-report-form-card .form {
+  margin-top: 0.8rem;
+}
+
+.security-report-guidance-card {
   display: grid;
+  gap: 1rem;
+  margin: 0.2rem 0 1.25rem;
+  padding-bottom: 1rem;
+  border-bottom: 3px solid color-mix(in srgb, var(--border) 78%, transparent);
+}
+
+.security-report-guidance-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 1rem;
 }
 
-.security-report-card {
-  padding: 1.35rem;
+.security-report-guidance-grid h3 {
+  margin: 0 0 0.6rem;
+  font-size: 0.95rem;
+  letter-spacing: 0.01em;
+}
+
+.security-report-reference {
+  opacity: 0.8;
 }
 
 .security-report-list {
@@ -568,59 +567,23 @@ const avoidList = [
 }
 
 .security-report-page a {
-  color: #7de7d6;
+  color: var(--link-color);
 }
 
 .security-report-form-card label {
   display: grid;
   gap: 0.48rem;
   font-weight: 600;
-  color: rgba(236, 241, 248, 0.92);
-}
-
-:global(html[data-theme="light"]) .security-report-form-card label {
-  color: #122033;
 }
 
 .security-report-form-card input:not(.honeypot),
 .security-report-form-card select,
 .security-report-form-card textarea {
-  width: 100%;
-  box-sizing: border-box;
-  border-radius: 14px;
-  border: 1px solid var(--report-input-border);
-  background: var(--report-input-bg);
-  color: var(--report-input-text);
-  padding: 0.85rem 0.95rem;
-  font: inherit;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.02);
-  transition: border-color 160ms ease, box-shadow 160ms ease, background-color 160ms ease;
-}
-
-.security-report-form-card input:not(.honeypot)::placeholder,
-.security-report-form-card textarea::placeholder {
-  color: var(--report-input-placeholder);
+  box-shadow: 0 1px 3px color-mix(in srgb, #000 10%, transparent);
 }
 
 .security-report-form-card textarea {
-  resize: vertical;
   min-height: 10rem;
-}
-
-.security-report-form-card select {
-  appearance: none;
-  background-image: var(--report-select-arrow);
-  background-repeat: no-repeat;
-  background-position: right 0.9rem center;
-  padding-right: 2.5rem;
-}
-
-.security-report-form-card input:not(.honeypot):focus,
-.security-report-form-card select:focus,
-.security-report-form-card textarea:focus {
-  outline: none;
-  border-color: var(--report-input-focus);
-  box-shadow: 0 0 0 4px color-mix(in srgb, var(--report-input-focus) 32%, transparent);
 }
 
 .security-report-form-card input[type="file"] {
@@ -640,9 +603,25 @@ const avoidList = [
 }
 
 .security-report-legal-note {
-  margin: 0.4rem 0 0;
-  color: rgba(231, 236, 245, 0.68);
+  margin: 0.4rem 0 1.25rem;
+  padding-bottom: 0.85rem;
+  border-bottom: 2px solid color-mix(in srgb, var(--border) 78%, transparent);
+  color: inherit;
+  opacity: 0.72;
   font-size: 0.92rem;
+}
+
+.security-note {
+  font-size: 0.84rem;
+}
+
+.security-report-form-card .button-primary:disabled {
+  background: color-mix(in srgb, var(--surface-2) 84%, #8b9097 16%);
+  border-color: color-mix(in srgb, var(--border) 78%, #8b9097 22%);
+  color: color-mix(in srgb, currentColor 65%, transparent);
+  box-shadow: none;
+  cursor: not-allowed;
+  opacity: 0.8;
 }
 
 .attachment-list {
@@ -666,7 +645,7 @@ const avoidList = [
 }
 
 @media (max-width: 900px) {
-  .security-report-layout {
+  .security-report-guidance-grid {
     grid-template-columns: 1fr;
   }
 }
@@ -676,14 +655,16 @@ const avoidList = [
     padding-top: calc(1.25rem + env(safe-area-inset-top, 0px));
   }
 
-  .security-report-container {
-    width: min(100%, calc(100% - 1.25rem));
+  .brand-mark {
+    margin-bottom: 0.25rem;
   }
 
-  .security-report-hero,
-  .security-report-card {
-    padding: 1.15rem 1rem;
-    border-radius: 1.15rem;
+  .brand-mark-full {
+    height: 3.9rem;
+  }
+
+  .security-report-guidance-card {
+    margin-bottom: 1rem;
   }
 }
 </style>

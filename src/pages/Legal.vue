@@ -4,7 +4,7 @@
       <div class="legal-container">
       <div class="page-nav-left legal-top-nav">
         <div class="legal-top-nav-left">
-          <RouterLink class="legal-back-link" to="/" aria-label="Return to home">
+          <RouterLink class="legal-back-link" to="/" aria-label="Return to home" @click.prevent="$router.back()">
             <svg viewBox="0 0 24 24" aria-hidden="true">
               <path d="M15 5 8 12l7 7" />
             </svg>
@@ -24,21 +24,27 @@
         </button>
       </div>
 
-      <header class="legal-header">
-        <h1>ItemTraxx Subscription Agreement and Policies</h1>
-        <p>
-          Effective date: March 21, 2026. This document combines the ItemTraxx legal terms,
-          software license, privacy policy, and security guidelines into one official legal
-          reference.
-        </p>
-        <p>
-          This Agreement is entered into between ItemTraxx Co, a California company, and the organization, 
-          district, team, or individual purchasing and using the service.
-        </p>
-        <p>
-          Last updated: March 07, 2026. ItemTraxx may update this document from time to time. Continued use of 
-          the service after updates means you accept the revised terms.
-        </p>
+      <header class="legal-header"> 
+    <h1>ItemTraxx Subscription Agreement and Policies</h1>
+
+    <p><strong>Effective Date:</strong> March 21, 2026</p>
+    <p><strong>Last Updated:</strong> April 11, 2026</p>
+
+  <p>
+  This document combines the ItemTraxx legal terms, software license, privacy policy,
+  and security guidelines into one official legal reference.
+</p>
+
+<p>
+  This Agreement is entered into between ItemTraxx Co, a California company, and the
+  organization, district, team, or individual purchasing or using the service.
+</p>
+
+<p>
+  ItemTraxx may update this document from time to time. The "Last Updated" date reflects
+  the most recent changes. Continued use of the service after an update becomes effective
+  constitutes acceptance of the revised terms.
+</p> 
       </header>
 
       <section>
@@ -323,20 +329,23 @@ onBeforeUnmount(() => {
   padding: 2rem 1rem 3rem;
 }
 
-.legal-shell,
 .legal-footer-wrap {
-}
-
-.legal-footer-wrap {
+  width: min(1280px, 92%);
+  margin-left: auto;
+  margin-right: auto;
+  position: relative;
+  z-index: 2;
   margin-top: 2.25rem;
+  padding-top: 0.85rem;
+  border-top: 3px solid color-mix(in srgb, var(--border) 72%, transparent);
 }
 
 .legal-container {
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: 16px;
+  background: transparent;
+  border: none;
+  border-radius: 0;
   padding: 1.5rem;
-  box-shadow: 0 12px 32px rgba(3, 10, 28, 0.14);
+  box-shadow: none;
 }
 
 .legal-top-nav {

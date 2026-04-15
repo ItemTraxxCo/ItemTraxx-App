@@ -59,6 +59,7 @@
 
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
+import { capturePostHogEvent } from "../services/posthogService";
 
 type OnboardingStep = { title: string; body: string };
 type OnboardingVariant = "tenant_checkout" | "tenant_admin";
@@ -142,10 +143,15 @@ const goNext = () => {
 };
 
 const emitClose = () => {
+  capturePostHogEvent("onboarding_skipped", {
+    step_reached: currentStepIndex.value,
+    variant: props.variant,
+  });
   emit("close");
 };
 
 const emitComplete = () => {
+  capturePostHogEvent("onboarding_completed", { variant: props.variant });
   emit("complete");
 };
 

@@ -174,6 +174,7 @@ import {
 import { sanitizeInput } from "../../utils/inputSanitizer";
 import { getAuthState } from "../../store/authState";
 import { toUserFacingErrorMessage } from "../../services/appErrors";
+import { capturePostHogEvent, capturePostHogException } from "../../services/posthogService";
 import type { ScannerHistoryItem, ScannerScanEvent } from "../../types/cameraScanner";
 
 const isStudentLoading = ref(false);
@@ -428,6 +429,7 @@ const submit = async () => {
     });
     if (submitResult.buffered) {
       const bufferedCount = submitResult.queuedCount;
+      capturePostHogEvent("checkout_transaction_buffered", { buffered_count: bufferedCount });
       success.value = "";
       receipt.value = null;
       barcodes.value = [];
@@ -462,6 +464,11 @@ const submit = async () => {
       returns: returnCount,
       items: itemsSnapshot,
     };
+    capturePostHogEvent("checkout_transaction_completed", {
+      checkout_count: checkoutCount,
+      return_count: returnCount,
+      item_count: checkoutCount + returnCount,
+    });
     success.value = " ";
     lastSummary.value = `processed:\n${checkoutCount} checkout(s)\n${returnCount} return(s)`;
     toastStatus.value = "Success";
@@ -478,6 +485,10 @@ const submit = async () => {
       toastMessage.value = "";
     }, 9000);
   } catch (err) {
+    capturePostHogException(err);
+    capturePostHogEvent("checkout_transaction_failed", {
+      error_message: err instanceof Error ? err.message : "Unknown error",
+    });
     error.value = toUserFacingErrorMessage(err, "Request failed.");
     toastStatus.value = "Failed";
     toastTitle.value = "Transaction complete (Failed). Please sign out completeley and sign back in. If issue still persists, contact support.";

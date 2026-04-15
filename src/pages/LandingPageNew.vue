@@ -209,6 +209,7 @@
 import { computed, onBeforeUnmount, onMounted, onUnmounted, ref } from 'vue';
 import { RouterLink } from 'vue-router';
 import { trackAnalyticsEvent } from "../services/analyticsService";
+import { capturePostHogEvent } from "../services/posthogService";
 import adminUiImage from '../assets/landing/admin_ui.png';
 import adminUiImage800 from '../assets/landing/admin_ui-800.webp';
 import adminUiImage1200 from '../assets/landing/admin_ui-1200.webp';
@@ -327,6 +328,7 @@ const trackCta = (
   location: 'header' | 'hero' | 'final',
 ) => {
   void trackAnalyticsEvent("landing_new_cta_click", { cta, location });
+  capturePostHogEvent("landing_cta_clicked", { cta, location });
 };
 
 const refreshSystemStatus = async () => {

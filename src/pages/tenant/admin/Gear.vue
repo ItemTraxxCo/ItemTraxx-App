@@ -315,6 +315,7 @@ import { exportRowsToCsv, exportRowsToPdf } from "../../../services/exportServic
 import { sanitizeInput } from "../../../utils/inputSanitizer";
 import { toUserFacingErrorMessage } from "../../../services/appErrors";
 import type { ScannerMode, ScannerScanEvent } from "../../../types/cameraScanner";
+import { capturePostHogEvent } from "../../../services/posthogService";
 
 const gear = ref<GearItem[]>([]);
 const archivedGear = ref<GearItem[]>([]);
@@ -563,6 +564,7 @@ const handleCreate = async () => {
       entity_id: created.id,
       metadata: { name: created.name, barcode: created.barcode },
     });
+    capturePostHogEvent("gear_item_created");
     gear.value = [created, ...gear.value];
     name.value = "";
     barcode.value = "";

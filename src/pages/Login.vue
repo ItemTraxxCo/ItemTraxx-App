@@ -139,6 +139,8 @@ import { createDistrictSessionHandoff, tenantLogin } from "../services/authServi
 import { useTurnstile } from "../composables/useTurnstile";
 import { buildDistrictAppHandoffUrl } from "../services/districtService";
 import { getDistrictState } from "../store/districtState";
+import { getAuthState } from "../store/authState";
+import { capturePostHogEvent, identifyPostHogUser } from "../services/posthogService";
 
 const router = useRouter();
 const district = getDistrictState();
@@ -292,6 +294,11 @@ const handleTenantLogin = async () => {
       password.value,
       turnstileToken.value || undefined
     );
+    const auth = getAuthState();
+    if (auth.userId) {
+      identifyPostHogUser(auth.userId, { email: auth.email ?? undefined, role: auth.role ?? undefined });
+    }
+    capturePostHogEvent("tenant_login_succeeded", { login_method: "password" });
     if (!district.isDistrictHost && session?.districtSlug) {
       const handoffCode = await createDistrictSessionHandoff(session.districtSlug);
       window.location.replace(
@@ -341,8 +348,10 @@ const handleTenantLogin = async () => {
     if (signInErrorMessage) {
       error.value = "";
       showToast("Sign in failed.", signInErrorMessage);
+      capturePostHogEvent("tenant_login_failed", { error_type: errorMessage });
       return;
     }
+    capturePostHogEvent("tenant_login_failed", { error_type: errorMessage });
     error.value = errorMessage;
   } finally {
     isLoading.value = false;

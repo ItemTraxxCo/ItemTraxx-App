@@ -91,6 +91,7 @@ import { logAdminAction } from "../../../services/auditLogService";
 import { sanitizeInput } from "../../../utils/inputSanitizer";
 import { toUserFacingErrorMessage } from "../../../services/appErrors";
 import type { ScannerHistoryItem, ScannerScanEvent } from "../../../types/cameraScanner";
+import { capturePostHogEvent } from "../../../services/posthogService";
 
 const barcodeInput = ref("");
 const barcodes = ref<GearSummary[]>([]);
@@ -179,6 +180,7 @@ const submitReturn = async () => {
         barcodes: barcodes.value.map((item) => item.barcode),
       },
     });
+    capturePostHogEvent("quick_return_completed", { items_returned: barcodes.value.length });
     success.value = "Quick return completed.";
     lastSummary.value = `Processed ${barcodes.value.length} item(s).`;
     barcodes.value = [];

@@ -14,11 +14,13 @@
 import { RouterLink } from "vue-router";
 import { useRouter } from "vue-router";
 import { getPostSignOutUrl, signOut } from "../../services/authService";
+import { resetPostHog } from "../../services/posthogService";
 
 const router = useRouter();
 const handleSignOut = async () => {
   const nextUrl = getPostSignOutUrl();
   await signOut();
+  resetPostHog();
   if (nextUrl.startsWith("http")) {
     window.location.assign(nextUrl);
     return;

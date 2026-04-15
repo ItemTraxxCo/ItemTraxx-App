@@ -203,7 +203,9 @@ const initializeSentry = async (app: ReturnType<typeof createApp>) => {
   await initializeSentryMonitoring(app, router);
 };
 
-const initializePostHog = async () => {
+const initializePostHog = async () => {  
+  console.log('token:', import.meta.env.VITE_POSTHOG_PROJECT_TOKEN)  
+  console.log('analytics allowed:', allowsAnalytics(readCookieConsent()))
   if (!import.meta.env.VITE_POSTHOG_PROJECT_TOKEN?.trim() || !allowsAnalytics(readCookieConsent())) {
     return;
   }

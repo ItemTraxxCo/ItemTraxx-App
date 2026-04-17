@@ -4,8 +4,8 @@
       <div class="cookie-consent-copy">
         <p class="cookie-consent-eyebrow">Cookie Preferences</p>
         <p>
-          ItemTraxx uses essential cookies for sign-in and security. We also use analytics tools to
-          understand site usage and performance. See <RouterLink to="/cookies">Cookies</RouterLink> for details.
+          ItemTraxx uses essential cookies for sign-in and security. With your consent, we may also use analytics and diagnostics
+          (for example PostHog and Sentry) to understand usage, performance, and reliability. See <RouterLink to="/cookies">Cookies</RouterLink> for details.
         </p>
         <p class="cookie-consent-legal">
           By continuing, you agree to the <RouterLink to="/privacy">Privacy Policy</RouterLink> and

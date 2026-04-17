@@ -56,7 +56,7 @@
         </article>
       </section>
 
-      <section class="security-grid security-grid-compact">
+      <section class="security-grid security-grid-compact security-section-gap-after">
         <article class="security-card security-outline-only">
           <p class="security-section-label">Data and Auditability</p>
           <h2>User separation and operational traceability for maximum security and ease of use.</h2>
@@ -75,6 +75,22 @@
             <li v-for="item in operationsControls" :key="item.title">
               <strong>{{ item.title }}</strong>
               <span>{{ item.description }}</span>
+            </li>
+          </ul>
+        </article>
+      </section>
+
+      <section class="security-grid security-grid-full security-section-gap-after">
+        <article class="security-card security-card-wide security-outline-only">
+          <p class="security-section-label">Third-Party Provider Certifications</p>
+          <h2>Certifications held by our supporting infrastructure providers.</h2>
+          <p>
+            This list contains security certifications for our third-party providers, where available.
+          </p>
+          <ul class="security-list">
+            <li v-for="item in thirdPartyProviderCertifications" :key="item.provider">
+              <strong>{{ item.provider }}</strong>
+              <span>{{ item.certifications }}</span>
             </li>
           </ul>
         </article>
@@ -150,7 +166,7 @@ const accessControls = [
   {
     title: "Protected login verification",
     description:
-      "All logins use Cloudflare verification, and the verification is enforced server-side on the relevant auth paths.",
+      "All logins use Cloudflare security verifications and multi-step authorization checks, and the verification is enforced server-side on the relevant auth paths.",
   },
   {
     title: "Fine-grained role-based access",
@@ -160,7 +176,7 @@ const accessControls = [
   {
     title: "Session handling",
     description:
-      "Session refresh, expiry handling, and verification windows are coordinated so privileged pages do not rely on stale client state alone.",
+      "Session refresh, expiry handling, and verification windows are coordinated so privileged pages do not rely on stale client state alone. Authorization is enforced client side and server side.",
   },
 ];
 
@@ -173,20 +189,20 @@ const edgeControls = [
   {
     title: "Security headers",
     description:
-      "ItemTraxx is served with Content Security Policy and related security headers as part of our security baseline.",
+      "ItemTraxx is served with Content Security Policy (CSP) and related security headers as part of our security baseline and industry standard.",
   },
   {
-    title: "Rate limiting",
+    title: "DDoS Protection",
     description:
-      "Critical public and auth-facing flows include rate-limit controls to reduce abuse and repeated request pressure.",
+      "ItemTraxx combats Distributed Denial of Service attacks in several ways to mitigate resource abuse and prevent service disruption. Critical public and auth-facing flows include rate-limit controls, server side security checks, and more.",
   },
 ];
 
 const dataControls = [
   {
-    title: "Row-level isolation",
+    title: "User isolation",
     description:
-      "ItemTraxx servers use row-level security and is used to scope protected data access by user and role where applicable.",
+      "ItemTraxx servers use row-level security and fine-grained access to scope protected data access by user and role where applicable to ensure only your data is available to you.",
   },
   {
     title: "Audit visibility",
@@ -197,6 +213,11 @@ const dataControls = [
     title: "Scoped admin tooling",
     description:
       "Tenant, organization, and other admin tools are separated by access model instead of exposing one flat administrative surface.",
+  },
+  {
+    title: "Customer Data Encryption",
+    description:
+      "All customer data on ItemTraxx servers is encrypted at rest with AES-256 and in transit via TLS.",
   },
 ];
 
@@ -209,12 +230,27 @@ const operationsControls = [
   {
     title: "Monitoring and error reporting",
     description:
-      "ItemTraxx uses third-party services for error monitoring and tracing, and other services for operational analytics, plus operational alerts and workflow notifications through internal systems to stay on top of issues.",
+      "ItemTraxx uses third-party services for error monitoring and tracing (Sentry) and operational analytics (PostHog), plus operational alerts and workflow notifications through internal systems to stay on top of issues. Analytics and diagnostics tooling is only enabled after user consent through the cookie banner. In addition to internal security reviews, we use tools to scan our code for vulnerabilities including GitHub, Aikido, and GitGuardian.",
   },
   {
     title: "Pre release checks and runbooks",
     description:
-      "Security checks, extensive testing, and deploy tooling is completed before public release instead of failing in user-facing versions. This allows for better control and visibility into the security posture and overall performance of the application.",
+      "Security checks, extensive testing, and deployment tooling is completed before public release instead of failing in user-facing versions. This allows for better control and visibility into the security posture and overall performance of the application.",
+  },
+];
+
+const thirdPartyProviderCertifications = [
+  {
+    provider: "Cloudflare",
+    certifications: "SOC 2 Type II, ISO 27001, PCI DSS",
+  },
+  {
+    provider: "Vercel",
+    certifications: "SOC 2 Type II, ISO 27001",
+  },
+  {
+    provider: "Supabase",
+    certifications: "SOC 2 Type II",
   },
 ];
 
@@ -247,7 +283,7 @@ const securityApproach = [
     category: "Response",
     title: "Incident response and escalation",
     description:
-      "ItemTraxx maintains incident-response and operational playbooks for triage, escalation, rollback, and status handling when production and client-facing issues occur.",
+      "ItemTraxx maintains incident-response and operational documentation for triage, escalation, rollback, and status handling when production and client-facing issues occur.",
   },
   {
     category: "Disclosure",
@@ -447,6 +483,15 @@ onUnmounted(() => {
 
 .security-grid-compact {
   grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.security-grid-full {
+  grid-template-columns: 1fr;
+}
+
+
+.security-section-gap-after {
+  margin-bottom: 1.8rem;
 }
 
 .security-card,

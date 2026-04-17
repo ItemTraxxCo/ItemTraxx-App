@@ -118,7 +118,7 @@
         <p>
           If you accept diagnostics in the cookie consent banner, ItemTraxx may also collect application error reports and runtime diagnostics through Sentry. ItemTraxx may also capture
           diagnostic events through PostHog as part of incident and reliability investigation.
-          If Sentry Replay sampling is enabled in the active environment, session replay data may be collected after consent for debugging and incident investigation.
+          If Sentry Replay sampling and/or PostHog Replay recording is enabled in the active environment, session replay data may be collected after consent for debugging and incident investigation.
         </p>
         <p>Your data is used to provide and improve the service, secure accounts, and show approximate session location in account security views.</p>
         <p>

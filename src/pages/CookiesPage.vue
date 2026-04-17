@@ -166,6 +166,11 @@ const diagnosticsCookies = [
       "Used to investigate product issues with event-level diagnostics and troubleshooting context during incident/error analysis.",
   },
   {
+    title: "PostHog Replay when enabled*",
+    description:
+      "If PostHog session replay is enabled in the active environment, browser session replay data may be collected after consent for debugging and incident investigation.",
+  },
+  {
     title: "Sentry error monitoring*",
     description:
       "Used to capture application errors, failed requests, and runtime diagnostics after consent so reliability issues can be investigated.",

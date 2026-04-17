@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient, type SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { sendLoggedResendEmail } from "../_shared/emailDeliveryLog.ts";
+import { buildEmailBrandHeaderHtml } from "../_shared/emailBranding.ts";
 import { isKillSwitchWriteBlocked } from "../_shared/killSwitch.ts";
 import { getRequestId, logError, logInfo } from "../_shared/observability.ts";
 import {
@@ -12,6 +13,8 @@ import {
 } from "../_shared/preloginGuards.ts";
 import { registerPrivilegedStepUp } from "../_shared/privilegedStepUp.ts";
 import { isAllowedOrigin, parseAllowedOrigins } from "../_shared/cors.ts";
+
+const EMAIL_LOGO_URL = Deno.env.get("ITX_EMAIL_LOGO_URL")?.trim() || null;
 
 const baseCorsHeaders = {
   "Access-Control-Allow-Headers":
@@ -189,7 +192,7 @@ const buildSuperAdminTwoFactorHtml = (payload: { code: string; support_email: st
           <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:560px;background:#ffffff;border:1px solid #e5e7eb;border-radius:12px;overflow:hidden;">
             <tr>
               <td style="padding:20px 24px;background:linear-gradient(180deg,#1f4ca3 0%,#38d0b1 100%);color:#ffffff;">
-                <h1 style="margin:0;font-size:20px;line-height:1.3;">ItemTraxx</h1>
+                ${buildEmailBrandHeaderHtml({ logoUrl: EMAIL_LOGO_URL, brandName: "ItemTraxx" })}
               </td>
             </tr>
             <tr>

@@ -28,7 +28,7 @@
     <h1>ItemTraxx Subscription Agreement and Policies</h1>
 
     <p><strong>Effective Date:</strong> March 21, 2026</p>
-    <p><strong>Last Updated:</strong> April 11, 2026</p>
+    <p><strong>Last Updated:</strong> April 16, 2026</p>
 
   <p>
   This document combines the ItemTraxx legal terms, software license, privacy policy,
@@ -50,7 +50,7 @@
       <section>
         <h2>1. Agreement and Scope</h2>
         <p>
-          By accessing, using ItemTraxx, you agree to this legal agreement and policy document.
+          By accessing and using ItemTraxx, you agree to this legal agreement and policy document.
           If you do not agree, do not use the service. ItemTraxx is provided for inventory and
           asset tracking workflows used by schools, businesses, and authorized organizations.
 
@@ -82,7 +82,7 @@
         <h2>4. License and Intellectual Property</h2>
         <p>
           ItemTraxx and all related source code, documentation, design, branding, and assets are
-          proprietary to ItemTraxx Co. A California company. You receive a limited right to use the software for its
+          proprietary to ItemTraxx Co, a California company. You receive a limited right to use the software for its
           intended purpose. You may not copy, modify, redistribute, reverse engineer, decompile,
           disassemble, sublicense, or commercially exploit the software without prior written
           approval from ItemTraxx Co.
@@ -110,6 +110,11 @@
           <li>Device, browser, technical information, and approximate IP-based location used for session security</li>
           <li>Inventory and transaction records</li>
         </ul>
+        <p>
+          If you accept analytics and diagnostics in the cookie consent banner, ItemTraxx may collect product analytics and diagnostic events through PostHog,
+          including page and feature usage, event timestamps, and device/browser metadata. When available, limited account context such as a user identifier,
+          email, and role may be associated with analytics events to help measure product usage and investigate issues. ItemTraxx does not use this data for advertising.
+        </p>
         <p>Your data is used to provide and improve the service, secure accounts, and show approximate session location in account security views.</p>
         <p>
           Data is retained only as necessary for service operations, contractual requirements, and

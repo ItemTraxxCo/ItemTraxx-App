@@ -115,6 +115,10 @@
           including page and feature usage, event timestamps, and device/browser metadata. When available, limited account context such as a user identifier,
           email, and role may be associated with analytics events to help measure product usage and investigate issues. ItemTraxx does not use this data for advertising.
         </p>
+        <p>
+          If you accept diagnostics in the cookie consent banner, ItemTraxx may also collect application error reports and runtime diagnostics through Sentry.
+          If Sentry Replay sampling is enabled in the active environment, session replay data may be collected after consent for debugging and incident investigation.
+        </p>
         <p>Your data is used to provide and improve the service, secure accounts, and show approximate session location in account security views.</p>
         <p>
           Data is retained only as necessary for service operations, contractual requirements, and

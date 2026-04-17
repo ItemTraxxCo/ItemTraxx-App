@@ -24,7 +24,7 @@ We may collect the following categories of information:
 - **Account Information:** Name, email address, role, tenant or role assignment, organization name, authentication metadata, and session/device metadata used to secure access
 - **Operational Data:** Inventory records, item status, barcodes, borrower identifiers, borrower profile details entered by customer admins, checkout and return history, audit logs, and administrative actions
 - **Usage Data:** App interactions, page usage, timestamps, route access, workflow activity, and operational events generated while using the service
-- **Product analytics and diagnostics (after consent):** If you enable analytics in the consent banner, ItemTraxx may collect product analytics and diagnostic events through PostHog. This can include event names and properties, page URLs, timestamps, and device/browser metadata. When available, limited account context (such as a user identifier, email, and role) may be associated with analytics events to help measure product usage and investigate issues.
+- **Product analytics and diagnostics (after consent):** If you enable analytics and diagnostics in the consent banner, ItemTraxx may collect product analytics and diagnostic events through PostHog and Sentry. This can include event names and properties, page URLs, timestamps, error reports and stack traces, and device/browser metadata. When available, limited account context (such as a user identifier, email, and role) may be associated with analytics events to help measure product usage and investigate issues. If Sentry Replay sampling is enabled in the active environment, session replay data may also be collected after consent for debugging.
 - **Device and Technical Data:** Browser type, operating system, approximate device metadata, IP-derived network and security context, approximate IP-based location used for account security and session review, request identifiers, and verification or abuse-prevention signals
 - **Communications Data:** Messages submitted through contact support, contact sales, password-reset, and related support workflows, including optional attachments where supported
 - **Transactional Data:** Plan metadata, billing-related plan classification, subscription records, and onboarding or support request metadata used to manage service delivery
@@ -122,6 +122,8 @@ ItemTraxx may be used in school environments. We do not knowingly collect person
 Depending on your jurisdiction and relationship to the service, you may have rights to request access, correction, deletion, or other actions regarding personal information.
 
 You can control whether analytics is enabled by choosing "Essential only" or "Accept all" in the cookie consent banner. If you decline analytics, PostHog analytics and diagnostics collection will not run in your browser session.
+
+You can control whether diagnostics is enabled by choosing "Essential only" or "Accept all" in the cookie consent banner. If you decline diagnostics, Sentry error monitoring and PostHog analytics (and any replay sampling, when enabled) will not run in your browser session.
 
 Because many ItemTraxx accounts are controlled by schools, districts, or organizations, some requests may need to be directed through the applicable account owner or administrator first.
 

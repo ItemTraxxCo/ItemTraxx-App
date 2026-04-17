@@ -37,7 +37,7 @@
         </article>
 
         <article class="cookies-card">
-          <p class="cookies-section-label">Analytics</p>
+          <p class="cookies-section-label">Analytics*</p>
           <h2>Used to understand product usage and performance.</h2>
           <ul class="cookies-list">
             <li v-for="item in analyticsCookies" :key="item.title">
@@ -50,7 +50,7 @@
 
       <section class="cookies-grid cookies-grid-compact">
         <article class="cookies-card">
-          <p class="cookies-section-label">Diagnostics</p>
+          <p class="cookies-section-label">Diagnostics*</p>
           <h2>Used to detect errors and investigate reliability issues.</h2>
           <ul class="cookies-list">
             <li v-for="item in diagnosticsCookies" :key="item.title">
@@ -72,7 +72,7 @@
         </article>
       </section>
 
-      <section class="cookies-grid cookies-grid-compact cookies-grid-footer-gap">
+      <section class="cookies-grid cookies-grid-compact">
         <article class="cookies-card">
           <p class="cookies-section-label">What We Do Not Use</p>
           <h2>Limited scope by design.</h2>
@@ -95,6 +95,12 @@
             For the broader privacy policy, see <RouterLink to="/privacy">Privacy</RouterLink>.
           </p>
         </article>
+      </section>
+
+      <section class="cookies-consent-standalone" aria-label="Consent note">
+        <p class="cookies-consent-note">
+          * Items marked with "*" are only enabled after user consent on first load through the consent banner.
+        </p>
       </section>
 
       <PublicFooter />
@@ -129,20 +135,25 @@ const essentialCookies = [
       "Used for request protection, step-up verification flows, and related account or session hardening behavior.",
   },
   {
-    title: "Tenant routing context",
+    title: "User routing context",
     description:
-      "Used where needed to maintain the correct tenant or district sign-in and handoff experience.",
+      "Used where needed to maintain the correct user or district/organization sign-in and handoff experience.",
   },
 ];
 
 const analyticsCookies = [
   {
-    title: "Vercel Analytics",
+    title: "PostHog product analytics*",
+    description:
+      "Used to understand feature usage, key product flows, and aggregate engagement patterns for product improvement.",
+  },
+  {
+    title: "Vercel Analytics*",
     description:
       "Used on public and app pages to measure navigation, page usage, and selected product interaction events after consent.",
   },
   {
-    title: "Speed Insights",
+    title: "Speed Insights*",
     description:
       "Used to understand frontend performance and page responsiveness across real user sessions after consent.",
   },
@@ -150,12 +161,22 @@ const analyticsCookies = [
 
 const diagnosticsCookies = [
   {
-    title: "Sentry error monitoring",
+    title: "PostHog diagnostics and session insights*",
+    description:
+      "Used to investigate product issues with event-level diagnostics and troubleshooting context during incident/error analysis.",
+  },
+  {
+    title: "PostHog Replay when enabled*",
+    description:
+      "If PostHog session replay is enabled in the active environment, browser session replay data may be collected after consent for debugging and incident investigation.",
+  },
+  {
+    title: "Sentry error monitoring*",
     description:
       "Used to capture application errors, failed requests, and runtime diagnostics after consent so reliability issues can be investigated.",
   },
   {
-    title: "Sentry Replay when enabled",
+    title: "Sentry Replay when enabled*",
     description:
       "If replay sampling is enabled in the active environment, browser session replay data may be collected after consent for debugging and incident investigation.",
   },
@@ -333,6 +354,14 @@ onUnmounted(() => {
   margin-bottom: 6.5rem;
 }
 
+.cookies-consent-standalone {
+  margin: calc(1.35rem + 4px) 0 6.5rem;
+  padding: 0.75rem 0.9rem;
+  border: 1px solid color-mix(in srgb, var(--border) 56%, transparent);
+  border-radius: 0.8rem;
+  background: color-mix(in srgb, var(--surface-2) 42%, transparent);
+}
+
 .cookies-card {
   display: flex;
   flex-direction: column;
@@ -363,6 +392,13 @@ onUnmounted(() => {
   color: color-mix(in srgb, var(--text) 62%, var(--accent) 38%);
 }
 
+.cookies-consent-note {
+  margin: 0;
+  color: color-mix(in srgb, var(--text) 76%, transparent);
+  font-size: 0.92rem;
+  line-height: 1.6;
+}
+
 @media (max-width: 720px) {
   .cookies-page {
     padding-top: calc(1.25rem + env(safe-area-inset-top, 0px));
@@ -385,6 +421,10 @@ onUnmounted(() => {
   }
 
   .cookies-grid-footer-gap {
+    margin-bottom: 4rem;
+  }
+
+  .cookies-consent-standalone {
     margin-bottom: 4rem;
   }
 

@@ -6,12 +6,23 @@ EDGE_URL="${2:-https://edge.itemtraxx.com/functions}"
 
 BROWSER_UA="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36"
 
-SMOKE_MAX_ATTEMPTS="${SMOKE_MAX_ATTEMPTS:-4}"
+SMOKE_HTML_MAX_ATTEMPTS="${SMOKE_HTML_MAX_ATTEMPTS:-3}"
+SMOKE_EDGE_MAX_ATTEMPTS="${SMOKE_EDGE_MAX_ATTEMPTS:-6}"
 SMOKE_RETRY_BASE_SLEEP_S="${SMOKE_RETRY_BASE_SLEEP_S:-1}"
 
 smoke_sleep() {
   local seconds="$1"
   sleep "$seconds"
+}
+
+smoke_jitter_sleep() {
+  # Add small jitter to avoid hammering an unhealthy edge at exactly the same cadence.
+  local base_sleep_s="$1"
+  local jitter_s=0
+  if [ "$base_sleep_s" -gt 0 ]; then
+    jitter_s="$((RANDOM % (base_sleep_s + 1)))"
+  fi
+  sleep "$((base_sleep_s + jitter_s))"
 }
 
 retryable_http_status() {
@@ -59,7 +70,7 @@ check_html_route() {
   local sleep_s="$SMOKE_RETRY_BASE_SLEEP_S"
   local status
 
-  while [ "$attempt" -le "$SMOKE_MAX_ATTEMPTS" ]; do
+  while [ "$attempt" -le "$SMOKE_HTML_MAX_ATTEMPTS" ]; do
     status="$(curl_http_code /dev/null \
       --http1.1 -I -A "$BROWSER_UA" \
       --connect-timeout 5 --max-time 15 \
@@ -68,12 +79,12 @@ check_html_route() {
       return 0
     fi
 
-    if [ "$attempt" -eq "$SMOKE_MAX_ATTEMPTS" ]; then
-      echo "Route returned HTTP $status after ${SMOKE_MAX_ATTEMPTS} attempts: $url"
+    if [ "$attempt" -eq "$SMOKE_HTML_MAX_ATTEMPTS" ]; then
+      echo "Route returned HTTP $status after ${SMOKE_HTML_MAX_ATTEMPTS} attempts: $url"
       return 1
     fi
-    echo "Route returned HTTP $status (attempt ${attempt}/${SMOKE_MAX_ATTEMPTS}); retrying in ${sleep_s}s: $url"
-    smoke_sleep "$sleep_s"
+    echo "Route returned HTTP $status (attempt ${attempt}/${SMOKE_HTML_MAX_ATTEMPTS}); retrying in ~${sleep_s}s: $url"
+    smoke_jitter_sleep "$sleep_s"
     sleep_s="$((sleep_s * 2))"
     attempt="$((attempt + 1))"
   done
@@ -85,7 +96,7 @@ check_status_endpoint() {
   local sleep_s="$SMOKE_RETRY_BASE_SLEEP_S"
   local status
 
-  while [ "$attempt" -le "$SMOKE_MAX_ATTEMPTS" ]; do
+  while [ "$attempt" -le "$SMOKE_EDGE_MAX_ATTEMPTS" ]; do
     status="$(curl_http_code /tmp/itx_status_body.json \
       --connect-timeout 5 --max-time 15 \
       "${EDGE_URL}/system-status" \
@@ -94,14 +105,16 @@ check_status_endpoint() {
       return 0
     fi
 
-    if [ "$attempt" -eq "$SMOKE_MAX_ATTEMPTS" ]; then
-      echo "system-status returned HTTP $status after ${SMOKE_MAX_ATTEMPTS} attempts"
-      cat /tmp/itx_status_body.json
+    if [ "$attempt" -eq "$SMOKE_EDGE_MAX_ATTEMPTS" ]; then
+      echo "system-status returned HTTP $status after ${SMOKE_EDGE_MAX_ATTEMPTS} attempts"
+      cat /tmp/itx_status_body.json || true
+      echo
       return 1
     fi
-    echo "system-status returned HTTP $status (attempt ${attempt}/${SMOKE_MAX_ATTEMPTS}); retrying in ${sleep_s}s"
-    cat /tmp/itx_status_body.json
-    smoke_sleep "$sleep_s"
+    echo "system-status returned HTTP $status (attempt ${attempt}/${SMOKE_EDGE_MAX_ATTEMPTS}); retrying in ~${sleep_s}s"
+    cat /tmp/itx_status_body.json || true
+    echo
+    smoke_jitter_sleep "$sleep_s"
     sleep_s="$((sleep_s * 2))"
     attempt="$((attempt + 1))"
   done
@@ -113,7 +126,7 @@ check_contact_sales_validation() {
   local sleep_s="$SMOKE_RETRY_BASE_SLEEP_S"
   local status
 
-  while [ "$attempt" -le "$SMOKE_MAX_ATTEMPTS" ]; do
+  while [ "$attempt" -le "$SMOKE_EDGE_MAX_ATTEMPTS" ]; do
     status="$(curl_http_code /tmp/itx_contact_body.json \
       --connect-timeout 5 --max-time 15 \
       -X POST "${EDGE_URL}/contact-sales-submit" \
@@ -124,14 +137,16 @@ check_contact_sales_validation() {
       return 0
     fi
 
-    if [ "$attempt" -eq "$SMOKE_MAX_ATTEMPTS" ]; then
-      echo "contact-sales-submit returned HTTP $status after ${SMOKE_MAX_ATTEMPTS} attempts"
-      cat /tmp/itx_contact_body.json
+    if [ "$attempt" -eq "$SMOKE_EDGE_MAX_ATTEMPTS" ]; then
+      echo "contact-sales-submit returned HTTP $status after ${SMOKE_EDGE_MAX_ATTEMPTS} attempts"
+      cat /tmp/itx_contact_body.json || true
+      echo
       return 1
     fi
-    echo "contact-sales-submit returned HTTP $status (attempt ${attempt}/${SMOKE_MAX_ATTEMPTS}); retrying in ${sleep_s}s"
-    cat /tmp/itx_contact_body.json
-    smoke_sleep "$sleep_s"
+    echo "contact-sales-submit returned HTTP $status (attempt ${attempt}/${SMOKE_EDGE_MAX_ATTEMPTS}); retrying in ~${sleep_s}s"
+    cat /tmp/itx_contact_body.json || true
+    echo
+    smoke_jitter_sleep "$sleep_s"
     sleep_s="$((sleep_s * 2))"
     attempt="$((attempt + 1))"
   done

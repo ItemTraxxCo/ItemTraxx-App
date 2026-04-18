@@ -35,7 +35,7 @@
     "jsbarcode": "^3.12.3",
     "jspdf": "^4.2.1",
     "jspdf-autotable": "^5.0.7",
-    "posthog-js": "^1.369.2",
+    "posthog-js": "^1.369.3",
     "supabase": "2.92.1",
     "vue": "^3.5.32",
     "vue-router": "^4.6.4",
@@ -50,8 +50,8 @@
     "typescript": "~6.0.3",
     "vite": "^8.0.8",
     "vue-tsc": "^3.2.6",
-    "zod-to-json-schema": "^3.25.2",
-    "wrangler": "^4.83.0"
+    "wrangler": "^4.83.0",
+    "zod-to-json-schema": "^3.25.2"
   },
   "overrides": {
     "tar": "^7.5.10",

@@ -43,7 +43,9 @@ jobs:
           cache: npm
 
       - name: Install dependencies
-        run: npm ci
+        # Avoid flaky native/CLI postinstall downloads during E2E runs (for example `supabase` CLI).
+        # Playwright browsers are installed explicitly in the next step.
+        run: npm ci --ignore-scripts
 
       - name: Install Playwright Browsers
         run: npx playwright install --with-deps chromium

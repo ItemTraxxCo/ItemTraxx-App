@@ -66,8 +66,6 @@ jobs:
           check_workflow "async-job-worker.yml" "Async Job Worker" 7200
           check_workflow "synthetic-journeys.yml" "Synthetic Journeys" 10800
           check_workflow "deployment-health.yml" "Deployment Health" 14400
-          check_workflow "supabase-backup.yml" "Supabase Backup" 86400
-
           if [ -n "$STALE_REPORT" ]; then
             {
               echo "stale=true"

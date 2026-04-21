@@ -283,6 +283,16 @@ verify_jwt = false
 # Keep gateway JWT verification off so proxy/header variations do not block valid requests.
 verify_jwt = false
 
+[functions.super-gear-mutate]
+# Authentication is validated inside the function with userClient.auth.getUser(authHeader).
+# Keep gateway JWT verification off so proxy/header variations do not block valid requests.
+verify_jwt = false
+
+[functions.super-logs-query]
+# Authentication is validated inside the function with userClient.auth.getUser(authHeader).
+# Keep gateway JWT verification off so proxy/header variations do not block valid requests.
+verify_jwt = false
+
 [functions.district-dashboard]
 # Authentication is validated inside the function with userClient.auth.getUser(authHeader).
 # Keep gateway JWT verification off so proxy/header variations do not block valid requests.

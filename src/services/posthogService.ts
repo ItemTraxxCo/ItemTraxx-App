@@ -6,14 +6,19 @@ export const initPostHog = () => {
   if (initialized) return;
   const token = import.meta.env.VITE_POSTHOG_PROJECT_TOKEN?.trim();
   if (!token) return;
-  posthog.init(token, {
-    api_host: import.meta.env.VITE_POSTHOG_HOST,
-    defaults: "2026-01-30",
-    // PostHog's client-side feature-flag condition evaluation uses `eval()` in some cases.
-    // We intentionally keep CSP strict (no `unsafe-eval`), and we are not using feature flags here.
-    advanced_disable_feature_flags: true,
-  });
-  initialized = true;
+  try {
+    posthog.init(token, {
+      api_host: import.meta.env.VITE_POSTHOG_HOST,
+      defaults: "2026-01-30",
+      // PostHog's client-side feature-flag condition evaluation uses `eval()` in some cases.
+      // We intentionally keep CSP strict (no `unsafe-eval`), and we are not using feature flags here.
+      advanced_disable_feature_flags: true,
+    });
+    initialized = true;
+  } catch (error) {
+    // Analytics must never break login or core flows.
+    console.warn("[posthog] init failed; continuing without analytics.", error);
+  }
 };
 
 export const capturePostHogEvent = (

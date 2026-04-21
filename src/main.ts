@@ -204,13 +204,16 @@ const initializeSentry = async (app: ReturnType<typeof createApp>) => {
 };
 
 const initializePostHog = async () => {  
-  console.log('token:', import.meta.env.VITE_POSTHOG_PROJECT_TOKEN)  
-  console.log('analytics allowed:', allowsAnalytics(readCookieConsent()))
   if (!import.meta.env.VITE_POSTHOG_PROJECT_TOKEN?.trim() || !allowsAnalytics(readCookieConsent())) {
     return;
   }
-  const { initPostHog } = await import("./services/posthogService");
-  initPostHog();
+  try {
+    const { initPostHog } = await import("./services/posthogService");
+    initPostHog();
+  } catch (error) {
+    // Analytics must never break login or core flows.
+    console.warn("[posthog] initialization failed; continuing without analytics.", error);
+  }
 };
 
 const bindConsentDrivenMonitoring = (app: ReturnType<typeof createApp>) => {

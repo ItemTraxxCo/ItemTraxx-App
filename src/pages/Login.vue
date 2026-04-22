@@ -237,7 +237,20 @@ let cancelIdlePrefetch: (() => void) | null = null;
 let storyTimer: number | null = null;
 let themeObserver: MutationObserver | null = null;
 
+const shouldPrefetchTenantRoutes = () => {
+  const connection = (navigator as Navigator & {
+    connection?: { saveData?: boolean; effectiveType?: string };
+  }).connection;
+  if (connection?.saveData) {
+    return false;
+  }
+  return connection?.effectiveType !== "slow-2g" && connection?.effectiveType !== "2g";
+};
+
 const prefetchTenantRoutes = () => {
+  if (!shouldPrefetchTenantRoutes() || document.visibilityState === "hidden") {
+    return;
+  }
   void import("./tenant/Checkout.vue");
   void import("./tenant/admin/AdminLogin.vue");
 };
@@ -398,10 +411,11 @@ onMounted(() => {
     attributes: true,
     attributeFilter: ["data-theme"],
   });
-  cancelIdlePrefetch = scheduleIdle(prefetchTenantRoutes, 1000);
+  // Heavily delay prefetching so we don't compete with first-load and early interactions.
+  // Prefetch is best-effort only; it should never hurt real-user INP/FCP on the login page.
   prefetchTimer = window.setTimeout(() => {
-    prefetchTenantRoutes();
-  }, 2500);
+    cancelIdlePrefetch = scheduleIdle(prefetchTenantRoutes, 2500);
+  }, 15_000);
   storyTimer = window.setInterval(() => {
     activeStoryIndex.value = (activeStoryIndex.value + 1) % storySlides.length;
   }, 4200);

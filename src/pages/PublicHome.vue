@@ -433,10 +433,11 @@ onMounted(() => {
   void refreshSystemStatus();
   startStatusPolling();
   document.addEventListener("visibilitychange", handleVisibilityChange);
-  cancelIdlePrefetch = scheduleIdle(prefetchPrimaryRoutes, 1400);
+  // Heavily delay prefetching so we don't compete with first-load and early interactions.
+  // Prefetch is best-effort only; it should never hurt real-user INP/FCP on the landing page.
   prefetchTimer = window.setTimeout(() => {
-    prefetchPrimaryRoutes();
-  }, 3000);
+    cancelIdlePrefetch = scheduleIdle(prefetchPrimaryRoutes, 2500);
+  }, 15_000);
 
   if (prefersReducedMotion) {
     revealElements.forEach((el) => el.classList.add("is-visible"));

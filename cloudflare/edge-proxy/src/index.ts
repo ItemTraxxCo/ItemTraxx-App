@@ -6,6 +6,7 @@ export interface Env {
   PENTEST_PROXY_TOKEN?: string;
   TRUST_LOCAL_ORIGINS?: string;
   ITX_ITEMTRAXX_KILLSWITCH_ENABLED?: string;
+  ITX_ITEMTRAXX_KILLSWITCH_MESSAGE?: string;
   SESSION_COOKIE_DOMAIN?: string;
   SENTRY_DSN?: string;
   SENTRY_ENVIRONMENT?: string;
@@ -18,6 +19,8 @@ const ACCESS_TOKEN_MAX_AGE_SECONDS = 60 * 60;
 const REFRESH_TOKEN_MAX_AGE_SECONDS = 60 * 60 * 24 * 30;
 const PENTEST_HOSTNAME = "edge-pentest.itemtraxx.com";
 const PENTEST_TOKEN_HEADER = "x-itx-pentest-token";
+const DEFAULT_KILL_SWITCH_MESSAGE =
+  "Unfortunately ItemTraxx is currently unavailable. We apologize for any inconvenience and are working to restore access as soon as possible. Please see the status page (https://status.itemtraxx.com/) for more information.";
 
 const BASE_CORS_HEADERS = {
   "Access-Control-Allow-Headers":
@@ -82,6 +85,8 @@ type ProfileRow = {
 };
 
 const trimTrailingSlash = (value: string) => value.replace(/\/+$/, "");
+const resolveKillSwitchMessage = (env: Env) =>
+  env.ITX_ITEMTRAXX_KILLSWITCH_MESSAGE?.trim() || DEFAULT_KILL_SWITCH_MESSAGE;
 
 const parseSentryDsn = (dsn?: string | null) => {
   if (!dsn) return null;
@@ -989,7 +994,12 @@ export default {
       const killSwitchEnabled =
         (env.ITX_ITEMTRAXX_KILLSWITCH_ENABLED ?? "").toLowerCase() === "true";
       if (killSwitchEnabled && functionName !== "system-status" && !isLocalhostOrigin(origin)) {
-        const response = buildError(503, "Unfortunately ItemTraxx is currently unavailable.", headers, requestId);
+        const response = buildError(
+          503,
+          resolveKillSwitchMessage(env),
+          headers,
+          requestId
+        );
         maybeReportWorkerResponse(env, request, requestId, response, ctx, { type: "kill_switch", functionName });
         return response;
       }

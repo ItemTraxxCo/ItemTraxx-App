@@ -1,6 +1,10 @@
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { isKillSwitchEnabled, isLocalhostBypassRequest } from "../_shared/killSwitch.ts";
+import {
+  isKillSwitchEnabled,
+  isLocalhostBypassRequest,
+  resolveKillSwitchMessage,
+} from "../_shared/killSwitch.ts";
 import { isAllowedOrigin, parseAllowedOrigins } from "../_shared/cors.ts";
 
 const corsHeaders = {
@@ -115,6 +119,7 @@ serve(async (req) => {
   const supabaseUrl = Deno.env.get("ITX_SUPABASE_URL");
   const serviceKey = Deno.env.get("ITX_SECRET_KEY");
   const incidentWidgetUrl = Deno.env.get("ITX_INCIDENT_IO_WIDGET_URL");
+  const killSwitchMessage = resolveKillSwitchMessage();
 
   if (!supabaseUrl || !serviceKey) {
     return jsonResponse(500, {
@@ -259,7 +264,7 @@ serve(async (req) => {
       },
       kill_switch: {
         enabled: killSwitchActive,
-        message: "Unfortunately ItemTraxx is currently unavailable.",
+        message: killSwitchMessage,
       },
       broadcast,
       maintenance,
@@ -276,7 +281,7 @@ serve(async (req) => {
       },
       kill_switch: {
         enabled: false,
-        message: "Unfortunately ItemTraxx is currently unavailable.",
+        message: killSwitchMessage,
       },
       duration_ms: Date.now() - startedAt,
       checked_at: new Date().toISOString(),

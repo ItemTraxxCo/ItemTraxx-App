@@ -116,6 +116,12 @@ const routes: RouteRecordRaw[] = [
     meta: { public: true, title: "Redirecting to ItemTraxx Statuspage | ItemTraxx" },
   },
   {
+    path: "/unavailable",
+    name: "public-unavailable",
+    component: () => import("../pages/Unavailable.vue"),
+    meta: { public: true, title: "ItemTraxx Unavailable | ItemTraxx" },
+  },
+  {
     path: "/about",
     name: "public-about",
     component: () => import("../pages/About.vue"),

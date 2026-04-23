@@ -6,6 +6,7 @@
       'route-shell-auth': isFullBleedRoute,
       'route-shell-marketing': isMarketingFullBleedRoute,
       'route-shell-confirmation': isSubmitConfirmationRoute,
+      'route-shell-unavailable': isUnavailableRoute,
       'route-shell-banner-bleed': isBannerBleedRoute,
     }"
   >
@@ -22,27 +23,28 @@
     </div>
     <div
       v-if="showKillSwitchOverlay"
-      class="maintenance-fullscreen"
+      class="kill-switch-fullscreen"
       role="alertdialog"
       aria-live="assertive"
       aria-modal="true"
     >
-      <div class="maintenance-fullscreen-card">
-        <h2>ItemTraxx is Currently Unavailable</h2>
+      <div class="kill-switch-fullscreen-card">
+        <p class="kill-switch-status">Service unavailable</p>
+        <h2>ItemTraxx is currently unavailable</h2>
         <p>{{ killSwitchMessage }}</p>
-        <div class="maintenance-fullscreen-actions">
+        <div class="kill-switch-fullscreen-actions">
           <a
-            class="button-link"
+            class="kill-switch-action kill-switch-action-primary"
             href="https://status.itemtraxx.com/"
             target="_blank"
             rel="noreferrer"
           >
-            View Live Status
+            View status page
           </a>
-          <a class="button-link" href="mailto:support@itemtraxx.com">
-            Email Support
+          <a class="kill-switch-action" href="mailto:support@itemtraxx.com">
+            Email support
           </a>
-          <button type="button" class="button-primary" @click="reloadApp">Refresh</button>
+          <button type="button" class="kill-switch-action" @click="reloadApp">Refresh</button>
         </div>
       </div>
     </div>
@@ -70,7 +72,7 @@
       </div>
     </div>
     <div
-      v-if="showVersionOverlay && !showMaintenanceOverlay"
+      v-if="showVersionOverlay && !showMaintenanceOverlay && !isUnavailableRoute"
       class="version-update-fullscreen"
       role="alertdialog"
       aria-live="assertive"
@@ -92,7 +94,7 @@
       </div>
     </div>
     <div
-      v-if="sessionTermination.visible && !showMaintenanceOverlay && !showKillSwitchOverlay"
+      v-if="sessionTermination.visible && !showMaintenanceOverlay && !showKillSwitchOverlay && !isUnavailableRoute"
       class="version-update-fullscreen"
       role="alertdialog"
       aria-live="assertive"
@@ -242,7 +244,7 @@
       @complete="handleOnboardingComplete"
     />
     <CookieConsentBanner
-      v-if="showCookieConsentBanner && !showMaintenanceOverlay && !showKillSwitchOverlay"
+      v-if="showCookieConsentBanner && !showMaintenanceOverlay && !showKillSwitchOverlay && !isUnavailableRoute"
       @essential-only="acceptEssentialCookiesOnly"
       @accept-all="acceptAllCookies"
     />
@@ -470,9 +472,16 @@ const isDarkChromeRoute = computed(
     route.path === "/changelog" ||
     route.path === "/itemscanner"
 );
+const isUnavailableRoute = computed(
+  () => route.path === "/unavailable" || route.name === "public-unavailable"
+);
+const isKillSwitchAllowedRoute = computed(
+  () => route.path === "/" || isUnavailableRoute.value
+);
 const showTopMenu = computed(
   () =>
     route.name !== "public-home" &&
+    route.name !== "public-unavailable" &&
     route.name !== "public-pricing" &&
     route.name !== "public-about" &&
     route.name !== "public-security" &&
@@ -548,7 +557,7 @@ const showIncidentBanner = computed(() => {
   return dismissedIncidentId.value !== incidentBanner.value.id;
 });
 const showMaintenanceBanner = computed(
-  () => maintenanceEnabled.value && !isLocalDevMaintenanceBypass.value
+  () => maintenanceEnabled.value && !isLocalDevMaintenanceBypass.value && !isUnavailableRoute.value
 );
 const showMaintenanceOverlay = computed(() => {
   if (isLocalDevMaintenanceBypass.value) return false;
@@ -556,6 +565,7 @@ const showMaintenanceOverlay = computed(() => {
   const routeName = String(route.name || "");
   if (
     routeName === "public-home" ||
+    routeName === "public-unavailable" ||
     routeName === "not-found" ||
     routeName === "super-auth" ||
     routeName === "internal-auth"
@@ -569,6 +579,7 @@ const showMaintenanceOverlay = computed(() => {
 });
 const showKillSwitchOverlay = computed(() => {
   if (isLocalDevMaintenanceBypass.value) return false;
+  if (isKillSwitchAllowedRoute.value) return false;
   return killSwitchEnabled.value;
 });
 const showVersionOverlay = computed(
@@ -714,6 +725,7 @@ let publicHomeRedirectInFlight = false;
 const maybeRedirectAuthenticatedPublicHome = async () => {
   if (publicHomeRedirectInFlight) return;
   if (route.path !== "/" && route.path !== "/landing-new" && route.path !== "/about") return;
+  if (killSwitchEnabled.value && route.path === "/") return;
   if (!auth.isInitialized || !auth.isAuthenticated) return;
 
   if (
@@ -1280,8 +1292,8 @@ watch(
   () => [killSwitchEnabled.value, route.path] as const,
   ([enabled, path]) => {
     if (!enabled || isLocalDevMaintenanceBypass.value) return;
-    if (path !== "/") {
-      void router.replace("/");
+    if (path !== "/" && path !== "/unavailable") {
+      void router.replace("/unavailable");
     }
   }
 );

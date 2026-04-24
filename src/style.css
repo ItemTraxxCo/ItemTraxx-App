@@ -118,6 +118,26 @@ body.confirmation-route-active #app {
   background: inherit;
 }
 
+html.unavailable-route-active,
+body.unavailable-route-active {
+  overflow-x: hidden;
+}
+
+html[data-theme="light"].unavailable-route-active,
+html[data-theme="light"] body.unavailable-route-active {
+  background: #f7f7f5;
+}
+
+html[data-theme="dark"].unavailable-route-active,
+html[data-theme="dark"] body.unavailable-route-active {
+  background: #101010;
+}
+
+body.unavailable-route-active #app {
+  min-height: 100vh;
+  background: inherit;
+}
+
 body.auth-route-active #app {
   min-height: 100vh;
   background: inherit;
@@ -708,14 +728,16 @@ textarea {
 
   align-items: center;
   background: var(--kill-switch-bg);
+  box-sizing: border-box;
   color: var(--kill-switch-text);
   display: flex;
   inset: 0;
   justify-content: center;
   min-height: 100vh;
   overflow: auto;
-  padding: 32px 18px;
+  padding: 48px 24px;
   position: fixed;
+  width: 100vw;
   z-index: 1250;
 }
 
@@ -732,12 +754,54 @@ textarea {
 }
 
 .kill-switch-fullscreen-card {
-  background: var(--kill-switch-panel-bg);
-  border: 1px solid var(--kill-switch-border);
-  border-radius: 14px;
+  margin-inline: auto;
   max-width: 640px;
-  padding: 36px;
+  text-align: center;
   width: min(100%, 640px);
+}
+
+.kill-switch-logo-link {
+  display: inline-flex;
+  left: max(24px, env(safe-area-inset-left, 0px));
+  position: absolute;
+  text-decoration: none;
+  top: max(24px, env(safe-area-inset-top, 0px));
+}
+
+.kill-switch-logo {
+  display: block;
+  height: 72px;
+  object-fit: contain;
+  width: auto;
+}
+
+.kill-switch-theme-toggle {
+  align-items: center;
+  background: var(--kill-switch-action-bg);
+  border: 1px solid var(--kill-switch-border);
+  border-radius: 999px;
+  color: var(--kill-switch-text);
+  cursor: pointer;
+  display: inline-flex;
+  font: inherit;
+  font-size: 0.84rem;
+  font-weight: 700;
+  gap: 7px;
+  min-height: 38px;
+  padding: 0 14px;
+  position: absolute;
+  right: max(24px, env(safe-area-inset-right, 0px));
+  top: max(24px, env(safe-area-inset-top, 0px));
+}
+
+.kill-switch-theme-toggle:hover,
+.kill-switch-theme-toggle:focus-visible {
+  background: var(--kill-switch-action-hover);
+}
+
+.kill-switch-theme-icon {
+  font-size: 0.95rem;
+  line-height: 1;
 }
 
 .kill-switch-status {
@@ -768,6 +832,7 @@ textarea {
   display: flex;
   flex-wrap: wrap;
   gap: 12px;
+  justify-content: center;
   margin-top: 28px;
 }
 
@@ -911,11 +976,17 @@ textarea {
 
 @media (max-width: 640px) {
   .kill-switch-fullscreen {
-    padding: 1rem;
+    padding: 92px 20px 36px;
   }
 
-  .kill-switch-fullscreen-card {
-    padding: 26px 20px;
+  .kill-switch-logo {
+    height: 58px;
+  }
+
+  .kill-switch-theme-toggle {
+    min-height: 36px;
+    padding: 0 12px;
+    right: max(20px, env(safe-area-inset-right, 0px));
   }
 
   .kill-switch-action {

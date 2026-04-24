@@ -28,6 +28,23 @@
       aria-live="assertive"
       aria-modal="true"
     >
+      <a class="kill-switch-logo-link" href="/" aria-label="ItemTraxx home">
+        <img
+          v-if="brandLogoUrl"
+          class="kill-switch-logo"
+          :src="brandLogoUrl"
+          alt="ItemTraxx Co"
+        />
+      </a>
+      <button
+        class="kill-switch-theme-toggle"
+        type="button"
+        :aria-label="theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'"
+        @click="toggleTheme"
+      >
+        <span class="kill-switch-theme-icon" aria-hidden="true">{{ theme === "dark" ? "☀" : "☾" }}</span>
+        <span>{{ theme === "dark" ? "Light" : "Dark" }}</span>
+      </button>
       <div class="kill-switch-fullscreen-card">
         <p class="kill-switch-status">Service unavailable</p>
         <h2>ItemTraxx is currently unavailable</h2>
@@ -308,6 +325,8 @@ const route = useRoute();
 const menuOpen = ref(false);
 const theme = ref<"light" | "dark">("light");
 const appVersion = import.meta.env.VITE_GIT_COMMIT || "n/a";
+const lightBrandLogoUrl = import.meta.env.VITE_BRAND_LOGO_LIGHT_URL as string | undefined;
+const darkBrandLogoUrl = import.meta.env.VITE_BRAND_LOGO_DARK_URL as string | undefined;
 type BroadcastLevel = "info" | "warning" | "critical";
 type BroadcastPayload = {
   id: string;
@@ -428,6 +447,11 @@ const isDevSubdomainHost = computed(() => {
 
 const themeLabel = computed(() =>
   theme.value === "dark" ? "Light Mode" : "Dark Mode"
+);
+const brandLogoUrl = computed(() =>
+  theme.value === "light"
+    ? lightBrandLogoUrl || darkBrandLogoUrl || ""
+    : darkBrandLogoUrl || lightBrandLogoUrl || ""
 );
 const isFullBleedRoute = computed(
   () =>
@@ -620,6 +644,9 @@ const updateBrowserChromeColor = () => {
   } else if (isSubmitConfirmationRoute.value) {
     color = theme.value === "dark" ? "#090c12" : "#eef5f8";
     appleStatusBarStyle = theme.value === "dark" ? "black-translucent" : "default";
+  } else if (isUnavailableRoute.value) {
+    color = theme.value === "dark" ? "#101010" : "#f7f7f5";
+    appleStatusBarStyle = theme.value === "dark" ? "black-translucent" : "default";
   } else if (isDarkChromeRoute.value) {
     color = "#090d14";
     appleStatusBarStyle = "black-translucent";
@@ -636,6 +663,8 @@ watchEffect(() => {
   document.body.classList.toggle("marketing-route-active", isDarkChromeRoute.value);
   document.documentElement.classList.toggle("confirmation-route-active", isSubmitConfirmationRoute.value);
   document.body.classList.toggle("confirmation-route-active", isSubmitConfirmationRoute.value);
+  document.documentElement.classList.toggle("unavailable-route-active", isUnavailableRoute.value);
+  document.body.classList.toggle("unavailable-route-active", isUnavailableRoute.value);
   updateBrowserChromeColor();
 });
 const offlineQueueTooltip = computed(

@@ -75,6 +75,12 @@ const trustLinks = [
     to: "/security",
   },
   {
+    category: "Compliance",
+    title: "Compliance",
+    description: "Public compliance mappings and remediation status supported by current security monitoring.",
+    to: "/compliance",
+  },
+  {
     category: "Privacy",
     title: "Privacy",
     description: "How ItemTraxx handles data, retention, support workflows, and privacy requests.",
@@ -109,7 +115,7 @@ const trustLinks = [
 const reviewNotes = [
   {
     title: "Security review",
-    description: "Start with Security, then use Contact Support if you need follow-up or additional clarification.",
+    description: "Start with Security and Compliance, then use Contact Support if you need follow-up or additional clarification.",
   },
   {
     title: "Privacy review",

@@ -474,6 +474,7 @@ const isBannerBleedRoute = computed(
     route.path === "/legal" ||
     route.path === "/security" ||
     route.path === "/trust" ||
+    route.path === "/compliance" ||
     route.path === "/faq" ||
     route.path === "/contact" ||
     route.path === "/privacy" ||
@@ -511,6 +512,7 @@ const showTopMenu = computed(
     route.name !== "public-security" &&
     route.name !== "public-report-security-issue" &&
     route.name !== "public-changelog" &&
+    route.name !== "public-compliance" &&
     route.name !== "public-privacy" &&
     route.name !== "public-cookies" &&
     route.name !== "public-contact" &&

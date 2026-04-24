@@ -132,6 +132,8 @@
           </p>
           <p class="security-note">
             ItemTraxx does not currently claim third-party compliance certifications on this page.
+            Public compliance mappings supported by current security monitoring are available on the
+            <RouterLink to="/compliance">Compliance page</RouterLink>.
             This page is limited to the practices and controls that are already documented and in use. 
             Private controls and practices that are not documented here are still in place, but are not 
             listed due to security considerations. If you have questions about our security practices or 

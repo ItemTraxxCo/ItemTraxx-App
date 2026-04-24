@@ -42,6 +42,7 @@
       <div class="footer-column">
         <p class="footer-heading">Company</p>
         <RouterLink to="/contact">Contact</RouterLink>
+        <RouterLink to="/compliance">Compliance</RouterLink>
         <RouterLink to="/legal">Legal</RouterLink>
         <RouterLink to="/privacy">Privacy</RouterLink>
         <RouterLink to="/cookies">Cookies</RouterLink>

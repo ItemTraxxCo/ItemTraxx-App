@@ -152,6 +152,12 @@ const routes: RouteRecordRaw[] = [
     meta: { public: true, title: "Trust | ItemTraxx" },
   },
   {
+    path: "/compliance",
+    name: "public-compliance",
+    component: () => import("../pages/CompliancePage.vue"),
+    meta: { public: true, title: "Compliance | ItemTraxx" },
+  },
+  {
     path: "/faq",
     name: "public-faq",
     component: () => import("../pages/FaqPage.vue"),

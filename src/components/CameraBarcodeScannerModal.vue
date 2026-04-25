@@ -265,22 +265,22 @@ onUnmounted(() => {
 
 <style scoped>
 .scanner-modal-backdrop {
-  --scanner-backdrop: rgba(5, 10, 18, 0.68);
-  --scanner-card-bg: linear-gradient(180deg, rgba(15, 22, 34, 0.97) 0%, rgba(10, 15, 24, 0.99) 100%);
-  --scanner-card-text: #f4f7fb;
-  --scanner-card-border: rgba(118, 143, 181, 0.18);
-  --scanner-muted: rgba(224, 232, 242, 0.72);
-  --scanner-panel-bg: rgba(9, 17, 31, 0.68);
-  --scanner-panel-border: rgba(118, 143, 181, 0.16);
-  --scanner-icon-bg: rgba(9, 17, 31, 0.58);
-  --scanner-icon-border: rgba(140, 157, 189, 0.24);
-  --scanner-eyebrow: rgba(194, 206, 223, 0.72);
-  --scanner-frame-bg: #04070d;
-  --scanner-frame-border: rgba(118, 143, 181, 0.16);
-  --scanner-status-bg: rgba(14, 23, 35, 0.9);
-  --scanner-status-border: rgba(118, 143, 181, 0.14);
-  --scanner-overlay-bg: rgba(7, 12, 20, 0.8);
-  --scanner-overlay-error-bg: rgba(59, 16, 18, 0.82);
+  --scanner-backdrop: rgba(10, 10, 10, 0.72);
+  --scanner-card-bg: #151515;
+  --scanner-card-text: #f3f3f0;
+  --scanner-card-border: #2f2f2c;
+  --scanner-muted: #a7a7a0;
+  --scanner-panel-bg: #20201d;
+  --scanner-panel-border: #2f2f2c;
+  --scanner-icon-bg: #20201d;
+  --scanner-icon-border: #3a3a35;
+  --scanner-eyebrow: #a7a7a0;
+  --scanner-frame-bg: #0b0b0b;
+  --scanner-frame-border: #2f2f2c;
+  --scanner-status-bg: #20201d;
+  --scanner-status-border: #2f2f2c;
+  --scanner-overlay-bg: rgba(16, 16, 16, 0.88);
+  --scanner-overlay-error-bg: rgba(127, 29, 29, 0.92);
   position: fixed;
   inset: 0;
   z-index: 2200;
@@ -289,32 +289,30 @@ onUnmounted(() => {
   justify-content: center;
   padding: 1rem;
   background: var(--scanner-backdrop);
-  backdrop-filter: blur(16px);
 }
 
 .scanner-modal-backdrop.scanner-theme-light {
-  --scanner-backdrop: rgba(232, 238, 243, 0.74);
-  --scanner-card-bg: linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(241, 243, 240, 0.99) 100%);
-  --scanner-card-text: #0f1724;
-  --scanner-card-border: rgba(15, 23, 36, 0.1);
-  --scanner-muted: rgba(15, 23, 36, 0.68);
-  --scanner-panel-bg: rgba(255, 255, 255, 0.86);
-  --scanner-panel-border: rgba(15, 23, 36, 0.12);
-  --scanner-icon-bg: rgba(255, 255, 255, 0.88);
-  --scanner-icon-border: rgba(15, 23, 36, 0.12);
-  --scanner-eyebrow: rgba(15, 23, 36, 0.58);
-  --scanner-frame-bg: rgba(245, 247, 250, 0.98);
-  --scanner-frame-border: rgba(15, 23, 36, 0.12);
-  --scanner-status-bg: rgba(255, 255, 255, 0.92);
-  --scanner-status-border: rgba(15, 23, 36, 0.12);
-  --scanner-overlay-bg: rgba(255, 255, 255, 0.88);
+  --scanner-backdrop: rgba(247, 247, 245, 0.78);
+  --scanner-card-bg: #ffffff;
+  --scanner-card-text: #171717;
+  --scanner-card-border: #d8d8d3;
+  --scanner-muted: #5f6368;
+  --scanner-panel-bg: #f1f1ee;
+  --scanner-panel-border: #d8d8d3;
+  --scanner-icon-bg: #f1f1ee;
+  --scanner-icon-border: #d8d8d3;
+  --scanner-eyebrow: #6f736f;
+  --scanner-frame-bg: #101010;
+  --scanner-frame-border: #d8d8d3;
+  --scanner-status-bg: #f7f7f5;
+  --scanner-status-border: #d8d8d3;
+  --scanner-overlay-bg: rgba(255, 255, 255, 0.9);
   --scanner-overlay-error-bg: rgba(127, 29, 29, 0.9);
 }
 
 @media (min-width: 1100px) {
   .scanner-modal-backdrop-lab {
-    background: color-mix(in srgb, var(--scanner-backdrop) 88%, transparent 12%);
-    backdrop-filter: blur(12px);
+    background: var(--scanner-backdrop);
   }
 }
 
@@ -324,7 +322,6 @@ onUnmounted(() => {
   border: 1px solid var(--scanner-card-border);
   background: var(--scanner-card-bg);
   color: var(--scanner-card-text);
-  box-shadow: 0 28px 80px rgba(3, 8, 18, 0.36);
   padding: 1.25rem;
 }
 
@@ -427,13 +424,10 @@ onUnmounted(() => {
 }
 
 .scanner-detection-box {
-  border: 3px solid #59dca3;
+  border: 3px solid #34a853;
   border-radius: 14px;
   background: rgba(255, 255, 255, 0.02);
-  box-shadow:
-    0 0 0 2px rgba(7, 12, 20, 0.75),
-    0 0 0 9999px rgba(6, 10, 16, 0.14),
-    0 0 22px rgba(89, 220, 163, 0.45);
+  box-shadow: 0 0 0 9999px rgba(6, 10, 16, 0.18);
   transition:
     left 120ms ease,
     top 120ms ease,
@@ -444,29 +438,20 @@ onUnmounted(() => {
 }
 
 .scanner-detection-success {
-  border-color: #59dca3;
-  box-shadow:
-    0 0 0 2px rgba(7, 12, 20, 0.78),
-    0 0 0 9999px rgba(6, 10, 16, 0.14),
-    0 0 26px rgba(89, 220, 163, 0.55);
+  border-color: #34a853;
+  box-shadow: 0 0 0 9999px rgba(6, 10, 16, 0.18);
 }
 
 .scanner-detection-low_light,
 .scanner-detection-glare,
 .scanner-detection-blurry {
-  border-color: #ffcc54;
-  box-shadow:
-    0 0 0 2px rgba(7, 12, 20, 0.78),
-    0 0 0 9999px rgba(6, 10, 16, 0.14),
-    0 0 24px rgba(255, 204, 84, 0.48);
+  border-color: #b7791f;
+  box-shadow: 0 0 0 9999px rgba(6, 10, 16, 0.18);
 }
 
 .scanner-detection-unscannable {
-  border-color: #ff6c70;
-  box-shadow:
-    0 0 0 2px rgba(7, 12, 20, 0.78),
-    0 0 0 9999px rgba(6, 10, 16, 0.14),
-    0 0 24px rgba(255, 108, 112, 0.48);
+  border-color: #b91c1c;
+  box-shadow: 0 0 0 9999px rgba(6, 10, 16, 0.18);
 }
 
 .scanner-overlay-message {
@@ -494,13 +479,9 @@ onUnmounted(() => {
   min-height: 2.55rem;
 }
 
-.scanner-close-button {
-  box-shadow: 0 10px 24px color-mix(in srgb, var(--accent, #2563eb) 24%, transparent 76%);
-}
-
 .scanner-controls .button-secondary {
   color: var(--scanner-card-text);
-  background: color-mix(in srgb, var(--scanner-panel-bg) 86%, var(--surface, #fff) 14%);
+  background: var(--scanner-panel-bg);
   border-color: var(--scanner-panel-border);
 }
 
@@ -512,9 +493,8 @@ onUnmounted(() => {
 .scanner-controls .button-secondary:disabled,
 .scanner-controls .button-primary:disabled {
   color: color-mix(in srgb, var(--scanner-card-text) 38%, transparent 62%);
-  background: color-mix(in srgb, var(--scanner-panel-bg) 52%, var(--scanner-card-bg) 48%);
+  background: var(--scanner-panel-bg);
   border-color: color-mix(in srgb, var(--scanner-panel-border) 56%, transparent 44%);
-  box-shadow: none;
   filter: saturate(0.45);
 }
 
@@ -558,17 +538,17 @@ onUnmounted(() => {
 }
 
 .scanner-status-success {
-  color: #6fe0af;
+  color: #34a853;
 }
 
 .scanner-status-low_light,
 .scanner-status-glare,
 .scanner-status-blurry {
-  color: #ffd56b;
+  color: #b7791f;
 }
 
 .scanner-status-unscannable {
-  color: #ff8b8f;
+  color: #b91c1c;
 }
 
 .scanner-helper-text {

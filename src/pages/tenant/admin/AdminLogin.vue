@@ -287,23 +287,21 @@ onUnmounted(() => {
 
 <style scoped>
 .admin-login-shell {
-  --admin-login-page-bg:
-    radial-gradient(circle at top, rgba(25, 194, 168, 0.16), transparent 34%),
-    radial-gradient(circle at bottom right, rgba(25, 67, 155, 0.18), transparent 38%),
-    linear-gradient(180deg, #11151c 0%, #090c12 100%);
-  --admin-login-panel-bg:
-    radial-gradient(circle at top right, rgba(25, 194, 168, 0.14), transparent 28%),
-    linear-gradient(180deg, #161b23 0%, #0d1117 100%);
-  --admin-login-heading: #f6f5fa;
-  --admin-login-copy: rgba(213, 222, 232, 0.68);
-  --admin-login-label: #efedf7;
-  --admin-login-input-bg: rgba(28, 34, 43, 0.92);
-  --admin-login-input-border: rgba(70, 84, 101, 0.42);
-  --admin-login-input-text: #fcfbff;
-  --admin-login-input-placeholder: rgba(188, 198, 210, 0.48);
-  --admin-login-kicker: rgba(214, 237, 233, 0.72);
-  --admin-login-back-bg: rgba(255, 255, 255, 0.08);
-  --admin-login-back-text: #f8f7ff;
+  --admin-login-page-bg: #101010;
+  --admin-login-panel-bg: #151515;
+  --admin-login-heading: #f3f3f0;
+  --admin-login-copy: #a7a7a0;
+  --admin-login-label: #f3f3f0;
+  --admin-login-input-bg: #101010;
+  --admin-login-input-border: #2f2f2c;
+  --admin-login-input-text: #f3f3f0;
+  --admin-login-input-placeholder: #777770;
+  --admin-login-kicker: #a7a7a0;
+  --admin-login-back-bg: #20201d;
+  --admin-login-back-text: #f3f3f0;
+  --admin-login-primary-bg: #f3f3f0;
+  --admin-login-primary-text: #101010;
+  --admin-login-primary-border: #f3f3f0;
   min-height: 100vh;
   min-height: 100dvh;
   display: flex;
@@ -315,23 +313,21 @@ onUnmounted(() => {
 }
 
 .admin-login-shell.theme-light {
-  --admin-login-page-bg:
-    radial-gradient(circle at top, rgba(25, 194, 168, 0.16), transparent 30%),
-    radial-gradient(circle at bottom right, rgba(25, 67, 155, 0.14), transparent 34%),
-    linear-gradient(180deg, #eef5f8 0%, #dde7ee 100%);
-  --admin-login-panel-bg:
-    radial-gradient(circle at top right, rgba(25, 194, 168, 0.12), transparent 24%),
-    linear-gradient(180deg, #fbfdff 0%, #edf3f7 100%);
-  --admin-login-heading: #111827;
-  --admin-login-copy: rgba(17, 24, 39, 0.7);
-  --admin-login-label: #1f2937;
-  --admin-login-input-bg: rgba(255, 255, 255, 0.95);
-  --admin-login-input-border: rgba(148, 163, 184, 0.34);
-  --admin-login-input-text: #111827;
-  --admin-login-input-placeholder: rgba(71, 85, 105, 0.56);
-  --admin-login-kicker: rgba(30, 41, 59, 0.64);
-  --admin-login-back-bg: rgba(15, 23, 42, 0.08);
-  --admin-login-back-text: #0f172a;
+  --admin-login-page-bg: #f7f7f5;
+  --admin-login-panel-bg: #ffffff;
+  --admin-login-heading: #171717;
+  --admin-login-copy: #5f6368;
+  --admin-login-label: #171717;
+  --admin-login-input-bg: #ffffff;
+  --admin-login-input-border: #d8d8d3;
+  --admin-login-input-text: #171717;
+  --admin-login-input-placeholder: #777770;
+  --admin-login-kicker: #6f736f;
+  --admin-login-back-bg: #f1f1ee;
+  --admin-login-back-text: #171717;
+  --admin-login-primary-bg: #171717;
+  --admin-login-primary-text: #ffffff;
+  --admin-login-primary-border: #171717;
 }
 
 .admin-login-panel {
@@ -341,9 +337,8 @@ onUnmounted(() => {
   grid-template-rows: auto 1fr;
   padding: 1.8rem 1.9rem 2rem;
   border-radius: 24px;
-  border: 1px solid color-mix(in srgb, var(--border) 72%, var(--accent) 28%);
+  border: 1px solid var(--admin-login-input-border);
   background: var(--admin-login-panel-bg);
-  box-shadow: 0 24px 48px rgba(0, 0, 0, 0.18);
 }
 
 .admin-login-topbar {
@@ -371,14 +366,13 @@ onUnmounted(() => {
   color: var(--admin-login-back-text);
   text-decoration: none;
   font-weight: 500;
-  transition: transform 0.16s ease, background-color 0.16s ease, box-shadow 0.16s ease;
+  transition: transform 0.16s ease, background-color 0.16s ease;
 }
 
 .admin-login-back:hover {
   text-decoration: none;
   transform: translateY(-1px);
-  background: color-mix(in srgb, var(--admin-login-back-bg) 70%, var(--accent) 30%);
-  box-shadow: 0 10px 20px rgba(25, 194, 168, 0.14);
+  background: color-mix(in srgb, var(--admin-login-back-bg) 86%, var(--admin-login-heading) 14%);
 }
 
 .admin-login-content {
@@ -416,7 +410,7 @@ onUnmounted(() => {
 .admin-login-form input {
   box-sizing: border-box;
   min-height: 4rem;
-  border-radius: 14px;
+  border-radius: 999px;
   border: 1px solid var(--admin-login-input-border);
   background: var(--admin-login-input-bg);
   color: var(--admin-login-input-text);
@@ -504,26 +498,19 @@ onUnmounted(() => {
   width: 100%;
   min-height: 3.7rem;
   margin-top: 0.4rem;
-  border-radius: 12px;
-  background-image: linear-gradient(90deg, #19c2a8 0%, #19439b 100%);
-  background-repeat: no-repeat;
-  background-size: 100% 100%;
-  background-origin: border-box;
-  border-color: transparent;
-  color: #f8fbff;
-  box-shadow: 0 16px 28px rgba(25, 67, 155, 0.24);
+  border-radius: 999px;
+  background: var(--admin-login-primary-bg);
+  border-color: var(--admin-login-primary-border);
+  color: var(--admin-login-primary-text);
 }
 
 .admin-login-submit:disabled {
-  background: #8d99b8;
-  border-color: #8d99b8;
-  color: rgba(248, 251, 255, 0.92);
-  box-shadow: none;
+  opacity: 0.48;
   cursor: not-allowed;
 }
 
 .admin-login-submit:hover:not(:disabled) {
-  background-image: linear-gradient(90deg, #22ccb1 0%, #2357bf 100%);
+  transform: translateY(-1px);
 }
 
 .admin-login-error {
@@ -545,7 +532,6 @@ onUnmounted(() => {
   border: 1px solid var(--border);
   background: var(--surface);
   padding: 0.75rem 0.85rem;
-  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.18);
   z-index: 1000;
 }
 

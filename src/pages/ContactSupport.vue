@@ -84,6 +84,7 @@
             @change="handleAttachmentChange"
           />
           <p class="muted">Supported file types: PNG, JPG, WEBP, or GIF. Maximum 2 images, up to 4 MB each.</p>
+          <p class="muted attachment-help">We prefer that you attach images, as that helps us assist you faster.</p>
         </label>
 
         <ul v-if="attachments.length" class="attachment-list field-full">
@@ -94,9 +95,9 @@
         </ul>
 
         <label v-if="turnstileSiteKey" class="field field-full">
-          Security Check
+          
           <div :ref="setTurnstileContainerRef"></div>
-          <p class="muted security-note">Complete the security check and ensure all fields are filled out before sending.</p>
+          <p class="muted security-note">Complete the security check and ensure all fields are filled out before sending. If you do not see the security check please reload the page and try again.</p>
         </label>
 
         <input
@@ -491,6 +492,11 @@ onUnmounted(() => {
 }
 
 .security-note {
+  font-size: 0.84rem;
+}
+
+.attachment-help {
+  margin-top: 0.35rem;
   font-size: 0.84rem;
 }
 

@@ -83,9 +83,9 @@
         </label>
 
         <label v-if="turnstileSiteKey" class="field field-full">
-          Security Check
+          
           <div :ref="setTurnstileContainerRef"></div>
-          <p class="muted security-note">Complete security check and ensure all fields are filled out before sending.</p>
+          <p class="muted security-note">Complete security check and ensure all fields are filled out before sending. If you do not see the security check please reload the page and try again.</p>
         </label>
 
         <input

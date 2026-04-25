@@ -60,9 +60,9 @@
             </RouterLink>
           </label>
           <label v-if="turnstileSiteKey" class="admin-security-check">
-            Security Check
+            
             <div :ref="setTurnstileContainerRef"></div>
-            <p class="muted turnstile-help">Complete security check to enable sign in.</p>
+            <p class="muted turnstile-help">Complete security check to enable sign in. If you do not see the security check please reload the page and try again.</p>
           </label>
           <div class="form-actions">
             <button

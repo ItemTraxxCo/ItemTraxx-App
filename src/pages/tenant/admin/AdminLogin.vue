@@ -73,6 +73,12 @@
               Sign in
             </button>
           </div>
+          <p class="muted support-note">
+            Trouble signing in? Contact our support team from the top-right menu for help.
+            <br />
+            By using this software, you agree to our
+            <a :href="legalUrl" target="_blank" rel="noreferrer">legal terms and policies</a>.
+          </p>
         </form>
         <p v-if="error" class="error admin-login-error">{{ error }}</p>
       </div>
@@ -104,6 +110,9 @@ import { capturePostHogEvent, identifyPostHogUser } from "../../../services/post
 const themeMode = ref<"light" | "dark">("dark");
 const lightBrandLogoUrl = import.meta.env.VITE_BRAND_LOGO_LIGHT_URL as string | undefined;
 const darkBrandLogoUrl = import.meta.env.VITE_BRAND_LOGO_DARK_URL as string | undefined;
+const legalUrl =
+  import.meta.env.VITE_LEGAL_URL ||
+  "https://www.itemtraxx.com/legal";
 const email = ref("");
 const password = ref("");
 const showPassword = ref(false);

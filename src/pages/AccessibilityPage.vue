@@ -214,19 +214,17 @@ onUnmounted(() => {
   width: 2.4rem;
   height: 2.4rem;
   border-radius: 999px;
-  border: 1px solid rgba(77, 97, 122, 0.4);
-  background: linear-gradient(180deg, rgba(31, 40, 54, 0.46) 0%, rgba(17, 23, 32, 0.34) 100%);
-  color: #ffffff;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
   text-decoration: none;
-  backdrop-filter: blur(2px);
   transition: transform 0.16s ease, border-color 0.16s ease, background 0.16s ease;
 }
 
 .accessibility-back-link:hover {
   transform: translateY(-1px);
-  border-color: rgba(39, 196, 172, 0.58);
-  background: linear-gradient(180deg, rgba(29, 66, 75, 0.62) 0%, rgba(16, 37, 48, 0.54) 100%);
-  box-shadow: 0 16px 32px rgba(25, 194, 168, 0.14);
+  border-color: var(--text);
+  background: var(--surface-2);
 }
 
 .accessibility-back-link svg {

@@ -197,8 +197,7 @@ onUnmounted(() => {
   height: 2.2rem;
   border-radius: 999px;
   border: 1px solid rgba(77, 97, 122, 0.4);
-  background: linear-gradient(180deg, rgba(31, 40, 54, 0.46) 0%, rgba(17, 23, 32, 0.34) 100%);
-  backdrop-filter: blur(2px);
+  background: var(--surface);
   color: inherit;
   text-decoration: none;
   transition: transform 0.16s ease, border-color 0.16s ease, background 0.16s ease;
@@ -207,9 +206,8 @@ onUnmounted(() => {
 .forgot-back-link:hover {
   text-decoration: none;
   transform: translateY(-1px);
-  border-color: rgba(39, 196, 172, 0.58);
-  background: linear-gradient(180deg, rgba(29, 66, 75, 0.62) 0%, rgba(16, 37, 48, 0.54) 100%);
-  box-shadow: 0 16px 32px rgba(25, 194, 168, 0.14);
+  border-color: var(--text);
+  background: var(--surface-2);
 }
 
 .forgot-back-link svg {
@@ -245,19 +243,14 @@ onUnmounted(() => {
 }
 
 .forgot-panel :is(input[type="email"]) {
-  box-shadow: 0 1px 3px color-mix(in srgb, #000 10%, transparent);
 }
 
 .forgot-submit-button {
   width: 100%;
   min-height: 3rem;
   border-radius: 999px;
-  background:
-    linear-gradient(90deg,
-      color-mix(in srgb, var(--accent) 88%, #3dc8ff 12%) 0%,
-      color-mix(in srgb, var(--button-primary-bg) 72%, #4f5dff 28%) 100%);
+  background: var(--button-primary-bg);
   border-color: transparent;
-  box-shadow: 0 14px 28px rgba(25, 194, 168, 0.18);
 }
 
 .forgot-submit-button:disabled {

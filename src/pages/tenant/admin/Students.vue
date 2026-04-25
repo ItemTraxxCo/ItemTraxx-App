@@ -633,7 +633,6 @@ onUnmounted(() => {
   border-radius: 12px;
   background: var(--surface);
   padding: 1rem;
-  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.24);
 }
 
 .modal h3 {

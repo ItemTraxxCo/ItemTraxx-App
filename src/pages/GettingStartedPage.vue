@@ -197,10 +197,9 @@ onUnmounted(() => {
   width: 2.4rem;
   height: 2.4rem;
   border-radius: 999px;
-  border: 1px solid rgba(77, 97, 122, 0.4);
-  background: linear-gradient(180deg, rgba(31, 40, 54, 0.46) 0%, rgba(17, 23, 32, 0.34) 100%);
-  backdrop-filter: blur(2px);
-  color: #ffffff;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
   text-decoration: none;
   transition: transform 0.16s ease, border-color 0.16s ease, background 0.16s ease;
 }
@@ -208,9 +207,8 @@ onUnmounted(() => {
 .getting-started-back-link:hover {
   text-decoration: none;
   transform: translateY(-1px);
-  border-color: rgba(39, 196, 172, 0.58);
-  background: linear-gradient(180deg, rgba(29, 66, 75, 0.62) 0%, rgba(16, 37, 48, 0.54) 100%);
-  box-shadow: 0 16px 32px rgba(25, 194, 168, 0.14);
+  border-color: var(--text);
+  background: var(--surface-2);
 }
 
 .getting-started-back-link svg {
@@ -224,7 +222,7 @@ onUnmounted(() => {
 }
 
 .getting-started-breadcrumb {
-  color: rgba(225, 232, 240, 0.72);
+  color: var(--muted);
   font-size: 0.95rem;
 }
 
@@ -286,14 +284,30 @@ onUnmounted(() => {
 }
 
 .getting-started-primary-link {
-  background: linear-gradient(135deg, #18c3a6 0%, #2367f2 100%);
-  color: #041019;
+  background: var(--text);
+  color: var(--page-bg);
+  border: 1px solid var(--text);
 }
 
 .getting-started-secondary-link {
-  border: 1px solid rgba(123, 143, 176, 0.22);
-  background: rgba(17, 24, 36, 0.64);
-  color: #eef4fc;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+}
+
+.getting-started-primary-link:hover,
+.getting-started-secondary-link:hover {
+  text-decoration: none;
+  transform: translateY(-1px);
+}
+
+.getting-started-primary-link:hover {
+  background: color-mix(in srgb, var(--text) 92%, var(--surface) 8%);
+}
+
+.getting-started-secondary-link:hover {
+  border-color: var(--text);
+  background: var(--surface-2);
 }
 
 .getting-started-grid {

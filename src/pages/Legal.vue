@@ -377,13 +377,12 @@ onBeforeUnmount(() => {
   width: 2.5rem;
   height: 2.5rem;
   border-radius: 999px;
-  border: 1px solid color-mix(in srgb, var(--accent) 22%, var(--border));
-  background: color-mix(in srgb, var(--card) 78%, var(--surface) 22%);
+  border: 1px solid var(--border);
+  background: var(--surface);
   color: var(--text);
   transition:
     transform 160ms ease,
     border-color 160ms ease,
-    box-shadow 180ms ease,
     background-color 180ms ease;
 }
 
@@ -400,9 +399,8 @@ onBeforeUnmount(() => {
 .legal-back-link:hover,
 .legal-back-link:focus-visible {
   transform: translateY(-1px);
-  border-color: color-mix(in srgb, var(--accent) 60%, transparent);
-  background: color-mix(in srgb, var(--accent) 16%, var(--card) 84%);
-  box-shadow: 0 10px 28px color-mix(in srgb, var(--accent) 18%, transparent);
+  border-color: var(--text);
+  background: var(--surface-2);
 }
 
 .legal-theme-toggle {
@@ -455,7 +453,6 @@ onBeforeUnmount(() => {
   height: 1.05rem;
   border-radius: 999px;
   background: #fff;
-  box-shadow: 0 4px 10px rgba(4, 10, 22, 0.18);
   transform: translateX(0);
   transition: transform 160ms ease;
 }

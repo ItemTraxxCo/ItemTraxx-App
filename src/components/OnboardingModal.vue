@@ -218,7 +218,6 @@ onUnmounted(() => {
   background: var(--surface);
   color: var(--text);
   padding: 1rem;
-  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.28);
   display: flex;
   flex-direction: column;
   gap: 0.8rem;

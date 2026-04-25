@@ -51,8 +51,6 @@ defineEmits<{
   border: 1px solid color-mix(in srgb, var(--border) 78%, var(--accent) 22%);
   border-radius: 18px;
   background: color-mix(in srgb, var(--surface) 92%, rgba(5, 10, 18, 0.92) 8%);
-  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.28);
-  backdrop-filter: blur(18px);
 }
 
 .cookie-consent-copy {

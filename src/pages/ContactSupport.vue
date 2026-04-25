@@ -352,10 +352,9 @@ onUnmounted(() => {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border: 1px solid rgba(77, 97, 122, 0.4);
-  background: linear-gradient(180deg, rgba(31, 40, 54, 0.46) 0%, rgba(17, 23, 32, 0.34) 100%);
-  backdrop-filter: blur(2px);
-  color: #ffffff;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
   text-decoration: none;
   transition: transform 0.16s ease, border-color 0.16s ease, background 0.16s ease;
 }
@@ -363,9 +362,8 @@ onUnmounted(() => {
 .pricing-back-link:hover {
   text-decoration: none;
   transform: translateY(-1px);
-  border-color: rgba(39, 196, 172, 0.58);
-  background: linear-gradient(180deg, rgba(29, 66, 75, 0.62) 0%, rgba(16, 37, 48, 0.54) 100%);
-  box-shadow: 0 16px 32px rgba(25, 194, 168, 0.14);
+  border-color: var(--text);
+  background: var(--surface-2);
 }
 
 .pricing-back-link svg {
@@ -379,7 +377,7 @@ onUnmounted(() => {
 }
 
 .pricing-breadcrumb {
-  color: rgba(225, 232, 240, 0.72);
+  color: var(--muted);
   font-size: 0.95rem;
 }
 
@@ -422,7 +420,6 @@ onUnmounted(() => {
 }
 
 .support-form :is(input, select, textarea) {
-  box-shadow: 0 1px 3px color-mix(in srgb, #000 10%, transparent);
 }
 
 .support-form input[type="file"] {
@@ -434,7 +431,7 @@ onUnmounted(() => {
   border: 1px solid var(--report-input-border);
   border-radius: 999px;
   padding: 0.45rem 0.8rem;
-  background: rgba(25, 194, 168, 0.12);
+  background: var(--surface-2);
   color: inherit;
   font: inherit;
   font-weight: 600;

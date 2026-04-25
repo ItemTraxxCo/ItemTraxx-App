@@ -476,7 +476,6 @@ onMounted(() => {
   border: 1px solid color-mix(in srgb, var(--text) 10%, transparent);
   border-radius: 24px;
   padding: 1.5rem;
-  box-shadow: 0 24px 70px rgba(15, 23, 42, 0.24);
 }
 
 .modal-body {

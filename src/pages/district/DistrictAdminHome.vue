@@ -601,7 +601,6 @@ onMounted(() => {
   border: 1px solid var(--border);
   background: var(--surface);
   color: var(--text);
-  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.24);
   padding: 1rem;
 }
 </style>

@@ -57,11 +57,11 @@
           </RouterLink>
         </label>
         <label>
-          Security Check
+          
           <div v-if="hasTurnstileSiteKey" :ref="setTurnstileContainerRef"></div>
           <p v-if="turnstileStatusMessage" :class="turnstileStatusClass">{{ turnstileStatusMessage }}</p>
           <p class="muted turnstile-help">
-            <template v-if="hasTurnstileSiteKey">Complete security check to enable sign in.</template>
+            <template v-if="hasTurnstileSiteKey">Complete security check to enable sign in. If you do not see the security check please reload the page and try again.</template>
             <template v-else>Turnstile is configured through `VITE_TURNSTILE_SITE_KEY` and requires a dev server restart after env changes.</template>
           </p>
         </label>

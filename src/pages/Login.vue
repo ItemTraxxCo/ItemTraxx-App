@@ -90,7 +90,7 @@
             </label>
 
             <label v-if="turnstileSiteKey" class="security-check-field">
-              Security Check
+              
               <div :ref="setTurnstileContainerRef"></div>
             </label>
 

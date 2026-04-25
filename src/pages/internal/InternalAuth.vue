@@ -49,9 +49,9 @@
           </span>
         </label>
         <label v-if="turnstileSiteKey">
-          Security Check
+          
           <div :ref="setTurnstileContainerRef"></div>
-          <p class="muted turnstile-help">Complete security check to continue.</p>
+          <p class="muted turnstile-help">Complete security check to continue. If you do not see the security check please reload the page and try again.</p>
         </label>
         <div class="form-actions">
           <button type="submit" class="button-primary" :disabled="!canSubmitCredentials">

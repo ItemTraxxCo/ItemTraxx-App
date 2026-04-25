@@ -1,6 +1,6 @@
 # Changelog
 
-Last updated (year-month-day): 2026-04-24
+Last updated (year-month-day): 2026-04-25
 
 This public changelog summarizes notable ItemTraxx product, reliability, security, and experience updates at a high level. Detailed internal engineering and operational notes are maintained separately.
 
@@ -17,6 +17,12 @@ Changes are dated based on the default timezone: America/Los_Angeles
 - [SECURITY.md](SECURITY.md) – Security reporting and guidelines
 
 ---
+
+### 4/25/2026 Development Update
+
+- Refined security check messages and improved related UI consistency across public forms and auth flows.
+- Continued public-page polish and improved related documentation.
+- Completed routine dependency and CI maintenance.
 
 ### 4/24/2026 Development Update
 

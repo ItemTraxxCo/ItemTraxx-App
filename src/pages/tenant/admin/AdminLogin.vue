@@ -1,13 +1,17 @@
 <template>
   <div class="admin-login-shell" :class="`theme-${themeMode}`">
+    <RouterLink class="admin-auth-logo-link" to="/" aria-label="ItemTraxx home">
+      <img v-if="brandLogoUrl" class="admin-auth-logo" :src="brandLogoUrl" alt="ItemTraxx Co" />
+      <span v-else>ItemTraxx</span>
+    </RouterLink>
     <section class="admin-login-panel">
-      <div class="admin-login-topbar">
-        <div class="admin-login-brand">ItemTraxx</div>
-        <RouterLink class="admin-login-back" to="/tenant/checkout">Back</RouterLink>
-      </div>
-
       <div class="admin-login-content">
         <div class="admin-login-copy">
+          <RouterLink class="admin-login-back" to="/tenant/checkout" aria-label="Back to checkout">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M15 5 8 12l7 7" />
+            </svg>
+          </RouterLink>
           <p class="admin-login-kicker">Tenant Admin or District/Organization Admin Access</p>
           <h1>Admin sign in</h1>
           <p class="admin-login-subtitle">
@@ -98,6 +102,8 @@ import { buildDistrictAppHandoffUrl } from "../../../services/districtService";
 import { capturePostHogEvent, identifyPostHogUser } from "../../../services/posthogService";
 
 const themeMode = ref<"light" | "dark">("dark");
+const lightBrandLogoUrl = import.meta.env.VITE_BRAND_LOGO_LIGHT_URL as string | undefined;
+const darkBrandLogoUrl = import.meta.env.VITE_BRAND_LOGO_DARK_URL as string | undefined;
 const email = ref("");
 const password = ref("");
 const showPassword = ref(false);
@@ -128,6 +134,12 @@ const setTurnstileContainerRef = (
 };
 let toastTimer: number | null = null;
 let themeObserver: MutationObserver | null = null;
+
+const brandLogoUrl = computed(() =>
+  themeMode.value === "light"
+    ? lightBrandLogoUrl || darkBrandLogoUrl || ""
+    : darkBrandLogoUrl || lightBrandLogoUrl || ""
+);
 
 const canSubmit = computed(() => {
   if (isLoading.value) return false;
@@ -336,19 +348,27 @@ onUnmounted(() => {
   display: grid;
   grid-template-rows: auto 1fr;
   padding: 1.8rem 1.9rem 2rem;
-  border-radius: 24px;
-  border: 1px solid var(--admin-login-input-border);
-  background: var(--admin-login-panel-bg);
+  border: 0;
+  background: transparent;
 }
 
-.admin-login-topbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
+.admin-auth-logo-link {
+  display: inline-flex;
+  left: max(24px, env(safe-area-inset-left, 0px));
+  position: absolute;
+  text-decoration: none;
+  top: max(24px, env(safe-area-inset-top, 0px));
+  z-index: 1;
 }
 
-.admin-login-brand {
+.admin-auth-logo {
+  display: block;
+  height: 72px;
+  object-fit: contain;
+  width: auto;
+}
+
+.admin-auth-logo-link span {
   font-family: Helvetica, "Helvetica Neue", Arial, sans-serif;
   font-size: 2rem;
   font-weight: 700;
@@ -360,19 +380,33 @@ onUnmounted(() => {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 0.65rem 1rem;
+  width: 2.3rem;
+  height: 2.3rem;
+  margin-bottom: 1rem;
+  padding: 0;
   border-radius: 999px;
-  background: var(--admin-login-back-bg);
+  background: transparent;
   color: var(--admin-login-back-text);
   text-decoration: none;
   font-weight: 500;
-  transition: transform 0.16s ease, background-color 0.16s ease;
+  transition: transform 0.16s ease, background-color 0.16s ease, color 0.16s ease;
 }
 
 .admin-login-back:hover {
   text-decoration: none;
   transform: translateY(-1px);
-  background: color-mix(in srgb, var(--admin-login-back-bg) 86%, var(--admin-login-heading) 14%);
+  background: var(--admin-login-back-bg);
+  color: var(--admin-login-heading);
+}
+
+.admin-login-back svg {
+  width: 1.35rem;
+  height: 1.35rem;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.9;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 .admin-login-content {
@@ -553,13 +587,15 @@ onUnmounted(() => {
 
   .admin-login-panel {
     min-height: calc(100vh - 2rem);
-    padding: 1.25rem;
-    border-radius: 18px;
+    padding: 1.25rem 0;
   }
 
   .admin-login-topbar {
-    flex-direction: column;
-    align-items: flex-start;
+    justify-content: flex-end;
+  }
+
+  .admin-auth-logo {
+    height: 54px;
   }
 }
 </style>

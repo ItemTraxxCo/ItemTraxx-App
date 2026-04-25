@@ -1,5 +1,9 @@
 <template>
   <div class="super-auth-shell" :class="`theme-${themeMode}`">
+    <RouterLink class="super-auth-logo-link" to="/" aria-label="ItemTraxx home">
+      <img v-if="brandLogoUrl" class="super-auth-logo" :src="brandLogoUrl" alt="ItemTraxx Co" />
+      <span v-else>ItemTraxx</span>
+    </RouterLink>
     <div class="super-auth-panel">
       <div class="super-auth-copy">
         <p class="super-auth-kicker">Restricted Access</p>
@@ -16,11 +20,9 @@
 
       <form v-if="!isCodeStep" class="form super-auth-form" @submit.prevent="handleCredentialSubmit">
         <label>
-          Email
           <input v-model="email" type="email" placeholder="Enter email" autocomplete="username" />
         </label>
         <label class="super-password-field">
-          Password
           <span class="super-password-input-wrap">
             <input
               v-model="password"
@@ -126,6 +128,8 @@ const isCodeStep = ref(false);
 const toastTitle = ref("");
 const toastMessage = ref("");
 const themeMode = ref<"light" | "dark">("dark");
+const lightBrandLogoUrl = import.meta.env.VITE_BRAND_LOGO_LIGHT_URL as string | undefined;
+const darkBrandLogoUrl = import.meta.env.VITE_BRAND_LOGO_DARK_URL as string | undefined;
 const turnstileSiteKey = (import.meta.env.VITE_TURNSTILE_SITE_KEY as string | undefined)?.trim();
 const hasTurnstileSiteKey = !!turnstileSiteKey;
 const {
@@ -147,6 +151,12 @@ const setTurnstileContainerRef = (el: Element | { $el?: Element } | null) => {
 };
 let toastTimer: number | null = null;
 let themeObserver: MutationObserver | null = null;
+
+const brandLogoUrl = computed(() =>
+  themeMode.value === "light"
+    ? lightBrandLogoUrl || darkBrandLogoUrl || ""
+    : darkBrandLogoUrl || lightBrandLogoUrl || ""
+);
 
 const turnstileStatusMessage = computed(() => {
   if (!hasTurnstileSiteKey) {
@@ -364,9 +374,32 @@ onUnmounted(() => {
 .super-auth-panel {
   width: min(100%, 34rem);
   padding: 1.8rem 1.9rem 2rem;
-  border-radius: 24px;
-  border: 1px solid var(--super-auth-border);
-  background: var(--super-auth-panel-bg);
+  border: 0;
+  background: transparent;
+}
+
+.super-auth-logo-link {
+  display: inline-flex;
+  left: max(24px, env(safe-area-inset-left, 0px));
+  position: absolute;
+  text-decoration: none;
+  top: max(24px, env(safe-area-inset-top, 0px));
+  z-index: 1;
+}
+
+.super-auth-logo {
+  display: block;
+  height: 72px;
+  object-fit: contain;
+  width: auto;
+}
+
+.super-auth-logo-link span {
+  color: var(--super-auth-text);
+  font-family: Helvetica, "Helvetica Neue", Arial, sans-serif;
+  font-size: 2rem;
+  font-weight: 700;
+  letter-spacing: -0.05em;
 }
 
 .super-auth-kicker {
@@ -493,5 +526,11 @@ onUnmounted(() => {
   margin-top: 0.5rem;
   margin-bottom: 0;
   font-size: 0.82rem;
+}
+
+@media (max-width: 640px) {
+  .super-auth-logo {
+    height: 54px;
+  }
 }
 </style>

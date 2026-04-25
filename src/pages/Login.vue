@@ -430,6 +430,8 @@ onMounted(() => {
   --login-story-text: #f3f3f0;
   --login-story-kicker: #a7a7a0;
   --login-story-body: #a7a7a0;
+  --login-story-indicator: #3a3a35;
+  --login-story-indicator-active: #f3f3f0;
   --login-back-bg: #20201d;
   --login-back-text: #f3f3f0;
   --login-form-bg: #101010;
@@ -464,6 +466,8 @@ onMounted(() => {
   --login-story-text: #171717;
   --login-story-kicker: #5f6368;
   --login-story-body: #5f6368;
+  --login-story-indicator: #d8d8d3;
+  --login-story-indicator-active: #171717;
   --login-back-bg: #f1f1ee;
   --login-back-text: #171717;
   --login-form-bg: #f7f7f5;
@@ -480,10 +484,6 @@ onMounted(() => {
   --login-support-link: #171717;
   --login-button-bg: #171717;
   --login-button-text: #ffffff;
-}
-
-.login-page-shell.theme-light .story-indicator {
-  background: rgba(15, 23, 42, 0.16);
 }
 
 .login-page-shell.theme-light .story-back-link {
@@ -612,12 +612,12 @@ onMounted(() => {
   width: 2.65rem;
   height: 0.28rem;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.18);
+  background: var(--login-story-indicator);
   transition: background-color 0.25s ease, transform 0.25s ease;
 }
 
 .story-indicator.active {
-  background: var(--login-story-text);
+  background: var(--login-story-indicator-active);
   transform: scaleX(1.04);
 }
 

@@ -780,7 +780,6 @@ onUnmounted(() => {
   border-radius: 12px;
   background: var(--surface);
   padding: 1.25rem;
-  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.24);
 }
 
 .modal .form-grid-2 {

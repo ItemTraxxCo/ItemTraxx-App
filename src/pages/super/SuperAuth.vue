@@ -1,5 +1,9 @@
 <template>
   <div class="super-auth-shell" :class="`theme-${themeMode}`">
+    <RouterLink class="super-auth-logo-link" to="/" aria-label="ItemTraxx home">
+      <img v-if="brandLogoUrl" class="super-auth-logo" :src="brandLogoUrl" alt="ItemTraxx Co" />
+      <span v-else>ItemTraxx</span>
+    </RouterLink>
     <div class="super-auth-panel">
       <div class="super-auth-copy">
         <p class="super-auth-kicker">Restricted Access</p>
@@ -16,11 +20,9 @@
 
       <form v-if="!isCodeStep" class="form super-auth-form" @submit.prevent="handleCredentialSubmit">
         <label>
-          Email
           <input v-model="email" type="email" placeholder="Enter email" autocomplete="username" />
         </label>
         <label class="super-password-field">
-          Password
           <span class="super-password-input-wrap">
             <input
               v-model="password"
@@ -126,6 +128,8 @@ const isCodeStep = ref(false);
 const toastTitle = ref("");
 const toastMessage = ref("");
 const themeMode = ref<"light" | "dark">("dark");
+const lightBrandLogoUrl = import.meta.env.VITE_BRAND_LOGO_LIGHT_URL as string | undefined;
+const darkBrandLogoUrl = import.meta.env.VITE_BRAND_LOGO_DARK_URL as string | undefined;
 const turnstileSiteKey = (import.meta.env.VITE_TURNSTILE_SITE_KEY as string | undefined)?.trim();
 const hasTurnstileSiteKey = !!turnstileSiteKey;
 const {
@@ -147,6 +151,12 @@ const setTurnstileContainerRef = (el: Element | { $el?: Element } | null) => {
 };
 let toastTimer: number | null = null;
 let themeObserver: MutationObserver | null = null;
+
+const brandLogoUrl = computed(() =>
+  themeMode.value === "light"
+    ? lightBrandLogoUrl || darkBrandLogoUrl || ""
+    : darkBrandLogoUrl || lightBrandLogoUrl || ""
+);
 
 const turnstileStatusMessage = computed(() => {
   if (!hasTurnstileSiteKey) {
@@ -329,6 +339,15 @@ onUnmounted(() => {
 
 <style scoped>
 .super-auth-shell {
+  --super-auth-page-bg: #101010;
+  --super-auth-panel-bg: #151515;
+  --super-auth-text: #f3f3f0;
+  --super-auth-muted: #a7a7a0;
+  --super-auth-border: #2f2f2c;
+  --super-auth-input-bg: #101010;
+  --super-auth-button-bg: #f3f3f0;
+  --super-auth-button-text: #101010;
+  --super-auth-button-border: #f3f3f0;
   min-height: 100vh;
   min-height: 100dvh;
   display: flex;
@@ -336,28 +355,51 @@ onUnmounted(() => {
   justify-content: center;
   padding: 2rem;
   overflow-y: auto;
-  background:
-    radial-gradient(circle at top, rgba(25, 194, 168, 0.16), transparent 34%),
-    radial-gradient(circle at bottom right, rgba(25, 67, 155, 0.18), transparent 38%),
-    linear-gradient(180deg, #11151c 0%, #090c12 100%);
+  background: var(--super-auth-page-bg);
+  color: var(--super-auth-text);
 }
 
 .super-auth-shell.theme-light {
-  background:
-    radial-gradient(circle at top, rgba(25, 194, 168, 0.16), transparent 30%),
-    radial-gradient(circle at bottom right, rgba(25, 67, 155, 0.14), transparent 34%),
-    linear-gradient(180deg, #eef5f8 0%, #dde7ee 100%);
+  --super-auth-page-bg: #f7f7f5;
+  --super-auth-panel-bg: #ffffff;
+  --super-auth-text: #171717;
+  --super-auth-muted: #5f6368;
+  --super-auth-border: #d8d8d3;
+  --super-auth-input-bg: #ffffff;
+  --super-auth-button-bg: #171717;
+  --super-auth-button-text: #ffffff;
+  --super-auth-button-border: #171717;
 }
 
 .super-auth-panel {
   width: min(100%, 34rem);
   padding: 1.8rem 1.9rem 2rem;
-  border-radius: 24px;
-  border: 1px solid color-mix(in srgb, var(--border) 72%, var(--accent) 28%);
-  background:
-    radial-gradient(circle at top right, color-mix(in srgb, var(--accent) 10%, transparent 90%), transparent 28%),
-    linear-gradient(180deg, color-mix(in srgb, var(--surface) 94%, transparent 6%) 0%, color-mix(in srgb, var(--surface-2) 92%, transparent 8%) 100%);
-  box-shadow: 0 24px 48px rgba(0, 0, 0, 0.18);
+  border: 0;
+  background: transparent;
+}
+
+.super-auth-logo-link {
+  display: inline-flex;
+  left: max(24px, env(safe-area-inset-left, 0px));
+  position: absolute;
+  text-decoration: none;
+  top: max(24px, env(safe-area-inset-top, 0px));
+  z-index: 1;
+}
+
+.super-auth-logo {
+  display: block;
+  height: 72px;
+  object-fit: contain;
+  width: auto;
+}
+
+.super-auth-logo-link span {
+  color: var(--super-auth-text);
+  font-family: Helvetica, "Helvetica Neue", Arial, sans-serif;
+  font-size: 2rem;
+  font-weight: 700;
+  letter-spacing: -0.05em;
 }
 
 .super-auth-kicker {
@@ -365,20 +407,35 @@ onUnmounted(() => {
   font-size: 0.82rem;
   letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: var(--muted);
+  color: var(--super-auth-muted);
 }
 
 .super-auth-copy h1 {
   margin: 0;
+  color: var(--super-auth-text);
 }
 
 .super-auth-subtitle {
   margin: 1rem 0 1.8rem;
-  color: var(--muted);
+  color: var(--super-auth-muted);
 }
 
 .super-auth-form input {
   min-height: 3.6rem;
+  border-radius: 999px;
+  border-color: var(--super-auth-border);
+  background: var(--super-auth-input-bg);
+  color: var(--super-auth-text);
+}
+
+.super-auth-form :deep(label) {
+  color: var(--super-auth-text);
+}
+
+.super-auth-form .button-primary {
+  border-color: var(--super-auth-button-border);
+  background: var(--super-auth-button-bg);
+  color: var(--super-auth-button-text);
 }
 
 .super-password-field {
@@ -407,12 +464,12 @@ onUnmounted(() => {
   padding: 0;
   border: 0;
   background: transparent;
-  color: color-mix(in srgb, var(--muted) 82%, var(--text) 18%);
+  color: color-mix(in srgb, var(--super-auth-muted) 82%, var(--super-auth-text) 18%);
   cursor: pointer;
 }
 
 .super-password-visibility-toggle:hover {
-  color: var(--text);
+  color: var(--super-auth-text);
   transform: translateY(-50%);
 }
 
@@ -437,12 +494,12 @@ onUnmounted(() => {
   right: 0;
   top: calc(100% + 0.45rem);
   font-size: 0.82rem;
-  color: color-mix(in srgb, var(--muted) 82%, var(--accent) 18%);
+  color: var(--super-auth-muted);
   text-decoration: none;
 }
 
 .super-password-help-link:hover {
-  color: var(--text);
+  color: var(--super-auth-text);
   text-decoration: underline;
 }
 
@@ -452,7 +509,7 @@ onUnmounted(() => {
 
 .verification-copy {
   margin: 0 0 1rem;
-  color: var(--muted);
+  color: var(--super-auth-muted);
 }
 
 .verification-actions {
@@ -469,5 +526,11 @@ onUnmounted(() => {
   margin-top: 0.5rem;
   margin-bottom: 0;
   font-size: 0.82rem;
+}
+
+@media (max-width: 640px) {
+  .super-auth-logo {
+    height: 54px;
+  }
 }
 </style>

@@ -450,8 +450,7 @@ onMounted(() => {
 .districts-table-wrap {
   border: 1px solid var(--border);
   border-radius: 16px;
-  background:
-    linear-gradient(180deg, color-mix(in srgb, var(--surface) 94%, transparent 6%) 0%, color-mix(in srgb, var(--surface-2) 92%, transparent 8%) 100%);
+  background: var(--surface);
   overflow: auto;
 }
 
@@ -572,7 +571,6 @@ onMounted(() => {
   place-items: center;
   padding: 1.25rem;
   background: rgba(7, 10, 16, 0.68);
-  backdrop-filter: blur(6px);
 }
 
 .district-edit-modal {
@@ -581,10 +579,7 @@ onMounted(() => {
   overflow: auto;
   border-radius: 24px;
   border: 1px solid color-mix(in srgb, var(--border) 72%, var(--accent) 28%);
-  background:
-    radial-gradient(circle at top right, color-mix(in srgb, var(--accent) 10%, transparent 90%), transparent 28%),
-    linear-gradient(180deg, color-mix(in srgb, var(--surface) 96%, transparent 4%) 0%, color-mix(in srgb, var(--surface-2) 94%, transparent 6%) 100%);
-  box-shadow: 0 28px 60px rgba(0, 0, 0, 0.28);
+  background: var(--surface);
   padding: 1.35rem 1.35rem 1.5rem;
 }
 

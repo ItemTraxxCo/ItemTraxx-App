@@ -294,11 +294,8 @@ import PublicFooter from "../components/PublicFooter.vue";
   margin-left: -2rem;
   margin-right: -2rem;
   padding: calc(2rem + env(safe-area-inset-top, 0px)) 0 3.2rem;
-  background:
-    radial-gradient(circle at top left, rgba(25, 194, 168, 0.14), transparent 22%),
-    radial-gradient(circle at 82% 18%, rgba(25, 67, 155, 0.2), transparent 28%),
-    linear-gradient(180deg, #10161f 0%, #090d14 100%);
-  color: #ffffff;
+  background: var(--page-bg);
+  color: var(--text);
   overflow-x: hidden;
 }
 
@@ -311,28 +308,25 @@ import PublicFooter from "../components/PublicFooter.vue";
   z-index: 2;
 }
 
-.grid-noise {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background-image:
-    linear-gradient(rgba(255, 255, 255, 0.025) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.025) 1px, transparent 1px);
-  background-size: 36px 36px;
-  mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.55), transparent 92%);
-  opacity: 0.16;
+.grid-noise,
+.pricing-orb {
+  display: none;
+}
+
+.pricing-top-nav {
+  margin-bottom: 1rem;
 }
 
 .pricing-back-link {
-  width: 2.4rem;
-  height: 2.4rem;
-  border-radius: 999px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border: 1px solid rgba(77, 97, 122, 0.4);
-  background: linear-gradient(180deg, rgba(31, 40, 54, 0.94) 0%, rgba(17, 23, 32, 0.98) 100%);
-  color: #ffffff;
+  width: 2.4rem;
+  height: 2.4rem;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
   text-decoration: none;
   transition: transform 0.16s ease, border-color 0.16s ease, background 0.16s ease;
 }
@@ -340,58 +334,28 @@ import PublicFooter from "../components/PublicFooter.vue";
 .pricing-back-link:hover {
   text-decoration: none;
   transform: translateY(-1px);
-  border-color: rgba(39, 196, 172, 0.58);
-  background: linear-gradient(180deg, rgba(29, 66, 75, 0.98) 0%, rgba(16, 37, 48, 1) 100%);
-  box-shadow: 0 16px 32px rgba(25, 194, 168, 0.14);
+  border-color: var(--text);
+  background: var(--surface-2);
 }
 
 .pricing-back-link svg {
   width: 1.2rem;
   height: 1.2rem;
+  fill: none;
   stroke: currentColor;
   stroke-width: 2.2;
   stroke-linecap: round;
   stroke-linejoin: round;
-  fill: none;
-}
-
-.pricing-orb {
-  position: absolute;
-  border-radius: 999px;
-  filter: blur(44px);
-  opacity: 0.36;
-  pointer-events: none;
-}
-
-.orb-one {
-  width: 320px;
-  height: 320px;
-  top: 60px;
-  left: -100px;
-  background: rgba(25, 194, 168, 0.26);
-}
-
-.orb-two {
-  width: 340px;
-  height: 340px;
-  top: 360px;
-  right: -70px;
-  background: rgba(25, 67, 155, 0.26);
-}
-
-.pricing-top-nav {
-  margin-bottom: 1rem;
 }
 
 .pricing-breadcrumb {
-  color: rgba(225, 232, 240, 0.72);
+  color: var(--muted);
   font-size: 0.95rem;
 }
 
 .pricing-hero {
-  border: 1px solid rgba(74, 92, 116, 0.34);
-  background: linear-gradient(180deg, rgba(20, 27, 37, 0.94) 0%, rgba(12, 17, 24, 0.98) 100%);
-  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.22);
+  border: 1px solid var(--border);
+  background: var(--surface);
   border-radius: 28px;
   padding: 2.6rem;
 }
@@ -402,7 +366,7 @@ import PublicFooter from "../components/PublicFooter.vue";
   font-weight: 700;
   letter-spacing: 0.16em;
   text-transform: uppercase;
-  color: rgba(214, 237, 233, 0.72);
+  color: var(--muted);
 }
 
 .pricing-hero h1 {
@@ -417,7 +381,7 @@ import PublicFooter from "../components/PublicFooter.vue";
   max-width: 42rem;
   font-size: 1.1rem;
   line-height: 1.75;
-  color: rgba(222, 229, 238, 0.76);
+  color: var(--muted);
 }
 
 .pricing-actions {
@@ -432,13 +396,10 @@ import PublicFooter from "../components/PublicFooter.vue";
   align-items: center;
   justify-content: center;
   min-height: 2.4rem;
-  border-radius: 10px;
-  border: 1px solid transparent;
-  background-image: linear-gradient(90deg, #19c2a8 0%, #19439b 100%);
-  background-repeat: no-repeat;
-  background-size: 100% 100%;
-  background-origin: border-box;
-  color: #f7fbff;
+  border-radius: 999px;
+  border: 1px solid var(--text);
+  background: var(--text);
+  color: var(--page-bg);
   font-weight: 700;
   text-decoration: none;
   padding: 0.45rem 0.95rem;
@@ -448,8 +409,7 @@ import PublicFooter from "../components/PublicFooter.vue";
 .pricing-contact-button:hover {
   text-decoration: none;
   transform: translateY(-1px);
-  background-image: linear-gradient(90deg, #22ccb1 0%, #2357bf 100%);
-  box-shadow: 0 16px 32px rgba(25, 67, 155, 0.18);
+  
 }
 
 .pricing-secondary-button {
@@ -457,11 +417,10 @@ import PublicFooter from "../components/PublicFooter.vue";
   align-items: center;
   justify-content: center;
   min-height: 2.4rem;
-  border-radius: 10px;
-  border: 1px solid rgba(77, 97, 122, 0.4);
-  background: linear-gradient(180deg, rgba(31, 40, 54, 0.94) 0%, rgba(17, 23, 32, 0.98) 100%);
-  color: #f5f7fb;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
   font-weight: 700;
   text-decoration: none;
   padding: 0.45rem 0.95rem;
@@ -471,11 +430,8 @@ import PublicFooter from "../components/PublicFooter.vue";
 .pricing-secondary-button:hover {
   text-decoration: none;
   transform: translateY(-1px);
-  border-color: rgba(39, 196, 172, 0.58);
-  background: linear-gradient(180deg, rgba(29, 66, 75, 0.98) 0%, rgba(16, 37, 48, 1) 100%);
-  box-shadow:
-    inset 0 1px 0 rgba(115, 255, 233, 0.08),
-    0 16px 32px rgba(25, 194, 168, 0.14);
+  border-color: var(--text);
+  background: var(--surface-2);
 }
 
 .pricing-section {
@@ -493,7 +449,7 @@ import PublicFooter from "../components/PublicFooter.vue";
   font-weight: 700;
   letter-spacing: 0.16em;
   text-transform: uppercase;
-  color: rgba(214, 237, 233, 0.68);
+  color: var(--muted);
 }
 
 .pricing-section-header h2 {
@@ -501,13 +457,13 @@ import PublicFooter from "../components/PublicFooter.vue";
   font-size: clamp(1.8rem, 2.8vw, 2.4rem);
   line-height: 1.05;
   letter-spacing: -0.04em;
-  color: #f7fbff;
+  color: var(--text);
 }
 
 .pricing-section-header p {
   margin: 0.8rem 0 0;
   line-height: 1.7;
-  color: rgba(222, 229, 238, 0.74);
+  color: var(--muted);
 }
 
 .plan-grid {
@@ -522,21 +478,20 @@ import PublicFooter from "../components/PublicFooter.vue";
   flex-direction: column;
   border-radius: 22px;
   padding: 1.6rem;
-  border: 1px solid rgba(74, 92, 116, 0.34);
-  background: linear-gradient(180deg, rgba(20, 27, 37, 0.94) 0%, rgba(12, 17, 24, 0.98) 100%);
-  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.22);
+  border: 1px solid var(--border);
+  background: var(--surface);
 }
 
 .plan-card h2 {
   margin: 0;
   font-size: 1.2rem;
-  color: #f5f7fb;
+  color: var(--text);
 }
 
 .plan-card h3 {
   margin: 0;
   font-size: 1.2rem;
-  color: #f5f7fb;
+  color: var(--text);
 }
 
 .plan-meta {
@@ -545,33 +500,33 @@ import PublicFooter from "../components/PublicFooter.vue";
   font-weight: 700;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: rgba(137, 239, 225, 0.78);
+  color: var(--muted);
 }
 
 .price {
   margin: 0.65rem 0 0.4rem;
   font-size: 1.7rem;
   font-weight: 700;
-  color: #f5f7fb;
+  color: var(--text);
 }
 
 .price span {
   margin-left: 0.25rem;
   font-size: 0.92rem;
   font-weight: 500;
-  color: rgba(222, 229, 238, 0.72);
+  color: var(--muted);
 }
 
 .starting {
   margin: 0 0 0.7rem;
   font-size: 0.9rem;
-  color: rgba(222, 229, 238, 0.78);
+  color: var(--muted);
 }
 
 .price-note {
   margin: 0 0 0.8rem;
   font-size: 0.84rem;
-  color: rgba(222, 229, 238, 0.68);
+  color: var(--muted);
 }
 
 .plan-card ul {
@@ -579,7 +534,7 @@ import PublicFooter from "../components/PublicFooter.vue";
   padding-left: 1.1rem;
   display: grid;
   gap: 0.45rem;
-  color: rgba(222, 229, 238, 0.8);
+  color: var(--muted);
 }
 
 .onboarding {
@@ -588,40 +543,36 @@ import PublicFooter from "../components/PublicFooter.vue";
   border-top: 1px solid rgba(74, 92, 116, 0.24);
   font-weight: 600;
   font-size: 0.92rem;
-  color: #f5f7fb;
+  color: var(--text);
 }
 
 .enterprise-note {
   margin: 0.65rem 0 0;
   font-size: 0.88rem;
-  color: rgba(222, 229, 238, 0.78);
+  color: var(--muted);
 }
 
 .enterprise-note a {
-  color: #89efe1;
+  color: var(--text);
   font-weight: 700;
   text-decoration: underline;
   text-underline-offset: 2px;
 }
 
 .enterprise-note a:hover {
-  color: #b9fff5;
+  color: var(--text);
 }
 
 .plan-highlight {
-  border-color: rgba(25, 194, 168, 0.3);
-  box-shadow:
-    0 18px 44px rgba(0, 0, 0, 0.24),
-    inset 0 0 0 1px rgba(25, 194, 168, 0.14);
+  border-color: var(--text);
 }
 
 .billing-card {
   margin-top: 1.2rem;
   border-radius: 22px;
   padding: 1.6rem;
-  border: 1px solid rgba(74, 92, 116, 0.34);
-  background: linear-gradient(180deg, rgba(20, 27, 37, 0.94) 0%, rgba(12, 17, 24, 0.98) 100%);
-  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.22);
+  border: 1px solid var(--border);
+  background: var(--surface);
 }
 
 .pricing-section-divider {
@@ -634,20 +585,12 @@ import PublicFooter from "../components/PublicFooter.vue";
   width: min(6767px, 32vw);
   height: 1px;
   border-radius: 999px;
-  background: linear-gradient(
-    90deg,
-    rgba(25, 194, 168, 0) 0%,
-    rgba(25, 194, 168, 0.55) 20%,
-    rgba(68, 111, 207, 0.62) 50%,
-    rgba(25, 194, 168, 0.55) 80%,
-    rgba(25, 194, 168, 0) 100%
-  );
-  box-shadow: 0 0 28px rgba(25, 194, 168, 0.12);
+  background: var(--border);
 }
 
 .billing-card h2 {
   margin-top: 0;
-  color: #f5f7fb;
+  color: var(--text);
 }
 
 .billing-card ul {
@@ -655,7 +598,7 @@ import PublicFooter from "../components/PublicFooter.vue";
   padding-left: 1.1rem;
   display: grid;
   gap: 0.45rem;
-  color: rgba(222, 229, 238, 0.8);
+  color: var(--muted);
 }
 
 .onboarding-includes-list {
@@ -669,14 +612,14 @@ import PublicFooter from "../components/PublicFooter.vue";
 }
 
 .billing-card a {
-  color: #89efe1;
+  color: var(--text);
   font-weight: 700;
   text-decoration: underline;
   text-underline-offset: 2px;
 }
 
 .billing-card a:hover {
-  color: #b9fff5;
+  color: var(--muted);
 }
 
 @media (max-width: 980px) {

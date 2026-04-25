@@ -1,13 +1,17 @@
 <template>
   <div class="admin-login-shell" :class="`theme-${themeMode}`">
+    <RouterLink class="admin-auth-logo-link" to="/" aria-label="ItemTraxx home">
+      <img v-if="brandLogoUrl" class="admin-auth-logo" :src="brandLogoUrl" alt="ItemTraxx Co" />
+      <span v-else>ItemTraxx</span>
+    </RouterLink>
     <section class="admin-login-panel">
-      <div class="admin-login-topbar">
-        <div class="admin-login-brand">ItemTraxx</div>
-        <RouterLink class="admin-login-back" to="/tenant/checkout">Back</RouterLink>
-      </div>
-
       <div class="admin-login-content">
         <div class="admin-login-copy">
+          <RouterLink class="admin-login-back" to="/tenant/checkout" aria-label="Back to checkout">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M15 5 8 12l7 7" />
+            </svg>
+          </RouterLink>
           <p class="admin-login-kicker">Tenant Admin or District/Organization Admin Access</p>
           <h1>Admin sign in</h1>
           <p class="admin-login-subtitle">
@@ -98,6 +102,8 @@ import { buildDistrictAppHandoffUrl } from "../../../services/districtService";
 import { capturePostHogEvent, identifyPostHogUser } from "../../../services/posthogService";
 
 const themeMode = ref<"light" | "dark">("dark");
+const lightBrandLogoUrl = import.meta.env.VITE_BRAND_LOGO_LIGHT_URL as string | undefined;
+const darkBrandLogoUrl = import.meta.env.VITE_BRAND_LOGO_DARK_URL as string | undefined;
 const email = ref("");
 const password = ref("");
 const showPassword = ref(false);
@@ -128,6 +134,12 @@ const setTurnstileContainerRef = (
 };
 let toastTimer: number | null = null;
 let themeObserver: MutationObserver | null = null;
+
+const brandLogoUrl = computed(() =>
+  themeMode.value === "light"
+    ? lightBrandLogoUrl || darkBrandLogoUrl || ""
+    : darkBrandLogoUrl || lightBrandLogoUrl || ""
+);
 
 const canSubmit = computed(() => {
   if (isLoading.value) return false;
@@ -287,23 +299,21 @@ onUnmounted(() => {
 
 <style scoped>
 .admin-login-shell {
-  --admin-login-page-bg:
-    radial-gradient(circle at top, rgba(25, 194, 168, 0.16), transparent 34%),
-    radial-gradient(circle at bottom right, rgba(25, 67, 155, 0.18), transparent 38%),
-    linear-gradient(180deg, #11151c 0%, #090c12 100%);
-  --admin-login-panel-bg:
-    radial-gradient(circle at top right, rgba(25, 194, 168, 0.14), transparent 28%),
-    linear-gradient(180deg, #161b23 0%, #0d1117 100%);
-  --admin-login-heading: #f6f5fa;
-  --admin-login-copy: rgba(213, 222, 232, 0.68);
-  --admin-login-label: #efedf7;
-  --admin-login-input-bg: rgba(28, 34, 43, 0.92);
-  --admin-login-input-border: rgba(70, 84, 101, 0.42);
-  --admin-login-input-text: #fcfbff;
-  --admin-login-input-placeholder: rgba(188, 198, 210, 0.48);
-  --admin-login-kicker: rgba(214, 237, 233, 0.72);
-  --admin-login-back-bg: rgba(255, 255, 255, 0.08);
-  --admin-login-back-text: #f8f7ff;
+  --admin-login-page-bg: #101010;
+  --admin-login-panel-bg: #151515;
+  --admin-login-heading: #f3f3f0;
+  --admin-login-copy: #a7a7a0;
+  --admin-login-label: #f3f3f0;
+  --admin-login-input-bg: #101010;
+  --admin-login-input-border: #2f2f2c;
+  --admin-login-input-text: #f3f3f0;
+  --admin-login-input-placeholder: #777770;
+  --admin-login-kicker: #a7a7a0;
+  --admin-login-back-bg: #20201d;
+  --admin-login-back-text: #f3f3f0;
+  --admin-login-primary-bg: #f3f3f0;
+  --admin-login-primary-text: #101010;
+  --admin-login-primary-border: #f3f3f0;
   min-height: 100vh;
   min-height: 100dvh;
   display: flex;
@@ -315,23 +325,21 @@ onUnmounted(() => {
 }
 
 .admin-login-shell.theme-light {
-  --admin-login-page-bg:
-    radial-gradient(circle at top, rgba(25, 194, 168, 0.16), transparent 30%),
-    radial-gradient(circle at bottom right, rgba(25, 67, 155, 0.14), transparent 34%),
-    linear-gradient(180deg, #eef5f8 0%, #dde7ee 100%);
-  --admin-login-panel-bg:
-    radial-gradient(circle at top right, rgba(25, 194, 168, 0.12), transparent 24%),
-    linear-gradient(180deg, #fbfdff 0%, #edf3f7 100%);
-  --admin-login-heading: #111827;
-  --admin-login-copy: rgba(17, 24, 39, 0.7);
-  --admin-login-label: #1f2937;
-  --admin-login-input-bg: rgba(255, 255, 255, 0.95);
-  --admin-login-input-border: rgba(148, 163, 184, 0.34);
-  --admin-login-input-text: #111827;
-  --admin-login-input-placeholder: rgba(71, 85, 105, 0.56);
-  --admin-login-kicker: rgba(30, 41, 59, 0.64);
-  --admin-login-back-bg: rgba(15, 23, 42, 0.08);
-  --admin-login-back-text: #0f172a;
+  --admin-login-page-bg: #f7f7f5;
+  --admin-login-panel-bg: #ffffff;
+  --admin-login-heading: #171717;
+  --admin-login-copy: #5f6368;
+  --admin-login-label: #171717;
+  --admin-login-input-bg: #ffffff;
+  --admin-login-input-border: #d8d8d3;
+  --admin-login-input-text: #171717;
+  --admin-login-input-placeholder: #777770;
+  --admin-login-kicker: #6f736f;
+  --admin-login-back-bg: #f1f1ee;
+  --admin-login-back-text: #171717;
+  --admin-login-primary-bg: #171717;
+  --admin-login-primary-text: #ffffff;
+  --admin-login-primary-border: #171717;
 }
 
 .admin-login-panel {
@@ -340,20 +348,27 @@ onUnmounted(() => {
   display: grid;
   grid-template-rows: auto 1fr;
   padding: 1.8rem 1.9rem 2rem;
-  border-radius: 24px;
-  border: 1px solid color-mix(in srgb, var(--border) 72%, var(--accent) 28%);
-  background: var(--admin-login-panel-bg);
-  box-shadow: 0 24px 48px rgba(0, 0, 0, 0.18);
+  border: 0;
+  background: transparent;
 }
 
-.admin-login-topbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
+.admin-auth-logo-link {
+  display: inline-flex;
+  left: max(24px, env(safe-area-inset-left, 0px));
+  position: absolute;
+  text-decoration: none;
+  top: max(24px, env(safe-area-inset-top, 0px));
+  z-index: 1;
 }
 
-.admin-login-brand {
+.admin-auth-logo {
+  display: block;
+  height: 72px;
+  object-fit: contain;
+  width: auto;
+}
+
+.admin-auth-logo-link span {
   font-family: Helvetica, "Helvetica Neue", Arial, sans-serif;
   font-size: 2rem;
   font-weight: 700;
@@ -365,20 +380,33 @@ onUnmounted(() => {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 0.65rem 1rem;
+  width: 2.3rem;
+  height: 2.3rem;
+  margin-bottom: 1rem;
+  padding: 0;
   border-radius: 999px;
-  background: var(--admin-login-back-bg);
+  background: transparent;
   color: var(--admin-login-back-text);
   text-decoration: none;
   font-weight: 500;
-  transition: transform 0.16s ease, background-color 0.16s ease, box-shadow 0.16s ease;
+  transition: transform 0.16s ease, background-color 0.16s ease, color 0.16s ease;
 }
 
 .admin-login-back:hover {
   text-decoration: none;
   transform: translateY(-1px);
-  background: color-mix(in srgb, var(--admin-login-back-bg) 70%, var(--accent) 30%);
-  box-shadow: 0 10px 20px rgba(25, 194, 168, 0.14);
+  background: var(--admin-login-back-bg);
+  color: var(--admin-login-heading);
+}
+
+.admin-login-back svg {
+  width: 1.35rem;
+  height: 1.35rem;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.9;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 .admin-login-content {
@@ -416,7 +444,7 @@ onUnmounted(() => {
 .admin-login-form input {
   box-sizing: border-box;
   min-height: 4rem;
-  border-radius: 14px;
+  border-radius: 999px;
   border: 1px solid var(--admin-login-input-border);
   background: var(--admin-login-input-bg);
   color: var(--admin-login-input-text);
@@ -504,26 +532,19 @@ onUnmounted(() => {
   width: 100%;
   min-height: 3.7rem;
   margin-top: 0.4rem;
-  border-radius: 12px;
-  background-image: linear-gradient(90deg, #19c2a8 0%, #19439b 100%);
-  background-repeat: no-repeat;
-  background-size: 100% 100%;
-  background-origin: border-box;
-  border-color: transparent;
-  color: #f8fbff;
-  box-shadow: 0 16px 28px rgba(25, 67, 155, 0.24);
+  border-radius: 999px;
+  background: var(--admin-login-primary-bg);
+  border-color: var(--admin-login-primary-border);
+  color: var(--admin-login-primary-text);
 }
 
 .admin-login-submit:disabled {
-  background: #8d99b8;
-  border-color: #8d99b8;
-  color: rgba(248, 251, 255, 0.92);
-  box-shadow: none;
+  opacity: 0.48;
   cursor: not-allowed;
 }
 
 .admin-login-submit:hover:not(:disabled) {
-  background-image: linear-gradient(90deg, #22ccb1 0%, #2357bf 100%);
+  transform: translateY(-1px);
 }
 
 .admin-login-error {
@@ -545,7 +566,6 @@ onUnmounted(() => {
   border: 1px solid var(--border);
   background: var(--surface);
   padding: 0.75rem 0.85rem;
-  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.18);
   z-index: 1000;
 }
 
@@ -567,13 +587,15 @@ onUnmounted(() => {
 
   .admin-login-panel {
     min-height: calc(100vh - 2rem);
-    padding: 1.25rem;
-    border-radius: 18px;
+    padding: 1.25rem 0;
   }
 
   .admin-login-topbar {
-    flex-direction: column;
-    align-items: flex-start;
+    justify-content: flex-end;
+  }
+
+  .admin-auth-logo {
+    height: 54px;
   }
 }
 </style>

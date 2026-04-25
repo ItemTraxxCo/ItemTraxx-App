@@ -244,7 +244,6 @@ button.footer-theme-toggle:hover:not(:disabled) {
   height: 0.84rem;
   border-radius: 999px;
   background: #ffffff;
-  box-shadow: 0 4px 10px rgba(4, 10, 22, 0.2);
   transform: translateX(0);
   transition: transform 160ms ease;
 }

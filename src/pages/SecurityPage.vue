@@ -354,10 +354,9 @@ onUnmounted(() => {
   width: 2.4rem;
   height: 2.4rem;
   border-radius: 999px;
-  border: 1px solid rgba(77, 97, 122, 0.4);
-  background: linear-gradient(180deg, rgba(31, 40, 54, 0.46) 0%, rgba(17, 23, 32, 0.34) 100%);
-  backdrop-filter: blur(2px);
-  color: #ffffff;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
   text-decoration: none;
   transition: transform 0.16s ease, border-color 0.16s ease, background 0.16s ease;
 }
@@ -365,9 +364,8 @@ onUnmounted(() => {
 .security-back-link:hover {
   text-decoration: none;
   transform: translateY(-1px);
-  border-color: rgba(39, 196, 172, 0.58);
-  background: linear-gradient(180deg, rgba(29, 66, 75, 0.62) 0%, rgba(16, 37, 48, 0.54) 100%);
-  box-shadow: 0 16px 32px rgba(25, 194, 168, 0.14);
+  border-color: var(--text);
+  background: var(--surface-2);
 }
 
 .security-back-link svg {
@@ -461,19 +459,29 @@ onUnmounted(() => {
 }
 
 .security-primary-link {
-  background: linear-gradient(135deg, #1fc8ad, #245ec6);
-  color: #08111d;
+  background: var(--text);
+  color: var(--page-bg);
 }
 
 .security-secondary-link {
-  border: 1px solid color-mix(in srgb, var(--border) 72%, transparent);
-  background: color-mix(in srgb, var(--surface-2) 64%, transparent);
-  color: inherit;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
 }
 
 .security-primary-link:hover,
 .security-secondary-link:hover {
   transform: translateY(-1px);
+  text-decoration: none;
+}
+
+.security-primary-link:hover {
+  background: color-mix(in srgb, var(--text) 92%, var(--surface) 8%);
+}
+
+.security-secondary-link:hover {
+  border-color: var(--text);
+  background: var(--surface-2);
 }
 
 .security-grid {

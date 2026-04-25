@@ -97,7 +97,6 @@ const submit = () => {
   padding: 1rem;
   display: grid;
   gap: 0.75rem;
-  box-shadow: 0 14px 32px rgba(0, 0, 0, 0.22);
 }
 
 .actions {

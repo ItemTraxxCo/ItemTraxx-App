@@ -297,33 +297,38 @@ onUnmounted(() => {
 
 <style scoped>
 .internal-auth-shell {
+  --internal-auth-page-bg: #101010;
+  --internal-auth-panel-bg: transparent;
+  --internal-auth-text: #f3f3f0;
+  --internal-auth-muted: #a7a7a0;
+  --internal-auth-border: #2f2f2c;
+  --internal-auth-input-bg: #151515;
+  --internal-auth-button-bg: #f3f3f0;
+  --internal-auth-button-text: #101010;
   min-height: 100vh;
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 2rem;
-  background:
-    radial-gradient(circle at top, rgba(25, 194, 168, 0.16), transparent 34%),
-    radial-gradient(circle at bottom right, rgba(25, 67, 155, 0.18), transparent 38%),
-    linear-gradient(180deg, #11151c 0%, #090c12 100%);
+  background: var(--internal-auth-page-bg);
+  color: var(--internal-auth-text);
 }
 
 .internal-auth-shell.theme-light {
-  background:
-    radial-gradient(circle at top, rgba(25, 194, 168, 0.16), transparent 30%),
-    radial-gradient(circle at bottom right, rgba(25, 67, 155, 0.14), transparent 34%),
-    linear-gradient(180deg, #eef5f8 0%, #dde7ee 100%);
+  --internal-auth-page-bg: #f7f7f5;
+  --internal-auth-text: #171717;
+  --internal-auth-muted: #5f6368;
+  --internal-auth-border: #d8d8d3;
+  --internal-auth-input-bg: #ffffff;
+  --internal-auth-button-bg: #171717;
+  --internal-auth-button-text: #ffffff;
 }
 
 .internal-auth-panel {
   width: min(100%, 34rem);
   padding: 1.8rem 1.9rem 2rem;
-  border-radius: 24px;
-  border: 1px solid color-mix(in srgb, var(--border) 72%, var(--accent) 28%);
-  background:
-    radial-gradient(circle at top right, color-mix(in srgb, var(--accent) 10%, transparent 90%), transparent 28%),
-    linear-gradient(180deg, color-mix(in srgb, var(--surface) 94%, transparent 6%) 0%, color-mix(in srgb, var(--surface-2) 92%, transparent 8%) 100%);
-  box-shadow: 0 24px 48px rgba(0, 0, 0, 0.18);
+  border: 0;
+  background: var(--internal-auth-panel-bg);
 }
 
 .internal-auth-kicker {
@@ -331,7 +336,7 @@ onUnmounted(() => {
   font-size: 0.82rem;
   letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: var(--muted);
+  color: var(--internal-auth-muted);
 }
 
 .internal-auth-copy h1 {
@@ -340,11 +345,21 @@ onUnmounted(() => {
 
 .internal-auth-subtitle {
   margin: 1rem 0 1.8rem;
-  color: var(--muted);
+  color: var(--internal-auth-muted);
 }
 
 .internal-auth-form input {
   min-height: 3.6rem;
+  border-radius: 999px;
+  border-color: var(--internal-auth-border);
+  background: var(--internal-auth-input-bg);
+  color: var(--internal-auth-text);
+}
+
+.internal-auth-form .button-primary {
+  border-color: var(--internal-auth-button-bg);
+  background: var(--internal-auth-button-bg);
+  color: var(--internal-auth-button-text);
 }
 
 .internal-password-field {

@@ -214,45 +214,14 @@ const entries = computed<ChangelogEntry[]>(() => {
   max-width: 100%;
   margin-left: 0;
   padding: calc(2rem + env(safe-area-inset-top, 0px)) 0 3.5rem;
-  background-color: #0a1120;
-  color: #f5f7fb;
+  background: var(--page-bg);
+  color: var(--text);
   overflow-x: hidden;
 }
 
-.changelog-page::before {
-  content: "";
-  position: fixed;
-  inset: 0;
-  z-index: 0;
-  background:
-    radial-gradient(circle at 14% 18%, rgba(25, 194, 168, 0.16), transparent 34%),
-    radial-gradient(circle at 83% 10%, rgba(25, 67, 155, 0.18), transparent 31%),
-    linear-gradient(180deg, #09111f 0%, #0d1524 48%, #0a1120 100%);
-  pointer-events: none;
-}
-
-.changelog-orb {
-  position: absolute;
-  border-radius: 999px;
-  filter: blur(40px);
-  opacity: 0.38;
-  pointer-events: none;
-}
-
-.changelog-orb-one {
-  width: 20rem;
-  height: 20rem;
-  top: 5rem;
-  left: -6rem;
-  background: rgba(30, 202, 183, 0.24);
-}
-
-.changelog-orb-two {
-  width: 24rem;
-  height: 24rem;
-  top: 9rem;
-  right: -8rem;
-  background: rgba(38, 104, 226, 0.2);
+.changelog-orb,
+.grid-noise {
+  display: none;
 }
 
 .changelog-container {
@@ -276,14 +245,14 @@ const entries = computed<ChangelogEntry[]>(() => {
   width: 2.75rem;
   height: 2.75rem;
   border-radius: 999px;
-  border: 1px solid rgba(136, 154, 184, 0.28);
-  background: rgba(10, 17, 31, 0.72);
-  color: #f5f7fb;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
   transition: border-color 160ms ease, transform 160ms ease;
 }
 
 .changelog-back-link:hover {
-  border-color: rgba(56, 208, 177, 0.55);
+  border-color: var(--text);
   transform: translateX(-1px);
 }
 
@@ -302,7 +271,7 @@ const entries = computed<ChangelogEntry[]>(() => {
   font-size: 0.8rem;
   letter-spacing: 0.11em;
   text-transform: uppercase;
-  color: #8be6d6;
+  color: var(--muted);
 }
 
 .changelog-hero,
@@ -310,20 +279,11 @@ const entries = computed<ChangelogEntry[]>(() => {
 .changelog-link-card {
   position: relative;
   overflow: hidden;
-  border: 1px solid rgba(112, 138, 180, 0.16);
-  background: linear-gradient(180deg, rgba(18, 26, 41, 0.95), rgba(11, 18, 31, 0.92));
-  box-shadow: 0 28px 64px rgba(5, 10, 18, 0.34);
+  border: 1px solid var(--border);
+  background: var(--surface);
 }
 
-.changelog-hero::after,
-.changelog-card::after,
-.changelog-link-card::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(120deg, rgba(255, 255, 255, 0.04), transparent 46%);
-  pointer-events: none;
-}
+
 
 .changelog-hero {
   padding: clamp(2rem, 4vw, 3.2rem);
@@ -344,7 +304,7 @@ const entries = computed<ChangelogEntry[]>(() => {
   font-size: 0.76rem;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: #8be6d6;
+  color: var(--muted);
 }
 
 .changelog-lead,
@@ -352,7 +312,7 @@ const entries = computed<ChangelogEntry[]>(() => {
 .changelog-link-card p,
 .changelog-list span,
 .changelog-link-card a {
-  color: rgba(231, 236, 245, 0.82);
+  color: var(--muted);
 }
 
 .changelog-lead {
@@ -411,8 +371,8 @@ const entries = computed<ChangelogEntry[]>(() => {
   margin-bottom: 1rem;
   padding: 0.85rem 1rem;
   border-radius: 1rem;
-  border: 1px solid rgba(112, 138, 180, 0.16);
-  background: linear-gradient(180deg, rgba(18, 26, 41, 0.9), rgba(11, 18, 31, 0.86));
+  border: 1px solid var(--border);
+  background: var(--surface);
 }
 
 .changelog-version-label {
@@ -420,27 +380,27 @@ const entries = computed<ChangelogEntry[]>(() => {
   font-size: 0.72rem;
   letter-spacing: 0.11em;
   text-transform: uppercase;
-  color: #8be6d6;
+  color: var(--muted);
 }
 
 .changelog-version-lead {
   margin: 0.16rem 0 0.08rem;
   font-size: 0.78rem;
   line-height: 1.35;
-  color: rgba(231, 236, 245, 0.74);
+  color: var(--muted);
 }
 
 .changelog-version-value {
   margin: 0.12rem 0 0;
   font-size: 0.96rem;
   font-weight: 700;
-  color: #f5f7fb;
+  color: var(--text);
 }
 
 .changelog-version-meta {
   margin: 0.2rem 0 0;
   font-size: 0.82rem;
-  color: rgba(231, 236, 245, 0.78);
+  color: var(--muted);
 }
 
 .changelog-version-divider {
@@ -455,7 +415,7 @@ const entries = computed<ChangelogEntry[]>(() => {
   font-size: 0.78rem;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: #8be6d6;
+  color: var(--muted);
 }
 
 .changelog-list {
@@ -472,7 +432,7 @@ const entries = computed<ChangelogEntry[]>(() => {
 }
 
 .changelog-list strong {
-  color: #f5f7fb;
+  color: var(--text);
 }
 
 @media (max-width: 980px) {

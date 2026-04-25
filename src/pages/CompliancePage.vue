@@ -228,18 +228,18 @@ onUnmounted(() => {
   justify-content: center;
   width: 2.4rem;
   height: 2.4rem;
-  border: 1px solid color-mix(in srgb, var(--border) 62%, transparent);
   border-radius: 999px;
-  background: color-mix(in srgb, var(--surface-2) 68%, transparent);
-  color: inherit;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
   text-decoration: none;
   transition: transform 0.16s ease, border-color 0.16s ease, background 0.16s ease;
 }
 
 .compliance-back-link:hover {
   transform: translateY(-1px);
-  border-color: color-mix(in srgb, var(--accent) 42%, var(--border) 58%);
-  background: color-mix(in srgb, var(--surface-2) 52%, var(--accent) 8%);
+  border-color: var(--text);
+  background: var(--surface-2);
 }
 
 .compliance-back-link svg {

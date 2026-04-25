@@ -1,6 +1,6 @@
 # Changelog
 
-Last updated (year-month-day): 2026-04-11
+Last updated (year-month-day): 2026-04-24
 
 This public changelog summarizes notable ItemTraxx product, reliability, security, and experience updates at a high level. Detailed internal engineering and operational notes are maintained separately.
 
@@ -15,6 +15,78 @@ Changes are dated based on the default timezone: America/Los_Angeles
 - [TERMS.md](TERMS.md) – Terms of service for users
 - [PRIVACY.md](PRIVACY.md) – Privacy policy and data handling
 - [SECURITY.md](SECURITY.md) – Security reporting and guidelines
+
+---
+
+### 4/24/2026 Development Update
+
+- Added a public compliance page and moved related navigation into a clearer company/trust structure.
+- Refined theme consistency across public, auth, admin, scanner, and operational screens.
+- Improved user-facing security-check guidance and polished several public-page actions, links, and theme-aware controls.
+
+---
+
+### 4/23/2026 Development Update
+
+- Added a configurable service availability control and a dedicated unavailable-page fallback experience.
+- Improved outage/maintenance presentation with clearer branding, theme support, and status/support actions.
+- Completed routine dependency and GitHub Actions maintenance.
+
+---
+
+### 4/22/2026 Development Update
+
+- Improved page-load responsiveness by delaying non-critical route prefetching in key sign-in paths.
+
+---
+
+### 4/21/2026 Development Update
+
+- Moved database backup operations into a safer private backup workflow.
+- Updated backup-related application configuration and removed legacy public-repo backup pieces.
+- Migrated brand logo assets into the app so key pages no longer depend on external logo storage.
+
+---
+
+### 4/20/2026 Development Update
+
+- Improved diagnostics reliability and reduced noisy client-side error reporting.
+- Refined analytics behavior to better align with the current security policy.
+
+---
+
+### 4/18/2026 Development Update
+
+- Improved CI and smoke-test reliability with safer retry behavior and reduced flaky setup paths.
+- Continued dependency maintenance.
+
+---
+
+### 4/17/2026 Development Update
+
+- Improved synthetic smoke-test handling for retries and HTTP status reporting.
+- Completed routine dependency maintenance.
+
+---
+
+### 4/16/2026 Development Update
+
+- Added branded email presentation for supported operational emails.
+- Updated public privacy, consent, and diagnostic disclosures to better reflect current analytics and monitoring behavior.
+- Improved analytics compatibility with the app security policy.
+
+---
+
+### 4/14/2026 Development Update
+
+- Updated analytics configuration and supporting deployment settings.
+- Completed dependency maintenance.
+
+---
+
+### 4/13/2026 Development Update
+
+- Completed routine dependency maintenance.
 
 ---
 

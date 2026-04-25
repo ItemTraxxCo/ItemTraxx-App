@@ -1,9 +1,5 @@
 <template>
   <div class="itemscanner-page">
-    <div class="itemscanner-orb itemscanner-orb-one" aria-hidden="true"></div>
-    <div class="itemscanner-orb itemscanner-orb-two" aria-hidden="true"></div>
-    <div class="grid-noise" aria-hidden="true"></div>
-
     <main class="itemscanner-container">
       <div class="page-nav-left itemscanner-top-nav">
         <RouterLink class="itemscanner-back-link" to="/" aria-label="Return to home">
@@ -160,36 +156,9 @@ const handleStatus = (event: ScannerStatusEvent) => {
   position: relative;
   min-height: 100vh;
   min-height: 100dvh;
-  background:
-    radial-gradient(circle at top left, rgba(25, 194, 168, 0.18), transparent 30%),
-    radial-gradient(circle at bottom right, rgba(25, 67, 155, 0.22), transparent 38%),
-    linear-gradient(180deg, #0e1420 0%, #0a0f18 100%);
-  color: #f3f6fb;
-  overflow: clip;
-}
-
-.itemscanner-orb {
-  position: absolute;
-  border-radius: 999px;
-  filter: blur(70px);
-  opacity: 0.22;
-  pointer-events: none;
-}
-
-.itemscanner-orb-one {
-  top: 5rem;
-  left: -3rem;
-  width: 16rem;
-  height: 16rem;
-  background: rgba(25, 194, 168, 0.36);
-}
-
-.itemscanner-orb-two {
-  right: -4rem;
-  top: 18rem;
-  width: 20rem;
-  height: 20rem;
-  background: rgba(25, 67, 155, 0.34);
+  background: var(--page-bg);
+  color: var(--text);
+  overflow-x: clip;
 }
 
 .itemscanner-container {
@@ -211,8 +180,8 @@ const handleStatus = (event: ScannerStatusEvent) => {
   width: 2.75rem;
   height: 2.75rem;
   border-radius: 999px;
-  border: 1px solid rgba(142, 163, 193, 0.18);
-  background: rgba(10, 15, 24, 0.68);
+  border: 1px solid var(--border);
+  background: var(--surface);
   color: inherit;
 }
 
@@ -229,7 +198,7 @@ const handleStatus = (event: ScannerStatusEvent) => {
 .itemscanner-breadcrumb {
   margin-left: 0.8rem;
   font-size: 0.9rem;
-  color: rgba(230, 238, 248, 0.72);
+  color: var(--muted);
 }
 
 .itemscanner-grid {
@@ -240,9 +209,8 @@ const handleStatus = (event: ScannerStatusEvent) => {
 
 .itemscanner-card {
   border-radius: 28px;
-  border: 1px solid rgba(118, 143, 181, 0.16);
-  background: linear-gradient(180deg, rgba(15, 22, 34, 0.94) 0%, rgba(10, 15, 24, 0.98) 100%);
-  box-shadow: 0 28px 80px rgba(3, 8, 18, 0.28);
+  border: 1px solid var(--border);
+  background: var(--surface);
   padding: 1.6rem;
 }
 
@@ -252,7 +220,7 @@ const handleStatus = (event: ScannerStatusEvent) => {
   font-weight: 700;
   letter-spacing: 0.16em;
   text-transform: uppercase;
-  color: rgba(194, 206, 223, 0.7);
+  color: var(--muted);
 }
 
 .itemscanner-controls-card h1 {
@@ -264,7 +232,7 @@ const handleStatus = (event: ScannerStatusEvent) => {
 
 .itemscanner-lead {
   margin: 1rem 0 0;
-  color: rgba(226, 233, 242, 0.78);
+  color: var(--muted);
   line-height: 1.72;
 }
 
@@ -290,7 +258,7 @@ const handleStatus = (event: ScannerStatusEvent) => {
 }
 
 .itemscanner-notes span {
-  color: rgba(224, 232, 242, 0.74);
+  color: var(--muted);
 }
 
 .itemscanner-terminal-header {
@@ -301,7 +269,7 @@ const handleStatus = (event: ScannerStatusEvent) => {
 }
 
 .itemscanner-terminal-label {
-  color: rgba(160, 175, 195, 0.74);
+  color: var(--muted);
   font-size: 0.82rem;
   text-transform: uppercase;
   letter-spacing: 0.14em;
@@ -311,8 +279,8 @@ const handleStatus = (event: ScannerStatusEvent) => {
   min-height: 580px;
   margin-top: 1rem;
   border-radius: 22px;
-  border: 1px solid rgba(118, 143, 181, 0.16);
-  background: linear-gradient(180deg, rgba(6, 11, 18, 0.95) 0%, rgba(3, 8, 14, 0.99) 100%);
+  border: 1px solid var(--border);
+  background: var(--surface-2);
   padding: 1rem;
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   font-size: 0.92rem;
@@ -322,7 +290,7 @@ const handleStatus = (event: ScannerStatusEvent) => {
 
 .itemscanner-terminal-empty {
   margin: 0;
-  color: rgba(177, 195, 214, 0.6);
+  color: var(--muted);
 }
 
 .itemscanner-terminal-line {
@@ -333,7 +301,7 @@ const handleStatus = (event: ScannerStatusEvent) => {
 }
 
 .itemscanner-terminal-time {
-  color: rgba(161, 183, 203, 0.72);
+  color: var(--muted);
 }
 
 .itemscanner-terminal-level {
@@ -341,15 +309,15 @@ const handleStatus = (event: ScannerStatusEvent) => {
 }
 
 .itemscanner-terminal-success {
-  color: #67e2aa;
+  color: var(--success);
 }
 
 .itemscanner-terminal-warning {
-  color: #ffd56b;
+  color: var(--warning);
 }
 
 .itemscanner-terminal-error {
-  color: #ff8b8f;
+  color: var(--danger);
 }
 
 @media (max-width: 980px) {

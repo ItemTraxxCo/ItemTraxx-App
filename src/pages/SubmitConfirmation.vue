@@ -1,7 +1,5 @@
 <template>
   <div class="submit-confirmation-page-shell">
-    <div class="submit-confirmation-orb" aria-hidden="true"></div>
-
     <main class="submit-confirmation-layout">
       <section class="submit-confirmation-panel">
         <p class="submit-confirmation-eyebrow">Submission received</p>
@@ -40,47 +38,27 @@ import { clearSubmissionConfirmation } from "../services/submissionConfirmation"
 }
 
 html[data-theme="dark"] .submit-confirmation-page-shell {
-  --submit-page-bg:
-    radial-gradient(circle at top, rgba(25, 194, 168, 0.16), transparent 34%),
-    radial-gradient(circle at bottom right, rgba(25, 67, 155, 0.18), transparent 38%),
-    linear-gradient(180deg, #11151c 0%, #090c12 100%);
-  --submit-panel-bg: linear-gradient(180deg, #161b23 0%, #0d1117 100%);
-  --submit-orb:
-    radial-gradient(circle at 10% 25%, rgba(255, 255, 255, 0.08), transparent 26%),
-    linear-gradient(160deg, rgba(25, 194, 168, 0.16), rgba(6, 9, 15, 0.92));
-  --submit-border: rgba(70, 84, 101, 0.42);
-  --submit-eyebrow: rgba(214, 237, 233, 0.72);
-  --submit-copy: rgba(227, 234, 242, 0.82);
-  --submit-button-text: #f8fbff;
+  --submit-page-bg: #101010;
+  --submit-panel-bg: transparent;
+  --submit-border: #2f2f2c;
+  --submit-eyebrow: #a7a7a0;
+  --submit-copy: #a7a7a0;
+  --submit-button-bg: #f3f3f0;
+  --submit-button-text: #101010;
   background: var(--submit-page-bg);
+  color: #f3f3f0;
 }
 
 html[data-theme="light"] .submit-confirmation-page-shell {
-  --submit-page-bg:
-    radial-gradient(circle at top, rgba(25, 194, 168, 0.16), transparent 30%),
-    radial-gradient(circle at bottom right, rgba(25, 67, 155, 0.14), transparent 34%),
-    linear-gradient(180deg, #eef5f8 0%, #dde7ee 100%);
-  --submit-panel-bg: linear-gradient(180deg, #fbfdff 0%, #edf3f7 100%);
-  --submit-orb:
-    radial-gradient(circle at 10% 25%, rgba(255, 255, 255, 0.18), transparent 26%),
-    linear-gradient(160deg, rgba(25, 194, 168, 0.16), rgba(25, 67, 155, 0.22));
-  --submit-border: rgba(148, 163, 184, 0.34);
-  --submit-eyebrow: rgba(30, 41, 59, 0.64);
-  --submit-copy: rgba(17, 24, 39, 0.78);
-  --submit-button-text: #f8fbff;
+  --submit-page-bg: #f7f7f5;
+  --submit-panel-bg: transparent;
+  --submit-border: #d8d8d3;
+  --submit-eyebrow: #5f6368;
+  --submit-copy: #5f6368;
+  --submit-button-bg: #171717;
+  --submit-button-text: #ffffff;
   background: var(--submit-page-bg);
-}
-
-.submit-confirmation-orb {
-  position: absolute;
-  inset: auto -10% -12% 12%;
-  height: 58%;
-  border-radius: 999px;
-  background: var(--submit-orb);
-  filter: blur(2px);
-  transform: rotate(-8deg);
-  opacity: 0.9;
-  pointer-events: none;
+  color: #171717;
 }
 
 .submit-confirmation-layout {
@@ -100,10 +78,9 @@ html[data-theme="light"] .submit-confirmation-page-shell {
   display: grid;
   gap: 1rem;
   padding: 1.55rem;
-  border-radius: 24px;
+  border-radius: 0;
   background: var(--submit-panel-bg);
-  border: 1px solid var(--submit-border);
-  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.18);
+  border: 0;
 }
 
 .submit-confirmation-eyebrow {
@@ -148,9 +125,8 @@ html[data-theme="light"] .submit-confirmation-page-shell {
   font-size: 0.88rem;
   font-weight: 600;
   color: var(--submit-button-text);
-  background-image: linear-gradient(90deg, #19c2a8 0%, #19439b 100%);
-  box-shadow: 0 16px 28px rgba(25, 67, 155, 0.24);
-  transition: transform 0.16s ease, box-shadow 0.16s ease, filter 0.16s ease;
+  background: var(--submit-button-bg);
+  transition: transform 0.16s ease, filter 0.16s ease;
 }
 
 .submit-confirmation-home:hover {

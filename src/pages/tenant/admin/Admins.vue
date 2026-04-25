@@ -324,8 +324,8 @@ onUnmounted(() => {
 
 .status-pill.is-primary {
   color: rgb(93, 229, 214);
-  border-color: rgba(25, 194, 168, 0.34);
-  background: rgba(25, 194, 168, 0.12);
+  border-color: var(--border);
+  background: var(--surface-2);
 }
 
 .status-pill.is-active {

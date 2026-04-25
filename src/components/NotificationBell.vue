@@ -222,7 +222,6 @@ onUnmounted(() => {
   border: 1px solid var(--border);
   border-radius: 12px;
   background: var(--surface);
-  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.15);
   padding: 0.75rem;
   z-index: 30;
 }

@@ -757,7 +757,7 @@ onUnmounted(() => {
 .funnel-fill {
   height: 100%;
   border-radius: inherit;
-  background: linear-gradient(90deg, #1f4ca3 0%, #38d0b1 100%);
+  background: var(--text);
 }
 
 .table-wrap {

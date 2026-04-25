@@ -549,10 +549,8 @@ onUnmounted(() => {
 }
 
 .checkout-card {
-  background:
-    radial-gradient(circle at top right, color-mix(in srgb, var(--accent) 10%, transparent 90%), transparent 30%),
-    linear-gradient(180deg, color-mix(in srgb, var(--surface) 94%, transparent 6%) 0%, color-mix(in srgb, var(--surface-2) 92%, transparent 8%) 100%);
-  border-color: color-mix(in srgb, var(--border) 74%, var(--accent) 26%);
+  background: var(--surface);
+  border-color: var(--border);
 }
 
 .checkout-input-row {

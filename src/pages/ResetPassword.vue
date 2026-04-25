@@ -134,33 +134,38 @@ onUnmounted(() => {
 
 <style scoped>
 .reset-shell {
+  --reset-page-bg: #101010;
+  --reset-panel-bg: transparent;
+  --reset-text: #f3f3f0;
+  --reset-muted: #a7a7a0;
+  --reset-border: #2f2f2c;
+  --reset-input-bg: #151515;
+  --reset-button-bg: #f3f3f0;
+  --reset-button-text: #101010;
   min-height: 100vh;
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 2rem;
-  background:
-    radial-gradient(circle at top, rgba(25, 194, 168, 0.16), transparent 34%),
-    radial-gradient(circle at bottom right, rgba(25, 67, 155, 0.18), transparent 38%),
-    linear-gradient(180deg, #11151c 0%, #090c12 100%);
+  background: var(--reset-page-bg);
+  color: var(--reset-text);
 }
 
 .reset-shell.theme-light {
-  background:
-    radial-gradient(circle at top, rgba(25, 194, 168, 0.16), transparent 30%),
-    radial-gradient(circle at bottom right, rgba(25, 67, 155, 0.14), transparent 34%),
-    linear-gradient(180deg, #eef5f8 0%, #dde7ee 100%);
+  --reset-page-bg: #f7f7f5;
+  --reset-text: #171717;
+  --reset-muted: #5f6368;
+  --reset-border: #d8d8d3;
+  --reset-input-bg: #ffffff;
+  --reset-button-bg: #171717;
+  --reset-button-text: #ffffff;
 }
 
 .reset-panel {
   width: min(100%, 34rem);
   padding: 1.8rem 1.9rem 2rem;
-  border-radius: 24px;
-  border: 1px solid color-mix(in srgb, var(--border) 72%, var(--accent) 28%);
-  background:
-    radial-gradient(circle at top right, color-mix(in srgb, var(--accent) 10%, transparent 90%), transparent 28%),
-    linear-gradient(180deg, color-mix(in srgb, var(--surface) 94%, transparent 6%) 0%, color-mix(in srgb, var(--surface-2) 92%, transparent 8%) 100%);
-  box-shadow: 0 24px 48px rgba(0, 0, 0, 0.18);
+  border: 0;
+  background: var(--reset-panel-bg);
 }
 
 .reset-kicker {
@@ -168,7 +173,7 @@ onUnmounted(() => {
   font-size: 0.82rem;
   letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: var(--muted);
+  color: var(--reset-muted);
 }
 
 .reset-copy h1 {
@@ -177,10 +182,20 @@ onUnmounted(() => {
 
 .reset-subtitle {
   margin: 1rem 0 1.8rem;
-  color: var(--muted);
+  color: var(--reset-muted);
 }
 
 .reset-form input {
   min-height: 3.6rem;
+  border-radius: 999px;
+  border-color: var(--reset-border);
+  background: var(--reset-input-bg);
+  color: var(--reset-text);
+}
+
+.reset-form .button-primary {
+  border-color: var(--reset-button-bg);
+  background: var(--reset-button-bg);
+  color: var(--reset-button-text);
 }
 </style>

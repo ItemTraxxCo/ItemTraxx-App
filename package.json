@@ -29,14 +29,14 @@
   "dependencies": {
     "@posthog/react": "^1.9.0",
     "@sentry/vue": "^10.50.0",
-    "@supabase/supabase-js": "^2.104.1",
+    "@supabase/supabase-js": "^2.105.0",
     "@vercel/analytics": "^2.0.1",
     "@vercel/speed-insights": "^2.0.0",
     "jsbarcode": "^3.12.3",
     "jspdf": "^4.2.1",
     "jspdf-autotable": "^5.0.7",
-    "posthog-js": "^1.372.1",
-    "supabase": "2.95.3",
+    "posthog-js": "^1.372.3",
+    "supabase": "2.95.5",
     "vue": "^3.5.33",
     "vue-router": "^4.6.4",
     "zod": "^4.3.6"

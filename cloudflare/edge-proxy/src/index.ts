@@ -19,6 +19,7 @@ const ACCESS_TOKEN_MAX_AGE_SECONDS = 60 * 60;
 const REFRESH_TOKEN_MAX_AGE_SECONDS = 60 * 60 * 24 * 30;
 const PENTEST_HOSTNAME = "edge-pentest.itemtraxx.com";
 const PENTEST_TOKEN_HEADER = "x-itx-pentest-token";
+const AIKIDO_TURNSTILE_BYPASS_HEADER = "x-itx-aikido-turnstile-bypass";
 const DEFAULT_KILL_SWITCH_MESSAGE =
   "Unfortunately ItemTraxx is currently unavailable. We apologize for any inconvenience and are working to restore access as soon as possible. Please see the status page (https://status.itemtraxx.com/) for more information.";
 
@@ -653,6 +654,13 @@ const sanitizeRequestHeaders = (
   const userAgent = request.headers.get("user-agent");
   if (userAgent) {
     headers.set("user-agent", userAgent);
+  }
+  const scanAgentHeader = request.headers.get("aikido-scan-agent");
+  if (scanAgentHeader) {
+    headers.set("aikido-scan-agent", scanAgentHeader);
+  }
+  if (isAikidoPentestRequest(request)) {
+    headers.set(AIKIDO_TURNSTILE_BYPASS_HEADER, "1");
   }
   const forwardedFor = request.headers.get("x-forwarded-for");
   if (forwardedFor) {

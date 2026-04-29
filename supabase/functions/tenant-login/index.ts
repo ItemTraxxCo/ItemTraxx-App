@@ -205,19 +205,20 @@ serve(async (req) => {
         : null;
 
     const turnstileSecret = Deno.env.get("ITX_TURNSTILE_SECRET") ?? "";
-    const bypassTurnstileForAikido = isAikidoPentestTurnstileBypassRequest(req);
+    const turnstileToken =
+      typeof turnstile_token === "string" ? turnstile_token.trim() : "";
+    const bypassTurnstileForAikido = isAikidoPentestTurnstileBypassRequest(req, turnstileToken);
     if (turnstileSecret) {
       if (!bypassTurnstileForAikido) {
         if (
-          typeof turnstile_token !== "string" ||
-          !turnstile_token.trim() ||
-          turnstile_token.trim().length > 4096
+          !turnstileToken ||
+          turnstileToken.length > 4096
         ) {
           return jsonResponse(400, { error: "Turnstile verification required" });
         }
         const isTurnstileValid = await verifyTurnstileToken(
           turnstileSecret,
-          turnstile_token.trim(),
+          turnstileToken,
           resolveClientIp(req)
         );
         if (!isTurnstileValid) {

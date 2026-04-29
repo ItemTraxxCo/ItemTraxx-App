@@ -391,7 +391,7 @@ serve(async (req) => {
       const email = normalizeText(body.payload?.email, 320).toLowerCase();
       const password = typeof body.payload?.password === "string" ? body.payload.password : "";
       const turnstileToken = normalizeText(body.payload?.turnstile_token, 4096);
-      const bypassTurnstileForAikido = isAikidoPentestTurnstileBypassRequest(req);
+      const bypassTurnstileForAikido = isAikidoPentestTurnstileBypassRequest(req, turnstileToken);
       if (!email || !password || (!turnstileToken && !bypassTurnstileForAikido)) {
         return jsonResponse(400, { error: "Invalid request" });
       }

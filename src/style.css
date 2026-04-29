@@ -321,14 +321,66 @@ button:focus-visible {
   z-index: 1400;
   background: var(--accent);
   opacity: 0.85;
+  transform-origin: left center;
+  animation: route-progress-pulse 1.1s ease-in-out infinite;
 }
 
-@keyframes route-progress-slide {
+@keyframes route-progress-pulse {
   0% {
-    background-position: 180% 0;
+    transform: scaleX(0.18);
+    opacity: 0.45;
+  }
+  55% {
+    transform: scaleX(0.72);
+    opacity: 0.9;
   }
   100% {
-    background-position: -20% 0;
+    transform: scaleX(1);
+    opacity: 0.25;
+  }
+}
+
+.page-loading-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1390;
+  display: grid;
+  place-items: center;
+  padding: 1.5rem;
+  background: var(--page-bg);
+  background: color-mix(in srgb, var(--page-bg) 82%, transparent);
+  color: var(--text);
+}
+
+.page-loading-copy {
+  display: grid;
+  gap: 0.2rem;
+  text-align: center;
+}
+
+.page-loading-copy strong {
+  font-size: 1rem;
+  letter-spacing: -0.01em;
+}
+
+.page-loading-copy span {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.page-loading-mark {
+  width: 2rem;
+  height: 2rem;
+  margin: 0 auto 0.85rem;
+  border: 2px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 999px;
+  animation: page-loading-spin 0.9s linear infinite;
+}
+
+@keyframes page-loading-spin {
+  to {
+    transform: rotate(360deg);
   }
 }
 

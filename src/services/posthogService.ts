@@ -2,17 +2,46 @@ import posthog from "posthog-js";
 
 let initialized = false;
 
+const isCspUnsafeEvalError = (error: unknown) => {
+  const message = error instanceof Error ? error.message : "";
+  return (
+    message.includes("Refused to evaluate a string as JavaScript") &&
+    message.includes("unsafe-eval") &&
+    message.includes("Content Security Policy")
+  );
+};
+
 export const initPostHog = () => {
   if (initialized) return;
   const token = import.meta.env.VITE_POSTHOG_PROJECT_TOKEN?.trim();
   if (!token) return;
   try {
-    posthog.init(token, {
-      api_host: import.meta.env.VITE_POSTHOG_HOST,
+    const posthogConfig: NonNullable<Parameters<typeof posthog.init>[1]> = {
+      api_host: import.meta.env.VITE_POSTHOG_HOST?.trim() || "https://us.i.posthog.com",
       defaults: "2026-01-30",
-      // PostHog's client-side feature-flag condition evaluation uses `eval()` in some cases.
-      // We intentionally keep CSP strict (no `unsafe-eval`), and we are not using feature flags here.
+      autocapture: false,
+      rageclick: false,
+      capture_pageview: false,
+      capture_pageleave: false,
+      capture_dead_clicks: false,
+      capture_exceptions: false,
+      disable_session_recording: true,
+      disable_surveys: true,
+      disable_surveys_automatic_display: true,
+      disable_product_tours: true,
+      disable_conversations: true,
+      disable_web_experiments: true,
+      disable_external_dependency_loading: true,
+      advanced_disable_flags: true,
+      advanced_disable_decide: true,
       advanced_disable_feature_flags: true,
+    };
+
+    posthog.init(token, {
+      ...posthogConfig,
+      loaded: () => {
+        initialized = true;
+      },
     });
     initialized = true;
   } catch (error) {
@@ -26,7 +55,11 @@ export const capturePostHogEvent = (
   properties?: Record<string, string | number | boolean | null | undefined>
 ) => {
   if (!initialized) return;
-  posthog.capture(event, properties);
+  try {
+    posthog.capture(event, properties);
+  } catch (error) {
+    console.warn("[posthog] capture failed; continuing without analytics.", error);
+  }
 };
 
 export const identifyPostHogUser = (
@@ -34,15 +67,27 @@ export const identifyPostHogUser = (
   properties?: Record<string, string | number | boolean | null | undefined>
 ) => {
   if (!initialized) return;
-  posthog.identify(distinctId, properties);
+  try {
+    posthog.identify(distinctId, properties);
+  } catch (error) {
+    console.warn("[posthog] identify failed; continuing without analytics.", error);
+  }
 };
 
 export const resetPostHog = () => {
   if (!initialized) return;
-  posthog.reset();
+  try {
+    posthog.reset();
+  } catch (error) {
+    console.warn("[posthog] reset failed; continuing without analytics.", error);
+  }
 };
 
 export const capturePostHogException = (error: unknown) => {
-  if (!initialized) return;
-  posthog.captureException(error);
+  if (!initialized || isCspUnsafeEvalError(error)) return;
+  try {
+    posthog.captureException(error);
+  } catch (captureError) {
+    console.warn("[posthog] exception capture failed; continuing without analytics.", captureError);
+  }
 };

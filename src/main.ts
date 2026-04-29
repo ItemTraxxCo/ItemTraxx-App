@@ -29,6 +29,7 @@ import {
 } from "./services/perfTelemetry";
 import { initializeDistrictContext } from "./services/districtService";
 import { rotateDeviceSession } from "./utils/deviceSession";
+import { finishRouteLoading, startRouteLoading } from "./store/routeLoading";
 
 declare global {
   interface Window {
@@ -238,11 +239,16 @@ const bindConsentDrivenMonitoring = (app: ReturnType<typeof createApp>) => {
 const mountApp = async () => {
   markRouteNavigationStart();
   router.beforeEach((_to, _from, next) => {
+    startRouteLoading();
     markRouteNavigationStart();
     next();
   });
   router.afterEach((to) => {
     markRouteNavigationEnd(to.fullPath);
+    finishRouteLoading();
+  });
+  router.onError(() => {
+    finishRouteLoading();
   });
 
   const app = createApp(App);

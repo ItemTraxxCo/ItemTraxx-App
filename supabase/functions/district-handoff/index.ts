@@ -7,6 +7,7 @@ import {
   resolveClientIp,
   verifyTurnstileToken,
 } from "../_shared/preloginGuards.ts";
+import { isAikidoPentestTurnstileBypassRequest } from "../_shared/aikidoPentest.ts";
 import { isAllowedOrigin, parseAllowedOrigins } from "../_shared/cors.ts";
 
 type ProfileRow = {
@@ -28,7 +29,7 @@ type TenantLookupRow = {
 
 const baseCorsHeaders = {
   "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-request-id",
+    "authorization, x-client-info, apikey, content-type, x-request-id, aikido-scan-agent",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
   Vary: "Origin",
 };
@@ -212,7 +213,8 @@ serve(async (req) => {
           ? body.current_district_slug.trim().toLowerCase()
           : "";
 
-      if (!email || !password || !turnstileToken) {
+      const bypassTurnstileForAikido = isAikidoPentestTurnstileBypassRequest(req);
+      if (!email || !password || (!turnstileToken && !bypassTurnstileForAikido)) {
         return jsonResponse(400, { error: "Invalid request" }, headers);
       }
 
@@ -270,14 +272,20 @@ serve(async (req) => {
         );
       }
 
-      const turnstileValid = await verifyTurnstileToken(
-        turnstileSecret,
-        turnstileToken,
-        clientIp,
-        "district-handoff create_admin",
-      );
-      if (!turnstileValid) {
-        return jsonResponse(403, { error: "Turnstile verification failed" }, headers);
+      if (!bypassTurnstileForAikido) {
+        const turnstileValid = await verifyTurnstileToken(
+          turnstileSecret,
+          turnstileToken,
+          clientIp,
+          "district-handoff create_admin",
+        );
+        if (!turnstileValid) {
+          return jsonResponse(403, { error: "Turnstile verification failed" }, headers);
+        }
+      } else {
+        console.info("district-handoff create_admin bypassed turnstile for vetted Aikido scan traffic", {
+          client_ip: clientIp || "unknown",
+        });
       }
 
       const userClient = createClient(supabaseUrl, publishableKey, {

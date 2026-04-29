@@ -24,7 +24,7 @@ const DEFAULT_KILL_SWITCH_MESSAGE =
 
 const BASE_CORS_HEADERS = {
   "Access-Control-Allow-Headers":
-    `authorization, x-client-info, apikey, content-type, x-request-id, prefer, x-itx-session-request, ${PENTEST_TOKEN_HEADER}`,
+    `authorization, x-client-info, apikey, content-type, x-request-id, prefer, x-itx-session-request, aikido-scan-agent, ${PENTEST_TOKEN_HEADER}`,
   "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
   "Access-Control-Allow-Credentials": "true",
   "Access-Control-Expose-Headers": "content-range, content-profile, x-request-id",

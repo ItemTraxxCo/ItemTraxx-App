@@ -43,6 +43,26 @@ const DEFAULT_ALLOWED_ORIGINS = [
   "https://preview.itemtraxx.com",
 ];
 
+const AIKIDO_PENTEST_IPS = new Set([
+  "34.252.102.184",
+  "52.48.122.82",
+  "52.49.182.62",
+  "52.209.168.11",
+  "52.210.210.125",
+  "54.76.103.212",
+  "54.194.175.200",
+  "54.217.255.121",
+  "3.226.27.188",
+  "34.237.95.50",
+  "44.209.154.183",
+  "52.204.120.162",
+  "54.80.175.207",
+  "54.227.161.94",
+  "98.88.145.68",
+  "98.91.68.215",
+  "79.127.239.171",
+]);
+
 type SessionCookies = {
   accessToken: string | null;
   refreshToken: string | null;
@@ -314,6 +334,17 @@ const hasValidPentestToken = (request: Request, env: Env) => {
   const expected = env.PENTEST_PROXY_TOKEN?.trim();
   if (!expected) return false;
   return request.headers.get(PENTEST_TOKEN_HEADER) === expected;
+};
+
+const isAikidoPentestRequest = (request: Request) => {
+  const clientIp = request.headers.get("cf-connecting-ip")?.trim();
+  if (!clientIp || !AIKIDO_PENTEST_IPS.has(clientIp)) {
+    return false;
+  }
+
+  const userAgent = (request.headers.get("user-agent") ?? "").toLowerCase();
+  const scanAgentHeader = (request.headers.get("aikido-scan-agent") ?? "").toLowerCase();
+  return userAgent.includes("aikido-pentest-agent") || scanAgentHeader.includes("aikido-pentest-agent");
 };
 
 const buildError = (
@@ -965,6 +996,15 @@ export default {
 
       if (!originAllowed) {
         return buildError(403, "Origin not allowed", headers, requestId);
+      }
+
+      if (url.pathname === "/turnstile-policy" && request.method === "GET") {
+        return buildJson(
+          200,
+          { bypass_turnstile: isAikidoPentestRequest(request) },
+          headers,
+          requestId
+        );
       }
 
       if (!env.SUPABASE_URL || !env.SUPABASE_ANON_KEY) {

@@ -2,10 +2,11 @@ import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { isAllowedOrigin, parseAllowedOrigins } from "../_shared/cors.ts";
 import { resolveClientFingerprint, resolveClientIp } from "../_shared/preloginGuards.ts";
+import { isAikidoPentestTurnstileBypassRequest } from "../_shared/aikidoPentest.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-request-id",
+    "authorization, x-client-info, apikey, content-type, x-request-id, aikido-scan-agent",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
   Vary: "Origin",
 };
@@ -78,42 +79,6 @@ const isLocalhostMaintenanceBypassRequest = (req: Request) => {
   } catch {
     return false;
   }
-};
-
-const resolveAikidoBypassConfig = () => {
-  const environment = (Deno.env.get("ITX_ENVIRONMENT") ?? "").trim().toLowerCase();
-  const bypassEnabled =
-    (Deno.env.get("ITX_AIKIDO_TURNSTILE_BYPASS_ENABLED") ?? "").toLowerCase() ===
-    "true";
-  const allowedIps = new Set(
-    (Deno.env.get("ITX_AIKIDO_ALLOWED_IPS") ?? "")
-      .split(",")
-      .map((item) => item.trim())
-      .filter(Boolean)
-  );
-  const userAgentNeedle = (Deno.env.get("ITX_AIKIDO_USER_AGENT_NEEDLE") ?? "")
-    .trim()
-    .toLowerCase();
-  const bypassEnvironmentAllowed =
-    environment === "development" || environment === "staging";
-  return { bypassEnabled, allowedIps, userAgentNeedle, bypassEnvironmentAllowed };
-};
-
-const isAikidoTurnstileBypassRequest = (req: Request) => {
-  const { bypassEnabled, allowedIps, userAgentNeedle, bypassEnvironmentAllowed } =
-    resolveAikidoBypassConfig();
-  if (!bypassEnabled || !bypassEnvironmentAllowed || !allowedIps.size || !userAgentNeedle) {
-    return false;
-  }
-
-  const clientIp = resolveClientIp(req);
-  if (!clientIp || !allowedIps.has(clientIp)) return false;
-
-  const userAgent = (req.headers.get("user-agent") ?? "").toLowerCase();
-  const scanAgentHeader = (req.headers.get("aikido-scan-agent") ?? "").toLowerCase();
-  const hasExpectedAgent =
-    userAgent.includes(userAgentNeedle) || scanAgentHeader.includes(userAgentNeedle);
-  return hasExpectedAgent;
 };
 
 const verifyTurnstileToken = async (
@@ -240,7 +205,7 @@ serve(async (req) => {
         : null;
 
     const turnstileSecret = Deno.env.get("ITX_TURNSTILE_SECRET") ?? "";
-    const bypassTurnstileForAikido = isAikidoTurnstileBypassRequest(req);
+    const bypassTurnstileForAikido = isAikidoPentestTurnstileBypassRequest(req);
     if (turnstileSecret) {
       if (!bypassTurnstileForAikido) {
         if (

@@ -1,4 +1,5 @@
 import { onMounted, onUnmounted, ref, type Ref } from "vue";
+import { AIKIDO_TURNSTILE_BYPASS_TOKEN, isAikidoPentestUserAgent } from "../utils/aikidoPentest";
 
 type RenderOptions = {
   sitekey: string;
@@ -53,6 +54,7 @@ export const useTurnstile = (siteKey?: string) => {
   const token = ref("");
   const isReady = ref(false);
   const loadError = ref("");
+  const isBypassed = isAikidoPentestUserAgent();
   let widgetId: string | null = null;
   let bootTimer: number | null = null;
 
@@ -98,7 +100,7 @@ export const useTurnstile = (siteKey?: string) => {
 
   const reset = () => {
     if (!widgetId || !window.turnstile) {
-      token.value = "";
+      token.value = isBypassed ? AIKIDO_TURNSTILE_BYPASS_TOKEN : "";
       return;
     }
     try {
@@ -106,10 +108,17 @@ export const useTurnstile = (siteKey?: string) => {
     } catch {
       // Keep login flow resilient even if Turnstile script glitches.
     }
-    token.value = "";
+    token.value = isBypassed ? AIKIDO_TURNSTILE_BYPASS_TOKEN : "";
   };
 
   onMounted(() => {
+    if (isBypassed) {
+      token.value = AIKIDO_TURNSTILE_BYPASS_TOKEN;
+      isReady.value = true;
+      loadError.value = "";
+      return;
+    }
+
     if (!siteKey) {
       return;
     }
@@ -151,6 +160,7 @@ export const useTurnstile = (siteKey?: string) => {
     token,
     isReady,
     loadError,
+    isBypassed,
     reset,
   };
 };

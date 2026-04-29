@@ -213,7 +213,7 @@ serve(async (req) => {
           ? body.current_district_slug.trim().toLowerCase()
           : "";
 
-      const bypassTurnstileForAikido = isAikidoPentestTurnstileBypassRequest(req);
+      const bypassTurnstileForAikido = isAikidoPentestTurnstileBypassRequest(req, turnstileToken);
       if (!email || !password || (!turnstileToken && !bypassTurnstileForAikido)) {
         return jsonResponse(400, { error: "Invalid request" }, headers);
       }

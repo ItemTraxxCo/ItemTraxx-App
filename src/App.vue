@@ -12,6 +12,19 @@
   >
     <div v-if="isRouteNavigating" class="route-progress" aria-hidden="true"></div>
     <div
+      v-if="showPageLoading"
+      class="page-loading-overlay"
+      role="status"
+      aria-live="polite"
+      aria-label="Loading page"
+    >
+      <div class="page-loading-mark" aria-hidden="true"></div>
+      <div class="page-loading-copy">
+        <strong>Loading...</strong>
+        <span>Preparing your tracking experience.</span>
+      </div>
+    </div>
+    <div
       v-if="showMaintenanceBanner"
       ref="maintenanceBannerRef"
       class="maintenance-top-banner"
@@ -293,6 +306,7 @@ import { fetchSystemStatus } from "./services/systemStatusService";
 import { fetchHttpSessionSummary } from "./services/httpSessionService";
 import { clearAdminVerification, clearAuthState, getAuthState } from "./store/authState";
 import { getDistrictState } from "./store/districtState";
+import { getRouteLoadingState } from "./store/routeLoading";
 import { clearSessionTermination, getSessionTerminationState, showSessionTermination } from "./store/sessionTermination";
 import { resolveRecoveryRouteFromPath } from "./services/appErrorRecovery";
 import { getOrCreateDeviceSession } from "./utils/deviceSession";
@@ -320,6 +334,7 @@ const SpeedInsights = defineAsyncComponent(async () => {
 
 const auth = getAuthState();
 const district = getDistrictState();
+const routeLoading = getRouteLoadingState();
 const router = useRouter();
 const route = useRoute();
 const menuOpen = ref(false);
@@ -362,13 +377,14 @@ const latestVersion = ref<string | null>(null);
 const forceUpdateOverlay = ref(false);
 const showTelemetry = ref(false);
 const cookieConsent = ref<CookieConsentState | null>(null);
-const isRouteNavigating = ref(false);
+const isRouteNavigating = computed(() => routeLoading.isLoading);
+const showPageLoading = ref(false);
 let statusTimer: number | null = null;
 let versionTimer: number | null = null;
 let adminIdleTimer: number | null = null;
 let deferredStatusTimer: number | null = null;
 let deferredVersionTimer: number | null = null;
-let routeProgressTimer: number | null = null;
+let pageLoadingTimer: number | null = null;
 let adminSessionTimer: number | null = null;
 let offlineQueueTimer: number | null = null;
 let sessionHeartbeatTimer: number | null = null;
@@ -1295,16 +1311,22 @@ onMounted(() => {
 });
 
 watch(
-  () => route.fullPath,
-  () => {
-    isRouteNavigating.value = true;
-    if (routeProgressTimer) {
-      window.clearTimeout(routeProgressTimer);
+  () => routeLoading.isLoading,
+  (isLoading) => {
+    if (pageLoadingTimer) {
+      window.clearTimeout(pageLoadingTimer);
+      pageLoadingTimer = null;
     }
-    routeProgressTimer = window.setTimeout(() => {
-      isRouteNavigating.value = false;
-      routeProgressTimer = null;
-    }, 280);
+
+    if (!isLoading) {
+      showPageLoading.value = false;
+      return;
+    }
+
+    pageLoadingTimer = window.setTimeout(() => {
+      showPageLoading.value = true;
+      pageLoadingTimer = null;
+    }, 350);
   }
 );
 
@@ -1413,9 +1435,9 @@ onUnmounted(() => {
     window.clearTimeout(deferredVersionTimer);
     deferredVersionTimer = null;
   }
-  if (routeProgressTimer) {
-    window.clearTimeout(routeProgressTimer);
-    routeProgressTimer = null;
+  if (pageLoadingTimer) {
+    window.clearTimeout(pageLoadingTimer);
+    pageLoadingTimer = null;
   }
   if (sessionTerminationRedirectTimer) {
     window.clearTimeout(sessionTerminationRedirectTimer);

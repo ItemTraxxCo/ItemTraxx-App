@@ -11,6 +11,7 @@ import {
   resolveClientIp,
   verifyTurnstileToken,
 } from "../_shared/preloginGuards.ts";
+import { isAikidoPentestTurnstileBypassRequest } from "../_shared/aikidoPentest.ts";
 import { registerPrivilegedStepUp } from "../_shared/privilegedStepUp.ts";
 import { isAllowedOrigin, parseAllowedOrigins } from "../_shared/cors.ts";
 
@@ -18,7 +19,7 @@ const EMAIL_LOGO_URL = Deno.env.get("ITX_EMAIL_LOGO_URL")?.trim() || null;
 
 const baseCorsHeaders = {
   "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-request-id",
+    "authorization, x-client-info, apikey, content-type, x-request-id, aikido-scan-agent",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
   Vary: "Origin",
 };
@@ -390,7 +391,8 @@ serve(async (req) => {
       const email = normalizeText(body.payload?.email, 320).toLowerCase();
       const password = typeof body.payload?.password === "string" ? body.payload.password : "";
       const turnstileToken = normalizeText(body.payload?.turnstile_token, 4096);
-      if (!email || !password || !turnstileToken) {
+      const bypassTurnstileForAikido = isAikidoPentestTurnstileBypassRequest(req);
+      if (!email || !password || (!turnstileToken && !bypassTurnstileForAikido)) {
         return jsonResponse(400, { error: "Invalid request" });
       }
       if (!turnstileSecret) {
@@ -436,14 +438,20 @@ serve(async (req) => {
         return jsonResponse(429, { error: "Too many requests. Please try again shortly." });
       }
 
-      const turnstileValid = await verifyTurnstileToken(
-        turnstileSecret,
-        turnstileToken,
-        clientIp,
-        "super-auth-verify start_password_login"
-      );
-      if (!turnstileValid) {
-        return jsonResponse(403, { error: "Turnstile verification failed" });
+      if (!bypassTurnstileForAikido) {
+        const turnstileValid = await verifyTurnstileToken(
+          turnstileSecret,
+          turnstileToken,
+          clientIp,
+          "super-auth-verify start_password_login"
+        );
+        if (!turnstileValid) {
+          return jsonResponse(403, { error: "Turnstile verification failed" });
+        }
+      } else {
+        logInfo("super-auth-verify bypassed turnstile for vetted Aikido scan traffic", requestId, {
+          client_ip: clientIp || "unknown",
+        });
       }
 
       const loginClient = createClient(supabaseUrl, publishableKey, {

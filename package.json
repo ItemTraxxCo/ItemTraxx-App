@@ -29,14 +29,14 @@
   "dependencies": {
     "@posthog/react": "^1.9.0",
     "@sentry/vue": "^10.50.0",
-    "@supabase/supabase-js": "^2.104.1",
+    "@supabase/supabase-js": "^2.105.1",
     "@vercel/analytics": "^2.0.1",
     "@vercel/speed-insights": "^2.0.0",
     "jsbarcode": "^3.12.3",
     "jspdf": "^4.2.1",
     "jspdf-autotable": "^5.0.7",
-    "posthog-js": "^1.372.1",
-    "supabase": "2.95.3",
+    "posthog-js": "^1.372.5",
+    "supabase": "2.95.6",
     "vue": "^3.5.33",
     "vue-router": "^4.6.4",
     "zod": "^4.3.6"
@@ -50,7 +50,7 @@
     "typescript": "~6.0.3",
     "vite": "^8.0.10",
     "vue-tsc": "^3.2.7",
-    "wrangler": "^4.85.0",
+    "wrangler": "^4.86.0",
     "zod-to-json-schema": "^3.25.2"
   },
   "overrides": {

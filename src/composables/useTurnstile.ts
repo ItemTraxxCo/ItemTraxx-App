@@ -1,5 +1,9 @@
 import { onMounted, onUnmounted, ref, type Ref } from "vue";
-import { AIKIDO_TURNSTILE_BYPASS_TOKEN, isAikidoPentestUserAgent } from "../utils/aikidoPentest";
+import {
+  AIKIDO_TURNSTILE_BYPASS_TOKEN,
+  isAikidoPentestUserAgent,
+  shouldBypassTurnstileForAikido,
+} from "../utils/aikidoPentest";
 
 type RenderOptions = {
   sitekey: string;
@@ -54,7 +58,7 @@ export const useTurnstile = (siteKey?: string) => {
   const token = ref("");
   const isReady = ref(false);
   const loadError = ref("");
-  const isBypassed = isAikidoPentestUserAgent();
+  let isBypassed = isAikidoPentestUserAgent();
   let widgetId: string | null = null;
   let bootTimer: number | null = null;
 
@@ -111,14 +115,14 @@ export const useTurnstile = (siteKey?: string) => {
     token.value = isBypassed ? AIKIDO_TURNSTILE_BYPASS_TOKEN : "";
   };
 
-  onMounted(() => {
-    if (isBypassed) {
-      token.value = AIKIDO_TURNSTILE_BYPASS_TOKEN;
-      isReady.value = true;
-      loadError.value = "";
-      return;
-    }
+  const applyBypass = () => {
+    isBypassed = true;
+    token.value = AIKIDO_TURNSTILE_BYPASS_TOKEN;
+    isReady.value = true;
+    loadError.value = "";
+  };
 
+  const loadWidget = () => {
     if (!siteKey) {
       return;
     }
@@ -145,6 +149,21 @@ export const useTurnstile = (siteKey?: string) => {
         token.value = "";
         loadError.value = "Unable to load the security check. Check your connection and try again.";
       });
+  };
+
+  onMounted(() => {
+    if (isBypassed) {
+      applyBypass();
+      return;
+    }
+
+    void shouldBypassTurnstileForAikido().then((shouldBypass) => {
+      if (shouldBypass) {
+        applyBypass();
+        return;
+      }
+      loadWidget();
+    });
   });
 
   onUnmounted(() => {

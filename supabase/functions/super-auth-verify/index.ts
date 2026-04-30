@@ -14,6 +14,7 @@ import {
 import { isAikidoPentestTurnstileBypassRequest } from "../_shared/aikidoPentest.ts";
 import { registerPrivilegedStepUp } from "../_shared/privilegedStepUp.ts";
 import { isAllowedOrigin, parseAllowedOrigins } from "../_shared/cors.ts";
+import { requireTrustedEdgeIngress } from "../_shared/trustedIngress.ts";
 
 const EMAIL_LOGO_URL = Deno.env.get("ITX_EMAIL_LOGO_URL")?.trim() || null;
 
@@ -361,6 +362,9 @@ serve(async (req) => {
   if (req.method !== "POST") {
     return jsonResponse(405, { error: "Method not allowed" });
   }
+
+  const ingressError = await requireTrustedEdgeIngress(req, "super-auth-verify", jsonResponse);
+  if (ingressError) return ingressError;
 
   try {
     const body = (await req.json().catch(() => ({}))) as RequestBody;

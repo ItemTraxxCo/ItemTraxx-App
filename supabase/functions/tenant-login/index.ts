@@ -3,6 +3,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { isAllowedOrigin, parseAllowedOrigins } from "../_shared/cors.ts";
 import { resolveClientFingerprint, resolveClientIp } from "../_shared/preloginGuards.ts";
 import { isAikidoPentestTurnstileBypassRequest } from "../_shared/aikidoPentest.ts";
+import { requireTrustedEdgeIngress } from "../_shared/trustedIngress.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Headers":
@@ -188,12 +189,18 @@ serve(async (req) => {
     return jsonResponse(403, { error: "Origin not allowed" });
   }
 
+  const ingressError = await requireTrustedEdgeIngress(req, "tenant-login", jsonResponse);
+  if (ingressError) return ingressError;
+
   try {
-    const { access_code, turnstile_token, district_slug } = await req.json();
+    const { access_code, password, turnstile_token, district_slug } = await req.json();
     if (
       typeof access_code !== "string" ||
       !access_code.trim() ||
-      access_code.trim().length > 64
+      access_code.trim().length > 64 ||
+      typeof password !== "string" ||
+      !password ||
+      password.length > 1024
     ) {
       return jsonResponse(400, { error: "Invalid request" });
     }
@@ -233,9 +240,10 @@ serve(async (req) => {
     }
 
     const supabaseUrl = Deno.env.get("ITX_SUPABASE_URL");
+    const publishableKey = Deno.env.get("ITX_PUBLISHABLE_KEY");
     const serviceKey = Deno.env.get("ITX_SECRET_KEY");
 
-    if (!supabaseUrl || !serviceKey) {
+    if (!supabaseUrl || !publishableKey || !serviceKey) {
       return jsonResponse(500, { error: "Server misconfiguration" });
     }
 
@@ -350,7 +358,7 @@ serve(async (req) => {
 
     const { data: profiles, error: profileError } = await adminClient
       .from("profiles")
-      .select("auth_email, role")
+      .select("auth_email, role, is_active")
       .eq("tenant_id", tenant.id)
       .in("role", ["tenant_user", "tenant_admin"]);
 
@@ -359,10 +367,41 @@ serve(async (req) => {
     }
 
     const selectedProfile =
-      profiles.find((profile) => profile.role === "tenant_user") ?? profiles[0];
+      profiles.find((profile) => profile.role === "tenant_user" && profile.is_active !== false) ??
+      profiles.find((profile) => profile.is_active !== false);
 
     if (!selectedProfile?.auth_email) {
       return jsonResponse(401, { error: "Unauthorized" });
+    }
+
+    const loginClient = createClient(supabaseUrl, publishableKey, {
+      auth: { persistSession: false },
+    });
+    const signIn = await loginClient.auth.signInWithPassword({
+      email: selectedProfile.auth_email,
+      password,
+    });
+    if (
+      signIn.error ||
+      !signIn.data.user?.id ||
+      !signIn.data.session?.access_token ||
+      !signIn.data.session.refresh_token
+    ) {
+      return jsonResponse(401, { error: "Invalid credentials" });
+    }
+
+    const { data: signedInProfile } = await adminClient
+      .from("profiles")
+      .select("tenant_id, role, is_active")
+      .eq("id", signIn.data.user.id)
+      .maybeSingle();
+
+    if (
+      signedInProfile?.tenant_id !== tenant.id ||
+      (signedInProfile?.role !== "tenant_user" && signedInProfile?.role !== "tenant_admin") ||
+      signedInProfile?.is_active === false
+    ) {
+      return jsonResponse(401, { error: "Invalid credentials" });
     }
 
     let resolvedDistrictSlug = normalizedDistrictSlug;
@@ -379,7 +418,8 @@ serve(async (req) => {
     }
 
     return jsonResponse(200, {
-      auth_email: selectedProfile.auth_email,
+      access_token: signIn.data.session.access_token,
+      refresh_token: signIn.data.session.refresh_token,
       district_slug: resolvedDistrictSlug,
     });
   } catch (error) {

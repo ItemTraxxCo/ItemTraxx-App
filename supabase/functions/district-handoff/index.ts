@@ -9,6 +9,7 @@ import {
 } from "../_shared/preloginGuards.ts";
 import { isAikidoPentestTurnstileBypassRequest } from "../_shared/aikidoPentest.ts";
 import { isAllowedOrigin, parseAllowedOrigins } from "../_shared/cors.ts";
+import { requireTrustedEdgeIngress } from "../_shared/trustedIngress.ts";
 
 type ProfileRow = {
   role: string | null;
@@ -77,6 +78,11 @@ serve(async (req) => {
   if (req.method !== "POST") {
     return jsonResponse(405, { error: "Method not allowed" }, headers);
   }
+
+  const ingressError = await requireTrustedEdgeIngress(req, "district-handoff", (status, body) =>
+    jsonResponse(status, body, headers)
+  );
+  if (ingressError) return ingressError;
 
   try {
     const supabaseUrl = Deno.env.get("ITX_SUPABASE_URL");

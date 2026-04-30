@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { isKillSwitchWriteBlocked } from "../_shared/killSwitch.ts";
 import { isAllowedOrigin, parseAllowedOrigins } from "../_shared/cors.ts";
+import { requireTrustedEdgeIngress } from "../_shared/trustedIngress.ts";
 
 const baseCorsHeaders = {
   "Access-Control-Allow-Headers":
@@ -13,6 +14,15 @@ const baseCorsHeaders = {
 type RateLimitResult = {
   allowed: boolean;
   retry_after_seconds: number | null;
+};
+
+type SupabaseAdminClient = ReturnType<typeof createClient<any, "public", any>>;
+
+type StudentRecord = {
+  id: string;
+  tenant_id: string;
+  username: string;
+  student_id: string;
 };
 
 const CODENAME_PREFIXES = [
@@ -248,7 +258,7 @@ const generateUsername = () => {
 };
 
 const buildUniqueStudentIdentity = async (
-  adminClient: ReturnType<typeof createClient>,
+  adminClient: SupabaseAdminClient,
   tenantId: string
 ) => {
   for (let attempt = 0; attempt < 12; attempt += 1) {
@@ -261,7 +271,7 @@ const buildUniqueStudentIdentity = async (
       .eq("student_id", candidateStudentId)
       .limit(1)
       .maybeSingle();
-    if (conflictStudentId?.id) {
+    if ((conflictStudentId as { id?: string } | null)?.id) {
       continue;
     }
     const { data: conflictUsername } = await adminClient
@@ -271,12 +281,70 @@ const buildUniqueStudentIdentity = async (
       .eq("username", candidateUsername)
       .limit(1)
       .maybeSingle();
-    if (conflictUsername?.id) {
+    if ((conflictUsername as { id?: string } | null)?.id) {
       continue;
     }
     return { studentId: candidateStudentId, username: candidateUsername };
   }
   throw new Error("Unable to generate a unique borrower identity.");
+};
+
+const isUniqueIdentityConflict = (error: unknown) => {
+  const record = error as { code?: string; message?: string; details?: string } | null;
+  const message = `${record?.message ?? ""} ${record?.details ?? ""}`.toLowerCase();
+  return (
+    record?.code === "23505" ||
+    message.includes("unique") ||
+    message.includes("duplicate") ||
+    message.includes("borrower identity already exists")
+  );
+};
+
+const createStudentRecord = async (
+  adminClient: SupabaseAdminClient,
+  tenantId: string,
+  username: string,
+  studentId: string
+) => {
+  const { data, error } = await (adminClient as any)
+    .rpc("create_student_identity", {
+      p_tenant_id: tenantId,
+      p_username: username,
+      p_student_id: studentId,
+    })
+    .single();
+
+  if (error || !data) {
+    return { data: null, error };
+  }
+
+  return { data: data as StudentRecord, error: null };
+};
+
+const createGeneratedStudentRecord = async (
+  adminClient: SupabaseAdminClient,
+  tenantId: string
+) => {
+  for (let attempt = 0; attempt < 12; attempt += 1) {
+    const generatedIdentity = await buildUniqueStudentIdentity(adminClient, tenantId);
+    const result = await createStudentRecord(
+      adminClient,
+      tenantId,
+      generatedIdentity.username,
+      generatedIdentity.studentId
+    );
+    if (result.data) {
+      return result;
+    }
+    if (!isUniqueIdentityConflict(result.error)) {
+      return result;
+    }
+  }
+
+  return {
+    data: null,
+    error: new Error("Unable to generate a unique borrower identity."),
+  };
 };
 
 const resolveCorsHeaders = (req: Request) => {
@@ -336,6 +404,15 @@ serve(async (req) => {
 
   if (hasOrigin && !originAllowed) {
     return jsonResponse(403, { error: "Origin not allowed" });
+  }
+
+  const ingressError = await requireTrustedEdgeIngress(
+    req,
+    "admin-student-mutate",
+    jsonResponse
+  );
+  if (ingressError) {
+    return ingressError;
   }
 
   if (isKillSwitchWriteBlocked(req)) {
@@ -476,6 +553,7 @@ serve(async (req) => {
             .select("id")
             .eq("tenant_id", profile.tenant_id)
             .eq("student_id", studentId)
+            .is("deleted_at", null)
             .limit(1)
             .maybeSingle(),
           adminClient
@@ -483,35 +561,24 @@ serve(async (req) => {
             .select("id")
             .eq("tenant_id", profile.tenant_id)
             .eq("username", username)
+            .is("deleted_at", null)
             .limit(1)
             .maybeSingle(),
         ]);
         if (idConflictResult.data?.id || usernameConflictResult.data?.id) {
-          studentId = "";
-          username = "";
+          return jsonResponse(409, { error: "Borrower ID or username already exists." });
         }
       }
 
-      if (!studentId || !username) {
-        const generatedIdentity = await buildUniqueStudentIdentity(
-          adminClient,
-          profile.tenant_id
-        );
-        studentId = generatedIdentity.studentId;
-        username = generatedIdentity.username;
-      }
-
-      const { data, error } = await adminClient
-        .from("students")
-        .insert({
-          tenant_id: profile.tenant_id,
-          username,
-          student_id: studentId,
-        })
-        .select("id, tenant_id, username, student_id")
-        .single();
+      const { data, error } =
+        studentId && username
+          ? await createStudentRecord(adminClient, profile.tenant_id, username, studentId)
+          : await createGeneratedStudentRecord(adminClient, profile.tenant_id);
 
       if (error || !data) {
+        if (isUniqueIdentityConflict(error)) {
+          return jsonResponse(409, { error: "Borrower ID or username already exists." });
+        }
         return jsonResponse(400, { error: "Unable to create student." });
       }
 
@@ -562,6 +629,7 @@ serve(async (req) => {
               .from("students")
               .select("student_id")
               .eq("tenant_id", profile.tenant_id)
+              .is("deleted_at", null)
               .in("student_id", requestedIds)
           : Promise.resolve({ data: [], error: null }),
         requestedUsernames.length
@@ -569,6 +637,7 @@ serve(async (req) => {
               .from("students")
               .select("username")
               .eq("tenant_id", profile.tenant_id)
+              .is("deleted_at", null)
               .in("username", requestedUsernames)
           : Promise.resolve({ data: [], error: null }),
       ]);
@@ -612,40 +681,38 @@ serve(async (req) => {
         }
 
         if (!studentId || !username) {
-          try {
-            const generated = await buildUniqueStudentIdentity(
-              adminClient,
-              profile.tenant_id
-            );
-            studentId = generated.studentId;
-            username = generated.username;
-          } catch {
+          const generated = await createGeneratedStudentRecord(
+            adminClient,
+            profile.tenant_id
+          );
+          if (!generated.data) {
             skipped.push({ row: row.row, reason: "Unable to generate identity." });
             continue;
           }
-        }
-
-        const { data, error } = await adminClient
-          .from("students")
-          .insert({
-            tenant_id: profile.tenant_id,
-            username,
-            student_id: studentId,
-          })
-          .select("id, tenant_id, username, student_id")
-          .single();
-
-        if (error || !data) {
-          skipped.push({ row: row.row, reason: "Insert failed." });
+          inserted.push(generated.data);
+          seenIds.add(generated.data.student_id);
+          seenUsernames.add(generated.data.username.toLowerCase());
           continue;
         }
 
-        inserted.push(data as {
-          id: string;
-          tenant_id: string;
-          username: string;
-          student_id: string;
-        });
+        const { data, error } = await createStudentRecord(
+          adminClient,
+          profile.tenant_id,
+          username,
+          studentId
+        );
+
+        if (error || !data) {
+          skipped.push({
+            row: row.row,
+            reason: isUniqueIdentityConflict(error)
+              ? "Borrower ID or username already exists."
+              : "Insert failed.",
+          });
+          continue;
+        }
+
+        inserted.push(data);
         seenIds.add(studentId);
         seenUsernames.add(username.toLowerCase());
       }
@@ -718,6 +785,43 @@ serve(async (req) => {
       const normalizedId = typeof id === "string" ? id.trim() : "";
       if (!normalizedId) {
         return jsonResponse(400, { error: "Invalid request" });
+      }
+
+      const { data: archivedStudent, error: archivedStudentError } = await adminClient
+        .from("students")
+        .select("id, username, student_id")
+        .eq("id", normalizedId)
+        .eq("tenant_id", profile.tenant_id)
+        .not("deleted_at", "is", null)
+        .maybeSingle();
+
+      if (archivedStudentError || !archivedStudent?.id) {
+        return jsonResponse(404, { error: "Student not found." });
+      }
+
+      const [idConflictResult, usernameConflictResult] = await Promise.all([
+        adminClient
+          .from("students")
+          .select("id")
+          .eq("tenant_id", profile.tenant_id)
+          .eq("student_id", archivedStudent.student_id)
+          .neq("id", normalizedId)
+          .is("deleted_at", null)
+          .limit(1)
+          .maybeSingle(),
+        adminClient
+          .from("students")
+          .select("id")
+          .eq("tenant_id", profile.tenant_id)
+          .eq("username", archivedStudent.username)
+          .neq("id", normalizedId)
+          .is("deleted_at", null)
+          .limit(1)
+          .maybeSingle(),
+      ]);
+
+      if (idConflictResult.data?.id || usernameConflictResult.data?.id) {
+        return jsonResponse(409, { error: "Borrower ID or username already exists." });
       }
 
       const { data, error } = await adminClient

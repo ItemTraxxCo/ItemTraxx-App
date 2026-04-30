@@ -6,6 +6,8 @@ import {
   isMissingPrivilegedStepUpTable,
 } from "../_shared/privilegedStepUp.ts";
 import { isAllowedOrigin, parseAllowedOrigins } from "../_shared/cors.ts";
+import { requireTrustedEdgeIngress } from "../_shared/trustedIngress.ts";
+import { validateTenantAdminDeviceSession } from "../_shared/tenantAdminSessions.ts";
 
 const baseCorsHeaders = {
   "Access-Control-Allow-Headers":
@@ -45,6 +47,15 @@ const resolveResetRedirectTo = (req: Request) => {
 };
 
 const randomPassword = () => `${crypto.randomUUID()}-Aa1!`;
+const TENANT_ADMIN_INVITE_ACCEPTED_MESSAGE =
+  "If this email is eligible, a tenant admin invitation will be sent.";
+
+const sanitizeText = (value: unknown, maxLen: number) => {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  return trimmed.slice(0, maxLen);
+};
 
 serve(async (req) => {
   const { hasOrigin, originAllowed, headers } = resolveCorsHeaders(req);
@@ -65,6 +76,9 @@ serve(async (req) => {
   if (hasOrigin && !originAllowed) {
     return jsonResponse(403, { error: "Origin not allowed" });
   }
+
+  const ingressError = await requireTrustedEdgeIngress(req, "tenant-admin-mutate", jsonResponse);
+  if (ingressError) return ingressError;
 
   if (isKillSwitchWriteBlocked(req)) {
     return jsonResponse(503, { error: "Unfortunately ItemTraxx is currently unavailable." });
@@ -146,10 +160,11 @@ serve(async (req) => {
     );
 
     if (rateLimitError) {
-      console.warn("tenant-admin-mutate rate limit unavailable", {
+      console.error("tenant-admin-mutate rate limit unavailable", {
         message: rateLimitError.message,
         code: (rateLimitError as { code?: string }).code,
       });
+      return jsonResponse(500, { error: "Rate limit check failed" });
     } else {
       const rateLimitResult = rateLimit as RateLimitResult;
       if (!rateLimitResult.allowed) {
@@ -192,6 +207,21 @@ serve(async (req) => {
       return jsonResponse(400, { error: "Invalid request" });
     }
     const next = payload as Record<string, unknown>;
+    const deviceId = sanitizeText(next.device_id, 128);
+    const activeSession = await validateTenantAdminDeviceSession(adminClient, {
+      tenantId: requesterProfile.tenant_id,
+      profileId: requesterProfile.id,
+      deviceId,
+      authToken,
+    });
+    if (activeSession.relationMissing) {
+      return jsonResponse(503, {
+        error: "Session controls unavailable. Run latest SQL setup.",
+      });
+    }
+    if (!activeSession.valid) {
+      return jsonResponse(401, { error: "Session revoked" });
+    }
 
     if (action === "list_tenant_admins") {
       const { data: admins, error } = await adminClient
@@ -240,29 +270,27 @@ serve(async (req) => {
         return jsonResponse(400, { error: "Invalid request" });
       }
 
+      const acceptedInviteResponse = () =>
+        jsonResponse(200, {
+          data: {
+            success: true,
+            auth_email: authEmail,
+            message: TENANT_ADMIN_INVITE_ACCEPTED_MESSAGE,
+          },
+        });
+
       const { data: existingProfile } = await adminClient
         .from("profiles")
-        .select("id, role, tenant_id")
+        .select("id")
         .eq("auth_email", authEmail)
         .maybeSingle();
 
-      if (existingProfile?.role === "super_admin") {
-        return jsonResponse(409, {
-          error: "This email is already used by a super admin account.",
+      if (existingProfile?.id) {
+        console.info("tenant-admin-mutate invite skipped for existing profile", {
+          tenant_id: requesterProfile.tenant_id,
+          actor_id: requesterProfile.id,
         });
-      }
-      if (existingProfile?.role === "district_admin") {
-        return jsonResponse(409, {
-          error: "This email is already used by a district admin account.",
-        });
-      }
-      if (existingProfile?.role === "tenant_admin") {
-        return jsonResponse(409, {
-          error:
-            existingProfile.tenant_id === requesterProfile.tenant_id
-              ? "A tenant admin with this email already exists."
-              : "This email is already assigned to another tenant admin account.",
-        });
+        return acceptedInviteResponse();
       }
 
       const { data: createdAuth, error: createUserError } = await adminClient.auth.admin.createUser(
@@ -280,12 +308,14 @@ serve(async (req) => {
           message.includes("registered") ||
           message.includes("exists")
         ) {
-          return jsonResponse(409, {
-            error: "An account with this email already exists.",
+          console.info("tenant-admin-mutate invite skipped for existing auth user", {
+            tenant_id: requesterProfile.tenant_id,
+            actor_id: requesterProfile.id,
           });
+          return acceptedInviteResponse();
         }
         return jsonResponse(400, {
-          error: createUserError?.message || "Unable to create auth user.",
+          error: "Unable to process tenant admin invitation.",
         });
       }
 
@@ -306,7 +336,7 @@ serve(async (req) => {
       if (insertProfileError || !createdProfile) {
         await adminClient.auth.admin.deleteUser(userId);
         return jsonResponse(400, {
-          error: insertProfileError?.message || "Unable to create tenant admin profile.",
+          error: "Unable to process tenant admin invitation.",
         });
       }
 
@@ -327,7 +357,7 @@ serve(async (req) => {
         await adminClient.from("profiles").delete().eq("id", userId);
         await adminClient.auth.admin.deleteUser(userId);
         return jsonResponse(400, {
-          error: `Unable to send password setup email. ${resetError.message}`,
+          error: "Unable to send tenant admin invitation.",
         });
       }
 

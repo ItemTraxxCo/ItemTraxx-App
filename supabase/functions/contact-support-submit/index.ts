@@ -4,6 +4,7 @@ import { isKillSwitchWriteBlocked } from "../_shared/killSwitch.ts";
 import { getRequestId, logError, logInfo } from "../_shared/observability.ts";
 import { isAllowedOrigin, parseAllowedOrigins } from "../_shared/cors.ts";
 import { resolveClientIp } from "../_shared/preloginGuards.ts";
+import { requireTrustedEdgeIngress } from "../_shared/trustedIngress.ts";
 
 const baseCorsHeaders = {
   "Access-Control-Allow-Headers":
@@ -239,6 +240,9 @@ serve(async (req) => {
     return jsonResponse(403, { error: "Origin not allowed" });
   }
 
+  const ingressError = await requireTrustedEdgeIngress(req, "contact-support-submit", jsonResponse);
+  if (ingressError) return ingressError;
+
   if (isKillSwitchWriteBlocked(req)) {
     return jsonResponse(503, { error: "Unfortunately ItemTraxx is currently unavailable." });
   }
@@ -284,6 +288,32 @@ serve(async (req) => {
     if (!turnstileToken) {
       return jsonResponse(400, { error: "Security check required." });
     }
+
+    const adminClient = createClient(supabaseUrl, serviceKey, {
+      auth: { persistSession: false },
+    });
+
+    const clientIp = resolveClientIp(req);
+    const fingerprintSource = `${clientIp}|${req.headers.get("user-agent") ?? ""}`;
+    const fingerprint = await hashString(fingerprintSource);
+
+    const { data: rateLimit, error: rateLimitError } = await adminClient.rpc(
+      "consume_rate_limit_prelogin",
+      {
+        p_key: fingerprint,
+        p_scope: "contact_support_submit",
+        p_limit: 5,
+        p_window_seconds: 3600,
+      },
+    );
+    if (rateLimitError) {
+      return jsonResponse(500, { error: "Rate limit check failed." });
+    }
+    const rateLimitResult = rateLimit as RateLimitResult;
+    if (!rateLimitResult.allowed) {
+      return jsonResponse(429, { error: "Too many requests. Please try again later." });
+    }
+
     if (attachmentsRaw.length > 2) {
       return jsonResponse(400, { error: "Attach up to 2 images." });
     }
@@ -323,31 +353,6 @@ serve(async (req) => {
         size_bytes: bytes.length,
         bytes,
       });
-    }
-
-    const adminClient = createClient(supabaseUrl, serviceKey, {
-      auth: { persistSession: false },
-    });
-
-    const clientIp = resolveClientIp(req);
-    const fingerprintSource = `${clientIp}|${replyEmail}|${req.headers.get("user-agent") ?? ""}`;
-    const fingerprint = await hashString(fingerprintSource);
-
-    const { data: rateLimit, error: rateLimitError } = await adminClient.rpc(
-      "consume_rate_limit_prelogin",
-      {
-        p_key: fingerprint,
-        p_scope: "contact_support_submit",
-        p_limit: 5,
-        p_window_seconds: 3600,
-      },
-    );
-    if (rateLimitError) {
-      return jsonResponse(500, { error: "Rate limit check failed." });
-    }
-    const rateLimitResult = rateLimit as RateLimitResult;
-    if (!rateLimitResult.allowed) {
-      return jsonResponse(429, { error: "Too many requests. Please try again later." });
     }
 
     const verified = await verifyTurnstileToken(turnstileSecret, turnstileToken, clientIp);

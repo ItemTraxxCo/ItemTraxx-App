@@ -2,6 +2,12 @@ import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { isKillSwitchWriteBlocked } from "../_shared/killSwitch.ts";
 import { isAllowedOrigin, parseAllowedOrigins } from "../_shared/cors.ts";
+import {
+  hasPrivilegedStepUp,
+  isMissingPrivilegedStepUpTable,
+} from "../_shared/privilegedStepUp.ts";
+import { requireTrustedEdgeIngress } from "../_shared/trustedIngress.ts";
+import { isTenantAdminTokenBlockedBySessionRevocation } from "../_shared/tenantAdminSessions.ts";
 
 const baseCorsHeaders = {
   "Access-Control-Allow-Headers":
@@ -258,6 +264,9 @@ serve(async (req) => {
     return jsonResponse(403, { error: "Origin not allowed" });
   }
 
+  const ingressError = await requireTrustedEdgeIngress(req, "admin-ops", jsonResponse);
+  if (ingressError) return ingressError;
+
   if (isKillSwitchWriteBlocked(req)) {
     return jsonResponse(503, { error: "Unfortunately ItemTraxx is currently unavailable." });
   }
@@ -267,6 +276,7 @@ serve(async (req) => {
     if (!authHeader) {
       return jsonResponse(401, { error: "Unauthorized" });
     }
+    const authToken = authHeader.replace(/^Bearer\s+/i, "").trim();
 
     const supabaseUrl = Deno.env.get("ITX_SUPABASE_URL");
     const publishableKey = Deno.env.get("ITX_PUBLISHABLE_KEY");
@@ -449,11 +459,15 @@ serve(async (req) => {
           }
         }
       } else {
-        const activeSession = await findActiveSession();
-        if (activeSession.relationMissing) {
+        const tokenBlock = await isTenantAdminTokenBlockedBySessionRevocation(adminClient, {
+          tenantId,
+          profileId: user.id,
+          authToken,
+        });
+        if (tokenBlock.relationMissing) {
           return { ok: false as const, relationMissing: true as const, reason: "missing_table" };
         }
-        if (activeSession.revoked) {
+        if (tokenBlock.blocked) {
           return { ok: false as const, relationMissing: false as const, reason: "revoked" };
         }
         const baseInsert = {
@@ -507,6 +521,21 @@ serve(async (req) => {
         if (activeSession.revoked) {
           return jsonResponse(401, { error: "Session revoked" });
         }
+        return jsonResponse(401, { error: "Session revoked" });
+      }
+    }
+
+    if (
+      profile.role === "tenant_admin" &&
+      (action === "list_sessions" || action === "revoke_session" || action === "revoke_all_sessions")
+    ) {
+      const activeSession = await findActiveSession();
+      if (activeSession.relationMissing) {
+        return jsonResponse(503, {
+          error: "Session controls unavailable. Run latest SQL setup.",
+        });
+      }
+      if (!activeSession.exists) {
         return jsonResponse(401, { error: "Session revoked" });
       }
     }
@@ -671,6 +700,23 @@ serve(async (req) => {
       }
       if (isTenantSuspended) {
         return jsonResponse(403, { error: "Tenant disabled" });
+      }
+      try {
+        const hasStepUp = await hasPrivilegedStepUp(adminClient, {
+          userId: user.id,
+          roleScope: "tenant_admin",
+          authToken,
+        });
+        if (!hasStepUp) {
+          return jsonResponse(403, { error: "Admin verification required." });
+        }
+      } catch (error) {
+        if (isMissingPrivilegedStepUpTable(error as { code?: string; message?: string })) {
+          return jsonResponse(503, {
+            error: "Privileged verification controls unavailable. Run latest SQL setup.",
+          });
+        }
+        throw error;
       }
 
       const next = payloadRecord;

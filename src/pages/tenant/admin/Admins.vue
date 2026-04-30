@@ -220,7 +220,7 @@ const handleCreate = async () => {
   try {
     await createTenantManagedAdmin({ auth_email: authEmail });
     createEmail.value = "";
-    showToast("Admin invited", "Password setup email sent to the new tenant admin.");
+    showToast("Invitation accepted", "If this email is eligible, a tenant admin invitation will be sent.");
     await loadAdmins();
   } catch (err) {
     showToast("Create failed", toUserFacingErrorMessage(err, "Unable to invite tenant admin."));

@@ -8,6 +8,7 @@ import {
 } from "../_shared/preloginGuards.ts";
 import { getRequestId, logError, logInfo } from "../_shared/observability.ts";
 import { isAllowedOrigin, parseAllowedOrigins } from "../_shared/cors.ts";
+import { requireTrustedEdgeIngress } from "../_shared/trustedIngress.ts";
 
 const baseCorsHeaders = {
   "Access-Control-Allow-Headers":
@@ -158,8 +159,12 @@ serve(async (req) => {
     return jsonResponse(403, { error: "Origin not allowed" });
   }
 
+  const ingressError = await requireTrustedEdgeIngress(req, "client-error-report", jsonResponse);
+  if (ingressError) return ingressError;
+
   try {
     const supabaseUrl = Deno.env.get("ITX_SUPABASE_URL");
+    const publishableKey = Deno.env.get("ITX_PUBLISHABLE_KEY");
     const serviceKey = Deno.env.get("ITX_SECRET_KEY");
     const slackWebhookUrl =
       Deno.env.get("ITX_CLIENT_ERROR_SLACK_WEBHOOK_URL")?.trim() ||
@@ -179,7 +184,7 @@ serve(async (req) => {
     const fingerprint = resolveClientFingerprint(req, origin);
     const ip = resolveClientIp(req);
     const requestHash = await hashString(
-      `${fingerprint}|${normalizeText(req.headers.get("user-agent"), 255)}|${normalizeText(origin, 255)}`
+      `${fingerprint}|${normalizeText(req.headers.get("user-agent"), 255)}`
     );
 
     const rateLimit = await enforcePreloginRateLimit(
@@ -208,9 +213,33 @@ serve(async (req) => {
     const environment = normalizeText(body.page?.environment, 40) || "unknown";
     const release = normalizeText(body.page?.release, 80) || "n/a";
     const userAgent = normalizeText(body.page?.user_agent, 255);
-    const authRole = normalizeText(body.auth?.role, 40) || "none";
-    const tenantContextId = normalizeText(body.auth?.tenant_context_id, 80) || "-";
-    const districtContextId = normalizeText(body.auth?.district_context_id, 80) || "-";
+    let isVerifiedAuthenticated = false;
+    let authRole = "none";
+    let tenantContextId = "-";
+    let districtContextId = "-";
+    const authHeader = req.headers.get("authorization");
+    if (authHeader && publishableKey) {
+      const userClient = createClient(supabaseUrl, publishableKey, {
+        global: { headers: { Authorization: authHeader } },
+        auth: { persistSession: false },
+      });
+      const {
+        data: { user },
+      } = await userClient.auth.getUser();
+      if (user?.id) {
+        const { data: profile } = await userClient
+          .from("profiles")
+          .select("role, tenant_id, district_id")
+          .eq("id", user.id)
+          .maybeSingle();
+        if (profile?.role) {
+          isVerifiedAuthenticated = true;
+          authRole = normalizeText(profile.role, 40) || "authenticated";
+          tenantContextId = normalizeText(profile.tenant_id, 80) || "-";
+          districtContextId = normalizeText(profile.district_id, 80) || "-";
+        }
+      }
+    }
     const consoleLines = formatConsoleLines(Array.isArray(body.diagnostics?.console) ? body.diagnostics?.console : []);
     const networkLines = formatNetworkLines(Array.isArray(body.diagnostics?.network) ? body.diagnostics?.network : []);
     const ipHash = ip ? await hashString(ip) : null;
@@ -228,7 +257,7 @@ serve(async (req) => {
         environment: environment || null,
         release: release || null,
         user_agent: userAgent || null,
-        is_authenticated: !!body.auth?.is_authenticated,
+        is_authenticated: isVerifiedAuthenticated,
         auth_role: authRole === "none" ? null : authRole,
         tenant_context_id: tenantContextId === "-" ? null : tenantContextId,
         district_context_id: districtContextId === "-" ? null : districtContextId,
@@ -258,7 +287,7 @@ serve(async (req) => {
       `Environment: ${environment}\n` +
       `Release: ${release}\n` +
       `Page: ${pageUrl || "-"}\n` +
-      `Role: ${authRole}\n` +
+      `Role: ${authRole}${isVerifiedAuthenticated ? "" : " (unverified)"}\n` +
       `Tenant Context: ${tenantContextId}\n` +
       `District Context: ${districtContextId}\n` +
       `Client Fingerprint: ${fingerprint}\n` +

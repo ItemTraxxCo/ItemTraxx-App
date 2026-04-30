@@ -395,7 +395,7 @@ export const tenantAdminManageResponseSchemas = {
       primary_admin_profile_id: z.string().uuid().nullable(),
     })
   ),
-  create_tenant_admin: edgeEnvelopeSchema(z.object({ success: z.boolean(), auth_email: z.string().email() })),
+  create_tenant_admin: edgeEnvelopeSchema(z.object({ success: z.boolean(), auth_email: z.string().email(), message: z.string().optional() })),
   set_admin_status: edgeEnvelopeSchema(tenantManagedAdminSchema),
   update_admin_email: edgeEnvelopeSchema(tenantManagedAdminSchema),
   send_tenant_admin_reset: edgeEnvelopeSchema(z.object({ success: z.boolean() })),

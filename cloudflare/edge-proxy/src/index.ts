@@ -1,6 +1,7 @@
 export interface Env {
   SUPABASE_URL: string;
   SUPABASE_ANON_KEY: string;
+  ITX_EDGE_PROXY_SHARED_SECRET?: string;
   ALLOWED_ORIGINS?: string;
   ALLOWED_FUNCTIONS?: string;
   PENTEST_PROXY_TOKEN?: string;
@@ -8,6 +9,8 @@ export interface Env {
   ITX_ITEMTRAXX_KILLSWITCH_ENABLED?: string;
   ITX_ITEMTRAXX_KILLSWITCH_MESSAGE?: string;
   SESSION_COOKIE_DOMAIN?: string;
+  SESSION_COOKIE_SAMESITE?: string;
+  SESSION_REFRESH_COOKIE_MAX_AGE_SECONDS?: string;
   SENTRY_DSN?: string;
   SENTRY_ENVIRONMENT?: string;
 }
@@ -16,10 +19,14 @@ const ACCESS_COOKIE_NAME = "itx_session";
 const REFRESH_COOKIE_NAME = "itx_refresh";
 const REFRESH_GRANT_TYPE = "refresh_token";
 const ACCESS_TOKEN_MAX_AGE_SECONDS = 60 * 60;
-const REFRESH_TOKEN_MAX_AGE_SECONDS = 60 * 60 * 24 * 30;
+const REFRESH_TOKEN_DEFAULT_MAX_AGE_SECONDS = 60 * 60 * 24 * 14;
+const REFRESH_TOKEN_MAX_ALLOWED_AGE_SECONDS = 60 * 60 * 24 * 14;
 const PENTEST_HOSTNAME = "edge-pentest.itemtraxx.com";
 const PENTEST_TOKEN_HEADER = "x-itx-pentest-token";
 const AIKIDO_TURNSTILE_BYPASS_HEADER = "x-itx-aikido-turnstile-bypass";
+const EDGE_PROXY_HEADER = "x-itx-edge-proxy";
+const EDGE_PROXY_TIMESTAMP_HEADER = "x-itx-edge-proxy-ts";
+const EDGE_PROXY_SIGNATURE_HEADER = "x-itx-edge-proxy-signature";
 const DEFAULT_KILL_SWITCH_MESSAGE =
   "Unfortunately ItemTraxx is currently unavailable. We apologize for any inconvenience and are working to restore access as soon as possible. Please see the status page (https://status.itemtraxx.com/) for more information.";
 
@@ -29,6 +36,7 @@ const BASE_CORS_HEADERS = {
   "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
   "Access-Control-Allow-Credentials": "true",
   "Access-Control-Expose-Headers": "content-range, content-profile, x-request-id",
+  "Strict-Transport-Security": "max-age=31536000; includeSubDomains",
   Vary: "Origin",
 };
 const DEFAULT_ALLOWED_ORIGINS = [
@@ -43,6 +51,41 @@ const DEFAULT_ALLOWED_ORIGINS = [
   "https://dev.itemtraxx.com",
   "https://preview.itemtraxx.com",
 ];
+
+const toHex = (bytes: Uint8Array) =>
+  Array.from(bytes)
+    .map((byte) => byte.toString(16).padStart(2, "0"))
+    .join("");
+
+const signTrustedIngress = async (secret: string, message: string) => {
+  const key = await crypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(secret),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"]
+  );
+  const signature = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(message));
+  return toHex(new Uint8Array(signature));
+};
+
+const applyTrustedIngressHeaders = async (
+  headers: Headers,
+  env: Env,
+  requestId: string,
+  target: string
+) => {
+  const secret = env.ITX_EDGE_PROXY_SHARED_SECRET?.trim();
+  if (!secret) return;
+
+  const timestamp = Date.now().toString();
+  headers.set(EDGE_PROXY_HEADER, "1");
+  headers.set(EDGE_PROXY_TIMESTAMP_HEADER, timestamp);
+  headers.set(
+    EDGE_PROXY_SIGNATURE_HEADER,
+    await signTrustedIngress(secret, `${timestamp}.${requestId}.${target}`)
+  );
+};
 
 const AIKIDO_PENTEST_IPS = new Set([
   "34.252.102.184",
@@ -416,6 +459,21 @@ const parseCookies = (request: Request): SessionCookies => {
   };
 };
 
+const resolveSessionCookieSameSite = (env: Env) => {
+  const configured = env.SESSION_COOKIE_SAMESITE?.trim().toLowerCase();
+  if (configured === "strict") return "Strict";
+  if (configured === "none") return "None";
+  return "Lax";
+};
+
+const resolveRefreshCookieMaxAgeSeconds = (env: Env) => {
+  const configured = Number(env.SESSION_REFRESH_COOKIE_MAX_AGE_SECONDS?.trim());
+  if (Number.isFinite(configured) && configured > 0) {
+    return Math.min(Math.floor(configured), REFRESH_TOKEN_MAX_ALLOWED_AGE_SECONDS);
+  }
+  return REFRESH_TOKEN_DEFAULT_MAX_AGE_SECONDS;
+};
+
 const appendCookie = (
   headers: Headers,
   name: string,
@@ -429,7 +487,7 @@ const appendCookie = (
     `Max-Age=${maxAgeSeconds}`,
     "HttpOnly",
     "Secure",
-    "SameSite=None",
+    `SameSite=${resolveSessionCookieSameSite(env)}`,
   ];
   const domain = env.SESSION_COOKIE_DOMAIN?.trim();
   if (domain) {
@@ -445,7 +503,7 @@ const clearCookie = (headers: Headers, name: string, env: Env) => {
     "Max-Age=0",
     "HttpOnly",
     "Secure",
-    "SameSite=None",
+    `SameSite=${resolveSessionCookieSameSite(env)}`,
   ];
   const domain = env.SESSION_COOKIE_DOMAIN?.trim();
   if (domain) {
@@ -460,7 +518,7 @@ const setSessionCookies = (
   session: { accessToken: string; refreshToken: string }
 ) => {
   appendCookie(headers, ACCESS_COOKIE_NAME, session.accessToken, env, ACCESS_TOKEN_MAX_AGE_SECONDS);
-  appendCookie(headers, REFRESH_COOKIE_NAME, session.refreshToken, env, REFRESH_TOKEN_MAX_AGE_SECONDS);
+  appendCookie(headers, REFRESH_COOKIE_NAME, session.refreshToken, env, resolveRefreshCookieMaxAgeSeconds(env));
 };
 
 const clearSessionCookies = (headers: Headers, env: Env) => {
@@ -779,6 +837,7 @@ const proxyFunctionRequest = async (
       functionName,
       sessionAccessToken
     );
+    await applyTrustedIngressHeaders(proxiedHeaders, env, requestId, functionName);
 
     const init: RequestInit = {
       method: request.method,
@@ -1028,9 +1087,13 @@ export default {
         return response;
       }
 
-      if (isRestProxyPath(url.pathname) || isRpcProxyPath(url.pathname)) {
+      if (isRpcProxyPath(url.pathname)) {
+        return buildError(403, "RPC proxy access is not allowed", headers, requestId);
+      }
+
+      if (isRestProxyPath(url.pathname)) {
         const response = await proxySupabaseApiRequest(request, env, headers, requestId, url.pathname);
-        maybeReportWorkerResponse(env, request, requestId, response, ctx, { type: isRpcProxyPath(url.pathname) ? "rpc" : "rest", path: url.pathname });
+        maybeReportWorkerResponse(env, request, requestId, response, ctx, { type: "rest", path: url.pathname });
         return response;
       }
 

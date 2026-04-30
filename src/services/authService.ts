@@ -1,6 +1,6 @@
 import { supabase } from "./supabaseClient";
 import { invokeEdgeFunction } from "./edgeFunctionClient";
-import { TimeoutError, withTimeout } from "./asyncUtils";
+import { withTimeout } from "./asyncUtils";
 import {
   clearAdminVerification,
   clearAuthState,
@@ -70,6 +70,8 @@ const SUPER_ADMIN_2FA_FUNCTION = normalizeFunctionTarget(
 );
 let pendingSuperAdminVerificationEmail: string | null = null;
 let pendingSuperAdminChallengeToken: string | null = null;
+
+const RAW_HANDOFF_TOKEN_PARAMS = ["itx_at", "itx_rt"];
 
 const sendLoginNotification = (accessToken: string | null) => {
   if (!accessToken) return;
@@ -430,14 +432,20 @@ export const tenantLogin = async (
 ) => {
   const functionName = getTenantLoginFunctionName();
   const district = getDistrictState();
-  const result = await invokeEdgeFunction<{ auth_email?: string; district_slug?: string | null }, {
+  const result = await invokeEdgeFunction<{
+    access_token?: string | null;
+    refresh_token?: string | null;
+    district_slug?: string | null;
+  }, {
     access_code: string;
+    password: string;
     turnstile_token?: string;
     district_slug?: string;
   }>(functionName, {
     method: "POST",
     body: {
       access_code: accessCode,
+      password,
       ...(turnstileToken ? { turnstile_token: turnstileToken } : {}),
       ...(district.isDistrictHost && district.slug ? { district_slug: district.slug } : {}),
     },
@@ -460,7 +468,7 @@ export const tenantLogin = async (
   }
 
   const data = result.data;
-  if (!data?.auth_email) {
+  if (!data?.access_token || !data?.refresh_token) {
     throw new Error("Invalid tenant access code.");
   }
 
@@ -469,39 +477,9 @@ export const tenantLogin = async (
     typeof data.district_slug === "string" &&
     !!data.district_slug.trim();
 
-  let signInError: unknown = null;
-  let accessToken: string | null = null;
-  let refreshToken: string | null = null;
-  try {
-    const signIn = await withTimeout(
-      supabase.auth.signInWithPassword({
-        email: data.auth_email,
-        password,
-      }),
-      AUTH_QUERY_TIMEOUT_MS,
-      "Sign in timed out."
-    );
-    signInError = signIn.error;
-    accessToken = signIn.data.session?.access_token ?? null;
-    refreshToken = signIn.data.session?.refresh_token ?? null;
-  } catch (requestError) {
-    if (requestError instanceof TimeoutError) {
-      throw new Error("Sign in timed out. Please try again.");
-    }
-    throw requestError;
-  }
-
-  if (signInError) {
-    throw new Error("Invalid credentials.");
-  }
-
-  if (!accessToken || !refreshToken) {
-    throw new Error("Invalid credentials.");
-  }
-
   const exchangedSessionSummary = await exchangeHttpSession({
-    access_token: accessToken,
-    refresh_token: refreshToken,
+    access_token: data.access_token,
+    refresh_token: data.refresh_token,
   });
   await clearLocalSession();
   const sessionSummary =
@@ -536,14 +514,14 @@ export const tenantLogin = async (
     (await resolveDistrictSlug(current.districtContextId));
 
   if (!shouldCrossHostRedirect) {
-    sendLoginNotification(accessToken);
+    sendLoginNotification(data.access_token);
   }
 
   return {
     districtId: current.districtContextId ?? null,
     districtSlug: districtSlug || null,
-    accessToken,
-    refreshToken,
+    accessToken: data.access_token,
+    refreshToken: data.refresh_token,
   };
 };
 
@@ -567,8 +545,7 @@ export const consumeDistrictSessionHandoff = async (): Promise<
   const params = new URLSearchParams(hash);
   const handoffCode = params.get("itx_hc");
   const tokenHash = params.get("itx_th");
-  const accessToken = params.get("itx_at");
-  const refreshToken = params.get("itx_rt");
+  const hasRawTokenParams = RAW_HANDOFF_TOKEN_PARAMS.some((key) => params.has(key));
   const rawLoginMethod = params.get("itx_lm");
   const rawLoginLocation = params.get("itx_ll");
   const loginMethod =
@@ -582,22 +559,26 @@ export const consumeDistrictSessionHandoff = async (): Promise<
       ? rawLoginLocation
       : null;
 
-  if (!handoffCode && !tokenHash && (!accessToken || !refreshToken)) {
+  if (!handoffCode && !tokenHash && !hasRawTokenParams) {
     return false;
   }
 
   params.delete("itx_hc");
   params.delete("itx_th");
-  params.delete("itx_at");
-  params.delete("itx_rt");
+  RAW_HANDOFF_TOKEN_PARAMS.forEach((key) => params.delete(key));
   params.delete("itx_lm");
   params.delete("itx_ll");
   const nextHash = params.toString();
   const nextUrl = `${window.location.pathname}${window.location.search}${nextHash ? `#${nextHash}` : ""}`;
   window.history.replaceState({}, document.title, nextUrl);
 
-  let finalAccessToken = accessToken;
-  let finalRefreshToken = refreshToken;
+  if (!handoffCode && !tokenHash) {
+    console.warn("Ignored deprecated raw district handoff token parameters.");
+    return false;
+  }
+
+  let finalAccessToken: string | null = null;
+  let finalRefreshToken: string | null = null;
 
   if (tokenHash) {
     const verifyResult = await supabase.auth.verifyOtp({

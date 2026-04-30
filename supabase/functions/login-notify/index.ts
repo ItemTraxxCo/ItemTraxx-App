@@ -5,7 +5,8 @@ import { buildEmailBrandHeaderHtml } from "../_shared/emailBranding.ts";
 import { isKillSwitchWriteBlocked } from "../_shared/killSwitch.ts";
 import { getRequestId, logError, logInfo } from "../_shared/observability.ts";
 import { isAllowedOrigin, parseAllowedOrigins } from "../_shared/cors.ts";
-import { resolveClientIp } from "../_shared/preloginGuards.ts";
+import { hashString, resolveClientIp } from "../_shared/preloginGuards.ts";
+import { requireTrustedEdgeIngress } from "../_shared/trustedIngress.ts";
 
 const EMAIL_LOGO_URL = Deno.env.get("ITX_EMAIL_LOGO_URL")?.trim() || null;
 
@@ -14,6 +15,11 @@ const baseCorsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-request-id",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
   Vary: "Origin",
+};
+
+type RateLimitResult = {
+  allowed: boolean;
+  retry_after_seconds: number | null;
 };
 
 const resolveCorsHeaders = (req: Request) => {
@@ -182,6 +188,9 @@ serve(async (req) => {
     return jsonResponse(403, { error: "Origin not allowed" });
   }
 
+  const ingressError = await requireTrustedEdgeIngress(req, "login-notify", jsonResponse);
+  if (ingressError) return ingressError;
+
   if (isKillSwitchWriteBlocked(req)) {
     return jsonResponse(503, { error: "Unfortunately ItemTraxx is currently unavailable." });
   }
@@ -222,6 +231,43 @@ serve(async (req) => {
 
     if (userError || !user) {
       return jsonResponse(401, { error: "Unauthorized" });
+    }
+
+    const clientIp = normalizeIp(req);
+    const rateLimitKey = await hashString(
+      `${user.id}|${clientIp ?? ""}|${req.headers.get("user-agent") ?? ""}`
+    );
+    const { data: rateLimit, error: rateLimitError } = await adminClient.rpc(
+      "consume_rate_limit_prelogin",
+      {
+        p_key: rateLimitKey,
+        p_scope: "login_notify",
+        p_limit: 3,
+        p_window_seconds: 600,
+      },
+    );
+    if (rateLimitError) {
+      logError("login-notify rate limit failed", requestId, rateLimitError);
+      return jsonResponse(500, { error: "Rate limit check failed" });
+    }
+    const rateLimitResult = rateLimit as RateLimitResult;
+    if (!rateLimitResult.allowed) {
+      const retryAfter = rateLimitResult.retry_after_seconds ?? 600;
+      return new Response(
+        JSON.stringify({
+          ok: false,
+          error: "Too many login notifications. Please try again later.",
+        }),
+        {
+          status: 429,
+          headers: {
+            ...headers,
+            "Content-Type": "application/json",
+            "x-request-id": requestId,
+            "Retry-After": String(Math.max(1, retryAfter)),
+          },
+        },
+      );
     }
 
     const { data: profile, error: profileError } = await adminClient
@@ -285,6 +331,40 @@ serve(async (req) => {
       return jsonResponse(200, { data: { queued: false, skipped: true, reason: "missing_recipient" } });
     }
 
+    const cooldownSince = new Date(Date.now() - 60_000).toISOString();
+    const { data: recentNotification, error: recentNotificationError } = await adminClient
+      .from("email_delivery_logs")
+      .select("id")
+      .eq("email_type", "login_notification")
+      .eq("triggered_by_user_id", user.id)
+      .gte("created_at", cooldownSince)
+      .in("status", ["queued", "sent"])
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (recentNotificationError) {
+      logError("login-notify cooldown check failed", requestId, recentNotificationError);
+      return jsonResponse(500, { error: "Rate limit check failed" });
+    }
+    if (recentNotification?.id) {
+      return new Response(
+        JSON.stringify({
+          ok: false,
+          error: "Too many login notifications. Please try again later.",
+        }),
+        {
+          status: 429,
+          headers: {
+            ...headers,
+            "Content-Type": "application/json",
+            "x-request-id": requestId,
+            "Retry-After": "60",
+          },
+        },
+      );
+    }
+
     const now = Date.now();
     const loginTimeIso = new Date(now).toISOString();
     const loginTime = new Date(loginTimeIso);
@@ -292,7 +372,6 @@ serve(async (req) => {
       ? loginTimeIso
       : `${loginTime.toISOString()} (UTC)`;
     const deviceInfo = req.headers.get("user-agent") ?? "Unknown device/browser";
-    const clientIp = normalizeIp(req);
     const generalLocation = resolveGeneralLocation(req);
 
     const subject = `New ItemTraxx Login - ${accountName}`;

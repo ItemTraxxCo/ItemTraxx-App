@@ -45,15 +45,16 @@ export const resolveClientIp = (req: Request) => {
   return "";
 };
 
-export const resolveClientFingerprint = (req: Request, origin: string | null) => {
+export const resolveClientFingerprint = (req: Request, _origin: string | null) => {
   const ipCandidate = resolveClientIp(req);
 
   if (ipCandidate) {
     return `ip-${normalizeScopePart(ipCandidate, "unknown-ip", 24)}`;
   }
 
-  if (origin) {
-    return `origin-${normalizeScopePart(origin, "unknown-origin", 24)}`;
+  const userAgent = req.headers.get("user-agent")?.trim() ?? "";
+  if (userAgent) {
+    return `ua-${normalizeScopePart(userAgent, "unknown-ua", 24)}`;
   }
 
   return "unknown-client";

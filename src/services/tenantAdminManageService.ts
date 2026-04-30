@@ -1,6 +1,7 @@
 import { invokeEdgeFunction } from "./edgeFunctionClient";
 import type { EdgeEnvelope, TenantAdminManageAction } from "../types/edgeContracts";
 import { edgeFunctionError } from "./appErrors";
+import { getOrCreateDeviceSession } from "../utils/deviceSession";
 
 export type TenantManagedAdmin = {
   id: string;
@@ -18,11 +19,19 @@ type TenantAdminManageRequest = {
 };
 
 const callTenantAdminManage = async <TData>(payload: TenantAdminManageRequest) => {
+  const { deviceId, deviceLabel } = getOrCreateDeviceSession();
   const result = await invokeEdgeFunction<EdgeEnvelope<TData>, TenantAdminManageRequest>(
     "tenant-admin-mutate",
     {
       method: "POST",
-      body: payload,
+      body: {
+        ...payload,
+        payload: {
+          ...payload.payload,
+          device_id: deviceId,
+          device_label: deviceLabel,
+        },
+      },
     }
   );
 

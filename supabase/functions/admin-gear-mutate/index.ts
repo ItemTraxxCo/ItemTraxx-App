@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { isKillSwitchWriteBlocked } from "../_shared/killSwitch.ts";
 import { isAllowedOrigin, parseAllowedOrigins } from "../_shared/cors.ts";
+import { requireTrustedEdgeIngress } from "../_shared/trustedIngress.ts";
 
 const baseCorsHeaders = {
   "Access-Control-Allow-Headers":
@@ -83,6 +84,9 @@ serve(async (req) => {
   if (hasOrigin && !originAllowed) {
     return jsonResponse(403, { error: "Origin not allowed" });
   }
+
+  const ingressError = await requireTrustedEdgeIngress(req, "admin-gear-mutate", jsonResponse);
+  if (ingressError) return ingressError;
 
   if (isKillSwitchWriteBlocked(req)) {
     return jsonResponse(503, { error: "Unfortunately ItemTraxx is currently unavailable." });
@@ -272,11 +276,22 @@ serve(async (req) => {
 
       const { data: existingGear } = await adminClient
         .from("gear")
-        .select("status")
+        .select("status, checked_out_by, checked_out_at")
         .eq("id", normalizedId)
         .eq("tenant_id", profile.tenant_id)
         .is("deleted_at", null)
         .single();
+
+      if (
+        normalizedStatus !== "checked_out" &&
+        (existingGear?.status === "checked_out" ||
+          !!existingGear?.checked_out_by ||
+          !!existingGear?.checked_out_at)
+      ) {
+        return jsonResponse(400, {
+          error: "Return this item before changing its checkout status.",
+        });
+      }
 
       const { data, error } = await adminClient
         .from("gear")
@@ -322,7 +337,7 @@ serve(async (req) => {
 
       const { data: activeGear } = await adminClient
         .from("gear")
-        .select("id, status")
+        .select("id, status, checked_out_by, checked_out_at")
         .eq("id", normalizedId)
         .eq("tenant_id", profile.tenant_id)
         .is("deleted_at", null)
@@ -332,7 +347,7 @@ serve(async (req) => {
         return jsonResponse(404, { error: "Item not found." });
       }
 
-      if (activeGear.status === "checked_out") {
+      if (activeGear.status === "checked_out" || activeGear.checked_out_by || activeGear.checked_out_at) {
         return jsonResponse(400, {
           error: "Return this item before archiving it.",
         });

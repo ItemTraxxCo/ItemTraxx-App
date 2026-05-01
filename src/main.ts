@@ -285,13 +285,15 @@ const bootstrap = async () => {
   const districtContext = getDistrictState();
   const isE2ETestMode = import.meta.env.VITE_E2E_TEST_UTILS === "true";
   const shouldPreloadAdminSession = consumedDistrictHandoff && isAdminBootstrapPath();
+  const canMountPublicBootstrap =
+    isPublicBootstrapPath() && !districtContext.isDistrictHost;
   const canMountFirst =
     !consumedDistrictHandoff &&
     !shouldPreloadAdminSession &&
-    (isE2ETestMode || isPublicBootstrapPath() || districtContext.isDistrictHost);
+    (isE2ETestMode || canMountPublicBootstrap);
   if (canMountFirst) {
     // Avoid flashing the temporary logout screen during normal public-route bootstrap.
-    if (!isE2ETestMode && isPublicBootstrapPath()) {
+    if (!isE2ETestMode && canMountPublicBootstrap) {
       clearAuthState(true);
     }
     await mountApp();

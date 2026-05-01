@@ -602,6 +602,13 @@ const hasFreshSuperVerification = (superVerifiedAt: string | null) => {
   return Date.now() - verifiedAtMs <= SUPER_VERIFICATION_TTL_MS;
 };
 
+const notFoundFor = (path: string) => ({
+  name: "not-found",
+  params: {
+    pathMatch: path.replace(/^\/+/, "").split("/").filter(Boolean),
+  },
+});
+
 router.beforeEach((to) => {
   const meta = to.meta as {
     public?: boolean;
@@ -630,11 +637,19 @@ router.beforeEach((to) => {
   }
 
   const district = getDistrictState();
-  if (district.isDistrictHost && !district.districtId && to.name !== "not-found") {
-    return { name: "not-found" };
-  }
-
   const auth = getAuthState();
+
+  if (district.isDistrictHost && to.name !== "not-found") {
+    if (!district.districtId) {
+      return notFoundFor(to.path);
+    }
+    if (!auth.isInitialized) {
+      return false;
+    }
+    if (!auth.isAuthenticated || auth.districtContextId !== district.districtId) {
+      return notFoundFor(to.path);
+    }
+  }
 
   // Redirect authenticated users away from home page to their appropriate dashboard
   // Note: We only redirect from public-home, not public-login, so users can still
@@ -644,18 +659,6 @@ router.beforeEach((to) => {
     auth.isAuthenticated &&
     to.name === "public-home"
   ) {
-    // For district hosts, verify user belongs to this district before redirecting
-    if (
-      district.isDistrictHost &&
-      district.districtId &&
-      auth.districtContextId &&
-      auth.districtContextId !== district.districtId
-    ) {
-      // User is logged in but belongs to a different district - let them see public page
-      // They may want to log out and log in with a different account
-      if (meta?.public) return true;
-    }
-
     // Redirect based on role
     if (auth.role === "super_admin") {
       if (auth.hasSecondaryAuth && hasFreshSuperVerification(auth.superVerifiedAt)) {
@@ -695,7 +698,7 @@ router.beforeEach((to) => {
   }
 
   if (district.isDistrictHost && meta?.requiresSession && !district.districtId) {
-    return { name: "public-home" };
+    return notFoundFor(to.path);
   }
 
   if (meta?.requiresRole && auth.role !== meta.requiresRole) {
@@ -729,10 +732,9 @@ router.beforeEach((to) => {
     district.isDistrictHost &&
     district.districtId &&
     auth.isAuthenticated &&
-    auth.districtContextId &&
     auth.districtContextId !== district.districtId
   ) {
-    return { name: "public-home" };
+    return notFoundFor(to.path);
   }
 
   if (meta?.requiresSuperAuth && !auth.hasSecondaryAuth) {

@@ -1,5 +1,9 @@
 <template>
-  <main class="not-found-page" aria-labelledby="not-found-title">
+  <main
+    class="not-found-page"
+    :class="{ 'not-found-page-dark': themeMode === 'dark' }"
+    aria-labelledby="not-found-title"
+  >
     <section class="not-found-panel">
       <p class="not-found-status">Page not found</p>
       <h1 id="not-found-title">404 Not Found</h1>
@@ -70,7 +74,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
+import { computed, onMounted, onUnmounted, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { getAuthState } from "../store/authState";
 import { getDistrictState } from "../store/districtState";
@@ -81,7 +85,9 @@ const route = useRoute();
 const router = useRouter();
 const now = ref("");
 const currentUrl = ref(route.fullPath);
+const themeMode = ref<"light" | "dark">("light");
 const showDiagnosticInfo = import.meta.env.DEV;
+let themeObserver: MutationObserver | null = null;
 const canGoBack = computed(() => {
   if (typeof window === "undefined") return false;
   return window.history.length > 1;
@@ -121,6 +127,26 @@ const goAdmin = () => {
 };
 
 onMounted(refreshNow);
+
+onMounted(() => {
+  const syncTheme = () => {
+    themeMode.value = document.documentElement.getAttribute("data-theme") === "dark" ? "dark" : "light";
+  };
+
+  syncTheme();
+  themeObserver = new MutationObserver(syncTheme);
+  themeObserver.observe(document.documentElement, {
+    attributes: true,
+    attributeFilter: ["data-theme"],
+  });
+});
+
+onUnmounted(() => {
+  if (themeObserver) {
+    themeObserver.disconnect();
+    themeObserver = null;
+  }
+});
 </script>
 
 <style scoped>
@@ -145,7 +171,7 @@ onMounted(refreshNow);
   width: 100%;
 }
 
-:global([data-theme="dark"]) .not-found-page {
+.not-found-page-dark {
   --not-found-bg: #101010;
   --not-found-text: #f3f3f0;
   --not-found-muted: #a7a7a0;

@@ -7,7 +7,10 @@ import {
   isMissingPrivilegedStepUpTable,
 } from "../_shared/privilegedStepUp.ts";
 import { requireTrustedEdgeIngress } from "../_shared/trustedIngress.ts";
-import { isTenantAdminTokenBlockedBySessionRevocation } from "../_shared/tenantAdminSessions.ts";
+import {
+  isTenantAdminTokenBlockedBySessionRevocation,
+  resolveTenantAdminAuthSessionBinding,
+} from "../_shared/tenantAdminSessions.ts";
 
 const baseCorsHeaders = {
   "Access-Control-Allow-Headers":
@@ -238,6 +241,10 @@ const isMissingSessionMetadataColumn = (error: RpcError | null | undefined) =>
   isMissingColumn(error, "login_location") ||
   isMissingColumn(error, "general_location");
 
+const isMissingSessionAuthBindingColumn = (error: RpcError | null | undefined) =>
+  isMissingColumn(error, "auth_session_id") ||
+  isMissingColumn(error, "auth_token_issued_at");
+
 
 serve(async (req) => {
   const { hasOrigin, originAllowed, headers } = resolveCorsHeaders(req);
@@ -277,6 +284,7 @@ serve(async (req) => {
       return jsonResponse(401, { error: "Unauthorized" });
     }
     const authToken = authHeader.replace(/^Bearer\s+/i, "").trim();
+    const authSessionBinding = resolveTenantAdminAuthSessionBinding(authToken);
 
     const supabaseUrl = Deno.env.get("ITX_SUPABASE_URL");
     const publishableKey = Deno.env.get("ITX_PUBLISHABLE_KEY");
@@ -367,9 +375,20 @@ serve(async (req) => {
       if (!deviceSession.deviceId) {
         return { exists: false as const, relationMissing: false, revoked: false as const };
       }
+      const tokenBlock = await isTenantAdminTokenBlockedBySessionRevocation(adminClient, {
+        tenantId,
+        profileId: user.id,
+        authToken,
+      });
+      if (tokenBlock.relationMissing) {
+        return { exists: false as const, relationMissing: true as const, revoked: false as const };
+      }
+      if (tokenBlock.blocked) {
+        return { exists: false as const, relationMissing: false as const, revoked: true as const };
+      }
       const { data, error } = await adminClient
         .from("tenant_admin_sessions")
-        .select("id")
+        .select("id, auth_session_id")
         .eq("tenant_id", tenantId)
         .eq("profile_id", user.id)
         .eq("device_id", deviceSession.deviceId)
@@ -380,9 +399,17 @@ serve(async (req) => {
         if (isMissingSessionTable(error as RpcError)) {
           return { exists: false as const, relationMissing: true as const, revoked: false as const };
         }
+        if (isMissingSessionAuthBindingColumn(error as RpcError)) {
+          return { exists: false as const, relationMissing: true as const, revoked: false as const };
+        }
         throw new Error("Unable to validate admin session.");
       }
-      if (data?.id) {
+      if (
+        data?.id &&
+        (!data.auth_session_id ||
+          !authSessionBinding.sessionId ||
+          data.auth_session_id === authSessionBinding.sessionId)
+      ) {
         return { exists: true as const, relationMissing: false as const, revoked: false as const };
       }
 
@@ -427,11 +454,25 @@ serve(async (req) => {
         throw new Error("Unable to register admin session.");
       }
 
+      const tokenBlock = await isTenantAdminTokenBlockedBySessionRevocation(adminClient, {
+        tenantId,
+        profileId: user.id,
+        authToken,
+      });
+      if (tokenBlock.relationMissing) {
+        return { ok: false as const, relationMissing: true as const, reason: "missing_table" };
+      }
+      if (tokenBlock.blocked) {
+        return { ok: false as const, relationMissing: false as const, reason: "revoked" };
+      }
+
       if (existing?.id) {
         const baseUpdate = {
           last_seen_at: now,
           device_label: deviceSession.deviceLabel,
           user_agent: deviceSession.userAgent,
+          auth_session_id: authSessionBinding.sessionId,
+          auth_token_issued_at: authSessionBinding.issuedAt,
         };
         const metadataUpdate = {
           ...baseUpdate,
@@ -446,10 +487,17 @@ serve(async (req) => {
           .update(shouldTryMetadataUpdate ? metadataUpdate : baseUpdate)
           .eq("id", existing.id);
         if (updateError) {
+          if (isMissingSessionAuthBindingColumn(updateError as RpcError)) {
+            return { ok: false as const, relationMissing: true as const, reason: "missing_table" };
+          }
           if (shouldTryMetadataUpdate && isMissingSessionMetadataColumn(updateError as RpcError)) {
             const { error: fallbackUpdateError } = await adminClient
               .from("tenant_admin_sessions")
-              .update(baseUpdate)
+              .update({
+                last_seen_at: now,
+                device_label: deviceSession.deviceLabel,
+                user_agent: deviceSession.userAgent,
+              })
               .eq("id", existing.id);
             if (fallbackUpdateError) {
               throw new Error("Unable to update admin session.");
@@ -459,23 +507,14 @@ serve(async (req) => {
           }
         }
       } else {
-        const tokenBlock = await isTenantAdminTokenBlockedBySessionRevocation(adminClient, {
-          tenantId,
-          profileId: user.id,
-          authToken,
-        });
-        if (tokenBlock.relationMissing) {
-          return { ok: false as const, relationMissing: true as const, reason: "missing_table" };
-        }
-        if (tokenBlock.blocked) {
-          return { ok: false as const, relationMissing: false as const, reason: "revoked" };
-        }
         const baseInsert = {
           tenant_id: tenantId,
           profile_id: user.id,
           device_id: deviceSession.deviceId,
           device_label: deviceSession.deviceLabel,
           user_agent: deviceSession.userAgent,
+          auth_session_id: authSessionBinding.sessionId,
+          auth_token_issued_at: authSessionBinding.issuedAt,
           created_at: now,
           last_seen_at: now,
         };
@@ -494,10 +533,23 @@ serve(async (req) => {
           if (isMissingSessionTable(insertError as RpcError)) {
             return { ok: false as const, relationMissing: true as const, reason: "missing_table" };
           }
+          if (isMissingSessionAuthBindingColumn(insertError as RpcError)) {
+            return { ok: false as const, relationMissing: true as const, reason: "missing_table" };
+          }
           if (shouldTryMetadataInsert && isMissingSessionMetadataColumn(insertError as RpcError)) {
             const { error: fallbackInsertError } = await adminClient
               .from("tenant_admin_sessions")
-              .insert(baseInsert);
+              .insert({
+                tenant_id: tenantId,
+                profile_id: user.id,
+                device_id: deviceSession.deviceId,
+                device_label: deviceSession.deviceLabel,
+                user_agent: deviceSession.userAgent,
+                auth_session_id: authSessionBinding.sessionId,
+                auth_token_issued_at: authSessionBinding.issuedAt,
+                created_at: now,
+                last_seen_at: now,
+              });
             if (fallbackInsertError) {
               throw new Error("Unable to register admin session.");
             }

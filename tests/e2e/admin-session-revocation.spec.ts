@@ -13,6 +13,7 @@ type SessionRow = {
 type AdminOpsState = {
   sessions: SessionRow[];
   revoked: Set<string>;
+  revokedAuthLineage: boolean;
   nextId: number;
 };
 
@@ -22,6 +23,7 @@ const DEVICE_LABEL_KEY = "itemtraxx-device-label";
 const createState = (): AdminOpsState => ({
   sessions: [],
   revoked: new Set<string>(),
+  revokedAuthLineage: false,
   nextId: 1,
 });
 
@@ -86,6 +88,14 @@ const installAdminOpsMock = async (context: BrowserContext, state: AdminOpsState
         });
         return;
       }
+      if (state.revokedAuthLineage && !state.sessions.some((session) => session.device_id === deviceId)) {
+        await route.fulfill({
+          status: 401,
+          contentType: "application/json",
+          body: JSON.stringify({ error: "Session revoked" }),
+        });
+        return;
+      }
       const existing = state.sessions.find((session) => session.device_id === deviceId);
       if (existing) {
         existing.last_seen_at = now;
@@ -131,6 +141,7 @@ const installAdminOpsMock = async (context: BrowserContext, state: AdminOpsState
         return;
       }
       state.revoked.add(match.device_id);
+      state.revokedAuthLineage = true;
       state.sessions = state.sessions.filter((session) => session.id !== sessionId);
       await ok({ revoked: true });
       return;
@@ -172,85 +183,59 @@ const callAdminOps = async <T>(page: Page, action: string, payload: Record<strin
 };
 
 test.describe("tenant admin device revocation", () => {
-  test("revoked device cannot silently reappear as active, but a rotated device can sign in cleanly", async ({ browser }) => {
+  test("revoked auth lineage cannot register a rotated device without reauth", async ({ browser }) => {
     const state = createState();
     const contextA = await browser.newContext();
-    const contextB = await browser.newContext();
     await installSystemStatusMock(contextA);
-    await installSystemStatusMock(contextB);
     await installAdminOpsMock(contextA, state);
-    await installAdminOpsMock(contextB, state);
 
     const pageA = await contextA.newPage();
-    const pageB = await contextB.newPage();
 
     await seedTenantAdminState(pageA, "device-a", "Mac");
-    await seedTenantAdminState(pageB, "device-b", "iPhone");
 
     const touchA = await callAdminOps<{ ok: boolean }>(pageA, "touch_session", {
       device_id: "device-a",
       device_label: "Mac",
     });
-    const touchB = await callAdminOps<{ ok: boolean }>(pageB, "touch_session", {
-      device_id: "device-b",
-      device_label: "iPhone",
-    });
     expect(touchA.status).toBe(200);
-    expect(touchB.status).toBe(200);
 
     const listBefore = await callAdminOps<{ sessions: SessionRow[] }>(pageA, "list_sessions", {
       device_id: "device-a",
       device_label: "Mac",
     });
     expect(listBefore.status).toBe(200);
-    expect(listBefore.body.data?.sessions).toHaveLength(2);
-    const deviceBSession = listBefore.body.data?.sessions.find((session) => session.device_id === "device-b");
-    expect(deviceBSession?.id).toBeTruthy();
+    const deviceASession = listBefore.body.data?.sessions.find((session) => session.device_id === "device-a");
+    expect(deviceASession?.id).toBeTruthy();
 
     const revoke = await callAdminOps<{ revoked: boolean }>(pageA, "revoke_session", {
-      session_id: deviceBSession?.id,
+      session_id: deviceASession?.id,
       device_id: "device-a",
       device_label: "Mac",
     });
     expect(revoke.status).toBe(200);
 
-    const touchRevoked = await callAdminOps(pageB, "touch_session", {
-      device_id: "device-b",
-      device_label: "iPhone",
+    const touchRevoked = await callAdminOps(pageA, "touch_session", {
+      device_id: "device-a",
+      device_label: "Mac",
     });
     expect(touchRevoked.status).toBe(401);
     expect(touchRevoked.body.error).toBe("Session revoked");
 
-    const listAfterRevocation = await callAdminOps<{ sessions: SessionRow[] }>(pageA, "list_sessions", {
-      device_id: "device-a",
-      device_label: "Mac",
-    });
-    expect(listAfterRevocation.body.data?.sessions.map((session) => session.device_id)).toEqual(["device-a"]);
-
-    await pageB.evaluate(
+    await pageA.evaluate(
       ({ deviceIdKey, deviceLabelKey }) => {
-        localStorage.setItem(deviceIdKey, "device-b-rotated");
-        localStorage.setItem(deviceLabelKey, "iPhone");
+        localStorage.setItem(deviceIdKey, "device-a-rotated");
+        localStorage.setItem(deviceLabelKey, "Mac");
       },
       { deviceIdKey: DEVICE_ID_KEY, deviceLabelKey: DEVICE_LABEL_KEY }
     );
 
-    const touchRotated = await callAdminOps<{ ok: boolean }>(pageB, "touch_session", {
-      device_id: "device-b-rotated",
-      device_label: "iPhone",
-    });
-    expect(touchRotated.status).toBe(200);
-
-    const listAfterRelogin = await callAdminOps<{ sessions: SessionRow[] }>(pageA, "list_sessions", {
-      device_id: "device-a",
+    const touchRotated = await callAdminOps<{ ok: boolean }>(pageA, "touch_session", {
+      device_id: "device-a-rotated",
       device_label: "Mac",
     });
-    expect(listAfterRelogin.body.data?.sessions.map((session) => session.device_id).sort()).toEqual([
-      "device-a",
-      "device-b-rotated",
-    ]);
+    expect(touchRotated.status).toBe(401);
+    expect(touchRotated.body.error).toBe("Session revoked");
 
     await contextA.close();
-    await contextB.close();
   });
 });

@@ -411,10 +411,10 @@ const getSessionAction = (pathname: string) => {
 
 const isRestProxyPath = (pathname: string) => pathname.startsWith("/rest/v1/");
 
-const isRpcProxyPath = (pathname: string) => pathname.startsWith("/rpc/");
+const isRpcProxyPath = (pathname: string) => pathname === "/rpc" || pathname.startsWith("/rpc/");
 
-const isBlockedRpcProxyPath = (pathname: string) =>
-  isRpcProxyPath(pathname) || pathname.startsWith("/rest/v1/rpc/");
+export const isBlockedRpcProxyPath = (pathname: string) =>
+  isRpcProxyPath(pathname) || pathname === "/rest/v1/rpc" || pathname.startsWith("/rest/v1/rpc/");
 
 const parseCookies = (request: Request): SessionCookies => {
   const raw = request.headers.get("cookie") ?? "";

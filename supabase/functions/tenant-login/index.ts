@@ -2,7 +2,6 @@ import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { isAllowedOrigin, parseAllowedOrigins } from "../_shared/cors.ts";
 import { resolveClientFingerprint, resolveClientIp } from "../_shared/preloginGuards.ts";
-import { isAikidoPentestTurnstileBypassRequest } from "../_shared/aikidoPentest.ts";
 import { requireTrustedEdgeIngress } from "../_shared/trustedIngress.ts";
 
 const corsHeaders = {
@@ -214,28 +213,20 @@ serve(async (req) => {
     const turnstileSecret = Deno.env.get("ITX_TURNSTILE_SECRET") ?? "";
     const turnstileToken =
       typeof turnstile_token === "string" ? turnstile_token.trim() : "";
-    const bypassTurnstileForAikido = isAikidoPentestTurnstileBypassRequest(req, turnstileToken);
     if (turnstileSecret) {
-      if (!bypassTurnstileForAikido) {
-        if (
-          !turnstileToken ||
-          turnstileToken.length > 4096
-        ) {
-          return jsonResponse(400, { error: "Turnstile verification required" });
-        }
-        const isTurnstileValid = await verifyTurnstileToken(
-          turnstileSecret,
-          turnstileToken,
-          resolveClientIp(req)
-        );
-        if (!isTurnstileValid) {
-          return jsonResponse(403, { error: "Turnstile verification failed" });
-        }
-      } else {
-        console.info("tenant-login bypassed turnstile for vetted Aikido scan traffic", {
-          request_id: requestId,
-          client_ip: resolveClientIp(req) || "unknown",
-        });
+      if (
+        !turnstileToken ||
+        turnstileToken.length > 4096
+      ) {
+        return jsonResponse(400, { error: "Turnstile verification required" });
+      }
+      const isTurnstileValid = await verifyTurnstileToken(
+        turnstileSecret,
+        turnstileToken,
+        resolveClientIp(req)
+      );
+      if (!isTurnstileValid) {
+        return jsonResponse(403, { error: "Turnstile verification failed" });
       }
     }
 

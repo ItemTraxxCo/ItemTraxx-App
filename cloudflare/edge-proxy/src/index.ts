@@ -23,7 +23,6 @@ const REFRESH_TOKEN_DEFAULT_MAX_AGE_SECONDS = 60 * 60 * 24 * 14;
 const REFRESH_TOKEN_MAX_ALLOWED_AGE_SECONDS = 60 * 60 * 24 * 14;
 const PENTEST_HOSTNAME = "edge-pentest.itemtraxx.com";
 const PENTEST_TOKEN_HEADER = "x-itx-pentest-token";
-const AIKIDO_TURNSTILE_BYPASS_HEADER = "x-itx-aikido-turnstile-bypass";
 const EDGE_PROXY_HEADER = "x-itx-edge-proxy";
 const EDGE_PROXY_TIMESTAMP_HEADER = "x-itx-edge-proxy-ts";
 const EDGE_PROXY_SIGNATURE_HEADER = "x-itx-edge-proxy-signature";
@@ -86,26 +85,6 @@ const applyTrustedIngressHeaders = async (
     await signTrustedIngress(secret, `${timestamp}.${requestId}.${target}`)
   );
 };
-
-const AIKIDO_PENTEST_IPS = new Set([
-  "34.252.102.184",
-  "52.48.122.82",
-  "52.49.182.62",
-  "52.209.168.11",
-  "52.210.210.125",
-  "54.76.103.212",
-  "54.194.175.200",
-  "54.217.255.121",
-  "3.226.27.188",
-  "34.237.95.50",
-  "44.209.154.183",
-  "52.204.120.162",
-  "54.80.175.207",
-  "54.227.161.94",
-  "98.88.145.68",
-  "98.91.68.215",
-  "79.127.239.171",
-]);
 
 type SessionCookies = {
   accessToken: string | null;
@@ -380,17 +359,6 @@ const hasValidPentestToken = (request: Request, env: Env) => {
   return request.headers.get(PENTEST_TOKEN_HEADER) === expected;
 };
 
-const isAikidoPentestRequest = (request: Request) => {
-  const clientIp = request.headers.get("cf-connecting-ip")?.trim();
-  if (!clientIp || !AIKIDO_PENTEST_IPS.has(clientIp)) {
-    return false;
-  }
-
-  const userAgent = (request.headers.get("user-agent") ?? "").toLowerCase();
-  const scanAgentHeader = (request.headers.get("aikido-scan-agent") ?? "").toLowerCase();
-  return userAgent.includes("aikido-pentest-agent") || scanAgentHeader.includes("aikido-pentest-agent");
-};
-
 const buildError = (
   status: number,
   message: string,
@@ -444,6 +412,9 @@ const getSessionAction = (pathname: string) => {
 const isRestProxyPath = (pathname: string) => pathname.startsWith("/rest/v1/");
 
 const isRpcProxyPath = (pathname: string) => pathname.startsWith("/rpc/");
+
+const isBlockedRpcProxyPath = (pathname: string) =>
+  isRpcProxyPath(pathname) || pathname.startsWith("/rest/v1/rpc/");
 
 const parseCookies = (request: Request): SessionCookies => {
   const raw = request.headers.get("cookie") ?? "";
@@ -717,9 +688,6 @@ const sanitizeRequestHeaders = (
   if (scanAgentHeader) {
     headers.set("aikido-scan-agent", scanAgentHeader);
   }
-  if (isAikidoPentestRequest(request)) {
-    headers.set(AIKIDO_TURNSTILE_BYPASS_HEADER, "1");
-  }
   const forwardedFor = request.headers.get("x-forwarded-for");
   if (forwardedFor) {
     headers.set("x-forwarded-for", forwardedFor);
@@ -773,6 +741,9 @@ const proxySupabaseApiRequest = async (
   upstreamPath: string
 ) => {
   const cookies = parseCookies(request);
+  if (isBlockedRpcProxyPath(upstreamPath)) {
+    return buildError(403, "RPC proxy access is not allowed", headers, requestId);
+  }
   const normalizedUpstreamPath = isRpcProxyPath(upstreamPath)
     ? `/rest/v1${upstreamPath}`
     : upstreamPath;
@@ -1068,7 +1039,7 @@ export default {
       if (url.pathname === "/turnstile-policy" && request.method === "GET") {
         return buildJson(
           200,
-          { bypass_turnstile: isAikidoPentestRequest(request) },
+          { bypass_turnstile: false },
           headers,
           requestId
         );
@@ -1087,7 +1058,7 @@ export default {
         return response;
       }
 
-      if (isRpcProxyPath(url.pathname)) {
+      if (isBlockedRpcProxyPath(url.pathname)) {
         return buildError(403, "RPC proxy access is not allowed", headers, requestId);
       }
 

@@ -7,7 +7,6 @@ import {
   resolveClientIp,
   verifyTurnstileToken,
 } from "../_shared/preloginGuards.ts";
-import { isAikidoPentestTurnstileBypassRequest } from "../_shared/aikidoPentest.ts";
 import { isAllowedOrigin, parseAllowedOrigins } from "../_shared/cors.ts";
 import { requireTrustedEdgeIngress } from "../_shared/trustedIngress.ts";
 
@@ -219,8 +218,7 @@ serve(async (req) => {
           ? body.current_district_slug.trim().toLowerCase()
           : "";
 
-      const bypassTurnstileForAikido = isAikidoPentestTurnstileBypassRequest(req, turnstileToken);
-      if (!email || !password || (!turnstileToken && !bypassTurnstileForAikido)) {
+      if (!email || !password || !turnstileToken) {
         return jsonResponse(400, { error: "Invalid request" }, headers);
       }
 
@@ -278,20 +276,14 @@ serve(async (req) => {
         );
       }
 
-      if (!bypassTurnstileForAikido) {
-        const turnstileValid = await verifyTurnstileToken(
-          turnstileSecret,
-          turnstileToken,
-          clientIp,
-          "district-handoff create_admin",
-        );
-        if (!turnstileValid) {
-          return jsonResponse(403, { error: "Turnstile verification failed" }, headers);
-        }
-      } else {
-        console.info("district-handoff create_admin bypassed turnstile for vetted Aikido scan traffic", {
-          client_ip: clientIp || "unknown",
-        });
+      const turnstileValid = await verifyTurnstileToken(
+        turnstileSecret,
+        turnstileToken,
+        clientIp,
+        "district-handoff create_admin",
+      );
+      if (!turnstileValid) {
+        return jsonResponse(403, { error: "Turnstile verification failed" }, headers);
       }
 
       const userClient = createClient(supabaseUrl, publishableKey, {

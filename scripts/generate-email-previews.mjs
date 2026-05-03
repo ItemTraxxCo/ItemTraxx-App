@@ -1,4 +1,4 @@
-import { copyFile, mkdir, writeFile } from "node:fs/promises";
+import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -6,11 +6,9 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(__dirname, "..");
 const outDir = path.join(repoRoot, "tmp", "email-previews");
 
-const logoSource = path.join(repoRoot, "public", "brand", "logo-light.png");
-const logoFileName = "brand-logo.png";
-const logoUrl = `./${logoFileName}`;
 const passwordResetUrl = "https://itemtraxx.com/forgot-password";
 const contactSupportUrl = "https://itemtraxx.com/contact-support";
+const emailLogoUrl = "https://assets.itemtraxx.com/brand/logo-light.png";
 
 const escapeHtml = (value) =>
   String(value)
@@ -21,15 +19,13 @@ const escapeHtml = (value) =>
     .replaceAll("'", "&#39;");
 
 const brandHeader = () =>
-  [
-    `<img`,
-    ` src="${logoUrl}"`,
-    ` alt="ItemTraxx"`,
-    ` width="150"`,
-    ` height="50"`,
-    ` style="display:block;width:150px;height:50px;max-width:150px;border:0;outline:none;text-decoration:none;"`,
-    ` />`,
-  ].join("");
+  `<img
+                  src="${emailLogoUrl}"
+                  alt="ItemTraxx"
+                  width="150"
+                  height="50"
+                  style="display:block;width:150px;height:50px;max-width:150px;border:0;outline:none;text-decoration:none;"
+                />`;
 
 const paragraph = (content) =>
   `<p style="margin:0 0 14px 0;font-size:15px;line-height:1.6;color:#343330;">${content}</p>`;
@@ -257,7 +253,6 @@ const indexHtml = `<!doctype html>
 </html>`;
 
 await mkdir(outDir, { recursive: true });
-await copyFile(logoSource, path.join(outDir, logoFileName));
 await Promise.all(previews.map((preview) => writeFile(path.join(outDir, preview.file), preview.html)));
 await writeFile(path.join(outDir, "index.html"), indexHtml);
 

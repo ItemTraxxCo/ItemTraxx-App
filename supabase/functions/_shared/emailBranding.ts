@@ -44,9 +44,9 @@ export const buildEmailBrandHeaderHtml = (params: {
     `<img`,
     ` src="${safeLogoUrl}"`,
     ` alt="${escapeHtmlAttribute(brandName)}"`,
-    ` width="126"`,
-    ` height="42"`,
-    ` style="display:block;width:126px;height:42px;max-width:126px;border:0;outline:none;text-decoration:none;"`,
+    ` width="150"`,
+    ` height="50"`,
+    ` style="display:block;width:150px;height:50px;max-width:150px;border:0;outline:none;text-decoration:none;"`,
     ` />`,
   ].join("");
 };

@@ -16,6 +16,8 @@ import { isAllowedOrigin, parseAllowedOrigins } from "../_shared/cors.ts";
 import { requireTrustedEdgeIngress } from "../_shared/trustedIngress.ts";
 
 const EMAIL_LOGO_URL = Deno.env.get("ITX_EMAIL_LOGO_URL")?.trim() || null;
+const PASSWORD_RESET_URL = "https://itemtraxx.com/forgot-password";
+const CONTACT_SUPPORT_URL = "https://itemtraxx.com/contact-support";
 
 const baseCorsHeaders = {
   "Access-Control-Allow-Headers":
@@ -202,14 +204,17 @@ const buildSuperAdminTwoFactorHtml = (payload: { code: string; support_email: st
                 <p style="margin:0 0 14px 0;font-size:15px;line-height:1.6;color:#343330;">
                   Use the following 6-digit verification code to finish signing in to ItemTraxx super admin.
                 </p>
-                <div style="margin:0 0 18px 0;padding:16px 18px;border-radius:12px;background:#fbfaf8;border:1px solid #d8d6d1;font-size:28px;line-height:1.2;font-weight:700;letter-spacing:0.22em;color:#171717;text-align:center;">
+                <div style="margin:0 0 18px 0;padding:16px 18px;border-radius:0;background:#fbfaf8;border:1px solid #d8d6d1;font-size:28px;line-height:1.2;font-weight:700;letter-spacing:0.22em;color:#171717;text-align:center;">
                   ${code}
                 </div>
                 <p style="margin:0 0 14px 0;font-size:14px;line-height:1.6;color:#68645f;">
                   This code expires in 10 minutes and can only be used once.
                 </p>
                 <p style="margin:0;font-size:14px;line-height:1.6;color:#68645f;">
-                  If you did not attempt to sign in, contact support immediately.
+                  If this wasn't you,
+                  <a href="${PASSWORD_RESET_URL}" style="color:#171717;text-decoration:underline;text-underline-offset:2px;">reset your password</a>
+                  and
+                  <a href="${CONTACT_SUPPORT_URL}" style="color:#171717;text-decoration:underline;text-underline-offset:2px;">contact support immediately</a>.
                 </p>
               </td>
             </tr>
@@ -248,7 +253,7 @@ const sendSuperAdminTwoFactorEmail = async (
     to: payload.to_email,
     subject,
     html: buildSuperAdminTwoFactorHtml({ code: payload.code, support_email: payload.support_email }),
-    text: `Your ItemTraxx verification code is ${payload.code}. It expires in 10 minutes. If you did not attempt to sign in, contact ${payload.support_email}.`,
+    text: `Your ItemTraxx verification code is ${payload.code}. It expires in 10 minutes. If this wasn't you, reset your password at ${PASSWORD_RESET_URL} and contact support immediately at ${CONTACT_SUPPORT_URL}.`,
   }, {
     emailType: "super_admin_2fa",
     recipientEmail: payload.to_email,

@@ -9,6 +9,8 @@ import { hashString, resolveClientIp } from "../_shared/preloginGuards.ts";
 import { requireTrustedEdgeIngress } from "../_shared/trustedIngress.ts";
 
 const EMAIL_LOGO_URL = Deno.env.get("ITX_EMAIL_LOGO_URL")?.trim() || null;
+const PASSWORD_RESET_URL = "https://itemtraxx.com/forgot-password";
+const CONTACT_SUPPORT_URL = "https://itemtraxx.com/contact-support";
 
 const baseCorsHeaders = {
   "Access-Control-Allow-Headers":
@@ -173,20 +175,24 @@ const buildLoginNotificationHtml = (payload: {
             </tr>
             <tr>
               <td style="padding:28px;">
-                <h2 style="margin:0 0 12px 0;font-size:22px;line-height:1.3;color:#171717;">${loginTypeLabel} detected</h2>
-                <p style="margin:0 0 14px 0;font-size:15px;line-height:1.6;color:#343330;">
-                  A new ${loginTypeBody} to ItemTraxx was detected.
+                <h2 style="margin:0 0 12px 0;font-size:22px;line-height:1.3;color:#171717;">New login to ItemTraxx</h2>
+                <p style="margin:0 0 22px 0;font-size:15px;line-height:1.6;color:#343330;">
+                  We noticed a ${loginTypeBody} to your ItemTraxx account from a new device or browser.
                 </p>
-                <p style="margin:0 0 14px 0;font-size:15px;line-height:1.7;color:#343330;">
+                <div style="height:1px;line-height:1px;background:#d8d6d1;margin:0 0 22px 0;">&nbsp;</div>
+                <p style="margin:0 0 22px 0;font-size:15px;line-height:1.8;color:#343330;">
                   <strong>Sign-in type:</strong> ${loginTypeLabel}<br />
                   <strong>${accountLabel}:</strong> ${accountName}<br />
-                  <strong>Login time:</strong> ${loginTime}<br />
-                  <strong>Device/Browser:</strong> ${deviceBrowser}<br />
-                  <strong>Approximate location:</strong> ${generalLocation}<br />
-                  <strong>IP Address:</strong> ${ipAddress}
+                  <strong>Platform:</strong> ${deviceBrowser}<br />
+                  <strong>Location:</strong> ${generalLocation} (${ipAddress})<br />
+                  <strong>Time:</strong> ${loginTime}
                 </p>
-                <p style="margin:0;font-size:14px;line-height:1.6;color:#68645f;">
-                  If this wasn't you, please contact support immediately.
+                <div style="height:1px;line-height:1px;background:#d8d6d1;margin:0 0 22px 0;">&nbsp;</div>
+                <p style="margin:0 0 18px 0;font-size:15px;line-height:1.6;color:#343330;">
+                  If this wasn't you,
+                  <a href="${PASSWORD_RESET_URL}" style="color:#171717;text-decoration:underline;text-underline-offset:2px;">reset your password</a>
+                  and
+                  <a href="${CONTACT_SUPPORT_URL}" style="color:#171717;text-decoration:underline;text-underline-offset:2px;">contact support immediately</a>.
                 </p>
               </td>
             </tr>
@@ -442,13 +448,13 @@ serve(async (req) => {
         generalLocation,
       }),
       text:
-        `A new ${loginContext.label.toLowerCase()} to ItemTraxx was detected.\n\n` +
+        `We noticed a ${loginContext.label.toLowerCase()} to your ItemTraxx account from a new device or browser.\n\n` +
         `Sign-in type: ${loginContext.label}\n` +
         `${accountLabel}: ${accountName}\n` +
-        `Login time: ${loginTimeLabel}\n` +
-        `Device/Browser: ${deviceInfo || "Unknown"}\n` +
-        `IP Address: ${clientIp ?? "Unavailable"}\n\n` +
-        `If this wasn't you, contact support immediately at ${supportEmail}.`,
+        `Platform: ${deviceInfo || "Unknown"}\n` +
+        `Location: ${generalLocation ?? "Unavailable"} (${clientIp ?? "Unavailable"})\n` +
+        `Time: ${loginTimeLabel}\n\n` +
+        `If this wasn't you, reset your password at ${PASSWORD_RESET_URL} and contact support immediately at ${CONTACT_SUPPORT_URL}.`,
     }, {
       emailType: "login_notification",
       recipientEmail,

@@ -48,3 +48,6 @@ CONVERSATION_HANDOFF.md
 .agents/skills/integration-vue-3/references/identify-users.md
 .agents/skills/integration-vue-3/references/vue-js.md
 .agents/skills/integration-vue-3/references/basic-integration-1.2-revise.md
+
+# Local generated previews
+tmp/email-previews/

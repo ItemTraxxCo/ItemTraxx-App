@@ -210,7 +210,7 @@ const initializePostHog = async () => {
   }
   try {
     const { initPostHog } = await import("./services/posthogService");
-    initPostHog();
+    await initPostHog();
   } catch (error) {
     // Analytics must never break login or core flows.
     console.warn("[posthog] initialization failed; continuing without analytics.", error);

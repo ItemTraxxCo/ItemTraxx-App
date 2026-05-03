@@ -6,31 +6,27 @@ const escapeHtmlAttribute = (value: string) =>
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#39;");
 
-const CANONICAL_EMAIL_LOGO_URL = "https://itemtraxx.com/brand/logo-light.png";
-const CANONICAL_EMAIL_LOGO_PATHS = new Set([
-  "/brand/logo-light.png",
-  "/brand/logo-dark.png",
-  "/brand/logo-mark.png",
-]);
+const CANONICAL_EMAIL_LOGO_URL = "https://assets.itemtraxx.com/brand/logo-light.png";
 
-const resolveSafeEmailLogoUrl = (candidate: string | null | undefined) => {
-  if (!candidate) return escapeHtmlAttribute(CANONICAL_EMAIL_LOGO_URL);
-  const trimmed = candidate.trim();
-  if (!trimmed) return escapeHtmlAttribute(CANONICAL_EMAIL_LOGO_URL);
+const normalizeEmailLogoUrl = (logoUrl?: string | null) => {
+  const candidate = logoUrl?.trim() || CANONICAL_EMAIL_LOGO_URL;
 
   try {
-    const url = new URL(trimmed);
-    if (url.protocol !== "https:") return escapeHtmlAttribute(CANONICAL_EMAIL_LOGO_URL);
-    if (
-      (url.hostname === "itemtraxx.com" || url.hostname === "www.itemtraxx.com") &&
-      CANONICAL_EMAIL_LOGO_PATHS.has(url.pathname)
-    ) {
-      return escapeHtmlAttribute(url.toString());
+    const parsed = new URL(candidate);
+    const isAllowedHost = parsed.hostname === "assets.itemtraxx.com";
+    const isAllowedLogo =
+      parsed.pathname === "/brand/logo-light.png" ||
+      parsed.pathname === "/brand/logo-dark.png" ||
+      parsed.pathname === "/brand/logo-mark.png";
+
+    if (parsed.protocol === "https:" && isAllowedHost && isAllowedLogo) {
+      return parsed.toString();
     }
-    return escapeHtmlAttribute(CANONICAL_EMAIL_LOGO_URL);
   } catch {
-    return escapeHtmlAttribute(CANONICAL_EMAIL_LOGO_URL);
+    return CANONICAL_EMAIL_LOGO_URL;
   }
+
+  return CANONICAL_EMAIL_LOGO_URL;
 };
 
 export const buildEmailBrandHeaderHtml = (params: {
@@ -38,15 +34,13 @@ export const buildEmailBrandHeaderHtml = (params: {
   brandName?: string;
 }) => {
   const brandName = params.brandName?.trim() || "ItemTraxx";
-  const safeLogoUrl = resolveSafeEmailLogoUrl(params.logoUrl);
+  const logoUrl = normalizeEmailLogoUrl(params.logoUrl);
 
-  return [
-    `<img`,
-    ` src="${safeLogoUrl}"`,
-    ` alt="${escapeHtmlAttribute(brandName)}"`,
-    ` width="150"`,
-    ` height="50"`,
-    ` style="display:block;width:150px;height:50px;max-width:150px;border:0;outline:none;text-decoration:none;"`,
-    ` />`,
-  ].join("");
+  return `<img
+                  src="${escapeHtmlAttribute(logoUrl)}"
+                  alt="${escapeHtmlAttribute(brandName)}"
+                  width="150"
+                  height="50"
+                  style="display:block;width:150px;height:50px;max-width:150px;border:0;outline:none;text-decoration:none;"
+                />`;
 };

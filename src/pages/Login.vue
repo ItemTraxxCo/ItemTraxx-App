@@ -321,7 +321,7 @@ const handleTenantLogin = async () => {
           {
             tokenHash: handoffCode.tokenHash,
             loginMethod: "password",
-            loginLocation: "regular_login",
+            loginLocation: "tenant_login",
           }
         )
       );

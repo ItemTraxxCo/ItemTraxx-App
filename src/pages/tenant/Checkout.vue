@@ -1,14 +1,14 @@
 <template>
   <div class="page checkout-page">
     <div class="page-header checkout-page-header">
-      <h1 class="brand-title checkout-brand-title">
+      <h1 class="checkout-brand-title">
         <img
-          v-if="logoUrl"
-          class="brand-logo"
-          :src="logoUrl"
-          alt="ItemTraxx logo"
+          v-if="brandLogoUrl"
+          class="checkout-brand-logo"
+          :src="brandLogoUrl"
+          alt="ItemTraxx Co"
         />
-        ItemTraxx
+        <span v-else>ItemTraxx</span>
       </h1>
     </div>
 
@@ -193,11 +193,19 @@ const toastStatus = ref<"Success" | "Failed" | "Processing">("Success");
 const barcodeField = ref<HTMLInputElement | null>(null);
 const borrowerScannerOpen = ref(false);
 const itemScannerOpen = ref(false);
-const logoUrl = import.meta.env.VITE_LOGO_URL as string | undefined;
+const lightBrandLogoUrl = import.meta.env.VITE_BRAND_LOGO_LIGHT_URL as string | undefined;
+const darkBrandLogoUrl = import.meta.env.VITE_BRAND_LOGO_DARK_URL as string | undefined;
+const themeMode = ref<"light" | "dark">("light");
+const brandLogoUrl = computed(() =>
+  themeMode.value === "light"
+    ? lightBrandLogoUrl || darkBrandLogoUrl || ""
+    : darkBrandLogoUrl || lightBrandLogoUrl || ""
+);
 const toastTitle = ref("");
 const syncInFlight = ref(false);
 const studentLookupCooldownSeconds = ref(0);
 let studentLookupCooldownTimer: number | null = null;
+let themeObserver: MutationObserver | null = null;
 const itemScannerHistory = computed<ScannerHistoryItem[]>(() =>
   barcodes.value.map((item) => {
     const isReturn = checkedOutGear.value.some((checkedOutItem) => checkedOutItem.barcode === item.barcode);
@@ -507,6 +515,17 @@ const handleOnline = () => {
 };
 
 onMounted(() => {
+  const syncTheme = () => {
+    themeMode.value = document.documentElement.getAttribute("data-theme") === "dark" ? "dark" : "light";
+  };
+
+  syncTheme();
+  themeObserver = new MutationObserver(syncTheme);
+  themeObserver.observe(document.documentElement, {
+    attributes: true,
+    attributeFilter: ["data-theme"],
+  });
+
   window.addEventListener("online", handleOnline);
   updateStudentLookupCooldown();
   ensureStudentLookupCooldownTimer();
@@ -521,6 +540,10 @@ onMounted(() => {
 
 onUnmounted(() => {
   window.removeEventListener("online", handleOnline);
+  if (themeObserver) {
+    themeObserver.disconnect();
+    themeObserver = null;
+  }
   if (studentLookupCooldownTimer !== null) {
     window.clearInterval(studentLookupCooldownTimer);
     studentLookupCooldownTimer = null;
@@ -539,7 +562,21 @@ onUnmounted(() => {
 }
 
 .checkout-brand-title {
+  align-items: center;
   color: inherit;
+  display: inline-flex;
+  font-size: clamp(2.4rem, 5vw, 3.4rem);
+  font-weight: 800;
+  letter-spacing: -0.055em;
+  line-height: 0.95;
+  margin: 0;
+}
+
+.checkout-brand-logo {
+  display: block;
+  height: 72px;
+  object-fit: contain;
+  width: auto;
 }
 
 .checkout-page-copy {

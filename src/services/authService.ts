@@ -73,13 +73,59 @@ let pendingSuperAdminChallengeToken: string | null = null;
 
 const RAW_HANDOFF_TOKEN_PARAMS = ["itx_at", "itx_rt"];
 
-const sendLoginNotification = (accessToken: string | null) => {
+export type LoginNotificationLocation =
+  | "tenant_login"
+  | "tenant_admin_login"
+  | "district_admin_login"
+  | "super_admin_login"
+  | "regular_login"
+  | "admin_login";
+
+type TenantAdminSessionLocation = "regular_login" | "admin_login";
+
+const normalizeLoginNotificationLocation = (
+  value: string | null
+): LoginNotificationLocation | null => {
+  if (
+    value === "tenant_login" ||
+    value === "tenant_admin_login" ||
+    value === "district_admin_login" ||
+    value === "super_admin_login" ||
+    value === "regular_login" ||
+    value === "admin_login"
+  ) {
+    return value;
+  }
+  return null;
+};
+
+const toTenantAdminSessionLocation = (
+  value: LoginNotificationLocation | null | undefined
+): TenantAdminSessionLocation | null => {
+  if (!value) return null;
+  if (value === "regular_login" || value === "tenant_login") return "regular_login";
+  if (
+    value === "admin_login" ||
+    value === "tenant_admin_login" ||
+    value === "district_admin_login"
+  ) {
+    return "admin_login";
+  }
+  return null;
+};
+
+const sendLoginNotification = (
+  accessToken: string | null,
+  options: { loginLocation?: LoginNotificationLocation | null } = {}
+) => {
   if (!accessToken) return;
   const loginNotifyFunctionName = getLoginNotifyFunctionName();
   void invokeEdgeFunction(loginNotifyFunctionName, {
     method: "POST",
     accessToken,
-    body: {},
+    body: {
+      login_location: options.loginLocation ?? null,
+    },
   }).then((result) => {
     if (!result.ok) {
       console.warn("login notification send failed", {
@@ -171,6 +217,7 @@ export const verifySuperAdminEmailChallenge = async (code: string) => {
   }
   setSecondaryAuth(true);
   clearPendingSuperAdminVerificationEmail();
+  sendLoginNotification(result.data.access_token, { loginLocation: "super_admin_login" });
 };
 
 const clearLocalSession = async () => {
@@ -514,7 +561,7 @@ export const tenantLogin = async (
     (await resolveDistrictSlug(current.districtContextId));
 
   if (!shouldCrossHostRedirect) {
-    sendLoginNotification(data.access_token);
+    sendLoginNotification(data.access_token, { loginLocation: "tenant_login" });
   }
 
   return {
@@ -532,7 +579,7 @@ export const consumeDistrictSessionHandoff = async (): Promise<
       refreshToken: string;
       sessionSummary: HttpSessionSummary | null;
       loginMethod: "password" | "magic_link" | "session_handoff" | null;
-      loginLocation: "regular_login" | "admin_login" | null;
+      loginLocation: LoginNotificationLocation | null;
     }
 > => {
   if (typeof window === "undefined" || !window.location.hash) {
@@ -554,10 +601,7 @@ export const consumeDistrictSessionHandoff = async (): Promise<
     rawLoginMethod === "session_handoff"
       ? rawLoginMethod
       : null;
-  const loginLocation =
-    rawLoginLocation === "regular_login" || rawLoginLocation === "admin_login"
-      ? rawLoginLocation
-      : null;
+  const loginLocation = normalizeLoginNotificationLocation(rawLoginLocation);
 
   if (!handoffCode && !tokenHash && !hasRawTokenParams) {
     return false;
@@ -602,7 +646,7 @@ export const consumeDistrictSessionHandoff = async (): Promise<
       refresh_token: verifiedRefreshToken,
     });
     await clearLocalSession();
-    sendLoginNotification(verifiedAccessToken);
+    sendLoginNotification(verifiedAccessToken, { loginLocation });
 
     try {
       window.sessionStorage.setItem(
@@ -656,7 +700,7 @@ export const consumeDistrictSessionHandoff = async (): Promise<
   });
   await clearLocalSession();
 
-  sendLoginNotification(finalAccessToken);
+  sendLoginNotification(finalAccessToken, { loginLocation });
 
   try {
     window.sessionStorage.setItem(
@@ -760,7 +804,7 @@ export const adminLoginWithSession = async (
   refreshToken: string,
   sessionTouchOptions: {
     loginMethod?: "password" | "magic_link" | "session_handoff" | null;
-    loginLocation?: "regular_login" | "admin_login" | null;
+    loginLocation?: LoginNotificationLocation | null;
     skipExchange?: boolean;
     skipLoginNotification?: boolean;
     preExchangedSessionSummary?: HttpSessionSummary | null;
@@ -870,7 +914,8 @@ export const adminLoginWithSession = async (
     try {
       await touchTenantAdminSession({
         loginMethod: sessionTouchOptions.loginMethod ?? "password",
-        loginLocation: sessionTouchOptions.loginLocation ?? "admin_login",
+        loginLocation:
+          toTenantAdminSessionLocation(sessionTouchOptions.loginLocation) ?? "admin_login",
       });
     } catch {
       // Session tracking is best-effort and must not block successful admin sign-in.
@@ -900,7 +945,11 @@ export const adminLoginWithSession = async (
 
   markAdminVerified();
   if (!sessionTouchOptions.skipLoginNotification) {
-    sendLoginNotification(accessToken);
+    const fallbackLoginLocation: LoginNotificationLocation =
+      resolvedRole === "district_admin" ? "district_admin_login" : "tenant_admin_login";
+    sendLoginNotification(accessToken, {
+      loginLocation: sessionTouchOptions.loginLocation ?? fallbackLoginLocation,
+    });
   }
   const districtSlug = await resolveDistrictSlug(resolvedDistrictId ?? null);
   return {

@@ -169,6 +169,18 @@ const isAdminBootstrapPath = () => {
   return path.startsWith("/tenant/admin") || path === "/district";
 };
 
+const toAdminSessionLoginLocation = (value: string | null | undefined) => {
+  if (value === "regular_login" || value === "tenant_login") return "regular_login";
+  if (
+    value === "admin_login" ||
+    value === "tenant_admin_login" ||
+    value === "district_admin_login"
+  ) {
+    return "admin_login";
+  }
+  return null;
+};
+
 const initializeAuth = async () => {
   const isE2ETestMode = import.meta.env.VITE_E2E_TEST_UTILS === "true";
   if (isE2ETestMode) {
@@ -317,7 +329,7 @@ const bootstrap = async () => {
         try {
           await touchTenantAdminSession({
             loginMethod: consumedDistrictHandoff.loginMethod,
-            loginLocation: consumedDistrictHandoff.loginLocation,
+            loginLocation: toAdminSessionLoginLocation(consumedDistrictHandoff.loginLocation),
           });
         } catch {
           // Best-effort session registration after district handoff.
@@ -338,7 +350,7 @@ const bootstrap = async () => {
       try {
         await touchTenantAdminSession({
           loginMethod: consumedDistrictHandoff.loginMethod,
-          loginLocation: consumedDistrictHandoff.loginLocation,
+          loginLocation: toAdminSessionLoginLocation(consumedDistrictHandoff.loginLocation),
         });
       } catch {
         // Best-effort session registration after district handoff.

@@ -186,40 +186,40 @@ const buildSuperAdminTwoFactorHtml = (payload: { code: string; support_email: st
 
   return `<!doctype html>
 <html>
-  <body style="margin:0;padding:0;background:#f4f6fb;font-family:Arial,Helvetica,sans-serif;color:#1f2937;">
-    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f4f6fb;padding:24px 12px;">
+  <body style="margin:0;padding:0;background:#f6f5f2;font-family:Arial,Helvetica,sans-serif;color:#171717;">
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f6f5f2;padding:24px 12px;">
       <tr>
         <td align="center">
-          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:560px;background:#ffffff;border:1px solid #e5e7eb;border-radius:12px;overflow:hidden;">
+          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:560px;background:#ffffff;border:1px solid #d8d6d1;border-radius:0;overflow:hidden;">
             <tr>
-              <td style="padding:20px 24px;background:linear-gradient(180deg,#1f4ca3 0%,#38d0b1 100%);color:#ffffff;">
+              <td style="padding:24px 28px 14px 28px;background:#ffffff;border-bottom:1px solid #e7e5df;color:#171717;">
                 ${buildEmailBrandHeaderHtml({ logoUrl: EMAIL_LOGO_URL, brandName: "ItemTraxx" })}
               </td>
             </tr>
             <tr>
-              <td style="padding:24px;">
-                <h2 style="margin:0 0 12px 0;font-size:22px;line-height:1.3;color:#111827;">Your Verification Code</h2>
-                <p style="margin:0 0 14px 0;font-size:15px;line-height:1.6;color:#374151;">
+              <td style="padding:28px;">
+                <h2 style="margin:0 0 12px 0;font-size:22px;line-height:1.3;color:#171717;">Your Verification Code</h2>
+                <p style="margin:0 0 14px 0;font-size:15px;line-height:1.6;color:#343330;">
                   Use the following 6-digit verification code to finish signing in to ItemTraxx super admin.
                 </p>
-                <div style="margin:0 0 18px 0;padding:16px 18px;border-radius:12px;background:#f9fafb;border:1px solid #e5e7eb;font-size:28px;line-height:1.2;font-weight:700;letter-spacing:0.22em;color:#111827;text-align:center;">
+                <div style="margin:0 0 18px 0;padding:16px 18px;border-radius:12px;background:#fbfaf8;border:1px solid #d8d6d1;font-size:28px;line-height:1.2;font-weight:700;letter-spacing:0.22em;color:#171717;text-align:center;">
                   ${code}
                 </div>
-                <p style="margin:0 0 14px 0;font-size:14px;line-height:1.6;color:#6b7280;">
+                <p style="margin:0 0 14px 0;font-size:14px;line-height:1.6;color:#68645f;">
                   This code expires in 10 minutes and can only be used once.
                 </p>
-                <p style="margin:0;font-size:14px;line-height:1.6;color:#6b7280;">
+                <p style="margin:0;font-size:14px;line-height:1.6;color:#68645f;">
                   If you did not attempt to sign in, contact support immediately.
                 </p>
               </td>
             </tr>
             <tr>
-              <td style="padding:16px 24px;border-top:1px solid #e5e7eb;background:#f9fafb;">
-                <p style="margin:0;font-size:12px;line-height:1.6;color:#6b7280;">
+              <td style="padding:16px 24px;border-top:1px solid #e7e5df;background:#fbfaf8;">
+                <p style="margin:0;font-size:12px;line-height:1.6;color:#68645f;">
                   Need help? Contact
-                  <a href="mailto:${supportEmail}" style="color:#19439b;text-decoration:none;">${supportEmail}</a>
+                  <a href="mailto:${supportEmail}" style="color:#171717;text-decoration:underline;text-underline-offset:2px;">${supportEmail}</a>
                 </p>
-                <p style="margin:6px 0 0 0;font-size:12px;line-height:1.6;color:#9ca3af;">
+                <p style="margin:6px 0 0 0;font-size:12px;line-height:1.6;color:#8b8680;">
                   &copy; 2026 ItemTraxx Co. All rights reserved.
                 </p>
               </td>

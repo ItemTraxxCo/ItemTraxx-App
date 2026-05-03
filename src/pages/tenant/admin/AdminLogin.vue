@@ -213,7 +213,7 @@ const handleAdminLogin = async () => {
       const params = new URLSearchParams({
         itx_th: handoff.tokenHash,
         itx_lm: "password",
-        itx_ll: "admin_login",
+        itx_ll: "tenant_admin_login",
       });
       window.location.replace(`/tenant/admin#${params.toString()}`);
       return;
@@ -230,7 +230,8 @@ const handleAdminLogin = async () => {
       buildDistrictAppHandoffUrl(handoff.districtSlug, targetPath, {
         tokenHash: handoff.tokenHash,
         loginMethod: "password",
-        loginLocation: "admin_login",
+        loginLocation:
+          handoff.role === "district_admin" ? "district_admin_login" : "tenant_admin_login",
       })
     );
     void logAdminAction({

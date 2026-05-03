@@ -40,3 +40,14 @@ DOCUMENTATION_COMPLETION_CHECKLIST.md
 # Added by ggshield
 .cache_ggshield
 CONVERSATION_HANDOFF.md
+.agents/skills/integration-vue-3/SKILL.md
+.agents/skills/integration-vue-3/references/basic-integration-1.0-begin.md
+.agents/skills/integration-vue-3/references/basic-integration-1.1-edit.md
+.agents/skills/integration-vue-3/references/basic-integration-1.3-conclude.md
+.agents/skills/integration-vue-3/references/EXAMPLE.md
+.agents/skills/integration-vue-3/references/identify-users.md
+.agents/skills/integration-vue-3/references/vue-js.md
+.agents/skills/integration-vue-3/references/basic-integration-1.2-revise.md
+
+# Local generated previews
+tmp/email-previews/

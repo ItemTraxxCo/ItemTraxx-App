@@ -6,18 +6,30 @@ const escapeHtmlAttribute = (value: string) =>
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#39;");
 
+const CANONICAL_EMAIL_LOGO_URL = "https://itemtraxx.com/brand/logo-light.png";
+const CANONICAL_EMAIL_LOGO_PATHS = new Set([
+  "/brand/logo-light.png",
+  "/brand/logo-dark.png",
+  "/brand/logo-mark.png",
+]);
+
 const resolveSafeEmailLogoUrl = (candidate: string | null | undefined) => {
-  if (!candidate) return null;
+  if (!candidate) return escapeHtmlAttribute(CANONICAL_EMAIL_LOGO_URL);
   const trimmed = candidate.trim();
-  if (!trimmed) return null;
+  if (!trimmed) return escapeHtmlAttribute(CANONICAL_EMAIL_LOGO_URL);
 
   try {
     const url = new URL(trimmed);
-    // Keep email assets HTTPS-only to avoid mixed-content issues in mail clients.
-    if (url.protocol !== "https:") return null;
-    return escapeHtmlAttribute(url.toString());
+    if (url.protocol !== "https:") return escapeHtmlAttribute(CANONICAL_EMAIL_LOGO_URL);
+    if (
+      (url.hostname === "itemtraxx.com" || url.hostname === "www.itemtraxx.com") &&
+      CANONICAL_EMAIL_LOGO_PATHS.has(url.pathname)
+    ) {
+      return escapeHtmlAttribute(url.toString());
+    }
+    return escapeHtmlAttribute(CANONICAL_EMAIL_LOGO_URL);
   } catch {
-    return null;
+    return escapeHtmlAttribute(CANONICAL_EMAIL_LOGO_URL);
   }
 };
 
@@ -28,18 +40,13 @@ export const buildEmailBrandHeaderHtml = (params: {
   const brandName = params.brandName?.trim() || "ItemTraxx";
   const safeLogoUrl = resolveSafeEmailLogoUrl(params.logoUrl);
 
-  if (!safeLogoUrl) {
-    return `<h1 style="margin:0;font-size:20px;line-height:1.3;">${escapeHtmlAttribute(brandName)}</h1>`;
-  }
-
-  // A lot of email clients strip or rewrite CSS; keep this small and inline.
   return [
     `<img`,
     ` src="${safeLogoUrl}"`,
     ` alt="${escapeHtmlAttribute(brandName)}"`,
-    ` height="24"`,
-    ` style="display:block;height:24px;max-height:24px;width:auto;max-width:220px;"`,
+    ` width="150"`,
+    ` height="50"`,
+    ` style="display:block;width:150px;height:50px;max-width:150px;border:0;outline:none;text-decoration:none;"`,
     ` />`,
   ].join("");
 };
-

@@ -1,7 +1,6 @@
 import posthog from "posthog-js";
 
 let initialized = false;
-let recorderLoadAttempted = false;
 
 const isCspUnsafeEvalError = (error: unknown) => {
   const message = error instanceof Error ? error.message : "";
@@ -12,23 +11,11 @@ const isCspUnsafeEvalError = (error: unknown) => {
   );
 };
 
-const loadBundledRecorder = async () => {
-  if (recorderLoadAttempted) return;
-  recorderLoadAttempted = true;
-  try {
-    await import("posthog-js/dist/recorder");
-  } catch (error) {
-    console.warn("[posthog] session replay recorder failed to load; continuing without replay.", error);
-  }
-};
-
 export const initPostHog = async () => {
   if (initialized) return;
   const token = import.meta.env.VITE_POSTHOG_PROJECT_TOKEN?.trim();
   if (!token) return;
   try {
-    await loadBundledRecorder();
-
     const posthogConfig: NonNullable<Parameters<typeof posthog.init>[1]> = {
       api_host: import.meta.env.VITE_POSTHOG_HOST?.trim() || "https://us.i.posthog.com",
       defaults: "2026-01-30",
@@ -47,7 +34,6 @@ export const initPostHog = async () => {
       disable_product_tours: true,
       disable_conversations: true,
       disable_web_experiments: true,
-      disable_external_dependency_loading: true,
       advanced_disable_feature_flags: true,
       advanced_disable_feature_flags_on_first_load: true,
     };

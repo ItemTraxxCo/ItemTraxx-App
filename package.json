@@ -29,29 +29,29 @@
   },
   "dependencies": {
     "@posthog/react": "^1.9.0",
-    "@sentry/vue": "^10.50.0",
-    "@supabase/supabase-js": "^2.104.1",
+    "@sentry/vue": "^10.51.0",
+    "@supabase/supabase-js": "^2.105.3",
     "@vercel/analytics": "^2.0.1",
     "@vercel/speed-insights": "^2.0.0",
     "jsbarcode": "^3.12.3",
     "jspdf": "^4.2.1",
     "jspdf-autotable": "^5.0.7",
-    "posthog-js": "^1.372.6",
-    "supabase": "2.95.3",
+    "posthog-js": "^1.372.8",
+    "supabase": "2.98.1",
     "vue": "^3.5.33",
     "vue-router": "^4.6.4",
-    "zod": "^4.3.6"
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@playwright/test": "^1.59.1",
     "@types/node": "^25.6.0",
     "@vitejs/plugin-vue": "^6.0.6",
     "@vue/tsconfig": "^0.9.1",
-    "rollup": "^4.60.2",
+    "rollup": "^4.60.3",
     "typescript": "~6.0.3",
     "vite": "^8.0.10",
-    "vue-tsc": "^3.2.7",
-    "wrangler": "^4.85.0",
+    "vue-tsc": "^3.2.8",
+    "wrangler": "^4.87.0",
     "zod-to-json-schema": "^3.25.2"
   },
   "overrides": {

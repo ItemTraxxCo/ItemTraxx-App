@@ -37,7 +37,7 @@
     "jspdf": "^4.2.1",
     "jspdf-autotable": "^5.0.7",
     "posthog-js": "^1.372.8",
-    "supabase": "2.98.1",
+    "supabase": "2.98.2",
     "vue": "^3.5.33",
     "vue-router": "^4.6.4",
     "zod": "^4.4.3"

@@ -1,7 +1,7 @@
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { sendLoggedResendEmail } from "../_shared/emailDeliveryLog.ts";
-import { buildEmailBrandHeaderHtml } from "../_shared/emailBranding.ts";
+import { buildEmailBrandHeaderHtml, withEmailBrandLogoAttachment } from "../_shared/emailBranding.ts";
 import { isKillSwitchWriteBlocked } from "../_shared/killSwitch.ts";
 import { getRequestId, logError, logInfo } from "../_shared/observability.ts";
 import { isAllowedOrigin, parseAllowedOrigins } from "../_shared/cors.ts";
@@ -433,7 +433,7 @@ serve(async (req) => {
     const generalLocation = resolveGeneralLocation(req);
 
     const subject = `New ItemTraxx ${loginContext.subjectLabel} - ${accountName}`;
-    await sendLoggedResendEmail(adminClient, resendApiKey, {
+    await sendLoggedResendEmail(adminClient, resendApiKey, withEmailBrandLogoAttachment({
       from: fromEmail,
       to: [recipientEmail],
       subject,
@@ -455,7 +455,7 @@ serve(async (req) => {
         `Location: ${generalLocation ?? "Unavailable"} (${clientIp ?? "Unavailable"})\n` +
         `Time: ${loginTimeLabel}\n\n` +
         `If this wasn't you, reset your password at ${PASSWORD_RESET_URL} and contact support immediately at ${CONTACT_SUPPORT_URL}.`,
-    }, {
+    }), {
       emailType: "login_notification",
       recipientEmail,
       subject,

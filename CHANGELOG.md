@@ -1,6 +1,6 @@
 # Changelog
 
-Last updated (year-month-day): 2026-04-25
+Last updated (year-month-day): 2026-05-06
 
 This public changelog summarizes notable ItemTraxx product, reliability, security, and experience updates at a high level. Detailed internal engineering and operational notes are maintained separately.
 
@@ -15,6 +15,43 @@ Changes are dated based on the default timezone: America/Los_Angeles
 - [TERMS.md](TERMS.md) – Terms of service for users
 - [PRIVACY.md](PRIVACY.md) – Privacy policy and data handling
 - [SECURITY.md](SECURITY.md) – Security reporting and guidelines
+
+---
+
+### 5/06/2026 Development Update
+
+- Improved login-route startup performance by mounting the app earlier and shifting non-critical monitoring initialization to asynchronous post-mount behavior.
+- Continued reliability updates for E2E/workflow execution and related test maintenance.
+- Refined operational email branding and authentication notification presentation for better consistency across security-related communications.
+
+### 5/03/2026 Development Update
+
+- Refined operational email branding delivery and asset-link consistency.
+- Continued authentication-notification quality and consistency updates across key sign-in/security communications.
+
+### 5/02/2026 Development Update
+
+- Improved login and security-notification message consistency.
+- Continued reliability-focused cleanup for monitoring/analytics behavior.
+
+### 5/01/2026 Development Update
+
+- Completed another security hardening pass across authentication/session and edge-proxy request handling.
+- Improved access-control behavior for district subdomain routing and related fallback/error handling flows.
+
+### 4/30/2026 Development Update
+
+- Improved not-found/error handling behavior for district-host and access-state edge cases.
+- Refined theme/interaction consistency on fallback and error experiences.
+
+### 4/28/2026 Development Update
+
+- Added loading-state improvements for route transitions and continued authentication hardening updates.
+- Completed additional security and reliability cleanup across auth-adjacent request handling.
+
+### 4/27/2026 Development Update
+
+- Completed routine dependency and branch-maintenance updates.
 
 ---
 

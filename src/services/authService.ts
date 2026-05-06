@@ -26,6 +26,7 @@ import {
 import { authenticatedRpc, authenticatedSelect } from "./authenticatedDataClient";
 import { rotateDeviceSession } from "../utils/deviceSession";
 import { revokeCurrentTenantAdminSession, touchTenantAdminSession } from "./adminOpsService";
+import { touchSuperAdminSession } from "./superOpsService";
 
 type ProfileRow = {
   id: string;
@@ -217,6 +218,14 @@ export const verifySuperAdminEmailChallenge = async (code: string) => {
   }
   setSecondaryAuth(true);
   clearPendingSuperAdminVerificationEmail();
+  try {
+    await touchSuperAdminSession({
+      loginMethod: "password",
+      loginLocation: "super_auth",
+    });
+  } catch {
+    // Super-admin session tracking is best-effort and must not block successful login.
+  }
   sendLoginNotification(result.data.access_token, { loginLocation: "super_admin_login" });
 };
 
@@ -1000,6 +1009,61 @@ export const superAdminLogin = async (
   return {
     email: challenge.email,
   };
+};
+
+export const superAdminPasskeyLogin = async (options: {
+  sendLoginNotification?: boolean;
+  loginLocation?: "super_auth" | "super_settings";
+} = {}) => {
+  const passkeySignIn = await supabase.auth.signInWithPasskey();
+  if (passkeySignIn.error || !passkeySignIn.data?.session) {
+    throw new Error(passkeySignIn.error?.message || "Passkey sign in failed.");
+  }
+
+  const session = passkeySignIn.data.session;
+  const accessToken = session.access_token;
+  const refreshToken = session.refresh_token;
+  if (!accessToken || !refreshToken) {
+    throw new Error("Passkey sign in failed.");
+  }
+
+  const verify = await invokeEdgeFunction<{ verified?: boolean }>(SUPER_ADMIN_2FA_FUNCTION, {
+    method: "POST",
+    accessToken,
+    body: {
+      action: "complete_passkey_login",
+      payload: {},
+    },
+  });
+  if (!verify.ok || !verify.data?.verified) {
+    throw edgeFunctionError(verify, "Passkey verification failed.");
+  }
+
+  await exchangeHttpSession({
+    access_token: accessToken,
+    refresh_token: refreshToken,
+  });
+  await clearLocalSession();
+  await refreshAuthFromSession();
+  const current = getAuthState();
+  if (current.role !== "super_admin") {
+    await signOut();
+    throw new Error("Access denied.");
+  }
+
+  setSecondaryAuth(true);
+  clearPendingSuperAdminVerificationEmail();
+  try {
+    await touchSuperAdminSession({
+      loginMethod: "passkey",
+      loginLocation: options.loginLocation ?? "super_auth",
+    });
+  } catch {
+    // Super-admin session tracking is best-effort and must not block successful login.
+  }
+  if (options.sendLoginNotification !== false) {
+    sendLoginNotification(accessToken, { loginLocation: "super_admin_login" });
+  }
 };
 
 export const signOut = async () => {

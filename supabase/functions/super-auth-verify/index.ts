@@ -45,7 +45,13 @@ type VerifyAction = {
   payload?: { code?: string; challenge_token?: string };
 };
 type ResendAction = { action: "resend_email_challenge"; payload?: { challenge_token?: string } };
-type RequestBody = StartPasswordLoginAction | StartAction | VerifyAction | ResendAction;
+type CompletePasskeyAction = { action: "complete_passkey_login"; payload?: Record<string, never> };
+type RequestBody =
+  | StartPasswordLoginAction
+  | StartAction
+  | VerifyAction
+  | ResendAction
+  | CompletePasskeyAction;
 
 type ChallengeRow = {
   id: string;
@@ -590,6 +596,22 @@ serve(async (req) => {
         metadata,
       });
     };
+
+    if (body.action === "complete_passkey_login") {
+      await registerPrivilegedStepUp(adminClient, {
+        userId: context.userId,
+        roleScope: "super_admin",
+        authToken: context.authToken,
+        source: "super_admin_passkey_login",
+      });
+
+      await writeAudit("super_admin_passkey_verified", {});
+      logInfo("super-auth-verify passkey login completed", requestId, { user_id: context.userId });
+      return jsonResponse(200, {
+        verified: true,
+        email: context.userEmail,
+      });
+    }
 
     if (body.action === "start_email_challenge" || body.action === "resend_email_challenge") {
       const { data: latestChallenge } = await adminClient

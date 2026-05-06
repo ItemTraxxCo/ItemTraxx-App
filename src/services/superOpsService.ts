@@ -1,5 +1,6 @@
 import { invokeEdgeFunction } from "./edgeFunctionClient";
 import { edgeFunctionError } from "./appErrors";
+import { getOrCreateDeviceSession } from "../utils/deviceSession";
 
 export type RuntimeConfigMap = Record<string, unknown>;
 
@@ -211,6 +212,11 @@ export type SupportRequestDetail = SupportRequestListItem & {
 };
 
 type SuperOpsAction =
+  | "verify_password"
+  | "touch_session"
+  | "list_sessions"
+  | "revoke_session"
+  | "revoke_all_sessions"
   | "get_control_center"
   | "set_runtime_config"
   | "upsert_alert_rule"
@@ -256,6 +262,19 @@ export type SuperControlCenter = {
   alert_rules: SuperAlertRule[];
   approvals: SuperApproval[];
   jobs: SuperJob[];
+};
+
+export type SuperAdminSessionItem = {
+  id: string;
+  device_id: string;
+  device_label: string | null;
+  user_agent: string | null;
+  login_method: "password" | "passkey" | null;
+  login_location: "super_auth" | "super_settings" | null;
+  general_location: string | null;
+  created_at: string | null;
+  last_seen_at: string | null;
+  is_current: boolean;
 };
 
 export const getControlCenter = async () =>
@@ -405,3 +424,61 @@ export const getInternalOpsSnapshot = async () =>
     action: "get_internal_ops_snapshot",
     payload: {},
   });
+
+export const verifySuperAdminPassword = (password: string) =>
+  callSuperOps<{ verified: boolean }>({
+    action: "verify_password",
+    payload: { password },
+  });
+
+export const touchSuperAdminSession = async (options: {
+  loginMethod?: "password" | "passkey" | null;
+  loginLocation?: "super_auth" | "super_settings" | null;
+} = {}) => {
+  const { deviceId, deviceLabel } = getOrCreateDeviceSession();
+  return callSuperOps<{ ok: boolean }>({
+    action: "touch_session",
+    payload: {
+      device_id: deviceId,
+      device_label: deviceLabel,
+      login_method: options.loginMethod ?? null,
+      login_location: options.loginLocation ?? null,
+    },
+  });
+};
+
+export const listSuperAdminSessions = async () => {
+  const { deviceId, deviceLabel } = getOrCreateDeviceSession();
+  const response = await callSuperOps<{ sessions: SuperAdminSessionItem[] }>({
+    action: "list_sessions",
+    payload: {
+      device_id: deviceId,
+      device_label: deviceLabel,
+    },
+  });
+  return response.sessions ?? [];
+};
+
+export const revokeSuperAdminSession = (sessionId: string) => {
+  const { deviceId, deviceLabel } = getOrCreateDeviceSession();
+  return callSuperOps<{ revoked: boolean }>({
+    action: "revoke_session",
+    payload: {
+      session_id: sessionId,
+      device_id: deviceId,
+      device_label: deviceLabel,
+    },
+  });
+};
+
+export const revokeAllSuperAdminSessions = (signOutCurrent = false) => {
+  const { deviceId, deviceLabel } = getOrCreateDeviceSession();
+  return callSuperOps<{ revoked: number }>({
+    action: "revoke_all_sessions",
+    payload: {
+      sign_out_current: signOutCurrent,
+      device_id: deviceId,
+      device_label: deviceLabel,
+    },
+  });
+};

@@ -409,6 +409,17 @@ const routes: RouteRecordRaw[] = [
     },
   },
   {
+    path: "/super-admin/settings",
+    name: "super-admin-settings",
+    component: () => import("../pages/super/Settings.vue"),
+    meta: {
+      requiresSession: true,
+      requiresRole: "super_admin",
+      requiresSuperAuth: true,
+      title: "Super Admin Settings | ItemTraxx",
+    },
+  },
+  {
     path: "/super-admin/tenants",
     name: "super-admin-tenants",
     component: () => import("../pages/super/Tenants.vue"),

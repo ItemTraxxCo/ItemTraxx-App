@@ -32,7 +32,7 @@
         "npm:jsbarcode@^3.12.3",
         "npm:jspdf-autotable@^5.0.7",
         "npm:jspdf@^4.2.1",
-        "npm:posthog-js@^1.372.1",
+        "npm:posthog-js@^1.372.6",
         "npm:rollup@^4.60.2",
         "npm:supabase@2.95.3",
         "npm:typescript@~6.0.3",

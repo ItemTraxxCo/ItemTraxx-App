@@ -264,8 +264,6 @@ const mountApp = async () => {
   });
 
   const app = createApp(App);
-  await initializeSentry(app);
-  await initializePostHog();
   const { installClientDiagnostics } = await import("./services/clientDiagnostics");
   installClientDiagnostics();
   const { installGlobalErrorHandling } = await import("./services/globalErrorHandling");
@@ -283,6 +281,8 @@ const mountApp = async () => {
   app.use(router);
   await router.isReady();
   app.mount("#app");
+  void initializeSentry(app);
+  void initializePostHog();
   bindConsentDrivenMonitoring(app);
   captureInitialPerfMetrics();
   attachE2EControls();

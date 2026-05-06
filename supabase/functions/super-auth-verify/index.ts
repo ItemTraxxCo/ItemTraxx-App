@@ -1,7 +1,7 @@
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient, type SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { sendLoggedResendEmail } from "../_shared/emailDeliveryLog.ts";
-import { buildEmailBrandHeaderHtml } from "../_shared/emailBranding.ts";
+import { buildEmailBrandHeaderHtml, withEmailBrandLogoAttachment } from "../_shared/emailBranding.ts";
 import { isKillSwitchWriteBlocked } from "../_shared/killSwitch.ts";
 import { getRequestId, logError, logInfo } from "../_shared/observability.ts";
 import {
@@ -248,13 +248,13 @@ const sendSuperAdminTwoFactorEmail = async (
   payload: { to_email: string; code: string; support_email: string; from_email: string },
 ) => {
   const subject = "Your ItemTraxx verification code";
-  await sendLoggedResendEmail(adminClient, resendApiKey, {
+  await sendLoggedResendEmail(adminClient, resendApiKey, withEmailBrandLogoAttachment({
     from: payload.from_email,
     to: payload.to_email,
     subject,
     html: buildSuperAdminTwoFactorHtml({ code: payload.code, support_email: payload.support_email }),
     text: `Your ItemTraxx verification code is ${payload.code}. It expires in 10 minutes. If this wasn't you, reset your password at ${PASSWORD_RESET_URL} and contact support immediately at ${CONTACT_SUPPORT_URL}.`,
-  }, {
+  }), {
     emailType: "super_admin_2fa",
     recipientEmail: payload.to_email,
     subject,

@@ -794,9 +794,7 @@ const maybeRedirectAuthenticatedPublicHome = async () => {
     targetPath = hasFreshAdminVerification(auth.adminVerifiedAt)
       ? "/district"
       : "/tenant/admin-login";
-  } else if (auth.role === "tenant_admin" && auth.tenantContextId) {
-    targetPath = "/tenant/checkout";
-  } else if (auth.role === "tenant_user" && auth.tenantContextId) {
+  } else if ((auth.role === "tenant_admin" || auth.role === "tenant_user") && auth.tenantContextId) {
     targetPath = "/tenant/checkout";
   }
 
@@ -815,12 +813,7 @@ const maybeRedirectAuthenticatedPublicHome = async () => {
       const districtSlug = resolvedDistrict?.slug?.trim().toLowerCase();
       if (districtSlug) {
         window.location.replace(buildDistrictAppUrl(districtSlug, targetPath));
-        return;
       }
-    }
-
-    if (route.path !== targetPath) {
-      await router.replace(targetPath);
     }
   } finally {
     publicHomeRedirectInFlight = false;

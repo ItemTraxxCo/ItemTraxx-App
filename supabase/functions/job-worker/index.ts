@@ -1,7 +1,7 @@
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient, type SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { sendLoggedResendEmail } from "../_shared/emailDeliveryLog.ts";
-import { buildEmailBrandHeaderHtml } from "../_shared/emailBranding.ts";
+import { buildEmailBrandHeaderHtml, withEmailBrandLogoAttachment } from "../_shared/emailBranding.ts";
 import { isKillSwitchWriteBlocked } from "../_shared/killSwitch.ts";
 import { getRequestId, logError, logInfo } from "../_shared/observability.ts";
 import { isAllowedOrigin, parseAllowedOrigins } from "../_shared/cors.ts";
@@ -145,7 +145,7 @@ const sendTrackedResendEmail = async (
     metadata?: Record<string, unknown> | null;
   },
 ) => {
-  await sendLoggedResendEmail(adminClient, apiKey, payload, {
+  await sendLoggedResendEmail(adminClient, apiKey, withEmailBrandLogoAttachment(payload), {
     emailType: context.emailType,
     recipientEmail: context.recipientEmail,
     subject: context.subject,

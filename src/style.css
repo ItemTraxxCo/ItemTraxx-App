@@ -754,8 +754,7 @@ textarea {
   padding: 0.85rem 1rem;
   background: var(--surface);
   color: var(--text);
-  border: 1px solid var(--border);
-  border-left: 4px solid color-mix(in srgb, var(--danger) 68%, var(--surface) 32%);
+  border: 2px solid color-mix(in srgb, var(--danger) 68%, var(--surface) 32%);
   border-radius: 16px;
   box-shadow: none;
   font-size: 0.92rem;
@@ -771,12 +770,15 @@ textarea {
 
 .maintenance-top-banner strong {
   font-size: 0.76rem;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  border: 1px solid color-mix(in srgb, var(--danger) 52%, var(--border) 48%);
-  border-radius: 999px;
-  padding: 0.12rem 0.48rem;
+  letter-spacing: 0.01em;
+  text-transform: none;
+  padding: 0;
   line-height: 1.2;
+  margin: 0;
+  border: 0;
+  outline: 0;
+  box-shadow: none;
+  background: transparent;
 }
 
 .kill-switch-fullscreen {
@@ -1154,8 +1156,7 @@ textarea {
   padding: 0.85rem 1rem;
   background: var(--surface);
   color: var(--text);
-  border: 1px solid var(--border);
-  border-left: 4px solid color-mix(in srgb, var(--warning) 72%, var(--surface) 28%);
+  border: 2px solid color-mix(in srgb, var(--warning) 72%, var(--surface) 28%);
   border-radius: 16px;
   box-shadow: none;
   font-size: 0.92rem;
@@ -1163,17 +1164,20 @@ textarea {
 }
 
 :root[data-theme="dark"] .broadcast-top-banner {
-  border-left-color: color-mix(in srgb, #dca737 72%, var(--surface) 28%);
+  border-color: color-mix(in srgb, #dca737 72%, var(--surface) 28%);
 }
 
 .broadcast-top-banner .broadcast-title {
   font-size: 0.76rem;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  border: 1px solid color-mix(in srgb, var(--warning) 56%, var(--border) 44%);
-  border-radius: 999px;
-  padding: 0.12rem 0.48rem;
+  letter-spacing: 0.01em;
+  text-transform: none;
+  padding: 0;
   line-height: 1.2;
+  margin: 0;
+  border: 0;
+  outline: 0;
+  box-shadow: none;
+  background: transparent;
 }
 
 .broadcast-top-banner .broadcast-content {
@@ -1208,7 +1212,7 @@ textarea {
   border-radius: 16px;
   box-shadow: none;
   padding: 0.85rem 1rem;
-  border: 1px solid var(--border);
+  border: 2px solid color-mix(in srgb, var(--warning) 72%, var(--surface) 28%);
   animation: top-banner-in 0.35s ease-out both;
 }
 
@@ -1220,8 +1224,12 @@ textarea {
 
 .broadcast-title {
   font-size: 0.8rem;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+  letter-spacing: 0.01em;
+  text-transform: none;
+  border: 0;
+  outline: 0;
+  box-shadow: none;
+  background: transparent;
 }
 
 .broadcast-message {
@@ -1267,11 +1275,11 @@ textarea {
 }
 
 .broadcast-warning {
-  border-left-color: color-mix(in srgb, var(--warning) 72%, var(--surface) 28%);
+  border-color: color-mix(in srgb, var(--warning) 72%, var(--surface) 28%);
 }
 
 .broadcast-critical {
-  border-left-color: color-mix(in srgb, var(--danger) 68%, var(--surface) 32%);
+  border-color: color-mix(in srgb, var(--danger) 68%, var(--surface) 32%);
 }
 
 @keyframes top-banner-in {

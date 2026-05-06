@@ -743,17 +743,18 @@ textarea {
 .maintenance-top-banner {
   position: fixed;
   top: calc(env(safe-area-inset-top, 0px) + 10px);
-  left: calc(0.7rem + env(safe-area-inset-left, 0px));
-  right: calc(0.7rem + env(safe-area-inset-right, 0px));
+  left: 50%;
+  transform: translateX(-50%);
   z-index: 1100;
   display: flex;
   align-items: flex-start;
   gap: 0.65rem;
-  width: auto;
-  max-width: 760px;
+  width: min(
+    760px,
+    calc(100vw - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px) - 1.4rem)
+  );
   min-height: 56px;
-  margin-left: auto;
-  margin-right: auto;
+  box-sizing: border-box;
   padding: 0.85rem 1rem;
   background: var(--surface);
   color: var(--text);
@@ -767,8 +768,8 @@ textarea {
 .app-shell.route-shell-banner-bleed .maintenance-top-banner,
 .app-shell.route-shell-banner-bleed .broadcast-top-banner,
 .app-shell.route-shell-banner-bleed .incident-banner {
-  margin-left: auto;
-  margin-right: auto;
+  margin-left: 0;
+  margin-right: 0;
 }
 
 .maintenance-top-banner strong {
@@ -1116,16 +1117,6 @@ textarea {
 }
 
 @media (max-width: 640px) {
-  .maintenance-top-banner,
-  .broadcast-top-banner,
-  .incident-banner {
-    left: calc(0.7rem + env(safe-area-inset-left, 0px));
-    right: calc(0.7rem + env(safe-area-inset-right, 0px));
-    width: auto;
-    max-width: none;
-    transform: none;
-  }
-
   .version-update-fullscreen {
     padding: 1.15rem;
   }
@@ -1158,17 +1149,18 @@ textarea {
 .broadcast-top-banner {
   position: fixed;
   top: calc(env(safe-area-inset-top, 0px) + 10px);
-  left: calc(0.7rem + env(safe-area-inset-left, 0px));
-  right: calc(0.7rem + env(safe-area-inset-right, 0px));
+  left: 50%;
+  transform: translateX(-50%);
   z-index: 1100;
   display: flex;
   align-items: flex-start;
   gap: 0.65rem;
-  width: auto;
-  max-width: 760px;
+  width: min(
+    760px,
+    calc(100vw - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px) - 1.4rem)
+  );
   min-height: 56px;
-  margin-left: auto;
-  margin-right: auto;
+  box-sizing: border-box;
   padding: 0.85rem 1rem;
   background: var(--surface);
   color: var(--text);
@@ -1218,14 +1210,20 @@ textarea {
 .incident-banner {
   position: fixed;
   top: calc(env(safe-area-inset-top, 0px) + 10px);
-  left: calc(0.7rem + env(safe-area-inset-left, 0px));
-  right: calc(0.7rem + env(safe-area-inset-right, 0px));
+  left: 50%;
+  right: auto;
+  transform: translateX(-50%);
   z-index: 1095;
-  width: auto;
-  max-width: 760px;
+  width: min(
+    760px,
+    calc(100vw - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px) - 1.4rem)
+  );
+  max-width: min(
+    760px,
+    calc(100vw - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px) - 1.4rem)
+  );
   margin: 0;
-  margin-left: auto;
-  margin-right: auto;
+  box-sizing: border-box;
   border-radius: 16px;
   box-shadow: none;
   padding: 0.85rem 1rem;

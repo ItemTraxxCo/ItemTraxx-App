@@ -16,7 +16,7 @@
     <div class="page-intro">
       <h1>Request a Demo</h1>
       <p class="muted">
-        Send a demo request and our team will follow up within 48 hours to schedule next
+        Send a demo request and our team will follow up within 72 hours (within active hours) to schedule next
         steps.
       </p>
     </div>

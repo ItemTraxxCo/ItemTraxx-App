@@ -143,7 +143,7 @@
           Target response windows:
         </p>
         <ul>
-          <li>Initial acknowledgment: within 72 hours</li>
+          <li>Initial acknowledgment: within 72 hours (within active hours)</li>
           <li>Severity triage target: within 5 business days</li>
           <li>Critical remediation: expedited as soon as practical</li>
         </ul>

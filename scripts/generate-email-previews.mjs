@@ -253,7 +253,24 @@ const indexHtml = `<!doctype html>
 </html>`;
 
 await mkdir(outDir, { recursive: true });
-await Promise.all(previews.map((preview) => writeFile(path.join(outDir, preview.file), preview.html)));
+const resolvePreviewOutputPath = (fileName) => {
+  const normalizedFileName = path.basename(String(fileName ?? ""));
+  if (!/^[a-z0-9][a-z0-9-]*\.html$/i.test(normalizedFileName)) {
+    throw new Error(`Invalid preview filename: ${fileName}`);
+  }
+
+  const resolvedOutDir = path.resolve(outDir);
+  const resolvedPath = path.resolve(resolvedOutDir, normalizedFileName);
+  if (!resolvedPath.startsWith(`${resolvedOutDir}${path.sep}`)) {
+    throw new Error(`Refused to write outside preview directory: ${fileName}`);
+  }
+
+  return resolvedPath;
+};
+
+await Promise.all(
+  previews.map((preview) => writeFile(resolvePreviewOutputPath(preview.file), preview.html))
+);
 await writeFile(path.join(outDir, "index.html"), indexHtml);
 
 console.log(`Wrote ${previews.length} email previews to ${outDir}`);

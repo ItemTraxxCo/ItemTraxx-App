@@ -194,7 +194,6 @@ import {
   revokeAllSuperAdminSessions,
   revokeSuperAdminSession,
   touchSuperAdminSession,
-  verifySuperAdminPassword,
   type SuperAdminSessionItem,
 } from "../../services/superOpsService";
 import { superAdminPasskeyLogin } from "../../services/authService";
@@ -316,7 +315,21 @@ const reauthWithPassword = async () => {
   passkeyError.value = "";
   isReauthLoading.value = true;
   try {
-    await verifySuperAdminPassword(reauthPassword.value);
+    const email = (auth.email || "").trim().toLowerCase();
+    if (!email) {
+      throw new Error("No account email found for this session.");
+    }
+    const signIn = await supabase.auth.signInWithPassword({
+      email,
+      password: reauthPassword.value,
+    });
+    if (signIn.error || !signIn.data.session?.access_token) {
+      throw signIn.error || new Error("Invalid password.");
+    }
+    await touchSuperAdminSession({
+      loginMethod: "password",
+      loginLocation: "super_settings",
+    });
     grantPasskeyManagementWindow();
     reauthPassword.value = "";
     reauthSuccess.value = "Password verified. You can now manage passkeys for 5 minutes.";

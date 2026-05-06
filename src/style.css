@@ -741,31 +741,48 @@ textarea {
 }
 
 .maintenance-top-banner {
-  position: sticky;
-  top: 0;
+  position: fixed;
+  top: calc(env(safe-area-inset-top, 0px) + 10px);
+  left: 50%;
+  transform: translateX(-50%);
   z-index: 1100;
   display: flex;
-  align-items: center;
-  gap: 0.55rem;
+  align-items: flex-start;
+  gap: 0.65rem;
+  width: min(
+    760px,
+    calc(100vw - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px) - 1.4rem)
+  );
   min-height: 56px;
-  padding: 0.75rem 1rem;
-  background: #7f1d1d;
-  color: #fff5f5;
-  border-bottom: 1px solid color-mix(in srgb, #ffffff 24%, #7f1d1d 76%);
+  box-sizing: border-box;
+  padding: 0.85rem 1rem;
+  background: var(--surface);
+  color: var(--text);
+  border: 2px solid color-mix(in srgb, var(--danger) 68%, var(--surface) 32%);
+  border-radius: 16px;
+  box-shadow: none;
   font-size: 0.92rem;
+  animation: top-banner-in 0.35s ease-out both;
 }
 
 .app-shell.route-shell-banner-bleed .maintenance-top-banner,
 .app-shell.route-shell-banner-bleed .broadcast-top-banner,
 .app-shell.route-shell-banner-bleed .incident-banner {
-  margin-left: -2rem;
-  margin-right: -2rem;
+  margin-left: 0;
+  margin-right: 0;
 }
 
 .maintenance-top-banner strong {
-  font-size: 0.8rem;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+  font-size: 0.76rem;
+  letter-spacing: 0.01em;
+  text-transform: none;
+  padding: 0;
+  line-height: 1.2;
+  margin: 0;
+  border: 0;
+  outline: 0;
+  box-shadow: none;
+  background: transparent;
 }
 
 .kill-switch-fullscreen {
@@ -1028,8 +1045,8 @@ textarea {
   .app-shell.route-shell-banner-bleed .maintenance-top-banner,
   .app-shell.route-shell-banner-bleed .broadcast-top-banner,
   .app-shell.route-shell-banner-bleed .incident-banner {
-    margin-left: -2rem;
-    margin-right: -2rem;
+    margin-left: 0;
+    margin-right: 0;
   }
 }
 
@@ -1130,30 +1147,45 @@ textarea {
 }
 
 .broadcast-top-banner {
-  position: sticky;
-  top: 0;
+  position: fixed;
+  top: calc(env(safe-area-inset-top, 0px) + 10px);
+  left: 50%;
+  transform: translateX(-50%);
   z-index: 1100;
   display: flex;
   align-items: flex-start;
-  gap: 0.55rem;
+  gap: 0.65rem;
+  width: min(
+    760px,
+    calc(100vw - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px) - 1.4rem)
+  );
   min-height: 56px;
-  padding: 0.75rem 1rem;
-  background: #f6c453;
-  color: #422006;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.15);
+  box-sizing: border-box;
+  padding: 0.85rem 1rem;
+  background: var(--surface);
+  color: var(--text);
+  border: 2px solid color-mix(in srgb, var(--warning) 72%, var(--surface) 28%);
+  border-radius: 16px;
+  box-shadow: none;
   font-size: 0.92rem;
+  animation: top-banner-in 0.35s ease-out both;
 }
 
 :root[data-theme="dark"] .broadcast-top-banner {
-  background: #5f4108;
-  color: #fff4cf;
-  border-bottom-color: rgba(255, 255, 255, 0.18);
+  border-color: color-mix(in srgb, #dca737 72%, var(--surface) 28%);
 }
 
 .broadcast-top-banner .broadcast-title {
-  font-size: 0.8rem;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+  font-size: 0.76rem;
+  letter-spacing: 0.01em;
+  text-transform: none;
+  padding: 0;
+  line-height: 1.2;
+  margin: 0;
+  border: 0;
+  outline: 0;
+  box-shadow: none;
+  background: transparent;
 }
 
 .broadcast-top-banner .broadcast-content {
@@ -1170,18 +1202,33 @@ textarea {
 
 .broadcast-top-banner .broadcast-dismiss {
   margin-top: 0.05rem;
+  color: inherit;
+  border-color: var(--border);
+  background: color-mix(in srgb, var(--surface-2) 82%, transparent);
 }
 
 .incident-banner {
-  position: sticky;
-  top: 0;
-  left: 0;
-  right: 0;
+  position: fixed;
+  top: calc(env(safe-area-inset-top, 0px) + 10px);
+  left: 50%;
+  right: auto;
+  transform: translateX(-50%);
   z-index: 1095;
-  max-width: none;
+  width: min(
+    760px,
+    calc(100vw - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px) - 1.4rem)
+  );
+  max-width: min(
+    760px,
+    calc(100vw - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px) - 1.4rem)
+  );
   margin: 0;
-  border-radius: 0;
+  box-sizing: border-box;
+  border-radius: 16px;
   box-shadow: none;
+  padding: 0.85rem 1rem;
+  border: 2px solid color-mix(in srgb, var(--warning) 72%, var(--surface) 28%);
+  animation: top-banner-in 0.35s ease-out both;
 }
 
 .broadcast-content {
@@ -1192,8 +1239,12 @@ textarea {
 
 .broadcast-title {
   font-size: 0.8rem;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+  letter-spacing: 0.01em;
+  text-transform: none;
+  border: 0;
+  outline: 0;
+  box-shadow: none;
+  background: transparent;
 }
 
 .broadcast-message {
@@ -1239,11 +1290,22 @@ textarea {
 }
 
 .broadcast-warning {
-  border-color: rgba(247, 176, 31, 0.6);
+  border-color: color-mix(in srgb, var(--warning) 72%, var(--surface) 28%);
 }
 
 .broadcast-critical {
-  border-color: rgba(210, 38, 38, 0.7);
+  border-color: color-mix(in srgb, var(--danger) 68%, var(--surface) 32%);
+}
+
+@keyframes top-banner-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -10px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
 }
 
 .menu-button {

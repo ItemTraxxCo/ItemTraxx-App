@@ -166,8 +166,8 @@ const isDemoIntent = computed(() => route.query.intent === "demo");
 const pageTitle = computed(() => (isDemoIntent.value ? "Request a Demo" : "Contact Sales"));
 const pageLead = computed(() =>
   isDemoIntent.value
-    ? "Send your demo request and our team will respond within 48 hours to schedule next steps."
-    : "Send your request and our team will respond within 48 hours."
+    ? "Send your demo request and our team will respond within 72 hours (within active hours) to schedule next steps."
+    : "Send your request and our team will respond within 72 hours (within active hours)."
 );
 const submitLabel = computed(() => (isDemoIntent.value ? "Request Demo" : "Submit Sales Request"));
 const returnPath = computed(() => (isDemoIntent.value ? "/" : "/pricing"));

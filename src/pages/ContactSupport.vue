@@ -15,7 +15,7 @@
 
     <div class="page-intro">
       <h1>Contact Support</h1>
-      <p class="muted">Send your request and our team will respond within 48 hours.</p>
+      <p class="muted">Send your request and our team will respond within 72 hours (within active hours).</p>
     </div>
 
     <section class="support-section">

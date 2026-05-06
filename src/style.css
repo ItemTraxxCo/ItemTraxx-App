@@ -743,14 +743,17 @@ textarea {
 .maintenance-top-banner {
   position: fixed;
   top: calc(env(safe-area-inset-top, 0px) + 10px);
-  left: 50%;
-  transform: translateX(-50%);
+  left: calc(0.7rem + env(safe-area-inset-left, 0px));
+  right: calc(0.7rem + env(safe-area-inset-right, 0px));
   z-index: 1100;
   display: flex;
   align-items: flex-start;
   gap: 0.65rem;
-  width: min(760px, calc(100vw - 1.4rem));
+  width: auto;
+  max-width: 760px;
   min-height: 56px;
+  margin-left: auto;
+  margin-right: auto;
   padding: 0.85rem 1rem;
   background: var(--surface);
   color: var(--text);
@@ -764,8 +767,8 @@ textarea {
 .app-shell.route-shell-banner-bleed .maintenance-top-banner,
 .app-shell.route-shell-banner-bleed .broadcast-top-banner,
 .app-shell.route-shell-banner-bleed .incident-banner {
-  margin-left: 0;
-  margin-right: 0;
+  margin-left: auto;
+  margin-right: auto;
 }
 
 .maintenance-top-banner strong {
@@ -1155,14 +1158,17 @@ textarea {
 .broadcast-top-banner {
   position: fixed;
   top: calc(env(safe-area-inset-top, 0px) + 10px);
-  left: 50%;
-  transform: translateX(-50%);
+  left: calc(0.7rem + env(safe-area-inset-left, 0px));
+  right: calc(0.7rem + env(safe-area-inset-right, 0px));
   z-index: 1100;
   display: flex;
   align-items: flex-start;
   gap: 0.65rem;
-  width: min(760px, calc(100vw - 1.4rem));
+  width: auto;
+  max-width: 760px;
   min-height: 56px;
+  margin-left: auto;
+  margin-right: auto;
   padding: 0.85rem 1rem;
   background: var(--surface);
   color: var(--text);
@@ -1212,13 +1218,14 @@ textarea {
 .incident-banner {
   position: fixed;
   top: calc(env(safe-area-inset-top, 0px) + 10px);
-  left: 50%;
-  right: auto;
-  transform: translateX(-50%);
+  left: calc(0.7rem + env(safe-area-inset-left, 0px));
+  right: calc(0.7rem + env(safe-area-inset-right, 0px));
   z-index: 1095;
-  width: min(760px, calc(100vw - 1.4rem));
-  max-width: min(760px, calc(100vw - 1.4rem));
+  width: auto;
+  max-width: 760px;
   margin: 0;
+  margin-left: auto;
+  margin-right: auto;
   border-radius: 16px;
   box-shadow: none;
   padding: 0.85rem 1rem;

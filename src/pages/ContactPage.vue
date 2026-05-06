@@ -21,6 +21,9 @@
           ItemTraxx has separate paths for demos, sales, support, and security reports. This page
           points you to the right one so your request gets to the right workflow faster.
         </p>
+        <p class="contact-lead contact-response-note">
+          Default response target: within 72 hours (within active hours).
+        </p>
       </section>
 
       <section class="contact-grid">
@@ -217,6 +220,10 @@ onUnmounted(() => {
 
 .contact-hero {
   padding: 2rem;
+}
+
+.contact-response-note {
+  margin-top: 0.9rem;
 }
 
 .contact-hero h1,

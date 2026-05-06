@@ -1113,6 +1113,16 @@ textarea {
 }
 
 @media (max-width: 640px) {
+  .maintenance-top-banner,
+  .broadcast-top-banner,
+  .incident-banner {
+    left: calc(0.7rem + env(safe-area-inset-left, 0px));
+    right: calc(0.7rem + env(safe-area-inset-right, 0px));
+    width: auto;
+    max-width: none;
+    transform: none;
+  }
+
   .version-update-fullscreen {
     padding: 1.15rem;
   }

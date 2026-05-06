@@ -46,7 +46,7 @@
         <div>
           <h2>Passkey security gate</h2>
           <p class="admin-section-copy">
-            Re-authenticate with your password or an existing passkey before adding/removing passkeys.
+            Protected changes require re-authentication. If needed, you will be prompted automatically.
           </p>
         </div>
       </div>
@@ -83,7 +83,7 @@
         </div>
       </div>
       <div class="form-actions">
-        <button type="button" class="button-primary" :disabled="!canManagePasskeys || isPasskeyActionLoading" @click="addPasskey">
+        <button type="button" class="button-primary" :disabled="isPasskeyActionLoading" @click="addPasskey">
           Add passkey
         </button>
         <button type="button" :disabled="isPasskeyActionLoading" @click="loadPasskeys">Reload passkeys</button>
@@ -106,7 +106,7 @@
               <td>
                 <button
                   type="button"
-                  :disabled="!canManagePasskeys || isPasskeyActionLoading"
+                  :disabled="isPasskeyActionLoading"
                   @click="removePasskey(passkey.id)"
                 >
                   Remove
@@ -180,6 +180,39 @@
       <p v-if="sessionError" class="error">{{ sessionError }}</p>
       <p v-if="sessionSuccess" class="success">{{ sessionSuccess }}</p>
     </div>
+
+    <div v-if="reauthModalOpen" class="settings-reauth-modal-backdrop" role="dialog" aria-modal="true">
+      <div class="settings-reauth-modal">
+        <h3>Re-authentication required</h3>
+        <p class="muted">
+          For security, confirm your identity before making this settings change.
+        </p>
+        <label>
+          Current password
+          <input
+            v-model="modalReauthPassword"
+            type="password"
+            placeholder="Enter current password"
+            autocomplete="current-password"
+          />
+        </label>
+        <div class="form-actions">
+          <button
+            type="button"
+            class="button-primary"
+            :disabled="isReauthLoading || !modalReauthPassword.trim()"
+            @click="handleModalPasswordReauth"
+          >
+            Verify password
+          </button>
+          <button type="button" :disabled="isReauthLoading || !isPasskeySupported" @click="handleModalPasskeyReauth">
+            Verify with passkey
+          </button>
+          <button type="button" :disabled="isReauthLoading" @click="closeReauthModal">Cancel</button>
+        </div>
+        <p v-if="modalReauthError" class="error">{{ modalReauthError }}</p>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -221,6 +254,10 @@ const passkeys = ref<PasskeyListItem[]>([]);
 const isPasskeyActionLoading = ref(false);
 const passkeyError = ref("");
 const passkeySuccess = ref("");
+const reauthModalOpen = ref(false);
+const modalReauthPassword = ref("");
+const modalReauthError = ref("");
+let pendingProtectedAction: null | (() => Promise<void>) = null;
 
 const sessions = ref<SuperAdminSessionItem[]>([]);
 const selectedSessionId = ref("");
@@ -364,48 +401,95 @@ const reauthWithPasskey = async () => {
   }
 };
 
+const runProtectedAction = async (action: () => Promise<void>) => {
+  if (canManagePasskeys.value) {
+    await action();
+    return;
+  }
+  pendingProtectedAction = action;
+  modalReauthPassword.value = "";
+  modalReauthError.value = "";
+  reauthModalOpen.value = true;
+};
+
+const closeReauthModal = () => {
+  if (isReauthLoading.value) return;
+  reauthModalOpen.value = false;
+  modalReauthPassword.value = "";
+  modalReauthError.value = "";
+  pendingProtectedAction = null;
+};
+
+const completeModalReauth = async () => {
+  const action = pendingProtectedAction;
+  pendingProtectedAction = null;
+  reauthModalOpen.value = false;
+  modalReauthPassword.value = "";
+  modalReauthError.value = "";
+  if (action) {
+    await action();
+  }
+};
+
+const handleModalPasswordReauth = async () => {
+  modalReauthError.value = "";
+  reauthPassword.value = modalReauthPassword.value;
+  await reauthWithPassword();
+  if (!canManagePasskeys.value) {
+    modalReauthError.value = reauthError.value || "Password verification failed.";
+    return;
+  }
+  await completeModalReauth();
+};
+
+const handleModalPasskeyReauth = async () => {
+  modalReauthError.value = "";
+  await reauthWithPasskey();
+  if (!canManagePasskeys.value) {
+    modalReauthError.value = reauthError.value || "Passkey verification failed.";
+    return;
+  }
+  await completeModalReauth();
+};
+
 const addPasskey = async () => {
   passkeyError.value = "";
   passkeySuccess.value = "";
-  if (!canManagePasskeys.value) {
-    passkeyError.value = "Re-authenticate before changing passkeys.";
-    return;
-  }
-  isPasskeyActionLoading.value = true;
-  try {
-    const result = await supabase.auth.registerPasskey();
-    if (result.error) throw result.error;
-    await touchSuperAdminSession({
-      loginMethod: "passkey",
-      loginLocation: "super_settings",
-    });
-    passkeySuccess.value = "Passkey added successfully.";
-    await loadPasskeys();
-  } catch (err) {
-    passkeyError.value = toUserFacingErrorMessage(err, "Unable to add passkey.");
-  } finally {
-    isPasskeyActionLoading.value = false;
-  }
+  await runProtectedAction(async () => {
+    isPasskeyActionLoading.value = true;
+    try {
+      const result = await supabase.auth.registerPasskey();
+      if (result.error) throw result.error;
+      await touchSuperAdminSession({
+        loginMethod: "passkey",
+        loginLocation: "super_settings",
+      });
+      passkeySuccess.value = "Passkey added successfully.";
+      await loadPasskeys();
+    } catch (err) {
+      passkeyError.value = toUserFacingErrorMessage(err, "Unable to add passkey.");
+    } finally {
+      isPasskeyActionLoading.value = false;
+    }
+  });
 };
 
 const removePasskey = async (passkeyId: string) => {
   passkeyError.value = "";
   passkeySuccess.value = "";
-  if (!canManagePasskeys.value) {
-    passkeyError.value = "Re-authenticate before changing passkeys.";
-    return;
-  }
-  isPasskeyActionLoading.value = true;
-  try {
-    const result = await supabase.auth.passkey.delete({ passkeyId });
-    if (result.error) throw result.error;
-    passkeySuccess.value = "Passkey removed.";
-    await loadPasskeys();
-  } catch (err) {
-    passkeyError.value = toUserFacingErrorMessage(err, "Unable to remove passkey.");
-  } finally {
-    isPasskeyActionLoading.value = false;
-  }
+  await runProtectedAction(async () => {
+    isPasskeyActionLoading.value = true;
+    try {
+      const result = await supabase.auth.passkey.delete({ passkeyId });
+      if (result.error) throw result.error;
+      passkeySuccess.value = "Passkey removed.";
+      await loadPasskeys();
+    } catch (err) {
+      passkeyError.value = toUserFacingErrorMessage(err, "Unable to remove passkey.");
+    } finally {
+      isPasskeyActionLoading.value = false;
+    }
+  });
 };
 
 const revokeSelectedSession = async () => {
@@ -458,5 +542,28 @@ onMounted(async () => {
 
 .session-select {
   max-width: 28rem;
+}
+
+.settings-reauth-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1300;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  background: color-mix(in srgb, #000 32%, transparent);
+}
+
+.settings-reauth-modal {
+  width: min(100%, 28rem);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 1rem;
+}
+
+.settings-reauth-modal h3 {
+  margin: 0 0 0.4rem;
 }
 </style>

@@ -11,8 +11,8 @@ ItemTraxx is designed to manage real-world gear and inventory workflows without 
 
 - Member and operator checkout / return flows
 - Tenant-admin inventory, student, and reporting tools
-- District-scoped workspaces and district admin controls
-- Super-admin management for tenants, districts, admins, and plan metadata
+- District/organization-scoped workspaces and district/org admin controls
+- Super-admin management for tenants, districts, organizations, admins, and plan metadata
 - Organization, district, and individual account structures
 - Contact sales, request demo, and contact support form flows
 
@@ -33,8 +33,8 @@ ItemTraxx is designed to manage real-world gear and inventory workflows without 
 ItemTraxx currently supports multiple operating roles:
 
 - **Tenant Admin:** Manages inventory, students, settings, and tenant reporting
-- **District Admin:** Oversees district-linked tenants and district-level operations (indev)
-- **Individual / Root-Domain Accounts:** Non-district usage on `itemtraxx.com` without district routing
+- **District/Organization Admin:** Oversees district-linked tenants and district/org-level operations (indev)
+- **Individual / Root-Domain Accounts:** Non-district/organization usage on `itemtraxx.com` without custom routing
 
 ---
 

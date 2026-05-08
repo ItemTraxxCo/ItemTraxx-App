@@ -67,6 +67,14 @@
         </label>
         <div class="form-actions">
           <button type="submit" class="button-primary" :disabled="!canSubmitCredentials">Sign in</button>
+          <button
+            type="button"
+            class="button-link passkey-button"
+            :disabled="!canUsePasskey"
+            @click="handlePasskeySubmit"
+          >
+            Sign in with passkey
+          </button>
         </div>
       </form>
 
@@ -109,6 +117,7 @@ import {
   getPendingSuperAdminVerificationEmail,
   signOut,
   superAdminLogin,
+  superAdminPasskeyLogin,
   resendSuperAdminEmailChallenge,
   verifySuperAdminEmailChallenge,
 } from "../../services/authService";
@@ -182,6 +191,12 @@ const canSubmitCode = computed(() => {
   if (isLoading.value) return false;
   return /^\d{6}$/.test(verificationCode.value.trim());
 });
+
+const canUsePasskey = computed(() =>
+  !isLoading.value &&
+  typeof window !== "undefined" &&
+  "PublicKeyCredential" in window
+);
 
 const verificationEmailLabel = computed(() => verificationEmail.value || auth.email || "your email");
 
@@ -302,6 +317,31 @@ const handleStartOver = async () => {
   verificationCode.value = "";
   verificationEmail.value = null;
   password.value = "";
+};
+
+const handlePasskeySubmit = async () => {
+  error.value = "";
+  if (!canUsePasskey.value) {
+    showToast("Passkey unavailable", "This browser does not support passkeys.");
+    return;
+  }
+
+  isLoading.value = true;
+  try {
+    await superAdminPasskeyLogin();
+    await router.push("/super-admin");
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Passkey sign in failed.";
+    if (message.toLowerCase().includes("access denied")) {
+      error.value = "This account does not have super admin access.";
+      showToast("Access denied", "This account does not have super admin access.");
+    } else {
+      error.value = "Unable to sign in with passkey. Please try again.";
+      showToast("Passkey sign in failed", "Unable to sign in with passkey. Please try again.");
+    }
+  } finally {
+    isLoading.value = false;
+  }
 };
 
 onMounted(() => {
@@ -515,6 +555,10 @@ onUnmounted(() => {
 .verification-actions {
   flex-wrap: wrap;
   gap: 0.75rem;
+}
+
+.passkey-button {
+  margin-left: 0.4rem;
 }
 
 .turnstile-help {

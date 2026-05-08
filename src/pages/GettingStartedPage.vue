@@ -38,7 +38,7 @@
               <span>Use the main <RouterLink to="/login">sign in page</RouterLink> with your access code and password.</span>
             </li>
             <li>
-              <strong>Tenant and district admins</strong>
+              <strong>Tenant and district/organization admins</strong>
               <span>Use the dedicated <RouterLink to="/tenant/admin-login">admin sign in</RouterLink> page with email and password.</span>
             </li>
             <li>

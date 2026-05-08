@@ -14,6 +14,7 @@
         <RouterLink class="button-link" to="/super-admin/tenants">Tenants</RouterLink>
         <RouterLink class="button-link" to="/super-admin/admins">Admins</RouterLink>
         <RouterLink class="button-link" to="/super-admin/super-admins">Super Admins</RouterLink>
+        <RouterLink class="button-link" to="/super-admin/settings">Settings</RouterLink>
         <RouterLink class="button-link" to="/super-admin/support-requests">Support Requests</RouterLink>
         <RouterLink class="button-link" to="/internal">Internal Ops</RouterLink>
         <button type="button" class="button-link" @click="handleSignOut">Sign out</button>
@@ -136,6 +137,10 @@
           <RouterLink class="section-link" to="/internal">
             <span class="section-link-title">Internal Ops</span>
             <span class="section-link-meta">Restricted operator tooling</span>
+          </RouterLink>
+          <RouterLink class="section-link" to="/super-admin/settings">
+            <span class="section-link-title">Settings</span>
+            <span class="section-link-meta">Password, passkeys, and sessions</span>
           </RouterLink>
         </div>
       </section>

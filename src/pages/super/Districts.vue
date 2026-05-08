@@ -6,11 +6,11 @@
       <RouterLink class="button-link" to="/super-admin/admins">Tenant Admins</RouterLink>
     </div>
 
-    <h1>District Management</h1>
-    <p>Create and manage district records that power subdomain scoping.</p>
+    <h1>District/Organization Management</h1>
+    <p>Create and manage district/organization records that power subdomain scoping.</p>
 
     <div class="card">
-      <h2>Create District</h2>
+      <h2>Create District/Organization</h2>
       <form class="form" @submit.prevent="handleCreate">
         <label>
           Name
@@ -26,7 +26,7 @@
         </label>
         <label>
           Contact Name
-          <input v-model="createContactName" type="text" placeholder="District IT Team" />
+          <input v-model="createContactName" type="text" placeholder="District/Organization IT Team" />
         </label>
         <label>
           Subscription Plan
@@ -64,22 +64,22 @@
           <input v-model="createInvoiceReference" type="text" placeholder="INV-2026-001" />
         </label>
         <div class="form-actions">
-          <button type="submit" class="button-primary" :disabled="isSaving">Create District</button>
+          <button type="submit" class="button-primary" :disabled="isSaving">Create District/Organization</button>
         </div>
       </form>
     </div>
 
     <div class="card">
-      <h2>District List</h2>
+      <h2>District/Organization List</h2>
       <div class="input-row">
-        <input v-model="search" type="text" placeholder="Search by district name, slug, or email" />
+        <input v-model="search" type="text" placeholder="Search by district/organization name, slug, or email" />
         <button type="button" @click="loadDistricts">Search</button>
       </div>
 
-      <p v-if="isLoading" class="muted">Loading districts...</p>
+      <p v-if="isLoading" class="muted">Loading districts/organizations...</p>
       <p v-else-if="error" class="error">{{ error }}</p>
       <div v-else class="districts-list-shell">
-        <div class="districts-list-summary muted">{{ districts.length }} district{{ districts.length === 1 ? "" : "s" }}</div>
+        <div class="districts-list-summary muted">{{ districts.length }} district/organization{{ districts.length === 1 ? "" : "s" }}</div>
         <div class="table-wrap districts-table-wrap">
           <table class="table districts-table">
             <thead>
@@ -137,24 +137,24 @@
       class="district-edit-overlay"
       role="dialog"
       aria-modal="true"
-      aria-label="Edit district"
+      aria-label="Edit district or organization"
       @click.self="closeEditModal"
     >
       <div class="district-edit-modal">
         <div class="district-edit-header">
           <div>
-            <p class="district-edit-kicker">District Editor</p>
-            <h2>Edit District</h2>
+            <p class="district-edit-kicker">District/Organization Editor</p>
+            <h2>Edit District/Organization</h2>
           </div>
           <button type="button" class="district-edit-close" aria-label="Close edit dialog" @click="closeEditModal">
             ×
           </button>
         </div>
-        <p class="muted district-edit-copy">Update district details, billing metadata, and status without leaving the list view.</p>
+        <p class="muted district-edit-copy">Update district/organization details, billing metadata, and status without leaving the list view.</p>
         <form class="form" @submit.prevent="saveEdit">
           <label>
             Name
-            <input v-model="editName" type="text" placeholder="District name" />
+            <input v-model="editName" type="text" placeholder="District/organization name" />
           </label>
           <label>
             Slug
@@ -166,7 +166,7 @@
           </label>
           <label>
             Contact Name
-            <input v-model="editContactName" type="text" placeholder="District IT Team" />
+            <input v-model="editContactName" type="text" placeholder="District/Organization IT Team" />
           </label>
           <label>
             Subscription Plan
@@ -321,7 +321,7 @@ const loadDistricts = async () => {
   try {
     districts.value = await listDistricts(search.value.trim());
   } catch (err) {
-    error.value = toUserFacingErrorMessage(err, "Unable to load districts.");
+    error.value = toUserFacingErrorMessage(err, "Unable to load districts/organizations.");
   } finally {
     isLoading.value = false;
   }
@@ -331,7 +331,7 @@ const handleCreate = async () => {
   const name = createName.value.trim();
   const slug = normalizeSlug(createSlug.value);
   if (!name || !slug) {
-    showToast("Invalid input", "District name and slug are required.");
+    showToast("Invalid input", "District/organization name and slug are required.");
     return;
   }
 
@@ -358,9 +358,9 @@ const handleCreate = async () => {
     createRenewalDate.value = "";
     createBillingEmail.value = "";
     createInvoiceReference.value = "";
-    showToast("District created", "District foundation record created successfully.");
+    showToast("District/organization created", "District/organization foundation record created successfully.");
   } catch (err) {
-    showToast("Create failed", toUserFacingErrorMessage(err, "Unable to create district."));
+    showToast("Create failed", toUserFacingErrorMessage(err, "Unable to create district/organization."));
   } finally {
     isSaving.value = false;
   }
@@ -401,7 +401,7 @@ const saveEdit = async () => {
   const name = editName.value.trim();
   const slug = normalizeSlug(editSlug.value);
   if (!name || !slug) {
-    showToast("Invalid input", "District name and slug are required.");
+    showToast("Invalid input", "District/organization name and slug are required.");
     return;
   }
 
@@ -424,9 +424,9 @@ const saveEdit = async () => {
       district.id === updated.id ? updated : district
     );
     closeEditModal();
-    showToast("District updated", "District record updated successfully.");
+    showToast("District/organization updated", "District/organization record updated successfully.");
   } catch (err) {
-    showToast("Update failed", toUserFacingErrorMessage(err, "Unable to update district."));
+    showToast("Update failed", toUserFacingErrorMessage(err, "Unable to update district/organization."));
   } finally {
     isSaving.value = false;
   }

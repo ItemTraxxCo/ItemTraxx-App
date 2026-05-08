@@ -36,6 +36,11 @@ const BASE_CORS_HEADERS = {
   "Access-Control-Allow-Credentials": "true",
   "Access-Control-Expose-Headers": "content-range, content-profile, x-request-id",
   "Strict-Transport-Security": "max-age=31536000; includeSubDomains",
+  "Content-Security-Policy": "default-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none';",
+  "Referrer-Policy": "strict-origin-when-cross-origin",
+  "X-Content-Type-Options": "nosniff",
+  "X-Frame-Options": "DENY",
+  "Permissions-Policy": "camera=(), microphone=(), geolocation=()",
   Vary: "Origin",
 };
 const DEFAULT_ALLOWED_ORIGINS = [

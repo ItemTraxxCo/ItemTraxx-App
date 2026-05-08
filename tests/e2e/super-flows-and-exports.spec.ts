@@ -32,7 +32,7 @@ test.describe("Super admin flows and export actions", () => {
     await navigateApp(page, "/super-admin/admins");
     await expect(page.getByRole("heading", { name: "Admin Management" })).toBeVisible();
     await expect(
-      page.getByText("Manage tenant and district admins from one place, with scope-aware filters and actions."),
+      page.getByText("Manage tenant and district/organization admins from one place, with scope-aware filters and actions."),
     ).toBeVisible();
 
     await navigateApp(page, "/super-admin/gear");

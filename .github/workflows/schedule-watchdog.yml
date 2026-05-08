@@ -31,13 +31,22 @@ jobs:
           check_workflow() {
             local workflow_file="$1"
             local workflow_name="$2"
-            local max_age_seconds="$3"
+            local heartbeat_max_age_seconds="$3"
+            local success_max_age_seconds="$4"
 
             local response
             response="$(curl -fsSL \
               -H "Authorization: Bearer ${GITHUB_TOKEN}" \
               -H "Accept: application/vnd.github+json" \
-              "${API_BASE}/actions/workflows/${workflow_file}/runs?event=schedule&branch=main&status=completed&per_page=20")"
+              "${API_BASE}/actions/workflows/${workflow_file}/runs?event=schedule&branch=main&status=completed&per_page=50")"
+
+            local latest_completed
+            latest_completed="$(printf '%s' "$response" | jq -r '
+              .workflow_runs
+              | sort_by(.created_at)
+              | reverse
+              | .[0].created_at // empty
+            ')"
 
             local latest_success
             latest_success="$(printf '%s' "$response" | jq -r '
@@ -48,24 +57,41 @@ jobs:
               | .[0].created_at // empty
             ')"
 
-            if [ -z "$latest_success" ]; then
-              STALE_REPORT="${STALE_REPORT}\n- ${workflow_name}: no successful scheduled runs found"
+            if [ -z "$latest_completed" ]; then
+              STALE_REPORT="${STALE_REPORT}\n- ${workflow_name}: no completed scheduled runs found"
               return
             fi
 
-            local latest_epoch age_minutes max_age_minutes
-            latest_epoch="$(python3 -c 'from datetime import datetime; import sys; print(int(datetime.fromisoformat(sys.argv[1].replace("Z", "+00:00")).timestamp()))' "$latest_success")"
-            age_minutes="$(( (CURRENT_EPOCH - latest_epoch) / 60 ))"
-            max_age_minutes="$(( max_age_seconds / 60 ))"
+            local latest_completed_epoch completed_age_minutes heartbeat_max_age_minutes
+            latest_completed_epoch="$(python3 -c 'from datetime import datetime; import sys; print(int(datetime.fromisoformat(sys.argv[1].replace("Z", "+00:00")).timestamp()))' "$latest_completed")"
+            completed_age_minutes="$(( (CURRENT_EPOCH - latest_completed_epoch) / 60 ))"
+            heartbeat_max_age_minutes="$(( heartbeat_max_age_seconds / 60 ))"
 
-            if [ $(( CURRENT_EPOCH - latest_epoch )) -gt "$max_age_seconds" ]; then
-              STALE_REPORT="${STALE_REPORT}\n- ${workflow_name}: last successful scheduled run was ${age_minutes} minutes ago (threshold ${max_age_minutes} minutes)"
+            if [ $(( CURRENT_EPOCH - latest_completed_epoch )) -gt "$heartbeat_max_age_seconds" ]; then
+              STALE_REPORT="${STALE_REPORT}\n- ${workflow_name}: last completed scheduled run was ${completed_age_minutes} minutes ago (heartbeat threshold ${heartbeat_max_age_minutes} minutes)"
+              return
+            fi
+
+            if [ -z "$latest_success" ]; then
+              STALE_REPORT="${STALE_REPORT}\n- ${workflow_name}: no successful scheduled runs in recent history"
+              return
+            fi
+
+            local latest_success_epoch success_age_minutes success_max_age_minutes
+            latest_success_epoch="$(python3 -c 'from datetime import datetime; import sys; print(int(datetime.fromisoformat(sys.argv[1].replace("Z", "+00:00")).timestamp()))' "$latest_success")"
+            success_age_minutes="$(( (CURRENT_EPOCH - latest_success_epoch) / 60 ))"
+            success_max_age_minutes="$(( success_max_age_seconds / 60 ))"
+
+            if [ $(( CURRENT_EPOCH - latest_success_epoch )) -gt "$success_max_age_seconds" ]; then
+              STALE_REPORT="${STALE_REPORT}\n- ${workflow_name}: last successful scheduled run was ${success_age_minutes} minutes ago (success threshold ${success_max_age_minutes} minutes)"
             fi
           }
 
-          check_workflow "async-job-worker.yml" "Async Job Worker" 7200
-          check_workflow "synthetic-journeys.yml" "Synthetic Journeys" 10800
-          check_workflow "deployment-health.yml" "Deployment Health" 14400
+          # heartbeat threshold catches true schedule outages quickly
+          # success threshold stays looser to avoid noise from transient failures
+          check_workflow "async-job-worker.yml" "Async Job Worker" 1800 7200
+          check_workflow "synthetic-journeys.yml" "Synthetic Journeys" 5400 10800
+          check_workflow "deployment-health.yml" "Deployment Health" 10800 14400
           if [ -n "$STALE_REPORT" ]; then
             {
               echo "stale=true"

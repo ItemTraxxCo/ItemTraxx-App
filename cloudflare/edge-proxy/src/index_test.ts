@@ -6,10 +6,12 @@ Deno.test("blocks RPC proxy routes through direct and REST paths", () => {
     "/rpc/run_data_retention",
     "/rpc/run_data_retention/",
     "/rpc/%72un_data_retention",
+    "/rpc/consume_rate_limit_prelogin",
     "/rest/v1/rpc",
     "/rest/v1/rpc/run_data_retention",
     "/rest/v1/rpc/run_data_retention/",
     "/rest/v1/rpc/%72un_data_retention",
+    "/rest/v1/rpc/consume_rate_limit_prelogin",
   ];
 
   for (const path of blockedPaths) {
@@ -21,6 +23,8 @@ Deno.test("blocks RPC proxy routes through direct and REST paths", () => {
 
 Deno.test("does not block non-RPC REST paths", () => {
   const allowedPaths = [
+    "/rpc/consume_rate_limit",
+    "/rest/v1/rpc/consume_rate_limit",
     "/rest/v1/profiles",
     "/rest/v1/tenants",
     "/functions/admin-ops",

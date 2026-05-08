@@ -28,7 +28,15 @@
           <span>Disabled admins</span>
         </div>
         <div class="admin-summary-card">
-          <strong>{{ primaryAdminEmail }}</strong>
+          <button
+            type="button"
+            class="primary-admin-trigger"
+            @click="openPrimaryAdminModal"
+            :disabled="!primaryAdminEmailValue"
+            :aria-label="primaryAdminEmailValue ? 'View primary admin email' : 'Primary admin unavailable'"
+          >
+            <strong>{{ maskedPrimaryAdminEmail }}</strong>
+          </button>
           <span>Primary admin</span>
         </div>
       </div>
@@ -138,6 +146,24 @@
       </div>
     </div>
 
+    <div v-if="primaryAdminModalVisible" class="modal-backdrop" @click.self="closePrimaryAdminModal">
+      <div class="modal primary-admin-email-modal">
+        <button
+          type="button"
+          class="modal-close-button"
+          aria-label="Close primary admin email modal"
+          @click="closePrimaryAdminModal"
+        >
+          ×
+        </button>
+        <h3>Primary Admin Email</h3>
+        <p class="primary-admin-email-value">{{ primaryAdminEmailValue }}</p>
+        <div class="form-actions">
+          <button type="button" class="button-primary" @click="copyPrimaryAdminEmail">Copy email</button>
+        </div>
+      </div>
+    </div>
+
     <div v-if="toastMessage" class="toast">
       <div class="toast-title">{{ toastTitle }}</div>
       <div class="toast-body">{{ toastMessage }}</div>
@@ -168,14 +194,19 @@ const createEmail = ref("");
 const editModalVisible = ref(false);
 const editTarget = ref<TenantManagedAdmin | null>(null);
 const editEmail = ref("");
+const primaryAdminModalVisible = ref(false);
 const toastTitle = ref("");
 const toastMessage = ref("");
 let toastTimer: number | null = null;
 
 const activeAdminCount = computed(() => admins.value.filter((item) => item.is_active).length);
 const disabledAdminCount = computed(() => admins.value.filter((item) => !item.is_active).length);
-const primaryAdminEmail = computed(
-  () => admins.value.find((item) => item.is_primary_admin)?.auth_email ?? "Unavailable"
+const primaryAdminEmailValue = computed(
+  () => admins.value.find((item) => item.is_primary_admin)?.auth_email?.trim() ?? ""
+);
+
+const maskedPrimaryAdminEmail = computed(() =>
+  primaryAdminEmailValue.value ? "•••••••••••••••••••" : "Unavailable"
 );
 
 const showToast = (title: string, message: string) => {
@@ -239,6 +270,25 @@ const closeEditModal = () => {
   editTarget.value = null;
   editEmail.value = "";
   editModalVisible.value = false;
+};
+
+const openPrimaryAdminModal = () => {
+  if (!primaryAdminEmailValue.value) return;
+  primaryAdminModalVisible.value = true;
+};
+
+const closePrimaryAdminModal = () => {
+  primaryAdminModalVisible.value = false;
+};
+
+const copyPrimaryAdminEmail = async () => {
+  if (!primaryAdminEmailValue.value) return;
+  try {
+    await navigator.clipboard.writeText(primaryAdminEmailValue.value);
+    showToast("Copied", "Email copied.");
+  } catch {
+    showToast("Copy failed", "Unable to copy email. Please copy manually.");
+  }
 };
 
 const saveEditEmail = async () => {
@@ -346,5 +396,50 @@ onUnmounted(() => {
 
 .admin-manage-modal {
   max-width: 34rem;
+}
+
+.primary-admin-trigger {
+  all: unset;
+  cursor: pointer;
+}
+
+.primary-admin-trigger:disabled {
+  cursor: default;
+}
+
+.primary-admin-email-modal {
+  width: fit-content;
+  min-width: 20rem;
+  max-width: min(92vw, 40rem);
+  position: relative;
+}
+
+.modal-close-button {
+  position: absolute;
+  top: 0.65rem;
+  right: 0.65rem;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text);
+  font-size: 1.25rem;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.primary-admin-email-value {
+  margin: 0.75rem 0 1rem;
+  padding: 0.75rem 0.9rem;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  white-space: nowrap;
+  overflow-x: auto;
+  font-weight: 700;
+  color: var(--text);
+  font-size: clamp(0.86rem, 2.2vw, 1rem);
 }
 </style>

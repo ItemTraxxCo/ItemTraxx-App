@@ -343,6 +343,12 @@ const addBarcode = async () => {
   isBarcodeLoading.value = true;
   try {
     const gear = await fetchGearByBarcode(value);
+    const normalizedStatus = String(gear.status ?? "").toLowerCase();
+    if (normalizedStatus !== "available") {
+      throw new Error(
+        "Only items with status “available” can be added to checkout/return."
+      );
+    }
     const isCurrentBorrowerReturn = checkedOutGear.value.some(
       (item) => item.barcode === gear.barcode
     );
@@ -352,7 +358,11 @@ const addBarcode = async () => {
     barcodes.value = [...barcodes.value, gear];
     barcodeInput.value = "";
   } catch (err) {
-    error.value = toUserFacingErrorMessage(err, "Invalid barcode. Please check it and try again.");
+    const message = toUserFacingErrorMessage(err, "Invalid barcode. Please check it and try again.");
+    error.value = message;
+    toastStatus.value = "Failed";
+    toastTitle.value = "Unable to add item.";
+    toastMessage.value = message;
   } finally {
     isBarcodeLoading.value = false;
   }

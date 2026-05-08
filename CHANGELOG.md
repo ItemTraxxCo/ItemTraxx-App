@@ -1,6 +1,6 @@
 # Changelog
 
-Last updated (year-month-day): 2026-05-06
+Last updated (year-month-day): 2026-05-08
 
 This public changelog summarizes notable ItemTraxx product, reliability, security, and experience updates at a high level. Detailed internal engineering and operational notes are maintained separately.
 
@@ -15,6 +15,22 @@ Changes are dated based on the default timezone: America/Los_Angeles
 - [TERMS.md](TERMS.md) – Terms of service for users
 - [PRIVACY.md](PRIVACY.md) – Privacy policy and data handling
 - [SECURITY.md](SECURITY.md) – Security reporting and guidelines
+
+---
+
+### 5/08/2026 Development Update
+
+- Completed maintenance and reliability follow-up tasks with no new user-facing product or UI changes.
+- Continued operational verification of security and deployment workflows.
+
+---
+
+### 5/07/2026 Development Update
+
+- Improved tenant-admin reliability and usability across admin management flows.
+- Refined notification behavior so attention badges dismiss after review and reappear only for new updates.
+- Tightened checkout safety rules so only eligible items can be processed in checkout/return flows.
+- Continued security hardening and edge-function configuration cleanup tied to vulnerability findings.
 
 ---
 

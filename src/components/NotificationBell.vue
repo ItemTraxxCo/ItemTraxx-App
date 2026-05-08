@@ -26,7 +26,7 @@
           stroke-width="1.8"
         />
       </svg>
-      <span v-if="unreadCount > 0" class="notif-badge">{{ unreadCount > 9 ? "9+" : unreadCount }}</span>
+      <span v-if="badgeCount > 0" class="notif-badge">{{ badgeCount > 9 ? "9+" : badgeCount }}</span>
     </button>
 
     <div
@@ -94,6 +94,8 @@ const updates = ref<
 >([]);
 const recentEvents = ref<StatusHistoryItem[]>([]);
 let pollTimer: number | null = null;
+const NOTIFICATION_DISMISSED_KEY = "itemtraxx:tenant-notifications:dismissed-signature:v1";
+const dismissedSignature = ref("");
 
 const unreadCount = computed(
   () =>
@@ -102,6 +104,39 @@ const unreadCount = computed(
     updates.value.length +
     (maintenanceEnabled.value ? 1 : 0)
 );
+
+const notificationSignature = computed(() => {
+  const updateIds = updates.value.map((item) => item.id).join(",");
+  const eventIds = recentEvents.value.map((item) => item.id).join(",");
+  return [
+    `flagged:${flaggedCount.value}`,
+    `overdue:${overdueCount.value}`,
+    `maint:${maintenanceEnabled.value ? "1" : "0"}`,
+    `updates:${updateIds}`,
+    `events:${eventIds}`,
+  ].join("|");
+});
+
+const badgeCount = computed(() =>
+  dismissedSignature.value === notificationSignature.value ? 0 : unreadCount.value
+);
+
+const loadDismissedSignature = () => {
+  try {
+    dismissedSignature.value = window.localStorage.getItem(NOTIFICATION_DISMISSED_KEY) ?? "";
+  } catch {
+    dismissedSignature.value = "";
+  }
+};
+
+const persistDismissedSignature = (signature: string) => {
+  dismissedSignature.value = signature;
+  try {
+    window.localStorage.setItem(NOTIFICATION_DISMISSED_KEY, signature);
+  } catch {
+    // Ignore storage failures.
+  }
+};
 
 const loadNotifications = async (showLoading = true) => {
   if (document.visibilityState === "hidden") return;
@@ -160,11 +195,13 @@ const handleVisibilityChange = () => {
 const toggleOpen = () => {
   isOpen.value = !isOpen.value;
   if (isOpen.value) {
+    persistDismissedSignature(notificationSignature.value);
     void loadNotifications();
   }
 };
 
 onMounted(() => {
+  loadDismissedSignature();
   void loadNotifications();
   startPolling();
   document.addEventListener("visibilitychange", handleVisibilityChange);

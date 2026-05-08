@@ -49,6 +49,7 @@ const DEFAULT_ALLOWED_ORIGINS = [
   "https://status.itemtraxx.com",
   "https://internal.itemtraxx.com",
   "https://app.itemtraxx.com",
+  "https://*.app.itemtraxx.com",
   "https://dennis.dev.itemtraxx.com",
   "https://leo.dev.itemtraxx.com",
   "https://testdist.app.itemtraxx.com",
@@ -418,8 +419,36 @@ const isRestProxyPath = (pathname: string) => pathname.startsWith("/rest/v1/");
 
 const isRpcProxyPath = (pathname: string) => pathname === "/rpc" || pathname.startsWith("/rpc/");
 
-export const isBlockedRpcProxyPath = (pathname: string) =>
-  isRpcProxyPath(pathname) || pathname === "/rest/v1/rpc" || pathname.startsWith("/rest/v1/rpc/");
+const ALLOWED_RPC_FUNCTIONS = new Set([
+  "consume_rate_limit",
+]);
+
+const getRpcFunctionName = (pathname: string) => {
+  const segments = pathname.split("/").filter(Boolean);
+  if (segments.length === 2 && segments[0] === "rpc") {
+    return segments[1] ?? "";
+  }
+  if (segments.length === 4 && segments[0] === "rest" && segments[1] === "v1" && segments[2] === "rpc") {
+    return segments[3] ?? "";
+  }
+  return "";
+};
+
+const isAllowedRpcProxyPath = (pathname: string) => {
+  const functionName = getRpcFunctionName(pathname);
+  if (!functionName) {
+    return false;
+  }
+  return ALLOWED_RPC_FUNCTIONS.has(functionName.toLowerCase());
+};
+
+export const isBlockedRpcProxyPath = (pathname: string) => {
+  const isRpcPath = isRpcProxyPath(pathname) || pathname === "/rest/v1/rpc" || pathname.startsWith("/rest/v1/rpc/");
+  if (!isRpcPath) {
+    return false;
+  }
+  return !isAllowedRpcProxyPath(pathname);
+};
 
 const parseCookies = (request: Request): SessionCookies => {
   const raw = request.headers.get("cookie") ?? "";
@@ -1067,7 +1096,7 @@ export default {
         return buildError(403, "RPC proxy access is not allowed", headers, requestId);
       }
 
-      if (isRestProxyPath(url.pathname)) {
+      if (isRestProxyPath(url.pathname) || isRpcProxyPath(url.pathname)) {
         const response = await proxySupabaseApiRequest(request, env, headers, requestId, url.pathname);
         maybeReportWorkerResponse(env, request, requestId, response, ctx, { type: "rest", path: url.pathname });
         return response;

@@ -253,13 +253,18 @@ serve(async (req) => {
 
       const { data: gear } = await adminClient
         .from("gear")
-        .select("id, tenant_id, checked_out_by")
+        .select("id, tenant_id, checked_out_by, status")
         .eq("barcode", barcode)
         .eq("tenant_id", callerProfile.tenant_id)
         .is("deleted_at", null)
         .single();
 
       if (!gear) {
+        skippedBarcodes.push(barcode);
+        continue;
+      }
+
+      if (String(gear.status ?? "").toLowerCase() !== "available") {
         skippedBarcodes.push(barcode);
         continue;
       }

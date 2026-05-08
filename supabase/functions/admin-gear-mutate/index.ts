@@ -140,29 +140,37 @@ serve(async (req) => {
       return jsonResponse(403, { error: "Tenant disabled" });
     }
 
-    const { data: rateLimit, error: rateLimitError } = await userClient.rpc(
-      "consume_rate_limit",
-      {
-        p_scope: "admin",
-        p_limit: 20,
-        p_window_seconds: 60,
-      }
-    );
-
-    if (rateLimitError) {
-      return jsonResponse(500, { error: "Rate limit check failed" });
-    }
-
-    const rateLimitResult = rateLimit as RateLimitResult;
-    if (!rateLimitResult.allowed) {
-      return jsonResponse(429, {
-        error: "Rate limit exceeded, please try again in a minute.",
-      });
-    }
-
     const { action, payload } = await req.json();
     if (typeof action !== "string" || typeof payload !== "object" || !payload) {
       return jsonResponse(400, { error: "Invalid request" });
+    }
+
+    const isMutationAction =
+      action === "create" ||
+      action === "update" ||
+      action === "delete" ||
+      action === "restore";
+
+    if (isMutationAction) {
+      const { data: rateLimit, error: rateLimitError } = await userClient.rpc(
+        "consume_rate_limit",
+        {
+          p_scope: "admin",
+          p_limit: 20,
+          p_window_seconds: 60,
+        }
+      );
+
+      if (rateLimitError) {
+        return jsonResponse(500, { error: "Rate limit check failed" });
+      }
+
+      const rateLimitResult = rateLimit as RateLimitResult;
+      if (!rateLimitResult.allowed) {
+        return jsonResponse(429, {
+          error: "Rate limit exceeded, please try again in a minute.",
+        });
+      }
     }
 
     const adminClient = createClient(supabaseUrl, serviceKey, {

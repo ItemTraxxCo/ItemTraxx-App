@@ -150,30 +150,6 @@ serve(async (req) => {
       throw error;
     }
 
-    const { data: rateLimit, error: rateLimitError } = await adminClient.rpc(
-      "consume_rate_limit",
-      {
-        p_scope: "admin",
-        p_limit: 20,
-        p_window_seconds: 60,
-      }
-    );
-
-    if (rateLimitError) {
-      console.error("tenant-admin-mutate rate limit unavailable", {
-        message: rateLimitError.message,
-        code: (rateLimitError as { code?: string }).code,
-      });
-      return jsonResponse(500, { error: "Rate limit check failed" });
-    } else {
-      const rateLimitResult = rateLimit as RateLimitResult;
-      if (!rateLimitResult.allowed) {
-        return jsonResponse(429, {
-          error: "Rate limit exceeded, please try again in a minute.",
-        });
-      }
-    }
-
     const { data: tenant, error: tenantError } = await adminClient
       .from("tenants")
       .select("id, primary_admin_profile_id")
@@ -206,6 +182,34 @@ serve(async (req) => {
     if (typeof action !== "string" || typeof payload !== "object" || !payload) {
       return jsonResponse(400, { error: "Invalid request" });
     }
+
+    const isMutationAction = action !== "list_tenant_admins";
+    if (isMutationAction) {
+      const { data: rateLimit, error: rateLimitError } = await adminClient.rpc(
+        "consume_rate_limit",
+        {
+          p_scope: "admin",
+          p_limit: 20,
+          p_window_seconds: 60,
+        }
+      );
+
+      if (rateLimitError) {
+        console.error("tenant-admin-mutate rate limit unavailable", {
+          message: rateLimitError.message,
+          code: (rateLimitError as { code?: string }).code,
+        });
+        return jsonResponse(500, { error: "Rate limit check failed" });
+      }
+
+      const rateLimitResult = rateLimit as RateLimitResult;
+      if (!rateLimitResult.allowed) {
+        return jsonResponse(429, {
+          error: "Rate limit exceeded, please try again in a minute.",
+        });
+      }
+    }
+
     const next = payload as Record<string, unknown>;
     const deviceId = sanitizeText(next.device_id, 128);
     const activeSession = await validateTenantAdminDeviceSession(adminClient, {

@@ -12,7 +12,7 @@
         or contact support from the menu in the top-right corner.
       </p>
       <p v-if="district.isDistrictHost && !district.districtId" class="not-found-message">
-        This district URL is not recognized.
+        This district/organization URL is not recognized.
       </p>
 
       <dl class="not-found-details" aria-label="Error details">

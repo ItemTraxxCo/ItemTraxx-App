@@ -136,8 +136,8 @@ const customerSegments = [
     description: 'Track shared gear cleanly across borrowers, staff, and media or production environments.',
   },
   {
-    title: 'Districts and multi-site groups',
-    description: 'Run a shared platform with district-aware routing, visibility, and admin control.',
+    title: 'Districts/Organizations and multi-site groups',
+    description: 'Run a shared platform with district and organization-aware routing, visibility, and admin control.',
   },
   {
     title: 'Organizations and teams',

@@ -88,8 +88,8 @@ const faqGroups = [
         a: "ItemTraxx can be set up quickly. Contact support, get your account provisioned, and then sign in to begin managing inventory.",
       },
       {
-        q: "Do I need a district setup to use ItemTraxx?",
-        a: "No. ItemTraxx supports districts, organizations, and individual operators depending on the account type and provisioning flow.",
+        q: "Do I need a district or organization setup to use ItemTraxx?",
+        a: "No. ItemTraxx supports districts, organizations, schools, small teams, and individual operators depending on the account type and provisioning flow.",
       },
       {
         q: "Is ItemTraxx self-serve?",
@@ -97,7 +97,7 @@ const faqGroups = [
       },
       {
         q: "Who is ItemTraxx for?",
-        a: "ItemTraxx is built for schools, districts, teams, organizations, and individual users who need cleaner inventory checkout, return, and oversight workflows.",
+        a: "ItemTraxx is built for schools, districts, organizations, teams, and individual users who need cleaner inventory checkout, return, and oversight workflows.",
       },
     ],
   },
@@ -135,7 +135,7 @@ const faqGroups = [
     items: [
       {
         q: "Can it work for schools and small teams?",
-        a: "Yes. ItemTraxx is designed for school programs, classrooms, districts, teams, and other environments where shared gear moves constantly.",
+        a: "Yes. ItemTraxx is designed for school programs, classrooms, districts, organizations, teams, and other environments where shared gear moves constantly.",
       },
       {
         q: "Can I use ItemTraxx as an individual user?",

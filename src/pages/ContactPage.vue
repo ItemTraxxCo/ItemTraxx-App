@@ -78,7 +78,7 @@ const contactOptions = [
     description: "Use this if you want a walkthrough, planning conversation, or a live product overview.",
     details: [
       "Best for prospective buyers and teams evaluating ItemTraxx.",
-      "Use it when you want to see checkout, returns, admin tools, or district workflows.",
+      "Use it when you want to see checkout, returns, admin tools, or district/organization workflows.",
     ],
     cta: "Open demo request",
     to: "/request-demo",

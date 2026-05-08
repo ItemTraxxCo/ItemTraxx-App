@@ -254,8 +254,8 @@ const handleAdminLogin = async () => {
       error.value = "This account does not have admin access.";
       showToast("Access denied", "This account does not have admin access.");
     } else if (message === "No district assignment.") {
-      error.value = "This admin account is not assigned to a district yet.";
-      showToast("Not assigned", "This admin account is not assigned to a district yet.");
+      error.value = "This admin account is not assigned to a district/organization yet.";
+      showToast("Not assigned", "This admin account is not assigned to a district/organization yet.");
     } else if (message === "Unable to prepare district sign-in." || message === "Unable to complete district sign-in.") {
       error.value = "Unable to finish sign in. Please try again.";
       showToast("Sign in failed", "Unable to finish sign in. Please try again.");

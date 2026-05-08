@@ -40,7 +40,7 @@
             v-model.trim="replyEmail"
             type="email"
             required
-            placeholder="name@district.org"
+            placeholder="name@organization.org"
           />
         </label>
 

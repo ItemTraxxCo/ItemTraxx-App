@@ -9,13 +9,13 @@
       <a class="button-link" href="#district-tenants">Tenants</a>
     </div>
 
-    <h1>{{ dashboard?.district.name || "District Admin" }}</h1>
+    <h1>{{ dashboard?.district.name || "District/Organization Admin" }}</h1>
     <p v-if="dashboard" class="muted">
       {{ districtUrlPreview(dashboard.district.slug) }} ·
       {{ dashboard.district.is_active ? "active" : "inactive" }}
     </p>
 
-    <p v-if="isLoading" class="muted">Loading district dashboard...</p>
+    <p v-if="isLoading" class="muted">Loading oversight dashboard...</p>
     <p v-else-if="error" class="error">{{ error }}</p>
 
     <template v-else-if="dashboard">
@@ -57,7 +57,7 @@
             <strong>{{ item.title }}</strong>
             <p class="muted">{{ item.count }} affected</p>
           </div>
-          <p v-if="dashboard.needs_attention.length === 0" class="muted">No urgent district items.</p>
+          <p v-if="dashboard.needs_attention.length === 0" class="muted">No urgent district/organization items.</p>
         </div>
       </div>
 
@@ -205,7 +205,7 @@
       </div>
 
       <div id="district-tenants" class="card">
-        <h2>District Tenants</h2>
+        <h2>District/Organization Tenants</h2>
         <div class="input-row">
           <input v-model="search" type="text" placeholder="Search tenants" />
           <select v-model="statusFilter">
@@ -266,7 +266,7 @@
               </td>
             </tr>
             <tr v-if="filteredTenants.length === 0">
-              <td colspan="6" class="muted">No district tenants match the current filter.</td>
+              <td colspan="6" class="muted">No district/organization tenants match the current filter.</td>
             </tr>
           </tbody>
         </table>

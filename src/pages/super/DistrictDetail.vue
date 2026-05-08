@@ -2,23 +2,23 @@
   <div class="page">
     <div class="page-nav-left">
       <RouterLink class="button-link" to="/super-admin">Return to Super Admin</RouterLink>
-      <RouterLink class="button-link" to="/super-admin/districts">Districts</RouterLink>
+      <RouterLink class="button-link" to="/super-admin/districts">Districts/Organizations</RouterLink>
       <RouterLink class="button-link" to="/super-admin/tenants">Tenants</RouterLink>
       <button type="button" class="button-link" :disabled="isLoading" @click="loadDetail">
         {{ isLoading ? "Refreshing..." : "Refresh" }}
       </button>
       <a v-if="detail" class="button-link" :href="districtUrlPreview(detail.district.slug)" target="_blank" rel="noreferrer">
-        Open District URL
+        Open District/Organization URL
       </a>
     </div>
 
-    <h1>{{ detail?.district.name || "District Overview" }}</h1>
+    <h1>{{ detail?.district.name || "District/Organization Overview" }}</h1>
     <p v-if="detail" class="muted">
       {{ districtUrlPreview(detail.district.slug) }} ·
       {{ detail.district.is_active ? "active" : "inactive" }}
     </p>
 
-    <p v-if="isLoading" class="muted">Loading district...</p>
+    <p v-if="isLoading" class="muted">Loading...</p>
     <p v-else-if="error" class="error">{{ error }}</p>
 
     <template v-else-if="detail">
@@ -60,7 +60,7 @@
             <strong>{{ item.title }}</strong>
             <p class="muted">{{ item.count }} affected</p>
           </div>
-          <p v-if="detail.needs_attention.length === 0" class="muted">No urgent district items.</p>
+          <p v-if="detail.needs_attention.length === 0" class="muted">No urgent district/organization items.</p>
         </div>
       </div>
 
@@ -140,7 +140,7 @@
       </div>
 
       <div class="card">
-        <h2>District Support</h2>
+        <h2>District/Organization Support</h2>
         <p><strong>Support Email:</strong> {{ detail.district.support_email || "-" }}</p>
         <p><strong>Contact Name:</strong> {{ detail.district.contact_name || "-" }}</p>
         <p><strong>Subdomain:</strong> {{ districtUrlPreview(detail.district.slug) }}</p>
@@ -174,7 +174,7 @@
       </div>
 
       <div class="card">
-        <h2>District Admins</h2>
+        <h2>District/Organization Admins</h2>
         <form class="form district-admin-form" @submit.prevent="createDistrictAdmin">
           <label>
             Admin Email
@@ -190,12 +190,12 @@
               class="button-primary"
               :disabled="isSavingAdmins || !createAdminEmail.trim() || createAdminPassword.length < 8"
             >
-              Create District Admin
+              Create District/Organization Admin
             </button>
           </div>
         </form>
 
-        <p v-if="isLoadingAdmins" class="muted">Loading district admins...</p>
+        <p v-if="isLoadingAdmins" class="muted">Loading district/organization admins...</p>
         <table v-else class="table">
           <thead>
             <tr>
@@ -224,7 +224,7 @@
               </td>
             </tr>
             <tr v-if="districtAdmins.length === 0">
-              <td colspan="4" class="muted">No district admins yet.</td>
+              <td colspan="4" class="muted">No district/organization admins yet.</td>
             </tr>
           </tbody>
         </table>
@@ -239,11 +239,11 @@
           <div class="kv-row"><span>Billing Email</span><strong>{{ detail.district.billing_email || "-" }}</strong></div>
           <div class="kv-row"><span>Invoice Reference</span><strong>{{ detail.district.invoice_reference || "-" }}</strong></div>
         </div>
-        <p class="muted">Manage billing metadata from District Management.</p>
+        <p class="muted">Manage billing metadata from District/Organization Management.</p>
       </div>
 
       <div class="card">
-        <h2>District Tenants</h2>
+        <h2>District/Organization Tenants</h2>
         <table class="table">
           <thead>
             <tr>
@@ -263,7 +263,7 @@
               <td>{{ formatDate(tenant.created_at) }}</td>
             </tr>
             <tr v-if="detail.tenants.length === 0">
-              <td colspan="5" class="muted">No tenants assigned to this district.</td>
+              <td colspan="5" class="muted">No tenants assigned to this district/organization.</td>
             </tr>
           </tbody>
         </table>
@@ -318,7 +318,7 @@ const calcBarHeight = (value: number) => {
 const loadDetail = async () => {
   const districtId = String(route.params.id || "").trim();
   if (!districtId) {
-    error.value = "District id is missing.";
+    error.value = "District/organization id is missing.";
     return;
   }
 

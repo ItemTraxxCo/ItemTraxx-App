@@ -5,10 +5,10 @@
         <div class="page-nav-left">
           <RouterLink class="button-link" to="/super-admin">Control Center</RouterLink>
           <RouterLink class="button-link" to="/super-admin/tenants">Tenants</RouterLink>
-          <RouterLink class="button-link" to="/super-admin/districts">Districts</RouterLink>
+          <RouterLink class="button-link" to="/super-admin/districts">Districts/Organizations</RouterLink>
         </div>
         <h1>Admin Management</h1>
-        <p>Manage tenant and district admins from one place, with scope-aware filters and actions.</p>
+        <p>Manage tenant and district/organization admins from one place, with scope-aware filters and actions.</p>
       </div>
       <div class="page-nav-left super-page-links">
         <RouterLink class="button-link" to="/super-admin/gear">All Items</RouterLink>
@@ -27,7 +27,7 @@
         <p class="stat-value">{{ tenantAdminCount }}</p>
       </div>
       <div class="stat-card">
-        <h3>District admins</h3>
+        <h3>District/Organization admins</h3>
         <p class="stat-value">{{ districtAdminCount }}</p>
       </div>
       <div class="stat-card">
@@ -40,18 +40,18 @@
       <div class="card section-card">
         <div class="section-heading">
           <h2>Create Admin</h2>
-          <p class="muted">Pick a scope first, then target the tenant or district directly.</p>
+          <p class="muted">Pick a scope first, then target the tenant or district/organization directly.</p>
         </div>
       <form class="form" @submit.prevent="handleCreate">
         <label>
           Admin Scope
           <select v-model="adminScope">
             <option value="tenant">tenant</option>
-            <option value="district">district</option>
+            <option value="district">district/organization</option>
           </select>
         </label>
         <label>
-          {{ adminScope === "tenant" ? "Tenant" : "District" }}
+          {{ adminScope === "tenant" ? "Tenant" : "District/Organization" }}
           <select v-model="createTargetId">
             <option value="">Select {{ adminScope }}</option>
             <option v-for="target in targets" :key="target.id" :value="target.id">
@@ -68,7 +68,9 @@
           <input v-model="createPassword" type="password" placeholder="Temporary password" />
         </label>
         <div class="form-actions">
-          <button type="submit" class="button-primary" :disabled="isSaving">Create Tenant Admin</button>
+          <button type="submit" class="button-primary" :disabled="isSaving">
+            {{ adminScope === "tenant" ? "Create Tenant Admin" : "Create District/Organization Admin" }}
+          </button>
         </div>
       </form>
       </div>
@@ -87,7 +89,7 @@
             Scope
             <select v-model="adminScope">
               <option value="tenant">tenant</option>
-              <option value="district">district</option>
+              <option value="district">district/organization</option>
             </select>
           </label>
           <label v-if="adminScope === 'tenant'" class="filter-select">
@@ -107,7 +109,7 @@
           <thead>
             <tr>
               <th>Email</th>
-              <th>{{ adminScope === "tenant" ? "Tenant" : "District" }}</th>
+              <th>{{ adminScope === "tenant" ? "Tenant" : "District/Organization" }}</th>
               <th>Status</th>
               <th>Created</th>
               <th>Actions</th>
@@ -124,7 +126,7 @@
               </td>
             </tr>
             <tr v-if="admins.length === 0">
-              <td colspan="5" class="muted">No tenant admins found.</td>
+              <td colspan="5" class="muted">No tenant or district/organization admins found.</td>
             </tr>
           </tbody>
         </table>

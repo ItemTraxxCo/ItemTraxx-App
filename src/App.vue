@@ -368,6 +368,7 @@ const maintenanceEnabled = ref(false);
 const maintenanceMessage = ref("Maintenance currentlyin progress.");
 const killSwitchEnabled = ref(false);
 const killSwitchMessage = ref("Unfortunately ItemTraxx is currently unavailable. We apologize for any inconvenience and are working to restore access as soon as possible. Please see the status page (https://status.itemtraxx.com/) for more information.");
+const backendUnavailable = ref(false);
 const statusLabel = ref("Unknown");
 const statusClass = ref<"status-ok" | "status-warn" | "status-down" | "status-unknown">(
   "status-unknown"
@@ -418,6 +419,53 @@ const GITHUB_HEAD_COMMIT_API =
   "https://api.github.com/repos/ItemTraxxCo/ItemTraxx-App/commits/main";
 const appBranch = (import.meta.env.VITE_GIT_BRANCH || "n/a").trim();
 const isNonMainBuild = appBranch !== "" && appBranch !== "n/a" && appBranch !== "main";
+const MAINTENANCE_CACHE_KEY = "itemtraxx-maintenance-state";
+
+type CachedMaintenanceState = {
+  enabled: boolean;
+  message: string;
+  updatedAt: string;
+};
+
+const readCachedMaintenanceState = (): CachedMaintenanceState | null => {
+  try {
+    const raw = localStorage.getItem(MAINTENANCE_CACHE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Partial<CachedMaintenanceState>;
+    if (
+      typeof parsed.enabled !== "boolean" ||
+      typeof parsed.message !== "string" ||
+      typeof parsed.updatedAt !== "string"
+    ) {
+      return null;
+    }
+    return {
+      enabled: parsed.enabled,
+      message: parsed.message.trim() || "Maintenance currently in progress.",
+      updatedAt: parsed.updatedAt,
+    };
+  } catch {
+    return null;
+  }
+};
+
+const writeCachedMaintenanceState = (state: CachedMaintenanceState | null) => {
+  try {
+    if (!state) {
+      localStorage.removeItem(MAINTENANCE_CACHE_KEY);
+      return;
+    }
+    localStorage.setItem(MAINTENANCE_CACHE_KEY, JSON.stringify(state));
+  } catch {
+    // Best effort only.
+  }
+};
+
+const cachedMaintenanceState = readCachedMaintenanceState();
+if (cachedMaintenanceState?.enabled) {
+  maintenanceEnabled.value = true;
+  maintenanceMessage.value = cachedMaintenanceState.message;
+}
 
 const showCookieConsentBanner = computed(() => !hasCookieConsent(cookieConsent.value));
 
@@ -606,7 +654,6 @@ const showMaintenanceOverlay = computed(() => {
   if (!maintenanceEnabled.value) return false;
   const routeName = String(route.name || "");
   if (
-    routeName === "public-home" ||
     routeName === "public-unavailable" ||
     routeName === "not-found" ||
     routeName === "super-auth" ||
@@ -1081,6 +1128,7 @@ const refreshSystemStatus = async () => {
   if (!response) {
     statusLabel.value = "Unknown";
     statusClass.value = "status-unknown";
+    backendUnavailable.value = false;
     return;
   }
 
@@ -1112,26 +1160,53 @@ const refreshSystemStatus = async () => {
     activeBroadcast.value = null;
   }
 
-  if (payload.maintenance?.enabled) {
-    maintenanceEnabled.value = true;
-    maintenanceMessage.value =
-      typeof payload.maintenance.message === "string" && payload.maintenance.message.trim()
+  const hasMaintenancePayload =
+    payload.maintenance && typeof payload.maintenance === "object";
+  if (hasMaintenancePayload) {
+    const enabled = payload.maintenance?.enabled === true;
+    const message =
+      typeof payload.maintenance?.message === "string" &&
+      payload.maintenance.message.trim()
         ? payload.maintenance.message.trim()
         : "Maintenance currently in progress.";
+    maintenanceEnabled.value = enabled;
+    maintenanceMessage.value = message;
+    if (enabled) {
+      writeCachedMaintenanceState({
+        enabled: true,
+        message,
+        updatedAt:
+          typeof payload.maintenance?.updated_at === "string"
+            ? payload.maintenance.updated_at
+            : new Date().toISOString(),
+      });
+    } else {
+      writeCachedMaintenanceState(null);
+    }
+  } else if (response.status >= 500 || payload.status === "down") {
+    // Keep last known maintenance state during backend outages.
+    const cached = readCachedMaintenanceState();
+    if (cached?.enabled) {
+      maintenanceEnabled.value = true;
+      maintenanceMessage.value = cached.message;
+    }
   } else {
     maintenanceEnabled.value = false;
+    writeCachedMaintenanceState(null);
   }
 
   if (response.ok && payload.status === "operational") {
     statusLabel.value = "Running";
     statusClass.value = "status-ok";
     incidentBanner.value = null;
+    backendUnavailable.value = false;
     return;
   }
 
   if (response.status >= 500 || payload.status === "down") {
     statusLabel.value = "Down";
     statusClass.value = "status-down";
+    backendUnavailable.value = !maintenanceEnabled.value;
     const incidentId =
       (payload.checked_at && String(payload.checked_at)) ||
       `${payload.status}-${payload.incident_summary || "down"}`;
@@ -1149,6 +1224,7 @@ const refreshSystemStatus = async () => {
 
   statusLabel.value = "Degraded";
   statusClass.value = "status-warn";
+  backendUnavailable.value = false;
   const incidentId =
     (payload.checked_at && String(payload.checked_at)) ||
     `${payload.status}-${payload.incident_summary || "degraded"}`;
@@ -1339,6 +1415,16 @@ watch(
   ([enabled, path]) => {
     if (!enabled || isLocalDevMaintenanceBypass.value) return;
     if (path !== "/" && path !== "/unavailable") {
+      void router.replace("/unavailable");
+    }
+  }
+);
+
+watch(
+  () => [backendUnavailable.value, route.path] as const,
+  ([isUnavailable, path]) => {
+    if (!isUnavailable || isLocalDevMaintenanceBypass.value) return;
+    if (path !== "/unavailable") {
       void router.replace("/unavailable");
     }
   }

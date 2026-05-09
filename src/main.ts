@@ -229,6 +229,24 @@ const initializePostHog = async () => {
   }
 };
 
+let posthogExceptionCapturePromise: Promise<((error: unknown) => void)> | null = null;
+
+const getPostHogExceptionCapture = async () => {
+  if (!posthogExceptionCapturePromise) {
+    posthogExceptionCapturePromise = import("./services/posthogService")
+      .then((module) => module.capturePostHogException)
+      .catch(() => {
+        posthogExceptionCapturePromise = null;
+        return () => undefined;
+      });
+  }
+  return posthogExceptionCapturePromise;
+};
+
+const capturePostHogExceptionSafely = (error: unknown) => {
+  void getPostHogExceptionCapture().then((capture) => capture(error));
+};
+
 const bindConsentDrivenMonitoring = (app: ReturnType<typeof createApp>) => {
   const maybeEnableDiagnostics = () => {
     if (!allowsDiagnostics(readCookieConsent())) {
@@ -264,23 +282,25 @@ const mountApp = async () => {
   });
 
   const app = createApp(App);
-  const { installClientDiagnostics } = await import("./services/clientDiagnostics");
-  installClientDiagnostics();
-  const { installGlobalErrorHandling } = await import("./services/globalErrorHandling");
-  installGlobalErrorHandling(app);
-  const { capturePostHogException } = await import("./services/posthogService");
   const existingErrorHandler = app.config.errorHandler;
   app.config.errorHandler = (error, instance, info) => {
-    capturePostHogException(error);
+    capturePostHogExceptionSafely(error);
     if (existingErrorHandler) {
       existingErrorHandler(error, instance, info);
     }
   };
-  const { installAppErrorRecovery } = await import("./services/appErrorRecovery");
-  installAppErrorRecovery(router);
   app.use(router);
   await router.isReady();
   app.mount("#app");
+  void import("./services/clientDiagnostics")
+    .then(({ installClientDiagnostics }) => installClientDiagnostics())
+    .catch(() => undefined);
+  void import("./services/globalErrorHandling")
+    .then(({ installGlobalErrorHandling }) => installGlobalErrorHandling(app))
+    .catch(() => undefined);
+  void import("./services/appErrorRecovery")
+    .then(({ installAppErrorRecovery }) => installAppErrorRecovery(router))
+    .catch(() => undefined);
   void initializeSentry(app);
   void initializePostHog();
   bindConsentDrivenMonitoring(app);

@@ -105,7 +105,6 @@ import { logAdminAction } from "../../../services/auditLogService";
 import { useTurnstile } from "../../../composables/useTurnstile";
 import { clearAdminVerification } from "../../../store/authState";
 import { buildDistrictAppHandoffUrl } from "../../../services/districtService";
-import { capturePostHogEvent, identifyPostHogUser } from "../../../services/posthogService";
 
 const themeMode = ref<"light" | "dark">("dark");
 const lightBrandLogoUrl = import.meta.env.VITE_BRAND_LOGO_LIGHT_URL as string | undefined;
@@ -143,6 +142,17 @@ const setTurnstileContainerRef = (
 };
 let toastTimer: number | null = null;
 let themeObserver: MutationObserver | null = null;
+
+const runPostHog = async (
+  callback: (posthog: typeof import("../../../services/posthogService")) => void
+) => {
+  try {
+    const posthog = await import("../../../services/posthogService");
+    callback(posthog);
+  } catch {
+    // Analytics must never block admin login.
+  }
+};
 
 const brandLogoUrl = computed(() =>
   themeMode.value === "light"
@@ -208,8 +218,12 @@ const handleAdminLogin = async () => {
     }
     if (handoff.role === "tenant_admin" && !handoff.districtSlug) {
       devLog("auth_request_success_local_tenant_admin");
-      identifyPostHogUser(email.value.trim(), { role: handoff.role });
-      capturePostHogEvent("admin_login_succeeded", { role: handoff.role });
+      void runPostHog(({ identifyPostHogUser }) =>
+        identifyPostHogUser(email.value.trim(), { role: handoff.role })
+      );
+      void runPostHog(({ capturePostHogEvent }) =>
+        capturePostHogEvent("admin_login_succeeded", { role: handoff.role })
+      );
       const params = new URLSearchParams({
         itx_th: handoff.tokenHash,
         itx_lm: "password",
@@ -224,8 +238,12 @@ const handleAdminLogin = async () => {
     const targetPath =
       handoff.role === "district_admin" ? "/district" : "/tenant/admin";
     devLog("auth_request_success");
-    identifyPostHogUser(email.value.trim(), { role: handoff.role });
-    capturePostHogEvent("admin_login_succeeded", { role: handoff.role });
+    void runPostHog(({ identifyPostHogUser }) =>
+      identifyPostHogUser(email.value.trim(), { role: handoff.role })
+    );
+    void runPostHog(({ capturePostHogEvent }) =>
+      capturePostHogEvent("admin_login_succeeded", { role: handoff.role })
+    );
     window.location.replace(
       buildDistrictAppHandoffUrl(handoff.districtSlug, targetPath, {
         tokenHash: handoff.tokenHash,
@@ -243,7 +261,9 @@ const handleAdminLogin = async () => {
   } catch (err) {
     devLog("auth_request_failed");
     const message = err instanceof Error ? err.message : "Sign in failed.";
-    capturePostHogEvent("admin_login_failed", { error_type: message });
+    void runPostHog(({ capturePostHogEvent }) =>
+      capturePostHogEvent("admin_login_failed", { error_type: message })
+    );
     if (message === "Invalid credentials.") {
       error.value = "Invalid email or password.";
       showToast("Sign in failed", "Invalid email or password.");

@@ -27,6 +27,7 @@ jobs:
           API_BASE="https://api.github.com/repos/${REPOSITORY}"
           CURRENT_EPOCH="$(date -u +%s)"
           STALE_REPORT=""
+          HEARTBEAT_REPORT=""
 
           check_workflow() {
             local workflow_file="$1"
@@ -68,7 +69,7 @@ jobs:
             heartbeat_max_age_minutes="$(( heartbeat_max_age_seconds / 60 ))"
 
             if [ $(( CURRENT_EPOCH - latest_completed_epoch )) -gt "$heartbeat_max_age_seconds" ]; then
-              STALE_REPORT="${STALE_REPORT}\n- ${workflow_name}: last completed scheduled run was ${completed_age_minutes} minutes ago (heartbeat threshold ${heartbeat_max_age_minutes} minutes)"
+              HEARTBEAT_REPORT="${HEARTBEAT_REPORT}\n- ${workflow_name}: last completed scheduled run was ${completed_age_minutes} minutes ago (heartbeat threshold ${heartbeat_max_age_minutes} minutes)"
               return
             fi
 
@@ -87,11 +88,24 @@ jobs:
             fi
           }
 
-          # heartbeat threshold catches true schedule outages quickly
-          # success threshold stays looser to avoid noise from transient failures
+          # heartbeat threshold is warning-only (non-fatal) to reduce alert noise
+          # success threshold is the fatal watchdog gate
           check_workflow "async-job-worker.yml" "Async Job Worker" 1800 7200
           check_workflow "synthetic-journeys.yml" "Synthetic Journeys" 5400 10800
           check_workflow "deployment-health.yml" "Deployment Health" 10800 14400
+          if [ -n "$HEARTBEAT_REPORT" ]; then
+            {
+              echo "heartbeat_stale=true"
+              echo "heartbeat_report<<EOF"
+              printf '%b\n' "$HEARTBEAT_REPORT"
+              echo "EOF"
+            } >> "$GITHUB_OUTPUT"
+            echo "Heartbeat threshold warnings (non-fatal):"
+            printf '%b\n' "$HEARTBEAT_REPORT"
+          else
+            echo "heartbeat_stale=false" >> "$GITHUB_OUTPUT"
+          fi
+
           if [ -n "$STALE_REPORT" ]; then
             {
               echo "stale=true"
@@ -126,6 +140,37 @@ jobs:
                   color: "#e01e5a",
                   fields: [
                     { title: "Status", value: "Stale scheduled workflows detected", short: false },
+                    { title: "Repository", value: $repo, short: false },
+                    { title: "Run", value: ("<" + $run_url + "|Open watchdog run>"), short: false },
+                    { title: "Details", value: $report, short: false }
+                  ],
+                  footer: "GitHub Actions"
+                }
+              ]
+            }')"
+          curl -fsSL -X POST "$SLACK_WEBHOOK_URL" \
+            -H "Content-Type: application/json" \
+            --data "$PAYLOAD"
+
+      - name: Send Slack heartbeat warning
+        if: ${{ steps.watchdog.outputs.heartbeat_stale == 'true' && env.SLACK_WEBHOOK_URL != '' }}
+        env:
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          REPORT: ${{ steps.watchdog.outputs.heartbeat_report }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          PAYLOAD="$(jq -n \
+            --arg run_url "$RUN_URL" \
+            --arg repo "$REPOSITORY" \
+            --arg report "$REPORT" \
+            '{
+              text: "Scheduled workflow heartbeat warning",
+              attachments: [
+                {
+                  color: "#f2c744",
+                  fields: [
+                    { title: "Status", value: "Heartbeat threshold exceeded (warning only)", short: false },
                     { title: "Repository", value: $repo, short: false },
                     { title: "Run", value: ("<" + $run_url + "|Open watchdog run>"), short: false },
                     { title: "Details", value: $report, short: false }

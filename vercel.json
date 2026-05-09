@@ -19,7 +19,7 @@
       ]
     },
     {
-      "source": "/(.*)",
+      "source": "/((?!brand/).*)",
       "headers": [
         {
           "key": "Content-Security-Policy",

@@ -140,7 +140,6 @@ import { useTurnstile } from "../composables/useTurnstile";
 import { buildDistrictAppHandoffUrl } from "../services/districtService";
 import { getDistrictState } from "../store/districtState";
 import { getAuthState } from "../store/authState";
-import { capturePostHogEvent, identifyPostHogUser } from "../services/posthogService";
 
 const router = useRouter();
 const district = getDistrictState();
@@ -237,6 +236,17 @@ let cancelIdlePrefetch: (() => void) | null = null;
 let storyTimer: number | null = null;
 let themeObserver: MutationObserver | null = null;
 
+const runPostHog = async (
+  callback: (posthog: typeof import("../services/posthogService")) => void
+) => {
+  try {
+    const posthog = await import("../services/posthogService");
+    callback(posthog);
+  } catch {
+    // Analytics must never block login.
+  }
+};
+
 const shouldPrefetchTenantRoutes = () => {
   const connection = (navigator as Navigator & {
     connection?: { saveData?: boolean; effectiveType?: string };
@@ -309,9 +319,14 @@ const handleTenantLogin = async () => {
     );
     const auth = getAuthState();
     if (auth.userId) {
-      identifyPostHogUser(auth.userId, { email: auth.email ?? undefined, role: auth.role ?? undefined });
+      const userId = auth.userId;
+      void runPostHog(({ identifyPostHogUser }) =>
+        identifyPostHogUser(userId, { email: auth.email ?? undefined, role: auth.role ?? undefined })
+      );
     }
-    capturePostHogEvent("tenant_login_succeeded", { login_method: "password" });
+    void runPostHog(({ capturePostHogEvent }) =>
+      capturePostHogEvent("tenant_login_succeeded", { login_method: "password" })
+    );
     if (!district.isDistrictHost && session?.districtSlug) {
       const handoffCode = await createDistrictSessionHandoff(session.districtSlug);
       window.location.replace(
@@ -361,10 +376,14 @@ const handleTenantLogin = async () => {
     if (signInErrorMessage) {
       error.value = "";
       showToast("Sign in failed.", signInErrorMessage);
-      capturePostHogEvent("tenant_login_failed", { error_type: errorMessage });
+      void runPostHog(({ capturePostHogEvent }) =>
+        capturePostHogEvent("tenant_login_failed", { error_type: errorMessage })
+      );
       return;
     }
-    capturePostHogEvent("tenant_login_failed", { error_type: errorMessage });
+    void runPostHog(({ capturePostHogEvent }) =>
+      capturePostHogEvent("tenant_login_failed", { error_type: errorMessage })
+    );
     error.value = errorMessage;
   } finally {
     isLoading.value = false;

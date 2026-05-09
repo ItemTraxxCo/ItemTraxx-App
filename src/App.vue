@@ -41,7 +41,7 @@
       aria-live="assertive"
       aria-modal="true"
     >
-      <a class="kill-switch-logo-link" href="/" aria-label="ItemTraxx home">
+      <a class="kill-switch-logo-link" href="/unavailable" aria-label="ItemTraxx unavailable">
         <img
           v-if="brandLogoUrl"
           class="kill-switch-logo"
@@ -868,7 +868,7 @@ const maybeRedirectAuthenticatedPublicHome = async () => {
 };
 
 const reloadApp = () => {
-  window.location.reload();
+  window.location.assign(`${window.location.origin}/`);
 };
 
 const signInAgain = async () => {

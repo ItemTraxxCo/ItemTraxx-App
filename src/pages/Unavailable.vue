@@ -4,7 +4,7 @@
     :class="{ 'unavailable-page-dark': themeMode === 'dark' }"
     aria-labelledby="unavailable-title"
   >
-    <a class="unavailable-logo-link" href="/" aria-label="ItemTraxx home">
+    <a class="unavailable-logo-link" href="/unavailable" aria-label="ItemTraxx unavailable">
       <img v-if="brandLogoUrl" class="unavailable-logo" :src="brandLogoUrl" alt="ItemTraxx Co" />
     </a>
     <button
@@ -55,7 +55,7 @@ const brandLogoUrl = computed(() =>
 let themeObserver: MutationObserver | null = null;
 
 const refreshPage = () => {
-  window.location.reload();
+  window.location.assign(`${window.location.origin}/`);
 };
 
 const applyTheme = (next: "light" | "dark") => {

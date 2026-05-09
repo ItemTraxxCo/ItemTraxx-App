@@ -13,6 +13,12 @@ ALLOWED_FUNCTIONS = "tenant-login,checkoutReturn,create-tenant-admin,admin-gear-
 ITX_ITEMTRAXX_KILLSWITCH_ENABLED = "false"
 SENTRY_ENVIRONMENT = "production"
 
+# Optional: enables maintenance-mode fallback state when system-status
+# cannot read Supabase during outages/upgrades.
+[[kv_namespaces]]
+binding = "MAINTENANCE_FALLBACK_KV"
+id = "09542de7b51b4edcb189f38addcba602"
+
 [[routes]]
 pattern = "edge.itemtraxx.com"
 zone_name = "itemtraxx.com"

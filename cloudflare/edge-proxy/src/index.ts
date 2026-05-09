@@ -1,3 +1,9 @@
+type KvBinding = {
+  get: <T = string>(key: string, type?: "text" | "json") => Promise<T | null>;
+  put: (key: string, value: string, options?: { expirationTtl?: number }) => Promise<void>;
+  delete: (key: string) => Promise<void>;
+};
+
 export interface Env {
   SUPABASE_URL: string;
   SUPABASE_ANON_KEY: string;
@@ -13,6 +19,7 @@ export interface Env {
   SESSION_REFRESH_COOKIE_MAX_AGE_SECONDS?: string;
   SENTRY_DSN?: string;
   SENTRY_ENVIRONMENT?: string;
+  MAINTENANCE_FALLBACK_KV?: KvBinding;
 }
 
 const ACCESS_COOKIE_NAME = "itx_session";
@@ -28,6 +35,7 @@ const EDGE_PROXY_TIMESTAMP_HEADER = "x-itx-edge-proxy-ts";
 const EDGE_PROXY_SIGNATURE_HEADER = "x-itx-edge-proxy-signature";
 const DEFAULT_KILL_SWITCH_MESSAGE =
   "Unfortunately ItemTraxx is currently unavailable. We apologize for any inconvenience and are working to restore access as soon as possible. Please see the status page (https://status.itemtraxx.com/) for more information.";
+const MAINTENANCE_FALLBACK_KEY = "itemtraxx:maintenance_fallback:v1";
 
 const BASE_CORS_HEADERS = {
   "Access-Control-Allow-Headers":
@@ -133,9 +141,102 @@ type ProfileRow = {
   is_active: boolean | null;
 };
 
+type MaintenanceFallbackPayload = {
+  enabled: boolean;
+  message: string;
+  updated_at: string;
+};
+
 const trimTrailingSlash = (value: string) => value.replace(/\/+$/, "");
 const resolveKillSwitchMessage = (env: Env) =>
   env.ITX_ITEMTRAXX_KILLSWITCH_MESSAGE?.trim() || DEFAULT_KILL_SWITCH_MESSAGE;
+
+const asRecord = (value: unknown): Record<string, unknown> | null =>
+  value && typeof value === "object" ? (value as Record<string, unknown>) : null;
+
+const readMaintenanceFallback = async (env: Env): Promise<MaintenanceFallbackPayload | null> => {
+  if (!env.MAINTENANCE_FALLBACK_KV) return null;
+  try {
+    const cached = await env.MAINTENANCE_FALLBACK_KV.get(MAINTENANCE_FALLBACK_KEY, "json");
+    const record = asRecord(cached);
+    if (!record) return null;
+    if (record.enabled !== true) return null;
+    if (typeof record.message !== "string" || typeof record.updated_at !== "string") return null;
+    return {
+      enabled: true,
+      message: record.message.trim() || "Maintenance currently in progress.",
+      updated_at: record.updated_at,
+    };
+  } catch {
+    return null;
+  }
+};
+
+const writeMaintenanceFallback = async (
+  env: Env,
+  payload: MaintenanceFallbackPayload | null
+) => {
+  if (!env.MAINTENANCE_FALLBACK_KV) return;
+  try {
+    if (!payload) {
+      await env.MAINTENANCE_FALLBACK_KV.delete(MAINTENANCE_FALLBACK_KEY);
+      return;
+    }
+    await env.MAINTENANCE_FALLBACK_KV.put(MAINTENANCE_FALLBACK_KEY, JSON.stringify(payload), {
+      expirationTtl: 60 * 60 * 24 * 14,
+    });
+  } catch {
+    // best effort only
+  }
+};
+
+const extractMaintenanceFromStatusPayload = (
+  payload: Record<string, unknown>
+): MaintenanceFallbackPayload | null => {
+  const maintenance = asRecord(payload.maintenance);
+  if (!maintenance) return null;
+  if (maintenance.enabled !== true) return { enabled: false, message: "", updated_at: new Date().toISOString() };
+  return {
+    enabled: true,
+    message:
+      typeof maintenance.message === "string" && maintenance.message.trim()
+        ? maintenance.message.trim()
+        : "Maintenance currently in progress.",
+    updated_at:
+      typeof maintenance.updated_at === "string" && maintenance.updated_at.trim()
+        ? maintenance.updated_at
+        : new Date().toISOString(),
+  };
+};
+
+const applyMaintenanceFallbackToStatusPayload = async (
+  env: Env,
+  upstreamStatusCode: number,
+  payload: Record<string, unknown>
+) => {
+  const extracted = extractMaintenanceFromStatusPayload(payload);
+  if (extracted?.enabled === true) {
+    await writeMaintenanceFallback(env, extracted);
+    return payload;
+  }
+  if (extracted?.enabled === false) {
+    await writeMaintenanceFallback(env, null);
+  }
+
+  const status = typeof payload.status === "string" ? payload.status : "";
+  const checks = asRecord(payload.checks);
+  const dbFailed = checks?.db === "failed";
+  const shouldFallback = upstreamStatusCode >= 500 || status === "down" || dbFailed;
+  if (!shouldFallback) return payload;
+
+  const cached = await readMaintenanceFallback(env);
+  if (!cached) return payload;
+  return {
+    ...payload,
+    maintenance: cached,
+    maintenance_fallback: true,
+  };
+};
 
 const parseSentryDsn = (dsn?: string | null) => {
   if (!dsn) return null;
@@ -834,6 +935,7 @@ const proxyFunctionRequest = async (
 ) => {
   const cookies = parseCookies(request);
   const supabaseFunctionUrl = `${trimTrailingSlash(env.SUPABASE_URL)}/functions/v1/${functionName}`;
+  const isSystemStatusGet = functionName === "system-status" && request.method === "GET";
   const invoke = async (sessionAccessToken?: string | null) => {
     const proxiedHeaders = sanitizeRequestHeaders(
       request,
@@ -856,7 +958,35 @@ const proxyFunctionRequest = async (
     return fetch(supabaseFunctionUrl, init);
   };
 
-  let upstreamResponse = await invoke(cookies.accessToken);
+  let upstreamResponse: Response;
+  try {
+    upstreamResponse = await invoke(cookies.accessToken);
+  } catch (error) {
+    if (isSystemStatusGet) {
+      const cached = await readMaintenanceFallback(env);
+      if (cached) {
+        const responseHeaders = new Headers();
+        Object.entries(headers).forEach(([key, value]) => responseHeaders.set(key, value));
+        responseHeaders.set("x-request-id", requestId);
+        responseHeaders.set("content-type", "application/json");
+        return new Response(
+          JSON.stringify({
+            status: "down",
+            checks: { config: "ok", db: "failed" },
+            maintenance: cached,
+            maintenance_fallback: true,
+            incident_summary: "system status unavailable; maintenance fallback active",
+            checked_at: new Date().toISOString(),
+          }),
+          {
+            status: 503,
+            headers: responseHeaders,
+          }
+        );
+      }
+    }
+    throw error;
+  }
   let sessionHeaders: Headers | null = null;
 
   if (!request.headers.get("Authorization") && upstreamResponse.status === 401 && cookies.refreshToken) {
@@ -872,6 +1002,25 @@ const proxyFunctionRequest = async (
   responseHeaders.set("x-request-id", requestId);
   if (sessionHeaders) {
     appendSetCookies(responseHeaders, sessionHeaders);
+  }
+
+  if (isSystemStatusGet) {
+    const rawBody = await upstreamResponse.clone().text();
+    try {
+      const parsed = JSON.parse(rawBody) as Record<string, unknown>;
+      const withFallback = await applyMaintenanceFallbackToStatusPayload(
+        env,
+        upstreamResponse.status,
+        parsed
+      );
+      responseHeaders.set("content-type", "application/json");
+      return new Response(JSON.stringify(withFallback), {
+        status: upstreamResponse.status,
+        headers: responseHeaders,
+      });
+    } catch {
+      // preserve original upstream payload when JSON parsing fails
+    }
   }
 
   return new Response(upstreamResponse.body, {

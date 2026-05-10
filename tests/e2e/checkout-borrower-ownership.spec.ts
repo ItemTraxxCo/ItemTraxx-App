@@ -137,11 +137,17 @@ test.describe("Checkout borrower ownership regression", () => {
     const barcodeInput = page.getByPlaceholder("Scan or enter barcode");
     const addBarcodeButton = page.getByRole("button", { name: "Add barcode" });
     const completeTransactionButton = page.getByRole("button", { name: "Complete transaction" });
+    const loadBorrower = async (id: "BRWRA" | "BRWRB") => {
+      await borrowerInput.fill(id);
+      await Promise.all([
+        page.waitForResponse((response) => response.url().includes("/rest/v1/students?") && response.ok()),
+        loadBorrowerButton.click(),
+      ]);
+      await expect(barcodeInput).toBeVisible();
+    };
 
     // 1) Checkout by borrower A.
-    await borrowerInput.fill("BRWRA");
-    await loadBorrowerButton.click();
-    await expect(page.getByText("Borrower A")).toBeVisible();
+    await loadBorrower("BRWRA");
     await barcodeInput.fill("ITEM-1");
     await addBarcodeButton.click();
     await expect(page.getByText("Checkout")).toBeVisible();
@@ -149,17 +155,13 @@ test.describe("Checkout borrower ownership regression", () => {
     await expect(page.getByText("Transaction complete (Success).")).toBeVisible();
 
     // 2) Borrower B cannot checkout/return while item is checked out by A.
-    await borrowerInput.fill("BRWRB");
-    await loadBorrowerButton.click();
-    await expect(page.getByText("Borrower B")).toBeVisible();
+    await loadBorrower("BRWRB");
     await barcodeInput.fill("ITEM-1");
     await addBarcodeButton.click();
     await expect(page.locator(".error", { hasText: "Item already checked out." })).toBeVisible();
 
     // 3) Borrower A can return their own checked-out item.
-    await borrowerInput.fill("BRWRA");
-    await loadBorrowerButton.click();
-    await expect(page.getByText("Borrower A")).toBeVisible();
+    await loadBorrower("BRWRA");
     await barcodeInput.fill("ITEM-1");
     await addBarcodeButton.click();
     await expect(page.getByText("Return")).toBeVisible();

@@ -274,6 +274,13 @@ const syncOfflineBuffer = async (showWhenNoOps = false) => {
   }
 };
 
+const waitForPendingSync = async () => {
+  for (let attempt = 0; attempt < 60; attempt += 1) {
+    if (!syncInFlight.value) return;
+    await new Promise((resolve) => window.setTimeout(resolve, 50));
+  }
+};
+
 const downloadReceiptPdf = async () => {
   if (!receipt.value) return;
   const [{ downloadTransactionReceiptPdf }] = await Promise.all([
@@ -344,19 +351,25 @@ const addBarcode = async () => {
   try {
     const gear = await fetchGearByBarcode(value);
     const normalizedStatus = String(gear.status ?? "").toLowerCase();
-    if (normalizedStatus !== "available") {
-      throw new Error(
-        "Only items with status “available” can be added to checkout/return."
-      );
-    }
     const isCurrentBorrowerReturn = checkedOutGear.value.some(
       (item) => item.barcode === gear.barcode
     );
-    if (gear.status === "checked_out" && !isCurrentBorrowerReturn) {
+    if (normalizedStatus === "available") {
+      barcodes.value = [...barcodes.value, gear];
+      barcodeInput.value = "";
+      return;
+    }
+    if (normalizedStatus === "checked_out" && isCurrentBorrowerReturn) {
+      barcodes.value = [...barcodes.value, gear];
+      barcodeInput.value = "";
+      return;
+    }
+    if (normalizedStatus === "checked_out" && !isCurrentBorrowerReturn) {
       throw new Error("Item already checked out.");
     }
-    barcodes.value = [...barcodes.value, gear];
-    barcodeInput.value = "";
+    throw new Error(
+      "Only items with status “available” can be added to checkout/return."
+    );
   } catch (err) {
     const message = toUserFacingErrorMessage(err, "Invalid barcode. Please check it and try again.");
     error.value = message;
@@ -424,6 +437,14 @@ const submit = async () => {
         toastTitle.value = "Transaction failed.";
         toastMessage.value = error.value || "Unable to load borrower. Please sign out completeley and sign back in. If issue persists, contact support.";
         return;
+      }
+    }
+
+    if (navigator.onLine) {
+      await waitForPendingSync();
+      await syncOfflineBuffer(false);
+      if (student.value) {
+        checkedOutGear.value = await fetchCheckedOutGear(student.value.id);
       }
     }
 

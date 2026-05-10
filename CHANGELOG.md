@@ -1,6 +1,6 @@
 # Changelog
 
-Last updated (year-month-day): 2026-05-08
+Last updated (year-month-day): 2026-05-10
 
 This public changelog summarizes notable ItemTraxx product, reliability, security, and experience updates at a high level. Detailed internal engineering and operational notes are maintained separately.
 
@@ -15,6 +15,14 @@ Changes are dated based on the default timezone: America/Los_Angeles
 - [TERMS.md](TERMS.md) – Terms of service for users
 - [PRIVACY.md](PRIVACY.md) – Privacy policy and data handling
 - [SECURITY.md](SECURITY.md) – Security reporting and guidelines
+
+---
+
+### 5/10/2026 Development Update
+
+- Improved checkout/return reliability and borrower-ownership safeguards for tenant checkout workflows.
+- Added and stabilized end-to-end regression coverage for borrower-specific checkout/return behavior.
+- Hardened CI E2E environment parity and reduced test flake risk in Playwright checks.
 
 ---
 

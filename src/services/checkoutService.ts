@@ -116,13 +116,15 @@ export const submitCheckoutReturn = async (
   } catch (error) {
     const message = error instanceof Error ? error.message : "Request failed.";
     if (isRetryableNetworkFailure(0, message)) {
-      const queuedCount = queueCheckoutPayload(payload, message);
       if (navigator.onLine) {
-        const syncResult = await syncBufferedCheckoutQueue();
-        if (syncResult.processed > 0 && syncResult.remaining === 0) {
-          return { buffered: false, queuedCount: 0 };
+        try {
+          await executeCheckoutReturn(payload);
+          return { buffered: false, queuedCount: readOfflineQueue().length };
+        } catch {
+          throw new Error("Unable to reach ItemTraxx servers right now. Please try again.");
         }
       }
+      const queuedCount = queueCheckoutPayload(payload, message);
       return { buffered: true, queuedCount };
     }
     throw error;

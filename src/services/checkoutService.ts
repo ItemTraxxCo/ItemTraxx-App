@@ -120,8 +120,8 @@ export const submitCheckoutReturn = async (
         try {
           await executeCheckoutReturn(payload);
           return { buffered: false, queuedCount: readOfflineQueue().length };
-        } catch {
-          throw new Error("Unable to reach ItemTraxx servers right now. Please try again.");
+        } catch (retryError) {
+          throw retryError;
         }
       }
       const queuedCount = queueCheckoutPayload(payload, message);

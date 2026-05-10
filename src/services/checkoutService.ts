@@ -21,6 +21,8 @@ type CheckoutReturnResponse = {
   success: boolean;
   processed: number;
   skipped_barcodes?: string[];
+  error?: string;
+  message?: string;
 };
 
 type BufferedCheckoutItem = {
@@ -104,6 +106,10 @@ const executeCheckoutReturn = async (payload: CheckoutReturnPayload) => {
     throw new Error(`${label} Refresh and try again.`);
   }
 
+  if (result.data && result.data.success === false) {
+    throw new Error(result.data.error || result.data.message || "Request failed.");
+  }
+
   return result.data;
 };
 
@@ -116,6 +122,14 @@ export const submitCheckoutReturn = async (
   } catch (error) {
     const message = error instanceof Error ? error.message : "Request failed.";
     if (isRetryableNetworkFailure(0, message)) {
+      if (navigator.onLine) {
+        try {
+          await executeCheckoutReturn(payload);
+          return { buffered: false, queuedCount: readOfflineQueue().length };
+        } catch (retryError) {
+          throw retryError;
+        }
+      }
       const queuedCount = queueCheckoutPayload(payload, message);
       return { buffered: true, queuedCount };
     }

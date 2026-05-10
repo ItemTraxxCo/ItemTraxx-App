@@ -117,6 +117,12 @@ export const submitCheckoutReturn = async (
     const message = error instanceof Error ? error.message : "Request failed.";
     if (isRetryableNetworkFailure(0, message)) {
       const queuedCount = queueCheckoutPayload(payload, message);
+      if (navigator.onLine) {
+        const syncResult = await syncBufferedCheckoutQueue();
+        if (syncResult.processed > 0 && syncResult.remaining === 0) {
+          return { buffered: false, queuedCount: 0 };
+        }
+      }
       return { buffered: true, queuedCount };
     }
     throw error;

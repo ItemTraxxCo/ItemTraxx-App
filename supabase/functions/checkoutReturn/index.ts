@@ -264,13 +264,12 @@ serve(async (req) => {
         continue;
       }
 
-      if (String(gear.status ?? "").toLowerCase() !== "available") {
-        skippedBarcodes.push(barcode);
-        continue;
-      }
-
       if (isAdminReturn) {
-        if (!gear.checked_out_by) continue;
+        const normalizedStatus = String(gear.status ?? "").toLowerCase();
+        if (!gear.checked_out_by || normalizedStatus !== "checked_out") {
+          skippedBarcodes.push(barcode);
+          continue;
+        }
 
         const { data: updatedGear, error: updateError } = await adminClient
           .from("gear")
@@ -301,8 +300,9 @@ serve(async (req) => {
         continue;
       }
 
-      const isCheckout = !gear.checked_out_by;
-      const isReturn = gear.checked_out_by === student!.id;
+      const normalizedStatus = String(gear.status ?? "").toLowerCase();
+      const isCheckout = normalizedStatus === "available" && !gear.checked_out_by;
+      const isReturn = normalizedStatus === "checked_out" && gear.checked_out_by === student!.id;
 
       if (!isCheckout && !isReturn) {
         skippedBarcodes.push(barcode);

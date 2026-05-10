@@ -139,10 +139,9 @@ test.describe("Checkout borrower ownership regression", () => {
     const completeTransactionButton = page.getByRole("button", { name: "Complete transaction" });
     const loadBorrower = async (id: "BRWRA" | "BRWRB") => {
       await borrowerInput.fill(id);
-      await Promise.all([
-        page.waitForResponse((response) => response.url().includes("/rest/v1/students?") && response.ok()),
-        loadBorrowerButton.click(),
-      ]);
+      await loadBorrowerButton.click();
+      await expect(page.locator(".checkout-student-summary")).toBeVisible();
+      await expect(page.getByText(`ID: ${id}`)).toBeVisible();
       await expect(barcodeInput).toBeVisible();
     };
 

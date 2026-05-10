@@ -8,6 +8,7 @@ const e2eSupabaseUrl =
 const e2eSupabaseAnonKey =
   process.env.VITE_SUPABASE_ANON_KEY ||
   "sb_publishable_dummy_for_e2e_tests_only";
+const e2eEdgeProxyUrl = process.env.VITE_EDGE_PROXY_URL || baseURL;
 
 export default defineConfig({
   testDir: "./tests/e2e",
@@ -29,6 +30,7 @@ export default defineConfig({
       VITE_E2E_TEST_UTILS: "true",
       VITE_SUPABASE_URL: e2eSupabaseUrl,
       VITE_SUPABASE_ANON_KEY: e2eSupabaseAnonKey,
+      VITE_EDGE_PROXY_URL: e2eEdgeProxyUrl,
     },
     url: baseURL,
     timeout: 120_000,

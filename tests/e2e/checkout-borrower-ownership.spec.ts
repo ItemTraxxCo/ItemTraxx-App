@@ -149,7 +149,7 @@ test.describe("Checkout borrower ownership regression", () => {
     await loadBorrower("BRWRA");
     await barcodeInput.fill("ITEM-1");
     await addBarcodeButton.click();
-    await expect(page.getByText("Checkout")).toBeVisible();
+    await expect(page.locator(".tag-checkout", { hasText: "Checkout" })).toBeVisible();
     await completeTransactionButton.click();
     await expect(page.getByText("Transaction complete (Success).")).toBeVisible();
 
@@ -163,7 +163,7 @@ test.describe("Checkout borrower ownership regression", () => {
     await loadBorrower("BRWRA");
     await barcodeInput.fill("ITEM-1");
     await addBarcodeButton.click();
-    await expect(page.getByText("Return")).toBeVisible();
+    await expect(page.locator(".tag-return", { hasText: "Return" })).toBeVisible();
     await completeTransactionButton.click();
     await expect(page.getByText("Transaction complete (Success).")).toBeVisible();
   });

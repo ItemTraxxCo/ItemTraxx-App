@@ -274,6 +274,13 @@ const syncOfflineBuffer = async (showWhenNoOps = false) => {
   }
 };
 
+const waitForPendingSync = async () => {
+  for (let attempt = 0; attempt < 60; attempt += 1) {
+    if (!syncInFlight.value) return;
+    await new Promise((resolve) => window.setTimeout(resolve, 50));
+  }
+};
+
 const downloadReceiptPdf = async () => {
   if (!receipt.value) return;
   const [{ downloadTransactionReceiptPdf }] = await Promise.all([
@@ -430,6 +437,14 @@ const submit = async () => {
         toastTitle.value = "Transaction failed.";
         toastMessage.value = error.value || "Unable to load borrower. Please sign out completeley and sign back in. If issue persists, contact support.";
         return;
+      }
+    }
+
+    if (navigator.onLine) {
+      await waitForPendingSync();
+      await syncOfflineBuffer(false);
+      if (student.value) {
+        checkedOutGear.value = await fetchCheckedOutGear(student.value.id);
       }
     }
 

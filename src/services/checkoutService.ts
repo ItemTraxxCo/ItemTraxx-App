@@ -21,6 +21,8 @@ type CheckoutReturnResponse = {
   success: boolean;
   processed: number;
   skipped_barcodes?: string[];
+  error?: string;
+  message?: string;
 };
 
 type BufferedCheckoutItem = {
@@ -102,6 +104,10 @@ const executeCheckoutReturn = async (payload: CheckoutReturnPayload) => {
         ? `Item ${skippedBarcodes[0]} is already checked out or no longer available.`
         : `${skippedBarcodes.length} item(s) are already checked out or no longer available.`;
     throw new Error(`${label} Refresh and try again.`);
+  }
+
+  if (result.data && result.data.success === false) {
+    throw new Error(result.data.error || result.data.message || "Request failed.");
   }
 
   return result.data;

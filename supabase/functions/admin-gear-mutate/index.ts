@@ -3,6 +3,11 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { isKillSwitchWriteBlocked } from "../_shared/killSwitch.ts";
 import { isAllowedOrigin, parseAllowedOrigins } from "../_shared/cors.ts";
 import { requireTrustedEdgeIngress } from "../_shared/trustedIngress.ts";
+import {
+  hasPrivilegedStepUp,
+  isMissingPrivilegedStepUpTable,
+} from "../_shared/privilegedStepUp.ts";
+import { validateTenantAdminDeviceSession } from "../_shared/tenantAdminSessions.ts";
 
 const baseCorsHeaders = {
   "Access-Control-Allow-Headers":
@@ -97,6 +102,7 @@ serve(async (req) => {
     if (!authHeader) {
       return jsonResponse(401, { error: "Unauthorized" });
     }
+    const authToken = authHeader.replace(/^Bearer\s+/i, "").trim();
 
     const supabaseUrl = Deno.env.get("ITX_SUPABASE_URL");
     const publishableKey = Deno.env.get("ITX_PUBLISHABLE_KEY");
@@ -122,11 +128,16 @@ serve(async (req) => {
 
     const { data: profile, error: profileError } = await userClient
       .from("profiles")
-      .select("tenant_id, role")
+      .select("id, tenant_id, role, is_active")
       .eq("id", user.id)
       .single();
 
-    if (profileError || !profile?.tenant_id || profile.role !== "tenant_admin") {
+    if (
+      profileError ||
+      !profile?.tenant_id ||
+      profile.role !== "tenant_admin" ||
+      profile.is_active === false
+    ) {
       return jsonResponse(403, { error: "Access denied" });
     }
 
@@ -151,7 +162,39 @@ serve(async (req) => {
       action === "delete" ||
       action === "restore";
 
+    const payloadRecord = payload as Record<string, unknown>;
+    const deviceId =
+      typeof payloadRecord.device_id === "string" ? payloadRecord.device_id.trim() : null;
+
+    const adminClient = createClient(supabaseUrl, serviceKey, {
+      auth: { persistSession: false },
+    });
+
     if (isMutationAction) {
+      try {
+        const hasStepUp = await hasPrivilegedStepUp(adminClient, {
+          userId: user.id,
+          roleScope: "tenant_admin",
+          authToken,
+        });
+        if (!hasStepUp) {
+          return jsonResponse(403, { error: "Admin verification required." });
+        }
+      } catch (error) {
+        if (isMissingPrivilegedStepUpTable(error as { code?: string; message?: string })) {
+          return jsonResponse(503, {
+            error: "Privileged verification controls unavailable. Run latest SQL setup.",
+          });
+        }
+        throw error;
+      }
+    }
+
+    if (isMutationAction) {
+      if (!deviceId) {
+        return jsonResponse(400, { error: "Device session is required." });
+      }
+
       const { data: rateLimit, error: rateLimitError } = await userClient.rpc(
         "consume_rate_limit",
         {
@@ -171,11 +214,22 @@ serve(async (req) => {
           error: "Rate limit exceeded, please try again in a minute.",
         });
       }
-    }
 
-    const adminClient = createClient(supabaseUrl, serviceKey, {
-      auth: { persistSession: false },
-    });
+      const activeSession = await validateTenantAdminDeviceSession(adminClient, {
+        tenantId: profile.tenant_id,
+        profileId: profile.id,
+        deviceId,
+        authToken,
+      });
+      if (activeSession.relationMissing) {
+        return jsonResponse(503, {
+          error: "Session controls unavailable. Run latest SQL setup.",
+        });
+      }
+      if (!activeSession.valid) {
+        return jsonResponse(401, { error: "Session revoked" });
+      }
+    }
 
     const { data: maintenanceRow } = await adminClient
       .from("app_runtime_config")

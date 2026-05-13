@@ -2,6 +2,7 @@ import { invokeEdgeFunction } from "./edgeFunctionClient";
 import { authenticatedSelect } from "./authenticatedDataClient";
 import { getAuthState } from "../store/authState";
 import { edgeFunctionError, missingContextError } from "./appErrors";
+import { getOrCreateDeviceSession } from "../utils/deviceSession";
 
 export type StudentItem = {
   id: string;
@@ -67,6 +68,7 @@ export const createStudent = async (payload: {
   username?: string;
   student_id?: string;
 }) => {
+  const { deviceId } = getOrCreateDeviceSession();
   const result = await invokeEdgeFunction<{ data: StudentItem }>(
     "admin-student-mutate",
     {
@@ -74,6 +76,7 @@ export const createStudent = async (payload: {
       body: {
         action: "create",
         payload: {
+          device_id: deviceId,
           tenant_id: payload.tenant_id,
           username: payload.username ?? "",
           student_id: payload.student_id ?? "",
@@ -92,6 +95,7 @@ export const createStudent = async (payload: {
 export const bulkCreateStudents = async (
   rows: Array<{ username?: string; student_id?: string }>
 ) => {
+  const { deviceId } = getOrCreateDeviceSession();
   const result = await invokeEdgeFunction<{
     data: {
       inserted_count: number;
@@ -103,7 +107,7 @@ export const bulkCreateStudents = async (
     method: "POST",
     body: {
       action: "bulk_create",
-      payload: { rows },
+      payload: { rows, device_id: deviceId },
     },
   });
 
@@ -120,11 +124,12 @@ export const bulkCreateStudents = async (
 };
 
 export const deleteStudent = async (id: string) => {
+  const { deviceId } = getOrCreateDeviceSession();
   const result = await invokeEdgeFunction("admin-student-mutate", {
     method: "POST",
     body: {
       action: "delete",
-      payload: { id },
+      payload: { id, device_id: deviceId },
     },
   });
 
@@ -134,13 +139,14 @@ export const deleteStudent = async (id: string) => {
 };
 
 export const restoreStudent = async (id: string) => {
+  const { deviceId } = getOrCreateDeviceSession();
   const result = await invokeEdgeFunction<{ data: StudentItem }>(
     "admin-student-mutate",
     {
       method: "POST",
       body: {
         action: "restore",
-        payload: { id },
+        payload: { id, device_id: deviceId },
       },
     }
   );

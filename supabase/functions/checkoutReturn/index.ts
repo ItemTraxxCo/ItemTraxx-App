@@ -181,7 +181,7 @@ serve(async (req) => {
     if (callerRole === "tenant_admin") {
       const deviceId = sanitizeText(device_id, 128);
       if (!deviceId) {
-        return jsonResponse(401, { error: "Session revoked" });
+        return jsonResponse(400, { error: "Device session is required." });
       }
 
       const { data: activeAdminSession, error: activeAdminSessionError } = await adminClient

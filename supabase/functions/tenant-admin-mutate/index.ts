@@ -212,6 +212,9 @@ serve(async (req) => {
 
     const next = payload as Record<string, unknown>;
     const deviceId = sanitizeText(next.device_id, 128);
+    if (!deviceId) {
+      return jsonResponse(400, { error: "Device session is required." });
+    }
     const activeSession = await validateTenantAdminDeviceSession(adminClient, {
       tenantId: requesterProfile.tenant_id,
       profileId: requesterProfile.id,

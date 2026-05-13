@@ -518,6 +518,10 @@ serve(async (req) => {
     }
 
     if (isMutationAction) {
+      if (!deviceId) {
+        return jsonResponse(400, { error: "Device session is required." });
+      }
+
       const { data: rateLimit, error: rateLimitError } = await userClient.rpc(
         "consume_rate_limit",
         {

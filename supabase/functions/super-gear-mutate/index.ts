@@ -113,11 +113,11 @@ serve(async (req) => {
 
     const { data: profile, error: profileError } = await userClient
       .from("profiles")
-      .select("role, auth_email")
+      .select("role, auth_email, is_active")
       .eq("id", user.id)
       .single();
 
-    if (profileError || profile?.role !== "super_admin") {
+    if (profileError || profile?.role !== "super_admin" || profile.is_active === false) {
       return jsonResponse(403, { error: "Access denied" });
     }
 

@@ -101,7 +101,7 @@ serve(async (req) => {
       return jsonResponse(403, { error: "Access denied" });
     }
 
-    if (profile.role === "district_admin" && !profile.district_id) {
+    if (profile.role === "district_admin" && (!profile.district_id || profile.is_active === false)) {
       return jsonResponse(403, { error: "Access denied" });
     }
 

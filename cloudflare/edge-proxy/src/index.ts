@@ -543,6 +543,25 @@ const isAllowedRpcProxyPath = (pathname: string) => {
   return ALLOWED_RPC_FUNCTIONS.has(functionName.toLowerCase());
 };
 
+const hasRpcCallerAuth = (request: Request, cookies: SessionCookies) => {
+  const authHeader = request.headers.get("Authorization");
+  if (authHeader && authHeader.trim()) {
+    return true;
+  }
+  if (cookies.accessToken || cookies.refreshToken) {
+    return true;
+  }
+  return false;
+};
+
+export const isUnauthorizedRpcProxyPath = (pathname: string, hasCallerAuth: boolean) => {
+  const isRpcPath = isRpcProxyPath(pathname) || pathname === "/rest/v1/rpc" || pathname.startsWith("/rest/v1/rpc/");
+  if (!isRpcPath) {
+    return false;
+  }
+  return !hasCallerAuth;
+};
+
 export const isBlockedRpcProxyPath = (pathname: string) => {
   const isRpcPath = isRpcProxyPath(pathname) || pathname === "/rest/v1/rpc" || pathname.startsWith("/rest/v1/rpc/");
   if (!isRpcPath) {
@@ -878,6 +897,9 @@ const proxySupabaseApiRequest = async (
   const cookies = parseCookies(request);
   if (isBlockedRpcProxyPath(upstreamPath)) {
     return buildError(403, "RPC proxy access is not allowed", headers, requestId);
+  }
+  if (isUnauthorizedRpcProxyPath(upstreamPath, hasRpcCallerAuth(request, cookies))) {
+    return buildError(401, "Unauthorized", headers, requestId);
   }
   const normalizedUpstreamPath = isRpcProxyPath(upstreamPath)
     ? `/rest/v1${upstreamPath}`

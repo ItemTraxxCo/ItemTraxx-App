@@ -2,6 +2,7 @@ import { invokeEdgeFunction } from "./edgeFunctionClient";
 import { authenticatedSelect } from "./authenticatedDataClient";
 import { getAuthState } from "../store/authState";
 import { edgeFunctionError, missingContextError } from "./appErrors";
+import { getOrCreateDeviceSession } from "../utils/deviceSession";
 
 export type GearItem = {
   id: string;
@@ -76,11 +77,13 @@ export const createGear = async (payload: {
   status: string;
   notes?: string;
 }) => {
+  const { deviceId } = getOrCreateDeviceSession();
   const result = await invokeEdgeFunction<{ data: GearItem }>("admin-gear-mutate", {
     method: "POST",
     body: {
       action: "create",
       payload: {
+        device_id: deviceId,
         tenant_id: payload.tenant_id,
         name: payload.name,
         barcode: payload.barcode,
@@ -105,11 +108,13 @@ export const updateGear = async (payload: {
   status: string;
   notes?: string;
 }) => {
+  const { deviceId } = getOrCreateDeviceSession();
   const result = await invokeEdgeFunction<{ data: GearItem }>("admin-gear-mutate", {
     method: "POST",
     body: {
       action: "update",
       payload: {
+        device_id: deviceId,
         id: payload.id,
         name: payload.name,
         barcode: payload.barcode,
@@ -127,11 +132,12 @@ export const updateGear = async (payload: {
 };
 
 export const deleteGear = async (id: string) => {
+  const { deviceId } = getOrCreateDeviceSession();
   const result = await invokeEdgeFunction("admin-gear-mutate", {
     method: "POST",
     body: {
       action: "delete",
-      payload: { id },
+      payload: { id, device_id: deviceId },
     },
   });
 
@@ -141,11 +147,12 @@ export const deleteGear = async (id: string) => {
 };
 
 export const restoreGear = async (id: string) => {
+  const { deviceId } = getOrCreateDeviceSession();
   const result = await invokeEdgeFunction<{ data: GearItem }>("admin-gear-mutate", {
     method: "POST",
     body: {
       action: "restore",
-      payload: { id },
+      payload: { id, device_id: deviceId },
     },
   });
 

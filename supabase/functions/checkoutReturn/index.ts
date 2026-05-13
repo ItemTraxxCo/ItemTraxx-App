@@ -115,7 +115,7 @@ serve(async (req) => {
 
     const { data: callerProfile, error: profileError } = await userClient
       .from("profiles")
-      .select("tenant_id, role")
+      .select("tenant_id, role, is_active")
       .eq("id", user.id)
       .single();
 
@@ -123,6 +123,7 @@ serve(async (req) => {
     if (
       profileError ||
       !callerProfile?.tenant_id ||
+      callerProfile.is_active === false ||
       !callerRole ||
       !["tenant_user", "tenant_admin"].includes(callerRole)
     ) {

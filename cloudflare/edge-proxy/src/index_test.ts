@@ -1,4 +1,4 @@
-import { isBlockedRpcProxyPath } from "./index.ts";
+import { isBlockedRpcProxyPath, isUnauthorizedRpcProxyPath } from "./index.ts";
 
 Deno.test("blocks RPC proxy routes through direct and REST paths", () => {
   const blockedPaths = [
@@ -33,6 +33,22 @@ Deno.test("does not block non-RPC REST paths", () => {
   for (const path of allowedPaths) {
     if (isBlockedRpcProxyPath(path)) {
       throw new Error(`Expected non-RPC path to remain allowed: ${path}`);
+    }
+  }
+});
+
+Deno.test("requires caller auth on RPC proxy paths", () => {
+  const rpcPaths = [
+    "/rpc/consume_rate_limit",
+    "/rest/v1/rpc/consume_rate_limit",
+  ];
+
+  for (const path of rpcPaths) {
+    if (!isUnauthorizedRpcProxyPath(path, false)) {
+      throw new Error(`Expected unauthenticated RPC path to be rejected: ${path}`);
+    }
+    if (isUnauthorizedRpcProxyPath(path, true)) {
+      throw new Error(`Expected authenticated RPC path to be allowed: ${path}`);
     }
   }
 });

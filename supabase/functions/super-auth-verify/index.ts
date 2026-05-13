@@ -290,11 +290,11 @@ const resolveSuperAdminContext = async (params: {
     const pendingSession = await openChallengeToken(serviceKey, challengeToken);
     const { data: profile } = await adminClient
       .from("profiles")
-      .select("role, auth_email")
+      .select("role, auth_email, is_active")
       .eq("id", pendingSession.user_id)
       .single();
 
-    if (profile?.role !== "super_admin") {
+    if (profile?.role !== "super_admin" || profile.is_active === false) {
       throw new Error("Access denied");
     }
 
@@ -326,11 +326,11 @@ const resolveSuperAdminContext = async (params: {
 
   const { data: profile, error: profileError } = await userClient
     .from("profiles")
-    .select("role, auth_email")
+    .select("role, auth_email, is_active")
     .eq("id", user.id)
     .single();
 
-  if (profileError || profile?.role !== "super_admin") {
+  if (profileError || profile?.role !== "super_admin" || profile.is_active === false) {
     throw new Error("Access denied");
   }
 
@@ -473,11 +473,11 @@ serve(async (req) => {
 
       const { data: profile } = await adminClient
         .from("profiles")
-        .select("role, auth_email")
+        .select("role, auth_email, is_active")
         .eq("id", signedInUser.id)
         .single();
 
-      if (profile?.role !== "super_admin") {
+      if (profile?.role !== "super_admin" || profile.is_active === false) {
         return jsonResponse(401, { error: "Invalid credentials" });
       }
 

@@ -38,6 +38,18 @@ declare global {
       setTenantAdminSession: (tenantId?: string, options?: { verified?: boolean }) => void;
       setDistrictAdminSession: (districtId?: string, options?: { verified?: boolean }) => void;
       setSuperAdminSession: (options?: { verified?: boolean }) => void;
+      invokeAdminGearCreate: (payload: {
+        tenant_id: string;
+        name: string;
+        barcode: string;
+        status: string;
+        notes?: string;
+      }) => Promise<unknown>;
+      invokeAdminStudentCreate: (payload: {
+        tenant_id: string;
+        username?: string;
+        student_id?: string;
+      }) => Promise<unknown>;
       clearSession: () => void;
       navigate: (path: string) => Promise<void>;
     };
@@ -130,6 +142,14 @@ const attachE2EControls = () => {
       setTenantContext(null);
       setDistrictContext(null);
       setSecondaryAuth(options.verified !== false);
+    },
+    async invokeAdminGearCreate(payload) {
+      const { createGear } = await import("./services/gearService");
+      return await createGear(payload);
+    },
+    async invokeAdminStudentCreate(payload) {
+      const { createStudent } = await import("./services/studentService");
+      return await createStudent(payload);
     },
     clearSession() {
       clearAuthState(true);

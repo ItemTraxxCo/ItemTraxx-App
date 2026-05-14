@@ -158,6 +158,7 @@
 import { computed, nextTick, onMounted, onUnmounted, ref } from "vue";
 import CameraBarcodeScannerModal from "../../components/CameraBarcodeScannerModal.vue";
 import {
+  consumeCheckoutOfflineWarning,
   fetchCheckedOutGear,
   fetchGearByBarcode,
   getBufferedCheckoutCount,
@@ -268,6 +269,12 @@ const syncOfflineBuffer = async (showWhenNoOps = false) => {
       toastStatus.value = "Success";
       toastTitle.value = "No buffered transactions.";
       toastMessage.value = "Everything is up to date.";
+    }
+    const queueWarning = consumeCheckoutOfflineWarning();
+    if (queueWarning) {
+      toastStatus.value = "Failed";
+      toastTitle.value = "Offline cache reset.";
+      toastMessage.value = queueWarning;
     }
   } finally {
     syncInFlight.value = false;
@@ -560,12 +567,13 @@ onMounted(() => {
   window.addEventListener("online", handleOnline);
   updateStudentLookupCooldown();
   ensureStudentLookupCooldownTimer();
-  const buffered = getBufferedCheckoutCount();
-  if (buffered > 0) {
-    toastStatus.value = "Processing";
-    toastTitle.value = "Buffered transactions detected.";
-    toastMessage.value = `${buffered} transaction(s) pending sync.`;
-  }
+  void getBufferedCheckoutCount().then((buffered) => {
+    if (buffered > 0) {
+      toastStatus.value = "Processing";
+      toastTitle.value = "Buffered transactions detected.";
+      toastMessage.value = `${buffered} transaction(s) pending sync.`;
+    }
+  });
   void syncOfflineBuffer(false);
 });
 

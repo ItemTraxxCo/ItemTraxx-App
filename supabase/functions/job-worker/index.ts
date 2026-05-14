@@ -465,16 +465,13 @@ const processContactSalesEmail = async (
   });
 
   if (slackWebhookUrl) {
-    const detailsPreview = (payload.details ?? "(none provided)").slice(0, 400);
     const slackText =
       `New ${payload.intent === "demo" ? "demo request" : "sales inquiry"} submitted\n` +
+      `Lead ID: ${payload.lead_id}\n` +
+      `Intent: ${payload.intent}\n` +
       `Plan: ${payload.plan_label}\n` +
-      `Name: ${payload.name}\n` +
-      `Organization: ${payload.organization}\n` +
-      `Reply email: ${payload.reply_email}` +
-      schoolsLine +
-      `\nLead ID: ${payload.lead_id}\n` +
-      `Details: ${detailsPreview}`;
+      `Job ID: ${jobId}\n` +
+      `Request ID: ${requestId}`;
     try {
       await sendSlackWebhook(slackWebhookUrl, slackText);
     } catch (error) {
@@ -803,10 +800,9 @@ const processSupportRequestEmail = async (
       `New support inquiry submitted\n` +
       `Category: ${payload.category}\n` +
       `Subject: ${payload.subject}\n` +
-      `Name: ${payload.name}\n` +
-      `Reply email: ${payload.reply_email}\n` +
       `Attachments: ${attachments.length}\n` +
-      `Message: ${payload.message.slice(0, 400)}`;
+      `Job ID: ${jobId}\n` +
+      `Request ID: ${requestId}`;
     try {
       await sendSlackWebhook(slackWebhookUrl, slackText);
     } catch (error) {

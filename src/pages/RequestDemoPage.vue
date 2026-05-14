@@ -171,16 +171,9 @@ const send = async () => {
     });
 
     saveSubmissionConfirmation({
-      kind: "Demo request",
-      title: "Demo request sent.",
-      lead: "Your demo request was submitted. We will follow up from support@itemtraxx.com to schedule next steps.",
+      kind: "demo",
+      submissionRef: response?.lead_id ?? `demo-${Date.now()}`,
       submittedAt: new Date().toISOString(),
-      referenceId: response?.lead_id ?? null,
-      fields: [
-        { label: "Reply email", value: replyEmail.value },
-        { label: "Name", value: fullName.value },
-        { label: "Organization", value: organization.value },
-      ],
     });
 
     await router.push({ name: "public-submit-confirmation" });

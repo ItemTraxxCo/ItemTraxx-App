@@ -35,6 +35,9 @@ type BufferedCheckoutItem = {
 
 const LOOKUP_TIMEOUT_MS = 7000;
 const OFFLINE_QUEUE_KEY = "itemtraxx:checkout-offline-buffer:v1";
+const OFFLINE_QUEUE_KEY_VERSION = "itemtraxx:checkout-offline-buffer:key:v1";
+const OFFLINE_QUEUE_ALGO = "AES-GCM";
+let offlineQueueWarning: string | null = null;
 
 const isRetryableNetworkFailure = (status: number, message: string) => {
   if (status === 0) return true;
@@ -42,28 +45,167 @@ const isRetryableNetworkFailure = (status: number, message: string) => {
   return normalized.includes("network request failed") || normalized.includes("timed out");
 };
 
-const readOfflineQueue = (): BufferedCheckoutItem[] => {
+const bytesToBase64 = (bytes: Uint8Array) => {
+  let binary = "";
+  for (const value of bytes) {
+    binary += String.fromCharCode(value);
+  }
+  return window.btoa(binary);
+};
+
+const base64ToBytes = (value: string) => {
+  const binary = window.atob(value);
+  const bytes = new Uint8Array(binary.length);
+  for (let index = 0; index < binary.length; index += 1) {
+    bytes[index] = binary.charCodeAt(index);
+  }
+  return bytes;
+};
+
+const buildFallbackCryptoKey = () => {
+  const seed = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const encoder = new TextEncoder();
+  return bytesToBase64(encoder.encode(seed));
+};
+
+const getOrCreateOfflineQueueKey = async () => {
+  let serialized = window.sessionStorage.getItem(OFFLINE_QUEUE_KEY_VERSION);
+  if (!serialized) {
+    const key = await window.crypto.subtle.generateKey(
+      {
+        name: OFFLINE_QUEUE_ALGO,
+        length: 256,
+      },
+      true,
+      ["encrypt", "decrypt"]
+    );
+    const exported = await window.crypto.subtle.exportKey("raw", key);
+    serialized = bytesToBase64(new Uint8Array(exported));
+    window.sessionStorage.setItem(OFFLINE_QUEUE_KEY_VERSION, serialized);
+  }
+
+  try {
+    return window.crypto.subtle.importKey(
+      "raw",
+      base64ToBytes(serialized),
+      OFFLINE_QUEUE_ALGO,
+      false,
+      ["encrypt", "decrypt"]
+    );
+  } catch {
+    const fallback = buildFallbackCryptoKey();
+    window.sessionStorage.setItem(OFFLINE_QUEUE_KEY_VERSION, fallback);
+    return window.crypto.subtle.importKey(
+      "raw",
+      base64ToBytes(fallback),
+      OFFLINE_QUEUE_ALGO,
+      false,
+      ["encrypt", "decrypt"]
+    );
+  }
+};
+
+const encryptOfflineQueue = async (items: BufferedCheckoutItem[]) => {
+  const key = await getOrCreateOfflineQueueKey();
+  const encoder = new TextEncoder();
+  const iv = window.crypto.getRandomValues(new Uint8Array(12));
+  const payload = encoder.encode(JSON.stringify(items));
+  const encrypted = await window.crypto.subtle.encrypt(
+    { name: OFFLINE_QUEUE_ALGO, iv },
+    key,
+    payload
+  );
+  return JSON.stringify({
+    version: 1,
+    iv: bytesToBase64(iv),
+    cipher: bytesToBase64(new Uint8Array(encrypted)),
+  });
+};
+
+const decryptOfflineQueue = async (raw: string) => {
+  const parsed = JSON.parse(raw) as { iv?: string; cipher?: string; version?: number };
+  if (parsed.version !== 1 || !parsed.iv || !parsed.cipher) {
+    throw new Error("invalid-offline-queue");
+  }
+  const key = await getOrCreateOfflineQueueKey();
+  const decrypted = await window.crypto.subtle.decrypt(
+    {
+      name: OFFLINE_QUEUE_ALGO,
+      iv: base64ToBytes(parsed.iv),
+    },
+    key,
+    base64ToBytes(parsed.cipher)
+  );
+  const decoder = new TextDecoder();
+  const payload = decoder.decode(decrypted);
+  const queue = JSON.parse(payload) as unknown;
+  if (!Array.isArray(queue)) {
+    throw new Error("invalid-offline-queue");
+  }
+  return queue as BufferedCheckoutItem[];
+};
+
+const markOfflineQueueCorrupted = () => {
+  window.localStorage.removeItem(OFFLINE_QUEUE_KEY);
+  offlineQueueWarning =
+    "Buffered transaction cache was reset because local data could not be verified. Please retry failed requests.";
+};
+
+export const consumeCheckoutOfflineWarning = () => {
+  const warning = offlineQueueWarning;
+  offlineQueueWarning = null;
+  return warning;
+};
+
+const readLegacyOfflineQueue = (): BufferedCheckoutItem[] => {
   try {
     const raw = window.localStorage.getItem(OFFLINE_QUEUE_KEY);
     if (!raw) return [];
     const parsed = JSON.parse(raw) as unknown;
-    if (!Array.isArray(parsed)) return [];
-    return parsed as BufferedCheckoutItem[];
+    if (Array.isArray(parsed)) {
+      return parsed as BufferedCheckoutItem[];
+    }
+    if (parsed && typeof parsed === "object" && "cipher" in parsed) {
+      return [];
+    }
+    return [];
   } catch {
     return [];
   }
 };
 
-const writeOfflineQueue = (items: BufferedCheckoutItem[]) => {
+const readOfflineQueue = async () => {
+  const raw = window.localStorage.getItem(OFFLINE_QUEUE_KEY);
+  if (!raw) return [] as BufferedCheckoutItem[];
+
   try {
-    window.localStorage.setItem(OFFLINE_QUEUE_KEY, JSON.stringify(items));
+    const parsed = JSON.parse(raw) as unknown;
+    if (Array.isArray(parsed)) {
+      const migrated = parsed as BufferedCheckoutItem[];
+      await writeOfflineQueue(migrated);
+      return migrated;
+    }
+    if (parsed && typeof parsed === "object" && "cipher" in parsed) {
+      return await decryptOfflineQueue(raw);
+    }
+  } catch {
+    markOfflineQueueCorrupted();
+  }
+
+  return readLegacyOfflineQueue();
+};
+
+const writeOfflineQueue = async (items: BufferedCheckoutItem[]) => {
+  try {
+    const encrypted = await encryptOfflineQueue(items);
+    window.localStorage.setItem(OFFLINE_QUEUE_KEY, encrypted);
   } catch {
     // Ignore storage failures so checkout path never crashes.
   }
 };
 
-const queueCheckoutPayload = (payload: CheckoutReturnPayload, error: string | null = null) => {
-  const queue = readOfflineQueue();
+const queueCheckoutPayload = async (payload: CheckoutReturnPayload, error: string | null = null) => {
+  const queue = await readOfflineQueue();
   const item: BufferedCheckoutItem = {
     id:
       typeof crypto !== "undefined" && "randomUUID" in crypto
@@ -75,7 +217,7 @@ const queueCheckoutPayload = (payload: CheckoutReturnPayload, error: string | nu
     last_error: error,
   };
   queue.push(item);
-  writeOfflineQueue(queue);
+  await writeOfflineQueue(queue);
   return queue.length;
 };
 
@@ -118,29 +260,29 @@ export const submitCheckoutReturn = async (
 ): Promise<SubmitCheckoutReturnResult> => {
   try {
     await executeCheckoutReturn(payload);
-    return { buffered: false, queuedCount: readOfflineQueue().length };
+    return { buffered: false, queuedCount: (await readOfflineQueue()).length };
   } catch (error) {
     const message = error instanceof Error ? error.message : "Request failed.";
     if (isRetryableNetworkFailure(0, message)) {
       if (navigator.onLine) {
         try {
           await executeCheckoutReturn(payload);
-          return { buffered: false, queuedCount: readOfflineQueue().length };
+          return { buffered: false, queuedCount: (await readOfflineQueue()).length };
         } catch (retryError) {
           throw retryError;
         }
       }
-      const queuedCount = queueCheckoutPayload(payload, message);
+      const queuedCount = await queueCheckoutPayload(payload, message);
       return { buffered: true, queuedCount };
     }
     throw error;
   }
 };
 
-export const getBufferedCheckoutCount = () => readOfflineQueue().length;
+export const getBufferedCheckoutCount = async () => (await readOfflineQueue()).length;
 
 export const syncBufferedCheckoutQueue = async () => {
-  const queue = readOfflineQueue();
+  const queue = await readOfflineQueue();
   if (queue.length === 0) {
     return { processed: 0, failed: 0, remaining: 0 };
   }
@@ -167,7 +309,7 @@ export const syncBufferedCheckoutQueue = async () => {
     }
   }
 
-  writeOfflineQueue(remaining);
+  await writeOfflineQueue(remaining);
   return {
     processed,
     failed,

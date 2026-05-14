@@ -274,17 +274,9 @@ const send = async () => {
     });
 
     saveSubmissionConfirmation({
-      kind: "Support request",
-      title: "Support request sent.",
-      lead: "Your support request was submitted. We will follow up from support@itemtraxx.com as soon as possible.",
+      kind: "support",
+      submissionRef: response?.request_id ?? `support-${Date.now()}`,
       submittedAt: new Date().toISOString(),
-      referenceId: response?.request_id ?? null,
-      fields: [
-        { label: "Reply email", value: replyEmail.value },
-        { label: "Name", value: fullName.value },
-        { label: "Category", value: category.value },
-        { label: "Subject", value: subject.value },
-      ],
     });
 
     await router.push({ name: "public-submit-confirmation" });

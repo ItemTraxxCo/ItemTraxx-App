@@ -1,15 +1,7 @@
-export type SubmissionConfirmationField = {
-  label: string;
-  value: string;
-};
-
 export type SubmissionConfirmationPayload = {
-  kind: string;
-  title: string;
-  lead: string;
+  kind: "contact_sales" | "demo" | "support" | "security_report";
+  submissionRef: string;
   submittedAt: string;
-  referenceId?: string | null;
-  fields: SubmissionConfirmationField[];
 };
 
 const STORAGE_KEY = "itemtraxx.submit-confirmation";

@@ -321,7 +321,7 @@ const handleTenantLogin = async () => {
     if (auth.userId) {
       const userId = auth.userId;
       void runPostHog(({ identifyPostHogUser }) =>
-        identifyPostHogUser(userId, { email: auth.email ?? undefined, role: auth.role ?? undefined })
+        identifyPostHogUser(userId, { role: auth.role ?? undefined })
       );
     }
     void runPostHog(({ capturePostHogEvent }) =>

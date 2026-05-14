@@ -761,6 +761,7 @@ export const createDistrictAdminSessionHandoff = async (
       district_slug?: string | null;
       role?: "tenant_admin" | "district_admin";
       hashed_token?: string | null;
+      user_id?: string | null;
     },
     {
       action: "create_admin";
@@ -804,6 +805,7 @@ export const createDistrictAdminSessionHandoff = async (
     districtSlug: result.data.district_slug ?? null,
     role: result.data.role,
     tokenHash: result.data.hashed_token,
+    userId: result.data.user_id ?? null,
   };
 };
 

@@ -51,7 +51,7 @@
           </span>
           <RouterLink
             class="link-button super-password-help-link"
-            :to="{ path: '/forgot-password', query: { email: email.trim(), from: 'super-auth' } }"
+            :to="{ path: '/forgot-password', query: { from: 'super-auth' } }"
           >
             Forgot password?
           </RouterLink>

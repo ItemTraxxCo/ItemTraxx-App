@@ -52,12 +52,12 @@
                 </svg>
               </button>
             </span>
-            <RouterLink
-              class="link-button admin-password-help-link"
-              :to="{ path: '/forgot-password', query: { email: email.trim(), from: 'admin-login' } }"
-            >
-              Forgot password?
-            </RouterLink>
+          <RouterLink
+            class="link-button admin-password-help-link"
+            :to="{ path: '/forgot-password', query: { from: 'admin-login' } }"
+          >
+            Forgot password?
+          </RouterLink>
           </label>
           <label v-if="turnstileSiteKey" class="admin-security-check">
             
@@ -218,9 +218,14 @@ const handleAdminLogin = async () => {
     }
     if (handoff.role === "tenant_admin" && !handoff.districtSlug) {
       devLog("auth_request_success_local_tenant_admin");
-      void runPostHog(({ identifyPostHogUser }) =>
-        identifyPostHogUser(email.value.trim(), { role: handoff.role })
-      );
+      const localTenantUserId = handoff.userId;
+      if (typeof localTenantUserId === "string" && localTenantUserId.length > 0) {
+        void runPostHog(({ identifyPostHogUser }) =>
+          identifyPostHogUser(localTenantUserId, {
+            role: handoff.role,
+          })
+        );
+      }
       void runPostHog(({ capturePostHogEvent }) =>
         capturePostHogEvent("admin_login_succeeded", { role: handoff.role })
       );
@@ -238,9 +243,14 @@ const handleAdminLogin = async () => {
     const targetPath =
       handoff.role === "district_admin" ? "/district" : "/tenant/admin";
     devLog("auth_request_success");
-    void runPostHog(({ identifyPostHogUser }) =>
-      identifyPostHogUser(email.value.trim(), { role: handoff.role })
-    );
+    const districtFlowUserId = handoff.userId;
+    if (typeof districtFlowUserId === "string" && districtFlowUserId.length > 0) {
+      void runPostHog(({ identifyPostHogUser }) =>
+        identifyPostHogUser(districtFlowUserId, {
+          role: handoff.role,
+        })
+      );
+    }
     void runPostHog(({ capturePostHogEvent }) =>
       capturePostHogEvent("admin_login_succeeded", { role: handoff.role })
     );

@@ -335,6 +335,7 @@ serve(async (req) => {
         200,
         {
           hashed_token: magicLink.data.properties.hashed_token,
+          user_id: user.id,
           district_slug: resolvedDistrictSlug ?? currentDistrictSlug ?? null,
           role,
         },

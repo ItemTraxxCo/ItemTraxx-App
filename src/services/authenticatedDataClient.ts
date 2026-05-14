@@ -33,6 +33,9 @@ type AuthenticatedRequestOptions = {
   suppressUnauthorizedRecovery?: boolean;
 };
 
+const sanitizePathForTelemetry = (path: string) =>
+  path.replace(/[?#].*$/, "");
+
 const request = async (
   path: string,
   init: RequestInit = {},
@@ -60,8 +63,8 @@ const request = async (
     }
     void captureHandledRequestFailure({
       area: "authenticated_data",
-      name: path,
-      path,
+      name: sanitizePathForTelemetry(path),
+      path: sanitizePathForTelemetry(path),
       method: init.method ?? "GET",
       status: response.status,
       message,

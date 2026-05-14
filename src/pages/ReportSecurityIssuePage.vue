@@ -334,18 +334,9 @@ const send = async () => {
     });
 
     saveSubmissionConfirmation({
-      kind: "Security report",
-      title: "Security report sent.",
-      lead: "Your security report was submitted privately. We will follow up from support@itemtraxx.com after review.",
+      kind: "security_report",
+      submissionRef: response?.request_id ?? `security-${Date.now()}`,
       submittedAt: new Date().toISOString(),
-      referenceId: response?.request_id ?? null,
-      fields: [
-        { label: "Reply email", value: replyEmail.value },
-        { label: "Name", value: fullName.value },
-        { label: "Severity", value: severity.value },
-        { label: "Summary", value: summary.value },
-        ...(affectedArea.value ? [{ label: "Affected area", value: affectedArea.value }] : []),
-      ],
     });
 
     await router.push({ name: "public-submit-confirmation" });

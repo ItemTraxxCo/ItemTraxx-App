@@ -133,10 +133,6 @@ const sendResetEmail = async () => {
 };
 
 onMounted(() => {
-  const presetEmail = typeof route.query.email === "string" ? route.query.email.trim() : "";
-  if (presetEmail) {
-    email.value = presetEmail;
-  }
   syncThemeMode();
   themeObserver = new MutationObserver(syncThemeMode);
   themeObserver.observe(document.documentElement, {

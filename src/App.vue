@@ -738,7 +738,13 @@ const offlineQueueTooltip = computed(
 );
 
 const refreshOfflineQueueCount = () => {
-  offlineQueueCount.value = getBufferedCheckoutCount();
+  void getBufferedCheckoutCount()
+    .then((count) => {
+      offlineQueueCount.value = count;
+    })
+    .catch(() => {
+      offlineQueueCount.value = 0;
+    });
 };
 
 const measureTopBanners = () => {

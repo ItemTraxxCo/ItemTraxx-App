@@ -88,35 +88,6 @@ const resolveCorsHeaders = (req: Request) => {
   return { hasOrigin, originAllowed, headers };
 };
 
-const formatConsoleLines = (entries: ConsoleEntry[]) =>
-  entries
-    .slice(-20)
-    .map((entry) =>
-      `[${normalizeText(entry.timestamp, 32) || "unknown"}] ${normalizeText(entry.level, 10) || "log"} ${normalizeText(entry.message, 240)}`
-    )
-    .join("\n");
-
-const formatNetworkLines = (entries: NetworkEntry[]) =>
-  entries
-    .slice(-15)
-    .map((entry) => {
-      const status = entry.status == null ? "ERR" : String(entry.status);
-      const requestId = normalizeText(entry.request_id, 80);
-      const error = normalizeText(entry.error, 120);
-      return [
-        `[${normalizeText(entry.timestamp, 32) || "unknown"}]`,
-        normalizeText(entry.method, 12) || "GET",
-        status,
-        `${Math.max(0, Math.round(Number(entry.duration_ms) || 0))}ms`,
-        normalizeText(entry.url, 220),
-        requestId ? `(request_id=${requestId})` : "",
-        error ? `error=${error}` : "",
-      ]
-        .filter(Boolean)
-        .join(" ");
-    })
-    .join("\n");
-
 const sendSlackWebhook = async (webhookUrl: string, text: string) => {
   const response = await fetch(webhookUrl, {
     method: "POST",
@@ -240,8 +211,6 @@ serve(async (req) => {
         }
       }
     }
-    const consoleLines = formatConsoleLines(Array.isArray(body.diagnostics?.console) ? body.diagnostics?.console : []);
-    const networkLines = formatNetworkLines(Array.isArray(body.diagnostics?.network) ? body.diagnostics?.network : []);
     const ipHash = ip ? await hashString(ip) : null;
 
     const { data: reportRow, error: insertError } = await adminClient
@@ -279,23 +248,14 @@ serve(async (req) => {
     const slackText =
       `Client error report submitted\n` +
       `Report ID: ${reportRow.id}\n` +
-      `Title: ${title}\n` +
       `Error: ${errorName}\n` +
-      `Message: ${message}\n` +
-      `Reason: ${reason}\n` +
-      `Context: ${context || "-"}\n` +
       `Environment: ${environment}\n` +
       `Release: ${release}\n` +
-      `Page: ${pageUrl || "-"}\n` +
       `Role: ${authRole}${isVerifiedAuthenticated ? "" : " (unverified)"}\n` +
       `Tenant Context: ${tenantContextId}\n` +
       `District Context: ${districtContextId}\n` +
-      `Client Fingerprint: ${fingerprint}\n` +
-      `IP Present: ${ip ? "yes" : "no"}\n` +
-      `User Agent: ${userAgent || "-"}\n` +
-      `Stack:\n${stack || "(none)"}\n\n` +
-      `Recent Console:\n${consoleLines || "(none)"}\n\n` +
-      `Recent Network:\n${networkLines || "(none)"}`;
+      `Request ID: ${requestId}\n` +
+      `Diagnostics stored: yes`;
 
     try {
       await sendSlackWebhook(slackWebhookUrl, slackText.slice(0, 35_000));

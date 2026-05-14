@@ -1,6 +1,7 @@
 import posthog from "posthog-js";
 
 let initialized = false;
+const EMAIL_PATTERN = /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/i;
 
 const isCspUnsafeEvalError = (error: unknown) => {
   const message = error instanceof Error ? error.message : "";
@@ -69,7 +70,26 @@ export const identifyPostHogUser = (
 ) => {
   if (!initialized) return;
   try {
-    posthog.identify(distinctId, properties);
+    const safeProperties =
+      properties
+        ? Object.entries(properties).reduce<Record<string, string | number | boolean | null | undefined>>(
+            (accumulator, [key, value]) => {
+              if (key.toLowerCase().includes("email")) {
+                return accumulator;
+              }
+              if (typeof value === "string" && EMAIL_PATTERN.test(value)) {
+                return accumulator;
+              }
+              accumulator[key] = value;
+              return accumulator;
+            },
+            {}
+          )
+        : undefined;
+    if (EMAIL_PATTERN.test(distinctId)) {
+      throw new Error("PostHog distinctId cannot be an email value.");
+    }
+    posthog.identify(distinctId, safeProperties);
   } catch (error) {
     console.warn("[posthog] identify failed; continuing without analytics.", error);
   }

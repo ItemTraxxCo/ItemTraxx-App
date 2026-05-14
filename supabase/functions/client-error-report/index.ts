@@ -248,13 +248,9 @@ serve(async (req) => {
     const slackText =
       `Client error report submitted\n` +
       `Report ID: ${reportRow.id}\n` +
-      `Title: ${title}\n` +
       `Error: ${errorName}\n` +
-      `Reason: ${reason}\n` +
-      `Context: ${context || "-"}\n` +
       `Environment: ${environment}\n` +
       `Release: ${release}\n` +
-      `Page: ${pageUrl || "-"}\n` +
       `Role: ${authRole}${isVerifiedAuthenticated ? "" : " (unverified)"}\n` +
       `Tenant Context: ${tenantContextId}\n` +
       `District Context: ${districtContextId}\n` +

@@ -799,14 +799,13 @@ const processSupportRequestEmail = async (
     const slackText =
       `New support inquiry submitted\n` +
       `Category: ${payload.category}\n` +
-      `Subject: ${payload.subject}\n` +
       `Attachments: ${attachments.length}\n` +
       `Job ID: ${jobId}\n` +
       `Request ID: ${requestId}`;
     try {
       await sendSlackWebhook(slackWebhookUrl, slackText);
     } catch (error) {
-      logError("support inquiry slack notify failed", payload.subject, error);
+      logError("support inquiry slack notify failed", requestId, error);
     }
   }
 

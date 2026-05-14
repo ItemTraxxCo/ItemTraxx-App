@@ -29,7 +29,12 @@ const redactSensitiveText = (value: string) =>
   value
     .replace(/Bearer\s+[A-Za-z0-9._-]+/gi, "Bearer [REDACTED]")
     .replace(/\beyJ[A-Za-z0-9._-]+\b/g, "[REDACTED_JWT]")
-    .replace(/\bsb_(publishable|secret)_[A-Za-z0-9._-]+\b/g, "sb_[REDACTED]");
+    .replace(/\bsb_(publishable|secret)_[A-Za-z0-9._-]+\b/g, "sb_[REDACTED]")
+    .replace(/\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi, "[REDACTED_EMAIL]")
+    .replace(
+      /(?<!\w)(?:\+?\d{1,3}[\s.-]?)?(?:\(?\d{3}\)?[\s.-]?\d{3}[\s.-]?\d{4})(?!\w)/g,
+      "[REDACTED_PHONE]"
+    );
 
 const pushBounded = <T>(buffer: T[], value: T, max: number) => {
   buffer.push(value);
@@ -73,9 +78,9 @@ const recordConsoleEntry = (level: ConsoleLevel, args: unknown[]) => {
 const normalizeUrl = (input: string) => {
   try {
     const url = new URL(input, window.location.origin);
-    return `${url.origin}${url.pathname}${url.search}`;
+    return `${url.origin}${url.pathname}`;
   } catch {
-    return input;
+    return redactSensitiveText(input);
   }
 };
 
@@ -117,7 +122,7 @@ export const installClientDiagnostics = () => {
       const response = await originalFetch(input, init);
       recordNetworkEntry({
         method,
-        url,
+        url: redactSensitiveText(url),
         status: response.status,
         ok: response.ok,
         duration_ms: Math.round(performance.now() - startedAt),
@@ -128,13 +133,16 @@ export const installClientDiagnostics = () => {
     } catch (error) {
       recordNetworkEntry({
         method,
-        url,
+        url: redactSensitiveText(url),
         status: null,
         ok: false,
         duration_ms: Math.round(performance.now() - startedAt),
         request_id: null,
         timestamp: new Date().toISOString(),
-        error: error instanceof Error ? error.message : "Network request failed.",
+        error:
+          error instanceof Error
+            ? redactSensitiveText(error.message)
+            : "Network request failed.",
       });
       throw error;
     }

@@ -18,7 +18,7 @@ const truncate = (value: string | undefined, max: number) =>
 const getSafePageUrl = () => {
   if (typeof window === "undefined") return "";
   try {
-    return `${window.location.origin}${window.location.pathname}${window.location.search}`;
+    return `${window.location.origin}${window.location.pathname}`;
   } catch {
     return window.location.pathname || "";
   }

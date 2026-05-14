@@ -432,7 +432,7 @@ const submit = async () => {
     if (!studentId.value.trim() || barcodes.value.length === 0) {
       error.value = "Enter a borrower ID and at least one barcode.";
       toastStatus.value = "Failed";
-      toastTitle.value = "Transaction failed. Please try again. If issue persists, sign out completeley and sign back in. If issue still persists, contact support.";
+      toastTitle.value = "Transaction failed. Please try again. If issue persists, sign out completely and sign back in. If issue still persists, contact support.";
       toastMessage.value = error.value;
       return;
     }
@@ -442,7 +442,7 @@ const submit = async () => {
       if (!student.value) {
         toastStatus.value = "Failed";
         toastTitle.value = "Transaction failed.";
-        toastMessage.value = error.value || "Unable to load borrower. Please sign out completeley and sign back in. If issue persists, contact support.";
+        toastMessage.value = error.value || "Unable to load borrower. Please sign out completely and sign back in. If issue persists, contact support.";
         return;
       }
     }

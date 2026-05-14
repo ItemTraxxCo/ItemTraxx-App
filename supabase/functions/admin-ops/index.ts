@@ -321,7 +321,7 @@ serve(async (req) => {
     if (profile.role !== "tenant_admin" && profile.role !== "tenant_user") {
       return jsonResponse(403, { error: "Access denied" });
     }
-    if (profile.role === "tenant_admin" && profile.is_active === false) {
+    if (profile.is_active === false) {
       return jsonResponse(403, { error: "Access denied" });
     }
 

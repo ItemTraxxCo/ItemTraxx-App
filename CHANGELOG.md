@@ -26,6 +26,15 @@ Changes are dated based on the default timezone: America/Los_Angeles
 
 ---
 
+### 5/12/2026 Development Update
+
+- Routine dependency maintenance and security updates.
+
+### 5/11/2026 Development Update
+
+- Improved tenant-admin reliability and usability across admin management flows.
+- Routine and security updates.
+
 ### 5/10/2026 Development Update
 
 - Improved checkout/return reliability and borrower-ownership safeguards for tenant checkout workflows.

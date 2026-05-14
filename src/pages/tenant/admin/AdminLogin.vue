@@ -219,7 +219,9 @@ const handleAdminLogin = async () => {
     if (handoff.role === "tenant_admin" && !handoff.districtSlug) {
       devLog("auth_request_success_local_tenant_admin");
       void runPostHog(({ identifyPostHogUser }) =>
-        identifyPostHogUser(`admin_handoff:${handoff.tokenHash}`, { role: handoff.role })
+        identifyPostHogUser(handoff.userId ?? `admin_handoff:${handoff.tokenHash}`, {
+          role: handoff.role,
+        })
       );
       void runPostHog(({ capturePostHogEvent }) =>
         capturePostHogEvent("admin_login_succeeded", { role: handoff.role })
@@ -239,7 +241,9 @@ const handleAdminLogin = async () => {
       handoff.role === "district_admin" ? "/district" : "/tenant/admin";
     devLog("auth_request_success");
     void runPostHog(({ identifyPostHogUser }) =>
-      identifyPostHogUser(`admin_handoff:${handoff.tokenHash}`, { role: handoff.role })
+      identifyPostHogUser(handoff.userId ?? `admin_handoff:${handoff.tokenHash}`, {
+        role: handoff.role,
+      })
     );
     void runPostHog(({ capturePostHogEvent }) =>
       capturePostHogEvent("admin_login_succeeded", { role: handoff.role })

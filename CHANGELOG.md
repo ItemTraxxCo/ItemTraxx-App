@@ -1,6 +1,6 @@
 # Changelog
 
-Last updated (year-month-day): 2026-05-10
+Last updated (year-month-day): 2026-05-13
 
 This public changelog summarizes notable ItemTraxx product, reliability, security, and experience updates at a high level. Detailed internal engineering and operational notes are maintained separately.
 
@@ -15,6 +15,14 @@ Changes are dated based on the default timezone: America/Los_Angeles
 - [TERMS.md](TERMS.md) – Terms of service for users
 - [PRIVACY.md](PRIVACY.md) – Privacy policy and data handling
 - [SECURITY.md](SECURITY.md) – Security reporting and guidelines
+
+---
+
+### 5/13/2026 Development Update
+
+- Completed another authentication hardening pass across tenant operational APIs.
+- Closed an access-control edge case affecting inactive-account handling in admin operations.
+- Continued reliability validation for secure session and auth-path behavior.
 
 ---
 

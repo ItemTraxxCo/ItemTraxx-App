@@ -537,7 +537,7 @@ const submit = async () => {
     });
     error.value = toUserFacingErrorMessage(err, "Request failed.");
     toastStatus.value = "Failed";
-    toastTitle.value = "Transaction complete (Failed). Please sign out completeley and sign back in. If issue still persists, contact support.";
+    toastTitle.value = "Transaction complete (Failed). Please sign out completely and sign back in. If issue still persists, contact support.";
     toastMessage.value = error.value;
     window.setTimeout(() => {
       toastTitle.value = "";

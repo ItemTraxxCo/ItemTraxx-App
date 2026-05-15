@@ -18,6 +18,11 @@ Changes are dated based on the default timezone: America/Los_Angeles
 
 ---
 
+### 5/15/2026 Development Update
+
+- Fixed a minor issue with a cloudflare worker config that was causing unexpected delete chruns.
+- Routine dependency maintenance and security updates.
+
 ## 5/14/2026 Development Update
 
 - Routine dependency maintenance and security updates.

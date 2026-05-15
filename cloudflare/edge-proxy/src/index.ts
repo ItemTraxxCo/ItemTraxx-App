@@ -190,6 +190,17 @@ const writeMaintenanceFallback = async (
   }
 };
 
+const clearMaintenanceFallbackIfPresent = async (env: Env) => {
+  if (!env.MAINTENANCE_FALLBACK_KV) return;
+  try {
+    const existing = await env.MAINTENANCE_FALLBACK_KV.get(MAINTENANCE_FALLBACK_KEY);
+    if (existing === null) return;
+    await env.MAINTENANCE_FALLBACK_KV.delete(MAINTENANCE_FALLBACK_KEY);
+  } catch {
+    // best effort only
+  }
+};
+
 const extractMaintenanceFromStatusPayload = (
   payload: Record<string, unknown>
 ): MaintenanceFallbackPayload | null => {
@@ -220,7 +231,7 @@ const applyMaintenanceFallbackToStatusPayload = async (
     return payload;
   }
   if (extracted?.enabled === false) {
-    await writeMaintenanceFallback(env, null);
+    await clearMaintenanceFallbackIfPresent(env);
   }
 
   const status = typeof payload.status === "string" ? payload.status : "";

@@ -1,22 +1,21 @@
 # Changelog
 
-Last updated (year-month-day): 2026-05-13
+Last updated (year-month-day): 2026-05-19
 
-This public changelog summarizes notable ItemTraxx product, reliability, security, and experience updates at a high level. Detailed internal engineering and operational notes are maintained separately.
+This changelog summarizes notable ItemTraxx product, reliability, security, and experience updates.
 
 Changes are dated based on the default timezone: America/Los_Angeles
 
 ---
 
-## Public Documentation Links
-- [README.md](README.md) – Product overview and details
-- [LICENSE.md](LICENSE.md) – Legal ownership and usage rights
-- [LEGAL.md](LEGAL.md) - Legal overview and governing documents
-- [TERMS.md](TERMS.md) – Terms of service for users
-- [PRIVACY.md](PRIVACY.md) – Privacy policy and data handling
-- [SECURITY.md](SECURITY.md) – Security reporting and guidelines
+### 5/19/2026 Development Update
 
----
+- Routine dependency maintenance and security updates.
+- Updated documentation.
+
+### 5/17/2026 Development Update
+
+- Routine dependency maintenance and security updates.
 
 ### 5/15/2026 Development Update
 

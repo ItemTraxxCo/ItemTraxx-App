@@ -13,6 +13,7 @@ Changes are dated based on the default timezone: America/Los_Angeles
 - Improved internal reliability alerting for operational GitHub workflow failures.
 - Verified incident alert delivery for workflow-failure notifications.
 - Fixed an internal super-admin operations issue that could prevent audit activity from loading correctly.
+- Improved password-reset link handling and made invalid reset-link states clearer for users.
 
 ### 5/21/2026 Development Update
 

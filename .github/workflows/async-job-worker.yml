@@ -57,3 +57,20 @@ jobs:
       slack_channel_id: ${{ needs.slack-notify-start.outputs.slack_channel_id }}
       slack_message_ts: ${{ needs.slack-notify-start.outputs.slack_message_ts }}
     secrets: inherit
+
+  incidentio-notify-failure:
+    needs:
+      - process-jobs
+    if: ${{ always() && (needs.process-jobs.result == 'failure' || needs.process-jobs.result == 'cancelled') }}
+    uses: ./.github/workflows/incidentio-workflow-alert.yml
+    with:
+      status: ${{ needs.process-jobs.result }}
+      severity: high
+      workflow_name: Async Job Worker
+      job_name: process-jobs
+      run_url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+      repository: ${{ github.repository }}
+      branch: ${{ github.ref_name }}
+      sha: ${{ github.sha }}
+      environment: production
+    secrets: inherit

@@ -4,10 +4,21 @@
       <div class="reset-copy">
         <p class="reset-kicker">Account Recovery</p>
         <h1>Reset Password</h1>
-        <p class="reset-subtitle">Set a new password for your account.</p>
+        <p class="reset-subtitle">{{ isReady ? "Set a new password for your account." : "A valid reset email link is required to continue." }}</p>
       </div>
 
-      <form class="form reset-form" @submit.prevent="handleReset">
+      <div v-if="showBlockedState" class="reset-blocked" role="alert">
+        <strong>Password reset is locked</strong>
+        <p>
+          This page only works from a valid password reset email link. Manually opening this URL
+          cannot reset your password.
+        </p>
+        <RouterLink class="button-primary reset-blocked-action" to="/forgot-password">
+          Request a new reset email
+        </RouterLink>
+      </div>
+
+      <form v-else-if="!success" class="form reset-form" @submit.prevent="handleReset">
         <label>
           New Password
           <input
@@ -32,7 +43,7 @@
           </button>
         </div>
       </form>
-      <p v-if="error" class="error">{{ error }}</p>
+      <p v-if="error && !showBlockedState" class="error">{{ error }}</p>
       <p v-if="success" class="muted">
         Password successfully updated. Please check your email for confirmation and try signing in again.
       </p>
@@ -42,7 +53,7 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref } from "vue";
+import { computed, onMounted, onUnmounted, ref } from "vue";
 import { RouterLink } from "vue-router";
 import { supabase } from "../services/supabaseClient";
 
@@ -51,11 +62,29 @@ const confirmPassword = ref("");
 const error = ref("");
 const isLoading = ref(false);
 const isReady = ref(false);
+const hasCheckedRecoverySession = ref(false);
 const success = ref(false);
 const themeMode = ref<"light" | "dark">("dark");
 let themeObserver: MutationObserver | null = null;
 
+const hasRecoveryLinkContext = () => {
+  const queryParams = new URLSearchParams(window.location.search);
+  const hashParams = new URLSearchParams(
+    window.location.hash.startsWith("#") ? window.location.hash.slice(1) : window.location.hash
+  );
+  return queryParams.get("type") === "recovery" || hashParams.get("type") === "recovery";
+};
+
+const showBlockedState = computed(
+  () => hasCheckedRecoverySession.value && !isReady.value && !success.value
+);
+
 const checkRecoverySession = async () => {
+  if (!hasRecoveryLinkContext()) {
+    isReady.value = false;
+    return;
+  }
+
   const attempt = async () => {
     const { data } = await supabase.auth.getSession();
     return !!data.session;
@@ -119,6 +148,7 @@ onMounted(async () => {
     attributeFilter: ["data-theme"],
   });
   await checkRecoverySession();
+  hasCheckedRecoverySession.value = true;
   if (!isReady.value) {
     error.value = "Invalid or expired reset link. Request a new reset email.";
   }
@@ -197,5 +227,30 @@ onUnmounted(() => {
   border-color: var(--reset-button-bg);
   background: var(--reset-button-bg);
   color: var(--reset-button-text);
+}
+
+.reset-blocked {
+  display: grid;
+  gap: 0.85rem;
+  margin: 1.8rem 0;
+  padding: 1.15rem;
+  border: 1px solid rgba(248, 113, 113, 0.45);
+  border-radius: 1.25rem;
+  background: rgba(127, 29, 29, 0.22);
+  color: var(--reset-text);
+}
+
+.reset-blocked strong {
+  font-size: 1.08rem;
+}
+
+.reset-blocked p {
+  margin: 0;
+  color: var(--reset-muted);
+}
+
+.reset-blocked-action {
+  width: fit-content;
+  text-decoration: none;
 }
 </style>

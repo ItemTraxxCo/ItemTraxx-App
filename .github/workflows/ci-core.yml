@@ -89,3 +89,20 @@ jobs:
       slack_channel_id: ${{ needs.slack-notify-start.outputs.slack_channel_id }}
       slack_message_ts: ${{ needs.slack-notify-start.outputs.slack_message_ts }}
     secrets: inherit
+
+  incidentio-notify-failure:
+    needs:
+      - build-and-verify
+    if: ${{ always() && github.event_name != 'pull_request' && (needs.build-and-verify.result == 'failure' || needs.build-and-verify.result == 'cancelled') }}
+    uses: ./.github/workflows/incidentio-workflow-alert.yml
+    with:
+      status: ${{ needs.build-and-verify.result }}
+      severity: high
+      workflow_name: CI Core
+      job_name: build-and-verify
+      run_url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+      repository: ${{ github.repository }}
+      branch: ${{ github.ref_name }}
+      sha: ${{ github.sha }}
+      environment: production
+    secrets: inherit

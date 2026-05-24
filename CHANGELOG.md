@@ -1,12 +1,18 @@
 # Changelog
 
-Last updated (year-month-day): 2026-05-23
+Last updated (year-month-day): 2026-05-24
 
 This changelog summarizes notable ItemTraxx product, reliability, security, and experience updates.
 
 Changes are dated based on the default timezone: America/Los_Angeles
 
 ---
+
+### 5/24/2026 Development Update
+
+- Improved internal reliability alerting for operational GitHub workflow failures.
+- Verified incident alert delivery for workflow-failure notifications.
+- Fixed an internal super-admin operations issue that could prevent audit activity from loading correctly.
 
 ### 5/21/2026 Development Update
 

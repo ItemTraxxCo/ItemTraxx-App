@@ -3,15 +3,14 @@
     <div class="reset-panel">
       <div class="reset-copy">
         <p class="reset-kicker">Account Recovery</p>
-        <h1>Reset Password</h1>
-        <p class="reset-subtitle">{{ isReady ? "Set a new password for your account." : "A valid reset email link is required to continue." }}</p>
+        <h1>Reset Your Password</h1>
+        <p class="reset-subtitle">{{ isReady ? "Set a new password for your account." : "A reset email link is required to continue." }}</p>
       </div>
 
       <div v-if="showBlockedState" class="reset-blocked" role="alert">
-        <strong>Password reset is locked</strong>
+        <strong>Password reset is unavailable</strong>
         <p>
-          This page only works from a valid password reset email link. Manually opening this URL
-          cannot reset your password.
+          Resetting your password requires a valid reset email link.
         </p>
         <RouterLink class="button-primary reset-blocked-action" to="/forgot-password">
           Request a new reset email
@@ -47,7 +46,7 @@
       <p v-if="success" class="muted">
         Password successfully updated. Please check your email for confirmation and try signing in again.
       </p>
-      <RouterLink class="link" to="/login">Back to login</RouterLink>
+      <RouterLink class="link" to="/login">Go to Login</RouterLink>
     </div>
   </div>
 </template>
@@ -250,7 +249,32 @@ onUnmounted(() => {
 }
 
 .reset-blocked-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   width: fit-content;
+  min-height: 2.9rem;
+  padding: 0.78rem 1.1rem;
+  border: 1px solid var(--reset-button-bg);
+  border-radius: 999px;
+  background: var(--reset-button-bg);
+  color: var(--reset-button-text);
+  font-weight: 700;
+  line-height: 1;
   text-decoration: none;
+  transition:
+    transform 0.15s ease,
+    opacity 0.2s ease;
+}
+
+.reset-blocked-action:hover {
+  transform: translateY(-1px);
+  opacity: 0.92;
+  text-decoration: none;
+}
+
+.reset-blocked-action:focus-visible {
+  outline: 2px solid var(--reset-button-bg);
+  outline-offset: 3px;
 }
 </style>

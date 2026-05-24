@@ -1,0 +1,40 @@
+name: incident.io Alert Smoke Test
+
+permissions: {}
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - dev/mmango10
+    paths:
+      - .github/workflows/incidentio-alert-smoke-test.yml
+
+jobs:
+  intentional_failure:
+    name: Intentional failure
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fail on purpose
+        run: |
+          echo "This workflow intentionally fails to test incident.io alert routing."
+          exit 1
+
+  incidentio-notify-failure:
+    name: Send incident.io smoke-test alert
+    needs: intentional_failure
+    if: ${{ always() && (needs.intentional_failure.result == 'failure' || needs.intentional_failure.result == 'cancelled') }}
+    uses: ./.github/workflows/incidentio-workflow-alert.yml
+    with:
+      status: ${{ needs.intentional_failure.result }}
+      severity: low
+      workflow_name: ${{ github.workflow }}
+      job_name: intentional_failure
+      run_url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+      repository: ${{ github.repository }}
+      branch: ${{ github.ref_name }}
+      sha: ${{ github.sha }}
+      environment: incidentio-smoke-test
+    secrets:
+      INCIDENT_IO_WEBHOOK_URL: ${{ secrets.INCIDENT_IO_WEBHOOK_URL }}
+      INCIDENT_IO_WEBHOOK_TOKEN: ${{ secrets.INCIDENT_IO_WEBHOOK_TOKEN }}

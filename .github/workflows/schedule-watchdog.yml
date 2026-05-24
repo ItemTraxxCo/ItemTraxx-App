@@ -29,6 +29,32 @@ jobs:
           STALE_REPORT=""
           HEARTBEAT_REPORT=""
 
+          fetch_workflow_runs() {
+            local workflow_file="$1"
+            local url="${API_BASE}/actions/workflows/${workflow_file}/runs?event=schedule&branch=main&status=completed&per_page=50"
+            local attempt
+            local max_attempts=4
+            local delay_seconds=5
+
+            for attempt in $(seq 1 "$max_attempts"); do
+              if curl -fsSL \
+                -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+                -H "Accept: application/vnd.github+json" \
+                "$url"; then
+                return 0
+              fi
+
+              if [ "$attempt" -lt "$max_attempts" ]; then
+                echo "GitHub API request for ${workflow_file} failed on attempt ${attempt}; retrying in ${delay_seconds}s..." >&2
+                sleep "$delay_seconds"
+                delay_seconds="$(( delay_seconds * 2 ))"
+              fi
+            done
+
+            echo "GitHub API request for ${workflow_file} failed after ${max_attempts} attempts." >&2
+            return 1
+          }
+
           check_workflow() {
             local workflow_file="$1"
             local workflow_name="$2"
@@ -36,10 +62,7 @@ jobs:
             local success_max_age_seconds="$4"
 
             local response
-            response="$(curl -fsSL \
-              -H "Authorization: Bearer ${GITHUB_TOKEN}" \
-              -H "Accept: application/vnd.github+json" \
-              "${API_BASE}/actions/workflows/${workflow_file}/runs?event=schedule&branch=main&status=completed&per_page=50")"
+            response="$(fetch_workflow_runs "$workflow_file")"
 
             local latest_completed
             latest_completed="$(printf '%s' "$response" | jq -r '

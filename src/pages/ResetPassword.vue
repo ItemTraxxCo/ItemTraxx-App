@@ -4,7 +4,7 @@
       <div class="reset-copy">
         <p class="reset-kicker">Account Recovery</p>
         <h1>Reset Your Password</h1>
-        <p class="reset-subtitle">{{ isReady ? "Set a new password for your account." : " " }}</p>
+        <p class="reset-subtitle">{{ isReady ? "Set a new password for your ItemTraxx account." : " " }}</p>
       </div>
 
       <div v-if="showBlockedState" class="reset-blocked" role="alert">
@@ -44,7 +44,7 @@
       </form>
       <p v-if="error && !showBlockedState" class="error">{{ error }}</p>
       <p v-if="success" class="muted">
-        Password successfully updated. Please check your email for confirmation and try signing in again.
+        Password successfully updated. Please check your email for confirmation and try signing in again. 
       </p>
       <RouterLink class="link" to="/login">Go to Login</RouterLink>
     </div>
@@ -253,13 +253,13 @@ onUnmounted(() => {
   align-items: center;
   justify-content: center;
   width: fit-content;
-  min-height: 2.35rem;
-  padding: 0.55rem 0.9rem;
+  min-height: 2.05rem;
+  padding: 0.42rem 0.72rem;
   border: 1px solid var(--reset-button-bg);
   border-radius: 999px;
   background: var(--reset-button-bg);
   color: var(--reset-button-text);
-  font-size: 1rem;
+  font-size: 0.92rem;
   font-weight: 700;
   line-height: 1;
   text-decoration: none;

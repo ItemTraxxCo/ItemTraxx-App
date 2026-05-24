@@ -96,7 +96,7 @@ const backLinkTarget = computed(() =>
 );
 
 const backLinkLabel = computed(() =>
-  BACK_LINK_BY_SOURCE[routeSource.value]?.label ?? "Back to login"
+  BACK_LINK_BY_SOURCE[routeSource.value]?.label ?? "Back"
 );
 
 const syncThemeMode = () => {

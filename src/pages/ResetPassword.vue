@@ -45,6 +45,7 @@
       <p v-if="error && !showBlockedState" class="error">{{ error }}</p>
       <p v-if="success" class="muted">
         Password successfully updated. Please check your email for confirmation and try signing in again. 
+        If you have any issues, please contact our support team.
       </p>
       <RouterLink class="link" to="/login">Go to Login</RouterLink>
     </div>
@@ -125,7 +126,7 @@ const handleReset = async () => {
       password: newPassword.value,
     });
     if (updateError) {
-      error.value = "Unable to update password. Request a new reset link and try again.";
+      error.value = "Unable to update password. Request a new reset link and try again. If the issue persists, contact support.";
       return;
     }
     success.value = true;

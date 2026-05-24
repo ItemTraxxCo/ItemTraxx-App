@@ -4,7 +4,7 @@
       <div class="reset-copy">
         <p class="reset-kicker">Account Recovery</p>
         <h1>Reset Your Password</h1>
-        <p class="reset-subtitle">{{ isReady ? "Set a new password for your account." : "A reset email link is required to continue." }}</p>
+        <p class="reset-subtitle">{{ isReady ? "Set a new password for your account." : " " }}</p>
       </div>
 
       <div v-if="showBlockedState" class="reset-blocked" role="alert">
@@ -232,10 +232,10 @@ onUnmounted(() => {
   display: grid;
   gap: 0.85rem;
   margin: 1.8rem 0;
-  padding: 1.15rem;
-  border: 1px solid rgba(248, 113, 113, 0.45);
-  border-radius: 1.25rem;
-  background: rgba(127, 29, 29, 0.22);
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
   color: var(--reset-text);
 }
 
@@ -253,12 +253,13 @@ onUnmounted(() => {
   align-items: center;
   justify-content: center;
   width: fit-content;
-  min-height: 2.9rem;
-  padding: 0.78rem 1.1rem;
+  min-height: 2.35rem;
+  padding: 0.55rem 0.9rem;
   border: 1px solid var(--reset-button-bg);
   border-radius: 999px;
   background: var(--reset-button-bg);
   color: var(--reset-button-text);
+  font-size: 1rem;
   font-weight: 700;
   line-height: 1;
   text-decoration: none;

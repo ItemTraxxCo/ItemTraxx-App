@@ -48,6 +48,10 @@ on:
         required: false
       SLACK_WEBHOOK_URL:
         required: false
+      INCIDENT_IO_WEBHOOK_URL:
+        required: false
+      INCIDENT_IO_WEBHOOK_TOKEN:
+        required: false
 
 jobs:
   notify_start:
@@ -145,6 +149,23 @@ jobs:
           fi
 
           send_webhook_fallback
+
+  incidentio-notify-start-failure:
+    needs:
+      - notify_start
+    if: ${{ always() && inputs.mode == 'start' && (needs.notify_start.result == 'failure' || needs.notify_start.result == 'cancelled') }}
+    uses: ./.github/workflows/incidentio-workflow-alert.yml
+    with:
+      status: ${{ needs.notify_start.result }}
+      severity: high
+      workflow_name: Slack Notify Status
+      job_name: notify_start
+      run_url: ${{ inputs.run_url }}
+      repository: ${{ github.repository }}
+      branch: ${{ inputs.ref_name }}
+      sha: ${{ inputs.sha }}
+      environment: production
+    secrets: inherit
 
   notify_finish:
     if: ${{ inputs.mode == 'finish' }}
@@ -282,3 +303,20 @@ jobs:
           fi
 
           send_webhook_fallback
+
+  incidentio-notify-finish-failure:
+    needs:
+      - notify_finish
+    if: ${{ always() && inputs.mode == 'finish' && (needs.notify_finish.result == 'failure' || needs.notify_finish.result == 'cancelled') }}
+    uses: ./.github/workflows/incidentio-workflow-alert.yml
+    with:
+      status: ${{ needs.notify_finish.result }}
+      severity: high
+      workflow_name: Slack Notify Status
+      job_name: notify_finish
+      run_url: ${{ inputs.run_url }}
+      repository: ${{ github.repository }}
+      branch: ${{ inputs.ref_name }}
+      sha: ${{ inputs.sha }}
+      environment: production
+    secrets: inherit

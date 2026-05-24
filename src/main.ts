@@ -29,6 +29,7 @@ import {
 } from "./services/perfTelemetry";
 import { initializeDistrictContext } from "./services/districtService";
 import { rotateDeviceSession } from "./utils/deviceSession";
+import { routeRecoveryLinksToResetPassword } from "./utils/passwordResetRedirect";
 import { finishRouteLoading, startRouteLoading } from "./store/routeLoading";
 
 declare global {
@@ -329,6 +330,7 @@ const mountApp = async () => {
 };
 
 const bootstrap = async () => {
+  routeRecoveryLinksToResetPassword();
   if (redirectCanonicalHost()) {
     return;
   }

@@ -230,6 +230,7 @@ import {
   type SuperAdminSessionItem,
 } from "../../services/superOpsService";
 import { superAdminPasskeyLogin } from "../../services/authService";
+import { getPasswordResetRedirectUrl } from "../../utils/passwordResetRedirect";
 
 type PasskeyListItem = {
   id: string;
@@ -331,7 +332,7 @@ const sendPasswordReset = async () => {
 
   isPasswordResetSending.value = true;
   try {
-    const redirectTo = `${window.location.origin}/reset-password`;
+    const redirectTo = getPasswordResetRedirectUrl();
     const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo });
     if (error) throw error;
     passwordResetMessage.value = "Password reset email sent.";

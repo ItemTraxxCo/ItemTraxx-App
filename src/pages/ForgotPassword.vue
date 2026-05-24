@@ -56,6 +56,7 @@ import { computed, onMounted, onUnmounted, ref } from "vue";
 import { RouterLink, useRoute } from "vue-router";
 import PublicFooter from "../components/PublicFooter.vue";
 import { supabase } from "../services/supabaseClient";
+import { getPasswordResetRedirectUrl } from "../utils/passwordResetRedirect";
 
 const RESET_ERROR_MESSAGE = "Unable to send reset link. Please try again.";
 
@@ -95,7 +96,7 @@ const backLinkTarget = computed(() =>
 );
 
 const backLinkLabel = computed(() =>
-  BACK_LINK_BY_SOURCE[routeSource.value]?.label ?? "Back to login"
+  BACK_LINK_BY_SOURCE[routeSource.value]?.label ?? "Back"
 );
 
 const syncThemeMode = () => {
@@ -114,7 +115,7 @@ const sendResetEmail = async () => {
 
   isLoading.value = true;
   try {
-    const redirectTo = `${window.location.origin}/reset-password`;
+    const redirectTo = getPasswordResetRedirectUrl();
     const { error: resetError } = await supabase.auth.resetPasswordForEmail(normalizedEmail, {
       redirectTo,
     });

@@ -3,11 +3,21 @@
     <div class="reset-panel">
       <div class="reset-copy">
         <p class="reset-kicker">Account Recovery</p>
-        <h1>Reset Password</h1>
-        <p class="reset-subtitle">Set a new password for your account.</p>
+        <h1>Reset Your Password</h1>
+        <p class="reset-subtitle">{{ isReady ? "Set a new password for your ItemTraxx account." : " " }}</p>
       </div>
 
-      <form class="form reset-form" @submit.prevent="handleReset">
+      <div v-if="showBlockedState" class="reset-blocked" role="alert">
+        <strong>Password reset is unavailable</strong>
+        <p>
+          Resetting your password requires a valid reset email link.
+        </p>
+        <RouterLink class="button-primary reset-blocked-action" to="/forgot-password">
+          Request a new reset email
+        </RouterLink>
+      </div>
+
+      <form v-else-if="!success" class="form reset-form" @submit.prevent="handleReset">
         <label>
           New Password
           <input
@@ -32,17 +42,18 @@
           </button>
         </div>
       </form>
-      <p v-if="error" class="error">{{ error }}</p>
+      <p v-if="error && !showBlockedState" class="error">{{ error }}</p>
       <p v-if="success" class="muted">
-        Password successfully updated. Please check your email for confirmation and try signing in again.
+        Password successfully updated. Please check your email for confirmation and try signing in again. 
+        If you have any issues, please contact our support team.
       </p>
-      <RouterLink class="link" to="/login">Back to login</RouterLink>
+      <RouterLink class="link" to="/login">Go to Login</RouterLink>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref } from "vue";
+import { computed, onMounted, onUnmounted, ref } from "vue";
 import { RouterLink } from "vue-router";
 import { supabase } from "../services/supabaseClient";
 
@@ -51,11 +62,29 @@ const confirmPassword = ref("");
 const error = ref("");
 const isLoading = ref(false);
 const isReady = ref(false);
+const hasCheckedRecoverySession = ref(false);
 const success = ref(false);
 const themeMode = ref<"light" | "dark">("dark");
 let themeObserver: MutationObserver | null = null;
 
+const hasRecoveryLinkContext = () => {
+  const queryParams = new URLSearchParams(window.location.search);
+  const hashParams = new URLSearchParams(
+    window.location.hash.startsWith("#") ? window.location.hash.slice(1) : window.location.hash
+  );
+  return queryParams.get("type") === "recovery" || hashParams.get("type") === "recovery";
+};
+
+const showBlockedState = computed(
+  () => hasCheckedRecoverySession.value && !isReady.value && !success.value
+);
+
 const checkRecoverySession = async () => {
+  if (!hasRecoveryLinkContext()) {
+    isReady.value = false;
+    return;
+  }
+
   const attempt = async () => {
     const { data } = await supabase.auth.getSession();
     return !!data.session;
@@ -97,7 +126,7 @@ const handleReset = async () => {
       password: newPassword.value,
     });
     if (updateError) {
-      error.value = "Unable to update password. Request a new reset link and try again.";
+      error.value = "Unable to update password. Request a new reset link and try again. If the issue persists, contact support.";
       return;
     }
     success.value = true;
@@ -119,6 +148,7 @@ onMounted(async () => {
     attributeFilter: ["data-theme"],
   });
   await checkRecoverySession();
+  hasCheckedRecoverySession.value = true;
   if (!isReady.value) {
     error.value = "Invalid or expired reset link. Request a new reset email.";
   }
@@ -197,5 +227,56 @@ onUnmounted(() => {
   border-color: var(--reset-button-bg);
   background: var(--reset-button-bg);
   color: var(--reset-button-text);
+}
+
+.reset-blocked {
+  display: grid;
+  gap: 0.85rem;
+  margin: 1.8rem 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--reset-text);
+}
+
+.reset-blocked strong {
+  font-size: 1.08rem;
+}
+
+.reset-blocked p {
+  margin: 0;
+  color: var(--reset-muted);
+}
+
+.reset-blocked-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: fit-content;
+  min-height: 2.05rem;
+  padding: 0.42rem 0.72rem;
+  border: 1px solid var(--reset-button-bg);
+  border-radius: 999px;
+  background: var(--reset-button-bg);
+  color: var(--reset-button-text);
+  font-size: 0.92rem;
+  font-weight: 700;
+  line-height: 1;
+  text-decoration: none;
+  transition:
+    transform 0.15s ease,
+    opacity 0.2s ease;
+}
+
+.reset-blocked-action:hover {
+  transform: translateY(-1px);
+  opacity: 0.92;
+  text-decoration: none;
+}
+
+.reset-blocked-action:focus-visible {
+  outline: 2px solid var(--reset-button-bg);
+  outline-offset: 3px;
 }
 </style>

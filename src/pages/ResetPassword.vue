@@ -10,7 +10,7 @@
       <div v-if="showBlockedState" class="reset-blocked" role="alert">
         <strong>Password reset is unavailable</strong>
         <p>
-          Resetting your password requires a valid reset email link.
+          Link expired or unavailable. Request a new one below. Resetting your password requires a valid reset email link.
         </p>
         <RouterLink class="button-primary reset-blocked-action" to="/forgot-password">
           Request a new reset email

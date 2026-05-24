@@ -205,3 +205,20 @@ jobs:
           curl -fsSL -X POST "$SLACK_WEBHOOK_URL" \
             -H "Content-Type: application/json" \
             --data "$PAYLOAD"
+
+  incidentio-notify-failure:
+    needs:
+      - check-stale-schedules
+    if: ${{ always() && (needs.check-stale-schedules.result == 'failure' || needs.check-stale-schedules.result == 'cancelled') }}
+    uses: ./.github/workflows/incidentio-workflow-alert.yml
+    with:
+      status: ${{ needs.check-stale-schedules.result }}
+      severity: high
+      workflow_name: Schedule Watchdog
+      job_name: check-stale-schedules
+      run_url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+      repository: ${{ github.repository }}
+      branch: ${{ github.ref_name }}
+      sha: ${{ github.sha }}
+      environment: production
+    secrets: inherit

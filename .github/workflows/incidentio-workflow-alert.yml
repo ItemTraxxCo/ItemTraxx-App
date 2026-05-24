@@ -1,0 +1,112 @@
+name: incident.io Workflow Alert
+
+permissions: {}
+
+on:
+  workflow_call:
+    inputs:
+      status:
+        required: true
+        type: string
+      severity:
+        required: false
+        type: string
+        default: high
+      workflow_name:
+        required: true
+        type: string
+      job_name:
+        required: true
+        type: string
+      run_url:
+        required: true
+        type: string
+      repository:
+        required: true
+        type: string
+      branch:
+        required: false
+        type: string
+        default: unknown
+      sha:
+        required: false
+        type: string
+        default: unknown
+      environment:
+        required: false
+        type: string
+        default: production
+    secrets:
+      INCIDENT_IO_WEBHOOK_URL:
+        required: false
+      INCIDENT_IO_WEBHOOK_TOKEN:
+        required: false
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send incident.io workflow alert
+        env:
+          INCIDENT_IO_WEBHOOK_URL: ${{ secrets.INCIDENT_IO_WEBHOOK_URL }}
+          INCIDENT_IO_WEBHOOK_TOKEN: ${{ secrets.INCIDENT_IO_WEBHOOK_TOKEN }}
+          STATUS: ${{ inputs.status }}
+          SEVERITY: ${{ inputs.severity }}
+          WORKFLOW_NAME: ${{ inputs.workflow_name }}
+          JOB_NAME: ${{ inputs.job_name }}
+          RUN_URL: ${{ inputs.run_url }}
+          REPOSITORY: ${{ inputs.repository }}
+          BRANCH: ${{ inputs.branch }}
+          SHA: ${{ inputs.sha }}
+          ENVIRONMENT: ${{ inputs.environment }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "${INCIDENT_IO_WEBHOOK_URL:-}" ]; then
+            echo "INCIDENT_IO_WEBHOOK_URL is not configured; skipping incident.io alert."
+            exit 0
+          fi
+
+          if [ -z "${INCIDENT_IO_WEBHOOK_TOKEN:-}" ]; then
+            echo "INCIDENT_IO_WEBHOOK_TOKEN is not configured; skipping incident.io alert."
+            exit 0
+          fi
+
+          SHORT_SHA="$(printf '%s' "$SHA" | cut -c1-7)"
+          DEDUPE_KEY="${REPOSITORY}:${WORKFLOW_NAME}:${JOB_NAME}:${BRANCH}"
+
+          jq -n \
+            --arg title "GitHub Actions workflow ${STATUS}: ${WORKFLOW_NAME} / ${JOB_NAME}" \
+            --arg workflow_status "$STATUS" \
+            --arg severity "$SEVERITY" \
+            --arg workflow "$WORKFLOW_NAME" \
+            --arg job "$JOB_NAME" \
+            --arg repo "$REPOSITORY" \
+            --arg branch "$BRANCH" \
+            --arg sha "$SHA" \
+            --arg short_sha "$SHORT_SHA" \
+            --arg run_url "$RUN_URL" \
+            --arg environment "$ENVIRONMENT" \
+            --arg dedupe_key "$DEDUPE_KEY" \
+            '{
+              title: $title,
+              description: ("GitHub Actions workflow `" + $workflow + "` job `" + $job + "` in `" + $repo + "` is `" + $workflow_status + "` on branch `" + $branch + "`."),
+              deduplication_key: $dedupe_key,
+              status: "firing",
+              metadata: {
+                workflow_status: $workflow_status,
+                severity: $severity,
+                repository: $repo,
+                workflow: $workflow,
+                job: $job,
+                branch: $branch,
+                sha: $sha,
+                short_sha: $short_sha,
+                run_url: $run_url,
+                environment: $environment
+              }
+            }' \
+          | curl -fsSL -X POST "$INCIDENT_IO_WEBHOOK_URL" \
+              -H "Authorization: Bearer ${INCIDENT_IO_WEBHOOK_TOKEN}" \
+              -H "Content-Type: application/json" \
+              --data-binary @-

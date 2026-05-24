@@ -91,3 +91,20 @@ jobs:
       slack_channel_id: ${{ needs.slack-notify-start.outputs.slack_channel_id }}
       slack_message_ts: ${{ needs.slack-notify-start.outputs.slack_message_ts }}
     secrets: inherit
+
+  incidentio-notify-failure:
+    needs:
+      - analyze
+    if: ${{ always() && github.event_name != 'pull_request' && (needs.analyze.result == 'failure' || needs.analyze.result == 'cancelled') }}
+    uses: ./.github/workflows/incidentio-workflow-alert.yml
+    with:
+      status: ${{ needs.analyze.result }}
+      severity: high
+      workflow_name: CodeQL
+      job_name: analyze
+      run_url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+      repository: ${{ github.repository }}
+      branch: ${{ github.ref_name }}
+      sha: ${{ github.sha }}
+      environment: production
+    secrets: inherit

@@ -1480,7 +1480,7 @@ serve(async (req) => {
           : Promise.resolve({ data: [], error: null }),
         adminClient
           .from("tenants")
-          .select("id, name, active")
+          .select("id, name, status")
           .order("name", { ascending: true })
           .limit(300),
       ]);
@@ -1503,7 +1503,7 @@ serve(async (req) => {
       const allTenants = (allTenantsResult.data ?? []) as Array<{
         id: string;
         name: string;
-        active: boolean | null;
+        status: string | null;
       }>;
 
       const recentEvents = recentLogs.slice(0, 40).map((row) => {

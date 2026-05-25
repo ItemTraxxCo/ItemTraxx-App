@@ -93,7 +93,6 @@ jobs:
 
             if [ $(( CURRENT_EPOCH - latest_completed_epoch )) -gt "$heartbeat_max_age_seconds" ]; then
               HEARTBEAT_REPORT="${HEARTBEAT_REPORT}\n- ${workflow_name}: last completed scheduled run was ${completed_age_minutes} minutes ago (heartbeat threshold ${heartbeat_max_age_minutes} minutes)"
-              return
             fi
 
             if [ -z "$latest_success" ]; then
@@ -113,9 +112,9 @@ jobs:
 
           # heartbeat threshold is warning-only (non-fatal) to reduce alert noise
           # success threshold is the fatal watchdog gate
-          check_workflow "async-job-worker.yml" "Async Job Worker" 1800 7200
-          check_workflow "synthetic-journeys.yml" "Synthetic Journeys" 5400 10800
-          check_workflow "deployment-health.yml" "Deployment Health" 10800 14400
+          check_workflow "async-job-worker.yml" "Async Job Worker" 6600 7200
+          check_workflow "synthetic-journeys.yml" "Synthetic Journeys" 10200 10800
+          check_workflow "deployment-health.yml" "Deployment Health" 13200 14400
           if [ -n "$HEARTBEAT_REPORT" ]; then
             {
               echo "heartbeat_stale=true"

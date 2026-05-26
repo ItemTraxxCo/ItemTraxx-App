@@ -8,6 +8,12 @@ import {
 import { isAllowedOrigin, parseAllowedOrigins } from "../_shared/cors.ts";
 import { requireTrustedEdgeIngress } from "../_shared/trustedIngress.ts";
 import { validateTenantAdminDeviceSession } from "../_shared/tenantAdminSessions.ts";
+import {
+  optionalText,
+  requireEmail,
+  requireUuid,
+  ValidationError,
+} from "../_shared/validation.ts";
 
 const baseCorsHeaders = {
   "Access-Control-Allow-Headers":
@@ -49,13 +55,6 @@ const resolveResetRedirectTo = (req: Request) => {
 const randomPassword = () => `${crypto.randomUUID()}-Aa1!`;
 const TENANT_ADMIN_INVITE_ACCEPTED_MESSAGE =
   "If this email is eligible, a tenant admin invitation will be sent.";
-
-const sanitizeText = (value: unknown, maxLen: number) => {
-  if (typeof value !== "string") return null;
-  const trimmed = value.trim();
-  if (!trimmed) return null;
-  return trimmed.slice(0, maxLen);
-};
 
 serve(async (req) => {
   const { hasOrigin, originAllowed, headers } = resolveCorsHeaders(req);
@@ -211,7 +210,7 @@ serve(async (req) => {
     }
 
     const next = payload as Record<string, unknown>;
-    const deviceId = sanitizeText(next.device_id, 128);
+    const deviceId = optionalText(next.device_id, { maxLen: 128 });
     if (!deviceId) {
       return jsonResponse(400, { error: "Device session is required." });
     }
@@ -271,11 +270,7 @@ serve(async (req) => {
     }
 
     if (action === "create_tenant_admin") {
-      const authEmail =
-        typeof next.auth_email === "string" ? next.auth_email.trim().toLowerCase() : "";
-      if (!authEmail || authEmail.length > 320) {
-        return jsonResponse(400, { error: "Invalid request" });
-      }
+      const authEmail = requireEmail(next.auth_email);
 
       const acceptedInviteResponse = () =>
         jsonResponse(200, {
@@ -381,9 +376,9 @@ serve(async (req) => {
     }
 
     if (action === "set_admin_status") {
-      const id = typeof next.id === "string" ? next.id.trim() : "";
+      const id = requireUuid(next.id);
       const isActive = next.is_active;
-      if (!id || typeof isActive !== "boolean") {
+      if (typeof isActive !== "boolean") {
         return jsonResponse(400, { error: "Invalid request" });
       }
       if (id === tenant.primary_admin_profile_id) {
@@ -421,12 +416,8 @@ serve(async (req) => {
     }
 
     if (action === "update_admin_email") {
-      const id = typeof next.id === "string" ? next.id.trim() : "";
-      const authEmail =
-        typeof next.auth_email === "string" ? next.auth_email.trim().toLowerCase() : "";
-      if (!id || !authEmail || authEmail.length > 320) {
-        return jsonResponse(400, { error: "Invalid request" });
-      }
+      const id = requireUuid(next.id);
+      const authEmail = requireEmail(next.auth_email);
       if (id === tenant.primary_admin_profile_id) {
         return jsonResponse(400, { error: "Primary admin email cannot be changed here." });
       }
@@ -497,11 +488,7 @@ serve(async (req) => {
     }
 
     if (action === "send_tenant_admin_reset") {
-      const authEmail =
-        typeof next.auth_email === "string" ? next.auth_email.trim().toLowerCase() : "";
-      if (!authEmail) {
-        return jsonResponse(400, { error: "Invalid request" });
-      }
+      const authEmail = requireEmail(next.auth_email);
 
       const { data: target, error: targetError } = await adminClient
         .from("profiles")
@@ -544,6 +531,9 @@ serve(async (req) => {
 
     return jsonResponse(400, { error: "Invalid action" });
   } catch (error) {
+    if (error instanceof ValidationError) {
+      return jsonResponse(error.status, { error: error.message });
+    }
     console.error("tenant-admin-mutate function error", {
       message: error instanceof Error ? error.message : "Unknown error",
       stack: error instanceof Error ? error.stack : undefined,

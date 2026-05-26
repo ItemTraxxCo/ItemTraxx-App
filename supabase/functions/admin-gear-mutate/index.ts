@@ -8,6 +8,14 @@ import {
   isMissingPrivilegedStepUpTable,
 } from "../_shared/privilegedStepUp.ts";
 import { validateTenantAdminDeviceSession } from "../_shared/tenantAdminSessions.ts";
+import {
+  BARCODE_PATTERN,
+  optionalText,
+  requireEnum,
+  requireText,
+  requireUuid,
+  ValidationError,
+} from "../_shared/validation.ts";
 
 const baseCorsHeaders = {
   "Access-Control-Allow-Headers":
@@ -29,7 +37,7 @@ const ALLOWED_GEAR_STATUSES = new Set([
   "in_repair",
   "retired",
   "in_studio_only",
-]);
+] as const);
 
 const resolveCorsHeaders = (req: Request) => {
   const origin = req.headers.get("Origin");
@@ -163,8 +171,7 @@ serve(async (req) => {
       action === "restore";
 
     const payloadRecord = payload as Record<string, unknown>;
-    const deviceId =
-      typeof payloadRecord.device_id === "string" ? payloadRecord.device_id.trim() : null;
+    const deviceId = optionalText(payloadRecord.device_id, { maxLen: 128 }) || null;
 
     const adminClient = createClient(supabaseUrl, serviceKey, {
       auth: { persistSession: false },
@@ -266,25 +273,12 @@ serve(async (req) => {
     }
 
     if (action === "create") {
-      const { name, barcode, serial_number, status, notes } = payload as Record<string, unknown>;
-      const normalizedName = typeof name === "string" ? name.trim() : "";
-      const normalizedBarcode = typeof barcode === "string" ? barcode.trim() : "";
-      const normalizedStatus = typeof status === "string" ? status.trim() : "";
-      const normalizedSerial =
-        typeof serial_number === "string" ? serial_number.trim() : "";
-      const normalizedNotes = typeof notes === "string" ? notes.trim() : "";
-      if (
-        !normalizedName ||
-        normalizedName.length > 120 ||
-        !normalizedBarcode ||
-        normalizedBarcode.length > 64 ||
-        !normalizedStatus ||
-        !ALLOWED_GEAR_STATUSES.has(normalizedStatus) ||
-        normalizedSerial.length > 64 ||
-        normalizedNotes.length > 500
-      ) {
-        return jsonResponse(400, { error: "Invalid request" });
-      }
+      const { name, barcode, serial_number, status, notes } = payloadRecord;
+      const normalizedName = requireText(name, { maxLen: 120 });
+      const normalizedBarcode = requireText(barcode, { maxLen: 64, pattern: BARCODE_PATTERN });
+      const normalizedStatus = requireEnum(status, ALLOWED_GEAR_STATUSES);
+      const normalizedSerial = optionalText(serial_number, { maxLen: 64 });
+      const normalizedNotes = optionalText(notes, { maxLen: 500 });
 
       const { data, error } = await adminClient
         .from("gear")
@@ -317,24 +311,12 @@ serve(async (req) => {
     }
 
     if (action === "update") {
-      const { id, name, barcode, status, notes } = payload as Record<string, unknown>;
-      const normalizedId = typeof id === "string" ? id.trim() : "";
-      const normalizedName = typeof name === "string" ? name.trim() : "";
-      const normalizedBarcode = typeof barcode === "string" ? barcode.trim() : "";
-      const normalizedStatus = typeof status === "string" ? status.trim() : "";
-      const normalizedNotes = typeof notes === "string" ? notes.trim() : "";
-      if (
-        !normalizedId ||
-        !normalizedName ||
-        normalizedName.length > 120 ||
-        !normalizedBarcode ||
-        normalizedBarcode.length > 64 ||
-        !normalizedStatus ||
-        !ALLOWED_GEAR_STATUSES.has(normalizedStatus) ||
-        normalizedNotes.length > 500
-      ) {
-        return jsonResponse(400, { error: "Invalid request" });
-      }
+      const { id, name, barcode, status, notes } = payloadRecord;
+      const normalizedId = requireUuid(id);
+      const normalizedName = requireText(name, { maxLen: 120 });
+      const normalizedBarcode = requireText(barcode, { maxLen: 64, pattern: BARCODE_PATTERN });
+      const normalizedStatus = requireEnum(status, ALLOWED_GEAR_STATUSES);
+      const normalizedNotes = optionalText(notes, { maxLen: 500 });
 
       const { data: existingGear } = await adminClient
         .from("gear")
@@ -391,11 +373,8 @@ serve(async (req) => {
     }
 
     if (action === "delete") {
-      const { id } = payload as Record<string, unknown>;
-      const normalizedId = typeof id === "string" ? id.trim() : "";
-      if (!normalizedId) {
-        return jsonResponse(400, { error: "Invalid request" });
-      }
+      const { id } = payloadRecord;
+      const normalizedId = requireUuid(id);
 
       const { data: activeGear } = await adminClient
         .from("gear")
@@ -433,11 +412,8 @@ serve(async (req) => {
     }
 
     if (action === "restore") {
-      const { id } = payload as Record<string, unknown>;
-      const normalizedId = typeof id === "string" ? id.trim() : "";
-      if (!normalizedId) {
-        return jsonResponse(400, { error: "Invalid request" });
-      }
+      const { id } = payloadRecord;
+      const normalizedId = requireUuid(id);
 
       const { data, error } = await adminClient
         .from("gear")
@@ -457,6 +433,9 @@ serve(async (req) => {
 
     return jsonResponse(400, { error: "Invalid action" });
   } catch (error) {
+    if (error instanceof ValidationError) {
+      return jsonResponse(error.status, { error: error.message });
+    }
     console.error("admin-gear-mutate function error", {
       message: error instanceof Error ? error.message : "Unknown error",
       stack: error instanceof Error ? error.stack : undefined,

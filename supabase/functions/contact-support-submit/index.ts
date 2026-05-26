@@ -5,6 +5,13 @@ import { getRequestId, logError, logInfo } from "../_shared/observability.ts";
 import { isAllowedOrigin, parseAllowedOrigins } from "../_shared/cors.ts";
 import { resolveClientIp } from "../_shared/preloginGuards.ts";
 import { requireTrustedEdgeIngress } from "../_shared/trustedIngress.ts";
+import {
+  optionalText,
+  requireEmail,
+  requireEnum,
+  requireText,
+  ValidationError,
+} from "../_shared/validation.ts";
 
 const baseCorsHeaders = {
   "Access-Control-Allow-Headers":
@@ -65,6 +72,7 @@ const normalizeText = (value: unknown, max = 5000) => {
 };
 
 const isEmail = (value: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+const SUPPORT_CATEGORIES = new Set(["general", "bug", "billing", "access", "feature", "other"] as const);
 const base64Pattern = /^[A-Za-z0-9+/]+={0,2}$/;
 const estimateBase64DecodedBytes = (value: string) => {
   const normalized = value.replace(/\s+/g, "");
@@ -265,28 +273,25 @@ serve(async (req) => {
     }
 
     const body = (await req.json()) as SupportPayload;
-    const name = normalizeText(body.name, 120);
-    const replyEmail = normalizeText(body.reply_email, 254).toLowerCase();
-    const subject = normalizeText(body.subject, 160);
-    const category = normalizeText(body.category, 40).toLowerCase();
-    const message = normalizeText(body.message, 3000);
     const website = normalizeText(body.website, 120);
-    const turnstileToken = normalizeText(body.turnstile_token, 4000);
-    const attachmentsRaw = Array.isArray(body.attachments) ? body.attachments : [];
-    const attachments: NormalizedAttachment[] = [];
-
     if (website) {
       return jsonResponse(200, { data: { accepted: true } });
     }
+
+    const name = requireText(body.name, { maxLen: 120 });
+    const replyEmail = requireEmail(body.reply_email);
+    const subject = requireText(body.subject, { maxLen: 160 });
+    const category = requireEnum(body.category, SUPPORT_CATEGORIES);
+    const message = requireText(body.message, { maxLen: 3000 });
+    const turnstileToken = requireText(body.turnstile_token, { maxLen: 4000 });
+    const attachmentsRaw = Array.isArray(body.attachments) ? body.attachments : [];
+    const attachments: NormalizedAttachment[] = [];
 
     if (!name || !replyEmail || !isEmail(replyEmail) || !subject || !message) {
       return jsonResponse(400, { error: "Name, valid email, subject, and message are required." });
     }
     if (!["general", "bug", "billing", "access", "feature", "other"].includes(category)) {
       return jsonResponse(400, { error: "Invalid category." });
-    }
-    if (!turnstileToken) {
-      return jsonResponse(400, { error: "Security check required." });
     }
 
     const adminClient = createClient(supabaseUrl, serviceKey, {
@@ -318,9 +323,19 @@ serve(async (req) => {
       return jsonResponse(400, { error: "Attach up to 2 images." });
     }
     for (const [index, attachment] of attachmentsRaw.entries()) {
-      const contentBase64 = normalizeText(attachment.content_base64, 8_000_000).replace(/\s+/g, "");
+      if (!attachment || typeof attachment !== "object" || Array.isArray(attachment)) {
+        return jsonResponse(400, { error: "Attachment data is invalid." });
+      }
+      const attachmentRecord = attachment as Record<string, unknown>;
+      const contentBase64 =
+        typeof attachmentRecord.content_base64 === "string"
+          ? attachmentRecord.content_base64.trim().replace(/\s+/g, "")
+          : "";
       if (!contentBase64 || !base64Pattern.test(contentBase64)) {
         return jsonResponse(400, { error: "Attachment data is invalid." });
+      }
+      if (contentBase64.length > 8_000_000) {
+        return jsonResponse(400, { error: "Attachment data is too large." });
       }
 
       const estimatedSize = estimateBase64DecodedBytes(contentBase64);
@@ -345,7 +360,7 @@ serve(async (req) => {
       }
 
       attachments.push({
-        original_filename: normalizeText(attachment.filename, 120) || null,
+        original_filename: optionalText(attachmentRecord.filename, { maxLen: 120 }) || null,
         stored_filename: `${crypto.randomUUID()}.${detectedType.extension}`,
         storage_extension: detectedType.extension,
         content_type: detectedType.contentType,
@@ -481,6 +496,9 @@ serve(async (req) => {
     });
     return jsonResponse(200, { data: { accepted: true, request_id: supportRequest.id } });
   } catch (error) {
+    if (error instanceof ValidationError) {
+      return jsonResponse(error.status, { error: error.message });
+    }
     logError("contact-support-submit error", requestId, error);
     return jsonResponse(500, { error: "Request failed." });
   }

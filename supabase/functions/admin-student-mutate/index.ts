@@ -8,6 +8,13 @@ import {
   isMissingPrivilegedStepUpTable,
 } from "../_shared/privilegedStepUp.ts";
 import { validateTenantAdminDeviceSession } from "../_shared/tenantAdminSessions.ts";
+import {
+  optionalText,
+  requireUuid,
+  STUDENT_ID_PATTERN,
+  USERNAME_PATTERN,
+  ValidationError,
+} from "../_shared/validation.ts";
 
 const baseCorsHeaders = {
   "Access-Control-Allow-Headers":
@@ -490,8 +497,7 @@ serve(async (req) => {
       action === "restore";
 
     const payloadRecord = payload as Record<string, unknown>;
-    const deviceId =
-      typeof payloadRecord.device_id === "string" ? payloadRecord.device_id.trim() : null;
+    const deviceId = optionalText(payloadRecord.device_id, { maxLen: 128 }) || null;
 
     const adminClient = createClient(supabaseUrl, serviceKey, {
       auth: { persistSession: false },
@@ -593,18 +599,14 @@ serve(async (req) => {
     }
 
     if (action === "create") {
-      const payloadRecord = payload as Record<string, unknown>;
-      const providedStudentId =
-        typeof payloadRecord.student_id === "string"
-          ? payloadRecord.student_id.trim().toUpperCase()
-          : "";
-      const providedUsername =
-        typeof payloadRecord.username === "string"
-          ? payloadRecord.username.trim()
-          : "";
-      const hasValidProvidedId = /^[0-9]{4}[A-Z]{2}$/.test(providedStudentId);
+      const providedStudentId = optionalText(payloadRecord.student_id, {
+        maxLen: 6,
+        transform: "uppercase",
+      });
+      const providedUsername = optionalText(payloadRecord.username, { maxLen: 40 });
+      const hasValidProvidedId = STUDENT_ID_PATTERN.test(providedStudentId);
       const hasValidProvidedUsername =
-        providedUsername.length >= 4 && providedUsername.length <= 40;
+        providedUsername.length >= 4 && USERNAME_PATTERN.test(providedUsername);
       let studentId = hasValidProvidedId ? providedStudentId : "";
       let username = hasValidProvidedUsername ? providedUsername : "";
 
@@ -668,22 +670,25 @@ serve(async (req) => {
       const seenUsernames = new Set<string>();
 
       const normalizedRows = rows.map((row, index) => {
-        const username =
-          typeof row.username === "string" ? row.username.trim() : "";
-        const studentId =
-          typeof row.student_id === "string"
-            ? row.student_id.trim().toUpperCase()
-            : "";
+        const rowRecord =
+          row && typeof row === "object" && !Array.isArray(row)
+            ? (row as Record<string, unknown>)
+            : {};
+        const username = optionalText(rowRecord.username, { maxLen: 40 });
+        const studentId = optionalText(rowRecord.student_id, {
+          maxLen: 6,
+          transform: "uppercase",
+        });
 
         return { row: index + 1, username, studentId };
       });
 
       const requestedIds = normalizedRows
         .map((row) => row.studentId)
-        .filter((value) => /^[0-9]{4}[A-Z]{2}$/.test(value));
+        .filter((value) => STUDENT_ID_PATTERN.test(value));
       const requestedUsernames = normalizedRows
         .map((row) => row.username)
-        .filter((value) => value.length >= 4 && value.length <= 40);
+        .filter((value) => value.length >= 4 && USERNAME_PATTERN.test(value));
 
       const [existingByIdResult, existingByUsernameResult] = await Promise.all([
         requestedIds.length
@@ -720,8 +725,9 @@ serve(async (req) => {
       );
 
       for (const row of normalizedRows) {
-        const hasValidId = /^[0-9]{4}[A-Z]{2}$/.test(row.studentId);
-        const hasValidUsername = row.username.length >= 4 && row.username.length <= 40;
+        const hasValidId = STUDENT_ID_PATTERN.test(row.studentId);
+        const hasValidUsername =
+          row.username.length >= 4 && USERNAME_PATTERN.test(row.username);
         let studentId = hasValidId ? row.studentId : "";
         let username = hasValidUsername ? row.username : "";
 
@@ -790,11 +796,8 @@ serve(async (req) => {
     }
 
     if (action === "delete") {
-      const { id } = payload as Record<string, unknown>;
-      const normalizedId = typeof id === "string" ? id.trim() : "";
-      if (!normalizedId) {
-        return jsonResponse(400, { error: "Invalid request" });
-      }
+      const { id } = payloadRecord;
+      const normalizedId = requireUuid(id);
 
       const { data: activeStudent } = await adminClient
         .from("students")
@@ -843,11 +846,8 @@ serve(async (req) => {
     }
 
     if (action === "restore") {
-      const { id } = payload as Record<string, unknown>;
-      const normalizedId = typeof id === "string" ? id.trim() : "";
-      if (!normalizedId) {
-        return jsonResponse(400, { error: "Invalid request" });
-      }
+      const { id } = payloadRecord;
+      const normalizedId = requireUuid(id);
 
       const { data: archivedStudent, error: archivedStudentError } = await adminClient
         .from("students")
@@ -904,6 +904,9 @@ serve(async (req) => {
 
     return jsonResponse(400, { error: "Invalid action" });
   } catch (error) {
+    if (error instanceof ValidationError) {
+      return jsonResponse(error.status, { error: error.message });
+    }
     console.error("admin-student-mutate function error", {
       message: error instanceof Error ? error.message : "Unknown error",
       stack: error instanceof Error ? error.stack : undefined,

@@ -10,7 +10,6 @@ import {
   optionalText,
   requireEmail,
   requireEnum,
-  requireText,
   requireUuid,
   UUID_PATTERN,
   ValidationError,

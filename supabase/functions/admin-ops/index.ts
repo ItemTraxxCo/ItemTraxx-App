@@ -1196,7 +1196,7 @@ serve(async (req) => {
         let name = "";
         let barcode = "";
         let serial = "";
-        let statusRaw: "available" | "checked_out" | "damaged" | "lost" | "in_repair" | "retired" | "in_studio_only" = "available";
+        let statusRaw: "available" | "checked_out" | "damaged" | "lost" | "in_repair" | "retired" | "in_studio_only";
         let notes = "";
         try {
           name = requireText(rowRecord.name, { maxLen: 120 });

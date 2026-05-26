@@ -3,6 +3,13 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { isAllowedOrigin, parseAllowedOrigins } from "../_shared/cors.ts";
 import { resolveClientFingerprint, resolveClientIp } from "../_shared/preloginGuards.ts";
 import { requireTrustedEdgeIngress } from "../_shared/trustedIngress.ts";
+import {
+  ACCESS_CODE_PATTERN,
+  optionalText,
+  requireText,
+  SLUG_PATTERN,
+  ValidationError,
+} from "../_shared/validation.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Headers":
@@ -193,26 +200,22 @@ serve(async (req) => {
 
   try {
     const { access_code, password, turnstile_token, district_slug } = await req.json();
-    if (
-      typeof access_code !== "string" ||
-      !access_code.trim() ||
-      access_code.trim().length > 64 ||
-      typeof password !== "string" ||
-      !password ||
-      password.length > 1024
-    ) {
+    const normalizedAccessCode = requireText(access_code, {
+      maxLen: 64,
+      pattern: ACCESS_CODE_PATTERN,
+    });
+    const normalizedDistrictSlug =
+      optionalText(district_slug, {
+        maxLen: 63,
+        pattern: SLUG_PATTERN,
+        transform: "lowercase",
+      }) || null;
+    if (typeof password !== "string" || !password || password.length > 1024) {
       return jsonResponse(400, { error: "Invalid request" });
     }
-    const normalizedDistrictSlug =
-      typeof district_slug === "string" &&
-      district_slug.trim() &&
-      district_slug.trim().length <= 63
-        ? district_slug.trim().toLowerCase()
-        : null;
 
     const turnstileSecret = Deno.env.get("ITX_TURNSTILE_SECRET") ?? "";
-    const turnstileToken =
-      typeof turnstile_token === "string" ? turnstile_token.trim() : "";
+    const turnstileToken = optionalText(turnstile_token, { maxLen: 4096 });
     if (turnstileSecret) {
       if (
         !turnstileToken ||
@@ -260,7 +263,6 @@ serve(async (req) => {
       });
     }
 
-    const normalizedAccessCode = access_code.trim();
     const clientFingerprint = resolveClientFingerprint(req, origin);
     const accessCodeHash = await hashString(normalizedAccessCode);
     const perClientScope = `tenant-login-client-${clientFingerprint}`;
@@ -414,6 +416,9 @@ serve(async (req) => {
       district_slug: resolvedDistrictSlug,
     });
   } catch (error) {
+    if (error instanceof ValidationError) {
+      return jsonResponse(error.status, { error: error.message });
+    }
     const message = error instanceof Error ? error.message : "Unknown error";
     const stack = error instanceof Error ? error.stack : undefined;
     console.error("tenant-login function error", {

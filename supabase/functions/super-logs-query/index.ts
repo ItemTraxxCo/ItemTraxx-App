@@ -5,6 +5,13 @@ import {
   isMissingPrivilegedStepUpTable,
 } from "../_shared/privilegedStepUp.ts";
 import { isAllowedOrigin, parseAllowedOrigins } from "../_shared/cors.ts";
+import {
+  optionalInteger,
+  optionalIsoDate,
+  optionalText,
+  UUID_PATTERN,
+  ValidationError,
+} from "../_shared/validation.ts";
 
 const baseCorsHeaders = {
   "Access-Control-Allow-Headers":
@@ -142,35 +149,18 @@ serve(async (req) => {
     if (typeof payload !== "object" || !payload) {
       return jsonResponse(400, { error: "Invalid request" });
     }
+    const payloadRecord = payload as Record<string, unknown>;
 
-    const tenantId =
-      typeof (payload as Record<string, unknown>).tenant_id === "string"
-        ? ((payload as Record<string, unknown>).tenant_id as string).trim()
-        : "all";
-    const search =
-      typeof (payload as Record<string, unknown>).search === "string"
-        ? ((payload as Record<string, unknown>).search as string).trim().toLowerCase()
-        : "";
-    const actionType =
-      typeof (payload as Record<string, unknown>).action_type === "string"
-        ? ((payload as Record<string, unknown>).action_type as string).trim()
-        : "all";
-    const page = Math.max(
-      1,
-      Number((payload as Record<string, unknown>).page ?? 1) || 1
-    );
-    const startAt =
-      typeof (payload as Record<string, unknown>).start_at === "string"
-        ? ((payload as Record<string, unknown>).start_at as string).trim()
-        : "";
-    const endAt =
-      typeof (payload as Record<string, unknown>).end_at === "string"
-        ? ((payload as Record<string, unknown>).end_at as string).trim()
-        : "";
-    const pageSize = Math.min(
-      200,
-      Math.max(10, Number((payload as Record<string, unknown>).page_size ?? 50) || 50)
-    );
+    const tenantId = optionalText(payloadRecord.tenant_id, { maxLen: 36 }) || "all";
+    if (tenantId !== "all" && !UUID_PATTERN.test(tenantId)) {
+      return jsonResponse(400, { error: "Invalid request" });
+    }
+    const search = optionalText(payloadRecord.search, { maxLen: 120, transform: "lowercase" });
+    const actionType = optionalText(payloadRecord.action_type, { maxLen: 40 }) || "all";
+    const page = optionalInteger(payloadRecord.page, 1, 10_000, 1);
+    const startAt = optionalIsoDate(payloadRecord.start_at);
+    const endAt = optionalIsoDate(payloadRecord.end_at);
+    const pageSize = optionalInteger(payloadRecord.page_size, 10, 200, 50);
 
     let query = adminClient
       .from("gear_logs")
@@ -280,6 +270,9 @@ serve(async (req) => {
       count: mapped.length,
     });
   } catch (error) {
+    if (error instanceof ValidationError) {
+      return jsonResponse(error.status, { error: error.message });
+    }
     console.error("super-logs-query function error", {
       message: error instanceof Error ? error.message : "Unknown error",
       stack: error instanceof Error ? error.stack : undefined,

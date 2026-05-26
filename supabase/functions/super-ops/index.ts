@@ -6,6 +6,16 @@ import {
   isMissingPrivilegedStepUpTable,
 } from "../_shared/privilegedStepUp.ts";
 import { isAllowedOrigin, parseAllowedOrigins } from "../_shared/cors.ts";
+import {
+  asRecord,
+  optionalInteger,
+  optionalJsonObject,
+  optionalPositiveInteger,
+  optionalText,
+  requireText,
+  requireUuid,
+  ValidationError,
+} from "../_shared/validation.ts";
 
 const baseCorsHeaders = {
   "Access-Control-Allow-Headers":
@@ -35,6 +45,7 @@ type SupportAttachmentRecord = {
   storage_bucket: string | null;
   storage_path: string | null;
 };
+type SupabaseAdminClient = ReturnType<typeof createClient<any>>;
 
 type SafeSupportAttachmentPathParts = {
   requestIdSegment: string;
@@ -104,7 +115,7 @@ const toSignedAttachmentResult = (
 });
 
 const createSafeSupportAttachmentSignedUrl = async (
-  adminClient: ReturnType<typeof createClient>,
+  adminClient: SupabaseAdminClient,
   rawStoragePath: string | null,
   expiresInSeconds: number,
 ) => {
@@ -155,7 +166,7 @@ const isMissingColumn = (error: { code?: string; message?: string } | null, colu
   error?.code === "42703" && (error.message ?? "").includes(column);
 
 const sanitizeText = (value: unknown, max = 255) =>
-  typeof value === "string" ? value.trim().slice(0, max) : "";
+  optionalText(value, { maxLen: max });
 
 const parseJwtPayload = (token: string): Record<string, unknown> | null => {
   const parts = token.split(".");
@@ -248,18 +259,9 @@ serve(async (req) => {
       return jsonResponse(403, { error: "Access denied" });
     }
 
-    const parsedBody = await req.json().catch(() => null);
-    const action =
-      parsedBody && typeof parsedBody === "object" && typeof (parsedBody as { action?: unknown }).action === "string"
-        ? ((parsedBody as { action: string }).action)
-        : "";
-    const payload =
-      parsedBody && typeof parsedBody === "object"
-        ? (((parsedBody as { payload?: unknown }).payload ?? {}) as Record<string, unknown>)
-        : {};
-    if (!action) {
-      return jsonResponse(400, { error: "Invalid request" });
-    }
+    const parsedBody = asRecord(await req.json().catch(() => ({})));
+    const action = requireText(parsedBody.action, { maxLen: 64 });
+    const payload = asRecord(parsedBody.payload ?? {});
 
     const securitySettingsActions = new Set([
       "verify_password",
@@ -439,7 +441,10 @@ serve(async (req) => {
       const next = (payload ?? {}) as Record<string, unknown>;
       const currentDeviceId = sanitizeText(next.device_id, 128);
 
-      let sessionQuery = await adminClient
+      let sessionQuery: {
+        data: Array<Record<string, unknown>> | null;
+        error: { code?: string; message?: string } | null;
+      } = await adminClient
         .from("super_admin_sessions")
         .select(
           "id, device_id, device_label, user_agent, login_method, login_location, general_location, created_at, last_seen_at"
@@ -491,11 +496,8 @@ serve(async (req) => {
     }
 
     if (action === "revoke_session") {
-      const next = (payload ?? {}) as Record<string, unknown>;
-      const sessionId = sanitizeText(next.session_id, 128);
-      if (!sessionId) {
-        return jsonResponse(400, { error: "Session id is required." });
-      }
+      const next = payload;
+      const sessionId = requireText(next.session_id, { maxLen: 128 });
 
       const { data, error } = await adminClient
         .from("super_admin_sessions")
@@ -679,12 +681,9 @@ serve(async (req) => {
     }
 
     if (action === "set_runtime_config") {
-      const next = (payload ?? {}) as Record<string, unknown>;
-      const key = typeof next.key === "string" ? next.key.trim() : "";
-      const value = next.value ?? {};
-      if (!key) {
-        return jsonResponse(400, { error: "Invalid request" });
-      }
+      const next = payload;
+      const key = requireText(next.key, { maxLen: 120 });
+      const value = optionalJsonObject(next.value, 25_000);
 
       const { data, error } = await adminClient
         .from("app_runtime_config")
@@ -702,13 +701,16 @@ serve(async (req) => {
     }
 
     if (action === "upsert_alert_rule") {
-      const next = (payload ?? {}) as Record<string, unknown>;
-      const id = typeof next.id === "string" ? next.id.trim() : "";
-      const name = typeof next.name === "string" ? next.name.trim() : "";
-      const metricKey = typeof next.metric_key === "string" ? next.metric_key.trim() : "";
+      const next = payload;
+      const id = optionalText(next.id, { maxLen: 36 });
+      if (id && !UUID_PATTERN.test(id)) {
+        return jsonResponse(400, { error: "Invalid request" });
+      }
+      const name = requireText(next.name, { maxLen: 120 });
+      const metricKey = requireText(next.metric_key, { maxLen: 120 });
       const threshold = Number(next.threshold);
       const isEnabled = next.is_enabled !== false;
-      if (!name || !metricKey || !Number.isFinite(threshold)) {
+      if (!Number.isFinite(threshold)) {
         return jsonResponse(400, { error: "Invalid request" });
       }
 
@@ -740,29 +742,17 @@ serve(async (req) => {
     }
 
     if (action === "set_tenant_policy") {
-      const next = (payload ?? {}) as Record<string, unknown>;
-      const tenantId = typeof next.tenant_id === "string" ? next.tenant_id.trim() : "";
-      if (!tenantId) {
-        return jsonResponse(400, { error: "Invalid request" });
-      }
+      const next = payload;
+      const tenantId = requireUuid(next.tenant_id);
 
       const row = {
         tenant_id: tenantId,
-        max_admins: typeof next.max_admins === "number" ? next.max_admins : null,
-        max_students: typeof next.max_students === "number" ? next.max_students : null,
-        max_gear: typeof next.max_gear === "number" ? next.max_gear : null,
-        checkout_due_hours:
-          typeof next.checkout_due_hours === "number"
-            ? Math.min(720, Math.max(1, Math.round(next.checkout_due_hours)))
-            : 72,
-        barcode_pattern:
-          typeof next.barcode_pattern === "string" && next.barcode_pattern.trim()
-            ? next.barcode_pattern.trim()
-            : null,
-        feature_flags:
-          next.feature_flags && typeof next.feature_flags === "object"
-            ? (next.feature_flags as Record<string, unknown>)
-            : {},
+        max_admins: optionalPositiveInteger(next.max_admins, 1000),
+        max_students: optionalPositiveInteger(next.max_students, 100_000),
+        max_gear: optionalPositiveInteger(next.max_gear, 100_000),
+        checkout_due_hours: optionalInteger(next.checkout_due_hours, 1, 720, 72),
+        barcode_pattern: optionalText(next.barcode_pattern, { maxLen: 80 }) || null,
+        feature_flags: optionalJsonObject(next.feature_flags, 10_000),
         updated_by: user.id,
         updated_at: new Date().toISOString(),
       };
@@ -819,11 +809,8 @@ serve(async (req) => {
     }
 
     if (action === "set_tenant_force_reauth") {
-      const next = (payload ?? {}) as Record<string, unknown>;
-      const tenantId = typeof next.tenant_id === "string" ? next.tenant_id.trim() : "";
-      if (!tenantId) {
-        return jsonResponse(400, { error: "Invalid request" });
-      }
+      const next = payload;
+      const tenantId = requireUuid(next.tenant_id);
 
       const forceAt = new Date().toISOString();
       const { error } = await adminClient
@@ -858,12 +845,9 @@ serve(async (req) => {
     }
 
     if (action === "create_approval") {
-      const next = (payload ?? {}) as Record<string, unknown>;
-      const actionType = typeof next.action_type === "string" ? next.action_type.trim() : "";
-      const approvalPayload = (next.payload ?? {}) as Record<string, unknown>;
-      if (!actionType) {
-        return jsonResponse(400, { error: "Invalid request" });
-      }
+      const next = payload;
+      const actionType = requireText(next.action_type, { maxLen: 120 });
+      const approvalPayload = optionalJsonObject(next.payload, 25_000);
 
       const { data, error } = await adminClient
         .from("super_approvals")
@@ -888,11 +872,8 @@ serve(async (req) => {
     }
 
     if (action === "approve_request") {
-      const next = (payload ?? {}) as Record<string, unknown>;
-      const id = typeof next.id === "string" ? next.id.trim() : "";
-      if (!id) {
-        return jsonResponse(400, { error: "Invalid request" });
-      }
+      const next = payload;
+      const id = requireUuid(next.id);
 
       const { data: approval, error: approvalError } = await adminClient
         .from("super_approvals")
@@ -930,13 +911,10 @@ serve(async (req) => {
     }
 
     if (action === "list_support_requests") {
-      const next = (payload ?? {}) as Record<string, unknown>;
-      const search = typeof next.search === "string" ? next.search.trim() : "";
-      const status = typeof next.status === "string" ? next.status.trim() : "";
-      const limitRaw = Number(next.limit);
-      const limit = Number.isFinite(limitRaw)
-        ? Math.min(200, Math.max(1, Math.round(limitRaw)))
-        : 100;
+      const next = payload;
+      const search = optionalText(next.search, { maxLen: 120 });
+      const status = optionalText(next.status, { maxLen: 40 });
+      const limit = optionalInteger(next.limit, 1, 200, 100);
       const allowedStatuses = new Set<SupportRequestStatus>([
         "open",
         "in_progress",
@@ -954,6 +932,8 @@ serve(async (req) => {
 
       if (status && allowedStatuses.has(status as SupportRequestStatus)) {
         query = query.eq("status", status);
+      } else if (status) {
+        return jsonResponse(400, { error: "Invalid support request status." });
       }
 
       if (search) {
@@ -971,12 +951,8 @@ serve(async (req) => {
     }
 
     if (action === "get_support_request") {
-      const next = (payload ?? {}) as Record<string, unknown>;
-      const supportRequestId =
-        typeof next.support_request_id === "string" ? next.support_request_id.trim() : "";
-      if (!supportRequestId) {
-        return jsonResponse(400, { error: "Invalid request" });
-      }
+      const next = payload;
+      const supportRequestId = requireUuid(next.support_request_id);
 
       const detail = await buildSupportRequestDetail(supportRequestId);
       if (detail.error || !detail.data) {
@@ -987,12 +963,12 @@ serve(async (req) => {
     }
 
     if (action === "update_support_request") {
-      const next = (payload ?? {}) as Record<string, unknown>;
-      const supportRequestId =
-        typeof next.support_request_id === "string" ? next.support_request_id.trim() : "";
-      const status = typeof next.status === "string" ? next.status.trim() as SupportRequestStatus : undefined;
-      const internalNotes =
-        typeof next.internal_notes === "string" ? next.internal_notes.trim().slice(0, 4000) : undefined;
+      const next = payload;
+      const supportRequestId = requireUuid(next.support_request_id);
+      const status = next.status === undefined ? undefined : optionalText(next.status, { maxLen: 40 }) as SupportRequestStatus;
+      const internalNotes = next.internal_notes === undefined
+        ? undefined
+        : optionalText(next.internal_notes, { maxLen: 4000 });
       const assignToMe = next.assign_to_me === true;
       const clearAssignment = next.clear_assignment === true;
       const allowedStatuses = new Set<SupportRequestStatus>([
@@ -1002,9 +978,6 @@ serve(async (req) => {
         "spam",
       ]);
 
-      if (!supportRequestId) {
-        return jsonResponse(400, { error: "Invalid request" });
-      }
       if (status && !allowedStatuses.has(status)) {
         return jsonResponse(400, { error: "Invalid support request status." });
       }
@@ -1080,12 +1053,9 @@ serve(async (req) => {
     }
 
     if (action === "list_sales_leads") {
-      const next = (payload ?? {}) as Record<string, unknown>;
-      const search = typeof next.search === "string" ? next.search.trim() : "";
-      const limitRaw = Number(next.limit);
-      const limit = Number.isFinite(limitRaw)
-        ? Math.min(200, Math.max(1, Math.round(limitRaw)))
-        : 100;
+      const next = payload;
+      const search = optionalText(next.search, { maxLen: 120 });
+      const limit = optionalInteger(next.limit, 1, 200, 100);
 
       let query = adminClient
         .from("sales_leads")
@@ -1114,11 +1084,8 @@ serve(async (req) => {
     }
 
     if (action === "close_sales_lead") {
-      const next = (payload ?? {}) as Record<string, unknown>;
-      const leadId = typeof next.lead_id === "string" ? next.lead_id.trim() : "";
-      if (!leadId) {
-        return jsonResponse(400, { error: "Invalid request" });
-      }
+      const next = payload;
+      const leadId = requireUuid(next.lead_id);
 
       const { data, error } = await adminClient
         .from("sales_leads")
@@ -1141,11 +1108,8 @@ serve(async (req) => {
     }
 
     if (action === "move_sales_lead_to_customer") {
-      const next = (payload ?? {}) as Record<string, unknown>;
-      const leadId = typeof next.lead_id === "string" ? next.lead_id.trim() : "";
-      if (!leadId) {
-        return jsonResponse(400, { error: "Invalid request" });
-      }
+      const next = payload;
+      const leadId = requireUuid(next.lead_id);
 
       const { data, error } = await adminClient
         .from("sales_leads")
@@ -1168,9 +1132,9 @@ serve(async (req) => {
     }
 
     if (action === "set_sales_lead_stage") {
-      const next = (payload ?? {}) as Record<string, unknown>;
-      const leadId = typeof next.lead_id === "string" ? next.lead_id.trim() : "";
-      const stage = typeof next.stage === "string" ? next.stage.trim() : "";
+      const next = payload;
+      const leadId = requireUuid(next.lead_id);
+      const stage = optionalText(next.stage, { maxLen: 40 });
       const allowedStages = new Set([
         "waiting_for_quote",
         "quote_generated",
@@ -1179,7 +1143,7 @@ serve(async (req) => {
         "invoice_sent",
         "invoice_paid",
       ]);
-      if (!leadId || !allowedStages.has(stage)) {
+      if (!allowedStages.has(stage)) {
         return jsonResponse(400, { error: "Invalid request" });
       }
 
@@ -1204,11 +1168,8 @@ serve(async (req) => {
     }
 
     if (action === "delete_sales_lead") {
-      const next = (payload ?? {}) as Record<string, unknown>;
-      const leadId = typeof next.lead_id === "string" ? next.lead_id.trim() : "";
-      if (!leadId) {
-        return jsonResponse(400, { error: "Invalid request" });
-      }
+      const next = payload;
+      const leadId = requireUuid(next.lead_id);
 
       const { error } = await adminClient
         .from("sales_leads")
@@ -1224,12 +1185,9 @@ serve(async (req) => {
     }
 
     if (action === "list_customers") {
-      const next = (payload ?? {}) as Record<string, unknown>;
-      const search = typeof next.search === "string" ? next.search.trim() : "";
-      const limitRaw = Number(next.limit);
-      const limit = Number.isFinite(limitRaw)
-        ? Math.min(300, Math.max(1, Math.round(limitRaw)))
-        : 150;
+      const next = payload;
+      const search = optionalText(next.search, { maxLen: 120 });
+      const limit = optionalInteger(next.limit, 1, 300, 150);
 
       let leadQuery = adminClient
         .from("sales_leads")
@@ -1303,17 +1261,17 @@ serve(async (req) => {
     }
 
     if (action === "add_customer_status_entry") {
-      const next = (payload ?? {}) as Record<string, unknown>;
-      const leadId = typeof next.lead_id === "string" ? next.lead_id.trim() : "";
-      const invoiceId = typeof next.invoice_id === "string" ? next.invoice_id.trim() : "";
-      const status = typeof next.status === "string" ? next.status.trim() : "";
+      const next = payload;
+      const leadId = requireUuid(next.lead_id);
+      const invoiceId = requireText(next.invoice_id, { maxLen: 120 });
+      const status = optionalText(next.status, { maxLen: 40 });
       const allowedStatuses = new Set([
         "paid_on_time",
         "paid_late",
         "awaiting_payment",
         "canceling",
       ]);
-      if (!leadId || !invoiceId || !allowedStatuses.has(status)) {
+      if (!allowedStatuses.has(status)) {
         return jsonResponse(400, { error: "Invalid request" });
       }
 
@@ -1709,6 +1667,9 @@ serve(async (req) => {
 
     return jsonResponse(400, { error: "Invalid action" });
   } catch (error) {
+    if (error instanceof ValidationError) {
+      return jsonResponse(error.status, { error: error.message });
+    }
     console.error("super-ops function error", {
       message: error instanceof Error ? error.message : "Unknown error",
       stack: error instanceof Error ? error.stack : undefined,

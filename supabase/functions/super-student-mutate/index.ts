@@ -6,6 +6,14 @@ import {
   isMissingPrivilegedStepUpTable,
 } from "../_shared/privilegedStepUp.ts";
 import { isAllowedOrigin, parseAllowedOrigins } from "../_shared/cors.ts";
+import {
+  optionalText,
+  requireUuid,
+  STUDENT_ID_PATTERN,
+  USERNAME_PATTERN,
+  UUID_PATTERN,
+  ValidationError,
+} from "../_shared/validation.ts";
 
 const baseCorsHeaders = {
   "Access-Control-Allow-Headers":
@@ -18,6 +26,8 @@ type RateLimitResult = {
   allowed: boolean;
   retry_after_seconds: number | null;
 };
+
+type SupabaseAdminClient = ReturnType<typeof createClient<any, "public", any>>;
 
 const CODENAME_PREFIXES = [
   "Nova",
@@ -83,7 +93,7 @@ const generateUsername = () => {
 };
 
 const buildUniqueStudentIdentity = async (
-  adminClient: ReturnType<typeof createClient>,
+  adminClient: SupabaseAdminClient,
   tenantId: string
 ) => {
   for (let attempt = 0; attempt < 12; attempt += 1) {
@@ -254,16 +264,14 @@ serve(async (req) => {
     if (typeof action !== "string" || typeof payload !== "object" || !payload) {
       return jsonResponse(400, { error: "Invalid request" });
     }
+    const payloadRecord = payload as Record<string, unknown>;
 
     if (action === "list") {
-      const tenantId =
-        typeof (payload as Record<string, unknown>).tenant_id === "string"
-          ? ((payload as Record<string, unknown>).tenant_id as string).trim()
-          : "all";
-      const search =
-        typeof (payload as Record<string, unknown>).search === "string"
-          ? ((payload as Record<string, unknown>).search as string).trim()
-          : "";
+      const tenantId = optionalText(payloadRecord.tenant_id, { maxLen: 36 }) || "all";
+      if (tenantId !== "all" && !UUID_PATTERN.test(tenantId)) {
+        return jsonResponse(400, { error: "Invalid request" });
+      }
+      const search = optionalText(payloadRecord.search, { maxLen: 120 });
 
       let query = adminClient
         .from("students")
@@ -299,21 +307,16 @@ serve(async (req) => {
     }
 
     if (action === "create") {
-      const input = payload as Record<string, unknown>;
-      const tenantId = typeof input.tenant_id === "string" ? input.tenant_id.trim() : "";
-      const providedStudentId =
-        typeof input.student_id === "string"
-          ? input.student_id.trim().toUpperCase()
-          : "";
-      const providedUsername =
-        typeof input.username === "string" ? input.username.trim() : "";
+      const tenantId = requireUuid(payloadRecord.tenant_id);
+      const providedStudentId = optionalText(payloadRecord.student_id, {
+        maxLen: 6,
+        transform: "uppercase",
+      });
+      const providedUsername = optionalText(payloadRecord.username, { maxLen: 40 });
 
-      if (!tenantId) {
-        return jsonResponse(400, { error: "Invalid request" });
-      }
-      const hasValidProvidedId = /^[0-9]{4}[A-Z]{2}$/.test(providedStudentId);
+      const hasValidProvidedId = STUDENT_ID_PATTERN.test(providedStudentId);
       const hasValidProvidedUsername =
-        providedUsername.length >= 4 && providedUsername.length <= 40;
+        providedUsername.length >= 4 && USERNAME_PATTERN.test(providedUsername);
       let studentId = hasValidProvidedId ? providedStudentId : "";
       let username = hasValidProvidedUsername ? providedUsername : "";
 
@@ -363,11 +366,7 @@ serve(async (req) => {
     }
 
     if (action === "update") {
-      const input = payload as Record<string, unknown>;
-      const id = typeof input.id === "string" ? input.id.trim() : "";
-      if (!id) {
-        return jsonResponse(400, { error: "Invalid request" });
-      }
+      const id = requireUuid(payloadRecord.id);
 
       const { data, error } = await adminClient
         .from("students")
@@ -382,12 +381,14 @@ serve(async (req) => {
     }
 
     if (action === "delete") {
-      const input = payload as Record<string, unknown>;
-      const id = typeof input.id === "string" ? input.id.trim() : "";
-      const password = typeof input.super_password === "string" ? input.super_password : "";
-      const phrase = typeof input.confirm_phrase === "string" ? input.confirm_phrase : "";
+      const id = requireUuid(payloadRecord.id);
+      const password =
+        typeof payloadRecord.super_password === "string" && payloadRecord.super_password.length <= 1024
+          ? payloadRecord.super_password
+          : "";
+      const phrase = optionalText(payloadRecord.confirm_phrase, { maxLen: 32 });
 
-      if (!id || !password || phrase.trim() !== "CONFIRM") {
+      if (!password || phrase !== "CONFIRM") {
         return jsonResponse(400, {
           error: "Super password and confirmation are required to delete student.",
         });
@@ -412,6 +413,9 @@ serve(async (req) => {
 
     return jsonResponse(400, { error: "Invalid action" });
   } catch (error) {
+    if (error instanceof ValidationError) {
+      return jsonResponse(error.status, { error: error.message });
+    }
     console.error("super-student-mutate function error", {
       message: error instanceof Error ? error.message : "Unknown error",
       stack: error instanceof Error ? error.stack : undefined,

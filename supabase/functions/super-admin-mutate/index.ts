@@ -6,6 +6,14 @@ import {
   isMissingPrivilegedStepUpTable,
 } from "../_shared/privilegedStepUp.ts";
 import { isAllowedOrigin, parseAllowedOrigins } from "../_shared/cors.ts";
+import {
+  optionalText,
+  requireEmail,
+  requireEnum,
+  requireUuid,
+  UUID_PATTERN,
+  ValidationError,
+} from "../_shared/validation.ts";
 
 const baseCorsHeaders = {
   "Access-Control-Allow-Headers":
@@ -20,6 +28,7 @@ type RateLimitResult = {
 };
 
 const lower = (value: string | null | undefined) => (value ?? "").toLowerCase();
+const ADMIN_SCOPES = new Set(["tenant", "district"] as const);
 
 const resolveCorsHeaders = (req: Request) => {
   const origin = req.headers.get("Origin");
@@ -156,6 +165,7 @@ serve(async (req) => {
     if (typeof action !== "string" || typeof payload !== "object" || !payload) {
       return jsonResponse(400, { error: "Invalid request" });
     }
+    const payloadRecord = payload as Record<string, unknown>;
 
     const writeAudit = async (
       actionType: string,
@@ -174,22 +184,16 @@ serve(async (req) => {
     };
 
     if (action === "list_tenant_admins") {
-      const search =
-        typeof (payload as Record<string, unknown>).search === "string"
-          ? ((payload as Record<string, unknown>).search as string).trim()
-          : "";
-      const tenantId =
-        typeof (payload as Record<string, unknown>).tenant_id === "string"
-          ? ((payload as Record<string, unknown>).tenant_id as string).trim()
-          : "all";
-      const districtId =
-        typeof (payload as Record<string, unknown>).district_id === "string"
-          ? ((payload as Record<string, unknown>).district_id as string).trim()
-          : "all";
-      const adminScope =
-        typeof (payload as Record<string, unknown>).admin_scope === "string"
-          ? ((payload as Record<string, unknown>).admin_scope as string).trim()
-          : "tenant";
+      const search = optionalText(payloadRecord.search, { maxLen: 120 });
+      const tenantId = optionalText(payloadRecord.tenant_id, { maxLen: 36 }) || "all";
+      const districtId = optionalText(payloadRecord.district_id, { maxLen: 36 }) || "all";
+      if (tenantId !== "all" && !UUID_PATTERN.test(tenantId)) {
+        return jsonResponse(400, { error: "Invalid request" });
+      }
+      if (districtId !== "all" && !UUID_PATTERN.test(districtId)) {
+        return jsonResponse(400, { error: "Invalid request" });
+      }
+      const adminScope = requireEnum(payloadRecord.admin_scope ?? "tenant", ADMIN_SCOPES);
       const targetRole = adminScope === "district" ? "district_admin" : "tenant_admin";
 
       let query = adminClient
@@ -310,21 +314,15 @@ serve(async (req) => {
     }
 
     if (action === "create_tenant_admin") {
-      const next = payload as Record<string, unknown>;
-      const tenantId = typeof next.tenant_id === "string" ? next.tenant_id.trim() : "";
-      const districtId =
-        typeof next.district_id === "string" ? next.district_id.trim() : "";
-      const authEmail = typeof next.auth_email === "string" ? next.auth_email.trim() : "";
-      const password = typeof next.password === "string" ? next.password : "";
-      const adminScope =
-        typeof next.admin_scope === "string" ? next.admin_scope.trim() : "tenant";
+      const next = payloadRecord;
+      const adminScope = requireEnum(next.admin_scope ?? "tenant", ADMIN_SCOPES);
       const targetRole = adminScope === "district" ? "district_admin" : "tenant_admin";
+      const tenantId = targetRole === "tenant_admin" ? requireUuid(next.tenant_id) : "";
+      const districtId = targetRole === "district_admin" ? requireUuid(next.district_id) : "";
+      const authEmail = requireEmail(next.auth_email);
+      const password = typeof next.password === "string" ? next.password : "";
 
       if (
-        (!tenantId && targetRole === "tenant_admin") ||
-        (!districtId && targetRole === "district_admin") ||
-        !authEmail ||
-        authEmail.length > 320 ||
         password.length < 8
       ) {
         return jsonResponse(400, { error: "Invalid request" });
@@ -447,11 +445,11 @@ serve(async (req) => {
     }
 
     if (action === "create_super_admin") {
-      const next = payload as Record<string, unknown>;
-      const authEmail = typeof next.auth_email === "string" ? next.auth_email.trim() : "";
+      const next = payloadRecord;
+      const authEmail = requireEmail(next.auth_email);
       const password = typeof next.password === "string" ? next.password : "";
 
-      if (!authEmail || authEmail.length > 320 || password.length < 8) {
+      if (password.length < 8) {
         return jsonResponse(400, { error: "Invalid request" });
       }
 
@@ -536,18 +534,15 @@ serve(async (req) => {
     }
 
     if (action === "set_admin_status") {
-      const next = payload as Record<string, unknown>;
-      const id = typeof next.id === "string" ? next.id.trim() : "";
+      const next = payloadRecord;
+      const id = requireUuid(next.id);
       const isActive = next.is_active;
 
-      if (!id || typeof isActive !== "boolean") {
+      if (typeof isActive !== "boolean") {
         return jsonResponse(400, { error: "Invalid request" });
       }
 
-      const adminScope =
-        typeof (payload as Record<string, unknown>).admin_scope === "string"
-          ? ((payload as Record<string, unknown>).admin_scope as string).trim()
-          : "tenant";
+      const adminScope = requireEnum(payloadRecord.admin_scope ?? "tenant", ADMIN_SCOPES);
       const targetRole = adminScope === "district" ? "district_admin" : "tenant_admin";
       const { data: updated, error: updateError } = await adminClient
         .from("profiles")
@@ -604,11 +599,11 @@ serve(async (req) => {
     }
 
     if (action === "set_super_admin_status") {
-      const next = payload as Record<string, unknown>;
-      const id = typeof next.id === "string" ? next.id.trim() : "";
+      const next = payloadRecord;
+      const id = requireUuid(next.id);
       const isActive = next.is_active;
 
-      if (!id || typeof isActive !== "boolean") {
+      if (typeof isActive !== "boolean") {
         return jsonResponse(400, { error: "Invalid request" });
       }
       if (id === user.id && !isActive) {
@@ -672,18 +667,11 @@ serve(async (req) => {
     }
 
     if (action === "update_admin_email") {
-      const next = payload as Record<string, unknown>;
-      const id = typeof next.id === "string" ? next.id.trim() : "";
-      const authEmail = typeof next.auth_email === "string" ? next.auth_email.trim() : "";
+      const next = payloadRecord;
+      const id = requireUuid(next.id);
+      const authEmail = requireEmail(next.auth_email);
 
-      if (!id || !authEmail || authEmail.length > 320) {
-        return jsonResponse(400, { error: "Invalid request" });
-      }
-
-      const adminScope =
-        typeof (payload as Record<string, unknown>).admin_scope === "string"
-          ? ((payload as Record<string, unknown>).admin_scope as string).trim()
-          : "tenant";
+      const adminScope = requireEnum(payloadRecord.admin_scope ?? "tenant", ADMIN_SCOPES);
       const targetRole = adminScope === "district" ? "district_admin" : "tenant_admin";
       const { data: current, error: currentError } = await adminClient
         .from("profiles")
@@ -770,13 +758,9 @@ serve(async (req) => {
     }
 
     if (action === "update_super_admin_email") {
-      const next = payload as Record<string, unknown>;
-      const id = typeof next.id === "string" ? next.id.trim() : "";
-      const authEmail = typeof next.auth_email === "string" ? next.auth_email.trim() : "";
-
-      if (!id || !authEmail || authEmail.length > 320) {
-        return jsonResponse(400, { error: "Invalid request" });
-      }
+      const next = payloadRecord;
+      const id = requireUuid(next.id);
+      const authEmail = requireEmail(next.auth_email);
 
       const { data: current, error: currentError } = await adminClient
         .from("profiles")
@@ -840,11 +824,8 @@ serve(async (req) => {
     }
 
     if (action === "send_reset") {
-      const next = payload as Record<string, unknown>;
-      const authEmail = typeof next.auth_email === "string" ? next.auth_email.trim() : "";
-      if (!authEmail) {
-        return jsonResponse(400, { error: "Invalid request" });
-      }
+      const next = payloadRecord;
+      const authEmail = requireEmail(next.auth_email);
 
       const redirectTo = resolveResetRedirectTo(req);
       if (!redirectTo) {
@@ -862,10 +843,7 @@ serve(async (req) => {
         });
       }
 
-      const adminScope =
-        typeof (payload as Record<string, unknown>).admin_scope === "string"
-          ? ((payload as Record<string, unknown>).admin_scope as string).trim()
-          : "tenant";
+      const adminScope = requireEnum(payloadRecord.admin_scope ?? "tenant", ADMIN_SCOPES);
       await writeAudit(
         adminScope === "district" ? "send_district_admin_reset" : "send_tenant_admin_reset",
         "profile",
@@ -877,11 +855,8 @@ serve(async (req) => {
     }
 
     if (action === "send_super_admin_reset") {
-      const next = payload as Record<string, unknown>;
-      const authEmail = typeof next.auth_email === "string" ? next.auth_email.trim() : "";
-      if (!authEmail) {
-        return jsonResponse(400, { error: "Invalid request" });
-      }
+      const next = payloadRecord;
+      const authEmail = requireEmail(next.auth_email);
 
       const redirectTo = resolveResetRedirectTo(req);
       if (!redirectTo) {
@@ -905,6 +880,9 @@ serve(async (req) => {
 
     return jsonResponse(400, { error: "Invalid action" });
   } catch (error) {
+    if (error instanceof ValidationError) {
+      return jsonResponse(error.status, { error: error.message });
+    }
     console.error("super-admin-mutate function error", {
       message: error instanceof Error ? error.message : "Unknown error",
       stack: error instanceof Error ? error.stack : undefined,

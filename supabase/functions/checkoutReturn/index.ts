@@ -2,6 +2,14 @@ import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { isKillSwitchWriteBlocked } from "../_shared/killSwitch.ts";
 import { isAllowedOrigin, parseAllowedOrigins } from "../_shared/cors.ts";
+import {
+  BARCODE_PATTERN,
+  optionalText,
+  requireEnum,
+  requireText,
+  requireTextArray,
+  ValidationError,
+} from "../_shared/validation.ts";
 
 const baseCorsHeaders = {
   "Access-Control-Allow-Headers":
@@ -10,17 +18,12 @@ const baseCorsHeaders = {
   Vary: "Origin",
 };
 
-const sanitizeText = (value: unknown, maxLen: number) => {
-  if (typeof value !== "string") return null;
-  const trimmed = value.trim();
-  if (!trimmed) return null;
-  return trimmed.slice(0, maxLen);
-};
-
 type RateLimitResult = {
   allowed: boolean;
   retry_after_seconds: number | null;
 };
+
+const CHECKOUT_ACTIONS = new Set(["checkout", "return", "auto", "admin_return"] as const);
 
 const resolveCorsHeaders = (req: Request) => {
   const origin = req.headers.get("Origin");
@@ -161,25 +164,25 @@ serve(async (req) => {
     }
 
     const { student_id, gear_barcodes, action_type, device_id } = await req.json();
-    if (!Array.isArray(gear_barcodes) || gear_barcodes.length === 0 || gear_barcodes.length > 100) {
-      return jsonResponse(400, { error: "Invalid request" });
-    }
-
-    if (!["checkout", "return", "auto", "admin_return"].includes(action_type)) {
-      return jsonResponse(400, { error: "Invalid action type" });
-    }
+    const actionType = requireEnum(action_type, CHECKOUT_ACTIONS);
+    const gearBarcodes = requireTextArray(gear_barcodes, {
+      minItems: 1,
+      maxItems: 100,
+      maxLen: 64,
+      pattern: BARCODE_PATTERN,
+    });
 
     const adminClient = createClient(supabaseUrl, serviceKey, {
       auth: { persistSession: false },
     });
 
-    const isAdminReturn = action_type === "admin_return";
+    const isAdminReturn = actionType === "admin_return";
     if (isAdminReturn && callerRole !== "tenant_admin") {
       return jsonResponse(403, { error: "Access denied" });
     }
 
     if (callerRole === "tenant_admin") {
-      const deviceId = sanitizeText(device_id, 128);
+      const deviceId = optionalText(device_id, { maxLen: 128 });
       if (!deviceId) {
         return jsonResponse(400, { error: "Device session is required." });
       }
@@ -225,14 +228,12 @@ serve(async (req) => {
     let student: { id: string; tenant_id: string } | null = null;
 
     if (!isAdminReturn) {
-      if (typeof student_id !== "string" || !student_id.trim()) {
-        return jsonResponse(400, { error: "Invalid request" });
-      }
+      const studentId = requireText(student_id, { maxLen: 32 });
 
       const { data: studentData, error: studentError } = await adminClient
         .from("students")
         .select("id, tenant_id")
-        .eq("student_id", student_id.trim())
+        .eq("student_id", studentId)
         .eq("tenant_id", callerProfile.tenant_id)
         .is("deleted_at", null)
         .single();
@@ -247,11 +248,7 @@ serve(async (req) => {
     let processed = 0;
     const skippedBarcodes: string[] = [];
 
-    for (const rawBarcode of gear_barcodes) {
-      if (typeof rawBarcode !== "string") continue;
-      const barcode = rawBarcode.trim();
-      if (!barcode || barcode.length > 64) continue;
-
+    for (const barcode of gearBarcodes) {
       const { data: gear } = await adminClient
         .from("gear")
         .select("id, tenant_id, checked_out_by, status")
@@ -343,6 +340,9 @@ serve(async (req) => {
 
     return jsonResponse(200, { success: true, processed, skipped_barcodes: skippedBarcodes });
   } catch (error) {
+    if (error instanceof ValidationError) {
+      return jsonResponse(error.status, { error: error.message });
+    }
     console.error("checkoutReturn function error", {
       message: error instanceof Error ? error.message : "Unknown error",
       stack: error instanceof Error ? error.stack : undefined,

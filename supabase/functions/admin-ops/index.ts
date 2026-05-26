@@ -11,6 +11,15 @@ import {
   isTenantAdminTokenBlockedBySessionRevocation,
   resolveTenantAdminAuthSessionBinding,
 } from "../_shared/tenantAdminSessions.ts";
+import {
+  asRecord,
+  BARCODE_PATTERN,
+  optionalInteger,
+  optionalText,
+  requireEnum,
+  requireText,
+  ValidationError,
+} from "../_shared/validation.ts";
 
 const baseCorsHeaders = {
   "Access-Control-Allow-Headers":
@@ -79,7 +88,7 @@ const ALLOWED_GEAR_STATUSES = new Set([
   "in_repair",
   "retired",
   "in_studio_only",
-]);
+] as const);
 
 type RpcError = {
   code?: string;
@@ -163,10 +172,7 @@ const resolveMaintenance = (value: unknown) => {
 };
 
 const sanitizeText = (value: unknown, maxLen: number) => {
-  if (typeof value !== "string") return null;
-  const trimmed = value.trim();
-  if (!trimmed) return null;
-  return trimmed.slice(0, maxLen);
+  return optionalText(value, { maxLen }) || null;
 };
 
 const sanitizeLoginMethod = (value: unknown): DeviceSessionContext["loginMethod"] =>
@@ -345,18 +351,15 @@ serve(async (req) => {
       });
     }
 
-    const { action, payload } = await req.json();
-    if (typeof action !== "string") {
-      return jsonResponse(400, { error: "Invalid request" });
-    }
-    const payloadRecord =
-      payload && typeof payload === "object" ? (payload as Record<string, unknown>) : {};
+    const requestBody = asRecord(await req.json());
+    const normalizedAction = requireText(requestBody.action, { maxLen: 64 });
+    const payloadRecord = asRecord(requestBody.payload ?? {});
     const isSessionAction =
-      action === "touch_session" ||
-      action === "validate_session" ||
-      action === "list_sessions" ||
-      action === "revoke_session" ||
-      action === "revoke_all_sessions";
+      normalizedAction === "touch_session" ||
+      normalizedAction === "validate_session" ||
+      normalizedAction === "list_sessions" ||
+      normalizedAction === "revoke_session" ||
+      normalizedAction === "revoke_all_sessions";
 
     const adminClient = createClient(supabaseUrl, serviceKey, {
       auth: { persistSession: false },
@@ -579,7 +582,9 @@ serve(async (req) => {
 
     if (
       profile.role === "tenant_admin" &&
-      (action === "list_sessions" || action === "revoke_session" || action === "revoke_all_sessions")
+      (normalizedAction === "list_sessions" ||
+        normalizedAction === "revoke_session" ||
+        normalizedAction === "revoke_all_sessions")
     ) {
       const activeSession = await findActiveSession();
       if (activeSession.relationMissing) {
@@ -683,7 +688,7 @@ serve(async (req) => {
       }
     }
 
-    if (action === "get_notifications") {
+    if (normalizedAction === "get_notifications") {
       const dueCutoffIso = new Date(
         Date.now() - checkoutDueHours * 60 * 60 * 1000
       ).toISOString();
@@ -724,7 +729,7 @@ serve(async (req) => {
       });
     }
 
-    if (action === "get_tenant_settings") {
+    if (normalizedAction === "get_tenant_settings") {
       if (profile.role !== "tenant_admin") {
         return jsonResponse(403, { error: "Access denied" });
       }
@@ -746,7 +751,7 @@ serve(async (req) => {
       });
     }
 
-    if (action === "update_tenant_settings") {
+    if (normalizedAction === "update_tenant_settings") {
       if (profile.role !== "tenant_admin") {
         return jsonResponse(403, { error: "Access denied" });
       }
@@ -772,15 +777,7 @@ serve(async (req) => {
       }
 
       const next = payloadRecord;
-      const checkoutDueHoursRaw = Number(next.checkout_due_hours);
-      if (!Number.isFinite(checkoutDueHoursRaw)) {
-        return jsonResponse(400, { error: "Invalid checkout due hours." });
-      }
-
-      const checkoutDueHoursNext = Math.min(
-        720,
-        Math.max(1, Math.round(checkoutDueHoursRaw))
-      );
+      const checkoutDueHoursNext = optionalInteger(next.checkout_due_hours, 1, 720, 24);
 
       const row = {
         tenant_id: tenantId,
@@ -836,7 +833,7 @@ serve(async (req) => {
       });
     }
 
-    if (action === "get_status_tracking") {
+    if (normalizedAction === "get_status_tracking") {
       if (profile.role !== "tenant_admin") {
         return jsonResponse(403, { error: "Access denied" });
       }
@@ -976,7 +973,7 @@ serve(async (req) => {
       });
     }
 
-    if (action === "touch_session") {
+    if (normalizedAction === "touch_session") {
       if (profile.role !== "tenant_admin") {
         return jsonResponse(403, { error: "Access denied" });
       }
@@ -995,7 +992,7 @@ serve(async (req) => {
       return jsonResponse(200, { data: { ok: true } });
     }
 
-    if (action === "validate_session") {
+    if (normalizedAction === "validate_session") {
       if (profile.role !== "tenant_admin") {
         return jsonResponse(403, { error: "Access denied" });
       }
@@ -1018,7 +1015,7 @@ serve(async (req) => {
       return jsonResponse(200, { data: { valid: true } });
     }
 
-    if (action === "list_sessions") {
+    if (normalizedAction === "list_sessions") {
       if (profile.role !== "tenant_admin") {
         return jsonResponse(403, { error: "Access denied" });
       }
@@ -1093,7 +1090,7 @@ serve(async (req) => {
       });
     }
 
-    if (action === "revoke_session") {
+    if (normalizedAction === "revoke_session") {
       if (profile.role !== "tenant_admin") {
         return jsonResponse(403, { error: "Access denied" });
       }
@@ -1129,7 +1126,7 @@ serve(async (req) => {
       return jsonResponse(200, { data: { revoked: true } });
     }
 
-    if (action === "revoke_all_sessions") {
+    if (normalizedAction === "revoke_all_sessions") {
       if (profile.role !== "tenant_admin") {
         return jsonResponse(403, { error: "Access denied" });
       }
@@ -1165,7 +1162,7 @@ serve(async (req) => {
       });
     }
 
-    if (action === "bulk_import_gear") {
+    if (normalizedAction === "bulk_import_gear") {
       if (profile.role !== "tenant_admin") {
         return jsonResponse(403, { error: "Access denied" });
       }
@@ -1173,9 +1170,7 @@ serve(async (req) => {
         return jsonResponse(403, { error: "Tenant disabled" });
       }
 
-      const rawRows = Array.isArray(payloadRecord.rows)
-        ? (payloadRecord.rows as Array<Record<string, unknown>>)
-        : [];
+      const rawRows = Array.isArray(payloadRecord.rows) ? payloadRecord.rows : [];
 
       if (!rawRows.length || rawRows.length > 1000) {
         return jsonResponse(400, { error: "Provide between 1 and 1000 rows." });
@@ -1193,22 +1188,24 @@ serve(async (req) => {
       const seenBarcodes = new Set<string>();
 
       for (const row of rawRows) {
-        const name = typeof row.name === "string" ? row.name.trim() : "";
-        const barcode = typeof row.barcode === "string" ? row.barcode.trim() : "";
-        const serial = typeof row.serial_number === "string" ? row.serial_number.trim() : "";
-        const statusRaw = typeof row.status === "string" ? row.status.trim() : "available";
-        const notes = typeof row.notes === "string" ? row.notes.trim() : "";
-
-        if (!name || !barcode) {
-          skippedRows.push({ barcode: barcode || "(blank)", reason: "Missing name or barcode." });
+        if (!row || typeof row !== "object" || Array.isArray(row)) {
+          skippedRows.push({ barcode: "(invalid)", reason: "Invalid row." });
           continue;
         }
-        if (name.length > 120 || barcode.length > 64 || serial.length > 64 || notes.length > 500) {
-          skippedRows.push({ barcode, reason: "Field length exceeded." });
-          continue;
-        }
-        if (!ALLOWED_GEAR_STATUSES.has(statusRaw)) {
-          skippedRows.push({ barcode, reason: "Invalid status." });
+        const rowRecord = row as Record<string, unknown>;
+        let name = "";
+        let barcode = "";
+        let serial = "";
+        let statusRaw: "available" | "checked_out" | "damaged" | "lost" | "in_repair" | "retired" | "in_studio_only";
+        let notes = "";
+        try {
+          name = requireText(rowRecord.name, { maxLen: 120 });
+          barcode = requireText(rowRecord.barcode, { maxLen: 64, pattern: BARCODE_PATTERN });
+          serial = optionalText(rowRecord.serial_number, { maxLen: 64 });
+          statusRaw = requireEnum(rowRecord.status ?? "available", ALLOWED_GEAR_STATUSES);
+          notes = optionalText(rowRecord.notes, { maxLen: 500 });
+        } catch {
+          skippedRows.push({ barcode: barcode || "(blank)", reason: "Invalid row." });
           continue;
         }
         if (seenBarcodes.has(barcode.toLowerCase())) {
@@ -1307,6 +1304,9 @@ serve(async (req) => {
 
     return jsonResponse(400, { error: "Invalid action" });
   } catch (error) {
+    if (error instanceof ValidationError) {
+      return jsonResponse(error.status, { error: error.message });
+    }
     console.error("admin-ops function error", {
       request_id: requestId,
       message: error instanceof Error ? error.message : "Unknown error",

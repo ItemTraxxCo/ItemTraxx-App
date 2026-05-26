@@ -6,6 +6,13 @@ import {
   isMissingPrivilegedStepUpTable,
 } from "../_shared/privilegedStepUp.ts";
 import { isAllowedOrigin, parseAllowedOrigins } from "../_shared/cors.ts";
+import {
+  ACCESS_CODE_PATTERN,
+  requireEnum,
+  requireText,
+  requireUuid,
+  ValidationError,
+} from "../_shared/validation.ts";
 
 const baseCorsHeaders = {
   "Access-Control-Allow-Headers":
@@ -43,6 +50,9 @@ const isMissingUpdatedAtColumn = (error: { code?: string; message?: string } | n
     message.includes("updated_at")
   );
 };
+
+const TENANT_STATUSES = new Set(["active", "suspended", "archived"] as const);
+const SUPPORT_PRIORITIES = new Set(["low", "normal", "high", "urgent"] as const);
 
 serve(async (req) => {
   const { hasOrigin, originAllowed, headers } = resolveCorsHeaders(req);
@@ -156,19 +166,6 @@ serve(async (req) => {
       });
     };
 
-    const normalizeSupportText = (value: unknown, max = 4000) =>
-      typeof value === "string" ? value.trim().slice(0, max) : "";
-
-    const isValidTenantStatus = (
-      value: unknown
-    ): value is "active" | "suspended" | "archived" =>
-      value === "active" || value === "suspended" || value === "archived";
-
-    const isValidSupportPriority = (
-      value: unknown
-    ): value is "low" | "normal" | "high" | "urgent" =>
-      value === "low" || value === "normal" || value === "high" || value === "urgent";
-
     const getTenantForDistrict = async (tenantId: string) => {
       const { data: tenant, error } = await adminClient
         .from("tenants")
@@ -215,13 +212,12 @@ serve(async (req) => {
 
     if (action === "update_tenant") {
       const next = payload as Record<string, unknown>;
-      const tenantId = typeof next.id === "string" ? next.id.trim() : "";
-      const name = typeof next.name === "string" ? next.name.trim() : "";
-      const accessCode = typeof next.access_code === "string" ? next.access_code.trim() : "";
-
-      if (!tenantId || !name || !accessCode) {
-        return jsonResponse(400, { error: "Invalid request" });
-      }
+      const tenantId = requireUuid(next.id);
+      const name = requireText(next.name, { maxLen: 160 });
+      const accessCode = requireText(next.access_code, {
+        maxLen: 64,
+        pattern: ACCESS_CODE_PATTERN,
+      });
 
       const current = await getTenantForDistrict(tenantId);
       if (!current) {
@@ -268,12 +264,8 @@ serve(async (req) => {
 
     if (action === "set_tenant_status") {
       const next = payload as Record<string, unknown>;
-      const tenantId = typeof next.id === "string" ? next.id.trim() : "";
-      const status = next.status;
-
-      if (!tenantId || !isValidTenantStatus(status)) {
-        return jsonResponse(400, { error: "Invalid request" });
-      }
+      const tenantId = requireUuid(next.id);
+      const status = requireEnum(next.status, TENANT_STATUSES);
 
       const current = await getTenantForDistrict(tenantId);
       if (!current) {
@@ -325,10 +317,7 @@ serve(async (req) => {
 
     if (action === "send_primary_admin_reset") {
       const next = payload as Record<string, unknown>;
-      const tenantId = typeof next.tenant_id === "string" ? next.tenant_id.trim() : "";
-      if (!tenantId) {
-        return jsonResponse(400, { error: "Invalid request" });
-      }
+      const tenantId = requireUuid(next.tenant_id);
 
       const tenant = await getTenantForDistrict(tenantId);
       if (!tenant) {
@@ -377,13 +366,9 @@ serve(async (req) => {
 
     if (action === "create_support_request") {
       const next = payload as Record<string, unknown>;
-      const subject = normalizeSupportText(next.subject, 160);
-      const message = normalizeSupportText(next.message, 4000);
-      const priority = next.priority;
-
-      if (!subject || !message || !isValidSupportPriority(priority)) {
-        return jsonResponse(400, { error: "Invalid request" });
-      }
+      const subject = requireText(next.subject, { maxLen: 160 });
+      const message = requireText(next.message, { maxLen: 4000 });
+      const priority = requireEnum(next.priority, SUPPORT_PRIORITIES);
 
       const supportPayload = {
         district_id: profile.district_id,
@@ -428,6 +413,9 @@ serve(async (req) => {
 
     return jsonResponse(400, { error: "Invalid action" });
   } catch (error) {
+    if (error instanceof ValidationError) {
+      return jsonResponse(error.status, { error: error.message });
+    }
     console.error("district-admin-mutate function error", {
       message: error instanceof Error ? error.message : "Unknown error",
       stack: error instanceof Error ? error.stack : undefined,

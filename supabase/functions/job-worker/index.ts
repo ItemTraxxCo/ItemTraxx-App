@@ -5,6 +5,11 @@ import { buildEmailBrandHeaderHtml, withEmailBrandLogoAttachment } from "../_sha
 import { isKillSwitchWriteBlocked } from "../_shared/killSwitch.ts";
 import { getRequestId, logError, logInfo } from "../_shared/observability.ts";
 import { isAllowedOrigin, parseAllowedOrigins } from "../_shared/cors.ts";
+import {
+  asRecord,
+  optionalInteger,
+  ValidationError,
+} from "../_shared/validation.ts";
 
 const EMAIL_LOGO_URL = Deno.env.get("ITX_EMAIL_LOGO_URL")?.trim() || null;
 const PASSWORD_RESET_URL = "https://itemtraxx.com/forgot-password";
@@ -942,11 +947,8 @@ serve(async (req) => {
       return jsonResponse(401, { error: "Unauthorized" });
     }
 
-    const body = await req.json().catch(() => ({})) as {
-      limit?: number;
-      run_reporting_refresh?: boolean;
-    };
-    const limit = Math.max(1, Math.min(50, Number(body.limit ?? 20) || 20));
+    const body = asRecord(await req.json().catch(() => ({})));
+    const limit = optionalInteger(body.limit, 1, 50, 20);
     const workerId = crypto.randomUUID();
 
     const adminClient = createClient(supabaseUrl, serviceKey, {
@@ -1077,6 +1079,9 @@ serve(async (req) => {
       },
     });
   } catch (error) {
+    if (error instanceof ValidationError) {
+      return jsonResponse(error.status, { error: error.message });
+    }
     logError("job-worker error", requestId, error);
     return jsonResponse(500, { error: "Request failed." });
   }

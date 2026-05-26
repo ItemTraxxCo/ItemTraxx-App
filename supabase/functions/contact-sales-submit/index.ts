@@ -4,6 +4,15 @@ import { isKillSwitchWriteBlocked } from "../_shared/killSwitch.ts";
 import { getRequestId, logError, logInfo } from "../_shared/observability.ts";
 import { isAllowedOrigin, parseAllowedOrigins } from "../_shared/cors.ts";
 import { resolveClientIp } from "../_shared/preloginGuards.ts";
+import {
+  optionalEnum,
+  optionalPositiveInteger,
+  optionalText,
+  requireEmail,
+  requireEnum,
+  requireText,
+  ValidationError,
+} from "../_shared/validation.ts";
 
 const baseCorsHeaders = {
   "Access-Control-Allow-Headers":
@@ -61,6 +70,8 @@ const SALES_PLAN_LABELS = {
   other: "Other",
 } as const;
 type SalesPlanKey = keyof typeof SALES_PLAN_LABELS;
+const SALES_PLAN_KEYS = new Set(Object.keys(SALES_PLAN_LABELS) as SalesPlanKey[]);
+const CONTACT_INTENTS = new Set(["sales", "demo"] as const);
 
 const toHex = (bytes: Uint8Array) =>
   Array.from(bytes)
@@ -169,27 +180,21 @@ serve(async (req) => {
     }
 
     const body = (await req.json()) as ContactPayload;
-    const plan = body.plan as SalesPlanKey | undefined;
-    const planLabel = plan ? SALES_PLAN_LABELS[plan] : null;
-    const name = normalizeText(body.name, 120);
-    const organization = normalizeText(body.organization, 160);
-    const replyEmail = normalizeText(body.reply_email, 254).toLowerCase();
-    const details = normalizeText(body.details, 2500);
-    const schoolsCountRaw = Number(body.schools_count);
-    const schoolsCount = Number.isFinite(schoolsCountRaw) && schoolsCountRaw > 0
-      ? Math.round(schoolsCountRaw)
-      : null;
     const website = normalizeText(body.website, 120);
-    const intent = body.intent === "demo" ? "demo" : "sales";
-    const turnstileToken = normalizeText(body.turnstile_token, 4000);
-
     if (website) {
       return jsonResponse(200, { data: { accepted: true } });
     }
 
-    if (!plan || !(plan in SALES_PLAN_LABELS)) {
-      return jsonResponse(400, { error: "Invalid plan." });
-    }
+    const plan = requireEnum(body.plan, SALES_PLAN_KEYS);
+    const planLabel = plan ? SALES_PLAN_LABELS[plan] : null;
+    const name = requireText(body.name, { maxLen: 120 });
+    const organization = optionalText(body.organization, { maxLen: 160 });
+    const replyEmail = requireEmail(body.reply_email);
+    const details = optionalText(body.details, { maxLen: 2500 });
+    const schoolsCount = optionalPositiveInteger(body.schools_count, 100_000);
+    const intent = optionalEnum(body.intent, CONTACT_INTENTS, "sales");
+    const turnstileToken = requireText(body.turnstile_token, { maxLen: 4000 });
+
     if (!name || !replyEmail || !isEmail(replyEmail)) {
       return jsonResponse(400, { error: "Name and valid email are required." });
     }
@@ -211,10 +216,6 @@ serve(async (req) => {
         },
       );
     }
-    if (!turnstileToken) {
-      return jsonResponse(400, { error: "Security check required." });
-    }
-
     const adminClient = createClient(supabaseUrl, serviceKey, {
       auth: { persistSession: false },
     });
@@ -301,6 +302,9 @@ serve(async (req) => {
     logInfo("contact-sales-submit accepted", requestId, { lead_id: lead.id, plan, intent });
     return jsonResponse(200, { data: { lead_id: lead.id } });
   } catch (error) {
+    if (error instanceof ValidationError) {
+      return jsonResponse(error.status, { error: error.message });
+    }
     logError("contact-sales-submit error", requestId, error);
     return jsonResponse(500, { error: "Request failed." });
   }

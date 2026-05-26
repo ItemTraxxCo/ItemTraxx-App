@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { isKillSwitchWriteBlocked } from "../_shared/killSwitch.ts";
 import {
   hasPrivilegedStepUp,
@@ -27,7 +28,36 @@ type RateLimitResult = {
   retry_after_seconds: number | null;
 };
 
-type SupabaseAdminClient = ReturnType<typeof createClient<any, "public", any>>;
+type StudentRow = {
+  id: string;
+  tenant_id: string;
+  username: string;
+  student_id: string;
+  created_at: string;
+};
+
+type SuperStudentDatabase = {
+  public: {
+    Tables: {
+      students: {
+        Row: StudentRow;
+        Insert: {
+          tenant_id: string;
+          username: string;
+          student_id: string;
+        };
+        Update: Partial<Pick<StudentRow, "username" | "student_id">>;
+        Relationships: [];
+      };
+    };
+    Views: Record<string, never>;
+    Functions: Record<string, never>;
+    Enums: Record<string, never>;
+    CompositeTypes: Record<string, never>;
+  };
+};
+
+type SupabaseAdminClient = SupabaseClient<SuperStudentDatabase>;
 
 const CODENAME_PREFIXES = [
   "Nova",
@@ -215,9 +245,13 @@ serve(async (req) => {
       return jsonResponse(403, { error: "Access denied" });
     }
 
-    const adminClient = createClient(supabaseUrl, serviceKey, {
-      auth: { persistSession: false },
-    });
+    const adminClient: SupabaseAdminClient = createClient<SuperStudentDatabase>(
+      supabaseUrl,
+      serviceKey,
+      {
+        auth: { persistSession: false },
+      }
+    );
 
     try {
       const hasStepUp = await hasPrivilegedStepUp(adminClient, {

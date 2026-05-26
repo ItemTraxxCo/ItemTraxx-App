@@ -15,7 +15,6 @@ import { registerPrivilegedStepUp } from "../_shared/privilegedStepUp.ts";
 import { isAllowedOrigin, parseAllowedOrigins } from "../_shared/cors.ts";
 import { requireTrustedEdgeIngress } from "../_shared/trustedIngress.ts";
 import {
-  optionalText,
   requireEmail,
   requireText,
   ValidationError,

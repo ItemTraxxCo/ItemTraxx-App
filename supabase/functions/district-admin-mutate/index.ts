@@ -8,7 +8,6 @@ import {
 import { isAllowedOrigin, parseAllowedOrigins } from "../_shared/cors.ts";
 import {
   ACCESS_CODE_PATTERN,
-  optionalText,
   requireEnum,
   requireText,
   requireUuid,

@@ -102,8 +102,6 @@ const resolveCorsHeaders = (req: Request) => {
   return { hasOrigin, originAllowed, headers };
 };
 
-const normalizeText = (value: unknown, max = 500) => optionalText(value, { maxLen: max });
-
 const parseAuthToken = (req: Request) => {
   const raw = req.headers.get("authorization") ?? "";
   return raw.replace(/^Bearer\s+/i, "").trim();

@@ -5,6 +5,7 @@ import {
   requireText,
   requireTextArray,
   requireUuid,
+  SLUG_PATTERN,
   STUDENT_ID_PATTERN,
   ValidationError,
 } from "./validation.ts";
@@ -40,6 +41,11 @@ Deno.test("validation rejects invalid enums", () => {
   const allowed = new Set(["healthy", "degraded", "down"] as const);
   assert(requireEnum("healthy", allowed) === "healthy", "expected allowed enum");
   assertValidationError(() => requireEnum("unknown", allowed));
+});
+
+Deno.test("validation enforces slug pattern", () => {
+  assert(requireText("district-1", { maxLen: 63, pattern: SLUG_PATTERN }) === "district-1", "expected valid slug");
+  assertValidationError(() => requireText("../admin", { maxLen: 63, pattern: SLUG_PATTERN }));
 });
 
 Deno.test("validation rejects too many items and malformed barcodes", () => {

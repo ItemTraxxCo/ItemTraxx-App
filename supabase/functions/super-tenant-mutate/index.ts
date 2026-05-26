@@ -6,6 +6,18 @@ import {
   isMissingPrivilegedStepUpTable,
 } from "../_shared/privilegedStepUp.ts";
 import { isAllowedOrigin, parseAllowedOrigins } from "../_shared/cors.ts";
+import {
+  ACCESS_CODE_PATTERN,
+  asRecord,
+  optionalEmail,
+  optionalText,
+  requireEmail,
+  requireEnum,
+  requireText,
+  requireUuid,
+  SLUG_PATTERN,
+  ValidationError,
+} from "../_shared/validation.ts";
 
 const baseCorsHeaders = {
   "Access-Control-Allow-Headers":
@@ -83,6 +95,7 @@ type PgError = {
   code?: string;
   message?: string;
 };
+type SupabaseAdminClient = ReturnType<typeof createClient<any>>;
 
 const isMissingStatusColumn = (error: PgError | null | undefined) =>
   !!error &&
@@ -170,10 +183,6 @@ const normalizeDistrictSlug = (value: string | null | undefined) =>
     .replace(/^-|-$/g, "");
 
 const normalizeDistrictName = (value: string | null | undefined) => (value ?? "").trim();
-const normalizeOptionalText = (value: string | null | undefined) => {
-  const trimmed = (value ?? "").trim();
-  return trimmed.length ? trimmed : null;
-};
 const isValidDistrictPlan = (
   value: unknown
 ):
@@ -228,29 +237,17 @@ const resolveResetRedirectTo = (req: Request) => {
 
 const isValidStatus = (value: unknown): value is "active" | "suspended" | "archived" =>
   value === "active" || value === "suspended" || value === "archived";
-
-const isValidTenantAccountCategory = (
-  value: unknown
-): value is "organization" | "district" | "individual" =>
-  value === "organization" || value === "district" || value === "individual";
-
-const isValidTenantPlanCode = (
-  value: unknown
-): value is
-  | "core"
-  | "growth"
-  | "starter"
-  | "scale"
-  | "enterprise"
-  | "individual_yearly"
-  | "individual_monthly" =>
-  value === "core" ||
-  value === "growth" ||
-  value === "starter" ||
-  value === "scale" ||
-  value === "enterprise" ||
-  value === "individual_yearly" ||
-  value === "individual_monthly";
+const TENANT_STATUSES = new Set(["active", "suspended", "archived"] as const);
+const TENANT_ACCOUNT_CATEGORIES = new Set(["organization", "district", "individual"] as const);
+const TENANT_PLAN_CODES = new Set([
+  "core",
+  "growth",
+  "starter",
+  "scale",
+  "enterprise",
+  "individual_yearly",
+  "individual_monthly",
+] as const);
 
 const verifySuperPassword = async (
   supabaseUrl: string,
@@ -266,7 +263,7 @@ const verifySuperPassword = async (
 };
 
 const ensureDistrict = async (
-  adminClient: ReturnType<typeof createClient>,
+  adminClient: SupabaseAdminClient,
   districtSlug: string,
   districtName: string
 ) => {
@@ -343,7 +340,7 @@ type TenantPolicyUpsertInput = {
 };
 
 const upsertTenantPolicy = async (
-  adminClient: ReturnType<typeof createClient>,
+  adminClient: SupabaseAdminClient,
   policy: TenantPolicyUpsertInput
 ) => {
   const buildPayload = (options: {
@@ -398,7 +395,7 @@ const upsertTenantPolicy = async (
 };
 
 const enrichDistricts = async (
-  adminClient: ReturnType<typeof createClient>,
+  adminClient: SupabaseAdminClient,
   rows: DistrictRow[]
 ) => {
   if (!rows.length) return [];
@@ -535,10 +532,9 @@ serve(async (req) => {
       }
     }
 
-    const { action, payload } = await req.json();
-    if (typeof action !== "string" || typeof payload !== "object" || !payload) {
-      return jsonResponse(400, { error: "Invalid request" });
-    }
+    const requestBody = asRecord(await req.json());
+    const action = requireText(requestBody.action, { maxLen: 64 });
+    const payload = asRecord(requestBody.payload);
 
     const writeAudit = async (
       actionType: string,
@@ -584,7 +580,10 @@ serve(async (req) => {
           : Promise.resolve({ data: [], error: null }),
       ]);
 
-      let policyRowsResult = rawPolicyRowsResult;
+      let policyRowsResult: {
+        data: Array<Record<string, unknown>> | null;
+        error: PgError | null;
+      } = rawPolicyRowsResult;
       if (isMissingFeatureFlagsColumn(rawPolicyRowsResult.error as PgError)) {
         const fallbackPolicyRowsResult = await adminClient
           .from("tenant_policies")
@@ -643,14 +642,8 @@ serve(async (req) => {
     };
 
     if (action === "list_tenants") {
-      const search =
-        typeof (payload as Record<string, unknown>).search === "string"
-          ? ((payload as Record<string, unknown>).search as string).trim()
-          : "";
-      const status =
-        typeof (payload as Record<string, unknown>).status === "string"
-          ? ((payload as Record<string, unknown>).status as string).trim()
-          : "all";
+      const search = optionalText(payload.search, { maxLen: 120 });
+      const status = optionalText(payload.status, { maxLen: 40 }) || "all";
 
       let query = adminClient
         .from("tenants")
@@ -660,6 +653,8 @@ serve(async (req) => {
 
       if (status !== "all" && isValidStatus(status)) {
         query = query.eq("status", status);
+      } else if (status !== "all") {
+        return jsonResponse(400, { error: "Invalid request" });
       }
 
       const { data, error } = await query;
@@ -683,9 +678,9 @@ serve(async (req) => {
           return jsonResponse(400, { error: "Unable to load tenants." });
         }
 
-        const normalized = ((fallbackData ?? []) as Array<TenantRow>).map((row) => ({
+        const normalized: TenantRow[] = ((fallbackData ?? []) as Array<TenantRow>).map((row) => ({
           ...row,
-          status: "active",
+          status: "active" as const,
           district_id: null,
           primary_admin_profile_id: null,
         }));
@@ -739,10 +734,7 @@ serve(async (req) => {
     }
 
     if (action === "list_districts") {
-      const search =
-        typeof (payload as Record<string, unknown>).search === "string"
-          ? ((payload as Record<string, unknown>).search as string).trim().toLowerCase()
-          : "";
+      const search = optionalText(payload.search, { maxLen: 120, transform: "lowercase" });
 
       const { data, error } = await adminClient
         .from("districts")
@@ -777,29 +769,19 @@ serve(async (req) => {
     }
 
     if (action === "create_district") {
-      const next = payload as Record<string, unknown>;
-      const name = typeof next.name === "string" ? normalizeDistrictName(next.name) : "";
-      const slug = typeof next.slug === "string" ? normalizeDistrictSlug(next.slug) : "";
-      const supportEmail =
-        typeof next.support_email === "string" ? next.support_email.trim().toLowerCase() : "";
-      const contactName =
-        typeof next.contact_name === "string" ? normalizeDistrictName(next.contact_name) : "";
+      const next = payload;
+      const name = requireText(next.name, { maxLen: 120 });
+      const slug = requireText(normalizeDistrictSlug(optionalText(next.slug, { maxLen: 80 })), {
+        maxLen: 63,
+        pattern: SLUG_PATTERN,
+      });
+      const supportEmail = optionalEmail(next.support_email);
+      const contactName = optionalText(next.contact_name, { maxLen: 120 });
       const subscriptionPlan = next.subscription_plan;
       const billingStatus = next.billing_status;
-      const renewalDate =
-        typeof next.renewal_date === "string" ? normalizeOptionalText(next.renewal_date) : null;
-      const billingEmail =
-        typeof next.billing_email === "string"
-          ? normalizeOptionalText(next.billing_email)?.toLowerCase() ?? null
-          : null;
-      const invoiceReference =
-        typeof next.invoice_reference === "string"
-          ? normalizeOptionalText(next.invoice_reference)
-          : null;
-
-      if (!name || !slug) {
-        return jsonResponse(400, { error: "District name and slug are required." });
-      }
+      const renewalDate = optionalText(next.renewal_date, { maxLen: 40 }) || null;
+      const billingEmail = optionalEmail(next.billing_email) || null;
+      const invoiceReference = optionalText(next.invoice_reference, { maxLen: 120 }) || null;
       if (subscriptionPlan != null && subscriptionPlan !== "" && !isValidDistrictPlan(subscriptionPlan)) {
         return jsonResponse(400, { error: "Invalid subscription plan." });
       }
@@ -843,31 +825,21 @@ serve(async (req) => {
     }
 
     if (action === "update_district") {
-      const next = payload as Record<string, unknown>;
-      const id = typeof next.id === "string" ? next.id.trim() : "";
-      const name = typeof next.name === "string" ? normalizeDistrictName(next.name) : "";
-      const slug = typeof next.slug === "string" ? normalizeDistrictSlug(next.slug) : "";
-      const supportEmail =
-        typeof next.support_email === "string" ? next.support_email.trim().toLowerCase() : "";
-      const contactName =
-        typeof next.contact_name === "string" ? normalizeDistrictName(next.contact_name) : "";
+      const next = payload;
+      const id = requireUuid(next.id);
+      const name = requireText(next.name, { maxLen: 120 });
+      const slug = requireText(normalizeDistrictSlug(optionalText(next.slug, { maxLen: 80 })), {
+        maxLen: 63,
+        pattern: SLUG_PATTERN,
+      });
+      const supportEmail = optionalEmail(next.support_email);
+      const contactName = optionalText(next.contact_name, { maxLen: 120 });
       const isActive = next.is_active !== false;
       const subscriptionPlan = next.subscription_plan;
       const billingStatus = next.billing_status;
-      const renewalDate =
-        typeof next.renewal_date === "string" ? normalizeOptionalText(next.renewal_date) : null;
-      const billingEmail =
-        typeof next.billing_email === "string"
-          ? normalizeOptionalText(next.billing_email)?.toLowerCase() ?? null
-          : null;
-      const invoiceReference =
-        typeof next.invoice_reference === "string"
-          ? normalizeOptionalText(next.invoice_reference)
-          : null;
-
-      if (!id || !name || !slug) {
-        return jsonResponse(400, { error: "District id, name, and slug are required." });
-      }
+      const renewalDate = optionalText(next.renewal_date, { maxLen: 40 }) || null;
+      const billingEmail = optionalEmail(next.billing_email) || null;
+      const invoiceReference = optionalText(next.invoice_reference, { maxLen: 120 }) || null;
       if (subscriptionPlan != null && subscriptionPlan !== "" && !isValidDistrictPlan(subscriptionPlan)) {
         return jsonResponse(400, { error: "Invalid subscription plan." });
       }
@@ -917,11 +889,8 @@ serve(async (req) => {
     }
 
     if (action === "get_district_details") {
-      const next = payload as Record<string, unknown>;
-      const id = typeof next.id === "string" ? next.id.trim() : "";
-      if (!id) {
-        return jsonResponse(400, { error: "District id is required." });
-      }
+      const next = payload;
+      const id = requireUuid(next.id);
 
       const { data: district, error: districtError } = await adminClient
         .from("districts")
@@ -979,7 +948,7 @@ serve(async (req) => {
               "tenant_id, gear_total, students_total, active_checkouts, overdue_items, transactions_7d"
             )
             .in("tenant_id", tenantIds)
-        : { data: [] as Array<Record<string, number | string>>, error: null };
+        : { data: [] as Array<Record<string, number | string>> };
 
       const tenantMetrics = ((metricRows ?? []) as Array<Record<string, number | string>>).map(
         (row) => ({
@@ -1029,7 +998,7 @@ serve(async (req) => {
             .gte("action_time", since24hIso)
             .order("action_time", { ascending: false })
             .limit(400)
-        : { data: [] as Array<Record<string, string | null>>, error: null };
+        : { data: [] as Array<Record<string, string | null>> };
 
       const traffic = {
         checkout_24h: (recentLogs ?? []).filter((row) => row.action_type === "checkout").length,
@@ -1154,33 +1123,28 @@ serve(async (req) => {
     }
 
     if (action === "create_tenant") {
-      const next = payload as Record<string, unknown>;
-      const name = typeof next.name === "string" ? next.name.trim() : "";
-      const accessCode =
-        typeof next.access_code === "string" ? next.access_code.trim() : "";
-      const authEmail =
-        typeof next.auth_email === "string" ? next.auth_email.trim().toLowerCase() : "";
+      const next = payload;
+      const name = requireText(next.name, { maxLen: 120 });
+      const accessCode = requireText(next.access_code, {
+        maxLen: 64,
+        pattern: ACCESS_CODE_PATTERN,
+      });
+      const authEmail = requireEmail(next.auth_email);
       const password = typeof next.password === "string" ? next.password : "";
-      const status = next.status;
-      const accountCategory = isValidTenantAccountCategory(next.account_category)
-        ? next.account_category
-        : "organization";
-      const planCode = isValidTenantPlanCode(next.plan_code) ? next.plan_code : null;
-      const districtSlug =
-        typeof next.district_slug === "string" ? normalizeDistrictSlug(next.district_slug) : "";
-      const districtName =
-        typeof next.district_name === "string" ? normalizeDistrictName(next.district_name) : "";
+      const status = requireEnum(next.status, TENANT_STATUSES);
+      const accountCategory = next.account_category === undefined || next.account_category === null || next.account_category === ""
+        ? "organization"
+        : requireEnum(next.account_category, TENANT_ACCOUNT_CATEGORIES);
+      const planCode = next.plan_code === undefined || next.plan_code === null || next.plan_code === ""
+        ? null
+        : requireEnum(next.plan_code, TENANT_PLAN_CODES);
+      const districtSlugRaw = optionalText(next.district_slug, { maxLen: 80 });
+      const districtSlug = districtSlugRaw
+        ? requireText(normalizeDistrictSlug(districtSlugRaw), { maxLen: 63, pattern: SLUG_PATTERN })
+        : "";
+      const districtName = optionalText(next.district_name, { maxLen: 120 });
 
-      if (
-        !name ||
-        name.length > 120 ||
-        !accessCode ||
-        accessCode.length > 64 ||
-        !authEmail ||
-        authEmail.length > 320 ||
-        password.length < 8 ||
-        !isValidStatus(status)
-      ) {
+      if (password.length < 8 || password.length > 1024) {
         return jsonResponse(400, { error: "Invalid request" });
       }
       if ((districtSlug && !districtName) || (!districtSlug && districtName)) {
@@ -1400,23 +1364,24 @@ serve(async (req) => {
     }
 
     if (action === "update_tenant") {
-      const next = payload as Record<string, unknown>;
-      const id = typeof next.id === "string" ? next.id.trim() : "";
-      const name = typeof next.name === "string" ? next.name.trim() : "";
-      const accessCode =
-        typeof next.access_code === "string" ? next.access_code.trim() : "";
-      const accountCategory = isValidTenantAccountCategory(next.account_category)
-        ? next.account_category
-        : "organization";
-      const planCode = isValidTenantPlanCode(next.plan_code) ? next.plan_code : null;
-      const districtSlug =
-        typeof next.district_slug === "string" ? normalizeDistrictSlug(next.district_slug) : "";
-      const districtName =
-        typeof next.district_name === "string" ? normalizeDistrictName(next.district_name) : "";
-
-      if (!id || !name || name.length > 120 || !accessCode || accessCode.length > 64) {
-        return jsonResponse(400, { error: "Invalid request" });
-      }
+      const next = payload;
+      const id = requireUuid(next.id);
+      const name = requireText(next.name, { maxLen: 120 });
+      const accessCode = requireText(next.access_code, {
+        maxLen: 64,
+        pattern: ACCESS_CODE_PATTERN,
+      });
+      const accountCategory = next.account_category === undefined || next.account_category === null || next.account_category === ""
+        ? "organization"
+        : requireEnum(next.account_category, TENANT_ACCOUNT_CATEGORIES);
+      const planCode = next.plan_code === undefined || next.plan_code === null || next.plan_code === ""
+        ? null
+        : requireEnum(next.plan_code, TENANT_PLAN_CODES);
+      const districtSlugRaw = optionalText(next.district_slug, { maxLen: 80 });
+      const districtSlug = districtSlugRaw
+        ? requireText(normalizeDistrictSlug(districtSlugRaw), { maxLen: 63, pattern: SLUG_PATTERN })
+        : "";
+      const districtName = optionalText(next.district_name, { maxLen: 120 });
       if ((districtSlug && !districtName) || (!districtSlug && districtName)) {
         return jsonResponse(400, {
           error: "District name and slug must both be provided when assigning a district.",
@@ -1496,21 +1461,12 @@ serve(async (req) => {
     }
 
     if (action === "set_tenant_status") {
-      const next = payload as Record<string, unknown>;
-      const id = typeof next.id === "string" ? next.id.trim() : "";
-      const status = next.status;
-      const superPassword =
-        typeof next.super_password === "string" ? next.super_password : "";
-      const confirmPhrase =
-        typeof next.confirm_phrase === "string" ? next.confirm_phrase.trim() : "";
+      const next = payload;
+      const id = requireUuid(next.id);
+      const status = requireEnum(next.status, TENANT_STATUSES);
+      const superPassword = requireText(next.super_password, { maxLen: 1024 });
+      const confirmPhrase = requireText(next.confirm_phrase, { maxLen: 32 });
 
-      if (!id || !isValidStatus(status)) {
-        return jsonResponse(400, { error: "Invalid request" });
-      }
-
-      if (!superPassword) {
-        return jsonResponse(400, { error: "Super password is required." });
-      }
       if (confirmPhrase !== "CONFIRM") {
         return jsonResponse(400, { error: "Confirmation phrase mismatch." });
       }
@@ -1557,11 +1513,8 @@ serve(async (req) => {
     }
 
     if (action === "send_primary_admin_reset") {
-      const next = payload as Record<string, unknown>;
-      const tenantId = typeof next.tenant_id === "string" ? next.tenant_id.trim() : "";
-      if (!tenantId) {
-        return jsonResponse(400, { error: "Invalid request" });
-      }
+      const next = payload;
+      const tenantId = requireUuid(next.tenant_id);
 
       const { data: tenant, error: tenantError } = await adminClient
         .from("tenants")
@@ -1614,13 +1567,9 @@ serve(async (req) => {
     }
 
     if (action === "set_primary_admin") {
-      const next = payload as Record<string, unknown>;
-      const tenantId = typeof next.tenant_id === "string" ? next.tenant_id.trim() : "";
-      const profileId = typeof next.profile_id === "string" ? next.profile_id.trim() : "";
-
-      if (!tenantId || !profileId) {
-        return jsonResponse(400, { error: "Invalid request" });
-      }
+      const next = payload;
+      const tenantId = requireUuid(next.tenant_id);
+      const profileId = requireUuid(next.profile_id);
 
       const { data: targetProfile, error: profileError } = await adminClient
         .from("profiles")
@@ -1664,6 +1613,9 @@ serve(async (req) => {
 
     return jsonResponse(400, { error: "Invalid action" });
   } catch (error) {
+    if (error instanceof ValidationError) {
+      return jsonResponse(error.status, { error: error.message });
+    }
     console.error("super-tenant-mutate function error", {
       message: error instanceof Error ? error.message : "Unknown error",
       stack: error instanceof Error ? error.stack : undefined,

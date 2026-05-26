@@ -7,6 +7,7 @@ import { getRequestId, logError, logInfo } from "../_shared/observability.ts";
 import { isAllowedOrigin, parseAllowedOrigins } from "../_shared/cors.ts";
 import { hashString, resolveClientIp } from "../_shared/preloginGuards.ts";
 import { requireTrustedEdgeIngress } from "../_shared/trustedIngress.ts";
+import { asRecord, optionalText, ValidationError } from "../_shared/validation.ts";
 
 const EMAIL_LOGO_URL = Deno.env.get("ITX_EMAIL_LOGO_URL")?.trim() || null;
 const PASSWORD_RESET_URL = "https://itemtraxx.com/forgot-password";
@@ -120,10 +121,11 @@ const LOGIN_CONTEXTS: Record<
 };
 
 const resolveLoginContext = (value: unknown) => {
-  if (typeof value === "string" && value in LOGIN_CONTEXTS) {
+  const normalized = optionalText(value, { maxLen: 40 });
+  if (normalized && normalized in LOGIN_CONTEXTS) {
     return {
-      loginLocation: value as LoginLocation,
-      ...LOGIN_CONTEXTS[value as LoginLocation],
+      loginLocation: normalized as LoginLocation,
+      ...LOGIN_CONTEXTS[normalized as LoginLocation],
     };
   }
   return {
@@ -261,12 +263,8 @@ serve(async (req) => {
     if (!accessToken) {
       return jsonResponse(401, { error: "Unauthorized" });
     }
-    const payload = await parseJsonBody(req);
-    const loginContext = resolveLoginContext(
-      payload && typeof payload === "object"
-        ? (payload as Record<string, unknown>).login_location
-        : null,
-    );
+    const payload = asRecord(await parseJsonBody(req));
+    const loginContext = resolveLoginContext(payload.login_location);
 
     const supabaseUrl = Deno.env.get("ITX_SUPABASE_URL") ?? Deno.env.get("SUPABASE_URL");
     const serviceKey = Deno.env.get("ITX_SECRET_KEY") ?? Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
@@ -490,6 +488,9 @@ serve(async (req) => {
       },
     });
   } catch (error) {
+    if (error instanceof ValidationError) {
+      return jsonResponse(error.status, { error: error.message });
+    }
     logError("login-notify error", requestId, error);
     return jsonResponse(500, { error: "Request failed" });
   }

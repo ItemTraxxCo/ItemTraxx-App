@@ -22,6 +22,8 @@ export const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 export const STUDENT_ID_PATTERN = /^[0-9]{4}[A-Z]{2}$/;
 export const USERNAME_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]{2,38}[A-Za-z0-9]$/;
 export const BARCODE_PATTERN = /^[A-Za-z0-9._:@/#-]{1,64}$/;
+export const SLUG_PATTERN = /^[a-z0-9][a-z0-9-]{0,62}$/;
+export const ACCESS_CODE_PATTERN = /^[A-Za-z0-9._-]{1,64}$/;
 
 export const asRecord = (value: unknown, message = "Invalid request") => {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
@@ -73,8 +75,9 @@ export const requireUuid = (value: unknown) =>
   requireText(value, { maxLen: 36, pattern: UUID_PATTERN });
 
 export const optionalUuid = (value: unknown) => {
-  if (value === undefined || value === null || value === "") return "";
-  return requireUuid(value);
+  const text = optionalText(value, { maxLen: 36 });
+  if (!text) return "";
+  return requireUuid(text);
 };
 
 export const requireEnum = <T extends string>(value: unknown, allowed: ReadonlySet<T>) => {
@@ -105,8 +108,9 @@ export const requireEmail = (value: unknown) =>
   });
 
 export const optionalEmail = (value: unknown) => {
-  if (value === undefined || value === null || value === "") return "";
-  return requireEmail(value);
+  const text = optionalText(value, { maxLen: 254 });
+  if (!text) return "";
+  return requireEmail(text);
 };
 
 export const optionalPositiveInteger = (value: unknown, max: number) => {
@@ -120,6 +124,39 @@ export const optionalPositiveInteger = (value: unknown, max: number) => {
     throw new ValidationError("Invalid request");
   }
   return rounded;
+};
+
+export const optionalInteger = (value: unknown, min: number, max: number, fallback: number) => {
+  if (value === undefined || value === null || value === "") return fallback;
+  const parsed = typeof value === "number" ? value : Number(value);
+  if (!Number.isFinite(parsed)) {
+    throw new ValidationError("Invalid request");
+  }
+  const rounded = Math.round(parsed);
+  if (rounded < min || rounded > max) {
+    throw new ValidationError("Invalid request");
+  }
+  return rounded;
+};
+
+export const optionalIsoDate = (value: unknown) => {
+  if (value === undefined || value === null || value === "") return "";
+  const text = requireText(value, { maxLen: 40 });
+  const parsed = Date.parse(text);
+  if (Number.isNaN(parsed)) {
+    throw new ValidationError("Invalid request");
+  }
+  return text;
+};
+
+export const optionalJsonObject = (value: unknown, maxBytes: number) => {
+  if (value === undefined || value === null) return {};
+  const record = asRecord(value);
+  const byteLength = new TextEncoder().encode(JSON.stringify(record)).length;
+  if (byteLength > maxBytes) {
+    throw new ValidationError("Invalid request");
+  }
+  return record;
 };
 
 export const requireTextArray = (

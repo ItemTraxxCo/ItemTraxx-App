@@ -6,6 +6,15 @@ import {
   isMissingPrivilegedStepUpTable,
 } from "../_shared/privilegedStepUp.ts";
 import { isAllowedOrigin, parseAllowedOrigins } from "../_shared/cors.ts";
+import {
+  BARCODE_PATTERN,
+  optionalText,
+  requireEnum,
+  requireText,
+  requireUuid,
+  UUID_PATTERN,
+  ValidationError,
+} from "../_shared/validation.ts";
 
 const baseCorsHeaders = {
   "Access-Control-Allow-Headers":
@@ -27,7 +36,7 @@ const ALLOWED_GEAR_STATUSES = new Set([
   "in_repair",
   "retired",
   "in_studio_only",
-]);
+] as const);
 
 const resolveCorsHeaders = (req: Request) => {
   const origin = req.headers.get("Origin");
@@ -167,16 +176,14 @@ serve(async (req) => {
     if (typeof action !== "string" || typeof payload !== "object" || !payload) {
       return jsonResponse(400, { error: "Invalid request" });
     }
+    const payloadRecord = payload as Record<string, unknown>;
 
     if (action === "list") {
-      const tenantId =
-        typeof (payload as Record<string, unknown>).tenant_id === "string"
-          ? ((payload as Record<string, unknown>).tenant_id as string).trim()
-          : "all";
-      const search =
-        typeof (payload as Record<string, unknown>).search === "string"
-          ? ((payload as Record<string, unknown>).search as string).trim()
-          : "";
+      const tenantId = optionalText(payloadRecord.tenant_id, { maxLen: 36 }) || "all";
+      if (tenantId !== "all" && !UUID_PATTERN.test(tenantId)) {
+        return jsonResponse(400, { error: "Invalid request" });
+      }
+      const search = optionalText(payloadRecord.search, { maxLen: 120 });
 
       let query = adminClient
         .from("gear")
@@ -217,17 +224,12 @@ serve(async (req) => {
     }
 
     if (action === "create") {
-      const input = payload as Record<string, unknown>;
-      const tenantId = typeof input.tenant_id === "string" ? input.tenant_id.trim() : "";
-      const name = typeof input.name === "string" ? input.name.trim() : "";
-      const barcode = typeof input.barcode === "string" ? input.barcode.trim() : "";
-      const serial = typeof input.serial_number === "string" ? input.serial_number.trim() : "";
-      const status = typeof input.status === "string" ? input.status.trim() : "";
-      const notes = typeof input.notes === "string" ? input.notes.trim() : "";
-
-      if (!tenantId || !name || !barcode || !ALLOWED_GEAR_STATUSES.has(status)) {
-        return jsonResponse(400, { error: "Invalid request" });
-      }
+      const tenantId = requireUuid(payloadRecord.tenant_id);
+      const name = requireText(payloadRecord.name, { maxLen: 120 });
+      const barcode = requireText(payloadRecord.barcode, { maxLen: 64, pattern: BARCODE_PATTERN });
+      const serial = optionalText(payloadRecord.serial_number, { maxLen: 64 });
+      const status = requireEnum(payloadRecord.status, ALLOWED_GEAR_STATUSES);
+      const notes = optionalText(payloadRecord.notes, { maxLen: 500 });
 
       const { data, error } = await adminClient
         .from("gear")
@@ -249,22 +251,19 @@ serve(async (req) => {
     }
 
     if (action === "update") {
-      const input = payload as Record<string, unknown>;
-      const id = typeof input.id === "string" ? input.id.trim() : "";
-      const name = typeof input.name === "string" ? input.name.trim() : "";
-      const barcode = typeof input.barcode === "string" ? input.barcode.trim() : "";
-      const status = typeof input.status === "string" ? input.status.trim() : "";
-      const notes = typeof input.notes === "string" ? input.notes.trim() : "";
-
-      if (!id || !name || !barcode || !ALLOWED_GEAR_STATUSES.has(status)) {
-        return jsonResponse(400, { error: "Invalid request" });
-      }
+      const id = requireUuid(payloadRecord.id);
+      const name = requireText(payloadRecord.name, { maxLen: 120 });
+      const barcode = requireText(payloadRecord.barcode, { maxLen: 64, pattern: BARCODE_PATTERN });
+      const status = requireEnum(payloadRecord.status, ALLOWED_GEAR_STATUSES);
+      const notes = optionalText(payloadRecord.notes, { maxLen: 500 });
 
       const needsStepUp = ["lost", "retired"].includes(status);
       if (needsStepUp) {
         const password =
-          typeof input.super_password === "string" ? input.super_password : "";
-        const phrase = typeof input.confirm_phrase === "string" ? input.confirm_phrase : "";
+          typeof payloadRecord.super_password === "string" && payloadRecord.super_password.length <= 1024
+            ? payloadRecord.super_password
+            : "";
+        const phrase = optionalText(payloadRecord.confirm_phrase, { maxLen: 32 });
         if (!password || phrase.trim() !== "CONFIRM") {
           return jsonResponse(400, {
             error: "Super password and confirmation are required for this status change.",
@@ -300,12 +299,14 @@ serve(async (req) => {
     }
 
     if (action === "delete") {
-      const input = payload as Record<string, unknown>;
-      const id = typeof input.id === "string" ? input.id.trim() : "";
-      const password = typeof input.super_password === "string" ? input.super_password : "";
-      const phrase = typeof input.confirm_phrase === "string" ? input.confirm_phrase : "";
+      const id = requireUuid(payloadRecord.id);
+      const password =
+        typeof payloadRecord.super_password === "string" && payloadRecord.super_password.length <= 1024
+          ? payloadRecord.super_password
+          : "";
+      const phrase = optionalText(payloadRecord.confirm_phrase, { maxLen: 32 });
 
-      if (!id || !password || phrase.trim() !== "CONFIRM") {
+      if (!password || phrase !== "CONFIRM") {
         return jsonResponse(400, {
           error: "Super password and confirmation are required to delete item.",
         });
@@ -330,6 +331,9 @@ serve(async (req) => {
 
     return jsonResponse(400, { error: "Invalid action" });
   } catch (error) {
+    if (error instanceof ValidationError) {
+      return jsonResponse(error.status, { error: error.message });
+    }
     console.error("super-gear-mutate function error", {
       message: error instanceof Error ? error.message : "Unknown error",
       stack: error instanceof Error ? error.stack : undefined,

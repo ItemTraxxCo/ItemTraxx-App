@@ -9,6 +9,13 @@ import {
 } from "../_shared/preloginGuards.ts";
 import { isAllowedOrigin, parseAllowedOrigins } from "../_shared/cors.ts";
 import { requireTrustedEdgeIngress } from "../_shared/trustedIngress.ts";
+import {
+  optionalText,
+  requireEmail,
+  requireText,
+  SLUG_PATTERN,
+  ValidationError,
+} from "../_shared/validation.ts";
 
 type ProfileRow = {
   role: string | null;
@@ -93,7 +100,7 @@ serve(async (req) => {
     }
 
     const body = await req.json().catch(() => ({}));
-    const action = typeof body?.action === "string" ? body.action.trim() : "";
+    const action = optionalText((body as Record<string, unknown>)?.action, { maxLen: 32 });
     const adminClient = createClient(supabaseUrl, serviceKey, {
       auth: { persistSession: false },
     });
@@ -139,10 +146,11 @@ serve(async (req) => {
     };
 
     if (action === "create") {
-      const districtSlug =
-        typeof body?.district_slug === "string"
-          ? body.district_slug.trim().toLowerCase()
-          : "";
+      const districtSlug = requireText((body as Record<string, unknown>)?.district_slug, {
+        maxLen: 63,
+        pattern: SLUG_PATTERN,
+        transform: "lowercase",
+      });
       const authHeader = req.headers.get("authorization") ?? "";
       const accessToken = authHeader.replace(/^Bearer\s+/i, "").trim();
 
@@ -206,17 +214,15 @@ serve(async (req) => {
     }
 
     if (action === "create_admin") {
-      const email =
-        typeof body?.email === "string" ? body.email.trim().toLowerCase() : "";
+      const bodyRecord = body as Record<string, unknown>;
+      const email = requireEmail(bodyRecord.email);
       const password = typeof body?.password === "string" ? body.password : "";
-      const turnstileToken =
-        typeof body?.turnstile_token === "string"
-          ? body.turnstile_token.trim()
-          : "";
-      const currentDistrictSlug =
-        typeof body?.current_district_slug === "string"
-          ? body.current_district_slug.trim().toLowerCase()
-          : "";
+      const turnstileToken = requireText(bodyRecord.turnstile_token, { maxLen: 4096 });
+      const currentDistrictSlug = optionalText(bodyRecord.current_district_slug, {
+        maxLen: 63,
+        pattern: SLUG_PATTERN,
+        transform: "lowercase",
+      });
 
       if (!email || !password || !turnstileToken) {
         return jsonResponse(400, { error: "Invalid request" }, headers);
@@ -349,6 +355,9 @@ serve(async (req) => {
 
     return jsonResponse(400, { error: "Invalid action" }, headers);
   } catch (error) {
+    if (error instanceof ValidationError) {
+      return jsonResponse(error.status, { error: error.message }, headers);
+    }
     console.error("district-handoff error", error);
     return jsonResponse(500, { error: "Unexpected server error" }, headers);
   }

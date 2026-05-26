@@ -14,6 +14,12 @@ import {
 import { registerPrivilegedStepUp } from "../_shared/privilegedStepUp.ts";
 import { isAllowedOrigin, parseAllowedOrigins } from "../_shared/cors.ts";
 import { requireTrustedEdgeIngress } from "../_shared/trustedIngress.ts";
+import {
+  optionalText,
+  requireEmail,
+  requireText,
+  ValidationError,
+} from "../_shared/validation.ts";
 
 const EMAIL_LOGO_URL = Deno.env.get("ITX_EMAIL_LOGO_URL")?.trim() || null;
 const PASSWORD_RESET_URL = "https://itemtraxx.com/forgot-password";
@@ -96,10 +102,7 @@ const resolveCorsHeaders = (req: Request) => {
   return { hasOrigin, originAllowed, headers };
 };
 
-const normalizeText = (value: unknown, max = 500) => {
-  if (typeof value !== "string") return "";
-  return value.trim().slice(0, max);
-};
+const normalizeText = (value: unknown, max = 500) => optionalText(value, { maxLen: max });
 
 const parseAuthToken = (req: Request) => {
   const raw = req.headers.get("authorization") ?? "";
@@ -402,9 +405,9 @@ serve(async (req) => {
     });
 
     if (body.action === "start_password_login") {
-      const email = normalizeText(body.payload?.email, 320).toLowerCase();
+      const email = requireEmail(body.payload?.email);
       const password = typeof body.payload?.password === "string" ? body.payload.password : "";
-      const turnstileToken = normalizeText(body.payload?.turnstile_token, 4096);
+      const turnstileToken = requireText(body.payload?.turnstile_token, { maxLen: 4096 });
       if (!email || !password || !turnstileToken) {
         return jsonResponse(400, { error: "Invalid request" });
       }
@@ -551,7 +554,7 @@ serve(async (req) => {
     }
 
     const authToken = parseAuthToken(req);
-    const challengeToken = normalizeText((body.payload as { challenge_token?: string } | undefined)?.challenge_token, 8192);
+    const challengeToken = requireText((body.payload as { challenge_token?: string } | undefined)?.challenge_token, { maxLen: 8192 });
 
     let context: SuperAdminContext;
     try {
@@ -687,7 +690,7 @@ serve(async (req) => {
     }
 
     if (body.action === "verify_email_challenge") {
-      const code = normalizeText(body.payload?.code, 12).replace(/\s+/g, "");
+      const code = requireText(body.payload?.code, { maxLen: 12 }).replace(/\s+/g, "");
       if (!/^\d{6}$/.test(code)) {
         return jsonResponse(400, { error: "Enter a valid 6-digit code." });
       }
@@ -771,6 +774,9 @@ serve(async (req) => {
 
     return jsonResponse(400, { error: "Invalid action" });
   } catch (error) {
+    if (error instanceof ValidationError) {
+      return jsonResponse(error.status, { error: error.message });
+    }
     logError("super-auth-verify error", requestId, error);
     return new Response(JSON.stringify({ ok: false, error: "Request failed." }), {
       status: 500,

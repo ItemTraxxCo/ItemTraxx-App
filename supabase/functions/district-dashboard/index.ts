@@ -5,6 +5,7 @@ import {
   isMissingPrivilegedStepUpTable,
 } from "../_shared/privilegedStepUp.ts";
 import { isAllowedOrigin, parseAllowedOrigins } from "../_shared/cors.ts";
+import { optionalText, UUID_PATTERN } from "../_shared/validation.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Headers":
@@ -117,7 +118,11 @@ serve(async (req) => {
     districtId = profile.district_id ?? null;
   } else if (profile.role === "super_admin") {
     const url = new URL(req.url);
-    districtId = url.searchParams.get("district_id");
+    const requestedDistrictId = optionalText(url.searchParams.get("district_id"), { maxLen: 36 });
+    if (requestedDistrictId && !UUID_PATTERN.test(requestedDistrictId)) {
+      return jsonResponse(400, { error: "Invalid request" });
+    }
+    districtId = requestedDistrictId || null;
   } else {
     return jsonResponse(403, { error: "Access denied" });
   }

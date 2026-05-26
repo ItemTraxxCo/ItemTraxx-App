@@ -9,6 +9,12 @@ import {
 import { getRequestId, logError, logInfo } from "../_shared/observability.ts";
 import { isAllowedOrigin, parseAllowedOrigins } from "../_shared/cors.ts";
 import { requireTrustedEdgeIngress } from "../_shared/trustedIngress.ts";
+import {
+  asRecord,
+  optionalJsonObject,
+  optionalText,
+  ValidationError,
+} from "../_shared/validation.ts";
 
 const baseCorsHeaders = {
   "Access-Control-Allow-Headers":
@@ -67,10 +73,7 @@ type StoredReportRow = {
   id: string;
 };
 
-const normalizeText = (value: unknown, max = 5000) => {
-  if (typeof value !== "string") return "";
-  return value.trim().slice(0, max);
-};
+const normalizeText = (value: unknown, max = 5000) => optionalText(value, { maxLen: max });
 
 const resolveCorsHeaders = (req: Request) => {
   const origin = req.headers.get("Origin");
@@ -173,17 +176,18 @@ serve(async (req) => {
       return jsonResponse(429, { error: "Too many reports. Please try again later." });
     }
 
-    const body = (await req.json()) as ReportPayload;
+    const body = asRecord(await req.json()) as ReportPayload;
     const title = normalizeText(body.title, 160) || "Unexpected frontend error";
     const message = normalizeText(body.message, 1200) || "Unknown error";
     const reason = normalizeText(body.reason, 400) || "No reason provided.";
     const errorName = normalizeText(body.error_name, 120) || "Error";
     const stack = normalizeText(body.stack, 5000);
     const context = normalizeText(body.context, 300);
-    const pageUrl = normalizeText(body.page?.url, 255);
-    const environment = normalizeText(body.page?.environment, 40) || "unknown";
-    const release = normalizeText(body.page?.release, 80) || "n/a";
-    const userAgent = normalizeText(body.page?.user_agent, 255);
+    const page = body.page === undefined ? {} : asRecord(body.page);
+    const pageUrl = normalizeText(page.url, 255);
+    const environment = normalizeText(page.environment, 40) || "unknown";
+    const release = normalizeText(page.release, 80) || "n/a";
+    const userAgent = normalizeText(page.user_agent, 255);
     let isVerifiedAuthenticated = false;
     let authRole = "none";
     let tenantContextId = "-";
@@ -230,12 +234,16 @@ serve(async (req) => {
         auth_role: authRole === "none" ? null : authRole,
         tenant_context_id: tenantContextId === "-" ? null : tenantContextId,
         district_context_id: districtContextId === "-" ? null : districtContextId,
-        is_district_host: !!body.district?.is_district_host,
-        district_id: normalizeText(body.district?.district_id, 80) || null,
+        is_district_host:
+          body.district !== undefined && asRecord(body.district).is_district_host === true,
+        district_id:
+          body.district !== undefined
+            ? normalizeText(asRecord(body.district).district_id, 80) || null
+            : null,
         request_id: requestId,
         client_fingerprint_hash: requestHash,
         ip_hash: ipHash,
-        diagnostics: body.diagnostics ?? {},
+        diagnostics: optionalJsonObject(body.diagnostics, 20_000),
       })
       .select("id")
       .single<StoredReportRow>();
@@ -284,6 +292,9 @@ serve(async (req) => {
 
     return jsonResponse(200, { data: { accepted: true, report_id: reportRow.id } });
   } catch (error) {
+    if (error instanceof ValidationError) {
+      return jsonResponse(error.status, { error: error.message });
+    }
     logError("client-error-report failed", requestId, error);
     return jsonResponse(500, { error: "Unable to send error report. Please contact support directly." });
   }

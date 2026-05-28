@@ -28,7 +28,11 @@ const resolveBuildBranch = (env: Record<string, string>) => {
 
 // https://vite.dev/config/
 export default defineConfig(({ mode, command }) => {
-  const env = loadEnv(mode, process.cwd(), "");
+  const env: Record<string, string> = {
+    ...loadEnv(mode, process.cwd()),
+    VERCEL_GIT_COMMIT_SHA: process.env.VERCEL_GIT_COMMIT_SHA ?? "",
+    VERCEL_GIT_COMMIT_REF: process.env.VERCEL_GIT_COMMIT_REF ?? "",
+  };
   const gitCommit = resolveBuildCommit(env);
   const gitBranch = resolveBuildBranch(env);
 

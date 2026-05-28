@@ -28,12 +28,19 @@ on:
       status:
         required: false
         type: string
+      status_message:
+        required: false
+        type: string
       slack_channel_id:
         required: false
         type: string
       slack_message_ts:
         required: false
         type: string
+      incident_alerts_enabled:
+        required: false
+        type: boolean
+        default: true
     outputs:
       slack_channel_id:
         description: Slack channel used for the status message.
@@ -153,7 +160,7 @@ jobs:
   incidentio-notify-start-failure:
     needs:
       - notify_start
-    if: ${{ always() && inputs.mode == 'start' && (needs.notify_start.result == 'failure' || needs.notify_start.result == 'cancelled') }}
+    if: ${{ always() && inputs.incident_alerts_enabled && inputs.mode == 'start' && (needs.notify_start.result == 'failure' || needs.notify_start.result == 'cancelled') }}
     uses: ./.github/workflows/incidentio-workflow-alert.yml
     with:
       status: ${{ needs.notify_start.result }}
@@ -182,6 +189,7 @@ jobs:
           REF_NAME: ${{ inputs.ref_name }}
           SHA: ${{ inputs.sha }}
           STATUS: ${{ inputs.status || 'completed' }}
+          STATUS_MESSAGE: ${{ inputs.status_message }}
           MESSAGE_TS: ${{ inputs.slack_message_ts }}
           MESSAGE_CHANNEL_ID: ${{ inputs.slack_channel_id }}
           REPOSITORY: ${{ github.repository }}
@@ -189,7 +197,8 @@ jobs:
           set -euo pipefail
 
           RUN_ID="$(printf '%s' "$RUN_URL" | awk -F/ '{print $NF}')"
-          if [ -n "${GITHUB_TOKEN:-}" ] && [ -n "${RUN_ID:-}" ]; then
+          INPUT_STATUS_LOWER="$(printf '%s' "$STATUS" | tr '[:upper:]' '[:lower:]')"
+          if [ "$INPUT_STATUS_LOWER" != "skipped" ] && [ -n "${GITHUB_TOKEN:-}" ] && [ -n "${RUN_ID:-}" ]; then
             RUN_RESPONSE="$(curl -fsSL \
               -H "Authorization: Bearer ${GITHUB_TOKEN}" \
               -H "Accept: application/vnd.github+json" \
@@ -209,6 +218,7 @@ jobs:
                 --arg commit "${SHA:0:7}" \
                 --arg run_url "$RUN_URL" \
                 --arg status_label "$STATUS_LABEL" \
+                --arg status_message "$STATUS_MESSAGE" \
                 --arg repo "$REPOSITORY" \
                 '{
                   text: ("GitHub Actions run " + ($status_label | ascii_downcase) + ": " + $workflow + " / " + $job),
@@ -224,6 +234,7 @@ jobs:
                       fields: [
                         { title: "Status", value: $status_label, short: true },
                         { title: "Commit", value: ($commit + " (" + $branch + ")"), short: true },
+                        if ($status_message != "") then { title: "Message", value: $status_message, short: false } else empty end,
                         { title: "Workflow", value: ("<" + $run_url + "|" + $workflow + " / " + $job + ">"), short: false },
                         { title: "Repository", value: $repo, short: false }
                       ],
@@ -250,6 +261,9 @@ jobs:
             cancelled)
               STATUS_LABEL='Cancelled'
               ;;
+            skipped)
+              STATUS_LABEL='Skipped'
+              ;;
             *)
               STATUS_LABEL='Completed'
               ;;
@@ -266,6 +280,7 @@ jobs:
               --arg repo "$REPOSITORY" \
               --arg run_url "$RUN_URL" \
               --arg status_label "$STATUS_LABEL" \
+              --arg status_message "$STATUS_MESSAGE" \
               '{
                 channel: $channel,
                 ts: $ts,
@@ -282,6 +297,7 @@ jobs:
                     fields: [
                       { title: "Status", value: $status_label, short: true },
                       { title: "Commit", value: ($commit + " (" + $branch + ")"), short: true },
+                      if ($status_message != "") then { title: "Message", value: $status_message, short: false } else empty end,
                       { title: "Workflow", value: ("<" + $run_url + "|" + $workflow + " / " + $job + ">"), short: false },
                       { title: "Repository", value: $repo, short: false }
                     ],
@@ -307,7 +323,7 @@ jobs:
   incidentio-notify-finish-failure:
     needs:
       - notify_finish
-    if: ${{ always() && inputs.mode == 'finish' && (needs.notify_finish.result == 'failure' || needs.notify_finish.result == 'cancelled') }}
+    if: ${{ always() && inputs.incident_alerts_enabled && inputs.mode == 'finish' && (needs.notify_finish.result == 'failure' || needs.notify_finish.result == 'cancelled') }}
     uses: ./.github/workflows/incidentio-workflow-alert.yml
     with:
       status: ${{ needs.notify_finish.result }}

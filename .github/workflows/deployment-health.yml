@@ -10,7 +10,11 @@ on:
     - cron: "29 * * * *"
 
 jobs:
+  kill-switch-preflight:
+    uses: ./.github/workflows/kill-switch-preflight.yml
+
   slack-notify-start:
+    needs: kill-switch-preflight
     uses: ./.github/workflows/slack-notify-status.yml
     with:
       mode: start
@@ -22,7 +26,10 @@ jobs:
     secrets: inherit
 
   health-check:
-    needs: slack-notify-start
+    needs:
+      - kill-switch-preflight
+      - slack-notify-start
+    if: ${{ needs.kill-switch-preflight.outputs.active != 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
@@ -33,6 +40,24 @@ jobs:
           BROWSER_UA="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36"
           CHALLENGE_SKIPS=0
           PASS_COUNT=0
+
+          kill_switch_active() {
+            local body
+            body="$(mktemp)"
+            local status
+            status="$(curl -sS -o "$body" -w '%{http_code}' \
+              --connect-timeout 5 \
+              --max-time 15 \
+              -H "Accept: application/json" \
+              -H "Origin: https://itemtraxx.com" \
+              "https://edge.itemtraxx.com/functions/system-status" || true)"
+            if [ "$status" -ge 200 ] && [ "$status" -lt 300 ] && jq -e '.kill_switch.enabled == true' "$body" >/dev/null 2>&1; then
+              rm -f "$body"
+              return 0
+            fi
+            rm -f "$body"
+            return 1
+          }
 
           check_headers() {
             local url="$1"
@@ -57,6 +82,10 @@ jobs:
               if [ "$status" -eq 403 ] && printf "%s\n" "$headers" | grep -qi "cf-mitigated: challenge"; then
                 echo "Cloudflare challenge for $url (non-browser CI request). Skipping this URL."
                 CHALLENGE_SKIPS=$((CHALLENGE_SKIPS + 1))
+                return 0
+              fi
+              if [ "$status" -eq 503 ] && kill_switch_active; then
+                echo "Kill switch active; treating $url as intentional maintenance skip."
                 return 0
               fi
               echo "HTTP $status for $url"
@@ -97,9 +126,21 @@ jobs:
       - name: Check status endpoint
         run: |
           set -euo pipefail
-          curl -fsS "https://mlaspkufocikfcbjgpof.supabase.co/functions/v1/system-status" \
+          BODY="$(mktemp)"
+          STATUS="$(curl -sS -o "$BODY" -w '%{http_code}' "https://mlaspkufocikfcbjgpof.supabase.co/functions/v1/system-status" \
             -H "Origin: https://itemtraxx.com" \
-            | head -c 300
+            || true)"
+          if [ "$STATUS" -eq 503 ] && jq -e '.kill_switch.enabled == true' "$BODY" >/dev/null 2>&1; then
+            echo "Kill switch active; treating system-status 503 as intentional maintenance skip."
+            head -c 300 "$BODY"
+            exit 0
+          fi
+          if [ "$STATUS" -lt 200 ] || [ "$STATUS" -ge 300 ]; then
+            echo "system-status returned HTTP $STATUS"
+            cat "$BODY" || true
+            exit 1
+          fi
+          head -c 300 "$BODY"
 
   slack-notify-finish:
     needs:
@@ -119,10 +160,32 @@ jobs:
       slack_message_ts: ${{ needs.slack-notify-start.outputs.slack_message_ts }}
     secrets: inherit
 
+  slack-notify-kill-switch-skip:
+    needs:
+      - kill-switch-preflight
+      - slack-notify-start
+      - health-check
+    if: ${{ always() && needs.kill-switch-preflight.outputs.active == 'true' && needs.health-check.result == 'skipped' }}
+    uses: ./.github/workflows/slack-notify-status.yml
+    with:
+      mode: finish
+      workflow_name: Deployment Health
+      job_name: health-check
+      run_url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+      ref_name: ${{ github.ref_name }}
+      sha: ${{ github.sha }}
+      status: skipped
+      status_message: ${{ format('Intentionally skipped because the ItemTraxx kill switch is active. {0}', needs.kill-switch-preflight.outputs.message) }}
+      slack_channel_id: ${{ needs.slack-notify-start.outputs.slack_channel_id }}
+      slack_message_ts: ${{ needs.slack-notify-start.outputs.slack_message_ts }}
+      incident_alerts_enabled: false
+    secrets: inherit
+
   incidentio-notify-failure:
     needs:
+      - kill-switch-preflight
       - health-check
-    if: ${{ always() && (needs.health-check.result == 'failure' || needs.health-check.result == 'cancelled') }}
+    if: ${{ always() && needs.kill-switch-preflight.outputs.active != 'true' && (needs.health-check.result == 'failure' || needs.health-check.result == 'cancelled') }}
     uses: ./.github/workflows/incidentio-workflow-alert.yml
     with:
       status: ${{ needs.health-check.result }}

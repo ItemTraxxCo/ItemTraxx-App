@@ -23,14 +23,12 @@
             <template v-for="(token, tokenIndex) in tokenizeInline(paragraph)" :key="`${paragraph}-${tokenIndex}`">
               <code v-if="token.type === 'code'">{{ token.text }}</code>
               <strong v-else-if="token.type === 'strong'">{{ token.text }}</strong>
-              <a
+              <SafeExternalLink
                 v-else-if="token.type === 'link'"
-                :href="token.href"
-                target="_blank"
-                rel="noreferrer"
+                :url="token.href"
               >
                 {{ token.text }}
-              </a>
+              </SafeExternalLink>
               <template v-else>{{ token.text }}</template>
             </template>
           </p>
@@ -46,14 +44,12 @@
                 <template v-for="(token, tokenIndex) in tokenizeInline(block.text)" :key="`${section.title}-${index}-${tokenIndex}`">
                   <code v-if="token.type === 'code'">{{ token.text }}</code>
                   <strong v-else-if="token.type === 'strong'">{{ token.text }}</strong>
-                  <a
+                  <SafeExternalLink
                     v-else-if="token.type === 'link'"
-                    :href="token.href"
-                    target="_blank"
-                    rel="noreferrer"
+                    :url="token.href"
                   >
                     {{ token.text }}
-                  </a>
+                  </SafeExternalLink>
                   <template v-else>{{ token.text }}</template>
                 </template>
               </p>
@@ -62,14 +58,12 @@
                   <template v-for="(token, tokenIndex) in tokenizeInline(item)" :key="`${item}-${tokenIndex}`">
                     <code v-if="token.type === 'code'">{{ token.text }}</code>
                     <strong v-else-if="token.type === 'strong'">{{ token.text }}</strong>
-                    <a
+                    <SafeExternalLink
                       v-else-if="token.type === 'link'"
-                      :href="token.href"
-                      target="_blank"
-                      rel="noreferrer"
+                      :url="token.href"
                     >
                       {{ token.text }}
-                    </a>
+                    </SafeExternalLink>
                     <template v-else>{{ token.text }}</template>
                   </template>
                 </li>
@@ -91,6 +85,8 @@
 import { computed, onMounted, onUnmounted, ref } from "vue";
 import { RouterLink } from "vue-router";
 import PublicFooter from "../components/PublicFooter.vue";
+import SafeExternalLink from "../components/SafeExternalLink.vue";
+import { safeExternalUrl } from "../utils/safeUrl";
 import privacyRaw from "../../PRIVACY.md?raw";
 
 type ContentBlock =
@@ -112,9 +108,11 @@ const lightBrandLogoUrl = import.meta.env.VITE_BRAND_LOGO_LIGHT_URL as string | 
 const darkBrandLogoUrl = import.meta.env.VITE_BRAND_LOGO_DARK_URL as string | undefined;
 const themeMode = ref<"light" | "dark">("dark");
 const brandLogoUrl = computed(() =>
-  themeMode.value === "light"
-    ? lightBrandLogoUrl || darkBrandLogoUrl || ""
-    : darkBrandLogoUrl || lightBrandLogoUrl || ""
+  safeExternalUrl(
+    themeMode.value === "light"
+      ? lightBrandLogoUrl || darkBrandLogoUrl || ""
+      : darkBrandLogoUrl || lightBrandLogoUrl || ""
+  )
 );
 let themeObserver: MutationObserver | null = null;
 
@@ -195,7 +193,12 @@ const tokenizeInline = (text: string): InlineToken[] => {
     } else if (match[2]) {
       tokens.push({ type: "strong", text: match[2] });
     } else if (match[3] && match[4]) {
-      tokens.push({ type: "link", text: match[3], href: match[4] });
+      const href = safeExternalUrl(match[4]);
+      if (href) {
+        tokens.push({ type: "link", text: match[3], href });
+      } else {
+        tokens.push({ type: "text", text: match[3] });
+      }
     }
 
     lastIndex = matchIndex + match[0].length;

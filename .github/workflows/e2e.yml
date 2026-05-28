@@ -16,7 +16,11 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  kill-switch-preflight:
+    uses: ./.github/workflows/kill-switch-preflight.yml
+
   slack-notify-start:
+    needs: kill-switch-preflight
     uses: ./.github/workflows/slack-notify-status.yml
     with:
       mode: start
@@ -28,7 +32,10 @@ jobs:
     secrets: inherit
 
   e2e:
-    needs: slack-notify-start
+    needs:
+      - kill-switch-preflight
+      - slack-notify-start
+    if: ${{ needs.kill-switch-preflight.outputs.active != 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
 
@@ -98,10 +105,31 @@ jobs:
       slack_message_ts: ${{ needs.slack-notify-start.outputs.slack_message_ts }}
     secrets: inherit
 
+  slack-notify-kill-switch-skip:
+    needs:
+      - kill-switch-preflight
+      - slack-notify-start
+      - e2e
+    if: ${{ always() && needs.kill-switch-preflight.outputs.active == 'true' && needs.e2e.result == 'skipped' }}
+    uses: ./.github/workflows/slack-notify-status.yml
+    with:
+      mode: finish
+      workflow_name: E2E Tests
+      job_name: e2e
+      run_url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+      ref_name: ${{ github.ref_name }}
+      sha: ${{ github.sha }}
+      status: success
+      status_message: ${{ format('Intentionally skipped because the ItemTraxx kill switch is active. {0}', needs.kill-switch-preflight.outputs.message) }}
+      slack_channel_id: ${{ needs.slack-notify-start.outputs.slack_channel_id }}
+      slack_message_ts: ${{ needs.slack-notify-start.outputs.slack_message_ts }}
+    secrets: inherit
+
   incidentio-notify-failure:
     needs:
+      - kill-switch-preflight
       - e2e
-    if: ${{ always() && github.event_name != 'pull_request' && (needs.e2e.result == 'failure' || needs.e2e.result == 'cancelled') }}
+    if: ${{ always() && needs.kill-switch-preflight.outputs.active != 'true' && github.event_name != 'pull_request' && (needs.e2e.result == 'failure' || needs.e2e.result == 'cancelled') }}
     uses: ./.github/workflows/incidentio-workflow-alert.yml
     with:
       status: ${{ needs.e2e.result }}

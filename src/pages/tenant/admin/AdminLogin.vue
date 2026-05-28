@@ -1,5 +1,5 @@
 <template>
-  <div class="admin-login-shell" :class="`theme-${themeMode}`">
+  <div class="admin-login-shell" :class="themeClass">
     <RouterLink class="admin-auth-logo-link" to="/" aria-label="ItemTraxx home">
       <img v-if="brandLogoUrl" class="admin-auth-logo" :src="brandLogoUrl" alt="ItemTraxx Co" />
       <span v-else>ItemTraxx</span>
@@ -77,7 +77,7 @@
             Trouble signing in? Contact our support team from the top-right menu for help.
             <br />
             By using this software, you agree to our
-            <a :href="legalUrl" target="_blank" rel="noreferrer">legal terms and policies</a>.
+            <SafeExternalLink :url="legalUrl">legal terms and policies</SafeExternalLink>.
           </p>
         </form>
         <p v-if="error" class="error admin-login-error">{{ error }}</p>
@@ -98,6 +98,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from "vue";
 import { RouterLink } from "vue-router";
+import SafeExternalLink from "../../../components/SafeExternalLink.vue";
 import {
   createDistrictAdminSessionHandoff,
 } from "../../../services/authService";
@@ -105,12 +106,16 @@ import { logAdminAction } from "../../../services/auditLogService";
 import { useTurnstile } from "../../../composables/useTurnstile";
 import { clearAdminVerification } from "../../../store/authState";
 import { buildDistrictAppHandoffUrl } from "../../../services/districtService";
+import { safeExternalUrl } from "../../../utils/safeUrl";
 
 const themeMode = ref<"light" | "dark">("dark");
+const themeClass = computed(() =>
+  themeMode.value === "light" ? "theme-light" : "theme-dark"
+);
 const lightBrandLogoUrl = import.meta.env.VITE_BRAND_LOGO_LIGHT_URL as string | undefined;
 const darkBrandLogoUrl = import.meta.env.VITE_BRAND_LOGO_DARK_URL as string | undefined;
 const legalUrl =
-  import.meta.env.VITE_LEGAL_URL ||
+  safeExternalUrl(import.meta.env.VITE_LEGAL_URL) ||
   "https://www.itemtraxx.com/legal";
 const email = ref("");
 const password = ref("");
@@ -155,9 +160,11 @@ const runPostHog = async (
 };
 
 const brandLogoUrl = computed(() =>
-  themeMode.value === "light"
-    ? lightBrandLogoUrl || darkBrandLogoUrl || ""
-    : darkBrandLogoUrl || lightBrandLogoUrl || ""
+  safeExternalUrl(
+    themeMode.value === "light"
+      ? lightBrandLogoUrl || darkBrandLogoUrl || ""
+      : darkBrandLogoUrl || lightBrandLogoUrl || ""
+  )
 );
 
 const canSubmit = computed(() => {

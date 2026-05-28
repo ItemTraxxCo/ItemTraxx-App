@@ -1,5 +1,5 @@
 <template>
-  <div class="login-page-shell" :class="`theme-${themeMode}`">
+  <div class="login-page-shell" :class="themeClass">
     <div class="login-split-panel">
       <section class="login-story-panel">
         <header class="story-header">
@@ -112,7 +112,7 @@
               Trouble signing in? Contact our support team from the top-right menu for help.
               <br />
               By using this software, you agree to our
-              <a :href="legalUrl" target="_blank" rel="noreferrer">legal terms and policies</a>.
+              <SafeExternalLink :url="legalUrl">legal terms and policies</SafeExternalLink>.
             </p>
           </form>
 
@@ -135,11 +135,13 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from "vue";
 import { RouterLink, useRouter } from "vue-router";
+import SafeExternalLink from "../components/SafeExternalLink.vue";
 import { createDistrictSessionHandoff, tenantLogin } from "../services/authService";
 import { useTurnstile } from "../composables/useTurnstile";
 import { buildDistrictAppHandoffUrl } from "../services/districtService";
 import { getDistrictState } from "../store/districtState";
 import { getAuthState } from "../store/authState";
+import { safeExternalUrl } from "../utils/safeUrl";
 
 const router = useRouter();
 const district = getDistrictState();
@@ -153,7 +155,7 @@ const toastMessage = ref("");
 const lightBrandLogoUrl = import.meta.env.VITE_BRAND_LOGO_LIGHT_URL as string | undefined;
 const darkBrandLogoUrl = import.meta.env.VITE_BRAND_LOGO_DARK_URL as string | undefined;
 const legalUrl =
-  import.meta.env.VITE_LEGAL_URL ||
+  safeExternalUrl(import.meta.env.VITE_LEGAL_URL) ||
   "https://www.itemtraxx.com/legal";
 const storySlides = [
   {
@@ -198,10 +200,15 @@ const storySlides = [
 ] as const;
 const activeStoryIndex = ref(0);
 const themeMode = ref<"light" | "dark">("dark");
+const themeClass = computed(() =>
+  themeMode.value === "light" ? "theme-light" : "theme-dark"
+);
 const brandLogoUrl = computed(() =>
-  themeMode.value === "light"
-    ? lightBrandLogoUrl || darkBrandLogoUrl || ""
-    : darkBrandLogoUrl || lightBrandLogoUrl || ""
+  safeExternalUrl(
+    themeMode.value === "light"
+      ? lightBrandLogoUrl || darkBrandLogoUrl || ""
+      : darkBrandLogoUrl || lightBrandLogoUrl || ""
+  )
 );
 const turnstileSiteKey = import.meta.env.VITE_TURNSTILE_SITE_KEY as
   | string

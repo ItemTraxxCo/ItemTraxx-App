@@ -2,7 +2,7 @@
 
 Last updated: 2026-04-7 (year-month-day)
 
-**ItemTraxx** is a cloud-based inventory, checkout, and administrative control platform built for schools, districts, organizations, and individual operators. It supports root-domain access on `itemtraxx.com`, custom-routed workspaces on `*.app.itemtraxx.com`, and role-based admin tooling across user, admin, and district surfacing.
+**ItemTraxx** is a cloud-based inventory, checkout, and administrative control platform built for schools, districts, organizations, and individual operators. It supports root-domain access on `itemtraxx.com`, custom-routed workspaces on `*.app.itemtraxx.com`, and role-based admin tooling across user, admin, and district/organization surfacing.
 
 ---
 
@@ -12,9 +12,8 @@ ItemTraxx is designed to manage real-world gear and inventory workflows without 
 - Member and operator checkout / return flows
 - Tenant-admin inventory, student, and reporting tools
 - District/organization-scoped workspaces and district/org admin controls
-- Super-admin management for tenants, districts, organizations, admins, and plan metadata
 - Organization, district, and individual account structures
-- Contact sales, request demo, and contact support form flows
+- Contact sales, request demo, and contact support form flows for easy contact and communication
 
 ---
 
@@ -33,17 +32,18 @@ ItemTraxx is designed to manage real-world gear and inventory workflows without 
 ItemTraxx currently supports multiple operating roles:
 
 - **Tenant Admin:** Manages inventory, students, settings, and tenant reporting
-- **District/Organization Admin:** Oversees district-linked tenants and district/org-level operations (indev)
+- **District/Organization Admin:** Oversees district-linked tenants and district/org-level operations (beta)
 - **Individual / Root-Domain Accounts:** Non-district/organization usage on `itemtraxx.com` without custom routing
-
+- **Custom-Routed Users:** Access workspaces on custom scoped domains `*.app.itemtraxx.com` where applicable
+- Internal ItemTraxx access roles are not listed here for securty purposes.
 ---
 
 ## 4. Tech Stack
 - **Frontend:** Vue 3, Vite, TypeScript, scoped CSS, and HTML
-- **Backend:** Supabase (PostgreSQL, Auth, Edge Functions) on AWS
+- **Backend:** Supabase (PostgreSQL, Auth, Edge Functions) on AWS + Supabase Edge Runtime, Cloudflare Workers for edge proxying and Security Turnstile
 - **Edge and Security:** Cloudflare Turnstile, Cloudflare Worker edge proxy, CSP/security headers, Cloudflare DNS
 - **Hosting and Delivery:** Vercel, GitHub
-- **Observability:** Vercel Web Analytics, Vercel Speed Insights, Sentry Error Monitoring, Google Analytics
+- **Observability:** Vercel Web Analytics, Vercel Speed Insights, Sentry Error Monitoring, Cloudflare Analytics, Supabase Logs and Metrics, PostHog
 
 ---
 
@@ -53,25 +53,25 @@ Public documentation in this repository is intentionally limited to product, leg
 For public-facing repository context, see:
 
 - [`README.md`](README.md) — Product overview and repository context
-- [`CHANGELOG.md`](CHANGELOG.md) — Product and engineering change history
+- [`CHANGELOG.md`](CHANGELOG.md) — Public product and engineering change history
 - [`docs/README.md`](docs/README.md) — Public documentation notice
 
 ---
 
 ## 6. Governance and Legal
-- [`CHANGELOG.md`](CHANGELOG.md) — Product and engineering changes
+- [`CHANGELOG.md`](CHANGELOG.md) — Public product and engineering changes
 - [`LICENSE.md`](LICENSE.md) — License and ownership
 - [`PRIVACY.md`](PRIVACY.md) — Privacy policy
 - [`SECURITY.md`](SECURITY.md) — Security reporting guidance
 - [`TERMS.md`](TERMS.md) — Pointer to legal terms of use
-- Live legal hub: [itemtraxx.com/legal](https://itemtraxx.com/legal)
+- Live legal hub: [itemtraxx.com/legal](https://itemtraxx.com/legal#from?=github) for the most up-to-date legal documents and policies
 
 ---
 
 ## 7. Support
-- Contact Support Via Website: [itemtraxx.com/contact-support](https://itemtraxx.com/contact-support)
-- Legal and Terms: [itemtraxx.com/legal](https://itemtraxx.com/legal)
-- Support Email: `support@itemtraxx.com`
+- Contact Support Via Website: [itemtraxx.com/contact-support](https://itemtraxx.com/contact-support#from?=github)
+- Legal and Terms: [itemtraxx.com/legal](https://itemtraxx.com/legal#from?=github)
+- Direct Support Email: `support@itemtraxx.com`
 
 ---
 

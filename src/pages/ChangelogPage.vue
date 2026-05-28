@@ -30,7 +30,7 @@
           <article v-for="link in docLinks" :key="link.title" class="changelog-link-card">
             <h2>{{ link.title }}</h2>
             <p>{{ link.description }}</p>
-            <a v-if="link.href" :href="link.href" target="_blank" rel="noreferrer">Open</a>
+            <SafeExternalLink v-if="link.href" :url="link.href">Open</SafeExternalLink>
           </article>
         </div>
       </section>
@@ -70,6 +70,8 @@
 import { computed } from "vue";
 import { RouterLink } from "vue-router";
 import PublicFooter from "../components/PublicFooter.vue";
+import SafeExternalLink from "../components/SafeExternalLink.vue";
+import { safeExternalUrl, safeSameOriginPath } from "../utils/safeUrl";
 import changelogRaw from "../../CHANGELOG.md?raw";
 
 type DocLink = {
@@ -140,10 +142,10 @@ const DOC_LINK_ROUTE_MAP: Record<string, string> = {
 };
 
 const normalizeDocHref = (href: string) => {
-  if (/^https?:\/\//.test(href)) return href;
+  if (/^https?:\/\//.test(href)) return safeExternalUrl(href);
   const mapped = DOC_LINK_ROUTE_MAP[href];
-  if (mapped) return mapped;
-  return `https://github.com/ItemTraxxCo/ItemTraxx-App/blob/main/${href}`;
+  if (mapped) return mapped.startsWith("/") ? safeSameOriginPath(mapped) : safeExternalUrl(mapped);
+  return safeExternalUrl(`https://github.com/ItemTraxxCo/ItemTraxx-App/blob/main/${href}`);
 };
 
 const docLinks = computed<DocLink[]>(() => {

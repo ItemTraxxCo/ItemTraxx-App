@@ -25,7 +25,11 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  kill-switch-preflight:
+    uses: ./.github/workflows/kill-switch-preflight.yml
+
   slack-notify-start:
+    needs: kill-switch-preflight
     uses: ./.github/workflows/slack-notify-status.yml
     with:
       mode: start
@@ -37,7 +41,9 @@ jobs:
     secrets: inherit
 
   apply:
-    needs: slack-notify-start
+    needs:
+      - kill-switch-preflight
+      - slack-notify-start
     runs-on: ubuntu-latest
     timeout-minutes: 20
     environment: production
@@ -128,8 +134,9 @@ jobs:
 
   incidentio-notify-failure:
     needs:
+      - kill-switch-preflight
       - apply
-    if: ${{ always() && (needs.apply.result == 'failure' || needs.apply.result == 'cancelled') }}
+    if: ${{ always() && needs.kill-switch-preflight.outputs.active != 'true' && (needs.apply.result == 'failure' || needs.apply.result == 'cancelled') }}
     uses: ./.github/workflows/incidentio-workflow-alert.yml
     with:
       status: ${{ needs.apply.result }}

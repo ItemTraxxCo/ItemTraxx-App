@@ -25,12 +25,12 @@
       </section>
 
       <section class="trust-grid">
-        <article v-for="item in trustLinks" :key="item.title" class="trust-card">
+        <article v-for="item in safeTrustLinks" :key="item.title" class="trust-card">
           <p class="trust-section-label">{{ item.category }}</p>
           <h2>{{ item.title }}</h2>
           <p>{{ item.description }}</p>
           <RouterLink v-if="item.to" class="trust-link" :to="item.to">Open page</RouterLink>
-          <a v-else class="trust-link" :href="item.href" target="_blank" rel="noreferrer">Open page</a>
+          <SafeExternalLink v-else class="trust-link" :url="item.href">Open page</SafeExternalLink>
         </article>
       </section>
 
@@ -56,14 +56,18 @@
 import { computed, onMounted, onUnmounted, ref } from "vue";
 import { RouterLink } from "vue-router";
 import PublicFooter from "../components/PublicFooter.vue";
+import SafeExternalLink from "../components/SafeExternalLink.vue";
+import { safeExternalUrl, safeSameOriginPath } from "../utils/safeUrl";
 
 const lightBrandLogoUrl = import.meta.env.VITE_BRAND_LOGO_LIGHT_URL as string | undefined;
 const darkBrandLogoUrl = import.meta.env.VITE_BRAND_LOGO_DARK_URL as string | undefined;
 const themeMode = ref<"light" | "dark">("dark");
 const brandLogoUrl = computed(() =>
-  themeMode.value === "light"
-    ? lightBrandLogoUrl || darkBrandLogoUrl || ""
-    : darkBrandLogoUrl || lightBrandLogoUrl || ""
+  safeExternalUrl(
+    themeMode.value === "light"
+      ? lightBrandLogoUrl || darkBrandLogoUrl || ""
+      : darkBrandLogoUrl || lightBrandLogoUrl || ""
+  )
 );
 let themeObserver: MutationObserver | null = null;
 
@@ -111,6 +115,14 @@ const trustLinks = [
     to: "/contact-support",
   },
 ];
+
+const safeTrustLinks = computed(() =>
+  trustLinks.map((item) => ({
+    ...item,
+    to: "to" in item ? safeSameOriginPath(item.to) : "",
+    href: "href" in item ? safeExternalUrl(item.href) : "",
+  }))
+);
 
 const reviewNotes = [
   {

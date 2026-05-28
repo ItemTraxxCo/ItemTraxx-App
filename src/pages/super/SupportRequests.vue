@@ -60,7 +60,7 @@
             <td>{{ categoryLabel(request.category) }}</td>
             <td>{{ request.subject }}</td>
             <td>
-              <span class="status-pill" :class="`status-${request.status}`">
+              <span class="status-pill" :class="statusClass(request.status)">
                 {{ statusLabel(request.status) }}
               </span>
             </td>
@@ -128,14 +128,14 @@
               class="attachment-card"
             >
               <a
-                v-if="attachment.signed_url"
-                :href="attachment.signed_url"
+                v-if="safeExternalUrl(attachment.signed_url)"
+                :href="safeExternalUrl(attachment.signed_url)"
                 target="_blank"
                 rel="noreferrer"
                 class="attachment-preview-link"
               >
                 <img
-                  :src="attachment.signed_url"
+                  :src="safeExternalUrl(attachment.signed_url)"
                   :alt="attachment.original_filename || attachment.stored_filename"
                   class="attachment-preview"
                 />
@@ -207,6 +207,7 @@ import {
   type SupportRequestListItem,
   type SupportRequestStatus,
 } from "../../services/superOpsService";
+import { safeExternalUrl } from "../../utils/safeUrl";
 
 const statusOptions: Array<{ value: SupportRequestStatus; label: string }> = [
   { value: "open", label: "Open" },
@@ -263,6 +264,19 @@ const statusLabel = (value: SupportRequestStatus) => {
       return "Spam";
     default:
       return "Open";
+  }
+};
+
+const statusClass = (value: SupportRequestStatus) => {
+  switch (value) {
+    case "in_progress":
+      return "status-in_progress";
+    case "resolved":
+      return "status-resolved";
+    case "spam":
+      return "status-spam";
+    default:
+      return "status-open";
   }
 };
 

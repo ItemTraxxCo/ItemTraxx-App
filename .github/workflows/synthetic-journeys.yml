@@ -10,7 +10,11 @@ on:
     - cron: "7,37 * * * *"
 
 jobs:
+  kill-switch-preflight:
+    uses: ./.github/workflows/kill-switch-preflight.yml
+
   slack-notify-start:
+    needs: kill-switch-preflight
     uses: ./.github/workflows/slack-notify-status.yml
     with:
       mode: start
@@ -22,7 +26,10 @@ jobs:
     secrets: inherit
 
   synthetic-smoke:
-    needs: slack-notify-start
+    needs:
+      - kill-switch-preflight
+      - slack-notify-start
+    if: ${{ needs.kill-switch-preflight.outputs.active != 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
@@ -51,10 +58,32 @@ jobs:
       slack_message_ts: ${{ needs.slack-notify-start.outputs.slack_message_ts }}
     secrets: inherit
 
+  slack-notify-kill-switch-skip:
+    needs:
+      - kill-switch-preflight
+      - slack-notify-start
+      - synthetic-smoke
+    if: ${{ always() && needs.kill-switch-preflight.outputs.active == 'true' && needs.synthetic-smoke.result == 'skipped' }}
+    uses: ./.github/workflows/slack-notify-status.yml
+    with:
+      mode: finish
+      workflow_name: Synthetic Journeys
+      job_name: synthetic-smoke
+      run_url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+      ref_name: ${{ github.ref_name }}
+      sha: ${{ github.sha }}
+      status: skipped
+      status_message: ${{ format('Intentionally skipped because the ItemTraxx kill switch is active. {0}', needs.kill-switch-preflight.outputs.message) }}
+      slack_channel_id: ${{ needs.slack-notify-start.outputs.slack_channel_id }}
+      slack_message_ts: ${{ needs.slack-notify-start.outputs.slack_message_ts }}
+      incident_alerts_enabled: false
+    secrets: inherit
+
   incidentio-notify-failure:
     needs:
+      - kill-switch-preflight
       - synthetic-smoke
-    if: ${{ always() && (needs.synthetic-smoke.result == 'failure' || needs.synthetic-smoke.result == 'cancelled') }}
+    if: ${{ always() && needs.kill-switch-preflight.outputs.active != 'true' && (needs.synthetic-smoke.result == 'failure' || needs.synthetic-smoke.result == 'cancelled') }}
     uses: ./.github/workflows/incidentio-workflow-alert.yml
     with:
       status: ${{ needs.synthetic-smoke.result }}

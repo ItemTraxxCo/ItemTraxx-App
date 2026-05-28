@@ -63,6 +63,39 @@ curl_http_code() {
   echo "$http_code"
 }
 
+body_has_kill_switch_message() {
+  local body_file="$1"
+  if [ ! -s "$body_file" ]; then
+    return 1
+  fi
+  grep -Eiq 'kill switch|killswitch|currently unavailable|maintenance' "$body_file"
+}
+
+kill_switch_active() {
+  local status_file
+  status_file="$(mktemp)"
+  local status
+  status="$(curl_http_code "$status_file" \
+    --connect-timeout 5 --max-time 15 \
+    -H "Accept: application/json" \
+    -H "Origin: ${BASE_URL}" \
+    "${EDGE_URL}/system-status")"
+
+  if [ "$status" -ge 200 ] && [ "$status" -lt 300 ] && jq -e '.kill_switch.enabled == true' "$status_file" >/dev/null 2>&1; then
+    rm -f "$status_file"
+    return 0
+  fi
+
+  rm -f "$status_file"
+  return 1
+}
+
+skip_for_kill_switch() {
+  local target="$1"
+  echo "Kill switch active; treating ${target} as intentional maintenance skip."
+  exit 0
+}
+
 check_html_route() {
   local url="$1"
   echo "== smoke route $url"
@@ -71,18 +104,28 @@ check_html_route() {
   local status
 
   while [ "$attempt" -le "$SMOKE_HTML_MAX_ATTEMPTS" ]; do
-    status="$(curl_http_code /dev/null \
+    local body_file
+    body_file="$(mktemp)"
+    status="$(curl_http_code "$body_file" \
       --http1.1 -I -A "$BROWSER_UA" \
       --connect-timeout 5 --max-time 15 \
       "$url")"
     if ! retryable_http_status "$status"; then
+      rm -f "$body_file"
       return 0
+    fi
+
+    if [ "$status" -eq 503 ] && kill_switch_active; then
+      rm -f "$body_file"
+      skip_for_kill_switch "$url"
     fi
 
     if [ "$attempt" -eq "$SMOKE_HTML_MAX_ATTEMPTS" ]; then
       echo "Route returned HTTP $status after ${SMOKE_HTML_MAX_ATTEMPTS} attempts: $url"
+      rm -f "$body_file"
       return 1
     fi
+    rm -f "$body_file"
     echo "Route returned HTTP $status (attempt ${attempt}/${SMOKE_HTML_MAX_ATTEMPTS}); retrying in ~${sleep_s}s: $url"
     smoke_jitter_sleep "$sleep_s"
     sleep_s="$((sleep_s * 2))"
@@ -103,6 +146,10 @@ check_status_endpoint() {
       -H "Origin: ${BASE_URL}")"
     if ! retryable_http_status "$status"; then
       return 0
+    fi
+
+    if [ "$status" -eq 503 ] && jq -e '.kill_switch.enabled == true' /tmp/itx_status_body.json >/dev/null 2>&1; then
+      skip_for_kill_switch "${EDGE_URL}/system-status"
     fi
 
     if [ "$attempt" -eq "$SMOKE_EDGE_MAX_ATTEMPTS" ]; then
@@ -135,6 +182,10 @@ check_contact_sales_validation() {
       --data '{"plan":"core"}')"
     if ! retryable_http_status "$status"; then
       return 0
+    fi
+
+    if [ "$status" -eq 503 ] && body_has_kill_switch_message /tmp/itx_contact_body.json && kill_switch_active; then
+      skip_for_kill_switch "${EDGE_URL}/contact-sales-submit"
     fi
 
     if [ "$attempt" -eq "$SMOKE_EDGE_MAX_ATTEMPTS" ]; then

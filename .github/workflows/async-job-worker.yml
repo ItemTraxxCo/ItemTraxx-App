@@ -10,7 +10,11 @@ on:
     - cron: "3,13,23,33,43,53 * * * *"
 
 jobs:
+  kill-switch-preflight:
+    uses: ./.github/workflows/kill-switch-preflight.yml
+
   slack-notify-start:
+    needs: kill-switch-preflight
     uses: ./.github/workflows/slack-notify-status.yml
     with:
       mode: start
@@ -22,7 +26,10 @@ jobs:
     secrets: inherit
 
   process-jobs:
-    needs: slack-notify-start
+    needs:
+      - kill-switch-preflight
+      - slack-notify-start
+    if: ${{ needs.kill-switch-preflight.outputs.active != 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
@@ -58,10 +65,32 @@ jobs:
       slack_message_ts: ${{ needs.slack-notify-start.outputs.slack_message_ts }}
     secrets: inherit
 
+  slack-notify-kill-switch-skip:
+    needs:
+      - kill-switch-preflight
+      - slack-notify-start
+      - process-jobs
+    if: ${{ always() && needs.kill-switch-preflight.outputs.active == 'true' && needs.process-jobs.result == 'skipped' }}
+    uses: ./.github/workflows/slack-notify-status.yml
+    with:
+      mode: finish
+      workflow_name: Async Job Worker
+      job_name: process-jobs
+      run_url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+      ref_name: ${{ github.ref_name }}
+      sha: ${{ github.sha }}
+      status: skipped
+      status_message: ${{ format('Intentionally skipped because the ItemTraxx kill switch is active. {0}', needs.kill-switch-preflight.outputs.message) }}
+      slack_channel_id: ${{ needs.slack-notify-start.outputs.slack_channel_id }}
+      slack_message_ts: ${{ needs.slack-notify-start.outputs.slack_message_ts }}
+      incident_alerts_enabled: false
+    secrets: inherit
+
   incidentio-notify-failure:
     needs:
+      - kill-switch-preflight
       - process-jobs
-    if: ${{ always() && (needs.process-jobs.result == 'failure' || needs.process-jobs.result == 'cancelled') }}
+    if: ${{ always() && needs.kill-switch-preflight.outputs.active != 'true' && (needs.process-jobs.result == 'failure' || needs.process-jobs.result == 'cancelled') }}
     uses: ./.github/workflows/incidentio-workflow-alert.yml
     with:
       status: ${{ needs.process-jobs.result }}

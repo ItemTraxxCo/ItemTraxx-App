@@ -41,7 +41,7 @@ import { computed, onMounted, onUnmounted, ref } from "vue";
 import { fetchSystemStatus } from "../services/systemStatusService";
 
 const DEFAULT_KILL_SWITCH_MESSAGE =
-  "Unfortunately ItemTraxx is currently unavailable. We apologize for any inconvenience and are working to restore access as soon as possible. Please see the status page (https://status.itemtraxx.com/) for more information.";
+  "Unfortunately ItemTraxx is currently unavailable. We apologize for any inconvenience and are working to restore access as soon as possible. Please see the status page for more information.";
 
 const message = ref(DEFAULT_KILL_SWITCH_MESSAGE);
 const lightBrandLogoUrl = import.meta.env.VITE_BRAND_LOGO_LIGHT_URL as string | undefined;

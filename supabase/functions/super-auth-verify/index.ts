@@ -180,6 +180,57 @@ const digest = async (value: string) => {
     .join("");
 };
 
+const parseJwtPayload = (token: string): Record<string, unknown> | null => {
+  const parts = token.split(".");
+  if (parts.length < 2) return null;
+  try {
+    const raw = parts[1].replace(/-/g, "+").replace(/_/g, "/");
+    const padded = raw + "=".repeat((4 - (raw.length % 4)) % 4);
+    return JSON.parse(atob(padded)) as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+};
+
+const collectAuthMethods = (value: unknown): string[] => {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .flatMap((item) => {
+      if (typeof item === "string") return [item];
+      if (!item || typeof item !== "object") return [];
+      const record = item as Record<string, unknown>;
+      return [record.method, record.name, record.type].filter(
+        (entry): entry is string => typeof entry === "string",
+      );
+    })
+    .map((method) => method.trim().toLowerCase())
+    .filter(Boolean);
+};
+
+const isPasskeyOrMfaBackedAuthToken = (authToken: string) => {
+  const payload = parseJwtPayload(authToken);
+  if (!payload) {
+    return false;
+  }
+
+  const aal = typeof payload.aal === "string" ? payload.aal.trim().toLowerCase() : "";
+  if (aal === "aal2") {
+    return true;
+  }
+
+  const authMethods = new Set([
+    ...collectAuthMethods(payload.amr),
+    ...collectAuthMethods((payload.app_metadata as Record<string, unknown> | undefined)?.amr),
+  ]);
+
+  return ["passkey", "webauthn", "fido2", "security_key", "mfa", "totp", "otp"].some((method) =>
+    authMethods.has(method)
+  );
+};
+
 const escapeHtml = (value: string) =>
   value
     .replaceAll("&", "&amp;")
@@ -598,6 +649,11 @@ serve(async (req) => {
     };
 
     if (body.action === "complete_passkey_login") {
+      if (!isPasskeyOrMfaBackedAuthToken(context.authToken)) {
+        await writeAudit("super_admin_passkey_rejected", { reason: "missing_passkey_or_mfa_claim" });
+        return jsonResponse(403, { error: "Passkey verification required." });
+      }
+
       await registerPrivilegedStepUp(adminClient, {
         userId: context.userId,
         roleScope: "super_admin",

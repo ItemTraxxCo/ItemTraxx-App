@@ -52,3 +52,9 @@ CONVERSATION_HANDOFF.md
 # Local generated previews
 tmp/email-previews/
 AGENTS.md
+.agents/plugins/marketplace.json
+.codex-plugins/caveman/.codex-plugin/plugin.json
+.codex-plugins/caveman/skills/caveman/SKILL.md
+
+# Local cloned skill repos
+codex-skills/

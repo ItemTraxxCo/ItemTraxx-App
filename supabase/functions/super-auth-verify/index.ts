@@ -16,6 +16,7 @@ import { isAllowedOrigin, parseAllowedOrigins } from "../_shared/cors.ts";
 import { requireTrustedEdgeIngress } from "../_shared/trustedIngress.ts";
 import {
   requireEmail,
+  optionalText,
   requireText,
   ValidationError,
 } from "../_shared/validation.ts";
@@ -602,7 +603,9 @@ serve(async (req) => {
     }
 
     const authToken = parseAuthToken(req);
-    const challengeToken = requireText((body.payload as { challenge_token?: string } | undefined)?.challenge_token, { maxLen: 8192 });
+    const challengeToken = body.action === "complete_passkey_login"
+      ? optionalText((body.payload as { challenge_token?: string } | undefined)?.challenge_token, { maxLen: 8192 })
+      : requireText((body.payload as { challenge_token?: string } | undefined)?.challenge_token, { maxLen: 8192 });
 
     let context: SuperAdminContext;
     try {

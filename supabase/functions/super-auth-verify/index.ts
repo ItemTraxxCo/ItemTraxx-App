@@ -211,15 +211,10 @@ const collectAuthMethods = (value: unknown): string[] => {
     .filter(Boolean);
 };
 
-const isPasskeyOrMfaBackedAuthToken = (authToken: string) => {
+const isPasskeyBackedAuthToken = (authToken: string) => {
   const payload = parseJwtPayload(authToken);
   if (!payload) {
     return false;
-  }
-
-  const aal = typeof payload.aal === "string" ? payload.aal.trim().toLowerCase() : "";
-  if (aal === "aal2") {
-    return true;
   }
 
   const authMethods = new Set([
@@ -227,7 +222,7 @@ const isPasskeyOrMfaBackedAuthToken = (authToken: string) => {
     ...collectAuthMethods((payload.app_metadata as Record<string, unknown> | undefined)?.amr),
   ]);
 
-  return ["passkey", "webauthn", "fido2", "security_key", "mfa", "totp", "otp"].some((method) =>
+  return ["passkey", "webauthn", "fido2", "security_key"].some((method) =>
     authMethods.has(method)
   );
 };
@@ -652,8 +647,8 @@ serve(async (req) => {
     };
 
     if (body.action === "complete_passkey_login") {
-      if (!isPasskeyOrMfaBackedAuthToken(context.authToken)) {
-        await writeAudit("super_admin_passkey_rejected", { reason: "missing_passkey_or_mfa_claim" });
+      if (!isPasskeyBackedAuthToken(context.authToken)) {
+        await writeAudit("super_admin_passkey_rejected", { reason: "missing_passkey_claim" });
         return jsonResponse(403, { error: "Passkey verification required." });
       }
 

@@ -32,5 +32,11 @@ create policy "super_admin_all_districts"
   on public.districts
   for all
   to authenticated
-  using (public.current_user_role() = 'super_admin')
-  with check (public.current_user_role() = 'super_admin');
+  using (
+    public.current_user_role() = 'super_admin'
+    and public.has_recent_privileged_step_up('super_admin')
+  )
+  with check (
+    public.current_user_role() = 'super_admin'
+    and public.has_recent_privileged_step_up('super_admin')
+  );

@@ -25,7 +25,7 @@
         <button type="button" @click="exportPdf">Export PDF</button>
       </div>
 
-      <p v-if="isLoading" class="muted">Loading logs...</p>
+      <SkeletonLoader v-if="isLoading" variant="table" :rows="7" :columns="5" label="Loading all logs" />
       <p v-else-if="error" class="error">{{ error }}</p>
       <table v-else class="table">
         <thead><tr><th>Time</th><th>Tenant</th><th>Action</th><th>Item</th><th>Borrower</th></tr></thead>
@@ -53,6 +53,7 @@
 <script setup lang="ts">
 import { onMounted, ref } from "vue";
 import { RouterLink, useRouter } from "vue-router";
+import SkeletonLoader from "../../components/SkeletonLoader.vue";
 import {
   handleSuperAdminUnauthorized,
   isUnauthorizedError,

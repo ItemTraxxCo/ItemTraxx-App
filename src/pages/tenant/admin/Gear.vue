@@ -109,7 +109,7 @@
         </label>
       </div>
       <p class="muted">Showing {{ filteredGear.length }} of {{ gear.length }} items.</p>
-      <p v-if="isLoading" class="muted">Loading items...</p>
+      <SkeletonLoader v-if="isLoading" variant="table" :rows="6" :columns="6" label="Loading items" />
       <div v-else class="table-wrap">
       <table class="table">
         <thead>
@@ -255,7 +255,7 @@
           <p class="admin-section-copy">Archived items can be restored when needed.</p>
         </div>
       </div>
-      <p v-if="isLoadingArchived" class="muted">Loading archived items...</p>
+      <SkeletonLoader v-if="isLoadingArchived" variant="table" :rows="4" :columns="7" label="Loading archived items" />
       <div v-else class="table-wrap">
       <table class="table">
         <thead>
@@ -299,6 +299,7 @@
 import { computed, onMounted, onUnmounted, ref } from "vue";
 import { RouterLink } from "vue-router";
 import CameraBarcodeScannerModal from "../../../components/CameraBarcodeScannerModal.vue";
+import SkeletonLoader from "../../../components/SkeletonLoader.vue";
 import { getAuthState } from "../../../store/authState";
 import { logAdminAction } from "../../../services/auditLogService";
 import { enforceAdminRateLimit } from "../../../services/rateLimitService";

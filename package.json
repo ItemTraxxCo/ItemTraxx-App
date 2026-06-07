@@ -36,7 +36,7 @@
     "jsbarcode": "^3.12.3",
     "jspdf": "^4.2.1",
     "jspdf-autotable": "^5.0.8",
-    "posthog-js": "^1.380.1",
+    "posthog-js": "^1.382.0",
     "supabase": "2.105.0",
     "vue": "^3.5.35",
     "vue-router": "^4.6.4",
@@ -44,7 +44,7 @@
   },
   "devDependencies": {
     "@playwright/test": "^1.60.0",
-    "@types/node": "^25.9.1",
+    "@types/node": "^25.9.2",
     "@vitejs/plugin-vue": "^6.0.7",
     "@vue/tsconfig": "^0.9.1",
     "rollup": "^4.61.1",

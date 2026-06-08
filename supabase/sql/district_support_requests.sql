@@ -23,19 +23,24 @@ create policy "district_admin_select_own_support_requests"
   for select
   to authenticated
   using (
-    exists (
-      select 1
-      from public.profiles p
-      where p.id = auth.uid()
-        and p.role = 'district_admin'
-        and p.district_id = district_support_requests.district_id
+    (
+      exists (
+        select 1
+        from public.profiles p
+        where p.id = auth.uid()
+          and p.role = 'district_admin'
+          and p.district_id = district_support_requests.district_id
+      )
+      and public.has_recent_privileged_step_up('district_admin')
     )
-    and public.has_recent_privileged_step_up('district_admin')
-    or exists (
-      select 1
-      from public.profiles p
-      where p.id = auth.uid()
-        and p.role = 'super_admin'
+    or (
+      exists (
+        select 1
+        from public.profiles p
+        where p.id = auth.uid()
+          and p.role = 'super_admin'
+      )
+      and public.has_recent_privileged_step_up('super_admin')
     )
   );
 
@@ -45,17 +50,22 @@ create policy "district_admin_insert_own_support_requests"
   for insert
   to authenticated
   with check (
-    exists (
-      select 1
-      from public.profiles p
-      where p.id = auth.uid()
-        and p.role = 'district_admin'
-        and p.district_id = district_support_requests.district_id
+    (
+      exists (
+        select 1
+        from public.profiles p
+        where p.id = auth.uid()
+          and p.role = 'district_admin'
+          and p.district_id = district_support_requests.district_id
+      )
     )
-    or exists (
-      select 1
-      from public.profiles p
-      where p.id = auth.uid()
-        and p.role = 'super_admin'
+    or (
+      exists (
+        select 1
+        from public.profiles p
+        where p.id = auth.uid()
+          and p.role = 'super_admin'
+      )
+      and public.has_recent_privileged_step_up('super_admin')
     )
   );

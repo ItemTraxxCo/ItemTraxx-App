@@ -1,7 +1,8 @@
 {
   "version": "5",
   "redirects": {
-    "https://esm.sh/@supabase/supabase-js@2": "https://esm.sh/@supabase/supabase-js@2.97.0"
+    "https://esm.sh/@supabase/supabase-js@2": "https://esm.sh/@supabase/supabase-js@2.97.0",
+    "https://esm.sh/iceberg-js@^0.8.1?target=denonext": "https://esm.sh/iceberg-js@0.8.1?target=denonext"
   },
   "remote": {
     "https://deno.land/std@0.177.0/async/abortable.ts": "73acfb3ed7261ce0d930dbe89e43db8d34e017b063cf0eaa7d215477bf53442e",
@@ -15,39 +16,49 @@
     "https://deno.land/std@0.177.0/async/retry.ts": "5efa3ba450ac0c07a40a82e2df296287b5013755d232049efd7ea2244f15b20f",
     "https://deno.land/std@0.177.0/async/tee.ts": "47e42d35f622650b02234d43803d0383a89eb4387e1b83b5a40106d18ae36757",
     "https://deno.land/std@0.177.0/http/server.ts": "cbb17b594651215ba95c01a395700684e569c165a567e4e04bba327f41197433",
-    "https://esm.sh/@supabase/supabase-js@2.97.0": "dcdf60d835a7a2edf75c186e8bb33fa5f43fec7dec96c93c89abfbb20b78245d"
+    "https://esm.sh/@supabase/auth-js@2.97.0/denonext/auth-js.mjs": "1647921d7d6c64ddb79cab6feefc5b8f373a97c6421695ae5af69514e42eacf3",
+    "https://esm.sh/@supabase/functions-js@2.97.0/denonext/functions-js.mjs": "89de9a4b9ff7b3d000c84989e586a53b3905f3e0bf3570b7595e24694b6d4e9e",
+    "https://esm.sh/@supabase/postgrest-js@2.97.0/denonext/postgrest-js.mjs": "7cdf9ffe7047f77421dad5af748d5e0e43b6253debdd85f3d71a9dec7bea39b6",
+    "https://esm.sh/@supabase/realtime-js@2.97.0/denonext/realtime-js.mjs": "4633785191d028eb751065b5f65443e982f14e68840f8c6559cdd300fa37bc4b",
+    "https://esm.sh/@supabase/storage-js@2.97.0/denonext/storage-js.mjs": "aed9af8fb795068fb6fb945f76bfe40a4dce0a84e22b60f333ee029b62c91f22",
+    "https://esm.sh/@supabase/supabase-js@2.97.0": "dcdf60d835a7a2edf75c186e8bb33fa5f43fec7dec96c93c89abfbb20b78245d",
+    "https://esm.sh/@supabase/supabase-js@2.97.0/denonext/supabase-js.mjs": "745f4cc1905e434b7a54fa2d48d875c920f1ef5d8ad9a964f8b079e3c7bd25ca",
+    "https://esm.sh/iceberg-js@0.8.1/denonext/iceberg-js.mjs": "d839d81a2e3966500ca2cdd0c1cb458e9608bacfc91f7bb67a69b2e878dcdb4f",
+    "https://esm.sh/iceberg-js@0.8.1?target=denonext": "58c849d7fe2bf4eca4a84eb501e83c161a7d8c34ca1bec15a962b3bec3062633",
+    "https://esm.sh/tslib@2.8.1/denonext/tslib.mjs": "c38da5dd6da6281964435002ce204cd586634fe3bdfb24a0ee116f48cf3292e9"
   },
   "workspace": {
     "packageJson": {
       "dependencies": [
-        "npm:@playwright/test@^1.59.1",
-        "npm:@posthog/react@^1.9.0",
-        "npm:@sentry/vue@^10.50.0",
-        "npm:@supabase/supabase-js@^2.104.1",
-        "npm:@types/node@^25.6.0",
+        "npm:@playwright/test@^1.60.0",
+        "npm:@posthog/react@^1.10.0",
+        "npm:@sentry/vue@^10.56.0",
+        "npm:@supabase/supabase-js@^2.107.0",
+        "npm:@types/node@^25.9.1",
         "npm:@vercel/analytics@^2.0.1",
         "npm:@vercel/speed-insights@2",
-        "npm:@vitejs/plugin-vue@^6.0.6",
+        "npm:@vitejs/plugin-vue@^6.0.7",
         "npm:@vue/tsconfig@~0.9.1",
         "npm:jsbarcode@^3.12.3",
-        "npm:jspdf-autotable@^5.0.7",
+        "npm:jspdf-autotable@^5.0.8",
         "npm:jspdf@^4.2.1",
-        "npm:posthog-js@^1.372.6",
-        "npm:rollup@^4.60.2",
-        "npm:supabase@2.95.3",
+        "npm:posthog-js@^1.380.1",
+        "npm:rollup@^4.61.1",
+        "npm:supabase@2.105.0",
         "npm:typescript@~6.0.3",
-        "npm:vite@^8.0.10",
+        "npm:vite@^8.0.16",
         "npm:vue-router@^4.6.4",
-        "npm:vue-tsc@^3.2.7",
-        "npm:vue@^3.5.33",
-        "npm:wrangler@^4.85.0",
+        "npm:vue-tsc@^3.3.3",
+        "npm:vue@^3.5.35",
+        "npm:wrangler@^4.98.0",
         "npm:zod-to-json-schema@^3.25.2",
-        "npm:zod@^4.3.6"
+        "npm:zod@^4.4.3"
       ],
       "overrides": {
         "tar": "^7.5.10",
         "tar@<=7.5.11": "7.5.11",
-        "protobufjs@<=8.2.0": "8.2.0"
+        "protobufjs@<=8.2.0": "8.2.0",
+        "ws": "^8.20.1"
       }
     }
   }

@@ -46,7 +46,7 @@
       <p v-if="studentLookupCooldownSeconds > 0" class="muted checkout-rate-limit-note">
         Try again in {{ studentLookupCooldownSeconds }} second{{ studentLookupCooldownSeconds === 1 ? "" : "s" }}.
       </p>
-      <p v-if="isStudentLoading" class="muted checkout-status-note">Loading borrower...</p>
+      <SkeletonLoader v-if="isStudentLoading" class="checkout-student-skeleton" variant="card" :rows="1" label="Loading borrower" />
 
       <div v-if="student" class="checkout-student-summary">
         <p>
@@ -157,6 +157,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref } from "vue";
 import CameraBarcodeScannerModal from "../../components/CameraBarcodeScannerModal.vue";
+import SkeletonLoader from "../../components/SkeletonLoader.vue";
 import {
   consumeCheckoutOfflineWarning,
   fetchCheckedOutGear,

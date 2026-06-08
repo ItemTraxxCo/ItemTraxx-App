@@ -42,4 +42,5 @@ create policy "super_admin_sessions_select_own"
       where p.id = auth.uid()
         and p.role = 'super_admin'
     )
+    and public.has_recent_privileged_step_up('super_admin')
   );

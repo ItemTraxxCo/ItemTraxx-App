@@ -62,8 +62,14 @@ create policy "super_admin_all_tenants"
 on public.tenants
 for all
 to authenticated
-using (public.current_user_role() = 'super_admin')
-with check (public.current_user_role() = 'super_admin');
+using (
+  public.current_user_role() = 'super_admin'
+  and public.has_recent_privileged_step_up('super_admin')
+)
+with check (
+  public.current_user_role() = 'super_admin'
+  and public.has_recent_privileged_step_up('super_admin')
+);
 
 -- profiles
 
@@ -89,8 +95,14 @@ create policy "super_admin_all_profiles"
 on public.profiles
 for all
 to authenticated
-using (public.current_user_role() = 'super_admin')
-with check (public.current_user_role() = 'super_admin');
+using (
+  public.current_user_role() = 'super_admin'
+  and public.has_recent_privileged_step_up('super_admin')
+)
+with check (
+  public.current_user_role() = 'super_admin'
+  and public.has_recent_privileged_step_up('super_admin')
+);
 
 -- students
 
@@ -125,8 +137,14 @@ create policy "super_admin_all_students"
 on public.students
 for all
 to authenticated
-using (public.current_user_role() = 'super_admin')
-with check (public.current_user_role() = 'super_admin');
+using (
+  public.current_user_role() = 'super_admin'
+  and public.has_recent_privileged_step_up('super_admin')
+)
+with check (
+  public.current_user_role() = 'super_admin'
+  and public.has_recent_privileged_step_up('super_admin')
+);
 
 -- gear
 
@@ -161,8 +179,14 @@ create policy "super_admin_all_gear"
 on public.gear
 for all
 to authenticated
-using (public.current_user_role() = 'super_admin')
-with check (public.current_user_role() = 'super_admin');
+using (
+  public.current_user_role() = 'super_admin'
+  and public.has_recent_privileged_step_up('super_admin')
+)
+with check (
+  public.current_user_role() = 'super_admin'
+  and public.has_recent_privileged_step_up('super_admin')
+);
 
 -- gear logs
 
@@ -192,8 +216,14 @@ create policy "super_admin_all_gear_logs"
 on public.gear_logs
 for all
 to authenticated
-using (public.current_user_role() = 'super_admin')
-with check (public.current_user_role() = 'super_admin');
+using (
+  public.current_user_role() = 'super_admin'
+  and public.has_recent_privileged_step_up('super_admin')
+)
+with check (
+  public.current_user_role() = 'super_admin'
+  and public.has_recent_privileged_step_up('super_admin')
+);
 
 -- admin audit logs
 
@@ -224,9 +254,13 @@ create policy "super_admin_all_admin_audit_logs"
 on public.admin_audit_logs
 for all
 to authenticated
-using (public.current_user_role() = 'super_admin')
+using (
+  public.current_user_role() = 'super_admin'
+  and public.has_recent_privileged_step_up('super_admin')
+)
 with check (
   public.current_user_role() = 'super_admin'
+  and public.has_recent_privileged_step_up('super_admin')
   and actor_id = auth.uid()
 );
 
@@ -263,8 +297,14 @@ create policy "super_admin_all_tenant_policies"
 on public.tenant_policies
 for all
 to authenticated
-using (public.current_user_role() = 'super_admin')
-with check (public.current_user_role() = 'super_admin');
+using (
+  public.current_user_role() = 'super_admin'
+  and public.has_recent_privileged_step_up('super_admin')
+)
+with check (
+  public.current_user_role() = 'super_admin'
+  and public.has_recent_privileged_step_up('super_admin')
+);
 
 -- tenant security controls
 
@@ -283,8 +323,14 @@ create policy "super_admin_all_security_controls"
 on public.tenant_security_controls
 for all
 to authenticated
-using (public.current_user_role() = 'super_admin')
-with check (public.current_user_role() = 'super_admin');
+using (
+  public.current_user_role() = 'super_admin'
+  and public.has_recent_privileged_step_up('super_admin')
+)
+with check (
+  public.current_user_role() = 'super_admin'
+  and public.has_recent_privileged_step_up('super_admin')
+);
 
 -- gear status history
 
@@ -314,8 +360,14 @@ create policy "super_admin_all_gear_status_history"
 on public.gear_status_history
 for all
 to authenticated
-using (public.current_user_role() = 'super_admin')
-with check (public.current_user_role() = 'super_admin');
+using (
+  public.current_user_role() = 'super_admin'
+  and public.has_recent_privileged_step_up('super_admin')
+)
+with check (
+  public.current_user_role() = 'super_admin'
+  and public.has_recent_privileged_step_up('super_admin')
+);
 
 -- super/admin runtime tables
 
@@ -324,37 +376,67 @@ create policy "super_admin_all_runtime_config"
 on public.app_runtime_config
 for all
 to authenticated
-using (public.current_user_role() = 'super_admin')
-with check (public.current_user_role() = 'super_admin');
+using (
+  public.current_user_role() = 'super_admin'
+  and public.has_recent_privileged_step_up('super_admin')
+)
+with check (
+  public.current_user_role() = 'super_admin'
+  and public.has_recent_privileged_step_up('super_admin')
+);
 
 drop policy if exists "super_admin_all_alert_rules" on public.super_alert_rules;
 create policy "super_admin_all_alert_rules"
 on public.super_alert_rules
 for all
 to authenticated
-using (public.current_user_role() = 'super_admin')
-with check (public.current_user_role() = 'super_admin');
+using (
+  public.current_user_role() = 'super_admin'
+  and public.has_recent_privileged_step_up('super_admin')
+)
+with check (
+  public.current_user_role() = 'super_admin'
+  and public.has_recent_privileged_step_up('super_admin')
+);
 
 drop policy if exists "super_admin_all_approvals" on public.super_approvals;
 create policy "super_admin_all_approvals"
 on public.super_approvals
 for all
 to authenticated
-using (public.current_user_role() = 'super_admin')
-with check (public.current_user_role() = 'super_admin');
+using (
+  public.current_user_role() = 'super_admin'
+  and public.has_recent_privileged_step_up('super_admin')
+)
+with check (
+  public.current_user_role() = 'super_admin'
+  and public.has_recent_privileged_step_up('super_admin')
+);
 
 drop policy if exists "super_admin_all_jobs" on public.super_jobs;
 create policy "super_admin_all_jobs"
 on public.super_jobs
 for all
 to authenticated
-using (public.current_user_role() = 'super_admin')
-with check (public.current_user_role() = 'super_admin');
+using (
+  public.current_user_role() = 'super_admin'
+  and public.has_recent_privileged_step_up('super_admin')
+)
+with check (
+  public.current_user_role() = 'super_admin'
+  and public.has_recent_privileged_step_up('super_admin')
+);
 
 drop policy if exists "super_admin_all_super_audit_logs" on public.super_admin_audit_logs;
 create policy "super_admin_all_super_audit_logs"
 on public.super_admin_audit_logs
 for all
 to authenticated
-using (public.current_user_role() = 'super_admin')
-with check (public.current_user_role() = 'super_admin');
+using (
+  public.current_user_role() = 'super_admin'
+  and public.has_recent_privileged_step_up('super_admin')
+)
+with check (
+  public.current_user_role() = 'super_admin'
+  and public.has_recent_privileged_step_up('super_admin')
+);

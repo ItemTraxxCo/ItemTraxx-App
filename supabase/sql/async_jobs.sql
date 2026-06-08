@@ -126,4 +126,5 @@ create policy "super_admin_select_async_jobs"
       where p.id = auth.uid()
         and p.role = 'super_admin'
     )
+    and public.has_recent_privileged_step_up('super_admin')
   );

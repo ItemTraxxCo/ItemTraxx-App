@@ -92,29 +92,44 @@ create policy "super_admin_select_support_requests"
   on public.support_requests
   for select
   to authenticated
-  using (public.current_user_role() = 'super_admin');
+  using (
+    public.current_user_role() = 'super_admin'
+    and public.has_recent_privileged_step_up('super_admin')
+  );
 
 drop policy if exists "super_admin_update_support_requests" on public.support_requests;
 create policy "super_admin_update_support_requests"
   on public.support_requests
   for update
   to authenticated
-  using (public.current_user_role() = 'super_admin')
-  with check (public.current_user_role() = 'super_admin');
+  using (
+    public.current_user_role() = 'super_admin'
+    and public.has_recent_privileged_step_up('super_admin')
+  )
+  with check (
+    public.current_user_role() = 'super_admin'
+    and public.has_recent_privileged_step_up('super_admin')
+  );
 
 drop policy if exists "super_admin_select_support_request_attachments" on public.support_request_attachments;
 create policy "super_admin_select_support_request_attachments"
   on public.support_request_attachments
   for select
   to authenticated
-  using (public.current_user_role() = 'super_admin');
+  using (
+    public.current_user_role() = 'super_admin'
+    and public.has_recent_privileged_step_up('super_admin')
+  );
 
 drop policy if exists "super_admin_select_support_request_events" on public.support_request_events;
 create policy "super_admin_select_support_request_events"
   on public.support_request_events
   for select
   to authenticated
-  using (public.current_user_role() = 'super_admin');
+  using (
+    public.current_user_role() = 'super_admin'
+    and public.has_recent_privileged_step_up('super_admin')
+  );
 
 drop policy if exists "super_admin_insert_support_request_events" on public.support_request_events;
 create policy "super_admin_insert_support_request_events"
@@ -123,6 +138,7 @@ create policy "super_admin_insert_support_request_events"
   to authenticated
   with check (
     public.current_user_role() = 'super_admin'
+    and public.has_recent_privileged_step_up('super_admin')
     and actor_id = auth.uid()
   );
 

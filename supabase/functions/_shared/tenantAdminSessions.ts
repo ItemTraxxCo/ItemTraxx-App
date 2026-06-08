@@ -7,7 +7,10 @@ type SupabaseLikeClient = {
   from: (table: string) => any;
 };
 
-const isMissingRelation = (error: RpcError | null | undefined, relation: string) =>
+const isMissingRelation = (
+  error: RpcError | null | undefined,
+  relation: string,
+) =>
   !!error &&
   error.code === "42P01" &&
   (error.message ?? "").toLowerCase().includes(relation.toLowerCase());
@@ -17,9 +20,15 @@ const isMissingColumn = (error: RpcError | null | undefined, column: string) =>
   error.code === "42703" &&
   (error.message ?? "").toLowerCase().includes(column.toLowerCase());
 
+const TENANT_ADMIN_SESSION_COLUMNS =
+  "id, auth_session_id, auth_token_issued_at";
+
 const decodeBase64Url = (value: string) => {
   const normalized = value.replace(/-/g, "+").replace(/_/g, "/");
-  const padded = normalized.padEnd(normalized.length + ((4 - (normalized.length % 4)) % 4), "=");
+  const padded = normalized.padEnd(
+    normalized.length + ((4 - (normalized.length % 4)) % 4),
+    "=",
+  );
   return atob(padded);
 };
 
@@ -28,7 +37,9 @@ const parseJwtPayload = (authToken: string): Record<string, unknown> | null => {
     const payload = authToken.split(".")[1];
     if (!payload) return null;
     const decoded = JSON.parse(decodeBase64Url(payload));
-    return decoded && typeof decoded === "object" ? (decoded as Record<string, unknown>) : null;
+    return decoded && typeof decoded === "object"
+      ? (decoded as Record<string, unknown>)
+      : null;
   } catch {
     return null;
   }
@@ -36,10 +47,13 @@ const parseJwtPayload = (authToken: string): Record<string, unknown> | null => {
 
 export const resolveTenantAdminAuthSessionBinding = (authToken: string) => {
   const payload = parseJwtPayload(authToken);
-  const sessionId = typeof payload?.session_id === "string" ? payload.session_id.trim() : "";
-  const issuedAt = typeof payload?.iat === "number" && Number.isFinite(payload.iat)
-    ? new Date(payload.iat * 1000).toISOString()
-    : null;
+  const sessionId = typeof payload?.session_id === "string"
+    ? payload.session_id.trim()
+    : "";
+  const issuedAt =
+    typeof payload?.iat === "number" && Number.isFinite(payload.iat)
+      ? new Date(payload.iat * 1000).toISOString()
+      : null;
 
   return {
     sessionId: sessionId || null,
@@ -53,7 +67,7 @@ export const isTenantAdminTokenBlockedBySessionRevocation = async (
     tenantId: string;
     profileId: string;
     authToken: string;
-  }
+  },
 ) => {
   const binding = resolveTenantAdminAuthSessionBinding(params.authToken);
   if (!binding.sessionId && !binding.issuedAt) {
@@ -119,40 +133,113 @@ export const validateTenantAdminDeviceSession = async (
     profileId: string;
     deviceId: string | null;
     authToken: string;
-  }
+  },
 ) => {
   if (!params.deviceId) {
-    return { valid: false as const, reason: "missing_device" as const, relationMissing: false as const };
+    return {
+      valid: false as const,
+      reason: "missing_device" as const,
+      relationMissing: false as const,
+    };
   }
 
-  const { data: activeSession, error: activeSessionError } = await client
+  const binding = resolveTenantAdminAuthSessionBinding(params.authToken);
+  if (!binding.sessionId && !binding.issuedAt) {
+    return {
+      valid: false as const,
+      reason: "revoked_token" as const,
+      relationMissing: false as const,
+    };
+  }
+
+  const tokenBlock = await isTenantAdminTokenBlockedBySessionRevocation(
+    client,
+    params,
+  );
+  if (tokenBlock.relationMissing) {
+    return {
+      valid: false as const,
+      reason: "missing_table" as const,
+      relationMissing: true as const,
+    };
+  }
+  if (tokenBlock.blocked) {
+    return {
+      valid: false as const,
+      reason: "revoked_token" as const,
+      relationMissing: false as const,
+    };
+  }
+
+  let activeSessionQuery = client
     .from("tenant_admin_sessions")
-    .select("id")
+    .select(TENANT_ADMIN_SESSION_COLUMNS)
     .eq("tenant_id", params.tenantId)
     .eq("profile_id", params.profileId)
     .eq("device_id", params.deviceId)
-    .is("revoked_at", null)
-    .limit(1)
-    .maybeSingle();
+    .is("revoked_at", null);
+
+  if (binding.sessionId) {
+    activeSessionQuery = activeSessionQuery.eq(
+      "auth_session_id",
+      binding.sessionId,
+    );
+  }
+
+  const { data: activeSession, error: activeSessionError } =
+    await activeSessionQuery
+      .limit(1)
+      .maybeSingle();
 
   if (activeSessionError) {
-    if (isMissingRelation(activeSessionError as RpcError, "tenant_admin_sessions")) {
-      return { valid: false as const, reason: "missing_table" as const, relationMissing: true as const };
+    if (
+      isMissingRelation(activeSessionError as RpcError, "tenant_admin_sessions")
+    ) {
+      return {
+        valid: false as const,
+        reason: "missing_table" as const,
+        relationMissing: true as const,
+      };
+    }
+    if (isMissingColumn(activeSessionError as RpcError, "auth_session_id")) {
+      return {
+        valid: false as const,
+        reason: "missing_table" as const,
+        relationMissing: true as const,
+      };
     }
     throw new Error("Unable to validate admin session.");
   }
 
   if (activeSession?.id) {
-    return { valid: true as const, reason: "active" as const, relationMissing: false as const };
+    const sessionAuthId = typeof activeSession.auth_session_id === "string"
+      ? activeSession.auth_session_id.trim()
+      : "";
+    if (binding.sessionId) {
+      return sessionAuthId === binding.sessionId
+        ? {
+          valid: true as const,
+          reason: "active" as const,
+          relationMissing: false as const,
+        }
+        : {
+          valid: false as const,
+          reason: "missing_session" as const,
+          relationMissing: false as const,
+        };
+    }
+    if (!sessionAuthId) {
+      return {
+        valid: true as const,
+        reason: "active" as const,
+        relationMissing: false as const,
+      };
+    }
   }
 
-  const tokenBlock = await isTenantAdminTokenBlockedBySessionRevocation(client, params);
-  if (tokenBlock.relationMissing) {
-    return { valid: false as const, reason: "missing_table" as const, relationMissing: true as const };
-  }
-  if (tokenBlock.blocked) {
-    return { valid: false as const, reason: "revoked_token" as const, relationMissing: false as const };
-  }
-
-  return { valid: false as const, reason: "missing_session" as const, relationMissing: false as const };
+  return {
+    valid: false as const,
+    reason: "missing_session" as const,
+    relationMissing: false as const,
+  };
 };

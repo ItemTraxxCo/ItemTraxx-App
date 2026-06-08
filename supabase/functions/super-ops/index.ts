@@ -17,6 +17,7 @@ import {
   requireUuid,
   ValidationError,
 } from "../_shared/validation.ts";
+import { optionalPostgrestSearchText } from "../_shared/postgrestSearch.ts";
 
 const baseCorsHeaders = {
   "Access-Control-Allow-Headers":
@@ -89,7 +90,10 @@ const getSafeSupportAttachmentPathParts = (attachment: {
   }
 
   const [fileIdSegment, extensionSegment] = fileNameSegments;
-  if (!UUID_PATTERN.test(fileIdSegment) || !SAFE_SUPPORT_ATTACHMENT_EXTENSION_PATTERN.test(extensionSegment)) {
+  if (
+    !UUID_PATTERN.test(fileIdSegment) ||
+    !SAFE_SUPPORT_ATTACHMENT_EXTENSION_PATTERN.test(extensionSegment)
+  ) {
     return null;
   }
 
@@ -103,7 +107,11 @@ const getSafeSupportAttachmentPathParts = (attachment: {
 const toSignedAttachmentResult = (
   attachment: Pick<
     SupportAttachmentRecord,
-    "id" | "original_filename" | "stored_filename" | "content_type" | "size_bytes"
+    | "id"
+    | "original_filename"
+    | "stored_filename"
+    | "content_type"
+    | "size_bytes"
   >,
   signedUrl: string | null,
 ) => ({
@@ -132,10 +140,12 @@ const createSafeSupportAttachmentSignedUrl = async (
     return { data: null, error: new Error("Invalid storage path.") };
   }
 
-  const canonicalStoragePath =
-    `${safePathParts.requestIdSegment}/` +
+  const canonicalStoragePath = `${safePathParts.requestIdSegment}/` +
     `${safePathParts.fileIdSegment}.${safePathParts.extensionSegment}`;
-  if (canonicalStoragePath.includes("../") || canonicalStoragePath.includes("..\\")) {
+  if (
+    canonicalStoragePath.includes("../") ||
+    canonicalStoragePath.includes("..\\")
+  ) {
     return { data: null, error: new Error("Invalid storage path.") };
   }
 
@@ -146,25 +156,30 @@ const createSafeSupportAttachmentSignedUrl = async (
 
 const resolveCorsHeaders = (req: Request) => {
   const origin = req.headers.get("Origin");
-  const allowedOrigins = parseAllowedOrigins(Deno.env.get("ITX_ALLOWED_ORIGINS"));
+  const allowedOrigins = parseAllowedOrigins(
+    Deno.env.get("ITX_ALLOWED_ORIGINS"),
+  );
 
   const hasOrigin = !!origin;
-  const originAllowed =
-    !hasOrigin || (hasOrigin && isAllowedOrigin(origin as string, allowedOrigins));
+  const originAllowed = !hasOrigin ||
+    (hasOrigin && isAllowedOrigin(origin as string, allowedOrigins));
 
-  const headers =
-    hasOrigin && originAllowed
-      ? { ...baseCorsHeaders, "Access-Control-Allow-Origin": origin as string }
-      : { ...baseCorsHeaders };
+  const headers = hasOrigin && originAllowed
+    ? { ...baseCorsHeaders, "Access-Control-Allow-Origin": origin as string }
+    : { ...baseCorsHeaders };
 
   return { hasOrigin, originAllowed, headers };
 };
 
-const isMissingRelation = (error: { code?: string; message?: string } | null, relation: string) =>
-  error?.code === "42P01" && (error.message ?? "").includes(relation);
+const isMissingRelation = (
+  error: { code?: string; message?: string } | null,
+  relation: string,
+) => error?.code === "42P01" && (error.message ?? "").includes(relation);
 
-const isMissingColumn = (error: { code?: string; message?: string } | null, column: string) =>
-  error?.code === "42703" && (error.message ?? "").includes(column);
+const isMissingColumn = (
+  error: { code?: string; message?: string } | null,
+  column: string,
+) => error?.code === "42703" && (error.message ?? "").includes(column);
 
 const sanitizeText = (value: unknown, max = 255) =>
   optionalText(value, { maxLen: max });
@@ -209,27 +224,33 @@ serve(async (req) => {
     return jsonResponse(403, { error: "Origin not allowed" });
   }
 
-  const ingressError = await requireTrustedEdgeIngress(req, "super-ops", jsonResponse);
+  const ingressError = await requireTrustedEdgeIngress(
+    req,
+    "super-ops",
+    jsonResponse,
+  );
   if (ingressError) return ingressError;
 
   if (isKillSwitchWriteBlocked(req)) {
-    return jsonResponse(503, { error: "Unfortunately ItemTraxx is currently unavailable." });
+    return jsonResponse(503, {
+      error: "Unfortunately ItemTraxx is currently unavailable.",
+    });
   }
 
   try {
-    const authHeader =
-      req.headers.get("x-itx-user-jwt") ?? req.headers.get("authorization");
+    const authHeader = req.headers.get("x-itx-user-jwt") ??
+      req.headers.get("authorization");
     if (!authHeader) {
       return jsonResponse(401, { error: "Unauthorized" });
     }
 
     // Prefer ITX_* secrets, but fall back to Supabase default injected env vars.
-    const supabaseUrl =
-      Deno.env.get("ITX_SUPABASE_URL") ?? Deno.env.get("SUPABASE_URL");
-    const serviceKey =
-      Deno.env.get("ITX_SECRET_KEY") ?? Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-    const publishableKey =
-      Deno.env.get("ITX_PUBLISHABLE_KEY") ?? Deno.env.get("SUPABASE_ANON_KEY");
+    const supabaseUrl = Deno.env.get("ITX_SUPABASE_URL") ??
+      Deno.env.get("SUPABASE_URL");
+    const serviceKey = Deno.env.get("ITX_SECRET_KEY") ??
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    const publishableKey = Deno.env.get("ITX_PUBLISHABLE_KEY") ??
+      Deno.env.get("SUPABASE_ANON_KEY");
 
     if (!supabaseUrl || !serviceKey) {
       return jsonResponse(500, { error: "Server misconfiguration" });
@@ -259,7 +280,10 @@ serve(async (req) => {
       .eq("id", user.id)
       .single();
 
-    if (profileError || profile?.role !== "super_admin" || profile.is_active === false) {
+    if (
+      profileError || profile?.role !== "super_admin" ||
+      profile.is_active === false
+    ) {
       return jsonResponse(403, { error: "Access denied" });
     }
 
@@ -283,12 +307,19 @@ serve(async (req) => {
           authToken: accessToken,
         });
         if (!hasStepUp) {
-          return jsonResponse(403, { error: "Super admin verification required." });
+          return jsonResponse(403, {
+            error: "Super admin verification required.",
+          });
         }
       } catch (error) {
-        if (isMissingPrivilegedStepUpTable(error as { code?: string; message?: string })) {
+        if (
+          isMissingPrivilegedStepUpTable(
+            error as { code?: string; message?: string },
+          )
+        ) {
           return jsonResponse(503, {
-            error: "Privileged verification controls unavailable. Run latest SQL setup.",
+            error:
+              "Privileged verification controls unavailable. Run latest SQL setup.",
           });
         }
         throw error;
@@ -301,7 +332,7 @@ serve(async (req) => {
         p_scope: "super_admin",
         p_limit: 30,
         p_window_seconds: 60,
-      }
+      },
     );
 
     if (rateLimitError) {
@@ -323,7 +354,7 @@ serve(async (req) => {
       actionType: string,
       targetType: string,
       targetId: string | null,
-      metadata: Record<string, unknown>
+      metadata: Record<string, unknown>,
     ) => {
       await adminClient.from("super_admin_audit_logs").insert({
         actor_id: user.id,
@@ -338,7 +369,8 @@ serve(async (req) => {
     if (action === "verify_password") {
       const next = (payload ?? {}) as Record<string, unknown>;
       const password = typeof next.password === "string" ? next.password : "";
-      const email = (profile.auth_email ?? user.email ?? "").trim().toLowerCase();
+      const email = (profile.auth_email ?? user.email ?? "").trim()
+        .toLowerCase();
       if (!password || !email) {
         return jsonResponse(400, { error: "Password is required." });
       }
@@ -349,13 +381,22 @@ serve(async (req) => {
       const signInClient = createClient(supabaseUrl, publishableKey, {
         auth: { persistSession: false },
       });
-      const signIn = await signInClient.auth.signInWithPassword({ email, password });
-      const verifiedUserId = signIn.data.user?.id ?? signIn.data.session?.user?.id ?? null;
+      const signIn = await signInClient.auth.signInWithPassword({
+        email,
+        password,
+      });
+      const verifiedUserId = signIn.data.user?.id ??
+        signIn.data.session?.user?.id ?? null;
       if (signIn.error || !verifiedUserId || verifiedUserId !== user.id) {
         return jsonResponse(401, { error: "Invalid password." });
       }
 
-      await writeAudit("super_admin_settings_password_verified", "super_admin_auth", user.id, {});
+      await writeAudit(
+        "super_admin_settings_password_verified",
+        "super_admin_auth",
+        user.id,
+        {},
+      );
       return jsonResponse(200, { data: { verified: true } });
     }
 
@@ -366,20 +407,24 @@ serve(async (req) => {
       const loginMethodRaw = sanitizeText(next.login_method, 32);
       const loginLocationRaw = sanitizeText(next.login_location, 32);
       const loginMethod =
-        loginMethodRaw === "password" || loginMethodRaw === "passkey" ? loginMethodRaw : null;
-      const loginLocation =
-        loginLocationRaw === "super_auth" || loginLocationRaw === "super_settings"
-          ? loginLocationRaw
+        loginMethodRaw === "password" || loginMethodRaw === "passkey"
+          ? loginMethodRaw
           : null;
+      const loginLocation = loginLocationRaw === "super_auth" ||
+          loginLocationRaw === "super_settings"
+        ? loginLocationRaw
+        : null;
       if (!deviceId) {
         return jsonResponse(400, { error: "Device session is required." });
       }
 
       const jwtPayload = parseJwtPayload(accessToken);
-      const authSessionId =
-        typeof jwtPayload?.session_id === "string" ? jwtPayload.session_id : null;
-      const authIssuedAt =
-        typeof jwtPayload?.iat === "number" ? new Date(jwtPayload.iat * 1000).toISOString() : null;
+      const authSessionId = typeof jwtPayload?.session_id === "string"
+        ? jwtPayload.session_id
+        : null;
+      const authIssuedAt = typeof jwtPayload?.iat === "number"
+        ? new Date(jwtPayload.iat * 1000).toISOString()
+        : null;
 
       const now = new Date().toISOString();
       const upsertPayload = {
@@ -404,7 +449,10 @@ serve(async (req) => {
         .is("revoked_at", null)
         .maybeSingle();
 
-      if (existing.error && isMissingRelation(existing.error, "super_admin_sessions")) {
+      if (
+        existing.error &&
+        isMissingRelation(existing.error, "super_admin_sessions")
+      ) {
         return jsonResponse(400, {
           error: "Session controls unavailable. Run latest SQL setup.",
         });
@@ -451,24 +499,32 @@ serve(async (req) => {
       } = await adminClient
         .from("super_admin_sessions")
         .select(
-          "id, device_id, device_label, user_agent, login_method, login_location, general_location, created_at, last_seen_at"
+          "id, device_id, device_label, user_agent, login_method, login_location, general_location, created_at, last_seen_at",
         )
         .eq("profile_id", user.id)
         .is("revoked_at", null)
         .order("last_seen_at", { ascending: false })
         .limit(100);
 
-      if (sessionQuery.error && isMissingColumn(sessionQuery.error, "login_method")) {
+      if (
+        sessionQuery.error &&
+        isMissingColumn(sessionQuery.error, "login_method")
+      ) {
         sessionQuery = await adminClient
           .from("super_admin_sessions")
-          .select("id, device_id, device_label, user_agent, created_at, last_seen_at")
+          .select(
+            "id, device_id, device_label, user_agent, created_at, last_seen_at",
+          )
           .eq("profile_id", user.id)
           .is("revoked_at", null)
           .order("last_seen_at", { ascending: false })
           .limit(100);
       }
 
-      if (sessionQuery.error && isMissingRelation(sessionQuery.error, "super_admin_sessions")) {
+      if (
+        sessionQuery.error &&
+        isMissingRelation(sessionQuery.error, "super_admin_sessions")
+      ) {
         return jsonResponse(400, {
           error: "Session controls unavailable. Run latest SQL setup.",
         });
@@ -483,15 +539,28 @@ serve(async (req) => {
           sessions: rows.map((row) => ({
             id: typeof row.id === "string" ? row.id : "",
             device_id: typeof row.device_id === "string" ? row.device_id : "",
-            device_label: typeof row.device_label === "string" ? row.device_label : null,
-            user_agent: typeof row.user_agent === "string" ? row.user_agent : null,
-            login_method: typeof row.login_method === "string" ? row.login_method : null,
-            login_location: typeof row.login_location === "string" ? row.login_location : null,
-            general_location: typeof row.general_location === "string" ? row.general_location : null,
-            created_at: typeof row.created_at === "string" ? row.created_at : null,
-            last_seen_at: typeof row.last_seen_at === "string" ? row.last_seen_at : null,
-            is_current:
-              !!currentDeviceId &&
+            device_label: typeof row.device_label === "string"
+              ? row.device_label
+              : null,
+            user_agent: typeof row.user_agent === "string"
+              ? row.user_agent
+              : null,
+            login_method: typeof row.login_method === "string"
+              ? row.login_method
+              : null,
+            login_location: typeof row.login_location === "string"
+              ? row.login_location
+              : null,
+            general_location: typeof row.general_location === "string"
+              ? row.general_location
+              : null,
+            created_at: typeof row.created_at === "string"
+              ? row.created_at
+              : null,
+            last_seen_at: typeof row.last_seen_at === "string"
+              ? row.last_seen_at
+              : null,
+            is_current: !!currentDeviceId &&
               typeof row.device_id === "string" &&
               row.device_id === currentDeviceId,
           })),
@@ -572,7 +641,7 @@ serve(async (req) => {
       const { data: request, error: requestError } = await adminClient
         .from("support_requests")
         .select(
-          "id, requester_name, reply_email, subject, category, message, source, status, assigned_to, internal_notes, created_at, updated_at"
+          "id, requester_name, reply_email, subject, category, message, source, status, assigned_to, internal_notes, created_at, updated_at",
         )
         .eq("id", supportRequestId)
         .single();
@@ -581,21 +650,23 @@ serve(async (req) => {
         return { error: "Support request not found.", data: null };
       }
 
-      const [{ data: attachments, error: attachmentsError }, { data: events, error: eventsError }] =
-        await Promise.all([
-          adminClient
-            .from("support_request_attachments")
-            .select(
-              "id, original_filename, stored_filename, content_type, size_bytes, storage_bucket, storage_path"
-            )
-            .eq("support_request_id", supportRequestId)
-            .order("created_at", { ascending: true }),
-          adminClient
-            .from("support_request_events")
-            .select("id, actor_id, actor_email, event_type, metadata, created_at")
-            .eq("support_request_id", supportRequestId)
-            .order("created_at", { ascending: true }),
-        ]);
+      const [
+        { data: attachments, error: attachmentsError },
+        { data: events, error: eventsError },
+      ] = await Promise.all([
+        adminClient
+          .from("support_request_attachments")
+          .select(
+            "id, original_filename, stored_filename, content_type, size_bytes, storage_bucket, storage_path",
+          )
+          .eq("support_request_id", supportRequestId)
+          .order("created_at", { ascending: true }),
+        adminClient
+          .from("support_request_events")
+          .select("id, actor_id, actor_email, event_type, metadata, created_at")
+          .eq("support_request_id", supportRequestId)
+          .order("created_at", { ascending: true }),
+      ]);
 
       if (attachmentsError || eventsError) {
         return { error: "Unable to load support request details.", data: null };
@@ -612,23 +683,25 @@ serve(async (req) => {
       }
 
       const signedAttachments = await Promise.all(
-        ((attachments ?? []) as SupportAttachmentRecord[]).map(async (attachment) => {
-          if (!getSafeSupportAttachmentPathParts(attachment)) {
-            return toSignedAttachmentResult(attachment, null);
-          }
+        ((attachments ?? []) as SupportAttachmentRecord[]).map(
+          async (attachment) => {
+            if (!getSafeSupportAttachmentPathParts(attachment)) {
+              return toSignedAttachmentResult(attachment, null);
+            }
 
-          const { data: signedData, error: signedError } =
-            await createSafeSupportAttachmentSignedUrl(
-              adminClient,
-              attachment.storage_path,
-              60 * 60,
+            const { data: signedData, error: signedError } =
+              await createSafeSupportAttachmentSignedUrl(
+                adminClient,
+                attachment.storage_path,
+                60 * 60,
+              );
+
+            return toSignedAttachmentResult(
+              attachment,
+              signedError ? null : signedData?.signedUrl ?? null,
             );
-
-          return toSignedAttachmentResult(
-            attachment,
-            signedError ? null : signedData?.signedUrl ?? null,
-          );
-        }),
+          },
+        ),
       );
 
       return {
@@ -656,7 +729,9 @@ serve(async (req) => {
           .order("created_at", { ascending: false }),
         adminClient
           .from("super_approvals")
-          .select("id, action_type, payload, requested_by, approved_by, status, created_at, decided_at")
+          .select(
+            "id, action_type, payload, requested_by, approved_by, status, created_at, decided_at",
+          )
           .order("created_at", { ascending: false })
           .limit(50),
         adminClient
@@ -666,12 +741,15 @@ serve(async (req) => {
           .limit(50),
       ]);
 
-      if (runtimeConfigResult.error || alertRulesResult.error || approvalsResult.error || jobsResult.error) {
+      if (
+        runtimeConfigResult.error || alertRulesResult.error ||
+        approvalsResult.error || jobsResult.error
+      ) {
         return jsonResponse(400, { error: "Unable to load control center." });
       }
 
       const runtimeConfig = Object.fromEntries(
-        (runtimeConfigResult.data ?? []).map((item) => [item.key, item.value])
+        (runtimeConfigResult.data ?? []).map((item) => [item.key, item.value]),
       );
 
       return jsonResponse(200, {
@@ -691,7 +769,12 @@ serve(async (req) => {
 
       const { data, error } = await adminClient
         .from("app_runtime_config")
-        .upsert({ key, value, updated_by: user.id, updated_at: new Date().toISOString() }, { onConflict: "key" })
+        .upsert({
+          key,
+          value,
+          updated_by: user.id,
+          updated_at: new Date().toISOString(),
+        }, { onConflict: "key" })
         .select("key, value")
         .single();
 
@@ -754,8 +837,14 @@ serve(async (req) => {
         max_admins: optionalPositiveInteger(next.max_admins, 1000),
         max_students: optionalPositiveInteger(next.max_students, 100_000),
         max_gear: optionalPositiveInteger(next.max_gear, 100_000),
-        checkout_due_hours: optionalInteger(next.checkout_due_hours, 1, 720, 72),
-        barcode_pattern: optionalText(next.barcode_pattern, { maxLen: 80 }) || null,
+        checkout_due_hours: optionalInteger(
+          next.checkout_due_hours,
+          1,
+          720,
+          72,
+        ),
+        barcode_pattern: optionalText(next.barcode_pattern, { maxLen: 80 }) ||
+          null,
         feature_flags: optionalJsonObject(next.feature_flags, 10_000),
         updated_by: user.id,
         updated_at: new Date().toISOString(),
@@ -765,7 +854,7 @@ serve(async (req) => {
         .from("tenant_policies")
         .upsert(row, { onConflict: "tenant_id" })
         .select(
-          "tenant_id, max_admins, max_students, max_gear, checkout_due_hours, barcode_pattern, feature_flags"
+          "tenant_id, max_admins, max_students, max_gear, checkout_due_hours, barcode_pattern, feature_flags",
         )
         .single();
 
@@ -773,7 +862,9 @@ serve(async (req) => {
         const message = (error?.message ?? "").toLowerCase();
         if (
           error?.code === "42703" &&
-          (message.includes("feature_flags") || message.includes("account_category") || message.includes("plan_code"))
+          (message.includes("feature_flags") ||
+            message.includes("account_category") ||
+            message.includes("plan_code"))
         ) {
           const { data: fallbackData, error: fallbackError } = await adminClient
             .from("tenant_policies")
@@ -788,27 +879,34 @@ serve(async (req) => {
                 updated_by: row.updated_by,
                 updated_at: row.updated_at,
               },
-              { onConflict: "tenant_id" }
+              { onConflict: "tenant_id" },
             )
             .select(
-              "tenant_id, max_admins, max_students, max_gear, checkout_due_hours, barcode_pattern"
+              "tenant_id, max_admins, max_students, max_gear, checkout_due_hours, barcode_pattern",
             )
             .single();
           if (fallbackError || !fallbackData) {
-            return jsonResponse(400, { error: "Unable to save tenant policy." });
+            return jsonResponse(400, {
+              error: "Unable to save tenant policy.",
+            });
           }
           await writeAudit(
             "set_tenant_policy",
             "tenant_policy",
             tenantId,
-            fallbackData as Record<string, unknown>
+            fallbackData as Record<string, unknown>,
           );
           return jsonResponse(200, { data: fallbackData });
         }
         return jsonResponse(400, { error: "Unable to save tenant policy." });
       }
 
-      await writeAudit("set_tenant_policy", "tenant_policy", tenantId, data as Record<string, unknown>);
+      await writeAudit(
+        "set_tenant_policy",
+        "tenant_policy",
+        tenantId,
+        data as Record<string, unknown>,
+      );
       return jsonResponse(200, { data });
     }
 
@@ -865,7 +963,9 @@ serve(async (req) => {
         .single();
 
       if (error || !data) {
-        return jsonResponse(400, { error: "Unable to create approval request." });
+        return jsonResponse(400, {
+          error: "Unable to create approval request.",
+        });
       }
 
       await writeAudit("create_approval", "approval", data.id, {
@@ -892,7 +992,9 @@ serve(async (req) => {
         return jsonResponse(403, { error: "Requester cannot self-approve." });
       }
       if (approval.status !== "pending") {
-        return jsonResponse(400, { error: "Approval request is already resolved." });
+        return jsonResponse(400, {
+          error: "Approval request is already resolved.",
+        });
       }
 
       const { data, error } = await adminClient
@@ -903,7 +1005,9 @@ serve(async (req) => {
           decided_at: new Date().toISOString(),
         })
         .eq("id", id)
-        .select("id, action_type, payload, requested_by, approved_by, status, created_at, decided_at")
+        .select(
+          "id, action_type, payload, requested_by, approved_by, status, created_at, decided_at",
+        )
         .single();
 
       if (error || !data) {
@@ -916,7 +1020,7 @@ serve(async (req) => {
 
     if (action === "list_support_requests") {
       const next = payload;
-      const search = optionalText(next.search, { maxLen: 120 });
+      const search = optionalPostgrestSearchText(next.search, { maxLen: 120 });
       const status = optionalText(next.status, { maxLen: 40 });
       const limit = optionalInteger(next.limit, 1, 200, 100);
       const allowedStatuses = new Set<SupportRequestStatus>([
@@ -929,7 +1033,7 @@ serve(async (req) => {
       let query = adminClient
         .from("support_requests")
         .select(
-          "id, requester_name, reply_email, subject, category, status, created_at, updated_at, assigned_to"
+          "id, requester_name, reply_email, subject, category, status, created_at, updated_at, assigned_to",
         )
         .order("created_at", { ascending: false })
         .limit(limit);
@@ -942,7 +1046,7 @@ serve(async (req) => {
 
       if (search) {
         query = query.or(
-          `requester_name.ilike.%${search}%,reply_email.ilike.%${search}%,subject.ilike.%${search}%,message.ilike.%${search}%`
+          `requester_name.ilike.%${search}%,reply_email.ilike.%${search}%,subject.ilike.%${search}%,message.ilike.%${search}%`,
         );
       }
 
@@ -960,7 +1064,9 @@ serve(async (req) => {
 
       const detail = await buildSupportRequestDetail(supportRequestId);
       if (detail.error || !detail.data) {
-        return jsonResponse(400, { error: detail.error ?? "Unable to load support request." });
+        return jsonResponse(400, {
+          error: detail.error ?? "Unable to load support request.",
+        });
       }
 
       return jsonResponse(200, { data: { request: detail.data } });
@@ -969,7 +1075,9 @@ serve(async (req) => {
     if (action === "update_support_request") {
       const next = payload;
       const supportRequestId = requireUuid(next.support_request_id);
-      const status = next.status === undefined ? undefined : optionalText(next.status, { maxLen: 40 }) as SupportRequestStatus;
+      const status = next.status === undefined
+        ? undefined
+        : optionalText(next.status, { maxLen: 40 }) as SupportRequestStatus;
       const internalNotes = next.internal_notes === undefined
         ? undefined
         : optionalText(next.internal_notes, { maxLen: 4000 });
@@ -1007,7 +1115,10 @@ serve(async (req) => {
         eventMetadata.status = { from: existing.status, to: status };
       }
 
-      if (internalNotes !== undefined && internalNotes !== (existing.internal_notes ?? "")) {
+      if (
+        internalNotes !== undefined &&
+        internalNotes !== (existing.internal_notes ?? "")
+      ) {
         updates.internal_notes = internalNotes || null;
         eventMetadata.internal_notes_updated = true;
       }
@@ -1029,7 +1140,9 @@ serve(async (req) => {
       if (Object.keys(updates).length === 0) {
         const detail = await buildSupportRequestDetail(supportRequestId);
         if (detail.error || !detail.data) {
-          return jsonResponse(400, { error: detail.error ?? "Unable to load support request." });
+          return jsonResponse(400, {
+            error: detail.error ?? "Unable to load support request.",
+          });
         }
         return jsonResponse(200, { data: { request: detail.data } });
       }
@@ -1042,15 +1155,28 @@ serve(async (req) => {
         .eq("id", supportRequestId);
 
       if (updateError) {
-        return jsonResponse(400, { error: "Unable to update support request." });
+        return jsonResponse(400, {
+          error: "Unable to update support request.",
+        });
       }
 
-      await writeSupportRequestEvent(supportRequestId, "updated", eventMetadata);
-      await writeAudit("update_support_request", "support_request", supportRequestId, eventMetadata);
+      await writeSupportRequestEvent(
+        supportRequestId,
+        "updated",
+        eventMetadata,
+      );
+      await writeAudit(
+        "update_support_request",
+        "support_request",
+        supportRequestId,
+        eventMetadata,
+      );
 
       const detail = await buildSupportRequestDetail(supportRequestId);
       if (detail.error || !detail.data) {
-        return jsonResponse(400, { error: detail.error ?? "Unable to load support request." });
+        return jsonResponse(400, {
+          error: detail.error ?? "Unable to load support request.",
+        });
       }
 
       return jsonResponse(200, { data: { request: detail.data } });
@@ -1058,20 +1184,20 @@ serve(async (req) => {
 
     if (action === "list_sales_leads") {
       const next = payload;
-      const search = optionalText(next.search, { maxLen: 120 });
+      const search = optionalPostgrestSearchText(next.search, { maxLen: 120 });
       const limit = optionalInteger(next.limit, 1, 200, 100);
 
       let query = adminClient
         .from("sales_leads")
         .select(
-          "id, plan, lead_state, stage, schools_count, name, organization, reply_email, details, source, created_at, updated_at"
+          "id, plan, lead_state, stage, schools_count, name, organization, reply_email, details, source, created_at, updated_at",
         )
         .order("created_at", { ascending: false })
         .limit(limit);
 
       if (search) {
         query = query.or(
-          `name.ilike.%${search}%,organization.ilike.%${search}%,reply_email.ilike.%${search}%`
+          `name.ilike.%${search}%,organization.ilike.%${search}%,reply_email.ilike.%${search}%`,
         );
       }
 
@@ -1099,7 +1225,7 @@ serve(async (req) => {
         })
         .eq("id", leadId)
         .select(
-          "id, plan, lead_state, stage, schools_count, name, organization, reply_email, details, source, created_at, updated_at"
+          "id, plan, lead_state, stage, schools_count, name, organization, reply_email, details, source, created_at, updated_at",
         )
         .single();
 
@@ -1123,12 +1249,14 @@ serve(async (req) => {
         })
         .eq("id", leadId)
         .select(
-          "id, plan, lead_state, stage, schools_count, name, organization, reply_email, details, source, created_at, updated_at"
+          "id, plan, lead_state, stage, schools_count, name, organization, reply_email, details, source, created_at, updated_at",
         )
         .single();
 
       if (error || !data) {
-        return jsonResponse(400, { error: "Unable to move lead to customers." });
+        return jsonResponse(400, {
+          error: "Unable to move lead to customers.",
+        });
       }
 
       await writeAudit("move_sales_lead_to_customer", "sales_lead", leadId, {});
@@ -1159,7 +1287,7 @@ serve(async (req) => {
         })
         .eq("id", leadId)
         .select(
-          "id, plan, stage, schools_count, name, organization, reply_email, details, source, created_at, updated_at"
+          "id, plan, stage, schools_count, name, organization, reply_email, details, source, created_at, updated_at",
         )
         .single();
 
@@ -1190,13 +1318,13 @@ serve(async (req) => {
 
     if (action === "list_customers") {
       const next = payload;
-      const search = optionalText(next.search, { maxLen: 120 });
+      const search = optionalPostgrestSearchText(next.search, { maxLen: 120 });
       const limit = optionalInteger(next.limit, 1, 300, 150);
 
       let leadQuery = adminClient
         .from("sales_leads")
         .select(
-          "id, plan, lead_state, stage, schools_count, name, organization, reply_email, details, created_at, updated_at"
+          "id, plan, lead_state, stage, schools_count, name, organization, reply_email, details, created_at, updated_at",
         )
         .eq("lead_state", "converted_to_customer")
         .order("created_at", { ascending: false })
@@ -1204,7 +1332,7 @@ serve(async (req) => {
 
       if (search) {
         leadQuery = leadQuery.or(
-          `name.ilike.%${search}%,organization.ilike.%${search}%,reply_email.ilike.%${search}%`
+          `name.ilike.%${search}%,organization.ilike.%${search}%,reply_email.ilike.%${search}%`,
         );
       }
 
@@ -1216,14 +1344,16 @@ serve(async (req) => {
       const leadIds = (leads ?? []).map((lead) => lead.id as string);
       const { data: statusLogs, error: statusError } = leadIds.length
         ? await adminClient
-            .from("customer_status_logs")
-            .select("id, lead_id, invoice_id, status, created_at, created_by")
-            .in("lead_id", leadIds)
-            .order("created_at", { ascending: false })
+          .from("customer_status_logs")
+          .select("id, lead_id, invoice_id, status, created_at, created_by")
+          .in("lead_id", leadIds)
+          .order("created_at", { ascending: false })
         : { data: [], error: null };
 
       if (statusError) {
-        return jsonResponse(400, { error: "Unable to load customer status logs." });
+        return jsonResponse(400, {
+          error: "Unable to load customer status logs.",
+        });
       }
 
       const groupedLogs = new Map<
@@ -1237,14 +1367,16 @@ serve(async (req) => {
           created_by: string | null;
         }>
       >();
-      for (const row of (statusLogs ?? []) as Array<{
-        id: string;
-        lead_id: string;
-        invoice_id: string;
-        status: string;
-        created_at: string;
-        created_by: string | null;
-      }>) {
+      for (
+        const row of (statusLogs ?? []) as Array<{
+          id: string;
+          lead_id: string;
+          invoice_id: string;
+          status: string;
+          created_at: string;
+          created_by: string | null;
+        }>
+      ) {
         const list = groupedLogs.get(row.lead_id) ?? [];
         list.push(row);
         groupedLogs.set(row.lead_id, list);
@@ -1291,7 +1423,9 @@ serve(async (req) => {
         .single();
 
       if (error || !data) {
-        return jsonResponse(400, { error: "Unable to add customer status entry." });
+        return jsonResponse(400, {
+          error: "Unable to add customer status entry.",
+        });
       }
 
       await writeAudit("add_customer_status_entry", "sales_lead", leadId, {
@@ -1304,7 +1438,8 @@ serve(async (req) => {
     if (action === "get_internal_ops_snapshot") {
       const nowIso = new Date().toISOString();
       const since15mIso = new Date(Date.now() - 15 * 60 * 1000).toISOString();
-      const since24hIso = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+      const since24hIso = new Date(Date.now() - 24 * 60 * 60 * 1000)
+        .toISOString();
 
       const [
         recentLogsResult,
@@ -1316,7 +1451,9 @@ serve(async (req) => {
       ] = await Promise.all([
         adminClient
           .from("gear_logs")
-          .select("tenant_id, gear_id, checked_out_by, action_type, action_time")
+          .select(
+            "tenant_id, gear_id, checked_out_by, action_type, action_time",
+          )
           .in("action_type", ["checkout", "return"])
           .gte("action_time", since24hIso)
           .order("action_time", { ascending: false })
@@ -1337,7 +1474,9 @@ serve(async (req) => {
           .in("key", ["maintenance_mode", "broadcast_message"]),
         adminClient
           .from("super_admin_audit_logs")
-          .select("id, actor_email, action_type, target_type, target_id, metadata, created_at")
+          .select(
+            "id, actor_email, action_type, target_type, target_id, metadata, created_at",
+          )
           .order("created_at", { ascending: false })
           .limit(50),
         adminClient
@@ -1349,7 +1488,9 @@ serve(async (req) => {
       ]);
 
       if (recentLogsResult.error) {
-        return jsonResponse(400, { error: "Unable to load recent traffic logs." });
+        return jsonResponse(400, {
+          error: "Unable to load recent traffic logs.",
+        });
       }
       if (queueRowsResult.error) {
         return jsonResponse(400, { error: "Unable to load async jobs." });
@@ -1361,20 +1502,32 @@ serve(async (req) => {
         return jsonResponse(400, { error: "Unable to load audit feed." });
       }
       if (customerLeadRowsResult.error) {
-        return jsonResponse(400, { error: "Unable to load customer health metrics." });
+        return jsonResponse(400, {
+          error: "Unable to load customer health metrics.",
+        });
       }
 
       const recentLogs = recentLogsResult.data ?? [];
-      const logs15m = recentLogs.filter((row) => row.action_time >= since15mIso);
-      const checkout15m = logs15m.filter((row) => row.action_type === "checkout").length;
-      const return15m = logs15m.filter((row) => row.action_type === "return").length;
-      const activeTenants15m = new Set(logs15m.map((row) => row.tenant_id)).size;
+      const logs15m = recentLogs.filter((row) =>
+        row.action_time >= since15mIso
+      );
+      const checkout15m = logs15m.filter((row) =>
+        row.action_type === "checkout"
+      ).length;
+      const return15m = logs15m.filter((row) =>
+        row.action_type === "return"
+      ).length;
+      const activeTenants15m = new Set(logs15m.map((row) =>
+        row.tenant_id
+      )).size;
 
       const queueRows = queueRowsResult.data ?? [];
       const queueTotal = queueRows.length;
       const queueSummary = {
         queued: queueRows.filter((row) => row.status === "queued").length,
-        processing: queueRows.filter((row) => row.status === "processing").length,
+        processing: queueRows.filter((row) =>
+          row.status === "processing"
+        ).length,
         completed: queueRows.filter((row) => row.status === "completed").length,
         failed: queueRows.filter((row) => row.status === "failed").length,
       };
@@ -1383,11 +1536,17 @@ serve(async (req) => {
       const leadSummary = {
         open: leads.filter((row) => row.lead_state === "open").length,
         closed: leads.filter((row) => row.lead_state === "closed").length,
-        converted: leads.filter((row) => row.lead_state === "converted_to_customer").length,
-        waiting_for_quote: leads.filter((row) => row.stage === "waiting_for_quote").length,
+        converted: leads.filter((row) =>
+          row.lead_state === "converted_to_customer"
+        ).length,
+        waiting_for_quote: leads.filter((row) =>
+          row.stage === "waiting_for_quote"
+        ).length,
         quote_sent: leads.filter((row) => row.stage === "quote_sent").length,
-        invoice_sent: leads.filter((row) => row.stage === "invoice_sent").length,
-        invoice_paid: leads.filter((row) => row.stage === "invoice_paid").length,
+        invoice_sent:
+          leads.filter((row) => row.stage === "invoice_sent").length,
+        invoice_paid:
+          leads.filter((row) => row.stage === "invoice_paid").length,
       };
 
       const trafficHourKeys = Array.from({ length: 24 }, (_, offset) => {
@@ -1396,7 +1555,9 @@ serve(async (req) => {
         return date.toISOString();
       });
       const trafficByHourMap = new Map(
-        trafficHourKeys.map((iso) => [iso, { hour: iso, checkout: 0, return: 0 }])
+        trafficHourKeys.map((
+          iso,
+        ) => [iso, { hour: iso, checkout: 0, return: 0 }]),
       );
       for (const log of recentLogs) {
         const hourDate = new Date(log.action_time);
@@ -1412,33 +1573,62 @@ serve(async (req) => {
       }
 
       const leadFunnel = {
-        waiting_for_quote: leads.filter((row) => row.stage === "waiting_for_quote").length,
-        quote_generated: leads.filter((row) => row.stage === "quote_generated").length,
+        waiting_for_quote:
+          leads.filter((row) => row.stage === "waiting_for_quote").length,
+        quote_generated:
+          leads.filter((row) => row.stage === "quote_generated").length,
         quote_sent: leads.filter((row) => row.stage === "quote_sent").length,
-        quote_converted_to_invoice: leads.filter((row) => row.stage === "quote_converted_to_invoice").length,
-        invoice_sent: leads.filter((row) => row.stage === "invoice_sent").length,
-        invoice_paid: leads.filter((row) => row.stage === "invoice_paid").length,
+        quote_converted_to_invoice:
+          leads.filter((row) => row.stage === "quote_converted_to_invoice")
+            .length,
+        invoice_sent:
+          leads.filter((row) => row.stage === "invoice_sent").length,
+        invoice_paid:
+          leads.filter((row) => row.stage === "invoice_paid").length,
       };
 
       const tenantIds = Array.from(
-        new Set(recentLogs.map((row) => row.tenant_id).filter((value): value is string => !!value))
+        new Set(
+          recentLogs.map((row) => row.tenant_id).filter((
+            value,
+          ): value is string => !!value),
+        ),
       );
       const gearIds = Array.from(
-        new Set(recentLogs.map((row) => row.gear_id).filter((value): value is string => !!value))
+        new Set(
+          recentLogs.map((row) => row.gear_id).filter((
+            value,
+          ): value is string => !!value),
+        ),
       );
       const studentIds = Array.from(
-        new Set(recentLogs.map((row) => row.checked_out_by).filter((value): value is string => !!value))
+        new Set(
+          recentLogs.map((row) => row.checked_out_by).filter((
+            value,
+          ): value is string => !!value),
+        ),
       );
 
-      const [tenantRowsResult, gearRowsResult, studentRowsResult, allTenantsResult] = await Promise.all([
+      const [
+        tenantRowsResult,
+        gearRowsResult,
+        studentRowsResult,
+        allTenantsResult,
+      ] = await Promise.all([
         tenantIds.length
           ? adminClient.from("tenants").select("id, name").in("id", tenantIds)
           : Promise.resolve({ data: [], error: null }),
         gearIds.length
-          ? adminClient.from("gear").select("id, name, barcode").in("id", gearIds)
+          ? adminClient.from("gear").select("id, name, barcode").in(
+            "id",
+            gearIds,
+          )
           : Promise.resolve({ data: [], error: null }),
         studentIds.length
-          ? adminClient.from("students").select("id, username, student_id").in("id", studentIds)
+          ? adminClient.from("students").select("id, username, student_id").in(
+            "id",
+            studentIds,
+          )
           : Promise.resolve({ data: [], error: null }),
         adminClient
           .from("tenants")
@@ -1448,19 +1638,27 @@ serve(async (req) => {
       ]);
 
       const tenantMap = new Map(
-        (tenantRowsResult.data ?? []).map((tenant) => [tenant.id as string, tenant.name as string])
+        (tenantRowsResult.data ?? []).map((
+          tenant,
+        ) => [tenant.id as string, tenant.name as string]),
       );
       const gearMap = new Map(
         (gearRowsResult.data ?? []).map((gear) => [
           gear.id as string,
-          { name: gear.name as string | null, barcode: gear.barcode as string | null },
-        ])
+          {
+            name: gear.name as string | null,
+            barcode: gear.barcode as string | null,
+          },
+        ]),
       );
       const studentMap = new Map(
         (studentRowsResult.data ?? []).map((student) => [
           student.id as string,
-          { username: student.username as string | null, student_id: student.student_id as string | null },
-        ])
+          {
+            username: student.username as string | null,
+            student_id: student.student_id as string | null,
+          },
+        ]),
       );
       const allTenants = (allTenantsResult.data ?? []) as Array<{
         id: string;
@@ -1470,10 +1668,14 @@ serve(async (req) => {
 
       const recentEvents = recentLogs.slice(0, 40).map((row) => {
         const gear = row.gear_id ? gearMap.get(row.gear_id) : null;
-        const student = row.checked_out_by ? studentMap.get(row.checked_out_by) : null;
+        const student = row.checked_out_by
+          ? studentMap.get(row.checked_out_by)
+          : null;
         return {
           tenant_id: row.tenant_id,
-          tenant_name: row.tenant_id ? tenantMap.get(row.tenant_id) ?? "Unknown tenant" : "Unknown tenant",
+          tenant_name: row.tenant_id
+            ? tenantMap.get(row.tenant_id) ?? "Unknown tenant"
+            : "Unknown tenant",
           action_type: row.action_type,
           action_time: row.action_time,
           gear_name: gear?.name ?? null,
@@ -1496,13 +1698,18 @@ serve(async (req) => {
       const durationSamples = auditRows
         .map((row) => {
           const value = row.metadata?.duration_ms;
-          return typeof value === "number" && Number.isFinite(value) ? value : null;
+          return typeof value === "number" && Number.isFinite(value)
+            ? value
+            : null;
         })
         .filter((value): value is number => value !== null)
         .sort((a, b) => a - b);
       const percentile = (values: number[], p: number) => {
         if (values.length === 0) return null;
-        const idx = Math.min(values.length - 1, Math.max(0, Math.floor((values.length - 1) * p)));
+        const idx = Math.min(
+          values.length - 1,
+          Math.max(0, Math.floor((values.length - 1) * p)),
+        );
         return values[idx] ?? null;
       };
       const medianDuration = percentile(durationSamples, 0.5);
@@ -1515,24 +1722,29 @@ serve(async (req) => {
         updated_at: string | null;
       }>;
       const customerLeadIds = customerLeads.map((row) => row.id);
-      const { data: customerStatusRows, error: customerStatusError } = customerLeadIds.length
-        ? await adminClient
+      const { data: customerStatusRows, error: customerStatusError } =
+        customerLeadIds.length
+          ? await adminClient
             .from("customer_status_logs")
             .select("lead_id, status, created_at")
             .in("lead_id", customerLeadIds)
             .order("created_at", { ascending: false })
             .limit(2000)
-        : { data: [], error: null };
+          : { data: [], error: null };
       if (customerStatusError) {
-        return jsonResponse(400, { error: "Unable to load customer status metrics." });
+        return jsonResponse(400, {
+          error: "Unable to load customer status metrics.",
+        });
       }
 
       const latestStatusByLead = new Map<string, string>();
-      for (const row of (customerStatusRows ?? []) as Array<{
-        lead_id: string;
-        status: string;
-        created_at: string;
-      }>) {
+      for (
+        const row of (customerStatusRows ?? []) as Array<{
+          lead_id: string;
+          status: string;
+          created_at: string;
+        }>
+      ) {
         if (!latestStatusByLead.has(row.lead_id)) {
           latestStatusByLead.set(row.lead_id, row.status);
         }
@@ -1567,47 +1779,50 @@ serve(async (req) => {
       const needsAttention = [
         ...(queueSummary.failed > 0
           ? [{
-              key: "failed_jobs",
-              level: "high",
-              title: "Failed async jobs",
-              count: queueSummary.failed,
-              route: "/super-admin/sales-leads",
-            }]
+            key: "failed_jobs",
+            level: "high",
+            title: "Failed async jobs",
+            count: queueSummary.failed,
+            route: "/super-admin/sales-leads",
+          }]
           : []),
         ...(queueSummary.queued >= 15
           ? [{
-              key: "queue_backlog",
-              level: "medium",
-              title: "Async queue backlog",
-              count: queueSummary.queued,
-              route: "/internal",
-            }]
+            key: "queue_backlog",
+            level: "medium",
+            title: "Async queue backlog",
+            count: queueSummary.queued,
+            route: "/internal",
+          }]
           : []),
         ...(staleOpenLeads > 0
           ? [{
-              key: "stale_open_leads",
-              level: "medium",
-              title: "Open leads older than 48h",
-              count: staleOpenLeads,
-              route: "/super-admin/sales-leads",
-            }]
+            key: "stale_open_leads",
+            level: "medium",
+            title: "Open leads older than 48h",
+            count: staleOpenLeads,
+            route: "/super-admin/sales-leads",
+          }]
           : []),
         ...(customerHealth.awaiting_payment + customerHealth.canceling > 0
           ? [{
-              key: "customer_billing_risk",
-              level: "high",
-              title: "Customers requiring billing attention",
-              count: customerHealth.awaiting_payment + customerHealth.canceling,
-              route: "/super-admin/customers",
-            }]
+            key: "customer_billing_risk",
+            level: "high",
+            title: "Customers requiring billing attention",
+            count: customerHealth.awaiting_payment + customerHealth.canceling,
+            route: "/super-admin/customers",
+          }]
           : []),
       ];
 
       let statusProbeMs: number | null = null;
       try {
-        const { data: statusData } = await adminClient.functions.invoke("system-status");
+        const { data: statusData } = await adminClient.functions.invoke(
+          "system-status",
+        );
         if (statusData && typeof statusData === "object") {
-          const durationMs = (statusData as Record<string, unknown>).duration_ms;
+          const durationMs =
+            (statusData as Record<string, unknown>).duration_ms;
           if (typeof durationMs === "number" && Number.isFinite(durationMs)) {
             statusProbeMs = durationMs;
           }
@@ -1617,10 +1832,30 @@ serve(async (req) => {
       }
 
       const searchIndex = [
-        { id: "cmd_internal_home", label: "Internal dashboard", type: "page", route: "/internal" },
-        { id: "cmd_super_home", label: "Super admin home", type: "page", route: "/super-admin" },
-        { id: "cmd_sales_leads", label: "Sales leads", type: "page", route: "/super-admin/sales-leads" },
-        { id: "cmd_customers", label: "Customers", type: "page", route: "/super-admin/customers" },
+        {
+          id: "cmd_internal_home",
+          label: "Internal dashboard",
+          type: "page",
+          route: "/internal",
+        },
+        {
+          id: "cmd_super_home",
+          label: "Super admin home",
+          type: "page",
+          route: "/super-admin",
+        },
+        {
+          id: "cmd_sales_leads",
+          label: "Sales leads",
+          type: "page",
+          route: "/super-admin/sales-leads",
+        },
+        {
+          id: "cmd_customers",
+          label: "Customers",
+          type: "page",
+          route: "/super-admin/customers",
+        },
         ...allTenants.slice(0, 40).map((tenant) => ({
           id: `tenant_${tenant.id}`,
           label: tenant.name,
@@ -1630,7 +1865,7 @@ serve(async (req) => {
       ];
 
       const runtimeConfig = Object.fromEntries(
-        (runtimeConfigResult.data ?? []).map((item) => [item.key, item.value])
+        (runtimeConfigResult.data ?? []).map((item) => [item.key, item.value]),
       );
 
       return jsonResponse(200, {
@@ -1649,7 +1884,9 @@ serve(async (req) => {
           sla: {
             median_latency_ms: medianDuration ?? statusProbeMs,
             p95_latency_ms: p95Duration ?? statusProbeMs,
-            error_rate_percent: queueTotal > 0 ? Number(((queueSummary.failed / queueTotal) * 100).toFixed(2)) : 0,
+            error_rate_percent: queueTotal > 0
+              ? Number(((queueSummary.failed / queueTotal) * 100).toFixed(2))
+              : 0,
             probe_latency_ms: statusProbeMs,
           },
           needs_attention: needsAttention,

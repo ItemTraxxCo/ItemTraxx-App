@@ -1,6 +1,9 @@
 import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-export type PrivilegedRoleScope = "super_admin" | "tenant_admin" | "district_admin";
+export type PrivilegedRoleScope =
+  | "super_admin"
+  | "tenant_admin"
+  | "district_admin";
 
 type PgLikeError = {
   code?: string;
@@ -9,10 +12,19 @@ type PgLikeError = {
 
 const DEFAULT_STEP_UP_TTL_MS = 15 * 60 * 1000;
 const ADMIN_STEP_UP_REGISTRATION_WINDOW_MS = 5 * 60 * 1000;
+const ADMIN_HANDOFF_AUTH_METHODS = new Set([
+  "magiclink",
+  "magic_link",
+  "otp",
+  "email_link",
+]);
 
 const decodeBase64Url = (value: string) => {
   const normalized = value.replace(/-/g, "+").replace(/_/g, "/");
-  const padded = normalized.padEnd(normalized.length + ((4 - (normalized.length % 4 || 4)) % 4), "=");
+  const padded = normalized.padEnd(
+    normalized.length + ((4 - (normalized.length % 4 || 4)) % 4),
+    "=",
+  );
   const decoded = atob(padded);
   return new Uint8Array(Array.from(decoded, (char) => char.charCodeAt(0)));
 };
@@ -24,7 +36,9 @@ const parseJwtPayload = (token: string): Record<string, unknown> | null => {
   try {
     const json = new TextDecoder().decode(decodeBase64Url(segments[1]));
     const payload = JSON.parse(json);
-    return payload && typeof payload === "object" ? (payload as Record<string, unknown>) : null;
+    return payload && typeof payload === "object"
+      ? (payload as Record<string, unknown>)
+      : null;
   } catch {
     return null;
   }
@@ -40,7 +54,9 @@ const sha256 = async (value: string) => {
 
 const resolveBindingKey = async (authToken: string) => {
   const payload = parseJwtPayload(authToken);
-  const sessionId = typeof payload?.session_id === "string" ? payload.session_id.trim() : "";
+  const sessionId = typeof payload?.session_id === "string"
+    ? payload.session_id.trim()
+    : "";
   if (sessionId) {
     return `session:${sessionId}`;
   }
@@ -56,7 +72,22 @@ export const canRegisterAdminStepUp = (authToken: string) => {
   return ageMs >= -30_000 && ageMs <= ADMIN_STEP_UP_REGISTRATION_WINDOW_MS;
 };
 
-export const isMissingPrivilegedStepUpTable = (error: PgLikeError | null | undefined) =>
+export const canRegisterAdminStepUpFromTrustedHandoff = (authToken: string) => {
+  if (!canRegisterAdminStepUp(authToken)) return false;
+
+  const payload = parseJwtPayload(authToken);
+  const amr = Array.isArray(payload?.amr) ? payload.amr : [];
+  return amr.some((entry) => {
+    if (!entry || typeof entry !== "object") return false;
+    const method = (entry as { method?: unknown }).method;
+    return typeof method === "string" &&
+      ADMIN_HANDOFF_AUTH_METHODS.has(method.toLowerCase());
+  });
+};
+
+export const isMissingPrivilegedStepUpTable = (
+  error: PgLikeError | null | undefined,
+) =>
   !!error &&
   error.code === "42P01" &&
   (error.message ?? "").toLowerCase().includes("privileged_session_stepups");
@@ -72,7 +103,9 @@ export const registerPrivilegedStepUp = async (
   },
 ) => {
   const now = new Date();
-  const expiresAt = new Date(now.getTime() + (options.ttlMs ?? DEFAULT_STEP_UP_TTL_MS)).toISOString();
+  const expiresAt = new Date(
+    now.getTime() + (options.ttlMs ?? DEFAULT_STEP_UP_TTL_MS),
+  ).toISOString();
   const bindingKey = await resolveBindingKey(options.authToken);
 
   const { error } = await adminClient.from("privileged_session_stepups").upsert(

@@ -41,6 +41,10 @@ create index if not exists tenant_admin_sessions_auth_session_revoked_idx
   on public.tenant_admin_sessions (tenant_id, profile_id, auth_session_id, revoked_at desc)
   where auth_session_id is not null and revoked_at is not null;
 
+create index if not exists tenant_admin_sessions_auth_session_active_idx
+  on public.tenant_admin_sessions (tenant_id, profile_id, device_id, auth_session_id)
+  where revoked_at is null and auth_session_id is not null;
+
 alter table public.tenant_admin_sessions enable row level security;
 
 drop policy if exists "tenant_admin_sessions_select_own" on public.tenant_admin_sessions;

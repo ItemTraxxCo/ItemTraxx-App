@@ -10,6 +10,7 @@ import {
   requireTextArray,
   ValidationError,
 } from "../_shared/validation.ts";
+import { validateTenantAdminDeviceSession } from "../_shared/tenantAdminSessions.ts";
 
 const baseCorsHeaders = {
   "Access-Control-Allow-Headers":
@@ -23,33 +24,42 @@ type RateLimitResult = {
   retry_after_seconds: number | null;
 };
 
-const CHECKOUT_ACTIONS = new Set(["checkout", "return", "auto", "admin_return"] as const);
+const CHECKOUT_ACTIONS = new Set(
+  ["checkout", "return", "auto", "admin_return"] as const,
+);
 
 const resolveCorsHeaders = (req: Request) => {
   const origin = req.headers.get("Origin");
-  const allowedOrigins = parseAllowedOrigins(Deno.env.get("ITX_ALLOWED_ORIGINS"));
+  const allowedOrigins = parseAllowedOrigins(
+    Deno.env.get("ITX_ALLOWED_ORIGINS"),
+  );
 
   const hasOrigin = !!origin;
-  const originAllowed =
-    !hasOrigin || (hasOrigin && isAllowedOrigin(origin as string, allowedOrigins));
+  const originAllowed = !hasOrigin ||
+    (hasOrigin && isAllowedOrigin(origin as string, allowedOrigins));
 
-  const headers =
-    hasOrigin && originAllowed
-      ? { ...baseCorsHeaders, "Access-Control-Allow-Origin": origin as string }
-      : { ...baseCorsHeaders };
+  const headers = hasOrigin && originAllowed
+    ? { ...baseCorsHeaders, "Access-Control-Allow-Origin": origin as string }
+    : { ...baseCorsHeaders };
 
   return { hasOrigin, originAllowed, headers };
 };
 
 const isLocalhostMaintenanceBypassRequest = (req: Request) => {
-  if ((Deno.env.get("ITX_ALLOW_LOCALHOST_MAINTENANCE_BYPASS") ?? "").toLowerCase() !== "true") {
+  if (
+    (Deno.env.get("ITX_ALLOW_LOCALHOST_MAINTENANCE_BYPASS") ?? "")
+      .toLowerCase() !== "true"
+  ) {
     return false;
   }
   const origin = req.headers.get("origin");
   if (!origin) return false;
   try {
     const hostname = new URL(origin).hostname.toLowerCase();
-    if (hostname === "localhost" || hostname === "127.0.0.1" || hostname === "0.0.0.0") {
+    if (
+      hostname === "localhost" || hostname === "127.0.0.1" ||
+      hostname === "0.0.0.0"
+    ) {
       return true;
     }
     if (hostname.startsWith("192.168.") || hostname.startsWith("10.")) {
@@ -58,7 +68,8 @@ const isLocalhostMaintenanceBypassRequest = (req: Request) => {
     const match172 = hostname.match(/^172\.(\d{1,3})\./);
     if (!match172) return false;
     const secondOctet = Number(match172[1]);
-    return Number.isFinite(secondOctet) && secondOctet >= 16 && secondOctet <= 31;
+    return Number.isFinite(secondOctet) && secondOctet >= 16 &&
+      secondOctet <= 31;
   } catch {
     return false;
   }
@@ -85,12 +96,18 @@ serve(async (req) => {
   }
 
   if (isKillSwitchWriteBlocked(req)) {
-    return jsonResponse(503, { error: "Unfortunately ItemTraxx is currently unavailable." });
+    return jsonResponse(503, {
+      error: "Unfortunately ItemTraxx is currently unavailable.",
+    });
   }
 
   try {
     const authHeader = req.headers.get("authorization");
     if (!authHeader) {
+      return jsonResponse(401, { error: "Unauthorized" });
+    }
+    const authToken = authHeader.replace(/^Bearer\s+/i, "").trim();
+    if (!authToken) {
       return jsonResponse(401, { error: "Unauthorized" });
     }
 
@@ -149,7 +166,7 @@ serve(async (req) => {
         p_scope: "tenant",
         p_limit: 10,
         p_window_seconds: 60,
-      }
+      },
     );
 
     if (rateLimitError) {
@@ -163,7 +180,8 @@ serve(async (req) => {
       });
     }
 
-    const { student_id, gear_barcodes, action_type, device_id } = await req.json();
+    const { student_id, gear_barcodes, action_type, device_id } = await req
+      .json();
     const actionType = requireEnum(action_type, CHECKOUT_ACTIONS);
     const gearBarcodes = requireTextArray(gear_barcodes, {
       minItems: 1,
@@ -187,22 +205,21 @@ serve(async (req) => {
         return jsonResponse(400, { error: "Device session is required." });
       }
 
-      const { data: activeAdminSession, error: activeAdminSessionError } = await adminClient
-        .from("tenant_admin_sessions")
-        .select("id")
-        .eq("tenant_id", callerProfile.tenant_id)
-        .eq("profile_id", user.id)
-        .eq("device_id", deviceId)
-        .is("revoked_at", null)
-        .limit(1)
-        .maybeSingle();
-
-      if (activeAdminSessionError) {
-        console.error("checkoutReturn tenant_admin session lookup failed", activeAdminSessionError);
-        return jsonResponse(500, { error: "Request failed" });
+      const activeAdminSession = await validateTenantAdminDeviceSession(
+        adminClient,
+        {
+          tenantId: callerProfile.tenant_id,
+          profileId: user.id,
+          deviceId,
+          authToken,
+        },
+      );
+      if (activeAdminSession.relationMissing) {
+        return jsonResponse(503, {
+          error: "Session controls unavailable. Run latest SQL setup.",
+        });
       }
-
-      if (!activeAdminSession?.id) {
+      if (!activeAdminSession.valid) {
         return jsonResponse(401, { error: "Session revoked" });
       }
     }
@@ -216,12 +233,15 @@ serve(async (req) => {
       maintenanceRow?.value && typeof maintenanceRow.value === "object"
         ? (maintenanceRow.value as Record<string, unknown>)
         : {};
-    if (maintenanceValue.enabled === true && !isLocalhostMaintenanceBypassRequest(req)) {
+    if (
+      maintenanceValue.enabled === true &&
+      !isLocalhostMaintenanceBypassRequest(req)
+    ) {
       return jsonResponse(503, {
-        error:
-          typeof maintenanceValue.message === "string" && maintenanceValue.message.trim()
-            ? maintenanceValue.message.trim()
-            : "Maintenance mode enabled.",
+        error: typeof maintenanceValue.message === "string" &&
+            maintenanceValue.message.trim()
+          ? maintenanceValue.message.trim()
+          : "Maintenance mode enabled.",
       });
     }
 
@@ -299,8 +319,10 @@ serve(async (req) => {
       }
 
       const normalizedStatus = String(gear.status ?? "").toLowerCase();
-      const isCheckout = normalizedStatus === "available" && !gear.checked_out_by;
-      const isReturn = normalizedStatus === "checked_out" && gear.checked_out_by === student!.id;
+      const isCheckout = normalizedStatus === "available" &&
+        !gear.checked_out_by;
+      const isReturn = normalizedStatus === "checked_out" &&
+        gear.checked_out_by === student!.id;
 
       if (!isCheckout && !isReturn) {
         skippedBarcodes.push(barcode);
@@ -338,7 +360,11 @@ serve(async (req) => {
       processed += 1;
     }
 
-    return jsonResponse(200, { success: true, processed, skipped_barcodes: skippedBarcodes });
+    return jsonResponse(200, {
+      success: true,
+      processed,
+      skipped_barcodes: skippedBarcodes,
+    });
   } catch (error) {
     if (error instanceof ValidationError) {
       return jsonResponse(error.status, { error: error.message });

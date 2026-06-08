@@ -81,11 +81,11 @@ let previousActiveElement: HTMLElement | null = null;
 const tenantUserSteps: OnboardingStep[] = [
   {
     title: "Welcome to the checkout page",
-    body: "This is your fast lane for checking gear in and out.",
+    body: "This is your fast lane for checking items in and out.",
   },
   {
     title: "Scan or enter a borrower ID",
-    body: "Start each transaction by entering the borrower's ID so ItemTraxx, and you know who is receiving gear.",
+    body: "Start each transaction by entering the borrower's ID so ItemTraxx, and you know who is receiving items.",
   },
   {
     title: "Scan item barcodes",
@@ -104,11 +104,11 @@ const tenantUserSteps: OnboardingStep[] = [
 const tenantAdminSteps: OnboardingStep[] = [
   {
     title: "Welcome to the admin panel",
-    body: "This area gives you control over borrowers, gear, logs, and admin-level operations of your app.",
+    body: "This area gives you control over borrowers, items, logs, and admin-level operations of your workspace.",
   },
   {
     title: "Manage borrowers",
-    body: "Use the Borrowers page to add, import, and review borrower records.",
+    body: "Use the Borrowers page to add, and review borrower records.",
   },
   {
     title: "Track item and activity",
@@ -120,7 +120,7 @@ const tenantAdminSteps: OnboardingStep[] = [
   },
   {
     title: "Support and replay",
-    body: "From the top-right menu, use 'Take tour' to replay onboarding.  If you need help or have questions, contact ItemTraxx support by clicking the menu in the top right and then 'Contact Support'.",
+    body: "From the top-right menu, use 'Take tour' to replay onboarding. If you need help or have questions, contact ItemTraxx support by clicking the menu in the top right and then 'Contact Support'.",
   },
 ];
 

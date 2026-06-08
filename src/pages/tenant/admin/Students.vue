@@ -89,7 +89,7 @@
         </label>
       </div>
       <p class="muted">Showing {{ filteredStudents.length }} of {{ students.length }} borrowers.</p>
-      <p v-if="isLoading" class="muted">Loading borrowers...</p>
+      <SkeletonLoader v-if="isLoading" variant="table" :rows="6" :columns="3" label="Loading borrowers" />
       <div v-else class="table-wrap">
       <table class="table">
         <thead>
@@ -121,7 +121,7 @@
           <p class="admin-section-copy">Archived borrowers can be restored at any time.</p>
         </div>
       </div>
-      <p v-if="isLoadingArchived" class="muted">Loading archived borrowers...</p>
+      <SkeletonLoader v-if="isLoadingArchived" variant="table" :rows="4" :columns="3" label="Loading archived borrowers" />
       <div v-else class="table-wrap">
       <table class="table">
         <thead>
@@ -211,7 +211,7 @@
           </label>
         </div>
 
-        <p v-if="detailsLoading" class="muted">Loading details...</p>
+        <SkeletonLoader v-if="detailsLoading" variant="lines" :rows="3" label="Loading borrower details" />
         <div v-else>
           <div>
             <h3>Currently checked out</h3>
@@ -255,6 +255,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from "vue";
 import { RouterLink } from "vue-router";
+import SkeletonLoader from "../../../components/SkeletonLoader.vue";
 import { getAuthState } from "../../../store/authState";
 import {
   bulkCreateStudents,

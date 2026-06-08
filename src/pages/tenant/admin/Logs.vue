@@ -47,7 +47,7 @@
         </label>
       </div>
       <p class="muted">Showing {{ filteredLogs.length }} of {{ logs.length }} log entries.</p>
-      <p v-if="isLoading" class="muted">Loading logs...</p>
+      <SkeletonLoader v-if="isLoading" variant="table" :rows="7" :columns="4" label="Loading item logs" />
       <div v-else class="table-wrap">
       <table class="table">
         <thead>
@@ -89,6 +89,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
 import { RouterLink } from "vue-router";
+import SkeletonLoader from "../../../components/SkeletonLoader.vue";
 import { fetchGearLogs, type GearLog } from "../../../services/gearService";
 import { exportRowsToCsv, exportRowsToPdf } from "../../../services/exportService";
 

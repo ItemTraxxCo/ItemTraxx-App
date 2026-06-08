@@ -48,7 +48,7 @@
         <button type="button" @click="exportCsv">Export CSV</button>
         <button type="button" @click="exportPdf">Export PDF</button>
       </div>
-      <p v-if="isLoading" class="muted">Loading items...</p>
+      <SkeletonLoader v-if="isLoading" variant="table" :rows="6" :columns="5" label="Loading all items" />
       <p v-else-if="error" class="error">{{ error }}</p>
       <table v-else class="table">
         <thead><tr><th>Name</th><th>Tenant</th><th>Barcode</th><th>Status</th><th>Actions</th></tr></thead>
@@ -87,6 +87,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
 import { RouterLink, useRouter } from "vue-router";
+import SkeletonLoader from "../../components/SkeletonLoader.vue";
 import StepUpModal from "../../components/StepUpModal.vue";
 import {
   handleSuperAdminUnauthorized,

@@ -43,6 +43,7 @@ create policy "super_admin_select_super_admin_audit_logs"
       where p.id = auth.uid()
         and p.role = 'super_admin'
     )
+    and public.has_recent_privileged_step_up('super_admin')
   );
 
 drop policy if exists "super_admin_insert_super_admin_audit_logs"
@@ -61,6 +62,7 @@ create policy "super_admin_insert_super_admin_audit_logs"
       where p.id = auth.uid()
         and p.role = 'super_admin'
     )
+    and public.has_recent_privileged_step_up('super_admin')
   );
 
 -- Optional helper index for dashboard/action history

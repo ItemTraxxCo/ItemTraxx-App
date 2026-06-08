@@ -1,12 +1,36 @@
 # Changelog
 
-Last updated (year-month-day): 2026-05-27
+Last updated (year-month-day): 2026-06-07
 
 This changelog summarizes notable ItemTraxx product, reliability, security, and experience updates.
 
 Changes are dated based on the default timezone: America/Los_Angeles
 
 ---
+
+### 6/07/2026 Development Update
+
+- Completed security fixes.
+
+### 6/05/2026 Development Update
+
+- Completed routine dependency maintenance and security scanning updates.
+
+### 6/04/2026 Development Update
+
+- Completed routine dependency maintenance.
+
+### 6/02/2026 Development Update
+
+- Completed security fixes for privileged backend access paths.
+- Improved authentication reliability and search-engine optimization metadata.
+- Completed routine GitHub Actions and npm dependency maintenance.
+
+### 5/29/2026 Development Update
+
+- Completed security and quality-of-life updates.
+- Updated DOM sanitization dependency for security maintenance.
+- Completed routine dependency maintenance.
 
 ### 5/27/2026 Development Update
 

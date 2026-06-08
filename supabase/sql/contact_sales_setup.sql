@@ -117,6 +117,7 @@ create policy "super_admin_select_sales_leads"
       where p.id = auth.uid()
         and p.role = 'super_admin'
     )
+    and public.has_recent_privileged_step_up('super_admin')
   );
 
 drop policy if exists "super_admin_select_customer_status_logs" on public.customer_status_logs;
@@ -131,4 +132,5 @@ create policy "super_admin_select_customer_status_logs"
       where p.id = auth.uid()
         and p.role = 'super_admin'
     )
+    and public.has_recent_privileged_step_up('super_admin')
   );

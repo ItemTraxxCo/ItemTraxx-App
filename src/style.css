@@ -725,6 +725,108 @@ textarea {
   margin-top: 0;
 }
 
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.skeleton-loader {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.skeleton-loader-table {
+  margin-top: 0.35rem;
+}
+
+.skeleton-line,
+.skeleton-card {
+  position: relative;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--surface-3) 72%, var(--surface-2) 28%);
+}
+
+.skeleton-line::after,
+.skeleton-card::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in srgb, var(--surface) 42%, transparent),
+    transparent
+  );
+  animation: skeleton-shimmer 1.25s ease-in-out infinite;
+}
+
+.skeleton-line {
+  display: block;
+  width: 100%;
+  height: 0.85rem;
+  border-radius: 999px;
+}
+
+.skeleton-line-title {
+  width: min(18rem, 62%);
+  height: 1.1rem;
+}
+
+.skeleton-line-short {
+  width: min(12rem, 48%);
+}
+
+.skeleton-table {
+  min-width: 560px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  overflow: hidden;
+}
+
+.skeleton-table-row {
+  display: grid;
+  gap: 1rem;
+  padding: 0.75rem 0.8rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.skeleton-table-row:last-child {
+  border-bottom: 0;
+}
+
+.skeleton-card {
+  display: grid;
+  gap: 0.75rem;
+  padding: 1rem;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+}
+
+.skeleton-card .skeleton-line {
+  background: color-mix(in srgb, var(--surface-2) 80%, var(--surface-3) 20%);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton-line::after,
+  .skeleton-card::after {
+    animation: none;
+  }
+}
+
+@keyframes skeleton-shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}
+
 .support-note {
   font-size: 0.85rem;
   margin-top: 0.5rem;

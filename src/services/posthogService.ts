@@ -18,7 +18,8 @@ export const initPostHog = async () => {
   if (!token) return;
   try {
     const posthogConfig: NonNullable<Parameters<typeof posthog.init>[1]> = {
-      api_host: import.meta.env.VITE_POSTHOG_HOST?.trim() || "https://us.i.posthog.com",
+      api_host: import.meta.env.VITE_POSTHOG_HOST?.trim() || "https://j.itemtraxx.com",
+      ui_host: "https://us.posthog.com",
       defaults: "2026-01-30",
       autocapture: false,
       rageclick: false,

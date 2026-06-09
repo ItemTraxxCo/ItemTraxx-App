@@ -23,7 +23,7 @@ export const initPostHog = async () => {
       defaults: "2026-01-30",
       autocapture: false,
       rageclick: false,
-      capture_pageview: false,
+      capture_pageview: "history_change",
       capture_pageleave: false,
       capture_dead_clicks: false,
       capture_exceptions: false,

@@ -28,15 +28,15 @@
     "deploy:cloudflare:worker": "bash ./scripts/deploy-cloudflare-worker.sh"
   },
   "dependencies": {
-    "@posthog/react": "^1.10.0",
-    "@sentry/vue": "^10.56.0",
-    "@supabase/supabase-js": "^2.107.0",
+    "@posthog/react": "^1.10.1",
+    "@sentry/vue": "^10.57.0",
+    "@supabase/supabase-js": "^2.108.0",
     "@vercel/analytics": "^2.0.1",
     "@vercel/speed-insights": "^2.0.0",
     "jsbarcode": "^3.12.3",
     "jspdf": "^4.2.1",
     "jspdf-autotable": "^5.0.8",
-    "posthog-js": "^1.382.0",
+    "posthog-js": "^1.383.2",
     "supabase": "2.105.0",
     "vue": "^3.5.35",
     "vue-router": "^4.6.4",
@@ -50,8 +50,8 @@
     "rollup": "^4.61.1",
     "typescript": "~6.0.3",
     "vite": "^8.0.16",
-    "vue-tsc": "^3.3.3",
-    "wrangler": "^4.98.0",
+    "vue-tsc": "^3.3.4",
+    "wrangler": "^4.99.0",
     "zod-to-json-schema": "^3.25.2"
   },
   "overrides": {

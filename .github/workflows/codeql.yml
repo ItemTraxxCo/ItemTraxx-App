@@ -85,7 +85,7 @@ jobs:
     needs:
       - slack-notify-start
       - analyze
-    if: ${{ always() && needs.analyze.result != 'skipped' }}
+    if: ${{ always() && needs.slack-notify-start.result == 'success' && needs.analyze.result != 'skipped' }}
     uses: ./.github/workflows/slack-notify-status.yml
     with:
       mode: finish
@@ -122,8 +122,9 @@ jobs:
   incidentio-notify-failure:
     needs:
       - kill-switch-preflight
+      - slack-notify-start
       - analyze
-    if: ${{ always() && needs.kill-switch-preflight.outputs.active != 'true' && github.event_name != 'pull_request' && (needs.analyze.result == 'failure' || needs.analyze.result == 'cancelled') }}
+    if: ${{ always() && needs.kill-switch-preflight.outputs.active != 'true' && needs.slack-notify-start.result == 'success' && github.event_name != 'pull_request' && (needs.analyze.result == 'failure' || needs.analyze.result == 'cancelled') }}
     uses: ./.github/workflows/incidentio-workflow-alert.yml
     with:
       status: ${{ needs.analyze.result }}

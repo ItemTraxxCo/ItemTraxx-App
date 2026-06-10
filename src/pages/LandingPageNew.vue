@@ -37,7 +37,7 @@
           </p>
           <p class="hero-support">
             Contact us to start mastering your inventory with ItemTraxx's
-            streamlined checkout, returns, and admin management.
+            checkout, returns, and admin management.
           </p>
           <div class="hero-actions">
             <RouterLink class="cta-primary" to="/pricing" @click="trackCta('pricing', 'hero')">Pricing</RouterLink>
@@ -103,7 +103,7 @@
           </p>
           <ul class="feature-checks">
             <li>Fast sign in and transaction flow</li>
-            <li>Clean operator-facing workflow design</li>
+            <li>Clean and clear user-facing workflow design</li>
             <li>Light and dark appearance modes available</li>
           </ul>
         </div>
@@ -188,8 +188,8 @@
 
       <section class="final-strip reveal reveal-up">
         <div>
-          <p class="eyebrow">Ready to simplify inventory tracking?</p>
-          <h2>Get started with ItemTraxx and streamline your inventory management.</h2>
+          <p class="eyebrow">Ready to simplify your inventory tracking?</p>
+          <h2>Get started with ItemTraxx and advance your inventory management.</h2>
           <p>Simplify your inventory management with ItemTraxx today.</p>
           <div class="final-actions">
             <RouterLink class="cta-primary" to="/login" @click="trackCta('login', 'final')">Go to Login</RouterLink>

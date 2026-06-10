@@ -232,12 +232,12 @@ const operationsControls = [
   {
     title: "Monitoring and error reporting",
     description:
-      "ItemTraxx uses third-party services for error monitoring and tracing (Sentry) and operational analytics (PostHog), plus operational alerts and workflow notifications through internal systems to stay on top of issues. Analytics and diagnostics tooling is only enabled after user consent through the cookie banner. In some environments, session replay sampling (Sentry Replay and/or PostHog Replay) may be enabled after consent for debugging and incident investigation. In addition to internal security reviews, we use tools to scan our code for vulnerabilities including GitHub, Aikido, and GitGuardian.",
+      "ItemTraxx uses third-party services for error monitoring and tracing (Sentry) and operational analytics (PostHog), plus operational alerts and workflow notifications through internal systems to stay on top of issues. Analytics and diagnostics tooling is only enabled after user consent through the cookie banner. In some environments, session replay sampling (Sentry Replay and/or PostHog Replay) may be enabled after consent for debugging and incident investigation. In addition to internal security reviews, we use tools to scan our code for vulnerabilities including GitHub Code Security, GitHub CodeQL, Aikido Security, GitGuardian, and other internal tools.",
   },
   {
     title: "Pre release checks and runbooks",
     description:
-      "Security checks, extensive testing, and deployment tooling is completed before public release instead of failing in user-facing versions. This allows for better control and visibility into the security posture and overall performance of the application.",
+      "Security checks, extensive testing, and deployment tooling is completed before public release instead of failing in user-facing versions. This allows for better control and visibility into the security posture and overall performance of the application. Even with all these safeguards, we cannot guarantee an absolute error-free experience. In the case of an issue, we're ready to respond with our incident response and escalation practices, and we maintain operational documentation for triage, escalation, rollback, and status handling when production and client-facing issues occur.",
   },
 ];
 
@@ -261,13 +261,13 @@ const securityApproach = [
     category: "Prevention",
     title: "Access control and request verification",
     description:
-      "Protected routes, server access checks, request verification, and abuse controls are used to reduce unauthorized access and automated misuse of ItemTraxx and your data.",
+      "Protected routes, server-side access checks, request verification, and abuse controls are used to mitigate unauthorized access and automated misuse of ItemTraxx and your data.",
   },
   {
     category: "Detection",
     title: "Monitoring and operational visibility",
     description:
-      "Application monitoring, alerting, audit visibility, and workflow reporting are used to surface unexpected failures and operational regressions in development, beta, and client-facing environments.",
+      "Application monitoring, alerting, audit visibility, and workflow reporting are used to surface unexpected failures and operational regressions in development, testing, and client-facing releases.",
   },
   {
     category: "Change management",
@@ -279,13 +279,13 @@ const securityApproach = [
     category: "Recovery",
     title: "Backup and restore readiness",
     description:
-      "Encrypted backups, restore context, and operational recovery documentation are maintained as part of the production operations standard.",
+      "Encrypted backups, restore context, and operational recovery documentation are maintained as part of our operations standard.",
   },
   {
     category: "Response",
     title: "Incident response and escalation",
     description:
-      "ItemTraxx maintains incident-response and operational documentation for triage, escalation, rollback, and status handling when production and client-facing issues occur.",
+      "ItemTraxx maintains incident-response and operational documentation for triage, escalation, rollback, and status handling when production and other client-facing issues occur.",
   },
   {
     category: "Disclosure",

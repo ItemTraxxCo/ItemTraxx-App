@@ -41,7 +41,7 @@
           />
           <RouterLink class="story-back-link compact-back-link" to="/">Back</RouterLink>
           <h1>Sign in</h1>
-          <p class="login-panel-copy">Use your ItemTraxx access code and password to enter your ItemTraxx app.</p>
+          <p class="login-panel-copy">Use your access code and password to enter your ItemTraxx app.</p>
 
           <form class="form login-form" @submit.prevent="handleTenantLogin">
             <label>

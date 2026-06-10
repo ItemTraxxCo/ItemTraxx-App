@@ -81,4 +81,4 @@ This repository contains both the current production-facing surfaces and preserv
 ---
 
 **© 2026 ItemTraxx Co. All rights reserved.**
-Empowering organizations with secure and efficient asset management.
+Empowering you with secure and efficient asset management.

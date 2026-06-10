@@ -13,7 +13,7 @@ test.describe("Public surfaces", () => {
       page.getByRole("navigation", { name: "Primary" }).getByRole("link", { name: "Login", exact: true }),
     ).toBeVisible();
     await expect(page.getByRole("heading", { name: "Answers to the common stuff." })).toBeVisible();
-    await expect(page.getByRole("heading", { name: "Get started with ItemTraxx and streamline your inventory management." })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Get started with ItemTraxx and advance your inventory management." })).toBeVisible();
   });
 
   test("loads unified legal agreement page", async ({ page }) => {

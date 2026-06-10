@@ -588,6 +588,7 @@ const showTopMenu = computed(
     route.name !== "public-legal" &&
     route.name !== "public-forgot-password" &&
     route.name !== "public-reset-password" &&
+    route.name !== "public-home-new2" &&
     route.name !== "public-request-demo" &&
     route.name !== "public-contact-sales" &&
     route.name !== "public-contact-support" &&

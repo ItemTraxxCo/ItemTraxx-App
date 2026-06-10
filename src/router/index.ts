@@ -38,6 +38,12 @@ const routes: RouteRecordRaw[] = [
     meta: { public: true, title: "ItemTraxx Inventory Tracking" },
   },
   {
+    path: "/landing-new2",
+    name: "public-home-new2",
+    component: () => import("../pages/LandingPageNew2.vue"),
+    meta: { public: true, title: "ItemTraxx Inventory Tracking" },
+  },
+  {
     path: "/reset-password",
     name: "public-reset-password",
     component: () => import("../pages/ResetPassword.vue"),

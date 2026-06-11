@@ -80,3 +80,22 @@ export const allowsAnalytics = (state: CookieConsentState | null) => state?.pref
 export const allowsDiagnostics = (state: CookieConsentState | null) => state?.preferences.diagnostics === true;
 export const allowsSessionReplay = (state: CookieConsentState | null) => state?.preferences.diagnostics === true;
 export const hasCookieConsent = (state: CookieConsentState | null) => state !== null;
+
+export const clearAnalyticsPersistence = () => {
+  if (!isBrowser()) return;
+  try {
+    for (const key of Object.keys(window.localStorage)) {
+      if (key.startsWith("ph_")) window.localStorage.removeItem(key);
+    }
+    for (const key of Object.keys(window.sessionStorage)) {
+      if (key.startsWith("ph_")) window.sessionStorage.removeItem(key);
+    }
+    for (const cookie of document.cookie.split(";")) {
+      const name = cookie.split("=", 1)[0]?.trim();
+      if (!name?.startsWith("ph_")) continue;
+      document.cookie = `${name}=; Max-Age=0; Path=/; SameSite=Lax`;
+    }
+  } catch {
+    // Storage cleanup is best-effort.
+  }
+};

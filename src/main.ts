@@ -250,6 +250,14 @@ const initializePostHog = async () => {
   }
 };
 
+const initializeClientDiagnostics = async () => {
+  if (!allowsDiagnostics(readCookieConsent())) {
+    return;
+  }
+  const { installClientDiagnostics } = await import("./services/clientDiagnostics");
+  installClientDiagnostics();
+};
+
 let posthogExceptionCapturePromise: Promise<((error: unknown) => void)> | null = null;
 
 const getPostHogExceptionCapture = async () => {
@@ -274,13 +282,16 @@ const bindConsentDrivenMonitoring = (app: ReturnType<typeof createApp>) => {
       return;
     }
     void initializeSentry(app);
+    void initializeClientDiagnostics();
   };
 
   const maybeEnableAnalytics = () => {
-    if (!allowsAnalytics(readCookieConsent())) {
-      return;
-    }
-    void initializePostHog();
+    void import("./services/posthogService").then(({ syncPostHogConsent }) => {
+      syncPostHogConsent();
+      if (allowsAnalytics(readCookieConsent())) {
+        void initializePostHog();
+      }
+    });
   };
 
   window.addEventListener("itemtraxx:cookie-consent", maybeEnableDiagnostics);
@@ -313,9 +324,7 @@ const mountApp = async () => {
   app.use(router);
   await router.isReady();
   app.mount("#app");
-  void import("./services/clientDiagnostics")
-    .then(({ installClientDiagnostics }) => installClientDiagnostics())
-    .catch(() => undefined);
+  void initializeClientDiagnostics().catch(() => undefined);
   void import("./services/globalErrorHandling")
     .then(({ installGlobalErrorHandling }) => installGlobalErrorHandling(app))
     .catch(() => undefined);

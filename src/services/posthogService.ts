@@ -1,6 +1,7 @@
-import posthog from "posthog-js";
+import { allowsAnalytics, readCookieConsent } from "./cookieConsentService";
 
 let initialized = false;
+let posthog: typeof import("posthog-js").default | null = null;
 const EMAIL_PATTERN = /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/i;
 const SENSITIVE_PROPERTY_KEY = /(email|phone|name|tenant|profile|student|user_id|address|token|secret)/i;
 
@@ -31,8 +32,9 @@ const isCspUnsafeEvalError = (error: unknown) => {
 export const initPostHog = async () => {
   if (initialized) return;
   const token = import.meta.env.VITE_POSTHOG_PROJECT_TOKEN?.trim();
-  if (!token) return;
+  if (!token || !allowsAnalytics(readCookieConsent())) return;
   try {
+    posthog = (await import("posthog-js")).default;
     const posthogConfig: NonNullable<Parameters<typeof posthog.init>[1]> = {
       api_host: import.meta.env.VITE_POSTHOG_HOST?.trim() || "https://j.itemtraxx.com",
       ui_host: "https://us.posthog.com",
@@ -69,11 +71,20 @@ export const initPostHog = async () => {
   }
 };
 
+export const syncPostHogConsent = () => {
+  if (!initialized || !posthog) return;
+  if (allowsAnalytics(readCookieConsent())) {
+    posthog.opt_in_capturing();
+    return;
+  }
+  posthog.opt_out_capturing();
+};
+
 export const capturePostHogEvent = (
   event: string,
   properties?: Record<string, string | number | boolean | null | undefined>
 ) => {
-  if (!initialized) return;
+  if (!initialized || !posthog || !allowsAnalytics(readCookieConsent())) return;
   try {
     posthog.capture(event, scrubProperties(properties));
   } catch (error) {
@@ -85,7 +96,7 @@ export const identifyPostHogUser = (
   distinctId: string,
   properties?: Record<string, string | number | boolean | null | undefined>
 ) => {
-  if (!initialized) return;
+  if (!initialized || !posthog || !allowsAnalytics(readCookieConsent())) return;
   try {
     const safeProperties = scrubProperties(properties);
     if (EMAIL_PATTERN.test(distinctId)) {
@@ -98,7 +109,7 @@ export const identifyPostHogUser = (
 };
 
 export const resetPostHog = () => {
-  if (!initialized) return;
+  if (!initialized || !posthog) return;
   try {
     posthog.reset();
   } catch (error) {
@@ -107,7 +118,7 @@ export const resetPostHog = () => {
 };
 
 export const capturePostHogException = (error: unknown) => {
-  if (!initialized || isCspUnsafeEvalError(error)) return;
+  if (!initialized || !posthog || !allowsAnalytics(readCookieConsent()) || isCspUnsafeEvalError(error)) return;
   try {
     posthog.captureException(error);
   } catch (captureError) {

@@ -311,7 +311,7 @@ import { getRouteLoadingState } from "./store/routeLoading";
 import { clearSessionTermination, getSessionTerminationState, showSessionTermination } from "./store/sessionTermination";
 import { resolveRecoveryRouteFromPath } from "./services/appErrorRecovery";
 import { getOrCreateDeviceSession } from "./utils/deviceSession";
-import { allowsAnalytics, hasCookieConsent, readCookieConsent, writeCookieConsent, type CookieConsentPreferences, type CookieConsentState } from "./services/cookieConsentService";
+import { allowsAnalytics, clearAnalyticsPersistence, hasCookieConsent, readCookieConsent, writeCookieConsent, type CookieConsentPreferences, type CookieConsentState } from "./services/cookieConsentService";
 import { recordCookieConsent } from "./services/consentRecordService";
 
 const Analytics = defineAsyncComponent(async () => {
@@ -474,6 +474,7 @@ const showCookieConsentBanner = computed(() => !hasCookieConsent(cookieConsent.v
 const syncCookieConsent = () => {
   cookieConsent.value = readCookieConsent();
   showTelemetry.value = allowsAnalytics(cookieConsent.value);
+  if (!showTelemetry.value) clearAnalyticsPersistence();
 };
 
 const syncConsentRecord = () => {

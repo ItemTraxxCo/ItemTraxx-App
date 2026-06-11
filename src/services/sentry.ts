@@ -133,7 +133,12 @@ const shouldCaptureHandledRequestFailure = (failure: HandledRequestFailure) => {
 };
 
 export const captureHandledRequestFailure = async (failure: HandledRequestFailure) => {
-  if (!SENTRY_DSN || !sentryInitialized || !shouldCaptureHandledRequestFailure(failure)) {
+  if (
+    !SENTRY_DSN ||
+    !sentryInitialized ||
+    !allowsDiagnostics(readCookieConsent()) ||
+    !shouldCaptureHandledRequestFailure(failure)
+  ) {
     return;
   }
 
@@ -192,6 +197,9 @@ export const initializeSentry = async (app: App, router: Router) => {
         : 0.1,
     tracePropagationTargets: getTracePropagationTargets(),
     beforeSend(event, hint) {
+      if (!allowsDiagnostics(readCookieConsent())) {
+        return null;
+      }
       if (!shouldReportError(hint.originalException)) {
         return null;
       }
@@ -199,6 +207,9 @@ export const initializeSentry = async (app: App, router: Router) => {
         return null;
       }
       return event;
+    },
+    beforeSendTransaction(event) {
+      return allowsDiagnostics(readCookieConsent()) ? event : null;
     },
   });
 

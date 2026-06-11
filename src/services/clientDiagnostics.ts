@@ -68,6 +68,7 @@ const serializeArgs = (args: unknown[]) =>
     .slice(0, MAX_SERIALIZED_LENGTH);
 
 const recordConsoleEntry = (level: ConsoleLevel, args: unknown[]) => {
+  if (!allowsDiagnostics(readCookieConsent())) return;
   pushBounded(
     consoleEntries,
     {
@@ -92,7 +93,7 @@ const shouldSkipNetworkCapture = (url: string) =>
   url.includes("/functions/v1/client-error-report") || url.includes("/functions/client-error-report");
 
 const recordNetworkEntry = (entry: NetworkEntry) => {
-  if (shouldSkipNetworkCapture(entry.url)) {
+  if (!allowsDiagnostics(readCookieConsent()) || shouldSkipNetworkCapture(entry.url)) {
     return;
   }
   pushBounded(networkEntries, entry, MAX_NETWORK_ENTRIES);
@@ -157,3 +158,4 @@ export const getClientDiagnosticsSnapshot = () => ({
   console: [...consoleEntries],
   network: [...networkEntries],
 });
+import { allowsDiagnostics, readCookieConsent } from "./cookieConsentService";

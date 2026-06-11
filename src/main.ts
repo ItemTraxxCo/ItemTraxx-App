@@ -229,12 +229,14 @@ const initializeAuth = async () => {
   initAuthListener();
 };
 
+let appMounted = false;
+
 const initializeSentry = async (app: ReturnType<typeof createApp>) => {
   if (!import.meta.env.VITE_SENTRY_DSN?.trim() || !allowsDiagnostics(readCookieConsent())) {
     return;
   }
   const { initializeSentry: initializeSentryMonitoring } = await import("./services/sentry");
-  await initializeSentryMonitoring(app, router);
+  await initializeSentryMonitoring(app, router, appMounted);
 };
 
 const initializePostHog = async () => {  
@@ -248,6 +250,14 @@ const initializePostHog = async () => {
     // Analytics must never break login or core flows.
     console.warn("[posthog] initialization failed; continuing without analytics.", error);
   }
+};
+
+const initializeClientDiagnostics = async () => {
+  if (!allowsDiagnostics(readCookieConsent())) {
+    return;
+  }
+  const { installClientDiagnostics } = await import("./services/clientDiagnostics");
+  installClientDiagnostics();
 };
 
 let posthogExceptionCapturePromise: Promise<((error: unknown) => void)> | null = null;
@@ -274,13 +284,16 @@ const bindConsentDrivenMonitoring = (app: ReturnType<typeof createApp>) => {
       return;
     }
     void initializeSentry(app);
+    void initializeClientDiagnostics();
   };
 
   const maybeEnableAnalytics = () => {
-    if (!allowsAnalytics(readCookieConsent())) {
-      return;
-    }
-    void initializePostHog();
+    void import("./services/posthogService").then(({ syncPostHogConsent }) => {
+      syncPostHogConsent();
+      if (allowsAnalytics(readCookieConsent())) {
+        void initializePostHog();
+      }
+    });
   };
 
   window.addEventListener("itemtraxx:cookie-consent", maybeEnableDiagnostics);
@@ -312,17 +325,16 @@ const mountApp = async () => {
   };
   app.use(router);
   await router.isReady();
+  await initializeSentry(app);
   app.mount("#app");
-  void import("./services/clientDiagnostics")
-    .then(({ installClientDiagnostics }) => installClientDiagnostics())
-    .catch(() => undefined);
+  appMounted = true;
+  void initializeClientDiagnostics().catch(() => undefined);
   void import("./services/globalErrorHandling")
     .then(({ installGlobalErrorHandling }) => installGlobalErrorHandling(app))
     .catch(() => undefined);
   void import("./services/appErrorRecovery")
     .then(({ installAppErrorRecovery }) => installAppErrorRecovery(router))
     .catch(() => undefined);
-  void initializeSentry(app);
   void initializePostHog();
   bindConsentDrivenMonitoring(app);
   captureInitialPerfMetrics();

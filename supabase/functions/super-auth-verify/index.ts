@@ -37,11 +37,6 @@ const CHALLENGE_TTL_MS = 10 * 60 * 1000;
 const RESEND_COOLDOWN_MS = 60 * 1000;
 const MAX_ATTEMPTS = 5;
 
-type RateLimitResult = {
-  allowed: boolean;
-  retry_after_seconds: number | null;
-};
-
 type StartPasswordLoginAction = {
   action: "start_password_login";
   payload?: { email?: string; password?: string; turnstile_token?: string };
@@ -614,17 +609,18 @@ serve(async (req) => {
       return jsonResponse(401, { error: "Unauthorized" });
     }
 
-    const { data: rateLimit, error: rateLimitError } = await adminClient.rpc("consume_rate_limit", {
-      p_scope: "super_admin_2fa",
-      p_limit: 10,
-      p_window_seconds: 600,
-    });
-    if (rateLimitError) {
-      logError("super-auth-verify rate limit failed", requestId, rateLimitError);
-      return jsonResponse(503, { error: "Rate limit check failed." });
-    }
-    const rateLimitResult = rateLimit as RateLimitResult;
-    if (!rateLimitResult.allowed) {
+    const rateLimit = await enforcePreloginRateLimit(
+      adminClient,
+      context.userId,
+      `super-admin-2fa-${context.userId}`,
+      10,
+      600,
+    );
+    if (!rateLimit.ok) {
+      if (rateLimit.error) {
+        logError("super-auth-verify rate limit failed", requestId, rateLimit.error);
+        return jsonResponse(503, { error: "Rate limit check failed." });
+      }
       return jsonResponse(429, { error: "Too many requests. Please try again shortly." });
     }
 

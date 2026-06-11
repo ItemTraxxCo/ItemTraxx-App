@@ -41,15 +41,26 @@ test.describe("Privacy and legal controls", () => {
     await expect(page.getByRole("heading", { name: "ItemTraxx Data Processing Addendum Template", level: 1 })).toBeVisible();
   });
 
-  test("administrator sign in requires explicit terms acceptance", async ({ page }) => {
+  test("district administrator sign in requires explicit terms acceptance", async ({ page }) => {
+    await page.route(/\/functions(?:\/v1)?\/district-handoff(?:\?.*)?$/, async (route) => {
+      await route.fulfill({
+        status: 403,
+        contentType: "application/json",
+        body: JSON.stringify({ error: "District terms acceptance required" }),
+      });
+    });
     await page.goto("/tenant/admin-login");
 
     await page.getByPlaceholder("Enter email").fill("admin@example.com");
     await page.getByPlaceholder("Enter password").fill("not-a-real-password");
 
     const submit = page.getByRole("button", { name: "Sign in" });
-    await expect(submit).toBeDisabled();
+    await expect(page.getByLabel(/authorized adult administrator/i)).toHaveCount(0);
+    await submit.click();
+
     const acceptance = page.getByLabel(/authorized adult administrator/i);
+    await expect(acceptance).toBeVisible();
+    await expect(submit).toBeDisabled();
     await expect(acceptance).toHaveAccessibleName(/school.*authority.*student borrower/i);
     await expect(acceptance).toHaveAccessibleName(/generated.*username.*borrower id/i);
     await acceptance.check();

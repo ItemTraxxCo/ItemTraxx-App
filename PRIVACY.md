@@ -1,6 +1,6 @@
 # Privacy Policy
 
-Last updated: 2026-04-16 (year-month-day)
+Last updated: 2026-06-11 (year-month-day)
 
 ItemTraxx Co ("we", "our", or "us") provides ItemTraxx, a cloud-based inventory, checkout, borrower-management, and administrative operations platform. This Privacy Policy explains what information we collect, how we use it, how we share it, and the choices available to users and customers.
 
@@ -24,7 +24,7 @@ We may collect the following categories of information:
 - **Account Information:** Name, email address, role, tenant or role assignment, organization name, authentication metadata, and session/device metadata used to secure access
 - **Operational Data:** Inventory records, item status, barcodes, borrower identifiers, borrower profile details entered by customer admins, checkout and return history, audit logs, and administrative actions
 - **Usage Data:** App interactions, page usage, timestamps, route access, workflow activity, and operational events generated while using the service
-- **Product analytics and diagnostics (after consent):** If you enable analytics and diagnostics in the consent banner, ItemTraxx may collect product analytics and diagnostic events through PostHog and Sentry. This can include event names and properties, page URLs, timestamps, error reports and stack traces, and device/browser metadata. When available, limited account context (such as a user identifier, email, and role) may be associated with analytics events to help measure product usage and investigate issues. If Sentry Replay sampling and/or PostHog session replay is enabled in the active environment, session replay data may also be collected after consent for debugging.
+- **Product analytics and diagnostics (after consent):** If you enable analytics or diagnostics in the consent banner, ItemTraxx may collect product analytics through PostHog and Vercel and diagnostic events through PostHog and Sentry. This can include event names, scrubbed event properties, page or route information, timestamps, error reports and stack traces, performance measurements, and device/browser metadata. ItemTraxx may associate a non-email account identifier and role with authorized adult account activity. Sensitive property names and email-form identifiers are filtered from PostHog events. If Sentry Replay or PostHog Replay is enabled in the active environment, replay data may be collected only when diagnostics consent is enabled.
 - **Device and Technical Data:** Browser type, operating system, approximate device metadata, IP-derived network and security context, approximate IP-based location used for account security and session review, request identifiers, and verification or abuse-prevention signals
 - **Communications Data:** Messages submitted through contact support, contact sales, password-reset, and related support workflows, including optional attachments where supported
 - **Transactional Data:** Plan metadata, billing-related plan classification, subscription records, and onboarding or support request metadata used to manage service delivery
@@ -70,18 +70,22 @@ No system is guaranteed to be completely secure. Users and customers should also
 
 ---
 
-## 6. Data Retention
+## 6. Data Retention and Deletion
 We retain information for as long as reasonably necessary to operate the service, comply with obligations, resolve disputes, and enforce agreements.
 
 Typical retention expectations include:
 
 - **Active workspace data:** retained while the applicable tenant, district, or account remains active
-- **Archived or soft-deleted operational records:** retained until removed by authorized process or policy
-- **Audit, security, and operational logs:** retained according to service, security, and compliance needs
+- **Archived or soft-deleted student and inventory records:** retained until an authorized administrator restores them or an approved retention process removes them
+- **Audit, security, and operational logs:** retained according to configured operational and security policy; automated database retention is not enabled by default
 - **Support and sales inquiries:** retained as needed for follow-up, customer service, and business records
-- **Backups:** may persist for a limited backup and rotation period before aging out
+- **Provider-managed backups or recovery copies:** may persist according to the applicable infrastructure provider's configured recovery and retention behavior
 
 Retention may vary depending on customer configuration, legal requirements, support needs, or operational necessity.
+
+For school-controlled student records, ItemTraxx follows verified school or district instructions,
+subject to legal preservation obligations and available administrative and retention controls.
+ItemTraxx does not retain student information for advertising or unrelated commercial purposes.
 
 ---
 
@@ -97,7 +101,12 @@ ItemTraxx relies on third-party infrastructure and service providers to operate 
 - internal operational alerting, incident coordination, and support workflows
 - security scanning, vulnerability monitoring, and security operations support
 
-These providers operate under their own terms and privacy practices. We use them as part of operating, securing, and supporting the service.
+Current systems include Supabase for database, authentication, storage, and Edge Functions;
+Cloudflare for edge proxying, request filtering, DNS, and Turnstile; Vercel for frontend hosting,
+analytics, and performance measurements; PostHog and Sentry for consent-controlled analytics and
+diagnostics; transactional email providers configured through server-side email services; GitHub for
+source control and CI/CD; and Slack and incident.io for operational notifications where configured.
+Provider use depends on the active environment and feature configuration.
 
 ---
 
@@ -114,37 +123,82 @@ If image attachments are supported in a support workflow, those attachments are 
 ---
 
 ## 9. Children and School Use
-ItemTraxx may be used in school environments. We do not knowingly collect personal information directly from children in a manner inconsistent with applicable law. In school- or organization-managed environments, the applicable institution or account owner may control the collection and management of operational and borrower-related data within its workspace.
+ItemTraxx is used in schools and may process information about students under 13. Students do not
+create independent consumer accounts or enter into ItemTraxx contracts. A school or district
+contracts for the service and authorizes ItemTraxx to process student information for the school's
+educational inventory, checkout, return, and related administrative purposes.
+
+Where COPPA applies, ItemTraxx relies on authorization from the school or district acting in the
+educational context. ItemTraxx provides the school notice of its collection, use, disclosure,
+security, and retention practices so the school can provide appropriate notice to parents or
+guardians. ItemTraxx does not use student information for targeted advertising, behavioral
+profiling, sale, or unrelated commercial purposes.
+
+ItemTraxx does not collect a student's age or date of birth. Borrower records use generated
+pseudonymous usernames and generated borrower IDs rather than student names, email addresses, or
+independent account credentials. The service associates those borrower records with a school or
+tenant, checked-out or returned items, transaction history, and related administrative audit records.
+Student borrower records are not Supabase Auth accounts and do not contain independent student
+email-login sessions. ItemTraxx discloses this information only to authorized school users and
+service providers needed to operate and secure the service, or when legally required.
+
+Parents and guardians should ordinarily direct requests to the applicable school or district,
+which controls the education records and can provide verified instructions to ItemTraxx. Schools
+may request access, correction, export, or deletion through the privacy request process.
 
 ---
 
 ## 10. Your Rights and Requests
 Depending on your jurisdiction and relationship to the service, you may have rights to request access, correction, deletion, or other actions regarding personal information.
 
-You can control whether analytics is enabled by choosing "Essential only" or "Accept all" in the cookie consent banner. If you decline analytics, PostHog analytics and diagnostics collection will not run in your browser session.
+You can independently enable or decline analytics and diagnostics in the cookie consent banner.
+Declining analytics prevents optional product analytics from running. Declining diagnostics prevents
+optional Sentry and PostHog diagnostic collection, including replay sampling when enabled.
 
-You can control whether diagnostics is enabled by choosing "Essential only" or "Accept all" in the cookie consent banner. If you decline diagnostics, Sentry error monitoring and PostHog diagnostics (including any replay sampling, when enabled) will not run in your browser session.
+For authenticated adult administrators, the selected consent version and category choices are also
+recorded server-side. Anonymous visitors and student borrower workflows store the preference only in
+the browser and do not create a server-side consent identity record.
 
 Because many ItemTraxx accounts are controlled by schools, districts, or organizations, some requests may need to be directed through the applicable account owner or administrator first.
 
-To contact us regarding privacy-related requests, use the contact information below.
+Submit a request through [itemtraxx.com/privacy-request](https://itemtraxx.com/privacy-request) or
+email `support@itemtraxx.com`. We verify requests before disclosing, correcting, or deleting data.
+We target acknowledgment within 10 business days and a substantive response within 45 calendar
+days, unless a different period applies or a permitted extension is necessary. We will explain any
+denial or limitation required by law, contract, security, or a school customer's instructions.
 
 ---
 
-## 11. Changes to This Policy
+## 11. California Privacy Notice
+California residents may have rights to know, access, correct, or delete personal information and
+to receive equal service when exercising those rights. ItemTraxx does not sell personal information
+and does not share personal information for cross-context behavioral advertising as those terms are
+defined by California law. Disclosures to hosting, authentication, monitoring, email, security, and
+other operational service providers are limited to providing and securing ItemTraxx under applicable
+contractual restrictions.
+
+California requests may be submitted through the privacy request form or support email listed above.
+Authorized agents may submit requests when they provide sufficient proof of authorization. ItemTraxx
+may need to verify the identity and authority of the requester. For student information controlled by
+a school, ItemTraxx will coordinate the request with that school or district.
+
+---
+
+## 12. Changes to This Policy
 We may update this Privacy Policy from time to time. Updates become effective when posted. Continued use of ItemTraxx after an update means the updated version applies to your continued use of the service.
 
 ---
 
-## 12. Contact
+## 13. Contact
 For privacy questions or data-related inquiries, contact:
 
 Contact Support via Website: [itemtraxx.com/contact-support](https://itemtraxx.com/contact-support)
+Privacy Request Form: [itemtraxx.com/privacy-request](https://itemtraxx.com/privacy-request)
 Email: `support@itemtraxx.com`
 
 ---
 
-## 13. Legal
+## 14. Legal
 For the current legal terms and related policies, visit:
 
 [itemtraxx.com/legal](https://itemtraxx.com/legal)

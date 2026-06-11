@@ -6,6 +6,8 @@ import {
   isMissingPrivilegedStepUpTable,
 } from "../_shared/privilegedStepUp.ts";
 import { isAllowedOrigin, parseAllowedOrigins } from "../_shared/cors.ts";
+import { readJsonBody } from "../_shared/requestBody.ts";
+import { requireTrustedEdgeIngress } from "../_shared/trustedIngress.ts";
 import {
   ACCESS_CODE_PATTERN,
   requireEnum,
@@ -71,6 +73,13 @@ serve(async (req) => {
   if (hasOrigin && !originAllowed) {
     return jsonResponse(403, { error: "Origin not allowed" });
   }
+
+  const ingressError = await requireTrustedEdgeIngress(
+    req,
+    "district-admin-mutate",
+    jsonResponse,
+  );
+  if (ingressError) return ingressError;
 
   if (isKillSwitchWriteBlocked(req)) {
     return jsonResponse(503, { error: "Unfortunately ItemTraxx is currently unavailable." });
@@ -145,7 +154,7 @@ serve(async (req) => {
       throw error;
     }
 
-    const { action, payload } = await req.json();
+    const { action, payload } = await readJsonBody(req);
     if (typeof action !== "string" || typeof payload !== "object" || !payload) {
       return jsonResponse(400, { error: "Invalid request" });
     }
@@ -156,7 +165,7 @@ serve(async (req) => {
       targetId: string | null,
       metadata: Record<string, unknown>
     ) => {
-      await adminClient.from("super_admin_audit_logs").insert({
+      const { error } = await adminClient.from("super_admin_audit_logs").insert({
         actor_id: user.id,
         actor_email: profile.auth_email ?? user.email ?? null,
         action_type: actionType,
@@ -164,6 +173,7 @@ serve(async (req) => {
         target_id: targetId,
         metadata,
       });
+      if (error) throw new Error("Unable to write security audit log.");
     };
 
     const getTenantForDistrict = async (tenantId: string) => {
@@ -247,7 +257,7 @@ serve(async (req) => {
       }
 
       if (updateError) {
-        return jsonResponse(400, { error: updateError.message || "Unable to update tenant." });
+        return jsonResponse(400, { error: "Unable to update tenant." });
       }
 
       const updated = await enrichTenant(await getTenantForDistrict(tenantId));
@@ -293,7 +303,7 @@ serve(async (req) => {
       }
 
       if (updateError) {
-        return jsonResponse(400, { error: updateError.message || "Unable to update tenant status." });
+        return jsonResponse(400, { error: "Unable to update tenant status." });
       }
 
       const updated = await enrichTenant(await getTenantForDistrict(tenantId));
@@ -352,7 +362,7 @@ serve(async (req) => {
 
       if (resetError) {
         return jsonResponse(400, {
-          error: `Unable to send password reset. ${resetError.message}`,
+          error: "Unable to send password reset.",
         });
       }
 

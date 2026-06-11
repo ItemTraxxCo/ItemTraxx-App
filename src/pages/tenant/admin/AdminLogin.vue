@@ -64,6 +64,15 @@
             <div :ref="setTurnstileContainerRef"></div>
             <p class="muted turnstile-help">Complete security check to enable sign in. If you do not see the security check please reload the page and try again.</p>
           </label>
+          <label class="admin-terms-acceptance">
+            <input v-model="termsAccepted" type="checkbox" />
+            <span>
+              I am an authorized adult administrator with school authority to use student borrower
+              data represented only by generated usernames and borrower IDs. I agree to the
+              <RouterLink to="/legal" target="_blank">Terms of Service</RouterLink>
+              and acknowledge the <RouterLink to="/privacy" target="_blank">Privacy Policy</RouterLink>.
+            </span>
+          </label>
           <div class="form-actions">
             <button
               type="submit"
@@ -120,6 +129,7 @@ const legalUrl =
 const email = ref("");
 const password = ref("");
 const showPassword = ref(false);
+const termsAccepted = ref(false);
 const error = ref("");
 const isLoading = ref(false);
 const toastTitle = ref("");
@@ -170,6 +180,7 @@ const brandLogoUrl = computed(() =>
 const canSubmit = computed(() => {
   if (isLoading.value) return false;
   if (!email.value.trim() || !password.value.trim()) return false;
+  if (!termsAccepted.value) return false;
   if (turnstileSiteKey && !turnstileToken.value) return false;
   return true;
 });
@@ -206,6 +217,11 @@ const handleAdminLogin = async () => {
     showToast("Sign in blocked", "Enter email and password to continue.");
     return;
   }
+  if (!termsAccepted.value) {
+    error.value = "Confirm the administrator terms to continue.";
+    showToast("Terms confirmation required", "Confirm the administrator terms to continue.");
+    return;
+  }
   if (turnstileSiteKey && !turnstileToken.value) {
     devLog("submit_blocked_turnstile_missing");
     error.value = "Complete the security check and try again.";
@@ -218,7 +234,8 @@ const handleAdminLogin = async () => {
     const handoff = await createDistrictAdminSessionHandoff(
       email.value.trim(),
       password.value,
-      turnstileToken.value ?? ""
+      turnstileToken.value ?? "",
+      true,
     );
     if (!handoff.tokenHash) {
       throw new Error("Unable to prepare district sign-in.");
@@ -573,6 +590,24 @@ onUnmounted(() => {
 .admin-security-check {
   display: block;
   margin-top: 1.6rem;
+}
+
+.admin-terms-acceptance {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.65rem;
+  margin-top: 1rem;
+  color: var(--admin-login-copy) !important;
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
+.admin-login-form .admin-terms-acceptance input {
+  width: 1rem;
+  min-height: 1rem;
+  margin-top: 0.2rem;
+  padding: 0;
+  flex: 0 0 auto;
 }
 
 .admin-login-submit {

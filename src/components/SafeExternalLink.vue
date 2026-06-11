@@ -3,7 +3,7 @@
     v-if="safeHref"
     ref="anchorRef"
     target="_blank"
-    rel="noreferrer"
+    rel="noopener noreferrer"
   >
     <slot />
   </a>

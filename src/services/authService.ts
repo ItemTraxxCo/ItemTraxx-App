@@ -318,8 +318,8 @@ const fetchProfile = async (userId: string): Promise<ProfileRow | null> => {
       2
     );
     data = response?.[0] ?? null;
-  } catch (requestError) {
-    console.error("Profile lookup failed:", requestError);
+  } catch {
+    console.error("Profile lookup failed.");
     try {
       // Fallback path when direct profile select is flaky/timeouts: use definer RPCs.
       const { role, tenantId } = await fetchCurrentRoleAndTenant();
@@ -334,8 +334,8 @@ const fetchProfile = async (userId: string): Promise<ProfileRow | null> => {
         auth_email: null,
         is_active: null,
       };
-    } catch (fallbackError) {
-      console.error("Profile fallback lookup failed:", fallbackError);
+    } catch {
+      console.error("Profile fallback lookup failed.");
       return null;
     }
   }
@@ -362,8 +362,8 @@ const fetchTenantContext = async (tenantId: string): Promise<TenantRow | null> =
       2
     );
     data = response?.[0] ?? null;
-  } catch (requestError) {
-    console.error("Tenant status lookup failed:", requestError);
+  } catch {
+    console.error("Tenant status lookup failed.");
     return null;
   }
 
@@ -469,8 +469,8 @@ export const refreshAuthFromSession = async () => {
       "Session refresh timed out."
     );
     await applySessionSummary(summary);
-  } catch (requestError) {
-    console.error("Session refresh failed:", requestError);
+  } catch {
+    console.error("Session refresh failed.");
     clearAuthState(true);
   }
 };
@@ -753,7 +753,8 @@ export const createDistrictSessionHandoff = async (districtSlug: string) => {
 export const createDistrictAdminSessionHandoff = async (
   email: string,
   password: string,
-  turnstileToken: string
+  turnstileToken: string,
+  termsAccepted: boolean,
 ) => {
   const district = getDistrictState();
   const result = await invokeEdgeFunction<
@@ -768,6 +769,8 @@ export const createDistrictAdminSessionHandoff = async (
       email: string;
       password: string;
       turnstile_token: string;
+      terms_accepted: boolean;
+      terms_version: string;
       current_district_slug?: string;
     }
   >(getDistrictHandoffFunctionName(), {
@@ -777,6 +780,8 @@ export const createDistrictAdminSessionHandoff = async (
       email,
       password,
       turnstile_token: turnstileToken,
+      terms_accepted: termsAccepted,
+      terms_version: "2026-06-11",
       current_district_slug: district.isDistrictHost ? district.slug ?? undefined : undefined,
     },
   });
@@ -841,7 +846,6 @@ export const adminLoginWithSession = async (
     throw new Error("Invalid credentials.");
   }
 
-  const current = getAuthState();
   let profile = sessionSummary.profile
     ? {
         id: sessionSummary.user.id,
@@ -870,9 +874,6 @@ export const adminLoginWithSession = async (
     }
   }
 
-  if (!resolvedRole) {
-    resolvedRole = current.role ?? null;
-  }
   if (resolvedRole !== "tenant_admin" && resolvedRole !== "district_admin") {
     await signOut();
     throw new Error("Access denied.");
@@ -911,7 +912,7 @@ export const adminLoginWithSession = async (
     }
   }
 
-  const finalTenantId = resolvedTenantId ?? current.sessionTenantId ?? fallbackTenantId ?? null;
+  const finalTenantId = resolvedTenantId ?? fallbackTenantId ?? null;
 
   try {
     await registerPrivilegedAdminStepUp(accessToken);
@@ -941,8 +942,8 @@ export const adminLoginWithSession = async (
     signedInAt: sessionSummary.user.last_sign_in_at ?? null,
     role: resolvedRole,
     sessionTenantId: finalTenantId,
-    tenantContextId: current.tenantContextId ?? finalTenantId ?? null,
-    districtContextId: resolvedDistrictId ?? current.districtContextId ?? null,
+    tenantContextId: finalTenantId,
+    districtContextId: resolvedDistrictId ?? null,
     hasSecondaryAuth: false,
     superVerifiedAt: null,
   });

@@ -2,6 +2,8 @@ import { execSync } from "node:child_process";
 import { defineConfig, loadEnv } from "vite";
 import vue from "@vitejs/plugin-vue";
 
+import { cloudflare } from "@cloudflare/vite-plugin";
+
 const resolveBuildCommit = (env: Record<string, string>) => {
   const vercelCommit = env.VERCEL_GIT_COMMIT_SHA?.trim();
   if (vercelCommit) {
@@ -45,7 +47,7 @@ export default defineConfig(({ mode, command }) => {
   }
 
   return {
-    plugins: [vue()],
+    plugins: [vue(), cloudflare()],
     build: {
       rollupOptions: {
         output: {

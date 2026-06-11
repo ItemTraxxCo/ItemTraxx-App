@@ -7,6 +7,7 @@ import {
 } from "../_shared/privilegedStepUp.ts";
 import { isAllowedOrigin, parseAllowedOrigins } from "../_shared/cors.ts";
 import { requireTrustedEdgeIngress } from "../_shared/trustedIngress.ts";
+import { readJsonBody } from "../_shared/requestBody.ts";
 import { validateTenantAdminDeviceSession } from "../_shared/tenantAdminSessions.ts";
 import {
   optionalText,
@@ -167,7 +168,7 @@ serve(async (req) => {
       entityId: string | null,
       metadata: Record<string, unknown>
     ) => {
-      await adminClient.from("admin_audit_logs").insert({
+      const { error } = await adminClient.from("admin_audit_logs").insert({
         tenant_id: requesterProfile.tenant_id,
         actor_id: requesterProfile.id,
         action_type: actionType,
@@ -175,9 +176,10 @@ serve(async (req) => {
         entity_id: entityId,
         metadata,
       });
+      if (error) throw new Error("Unable to write security audit log.");
     };
 
-    const { action, payload } = await req.json();
+    const { action, payload } = await readJsonBody(req);
     if (typeof action !== "string" || typeof payload !== "object" || !payload) {
       return jsonResponse(400, { error: "Invalid request" });
     }
@@ -452,7 +454,7 @@ serve(async (req) => {
       });
       if (authUpdateError) {
         return jsonResponse(400, {
-          error: authUpdateError.message || "Unable to update auth email.",
+          error: "Unable to update auth email.",
         });
       }
 

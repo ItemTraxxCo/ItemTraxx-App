@@ -1,9 +1,10 @@
 export class ValidationError extends Error {
-  status = 400;
+  status: number;
 
-  constructor(message = "Invalid request") {
+  constructor(message = "Invalid request", status = 400) {
     super(message);
     this.name = "ValidationError";
+    this.status = status;
   }
 }
 
@@ -15,7 +16,7 @@ type TextOptions = {
   allowEmpty?: boolean;
 };
 
-const CONTROL_CHARS = /[\u0000-\u001F\u007F]/;
+const CONTROL_CHARS = /[\u0000-\u001F\u007F\u200B-\u200F\u202A-\u202E\u2060-\u206F\uFEFF]/;
 export const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 export const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;

@@ -8,6 +8,7 @@ import {
   verifyTurnstileToken,
 } from "../_shared/preloginGuards.ts";
 import { isAllowedOrigin, parseAllowedOrigins } from "../_shared/cors.ts";
+import { readJsonBody } from "../_shared/requestBody.ts";
 import { requireTrustedEdgeIngress } from "../_shared/trustedIngress.ts";
 import {
   optionalText,
@@ -16,6 +17,10 @@ import {
   SLUG_PATTERN,
   ValidationError,
 } from "../_shared/validation.ts";
+import {
+  CURRENT_TERMS_VERSION,
+  STUDENT_PRIVACY_AGREEMENT_CONTEXT,
+} from "../_shared/studentPrivacy.ts";
 
 type ProfileRow = {
   role: string | null;
@@ -44,7 +49,7 @@ const baseCorsHeaders = {
 const jsonResponse = (
   status: number,
   body: Record<string, unknown>,
-  headers: Record<string, string>
+  headers: Record<string, string>,
 ) =>
   new Response(JSON.stringify(body), {
     status,
@@ -53,16 +58,17 @@ const jsonResponse = (
 
 const resolveCorsHeaders = (req: Request) => {
   const origin = req.headers.get("Origin");
-  const allowedOrigins = parseAllowedOrigins(Deno.env.get("ITX_ALLOWED_ORIGINS"));
+  const allowedOrigins = parseAllowedOrigins(
+    Deno.env.get("ITX_ALLOWED_ORIGINS"),
+  );
 
   const hasOrigin = !!origin;
-  const originAllowed =
-    !hasOrigin || (hasOrigin && isAllowedOrigin(origin as string, allowedOrigins));
+  const originAllowed = !hasOrigin ||
+    (hasOrigin && isAllowedOrigin(origin as string, allowedOrigins));
 
-  const headers =
-    hasOrigin && originAllowed
-      ? { ...baseCorsHeaders, "Access-Control-Allow-Origin": origin as string }
-      : { ...baseCorsHeaders };
+  const headers = hasOrigin && originAllowed
+    ? { ...baseCorsHeaders, "Access-Control-Allow-Origin": origin as string }
+    : { ...baseCorsHeaders };
 
   return { hasOrigin, originAllowed, headers };
 };
@@ -85,8 +91,10 @@ serve(async (req) => {
     return jsonResponse(405, { error: "Method not allowed" }, headers);
   }
 
-  const ingressError = await requireTrustedEdgeIngress(req, "district-handoff", (status, body) =>
-    jsonResponse(status, body, headers)
+  const ingressError = await requireTrustedEdgeIngress(
+    req,
+    "district-handoff",
+    (status, body) => jsonResponse(status, body, headers),
   );
   if (ingressError) return ingressError;
 
@@ -99,8 +107,10 @@ serve(async (req) => {
       return jsonResponse(500, { error: "Server misconfiguration" }, headers);
     }
 
-    const body = await req.json().catch(() => ({}));
-    const action = optionalText((body as Record<string, unknown>)?.action, { maxLen: 32 });
+    const body = await readJsonBody(req);
+    const action = optionalText((body as Record<string, unknown>)?.action, {
+      maxLen: 32,
+    });
     const adminClient = createClient(supabaseUrl, serviceKey, {
       auth: { persistSession: false },
     });
@@ -146,11 +156,14 @@ serve(async (req) => {
     };
 
     if (action === "create") {
-      const districtSlug = requireText((body as Record<string, unknown>)?.district_slug, {
-        maxLen: 63,
-        pattern: SLUG_PATTERN,
-        transform: "lowercase",
-      });
+      const districtSlug = requireText(
+        (body as Record<string, unknown>)?.district_slug,
+        {
+          maxLen: 63,
+          pattern: SLUG_PATTERN,
+          transform: "lowercase",
+        },
+      );
       const authHeader = req.headers.get("authorization") ?? "";
       const accessToken = authHeader.replace(/^Bearer\s+/i, "").trim();
 
@@ -184,7 +197,9 @@ serve(async (req) => {
         return jsonResponse(403, { error: "Access denied" }, headers);
       }
 
-      const resolvedDistrictSlug = await resolveDistrictSlugForProfile(profile ?? null);
+      const resolvedDistrictSlug = await resolveDistrictSlugForProfile(
+        profile ?? null,
+      );
       if (
         typeof resolvedDistrictSlug === "object" &&
         resolvedDistrictSlug?.error === "Tenant disabled"
@@ -201,7 +216,11 @@ serve(async (req) => {
       });
 
       if (magicLink.error || !magicLink.data.properties.email_otp) {
-        return jsonResponse(500, { error: "Unable to create handoff" }, headers);
+        return jsonResponse(
+          500,
+          { error: "Unable to create handoff" },
+          headers,
+        );
       }
 
       return jsonResponse(
@@ -217,20 +236,27 @@ serve(async (req) => {
       const bodyRecord = body as Record<string, unknown>;
       const email = requireEmail(bodyRecord.email);
       const password = typeof body?.password === "string" ? body.password : "";
-      const turnstileToken = requireText(bodyRecord.turnstile_token, { maxLen: 4096 });
-      const currentDistrictSlug = optionalText(bodyRecord.current_district_slug, {
-        maxLen: 63,
-        pattern: SLUG_PATTERN,
-        transform: "lowercase",
+      const turnstileToken = requireText(bodyRecord.turnstile_token, {
+        maxLen: 4096,
       });
+      const termsAccepted = bodyRecord.terms_accepted === true;
+      const termsVersion = requireText(bodyRecord.terms_version, {
+        maxLen: 32,
+      });
+      const currentDistrictSlug = optionalText(
+        bodyRecord.current_district_slug,
+        {
+          maxLen: 63,
+          pattern: SLUG_PATTERN,
+          transform: "lowercase",
+        },
+      );
 
-      if (!email || !password || !turnstileToken) {
+      if (
+        !email || !password || !turnstileToken || !termsAccepted ||
+        termsVersion !== CURRENT_TERMS_VERSION
+      ) {
         return jsonResponse(400, { error: "Invalid request" }, headers);
-      }
-
-      const turnstileSecret = Deno.env.get("ITX_TURNSTILE_SECRET") ?? "";
-      if (!turnstileSecret) {
-        return jsonResponse(500, { error: "Server misconfiguration" }, headers);
       }
 
       const origin = req.headers.get("Origin");
@@ -251,7 +277,11 @@ serve(async (req) => {
             scope: `district-admin-login-client-${clientFingerprint}`,
             message: perClientLimit.error.message,
           });
-          return jsonResponse(503, { error: "Rate limit check failed" }, headers);
+          return jsonResponse(
+            503,
+            { error: "Rate limit check failed" },
+            headers,
+          );
         }
         return jsonResponse(
           429,
@@ -273,7 +303,11 @@ serve(async (req) => {
             scope: `district-admin-login-email-${emailHash.slice(0, 12)}`,
             message: perEmailLimit.error.message,
           });
-          return jsonResponse(503, { error: "Rate limit check failed" }, headers);
+          return jsonResponse(
+            503,
+            { error: "Rate limit check failed" },
+            headers,
+          );
         }
         return jsonResponse(
           429,
@@ -283,19 +317,25 @@ serve(async (req) => {
       }
 
       const turnstileValid = await verifyTurnstileToken(
-        turnstileSecret,
         turnstileToken,
         clientIp,
         "district-handoff create_admin",
       );
       if (!turnstileValid) {
-        return jsonResponse(403, { error: "Turnstile verification failed" }, headers);
+        return jsonResponse(
+          403,
+          { error: "Turnstile verification failed" },
+          headers,
+        );
       }
 
       const userClient = createClient(supabaseUrl, publishableKey, {
         auth: { persistSession: false },
       });
-      const signIn = await userClient.auth.signInWithPassword({ email, password });
+      const signIn = await userClient.auth.signInWithPassword({
+        email,
+        password,
+      });
 
       if (
         signIn.error ||
@@ -321,7 +361,32 @@ serve(async (req) => {
         return jsonResponse(401, { error: "Invalid credentials" }, headers);
       }
 
-      const resolvedDistrictSlug = await resolveDistrictSlugForProfile(profile ?? null);
+      const acceptedAt = new Date().toISOString();
+      const acceptanceRecord = {
+        profile_id: user.id,
+        terms_version: CURRENT_TERMS_VERSION,
+        acceptance_method: "admin_login_clickwrap",
+        agreement_context: STUDENT_PRIVACY_AGREEMENT_CONTEXT,
+        ip_hash: await hashString(clientIp || "unknown"),
+        user_agent: (req.headers.get("user-agent") ?? "").slice(0, 500) || null,
+        accepted_at: acceptedAt,
+      };
+      const { error: acceptanceError } = await adminClient
+        .from("legal_acceptances")
+        .upsert(acceptanceRecord, { onConflict: "profile_id,terms_version" });
+      if (acceptanceError) {
+        console.error("district-handoff legal acceptance write failed", {
+          user_id: user.id,
+          message: acceptanceError.message,
+        });
+        return jsonResponse(503, {
+          error: "Unable to record terms acceptance",
+        }, headers);
+      }
+
+      const resolvedDistrictSlug = await resolveDistrictSlugForProfile(
+        profile ?? null,
+      );
       if (
         typeof resolvedDistrictSlug === "object" &&
         resolvedDistrictSlug?.error === "Tenant disabled"
@@ -334,7 +399,11 @@ serve(async (req) => {
         email,
       });
       if (magicLink.error || !magicLink.data.properties.email_otp) {
-        return jsonResponse(500, { error: "Unable to create handoff" }, headers);
+        return jsonResponse(
+          500,
+          { error: "Unable to create handoff" },
+          headers,
+        );
       }
 
       return jsonResponse(

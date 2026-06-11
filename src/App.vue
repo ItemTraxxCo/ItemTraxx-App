@@ -277,6 +277,7 @@
       v-if="showCookieConsentBanner && !showMaintenanceOverlay && !showKillSwitchOverlay && !isUnavailableRoute"
       @essential-only="acceptEssentialCookiesOnly"
       @accept-all="acceptAllCookies"
+      @save-preferences="saveCookiePreferences"
     />
     <FatalErrorToast />
     <Analytics v-if="showTelemetry" />
@@ -310,7 +311,8 @@ import { getRouteLoadingState } from "./store/routeLoading";
 import { clearSessionTermination, getSessionTerminationState, showSessionTermination } from "./store/sessionTermination";
 import { resolveRecoveryRouteFromPath } from "./services/appErrorRecovery";
 import { getOrCreateDeviceSession } from "./utils/deviceSession";
-import { allowsAnalytics, hasCookieConsent, readCookieConsent, writeCookieConsent, type CookieConsentState } from "./services/cookieConsentService";
+import { allowsAnalytics, hasCookieConsent, readCookieConsent, writeCookieConsent, type CookieConsentPreferences, type CookieConsentState } from "./services/cookieConsentService";
+import { recordCookieConsent } from "./services/consentRecordService";
 
 const Analytics = defineAsyncComponent(async () => {
   const module = await import("@vercel/analytics/vue");
@@ -474,15 +476,33 @@ const syncCookieConsent = () => {
   showTelemetry.value = allowsAnalytics(cookieConsent.value);
 };
 
+const syncConsentRecord = () => {
+  const state = cookieConsent.value;
+  if (!state) return;
+  void recordCookieConsent(state.preferences, state.updatedAt).catch(() => {
+    // Consent remains effective locally if the audit mirror is temporarily unavailable.
+  });
+};
+
 const acceptEssentialCookiesOnly = () => {
-  writeCookieConsent("essential");
+  writeCookieConsent({ analytics: false, diagnostics: false });
   syncCookieConsent();
+  syncConsentRecord();
 };
 
 const acceptAllCookies = () => {
-  writeCookieConsent("all");
+  writeCookieConsent({ analytics: true, diagnostics: true });
   syncCookieConsent();
+  syncConsentRecord();
 };
+
+const saveCookiePreferences = (preferences: CookieConsentPreferences) => {
+  writeCookieConsent(preferences);
+  syncCookieConsent();
+  syncConsentRecord();
+};
+
+watch(() => auth.role, () => syncConsentRecord());
 
 const isDevSubdomainHost = computed(() => {
   if (typeof window === "undefined") return false;

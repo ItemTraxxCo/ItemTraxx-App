@@ -62,6 +62,18 @@ const routes: RouteRecordRaw[] = [
     meta: { public: true, title: "Legal | ItemTraxx" },
   },
   {
+    path: "/legal/student-privacy",
+    name: "public-student-privacy",
+    component: () => import("../pages/LegalDocumentPage.vue"),
+    meta: { public: true, title: "Student Privacy Notice | ItemTraxx" },
+  },
+  {
+    path: "/legal/dpa",
+    name: "public-dpa",
+    component: () => import("../pages/LegalDocumentPage.vue"),
+    meta: { public: true, title: "Data Processing Addendum | ItemTraxx" },
+  },
+  {
     path: "/privacy",
     name: "public-privacy",
     component: () => import("../pages/PrivacyPage.vue"),
@@ -96,6 +108,12 @@ const routes: RouteRecordRaw[] = [
     name: "public-contact-support",
     component: () => import("../pages/ContactSupport.vue"),
     meta: { public: true, title: "Contact Support | ItemTraxx" },
+  },
+  {
+    path: "/privacy-request",
+    name: "public-privacy-request",
+    component: () => import("../pages/ContactSupport.vue"),
+    meta: { public: true, title: "Privacy Request | ItemTraxx" },
   },
   {
     path: "/contact",

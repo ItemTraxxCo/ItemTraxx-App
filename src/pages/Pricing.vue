@@ -203,7 +203,7 @@
         <ul>
           <li><strong>Are plans annual or monthly?</strong> District and organization plans are annual. Individual plans are available annually or monthly.</li>
           <li><strong>When is onboarding charged?</strong> Onboarding is a one-time fee in year one (1) only and is required for all new customers.</li>
-          <li><strong>Can we move between plans?</strong> Yes. Upgrades are prorated; downgrades apply next billing cycle. Contact support for details.</li>
+          <li><strong>Can we move between plans?</strong> Yes. Plan changes, effective dates, and any proration or credit are confirmed through the quote and invoice process. Contact support for details.</li>
           <li><strong>How do we request a formal quote?</strong> Use the Contact Sales button above and we will provide an official quote.</li>
           <li><strong>How are plans billed?</strong> Plans are billed annually or monthly, depending on the plan selected via invoice.</li>
           <li><strong>What payment methods do you accept?</strong> We accept payment via credit card or ACH bank transfer. Contact sales for details.</li>

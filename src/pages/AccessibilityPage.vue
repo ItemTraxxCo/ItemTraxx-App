@@ -48,6 +48,19 @@
         </article>
       </section>
 
+      <section class="accessibility-grid accessibility-grid-compact">
+        <article class="accessibility-card accessibility-card-emphasis">
+          <p class="accessibility-section-label">Conformance Target</p>
+          <h2>WCAG 2.1 Level AA.</h2>
+          <p>
+            ItemTraxx uses WCAG 2.1 Level AA as its current accessibility target. This is a
+            development and remediation commitment, not a claim that every page has been formally
+            audited or certified. A current VPAT or Accessibility Conformance Report can be prepared
+            when required for school procurement after an appropriate conformance review.
+          </p>
+        </article>
+      </section>
+
       <section class="accessibility-grid accessibility-grid-compact accessibility-grid-footer-gap">
         <article class="accessibility-card accessibility-card-emphasis">
           <p class="accessibility-section-label">Known Reality</p>

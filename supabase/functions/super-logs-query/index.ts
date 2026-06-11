@@ -5,6 +5,8 @@ import {
   isMissingPrivilegedStepUpTable,
 } from "../_shared/privilegedStepUp.ts";
 import { isAllowedOrigin, parseAllowedOrigins } from "../_shared/cors.ts";
+import { readJsonBody } from "../_shared/requestBody.ts";
+import { requireTrustedEdgeIngress } from "../_shared/trustedIngress.ts";
 import {
   optionalInteger,
   optionalIsoDate,
@@ -60,6 +62,13 @@ serve(async (req) => {
   if (hasOrigin && !originAllowed) {
     return jsonResponse(403, { error: "Origin not allowed" });
   }
+
+  const ingressError = await requireTrustedEdgeIngress(
+    req,
+    "super-logs-query",
+    jsonResponse,
+  );
+  if (ingressError) return ingressError;
 
   try {
     const authHeader = req.headers.get("authorization");
@@ -145,7 +154,7 @@ serve(async (req) => {
       }
     }
 
-    const { payload } = await req.json();
+    const { payload } = await readJsonBody(req);
     if (typeof payload !== "object" || !payload) {
       return jsonResponse(400, { error: "Invalid request" });
     }

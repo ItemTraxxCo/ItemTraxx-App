@@ -19,15 +19,20 @@ test.describe("Checkout borrower ownership regression", () => {
       BRWRB: { id: "student-b", username: "Borrower B", student_id: "BRWRB" },
     };
 
+    let directStudentLookupAttempted = false;
     await page.route("**/rest/v1/students?**", async (route) => {
-      const url = new URL(route.request().url());
-      const studentIdFilter = url.searchParams.get("student_id");
-      const studentId = studentIdFilter?.replace("eq.", "") ?? "";
+      directStudentLookupAttempted = true;
+      await route.fulfill({ status: 403, contentType: "application/json", body: "[]" });
+    });
+
+    await page.route(/\/functions(?:\/v1)?\/checkout-borrower-lookup(?:\?.*)?$/, async (route) => {
+      const body = route.request().postDataJSON() as { student_id: string };
+      const studentId = body.student_id;
       const row = borrowerByStudentId[studentId];
       await route.fulfill({
-        status: 200,
+        status: row ? 200 : 404,
         contentType: "application/json",
-        body: JSON.stringify(row ? [row] : []),
+        body: JSON.stringify(row ? { data: row } : { error: "Borrower not found" }),
       });
     });
 
@@ -122,8 +127,8 @@ test.describe("Checkout borrower ownership regression", () => {
       window.localStorage.setItem(
         "itemtraxx-cookie-consent",
         JSON.stringify({
-          version: 1,
-          choice: "all",
+          version: 2,
+          preferences: { analytics: true, diagnostics: true },
           updatedAt: new Date().toISOString(),
         })
       );
@@ -166,5 +171,6 @@ test.describe("Checkout borrower ownership regression", () => {
     await expect(page.locator(".tag-return", { hasText: "Return" })).toBeVisible();
     await completeTransactionButton.click();
     await expect(page.getByText("Transaction complete (Success).")).toBeVisible();
+    expect(directStudentLookupAttempted).toBe(false);
   });
 });

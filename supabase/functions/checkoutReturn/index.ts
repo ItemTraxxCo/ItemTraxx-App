@@ -11,6 +11,8 @@ import {
   ValidationError,
 } from "../_shared/validation.ts";
 import { validateTenantAdminDeviceSession } from "../_shared/tenantAdminSessions.ts";
+import { readJsonBody } from "../_shared/requestBody.ts";
+import { requireTrustedEdgeIngress } from "../_shared/trustedIngress.ts";
 
 const baseCorsHeaders = {
   "Access-Control-Allow-Headers":
@@ -62,14 +64,7 @@ const isLocalhostMaintenanceBypassRequest = (req: Request) => {
     ) {
       return true;
     }
-    if (hostname.startsWith("192.168.") || hostname.startsWith("10.")) {
-      return true;
-    }
-    const match172 = hostname.match(/^172\.(\d{1,3})\./);
-    if (!match172) return false;
-    const secondOctet = Number(match172[1]);
-    return Number.isFinite(secondOctet) && secondOctet >= 16 &&
-      secondOctet <= 31;
+    return false;
   } catch {
     return false;
   }
@@ -94,6 +89,9 @@ serve(async (req) => {
   if (hasOrigin && !originAllowed) {
     return jsonResponse(403, { error: "Origin not allowed" });
   }
+
+  const ingressError = await requireTrustedEdgeIngress(req, "checkoutReturn", jsonResponse);
+  if (ingressError) return ingressError;
 
   if (isKillSwitchWriteBlocked(req)) {
     return jsonResponse(503, {
@@ -180,8 +178,8 @@ serve(async (req) => {
       });
     }
 
-    const { student_id, gear_barcodes, action_type, device_id } = await req
-      .json();
+    const { student_id, gear_barcodes, action_type, device_id } =
+      await readJsonBody(req);
     const actionType = requireEnum(action_type, CHECKOUT_ACTIONS);
     const gearBarcodes = requireTextArray(gear_barcodes, {
       minItems: 1,

@@ -172,7 +172,9 @@ jobs:
       branch: ${{ inputs.ref_name }}
       sha: ${{ inputs.sha }}
       environment: production
-    secrets: inherit
+    secrets:
+      INCIDENT_IO_WEBHOOK_URL: ${{ secrets.INCIDENT_IO_WEBHOOK_URL }}
+      INCIDENT_IO_WEBHOOK_TOKEN: ${{ secrets.INCIDENT_IO_WEBHOOK_TOKEN }}
 
   notify_finish:
     if: ${{ inputs.mode == 'finish' }}
@@ -335,4 +337,6 @@ jobs:
       branch: ${{ inputs.ref_name }}
       sha: ${{ inputs.sha }}
       environment: production
-    secrets: inherit
+    secrets:
+      INCIDENT_IO_WEBHOOK_URL: ${{ secrets.INCIDENT_IO_WEBHOOK_URL }}
+      INCIDENT_IO_WEBHOOK_TOKEN: ${{ secrets.INCIDENT_IO_WEBHOOK_TOKEN }}

@@ -6,6 +6,7 @@ import {
 } from "../_shared/privilegedStepUp.ts";
 import { isAllowedOrigin, parseAllowedOrigins } from "../_shared/cors.ts";
 import { optionalText, UUID_PATTERN } from "../_shared/validation.ts";
+import { requireTrustedEdgeIngress } from "../_shared/trustedIngress.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Headers":
@@ -45,6 +46,13 @@ serve(async (req) => {
   if (hasOrigin && !originAllowed) {
     return jsonResponse(403, { error: "Origin not allowed" });
   }
+
+  const ingressError = await requireTrustedEdgeIngress(
+    req,
+    "district-dashboard",
+    jsonResponse,
+  );
+  if (ingressError) return ingressError;
 
   if (req.method !== "GET") {
     return jsonResponse(405, { error: "Method not allowed" });

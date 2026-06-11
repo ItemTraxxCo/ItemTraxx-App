@@ -8,6 +8,7 @@ import {
   isMissingPrivilegedStepUpTable,
 } from "../_shared/privilegedStepUp.ts";
 import { validateTenantAdminDeviceSession } from "../_shared/tenantAdminSessions.ts";
+import { readJsonBody } from "../_shared/requestBody.ts";
 import {
   optionalText,
   requireUuid,
@@ -15,6 +16,10 @@ import {
   USERNAME_PATTERN,
   ValidationError,
 } from "../_shared/validation.ts";
+import {
+  CURRENT_TERMS_VERSION,
+  isCurrentStudentPrivacyAcceptance,
+} from "../_shared/studentPrivacy.ts";
 
 const baseCorsHeaders = {
   "Access-Control-Allow-Headers":
@@ -386,13 +391,7 @@ const isLocalhostMaintenanceBypassRequest = (req: Request) => {
     if (hostname === "localhost" || hostname === "127.0.0.1" || hostname === "0.0.0.0") {
       return true;
     }
-    if (hostname.startsWith("192.168.") || hostname.startsWith("10.")) {
-      return true;
-    }
-    const match172 = hostname.match(/^172\.(\d{1,3})\./);
-    if (!match172) return false;
-    const secondOctet = Number(match172[1]);
-    return Number.isFinite(secondOctet) && secondOctet >= 16 && secondOctet <= 31;
+    return false;
   } catch {
     return false;
   }
@@ -485,7 +484,7 @@ serve(async (req) => {
       return jsonResponse(403, { error: "Tenant disabled" });
     }
 
-    const { action, payload } = await req.json();
+    const { action, payload } = await readJsonBody(req);
     if (typeof action !== "string" || typeof payload !== "object" || !payload) {
       return jsonResponse(400, { error: "Invalid request" });
     }
@@ -502,6 +501,26 @@ serve(async (req) => {
     const adminClient = createClient(supabaseUrl, serviceKey, {
       auth: { persistSession: false },
     });
+
+    if (action === "create" || action === "bulk_create") {
+      const { data: acceptance, error: acceptanceError } = await adminClient
+        .from("legal_acceptances")
+        .select("terms_version, agreement_context")
+        .eq("profile_id", profile.id)
+        .eq("terms_version", CURRENT_TERMS_VERSION)
+        .maybeSingle();
+
+      if (acceptanceError) {
+        return jsonResponse(503, {
+          error: "Student privacy authorization controls unavailable.",
+        });
+      }
+      if (!isCurrentStudentPrivacyAcceptance(acceptance)) {
+        return jsonResponse(403, {
+          error: "School authorization for student borrower data is required.",
+        });
+      }
+    }
 
     if (isMutationAction) {
       try {

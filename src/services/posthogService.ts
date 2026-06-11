@@ -2,6 +2,22 @@ import posthog from "posthog-js";
 
 let initialized = false;
 const EMAIL_PATTERN = /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/i;
+const SENSITIVE_PROPERTY_KEY = /(email|phone|name|tenant|profile|student|user_id|address|token|secret)/i;
+
+const scrubProperties = (
+  properties?: Record<string, string | number | boolean | null | undefined>
+) =>
+  properties
+    ? Object.entries(properties).reduce<Record<string, string | number | boolean | null | undefined>>(
+        (safe, [key, value]) => {
+          if (SENSITIVE_PROPERTY_KEY.test(key)) return safe;
+          if (typeof value === "string" && EMAIL_PATTERN.test(value)) return safe;
+          safe[key] = value;
+          return safe;
+        },
+        {}
+      )
+    : undefined;
 
 const isCspUnsafeEvalError = (error: unknown) => {
   const message = error instanceof Error ? error.message : "";
@@ -59,7 +75,7 @@ export const capturePostHogEvent = (
 ) => {
   if (!initialized) return;
   try {
-    posthog.capture(event, properties);
+    posthog.capture(event, scrubProperties(properties));
   } catch (error) {
     console.warn("[posthog] capture failed; continuing without analytics.", error);
   }
@@ -71,22 +87,7 @@ export const identifyPostHogUser = (
 ) => {
   if (!initialized) return;
   try {
-    const safeProperties =
-      properties
-        ? Object.entries(properties).reduce<Record<string, string | number | boolean | null | undefined>>(
-            (accumulator, [key, value]) => {
-              if (key.toLowerCase().includes("email")) {
-                return accumulator;
-              }
-              if (typeof value === "string" && EMAIL_PATTERN.test(value)) {
-                return accumulator;
-              }
-              accumulator[key] = value;
-              return accumulator;
-            },
-            {}
-          )
-        : undefined;
+    const safeProperties = scrubProperties(properties);
     if (EMAIL_PATTERN.test(distinctId)) {
       throw new Error("PostHog distinctId cannot be an email value.");
     }

@@ -45,6 +45,9 @@
         <RouterLink to="/compliance">Compliance</RouterLink>
         <RouterLink to="/legal">Legal</RouterLink>
         <RouterLink to="/privacy">Privacy</RouterLink>
+        <RouterLink to="/legal/student-privacy">Student Privacy</RouterLink>
+        <RouterLink to="/legal/dpa">Data Processing Addendum</RouterLink>
+        <RouterLink to="/privacy-request">Privacy Request</RouterLink>
         <RouterLink to="/cookies">Cookies</RouterLink>
         <RouterLink to="/accessibility">Accessibility</RouterLink>
         <RouterLink to="/about">About</RouterLink>

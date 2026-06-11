@@ -19,31 +19,6 @@ const ADMIN_HANDOFF_AUTH_METHODS = new Set([
   "email_link",
 ]);
 
-const decodeBase64Url = (value: string) => {
-  const normalized = value.replace(/-/g, "+").replace(/_/g, "/");
-  const padded = normalized.padEnd(
-    normalized.length + ((4 - (normalized.length % 4 || 4)) % 4),
-    "=",
-  );
-  const decoded = atob(padded);
-  return new Uint8Array(Array.from(decoded, (char) => char.charCodeAt(0)));
-};
-
-const parseJwtPayload = (token: string): Record<string, unknown> | null => {
-  const segments = token.split(".");
-  if (segments.length < 2 || !segments[1]) return null;
-
-  try {
-    const json = new TextDecoder().decode(decodeBase64Url(segments[1]));
-    const payload = JSON.parse(json);
-    return payload && typeof payload === "object"
-      ? (payload as Record<string, unknown>)
-      : null;
-  } catch {
-    return null;
-  }
-};
-
 const sha256 = async (value: string) => {
   const encoded = new TextEncoder().encode(value);
   const digest = await crypto.subtle.digest("SHA-256", encoded);
@@ -52,8 +27,22 @@ const sha256 = async (value: string) => {
     .join("");
 };
 
-const resolveBindingKey = async (authToken: string) => {
-  const payload = parseJwtPayload(authToken);
+const getVerifiedClaims = async (
+  authClient: SupabaseClient,
+  authToken: string,
+) => {
+  const { data, error } = await authClient.auth.getClaims(authToken);
+  if (error || !data?.claims) {
+    throw new Error("Unable to verify authentication claims.");
+  }
+  return data.claims as Record<string, unknown>;
+};
+
+const resolveBindingKey = async (
+  authClient: SupabaseClient,
+  authToken: string,
+) => {
+  const payload = await getVerifiedClaims(authClient, authToken);
   const sessionId = typeof payload?.session_id === "string"
     ? payload.session_id.trim()
     : "";
@@ -63,8 +52,11 @@ const resolveBindingKey = async (authToken: string) => {
   return `token:${await sha256(authToken)}`;
 };
 
-export const canRegisterAdminStepUp = (authToken: string) => {
-  const payload = parseJwtPayload(authToken);
+export const canRegisterAdminStepUp = async (
+  authClient: SupabaseClient,
+  authToken: string,
+) => {
+  const payload = await getVerifiedClaims(authClient, authToken);
   const issuedAt = typeof payload?.iat === "number" ? payload.iat * 1000 : null;
   if (!issuedAt || Number.isNaN(issuedAt)) return false;
 
@@ -72,10 +64,13 @@ export const canRegisterAdminStepUp = (authToken: string) => {
   return ageMs >= -30_000 && ageMs <= ADMIN_STEP_UP_REGISTRATION_WINDOW_MS;
 };
 
-export const canRegisterAdminStepUpFromTrustedHandoff = (authToken: string) => {
-  if (!canRegisterAdminStepUp(authToken)) return false;
+export const canRegisterAdminStepUpFromTrustedHandoff = async (
+  authClient: SupabaseClient,
+  authToken: string,
+) => {
+  if (!await canRegisterAdminStepUp(authClient, authToken)) return false;
 
-  const payload = parseJwtPayload(authToken);
+  const payload = await getVerifiedClaims(authClient, authToken);
   const amr = Array.isArray(payload?.amr) ? payload.amr : [];
   return amr.some((entry) => {
     if (!entry || typeof entry !== "object") return false;
@@ -106,7 +101,7 @@ export const registerPrivilegedStepUp = async (
   const expiresAt = new Date(
     now.getTime() + (options.ttlMs ?? DEFAULT_STEP_UP_TTL_MS),
   ).toISOString();
-  const bindingKey = await resolveBindingKey(options.authToken);
+  const bindingKey = await resolveBindingKey(adminClient, options.authToken);
 
   const { error } = await adminClient.from("privileged_session_stepups").upsert(
     {
@@ -136,7 +131,7 @@ export const hasPrivilegedStepUp = async (
     authToken: string;
   },
 ) => {
-  const bindingKey = await resolveBindingKey(options.authToken);
+  const bindingKey = await resolveBindingKey(adminClient, options.authToken);
   const { data, error } = await adminClient
     .from("privileged_session_stepups")
     .select("id")

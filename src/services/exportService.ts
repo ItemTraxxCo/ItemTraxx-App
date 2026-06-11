@@ -1,7 +1,7 @@
 type ExportRow = Record<string, string | number | null | undefined>;
 
 const escapeCsvCell = (value: string) => {
-  const prefixedValue = /^[=+\-@]/.test(value) ? `'${value}` : value;
+  const prefixedValue = /^\s*[=+\-@]/.test(value) ? `'${value}` : value;
   if (/[",\n]/.test(prefixedValue)) {
     return `"${prefixedValue.replace(/"/g, '""')}"`;
   }

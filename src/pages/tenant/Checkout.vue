@@ -22,13 +22,12 @@
             v-model="studentId"
             type="text"
             placeholder="Enter borrower ID"
-            :disabled="studentLookupCooldownSeconds > 0"
             @keyup.enter="loadStudent"
           />
           <button
             type="button"
             class="button-primary checkout-inline-button"
-            :disabled="isStudentLoading || studentLookupCooldownSeconds > 0"
+            :disabled="isStudentLoading"
             @click="loadStudent"
           >
             Load borrower
@@ -37,15 +36,11 @@
         <button
           type="button"
           class="button-secondary checkout-camera-button"
-          :disabled="studentLookupCooldownSeconds > 0"
           @click="borrowerScannerOpen = true"
         >
           Use device camera to scan barcode
         </button>
       </label>
-      <p v-if="studentLookupCooldownSeconds > 0" class="muted checkout-rate-limit-note">
-        Try again in {{ studentLookupCooldownSeconds }} second{{ studentLookupCooldownSeconds === 1 ? "" : "s" }}.
-      </p>
       <SkeletonLoader v-if="isStudentLoading" class="checkout-student-skeleton" variant="card" :rows="1" label="Loading borrower" />
 
       <div v-if="student" class="checkout-student-summary">
@@ -169,10 +164,6 @@ import {
   type GearSummary,
   type StudentSummary,
 } from "../../services/checkoutService";
-import {
-  enforceTenantLookupRateLimit,
-  getTenantLookupCooldownRemainingMs,
-} from "../../services/rateLimitService";
 import { sanitizeInput } from "../../utils/inputSanitizer";
 import { getAuthState } from "../../store/authState";
 import { toUserFacingErrorMessage } from "../../services/appErrors";
@@ -205,8 +196,6 @@ const brandLogoUrl = computed(() =>
 );
 const toastTitle = ref("");
 const syncInFlight = ref(false);
-const studentLookupCooldownSeconds = ref(0);
-let studentLookupCooldownTimer: number | null = null;
 let themeObserver: MutationObserver | null = null;
 const itemScannerHistory = computed<ScannerHistoryItem[]>(() =>
   barcodes.value.map((item) => {
@@ -232,27 +221,6 @@ const receipt = ref<{
   returns: number;
   items: Array<{ name: string; barcode: string; action: "checkout" | "return" }>;
 } | null>(null);
-
-const updateStudentLookupCooldown = () => {
-  const remainingMs = getTenantLookupCooldownRemainingMs();
-  studentLookupCooldownSeconds.value = remainingMs > 0 ? Math.ceil(remainingMs / 1000) : 0;
-
-  if (studentLookupCooldownSeconds.value === 0 && studentLookupCooldownTimer !== null) {
-    window.clearInterval(studentLookupCooldownTimer);
-    studentLookupCooldownTimer = null;
-  }
-};
-
-const ensureStudentLookupCooldownTimer = () => {
-  updateStudentLookupCooldown();
-  if (studentLookupCooldownSeconds.value === 0 || studentLookupCooldownTimer !== null) {
-    return;
-  }
-
-  studentLookupCooldownTimer = window.setInterval(() => {
-    updateStudentLookupCooldown();
-  }, 250);
-};
 
 const syncOfflineBuffer = async (showWhenNoOps = false) => {
   if (syncInFlight.value) return;
@@ -311,22 +279,14 @@ const loadStudent = async () => {
     error.value = "Enter a borrower ID.";
     return;
   }
-  if (studentLookupCooldownSeconds.value > 0) {
-    error.value = `Rate limit reached. Wait ${studentLookupCooldownSeconds.value} second${studentLookupCooldownSeconds.value === 1 ? "" : "s"} and try again.`;
-    ensureStudentLookupCooldownTimer();
-    return;
-  }
   isStudentLoading.value = true;
   try {
-    await enforceTenantLookupRateLimit();
-    updateStudentLookupCooldown();
     const studentRow = await fetchStudentByStudentId(studentId.value.trim());
     student.value = studentRow;
     checkedOutGear.value = await fetchCheckedOutGear(studentRow.id);
     await nextTick();
     barcodeField.value?.focus();
   } catch (err) {
-    ensureStudentLookupCooldownTimer();
     student.value = null;
     checkedOutGear.value = [];
     error.value = toUserFacingErrorMessage(err, "Borrower not found. Please check the borrower ID and try again.");
@@ -339,6 +299,13 @@ const handleBorrowerScan = async (event: ScannerScanEvent) => {
   studentId.value = event.value;
   await nextTick();
   await loadStudent();
+};
+
+const showBarcodeError = (message: string) => {
+  error.value = message;
+  toastStatus.value = "Failed";
+  toastTitle.value = "Unable to add item.";
+  toastMessage.value = message;
 };
 
 const addBarcode = async () => {
@@ -373,17 +340,13 @@ const addBarcode = async () => {
       return;
     }
     if (normalizedStatus === "checked_out" && !isCurrentBorrowerReturn) {
-      throw new Error("Item already checked out.");
+      showBarcodeError("Item already checked out.");
+      return;
     }
-    throw new Error(
-      "Only items with status “available” can be added to checkout/return."
-    );
+    showBarcodeError("Only available items can be added to checkout or return.");
   } catch (err) {
     const message = toUserFacingErrorMessage(err, "Invalid barcode. Please check it and try again.");
-    error.value = message;
-    toastStatus.value = "Failed";
-    toastTitle.value = "Unable to add item.";
-    toastMessage.value = message;
+    showBarcodeError(message);
   } finally {
     isBarcodeLoading.value = false;
   }
@@ -566,8 +529,6 @@ onMounted(() => {
   });
 
   window.addEventListener("online", handleOnline);
-  updateStudentLookupCooldown();
-  ensureStudentLookupCooldownTimer();
   void getBufferedCheckoutCount().then((buffered) => {
     if (buffered > 0) {
       toastStatus.value = "Processing";
@@ -583,10 +544,6 @@ onUnmounted(() => {
   if (themeObserver) {
     themeObserver.disconnect();
     themeObserver = null;
-  }
-  if (studentLookupCooldownTimer !== null) {
-    window.clearInterval(studentLookupCooldownTimer);
-    studentLookupCooldownTimer = null;
   }
 });
 </script>

@@ -6,6 +6,8 @@ import {
   isMissingPrivilegedStepUpTable,
 } from "../_shared/privilegedStepUp.ts";
 import { isAllowedOrigin, parseAllowedOrigins } from "../_shared/cors.ts";
+import { readJsonBody } from "../_shared/requestBody.ts";
+import { requireTrustedEdgeIngress } from "../_shared/trustedIngress.ts";
 import {
   BARCODE_PATTERN,
   optionalText,
@@ -86,6 +88,13 @@ serve(async (req) => {
   if (hasOrigin && !originAllowed) {
     return jsonResponse(403, { error: "Origin not allowed" });
   }
+
+  const ingressError = await requireTrustedEdgeIngress(
+    req,
+    "super-gear-mutate",
+    jsonResponse,
+  );
+  if (ingressError) return ingressError;
 
   if (isKillSwitchWriteBlocked(req)) {
     return jsonResponse(503, { error: "Unfortunately ItemTraxx is currently unavailable." });
@@ -172,7 +181,7 @@ serve(async (req) => {
       });
     }
 
-    const { action, payload } = await req.json();
+    const { action, payload } = await readJsonBody(req);
     if (typeof action !== "string" || typeof payload !== "object" || !payload) {
       return jsonResponse(400, { error: "Invalid request" });
     }

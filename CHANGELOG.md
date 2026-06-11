@@ -1,12 +1,19 @@
 # Changelog
 
-Last updated (year-month-day): 2026-06-07
+Last updated (year-month-day): 2026-06-11
 
 This changelog summarizes notable ItemTraxx product, reliability, security, and experience updates.
 
 Changes are dated based on the default timezone: America/Los_Angeles
 
 ---
+
+### 6/11/2026 Development Update
+
+- Completed a comprehensive security hardening and compliance-readiness review across authentication, privileged sessions, tenant isolation, checkout/return, and administrative operations.
+- Improved server-side rate limiting, request validation, audit reliability, consent records, data retention, and CI/CD security controls.
+- Added student privacy and data-processing documentation, explicit administrator acceptance, and stronger privacy-request and cookie-consent handling.
+- Expanded regression coverage for authentication, session revocation, checkout/return ownership, admin operations, and protected routes.
 
 ### 6/07/2026 Development Update
 

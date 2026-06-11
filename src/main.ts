@@ -229,12 +229,14 @@ const initializeAuth = async () => {
   initAuthListener();
 };
 
+let appMounted = false;
+
 const initializeSentry = async (app: ReturnType<typeof createApp>) => {
   if (!import.meta.env.VITE_SENTRY_DSN?.trim() || !allowsDiagnostics(readCookieConsent())) {
     return;
   }
   const { initializeSentry: initializeSentryMonitoring } = await import("./services/sentry");
-  await initializeSentryMonitoring(app, router);
+  await initializeSentryMonitoring(app, router, appMounted);
 };
 
 const initializePostHog = async () => {  
@@ -323,7 +325,9 @@ const mountApp = async () => {
   };
   app.use(router);
   await router.isReady();
+  await initializeSentry(app);
   app.mount("#app");
+  appMounted = true;
   void initializeClientDiagnostics().catch(() => undefined);
   void import("./services/globalErrorHandling")
     .then(({ installGlobalErrorHandling }) => installGlobalErrorHandling(app))
@@ -331,7 +335,6 @@ const mountApp = async () => {
   void import("./services/appErrorRecovery")
     .then(({ installAppErrorRecovery }) => installAppErrorRecovery(router))
     .catch(() => undefined);
-  void initializeSentry(app);
   void initializePostHog();
   bindConsentDrivenMonitoring(app);
   captureInitialPerfMetrics();

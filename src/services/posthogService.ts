@@ -44,7 +44,10 @@ export const initPostHog = async () => {
       capture_pageview: "history_change",
       capture_pageleave: false,
       capture_dead_clicks: false,
-      capture_exceptions: false,
+      capture_exceptions: true,
+      logs: {
+        captureConsoleLogs: true,
+      },
       disable_session_recording: false,
       session_recording: {
         maskAllInputs: true,

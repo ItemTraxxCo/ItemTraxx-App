@@ -161,25 +161,31 @@ export const captureHandledRequestFailure = async (failure: HandledRequestFailur
     },
   });
 };
-export const initializeSentry = async (app: App, router: Router) => {
+export const initializeSentry = async (app: App, router: Router, appMounted = false) => {
   if (!SENTRY_DSN || sentryInitialized || !allowsDiagnostics(readCookieConsent())) {
     return;
   }
 
   const Sentry = await import("@sentry/vue");
+  const configuredIntegrations = [
+    Sentry.browserTracingIntegration({ router }),
+    ...(SENTRY_ENABLE_LOGS
+      ? [Sentry.consoleLoggingIntegration({ levels: ["warn", "error"] })]
+      : []),
+  ];
 
   Sentry.init({
-    app,
+    ...(appMounted ? {} : { app }),
     dsn: SENTRY_DSN,
     environment: SENTRY_ENVIRONMENT,
     release: APP_VERSION === "n/a" ? undefined : APP_VERSION,
     sendDefaultPii: false,
-    integrations: [
-      Sentry.browserTracingIntegration({ router }),
-      ...(SENTRY_ENABLE_LOGS
-        ? [Sentry.consoleLoggingIntegration({ levels: ["warn", "error"] })]
-        : []),
-    ],
+    integrations: appMounted
+      ? (defaultIntegrations) => [
+          ...defaultIntegrations.filter((integration) => integration.name !== "Vue"),
+          ...configuredIntegrations,
+        ]
+      : configuredIntegrations,
     enableLogs: SENTRY_ENABLE_LOGS,
     tracesSampleRate:
       Number.isFinite(SENTRY_TRACES_SAMPLE_RATE) && SENTRY_TRACES_SAMPLE_RATE >= 0
@@ -212,6 +218,21 @@ export const initializeSentry = async (app: App, router: Router) => {
       return allowsDiagnostics(readCookieConsent()) ? event : null;
     },
   });
+
+  if (appMounted) {
+    const previousErrorHandler = app.config.errorHandler;
+    app.config.errorHandler = (error, instance, info) => {
+      Sentry.captureException(error, {
+        contexts: {
+          vue: {
+            component: instance?.$options.name ?? "anonymous",
+            lifecycleHook: info,
+          },
+        },
+      });
+      previousErrorHandler?.(error, instance, info);
+    };
+  }
 
   sentryInitialized = true;
   void loadSentryReplay();

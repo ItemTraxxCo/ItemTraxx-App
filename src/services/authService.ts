@@ -754,7 +754,6 @@ export const createDistrictAdminSessionHandoff = async (
   email: string,
   password: string,
   turnstileToken: string,
-  termsAccepted: boolean,
 ) => {
   const district = getDistrictState();
   const result = await invokeEdgeFunction<
@@ -769,8 +768,6 @@ export const createDistrictAdminSessionHandoff = async (
       email: string;
       password: string;
       turnstile_token: string;
-      terms_accepted: boolean;
-      terms_version: string;
       current_district_slug?: string;
     }
   >(getDistrictHandoffFunctionName(), {
@@ -780,8 +777,6 @@ export const createDistrictAdminSessionHandoff = async (
       email,
       password,
       turnstile_token: turnstileToken,
-      terms_accepted: termsAccepted,
-      terms_version: "2026-06-11",
       current_district_slug: district.isDistrictHost ? district.slug ?? undefined : undefined,
     },
   });
@@ -802,9 +797,6 @@ export const createDistrictAdminSessionHandoff = async (
     }
     if (!result.ok && result.error === "District not found") {
       throw new Error("No district assignment.");
-    }
-    if (!result.ok && result.error === "District terms acceptance required") {
-      throw new Error("District terms acceptance required.");
     }
     throw new Error("Unable to prepare district sign-in.");
   }

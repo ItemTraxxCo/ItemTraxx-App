@@ -16,10 +16,6 @@ import {
   USERNAME_PATTERN,
   ValidationError,
 } from "../_shared/validation.ts";
-import {
-  CURRENT_TERMS_VERSION,
-  isCurrentStudentPrivacyAcceptance,
-} from "../_shared/studentPrivacy.ts";
 
 const baseCorsHeaders = {
   "Access-Control-Allow-Headers":
@@ -501,26 +497,6 @@ serve(async (req) => {
     const adminClient = createClient(supabaseUrl, serviceKey, {
       auth: { persistSession: false },
     });
-
-    if (action === "create" || action === "bulk_create") {
-      const { data: acceptance, error: acceptanceError } = await adminClient
-        .from("legal_acceptances")
-        .select("terms_version, agreement_context")
-        .eq("profile_id", profile.id)
-        .eq("terms_version", CURRENT_TERMS_VERSION)
-        .maybeSingle();
-
-      if (acceptanceError) {
-        return jsonResponse(503, {
-          error: "Student privacy authorization controls unavailable.",
-        });
-      }
-      if (!isCurrentStudentPrivacyAcceptance(acceptance)) {
-        return jsonResponse(403, {
-          error: "School authorization for student borrower data is required.",
-        });
-      }
-    }
 
     if (isMutationAction) {
       try {

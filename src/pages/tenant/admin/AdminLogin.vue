@@ -64,15 +64,6 @@
             <div :ref="setTurnstileContainerRef"></div>
             <p class="muted turnstile-help">Complete security check to enable sign in. If you do not see the security check please reload the page and try again.</p>
           </label>
-          <label v-if="districtTermsRequired" class="admin-terms-acceptance">
-            <input v-model="termsAccepted" type="checkbox" />
-            <span>
-              I am an authorized adult administrator with school authority to use student borrower
-              data represented only by generated usernames and borrower IDs. I agree to the
-              <RouterLink to="/legal" target="_blank">Terms of Service</RouterLink>
-              and acknowledge the <RouterLink to="/privacy" target="_blank">Privacy Policy</RouterLink>.
-            </span>
-          </label>
           <div class="form-actions">
             <button
               type="submit"
@@ -105,7 +96,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, watch } from "vue";
+import { computed, onMounted, onUnmounted, ref } from "vue";
 import { RouterLink } from "vue-router";
 import SafeExternalLink from "../../../components/SafeExternalLink.vue";
 import {
@@ -129,8 +120,6 @@ const legalUrl =
 const email = ref("");
 const password = ref("");
 const showPassword = ref(false);
-const termsAccepted = ref(false);
-const districtTermsRequired = ref(false);
 const error = ref("");
 const isLoading = ref(false);
 const toastTitle = ref("");
@@ -181,14 +170,8 @@ const brandLogoUrl = computed(() =>
 const canSubmit = computed(() => {
   if (isLoading.value) return false;
   if (!email.value.trim() || !password.value.trim()) return false;
-  if (districtTermsRequired.value && !termsAccepted.value) return false;
   if (turnstileSiteKey && !turnstileToken.value) return false;
   return true;
-});
-
-watch(email, () => {
-  districtTermsRequired.value = false;
-  termsAccepted.value = false;
 });
 
 const devLog = (message: string, data?: Record<string, unknown>) => {
@@ -223,11 +206,6 @@ const handleAdminLogin = async () => {
     showToast("Sign in blocked", "Enter email and password to continue.");
     return;
   }
-  if (districtTermsRequired.value && !termsAccepted.value) {
-    error.value = "Confirm the administrator terms to continue.";
-    showToast("Terms confirmation required", "Confirm the administrator terms to continue.");
-    return;
-  }
   if (turnstileSiteKey && !turnstileToken.value) {
     devLog("submit_blocked_turnstile_missing");
     error.value = "Complete the security check and try again.";
@@ -241,7 +219,6 @@ const handleAdminLogin = async () => {
       email.value.trim(),
       password.value,
       turnstileToken.value ?? "",
-      termsAccepted.value,
     );
     if (!handoff.tokenHash) {
       throw new Error("Unable to prepare district sign-in.");
@@ -319,11 +296,6 @@ const handleAdminLogin = async () => {
     } else if (message === "Unable to prepare district sign-in." || message === "Unable to complete district sign-in.") {
       error.value = "Unable to finish sign in. Please try again.";
       showToast("Sign in failed", "Unable to finish sign in. Please try again.");
-    } else if (message === "District terms acceptance required.") {
-      districtTermsRequired.value = true;
-      termsAccepted.value = false;
-      error.value = "Confirm the district administrator terms to continue.";
-      showToast("Terms confirmation required", "Confirm the district administrator terms to continue.");
     } else if (message === "Admin verification required.") {
       error.value = "Admin verification failed. Sign in again.";
       showToast("Admin verification required", "Please sign in again to continue.");

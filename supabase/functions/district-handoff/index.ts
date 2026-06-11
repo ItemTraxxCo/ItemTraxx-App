@@ -17,11 +17,6 @@ import {
   SLUG_PATTERN,
   ValidationError,
 } from "../_shared/validation.ts";
-import {
-  CURRENT_TERMS_VERSION,
-  STUDENT_PRIVACY_AGREEMENT_CONTEXT,
-} from "../_shared/studentPrivacy.ts";
-
 type ProfileRow = {
   role: string | null;
   tenant_id: string | null;
@@ -239,10 +234,6 @@ serve(async (req) => {
       const turnstileToken = requireText(bodyRecord.turnstile_token, {
         maxLen: 4096,
       });
-      const termsAccepted = bodyRecord.terms_accepted === true;
-      const termsVersion = requireText(bodyRecord.terms_version, {
-        maxLen: 32,
-      });
       const currentDistrictSlug = optionalText(
         bodyRecord.current_district_slug,
         {
@@ -253,8 +244,7 @@ serve(async (req) => {
       );
 
       if (
-        !email || !password || !turnstileToken ||
-        termsVersion !== CURRENT_TERMS_VERSION
+        !email || !password || !turnstileToken
       ) {
         return jsonResponse(400, { error: "Invalid request" }, headers);
       }
@@ -359,37 +349,6 @@ serve(async (req) => {
         profile?.is_active === false
       ) {
         return jsonResponse(401, { error: "Invalid credentials" }, headers);
-      }
-
-      if (role === "district_admin") {
-        if (!termsAccepted) {
-          return jsonResponse(403, {
-            error: "District terms acceptance required",
-          }, headers);
-        }
-
-        const acceptedAt = new Date().toISOString();
-        const acceptanceRecord = {
-          profile_id: user.id,
-          terms_version: CURRENT_TERMS_VERSION,
-          acceptance_method: "admin_login_clickwrap",
-          agreement_context: STUDENT_PRIVACY_AGREEMENT_CONTEXT,
-          ip_hash: await hashString(clientIp || "unknown"),
-          user_agent: (req.headers.get("user-agent") ?? "").slice(0, 500) || null,
-          accepted_at: acceptedAt,
-        };
-        const { error: acceptanceError } = await adminClient
-          .from("legal_acceptances")
-          .upsert(acceptanceRecord, { onConflict: "profile_id,terms_version" });
-        if (acceptanceError) {
-          console.error("district-handoff legal acceptance write failed", {
-            user_id: user.id,
-            message: acceptanceError.message,
-          });
-          return jsonResponse(503, {
-            error: "Unable to record terms acceptance",
-          }, headers);
-        }
       }
 
       const resolvedDistrictSlug = await resolveDistrictSlugForProfile(

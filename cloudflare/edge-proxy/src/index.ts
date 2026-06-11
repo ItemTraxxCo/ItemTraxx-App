@@ -4,6 +4,10 @@ type KvBinding = {
   delete: (key: string) => Promise<void>;
 };
 
+type RateLimitBinding = {
+  limit: (options: { key: string }) => Promise<{ success: boolean }>;
+};
+
 export interface Env {
   SUPABASE_URL: string;
   SUPABASE_ANON_KEY: string;
@@ -20,6 +24,8 @@ export interface Env {
   SENTRY_DSN?: string;
   SENTRY_ENVIRONMENT?: string;
   MAINTENANCE_FALLBACK_KV?: KvBinding;
+  SESSION_EXCHANGE_RATE_LIMITER?: RateLimitBinding;
+  SESSION_REFRESH_RATE_LIMITER?: RateLimitBinding;
 }
 
 const ACCESS_COOKIE_NAME = "itx_session";
@@ -28,6 +34,7 @@ const REFRESH_GRANT_TYPE = "refresh_token";
 const ACCESS_TOKEN_MAX_AGE_SECONDS = 60 * 60;
 const REFRESH_TOKEN_DEFAULT_MAX_AGE_SECONDS = 60 * 60 * 24 * 14;
 const REFRESH_TOKEN_MAX_ALLOWED_AGE_SECONDS = 60 * 60 * 24 * 14;
+const RATE_LIMIT_RETRY_AFTER_SECONDS = 60;
 const PENTEST_HOSTNAME = "edge-pentest.itemtraxx.com";
 const PENTEST_TOKEN_HEADER = "x-itx-pentest-token";
 const EDGE_PROXY_HEADER = "x-itx-edge-proxy";
@@ -39,7 +46,7 @@ const MAINTENANCE_FALLBACK_KEY = "itemtraxx:maintenance_fallback:v1";
 
 const BASE_CORS_HEADERS = {
   "Access-Control-Allow-Headers":
-    `authorization, x-client-info, apikey, content-type, x-request-id, prefer, x-itx-session-request, aikido-scan-agent, ${PENTEST_TOKEN_HEADER}`,
+    `authorization, x-client-info, apikey, content-type, x-request-id, prefer, x-itx-session-request, x-itx-data-request, aikido-scan-agent, ${PENTEST_TOKEN_HEADER}`,
   "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
   "Access-Control-Allow-Credentials": "true",
   "Access-Control-Expose-Headers": "content-range, content-profile, x-request-id",
@@ -392,13 +399,7 @@ const isLocalhostOrigin = (origin: string | null) => {
     if (hostname === "localhost" || hostname === "127.0.0.1" || hostname === "0.0.0.0") {
       return true;
     }
-    if (hostname.startsWith("192.168.") || hostname.startsWith("10.")) {
-      return true;
-    }
-    const match172 = hostname.match(/^172\.(\d{1,3})\./);
-    if (!match172) return false;
-    const secondOctet = Number(match172[1]);
-    return Number.isFinite(secondOctet) && secondOctet >= 16 && secondOctet <= 31;
+    return false;
   } catch {
     return false;
   }
@@ -458,15 +459,7 @@ const withCorsHeaders = (origin: string | null, allowedOrigins: string[], env: E
 };
 
 const resolveRequestOrigin = (request: Request) => {
-  const origin = request.headers.get("Origin");
-  if (origin) return origin;
-  const referer = request.headers.get("Referer");
-  if (!referer) return null;
-  try {
-    return new URL(referer).origin;
-  } catch {
-    return null;
-  }
+  return request.headers.get("Origin");
 };
 
 const isPentestHost = (url: URL) => url.hostname.toLowerCase() === PENTEST_HOSTNAME;
@@ -492,6 +485,19 @@ const buildError = (
     status,
     headers: responseHeaders,
   });
+};
+
+const buildSessionRateLimitError = (
+  failure: "rate_limited" | "unavailable",
+  headers: Record<string, string>,
+  requestId: string,
+) => {
+  const responseHeaders = new Headers();
+  if (failure === "rate_limited") {
+    responseHeaders.set("Retry-After", RATE_LIMIT_RETRY_AFTER_SECONDS.toString());
+    return buildError(429, "Too many session requests", headers, requestId, responseHeaders);
+  }
+  return buildError(503, "Session protection unavailable", headers, requestId);
 };
 
 const buildJson = (
@@ -750,7 +756,41 @@ const buildSessionSummary = async (env: Env, accessToken: string): Promise<Sessi
   };
 };
 
-const refreshSession = async (env: Env, refreshToken: string) => {
+type SessionRateLimitResult = "allowed" | "limited" | "unavailable";
+
+export const checkSessionRateLimit = async (
+  binding: RateLimitBinding | undefined,
+  request: Request,
+): Promise<SessionRateLimitResult> => {
+  const clientIp = request.headers.get("cf-connecting-ip")?.trim();
+  if (!binding || !clientIp) {
+    return "unavailable";
+  }
+  try {
+    const result = await binding.limit({ key: clientIp });
+    return result.success ? "allowed" : "limited";
+  } catch {
+    return "unavailable";
+  }
+};
+
+type RefreshSessionResult =
+  | { status: "ok"; accessToken: string; refreshToken: string }
+  | { status: "unauthorized" | "rate_limited" | "unavailable" };
+
+const refreshSession = async (
+  request: Request,
+  env: Env,
+  refreshToken: string,
+): Promise<RefreshSessionResult> => {
+  const rateLimit = await checkSessionRateLimit(env.SESSION_REFRESH_RATE_LIMITER, request);
+  if (rateLimit === "limited") {
+    return { status: "rate_limited" };
+  }
+  if (rateLimit === "unavailable") {
+    return { status: "unavailable" };
+  }
+
   const response = await fetch(buildSupabaseUrl(env, `/auth/v1/token?grant_type=${REFRESH_GRANT_TYPE}`), {
     method: "POST",
     headers: {
@@ -761,38 +801,47 @@ const refreshSession = async (env: Env, refreshToken: string) => {
   });
 
   if (!response.ok) {
-    return null;
+    return { status: "unauthorized" };
   }
 
   const payload = (await response.json()) as TokenRefreshResponse;
   if (!payload.access_token || !payload.refresh_token) {
-    return null;
+    return { status: "unauthorized" };
   }
 
   return {
+    status: "ok",
     accessToken: payload.access_token,
     refreshToken: payload.refresh_token,
   };
 };
 
 const maybeRefreshSession = async (
+  request: Request,
   env: Env,
   cookies: SessionCookies
-): Promise<{ session: { accessToken: string; refreshToken: string } | null; headers: Headers | null }> => {
+): Promise<{
+  session: { accessToken: string; refreshToken: string } | null;
+  headers: Headers | null;
+  failure: "rate_limited" | "unavailable" | null;
+}> => {
   if (!cookies.refreshToken) {
-    return { session: null, headers: null };
+    return { session: null, headers: null, failure: null };
   }
 
-  const refreshed = await refreshSession(env, cookies.refreshToken);
-  if (!refreshed) {
+  const refreshed = await refreshSession(request, env, cookies.refreshToken);
+  if (refreshed.status === "rate_limited" || refreshed.status === "unavailable") {
+    return { session: null, headers: null, failure: refreshed.status };
+  }
+  if (refreshed.status === "unauthorized") {
     const headers = new Headers();
     clearSessionCookies(headers, env);
-    return { session: null, headers };
+    return { session: null, headers, failure: null };
   }
 
   const headers = new Headers();
   setSessionCookies(headers, env, refreshed);
-  return { session: refreshed, headers };
+  return { session: refreshed, headers, failure: null };
 };
 
 type RequestWithCf = Request & {
@@ -939,7 +988,10 @@ const proxySupabaseApiRequest = async (
   let sessionHeaders: Headers | null = null;
 
   if (!request.headers.get("Authorization") && upstreamResponse.status === 401 && cookies.refreshToken) {
-    const refreshed = await maybeRefreshSession(env, cookies);
+    const refreshed = await maybeRefreshSession(request, env, cookies);
+    if (refreshed.failure) {
+      return buildSessionRateLimitError(refreshed.failure, headers, requestId);
+    }
     sessionHeaders = refreshed.headers;
     if (refreshed.session) {
       upstreamResponse = await invoke(refreshed.session.accessToken);
@@ -1023,7 +1075,10 @@ const proxyFunctionRequest = async (
   let sessionHeaders: Headers | null = null;
 
   if (!request.headers.get("Authorization") && upstreamResponse.status === 401 && cookies.refreshToken) {
-    const refreshed = await maybeRefreshSession(env, cookies);
+    const refreshed = await maybeRefreshSession(request, env, cookies);
+    if (refreshed.failure) {
+      return buildSessionRateLimitError(refreshed.failure, headers, requestId);
+    }
     sessionHeaders = refreshed.headers;
     if (refreshed.session) {
       upstreamResponse = await invoke(refreshed.session.accessToken);
@@ -1068,6 +1123,14 @@ const handleSessionExchange = async (
   headers: Record<string, string>,
   requestId: string
 ) => {
+  const rateLimit = await checkSessionRateLimit(env.SESSION_EXCHANGE_RATE_LIMITER, request);
+  if (rateLimit === "limited") {
+    return buildSessionRateLimitError("rate_limited", headers, requestId);
+  }
+  if (rateLimit === "unavailable") {
+    return buildSessionRateLimitError("unavailable", headers, requestId);
+  }
+
   const payload = (await request.json().catch(() => ({}))) as SessionExchangePayload;
   if (!payload.access_token || !payload.refresh_token) {
     return buildError(400, "Invalid request", headers, requestId);
@@ -1100,8 +1163,11 @@ const handleSessionRefresh = async (
     return buildError(401, "Unauthorized", headers, requestId, responseHeaders);
   }
 
-  const refreshed = await refreshSession(env, cookies.refreshToken);
-  if (!refreshed) {
+  const refreshed = await refreshSession(request, env, cookies.refreshToken);
+  if (refreshed.status === "rate_limited" || refreshed.status === "unavailable") {
+    return buildSessionRateLimitError(refreshed.status, headers, requestId);
+  }
+  if (refreshed.status === "unauthorized") {
     const responseHeaders = new Headers();
     clearSessionCookies(responseHeaders, env);
     return buildError(401, "Unauthorized", headers, requestId, responseHeaders);
@@ -1130,7 +1196,10 @@ const handleSessionMe = async (
   let responseHeaders: Headers | null = null;
 
   if (!accessToken && cookies.refreshToken) {
-    const refreshed = await maybeRefreshSession(env, cookies);
+    const refreshed = await maybeRefreshSession(request, env, cookies);
+    if (refreshed.failure) {
+      return buildSessionRateLimitError(refreshed.failure, headers, requestId);
+    }
     if (refreshed.session) {
       accessToken = refreshed.session.accessToken;
       responseHeaders = refreshed.headers;
@@ -1279,6 +1348,12 @@ export default {
       }
 
       if (isRestProxyPath(url.pathname) || isRpcProxyPath(url.pathname)) {
+        if (
+          request.method !== "GET" && request.method !== "HEAD" &&
+          request.headers.get("x-itx-data-request") !== "1"
+        ) {
+          return buildError(400, "Invalid data request", headers, requestId);
+        }
         const response = await proxySupabaseApiRequest(request, env, headers, requestId, url.pathname);
         maybeReportWorkerResponse(env, request, requestId, response, ctx, { type: "rest", path: url.pathname });
         return response;

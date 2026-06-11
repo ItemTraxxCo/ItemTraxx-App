@@ -3,7 +3,9 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { isKillSwitchWriteBlocked } from "../_shared/killSwitch.ts";
 import { getRequestId, logError, logInfo } from "../_shared/observability.ts";
 import { isAllowedOrigin, parseAllowedOrigins } from "../_shared/cors.ts";
+import { readJsonBody } from "../_shared/requestBody.ts";
 import { resolveClientIp } from "../_shared/preloginGuards.ts";
+import { requireTrustedEdgeIngress } from "../_shared/trustedIngress.ts";
 import {
   optionalEnum,
   optionalPositiveInteger,
@@ -158,6 +160,13 @@ serve(async (req) => {
     return jsonResponse(403, { error: "Origin not allowed" });
   }
 
+  const ingressError = await requireTrustedEdgeIngress(
+    req,
+    "contact-sales-submit",
+    jsonResponse,
+  );
+  if (ingressError) return ingressError;
+
   if (isKillSwitchWriteBlocked(req)) {
     return jsonResponse(503, { error: "Unfortunately ItemTraxx is currently unavailable." });
   }
@@ -166,20 +175,17 @@ serve(async (req) => {
     const supabaseUrl = Deno.env.get("ITX_SUPABASE_URL");
     const publishableKey = Deno.env.get("ITX_PUBLISHABLE_KEY");
     const serviceKey = Deno.env.get("ITX_SECRET_KEY");
-    const turnstileSecret =
-      Deno.env.get("ITX_TURNSTILE_SECRET") ??
-      Deno.env.get("ITX_TURNSTILE_SECRET_KEY");
     const supportEmail = Deno.env.get("ITX_SUPPORT_EMAIL") ?? "support@itemtraxx.com";
     const fromEmail =
       Deno.env.get("ITX_EMAIL_FROM") ??
       Deno.env.get("ITX_RESEND_FROM") ??
       "ItemTraxx Sales <support@itemtraxx.com>";
 
-    if (!supabaseUrl || !publishableKey || !serviceKey || !turnstileSecret) {
+    if (!supabaseUrl || !publishableKey || !serviceKey) {
       return jsonResponse(500, { error: "Server misconfiguration." });
     }
 
-    const body = (await req.json()) as ContactPayload;
+    const body = await readJsonBody<ContactPayload>(req, 128 * 1024);
     const website = normalizeText(body.website, 120);
     if (website) {
       return jsonResponse(200, { data: { accepted: true } });
@@ -241,7 +247,7 @@ serve(async (req) => {
       return jsonResponse(429, { error: "Too many requests. Please try again later." });
     }
 
-    const verified = await verifyTurnstileToken(turnstileSecret, turnstileToken, clientIp);
+    const verified = await verifyTurnstileToken(turnstileToken, clientIp, "contact-sales-submit");
     if (!verified) {
       return jsonResponse(403, { error: "Security check failed." });
     }

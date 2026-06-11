@@ -30,6 +30,10 @@ const redactSensitiveText = (value: string) =>
     .replace(/Bearer\s+[A-Za-z0-9._-]+/gi, "Bearer [REDACTED]")
     .replace(/\beyJ[A-Za-z0-9._-]+\b/g, "[REDACTED_JWT]")
     .replace(/\bsb_(publishable|secret)_[A-Za-z0-9._-]+\b/g, "sb_[REDACTED]")
+    .replace(/\b(?:apikey|api_key|x-api-key)\s*[:=]\s*[^\s,;]+/gi, "api_key=[REDACTED]")
+    .replace(/\b(?:tenant|tenant_id|profile_id)\s*[:=]\s*[0-9a-f-]{16,}/gi, "[REDACTED_ID]")
+    .replace(/\b(?:\d[ -]*?){13,19}\b/g, "[REDACTED_CARD]")
+    .replace(/https?:\/\/[^\s"']+/gi, "[REDACTED_URL]")
     .replace(/\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi, "[REDACTED_EMAIL]")
     .replace(
       /(?<!\w)(?:\+?\d{1,3}[\s.-]?)?(?:\(?\d{3}\)?[\s.-]?\d{3}[\s.-]?\d{4})(?!\w)/g,
@@ -64,6 +68,7 @@ const serializeArgs = (args: unknown[]) =>
     .slice(0, MAX_SERIALIZED_LENGTH);
 
 const recordConsoleEntry = (level: ConsoleLevel, args: unknown[]) => {
+  if (!allowsDiagnostics(readCookieConsent())) return;
   pushBounded(
     consoleEntries,
     {
@@ -88,7 +93,7 @@ const shouldSkipNetworkCapture = (url: string) =>
   url.includes("/functions/v1/client-error-report") || url.includes("/functions/client-error-report");
 
 const recordNetworkEntry = (entry: NetworkEntry) => {
-  if (shouldSkipNetworkCapture(entry.url)) {
+  if (!allowsDiagnostics(readCookieConsent()) || shouldSkipNetworkCapture(entry.url)) {
     return;
   }
   pushBounded(networkEntries, entry, MAX_NETWORK_ENTRIES);
@@ -153,3 +158,4 @@ export const getClientDiagnosticsSnapshot = () => ({
   console: [...consoleEntries],
   network: [...networkEntries],
 });
+import { allowsDiagnostics, readCookieConsent } from "./cookieConsentService";

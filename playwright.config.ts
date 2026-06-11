@@ -31,6 +31,7 @@ export default defineConfig({
       VITE_SUPABASE_URL: e2eSupabaseUrl,
       VITE_SUPABASE_ANON_KEY: e2eSupabaseAnonKey,
       VITE_EDGE_PROXY_URL: e2eEdgeProxyUrl,
+      VITE_TURNSTILE_SITE_KEY: "",
     },
     url: baseURL,
     timeout: 120_000,

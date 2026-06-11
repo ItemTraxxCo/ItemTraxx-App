@@ -17,51 +17,20 @@ import { captureHandledRequestFailure } from "./sentry";
 
 const trimTrailingSlash = (value: string) => value.replace(/\/+$/, "");
 
-const getDirectFunctionsBaseUrl = () => {
-  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined;
-  if (!supabaseUrl) {
-    return "";
-  }
-  return `${trimTrailingSlash(supabaseUrl)}/functions/v1`;
-};
-
 export const getEdgeFunctionsBaseUrl = () => {
   const proxyUrl = import.meta.env.VITE_EDGE_PROXY_URL as string | undefined;
   const trimmedProxyUrl = proxyUrl?.trim();
-  const useProxyInDevSetting = (
-    import.meta.env.VITE_USE_EDGE_PROXY_IN_DEV as string | undefined
-  )?.trim();
-  const shouldUseProxyInDev = useProxyInDevSetting === "false" ? false : !!trimmedProxyUrl;
-
-  if (!import.meta.env.DEV && trimmedProxyUrl) {
+  if (trimmedProxyUrl) {
     return `${trimTrailingSlash(trimmedProxyUrl)}/functions`;
   }
-  if (!import.meta.env.DEV) {
-    return "/functions";
-  }
-  if (shouldUseProxyInDev && trimmedProxyUrl) {
-    return `${trimTrailingSlash(trimmedProxyUrl)}/functions`;
-  }
-  return getDirectFunctionsBaseUrl();
+  return "/functions";
 };
 
 const getDefaultHeaders = (accessToken?: string) => {
   const headers: Record<string, string> = {};
-  const proxyUrl = import.meta.env.VITE_EDGE_PROXY_URL as string | undefined;
-  const isUsingProxy = !import.meta.env.DEV || !!proxyUrl?.trim();
 
   if (accessToken) {
     headers.Authorization = `Bearer ${accessToken}`;
-  }
-
-  if (!isUsingProxy) {
-    const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
-    if (anonKey) {
-      headers.apikey = anonKey;
-      if (!accessToken && !anonKey.startsWith("sb_publishable_")) {
-        headers.Authorization = `Bearer ${anonKey}`;
-      }
-    }
   }
 
   return headers;
@@ -186,9 +155,6 @@ export const invokeEdgeFunction = async <TData = unknown, TBody = unknown>(
   functionName: string,
   options: EdgeFunctionOptions<TBody> = {}
 ): Promise<EdgeFunctionResult<TData>> => {
-  const proxyUrl = (import.meta.env.VITE_EDGE_PROXY_URL as string | undefined)?.trim();
-  const isUsingProxy = !!proxyUrl;
-  const directBaseUrl = getDirectFunctionsBaseUrl();
   let current = await requestEdgeFunction<TData, TBody>(functionName, options);
   const method = options.method ?? "POST";
 
@@ -212,22 +178,6 @@ export const invokeEdgeFunction = async <TData = unknown, TBody = unknown>(
         refreshedToken
       );
     }
-  }
-
-  if (
-    import.meta.env.DEV &&
-    isUsingProxy &&
-    !!directBaseUrl &&
-    current.status === 401 &&
-    options.accessToken
-  ) {
-    // Local-only fallback for cases where proxy auth config drifts from the active Supabase project.
-    current = await requestEdgeFunction<TData, TBody>(
-      functionName,
-      options,
-      options.accessToken,
-      directBaseUrl
-    );
   }
 
   return current;

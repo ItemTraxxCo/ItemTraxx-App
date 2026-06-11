@@ -54,10 +54,12 @@ create policy "tenant_admin_sessions_select_own"
   to authenticated
   using (
     auth.uid() = profile_id
+    and tenant_id = public.current_tenant_id()
     and exists (
       select 1
       from public.profiles p
       where p.id = auth.uid()
         and p.role = 'tenant_admin'
+        and p.is_active = true
     )
   );

@@ -15,7 +15,11 @@
     "https://deno.land/std@0.177.0/async/pool.ts": "fd082bd4aaf26445909889435a5c74334c017847842ec035739b4ae637ae8260",
     "https://deno.land/std@0.177.0/async/retry.ts": "5efa3ba450ac0c07a40a82e2df296287b5013755d232049efd7ea2244f15b20f",
     "https://deno.land/std@0.177.0/async/tee.ts": "47e42d35f622650b02234d43803d0383a89eb4387e1b83b5a40106d18ae36757",
+    "https://deno.land/std@0.177.0/fmt/colors.ts": "938c5d44d889fb82eff6c358bea8baa7e85950a16c9f6dae3ec3a7a729164471",
     "https://deno.land/std@0.177.0/http/server.ts": "cbb17b594651215ba95c01a395700684e569c165a567e4e04bba327f41197433",
+    "https://deno.land/std@0.177.0/testing/_diff.ts": "1a3c044aedf77647d6cac86b798c6417603361b66b54c53331b312caeb447aea",
+    "https://deno.land/std@0.177.0/testing/_format.ts": "a69126e8a469009adf4cf2a50af889aca364c349797e63174884a52ff75cf4c7",
+    "https://deno.land/std@0.177.0/testing/asserts.ts": "984ab0bfb3faeed92ffaa3a6b06536c66811185328c5dd146257c702c41b01ab",
     "https://esm.sh/@supabase/auth-js@2.97.0/denonext/auth-js.mjs": "1647921d7d6c64ddb79cab6feefc5b8f373a97c6421695ae5af69514e42eacf3",
     "https://esm.sh/@supabase/functions-js@2.97.0/denonext/functions-js.mjs": "89de9a4b9ff7b3d000c84989e586a53b3905f3e0bf3570b7595e24694b6d4e9e",
     "https://esm.sh/@supabase/postgrest-js@2.97.0/denonext/postgrest-js.mjs": "7cdf9ffe7047f77421dad5af748d5e0e43b6253debdd85f3d71a9dec7bea39b6",
@@ -30,6 +34,8 @@
   "workspace": {
     "packageJson": {
       "dependencies": [
+        "npm:@cloudflare/vite-plugin@^1.40.1",
+        "npm:@cyclonedx/cyclonedx-npm@4.2.1",
         "npm:@playwright/test@^1.60.0",
         "npm:@posthog/react@^1.10.0",
         "npm:@sentry/vue@^10.56.0",
@@ -50,13 +56,12 @@
         "npm:vue-router@^4.6.4",
         "npm:vue-tsc@^3.3.3",
         "npm:vue@^3.5.35",
-        "npm:wrangler@^4.98.0",
+        "npm:wrangler@^4.99.0",
         "npm:zod-to-json-schema@^3.25.2",
         "npm:zod@^4.4.3"
       ],
       "overrides": {
         "tar": "^7.5.10",
-        "tar@<=7.5.11": "7.5.11",
         "protobufjs@<=8.2.0": "8.2.0",
         "ws": "^8.20.1"
       }

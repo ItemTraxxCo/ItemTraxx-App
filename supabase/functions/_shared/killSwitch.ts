@@ -8,13 +8,7 @@ const isLocalhostHost = (hostname: string) => {
   if (hostname === "localhost" || hostname === "127.0.0.1" || hostname === "0.0.0.0") {
     return true;
   }
-  if (hostname.startsWith("192.168.") || hostname.startsWith("10.")) {
-    return true;
-  }
-  const match172 = hostname.match(/^172\.(\d{1,3})\./);
-  if (!match172) return false;
-  const secondOctet = Number(match172[1]);
-  return Number.isFinite(secondOctet) && secondOctet >= 16 && secondOctet <= 31;
+  return false;
 };
 
 export const isLocalhostBypassRequest = (req: Request) => {

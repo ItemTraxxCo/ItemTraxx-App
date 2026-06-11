@@ -350,22 +350,23 @@ export const fetchGearByBarcode = async (barcode: string) => {
 };
 
 export const fetchStudentByStudentId = async (studentId: string) => {
-  const rows = await withTimeout(
-    authenticatedSelect<StudentSummary[]>("students", {
-      select: "id,username,student_id",
-      student_id: `eq.${studentId}`,
-      deleted_at: "is.null",
-      limit: "1",
-    }),
+  const result = await withTimeout(
+    invokeEdgeFunction<{ data: StudentSummary }, { student_id: string }>(
+      "checkout-borrower-lookup",
+      {
+        method: "POST",
+        body: { student_id: studentId },
+      },
+    ),
     LOOKUP_TIMEOUT_MS,
     "Borrower lookup timed out."
   );
 
-  if (!rows?.length) {
-    throw new Error("Borrower not found.");
+  if (!result.ok || !result.data?.data) {
+    throw edgeFunctionError(result, "Borrower not found.");
   }
 
-  return rows[0] as StudentSummary;
+  return result.data.data;
 };
 
 export const fetchCheckedOutGear = async (studentUuid: string) => {

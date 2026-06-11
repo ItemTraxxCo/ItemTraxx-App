@@ -99,7 +99,11 @@
 
       <section class="cookies-consent-standalone" aria-label="Consent note">
         <p class="cookies-consent-note">
-          * Items marked with "*" are only enabled after user consent on first load through the consent banner.
+          * Analytics and diagnostics can be accepted or declined independently through the consent banner.
+          You can clear browser storage to reset the choice and select new preferences on the next visit.
+          Each submitted choice is also recorded server-side using a browser-generated pseudonymous
+          consent identifier. When a verified account session is available, the record may also be
+          associated with that account profile.
         </p>
       </section>
 
@@ -145,7 +149,12 @@ const analyticsCookies = [
   {
     title: "PostHog product analytics*",
     description:
-      "Used to understand feature usage, key product flows, and aggregate engagement patterns for product improvement.",
+      "Used to understand feature usage, key product flows, aggregate engagement patterns, and selected product diagnostics for product improvement.",
+  },
+  {
+    title: "PostHog Replay when enabled*",
+    description:
+      "If PostHog session replay is enabled in the active environment, masked browser session replay may be collected after Analytics consent for product analysis and troubleshooting.",
   },
   {
     title: "Vercel Analytics*",
@@ -161,16 +170,6 @@ const analyticsCookies = [
 
 const diagnosticsCookies = [
   {
-    title: "PostHog diagnostics and session insights*",
-    description:
-      "Used to investigate product issues with event-level diagnostics and troubleshooting context during incident/error analysis.",
-  },
-  {
-    title: "PostHog Replay when enabled*",
-    description:
-      "If PostHog session replay is enabled in the active environment, browser session replay data may be collected after consent for debugging and incident investigation.",
-  },
-  {
     title: "Sentry error monitoring*",
     description:
       "Used to capture application errors, failed requests, and runtime diagnostics after consent so reliability issues can be investigated.",
@@ -179,6 +178,11 @@ const diagnosticsCookies = [
     title: "Sentry Replay when enabled*",
     description:
       "If replay sampling is enabled in the active environment, browser session replay data may be collected after consent for debugging and incident investigation.",
+  },
+  {
+    title: "ItemTraxx client diagnostics*",
+    description:
+      "After Diagnostics consent, ItemTraxx may retain a limited, redacted in-memory snapshot of recent console and network activity and include it in application error reports.",
   },
 ];
 
@@ -196,7 +200,7 @@ const operationalCookies = [
   {
     title: "Reliability and abuse protection",
     description:
-      "Some browser storage and request-layer controls are used to support rate limiting, anti-abuse, platform stability, platform security, and approximate IP-based session location for device history.",
+      "ItemTraxx and Cloudflare may use essential security or challenge cookies, browser storage, and request-layer controls for rate limiting, anti-abuse, platform stability, and approximate IP-based session location for device history.",
   },
 ];
 

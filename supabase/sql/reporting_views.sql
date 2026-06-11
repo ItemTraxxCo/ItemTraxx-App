@@ -50,6 +50,9 @@ left join tx_counts tx on tx.tenant_id = t.id;
 create unique index if not exists super_reporting_tenant_metrics_tenant_id_idx
   on public.super_reporting_tenant_metrics (tenant_id);
 
+revoke all on table public.super_reporting_tenant_metrics from public, anon, authenticated;
+grant select on table public.super_reporting_tenant_metrics to service_role;
+
 create or replace function public.refresh_super_reporting_views()
 returns void
 language plpgsql

@@ -2,10 +2,14 @@ const DEVICE_ID_KEY = "itemtraxx-device-id";
 const DEVICE_LABEL_KEY = "itemtraxx-device-label";
 
 const createDeviceId = () => {
-  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
     return crypto.randomUUID();
   }
-  return `itx-${Date.now()}-${Math.floor(Math.random() * 1_000_000)}`;
+  if (typeof crypto !== "undefined" && typeof crypto.getRandomValues === "function") {
+    const bytes = crypto.getRandomValues(new Uint8Array(16));
+    return `itx-${Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("")}`;
+  }
+  throw new Error("Secure random device identifiers are unavailable.");
 };
 
 const detectDeviceLabel = () => {

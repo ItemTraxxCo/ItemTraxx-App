@@ -3,6 +3,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { isKillSwitchWriteBlocked } from "../_shared/killSwitch.ts";
 import { getRequestId, logError, logInfo } from "../_shared/observability.ts";
 import { isAllowedOrigin, parseAllowedOrigins } from "../_shared/cors.ts";
+import { readJsonBody } from "../_shared/requestBody.ts";
 import { resolveClientIp } from "../_shared/preloginGuards.ts";
 import { requireTrustedEdgeIngress } from "../_shared/trustedIngress.ts";
 import {
@@ -34,7 +35,7 @@ type SupportPayload = {
   name?: string;
   reply_email?: string;
   subject?: string;
-  category?: "general" | "bug" | "billing" | "access" | "feature" | "other";
+  category?: "general" | "bug" | "billing" | "access" | "feature" | "privacy" | "other";
   message?: string;
   turnstile_token?: string;
   website?: string;
@@ -72,7 +73,7 @@ const normalizeText = (value: unknown, max = 5000) => {
 };
 
 const isEmail = (value: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
-const SUPPORT_CATEGORIES = new Set(["general", "bug", "billing", "access", "feature", "other"] as const);
+const SUPPORT_CATEGORIES = new Set(["general", "bug", "billing", "access", "feature", "privacy", "other"] as const);
 const base64Pattern = /^[A-Za-z0-9+/]+={0,2}$/;
 const estimateBase64DecodedBytes = (value: string) => {
   const normalized = value.replace(/\s+/g, "");
@@ -272,7 +273,7 @@ serve(async (req) => {
       return jsonResponse(500, { error: "Server misconfiguration." });
     }
 
-    const body = (await req.json()) as SupportPayload;
+    const body = await readJsonBody<SupportPayload>(req, 12 * 1024 * 1024);
     const website = normalizeText(body.website, 120);
     if (website) {
       return jsonResponse(200, { data: { accepted: true } });
@@ -290,7 +291,7 @@ serve(async (req) => {
     if (!name || !replyEmail || !isEmail(replyEmail) || !subject || !message) {
       return jsonResponse(400, { error: "Name, valid email, subject, and message are required." });
     }
-    if (!["general", "bug", "billing", "access", "feature", "other"].includes(category)) {
+    if (!["general", "bug", "billing", "access", "feature", "privacy", "other"].includes(category)) {
       return jsonResponse(400, { error: "Invalid category." });
     }
 
@@ -370,7 +371,11 @@ serve(async (req) => {
       });
     }
 
-    const verified = await verifyTurnstileToken(turnstileSecret, turnstileToken, clientIp);
+    const verified = await verifyTurnstileToken(
+      turnstileToken,
+      clientIp,
+      "contact-support-submit",
+    );
     if (!verified) {
       return jsonResponse(403, { error: "Security check failed." });
     }

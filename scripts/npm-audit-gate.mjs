@@ -12,7 +12,7 @@ const minSeverity = process.env.ITX_AUDIT_MIN_SEVERITY ?? "moderate";
 const minSeverityRank = severityRank[minSeverity] ?? severityRank.moderate;
 
 const allowedSources = new Set(
-  (process.env.ITX_AUDIT_ALLOW_SOURCES ?? "1113979")
+  (process.env.ITX_AUDIT_ALLOW_SOURCES ?? "")
     .split(",")
     .map((value) => value.trim())
     .filter(Boolean)

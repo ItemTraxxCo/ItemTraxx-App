@@ -41,11 +41,15 @@ const request = async (
   init: RequestInit = {},
   options: AuthenticatedRequestOptions = {}
 ) => {
+  const method = (init.method ?? "GET").toUpperCase();
   const response = await fetch(`${getBaseUrl()}${path}`, {
     ...init,
     credentials: "include",
     headers: {
       Accept: "application/json",
+      ...(method !== "GET" && method !== "HEAD"
+        ? { "x-itx-data-request": "1" }
+        : {}),
       ...(init.headers ?? {}),
     },
   });

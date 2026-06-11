@@ -8,6 +8,7 @@ import {
 } from "../_shared/preloginGuards.ts";
 import { getRequestId, logError, logInfo } from "../_shared/observability.ts";
 import { isAllowedOrigin, parseAllowedOrigins } from "../_shared/cors.ts";
+import { readJsonBody } from "../_shared/requestBody.ts";
 import { requireTrustedEdgeIngress } from "../_shared/trustedIngress.ts";
 import {
   asRecord,
@@ -176,7 +177,7 @@ serve(async (req) => {
       return jsonResponse(429, { error: "Too many reports. Please try again later." });
     }
 
-    const body = asRecord(await req.json()) as ReportPayload;
+    const body = asRecord(await readJsonBody(req, 128 * 1024)) as ReportPayload;
     const title = normalizeText(body.title, 160) || "Unexpected frontend error";
     const message = normalizeText(body.message, 1200) || "Unknown error";
     const reason = normalizeText(body.reason, 400) || "No reason provided.";

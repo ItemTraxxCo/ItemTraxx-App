@@ -4,15 +4,6 @@ const assert = (condition: boolean, message: string) => {
   if (!condition) throw new Error(message);
 };
 
-const base64Url = (value: Record<string, unknown>) =>
-  btoa(JSON.stringify(value)).replace(/\+/g, "-").replace(/\//g, "_").replace(
-    /=+$/g,
-    "",
-  );
-
-const unsignedJwt = (payload: Record<string, unknown>) =>
-  `${base64Url({ alg: "none", typ: "JWT" })}.${base64Url(payload)}.signature`;
-
 type QueryResponse = {
   data: Record<string, unknown> | null;
   error: unknown | null;
@@ -47,7 +38,24 @@ class QueryBuilder {
 }
 
 class MockClient {
-  constructor(private readonly responses: QueryResponse[]) {}
+  auth: {
+    getClaims: () => Promise<{
+      data: { claims: Record<string, unknown> } | null;
+      error: Error | null;
+    }>;
+  };
+
+  constructor(
+    private readonly responses: QueryResponse[],
+    claims: Record<string, unknown> | null,
+  ) {
+    this.auth = {
+      getClaims: () => Promise.resolve({
+        data: claims ? { claims } : null,
+        error: claims ? null : new Error("invalid jwt"),
+      }),
+    };
+  }
   from() {
     const response = this.responses.shift();
     if (!response) throw new Error("Unexpected query");
@@ -56,10 +64,10 @@ class MockClient {
 }
 
 Deno.test("tenant admin device session rejects active row bound to another auth session", async () => {
-  const authToken = unsignedJwt({
+  const claims = {
     iat: Math.floor(Date.now() / 1000),
     session_id: "current-session",
-  });
+  };
   const client = new MockClient([
     { data: null, error: null },
     { data: null, error: null },
@@ -67,13 +75,13 @@ Deno.test("tenant admin device session rejects active row bound to another auth 
       data: { id: "active-row", auth_session_id: "other-session" },
       error: null,
     },
-  ]);
+  ], claims);
 
   const result = await validateTenantAdminDeviceSession(client, {
     tenantId: "tenant-1",
     profileId: "profile-1",
     deviceId: "device-1",
-    authToken,
+    authToken: "verified-token",
   });
 
   assert(!result.valid, "expected mismatched auth session to be rejected");
@@ -84,10 +92,10 @@ Deno.test("tenant admin device session rejects active row bound to another auth 
 });
 
 Deno.test("tenant admin device session accepts active row bound to presented auth session", async () => {
-  const authToken = unsignedJwt({
+  const claims = {
     iat: Math.floor(Date.now() / 1000),
     session_id: "current-session",
-  });
+  };
   const client = new MockClient([
     { data: null, error: null },
     { data: null, error: null },
@@ -95,14 +103,27 @@ Deno.test("tenant admin device session accepts active row bound to presented aut
       data: { id: "active-row", auth_session_id: "current-session" },
       error: null,
     },
-  ]);
+  ], claims);
 
   const result = await validateTenantAdminDeviceSession(client, {
     tenantId: "tenant-1",
     profileId: "profile-1",
     deviceId: "device-1",
-    authToken,
+    authToken: "verified-token",
   });
 
   assert(result.valid, "expected matching auth session to be accepted");
+});
+
+Deno.test("tenant admin device session rejects unverified tokens", async () => {
+  const client = new MockClient([], null);
+  const result = await validateTenantAdminDeviceSession(client, {
+    tenantId: "tenant-1",
+    profileId: "profile-1",
+    deviceId: "device-1",
+    authToken: "forged-token",
+  });
+
+  assert(!result.valid, "expected unverified token rejection");
+  assert(result.reason === "revoked_token", "expected revoked_token reason");
 });

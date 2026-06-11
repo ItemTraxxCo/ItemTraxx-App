@@ -7,6 +7,7 @@ import { getRequestId, logError, logInfo } from "../_shared/observability.ts";
 import { isAllowedOrigin, parseAllowedOrigins } from "../_shared/cors.ts";
 import { hashString, resolveClientIp } from "../_shared/preloginGuards.ts";
 import { requireTrustedEdgeIngress } from "../_shared/trustedIngress.ts";
+import { readJsonBody } from "../_shared/requestBody.ts";
 import { asRecord, optionalText, ValidationError } from "../_shared/validation.ts";
 
 const EMAIL_LOGO_URL = Deno.env.get("ITX_EMAIL_LOGO_URL")?.trim() || null;
@@ -137,7 +138,7 @@ const resolveLoginContext = (value: unknown) => {
 
 const parseJsonBody = async (req: Request) => {
   try {
-    return await req.json();
+    return await readJsonBody(req, 128 * 1024);
   } catch {
     return {};
   }

@@ -48,6 +48,7 @@ export type AdminOpsAction =
   | "touch_session"
   | "validate_session"
   | "list_sessions"
+  | "revoke_current_session"
   | "revoke_session"
   | "revoke_all_sessions";
 

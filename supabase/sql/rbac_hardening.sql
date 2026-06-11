@@ -10,7 +10,8 @@ set search_path = public
 as $$
   select p.role
   from public.profiles p
-  where p.id = auth.uid();
+  where p.id = auth.uid()
+    and p.is_active = true;
 $$;
 
 create or replace function public.current_tenant_id()
@@ -112,7 +113,7 @@ on public.students
 for select
 to authenticated
 using (
-  public.current_user_role() in ('tenant_user', 'tenant_admin')
+  public.current_user_role() = 'tenant_admin'
   and tenant_id = public.current_tenant_id()
 );
 
@@ -428,15 +429,25 @@ with check (
 );
 
 drop policy if exists "super_admin_all_super_audit_logs" on public.super_admin_audit_logs;
-create policy "super_admin_all_super_audit_logs"
+drop policy if exists "super_admin_select_super_audit_logs" on public.super_admin_audit_logs;
+drop policy if exists "super_admin_insert_super_audit_logs" on public.super_admin_audit_logs;
+
+create policy "super_admin_select_super_audit_logs"
 on public.super_admin_audit_logs
-for all
+for select
 to authenticated
 using (
   public.current_user_role() = 'super_admin'
   and public.has_recent_privileged_step_up('super_admin')
-)
+);
+
+create policy "super_admin_insert_super_audit_logs"
+on public.super_admin_audit_logs
+for insert
+to authenticated
 with check (
+  actor_id = auth.uid()
+  and
   public.current_user_role() = 'super_admin'
   and public.has_recent_privileged_step_up('super_admin')
 );

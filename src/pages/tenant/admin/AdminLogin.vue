@@ -218,7 +218,7 @@ const handleAdminLogin = async () => {
     const handoff = await createDistrictAdminSessionHandoff(
       email.value.trim(),
       password.value,
-      turnstileToken.value ?? ""
+      turnstileToken.value ?? "",
     );
     if (!handoff.tokenHash) {
       throw new Error("Unable to prepare district sign-in.");
@@ -573,6 +573,24 @@ onUnmounted(() => {
 .admin-security-check {
   display: block;
   margin-top: 1.6rem;
+}
+
+.admin-terms-acceptance {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.65rem;
+  margin-top: 1rem;
+  color: var(--admin-login-copy) !important;
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
+.admin-login-form .admin-terms-acceptance input {
+  width: 1rem;
+  min-height: 1rem;
+  margin-top: 0.2rem;
+  padding: 0;
+  flex: 0 0 auto;
 }
 
 .admin-login-submit {

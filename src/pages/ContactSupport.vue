@@ -14,8 +14,8 @@
     </div>
 
     <div class="page-intro">
-      <h1>Contact Support</h1>
-      <p class="muted">Send your request and our team will respond within 72 hours (within active hours).</p>
+      <h1>{{ isPrivacyRequest ? "Privacy Request" : "Contact Support" }}</h1>
+      <p class="muted">{{ isPrivacyRequest ? "Submit a request to access, correct, delete, or otherwise exercise rights regarding your PII (Personal Identifiable Information) Send your request and our team will respond within 72 hours (within active hours)." : "Send your request and our team will respond within 72 hours (within active hours)." }}</p>
     </div>
 
     <section class="support-section">
@@ -49,6 +49,7 @@
             <option value="billing">Billing</option>
             <option value="access">Access / login</option>
             <option value="feature">Feature request</option>
+            <option value="privacy">Privacy / data rights request</option>
             <option value="other">Other</option>
           </select>
         </label>
@@ -127,14 +128,14 @@
 
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from "vue";
-import { RouterLink, useRouter } from "vue-router";
+import { RouterLink, useRoute, useRouter } from "vue-router";
 import PublicFooter from "../components/PublicFooter.vue";
 import { useTurnstile } from "../composables/useTurnstile";
 import { submitContactSupportRequest } from "../services/contactSupportService";
 import { toUserFacingErrorMessage } from "../services/appErrors";
 import { saveSubmissionConfirmation } from "../services/submissionConfirmation";
 
-type Category = "general" | "bug" | "billing" | "access" | "feature";
+type Category = "general" | "bug" | "billing" | "access" | "feature" | "privacy";
 type SupportAttachment = {
   filename: string;
   content_type: string;
@@ -143,9 +144,11 @@ type SupportAttachment = {
 };
 
 const router = useRouter();
+const route = useRoute();
+const isPrivacyRequest = computed(() => route.name === "public-privacy-request");
 const fullName = ref("");
 const replyEmail = ref("");
-const category = ref<Category | "other">("general");
+const category = ref<Category | "other">(isPrivacyRequest.value ? "privacy" : "general");
 const subject = ref("");
 const message = ref("");
 const website = ref("");

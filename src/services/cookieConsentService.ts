@@ -1,11 +1,15 @@
 const COOKIE_CONSENT_STORAGE_KEY = "itemtraxx-cookie-consent";
-const COOKIE_CONSENT_VERSION = 1;
+const COOKIE_CONSENT_VERSION = 2;
+const COOKIE_CONSENT_SUBJECT_KEY = "itemtraxx-cookie-consent-subject";
 
-export type CookieConsentChoice = "essential" | "all";
+export type CookieConsentPreferences = {
+  analytics: boolean;
+  diagnostics: boolean;
+};
 
 export type CookieConsentState = {
   version: number;
-  choice: CookieConsentChoice;
+  preferences: CookieConsentPreferences;
   updatedAt: string;
 };
 
@@ -17,16 +21,30 @@ export const readCookieConsent = (): CookieConsentState | null => {
     const raw = window.localStorage.getItem(COOKIE_CONSENT_STORAGE_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw) as Partial<CookieConsentState>;
+    if (parsed.version === 1 && (parsed as { choice?: unknown }).choice) {
+      const choice = (parsed as { choice?: unknown }).choice;
+      if ((choice === "essential" || choice === "all") && typeof parsed.updatedAt === "string") {
+        return {
+          version: COOKIE_CONSENT_VERSION,
+          preferences: {
+            analytics: choice === "all",
+            diagnostics: choice === "all",
+          },
+          updatedAt: parsed.updatedAt,
+        };
+      }
+    }
     if (
       parsed.version !== COOKIE_CONSENT_VERSION ||
-      (parsed.choice !== "essential" && parsed.choice !== "all") ||
+      typeof parsed.preferences?.analytics !== "boolean" ||
+      typeof parsed.preferences?.diagnostics !== "boolean" ||
       typeof parsed.updatedAt !== "string"
     ) {
       return null;
     }
     return {
       version: COOKIE_CONSENT_VERSION,
-      choice: parsed.choice,
+      preferences: parsed.preferences,
       updatedAt: parsed.updatedAt,
     };
   } catch {
@@ -34,11 +52,11 @@ export const readCookieConsent = (): CookieConsentState | null => {
   }
 };
 
-export const writeCookieConsent = (choice: CookieConsentChoice) => {
+export const writeCookieConsent = (preferences: CookieConsentPreferences) => {
   if (!isBrowser()) return;
   const next: CookieConsentState = {
     version: COOKIE_CONSENT_VERSION,
-    choice,
+    preferences,
     updatedAt: new Date().toISOString(),
   };
   try {
@@ -49,7 +67,16 @@ export const writeCookieConsent = (choice: CookieConsentChoice) => {
   }
 };
 
-export const allowsAnalytics = (state: CookieConsentState | null) => state?.choice === "all";
-export const allowsDiagnostics = (state: CookieConsentState | null) => state?.choice === "all";
-export const allowsSessionReplay = (state: CookieConsentState | null) => state?.choice === "all";
+export const getOrCreateCookieConsentSubject = () => {
+  if (!isBrowser()) return "";
+  const existing = window.localStorage.getItem(COOKIE_CONSENT_SUBJECT_KEY);
+  if (existing) return existing;
+  const subject = crypto.randomUUID();
+  window.localStorage.setItem(COOKIE_CONSENT_SUBJECT_KEY, subject);
+  return subject;
+};
+
+export const allowsAnalytics = (state: CookieConsentState | null) => state?.preferences.analytics === true;
+export const allowsDiagnostics = (state: CookieConsentState | null) => state?.preferences.diagnostics === true;
+export const allowsSessionReplay = (state: CookieConsentState | null) => state?.preferences.diagnostics === true;
 export const hasCookieConsent = (state: CookieConsentState | null) => state !== null;

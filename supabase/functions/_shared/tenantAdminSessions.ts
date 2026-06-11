@@ -4,6 +4,12 @@ type RpcError = {
 };
 
 type SupabaseLikeClient = {
+  auth: {
+    getClaims: (token: string) => Promise<{
+      data: { claims: Record<string, unknown> } | null;
+      error: unknown | null;
+    }>;
+  };
   from: (table: string) => any;
 };
 
@@ -23,30 +29,15 @@ const isMissingColumn = (error: RpcError | null | undefined, column: string) =>
 const TENANT_ADMIN_SESSION_COLUMNS =
   "id, auth_session_id, auth_token_issued_at";
 
-const decodeBase64Url = (value: string) => {
-  const normalized = value.replace(/-/g, "+").replace(/_/g, "/");
-  const padded = normalized.padEnd(
-    normalized.length + ((4 - (normalized.length % 4)) % 4),
-    "=",
-  );
-  return atob(padded);
-};
-
-const parseJwtPayload = (authToken: string): Record<string, unknown> | null => {
-  try {
-    const payload = authToken.split(".")[1];
-    if (!payload) return null;
-    const decoded = JSON.parse(decodeBase64Url(payload));
-    return decoded && typeof decoded === "object"
-      ? (decoded as Record<string, unknown>)
-      : null;
-  } catch {
-    return null;
+export const resolveTenantAdminAuthSessionBinding = async (
+  client: SupabaseLikeClient,
+  authToken: string,
+) => {
+  const { data, error } = await client.auth.getClaims(authToken);
+  if (error || !data?.claims) {
+    return { sessionId: null, issuedAt: null };
   }
-};
-
-export const resolveTenantAdminAuthSessionBinding = (authToken: string) => {
-  const payload = parseJwtPayload(authToken);
+  const payload = data.claims;
   const sessionId = typeof payload?.session_id === "string"
     ? payload.session_id.trim()
     : "";
@@ -69,7 +60,10 @@ export const isTenantAdminTokenBlockedBySessionRevocation = async (
     authToken: string;
   },
 ) => {
-  const binding = resolveTenantAdminAuthSessionBinding(params.authToken);
+  const binding = await resolveTenantAdminAuthSessionBinding(
+    client,
+    params.authToken,
+  );
   if (!binding.sessionId && !binding.issuedAt) {
     return { blocked: true as const, relationMissing: false as const };
   }
@@ -143,7 +137,10 @@ export const validateTenantAdminDeviceSession = async (
     };
   }
 
-  const binding = resolveTenantAdminAuthSessionBinding(params.authToken);
+  const binding = await resolveTenantAdminAuthSessionBinding(
+    client,
+    params.authToken,
+  );
   if (!binding.sessionId && !binding.issuedAt) {
     return {
       valid: false as const,

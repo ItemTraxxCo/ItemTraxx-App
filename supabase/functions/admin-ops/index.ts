@@ -7,6 +7,7 @@ import {
   isMissingPrivilegedStepUpTable,
 } from "../_shared/privilegedStepUp.ts";
 import { requireTrustedEdgeIngress } from "../_shared/trustedIngress.ts";
+import { readJsonBody } from "../_shared/requestBody.ts";
 import {
   isTenantAdminTokenBlockedBySessionRevocation,
   resolveTenantAdminAuthSessionBinding,
@@ -290,7 +291,6 @@ serve(async (req) => {
       return jsonResponse(401, { error: "Unauthorized" });
     }
     const authToken = authHeader.replace(/^Bearer\s+/i, "").trim();
-    const authSessionBinding = resolveTenantAdminAuthSessionBinding(authToken);
 
     const supabaseUrl = Deno.env.get("ITX_SUPABASE_URL");
     const publishableKey = Deno.env.get("ITX_PUBLISHABLE_KEY");
@@ -299,6 +299,14 @@ serve(async (req) => {
     if (!supabaseUrl || !publishableKey || !serviceKey) {
       return jsonResponse(500, { error: "Server misconfiguration" });
     }
+
+    const adminClient = createClient(supabaseUrl, serviceKey, {
+      auth: { persistSession: false },
+    });
+    const authSessionBinding = await resolveTenantAdminAuthSessionBinding(
+      adminClient,
+      authToken,
+    );
 
     const userClient = createClient(supabaseUrl, publishableKey, {
       global: { headers: { Authorization: authHeader } },
@@ -351,19 +359,16 @@ serve(async (req) => {
       });
     }
 
-    const requestBody = asRecord(await req.json());
+    const requestBody = asRecord(await readJsonBody(req));
     const normalizedAction = requireText(requestBody.action, { maxLen: 64 });
     const payloadRecord = asRecord(requestBody.payload ?? {});
     const isSessionAction =
       normalizedAction === "touch_session" ||
       normalizedAction === "validate_session" ||
       normalizedAction === "list_sessions" ||
+      normalizedAction === "revoke_current_session" ||
       normalizedAction === "revoke_session" ||
       normalizedAction === "revoke_all_sessions";
-
-    const adminClient = createClient(supabaseUrl, serviceKey, {
-      auth: { persistSession: false },
-    });
 
     const tenantId = profile.tenant_id as string;
     const { data: tenantStatus } = await userClient
@@ -583,6 +588,7 @@ serve(async (req) => {
     if (
       profile.role === "tenant_admin" &&
       (normalizedAction === "list_sessions" ||
+        normalizedAction === "revoke_current_session" ||
         normalizedAction === "revoke_session" ||
         normalizedAction === "revoke_all_sessions")
     ) {
@@ -1124,6 +1130,38 @@ serve(async (req) => {
         return jsonResponse(404, { error: "Session not found." });
       }
       return jsonResponse(200, { data: { revoked: true } });
+    }
+
+    if (normalizedAction === "revoke_current_session") {
+      if (profile.role !== "tenant_admin") {
+        return jsonResponse(403, { error: "Access denied" });
+      }
+      if (isTenantSuspended) {
+        return jsonResponse(403, { error: "Tenant disabled" });
+      }
+      let query = adminClient
+        .from("tenant_admin_sessions")
+        .update({
+          revoked_at: new Date().toISOString(),
+          revoked_by: user.id,
+        })
+        .eq("tenant_id", tenantId)
+        .eq("profile_id", user.id)
+        .is("revoked_at", null);
+      if (authSessionBinding.sessionId) {
+        query = query.eq("auth_session_id", authSessionBinding.sessionId);
+      } else if (deviceSession.deviceId) {
+        query = query.eq("device_id", deviceSession.deviceId);
+      } else {
+        return jsonResponse(401, { error: "Session binding unavailable." });
+      }
+      const { data, error } = await query.select("id");
+      if (error) {
+        return jsonResponse(400, { error: "Unable to revoke session." });
+      }
+      return jsonResponse(200, {
+        data: { revoked: (data ?? []).length > 0 },
+      });
     }
 
     if (normalizedAction === "revoke_all_sessions") {

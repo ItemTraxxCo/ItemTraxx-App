@@ -125,7 +125,7 @@ serve(async (req) => {
       return jsonResponse(403, { error: "Access denied" });
     }
 
-    if (!canRegisterAdminStepUpFromTrustedHandoff(authToken)) {
+    if (!await canRegisterAdminStepUpFromTrustedHandoff(userClient, authToken)) {
       return jsonResponse(403, { error: "Admin verification required." });
     }
 
@@ -154,7 +154,7 @@ serve(async (req) => {
           "Privileged verification controls unavailable. Run latest SQL setup.",
       });
     }
-    const message = error instanceof Error ? error.message : "Request failed.";
-    return jsonResponse(500, { error: message || "Request failed." });
+    console.error("privileged-step-up failed", error);
+    return jsonResponse(500, { error: "Request failed." });
   }
 });

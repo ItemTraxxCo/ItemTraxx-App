@@ -7,6 +7,7 @@ import {
   isMissingPrivilegedStepUpTable,
 } from "../_shared/privilegedStepUp.ts";
 import { isAllowedOrigin, parseAllowedOrigins } from "../_shared/cors.ts";
+import { requireTrustedEdgeIngress } from "../_shared/trustedIngress.ts";
 
 const baseCorsHeaders = {
   "Access-Control-Allow-Headers":
@@ -75,6 +76,13 @@ serve(async (req) => {
   if (hasOrigin && !originAllowed) {
     return jsonResponse(403, { error: "Origin not allowed" });
   }
+
+  const ingressError = await requireTrustedEdgeIngress(
+    req,
+    "super-dashboard",
+    jsonResponse,
+  );
+  if (ingressError) return ingressError;
 
   if (req.method !== "GET") {
     return jsonResponse(405, { error: "Method not allowed" });

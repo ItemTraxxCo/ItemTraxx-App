@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { isAllowedOrigin, parseAllowedOrigins } from "../_shared/cors.ts";
+import { readJsonBody } from "../_shared/requestBody.ts";
 import { resolveClientFingerprint, resolveClientIp } from "../_shared/preloginGuards.ts";
 import { requireTrustedEdgeIngress } from "../_shared/trustedIngress.ts";
 import {
@@ -76,13 +77,7 @@ const isLocalhostMaintenanceBypassRequest = (req: Request) => {
     if (hostname === "localhost" || hostname === "127.0.0.1" || hostname === "0.0.0.0") {
       return true;
     }
-    if (hostname.startsWith("192.168.") || hostname.startsWith("10.")) {
-      return true;
-    }
-    const match172 = hostname.match(/^172\.(\d{1,3})\./);
-    if (!match172) return false;
-    const secondOctet = Number(match172[1]);
-    return Number.isFinite(secondOctet) && secondOctet >= 16 && secondOctet <= 31;
+    return false;
   } catch {
     return false;
   }
@@ -199,7 +194,8 @@ serve(async (req) => {
   if (ingressError) return ingressError;
 
   try {
-    const { access_code, password, turnstile_token, district_slug } = await req.json();
+    const { access_code, password, turnstile_token, district_slug } =
+      await readJsonBody(req, 32 * 1024);
     const normalizedAccessCode = requireText(access_code, {
       maxLen: 64,
       pattern: ACCESS_CODE_PATTERN,
@@ -216,21 +212,19 @@ serve(async (req) => {
 
     const turnstileSecret = Deno.env.get("ITX_TURNSTILE_SECRET") ?? "";
     const turnstileToken = optionalText(turnstile_token, { maxLen: 4096 });
-    if (turnstileSecret) {
-      if (
-        !turnstileToken ||
-        turnstileToken.length > 4096
-      ) {
-        return jsonResponse(400, { error: "Turnstile verification required" });
-      }
-      const isTurnstileValid = await verifyTurnstileToken(
-        turnstileSecret,
-        turnstileToken,
-        resolveClientIp(req)
-      );
-      if (!isTurnstileValid) {
-        return jsonResponse(403, { error: "Turnstile verification failed" });
-      }
+    if (!turnstileSecret) {
+      return jsonResponse(500, { error: "Server misconfiguration" });
+    }
+    if (!turnstileToken) {
+      return jsonResponse(400, { error: "Turnstile verification required" });
+    }
+    const isTurnstileValid = await verifyTurnstileToken(
+      turnstileToken,
+      resolveClientIp(req),
+      "tenant-login",
+    );
+    if (!isTurnstileValid) {
+      return jsonResponse(403, { error: "Turnstile verification failed" });
     }
 
     const supabaseUrl = Deno.env.get("ITX_SUPABASE_URL");

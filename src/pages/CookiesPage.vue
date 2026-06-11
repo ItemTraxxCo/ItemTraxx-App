@@ -99,7 +99,10 @@
 
       <section class="cookies-consent-standalone" aria-label="Consent note">
         <p class="cookies-consent-note">
-          * Items marked with "*" are only enabled after user consent on first load through the consent banner.
+          * Analytics and diagnostics can be accepted or declined independently through the consent banner.
+          You can clear browser storage to reset the choice and select new preferences on the next visit.
+          Authenticated adult administrator choices are also recorded server-side. Anonymous visitors
+          and student borrower workflows do not create a server-side consent identity record.
         </p>
       </section>
 

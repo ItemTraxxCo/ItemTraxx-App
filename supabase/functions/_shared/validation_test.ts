@@ -35,6 +35,8 @@ Deno.test("validation rejects malformed emails and IDs", () => {
 Deno.test("validation rejects oversized text and control characters", () => {
   assertValidationError(() => requireText("a".repeat(121), { maxLen: 120 }));
   assertValidationError(() => requireText("bad\u0000value", { maxLen: 120 }));
+  assertValidationError(() => requireText("hidden\u200Bvalue", { maxLen: 120 }));
+  assertValidationError(() => requireText("spoof\u202Evalue", { maxLen: 120 }));
 });
 
 Deno.test("validation rejects invalid enums", () => {

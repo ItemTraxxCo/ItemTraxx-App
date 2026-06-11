@@ -5,6 +5,7 @@ import { buildEmailBrandHeaderHtml, withEmailBrandLogoAttachment } from "../_sha
 import { isKillSwitchWriteBlocked } from "../_shared/killSwitch.ts";
 import { getRequestId, logError, logInfo } from "../_shared/observability.ts";
 import { isAllowedOrigin, parseAllowedOrigins } from "../_shared/cors.ts";
+import { readJsonBody } from "../_shared/requestBody.ts";
 import {
   asRecord,
   optionalInteger,
@@ -947,7 +948,7 @@ serve(async (req) => {
       return jsonResponse(401, { error: "Unauthorized" });
     }
 
-    const body = asRecord(await req.json().catch(() => ({})));
+    const body = asRecord(await readJsonBody(req, 128 * 1024));
     const limit = optionalInteger(body.limit, 1, 50, 20);
     const workerId = crypto.randomUUID();
 

@@ -6,6 +6,8 @@ import {
   isMissingPrivilegedStepUpTable,
 } from "../_shared/privilegedStepUp.ts";
 import { isAllowedOrigin, parseAllowedOrigins } from "../_shared/cors.ts";
+import { readJsonBody } from "../_shared/requestBody.ts";
+import { requireTrustedEdgeIngress } from "../_shared/trustedIngress.ts";
 import {
   optionalText,
   requireEmail,
@@ -72,6 +74,13 @@ serve(async (req) => {
   if (hasOrigin && !originAllowed) {
     return jsonResponse(403, { error: "Origin not allowed" });
   }
+
+  const ingressError = await requireTrustedEdgeIngress(
+    req,
+    "super-admin-mutate",
+    jsonResponse,
+  );
+  if (ingressError) return ingressError;
 
   if (isKillSwitchWriteBlocked(req)) {
     return jsonResponse(503, { error: "Unfortunately ItemTraxx is currently unavailable." });
@@ -161,7 +170,7 @@ serve(async (req) => {
       }
     }
 
-    const { action, payload } = await req.json();
+    const { action, payload } = await readJsonBody(req);
     if (typeof action !== "string" || typeof payload !== "object" || !payload) {
       return jsonResponse(400, { error: "Invalid request" });
     }
@@ -173,7 +182,7 @@ serve(async (req) => {
       targetId: string | null,
       metadata: Record<string, unknown>
     ) => {
-      await adminClient.from("super_admin_audit_logs").insert({
+      const { error } = await adminClient.from("super_admin_audit_logs").insert({
         actor_id: user.id,
         actor_email: profile.auth_email ?? user.email ?? null,
         action_type: actionType,
@@ -181,6 +190,7 @@ serve(async (req) => {
         target_id: targetId,
         metadata,
       });
+      if (error) throw new Error("Unable to write security audit log.");
     };
 
     if (action === "list_tenant_admins") {
@@ -396,7 +406,7 @@ serve(async (req) => {
           });
         }
         return jsonResponse(400, {
-          error: createUserError?.message || "Unable to create auth user.",
+          error: "Unable to create auth user.",
         });
       }
 
@@ -424,7 +434,7 @@ serve(async (req) => {
           });
         }
         return jsonResponse(400, {
-          error: insertProfileError?.message || "Unable to create tenant admin profile.",
+          error: "Unable to create tenant admin profile.",
         });
       }
 
@@ -493,7 +503,7 @@ serve(async (req) => {
           });
         }
         return jsonResponse(400, {
-          error: createUserError?.message || "Unable to create auth user.",
+          error: "Unable to create auth user.",
         });
       }
 
@@ -514,7 +524,7 @@ serve(async (req) => {
       if (insertProfileError || !createdProfile) {
         await adminClient.auth.admin.deleteUser(userId);
         return jsonResponse(400, {
-          error: insertProfileError?.message || "Unable to create super admin profile.",
+          error: "Unable to create super admin profile.",
         });
       }
 
@@ -702,7 +712,7 @@ serve(async (req) => {
       });
       if (authUpdateError) {
         return jsonResponse(400, {
-          error: authUpdateError.message || "Unable to update auth email.",
+          error: "Unable to update auth email.",
         });
       }
 
@@ -791,7 +801,7 @@ serve(async (req) => {
       });
       if (authUpdateError) {
         return jsonResponse(400, {
-          error: authUpdateError.message || "Unable to update auth email.",
+          error: "Unable to update auth email.",
         });
       }
 

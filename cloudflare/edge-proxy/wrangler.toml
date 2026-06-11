@@ -9,7 +9,7 @@ preview_urls = false
 ALLOWED_ORIGINS = "https://itemtraxx.com,https://www.itemtraxx.com,https://status.itemtraxx.com,https://internal.itemtraxx.com,https://app.itemtraxx.com,https://dennis.dev.itemtraxx.com,https://leo.dev.itemtraxx.com,https://testdist.app.itemtraxx.com,https://dev.itemtraxx.com,https://preview.itemtraxx.com,https://pentest.app.itemtraxx.com"
 TRUST_LOCAL_ORIGINS = "false"
 # Optional hard allowlist of function names (comma-separated).
-ALLOWED_FUNCTIONS = "tenant-login,checkoutReturn,create-tenant-admin,admin-gear-mutate,admin-student-mutate,admin-ops,system-status,super-tenant-mutate,super-admin-mutate,super-dashboard,super-gear-mutate,super-student-mutate,super-logs-query,super-ops,district-dashboard,district-admin-mutate,contact-sales-submit,contact-support-submit,client-error-report,job-worker,login-notify,super-auth-verify,district-handoff,tenant-admin-mutate,privileged-step-up"
+ALLOWED_FUNCTIONS = "tenant-login,checkoutReturn,checkout-borrower-lookup,create-tenant-admin,admin-gear-mutate,admin-student-mutate,admin-ops,system-status,super-tenant-mutate,super-admin-mutate,super-dashboard,super-gear-mutate,super-student-mutate,super-logs-query,super-ops,district-dashboard,district-admin-mutate,contact-sales-submit,contact-support-submit,client-error-report,consent-record,job-worker,login-notify,super-auth-verify,district-handoff,tenant-admin-mutate,privileged-step-up"
 ITX_ITEMTRAXX_KILLSWITCH_ENABLED = "false"
 SENTRY_ENVIRONMENT = "production"
 
@@ -18,6 +18,20 @@ SENTRY_ENVIRONMENT = "production"
 [[kv_namespaces]]
 binding = "MAINTENANCE_FALLBACK_KV"
 id = "09542de7b51b4edcb189f38addcba602"
+
+[[ratelimits]]
+name = "SESSION_EXCHANGE_RATE_LIMITER"
+namespace_id = "2026061101"
+  [ratelimits.simple]
+  limit = 120
+  period = 60
+
+[[ratelimits]]
+name = "SESSION_REFRESH_RATE_LIMITER"
+namespace_id = "2026061102"
+  [ratelimits.simple]
+  limit = 60
+  period = 60
 
 [[routes]]
 pattern = "edge.itemtraxx.com"

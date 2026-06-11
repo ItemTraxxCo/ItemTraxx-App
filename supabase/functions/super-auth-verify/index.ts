@@ -14,6 +14,7 @@ import {
 import { registerPrivilegedStepUp } from "../_shared/privilegedStepUp.ts";
 import { isAllowedOrigin, parseAllowedOrigins } from "../_shared/cors.ts";
 import { requireTrustedEdgeIngress } from "../_shared/trustedIngress.ts";
+import { readJsonBody } from "../_shared/requestBody.ts";
 import {
   requireEmail,
   optionalText,
@@ -181,18 +182,6 @@ const digest = async (value: string) => {
     .join("");
 };
 
-const parseJwtPayload = (token: string): Record<string, unknown> | null => {
-  const parts = token.split(".");
-  if (parts.length < 2) return null;
-  try {
-    const raw = parts[1].replace(/-/g, "+").replace(/_/g, "/");
-    const padded = raw + "=".repeat((4 - (raw.length % 4)) % 4);
-    return JSON.parse(atob(padded)) as Record<string, unknown>;
-  } catch {
-    return null;
-  }
-};
-
 const collectAuthMethods = (value: unknown): string[] => {
   if (!Array.isArray(value)) {
     return [];
@@ -211,11 +200,15 @@ const collectAuthMethods = (value: unknown): string[] => {
     .filter(Boolean);
 };
 
-const isPasskeyBackedAuthToken = (authToken: string) => {
-  const payload = parseJwtPayload(authToken);
-  if (!payload) {
+const isPasskeyBackedAuthToken = async (
+  authClient: SupabaseClient,
+  authToken: string,
+) => {
+  const { data, error } = await authClient.auth.getClaims(authToken);
+  if (error || !data?.claims) {
     return false;
   }
+  const payload = data.claims as Record<string, unknown>;
 
   const authMethods = new Set([
     ...collectAuthMethods(payload.amr),
@@ -424,7 +417,7 @@ serve(async (req) => {
   if (ingressError) return ingressError;
 
   try {
-    const body = (await req.json().catch(() => ({}))) as RequestBody;
+    const body = await readJsonBody<RequestBody>(req, 128 * 1024);
     if (!body || typeof body !== "object" || typeof body.action !== "string") {
       return jsonResponse(400, { error: "Invalid request" });
     }
@@ -432,7 +425,6 @@ serve(async (req) => {
     const supabaseUrl = Deno.env.get("ITX_SUPABASE_URL");
     const publishableKey = Deno.env.get("ITX_PUBLISHABLE_KEY");
     const serviceKey = Deno.env.get("ITX_SECRET_KEY");
-    const turnstileSecret = Deno.env.get("ITX_TURNSTILE_SECRET") ?? "";
     const supportEmail = Deno.env.get("ITX_SUPPORT_EMAIL") ?? "support@itemtraxx.com";
     const fromEmail =
       Deno.env.get("ITX_EMAIL_FROM") ??
@@ -454,9 +446,6 @@ serve(async (req) => {
       const turnstileToken = requireText(body.payload?.turnstile_token, { maxLen: 4096 });
       if (!email || !password || !turnstileToken) {
         return jsonResponse(400, { error: "Invalid request" });
-      }
-      if (!turnstileSecret) {
-        return jsonResponse(500, { error: "Server misconfiguration" });
       }
 
       const origin = req.headers.get("Origin");
@@ -499,7 +488,6 @@ serve(async (req) => {
       }
 
       const turnstileValid = await verifyTurnstileToken(
-        turnstileSecret,
         turnstileToken,
         clientIp,
         "super-auth-verify start_password_login"
@@ -579,7 +567,7 @@ serve(async (req) => {
         from_email: fromEmail,
       });
 
-      await adminClient.from("super_admin_audit_logs").insert({
+      const { error: auditError } = await adminClient.from("super_admin_audit_logs").insert({
         actor_id: signedInUser.id,
         actor_email: recipientEmail,
         action_type: "super_admin_2fa_started",
@@ -587,6 +575,9 @@ serve(async (req) => {
         target_id: signedInUser.id,
         metadata: { expires_at: expiresAt, via: "password_login" },
       });
+      if (auditError) {
+        return jsonResponse(500, { error: "Unable to record security event." });
+      }
 
       logInfo("super-auth-verify password login challenge started", requestId, { user_id: signedInUser.id });
       return jsonResponse(200, {
@@ -628,15 +619,17 @@ serve(async (req) => {
       p_limit: 10,
       p_window_seconds: 600,
     });
-    if (!rateLimitError) {
-      const rateLimitResult = rateLimit as RateLimitResult;
-      if (!rateLimitResult.allowed) {
-        return jsonResponse(429, { error: "Too many requests. Please try again shortly." });
-      }
+    if (rateLimitError) {
+      logError("super-auth-verify rate limit failed", requestId, rateLimitError);
+      return jsonResponse(503, { error: "Rate limit check failed." });
+    }
+    const rateLimitResult = rateLimit as RateLimitResult;
+    if (!rateLimitResult.allowed) {
+      return jsonResponse(429, { error: "Too many requests. Please try again shortly." });
     }
 
     const writeAudit = async (actionType: string, metadata: Record<string, unknown>) => {
-      await adminClient.from("super_admin_audit_logs").insert({
+      const { error } = await adminClient.from("super_admin_audit_logs").insert({
         actor_id: context.userId,
         actor_email: context.userEmail,
         action_type: actionType,
@@ -644,10 +637,11 @@ serve(async (req) => {
         target_id: context.userId,
         metadata,
       });
+      if (error) throw new Error("Unable to write security audit log.");
     };
 
     if (body.action === "complete_passkey_login") {
-      if (!isPasskeyBackedAuthToken(context.authToken)) {
+      if (!await isPasskeyBackedAuthToken(adminClient, context.authToken)) {
         await writeAudit("super_admin_passkey_rejected", { reason: "missing_passkey_claim" });
         return jsonResponse(403, { error: "Passkey verification required." });
       }

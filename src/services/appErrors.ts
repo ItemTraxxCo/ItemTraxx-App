@@ -155,7 +155,7 @@ export const toUserFacingErrorMessage = (error: unknown, fallbackMessage: string
     return fallbackMessage;
   }
 
-  return rawMessage;
+  return fallbackMessage;
 };
 
 export const shouldReportError = (error: unknown) =>

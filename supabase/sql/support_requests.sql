@@ -3,7 +3,7 @@ create table if not exists public.support_requests (
   requester_name text not null,
   reply_email text not null,
   subject text not null,
-  category text not null check (category in ('general', 'bug', 'billing', 'access', 'feature', 'other')),
+  category text not null check (category in ('general', 'bug', 'billing', 'access', 'feature', 'privacy', 'other')),
   message text not null,
   source text not null default 'public_form' check (source in ('public_form')),
   status text not null default 'open' check (status in ('open', 'in_progress', 'resolved', 'spam')),
@@ -50,6 +50,13 @@ create index if not exists support_request_attachments_request_idx
 
 create index if not exists support_request_events_request_idx
   on public.support_request_events (support_request_id, created_at asc);
+
+alter table public.support_requests
+  drop constraint if exists support_requests_category_check;
+
+alter table public.support_requests
+  add constraint support_requests_category_check
+  check (category in ('general', 'bug', 'billing', 'access', 'feature', 'privacy', 'other'));
 
 alter table public.support_request_attachments
   drop constraint if exists support_request_attachments_storage_bucket_check;

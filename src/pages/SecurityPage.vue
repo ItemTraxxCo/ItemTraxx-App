@@ -219,15 +219,15 @@ const dataControls = [
   {
     title: "Customer Data Encryption",
     description:
-      "All customer data on ItemTraxx servers is encrypted at rest with AES-256 and in transit via TLS.",
+      "Customer traffic uses HTTPS/TLS. Database, authentication, storage, and hosting encryption at rest are provided through the configured infrastructure services; ItemTraxx does not claim a repository-controlled encryption algorithm for every provider-managed store.",
   },
 ];
 
 const operationsControls = [
   {
-    title: "Encrypted backups",
+    title: "Provider recovery and retention",
     description:
-      "ItemTraxx server backups are encrypted and scheduled through internal processes, with documented restore context and retention handling for smooth operations.",
+      "Database and hosting recovery capabilities depend on configured infrastructure-provider features. Application retention controls exist for selected database records but are disabled by default until an approved policy activates them.",
   },
   {
     title: "Monitoring and error reporting",
@@ -279,7 +279,7 @@ const securityApproach = [
     category: "Recovery",
     title: "Backup and restore readiness",
     description:
-      "Encrypted backups, restore context, and operational recovery documentation are maintained as part of our operations standard.",
+      "Operational recovery uses available provider recovery features, deployment history, source control, and documented incident and rollback workflows.",
   },
   {
     category: "Response",

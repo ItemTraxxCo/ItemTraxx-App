@@ -7,6 +7,7 @@ import {
 } from "../_shared/privilegedStepUp.ts";
 import { isAllowedOrigin, parseAllowedOrigins } from "../_shared/cors.ts";
 import { requireTrustedEdgeIngress } from "../_shared/trustedIngress.ts";
+import { readJsonBody } from "../_shared/requestBody.ts";
 import {
   ACCESS_CODE_PATTERN,
   asRecord,
@@ -536,7 +537,7 @@ serve(async (req) => {
       }
     }
 
-    const requestBody = asRecord(await req.json());
+    const requestBody = asRecord(await readJsonBody(req));
     const action = requireText(requestBody.action, { maxLen: 64 });
     const payload = asRecord(requestBody.payload);
 
@@ -546,7 +547,7 @@ serve(async (req) => {
       targetId: string | null,
       metadata: Record<string, unknown>
     ) => {
-      await adminClient.from("super_admin_audit_logs").insert({
+      const { error } = await adminClient.from("super_admin_audit_logs").insert({
         actor_id: user.id,
         actor_email: profile.auth_email ?? user.email ?? null,
         action_type: actionType,
@@ -554,6 +555,7 @@ serve(async (req) => {
         target_id: targetId,
         metadata,
       });
+      if (error) throw new Error("Unable to write security audit log.");
     };
 
     const enrichTenants = async (rows: TenantRow[]) => {
@@ -1254,7 +1256,7 @@ serve(async (req) => {
           });
         }
         return jsonResponse(400, {
-          error: createAuthUser.error?.message || "Unable to create auth user.",
+          error: "Unable to create auth user.",
         });
       }
 
@@ -1342,8 +1344,7 @@ serve(async (req) => {
         }
         await adminClient.from("tenants").delete().eq("id", data.id);
         return jsonResponse(400, {
-          error: tenantPolicyResult.error.message || "Unable to create tenant policy.",
-          code: tenantPolicyResult.error.code || null,
+          error: "Unable to create tenant policy.",
         });
       }
 
@@ -1449,8 +1450,7 @@ serve(async (req) => {
           tenantId: id,
         });
         return jsonResponse(400, {
-          error: policyError.message || "Unable to update tenant plan details.",
-          code: policyError.code || null,
+          error: "Unable to update tenant plan details.",
         });
       }
 

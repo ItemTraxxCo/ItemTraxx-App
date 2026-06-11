@@ -1,6 +1,6 @@
 # Legal Notice
 
-Last updated: 2026-03-10 (year-month-day)
+Last updated: 2026-06-11 (year-month-day)
 
 This Legal Notice provides a high-level summary of the legal materials associated with **ItemTraxx**, a product owned and operated by **ItemTraxx Co**.
 

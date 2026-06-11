@@ -18,7 +18,7 @@ alter table if exists public.profiles
 
 create table if not exists public.super_admin_audit_logs (
   id uuid primary key default gen_random_uuid(),
-  actor_id uuid not null references auth.users(id) on delete cascade,
+  actor_id uuid references auth.users(id) on delete set null,
   actor_email text,
   action_type text not null,
   target_type text,
@@ -26,6 +26,16 @@ create table if not exists public.super_admin_audit_logs (
   metadata jsonb,
   created_at timestamptz not null default now()
 );
+
+alter table public.super_admin_audit_logs
+  alter column actor_id drop not null;
+
+alter table public.super_admin_audit_logs
+  drop constraint if exists super_admin_audit_logs_actor_id_fkey;
+
+alter table public.super_admin_audit_logs
+  add constraint super_admin_audit_logs_actor_id_fkey
+  foreign key (actor_id) references auth.users(id) on delete set null;
 
 alter table public.super_admin_audit_logs enable row level security;
 

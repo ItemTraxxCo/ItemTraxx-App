@@ -27,12 +27,12 @@
       <header class="legal-header"> 
     <h1>ItemTraxx Subscription Agreement and Policies</h1>
 
-    <p><strong>Effective Date:</strong> March 21, 2026</p>
-    <p><strong>Last Updated:</strong> April 16, 2026</p>
+    <p><strong>Effective Date:</strong> June 11, 2026</p>
+    <p><strong>Last Updated:</strong> June 11, 2026</p>
 
   <p>
-  This document combines the ItemTraxx legal terms, software license, privacy policy,
-  and security guidelines into one official legal reference.
+  This page contains the ItemTraxx subscription terms and serves as the central hub for
+  the separate privacy, student privacy, cookie, accessibility, security, and data-processing documents.
 </p>
 
 <p>
@@ -46,6 +46,20 @@
   constitutes acceptance of the revised terms.
 </p> 
       </header>
+
+      <section class="legal-hub" aria-labelledby="legal-hub-title">
+        <h2 id="legal-hub-title">Legal and Privacy Documents</h2>
+        <div class="legal-hub-grid">
+          <RouterLink to="/legal" class="legal-hub-card"><strong>Terms of Service</strong><span>Subscription, account, billing, and service terms. (Scroll down to view)</span></RouterLink>
+          <RouterLink to="/privacy" class="legal-hub-card"><strong>Privacy Policy</strong><span>Information collection, use, disclosure, retention, and California rights.</span></RouterLink>
+          <RouterLink to="/legal/student-privacy" class="legal-hub-card"><strong>Student Privacy Notice</strong><span>COPPA, FERPA, school authorization, and student-data practices.</span></RouterLink>
+          <RouterLink to="/legal/dpa" class="legal-hub-card"><strong>Data Processing Addendum</strong><span>School and district data-processing contract terms.</span></RouterLink>
+          <RouterLink to="/cookies" class="legal-hub-card"><strong>Cookies Notice</strong><span>Essential storage, analytics, diagnostics, and consent choices.</span></RouterLink>
+          <RouterLink to="/accessibility" class="legal-hub-card"><strong>Accessibility</strong><span>WCAG 2.1 AA target and accessibility support.</span></RouterLink>
+          <RouterLink to="/security" class="legal-hub-card"><strong>Security</strong><span>Platform security practices and reporting.</span></RouterLink>
+          <RouterLink to="/privacy-request" class="legal-hub-card"><strong>Privacy Request</strong><span>Request access, correction, export, or deletion.</span></RouterLink>
+        </div>
+      </section>
 
       <section>
         <h2>1. Agreement and Scope</h2>
@@ -111,9 +125,9 @@
           <li>Inventory and transaction records</li>
         </ul>
         <p>
-          If you accept analytics and diagnostics in the cookie consent banner, ItemTraxx may collect product analytics and diagnostic events through PostHog,
-          including page and feature usage, event timestamps, and device/browser metadata. When available, limited account context such as a user identifier,
-          email, and role may be associated with analytics events to help measure product usage and investigate issues. ItemTraxx does not use this data for advertising.
+          If you accept analytics, ItemTraxx may collect product analytics through PostHog and Vercel,
+          including page or feature usage, event timestamps, performance measurements, and device/browser metadata. PostHog event properties are scrubbed for
+          sensitive property names, and email addresses are not used as PostHog identifiers. ItemTraxx does not use this data for advertising.
         </p>
         <p>
           If you accept diagnostics in the cookie consent banner, ItemTraxx may also collect application error reports and runtime diagnostics through Sentry. ItemTraxx may also capture
@@ -147,6 +161,36 @@
           <li>Severity triage target: within 5 business days</li>
           <li>Critical remediation: expedited as soon as practical</li>
         </ul>
+      </section>
+
+      <section>
+        <h2>7A. School and Student Data</h2>
+        <p>
+          Schools and districts authorize ItemTraxx to process student information only to provide
+          the contracted educational inventory and checkout service. ItemTraxx does not permit
+          students to create independent consumer accounts and does not use student information for
+          advertising, behavioral profiling, or unrelated commercial purposes.
+        </p>
+        <p>
+          The school or district represents that it has authority to provide student information and,
+          where applicable, to authorize processing on behalf of a parent or guardian. ItemTraxx acts
+          under the school's direction, limits collection to information needed for the service, and
+          supports school-directed access, correction, export, and deletion requests. Additional terms
+          are provided in the <a href="/privacy">Privacy Policy</a>,
+          <a href="/legal/student-privacy">Student Privacy Notice</a>, and the applicable signed
+          <a href="/legal/dpa">Data Processing Addendum</a>.
+        </p>
+      </section>
+
+      <section>
+        <h2>7B. Administrator Acceptance</h2>
+        <p>
+          Tenant and district administrators using the public administrator password sign-in must
+          affirmatively accept the current Terms of Service. ItemTraxx records the verified
+          administrator identity, terms version, acceptance time, and limited security metadata.
+          Organization-level acceptance may also be established through a signed quote or agreement.
+          Student borrowers are not asked to enter into this agreement.
+        </p>
       </section>
 
       <section>
@@ -214,8 +258,10 @@
             written notice at least fifteen (15) days before the renewal date. Cancellation will take effect at the end of the
             current subscription term billing cycle. Access to the service will continue until the end of the paid
             subscription period billing cycle, after which access may be suspended or terminated. After the final
-            billing cycle ends, customer data is archived for one (1) year, then permanently deleted
-            from ItemTraxx systems. Cancellation requests must be submitted via contact support or
+          billing cycle ends, customer data may be archived or access-restricted. Retention, export,
+          and permanent deletion follow the signed order form, applicable DPA, verified customer
+          instructions, and approved retention processes. Automated database retention is not enabled
+          by default. Cancellation requests must be submitted via contact support or
             email to
             <a href="mailto:support@itemtraxx.com">support@itemtraxx.com</a>.
           </li>
@@ -225,11 +271,9 @@
             law or agreed in writing from ItemTraxx Co.
           </li>
           <li>
-            <strong>Between-plan movement protocol:</strong> Plan upgrades are allowed at any time
-            and billing is prorated for the remainder of the current billing cycle. Plan
-            downgrades are also allowed at any time and restrictions of the new plan apply at the start 
-            of the next billing cycle; credit is issued for the unused portion of the current billing 
-            cycle, and downgraded plan limits and restrictions take effect at the start of the next billing cycle.
+            <strong>Between-plan movement protocol:</strong> Plan changes are handled through the
+            quote and invoice process. Any proration, credit, effective date, and changed limits must
+            be confirmed in writing because the application does not automatically calculate or issue billing adjustments.
           </li>
         </ul>
       </section>
@@ -240,9 +284,10 @@
           Violations of this policy may result in account restriction, account suspension, or
           account termination of service access. Upon termination, all license rights end immediately. 
           Customers may terminate the subscription at the end of the applicable subscription 
-          term in accordance with the agreed cancellation window. Upon termination, customer data
-          will be archived for one (1) year after which it will be permanently deleted in accordance 
-          with ItemTraxx Co data retention practices.
+          term in accordance with the agreed cancellation window. Upon termination, access may be
+          suspended and data may be archived. Export and deletion are completed according to the
+          signed agreement, verified customer instructions, legal preservation requirements, and an
+          approved operational or retention process.
         </p>
       </section>
 
@@ -476,6 +521,27 @@ section {
   margin-top: 1.35rem;
 }
 
+.legal-hub-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+  margin-top: 0.9rem;
+}
+
+.legal-hub-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  padding: 1rem;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  color: var(--text);
+  text-decoration: none;
+}
+
+.legal-hub-card span { color: var(--muted); line-height: 1.45; }
+.legal-hub-card:hover { border-color: var(--accent); }
+
 h2 {
   margin: 0;
   font-size: 1.08rem;
@@ -498,6 +564,7 @@ a {
 }
 
 @media (max-width: 640px) {
+  .legal-hub-grid { grid-template-columns: 1fr; }
   .legal-top-nav {
     gap: 0.75rem;
     align-items: flex-start;

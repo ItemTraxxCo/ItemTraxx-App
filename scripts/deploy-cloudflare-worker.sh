@@ -11,4 +11,4 @@ fi
 
 cd "$WORKER_DIR"
 echo "[deploy] worker dir: $WORKER_DIR"
-npx wrangler deploy "$@"
+npx wrangler deploy --config wrangler.toml "$@"

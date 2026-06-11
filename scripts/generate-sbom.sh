@@ -6,7 +6,7 @@ OUT_FILE="${OUT_DIR}/sbom.cdx.json"
 
 mkdir -p "${OUT_DIR}"
 
-npx --yes @cyclonedx/cyclonedx-npm@4.1.1 \
+./node_modules/.bin/cyclonedx-npm \
   --output-file "${OUT_FILE}" \
   --output-format JSON
 

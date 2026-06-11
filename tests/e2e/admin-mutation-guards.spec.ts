@@ -124,8 +124,8 @@ test.describe("tenant-admin mutation guard coverage", () => {
         window.localStorage.setItem(
           "itemtraxx-cookie-consent",
           JSON.stringify({
-            version: 1,
-            choice: "all",
+            version: 2,
+            preferences: { analytics: true, diagnostics: true },
             updatedAt: new Date().toISOString(),
           })
         );

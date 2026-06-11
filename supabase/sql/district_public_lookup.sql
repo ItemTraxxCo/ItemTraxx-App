@@ -12,7 +12,7 @@ stable
 as $$
   select d.id, d.name, d.slug, d.is_active
   from public.districts d
-  where d.slug = lower(trim(input_slug))
+  where lower(d.slug) = lower(trim(input_slug))
     and d.is_active = true
   limit 1;
 $$;

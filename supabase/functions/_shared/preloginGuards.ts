@@ -87,11 +87,16 @@ export const enforcePreloginRateLimit = async (
 };
 
 export const verifyTurnstileToken = async (
-  secret: string,
   token: string,
   remoteIp: string,
   logContext: string
 ) => {
+  const secret = Deno.env.get("ITX_TURNSTILE_SECRET") ??
+    Deno.env.get("ITX_TURNSTILE_SECRET_KEY") ?? "";
+  if (!secret) {
+    console.error(`${logContext} turnstile secret is not configured`);
+    return false;
+  }
   const submitVerification = async (ip?: string) => {
     const params = new URLSearchParams();
     params.set("secret", secret);

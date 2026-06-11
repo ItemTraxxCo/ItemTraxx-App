@@ -7,6 +7,7 @@ import {
 } from "../_shared/privilegedStepUp.ts";
 import { isAllowedOrigin, parseAllowedOrigins } from "../_shared/cors.ts";
 import { requireTrustedEdgeIngress } from "../_shared/trustedIngress.ts";
+import { readJsonBody } from "../_shared/requestBody.ts";
 import {
   asRecord,
   optionalInteger,
@@ -184,19 +185,6 @@ const isMissingColumn = (
 const sanitizeText = (value: unknown, max = 255) =>
   optionalText(value, { maxLen: max });
 
-const parseJwtPayload = (token: string): Record<string, unknown> | null => {
-  const parts = token.split(".");
-  if (parts.length < 2) return null;
-  try {
-    const raw = parts[1].replace(/-/g, "+").replace(/_/g, "/");
-    const padded = raw + "=".repeat((4 - (raw.length % 4)) % 4);
-    const decoded = atob(padded);
-    return JSON.parse(decoded) as Record<string, unknown>;
-  } catch {
-    return null;
-  }
-};
-
 const resolveGeneralLocation = (req: Request) => {
   const city = req.headers.get("cf-ipcity")?.trim();
   const region = req.headers.get("cf-region")?.trim();
@@ -238,8 +226,8 @@ serve(async (req) => {
   }
 
   try {
-    const authHeader = req.headers.get("x-itx-user-jwt") ??
-      req.headers.get("authorization");
+    const authHeader = req.headers.get("authorization") ??
+      req.headers.get("x-itx-user-jwt");
     if (!authHeader) {
       return jsonResponse(401, { error: "Unauthorized" });
     }
@@ -287,7 +275,7 @@ serve(async (req) => {
       return jsonResponse(403, { error: "Access denied" });
     }
 
-    const parsedBody = asRecord(await req.json().catch(() => ({})));
+    const parsedBody = asRecord(await readJsonBody(req));
     const action = requireText(parsedBody.action, { maxLen: 64 });
     const payload = asRecord(parsedBody.payload ?? {});
 
@@ -341,6 +329,7 @@ serve(async (req) => {
         message: rateLimitError.message,
         details: rateLimitError.details,
       });
+      return jsonResponse(503, { error: "Rate limit check failed." });
     } else {
       const rateLimitResult = rateLimit as RateLimitResult;
       if (!rateLimitResult.allowed) {
@@ -356,7 +345,7 @@ serve(async (req) => {
       targetId: string | null,
       metadata: Record<string, unknown>,
     ) => {
-      await adminClient.from("super_admin_audit_logs").insert({
+      const { error } = await adminClient.from("super_admin_audit_logs").insert({
         actor_id: user.id,
         actor_email: profile.auth_email ?? user.email ?? null,
         action_type: actionType,
@@ -364,6 +353,7 @@ serve(async (req) => {
         target_id: targetId,
         metadata,
       });
+      if (error) throw new Error("Unable to write security audit log.");
     };
 
     if (action === "verify_password") {
@@ -418,7 +408,12 @@ serve(async (req) => {
         return jsonResponse(400, { error: "Device session is required." });
       }
 
-      const jwtPayload = parseJwtPayload(accessToken);
+      const { data: claimsData, error: claimsError } = await adminClient.auth
+        .getClaims(accessToken);
+      if (claimsError || !claimsData?.claims) {
+        return jsonResponse(401, { error: "Unauthorized" });
+      }
+      const jwtPayload = claimsData.claims as Record<string, unknown>;
       const authSessionId = typeof jwtPayload?.session_id === "string"
         ? jwtPayload.session_id
         : null;

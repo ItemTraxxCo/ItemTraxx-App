@@ -7,14 +7,18 @@
           ItemTraxx uses essential cookies for sign-in and security. With your consent, we may also use analytics and diagnostics
           (for example PostHog and Sentry) to understand usage, performance, and reliability. See <RouterLink to="/cookies">Cookies</RouterLink> for details.
         </p>
-        <p class="cookie-consent-legal">
-          By continuing, you agree to the <RouterLink to="/privacy">Privacy Policy</RouterLink> and
-          <RouterLink to="/legal">Terms of Use</RouterLink>.
-        </p>
+        <div class="cookie-consent-options" aria-label="Optional cookie categories">
+          <label><input v-model="analytics" type="checkbox" /> Analytics</label>
+          <label><input v-model="diagnostics" type="checkbox" /> Diagnostics and error monitoring</label>
+        </div>
+        <p class="cookie-consent-legal">See the <RouterLink to="/privacy">Privacy Policy</RouterLink> and <RouterLink to="/cookies">Cookies Notice</RouterLink>.</p>
       </div>
       <div class="cookie-consent-actions">
         <button type="button" class="button-link cookie-consent-secondary" @click="$emit('essential-only')">
           Essential only
+        </button>
+        <button type="button" class="button-link cookie-consent-secondary" @click="$emit('save-preferences', { analytics, diagnostics })">
+          Save choices
         </button>
         <button type="button" class="button-primary cookie-consent-primary" @click="$emit('accept-all')">
           Accept all
@@ -25,13 +29,17 @@
 </template>
 
 <script setup lang="ts">
-import { Teleport } from "vue";
+import { ref, Teleport } from "vue";
 import { RouterLink } from "vue-router";
 
 defineEmits<{
   (e: "essential-only"): void;
   (e: "accept-all"): void;
+  (e: "save-preferences", preferences: { analytics: boolean; diagnostics: boolean }): void;
 }>();
+
+const analytics = ref(false);
+const diagnostics = ref(false);
 </script>
 
 <style scoped>
@@ -74,6 +82,19 @@ defineEmits<{
   margin-top: 0.55rem;
   font-size: 0.92rem;
   color: var(--muted);
+}
+
+.cookie-consent-options {
+  display: flex;
+  gap: 1rem;
+  margin-top: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.cookie-consent-options label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
 }
 
 .cookie-consent-actions {

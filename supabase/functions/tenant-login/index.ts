@@ -219,9 +219,9 @@ serve(async (req) => {
       return jsonResponse(400, { error: "Turnstile verification required" });
     }
     const isTurnstileValid = await verifyTurnstileToken(
+      turnstileSecret,
       turnstileToken,
       resolveClientIp(req),
-      "tenant-login",
     );
     if (!isTurnstileValid) {
       return jsonResponse(403, { error: "Turnstile verification failed" });

@@ -803,6 +803,9 @@ export const createDistrictAdminSessionHandoff = async (
     if (!result.ok && result.error === "District not found") {
       throw new Error("No district assignment.");
     }
+    if (!result.ok && result.error === "District terms acceptance required") {
+      throw new Error("District terms acceptance required.");
+    }
     throw new Error("Unable to prepare district sign-in.");
   }
 

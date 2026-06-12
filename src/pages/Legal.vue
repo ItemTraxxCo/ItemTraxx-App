@@ -9,7 +9,7 @@
               <path d="M15 5 8 12l7 7" />
             </svg>
           </RouterLink>
-          <span class="legal-breadcrumb"></span>
+          <span class="legal-breadcrumb">Legal</span>
         </div>
         <button
           type="button"
@@ -117,28 +117,11 @@
 
       <section>
         <h2>6. Privacy Policy</h2>
-        <p>ItemTraxx may process the following categories of information:</p>
-        <ul>
-          <li>Account information (organization, school, district, team, role, authentication-related data)</li>
-          <li>Usage data and audit activity data</li>
-          <li>Device, browser, technical information, and approximate IP-based location used for session security</li>
-          <li>Inventory and transaction records</li>
-        </ul>
         <p>
-          If you accept analytics, ItemTraxx may collect product analytics through PostHog and Vercel,
-          including page or feature usage, event timestamps, performance measurements, and device/browser metadata. PostHog event properties are scrubbed for
-          sensitive property names, and email addresses are not used as PostHog identifiers. ItemTraxx does not use this data for advertising.
-        </p>
-        <p>
-          If you accept diagnostics in the cookie consent banner, ItemTraxx may also collect application error reports and runtime diagnostics through Sentry. ItemTraxx may also capture
-          diagnostic events through PostHog as part of incident and reliability investigation.
-          If Sentry Replay sampling and/or PostHog Replay recording is enabled in the active environment, session replay data may be collected after consent for debugging and incident investigation.
-        </p>
-        <p>Your data is used to provide and improve the service, secure accounts, and show approximate session location in account security views.</p>
-        <p>
-          Data is retained only as necessary for service operations, contractual requirements, and
-          legal compliance. Certain backup and audit records may persist for limited operational
-          windows.
+          ItemTraxx's collection, use, disclosure, and retention of personal and operational data is
+          governed by the <a href="/privacy">Privacy Policy</a>, which is incorporated into this
+          Agreement by reference. By accepting this Agreement, you also accept the Privacy Policy
+          as it exists at the time of acceptance and as updated in accordance with its terms.
         </p>
       </section>
 
@@ -164,7 +147,7 @@
       </section>
 
       <section>
-        <h2>7A. School and Student Data</h2>
+        <h2>8. School and Student Data</h2>
         <p>
           Schools and districts authorize ItemTraxx to process student information only to provide
           the contracted educational inventory and checkout service. ItemTraxx does not permit
@@ -183,7 +166,7 @@
       </section>
 
       <section>
-        <h2>7B. Administrator Acceptance</h2>
+        <h2>9. Administrator Acceptance</h2>
         <p>
           Tenant and district administrators using the public administrator password sign-in must
           affirmatively accept the current Terms of Service. ItemTraxx records the verified
@@ -194,7 +177,7 @@
       </section>
 
       <section>
-        <h2>8. Availability, Warranty, and Liability</h2>
+        <h2>10. Availability, Warranty, and Liability</h2>
         <p>
           ItemTraxx is provided on an "as is" and "as available" basis. ItemTraxx Co does not
           guarantee uninterrupted, error-free, or always-available service, and does not guarantee
@@ -213,7 +196,7 @@
       </section>
 
       <section>
-        <h2>9. Billing and Subscription Terms</h2>
+        <h2>11. Billing and Subscription Terms</h2>
         <ul>
           <li>
             <strong>Billing:</strong> Fees are billed according to the applicable quote, order
@@ -224,7 +207,7 @@
             purchase and remains subject to this legal agreement and service policies.
           </li>
           <li>
-            <strong>Non refundability:</strong> Unless required by law or explicitly agreed in
+            <strong>Non-refundability:</strong> Unless required by law or explicitly agreed in
             writing, all payments are non-refundable.
           </li>
           <li>
@@ -279,7 +262,7 @@
       </section>
 
       <section>
-        <h2>10. Restrictions, Enforcement, and Termination</h2>
+        <h2>12. Restrictions, Enforcement, and Termination</h2>
         <p>
           Violations of this policy may result in account restriction, account suspension, or
           account termination of service access. Upon termination, all license rights end immediately. 
@@ -292,15 +275,24 @@
       </section>
 
       <section>
-        <h2>11. Indemnification</h2>
+        <h2>13. Indemnification</h2>
         <p>
-          The customer agrees to indemnify and hold harmless ItemTraxx Co from claims arising from
-          the customer's misuse of the service or violation of this Agreement.
+          The customer agrees to indemnify, defend, and hold harmless ItemTraxx Co and its officers,
+          employees, and agents from third-party claims arising from the customer's misuse of the
+          service or violation of this Agreement.
+        </p>
+        <p>
+          ItemTraxx Co agrees to indemnify, defend, and hold harmless the customer from third-party
+          claims alleging that the ItemTraxx software, as provided by ItemTraxx Co and used in
+          accordance with this Agreement, infringes a third party's intellectual property rights.
+          This obligation does not apply to claims arising from customer modifications, combinations
+          with third-party materials not provided by ItemTraxx Co, or use of the service in
+          violation of this Agreement.
         </p>
       </section>
 
       <section>
-        <h2>12. Force Majeure</h2>
+        <h2>14. Force Majeure</h2>
         <p>
           ItemTraxx Co is not liable for failure or delay in performance due to causes beyond its
           reasonable control, including but not limited to natural disasters, internet outages,
@@ -309,15 +301,50 @@
       </section>
 
       <section>
-        <h2>13. Governing Law</h2>
+        <h2>15. Governing Law and Venue</h2>
         <p>
-          This Agreement is governed by the laws of the State of California, without regard to conflict of law principles,
-          without limiting any mandatory legal rights where prohibited by law.
+          This Agreement is governed by the laws of the State of California, without regard to
+          conflict of law principles, and without limiting any mandatory legal rights where
+          prohibited by law. Any legal action or proceeding arising out of or relating to this
+          Agreement shall be brought exclusively in the state courts of Santa Clara County,
+          California, or, if federal jurisdiction applies, the United States District Court for the
+          Northern District of California (San Jose Division). Each party consents to personal
+          jurisdiction in those courts.
         </p>
       </section>
 
       <section>
-        <h2>14. Changes to This Document</h2>
+        <h2>16. Dispute Resolution</h2>
+        <p>
+          Before initiating formal legal proceedings, the parties agree to attempt to resolve any
+          dispute informally. Either party may send written notice describing the dispute, and the
+          parties will negotiate in good faith for at least thirty (30) days before either party
+          may file a claim in the courts specified in Section 15.
+        </p>
+        <p>
+          Nothing in this section prevents either party from seeking emergency injunctive or
+          equitable relief from a court of competent jurisdiction where necessary to protect
+          intellectual property rights, confidential information, or service security.
+        </p>
+      </section>
+
+      <section>
+        <h2>17. Severability and Entire Agreement</h2>
+        <p>
+          If any provision of this Agreement is held to be invalid, illegal, or unenforceable, the
+          remaining provisions will continue in full force and effect, and the invalid provision
+          will be modified to the minimum extent necessary to make it enforceable.
+        </p>
+        <p>
+          This Agreement, together with the Privacy Policy, Student Privacy Notice, applicable Data
+          Processing Addendum, and any signed order form or quote, constitutes the entire agreement
+          between the parties regarding the subject matter herein and supersedes all prior
+          negotiations, representations, warranties, or agreements, whether written or oral.
+        </p>
+      </section>
+
+      <section>
+        <h2>18. Changes to This Document</h2>
         <p>
           ItemTraxx Co may revise this legal document from time to time. Continued use of the
           service after updates to this document means you accept the revised terms, except for material changes described below.
@@ -330,10 +357,15 @@
       </section>
 
       <section>
-        <h2>15. Contact</h2>
+        <h2>19. Contact</h2>
+        <p>
+          <strong>ItemTraxx Co</strong><br />
+          [COMPANY ADDRESS — TO BE COMPLETED]
+        </p>
         <p>
           For legal, privacy, and security inquiries, please
           <a href="https://www.itemtraxx.com/contact-support" target="_blank" rel="noreferrer noopener">contact support here</a>
+          or email <a href="mailto:support@itemtraxx.com">support@itemtraxx.com</a>.
         </p>
       </section>
       </div>

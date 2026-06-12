@@ -19,17 +19,13 @@ import {
   ValidationError,
 } from "../_shared/validation.ts";
 import { optionalPostgrestSearchText } from "../_shared/postgrestSearch.ts";
+import { enforcePreloginRateLimit } from "../_shared/preloginGuards.ts";
 
 const baseCorsHeaders = {
   "Access-Control-Allow-Headers":
     "authorization, x-client-info, apikey, content-type, x-request-id",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
   Vary: "Origin",
-};
-
-type RateLimitResult = {
-  allowed: boolean;
-  retry_after_seconds: number | null;
 };
 
 type SupportRequestStatus = "open" | "in_progress" | "resolved" | "spam";
@@ -314,29 +310,24 @@ serve(async (req) => {
       }
     }
 
-    const { data: rateLimit, error: rateLimitError } = await adminClient.rpc(
-      "consume_rate_limit",
-      {
-        p_scope: "super_admin",
-        p_limit: 30,
-        p_window_seconds: 60,
-      },
+    const rateLimit = await enforcePreloginRateLimit(
+      adminClient,
+      user.id,
+      `super-admin-ops-${user.id}`,
+      30,
+      60,
     );
 
-    if (rateLimitError) {
-      console.error("super-ops rate limit rpc failed", {
-        code: rateLimitError.code,
-        message: rateLimitError.message,
-        details: rateLimitError.details,
-      });
-      return jsonResponse(503, { error: "Rate limit check failed." });
-    } else {
-      const rateLimitResult = rateLimit as RateLimitResult;
-      if (!rateLimitResult.allowed) {
-        return jsonResponse(429, {
-          error: "Rate limit exceeded, please try again in a minute.",
+    if (!rateLimit.ok) {
+      if (rateLimit.error) {
+        console.error("super-ops rate limit rpc failed", {
+          message: rateLimit.error.message,
         });
+        return jsonResponse(503, { error: "Rate limit check failed." });
       }
+      return jsonResponse(429, {
+        error: "Rate limit exceeded, please try again in a minute.",
+      });
     }
 
     const writeAudit = async (

@@ -20,6 +20,14 @@ import {
 } from "../_shared/validation.ts";
 import { optionalPostgrestSearchText } from "../_shared/postgrestSearch.ts";
 import { enforcePreloginRateLimit } from "../_shared/preloginGuards.ts";
+import { sendLoggedResendEmail } from "../_shared/emailDeliveryLog.ts";
+import {
+  buildSubprocessorEmailSubject,
+  buildSubprocessorNoticeHtml,
+  buildSubprocessorNoticePlainText,
+  formatSubprocessorPreview,
+  type SubprocessorChangeType,
+} from "../_shared/subprocessorNotice.ts";
 
 const baseCorsHeaders = {
   "Access-Control-Allow-Headers":
@@ -1890,6 +1898,199 @@ serve(async (req) => {
           recent_events: recentEvents,
         },
       });
+    }
+
+    // ── Subprocessor notice: preview ────────────────────────────────────────────
+    if (action === "preview_subprocessor_notice") {
+      const body = asRecord(await readJsonBody(req));
+      const vendor = requireText(body, "vendor", 256);
+      const rawChangeType = requireText(body, "change_type", 32);
+      if (!["added", "replaced", "removed"].includes(rawChangeType)) {
+        throw new ValidationError(400, "change_type must be 'added', 'replaced', or 'removed'");
+      }
+      const changeType = rawChangeType as SubprocessorChangeType;
+      const effectiveDate = requireText(body, "effective_date", 10);
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(effectiveDate)) {
+        throw new ValidationError(400, "effective_date must be YYYY-MM-DD");
+      }
+      const thirtyDaysOut = new Date();
+      thirtyDaysOut.setDate(thirtyDaysOut.getDate() + 30);
+      if (new Date(effectiveDate) < thirtyDaysOut) {
+        throw new ValidationError(400, "effective_date must be at least 30 days from today");
+      }
+      const description = optionalText(body, "description", 2048) ?? undefined;
+
+      const { count: districtCount } = await adminClient
+        .from("districts")
+        .select("billing_email", { count: "exact", head: true })
+        .eq("billing_status", "active")
+        .not("billing_email", "is", null);
+
+      const { count: leadCount } = await adminClient
+        .from("sales_leads")
+        .select("reply_email", { count: "exact", head: true })
+        .eq("lead_state", "converted_to_customer")
+        .not("reply_email", "is", null);
+
+      const logoUrl = Deno.env.get("ITX_EMAIL_LOGO_URL")?.trim() || null;
+      const legalHubUrl = Deno.env.get("ITX_LEGAL_HUB_URL")?.trim() || "https://www.itemtraxx.com/legal";
+      const contactSupportUrl = Deno.env.get("ITX_CONTACT_SUPPORT_URL")?.trim() || "https://www.itemtraxx.com/contact-support";
+
+      const preview = formatSubprocessorPreview(
+        { vendor, changeType, effectiveDate, description, logoUrl, legalHubUrl, contactSupportUrl },
+        (districtCount ?? 0) + (leadCount ?? 0),
+      );
+
+      return jsonResponse(200, { preview });
+    }
+
+    // ── Subprocessor notice: announce (sends emails + creates DB record) ─────────
+    if (action === "announce_subprocessor_change") {
+      const body = asRecord(await readJsonBody(req));
+      const vendor = requireText(body, "vendor", 256);
+      const rawChangeType = requireText(body, "change_type", 32);
+      if (!["added", "replaced", "removed"].includes(rawChangeType)) {
+        throw new ValidationError(400, "change_type must be 'added', 'replaced', or 'removed'");
+      }
+      const changeType = rawChangeType as SubprocessorChangeType;
+      const effectiveDate = requireText(body, "effective_date", 10);
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(effectiveDate)) {
+        throw new ValidationError(400, "effective_date must be YYYY-MM-DD");
+      }
+      const thirtyDaysOut = new Date();
+      thirtyDaysOut.setDate(thirtyDaysOut.getDate() + 30);
+      if (new Date(effectiveDate) < thirtyDaysOut) {
+        throw new ValidationError(400, "effective_date must be at least 30 days from today");
+      }
+      const description = optionalText(body, "description", 2048) ?? undefined;
+
+      const resendApiKey = Deno.env.get("ITX_RESEND_API_KEY");
+      if (!resendApiKey) {
+        return jsonResponse(503, { error: "Email service not configured." });
+      }
+      const emailFrom = Deno.env.get("ITX_EMAIL_FROM") ?? "ItemTraxx <noreply@itemtraxx.com>";
+      const logoUrl = Deno.env.get("ITX_EMAIL_LOGO_URL")?.trim() || null;
+      const legalHubUrl = Deno.env.get("ITX_LEGAL_HUB_URL")?.trim() || "https://www.itemtraxx.com/legal";
+      const contactSupportUrl = Deno.env.get("ITX_CONTACT_SUPPORT_URL")?.trim() || "https://www.itemtraxx.com/contact-support";
+
+      // Collect customer emails from active districts and converted leads.
+      const { data: districtRows } = await adminClient
+        .from("districts")
+        .select("billing_email")
+        .eq("billing_status", "active")
+        .not("billing_email", "is", null);
+
+      const { data: leadRows } = await adminClient
+        .from("sales_leads")
+        .select("reply_email")
+        .eq("lead_state", "converted_to_customer")
+        .not("reply_email", "is", null);
+
+      const emailSet = new Set<string>();
+      for (const row of districtRows ?? []) {
+        if (typeof row.billing_email === "string") emailSet.add(row.billing_email.toLowerCase());
+      }
+      for (const row of leadRows ?? []) {
+        if (typeof row.reply_email === "string") emailSet.add(row.reply_email.toLowerCase());
+      }
+      const recipients = Array.from(emailSet);
+
+      // Create record in pending state before sending.
+      const { data: changeRecord, error: insertError } = await adminClient
+        .from("subprocessor_changes")
+        .insert({
+          vendor,
+          change_type: changeType,
+          effective_date: effectiveDate,
+          description: description ?? null,
+          status: "pending",
+          created_by_email: profile.auth_email ?? user.email ?? null,
+        })
+        .select("id")
+        .single();
+
+      if (insertError || !changeRecord) {
+        return jsonResponse(500, { error: "Failed to create subprocessor change record." });
+      }
+      const changeId: string = changeRecord.id;
+
+      const noticePayload = { vendor, changeType, effectiveDate, description, logoUrl, legalHubUrl, contactSupportUrl };
+      const subject = buildSubprocessorEmailSubject(vendor, changeType);
+      const html = buildSubprocessorNoticeHtml(noticePayload);
+      const text = buildSubprocessorNoticePlainText(noticePayload);
+
+      let sentCount = 0;
+      const emailResults = await Promise.allSettled(
+        recipients.map((recipientEmail) =>
+          sendLoggedResendEmail(
+            adminClient,
+            resendApiKey,
+            { from: emailFrom, to: [recipientEmail], subject, html, text },
+            {
+              emailType: "subprocessor_change_notice",
+              recipientEmail,
+              subject,
+              provider: "resend",
+              requestContext: "super-ops/announce_subprocessor_change",
+              triggeredByUserId: user.id,
+              tenantId: null,
+              districtId: null,
+              metadata: { changeId, vendor, changeType, effectiveDate },
+            },
+          )
+        ),
+      );
+
+      for (const result of emailResults) {
+        if (result.status === "fulfilled") sentCount++;
+      }
+
+      const noticeSentAt = new Date().toISOString();
+      await adminClient
+        .from("subprocessor_changes")
+        .update({
+          status: recipients.length === 0 || sentCount > 0 ? "sent" : "failed",
+          notice_sent_at: noticeSentAt,
+          objection_deadline: effectiveDate,
+          recipients_count: sentCount,
+        })
+        .eq("id", changeId);
+
+      await writeAudit("announce_subprocessor_change", "subprocessor_change", changeId, {
+        vendor,
+        changeType,
+        effectiveDate,
+        recipientsCount: sentCount,
+      });
+
+      return jsonResponse(200, {
+        changeId,
+        vendor,
+        changeType,
+        effectiveDate,
+        objectionDeadline: effectiveDate,
+        noticeSentAt,
+        recipientsCount: sentCount,
+        totalTargets: recipients.length,
+      });
+    }
+
+    // ── Subprocessor notice: list ────────────────────────────────────────────────
+    if (action === "list_subprocessor_notices") {
+      const { data: notices, error: listError } = await adminClient
+        .from("subprocessor_changes")
+        .select("id,vendor,change_type,effective_date,description,notice_sent_at,objection_deadline,recipients_count,status,created_by_email,created_at")
+        .order("created_at", { ascending: false })
+        .limit(100);
+
+      if (listError) {
+        if (listError.code === "42P01") {
+          return jsonResponse(503, { error: "Subprocessor changes table not found. Run latest SQL setup." });
+        }
+        return jsonResponse(500, { error: "Failed to fetch subprocessor notices." });
+      }
+
+      return jsonResponse(200, { notices: notices ?? [] });
     }
 
     return jsonResponse(400, { error: "Invalid action" });

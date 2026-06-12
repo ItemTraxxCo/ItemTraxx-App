@@ -146,7 +146,7 @@ jobs:
       - kill-switch-preflight
       - slack-notify-start
       - e2e
-    if: ${{ always() && needs.kill-switch-preflight.outputs.active != 'true' && needs.slack-notify-start.result == 'success' && github.event_name != 'pull_request' && (needs.e2e.result == 'failure' || needs.e2e.result == 'cancelled') }}
+    if: ${{ always() && needs.kill-switch-preflight.outputs.active != 'true' && needs.slack-notify-start.result == 'success' && (needs.e2e.result == 'failure' || (github.event_name != 'pull_request' && needs.e2e.result == 'cancelled')) }}
     uses: ./.github/workflows/incidentio-workflow-alert.yml
     with:
       status: ${{ needs.e2e.result }}

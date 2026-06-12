@@ -41,8 +41,12 @@ Customer authorizes ItemTraxx to use subprocessors needed for hosting, database 
 storage, edge security, email, monitoring, diagnostics, support, and engineering operations.
 The current platform may use Supabase, Cloudflare, Vercel, PostHog, Sentry, transactional email
 providers, GitHub, Slack, and incident.io according to the active environment and feature
-configuration. Any required subprocessor restrictions, notification process, or flow-down terms must
-be included in the executed agreement and supported by the applicable provider terms.
+configuration. ItemTraxx will provide at least thirty (30) days advance notice before adding or
+replacing a subprocessor that processes Customer Data, via email to the Customer's primary contact
+or a notice posted to the ItemTraxx legal hub. Customer may object in writing within that period;
+if the parties cannot resolve a reasonable objection, Customer may terminate the affected portion
+of the service on written notice. Any required subprocessor restrictions or additional flow-down
+terms must be included in the executed agreement.
 
 ## 6. Requests and Cooperation
 
@@ -52,9 +56,15 @@ records will be referred to or coordinated with Customer.
 
 ## 7. Security Incidents
 
-ItemTraxx maintains monitoring, escalation, and incident-notification tooling. The executed agreement
-must specify what constitutes a reportable incident, the notice contacts, required information, and
-the applicable notification deadline; this template does not create a specific deadline by itself.
+ItemTraxx maintains monitoring, escalation, and incident-notification tooling. If ItemTraxx becomes
+aware of a security incident reasonably likely to have compromised Customer Data, ItemTraxx will
+notify Customer without undue delay and, where feasible, within seventy-two (72) hours of becoming
+aware of the incident. Notification will include a description of the incident, the categories and
+approximate volume of data affected (to the extent known), and the measures taken or proposed to
+address the incident. The executed agreement may specify additional notice contacts, required
+information, or a different notification deadline; absent such specification, the seventy-two-hour
+default applies. ItemTraxx's notification obligation does not extend to incidents affecting only
+non-Customer infrastructure or publicly available information.
 
 ## 8. Retention, Return, and Deletion
 
@@ -79,3 +89,14 @@ processing begins.
 
 If this DPA conflicts with the underlying agreement regarding data protection, the executed DPA
 controls for that subject. No repository template is binding until incorporated into a signed agreement.
+
+## 12. CCPA/CPRA Service Provider Terms
+
+To the extent the California Consumer Privacy Act (CCPA) or California Privacy Rights Act (CPRA)
+applies to Customer Data, ItemTraxx acts as a Service Provider (as defined under CCPA/CPRA) and
+not as a Third Party or Business with respect to that data. ItemTraxx will not sell or share
+Customer Data, use it for cross-context behavioral advertising, retain it outside the scope of the
+business purpose stated in this DPA and the underlying agreement, or disclose it except as
+permitted under CCPA/CPRA for service providers. ItemTraxx will cooperate with Customer in
+responding to verifiable consumer requests to the extent ItemTraxx holds the relevant data and
+the request is directed to ItemTraxx in accordance with this DPA.

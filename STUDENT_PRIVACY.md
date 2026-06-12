@@ -47,9 +47,16 @@ education records and can submit verified instructions to ItemTraxx. Schools may
 export, archive, restore, or deletion. Permanent deletion depends on an approved retention process
 or a verified operational request; automated database retention is not enabled by default.
 
+## California SOPIPA Compliance
+
+ItemTraxx operates websites and applications used primarily for K–12 school purposes in California
+and complies with the Student Online Personal Information Protection Act (SOPIPA), Cal. Bus. &
+Prof. Code §22584 et seq. ItemTraxx does not use covered information for targeted advertising,
+does not build advertising profiles on students, does not sell student information, and does not
+use student information for any purpose other than providing the contracted K–12 educational
+inventory and checkout service. Other state student-data privacy statutes with similar requirements
+are honored to the extent applicable to ItemTraxx's operations in those jurisdictions.
+
 ## Contact
 
 Email: `support@itemtraxx.com`
-
-This notice and the Data Processing Addendum should be reviewed by qualified counsel before being
-incorporated into customer contracts.

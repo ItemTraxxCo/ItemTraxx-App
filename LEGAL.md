@@ -64,7 +64,8 @@ Unless otherwise expressly stated in the governing legal terms, ItemTraxx is pro
 ## 6. Contact
 For legal inquiries related to ItemTraxx, contact:
 
-**ItemTraxx Co**  
+**ItemTraxx Co**
+670 San Antonio Rd, Palo Alto, CA 94306, USA
 Email: `support@itemtraxx.com`
 
 ---

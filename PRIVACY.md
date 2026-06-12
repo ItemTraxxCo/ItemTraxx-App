@@ -16,6 +16,8 @@ This Privacy Policy applies to:
 
 If your access to ItemTraxx is provided by a school, district, business, or other organization, that organization may also control certain account, inventory, and borrower-related data inside its workspace.
 
+ItemTraxx is intended for use in the United States. If you access the service from outside the United States, you do so at your own risk and are responsible for compliance with local laws. ItemTraxx does not knowingly target users in the European Union or United Kingdom, and this Privacy Policy does not constitute a GDPR-compliant privacy notice for EU/UK residents.
+
 ---
 
 ## 2. Information We Collect
@@ -167,6 +169,8 @@ We target acknowledgment within 10 business days and a substantive response with
 days, unless a different period applies or a permitted extension is necessary. We will explain any
 denial or limitation required by law, contract, security, or a school customer's instructions.
 
+If ItemTraxx becomes aware of a security incident that may have compromised your personal information, we will notify affected individuals or account holders as required by applicable law, including California Civil Code §1798.29 and §1798.82. Notification will be provided via email to the address associated with your account, or by an alternative method if required by law or if email is not available.
+
 ---
 
 ## 11. California Privacy Notice
@@ -182,15 +186,22 @@ Authorized agents may submit requests when they provide sufficient proof of auth
 may need to verify the identity and authority of the requester. For student information controlled by
 a school, ItemTraxx will coordinate the request with that school or district.
 
+ItemTraxx does not alter its data collection or sharing practices in response to web browser Do Not
+Track (DNT) signals. You may independently control optional analytics and diagnostics data
+collection through the cookie consent banner on the ItemTraxx site.
+
 ---
 
 ## 12. Changes to This Policy
-We may update this Privacy Policy from time to time. Updates become effective when posted. Continued use of ItemTraxx after an update means the updated version applies to your continued use of the service.
+We may update this Privacy Policy from time to time. For material changes — those that meaningfully affect how we collect, use, or share your personal information — we will provide at least fourteen (14) days advance notice before the updated policy takes effect, by posting a notice on the ItemTraxx site or by email to the address associated with your account. Other updates become effective when posted. Continued use of ItemTraxx after an update means the updated version applies to your continued use of the service.
 
 ---
 
 ## 13. Contact
 For privacy questions or data-related inquiries, contact:
+
+**ItemTraxx Co**
+[COMPANY ADDRESS — TO BE COMPLETED]
 
 Contact Support via Website: [itemtraxx.com/contact-support](https://itemtraxx.com/contact-support)
 Privacy Request Form: [itemtraxx.com/privacy-request](https://itemtraxx.com/privacy-request)

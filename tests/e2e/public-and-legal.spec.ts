@@ -23,8 +23,8 @@ test.describe("Public surfaces", () => {
         name: "ItemTraxx Subscription Agreement and Policies",
       }),
     ).toBeVisible();
-    await expect(page.getByRole("heading", { name: "9. Billing and Subscription Terms" })).toBeVisible();
-    await expect(page.getByRole("heading", { name: "11. Indemnification" })).toBeVisible();
-    await expect(page.getByRole("heading", { name: "12. Force Majeure" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "11. Billing and Subscription Terms" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "13. Indemnification" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "14. Force Majeure" })).toBeVisible();
   });
 });

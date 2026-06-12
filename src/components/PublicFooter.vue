@@ -41,6 +41,7 @@
       </div>
       <div class="footer-column">
         <p class="footer-heading">Company</p>
+        <RouterLink to="/">Home</RouterLink>
         <RouterLink to="/contact">Contact</RouterLink>
         <RouterLink to="/compliance">Compliance</RouterLink>
         <RouterLink to="/legal">Legal</RouterLink>

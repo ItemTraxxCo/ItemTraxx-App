@@ -18,21 +18,21 @@
         <p class="compliance-eyebrow">Security and compliance overview</p>
         <h1>Public compliance mappings backed by current security monitoring.</h1>
         <p class="compliance-lead">
-          This page summarizes security control areas visible in the current ItemTraxx repository and
-          deployment configuration. It is not a certification, legal opinion, or guarantee of compliance.
+          This page summarizes compliance-related control areas that are supported by the April 2026
++         ItemTraxx Co security audit report prepared by Aikido Security. We don't play around about security.
         </p>
         <div class="compliance-meta-grid" aria-label="Compliance report summary">
           <article>
-            <span>Repository review</span>
-            <strong>June 2026</strong>
+            <span>Report date</span>
+            <strong>April 2026</strong>
+          </article>
+          <article>
+            <span>Aikido Security benchmark</span>
+            <strong>Top 5%</strong>
           </article>
           <article>
             <span>Automated scanning</span>
-            <strong>Configured</strong>
-          </article>
-          <article>
-            <span>Certification claim</span>
-            <strong>None</strong>
+            <strong>Active</strong>
           </article>
         </div>
       </section>
@@ -60,8 +60,8 @@
           <p class="compliance-section-label">Remediation SLA</p>
           <h2>Configured vulnerability response targets.</h2>
           <p>
-            These are internal remediation targets used for prioritization. They are not contractual
-            response guarantees unless included in a signed customer agreement.
+            These internal targets for security issue remediation are tracked through our issue tracker and are part of our overall 
+            security operations posture.
           </p>
         </div>
 
@@ -116,7 +116,7 @@ const complianceMappings = [
     category: "Application security",
     title: "OWASP Top 10 active measures",
     description:
-      "Current code contains controls relevant to OWASP Top 10 risk categories.",
+      "ItemTraxx contains controls relevant to OWASP Top 10 risk categories.",
     measures: [
       "Access control and authorization protections",
       "Encryption of data at rest and secure connections",
@@ -128,7 +128,7 @@ const complianceMappings = [
     category: "Baseline controls",
     title: "UK Cyber Essentials mapped controls",
     description:
-      "Current code and deployment configuration contain measures relevant to Cyber Essentials control areas, without claiming certification.",
+      "ItemTraxx contains measures relevant to Cyber Essentials control areas.",
     measures: [
       "Public access restrictions for file storage, databases, and network resources",
       "Proper resource access management, encryption at rest, SSL/TLS controls, and secure cookie usage",
@@ -140,7 +140,7 @@ const complianceMappings = [
     category: "Security operations",
     title: "CIS Controls v8.1 mapped controls",
     description:
-      "Current code contains control mappings for data protection, logging, recovery, and network restrictions.",
+      "ItemTraxx contains control mappings for data protection, logging, recovery, and network restrictions.",
     measures: [
       "Least-privilege cloud access and data access control lists",
       "Encryption of sensitive data in transit and at rest",
@@ -153,7 +153,7 @@ const complianceMappings = [
     category: "Operational resilience",
     title: "NIS2-aligned active measures",
     description:
-      "Current code contains measures relevant to incident handling, supply-chain hygiene, transport security, and access control, without claiming NIS2 compliance.",
+      "ItemTraxx contains measures relevant to incident handling, supply-chain hygiene, transport security, and access control.",
     measures: [
       "Monitoring for code repositories, container images, public domains, and repository exposure",
       "Incident tracking through an issue tracker and configured remediation SLAs",

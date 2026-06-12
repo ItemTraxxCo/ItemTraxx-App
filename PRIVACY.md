@@ -201,7 +201,7 @@ We may update this Privacy Policy from time to time. For material changes — th
 For privacy questions or data-related inquiries, contact:
 
 **ItemTraxx Co**
-[COMPANY ADDRESS — TO BE COMPLETED]
+670 San Antonio Rd, Palo Alto, CA 94306, USA
 
 Contact Support via Website: [itemtraxx.com/contact-support](https://itemtraxx.com/contact-support)
 Privacy Request Form: [itemtraxx.com/privacy-request](https://itemtraxx.com/privacy-request)

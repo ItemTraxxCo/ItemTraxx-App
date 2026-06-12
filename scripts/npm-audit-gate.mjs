@@ -11,12 +11,36 @@ const severityRank = {
 const minSeverity = process.env.ITX_AUDIT_MIN_SEVERITY ?? "moderate";
 const minSeverityRank = severityRank[minSeverity] ?? severityRank.moderate;
 
+const temporaryAllowlistExpiresAt = new Date("2026-07-12T00:00:00Z");
+const temporaryAllowedSources = [
+  // No patched esbuild release exists yet. ItemTraxx installs from the trusted npm
+  // registry with lifecycle scripts disabled in security/build CI, so the hostile
+  // NPM_CONFIG_REGISTRY precondition is not present. Remove once esbuild >=0.28.1
+  // is available. Tracking: https://github.com/advisories/GHSA-gv7w-rqvm-qjhr.
+  "1120679",
+];
+
+const usesTemporaryAllowlist =
+  process.env.ITX_AUDIT_ALLOW_SOURCES === undefined;
 const allowedSources = new Set(
-  (process.env.ITX_AUDIT_ALLOW_SOURCES ?? "")
+  (process.env.ITX_AUDIT_ALLOW_SOURCES ?? temporaryAllowedSources.join(","))
     .split(",")
     .map((value) => value.trim())
-    .filter(Boolean)
+    .filter(Boolean),
 );
+
+if (
+  usesTemporaryAllowlist &&
+  allowedSources.has("1120679") &&
+  Date.now() >= temporaryAllowlistExpiresAt.getTime()
+) {
+  console.error(
+    "[security] Temporary ITX_AUDIT_ALLOW_SOURCES exception 1120679 for " +
+      "GHSA-gv7w-rqvm-qjhr expired on 2026-07-12. Reassess and remove or " +
+      "explicitly renew the exception.",
+  );
+  process.exit(1);
+}
 
 const runNpmAuditJson = () => {
   try {
@@ -35,7 +59,11 @@ const reportRaw = runNpmAuditJson();
 const report = JSON.parse(reportRaw);
 const vulnerabilities = report.vulnerabilities ?? {};
 
-const isIgnoredBySource = (vulnerabilityName, vulnerability, visited = new Set()) => {
+const isIgnoredBySource = (
+  vulnerabilityName,
+  vulnerability,
+  visited = new Set(),
+) => {
   if (visited.has(vulnerabilityName)) {
     return false;
   }
@@ -46,12 +74,14 @@ const isIgnoredBySource = (vulnerabilityName, vulnerability, visited = new Set()
 
   return via.every((item) => {
     if (item && typeof item === "object" && "source" in item) {
+      const itemRank = severityRank[item.severity] ?? severityRank.info;
+      if (itemRank < minSeverityRank) return true;
       return allowedSources.has(String(item.source));
     }
     if (typeof item === "string") {
       const linked = vulnerabilities[item];
       if (!linked) return false;
-      return isIgnoredBySource(item, linked, visited);
+      return isIgnoredBySource(item, linked, new Set(visited));
     }
     return false;
   });
@@ -76,26 +106,37 @@ for (const [name, vulnerability] of Object.entries(vulnerabilities)) {
 if (blocking.length > 0) {
   console.error("[security] npm audit gate failed.");
   console.error(
-    `[security] Blocking vulnerabilities at or above '${minSeverity}': ${blocking.length}`
+    `[security] Blocking vulnerabilities at or above '${minSeverity}': ${blocking.length}`,
   );
   for (const vulnerability of blocking) {
-    const firstVia = Array.isArray(vulnerability.via) ? vulnerability.via[0] : null;
-    const title =
-      firstVia && typeof firstVia === "object" ? firstVia.title ?? vulnerability.name : vulnerability.name;
-    console.error(` - ${vulnerability.name} (${vulnerability.severity}): ${title}`);
+    const firstVia = Array.isArray(vulnerability.via)
+      ? vulnerability.via[0]
+      : null;
+    const title = firstVia && typeof firstVia === "object"
+      ? firstVia.title ?? vulnerability.name
+      : vulnerability.name;
+    console.error(
+      ` - ${vulnerability.name} (${vulnerability.severity}): ${title}`,
+    );
   }
   process.exit(1);
 }
 
 if (ignored.length > 0) {
   console.log(
-    `[security] npm audit gate passed with ignored advisory source(s): ${[...allowedSources].join(", ")}`
+    `[security] npm audit gate passed with ignored advisory source(s): ${
+      [...allowedSources].join(", ")
+    }`,
   );
   console.log(
-    `[security] Ignored vulnerabilities at or above '${minSeverity}': ${ignored
-      .map((vulnerability) => vulnerability.name)
-      .join(", ")}`
+    `[security] Ignored vulnerabilities at or above '${minSeverity}': ${
+      ignored
+        .map((vulnerability) => vulnerability.name)
+        .join(", ")
+    }`,
   );
 } else {
-  console.log(`[security] npm audit gate passed with no vulnerabilities at or above '${minSeverity}'.`);
+  console.log(
+    `[security] npm audit gate passed with no vulnerabilities at or above '${minSeverity}'.`,
+  );
 }

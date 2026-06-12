@@ -76,6 +76,41 @@ const parseEffectiveDateUtc = (value: string) => {
   return parsed;
 };
 
+const loadSubprocessorNoticeRecipients = async (
+  adminClient: SupabaseAdminClient,
+) => {
+  const [districtResult, leadResult] = await Promise.all([
+    adminClient
+      .from("districts")
+      .select("billing_email")
+      .eq("billing_status", "active")
+      .not("billing_email", "is", null),
+    adminClient
+      .from("sales_leads")
+      .select("reply_email")
+      .eq("lead_state", "converted_to_customer")
+      .not("reply_email", "is", null),
+  ]);
+
+  if (districtResult.error || leadResult.error) {
+    throw new Error("Unable to load subprocessor notice recipients.");
+  }
+
+  const recipients = new Set<string>();
+  for (const row of districtResult.data ?? []) {
+    if (typeof row.billing_email === "string" && row.billing_email.trim()) {
+      recipients.add(row.billing_email.trim().toLowerCase());
+    }
+  }
+  for (const row of leadResult.data ?? []) {
+    if (typeof row.reply_email === "string" && row.reply_email.trim()) {
+      recipients.add(row.reply_email.trim().toLowerCase());
+    }
+  }
+
+  return Array.from(recipients);
+};
+
 const getSafeSupportAttachmentPathParts = (attachment: {
   storage_bucket: string | null;
   storage_path: string | null;
@@ -360,14 +395,16 @@ serve(async (req) => {
       targetId: string | null,
       metadata: Record<string, unknown>,
     ) => {
-      const { error } = await adminClient.from("super_admin_audit_logs").insert({
-        actor_id: user.id,
-        actor_email: profile.auth_email ?? user.email ?? null,
-        action_type: actionType,
-        target_type: targetType,
-        target_id: targetId,
-        metadata,
-      });
+      const { error } = await adminClient.from("super_admin_audit_logs").insert(
+        {
+          actor_id: user.id,
+          actor_email: profile.auth_email ?? user.email ?? null,
+          action_type: actionType,
+          target_type: targetType,
+          target_id: targetId,
+          metadata,
+        },
+      );
       if (error) throw new Error("Unable to write security audit log.");
     };
 
@@ -1939,27 +1976,29 @@ serve(async (req) => {
           400,
         );
       }
-      const description = optionalText(payload.description, { maxLen: 2048 }) || undefined;
+      const description = optionalText(payload.description, { maxLen: 2048 }) ||
+        undefined;
 
-      const { count: districtCount } = await adminClient
-        .from("districts")
-        .select("billing_email", { count: "exact", head: true })
-        .eq("billing_status", "active")
-        .not("billing_email", "is", null);
-
-      const { count: leadCount } = await adminClient
-        .from("sales_leads")
-        .select("reply_email", { count: "exact", head: true })
-        .eq("lead_state", "converted_to_customer")
-        .not("reply_email", "is", null);
+      const recipients = await loadSubprocessorNoticeRecipients(adminClient);
 
       const logoUrl = Deno.env.get("ITX_EMAIL_LOGO_URL")?.trim() || null;
-      const legalHubUrl = Deno.env.get("ITX_LEGAL_HUB_URL")?.trim() || "https://www.itemtraxx.com/legal";
-      const contactSupportUrl = Deno.env.get("ITX_CONTACT_SUPPORT_URL")?.trim() || "https://www.itemtraxx.com/contact-support";
+      const legalHubUrl = Deno.env.get("ITX_LEGAL_HUB_URL")?.trim() ||
+        "https://www.itemtraxx.com/legal";
+      const contactSupportUrl =
+        Deno.env.get("ITX_CONTACT_SUPPORT_URL")?.trim() ||
+        "https://www.itemtraxx.com/contact-support";
 
       const preview = formatSubprocessorPreview(
-        { vendor, changeType, effectiveDate, description, logoUrl, legalHubUrl, contactSupportUrl },
-        (districtCount ?? 0) + (leadCount ?? 0),
+        {
+          vendor,
+          changeType,
+          effectiveDate,
+          description,
+          logoUrl,
+          legalHubUrl,
+          contactSupportUrl,
+        },
+        recipients.length,
       );
 
       return jsonResponse(200, { preview });
@@ -1988,38 +2027,23 @@ serve(async (req) => {
           400,
         );
       }
-      const description = optionalText(payload.description, { maxLen: 2048 }) || undefined;
+      const description = optionalText(payload.description, { maxLen: 2048 }) ||
+        undefined;
 
       const resendApiKey = Deno.env.get("ITX_RESEND_API_KEY");
       if (!resendApiKey) {
         return jsonResponse(503, { error: "Email service not configured." });
       }
-      const emailFrom = Deno.env.get("ITX_EMAIL_FROM") ?? "ItemTraxx <noreply@itemtraxx.com>";
+      const emailFrom = Deno.env.get("ITX_EMAIL_FROM") ??
+        "ItemTraxx <noreply@itemtraxx.com>";
       const logoUrl = Deno.env.get("ITX_EMAIL_LOGO_URL")?.trim() || null;
-      const legalHubUrl = Deno.env.get("ITX_LEGAL_HUB_URL")?.trim() || "https://www.itemtraxx.com/legal";
-      const contactSupportUrl = Deno.env.get("ITX_CONTACT_SUPPORT_URL")?.trim() || "https://www.itemtraxx.com/contact-support";
+      const legalHubUrl = Deno.env.get("ITX_LEGAL_HUB_URL")?.trim() ||
+        "https://www.itemtraxx.com/legal";
+      const contactSupportUrl =
+        Deno.env.get("ITX_CONTACT_SUPPORT_URL")?.trim() ||
+        "https://www.itemtraxx.com/contact-support";
 
-      // Collect customer emails from active districts and converted leads.
-      const { data: districtRows } = await adminClient
-        .from("districts")
-        .select("billing_email")
-        .eq("billing_status", "active")
-        .not("billing_email", "is", null);
-
-      const { data: leadRows } = await adminClient
-        .from("sales_leads")
-        .select("reply_email")
-        .eq("lead_state", "converted_to_customer")
-        .not("reply_email", "is", null);
-
-      const emailSet = new Set<string>();
-      for (const row of districtRows ?? []) {
-        if (typeof row.billing_email === "string") emailSet.add(row.billing_email.toLowerCase());
-      }
-      for (const row of leadRows ?? []) {
-        if (typeof row.reply_email === "string") emailSet.add(row.reply_email.toLowerCase());
-      }
-      const recipients = Array.from(emailSet);
+      const recipients = await loadSubprocessorNoticeRecipients(adminClient);
 
       // Create record in pending state before sending.
       const { data: changeRecord, error: insertError } = await adminClient
@@ -2036,45 +2060,63 @@ serve(async (req) => {
         .single();
 
       if (insertError || !changeRecord) {
-        return jsonResponse(500, { error: "Failed to create subprocessor change record." });
+        return jsonResponse(500, {
+          error: "Failed to create subprocessor change record.",
+        });
       }
       const changeId: string = changeRecord.id;
 
-      const noticePayload = { vendor, changeType, effectiveDate, description, logoUrl, legalHubUrl, contactSupportUrl };
+      const noticePayload = {
+        vendor,
+        changeType,
+        effectiveDate,
+        description,
+        logoUrl,
+        legalHubUrl,
+        contactSupportUrl,
+      };
       const subject = buildSubprocessorEmailSubject(vendor, changeType);
       const html = buildSubprocessorNoticeHtml(noticePayload);
       const text = buildSubprocessorNoticePlainText(noticePayload);
 
       let sentCount = 0;
-      const emailResults = await Promise.allSettled(
-        recipients.map((recipientEmail) =>
-          sendLoggedResendEmail(
-            adminClient,
-            resendApiKey,
-            { from: emailFrom, to: [recipientEmail], subject, html, text },
-            {
-              emailType: "subprocessor_change_notice",
-              recipientEmail,
-              subject,
-              provider: "resend",
-              requestContext: {
-                source: "super-ops/announce_subprocessor_change",
+      const emailBatchSize = 25;
+      for (
+        let offset = 0;
+        offset < recipients.length;
+        offset += emailBatchSize
+      ) {
+        const batch = recipients.slice(offset, offset + emailBatchSize);
+        const emailResults = await Promise.allSettled(
+          batch.map((recipientEmail) =>
+            sendLoggedResendEmail(
+              adminClient,
+              resendApiKey,
+              { from: emailFrom, to: [recipientEmail], subject, html, text },
+              {
+                emailType: "subprocessor_change_notice",
+                recipientEmail,
+                subject,
+                provider: "resend",
+                requestContext: {
+                  source: "super-ops/announce_subprocessor_change",
+                },
+                triggeredByUserId: user.id,
+                tenantId: null,
+                districtId: null,
+                metadata: { changeId, vendor, changeType, effectiveDate },
               },
-              triggeredByUserId: user.id,
-              tenantId: null,
-              districtId: null,
-              metadata: { changeId, vendor, changeType, effectiveDate },
-            },
-          )
-        ),
-      );
+            )
+          ),
+        );
 
-      for (const result of emailResults) {
-        if (result.status === "fulfilled") sentCount++;
+        for (const result of emailResults) {
+          if (result.status === "fulfilled") sentCount++;
+        }
       }
 
       const noticeSentAt = new Date().toISOString();
-      await adminClient
+      const { data: updatedChange, error: updateError } = await adminClient
         .from("subprocessor_changes")
         .update({
           status: recipients.length === 0 || sentCount > 0 ? "sent" : "failed",
@@ -2082,14 +2124,28 @@ serve(async (req) => {
           objection_deadline: effectiveDate,
           recipients_count: sentCount,
         })
-        .eq("id", changeId);
+        .eq("id", changeId)
+        .select("id")
+        .single();
 
-      await writeAudit("announce_subprocessor_change", "subprocessor_change", changeId, {
-        vendor,
-        changeType,
-        effectiveDate,
-        recipientsCount: sentCount,
-      });
+      if (updateError || !updatedChange) {
+        return jsonResponse(500, {
+          error:
+            "Notice delivery completed, but its status could not be saved.",
+        });
+      }
+
+      await writeAudit(
+        "announce_subprocessor_change",
+        "subprocessor_change",
+        changeId,
+        {
+          vendor,
+          changeType,
+          effectiveDate,
+          recipientsCount: sentCount,
+        },
+      );
 
       return jsonResponse(200, {
         changeId,
@@ -2107,15 +2163,22 @@ serve(async (req) => {
     if (action === "list_subprocessor_notices") {
       const { data: notices, error: listError } = await adminClient
         .from("subprocessor_changes")
-        .select("id,vendor,change_type,effective_date,description,notice_sent_at,objection_deadline,recipients_count,status,created_by_email,created_at")
+        .select(
+          "id,vendor,change_type,effective_date,description,notice_sent_at,objection_deadline,recipients_count,status,created_by_email,created_at",
+        )
         .order("created_at", { ascending: false })
         .limit(100);
 
       if (listError) {
         if (listError.code === "42P01") {
-          return jsonResponse(503, { error: "Subprocessor changes table not found. Run latest SQL setup." });
+          return jsonResponse(503, {
+            error:
+              "Subprocessor changes table not found. Run latest SQL setup.",
+          });
         }
-        return jsonResponse(500, { error: "Failed to fetch subprocessor notices." });
+        return jsonResponse(500, {
+          error: "Failed to fetch subprocessor notices.",
+        });
       }
 
       return jsonResponse(200, { notices: notices ?? [] });

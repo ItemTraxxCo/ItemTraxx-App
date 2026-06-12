@@ -60,6 +60,22 @@ type SafeSupportAttachmentPathParts = {
   extensionSegment: string;
 };
 
+const parseEffectiveDateUtc = (value: string) => {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    throw new ValidationError("effective_date must be YYYY-MM-DD", 400);
+  }
+  const [year, month, day] = value.split("-").map(Number);
+  const parsed = new Date(Date.UTC(year, month - 1, day));
+  if (
+    parsed.getUTCFullYear() !== year ||
+    parsed.getUTCMonth() !== month - 1 ||
+    parsed.getUTCDate() !== day
+  ) {
+    throw new ValidationError("effective_date must be a valid date", 400);
+  }
+  return parsed;
+};
+
 const getSafeSupportAttachmentPathParts = (attachment: {
   storage_bucket: string | null;
   storage_path: string | null;
@@ -1902,23 +1918,28 @@ serve(async (req) => {
 
     // ── Subprocessor notice: preview ────────────────────────────────────────────
     if (action === "preview_subprocessor_notice") {
-      const body = asRecord(await readJsonBody(req));
-      const vendor = requireText(body, "vendor", 256);
-      const rawChangeType = requireText(body, "change_type", 32);
+      const vendor = requireText(payload.vendor, { maxLen: 256 });
+      const rawChangeType = requireText(payload.change_type, { maxLen: 32 });
       if (!["added", "replaced", "removed"].includes(rawChangeType)) {
-        throw new ValidationError(400, "change_type must be 'added', 'replaced', or 'removed'");
+        throw new ValidationError(
+          "change_type must be 'added', 'replaced', or 'removed'",
+          400,
+        );
       }
       const changeType = rawChangeType as SubprocessorChangeType;
-      const effectiveDate = requireText(body, "effective_date", 10);
-      if (!/^\d{4}-\d{2}-\d{2}$/.test(effectiveDate)) {
-        throw new ValidationError(400, "effective_date must be YYYY-MM-DD");
+      const effectiveDate = requireText(payload.effective_date, { maxLen: 10 });
+      const effectiveDateUtc = parseEffectiveDateUtc(effectiveDate);
+      const todayUtc = new Date();
+      todayUtc.setUTCHours(0, 0, 0, 0);
+      const thirtyDaysOut = new Date(todayUtc);
+      thirtyDaysOut.setUTCDate(thirtyDaysOut.getUTCDate() + 30);
+      if (effectiveDateUtc < thirtyDaysOut) {
+        throw new ValidationError(
+          "effective_date must be at least 30 days from today",
+          400,
+        );
       }
-      const thirtyDaysOut = new Date();
-      thirtyDaysOut.setDate(thirtyDaysOut.getDate() + 30);
-      if (new Date(effectiveDate) < thirtyDaysOut) {
-        throw new ValidationError(400, "effective_date must be at least 30 days from today");
-      }
-      const description = optionalText(body, "description", 2048) ?? undefined;
+      const description = optionalText(payload.description, { maxLen: 2048 }) || undefined;
 
       const { count: districtCount } = await adminClient
         .from("districts")
@@ -1946,23 +1967,28 @@ serve(async (req) => {
 
     // ── Subprocessor notice: announce (sends emails + creates DB record) ─────────
     if (action === "announce_subprocessor_change") {
-      const body = asRecord(await readJsonBody(req));
-      const vendor = requireText(body, "vendor", 256);
-      const rawChangeType = requireText(body, "change_type", 32);
+      const vendor = requireText(payload.vendor, { maxLen: 256 });
+      const rawChangeType = requireText(payload.change_type, { maxLen: 32 });
       if (!["added", "replaced", "removed"].includes(rawChangeType)) {
-        throw new ValidationError(400, "change_type must be 'added', 'replaced', or 'removed'");
+        throw new ValidationError(
+          "change_type must be 'added', 'replaced', or 'removed'",
+          400,
+        );
       }
       const changeType = rawChangeType as SubprocessorChangeType;
-      const effectiveDate = requireText(body, "effective_date", 10);
-      if (!/^\d{4}-\d{2}-\d{2}$/.test(effectiveDate)) {
-        throw new ValidationError(400, "effective_date must be YYYY-MM-DD");
+      const effectiveDate = requireText(payload.effective_date, { maxLen: 10 });
+      const effectiveDateUtc = parseEffectiveDateUtc(effectiveDate);
+      const todayUtc = new Date();
+      todayUtc.setUTCHours(0, 0, 0, 0);
+      const thirtyDaysOut = new Date(todayUtc);
+      thirtyDaysOut.setUTCDate(thirtyDaysOut.getUTCDate() + 30);
+      if (effectiveDateUtc < thirtyDaysOut) {
+        throw new ValidationError(
+          "effective_date must be at least 30 days from today",
+          400,
+        );
       }
-      const thirtyDaysOut = new Date();
-      thirtyDaysOut.setDate(thirtyDaysOut.getDate() + 30);
-      if (new Date(effectiveDate) < thirtyDaysOut) {
-        throw new ValidationError(400, "effective_date must be at least 30 days from today");
-      }
-      const description = optionalText(body, "description", 2048) ?? undefined;
+      const description = optionalText(payload.description, { maxLen: 2048 }) || undefined;
 
       const resendApiKey = Deno.env.get("ITX_RESEND_API_KEY");
       if (!resendApiKey) {
@@ -2031,7 +2057,9 @@ serve(async (req) => {
               recipientEmail,
               subject,
               provider: "resend",
-              requestContext: "super-ops/announce_subprocessor_change",
+              requestContext: {
+                source: "super-ops/announce_subprocessor_change",
+              },
               triggeredByUserId: user.id,
               tenantId: null,
               districtId: null,

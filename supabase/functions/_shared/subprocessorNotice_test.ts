@@ -1,4 +1,7 @@
-import { assertEquals, assertStringIncludes } from "https://deno.land/std@0.177.0/testing/asserts.ts";
+import {
+  assertEquals,
+  assertStringIncludes,
+} from "https://deno.land/std@0.177.0/testing/asserts.ts";
 import {
   buildSubprocessorEmailSubject,
   buildSubprocessorNoticeHtml,
@@ -47,6 +50,25 @@ Deno.test("buildSubprocessorNoticeHtml: contains effective date", () => {
   assertStringIncludes(html, "August 1, 2026");
 });
 
+Deno.test("buildSubprocessorNoticeHtml: preserves malformed date safely", () => {
+  const html = buildSubprocessorNoticeHtml({
+    ...BASE,
+    effectiveDate: "not-a-date",
+  });
+  assertStringIncludes(html, "not-a-date");
+  assertEquals(html.includes("undefined"), false);
+  assertEquals(html.includes("NaN"), false);
+});
+
+Deno.test("buildSubprocessorNoticeHtml: preserves invalid calendar date safely", () => {
+  const html = buildSubprocessorNoticeHtml({
+    ...BASE,
+    effectiveDate: "2026-02-31",
+  });
+  assertStringIncludes(html, "2026-02-31");
+  assertEquals(html.includes("March 3, 2026"), false);
+});
+
 Deno.test("buildSubprocessorNoticeHtml: contains change type label for added", () => {
   const html = buildSubprocessorNoticeHtml(BASE);
   assertStringIncludes(html, "has been added as a subprocessor");
@@ -63,7 +85,10 @@ Deno.test("buildSubprocessorNoticeHtml: contains change type label for removed",
 });
 
 Deno.test("buildSubprocessorNoticeHtml: optional description rendered", () => {
-  const html = buildSubprocessorNoticeHtml({ ...BASE, description: "Used for transactional email delivery." });
+  const html = buildSubprocessorNoticeHtml({
+    ...BASE,
+    description: "Used for transactional email delivery.",
+  });
   assertStringIncludes(html, "Used for transactional email delivery.");
 });
 
@@ -73,24 +98,36 @@ Deno.test("buildSubprocessorNoticeHtml: omits description block when absent", ()
 });
 
 Deno.test("buildSubprocessorNoticeHtml: escapes HTML in vendor name", () => {
-  const html = buildSubprocessorNoticeHtml({ ...BASE, vendor: '<script>alert("xss")</script>' });
+  const html = buildSubprocessorNoticeHtml({
+    ...BASE,
+    vendor: '<script>alert("xss")</script>',
+  });
   assertEquals(html.includes("<script>"), false);
   assertStringIncludes(html, "&lt;script&gt;");
 });
 
 Deno.test("buildSubprocessorNoticeHtml: escapes HTML in description", () => {
-  const html = buildSubprocessorNoticeHtml({ ...BASE, description: '<img src=x onerror="bad()">' });
+  const html = buildSubprocessorNoticeHtml({
+    ...BASE,
+    description: '<img src=x onerror="bad()">',
+  });
   assertEquals(html.includes("<img"), false);
   assertStringIncludes(html, "&lt;img");
 });
 
 Deno.test("buildSubprocessorNoticeHtml: custom legalHubUrl used", () => {
-  const html = buildSubprocessorNoticeHtml({ ...BASE, legalHubUrl: "https://example.com/dpa" });
+  const html = buildSubprocessorNoticeHtml({
+    ...BASE,
+    legalHubUrl: "https://example.com/dpa",
+  });
   assertStringIncludes(html, "https://example.com/dpa");
 });
 
 Deno.test("buildSubprocessorNoticeHtml: custom contactSupportUrl used", () => {
-  const html = buildSubprocessorNoticeHtml({ ...BASE, contactSupportUrl: "https://example.com/support" });
+  const html = buildSubprocessorNoticeHtml({
+    ...BASE,
+    contactSupportUrl: "https://example.com/support",
+  });
   assertStringIncludes(html, "https://example.com/support");
 });
 
@@ -101,7 +138,10 @@ Deno.test("buildSubprocessorNoticeHtml: falls back to default URLs", () => {
 });
 
 Deno.test("buildSubprocessorNoticeHtml: logo img rendered when logoUrl provided", () => {
-  const html = buildSubprocessorNoticeHtml({ ...BASE, logoUrl: "https://example.com/logo.png" });
+  const html = buildSubprocessorNoticeHtml({
+    ...BASE,
+    logoUrl: "https://example.com/logo.png",
+  });
   assertStringIncludes(html, 'src="https://example.com/logo.png"');
 });
 
@@ -119,7 +159,10 @@ Deno.test("buildSubprocessorNoticePlainText: contains vendor and date", () => {
 });
 
 Deno.test("buildSubprocessorNoticePlainText: optional description present", () => {
-  const text = buildSubprocessorNoticePlainText({ ...BASE, description: "For email delivery." });
+  const text = buildSubprocessorNoticePlainText({
+    ...BASE,
+    description: "For email delivery.",
+  });
   assertStringIncludes(text, "For email delivery.");
 });
 

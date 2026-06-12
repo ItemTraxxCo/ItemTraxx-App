@@ -39,10 +39,29 @@ function changeTypeSuffix(t: SubprocessorChangeType): string {
 }
 
 function formatDateLabel(iso: string): string {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(iso)) return iso;
   const [year, month, day] = iso.split("-").map(Number);
+  const parsed = new Date(Date.UTC(year, month - 1, day));
+  if (
+    parsed.getUTCFullYear() !== year ||
+    parsed.getUTCMonth() !== month - 1 ||
+    parsed.getUTCDate() !== day
+  ) {
+    return iso;
+  }
   const months = [
-    "January", "February", "March", "April", "May", "June",
-    "July", "August", "September", "October", "November", "December",
+    "January",
+    "February",
+    "March",
+    "April",
+    "May",
+    "June",
+    "July",
+    "August",
+    "September",
+    "October",
+    "November",
+    "December",
   ];
   return `${months[month - 1]} ${day}, ${year}`;
 }
@@ -51,20 +70,29 @@ export function buildSubprocessorEmailSubject(
   vendor: string,
   changeType: SubprocessorChangeType,
 ): string {
-  return `ItemTraxx Data Processing Notice: Subprocessor ${changeTypeSuffix(changeType)} — ${vendor}`;
+  return `ItemTraxx Data Processing Notice: Subprocessor ${
+    changeTypeSuffix(changeType)
+  } — ${vendor}`;
 }
 
-export function buildSubprocessorNoticeHtml(p: SubprocessorNoticePayload): string {
+export function buildSubprocessorNoticeHtml(
+  p: SubprocessorNoticePayload,
+): string {
   const legalHubUrl = p.legalHubUrl ?? "https://www.itemtraxx.com/legal";
-  const contactSupportUrl = p.contactSupportUrl ?? "https://www.itemtraxx.com/contact-support";
+  const contactSupportUrl = p.contactSupportUrl ??
+    "https://www.itemtraxx.com/contact-support";
   const effectiveDateLabel = formatDateLabel(p.effectiveDate);
   const vendorSafe = escapeHtml(p.vendor);
   const descriptionBlock = p.description
-    ? `<tr><td style="padding:0 0 10px;font-size:14px;color:#444444;line-height:1.6;"><strong>Details:</strong> ${escapeHtml(p.description)}</td></tr>`
+    ? `<tr><td style="padding:0 0 10px;font-size:14px;color:#444444;line-height:1.6;"><strong>Details:</strong> ${
+      escapeHtml(p.description)
+    }</td></tr>`
     : "";
 
   const logoBlock = p.logoUrl
-    ? `<img src="${escapeHtml(p.logoUrl)}" alt="ItemTraxx" height="40" style="display:block;border:0;" />`
+    ? `<img src="${
+      escapeHtml(p.logoUrl)
+    }" alt="ItemTraxx" height="40" style="display:block;border:0;" />`
     : `<span style="font-size:18px;font-weight:700;color:#111111;">ItemTraxx</span>`;
 
   return `<!DOCTYPE html>
@@ -86,7 +114,9 @@ export function buildSubprocessorNoticeHtml(p: SubprocessorNoticePayload): strin
                 <tr>
                   <td style="padding:0 0 16px;">
                     <h1 style="margin:0;font-size:20px;font-weight:700;color:#111111;line-height:1.3;">
-                      Data Processing Notice: Subprocessor ${escapeHtml(changeTypeSuffix(p.changeType))}
+                      Data Processing Notice: Subprocessor ${
+    escapeHtml(changeTypeSuffix(p.changeType))
+  }
                     </h1>
                   </td>
                 </tr>
@@ -108,12 +138,16 @@ export function buildSubprocessorNoticeHtml(p: SubprocessorNoticePayload): strin
                       </tr>
                       <tr>
                         <td style="padding:0 0 10px;font-size:14px;color:#444444;line-height:1.6;">
-                          <strong>Change:</strong> ${vendorSafe} ${escapeHtml(changeTypeLabel(p.changeType))}
+                          <strong>Change:</strong> ${vendorSafe} ${
+    escapeHtml(changeTypeLabel(p.changeType))
+  }
                         </td>
                       </tr>
                       <tr>
                         <td style="padding:0 0 10px;font-size:14px;color:#444444;line-height:1.6;">
-                          <strong>Effective date:</strong> ${escapeHtml(effectiveDateLabel)}
+                          <strong>Effective date:</strong> ${
+    escapeHtml(effectiveDateLabel)
+  }
                         </td>
                       </tr>
                       ${descriptionBlock}
@@ -123,7 +157,9 @@ export function buildSubprocessorNoticeHtml(p: SubprocessorNoticePayload): strin
                 <tr>
                   <td style="padding:0 0 20px;font-size:15px;color:#444444;line-height:1.6;">
                     Under your Data Processing Addendum, you may object to this change in writing before
-                    the effective date (<strong>${escapeHtml(effectiveDateLabel)}</strong>). If you have
+                    the effective date (<strong>${
+    escapeHtml(effectiveDateLabel)
+  }</strong>). If you have
                     questions, wish to object, or need a copy of the updated DPA, please contact us.
                   </td>
                 </tr>
@@ -164,13 +200,18 @@ export function buildSubprocessorNoticeHtml(p: SubprocessorNoticePayload): strin
 </html>`;
 }
 
-export function buildSubprocessorNoticePlainText(p: SubprocessorNoticePayload): string {
+export function buildSubprocessorNoticePlainText(
+  p: SubprocessorNoticePayload,
+): string {
   const legalHubUrl = p.legalHubUrl ?? "https://www.itemtraxx.com/legal";
-  const contactSupportUrl = p.contactSupportUrl ?? "https://www.itemtraxx.com/contact-support";
+  const contactSupportUrl = p.contactSupportUrl ??
+    "https://www.itemtraxx.com/contact-support";
   const effectiveDateLabel = formatDateLabel(p.effectiveDate);
   const descriptionLine = p.description ? `Details: ${p.description}\n` : "";
 
-  return `ItemTraxx Data Processing Notice: Subprocessor ${changeTypeSuffix(p.changeType)}
+  return `ItemTraxx Data Processing Notice: Subprocessor ${
+    changeTypeSuffix(p.changeType)
+  }
 
 You are receiving this notice because your organization has an active ItemTraxx service agreement
 that includes a Data Processing Addendum. Under that agreement, ItemTraxx is required to notify

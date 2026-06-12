@@ -360,7 +360,7 @@
         <h2>19. Contact</h2>
         <p>
           <strong>ItemTraxx Co</strong><br />
-          [COMPANY ADDRESS — TO BE COMPLETED]
+          670 San Antonio Rd, Palo Alto, CA 94306, USA
         </p>
         <p>
           For legal, privacy, and security inquiries, please

@@ -19,7 +19,7 @@
         <h1>Public compliance mappings backed by current security monitoring.</h1>
         <p class="compliance-lead">
           This page summarizes compliance-related control areas that are supported by the April 2026
-          ItemTraxx Co security audit report put together by our security service, Aikido Security. We dont play around about security.
++         ItemTraxx Co security audit report prepared by Aikido Security. We don't play around about security.
         </p>
         <div class="compliance-meta-grid" aria-label="Compliance report summary">
           <article>

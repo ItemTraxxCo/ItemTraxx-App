@@ -169,7 +169,7 @@ We target acknowledgment within 10 business days and a substantive response with
 days, unless a different period applies or a permitted extension is necessary. We will explain any
 denial or limitation required by law, contract, security, or a school customer's instructions.
 
-If ItemTraxx becomes aware of a security incident that may have compromised your personal information, we will notify affected individuals or account holders as required by applicable law, including California Civil Code §1798.29 and §1798.82. Notification will be provided via email to the address associated with your account, or by an alternative method if required by law or if email is not available.
+If ItemTraxx becomes aware of a security incident that may have compromised your personal information, we will notify affected individuals or account holders as required by applicable law, including California Civil Code §1798.29 and §1798.82. Notification will be provided via email to the address associated with your account, or by an alternative method if required by law or if email is not available. For customers operating under an executed Data Processing Addendum (DPA), incident-notification timelines are governed by that agreement, which sets a default of notifying the customer without undue delay and, where feasible, within seventy-two (72) hours of becoming aware of the incident; the DPA controls where its terms differ from this general statement.
 
 ---
 

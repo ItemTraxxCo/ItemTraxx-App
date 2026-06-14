@@ -90,7 +90,7 @@ begin
 end;
 $$;
 
-revoke all on function public.run_data_retention() from public;
+revoke all on function public.run_data_retention() from public, anon, authenticated;
 grant execute on function public.run_data_retention() to service_role;
 
 create extension if not exists pg_cron;

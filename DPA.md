@@ -1,6 +1,6 @@
 # ItemTraxx Data Processing Addendum Template
 
-Last updated: 2026-06-11 (year-month-day)
+Last updated: 2026-06-15 (year-month-day)
 
 **Status: Contract template requiring qualified legal review before execution.**
 
@@ -58,13 +58,17 @@ records will be referred to or coordinated with Customer.
 
 ItemTraxx maintains monitoring, escalation, and incident-notification tooling. If ItemTraxx becomes
 aware of a security incident reasonably likely to have compromised Customer Data, ItemTraxx will
-notify Customer without undue delay and, where feasible, within seventy-two (72) hours of becoming
-aware of the incident. Notification will include a description of the incident, the categories and
-approximate volume of data affected (to the extent known), and the measures taken or proposed to
-address the incident. The executed agreement may specify additional notice contacts, required
-information, or a different notification deadline; absent such specification, the seventy-two-hour
-default applies. ItemTraxx's notification obligation does not extend to incidents affecting only
-non-Customer infrastructure or publicly available information.
+notify Customer without undue delay and, unless a shorter period is required by applicable law or
+law-enforcement delay applies, no later than thirty (30) calendar days after becoming aware of the
+incident. Notification will include a description of the incident and
+approximate data affected (to the extent known), and the recommended measures to be taken by affected users (to the extent known).
+The executed agreement may specify additional notice contacts, required
+information, or a shorter notification deadline; absent such specification, the thirty (30) day
+period and described content requirements will apply. If processing is subject to GDPR or similar
+law, any regulator or supervisory-authority notification obligation remains independently binding
+and is not limited by this customer-notification timeline. ItemTraxx's notification obligation does
+not extend to incidents affecting only non-Customer infrastructure or publicly available
+information.
 
 ## 8. Retention, Return, and Deletion
 

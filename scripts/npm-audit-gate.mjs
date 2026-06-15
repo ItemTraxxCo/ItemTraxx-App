@@ -11,36 +11,12 @@ const severityRank = {
 const minSeverity = process.env.ITX_AUDIT_MIN_SEVERITY ?? "moderate";
 const minSeverityRank = severityRank[minSeverity] ?? severityRank.moderate;
 
-const temporaryAllowlistExpiresAt = new Date("2026-07-12T00:00:00Z");
-const temporaryAllowedSources = [
-  // No patched esbuild release exists yet. ItemTraxx installs from the trusted npm
-  // registry with lifecycle scripts disabled in security/build CI, so the hostile
-  // NPM_CONFIG_REGISTRY precondition is not present. Remove once esbuild >=0.28.1
-  // is available. Tracking: https://github.com/advisories/GHSA-gv7w-rqvm-qjhr.
-  "1120679",
-];
-
-const usesTemporaryAllowlist =
-  process.env.ITX_AUDIT_ALLOW_SOURCES === undefined;
 const allowedSources = new Set(
-  (process.env.ITX_AUDIT_ALLOW_SOURCES ?? temporaryAllowedSources.join(","))
+  (process.env.ITX_AUDIT_ALLOW_SOURCES ?? "")
     .split(",")
     .map((value) => value.trim())
     .filter(Boolean),
 );
-
-if (
-  usesTemporaryAllowlist &&
-  allowedSources.has("1120679") &&
-  Date.now() >= temporaryAllowlistExpiresAt.getTime()
-) {
-  console.error(
-    "[security] Temporary ITX_AUDIT_ALLOW_SOURCES exception 1120679 for " +
-      "GHSA-gv7w-rqvm-qjhr expired on 2026-07-12. Reassess and remove or " +
-      "explicitly renew the exception.",
-  );
-  process.exit(1);
-}
 
 const runNpmAuditJson = () => {
   try {

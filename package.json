@@ -29,15 +29,15 @@
     "deploy": "npm run build && wrangler deploy"
   },
   "dependencies": {
-    "@posthog/react": "^1.10.1",
-    "@sentry/vue": "^10.57.0",
-    "@supabase/supabase-js": "^2.108.0",
+    "@posthog/react": "^1.10.2",
+    "@sentry/vue": "^10.58.0",
+    "@supabase/supabase-js": "^2.108.2",
     "@vercel/analytics": "^2.0.1",
     "@vercel/speed-insights": "^2.0.0",
     "jsbarcode": "^3.12.3",
     "jspdf": "^4.2.1",
     "jspdf-autotable": "^5.0.8",
-    "posthog-js": "^1.386.6",
+    "posthog-js": "^1.386.8",
     "vue": "^3.5.38",
     "vue-router": "^4.6.4",
     "zod": "^4.4.3"
@@ -45,7 +45,7 @@
   "devDependencies": {
     "@cloudflare/vite-plugin": "^1.40.2",
     "@cyclonedx/cyclonedx-npm": "4.2.1",
-    "@playwright/test": "^1.60.0",
+    "@playwright/test": "^1.61.0",
     "@types/node": "^25.9.3",
     "@vitejs/plugin-vue": "^6.0.7",
     "@vue/tsconfig": "^0.9.1",

@@ -58,6 +58,7 @@
     "zod-to-json-schema": "^3.25.2"
   },
   "overrides": {
+    "esbuild": "0.28.1",
     "tar": "^7.5.10",
     "protobufjs@<=8.2.0": "8.2.0",
     "ws": "^8.20.1",

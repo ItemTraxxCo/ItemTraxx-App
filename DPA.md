@@ -62,9 +62,7 @@ notify Customer without undue delay and, where feasible, within sixty (60) days 
 aware of the incident. Notification will include a description of the incident and
 approximate data affected (to the extent known), and the recommended measures to be taken by affected users (to the extent known).
 The executed agreement may specify additional notice contacts, required
-information, or a different notification deadline; absent such specification, the seventy-two-hour
-default applies. ItemTraxx's notification obligation does not extend to incidents affecting only
-non-Customer infrastructure or publicly available information.
+information, or a different notification deadline; absent such specification, the sixty (60) day period and described content requirements will apply. ItemTraxx's notification obligation does not extend to incidents affecting only non-Customer infrastructure or publicly available information.
 
 ## 8. Retention, Return, and Deletion
 

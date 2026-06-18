@@ -4,7 +4,10 @@ import { isKillSwitchWriteBlocked } from "../_shared/killSwitch.ts";
 import { getRequestId, logError, logInfo } from "../_shared/observability.ts";
 import { isAllowedOrigin, parseAllowedOrigins } from "../_shared/cors.ts";
 import { readJsonBody } from "../_shared/requestBody.ts";
-import { resolveClientIp } from "../_shared/preloginGuards.ts";
+import {
+  resolveClientIp,
+  verifyTurnstileToken,
+} from "../_shared/preloginGuards.ts";
 import { requireTrustedEdgeIngress } from "../_shared/trustedIngress.ts";
 import {
   optionalEnum,
@@ -26,11 +29,6 @@ const baseCorsHeaders = {
 type RateLimitResult = {
   allowed: boolean;
   retry_after_seconds: number | null;
-};
-
-type TurnstileVerifyResult = {
-  success: boolean;
-  "error-codes"?: string[];
 };
 
 type ContactPayload = {
@@ -72,7 +70,9 @@ const SALES_PLAN_LABELS = {
   other: "Other",
 } as const;
 type SalesPlanKey = keyof typeof SALES_PLAN_LABELS;
-const SALES_PLAN_KEYS = new Set(Object.keys(SALES_PLAN_LABELS) as SalesPlanKey[]);
+const SALES_PLAN_KEYS = new Set(
+  Object.keys(SALES_PLAN_LABELS) as SalesPlanKey[],
+);
 const CONTACT_INTENTS = new Set(["sales", "demo"] as const);
 
 const toHex = (bytes: Uint8Array) =>
@@ -88,47 +88,19 @@ const hashString = async (value: string) => {
 
 const resolveCorsHeaders = (req: Request) => {
   const origin = req.headers.get("Origin");
-  const allowedOrigins = parseAllowedOrigins(Deno.env.get("ITX_ALLOWED_ORIGINS"));
-
-  const hasOrigin = !!origin;
-  const originAllowed =
-    !hasOrigin || (hasOrigin && isAllowedOrigin(origin as string, allowedOrigins));
-
-  const headers =
-    hasOrigin && originAllowed
-      ? { ...baseCorsHeaders, "Access-Control-Allow-Origin": origin as string }
-      : { ...baseCorsHeaders };
-
-  return { hasOrigin, originAllowed, headers };
-};
-
-const verifyTurnstileToken = async (
-  secret: string,
-  token: string,
-  remoteIp: string
-) => {
-  const params = new URLSearchParams();
-  params.set("secret", secret);
-  params.set("response", token);
-  if (remoteIp) {
-    params.set("remoteip", remoteIp);
-  }
-
-  const response = await fetch(
-    "https://challenges.cloudflare.com/turnstile/v0/siteverify",
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: params.toString(),
-    }
+  const allowedOrigins = parseAllowedOrigins(
+    Deno.env.get("ITX_ALLOWED_ORIGINS"),
   );
 
-  if (!response.ok) {
-    return false;
-  }
+  const hasOrigin = !!origin;
+  const originAllowed = !hasOrigin ||
+    (hasOrigin && isAllowedOrigin(origin as string, allowedOrigins));
 
-  const result = (await response.json()) as TurnstileVerifyResult;
-  return !!result.success;
+  const headers = hasOrigin && originAllowed
+    ? { ...baseCorsHeaders, "Access-Control-Allow-Origin": origin as string }
+    : { ...baseCorsHeaders };
+
+  return { hasOrigin, originAllowed, headers };
 };
 
 serve(async (req) => {
@@ -168,16 +140,18 @@ serve(async (req) => {
   if (ingressError) return ingressError;
 
   if (isKillSwitchWriteBlocked(req)) {
-    return jsonResponse(503, { error: "Unfortunately ItemTraxx is currently unavailable." });
+    return jsonResponse(503, {
+      error: "Unfortunately ItemTraxx is currently unavailable.",
+    });
   }
 
   try {
     const supabaseUrl = Deno.env.get("ITX_SUPABASE_URL");
     const publishableKey = Deno.env.get("ITX_PUBLISHABLE_KEY");
     const serviceKey = Deno.env.get("ITX_SECRET_KEY");
-    const supportEmail = Deno.env.get("ITX_SUPPORT_EMAIL") ?? "support@itemtraxx.com";
-    const fromEmail =
-      Deno.env.get("ITX_EMAIL_FROM") ??
+    const supportEmail = Deno.env.get("ITX_SUPPORT_EMAIL") ??
+      "support@itemtraxx.com";
+    const fromEmail = Deno.env.get("ITX_EMAIL_FROM") ??
       Deno.env.get("ITX_RESEND_FROM") ??
       "ItemTraxx Sales <support@itemtraxx.com>";
 
@@ -204,9 +178,15 @@ serve(async (req) => {
     if (!name || !replyEmail || !isEmail(replyEmail)) {
       return jsonResponse(400, { error: "Name and valid email are required." });
     }
-    const organizationRequired = !["individual_yearly", "individual_monthly", "other"].includes(plan);
+    const organizationRequired = ![
+      "individual_yearly",
+      "individual_monthly",
+      "other",
+    ].includes(plan);
     if (organizationRequired && !organization) {
-      return jsonResponse(400, { error: "Organization is required for this plan." });
+      return jsonResponse(400, {
+        error: "Organization is required for this plan.",
+      });
     }
     if (
       (plan === "district_enterprise" || plan === "organization_enterprise") &&
@@ -215,10 +195,9 @@ serve(async (req) => {
       return jsonResponse(
         400,
         {
-          error:
-            plan === "district_enterprise"
-              ? "Number of schools is required for district enterprise."
-              : "Number of locations or teams is required for organization enterprise.",
+          error: plan === "district_enterprise"
+            ? "Number of schools is required for district enterprise."
+            : "Number of locations or teams is required for organization enterprise.",
         },
       );
     }
@@ -227,7 +206,9 @@ serve(async (req) => {
     });
 
     const clientIp = resolveClientIp(req);
-    const fingerprintSource = `${clientIp}|${replyEmail}|${req.headers.get("user-agent") ?? ""}`;
+    const fingerprintSource = `${clientIp}|${replyEmail}|${
+      req.headers.get("user-agent") ?? ""
+    }`;
     const fingerprint = await hashString(fingerprintSource);
 
     const { data: rateLimit, error: rateLimitError } = await adminClient.rpc(
@@ -237,17 +218,23 @@ serve(async (req) => {
         p_scope: "contact_sales_submit",
         p_limit: 5,
         p_window_seconds: 3600,
-      }
+      },
     );
     if (rateLimitError) {
       return jsonResponse(500, { error: "Rate limit check failed." });
     }
     const rateLimitResult = rateLimit as RateLimitResult;
     if (!rateLimitResult.allowed) {
-      return jsonResponse(429, { error: "Too many requests. Please try again later." });
+      return jsonResponse(429, {
+        error: "Too many requests. Please try again later.",
+      });
     }
 
-    const verified = await verifyTurnstileToken(turnstileToken, clientIp, "contact-sales-submit");
+    const verified = await verifyTurnstileToken(
+      turnstileToken,
+      clientIp,
+      "contact-sales-submit",
+    );
     if (!verified) {
       return jsonResponse(403, { error: "Security check failed." });
     }
@@ -275,7 +262,11 @@ serve(async (req) => {
       .single();
 
     if (insertError || !lead) {
-      logError("contact-sales-submit insert failed", requestId, insertError ?? "missing lead row");
+      logError(
+        "contact-sales-submit insert failed",
+        requestId,
+        insertError ?? "missing lead row",
+      );
       return jsonResponse(400, { error: "Unable to save sales request." });
     }
 
@@ -305,7 +296,11 @@ serve(async (req) => {
       return jsonResponse(500, { error: "Unable to queue follow-up email." });
     }
 
-    logInfo("contact-sales-submit accepted", requestId, { lead_id: lead.id, plan, intent });
+    logInfo("contact-sales-submit accepted", requestId, {
+      lead_id: lead.id,
+      plan,
+      intent,
+    });
     return jsonResponse(200, { data: { lead_id: lead.id } });
   } catch (error) {
     if (error instanceof ValidationError) {

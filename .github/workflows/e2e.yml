@@ -73,9 +73,8 @@ jobs:
         run: npx playwright install chromium
 
       - name: Install Playwright system dependencies
-        timeout-minutes: 3
         run: |
-          npx playwright install-deps chromium || {
+          timeout 180s npx playwright install-deps chromium || {
             echo "::warning::Playwright system dependency install failed or timed out; continuing so E2E can verify whether the runner already has the required libraries."
           }
 

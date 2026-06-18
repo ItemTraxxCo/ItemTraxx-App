@@ -4,7 +4,10 @@ import { isKillSwitchWriteBlocked } from "../_shared/killSwitch.ts";
 import { getRequestId, logError, logInfo } from "../_shared/observability.ts";
 import { isAllowedOrigin, parseAllowedOrigins } from "../_shared/cors.ts";
 import { readJsonBody } from "../_shared/requestBody.ts";
-import { resolveClientIp } from "../_shared/preloginGuards.ts";
+import {
+  resolveClientIp,
+  verifyTurnstileToken,
+} from "../_shared/preloginGuards.ts";
 import { requireTrustedEdgeIngress } from "../_shared/trustedIngress.ts";
 import {
   optionalText,
@@ -26,16 +29,18 @@ type RateLimitResult = {
   retry_after_seconds: number | null;
 };
 
-type TurnstileVerifyResult = {
-  success: boolean;
-  "error-codes"?: string[];
-};
-
 type SupportPayload = {
   name?: string;
   reply_email?: string;
   subject?: string;
-  category?: "general" | "bug" | "billing" | "access" | "feature" | "privacy" | "other";
+  category?:
+    | "general"
+    | "bug"
+    | "billing"
+    | "access"
+    | "feature"
+    | "privacy"
+    | "other";
   message?: string;
   turnstile_token?: string;
   website?: string;
@@ -73,11 +78,25 @@ const normalizeText = (value: unknown, max = 5000) => {
 };
 
 const isEmail = (value: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
-const SUPPORT_CATEGORIES = new Set(["general", "bug", "billing", "access", "feature", "privacy", "other"] as const);
+const SUPPORT_CATEGORIES = new Set(
+  [
+    "general",
+    "bug",
+    "billing",
+    "access",
+    "feature",
+    "privacy",
+    "other",
+  ] as const,
+);
 const base64Pattern = /^[A-Za-z0-9+/]+={0,2}$/;
 const estimateBase64DecodedBytes = (value: string) => {
   const normalized = value.replace(/\s+/g, "");
-  const padding = normalized.endsWith("==") ? 2 : normalized.endsWith("=") ? 1 : 0;
+  const padding = normalized.endsWith("==")
+    ? 2
+    : normalized.endsWith("=")
+    ? 1
+    : 0;
   return Math.floor((normalized.length * 3) / 4) - padding;
 };
 
@@ -90,7 +109,9 @@ const decodeBase64 = (value: string) => {
   return bytes;
 };
 
-const detectAttachmentType = (bytes: Uint8Array): DetectedAttachmentType | null => {
+const detectAttachmentType = (
+  bytes: Uint8Array,
+): DetectedAttachmentType | null => {
   if (
     bytes.length >= 8 &&
     bytes[0] === 0x89 &&
@@ -180,44 +201,19 @@ const buildSafeStoragePath = (
 
 const resolveCorsHeaders = (req: Request) => {
   const origin = req.headers.get("Origin");
-  const allowedOrigins = parseAllowedOrigins(Deno.env.get("ITX_ALLOWED_ORIGINS"));
-
-  const hasOrigin = !!origin;
-  const originAllowed =
-    !hasOrigin || (hasOrigin && isAllowedOrigin(origin as string, allowedOrigins));
-
-  const headers =
-    hasOrigin && originAllowed
-      ? { ...baseCorsHeaders, "Access-Control-Allow-Origin": origin as string }
-      : { ...baseCorsHeaders };
-
-  return { hasOrigin, originAllowed, headers };
-};
-
-const verifyTurnstileToken = async (
-  secret: string,
-  token: string,
-  remoteIp: string,
-) => {
-  const params = new URLSearchParams();
-  params.set("secret", secret);
-  params.set("response", token);
-  if (remoteIp) {
-    params.set("remoteip", remoteIp);
-  }
-
-  const response = await fetch(
-    "https://challenges.cloudflare.com/turnstile/v0/siteverify",
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: params.toString(),
-    },
+  const allowedOrigins = parseAllowedOrigins(
+    Deno.env.get("ITX_ALLOWED_ORIGINS"),
   );
 
-  if (!response.ok) return false;
-  const result = (await response.json()) as TurnstileVerifyResult;
-  return !!result.success;
+  const hasOrigin = !!origin;
+  const originAllowed = !hasOrigin ||
+    (hasOrigin && isAllowedOrigin(origin as string, allowedOrigins));
+
+  const headers = hasOrigin && originAllowed
+    ? { ...baseCorsHeaders, "Access-Control-Allow-Origin": origin as string }
+    : { ...baseCorsHeaders };
+
+  return { hasOrigin, originAllowed, headers };
 };
 
 serve(async (req) => {
@@ -249,27 +245,30 @@ serve(async (req) => {
     return jsonResponse(403, { error: "Origin not allowed" });
   }
 
-  const ingressError = await requireTrustedEdgeIngress(req, "contact-support-submit", jsonResponse);
+  const ingressError = await requireTrustedEdgeIngress(
+    req,
+    "contact-support-submit",
+    jsonResponse,
+  );
   if (ingressError) return ingressError;
 
   if (isKillSwitchWriteBlocked(req)) {
-    return jsonResponse(503, { error: "Unfortunately ItemTraxx is currently unavailable." });
+    return jsonResponse(503, {
+      error: "Unfortunately ItemTraxx is currently unavailable.",
+    });
   }
 
   try {
     const supabaseUrl = Deno.env.get("ITX_SUPABASE_URL");
     const publishableKey = Deno.env.get("ITX_PUBLISHABLE_KEY");
     const serviceKey = Deno.env.get("ITX_SECRET_KEY");
-    const turnstileSecret =
-      Deno.env.get("ITX_TURNSTILE_SECRET") ??
-      Deno.env.get("ITX_TURNSTILE_SECRET_KEY");
-    const supportEmail = Deno.env.get("ITX_SUPPORT_EMAIL") ?? "support@itemtraxx.com";
-    const fromEmail =
-      Deno.env.get("ITX_EMAIL_FROM") ??
+    const supportEmail = Deno.env.get("ITX_SUPPORT_EMAIL") ??
+      "support@itemtraxx.com";
+    const fromEmail = Deno.env.get("ITX_EMAIL_FROM") ??
       Deno.env.get("ITX_RESEND_FROM") ??
       "ItemTraxx Support <support@itemtraxx.com>";
 
-    if (!supabaseUrl || !publishableKey || !serviceKey || !turnstileSecret) {
+    if (!supabaseUrl || !publishableKey || !serviceKey) {
       return jsonResponse(500, { error: "Server misconfiguration." });
     }
 
@@ -285,13 +284,20 @@ serve(async (req) => {
     const category = requireEnum(body.category, SUPPORT_CATEGORIES);
     const message = requireText(body.message, { maxLen: 3000 });
     const turnstileToken = requireText(body.turnstile_token, { maxLen: 4000 });
-    const attachmentsRaw = Array.isArray(body.attachments) ? body.attachments : [];
+    const attachmentsRaw = Array.isArray(body.attachments)
+      ? body.attachments
+      : [];
     const attachments: NormalizedAttachment[] = [];
 
     if (!name || !replyEmail || !isEmail(replyEmail) || !subject || !message) {
-      return jsonResponse(400, { error: "Name, valid email, subject, and message are required." });
+      return jsonResponse(400, {
+        error: "Name, valid email, subject, and message are required.",
+      });
     }
-    if (!["general", "bug", "billing", "access", "feature", "privacy", "other"].includes(category)) {
+    if (
+      !["general", "bug", "billing", "access", "feature", "privacy", "other"]
+        .includes(category)
+    ) {
       return jsonResponse(400, { error: "Invalid category." });
     }
 
@@ -300,7 +306,9 @@ serve(async (req) => {
     });
 
     const clientIp = resolveClientIp(req);
-    const fingerprintSource = `${clientIp}|${req.headers.get("user-agent") ?? ""}`;
+    const fingerprintSource = `${clientIp}|${
+      req.headers.get("user-agent") ?? ""
+    }`;
     const fingerprint = await hashString(fingerprintSource);
 
     const { data: rateLimit, error: rateLimitError } = await adminClient.rpc(
@@ -317,21 +325,25 @@ serve(async (req) => {
     }
     const rateLimitResult = rateLimit as RateLimitResult;
     if (!rateLimitResult.allowed) {
-      return jsonResponse(429, { error: "Too many requests. Please try again later." });
+      return jsonResponse(429, {
+        error: "Too many requests. Please try again later.",
+      });
     }
 
     if (attachmentsRaw.length > 2) {
       return jsonResponse(400, { error: "Attach up to 2 images." });
     }
     for (const [index, attachment] of attachmentsRaw.entries()) {
-      if (!attachment || typeof attachment !== "object" || Array.isArray(attachment)) {
+      if (
+        !attachment || typeof attachment !== "object" ||
+        Array.isArray(attachment)
+      ) {
         return jsonResponse(400, { error: "Attachment data is invalid." });
       }
       const attachmentRecord = attachment as Record<string, unknown>;
-      const contentBase64 =
-        typeof attachmentRecord.content_base64 === "string"
-          ? attachmentRecord.content_base64.trim().replace(/\s+/g, "")
-          : "";
+      const contentBase64 = typeof attachmentRecord.content_base64 === "string"
+        ? attachmentRecord.content_base64.trim().replace(/\s+/g, "")
+        : "";
       if (!contentBase64 || !base64Pattern.test(contentBase64)) {
         return jsonResponse(400, { error: "Attachment data is invalid." });
       }
@@ -341,7 +353,9 @@ serve(async (req) => {
 
       const estimatedSize = estimateBase64DecodedBytes(contentBase64);
       if (estimatedSize > 4 * 1024 * 1024) {
-        return jsonResponse(400, { error: "Each image must be 4 MB or smaller." });
+        return jsonResponse(400, {
+          error: "Each image must be 4 MB or smaller.",
+        });
       }
 
       let bytes: Uint8Array;
@@ -352,16 +366,21 @@ serve(async (req) => {
       }
 
       if (bytes.length === 0 || bytes.length > 4 * 1024 * 1024) {
-        return jsonResponse(400, { error: "Each image must be 4 MB or smaller." });
+        return jsonResponse(400, {
+          error: "Each image must be 4 MB or smaller.",
+        });
       }
 
       const detectedType = detectAttachmentType(bytes);
       if (!detectedType) {
-        return jsonResponse(400, { error: "Only PNG, JPG, WEBP, and GIF attachments are allowed." });
+        return jsonResponse(400, {
+          error: "Only PNG, JPG, WEBP, and GIF attachments are allowed.",
+        });
       }
 
       attachments.push({
-        original_filename: optionalText(attachmentRecord.filename, { maxLen: 120 }) || null,
+        original_filename:
+          optionalText(attachmentRecord.filename, { maxLen: 120 }) || null,
         stored_filename: `${crypto.randomUUID()}.${detectedType.extension}`,
         storage_extension: detectedType.extension,
         content_type: detectedType.contentType,
@@ -380,22 +399,27 @@ serve(async (req) => {
       return jsonResponse(403, { error: "Security check failed." });
     }
 
-    const { data: supportRequest, error: supportRequestError } = await adminClient
-      .from("support_requests")
-      .insert({
-        requester_name: name,
-        reply_email: replyEmail,
-        subject,
-        category,
-        message,
-        source: "public_form",
-        status: "open",
-      })
-      .select("id")
-      .single();
+    const { data: supportRequest, error: supportRequestError } =
+      await adminClient
+        .from("support_requests")
+        .insert({
+          requester_name: name,
+          reply_email: replyEmail,
+          subject,
+          category,
+          message,
+          source: "public_form",
+          status: "open",
+        })
+        .select("id")
+        .single();
 
     if (supportRequestError || !supportRequest?.id) {
-      logError("contact-support-submit support request insert failed", requestId, supportRequestError);
+      logError(
+        "contact-support-submit support request insert failed",
+        requestId,
+        supportRequestError,
+      );
       return jsonResponse(500, { error: "Unable to save support request." });
     }
 
@@ -407,8 +431,8 @@ serve(async (req) => {
           supportRequest.id,
           attachment.storage_extension,
         );
-        if (storagePath.includes('..')) {
-          throw new Error('Invalid storage path');
+        if (storagePath.includes("..")) {
+          throw new Error("Invalid storage path");
         }
         const uploadResult = await adminClient.storage
           .from(SUPPORT_ATTACHMENT_BUCKET)
@@ -459,13 +483,28 @@ serve(async (req) => {
         throw eventInsertError;
       }
     } catch (persistenceError) {
-      logError("contact-support-submit attachment persistence failed", requestId, persistenceError);
+      logError(
+        "contact-support-submit attachment persistence failed",
+        requestId,
+        persistenceError,
+      );
       for (const path of uploadedPaths) {
-        await adminClient.storage.from(SUPPORT_ATTACHMENT_BUCKET).remove([path]);
+        await adminClient.storage.from(SUPPORT_ATTACHMENT_BUCKET).remove([
+          path,
+        ]);
       }
-      await adminClient.from("support_request_attachments").delete().eq("support_request_id", supportRequest.id);
-      await adminClient.from("support_request_events").delete().eq("support_request_id", supportRequest.id);
-      await adminClient.from("support_requests").delete().eq("id", supportRequest.id);
+      await adminClient.from("support_request_attachments").delete().eq(
+        "support_request_id",
+        supportRequest.id,
+      );
+      await adminClient.from("support_request_events").delete().eq(
+        "support_request_id",
+        supportRequest.id,
+      );
+      await adminClient.from("support_requests").delete().eq(
+        "id",
+        supportRequest.id,
+      );
       return jsonResponse(500, { error: "Unable to save support request." });
     }
 
@@ -490,7 +529,11 @@ serve(async (req) => {
       p_max_attempts: 5,
     });
     if (enqueueError) {
-      logError("contact-support-submit enqueue failed", requestId, enqueueError);
+      logError(
+        "contact-support-submit enqueue failed",
+        requestId,
+        enqueueError,
+      );
       return jsonResponse(500, { error: "Unable to queue follow-up email." });
     }
 
@@ -499,7 +542,9 @@ serve(async (req) => {
       support_request_id: supportRequest.id,
       attachment_count: attachments.length,
     });
-    return jsonResponse(200, { data: { accepted: true, request_id: supportRequest.id } });
+    return jsonResponse(200, {
+      data: { accepted: true, request_id: supportRequest.id },
+    });
   } catch (error) {
     if (error instanceof ValidationError) {
       return jsonResponse(error.status, { error: error.message });

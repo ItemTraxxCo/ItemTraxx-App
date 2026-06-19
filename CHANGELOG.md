@@ -1,12 +1,37 @@
 # Changelog
 
-Last updated (year-month-day): 2026-06-11
+Last updated (year-month-day): 2026-06-18
 
 This changelog summarizes notable ItemTraxx product, reliability, security, and experience updates.
 
 Changes are dated based on the default timezone: America/Los_Angeles
 
 ---
+
+### 6/18/2026 Development Update
+
+- Fixed contact-form submission reliability and improved request validation for public inbound forms.
+- Expanded end-to-end coverage for public contact forms and checkout/return transaction flows.
+- Hardened checkout/return handling against duplicate submissions, offline replay conflicts, and race conditions.
+
+### 6/16/2026 Development Update
+
+- Completed a routine security dependency update.
+
+### 6/15/2026 Development Update
+
+- Updated privacy and breach-notification language for clearer customer disclosures and legal consistency.
+- Completed routine dependency and security maintenance.
+
+### 6/13/2026 Development Update
+
+- Strengthened data-governance and retention protections.
+- Completed routine dependency maintenance.
+
+### 6/12/2026 Development Update
+
+- Improved legal and privacy notice handling.
+- Refined footer, compliance, and related public-policy content presentation.
 
 ### 6/11/2026 Development Update
 

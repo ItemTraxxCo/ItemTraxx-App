@@ -10,6 +10,7 @@ type CheckoutReturnPayload = {
   action_type: "checkout" | "return" | "auto" | "admin_return";
   device_id?: string;
   device_label?: string;
+  operation_id?: string;
 };
 
 type SubmitCheckoutReturnResult = {
@@ -36,7 +37,10 @@ type BufferedCheckoutItem = {
 const LOOKUP_TIMEOUT_MS = 7000;
 const OFFLINE_QUEUE_KEY = "itemtraxx:checkout-offline-buffer:v1";
 const OFFLINE_QUEUE_KEY_VERSION = "itemtraxx:checkout-offline-buffer:key:v1";
+const OFFLINE_QUEUE_LOCK_KEY = "itemtraxx:checkout-offline-buffer:lock:v1";
 const OFFLINE_QUEUE_ALGO = "AES-GCM";
+const OFFLINE_QUEUE_LOCK_TTL_MS = 30_000;
+const OFFLINE_QUEUE_LOCK_REFRESH_MS = 1_000;
 let offlineQueueWarning: string | null = null;
 
 const isRetryableNetworkFailure = (status: number, message: string) => {
@@ -66,6 +70,99 @@ const buildFallbackCryptoKey = () => {
   const seed = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
   const encoder = new TextEncoder();
   return bytesToBase64(encoder.encode(seed));
+};
+
+const createOperationId = () =>
+  typeof crypto !== "undefined" && "randomUUID" in crypto
+    ? crypto.randomUUID()
+    : `op-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+
+const ensureOperationId = (payload: CheckoutReturnPayload): CheckoutReturnPayload => ({
+  ...payload,
+  operation_id: payload.operation_id ?? createOperationId(),
+});
+
+const sleep = (ms: number) => new Promise((resolve) => window.setTimeout(resolve, ms));
+
+const runWithStorageLease = async <T>(callback: () => Promise<T>) => {
+  const owner = createOperationId();
+  const acquireStartedAt = Date.now();
+  let heartbeatId: number | null = null;
+
+  const renewLease = () => {
+    window.localStorage.setItem(
+      OFFLINE_QUEUE_LOCK_KEY,
+      JSON.stringify({
+        owner,
+        expires_at: Date.now() + OFFLINE_QUEUE_LOCK_TTL_MS,
+      })
+    );
+  };
+
+  while (true) {
+    const now = Date.now();
+    const raw = window.localStorage.getItem(OFFLINE_QUEUE_LOCK_KEY);
+    let currentOwner = "";
+    let expiresAt = 0;
+
+    if (raw) {
+      try {
+        const parsed = JSON.parse(raw) as { owner?: string; expires_at?: number };
+        currentOwner = typeof parsed.owner === "string" ? parsed.owner : "";
+        expiresAt = typeof parsed.expires_at === "number" ? parsed.expires_at : 0;
+      } catch {
+        window.localStorage.removeItem(OFFLINE_QUEUE_LOCK_KEY);
+      }
+    }
+
+    if (!currentOwner || expiresAt <= now || currentOwner === owner) {
+      renewLease();
+      try {
+        const confirmed = JSON.parse(
+          window.localStorage.getItem(OFFLINE_QUEUE_LOCK_KEY) ?? "{}"
+        ) as { owner?: string };
+        if (confirmed.owner === owner) {
+          heartbeatId = window.setInterval(renewLease, OFFLINE_QUEUE_LOCK_REFRESH_MS);
+          break;
+        }
+      } catch {
+        window.localStorage.removeItem(OFFLINE_QUEUE_LOCK_KEY);
+      }
+    }
+
+    if (Date.now() - acquireStartedAt > OFFLINE_QUEUE_LOCK_TTL_MS * 2) {
+      throw new Error("Offline queue is busy. Please try again.");
+    }
+
+    await sleep(50);
+  }
+
+  try {
+    return await callback();
+  } finally {
+    if (heartbeatId !== null) {
+      window.clearInterval(heartbeatId);
+    }
+    try {
+      const current = JSON.parse(
+        window.localStorage.getItem(OFFLINE_QUEUE_LOCK_KEY) ?? "{}"
+      ) as { owner?: string };
+      if (current.owner === owner) {
+        window.localStorage.removeItem(OFFLINE_QUEUE_LOCK_KEY);
+      }
+    } catch {
+      window.localStorage.removeItem(OFFLINE_QUEUE_LOCK_KEY);
+    }
+  }
+};
+
+const withOfflineQueueLock = async <T>(callback: () => Promise<T>) => {
+  if (typeof navigator !== "undefined" && "locks" in navigator && navigator.locks) {
+    return navigator.locks.request("itemtraxx-checkout-offline-buffer", { mode: "exclusive" }, callback);
+  }
+  // Fallback only for browsers without Web Locks support. This localStorage lease is
+  // best-effort and may still allow rare split-brain acquisition under tight interleaving.
+  return runWithStorageLease(callback);
 };
 
 const getOrCreateOfflineQueueKey = async () => {
@@ -204,22 +301,23 @@ const writeOfflineQueue = async (items: BufferedCheckoutItem[]) => {
   }
 };
 
-const queueCheckoutPayload = async (payload: CheckoutReturnPayload, error: string | null = null) => {
-  const queue = await readOfflineQueue();
-  const item: BufferedCheckoutItem = {
-    id:
-      typeof crypto !== "undefined" && "randomUUID" in crypto
-        ? crypto.randomUUID()
-        : `queued-${Date.now()}-${Math.random().toString(16).slice(2)}`,
-    payload,
-    created_at: new Date().toISOString(),
-    attempts: 0,
-    last_error: error,
-  };
-  queue.push(item);
-  await writeOfflineQueue(queue);
-  return queue.length;
-};
+const queueCheckoutPayload = async (payload: CheckoutReturnPayload, error: string | null = null) =>
+  withOfflineQueueLock(async () => {
+    const queue = await readOfflineQueue();
+    const item: BufferedCheckoutItem = {
+      id:
+        typeof crypto !== "undefined" && "randomUUID" in crypto
+          ? crypto.randomUUID()
+          : `queued-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+      payload: ensureOperationId(payload),
+      created_at: new Date().toISOString(),
+      attempts: 0,
+      last_error: error,
+    };
+    queue.push(item);
+    await writeOfflineQueue(queue);
+    return queue.length;
+  });
 
 const executeCheckoutReturn = async (payload: CheckoutReturnPayload) => {
   const { deviceId, deviceLabel } = getOrCreateDeviceSession();
@@ -258,64 +356,74 @@ const executeCheckoutReturn = async (payload: CheckoutReturnPayload) => {
 export const submitCheckoutReturn = async (
   payload: CheckoutReturnPayload
 ): Promise<SubmitCheckoutReturnResult> => {
+  const payloadWithOperationId = ensureOperationId(payload);
   try {
-    await executeCheckoutReturn(payload);
-    return { buffered: false, queuedCount: (await readOfflineQueue()).length };
+    await executeCheckoutReturn(payloadWithOperationId);
+    return {
+      buffered: false,
+      queuedCount: await withOfflineQueueLock(async () => (await readOfflineQueue()).length),
+    };
   } catch (error) {
     const message = error instanceof Error ? error.message : "Request failed.";
     if (isRetryableNetworkFailure(0, message)) {
       if (navigator.onLine) {
         try {
-          await executeCheckoutReturn(payload);
-          return { buffered: false, queuedCount: (await readOfflineQueue()).length };
+          await executeCheckoutReturn(payloadWithOperationId);
+          return {
+            buffered: false,
+            queuedCount: await withOfflineQueueLock(async () => (await readOfflineQueue()).length),
+          };
         } catch (retryError) {
           throw retryError;
         }
       }
-      const queuedCount = await queueCheckoutPayload(payload, message);
+      const queuedCount = await queueCheckoutPayload(payloadWithOperationId, message);
       return { buffered: true, queuedCount };
     }
     throw error;
   }
 };
 
-export const getBufferedCheckoutCount = async () => (await readOfflineQueue()).length;
+export const getBufferedCheckoutCount = async () =>
+  withOfflineQueueLock(async () => (await readOfflineQueue()).length);
 
-export const syncBufferedCheckoutQueue = async () => {
-  const queue = await readOfflineQueue();
-  if (queue.length === 0) {
-    return { processed: 0, failed: 0, remaining: 0 };
-  }
+export const syncBufferedCheckoutQueue = async () =>
+  withOfflineQueueLock(async () => {
+    const queue = await readOfflineQueue();
+    if (queue.length === 0) {
+      return { processed: 0, failed: 0, remaining: 0 };
+    }
 
-  let processed = 0;
-  let failed = 0;
-  const remaining: BufferedCheckoutItem[] = [];
+    let processed = 0;
+    let failed = 0;
+    const remaining: BufferedCheckoutItem[] = [];
 
-  for (const item of queue) {
-    try {
-      await executeCheckoutReturn(item.payload);
-      processed += 1;
-    } catch (error) {
-      failed += 1;
-      const message = error instanceof Error ? error.message : "Request failed.";
-      // Keep retryable network failures in the buffer, drop permanent authorization/policy failures.
-      if (isRetryableNetworkFailure(0, message)) {
-        remaining.push({
-          ...item,
-          attempts: item.attempts + 1,
-          last_error: message,
-        });
+    for (const item of queue) {
+      const payload = ensureOperationId(item.payload);
+      try {
+        await executeCheckoutReturn(payload);
+        processed += 1;
+      } catch (error) {
+        failed += 1;
+        const message = error instanceof Error ? error.message : "Request failed.";
+        if (isRetryableNetworkFailure(0, message)) {
+          remaining.push({
+            ...item,
+            payload,
+            attempts: item.attempts + 1,
+            last_error: message,
+          });
+        }
       }
     }
-  }
 
-  await writeOfflineQueue(remaining);
-  return {
-    processed,
-    failed,
-    remaining: remaining.length,
-  };
-};
+    await writeOfflineQueue(remaining);
+    return {
+      processed,
+      failed,
+      remaining: remaining.length,
+    };
+  });
 
 export type StudentSummary = {
   id: string;

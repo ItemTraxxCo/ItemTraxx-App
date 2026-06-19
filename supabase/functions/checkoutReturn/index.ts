@@ -30,6 +30,12 @@ const CHECKOUT_ACTIONS = new Set(
   ["checkout", "return", "auto", "admin_return"] as const,
 );
 
+const buildGearLogOperationId = (
+  operationId: string,
+  gearId: string,
+  actionType: "checkout" | "return" | "admin_return",
+) => `${operationId}:${gearId}:${actionType}`;
+
 const resolveCorsHeaders = (req: Request) => {
   const origin = req.headers.get("Origin");
   const allowedOrigins = parseAllowedOrigins(
@@ -178,7 +184,7 @@ serve(async (req) => {
       });
     }
 
-    const { student_id, gear_barcodes, action_type, device_id } =
+    const { student_id, gear_barcodes, action_type, device_id, operation_id } =
       await readJsonBody(req);
     const actionType = requireEnum(action_type, CHECKOUT_ACTIONS);
     const gearBarcodes = requireTextArray(gear_barcodes, {
@@ -187,6 +193,12 @@ serve(async (req) => {
       maxLen: 64,
       pattern: BARCODE_PATTERN,
     });
+    const requestIdFallback = optionalText(req.headers.get("x-request-id"), {
+      maxLen: 128,
+    });
+    const operationId = optionalText(operation_id, { maxLen: 128 }) ||
+      requestIdFallback ||
+      crypto.randomUUID();
 
     const adminClient = createClient(supabaseUrl, serviceKey, {
       auth: { persistSession: false },
@@ -280,6 +292,32 @@ serve(async (req) => {
         continue;
       }
 
+      const existingOperationId = buildGearLogOperationId(
+        operationId,
+        gear.id,
+        isAdminReturn ? "admin_return" : "checkout",
+      );
+      const existingReturnOperationId = buildGearLogOperationId(
+        operationId,
+        gear.id,
+        "return",
+      );
+      const { data: existingOperation } = await adminClient
+        .from("gear_logs")
+        .select("id")
+        .eq("tenant_id", callerProfile.tenant_id)
+        .eq("gear_id", gear.id)
+        .in("operation_id", isAdminReturn
+          ? [existingOperationId]
+          : [existingOperationId, existingReturnOperationId])
+        .limit(1)
+        .maybeSingle();
+
+      if (existingOperation?.id) {
+        processed += 1;
+        continue;
+      }
+
       if (isAdminReturn) {
         const normalizedStatus = String(gear.status ?? "").toLowerCase();
         if (!gear.checked_out_by || normalizedStatus !== "checked_out") {
@@ -296,6 +334,7 @@ serve(async (req) => {
           })
           .eq("id", gear.id)
           .eq("tenant_id", callerProfile.tenant_id)
+          .eq("status", "checked_out")
           .not("checked_out_by", "is", null)
           .select("id")
           .maybeSingle();
@@ -305,12 +344,24 @@ serve(async (req) => {
           continue;
         }
 
-        await adminClient.from("gear_logs").insert({
+        const { error: logError } = await adminClient.from("gear_logs").upsert({
           gear_id: gear.id,
           action_type: "admin_return",
           checked_out_by: gear.checked_out_by,
           tenant_id: callerProfile.tenant_id,
+          operation_id: buildGearLogOperationId(operationId, gear.id, "admin_return"),
+        }, {
+          onConflict: "tenant_id,gear_id,action_type,operation_id",
+          ignoreDuplicates: true,
         });
+
+        if (logError) {
+          console.error("checkoutReturn admin log write failed", {
+            gearId: gear.id,
+            operationId,
+            message: logError.message,
+          });
+        }
 
         processed += 1;
         continue;
@@ -338,8 +389,8 @@ serve(async (req) => {
         .eq("tenant_id", callerProfile.tenant_id);
 
       const { data: updatedGear, error: updateError } = await (isCheckout
-        ? updateBuilder.is("checked_out_by", null)
-        : updateBuilder.eq("checked_out_by", student!.id))
+        ? updateBuilder.is("checked_out_by", null).eq("status", "available")
+        : updateBuilder.eq("checked_out_by", student!.id).eq("status", "checked_out"))
         .select("id")
         .maybeSingle();
 
@@ -348,12 +399,26 @@ serve(async (req) => {
         continue;
       }
 
-      await adminClient.from("gear_logs").insert({
+      const resolvedActionType = isCheckout ? "checkout" : "return";
+      const { error: logError } = await adminClient.from("gear_logs").upsert({
         gear_id: gear.id,
-        action_type: isCheckout ? "checkout" : "return",
+        action_type: resolvedActionType,
         checked_out_by: student!.id,
         tenant_id: callerProfile.tenant_id,
+        operation_id: buildGearLogOperationId(operationId, gear.id, resolvedActionType),
+      }, {
+        onConflict: "tenant_id,gear_id,action_type,operation_id",
+        ignoreDuplicates: true,
       });
+
+      if (logError) {
+        console.error("checkoutReturn gear log write failed", {
+          gearId: gear.id,
+          operationId,
+          actionType: resolvedActionType,
+          message: logError.message,
+        });
+      }
 
       processed += 1;
     }

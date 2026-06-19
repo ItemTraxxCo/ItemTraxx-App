@@ -193,8 +193,11 @@ serve(async (req) => {
       maxLen: 64,
       pattern: BARCODE_PATTERN,
     });
+    const requestIdFallback = optionalText(req.headers.get("x-request-id"), {
+      maxLen: 128,
+    });
     const operationId = optionalText(operation_id, { maxLen: 128 }) ||
-      req.headers.get("x-request-id")?.trim() ||
+      requestIdFallback ||
       crypto.randomUUID();
 
     const adminClient = createClient(supabaseUrl, serviceKey, {

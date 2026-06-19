@@ -46,7 +46,7 @@
     "@cloudflare/vite-plugin": "1.41.0",
     "@cyclonedx/cyclonedx-npm": "5.0.0",
     "@playwright/test": "^1.61.0",
-    "@types/node": "^26.0.0",
+    "@types/node": "^22.19.21",
     "@vitejs/plugin-vue": "^6.0.7",
     "@vue/tsconfig": "^0.9.1",
     "rollup": "^4.62.1",

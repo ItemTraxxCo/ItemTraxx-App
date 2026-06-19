@@ -37,6 +37,7 @@ test.describe("Public contact forms", () => {
       reply_email: "taylor@example.edu",
       details: "We need help evaluating ItemTraxx.",
       intent: "sales",
+      turnstile_token: "",
       website: "",
     });
   });
@@ -69,6 +70,7 @@ test.describe("Public contact forms", () => {
       category: "bug",
       subject: "Checkout issue",
       message: "The checkout page showed an unexpected error.",
+      turnstile_token: "",
       website: "",
       attachments: [],
     });

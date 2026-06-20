@@ -265,10 +265,19 @@
           </a>
         </div>
         <div class="footer-column">
-          <p class="footer-heading">Company</p>
-          <RouterLink to="/legal">Legal</RouterLink>
+          <p class="footer-heading">Legal</p>
+          <RouterLink to="/legal">Legal Home</RouterLink>
           <RouterLink to="/privacy">Privacy</RouterLink>
-        <RouterLink to="/accessibility">Accessibility</RouterLink>
+          <RouterLink to="/legal/student-privacy">Student Privacy</RouterLink>
+          <RouterLink to="/legal/dpa">DPA</RouterLink>
+          <RouterLink to="/cookies">Cookies</RouterLink>
+          <RouterLink to="/accessibility">Accessibility</RouterLink>
+          <RouterLink to="/security">Security</RouterLink>
+          <RouterLink to="/trust">Trust</RouterLink>
+          <RouterLink to="/compliance">Compliance</RouterLink>
+        </div>
+        <div class="footer-column">
+          <p class="footer-heading">Company</p>
           <RouterLink to="/about">About</RouterLink>
         </div>
       </div>

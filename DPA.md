@@ -1,8 +1,6 @@
-# ItemTraxx Data Processing Addendum Template
+# ItemTraxx Data Processing Addendum
 
-Last updated: 2026-06-15 (year-month-day)
-
-**Status: Contract template requiring qualified legal review before execution.**
+Last updated: 2026-06-20 (year-month-day)
 
 This Data Processing Addendum ("DPA") supplements the applicable order form, subscription
 agreement, or other written agreement between ItemTraxx Co ("ItemTraxx") and the school, district,
@@ -37,16 +35,8 @@ confidentiality and any additional organizational commitments must be confirmed 
 
 ## 5. Service Providers
 
-Customer authorizes ItemTraxx to use subprocessors needed for hosting, database and authentication,
-storage, edge security, email, monitoring, diagnostics, support, and engineering operations.
-The current platform may use Supabase, Cloudflare, Vercel, PostHog, Sentry, transactional email
-providers, GitHub, Slack, and incident.io according to the active environment and feature
-configuration. ItemTraxx will provide at least thirty (30) days advance notice before adding or
-replacing a subprocessor that processes Customer Data, via email to the Customer's primary contact
-or a notice posted to the ItemTraxx legal hub. Customer may object in writing within that period;
-if the parties cannot resolve a reasonable objection, Customer may terminate the affected portion
-of the service on written notice. Any required subprocessor restrictions or additional flow-down
-terms must be included in the executed agreement.
+Customer authorizes ItemTraxx to use subprocessors needed for hosting, database and authentication, storage, edge security, email, monitoring, diagnostics, support, and engineering operations.
+The current platform may use Supabase, Cloudflare, Vercel, PostHog, Sentry, transactional email providers, GitHub, Slack, and incident.io according to the active environment and feature configuration. Any required subprocessor restrictions, approval rights, or additional flow-down terms must be included in the executed agreement.
 
 ## 6. Requests and Cooperation
 

@@ -32,25 +32,28 @@
       <div class="footer-column">
         <p class="footer-heading">Support</p>
         <RouterLink to="/contact-support">Contact Support</RouterLink>
-        <RouterLink to="/security">Security</RouterLink>
         <RouterLink to="/report-security-issue">Report Security Issue</RouterLink>
-        <RouterLink to="/trust">Trust</RouterLink>
         <RouterLink to="/changelog">Changelog</RouterLink>
         <RouterLink to="/faq">FAQ</RouterLink>
         <a href="https://status.itemtraxx.com/" target="_blank" rel="noreferrer">Status</a>
       </div>
       <div class="footer-column">
-        <p class="footer-heading">Company</p>
-        <RouterLink to="/">Home</RouterLink>
-        <RouterLink to="/contact">Contact</RouterLink>
-        <RouterLink to="/compliance">Compliance</RouterLink>
-        <RouterLink to="/legal">Legal</RouterLink>
+        <p class="footer-heading">Legal</p>
+        <RouterLink to="/legal">Legal Home</RouterLink>
         <RouterLink to="/privacy">Privacy</RouterLink>
         <RouterLink to="/legal/student-privacy">Student Privacy</RouterLink>
         <RouterLink to="/legal/dpa">Data Processing Addendum</RouterLink>
         <RouterLink to="/privacy-request">Privacy Request</RouterLink>
         <RouterLink to="/cookies">Cookies</RouterLink>
         <RouterLink to="/accessibility">Accessibility</RouterLink>
+        <RouterLink to="/security">Security</RouterLink>
+        <RouterLink to="/trust">Trust</RouterLink>
+        <RouterLink to="/compliance">Compliance</RouterLink>
+      </div>
+      <div class="footer-column">
+        <p class="footer-heading">Company</p>
+        <RouterLink to="/">Home</RouterLink>
+        <RouterLink to="/contact">Contact</RouterLink>
         <RouterLink to="/about">About</RouterLink>
         <a href="https://github.com/ItemTraxxCo" target="_blank" rel="noreferrer">GitHub</a>
       </div>
@@ -148,7 +151,7 @@ onUnmounted(() => {
 
 .footer-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 1.5rem 2.5rem;
   flex: 1;
 }

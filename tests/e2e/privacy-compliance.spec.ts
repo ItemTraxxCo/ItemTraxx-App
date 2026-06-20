@@ -76,7 +76,7 @@ test.describe("Privacy and legal controls", () => {
     await expect(page.getByRole("heading", { name: "Student Privacy Notice", level: 1 })).toBeVisible();
 
     await page.goto("/legal/dpa");
-    await expect(page.getByRole("heading", { name: "ItemTraxx Data Processing Addendum Template", level: 1 })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "ItemTraxx Data Processing Addendum", level: 1 })).toBeVisible();
   });
 
 });

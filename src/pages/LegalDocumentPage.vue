@@ -42,6 +42,17 @@ const sections = computed<Section[]>(() => {
   const result: Section[] = [];
   let current: Section | null = null;
   let pendingList: string[] = [];
+  let pendingParagraph: string[] = [];
+
+  const flushParagraph = () => {
+    if (!current || !pendingParagraph.length) return;
+    current.blocks.push({
+      type: "paragraph",
+      text: pendingParagraph.join(" ").replace(/\*\*/g, ""),
+    });
+    pendingParagraph = [];
+  };
+
   const flushList = () => {
     if (current && pendingList.length) current.blocks.push({ type: "list", items: [...pendingList] });
     pendingList = [];
@@ -50,23 +61,29 @@ const sections = computed<Section[]>(() => {
   for (const raw of lines.value) {
     const line = raw.trim();
     if (!line || line === "---") {
+      flushParagraph();
       flushList();
       continue;
     }
     if (line.startsWith("# ") || line.startsWith("Last updated:")) continue;
     if (line.startsWith("## ")) {
+      flushParagraph();
       flushList();
       if (current) result.push(current);
       current = { title: line.slice(3).trim(), blocks: [] };
       continue;
     }
     if (!current) current = { title: "Overview", blocks: [] };
-    if (line.startsWith("- ")) pendingList.push(line.slice(2).trim());
+    if (line.startsWith("- ")) {
+      flushParagraph();
+      pendingList.push(line.slice(2).trim());
+    }
     else {
       flushList();
-      current.blocks.push({ type: "paragraph", text: line.replace(/\*\*/g, "") });
+      pendingParagraph.push(line);
     }
   }
+  flushParagraph();
   flushList();
   if (current) result.push(current);
   return result;

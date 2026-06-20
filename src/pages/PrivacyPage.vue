@@ -142,6 +142,13 @@ const sections = computed<PrivacySection[]>(() => {
   const result: PrivacySection[] = [];
   let current: PrivacySection | null = null;
   let pendingList: string[] = [];
+  let pendingParagraph: string[] = [];
+
+  const flushParagraph = () => {
+    if (!current || !pendingParagraph.length) return;
+    current.blocks.push({ type: "paragraph", text: pendingParagraph.join(" ") });
+    pendingParagraph = [];
+  };
 
   const flushList = () => {
     if (current && pendingList.length) {
@@ -153,11 +160,13 @@ const sections = computed<PrivacySection[]>(() => {
   for (const rawLine of lines) {
     const line = rawLine.trim();
     if (!line || line === '---') {
+      flushParagraph();
       flushList();
       continue;
     }
     if (line.startsWith('# ') || line.startsWith('Last updated:')) continue;
     if (line.startsWith('## ')) {
+      flushParagraph();
       flushList();
       if (current) result.push(current);
       current = { title: line.replace(/^##\s+/, '').trim(), blocks: [] };
@@ -165,13 +174,15 @@ const sections = computed<PrivacySection[]>(() => {
     }
     if (!current) continue;
     if (line.startsWith('- ')) {
+      flushParagraph();
       pendingList.push(line.replace(/^-\s+/, '').trim());
       continue;
     }
     flushList();
-    current.blocks.push({ type: 'paragraph', text: line });
+    pendingParagraph.push(line);
   }
 
+  flushParagraph();
   flushList();
   if (current) result.push(current);
   return result;

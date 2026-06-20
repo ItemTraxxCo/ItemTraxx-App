@@ -123,8 +123,7 @@ export function buildSubprocessorNoticeHtml(
                 <tr>
                   <td style="padding:0 0 20px;font-size:15px;color:#444444;line-height:1.6;">
                     You are receiving this notice because your organization has an active ItemTraxx service
-                    agreement that includes a Data Processing Addendum. Under that agreement, ItemTraxx is
-                    required to notify you at least 30 days before adding or replacing a subprocessor.
+                    agreement that requires notice for this subprocessor change.
                   </td>
                 </tr>
                 <tr>
@@ -156,11 +155,11 @@ export function buildSubprocessorNoticeHtml(
                 </tr>
                 <tr>
                   <td style="padding:0 0 20px;font-size:15px;color:#444444;line-height:1.6;">
-                    Under your Data Processing Addendum, you may object to this change in writing before
-                    the effective date (<strong>${
+                    If your executed agreement includes objection or approval rights for this change, please
+                    contact us in writing before the effective date (<strong>${
     escapeHtml(effectiveDateLabel)
   }</strong>). If you have
-                    questions, wish to object, or need a copy of the updated DPA, please contact us.
+                    questions or need a copy of the current DPA, please contact us.
                   </td>
                 </tr>
                 <tr>
@@ -188,7 +187,7 @@ export function buildSubprocessorNoticeHtml(
           </tr>
           <tr>
             <td style="padding:18px 32px;border-top:1px solid #e5e5e5;font-size:12px;color:#888888;line-height:1.5;">
-              This is a required legal notice sent to customers with an active Data Processing Addendum.
+              This notice is sent to customers whose executed agreement requires subprocessor-change notice.
               ItemTraxx Co &middot; 670 San Antonio Rd, Palo Alto, CA 94306, USA &middot; support@itemtraxx.com
             </td>
           </tr>
@@ -214,8 +213,7 @@ export function buildSubprocessorNoticePlainText(
   }
 
 You are receiving this notice because your organization has an active ItemTraxx service agreement
-that includes a Data Processing Addendum. Under that agreement, ItemTraxx is required to notify
-you at least 30 days before adding or replacing a subprocessor.
+that requires notice for this subprocessor change.
 
 CHANGE DETAILS
 --------------
@@ -223,17 +221,17 @@ Subprocessor: ${p.vendor}
 Change: ${p.vendor} ${changeTypeLabel(p.changeType)}
 Effective date: ${effectiveDateLabel}
 ${descriptionLine}
-YOUR RIGHTS
------------
-Under your Data Processing Addendum, you may object to this change in writing before the effective
-date (${effectiveDateLabel}). If you have questions, wish to object, or need a copy of the updated
-DPA, please contact us before that date.
+CONTRACT TERMS
+--------------
+If your executed agreement includes objection or approval rights for this change, please contact us
+in writing before the effective date (${effectiveDateLabel}). If you have questions or need a copy
+of the current DPA, please contact us before that date.
 
 Contact Support: ${contactSupportUrl}
 View DPA & Legal Docs: ${legalHubUrl}
 
 ---
-This is a required legal notice sent to customers with an active Data Processing Addendum.
+This notice is sent to customers whose executed agreement requires subprocessor-change notice.
 ItemTraxx Co · 670 San Antonio Rd, Palo Alto, CA 94306, USA · support@itemtraxx.com
 `;
 }

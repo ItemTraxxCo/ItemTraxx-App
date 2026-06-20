@@ -58,8 +58,6 @@ jobs:
         run: npm ci --ignore-scripts
 
       - name: Run security gate
-        env:
-          ITX_AUDIT_ALLOW_SOURCES: "1121192"
         run: npm run security:gate
 
       - name: Generate SBOM

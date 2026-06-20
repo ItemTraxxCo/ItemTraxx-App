@@ -8,7 +8,7 @@ Changes are dated based on the default timezone: America/Los_Angeles
 
 ---
 
-### 6/20/2026 Development Update
+## 6/20/2026 Development Update
 
 - Completed routine dependency security cleanup.
 

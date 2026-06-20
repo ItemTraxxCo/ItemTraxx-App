@@ -215,22 +215,47 @@ jobs:
       - kill-switch-preflight
       - check-stale-schedules
     if: ${{ always() && needs.kill-switch-preflight.outputs.active == 'true' && needs.check-stale-schedules.result == 'skipped' }}
-    uses: ./.github/workflows/slack-notify-status.yml
-    with:
-      mode: finish
-      workflow_name: Schedule Watchdog
-      job_name: check-stale-schedules
-      run_url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-      ref_name: ${{ github.ref_name }}
-      sha: ${{ github.sha }}
-      status: success
-      status_message: ${{ format('Intentionally skipped because the ItemTraxx kill switch is active. {0}', needs.kill-switch-preflight.outputs.message) }}
-    secrets:
-      SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
-      SLACK_CHANNEL_ID: ${{ secrets.SLACK_CHANNEL_ID }}
-      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
-      INCIDENT_IO_WEBHOOK_URL: ${{ secrets.INCIDENT_IO_WEBHOOK_URL }}
-      INCIDENT_IO_WEBHOOK_TOKEN: ${{ secrets.INCIDENT_IO_WEBHOOK_TOKEN }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send Slack kill-switch skip notification
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          REPOSITORY: ${{ github.repository }}
+          REF_NAME: ${{ github.ref_name }}
+          SHA: ${{ github.sha }}
+          STATUS_MESSAGE: ${{ format('Intentionally skipped because the ItemTraxx kill switch is active. {0}', needs.kill-switch-preflight.outputs.message) }}
+        run: |
+          set -euo pipefail
+          if [ -z "${SLACK_WEBHOOK_URL:-}" ]; then
+            echo "No Slack webhook configured; skipping."
+            exit 0
+          fi
+          PAYLOAD="$(jq -n \
+            --arg run_url "$RUN_URL" \
+            --arg repo "$REPOSITORY" \
+            --arg branch "$REF_NAME" \
+            --arg commit "${SHA:0:7}" \
+            --arg status_message "$STATUS_MESSAGE" \
+            '{
+              text: "GitHub Actions run skipped",
+              attachments: [
+                {
+                  color: "#d4a017",
+                  fields: [
+                    { title: "Status", value: "Skipped", short: true },
+                    { title: "Commit", value: ($commit + " (" + $branch + ")"), short: true },
+                    if ($status_message != "") then { title: "Message", value: $status_message, short: false } else empty end,
+                    { title: "Workflow", value: ("<" + $run_url + "|Schedule Watchdog / check-stale-schedules>"), short: false },
+                    { title: "Repository", value: $repo, short: false }
+                  ],
+                  footer: "GitHub Actions"
+                }
+              ]
+            }')"
+          curl -fsSL -X POST "$SLACK_WEBHOOK_URL" \
+            -H "Content-Type: application/json" \
+            --data "$PAYLOAD"
 
   incidentio-notify-failure:
     needs:

@@ -114,7 +114,7 @@ jobs:
       - kill-switch-preflight
       - slack-notify-start
       - analyze
-    if: ${{ always() && needs.kill-switch-preflight.outputs.active == 'true' && needs.analyze.result == 'skipped' }}
+    if: ${{ always() && needs.slack-notify-start.result == 'success' && needs.kill-switch-preflight.outputs.active == 'true' && needs.analyze.result == 'skipped' }}
     uses: ./.github/workflows/slack-notify-status.yml
     with:
       mode: finish

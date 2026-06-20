@@ -49,7 +49,7 @@ jobs:
     needs:
       - slack-notify-start
       - synthetic-smoke
-    if: ${{ always() && needs.synthetic-smoke.result != 'skipped' }}
+    if: ${{ always() && needs.slack-notify-start.result == 'success' && needs.synthetic-smoke.result != 'skipped' }}
     uses: ./.github/workflows/slack-notify-status.yml
     with:
       mode: finish
@@ -73,7 +73,7 @@ jobs:
       - kill-switch-preflight
       - slack-notify-start
       - synthetic-smoke
-    if: ${{ always() && needs.kill-switch-preflight.outputs.active == 'true' && needs.synthetic-smoke.result == 'skipped' }}
+    if: ${{ always() && needs.slack-notify-start.result == 'success' && needs.kill-switch-preflight.outputs.active == 'true' && needs.synthetic-smoke.result == 'skipped' }}
     uses: ./.github/workflows/slack-notify-status.yml
     with:
       mode: finish

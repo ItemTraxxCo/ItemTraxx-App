@@ -211,47 +211,6 @@ jobs:
             fi
           fi
 
-          send_webhook_fallback() {
-            if [ -n "${SLACK_WEBHOOK_URL:-}" ]; then
-              PAYLOAD="$(jq -n \
-                --arg workflow "$WORKFLOW_NAME" \
-                --arg job "$JOB_NAME" \
-                --arg branch "$REF_NAME" \
-                --arg commit "${SHA:0:7}" \
-                --arg run_url "$RUN_URL" \
-                --arg status_label "$STATUS_LABEL" \
-                --arg status_message "$STATUS_MESSAGE" \
-                --arg repo "$REPOSITORY" \
-                '{
-                  text: ("GitHub Actions run " + ($status_label | ascii_downcase) + ": " + $workflow + " / " + $job),
-                  attachments: [
-                    {
-                      color: (
-                        if ($status_label == "Succeeded") then "#2eb67d"
-                        elif ($status_label == "Failed") then "#e01e5a"
-                        elif ($status_label == "Cancelled") then "#9ca3af"
-                        else "#d4a017"
-                        end
-                      ),
-                      fields: [
-                        { title: "Status", value: $status_label, short: true },
-                        { title: "Commit", value: ($commit + " (" + $branch + ")"), short: true },
-                        if ($status_message != "") then { title: "Message", value: $status_message, short: false } else empty end,
-                        { title: "Workflow", value: ("<" + $run_url + "|" + $workflow + " / " + $job + ">"), short: false },
-                        { title: "Repository", value: $repo, short: false }
-                      ],
-                      footer: "GitHub Actions"
-                    }
-                  ]
-                }')"
-              curl -fsSL -X POST "$SLACK_WEBHOOK_URL" \
-                -H "Content-Type: application/json" \
-                --data "$PAYLOAD"
-            else
-              echo "No Slack secrets configured; skipping finish notification."
-            fi
-          }
-
           STATUS_LOWER="$(printf '%s' "$STATUS" | tr '[:upper:]' '[:lower:]')"
           case "$STATUS_LOWER" in
             success)
@@ -271,56 +230,55 @@ jobs:
               ;;
           esac
 
-          if [ -n "${SLACK_BOT_TOKEN:-}" ] && [ -n "${MESSAGE_CHANNEL_ID:-}" ] && [ -n "${MESSAGE_TS:-}" ]; then
-            PAYLOAD="$(jq -n \
-              --arg channel "$MESSAGE_CHANNEL_ID" \
-              --arg ts "$MESSAGE_TS" \
-              --arg workflow "$WORKFLOW_NAME" \
-              --arg job "$JOB_NAME" \
-              --arg branch "$REF_NAME" \
-              --arg commit "${SHA:0:7}" \
-              --arg repo "$REPOSITORY" \
-              --arg run_url "$RUN_URL" \
-              --arg status_label "$STATUS_LABEL" \
-              --arg status_message "$STATUS_MESSAGE" \
-              '{
-                channel: $channel,
-                ts: $ts,
-                text: ("GitHub Actions run " + ($status_label | ascii_downcase)),
-                attachments: [
-                  {
-                    color: (
-                      if ($status_label == "Succeeded") then "#2eb67d"
-                      elif ($status_label == "Failed") then "#e01e5a"
-                      elif ($status_label == "Cancelled") then "#9ca3af"
-                      else "#d4a017"
-                      end
-                    ),
-                    fields: [
-                      { title: "Status", value: $status_label, short: true },
-                      { title: "Commit", value: ($commit + " (" + $branch + ")"), short: true },
-                      if ($status_message != "") then { title: "Message", value: $status_message, short: false } else empty end,
-                      { title: "Workflow", value: ("<" + $run_url + "|" + $workflow + " / " + $job + ">"), short: false },
-                      { title: "Repository", value: $repo, short: false }
-                    ],
-                    footer: "GitHub Actions"
-                  }
-                ]
-              }')"
-            RESPONSE="$(curl -fsSL https://slack.com/api/chat.update \
-              -H "Authorization: Bearer ${SLACK_BOT_TOKEN}" \
-              -H "Content-Type: application/json; charset=utf-8" \
-              --data "$PAYLOAD")"
-            OK="$(printf '%s' "$RESPONSE" | jq -r '.ok')"
-            if [ "$OK" != "true" ]; then
-              echo "Slack bot update failed, falling back to webhook: $RESPONSE"
-              send_webhook_fallback
-              exit 0
-            fi
+          if [ -z "${SLACK_BOT_TOKEN:-}" ] || [ -z "${MESSAGE_CHANNEL_ID:-}" ] || [ -z "${MESSAGE_TS:-}" ]; then
+            echo "No Slack bot update target available; skipping finish notification to avoid posting a duplicate standalone message."
             exit 0
           fi
 
-          send_webhook_fallback
+          PAYLOAD="$(jq -n \
+            --arg channel "$MESSAGE_CHANNEL_ID" \
+            --arg ts "$MESSAGE_TS" \
+            --arg workflow "$WORKFLOW_NAME" \
+            --arg job "$JOB_NAME" \
+            --arg branch "$REF_NAME" \
+            --arg commit "${SHA:0:7}" \
+            --arg repo "$REPOSITORY" \
+            --arg run_url "$RUN_URL" \
+            --arg status_label "$STATUS_LABEL" \
+            --arg status_message "$STATUS_MESSAGE" \
+            '{
+              channel: $channel,
+              ts: $ts,
+              text: ("GitHub Actions run " + ($status_label | ascii_downcase)),
+              attachments: [
+                {
+                  color: (
+                    if ($status_label == "Succeeded") then "#2eb67d"
+                    elif ($status_label == "Failed") then "#e01e5a"
+                    elif ($status_label == "Cancelled") then "#9ca3af"
+                    else "#d4a017"
+                    end
+                  ),
+                  fields: [
+                    { title: "Status", value: $status_label, short: true },
+                    { title: "Commit", value: ($commit + " (" + $branch + ")"), short: true },
+                    if ($status_message != "") then { title: "Message", value: $status_message, short: false } else empty end,
+                    { title: "Workflow", value: ("<" + $run_url + "|" + $workflow + " / " + $job + ">"), short: false },
+                    { title: "Repository", value: $repo, short: false }
+                  ],
+                  footer: "GitHub Actions"
+                }
+              ]
+            }')"
+          RESPONSE="$(curl -fsSL https://slack.com/api/chat.update \
+            -H "Authorization: Bearer ${SLACK_BOT_TOKEN}" \
+            -H "Content-Type: application/json; charset=utf-8" \
+            --data "$PAYLOAD")"
+          OK="$(printf '%s' "$RESPONSE" | jq -r '.ok')"
+          if [ "$OK" != "true" ]; then
+            echo "Slack bot update failed; skipping webhook fallback to avoid posting a duplicate standalone message: $RESPONSE"
+            exit 0
+          fi
 
   incidentio-notify-finish-failure:
     needs:

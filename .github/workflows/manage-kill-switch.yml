@@ -123,7 +123,7 @@ jobs:
     needs:
       - slack-notify-start
       - apply
-    if: ${{ always() && needs.apply.result != 'skipped' }}
+    if: ${{ always() && needs.slack-notify-start.result == 'success' && needs.apply.result != 'skipped' }}
     uses: ./.github/workflows/slack-notify-status.yml
     with:
       mode: finish

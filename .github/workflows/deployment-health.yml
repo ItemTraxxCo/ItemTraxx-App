@@ -151,7 +151,7 @@ jobs:
     needs:
       - slack-notify-start
       - health-check
-    if: ${{ always() && needs.health-check.result != 'skipped' }}
+    if: ${{ always() && needs.slack-notify-start.result == 'success' && needs.health-check.result != 'skipped' }}
     uses: ./.github/workflows/slack-notify-status.yml
     with:
       mode: finish
@@ -175,7 +175,7 @@ jobs:
       - kill-switch-preflight
       - slack-notify-start
       - health-check
-    if: ${{ always() && needs.kill-switch-preflight.outputs.active == 'true' && needs.health-check.result == 'skipped' }}
+    if: ${{ always() && needs.slack-notify-start.result == 'success' && needs.kill-switch-preflight.outputs.active == 'true' && needs.health-check.result == 'skipped' }}
     uses: ./.github/workflows/slack-notify-status.yml
     with:
       mode: finish

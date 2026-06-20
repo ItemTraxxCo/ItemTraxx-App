@@ -1,12 +1,16 @@
 # Changelog
 
-Last updated (year-month-day): 2026-06-18
+Last updated (year-month-day): 2026-06-20
 
 This changelog summarizes notable ItemTraxx product, reliability, security, and experience updates.
 
 Changes are dated based on the default timezone: America/Los_Angeles
 
 ---
+
+## 6/20/2026 Development Update
+
+- Completed routine dependency security cleanup.
 
 ### 6/18/2026 Development Update
 

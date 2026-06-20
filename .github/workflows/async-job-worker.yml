@@ -56,7 +56,7 @@ jobs:
     needs:
       - slack-notify-start
       - process-jobs
-    if: ${{ always() && needs.process-jobs.result != 'skipped' }}
+    if: ${{ always() && needs.slack-notify-start.result == 'success' && needs.process-jobs.result != 'skipped' }}
     uses: ./.github/workflows/slack-notify-status.yml
     with:
       mode: finish
@@ -80,7 +80,7 @@ jobs:
       - kill-switch-preflight
       - slack-notify-start
       - process-jobs
-    if: ${{ always() && needs.kill-switch-preflight.outputs.active == 'true' && needs.process-jobs.result == 'skipped' }}
+    if: ${{ always() && needs.slack-notify-start.result == 'success' && needs.kill-switch-preflight.outputs.active == 'true' && needs.process-jobs.result == 'skipped' }}
     uses: ./.github/workflows/slack-notify-status.yml
     with:
       mode: finish

@@ -269,7 +269,7 @@
           <RouterLink to="/legal">Legal Home</RouterLink>
           <RouterLink to="/privacy">Privacy</RouterLink>
           <RouterLink to="/legal/student-privacy">Student Privacy</RouterLink>
-          <RouterLink to="/legal/dpa">DPA</RouterLink>
+          <RouterLink to="/legal/dpa">Data Processing Addendum</RouterLink>
           <RouterLink to="/cookies">Cookies</RouterLink>
           <RouterLink to="/accessibility">Accessibility</RouterLink>
           <RouterLink to="/security">Security</RouterLink>

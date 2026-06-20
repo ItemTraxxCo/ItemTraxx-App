@@ -36,7 +36,8 @@ confidentiality and any additional organizational commitments must be confirmed 
 ## 5. Service Providers
 
 Customer authorizes ItemTraxx to use subprocessors needed for hosting, database and authentication, storage, edge security, email, monitoring, diagnostics, support, and engineering operations.
-The current platform may use Supabase, Cloudflare, Vercel, PostHog, Sentry, transactional email providers, GitHub, Slack, and incident.io according to the active environment and feature configuration. Any required subprocessor restrictions, approval rights, or additional flow-down terms must be included in the executed agreement.
+The current platform may use Supabase, Cloudflare, Vercel, PostHog, Sentry, transactional email providers, GitHub, Slack, and incident.io according to the active environment and feature configuration.
+This DPA does not create a general third-party subprocessor-change notice, objection, or termination right unless those rights are expressly included in the executed agreement. Any required subprocessor restrictions, approval rights, notice obligations, objection rights, termination rights, or additional flow-down terms must be included in the executed agreement.
 
 ## 6. Requests and Cooperation
 

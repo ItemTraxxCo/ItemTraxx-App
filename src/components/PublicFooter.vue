@@ -32,9 +32,7 @@
       <div class="footer-column">
         <p class="footer-heading">Support</p>
         <RouterLink to="/contact-support">Contact Support</RouterLink>
-        <RouterLink to="/security">Security</RouterLink>
         <RouterLink to="/report-security-issue">Report Security Issue</RouterLink>
-        <RouterLink to="/trust">Trust</RouterLink>
         <RouterLink to="/changelog">Changelog</RouterLink>
         <RouterLink to="/faq">FAQ</RouterLink>
         <a href="https://status.itemtraxx.com/" target="_blank" rel="noreferrer">Status</a>

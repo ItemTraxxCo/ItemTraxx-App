@@ -53,6 +53,9 @@ declare global {
       }) => Promise<unknown>;
       clearSession: () => void;
       navigate: (path: string) => Promise<void>;
+      generateBarcodePattern: (
+        value: string
+      ) => Promise<{ modules: number; bars: { start: number; width: number }[] }>;
     };
   }
 }
@@ -159,6 +162,20 @@ const attachE2EControls = () => {
     },
     async navigate(path: string) {
       await router.push(path);
+    },
+    async generateBarcodePattern(value: string) {
+      const [{ createBarcodePattern }, { default: JsBarcode }] = await Promise.all([
+        import("./services/barcodePdfService"),
+        import("jsbarcode"),
+      ]);
+      return createBarcodePattern(
+        value,
+        JsBarcode as (
+          element: HTMLCanvasElement,
+          text: string,
+          options?: unknown
+        ) => void
+      );
     },
   };
 };

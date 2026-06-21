@@ -93,6 +93,24 @@ const getTorchSupport = (track: MediaStreamTrack | null) => {
   return Boolean(capabilities.torch);
 };
 
+const applyContinuousFocus = async (track: MediaStreamTrack | null) => {
+  if (!track || typeof (track as MediaStreamTrack & { getCapabilities?: () => MediaTrackCapabilities }).getCapabilities !== "function") {
+    return;
+  }
+  try {
+    const capabilities = (track as MediaStreamTrack & {
+      getCapabilities: () => MediaTrackCapabilities;
+    }).getCapabilities() as MediaTrackCapabilities & { focusMode?: string[] };
+    if (Array.isArray(capabilities.focusMode) && capabilities.focusMode.includes("continuous")) {
+      await track.applyConstraints({
+        advanced: [{ focusMode: "continuous" } as unknown as MediaTrackConstraintSet],
+      });
+    }
+  } catch {
+    // Focus control unsupported on this device/browser; rely on system default.
+  }
+};
+
 const chooseStatus = (metrics: FrameMetrics, hasDetection: boolean): ScannerStatus => {
   if (metrics.brightness < 20) return "low_light";
   if (metrics.glareRatio > 0.26) return "glare";
@@ -127,8 +145,13 @@ export const useCameraBarcodeScanner = (options: UseCameraBarcodeScannerOptions)
   let scanTimer: number | null = null;
   let devices: string[] = [];
   let deviceIndex = 0;
-  let canvas: HTMLCanvasElement | null = null;
-  let context: CanvasRenderingContext2D | null = null;
+  let metricsCanvas: HTMLCanvasElement | null = null;
+  let metricsContext: CanvasRenderingContext2D | null = null;
+  let detectCanvas: HTMLCanvasElement | null = null;
+  let detectContext: CanvasRenderingContext2D | null = null;
+  let scanInFlight = false;
+  let loopActive = false;
+  let loopGeneration = 0;
   let lastScanValue = "";
   let lastScanAt = 0;
   let lastStatusKey = "";
@@ -158,8 +181,12 @@ export const useCameraBarcodeScanner = (options: UseCameraBarcodeScannerOptions)
   };
 
   const stopLoop = () => {
+    loopActive = false;
+    // Invalidate any in-flight tick closure so a resuming scanFrame cannot
+    // schedule another timer after the loop has been stopped/restarted.
+    loopGeneration += 1;
     if (scanTimer !== null) {
-      window.clearInterval(scanTimer);
+      window.clearTimeout(scanTimer);
       scanTimer = null;
     }
   };
@@ -187,13 +214,13 @@ export const useCameraBarcodeScanner = (options: UseCameraBarcodeScannerOptions)
 
   const analyzeFrame = (): FrameMetrics => {
     const video = videoRef.value;
-    if (!video || !context || !canvas) return { brightness: 0, glareRatio: 0, sharpness: 0 };
+    if (!video || !metricsContext || !metricsCanvas) return { brightness: 0, glareRatio: 0, sharpness: 0 };
     const width = 240;
     const height = 180;
-    canvas.width = width;
-    canvas.height = height;
-    context.drawImage(video, 0, 0, width, height);
-    const { data } = context.getImageData(0, 0, width, height);
+    if (metricsCanvas.width !== width) metricsCanvas.width = width;
+    if (metricsCanvas.height !== height) metricsCanvas.height = height;
+    metricsContext.drawImage(video, 0, 0, width, height);
+    const { data } = metricsContext.getImageData(0, 0, width, height);
     let brightnessTotal = 0;
     let glareCount = 0;
     let sharpnessTotal = 0;
@@ -225,7 +252,7 @@ export const useCameraBarcodeScanner = (options: UseCameraBarcodeScannerOptions)
   };
 
   const detectInCenterRegion = async (video: HTMLVideoElement): Promise<DetectedBarcodeLike | null> => {
-    if (!detector || !canvas || !context || !video.videoWidth || !video.videoHeight) return null;
+    if (!detector || !detectCanvas || !detectContext || !video.videoWidth || !video.videoHeight) return null;
     const sourceWidth = video.videoWidth;
     const sourceHeight = video.videoHeight;
     const region = {
@@ -235,9 +262,11 @@ export const useCameraBarcodeScanner = (options: UseCameraBarcodeScannerOptions)
       y: sourceHeight * 0.31,
     };
 
-    canvas.width = Math.max(1, Math.round(region.width * 1.4));
-    canvas.height = Math.max(1, Math.round(region.height * 1.4));
-    context.drawImage(
+    const targetWidth = Math.max(1, Math.round(region.width * 1.4));
+    const targetHeight = Math.max(1, Math.round(region.height * 1.4));
+    if (detectCanvas.width !== targetWidth) detectCanvas.width = targetWidth;
+    if (detectCanvas.height !== targetHeight) detectCanvas.height = targetHeight;
+    detectContext.drawImage(
       video,
       region.x,
       region.y,
@@ -245,19 +274,19 @@ export const useCameraBarcodeScanner = (options: UseCameraBarcodeScannerOptions)
       region.height,
       0,
       0,
-      canvas.width,
-      canvas.height
+      detectCanvas.width,
+      detectCanvas.height
     );
 
-    const matches = await detector.detect(canvas);
+    const matches = await detector.detect(detectCanvas);
     const firstMatch = matches.find((item) => Boolean(item.rawValue?.trim()));
     if (!firstMatch) return null;
 
     const box = toBoundingBox(firstMatch.boundingBox);
     if (!box) return firstMatch;
 
-    const scaleX = region.width / canvas.width;
-    const scaleY = region.height / canvas.height;
+    const scaleX = region.width / detectCanvas.width;
+    const scaleY = region.height / detectCanvas.height;
     return {
       ...firstMatch,
       boundingBox: {
@@ -325,9 +354,11 @@ export const useCameraBarcodeScanner = (options: UseCameraBarcodeScannerOptions)
   const scanFrame = async () => {
     const video = videoRef.value;
     if (!video || !detector || video.readyState < 2) return;
+    if (scanInFlight) return;
+    scanInFlight = true;
 
-    const metrics = analyzeFrame();
     try {
+      const metrics = analyzeFrame();
       const matches = await detector.detect(video);
       let firstMatch = matches.find((item) => Boolean(item.rawValue?.trim())) ?? null;
       if (!firstMatch) {
@@ -376,13 +407,26 @@ export const useCameraBarcodeScanner = (options: UseCameraBarcodeScannerOptions)
       currentDetection.value = null;
       previewBox.value = null;
       emitStatus("unscannable");
+    } finally {
+      scanInFlight = false;
     }
   };
 
   const startLoop = () => {
     stopLoop();
-    scanTimer = window.setInterval(() => {
-      void scanFrame();
+    loopActive = true;
+    const generation = loopGeneration;
+    const isCurrent = () => loopActive && generation === loopGeneration;
+    const tick = async () => {
+      if (!isCurrent()) return;
+      await scanFrame();
+      if (!isCurrent()) return;
+      scanTimer = window.setTimeout(() => {
+        void tick();
+      }, SCAN_INTERVAL_MS);
+    };
+    scanTimer = window.setTimeout(() => {
+      void tick();
     }, SCAN_INTERVAL_MS);
   };
 
@@ -427,13 +471,34 @@ export const useCameraBarcodeScanner = (options: UseCameraBarcodeScannerOptions)
     try {
       stopStream();
       detector = new DetectorCtor({ formats: [...FORMATS] });
+      const baseVideo: MediaTrackConstraints = {
+        width: { ideal: 1920 },
+        height: { ideal: 1080 },
+        frameRate: { ideal: 30 },
+      };
       const constraints: MediaStreamConstraints = {
         video: devices[deviceIndex]
-          ? { deviceId: { exact: devices[deviceIndex] } }
-          : { facingMode: usingRearCamera.value ? { ideal: "environment" } : { ideal: "user" } },
+          ? { ...baseVideo, deviceId: { exact: devices[deviceIndex] } }
+          : {
+              ...baseVideo,
+              facingMode: usingRearCamera.value ? { ideal: "environment" } : { ideal: "user" },
+            },
         audio: false,
       };
-      stream = await navigator.mediaDevices.getUserMedia(constraints);
+      // Minimal constraints used as a fallback when the preferred ones are
+      // rejected (e.g. a stale exact deviceId or an unsupported resolution),
+      // so the scanner degrades to the default camera instead of failing.
+      const fallbackConstraints: MediaStreamConstraints = {
+        video: {
+          facingMode: usingRearCamera.value ? { ideal: "environment" } : { ideal: "user" },
+        },
+        audio: false,
+      };
+      try {
+        stream = await navigator.mediaDevices.getUserMedia(constraints);
+      } catch {
+        stream = await navigator.mediaDevices.getUserMedia(fallbackConstraints);
+      }
       currentTrack = stream.getVideoTracks()[0] ?? null;
       if (!currentTrack) {
         throw new Error("No camera track available.");
@@ -442,8 +507,13 @@ export const useCameraBarcodeScanner = (options: UseCameraBarcodeScannerOptions)
         videoRef.value.srcObject = stream;
         await videoRef.value.play();
       }
+      await applyContinuousFocus(currentTrack);
       await refreshCapabilities();
-      startLoop();
+      // Skip starting the loop if the tab went hidden during async startup;
+      // the visibilitychange handler resumes scanning on foreground.
+      if (typeof document === "undefined" || !document.hidden) {
+        startLoop();
+      }
     } catch (error) {
       permissionDenied.value = true;
       errorMessage.value =
@@ -500,13 +570,30 @@ export const useCameraBarcodeScanner = (options: UseCameraBarcodeScannerOptions)
     );
   };
 
+  const handleVisibilityChange = () => {
+    if (typeof document === "undefined") return;
+    if (document.hidden) {
+      // Pause the scan loop while backgrounded to save CPU/battery; the camera
+      // stream is left intact so resuming is instant.
+      stopLoop();
+    } else if (isOpen.value && stream && detector) {
+      startLoop();
+    }
+  };
+
   onUnmounted(() => {
+    if (typeof document !== "undefined") {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    }
     stopStream();
   });
 
   if (typeof document !== "undefined") {
-    canvas = document.createElement("canvas");
-    context = canvas.getContext("2d", { willReadFrequently: true });
+    metricsCanvas = document.createElement("canvas");
+    metricsContext = metricsCanvas.getContext("2d", { willReadFrequently: true });
+    detectCanvas = document.createElement("canvas");
+    detectContext = detectCanvas.getContext("2d", { willReadFrequently: true });
+    document.addEventListener("visibilitychange", handleVisibilityChange);
   }
 
   return {

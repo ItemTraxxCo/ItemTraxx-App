@@ -1,10 +1,6 @@
 import { expect, test } from "@playwright/test";
 import type { Page } from "@playwright/test";
-
-type BarcodePattern = {
-  modules: number;
-  bars: { start: number; width: number }[];
-};
+import type { BarcodePattern } from "../../src/services/barcodePdfService";
 
 const generatePattern = async (page: Page, value: string): Promise<BarcodePattern> => {
   await page.waitForFunction(

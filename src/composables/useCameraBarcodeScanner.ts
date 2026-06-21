@@ -151,6 +151,7 @@ export const useCameraBarcodeScanner = (options: UseCameraBarcodeScannerOptions)
   let detectContext: CanvasRenderingContext2D | null = null;
   let scanInFlight = false;
   let loopActive = false;
+  let loopGeneration = 0;
   let lastScanValue = "";
   let lastScanAt = 0;
   let lastStatusKey = "";
@@ -181,6 +182,9 @@ export const useCameraBarcodeScanner = (options: UseCameraBarcodeScannerOptions)
 
   const stopLoop = () => {
     loopActive = false;
+    // Invalidate any in-flight tick closure so a resuming scanFrame cannot
+    // schedule another timer after the loop has been stopped/restarted.
+    loopGeneration += 1;
     if (scanTimer !== null) {
       window.clearTimeout(scanTimer);
       scanTimer = null;
@@ -411,10 +415,12 @@ export const useCameraBarcodeScanner = (options: UseCameraBarcodeScannerOptions)
   const startLoop = () => {
     stopLoop();
     loopActive = true;
+    const generation = loopGeneration;
+    const isCurrent = () => loopActive && generation === loopGeneration;
     const tick = async () => {
-      if (!loopActive) return;
+      if (!isCurrent()) return;
       await scanFrame();
-      if (!loopActive) return;
+      if (!isCurrent()) return;
       scanTimer = window.setTimeout(() => {
         void tick();
       }, SCAN_INTERVAL_MS);

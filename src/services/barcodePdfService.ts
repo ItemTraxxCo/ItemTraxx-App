@@ -1,6 +1,6 @@
-type BarRun = { start: number; width: number };
+export type BarRun = { start: number; width: number };
 
-type BarcodePattern = { modules: number; bars: BarRun[] };
+export type BarcodePattern = { modules: number; bars: BarRun[] };
 
 // Use JsBarcode purely as the (scanner-correct) CODE128 encoder, then read a
 // single pixel row to recover the bar pattern. Rendering one module-wide,
@@ -23,7 +23,7 @@ export const createBarcodePattern = (
   });
 
   const context = canvas.getContext("2d");
-  if (!context || canvas.width === 0) {
+  if (!context || canvas.width === 0 || canvas.height === 0) {
     throw new Error("Unable to render barcode.");
   }
 

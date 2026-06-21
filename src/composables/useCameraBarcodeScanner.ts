@@ -357,8 +357,8 @@ export const useCameraBarcodeScanner = (options: UseCameraBarcodeScannerOptions)
     if (scanInFlight) return;
     scanInFlight = true;
 
-    const metrics = analyzeFrame();
     try {
+      const metrics = analyzeFrame();
       const matches = await detector.detect(video);
       let firstMatch = matches.find((item) => Boolean(item.rawValue?.trim())) ?? null;
       if (!firstMatch) {
@@ -509,7 +509,11 @@ export const useCameraBarcodeScanner = (options: UseCameraBarcodeScannerOptions)
       }
       await applyContinuousFocus(currentTrack);
       await refreshCapabilities();
-      startLoop();
+      // Skip starting the loop if the tab went hidden during async startup;
+      // the visibilitychange handler resumes scanning on foreground.
+      if (typeof document === "undefined" || !document.hidden) {
+        startLoop();
+      }
     } catch (error) {
       permissionDenied.value = true;
       errorMessage.value =

@@ -3,7 +3,6 @@ name: Guard Dev PRs To Main
 permissions:
   contents: read
   issues: write
-  pull-requests: write
 
 on:
   pull_request:
@@ -38,7 +37,7 @@ jobs:
 
       - name: Comment on blocked PR
         if: ${{ steps.guard.outputs.blocked == 'true' }}
-        uses: actions/github-script@v8
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd
         with:
           script: |
             const body = [

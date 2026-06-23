@@ -289,10 +289,6 @@ import PublicFooter from "../components/PublicFooter.vue";
 .pricing-shell {
   min-height: 100vh;
   position: relative;
-  margin-top: -2.5rem;
-  margin-bottom: -3rem;
-  margin-left: -2rem;
-  margin-right: -2rem;
   padding: calc(2rem + env(safe-area-inset-top, 0px)) 0 3.2rem;
   background: var(--page-bg);
   color: var(--text);
@@ -582,7 +578,7 @@ import PublicFooter from "../components/PublicFooter.vue";
 }
 
 .pricing-section-divider span {
-  width: min(6767px, 32vw);
+  width: min(67px, 32vw);
   height: 1px;
   border-radius: 999px;
   background: var(--border);
@@ -624,8 +620,6 @@ import PublicFooter from "../components/PublicFooter.vue";
 
 @media (max-width: 980px) {
   .pricing-shell {
-    margin-top: -2.5rem;
-    margin-bottom: -3rem;
     padding: calc(1.25rem + env(safe-area-inset-top, 0px)) 0 2.6rem;
   }
 

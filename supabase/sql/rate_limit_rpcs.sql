@@ -26,8 +26,10 @@ declare
   v_scope text := trim(p_scope);
   v_window_seconds integer := greatest(coalesce(p_window_seconds, 0), 1);
   v_limit integer := greatest(coalesce(p_limit, 0), 1);
+  v_window_bucket timestamptz := timestamptz 'epoch' +
+    floor(extract(epoch from v_now) / v_window_seconds) * v_window_seconds * interval '1 second';
   v_cutoff timestamptz := v_now - make_interval(secs => v_window_seconds);
-  v_rate_limit public.rate_limits%rowtype;
+  v_next_count integer;
   v_retry_after integer;
 begin
   if v_actor_id is null then
@@ -44,51 +46,33 @@ begin
     and scope = v_scope
     and window_start < v_cutoff;
 
-  select *
-  into v_rate_limit
-  from public.rate_limits
-  where tenant_id = v_tenant_id
-    and actor_id = v_actor_id
-    and scope = v_scope
-    and window_start >= v_cutoff
-  order by window_start desc
-  limit 1
-  for update;
+  insert into public.rate_limits (
+    tenant_id,
+    actor_id,
+    scope,
+    window_start,
+    count
+  ) values (
+    v_tenant_id,
+    v_actor_id,
+    v_scope,
+    v_window_bucket,
+    1
+  )
+  on conflict (tenant_id, actor_id, scope, window_start)
+  do update
+    set count = public.rate_limits.count + 1
+  where public.rate_limits.count < v_limit
+  returning count into v_next_count;
 
   if not found then
-    insert into public.rate_limits (
-      tenant_id,
-      actor_id,
-      scope,
-      window_start,
-      count
-    ) values (
-      v_tenant_id,
-      v_actor_id,
-      v_scope,
-      v_now,
-      1
-    );
-
-    return query select true, null::integer;
-    return;
-  end if;
-
-  if v_rate_limit.count >= v_limit then
     v_retry_after := greatest(
-      ceil(extract(epoch from ((v_rate_limit.window_start + make_interval(secs => v_window_seconds)) - v_now)))::integer,
+      ceil(extract(epoch from ((v_window_bucket + make_interval(secs => v_window_seconds)) - v_now)))::integer,
       0
     );
     return query select false, v_retry_after;
     return;
   end if;
-
-  update public.rate_limits
-  set count = v_rate_limit.count + 1
-  where tenant_id = v_rate_limit.tenant_id
-    and actor_id = v_rate_limit.actor_id
-    and scope = v_rate_limit.scope
-    and window_start = v_rate_limit.window_start;
 
   return query select true, null::integer;
 end;
@@ -116,8 +100,10 @@ declare
   v_scope text := trim(p_scope);
   v_window_seconds integer := greatest(coalesce(p_window_seconds, 0), 1);
   v_limit integer := greatest(coalesce(p_limit, 0), 1);
+  v_window_bucket timestamptz := timestamptz 'epoch' +
+    floor(extract(epoch from v_now) / v_window_seconds) * v_window_seconds * interval '1 second';
   v_cutoff timestamptz := v_now - make_interval(secs => v_window_seconds);
-  v_rate_limit public.rate_limits_prelogin%rowtype;
+  v_next_count integer;
   v_retry_after integer;
 begin
   if v_rate_key = '' then
@@ -133,47 +119,31 @@ begin
     and scope = v_scope
     and window_start < v_cutoff;
 
-  select *
-  into v_rate_limit
-  from public.rate_limits_prelogin
-  where rate_key = v_rate_key
-    and scope = v_scope
-    and window_start >= v_cutoff
-  order by window_start desc
-  limit 1
-  for update;
+  insert into public.rate_limits_prelogin (
+    rate_key,
+    scope,
+    window_start,
+    count
+  ) values (
+    v_rate_key,
+    v_scope,
+    v_window_bucket,
+    1
+  )
+  on conflict (rate_key, scope, window_start)
+  do update
+    set count = public.rate_limits_prelogin.count + 1
+  where public.rate_limits_prelogin.count < v_limit
+  returning count into v_next_count;
 
   if not found then
-    insert into public.rate_limits_prelogin (
-      rate_key,
-      scope,
-      window_start,
-      count
-    ) values (
-      v_rate_key,
-      v_scope,
-      v_now,
-      1
-    );
-
-    return query select true, null::integer;
-    return;
-  end if;
-
-  if v_rate_limit.count >= v_limit then
     v_retry_after := greatest(
-      ceil(extract(epoch from ((v_rate_limit.window_start + make_interval(secs => v_window_seconds)) - v_now)))::integer,
+      ceil(extract(epoch from ((v_window_bucket + make_interval(secs => v_window_seconds)) - v_now)))::integer,
       0
     );
     return query select false, v_retry_after;
     return;
   end if;
-
-  update public.rate_limits_prelogin
-  set count = v_rate_limit.count + 1
-  where rate_key = v_rate_limit.rate_key
-    and scope = v_rate_limit.scope
-    and window_start = v_rate_limit.window_start;
 
   return query select true, null::integer;
 end;

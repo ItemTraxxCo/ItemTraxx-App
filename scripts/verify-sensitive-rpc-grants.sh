@@ -10,6 +10,18 @@ fi
 
 psql "$DB_URL" -v ON_ERROR_STOP=1 <<'SQL'
 select
+  'public.consume_rate_limit(p_scope text, p_limit integer, p_window_seconds integer)' as function_name,
+  has_function_privilege('anon', 'public.consume_rate_limit(p_scope text, p_limit integer, p_window_seconds integer)', 'EXECUTE') as anon_execute,
+  has_function_privilege('authenticated', 'public.consume_rate_limit(p_scope text, p_limit integer, p_window_seconds integer)', 'EXECUTE') as authenticated_execute,
+  has_function_privilege('service_role', 'public.consume_rate_limit(p_scope text, p_limit integer, p_window_seconds integer)', 'EXECUTE') as service_role_execute
+union all
+select
+  'public.consume_rate_limit_prelogin(p_key text, p_scope text, p_limit integer, p_window_seconds integer)' as function_name,
+  has_function_privilege('anon', 'public.consume_rate_limit_prelogin(p_key text, p_scope text, p_limit integer, p_window_seconds integer)', 'EXECUTE') as anon_execute,
+  has_function_privilege('authenticated', 'public.consume_rate_limit_prelogin(p_key text, p_scope text, p_limit integer, p_window_seconds integer)', 'EXECUTE') as authenticated_execute,
+  has_function_privilege('service_role', 'public.consume_rate_limit_prelogin(p_key text, p_scope text, p_limit integer, p_window_seconds integer)', 'EXECUTE') as service_role_execute
+union all
+select
   'public.enqueue_async_job(text,jsonb,integer,timestamptz,integer)' as function_name,
   has_function_privilege('anon', 'public.enqueue_async_job(text,jsonb,integer,timestamptz,integer)', 'EXECUTE') as anon_execute,
   has_function_privilege('authenticated', 'public.enqueue_async_job(text,jsonb,integer,timestamptz,integer)', 'EXECUTE') as authenticated_execute,
@@ -50,6 +62,26 @@ declare
   function_signature text;
   unexpected_function text;
 begin
+  if to_regprocedure('public.consume_rate_limit(text,integer,integer)') is null then
+    raise exception 'Missing RPC definition for public.consume_rate_limit(text,integer,integer)';
+  end if;
+
+  if to_regprocedure('public.consume_rate_limit_prelogin(text,text,integer,integer)') is null then
+    raise exception 'Missing RPC definition for public.consume_rate_limit_prelogin(text,text,integer,integer)';
+  end if;
+
+  if has_function_privilege('anon', 'public.consume_rate_limit(p_scope text, p_limit integer, p_window_seconds integer)', 'EXECUTE')
+    or not has_function_privilege('authenticated', 'public.consume_rate_limit(p_scope text, p_limit integer, p_window_seconds integer)', 'EXECUTE')
+    or not has_function_privilege('service_role', 'public.consume_rate_limit(p_scope text, p_limit integer, p_window_seconds integer)', 'EXECUTE') then
+    raise exception 'Unsafe RPC grants for public.consume_rate_limit(p_scope text, p_limit integer, p_window_seconds integer)';
+  end if;
+
+  if not has_function_privilege('anon', 'public.consume_rate_limit_prelogin(p_key text, p_scope text, p_limit integer, p_window_seconds integer)', 'EXECUTE')
+    or not has_function_privilege('authenticated', 'public.consume_rate_limit_prelogin(p_key text, p_scope text, p_limit integer, p_window_seconds integer)', 'EXECUTE')
+    or not has_function_privilege('service_role', 'public.consume_rate_limit_prelogin(p_key text, p_scope text, p_limit integer, p_window_seconds integer)', 'EXECUTE') then
+    raise exception 'Unsafe RPC grants for public.consume_rate_limit_prelogin(p_key text, p_scope text, p_limit integer, p_window_seconds integer)';
+  end if;
+
   foreach function_signature in array array[
     'public.enqueue_async_job(text,jsonb,integer,timestamptz,integer)',
     'public.claim_async_jobs(uuid,integer)',
@@ -93,6 +125,7 @@ begin
     and p.prosecdef
     and has_function_privilege('authenticated', p.oid, 'EXECUTE')
     and format('%I.%I(%s)', n.nspname, p.proname, pg_get_function_identity_arguments(p.oid)) not in (
+      'public.consume_rate_limit(p_scope text, p_limit integer, p_window_seconds integer)',
       'public.consume_rate_limit_prelogin(p_key text, p_scope text, p_limit integer, p_window_seconds integer)',
       'public.current_district_id()',
       'public.current_session_binding_key()',

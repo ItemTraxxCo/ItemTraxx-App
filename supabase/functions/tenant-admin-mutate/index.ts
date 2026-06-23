@@ -186,7 +186,7 @@ serve(async (req) => {
 
     const isMutationAction = action !== "list_tenant_admins";
     if (isMutationAction) {
-      const { data: rateLimit, error: rateLimitError } = await adminClient.rpc(
+      const { data: rateLimit, error: rateLimitError } = await userClient.rpc(
         "consume_rate_limit",
         {
           p_scope: "admin",

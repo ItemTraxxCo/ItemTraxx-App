@@ -1,3 +1,22 @@
+create table if not exists public.rate_limits (
+  tenant_id uuid not null,
+  actor_id uuid not null,
+  scope text not null,
+  window_start timestamptz not null default now(),
+  count integer not null default 0,
+  primary key (tenant_id, actor_id, scope, window_start),
+  constraint rate_limits_count_nonnegative check (count >= 0)
+);
+
+create table if not exists public.rate_limits_prelogin (
+  rate_key text not null,
+  scope text not null,
+  window_start timestamptz not null default now(),
+  count integer not null default 0,
+  primary key (rate_key, scope, window_start),
+  constraint rate_limits_prelogin_count_nonnegative check (count >= 0)
+);
+
 alter table if exists public.data_retention_policies enable row level security;
 alter table if exists public.rate_limits enable row level security;
 alter table if exists public.rate_limits_prelogin enable row level security;

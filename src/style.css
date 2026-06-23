@@ -66,12 +66,15 @@ a:hover {
 }
 
 html {
+  width: 100%;
+  max-width: 100%;
   background-color: var(--page-bg);
 }
 
 body {
   margin: 0;
-  display: flex;
+  width: 100%;
+  max-width: 100%;
   min-width: 320px;
   min-height: 100vh;
   background-color: var(--page-bg);
@@ -94,6 +97,7 @@ body.marketing-route-active {
 body.marketing-route-active #app {
   min-height: 100vh;
   min-height: 100dvh;
+  padding: 0;
   background: #090d14;
 }
 
@@ -125,6 +129,7 @@ html[data-theme="dark"] body.confirmation-route-active {
 
 body.confirmation-route-active #app {
   min-height: 100vh;
+  padding: 0;
   background: inherit;
 }
 
@@ -145,11 +150,13 @@ html[data-theme="dark"] body.unavailable-route-active {
 
 body.unavailable-route-active #app {
   min-height: 100vh;
+  padding: 0;
   background: inherit;
 }
 
 body.auth-route-active #app {
   min-height: 100vh;
+  padding: 0;
   background: inherit;
 }
 
@@ -231,6 +238,7 @@ button:focus-visible {
 
 #app {
   width: 100%;
+  max-width: 100%;
   box-sizing: border-box;
   margin: 0 auto;
   padding: 2.5rem 2rem 3rem;
@@ -238,7 +246,6 @@ button:focus-visible {
 }
 
 .app-shell.route-shell-auth {
-  margin: -2.5rem -2rem 0;
   min-height: 100vh;
   min-height: 100dvh;
   overflow-x: hidden;
@@ -247,7 +254,6 @@ button:focus-visible {
 
 .app-shell.route-shell-marketing {
   position: relative;
-  margin: -2.5rem -2rem -3rem;
   min-height: 100vh;
   min-height: 100dvh;
   padding: 0;
@@ -265,7 +271,6 @@ button:focus-visible {
 }
 
 .app-shell.route-shell-confirmation {
-  margin: -2.5rem -2rem -3rem;
   min-height: 100vh;
   min-height: 100dvh;
   padding: 0;
@@ -274,7 +279,6 @@ button:focus-visible {
 }
 
 .app-shell.route-shell-unavailable {
-  margin: -2.5rem -2rem -3rem;
   min-height: 100vh;
   min-height: 100dvh;
   padding: 0;
@@ -282,7 +286,7 @@ button:focus-visible {
 }
 
 .app-shell.route-shell-banner-bleed.with-top-banners {
-  margin-top: -2.5rem;
+  margin-top: 0;
 }
 
 .app-shell.with-top-banners .pricing-shell {
@@ -295,18 +299,6 @@ button:focus-visible {
 }
 
 @media (max-width: 640px) {
-  .app-shell.route-shell-auth {
-    margin: -2.5rem -2rem 0;
-  }
-
-  .app-shell.route-shell-marketing {
-    margin: -2.5rem -2rem -3rem;
-  }
-
-  .app-shell.route-shell-confirmation {
-    margin: -2.5rem -2rem -3rem;
-  }
-
   .app-shell.with-top-banners .pricing-shell {
     padding-top: 1.1rem;
   }
@@ -393,7 +385,7 @@ button:focus-visible {
   position: fixed;
   inset: 0;
   z-index: 20;
-  width: 100vw;
+  width: 100%;
   min-height: 100vh;
   max-width: none;
   display: grid;
@@ -909,7 +901,7 @@ textarea {
   overflow: auto;
   padding: 48px 24px;
   position: fixed;
-  width: 100vw;
+  width: 100%;
   z-index: 1250;
 }
 

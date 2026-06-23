@@ -116,7 +116,7 @@ onUnmounted(() => {
   min-height: 100vh;
   padding: 48px 24px;
   position: relative;
-  width: 100vw;
+  width: 100%;
 }
 
 .unavailable-page-dark {

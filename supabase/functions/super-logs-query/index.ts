@@ -141,17 +141,18 @@ serve(async (req) => {
     );
 
     if (rateLimitError) {
-      console.warn("super-logs-query rate limit unavailable", {
+      console.error("super-logs-query rate limit unavailable", {
         message: rateLimitError.message,
         code: (rateLimitError as { code?: string }).code,
       });
-    } else {
-      const rateLimitResult = rateLimit as RateLimitResult;
-      if (!rateLimitResult.allowed) {
-        return jsonResponse(429, {
-          error: "Rate limit exceeded, please try again in a minute.",
-        });
-      }
+      return jsonResponse(500, { error: "Rate limit check failed" });
+    }
+
+    const rateLimitResult = rateLimit as RateLimitResult;
+    if (!rateLimitResult.allowed) {
+      return jsonResponse(429, {
+        error: "Rate limit exceeded, please try again in a minute.",
+      });
     }
 
     const { payload } = await readJsonBody(req);

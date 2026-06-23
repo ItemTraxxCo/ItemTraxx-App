@@ -489,7 +489,6 @@ onBeforeUnmount(() => {
 <style scoped>
 .landing-page {
   min-height: 100vh;
-  margin: -2.5rem -2rem -3rem;
   padding: 1.2rem 0 3.4rem;
   background: linear-gradient(180deg, #1f4ca3 0%, #38d0b1 100%);
   color: #ffffff;
@@ -1075,7 +1074,6 @@ onBeforeUnmount(() => {
 
 @media (max-width: 720px) {
   .landing-page {
-    margin: -2.5rem -2rem -3rem;
     padding-bottom: 2.2rem;
   }
 

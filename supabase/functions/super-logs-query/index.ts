@@ -131,7 +131,7 @@ serve(async (req) => {
       throw error;
     }
 
-    const { data: rateLimit, error: rateLimitError } = await adminClient.rpc(
+    const { data: rateLimit, error: rateLimitError } = await userClient.rpc(
       "consume_rate_limit",
       {
         p_scope: "super_admin",

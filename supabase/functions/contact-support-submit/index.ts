@@ -57,9 +57,9 @@ type NormalizedAttachment = {
   stored_filename: string;
   storage_extension: DetectedAttachmentType["extension"];
   content_type: string;
-  content_base64: string;
   size_bytes: number;
   bytes: Uint8Array;
+  storage_path?: string;
 };
 
 type DetectedAttachmentType = {
@@ -384,7 +384,6 @@ serve(async (req) => {
         stored_filename: `${crypto.randomUUID()}.${detectedType.extension}`,
         storage_extension: detectedType.extension,
         content_type: detectedType.contentType,
-        content_base64: contentBase64,
         size_bytes: bytes.length,
         bytes,
       });
@@ -446,6 +445,7 @@ serve(async (req) => {
         }
 
         uploadedPaths.push(storagePath);
+        attachment.storage_path = storagePath;
         attachmentRows.push({
           support_request_id: supportRequest.id,
           storage_bucket: SUPPORT_ATTACHMENT_BUCKET,
@@ -518,8 +518,8 @@ serve(async (req) => {
         message,
         attachments: attachments.map((attachment) => ({
           filename: attachment.stored_filename,
+          storage_path: attachment.storage_path,
           content_type: attachment.content_type,
-          content_base64: attachment.content_base64,
           size_bytes: attachment.size_bytes,
         })),
         support_email: supportEmail,

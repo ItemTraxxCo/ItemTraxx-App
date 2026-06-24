@@ -363,7 +363,7 @@ const startStatusPolling = () => {
   if (statusTimer || document.visibilityState === 'hidden') return;
   statusTimer = window.setInterval(() => {
     void refreshSystemStatus();
-  }, 60_000);
+  }, 300_000);
 };
 
 const stopStatusPolling = () => {

@@ -15,6 +15,7 @@ import {
 const EMAIL_LOGO_URL = Deno.env.get("ITX_EMAIL_LOGO_URL")?.trim() || null;
 const PASSWORD_RESET_URL = "https://itemtraxx.com/forgot-password";
 const CONTACT_SUPPORT_URL = "https://itemtraxx.com/contact-support";
+const SUPPORT_ATTACHMENT_BUCKET = "support-request-attachments";
 
 type AsyncJobRow = {
   id: string;
@@ -51,12 +52,12 @@ type SupportRequestPayload = {
   name: string;
   reply_email: string;
   subject: string;
-  category: "general" | "bug" | "billing" | "access" | "feature" | "other";
+  category: "general" | "bug" | "billing" | "access" | "feature" | "privacy" | "other";
   message: string;
   attachments?: Array<{
     filename: string;
+    storage_path: string;
     content_type: string;
-    content_base64: string;
     size_bytes: number;
   }>;
   support_email: string;
@@ -760,11 +761,45 @@ const processSupportRequestEmail = async (
   requestId: string,
   slackWebhookUrl?: string,
 ) => {
-  const attachments = (payload.attachments ?? []).slice(0, 2).map((attachment) => ({
-    filename: attachment.filename,
-    content: attachment.content_base64,
-    content_type: attachment.content_type,
-  }));
+  const attachments: Array<{
+    filename: string;
+    content: string;
+    content_type: string;
+  }> = [];
+  for (const attachment of (payload.attachments ?? []).slice(0, 2)) {
+    const downloadResult = await adminClient.storage
+      .from(SUPPORT_ATTACHMENT_BUCKET)
+      .download(attachment.storage_path);
+
+    if (downloadResult.error || !downloadResult.data) {
+      logError("job-worker support attachment download failed", requestId, downloadResult.error, {
+        job_id: jobId,
+        storage_path: attachment.storage_path,
+        filename: attachment.filename,
+      });
+      continue;
+    }
+
+    try {
+      const bytes = new Uint8Array(await downloadResult.data.arrayBuffer());
+      let binary = "";
+      for (const byte of bytes) {
+        binary += String.fromCharCode(byte);
+      }
+
+      attachments.push({
+        filename: attachment.filename,
+        content: btoa(binary),
+        content_type: attachment.content_type,
+      });
+    } catch (error) {
+      logError("job-worker support attachment encode failed", requestId, error, {
+        job_id: jobId,
+        storage_path: attachment.storage_path,
+        filename: attachment.filename,
+      });
+    }
+  }
   const internalSubject = `Support Request - ${payload.subject}`;
   await sendTrackedResendEmail(adminClient, resendApiKey, {
     from: payload.from_email,

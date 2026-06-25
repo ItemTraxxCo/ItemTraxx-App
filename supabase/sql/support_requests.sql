@@ -77,6 +77,7 @@ alter table public.support_request_attachments
 create or replace function public.touch_support_requests_updated_at()
 returns trigger
 language plpgsql
+set search_path = public
 as $$
 begin
   new.updated_at = now();

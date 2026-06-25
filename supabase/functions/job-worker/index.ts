@@ -16,6 +16,8 @@ const EMAIL_LOGO_URL = Deno.env.get("ITX_EMAIL_LOGO_URL")?.trim() || null;
 const PASSWORD_RESET_URL = "https://itemtraxx.com/forgot-password";
 const CONTACT_SUPPORT_URL = "https://itemtraxx.com/contact-support";
 const SUPPORT_ATTACHMENT_BUCKET = "support-request-attachments";
+const SUPPORT_ATTACHMENT_PATH_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\/[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\.(png|jpg|webp|gif)$/i;
 
 type AsyncJobRow = {
   id: string;
@@ -56,10 +58,12 @@ type SupportRequestPayload = {
   message: string;
   attachments?: Array<{
     filename: string;
-    storage_path: string;
+    storage_path?: string;
+    content_base64?: string;
     content_type: string;
     size_bytes: number;
   }>;
+  support_request_id?: string;
   support_email: string;
   from_email: string;
 };
@@ -636,15 +640,18 @@ const buildDistrictSupportHtml = (payload: DistrictSupportPayload, supportEmail:
 </html>`;
 };
 
-const buildSupportRequestInternalHtml = (payload: SupportRequestPayload) => {
+const buildSupportRequestInternalHtml = (
+  payload: SupportRequestPayload,
+  deliveredAttachmentCount: number,
+) => {
   const name = escapeHtml(payload.name);
   const replyEmail = escapeHtml(payload.reply_email);
   const subject = escapeHtml(payload.subject);
   const category = escapeHtml(payload.category);
   const message = escapeHtml(payload.message).replaceAll("\n", "<br />");
   const supportEmail = escapeHtml(payload.support_email);
-  const attachmentSummary = payload.attachments?.length
-    ? `<p style="margin:14px 0 0 0;font-size:14px;line-height:1.6;color:#68645f;"><strong>Attachments:</strong> ${payload.attachments.length} image${payload.attachments.length === 1 ? "" : "s"} included.</p>`
+  const attachmentSummary = deliveredAttachmentCount
+    ? `<p style="margin:14px 0 0 0;font-size:14px;line-height:1.6;color:#68645f;"><strong>Attachments:</strong> ${deliveredAttachmentCount} image${deliveredAttachmentCount === 1 ? "" : "s"} included.</p>`
     : "";
 
   return `<!doctype html>
@@ -761,23 +768,74 @@ const processSupportRequestEmail = async (
   requestId: string,
   slackWebhookUrl?: string,
 ) => {
+  const normalizeAttachmentValue = (value: unknown, maxLength = 4096) => {
+    if (typeof value !== "string") return null;
+    const trimmed = value.trim();
+    if (!trimmed || trimmed.length > maxLength) return null;
+    return trimmed;
+  };
+
   const attachments: Array<{
     filename: string;
     content: string;
     content_type: string;
   }> = [];
   for (const attachment of (payload.attachments ?? []).slice(0, 2)) {
+    if (!attachment) {
+      logError("job-worker support attachment path rejected", requestId, new Error("Missing attachment storage path"), {
+        job_id: jobId,
+        filename: null,
+      });
+      continue;
+    }
+
+    const inlineContent = normalizeAttachmentValue(attachment.content_base64, 12_000_000);
+    if (inlineContent) {
+      attachments.push({
+        filename: attachment.filename,
+        content: inlineContent,
+        content_type: attachment.content_type,
+      });
+      continue;
+    }
+
+    const storagePath = normalizeAttachmentValue(attachment.storage_path, 256);
+    if (!storagePath) {
+      logError("job-worker support attachment path rejected", requestId, new Error("Missing attachment storage path"), {
+        job_id: jobId,
+        filename: attachment.filename,
+      });
+      continue;
+    }
+    if (!SUPPORT_ATTACHMENT_PATH_PATTERN.test(storagePath)) {
+      logError("job-worker support attachment path rejected", requestId, new Error("Invalid attachment storage path"), {
+        job_id: jobId,
+        storage_path: attachment.storage_path ?? null,
+        filename: attachment.filename,
+      });
+      continue;
+    }
+    if (payload.support_request_id && !storagePath.startsWith(`${payload.support_request_id}/`)) {
+      logError("job-worker support attachment path mismatched request", requestId, new Error("Attachment storage path does not match support request"), {
+        job_id: jobId,
+        support_request_id: payload.support_request_id,
+        storage_path: attachment.storage_path ?? null,
+        filename: attachment.filename,
+      });
+      continue;
+    }
+
     const downloadResult = await adminClient.storage
       .from(SUPPORT_ATTACHMENT_BUCKET)
-      .download(attachment.storage_path);
+      .download(storagePath);
 
     if (downloadResult.error || !downloadResult.data) {
       logError("job-worker support attachment download failed", requestId, downloadResult.error, {
         job_id: jobId,
-        storage_path: attachment.storage_path,
+        storage_path: storagePath,
         filename: attachment.filename,
       });
-      continue;
+      throw downloadResult.error ?? new Error("Support attachment download returned no data");
     }
 
     try {
@@ -795,9 +853,10 @@ const processSupportRequestEmail = async (
     } catch (error) {
       logError("job-worker support attachment encode failed", requestId, error, {
         job_id: jobId,
-        storage_path: attachment.storage_path,
+        storage_path: storagePath,
         filename: attachment.filename,
       });
+      throw error;
     }
   }
   const internalSubject = `Support Request - ${payload.subject}`;
@@ -806,7 +865,7 @@ const processSupportRequestEmail = async (
     to: [payload.support_email],
     reply_to: payload.reply_email,
     subject: internalSubject,
-    html: buildSupportRequestInternalHtml(payload),
+    html: buildSupportRequestInternalHtml(payload, attachments.length),
     attachments,
     text:
       `A new support request was submitted.

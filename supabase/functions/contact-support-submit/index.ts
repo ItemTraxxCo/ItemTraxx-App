@@ -516,12 +516,18 @@ serve(async (req) => {
         subject,
         category,
         message,
-        attachments: attachments.map((attachment) => ({
-          filename: attachment.stored_filename,
-          storage_path: attachment.storage_path,
-          content_type: attachment.content_type,
-          size_bytes: attachment.size_bytes,
-        })),
+        attachments: attachments.map((attachment) => {
+          if (!attachment.storage_path) {
+            throw new Error("Support attachment upload did not produce a storage path.");
+          }
+          return {
+            filename: attachment.stored_filename,
+            storage_path: attachment.storage_path,
+            content_type: attachment.content_type,
+            size_bytes: attachment.size_bytes,
+          };
+        }),
+        support_request_id: supportRequest.id,
         support_email: supportEmail,
         from_email: fromEmail,
       },

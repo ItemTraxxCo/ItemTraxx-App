@@ -20,12 +20,51 @@ const scrubProperties = (
       )
     : undefined;
 
+const CSP_UNSAFE_EVAL_PATTERNS = [
+  /unsafe-eval/i,
+  /content security policy|content-security-policy|csp/i,
+  /refused to evaluate a string as javascript/i,
+];
+
+const isCspUnsafeEvalMessage = (message: string) => {
+  if (!message) return false;
+  const normalizedMessage = message.trim();
+  return (
+    CSP_UNSAFE_EVAL_PATTERNS[0].test(normalizedMessage) &&
+    CSP_UNSAFE_EVAL_PATTERNS[1].test(normalizedMessage) &&
+    (
+      CSP_UNSAFE_EVAL_PATTERNS[2].test(normalizedMessage) ||
+      /call to eval\(\) blocked by csp/i.test(normalizedMessage) ||
+      /disallowed string compilation/i.test(normalizedMessage)
+    )
+  );
+};
+
 const isCspUnsafeEvalError = (error: unknown) => {
   const message = error instanceof Error ? error.message : "";
   return (
-    message.includes("Refused to evaluate a string as JavaScript") &&
-    message.includes("unsafe-eval") &&
-    message.includes("Content Security Policy")
+    (error instanceof Error && error.name === "EvalError") &&
+    isCspUnsafeEvalMessage(message)
+  );
+};
+
+// PostHog's exception autocapture installs its own global onerror/onunhandledrejection
+// handlers and reports directly, bypassing the guards in globalErrorHandling.ts and
+// capturePostHogException. Drop the benign CSP unsafe-eval EvalError here too so the
+// strict CSP (vercel.json) does not pollute the error feed.
+const isCspUnsafeEvalExceptionEvent = (
+  properties?: Record<string, unknown>
+) => {
+  if (!properties) return false;
+  const exceptionList = properties.$exception_list;
+  if (!Array.isArray(exceptionList)) return false;
+  return exceptionList.some(
+    (entry) =>
+      !!entry &&
+      typeof entry === "object" &&
+      (entry as { type?: unknown }).type === "EvalError" &&
+      typeof (entry as { value?: unknown }).value === "string" &&
+      isCspUnsafeEvalMessage((entry as { value: string }).value)
   );
 };
 
@@ -45,6 +84,15 @@ export const initPostHog = async () => {
       capture_pageleave: false,
       capture_dead_clicks: false,
       capture_exceptions: true,
+      before_send: (event) => {
+        if (
+          event?.event === "$exception" &&
+          isCspUnsafeEvalExceptionEvent(event.properties)
+        ) {
+          return null;
+        }
+        return event;
+      },
       logs: {
         captureConsoleLogs: true,
       },

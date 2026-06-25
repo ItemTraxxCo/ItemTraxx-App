@@ -58,7 +58,8 @@ type SupportRequestPayload = {
   message: string;
   attachments?: Array<{
     filename: string;
-    storage_path: string;
+    storage_path?: string;
+    content_base64?: string;
     content_type: string;
     size_bytes: number;
   }>;
@@ -767,24 +768,49 @@ const processSupportRequestEmail = async (
   requestId: string,
   slackWebhookUrl?: string,
 ) => {
+  const normalizeAttachmentValue = (value: unknown, maxLength = 4096) => {
+    if (typeof value !== "string") return null;
+    const trimmed = value.trim();
+    if (!trimmed || trimmed.length > maxLength) return null;
+    return trimmed;
+  };
+
   const attachments: Array<{
     filename: string;
     content: string;
     content_type: string;
   }> = [];
   for (const attachment of (payload.attachments ?? []).slice(0, 2)) {
-    if (!attachment || typeof attachment.storage_path !== "string") {
+    if (!attachment) {
       logError("job-worker support attachment path rejected", requestId, new Error("Missing attachment storage path"), {
         job_id: jobId,
-        filename: attachment?.filename,
+        filename: null,
       });
       continue;
     }
-    const storagePath = attachment.storage_path.trim();
+
+    const inlineContent = normalizeAttachmentValue(attachment.content_base64, 12_000_000);
+    if (inlineContent) {
+      attachments.push({
+        filename: attachment.filename,
+        content: inlineContent,
+        content_type: attachment.content_type,
+      });
+      continue;
+    }
+
+    const storagePath = normalizeAttachmentValue(attachment.storage_path, 256);
+    if (!storagePath) {
+      logError("job-worker support attachment path rejected", requestId, new Error("Missing attachment storage path"), {
+        job_id: jobId,
+        filename: attachment.filename,
+      });
+      continue;
+    }
     if (!SUPPORT_ATTACHMENT_PATH_PATTERN.test(storagePath)) {
       logError("job-worker support attachment path rejected", requestId, new Error("Invalid attachment storage path"), {
         job_id: jobId,
-        storage_path: attachment.storage_path,
+        storage_path: attachment.storage_path ?? null,
         filename: attachment.filename,
       });
       continue;
@@ -793,7 +819,7 @@ const processSupportRequestEmail = async (
       logError("job-worker support attachment path mismatched request", requestId, new Error("Attachment storage path does not match support request"), {
         job_id: jobId,
         support_request_id: payload.support_request_id,
-        storage_path: attachment.storage_path,
+        storage_path: attachment.storage_path ?? null,
         filename: attachment.filename,
       });
       continue;
@@ -809,7 +835,7 @@ const processSupportRequestEmail = async (
         storage_path: storagePath,
         filename: attachment.filename,
       });
-      continue;
+      throw downloadResult.error ?? new Error("Support attachment download returned no data");
     }
 
     try {
@@ -830,6 +856,7 @@ const processSupportRequestEmail = async (
         storage_path: storagePath,
         filename: attachment.filename,
       });
+      throw error;
     }
   }
   const internalSubject = `Support Request - ${payload.subject}`;

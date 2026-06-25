@@ -20,10 +20,25 @@ const scrubProperties = (
       )
     : undefined;
 
-const isCspUnsafeEvalMessage = (message: string) =>
-  message.includes("Refused to evaluate a string as JavaScript") &&
-  message.includes("unsafe-eval") &&
-  message.includes("Content Security Policy");
+const CSP_UNSAFE_EVAL_PATTERNS = [
+  /unsafe-eval/i,
+  /content security policy|content-security-policy|csp/i,
+  /refused to evaluate a string as javascript/i,
+];
+
+const isCspUnsafeEvalMessage = (message: string) => {
+  if (!message) return false;
+  const normalizedMessage = message.trim();
+  return (
+    CSP_UNSAFE_EVAL_PATTERNS[0].test(normalizedMessage) &&
+    CSP_UNSAFE_EVAL_PATTERNS[1].test(normalizedMessage) &&
+    (
+      CSP_UNSAFE_EVAL_PATTERNS[2].test(normalizedMessage) ||
+      /call to eval\(\) blocked by csp/i.test(normalizedMessage) ||
+      /disallowed string compilation/i.test(normalizedMessage)
+    )
+  );
+};
 
 const isCspUnsafeEvalError = (error: unknown) => {
   const message = error instanceof Error ? error.message : "";

@@ -41,31 +41,15 @@ const isCspUnsafeEvalExceptionEvent = (
   properties?: Record<string, unknown>
 ) => {
   if (!properties) return false;
-  const candidates: Array<{ type?: unknown; value?: unknown }> = [];
-  const values: unknown[] = [];
-  const types: unknown[] = [];
-  const collect = (value: unknown, target: unknown[]) => {
-    if (Array.isArray(value)) target.push(...value);
-  };
-  collect(properties.$exception_values, values);
-  collect(properties.$exception_types, types);
-  const pairCount = Math.max(values.length, types.length);
-  for (let index = 0; index < pairCount; index += 1) {
-    candidates.push({ type: types[index], value: values[index] });
-  }
   const exceptionList = properties.$exception_list;
-  if (Array.isArray(exceptionList)) {
-    for (const entry of exceptionList) {
-      if (entry && typeof entry === "object") {
-        candidates.push(entry as { value?: unknown; type?: unknown });
-      }
-    }
-  }
-  return candidates.some(
-    (candidate) =>
-      candidate.type === "EvalError" &&
-      typeof candidate.value === "string" &&
-      isCspUnsafeEvalMessage(candidate.value)
+  if (!Array.isArray(exceptionList)) return false;
+  return exceptionList.some(
+    (entry) =>
+      !!entry &&
+      typeof entry === "object" &&
+      (entry as { type?: unknown }).type === "EvalError" &&
+      typeof (entry as { value?: unknown }).value === "string" &&
+      isCspUnsafeEvalMessage((entry as { value: string }).value)
   );
 };
 

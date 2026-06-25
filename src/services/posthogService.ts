@@ -20,12 +20,52 @@ const scrubProperties = (
       )
     : undefined;
 
+const isCspUnsafeEvalMessage = (message: string) =>
+  message.includes("Refused to evaluate a string as JavaScript") &&
+  message.includes("unsafe-eval") &&
+  message.includes("Content Security Policy");
+
 const isCspUnsafeEvalError = (error: unknown) => {
   const message = error instanceof Error ? error.message : "";
   return (
-    message.includes("Refused to evaluate a string as JavaScript") &&
-    message.includes("unsafe-eval") &&
-    message.includes("Content Security Policy")
+    (error instanceof Error && error.name === "EvalError") &&
+    isCspUnsafeEvalMessage(message)
+  );
+};
+
+// PostHog's exception autocapture installs its own global onerror/onunhandledrejection
+// handlers and reports directly, bypassing the guards in globalErrorHandling.ts and
+// capturePostHogException. Drop the benign CSP unsafe-eval EvalError here too so the
+// strict CSP (vercel.json) does not pollute the error feed.
+const isCspUnsafeEvalExceptionEvent = (
+  properties?: Record<string, unknown>
+) => {
+  if (!properties) return false;
+  const candidates: Array<{ type?: unknown; value?: unknown }> = [];
+  const values: unknown[] = [];
+  const types: unknown[] = [];
+  const collect = (value: unknown, target: unknown[]) => {
+    if (Array.isArray(value)) target.push(...value);
+  };
+  collect(properties.$exception_values, values);
+  collect(properties.$exception_types, types);
+  const pairCount = Math.max(values.length, types.length);
+  for (let index = 0; index < pairCount; index += 1) {
+    candidates.push({ type: types[index], value: values[index] });
+  }
+  const exceptionList = properties.$exception_list;
+  if (Array.isArray(exceptionList)) {
+    for (const entry of exceptionList) {
+      if (entry && typeof entry === "object") {
+        candidates.push(entry as { value?: unknown; type?: unknown });
+      }
+    }
+  }
+  return candidates.some(
+    (candidate) =>
+      candidate.type === "EvalError" &&
+      typeof candidate.value === "string" &&
+      isCspUnsafeEvalMessage(candidate.value)
   );
 };
 
@@ -45,6 +85,15 @@ export const initPostHog = async () => {
       capture_pageleave: false,
       capture_dead_clicks: false,
       capture_exceptions: true,
+      before_send: (event) => {
+        if (
+          event?.event === "$exception" &&
+          isCspUnsafeEvalExceptionEvent(event.properties)
+        ) {
+          return null;
+        }
+        return event;
+      },
       logs: {
         captureConsoleLogs: true,
       },

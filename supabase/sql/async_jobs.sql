@@ -27,6 +27,7 @@ create index if not exists async_jobs_created_idx
 create or replace function public.touch_async_job_updated_at()
 returns trigger
 language plpgsql
+set search_path = public
 as $$
 begin
   new.updated_at = now();

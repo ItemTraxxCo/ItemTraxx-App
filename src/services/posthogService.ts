@@ -20,12 +20,36 @@ const scrubProperties = (
       )
     : undefined;
 
+const isCspUnsafeEvalMessage = (message: string) =>
+  message.includes("Refused to evaluate a string as JavaScript") &&
+  message.includes("unsafe-eval") &&
+  message.includes("Content Security Policy");
+
 const isCspUnsafeEvalError = (error: unknown) => {
   const message = error instanceof Error ? error.message : "";
   return (
-    message.includes("Refused to evaluate a string as JavaScript") &&
-    message.includes("unsafe-eval") &&
-    message.includes("Content Security Policy")
+    (error instanceof Error && error.name === "EvalError") &&
+    isCspUnsafeEvalMessage(message)
+  );
+};
+
+// PostHog's exception autocapture installs its own global onerror/onunhandledrejection
+// handlers and reports directly, bypassing the guards in globalErrorHandling.ts and
+// capturePostHogException. Drop the benign CSP unsafe-eval EvalError here too so the
+// strict CSP (vercel.json) does not pollute the error feed.
+const isCspUnsafeEvalExceptionEvent = (
+  properties?: Record<string, unknown>
+) => {
+  if (!properties) return false;
+  const exceptionList = properties.$exception_list;
+  if (!Array.isArray(exceptionList)) return false;
+  return exceptionList.some(
+    (entry) =>
+      !!entry &&
+      typeof entry === "object" &&
+      (entry as { type?: unknown }).type === "EvalError" &&
+      typeof (entry as { value?: unknown }).value === "string" &&
+      isCspUnsafeEvalMessage((entry as { value: string }).value)
   );
 };
 
@@ -45,6 +69,15 @@ export const initPostHog = async () => {
       capture_pageleave: false,
       capture_dead_clicks: false,
       capture_exceptions: true,
+      before_send: (event) => {
+        if (
+          event?.event === "$exception" &&
+          isCspUnsafeEvalExceptionEvent(event.properties)
+        ) {
+          return null;
+        }
+        return event;
+      },
       logs: {
         captureConsoleLogs: true,
       },

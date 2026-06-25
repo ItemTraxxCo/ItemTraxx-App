@@ -773,10 +773,10 @@ const processSupportRequestEmail = async (
     content_type: string;
   }> = [];
   for (const attachment of (payload.attachments ?? []).slice(0, 2)) {
-    if (typeof attachment.storage_path !== "string") {
+    if (!attachment || typeof attachment.storage_path !== "string") {
       logError("job-worker support attachment path rejected", requestId, new Error("Missing attachment storage path"), {
         job_id: jobId,
-        filename: attachment.filename,
+        filename: attachment?.filename,
       });
       continue;
     }

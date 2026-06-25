@@ -21,6 +21,7 @@ create index if not exists super_admin_email_challenges_active_idx
 create or replace function public.touch_super_admin_email_challenges_updated_at()
 returns trigger
 language plpgsql
+set search_path = public
 as $$
 begin
   new.updated_at = now();

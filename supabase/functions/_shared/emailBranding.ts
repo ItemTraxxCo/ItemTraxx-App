@@ -23,7 +23,8 @@ const normalizeEmailLogoUrl = (logoUrl?: string | null) => {
     const isAllowedLogo =
       parsed.pathname === "/brand/logo-light.png" ||
       parsed.pathname === "/brand/logo-dark.png" ||
-      parsed.pathname === "/brand/logo-mark.png";
+      parsed.pathname === "/brand/logo-mark.png" ||
+      parsed.pathname === "/brand/logo-mark.svg";
 
     if (parsed.protocol === "https:" && isAllowedHost && isAllowedLogo) {
       return parsed.toString();

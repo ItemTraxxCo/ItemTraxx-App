@@ -18,6 +18,7 @@ create index if not exists privileged_session_stepups_lookup_idx
 create or replace function public.touch_privileged_session_stepups_updated_at()
 returns trigger
 language plpgsql
+set search_path = public
 as $$
 begin
   new.updated_at = now();

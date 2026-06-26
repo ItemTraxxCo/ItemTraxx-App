@@ -1,6 +1,6 @@
 -- ITX-45: pin checkout_return search_path (advisor 0011_function_search_path_mutable).
 -- Body unchanged from the deployed definition; only adds `set search_path`.
--- pg_temp is included so the `tmp_gear` temporary table still resolves.
+-- pg_temp is included so the `pg_temp.tmp_gear` temporary table still resolves.
 create or replace function public.checkout_return(p_student_id text, p_gear_barcodes text[], p_action_type text)
  returns json
  language plpgsql
@@ -50,7 +50,7 @@ begin
   end if;
 
   -- Lock gear rows
-  drop table if exists tmp_gear;
+  drop table if exists pg_temp.tmp_gear;
 
   create temporary table tmp_gear
   on commit drop
@@ -63,14 +63,14 @@ begin
 
   -- Reject unavailable statuses
   if exists (
-    select 1 from tmp_gear
+    select 1 from pg_temp.tmp_gear
     where status in ('damaged','lost','retired','in_studio_only')
   ) then
     raise exception 'Gear unavailable';
   end if;
 
   if p_action_type = 'checkout' then
-    if exists (select 1 from tmp_gear where checked_out_by is not null) then
+    if exists (select 1 from pg_temp.tmp_gear where checked_out_by is not null) then
       raise exception 'Gear already checked out';
     end if;
 
@@ -78,15 +78,15 @@ begin
     set checked_out_by = v_student_uuid,
         checked_out_at = now(),
         status = 'checked_out'
-    where id in (select id from tmp_gear);
+    where id in (select id from pg_temp.tmp_gear);
 
     insert into gear_logs (tenant_id, gear_id, checked_out_by, action_type, action_time, performed_by)
     select v_tenant_id, id, v_student_uuid, 'checkout', now(), v_user_id
-    from tmp_gear;
+    from pg_temp.tmp_gear;
 
   elsif p_action_type = 'return' then
     if exists (
-      select 1 from tmp_gear
+      select 1 from pg_temp.tmp_gear
       where checked_out_by is distinct from v_student_uuid
     ) then
       raise exception 'Gear checked out by different student';
@@ -96,11 +96,11 @@ begin
     set checked_out_by = null,
         checked_out_at = null,
         status = 'available'
-    where id in (select id from tmp_gear);
+    where id in (select id from pg_temp.tmp_gear);
 
     insert into gear_logs (tenant_id, gear_id, checked_out_by, action_type, action_time, performed_by)
     select v_tenant_id, id, v_student_uuid, 'return', now(), v_user_id
-    from tmp_gear;
+    from pg_temp.tmp_gear;
 
   elsif p_action_type = 'auto' then
     -- Return only items already checked out by this student
@@ -109,18 +109,18 @@ begin
         checked_out_at = null,
         status = 'available'
     where id in (
-      select id from tmp_gear
+      select id from pg_temp.tmp_gear
       where checked_out_by = v_student_uuid
     );
 
     insert into gear_logs (tenant_id, gear_id, checked_out_by, action_type, action_time, performed_by)
     select v_tenant_id, id, v_student_uuid, 'return', now(), v_user_id
-    from tmp_gear
+    from pg_temp.tmp_gear
     where checked_out_by = v_student_uuid;
 
     -- Checkout only items not checked out
     if exists (
-      select 1 from tmp_gear
+      select 1 from pg_temp.tmp_gear
       where checked_out_by is not null
         and checked_out_by <> v_student_uuid
     ) then
@@ -132,18 +132,25 @@ begin
         checked_out_at = now(),
         status = 'checked_out'
     where id in (
-      select id from tmp_gear
+      select id from pg_temp.tmp_gear
       where checked_out_by is null
     );
 
     insert into gear_logs (tenant_id, gear_id, checked_out_by, action_type, action_time, performed_by)
     select v_tenant_id, id, v_student_uuid, 'checkout', now(), v_user_id
-    from tmp_gear
+    from pg_temp.tmp_gear
     where checked_out_by is null;
 
   elsif p_action_type = 'admin_return' then
+    -- ITX-42/CodeRabbit: admin_return clears any checked-out gear in the
+    -- tenant by barcode and skips student validation. Require tenant_admin
+    -- with a recent privileged step-up before allowing it.
+    if public.current_user_role() <> 'tenant_admin'
+       or not public.has_recent_privileged_step_up('tenant_admin') then
+      raise exception 'Unauthorized';
+    end if;
     -- Ensure all items are currently checked out
-    if exists (select 1 from tmp_gear where checked_out_by is null) then
+    if exists (select 1 from pg_temp.tmp_gear where checked_out_by is null) then
       raise exception 'Gear not checked out';
     end if;
 
@@ -151,11 +158,11 @@ begin
     set checked_out_by = null,
         checked_out_at = null,
         status = 'available'
-    where id in (select id from tmp_gear);
+    where id in (select id from pg_temp.tmp_gear);
 
     insert into gear_logs (tenant_id, gear_id, checked_out_by, action_type, action_time, performed_by)
     select v_tenant_id, id, checked_out_by, 'return', now(), v_user_id
-    from tmp_gear;
+    from pg_temp.tmp_gear;
 
   else
     raise exception 'Invalid action type';

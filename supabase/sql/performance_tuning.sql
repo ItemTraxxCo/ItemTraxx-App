@@ -52,8 +52,10 @@ create index if not exists idx_gear_logs_checked_out_by_action_time
 create index if not exists idx_admin_audit_logs_tenant_created
   on public.admin_audit_logs (tenant_id, created_at desc);
 
-create index if not exists idx_tenant_policies_tenant
-  on public.tenant_policies (tenant_id);
+-- Note: no separate index on tenant_policies(tenant_id) -- tenant_id is the
+-- table's primary key, so tenant_policies_pkey already covers it. The previously
+-- redundant idx_tenant_policies_tenant is dropped in
+-- index_hygiene_drop_duplicate_indexes.sql.
 
 create index if not exists idx_super_jobs_updated
   on public.super_jobs (updated_at desc);

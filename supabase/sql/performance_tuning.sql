@@ -31,8 +31,7 @@ begin
   end if;
 end $$;
 
-create index if not exists idx_gear_tenant_barcode
-  on public.gear (tenant_id, barcode);
+-- ITX-52: idx_gear_tenant_barcode removed — duplicates unique gear_unique_barcode_per_tenant.
 
 create index if not exists idx_students_tenant_deleted_created
   on public.students (tenant_id, deleted_at, created_at desc);
@@ -52,8 +51,7 @@ create index if not exists idx_gear_logs_checked_out_by_action_time
 create index if not exists idx_admin_audit_logs_tenant_created
   on public.admin_audit_logs (tenant_id, created_at desc);
 
-create index if not exists idx_tenant_policies_tenant
-  on public.tenant_policies (tenant_id);
+-- ITX-52: idx_tenant_policies_tenant removed — duplicates tenant_policies_pkey (tenant_id).
 
 create index if not exists idx_super_jobs_updated
   on public.super_jobs (updated_at desc);

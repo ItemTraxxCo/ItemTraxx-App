@@ -16,8 +16,7 @@ alter table if exists public.districts
   add constraint districts_slug_format_check
   check (slug ~ '^[a-z0-9-]{2,63}$');
 
-create index if not exists idx_districts_slug
-  on public.districts (slug);
+-- ITX-52: idx_districts_slug removed — duplicates the unique districts_slug_key.
 
 alter table if exists public.tenants
   add column if not exists district_id uuid null references public.districts(id) on delete set null;

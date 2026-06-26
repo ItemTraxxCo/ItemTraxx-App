@@ -6,14 +6,14 @@
 -- duplicates are intentionally left alone.
 
 -- (slug) — duplicates unique districts_slug_key
-drop index if exists public.idx_districts_slug;
+drop index concurrently if exists public.idx_districts_slug;
 
 -- (tenant_id, barcode) — duplicates unique gear_unique_barcode_per_tenant
-drop index if exists public.idx_gear_tenant_barcode;
+drop index concurrently if exists public.idx_gear_tenant_barcode;
 
 -- (tenant_id) — duplicates tenant_policies_pkey
-drop index if exists public.idx_tenant_policies_tenant;
+drop index concurrently if exists public.idx_tenant_policies_tenant;
 
 -- (tenant_id, created_at desc) — identical to idx_admin_audit_logs_tenant_created,
 -- which is created in performance_tuning.sql and kept.
-drop index if exists public.admin_audit_logs_tenant_time_idx;
+drop index concurrently if exists public.admin_audit_logs_tenant_time_idx;

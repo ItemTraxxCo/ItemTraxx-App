@@ -9,3 +9,7 @@
 
 create schema if not exists extensions;
 alter extension pg_trgm set schema extensions;
+
+-- CodeRabbit: ensure Supabase roles can use objects in the new schema,
+-- otherwise bare similarity()/% trigram lookups fail after the move.
+grant usage on schema extensions to anon, authenticated, service_role;

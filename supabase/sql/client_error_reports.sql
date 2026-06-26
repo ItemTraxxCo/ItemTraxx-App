@@ -41,12 +41,30 @@ create index if not exists client_error_reports_page_url_idx
 
 alter table public.client_error_reports enable row level security;
 
+-- Deny-by-default floor. A *permissive* `for all ... using(false)` policy would
+-- overlap the super-admin select grant below, leaving two permissive policies
+-- for the (authenticated, select) pair (Supabase advisor: multiple_permissive_
+-- policies). Declaring it `as restrictive` makes it AND-combine instead, so it
+-- no longer counts as a second permissive policy. A literal `using(false)` would
+-- block the legitimate super-admin read, so the restrictive read predicate
+-- mirrors the grant (super-admin + recent step-up) — keeping behaviour identical
+-- while preserving the defense-in-depth invariant that no other role can read —
+-- and `with check(false)` hard-blocks every RLS write path.
 drop policy if exists "deny_all_client_error_reports" on public.client_error_reports;
 create policy "deny_all_client_error_reports"
   on public.client_error_reports
+  as restrictive
   for all
   to public
-  using (false)
+  using (
+    exists (
+      select 1
+      from public.profiles p
+      where p.id = auth.uid()
+        and p.role = 'super_admin'
+    )
+    and public.has_recent_privileged_step_up('super_admin')
+  )
   with check (false);
 
 drop policy if exists "super_admin_select_client_error_reports" on public.client_error_reports;

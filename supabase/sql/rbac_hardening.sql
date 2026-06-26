@@ -1,5 +1,18 @@
 -- RBAC/RLS hardening baseline
 -- Apply in Supabase SQL editor (idempotent).
+--
+-- Policy layout note:
+-- Postgres OR-evaluates every *permissive* policy that matches a given
+-- (role, command) pair. A broad `for all` policy therefore overlaps any
+-- narrower `for select`/`for insert` policy on the same table, leaving two or
+-- more permissive policies for the same (role, command) and tripping the
+-- Supabase performance advisor's `multiple_permissive_policies` warning.
+-- To avoid that, every table below keeps at most ONE permissive policy per
+-- command: the broad `for all` policies are expanded into explicit
+-- `for insert` / `for update` / `for delete` policies, and any role that also
+-- needs read/write access is merged into the matching per-command policy with
+-- `OR`. This is behaviour-preserving — OR-ing predicates into one policy is
+-- exactly what Postgres already did across several permissive policies.
 
 create or replace function public.current_user_role()
 returns text
@@ -49,25 +62,53 @@ alter table if exists public.super_admin_audit_logs enable row level security;
 -- tenants
 
 drop policy if exists "tenant_self_select_tenants" on public.tenants;
+drop policy if exists "super_admin_all_tenants" on public.tenants;
+drop policy if exists "super_admin_insert_tenants" on public.tenants;
+drop policy if exists "super_admin_update_tenants" on public.tenants;
+drop policy if exists "super_admin_delete_tenants" on public.tenants;
+
 create policy "tenant_self_select_tenants"
 on public.tenants
 for select
 to authenticated
 using (
-  public.current_user_role() in ('tenant_user', 'tenant_admin')
-  and id = public.current_tenant_id()
+  (
+    public.current_user_role() in ('tenant_user', 'tenant_admin')
+    and id = public.current_tenant_id()
+  )
+  or (
+    public.current_user_role() = 'super_admin'
+    and public.has_recent_privileged_step_up('super_admin')
+  )
 );
 
-drop policy if exists "super_admin_all_tenants" on public.tenants;
-create policy "super_admin_all_tenants"
+create policy "super_admin_insert_tenants"
 on public.tenants
-for all
+for insert
+to authenticated
+with check (
+  public.current_user_role() = 'super_admin'
+  and public.has_recent_privileged_step_up('super_admin')
+);
+
+create policy "super_admin_update_tenants"
+on public.tenants
+for update
 to authenticated
 using (
   public.current_user_role() = 'super_admin'
   and public.has_recent_privileged_step_up('super_admin')
 )
 with check (
+  public.current_user_role() = 'super_admin'
+  and public.has_recent_privileged_step_up('super_admin')
+);
+
+create policy "super_admin_delete_tenants"
+on public.tenants
+for delete
+to authenticated
+using (
   public.current_user_role() = 'super_admin'
   and public.has_recent_privileged_step_up('super_admin')
 );
@@ -75,32 +116,55 @@ with check (
 -- profiles
 
 drop policy if exists "self_select_profile" on public.profiles;
+drop policy if exists "tenant_admin_select_tenant_profiles" on public.profiles;
+drop policy if exists "super_admin_all_profiles" on public.profiles;
+drop policy if exists "super_admin_insert_profiles" on public.profiles;
+drop policy if exists "super_admin_update_profiles" on public.profiles;
+drop policy if exists "super_admin_delete_profiles" on public.profiles;
+
 create policy "self_select_profile"
 on public.profiles
 for select
 to authenticated
-using (id = auth.uid());
-
-drop policy if exists "tenant_admin_select_tenant_profiles" on public.profiles;
-create policy "tenant_admin_select_tenant_profiles"
-on public.profiles
-for select
-to authenticated
 using (
-  public.current_user_role() = 'tenant_admin'
-  and tenant_id = public.current_tenant_id()
+  id = auth.uid()
+  or (
+    public.current_user_role() = 'tenant_admin'
+    and tenant_id = public.current_tenant_id()
+  )
+  or (
+    public.current_user_role() = 'super_admin'
+    and public.has_recent_privileged_step_up('super_admin')
+  )
 );
 
-drop policy if exists "super_admin_all_profiles" on public.profiles;
-create policy "super_admin_all_profiles"
+create policy "super_admin_insert_profiles"
 on public.profiles
-for all
+for insert
+to authenticated
+with check (
+  public.current_user_role() = 'super_admin'
+  and public.has_recent_privileged_step_up('super_admin')
+);
+
+create policy "super_admin_update_profiles"
+on public.profiles
+for update
 to authenticated
 using (
   public.current_user_role() = 'super_admin'
   and public.has_recent_privileged_step_up('super_admin')
 )
 with check (
+  public.current_user_role() = 'super_admin'
+  and public.has_recent_privileged_step_up('super_admin')
+);
+
+create policy "super_admin_delete_profiles"
+on public.profiles
+for delete
+to authenticated
+using (
   public.current_user_role() = 'super_admin'
   and public.has_recent_privileged_step_up('super_admin')
 );
@@ -108,120 +172,226 @@ with check (
 -- students
 
 drop policy if exists "tenant_select_students" on public.students;
+drop policy if exists "tenant_admin_write_students" on public.students;
+drop policy if exists "super_admin_all_students" on public.students;
+drop policy if exists "students_insert" on public.students;
+drop policy if exists "students_update" on public.students;
+drop policy if exists "students_delete" on public.students;
+
 create policy "tenant_select_students"
 on public.students
 for select
 to authenticated
 using (
-  public.current_user_role() = 'tenant_admin'
-  and tenant_id = public.current_tenant_id()
+  (
+    public.current_user_role() = 'tenant_admin'
+    and tenant_id = public.current_tenant_id()
+  )
+  or (
+    public.current_user_role() = 'super_admin'
+    and public.has_recent_privileged_step_up('super_admin')
+  )
 );
 
-drop policy if exists "tenant_admin_write_students" on public.students;
-create policy "tenant_admin_write_students"
+create policy "students_insert"
 on public.students
-for all
+for insert
 to authenticated
-using (
-  public.current_user_role() = 'tenant_admin'
-  and tenant_id = public.current_tenant_id()
-  and public.has_recent_privileged_step_up('tenant_admin')
-)
 with check (
-  public.current_user_role() = 'tenant_admin'
-  and tenant_id = public.current_tenant_id()
-  and public.has_recent_privileged_step_up('tenant_admin')
+  (
+    public.current_user_role() = 'tenant_admin'
+    and tenant_id = public.current_tenant_id()
+    and public.has_recent_privileged_step_up('tenant_admin')
+  )
+  or (
+    public.current_user_role() = 'super_admin'
+    and public.has_recent_privileged_step_up('super_admin')
+  )
 );
 
-drop policy if exists "super_admin_all_students" on public.students;
-create policy "super_admin_all_students"
+create policy "students_update"
 on public.students
-for all
+for update
 to authenticated
 using (
-  public.current_user_role() = 'super_admin'
-  and public.has_recent_privileged_step_up('super_admin')
+  (
+    public.current_user_role() = 'tenant_admin'
+    and tenant_id = public.current_tenant_id()
+    and public.has_recent_privileged_step_up('tenant_admin')
+  )
+  or (
+    public.current_user_role() = 'super_admin'
+    and public.has_recent_privileged_step_up('super_admin')
+  )
 )
 with check (
-  public.current_user_role() = 'super_admin'
-  and public.has_recent_privileged_step_up('super_admin')
+  (
+    public.current_user_role() = 'tenant_admin'
+    and tenant_id = public.current_tenant_id()
+    and public.has_recent_privileged_step_up('tenant_admin')
+  )
+  or (
+    public.current_user_role() = 'super_admin'
+    and public.has_recent_privileged_step_up('super_admin')
+  )
+);
+
+create policy "students_delete"
+on public.students
+for delete
+to authenticated
+using (
+  (
+    public.current_user_role() = 'tenant_admin'
+    and tenant_id = public.current_tenant_id()
+    and public.has_recent_privileged_step_up('tenant_admin')
+  )
+  or (
+    public.current_user_role() = 'super_admin'
+    and public.has_recent_privileged_step_up('super_admin')
+  )
 );
 
 -- gear
 
 drop policy if exists "tenant_select_gear" on public.gear;
+drop policy if exists "tenant_admin_write_gear" on public.gear;
+drop policy if exists "super_admin_all_gear" on public.gear;
+drop policy if exists "gear_insert" on public.gear;
+drop policy if exists "gear_update" on public.gear;
+drop policy if exists "gear_delete" on public.gear;
+
 create policy "tenant_select_gear"
 on public.gear
 for select
 to authenticated
 using (
-  public.current_user_role() in ('tenant_user', 'tenant_admin')
-  and tenant_id = public.current_tenant_id()
+  (
+    public.current_user_role() in ('tenant_user', 'tenant_admin')
+    and tenant_id = public.current_tenant_id()
+  )
+  or (
+    public.current_user_role() = 'super_admin'
+    and public.has_recent_privileged_step_up('super_admin')
+  )
 );
 
-drop policy if exists "tenant_admin_write_gear" on public.gear;
-create policy "tenant_admin_write_gear"
+create policy "gear_insert"
 on public.gear
-for all
+for insert
 to authenticated
-using (
-  public.current_user_role() = 'tenant_admin'
-  and tenant_id = public.current_tenant_id()
-  and public.has_recent_privileged_step_up('tenant_admin')
-)
 with check (
-  public.current_user_role() = 'tenant_admin'
-  and tenant_id = public.current_tenant_id()
-  and public.has_recent_privileged_step_up('tenant_admin')
+  (
+    public.current_user_role() = 'tenant_admin'
+    and tenant_id = public.current_tenant_id()
+    and public.has_recent_privileged_step_up('tenant_admin')
+  )
+  or (
+    public.current_user_role() = 'super_admin'
+    and public.has_recent_privileged_step_up('super_admin')
+  )
 );
 
-drop policy if exists "super_admin_all_gear" on public.gear;
-create policy "super_admin_all_gear"
+create policy "gear_update"
 on public.gear
-for all
+for update
 to authenticated
 using (
-  public.current_user_role() = 'super_admin'
-  and public.has_recent_privileged_step_up('super_admin')
+  (
+    public.current_user_role() = 'tenant_admin'
+    and tenant_id = public.current_tenant_id()
+    and public.has_recent_privileged_step_up('tenant_admin')
+  )
+  or (
+    public.current_user_role() = 'super_admin'
+    and public.has_recent_privileged_step_up('super_admin')
+  )
 )
 with check (
-  public.current_user_role() = 'super_admin'
-  and public.has_recent_privileged_step_up('super_admin')
+  (
+    public.current_user_role() = 'tenant_admin'
+    and tenant_id = public.current_tenant_id()
+    and public.has_recent_privileged_step_up('tenant_admin')
+  )
+  or (
+    public.current_user_role() = 'super_admin'
+    and public.has_recent_privileged_step_up('super_admin')
+  )
+);
+
+create policy "gear_delete"
+on public.gear
+for delete
+to authenticated
+using (
+  (
+    public.current_user_role() = 'tenant_admin'
+    and tenant_id = public.current_tenant_id()
+    and public.has_recent_privileged_step_up('tenant_admin')
+  )
+  or (
+    public.current_user_role() = 'super_admin'
+    and public.has_recent_privileged_step_up('super_admin')
+  )
 );
 
 -- gear logs
 
 drop policy if exists "tenant_select_gear_logs" on public.gear_logs;
+drop policy if exists "tenant_admin_insert_gear_logs" on public.gear_logs;
+drop policy if exists "super_admin_all_gear_logs" on public.gear_logs;
+drop policy if exists "super_admin_update_gear_logs" on public.gear_logs;
+drop policy if exists "super_admin_delete_gear_logs" on public.gear_logs;
+
 create policy "tenant_select_gear_logs"
 on public.gear_logs
 for select
 to authenticated
 using (
-  public.current_user_role() in ('tenant_user', 'tenant_admin')
-  and tenant_id = public.current_tenant_id()
+  (
+    public.current_user_role() in ('tenant_user', 'tenant_admin')
+    and tenant_id = public.current_tenant_id()
+  )
+  or (
+    public.current_user_role() = 'super_admin'
+    and public.has_recent_privileged_step_up('super_admin')
+  )
 );
 
-drop policy if exists "tenant_admin_insert_gear_logs" on public.gear_logs;
 create policy "tenant_admin_insert_gear_logs"
 on public.gear_logs
 for insert
 to authenticated
 with check (
-  public.current_user_role() = 'tenant_admin'
-  and tenant_id = public.current_tenant_id()
-  and public.has_recent_privileged_step_up('tenant_admin')
+  (
+    public.current_user_role() = 'tenant_admin'
+    and tenant_id = public.current_tenant_id()
+    and public.has_recent_privileged_step_up('tenant_admin')
+  )
+  or (
+    public.current_user_role() = 'super_admin'
+    and public.has_recent_privileged_step_up('super_admin')
+  )
 );
 
-drop policy if exists "super_admin_all_gear_logs" on public.gear_logs;
-create policy "super_admin_all_gear_logs"
+create policy "super_admin_update_gear_logs"
 on public.gear_logs
-for all
+for update
 to authenticated
 using (
   public.current_user_role() = 'super_admin'
   and public.has_recent_privileged_step_up('super_admin')
 )
 with check (
+  public.current_user_role() = 'super_admin'
+  and public.has_recent_privileged_step_up('super_admin')
+);
+
+create policy "super_admin_delete_gear_logs"
+on public.gear_logs
+for delete
+to authenticated
+using (
   public.current_user_role() = 'super_admin'
   and public.has_recent_privileged_step_up('super_admin')
 );
@@ -229,31 +399,47 @@ with check (
 -- admin audit logs
 
 drop policy if exists "tenant_admin_select_admin_audit_logs" on public.admin_audit_logs;
+drop policy if exists "tenant_admin_insert_admin_audit_logs" on public.admin_audit_logs;
+drop policy if exists "super_admin_all_admin_audit_logs" on public.admin_audit_logs;
+drop policy if exists "super_admin_update_admin_audit_logs" on public.admin_audit_logs;
+drop policy if exists "super_admin_delete_admin_audit_logs" on public.admin_audit_logs;
+
 create policy "tenant_admin_select_admin_audit_logs"
 on public.admin_audit_logs
 for select
 to authenticated
 using (
-  public.current_user_role() = 'tenant_admin'
-  and tenant_id = public.current_tenant_id()
+  (
+    public.current_user_role() = 'tenant_admin'
+    and tenant_id = public.current_tenant_id()
+  )
+  or (
+    public.current_user_role() = 'super_admin'
+    and public.has_recent_privileged_step_up('super_admin')
+  )
 );
 
-drop policy if exists "tenant_admin_insert_admin_audit_logs" on public.admin_audit_logs;
 create policy "tenant_admin_insert_admin_audit_logs"
 on public.admin_audit_logs
 for insert
 to authenticated
 with check (
-  public.current_user_role() = 'tenant_admin'
-  and actor_id = auth.uid()
-  and tenant_id = public.current_tenant_id()
-  and public.has_recent_privileged_step_up('tenant_admin')
+  (
+    public.current_user_role() = 'tenant_admin'
+    and actor_id = auth.uid()
+    and tenant_id = public.current_tenant_id()
+    and public.has_recent_privileged_step_up('tenant_admin')
+  )
+  or (
+    public.current_user_role() = 'super_admin'
+    and public.has_recent_privileged_step_up('super_admin')
+    and actor_id = auth.uid()
+  )
 );
 
-drop policy if exists "super_admin_all_admin_audit_logs" on public.admin_audit_logs;
-create policy "super_admin_all_admin_audit_logs"
+create policy "super_admin_update_admin_audit_logs"
 on public.admin_audit_logs
-for all
+for update
 to authenticated
 using (
   public.current_user_role() = 'super_admin'
@@ -263,72 +449,150 @@ with check (
   public.current_user_role() = 'super_admin'
   and public.has_recent_privileged_step_up('super_admin')
   and actor_id = auth.uid()
+);
+
+create policy "super_admin_delete_admin_audit_logs"
+on public.admin_audit_logs
+for delete
+to authenticated
+using (
+  public.current_user_role() = 'super_admin'
+  and public.has_recent_privileged_step_up('super_admin')
 );
 
 -- tenant policies
 
 drop policy if exists "tenant_select_tenant_policies" on public.tenant_policies;
+drop policy if exists "tenant_admin_write_tenant_policies" on public.tenant_policies;
+drop policy if exists "super_admin_all_tenant_policies" on public.tenant_policies;
+drop policy if exists "tenant_policies_insert" on public.tenant_policies;
+drop policy if exists "tenant_policies_update" on public.tenant_policies;
+drop policy if exists "tenant_policies_delete" on public.tenant_policies;
+
 create policy "tenant_select_tenant_policies"
 on public.tenant_policies
 for select
 to authenticated
 using (
-  public.current_user_role() in ('tenant_user', 'tenant_admin')
-  and tenant_id = public.current_tenant_id()
+  (
+    public.current_user_role() in ('tenant_user', 'tenant_admin')
+    and tenant_id = public.current_tenant_id()
+  )
+  or (
+    public.current_user_role() = 'super_admin'
+    and public.has_recent_privileged_step_up('super_admin')
+  )
 );
 
-drop policy if exists "tenant_admin_write_tenant_policies" on public.tenant_policies;
-create policy "tenant_admin_write_tenant_policies"
+create policy "tenant_policies_insert"
 on public.tenant_policies
-for all
+for insert
 to authenticated
-using (
-  public.current_user_role() = 'tenant_admin'
-  and tenant_id = public.current_tenant_id()
-  and public.has_recent_privileged_step_up('tenant_admin')
-)
 with check (
-  public.current_user_role() = 'tenant_admin'
-  and tenant_id = public.current_tenant_id()
-  and public.has_recent_privileged_step_up('tenant_admin')
+  (
+    public.current_user_role() = 'tenant_admin'
+    and tenant_id = public.current_tenant_id()
+    and public.has_recent_privileged_step_up('tenant_admin')
+  )
+  or (
+    public.current_user_role() = 'super_admin'
+    and public.has_recent_privileged_step_up('super_admin')
+  )
 );
 
-drop policy if exists "super_admin_all_tenant_policies" on public.tenant_policies;
-create policy "super_admin_all_tenant_policies"
+create policy "tenant_policies_update"
 on public.tenant_policies
-for all
+for update
 to authenticated
 using (
-  public.current_user_role() = 'super_admin'
-  and public.has_recent_privileged_step_up('super_admin')
+  (
+    public.current_user_role() = 'tenant_admin'
+    and tenant_id = public.current_tenant_id()
+    and public.has_recent_privileged_step_up('tenant_admin')
+  )
+  or (
+    public.current_user_role() = 'super_admin'
+    and public.has_recent_privileged_step_up('super_admin')
+  )
 )
 with check (
-  public.current_user_role() = 'super_admin'
-  and public.has_recent_privileged_step_up('super_admin')
+  (
+    public.current_user_role() = 'tenant_admin'
+    and tenant_id = public.current_tenant_id()
+    and public.has_recent_privileged_step_up('tenant_admin')
+  )
+  or (
+    public.current_user_role() = 'super_admin'
+    and public.has_recent_privileged_step_up('super_admin')
+  )
+);
+
+create policy "tenant_policies_delete"
+on public.tenant_policies
+for delete
+to authenticated
+using (
+  (
+    public.current_user_role() = 'tenant_admin'
+    and tenant_id = public.current_tenant_id()
+    and public.has_recent_privileged_step_up('tenant_admin')
+  )
+  or (
+    public.current_user_role() = 'super_admin'
+    and public.has_recent_privileged_step_up('super_admin')
+  )
 );
 
 -- tenant security controls
 
 drop policy if exists "tenant_admin_select_security_controls" on public.tenant_security_controls;
+drop policy if exists "super_admin_all_security_controls" on public.tenant_security_controls;
+drop policy if exists "super_admin_insert_security_controls" on public.tenant_security_controls;
+drop policy if exists "super_admin_update_security_controls" on public.tenant_security_controls;
+drop policy if exists "super_admin_delete_security_controls" on public.tenant_security_controls;
+
 create policy "tenant_admin_select_security_controls"
 on public.tenant_security_controls
 for select
 to authenticated
 using (
-  public.current_user_role() = 'tenant_admin'
-  and tenant_id = public.current_tenant_id()
+  (
+    public.current_user_role() = 'tenant_admin'
+    and tenant_id = public.current_tenant_id()
+  )
+  or (
+    public.current_user_role() = 'super_admin'
+    and public.has_recent_privileged_step_up('super_admin')
+  )
 );
 
-drop policy if exists "super_admin_all_security_controls" on public.tenant_security_controls;
-create policy "super_admin_all_security_controls"
+create policy "super_admin_insert_security_controls"
 on public.tenant_security_controls
-for all
+for insert
+to authenticated
+with check (
+  public.current_user_role() = 'super_admin'
+  and public.has_recent_privileged_step_up('super_admin')
+);
+
+create policy "super_admin_update_security_controls"
+on public.tenant_security_controls
+for update
 to authenticated
 using (
   public.current_user_role() = 'super_admin'
   and public.has_recent_privileged_step_up('super_admin')
 )
 with check (
+  public.current_user_role() = 'super_admin'
+  and public.has_recent_privileged_step_up('super_admin')
+);
+
+create policy "super_admin_delete_security_controls"
+on public.tenant_security_controls
+for delete
+to authenticated
+using (
   public.current_user_role() = 'super_admin'
   and public.has_recent_privileged_step_up('super_admin')
 );
@@ -336,36 +600,60 @@ with check (
 -- gear status history
 
 drop policy if exists "tenant_select_gear_status_history" on public.gear_status_history;
+drop policy if exists "tenant_admin_insert_gear_status_history" on public.gear_status_history;
+drop policy if exists "super_admin_all_gear_status_history" on public.gear_status_history;
+drop policy if exists "super_admin_update_gear_status_history" on public.gear_status_history;
+drop policy if exists "super_admin_delete_gear_status_history" on public.gear_status_history;
+
 create policy "tenant_select_gear_status_history"
 on public.gear_status_history
 for select
 to authenticated
 using (
-  public.current_user_role() in ('tenant_user', 'tenant_admin')
-  and tenant_id = public.current_tenant_id()
+  (
+    public.current_user_role() in ('tenant_user', 'tenant_admin')
+    and tenant_id = public.current_tenant_id()
+  )
+  or (
+    public.current_user_role() = 'super_admin'
+    and public.has_recent_privileged_step_up('super_admin')
+  )
 );
 
-drop policy if exists "tenant_admin_insert_gear_status_history" on public.gear_status_history;
 create policy "tenant_admin_insert_gear_status_history"
 on public.gear_status_history
 for insert
 to authenticated
 with check (
-  public.current_user_role() = 'tenant_admin'
-  and tenant_id = public.current_tenant_id()
-  and public.has_recent_privileged_step_up('tenant_admin')
+  (
+    public.current_user_role() = 'tenant_admin'
+    and tenant_id = public.current_tenant_id()
+    and public.has_recent_privileged_step_up('tenant_admin')
+  )
+  or (
+    public.current_user_role() = 'super_admin'
+    and public.has_recent_privileged_step_up('super_admin')
+  )
 );
 
-drop policy if exists "super_admin_all_gear_status_history" on public.gear_status_history;
-create policy "super_admin_all_gear_status_history"
+create policy "super_admin_update_gear_status_history"
 on public.gear_status_history
-for all
+for update
 to authenticated
 using (
   public.current_user_role() = 'super_admin'
   and public.has_recent_privileged_step_up('super_admin')
 )
 with check (
+  public.current_user_role() = 'super_admin'
+  and public.has_recent_privileged_step_up('super_admin')
+);
+
+create policy "super_admin_delete_gear_status_history"
+on public.gear_status_history
+for delete
+to authenticated
+using (
   public.current_user_role() = 'super_admin'
   and public.has_recent_privileged_step_up('super_admin')
 );

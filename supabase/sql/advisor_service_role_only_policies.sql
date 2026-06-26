@@ -24,6 +24,10 @@ begin
     'super_admin_email_challenges'
   ]
   loop
+    -- CodeRabbit: enforce RLS in the same migration so the deny policies
+    -- actually protect the table regardless of external state.
+    execute format('alter table public.%I enable row level security', t);
+    execute format('alter table public.%I force row level security', t);
     execute format('drop policy if exists %I on public.%I', t || '_service_role_only', t);
     execute format(
       'create policy %I on public.%I as restrictive for all to authenticated, anon using (false) with check (false)',

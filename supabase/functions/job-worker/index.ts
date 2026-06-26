@@ -825,6 +825,10 @@ const processSupportRequestEmail = async (
       continue;
     }
 
+    if (storagePath.includes('..')) {
+      throw new Error("Invalid storage path");
+    }
+
     const downloadResult = await adminClient.storage
       .from(SUPPORT_ATTACHMENT_BUCKET)
       .download(storagePath);

@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { isAllowedOrigin, parseAllowedOrigins } from "../_shared/cors.ts";
+import { resolveRateLimitResult } from "../_shared/preloginGuards.ts";
 import { readJsonBody } from "../_shared/requestBody.ts";
 import { requireTrustedEdgeIngress } from "../_shared/trustedIngress.ts";
 import {
@@ -14,11 +15,6 @@ const baseCorsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-request-id",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
   Vary: "Origin",
-};
-
-type RateLimitResult = {
-  allowed: boolean;
-  retry_after_seconds: number | null;
 };
 
 serve(async (req) => {
@@ -88,15 +84,13 @@ serve(async (req) => {
       "consume_rate_limit",
       { p_scope: "tenant", p_limit: 20, p_window_seconds: 30 },
     );
-    if (rateLimitError) {
-      return jsonResponse(503, { error: "Rate limit check failed" });
-    }
-    const limit = Array.isArray(rateLimit)
-      ? ((rateLimit[0] as RateLimitResult | undefined) ?? null)
-      : ((rateLimit as RateLimitResult | null) ?? null);
-    if (!limit) {
-      return jsonResponse(503, { error: "Rate limit check failed" });
-    }
+    const { result: limit, response: rateLimitFailure } = resolveRateLimitResult({
+      data: rateLimit,
+      error: rateLimitError,
+      jsonResponse,
+      failureStatus: 503,
+    });
+    if (rateLimitFailure) return rateLimitFailure;
     if (!limit.allowed) {
       return jsonResponse(429, {
         error: "Rate limit exceeded, please try again shortly.",

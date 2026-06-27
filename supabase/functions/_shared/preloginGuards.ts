@@ -23,6 +23,8 @@ export const hashString = async (value: string) => {
   return toHex(new Uint8Array(digest));
 };
 
+type JsonResponse = (status: number, body: Record<string, unknown>) => Response;
+
 const normalizeScopePart = (value: string, fallback: string, maxLen = 32) => {
   const normalized = value
     .toLowerCase()
@@ -92,6 +94,43 @@ export const enforcePreloginRateLimit = async (
   }
 
   return { ok: true as const, error: null as RateLimitError };
+};
+
+export const resolveRateLimitResult = ({
+  data,
+  error,
+  jsonResponse,
+  failureStatus = 500,
+  failureMessage = "Rate limit check failed",
+}: {
+  data: unknown;
+  error: RateLimitError;
+  jsonResponse: JsonResponse;
+  failureStatus?: number;
+  failureMessage?: string;
+}) => {
+  if (error) {
+    return {
+      result: null as RateLimitResult | null,
+      response: jsonResponse(failureStatus, { error: failureMessage }),
+    };
+  }
+
+  const result = Array.isArray(data)
+    ? ((data[0] as RateLimitResult | undefined) ?? null)
+    : ((data as RateLimitResult | null) ?? null);
+
+  if (!result) {
+    return {
+      result: null as RateLimitResult | null,
+      response: jsonResponse(failureStatus, { error: failureMessage }),
+    };
+  }
+
+  return {
+    result,
+    response: null as Response | null,
+  };
 };
 
 export const verifyTurnstileToken = async (

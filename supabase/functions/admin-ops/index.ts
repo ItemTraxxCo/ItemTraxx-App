@@ -6,6 +6,7 @@ import {
   hasPrivilegedStepUp,
   isMissingPrivilegedStepUpTable,
 } from "../_shared/privilegedStepUp.ts";
+import { resolveRateLimitResult } from "../_shared/preloginGuards.ts";
 import { requireTrustedEdgeIngress } from "../_shared/trustedIngress.ts";
 import { readJsonBody } from "../_shared/requestBody.ts";
 import {
@@ -27,11 +28,6 @@ const baseCorsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-request-id",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
   Vary: "Origin",
-};
-
-type RateLimitResult = {
-  allowed: boolean;
-  retry_after_seconds: number | null;
 };
 
 type RuntimeUpdateItem = {
@@ -351,16 +347,12 @@ serve(async (req) => {
       }
     );
 
-    if (rateLimitError) {
-      return jsonResponse(500, { error: "Rate limit check failed" });
-    }
-
-    const rateLimitResult = Array.isArray(rateLimit)
-      ? ((rateLimit[0] as RateLimitResult | undefined) ?? null)
-      : ((rateLimit as RateLimitResult | null) ?? null);
-    if (!rateLimitResult) {
-      return jsonResponse(500, { error: "Rate limit check failed" });
-    }
+    const { result: rateLimitResult, response: rateLimitFailure } = resolveRateLimitResult({
+      data: rateLimit,
+      error: rateLimitError,
+      jsonResponse,
+    });
+    if (rateLimitFailure) return rateLimitFailure;
     if (!rateLimitResult.allowed) {
       return jsonResponse(429, {
         error: "Rate limit exceeded, please try again in a minute.",
@@ -575,7 +567,6 @@ serve(async (req) => {
             tenant_id: tenantId,
             profile_id: user.id,
             device_id: deviceSession.deviceId,
-            auth_session_id: authSessionBinding.sessionId,
             error: insertError,
             used_metadata_insert: shouldTryMetadataInsert,
           });
@@ -605,7 +596,6 @@ serve(async (req) => {
                 tenant_id: tenantId,
                 profile_id: user.id,
                 device_id: deviceSession.deviceId,
-                auth_session_id: authSessionBinding.sessionId,
                 error: fallbackInsertError,
               });
               throw new Error(`Unable to register admin session: ${formatRpcError(fallbackInsertError as RpcError)}`);

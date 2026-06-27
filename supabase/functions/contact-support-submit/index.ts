@@ -323,7 +323,12 @@ serve(async (req) => {
     if (rateLimitError) {
       return jsonResponse(500, { error: "Rate limit check failed." });
     }
-    const rateLimitResult = rateLimit as RateLimitResult;
+    const rateLimitResult = Array.isArray(rateLimit)
+      ? ((rateLimit[0] as RateLimitResult | undefined) ?? null)
+      : ((rateLimit as RateLimitResult | null) ?? null);
+    if (!rateLimitResult) {
+      return jsonResponse(500, { error: "Rate limit check failed." });
+    }
     if (!rateLimitResult.allowed) {
       return jsonResponse(429, {
         error: "Too many requests. Please try again later.",

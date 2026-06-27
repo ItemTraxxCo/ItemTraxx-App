@@ -91,7 +91,12 @@ serve(async (req) => {
     if (rateLimitError) {
       return jsonResponse(503, { error: "Rate limit check failed" });
     }
-    const limit = rateLimit as RateLimitResult;
+    const limit = Array.isArray(rateLimit)
+      ? ((rateLimit[0] as RateLimitResult | undefined) ?? null)
+      : ((rateLimit as RateLimitResult | null) ?? null);
+    if (!limit) {
+      return jsonResponse(503, { error: "Rate limit check failed" });
+    }
     if (!limit.allowed) {
       return jsonResponse(429, {
         error: "Rate limit exceeded, please try again shortly.",

@@ -307,7 +307,13 @@ serve(async (req) => {
       logError("login-notify rate limit failed", requestId, rateLimitError);
       return jsonResponse(500, { error: "Rate limit check failed" });
     }
-    const rateLimitResult = rateLimit as RateLimitResult;
+    const rateLimitResult = Array.isArray(rateLimit)
+      ? ((rateLimit[0] as RateLimitResult | undefined) ?? null)
+      : ((rateLimit as RateLimitResult | null) ?? null);
+    if (!rateLimitResult) {
+      logError("login-notify rate limit returned no rows", requestId, null);
+      return jsonResponse(500, { error: "Rate limit check failed" });
+    }
     if (!rateLimitResult.allowed) {
       const retryAfter = rateLimitResult.retry_after_seconds ?? 600;
       return new Response(

@@ -106,6 +106,9 @@ const isMissingColumn = (error: RpcError | null | undefined, column: string) =>
   error.code === "42703" &&
   (error.message ?? "").toLowerCase().includes(column.toLowerCase());
 
+const formatRpcError = (error: RpcError | null | undefined) =>
+  error ? `${error.code ?? "unknown"}: ${error.message ?? "Unknown error"}` : "Unknown error";
+
 const defaultFeatureFlags = (): TenantFeatureFlags => ({
   enable_notifications: true,
   enable_bulk_item_import: true,
@@ -352,7 +355,12 @@ serve(async (req) => {
       return jsonResponse(500, { error: "Rate limit check failed" });
     }
 
-    const rateLimitResult = rateLimit as RateLimitResult;
+    const rateLimitResult = Array.isArray(rateLimit)
+      ? ((rateLimit[0] as RateLimitResult | undefined) ?? null)
+      : ((rateLimit as RateLimitResult | null) ?? null);
+    if (!rateLimitResult) {
+      return jsonResponse(500, { error: "Rate limit check failed" });
+    }
     if (!rateLimitResult.allowed) {
       return jsonResponse(429, {
         error: "Rate limit exceeded, please try again in a minute.",
@@ -456,10 +464,17 @@ serve(async (req) => {
         .limit(1)
         .maybeSingle();
       if (existingError) {
+        console.error("admin-ops touch_session existing lookup failed", {
+          request_id: requestId,
+          tenant_id: tenantId,
+          profile_id: user.id,
+          device_id: deviceSession.deviceId,
+          error: existingError,
+        });
         if (isMissingSessionTable(existingError as RpcError)) {
           return { ok: false as const, relationMissing: true as const, reason: "missing_table" };
         }
-        throw new Error("Unable to register admin session.");
+        throw new Error(`Unable to register admin session: ${formatRpcError(existingError as RpcError)}`);
       }
 
       const tokenBlock = await isTenantAdminTokenBlockedBySessionRevocation(adminClient, {
@@ -495,6 +510,15 @@ serve(async (req) => {
           .update(shouldTryMetadataUpdate ? metadataUpdate : baseUpdate)
           .eq("id", existing.id);
         if (updateError) {
+          console.error("admin-ops touch_session update failed", {
+            request_id: requestId,
+            session_id: existing.id,
+            tenant_id: tenantId,
+            profile_id: user.id,
+            device_id: deviceSession.deviceId,
+            error: updateError,
+            used_metadata_update: shouldTryMetadataUpdate,
+          });
           if (isMissingSessionAuthBindingColumn(updateError as RpcError)) {
             return { ok: false as const, relationMissing: true as const, reason: "missing_table" };
           }
@@ -508,10 +532,18 @@ serve(async (req) => {
               })
               .eq("id", existing.id);
             if (fallbackUpdateError) {
-              throw new Error("Unable to update admin session.");
+              console.error("admin-ops touch_session fallback update failed", {
+                request_id: requestId,
+                session_id: existing.id,
+                tenant_id: tenantId,
+                profile_id: user.id,
+                device_id: deviceSession.deviceId,
+                error: fallbackUpdateError,
+              });
+              throw new Error(`Unable to update admin session: ${formatRpcError(fallbackUpdateError as RpcError)}`);
             }
           } else {
-            throw new Error("Unable to update admin session.");
+            throw new Error(`Unable to update admin session: ${formatRpcError(updateError as RpcError)}`);
           }
         }
       } else {
@@ -538,6 +570,15 @@ serve(async (req) => {
           .from("tenant_admin_sessions")
           .insert(shouldTryMetadataInsert ? metadataInsert : baseInsert);
         if (insertError) {
+          console.error("admin-ops touch_session insert failed", {
+            request_id: requestId,
+            tenant_id: tenantId,
+            profile_id: user.id,
+            device_id: deviceSession.deviceId,
+            auth_session_id: authSessionBinding.sessionId,
+            error: insertError,
+            used_metadata_insert: shouldTryMetadataInsert,
+          });
           if (isMissingSessionTable(insertError as RpcError)) {
             return { ok: false as const, relationMissing: true as const, reason: "missing_table" };
           }
@@ -559,10 +600,18 @@ serve(async (req) => {
                 last_seen_at: now,
               });
             if (fallbackInsertError) {
-              throw new Error("Unable to register admin session.");
+              console.error("admin-ops touch_session fallback insert failed", {
+                request_id: requestId,
+                tenant_id: tenantId,
+                profile_id: user.id,
+                device_id: deviceSession.deviceId,
+                auth_session_id: authSessionBinding.sessionId,
+                error: fallbackInsertError,
+              });
+              throw new Error(`Unable to register admin session: ${formatRpcError(fallbackInsertError as RpcError)}`);
             }
           } else {
-            throw new Error("Unable to register admin session.");
+            throw new Error(`Unable to register admin session: ${formatRpcError(insertError as RpcError)}`);
           }
         }
       }
@@ -1345,9 +1394,10 @@ serve(async (req) => {
     if (error instanceof ValidationError) {
       return jsonResponse(error.status, { error: error.message });
     }
+    const message = error instanceof Error ? error.message : "Unknown error";
     console.error("admin-ops function error", {
       request_id: requestId,
-      message: error instanceof Error ? error.message : "Unknown error",
+      message,
       stack: error instanceof Error ? error.stack : undefined,
     });
     return jsonResponse(500, { error: "Request failed" });

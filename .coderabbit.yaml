@@ -1,0 +1,8 @@
+reviews:
+  auto_review:
+    enabled: false
+    description_keyword: "coderabbit:review"
+    ignore_usernames:
+      - "dependabot[bot]"
+      - "renovate[bot]"
+      - "github-actions[bot]"

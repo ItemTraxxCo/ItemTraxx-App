@@ -7,6 +7,7 @@ import {
   hasPrivilegedStepUp,
   isMissingPrivilegedStepUpTable,
 } from "../_shared/privilegedStepUp.ts";
+import { resolveRateLimitResult } from "../_shared/preloginGuards.ts";
 import { validateTenantAdminDeviceSession } from "../_shared/tenantAdminSessions.ts";
 import { readJsonBody } from "../_shared/requestBody.ts";
 import {
@@ -23,11 +24,6 @@ const baseCorsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-request-id",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
   Vary: "Origin",
-};
-
-type RateLimitResult = {
-  allowed: boolean;
-  retry_after_seconds: number | null;
 };
 
 const ALLOWED_GEAR_STATUSES = new Set([
@@ -206,11 +202,12 @@ serve(async (req) => {
         }
       );
 
-      if (rateLimitError) {
-        return jsonResponse(500, { error: "Rate limit check failed" });
-      }
-
-      const rateLimitResult = rateLimit as RateLimitResult;
+      const { result: rateLimitResult, response: rateLimitFailure } = resolveRateLimitResult({
+        data: rateLimit,
+        error: rateLimitError,
+        jsonResponse,
+      });
+      if (rateLimitFailure) return rateLimitFailure;
       if (!rateLimitResult.allowed) {
         return jsonResponse(429, {
           error: "Rate limit exceeded, please try again in a minute.",

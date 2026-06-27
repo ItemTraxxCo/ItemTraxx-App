@@ -1,12 +1,38 @@
 # Changelog
 
-Last updated (year-month-day): 2026-06-21
+Last updated (year-month-day): 2026-06-27
 
 This changelog summarizes notable ItemTraxx product, reliability, security, and experience updates.
 
 Changes are dated based on the default timezone: America/Los_Angeles
 
 ---
+
+## 6/27/2026 Development Update
+
+- Fixed tenant sign-in reliability after a pre-login rate-limiter regression blocked valid login attempts.
+- Completed follow-up backend compatibility updates for the latest rate-limiter response handling across protected function paths.
+
+## 6/26/2026 Development Update
+
+- Hardened internal deployment workflow security by disabling persisted checkout credentials in GitHub Actions.
+- Added SQL-editor-safe database maintenance helpers to support recent advisor and hardening follow-up work.
+
+## 6/25/2026 Development Update
+
+- Improved public site metadata and asset handling, including favicon and social sharing image coverage.
+- Completed a database hardening and performance cleanup pass based on advisor findings and policy reviews.
+
+## 6/24/2026 Development Update
+
+- Reduced noisy error tracking by suppressing a known browser CSP-related EvalError that was not an actionable product failure.
+
+## 6/23/2026 Development Update
+
+- Fixed a browser-specific layout issue that could leave blank space on the right edge of affected pages.
+- Improved sensitive-path request protection and related rate-limiting reliability.
+- Reduced background landing-page status polling frequency to lower unnecessary request volume.
+- Improved support-request processing so attachment handling is more reliable and efficient.
 
 ## 6/21/2026 Development Update
 

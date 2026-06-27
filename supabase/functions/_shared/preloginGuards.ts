@@ -78,7 +78,15 @@ export const enforcePreloginRateLimit = async (
     return { ok: false as const, error: error as RateLimitError };
   }
 
-  const result = data as RateLimitResult;
+  const result = Array.isArray(data)
+    ? ((data[0] as RateLimitResult | undefined) ?? null)
+    : ((data as RateLimitResult | null) ?? null);
+  if (!result) {
+    return {
+      ok: false as const,
+      error: { message: "Rate limit RPC returned no rows." } as RateLimitError,
+    };
+  }
   if (!result.allowed) {
     return { ok: false as const, error: null as RateLimitError };
   }

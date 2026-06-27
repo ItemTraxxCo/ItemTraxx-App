@@ -58,7 +58,12 @@ const enforceRateLimit = async (
     return { ok: false as const, error };
   }
 
-  const result = data as RateLimitResult;
+  const result = Array.isArray(data)
+    ? ((data[0] as RateLimitResult | undefined) ?? null)
+    : ((data as RateLimitResult | null) ?? null);
+  if (!result) {
+    return { ok: false as const, error: { message: "Rate limit RPC returned no rows." } };
+  }
   if (!result.allowed) {
     return { ok: false as const, error: null };
   }

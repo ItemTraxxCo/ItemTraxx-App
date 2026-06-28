@@ -151,7 +151,7 @@ export const identifyPostHogUser = (
   try {
     const safeProperties = scrubProperties(properties);
     if (EMAIL_PATTERN.test(distinctId)) {
-      throw new Error("PostHog distinctId cannot be an email value.");
+      throw new Error("PostHog distinctId cannot be an email value. Please contact support.");
     }
     posthog.identify(distinctId, safeProperties);
   } catch (error) {
@@ -173,6 +173,6 @@ export const capturePostHogException = (error: unknown) => {
   try {
     posthog.captureException(error);
   } catch (captureError) {
-    console.warn("[posthog] exception capture failed; continuing without analytics.", captureError);
+    console.warn("[posthog] exception capture failed; continuing without analytics. Please contact support.", captureError);
   }
 };

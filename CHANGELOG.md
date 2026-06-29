@@ -15,7 +15,6 @@ Changes are dated based on the default timezone: America/Los_Angeles
 ## 6/28/2026 Development Update
 
 - Redid some error messages around the app for clarity.
-
 ## 6/27/2026 Development Update
 
 - Fixed tenant sign-in reliability after a pre-login rate-limiter regression blocked valid login attempts.

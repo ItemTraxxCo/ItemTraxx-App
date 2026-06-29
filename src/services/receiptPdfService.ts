@@ -73,14 +73,14 @@ export const downloadTransactionReceiptPdf = async (receipt: TransactionReceipt)
   row("Time", new Date(receipt.timestamp).toLocaleString());
   row("Borrower", receipt.studentUsername);
   row("Borrower ID", receipt.studentId);
-  row("Operator", receipt.operatorEmail);
-  row("Tenant ID", receipt.tenantId ?? "Unknown");
-  row("Checkouts", String(receipt.checkouts));
-  row("Returns", String(receipt.returns));
+  row("Tenant", receipt.operatorEmail);
+  row("Tenant ID", receipt.tenantId ?? "Unknown. Please contact support.");
+  row("Checkout(s)", String(receipt.checkouts));
+  row("Return(s)", String(receipt.returns));
 
   y += 8;
   doc.setFont("helvetica", "bold");
-  doc.text("Items", left, y);
+  doc.text("Item(s)", left, y);
   y += 14;
 
   doc.setFont("helvetica", "normal");
@@ -97,7 +97,7 @@ export const downloadTransactionReceiptPdf = async (receipt: TransactionReceipt)
 
   y += 10;
   const footer =
-    "Please review this receipt for accuracy. If anything appears incorrect, contact support@itemtraxx.com.";
+    "Please review this receipt for accuracy. If anything appears incorrect, contact support right away.";
   doc.setFont("helvetica", "italic");
   doc.setFontSize(10);
   doc.text(doc.splitTextToSize(footer, right - left), left, y);
@@ -108,7 +108,7 @@ export const downloadTransactionReceiptPdf = async (receipt: TransactionReceipt)
     doc.setFont("helvetica", "normal");
     doc.setFontSize(9);
     doc.setTextColor(110, 118, 131);
-    doc.text("© 2026 ItemTraxx Co", left, 760);
+    doc.text("© 2026 ItemTraxx", left, 760);
   }
   doc.setTextColor(0, 0, 0);
 

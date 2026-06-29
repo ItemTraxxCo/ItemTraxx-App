@@ -1,6 +1,6 @@
 # Changelog
 
-Last updated (year-month-day): 2026-06-27
+Last updated (year-month-day): 2026-06-29
 
 This changelog summarizes notable ItemTraxx product, reliability, security, and experience updates.
 

@@ -14,7 +14,6 @@ export interface Env {
   ITX_EDGE_PROXY_SHARED_SECRET?: string;
   ALLOWED_ORIGINS?: string;
   ALLOWED_FUNCTIONS?: string;
-  PENTEST_PROXY_TOKEN?: string;
   TRUST_LOCAL_ORIGINS?: string;
   ITX_ITEMTRAXX_KILLSWITCH_ENABLED?: string;
   ITX_ITEMTRAXX_KILLSWITCH_MESSAGE?: string;
@@ -35,8 +34,6 @@ const ACCESS_TOKEN_MAX_AGE_SECONDS = 60 * 60;
 const REFRESH_TOKEN_DEFAULT_MAX_AGE_SECONDS = 60 * 60 * 24 * 14;
 const REFRESH_TOKEN_MAX_ALLOWED_AGE_SECONDS = 60 * 60 * 24 * 14;
 const RATE_LIMIT_RETRY_AFTER_SECONDS = 60;
-const PENTEST_HOSTNAME = "edge-pentest.itemtraxx.com";
-const PENTEST_TOKEN_HEADER = "x-itx-pentest-token";
 const EDGE_PROXY_HEADER = "x-itx-edge-proxy";
 const EDGE_PROXY_TIMESTAMP_HEADER = "x-itx-edge-proxy-ts";
 const EDGE_PROXY_SIGNATURE_HEADER = "x-itx-edge-proxy-signature";
@@ -46,7 +43,7 @@ const MAINTENANCE_FALLBACK_KEY = "itemtraxx:maintenance_fallback:v1";
 
 const BASE_CORS_HEADERS = {
   "Access-Control-Allow-Headers":
-    `authorization, x-client-info, apikey, content-type, x-request-id, prefer, x-itx-session-request, x-itx-data-request, aikido-scan-agent, ${PENTEST_TOKEN_HEADER}`,
+    "authorization, x-client-info, apikey, content-type, x-request-id, prefer, x-itx-session-request, x-itx-data-request, aikido-scan-agent",
   "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
   "Access-Control-Allow-Credentials": "true",
   "Access-Control-Expose-Headers": "content-range, content-profile, x-request-id",
@@ -89,21 +86,36 @@ const signTrustedIngress = async (secret: string, message: string) => {
   return toHex(new Uint8Array(signature));
 };
 
+const hashTrustedIngressBody = async (body: Uint8Array | null) => {
+  if (!body) {
+    return "no-body";
+  }
+
+  const digest = await crypto.subtle.digest("SHA-256", body);
+  return toHex(new Uint8Array(digest));
+};
+
 const applyTrustedIngressHeaders = async (
   headers: Headers,
   env: Env,
   requestId: string,
-  target: string
+  target: string,
+  method: string,
+  body: Uint8Array | null,
 ) => {
   const secret = env.ITX_EDGE_PROXY_SHARED_SECRET?.trim();
   if (!secret) return;
 
   const timestamp = Date.now().toString();
+  const bodyHash = await hashTrustedIngressBody(body);
   headers.set(EDGE_PROXY_HEADER, "1");
   headers.set(EDGE_PROXY_TIMESTAMP_HEADER, timestamp);
   headers.set(
     EDGE_PROXY_SIGNATURE_HEADER,
-    await signTrustedIngress(secret, `${timestamp}.${requestId}.${target}`)
+    await signTrustedIngress(
+      secret,
+      `${timestamp}.${requestId}.${method.toUpperCase()}.${target}.${bodyHash}`,
+    )
   );
 };
 
@@ -460,14 +472,6 @@ const withCorsHeaders = (origin: string | null, allowedOrigins: string[], env: E
 
 const resolveRequestOrigin = (request: Request) => {
   return request.headers.get("Origin");
-};
-
-const isPentestHost = (url: URL) => url.hostname.toLowerCase() === PENTEST_HOSTNAME;
-
-const hasValidPentestToken = (request: Request, env: Env) => {
-  const expected = env.PENTEST_PROXY_TOKEN?.trim();
-  if (!expected) return false;
-  return request.headers.get(PENTEST_TOKEN_HEADER) === expected;
 };
 
 const buildError = (
@@ -1021,6 +1025,10 @@ const proxyFunctionRequest = async (
   const cookies = parseCookies(request);
   const supabaseFunctionUrl = `${trimTrailingSlash(env.SUPABASE_URL)}/functions/v1/${functionName}`;
   const isSystemStatusGet = functionName === "system-status" && request.method === "GET";
+  const requestBody =
+    request.method === "GET" || request.method === "HEAD"
+      ? null
+      : new Uint8Array(await request.clone().arrayBuffer());
   const invoke = async (sessionAccessToken?: string | null) => {
     const proxiedHeaders = sanitizeRequestHeaders(
       request,
@@ -1029,15 +1037,20 @@ const proxyFunctionRequest = async (
       functionName,
       sessionAccessToken
     );
-    await applyTrustedIngressHeaders(proxiedHeaders, env, requestId, functionName);
+    await applyTrustedIngressHeaders(
+      proxiedHeaders,
+      env,
+      requestId,
+      functionName,
+      request.method,
+      requestBody,
+    );
 
     const init: RequestInit = {
       method: request.method,
       headers: proxiedHeaders,
       body:
-        request.method === "GET" || request.method === "HEAD"
-          ? undefined
-          : await request.clone().text(),
+        requestBody ? requestBody.slice() : undefined,
     };
 
     return fetch(supabaseFunctionUrl, init);
@@ -1306,10 +1319,6 @@ export default {
     const { originAllowed, headers } = withCorsHeaders(origin, allowedOrigins, env);
 
     try {
-      if (isPentestHost(url) && !hasValidPentestToken(request, env)) {
-        return buildError(403, "Pentest token required", headers, requestId);
-      }
-
       if (request.method === "OPTIONS") {
         if (!originAllowed) {
           return new Response("Origin not allowed", { status: 403, headers });

@@ -30,6 +30,14 @@ const sign = async (message: string) => {
   return toHex(new Uint8Array(signature));
 };
 
+const bodyHash = async (value: string) => {
+  const digest = await crypto.subtle.digest(
+    "SHA-256",
+    new TextEncoder().encode(value),
+  );
+  return toHex(new Uint8Array(digest));
+};
+
 const withSecret = async (run: () => Promise<void>) => {
   const previous = Deno.env.get("ITX_EDGE_PROXY_SHARED_SECRET");
   Deno.env.set("ITX_EDGE_PROXY_SHARED_SECRET", SECRET);
@@ -61,14 +69,20 @@ Deno.test("trusted ingress accepts a fresh matching proxy signature", async () =
     const timestamp = Date.now().toString();
     const requestId = "request-123";
     const target = "tenant-login";
-    const signature = await sign(`${timestamp}.${requestId}.${target}`);
+    const payload = JSON.stringify({ access_code: "tenant-1", password: "secret" });
+    const signature = await sign(
+      `${timestamp}.${requestId}.POST.${target}.${await bodyHash(payload)}`,
+    );
     const request = new Request("https://example.test/functions/tenant-login", {
+      method: "POST",
       headers: {
         "x-itx-edge-proxy": "1",
         "x-itx-edge-proxy-ts": timestamp,
         "x-itx-edge-proxy-signature": signature,
         "x-request-id": requestId,
+        "content-type": "application/json",
       },
+      body: payload,
     });
 
     assert(
@@ -78,6 +92,35 @@ Deno.test("trusted ingress accepts a fresh matching proxy signature", async () =
     assert(
       !(await hasTrustedEdgeIngress(request, "different-target")),
       "expected target-bound signature rejection",
+    );
+  });
+});
+
+Deno.test("trusted ingress rejects body replay with modified payload", async () => {
+  await withSecret(async () => {
+    const timestamp = Date.now().toString();
+    const requestId = "request-123";
+    const target = "tenant-login";
+    const originalPayload = JSON.stringify({ access_code: "tenant-1", password: "secret" });
+    const tamperedPayload = JSON.stringify({ access_code: "tenant-1", password: "changed" });
+    const signature = await sign(
+      `${timestamp}.${requestId}.POST.${target}.${await bodyHash(originalPayload)}`,
+    );
+    const request = new Request("https://example.test/functions/tenant-login", {
+      method: "POST",
+      headers: {
+        "x-itx-edge-proxy": "1",
+        "x-itx-edge-proxy-ts": timestamp,
+        "x-itx-edge-proxy-signature": signature,
+        "x-request-id": requestId,
+        "content-type": "application/json",
+      },
+      body: tamperedPayload,
+    });
+
+    assert(
+      !(await hasTrustedEdgeIngress(request, target)),
+      "expected modified body rejection",
     );
   });
 });

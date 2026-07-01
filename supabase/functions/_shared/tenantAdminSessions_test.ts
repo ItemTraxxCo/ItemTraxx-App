@@ -1,4 +1,7 @@
-import { validateTenantAdminDeviceSession } from "./tenantAdminSessions.ts";
+import {
+  isTenantAdminTokenBlockedBySessionRevocation,
+  validateTenantAdminDeviceSession,
+} from "./tenantAdminSessions.ts";
 
 const assert = (condition: boolean, message: string) => {
   if (!condition) throw new Error(message);
@@ -126,4 +129,29 @@ Deno.test("tenant admin device session rejects unverified tokens", async () => {
 
   assert(!result.valid, "expected unverified token rejection");
   assert(result.reason === "revoked_token", "expected revoked_token reason");
+});
+
+Deno.test("tenant admin revocation check fails closed when session table is missing", async () => {
+  const claims = {
+    iat: Math.floor(Date.now() / 1000),
+    session_id: "current-session",
+  };
+  const client = new MockClient([
+    {
+      data: null,
+      error: {
+        code: "42P01",
+        message: 'relation "tenant_admin_sessions" does not exist',
+      },
+    },
+  ], claims);
+
+  const result = await isTenantAdminTokenBlockedBySessionRevocation(client, {
+    tenantId: "tenant-1",
+    profileId: "profile-1",
+    authToken: "verified-token",
+  });
+
+  assert(result.blocked, "expected missing session schema to block access");
+  assert(result.relationMissing, "expected relationMissing marker");
 });

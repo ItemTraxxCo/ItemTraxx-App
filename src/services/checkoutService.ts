@@ -67,9 +67,7 @@ const base64ToBytes = (value: string) => {
 };
 
 const buildFallbackCryptoKey = () => {
-  const seed = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-  const encoder = new TextEncoder();
-  return bytesToBase64(encoder.encode(seed));
+  return bytesToBase64(window.crypto.getRandomValues(new Uint8Array(32)));
 };
 
 const createOperationId = () =>

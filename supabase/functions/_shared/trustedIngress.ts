@@ -29,6 +29,16 @@ const sign = async (secret: string, message: string) => {
   return toHex(new Uint8Array(signature));
 };
 
+const hashRequestBody = async (req: Request) => {
+  if (req.method === "GET" || req.method === "HEAD") {
+    return "no-body";
+  }
+
+  const body = await req.clone().arrayBuffer();
+  const digest = await crypto.subtle.digest("SHA-256", body);
+  return toHex(new Uint8Array(digest));
+};
+
 export const hasTrustedEdgeIngress = async (req: Request, target: string) => {
   const secret = Deno.env.get("ITX_EDGE_PROXY_SHARED_SECRET")?.trim();
   if (!secret) {
@@ -51,7 +61,11 @@ export const hasTrustedEdgeIngress = async (req: Request, target: string) => {
   }
 
   const requestId = req.headers.get("x-request-id")?.trim() ?? "";
-  const expected = await sign(secret, `${timestamp}.${requestId}.${target}`);
+  const bodyHash = await hashRequestBody(req);
+  const expected = await sign(
+    secret,
+    `${timestamp}.${requestId}.${req.method.toUpperCase()}.${target}.${bodyHash}`,
+  );
   return timingSafeEqual(signature, expected);
 };
 

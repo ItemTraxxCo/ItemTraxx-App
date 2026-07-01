@@ -31,7 +31,7 @@
   "dependencies": {
     "@posthog/react": "^1.10.3",
     "@sentry/vue": "^10.63.0",
-    "@supabase/supabase-js": "^2.110.0",
+    "@supabase/supabase-js": "^2.108.2",
     "@vercel/analytics": "^2.0.1",
     "@vercel/speed-insights": "^2.0.0",
     "jsbarcode": "^3.12.3",

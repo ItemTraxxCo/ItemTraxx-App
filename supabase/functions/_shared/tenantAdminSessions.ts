@@ -82,10 +82,10 @@ export const isTenantAdminTokenBlockedBySessionRevocation = async (
 
     if (error) {
       if (isMissingRelation(error as RpcError, "tenant_admin_sessions")) {
-        return { blocked: false as const, relationMissing: true as const };
+        return { blocked: true as const, relationMissing: true as const };
       }
       if (isMissingColumn(error as RpcError, "auth_session_id")) {
-        return { blocked: false as const, relationMissing: true as const };
+        return { blocked: true as const, relationMissing: true as const };
       }
       throw new Error("Unable to validate admin session revocation.");
     }
@@ -109,7 +109,7 @@ export const isTenantAdminTokenBlockedBySessionRevocation = async (
 
     if (error) {
       if (isMissingRelation(error as RpcError, "tenant_admin_sessions")) {
-        return { blocked: false as const, relationMissing: true as const };
+        return { blocked: true as const, relationMissing: true as const };
       }
       throw new Error("Unable to validate admin session revocation.");
     }

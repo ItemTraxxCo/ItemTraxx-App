@@ -249,7 +249,16 @@ const isMissingSessionMetadataColumn = (error: RpcError | null | undefined) =>
 
 const isMissingSessionAuthBindingColumn = (error: RpcError | null | undefined) =>
   isMissingColumn(error, "auth_session_id") ||
+  isMissingColumn(error, "auth_token_hash") ||
   isMissingColumn(error, "auth_token_issued_at");
+
+const sha256 = async (value: string) => {
+  const encoded = new TextEncoder().encode(value);
+  const digest = await crypto.subtle.digest("SHA-256", encoded);
+  return Array.from(new Uint8Array(digest))
+    .map((byte) => byte.toString(16).padStart(2, "0"))
+    .join("");
+};
 
 
 serve(async (req) => {
@@ -306,6 +315,9 @@ serve(async (req) => {
       adminClient,
       authToken,
     );
+    const authTokenBindingKey = authSessionBinding.sessionId
+      ? `session:${authSessionBinding.sessionId}`
+      : `token:${await sha256(authToken)}`;
 
     const userClient = createClient(supabaseUrl, publishableKey, {
       global: { headers: { Authorization: authHeader } },
@@ -396,7 +408,7 @@ serve(async (req) => {
       }
       const { data, error } = await adminClient
         .from("tenant_admin_sessions")
-        .select("id, auth_session_id")
+        .select("id, auth_session_id, auth_token_hash")
         .eq("tenant_id", tenantId)
         .eq("profile_id", user.id)
         .eq("device_id", deviceSession.deviceId)
@@ -414,9 +426,17 @@ serve(async (req) => {
       }
       if (
         data?.id &&
-        (!data.auth_session_id ||
-          !authSessionBinding.sessionId ||
-          data.auth_session_id === authSessionBinding.sessionId)
+        (
+          (typeof data.auth_session_id === "string" &&
+            data.auth_session_id.trim().length > 0 &&
+            !!authSessionBinding.sessionId &&
+            data.auth_session_id === authSessionBinding.sessionId) ||
+          ((!data.auth_session_id ||
+            (typeof data.auth_session_id === "string" &&
+              data.auth_session_id.trim().length === 0)) &&
+            typeof data.auth_token_hash === "string" &&
+            data.auth_token_hash.trim() === authTokenBindingKey)
+        )
       ) {
         return { exists: true as const, relationMissing: false as const, revoked: false as const };
       }
@@ -487,6 +507,7 @@ serve(async (req) => {
           device_label: deviceSession.deviceLabel,
           user_agent: deviceSession.userAgent,
           auth_session_id: authSessionBinding.sessionId,
+          auth_token_hash: authTokenBindingKey,
           auth_token_issued_at: authSessionBinding.issuedAt,
         };
         const metadataUpdate = {
@@ -546,6 +567,7 @@ serve(async (req) => {
           device_label: deviceSession.deviceLabel,
           user_agent: deviceSession.userAgent,
           auth_session_id: authSessionBinding.sessionId,
+          auth_token_hash: authTokenBindingKey,
           auth_token_issued_at: authSessionBinding.issuedAt,
           created_at: now,
           last_seen_at: now,
@@ -586,6 +608,7 @@ serve(async (req) => {
                 device_label: deviceSession.deviceLabel,
                 user_agent: deviceSession.userAgent,
                 auth_session_id: authSessionBinding.sessionId,
+                auth_token_hash: authTokenBindingKey,
                 auth_token_issued_at: authSessionBinding.issuedAt,
                 created_at: now,
                 last_seen_at: now,

@@ -27,6 +27,9 @@ alter table public.tenant_admin_sessions
   add column if not exists auth_session_id text null;
 
 alter table public.tenant_admin_sessions
+  add column if not exists auth_token_hash text null;
+
+alter table public.tenant_admin_sessions
   add column if not exists auth_token_issued_at timestamptz null;
 
 create index if not exists tenant_admin_sessions_tenant_profile_active_idx
@@ -44,6 +47,10 @@ create index if not exists tenant_admin_sessions_auth_session_revoked_idx
 create index if not exists tenant_admin_sessions_auth_session_active_idx
   on public.tenant_admin_sessions (tenant_id, profile_id, device_id, auth_session_id)
   where revoked_at is null and auth_session_id is not null;
+
+create index if not exists tenant_admin_sessions_auth_token_active_idx
+  on public.tenant_admin_sessions (tenant_id, profile_id, device_id, auth_token_hash)
+  where revoked_at is null and auth_token_hash is not null;
 
 alter table public.tenant_admin_sessions enable row level security;
 

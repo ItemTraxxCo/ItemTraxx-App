@@ -27,7 +27,15 @@ const isMissingColumn = (error: RpcError | null | undefined, column: string) =>
   (error.message ?? "").toLowerCase().includes(column.toLowerCase());
 
 const TENANT_ADMIN_SESSION_COLUMNS =
-  "id, auth_session_id, auth_token_issued_at";
+  "id, auth_session_id, auth_token_hash, auth_token_issued_at";
+
+const sha256 = async (value: string) => {
+  const encoded = new TextEncoder().encode(value);
+  const digest = await crypto.subtle.digest("SHA-256", encoded);
+  return Array.from(new Uint8Array(digest))
+    .map((byte) => byte.toString(16).padStart(2, "0"))
+    .join("");
+};
 
 export const resolveTenantAdminAuthSessionBinding = async (
   client: SupabaseLikeClient,
@@ -49,6 +57,24 @@ export const resolveTenantAdminAuthSessionBinding = async (
   return {
     sessionId: sessionId || null,
     issuedAt,
+  };
+};
+
+const resolveTenantAdminAuthBindingKey = async (
+  client: SupabaseLikeClient,
+  authToken: string,
+) => {
+  const binding = await resolveTenantAdminAuthSessionBinding(client, authToken);
+  if (binding.sessionId) {
+    return {
+      ...binding,
+      bindingKey: `session:${binding.sessionId}`,
+    };
+  }
+
+  return {
+    ...binding,
+    bindingKey: `token:${await sha256(authToken)}`,
   };
 };
 
@@ -137,11 +163,11 @@ export const validateTenantAdminDeviceSession = async (
     };
   }
 
-  const binding = await resolveTenantAdminAuthSessionBinding(
+  const binding = await resolveTenantAdminAuthBindingKey(
     client,
     params.authToken,
   );
-  if (!binding.sessionId && !binding.issuedAt) {
+  if (!binding.issuedAt) {
     return {
       valid: false as const,
       reason: "revoked_token" as const,
@@ -212,6 +238,9 @@ export const validateTenantAdminDeviceSession = async (
     const sessionAuthId = typeof activeSession.auth_session_id === "string"
       ? activeSession.auth_session_id.trim()
       : "";
+    const sessionTokenHash = typeof activeSession.auth_token_hash === "string"
+      ? activeSession.auth_token_hash.trim()
+      : "";
     if (binding.sessionId) {
       return sessionAuthId === binding.sessionId
         ? {
@@ -225,7 +254,7 @@ export const validateTenantAdminDeviceSession = async (
           relationMissing: false as const,
         };
     }
-    if (!sessionAuthId) {
+    if (!sessionAuthId && sessionTokenHash === binding.bindingKey) {
       return {
         valid: true as const,
         reason: "active" as const,

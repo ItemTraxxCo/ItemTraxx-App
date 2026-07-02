@@ -1,16 +1,37 @@
 <template>
-  <div class="landing-new">
+  <div class="lp">
     <a class="skip-link" href="#landing-new-main">Skip to main content</a>
 
-    <div class="ambient ambient-one" aria-hidden="true"></div>
-    <div class="ambient ambient-two" aria-hidden="true"></div>
-    <div class="grid-noise" aria-hidden="true"></div>
+    <svg class="bg-trails" viewBox="0 0 1440 900" preserveAspectRatio="xMaxYMid slice" aria-hidden="true">
+      <defs>
+        <linearGradient id="lp-trace" x1="0%" y1="100%" x2="100%" y2="0%">
+          <stop offset="0%" stop-color="#2c5cf6" stop-opacity="0" />
+          <stop offset="45%" stop-color="#2c5cf6" />
+          <stop offset="78%" stop-color="#22c3ea" />
+          <stop offset="100%" stop-color="#2ce9c4" />
+        </linearGradient>
+        <linearGradient id="lp-trace-soft" x1="0%" y1="100%" x2="100%" y2="0%">
+          <stop offset="0%" stop-color="#2c5cf6" stop-opacity="0" />
+          <stop offset="60%" stop-color="#2456d8" stop-opacity="0.55" />
+          <stop offset="100%" stop-color="#22c3ea" stop-opacity="0.9" />
+        </linearGradient>
+      </defs>
+      <path class="trail trail-a" d="M-80 880 C 480 840, 950 640, 1240 160" />
+      <path class="trail trail-b" d="M60 910 C 560 880, 1040 700, 1330 260" />
+      <path class="trail trail-c" d="M240 920 C 700 900, 1130 760, 1410 380" />
+      <circle class="node node-1" cx="1240" cy="160" r="5" />
+      <circle class="node node-2" cx="1330" cy="260" r="4" />
+      <circle class="node node-3" cx="1410" cy="380" r="3.5" />
+      <circle class="node node-4" cx="1120" cy="420" r="2.5" />
+      <circle class="node node-5" cx="1010" cy="560" r="2" />
+    </svg>
+    <div class="bg-grid" aria-hidden="true"></div>
 
-    <header class="landing-header shell">
+    <header class="lp-header shell">
       <RouterLink class="brand-mark" to="/">
         <img class="brand-mark-full" :src="brandLogoUrl" alt="ItemTraxx Co" />
       </RouterLink>
-      <nav class="landing-nav" aria-label="Primary">
+      <nav class="lp-nav" aria-label="Primary">
         <RouterLink to="/pricing">Pricing</RouterLink>
         <RouterLink to="/contact-support">Support</RouterLink>
         <a
@@ -27,28 +48,110 @@
       </nav>
     </header>
 
-    <main id="landing-new-main" class="shell landing-main">
-      <section class="hero-grid reveal reveal-up">
-        <div class="hero-copy reveal reveal-left">
-          <p class="eyebrow">Inventory tracking made simple</p>
-          <h1>ItemTraxx</h1>
+    <main id="landing-new-main" class="shell lp-main">
+      <section class="hero">
+        <div class="hero-copy reveal">
+          <p class="eyebrow">Inventory tracking made simple<span class="caret" aria-hidden="true">▍</span></p>
+          <h1 class="hero-title"><span>Item</span><span class="grad-text">Traxx</span></h1>
+          <p class="tagline" aria-label="Smart. Track. Transform.">
+            <span class="tag-blue">Smart.</span>
+            <span class="tag-cyan">Track.</span>
+            <span class="tag-mint">Transform.</span>
+          </p>
           <p class="hero-body">
             Losing track of where stuff goes? ItemTraxx is the right service for you.
           </p>
           <p class="hero-support">
-            Contact us to start mastering your inventory with ItemTraxx's
-            checkout, returns, and admin management.
+            Contact us to start mastering your inventory with ItemTraxx's checkout,
+            returns, and admin management.
           </p>
           <div class="hero-actions">
             <RouterLink class="cta-primary" to="/pricing" @click="trackCta('pricing', 'hero')">Pricing</RouterLink>
-            <RouterLink
-              class="cta-secondary"
-              to="/request-demo"
-              @click="trackCta('demo', 'hero')"
-            >
+            <RouterLink class="cta-secondary" to="/request-demo" @click="trackCta('demo', 'hero')">
               Request Demo
             </RouterLink>
           </div>
+        </div>
+
+        <div class="hero-panel reveal reveal-delay-1">
+          <article class="ledger" aria-label="Checkout flow demo">
+            <header class="ledger-head">
+              <span class="ledger-title">Checkout and return</span>
+              <span class="live-pill"><span class="live-dot" aria-hidden="true"></span>Demo</span>
+            </header>
+            <div class="demo-app">
+              <p class="demo-app-brand">ItemTraxx</p>
+              <p class="demo-app-copy">Checkout and return</p>
+              <div class="demo-card">
+                <div>
+                  <span class="demo-label">Borrower ID</span>
+                  <div class="demo-input-row">
+                    <div class="demo-input" :class="{ 'is-focus': demoStage === 'typing' }">
+                      <span v-if="demoTyped">{{ demoTyped }}</span>
+                      <span v-else class="demo-placeholder">Enter borrower ID</span>
+                      <span v-if="demoStage === 'typing'" class="demo-caret" aria-hidden="true">▍</span>
+                    </div>
+                    <span class="demo-btn" :class="{ 'is-active': demoStage === 'loading' }">Load borrower</span>
+                  </div>
+                  <p v-if="!demoBorrowerVisible" class="demo-hint">Enter a borrower ID to begin.</p>
+                </div>
+
+                <Transition name="demo-fade">
+                  <div v-if="demoBorrowerVisible" class="demo-summary">
+                    <p class="demo-summary-name">
+                      <strong>jordan.m</strong>
+                      <span class="demo-muted"> ID: 24187</span>
+                    </p>
+                    <p class="demo-muted">No items currently checked out.</p>
+                  </div>
+                </Transition>
+
+                <Transition name="demo-fade">
+                  <div v-if="demoBorrowerVisible">
+                    <span class="demo-label">Item barcode</span>
+                    <div class="demo-input-row">
+                      <div class="demo-input" :class="{ 'is-focus': demoStage === 'scan' }">
+                        <span v-if="demoStage === 'scan'">ITX-0147</span>
+                        <span v-else class="demo-placeholder">Scan or enter barcode</span>
+                      </div>
+                      <span class="demo-btn" :class="{ 'is-active': demoStage === 'scan' }">Add barcode</span>
+                    </div>
+                  </div>
+                </Transition>
+
+                <Transition name="demo-fade">
+                  <div v-if="demoStage === 'scanned' || demoStage === 'submitting'">
+                    <p class="demo-subheading">Items</p>
+                    <p class="demo-item-row">
+                      Canon EOS R50
+                      <span class="demo-muted"> (ITX-0147)</span>
+                      <span class="demo-tag">Checkout</span>
+                      <span class="demo-remove">Remove</span>
+                    </p>
+                  </div>
+                </Transition>
+
+                <Transition name="demo-fade">
+                  <span
+                    v-if="demoBorrowerVisible"
+                    class="demo-btn demo-submit"
+                    :class="{ 'is-active': demoStage === 'submitting' }"
+                  >
+                    Complete transaction
+                  </span>
+                </Transition>
+
+                <Transition name="demo-fade">
+                  <div v-if="demoStage === 'submitted'" class="demo-toast">
+                    <p class="demo-toast-title">Transaction complete (Success).</p>
+                    <p class="demo-muted">processed: 1 checkout(s), 0 return(s)</p>
+                  </div>
+                </Transition>
+              </div>
+            </div>
+            <p class="ledger-caption">The actual flow: load a borrower, scan barcodes, complete the transaction.</p>
+          </article>
+
           <ul class="hero-points" aria-label="Key product benefits">
             <li>Secure sign-ins and protected admin access</li>
             <li>Clear transaction history and audit visibility</li>
@@ -58,77 +161,35 @@
             <li>Avoid common inventory management fails</li>
           </ul>
         </div>
-
-        <div class="hero-showcase">
-          <article class="showcase-card showcase-primary reveal reveal-right reveal-delay-1">
-            <div class="showcase-header">
-              <p class="showcase-label">{{ rotatingShowcase.label }}</p>
-              <span class="showcase-pill">{{ rotatingShowcase.pill }}</span>
-            </div>
-            <h2>{{ rotatingShowcase.title }}</h2>
-            <p>{{ rotatingShowcase.body }}</p>
-            <ul class="showcase-points">
-              <li v-for="point in rotatingShowcase.points" :key="point">{{ point }}</li>
-            </ul>
-          </article>
-
-          <article class="showcase-card showcase-secondary reveal reveal-up reveal-delay-2">
-            <p class="showcase-label">Checkout and return preview</p>
-            <picture>
-              <source
-                type="image/webp"
-                :srcset="`${checkoutReturnUiImage800} 800w, ${checkoutReturnUiImage1200} 1200w, ${checkoutReturnUiImage1600} 1600w`"
-                sizes="(max-width: 900px) 92vw, 640px"
-              />
-              <img
-                class="showcase-image"
-                :src="checkoutReturnUiImage"
-                alt="Checkout and return interface preview"
-                loading="lazy"
-                decoding="async"
-                width="1600"
-                height="810"
-              />
-            </picture>
-          </article>
-        </div>
       </section>
 
-      <section class="feature-band reveal reveal-up">
-        <div class="feature-band-copy reveal reveal-left">
+      <div class="marquee" aria-label="Product capabilities">
+        <div class="marquee-track">
+          <span v-for="cap in capabilities" :key="cap" class="marquee-item">
+            {{ cap }}<span class="marquee-star" aria-hidden="true">✦</span>
+          </span>
+          <span v-for="cap in capabilities" :key="`dup-${cap}`" class="marquee-item" aria-hidden="true">
+            {{ cap }}<span class="marquee-star">✦</span>
+          </span>
+        </div>
+      </div>
+
+      <section class="feature-band reveal">
+        <div class="feature-copy">
           <p class="eyebrow">Simple usage</p>
           <h2>Simple UI keeps everything minimal, sleek, and easy to navigate.</h2>
-          <p>
-            Simple UI keeps everything minimal, sleek, and easy to navigate, confusion free.
-          </p>
-          <ul class="feature-checks">
+          <p class="section-sub">Confusion free, for admins and borrowers alike.</p>
+          <ul class="check-list">
             <li>Fast sign in and transaction flow</li>
             <li>Clean and clear user-facing workflow design</li>
             <li>Light and dark appearance modes available</li>
           </ul>
         </div>
-        <div class="feature-band-visual reveal reveal-right reveal-delay-1">
-          <picture>
-            <source
-              type="image/webp"
-              :srcset="`${adminUiImage800} 800w, ${adminUiImage1200} 1200w, ${adminUiImage1600} 1600w`"
-              sizes="(max-width: 900px) 92vw, 700px"
-            />
-            <img
-              class="feature-image"
-              :src="adminUiImage"
-              alt="Admin interface preview"
-              loading="lazy"
-              decoding="async"
-              width="1600"
-              height="934"
-            />
-          </picture>
-        </div>
       </section>
 
-      <section class="ops-grid reveal reveal-up">
-        <article class="ops-panel reveal reveal-left reveal-delay-1">
+      <section class="pillars reveal">
+        <article class="pillar">
+          <span class="pillar-num" aria-hidden="true">01</span>
           <p class="eyebrow">Easy management</p>
           <h3>Management workflows without the spreadsheet sprawl.</h3>
           <p>
@@ -136,7 +197,8 @@
             and more, keeping track of inventory has never been easier.
           </p>
         </article>
-        <article class="ops-panel reveal reveal-up reveal-delay-2">
+        <article class="pillar">
+          <span class="pillar-num" aria-hidden="true">02</span>
           <p class="eyebrow">Why it matters</p>
           <h3>Master your inventory.</h3>
           <p>
@@ -144,19 +206,41 @@
             taken, when it was returned, and what items are currently out.
           </p>
         </article>
-        <article class="ops-panel reveal reveal-right reveal-delay-3">
+        <article class="pillar">
+          <span class="pillar-num" aria-hidden="true">03</span>
           <p class="eyebrow">Fit</p>
           <h3>Built for teams, organizations, and individual users.</h3>
           <p>
-            ItemTraxx is flexible and scalable, making it a fit for schools, smaller and larger teams, and
-            organizations of any size that need cleaner inventory operations. We also offer individual plans 
-            for single-user use.
+            ItemTraxx is flexible and scalable, making it a fit for schools, smaller and larger
+            teams, and organizations of any size that need cleaner inventory operations. We also
+            offer individual plans for single-user use.
           </p>
         </article>
       </section>
 
-      <section class="faq-section reveal reveal-up">
-        <div class="faq-header">
+      <section class="why reveal">
+        <div class="section-head">
+          <p class="eyebrow">Why teams run ItemTraxx</p>
+          <h2>One system for the whole checkout loop.</h2>
+        </div>
+        <div class="why-grid">
+          <article v-for="(variant, index) in showcaseVariants" :key="variant.title" class="why-card">
+            <header class="why-head">
+              <span class="why-index">{{ String(index + 1).padStart(2, "0") }}</span>
+              <span class="why-pill">{{ variant.pill }}</span>
+            </header>
+            <p class="why-label">{{ variant.label }}</p>
+            <h3>{{ variant.title }}</h3>
+            <p class="why-body">{{ variant.body }}</p>
+            <ul class="why-points">
+              <li v-for="point in variant.points" :key="point">{{ point }}</li>
+            </ul>
+          </article>
+        </div>
+      </section>
+
+      <section class="faq reveal">
+        <div class="section-head">
           <p class="eyebrow">Frequently asked questions</p>
           <h2>Answers to the common stuff.</h2>
         </div>
@@ -170,7 +254,8 @@
               :aria-controls="`landing-new-faq-answer-${index}`"
               @click="toggleFaq(index)"
             >
-              <span>{{ item.q }}</span>
+              <span class="faq-index" aria-hidden="true">{{ String(index + 1).padStart(2, "0") }}</span>
+              <span class="faq-q">{{ item.q }}</span>
               <span class="faq-symbol" aria-hidden="true">{{ openFaqIndex === index ? "−" : "+" }}</span>
             </button>
             <div
@@ -186,42 +271,31 @@
         </div>
       </section>
 
-      <section class="final-strip reveal reveal-up">
-        <div>
-          <p class="eyebrow">Ready to simplify your inventory tracking?</p>
-          <h2>Get started with ItemTraxx and advance your inventory management.</h2>
-          <p>Simplify your inventory management with ItemTraxx today.</p>
-          <div class="final-actions">
-            <RouterLink class="cta-primary" to="/login" @click="trackCta('login', 'final')">Go to Login</RouterLink>
-            <RouterLink class="cta-secondary" to="/pricing" @click="trackCta('pricing', 'final')">Pricing</RouterLink>
-          </div>
+      <section class="final-strip reveal">
+        <p class="eyebrow">Ready to simplify your inventory tracking?</p>
+        <h2>Get started with ItemTraxx and advance your inventory management.</h2>
+        <p class="section-sub">Simplify your inventory management with ItemTraxx today.</p>
+        <div class="final-actions">
+          <RouterLink class="cta-primary" to="/login" @click="trackCta('login', 'final')">Go to Login</RouterLink>
+          <RouterLink class="cta-secondary" to="/pricing" @click="trackCta('pricing', 'final')">Pricing</RouterLink>
         </div>
       </section>
     </main>
 
-    <div class="landing-footer shell">
+    <div class="lp-footer shell">
       <PublicFooter />
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, onUnmounted, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { RouterLink } from 'vue-router';
 import { trackAnalyticsEvent } from "../services/analyticsService";
 import { capturePostHogEvent } from "../services/posthogService";
-import adminUiImage from '../assets/landing/admin_ui.png';
-import adminUiImage800 from '../assets/landing/admin_ui-800.webp';
-import adminUiImage1200 from '../assets/landing/admin_ui-1200.webp';
-import adminUiImage1600 from '../assets/landing/admin_ui-1600.webp';
-import checkoutReturnUiImage from '../assets/landing/checkout_return_ui.png';
-import checkoutReturnUiImage800 from '../assets/landing/checkout_return_ui-800.webp';
-import checkoutReturnUiImage1200 from '../assets/landing/checkout_return_ui-1200.webp';
-import checkoutReturnUiImage1600 from '../assets/landing/checkout_return_ui-1600.webp';
 import { fetchSystemStatus } from '../services/systemStatusService';
 import PublicFooter from "../components/PublicFooter.vue";
 
-const themeMode = ref<"light" | "dark">("dark");
 const brandLogoUrl = computed(() => import.meta.env.VITE_BRAND_LOGO_DARK_URL || "");
 
 type ShowcaseVariant = {
@@ -277,7 +351,81 @@ const showcaseVariants: ShowcaseVariant[] = [
   },
 ];
 
-const rotatingShowcase = showcaseVariants[Math.floor(Math.random() * showcaseVariants.length)];
+const capabilities = [
+  'Checkout & returns',
+  'Transaction history',
+  'Audit logs',
+  'Item management',
+  'User management',
+  'Admin controls',
+  'Light & dark modes',
+  'No item limits',
+  'Built to scale',
+];
+
+type DemoStage =
+  | 'idle'
+  | 'typing'
+  | 'loading'
+  | 'loaded'
+  | 'scan'
+  | 'scanned'
+  | 'submitting'
+  | 'submitted';
+
+const DEMO_BORROWER_ID = '24187';
+const demoStage = ref<DemoStage>('idle');
+const demoTyped = ref('');
+let demoHoldTicks = 0;
+
+const demoBorrowerVisible = computed(() =>
+  demoStage.value === 'loaded'
+  || demoStage.value === 'scan'
+  || demoStage.value === 'scanned'
+  || demoStage.value === 'submitting',
+);
+
+const demoHold = (ticks: number, next: DemoStage) => {
+  if (++demoHoldTicks >= ticks) {
+    demoHoldTicks = 0;
+    demoStage.value = next;
+  }
+};
+
+const advanceDemo = () => {
+  switch (demoStage.value) {
+    case 'idle':
+      demoHold(2, 'typing');
+      break;
+    case 'typing':
+      if (demoTyped.value.length < DEMO_BORROWER_ID.length) {
+        demoTyped.value = DEMO_BORROWER_ID.slice(0, demoTyped.value.length + 1);
+      } else {
+        demoStage.value = 'loading';
+      }
+      break;
+    case 'loading':
+      demoHold(1, 'loaded');
+      break;
+    case 'loaded':
+      demoHold(3, 'scan');
+      break;
+    case 'scan':
+      demoHold(2, 'scanned');
+      break;
+    case 'scanned':
+      demoHold(3, 'submitting');
+      break;
+    case 'submitting':
+      demoHoldTicks = 0;
+      demoTyped.value = '';
+      demoStage.value = 'submitted';
+      break;
+    case 'submitted':
+      demoHold(6, 'idle');
+      break;
+  }
+};
 
 const statusLabel = ref('Unknown');
 const statusClass = ref<'status-ok' | 'status-warn' | 'status-down' | 'status-unknown'>('status-unknown');
@@ -357,7 +505,7 @@ const refreshSystemStatus = async () => {
 
 let observer: IntersectionObserver | null = null;
 let statusTimer: number | null = null;
-let themeObserver: MutationObserver | null = null;
+let demoTimer: number | null = null;
 
 const startStatusPolling = () => {
   if (statusTimer || document.visibilityState === 'hidden') return;
@@ -382,15 +530,6 @@ const handleVisibilityChange = () => {
 };
 
 onMounted(() => {
-  const syncTheme = () => {
-    themeMode.value = document.documentElement.getAttribute('data-theme') === 'light' ? 'light' : 'dark';
-  };
-  syncTheme();
-  themeObserver = new MutationObserver(syncTheme);
-  themeObserver.observe(document.documentElement, {
-    attributes: true,
-    attributeFilter: ['data-theme'],
-  });
   window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
   void refreshSystemStatus();
   startStatusPolling();
@@ -401,8 +540,12 @@ onMounted(() => {
 
   if (prefersReducedMotion) {
     revealElements.forEach((el) => el.classList.add('is-visible'));
+    demoTyped.value = DEMO_BORROWER_ID;
+    demoStage.value = 'scanned';
     return;
   }
+
+  demoTimer = window.setInterval(advanceDemo, 450);
 
   observer = new IntersectionObserver(
     (entries) => {
@@ -413,7 +556,7 @@ onMounted(() => {
         }
       });
     },
-    { threshold: 0.14, rootMargin: '0px 0px -30px 0px' },
+    { threshold: 0.12, rootMargin: '0px 0px -30px 0px' },
   );
 
   revealElements.forEach((el) => observer?.observe(el));
@@ -423,29 +566,99 @@ onBeforeUnmount(() => {
   observer?.disconnect();
   observer = null;
   stopStatusPolling();
-  document.removeEventListener('visibilitychange', handleVisibilityChange);
-});
-
-onUnmounted(() => {
-  if (themeObserver) {
-    themeObserver.disconnect();
-    themeObserver = null;
+  if (demoTimer) {
+    window.clearInterval(demoTimer);
+    demoTimer = null;
   }
+  document.removeEventListener('visibilitychange', handleVisibilityChange);
 });
 </script>
 
 <style scoped>
-.landing-new {
+.lp {
+  --lp-bg: #030509;
+  --lp-panel: rgba(10, 16, 28, 0.78);
+  --lp-panel-solid: #0a101c;
+  --lp-line: rgba(124, 156, 214, 0.16);
+  --lp-line-strong: rgba(124, 156, 214, 0.3);
+  --lp-ink: #eef3fb;
+  --lp-mute: rgba(206, 219, 238, 0.62);
+  --lp-blue: #2c5cf6;
+  --lp-cyan: #22c3ea;
+  --lp-mint: #2ce9c4;
+  --lp-trace: linear-gradient(90deg, #2c5cf6 0%, #22c3ea 52%, #2ce9c4 100%);
+  --lp-display: "Sora", "Inter", "Segoe UI", sans-serif;
+  --lp-mono: "JetBrains Mono", "SFMono-Regular", Menlo, monospace;
+
   position: relative;
   min-height: 100vh;
   margin: 0;
   padding: 1.35rem 0 4rem;
   overflow: hidden;
-  color: #f5f7fb;
+  font-family: var(--lp-display);
+  color: var(--lp-ink);
   background:
-    radial-gradient(circle at top left, rgba(25, 194, 168, 0.16), transparent 22%),
-    radial-gradient(circle at 82% 18%, rgba(25, 67, 155, 0.22), transparent 28%),
-    linear-gradient(180deg, #10161f 0%, #090d14 100%);
+    radial-gradient(ellipse 60% 40% at 85% 8%, rgba(44, 92, 246, 0.14), transparent 70%),
+    radial-gradient(ellipse 50% 35% at 15% 92%, rgba(34, 195, 234, 0.06), transparent 70%),
+    linear-gradient(180deg, #05070d 0%, var(--lp-bg) 45%, #04060b 100%);
+}
+
+/* ---------- background layers ---------- */
+
+.bg-trails {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: min(100vh, 60rem);
+  pointer-events: none;
+  opacity: 0.85;
+}
+
+.trail {
+  fill: none;
+  stroke: url(#lp-trace);
+  stroke-linecap: round;
+}
+
+.trail-a { stroke-width: 2.6; opacity: 0.8; }
+.trail-b { stroke-width: 1.6; opacity: 0.5; stroke: url(#lp-trace-soft); }
+.trail-c { stroke-width: 1.1; opacity: 0.3; stroke: url(#lp-trace-soft); }
+
+.node {
+  fill: var(--lp-cyan);
+  opacity: 0.9;
+  animation: node-pulse 3.4s ease-in-out infinite;
+}
+
+.node-1 { fill: var(--lp-mint); }
+.node-2 { animation-delay: 0.6s; }
+.node-3 { animation-delay: 1.2s; fill: var(--lp-mint); }
+.node-4 { animation-delay: 1.8s; fill: var(--lp-blue); }
+.node-5 { animation-delay: 2.4s; }
+
+@keyframes node-pulse {
+  0%, 100% { opacity: 0.35; }
+  50% { opacity: 1; }
+}
+
+.bg-grid {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(rgba(148, 180, 235, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(148, 180, 235, 0.05) 1px, transparent 1px);
+  background-size: 44px 44px;
+  mask-image: radial-gradient(ellipse 90% 55% at 50% 0%, rgba(0, 0, 0, 0.5), transparent 90%);
+}
+
+/* ---------- shared ---------- */
+
+.shell {
+  width: min(1240px, 92%);
+  margin: 0 auto;
+  position: relative;
+  z-index: 2;
 }
 
 .skip-link {
@@ -453,7 +666,7 @@ onUnmounted(() => {
   left: 1rem;
   top: 0.75rem;
   transform: translateY(-180%);
-  background: #0b1324;
+  background: var(--lp-panel-solid);
   color: #fff;
   padding: 0.5rem 0.75rem;
   border-radius: 8px;
@@ -466,57 +679,64 @@ onUnmounted(() => {
   transform: translateY(0);
 }
 
-.shell {
-  width: min(1280px, 92%);
-  margin: 0 auto;
-  position: relative;
-  z-index: 2;
+.lp a:focus-visible,
+.lp button:focus-visible {
+  outline: 2px solid var(--lp-cyan);
+  outline-offset: 2px;
 }
 
-.ambient,
-.grid-noise {
-  pointer-events: none;
-  position: absolute;
+.eyebrow {
+  margin: 0 0 1rem;
+  font-family: var(--lp-mono);
+  font-size: 0.74rem;
+  font-weight: 500;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--lp-cyan);
 }
 
-.ambient {
-  border-radius: 999px;
-  filter: blur(44px);
-  opacity: 0.4;
+.eyebrow::before {
+  content: "// ";
+  color: var(--lp-mute);
 }
 
-.ambient-one {
-  width: 22rem;
-  height: 22rem;
-  top: 5rem;
-  left: -7rem;
-  background: rgba(25, 194, 168, 0.2);
+.section-head {
+  max-width: 46rem;
+  margin-bottom: 2rem;
 }
 
-.ambient-two {
-  width: 20rem;
-  height: 20rem;
-  top: 26rem;
-  right: -6rem;
-  background: rgba(25, 67, 155, 0.24);
+.section-head h2,
+.feature-copy h2,
+.final-strip h2 {
+  margin: 0;
+  font-size: clamp(1.9rem, 3.6vw, 3rem);
+  line-height: 1.08;
+  letter-spacing: -0.045em;
+  font-weight: 700;
 }
 
-.grid-noise {
-  inset: 0;
-  background-image:
-    linear-gradient(rgba(255, 255, 255, 0.025) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.025) 1px, transparent 1px);
-  background-size: 36px 36px;
-  mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.55), transparent 92%);
-  opacity: 0.16;
+.section-sub {
+  margin: 1rem 0 0;
+  color: var(--lp-mute);
+  line-height: 1.7;
+  max-width: 40rem;
 }
 
-.landing-header {
+.grad-text {
+  background: var(--lp-trace);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* ---------- header ---------- */
+
+.lp-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
-  padding: calc(0.6rem + env(safe-area-inset-top, 0px)) 0 1.8rem;
+  padding: calc(0.6rem + env(safe-area-inset-top, 0px)) 0 2rem;
 }
 
 .brand-mark {
@@ -531,126 +751,821 @@ onUnmounted(() => {
   object-fit: contain;
   flex-shrink: 0;
   display: block;
-  transform: translateY(-2px);
 }
 
-.landing-nav {
+.lp-nav {
   display: flex;
   align-items: center;
-  gap: 0.7rem;
+  gap: 1.1rem;
   flex-wrap: wrap;
 }
 
-.landing-nav a {
-  color: rgba(235, 239, 244, 0.82);
+.lp-nav > a {
+  color: rgba(226, 235, 247, 0.82);
   text-decoration: none;
+  font-size: 0.92rem;
+  font-weight: 600;
+  transition: color 0.15s ease;
 }
 
-.status-pill,
-.nav-cta,
-.cta-secondary,
-.cta-primary {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 2.15rem;
-  padding: 0.42rem 0.85rem;
-  border-radius: 10px;
-  text-decoration: none;
-  font-weight: 600;
-  transition: transform 0.16s ease, box-shadow 0.16s ease, background-color 0.16s ease;
+.lp-nav > a:hover {
+  color: var(--lp-ink);
 }
 
 .status-pill {
-  gap: 0.55rem;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.36rem 0.8rem;
+  border-radius: 999px;
+  border: 1px solid var(--lp-line);
+  background: rgba(12, 19, 33, 0.7);
+  font-family: var(--lp-mono);
+  font-size: 0.74rem !important;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
   white-space: nowrap;
 }
 
-.nav-cta,
-.cta-secondary {
-  background:
-    linear-gradient(180deg, rgba(31, 40, 54, 0.94) 0%, rgba(17, 23, 32, 0.98) 100%);
-  border: 1px solid rgba(77, 97, 122, 0.4);
-  color: #f5f7fb;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
-}
-
-.cta-primary,
-.nav-cta:hover,
-.cta-secondary:hover,
-.cta-primary:hover {
-  box-shadow: 0 16px 32px rgba(25, 67, 155, 0.18);
-  transform: translateY(-1px);
-}
-
-.cta-primary {
-  background-image: linear-gradient(90deg, #19c2a8 0%, #19439b 100%);
-  background-repeat: no-repeat;
-  background-size: 100% 100%;
-  background-origin: border-box;
-  color: #f7fbff;
-  border: 1px solid transparent;
-}
-
-.nav-cta:hover,
-.cta-secondary:hover {
-  border-color: rgba(39, 196, 172, 0.58);
-  background:
-    linear-gradient(180deg, rgba(29, 66, 75, 0.98) 0%, rgba(16, 37, 48, 1) 100%);
-  box-shadow:
-    inset 0 1px 0 rgba(115, 255, 233, 0.08),
-    0 16px 32px rgba(25, 194, 168, 0.14);
-  color: #e9fffb;
-}
-
 .status-dot {
-  width: 0.6rem;
-  height: 0.6rem;
+  width: 0.55rem;
+  height: 0.55rem;
   border-radius: 999px;
   display: inline-block;
 }
 
-.status-ok { background: #2fd17c; }
-.status-warn { background: #f5b642; }
-.status-down { background: #f35f6f; }
+.status-ok { background: #2fd17c; box-shadow: 0 0 8px rgba(47, 209, 124, 0.8); }
+.status-warn { background: #f5b642; box-shadow: 0 0 8px rgba(245, 182, 66, 0.8); }
+.status-down { background: #f35f6f; box-shadow: 0 0 8px rgba(243, 95, 111, 0.8); }
 .status-unknown { background: #7b8698; }
 
-.landing-main {
+.nav-cta,
+.cta-primary,
+.cta-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.4rem;
+  padding: 0.5rem 1.15rem;
+  border-radius: 12px;
+  text-decoration: none;
+  font-weight: 700;
+  font-size: 0.95rem;
+  letter-spacing: -0.01em;
+  transition: transform 0.16s ease, box-shadow 0.16s ease, border-color 0.16s ease, color 0.16s ease;
+}
+
+.nav-cta,
+.cta-secondary {
+  color: var(--lp-ink);
+  border: 1px solid var(--lp-line-strong);
+  background: rgba(14, 22, 38, 0.72);
+}
+
+.nav-cta:hover,
+.cta-secondary:hover {
+  transform: translateY(-1px);
+  border-color: rgba(44, 233, 196, 0.55);
+  box-shadow: 0 12px 30px rgba(34, 195, 234, 0.14);
+  color: #e9fffb;
+}
+
+.cta-primary {
+  position: relative;
+  color: #04121c;
+  background: #19c2a8;
+  border: 1px solid transparent;
+}
+
+.cta-primary:hover {
+  transform: translateY(-1px);
+  background: #1fd6b9;
+}
+
+/* ---------- main / hero ---------- */
+
+.lp-main {
   display: grid;
-  gap: 2rem;
+  gap: 4.5rem;
 }
 
-.hero-grid,
-.hero-copy,
-.showcase-card,
-.feature-band,
-.feature-band-copy,
-.feature-band-visual,
-.final-strip,
-.ops-grid,
-.ops-panel,
-.faq-section {
+.hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(21rem, 0.95fr);
+  gap: 3rem;
+  align-items: center;
+  padding-top: 1.5rem;
+}
+
+.hero-copy .eyebrow {
+  margin-bottom: 1.4rem;
+}
+
+.caret {
+  margin-left: 0.2rem;
+  color: var(--lp-mint);
+  animation: caret-blink 1.1s steps(1) infinite;
+}
+
+@keyframes caret-blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+.hero-title {
+  margin: 0;
+  font-size: clamp(3.4rem, 8.5vw, 7rem);
+  line-height: 0.96;
+  letter-spacing: -0.055em;
+  font-weight: 800;
+}
+
+.tagline {
+  margin: 1.1rem 0 0;
+  font-size: clamp(1.05rem, 2vw, 1.4rem);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  display: flex;
+  gap: 0.55em;
+  flex-wrap: wrap;
+}
+
+.tag-blue { color: #4d79ff; }
+.tag-cyan { color: var(--lp-cyan); }
+.tag-mint { color: var(--lp-mint); }
+
+.hero-body {
+  margin: 1.6rem 0 0;
+  max-width: 34rem;
+  font-size: 1.3rem;
+  line-height: 1.5;
+  color: rgba(238, 243, 251, 0.92);
+}
+
+.hero-support {
+  margin: 1rem 0 0;
+  max-width: 33rem;
+  line-height: 1.75;
+  color: var(--lp-mute);
+}
+
+.hero-actions,
+.final-actions {
+  display: flex;
+  gap: 0.95rem;
+  flex-wrap: wrap;
+  margin-top: 2rem;
+}
+
+/* ---------- ledger ---------- */
+
+.hero-panel {
+  display: grid;
+  gap: 1.4rem;
+}
+
+.ledger {
+  position: relative;
+  border-radius: 20px;
+  border: 1px solid var(--lp-line);
+  background: var(--lp-panel);
+  padding: 1.25rem 1.35rem 1.1rem;
+  overflow: hidden;
+}
+
+.ledger::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  height: 1px;
+  background: var(--lp-trace);
+  opacity: 0.85;
+}
+
+.ledger-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+}
+
+.ledger-title {
+  font-family: var(--lp-mono);
+  font-size: 0.74rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--lp-mute);
+}
+
+.live-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.42rem;
+  font-family: var(--lp-mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--lp-mint);
+}
+
+.live-dot {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 999px;
+  background: var(--lp-mint);
+  box-shadow: 0 0 10px rgba(44, 233, 196, 0.9);
+  animation: node-pulse 1.8s ease-in-out infinite;
+}
+
+.demo-app {
+  min-height: 21rem;
+  border-radius: 14px;
+  background: #f7f7f5;
+  color: #171717;
+  font-family: "Inter", "Segoe UI", sans-serif;
+  padding: 1rem 1.1rem 1.1rem;
+}
+
+.demo-app-brand {
+  margin: 0;
+  font-size: 1.2rem;
+  font-weight: 800;
+  letter-spacing: -0.055em;
+  line-height: 1;
+}
+
+.demo-app-copy {
+  margin: 0.3rem 0 0.75rem;
+  font-size: 0.8rem;
+  color: #5f6368;
+}
+
+.demo-card {
+  display: grid;
+  align-content: start;
+  gap: 0.85rem;
+  padding: 1rem;
+  border-radius: 16px;
+  border: 1px solid #d8d8d3;
+  background: #ffffff;
+}
+
+.demo-label {
+  display: block;
+  margin-bottom: 0.4rem;
+  font-size: 0.82rem;
+  font-weight: 500;
+}
+
+.demo-input-row {
+  display: flex;
+  gap: 0.55rem;
+  align-items: center;
+}
+
+.demo-input {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  height: 2.2rem;
+  padding: 0 0.72rem;
+  border-radius: 12px;
+  border: 1px solid #c9c9c2;
+  background: #ffffff;
+  font-size: 0.85rem;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.demo-input.is-focus {
+  border-color: #171717;
+  box-shadow: 0 0 0 3px rgba(23, 23, 23, 0.08);
+}
+
+.demo-placeholder {
+  color: #9aa0a6;
+}
+
+.demo-caret {
+  color: #171717;
+  animation: caret-blink 0.9s steps(1) infinite;
+}
+
+.demo-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.2rem;
+  padding: 0.36rem 0.8rem;
+  border-radius: 12px;
+  background: #171717;
+  color: #ffffff;
+  font-size: 0.8rem;
+  font-weight: 600;
+  white-space: nowrap;
+  transition: filter 0.2s ease, transform 0.2s ease;
+}
+
+.demo-btn.is-active {
+  filter: brightness(1.7);
+  transform: scale(0.97);
+}
+
+.demo-hint {
+  margin: 0.55rem 0 0;
+  font-size: 0.78rem;
+  color: #5f6368;
+}
+
+.demo-summary {
+  display: grid;
+  gap: 0.3rem;
+}
+
+.demo-summary-name {
+  margin: 0;
+  font-size: 0.88rem;
+}
+
+.demo-muted {
+  color: #5f6368;
+  font-size: 0.78rem;
+}
+
+.demo-subheading {
+  margin: 0 0 0.35rem;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.demo-item-row {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  font-size: 0.84rem;
+}
+
+.demo-tag,
+.demo-remove {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 0.5rem;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  border: 1px solid #d8d8d3;
+  background: #f1f1ee;
+  white-space: nowrap;
+}
+
+.demo-tag {
+  color: #0b5;
+}
+
+.demo-remove {
+  color: #171717;
+}
+
+.demo-submit {
+  justify-self: start;
+}
+
+.demo-toast {
+  display: grid;
+  gap: 0.25rem;
+  padding: 0.75rem 0.9rem;
+  border-radius: 12px;
+  border: 1px solid #d8d8d3;
+  background: #f1f1ee;
+}
+
+.demo-toast-title {
+  margin: 0;
+  font-size: 0.84rem;
+  font-weight: 700;
+  color: #15803d;
+}
+
+.ledger-caption {
+  margin: 1rem 0 0;
+  font-size: 0.82rem;
+  color: var(--lp-mute);
+}
+
+.demo-fade-enter-from {
   opacity: 0;
-  filter: blur(12px);
+  transform: translateY(10px);
+}
+
+.demo-fade-enter-active {
+  transition: opacity 0.35s ease, transform 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.demo-fade-leave-active {
+  transition: opacity 0.22s ease;
+}
+
+.demo-fade-leave-to {
+  opacity: 0;
+}
+
+/* ---------- hero points ---------- */
+
+.hero-points {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.65rem 1.1rem;
+}
+
+.hero-points li {
+  position: relative;
+  padding-left: 1.45rem;
+  font-size: 0.88rem;
+  line-height: 1.5;
+  color: rgba(222, 231, 243, 0.82);
+}
+
+.hero-points li::before {
+  content: "✓";
+  position: absolute;
+  left: 0;
+  top: 0;
+  font-family: var(--lp-mono);
+  font-weight: 600;
+  background: var(--lp-trace);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* ---------- marquee ---------- */
+
+.marquee {
+  position: relative;
+  overflow: hidden;
+  padding: 1.1rem 0;
+  border-top: 1px solid var(--lp-line);
+  border-bottom: 1px solid var(--lp-line);
+  mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent);
+}
+
+.marquee-track {
+  display: flex;
+  width: max-content;
+  animation: marquee-slide 30s linear infinite;
+}
+
+.marquee-item {
+  display: inline-flex;
+  align-items: center;
+  font-family: var(--lp-mono);
+  font-size: 0.78rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: rgba(196, 212, 236, 0.66);
+  white-space: nowrap;
+}
+
+.marquee-star {
+  margin: 0 1.6rem;
+  background: var(--lp-trace);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+@keyframes marquee-slide {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+
+/* ---------- feature band ---------- */
+
+.feature-band {
+  display: grid;
+  justify-items: start;
+}
+
+.check-list {
+  margin: 1.6rem 0 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 0.75rem;
+}
+
+.check-list li {
+  position: relative;
+  padding-left: 1.6rem;
+  color: rgba(228, 236, 247, 0.85);
+  line-height: 1.55;
+}
+
+.check-list li::before {
+  content: "✓";
+  position: absolute;
+  left: 0;
+  font-family: var(--lp-mono);
+  font-weight: 600;
+  background: var(--lp-trace);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* ---------- pillars ---------- */
+
+.pillars {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1.3rem;
+}
+
+.pillar {
+  position: relative;
+  border-radius: 20px;
+  border: 1px solid var(--lp-line);
+  background: var(--lp-panel);
+  padding: 1.8rem 1.7rem;
+  overflow: hidden;
+  transition: border-color 0.2s ease, transform 0.2s ease;
+}
+
+.pillar:hover {
+  border-color: rgba(34, 195, 234, 0.4);
+  transform: translateY(-3px);
+}
+
+.pillar-num {
+  display: block;
+  font-family: var(--lp-mono);
+  font-size: 2.6rem;
+  font-weight: 600;
+  line-height: 1;
+  margin-bottom: 1.1rem;
+  background: var(--lp-trace);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  opacity: 0.9;
+}
+
+.pillar h3,
+.why-card h3 {
+  margin: 0 0 0.75rem;
+  font-size: 1.28rem;
+  line-height: 1.25;
+  letter-spacing: -0.03em;
+  font-weight: 700;
+}
+
+.pillar p:last-child,
+.why-body {
+  margin: 0;
+  color: var(--lp-mute);
+  line-height: 1.7;
+  font-size: 0.95rem;
+}
+
+/* ---------- why grid ---------- */
+
+.why-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1.3rem;
+}
+
+.why-card {
+  display: flex;
+  flex-direction: column;
+  border-radius: 20px;
+  border: 1px solid var(--lp-line);
+  background: var(--lp-panel);
+  padding: 1.6rem 1.5rem;
+  transition: border-color 0.2s ease, transform 0.2s ease;
+}
+
+.why-card:hover {
+  border-color: rgba(44, 233, 196, 0.38);
+  transform: translateY(-3px);
+}
+
+.why-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+}
+
+.why-index {
+  font-family: var(--lp-mono);
+  font-size: 0.8rem;
+  color: rgba(150, 178, 220, 0.55);
+}
+
+.why-pill {
+  font-family: var(--lp-mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  padding: 0.28rem 0.65rem;
+  border-radius: 999px;
+  color: #8af0d9;
+  background: rgba(44, 233, 196, 0.08);
+  border: 1px solid rgba(44, 233, 196, 0.24);
+}
+
+.why-label {
+  margin: 0 0 0.5rem;
+  font-family: var(--lp-mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--lp-cyan);
+}
+
+.why-body {
+  margin-bottom: 1.1rem;
+}
+
+.why-points {
+  margin: auto 0 0;
+  padding: 0.9rem 0 0;
+  list-style: none;
+  border-top: 1px solid var(--lp-line);
+  display: grid;
+  gap: 0.45rem;
+}
+
+.why-points li {
+  position: relative;
+  padding-left: 1.15rem;
+  font-size: 0.82rem;
+  color: rgba(210, 222, 240, 0.72);
+  line-height: 1.5;
+}
+
+.why-points li::before {
+  content: "▸";
+  position: absolute;
+  left: 0;
+  color: var(--lp-cyan);
+}
+
+/* ---------- faq ---------- */
+
+.faq-list {
+  border-top: 1px solid var(--lp-line);
+}
+
+.faq-item {
+  border-bottom: 1px solid var(--lp-line);
+}
+
+.faq-toggle {
+  width: 100%;
+  display: flex;
+  align-items: baseline;
+  gap: 1.1rem;
+  padding: 1.2rem 0.4rem;
+  background: transparent;
+  border: 0;
+  color: var(--lp-ink);
+  text-align: left;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  transition: color 0.15s ease;
+}
+
+.faq-toggle:hover .faq-q {
+  background: var(--lp-trace);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.faq-index {
+  font-family: var(--lp-mono);
+  font-size: 0.78rem;
+  color: rgba(150, 178, 220, 0.55);
+  flex-shrink: 0;
+}
+
+.faq-q {
+  flex: 1;
+  font-size: 1.05rem;
+  letter-spacing: -0.02em;
+}
+
+.faq-symbol {
+  font-family: var(--lp-mono);
+  font-size: 1.3rem;
+  line-height: 1;
+  color: var(--lp-mint);
+  flex-shrink: 0;
+}
+
+.faq-answer {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 0.22s ease;
+}
+
+.faq-answer > p {
+  overflow: hidden;
+  margin: 0;
+  padding: 0 2.6rem 0;
+  color: var(--lp-mute);
+  line-height: 1.75;
+}
+
+.faq-answer.is-open {
+  grid-template-rows: 1fr;
+}
+
+.faq-answer.is-open > p {
+  padding-bottom: 1.3rem;
+}
+
+/* ---------- final strip ---------- */
+
+.final-strip {
+  position: relative;
+  text-align: center;
+  padding: 4rem 1.5rem;
+  border-radius: 26px;
+  border: 1px solid var(--lp-line);
+  background: var(--lp-panel);
+  overflow: hidden;
+}
+
+.final-strip::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: -6rem;
+  width: 34rem;
+  height: 14rem;
+  transform: translateX(-50%);
+  background: radial-gradient(ellipse, rgba(44, 92, 246, 0.35), rgba(34, 195, 234, 0.12) 55%, transparent 75%);
+  filter: blur(30px);
+  pointer-events: none;
+}
+
+.final-strip::after {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  height: 1px;
+  background: var(--lp-trace);
+  opacity: 0.8;
+}
+
+.final-strip .section-sub {
+  margin-inline: auto;
+}
+
+.final-strip h2 {
+  max-width: 44rem;
+  margin-inline: auto;
+}
+
+.final-actions {
+  justify-content: center;
+  position: relative;
+}
+
+/* ---------- footer ---------- */
+
+.lp-footer {
+  margin-top: 3.6rem;
+  padding: 1rem 0 0;
+  color: rgba(216, 224, 235, 0.76);
+}
+
+.lp-footer :deep(.public-footer) {
+  width: 100%;
+  margin-top: 0;
+  color: inherit;
+}
+
+/* ---------- reveal ---------- */
+
+.reveal {
+  opacity: 0;
+  transform: translateY(30px);
+  filter: blur(10px);
   transition:
-    opacity 0.8s cubic-bezier(0.22, 1, 0.36, 1),
-    transform 0.8s cubic-bezier(0.22, 1, 0.36, 1),
-    filter 0.8s cubic-bezier(0.22, 1, 0.36, 1);
+    opacity 0.75s cubic-bezier(0.22, 1, 0.36, 1),
+    transform 0.75s cubic-bezier(0.22, 1, 0.36, 1),
+    filter 0.75s cubic-bezier(0.22, 1, 0.36, 1);
   will-change: opacity, transform, filter;
-}
-
-.reveal-up {
-  transform: translateY(42px) scale(0.985);
-}
-
-.reveal-left {
-  transform: translateX(-48px) scale(0.985);
-}
-
-.reveal-right {
-  transform: translateX(48px) scale(0.985);
 }
 
 .reveal.is-visible {
@@ -659,347 +1574,57 @@ onUnmounted(() => {
   filter: blur(0);
 }
 
-.reveal.is-visible.reveal-left,
-.reveal.is-visible.reveal-right {
-  transform: translateX(0) scale(1);
+.reveal-delay-1 { transition-delay: 0.15s; }
+
+@media (prefers-reduced-motion: reduce) {
+  .marquee-track { animation: none; }
+  .caret,
+  .node,
+  .live-dot,
+  .demo-caret { animation: none; }
+  .reveal {
+    opacity: 1;
+    transform: none;
+    filter: none;
+    transition: none;
+  }
 }
 
-.reveal.is-visible.reveal-up {
-  transform: translateY(0) scale(1);
-}
-
-.reveal-delay-1 { transition-delay: 0.14s; }
-.reveal-delay-2 { transition-delay: 0.28s; }
-.reveal-delay-3 { transition-delay: 0.42s; }
-
-.hero-grid {
-  display: grid;
-  grid-template-columns: minmax(0, 1.02fr) minmax(21rem, 0.98fr);
-  gap: 1.8rem;
-  align-items: stretch;
-}
-
-.hero-copy,
-.feature-band,
-.final-strip,
-.ops-panel {
-  border: 1px solid rgba(74, 92, 116, 0.34);
-  background: linear-gradient(180deg, rgba(20, 27, 37, 0.94) 0%, rgba(12, 17, 24, 0.98) 100%);
-  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.22);
-}
-
-.hero-copy {
-  border-radius: 28px;
-  padding: 3rem;
-  display: grid;
-  align-content: center;
-}
-
-.hero-showcase {
-  display: grid;
-  gap: 1.3rem;
-}
-
-.eyebrow,
-.showcase-label {
-  margin: 0 0 0.85rem;
-  font-size: 0.78rem;
-  font-weight: 700;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  color: rgba(214, 237, 233, 0.72);
-}
-
-.hero-copy h1,
-.feature-band-copy h2,
-.final-strip h2 {
-  margin: 0;
-  font-size: clamp(2.8rem, 5vw, 5.6rem);
-  line-height: 0.98;
-  letter-spacing: -0.06em;
-}
-
-.hero-body,
-.feature-band-copy p,
-.final-strip p,
-.ops-panel p,
-.ops-panel li,
-.hero-points li,
-.showcase-card p {
-  color: rgba(222, 229, 238, 0.76);
-}
-
-.hero-body {
-  margin: 1.35rem 0 0;
-  max-width: 37rem;
-  font-size: 1.4rem;
-  line-height: 1.5;
-  color: rgba(241, 245, 251, 0.9);
-}
-
-.hero-support {
-  margin: 1.2rem 0 0;
-  max-width: 36rem;
-  font-size: 1rem;
-  line-height: 1.8;
-  color: rgba(222, 229, 238, 0.72);
-}
-
-.hero-actions,
-.final-actions {
-  display: flex;
-  gap: 0.95rem;
-  flex-wrap: wrap;
-  margin-top: 1.9rem;
-}
-
-.hero-points {
-  margin: 1.7rem 0 0;
-  padding-left: 1.2rem;
-  display: grid;
-  gap: 0.6rem;
-}
-
-.hero-points li {
-  line-height: 1.5;
-}
-
-.showcase-card {
-  border-radius: 24px;
-  padding: 1.75rem;
-  border: 1px solid rgba(74, 92, 116, 0.34);
-  background: linear-gradient(180deg, rgba(20, 27, 37, 0.94) 0%, rgba(12, 17, 24, 0.98) 100%);
-}
-
-.showcase-primary {
-  display: grid;
-  gap: 1.1rem;
-}
-
-.showcase-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.8rem;
-}
-
-.showcase-pill {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0.35rem 0.75rem;
-  border-radius: 999px;
-  font-size: 0.78rem;
-  font-weight: 600;
-  background: rgba(25, 194, 168, 0.11);
-  color: #85efe1;
-  border: 1px solid rgba(25, 194, 168, 0.24);
-}
-
-.showcase-primary h2 {
-  margin: 0;
-  font-size: clamp(1.8rem, 3vw, 2.65rem);
-  line-height: 1.12;
-  letter-spacing: -0.05em;
-  padding: 0.08em 0 0 0.04em;
-}
-
-.showcase-points {
-  margin: 0;
-  padding-left: 1.1rem;
-  color: rgba(232, 238, 246, 0.84);
-}
-
-.showcase-points li + li {
-  margin-top: 0.6rem;
-}
-
-.showcase-secondary {
-  overflow: hidden;
-}
-
-.showcase-image,
-.feature-image {
-  display: block;
-  width: 100%;
-  height: auto;
-  border-radius: 18px;
-  border: 1px solid rgba(94, 113, 138, 0.22);
-}
-
-.ops-panel {
-  border-radius: 22px;
-  padding: 1.7rem;
-}
-
-.ops-panel h3 {
-  margin: 0 0 0.8rem;
-  font-size: 1.35rem;
-  letter-spacing: -0.04em;
-}
-
-.feature-band {
-  display: grid;
-  grid-template-columns: minmax(0, 0.95fr) minmax(20rem, 1.05fr);
-  gap: 1.6rem;
-  border-radius: 28px;
-  padding: 1.85rem;
-}
-
-.feature-band-copy,
-.feature-band-visual {
-  border-radius: 22px;
-  overflow: hidden;
-}
-
-.feature-checks {
-  margin: 1.2rem 0 0;
-  padding-left: 1.2rem;
-  color: rgba(235, 240, 248, 0.84);
-}
-
-.feature-checks li + li {
-  margin-top: 0.6rem;
-}
-
-.ops-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 1.2rem;
-}
-
-.final-strip {
-  border-radius: 28px;
-  padding: 2.1rem;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1.5rem;
-}
-
-.faq-section {
-  display: grid;
-  gap: 1.25rem;
-}
-
-.faq-header h2 {
-  margin: 0;
-  font-size: clamp(2rem, 4vw, 3rem);
-  line-height: 1.02;
-  letter-spacing: -0.05em;
-}
-
-.faq-list {
-  display: grid;
-  gap: 1rem;
-}
-
-.faq-item {
-  border-radius: 18px;
-  border: 1px solid rgba(74, 92, 116, 0.34);
-  background: linear-gradient(180deg, rgba(20, 27, 37, 0.94) 0%, rgba(12, 17, 24, 0.98) 100%);
-  overflow: hidden;
-}
-
-.faq-toggle {
-  width: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  padding: 1.15rem 1.3rem;
-  background: transparent;
-  border: 0;
-  color: #f6f7fb;
-  text-align: left;
-  font: inherit;
-  cursor: pointer;
-}
-
-.faq-toggle:hover,
-.faq-toggle:focus-visible {
-  background: linear-gradient(180deg, rgba(24, 33, 46, 0.98) 0%, rgba(14, 20, 29, 0.98) 100%);
-  box-shadow: none;
-}
-
-.faq-symbol {
-  font-size: 1.4rem;
-  color: rgba(126, 232, 219, 0.9);
-}
-
-.faq-answer {
-  display: grid;
-  grid-template-rows: 0fr;
-  transition: grid-template-rows 0.2s ease;
-}
-
-.faq-answer > p {
-  overflow: hidden;
-  margin: 0;
-  padding: 0 1.3rem 0;
-  color: rgba(222, 229, 238, 0.78);
-  line-height: 1.72;
-}
-
-.faq-answer.is-open {
-  grid-template-rows: 1fr;
-}
-
-.faq-answer.is-open > p {
-  padding-bottom: 1rem;
-}
-
-.landing-footer {
-  margin-top: 3.6rem;
-  padding: 1rem 0 0;
-  color: rgba(216, 224, 235, 0.76);
-}
-
-.landing-footer :deep(.public-footer) {
-  width: 100%;
-  margin-top: 0;
-  color: inherit;
-}
+/* ---------- responsive ---------- */
 
 @media (max-width: 1100px) {
-  .hero-grid,
-  .feature-band,
-  .ops-grid,
-  .final-strip {
+  .hero {
     grid-template-columns: 1fr;
   }
 
-  .final-strip {
-    align-items: flex-start;
-    flex-direction: column;
+  .pillars,
+  .why-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
-
 }
 
-@media (max-width: 720px) {
+@media (max-width: 760px) {
   .shell {
     width: min(100%, calc(100% - 1.5rem));
   }
 
-  .landing-header {
+  .lp-header {
     align-items: center;
-    flex-direction: row;
     gap: 0.7rem;
-    padding: calc(0.35rem + env(safe-area-inset-top, 0px)) 0 1.25rem;
+    padding-bottom: 1.4rem;
   }
 
-  .landing-nav {
+  .lp-nav {
     flex: 1;
     justify-content: flex-end;
     flex-wrap: nowrap;
-    gap: 0.5rem;
+    gap: 0.55rem;
     min-width: 0;
     overflow-x: auto;
     scrollbar-width: none;
-    padding-left: 0.15rem;
   }
 
-  .landing-nav::-webkit-scrollbar {
+  .lp-nav::-webkit-scrollbar {
     display: none;
   }
 
@@ -1011,61 +1636,49 @@ onUnmounted(() => {
     height: 3rem;
   }
 
-  .landing-nav a,
-  .status-pill,
-  .nav-cta {
-    font-size: 0.74rem;
-  }
-
-  .status-pill,
-  .nav-cta,
-  .cta-secondary,
-  .cta-primary {
-    min-height: 1.7rem;
-    padding: 0.26rem 0.58rem;
-    border-radius: 999px;
+  .lp-nav > a {
+    font-size: 0.78rem;
   }
 
   .status-pill {
-    gap: 0.38rem;
-    padding-inline: 0.52rem 0.62rem;
+    font-size: 0.62rem !important;
+    padding: 0.28rem 0.6rem;
   }
 
-  .status-dot {
-    width: 0.45rem;
-    height: 0.45rem;
+  .nav-cta {
+    min-height: 1.9rem;
+    padding: 0.3rem 0.75rem;
+    font-size: 0.8rem;
   }
 
-  .landing-footer {
-    align-items: flex-start;
-    flex-direction: column;
-    gap: 1rem;
+  .lp-main {
+    gap: 3.2rem;
   }
 
-  .footer-grid {
-    width: 100%;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 1.2rem 1.8rem;
+  .hero-points {
+    grid-template-columns: 1fr;
   }
 
-  .hero-copy,
-  .showcase-card,
-  .feature-band,
-  .ops-panel,
+  .pillars,
+  .why-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .demo-input-row {
+    flex-wrap: wrap;
+  }
+
+  .demo-app {
+    min-height: 24rem;
+  }
+
   .final-strip {
-    border-radius: 22px;
+    padding: 2.6rem 1.2rem;
   }
 
-  .hero-copy,
-  .feature-band,
-  .final-strip {
-    padding: 1.2rem;
-  }
-
-  .hero-copy h1,
-  .feature-band-copy h2,
-  .final-strip h2 {
-    font-size: clamp(2.2rem, 10vw, 3.25rem);
+  .faq-answer > p {
+    padding-left: 0.4rem;
+    padding-right: 0.4rem;
   }
 }
 </style>

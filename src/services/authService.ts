@@ -23,6 +23,7 @@ import {
   fetchHttpSessionSummary,
   type HttpSessionSummary,
 } from "./httpSessionService";
+import { signOutLocalSupabaseSession } from "./supabaseAuthSession";
 import { authenticatedRpc, authenticatedSelect } from "./authenticatedDataClient";
 import { rotateDeviceSession } from "../utils/deviceSession";
 import { revokeCurrentTenantAdminSession, touchTenantAdminSession } from "./adminOpsService";
@@ -453,7 +454,7 @@ const handleSuspendedTenantSession = async (profile: ProfileRow | null) => {
   }
   const tenant = await fetchTenantContext(profile.tenant_id);
   if (tenant?.status && tenant.status !== "active") {
-    await supabase.auth.signOut({ scope: "local" });
+    await signOutLocalSupabaseSession();
     clearAdminVerification();
     clearAuthState(true);
     return true;
@@ -1076,18 +1077,11 @@ export const signOut = async () => {
     }
   }
 
+  await signOutLocalSupabaseSession();
   try {
     await clearHttpSession();
   } catch {
     // Ignore cookie logout failures during the migration window.
-  }
-  try {
-    await supabase.auth.signOut({ scope: "local" });
-  } catch (error) {
-    const message = error instanceof Error ? error.message.toLowerCase() : "";
-    if (!message.includes("session_not_found")) {
-      throw error;
-    }
   }
   clearAdminVerification();
   clearPendingSuperAdminVerificationEmail();

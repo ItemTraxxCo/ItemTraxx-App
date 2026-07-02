@@ -11,9 +11,10 @@ type EdgeFunctionResult<TData> = {
   error: string;
   requestId?: string;
 };
-import { supabase } from "./supabaseClient";
 import { clearAdminVerification, clearAuthState } from "../store/authState";
 import { captureHandledRequestFailure } from "./sentry";
+import { signOutLocalSupabaseSession } from "./supabaseAuthSession";
+import { supabase } from "./supabaseClient";
 
 const trimTrailingSlash = (value: string) => value.replace(/\/+$/, "");
 
@@ -101,7 +102,7 @@ const requestEdgeFunction = async <TData = unknown, TBody = unknown>(
 
     if (!response.ok) {
       if (isTenantDisabledError(payload)) {
-        await supabase.auth.signOut({ scope: "local" });
+        await signOutLocalSupabaseSession();
         clearAdminVerification();
         clearAuthState(true);
       }

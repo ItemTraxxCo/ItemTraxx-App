@@ -25,4 +25,10 @@ if "${SEARCH[@]}" "sb_secret_|SUPABASE_SERVICE_ROLE_KEY=.+|CLOUDFLARE_API_TOKEN=
 fi
 echo "No private secret assignments found in .env.example."
 
+echo "[security] running Supabase shared security regression tests"
+deno test --allow-env \
+  supabase/functions/_shared/tenantAdminSessions_test.ts \
+  supabase/functions/_shared/preloginGuards_test.ts \
+  supabase/functions/_shared/trustedIngress_test.ts
+
 echo "[security] audit complete"

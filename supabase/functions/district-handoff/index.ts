@@ -234,15 +234,6 @@ serve(async (req) => {
       const turnstileToken = requireText(bodyRecord.turnstile_token, {
         maxLen: 4096,
       });
-      const currentDistrictSlug = optionalText(
-        bodyRecord.current_district_slug,
-        {
-          maxLen: 63,
-          pattern: SLUG_PATTERN,
-          transform: "lowercase",
-        },
-      );
-
       if (
         !email || !password || !turnstileToken
       ) {
@@ -360,6 +351,9 @@ serve(async (req) => {
       ) {
         return jsonResponse(403, { error: "Tenant disabled" }, headers);
       }
+      if (role === "district_admin" && !resolvedDistrictSlug) {
+        return jsonResponse(403, { error: "Access denied" }, headers);
+      }
 
       const magicLink = await adminClient.auth.admin.generateLink({
         type: "magiclink",
@@ -378,7 +372,7 @@ serve(async (req) => {
         {
           hashed_token: magicLink.data.properties.hashed_token,
           user_id: user.id,
-          district_slug: resolvedDistrictSlug ?? currentDistrictSlug ?? null,
+          district_slug: resolvedDistrictSlug ?? null,
           role,
         },
         headers,

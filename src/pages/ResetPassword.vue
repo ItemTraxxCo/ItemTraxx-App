@@ -55,6 +55,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from "vue";
 import { RouterLink } from "vue-router";
+import { signOutLocalSupabaseSession } from "../services/supabaseAuthSession";
 import { supabase } from "../services/supabaseClient";
 
 const newPassword = ref("");
@@ -130,7 +131,7 @@ const handleReset = async () => {
       return;
     }
     success.value = true;
-    await supabase.auth.signOut({ scope: "local" });
+    await signOutLocalSupabaseSession();
   } finally {
     isLoading.value = false;
   }

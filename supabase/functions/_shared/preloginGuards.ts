@@ -54,11 +54,6 @@ export const resolveClientFingerprint = (req: Request, _origin: string | null) =
     return `ip-${normalizeScopePart(ipCandidate, "unknown-ip", 24)}`;
   }
 
-  const userAgent = req.headers.get("user-agent")?.trim() ?? "";
-  if (userAgent) {
-    return `ua-${normalizeScopePart(userAgent, "unknown-ua", 24)}`;
-  }
-
   return "unknown-client";
 };
 

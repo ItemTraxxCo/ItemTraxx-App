@@ -1,7 +1,7 @@
 const EDGE_PROXY_HEADER = "x-itx-edge-proxy";
 const EDGE_PROXY_TIMESTAMP_HEADER = "x-itx-edge-proxy-ts";
 const EDGE_PROXY_SIGNATURE_HEADER = "x-itx-edge-proxy-signature";
-const MAX_CLOCK_SKEW_MS = 60 * 1000;
+const MAX_CLOCK_SKEW_MS = 30 * 1000;
 
 const toHex = (bytes: Uint8Array) =>
   Array.from(bytes)
@@ -61,6 +61,9 @@ export const hasTrustedEdgeIngress = async (req: Request, target: string) => {
   }
 
   const requestId = req.headers.get("x-request-id")?.trim() ?? "";
+  if (!requestId) {
+    return false;
+  }
   const bodyHash = await hashRequestBody(req);
   const expected = await sign(
     secret,

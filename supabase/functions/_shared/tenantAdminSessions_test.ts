@@ -118,6 +118,70 @@ Deno.test("tenant admin device session accepts active row bound to presented aut
   assert(result.valid, "expected matching auth session to be accepted");
 });
 
+Deno.test("tenant admin device session accepts no-session-id tokens only when token hash matches", async () => {
+  const claims = {
+    iat: Math.floor(Date.now() / 1000),
+  };
+  const digest = await crypto.subtle.digest(
+    "SHA-256",
+    new TextEncoder().encode("verified-token"),
+  );
+  const tokenHash = `token:${Array.from(new Uint8Array(digest))
+    .map((byte) => byte.toString(16).padStart(2, "0"))
+    .join("")}`;
+
+  const client = new MockClient([
+    { data: null, error: null },
+    {
+      data: {
+        id: "active-row",
+        auth_session_id: null,
+        auth_token_hash: tokenHash,
+      },
+      error: null,
+    },
+  ], claims);
+
+  const result = await validateTenantAdminDeviceSession(client, {
+    tenantId: "tenant-1",
+    profileId: "profile-1",
+    deviceId: "device-1",
+    authToken: "verified-token",
+  });
+
+  assert(result.valid, "expected matching token hash fallback to be accepted");
+});
+
+Deno.test("tenant admin device session rejects no-session-id tokens when token hash is missing", async () => {
+  const claims = {
+    iat: Math.floor(Date.now() / 1000),
+  };
+  const client = new MockClient([
+    { data: null, error: null },
+    {
+      data: {
+        id: "active-row",
+        auth_session_id: null,
+        auth_token_hash: null,
+      },
+      error: null,
+    },
+  ], claims);
+
+  const result = await validateTenantAdminDeviceSession(client, {
+    tenantId: "tenant-1",
+    profileId: "profile-1",
+    deviceId: "device-1",
+    authToken: "verified-token",
+  });
+
+  assert(!result.valid, "expected missing token hash fallback to be rejected");
+  assert(
+    result.reason === "missing_session",
+    "expected missing_session reason",
+  );
+});
+
 Deno.test("tenant admin device session rejects unverified tokens", async () => {
   const client = new MockClient([], null);
   const result = await validateTenantAdminDeviceSession(client, {

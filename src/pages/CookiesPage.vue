@@ -17,7 +17,7 @@
       <section class="cookies-hero">
         <p class="cookies-eyebrow">ItemTraxx cookies notice</p>
         <h1>How ItemTraxx uses cookies and similar browser storage.</h1>
-        <p class="cookies-lead-meta" style="margin:0 0 0.5rem;font-size:0.8rem;color:var(--muted);">Last updated: June 23, 2026</p>
+        <p class="cookies-lead-meta" style="margin:0 0 0.5rem;font-size:0.8rem;color:var(--muted);">Last updated: July 2, 2026</p>
         <p class="cookies-lead">
           ItemTraxx uses cookies and similar browser storage for secure sign-in, anti-abuse controls,
           product telemetry, and diagnostics. Essential cookies stay on because the app cannot work

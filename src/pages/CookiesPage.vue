@@ -17,7 +17,7 @@
       <section class="cookies-hero">
         <p class="cookies-eyebrow">ItemTraxx cookies notice</p>
         <h1>How ItemTraxx uses cookies and similar browser storage.</h1>
-        <p class="cookies-lead-meta" style="margin:0 0 0.5rem;font-size:0.8rem;color:var(--muted);">Last updated: June 11, 2026</p>
+        <p class="cookies-lead-meta" style="margin:0 0 0.5rem;font-size:0.8rem;color:var(--muted);">Last updated: June 23, 2026</p>
         <p class="cookies-lead">
           ItemTraxx uses cookies and similar browser storage for secure sign-in, anti-abuse controls,
           product telemetry, and diagnostics. Essential cookies stay on because the app cannot work
@@ -105,6 +105,11 @@
           Each submitted choice is also recorded server-side using a browser-generated pseudonymous
           consent identifier. When a verified account session is available, the record may also be
           associated with that account profile.
+        </p>
+        <p class="cookies-consent-note">
+          We do not use third-party advertising or remarketing cookies. ItemTraxx may use third-party security,
+          analytics, and diagnostics technologies — including Cloudflare, PostHog, Sentry, Vercel Analytics, and
+          Speed Insights — and optional analytics/diagnostics tools are enabled only after consent where required.
         </p>
       </section>
 
@@ -358,11 +363,13 @@ onUnmounted(() => {
 }
 
 .cookies-consent-standalone {
-  margin: calc(1.35rem + 4px) 0 6.5rem;
-  padding: 0.75rem 0.9rem;
-  border: 1px solid color-mix(in srgb, var(--border) 56%, transparent);
-  border-radius: 0.8rem;
-  background: color-mix(in srgb, var(--surface-2) 42%, transparent);
+  margin: 1.35rem 0 6.5rem;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  display: grid;
+  gap: 0.9rem;
 }
 
 .cookies-card {

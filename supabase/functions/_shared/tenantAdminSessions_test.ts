@@ -137,6 +137,7 @@ Deno.test("tenant admin device session accepts no-session-id tokens only when to
         id: "active-row",
         auth_session_id: null,
         auth_token_hash: tokenHash,
+        auth_token_issued_at: new Date(claims.iat * 1000).toISOString(),
       },
       error: null,
     },
@@ -150,6 +151,45 @@ Deno.test("tenant admin device session accepts no-session-id tokens only when to
   });
 
   assert(result.valid, "expected matching token hash fallback to be accepted");
+});
+
+Deno.test("tenant admin device session rejects no-session-id tokens when issued-at does not match", async () => {
+  const claims = {
+    iat: Math.floor(Date.now() / 1000),
+  };
+  const digest = await crypto.subtle.digest(
+    "SHA-256",
+    new TextEncoder().encode("verified-token"),
+  );
+  const tokenHash = `token:${Array.from(new Uint8Array(digest))
+    .map((byte) => byte.toString(16).padStart(2, "0"))
+    .join("")}`;
+
+  const client = new MockClient([
+    { data: null, error: null },
+    {
+      data: {
+        id: "active-row",
+        auth_session_id: null,
+        auth_token_hash: tokenHash,
+        auth_token_issued_at: new Date((claims.iat - 60) * 1000).toISOString(),
+      },
+      error: null,
+    },
+  ], claims);
+
+  const result = await validateTenantAdminDeviceSession(client, {
+    tenantId: "tenant-1",
+    profileId: "profile-1",
+    deviceId: "device-1",
+    authToken: "verified-token",
+  });
+
+  assert(!result.valid, "expected stale token hash fallback to be rejected");
+  assert(
+    result.reason === "missing_session",
+    "expected missing_session reason",
+  );
 });
 
 Deno.test("tenant admin device session rejects no-session-id tokens when token hash is missing", async () => {

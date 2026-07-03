@@ -419,35 +419,6 @@ const isLocalhostOrigin = (origin: string | null) => {
   }
 };
 
-const matchesWildcardOrigin = (origin: string, candidate: string) => {
-  if (!candidate.includes("*")) {
-    return false;
-  }
-
-  try {
-    const originUrl = new URL(origin);
-    const protocolMatch = candidate.match(/^(https?:)\/\//i);
-    if (!protocolMatch) {
-      return false;
-    }
-    const candidateProtocol = protocolMatch[1].toLowerCase();
-    if (originUrl.protocol.toLowerCase() !== candidateProtocol) {
-      return false;
-    }
-
-    const candidateHost = candidate.slice(protocolMatch[0].length).split("/")[0]?.toLowerCase() ?? "";
-    if (!candidateHost.startsWith("*.")) {
-      return false;
-    }
-
-    const suffix = candidateHost.slice(2);
-    const hostname = originUrl.hostname.toLowerCase();
-    return hostname !== suffix && hostname.endsWith(`.${suffix}`);
-  } catch {
-    return false;
-  }
-};
-
 const shouldTrustLocalOrigins = (env: Env) =>
   (env.TRUST_LOCAL_ORIGINS ?? "").trim().toLowerCase() === "true";
 
@@ -460,7 +431,7 @@ const isAllowedOrigin = (origin: string | null, allowedOrigins: string[], env: E
     return true;
   }
 
-  return allowedOrigins.some((candidate) => candidate === origin || matchesWildcardOrigin(origin, candidate));
+  return allowedOrigins.some((candidate) => candidate === origin);
 };
 
 const withCorsHeaders = (origin: string | null, allowedOrigins: string[], env: Env) => {

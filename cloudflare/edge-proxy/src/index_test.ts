@@ -167,3 +167,67 @@ Deno.test("session exchange returns 503 when rate limiting is unavailable", asyn
     throw new Error("Expected session exchange to fail closed");
   }
 });
+
+Deno.test("edge proxy CORS requires exact configured origins", async () => {
+  const response = await worker.fetch(
+    new Request("https://edge.itemtraxx.com/functions/v1/system-status", {
+      method: "OPTIONS",
+      headers: {
+        origin: "https://app.itemtraxx.com",
+      },
+    }),
+    {
+      SUPABASE_URL: "https://example.supabase.co",
+      SUPABASE_ANON_KEY: "anon-key",
+      ALLOWED_ORIGINS: "https://app.itemtraxx.com,https://testdist.app.itemtraxx.com",
+    },
+    executionContext,
+  );
+
+  if (
+    response.status !== 200 ||
+    response.headers.get("Access-Control-Allow-Origin") !== "https://app.itemtraxx.com"
+  ) {
+    throw new Error("Expected exact configured origin to be allowed");
+  }
+});
+
+Deno.test("edge proxy CORS does not expand wildcard origin patterns", async () => {
+  const response = await worker.fetch(
+    new Request("https://edge.itemtraxx.com/functions/v1/system-status", {
+      method: "OPTIONS",
+      headers: {
+        origin: "https://newdistrict.itemtraxx.com",
+      },
+    }),
+    {
+      SUPABASE_URL: "https://example.supabase.co",
+      SUPABASE_ANON_KEY: "anon-key",
+      ALLOWED_ORIGINS: "https://*.itemtraxx.com",
+    },
+    executionContext,
+  );
+
+  if (response.status !== 403) {
+    throw new Error("Expected wildcard subdomain configuration not to be expanded");
+  }
+
+  const lookalikeResponse = await worker.fetch(
+    new Request("https://edge.itemtraxx.com/functions/v1/system-status", {
+      method: "OPTIONS",
+      headers: {
+        origin: "https://evil.itemtraxx.com.attacker.com",
+      },
+    }),
+    {
+      SUPABASE_URL: "https://example.supabase.co",
+      SUPABASE_ANON_KEY: "anon-key",
+      ALLOWED_ORIGINS: "https://*.itemtraxx.com",
+    },
+    executionContext,
+  );
+
+  if (lookalikeResponse.status !== 403) {
+    throw new Error("Expected wildcard-like origin configuration not to be expanded");
+  }
+});

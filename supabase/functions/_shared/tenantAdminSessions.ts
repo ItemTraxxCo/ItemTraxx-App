@@ -241,6 +241,9 @@ export const validateTenantAdminDeviceSession = async (
     const sessionTokenHash = typeof activeSession.auth_token_hash === "string"
       ? activeSession.auth_token_hash.trim()
       : "";
+    const sessionTokenIssuedAt = typeof activeSession.auth_token_issued_at === "string"
+      ? activeSession.auth_token_issued_at
+      : null;
     if (binding.sessionId) {
       return sessionAuthId === binding.sessionId
         ? {
@@ -254,7 +257,11 @@ export const validateTenantAdminDeviceSession = async (
           relationMissing: false as const,
         };
     }
-    if (!sessionAuthId && sessionTokenHash === binding.bindingKey) {
+    if (
+      !sessionAuthId &&
+      sessionTokenHash === binding.bindingKey &&
+      sessionTokenIssuedAt === binding.issuedAt
+    ) {
       return {
         valid: true as const,
         reason: "active" as const,

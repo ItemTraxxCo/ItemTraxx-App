@@ -56,6 +56,12 @@ jobs:
           node-version: 22.15.0
           cache: npm
 
+      - name: Setup Deno
+        uses: denoland/setup-deno@667a34cdef165d8d2b2e98dde39547c9daac7282 # v2.0.4
+        with:
+          deno-version: 2.x
+          cache: true
+
       - name: Install dependencies
         run: npm ci --ignore-scripts
 

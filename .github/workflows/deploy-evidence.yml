@@ -18,7 +18,7 @@ jobs:
       actions: read
       contents: read
     with:
-      run_id: ${{ github.event.workflow_run.id }}
+      run_id: ${{ format('{0}', github.event.workflow_run.id) }}
       sha: ${{ github.event.workflow_run.head_sha }}
       workflow_name: ${{ github.event.workflow_run.name }}
       surfaces: ${{ github.event.workflow_run.name == 'Deploy Supabase Functions' && 'supabase-functions' || 'cloudflare-worker' }}

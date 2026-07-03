@@ -19,6 +19,6 @@ jobs:
       pull-requests: write
       issues: write
     with:
-      pr_number: ${{ github.event.pull_request.number }}
+      pr_number: ${{ format('{0}', github.event.pull_request.number) }}
     secrets:
       ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}

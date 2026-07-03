@@ -1,0 +1,32 @@
+name: CI Triage
+
+permissions: {}
+
+on:
+  workflow_run:
+    workflows:
+      - CI Core
+      - E2E Tests
+      - Security Audit
+      - CodeQL
+      - Deploy Supabase Functions
+      - Deploy Cloudflare Worker
+      - Deployment Health
+      - Synthetic Journeys
+      - Synthetic Probes (Hub)
+    types:
+      - completed
+
+jobs:
+  triage:
+    if: ${{ github.event.workflow_run.conclusion == 'failure' }}
+    uses: ItemTraxxCo/devops/.github/workflows/reusable-ci-triage.yml@main
+    permissions:
+      actions: read
+      contents: read
+    with:
+      run_id: ${{ github.event.workflow_run.id }}
+      workflow_name: ${{ github.event.workflow_run.name }}
+    secrets:
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}

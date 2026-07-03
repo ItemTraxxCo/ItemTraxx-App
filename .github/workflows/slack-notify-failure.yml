@@ -1,5 +1,8 @@
 name: Slack Notify Failure
 
+# Thin shim: delegates to the ItemTraxxCo/devops automation hub.
+# Interface is unchanged for all in-repo callers.
+
 permissions: {}
 
 on:
@@ -29,82 +32,15 @@ on:
         required: false
 
 jobs:
-  notify:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Send Slack failure notification
-        env:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
-          WORKFLOW_NAME: ${{ inputs.workflow_name }}
-          JOB_NAME: ${{ inputs.job_name }}
-          RUN_URL: ${{ inputs.run_url }}
-          REF_NAME: ${{ inputs.ref_name }}
-          SHA: ${{ inputs.sha }}
-          REPOSITORY: ${{ github.repository }}
-        run: |
-          SHORT_SHA="$(printf '%s' "$SHA" | cut -c1-7)"
-          PAYLOAD="$(cat <<EOF
-          {
-            "text": "GitHub Actions failure",
-            "blocks": [
-              {
-                "type": "header",
-                "text": {
-                  "type": "plain_text",
-                  "text": ":x: GitHub Actions failure"
-                }
-              },
-              {
-                "type": "section",
-                "fields": [
-                  {
-                    "type": "mrkdwn",
-                    "text": "*Workflow:*\n$WORKFLOW_NAME"
-                  },
-                  {
-                    "type": "mrkdwn",
-                    "text": "*Job:*\n$JOB_NAME"
-                  },
-                  {
-                    "type": "mrkdwn",
-                    "text": "*Branch:*\n$REF_NAME"
-                  },
-                  {
-                    "type": "mrkdwn",
-                    "text": "*Commit:*\n$SHORT_SHA"
-                  }
-                ]
-              },
-              {
-                "type": "section",
-                "text": {
-                  "type": "mrkdwn",
-                  "text": "*Repository:* $REPOSITORY\n*Run:* <$RUN_URL|Open failing run>"
-                }
-              }
-            ]
-          }
-          EOF
-          )"
-          curl -fsSL -X POST "$SLACK_WEBHOOK_URL" \
-            -H "Content-Type: application/json" \
-            --data "$PAYLOAD"
-
-  incidentio-notify-failure:
-    needs:
-      - notify
-    if: ${{ always() && (needs.notify.result == 'failure' || needs.notify.result == 'cancelled') }}
-    uses: ./.github/workflows/incidentio-workflow-alert.yml
+  hub:
+    uses: ItemTraxxCo/devops/.github/workflows/reusable-slack-notify-failure.yml@main
     with:
-      status: ${{ needs.notify.result }}
-      severity: high
-      workflow_name: Slack Notify Failure
-      job_name: notify
+      workflow_name: ${{ inputs.workflow_name }}
+      job_name: ${{ inputs.job_name }}
       run_url: ${{ inputs.run_url }}
-      repository: ${{ github.repository }}
-      branch: ${{ inputs.ref_name }}
+      ref_name: ${{ inputs.ref_name }}
       sha: ${{ inputs.sha }}
-      environment: production
     secrets:
+      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
       INCIDENT_IO_WEBHOOK_URL: ${{ secrets.INCIDENT_IO_WEBHOOK_URL }}
       INCIDENT_IO_WEBHOOK_TOKEN: ${{ secrets.INCIDENT_IO_WEBHOOK_TOKEN }}

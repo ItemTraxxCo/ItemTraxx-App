@@ -1,0 +1,24 @@
+name: PR Risk Review
+
+permissions: {}
+
+on:
+  pull_request:
+    types:
+      - opened
+      - reopened
+      - synchronize
+      - ready_for_review
+
+jobs:
+  risk-review:
+    if: ${{ !github.event.pull_request.draft && github.actor != 'dependabot[bot]' }}
+    uses: ItemTraxxCo/devops/.github/workflows/reusable-pr-risk-review.yml@main
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
+    with:
+      pr_number: ${{ github.event.pull_request.number }}
+    secrets:
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}

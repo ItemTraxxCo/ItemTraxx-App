@@ -1,0 +1,27 @@
+name: Dependabot Promotion
+
+# Uses pull_request_target so the run has normal Actions secrets and a
+# write-capable token for labeling. Safe because neither this workflow nor
+# the hub workflow it calls ever checks out or executes PR code — only
+# Dependabot metadata is read.
+
+permissions: {}
+
+on:
+  pull_request_target:
+    types:
+      - opened
+      - reopened
+      - synchronize
+
+jobs:
+  promote:
+    if: ${{ github.actor == 'dependabot[bot]' }}
+    uses: ItemTraxxCo/devops/.github/workflows/reusable-dependency-promotion.yml@main
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
+    with:
+      pr_number: ${{ github.event.pull_request.number }}
+      enable_automerge: false

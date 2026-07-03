@@ -1,0 +1,26 @@
+name: Deploy Evidence
+
+permissions: {}
+
+on:
+  workflow_run:
+    workflows:
+      - Deploy Supabase Functions
+      - Deploy Cloudflare Worker
+    types:
+      - completed
+
+jobs:
+  evidence:
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    uses: ItemTraxxCo/devops/.github/workflows/reusable-deploy-evidence.yml@main
+    permissions:
+      actions: read
+      contents: read
+    with:
+      run_id: ${{ github.event.workflow_run.id }}
+      sha: ${{ github.event.workflow_run.head_sha }}
+      workflow_name: ${{ github.event.workflow_run.name }}
+      surfaces: ${{ github.event.workflow_run.name == 'Deploy Supabase Functions' && 'supabase-functions' || 'cloudflare-worker' }}
+    secrets:
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}

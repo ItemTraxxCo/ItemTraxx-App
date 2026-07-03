@@ -3,6 +3,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.108.2";
 import { isAllowedOrigin, parseAllowedOrigins } from "../_shared/cors.ts";
 import { readJsonBody } from "../_shared/requestBody.ts";
 import { requireTrustedEdgeIngress } from "../_shared/trustedIngress.ts";
+import { ValidationError } from "../_shared/validation.ts";
 import {
   enforcePreloginRateLimit,
   resolveClientFingerprint,
@@ -80,10 +81,19 @@ serve(async (req) => {
       ? jsonResponse(503, { error: "Rate limit check failed" }, headers)
       : jsonResponse(429, { error: "Too many requests" }, headers);
   }
-  const body = await readJsonBody<Record<string, unknown>>(req, 16 * 1024);
+  let body: Record<string, unknown>;
+  try {
+    body = await readJsonBody<Record<string, unknown>>(req, 16 * 1024);
+  } catch (error) {
+    if (error instanceof ValidationError) {
+      return jsonResponse(error.status, { error: error.message }, headers);
+    }
+    throw error;
+  }
   if (
     typeof body.subject_id !== "string" ||
-    !/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(body.subject_id) ||
+    !/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+      .test(body.subject_id) ||
     body.consent_version !== 2 ||
     typeof body.analytics !== "boolean" ||
     typeof body.diagnostics !== "boolean" ||
@@ -117,7 +127,9 @@ serve(async (req) => {
       { onConflict: "subject_id,consent_version" },
     );
   if (writeError) {
-    console.error("consent-record write failed", { message: writeError.message });
+    console.error("consent-record write failed", {
+      message: writeError.message,
+    });
     return jsonResponse(503, { error: "Unable to record consent" }, headers);
   }
 

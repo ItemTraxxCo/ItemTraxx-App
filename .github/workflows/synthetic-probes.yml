@@ -9,7 +9,35 @@ on:
 
 jobs:
   probes:
-    uses: ItemTraxxCo/devops/.github/workflows/reusable-synthetic-probes.yml@main
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - name: Check hub token
+        id: hub
+        env:
+          DEVOPS_HUB_TOKEN: ${{ secrets.DEVOPS_HUB_TOKEN }}
+        run: |
+          if [ -n "$DEVOPS_HUB_TOKEN" ]; then
+            echo "available=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "available=false" >> "$GITHUB_OUTPUT"
+            echo "DEVOPS_HUB_TOKEN is not configured; skipping synthetic probes."
+          fi
+
+      - name: Checkout devops hub
+        if: ${{ steps.hub.outputs.available == 'true' }}
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          repository: ItemTraxxCo/devops
+          token: ${{ secrets.DEVOPS_HUB_TOKEN }}
+          path: devops-hub
+          persist-credentials: false
+
+      - name: Run synthetic probes
+        if: ${{ steps.hub.outputs.available == 'true' }}
+        uses: ./devops-hub/actions/run-probes
 
   slack-notify-failure:
     needs:

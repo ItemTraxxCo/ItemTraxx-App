@@ -20,24 +20,10 @@ on:
 jobs:
   triage:
     if: ${{ github.event.workflow_run.conclusion == 'failure' }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    permissions:
-      actions: read
-      contents: read
-    steps:
-      - name: Checkout devops hub
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-        with:
-          repository: ItemTraxxCo/devops
-          path: devops-hub
-          persist-credentials: false
-
-      - name: Run CI triage
-        uses: ./devops-hub/actions/ci-triage
-        with:
-          run_id: ${{ github.event.workflow_run.id }}
-          repository: ${{ github.repository }}
-          github_token: ${{ github.token }}
-          ai_api_key: ${{ secrets.AI_API_KEY }}
-          slack_webhook_url: ${{ secrets.SLACK_WEBHOOK_URL }}
+    uses: ItemTraxxCo/devops/.github/workflows/reusable-ci-triage.yml@6bcf366a32a1c5a5198b014648fe8e4133828e30
+    with:
+      run_id: ${{ format('{0}', github.event.workflow_run.id) }}
+      workflow_name: ${{ github.event.workflow_run.name }}
+    secrets:
+      AI_API_KEY: ${{ secrets.AI_API_KEY }}
+      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}

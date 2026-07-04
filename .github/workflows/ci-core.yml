@@ -49,6 +49,7 @@ jobs:
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           persist-credentials: false
+          fetch-depth: 0
 
       - name: Setup Node
         uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
@@ -62,6 +63,18 @@ jobs:
 
       - name: Verify env parity
         run: bash ./scripts/check-env-parity.sh
+
+      - name: Check edge-function coverage
+        run: npm run devops:check:edge-coverage
+
+      - name: Check edge contract drift
+        run: npm run devops:check:edge-contract-drift
+
+      - name: Check SQL and function coupling
+        env:
+          ITX_DIFF_BASE: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
+          ITX_DIFF_HEAD: ${{ github.sha }}
+        run: npm run devops:check:sql-coupling
 
       - name: Clean dist
         run: rm -rf dist artifacts

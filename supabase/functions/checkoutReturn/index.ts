@@ -353,6 +353,7 @@ serve(async (req) => {
           gear_id: gear.id,
           action_type: "admin_return",
           checked_out_by: gear.checked_out_by,
+          performed_by: user.id,
           tenant_id: callerProfile.tenant_id,
           operation_id: buildGearLogOperationId(operationId, gear.id, "admin_return"),
         }, {
@@ -409,6 +410,7 @@ serve(async (req) => {
         gear_id: gear.id,
         action_type: resolvedActionType,
         checked_out_by: student!.id,
+        performed_by: user.id,
         tenant_id: callerProfile.tenant_id,
         operation_id: buildGearLogOperationId(operationId, gear.id, resolvedActionType),
       }, {

@@ -168,6 +168,22 @@ serve(async (req) => {
       auth: { persistSession: false },
     });
 
+    const writeAudit = async (
+      actionType: string,
+      entityId: string | null,
+      metadata: Record<string, unknown>,
+    ) => {
+      const { error } = await adminClient.from("admin_audit_logs").insert({
+        tenant_id: profile.tenant_id,
+        actor_id: profile.id,
+        action_type: actionType,
+        entity_type: "gear",
+        entity_id: entityId,
+        metadata,
+      });
+      if (error) throw new Error("Unable to write security audit log.");
+    };
+
     if (isMutationAction) {
       try {
         const hasStepUp = await hasPrivilegedStepUp(adminClient, {
@@ -208,7 +224,7 @@ serve(async (req) => {
         jsonResponse,
       });
       if (rateLimitFailure) return rateLimitFailure;
-      if (!rateLimitResult.allowed) {
+      if (!rateLimitResult?.allowed) {
         return jsonResponse(429, {
           error: "Rate limit exceeded, please try again in a minute.",
         });
@@ -299,6 +315,12 @@ serve(async (req) => {
         });
       }
 
+      await writeAudit("gear_create", data.id, {
+        barcode: normalizedBarcode,
+        status: normalizedStatus,
+        has_serial_number: !!normalizedSerial,
+      });
+
       return jsonResponse(200, { data });
     }
 
@@ -361,6 +383,12 @@ serve(async (req) => {
         });
       }
 
+      await writeAudit("gear_update", data.id, {
+        barcode: normalizedBarcode,
+        previous_status: existingGear?.status ?? null,
+        status: normalizedStatus,
+      });
+
       return jsonResponse(200, { data });
     }
 
@@ -400,6 +428,10 @@ serve(async (req) => {
         return jsonResponse(400, { error: "Unable to archive item." });
       }
 
+      await writeAudit("gear_archive", normalizedId, {
+        previous_status: activeGear.status ?? null,
+      });
+
       return jsonResponse(200, { success: true });
     }
 
@@ -419,6 +451,11 @@ serve(async (req) => {
       if (error || !data) {
         return jsonResponse(400, { error: "Unable to restore item." });
       }
+
+      await writeAudit("gear_restore", data.id, {
+        barcode: data.barcode ?? null,
+        status: data.status ?? null,
+      });
 
       return jsonResponse(200, { data });
     }

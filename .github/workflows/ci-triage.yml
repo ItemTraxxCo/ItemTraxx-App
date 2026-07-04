@@ -26,29 +26,14 @@ jobs:
       actions: read
       contents: read
     steps:
-      - name: Check hub token
-        id: hub
-        env:
-          DEVOPS_HUB_TOKEN: ${{ secrets.DEVOPS_HUB_TOKEN }}
-        run: |
-          if [ -n "$DEVOPS_HUB_TOKEN" ]; then
-            echo "available=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "available=false" >> "$GITHUB_OUTPUT"
-            echo "DEVOPS_HUB_TOKEN is not configured; skipping hub CI triage."
-          fi
-
       - name: Checkout devops hub
-        if: ${{ steps.hub.outputs.available == 'true' }}
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           repository: ItemTraxxCo/devops
-          token: ${{ secrets.DEVOPS_HUB_TOKEN }}
           path: devops-hub
           persist-credentials: false
 
       - name: Run CI triage
-        if: ${{ steps.hub.outputs.available == 'true' }}
         uses: ./devops-hub/actions/ci-triage
         with:
           run_id: ${{ github.event.workflow_run.id }}

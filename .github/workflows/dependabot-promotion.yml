@@ -2,8 +2,8 @@ name: Dependabot Promotion
 
 # Uses pull_request_target so the run has a write-capable token for
 # labeling. Safe because neither this workflow nor the hub action it runs
-# ever checks out or executes PR code — only the private devops hub repo
-# is checked out, and only Dependabot metadata is read.
+# ever checks out or executes PR code — only the public devops hub repo is
+# checked out, and only Dependabot metadata is read.
 
 permissions: {}
 
@@ -24,29 +24,14 @@ jobs:
       pull-requests: write
       issues: write
     steps:
-      - name: Check hub token
-        id: hub
-        env:
-          DEVOPS_HUB_TOKEN: ${{ secrets.DEVOPS_HUB_TOKEN }}
-        run: |
-          if [ -n "$DEVOPS_HUB_TOKEN" ]; then
-            echo "available=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "available=false" >> "$GITHUB_OUTPUT"
-            echo "DEVOPS_HUB_TOKEN is not configured (needs to exist as a Dependabot secret too); skipping promotion."
-          fi
-
       - name: Checkout devops hub
-        if: ${{ steps.hub.outputs.available == 'true' }}
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           repository: ItemTraxxCo/devops
-          token: ${{ secrets.DEVOPS_HUB_TOKEN }}
           path: devops-hub
           persist-credentials: false
 
       - name: Run dependency promotion
-        if: ${{ steps.hub.outputs.available == 'true' }}
         uses: ./devops-hub/actions/dependabot-promotion
         with:
           pr_number: ${{ github.event.pull_request.number }}

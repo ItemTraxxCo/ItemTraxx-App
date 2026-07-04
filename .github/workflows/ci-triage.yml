@@ -28,5 +28,5 @@ jobs:
       run_id: ${{ format('{0}', github.event.workflow_run.id) }}
       workflow_name: ${{ github.event.workflow_run.name }}
     secrets:
-      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      AI_API_KEY: ${{ secrets.AI_API_KEY }}
       SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}

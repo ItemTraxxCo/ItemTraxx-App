@@ -23,4 +23,4 @@ jobs:
       workflow_name: ${{ github.event.workflow_run.name }}
       surfaces: ${{ github.event.workflow_run.name == 'Deploy Supabase Functions' && 'supabase-functions' || 'cloudflare-worker' }}
     secrets:
-      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      AI_API_KEY: ${{ secrets.AI_API_KEY }}

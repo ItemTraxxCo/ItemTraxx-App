@@ -21,4 +21,4 @@ jobs:
     with:
       pr_number: ${{ format('{0}', github.event.pull_request.number) }}
     secrets:
-      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      AI_API_KEY: ${{ secrets.AI_API_KEY }}

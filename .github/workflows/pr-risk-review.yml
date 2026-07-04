@@ -16,7 +16,7 @@ on:
 jobs:
   risk-review:
     if: ${{ !github.event.pull_request.draft && github.actor != 'dependabot[bot]' }}
-    uses: ItemTraxxCo/devops/.github/workflows/reusable-pr-risk-review.yml@90a5884dd6e096ecdd803ecae9066dc6737847b5
+    uses: ItemTraxxCo/devops/.github/workflows/reusable-pr-risk-review.yml@90a58846345e8fc3adfd204a18f762961b052ec3
     with:
       pr_number: ${{ format('{0}', github.event.pull_request.number) }}
     secrets:

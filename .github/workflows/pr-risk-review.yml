@@ -1,0 +1,36 @@
+name: PR Risk Review
+
+permissions: {}
+
+on:
+  pull_request:
+    types:
+      - opened
+      - reopened
+      - synchronize
+      - ready_for_review
+
+jobs:
+  risk-review:
+    if: ${{ !github.event.pull_request.draft && github.actor != 'dependabot[bot]' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
+    steps:
+      - name: Checkout devops hub
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          repository: ItemTraxxCo/devops
+          path: devops-hub
+          persist-credentials: false
+
+      - name: Run PR risk review
+        uses: ./devops-hub/actions/pr-risk-review
+        with:
+          pr_number: ${{ github.event.pull_request.number }}
+          repository: ${{ github.repository }}
+          github_token: ${{ github.token }}
+          ai_api_key: ${{ secrets.AI_API_KEY }}

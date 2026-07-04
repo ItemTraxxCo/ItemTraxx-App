@@ -1,0 +1,40 @@
+name: Dependabot Promotion
+
+# Uses pull_request_target so the run has a write-capable token for
+# labeling. Safe because neither this workflow nor the hub action it runs
+# ever checks out or executes PR code — only the public devops hub repo is
+# checked out, and only Dependabot metadata is read.
+
+permissions: {}
+
+on:
+  pull_request_target:
+    types:
+      - opened
+      - reopened
+      - synchronize
+
+jobs:
+  promote:
+    if: ${{ github.actor == 'dependabot[bot]' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
+    steps:
+      - name: Checkout devops hub
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          repository: ItemTraxxCo/devops
+          path: devops-hub
+          persist-credentials: false
+
+      - name: Run dependency promotion
+        uses: ./devops-hub/actions/dependabot-promotion
+        with:
+          pr_number: ${{ github.event.pull_request.number }}
+          repository: ${{ github.repository }}
+          github_token: ${{ github.token }}
+          enable_automerge: "false"

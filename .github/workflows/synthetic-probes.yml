@@ -1,0 +1,41 @@
+name: Synthetic Probes (Hub)
+
+permissions: {}
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 */2 * * *"
+
+jobs:
+  probes:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout devops hub
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          repository: ItemTraxxCo/devops
+          path: devops-hub
+          persist-credentials: false
+
+      - name: Run synthetic probes
+        uses: ./devops-hub/actions/run-probes
+
+  slack-notify-failure:
+    needs:
+      - probes
+    if: ${{ always() && (needs.probes.result == 'failure' || needs.probes.result == 'cancelled') }}
+    uses: ./.github/workflows/slack-notify-failure.yml
+    with:
+      workflow_name: Synthetic Probes (Hub)
+      job_name: probes
+      run_url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+      ref_name: ${{ github.ref_name }}
+      sha: ${{ github.sha }}
+    secrets:
+      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+      INCIDENT_IO_WEBHOOK_URL: ${{ secrets.INCIDENT_IO_WEBHOOK_URL }}
+      INCIDENT_IO_WEBHOOK_TOKEN: ${{ secrets.INCIDENT_IO_WEBHOOK_TOKEN }}

@@ -1,0 +1,43 @@
+name: CI Triage
+
+permissions: {}
+
+on:
+  workflow_run:
+    workflows:
+      - CI Core
+      - E2E Tests
+      - Security Audit
+      - CodeQL
+      - Deploy Supabase Functions
+      - Deploy Cloudflare Worker
+      - Deployment Health
+      - Synthetic Journeys
+      - Synthetic Probes (Hub)
+    types:
+      - completed
+
+jobs:
+  triage:
+    if: ${{ github.event.workflow_run.conclusion == 'failure' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      actions: read
+      contents: read
+    steps:
+      - name: Checkout devops hub
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          repository: ItemTraxxCo/devops
+          path: devops-hub
+          persist-credentials: false
+
+      - name: Run CI triage
+        uses: ./devops-hub/actions/ci-triage
+        with:
+          run_id: ${{ github.event.workflow_run.id }}
+          repository: ${{ github.repository }}
+          github_token: ${{ github.token }}
+          ai_api_key: ${{ secrets.AI_API_KEY }}
+          slack_webhook_url: ${{ secrets.SLACK_WEBHOOK_URL }}

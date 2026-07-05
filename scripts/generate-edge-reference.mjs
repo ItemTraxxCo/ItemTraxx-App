@@ -1,9 +1,13 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 
-const openapiPath = path.resolve('docs/api/generated/edge-contracts.openapi.json');
-const schemaPath = path.resolve('docs/api/generated/edge-contracts.schema.json');
-const outPath = path.resolve('docs/api/edge-endpoints.md');
+const openapiPath = path.resolve(
+  process.env.ITX_EDGE_OPENAPI_IN_PATH || 'docs/api/generated/edge-contracts.openapi.json'
+);
+const schemaPath = path.resolve(
+  process.env.ITX_EDGE_SCHEMA_IN_PATH || 'docs/api/generated/edge-contracts.schema.json'
+);
+const outPath = path.resolve(process.env.ITX_EDGE_REFERENCE_OUT_PATH || 'docs/api/edge-endpoints.md');
 
 const openapi = JSON.parse(await fs.readFile(openapiPath, 'utf8'));
 const schemaDoc = JSON.parse(await fs.readFile(schemaPath, 'utf8'));
@@ -82,8 +86,6 @@ lines.push('');
 lines.push('Generated from:');
 lines.push('- `/docs/api/generated/edge-contracts.openapi.json`');
 lines.push('- `/docs/api/generated/edge-contracts.schema.json`');
-lines.push('');
-lines.push(`Generated at: ${new Date().toISOString()}`);
 lines.push('');
 
 for (const [route, methods] of Object.entries(openapi.paths ?? {})) {

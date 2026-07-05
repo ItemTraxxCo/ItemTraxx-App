@@ -9,20 +9,7 @@ on:
 
 jobs:
   probes:
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    permissions:
-      contents: read
-    steps:
-      - name: Checkout devops hub
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-        with:
-          repository: ItemTraxxCo/devops
-          path: devops-hub
-          persist-credentials: false
-
-      - name: Run synthetic probes
-        uses: ./devops-hub/actions/run-probes
+    uses: ItemTraxxCo/devops/.github/workflows/reusable-synthetic-probes.yml@9fc8279354a5c30c2279d09bcfe452259bbc850c
 
   slack-notify-failure:
     needs:

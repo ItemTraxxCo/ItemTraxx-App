@@ -13,26 +13,11 @@ on:
 jobs:
   evidence:
     if: ${{ github.event.workflow_run.conclusion == 'success' }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    permissions:
-      actions: read
-      contents: read
-    steps:
-      - name: Checkout devops hub
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-        with:
-          repository: ItemTraxxCo/devops
-          path: devops-hub
-          persist-credentials: false
-
-      - name: Build deploy evidence bundle
-        uses: ./devops-hub/actions/collect-deploy-evidence
-        with:
-          run_id: ${{ github.event.workflow_run.id }}
-          repository: ${{ github.repository }}
-          sha: ${{ github.event.workflow_run.head_sha }}
-          github_token: ${{ github.token }}
-          workflow_name: ${{ github.event.workflow_run.name }}
-          surfaces: ${{ github.event.workflow_run.name == 'Deploy Supabase Functions' && 'supabase-functions' || 'cloudflare-worker' }}
-          ai_api_key: ${{ secrets.AI_API_KEY }}
+    uses: ItemTraxxCo/devops/.github/workflows/reusable-deploy-evidence.yml@9fc8279354a5c30c2279d09bcfe452259bbc850c
+    with:
+      run_id: ${{ format('{0}', github.event.workflow_run.id) }}
+      sha: ${{ github.event.workflow_run.head_sha }}
+      workflow_name: ${{ github.event.workflow_run.name }}
+      surfaces: ${{ github.event.workflow_run.name == 'Deploy Supabase Functions' && 'supabase-functions' || 'cloudflare-worker' }}
+    secrets:
+      AI_API_KEY: ${{ secrets.AI_API_KEY }}

@@ -3,11 +3,14 @@ import path from 'node:path';
 import { z } from 'zod';
 import { generatedEdgeSchemas } from '../src/types/edgeSchemas.mjs';
 
-const schemaOutPath = path.resolve('docs/api/generated/edge-contracts.schema.json');
-const openapiOutPath = path.resolve('docs/api/generated/edge-contracts.openapi.json');
+const schemaOutPath = path.resolve(
+  process.env.ITX_EDGE_SCHEMA_OUT_PATH || 'docs/api/generated/edge-contracts.schema.json'
+);
+const openapiOutPath = path.resolve(
+  process.env.ITX_EDGE_OPENAPI_OUT_PATH || 'docs/api/generated/edge-contracts.openapi.json'
+);
 
 const generated = {
-  generated_at: new Date().toISOString(),
   source: {
     contracts: '/src/types/edgeContracts.ts',
     validators: '/src/types/edgeSchemas.mjs',

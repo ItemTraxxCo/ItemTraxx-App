@@ -16,9 +16,9 @@ on:
 jobs:
   risk-review:
     if: ${{ !github.event.pull_request.draft && github.actor != 'dependabot[bot]' }}
-    uses: ItemTraxxCo/devops/.github/workflows/reusable-pr-risk-review.yml@9fc8279c1de4a0a281cdbb800e58bafc12e46f88
+    uses: ItemTraxxCo/devops/.github/workflows/reusable-pr-risk-review.yml@9fc8279354a5c30c2279d09bcfe452259bbc850c
     with:
       pr_number: ${{ format('{0}', github.event.pull_request.number) }}
-      hub_ref: 9fc8279c1de4a0a281cdbb800e58bafc12e46f88
+      hub_ref: 9fc8279354a5c30c2279d09bcfe452259bbc850c
     secrets:
       AI_API_KEY: ${{ secrets.AI_API_KEY }}

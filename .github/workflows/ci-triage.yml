@@ -20,7 +20,7 @@ on:
 jobs:
   triage:
     if: ${{ github.event.workflow_run.conclusion == 'failure' }}
-    uses: ItemTraxxCo/devops/.github/workflows/reusable-ci-triage.yml@6bcf366a32a1c5a5198b014648fe8e4133828e30
+    uses: ItemTraxxCo/devops/.github/workflows/reusable-ci-triage.yml@9fc8279c1de4a0a281cdbb800e58bafc12e46f88
     with:
       run_id: ${{ format('{0}', github.event.workflow_run.id) }}
       workflow_name: ${{ github.event.workflow_run.name }}

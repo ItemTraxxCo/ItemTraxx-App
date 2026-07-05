@@ -1,6 +1,8 @@
 name: CI Triage
 
-permissions: {}
+permissions:
+  actions: read
+  contents: read
 
 on:
   workflow_run:
@@ -20,10 +22,11 @@ on:
 jobs:
   triage:
     if: ${{ github.event.workflow_run.conclusion == 'failure' }}
-    uses: ItemTraxxCo/devops/.github/workflows/reusable-ci-triage.yml@9fc8279354a5c30c2279d09bcfe452259bbc850c
+    uses: ItemTraxxCo/devops/.github/workflows/reusable-ci-triage.yml@4fd58daee1a0fccde29ffc9c896d07ea21e731ab
     with:
       run_id: ${{ format('{0}', github.event.workflow_run.id) }}
       workflow_name: ${{ github.event.workflow_run.name }}
+      hub_ref: 4fd58daee1a0fccde29ffc9c896d07ea21e731ab
     secrets:
       AI_API_KEY: ${{ secrets.AI_API_KEY }}
       SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}

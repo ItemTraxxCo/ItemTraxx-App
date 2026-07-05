@@ -5,7 +5,10 @@ name: Dependabot Promotion
 # ever checks out or executes PR code — only the public devops hub repo is
 # checked out, and only Dependabot metadata is read.
 
-permissions: {}
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
 
 on:
   pull_request_target:
@@ -17,7 +20,8 @@ on:
 jobs:
   promote:
     if: ${{ github.actor == 'dependabot[bot]' }}
-    uses: ItemTraxxCo/devops/.github/workflows/reusable-dependency-promotion.yml@9fc8279354a5c30c2279d09bcfe452259bbc850c
+    uses: ItemTraxxCo/devops/.github/workflows/reusable-dependency-promotion.yml@4fd58daee1a0fccde29ffc9c896d07ea21e731ab
     with:
       pr_number: ${{ format('{0}', github.event.pull_request.number) }}
       enable_automerge: false
+      hub_ref: 4fd58daee1a0fccde29ffc9c896d07ea21e731ab

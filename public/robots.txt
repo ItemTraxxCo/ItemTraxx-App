@@ -8,7 +8,7 @@ Disallow: /super-admin/
 Disallow: /super-auth
 Disallow: /reset-password
 
-Sitemap: https://www.itemtraxx.com/sitemap.xml
+Sitemap: https://itemtraxx.com/sitemap.xml
 
 #   ___ _                 _____
 #  |_ _| |_ ___ _ __ ___ |_   _| __ __ ___  __

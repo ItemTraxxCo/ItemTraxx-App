@@ -17,24 +17,7 @@ on:
 jobs:
   promote:
     if: ${{ github.actor == 'dependabot[bot]' }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    permissions:
-      contents: read
-      pull-requests: write
-      issues: write
-    steps:
-      - name: Checkout devops hub
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-        with:
-          repository: ItemTraxxCo/devops
-          path: devops-hub
-          persist-credentials: false
-
-      - name: Run dependency promotion
-        uses: ./devops-hub/actions/dependabot-promotion
-        with:
-          pr_number: ${{ github.event.pull_request.number }}
-          repository: ${{ github.repository }}
-          github_token: ${{ github.token }}
-          enable_automerge: "false"
+    uses: ItemTraxxCo/devops/.github/workflows/reusable-dependency-promotion.yml@9fc8279354a5c30c2279d09bcfe452259bbc850c
+    with:
+      pr_number: ${{ format('{0}', github.event.pull_request.number) }}
+      enable_automerge: false

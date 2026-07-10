@@ -10,7 +10,7 @@ const FORBIDDEN_INITIAL_MODULE_RE = /node_modules\/(?:jspdf|html2canvas|jsbarcod
 
 const readAssetReferences = (html) => {
   const references = [];
-  for (const match of html.matchAll(/<(?:script|link)\b[^>]*(?:src|href)=["']([^"']+\.js(?:[?#][^"']*)?)["'][^>]*>/gi)) {
+  for (const match of html.matchAll(/<(?:script|link)\b[^>]*?\s(?:src|href)\s*=\s*["']([^"']+)["'][^>]*>/gi)) {
     const tag = match[0];
     if (/^<script\b/i.test(tag) || /rel=["']modulepreload["']/i.test(tag)) {
       references.push(match[1]);
@@ -64,16 +64,19 @@ export const measureInitialLoad = ({
   return { assets, ...totals, forbiddenModules, moduleMapPresent: moduleMap !== null };
 };
 
-const run = () => {
-  const reportOnly = process.argv.includes("--report-only");
-  const result = measureInitialLoad();
-  console.log("[perf] Initial JavaScript closure", result);
-  if (!reportOnly && (
+export const shouldFailInitialLoad = (result, { reportOnly = false } = {}) =>
+  !reportOnly && (
     result.minifiedBytes > MAX_INITIAL_MINIFIED_BYTES ||
     result.gzipBytes > MAX_INITIAL_GZIP_BYTES ||
     !result.moduleMapPresent ||
     result.forbiddenModules.length > 0
-  )) {
+  );
+
+const run = () => {
+  const reportOnly = process.argv.includes("--report-only");
+  const result = measureInitialLoad();
+  console.log("[perf] Initial JavaScript closure", result);
+  if (shouldFailInitialLoad(result, { reportOnly })) {
     console.error("[perf] Initial JavaScript budget failed", {
       maxMinifiedBytes: MAX_INITIAL_MINIFIED_BYTES,
       maxGzipBytes: MAX_INITIAL_GZIP_BYTES,

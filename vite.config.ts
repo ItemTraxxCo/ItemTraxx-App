@@ -72,22 +72,6 @@ export default defineConfig(({ mode, command }) => {
 
   return {
     plugins: [vue(), cloudflare(), initialModuleMapPlugin()],
-    build: {
-      rollupOptions: {
-        output: {
-          manualChunks(id) {
-            if (id.includes("node_modules")) {
-              if (id.includes("@supabase/supabase-js")) return "vendor-supabase";
-              if (id.includes("vue") || id.includes("vue-router")) return "vendor-vue";
-              if (id.includes("jspdf-autotable")) return "vendor-jspdf-autotable";
-              if (id.includes("jspdf")) return "vendor-jspdf";
-              if (id.includes("jsbarcode")) return "vendor-jsbarcode";
-            }
-            return undefined;
-          },
-        },
-      },
-    },
     define: {
       "import.meta.env.VITE_GIT_COMMIT": JSON.stringify(gitCommit),
       "import.meta.env.VITE_GIT_BRANCH": JSON.stringify(gitBranch),

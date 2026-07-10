@@ -30,13 +30,33 @@ test("measures the unique entry and static modulepreload closure", () => {
   }
 });
 
+test("counts query-bearing assets and deduplicates fragment variants", () => {
+  const root = mkdtempSync(join(tmpdir(), "itemtraxx-initial-load-"));
+  const assetsDir = join(root, "assets");
+  mkdirSync(assetsDir);
+  writeFileSync(join(assetsDir, "app.js"), "x");
+  writeFileSync(
+    join(root, "index.html"),
+    '<script type="module" src="/assets/app.js?v=1"></script>' +
+      '<link rel="modulepreload" href="/assets/app.js#fragment">'
+  );
+
+  try {
+    const result = measureInitialLoad({ htmlPath: join(root, "index.html"), assetsDir });
+    assert.deepEqual(result.assets, ["app.js"]);
+    assert.equal(result.minifiedBytes, 1);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test("rejects references outside the generated assets directory", () => {
   const root = mkdtempSync(join(tmpdir(), "itemtraxx-initial-load-"));
   const assetsDir = join(root, "assets");
   mkdirSync(assetsDir);
   writeFileSync(
     join(root, "index.html"),
-    '<script type="module" src="/assets/../escape.js"></script>'
+    '<script type="module" src="/assets/../escape.js?v=1"></script>'
   );
   try {
     assert.throws(

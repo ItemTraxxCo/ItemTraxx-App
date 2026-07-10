@@ -10,7 +10,7 @@ const FORBIDDEN_INITIAL_MODULE_RE = /node_modules\/(?:jspdf|html2canvas|jsbarcod
 
 const readAssetReferences = (html) => {
   const references = [];
-  for (const match of html.matchAll(/<(?:script|link)\b[^>]*(?:src|href)=["']([^"']+\.js)["'][^>]*>/gi)) {
+  for (const match of html.matchAll(/<(?:script|link)\b[^>]*(?:src|href)=["']([^"']+\.js(?:[?#][^"']*)?)["'][^>]*>/gi)) {
     const tag = match[0];
     if (/^<script\b/i.test(tag) || /rel=["']modulepreload["']/i.test(tag)) {
       references.push(match[1]);

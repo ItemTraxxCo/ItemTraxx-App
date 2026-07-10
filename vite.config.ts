@@ -1,8 +1,32 @@
 import { execSync } from "node:child_process";
+import { mkdirSync, writeFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { defineConfig, loadEnv } from "vite";
+import type { Plugin } from "vite";
 import vue from "@vitejs/plugin-vue";
 
 import { cloudflare } from "@cloudflare/vite-plugin";
+
+const initialModuleMapPlugin = (): Plugin => ({
+  name: "itemtraxx-initial-module-map",
+  apply: "build" as const,
+  writeBundle(_options, bundle) {
+    const moduleMap: Record<string, string[]> = {};
+    for (const output of Object.values(bundle)) {
+      if (output.type === "chunk" && output.fileName.endsWith(".js")) {
+        moduleMap[output.fileName.replace(/^assets\//, "")] = Object.keys(
+          output.modules
+        ).sort();
+      }
+    }
+    const artifactsDir = resolve("artifacts");
+    mkdirSync(artifactsDir, { recursive: true });
+    writeFileSync(
+      resolve(artifactsDir, "initial-module-map.json"),
+      `${JSON.stringify(moduleMap, null, 2)}\n`
+    );
+  },
+});
 
 const resolveBuildCommit = (env: Record<string, string>) => {
   const vercelCommit = env.VERCEL_GIT_COMMIT_SHA?.trim();
@@ -47,7 +71,7 @@ export default defineConfig(({ mode, command }) => {
   }
 
   return {
-    plugins: [vue(), cloudflare()],
+    plugins: [vue(), cloudflare(), initialModuleMapPlugin()],
     build: {
       rollupOptions: {
         output: {

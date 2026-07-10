@@ -1,7 +1,7 @@
 # ItemTraxx Codebase Cleanup and Modernization Design
 
 **Date:** 2026-07-10  
-**Status:** Approved for implementation planning  
+**Status:** Design approved; awaiting written-spec review
 **Repository:** `ItemTraxxCo/ItemTraxx-App`  
 **Working branch:** `dev/mmango10`
 
@@ -10,6 +10,15 @@
 This sprint reduces technical debt across the ItemTraxx repository without adding features or changing product behavior. The work removes code that is demonstrably dead, reduces duplication and oversized units, modernizes the Vue/Vite build, and materially improves the public landing-page payload. Checkout, return, authentication, authorization, tenant isolation, Supabase security, RLS, database behavior, and business rules remain unchanged.
 
 The repository is too broad for one safe rewrite. The sprint is therefore an umbrella program composed of independently testable workstreams. Each workstream must leave the repository buildable and releasable before the next begins.
+
+Implementation planning will use four sequential plan documents under this approved umbrella design:
+
+1. baseline synchronization, landing performance, and proven dead-code removal;
+2. frontend shell, page, and service decomposition;
+3. Cloudflare Worker and Supabase function decomposition;
+4. style/dependency/generated-state cleanup and the final repository audit.
+
+Each plan must be reviewed and completed before execution advances to the next plan. This preserves the repository-wide objective without creating one unreviewable implementation batch.
 
 ## Current-State Evidence
 
@@ -240,7 +249,7 @@ No shared abstraction may make it harder to see whether an action is authorized.
 - Keep route/component styles colocated or asynchronously imported with their owning route.
 - Re-run image budgets; retain the responsive WebP landing images and PNG fallbacks unless browser evidence proves a fallback unnecessary.
 - Apply only patch/minor dependency updates that remain inside the merged manifest's existing compatibility ranges and are independently verifiable.
-- Do not include Vue Router, TypeScript, CycloneDX, or other major migrations solely for modernization.
+- Do not add Vue Router, TypeScript, CycloneDX, or other major migrations solely for modernization. Major versions already merged into `origin/main` are the implementation baseline and are not rolled back by this sprint.
 - Align `deno.lock` with the merged source and package state, then use frozen verification where supported so tests do not silently mutate it.
 - Regenerate edge schema/reference artifacts only through the repository scripts and verify generated diffs are deterministic.
 
@@ -331,4 +340,3 @@ The sprint is complete only when all of the following are true:
 - Keep performance, dead-code, frontend decomposition, Worker, and Supabase-function changes in distinct commit groups.
 - Never combine a security-sensitive extraction with unrelated style, dependency, or generated-file churn.
 - Re-run the relevant verification before each commit and the full verification before declaring completion.
-

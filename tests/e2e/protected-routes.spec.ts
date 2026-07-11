@@ -31,14 +31,25 @@ test.describe("Protected route smoke tests", () => {
 
   for (const path of ["/tenant/checkout", "/district"]) {
     test(`E2E first mount of protected ${path} does not use public auth bootstrap`, async ({ page }) => {
+      let publicSessionRequests = 0;
+      await page.route("**/auth/session/me", async (route) => {
+        publicSessionRequests += 1;
+        await route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: JSON.stringify({ authenticated: false, user: null, profile: null }),
+        });
+      });
+
       await page.goto(path);
 
       await expect(page).toHaveURL(new RegExp(`${path.replaceAll("/", "\\/")}$`));
-      await expect
-        .poll(() =>
-          page.evaluate(() => document.documentElement.dataset.itemtraxxPublicAuth ?? null)
-        )
-        .not.toBe("settled");
+      await page.waitForFunction(() => window.__itemtraxxTest !== undefined);
+      await page.waitForLoadState("networkidle");
+      expect(publicSessionRequests).toBe(0);
+      expect(
+        await page.evaluate(() => document.documentElement.dataset.itemtraxxPublicAuth)
+      ).toBeUndefined();
     });
   }
 

@@ -34,20 +34,20 @@
   },
   "dependencies": {
     "@posthog/react": "^1.10.3",
-    "@sentry/vue": "^10.64.0",
+    "@sentry/vue": "^10.65.0",
     "@supabase/supabase-js": "^2.110.2",
     "@vercel/analytics": "^2.0.1",
     "@vercel/speed-insights": "^2.0.0",
     "jsbarcode": "^3.12.3",
     "jspdf": "^4.2.1",
     "jspdf-autotable": "^5.0.8",
-    "posthog-js": "^1.399.0",
+    "posthog-js": "^1.399.2",
     "vue": "^3.5.39",
     "vue-router": "^4.6.4",
     "zod": "^4.4.3"
   },
   "devDependencies": {
-    "@cloudflare/vite-plugin": "1.43.1",
+    "@cloudflare/vite-plugin": "1.44.0",
     "@cyclonedx/cyclonedx-npm": "6.0.0",
     "@playwright/test": "^1.61.1",
     "@types/node": "^26.1.1",
@@ -58,7 +58,7 @@
     "typescript": "~6.0.3",
     "vite": "^8.1.4",
     "vue-tsc": "^3.3.7",
-    "wrangler": "4.107.1",
+    "wrangler": "4.110.0",
     "zod-to-json-schema": "^3.25.2"
   },
   "overrides": {

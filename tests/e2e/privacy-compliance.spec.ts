@@ -1,9 +1,10 @@
 import { expect, test } from "@playwright/test";
-import { mockSystemStatus } from "./helpers/testHarness";
+import { mockSystemStatus, mockUnauthenticatedSession } from "./helpers/testHarness";
 
 test.describe("Privacy and legal controls", () => {
   test.beforeEach(async ({ page }) => {
     await mockSystemStatus(page);
+    await mockUnauthenticatedSession(page);
   });
 
   test("stores independent analytics and diagnostics preferences", async ({ page }) => {

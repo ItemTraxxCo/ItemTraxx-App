@@ -1,4 +1,4 @@
-import type { Page } from "@playwright/test";
+import type { BrowserContext, Page } from "@playwright/test";
 
 export const mockSystemStatus = async (page: Page) => {
   await page.route(/\/functions(?:\/v1)?\/system-status(?:\?.*)?$/, async (route) => {
@@ -16,8 +16,8 @@ export const mockSystemStatus = async (page: Page) => {
   });
 };
 
-export const mockUnauthenticatedSession = async (page: Page) => {
-  await page.route("**/auth/session/me", async (route) => {
+export const mockUnauthenticatedSession = async (target: Page | BrowserContext) => {
+  await target.route("**/auth/session/me", async (route) => {
     await route.fulfill({
       status: 200,
       contentType: "application/json",

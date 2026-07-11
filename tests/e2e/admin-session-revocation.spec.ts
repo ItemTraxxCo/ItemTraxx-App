@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import type { BrowserContext, Page, Route } from "@playwright/test";
+import { mockUnauthenticatedSession } from "./helpers/testHarness";
 
 type SessionRow = {
   id: string;
@@ -187,6 +188,7 @@ test.describe("tenant admin device revocation", () => {
     const state = createState();
     const contextA = await browser.newContext();
     await installSystemStatusMock(contextA);
+    await mockUnauthenticatedSession(contextA);
     await installAdminOpsMock(contextA, state);
 
     const pageA = await contextA.newPage();

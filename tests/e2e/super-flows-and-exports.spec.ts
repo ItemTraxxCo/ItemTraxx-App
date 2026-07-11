@@ -7,6 +7,7 @@ import {
   mockSuperStudentMutate,
   mockSuperTenantMutate,
   mockSystemStatus,
+  mockUnauthenticatedSession,
   navigateApp,
   setSuperAdminSession,
 } from "./helpers/testHarness";
@@ -14,6 +15,7 @@ import {
 test.describe("Super admin flows and export actions", () => {
   test.beforeEach(async ({ page }) => {
     await mockSystemStatus(page);
+    await mockUnauthenticatedSession(page);
     await mockSuperDashboard(page);
     await mockSuperTenantMutate(page);
     await mockSuperAdminMutate(page);

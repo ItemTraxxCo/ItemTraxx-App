@@ -44,7 +44,7 @@ const loadSentryReplay = async () => {
   }
 
   try {
-    const { addIntegration, replayIntegration } = await import("@sentry/browser");
+    const { addIntegration, replayIntegration } = await import("@sentry/vue");
     addIntegration(
       replayIntegration({
         maskAllText: true,

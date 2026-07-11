@@ -5,6 +5,7 @@ import {
   setDistrictContext,
 } from "../../store/authState";
 import { revokeCurrentTenantAdminSession } from "../adminOpsService";
+import { resolveDistrictHost } from "../districtService";
 import { clearHttpSession } from "../httpSessionService";
 import { signOutLocalSupabaseSession } from "../supabaseAuthSession";
 import { clearPendingSuperAdminVerificationEmail } from "./sessionState";
@@ -31,4 +32,33 @@ export const signOut = async () => {
   clearPendingSuperAdminVerificationEmail();
   clearAuthState(true);
   setDistrictContext(null);
+};
+
+export const getPostSignOutUrl = () => {
+  if (typeof window === "undefined") {
+    return "/login";
+  }
+
+  const { host, isDistrictHost } = resolveDistrictHost(window.location.hostname);
+  const normalizedHost = host.trim().toLowerCase();
+  if (!normalizedHost) {
+    return "/login";
+  }
+
+  if (
+    normalizedHost === "itemtraxx.com" ||
+    normalizedHost === "www.itemtraxx.com" ||
+    normalizedHost === "localhost" ||
+    normalizedHost === "127.0.0.1" ||
+    normalizedHost === "0.0.0.0" ||
+    normalizedHost.endsWith(".localhost")
+  ) {
+    return "/login";
+  }
+
+  if (isDistrictHost || normalizedHost !== "app.itemtraxx.com") {
+    return "https://itemtraxx.com/login";
+  }
+
+  return "/login";
 };

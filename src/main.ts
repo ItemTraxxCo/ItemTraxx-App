@@ -224,14 +224,16 @@ const initializeAuth = async () => {
     return;
   }
 
-  const { initAuthListener, refreshAuthFromSession } = await import("./services/authService");
-
   try {
-    await withTimeout(
-      refreshAuthFromSession(),
+    const { initAuthListener } = await withTimeout(
+      import("./services/authService").then(async (authService) => {
+        await authService.refreshAuthFromSession();
+        return authService;
+      }),
       6000,
       "Authentication initialization timed out."
     );
+    initAuthListener();
   } catch (error) {
     if (error instanceof TimeoutError) {
       console.error("Auth initialization timeout:", error.message);
@@ -243,10 +245,10 @@ const initializeAuth = async () => {
       clearAuthState(true);
     }
   }
-  initAuthListener();
 };
 
 const initializePublicAuth = async () => {
+  document.documentElement.dataset.itemtraxxPublicAuth = "pending";
   const isE2ETestMode = import.meta.env.VITE_E2E_TEST_UTILS === "true";
   if (isE2ETestMode) {
     clearAuthState(true);
@@ -268,6 +270,7 @@ const initializePublicAuth = async () => {
     if (!getAuthState().isInitialized) {
       clearAuthState(true);
     }
+    document.documentElement.dataset.itemtraxxPublicAuth = "settled";
   }
 };
 

@@ -4,6 +4,7 @@ import {
   mockUnauthenticatedSession,
   navigateApp,
   setTenantAdminSession,
+  waitForPublicAuthBootstrap,
 } from "./helpers/testHarness";
 
 const authenticatedSessionSummary = () => ({
@@ -56,6 +57,7 @@ test.describe("Auth edge cases", () => {
     await page.goto("/");
 
     await expect(page.getByRole("heading", { name: "ItemTraxx", exact: true })).toBeVisible();
+    await waitForPublicAuthBootstrap(page);
     await expect.poll(() => sessionSummaryRequests).toBe(1);
     expect(requestedUrls.some((url) => /\.supabase\.(?:co|in)\//.test(url))).toBe(false);
   });

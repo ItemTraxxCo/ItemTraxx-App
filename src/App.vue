@@ -268,6 +268,7 @@
     </div>
     <router-view v-else />
     <OnboardingModal
+      v-if="showOnboardingModal"
       :visible="showOnboardingModal"
       :variant="onboardingVariant"
       @close="handleOnboardingClose"
@@ -279,7 +280,7 @@
       @accept-all="acceptAllCookies"
       @save-preferences="saveCookiePreferences"
     />
-    <FatalErrorToast />
+    <FatalErrorToast v-if="fatalErrorToast.visible" />
     <Analytics v-if="showTelemetry" />
     <SpeedInsights v-if="showTelemetry" />
   </div>
@@ -288,13 +289,6 @@
 <script setup lang="ts">
 import { computed, defineAsyncComponent, nextTick, onMounted, onUnmounted, ref, watch, watchEffect } from "vue";
 import { useRoute, useRouter } from "vue-router";
-import { getPostSignOutUrl, signOut } from "./services/authService";
-import {
-  touchTenantAdminSession,
-  validateTenantAdminSession,
-} from "./services/adminOpsService";
-import { getBufferedCheckoutCount } from "./services/checkoutService";
-import OnboardingModal from "./components/OnboardingModal.vue";
 import CookieConsentBanner from "./components/CookieConsentBanner.vue";
 import {
   hasCompletedOnboarding,
@@ -308,11 +302,13 @@ import { fetchHttpSessionSummary } from "./services/httpSessionService";
 import { clearAdminVerification, clearAuthState, getAuthState } from "./store/authState";
 import { getDistrictState } from "./store/districtState";
 import { getRouteLoadingState } from "./store/routeLoading";
+import { getFatalErrorToastState } from "./store/fatalErrorToast";
 import { clearSessionTermination, getSessionTerminationState, showSessionTermination } from "./store/sessionTermination";
 import { resolveRecoveryRouteFromPath } from "./services/appErrorRecovery";
 import { getOrCreateDeviceSession } from "./utils/deviceSession";
 import { allowsAnalytics, clearAnalyticsPersistence, hasCookieConsent, readCookieConsent, writeCookieConsent, type CookieConsentPreferences, type CookieConsentState } from "./services/cookieConsentService";
-import { recordCookieConsent } from "./services/consentRecordService";
+
+const OnboardingModal = defineAsyncComponent(() => import("./components/OnboardingModal.vue"));
 
 const Analytics = defineAsyncComponent(async () => {
   const module = await import("@vercel/analytics/vue");
@@ -337,6 +333,7 @@ const SpeedInsights = defineAsyncComponent(async () => {
 const auth = getAuthState();
 const district = getDistrictState();
 const routeLoading = getRouteLoadingState();
+const fatalErrorToast = getFatalErrorToastState();
 const router = useRouter();
 const route = useRoute();
 const menuOpen = ref(false);
@@ -480,9 +477,13 @@ const syncCookieConsent = () => {
 const syncConsentRecord = () => {
   const state = cookieConsent.value;
   if (!state) return;
-  void recordCookieConsent(state.preferences, state.updatedAt).catch(() => {
-    // Consent remains effective locally if the audit mirror is temporarily unavailable.
-  });
+  void import("./services/consentRecordService")
+    .then(({ recordCookieConsent }) =>
+      recordCookieConsent(state.preferences, state.updatedAt),
+    )
+    .catch(() => {
+      // Consent remains effective locally if the audit mirror is temporarily unavailable.
+    });
 };
 
 const acceptEssentialCookiesOnly = () => {
@@ -624,6 +625,9 @@ const currentTenantOnboardingRole = computed<TenantOnboardingRole | null>(() => 
   return null;
 });
 const isOnTenantRoute = computed(() => route.path.startsWith("/tenant"));
+const isTenantScopedRoute = computed(
+  () => auth.isAuthenticated && !!auth.tenantContextId && isOnTenantRoute.value,
+);
 const canReplayOnboarding = computed(
   () => !!currentTenantOnboardingRole.value && isOnTenantRoute.value
 );
@@ -760,14 +764,36 @@ const offlineQueueTooltip = computed(
     "Offline Queue stores checkout/return requests when internet is unavailable and auto-syncs them when connection is restored."
 );
 
-const refreshOfflineQueueCount = () => {
-  void getBufferedCheckoutCount()
-    .then((count) => {
-      offlineQueueCount.value = count;
-    })
-    .catch(() => {
-      offlineQueueCount.value = 0;
-    });
+const stopOfflineQueuePolling = () => {
+  if (!offlineQueueTimer) return;
+  window.clearInterval(offlineQueueTimer);
+  offlineQueueTimer = null;
+};
+
+const refreshOfflineQueueCount = async () => {
+  if (!isTenantScopedRoute.value) {
+    offlineQueueCount.value = 0;
+    return;
+  }
+  try {
+    const { getBufferedCheckoutCount } = await import("./services/checkoutService");
+    offlineQueueCount.value = await getBufferedCheckoutCount();
+  } catch {
+    offlineQueueCount.value = 0;
+  }
+};
+
+const startOfflineQueuePolling = () => {
+  if (!isTenantScopedRoute.value || document.visibilityState === "hidden") {
+    stopOfflineQueuePolling();
+    offlineQueueCount.value = 0;
+    return;
+  }
+  void refreshOfflineQueueCount();
+  if (offlineQueueTimer) return;
+  offlineQueueTimer = window.setInterval(() => {
+    void refreshOfflineQueueCount();
+  }, 10000);
 };
 
 const measureTopBanners = () => {
@@ -821,6 +847,7 @@ const logoutTenant = async () => {
     return;
   }
   menuOpen.value = false;
+  const { getPostSignOutUrl, signOut } = await import("./services/authService");
   const nextUrl = getPostSignOutUrl();
   await signOut();
   if (nextUrl.startsWith("http")) {
@@ -902,10 +929,12 @@ const reloadApp = () => {
 
 const signInAgain = async () => {
   const recoveryRoute = sessionTermination.recoveryRoute ?? resolveRecoveryRouteFromPath(route.path);
-  const nextUrl =
+  const getPostSignOutUrl =
     route.path.startsWith("/super-admin") || route.path.startsWith("/internal")
       ? null
-      : getPostSignOutUrl();
+      : (await import("./services/authService")).getPostSignOutUrl;
+  const nextUrl =
+    getPostSignOutUrl === null ? null : getPostSignOutUrl();
   if (sessionTerminationRedirectTimer) {
     window.clearTimeout(sessionTerminationRedirectTimer);
     sessionTerminationRedirectTimer = null;
@@ -1062,6 +1091,9 @@ const runAdminSessionCheck = async () => {
   const deviceId = getOrCreateDeviceSession().deviceId;
   isAdminSessionCheckRunning.value = true;
   try {
+    const { touchTenantAdminSession, validateTenantAdminSession } = await import(
+      "./services/adminOpsService"
+    );
     try {
       await touchTenantAdminSession();
     } catch {
@@ -1343,6 +1375,7 @@ const handlePageVisibilityChange = () => {
     stopVersionPolling();
     stopAdminSessionPolling();
     stopSessionHeartbeat();
+    stopOfflineQueuePolling();
     return;
   }
   resetAdminIdleTimer();
@@ -1352,12 +1385,12 @@ const handlePageVisibilityChange = () => {
   startStatusPolling();
   void refreshVersionStatus();
   startVersionPolling();
-  refreshOfflineQueueCount();
+  startOfflineQueuePolling();
 };
 
 const handleStorageChange = (event: StorageEvent) => {
   if (!event.key || event.key.startsWith("itemtraxx:checkout-offline-buffer:")) {
-    refreshOfflineQueueCount();
+    void refreshOfflineQueueCount();
   }
   if (!event.key || event.key === "itemtraxx-cookie-consent") {
     syncCookieConsent();
@@ -1392,10 +1425,7 @@ onMounted(() => {
   }
   window.addEventListener("storage", handleStorageChange);
   window.addEventListener("itemtraxx:cookie-consent", handleCookieConsentChange);
-  refreshOfflineQueueCount();
-  offlineQueueTimer = window.setInterval(() => {
-    refreshOfflineQueueCount();
-  }, 10000);
+  startOfflineQueuePolling();
   window.addEventListener("resize", measureTopBanners);
   document.addEventListener("visibilitychange", handlePageVisibilityChange);
   resetAdminIdleTimer();
@@ -1434,6 +1464,7 @@ watch(
     resetAdminIdleTimer();
     startAdminSessionPolling();
     startSessionHeartbeat();
+    startOfflineQueuePolling();
     evaluateOnboardingVisibility();
     void maybeRedirectAuthenticatedPublicHome();
   }
@@ -1471,6 +1502,8 @@ watch(
     }
     stopAdminSessionPolling();
     stopSessionHeartbeat();
+    stopOfflineQueuePolling();
+    offlineQueueCount.value = 0;
     showOnboardingModal.value = false;
     onboardingEvaluationDone.value = false;
   }
@@ -1551,10 +1584,7 @@ onUnmounted(() => {
     window.clearTimeout(sessionTerminationRedirectTimer);
     sessionTerminationRedirectTimer = null;
   }
-  if (offlineQueueTimer) {
-    window.clearInterval(offlineQueueTimer);
-    offlineQueueTimer = null;
-  }
+  stopOfflineQueuePolling();
   stopAdminSessionPolling();
   stopSessionHeartbeat();
   document.removeEventListener("visibilitychange", handlePageVisibilityChange);

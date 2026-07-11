@@ -19,13 +19,27 @@ test.describe("Public surfaces", () => {
 
   test("loads public status without contacting Supabase directly", async ({ page }) => {
     const requestedUrls: string[] = [];
+    const responseUrls: string[] = [];
     page.on("request", (request) => requestedUrls.push(request.url()));
+    page.on("response", (response) => responseUrls.push(response.url()));
 
-    await page.goto("/");
+    await page.goto("/", { waitUntil: "networkidle" });
+    await page.waitForTimeout(2_000);
     await expect(page.getByRole("link", { name: "Open system status page" })).toContainText("Running");
 
     expect(requestedUrls.filter((url) => url.includes("/functions/system-status"))).toHaveLength(1);
     expect(requestedUrls.some((url) => /\.supabase\.(?:co|in)\//.test(url))).toBe(false);
+    const forbiddenJavaScriptResponses = responseUrls.filter((url) => {
+      const filename = new URL(url).pathname.split("/").pop()?.toLowerCase() ?? "";
+      return (
+        filename.endsWith(".js") &&
+        ["jspdf", "html2canvas", "jsbarcode", "posthog", "sentry", "supabase"].some((name) =>
+          filename.includes(name),
+        )
+      );
+    });
+    expect(forbiddenJavaScriptResponses).toEqual([]);
+    expect(responseUrls.some((url) => /\.supabase\.(?:co|in)\//.test(url))).toBe(false);
   });
 
   test("loads unified legal agreement page", async ({ page }) => {

@@ -18,7 +18,6 @@ import {
   refreshPublicAuthFromSession,
 } from "./services/publicAuthBootstrap";
 import { allowsAnalytics, allowsDiagnostics, readCookieConsent } from "./services/cookieConsentService";
-import { touchTenantAdminSession } from "./services/adminOpsService";
 import { TimeoutError, withTimeout } from "./services/asyncUtils";
 import {
   captureInitialPerfMetrics,
@@ -280,8 +279,13 @@ const initializeSentry = async (app: ReturnType<typeof createApp>) => {
   if (!import.meta.env.VITE_SENTRY_DSN?.trim() || !allowsDiagnostics(readCookieConsent())) {
     return;
   }
-  const { initializeSentry: initializeSentryMonitoring } = await import("./services/sentry");
-  await initializeSentryMonitoring(app, router, appMounted);
+  try {
+    const { initializeSentry: initializeSentryMonitoring } = await import("./services/sentry");
+    await initializeSentryMonitoring(app, router, appMounted);
+  } catch (error) {
+    // Diagnostics must never break login or core flows.
+    console.warn("[sentry] initialization failed; continuing without diagnostics.", error);
+  }
 };
 
 const initializePostHog = async () => {  
@@ -289,7 +293,7 @@ const initializePostHog = async () => {
     return;
   }
   try {
-    const { initPostHog } = await import("./services/posthogService");
+    const { initPostHog } = await loadPostHogService();
     await initPostHog();
   } catch (error) {
     // Analytics must never break login or core flows.
@@ -301,22 +305,34 @@ const initializeClientDiagnostics = async () => {
   if (!allowsDiagnostics(readCookieConsent())) {
     return;
   }
-  const { installClientDiagnostics } = await import("./services/clientDiagnostics");
-  installClientDiagnostics();
+  try {
+    const { installClientDiagnostics } = await import("./services/clientDiagnostics");
+    installClientDiagnostics();
+  } catch (error) {
+    // Diagnostics must never break login or core flows.
+    console.warn("[diagnostics] initialization failed; continuing without diagnostics.", error);
+  }
 };
 
-let posthogExceptionCapturePromise: Promise<((error: unknown) => void)> | null = null;
+let posthogServicePromise: Promise<typeof import("./services/posthogService")> | null = null;
+
+const loadPostHogService = () => {
+  if (!posthogServicePromise) {
+    posthogServicePromise = import("./services/posthogService").catch((error) => {
+      posthogServicePromise = null;
+      throw error;
+    });
+  }
+  return posthogServicePromise;
+};
 
 const getPostHogExceptionCapture = async () => {
-  if (!posthogExceptionCapturePromise) {
-    posthogExceptionCapturePromise = import("./services/posthogService")
-      .then((module) => module.capturePostHogException)
-      .catch(() => {
-        posthogExceptionCapturePromise = null;
-        return () => undefined;
-      });
+  if (!allowsAnalytics(readCookieConsent())) {
+    return () => undefined;
   }
-  return posthogExceptionCapturePromise;
+  return loadPostHogService()
+    .then((module) => module.capturePostHogException)
+    .catch(() => () => undefined);
 };
 
 const capturePostHogExceptionSafely = (error: unknown) => {
@@ -333,12 +349,22 @@ const bindConsentDrivenMonitoring = (app: ReturnType<typeof createApp>) => {
   };
 
   const maybeEnableAnalytics = () => {
-    void import("./services/posthogService").then(({ syncPostHogConsent }) => {
-      syncPostHogConsent();
-      if (allowsAnalytics(readCookieConsent())) {
-        void initializePostHog();
-      }
-    });
+    if (allowsAnalytics(readCookieConsent())) {
+      void loadPostHogService()
+        .then(({ syncPostHogConsent }) => {
+          syncPostHogConsent();
+          void initializePostHog();
+        })
+        .catch((error) => {
+          console.warn("[posthog] consent sync failed; continuing without analytics.", error);
+        });
+      return;
+    }
+    if (posthogServicePromise) {
+      void posthogServicePromise
+        .then(({ syncPostHogConsent }) => syncPostHogConsent())
+        .catch(() => undefined);
+    }
   };
 
   window.addEventListener("itemtraxx:cookie-consent", maybeEnableDiagnostics);
@@ -432,6 +458,7 @@ const bootstrap = async () => {
       );
       if (session.role === "tenant_admin") {
         try {
+          const { touchTenantAdminSession } = await import("./services/adminOpsService");
           await touchTenantAdminSession({
             loginMethod: consumedDistrictHandoff.loginMethod,
             loginLocation: toAdminSessionLoginLocation(consumedDistrictHandoff.loginLocation),
@@ -453,6 +480,7 @@ const bootstrap = async () => {
     if (getAuthState().role === "tenant_admin") {
       rotateDeviceSession();
       try {
+        const { touchTenantAdminSession } = await import("./services/adminOpsService");
         await touchTenantAdminSession({
           loginMethod: consumedDistrictHandoff.loginMethod,
           loginLocation: toAdminSessionLoginLocation(consumedDistrictHandoff.loginLocation),

@@ -1,6 +1,5 @@
 import { reactive } from "vue";
 import { AppError } from "../services/appErrors";
-import { sendClientErrorReport } from "../services/clientErrorReportService";
 
 type FatalErrorToastState = {
   visible: boolean;
@@ -125,6 +124,7 @@ export const sendFatalErrorToastReport = async () => {
   state.sendError = "";
 
   try {
+    const { sendClientErrorReport } = await import("../services/clientErrorReportService");
     await sendClientErrorReport({
       title: state.title,
       message: state.reportMessage,

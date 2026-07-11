@@ -16,6 +16,17 @@ test.describe("Public surfaces", () => {
     await expect(page.getByRole("heading", { name: "Get started with ItemTraxx and advance your inventory management." })).toBeVisible();
   });
 
+  test("loads public status without contacting Supabase directly", async ({ page }) => {
+    const requestedUrls: string[] = [];
+    page.on("request", (request) => requestedUrls.push(request.url()));
+
+    await page.goto("/");
+    await expect(page.getByRole("link", { name: "Open system status page" })).toContainText("Running");
+
+    expect(requestedUrls.filter((url) => url.includes("/functions/system-status"))).toHaveLength(1);
+    expect(requestedUrls.some((url) => /\.supabase\.(?:co|in)\//.test(url))).toBe(false);
+  });
+
   test("loads unified legal agreement page", async ({ page }) => {
     await page.goto("/legal");
     await expect(

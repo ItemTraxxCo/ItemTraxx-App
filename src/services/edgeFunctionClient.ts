@@ -12,20 +12,12 @@ type EdgeFunctionResult<TData> = {
   requestId?: string;
 };
 import { clearAdminVerification, clearAuthState } from "../store/authState";
+import { getEdgeFunctionsBaseUrl } from "./edgeUrls";
 import { captureHandledRequestFailure } from "./sentry";
 import { signOutLocalSupabaseSession } from "./supabaseAuthSession";
 import { supabase } from "./supabaseClient";
 
-const trimTrailingSlash = (value: string) => value.replace(/\/+$/, "");
-
-export const getEdgeFunctionsBaseUrl = () => {
-  const proxyUrl = import.meta.env.VITE_EDGE_PROXY_URL as string | undefined;
-  const trimmedProxyUrl = proxyUrl?.trim();
-  if (trimmedProxyUrl) {
-    return `${trimTrailingSlash(trimmedProxyUrl)}/functions`;
-  }
-  return "/functions";
-};
+export { getEdgeFunctionsBaseUrl } from "./edgeUrls";
 
 const getDefaultHeaders = (accessToken?: string) => {
   const headers: Record<string, string> = {};

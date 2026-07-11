@@ -1,5 +1,6 @@
 import { clearDistrictState, setDistrictState } from "../store/districtState";
-import { supabase } from "./supabaseClient";
+
+const getSupabaseClient = async () => (await import("./supabaseClient")).supabase;
 
 export const DISTRICT_HOST_ROOT = "app.itemtraxx.com";
 const RESERVED_SUBDOMAINS = new Set(["www", "internal", "status", "app"]);
@@ -83,6 +84,7 @@ export const resolveDistrictHost = (
 };
 
 const lookupDistrictBySlug = async (slug: string) => {
+  const supabase = await getSupabaseClient();
   const { data, error } = await supabase.rpc("resolve_public_district_by_slug", {
     input_slug: slug,
   });
@@ -100,6 +102,7 @@ const lookupDistrictBySlug = async (slug: string) => {
 };
 
 export const lookupDistrictById = async (districtId: string) => {
+  const supabase = await getSupabaseClient();
   const { data, error } = await supabase.rpc("resolve_public_district_by_id", {
     input_id: districtId,
   });

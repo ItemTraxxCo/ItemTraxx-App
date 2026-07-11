@@ -1,4 +1,4 @@
-import { getEdgeFunctionsBaseUrl } from "./edgeFunctionClient";
+import { getEdgeFunctionsBaseUrl } from "./edgeUrls";
 
 export type SystemStatusPayload = {
   status?: string;

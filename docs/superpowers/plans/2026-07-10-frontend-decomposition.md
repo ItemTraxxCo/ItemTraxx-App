@@ -229,7 +229,6 @@ Keep the status cases in the existing `tests/e2e/public-and-legal.spec.ts`; do n
 ### Task 3: Consolidate public-page chrome and product-event delivery
 
 **Files:**
-- Create: `src/composables/usePublicPageChrome.ts`
 - Create: `src/services/productEvents.ts`
 - Modify: `src/pages/LandingPageNew.vue`
 - Modify: `src/pages/LandingPageNew2.vue`
@@ -243,62 +242,42 @@ Keep the status cases in the existing `tests/e2e/public-and-legal.spec.ts`; do n
 - Modify: `tests/e2e/public-and-legal.spec.ts`
 
 **Interfaces:**
-- Consumes: menu open state, scroll behavior, current year, Vercel analytics event name/properties, consent-gated PostHog event name/properties.
-- Produces: `usePublicPageChrome()` and `trackProductEvent(name, properties): void` with no eager telemetry SDK imports.
+- Consumes: current year, Vercel analytics event name/properties, and consent-gated PostHog event name/properties.
+- Produces: `trackProductEvent({ analytics?, posthog? }): void`, where each optional provider delivery carries its own exact `name` and `properties`, with no eager telemetry SDK imports.
+- Audit correction: no target page currently owns a menu open/close or Escape lifecycle. `LandingPageNew` alone owns `window.scrollTo({ top: 0, left: 0, behavior: "auto" })`. Do not invent those behaviors or extract a trivial/unused `usePublicPageChrome` composable.
 
 - [ ] **Step 1: Lock current public interactions**
 
-Add tests for menu open/close, anchor scroll, Escape close, copyright year, CTA navigation, and one analytics call route mock. Assert DOM/accessibility behavior, not implementation details.
+Add tests for copyright year/footer parity, CTA navigation, and provider-specific telemetry delivery/absence. Assert rendered and delivery behavior, not implementation details, and prove the telemetry SDKs are not eagerly owned by the public entry closure.
 
-- [ ] **Step 2: Implement the page-chrome composable**
-
-```ts
-import { onBeforeUnmount, onMounted, ref } from "vue";
-
-export const usePublicPageChrome = () => {
-  const menuOpen = ref(false);
-  const currentYear = new Date().getFullYear();
-  const closeMenu = () => { menuOpen.value = false; };
-  const toggleMenu = () => { menuOpen.value = !menuOpen.value; };
-  const onKeydown = (event: KeyboardEvent) => { if (event.key === "Escape") closeMenu(); };
-  onMounted(() => window.addEventListener("keydown", onKeydown));
-  onBeforeUnmount(() => window.removeEventListener("keydown", onKeydown));
-  return { menuOpen, currentYear, closeMenu, toggleMenu };
-};
-```
-
-Only include scroll code if all adopted pages currently use identical scroll/offset semantics. Leave visually different mobile menus local.
-
-- [ ] **Step 3: Implement a lazy product-event facade**
+- [ ] **Step 2: Implement a lazy provider-specific product-event facade**
 
 ```ts
-export const trackProductEvent = (
-  name: string,
-  properties: Record<string, string | number | boolean> = {}
-): void => {
-  void import("./analyticsService")
-    .then(({ trackAnalyticsEvent }) => trackAnalyticsEvent(name, properties))
-    .catch(() => undefined);
-  void import("./posthogService")
-    .then(({ capturePostHogEvent }) => capturePostHogEvent(name, properties))
-    .catch(() => undefined);
+type ProductEventDelivery = {
+  name: string;
+  properties?: Record<string, string | number | boolean>;
 };
+
+export const trackProductEvent = (deliveries: {
+  analytics?: ProductEventDelivery;
+  posthog?: ProductEventDelivery;
+}): void => { /* lazy, independent, best-effort provider delivery */ };
 ```
 
-The underlying PostHog service remains responsible for consent. Keep current event names and property keys exactly; the facade coordinates delivery but does not rename telemetry.
+Lazy-load only the requested provider facade. Import and delivery failures are independent and best-effort. The underlying PostHog service remains responsible for consent. Keep every current event name and property key exactly; the facade coordinates delivery but does not rename telemetry or add a provider that a call site did not previously use.
 
-- [ ] **Step 4: Migrate only identical call sites and shared footers**
+- [ ] **Step 3: Migrate only identical call sites and shared footers**
 
-Adopt the composable/facade in the three retained landing variants. Reuse `PublicFooter.vue` only when rendered copy, order, URLs, `target`, and `rel` attributes match. Preserve page-specific sections instead of adding a configuration mega-component.
+Adopt the facade in the three retained landing variants with provider-specific deliveries. Render the current year through `PublicFooter.vue`, which the eligible public pages already share. Reuse `PublicFooter.vue` only when rendered copy, order, URLs, `target`, and `rel` attributes match. Keep `ResetPassword` and the visually/behaviorally different legacy `PublicHome` footer local. Preserve page-specific sections instead of adding a configuration mega-component.
 
-- [ ] **Step 5: Verify and commit**
+- [ ] **Step 4: Verify and commit**
 
 ```bash
 npm run build
 npm run perf:initial
 npx playwright test tests/e2e/public-and-legal.spec.ts
 git diff --check
-git add src/composables/usePublicPageChrome.ts src/services/productEvents.ts src/pages src/components/PublicFooter.vue tests/e2e/public-and-legal.spec.ts
+git add src/services/productEvents.ts src/pages/LandingPageNew.vue src/pages/LandingPageNew2.vue src/pages/PublicHome.vue src/components/PublicFooter.vue tests/e2e/public-and-legal.spec.ts
 git commit -m "refactor: consolidate public page lifecycles"
 ```
 

@@ -127,6 +127,175 @@ test.describe("Auth edge cases", () => {
     await expect(page).toHaveURL("https://e2e-district.app.itemtraxx.com/tenant/checkout");
   });
 
+  test("suspended tenant bootstrap fails closed and clears the authenticated state", async ({ page }) => {
+    await page.route("**/auth/session/me", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify(authenticatedSessionSummary()),
+      });
+    });
+    await page.route("**/rest/v1/tenants?**", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify([
+          { id: "tenant-e2e", status: "suspended", district_id: "district-e2e" },
+        ]),
+      });
+    });
+
+    await page.goto("/");
+    await waitForPublicAuthBootstrap(page);
+
+    await expect(page).toHaveURL(/\/$/);
+    expect(
+      await page.evaluate(() => window.__itemtraxxTest !== undefined)
+    ).toBe(true);
+    await navigateApp(page, "/tenant/checkout");
+    await expect(page).toHaveURL(/\/$/);
+  });
+
+  test("district handoff consumes only the one-time code and removes auth material from the URL", async ({ page }) => {
+    let consumePayload: unknown = null;
+    let exchangePayload: unknown = null;
+    await page.addInitScript(() => {
+      const originalReplaceState = window.history.replaceState.bind(window.history);
+      const recordedUrls: string[] = [];
+      (window as unknown as { __authReplaceStateUrls: string[] }).__authReplaceStateUrls = recordedUrls;
+      window.history.replaceState = (data: unknown, unused: string, url?: string | URL | null) => {
+        recordedUrls.push(String(url ?? ""));
+        originalReplaceState(data, unused, url);
+      };
+    });
+    await page.route(/\/functions(?:\/v1)?\/district-handoff(?:\?.*)?$/, async (route) => {
+      consumePayload = route.request().postDataJSON();
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ access_token: "access-e2e", refresh_token: "refresh-e2e" }),
+      });
+    });
+    await page.route("**/auth/session/exchange", async (route) => {
+      exchangePayload = route.request().postDataJSON();
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify(authenticatedSessionSummary()),
+      });
+    });
+    await page.route(/\/functions(?:\/v1)?\/login-notify(?:\?.*)?$/, async (route) => {
+      await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ data: {} }) });
+    });
+    await page.route("**/rest/v1/tenants?**", async (route) => {
+      await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify([{ id: "tenant-e2e", status: "active", district_id: null }]) });
+    });
+
+    await page.goto("/#itx_hc=one-time-code&itx_lm=password&itx_ll=tenant_login&keep=1");
+
+    await expect.poll(() => consumePayload).not.toBeNull();
+    expect(consumePayload).toEqual({ action: "consume", code: "one-time-code" });
+    expect(exchangePayload).toEqual({ access_token: "access-e2e", refresh_token: "refresh-e2e" });
+    expect(
+      await page.evaluate(
+        () => (window as unknown as { __authReplaceStateUrls: string[] }).__authReplaceStateUrls
+      )
+    ).toContain("/#keep=1");
+    expect(await page.evaluate(() => sessionStorage.getItem("itemtraxx:district-handoff-at"))).toMatch(/^\d+$/);
+  });
+
+  test("deprecated raw district tokens are rejected and scrubbed without exchange", async ({ page }) => {
+    let exchangeRequests = 0;
+    await page.route("**/auth/session/exchange", async (route) => {
+      exchangeRequests += 1;
+      await route.fulfill({ status: 500, body: "unexpected" });
+    });
+
+    await page.goto("/#itx_at=raw-access&itx_rt=raw-refresh&keep=1");
+
+    await expect(page).toHaveURL(/#keep=1$/);
+    expect(exchangeRequests).toBe(0);
+  });
+
+  test("super-admin password challenge preserves action and payload contract", async ({ page }) => {
+    let challengePayload: unknown = null;
+    await page.route(/\/functions(?:\/v1)?\/super-auth-verify(?:\?.*)?$/, async (route) => {
+      challengePayload = route.request().postDataJSON();
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ challenge_started: true, email: "super@example.com", challenge_token: "challenge-e2e" }),
+      });
+    });
+
+    await page.goto("/super-auth");
+    await page.evaluate(async () => {
+      const auth = await import("/src/services/authService.ts");
+      await auth.superAdminLogin("super@example.com", "correct horse battery staple", "turnstile-e2e");
+    });
+
+    await expect.poll(() => challengePayload).not.toBeNull();
+    expect(challengePayload).toEqual({
+      action: "start_password_login",
+      payload: {
+        email: "super@example.com",
+        password: "correct horse battery staple",
+        turnstile_token: "turnstile-e2e",
+      },
+    });
+    expect(
+      await page.evaluate(async () => {
+        const auth = await import("/src/services/authService.ts");
+        return {
+          token: auth.getPendingSuperAdminChallengeToken(),
+          email: auth.getPendingSuperAdminVerificationEmail(),
+        };
+      })
+    ).toEqual({ token: "challenge-e2e", email: "super@example.com" });
+  });
+
+  test("logout tolerates a missing local Supabase session and uses the local post-sign-out URL", async ({ page }) => {
+    let logoutRequests = 0;
+    await page.route("**/auth/session/logout", async (route) => {
+      logoutRequests += 1;
+      await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ ok: true }) });
+    });
+    await page.goto("/");
+    await page.waitForFunction(() => window.__itemtraxxTest !== undefined);
+    await page.evaluate(() => window.__itemtraxxTest?.setTenantUserSession());
+    const nextUrl = await page.evaluate(async () => {
+      const auth = await import("/src/services/authService.ts");
+      const url = auth.getPostSignOutUrl();
+      await auth.signOut();
+      return url;
+    });
+
+    expect(nextUrl).toBe("/login");
+    expect(logoutRequests).toBe(1);
+  });
+
+  test("forced tenant-admin termination shows the blocking session message", async ({ page }) => {
+    await page.route(/\/functions(?:\/v1)?\/admin-ops(?:\?.*)?$/, async (route) => {
+      const body = (route.request().postDataJSON() as { action?: string }) ?? {};
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ data: body.action === "validate_session" ? { valid: false } : { ok: true } }),
+      });
+    });
+
+    await page.goto("/");
+    await setTenantAdminSession(page, "tenant-e2e");
+    await navigateApp(page, "/tenant/admin");
+
+    await expect(page.getByRole("heading", { name: "This session has been terminated." })).toBeVisible();
+  });
+
+  test("auth extraction begins behind a stable types boundary", async () => {
+    const source = await readFile(new URL("../../src/services/auth/types.ts", import.meta.url), "utf8");
+    expect(source).toContain('export type AuthRole = "tenant_user" | "tenant_admin" | "district_admin" | "super_admin";');
+  });
+
   test("authenticated tenant checkout survives refresh when tenant bootstrap lookup returns 401", async ({ page }) => {
     await page.route("**/auth/session/me", async (route) => {
       await route.fulfill({

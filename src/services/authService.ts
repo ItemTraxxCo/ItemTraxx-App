@@ -28,34 +28,16 @@ import { authenticatedRpc, authenticatedSelect } from "./authenticatedDataClient
 import { rotateDeviceSession } from "../utils/deviceSession";
 import { revokeCurrentTenantAdminSession, touchTenantAdminSession } from "./adminOpsService";
 import { touchSuperAdminSession } from "./superOpsService";
-
-type ProfileRow = {
-  id: string;
-  role: "tenant_user" | "tenant_admin" | "district_admin" | "super_admin" | null;
-  tenant_id: string | null;
-  district_id?: string | null;
-  auth_email: string | null;
-  is_active?: boolean | null;
-};
-
-type TenantRow = {
-  id: string;
-  status: "active" | "suspended" | "archived" | null;
-  district_id?: string | null;
-};
-
-const normalizeFunctionTarget = (value: string | undefined, fallback: string) => {
-  const trimmed = value?.trim();
-  if (!trimmed) return fallback;
-  try {
-    const url = new URL(trimmed);
-    const segments = url.pathname.split("/").filter(Boolean);
-    return segments[segments.length - 1] || fallback;
-  } catch {
-    const segments = trimmed.split("/").filter(Boolean);
-    return segments[segments.length - 1] || fallback;
-  }
-};
+import {
+  normalizeFunctionTarget,
+  normalizeLoginNotificationLocation,
+  toKnownRole,
+  toTenantAdminSessionLocation,
+  type LoginNotificationLocation,
+  type ProfileRow,
+  type TenantRow,
+} from "./auth/types";
+export type { LoginNotificationLocation } from "./auth/types";
 
 const getTenantLoginFunctionName = () =>
   normalizeFunctionTarget(import.meta.env.VITE_TENANT_LOGIN_FUNCTION, "tenant-login");
@@ -75,46 +57,6 @@ let pendingSuperAdminChallengeToken: string | null = null;
 
 const RAW_HANDOFF_TOKEN_PARAMS = ["itx_at", "itx_rt"];
 
-export type LoginNotificationLocation =
-  | "tenant_login"
-  | "tenant_admin_login"
-  | "district_admin_login"
-  | "super_admin_login"
-  | "regular_login"
-  | "admin_login";
-
-type TenantAdminSessionLocation = "regular_login" | "admin_login";
-
-const normalizeLoginNotificationLocation = (
-  value: string | null
-): LoginNotificationLocation | null => {
-  if (
-    value === "tenant_login" ||
-    value === "tenant_admin_login" ||
-    value === "district_admin_login" ||
-    value === "super_admin_login" ||
-    value === "regular_login" ||
-    value === "admin_login"
-  ) {
-    return value;
-  }
-  return null;
-};
-
-const toTenantAdminSessionLocation = (
-  value: LoginNotificationLocation | null | undefined
-): TenantAdminSessionLocation | null => {
-  if (!value) return null;
-  if (value === "regular_login" || value === "tenant_login") return "regular_login";
-  if (
-    value === "admin_login" ||
-    value === "tenant_admin_login" ||
-    value === "district_admin_login"
-  ) {
-    return "admin_login";
-  }
-  return null;
-};
 
 const sendLoginNotification = (
   accessToken: string | null,
@@ -254,18 +196,6 @@ const withRetry = async <T>(
     }
   }
   throw lastError;
-};
-
-const toKnownRole = (value: unknown): ProfileRow["role"] => {
-  if (
-    value === "tenant_user" ||
-    value === "tenant_admin" ||
-    value === "district_admin" ||
-    value === "super_admin"
-  ) {
-    return value;
-  }
-  return null;
 };
 
 const fetchCurrentRoleAndTenant = async () => {

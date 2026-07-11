@@ -390,7 +390,7 @@ const resolveDistrictSlug = async (districtId: string | null) => {
   return district?.slug?.trim() || null;
 };
 
-const applySessionSummary = async (
+export const applyHttpSessionSummary = async (
   summary: Awaited<ReturnType<typeof fetchHttpSessionSummary>>
 ) => {
   if (!summary.authenticated || !summary.user) {
@@ -469,7 +469,7 @@ export const refreshAuthFromSession = async () => {
       AUTH_QUERY_TIMEOUT_MS,
       "Session refresh timed out."
     );
-    await applySessionSummary(summary);
+    await applyHttpSessionSummary(summary);
   } catch {
     console.error("Session refresh failed.");
     clearAuthState(true);
@@ -549,7 +549,7 @@ export const tenantLogin = async (
       const fallback = await fetchCurrentRoleAndTenant();
       shouldRegisterTenantAdminSession = fallback.role === "tenant_admin";
     } catch {
-      // Ignore fallback failures; applySessionSummary will still restore best-effort auth state.
+      // Ignore fallback failures; applyHttpSessionSummary will still restore best-effort auth state.
     }
   }
   if (shouldRegisterTenantAdminSession) {
@@ -563,7 +563,7 @@ export const tenantLogin = async (
       // Session tracking is best-effort and must not block successful login.
     }
   }
-  await applySessionSummary(sessionSummary);
+  await applyHttpSessionSummary(sessionSummary);
   const current = getAuthState();
   setTenantContext(current.sessionTenantId ?? null);
   const districtSlug =

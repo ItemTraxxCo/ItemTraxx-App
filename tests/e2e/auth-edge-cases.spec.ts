@@ -1,9 +1,31 @@
 import { expect, test } from "@playwright/test";
-import { mockSystemStatus, navigateApp, setTenantAdminSession } from "./helpers/testHarness";
+import {
+  mockSystemStatus,
+  mockUnauthenticatedSession,
+  navigateApp,
+  setTenantAdminSession,
+} from "./helpers/testHarness";
+
+const authenticatedSessionSummary = () => ({
+  authenticated: true,
+  user: {
+    id: "user-tenant-refresh",
+    email: "tenant.user@example.com",
+    last_sign_in_at: new Date().toISOString(),
+  },
+  profile: {
+    role: "tenant_user",
+    tenant_id: "tenant-e2e",
+    district_id: null,
+    auth_email: "tenant.user@example.com",
+    is_active: true,
+  },
+});
 
 test.describe("Auth edge cases", () => {
   test.beforeEach(async ({ page }) => {
     await mockSystemStatus(page);
+    await mockUnauthenticatedSession(page);
   });
 
   test("unauthenticated tenant admin route redirects to public home", async ({ page }) => {
@@ -18,26 +40,75 @@ test.describe("Auth edge cases", () => {
     await expect(page).toHaveURL(/\/$/);
   });
 
+  test("public session bootstrap renders for an unauthenticated session without contacting Supabase", async ({ page }) => {
+    const requestedUrls: string[] = [];
+    let sessionSummaryRequests = 0;
+    page.on("request", (request) => requestedUrls.push(request.url()));
+    await page.route("**/auth/session/me", async (route) => {
+      sessionSummaryRequests += 1;
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ authenticated: false, user: null, profile: null }),
+      });
+    });
+
+    await page.goto("/");
+
+    await expect(page.getByRole("heading", { name: "ItemTraxx", exact: true })).toBeVisible();
+    await expect.poll(() => sessionSummaryRequests).toBe(1);
+    expect(requestedUrls.some((url) => /\.supabase\.(?:co|in)\//.test(url))).toBe(false);
+  });
+
+  test("public session bootstrap preserves the authenticated role redirect", async ({ page }) => {
+    let sessionSummaryRequests = 0;
+    await page.route("**/auth/session/me", async (route) => {
+      sessionSummaryRequests += 1;
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify(authenticatedSessionSummary()),
+      });
+    });
+    await page.route("**/rest/v1/tenants?**", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify([
+          { id: "tenant-e2e", status: "active", district_id: "district-e2e" },
+        ]),
+      });
+    });
+    await page.route("**/rest/v1/rpc/resolve_public_district_by_id", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify([
+          {
+            id: "district-e2e",
+            name: "E2E District",
+            slug: "e2e-district",
+            is_active: true,
+          },
+        ]),
+      });
+    });
+    await page.route("https://e2e-district.app.itemtraxx.com/tenant/checkout", async (route) => {
+      await route.fulfill({ status: 200, contentType: "text/html", body: "<!doctype html>" });
+    });
+
+    await page.goto("/");
+
+    await expect.poll(() => sessionSummaryRequests).toBe(1);
+    await expect(page).toHaveURL("https://e2e-district.app.itemtraxx.com/tenant/checkout");
+  });
+
   test("authenticated tenant checkout survives refresh when tenant bootstrap lookup returns 401", async ({ page }) => {
     await page.route("**/auth/session/me", async (route) => {
       await route.fulfill({
         status: 200,
         contentType: "application/json",
-        body: JSON.stringify({
-          authenticated: true,
-          user: {
-            id: "user-tenant-refresh",
-            email: "tenant.user@example.com",
-            last_sign_in_at: new Date().toISOString(),
-          },
-          profile: {
-            role: "tenant_user",
-            tenant_id: "tenant-e2e",
-            district_id: null,
-            auth_email: "tenant.user@example.com",
-            is_active: true,
-          },
-        }),
+        body: JSON.stringify(authenticatedSessionSummary()),
       });
     });
 

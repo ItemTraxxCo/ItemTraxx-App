@@ -4,6 +4,7 @@ import {
   navigateApp,
   mockSuperDashboard,
   mockSystemStatus,
+  mockUnauthenticatedSession,
   setSuperAdminSession,
   setTenantAdminSession,
 } from "./helpers/testHarness";
@@ -11,6 +12,7 @@ import {
 test.describe("Protected route smoke tests", () => {
   test.beforeEach(async ({ page }) => {
     await mockSystemStatus(page);
+    await mockUnauthenticatedSession(page);
     await mockAdminOps(page);
     await mockSuperDashboard(page);
   });

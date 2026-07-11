@@ -14,11 +14,9 @@ import {
 } from "./store/authState";
 import { getDistrictState } from "./store/districtState";
 import {
-  adminLoginWithSession,
-  consumeDistrictSessionHandoff,
-  initAuthListener,
-  refreshAuthFromSession,
-} from "./services/authService";
+  hasDistrictSessionHandoff,
+  refreshPublicAuthFromSession,
+} from "./services/publicAuthBootstrap";
 import { allowsAnalytics, allowsDiagnostics, readCookieConsent } from "./services/cookieConsentService";
 import { touchTenantAdminSession } from "./services/adminOpsService";
 import { TimeoutError, withTimeout } from "./services/asyncUtils";
@@ -226,6 +224,8 @@ const initializeAuth = async () => {
     return;
   }
 
+  const { initAuthListener, refreshAuthFromSession } = await import("./services/authService");
+
   try {
     await withTimeout(
       refreshAuthFromSession(),
@@ -244,6 +244,31 @@ const initializeAuth = async () => {
     }
   }
   initAuthListener();
+};
+
+const initializePublicAuth = async () => {
+  const isE2ETestMode = import.meta.env.VITE_E2E_TEST_UTILS === "true";
+  if (isE2ETestMode) {
+    clearAuthState(true);
+  }
+
+  try {
+    await withTimeout(
+      refreshPublicAuthFromSession(),
+      6000,
+      "Authentication initialization timed out."
+    );
+  } catch (error) {
+    if (error instanceof TimeoutError) {
+      console.error("Auth initialization timeout:", error.message);
+    } else {
+      console.error("Auth initialization failed:", error);
+    }
+  } finally {
+    if (!getAuthState().isInitialized) {
+      clearAuthState(true);
+    }
+  }
 };
 
 let appMounted = false;
@@ -363,7 +388,12 @@ const bootstrap = async () => {
   if (redirectCanonicalHost()) {
     return;
   }
-  const consumedDistrictHandoff = await consumeDistrictSessionHandoff();
+  const consumedDistrictHandoff = hasDistrictSessionHandoff()
+    ? await (async () => {
+        const { consumeDistrictSessionHandoff } = await import("./services/authService");
+        return consumeDistrictSessionHandoff();
+      })()
+    : false;
   await initializeDistrictContext();
   const districtContext = getDistrictState();
   const isE2ETestMode = import.meta.env.VITE_E2E_TEST_UTILS === "true";
@@ -380,11 +410,12 @@ const bootstrap = async () => {
       clearAuthState(true);
     }
     await mountApp();
-    void initializeAuth();
+    void (canMountPublicBootstrap ? initializePublicAuth() : initializeAuth());
     return;
   }
   if (consumedDistrictHandoff && isAdminBootstrapPath()) {
     try {
+      const { adminLoginWithSession } = await import("./services/authService");
       const session = await adminLoginWithSession(
         consumedDistrictHandoff.accessToken,
         consumedDistrictHandoff.refreshToken,

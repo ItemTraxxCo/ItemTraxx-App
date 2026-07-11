@@ -1,9 +1,10 @@
 import { expect, test } from "@playwright/test";
-import { mockSystemStatus } from "./helpers/testHarness";
+import { mockSystemStatus, mockUnauthenticatedSession } from "./helpers/testHarness";
 
 test.describe("Public surfaces", () => {
   test.beforeEach(async ({ page }) => {
     await mockSystemStatus(page);
+    await mockUnauthenticatedSession(page);
   });
 
   test("loads landing page with primary sections", async ({ page }) => {

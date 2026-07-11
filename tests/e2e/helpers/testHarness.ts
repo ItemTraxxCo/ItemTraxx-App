@@ -16,6 +16,16 @@ export const mockSystemStatus = async (page: Page) => {
   });
 };
 
+export const mockUnauthenticatedSession = async (page: Page) => {
+  await page.route("**/auth/session/me", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ authenticated: false, user: null, profile: null }),
+    });
+  });
+};
+
 export const mockAdminOps = async (page: Page) => {
   await page.route(/\/functions(?:\/v1)?\/admin-ops(?:\?.*)?$/, async (route) => {
     const request = route.request();
@@ -307,6 +317,7 @@ export const mockSuspendedTenantAdminOps = async (page: Page) => {
 
 export const setTenantAdminSession = async (page: Page, tenantId = "tenant-e2e") => {
   await page.waitForFunction(() => typeof window.__itemtraxxTest?.setTenantAdminSession === "function");
+  await page.waitForLoadState("networkidle");
   await page.evaluate((id) => {
     window.__itemtraxxTest?.setTenantAdminSession(id);
   }, tenantId);
@@ -314,6 +325,7 @@ export const setTenantAdminSession = async (page: Page, tenantId = "tenant-e2e")
 
 export const setSuperAdminSession = async (page: Page) => {
   await page.waitForFunction(() => typeof window.__itemtraxxTest?.setSuperAdminSession === "function");
+  await page.waitForLoadState("networkidle");
   await page.evaluate(() => {
     window.__itemtraxxTest?.setSuperAdminSession();
   });

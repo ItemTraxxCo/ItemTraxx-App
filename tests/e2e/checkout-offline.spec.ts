@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { mockUnauthenticatedSession } from "./helpers/testHarness";
 
 const OFFLINE_QUEUE_KEY = "itemtraxx:checkout-offline-buffer:v1";
 const OFFLINE_QUEUE_KEY_VERSION = "itemtraxx:checkout-offline-buffer:key:v1";
@@ -73,6 +74,7 @@ const clearQueueStorage = async (page: Page) => {
 
 test.describe("encrypted checkout offline queue contract", () => {
   test.beforeEach(async ({ page }) => {
+    await mockUnauthenticatedSession(page);
     await openFixture(page);
     await clearQueueStorage(page);
   });

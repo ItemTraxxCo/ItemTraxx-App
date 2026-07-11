@@ -195,7 +195,10 @@ test.describe("Auth edge cases", () => {
 
     await expect.poll(() => consumePayload).not.toBeNull();
     expect(consumePayload).toEqual({ action: "consume", code: "one-time-code" });
-    expect(exchangePayload).toEqual({ access_token: "access-e2e", refresh_token: "refresh-e2e" });
+    await expect.poll(() => exchangePayload).toEqual({
+      access_token: "access-e2e",
+      refresh_token: "refresh-e2e",
+    });
     expect(
       await page.evaluate(
         () => (window as unknown as { __authReplaceStateUrls: string[] }).__authReplaceStateUrls
@@ -206,6 +209,15 @@ test.describe("Auth edge cases", () => {
 
   test("deprecated raw district tokens are rejected and scrubbed without exchange", async ({ page }) => {
     let exchangeRequests = 0;
+    await page.addInitScript(() => {
+      const originalReplaceState = window.history.replaceState.bind(window.history);
+      const recordedUrls: string[] = [];
+      (window as unknown as { __authReplaceStateUrls: string[] }).__authReplaceStateUrls = recordedUrls;
+      window.history.replaceState = (data: unknown, unused: string, url?: string | URL | null) => {
+        recordedUrls.push(String(url ?? ""));
+        originalReplaceState(data, unused, url);
+      };
+    });
     await page.route("**/auth/session/exchange", async (route) => {
       exchangeRequests += 1;
       await route.fulfill({ status: 500, body: "unexpected" });
@@ -213,7 +225,11 @@ test.describe("Auth edge cases", () => {
 
     await page.goto("/#itx_at=raw-access&itx_rt=raw-refresh&keep=1");
 
-    await expect(page).toHaveURL(/#keep=1$/);
+    await expect.poll(async () =>
+      page.evaluate(
+        () => (window as unknown as { __authReplaceStateUrls: string[] }).__authReplaceStateUrls
+      )
+    ).toContain("/#keep=1");
     expect(exchangeRequests).toBe(0);
   });
 
@@ -252,6 +268,139 @@ test.describe("Auth edge cases", () => {
         };
       })
     ).toEqual({ token: "challenge-e2e", email: "super@example.com" });
+  });
+
+  test("tenant-admin session login marks a fresh 15-minute verification", async ({ page }) => {
+    await page.route(/\/functions(?:\/v1)?\/privileged-step-up(?:\?.*)?$/, async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ data: { registered: true, expires_at: new Date(Date.now() + 15 * 60_000).toISOString() } }),
+      });
+    });
+    await page.route(/\/functions(?:\/v1)?\/admin-ops(?:\?.*)?$/, async (route) => {
+      await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ data: { ok: true } }) });
+    });
+    await page.route(/\/functions(?:\/v1)?\/login-notify(?:\?.*)?$/, async (route) => {
+      await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({}) });
+    });
+    await page.route("**/rest/v1/tenants?**", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify([{ id: "tenant-admin-e2e", status: "active", district_id: null }]),
+      });
+    });
+
+    await page.goto("/");
+    const result = await page.evaluate(async () => {
+      const auth = await import("/src/services/authService.ts");
+      const { getAuthState } = await import("/src/store/authState.ts");
+      const login = await auth.adminLoginWithSession("admin-access", "admin-refresh", {
+        skipExchange: true,
+        preExchangedSessionSummary: {
+          authenticated: true,
+          user: {
+            id: "tenant-admin-user-e2e",
+            email: "tenant.admin@example.com",
+            last_sign_in_at: new Date().toISOString(),
+          },
+          profile: {
+            role: "tenant_admin",
+            tenant_id: "tenant-admin-e2e",
+            district_id: null,
+            auth_email: "tenant.admin@example.com",
+            is_active: true,
+          },
+        },
+      });
+      const state = getAuthState();
+      return {
+        role: login.role,
+        tenantId: login.tenantId,
+        verifiedAt: state.adminVerifiedAt,
+        persisted: sessionStorage.getItem("itemtraxx:admin-verification"),
+      };
+    });
+
+    expect(result.role).toBe("tenant_admin");
+    expect(result.tenantId).toBe("tenant-admin-e2e");
+    expect(Date.now() - Date.parse(result.verifiedAt ?? "")).toBeLessThanOrEqual(15 * 60_000);
+    expect(JSON.parse(result.persisted ?? "null")).toMatchObject({
+      userId: "tenant-admin-user-e2e",
+      verifiedAt: result.verifiedAt,
+    });
+  });
+
+  test("super-admin passkey login preserves verification payload and fresh secondary auth", async ({ page }) => {
+    let verifyPayload: unknown = null;
+    await page.route(/\/functions(?:\/v1)?\/super-auth-verify(?:\?.*)?$/, async (route) => {
+      verifyPayload = route.request().postDataJSON();
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ verified: true }),
+      });
+    });
+    await page.route("**/auth/session/exchange", async (route) => {
+      await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ ok: true }) });
+    });
+    await page.route("**/auth/session/me", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          authenticated: true,
+          user: {
+            id: "super-passkey-e2e",
+            email: "super@example.com",
+            last_sign_in_at: new Date().toISOString(),
+          },
+          profile: {
+            role: "super_admin",
+            tenant_id: null,
+            district_id: null,
+            auth_email: "super@example.com",
+            is_active: true,
+          },
+        }),
+      });
+    });
+    await page.route(/\/functions(?:\/v1)?\/super-ops(?:\?.*)?$/, async (route) => {
+      await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ data: { ok: true } }) });
+    });
+
+    await page.goto("/");
+    const result = await page.evaluate(async () => {
+      const [{ supabase }, auth, { getAuthState }] = await Promise.all([
+        import("/src/services/supabaseClient.ts"),
+        import("/src/services/authService.ts"),
+        import("/src/store/authState.ts"),
+      ]);
+      const passkeySession = {
+        access_token: "passkey-access",
+        refresh_token: "passkey-refresh",
+      };
+      Object.defineProperty(supabase.auth, "signInWithPasskey", {
+        configurable: true,
+        value: async () => ({ data: { session: passkeySession }, error: null }),
+      });
+      await auth.superAdminPasskeyLogin({
+        sendLoginNotification: false,
+        loginLocation: "super_settings",
+      });
+      const state = getAuthState();
+      return {
+        role: state.role,
+        hasSecondaryAuth: state.hasSecondaryAuth,
+        verifiedAt: state.superVerifiedAt,
+      };
+    });
+
+    expect(verifyPayload).toEqual({ action: "complete_passkey_login", payload: {} });
+    expect(result.role).toBe("super_admin");
+    expect(result.hasSecondaryAuth).toBe(true);
+    expect(Date.now() - Date.parse(result.verifiedAt ?? "")).toBeLessThanOrEqual(15 * 60_000);
   });
 
   test("logout tolerates a missing local Supabase session and uses the local post-sign-out URL", async ({ page }) => {

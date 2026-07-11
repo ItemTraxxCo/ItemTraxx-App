@@ -2,7 +2,7 @@ import { clearDistrictState, setDistrictState } from "../store/districtState";
 
 const getSupabaseClient = async () => (await import("./supabaseClient")).supabase;
 
-export const DISTRICT_HOST_ROOT = "app.itemtraxx.com";
+const DISTRICT_HOST_ROOT = "app.itemtraxx.com";
 const RESERVED_SUBDOMAINS = new Set(["www", "internal", "status", "app"]);
 const ROOT_HOSTS = new Set(["itemtraxx.com", "www.itemtraxx.com", DISTRICT_HOST_ROOT]);
 const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "0.0.0.0"]);

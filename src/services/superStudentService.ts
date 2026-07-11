@@ -47,12 +47,6 @@ export const createSuperStudent = async (payload: {
     payload,
   });
 
-export const updateSuperStudent = async (payload: { id: string }) =>
-  callSuperStudent<SuperStudentItem>({
-    action: "update",
-    payload,
-  });
-
 export const deleteSuperStudent = async (payload: {
   id: string;
   super_password: string;

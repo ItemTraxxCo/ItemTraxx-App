@@ -1,7 +1,7 @@
 import { invokeEdgeFunction } from "./edgeFunctionClient";
 import { edgeFunctionError } from "./appErrors";
 
-export type SuperAuditLog = {
+type SuperAuditLog = {
   id: string;
   actor_id: string;
   actor_email: string | null;

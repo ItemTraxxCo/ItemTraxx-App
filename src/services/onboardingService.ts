@@ -27,7 +27,7 @@ const safeRemoveItem = (key: string) => {
   }
 };
 
-export const getOnboardingKey = (role: TenantOnboardingRole) =>
+const getOnboardingKey = (role: TenantOnboardingRole) =>
   `${ONBOARDING_KEY_PREFIX}:${role}`;
 
 export const hasCompletedOnboarding = (role: TenantOnboardingRole): boolean => {

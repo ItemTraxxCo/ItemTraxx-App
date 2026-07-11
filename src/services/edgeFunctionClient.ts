@@ -17,8 +17,6 @@ import { captureHandledRequestFailure } from "./sentry";
 import { signOutLocalSupabaseSession } from "./supabaseAuthSession";
 import { supabase } from "./supabaseClient";
 
-export { getEdgeFunctionsBaseUrl } from "./edgeUrls";
-
 const getDefaultHeaders = (accessToken?: string) => {
   const headers: Record<string, string> = {};
 

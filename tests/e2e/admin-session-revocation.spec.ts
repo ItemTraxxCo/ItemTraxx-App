@@ -1,6 +1,10 @@
 import { expect, test } from "@playwright/test";
 import type { BrowserContext, Page, Route } from "@playwright/test";
-import { mockUnauthenticatedSession } from "./helpers/testHarness";
+import {
+  mockUnauthenticatedSession,
+  navigateApp,
+  waitForPublicAuthBootstrap,
+} from "./helpers/testHarness";
 
 type SessionRow = {
   id: string;
@@ -155,6 +159,7 @@ const installAdminOpsMock = async (context: BrowserContext, state: AdminOpsState
 const seedTenantAdminState = async (page: Page, deviceId: string, deviceLabel: string) => {
   await page.goto("/");
   await page.waitForFunction(() => typeof window.__itemtraxxTest?.setTenantAdminSession === "function");
+  await waitForPublicAuthBootstrap(page);
   await page.evaluate(
     ({ tenantId, deviceId: id, deviceLabel: label, deviceIdKey, deviceLabelKey }) => {
       localStorage.setItem(deviceIdKey, id);
@@ -188,12 +193,15 @@ test.describe("tenant admin device revocation", () => {
     const state = createState();
     const contextA = await browser.newContext();
     await installSystemStatusMock(contextA);
-    await mockUnauthenticatedSession(contextA);
+    await mockUnauthenticatedSession(contextA, { delayMs: 750 });
     await installAdminOpsMock(contextA, state);
 
     const pageA = await contextA.newPage();
 
     await seedTenantAdminState(pageA, "device-a", "Mac");
+    await waitForPublicAuthBootstrap(pageA);
+    await navigateApp(pageA, "/tenant/admin");
+    await expect(pageA).toHaveURL(/\/tenant\/admin$/);
 
     const touchA = await callAdminOps<{ ok: boolean }>(pageA, "touch_session", {
       device_id: "device-a",

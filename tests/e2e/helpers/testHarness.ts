@@ -16,8 +16,14 @@ export const mockSystemStatus = async (page: Page) => {
   });
 };
 
-export const mockUnauthenticatedSession = async (target: Page | BrowserContext) => {
+export const mockUnauthenticatedSession = async (
+  target: Page | BrowserContext,
+  options: { delayMs?: number } = {}
+) => {
   await target.route("**/auth/session/me", async (route) => {
+    if (options.delayMs) {
+      await new Promise((resolve) => setTimeout(resolve, options.delayMs));
+    }
     await route.fulfill({
       status: 200,
       contentType: "application/json",

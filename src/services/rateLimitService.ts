@@ -22,13 +22,6 @@ const consumeRateLimit = async (
   }
 };
 
-export const enforceTenantTxnRateLimit = async () => {
-  const result = await consumeRateLimit("tenant", 10, 60);
-  if (!result.allowed) {
-    throw new Error("Rate limit exceeded, please try again in a minute.");
-  }
-};
-
 export const enforceAdminRateLimit = async () => {
   const result = await consumeRateLimit("admin", 20, 60);
   if (!result.allowed) {

@@ -2,7 +2,7 @@ import { invokeEdgeFunction } from "./edgeFunctionClient";
 import { edgeFunctionError } from "./appErrors";
 import { getOrCreateDeviceSession } from "../utils/deviceSession";
 
-export type RuntimeConfigMap = Record<string, unknown>;
+type RuntimeConfigMap = Record<string, unknown>;
 
 export type SuperAlertRule = {
   id: string;
@@ -84,7 +84,7 @@ export type CustomerRecord = {
   status_logs: CustomerStatusLog[];
 };
 
-export type InternalOpsEvent = {
+type InternalOpsEvent = {
   tenant_id: string | null;
   tenant_name: string;
   action_type: "checkout" | "return";
@@ -184,7 +184,7 @@ export type SupportRequestListItem = {
   assigned_to: string | null;
 };
 
-export type SupportRequestAttachment = {
+type SupportRequestAttachment = {
   id: string;
   original_filename: string | null;
   stored_filename: string;
@@ -193,7 +193,7 @@ export type SupportRequestAttachment = {
   signed_url: string | null;
 };
 
-export type SupportRequestEvent = {
+type SupportRequestEvent = {
   id: string;
   actor_id: string | null;
   actor_email: string | null;
@@ -385,12 +385,6 @@ export const setSalesLeadStage = async (payload: {
     payload,
   });
 
-export const deleteSalesLead = async (payload: { lead_id: string }) =>
-  callSuperOps<{ deleted: boolean }>({
-    action: "delete_sales_lead",
-    payload,
-  });
-
 export const closeSalesLead = async (payload: { lead_id: string }) =>
   callSuperOps<{ lead: SalesLead }>({
     action: "close_sales_lead",
@@ -423,12 +417,6 @@ export const getInternalOpsSnapshot = async () =>
   callSuperOps<InternalOpsSnapshot>({
     action: "get_internal_ops_snapshot",
     payload: {},
-  });
-
-export const verifySuperAdminPassword = (password: string) =>
-  callSuperOps<{ verified: boolean }>({
-    action: "verify_password",
-    payload: { password },
   });
 
 export const touchSuperAdminSession = async (options: {

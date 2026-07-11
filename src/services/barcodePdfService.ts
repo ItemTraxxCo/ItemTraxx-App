@@ -1,4 +1,4 @@
-export type BarRun = { start: number; width: number };
+type BarRun = { start: number; width: number };
 
 export type BarcodePattern = { modules: number; bars: BarRun[] };
 

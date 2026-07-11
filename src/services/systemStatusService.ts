@@ -1,6 +1,6 @@
 import { getEdgeFunctionsBaseUrl } from "./edgeUrls";
 
-export type SystemStatusPayload = {
+type SystemStatusPayload = {
   status?: string;
   broadcast?: {
     enabled?: boolean;
@@ -21,7 +21,7 @@ export type SystemStatusPayload = {
   checked_at?: string;
 };
 
-export type SystemStatusResponse = {
+type SystemStatusResponse = {
   ok: boolean;
   status: number;
   payload: SystemStatusPayload;

@@ -112,7 +112,7 @@ const tenantSessionSchema = z.object({
   is_current: z.boolean(),
 });
 
-export const adminOpsRequestSchema = z.discriminatedUnion("action", [
+const adminOpsRequestSchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("get_notifications"), payload: adminOpsDevicePayloadSchema }),
   z.object({
     action: z.literal("get_status_tracking"),
@@ -156,7 +156,7 @@ export const adminOpsRequestSchema = z.discriminatedUnion("action", [
   }),
 ]);
 
-export const adminOpsResponseSchemas = {
+const adminOpsResponseSchemas = {
   get_notifications: edgeEnvelopeSchema(tenantNotificationSchema),
   get_status_tracking: edgeEnvelopeSchema(
     z.object({
@@ -283,7 +283,7 @@ const superDistrictDetailSchema = z.object({
   }),
 });
 
-export const superTenantRequestSchema = z.discriminatedUnion("action", [
+const superTenantRequestSchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("list_tenants"), payload: z.object({ search: z.string(), status: z.string() }) }),
   z.object({
     action: z.literal("create_tenant"),
@@ -356,7 +356,7 @@ export const superTenantRequestSchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("get_district_details"), payload: z.object({ id: z.string().uuid() }) }),
 ]);
 
-export const superTenantResponseSchemas = {
+const superTenantResponseSchemas = {
   list_tenants: edgeEnvelopeSchema(z.array(superTenantSchema)),
   create_tenant: edgeEnvelopeSchema(superTenantSchema),
   update_tenant: edgeEnvelopeSchema(superTenantSchema),
@@ -379,7 +379,7 @@ const tenantManagedAdminSchema = z.object({
   is_primary_admin: z.boolean(),
 });
 
-export const tenantAdminManageRequestSchema = z.discriminatedUnion("action", [
+const tenantAdminManageRequestSchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("list_tenant_admins"), payload: z.object({}) }),
   z.object({ action: z.literal("create_tenant_admin"), payload: z.object({ auth_email: z.string().email() }) }),
   z.object({ action: z.literal("set_admin_status"), payload: z.object({ id: z.string().uuid(), is_active: z.boolean() }) }),
@@ -387,7 +387,7 @@ export const tenantAdminManageRequestSchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("send_tenant_admin_reset"), payload: z.object({ auth_email: z.string().email() }) }),
 ]);
 
-export const tenantAdminManageResponseSchemas = {
+const tenantAdminManageResponseSchemas = {
   list_tenant_admins: edgeEnvelopeSchema(
     z.object({
       admins: z.array(tenantManagedAdminSchema),
@@ -521,7 +521,7 @@ const internalOpsSnapshotSchema = z.object({
   })).optional(),
 });
 
-export const superOpsRequestSchema = z.discriminatedUnion("action", [
+const superOpsRequestSchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("get_control_center"), payload: z.object({}).optional() }),
   z.object({ action: z.literal("set_runtime_config"), payload: z.object({ key: z.string().min(1), value: z.unknown() }) }),
   z.object({ action: z.literal("upsert_alert_rule"), payload: z.object({ id: z.string().optional(), name: z.string().min(1), metric_key: z.string().min(1), threshold: z.number(), is_enabled: z.boolean().optional() }) }),
@@ -539,7 +539,7 @@ export const superOpsRequestSchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("get_internal_ops_snapshot"), payload: z.object({}).optional() }),
 ]);
 
-export const superOpsResponseSchemas = {
+const superOpsResponseSchemas = {
   get_control_center: edgeEnvelopeSchema(z.object({
     runtime_config: z.record(z.string(), z.unknown()),
     alert_rules: z.array(superOpsAlertRuleSchema),
@@ -574,7 +574,7 @@ const superTenantAdminSchema = z.object({
   district_name: z.string().nullable().optional(),
 });
 
-export const superAdminRequestSchema = z.discriminatedUnion("action", [
+const superAdminRequestSchema = z.discriminatedUnion("action", [
   z.object({
     action: z.literal("list_tenant_admins"),
     payload: z.object({
@@ -619,7 +619,7 @@ export const superAdminRequestSchema = z.discriminatedUnion("action", [
   }),
 ]);
 
-export const superAdminResponseSchemas = {
+const superAdminResponseSchemas = {
   list_tenant_admins: edgeEnvelopeSchema(z.array(superTenantAdminSchema)),
   create_tenant_admin: edgeEnvelopeSchema(superTenantAdminSchema),
   set_admin_status: edgeEnvelopeSchema(superTenantAdminSchema),
@@ -652,7 +652,7 @@ const districtDashboardTenantSchema = z.object({
   primary_admin_email: z.string().nullable().optional(),
 });
 
-export const districtDashboardResponseSchema = z.object({
+const districtDashboardResponseSchema = z.object({
   data: z.object({
     district: districtDashboardDistrictSchema,
     support_requests: z.array(z.object({
@@ -670,13 +670,13 @@ export const districtDashboardResponseSchema = z.object({
   })
 });
 
-export const districtHandoffRequestSchema = z.discriminatedUnion("action", [
+const districtHandoffRequestSchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("create"), auth_email: z.string().email(), password: z.string().min(1), district_slug: z.string().min(1) }),
   z.object({ action: z.literal("create_admin"), email: z.string().email(), password: z.string().min(1) }),
   z.object({ action: z.literal("consume"), code: z.string().min(1) }),
 ]);
 
-export const districtHandoffResponseSchemas = {
+const districtHandoffResponseSchemas = {
   create: z.object({ code: z.string(), expires_at: z.string() }),
   create_admin: z.object({ code: z.string().nullable(), district_slug: z.string().nullable(), role: z.enum(["tenant_admin","district_admin"]), expires_at: z.string().optional(), root_only: z.boolean().optional() }),
   consume: z.object({ access_token: z.string(), refresh_token: z.string(), district_slug: z.string() }),
@@ -685,7 +685,7 @@ export const districtHandoffResponseSchemas = {
 const contactSalesPlanSchema = z.enum(["district_core","district_growth","district_enterprise","organization_starter","organization_scale","organization_enterprise","individual_yearly","individual_monthly","other"]);
 const contactSalesIntentSchema = z.enum(["sales","demo"]);
 
-export const contactSalesSubmitRequestSchema = z.object({
+const contactSalesSubmitRequestSchema = z.object({
   plan: contactSalesPlanSchema,
   schools_count: z.number().int().positive().nullable().optional(),
   name: z.string().min(1),
@@ -697,7 +697,7 @@ export const contactSalesSubmitRequestSchema = z.object({
   intent: contactSalesIntentSchema.optional(),
 });
 
-export const contactSalesSubmitResponseSchema = z.object({
+const contactSalesSubmitResponseSchema = z.object({
   ok: z.boolean(),
   data: z.object({ lead_id: z.string() }).optional(),
   error: z.string().optional(),
@@ -710,7 +710,7 @@ const supportAttachmentSchema = z.object({
   size_bytes: z.number().int().nonnegative().optional(),
 });
 
-export const contactSupportSubmitRequestSchema = z.object({
+const contactSupportSubmitRequestSchema = z.object({
   name: z.string().min(1),
   reply_email: z.string().email(),
   subject: z.string().min(1),
@@ -721,7 +721,7 @@ export const contactSupportSubmitRequestSchema = z.object({
   attachments: z.array(supportAttachmentSchema).max(2).optional(),
 });
 
-export const contactSupportSubmitResponseSchema = z.object({
+const contactSupportSubmitResponseSchema = z.object({
   ok: z.boolean(),
   data: z.object({ accepted: z.boolean() }).optional(),
   error: z.string().optional(),

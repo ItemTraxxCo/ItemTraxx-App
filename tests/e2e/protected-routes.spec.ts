@@ -61,4 +61,37 @@ test.describe("Protected route smoke tests", () => {
     await expect(page.getByRole("heading", { name: "Super Admin" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Control Center" })).toBeVisible();
   });
+
+  test("tenant admin verification expires after 15 minutes", async ({ page }) => {
+    await page.goto("/");
+    await setTenantAdminSession(page);
+    await page.evaluate(async () => {
+      const { setAuthStateFromBackend } = await import("/src/store/authState.ts");
+      setAuthStateFromBackend({
+        role: "tenant_admin",
+        adminVerifiedAt: new Date(Date.now() - 15 * 60_000 - 1).toISOString(),
+      });
+    });
+
+    await navigateApp(page, "/tenant/admin");
+
+    await expect(page).toHaveURL(/\/tenant\/admin-login$/);
+  });
+
+  test("super-admin secondary verification expires after 15 minutes", async ({ page }) => {
+    await page.goto("/");
+    await setSuperAdminSession(page);
+    await page.evaluate(async () => {
+      const { setAuthStateFromBackend } = await import("/src/store/authState.ts");
+      setAuthStateFromBackend({
+        role: "super_admin",
+        hasSecondaryAuth: true,
+        superVerifiedAt: new Date(Date.now() - 15 * 60_000 - 1).toISOString(),
+      });
+    });
+
+    await navigateApp(page, "/super-admin");
+
+    await expect(page).toHaveURL(/\/super-auth$/);
+  });
 });

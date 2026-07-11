@@ -47,6 +47,10 @@ const refresh = async (force = false): Promise<void> => {
       state.responseStatus = result.status;
       state.responseOk = result.ok;
       state.hasResult = true;
+    } else {
+      state.responseStatus = 0;
+      state.responseOk = false;
+      state.hasResult = false;
     }
     state.refreshedAt = Date.now();
   } finally {

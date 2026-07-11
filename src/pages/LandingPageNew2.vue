@@ -325,7 +325,14 @@ const faqItems = [
 ];
 
 const openFaqIndex = ref<number | null>(null);
-const { statusLabel, statusClass } = useSystemStatus();
+const {
+  state: systemStatus,
+  statusLabel: sharedStatusLabel,
+  statusClass,
+} = useSystemStatus();
+const statusLabel = computed(() =>
+  systemStatus.refreshedAt === 0 ? "Checking" : sharedStatusLabel.value,
+);
 
 let observer: IntersectionObserver | null = null;
 let themeObserver: MutationObserver | null = null;

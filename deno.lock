@@ -4,7 +4,6 @@
     "npm:@cloudflare/vite-plugin@1.43.1": "1.43.1_vite@8.1.4__@types+node@26.1.1_wrangler@4.107.1_@types+node@26.1.1",
     "npm:@cyclonedx/cyclonedx-npm@6.0.0": "6.0.0",
     "npm:@playwright/test@^1.61.1": "1.61.1",
-    "npm:@posthog/react@^1.10.3": "1.10.3_posthog-js@1.399.1_react@19.2.7",
     "npm:@sentry/vue@^10.64.0": "10.64.0_vue@3.5.39__typescript@6.0.3_typescript@6.0.3",
     "npm:@supabase/supabase-js@^2.110.2": "2.110.2",
     "npm:@types/node@^26.1.1": "26.1.1",
@@ -16,7 +15,6 @@
     "npm:jspdf-autotable@^5.0.8": "5.0.8_jspdf@4.2.1",
     "npm:jspdf@^4.2.1": "4.2.1",
     "npm:posthog-js@^1.399.0": "1.399.1",
-    "npm:rollup@^4.62.2": "4.62.2",
     "npm:supabase@2.109.1": "2.109.1",
     "npm:typescript@~6.0.3": "6.0.3",
     "npm:vite@^8.1.4": "8.1.4_@types+node@26.1.1",
@@ -24,7 +22,6 @@
     "npm:vue-tsc@^3.3.7": "3.3.7_typescript@6.0.3",
     "npm:vue@^3.5.39": "3.5.39_typescript@6.0.3",
     "npm:wrangler@4.107.1": "4.107.1",
-    "npm:zod-to-json-schema@^3.25.2": "3.25.2_zod@4.4.3",
     "npm:zod@^4.4.3": "4.4.3"
   },
   "npm": {
@@ -580,13 +577,6 @@
       "integrity": "sha512-jXuMtZCwA7AMpYlo1wjm6GlC58YBlz/ZxpDIsF9hroUfqYoPPDmQbsQb4iiZAS43+o/kwloxdKJIlE0IiwQ5HQ==",
       "dependencies": [
         "@posthog/types"
-      ]
-    },
-    "@posthog/react@1.10.3_posthog-js@1.399.1_react@19.2.7": {
-      "integrity": "sha512-Qu//fGQmVlX0B9kTA3LLg67e7AYLEmeuA0Bf1qSyUM0uUILcRQGjQezhNQPLYSTakOqvXEnl6fM2iQBF6Toxrw==",
-      "dependencies": [
-        "posthog-js",
-        "react"
       ]
     },
     "@posthog/types@1.393.0": {
@@ -2528,12 +2518,6 @@
         "youch-core"
       ]
     },
-    "zod-to-json-schema@3.25.2_zod@4.4.3": {
-      "integrity": "sha512-O/PgfnpT1xKSDeQYSCfRI5Gy3hPf91mKVDuYLUHZJMiDFptvP41MSnWofm8dnCm0256ZNfZIM7DSzuSMAFnjHA==",
-      "dependencies": [
-        "zod"
-      ]
-    },
     "zod@4.4.3": {
       "integrity": "sha512-ytENFjIJFl2UwYglde2jchW2Hwm4GJFLDiSXWdTrJQBIN9Fcyp7n4DhxJEiWNAJMV1/BqWfW/kkg71UDcHJyTQ=="
     }
@@ -2618,7 +2602,6 @@
         "npm:@cloudflare/vite-plugin@1.43.1",
         "npm:@cyclonedx/cyclonedx-npm@6.0.0",
         "npm:@playwright/test@^1.61.1",
-        "npm:@posthog/react@^1.10.3",
         "npm:@sentry/vue@^10.64.0",
         "npm:@supabase/supabase-js@^2.110.2",
         "npm:@types/node@^26.1.1",
@@ -2630,7 +2613,6 @@
         "npm:jspdf-autotable@^5.0.8",
         "npm:jspdf@^4.2.1",
         "npm:posthog-js@^1.399.0",
-        "npm:rollup@^4.62.2",
         "npm:supabase@2.109.1",
         "npm:typescript@~6.0.3",
         "npm:vite@^8.1.4",
@@ -2638,7 +2620,6 @@
         "npm:vue-tsc@^3.3.7",
         "npm:vue@^3.5.39",
         "npm:wrangler@4.107.1",
-        "npm:zod-to-json-schema@^3.25.2",
         "npm:zod@^4.4.3"
       ],
       "overrides": {

@@ -560,26 +560,6 @@ textarea {
   margin: 0;
 }
 
-.dot-button {
-  width: 34px;
-  height: 30px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 10px;
-  border: 1px solid var(--border);
-  background: var(--surface);
-  color: inherit;
-  font-weight: 600;
-  line-height: 1;
-  cursor: pointer;
-}
-
-.dot-button:hover:not(:disabled) {
-  border-color: color-mix(in srgb, currentColor 34%, var(--border) 66%);
-  background: var(--surface-2);
-}
-
 .serial-number.dim {
   color: var(--muted);
 }
@@ -679,11 +659,6 @@ textarea {
   color: var(--muted);
   text-transform: uppercase;
   letter-spacing: 0.05em;
-}
-
-.admin-section-grid {
-  display: grid;
-  gap: 1.25rem;
 }
 
 .admin-section-card {
@@ -1671,7 +1646,6 @@ textarea {
 
 .landing-page button:hover,
 .landing-page .button-link:hover,
-.landing-page .dot-button:hover,
 .landing-page .toast-action-button:hover,
 .landing-page .chip-button:hover {
   background-color: revert;
@@ -1685,8 +1659,4 @@ textarea {
 
 .gear-notes-input {
   width: 100%;
-}
-
-.edit-actions-cell {
-  padding-left: 1rem;
 }

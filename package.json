@@ -35,7 +35,6 @@
     "deploy": "npm run build && wrangler deploy"
   },
   "dependencies": {
-    "@posthog/react": "^1.10.3",
     "@sentry/vue": "^10.64.0",
     "@supabase/supabase-js": "^2.110.2",
     "@vercel/analytics": "^2.0.1",
@@ -55,13 +54,11 @@
     "@types/node": "^26.1.1",
     "@vitejs/plugin-vue": "^6.0.7",
     "@vue/tsconfig": "^0.9.1",
-    "rollup": "^4.62.2",
     "supabase": "2.109.1",
     "typescript": "~6.0.3",
     "vite": "^8.1.4",
     "vue-tsc": "^3.3.7",
-    "wrangler": "4.107.1",
-    "zod-to-json-schema": "^3.25.2"
+    "wrangler": "4.107.1"
   },
   "overrides": {
     "esbuild": "0.28.1",

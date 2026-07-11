@@ -56,34 +56,6 @@ const loadSentryReplay = async () => {
   }
 };
 
-const isLocalDevelopmentUrl = (url?: string | null) =>
-  !!url && (url.startsWith("http://127.0.0.1") || url.startsWith("http://localhost"));
-
-const isExpectedUnauthorizedAuthEvent = (event: {
-  exception?: { values?: Array<{ value?: string; stacktrace?: { frames?: Array<{ module?: string }> } }> };
-  request?: { url?: string };
-  environment?: string;
-}) => {
-  const topException = event.exception?.values?.[0];
-  const message = topException?.value?.trim().toLowerCase();
-  if (message !== "unauthorized" && message !== "unauthorized.") {
-    return false;
-  }
-
-  const frames = topException?.stacktrace?.frames ?? [];
-  const sessionAuthFrame = frames.some((frame) =>
-    frame.module?.includes("src/services/sessionAccessToken")
-  );
-
-  if (!sessionAuthFrame) {
-    return false;
-  }
-
-  return event.environment === "development" || isLocalDevelopmentUrl(event.request?.url);
-};
-
-
-
 type HandledRequestFailure = {
   area: "edge_function" | "authenticated_data" | "http_session";
   name: string;
@@ -207,9 +179,6 @@ export const initializeSentry = async (app: App, router: Router, appMounted = fa
         return null;
       }
       if (!shouldReportError(hint.originalException)) {
-        return null;
-      }
-      if (isExpectedUnauthorizedAuthEvent(event)) {
         return null;
       }
       return event;

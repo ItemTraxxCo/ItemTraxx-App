@@ -2,6 +2,7 @@ import { expect, test } from "@playwright/test";
 import {
   mockSuspendedTenantAdminOps,
   mockSystemStatus,
+  mockUnauthenticatedSession,
   navigateApp,
   setTenantAdminSession,
 } from "./helpers/testHarness";
@@ -9,6 +10,7 @@ import {
 test.describe("Suspended tenant behavior", () => {
   test.beforeEach(async ({ page }) => {
     await mockSystemStatus(page);
+    await mockUnauthenticatedSession(page);
     await mockSuspendedTenantAdminOps(page);
   });
 

@@ -3,14 +3,9 @@ import "./style.css";
 import App from "./App.vue";
 import router from "./router";
 import {
-  clearAdminVerification,
   clearAuthState,
   getAuthState,
   markAdminVerified,
-  setDistrictContext,
-  setAuthStateFromBackend,
-  setSecondaryAuth,
-  setTenantContext,
 } from "./store/authState";
 import { getDistrictState } from "./store/districtState";
 import {
@@ -28,156 +23,10 @@ import { initializeDistrictContext } from "./services/districtService";
 import { rotateDeviceSession } from "./utils/deviceSession";
 import { routeRecoveryLinksToResetPassword } from "./utils/passwordResetRedirect";
 import { finishRouteLoading, startRouteLoading } from "./store/routeLoading";
-
-declare global {
-  interface Window {
-    __itemtraxxTest?: {
-      setTenantUserSession: (tenantId?: string) => void;
-      setTenantAdminSession: (tenantId?: string, options?: { verified?: boolean }) => void;
-      setDistrictAdminSession: (districtId?: string, options?: { verified?: boolean }) => void;
-      setSuperAdminSession: (options?: { verified?: boolean }) => void;
-      invokeAdminGearCreate: (payload: {
-        tenant_id: string;
-        name: string;
-        barcode: string;
-        status: string;
-        notes?: string;
-      }) => Promise<unknown>;
-      invokeAdminStudentCreate: (payload: {
-        tenant_id: string;
-        username?: string;
-        student_id?: string;
-      }) => Promise<unknown>;
-      clearSession: () => void;
-      navigate: (path: string) => Promise<void>;
-      generateBarcodePattern: (
-        value: string
-      ) => Promise<{ modules: number; bars: { start: number; width: number }[] }>;
-    };
-  }
-}
-
-const attachE2EControls = () => {
-  if (import.meta.env.VITE_E2E_TEST_UTILS !== "true") {
-    return;
-  }
-
-  if (import.meta.env.PROD) {
-    throw new Error("VITE_E2E_TEST_UTILS cannot be enabled in production.");
-  }
-
-  window.__itemtraxxTest = {
-    setTenantUserSession(tenantId = "tenant-e2e") {
-      setAuthStateFromBackend({
-        isInitialized: true,
-        isAuthenticated: true,
-        userId: "user-e2e-tenant",
-        email: "tenant.user@example.com",
-        signedInAt: new Date().toISOString(),
-        role: "tenant_user",
-        sessionTenantId: tenantId,
-        tenantContextId: tenantId,
-        districtContextId: null,
-        hasSecondaryAuth: false,
-        superVerifiedAt: null,
-      });
-      setTenantContext(tenantId);
-    },
-    setTenantAdminSession(tenantId = "tenant-e2e", options = { verified: true }) {
-      setAuthStateFromBackend({
-        isInitialized: true,
-        isAuthenticated: true,
-        userId: "user-e2e-admin",
-        email: "tenant.admin@example.com",
-        signedInAt: new Date().toISOString(),
-        role: "tenant_admin",
-        sessionTenantId: tenantId,
-        tenantContextId: tenantId,
-        districtContextId: null,
-        hasSecondaryAuth: false,
-        superVerifiedAt: null,
-      });
-      setTenantContext(tenantId);
-      setDistrictContext(null);
-      if (options.verified === false) {
-        clearAdminVerification();
-        return;
-      }
-      markAdminVerified();
-    },
-    setDistrictAdminSession(districtId = "district-e2e", options = { verified: true }) {
-      setAuthStateFromBackend({
-        isInitialized: true,
-        isAuthenticated: true,
-        userId: "user-e2e-district-admin",
-        email: "district.admin@example.com",
-        signedInAt: new Date().toISOString(),
-        role: "district_admin",
-        sessionTenantId: null,
-        tenantContextId: null,
-        districtContextId: districtId,
-        hasSecondaryAuth: false,
-        superVerifiedAt: null,
-      });
-      setTenantContext(null);
-      setDistrictContext(districtId);
-      if (options.verified === false) {
-        clearAdminVerification();
-        return;
-      }
-      markAdminVerified();
-    },
-    setSuperAdminSession(options = { verified: true }) {
-      setAuthStateFromBackend({
-        isInitialized: true,
-        isAuthenticated: true,
-        userId: "user-e2e-super",
-        email: "super.admin@example.com",
-        signedInAt: new Date().toISOString(),
-        role: "super_admin",
-        sessionTenantId: null,
-        tenantContextId: null,
-        districtContextId: null,
-        hasSecondaryAuth: options.verified !== false,
-      });
-      setTenantContext(null);
-      setDistrictContext(null);
-      setSecondaryAuth(options.verified !== false);
-    },
-    async invokeAdminGearCreate(payload) {
-      const { createGear } = await import("./services/gearService");
-      return await createGear(payload);
-    },
-    async invokeAdminStudentCreate(payload) {
-      const { createStudent } = await import("./services/studentService");
-      return await createStudent(payload);
-    },
-    clearSession() {
-      clearAuthState(true);
-      setTenantContext(null);
-      setDistrictContext(null);
-    },
-    async navigate(path: string) {
-      await router.push(path);
-    },
-    async generateBarcodePattern(value: string) {
-      const [{ createBarcodePattern }, { default: JsBarcode }] = await Promise.all([
-        import("./services/barcodePdfService"),
-        import("jsbarcode"),
-      ]);
-      return createBarcodePattern(
-        value,
-        JsBarcode as (
-          element: HTMLCanvasElement,
-          text: string,
-          options?: unknown
-        ) => void
-      );
-    },
-  };
-};
-
-const PUBLIC_BOOTSTRAP_PATHS = new Set(["/", "/login", "/legal", "/reset-password"]);
+import {
+  isAdminBootstrapRoute,
+  isPublicBootstrapRoute,
+} from "./bootstrap/routeBootstrap";
 
 const redirectCanonicalHost = () => {
   if (typeof window === "undefined") return false;
@@ -189,19 +38,6 @@ const redirectCanonicalHost = () => {
   target.hostname = "itemtraxx.com";
   window.location.replace(target.toString());
   return true;
-};
-
-const isPublicBootstrapPath = () => {
-  const path = window.location.pathname || "/";
-  if (PUBLIC_BOOTSTRAP_PATHS.has(path)) {
-    return true;
-  }
-  return false;
-};
-
-const isAdminBootstrapPath = () => {
-  const path = window.location.pathname || "/";
-  return path.startsWith("/tenant/admin") || path === "/district";
 };
 
 const toAdminSessionLoginLocation = (value: string | null | undefined) => {
@@ -409,7 +245,10 @@ const mountApp = async () => {
   void initializePostHog();
   bindConsentDrivenMonitoring(app);
   captureInitialPerfMetrics();
-  attachE2EControls();
+  if (import.meta.env.VITE_E2E_TEST_UTILS === "true") {
+    const { attachE2EControls } = await import("./e2e/testControls");
+    attachE2EControls(router);
+  }
 };
 
 const bootstrap = async () => {
@@ -426,9 +265,11 @@ const bootstrap = async () => {
   await initializeDistrictContext();
   const districtContext = getDistrictState();
   const isE2ETestMode = import.meta.env.VITE_E2E_TEST_UTILS === "true";
-  const shouldPreloadAdminSession = consumedDistrictHandoff && isAdminBootstrapPath();
+  const shouldPreloadAdminSession =
+    consumedDistrictHandoff &&
+    isAdminBootstrapRoute(router, window.location.pathname);
   const canMountPublicBootstrap =
-    isPublicBootstrapPath() && !districtContext.isDistrictHost;
+    isPublicBootstrapRoute(router, window.location.pathname) && !districtContext.isDistrictHost;
   const canMountFirst =
     !consumedDistrictHandoff &&
     !shouldPreloadAdminSession &&
@@ -442,7 +283,10 @@ const bootstrap = async () => {
     void (canMountPublicBootstrap ? initializePublicAuth() : initializeAuth());
     return;
   }
-  if (consumedDistrictHandoff && isAdminBootstrapPath()) {
+  if (
+    consumedDistrictHandoff &&
+    isAdminBootstrapRoute(router, window.location.pathname)
+  ) {
     try {
       const { adminLoginWithSession } = await import("./services/authService");
       const session = await adminLoginWithSession(
@@ -473,7 +317,10 @@ const bootstrap = async () => {
   } else {
     await initializeAuth();
   }
-  if (consumedDistrictHandoff && !isAdminBootstrapPath()) {
+  if (
+    consumedDistrictHandoff &&
+    !isAdminBootstrapRoute(router, window.location.pathname)
+  ) {
     if (getAuthState().role === "tenant_admin" || getAuthState().role === "district_admin") {
       markAdminVerified();
     }

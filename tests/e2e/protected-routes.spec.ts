@@ -29,6 +29,19 @@ test.describe("Protected route smoke tests", () => {
     await expect(page.getByRole("heading", { name: "Item Status Tracking" })).toBeVisible();
   });
 
+  for (const path of ["/tenant/checkout", "/district"]) {
+    test(`E2E first mount of protected ${path} does not use public auth bootstrap`, async ({ page }) => {
+      await page.goto(path);
+
+      await expect(page).toHaveURL(new RegExp(`${path.replaceAll("/", "\\/")}$`));
+      await expect
+        .poll(() =>
+          page.evaluate(() => document.documentElement.dataset.itemtraxxPublicAuth ?? null)
+        )
+        .not.toBe("settled");
+    });
+  }
+
   test("super admin can reach dashboard", async ({ page }) => {
     await page.goto("/");
     await setSuperAdminSession(page);

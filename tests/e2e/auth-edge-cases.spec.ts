@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { readFile } from "node:fs/promises";
 import {
   mockSystemStatus,
   mockUnauthenticatedSession,
@@ -60,6 +61,27 @@ test.describe("Auth edge cases", () => {
     await waitForPublicAuthBootstrap(page);
     await expect.poll(() => sessionSummaryRequests).toBe(1);
     expect(requestedUrls.some((url) => /\.supabase\.(?:co|in)\//.test(url))).toBe(false);
+  });
+
+  for (const path of [
+    "/forgot-password",
+    "/legal/student-privacy",
+    "/landing-old",
+    "/landing-new2",
+  ]) {
+    test(`${path} uses public auth bootstrap on first mount`, async ({ page }) => {
+      await page.goto(path);
+
+      await expect(page).toHaveURL(new RegExp(`${path.replaceAll("/", "\\/")}$`));
+      await waitForPublicAuthBootstrap(page);
+    });
+  }
+
+  test("normal production entry graph does not statically own E2E controls", async () => {
+    const mainSource = await readFile(new URL("../../src/main.ts", import.meta.url), "utf8");
+
+    expect(mainSource).toContain('await import("./e2e/testControls")');
+    expect(mainSource).not.toMatch(/from ["']\.\/e2e\/testControls["']/);
   });
 
   test("public session bootstrap preserves the authenticated role redirect", async ({ page }) => {

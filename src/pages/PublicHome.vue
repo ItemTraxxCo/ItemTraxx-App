@@ -298,12 +298,9 @@ import checkoutReturnUiImage from "../assets/landing/checkout_return_ui.png";
 import checkoutReturnUiImage800 from "../assets/landing/checkout_return_ui-800.webp";
 import checkoutReturnUiImage1200 from "../assets/landing/checkout_return_ui-1200.webp";
 import checkoutReturnUiImage1600 from "../assets/landing/checkout_return_ui-1600.webp";
-import { fetchSystemStatus } from "../services/systemStatusService";
+import { useSystemStatus } from "../composables/useSystemStatus";
 
-const statusLabel = ref("Unknown");
-const statusClass = ref<"status-ok" | "status-warn" | "status-down" | "status-unknown">(
-  "status-unknown",
-);
+const { statusLabel, statusClass } = useSystemStatus();
 
 const faqItems = [
   {
@@ -353,64 +350,10 @@ const trackCta = (
 };
 
 let observer: IntersectionObserver | null = null;
-let statusTimer: number | null = null;
-
-const refreshSystemStatus = async () => {
-  const response = await fetchSystemStatus();
-  if (!response) {
-    statusLabel.value = "Unknown";
-    statusClass.value = "status-unknown";
-    return;
-  }
-
-  if (response.ok && response.payload.status === "operational") {
-    statusLabel.value = "Running";
-    statusClass.value = "status-ok";
-    return;
-  }
-
-  if (response.status >= 500 || response.payload.status === "down") {
-    statusLabel.value = "Down";
-    statusClass.value = "status-down";
-    return;
-  }
-
-  statusLabel.value = "Degraded";
-  statusClass.value = "status-warn";
-};
-
-const startStatusPolling = () => {
-  if (statusTimer || document.visibilityState === "hidden") {
-    return;
-  }
-  statusTimer = window.setInterval(() => {
-    void refreshSystemStatus();
-  }, 300_000);
-};
-
-const stopStatusPolling = () => {
-  if (!statusTimer) {
-    return;
-  }
-  window.clearInterval(statusTimer);
-  statusTimer = null;
-};
-
-const handleVisibilityChange = () => {
-  if (document.visibilityState === "hidden") {
-    stopStatusPolling();
-    return;
-  }
-  void refreshSystemStatus();
-  startStatusPolling();
-};
 
 onMounted(() => {
   const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   const revealElements = document.querySelectorAll<HTMLElement>(".reveal");
-  void refreshSystemStatus();
-  startStatusPolling();
-  document.addEventListener("visibilitychange", handleVisibilityChange);
 
   if (prefersReducedMotion) {
     revealElements.forEach((el) => el.classList.add("is-visible"));
@@ -435,10 +378,6 @@ onMounted(() => {
 onBeforeUnmount(() => {
   observer?.disconnect();
   observer = null;
-  if (statusTimer) {
-    stopStatusPolling();
-  }
-  document.removeEventListener("visibilitychange", handleVisibilityChange);
 });
 </script>
 

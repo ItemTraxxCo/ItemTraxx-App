@@ -49,6 +49,85 @@ test.describe("Public surfaces", () => {
     expect(responseUrls.some((url) => /\.supabase\.(?:co|in)\//.test(url))).toBe(false);
   });
 
+  test("shares one system status lifecycle across retained landing routes", async ({ page }) => {
+    let statusRequestCount = 0;
+    page.on("request", (request) => {
+      if (request.url().includes("/functions/system-status")) {
+        statusRequestCount += 1;
+      }
+    });
+    await page.clock.install();
+    await page.addInitScript(() => {
+      const activeStatusIntervals = new Set<number>();
+      const nativeSetInterval = window.setInterval.bind(window);
+      const nativeClearInterval = window.clearInterval.bind(window);
+      window.setInterval = ((handler: TimerHandler, timeout?: number, ...args: unknown[]) => {
+        const intervalId = nativeSetInterval(handler, timeout, ...args);
+        if (timeout === 300_000) {
+          activeStatusIntervals.add(intervalId);
+        }
+        return intervalId;
+      }) as typeof window.setInterval;
+      window.clearInterval = ((intervalId?: number) => {
+        if (typeof intervalId === "number") {
+          activeStatusIntervals.delete(intervalId);
+        }
+        nativeClearInterval(intervalId);
+      }) as typeof window.clearInterval;
+      Object.defineProperty(window, "__activeSystemStatusIntervals", {
+        configurable: true,
+        get: () => activeStatusIntervals.size,
+      });
+    });
+    const activeStatusIntervalCount = () =>
+      page.evaluate(
+        () =>
+          (window as Window & { __activeSystemStatusIntervals?: number })
+            .__activeSystemStatusIntervals ?? 0,
+      );
+    const setVisibility = (visibilityState: "hidden" | "visible") =>
+      page.evaluate((nextVisibilityState) => {
+        Object.defineProperty(document, "visibilityState", {
+          configurable: true,
+          value: nextVisibilityState,
+        });
+        document.dispatchEvent(new Event("visibilitychange"));
+      }, visibilityState);
+    const navigateWithinApp = async (path: string) => {
+      await page.evaluate((nextPath) => {
+        window.history.pushState({}, "", nextPath);
+        window.dispatchEvent(new PopStateEvent("popstate"));
+      }, path);
+      await page.waitForURL(`**${path}`);
+    };
+
+    await page.goto("/");
+    await expect(page.getByRole("link", { name: "Open system status page" })).toContainText(
+      "Running",
+    );
+    expect(statusRequestCount).toBe(1);
+    await expect.poll(activeStatusIntervalCount).toBe(1);
+
+    await page.clock.fastForward(10_001);
+    await setVisibility("hidden");
+    expect(statusRequestCount).toBe(1);
+    await expect.poll(activeStatusIntervalCount).toBe(0);
+    await setVisibility("visible");
+    await expect.poll(() => statusRequestCount).toBe(2);
+    await expect.poll(activeStatusIntervalCount).toBe(1);
+
+    await page.clock.fastForward(100_000);
+    await navigateWithinApp("/landing-old");
+    await expect.poll(activeStatusIntervalCount).toBe(1);
+    await page.clock.fastForward(300_000);
+    await expect.poll(() => statusRequestCount).toBe(3);
+
+    await navigateWithinApp("/landing-new2");
+    await expect.poll(activeStatusIntervalCount).toBe(1);
+    await page.clock.fastForward(300_000);
+    await expect.poll(() => statusRequestCount).toBe(4);
+  });
+
   for (const path of ["/landing-old", "/login"]) {
     test(`${path} does not prefetch authenticated routes after the delayed idle window`, async ({ page }) => {
       const responseUrls: string[] = [];

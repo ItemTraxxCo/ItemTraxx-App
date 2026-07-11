@@ -218,7 +218,7 @@ import checkoutReturnUiImage from '../assets/landing/checkout_return_ui.png';
 import checkoutReturnUiImage800 from '../assets/landing/checkout_return_ui-800.webp';
 import checkoutReturnUiImage1200 from '../assets/landing/checkout_return_ui-1200.webp';
 import checkoutReturnUiImage1600 from '../assets/landing/checkout_return_ui-1600.webp';
-import { fetchSystemStatus } from '../services/systemStatusService';
+import { useSystemStatus } from '../composables/useSystemStatus';
 import PublicFooter from "../components/PublicFooter.vue";
 
 const themeMode = ref<"light" | "dark">("dark");
@@ -279,8 +279,7 @@ const showcaseVariants: ShowcaseVariant[] = [
 
 const rotatingShowcase = showcaseVariants[Math.floor(Math.random() * showcaseVariants.length)];
 
-const statusLabel = ref('Unknown');
-const statusClass = ref<'status-ok' | 'status-warn' | 'status-down' | 'status-unknown'>('status-unknown');
+const { statusLabel, statusClass } = useSystemStatus();
 
 const faqItems = [
   {
@@ -331,55 +330,8 @@ const trackCta = (
   capturePostHogEvent("landing_cta_clicked", { cta, location });
 };
 
-const refreshSystemStatus = async () => {
-  const response = await fetchSystemStatus();
-  if (!response) {
-    statusLabel.value = 'Unknown';
-    statusClass.value = 'status-unknown';
-    return;
-  }
-
-  if (response.ok && response.payload.status === 'operational') {
-    statusLabel.value = 'Running';
-    statusClass.value = 'status-ok';
-    return;
-  }
-
-  if (response.status >= 500 || response.payload.status === 'down') {
-    statusLabel.value = 'Down';
-    statusClass.value = 'status-down';
-    return;
-  }
-
-  statusLabel.value = 'Degraded';
-  statusClass.value = 'status-warn';
-};
-
 let observer: IntersectionObserver | null = null;
-let statusTimer: number | null = null;
 let themeObserver: MutationObserver | null = null;
-
-const startStatusPolling = () => {
-  if (statusTimer || document.visibilityState === 'hidden') return;
-  statusTimer = window.setInterval(() => {
-    void refreshSystemStatus();
-  }, 300_000);
-};
-
-const stopStatusPolling = () => {
-  if (!statusTimer) return;
-  window.clearInterval(statusTimer);
-  statusTimer = null;
-};
-
-const handleVisibilityChange = () => {
-  if (document.visibilityState === 'hidden') {
-    stopStatusPolling();
-    return;
-  }
-  void refreshSystemStatus();
-  startStatusPolling();
-};
 
 onMounted(() => {
   const syncTheme = () => {
@@ -392,9 +344,6 @@ onMounted(() => {
     attributeFilter: ['data-theme'],
   });
   window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
-  void refreshSystemStatus();
-  startStatusPolling();
-  document.addEventListener('visibilitychange', handleVisibilityChange);
 
   const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   const revealElements = document.querySelectorAll<HTMLElement>('.reveal');
@@ -422,8 +371,6 @@ onMounted(() => {
 onBeforeUnmount(() => {
   observer?.disconnect();
   observer = null;
-  stopStatusPolling();
-  document.removeEventListener('visibilitychange', handleVisibilityChange);
 });
 
 onUnmounted(() => {

@@ -296,8 +296,8 @@ import {
   resetOnboarding,
   type TenantOnboardingRole,
 } from "./services/onboardingService";
+import { useSystemStatus } from "./composables/useSystemStatus";
 import { buildDistrictAppUrl, lookupDistrictById, resolveDistrictHost } from "./services/districtService";
-import { fetchSystemStatus } from "./services/systemStatusService";
 import { fetchHttpSessionSummary } from "./services/httpSessionService";
 import { clearAdminVerification, clearAuthState, getAuthState } from "./store/authState";
 import { getDistrictState } from "./store/districtState";
@@ -334,6 +334,7 @@ const auth = getAuthState();
 const district = getDistrictState();
 const routeLoading = getRouteLoadingState();
 const fatalErrorToast = getFatalErrorToastState();
+const { state: systemStatus, statusLabel, statusClass } = useSystemStatus();
 const router = useRouter();
 const route = useRoute();
 const menuOpen = ref(false);
@@ -368,10 +369,6 @@ const maintenanceMessage = ref("Maintenance currentlyin progress.");
 const killSwitchEnabled = ref(false);
 const killSwitchMessage = ref("Unfortunately ItemTraxx is currently unavailable. We apologize for any inconvenience and are working to restore access as soon as possible. Please see the status page (https://status.itemtraxx.com/) for more information.");
 const backendUnavailable = ref(false);
-const statusLabel = ref("Unknown");
-const statusClass = ref<"status-ok" | "status-warn" | "status-down" | "status-unknown">(
-  "status-unknown"
-);
 const isOutdated = ref(false);
 const latestVersion = ref<string | null>(null);
 const forceUpdateOverlay = ref(false);
@@ -379,10 +376,8 @@ const showTelemetry = ref(false);
 const cookieConsent = ref<CookieConsentState | null>(null);
 const isRouteNavigating = computed(() => routeLoading.isLoading);
 const showPageLoading = ref(false);
-let statusTimer: number | null = null;
 let versionTimer: number | null = null;
 let adminIdleTimer: number | null = null;
-let deferredStatusTimer: number | null = null;
 let deferredVersionTimer: number | null = null;
 let pageLoadingTimer: number | null = null;
 let adminSessionTimer: number | null = null;
@@ -1203,16 +1198,13 @@ const dismissIncidentBanner = () => {
   localStorage.setItem("itemtraxx-incident-dismissed", incidentBanner.value.id);
 };
 
-const refreshSystemStatus = async () => {
-  const response = await fetchSystemStatus();
-  if (!response) {
-    statusLabel.value = "Unknown";
-    statusClass.value = "status-unknown";
+const applySystemStatus = () => {
+  if (!systemStatus.hasResult) {
     backendUnavailable.value = false;
     return;
   }
 
-  const payload = response.payload;
+  const payload = systemStatus.payload;
   if (payload.kill_switch?.enabled === true) {
     killSwitchEnabled.value = true;
     killSwitchMessage.value =
@@ -1263,7 +1255,7 @@ const refreshSystemStatus = async () => {
     } else {
       writeCachedMaintenanceState(null);
     }
-  } else if (response.status >= 500 || payload.status === "down") {
+  } else if (systemStatus.responseStatus >= 500 || payload.status === "down") {
     // Keep last known maintenance state during backend outages.
     const cached = readCachedMaintenanceState();
     if (cached?.enabled) {
@@ -1275,17 +1267,13 @@ const refreshSystemStatus = async () => {
     writeCachedMaintenanceState(null);
   }
 
-  if (response.ok && payload.status === "operational") {
-    statusLabel.value = "Running";
-    statusClass.value = "status-ok";
+  if (systemStatus.responseOk && payload.status === "operational") {
     incidentBanner.value = null;
     backendUnavailable.value = false;
     return;
   }
 
-  if (response.status >= 500 || payload.status === "down") {
-    statusLabel.value = "Down";
-    statusClass.value = "status-down";
+  if (systemStatus.responseStatus >= 500 || payload.status === "down") {
     backendUnavailable.value = !maintenanceEnabled.value;
     const incidentId =
       (payload.checked_at && String(payload.checked_at)) ||
@@ -1302,8 +1290,6 @@ const refreshSystemStatus = async () => {
     return;
   }
 
-  statusLabel.value = "Degraded";
-  statusClass.value = "status-warn";
   backendUnavailable.value = false;
   const incidentId =
     (payload.checked_at && String(payload.checked_at)) ||
@@ -1362,19 +1348,6 @@ const refreshVersionStatus = async () => {
 const scheduleLowPriorityTask = (task: () => void, delayMs = 300) =>
   window.setTimeout(task, delayMs);
 
-const startStatusPolling = () => {
-  if (statusTimer || document.visibilityState === "hidden") return;
-  statusTimer = window.setInterval(() => {
-    void refreshSystemStatus();
-  }, 300_000);
-};
-
-const stopStatusPolling = () => {
-  if (!statusTimer) return;
-  window.clearInterval(statusTimer);
-  statusTimer = null;
-};
-
 const startVersionPolling = () => {
   if (versionTimer || document.visibilityState === "hidden") return;
   versionTimer = window.setInterval(() => {
@@ -1390,7 +1363,6 @@ const stopVersionPolling = () => {
 
 const handlePageVisibilityChange = () => {
   if (document.visibilityState === "hidden") {
-    stopStatusPolling();
     stopVersionPolling();
     stopAdminSessionPolling();
     stopSessionHeartbeat();
@@ -1400,8 +1372,6 @@ const handlePageVisibilityChange = () => {
   resetAdminIdleTimer();
   startAdminSessionPolling();
   startSessionHeartbeat();
-  void refreshSystemStatus();
-  startStatusPolling();
   void refreshVersionStatus();
   startVersionPolling();
   startOfflineQueuePolling();
@@ -1430,10 +1400,6 @@ onMounted(() => {
   } else {
     applyTheme("light");
   }
-  deferredStatusTimer = scheduleLowPriorityTask(() => {
-    void refreshSystemStatus();
-    startStatusPolling();
-  }, 250);
   deferredVersionTimer = scheduleLowPriorityTask(() => {
     void refreshVersionStatus();
     startVersionPolling();
@@ -1456,6 +1422,18 @@ onMounted(() => {
     measureTopBanners();
   });
 });
+
+watch(
+  () =>
+    [
+      systemStatus.hasResult,
+      systemStatus.responseOk,
+      systemStatus.responseStatus,
+      systemStatus.payload,
+    ] as const,
+  applySystemStatus,
+  { immediate: true },
+);
 
 watch(
   () => routeLoading.isLoading,
@@ -1583,14 +1561,7 @@ onUnmounted(() => {
   for (const eventName of adminActivityEvents) {
     window.removeEventListener(eventName, handleAdminActivity);
   }
-  if (statusTimer) {
-    stopStatusPolling();
-  }
   stopVersionPolling();
-  if (deferredStatusTimer) {
-    window.clearTimeout(deferredStatusTimer);
-    deferredStatusTimer = null;
-  }
   if (deferredVersionTimer) {
     window.clearTimeout(deferredVersionTimer);
     deferredVersionTimer = null;

@@ -1094,6 +1094,21 @@ const runAdminSessionCheck = async () => {
     const { touchTenantAdminSession, validateTenantAdminSession } = await import(
       "./services/adminOpsService"
     );
+    const shouldStopPolling =
+      !shouldTrackTenantAdminSession.value ||
+      sessionTermination.visible ||
+      document.visibilityState === "hidden";
+    if (shouldStopPolling) {
+      stopAdminSessionPolling();
+      return;
+    }
+    if (
+      epoch !== authSessionEpoch ||
+      userId !== auth.userId ||
+      deviceId !== getOrCreateDeviceSession().deviceId
+    ) {
+      return;
+    }
     try {
       await touchTenantAdminSession();
     } catch {
@@ -1136,7 +1151,11 @@ const runAdminSessionCheck = async () => {
 };
 
 const startAdminSessionPolling = () => {
-  if (!shouldTrackTenantAdminSession.value || sessionTermination.visible) {
+  if (
+    !shouldTrackTenantAdminSession.value ||
+    sessionTermination.visible ||
+    document.visibilityState === "hidden"
+  ) {
     stopAdminSessionPolling();
     return;
   }

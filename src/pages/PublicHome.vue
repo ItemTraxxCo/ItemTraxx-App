@@ -354,37 +354,6 @@ const trackCta = (
 
 let observer: IntersectionObserver | null = null;
 let statusTimer: number | null = null;
-let prefetchTimer: number | null = null;
-
-const scheduleIdle = (callback: () => void, timeout = 1200) => {
-  if (typeof window.requestIdleCallback === "function") {
-    const idleId = window.requestIdleCallback(callback, { timeout });
-    return () => window.cancelIdleCallback(idleId);
-  }
-  const timerId = window.setTimeout(callback, timeout);
-  return () => window.clearTimeout(timerId);
-};
-
-let cancelIdlePrefetch: (() => void) | null = null;
-
-const shouldPrefetchPrimaryRoutes = () => {
-  const connection = (navigator as Navigator & {
-    connection?: { saveData?: boolean; effectiveType?: string };
-  }).connection;
-  if (connection?.saveData) {
-    return false;
-  }
-  return connection?.effectiveType !== "slow-2g" && connection?.effectiveType !== "2g";
-};
-
-const prefetchPrimaryRoutes = () => {
-  if (!shouldPrefetchPrimaryRoutes() || document.visibilityState === "hidden") {
-    return;
-  }
-  void import("./Login.vue");
-  void import("./tenant/Checkout.vue");
-  void import("./tenant/admin/AdminLogin.vue");
-};
 
 const refreshSystemStatus = async () => {
   const response = await fetchSystemStatus();
@@ -442,11 +411,6 @@ onMounted(() => {
   void refreshSystemStatus();
   startStatusPolling();
   document.addEventListener("visibilitychange", handleVisibilityChange);
-  // Heavily delay prefetching so we don't compete with first-load and early interactions.
-  // Prefetch is best-effort only; it should never hurt real-user INP/FCP on the landing page.
-  prefetchTimer = window.setTimeout(() => {
-    cancelIdlePrefetch = scheduleIdle(prefetchPrimaryRoutes, 2500);
-  }, 15_000);
 
   if (prefersReducedMotion) {
     revealElements.forEach((el) => el.classList.add("is-visible"));
@@ -473,14 +437,6 @@ onBeforeUnmount(() => {
   observer = null;
   if (statusTimer) {
     stopStatusPolling();
-  }
-  if (prefetchTimer) {
-    window.clearTimeout(prefetchTimer);
-    prefetchTimer = null;
-  }
-  if (cancelIdlePrefetch) {
-    cancelIdlePrefetch();
-    cancelIdlePrefetch = null;
   }
   document.removeEventListener("visibilitychange", handleVisibilityChange);
 });

@@ -136,7 +136,6 @@
 import { computed, onMounted, onUnmounted, ref } from "vue";
 import { RouterLink, useRouter } from "vue-router";
 import SafeExternalLink from "../components/SafeExternalLink.vue";
-import { createDistrictSessionHandoff, tenantLogin } from "../services/authService";
 import { useTurnstile } from "../composables/useTurnstile";
 import { buildDistrictAppHandoffUrl } from "../services/districtService";
 import { getDistrictState } from "../store/districtState";
@@ -238,8 +237,6 @@ const setTurnstileContainerRef = (
   turnstileContainerRef.value = null;
 };
 let toastTimer: number | null = null;
-let prefetchTimer: number | null = null;
-let cancelIdlePrefetch: (() => void) | null = null;
 let storyTimer: number | null = null;
 let themeObserver: MutationObserver | null = null;
 
@@ -252,33 +249,6 @@ const runPostHog = async (
   } catch {
     // Analytics must never block login.
   }
-};
-
-const shouldPrefetchTenantRoutes = () => {
-  const connection = (navigator as Navigator & {
-    connection?: { saveData?: boolean; effectiveType?: string };
-  }).connection;
-  if (connection?.saveData) {
-    return false;
-  }
-  return connection?.effectiveType !== "slow-2g" && connection?.effectiveType !== "2g";
-};
-
-const prefetchTenantRoutes = () => {
-  if (!shouldPrefetchTenantRoutes() || document.visibilityState === "hidden") {
-    return;
-  }
-  void import("./tenant/Checkout.vue");
-  void import("./tenant/admin/AdminLogin.vue");
-};
-
-const scheduleIdle = (callback: () => void, timeout = 1200) => {
-  if (typeof window.requestIdleCallback === "function") {
-    const idleId = window.requestIdleCallback(callback, { timeout });
-    return () => window.cancelIdleCallback(idleId);
-  }
-  const timerId = window.setTimeout(callback, timeout);
-  return () => window.clearTimeout(timerId);
 };
 
 const showToast = (title: string, message: string) => {
@@ -319,6 +289,7 @@ const handleTenantLogin = async () => {
       error.value = "Complete the security check and try again.";
       return;
     }
+    const { createDistrictSessionHandoff, tenantLogin } = await import("../services/authService");
     const session = await tenantLogin(
       accessCode.value.trim(),
       password.value,
@@ -409,14 +380,6 @@ onUnmounted(() => {
     window.clearTimeout(toastTimer);
     toastTimer = null;
   }
-  if (prefetchTimer) {
-    window.clearTimeout(prefetchTimer);
-    prefetchTimer = null;
-  }
-  if (cancelIdlePrefetch) {
-    cancelIdlePrefetch();
-    cancelIdlePrefetch = null;
-  }
   if (storyTimer) {
     window.clearInterval(storyTimer);
     storyTimer = null;
@@ -437,11 +400,6 @@ onMounted(() => {
     attributes: true,
     attributeFilter: ["data-theme"],
   });
-  // Heavily delay prefetching so we don't compete with first-load and early interactions.
-  // Prefetch is best-effort only; it should never hurt real-user INP/FCP on the login page.
-  prefetchTimer = window.setTimeout(() => {
-    cancelIdlePrefetch = scheduleIdle(prefetchTenantRoutes, 2500);
-  }, 15_000);
   storyTimer = window.setInterval(() => {
     activeStoryIndex.value = (activeStoryIndex.value + 1) % storySlides.length;
   }, 4200);

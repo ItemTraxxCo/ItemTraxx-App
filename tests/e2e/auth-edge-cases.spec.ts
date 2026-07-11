@@ -213,6 +213,55 @@ test.describe("Auth edge cases", () => {
     await expect(page).not.toHaveURL(/\/tenant\/checkout$/);
   });
 
+  test("hidden tenant admin navigation defers session polling until visibility returns", async ({ page }) => {
+    let touchRequests = 0;
+    let validationRequests = 0;
+    await page.route(/\/functions(?:\/v1)?\/admin-ops(?:\?.*)?$/, async (route) => {
+      const body = (route.request().postDataJSON() as { action?: string }) ?? {};
+      if (body.action === "touch_session") touchRequests += 1;
+      if (body.action === "validate_session") validationRequests += 1;
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ data: { ok: true, valid: true } }),
+      });
+    });
+
+    await page.goto("/");
+    await setTenantAdminSession(page, "tenant-e2e");
+    await page.evaluate(() => {
+      Object.defineProperty(document, "visibilityState", {
+        configurable: true,
+        get: () => "hidden",
+      });
+      Object.defineProperty(document, "hidden", {
+        configurable: true,
+        get: () => true,
+      });
+      document.dispatchEvent(new Event("visibilitychange"));
+    });
+    await navigateApp(page, "/tenant/admin");
+    await page.waitForTimeout(250);
+
+    expect(touchRequests).toBe(0);
+    expect(validationRequests).toBe(0);
+
+    await page.evaluate(() => {
+      Object.defineProperty(document, "visibilityState", {
+        configurable: true,
+        get: () => "visible",
+      });
+      Object.defineProperty(document, "hidden", {
+        configurable: true,
+        get: () => false,
+      });
+      document.dispatchEvent(new Event("visibilitychange"));
+    });
+
+    await expect.poll(() => touchRequests).toBe(1);
+    await expect.poll(() => validationRequests).toBe(1);
+  });
+
   test("tenant admin dev hosts disable idle logout behavior", async ({ page }) => {
     await page.route(/\/functions(?:\/v1)?\/admin-ops(?:\?.*)?$/, async (route) => {
       await route.fulfill({

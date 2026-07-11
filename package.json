@@ -17,6 +17,7 @@
     "security:gate": "npm run security:audit",
     "security:sbom": "bash ./scripts/generate-sbom.sh",
     "perf:budget": "node ./scripts/check-bundle-budget.mjs",
+    "perf:initial": "node ./scripts/check-initial-load-budget.mjs",
     "perf:initial:report": "node ./scripts/check-initial-load-budget.mjs --report-only",
     "perf:images": "node ./scripts/check-image-budget.mjs",
     "perf:report": "node ./scripts/perf-report.mjs",

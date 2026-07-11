@@ -15,7 +15,7 @@ const resolveSafeAssetPath = (assetName) => {
 // Bundle budget thresholds (5 MiB each)
 // DO NOT UPDATE THESE WITHOUT DISCUSSING WITH THE TEAM FIRST.
 const maxMainBytes = 5 * 1024 * 1024;
-const maxPublicHomeBytes = 5 * 1024 * 1024;
+const maxLandingBytes = 5 * 1024 * 1024;
 
 const files = readdirSync(assetsDir);
 const findAssetSize = (prefix) => {
@@ -37,7 +37,7 @@ const findAssetSize = (prefix) => {
 };
 
 const mainChunk = findAssetSize("index-");
-const landingChunk = findAssetSize("PublicHome-");
+const canonicalLandingChunk = findAssetSize("LandingPageNew-");
 
 const failures = [];
 
@@ -47,11 +47,11 @@ if (!mainChunk) {
   failures.push(`Main chunk ${mainChunk.name} is ${mainChunk.size} bytes (> ${maxMainBytes})`);
 }
 
-if (!landingChunk) {
-  failures.push("Missing landing chunk (PublicHome-*.js)");
-} else if (landingChunk.size > maxPublicHomeBytes) {
+if (!canonicalLandingChunk) {
+  failures.push("Missing canonical landing chunk (LandingPageNew-*.js)");
+} else if (canonicalLandingChunk.size > maxLandingBytes) {
   failures.push(
-    `Landing chunk ${landingChunk.name} is ${landingChunk.size} bytes (> ${maxPublicHomeBytes})`
+    `Canonical landing chunk ${canonicalLandingChunk.name} is ${canonicalLandingChunk.size} bytes (> ${maxLandingBytes})`
   );
 }
 
@@ -65,5 +65,5 @@ if (failures.length) {
 
 console.log("[perf] Bundle budget check passed", {
   main: mainChunk,
-  landing: landingChunk,
+  canonicalLanding: canonicalLandingChunk,
 });

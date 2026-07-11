@@ -231,8 +231,7 @@ import checkoutReturnUiImage800 from "../assets/landing/checkout_return_ui-800.w
 import checkoutReturnUiImage1200 from "../assets/landing/checkout_return_ui-1200.webp";
 import checkoutReturnUiImage1600 from "../assets/landing/checkout_return_ui-1600.webp";
 import PublicFooter from "../components/PublicFooter.vue";
-import { trackAnalyticsEvent } from "../services/analyticsService";
-import { capturePostHogEvent } from "../services/posthogService";
+import { trackProductEvent } from "../services/productEvents";
 import { useSystemStatus } from "../composables/useSystemStatus";
 
 const lightBrandLogoUrl = import.meta.env.VITE_BRAND_LOGO_LIGHT_URL as string | undefined;
@@ -342,8 +341,16 @@ const toggleFaq = (index: number) => {
 };
 
 const trackCta = (cta: "pricing" | "demo" | "login", location: "header" | "hero" | "final") => {
-  void trackAnalyticsEvent("landing_new2_cta_click", { cta, location });
-  capturePostHogEvent("landing_cta_clicked", { cta, location, page: "landing-new2" });
+  trackProductEvent({
+    analytics: {
+      name: "landing_new2_cta_click",
+      properties: { cta, location },
+    },
+    posthog: {
+      name: "landing_cta_clicked",
+      properties: { cta, location, page: "landing-new2" },
+    },
+  });
 };
 
 onMounted(() => {

@@ -1,7 +1,7 @@
 <template>
   <footer class="public-footer">
     <div class="footer-brand-block">
-      <p class="footer-brand">©2026 ItemTraxx Co</p>
+      <p class="footer-brand">©{{ currentYear }} ItemTraxx Co</p>
       <span class="footer-env footer-version">{{ releaseChannel }}</span>
       <span class="footer-version">v-{{ appVersion }}</span>
       <span v-if="showBranchName" class="footer-version footer-branch">{{ appBranch }}</span>
@@ -67,6 +67,7 @@ import { RouterLink } from "vue-router";
 
 const appVersion = import.meta.env.VITE_GIT_COMMIT || "n/a";
 const appBranch = import.meta.env.VITE_GIT_BRANCH || "n/a";
+const currentYear = new Date().getFullYear();
 const runtimeEnvironment = (
   import.meta.env.VITE_SENTRY_ENVIRONMENT ||
   import.meta.env.MODE ||

@@ -289,7 +289,7 @@
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, ref } from "vue";
 import { RouterLink } from "vue-router";
-import { trackAnalyticsEvent } from "../services/analyticsService";
+import { trackProductEvent } from "../services/productEvents";
 import adminUiImage from "../assets/landing/admin_ui.png";
 import adminUiImage800 from "../assets/landing/admin_ui-800.webp";
 import adminUiImage1200 from "../assets/landing/admin_ui-1200.webp";
@@ -346,7 +346,12 @@ const trackCta = (
   cta: "view_pricing" | "request_demo" | "go_to_login",
   location: "hero" | "final_cta",
 ) => {
-  void trackAnalyticsEvent("landing_cta_click", { cta, location });
+  trackProductEvent({
+    analytics: {
+      name: "landing_cta_click",
+      properties: { cta, location },
+    },
+  });
 };
 
 let observer: IntersectionObserver | null = null;

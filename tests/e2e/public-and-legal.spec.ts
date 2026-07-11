@@ -32,6 +32,131 @@ test.describe("Public surfaces", () => {
     await expect(page.getByRole("heading", { name: "Get started with ItemTraxx and advance your inventory management." })).toBeVisible();
   });
 
+  test("shared public footers render the current year with identical link contracts", async ({ page }) => {
+    await page.clock.install();
+    await page.clock.setFixedTime(new Date("2027-02-03T12:00:00Z"));
+
+    const footerContract = async () => {
+      const footer = page.locator("footer.public-footer");
+      await expect(footer.locator(".footer-brand")).toHaveText("©2027 ItemTraxx Co");
+      return footer.locator("a").evaluateAll((links) =>
+        links.map((link) => ({
+          text: link.textContent?.trim() ?? "",
+          href: link.getAttribute("href"),
+          target: link.getAttribute("target"),
+          rel: link.getAttribute("rel"),
+        })),
+      );
+    };
+
+    await page.goto("/");
+    const canonicalFooter = await footerContract();
+
+    await page.goto("/landing-new2");
+    expect(await footerContract()).toEqual(canonicalFooter);
+  });
+
+  test("the canonical landing demo CTA navigates to the demo request", async ({ page }) => {
+    await page.goto("/");
+
+    await page.locator("main").getByRole("link", { name: "Request Demo", exact: true }).click();
+
+    await expect(page).toHaveURL(/\/request-demo$/);
+    await expect(page.getByRole("heading", { name: "Request a Demo" })).toBeVisible();
+  });
+
+  for (const contract of [
+    {
+      path: "/",
+      linkName: "Pricing",
+      destination: "/pricing",
+      analytics: {
+        name: "landing_new_cta_click",
+        properties: { cta: "pricing", location: "hero" },
+      },
+      posthog: {
+        name: "landing_cta_clicked",
+        properties: { cta: "pricing", location: "hero" },
+      },
+    },
+    {
+      path: "/landing-new2",
+      linkName: "Request Demo",
+      destination: "/request-demo",
+      analytics: {
+        name: "landing_new2_cta_click",
+        properties: { cta: "demo", location: "hero" },
+      },
+      posthog: {
+        name: "landing_cta_clicked",
+        properties: { cta: "demo", location: "hero", page: "landing-new2" },
+      },
+    },
+    {
+      path: "/landing-old",
+      linkName: "Pricing",
+      destination: "/pricing",
+      analytics: {
+        name: "landing_cta_click",
+        properties: { cta: "view_pricing", location: "hero" },
+      },
+      posthog: null,
+    },
+  ] as const) {
+    test(`${contract.path} lazily preserves its provider-specific CTA event contract`, async ({ page }) => {
+      const requestedTelemetryFacades: string[] = [];
+      await page.route(/\/src\/services\/(analyticsService|posthogService)\.ts(?:\?.*)?$/, async (route) => {
+        const service = route.request().url().includes("posthogService") ? "posthog" : "analytics";
+        requestedTelemetryFacades.push(service);
+        await route.fulfill({
+          status: 200,
+          contentType: "application/javascript",
+          body:
+            service === "analytics"
+              ? `export const trackAnalyticsEvent = async (name, properties) => {
+                  window.__productEventDeliveries ??= { analytics: [], posthog: [] };
+                  window.__productEventDeliveries.analytics.push({ name, properties });
+                };`
+              : `export const capturePostHogEvent = (name, properties) => {
+                  window.__productEventDeliveries ??= { analytics: [], posthog: [] };
+                  window.__productEventDeliveries.posthog.push({ name, properties });
+                };`,
+        });
+      });
+      await page.addInitScript(() => {
+        Object.defineProperty(window, "__productEventDeliveries", {
+          configurable: true,
+          value: { analytics: [], posthog: [] },
+          writable: true,
+        });
+      });
+
+      await page.goto(contract.path);
+      const cta = page.locator("main").getByRole("link", { name: contract.linkName, exact: true }).first();
+      await expect(cta).toBeVisible();
+      expect(requestedTelemetryFacades).toEqual([]);
+
+      await cta.click();
+      await expect(page).toHaveURL(new RegExp(`${contract.destination}$`));
+      await expect.poll(() =>
+        page.evaluate(() =>
+          (window as Window & {
+            __productEventDeliveries?: {
+              analytics: Array<{ name: string; properties: Record<string, unknown> }>;
+              posthog: Array<{ name: string; properties: Record<string, unknown> }>;
+            };
+          }).__productEventDeliveries,
+        ),
+      ).toEqual({
+        analytics: [contract.analytics],
+        posthog: contract.posthog ? [contract.posthog] : [],
+      });
+      expect(requestedTelemetryFacades.sort()).toEqual(
+        contract.posthog ? ["analytics", "posthog"] : ["analytics"],
+      );
+    });
+  }
+
   test("loads public status without contacting Supabase directly", async ({ page }) => {
     const requestedUrls: string[] = [];
     const responseUrls: string[] = [];

@@ -157,18 +157,31 @@ test.describe("Auth edge cases", () => {
   });
 
   test("district handoff consumes only the one-time code and removes auth material from the URL", async ({ page }) => {
+    const authEvents: string[] = [];
     let consumePayload: unknown = null;
     let exchangePayload: unknown = null;
+    await page.exposeFunction("recordDistrictHandoffEvent", (event: string) => {
+      authEvents.push(event);
+    });
     await page.addInitScript(() => {
       const originalReplaceState = window.history.replaceState.bind(window.history);
       const recordedUrls: string[] = [];
       (window as unknown as { __authReplaceStateUrls: string[] }).__authReplaceStateUrls = recordedUrls;
       window.history.replaceState = (data: unknown, unused: string, url?: string | URL | null) => {
-        recordedUrls.push(String(url ?? ""));
+        const nextUrl = String(url ?? "");
+        recordedUrls.push(nextUrl);
+        if (nextUrl === "/#keep=1") {
+          void (
+            window as unknown as {
+              recordDistrictHandoffEvent: (event: string) => Promise<void>;
+            }
+          ).recordDistrictHandoffEvent("url-scrub");
+        }
         originalReplaceState(data, unused, url);
       };
     });
     await page.route(/\/functions(?:\/v1)?\/district-handoff(?:\?.*)?$/, async (route) => {
+      authEvents.push("consume-request");
       consumePayload = route.request().postDataJSON();
       await route.fulfill({
         status: 200,
@@ -177,6 +190,7 @@ test.describe("Auth edge cases", () => {
       });
     });
     await page.route("**/auth/session/exchange", async (route) => {
+      authEvents.push("session-exchange");
       exchangePayload = route.request().postDataJSON();
       await route.fulfill({
         status: 200,
@@ -204,11 +218,28 @@ test.describe("Auth edge cases", () => {
         () => (window as unknown as { __authReplaceStateUrls: string[] }).__authReplaceStateUrls
       )
     ).toContain("/#keep=1");
+    expect(authEvents.slice(0, 3)).toEqual([
+      "url-scrub",
+      "consume-request",
+      "session-exchange",
+    ]);
     expect(await page.evaluate(() => sessionStorage.getItem("itemtraxx:district-handoff-at"))).toMatch(/^\d+$/);
   });
 
   test("deprecated raw district tokens are rejected and scrubbed without exchange", async ({ page }) => {
-    let exchangeRequests = 0;
+    const tokenConsumptionRequests: string[] = [];
+    page.on("request", (request) => {
+      const url = request.url();
+      if (/\/functions(?:\/v1)?\/district-handoff(?:\?.*)?$/.test(url)) {
+        tokenConsumptionRequests.push("district-handoff");
+      } else if (/\/auth\/v1\/verify(?:\?.*)?$/.test(url)) {
+        tokenConsumptionRequests.push("otp-verify");
+      } else if (/\/auth\/v1\/token(?:\?.*)?$/.test(url)) {
+        tokenConsumptionRequests.push("supabase-token");
+      } else if (/\/auth\/session\/exchange(?:\?.*)?$/.test(url)) {
+        tokenConsumptionRequests.push("session-exchange");
+      }
+    });
     await page.addInitScript(() => {
       const originalReplaceState = window.history.replaceState.bind(window.history);
       const recordedUrls: string[] = [];
@@ -218,8 +249,13 @@ test.describe("Auth edge cases", () => {
         originalReplaceState(data, unused, url);
       };
     });
+    await page.route(/\/functions(?:\/v1)?\/district-handoff(?:\?.*)?$/, async (route) => {
+      await route.fulfill({ status: 500, body: "unexpected district handoff" });
+    });
+    await page.route(/\/auth\/v1\/(?:verify|token)(?:\?.*)?$/, async (route) => {
+      await route.fulfill({ status: 500, body: "unexpected Supabase token consumption" });
+    });
     await page.route("**/auth/session/exchange", async (route) => {
-      exchangeRequests += 1;
       await route.fulfill({ status: 500, body: "unexpected" });
     });
 
@@ -230,7 +266,8 @@ test.describe("Auth edge cases", () => {
         () => (window as unknown as { __authReplaceStateUrls: string[] }).__authReplaceStateUrls
       )
     ).toContain("/#keep=1");
-    expect(exchangeRequests).toBe(0);
+    await waitForPublicAuthBootstrap(page);
+    expect(tokenConsumptionRequests).toEqual([]);
   });
 
   test("super-admin password challenge preserves action and payload contract", async ({ page }) => {
@@ -335,7 +372,20 @@ test.describe("Auth edge cases", () => {
   test("super-admin passkey login preserves verification payload and fresh secondary auth", async ({ page }) => {
     let verifyPayload: unknown = null;
     await page.route(/\/functions(?:\/v1)?\/super-auth-verify(?:\?.*)?$/, async (route) => {
-      verifyPayload = route.request().postDataJSON();
+      const body = route.request().postDataJSON() as { action?: string };
+      if (body.action === "start_password_login") {
+        await route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: JSON.stringify({
+            challenge_started: true,
+            email: "pending.passkey@example.com",
+            challenge_token: "pending-passkey-challenge",
+          }),
+        });
+        return;
+      }
+      verifyPayload = body;
       await route.fulfill({
         status: 200,
         contentType: "application/json",
@@ -385,12 +435,26 @@ test.describe("Auth edge cases", () => {
         configurable: true,
         value: async () => ({ data: { session: passkeySession }, error: null }),
       });
+      await auth.superAdminLogin(
+        "pending.passkey@example.com",
+        "correct horse battery staple",
+        "turnstile-e2e",
+      );
+      const pendingBefore = {
+        token: auth.getPendingSuperAdminChallengeToken(),
+        email: auth.getPendingSuperAdminVerificationEmail(),
+      };
       await auth.superAdminPasskeyLogin({
         sendLoginNotification: false,
         loginLocation: "super_settings",
       });
       const state = getAuthState();
       return {
+        pendingBefore,
+        pendingAfter: {
+          token: auth.getPendingSuperAdminChallengeToken(),
+          email: auth.getPendingSuperAdminVerificationEmail(),
+        },
         role: state.role,
         hasSecondaryAuth: state.hasSecondaryAuth,
         verifiedAt: state.superVerifiedAt,
@@ -398,29 +462,213 @@ test.describe("Auth edge cases", () => {
     });
 
     expect(verifyPayload).toEqual({ action: "complete_passkey_login", payload: {} });
+    expect(result.pendingBefore).toEqual({
+      token: "pending-passkey-challenge",
+      email: "pending.passkey@example.com",
+    });
+    expect(result.pendingAfter).toEqual({ token: null, email: null });
     expect(result.role).toBe("super_admin");
     expect(result.hasSecondaryAuth).toBe(true);
     expect(Date.now() - Date.parse(result.verifiedAt ?? "")).toBeLessThanOrEqual(15 * 60_000);
   });
 
-  test("logout tolerates a missing local Supabase session and uses the local post-sign-out URL", async ({ page }) => {
-    let logoutRequests = 0;
-    await page.route("**/auth/session/logout", async (route) => {
-      logoutRequests += 1;
+  test("successful super-admin OTP verification clears the shared pending challenge", async ({ page }) => {
+    let verificationPayload: unknown = null;
+    await page.route(/\/functions(?:\/v1)?\/super-auth-verify(?:\?.*)?$/, async (route) => {
+      const body = route.request().postDataJSON() as { action?: string };
+      if (body.action === "start_password_login") {
+        await route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: JSON.stringify({
+            challenge_started: true,
+            email: "pending.otp@example.com",
+            challenge_token: "pending-otp-challenge",
+          }),
+        });
+        return;
+      }
+      verificationPayload = body;
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          verified: true,
+          access_token: "otp-access",
+          refresh_token: "otp-refresh",
+        }),
+      });
+    });
+    await page.route("**/auth/session/exchange", async (route) => {
       await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ ok: true }) });
     });
-    await page.goto("/");
-    await page.waitForFunction(() => window.__itemtraxxTest !== undefined);
-    await page.evaluate(() => window.__itemtraxxTest?.setTenantUserSession());
-    const nextUrl = await page.evaluate(async () => {
-      const auth = await import("/src/services/authService.ts");
-      const url = auth.getPostSignOutUrl();
-      await auth.signOut();
-      return url;
+    await page.route("**/auth/session/me", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          authenticated: true,
+          user: {
+            id: "super-otp-e2e",
+            email: "pending.otp@example.com",
+            last_sign_in_at: new Date().toISOString(),
+          },
+          profile: {
+            role: "super_admin",
+            tenant_id: null,
+            district_id: null,
+            auth_email: "pending.otp@example.com",
+            is_active: true,
+          },
+        }),
+      });
+    });
+    await page.route(/\/functions(?:\/v1)?\/(?:super-ops|login-notify)(?:\?.*)?$/, async (route) => {
+      await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ data: { ok: true } }) });
     });
 
-    expect(nextUrl).toBe("/login");
-    expect(logoutRequests).toBe(1);
+    await page.goto("/");
+    const result = await page.evaluate(async () => {
+      const auth = await import("/src/services/authService.ts");
+      await auth.superAdminLogin(
+        "pending.otp@example.com",
+        "correct horse battery staple",
+        "turnstile-e2e",
+      );
+      const pendingBefore = {
+        token: auth.getPendingSuperAdminChallengeToken(),
+        email: auth.getPendingSuperAdminVerificationEmail(),
+      };
+      await auth.verifySuperAdminEmailChallenge("123456");
+      return {
+        pendingBefore,
+        pendingAfter: {
+          token: auth.getPendingSuperAdminChallengeToken(),
+          email: auth.getPendingSuperAdminVerificationEmail(),
+        },
+      };
+    });
+
+    expect(verificationPayload).toEqual({
+      action: "verify_email_challenge",
+      payload: { code: "123456", challenge_token: "pending-otp-challenge" },
+    });
+    expect(result.pendingBefore).toEqual({
+      token: "pending-otp-challenge",
+      email: "pending.otp@example.com",
+    });
+    expect(result.pendingAfter).toEqual({ token: null, email: null });
+  });
+
+  test("missing-session logout preserves cleanup order and clears every auth context", async ({ page }) => {
+    const cleanupEvents: string[] = [];
+    await page.exposeFunction("recordAuthCleanupEvent", (event: string) => {
+      cleanupEvents.push(event);
+    });
+    await page.route(/\/functions(?:\/v1)?\/super-auth-verify(?:\?.*)?$/, async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          challenge_started: true,
+          email: "pending.super@example.com",
+          challenge_token: "pending-challenge-e2e",
+        }),
+      });
+    });
+    await page.route(/\/functions(?:\/v1)?\/admin-ops(?:\?.*)?$/, async (route) => {
+      const body = (route.request().postDataJSON() as { action?: string }) ?? {};
+      if (body.action === "revoke_current_session") {
+        cleanupEvents.push("admin-revoke");
+      }
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ data: { revoked: true } }),
+      });
+    });
+    await page.route("**/auth/session/logout", async (route) => {
+      cleanupEvents.push("http-session");
+      await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ ok: true }) });
+    });
+
+    await page.goto("/");
+    await page.waitForFunction(() => window.__itemtraxxTest !== undefined);
+    const result = await page.evaluate(async () => {
+      const [auth, { getAuthState, setDistrictContext }, { supabase }] = await Promise.all([
+        import("/src/services/authService.ts"),
+        import("/src/store/authState.ts"),
+        import("/src/services/supabaseClient.ts"),
+      ]);
+      Object.defineProperty(supabase.auth, "signOut", {
+        configurable: true,
+        value: async () => {
+          await (
+            window as unknown as {
+              recordAuthCleanupEvent: (event: string) => Promise<void>;
+            }
+          ).recordAuthCleanupEvent("local-supabase");
+          return {
+            error: {
+              name: "AuthSessionMissingError",
+              message: "Auth session missing!",
+              status: 403,
+              code: "session_not_found",
+            },
+          };
+        },
+      });
+      await auth.superAdminLogin(
+        "pending.super@example.com",
+        "correct horse battery staple",
+        "turnstile-e2e",
+      );
+      window.__itemtraxxTest?.setTenantAdminSession("tenant-e2e");
+      setDistrictContext("district-e2e");
+      const before = {
+        token: auth.getPendingSuperAdminChallengeToken(),
+        email: auth.getPendingSuperAdminVerificationEmail(),
+        adminVerifiedAt: getAuthState().adminVerifiedAt,
+        tenantContextId: getAuthState().tenantContextId,
+        districtContextId: getAuthState().districtContextId,
+      };
+      await auth.signOut();
+      const state = getAuthState();
+      return {
+        before,
+        after: {
+          isInitialized: state.isInitialized,
+          isAuthenticated: state.isAuthenticated,
+          userId: state.userId,
+          adminVerifiedAt: state.adminVerifiedAt,
+          tenantContextId: state.tenantContextId,
+          districtContextId: state.districtContextId,
+          token: auth.getPendingSuperAdminChallengeToken(),
+          email: auth.getPendingSuperAdminVerificationEmail(),
+          persistedAdminVerification: sessionStorage.getItem("itemtraxx:admin-verification"),
+        },
+      };
+    });
+
+    expect(result.before).toMatchObject({
+      token: "pending-challenge-e2e",
+      email: "pending.super@example.com",
+      tenantContextId: "tenant-e2e",
+      districtContextId: "district-e2e",
+    });
+    expect(result.before.adminVerifiedAt).toBeTruthy();
+    expect(cleanupEvents).toEqual(["admin-revoke", "local-supabase", "http-session"]);
+    expect(result.after).toEqual({
+      isInitialized: true,
+      isAuthenticated: false,
+      userId: null,
+      adminVerifiedAt: null,
+      tenantContextId: null,
+      districtContextId: null,
+      token: null,
+      email: null,
+      persistedAdminVerification: null,
+    });
   });
 
   test("forced tenant-admin termination shows the blocking session message", async ({ page }) => {
@@ -440,9 +688,38 @@ test.describe("Auth edge cases", () => {
     await expect(page.getByRole("heading", { name: "This session has been terminated." })).toBeVisible();
   });
 
-  test("auth extraction begins behind a stable types boundary", async () => {
-    const source = await readFile(new URL("../../src/services/auth/types.ts", import.meta.url), "utf8");
-    expect(source).toContain('export type AuthRole = "tenant_user" | "tenant_admin" | "district_admin" | "super_admin";');
+  test("role normalization accepts only the four authenticated roles", async ({ page }) => {
+    await page.goto("/");
+    const result = await page.evaluate(async () => {
+      const { toKnownRole } = await import("/src/services/auth/types.ts");
+      const allowed = [
+        "tenant_user",
+        "tenant_admin",
+        "district_admin",
+        "super_admin",
+      ];
+      const rejected: unknown[] = [
+        "owner",
+        "Tenant_Admin",
+        "",
+        null,
+        undefined,
+        42,
+        {},
+      ];
+      return {
+        allowed: allowed.map((value) => [value, toKnownRole(value)]),
+        rejected: rejected.map((value) => toKnownRole(value)),
+      };
+    });
+
+    expect(result.allowed).toEqual([
+      ["tenant_user", "tenant_user"],
+      ["tenant_admin", "tenant_admin"],
+      ["district_admin", "district_admin"],
+      ["super_admin", "super_admin"],
+    ]);
+    expect(result.rejected).toEqual([null, null, null, null, null, null, null]);
   });
 
   test("authenticated tenant checkout survives refresh when tenant bootstrap lookup returns 401", async ({ page }) => {

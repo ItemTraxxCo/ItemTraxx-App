@@ -1,4 +1,8 @@
 import type { Router } from "vue-router";
+import type {
+  BufferedCheckoutItem,
+  CheckoutReturnPayload,
+} from "../services/offlineCheckoutQueue";
 import {
   clearAdminVerification,
   clearAuthState,
@@ -33,6 +37,15 @@ declare global {
       generateBarcodePattern: (
         value: string
       ) => Promise<{ modules: number; bars: { start: number; width: number }[] }>;
+      offlineCheckoutQueue: {
+        consumeWarning: () => Promise<string | null>;
+        ensureOperationId: (payload: CheckoutReturnPayload) => Promise<CheckoutReturnPayload>;
+        getCount: () => Promise<number>;
+        queue: (payload: CheckoutReturnPayload, error?: string | null) => Promise<number>;
+        read: () => Promise<BufferedCheckoutItem[]>;
+        withLock: <T>(callback: () => Promise<T>) => Promise<T>;
+        write: (items: BufferedCheckoutItem[]) => Promise<void>;
+      };
     };
   }
 }
@@ -153,6 +166,36 @@ export const attachE2EControls = (router: Router): void => {
           options?: unknown
         ) => void
       );
+    },
+    offlineCheckoutQueue: {
+      async consumeWarning() {
+        const { consumeCheckoutOfflineWarning } = await import("../services/offlineCheckoutQueue");
+        return consumeCheckoutOfflineWarning();
+      },
+      async ensureOperationId(payload) {
+        const { ensureCheckoutOperationId } = await import("../services/offlineCheckoutQueue");
+        return ensureCheckoutOperationId(payload);
+      },
+      async getCount() {
+        const { getBufferedCheckoutCount } = await import("../services/offlineCheckoutQueue");
+        return getBufferedCheckoutCount();
+      },
+      async queue(payload, error) {
+        const { queueCheckoutPayload } = await import("../services/offlineCheckoutQueue");
+        return queueCheckoutPayload(payload, error);
+      },
+      async read() {
+        const { readOfflineQueue } = await import("../services/offlineCheckoutQueue");
+        return readOfflineQueue();
+      },
+      async withLock(callback) {
+        const { withOfflineQueueLock } = await import("../services/offlineCheckoutQueue");
+        return withOfflineQueueLock(callback);
+      },
+      async write(items) {
+        const { writeOfflineQueue } = await import("../services/offlineCheckoutQueue");
+        return writeOfflineQueue(items);
+      },
     },
   };
 };

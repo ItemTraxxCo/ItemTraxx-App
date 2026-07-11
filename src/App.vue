@@ -771,7 +771,7 @@ const refreshOfflineQueueCount = async () => {
     return;
   }
   try {
-    const { getBufferedCheckoutCount } = await import("./services/checkoutService");
+    const { getBufferedCheckoutCount } = await import("./services/offlineCheckoutQueue");
     offlineQueueCount.value = await getBufferedCheckoutCount();
   } catch {
     offlineQueueCount.value = 0;

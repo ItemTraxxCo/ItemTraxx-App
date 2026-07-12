@@ -97,7 +97,7 @@ export const downloadTransactionReceiptPdf = async (receipt: TransactionReceipt)
 
   y += 10;
   const footer =
-    "Please review this receipt for accuracy. If anything appears incorrect, contact support right away.";
+    "Report generated on itemtraxx.com via checkout/return.";
   doc.setFont("helvetica", "italic");
   doc.setFontSize(10);
   doc.text(doc.splitTextToSize(footer, right - left), left, y);

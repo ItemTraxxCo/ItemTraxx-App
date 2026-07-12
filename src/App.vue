@@ -21,7 +21,7 @@
       <div class="page-loading-mark" aria-hidden="true"></div>
       <div class="page-loading-copy">
         <strong>Loading...</strong>
-        <span>Preparing your tracking experience.</span>
+        <span>Hold tight, we're preparing your tracking experience.</span>
       </div>
     </div>
     <div
@@ -60,12 +60,12 @@
       </button>
       <div class="kill-switch-fullscreen-card">
         <p class="kill-switch-status">Service unavailable</p>
-        <h2>ItemTraxx is currently unavailable</h2>
+        <h2>ItemTraxx is currently unavailable. We're sorry for the inconvenience.</h2>
         <p>{{ killSwitchMessage }}</p>
         <div class="kill-switch-fullscreen-actions">
           <a
             class="kill-switch-action kill-switch-action-primary"
-            href="https://status.itemtraxx.com/"
+            href="https://status.itemtraxx.com/ref=killswitch"
             target="_blank"
             rel="noreferrer"
           >
@@ -85,13 +85,13 @@
           ItemTraxx is currently unavailable while we apply updates and complete maintenance.
         </p>
         <p>
-          Please try again shortly. Your data is safe and we will restore full access as soon as
-          maintenance is complete. Please check the live status page for updates and estimated completion time. 
+          Please try again shortly. Your data is safe and we will restore access as soon as
+          maintenance is complete. Please check the ItemTraxx status page for updates. 
         </p>
         <div class="maintenance-fullscreen-actions">
           <a
             class="button-link"
-            href="https://status.itemtraxx.com/"
+            href="https://status.itemtraxx.com/?ref=maintscreen"
             target="_blank"
             rel="noreferrer"
           >
@@ -174,7 +174,7 @@
       </div>
       <a
         class="broadcast-link"
-        href="https://status.itemtraxx.com/"
+        href="https://status.itemtraxx.com/?ref=bcastlink"
         target="_blank"
         rel="noreferrer"
       >
@@ -251,7 +251,7 @@
         </div>
         <a
           class="menu-item muted menu-status" role="menuitem"
-          href="https://status.itemtraxx.com/"
+          href="https://status.itemtraxx.com/?ref=trmenu"
           target="_blank"
           rel="noreferrer"
         >
@@ -367,7 +367,7 @@ const incidentBannerHeight = ref(0);
 const maintenanceEnabled = ref(false);
 const maintenanceMessage = ref("Maintenance currentlyin progress.");
 const killSwitchEnabled = ref(false);
-const killSwitchMessage = ref("Unfortunately ItemTraxx is currently unavailable. We apologize for any inconvenience and are working to restore access as soon as possible. Please see the status page (https://status.itemtraxx.com/) for more information.");
+const killSwitchMessage = ref("Unfortunately ItemTraxx is currently unavailable. We apologize for any inconvenience and are working to restore access as soon as possible. Please see the status page (https://status.itemtraxx.com/ref=killswitch) for more information.");
 const backendUnavailable = ref(false);
 const isOutdated = ref(false);
 const latestVersion = ref<string | null>(null);
@@ -1210,7 +1210,7 @@ const applySystemStatus = () => {
     killSwitchMessage.value =
       typeof payload.kill_switch.message === "string" && payload.kill_switch.message.trim()
         ? payload.kill_switch.message.trim()
-        : "Unfortunately ItemTraxx is currently unavailable. We apologize for any inconvenience and are working to restore access as soon as possible. Please see the status page (https://status.itemtraxx.com/) for more information.";
+        : "Unfortunately ItemTraxx is currently unavailable. We apologize for any inconvenience and are working to restore access as soon as possible. Please see the status page (https://status.itemtraxx.com/ref=killswitch) for more information.";
   } else {
     killSwitchEnabled.value = false;
   }

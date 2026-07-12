@@ -12,7 +12,7 @@ export const registerPrivilegedAdminStepUp = async (accessToken?: string) => {
   );
 
   if (!result.ok) {
-    throw edgeFunctionError(result, "Unable to verify admin session.");
+    throw edgeFunctionError(result, "Unable to verify admin session. Please sign out and try again.");
   }
 
   return result.data?.data ?? { registered: false, expires_at: "" };

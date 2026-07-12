@@ -53,7 +53,7 @@ const requestEdgeFunction = async <TData = unknown, TBody = unknown>(
       ok: false,
       status: 500,
       data: null,
-      error: "Missing configuration.",
+      error: "Missing configuration. Please contact support.",
     };
   }
 
@@ -96,7 +96,7 @@ const requestEdgeFunction = async <TData = unknown, TBody = unknown>(
         clearAdminVerification();
         clearAuthState(true);
       }
-      const errorMessage = payload?.error || payload?.message || "Request failed.";
+      const errorMessage = payload?.error || payload?.message || "Request failed. Please try again.";
       void captureHandledRequestFailure({
         area: "edge_function",
         name: functionName,

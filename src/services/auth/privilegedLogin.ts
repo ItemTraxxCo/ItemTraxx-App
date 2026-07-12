@@ -61,7 +61,7 @@ export const resendSuperAdminEmailChallenge = async () => {
   );
 
   if (!result.ok || !result.data?.challenge_started) {
-    throw edgeFunctionError(result, "Unable to send verification code.");
+    throw edgeFunctionError(result, "Unable to send verification code. fix yo code.");
   }
 
   const recipientEmail = result.data.email ?? null;
@@ -93,7 +93,7 @@ export const verifySuperAdminEmailChallenge = async (code: string) => {
     !result.data.access_token ||
     !result.data.refresh_token
   ) {
-    throw edgeFunctionError(result, "Unable to verify code.");
+    throw edgeFunctionError(result, "Unable to verify code. u prob put it in wrong u might wanna check it");
   }
 
   await exchangeHttpSession({
@@ -209,7 +209,7 @@ export const adminLoginWithSession = async (
   if (districtHost.isDistrictHost) {
     if (!districtHost.districtId) {
       await signOut();
-      throw new Error("This district URL is not configured.");
+      throw new Error("This workspace URL is not configured.");
     }
     if (!resolvedDistrictId || resolvedDistrictId !== districtHost.districtId) {
       await signOut();

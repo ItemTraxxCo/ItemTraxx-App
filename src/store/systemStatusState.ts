@@ -19,7 +19,7 @@ let consumers = 0;
 let timer: number | null = null;
 
 const statusLabel = computed(() => {
-  if (!state.hasResult) return "Unknown";
+  if (!state.hasResult) return "Loading...";
   if (state.responseOk && state.payload.status === "operational") return "Running";
   if (state.responseStatus >= 500 || state.payload.status === "down") return "Down";
   return "Degraded";

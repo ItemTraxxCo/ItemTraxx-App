@@ -251,7 +251,7 @@ const callSuperOps = async <TData>(payload: SuperOpsRequest) => {
   );
 
   if (!result.ok) {
-    throw edgeFunctionError(result, "Super ops request failed.");
+    throw edgeFunctionError(result, "Super ops request failed. Please try again.");
   }
 
   return result.data?.data as TData;

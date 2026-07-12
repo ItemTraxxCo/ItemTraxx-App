@@ -105,7 +105,7 @@ const runWithStorageLease = async <T>(callback: () => Promise<T>) => {
     }
 
     if (Date.now() - acquireStartedAt > OFFLINE_QUEUE_LOCK_TTL_MS * 2) {
-      throw new Error("Offline queue is busy. Please try again.");
+      throw new Error("Offline queue is busy. Please try again in a bit.");
     }
 
     await sleep(50);
@@ -223,7 +223,7 @@ const decryptOfflineQueue = async (raw: string) => {
 const markOfflineQueueCorrupted = () => {
   window.localStorage.removeItem(OFFLINE_QUEUE_KEY);
   offlineQueueWarning =
-    "Buffered transaction cache was reset because local data could not be verified. Please retry failed requests.";
+    "Buffered transaction cache was reset because local data could not be verified. Please retry the failed requests.";
 };
 
 export const consumeCheckoutOfflineWarning = () => {

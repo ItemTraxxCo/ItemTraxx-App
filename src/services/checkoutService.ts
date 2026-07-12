@@ -52,7 +52,7 @@ const executeCheckoutReturn = async (payload: CheckoutReturnPayload) => {
     if (result.status === 429) {
       throw new Error("Rate limit exceeded, please try again in a minute.");
     }
-    throw edgeFunctionError(result, "Request failed.");
+    throw edgeFunctionError(result, "Request failed. Please contact support.");
   }
 
   const skippedBarcodes = result.data?.skipped_barcodes ?? [];
@@ -162,7 +162,7 @@ export const fetchGearByBarcode = async (barcode: string) => {
       limit: "1",
     }),
     LOOKUP_TIMEOUT_MS,
-    "Barcode lookup timed out."
+    "Unable to connect to ItemTraxx servers. Please check your internet connection and try again."
   );
 
   if (!rows?.length) {
@@ -182,7 +182,7 @@ export const fetchStudentByStudentId = async (studentId: string) => {
       },
     ),
     LOOKUP_TIMEOUT_MS,
-    "Borrower lookup timed out."
+    "Unable to connect to ItemTraxx servers. Please check your internet connection and try again."
   );
 
   if (!result.ok || !result.data?.data) {
@@ -200,7 +200,7 @@ export const fetchCheckedOutGear = async (studentUuid: string) => {
       deleted_at: "is.null",
     }),
     LOOKUP_TIMEOUT_MS,
-    "Checked out items lookup timed out."
+    "Unable to connect to ItemTraxx servers. Please check your internet connection and try again."
   );
 
   return (rows ?? []) as GearSummary[];

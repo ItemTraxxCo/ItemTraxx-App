@@ -26,7 +26,7 @@ const loadReceiptLogo = async (): Promise<{ dataUrl: string; width: number; heig
     const dimensions = await new Promise<{ width: number; height: number }>((resolve, reject) => {
       const image = new Image();
       image.onload = () => resolve({ width: image.naturalWidth, height: image.naturalHeight });
-      image.onerror = () => reject(new Error("Unable to load receipt logo image."));
+      image.onerror = () => reject(new Error("Unable to load receipt logo image. Please contact support."));
       image.src = dataUrl;
     });
     return { dataUrl, ...dimensions };
@@ -74,7 +74,7 @@ export const downloadTransactionReceiptPdf = async (receipt: TransactionReceipt)
   row("Borrower", receipt.studentUsername);
   row("Borrower ID", receipt.studentId);
   row("Tenant", receipt.operatorEmail);
-  row("Tenant ID", receipt.tenantId ?? "Unknown. Please contact support.");
+  row("Tenant ID", receipt.tenantId ?? "Unknown. Please contact support to resolve this.");
   row("Checkout(s)", String(receipt.checkouts));
   row("Return(s)", String(receipt.returns));
 

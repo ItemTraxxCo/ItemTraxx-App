@@ -63,7 +63,7 @@ export const consumeDistrictSessionHandoff = async (): Promise<
   window.history.replaceState({}, document.title, nextUrl);
 
   if (!handoffCode && !tokenHash) {
-    console.warn("Ignored deprecated raw district handoff token parameters.");
+    console.warn("Ignored deprecated raw district handoff token parameters. Please contact support.");
     return false;
   }
 
@@ -81,7 +81,7 @@ export const consumeDistrictSessionHandoff = async (): Promise<
       !verifyResult.data.session?.access_token ||
       !verifyResult.data.session.refresh_token
     ) {
-      throw new Error("Unable to complete district sign-in.");
+      throw new Error("Unable to complete workspace sign-in.");
     }
 
     const verifiedAccessToken = verifyResult.data.session.access_token;
@@ -129,7 +129,7 @@ export const consumeDistrictSessionHandoff = async (): Promise<
           return false;
         }
       }
-      throw new Error("Unable to complete district sign-in.");
+      throw new Error("Unable to complete workspace sign-in.");
     }
 
     finalAccessToken = result.data.access_token;
@@ -137,7 +137,7 @@ export const consumeDistrictSessionHandoff = async (): Promise<
   }
 
   if (!finalAccessToken || !finalRefreshToken) {
-    throw new Error("Unable to complete district sign-in.");
+    throw new Error("Unable to complete workspace sign-in.");
   }
 
   const exchangedSessionSummary = await exchangeHttpSession({
@@ -178,7 +178,7 @@ export const createDistrictSessionHandoff = async (districtSlug: string) => {
   });
 
   if (!result.ok || !result.data?.hashed_token) {
-    throw new Error("Unable to prepare district sign-in.");
+    throw new Error("Unable to prepare workspace sign-in.");
   }
 
   await clearLocalSession();
@@ -233,9 +233,9 @@ export const createDistrictAdminSessionHandoff = async (
       throw new Error("Invalid credentials.");
     }
     if (!result.ok && result.error === "District not found") {
-      throw new Error("No district assignment.");
+      throw new Error("No workspace assignment.");
     }
-    throw new Error("Unable to prepare district sign-in.");
+    throw new Error("Unable to prepare workspace sign-in.");
   }
 
   return {

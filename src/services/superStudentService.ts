@@ -25,7 +25,7 @@ const callSuperStudent = async <TData>(payload: SuperStudentRequest) => {
   );
 
   if (!result.ok) {
-    throw edgeFunctionError(result, "Super borrower request failed.");
+    throw edgeFunctionError(result, "Borrower request failed. Try again.");
   }
 
   return result.data?.data as TData;

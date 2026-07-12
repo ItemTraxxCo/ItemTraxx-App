@@ -62,7 +62,7 @@ export const fetchSuperDashboard = async () => {
   );
 
   if (!result.ok) {
-    throw edgeFunctionError(result, "Unable to load super dashboard.");
+    throw edgeFunctionError(result, "Unable to load super dashboard. fix yo code.");
   }
 
   return result.data?.data as SuperDashboard;

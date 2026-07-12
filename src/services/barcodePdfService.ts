@@ -18,13 +18,13 @@ export const createBarcodePattern = (
     margin: 0,
     width: 1,
     height: 1,
-    background: "#ffffff",
+    background: "#e0e0e0",
     lineColor: "#000000",
   });
 
   const context = canvas.getContext("2d");
   if (!context || canvas.width === 0 || canvas.height === 0) {
-    throw new Error("Unable to render barcode.");
+    throw new Error("Unable to render barcode(s).");
   }
 
   const row = Math.floor(canvas.height / 2);
@@ -52,7 +52,7 @@ export const createBarcodePattern = (
 
 export const downloadBarcodePdf = async (barcodes: string[], message: string) => {
   if (!barcodes.length) {
-    throw new Error("No barcodes to export.");
+    throw new Error("No barcode(s) to export.");
   }
 
   const [{ default: jsPDF }, { default: JsBarcode }] = await Promise.all([

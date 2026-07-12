@@ -38,7 +38,7 @@ export const submitContactSalesLead = async (payload: ContactSalesPayload) => {
   );
 
   if (!result.ok || !result.data?.ok || !result.data.data?.lead_id) {
-    throw edgeFunctionError(result, result.data?.error || "Unable to send sales request.");
+    throw edgeFunctionError(result, result.data?.error || "Unable to send sales request. Please contact sales directly via email: support@itemtraxx.com");
   }
 
   return result.data.data;

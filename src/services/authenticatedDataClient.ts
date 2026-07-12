@@ -24,7 +24,7 @@ const getBaseUrl = () => {
     return "";
   }
   if (!origin) {
-    throw new Error("Missing edge proxy configuration for authenticated data requests.");
+    throw new Error("Missing edge proxy config for authenticated data requests. Please contact support.");
   }
   return origin;
 };
@@ -55,7 +55,7 @@ const request = async (
   });
 
   if (!response.ok) {
-    let message = `Authenticated data request failed (${response.status}).`;
+    let message = `Whoops! Authenticated data request failed (${response.status}).`;
     try {
       const text = await response.text();
       if (text.trim()) {
@@ -76,7 +76,7 @@ const request = async (
     });
     if (response.status === 401) {
       if (options.suppressUnauthorizedRecovery) {
-        throw new AppError("UNAUTHORIZED", "Your session expired. Sign in again.", {
+        throw new AppError("UNAUTHORIZED", "Your session has expired. Please sign in again.", {
           status: 401,
           reportToSentry: false,
         });
@@ -85,7 +85,7 @@ const request = async (
     }
     if (response.status === 403 && /permission denied/i.test(message)) {
       if (options.suppressUnauthorizedRecovery) {
-        throw new AppError("UNAUTHORIZED", "Your session expired. Sign in again.", {
+        throw new AppError("UNAUTHORIZED", "Your session has expired. Please sign in again.", {
           status: 403,
           reportToSentry: false,
         });
@@ -188,7 +188,7 @@ export const authenticatedCount = async (table: string, query: Record<string, st
   const contentRange = response.headers.get("content-range") ?? "";
   const match = contentRange.match(/\/(\d+)$/);
   if (!match) {
-    throw new Error("Authenticated count request missing content-range.");
+    throw new Error("Authenticated count request missing content-range. Please contact support.");
   }
   return Number(match[1]);
 };

@@ -33,7 +33,7 @@ export const submitContactSupportRequest = async (payload: ContactSupportPayload
   );
 
   if (!result.ok || !result.data?.ok || !result.data.data?.accepted) {
-    throw edgeFunctionError(result, result.data?.error || "Unable to send support request.");
+    throw edgeFunctionError(result, result.data?.error || "Unable to send support request. Please contact support direcly via email: support@itemtraxx.com");
   }
 
   return result.data.data;

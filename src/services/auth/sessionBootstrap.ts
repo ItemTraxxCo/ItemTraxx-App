@@ -44,7 +44,7 @@ export const fetchCurrentRoleAndTenant = async () => {
             suppressUnauthorizedRecovery: true,
           }),
           AUTH_QUERY_TIMEOUT_MS,
-          "Role lookup timed out."
+          "Role lookup timed out. Unable to reach ItemTraxx servers."
         ),
       2
     ),
@@ -55,7 +55,7 @@ export const fetchCurrentRoleAndTenant = async () => {
             suppressUnauthorizedRecovery: true,
           }),
           AUTH_QUERY_TIMEOUT_MS,
-          "Tenant lookup timed out."
+          "Tenant lookup timed out. Unable to reach ItemTraxx servers."
         ),
       2
     ),
@@ -81,7 +81,7 @@ export const fetchProfile = async (userId: string): Promise<ProfileRow | null> =
             suppressUnauthorizedRecovery: true,
           }),
           AUTH_QUERY_TIMEOUT_MS,
-          "Profile lookup timed out."
+          "Profile lookup timed out. Unable to reach ItemTraxx servers."
         ),
       2
     );
@@ -102,7 +102,7 @@ export const fetchProfile = async (userId: string): Promise<ProfileRow | null> =
         is_active: null,
       };
     } catch {
-      console.error("Profile fallback lookup failed.");
+      console.error("Profile fallback lookup failed. Unable to reach ItemTraxx servers.");
       return null;
     }
   }
@@ -124,13 +124,13 @@ export const fetchTenantContext = async (tenantId: string): Promise<TenantRow | 
             suppressUnauthorizedRecovery: true,
           }),
           AUTH_QUERY_TIMEOUT_MS,
-          "Tenant status lookup timed out."
+          "Tenant status lookup timed out. Unable to reach ItemTraxx servers."
         ),
       2
     );
     data = response?.[0] ?? null;
   } catch {
-    console.error("Tenant status lookup failed.");
+    console.error("Tenant status lookup failed. Unable to reach ItemTraxx servers.");
     return null;
   }
 
@@ -237,7 +237,7 @@ export const refreshAuthFromSession = async () => {
     );
     await applyHttpSessionSummary(summary);
   } catch {
-    console.error("Session refresh failed.");
+    console.error("Session refresh failed. Unable to reach ItemTraxx servers. Please sign out and sign back in.");
     clearAuthState(true);
   }
 };

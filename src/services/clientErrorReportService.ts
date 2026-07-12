@@ -59,6 +59,6 @@ export const sendClientErrorReport = async (draft: FatalErrorReportDraft) => {
   });
 
   if (!result.ok) {
-    throw new Error(result.error || "Unable to send error report.");
+    throw new Error(result.error || "Unable to send error report. Please contact support directly via email: support@itemtraxx.com");
   }
 };

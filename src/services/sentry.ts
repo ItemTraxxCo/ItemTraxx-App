@@ -52,7 +52,7 @@ const loadSentryReplay = async () => {
       })
     );
   } catch (error) {
-    console.warn("Sentry Replay failed to load.", error);
+    console.warn("Sentry Replay failed to load. Please contact support.", error);
   }
 };
 

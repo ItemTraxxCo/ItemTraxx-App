@@ -22,6 +22,6 @@ export const recordCookieConsent = async (
     },
   );
   if (!result.ok || result.data?.data?.recorded !== true) {
-    throw new Error("Unable to confirm cookie consent record.");
+    throw new Error("Unable to confirm cookie consent record. Your selected choice may not have been applied. Please contact support.");
   }
 };

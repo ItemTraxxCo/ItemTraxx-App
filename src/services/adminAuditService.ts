@@ -21,7 +21,7 @@ type ActorProfileRow = {
 export const fetchAdminAuditLogs = async (): Promise<AdminAuditLog[]> => {
   const tenantId = getAuthState().tenantContextId;
   if (!tenantId) {
-    throw new Error("Missing tenant context.");
+    throw new Error("Missing requored account data. Please sign out and sign in again and try again. If error persists, please contact support.");
   }
 
   const data = await authenticatedSelect<AdminAuditLog[]>("admin_audit_logs", {
@@ -32,7 +32,7 @@ export const fetchAdminAuditLogs = async (): Promise<AdminAuditLog[]> => {
   }).catch(() => null);
 
   if (!data) {
-    throw new Error("Unable to load admin audit logs.");
+    throw new Error("Unable to load admin audit logs. Please try again.");
   }
 
   const logs = data ?? [];

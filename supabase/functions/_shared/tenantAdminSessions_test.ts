@@ -53,10 +53,11 @@ class MockClient {
     claims: Record<string, unknown> | null,
   ) {
     this.auth = {
-      getClaims: () => Promise.resolve({
-        data: claims ? { claims } : null,
-        error: claims ? null : new Error("invalid jwt"),
-      }),
+      getClaims: () =>
+        Promise.resolve({
+          data: claims ? { claims } : null,
+          error: claims ? null : new Error("invalid jwt"),
+        }),
     };
   }
   from() {
@@ -126,9 +127,11 @@ Deno.test("tenant admin device session accepts no-session-id tokens only when to
     "SHA-256",
     new TextEncoder().encode("verified-token"),
   );
-  const tokenHash = `token:${Array.from(new Uint8Array(digest))
-    .map((byte) => byte.toString(16).padStart(2, "0"))
-    .join("")}`;
+  const tokenHash = `token:${
+    Array.from(new Uint8Array(digest))
+      .map((byte) => byte.toString(16).padStart(2, "0"))
+      .join("")
+  }`;
 
   const client = new MockClient([
     { data: null, error: null },
@@ -161,9 +164,11 @@ Deno.test("tenant admin device session rejects no-session-id tokens when issued-
     "SHA-256",
     new TextEncoder().encode("verified-token"),
   );
-  const tokenHash = `token:${Array.from(new Uint8Array(digest))
-    .map((byte) => byte.toString(16).padStart(2, "0"))
-    .join("")}`;
+  const tokenHash = `token:${
+    Array.from(new Uint8Array(digest))
+      .map((byte) => byte.toString(16).padStart(2, "0"))
+      .join("")
+  }`;
 
   const client = new MockClient([
     { data: null, error: null },

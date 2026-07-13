@@ -3,6 +3,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.108.2";
 import { isAllowedOrigin, parseAllowedOrigins } from "../_shared/cors.ts";
 import { readJsonBody } from "../_shared/requestBody.ts";
 import { resolveClientFingerprint, resolveClientIp } from "../_shared/preloginGuards.ts";
+import { sha256Hex } from "../_shared/sha256.ts";
 import { requireTrustedEdgeIngress } from "../_shared/trustedIngress.ts";
 import {
   ACCESS_CODE_PATTERN,
@@ -27,17 +28,6 @@ type RateLimitResult = {
 type TurnstileVerifyResult = {
   success: boolean;
   "error-codes"?: string[];
-};
-
-const toHex = (bytes: Uint8Array) =>
-  Array.from(bytes)
-    .map((byte) => byte.toString(16).padStart(2, "0"))
-    .join("");
-
-const hashString = async (value: string) => {
-  const encoded = new TextEncoder().encode(value);
-  const digest = await crypto.subtle.digest("SHA-256", encoded);
-  return toHex(new Uint8Array(digest));
 };
 
 const enforceRateLimit = async (
@@ -263,7 +253,7 @@ serve(async (req) => {
     }
 
     const clientFingerprint = resolveClientFingerprint(req, origin);
-    const accessCodeHash = await hashString(normalizedAccessCode);
+    const accessCodeHash = await sha256Hex(normalizedAccessCode);
     const perClientScope = `tenant-login-client-${clientFingerprint}`;
     const perClientAccessScope = `tenant-login-client-access-${clientFingerprint}-${accessCodeHash.slice(
       0,

@@ -13,10 +13,10 @@
       <div class="scanner-modal-card" role="dialog" aria-modal="true" :aria-label="title">
         <div class="scanner-modal-header">
           <div>
-            <p class="scanner-modal-eyebrow">Camera barcode scanner</p>
+            <p class="scanner-modal-eyebrow">ItemTraxx Camera Scanner</p>
             <h2>{{ title }}</h2>
           </div>
-          <button type="button" class="scanner-icon-button" @click="handleClose">×</button>
+          <button type="button" class="scanner-icon-button" @click="handleClose">x</button>
         </div>
 
         <div class="scanner-preview-shell">
@@ -37,7 +37,7 @@
                 />
               </svg>
             </div>
-            <div v-if="isStarting" class="scanner-overlay-message">Starting camera...</div>
+            <div v-if="isStarting" class="scanner-overlay-message">Loading, please wait...</div>
             <div v-else-if="errorMessage" class="scanner-overlay-message scanner-overlay-error">
               {{ errorMessage }}
             </div>
@@ -45,7 +45,7 @@
               v-if="props.mode === 'borrower' && currentDetection"
               class="scanner-inline-detection"
             >
-              <strong>Scanned borrower ID</strong>
+              <strong>Scanned borrower</strong>
               <span>{{ currentDetection.value }}</span>
             </div>
           </div>
@@ -89,7 +89,7 @@
             <p class="scanner-status-copy">{{ statusMessageText }}</p>
           </div>
           <span class="scanner-helper-text">
-            Make sure the barcode is clearly visible, there are no glares, and well lit.
+            Make sure the barcode is clearly visible, no glares, and well lit.
           </span>
         </div>
 
@@ -232,7 +232,7 @@ const currentStatus = computed<ScannerStatus>(() => currentDetection.value?.stat
 const statusLabel = computed(() => {
   switch (currentStatus.value) {
     case "success":
-      return "Successful scan";
+      return "Scan Successful";
     case "low_light":
       return "Too little light";
     case "glare":
@@ -240,7 +240,7 @@ const statusLabel = computed(() => {
     case "blurry":
       return "Blurry barcode";
     default:
-      return "Barcode not readable";
+      return "Barcode is not readable";
   }
 });
 

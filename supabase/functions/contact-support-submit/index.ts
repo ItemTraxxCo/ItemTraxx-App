@@ -4,6 +4,7 @@ import { isKillSwitchWriteBlocked } from "../_shared/killSwitch.ts";
 import { getRequestId, logError, logInfo } from "../_shared/observability.ts";
 import { isAllowedOrigin, parseAllowedOrigins } from "../_shared/cors.ts";
 import { readJsonBody } from "../_shared/requestBody.ts";
+import { sha256Hex } from "../_shared/sha256.ts";
 import {
   resolveClientIp,
   verifyTurnstileToken,
@@ -164,17 +165,6 @@ const detectAttachmentType = (
   return null;
 };
 
-const toHex = (bytes: Uint8Array) =>
-  Array.from(bytes)
-    .map((byte) => byte.toString(16).padStart(2, "0"))
-    .join("");
-
-const hashString = async (value: string) => {
-  const encoded = new TextEncoder().encode(value);
-  const digest = await crypto.subtle.digest("SHA-256", encoded);
-  return toHex(new Uint8Array(digest));
-};
-
 const SUPPORT_ATTACHMENT_BUCKET = "support-request-attachments";
 
 const buildSafeStoragePath = (
@@ -309,7 +299,7 @@ serve(async (req) => {
     const fingerprintSource = `${clientIp}|${
       req.headers.get("user-agent") ?? ""
     }`;
-    const fingerprint = await hashString(fingerprintSource);
+    const fingerprint = await sha256Hex(fingerprintSource);
 
     const { data: rateLimit, error: rateLimitError } = await adminClient.rpc(
       "consume_rate_limit_prelogin",

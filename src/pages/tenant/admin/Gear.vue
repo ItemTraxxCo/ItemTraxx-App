@@ -760,6 +760,21 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
+.form-help-row {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 0.35rem;
+  font-size: 0.75rem;
+}
+
+.gear-notes-cell {
+  min-width: 220px;
+}
+
+.gear-notes-input {
+  width: 100%;
+}
+
 .modal-backdrop {
   position: fixed;
   inset: 0;

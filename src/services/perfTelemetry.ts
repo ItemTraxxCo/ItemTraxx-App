@@ -53,5 +53,3 @@ export const captureInitialPerfMetrics = () => {
     pushMetric({ name: "first-contentful-paint", valueMs: fcpEntry.startTime });
   }
 };
-
-export const getPerfMetricsSnapshot = () => [...metricsBuffer];

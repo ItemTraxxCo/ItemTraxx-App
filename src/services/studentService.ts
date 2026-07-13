@@ -29,7 +29,7 @@ const pickRelation = <T>(value: MaybeRelation<T>): T | null => {
 const getTenantContextId = () => {
   const tenantId = getAuthState().tenantContextId;
   if (!tenantId) {
-    throw missingContextError("Missing tenant context.");
+    throw missingContextError("Missing tenant context. Please try again or contact support.");
   }
   return tenantId;
 };
@@ -57,7 +57,7 @@ export const fetchDeletedStudents = async () => {
   );
 
   if (!result.ok) {
-    throw edgeFunctionError(result, "Unable to load archived borrowers.");
+    throw edgeFunctionError(result, "Unable to load archived borrowers. Please try again.");
   }
 
   return (result.data?.data ?? []) as StudentItem[];
@@ -86,7 +86,7 @@ export const createStudent = async (payload: {
   );
 
   if (!result.ok) {
-    throw edgeFunctionError(result, "Unable to create borrower.");
+    throw edgeFunctionError(result, "Unable to create borrower. Please try again or contact suppport.");
   }
 
   return result.data?.data as StudentItem;
@@ -112,7 +112,7 @@ export const bulkCreateStudents = async (
   });
 
   if (!result.ok) {
-    throw edgeFunctionError(result, "Unable to import borrowers.");
+    throw edgeFunctionError(result, "Unable to import borrowers. Please try again or contact support..");
   }
 
   return result.data?.data as {
@@ -134,7 +134,7 @@ export const deleteStudent = async (id: string) => {
   });
 
   if (!result.ok) {
-    throw edgeFunctionError(result, "Unable to remove borrower.");
+    throw edgeFunctionError(result, "Unable to remove borrower. Please try again or contact support.");
   }
 };
 
@@ -152,7 +152,7 @@ export const restoreStudent = async (id: string) => {
   );
 
   if (!result.ok) {
-    throw edgeFunctionError(result, "Unable to restore borrower.");
+    throw edgeFunctionError(result, "Unable to restore borrower. Please try again or contact support.");
   }
 
   return result.data?.data as StudentItem;

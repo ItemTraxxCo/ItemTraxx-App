@@ -38,7 +38,7 @@ const pickRelation = <T>(value: MaybeRelation<T>): T | null => {
 const getTenantContextId = () => {
   const tenantId = getAuthState().tenantContextId;
   if (!tenantId) {
-    throw missingContextError("Missing tenant context.");
+    throw missingContextError("Missing tenant context. Please try again or contact support.");
   }
   return tenantId;
 };
@@ -63,7 +63,7 @@ export const fetchDeletedGear = async () => {
   });
 
   if (!result.ok) {
-    throw edgeFunctionError(result, "Unable to load archived items.");
+    throw edgeFunctionError(result, "Unable to load archived items. Please contact support.");
   }
 
   return (result.data?.data ?? []) as GearItem[];
@@ -95,7 +95,7 @@ export const createGear = async (payload: {
   });
 
   if (!result.ok) {
-    throw edgeFunctionError(result, "Unable to create item.");
+    throw edgeFunctionError(result, "Unable to create item. Please make sure your information is accurate and try again.");
   }
 
   return result.data?.data as GearItem;

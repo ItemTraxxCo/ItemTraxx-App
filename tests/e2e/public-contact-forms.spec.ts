@@ -1,9 +1,10 @@
 import { expect, test } from "@playwright/test";
-import { mockSystemStatus } from "./helpers/testHarness";
+import { mockSystemStatus, mockUnauthenticatedSession } from "./helpers/testHarness";
 
 test.describe("Public contact forms", () => {
   test.beforeEach(async ({ page }) => {
     await mockSystemStatus(page);
+    await mockUnauthenticatedSession(page);
   });
 
   test("contact sales submits the expected edge payload and shows confirmation", async ({ page }) => {

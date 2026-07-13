@@ -439,7 +439,7 @@ import {
   setRuntimeConfig,
   upsertAlertRule,
   type SuperControlCenter,
-} from "../../services/superOpsService";
+} from "../../services/superOps/controlCenter";
 
 const router = useRouter();
 const dashboard = ref<SuperDashboard | null>(null);

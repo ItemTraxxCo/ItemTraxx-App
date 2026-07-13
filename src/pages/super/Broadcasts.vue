@@ -94,7 +94,7 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted, ref } from "vue";
 import { RouterLink } from "vue-router";
-import { getControlCenter, setRuntimeConfig } from "../../services/superOpsService";
+import { getControlCenter, setRuntimeConfig } from "../../services/superOps/controlCenter";
 import { toUserFacingErrorMessage } from "../../services/appErrors";
 
 const message = ref("");

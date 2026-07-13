@@ -36,7 +36,7 @@ const callTenantAdminManage = async <TData>(payload: TenantAdminManageRequest) =
   );
 
   if (!result.ok) {
-    throw edgeFunctionError(result, "Tenant admin request failed.");
+    throw edgeFunctionError(result, "Tenant admin request failed. Please try again. If this keeps happening, sign out and sign back in. If that doesn't work, please contact support.");
   }
 
   return result.data?.data as TData;

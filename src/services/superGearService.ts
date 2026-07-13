@@ -27,7 +27,7 @@ const callSuperGear = async <TData>(payload: SuperGearRequest) => {
   );
 
   if (!result.ok) {
-    throw edgeFunctionError(result, "Super item request failed.");
+    throw edgeFunctionError(result, "Super item request failed. fix yo code.");
   }
 
   return result.data?.data as TData;

@@ -258,7 +258,8 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from "vue";
 import { useRouter } from "vue-router";
-import { getInternalOpsSnapshot, setRuntimeConfig, type InternalOpsSnapshot } from "../../services/superOpsService";
+import { setRuntimeConfig } from "../../services/superOps/controlCenter";
+import { getInternalOpsSnapshot, type InternalOpsSnapshot } from "../../services/superOps/internalOps";
 
 const router = useRouter();
 const snapshot = ref<InternalOpsSnapshot | null>(null);

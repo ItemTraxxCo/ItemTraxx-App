@@ -10,8 +10,6 @@ export type TenantFeatureFlags = {
   enable_barcode_generator: boolean;
 };
 
-export type TenantStatus = "active" | "suspended" | "archived";
-
 export type SuperTenantAction =
   | "list_tenants"
   | "create_tenant"

@@ -1,14 +1,14 @@
 import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.108.2";
+import {
+  isMissingPostgrestRelation,
+  type PostgrestErrorLike,
+} from "./postgrestErrors.ts";
+import { sha256Hex } from "./sha256.ts";
 
 export type PrivilegedRoleScope =
   | "super_admin"
   | "tenant_admin"
   | "district_admin";
-
-type PgLikeError = {
-  code?: string;
-  message?: string;
-};
 
 const DEFAULT_STEP_UP_TTL_MS = 15 * 60 * 1000;
 const ADMIN_STEP_UP_REGISTRATION_WINDOW_MS = 5 * 60 * 1000;
@@ -18,14 +18,6 @@ const ADMIN_HANDOFF_AUTH_METHODS = new Set([
   "otp",
   "email_link",
 ]);
-
-const sha256 = async (value: string) => {
-  const encoded = new TextEncoder().encode(value);
-  const digest = await crypto.subtle.digest("SHA-256", encoded);
-  return Array.from(new Uint8Array(digest))
-    .map((byte) => byte.toString(16).padStart(2, "0"))
-    .join("");
-};
 
 const getVerifiedClaims = async (
   authClient: SupabaseClient,
@@ -49,7 +41,7 @@ const resolveBindingKey = async (
   if (sessionId) {
     return `session:${sessionId}`;
   }
-  return `token:${await sha256(authToken)}`;
+  return `token:${await sha256Hex(authToken)}`;
 };
 
 export const canRegisterAdminStepUp = async (
@@ -81,11 +73,8 @@ export const canRegisterAdminStepUpFromTrustedHandoff = async (
 };
 
 export const isMissingPrivilegedStepUpTable = (
-  error: PgLikeError | null | undefined,
-) =>
-  !!error &&
-  error.code === "42P01" &&
-  (error.message ?? "").toLowerCase().includes("privileged_session_stepups");
+  error: PostgrestErrorLike | null | undefined,
+) => isMissingPostgrestRelation(error, "privileged_session_stepups");
 
 export const registerPrivilegedStepUp = async (
   adminClient: SupabaseClient,

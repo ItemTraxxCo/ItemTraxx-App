@@ -1,7 +1,10 @@
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.108.2";
-import type { PostgrestError } from "https://esm.sh/@supabase/supabase-js@2.108.2";
 import { getRequestId, logError } from "../_shared/observability.ts";
+import {
+  isMissingPostgrestColumn as isMissingColumn,
+  isMissingPostgrestRelation as isMissingRelation,
+} from "../_shared/postgrestErrors.ts";
 import {
   hasPrivilegedStepUp,
   isMissingPrivilegedStepUpTable,
@@ -31,15 +34,6 @@ const resolveCorsHeaders = (req: Request) => {
 
   return { hasOrigin, originAllowed, headers };
 };
-
-const isMissingColumn = (error: PostgrestError | null, column: string) =>
-  !!error &&
-  error.code === "42703" &&
-  error.message.toLowerCase().includes(column.toLowerCase());
-const isMissingRelation = (error: PostgrestError | null, relation: string) =>
-  !!error &&
-  error.code === "42P01" &&
-  error.message.toLowerCase().includes(relation.toLowerCase());
 
 type TenantMetricRow = {
   tenant_id: string;

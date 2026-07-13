@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 import type { Page } from "@playwright/test";
 import type { BarcodePattern } from "../../src/services/barcodePdfService";
+import { mockUnauthenticatedSession } from "./helpers/testHarness";
 
 const generatePattern = async (page: Page, value: string): Promise<BarcodePattern> => {
   await page.waitForFunction(
@@ -14,6 +15,7 @@ const generatePattern = async (page: Page, value: string): Promise<BarcodePatter
 
 test.describe("createBarcodePattern", () => {
   test.beforeEach(async ({ page }) => {
+    await mockUnauthenticatedSession(page);
     await page.goto("/");
   });
 

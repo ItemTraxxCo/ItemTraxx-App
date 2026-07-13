@@ -9,6 +9,7 @@
       'route-shell-unavailable': isUnavailableRoute,
       'route-shell-banner-bleed': isBannerBleedRoute,
     }"
+    :style="appShellStyle"
   >
     <div v-if="isRouteNavigating" class="route-progress" aria-hidden="true"></div>
     <div
@@ -21,245 +22,59 @@
       <div class="page-loading-mark" aria-hidden="true"></div>
       <div class="page-loading-copy">
         <strong>Loading...</strong>
-        <span>Preparing your tracking experience.</span>
+        <span>Hold tight, we're preparing your tracking experience.</span>
       </div>
     </div>
-    <div
-      v-if="showMaintenanceBanner"
-      ref="maintenanceBannerRef"
-      class="maintenance-top-banner"
-      role="alert"
-      aria-live="assertive"
+    <AppTopBanners
+      :maintenance-visible="showMaintenanceBanner"
+      :maintenance-message="maintenanceMessage"
+      :broadcast="activeBroadcast"
+      :broadcast-visible="showBroadcast"
+      :incident="incidentBanner"
+      :incident-visible="showIncidentBanner"
+      :incident-title="incidentBannerTitle"
+      :incident-sla-line="incidentSlaLine"
+      @dismiss-broadcast="dismissBroadcast"
+      @dismiss-incident="dismissIncidentBanner"
+      @elements="setTopBannerElements"
     >
-      <strong>Maintenance Mode</strong>
-      <span>{{ maintenanceMessage }}</span>
-    </div>
-    <div
-      v-if="showKillSwitchOverlay"
-      class="kill-switch-fullscreen"
-      role="alertdialog"
-      aria-live="assertive"
-      aria-modal="true"
-    >
-      <a class="kill-switch-logo-link" href="/unavailable" aria-label="ItemTraxx unavailable">
-        <img
-          v-if="brandLogoUrl"
-          class="kill-switch-logo"
-          :src="brandLogoUrl"
-          alt="ItemTraxx Co"
-        />
-      </a>
-      <button
-        class="kill-switch-theme-toggle"
-        type="button"
-        :aria-label="theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'"
-        @click="toggleTheme"
-      >
-        <span class="kill-switch-theme-icon" aria-hidden="true">{{ theme === "dark" ? "☀" : "☾" }}</span>
-        <span>{{ theme === "dark" ? "Light" : "Dark" }}</span>
-      </button>
-      <div class="kill-switch-fullscreen-card">
-        <p class="kill-switch-status">Service unavailable</p>
-        <h2>ItemTraxx is currently unavailable</h2>
-        <p>{{ killSwitchMessage }}</p>
-        <div class="kill-switch-fullscreen-actions">
-          <a
-            class="kill-switch-action kill-switch-action-primary"
-            href="https://status.itemtraxx.com/"
-            target="_blank"
-            rel="noreferrer"
-          >
-            View status page
-          </a>
-          <a class="kill-switch-action" href="mailto:support@itemtraxx.com">
-            Email support
-          </a>
-          <button type="button" class="kill-switch-action" @click="reloadApp">Refresh</button>
-        </div>
-      </div>
-    </div>
-    <div v-else-if="showMaintenanceOverlay" class="maintenance-fullscreen" role="alertdialog" aria-live="assertive">
-      <div class="maintenance-fullscreen-card">
-        <h2>Maintenance currently in Progress</h2>
-        <p>
-          ItemTraxx is currently unavailable while we apply updates and complete maintenance.
-        </p>
-        <p>
-          Please try again shortly. Your data is safe and we will restore full access as soon as
-          maintenance is complete. Please check the live status page for updates and estimated completion time. 
-        </p>
-        <div class="maintenance-fullscreen-actions">
-          <a
-            class="button-link"
-            href="https://status.itemtraxx.com/"
-            target="_blank"
-            rel="noreferrer"
-          >
-            View Live Status
-          </a>
-          <button type="button" class="button-primary" @click="reloadApp">Refresh</button>
-        </div>
-      </div>
-    </div>
-    <div
-      v-if="showVersionOverlay && !showMaintenanceOverlay && !isUnavailableRoute"
-      class="version-update-fullscreen"
-      role="alertdialog"
-      aria-live="assertive"
-      aria-modal="true"
-    >
-      <div class="version-update-card">
-        <p class="version-update-eyebrow">Update Available</p>
-        <h2>A new version of ItemTraxx is available.</h2>
-        <p>
-          A newer release is available. Please click the update button to load the latest version.
-        </p>
-        <div class="version-update-meta">
-          <span>Current: {{ appVersion }}</span>
-          <span v-if="latestVersion">Latest: {{ latestVersion }}</span>
-        </div>
-        <button type="button" class="button-primary version-update-button" @click="reloadApp">
-          Update
-        </button>
-      </div>
-    </div>
-    <div
-      v-if="sessionTermination.visible && !showMaintenanceOverlay && !showKillSwitchOverlay && !isUnavailableRoute"
-      class="version-update-fullscreen"
-      role="alertdialog"
-      aria-live="assertive"
-      aria-modal="true"
-    >
-      <div class="version-update-card">
-        <p class="version-update-eyebrow">Session Ended</p>
-        <h2>{{ sessionTermination.title }}</h2>
-        <p>{{ sessionTermination.message }}</p>
-        <button type="button" class="button-primary version-update-button" @click="signInAgain">
-          Sign in again
-        </button>
-      </div>
-    </div>
-    <div
-      v-if="activeBroadcast && showBroadcast"
-      ref="broadcastBannerRef"
-      class="broadcast-top-banner"
-      role="status"
-      aria-live="polite"
-    >
-      <div class="broadcast-content">
-        <strong class="broadcast-title">Broadcast</strong>
-        <span class="broadcast-message">{{ activeBroadcast.message }}</span>
-      </div>
-      <button
-        type="button"
-        class="broadcast-dismiss"
-        aria-label="Dismiss broadcast"
-        @click="dismissBroadcast"
-      >
-        ×
-      </button>
-    </div>
-    <div
-      v-if="incidentBanner && showIncidentBanner"
-      ref="incidentBannerRef"
-      class="broadcast-banner incident-banner"
-      :class="incidentBanner.level === 'down' ? 'broadcast-critical' : 'broadcast-warning'"
-      role="status"
-      aria-live="polite"
-    >
-      <div class="broadcast-content">
-        <strong class="broadcast-title">{{ incidentBannerTitle }}</strong>
-        <span class="broadcast-message">{{ incidentBanner.message }}</span>
-        <span class="broadcast-meta">{{ incidentSlaLine }}</span>
-      </div>
-      <a
-        class="broadcast-link"
-        href="https://status.itemtraxx.com/"
-        target="_blank"
-        rel="noreferrer"
-      >
-        View status
-      </a>
-      <button type="button" class="broadcast-dismiss" @click="dismissIncidentBanner">
-        x
-      </button>
-    </div>
-    <div v-if="showTopMenu" class="top-menu">
-      <div class="menu-button-wrap">
-        <div v-if="showNotificationBell" class="menu-notification">
-          <NotificationBell />
-        </div>
-        <span v-if="isOutdated" class="menu-alert" aria-hidden="true">!</span>
-        <button
-          type="button"
-          class="menu-button"
-          @click="toggleMenu"
-          aria-label="Open menu"
-          aria-haspopup="menu"
-          :aria-expanded="menuOpen"
-          aria-controls="top-menu-dropdown"
-        >
-          <svg class="menu-icon" viewBox="0 0 24 24" aria-hidden="true">
-            <path d="M5 7.5h14M5 12h14M5 16.5h14" />
-          </svg>
-        </button>
-      </div>
-      <div v-if="menuOpen" id="top-menu-dropdown" class="menu-dropdown" role="menu">
-        <button type="button" class="menu-item" role="menuitem" @click="toggleTheme">
-          {{ themeLabel }}
-        </button>
-        <button type="button" class="menu-item" role="menuitem" @click="openAdminPanel">
-          Open Admin Panel
-        </button>
-        <button
-          v-if="canReplayOnboarding"
-          type="button"
-          class="menu-item"
-          role="menuitem"
-          @click="openOnboardingTour"
-        >
-          Take tour again
-        </button>
-        <button
-          v-if="showLogoutUserAction"
-          type="button"
-          class="menu-item danger"
-          role="menuitem"
-          @click="logoutTenant"
-        >
-          Log Out User
-        </button>
-        <a
-          class="menu-item muted" role="menuitem"
-          href="/changelog"
-          @click="menuOpen = false"
-        >
-          Version: <strong>{{ appVersion }}</strong>
-        </a>
-        <div v-if="isOutdated" class="menu-item status-warning" role="menuitem">
-          Version outdated, refresh to update.
-        </div>
-        <RouterLink class="menu-item" role="menuitem" to="/contact-support" @click="menuOpen = false">
-          Contact Support
-        </RouterLink>
-        <div
-          class="menu-item muted menu-offline-queue"
-          role="menuitem"
-          :title="offlineQueueTooltip"
-        >
-          Offline Queue: {{ offlineQueueCount }}
-        </div>
-        <a
-          class="menu-item muted menu-status" role="menuitem"
-          href="https://status.itemtraxx.com/"
-          target="_blank"
-          rel="noreferrer"
-        >
-          <span class="status-dot" :class="statusClass" aria-hidden="true"></span>
-          System Status: {{ statusLabel }}
-        </a>
-      </div>
-    </div>
+      <AppBlockingOverlays
+        :kill-switch-visible="showKillSwitchOverlay"
+        :kill-switch-message="killSwitchMessage"
+        :brand-logo-url="brandLogoUrl"
+        :theme="theme"
+        :maintenance-visible="showMaintenanceOverlay"
+        :version-visible="showVersionOverlay && !showMaintenanceOverlay && !isUnavailableRoute"
+        :current-version="appVersion"
+        :latest-version="latestVersion"
+        :session-visible="sessionTermination.visible && !showMaintenanceOverlay && !showKillSwitchOverlay && !isUnavailableRoute"
+        :session-title="sessionTermination.title"
+        :session-message="sessionTermination.message"
+        @reload="reloadApp"
+        @toggle-theme="toggleTheme"
+        @sign-in-again="signInAgain"
+      />
+    </AppTopBanners>
+    <AuthenticatedNavigation
+      :visible="showTopMenu"
+      :show-notification-bell="showNotificationBell"
+      :is-outdated="isOutdated"
+      :menu-open="menuOpen"
+      :theme-label="themeLabel"
+      :can-replay-onboarding="onboarding.canReplay.value"
+      :show-logout-user-action="showLogoutUserAction"
+      :app-version="appVersion"
+      :offline-queue-count="offlineQueue.count.value"
+      :offline-queue-tooltip="offlineQueue.tooltip.value"
+      :status-class="statusClass"
+      :status-label="statusLabel"
+      @toggle-menu="toggleMenu"
+      @toggle-theme="toggleTheme"
+      @open-admin-panel="openAdminPanel"
+      @open-onboarding="openOnboardingTour"
+      @logout="logoutTenant"
+      @close-menu="menuOpen = false"
+    />
     <div v-if="!auth.isInitialized" class="page auth-loading-page">
       <div class="auth-loading-card">
         <h1>Loading ItemTraxx</h1>
@@ -268,480 +83,258 @@
     </div>
     <router-view v-else />
     <OnboardingModal
-      :visible="showOnboardingModal"
-      :variant="onboardingVariant"
-      @close="handleOnboardingClose"
-      @complete="handleOnboardingComplete"
+      v-if="onboarding.visible.value"
+      :visible="onboarding.visible.value"
+      :variant="onboarding.variant.value"
+      @close="onboarding.complete"
+      @complete="onboarding.complete"
     />
     <CookieConsentBanner
-      v-if="showCookieConsentBanner && !showMaintenanceOverlay && !showKillSwitchOverlay && !isUnavailableRoute"
-      @essential-only="acceptEssentialCookiesOnly"
-      @accept-all="acceptAllCookies"
-      @save-preferences="saveCookiePreferences"
+      v-if="consent.showCookieConsentBanner.value && !showMaintenanceOverlay && !showKillSwitchOverlay && !isUnavailableRoute"
+      @essential-only="consent.acceptEssentialOnly"
+      @accept-all="consent.acceptAll"
+      @save-preferences="consent.savePreferences"
     />
-    <FatalErrorToast />
-    <Analytics v-if="showTelemetry" />
-    <SpeedInsights v-if="showTelemetry" />
+    <FatalErrorToast v-if="fatalErrorToast.visible" />
+    <Analytics v-if="consent.showTelemetry.value" />
+    <SpeedInsights v-if="consent.showTelemetry.value" />
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, defineAsyncComponent, nextTick, onMounted, onUnmounted, ref, watch, watchEffect } from "vue";
+import { computed, defineAsyncComponent, onMounted, onScopeDispose, ref, watch, watchEffect } from "vue";
 import { useRoute, useRouter } from "vue-router";
-import { getPostSignOutUrl, signOut } from "./services/authService";
-import {
-  touchTenantAdminSession,
-  validateTenantAdminSession,
-} from "./services/adminOpsService";
-import { getBufferedCheckoutCount } from "./services/checkoutService";
-import OnboardingModal from "./components/OnboardingModal.vue";
+import AppBlockingOverlays from "./components/app/AppBlockingOverlays.vue";
+import AppTopBanners from "./components/app/AppTopBanners.vue";
+import AuthenticatedNavigation from "./components/app/AuthenticatedNavigation.vue";
 import CookieConsentBanner from "./components/CookieConsentBanner.vue";
-import {
-  hasCompletedOnboarding,
-  markOnboardingCompleted,
-  resetOnboarding,
-  type TenantOnboardingRole,
-} from "./services/onboardingService";
+import { useAdminSessionLifecycle } from "./composables/useAdminSessionLifecycle";
+import { useAppVersionStatus } from "./composables/useAppVersionStatus";
+import { useCookieConsentTelemetry } from "./composables/useCookieConsentTelemetry";
+import { useOfflineQueueCount } from "./composables/useOfflineQueueCount";
+import { useOnboarding } from "./composables/useOnboarding";
+import { useSystemStatus } from "./composables/useSystemStatus";
+import { useTopBannerLayout } from "./composables/useTopBannerLayout";
 import { buildDistrictAppUrl, lookupDistrictById, resolveDistrictHost } from "./services/districtService";
-import { fetchSystemStatus } from "./services/systemStatusService";
-import { fetchHttpSessionSummary } from "./services/httpSessionService";
-import { clearAdminVerification, clearAuthState, getAuthState } from "./store/authState";
+import { getAuthState } from "./store/authState";
 import { getDistrictState } from "./store/districtState";
+import { getFatalErrorToastState } from "./store/fatalErrorToast";
 import { getRouteLoadingState } from "./store/routeLoading";
-import { clearSessionTermination, getSessionTerminationState, showSessionTermination } from "./store/sessionTermination";
-import { resolveRecoveryRouteFromPath } from "./services/appErrorRecovery";
-import { getOrCreateDeviceSession } from "./utils/deviceSession";
-import { allowsAnalytics, clearAnalyticsPersistence, hasCookieConsent, readCookieConsent, writeCookieConsent, type CookieConsentPreferences, type CookieConsentState } from "./services/cookieConsentService";
-import { recordCookieConsent } from "./services/consentRecordService";
+import { getSessionTerminationState } from "./store/sessionTermination";
 
-const Analytics = defineAsyncComponent(async () => {
-  const module = await import("@vercel/analytics/vue");
-  return module.Analytics;
-});
-
-const NotificationBell = defineAsyncComponent(async () => {
-  const module = await import("./components/NotificationBell.vue");
-  return module.default;
-});
-
-const FatalErrorToast = defineAsyncComponent(async () => {
-  const module = await import("./components/FatalErrorToast.vue");
-  return module.default;
-});
-
-const SpeedInsights = defineAsyncComponent(async () => {
-  const module = await import("@vercel/speed-insights/vue");
-  return module.SpeedInsights;
-});
+const OnboardingModal = defineAsyncComponent(() => import("./components/OnboardingModal.vue"));
+const Analytics = defineAsyncComponent(async () => (await import("@vercel/analytics/vue")).Analytics);
+const FatalErrorToast = defineAsyncComponent(async () => (await import("./components/FatalErrorToast.vue")).default);
+const SpeedInsights = defineAsyncComponent(async () => (await import("@vercel/speed-insights/vue")).SpeedInsights);
 
 const auth = getAuthState();
 const district = getDistrictState();
 const routeLoading = getRouteLoadingState();
+const fatalErrorToast = getFatalErrorToastState();
+const sessionTermination = getSessionTerminationState();
+const { state: systemStatus, statusLabel, statusClass } = useSystemStatus();
 const router = useRouter();
 const route = useRoute();
 const menuOpen = ref(false);
 const theme = ref<"light" | "dark">("light");
 const appVersion = import.meta.env.VITE_GIT_COMMIT || "n/a";
+const appBranch = (import.meta.env.VITE_GIT_BRANCH || "n/a").trim();
+const isNonMainBuild = appBranch !== "" && appBranch !== "n/a" && appBranch !== "main";
 const lightBrandLogoUrl = import.meta.env.VITE_BRAND_LOGO_LIGHT_URL as string | undefined;
 const darkBrandLogoUrl = import.meta.env.VITE_BRAND_LOGO_DARK_URL as string | undefined;
-type BroadcastLevel = "info" | "warning" | "critical";
-type BroadcastPayload = {
-  id: string;
-  message: string;
-  level: BroadcastLevel;
-};
-type IncidentBanner = {
-  id: string;
-  message: string;
-  level: "degraded" | "down";
-  checkedAt?: string;
-};
+type BroadcastPayload = { id: string; message: string; level: "info" | "warning" | "critical" };
+type IncidentBanner = { id: string; message: string; level: "degraded" | "down"; checkedAt?: string };
 const activeBroadcast = ref<BroadcastPayload | null>(null);
-const dismissedBroadcastId = ref(localStorage.getItem("itemtraxx-broadcast-dismissed") || "");
 const incidentBanner = ref<IncidentBanner | null>(null);
+const dismissedBroadcastId = ref(localStorage.getItem("itemtraxx-broadcast-dismissed") || "");
 const dismissedIncidentId = ref(localStorage.getItem("itemtraxx-incident-dismissed") || "");
-const maintenanceBannerRef = ref<HTMLElement | null>(null);
-const broadcastBannerRef = ref<HTMLElement | null>(null);
-const incidentBannerRef = ref<HTMLElement | null>(null);
-const maintenanceBannerHeight = ref(0);
-const broadcastBannerHeight = ref(0);
-const incidentBannerHeight = ref(0);
 const maintenanceEnabled = ref(false);
 const maintenanceMessage = ref("Maintenance currentlyin progress.");
 const killSwitchEnabled = ref(false);
-const killSwitchMessage = ref("Unfortunately ItemTraxx is currently unavailable. We apologize for any inconvenience and are working to restore access as soon as possible. Please see the status page (https://status.itemtraxx.com/) for more information.");
+const killSwitchMessage = ref("Unfortunately ItemTraxx is currently unavailable. We apologize for any inconvenience and are working to restore access as soon as possible. Please see the status page (https://status.itemtraxx.com/?ref=killswitch) for more information.");
 const backendUnavailable = ref(false);
-const statusLabel = ref("Unknown");
-const statusClass = ref<"status-ok" | "status-warn" | "status-down" | "status-unknown">(
-  "status-unknown"
-);
-const isOutdated = ref(false);
-const latestVersion = ref<string | null>(null);
-const forceUpdateOverlay = ref(false);
-const showTelemetry = ref(false);
-const cookieConsent = ref<CookieConsentState | null>(null);
-const isRouteNavigating = computed(() => routeLoading.isLoading);
 const showPageLoading = ref(false);
-let statusTimer: number | null = null;
-let versionTimer: number | null = null;
-let adminIdleTimer: number | null = null;
-let deferredStatusTimer: number | null = null;
-let deferredVersionTimer: number | null = null;
 let pageLoadingTimer: number | null = null;
-let adminSessionTimer: number | null = null;
-let offlineQueueTimer: number | null = null;
-let sessionHeartbeatTimer: number | null = null;
-let sessionTerminationRedirectTimer: number | null = null;
-let authSessionEpoch = 0;
-const isIdleLogoutRunning = ref(false);
-const isAdminSessionCheckRunning = ref(false);
-const isSessionHeartbeatRunning = ref(false);
-const showOnboardingModal = ref(false);
-const onboardingRole = ref<TenantOnboardingRole>("tenant_user");
-const onboardingVariant = ref<"tenant_checkout" | "tenant_admin">("tenant_checkout");
-const onboardingEvaluationDone = ref(false);
-const offlineQueueCount = ref(0);
-const sessionTermination = getSessionTerminationState();
-
-const IS_E2E_TEST_MODE = import.meta.env.VITE_E2E_TEST_UTILS === "true";
-const DEFAULT_ADMIN_IDLE_TIMEOUT_MINUTES = 20;
-const MIN_ADMIN_IDLE_TIMEOUT_MINUTES = 5;
-const parsedAdminIdleTimeoutMinutes = Number(
-  import.meta.env.VITE_ADMIN_IDLE_TIMEOUT_MINUTES || DEFAULT_ADMIN_IDLE_TIMEOUT_MINUTES
-);
-const effectiveAdminIdleTimeoutMinutes =
-  Number.isFinite(parsedAdminIdleTimeoutMinutes) && parsedAdminIdleTimeoutMinutes > 0
-    ? IS_E2E_TEST_MODE
-      ? parsedAdminIdleTimeoutMinutes
-      : Math.max(parsedAdminIdleTimeoutMinutes, MIN_ADMIN_IDLE_TIMEOUT_MINUTES)
-    : DEFAULT_ADMIN_IDLE_TIMEOUT_MINUTES;
-const ADMIN_IDLE_TIMEOUT_MS = effectiveAdminIdleTimeoutMinutes * 60 * 1000;
-
-const GITHUB_HEAD_COMMIT_API =
-  "https://api.github.com/repos/ItemTraxxCo/ItemTraxx-App/commits/main";
-const appBranch = (import.meta.env.VITE_GIT_BRANCH || "n/a").trim();
-const isNonMainBuild = appBranch !== "" && appBranch !== "n/a" && appBranch !== "main";
 const MAINTENANCE_CACHE_KEY = "itemtraxx-maintenance-state";
-
-type CachedMaintenanceState = {
-  enabled: boolean;
-  message: string;
-  updatedAt: string;
-};
+type CachedMaintenanceState = { enabled: boolean; message: string; updatedAt: string };
 
 const readCachedMaintenanceState = (): CachedMaintenanceState | null => {
   try {
-    const raw = localStorage.getItem(MAINTENANCE_CACHE_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw) as Partial<CachedMaintenanceState>;
-    if (
-      typeof parsed.enabled !== "boolean" ||
-      typeof parsed.message !== "string" ||
-      typeof parsed.updatedAt !== "string"
-    ) {
-      return null;
-    }
-    return {
-      enabled: parsed.enabled,
-      message: parsed.message.trim() || "Maintenance currently in progress.",
-      updatedAt: parsed.updatedAt,
-    };
-  } catch {
-    return null;
-  }
+    const parsed = JSON.parse(localStorage.getItem(MAINTENANCE_CACHE_KEY) || "null") as Partial<CachedMaintenanceState> | null;
+    if (!parsed || typeof parsed.enabled !== "boolean" || typeof parsed.message !== "string" || typeof parsed.updatedAt !== "string") return null;
+    return { enabled: parsed.enabled, message: parsed.message.trim() || "Maintenance currently in progress.", updatedAt: parsed.updatedAt };
+  } catch { return null; }
 };
-
 const writeCachedMaintenanceState = (state: CachedMaintenanceState | null) => {
   try {
-    if (!state) {
-      localStorage.removeItem(MAINTENANCE_CACHE_KEY);
-      return;
-    }
-    localStorage.setItem(MAINTENANCE_CACHE_KEY, JSON.stringify(state));
-  } catch {
-    // Best effort only.
-  }
+    if (state) localStorage.setItem(MAINTENANCE_CACHE_KEY, JSON.stringify(state));
+    else localStorage.removeItem(MAINTENANCE_CACHE_KEY);
+  } catch { /* Best effort only. */ }
 };
-
 const cachedMaintenanceState = readCachedMaintenanceState();
 if (cachedMaintenanceState?.enabled) {
   maintenanceEnabled.value = true;
   maintenanceMessage.value = cachedMaintenanceState.message;
 }
 
-const showCookieConsentBanner = computed(() => !hasCookieConsent(cookieConsent.value));
-
-const syncCookieConsent = () => {
-  cookieConsent.value = readCookieConsent();
-  showTelemetry.value = allowsAnalytics(cookieConsent.value);
-  if (!showTelemetry.value) clearAnalyticsPersistence();
-};
-
-const syncConsentRecord = () => {
-  const state = cookieConsent.value;
-  if (!state) return;
-  void recordCookieConsent(state.preferences, state.updatedAt).catch(() => {
-    // Consent remains effective locally if the audit mirror is temporarily unavailable.
-  });
-};
-
-const acceptEssentialCookiesOnly = () => {
-  writeCookieConsent({ analytics: false, diagnostics: false });
-  syncCookieConsent();
-  syncConsentRecord();
-};
-
-const acceptAllCookies = () => {
-  writeCookieConsent({ analytics: true, diagnostics: true });
-  syncCookieConsent();
-  syncConsentRecord();
-};
-
-const saveCookiePreferences = (preferences: CookieConsentPreferences) => {
-  writeCookieConsent(preferences);
-  syncCookieConsent();
-  syncConsentRecord();
-};
-
-watch(() => auth.role, () => syncConsentRecord());
-
 const isDevSubdomainHost = computed(() => {
-  if (typeof window === "undefined") return false;
   const hostname = window.location.hostname.toLowerCase();
-  if (hostname === "dev.itemtraxx.com" || hostname.endsWith(".dev.itemtraxx.com")) {
-    return true;
-  }
-  if (
-    hostname === "localhost" ||
-    hostname === "127.0.0.1" ||
-    hostname === "0.0.0.0" ||
-    hostname.endsWith(".localhost")
-  ) {
-    return true;
-  }
-  if (hostname.startsWith("192.168.") || hostname.startsWith("10.")) {
-    return true;
-  }
+  if (hostname === "dev.itemtraxx.com" || hostname.endsWith(".dev.itemtraxx.com")) return true;
+  if (["localhost", "127.0.0.1", "0.0.0.0"].includes(hostname) || hostname.endsWith(".localhost")) return true;
+  if (hostname.startsWith("192.168.") || hostname.startsWith("10.")) return true;
   const match172 = hostname.match(/^172\.(\d{1,3})\./);
-  if (match172) {
-    const secondOctet = Number(match172[1]);
-    return Number.isFinite(secondOctet) && secondOctet >= 16 && secondOctet <= 31;
-  }
-  return false;
+  const secondOctet = Number(match172?.[1]);
+  return !!match172 && Number.isFinite(secondOctet) && secondOctet >= 16 && secondOctet <= 31;
+});
+const isFullBleedRoute = computed(() => ["/login", "/tenant/admin-login", "/super-auth", "/internal-auth", "/reset-password"].includes(route.path));
+const isMarketingFullBleedRoute = computed(() => ["/", "/landing-new", "/changelog", "/itemscanner"].includes(route.path));
+const isSubmitConfirmationRoute = computed(() => route.path === "/submitconfirmation");
+const isBannerBleedRoute = computed(() => ["/legal", "/security", "/trust", "/compliance", "/faq", "/contact", "/privacy", "/cookies", "/accessibility", "/about", "/pricing", "/forgot-password", "/contact-sales", "/request-demo", "/contact-support", "/report-security-issue", "/getting-started"].includes(route.path));
+const isDarkChromeRoute = computed(() => ["/", "/landing-new", "/pricing", "/changelog", "/itemscanner"].includes(route.path));
+const isUnavailableRoute = computed(() => route.path === "/unavailable" || route.name === "public-unavailable");
+const isKillSwitchAllowedRoute = computed(() => route.path === "/" || isUnavailableRoute.value);
+const hiddenMenuRoutes = new Set(["public-home", "public-unavailable", "public-pricing", "public-about", "public-security", "public-report-security-issue", "public-changelog", "public-compliance", "public-privacy", "public-cookies", "public-contact", "public-trust", "public-faq", "public-accessibility", "public-getting-started", "public-itemscanner", "public-legal", "public-forgot-password", "public-reset-password", "public-home-new2", "public-request-demo", "public-contact-sales", "public-contact-support", "public-submit-confirmation"]);
+const showTopMenu = computed(() => !hiddenMenuRoutes.has(String(route.name)));
+const showLogoutUserAction = computed(() => auth.isAuthenticated && !Boolean(route.meta.public) && route.path !== "/login");
+const isTenantScopedRoute = computed(() => auth.isAuthenticated && !!auth.tenantContextId && route.path.startsWith("/tenant"));
+const isTenantAdminArea = computed(() => route.path !== "/tenant/admin-login" && route.path.startsWith("/tenant/admin"));
+const shouldTrackTenantAdminSession = computed(() => auth.isAuthenticated && auth.role === "tenant_admin" && isTenantAdminArea.value);
+const showNotificationBell = computed(() => auth.isAuthenticated && auth.role === "tenant_admin" && route.path !== "/tenant/admin-login" && (route.path.startsWith("/tenant/admin") || route.path.startsWith("/district")));
+const isLocalDevMaintenanceBypass = computed(() => {
+  if (!import.meta.env.DEV || (import.meta.env.VITE_DEV_MAINTENANCE_BYPASS ?? "true") !== "true") return false;
+  const host = window.location.hostname.toLowerCase();
+  if (["localhost", "127.0.0.1", "0.0.0.0"].includes(host) || host.startsWith("192.168.") || host.startsWith("10.")) return true;
+  const secondOctet = Number(host.match(/^172\.(\d{1,3})\./)?.[1]);
+  return Number.isFinite(secondOctet) && secondOctet >= 16 && secondOctet <= 31;
 });
 
-const themeLabel = computed(() =>
-  theme.value === "dark" ? "Light Mode" : "Dark Mode"
-);
-const brandLogoUrl = computed(() =>
-  theme.value === "light"
-    ? lightBrandLogoUrl || darkBrandLogoUrl || ""
-    : darkBrandLogoUrl || lightBrandLogoUrl || ""
-);
-const isFullBleedRoute = computed(
-  () =>
-    route.path === "/login" ||
-    route.path === "/tenant/admin-login" ||
-    route.path === "/super-auth" ||
-    route.path === "/internal-auth" ||
-    route.path === "/reset-password"
-);
-const isMarketingFullBleedRoute = computed(
-  () =>
-    route.path === "/" ||
-    route.path === "/landing-new" ||
-    route.path === "/changelog" ||
-    route.path === "/itemscanner"
-);
-const isSubmitConfirmationRoute = computed(() => route.path === "/submitconfirmation");
-const isBannerBleedRoute = computed(
-  () =>
-    route.path === "/legal" ||
-    route.path === "/security" ||
-    route.path === "/trust" ||
-    route.path === "/compliance" ||
-    route.path === "/faq" ||
-    route.path === "/contact" ||
-    route.path === "/privacy" ||
-    route.path === "/cookies" ||
-    route.path === "/accessibility" ||
-    route.path === "/about" ||
-    route.path === "/pricing" ||
-    route.path === "/forgot-password" ||
-    route.path === "/contact-sales" ||
-    route.path === "/request-demo" ||
-    route.path === "/contact-support" ||
-    route.path === "/report-security-issue" ||
-    route.path === "/getting-started"
-);
-const isDarkChromeRoute = computed(
-  () =>
-    route.path === "/" ||
-    route.path === "/landing-new" ||
-    route.path === "/pricing" ||
-    route.path === "/changelog" ||
-    route.path === "/itemscanner"
-);
-const isUnavailableRoute = computed(
-  () => route.path === "/unavailable" || route.name === "public-unavailable"
-);
-const isKillSwitchAllowedRoute = computed(
-  () => route.path === "/" || isUnavailableRoute.value
-);
-const showTopMenu = computed(
-  () =>
-    route.name !== "public-home" &&
-    route.name !== "public-unavailable" &&
-    route.name !== "public-pricing" &&
-    route.name !== "public-about" &&
-    route.name !== "public-security" &&
-    route.name !== "public-report-security-issue" &&
-    route.name !== "public-changelog" &&
-    route.name !== "public-compliance" &&
-    route.name !== "public-privacy" &&
-    route.name !== "public-cookies" &&
-    route.name !== "public-contact" &&
-    route.name !== "public-trust" &&
-    route.name !== "public-faq" &&
-    route.name !== "public-accessibility" &&
-    route.name !== "public-getting-started" &&
-    route.name !== "public-itemscanner" &&
-    route.name !== "public-legal" &&
-    route.name !== "public-forgot-password" &&
-    route.name !== "public-reset-password" &&
-    route.name !== "public-home-new2" &&
-    route.name !== "public-request-demo" &&
-    route.name !== "public-contact-sales" &&
-    route.name !== "public-contact-support" &&
-    route.name !== "public-submit-confirmation"
-);
-const showLogoutUserAction = computed(() => auth.isAuthenticated && !Boolean(route.meta.public) && route.path !== "/login");
-const currentTenantOnboardingRole = computed<TenantOnboardingRole | null>(() => {
-  if (!auth.isAuthenticated) return null;
-  if (auth.role === "tenant_user" || auth.role === "tenant_admin") {
-    return auth.role;
-  }
-  return null;
-});
-const isOnTenantRoute = computed(() => route.path.startsWith("/tenant"));
-const canReplayOnboarding = computed(
-  () => !!currentTenantOnboardingRole.value && isOnTenantRoute.value
-);
-const isLocalDevMaintenanceBypass = computed(() => {
-  if (import.meta.env.DEV !== true) return false;
-  if ((import.meta.env.VITE_DEV_MAINTENANCE_BYPASS ?? "true") !== "true") return false;
-  const host = window.location.hostname.toLowerCase();
-  if (host === "localhost" || host === "127.0.0.1" || host === "0.0.0.0") {
-    return true;
-  }
-  if (host.startsWith("192.168.") || host.startsWith("10.")) {
-    return true;
-  }
-  const match172 = host.match(/^172\.(\d{1,3})\./);
-  if (match172) {
-    const secondOctet = Number(match172[1]);
-    return Number.isFinite(secondOctet) && secondOctet >= 16 && secondOctet <= 31;
-  }
-  return false;
-});
-const isTenantAdminArea = computed(() => {
-  if (route.path === "/tenant/admin-login") return false;
-  return route.path.startsWith("/tenant/admin");
-});
-const isAdminIdleLogoutEnabled = computed(() => !isDevSubdomainHost.value);
-const shouldTrackTenantAdminSession = computed(() => {
-  if (!auth.isAuthenticated || auth.role !== "tenant_admin") return false;
-  if (route.path === "/tenant/admin-login") return false;
-  return isTenantAdminArea.value;
-});
-const showNotificationBell = computed(() => {
-  if (!auth.isAuthenticated) return false;
-  if (auth.role !== "tenant_admin") return false;
-  if (route.path === "/tenant/admin-login") return false;
-  return route.path.startsWith("/tenant/admin") || route.path.startsWith("/district");
-});
-const showBroadcast = computed(() => {
-  if (!activeBroadcast.value) return false;
-  return dismissedBroadcastId.value !== activeBroadcast.value.id;
-});
-const showIncidentBanner = computed(() => {
-  if (!auth.isAuthenticated) return false;
-  if (!incidentBanner.value) return false;
-  return dismissedIncidentId.value !== incidentBanner.value.id;
-});
-const showMaintenanceBanner = computed(
-  () => maintenanceEnabled.value && !isLocalDevMaintenanceBypass.value && !isUnavailableRoute.value
-);
+const showBroadcast = computed(() => !!activeBroadcast.value && dismissedBroadcastId.value !== activeBroadcast.value.id);
+const showIncidentBanner = computed(() => auth.isAuthenticated && !!incidentBanner.value && dismissedIncidentId.value !== incidentBanner.value.id);
+const showMaintenanceBanner = computed(() => maintenanceEnabled.value && !isLocalDevMaintenanceBypass.value && !isUnavailableRoute.value);
 const showMaintenanceOverlay = computed(() => {
-  if (isLocalDevMaintenanceBypass.value) return false;
-  if (!maintenanceEnabled.value) return false;
-  const routeName = String(route.name || "");
-  if (
-    routeName === "public-unavailable" ||
-    routeName === "not-found" ||
-    routeName === "super-auth" ||
-    routeName === "internal-auth"
-  ) {
-    return false;
-  }
-  if (routeName.startsWith("internal-")) {
-    return false;
-  }
-  return !routeName.startsWith("super-admin-");
+  if (isLocalDevMaintenanceBypass.value || !maintenanceEnabled.value) return false;
+  const name = String(route.name || "");
+  if (["public-unavailable", "not-found", "super-auth", "internal-auth"].includes(name) || name.startsWith("internal-")) return false;
+  return !name.startsWith("super-admin-");
 });
-const showKillSwitchOverlay = computed(() => {
-  if (isLocalDevMaintenanceBypass.value) return false;
-  if (isKillSwitchAllowedRoute.value) return false;
-  return killSwitchEnabled.value;
-});
-const showVersionOverlay = computed(
-  () => !isDevSubdomainHost.value && !isNonMainBuild && (isOutdated.value || forceUpdateOverlay.value)
-);
-const incidentBannerTitle = computed(() => {
-  if (!incidentBanner.value) return "System Notice";
-  return incidentBanner.value.level === "down" ? "System Outage" : "System Degraded";
-});
+const showKillSwitchOverlay = computed(() => !isLocalDevMaintenanceBypass.value && !isKillSwitchAllowedRoute.value && killSwitchEnabled.value);
+const hasTopBanners = computed(() => showMaintenanceBanner.value || showBroadcast.value || showIncidentBanner.value);
+const incidentBannerTitle = computed(() => incidentBanner.value?.level === "down" ? "System Outage" : "System Degraded");
 const incidentSlaLine = computed(() => {
   if (!incidentBanner.value) return "";
-  const slaTarget =
-    incidentBanner.value.level === "down"
-      ? "SLA target: status update within 6 hours on status page."
-      : "SLA target: status update within 6 hours on status page.";
-  if (!incidentBanner.value.checkedAt) return slaTarget;
+  const target = "SLA target: status update within 6 hours on status page.";
+  if (!incidentBanner.value.checkedAt) return target;
   const checked = new Date(incidentBanner.value.checkedAt);
-  if (Number.isNaN(checked.getTime())) return slaTarget;
-  return `${slaTarget} Last checked ${checked.toLocaleTimeString()}.`;
+  return Number.isNaN(checked.getTime()) ? target : `${target} Last checked ${checked.toLocaleTimeString()}.`;
 });
-const hasTopBanners = computed(() =>
-  showMaintenanceBanner.value ||
-  (showBroadcast.value && !!activeBroadcast.value) ||
-  showIncidentBanner.value
-);
+
+const consent = useCookieConsentTelemetry(auth);
+const version = useAppVersionStatus({ appVersion, isDevHost: isDevSubdomainHost, isNonMainBuild });
+const { isOutdated, latestVersion, forceUpdateOverlay } = version;
+const showVersionOverlay = computed(() => forceUpdateOverlay.value || (!isDevSubdomainHost.value && !isNonMainBuild && isOutdated.value));
+const offlineQueue = useOfflineQueueCount(isTenantScopedRoute);
+const onboarding = useOnboarding(auth, route);
+const { appShellStyle, setElements: setTopBannerElements } = useTopBannerLayout();
+const adminSession = useAdminSessionLifecycle({ auth, route, router, sessionTermination, isDevHost: isDevSubdomainHost, isTenantAdminArea, shouldTrackTenantAdminSession, closeMenu: () => { menuOpen.value = false; } });
+const { signInAgain } = adminSession;
+const isRouteNavigating = computed(() => routeLoading.isLoading);
+const themeLabel = computed(() => theme.value === "dark" ? "Light Mode" : "Dark Mode");
+const brandLogoUrl = computed(() => theme.value === "light" ? lightBrandLogoUrl || darkBrandLogoUrl || "" : darkBrandLogoUrl || lightBrandLogoUrl || "");
 
 const updateBrowserChromeColor = () => {
-  const themeColorMeta = document.querySelector('meta[name="theme-color"]');
-  const appleStatusBarMeta = document.querySelector('meta[name="apple-mobile-web-app-status-bar-style"]');
-  if (!themeColorMeta) return;
-
+  const themeColor = document.querySelector('meta[name="theme-color"]');
+  const appleStatus = document.querySelector('meta[name="apple-mobile-web-app-status-bar-style"]');
+  if (!themeColor) return;
   let color = theme.value === "dark" ? "#0c1016" : "#f9f9f7";
-  let appleStatusBarStyle = theme.value === "dark" ? "black-translucent" : "default";
+  let appleStyle = theme.value === "dark" ? "black-translucent" : "default";
+  if (isFullBleedRoute.value) color = theme.value === "dark" ? "#090c12" : "#f9f9f7";
+  else if (isSubmitConfirmationRoute.value) color = theme.value === "dark" ? "#090c12" : "#eef5f8";
+  else if (isUnavailableRoute.value) color = theme.value === "dark" ? "#101010" : "#f7f7f5";
+  else if (isDarkChromeRoute.value) { color = "#090d14"; appleStyle = "black-translucent"; }
+  themeColor.setAttribute("content", color);
+  appleStatus?.setAttribute("content", appleStyle);
+};
+const applyTheme = (next: "light" | "dark") => {
+  theme.value = next;
+  document.documentElement.setAttribute("data-theme", next);
+  localStorage.setItem("itemtraxx-theme", next);
+  updateBrowserChromeColor();
+};
+const toggleTheme = () => { applyTheme(theme.value === "dark" ? "light" : "dark"); menuOpen.value = false; };
+const toggleMenu = () => { menuOpen.value = !menuOpen.value; };
+const reloadApp = () => window.location.assign(`${window.location.origin}/`);
+const openOnboardingTour = () => { onboarding.open(); menuOpen.value = false; };
+const openAdminPanel = async () => { menuOpen.value = false; await router.push("/tenant/admin-login"); };
+const logoutTenant = async () => {
+  if (!window.confirm("Are you sure you want to log out?")) return;
+  menuOpen.value = false;
+  const { getPostSignOutUrl, signOut } = await import("./services/authService");
+  const nextUrl = getPostSignOutUrl();
+  await signOut();
+  if (nextUrl.startsWith("http")) window.location.assign(nextUrl);
+  else await router.push(nextUrl);
+};
+const dismissBroadcast = () => {
+  if (!activeBroadcast.value) return;
+  dismissedBroadcastId.value = activeBroadcast.value.id;
+  localStorage.setItem("itemtraxx-broadcast-dismissed", activeBroadcast.value.id);
+};
+const dismissIncidentBanner = () => {
+  if (!incidentBanner.value) return;
+  dismissedIncidentId.value = incidentBanner.value.id;
+  localStorage.setItem("itemtraxx-incident-dismissed", incidentBanner.value.id);
+};
 
-  if (isFullBleedRoute.value) {
-    color = theme.value === "dark" ? "#090c12" : "#f9f9f7";
-    appleStatusBarStyle = theme.value === "dark" ? "black-translucent" : "default";
-  } else if (isSubmitConfirmationRoute.value) {
-    color = theme.value === "dark" ? "#090c12" : "#eef5f8";
-    appleStatusBarStyle = theme.value === "dark" ? "black-translucent" : "default";
-  } else if (isUnavailableRoute.value) {
-    color = theme.value === "dark" ? "#101010" : "#f7f7f5";
-    appleStatusBarStyle = theme.value === "dark" ? "black-translucent" : "default";
-  } else if (isDarkChromeRoute.value) {
-    color = "#090d14";
-    appleStatusBarStyle = "black-translucent";
-  }
+const applySystemStatus = () => {
+  if (!systemStatus.hasResult) { backendUnavailable.value = false; return; }
+  const payload = systemStatus.payload;
+  killSwitchEnabled.value = payload.kill_switch?.enabled === true;
+  if (killSwitchEnabled.value) killSwitchMessage.value = typeof payload.kill_switch?.message === "string" && payload.kill_switch.message.trim() ? payload.kill_switch.message.trim() : "Unfortunately ItemTraxx is currently unavailable. We apologize for any inconvenience and are working to restore access as soon as possible. Please see the status page (https://status.itemtraxx.com/?ref=killswitch) for more information.";
+  const broadcast = payload.broadcast;
+  activeBroadcast.value = broadcast?.enabled && typeof broadcast.message === "string" && broadcast.message.trim() ? {
+    id: typeof broadcast.updated_at === "string" && broadcast.updated_at ? broadcast.updated_at : broadcast.message.trim(),
+    message: broadcast.message.trim(),
+    level: broadcast.level === "warning" || broadcast.level === "critical" ? broadcast.level : "info",
+  } : null;
+  if (payload.maintenance && typeof payload.maintenance === "object") {
+    const enabled = payload.maintenance.enabled === true;
+    const message = typeof payload.maintenance.message === "string" && payload.maintenance.message.trim() ? payload.maintenance.message.trim() : "Maintenance currently in progress.";
+    maintenanceEnabled.value = enabled;
+    maintenanceMessage.value = message;
+    writeCachedMaintenanceState(enabled ? { enabled: true, message, updatedAt: typeof payload.maintenance.updated_at === "string" ? payload.maintenance.updated_at : new Date().toISOString() } : null);
+  } else if (systemStatus.responseStatus >= 500 || payload.status === "down") {
+    const cached = readCachedMaintenanceState();
+    if (cached?.enabled) { maintenanceEnabled.value = true; maintenanceMessage.value = cached.message; }
+  } else { maintenanceEnabled.value = false; writeCachedMaintenanceState(null); }
+  if (systemStatus.responseOk && payload.status === "operational") { incidentBanner.value = null; backendUnavailable.value = false; return; }
+  const down = systemStatus.responseStatus >= 500 || payload.status === "down";
+  backendUnavailable.value = down && !maintenanceEnabled.value;
+  incidentBanner.value = {
+    id: payload.checked_at ? String(payload.checked_at) : `${payload.status}-${payload.incident_summary || (down ? "down" : "degraded")}`,
+    message: typeof payload.incident_summary === "string" && payload.incident_summary ? payload.incident_summary : down ? "A system outage has been detected." : "A system incident or maintenance event is active.",
+    level: down ? "down" : "degraded",
+    checkedAt: payload.checked_at,
+  };
+};
 
-  themeColorMeta.setAttribute("content", color);
-  appleStatusBarMeta?.setAttribute("content", appleStatusBarStyle);
+const hasFreshVerification = (verifiedAt: string | null) => !!verifiedAt && !Number.isNaN(Date.parse(verifiedAt)) && Date.now() - Date.parse(verifiedAt) <= 15 * 60 * 1000;
+let publicHomeRedirectInFlight = false;
+const maybeRedirectAuthenticatedPublicHome = async () => {
+  if (publicHomeRedirectInFlight || !["/", "/landing-new", "/about"].includes(route.path) || (killSwitchEnabled.value && route.path === "/") || !auth.isInitialized || !auth.isAuthenticated) return;
+  if (district.isDistrictHost && district.districtId && auth.districtContextId && auth.districtContextId !== district.districtId) return;
+  let targetPath: string | null = null;
+  if (auth.role === "super_admin") targetPath = auth.hasSecondaryAuth && hasFreshVerification(auth.superVerifiedAt) ? "/super-admin" : "/super-auth";
+  else if (auth.role === "district_admin") targetPath = hasFreshVerification(auth.adminVerifiedAt) ? "/district" : "/tenant/admin-login";
+  else if ((auth.role === "tenant_admin" || auth.role === "tenant_user") && auth.tenantContextId) targetPath = "/tenant/checkout";
+  if (!targetPath) return;
+  publicHomeRedirectInFlight = true;
+  try {
+    const currentHost = resolveDistrictHost(window.location.hostname);
+    if (!currentHost.isDistrictHost && auth.role !== "super_admin" && auth.districtContextId) {
+      const districtSlug = (await lookupDistrictById(auth.districtContextId))?.slug?.trim().toLowerCase();
+      if (districtSlug) window.location.replace(buildDistrictAppUrl(districtSlug, targetPath));
+    }
+  } finally { publicHomeRedirectInFlight = false; }
 };
 
 watchEffect(() => {
@@ -755,811 +348,24 @@ watchEffect(() => {
   document.body.classList.toggle("unavailable-route-active", isUnavailableRoute.value);
   updateBrowserChromeColor();
 });
-const offlineQueueTooltip = computed(
-  () =>
-    "Offline Queue stores checkout/return requests when internet is unavailable and auto-syncs them when connection is restored."
-);
-
-const refreshOfflineQueueCount = () => {
-  void getBufferedCheckoutCount()
-    .then((count) => {
-      offlineQueueCount.value = count;
-    })
-    .catch(() => {
-      offlineQueueCount.value = 0;
-    });
-};
-
-const measureTopBanners = () => {
-  maintenanceBannerHeight.value = showMaintenanceBanner.value
-    ? (maintenanceBannerRef.value?.offsetHeight ?? 0)
-    : 0;
-  broadcastBannerHeight.value = showBroadcast.value && activeBroadcast.value
-    ? (broadcastBannerRef.value?.offsetHeight ?? 0)
-    : 0;
-  incidentBannerHeight.value = showIncidentBanner.value && incidentBanner.value
-    ? (incidentBannerRef.value?.offsetHeight ?? 0)
-    : 0;
-};
-
-const applyTheme = (next: "light" | "dark") => {
-  theme.value = next;
-  document.documentElement.setAttribute("data-theme", next);
-  localStorage.setItem("itemtraxx-theme", next);
-  updateBrowserChromeColor();
-};
-
-const toggleTheme = () => {
-  applyTheme(theme.value === "dark" ? "light" : "dark");
-  menuOpen.value = false;
-};
-
-const toggleMenu = () => {
-  menuOpen.value = !menuOpen.value;
-};
-
-const openOnboardingTour = () => {
-  if (!currentTenantOnboardingRole.value) return;
-  resetOnboarding(currentTenantOnboardingRole.value);
-  onboardingRole.value = currentTenantOnboardingRole.value;
-  onboardingVariant.value = route.path.startsWith("/tenant/admin")
-    ? "tenant_admin"
-    : "tenant_checkout";
-  onboardingEvaluationDone.value = true;
-  showOnboardingModal.value = true;
-  menuOpen.value = false;
-};
-
-const openAdminPanel = async () => {
-  menuOpen.value = false;
-  await router.push("/tenant/admin-login");
-};
-
-const logoutTenant = async () => {
-  const confirmed = window.confirm("Are you sure you want to log out?");
-  if (!confirmed) {
-    return;
-  }
-  menuOpen.value = false;
-  const nextUrl = getPostSignOutUrl();
-  await signOut();
-  if (nextUrl.startsWith("http")) {
-    window.location.assign(nextUrl);
-    return;
-  }
-  await router.push(nextUrl);
-};
-
-const hasFreshAdminVerification = (verifiedAt: string | null) => {
-  if (!verifiedAt) return false;
-  const verifiedAtMs = Date.parse(verifiedAt);
-  if (Number.isNaN(verifiedAtMs)) return false;
-  return Date.now() - verifiedAtMs <= 15 * 60 * 1000;
-};
-
-const hasFreshSuperVerification = (verifiedAt: string | null) => {
-  if (!verifiedAt) return false;
-  const verifiedAtMs = Date.parse(verifiedAt);
-  if (Number.isNaN(verifiedAtMs)) return false;
-  return Date.now() - verifiedAtMs <= 15 * 60 * 1000;
-};
-
-let publicHomeRedirectInFlight = false;
-const maybeRedirectAuthenticatedPublicHome = async () => {
-  if (publicHomeRedirectInFlight) return;
-  if (route.path !== "/" && route.path !== "/landing-new" && route.path !== "/about") return;
-  if (killSwitchEnabled.value && route.path === "/") return;
-  if (!auth.isInitialized || !auth.isAuthenticated) return;
-
-  if (
-    district.isDistrictHost &&
-    district.districtId &&
-    auth.districtContextId &&
-    auth.districtContextId !== district.districtId
-  ) {
-    return;
-  }
-
-  let targetPath: string | null = null;
-  if (auth.role === "super_admin") {
-    targetPath =
-      auth.hasSecondaryAuth && hasFreshSuperVerification(auth.superVerifiedAt)
-        ? "/super-admin"
-        : "/super-auth";
-  } else if (auth.role === "district_admin") {
-    targetPath = hasFreshAdminVerification(auth.adminVerifiedAt)
-      ? "/district"
-      : "/tenant/admin-login";
-  } else if ((auth.role === "tenant_admin" || auth.role === "tenant_user") && auth.tenantContextId) {
-    targetPath = "/tenant/checkout";
-  }
-
-  if (!targetPath) return;
-
-  publicHomeRedirectInFlight = true;
-  try {
-    const currentHost = resolveDistrictHost(window.location.hostname);
-    const shouldCrossHostRedirect =
-      !currentHost.isDistrictHost &&
-      auth.role !== "super_admin" &&
-      !!auth.districtContextId;
-
-    if (shouldCrossHostRedirect) {
-      const resolvedDistrict = await lookupDistrictById(auth.districtContextId as string);
-      const districtSlug = resolvedDistrict?.slug?.trim().toLowerCase();
-      if (districtSlug) {
-        window.location.replace(buildDistrictAppUrl(districtSlug, targetPath));
-      }
-    }
-  } finally {
-    publicHomeRedirectInFlight = false;
-  }
-};
-
-const reloadApp = () => {
-  window.location.assign(`${window.location.origin}/`);
-};
-
-const signInAgain = async () => {
-  const recoveryRoute = sessionTermination.recoveryRoute ?? resolveRecoveryRouteFromPath(route.path);
-  const nextUrl =
-    route.path.startsWith("/super-admin") || route.path.startsWith("/internal")
-      ? null
-      : getPostSignOutUrl();
-  if (sessionTerminationRedirectTimer) {
-    window.clearTimeout(sessionTerminationRedirectTimer);
-    sessionTerminationRedirectTimer = null;
-  }
-  clearSessionTermination();
-  menuOpen.value = false;
-  if (nextUrl) {
-    if (nextUrl.startsWith("http")) {
-      window.location.assign(nextUrl);
-      return;
-    }
-    await router.replace(nextUrl);
-    return;
-  }
-  await router.replace(recoveryRoute);
-};
-
-const completeOnboarding = () => {
-  markOnboardingCompleted(onboardingRole.value);
-  onboardingEvaluationDone.value = true;
-  showOnboardingModal.value = false;
-};
-
-const handleOnboardingClose = () => {
-  completeOnboarding();
-};
-
-const handleOnboardingComplete = () => {
-  completeOnboarding();
-};
-
-const evaluateOnboardingVisibility = () => {
-  const role = currentTenantOnboardingRole.value;
-  if (!auth.isInitialized || !auth.isAuthenticated || !role) {
-    showOnboardingModal.value = false;
-    onboardingEvaluationDone.value = false;
-    return;
-  }
-  if (!isOnTenantRoute.value) {
-    showOnboardingModal.value = false;
-    return;
-  }
-  onboardingRole.value = role;
-  onboardingVariant.value = route.path.startsWith("/tenant/admin")
-    ? "tenant_admin"
-    : "tenant_checkout";
-  if (onboardingEvaluationDone.value) {
-    return;
-  }
-  if (!hasCompletedOnboarding(role)) {
-    showOnboardingModal.value = true;
-  }
-  onboardingEvaluationDone.value = true;
-};
-
-const clearAdminIdleTimer = () => {
-  if (adminIdleTimer) {
-    window.clearTimeout(adminIdleTimer);
-    adminIdleTimer = null;
-  }
-};
-
-const runIdleLogout = async () => {
-  if (isIdleLogoutRunning.value) return;
-  if (!isAdminIdleLogoutEnabled.value) return;
-  if (!auth.isAuthenticated || auth.role !== "tenant_admin" || !isTenantAdminArea.value) {
-    return;
-  }
-  isIdleLogoutRunning.value = true;
-  try {
-    clearAdminVerification();
-    await router.replace("/tenant/checkout");
-  } finally {
-    isIdleLogoutRunning.value = false;
-  }
-};
-
-const stopAdminSessionPolling = () => {
-  if (!adminSessionTimer) return;
-  window.clearInterval(adminSessionTimer);
-  adminSessionTimer = null;
-};
-
-const stopSessionHeartbeat = () => {
-  if (!sessionHeartbeatTimer) return;
-  window.clearInterval(sessionHeartbeatTimer);
-  sessionHeartbeatTimer = null;
-};
-
-const handleSessionTermination = () => {
-  clearAuthState(true);
-  clearAdminVerification();
-  menuOpen.value = false;
-  const recoveryRoute = resolveRecoveryRouteFromPath(route.path);
-  showSessionTermination(recoveryRoute);
-  if (sessionTerminationRedirectTimer) {
-    window.clearTimeout(sessionTerminationRedirectTimer);
-  }
-  sessionTerminationRedirectTimer = window.setTimeout(() => {
-    sessionTerminationRedirectTimer = null;
-    void signInAgain();
-  }, 5000);
-};
-
-const runSessionHeartbeat = async () => {
-  if (IS_E2E_TEST_MODE) return;
-  if (isSessionHeartbeatRunning.value) return;
-  if (!auth.isAuthenticated) {
-    stopSessionHeartbeat();
-    return;
-  }
-  const epoch = authSessionEpoch;
-  const userId = auth.userId;
-  isSessionHeartbeatRunning.value = true;
-  try {
-    const summary = await fetchHttpSessionSummary();
-    if (epoch !== authSessionEpoch || userId !== auth.userId) {
-      return;
-    }
-    if (!summary.authenticated) {
-      handleSessionTermination();
-    }
-  } catch {
-    // Ignore transient heartbeat failures. Protected requests still trigger recovery.
-  } finally {
-    isSessionHeartbeatRunning.value = false;
-  }
-};
-
-const startSessionHeartbeat = () => {
-  if (IS_E2E_TEST_MODE) {
-    stopSessionHeartbeat();
-    return;
-  }
-  if (!auth.isAuthenticated || sessionTermination.visible) {
-    stopSessionHeartbeat();
-    return;
-  }
-  void runSessionHeartbeat();
-  if (sessionHeartbeatTimer) return;
-  sessionHeartbeatTimer = window.setInterval(() => {
-    void runSessionHeartbeat();
-  }, 30_000);
-};
-
-const runAdminSessionCheck = async () => {
-  if (isAdminSessionCheckRunning.value) return;
-  if (!shouldTrackTenantAdminSession.value) {
-    stopAdminSessionPolling();
-    return;
-  }
-  const epoch = authSessionEpoch;
-  const userId = auth.userId;
-  const deviceId = getOrCreateDeviceSession().deviceId;
-  isAdminSessionCheckRunning.value = true;
-  try {
-    try {
-      await touchTenantAdminSession();
-    } catch {
-      // Best-effort keepalive; validation below is authoritative.
-    }
-    if (epoch !== authSessionEpoch || userId !== auth.userId || deviceId !== getOrCreateDeviceSession().deviceId) {
-      return;
-    }
-    const validation = await validateTenantAdminSession();
-    if (epoch !== authSessionEpoch || userId !== auth.userId || deviceId !== getOrCreateDeviceSession().deviceId) {
-      return;
-    }
-    if (!validation.valid) {
-      // One short retry to avoid false negatives during immediate post-login propagation.
-      await new Promise((resolve) => window.setTimeout(resolve, 250));
-      if (epoch !== authSessionEpoch || userId !== auth.userId || deviceId !== getOrCreateDeviceSession().deviceId) {
-        return;
-      }
-      const retryValidation = await validateTenantAdminSession();
-      if (epoch !== authSessionEpoch || userId !== auth.userId || deviceId !== getOrCreateDeviceSession().deviceId) {
-        return;
-      }
-      if (!retryValidation.valid) {
-        handleSessionTermination();
-      }
-    }
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "";
-    if (
-      message === "Session revoked" &&
-      epoch === authSessionEpoch &&
-      userId === auth.userId &&
-      deviceId === getOrCreateDeviceSession().deviceId
-    ) {
-      handleSessionTermination();
-    }
-  } finally {
-    isAdminSessionCheckRunning.value = false;
-  }
-};
-
-const startAdminSessionPolling = () => {
-  if (!shouldTrackTenantAdminSession.value || sessionTermination.visible) {
-    stopAdminSessionPolling();
-    return;
-  }
-  void runAdminSessionCheck();
-  if (adminSessionTimer) return;
-  adminSessionTimer = window.setInterval(() => {
-    void runAdminSessionCheck();
-  }, 45_000);
-};
-
-const resetAdminIdleTimer = () => {
-  clearAdminIdleTimer();
-  if (!isAdminIdleLogoutEnabled.value) {
-    return;
-  }
-  if (!auth.isAuthenticated || auth.role !== "tenant_admin" || !isTenantAdminArea.value) {
-    return;
-  }
-  adminIdleTimer = window.setTimeout(() => {
-    void runIdleLogout();
-  }, ADMIN_IDLE_TIMEOUT_MS);
-};
-
-const adminActivityEvents: Array<keyof WindowEventMap> = [
-  "mousemove",
-  "mousedown",
-  "keydown",
-  "touchstart",
-  "scroll",
-];
-
-const handleAdminActivity = () => {
-  resetAdminIdleTimer();
-};
-
-const dismissBroadcast = () => {
-  if (!activeBroadcast.value) return;
-  dismissedBroadcastId.value = activeBroadcast.value.id;
-  localStorage.setItem("itemtraxx-broadcast-dismissed", activeBroadcast.value.id);
-};
-
-const dismissIncidentBanner = () => {
-  if (!incidentBanner.value) return;
-  dismissedIncidentId.value = incidentBanner.value.id;
-  localStorage.setItem("itemtraxx-incident-dismissed", incidentBanner.value.id);
-};
-
-const refreshSystemStatus = async () => {
-  const response = await fetchSystemStatus();
-  if (!response) {
-    statusLabel.value = "Unknown";
-    statusClass.value = "status-unknown";
-    backendUnavailable.value = false;
-    return;
-  }
-
-  const payload = response.payload;
-  if (payload.kill_switch?.enabled === true) {
-    killSwitchEnabled.value = true;
-    killSwitchMessage.value =
-      typeof payload.kill_switch.message === "string" && payload.kill_switch.message.trim()
-        ? payload.kill_switch.message.trim()
-        : "Unfortunately ItemTraxx is currently unavailable. We apologize for any inconvenience and are working to restore access as soon as possible. Please see the status page (https://status.itemtraxx.com/) for more information.";
-  } else {
-    killSwitchEnabled.value = false;
-  }
-  const broadcast = payload.broadcast;
-  if (broadcast?.enabled && typeof broadcast.message === "string" && broadcast.message.trim()) {
-    const level: BroadcastLevel =
-      broadcast.level === "warning" || broadcast.level === "critical"
-        ? broadcast.level
-        : "info";
-    const broadcastId = typeof broadcast.updated_at === "string" && broadcast.updated_at
-      ? broadcast.updated_at
-      : broadcast.message.trim();
-    activeBroadcast.value = {
-      id: broadcastId,
-      message: broadcast.message.trim(),
-      level,
-    };
-  } else {
-    activeBroadcast.value = null;
-  }
-
-  const hasMaintenancePayload =
-    payload.maintenance && typeof payload.maintenance === "object";
-  if (hasMaintenancePayload) {
-    const enabled = payload.maintenance?.enabled === true;
-    const message =
-      typeof payload.maintenance?.message === "string" &&
-      payload.maintenance.message.trim()
-        ? payload.maintenance.message.trim()
-        : "Maintenance currently in progress.";
-    maintenanceEnabled.value = enabled;
-    maintenanceMessage.value = message;
-    if (enabled) {
-      writeCachedMaintenanceState({
-        enabled: true,
-        message,
-        updatedAt:
-          typeof payload.maintenance?.updated_at === "string"
-            ? payload.maintenance.updated_at
-            : new Date().toISOString(),
-      });
-    } else {
-      writeCachedMaintenanceState(null);
-    }
-  } else if (response.status >= 500 || payload.status === "down") {
-    // Keep last known maintenance state during backend outages.
-    const cached = readCachedMaintenanceState();
-    if (cached?.enabled) {
-      maintenanceEnabled.value = true;
-      maintenanceMessage.value = cached.message;
-    }
-  } else {
-    maintenanceEnabled.value = false;
-    writeCachedMaintenanceState(null);
-  }
-
-  if (response.ok && payload.status === "operational") {
-    statusLabel.value = "Running";
-    statusClass.value = "status-ok";
-    incidentBanner.value = null;
-    backendUnavailable.value = false;
-    return;
-  }
-
-  if (response.status >= 500 || payload.status === "down") {
-    statusLabel.value = "Down";
-    statusClass.value = "status-down";
-    backendUnavailable.value = !maintenanceEnabled.value;
-    const incidentId =
-      (payload.checked_at && String(payload.checked_at)) ||
-      `${payload.status}-${payload.incident_summary || "down"}`;
-    incidentBanner.value = {
-      id: incidentId,
-      message:
-        typeof payload.incident_summary === "string" && payload.incident_summary
-          ? payload.incident_summary
-          : "A system outage has been detected.",
-      level: "down",
-      checkedAt: payload.checked_at,
-    };
-    return;
-  }
-
-  statusLabel.value = "Degraded";
-  statusClass.value = "status-warn";
-  backendUnavailable.value = false;
-  const incidentId =
-    (payload.checked_at && String(payload.checked_at)) ||
-    `${payload.status}-${payload.incident_summary || "degraded"}`;
-  incidentBanner.value = {
-    id: incidentId,
-    message:
-      typeof payload.incident_summary === "string" && payload.incident_summary
-        ? payload.incident_summary
-        : "A system incident or maintenance event is active.",
-    level: "degraded",
-    checkedAt: payload.checked_at,
-  };
-};
-
-const refreshVersionStatus = async () => {
-  if (isDevSubdomainHost.value || isNonMainBuild) {
-    isOutdated.value = false;
-    latestVersion.value = null;
-    return;
-  }
-
-  if (!appVersion || appVersion === "n/a") {
-    isOutdated.value = false;
-    return;
-  }
-
-  const controller = new AbortController();
-  const timeoutId = window.setTimeout(() => controller.abort(), 4000);
-  try {
-    const response = await fetch(GITHUB_HEAD_COMMIT_API, {
-      method: "GET",
-      signal: controller.signal,
-    });
-    if (!response.ok) {
-      return;
-    }
-
-    const payload = (await response.json().catch(() => ({}))) as {
-      sha?: string;
-    };
-    const latestSha = typeof payload.sha === "string" ? payload.sha : "";
-    if (latestSha.length < 7) {
-      return;
-    }
-
-    latestVersion.value = latestSha.slice(0, 7);
-    isOutdated.value = latestVersion.value !== appVersion;
-  } catch {
-    // Keep current state on network/API errors.
-  } finally {
-    window.clearTimeout(timeoutId);
-  }
-};
-
-const scheduleLowPriorityTask = (task: () => void, delayMs = 300) =>
-  window.setTimeout(task, delayMs);
-
-const startStatusPolling = () => {
-  if (statusTimer || document.visibilityState === "hidden") return;
-  statusTimer = window.setInterval(() => {
-    void refreshSystemStatus();
-  }, 300_000);
-};
-
-const stopStatusPolling = () => {
-  if (!statusTimer) return;
-  window.clearInterval(statusTimer);
-  statusTimer = null;
-};
-
-const startVersionPolling = () => {
-  if (versionTimer || document.visibilityState === "hidden") return;
-  versionTimer = window.setInterval(() => {
-    void refreshVersionStatus();
-  }, 120_000);
-};
-
-const stopVersionPolling = () => {
-  if (!versionTimer) return;
-  window.clearInterval(versionTimer);
-  versionTimer = null;
-};
-
-const handlePageVisibilityChange = () => {
-  if (document.visibilityState === "hidden") {
-    stopStatusPolling();
-    stopVersionPolling();
-    stopAdminSessionPolling();
-    stopSessionHeartbeat();
-    return;
-  }
-  resetAdminIdleTimer();
-  startAdminSessionPolling();
-  startSessionHeartbeat();
-  void refreshSystemStatus();
-  startStatusPolling();
-  void refreshVersionStatus();
-  startVersionPolling();
-  refreshOfflineQueueCount();
-};
-
-const handleStorageChange = (event: StorageEvent) => {
-  if (!event.key || event.key.startsWith("itemtraxx:checkout-offline-buffer:")) {
-    refreshOfflineQueueCount();
-  }
-  if (!event.key || event.key === "itemtraxx-cookie-consent") {
-    syncCookieConsent();
-  }
-};
-
-const handleCookieConsentChange = () => {
-  syncCookieConsent();
-};
-
+watch(() => [systemStatus.hasResult, systemStatus.responseOk, systemStatus.responseStatus, systemStatus.payload] as const, applySystemStatus, { immediate: true });
+watch(() => routeLoading.isLoading, (loading) => {
+  if (pageLoadingTimer) window.clearTimeout(pageLoadingTimer);
+  pageLoadingTimer = null;
+  if (!loading) { showPageLoading.value = false; return; }
+  pageLoadingTimer = window.setTimeout(() => { showPageLoading.value = true; pageLoadingTimer = null; }, 350);
+});
+watch(() => [killSwitchEnabled.value, route.path] as const, ([enabled, path]) => {
+  if (enabled && !isLocalDevMaintenanceBypass.value && path !== "/" && path !== "/unavailable") void router.replace("/unavailable");
+});
+watch(() => [backendUnavailable.value, route.path] as const, ([unavailable, path]) => {
+  if (unavailable && !isLocalDevMaintenanceBypass.value && path !== "/unavailable") void router.replace("/unavailable");
+});
+watch(() => [route.name, auth.isInitialized, auth.isAuthenticated, auth.role, auth.districtContextId, auth.adminVerifiedAt, auth.hasSecondaryAuth, auth.superVerifiedAt, district.isDistrictHost, district.districtId] as const, () => void maybeRedirectAuthenticatedPublicHome());
 onMounted(() => {
-  forceUpdateOverlay.value =
-    import.meta.env.DEV &&
-    new URLSearchParams(window.location.search).get("force-update-overlay") === "1";
   const saved = localStorage.getItem("itemtraxx-theme");
-  if (saved === "light" || saved === "dark") {
-    applyTheme(saved);
-  } else {
-    applyTheme("light");
-  }
-  deferredStatusTimer = scheduleLowPriorityTask(() => {
-    void refreshSystemStatus();
-    startStatusPolling();
-  }, 250);
-  deferredVersionTimer = scheduleLowPriorityTask(() => {
-    void refreshVersionStatus();
-    startVersionPolling();
-  }, 750);
-  syncCookieConsent();
-  for (const eventName of adminActivityEvents) {
-    window.addEventListener(eventName, handleAdminActivity, { passive: true });
-  }
-  window.addEventListener("storage", handleStorageChange);
-  window.addEventListener("itemtraxx:cookie-consent", handleCookieConsentChange);
-  refreshOfflineQueueCount();
-  offlineQueueTimer = window.setInterval(() => {
-    refreshOfflineQueueCount();
-  }, 10000);
-  window.addEventListener("resize", measureTopBanners);
-  document.addEventListener("visibilitychange", handlePageVisibilityChange);
-  resetAdminIdleTimer();
-  startAdminSessionPolling();
-  startSessionHeartbeat();
-  evaluateOnboardingVisibility();
+  applyTheme(saved === "light" || saved === "dark" ? saved : "light");
   void maybeRedirectAuthenticatedPublicHome();
-  void nextTick(() => {
-    measureTopBanners();
-  });
 });
-
-watch(
-  () => routeLoading.isLoading,
-  (isLoading) => {
-    if (pageLoadingTimer) {
-      window.clearTimeout(pageLoadingTimer);
-      pageLoadingTimer = null;
-    }
-
-    if (!isLoading) {
-      showPageLoading.value = false;
-      return;
-    }
-
-    pageLoadingTimer = window.setTimeout(() => {
-      showPageLoading.value = true;
-      pageLoadingTimer = null;
-    }, 350);
-  }
-);
-
-watch(
-  () => [route.path, auth.isAuthenticated, auth.role] as const,
-  () => {
-    resetAdminIdleTimer();
-    startAdminSessionPolling();
-    startSessionHeartbeat();
-    evaluateOnboardingVisibility();
-    void maybeRedirectAuthenticatedPublicHome();
-  }
-);
-
-watch(
-  () => [killSwitchEnabled.value, route.path] as const,
-  ([enabled, path]) => {
-    if (!enabled || isLocalDevMaintenanceBypass.value) return;
-    if (path !== "/" && path !== "/unavailable") {
-      void router.replace("/unavailable");
-    }
-  }
-);
-
-watch(
-  () => [backendUnavailable.value, route.path] as const,
-  ([isUnavailable, path]) => {
-    if (!isUnavailable || isLocalDevMaintenanceBypass.value) return;
-    if (path !== "/unavailable") {
-      void router.replace("/unavailable");
-    }
-  }
-);
-
-watch(
-  () => auth.isAuthenticated,
-  () => {
-    if (auth.isAuthenticated) {
-      startAdminSessionPolling();
-      startSessionHeartbeat();
-      evaluateOnboardingVisibility();
-      void maybeRedirectAuthenticatedPublicHome();
-      return;
-    }
-    stopAdminSessionPolling();
-    stopSessionHeartbeat();
-    showOnboardingModal.value = false;
-    onboardingEvaluationDone.value = false;
-  }
-);
-
-watch(
-  () => [auth.isAuthenticated, auth.userId, auth.adminVerifiedAt, auth.superVerifiedAt] as const,
-  () => {
-    authSessionEpoch += 1;
-  }
-);
-
-
-watch(
-  () => sessionTermination.visible,
-  (visible) => {
-    if (!visible && sessionTerminationRedirectTimer) {
-      window.clearTimeout(sessionTerminationRedirectTimer);
-      sessionTerminationRedirectTimer = null;
-    }
-    if (visible) {
-      stopAdminSessionPolling();
-      stopSessionHeartbeat();
-    }
-  }
-);
-
-watch(
-  () =>
-    [
-      route.name,
-      auth.isInitialized,
-      auth.isAuthenticated,
-      auth.role,
-      auth.districtContextId,
-      auth.adminVerifiedAt,
-      auth.hasSecondaryAuth,
-      auth.superVerifiedAt,
-      district.isDistrictHost,
-      district.districtId,
-    ] as const,
-  () => {
-    void maybeRedirectAuthenticatedPublicHome();
-  }
-);
-
-watch(
-  () => [showMaintenanceBanner.value, showBroadcast.value, activeBroadcast.value?.message] as const,
-  () => {
-    void nextTick(() => {
-      measureTopBanners();
-    });
-  }
-);
-
-onUnmounted(() => {
-  clearAdminIdleTimer();
-  for (const eventName of adminActivityEvents) {
-    window.removeEventListener(eventName, handleAdminActivity);
-  }
-  if (statusTimer) {
-    stopStatusPolling();
-  }
-  stopVersionPolling();
-  if (deferredStatusTimer) {
-    window.clearTimeout(deferredStatusTimer);
-    deferredStatusTimer = null;
-  }
-  if (deferredVersionTimer) {
-    window.clearTimeout(deferredVersionTimer);
-    deferredVersionTimer = null;
-  }
-  if (pageLoadingTimer) {
-    window.clearTimeout(pageLoadingTimer);
-    pageLoadingTimer = null;
-  }
-  if (sessionTerminationRedirectTimer) {
-    window.clearTimeout(sessionTerminationRedirectTimer);
-    sessionTerminationRedirectTimer = null;
-  }
-  if (offlineQueueTimer) {
-    window.clearInterval(offlineQueueTimer);
-    offlineQueueTimer = null;
-  }
-  stopAdminSessionPolling();
-  stopSessionHeartbeat();
-  document.removeEventListener("visibilitychange", handlePageVisibilityChange);
-  window.removeEventListener("itemtraxx:cookie-consent", handleCookieConsentChange);
-  window.removeEventListener("storage", handleStorageChange);
-  window.removeEventListener("resize", measureTopBanners);
-});
+onScopeDispose(() => { if (pageLoadingTimer) window.clearTimeout(pageLoadingTimer); });
 </script>

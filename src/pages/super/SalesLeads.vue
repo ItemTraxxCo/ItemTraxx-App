@@ -142,7 +142,7 @@ import {
   moveSalesLeadToCustomer,
   setSalesLeadStage,
   type SalesLead,
-} from "../../services/superOpsService";
+} from "../../services/superOps/salesCustomers";
 
 const stageOptions = [
   { value: "waiting_for_quote", label: "Waiting for quote" },

@@ -1,6 +1,6 @@
 type ConsoleLevel = "log" | "info" | "warn" | "error";
 
-export type ConsoleEntry = {
+type ConsoleEntry = {
   level: ConsoleLevel;
   message: string;
   timestamp: string;

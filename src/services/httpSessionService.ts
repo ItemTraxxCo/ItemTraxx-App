@@ -30,7 +30,7 @@ const getEdgeProxyOrigin = () => {
   }
 };
 
-export const getHttpSessionBaseUrl = () => {
+const getHttpSessionBaseUrl = () => {
   const proxyOrigin = getEdgeProxyOrigin();
   if (!import.meta.env.DEV && proxyOrigin) {
     return `${proxyOrigin}/auth/session`;
@@ -88,9 +88,6 @@ export const exchangeHttpSession = async (payload: {
     method: "POST",
     body: JSON.stringify(payload),
   });
-
-export const refreshHttpSession = async () =>
-  requestHttpSession<HttpSessionSummary>("refresh", { method: "POST" });
 
 export const clearHttpSession = async () =>
   requestHttpSession<{ ok: boolean }>("logout", { method: "POST", body: JSON.stringify({}) });

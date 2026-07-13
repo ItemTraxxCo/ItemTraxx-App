@@ -37,7 +37,7 @@ const callSuperAdmin = async <TData>(payload: SuperAdminRequest) => {
   );
 
   if (!result.ok) {
-    throw edgeFunctionError(result, "Super admin request failed.");
+    throw edgeFunctionError(result, "Super admin request failed. fix yo code.");
   }
 
   return result.data?.data as TData;

@@ -231,9 +231,8 @@ import checkoutReturnUiImage800 from "../assets/landing/checkout_return_ui-800.w
 import checkoutReturnUiImage1200 from "../assets/landing/checkout_return_ui-1200.webp";
 import checkoutReturnUiImage1600 from "../assets/landing/checkout_return_ui-1600.webp";
 import PublicFooter from "../components/PublicFooter.vue";
-import { trackAnalyticsEvent } from "../services/analyticsService";
-import { capturePostHogEvent } from "../services/posthogService";
-import { fetchSystemStatus } from "../services/systemStatusService";
+import { trackProductEvent } from "../services/productEvents";
+import { useSystemStatus } from "../composables/useSystemStatus";
 
 const lightBrandLogoUrl = import.meta.env.VITE_BRAND_LOGO_LIGHT_URL as string | undefined;
 const darkBrandLogoUrl = import.meta.env.VITE_BRAND_LOGO_DARK_URL as string | undefined;
@@ -325,11 +324,16 @@ const faqItems = [
 ];
 
 const openFaqIndex = ref<number | null>(null);
-const statusLabel = ref("Checking");
-const statusClass = ref<"status-ok" | "status-warn" | "status-down" | "status-unknown">("status-unknown");
+const {
+  state: systemStatus,
+  statusLabel: sharedStatusLabel,
+  statusClass,
+} = useSystemStatus();
+const statusLabel = computed(() =>
+  systemStatus.refreshedAt === 0 ? "Checking" : sharedStatusLabel.value,
+);
 
 let observer: IntersectionObserver | null = null;
-let statusTimer: number | null = null;
 let themeObserver: MutationObserver | null = null;
 
 const toggleFaq = (index: number) => {
@@ -337,54 +341,16 @@ const toggleFaq = (index: number) => {
 };
 
 const trackCta = (cta: "pricing" | "demo" | "login", location: "header" | "hero" | "final") => {
-  void trackAnalyticsEvent("landing_new2_cta_click", { cta, location });
-  capturePostHogEvent("landing_cta_clicked", { cta, location, page: "landing-new2" });
-};
-
-const refreshSystemStatus = async () => {
-  const response = await fetchSystemStatus();
-  if (!response) {
-    statusLabel.value = "Unknown";
-    statusClass.value = "status-unknown";
-    return;
-  }
-
-  if (response.ok && response.payload.status === "operational") {
-    statusLabel.value = "Running";
-    statusClass.value = "status-ok";
-    return;
-  }
-
-  if (response.status >= 500 || response.payload.status === "down") {
-    statusLabel.value = "Down";
-    statusClass.value = "status-down";
-    return;
-  }
-
-  statusLabel.value = "Degraded";
-  statusClass.value = "status-warn";
-};
-
-const startStatusPolling = () => {
-  if (statusTimer || document.visibilityState === "hidden") return;
-  statusTimer = window.setInterval(() => {
-    void refreshSystemStatus();
-  }, 300_000);
-};
-
-const stopStatusPolling = () => {
-  if (!statusTimer) return;
-  window.clearInterval(statusTimer);
-  statusTimer = null;
-};
-
-const handleVisibilityChange = () => {
-  if (document.visibilityState === "hidden") {
-    stopStatusPolling();
-    return;
-  }
-  void refreshSystemStatus();
-  startStatusPolling();
+  trackProductEvent({
+    analytics: {
+      name: "landing_new2_cta_click",
+      properties: { cta, location },
+    },
+    posthog: {
+      name: "landing_cta_clicked",
+      properties: { cta, location, page: "landing-new2" },
+    },
+  });
 };
 
 onMounted(() => {
@@ -397,10 +363,6 @@ onMounted(() => {
     attributes: true,
     attributeFilter: ["data-theme"],
   });
-
-  void refreshSystemStatus();
-  startStatusPolling();
-  document.addEventListener("visibilitychange", handleVisibilityChange);
 
   const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   const revealElements = document.querySelectorAll<HTMLElement>(".lp-reveal");
@@ -428,8 +390,6 @@ onMounted(() => {
 onBeforeUnmount(() => {
   observer?.disconnect();
   observer = null;
-  stopStatusPolling();
-  document.removeEventListener("visibilitychange", handleVisibilityChange);
 });
 
 onUnmounted(() => {

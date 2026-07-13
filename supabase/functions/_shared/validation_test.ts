@@ -35,29 +35,43 @@ Deno.test("validation rejects malformed emails and IDs", () => {
 Deno.test("validation rejects oversized text and control characters", () => {
   assertValidationError(() => requireText("a".repeat(121), { maxLen: 120 }));
   assertValidationError(() => requireText("bad\u0000value", { maxLen: 120 }));
-  assertValidationError(() => requireText("hidden\u200Bvalue", { maxLen: 120 }));
+  assertValidationError(() =>
+    requireText("hidden\u200Bvalue", { maxLen: 120 })
+  );
   assertValidationError(() => requireText("spoof\u202Evalue", { maxLen: 120 }));
 });
 
 Deno.test("validation rejects invalid enums", () => {
   const allowed = new Set(["healthy", "degraded", "down"] as const);
-  assert(requireEnum("healthy", allowed) === "healthy", "expected allowed enum");
+  assert(
+    requireEnum("healthy", allowed) === "healthy",
+    "expected allowed enum",
+  );
   assertValidationError(() => requireEnum("unknown", allowed));
 });
 
 Deno.test("validation enforces slug pattern", () => {
-  assert(requireText("district-1", { maxLen: 63, pattern: SLUG_PATTERN }) === "district-1", "expected valid slug");
-  assertValidationError(() => requireText("../admin", { maxLen: 63, pattern: SLUG_PATTERN }));
+  assert(
+    requireText("district-1", { maxLen: 63, pattern: SLUG_PATTERN }) ===
+      "district-1",
+    "expected valid slug",
+  );
+  assertValidationError(() =>
+    requireText("../admin", { maxLen: 63, pattern: SLUG_PATTERN })
+  );
 });
 
 Deno.test("validation rejects too many items and malformed barcodes", () => {
   assertValidationError(() =>
-    requireTextArray(Array.from({ length: 101 }, (_, index) => `ITX-${index}`), {
-      minItems: 1,
-      maxItems: 100,
-      maxLen: 64,
-      pattern: BARCODE_PATTERN,
-    })
+    requireTextArray(
+      Array.from({ length: 101 }, (_, index) => `ITX-${index}`),
+      {
+        minItems: 1,
+        maxItems: 100,
+        maxLen: 64,
+        pattern: BARCODE_PATTERN,
+      },
+    )
   );
   assertValidationError(() =>
     requireTextArray(["valid-1", "<script>"], {

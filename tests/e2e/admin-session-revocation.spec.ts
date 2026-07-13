@@ -1,5 +1,10 @@
 import { expect, test } from "@playwright/test";
 import type { BrowserContext, Page, Route } from "@playwright/test";
+import {
+  mockUnauthenticatedSession,
+  navigateApp,
+  waitForPublicAuthBootstrap,
+} from "./helpers/testHarness";
 
 type SessionRow = {
   id: string;
@@ -154,6 +159,7 @@ const installAdminOpsMock = async (context: BrowserContext, state: AdminOpsState
 const seedTenantAdminState = async (page: Page, deviceId: string, deviceLabel: string) => {
   await page.goto("/");
   await page.waitForFunction(() => typeof window.__itemtraxxTest?.setTenantAdminSession === "function");
+  await waitForPublicAuthBootstrap(page);
   await page.evaluate(
     ({ tenantId, deviceId: id, deviceLabel: label, deviceIdKey, deviceLabelKey }) => {
       localStorage.setItem(deviceIdKey, id);
@@ -183,15 +189,109 @@ const callAdminOps = async <T>(page: Page, action: string, payload: Record<strin
 };
 
 test.describe("tenant admin device revocation", () => {
+
+  test("HTTP session heartbeat repeats after start and handles server-side termination", async ({ page }) => {
+    let authenticatedPhase = false;
+    let heartbeatRequests = 0;
+    await installSystemStatusMock(page.context());
+    await page.route("**/auth/session/me", async (route) => {
+      if (!authenticatedPhase) {
+        await route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: JSON.stringify({ authenticated: false, user: null, profile: null }),
+        });
+        return;
+      }
+      heartbeatRequests += 1;
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify(
+          heartbeatRequests === 1
+            ? {
+                authenticated: true,
+                user: {
+                  id: "user-heartbeat",
+                  email: "heartbeat@example.com",
+                  last_sign_in_at: "2026-07-13T12:00:00.000Z",
+                },
+                profile: {
+                  role: "tenant_admin",
+                  tenant_id: "tenant-e2e",
+                  district_id: null,
+                  auth_email: "heartbeat@example.com",
+                  is_active: true,
+                },
+              }
+            : { authenticated: false, user: null, profile: null },
+        ),
+      });
+    });
+    await page.route(/\/functions(?:\/v1)?\/admin-ops(?:\?.*)?$/, async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ data: { ok: true, valid: true } }),
+      });
+    });
+
+    await page.goto("/?e2e-session-heartbeat=1");
+    await page.waitForFunction(() => typeof window.__itemtraxxTest?.setTenantAdminSession === "function");
+    await waitForPublicAuthBootstrap(page);
+    authenticatedPhase = true;
+    await page.evaluate(
+      ({ deviceIdKey, deviceLabelKey }) => {
+        localStorage.setItem(deviceIdKey, "device-heartbeat");
+        localStorage.setItem(deviceLabelKey, "Heartbeat browser");
+        window.__itemtraxxTest?.setTenantAdminSession("tenant-e2e");
+      },
+      { deviceIdKey: DEVICE_ID_KEY, deviceLabelKey: DEVICE_LABEL_KEY },
+    );
+    await navigateApp(page, "/tenant/admin");
+
+    await expect.poll(() => heartbeatRequests).toBe(2);
+    const overlay = page.getByRole("alertdialog").filter({ hasText: "Session Ended" });
+    await expect(overlay).toBeVisible({ timeout: 4_000 });
+    await page.waitForTimeout(1_100);
+    expect(heartbeatRequests).toBe(2);
+  });
+
+  test("invalid tenant-admin validation shows the session-ended recovery overlay", async ({ page }) => {
+    await installSystemStatusMock(page.context());
+    await mockUnauthenticatedSession(page);
+    await page.route(/\/functions(?:\/v1)?\/admin-ops(?:\?.*)?$/, async (route) => {
+      const body = (route.request().postDataJSON() as { action?: string }) ?? {};
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          data: body.action === "validate_session" ? { valid: false } : { ok: true },
+        }),
+      });
+    });
+
+    await seedTenantAdminState(page, "device-invalid", "Test browser");
+    await navigateApp(page, "/tenant/admin");
+
+    const overlay = page.getByRole("alertdialog").filter({ hasText: "Session Ended" });
+    await expect(overlay).toBeVisible();
+    await expect(overlay.getByRole("button", { name: "Sign in again" })).toBeVisible();
+  });
+
   test("revoked auth lineage cannot register a rotated device without reauth", async ({ browser }) => {
     const state = createState();
     const contextA = await browser.newContext();
     await installSystemStatusMock(contextA);
+    await mockUnauthenticatedSession(contextA, { delayMs: 750 });
     await installAdminOpsMock(contextA, state);
 
     const pageA = await contextA.newPage();
 
     await seedTenantAdminState(pageA, "device-a", "Mac");
+    await waitForPublicAuthBootstrap(pageA);
+    await navigateApp(pageA, "/tenant/admin");
+    await expect(pageA).toHaveURL(/\/tenant\/admin$/);
 
     const touchA = await callAdminOps<{ ok: boolean }>(pageA, "touch_session", {
       device_id: "device-a",

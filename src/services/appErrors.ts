@@ -42,7 +42,7 @@ const isNetworkMessage = (message: string) => /network request failed/i.test(mes
 const isTimeoutMessage = (message: string) => /timed out/i.test(message);
 const isUnauthorizedMessage = (message: string) => message.trim().toLowerCase() === "unauthorized";
 
-export const unauthorizedError = (message = "Your session expired. Sign in again.") =>
+export const unauthorizedError = (message = "Your session has expired. Please sign in again.") =>
   (() => {
     dispatchRecoverableAppError({ code: "UNAUTHORIZED", message });
     return new AppError("UNAUTHORIZED", message, { status: 401, reportToSentry: false });
@@ -61,19 +61,19 @@ export const edgeFunctionError = (result: EdgeLikeResult, fallbackMessage: strin
     return new AppError("RATE_LIMIT", message, { status: 429, reportToSentry: false });
   }
   if (isTimeoutMessage(message)) {
-    return new AppError("TIMEOUT", "Request timed out. Please try again.", {
+    return new AppError("TIMEOUT", "Request timed out. Unable to reach ItemTraxx servers. Please try again.", {
       status: result.status,
       reportToSentry: false,
     });
   }
   if (isNetworkMessage(message)) {
-    return new AppError("NETWORK", "Network request failed. Check your connection and try again.", {
+    return new AppError("NETWORK", "Network request failed. Unable to reach ItemTraxx servers. Check your connection and try again.", {
       status: result.status,
       reportToSentry: false,
     });
   }
   if (/tenant disabled/i.test(message)) {
-    return new AppError("TENANT_DISABLED", "Tenant is disabled. Access is blocked.", {
+    return new AppError("TENANT_DISABLED", "Tenant is disabled. Access is blocked. Please contact support.", {
       status: result.status || 403,
       reportToSentry: false,
     });
@@ -98,29 +98,29 @@ export const toUserFacingErrorMessage = (error: unknown, fallbackMessage: string
   if (!rawMessage) return fallbackMessage;
 
   if (error instanceof AppError) {
-    if (error.code === "UNAUTHORIZED") return "Your session expired. Sign in again.";
+    if (error.code === "UNAUTHORIZED") return "Your session has expired. Please sign in again.";
     if (error.code === "RATE_LIMIT") return "Too many requests right now. Please try again in a moment.";
-    if (error.code === "NETWORK") return "Network issue. Check your connection and try again.";
-    if (error.code === "TIMEOUT") return "Request timed out. Please try again.";
+    if (error.code === "NETWORK") return "Network issue. Unable to reach ItemTraxx servers. Check your connection and try again.";
+    if (error.code === "TIMEOUT") return "Request timed out. Unable to reach ItemTraxx servers. Please try again.";
     if (error.code === "TENANT_DISABLED") return "This account cannot be used right now. Please contact support.";
     if (error.code === "REQUEST_FAILED") {
-      if (normalized.includes("invalid barcode")) return "Invalid barcode. Please check it and try again.";
+      if (normalized.includes("invalid barcode")) return "Invalid barcode. Please check the barcode and try again.";
       if (normalized.includes("borrower not found")) return "Borrower not found. Please check the borrower ID and try again.";
-      if (normalized.includes("missing tenant context")) return "Your session is missing required account information. Sign in again.";
+      if (normalized.includes("missing tenant context")) return "Your session is missing required account information. Please sign out and sign in again.";
       if (normalized.includes("rate limit")) return "Too many requests right now. Please try again in a moment.";
-      if (normalized.includes("timed out")) return "Request timed out. Please try again.";
+      if (normalized.includes("timed out")) return "Request timed out. Unable to reach ItemTraxx servers. Please try again. and check your connection.";
       return fallbackMessage;
     }
   }
 
   if (normalized === "unauthorized" || normalized === "unauthorized.") {
-    return "Your session expired. Sign in again.";
+    return "Your session has  expired. Please sign in again.";
   }
   if (normalized.includes("network request failed")) {
-    return "Network issue. Check your connection and try again.";
+    return "Network issue. Unable to reach ItemTraxx servers. Check your connection and try again.";
   }
   if (normalized.includes("timed out")) {
-    return "Request timed out. Please try again.";
+    return "Request timed out. Unable to reach ItemTraxx servers. Please try again.";
   }
   if (normalized.includes("rate limit") || normalized.includes("too many requests")) {
     return "Too many requests right now. Please try again in a moment.";
@@ -129,7 +129,7 @@ export const toUserFacingErrorMessage = (error: unknown, fallbackMessage: string
     return "This account cannot be used right now. Please contact support.";
   }
   if (normalized.includes("invalid barcode")) {
-    return "Invalid barcode. Please check it and try again.";
+    return "Invalid barcode. Please check the barcode and try again.";
   }
   if (normalized.includes("borrower not found")) {
     return "Borrower not found. Please check the borrower ID and try again.";
@@ -139,10 +139,10 @@ export const toUserFacingErrorMessage = (error: unknown, fallbackMessage: string
     normalized.includes("session terminated") ||
     normalized.includes("session expired")
   ) {
-    return "Your session expired. Sign in again.";
+    return "Your session has expired or has been terminated. Please sign in again.";
   }
   if (normalized.includes("missing tenant context")) {
-    return "Your session is missing required account information. Sign in again.";
+    return "Your session is missing required account information. Please sign out and sign in again.";
   }
   if (
     normalized.startsWith("unable to ") ||

@@ -1,7 +1,7 @@
 import { invokeEdgeFunction } from "./edgeFunctionClient";
 import { edgeFunctionError } from "./appErrors";
 
-export type SuperAuditLog = {
+type SuperAuditLog = {
   id: string;
   actor_id: string;
   actor_email: string | null;
@@ -62,7 +62,7 @@ export const fetchSuperDashboard = async () => {
   );
 
   if (!result.ok) {
-    throw edgeFunctionError(result, "Unable to load super dashboard.");
+    throw edgeFunctionError(result, "Unable to load super dashboard. fix yo code.");
   }
 
   return result.data?.data as SuperDashboard;

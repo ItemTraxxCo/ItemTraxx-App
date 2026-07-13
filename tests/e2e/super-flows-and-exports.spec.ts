@@ -89,6 +89,20 @@ test.describe("Super admin flows and export actions", () => {
     await expect(page.getByRole("button", { name: "Export PDF" })).toBeVisible();
   });
 
+  test("super-admin top navigation preserves role actions and system status", async ({ page }) => {
+    await page.goto("/");
+    await setSuperAdminSession(page);
+    await navigateApp(page, "/super-admin");
+
+    await page.getByRole("button", { name: "Open menu" }).click();
+    await expect(page.getByRole("menuitem", { name: "Open Admin Panel" })).toBeVisible();
+    await expect(page.getByRole("menuitem", { name: "Log Out User" })).toBeVisible();
+    await expect(page.getByRole("menuitem", { name: /System Status: Running/ })).toHaveAttribute(
+      "href",
+      "https://status.itemtraxx.com/?ref=trmenu",
+    );
+  });
+
   test("control-center actions preserve their exact request envelopes", async ({ page }) => {
     const requests = await captureSuperOpsRequests(page);
     await page.goto("/");

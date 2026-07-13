@@ -1246,6 +1246,27 @@ test.describe("Auth edge cases", () => {
     await expect.poll(() => validationRequests).toBe(1);
   });
 
+  test("admin activity keeps touch and validation heartbeat behavior distinct", async ({ page }) => {
+    const actions: string[] = [];
+    await page.route(/\/functions(?:\/v1)?\/admin-ops(?:\?.*)?$/, async (route) => {
+      const body = (route.request().postDataJSON() as { action?: string }) ?? {};
+      actions.push(body.action ?? "");
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ data: { ok: true, valid: true } }),
+      });
+    });
+
+    await page.goto("/");
+    await setTenantAdminSession(page, "tenant-e2e");
+    await navigateApp(page, "/tenant/admin");
+    await page.mouse.move(10, 10);
+
+    await expect.poll(() => actions.filter((action) => action === "touch_session").length).toBe(1);
+    await expect.poll(() => actions.filter((action) => action === "validate_session").length).toBe(1);
+  });
+
   test("tenant admin dev hosts disable idle logout behavior", async ({ page }) => {
     await page.route(/\/functions(?:\/v1)?\/admin-ops(?:\?.*)?$/, async (route) => {
       await route.fulfill({

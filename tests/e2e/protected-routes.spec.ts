@@ -29,6 +29,26 @@ test.describe("Protected route smoke tests", () => {
     await expect(page.getByRole("heading", { name: "Item Status Tracking" })).toBeVisible();
   });
 
+  test("tenant navigation preserves onboarding replay and offline queue chrome", async ({ page }) => {
+    await page.goto("/");
+    await page.evaluate(() => {
+      localStorage.setItem("itemtraxx:onboarding:v1:tenant_admin", new Date().toISOString());
+    });
+    await setTenantAdminSession(page);
+    await navigateApp(page, "/tenant/checkout");
+
+    await page.getByRole("button", { name: "Open menu" }).click();
+    await expect(page.getByRole("menuitem", { name: "Open Admin Panel" })).toBeVisible();
+    await expect(page.getByRole("menuitem", { name: "Take tour again" })).toBeVisible();
+    await expect(page.getByRole("menuitem", { name: "Offline Queue: 0" })).toHaveAttribute(
+      "title",
+      /auto-syncs them when connection is restored/,
+    );
+
+    await page.getByRole("menuitem", { name: "Take tour again" }).click();
+    await expect(page.getByRole("dialog")).toBeVisible();
+  });
+
   for (const path of ["/tenant/checkout", "/district"]) {
     test(`E2E first mount of protected ${path} does not use public auth bootstrap`, async ({ page }) => {
       let publicSessionRequests = 0;

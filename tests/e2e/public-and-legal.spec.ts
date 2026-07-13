@@ -371,32 +371,32 @@ test.describe("Public surfaces", () => {
     );
     expect(statusRequestCount).toBe(1);
     await expect.poll(activeStatusIntervalCount).toBe(1);
-    // App and PostHog each own an unrelated listener; status owns the third.
-    await expect.poll(activeVisibilityListenerCount).toBe(3);
+    // Version, offline queue, admin session, PostHog, and status own distinct lifecycles.
+    await expect.poll(activeVisibilityListenerCount).toBe(5);
 
     await page.clock.fastForward(10_001);
     await setVisibility("hidden");
     expect(statusRequestCount).toBe(1);
     await expect.poll(activeStatusIntervalCount).toBe(0);
-    await expect.poll(activeVisibilityListenerCount).toBe(3);
+    await expect.poll(activeVisibilityListenerCount).toBe(5);
     await expect.poll(statusLifecycleVisibilityListenerCount).toBe(1);
     await setVisibility("visible");
     await expect.poll(() => statusRequestCount).toBe(2);
     await expect.poll(activeStatusIntervalCount).toBe(1);
-    await expect.poll(activeVisibilityListenerCount).toBe(3);
+    await expect.poll(activeVisibilityListenerCount).toBe(5);
     await expect.poll(statusLifecycleVisibilityListenerCount).toBe(1);
 
     await page.clock.fastForward(100_000);
     await navigateWithinApp("/landing-old");
     await expect.poll(activeStatusIntervalCount).toBe(1);
-    await expect.poll(activeVisibilityListenerCount).toBe(3);
+    await expect.poll(activeVisibilityListenerCount).toBe(5);
     await expect.poll(statusLifecycleVisibilityListenerCount).toBe(1);
     await page.clock.fastForward(300_000);
     await expect.poll(() => statusRequestCount).toBe(3);
 
     await navigateWithinApp("/landing-new2");
     await expect.poll(activeStatusIntervalCount).toBe(1);
-    await expect.poll(activeVisibilityListenerCount).toBe(3);
+    await expect.poll(activeVisibilityListenerCount).toBe(5);
     await expect.poll(statusLifecycleVisibilityListenerCount).toBe(1);
     await page.clock.fastForward(300_000);
     await expect.poll(() => statusRequestCount).toBe(4);
@@ -423,6 +423,73 @@ test.describe("Public surfaces", () => {
       expect(responseUrls.some((url) => /\.supabase\.(?:co|in)\//.test(url))).toBe(false);
     });
   }
+
+  test("cookie preferences and theme survive app-shell remounts", async ({ page }) => {
+    await page.goto("/login");
+
+    await page.getByRole("button", { name: "Accept all" }).click();
+    await expect.poll(() =>
+      page.evaluate(() =>
+        JSON.parse(localStorage.getItem("itemtraxx-cookie-consent") ?? "null")?.preferences,
+      ),
+    ).toEqual({ analytics: true, diagnostics: true });
+
+    await page.getByRole("button", { name: "Open menu" }).click();
+    await page.getByRole("menuitem", { name: "Dark Mode" }).click();
+    await expect.poll(() => page.evaluate(() => document.documentElement.dataset.theme)).toBe("dark");
+    await expect.poll(() => page.evaluate(() => localStorage.getItem("itemtraxx-theme"))).toBe("dark");
+
+    await page.reload();
+    await expect.poll(() => page.evaluate(() => document.documentElement.dataset.theme)).toBe("dark");
+    await expect(page.getByRole("button", { name: "Accept all" })).toHaveCount(0);
+  });
+
+  test("broadcast dismissal and top-banner CSS offset follow the rendered banner height", async ({ page }) => {
+    await page.route(/\/functions(?:\/v1)?\/system-status(?:\?.*)?$/, async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          status: "operational",
+          checked_at: "2026-07-13T12:00:00.000Z",
+          maintenance: { enabled: false, message: "" },
+          broadcast: {
+            enabled: true,
+            message: "Planned dashboard notice",
+            level: "info",
+            updated_at: "broadcast-2026-07-13",
+          },
+        }),
+      });
+    });
+
+    await page.goto("/login");
+    const banner = page.getByRole("status").filter({ hasText: "Planned dashboard notice" });
+    await expect(banner).toBeVisible();
+    const height = await banner.evaluate((element) => element.getBoundingClientRect().height);
+    await expect.poll(() =>
+      page.evaluate(() =>
+        Number.parseFloat(
+          getComputedStyle(document.querySelector(".app-shell") as HTMLElement)
+            .getPropertyValue("--top-banner-offset"),
+        ),
+      ),
+    ).toBeCloseTo(height, 0);
+
+    await page.getByRole("button", { name: "Dismiss broadcast" }).click();
+    await expect(banner).toHaveCount(0);
+    expect(await page.evaluate(() => localStorage.getItem("itemtraxx-broadcast-dismissed"))).toBe(
+      "broadcast-2026-07-13",
+    );
+  });
+
+  test("the forced version overlay preserves update copy and precedence", async ({ page }) => {
+    await page.goto("/login?force-update-overlay=1");
+    const overlay = page.getByRole("alertdialog").filter({ hasText: "Update Available" });
+    await expect(overlay).toBeVisible();
+    await expect(overlay).toContainText("A new version of ItemTraxx is available.");
+    await expect(overlay.getByRole("button", { name: "Update" })).toBeVisible();
+  });
 
   test("loads unified legal agreement page", async ({ page }) => {
     await page.goto("/legal");

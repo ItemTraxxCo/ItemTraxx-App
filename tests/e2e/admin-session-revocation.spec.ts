@@ -189,6 +189,29 @@ const callAdminOps = async <T>(page: Page, action: string, payload: Record<strin
 };
 
 test.describe("tenant admin device revocation", () => {
+
+  test("invalid tenant-admin validation shows the session-ended recovery overlay", async ({ page }) => {
+    await installSystemStatusMock(page.context());
+    await mockUnauthenticatedSession(page);
+    await page.route(/\/functions(?:\/v1)?\/admin-ops(?:\?.*)?$/, async (route) => {
+      const body = (route.request().postDataJSON() as { action?: string }) ?? {};
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          data: body.action === "validate_session" ? { valid: false } : { ok: true },
+        }),
+      });
+    });
+
+    await seedTenantAdminState(page, "device-invalid", "Test browser");
+    await navigateApp(page, "/tenant/admin");
+
+    const overlay = page.getByRole("alertdialog").filter({ hasText: "Session Ended" });
+    await expect(overlay).toBeVisible();
+    await expect(overlay.getByRole("button", { name: "Sign in again" })).toBeVisible();
+  });
+
   test("revoked auth lineage cannot register a rotated device without reauth", async ({ browser }) => {
     const state = createState();
     const contextA = await browser.newContext();

@@ -2,10 +2,6 @@ import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.108.2";
 import { isKillSwitchWriteBlocked } from "../_shared/killSwitch.ts";
 import { isAllowedOrigin, parseAllowedOrigins } from "../_shared/cors.ts";
-import {
-  hasPrivilegedStepUp,
-  isMissingPrivilegedStepUpTable,
-} from "../_shared/privilegedStepUp.ts";
 import { resolveRateLimitResult } from "../_shared/preloginGuards.ts";
 import { requireTrustedEdgeIngress } from "../_shared/trustedIngress.ts";
 import { readJsonBody } from "../_shared/requestBody.ts";
@@ -27,21 +23,21 @@ import {
   requireText,
   ValidationError,
 } from "../_shared/validation.ts";
+import {
+  authorizeAdminOpsAction,
+  dispatchAdminOpsAction,
+} from "./actions/index.ts";
+import {
+  normalizeTenantUpdates,
+  resolveMaintenance,
+} from "./actions/notifications.ts";
+import type { AdminOpsContext } from "./context.ts";
 
 const baseCorsHeaders = {
   "Access-Control-Allow-Headers":
     "authorization, x-client-info, apikey, content-type, x-request-id",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
   Vary: "Origin",
-};
-
-type RuntimeUpdateItem = {
-  id: string;
-  title: string;
-  message: string;
-  level: "info" | "warning" | "critical";
-  created_at: string;
-  link_url: string | null;
 };
 
 type TenantFeatureFlags = {
@@ -81,16 +77,24 @@ type DeviceSessionContext = {
   generalLocation: string | null;
 };
 
-const TRACKED_STATUSES = new Set(["damaged", "lost", "in_repair", "retired", "in_studio_only"]);
-const ALLOWED_GEAR_STATUSES = new Set([
-  "available",
-  "checked_out",
+const TRACKED_STATUSES = new Set([
   "damaged",
   "lost",
   "in_repair",
   "retired",
   "in_studio_only",
-] as const);
+]);
+const ALLOWED_GEAR_STATUSES = new Set(
+  [
+    "available",
+    "checked_out",
+    "damaged",
+    "lost",
+    "in_repair",
+    "retired",
+    "in_studio_only",
+  ] as const,
+);
 
 type RpcError = {
   code?: string;
@@ -98,7 +102,9 @@ type RpcError = {
 };
 
 const formatRpcError = (error: RpcError | null | undefined) =>
-  error ? `${error.code ?? "unknown"}: ${error.message ?? "Unknown error"}` : "Unknown error";
+  error
+    ? `${error.code ?? "unknown"}: ${error.message ?? "Unknown error"}`
+    : "Unknown error";
 
 const defaultFeatureFlags = (): TenantFeatureFlags => ({
   enable_notifications: true,
@@ -113,10 +119,9 @@ const normalizeFeatureFlags = (value: unknown): TenantFeatureFlags => {
   const payload = value as Record<string, unknown>;
   const fallback = defaultFeatureFlags();
   return {
-    enable_notifications:
-      typeof payload.enable_notifications === "boolean"
-        ? payload.enable_notifications
-        : fallback.enable_notifications,
+    enable_notifications: typeof payload.enable_notifications === "boolean"
+      ? payload.enable_notifications
+      : fallback.enable_notifications,
     enable_bulk_item_import:
       typeof payload.enable_bulk_item_import === "boolean"
         ? payload.enable_bulk_item_import
@@ -125,10 +130,9 @@ const normalizeFeatureFlags = (value: unknown): TenantFeatureFlags => {
       typeof payload.enable_bulk_student_tools === "boolean"
         ? payload.enable_bulk_student_tools
         : fallback.enable_bulk_student_tools,
-    enable_status_tracking:
-      typeof payload.enable_status_tracking === "boolean"
-        ? payload.enable_status_tracking
-        : fallback.enable_status_tracking,
+    enable_status_tracking: typeof payload.enable_status_tracking === "boolean"
+      ? payload.enable_status_tracking
+      : fallback.enable_status_tracking,
     enable_barcode_generator:
       typeof payload.enable_barcode_generator === "boolean"
         ? payload.enable_barcode_generator
@@ -138,49 +142,40 @@ const normalizeFeatureFlags = (value: unknown): TenantFeatureFlags => {
 
 const resolveCorsHeaders = (req: Request) => {
   const origin = req.headers.get("Origin");
-  const allowedOrigins = parseAllowedOrigins(Deno.env.get("ITX_ALLOWED_ORIGINS"));
+  const allowedOrigins = parseAllowedOrigins(
+    Deno.env.get("ITX_ALLOWED_ORIGINS"),
+  );
 
   const hasOrigin = !!origin;
-  const originAllowed =
-    !hasOrigin || (hasOrigin && isAllowedOrigin(origin as string, allowedOrigins));
+  const originAllowed = !hasOrigin ||
+    (hasOrigin && isAllowedOrigin(origin as string, allowedOrigins));
 
-  const headers =
-    hasOrigin && originAllowed
-      ? { ...baseCorsHeaders, "Access-Control-Allow-Origin": origin as string }
-      : { ...baseCorsHeaders };
+  const headers = hasOrigin && originAllowed
+    ? { ...baseCorsHeaders, "Access-Control-Allow-Origin": origin as string }
+    : { ...baseCorsHeaders };
 
   return { hasOrigin, originAllowed, headers };
-};
-
-const resolveMaintenance = (value: unknown) => {
-  if (!value || typeof value !== "object") {
-    return { enabled: false, message: "" };
-  }
-  const payload = value as Record<string, unknown>;
-  return {
-    enabled: payload.enabled === true,
-    message:
-      typeof payload.message === "string" && payload.message.trim()
-        ? payload.message.trim()
-        : "Maintenance in progress.",
-  };
 };
 
 const sanitizeText = (value: unknown, maxLen: number) => {
   return optionalText(value, { maxLen }) || null;
 };
 
-const sanitizeLoginMethod = (value: unknown): DeviceSessionContext["loginMethod"] =>
+const sanitizeLoginMethod = (
+  value: unknown,
+): DeviceSessionContext["loginMethod"] =>
   value === "password" || value === "magic_link" || value === "session_handoff"
     ? value
     : null;
 
-const sanitizeLoginLocation = (value: unknown): DeviceSessionContext["loginLocation"] =>
+const sanitizeLoginLocation = (
+  value: unknown,
+): DeviceSessionContext["loginLocation"] =>
   value === "regular_login" || value === "admin_login" ? value : null;
 
 const resolveDeviceSessionContext = (
   payload: Record<string, unknown>,
-  req: Request
+  req: Request,
 ): DeviceSessionContext => ({
   deviceId: sanitizeText(payload.device_id, 128),
   deviceLabel: sanitizeText(payload.device_label, 160),
@@ -198,7 +193,9 @@ const isMissingSessionMetadataColumn = (error: RpcError | null | undefined) =>
   isMissingColumn(error, "login_location") ||
   isMissingColumn(error, "general_location");
 
-const isMissingSessionAuthBindingColumn = (error: RpcError | null | undefined) =>
+const isMissingSessionAuthBindingColumn = (
+  error: RpcError | null | undefined,
+) =>
   isMissingColumn(error, "auth_session_id") ||
   isMissingColumn(error, "auth_token_hash") ||
   isMissingColumn(error, "auth_token_issued_at");
@@ -210,7 +207,6 @@ const sha256 = async (value: string) => {
     .map((byte) => byte.toString(16).padStart(2, "0"))
     .join("");
 };
-
 
 serve(async (req) => {
   const { hasOrigin, originAllowed, headers } = resolveCorsHeaders(req);
@@ -237,11 +233,17 @@ serve(async (req) => {
     return jsonResponse(403, { error: "Origin not allowed" });
   }
 
-  const ingressError = await requireTrustedEdgeIngress(req, "admin-ops", jsonResponse);
+  const ingressError = await requireTrustedEdgeIngress(
+    req,
+    "admin-ops",
+    jsonResponse,
+  );
   if (ingressError) return ingressError;
 
   if (isKillSwitchWriteBlocked(req)) {
-    return jsonResponse(503, { error: "Unfortunately ItemTraxx is currently unavailable." });
+    return jsonResponse(503, {
+      error: "Unfortunately ItemTraxx is currently unavailable.",
+    });
   }
 
   try {
@@ -307,16 +309,17 @@ serve(async (req) => {
         p_scope: profile.role === "tenant_admin" ? "admin" : "tenant",
         p_limit: profile.role === "tenant_admin" ? 30 : 25,
         p_window_seconds: 60,
-      }
+      },
     );
 
-    const { result: rateLimitResult, response: rateLimitFailure } = resolveRateLimitResult({
-      data: rateLimit,
-      error: rateLimitError,
-      jsonResponse,
-    });
+    const { result: rateLimitResult, response: rateLimitFailure } =
+      resolveRateLimitResult({
+        data: rateLimit,
+        error: rateLimitError,
+        jsonResponse,
+      });
     if (rateLimitFailure) return rateLimitFailure;
-    if (!rateLimitResult.allowed) {
+    if (!rateLimitResult?.allowed) {
       return jsonResponse(429, {
         error: "Rate limit exceeded, please try again in a minute.",
       });
@@ -325,8 +328,7 @@ serve(async (req) => {
     const requestBody = asRecord(await readJsonBody(req));
     const normalizedAction = requireText(requestBody.action, { maxLen: 64 });
     const payloadRecord = asRecord(requestBody.payload ?? {});
-    const isSessionAction =
-      normalizedAction === "touch_session" ||
+    const isSessionAction = normalizedAction === "touch_session" ||
       normalizedAction === "validate_session" ||
       normalizedAction === "list_sessions" ||
       normalizedAction === "revoke_current_session" ||
@@ -339,23 +341,39 @@ serve(async (req) => {
       .select("status")
       .eq("id", tenantId)
       .maybeSingle();
-    const isTenantSuspended = !!tenantStatus?.status && tenantStatus.status !== "active";
+    const isTenantSuspended = !!tenantStatus?.status &&
+      tenantStatus.status !== "active";
     const deviceSession = resolveDeviceSessionContext(payloadRecord, req);
 
     const findActiveSession = async () => {
       if (!deviceSession.deviceId) {
-        return { exists: false as const, relationMissing: false, revoked: false as const };
+        return {
+          exists: false as const,
+          relationMissing: false,
+          revoked: false as const,
+        };
       }
-      const tokenBlock = await isTenantAdminTokenBlockedBySessionRevocation(adminClient, {
-        tenantId,
-        profileId: user.id,
-        authToken,
-      });
+      const tokenBlock = await isTenantAdminTokenBlockedBySessionRevocation(
+        adminClient,
+        {
+          tenantId,
+          profileId: user.id,
+          authToken,
+        },
+      );
       if (tokenBlock.relationMissing) {
-        return { exists: false as const, relationMissing: true as const, revoked: false as const };
+        return {
+          exists: false as const,
+          relationMissing: true as const,
+          revoked: false as const,
+        };
       }
       if (tokenBlock.blocked) {
-        return { exists: false as const, relationMissing: false as const, revoked: true as const };
+        return {
+          exists: false as const,
+          relationMissing: false as const,
+          revoked: true as const,
+        };
       }
       const { data, error } = await adminClient
         .from("tenant_admin_sessions")
@@ -368,10 +386,18 @@ serve(async (req) => {
         .maybeSingle();
       if (error) {
         if (isMissingSessionTable(error as RpcError)) {
-          return { exists: false as const, relationMissing: true as const, revoked: false as const };
+          return {
+            exists: false as const,
+            relationMissing: true as const,
+            revoked: false as const,
+          };
         }
         if (isMissingSessionAuthBindingColumn(error as RpcError)) {
-          return { exists: false as const, relationMissing: true as const, revoked: false as const };
+          return {
+            exists: false as const,
+            relationMissing: true as const,
+            revoked: false as const,
+          };
         }
         throw new Error("Unable to validate admin session.");
       }
@@ -389,7 +415,11 @@ serve(async (req) => {
             data.auth_token_hash.trim() === authTokenBindingKey)
         )
       ) {
-        return { exists: true as const, relationMissing: false as const, revoked: false as const };
+        return {
+          exists: true as const,
+          relationMissing: false as const,
+          revoked: false as const,
+        };
       }
 
       const { data: revokedRow, error: revokedError } = await adminClient
@@ -404,17 +434,29 @@ serve(async (req) => {
         .maybeSingle();
       if (revokedError) {
         if (isMissingSessionTable(revokedError as RpcError)) {
-          return { exists: false as const, relationMissing: true as const, revoked: false as const };
+          return {
+            exists: false as const,
+            relationMissing: true as const,
+            revoked: false as const,
+          };
         }
         throw new Error("Unable to validate admin session.");
       }
 
-      return { exists: false as const, relationMissing: false as const, revoked: !!revokedRow?.id };
+      return {
+        exists: false as const,
+        relationMissing: false as const,
+        revoked: !!revokedRow?.id,
+      };
     };
 
     const touchCurrentSession = async () => {
       if (!deviceSession.deviceId) {
-        return { ok: false as const, relationMissing: false as const, reason: "missing_device" };
+        return {
+          ok: false as const,
+          relationMissing: false as const,
+          reason: "missing_device",
+        };
       }
       const now = new Date().toISOString();
       const { data: existing, error: existingError } = await adminClient
@@ -435,21 +477,40 @@ serve(async (req) => {
           error: existingError,
         });
         if (isMissingSessionTable(existingError as RpcError)) {
-          return { ok: false as const, relationMissing: true as const, reason: "missing_table" };
+          return {
+            ok: false as const,
+            relationMissing: true as const,
+            reason: "missing_table",
+          };
         }
-        throw new Error(`Unable to register admin session: ${formatRpcError(existingError as RpcError)}`);
+        throw new Error(
+          `Unable to register admin session: ${
+            formatRpcError(existingError as RpcError)
+          }`,
+        );
       }
 
-      const tokenBlock = await isTenantAdminTokenBlockedBySessionRevocation(adminClient, {
-        tenantId,
-        profileId: user.id,
-        authToken,
-      });
+      const tokenBlock = await isTenantAdminTokenBlockedBySessionRevocation(
+        adminClient,
+        {
+          tenantId,
+          profileId: user.id,
+          authToken,
+        },
+      );
       if (tokenBlock.relationMissing) {
-        return { ok: false as const, relationMissing: true as const, reason: "missing_table" };
+        return {
+          ok: false as const,
+          relationMissing: true as const,
+          reason: "missing_table",
+        };
       }
       if (tokenBlock.blocked) {
-        return { ok: false as const, relationMissing: false as const, reason: "revoked" };
+        return {
+          ok: false as const,
+          relationMissing: false as const,
+          reason: "revoked",
+        };
       }
 
       if (existing?.id) {
@@ -463,12 +524,18 @@ serve(async (req) => {
         };
         const metadataUpdate = {
           ...baseUpdate,
-          ...(deviceSession.loginMethod ? { login_method: deviceSession.loginMethod } : {}),
-          ...(deviceSession.loginLocation ? { login_location: deviceSession.loginLocation } : {}),
-          ...(deviceSession.generalLocation ? { general_location: deviceSession.generalLocation } : {}),
+          ...(deviceSession.loginMethod
+            ? { login_method: deviceSession.loginMethod }
+            : {}),
+          ...(deviceSession.loginLocation
+            ? { login_location: deviceSession.loginLocation }
+            : {}),
+          ...(deviceSession.generalLocation
+            ? { general_location: deviceSession.generalLocation }
+            : {}),
         };
-        const shouldTryMetadataUpdate =
-          !!deviceSession.loginMethod || !!deviceSession.loginLocation || !!deviceSession.generalLocation;
+        const shouldTryMetadataUpdate = !!deviceSession.loginMethod ||
+          !!deviceSession.loginLocation || !!deviceSession.generalLocation;
         const { error: updateError } = await adminClient
           .from("tenant_admin_sessions")
           .update(shouldTryMetadataUpdate ? metadataUpdate : baseUpdate)
@@ -484,9 +551,16 @@ serve(async (req) => {
             used_metadata_update: shouldTryMetadataUpdate,
           });
           if (isMissingSessionAuthBindingColumn(updateError as RpcError)) {
-            return { ok: false as const, relationMissing: true as const, reason: "missing_table" };
+            return {
+              ok: false as const,
+              relationMissing: true as const,
+              reason: "missing_table",
+            };
           }
-          if (shouldTryMetadataUpdate && isMissingSessionMetadataColumn(updateError as RpcError)) {
+          if (
+            shouldTryMetadataUpdate &&
+            isMissingSessionMetadataColumn(updateError as RpcError)
+          ) {
             const { error: fallbackUpdateError } = await adminClient
               .from("tenant_admin_sessions")
               .update({
@@ -504,10 +578,18 @@ serve(async (req) => {
                 device_id: deviceSession.deviceId,
                 error: fallbackUpdateError,
               });
-              throw new Error(`Unable to update admin session: ${formatRpcError(fallbackUpdateError as RpcError)}`);
+              throw new Error(
+                `Unable to update admin session: ${
+                  formatRpcError(fallbackUpdateError as RpcError)
+                }`,
+              );
             }
           } else {
-            throw new Error(`Unable to update admin session: ${formatRpcError(updateError as RpcError)}`);
+            throw new Error(
+              `Unable to update admin session: ${
+                formatRpcError(updateError as RpcError)
+              }`,
+            );
           }
         }
       } else {
@@ -525,12 +607,18 @@ serve(async (req) => {
         };
         const metadataInsert = {
           ...baseInsert,
-          ...(deviceSession.loginMethod ? { login_method: deviceSession.loginMethod } : {}),
-          ...(deviceSession.loginLocation ? { login_location: deviceSession.loginLocation } : {}),
-          ...(deviceSession.generalLocation ? { general_location: deviceSession.generalLocation } : {}),
+          ...(deviceSession.loginMethod
+            ? { login_method: deviceSession.loginMethod }
+            : {}),
+          ...(deviceSession.loginLocation
+            ? { login_location: deviceSession.loginLocation }
+            : {}),
+          ...(deviceSession.generalLocation
+            ? { general_location: deviceSession.generalLocation }
+            : {}),
         };
-        const shouldTryMetadataInsert =
-          !!deviceSession.loginMethod || !!deviceSession.loginLocation || !!deviceSession.generalLocation;
+        const shouldTryMetadataInsert = !!deviceSession.loginMethod ||
+          !!deviceSession.loginLocation || !!deviceSession.generalLocation;
         const { error: insertError } = await adminClient
           .from("tenant_admin_sessions")
           .insert(shouldTryMetadataInsert ? metadataInsert : baseInsert);
@@ -544,12 +632,23 @@ serve(async (req) => {
             used_metadata_insert: shouldTryMetadataInsert,
           });
           if (isMissingSessionTable(insertError as RpcError)) {
-            return { ok: false as const, relationMissing: true as const, reason: "missing_table" };
+            return {
+              ok: false as const,
+              relationMissing: true as const,
+              reason: "missing_table",
+            };
           }
           if (isMissingSessionAuthBindingColumn(insertError as RpcError)) {
-            return { ok: false as const, relationMissing: true as const, reason: "missing_table" };
+            return {
+              ok: false as const,
+              relationMissing: true as const,
+              reason: "missing_table",
+            };
           }
-          if (shouldTryMetadataInsert && isMissingSessionMetadataColumn(insertError as RpcError)) {
+          if (
+            shouldTryMetadataInsert &&
+            isMissingSessionMetadataColumn(insertError as RpcError)
+          ) {
             const { error: fallbackInsertError } = await adminClient
               .from("tenant_admin_sessions")
               .insert({
@@ -572,15 +671,27 @@ serve(async (req) => {
                 device_id: deviceSession.deviceId,
                 error: fallbackInsertError,
               });
-              throw new Error(`Unable to register admin session: ${formatRpcError(fallbackInsertError as RpcError)}`);
+              throw new Error(
+                `Unable to register admin session: ${
+                  formatRpcError(fallbackInsertError as RpcError)
+                }`,
+              );
             }
           } else {
-            throw new Error(`Unable to register admin session: ${formatRpcError(insertError as RpcError)}`);
+            throw new Error(
+              `Unable to register admin session: ${
+                formatRpcError(insertError as RpcError)
+              }`,
+            );
           }
         }
       }
 
-      return { ok: true as const, relationMissing: false as const, reason: "ok" };
+      return {
+        ok: true as const,
+        relationMissing: false as const,
+        reason: "ok",
+      };
     };
 
     if (profile.role === "tenant_admin" && !isSessionAction) {
@@ -628,7 +739,9 @@ serve(async (req) => {
         .eq("key", "tenant_updates")
         .maybeSingle(),
     ]);
-    const maintenance = resolveMaintenance(maintenanceRuntimeResult.data?.value);
+    const maintenance = resolveMaintenance(
+      maintenanceRuntimeResult.data?.value,
+    );
 
     let checkoutDueHours = 72;
     let featureFlags = defaultFeatureFlags();
@@ -659,111 +772,62 @@ serve(async (req) => {
       if (typeof tenantPolicy.checkout_due_hours === "number") {
         checkoutDueHours = Math.min(
           720,
-          Math.max(1, Math.round(tenantPolicy.checkout_due_hours))
+          Math.max(1, Math.round(tenantPolicy.checkout_due_hours)),
         );
       }
       featureFlags = normalizeFeatureFlags(tenantPolicy.feature_flags);
     }
 
-    let tenantUpdates: RuntimeUpdateItem[] = [];
     const updateRuntimeValue = updateRuntimeResult.data?.value;
-    if (updateRuntimeValue && typeof updateRuntimeValue === "object") {
-      const payload = updateRuntimeValue as Record<string, unknown>;
-      const enabled = payload.enabled !== false;
-      if (enabled && Array.isArray(payload.items)) {
-        tenantUpdates = payload.items
-          .filter((item) => item && typeof item === "object")
-          .map((item, index) => {
-            const row = item as Record<string, unknown>;
-            const message = typeof row.message === "string" ? row.message.trim() : "";
-            const title = typeof row.title === "string" ? row.title.trim() : "";
-            if (!message) return null;
-            const level =
-              row.level === "warning" || row.level === "critical"
-                ? row.level
-                : "info";
-            const createdAt =
-              typeof row.created_at === "string" && row.created_at
-                ? row.created_at
-                : new Date().toISOString();
-            const id =
-              typeof row.id === "string" && row.id
-                ? row.id
-                : `${createdAt}-${index}`;
-            return {
-              id,
-              title: title || "Product update",
-              message,
-              level,
-              created_at: createdAt,
-              link_url:
-                typeof row.link_url === "string" && row.link_url.trim()
-                  ? row.link_url.trim()
-                  : null,
-            } as RuntimeUpdateItem;
-          })
-          .filter((item): item is RuntimeUpdateItem => !!item)
-          .slice(0, 5);
-      }
-    }
+    const tenantUpdates = normalizeTenantUpdates(updateRuntimeValue);
+
+    const actionAuthorizationFailure = await authorizeAdminOpsAction({
+      action: normalizedAction,
+      profileRole: profile.role,
+      isTenantSuspended,
+      adminClient,
+      userId: user.id,
+      authToken,
+      jsonResponse,
+    });
+    if (actionAuthorizationFailure) return actionAuthorizationFailure;
 
     if (normalizedAction === "get_notifications") {
-      const dueCutoffIso = new Date(
-        Date.now() - checkoutDueHours * 60 * 60 * 1000
-      ).toISOString();
-
-      const [statusCountResult, recentStatusResult, overdueCountResult] =
-        await Promise.all([
-          adminClient
-            .from("gear")
-            .select("id", { count: "exact", head: true })
-            .eq("tenant_id", tenantId)
-            .is("deleted_at", null)
-            .not("status", "in", "(available,checked_out)"),
-          adminClient
-            .from("gear_status_history")
-            .select("id, status, changed_at, gear:gear_id(name, barcode)")
-            .eq("tenant_id", tenantId)
-            .order("changed_at", { ascending: false })
-            .limit(8),
-          adminClient
-            .from("gear")
-            .select("id", { count: "exact", head: true })
-            .eq("tenant_id", tenantId)
-            .is("deleted_at", null)
-            .not("checked_out_by", "is", null)
-            .lte("checked_out_at", dueCutoffIso),
-        ]);
-
-      return jsonResponse(200, {
-        data: {
-          overdue_count: overdueCountResult.error ? 0 : overdueCountResult.count ?? 0,
-          flagged_count: statusCountResult.error ? 0 : statusCountResult.count ?? 0,
-          maintenance,
-          recent_status_events: recentStatusResult.error ? [] : recentStatusResult.data ?? [],
-          updates: tenantUpdates,
-          checkout_due_hours: checkoutDueHours,
-          feature_flags: featureFlags,
-        },
-      });
+      const context: AdminOpsContext = {
+        req,
+        requestId,
+        action: normalizedAction,
+        payload: payloadRecord,
+        adminClient,
+        user: { id: user.id },
+        profile: { role: profile.role },
+        tenantId,
+        isTenantSuspended,
+        authToken,
+        authSessionBinding,
+        authTokenBindingKey,
+        deviceSession,
+        tenantPolicy: tenantPolicy as AdminOpsContext["tenantPolicy"],
+        checkoutDueHours,
+        featureFlags,
+        maintenance,
+        tenantUpdates,
+        jsonResponse,
+      };
+      return dispatchAdminOpsAction(context);
     }
 
     if (normalizedAction === "get_tenant_settings") {
-      if (profile.role !== "tenant_admin") {
-        return jsonResponse(403, { error: "Access denied" });
-      }
-
       return jsonResponse(200, {
         data: {
           checkout_due_hours: checkoutDueHours,
-          account_category:
-            tenantPolicy?.account_category === "individual"
-              ? "individual"
-              : tenantPolicy?.account_category === "district"
-                ? "district"
-                : tenantPolicy?.account_category === "organization"
-                  ? "organization"
-                  : null,
+          account_category: tenantPolicy?.account_category === "individual"
+            ? "individual"
+            : tenantPolicy?.account_category === "district"
+            ? "district"
+            : tenantPolicy?.account_category === "organization"
+            ? "organization"
+            : null,
           plan_code: tenantPolicy?.plan_code ?? null,
           feature_flags: featureFlags,
         },
@@ -771,32 +835,13 @@ serve(async (req) => {
     }
 
     if (normalizedAction === "update_tenant_settings") {
-      if (profile.role !== "tenant_admin") {
-        return jsonResponse(403, { error: "Access denied" });
-      }
-      if (isTenantSuspended) {
-        return jsonResponse(403, { error: "Tenant disabled" });
-      }
-      try {
-        const hasStepUp = await hasPrivilegedStepUp(adminClient, {
-          userId: user.id,
-          roleScope: "tenant_admin",
-          authToken,
-        });
-        if (!hasStepUp) {
-          return jsonResponse(403, { error: "Admin verification required." });
-        }
-      } catch (error) {
-        if (isMissingPrivilegedStepUpTable(error as { code?: string; message?: string })) {
-          return jsonResponse(503, {
-            error: "Privileged verification controls unavailable. Run latest SQL setup.",
-          });
-        }
-        throw error;
-      }
-
       const next = payloadRecord;
-      const checkoutDueHoursNext = optionalInteger(next.checkout_due_hours, 1, 720, 24);
+      const checkoutDueHoursNext = optionalInteger(
+        next.checkout_due_hours,
+        1,
+        720,
+        24,
+      );
 
       const row = {
         tenant_id: tenantId,
@@ -808,7 +853,9 @@ serve(async (req) => {
       let settingsResult: TenantPolicyResult = await adminClient
         .from("tenant_policies")
         .upsert(row, { onConflict: "tenant_id" })
-        .select("checkout_due_hours, account_category, plan_code, feature_flags")
+        .select(
+          "checkout_due_hours, account_category, plan_code, feature_flags",
+        )
         .single() as unknown as TenantPolicyResult;
 
       if (isMissingColumn(settingsResult.error, "feature_flags")) {
@@ -834,18 +881,16 @@ serve(async (req) => {
 
       return jsonResponse(200, {
         data: {
-          checkout_due_hours:
-            typeof data.checkout_due_hours === "number"
-              ? data.checkout_due_hours
-              : checkoutDueHoursNext,
-          account_category:
-            data.account_category === "individual"
-              ? "individual"
-              : data.account_category === "district"
-                ? "district"
-                : data.account_category === "organization"
-                  ? "organization"
-                  : null,
+          checkout_due_hours: typeof data.checkout_due_hours === "number"
+            ? data.checkout_due_hours
+            : checkoutDueHoursNext,
+          account_category: data.account_category === "individual"
+            ? "individual"
+            : data.account_category === "district"
+            ? "district"
+            : data.account_category === "organization"
+            ? "organization"
+            : null,
           plan_code: data.plan_code ?? null,
           feature_flags: normalizeFeatureFlags(data.feature_flags),
         },
@@ -853,14 +898,12 @@ serve(async (req) => {
     }
 
     if (normalizedAction === "get_status_tracking") {
-      if (profile.role !== "tenant_admin") {
-        return jsonResponse(403, { error: "Access denied" });
-      }
-
       const [flaggedResult, historyBaseResult] = await Promise.all([
         adminClient
           .from("gear")
-          .select("id, name, barcode, serial_number, status, notes, updated_at, created_at")
+          .select(
+            "id, name, barcode, serial_number, status, notes, updated_at, created_at",
+          )
           .eq("tenant_id", tenantId)
           .is("deleted_at", null)
           .not("status", "in", "(available,checked_out)")
@@ -888,18 +931,25 @@ serve(async (req) => {
         if (isMissingColumn(flaggedResult.error as RpcError, "updated_at")) {
           const fallbackFlagged = await adminClient
             .from("gear")
-            .select("id, name, barcode, serial_number, status, notes, created_at")
+            .select(
+              "id, name, barcode, serial_number, status, notes, created_at",
+            )
             .eq("tenant_id", tenantId)
             .is("deleted_at", null)
             .not("status", "in", "(available,checked_out)")
             .order("created_at", { ascending: false })
             .limit(400);
           if (fallbackFlagged.error) {
-            console.error("admin-ops get_status_tracking flagged fallback failed", {
-              message: fallbackFlagged.error.message,
-              code: fallbackFlagged.error.code,
+            console.error(
+              "admin-ops get_status_tracking flagged fallback failed",
+              {
+                message: fallbackFlagged.error.message,
+                code: fallbackFlagged.error.code,
+              },
+            );
+            return jsonResponse(400, {
+              error: "Unable to load status tracking.",
             });
-            return jsonResponse(400, { error: "Unable to load status tracking." });
           }
           flaggedItems = ((fallbackFlagged.data ?? []) as Array<{
             id: string;
@@ -918,7 +968,9 @@ serve(async (req) => {
             message: flaggedResult.error.message,
             code: flaggedResult.error.code,
           });
-          return jsonResponse(400, { error: "Unable to load status tracking." });
+          return jsonResponse(400, {
+            error: "Unable to load status tracking.",
+          });
         }
       } else {
         flaggedItems = ((flaggedResult.data ?? []) as Array<{
@@ -937,7 +989,8 @@ serve(async (req) => {
           serial_number: item.serial_number,
           status: item.status,
           notes: item.notes,
-          updated_at: item.updated_at ?? item.created_at ?? new Date().toISOString(),
+          updated_at: item.updated_at ?? item.created_at ??
+            new Date().toISOString(),
         }));
       }
 
@@ -952,12 +1005,19 @@ serve(async (req) => {
       }> = [];
 
       if (historyBaseResult.error) {
-        if (!isMissingRelation(historyBaseResult.error as RpcError, "gear_status_history")) {
+        if (
+          !isMissingRelation(
+            historyBaseResult.error as RpcError,
+            "gear_status_history",
+          )
+        ) {
           console.error("admin-ops get_status_tracking history query failed", {
             message: historyBaseResult.error.message,
             code: historyBaseResult.error.code,
           });
-          return jsonResponse(400, { error: "Unable to load status tracking." });
+          return jsonResponse(400, {
+            error: "Unable to load status tracking.",
+          });
         }
       } else {
         const historyRows = (historyBaseResult.data ?? []) as Array<{
@@ -968,15 +1028,22 @@ serve(async (req) => {
           changed_at: string;
           changed_by: string | null;
         }>;
-        const gearIds = Array.from(new Set(historyRows.map((row) => row.gear_id)));
+        const gearIds = Array.from(
+          new Set(historyRows.map((row) => row.gear_id)),
+        );
         const { data: gearRows } = gearIds.length
-          ? await adminClient.from("gear").select("id, name, barcode").in("id", gearIds)
+          ? await adminClient.from("gear").select("id, name, barcode").in(
+            "id",
+            gearIds,
+          )
           : { data: [] };
         const gearMap = new Map(
-          ((gearRows ?? []) as Array<{ id: string; name: string; barcode: string }>).map((row) => [
+          ((gearRows ?? []) as Array<
+            { id: string; name: string; barcode: string }
+          >).map((row) => [
             row.id,
             { name: row.name, barcode: row.barcode },
-          ])
+          ]),
         );
         history = historyRows.map((row) => ({
           ...row,
@@ -993,9 +1060,6 @@ serve(async (req) => {
     }
 
     if (normalizedAction === "touch_session") {
-      if (profile.role !== "tenant_admin") {
-        return jsonResponse(403, { error: "Access denied" });
-      }
       const touch = await touchCurrentSession();
       if (touch.relationMissing) {
         return jsonResponse(503, {
@@ -1012,9 +1076,6 @@ serve(async (req) => {
     }
 
     if (normalizedAction === "validate_session") {
-      if (profile.role !== "tenant_admin") {
-        return jsonResponse(403, { error: "Access denied" });
-      }
       if (!deviceSession.deviceId) {
         return jsonResponse(400, { error: "Device session is required." });
       }
@@ -1035,34 +1096,40 @@ serve(async (req) => {
     }
 
     if (normalizedAction === "list_sessions") {
-      if (profile.role !== "tenant_admin") {
-        return jsonResponse(403, { error: "Access denied" });
-      }
       let sessionQuery: {
-        data: Array<{
-          id: string;
-          device_id: string;
-          device_label: string | null;
-          user_agent: string | null;
-          login_method?: "password" | "magic_link" | "session_handoff" | null;
-          login_location?: "regular_login" | "admin_login" | null;
-          general_location?: string | null;
-          created_at: string;
-          last_seen_at: string;
-        }> | null;
+        data:
+          | Array<{
+            id: string;
+            device_id: string;
+            device_label: string | null;
+            user_agent: string | null;
+            login_method?: "password" | "magic_link" | "session_handoff" | null;
+            login_location?: "regular_login" | "admin_login" | null;
+            general_location?: string | null;
+            created_at: string;
+            last_seen_at: string;
+          }>
+          | null;
         error: RpcError | null;
       } = await adminClient
         .from("tenant_admin_sessions")
-        .select("id, device_id, device_label, user_agent, login_method, login_location, general_location, created_at, last_seen_at")
+        .select(
+          "id, device_id, device_label, user_agent, login_method, login_location, general_location, created_at, last_seen_at",
+        )
         .eq("tenant_id", tenantId)
         .eq("profile_id", user.id)
         .is("revoked_at", null)
         .order("last_seen_at", { ascending: false })
         .limit(100);
-      if (sessionQuery.error && isMissingSessionMetadataColumn(sessionQuery.error as RpcError)) {
+      if (
+        sessionQuery.error &&
+        isMissingSessionMetadataColumn(sessionQuery.error as RpcError)
+      ) {
         sessionQuery = await adminClient
           .from("tenant_admin_sessions")
-          .select("id, device_id, device_label, user_agent, created_at, last_seen_at")
+          .select(
+            "id, device_id, device_label, user_agent, created_at, last_seen_at",
+          )
           .eq("tenant_id", tenantId)
           .eq("profile_id", user.id)
           .is("revoked_at", null)
@@ -1103,19 +1170,14 @@ serve(async (req) => {
             login_method: row.login_method ?? null,
             login_location: row.login_location ?? null,
             general_location: row.general_location ?? null,
-            is_current: !!deviceSession.deviceId && row.device_id === deviceSession.deviceId,
+            is_current: !!deviceSession.deviceId &&
+              row.device_id === deviceSession.deviceId,
           })),
         },
       });
     }
 
     if (normalizedAction === "revoke_session") {
-      if (profile.role !== "tenant_admin") {
-        return jsonResponse(403, { error: "Access denied" });
-      }
-      if (isTenantSuspended) {
-        return jsonResponse(403, { error: "Tenant disabled" });
-      }
       const sessionId = sanitizeText(payloadRecord.session_id, 128);
       if (!sessionId) {
         return jsonResponse(400, { error: "Session id is required." });
@@ -1146,12 +1208,6 @@ serve(async (req) => {
     }
 
     if (normalizedAction === "revoke_current_session") {
-      if (profile.role !== "tenant_admin") {
-        return jsonResponse(403, { error: "Access denied" });
-      }
-      if (isTenantSuspended) {
-        return jsonResponse(403, { error: "Tenant disabled" });
-      }
       let query = adminClient
         .from("tenant_admin_sessions")
         .update({
@@ -1178,12 +1234,6 @@ serve(async (req) => {
     }
 
     if (normalizedAction === "revoke_all_sessions") {
-      if (profile.role !== "tenant_admin") {
-        return jsonResponse(403, { error: "Access denied" });
-      }
-      if (isTenantSuspended) {
-        return jsonResponse(403, { error: "Tenant disabled" });
-      }
       const signOutCurrent = payloadRecord.sign_out_current === true;
       let query = adminClient
         .from("tenant_admin_sessions")
@@ -1214,14 +1264,9 @@ serve(async (req) => {
     }
 
     if (normalizedAction === "bulk_import_gear") {
-      if (profile.role !== "tenant_admin") {
-        return jsonResponse(403, { error: "Access denied" });
-      }
-      if (isTenantSuspended) {
-        return jsonResponse(403, { error: "Tenant disabled" });
-      }
-
-      const rawRows = Array.isArray(payloadRecord.rows) ? payloadRecord.rows : [];
+      const rawRows = Array.isArray(payloadRecord.rows)
+        ? payloadRecord.rows
+        : [];
 
       if (!rawRows.length || rawRows.length > 1000) {
         return jsonResponse(400, { error: "Provide between 1 and 1000 rows." });
@@ -1247,16 +1292,32 @@ serve(async (req) => {
         let name = "";
         let barcode = "";
         let serial = "";
-        let statusRaw: "available" | "checked_out" | "damaged" | "lost" | "in_repair" | "retired" | "in_studio_only";
+        let statusRaw:
+          | "available"
+          | "checked_out"
+          | "damaged"
+          | "lost"
+          | "in_repair"
+          | "retired"
+          | "in_studio_only";
         let notes = "";
         try {
           name = requireText(rowRecord.name, { maxLen: 120 });
-          barcode = requireText(rowRecord.barcode, { maxLen: 64, pattern: BARCODE_PATTERN });
+          barcode = requireText(rowRecord.barcode, {
+            maxLen: 64,
+            pattern: BARCODE_PATTERN,
+          });
           serial = optionalText(rowRecord.serial_number, { maxLen: 64 });
-          statusRaw = requireEnum(rowRecord.status ?? "available", ALLOWED_GEAR_STATUSES);
+          statusRaw = requireEnum(
+            rowRecord.status ?? "available",
+            ALLOWED_GEAR_STATUSES,
+          );
           notes = optionalText(rowRecord.notes, { maxLen: 500 });
         } catch {
-          skippedRows.push({ barcode: barcode || "(blank)", reason: "Invalid row." });
+          skippedRows.push({
+            barcode: barcode || "(blank)",
+            reason: "Invalid row.",
+          });
           continue;
         }
         if (seenBarcodes.has(barcode.toLowerCase())) {
@@ -1291,12 +1352,17 @@ serve(async (req) => {
         .select("barcode")
         .eq("tenant_id", tenantId)
         .in("barcode", lookupBarcodes);
-      const existing = new Set((existingRows ?? []).map((row) => (row as { barcode: string }).barcode));
+      const existing = new Set(
+        (existingRows ?? []).map((row) => (row as { barcode: string }).barcode),
+      );
 
       const toInsert = normalizedRows.filter((row) => {
         const isExisting = existing.has(row.barcode);
         if (isExisting) {
-          skippedRows.push({ barcode: row.barcode, reason: "Barcode already exists." });
+          skippedRows.push({
+            barcode: row.barcode,
+            reason: "Barcode already exists.",
+          });
         }
         return !isExisting;
       });
@@ -1331,7 +1397,9 @@ serve(async (req) => {
       }
 
       const historyPayload = (insertedRows ?? [])
-        .filter((item) => TRACKED_STATUSES.has((item as { status: string }).status))
+        .filter((item) =>
+          TRACKED_STATUSES.has((item as { status: string }).status)
+        )
         .map((item) => ({
           tenant_id: tenantId,
           gear_id: (item as { id: string }).id,

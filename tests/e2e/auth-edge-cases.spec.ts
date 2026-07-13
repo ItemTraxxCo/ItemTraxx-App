@@ -825,17 +825,6 @@ test.describe("Auth edge cases", () => {
           }),
         });
       });
-      await page.route(/\/functions(?:\/v1)?\/admin-ops(?:\?.*)?$/, async (route) => {
-        await route.fulfill({
-          status: 200,
-          contentType: "application/json",
-          body: JSON.stringify({ data: { revoked: true } }),
-        });
-      });
-      await page.route("**/auth/session/logout", async (route) => {
-        await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ ok: true }) });
-      });
-
       await page.goto("/");
       await waitForPublicAuthBootstrap(page);
       const result = await page.evaluate(async (mode) => {
@@ -855,7 +844,8 @@ test.describe("Auth edge cases", () => {
           import("/src/services/supabaseClient.ts"),
         ]);
         const cleanupEvents: string[] = [];
-        const boundarySnapshots: Array<{ event: string; state: unknown }> = [];
+        const pendingSnapshots: Array<{ event: string; state: unknown }> = [];
+        const resolutionSnapshots: Array<{ event: string; state: unknown }> = [];
         const snapshot = () => {
           const state = getAuthState();
           return {
@@ -879,20 +869,65 @@ test.describe("Auth edge cases", () => {
             persistedAdminVerification: sessionStorage.getItem("itemtraxx:admin-verification"),
           };
         };
-        const recordBoundary = (event: string) => {
+        const createBoundary = () => {
+          let markReached!: () => void;
+          let release!: () => void;
+          let markResolved!: () => void;
+          return {
+            reached: new Promise<void>((resolve) => {
+              markReached = resolve;
+            }),
+            released: new Promise<void>((resolve) => {
+              release = resolve;
+            }),
+            resolved: new Promise<void>((resolve) => {
+              markResolved = resolve;
+            }),
+            markReached: () => markReached(),
+            release: () => release(),
+            markResolved: () => markResolved(),
+          };
+        };
+        const boundaries = {
+          adminRevoke: createBoundary(),
+          localSupabase: createBoundary(),
+          httpSession: createBoundary(),
+        };
+        const recordPending = (event: string) => {
+          pendingSnapshots.push({ event, state: snapshot() });
+        };
+        const recordResolution = (event: string) => {
+          resolutionSnapshots.push({ event, state: snapshot() });
+        };
+        const markBoundaryReached = (event: string) => {
           cleanupEvents.push(event);
-          boundarySnapshots.push({ event, state: snapshot() });
         };
         const originalFetch = window.fetch.bind(window);
-        window.fetch = (input: RequestInfo | URL, init?: RequestInit) => {
+        window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
           const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
           if (/\/functions(?:\/v1)?\/admin-ops(?:\?.*)?$/.test(url)) {
             const body = typeof init?.body === "string" ? JSON.parse(init.body) as { action?: string } : {};
             if (body.action === "revoke_current_session") {
-              recordBoundary("admin-revoke");
+              markBoundaryReached("admin-revoke");
+              boundaries.adminRevoke.markReached();
+              await boundaries.adminRevoke.released;
+              recordResolution("admin-revoke");
+              boundaries.adminRevoke.markResolved();
+              return new Response(JSON.stringify({ data: { revoked: true } }), {
+                status: 200,
+                headers: { "Content-Type": "application/json" },
+              });
             }
           } else if (/\/auth\/session\/logout(?:\?.*)?$/.test(url)) {
-            recordBoundary("http-session");
+            markBoundaryReached("http-session");
+            boundaries.httpSession.markReached();
+            await boundaries.httpSession.released;
+            recordResolution("http-session");
+            boundaries.httpSession.markResolved();
+            return new Response(JSON.stringify({ ok: true }), {
+              status: 200,
+              headers: { "Content-Type": "application/json" },
+            });
           }
           return originalFetch(input, init);
         };
@@ -906,7 +941,11 @@ test.describe("Auth edge cases", () => {
         Object.defineProperty(supabase.auth, "signOut", {
           configurable: true,
           value: async () => {
-            recordBoundary("local-supabase");
+            markBoundaryReached("local-supabase");
+            boundaries.localSupabase.markReached();
+            await boundaries.localSupabase.released;
+            recordResolution("local-supabase");
+            boundaries.localSupabase.markResolved();
             if (mode === "thrown") {
               throw missingSessionError;
             }
@@ -937,8 +976,31 @@ test.describe("Auth edge cases", () => {
         setDistrictContext("district-e2e");
         markAdminVerified();
         const before = snapshot();
-        await auth.signOut();
-        return { before, boundarySnapshots, cleanupEvents, after: snapshot() };
+        const signOutPromise = auth.signOut();
+
+        await boundaries.adminRevoke.reached;
+        recordPending("admin-revoke");
+        boundaries.adminRevoke.release();
+        await boundaries.adminRevoke.resolved;
+
+        await boundaries.localSupabase.reached;
+        recordPending("local-supabase");
+        boundaries.localSupabase.release();
+        await boundaries.localSupabase.resolved;
+
+        await boundaries.httpSession.reached;
+        recordPending("http-session");
+        boundaries.httpSession.release();
+        await boundaries.httpSession.resolved;
+
+        await signOutPromise;
+        return {
+          before,
+          cleanupEvents,
+          pendingSnapshots,
+          resolutionSnapshots,
+          after: snapshot(),
+        };
       }, missingSessionMode);
 
       expect(result.before).toMatchObject({
@@ -962,7 +1024,12 @@ test.describe("Auth edge cases", () => {
       expect(result.before.adminVerifiedAt).toBeTruthy();
       expect(result.before.persistedAdminVerification).toBeTruthy();
       expect(result.cleanupEvents).toEqual(["admin-revoke", "local-supabase", "http-session"]);
-      expect(result.boundarySnapshots).toEqual([
+      expect(result.pendingSnapshots).toEqual([
+        { event: "admin-revoke", state: result.before },
+        { event: "local-supabase", state: result.before },
+        { event: "http-session", state: result.before },
+      ]);
+      expect(result.resolutionSnapshots).toEqual([
         { event: "admin-revoke", state: result.before },
         { event: "local-supabase", state: result.before },
         { event: "http-session", state: result.before },

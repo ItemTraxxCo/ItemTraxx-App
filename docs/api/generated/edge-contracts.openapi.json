@@ -2482,8 +2482,14 @@
                   ],
                   "additionalProperties": false
                 }
+              },
+              "ok": {
+                "type": "boolean"
               }
             },
+            "required": [
+              "ok"
+            ],
             "additionalProperties": false
           },
           "create_tenant": {
@@ -2624,8 +2630,14 @@
                   "created_at"
                 ],
                 "additionalProperties": false
+              },
+              "ok": {
+                "type": "boolean"
               }
             },
+            "required": [
+              "ok"
+            ],
             "additionalProperties": false
           },
           "update_tenant": {
@@ -2766,8 +2778,14 @@
                   "created_at"
                 ],
                 "additionalProperties": false
+              },
+              "ok": {
+                "type": "boolean"
               }
             },
+            "required": [
+              "ok"
+            ],
             "additionalProperties": false
           },
           "set_tenant_status": {
@@ -2908,8 +2926,14 @@
                   "created_at"
                 ],
                 "additionalProperties": false
+              },
+              "ok": {
+                "type": "boolean"
               }
             },
+            "required": [
+              "ok"
+            ],
             "additionalProperties": false
           },
           "send_primary_admin_reset": {
@@ -2932,8 +2956,14 @@
                   "auth_email"
                 ],
                 "additionalProperties": false
+              },
+              "ok": {
+                "type": "boolean"
               }
             },
+            "required": [
+              "ok"
+            ],
             "additionalProperties": false
           },
           "set_primary_admin": {
@@ -3074,8 +3104,14 @@
                   "created_at"
                 ],
                 "additionalProperties": false
+              },
+              "ok": {
+                "type": "boolean"
               }
             },
+            "required": [
+              "ok"
+            ],
             "additionalProperties": false
           },
           "list_districts": {
@@ -3200,8 +3236,14 @@
                   ],
                   "additionalProperties": false
                 }
+              },
+              "ok": {
+                "type": "boolean"
               }
             },
+            "required": [
+              "ok"
+            ],
             "additionalProperties": false
           },
           "create_district": {
@@ -3323,8 +3365,14 @@
                   "created_at"
                 ],
                 "additionalProperties": false
+              },
+              "ok": {
+                "type": "boolean"
               }
             },
+            "required": [
+              "ok"
+            ],
             "additionalProperties": false
           },
           "update_district": {
@@ -3446,8 +3494,14 @@
                   "created_at"
                 ],
                 "additionalProperties": false
+              },
+              "ok": {
+                "type": "boolean"
               }
             },
+            "required": [
+              "ok"
+            ],
             "additionalProperties": false
           },
           "get_district_details": {
@@ -4053,8 +4107,14 @@
                   "usage"
                 ],
                 "additionalProperties": false
+              },
+              "ok": {
+                "type": "boolean"
               }
             },
+            "required": [
+              "ok"
+            ],
             "additionalProperties": false
           }
         },
@@ -5643,8 +5703,14 @@
                   "verified"
                 ],
                 "additionalProperties": false
+              },
+              "ok": {
+                "type": "boolean"
               }
             },
+            "required": [
+              "ok"
+            ],
             "additionalProperties": false
           },
           "touch_session": {
@@ -5661,8 +5727,14 @@
                   "ok"
                 ],
                 "additionalProperties": false
+              },
+              "ok": {
+                "type": "boolean"
               }
             },
+            "required": [
+              "ok"
+            ],
             "additionalProperties": false
           },
           "list_sessions": {
@@ -5784,8 +5856,14 @@
                   "sessions"
                 ],
                 "additionalProperties": false
+              },
+              "ok": {
+                "type": "boolean"
               }
             },
+            "required": [
+              "ok"
+            ],
             "additionalProperties": false
           },
           "revoke_session": {
@@ -5802,8 +5880,14 @@
                   "revoked"
                 ],
                 "additionalProperties": false
+              },
+              "ok": {
+                "type": "boolean"
               }
             },
+            "required": [
+              "ok"
+            ],
             "additionalProperties": false
           },
           "revoke_all_sessions": {
@@ -5822,8 +5906,14 @@
                   "revoked"
                 ],
                 "additionalProperties": false
+              },
+              "ok": {
+                "type": "boolean"
               }
             },
+            "required": [
+              "ok"
+            ],
             "additionalProperties": false
           },
           "get_control_center": {
@@ -6010,8 +6100,14 @@
                   "jobs"
                 ],
                 "additionalProperties": false
+              },
+              "ok": {
+                "type": "boolean"
               }
             },
+            "required": [
+              "ok"
+            ],
             "additionalProperties": false
           },
           "set_runtime_config": {
@@ -6030,8 +6126,14 @@
                   "value"
                 ],
                 "additionalProperties": false
+              },
+              "ok": {
+                "type": "boolean"
               }
             },
+            "required": [
+              "ok"
+            ],
             "additionalProperties": false
           },
           "upsert_alert_rule": {
@@ -6068,8 +6170,14 @@
                   "created_at"
                 ],
                 "additionalProperties": false
+              },
+              "ok": {
+                "type": "boolean"
               }
             },
+            "required": [
+              "ok"
+            ],
             "additionalProperties": false
           },
           "set_tenant_policy": {
@@ -6145,8 +6253,14 @@
                   "checkout_due_hours"
                 ],
                 "additionalProperties": false
+              },
+              "ok": {
+                "type": "boolean"
               }
             },
+            "required": [
+              "ok"
+            ],
             "additionalProperties": false
           },
           "set_tenant_force_reauth": {
@@ -6221,8 +6335,14 @@
                   "success"
                 ],
                 "additionalProperties": false
+              },
+              "ok": {
+                "type": "boolean"
               }
             },
+            "required": [
+              "ok"
+            ],
             "additionalProperties": false
           },
           "create_approval": {
@@ -6278,8 +6398,14 @@
                   "created_at"
                 ],
                 "additionalProperties": false
+              },
+              "ok": {
+                "type": "boolean"
               }
             },
+            "required": [
+              "ok"
+            ],
             "additionalProperties": false
           },
           "approve_request": {
@@ -6355,8 +6481,14 @@
                   "created_at"
                 ],
                 "additionalProperties": false
+              },
+              "ok": {
+                "type": "boolean"
               }
             },
+            "required": [
+              "ok"
+            ],
             "additionalProperties": false
           },
           "list_support_requests": {
@@ -6439,8 +6571,14 @@
                   "requests"
                 ],
                 "additionalProperties": false
+              },
+              "ok": {
+                "type": "boolean"
               }
             },
+            "required": [
+              "ok"
+            ],
             "additionalProperties": false
           },
           "get_support_request": {
@@ -6663,8 +6801,14 @@
                   "request"
                 ],
                 "additionalProperties": false
+              },
+              "ok": {
+                "type": "boolean"
               }
             },
+            "required": [
+              "ok"
+            ],
             "additionalProperties": false
           },
           "update_support_request": {
@@ -6887,8 +7031,14 @@
                   "request"
                 ],
                 "additionalProperties": false
+              },
+              "ok": {
+                "type": "boolean"
               }
             },
+            "required": [
+              "ok"
+            ],
             "additionalProperties": false
           },
           "list_sales_leads": {
@@ -7005,8 +7155,14 @@
                   "leads"
                 ],
                 "additionalProperties": false
+              },
+              "ok": {
+                "type": "boolean"
               }
             },
+            "required": [
+              "ok"
+            ],
             "additionalProperties": false
           },
           "close_sales_lead": {
@@ -7120,8 +7276,14 @@
                   "lead"
                 ],
                 "additionalProperties": false
+              },
+              "ok": {
+                "type": "boolean"
               }
             },
+            "required": [
+              "ok"
+            ],
             "additionalProperties": false
           },
           "move_sales_lead_to_customer": {
@@ -7235,8 +7397,14 @@
                   "lead"
                 ],
                 "additionalProperties": false
+              },
+              "ok": {
+                "type": "boolean"
               }
             },
+            "required": [
+              "ok"
+            ],
             "additionalProperties": false
           },
           "set_sales_lead_stage": {
@@ -7350,8 +7518,14 @@
                   "lead"
                 ],
                 "additionalProperties": false
+              },
+              "ok": {
+                "type": "boolean"
               }
             },
+            "required": [
+              "ok"
+            ],
             "additionalProperties": false
           },
           "delete_sales_lead": {
@@ -7368,8 +7542,14 @@
                   "deleted"
                 ],
                 "additionalProperties": false
+              },
+              "ok": {
+                "type": "boolean"
               }
             },
+            "required": [
+              "ok"
+            ],
             "additionalProperties": false
           },
           "list_customers": {
@@ -7548,8 +7728,14 @@
                   "customers"
                 ],
                 "additionalProperties": false
+              },
+              "ok": {
+                "type": "boolean"
               }
             },
+            "required": [
+              "ok"
+            ],
             "additionalProperties": false
           },
           "add_customer_status_entry": {
@@ -7601,8 +7787,14 @@
                   "entry"
                 ],
                 "additionalProperties": false
+              },
+              "ok": {
+                "type": "boolean"
               }
             },
+            "required": [
+              "ok"
+            ],
             "additionalProperties": false
           },
           "get_internal_ops_snapshot": {
@@ -8122,8 +8314,14 @@
                   "recent_events"
                 ],
                 "additionalProperties": false
+              },
+              "ok": {
+                "type": "boolean"
               }
             },
+            "required": [
+              "ok"
+            ],
             "additionalProperties": false
           },
           "preview_subprocessor_notice": {
@@ -8158,10 +8356,14 @@
                   "objectionDeadline"
                 ],
                 "additionalProperties": false
+              },
+              "ok": {
+                "type": "boolean"
               }
             },
             "required": [
-              "preview"
+              "preview",
+              "ok"
             ],
             "additionalProperties": false
           },
@@ -8200,6 +8402,9 @@
                 "type": "integer",
                 "minimum": 0,
                 "maximum": 9007199254740991
+              },
+              "ok": {
+                "type": "boolean"
               }
             },
             "required": [
@@ -8210,7 +8415,8 @@
               "objectionDeadline",
               "noticeSentAt",
               "recipientsCount",
-              "totalTargets"
+              "totalTargets",
+              "ok"
             ],
             "additionalProperties": false
           },
@@ -8311,10 +8517,14 @@
                   ],
                   "additionalProperties": false
                 }
+              },
+              "ok": {
+                "type": "boolean"
               }
             },
             "required": [
-              "notices"
+              "notices",
+              "ok"
             ],
             "additionalProperties": false
           }

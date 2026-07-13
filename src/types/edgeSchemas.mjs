@@ -13,6 +13,15 @@ const edgeEnvelopeSchema = (dataSchema) =>
     data: dataSchema.optional(),
   });
 
+const superTenantEnvelopeSchema = (dataSchema) =>
+  edgeEnvelopeSchema(dataSchema).extend({ ok: z.boolean() });
+
+const superOpsEnvelopeSchema = (dataSchema) =>
+  edgeEnvelopeSchema(dataSchema).extend({ ok: z.boolean() });
+
+const superOpsDirectResponseSchema = (responseSchema) =>
+  responseSchema.extend({ ok: z.boolean() });
+
 const tenantStatusSchema = z.enum(["active", "suspended", "archived"]);
 const accountCategorySchema = z.enum(["organization", "district", "individual"]);
 const tenantPlanCodeSchema = z.enum([
@@ -362,16 +371,16 @@ const superTenantRequestSchema = z.discriminatedUnion("action", [
 ]);
 
 const superTenantResponseSchemas = {
-  list_tenants: edgeEnvelopeSchema(z.array(superTenantSchema)),
-  create_tenant: edgeEnvelopeSchema(superTenantSchema),
-  update_tenant: edgeEnvelopeSchema(superTenantSchema),
-  set_tenant_status: edgeEnvelopeSchema(superTenantSchema),
-  send_primary_admin_reset: edgeEnvelopeSchema(z.object({ success: z.boolean(), auth_email: z.string().email() })),
-  set_primary_admin: edgeEnvelopeSchema(superTenantSchema),
-  list_districts: edgeEnvelopeSchema(z.array(superDistrictSchema)),
-  create_district: edgeEnvelopeSchema(superDistrictSchema),
-  update_district: edgeEnvelopeSchema(superDistrictSchema),
-  get_district_details: edgeEnvelopeSchema(superDistrictDetailSchema),
+  list_tenants: superTenantEnvelopeSchema(z.array(superTenantSchema)),
+  create_tenant: superTenantEnvelopeSchema(superTenantSchema),
+  update_tenant: superTenantEnvelopeSchema(superTenantSchema),
+  set_tenant_status: superTenantEnvelopeSchema(superTenantSchema),
+  send_primary_admin_reset: superTenantEnvelopeSchema(z.object({ success: z.boolean(), auth_email: z.string().email() })),
+  set_primary_admin: superTenantEnvelopeSchema(superTenantSchema),
+  list_districts: superTenantEnvelopeSchema(z.array(superDistrictSchema)),
+  create_district: superTenantEnvelopeSchema(superDistrictSchema),
+  update_district: superTenantEnvelopeSchema(superDistrictSchema),
+  get_district_details: superTenantEnvelopeSchema(superDistrictDetailSchema),
 };
 
 const tenantManagedAdminSchema = z.object({
@@ -701,35 +710,35 @@ const superOpsRequestSchema = z.discriminatedUnion("action", [
 ]);
 
 const superOpsResponseSchemas = {
-  verify_password: edgeEnvelopeSchema(z.object({ verified: z.boolean() })),
-  touch_session: edgeEnvelopeSchema(z.object({ ok: z.boolean() })),
-  list_sessions: edgeEnvelopeSchema(z.object({ sessions: z.array(superOpsSessionSchema) })),
-  revoke_session: edgeEnvelopeSchema(z.object({ revoked: z.boolean() })),
-  revoke_all_sessions: edgeEnvelopeSchema(z.object({ revoked: z.number().int().nonnegative() })),
-  get_control_center: edgeEnvelopeSchema(z.object({
+  verify_password: superOpsEnvelopeSchema(z.object({ verified: z.boolean() })),
+  touch_session: superOpsEnvelopeSchema(z.object({ ok: z.boolean() })),
+  list_sessions: superOpsEnvelopeSchema(z.object({ sessions: z.array(superOpsSessionSchema) })),
+  revoke_session: superOpsEnvelopeSchema(z.object({ revoked: z.boolean() })),
+  revoke_all_sessions: superOpsEnvelopeSchema(z.object({ revoked: z.number().int().nonnegative() })),
+  get_control_center: superOpsEnvelopeSchema(z.object({
     runtime_config: z.record(z.string(), z.unknown()),
     alert_rules: z.array(superOpsAlertRuleSchema),
     approvals: z.array(superOpsApprovalSchema),
     jobs: z.array(superOpsJobSchema),
   })),
-  set_runtime_config: edgeEnvelopeSchema(z.object({ key: z.string(), value: z.unknown() })),
-  upsert_alert_rule: edgeEnvelopeSchema(superOpsAlertRuleSchema),
-  set_tenant_policy: edgeEnvelopeSchema(superOpsTenantPolicySchema),
-  set_tenant_force_reauth: edgeEnvelopeSchema(z.object({ success: z.boolean(), job: superOpsJobSchema.nullable().optional() })),
-  create_approval: edgeEnvelopeSchema(z.object({ id: z.string(), action_type: z.string(), payload: z.record(z.string(), z.unknown()).or(z.object({}).passthrough()), requested_by: z.string().nullable().optional(), status: z.string(), created_at: z.string() })),
-  approve_request: edgeEnvelopeSchema(superOpsApprovalSchema),
-  list_support_requests: edgeEnvelopeSchema(z.object({ requests: z.array(supportRequestListItemSchema) })),
-  get_support_request: edgeEnvelopeSchema(z.object({ request: supportRequestDetailSchema })),
-  update_support_request: edgeEnvelopeSchema(z.object({ request: supportRequestDetailSchema })),
-  list_sales_leads: edgeEnvelopeSchema(z.object({ leads: z.array(salesLeadSchema) })),
-  close_sales_lead: edgeEnvelopeSchema(z.object({ lead: salesLeadSchema })),
-  move_sales_lead_to_customer: edgeEnvelopeSchema(z.object({ lead: salesLeadSchema })),
-  set_sales_lead_stage: edgeEnvelopeSchema(z.object({ lead: salesLeadSchema })),
-  delete_sales_lead: edgeEnvelopeSchema(z.object({ deleted: z.boolean() })),
-  list_customers: edgeEnvelopeSchema(z.object({ customers: z.array(customerSchema) })),
-  add_customer_status_entry: edgeEnvelopeSchema(z.object({ entry: customerStatusLogSchema })),
-  get_internal_ops_snapshot: edgeEnvelopeSchema(internalOpsSnapshotSchema),
-  preview_subprocessor_notice: z.object({
+  set_runtime_config: superOpsEnvelopeSchema(z.object({ key: z.string(), value: z.unknown() })),
+  upsert_alert_rule: superOpsEnvelopeSchema(superOpsAlertRuleSchema),
+  set_tenant_policy: superOpsEnvelopeSchema(superOpsTenantPolicySchema),
+  set_tenant_force_reauth: superOpsEnvelopeSchema(z.object({ success: z.boolean(), job: superOpsJobSchema.nullable().optional() })),
+  create_approval: superOpsEnvelopeSchema(z.object({ id: z.string(), action_type: z.string(), payload: z.record(z.string(), z.unknown()).or(z.object({}).passthrough()), requested_by: z.string().nullable().optional(), status: z.string(), created_at: z.string() })),
+  approve_request: superOpsEnvelopeSchema(superOpsApprovalSchema),
+  list_support_requests: superOpsEnvelopeSchema(z.object({ requests: z.array(supportRequestListItemSchema) })),
+  get_support_request: superOpsEnvelopeSchema(z.object({ request: supportRequestDetailSchema })),
+  update_support_request: superOpsEnvelopeSchema(z.object({ request: supportRequestDetailSchema })),
+  list_sales_leads: superOpsEnvelopeSchema(z.object({ leads: z.array(salesLeadSchema) })),
+  close_sales_lead: superOpsEnvelopeSchema(z.object({ lead: salesLeadSchema })),
+  move_sales_lead_to_customer: superOpsEnvelopeSchema(z.object({ lead: salesLeadSchema })),
+  set_sales_lead_stage: superOpsEnvelopeSchema(z.object({ lead: salesLeadSchema })),
+  delete_sales_lead: superOpsEnvelopeSchema(z.object({ deleted: z.boolean() })),
+  list_customers: superOpsEnvelopeSchema(z.object({ customers: z.array(customerSchema) })),
+  add_customer_status_entry: superOpsEnvelopeSchema(z.object({ entry: customerStatusLogSchema })),
+  get_internal_ops_snapshot: superOpsEnvelopeSchema(internalOpsSnapshotSchema),
+  preview_subprocessor_notice: superOpsDirectResponseSchema(z.object({
     preview: z.object({
       subject: z.string(),
       html: z.string(),
@@ -737,8 +746,8 @@ const superOpsResponseSchemas = {
       targetCount: z.number().int().nonnegative(),
       objectionDeadline: z.string(),
     }),
-  }),
-  announce_subprocessor_change: z.object({
+  })),
+  announce_subprocessor_change: superOpsDirectResponseSchema(z.object({
     changeId: z.string(),
     vendor: z.string(),
     changeType: subprocessorChangeTypeSchema,
@@ -747,8 +756,10 @@ const superOpsResponseSchemas = {
     noticeSentAt: z.string(),
     recipientsCount: z.number().int().nonnegative(),
     totalTargets: z.number().int().nonnegative(),
-  }),
-  list_subprocessor_notices: z.object({ notices: z.array(subprocessorNoticeSchema) }),
+  })),
+  list_subprocessor_notices: superOpsDirectResponseSchema(
+    z.object({ notices: z.array(subprocessorNoticeSchema) }),
+  ),
 };
 
 const superTenantAdminSchema = z.object({

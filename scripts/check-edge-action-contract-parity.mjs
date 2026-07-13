@@ -25,6 +25,14 @@ const endpoints = [
     responseSchema: "superOpsResponses",
     responseMapName: "superOpsResponseSchemas",
   },
+  {
+    name: "super-tenant-mutate",
+    registryPath: "supabase/functions/super-tenant-mutate/actions/index.ts",
+    registryName: "SUPER_TENANT_ACTIONS",
+    requestSchema: "superTenantRequest",
+    responseSchema: "superTenantResponses",
+    responseMapName: "superTenantResponseSchemas",
+  },
 ];
 
 const unwrapExpression = (node) => {

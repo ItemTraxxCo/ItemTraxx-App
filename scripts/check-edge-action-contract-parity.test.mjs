@@ -48,7 +48,38 @@ test("runtime registries have exact generated request and response coverage", as
   assert.deepEqual(await inspectEdgeActionContractParity(), [
     { endpoint: "admin-ops", count: 11 },
     { endpoint: "super-ops", count: 26 },
+    { endpoint: "super-tenant-mutate", count: 10 },
   ]);
+});
+
+const assertRequiredBooleanOk = (responses, endpoint) => {
+  for (const [action, response] of Object.entries(responses.properties)) {
+    assert.deepEqual(
+      response.properties?.ok,
+      { type: "boolean" },
+      `${endpoint}.${action} must declare a top-level boolean ok`,
+    );
+    assert.ok(
+      response.required?.includes("ok"),
+      `${endpoint}.${action} must require top-level ok`,
+    );
+  }
+};
+
+test("all generated super-ops action responses require top-level boolean ok", async () => {
+  const contracts = JSON.parse(
+    await readFile(new URL("../docs/api/generated/edge-contracts.schema.json", import.meta.url), "utf8"),
+  );
+
+  assertRequiredBooleanOk(contracts.schemas.superOpsResponses, "super-ops");
+});
+
+test("all generated super-tenant action responses require top-level boolean ok", async () => {
+  const contracts = JSON.parse(
+    await readFile(new URL("../docs/api/generated/edge-contracts.schema.json", import.meta.url), "utf8"),
+  );
+
+  assertRequiredBooleanOk(contracts.schemas.superTenantResponses, "super-tenant-mutate");
 });
 
 test("generated internal ops snapshot matches the live response shape", async () => {

@@ -49,15 +49,12 @@ export type DeviceSessionContext = {
 };
 
 export type AdminOpsContext = {
-  req: Request;
   requestId: string;
   action: string;
   payload: Record<string, unknown>;
   adminClient: SupabaseClient;
   user: { id: string };
-  profile: { role: "tenant_admin" | "tenant_user" };
   tenantId: string;
-  isTenantSuspended: boolean;
   authToken: string;
   authSessionBinding: { sessionId: string | null; issuedAt: string | null };
   authTokenBindingKey: string;

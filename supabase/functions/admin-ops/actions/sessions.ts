@@ -9,7 +9,6 @@ import type {
   AdminOpsContext,
   DeviceSessionContext,
   RpcError,
-  SupabaseClient,
 } from "../context.ts";
 
 export type SessionSecurityContext = Pick<

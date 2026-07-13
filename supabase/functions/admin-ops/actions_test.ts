@@ -127,18 +127,12 @@ const contextFor = (
   payload: Record<string, unknown> = {},
   overrides: Partial<AdminOpsContext> = {},
 ): AdminOpsContext => ({
-  req: new Request("https://example.test/functions/v1/admin-ops", {
-    method: "POST",
-    headers: { "user-agent": "ItemTraxx test" },
-  }),
   requestId: "request-1",
   action,
   payload,
   adminClient,
   user: { id: "00000000-0000-4000-8000-000000000001" },
-  profile: { role: "tenant_admin" },
   tenantId: "00000000-0000-4000-8000-000000000002",
-  isTenantSuspended: false,
   authToken: "test-auth-token",
   authSessionBinding: {
     sessionId: "auth-session-1",

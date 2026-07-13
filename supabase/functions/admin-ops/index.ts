@@ -273,15 +273,12 @@ serve(async (req) => {
     if (actionAuthorizationFailure) return actionAuthorizationFailure;
 
     const context: AdminOpsContext = {
-      req,
       requestId,
       action: normalizedAction,
       payload: payloadRecord,
       adminClient,
       user: { id: user.id },
-      profile: { role: profile.role },
       tenantId,
-      isTenantSuspended,
       authToken,
       authSessionBinding,
       authTokenBindingKey,

@@ -35,7 +35,7 @@
   "dependencies": {
     "@posthog/react": "^1.10.3",
     "@sentry/vue": "^10.65.0",
-    "@supabase/supabase-js": "^2.110.2",
+    "@supabase/supabase-js": "^2.110.3",
     "@vercel/analytics": "^2.0.1",
     "@vercel/speed-insights": "^2.0.0",
     "jsbarcode": "^3.12.3",
@@ -55,7 +55,7 @@
     "@vue/tsconfig": "^0.9.1",
     "rollup": "^4.62.2",
     "supabase": "2.109.1",
-    "typescript": "~6.0.3",
+    "typescript": "~7.0.2",
     "vite": "^8.1.4",
     "vue-tsc": "^3.3.7",
     "wrangler": "4.110.0",

@@ -76,3 +76,12 @@ const loadStats = async () => {
 
 onMounted(loadStats);
 </script>
+
+<style scoped>
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 1rem;
+  margin-top: 1rem;
+}
+</style>

@@ -5,30 +5,6 @@
   margin: 1.5rem 0;
 }
 
-.admin-card {
-  display: block;
-  border: 1px solid var(--border);
-  border-radius: 14px;
-  padding: 1.2rem 1.3rem;
-  background: var(--surface-2);
-  transition: transform 0.2s ease, border-color 0.2s ease;
-}
-
-.admin-card h2 {
-  margin: 0 0 0.5rem;
-  font-size: 1.2rem;
-}
-
-.admin-card p {
-  margin: 0;
-  color: var(--muted);
-}
-
-.admin-card:hover {
-  border-color: var(--accent);
-  transform: translateY(-2px);
-}
-
 .admin-actions {
   display: flex;
   gap: 1rem;
@@ -53,13 +29,6 @@
   font-weight: 600;
 }
 
-.stats-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 1rem;
-  margin-top: 1rem;
-}
-
 .stat-card {
   border: 1px solid var(--border);
   border-radius: 14px;
@@ -78,21 +47,10 @@
   margin: 0;
 }
 
-.serial-number.dim {
-  color: var(--muted);
-}
-
 .form-grid-2 {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: 0.8rem 1rem;
-}
-
-.form-help-row {
-  display: flex;
-  justify-content: space-between;
-  margin-top: 0.35rem;
-  font-size: 0.75rem;
 }
 
 .admin-shell {
@@ -308,12 +266,4 @@
 .checkout-item-row {
   padding-top: 0.45rem;
   padding-bottom: 0.45rem;
-}
-
-.gear-notes-cell {
-  min-width: 220px;
-}
-
-.gear-notes-input {
-  width: 100%;
 }

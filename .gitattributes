@@ -1,3 +1,4 @@
 *.ts linguist-language=Vue
 *.tsx linguist-language=Vue
 *.d.ts linguist-language=Vue
+cloudflare/edge-proxy/worker-configuration.d.ts whitespace=-trailing-space

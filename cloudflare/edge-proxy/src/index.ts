@@ -1,32 +1,3 @@
-type KvBinding = {
-  get: <T = string>(key: string, type?: "text" | "json") => Promise<T | null>;
-  put: (key: string, value: string, options?: { expirationTtl?: number }) => Promise<void>;
-  delete: (key: string) => Promise<void>;
-};
-
-type RateLimitBinding = {
-  limit: (options: { key: string }) => Promise<{ success: boolean }>;
-};
-
-export interface Env {
-  SUPABASE_URL: string;
-  SUPABASE_ANON_KEY: string;
-  ITX_EDGE_PROXY_SHARED_SECRET?: string;
-  ALLOWED_ORIGINS?: string;
-  ALLOWED_FUNCTIONS?: string;
-  TRUST_LOCAL_ORIGINS?: string;
-  ITX_ITEMTRAXX_KILLSWITCH_ENABLED?: string;
-  ITX_ITEMTRAXX_KILLSWITCH_MESSAGE?: string;
-  SESSION_COOKIE_DOMAIN?: string;
-  SESSION_COOKIE_SAMESITE?: string;
-  SESSION_REFRESH_COOKIE_MAX_AGE_SECONDS?: string;
-  SENTRY_DSN?: string;
-  SENTRY_ENVIRONMENT?: string;
-  MAINTENANCE_FALLBACK_KV?: KvBinding;
-  SESSION_EXCHANGE_RATE_LIMITER?: RateLimitBinding;
-  SESSION_REFRESH_RATE_LIMITER?: RateLimitBinding;
-}
-
 const ACCESS_COOKIE_NAME = "itx_session";
 const REFRESH_COOKIE_NAME = "itx_refresh";
 const REFRESH_GRANT_TYPE = "refresh_token";
@@ -93,7 +64,9 @@ const hashTrustedIngressBody = async (body: Uint8Array | null) => {
     return "no-body";
   }
 
-  const digest = await crypto.subtle.digest("SHA-256", body);
+  const bytes = new Uint8Array(body.byteLength);
+  bytes.set(body);
+  const digest = await crypto.subtle.digest("SHA-256", bytes.buffer);
   return toHex(new Uint8Array(digest));
 };
 
@@ -736,7 +709,7 @@ const buildSessionSummary = async (env: Env, accessToken: string): Promise<Sessi
 type SessionRateLimitResult = "allowed" | "limited" | "unavailable";
 
 export const checkSessionRateLimit = async (
-  binding: RateLimitBinding | undefined,
+  binding: RateLimit | undefined,
   request: Request,
 ): Promise<SessionRateLimitResult> => {
   const clientIp = request.headers.get("cf-connecting-ip")?.trim();
@@ -807,10 +780,10 @@ const maybeRefreshSession = async (
   }
 
   const refreshed = await refreshSession(request, env, cookies.refreshToken);
-  if (refreshed.status === "rate_limited" || refreshed.status === "unavailable") {
-    return { session: null, headers: null, failure: refreshed.status };
-  }
-  if (refreshed.status === "unauthorized") {
+  if (refreshed.status !== "ok") {
+    if (refreshed.status === "rate_limited" || refreshed.status === "unavailable") {
+      return { session: null, headers: null, failure: refreshed.status };
+    }
     const headers = new Headers();
     clearSessionCookies(headers, env);
     return { session: null, headers, failure: null };
@@ -1150,10 +1123,10 @@ const handleSessionRefresh = async (
   }
 
   const refreshed = await refreshSession(request, env, cookies.refreshToken);
-  if (refreshed.status === "rate_limited" || refreshed.status === "unavailable") {
-    return buildSessionRateLimitError(refreshed.status, headers, requestId);
-  }
-  if (refreshed.status === "unauthorized") {
+  if (refreshed.status !== "ok") {
+    if (refreshed.status === "rate_limited" || refreshed.status === "unavailable") {
+      return buildSessionRateLimitError(refreshed.status, headers, requestId);
+    }
     const responseHeaders = new Headers();
     clearSessionCookies(responseHeaders, env);
     return buildError(401, "Unauthorized", headers, requestId, responseHeaders);
@@ -1372,4 +1345,4 @@ export default {
       return buildError(500, "Internal worker error", headers, requestId);
     }
   },
-};
+} satisfies ExportedHandler<Env>;

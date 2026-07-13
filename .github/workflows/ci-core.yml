@@ -57,6 +57,12 @@ jobs:
           node-version: 22.15.0
           cache: npm
 
+      - name: Setup Deno
+        uses: denoland/setup-deno@22d081ff2d3a40755e97629de92e3bcbfa7cf2ed # v2.0.5
+        with:
+          deno-version: 2.x
+          cache: true
+
       - name: Install dependencies
         # Avoid flaky native/CLI postinstall downloads during CI (for example `supabase` CLI).
         run: npm ci --ignore-scripts
@@ -81,6 +87,12 @@ jobs:
 
       - name: Build
         run: npm run build
+
+      - name: Typecheck Cloudflare Worker
+        run: npm run worker:typecheck
+
+      - name: Test Cloudflare Worker
+        run: npm run worker:test
 
       - name: Check initial JavaScript budget
         run: npm run perf:initial

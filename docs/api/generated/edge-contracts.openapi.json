@@ -6390,6 +6390,7 @@
                             "billing",
                             "access",
                             "feature",
+                            "privacy",
                             "other"
                           ]
                         },
@@ -6471,6 +6472,7 @@
                           "billing",
                           "access",
                           "feature",
+                          "privacy",
                           "other"
                         ]
                       },
@@ -6694,6 +6696,7 @@
                           "billing",
                           "access",
                           "feature",
+                          "privacy",
                           "other"
                         ]
                       },
@@ -9543,6 +9546,7 @@
               "billing",
               "access",
               "feature",
+              "privacy",
               "other"
             ]
           },

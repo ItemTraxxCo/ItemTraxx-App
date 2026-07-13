@@ -6,6 +6,7 @@ import {
   assertActionParity,
   inspectEdgeActionContractParity,
   readRegistryActions,
+  readResponseMapActions,
 } from "./check-edge-action-contract-parity.mjs";
 
 test("extracts literal action registries without executing Deno modules", () => {
@@ -30,6 +31,16 @@ test("rejects missing, extra, and duplicate contract actions", () => {
   assert.throws(
     () => assertActionParity({ endpoint: "fixture", registry: ["a"], request: ["a", "a"], response: ["a"] }),
     /request contract contains duplicate actions/,
+  );
+});
+
+test("rejects duplicate declarations in an authoritative response map", () => {
+  assert.throws(
+    () => readResponseMapActions(
+      "const responses = { first: schema, first: otherSchema };",
+      "responses",
+    ),
+    /contains duplicate actions/,
   );
 });
 
@@ -86,4 +97,18 @@ test("generated internal ops snapshot matches the live response shape", async ()
     "tenant_id",
     "tenant_name",
   ]);
+});
+
+test("generated support request contracts preserve the privacy category", async () => {
+  const contracts = JSON.parse(
+    await readFile(new URL("../docs/api/generated/edge-contracts.schema.json", import.meta.url), "utf8"),
+  );
+  const contactCategories = contracts.schemas.contactSupportSubmitRequest
+    .properties.category.enum;
+  const supportCategories = contracts.schemas.superOpsResponses.properties
+    .list_support_requests.properties.data.properties.requests.items
+    .properties.category.enum;
+
+  assert.ok(contactCategories.includes("privacy"));
+  assert.ok(supportCategories.includes("privacy"));
 });

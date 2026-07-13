@@ -173,7 +173,14 @@ export type SupportRequestListItem = {
   requester_name: string;
   reply_email: string;
   subject: string;
-  category: "general" | "bug" | "billing" | "access" | "feature" | "other";
+  category:
+    | "general"
+    | "bug"
+    | "billing"
+    | "access"
+    | "feature"
+    | "privacy"
+    | "other";
   status: SupportRequestStatus;
   created_at: string;
   updated_at: string;

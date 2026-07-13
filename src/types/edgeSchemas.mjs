@@ -500,7 +500,7 @@ const superOpsSessionSchema = z.object({
 });
 
 const supportRequestStatusSchema = z.enum(["open", "in_progress", "resolved", "spam"]);
-const supportRequestCategorySchema = z.enum(["general", "bug", "billing", "access", "feature", "other"]);
+const supportRequestCategorySchema = z.enum(["general", "bug", "billing", "access", "feature", "privacy", "other"]);
 
 const supportRequestListItemSchema = z.object({
   id: z.string(),
@@ -903,7 +903,7 @@ const contactSupportSubmitRequestSchema = z.object({
   name: z.string().min(1),
   reply_email: z.string().email(),
   subject: z.string().min(1),
-  category: z.enum(["general","bug","billing","access","feature","other"]),
+  category: supportRequestCategorySchema,
   message: z.string().min(1),
   turnstile_token: z.string().min(1),
   website: z.string().optional(),

@@ -7,6 +7,7 @@ import type {
   JsonResponse,
   SupabaseClient,
 } from "../context.ts";
+import { handleBulkGearAction } from "./bulkGear.ts";
 import { handleNotificationAction } from "./notifications.ts";
 import { handleSettingsAction } from "./settings.ts";
 import { handleSessionAction } from "./sessions.ts";
@@ -121,6 +122,7 @@ const ACTION_HANDLERS: Partial<Record<AdminOpsAction, ActionHandler>> = {
   revoke_session: handleSessionAction,
   revoke_current_session: handleSessionAction,
   revoke_all_sessions: handleSessionAction,
+  bulk_import_gear: handleBulkGearAction,
 };
 
 export const dispatchAdminOpsAction = (context: AdminOpsContext) => {

@@ -72,6 +72,13 @@ Tenant admin operational actions used by the tenant admin panel.
 - `login_method`: string
 - `login_location`: string
 
+#### `revoke_current_session`
+
+- `device_id` (required): string
+- `device_label` (required): string
+- `login_method`: string
+- `login_location`: string
+
 #### `revoke_session`
 
 - `device_id` (required): string
@@ -91,7 +98,7 @@ Tenant admin operational actions used by the tenant admin panel.
 ### Response schema
 
 - Schema: `adminOpsResponses`
-- Top-level keys: `get_notifications`, `get_status_tracking`, `bulk_import_gear`, `get_tenant_settings`, `update_tenant_settings`, `touch_session`, `validate_session`, `list_sessions`, `revoke_session`, `revoke_all_sessions`
+- Top-level keys: `get_notifications`, `get_status_tracking`, `bulk_import_gear`, `get_tenant_settings`, `update_tenant_settings`, `touch_session`, `validate_session`, `list_sessions`, `revoke_current_session`, `revoke_session`, `revoke_all_sessions`
 
 ## `POST /functions/v1/super-tenant-mutate`
 
@@ -236,6 +243,40 @@ Super-admin operational controls, approvals, customer ops, and reporting.
 
 ### Supported actions
 
+#### `verify_password`
+
+- `password` (required): string
+
+#### `touch_session`
+
+- `device_id` (required): string
+- `device_label`: any
+- `login_method`: any
+- `login_location`: any
+
+#### `list_sessions`
+
+- `device_id`: string
+- `device_label`: any
+- `login_method`: any
+- `login_location`: any
+
+#### `revoke_session`
+
+- `device_id`: string
+- `device_label`: any
+- `login_method`: any
+- `login_location`: any
+- `session_id` (required): string
+
+#### `revoke_all_sessions`
+
+- `device_id`: string
+- `device_label`: any
+- `login_method`: any
+- `login_location`: any
+- `sign_out_current`: boolean
+
 #### `get_control_center`
 
 - No additional fields.
@@ -276,6 +317,24 @@ Super-admin operational controls, approvals, customer ops, and reporting.
 
 - `id` (required): string
 
+#### `list_support_requests`
+
+- `search`: string
+- `status`: any
+- `limit`: integer
+
+#### `get_support_request`
+
+- `support_request_id` (required): string
+
+#### `update_support_request`
+
+- `support_request_id` (required): string
+- `status`: string
+- `internal_notes`: string
+- `assign_to_me`: boolean
+- `clear_assignment`: boolean
+
 #### `list_sales_leads`
 
 - `search`: string
@@ -313,10 +372,28 @@ Super-admin operational controls, approvals, customer ops, and reporting.
 
 - No additional fields.
 
+#### `preview_subprocessor_notice`
+
+- `vendor` (required): string
+- `change_type` (required): string
+- `effective_date` (required): string
+- `description`: string
+
+#### `announce_subprocessor_change`
+
+- `vendor` (required): string
+- `change_type` (required): string
+- `effective_date` (required): string
+- `description`: string
+
+#### `list_subprocessor_notices`
+
+- No additional fields.
+
 ### Response schema
 
 - Schema: `superOpsResponses`
-- Top-level keys: `get_control_center`, `set_runtime_config`, `upsert_alert_rule`, `set_tenant_policy`, `set_tenant_force_reauth`, `create_approval`, `approve_request`, `list_sales_leads`, `close_sales_lead`, `move_sales_lead_to_customer`, `set_sales_lead_stage`, `delete_sales_lead`, `list_customers`, `add_customer_status_entry`, `get_internal_ops_snapshot`
+- Top-level keys: `verify_password`, `touch_session`, `list_sessions`, `revoke_session`, `revoke_all_sessions`, `get_control_center`, `set_runtime_config`, `upsert_alert_rule`, `set_tenant_policy`, `set_tenant_force_reauth`, `create_approval`, `approve_request`, `list_support_requests`, `get_support_request`, `update_support_request`, `list_sales_leads`, `close_sales_lead`, `move_sales_lead_to_customer`, `set_sales_lead_stage`, `delete_sales_lead`, `list_customers`, `add_customer_status_entry`, `get_internal_ops_snapshot`, `preview_subprocessor_notice`, `announce_subprocessor_change`, `list_subprocessor_notices`
 
 ## `POST /functions/v1/tenant-admin-mutate`
 

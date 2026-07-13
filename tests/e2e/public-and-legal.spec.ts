@@ -16,6 +16,8 @@ const authenticatedRouteResponse = (url: string) => {
   return pathname.includes("/tenant/checkout.vue") || pathname.includes("/tenant/admin/adminlogin.vue");
 };
 
+const nonDevE2eOrigin = "http://127.0.0.1.nip.io:4173";
+
 test.describe("Public surfaces", () => {
   test.beforeEach(async ({ page }) => {
     await mockSystemStatus(page);
@@ -481,6 +483,61 @@ test.describe("Public surfaces", () => {
     expect(await page.evaluate(() => localStorage.getItem("itemtraxx-broadcast-dismissed"))).toBe(
       "broadcast-2026-07-13",
     );
+  });
+
+  test("maintenance blocks non-exempt routes and preserves its cached message", async ({ page }) => {
+    await page.route(/\/functions(?:\/v1)?\/system-status(?:\?.*)?$/, async (route) => {
+      await route.fulfill({
+        status: 200,
+        headers: { "access-control-allow-origin": nonDevE2eOrigin },
+        contentType: "application/json",
+        body: JSON.stringify({
+          status: "degraded",
+          checked_at: "2026-07-13T12:00:00.000Z",
+          maintenance: {
+            enabled: true,
+            message: "Scheduled inventory maintenance",
+            updated_at: "2026-07-13T12:00:00.000Z",
+          },
+        }),
+      });
+    });
+
+    await page.goto(`${nonDevE2eOrigin}/login`);
+    const overlay = page.getByRole("alertdialog").filter({ hasText: "Maintenance currently in Progress" });
+    await expect(overlay).toBeVisible();
+    await expect(overlay.getByRole("link", { name: "View Live Status" })).toHaveAttribute(
+      "href",
+      "https://status.itemtraxx.com/?ref=maintscreen",
+    );
+    await expect.poll(() =>
+      page.evaluate(() => JSON.parse(localStorage.getItem("itemtraxx-maintenance-state") ?? "null")),
+    ).toEqual({
+      enabled: true,
+      message: "Scheduled inventory maintenance",
+      updatedAt: "2026-07-13T12:00:00.000Z",
+    });
+  });
+
+  test("kill switch keeps public home available and sends other routes to unavailable", async ({ page }) => {
+    await page.route(/\/functions(?:\/v1)?\/system-status(?:\?.*)?$/, async (route) => {
+      await route.fulfill({
+        status: 200,
+        headers: { "access-control-allow-origin": nonDevE2eOrigin },
+        contentType: "application/json",
+        body: JSON.stringify({
+          status: "operational",
+          kill_switch: { enabled: true, message: "Emergency maintenance" },
+          maintenance: { enabled: false, message: "" },
+        }),
+      });
+    });
+
+    await page.goto(`${nonDevE2eOrigin}/`);
+    await expect(page).toHaveURL(`${nonDevE2eOrigin}/`);
+    await page.goto(`${nonDevE2eOrigin}/login`);
+    await expect(page).toHaveURL(`${nonDevE2eOrigin}/unavailable`);
+    await expect(page.getByRole("heading", { name: /currently unavailable/i })).toBeVisible();
   });
 
   test("the forced version overlay preserves update copy and precedence", async ({ page }) => {

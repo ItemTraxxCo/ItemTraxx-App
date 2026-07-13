@@ -1267,6 +1267,35 @@ test.describe("Auth edge cases", () => {
     await expect.poll(() => actions.filter((action) => action === "validate_session").length).toBe(1);
   });
 
+  test("tenant admin idle timeout removes fresh verification on non-dev hosts", async ({ page }) => {
+    await page.route(/\/functions(?:\/v1)?\/admin-ops(?:\?.*)?$/, async (route) => {
+      if (route.request().method() === "OPTIONS") {
+        await route.fulfill({
+          status: 204,
+          headers: {
+            "access-control-allow-origin": "http://127.0.0.1.nip.io:4173",
+            "access-control-allow-methods": "POST, OPTIONS",
+            "access-control-allow-headers": "content-type",
+          },
+        });
+        return;
+      }
+      await route.fulfill({
+        status: 200,
+        headers: { "access-control-allow-origin": "http://127.0.0.1.nip.io:4173" },
+        contentType: "application/json",
+        body: JSON.stringify({ data: { valid: true, ok: true } }),
+      });
+    });
+
+    await page.goto("http://127.0.0.1.nip.io:4173/");
+    await setTenantAdminSession(page, "tenant-e2e");
+    await navigateApp(page, "/tenant/admin");
+    await expect(page).toHaveURL(/\/tenant\/admin$/);
+
+    await expect(page).toHaveURL(/\/tenant\/checkout$/, { timeout: 4_000 });
+  });
+
   test("tenant admin dev hosts disable idle logout behavior", async ({ page }) => {
     await page.route(/\/functions(?:\/v1)?\/admin-ops(?:\?.*)?$/, async (route) => {
       await route.fulfill({

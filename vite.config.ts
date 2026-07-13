@@ -72,6 +72,10 @@ export default defineConfig(({ mode, command }) => {
 
   return {
     plugins: [vue(), cloudflare(), initialModuleMapPlugin()],
+    server:
+      process.env.VITE_E2E_TEST_UTILS === "true"
+        ? { allowedHosts: ["127.0.0.1.nip.io"] }
+        : undefined,
     define: {
       "import.meta.env.VITE_GIT_COMMIT": JSON.stringify(gitCommit),
       "import.meta.env.VITE_GIT_BRANCH": JSON.stringify(gitBranch),

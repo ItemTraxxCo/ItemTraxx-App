@@ -49,6 +49,36 @@ test.describe("Protected route smoke tests", () => {
     await expect(page.getByRole("dialog")).toBeVisible();
   });
 
+  test("authenticated users can dismiss a degraded incident without changing its status link", async ({ page }) => {
+    await page.route(/\/functions(?:\/v1)?\/system-status(?:\?.*)?$/, async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          status: "degraded",
+          incident_summary: "Checkout latency is elevated",
+          checked_at: "2026-07-13T12:00:00.000Z",
+          maintenance: { enabled: false, message: "" },
+        }),
+      });
+    });
+    await page.goto("/");
+    await setTenantAdminSession(page);
+    await navigateApp(page, "/tenant/checkout");
+
+    const banner = page.getByRole("status").filter({ hasText: "Checkout latency is elevated" });
+    await expect(banner).toBeVisible();
+    await expect(banner.getByRole("link", { name: "View status" })).toHaveAttribute(
+      "href",
+      "https://status.itemtraxx.com/?ref=bcastlink",
+    );
+    await banner.getByRole("button").click();
+    await expect(banner).toHaveCount(0);
+    expect(await page.evaluate(() => localStorage.getItem("itemtraxx-incident-dismissed"))).toBe(
+      "2026-07-13T12:00:00.000Z",
+    );
+  });
+
   for (const path of ["/tenant/checkout", "/district"]) {
     test(`E2E first mount of protected ${path} does not use public auth bootstrap`, async ({ page }) => {
       let publicSessionRequests = 0;

@@ -1,5 +1,6 @@
 import type { SuperOpsContext } from "../context.ts";
 import { handleControlCenterAction } from "./controlCenter.ts";
+import { handleInternalOpsAction } from "./internalOps.ts";
 import { handleSalesCustomersAction } from "./salesCustomers.ts";
 import { handleSecuritySessionsAction } from "./securitySessions.ts";
 import { handleSupportAction } from "./support.ts";
@@ -42,6 +43,7 @@ export const dispatchSuperOpsAction = async (
       handleControlCenterAction,
       handleSupportAction,
       handleSalesCustomersAction,
+      handleInternalOpsAction,
     ]
   ) {
     const response = await handler(context);

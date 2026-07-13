@@ -4,11 +4,11 @@
 
 **Branch:** `dev/mmango10`
 
-**Final verified implementation head:** `3d07b74fd0ad93ac57a46187f7ad3ab4202cd81b`
+**Final verified implementation head:** `50d48c94f753dde9ba2ed06bc063514269b7fcab`
 
-**Status:** PASS. Tasks 1-8 are complete. The clean-checkout-equivalent Task 8
-verification passed at `3d07b74f`; this report is committed only after those
-results and the protected-flow traces were recorded.
+**Status:** PASS. Tasks 1-8 and the umbrella review closure are complete. The
+clean-checkout-equivalent final verification passed at `50d48c94`; this report is
+committed only after those results and the protected-flow traces were recorded.
 
 ## 1. Executive outcome and scope
 
@@ -39,16 +39,17 @@ post-merge lock alignment is called out separately below.
 | Baseline merge | `e95f75643f87af6e30c637a8d236040b6de6c2fa` | `git show -s --format='%H%n%P' e95f7564` reports parents `6a99043d8130b39ad26c9d66b1c05b459adb704f` and `a1a1113222fdd401b58b9ac763b9ef6e6bac7487`. |
 | Immediate merged-dependency alignment | `119b1fe053f5b72de38a720e1b5bc3459fd87833` | Lock-only Deno alignment after the merge; it is not an edge behavior rewrite. |
 | Interleaved user commits | `f2f43406 refactor reciept pdf service`; `1006f461 refactor error messages` | These are retained in the branch history and are not silently attributed to cleanup tasks. |
-| Current implementation head | `3d07b74fd0ad93ac57a46187f7ad3ab4202cd81b` | Final verified production-source head. It includes the separately reviewed deletion of the unowned `src/services/superOpsService.ts` facade. |
+| Final implementation head | `50d48c94f753dde9ba2ed06bc063514269b7fcab` | Final verified production-source head. It includes the reviewed umbrella fixes and rendered recovery/fallback hardening. |
 | Task 8 executable-gate correction | `f6c3ad7c docs: correct final deno verification gate` | Plan-only commit after review; it scopes Deno read access to `supabase/functions/super-tenant-mutate/actions`. Production source and the report are not part of the commit. |
-| Final verified implementation-head diff | `git diff --stat e95f7564..3d07b74f` | 232 files, 44,690 insertions, 13,918 deletions. These totals stop at the verified implementation head; generated Worker declarations and API artifacts account for a large share of insertions. |
+| Prior Task 8 implementation snapshot | `git diff --stat e95f7564..3d07b74f` | 232 files, 44,690 insertions, 13,918 deletions before umbrella review fixes. |
 | Initial report snapshot | `git diff --stat e95f7564..6aab2bd2` | 233 files, 45,143 insertions, 13,918 deletions after the initial report commit. This snapshot is not mislabeled as the implementation-head diff. |
-| Verified implementation-head divergence | `git rev-list --left-right --count 3d07b74f...origin/main`; same command against `origin/dev/mmango10` | At the source state actually verified: 108 ahead / 3 behind `origin/main`, and 111 ahead / 0 behind the branch remote. |
-| Terminal post-correction divergence | `git rev-list --left-right --count HEAD...origin/main`; same command against `origin/dev/mmango10` | 110 ahead / 3 behind `origin/main`, and 113 ahead / 0 behind the branch remote after the initial report and this report-only correction. The three unmerged upstream commits remain `16140b45`, `b13591fc`, and `cc7d03a9`; no merge, rebase, cherry-pick, reset, or push was performed. |
-| Final verified implementation/result commit | `3d07b74fd0ad93ac57a46187f7ad3ab4202cd81b` | Every Task 8 gate and trace below was run against this production-source state. |
-| Report commits | `6aab2bd2 docs: report codebase cleanup results`; follow-up subject `docs: correct cleanup audit evidence` | The follow-up changes this report only. Its self-referential hash is intentionally omitted; resolve it with `git log -1 --format=%H -- docs/superpowers/reports/2026-07-10-cleanup-modernization-report.md`. |
+| Final verified implementation-head diff | `git diff --stat e95f7564..50d48c94` | 233 files, 45,684 insertions, 13,967 deletions. These totals stop at the final verified implementation head. |
+| Final implementation-head divergence | `git rev-list --left-right --count 50d48c94...origin/main`; same command against `origin/dev/mmango10` | At the source state actually verified: 113 ahead / 3 behind `origin/main`, and 116 ahead / 0 behind the branch remote. |
+| Terminal post-report divergence | `git rev-list --left-right --count HEAD...origin/main`; same command against `origin/dev/mmango10` | 114 ahead / 3 behind `origin/main`, and 117 ahead / 0 behind the branch remote after this report-only closure commit. The three unmerged upstream commits remain `16140b45`, `b13591fc`, and `cc7d03a9`; no merge, rebase, cherry-pick, reset, or push was performed. |
+| Final verified implementation/result commit | `50d48c94f753dde9ba2ed06bc063514269b7fcab` | Every final gate and protected-flow trace below was run against this production-source state. |
+| Report commits | `6aab2bd2 docs: report codebase cleanup results`; `ca8d9d52 docs: correct cleanup audit evidence`; follow-up subject `docs: close umbrella cleanup audit` | The follow-up changes this report only. Its self-referential hash is intentionally omitted; resolve it with `git log -1 --format=%H -- docs/superpowers/reports/2026-07-10-cleanup-modernization-report.md`. |
 
-The range `e95f7564..3d07b74f` is used for implementation before/after accounting.
+The range `e95f7564..50d48c94` is used for final implementation before/after accounting.
 Task-level ownership comes from `.superpowers/sdd/progress.md` and the task reports;
 the range itself is not treated as proof that every change is cleanup-owned.
 
@@ -102,7 +103,9 @@ the range itself is not treated as proof that every change is cleanup-owned.
   domain action modules.
 - Runtime registries retain exactly 26, 10, and 11 actions respectively. The
   current parity gate reports generated request/response parity for `super-ops`
-  26/26 and `admin-ops` 11/11.
+  26/26, `super-tenant-mutate` 10/10, and `admin-ops` 11/11. Every generated
+  `super-ops` and `super-tenant-mutate` success response schema now requires a
+  top-level boolean `ok`; admin and tenant-admin contracts remain unchanged.
 - Pure identical helpers were shared narrowly: PostgREST missing relation/column
   classification, bounded metadata, SHA-256 formatting, and Worker JSON response
   construction. Endpoint-specific status, failure, audit, and compatibility
@@ -117,8 +120,9 @@ the range itself is not treated as proof that every change is cleanup-owned.
 - `src/types/edgeSchemas.mjs` is the source for deterministic schema/OpenAPI
   generation. The internal operations snapshot, support privacy field,
   subprocessor actions, and `revoke_current_session` are represented in generated
-  state. `npm run devops:check:edge-contract-drift` regenerated three temporary
-  artifacts and reported all three committed files in sync.
+  state. Shape-level tests lock the required top-level `ok` contracts, and
+  `npm run devops:check:edge-contract-drift` regenerated three temporary artifacts
+  and reported all three committed files in sync. Generation remains deterministic.
 - CI now owns initial JS, public CSS, Worker type/test, edge action parity,
   generated drift, edge coverage, and existing SQL-coupling gates. The heavier
   production Chromium network trace remains a local/final gate by design.
@@ -129,7 +133,7 @@ the range itself is not treated as proof that every change is cleanup-owned.
 design's pre-merge measurements are retained separately; they match the merged
 baseline only for the files the design explicitly named. The design did not
 separately record `checkoutService.ts`. Current values come from `wc -l` at
-`3d07b74f`.
+`50d48c94`.
 
 | File | Approved pre-merge baseline | Exact merged baseline | Current | Net entrypoint/facade reduction |
 | --- | ---: | ---: | ---: | ---: |
@@ -199,8 +203,8 @@ npx -y jscpd src supabase/functions cloudflare/edge-proxy/src \
 ```
 
 It analyzed 486 files and reported 277 clone groups, 5,635 duplicated lines out
-of 147,193 (3.83%) overall. By parsed format: CSS 1,014/28,917 (3.51%), HTML
-389/30,981 (1.26%), JavaScript 63/937 (6.72%), TypeScript 4,169/55,354
+of 147,204 (3.83%) overall. By parsed format: CSS 1,014/28,917 (3.51%), HTML
+389/30,981 (1.26%), JavaScript 63/948 (6.65%), TypeScript 4,169/55,354
 (7.53%), and Vue 0/31,004 (0.00%).
 
 The design's approximately 9.35% duplicated TypeScript baseline is **not directly
@@ -225,9 +229,9 @@ minified JavaScript in 18 requests. Once the merged baseline analyzer existed,
 ownership matches. That exact merged baseline comes from the Task 2 report.
 
 At the current implementation head, the same analyzer reports nine assets,
-189,580 minified bytes and 66,588 gzip bytes with an ownership map and zero
-forbidden modules. Relative to the exact merged closure, that is 1,080,612 fewer
-minified bytes (85.07%) and 335,114 fewer gzip bytes (83.42%).
+189,583 minified bytes and 66,584 gzip bytes with an ownership map and zero
+forbidden modules. Relative to the exact merged closure, that is 1,080,609 fewer
+minified bytes (85.07%) and 335,118 fewer gzip bytes (83.42%).
 
 Current initial assets from `npm run perf:initial:report`:
 
@@ -236,7 +240,7 @@ Current initial assets from `npm run perf:initial:report`:
 3. `authState-7tDta680.js`
 4. `cookieConsentService-QioYVWQJ.js`
 5. `edgeUrls-B2tvSMcX.js`
-6. `index-5_p89X_G.js`
+6. `index-DD83kMNH.js`
 7. `preload-helper-Czpn1I53.js`
 8. `reactivity.esm-bundler-DEPiGFhz.js`
 9. `rolldown-runtime-QTnfLwEv.js`
@@ -251,8 +255,8 @@ head, records:
 | `system-status` requests | 1 |
 | Direct Supabase project-host requests | 0 |
 | Forbidden SDK requests | 0 |
-| Initial minified JS | 189,580 bytes |
-| Initial gzip JS | 66,588 bytes |
+| Initial minified JS | 189,583 bytes |
+| Initial gzip JS | 66,584 bytes |
 | Violations | 0 |
 
 The current 24-request trace should not be read as an 18-to-24 regression claim:
@@ -301,13 +305,31 @@ The task reports and independent reviews in `.superpowers/sdd/progress.md` recor
   Worker 63/63 and Playwright 104/104; exact generated action parity and frozen
   state; and the reviewed production landing trace.
 
+### Umbrella review closure
+
+- `2b51cfa8 fix: correct kill-switch status links` corrected the malformed
+  kill-switch status URL while preserving the status-page destination and fallback
+  copy.
+- `1e7728cb fix: align super response contracts with runtime` aligned strict
+  top-level `ok` success-response contracts, added exact 10-action
+  `super-tenant-mutate` parity, and added shape-level generated-contract tests.
+- `50d48c94 test: verify rendered kill-switch recovery` hardened rendered link and
+  fallback coverage. The exact `https://status.itemtraxx.com/?ref=killswitch` link,
+  fallback message, and live HTTP 200 status were verified; no malformed live URL
+  remains.
+- The original umbrella reviewer re-reviewed the fixes and approved the branch
+  with no remaining findings. These commits do not change SQL, RLS, or deployment
+  configuration.
+
 ### Commands rerun while drafting Task 7
 
 - `node --version`: `v22.15.0`.
 - Current/baseline `wc -l` and dependency counts: recorded in Sections 4 and 5.
 - `npm run perf:initial:report`, `npm run perf:report`, `npm run
   perf:css-boundary`, `npm run perf:budget`, and `npm run perf:images`: exit 0.
-- `npm run devops:check:edge-action-parity`: admin 11 and super 26 match.
+- `npm run devops:check:edge-action-parity`: Task 7's then-current two registries
+  matched; umbrella closure expanded the gate to the three-endpoint result in the
+  final verification table.
 - `npm run devops:check:edge-contract-drift`: three artifacts in sync.
 - Corrected the Task 8 plan command and ran it exactly:
   `deno test --allow-env
@@ -322,29 +344,29 @@ The task reports and independent reviews in `.superpowers/sdd/progress.md` recor
 - `git diff --stat`, `git diff --name-status`, remote divergence, generated-state
   diff, and current artifacts: inspected.
 
-### Clean-checkout-equivalent Task 8 verification
+### Final lead-owned clean-checkout-equivalent verification
 
-All enforcing gates below exited 0 at `3d07b74f` on 2026-07-13. Knip is an
+All enforcing gates below exited 0 at `50d48c94` on 2026-07-13. Knip is an
 explicitly characterized analyzer rather than an enforcing zero-finding gate.
 
 | Command or gate | Exact current result |
 | --- | --- |
 | `node --version`; `npm ci --ignore-scripts` | `v22.15.0`; 321 packages installed, 322 audited, 0 vulnerabilities. |
 | `bash scripts/check-env-parity.sh` | PASS against `.env.example`. |
-| Edge coverage, contract drift, action parity, SQL coupling | PASS: 27 functions / 24 mapped targets; three generated artifacts in sync; admin 11 and super 26 actions exact; no SQL changed. |
-| Clean build and performance gates | PASS: 990 modules transformed; initial closure 9 assets / 189,580 minified / 66,588 gzip / 0 forbidden modules; CSS boundary 0 violations; main 159,972 bytes; canonical landing 14,404 bytes; image budget and report PASS. |
-| `node --test scripts/*.test.mjs` | 42 passed, 0 failed. |
+| Edge coverage, contract drift, action parity, SQL coupling | PASS: 27 functions / 24 mapped targets; three generated artifacts in sync; admin 11, super 26, and super-tenant 10 actions exact; no SQL changed. |
+| Clean build and performance gates | PASS: 990 modules transformed; initial closure 9 assets / 189,583 minified / 66,584 gzip / 0 forbidden modules; CSS boundary 0 violations; main 159,975 bytes; canonical landing 14,404 bytes; image budget and report PASS. |
+| `node --test scripts/*.test.mjs` | 44 passed, 0 failed. |
 | `npm run security:gate`; `npm run security:sbom` | PASS: no moderate-or-higher npm vulnerability, unsafe dynamic execution, or sample-env secret assignment; 15 shared security tests passed; CycloneDX SBOM generated. |
 | Worker declaration/type/test gates | Types current; TypeScript PASS; 63 passed, 0 failed. |
 | Corrected frozen Deno suite | 101 passed, 0 failed with `--allow-env --allow-read=supabase/functions/super-tenant-mutate/actions --frozen`. |
 | Frozen Deno checks | `super-ops`, `super-tenant-mutate`, and `admin-ops` entrypoints all checked successfully. |
 | Generated-state no-drift | `git diff --exit-code` PASS for `deno.lock`, Worker declarations, generated schema/OpenAPI, and endpoint reference. |
 | Chromium install and full browser suite | Chromium present; 104 passed in 30.4 seconds. |
-| Fresh production landing network | PASS: 24 raw / 24 sanitized unique requests; one system status; zero direct Supabase; zero forbidden SDK; 189,580 minified / 66,588 gzip. |
-| jscpd | Characterized: 486 files, 277 clones, 5,635 / 147,193 duplicated lines (3.83%); TypeScript 4,169 / 55,354 (7.53%). |
+| Fresh production landing network | PASS: 24 raw / 24 sanitized unique requests; one system status; zero direct Supabase; zero forbidden SDK; 189,583 minified / 66,584 gzip. |
+| jscpd | Characterized: 486 files, 277 clones, 5,635 / 147,204 duplicated lines (3.83%); JavaScript 63 / 948 (6.65%); TypeScript 4,169 / 55,354 (7.53%). |
 | Knip compact | Characterized: 115 unused-file findings, one devDependency, five unresolved-import groups, and two exported types. The deleted super-ops facade is absent. |
 | Removed-candidate and whitespace scans | Focused file/import/reference scans are clean; `git diff --check` PASS. The plan's combined token scan has the false-positive described below. |
-| Process cleanup | No Task 8 Vite preview, Playwright, or test Chromium process remained after the traces. |
+| Process cleanup | No final-verification Vite preview, Playwright, or test Chromium process remained after the traces. |
 
 The exact plan `rg` token list is nonzero because `sessionAccessToken` remains a
 legitimate local/parameter name on eight Worker lines, containing ten token
@@ -360,8 +382,8 @@ Generated-state SHA-256 values after every gate:
 
 - `deno.lock`: `87e0958fc7dc29604fef025b72a371b82b1788cb742e967af4556e2ba70e5e20`
 - `cloudflare/edge-proxy/worker-configuration.d.ts`: `6fced50d9ecfe9723af42b5b8e0e912a3e4dcc9e4228f9f412625a89869fab4c`
-- generated schema: `33ef4a77d1b844216ae9ffa0d9741e525ad8760439d2f077fe3aacd182dae113`
-- generated OpenAPI: `42d8711869ec7069d06dd46dbea7fb6267bbf4fe85e09f0efa7778f7db85205c`
+- generated schema: `0fde134676a6b105e4e74965414b6d9632758a09b8ee58eac43ffa5efaaea09d`
+- generated OpenAPI: `3d245600dab828988ad94f27e1b458c034bc959b81947cfbd592b77979846880`
 - endpoint reference: `6e72e892af27ff93cde1542a9235ad7c1fa7d2ab3f54f814c7605795885dfd5b`
 
 ## 10. Protected-flow preservation matrix
@@ -369,7 +391,7 @@ Generated-state SHA-256 values after every gate:
 The complete 104-test Chromium run, current code traces, and two direct production
 preview traces refresh the matrix below at the final implementation head.
 
-| Protected contract | Named evidence | Final Task 8 status |
+| Protected contract | Named evidence | Final verification status |
 | --- | --- | --- |
 | Checkout and return | `checkout-borrower-ownership.spec.ts` — “checkout by borrower A, borrower B blocked, return by borrower A allowed”; the current facade trace keeps separate `checkout` and `return` edge envelopes. | PASS. |
 | Offline encrypted buffer/replay | Seven `checkout-offline.spec.ts` contracts cover encrypted bytes, legacy migration, corruption warning, exclusive lock, count and operation ID; `protected-routes.spec.ts` covers badge transitions; the facade still delegates queue durability/replay to `offlineCheckoutQueue.ts`. | PASS. |
@@ -382,7 +404,7 @@ preview traces refresh the matrix below at the final implementation head.
 | Internal host `/` | A direct production-preview trace with hostname resolution and a temporary ignored Vite allowlist (removed after use) followed `internal.itemtraxx.com/ -> /auth`, rendered “Internal Login | ItemTraxx”, loaded route-owned `InternalAuth` CSS, and made zero global authenticated-CSS requests. `get_internal_ops_snapshot` envelope coverage also passed. | PASS. |
 | Unauthorized protected navigation | A direct production-preview trace followed `/tenant/checkout -> /`, rendered the public landing page, and made zero authenticated-CSS requests. | PASS. |
 | Authenticated public redirect | `auth-edge-cases.spec.ts` passed authenticated role redirect and the separate tenant-admin marketing-route contract. | PASS. |
-| Kill switch | `public-and-legal.spec.ts` passed public-home availability and unavailable routing; Worker dispatch tests retained allowlist/exemption order. | PASS. |
+| Kill switch | `public-and-legal.spec.ts` passed public-home availability, unavailable routing, rendered `https://status.itemtraxx.com/?ref=killswitch`, and exact fallback copy; the live status URL returned HTTP 200. Worker dispatch tests retained allowlist/exemption order, and no malformed live URL remains. | PASS. |
 | Maintenance | Route block/cached message and overlay-precedence tests passed; Worker tests retained the 64 KiB status-read bound and fallback behavior. | PASS. |
 | Consent telemetry | Preference persistence, app-shell synchronization, and no-PostHog-before-consent tests passed; the fresh network trace found zero forbidden SDK requests. | PASS. |
 | Deployment dry validation | `python3 scripts/deploy-supabase-functions.py --dry-run` printed all 26 function commands. `bash scripts/deploy-cloudflare-worker.sh --dry-run` exercised Wrangler's native dry run at 43.84 KiB upload / 9.75 KiB gzip with the expected bindings. No deployment occurred. | PASS. |
@@ -441,10 +463,10 @@ preview traces refresh the matrix below at the final implementation head.
    event delivery types) remain review candidates, not proven dead code. The
    separately reviewed deletion of `src/services/superOpsService.ts` reduced the
    unused-file count by one and is absent from the final findings.
-10. At the verified implementation head, the branch was 108 commits ahead and
-    three commits behind `origin/main`; the two report-only commits produce the
-    terminal 110-ahead / 3-behind state recorded in Section 2. The behind commits
-    are dependency-only and
+10. At the final verified implementation head, the branch was 113 commits ahead
+    and three commits behind `origin/main`; this report-only closure commit produces
+    the terminal 114-ahead / 3-behind state recorded in Section 2. The behind
+    commits are dependency-only and
     include exact-pin Cloudflare/Wrangler minor updates outside the reviewed Task 4
     upgrade scope plus packages deliberately removed by this cleanup. Per the
     final audit decision, no merge/rebase/cherry-pick was performed; reconciliation
@@ -454,6 +476,6 @@ preview traces refresh the matrix below at the final implementation head.
     matching lines, ten token occurrences, and clean path-qualified replacement
     scans.
 
-All required Task 8 gates, protected-flow traces, generated hashes, divergence,
-and deploy dry runs are now recorded. The report-only commits are the only
-post-verification changes and do not modify production behavior.
+All required final gates, protected-flow traces, generated hashes, divergence,
+and deploy dry runs are now recorded. This report-only closure commit is the only
+change after final lead verification and does not modify production behavior.

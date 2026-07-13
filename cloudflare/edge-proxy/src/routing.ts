@@ -26,8 +26,59 @@ export const isAllowedRpcProxyPath = (pathname: string) => {
   return Boolean(functionName) && ALLOWED_RPC_FUNCTIONS.has(functionName.toLowerCase());
 };
 
-const isAnyRpcPath = (pathname: string) =>
-  isRpcProxyPath(pathname) || pathname === "/rest/v1/rpc" || pathname.startsWith("/rest/v1/rpc/");
+const normalizePathShape = (pathname: string) => {
+  const segments: string[] = [];
+  for (const segment of pathname.replace(/\\/g, "/").split("/")) {
+    if (!segment || segment === ".") continue;
+    if (segment === "..") {
+      segments.pop();
+      continue;
+    }
+    segments.push(segment);
+  }
+  return `/${segments.join("/")}`;
+};
+
+const canonicalizeForRpcDetection = (pathname: string) => {
+  let value = pathname;
+  let malformedEncoding = false;
+
+  for (let index = 0; index <= pathname.length; index += 1) {
+    let decoded: string;
+    try {
+      decoded = decodeURIComponent(value);
+    } catch {
+      malformedEncoding = true;
+      decoded = value.replace(/%([0-9a-f]{2})/gi, (_match, hex: string) =>
+        String.fromCharCode(Number.parseInt(hex, 16))
+      );
+    }
+    if (decoded === value) break;
+    value = decoded;
+  }
+
+  return { pathname: normalizePathShape(value), malformedEncoding };
+};
+
+const isCanonicalRpcPath = (pathname: string) => {
+  const normalized = pathname.toLowerCase();
+  return normalized === "/rpc" || normalized.startsWith("/rpc/") ||
+    normalized === "/rest/v1/rpc" || normalized.startsWith("/rest/v1/rpc/");
+};
+
+const hasMalformedRpcSegment = (pathname: string) => {
+  const segments = pathname.toLowerCase().split("/").filter(Boolean);
+  const candidate = segments[0] === "rest" && segments[1] === "v1"
+    ? segments[2]
+    : segments[0];
+  return candidate === "rpc" || candidate?.startsWith("rpc%") === true;
+};
+
+const isAnyRpcPath = (pathname: string) => {
+  const canonical = canonicalizeForRpcDetection(pathname);
+  if (isCanonicalRpcPath(canonical.pathname)) return true;
+  return canonical.malformedEncoding && hasMalformedRpcSegment(canonical.pathname);
+};
 
 export const isBlockedRpcProxyPath = (pathname: string) =>
   isAnyRpcPath(pathname) && !isAllowedRpcProxyPath(pathname);

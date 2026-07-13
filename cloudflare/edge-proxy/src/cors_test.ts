@@ -53,13 +53,30 @@ Deno.test("CORS headers preserve the exact security set and reflect only allowed
   assertEquals(allowed.headers["Access-Control-Allow-Credentials"], "true", "credentials header");
   assertEquals(allowed.headers["Access-Control-Allow-Methods"], "GET, POST, OPTIONS", "methods header");
   assertEquals(
+    allowed.headers["Access-Control-Expose-Headers"],
+    "content-range, content-profile, x-request-id",
+    "exposed headers",
+  );
+  assertEquals(
     allowed.headers["Access-Control-Allow-Headers"],
     "authorization, x-client-info, apikey, content-type, x-request-id, prefer, x-itx-session-request, x-itx-data-request, aikido-scan-agent",
     "allowed headers",
   );
   assertEquals(allowed.headers["Vary"], "Origin", "vary header");
   assertEquals(allowed.headers["Strict-Transport-Security"], "max-age=31536000; includeSubDomains", "HSTS");
+  assertEquals(
+    allowed.headers["Content-Security-Policy"],
+    "default-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none';",
+    "content security policy",
+  );
+  assertEquals(allowed.headers["Referrer-Policy"], "strict-origin-when-cross-origin", "referrer policy");
+  assertEquals(allowed.headers["X-Content-Type-Options"], "nosniff", "content type protection");
   assertEquals(allowed.headers["X-Frame-Options"], "DENY", "frame protection");
+  assertEquals(
+    allowed.headers["Permissions-Policy"],
+    "camera=(), microphone=(), geolocation=()",
+    "permissions policy",
+  );
 
   const blocked = withCorsHeaders("https://attacker.example", [origin], {} as Env);
   assert(!blocked.originAllowed, "unlisted origin should be blocked");

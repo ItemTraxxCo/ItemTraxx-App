@@ -78,3 +78,58 @@ Deno.test("RPC auth requirement applies to direct and REST RPC path families", (
   }
   assert(!isUnauthorizedRpcProxyPath("/rest/v1/profiles", false), "non-RPC path required RPC auth");
 });
+
+Deno.test("canonicalizable RPC prefixes fail closed before generic REST proxying", () => {
+  const canonicalizableRpcPaths = [
+    "/rest/v1/%72pc/run_data_retention",
+    "/rest/v1/rpc%2Frun_data_retention",
+    "/rest/v1//rpc/run_data_retention",
+    "/rest/v1/%2572pc/run_data_retention",
+    "/rest/v1/r%2570c/run_data_retention",
+    "/rest/v1/rpc%5Crun_data_retention",
+    "/rest/v1/profiles/%252e%252e/rpc/run_data_retention",
+    "/r%70c/run_data_retention",
+  ];
+
+  for (const path of canonicalizableRpcPaths) {
+    assert(isRestProxyPath(path) || path.startsWith("/r"), `fixture must enter a proxy family: ${path}`);
+    assert(!isAllowedRpcProxyPath(path), `canonicalized RPC was allowlisted: ${path}`);
+    assert(isBlockedRpcProxyPath(path), `canonicalized RPC was not blocked: ${path}`);
+    assert(isUnauthorizedRpcProxyPath(path, false), `canonicalized RPC skipped caller auth: ${path}`);
+  }
+});
+
+Deno.test("encoded variants of the allowed RPC remain blocked; only the literal route is allowed", () => {
+  const encodedAllowedVariants = [
+    "/rest/v1/%72pc/consume_rate_limit",
+    "/rest/v1/rpc%2Fconsume_rate_limit",
+    "/rest/v1/rpc/%63onsume_rate_limit",
+    "/rest/v1/%2572pc/consume_rate_limit",
+    "/rpc/%63onsume_rate_limit",
+  ];
+
+  for (const path of encodedAllowedVariants) {
+    assert(!isAllowedRpcProxyPath(path), `encoded allowed RPC variant was allowlisted: ${path}`);
+    assert(isBlockedRpcProxyPath(path), `encoded allowed RPC variant was not blocked: ${path}`);
+  }
+  assert(isAllowedRpcProxyPath("/rest/v1/rpc/consume_rate_limit"), "literal REST RPC should stay allowed");
+});
+
+Deno.test("malformed RPC-like encoding fails closed without blocking normal REST paths", () => {
+  for (const path of [
+    "/rest/v1/%72pc%ZZ/run_data_retention",
+    "/rest/v1/rpc/%ZZ",
+    "/%72pc%ZZ/run_data_retention",
+  ]) {
+    assert(isBlockedRpcProxyPath(path), `malformed RPC-like path was not blocked: ${path}`);
+  }
+
+  for (const path of [
+    "/rest/v1/profiles",
+    "/rest/v1/profiles/user%2Fid",
+    "/rest/v1/rpc_logs",
+    "/rest/v1//profiles",
+  ]) {
+    assert(!isBlockedRpcProxyPath(path), `normal REST path was blocked: ${path}`);
+  }
+});

@@ -17,7 +17,6 @@ import {
 import {
   asRecord,
   BARCODE_PATTERN,
-  optionalInteger,
   optionalText,
   requireEnum,
   requireText,
@@ -31,6 +30,7 @@ import {
   normalizeTenantUpdates,
   resolveMaintenance,
 } from "./actions/notifications.ts";
+import { resolveTenantPolicyState } from "./actions/settings.ts";
 import type { AdminOpsContext } from "./context.ts";
 
 const baseCorsHeaders = {
@@ -38,34 +38,6 @@ const baseCorsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-request-id",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
   Vary: "Origin",
-};
-
-type TenantFeatureFlags = {
-  enable_notifications: boolean;
-  enable_bulk_item_import: boolean;
-  enable_bulk_student_tools: boolean;
-  enable_status_tracking: boolean;
-  enable_barcode_generator: boolean;
-};
-
-type TenantPolicyRow = {
-  checkout_due_hours: number | null;
-  account_category: "organization" | "district" | "individual" | null;
-  plan_code:
-    | "core"
-    | "growth"
-    | "starter"
-    | "scale"
-    | "enterprise"
-    | "individual_yearly"
-    | "individual_monthly"
-    | null;
-  feature_flags: unknown;
-};
-
-type TenantPolicyResult = {
-  data: TenantPolicyRow | null;
-  error: RpcError | null;
 };
 
 type DeviceSessionContext = {
@@ -105,40 +77,6 @@ const formatRpcError = (error: RpcError | null | undefined) =>
   error
     ? `${error.code ?? "unknown"}: ${error.message ?? "Unknown error"}`
     : "Unknown error";
-
-const defaultFeatureFlags = (): TenantFeatureFlags => ({
-  enable_notifications: true,
-  enable_bulk_item_import: true,
-  enable_bulk_student_tools: true,
-  enable_status_tracking: true,
-  enable_barcode_generator: true,
-});
-
-const normalizeFeatureFlags = (value: unknown): TenantFeatureFlags => {
-  if (!value || typeof value !== "object") return defaultFeatureFlags();
-  const payload = value as Record<string, unknown>;
-  const fallback = defaultFeatureFlags();
-  return {
-    enable_notifications: typeof payload.enable_notifications === "boolean"
-      ? payload.enable_notifications
-      : fallback.enable_notifications,
-    enable_bulk_item_import:
-      typeof payload.enable_bulk_item_import === "boolean"
-        ? payload.enable_bulk_item_import
-        : fallback.enable_bulk_item_import,
-    enable_bulk_student_tools:
-      typeof payload.enable_bulk_student_tools === "boolean"
-        ? payload.enable_bulk_student_tools
-        : fallback.enable_bulk_student_tools,
-    enable_status_tracking: typeof payload.enable_status_tracking === "boolean"
-      ? payload.enable_status_tracking
-      : fallback.enable_status_tracking,
-    enable_barcode_generator:
-      typeof payload.enable_barcode_generator === "boolean"
-        ? payload.enable_barcode_generator
-        : fallback.enable_barcode_generator,
-  };
-};
 
 const resolveCorsHeaders = (req: Request) => {
   const origin = req.headers.get("Origin");
@@ -743,40 +681,8 @@ serve(async (req) => {
       maintenanceRuntimeResult.data?.value,
     );
 
-    let checkoutDueHours = 72;
-    let featureFlags = defaultFeatureFlags();
-    let tenantPolicyResult: TenantPolicyResult = await adminClient
-      .from("tenant_policies")
-      .select("checkout_due_hours, account_category, plan_code, feature_flags")
-      .eq("tenant_id", tenantId)
-      .maybeSingle() as unknown as TenantPolicyResult;
-
-    if (isMissingColumn(tenantPolicyResult.error, "feature_flags")) {
-      const fallbackTenantPolicyResult = await adminClient
-        .from("tenant_policies")
-        .select("checkout_due_hours, account_category, plan_code")
-        .eq("tenant_id", tenantId)
-        .maybeSingle();
-
-      tenantPolicyResult = {
-        data: fallbackTenantPolicyResult.data
-          ? { ...fallbackTenantPolicyResult.data, feature_flags: null }
-          : null,
-        error: fallbackTenantPolicyResult.error,
-      };
-    }
-
-    const tenantPolicy = tenantPolicyResult.data;
-
-    if (!tenantPolicyResult.error && tenantPolicy) {
-      if (typeof tenantPolicy.checkout_due_hours === "number") {
-        checkoutDueHours = Math.min(
-          720,
-          Math.max(1, Math.round(tenantPolicy.checkout_due_hours)),
-        );
-      }
-      featureFlags = normalizeFeatureFlags(tenantPolicy.feature_flags);
-    }
+    const { tenantPolicy, checkoutDueHours, featureFlags } =
+      await resolveTenantPolicyState(adminClient, tenantId);
 
     const updateRuntimeValue = updateRuntimeResult.data?.value;
     const tenantUpdates = normalizeTenantUpdates(updateRuntimeValue);
@@ -792,109 +698,33 @@ serve(async (req) => {
     });
     if (actionAuthorizationFailure) return actionAuthorizationFailure;
 
-    if (normalizedAction === "get_notifications") {
-      const context: AdminOpsContext = {
-        req,
-        requestId,
-        action: normalizedAction,
-        payload: payloadRecord,
-        adminClient,
-        user: { id: user.id },
-        profile: { role: profile.role },
-        tenantId,
-        isTenantSuspended,
-        authToken,
-        authSessionBinding,
-        authTokenBindingKey,
-        deviceSession,
-        tenantPolicy: tenantPolicy as AdminOpsContext["tenantPolicy"],
-        checkoutDueHours,
-        featureFlags,
-        maintenance,
-        tenantUpdates,
-        jsonResponse,
-      };
+    const context: AdminOpsContext = {
+      req,
+      requestId,
+      action: normalizedAction,
+      payload: payloadRecord,
+      adminClient,
+      user: { id: user.id },
+      profile: { role: profile.role },
+      tenantId,
+      isTenantSuspended,
+      authToken,
+      authSessionBinding,
+      authTokenBindingKey,
+      deviceSession,
+      tenantPolicy,
+      checkoutDueHours,
+      featureFlags,
+      maintenance,
+      tenantUpdates,
+      jsonResponse,
+    };
+    if (
+      normalizedAction === "get_notifications" ||
+      normalizedAction === "get_tenant_settings" ||
+      normalizedAction === "update_tenant_settings"
+    ) {
       return dispatchAdminOpsAction(context);
-    }
-
-    if (normalizedAction === "get_tenant_settings") {
-      return jsonResponse(200, {
-        data: {
-          checkout_due_hours: checkoutDueHours,
-          account_category: tenantPolicy?.account_category === "individual"
-            ? "individual"
-            : tenantPolicy?.account_category === "district"
-            ? "district"
-            : tenantPolicy?.account_category === "organization"
-            ? "organization"
-            : null,
-          plan_code: tenantPolicy?.plan_code ?? null,
-          feature_flags: featureFlags,
-        },
-      });
-    }
-
-    if (normalizedAction === "update_tenant_settings") {
-      const next = payloadRecord;
-      const checkoutDueHoursNext = optionalInteger(
-        next.checkout_due_hours,
-        1,
-        720,
-        24,
-      );
-
-      const row = {
-        tenant_id: tenantId,
-        checkout_due_hours: checkoutDueHoursNext,
-        updated_by: user.id,
-        updated_at: new Date().toISOString(),
-      };
-
-      let settingsResult: TenantPolicyResult = await adminClient
-        .from("tenant_policies")
-        .upsert(row, { onConflict: "tenant_id" })
-        .select(
-          "checkout_due_hours, account_category, plan_code, feature_flags",
-        )
-        .single() as unknown as TenantPolicyResult;
-
-      if (isMissingColumn(settingsResult.error, "feature_flags")) {
-        const fallbackSettingsResult = await adminClient
-          .from("tenant_policies")
-          .upsert(row, { onConflict: "tenant_id" })
-          .select("checkout_due_hours, account_category, plan_code")
-          .single();
-
-        settingsResult = {
-          data: fallbackSettingsResult.data
-            ? { ...fallbackSettingsResult.data, feature_flags: null }
-            : null,
-          error: fallbackSettingsResult.error,
-        };
-      }
-
-      const { data, error } = settingsResult;
-
-      if (error || !data) {
-        return jsonResponse(400, { error: "Unable to save tenant settings." });
-      }
-
-      return jsonResponse(200, {
-        data: {
-          checkout_due_hours: typeof data.checkout_due_hours === "number"
-            ? data.checkout_due_hours
-            : checkoutDueHoursNext,
-          account_category: data.account_category === "individual"
-            ? "individual"
-            : data.account_category === "district"
-            ? "district"
-            : data.account_category === "organization"
-            ? "organization"
-            : null,
-          plan_code: data.plan_code ?? null,
-          feature_flags: normalizeFeatureFlags(data.feature_flags),
-        },
-      });
     }
 
     if (normalizedAction === "get_status_tracking") {

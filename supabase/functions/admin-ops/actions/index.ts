@@ -8,6 +8,7 @@ import type {
   SupabaseClient,
 } from "../context.ts";
 import { handleNotificationAction } from "./notifications.ts";
+import { handleSettingsAction } from "./settings.ts";
 
 export const ADMIN_OPS_ACTIONS = [
   "get_notifications",
@@ -109,6 +110,8 @@ type ActionHandler = (context: AdminOpsContext) => Promise<Response>;
 
 const ACTION_HANDLERS: Partial<Record<AdminOpsAction, ActionHandler>> = {
   get_notifications: handleNotificationAction,
+  get_tenant_settings: handleSettingsAction,
+  update_tenant_settings: handleSettingsAction,
 };
 
 export const dispatchAdminOpsAction = (context: AdminOpsContext) => {

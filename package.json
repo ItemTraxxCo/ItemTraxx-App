@@ -30,6 +30,7 @@
     "docs:edge-openapi": "node ./scripts/generate-edge-schemas.mjs",
     "docs:edge-reference": "node ./scripts/generate-edge-reference.mjs",
     "devops:check:edge-coverage": "node ./scripts/check-edge-function-coverage.mjs",
+    "devops:check:edge-action-parity": "node ./scripts/check-edge-action-contract-parity.mjs",
     "devops:check:edge-contract-drift": "node ./scripts/check-edge-contract-drift.mjs",
     "devops:check:sql-coupling": "node ./scripts/check-sql-function-coupling.mjs",
     "devops:bump-hub-sha": "node ./scripts/bump-devops-hub-sha.mjs",

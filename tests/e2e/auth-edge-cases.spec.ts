@@ -1052,7 +1052,7 @@ test.describe("Auth edge cases", () => {
     await setTenantAdminSession(page, "tenant-e2e");
     await navigateApp(page, "/tenant/admin");
 
-    await expect(page.getByRole("heading", { name: "This session has been terminated." })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "This session has been terminated or expired." })).toBeVisible();
   });
 
   test("role normalization accepts only the four authenticated roles", async ({ page }) => {

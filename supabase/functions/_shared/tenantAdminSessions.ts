@@ -3,6 +3,7 @@ import {
   isMissingPostgrestRelation as isMissingRelation,
   type PostgrestErrorLike,
 } from "./postgrestErrors.ts";
+import { sha256Hex } from "./sha256.ts";
 
 type SupabaseLikeClient = {
   auth: {
@@ -16,14 +17,6 @@ type SupabaseLikeClient = {
 
 const TENANT_ADMIN_SESSION_COLUMNS =
   "id, auth_session_id, auth_token_hash, auth_token_issued_at";
-
-const sha256 = async (value: string) => {
-  const encoded = new TextEncoder().encode(value);
-  const digest = await crypto.subtle.digest("SHA-256", encoded);
-  return Array.from(new Uint8Array(digest))
-    .map((byte) => byte.toString(16).padStart(2, "0"))
-    .join("");
-};
 
 export const resolveTenantAdminAuthSessionBinding = async (
   client: SupabaseLikeClient,
@@ -62,7 +55,7 @@ const resolveTenantAdminAuthBindingKey = async (
 
   return {
     ...binding,
-    bindingKey: `token:${await sha256(authToken)}`,
+    bindingKey: `token:${await sha256Hex(authToken)}`,
   };
 };
 

@@ -5,6 +5,7 @@ import { isAllowedOrigin, parseAllowedOrigins } from "../_shared/cors.ts";
 import { resolveRateLimitResult } from "../_shared/preloginGuards.ts";
 import { requireTrustedEdgeIngress } from "../_shared/trustedIngress.ts";
 import { readJsonBody } from "../_shared/requestBody.ts";
+import { sha256Hex } from "../_shared/sha256.ts";
 import { resolveTenantAdminAuthSessionBinding } from "../_shared/tenantAdminSessions.ts";
 import {
   asRecord,
@@ -48,14 +49,6 @@ const resolveCorsHeaders = (req: Request) => {
     : { ...baseCorsHeaders };
 
   return { hasOrigin, originAllowed, headers };
-};
-
-const sha256 = async (value: string) => {
-  const encoded = new TextEncoder().encode(value);
-  const digest = await crypto.subtle.digest("SHA-256", encoded);
-  return Array.from(new Uint8Array(digest))
-    .map((byte) => byte.toString(16).padStart(2, "0"))
-    .join("");
 };
 
 serve(async (req) => {
@@ -120,7 +113,7 @@ serve(async (req) => {
     );
     const authTokenBindingKey = authSessionBinding.sessionId
       ? `session:${authSessionBinding.sessionId}`
-      : `token:${await sha256(authToken)}`;
+      : `token:${await sha256Hex(authToken)}`;
 
     const userClient = createClient(supabaseUrl, publishableKey, {
       global: { headers: { Authorization: authHeader } },

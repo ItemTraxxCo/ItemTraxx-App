@@ -1,3 +1,5 @@
+import { sha256Hex } from "./sha256.ts";
+
 type RateLimitResult = {
   allowed: boolean;
   retry_after_seconds: number | null;
@@ -12,16 +14,7 @@ type TurnstileVerifyResult = {
   "error-codes"?: string[];
 };
 
-const toHex = (bytes: Uint8Array) =>
-  Array.from(bytes)
-    .map((byte) => byte.toString(16).padStart(2, "0"))
-    .join("");
-
-export const hashString = async (value: string) => {
-  const encoded = new TextEncoder().encode(value);
-  const digest = await crypto.subtle.digest("SHA-256", encoded);
-  return toHex(new Uint8Array(digest));
-};
+export const hashString = sha256Hex;
 
 type JsonResponse = (status: number, body: Record<string, unknown>) => Response;
 

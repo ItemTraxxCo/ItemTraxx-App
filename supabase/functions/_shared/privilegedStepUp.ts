@@ -3,6 +3,7 @@ import {
   isMissingPostgrestRelation,
   type PostgrestErrorLike,
 } from "./postgrestErrors.ts";
+import { sha256Hex } from "./sha256.ts";
 
 export type PrivilegedRoleScope =
   | "super_admin"
@@ -17,14 +18,6 @@ const ADMIN_HANDOFF_AUTH_METHODS = new Set([
   "otp",
   "email_link",
 ]);
-
-const sha256 = async (value: string) => {
-  const encoded = new TextEncoder().encode(value);
-  const digest = await crypto.subtle.digest("SHA-256", encoded);
-  return Array.from(new Uint8Array(digest))
-    .map((byte) => byte.toString(16).padStart(2, "0"))
-    .join("");
-};
 
 const getVerifiedClaims = async (
   authClient: SupabaseClient,
@@ -48,7 +41,7 @@ const resolveBindingKey = async (
   if (sessionId) {
     return `session:${sessionId}`;
   }
-  return `token:${await sha256(authToken)}`;
+  return `token:${await sha256Hex(authToken)}`;
 };
 
 export const canRegisterAdminStepUp = async (

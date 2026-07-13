@@ -9,6 +9,12 @@ const isInternalHostRuntime = () =>
   typeof window !== "undefined" &&
   window.location.hostname === "internal.itemtraxx.com";
 
+let authenticatedStylesPromise: Promise<unknown> | null = null;
+const loadAuthenticatedStyles = () => {
+  authenticatedStylesPromise ??= import("../styles/authenticated.css");
+  return authenticatedStylesPromise;
+};
+
 const routes: RouteRecordRaw[] = [
   {
     path: "/",
@@ -644,7 +650,7 @@ const notFoundFor = (path: string) => ({
   },
 });
 
-router.beforeEach((to) => {
+router.beforeEach(async (to) => {
   const meta = to.meta as {
     public?: boolean;
     requiresSession?: boolean;
@@ -668,6 +674,7 @@ router.beforeEach((to) => {
     if (!auth.hasSecondaryAuth || !hasFreshSuperVerification(auth.superVerifiedAt)) {
       return { name: "internal-auth" };
     }
+    await loadAuthenticatedStyles();
     return true;
   }
 
@@ -785,6 +792,10 @@ router.beforeEach((to) => {
     return to.path.startsWith("/internal")
       ? { name: "internal-auth" }
       : { name: "super-auth" };
+  }
+
+  if (meta?.requiresSession) {
+    await loadAuthenticatedStyles();
   }
 
   return true;

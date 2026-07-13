@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import {
+  mockAdminOps,
   mockSuperDashboard,
   mockSuperGearMutate,
   mockSuperTenantMutate,
@@ -7,15 +8,41 @@ import {
   mockUnauthenticatedSession,
   navigateApp,
   setSuperAdminSession,
+  setTenantAdminSession,
 } from "./helpers/testHarness";
 
 test.describe("global CSS ownership contracts", () => {
   test.beforeEach(async ({ page }) => {
     await mockSystemStatus(page);
     await mockUnauthenticatedSession(page);
+    await mockAdminOps(page);
     await mockSuperDashboard(page);
     await mockSuperTenantMutate(page);
     await mockSuperGearMutate(page);
+  });
+
+  test("authenticated CSS is absent from public startup and resolves before protected UI", async ({
+    page,
+  }) => {
+    const authenticatedCssRequests: string[] = [];
+    page.on("request", (request) => {
+      const url = new URL(request.url());
+      if (url.pathname.endsWith("/src/styles/authenticated.css")) {
+        authenticatedCssRequests.push(request.url());
+      }
+    });
+
+    await page.goto("/");
+    await expect(page.getByRole("heading", { name: "ItemTraxx", exact: true })).toBeVisible();
+    expect(authenticatedCssRequests).toEqual([]);
+
+    await setTenantAdminSession(page);
+    await navigateApp(page, "/tenant/admin");
+    await expect(page.getByRole("heading", { name: "Admin Panel", exact: true })).toBeVisible();
+    await expect.poll(() => authenticatedCssRequests.length).toBe(1);
+    expect(
+      await page.locator(".admin-grid").evaluate((element) => getComputedStyle(element).display),
+    ).toBe("grid");
   });
 
   test("protected tables retain horizontal overflow and mobile navigation stays fixed", async ({

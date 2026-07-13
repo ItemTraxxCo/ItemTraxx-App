@@ -1,8 +1,7 @@
 import { isMissingPostgrestColumn } from "../../_shared/postgrestErrors.ts";
 import { optionalText } from "../../_shared/validation.ts";
 import type { PgError, SuperTenantContext, TenantRow } from "../context.ts";
-import { isMissingDistrictIdColumn } from "./districts.ts";
-import { isValidTenantStatus } from "./tenantWrites.ts";
+import { isMissingDistrictIdColumn, isValidTenantStatus } from "./contracts.ts";
 
 type TenantPolicyRow = {
   tenant_id: string;

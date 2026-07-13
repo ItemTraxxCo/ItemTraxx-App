@@ -10,14 +10,15 @@ import {
   normalizeDistrictSlug,
 } from "./actions/districts.ts";
 import {
-  describeTenantWriteError,
   isValidTenantAccountCategory,
   isValidTenantPlanForAccountCategory,
-  isValidTenantStatus,
   nextTenantPolicyFallback,
 } from "./actions/tenantWrites.ts";
 import { tenantPolicySelectFallback } from "./actions/tenantQueries.ts";
-import { resolveResetRedirectTo } from "./actions/primaryAdmins.ts";
+import {
+  isValidTenantStatus,
+  resolveResetRedirectTo,
+} from "./actions/contracts.ts";
 import type { SuperTenantContext } from "./context.ts";
 
 const EXPECTED_ACTIONS = [
@@ -85,20 +86,13 @@ Deno.test("tenant validators preserve status, account-category, and plan compati
   assertEquals(isValidTenantPlanForAccountCategory("organization", null), true);
 });
 
-Deno.test("duplicate slug and access-code errors keep their response messages", () => {
+Deno.test("duplicate district slugs keep their response message", () => {
   assertEquals(
     describeDistrictWriteError("Unable to create district.", {
       code: "23505",
       message: "duplicate key violates districts_slug_key",
     }),
     "District slug already exists.",
-  );
-  assertEquals(
-    describeTenantWriteError("Unable to create tenant.", {
-      code: "23505",
-      message: "duplicate key violates tenants_access_code_key",
-    }),
-    "Unable to create tenant.",
   );
 });
 
@@ -183,6 +177,7 @@ const contextFor = (
   payload: Record<string, unknown>,
   adminClient: unknown,
   writeAudit: SuperTenantContext["writeAudit"] = async () => {},
+  resetRedirectTo: string | null = "https://app.example.test/reset-password",
 ) =>
   ({
     req: new Request(
@@ -200,7 +195,7 @@ const contextFor = (
     profile: { auth_email: "admin@example.test" },
     jsonResponse: testJsonResponse,
     writeAudit,
-    resetRedirectTo: "https://app.example.test/reset-password",
+    resetRedirectTo,
     supabaseUrl: "https://supabase.example.test",
     publishableKey: "test-publishable-key",
   }) as unknown as SuperTenantContext;
@@ -322,6 +317,145 @@ Deno.test("super tenant dispatcher preserves a representative database error", a
     ok: false,
     error: "Unable to load districts.",
   });
+});
+
+Deno.test("duplicate tenant access codes preserve the production response without Auth continuation", async () => {
+  let createUserCalls = 0;
+  const adminClient = {
+    auth: {
+      admin: {
+        createUser: async () => {
+          createUserCalls += 1;
+          return { data: { user: null }, error: null };
+        },
+      },
+    },
+    from: (table: string) =>
+      queryResult(
+        table === "tenants"
+          ? {
+            data: null,
+            error: {
+              code: "23505",
+              message: "duplicate key violates tenants_access_code_key",
+            },
+          }
+          : { data: null, error: null },
+      ),
+  };
+
+  const response = await dispatchSuperTenantAction(
+    contextFor(
+      "create_tenant",
+      {
+        name: "Duplicate Tenant",
+        access_code: "DUPLICATE-123",
+        auth_email: "duplicate@example.test",
+        password: "strong-password",
+        status: "active",
+      },
+      adminClient,
+    ),
+  );
+
+  assertEquals(response.status, 400);
+  assertEquals(await response.json(), {
+    ok: false,
+    error: "Unable to create tenant.",
+  });
+  assertEquals(createUserCalls, 0);
+});
+
+Deno.test("primary-admin reset passes the configured redirect to Auth", async () => {
+  const tenantId = "00000000-0000-4000-8000-000000000004";
+  const profileId = "00000000-0000-4000-8000-000000000005";
+  const redirectTo = "https://app.example.test/reset-password";
+  const resetCalls: unknown[][] = [];
+  const auditCalls: unknown[][] = [];
+  const adminClient = {
+    auth: {
+      resetPasswordForEmail: async (...args: unknown[]) => {
+        resetCalls.push(args);
+        return { error: null };
+      },
+    },
+    from: (table: string) =>
+      queryResult(
+        table === "tenants"
+          ? {
+            data: { id: tenantId, primary_admin_profile_id: profileId },
+            error: null,
+          }
+          : { data: { auth_email: "primary@example.test" }, error: null },
+      ),
+  };
+
+  const response = await dispatchSuperTenantAction(
+    contextFor(
+      "send_primary_admin_reset",
+      { tenant_id: tenantId },
+      adminClient,
+      async (...args) => {
+        auditCalls.push(args);
+      },
+      redirectTo,
+    ),
+  );
+
+  assertEquals(response.status, 200);
+  assertEquals(await response.json(), {
+    ok: true,
+    data: { success: true, auth_email: "primary@example.test" },
+  });
+  assertEquals(resetCalls, [["primary@example.test", { redirectTo }]]);
+  assertEquals(auditCalls, [[
+    "send_primary_admin_reset",
+    "tenant",
+    tenantId,
+    { auth_email: "primary@example.test" },
+  ]]);
+});
+
+Deno.test("primary-admin reset fails closed when the redirect is missing", async () => {
+  const tenantId = "00000000-0000-4000-8000-000000000006";
+  let resetCalls = 0;
+  const adminClient = {
+    auth: {
+      resetPasswordForEmail: async () => {
+        resetCalls += 1;
+        return { error: null };
+      },
+    },
+    from: (table: string) =>
+      queryResult(
+        table === "tenants"
+          ? {
+            data: {
+              id: tenantId,
+              primary_admin_profile_id: "00000000-0000-4000-8000-000000000007",
+            },
+            error: null,
+          }
+          : { data: { auth_email: "primary@example.test" }, error: null },
+      ),
+  };
+
+  const response = await dispatchSuperTenantAction(
+    contextFor(
+      "send_primary_admin_reset",
+      { tenant_id: tenantId },
+      adminClient,
+      async () => {},
+      null,
+    ),
+  );
+
+  assertEquals(response.status, 500);
+  assertEquals(await response.json(), {
+    ok: false,
+    error: "Password reset redirect is not configured.",
+  });
+  assertEquals(resetCalls, 0);
 });
 
 Deno.test("tenant creation preserves auth-failure tenant rollback", async () => {

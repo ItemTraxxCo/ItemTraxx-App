@@ -9,11 +9,8 @@ import {
   SLUG_PATTERN,
 } from "../../_shared/validation.ts";
 import type { PgError, SuperTenantContext, TenantRow } from "../context.ts";
-import {
-  isMissingDistrictIdColumn,
-  isMissingDistrictsTable,
-  normalizeDistrictSlug,
-} from "./districts.ts";
+import { isMissingDistrictIdColumn } from "./contracts.ts";
+import { isMissingDistrictsTable, normalizeDistrictSlug } from "./districts.ts";
 import {
   defaultFeatureFlags,
   enrichTenants,
@@ -56,11 +53,6 @@ export const TENANT_PLAN_CODES = new Set(
   ] as const,
 );
 
-export const isValidTenantStatus = (
-  value: unknown,
-): value is "active" | "suspended" | "archived" =>
-  value === "active" || value === "suspended" || value === "archived";
-
 export const isValidTenantAccountCategory = (
   value: unknown,
 ): value is TenantAccountCategory =>
@@ -79,11 +71,6 @@ export const isValidTenantPlanForAccountCategory = (
   (accountCategory === "organization" &&
     (planCode === "starter" || planCode === "scale" ||
       planCode === "enterprise"));
-
-export const describeTenantWriteError = (
-  fallback: string,
-  _error: PgError | null | undefined,
-) => fallback;
 
 type TenantPolicyFallbackOptions = {
   includeAccountCategory: boolean;
@@ -349,12 +336,7 @@ export const handleTenantWriteAction = async (context: SuperTenantContext) => {
             "District foundation is not enabled yet. Run the latest database migration.",
         });
       }
-      return jsonResponse(400, {
-        error: describeTenantWriteError(
-          "Unable to update tenant.",
-          error as PgError,
-        ),
-      });
+      return jsonResponse(400, { error: "Unable to update tenant." });
     }
 
     const { error: policyError } = await upsertTenantPolicy(context, {

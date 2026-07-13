@@ -15,6 +15,7 @@ import {
 } from "../_shared/validation.ts";
 import type { SuperTenantContext } from "./context.ts";
 import { dispatchSuperTenantAction } from "./actions/index.ts";
+import { resolveResetRedirectTo } from "./actions/contracts.ts";
 
 const baseCorsHeaders = {
   "Access-Control-Allow-Headers":
@@ -214,8 +215,9 @@ serve(async (req) => {
       profile,
       jsonResponse,
       writeAudit,
-      resetRedirectTo:
-        (Deno.env.get("ITX_PASSWORD_RESET_REDIRECT_URL") ?? "").trim() || null,
+      resetRedirectTo: resolveResetRedirectTo(
+        Deno.env.get("ITX_PASSWORD_RESET_REDIRECT_URL"),
+      ),
       supabaseUrl,
       publishableKey,
     };

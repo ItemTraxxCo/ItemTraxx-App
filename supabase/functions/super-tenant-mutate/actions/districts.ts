@@ -1,7 +1,4 @@
-import {
-  isMissingPostgrestColumn,
-  isMissingPostgrestRelation,
-} from "../../_shared/postgrestErrors.ts";
+import { isMissingPostgrestRelation } from "../../_shared/postgrestErrors.ts";
 import {
   optionalEmail,
   optionalText,
@@ -15,6 +12,7 @@ import type {
   SuperTenantContext,
   TenantRow,
 } from "../context.ts";
+import { isMissingDistrictIdColumn } from "./contracts.ts";
 import { enrichTenants } from "./tenantQueries.ts";
 
 export const normalizeDistrictSlug = (value: string | null | undefined) =>
@@ -66,10 +64,6 @@ export const describeDistrictWriteError = (
 
 export const isMissingDistrictsTable = (error: PgError | null | undefined) =>
   isMissingPostgrestRelation(error, "districts");
-
-export const isMissingDistrictIdColumn = (
-  error: PgError | null | undefined,
-) => isMissingPostgrestColumn(error, "district_id");
 
 export const enrichDistricts = async (
   context: SuperTenantContext,

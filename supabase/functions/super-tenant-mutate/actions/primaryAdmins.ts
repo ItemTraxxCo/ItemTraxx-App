@@ -9,10 +9,8 @@ import {
   SLUG_PATTERN,
 } from "../../_shared/validation.ts";
 import type { PgError, SuperTenantContext, TenantRow } from "../context.ts";
-import {
-  isMissingDistrictIdColumn,
-  normalizeDistrictSlug,
-} from "./districts.ts";
+import { normalizeDistrictSlug } from "./districts.ts";
+import { isMissingDistrictIdColumn } from "./contracts.ts";
 import {
   defaultFeatureFlags,
   enrichTenants,
@@ -32,11 +30,6 @@ const isMissingIsActiveColumn = (error: PgError | null | undefined) =>
   isMissingPostgrestColumn(error, "is_active");
 
 const lower = (value: string | null | undefined) => (value ?? "").toLowerCase();
-
-export const resolveResetRedirectTo = (configured: string | undefined) => {
-  const redirectTo = (configured ?? "").trim();
-  return redirectTo || null;
-};
 
 export const handlePrimaryAdminAction = async (
   context: SuperTenantContext,

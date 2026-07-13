@@ -2,29 +2,55 @@ import { proxyFunctionRequest } from "./functionProxy.ts";
 
 const assertEquals = (actual: unknown, expected: unknown, message: string) => {
   if (JSON.stringify(actual) !== JSON.stringify(expected)) {
-    throw new Error(`${message}: expected ${JSON.stringify(expected)}, received ${JSON.stringify(actual)}`);
+    throw new Error(
+      `${message}: expected ${JSON.stringify(expected)}, received ${
+        JSON.stringify(actual)
+      }`,
+    );
   }
 };
 
 Deno.test("non-status function proxy preserves streamed response bytes, status, and headers", async () => {
   const originalFetch = globalThis.fetch;
-  globalThis.fetch = (() => Promise.resolve(new Response(new Uint8Array([222, 173, 190, 239]), {
-    status: 418,
-    headers: { "content-type": "application/octet-stream", "x-upstream": "kept" },
-  }))) as typeof fetch;
+  globalThis.fetch = (() =>
+    Promise.resolve(
+      new Response(new Uint8Array([222, 173, 190, 239]), {
+        status: 418,
+        headers: {
+          "content-type": "application/octet-stream",
+          "x-upstream": "kept",
+        },
+      }),
+    )) as typeof fetch;
   try {
     const response = await proxyFunctionRequest(
       new Request("https://edge.itemtraxx.com/functions/admin-ops"),
-      { SUPABASE_URL: "https://example.supabase.co", SUPABASE_ANON_KEY: "anon" } as Env,
+      {
+        SUPABASE_URL: "https://example.supabase.co",
+        SUPABASE_ANON_KEY: "anon",
+      } as Env,
       { "Access-Control-Allow-Credentials": "true" },
       "request-2",
       "admin-ops",
     );
     assertEquals(response.status, 418, "response status");
-    assertEquals(Array.from(new Uint8Array(await response.arrayBuffer())), [222, 173, 190, 239], "response bytes");
-    assertEquals(response.headers.get("content-type"), "application/octet-stream", "content type");
+    assertEquals(Array.from(new Uint8Array(await response.arrayBuffer())), [
+      222,
+      173,
+      190,
+      239,
+    ], "response bytes");
+    assertEquals(
+      response.headers.get("content-type"),
+      "application/octet-stream",
+      "content type",
+    );
     assertEquals(response.headers.get("x-upstream"), "kept", "upstream header");
-    assertEquals(response.headers.get("x-request-id"), "request-2", "request ID");
+    assertEquals(
+      response.headers.get("x-request-id"),
+      "request-2",
+      "request ID",
+    );
   } finally {
     globalThis.fetch = originalFetch;
   }
@@ -41,21 +67,26 @@ const statusEnv = {
   SUPABASE_ANON_KEY: "anon",
   MAINTENANCE_FALLBACK_KV: {
     get: (_key: string, type?: string) =>
-      Promise.resolve(type === "json" ? cachedMaintenance : JSON.stringify(cachedMaintenance)),
+      Promise.resolve(
+        type === "json" ? cachedMaintenance : JSON.stringify(cachedMaintenance),
+      ),
   },
 } as unknown as Env;
 
 Deno.test("system-status skips fallback mutation when declared Content-Length exceeds the JSON cap", async () => {
   const originalFetch = globalThis.fetch;
   const raw = JSON.stringify({ status: "down", checks: { db: "failed" } });
-  globalThis.fetch = (() => Promise.resolve(new Response(raw, {
-    status: 503,
-    headers: {
-      "content-length": String(64 * 1024 + 1),
-      "content-type": "application/json",
-      "x-upstream": "kept",
-    },
-  }))) as typeof fetch;
+  globalThis.fetch = (() =>
+    Promise.resolve(
+      new Response(raw, {
+        status: 503,
+        headers: {
+          "content-length": String(64 * 1024 + 1),
+          "content-type": "application/json",
+          "x-upstream": "kept",
+        },
+      }),
+    )) as typeof fetch;
   try {
     const response = await proxyFunctionRequest(
       new Request("https://edge.itemtraxx.com/functions/system-status"),
@@ -66,7 +97,11 @@ Deno.test("system-status skips fallback mutation when declared Content-Length ex
     );
     assertEquals(response.status, 503, "response status");
     assertEquals(await response.text(), raw, "original body");
-    assertEquals(response.headers.get("content-length"), String(64 * 1024 + 1), "content length");
+    assertEquals(
+      response.headers.get("content-length"),
+      String(64 * 1024 + 1),
+      "content length",
+    );
     assertEquals(response.headers.get("x-upstream"), "kept", "upstream header");
   } finally {
     globalThis.fetch = originalFetch;
@@ -89,14 +124,16 @@ Deno.test("system-status stops an unknown-length clone after the JSON cap and st
         controller.close();
       },
     });
-    return Promise.resolve(new Response(body, {
-      status: 503,
-      headers: {
-        "content-length": "not-a-number",
-        "content-type": "application/json",
-        "x-upstream": "kept",
-      },
-    }));
+    return Promise.resolve(
+      new Response(body, {
+        status: 503,
+        headers: {
+          "content-length": "not-a-number",
+          "content-type": "application/json",
+          "x-upstream": "kept",
+        },
+      }),
+    );
   }) as typeof fetch;
   try {
     const response = await proxyFunctionRequest(
@@ -108,7 +145,11 @@ Deno.test("system-status stops an unknown-length clone after the JSON cap and st
     );
     assertEquals(response.status, 503, "response status");
     assertEquals(await response.text(), raw, "original streamed body");
-    assertEquals(response.headers.get("content-length"), "not-a-number", "invalid length preserved");
+    assertEquals(
+      response.headers.get("content-length"),
+      "not-a-number",
+      "invalid length preserved",
+    );
     assertEquals(response.headers.get("x-upstream"), "kept", "upstream header");
   } finally {
     globalThis.fetch = originalFetch;
@@ -117,10 +158,11 @@ Deno.test("system-status stops an unknown-length clone after the JSON cap and st
 
 Deno.test("small system-status JSON retains maintenance fallback mutation", async () => {
   const originalFetch = globalThis.fetch;
-  globalThis.fetch = (() => Promise.resolve(Response.json(
-    { status: "down", checks: { db: "failed" } },
-    { status: 503 },
-  ))) as typeof fetch;
+  globalThis.fetch = (() =>
+    Promise.resolve(Response.json(
+      { status: "down", checks: { db: "failed" } },
+      { status: 503 },
+    ))) as typeof fetch;
   try {
     const response = await proxyFunctionRequest(
       new Request("https://edge.itemtraxx.com/functions/system-status"),

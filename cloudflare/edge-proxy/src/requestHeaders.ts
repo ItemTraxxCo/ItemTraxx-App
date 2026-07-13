@@ -20,7 +20,10 @@ type RequestWithCf = Request & {
   };
 };
 
-const sanitizeGeoHeaderValue = (value: string | null | undefined, maxLen: number) => {
+const sanitizeGeoHeaderValue = (
+  value: string | null | undefined,
+  maxLen: number,
+) => {
   if (!value) return null;
   const trimmed = value.trim();
   if (!trimmed) return null;
@@ -48,9 +51,13 @@ export const sanitizeRequestHeaders = (
   const headers = new Headers();
   headers.set("x-request-id", requestId);
   headers.set("apikey", anonKey);
-  headers.set("Content-Type", request.headers.get("Content-Type") ?? "application/json");
+  headers.set(
+    "Content-Type",
+    request.headers.get("Content-Type") ?? "application/json",
+  );
   const incomingAuth = request.headers.get("Authorization");
-  const resolvedAuth = incomingAuth ?? (sessionAccessToken ? `Bearer ${sessionAccessToken}` : null);
+  const resolvedAuth = incomingAuth ??
+    (sessionAccessToken ? `Bearer ${sessionAccessToken}` : null);
   if (functionName === "super-ops" && resolvedAuth) {
     headers.set("x-itx-user-jwt", resolvedAuth);
     headers.set("Authorization", resolvedAuth);
@@ -83,7 +90,8 @@ export const sanitizeUpstreamHeaders = (
   const contentType = request.headers.get("Content-Type");
   if (contentType) headers.set("Content-Type", contentType);
   const incomingAuth = request.headers.get("Authorization");
-  const resolvedAuth = incomingAuth ?? (sessionAccessToken ? `Bearer ${sessionAccessToken}` : null);
+  const resolvedAuth = incomingAuth ??
+    (sessionAccessToken ? `Bearer ${sessionAccessToken}` : null);
   if (resolvedAuth) headers.set("Authorization", resolvedAuth);
   const accept = request.headers.get("accept");
   if (accept) headers.set("accept", accept);

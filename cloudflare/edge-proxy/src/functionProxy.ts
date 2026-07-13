@@ -13,11 +13,16 @@ const trimTrailingSlash = (value: string) => value.replace(/\/+$/, "");
 // The status envelope is small; bound the only upstream response branch that is read.
 export const SYSTEM_STATUS_JSON_MAX_BYTES = 64 * 1024;
 
-const readBoundedSystemStatusText = async (response: Response): Promise<string | null> => {
+const readBoundedSystemStatusText = async (
+  response: Response,
+): Promise<string | null> => {
   const contentLength = response.headers.get("content-length");
   if (contentLength !== null) {
     const declaredBytes = Number(contentLength);
-    if (Number.isFinite(declaredBytes) && declaredBytes > SYSTEM_STATUS_JSON_MAX_BYTES) {
+    if (
+      Number.isFinite(declaredBytes) &&
+      declaredBytes > SYSTEM_STATUS_JSON_MAX_BYTES
+    ) {
       return null;
     }
   }
@@ -34,7 +39,8 @@ const readBoundedSystemStatusText = async (response: Response): Promise<string |
     }
     totalBytes += value.byteLength;
     if (totalBytes > SYSTEM_STATUS_JSON_MAX_BYTES) {
-      void reader.cancel("system-status response exceeds JSON read limit").catch(() => undefined);
+      void reader.cancel("system-status response exceeds JSON read limit")
+        .catch(() => undefined);
       return null;
     }
     text += decoder.decode(value, { stream: true });
@@ -49,8 +55,11 @@ export const proxyFunctionRequest = async (
   functionName: string,
 ) => {
   const cookies = parseCookies(request);
-  const supabaseFunctionUrl = `${trimTrailingSlash(env.SUPABASE_URL)}/functions/v1/${functionName}`;
-  const isSystemStatusGet = functionName === "system-status" && request.method === "GET";
+  const supabaseFunctionUrl = `${
+    trimTrailingSlash(env.SUPABASE_URL)
+  }/functions/v1/${functionName}`;
+  const isSystemStatusGet = functionName === "system-status" &&
+    request.method === "GET";
   const requestBody = request.method === "GET" || request.method === "HEAD"
     ? null
     : new Uint8Array(await request.clone().arrayBuffer());
@@ -85,24 +94,33 @@ export const proxyFunctionRequest = async (
       const cached = await readMaintenanceFallback(env);
       if (cached) {
         const responseHeaders = new Headers();
-        Object.entries(headers).forEach(([key, value]) => responseHeaders.set(key, value));
+        Object.entries(headers).forEach(([key, value]) =>
+          responseHeaders.set(key, value)
+        );
         responseHeaders.set("x-request-id", requestId);
         responseHeaders.set("content-type", "application/json");
-        return new Response(JSON.stringify({
-          status: "down",
-          checks: { config: "ok", db: "failed" },
-          maintenance: cached,
-          maintenance_fallback: true,
-          incident_summary: "system status unavailable; maintenance fallback active",
-          checked_at: new Date().toISOString(),
-        }), { status: 503, headers: responseHeaders });
+        return new Response(
+          JSON.stringify({
+            status: "down",
+            checks: { config: "ok", db: "failed" },
+            maintenance: cached,
+            maintenance_fallback: true,
+            incident_summary:
+              "system status unavailable; maintenance fallback active",
+            checked_at: new Date().toISOString(),
+          }),
+          { status: 503, headers: responseHeaders },
+        );
       }
     }
     throw error;
   }
 
   let sessionHeaders: Headers | null = null;
-  if (!request.headers.get("Authorization") && upstreamResponse.status === 401 && cookies.refreshToken) {
+  if (
+    !request.headers.get("Authorization") && upstreamResponse.status === 401 &&
+    cookies.refreshToken
+  ) {
     const refreshed = await maybeRefreshSession(request, env, cookies);
     if (refreshed.failure) {
       return buildSessionRateLimitError(refreshed.failure, headers, requestId);
@@ -114,7 +132,9 @@ export const proxyFunctionRequest = async (
   }
 
   const responseHeaders = new Headers(upstreamResponse.headers);
-  Object.entries(headers).forEach(([key, value]) => responseHeaders.set(key, value));
+  Object.entries(headers).forEach(([key, value]) =>
+    responseHeaders.set(key, value)
+  );
   responseHeaders.set("x-request-id", requestId);
   if (sessionHeaders) appendSetCookies(responseHeaders, sessionHeaders);
 
@@ -123,7 +143,11 @@ export const proxyFunctionRequest = async (
     if (rawBody !== null) {
       try {
         const parsed = JSON.parse(rawBody) as Record<string, unknown>;
-        const withFallback = await applyMaintenanceFallbackToStatusPayload(env, upstreamResponse.status, parsed);
+        const withFallback = await applyMaintenanceFallbackToStatusPayload(
+          env,
+          upstreamResponse.status,
+          parsed,
+        );
         responseHeaders.set("content-type", "application/json");
         return new Response(JSON.stringify(withFallback), {
           status: upstreamResponse.status,

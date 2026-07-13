@@ -19,15 +19,24 @@ export const proxySupabaseApiRequest = async (
 ) => {
   const cookies = parseCookies(request);
   if (isBlockedRpcProxyPath(upstreamPath)) {
-    return buildError(403, "RPC proxy access is not allowed", headers, requestId);
+    return buildError(
+      403,
+      "RPC proxy access is not allowed",
+      headers,
+      requestId,
+    );
   }
-  if (isUnauthorizedRpcProxyPath(upstreamPath, hasRpcCallerAuth(request, cookies))) {
+  if (
+    isUnauthorizedRpcProxyPath(upstreamPath, hasRpcCallerAuth(request, cookies))
+  ) {
     return buildError(401, "Unauthorized", headers, requestId);
   }
   const normalizedUpstreamPath = isRpcProxyPath(upstreamPath)
     ? `/rest/v1${upstreamPath}`
     : upstreamPath;
-  const upstreamUrl = `${trimTrailingSlash(env.SUPABASE_URL)}${normalizedUpstreamPath}${new URL(request.url).search}`;
+  const upstreamUrl = `${
+    trimTrailingSlash(env.SUPABASE_URL)
+  }${normalizedUpstreamPath}${new URL(request.url).search}`;
   const requestBody = request.method === "GET" || request.method === "HEAD"
     ? undefined
     : await request.clone().text();
@@ -47,7 +56,10 @@ export const proxySupabaseApiRequest = async (
 
   let upstreamResponse = await invoke(cookies.accessToken);
   let sessionHeaders: Headers | null = null;
-  if (!request.headers.get("Authorization") && upstreamResponse.status === 401 && cookies.refreshToken) {
+  if (
+    !request.headers.get("Authorization") && upstreamResponse.status === 401 &&
+    cookies.refreshToken
+  ) {
     const refreshed = await maybeRefreshSession(request, env, cookies);
     if (refreshed.failure) {
       return buildSessionRateLimitError(refreshed.failure, headers, requestId);
@@ -59,7 +71,9 @@ export const proxySupabaseApiRequest = async (
   }
 
   const responseHeaders = new Headers(upstreamResponse.headers);
-  Object.entries(headers).forEach(([key, value]) => responseHeaders.set(key, value));
+  Object.entries(headers).forEach(([key, value]) =>
+    responseHeaders.set(key, value)
+  );
   responseHeaders.set("x-request-id", requestId);
   if (sessionHeaders) appendSetCookies(responseHeaders, sessionHeaders);
   return new Response(upstreamResponse.body, {

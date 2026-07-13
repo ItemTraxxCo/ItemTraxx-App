@@ -33,7 +33,10 @@ const resolveSessionCookieSameSite = (env: Env) => {
 const resolveRefreshCookieMaxAgeSeconds = (env: Env) => {
   const configured = Number(env.SESSION_REFRESH_COOKIE_MAX_AGE_SECONDS?.trim());
   if (Number.isFinite(configured) && configured > 0) {
-    return Math.min(Math.floor(configured), REFRESH_TOKEN_MAX_ALLOWED_AGE_SECONDS);
+    return Math.min(
+      Math.floor(configured),
+      REFRESH_TOKEN_MAX_ALLOWED_AGE_SECONDS,
+    );
   }
   return REFRESH_TOKEN_DEFAULT_MAX_AGE_SECONDS;
 };
@@ -81,7 +84,13 @@ export const setSessionCookies = (
   env: Env,
   session: { accessToken: string; refreshToken: string },
 ) => {
-  appendCookie(headers, ACCESS_COOKIE_NAME, session.accessToken, env, ACCESS_TOKEN_MAX_AGE_SECONDS);
+  appendCookie(
+    headers,
+    ACCESS_COOKIE_NAME,
+    session.accessToken,
+    env,
+    ACCESS_TOKEN_MAX_AGE_SECONDS,
+  );
   appendCookie(
     headers,
     REFRESH_COOKIE_NAME,
@@ -99,7 +108,9 @@ export const clearSessionCookies = (headers: Headers, env: Env) => {
 export const appendSetCookies = (target: Headers, source: Headers) => {
   const maybeExtended = source as Headers & { getSetCookie?: () => string[] };
   if (typeof maybeExtended.getSetCookie === "function") {
-    maybeExtended.getSetCookie().forEach((cookie) => target.append("Set-Cookie", cookie));
+    maybeExtended.getSetCookie().forEach((cookie) =>
+      target.append("Set-Cookie", cookie)
+    );
     return;
   }
   const raw = source.get("Set-Cookie");

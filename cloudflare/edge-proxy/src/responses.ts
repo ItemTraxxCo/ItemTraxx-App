@@ -7,7 +7,13 @@ export const buildError = (
   requestId: string,
   extraHeaders?: Headers,
 ) => {
-  return buildJson(status, { error: message }, headers, requestId, extraHeaders);
+  return buildJson(
+    status,
+    { error: message },
+    headers,
+    requestId,
+    extraHeaders,
+  );
 };
 
 export const buildSessionRateLimitError = (
@@ -17,8 +23,17 @@ export const buildSessionRateLimitError = (
 ) => {
   const responseHeaders = new Headers();
   if (failure === "rate_limited") {
-    responseHeaders.set("Retry-After", RATE_LIMIT_RETRY_AFTER_SECONDS.toString());
-    return buildError(429, "Too many session requests", headers, requestId, responseHeaders);
+    responseHeaders.set(
+      "Retry-After",
+      RATE_LIMIT_RETRY_AFTER_SECONDS.toString(),
+    );
+    return buildError(
+      429,
+      "Too many session requests",
+      headers,
+      requestId,
+      responseHeaders,
+    );
   }
   return buildError(503, "Session protection unavailable", headers, requestId);
 };
@@ -30,8 +45,12 @@ export const buildJson = (
   requestId: string,
   extraHeaders?: Headers,
 ) => {
-  const responseHeaders = extraHeaders ? new Headers(extraHeaders) : new Headers();
-  Object.entries(headers).forEach(([key, value]) => responseHeaders.set(key, value));
+  const responseHeaders = extraHeaders
+    ? new Headers(extraHeaders)
+    : new Headers();
+  Object.entries(headers).forEach(([key, value]) =>
+    responseHeaders.set(key, value)
+  );
   responseHeaders.set("Content-Type", "application/json");
   responseHeaders.set("x-request-id", requestId);
   return new Response(JSON.stringify(body), {

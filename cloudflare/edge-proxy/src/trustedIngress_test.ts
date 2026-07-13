@@ -6,7 +6,9 @@ import {
 
 const assertEquals = (actual: unknown, expected: unknown, message: string) => {
   if (actual !== expected) {
-    throw new Error(`${message}: expected ${String(expected)}, received ${String(actual)}`);
+    throw new Error(
+      `${message}: expected ${String(expected)}, received ${String(actual)}`,
+    );
   }
 };
 
@@ -18,7 +20,11 @@ Deno.test("trusted-ingress hashing and signing preserve fixed byte-level fixture
     "60f760a777617df09478ebf025b5cddc22c387ed8599c420042374296e6cdc2c",
     "UTF-8 body hash",
   );
-  assertEquals(await hashTrustedIngressBody(null), "no-body", "null body marker");
+  assertEquals(
+    await hashTrustedIngressBody(null),
+    "no-body",
+    "null body marker",
+  );
 
   const message = `1712345678901.request-123.POST.checkoutReturn.${bodyHash}`;
   assertEquals(
@@ -44,7 +50,11 @@ Deno.test("trusted-ingress headers sign the exact timestamp, request, method, ta
     );
 
     assertEquals(headers.get("x-itx-edge-proxy"), "1", "trusted marker");
-    assertEquals(headers.get("x-itx-edge-proxy-ts"), "1712345678901", "timestamp header");
+    assertEquals(
+      headers.get("x-itx-edge-proxy-ts"),
+      "1712345678901",
+      "timestamp header",
+    );
     assertEquals(
       headers.get("x-itx-edge-proxy-signature"),
       "441f86e3a8877e9abd4e742b6b9ab375bd40766e3a4c990ca102310a04a7fbfe",
@@ -69,6 +79,10 @@ Deno.test("trusted-ingress headers remain absent without a nonblank secret", asy
     assertEquals(headers.get("existing"), "kept", "existing header");
     assertEquals(headers.get("x-itx-edge-proxy"), null, "trusted marker");
     assertEquals(headers.get("x-itx-edge-proxy-ts"), null, "timestamp header");
-    assertEquals(headers.get("x-itx-edge-proxy-signature"), null, "signature header");
+    assertEquals(
+      headers.get("x-itx-edge-proxy-signature"),
+      null,
+      "signature header",
+    );
   }
 });

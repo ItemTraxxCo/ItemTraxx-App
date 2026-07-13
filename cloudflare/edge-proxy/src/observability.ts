@@ -57,7 +57,10 @@ ${itemHeaders}
 ${payload}`;
 };
 
-export const reportWorkerEvent = async (env: Env, event: Record<string, unknown>) => {
+export const reportWorkerEvent = async (
+  env: Env,
+  event: Record<string, unknown>,
+) => {
   const sentry = parseSentryDsn(env.SENTRY_DSN?.trim());
   if (!sentry) return;
 
@@ -66,7 +69,8 @@ export const reportWorkerEvent = async (env: Env, event: Record<string, unknown>
     method: "POST",
     headers: {
       "Content-Type": "application/x-sentry-envelope",
-      "X-Sentry-Auth": `Sentry sentry_version=7, sentry_client=itemtraxx-edge-proxy/1.0, sentry_key=${sentry.publicKey}`,
+      "X-Sentry-Auth":
+        `Sentry sentry_version=7, sentry_client=itemtraxx-edge-proxy/1.0, sentry_key=${sentry.publicKey}`,
     },
     body: envelope,
   }).catch(() => undefined);

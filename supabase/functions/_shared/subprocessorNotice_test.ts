@@ -174,7 +174,10 @@ Deno.test("buildSubprocessorNoticePlainText: omits description line when absent"
 Deno.test("buildSubprocessorNoticePlainText: contract terms section present", () => {
   const text = buildSubprocessorNoticePlainText(BASE);
   assertStringIncludes(text, "CONTRACT TERMS");
-  assertStringIncludes(text, "If your executed agreement includes objection or approval rights");
+  assertStringIncludes(
+    text,
+    "If your executed agreement includes objection or approval rights",
+  );
 });
 
 // --- preview ---

@@ -25,7 +25,11 @@ const sign = async (secret: string, message: string) => {
     false,
     ["sign"],
   );
-  const signature = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(message));
+  const signature = await crypto.subtle.sign(
+    "HMAC",
+    key,
+    new TextEncoder().encode(message),
+  );
   return toHex(new Uint8Array(signature));
 };
 
@@ -84,7 +88,10 @@ export const requireTrustedEdgeIngress = async (
     }
     return null;
   } catch (error) {
-    if (error instanceof Error && error.message === "Missing ITX_EDGE_PROXY_SHARED_SECRET") {
+    if (
+      error instanceof Error &&
+      error.message === "Missing ITX_EDGE_PROXY_SHARED_SECRET"
+    ) {
       return jsonResponse(500, { error: "Server misconfiguration." });
     }
     throw error;

@@ -16,7 +16,8 @@ type TextOptions = {
   allowEmpty?: boolean;
 };
 
-const CONTROL_CHARS = /[\u0000-\u001F\u007F\u200B-\u200F\u202A-\u202E\u2060-\u206F\uFEFF]/;
+const CONTROL_CHARS =
+  /[\u0000-\u001F\u007F\u200B-\u200F\u202A-\u202E\u2060-\u206F\uFEFF]/;
 export const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 export const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -81,7 +82,10 @@ export const optionalUuid = (value: unknown) => {
   return requireUuid(text);
 };
 
-export const requireEnum = <T extends string>(value: unknown, allowed: ReadonlySet<T>) => {
+export const requireEnum = <T extends string>(
+  value: unknown,
+  allowed: ReadonlySet<T>,
+) => {
   if (typeof value !== "string") {
     throw new ValidationError("Invalid request");
   }
@@ -127,7 +131,12 @@ export const optionalPositiveInteger = (value: unknown, max: number) => {
   return rounded;
 };
 
-export const optionalInteger = (value: unknown, min: number, max: number, fallback: number) => {
+export const optionalInteger = (
+  value: unknown,
+  min: number,
+  max: number,
+  fallback: number,
+) => {
   if (value === undefined || value === null || value === "") return fallback;
   const parsed = typeof value === "number" ? value : Number(value);
   if (!Number.isFinite(parsed)) {

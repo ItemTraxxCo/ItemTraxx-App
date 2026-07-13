@@ -1,4 +1,7 @@
-import { assert, assertEquals } from "https://deno.land/std@0.224.0/assert/mod.ts";
+import {
+  assert,
+  assertEquals,
+} from "https://deno.land/std@0.224.0/assert/mod.ts";
 import { isAllowedOrigin, parseAllowedOrigins } from "./cors.ts";
 
 Deno.test("parseAllowedOrigins trims blank entries", () => {
@@ -21,6 +24,10 @@ Deno.test("isAllowedOrigin does not expand wildcard origin patterns", () => {
   const allowedOrigins = parseAllowedOrigins("https://*.itemtraxx.com");
 
   assert(!isAllowedOrigin("https://app.itemtraxx.com", allowedOrigins));
-  assert(!isAllowedOrigin("https://itemtraxx.com.attacker.com", allowedOrigins));
-  assert(!isAllowedOrigin("https://evil.itemtraxx.com.attacker.com", allowedOrigins));
+  assert(
+    !isAllowedOrigin("https://itemtraxx.com.attacker.com", allowedOrigins),
+  );
+  assert(
+    !isAllowedOrigin("https://evil.itemtraxx.com.attacker.com", allowedOrigins),
+  );
 });

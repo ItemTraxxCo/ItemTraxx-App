@@ -9,13 +9,17 @@ const readExactSegment = (pathname: string, prefix: string) => {
   return segment;
 };
 
-export const getFunctionName = (pathname: string) => readExactSegment(pathname, "/functions/");
+export const getFunctionName = (pathname: string) =>
+  readExactSegment(pathname, "/functions/");
 
-export const getSessionAction = (pathname: string) => readExactSegment(pathname, "/auth/session/");
+export const getSessionAction = (pathname: string) =>
+  readExactSegment(pathname, "/auth/session/");
 
-export const isRestProxyPath = (pathname: string) => pathname.startsWith("/rest/v1/");
+export const isRestProxyPath = (pathname: string) =>
+  pathname.startsWith("/rest/v1/");
 
-export const isRpcProxyPath = (pathname: string) => pathname === "/rpc" || pathname.startsWith("/rpc/");
+export const isRpcProxyPath = (pathname: string) =>
+  pathname === "/rpc" || pathname.startsWith("/rpc/");
 
 export const getRpcFunctionName = (pathname: string) => {
   const direct = readExactSegment(pathname, "/rpc/");
@@ -25,7 +29,8 @@ export const getRpcFunctionName = (pathname: string) => {
 
 export const isAllowedRpcProxyPath = (pathname: string) => {
   const functionName = getRpcFunctionName(pathname);
-  return Boolean(functionName) && ALLOWED_RPC_FUNCTIONS.has(functionName.toLowerCase());
+  return Boolean(functionName) &&
+    ALLOWED_RPC_FUNCTIONS.has(functionName.toLowerCase());
 };
 
 const normalizePathShape = (pathname: string) => {
@@ -51,8 +56,9 @@ const canonicalizeForRpcDetection = (pathname: string) => {
       decoded = decodeURIComponent(value);
     } catch {
       malformedEncoding = true;
-      decoded = value.replace(/%([0-9a-f]{2})/gi, (_match, hex: string) =>
-        String.fromCharCode(Number.parseInt(hex, 16))
+      decoded = value.replace(
+        /%([0-9a-f]{2})/gi,
+        (_match, hex: string) => String.fromCharCode(Number.parseInt(hex, 16)),
       );
     }
     if (decoded === value) {
@@ -90,11 +96,14 @@ const isAnyRpcPath = (pathname: string) => {
   const canonical = canonicalizeForRpcDetection(pathname);
   if (isCanonicalRpcPath(canonical.pathname)) return true;
   if (canonical.decodeDepthExhausted && isRestProxyPath(pathname)) return true;
-  return canonical.malformedEncoding && hasMalformedRpcSegment(canonical.pathname);
+  return canonical.malformedEncoding &&
+    hasMalformedRpcSegment(canonical.pathname);
 };
 
 export const isBlockedRpcProxyPath = (pathname: string) =>
   isAnyRpcPath(pathname) && !isAllowedRpcProxyPath(pathname);
 
-export const isUnauthorizedRpcProxyPath = (pathname: string, hasCallerAuth: boolean) =>
-  isAnyRpcPath(pathname) && !hasCallerAuth;
+export const isUnauthorizedRpcProxyPath = (
+  pathname: string,
+  hasCallerAuth: boolean,
+) => isAnyRpcPath(pathname) && !hasCallerAuth;

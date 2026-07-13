@@ -2,8 +2,8 @@ import { isAllowedOrigin, resolveRequestOrigin } from "./cors.ts";
 import {
   clearSessionCookies,
   parseCookies,
-  setSessionCookies,
   type SessionCookies,
+  setSessionCookies,
 } from "./cookies.ts";
 import {
   buildError,
@@ -50,7 +50,8 @@ type ProfileRow = {
 };
 
 const trimTrailingSlash = (value: string) => value.replace(/\/+$/, "");
-const buildSupabaseUrl = (env: Env, path: string) => `${trimTrailingSlash(env.SUPABASE_URL)}${path}`;
+const buildSupabaseUrl = (env: Env, path: string) =>
+  `${trimTrailingSlash(env.SUPABASE_URL)}${path}`;
 
 const fetchAuthUser = async (env: Env, accessToken: string) => {
   const response = await fetch(buildSupabaseUrl(env, "/auth/v1/user"), {
@@ -79,7 +80,10 @@ const fetchAuthUser = async (env: Env, accessToken: string) => {
 const fetchProfile = async (env: Env, accessToken: string, userId: string) => {
   const url = new URL(buildSupabaseUrl(env, "/rest/v1/profiles"));
   url.searchParams.set("id", `eq.${userId}`);
-  url.searchParams.set("select", "id,role,tenant_id,district_id,auth_email,is_active");
+  url.searchParams.set(
+    "select",
+    "id,role,tenant_id,district_id,auth_email,is_active",
+  );
   const response = await fetch(url.toString(), {
     method: "GET",
     headers: {
@@ -93,7 +97,10 @@ const fetchProfile = async (env: Env, accessToken: string, userId: string) => {
   return rows[0] ?? null;
 };
 
-const buildSessionSummary = async (env: Env, accessToken: string): Promise<SessionSummary | null> => {
+const buildSessionSummary = async (
+  env: Env,
+  accessToken: string,
+): Promise<SessionSummary | null> => {
   const user = await fetchAuthUser(env, accessToken);
   if (!user) return null;
   const profile = await fetchProfile(env, accessToken, user.id);
@@ -102,12 +109,12 @@ const buildSessionSummary = async (env: Env, accessToken: string): Promise<Sessi
     user,
     profile: profile
       ? {
-          role: profile.role ?? null,
-          tenant_id: profile.tenant_id ?? null,
-          district_id: profile.district_id ?? null,
-          auth_email: profile.auth_email ?? null,
-          is_active: profile.is_active ?? null,
-        }
+        role: profile.role ?? null,
+        tenant_id: profile.tenant_id ?? null,
+        district_id: profile.district_id ?? null,
+        auth_email: profile.auth_email ?? null,
+        is_active: profile.is_active ?? null,
+      }
       : null,
   };
 };
@@ -137,21 +144,29 @@ const refreshSession = async (
   env: Env,
   refreshToken: string,
 ): Promise<RefreshSessionResult> => {
-  const rateLimit = await checkSessionRateLimit(env.SESSION_REFRESH_RATE_LIMITER, request);
+  const rateLimit = await checkSessionRateLimit(
+    env.SESSION_REFRESH_RATE_LIMITER,
+    request,
+  );
   if (rateLimit === "limited") return { status: "rate_limited" };
   if (rateLimit === "unavailable") return { status: "unavailable" };
 
-  const response = await fetch(buildSupabaseUrl(env, `/auth/v1/token?grant_type=${REFRESH_GRANT_TYPE}`), {
-    method: "POST",
-    headers: {
-      apikey: env.SUPABASE_ANON_KEY,
-      "Content-Type": "application/json",
+  const response = await fetch(
+    buildSupabaseUrl(env, `/auth/v1/token?grant_type=${REFRESH_GRANT_TYPE}`),
+    {
+      method: "POST",
+      headers: {
+        apikey: env.SUPABASE_ANON_KEY,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ refresh_token: refreshToken }),
     },
-    body: JSON.stringify({ refresh_token: refreshToken }),
-  });
+  );
   if (!response.ok) return { status: "unauthorized" };
   const payload = (await response.json()) as TokenRefreshResponse;
-  if (!payload.access_token || !payload.refresh_token) return { status: "unauthorized" };
+  if (!payload.access_token || !payload.refresh_token) {
+    return { status: "unauthorized" };
+  }
   return {
     status: "ok",
     accessToken: payload.access_token,
@@ -168,11 +183,15 @@ export const maybeRefreshSession = async (
   headers: Headers | null;
   failure: "rate_limited" | "unavailable" | null;
 }> => {
-  if (!cookies.refreshToken) return { session: null, headers: null, failure: null };
+  if (!cookies.refreshToken) {
+    return { session: null, headers: null, failure: null };
+  }
 
   const refreshed = await refreshSession(request, env, cookies.refreshToken);
   if (refreshed.status !== "ok") {
-    if (refreshed.status === "rate_limited" || refreshed.status === "unavailable") {
+    if (
+      refreshed.status === "rate_limited" || refreshed.status === "unavailable"
+    ) {
       return { session: null, headers: null, failure: refreshed.status };
     }
     const headers = new Headers();
@@ -190,11 +209,19 @@ const handleSessionExchange = async (
   headers: Record<string, string>,
   requestId: string,
 ) => {
-  const rateLimit = await checkSessionRateLimit(env.SESSION_EXCHANGE_RATE_LIMITER, request);
-  if (rateLimit === "limited") return buildSessionRateLimitError("rate_limited", headers, requestId);
-  if (rateLimit === "unavailable") return buildSessionRateLimitError("unavailable", headers, requestId);
+  const rateLimit = await checkSessionRateLimit(
+    env.SESSION_EXCHANGE_RATE_LIMITER,
+    request,
+  );
+  if (rateLimit === "limited") {
+    return buildSessionRateLimitError("rate_limited", headers, requestId);
+  }
+  if (rateLimit === "unavailable") {
+    return buildSessionRateLimitError("unavailable", headers, requestId);
+  }
 
-  const payload = (await request.json().catch(() => ({}))) as SessionExchangePayload;
+  const payload =
+    (await request.json().catch(() => ({}))) as SessionExchangePayload;
   if (!payload.access_token || !payload.refresh_token) {
     return buildError(400, "Invalid request", headers, requestId);
   }
@@ -223,7 +250,9 @@ const handleSessionRefresh = async (
   }
   const refreshed = await refreshSession(request, env, cookies.refreshToken);
   if (refreshed.status !== "ok") {
-    if (refreshed.status === "rate_limited" || refreshed.status === "unavailable") {
+    if (
+      refreshed.status === "rate_limited" || refreshed.status === "unavailable"
+    ) {
       return buildSessionRateLimitError(refreshed.status, headers, requestId);
     }
     const responseHeaders = new Headers();
@@ -241,7 +270,11 @@ const handleSessionRefresh = async (
   return buildJson(200, summary, headers, requestId, responseHeaders);
 };
 
-const unauthenticatedSummary = { authenticated: false, user: null, profile: null };
+const unauthenticatedSummary = {
+  authenticated: false,
+  user: null,
+  profile: null,
+};
 
 const handleSessionMe = async (
   request: Request,
@@ -254,22 +287,44 @@ const handleSessionMe = async (
   let responseHeaders: Headers | null = null;
   if (!accessToken && cookies.refreshToken) {
     const refreshed = await maybeRefreshSession(request, env, cookies);
-    if (refreshed.failure) return buildSessionRateLimitError(refreshed.failure, headers, requestId);
+    if (refreshed.failure) {
+      return buildSessionRateLimitError(refreshed.failure, headers, requestId);
+    }
     if (refreshed.session) {
       accessToken = refreshed.session.accessToken;
       responseHeaders = refreshed.headers;
     } else if (refreshed.headers) {
-      return buildJson(200, unauthenticatedSummary, headers, requestId, refreshed.headers);
+      return buildJson(
+        200,
+        unauthenticatedSummary,
+        headers,
+        requestId,
+        refreshed.headers,
+      );
     }
   }
-  if (!accessToken) return buildJson(200, unauthenticatedSummary, headers, requestId);
+  if (!accessToken) {
+    return buildJson(200, unauthenticatedSummary, headers, requestId);
+  }
   const summary = await buildSessionSummary(env, accessToken);
   if (!summary) {
     const clearHeaders = responseHeaders ?? new Headers();
     clearSessionCookies(clearHeaders, env);
-    return buildJson(200, unauthenticatedSummary, headers, requestId, clearHeaders);
+    return buildJson(
+      200,
+      unauthenticatedSummary,
+      headers,
+      requestId,
+      clearHeaders,
+    );
   }
-  return buildJson(200, summary, headers, requestId, responseHeaders ?? undefined);
+  return buildJson(
+    200,
+    summary,
+    headers,
+    requestId,
+    responseHeaders ?? undefined,
+  );
 };
 
 const handleSessionLogout = async (
@@ -320,17 +375,35 @@ export const handleSessionRequest = async (
   allowedOrigins: string[],
 ) => {
   if (action === "exchange" && request.method === "POST") {
-    const error = validateSessionMutationRequest(request, env, allowedOrigins, headers, requestId);
+    const error = validateSessionMutationRequest(
+      request,
+      env,
+      allowedOrigins,
+      headers,
+      requestId,
+    );
     if (error) return error;
     return handleSessionExchange(request, env, headers, requestId);
   }
   if (action === "refresh" && request.method === "POST") {
-    const error = validateSessionMutationRequest(request, env, allowedOrigins, headers, requestId);
+    const error = validateSessionMutationRequest(
+      request,
+      env,
+      allowedOrigins,
+      headers,
+      requestId,
+    );
     if (error) return error;
     return handleSessionRefresh(request, env, headers, requestId);
   }
   if (action === "logout" && request.method === "POST") {
-    const error = validateSessionMutationRequest(request, env, allowedOrigins, headers, requestId);
+    const error = validateSessionMutationRequest(
+      request,
+      env,
+      allowedOrigins,
+      headers,
+      requestId,
+    );
     if (error) return error;
     return handleSessionLogout(request, env, headers, requestId);
   }

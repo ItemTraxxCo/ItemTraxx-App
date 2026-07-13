@@ -17,7 +17,11 @@ export const signTrustedIngress = async (secret: string, message: string) => {
     false,
     ["sign"],
   );
-  const signature = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(message));
+  const signature = await crypto.subtle.sign(
+    "HMAC",
+    key,
+    new TextEncoder().encode(message),
+  );
   return toHex(new Uint8Array(signature));
 };
 

@@ -88,7 +88,9 @@ export const isTenantAdminTokenBlockedBySessionRevocation = async (
       .maybeSingle();
 
     if (error) {
-      if (isMissingRelation(error as PostgrestErrorLike, "tenant_admin_sessions")) {
+      if (
+        isMissingRelation(error as PostgrestErrorLike, "tenant_admin_sessions")
+      ) {
         return { blocked: true as const, relationMissing: true as const };
       }
       if (isMissingColumn(error as PostgrestErrorLike, "auth_session_id")) {
@@ -115,7 +117,9 @@ export const isTenantAdminTokenBlockedBySessionRevocation = async (
       .maybeSingle();
 
     if (error) {
-      if (isMissingRelation(error as PostgrestErrorLike, "tenant_admin_sessions")) {
+      if (
+        isMissingRelation(error as PostgrestErrorLike, "tenant_admin_sessions")
+      ) {
         return { blocked: true as const, relationMissing: true as const };
       }
       throw new Error("Unable to validate admin session revocation.");
@@ -197,7 +201,10 @@ export const validateTenantAdminDeviceSession = async (
 
   if (activeSessionError) {
     if (
-      isMissingRelation(activeSessionError as PostgrestErrorLike, "tenant_admin_sessions")
+      isMissingRelation(
+        activeSessionError as PostgrestErrorLike,
+        "tenant_admin_sessions",
+      )
     ) {
       return {
         valid: false as const,
@@ -205,7 +212,12 @@ export const validateTenantAdminDeviceSession = async (
         relationMissing: true as const,
       };
     }
-    if (isMissingColumn(activeSessionError as PostgrestErrorLike, "auth_session_id")) {
+    if (
+      isMissingColumn(
+        activeSessionError as PostgrestErrorLike,
+        "auth_session_id",
+      )
+    ) {
       return {
         valid: false as const,
         reason: "missing_table" as const,
@@ -222,9 +234,10 @@ export const validateTenantAdminDeviceSession = async (
     const sessionTokenHash = typeof activeSession.auth_token_hash === "string"
       ? activeSession.auth_token_hash.trim()
       : "";
-    const sessionTokenIssuedAt = typeof activeSession.auth_token_issued_at === "string"
-      ? activeSession.auth_token_issued_at
-      : null;
+    const sessionTokenIssuedAt =
+      typeof activeSession.auth_token_issued_at === "string"
+        ? activeSession.auth_token_issued_at
+        : null;
     if (binding.sessionId) {
       return sessionAuthId === binding.sessionId
         ? {

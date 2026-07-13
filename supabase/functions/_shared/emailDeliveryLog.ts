@@ -102,7 +102,9 @@ export const sendLoggedResendEmail = async (
       body: JSON.stringify(resendPayload),
     });
 
-    const responseBody = await response.json().catch(() => null) as Record<string, unknown> | null;
+    const responseBody = await response.json().catch(() => null) as
+      | Record<string, unknown>
+      | null;
 
     if (!response.ok) {
       const errorMessage = typeof responseBody?.message === "string"
@@ -125,7 +127,9 @@ export const sendLoggedResendEmail = async (
     if (logId) {
       await updateEmailLog(adminClient, logId, {
         status: "sent",
-        providerMessageId: typeof responseBody?.id === "string" ? responseBody.id : null,
+        providerMessageId: typeof responseBody?.id === "string"
+          ? responseBody.id
+          : null,
         metadata: {
           ...(context.metadata ?? {}),
           response_status: response.status,
@@ -140,7 +144,9 @@ export const sendLoggedResendEmail = async (
       try {
         await updateEmailLog(adminClient, logId, {
           status: "failed",
-          errorMessage: error instanceof Error ? error.message : "Email send failed.",
+          errorMessage: error instanceof Error
+            ? error.message
+            : "Email send failed.",
           metadata: context.metadata ?? null,
         });
       } catch {

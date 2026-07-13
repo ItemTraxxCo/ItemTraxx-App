@@ -40,7 +40,10 @@ export const resolveClientIp = (req: Request) => {
   return "";
 };
 
-export const resolveClientFingerprint = (req: Request, _origin: string | null) => {
+export const resolveClientFingerprint = (
+  req: Request,
+  _origin: string | null,
+) => {
   const ipCandidate = resolveClientIp(req);
 
   if (ipCandidate) {
@@ -55,7 +58,7 @@ export const enforcePreloginRateLimit = async (
   key: string,
   scope: string,
   limit: number,
-  windowSeconds: number
+  windowSeconds: number,
 ) => {
   const { data, error } = await client.rpc("consume_rate_limit_prelogin", {
     p_key: key,
@@ -124,7 +127,7 @@ export const resolveRateLimitResult = ({
 export const verifyTurnstileToken = async (
   token: string,
   remoteIp: string,
-  logContext: string
+  logContext: string,
 ) => {
   const secret = Deno.env.get("ITX_TURNSTILE_SECRET") ??
     Deno.env.get("ITX_TURNSTILE_SECRET_KEY") ?? "";
@@ -146,7 +149,7 @@ export const verifyTurnstileToken = async (
         method: "POST",
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
         body: params.toString(),
-      }
+      },
     );
 
     if (!response.ok) {
@@ -168,7 +171,9 @@ export const verifyTurnstileToken = async (
   if (remoteIp) {
     const fallbackResult = await submitVerification();
     if (fallbackResult?.success) {
-      console.warn(`${logContext} turnstile verification succeeded after retry without remote IP`);
+      console.warn(
+        `${logContext} turnstile verification succeeded after retry without remote IP`,
+      );
       return true;
     }
     if (fallbackResult) {

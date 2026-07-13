@@ -41,11 +41,12 @@ post-merge lock alignment is called out separately below.
 | Interleaved user commits | `f2f43406 refactor reciept pdf service`; `1006f461 refactor error messages` | These are retained in the branch history and are not silently attributed to cleanup tasks. |
 | Current implementation head | `3d07b74fd0ad93ac57a46187f7ad3ab4202cd81b` | Final verified production-source head. It includes the separately reviewed deletion of the unowned `src/services/superOpsService.ts` facade. |
 | Task 8 executable-gate correction | `f6c3ad7c docs: correct final deno verification gate` | Plan-only commit after review; it scopes Deno read access to `supabase/functions/super-tenant-mutate/actions`. Production source and the report are not part of the commit. |
-| Full implementation diff | `git diff --stat e95f7564..3d07b74f` | 232 files, 44,690 insertions, 13,918 deletions. Generated Worker declarations and API artifacts account for a large share of insertions. |
-| Final remote state | `git fetch --prune origin`; `git rev-list --left-right --count HEAD...origin/main` | 109 commits ahead and 3 behind `origin/main`, including this report commit. The three unmerged upstream commits are `16140b45`, `b13591fc`, and `cc7d03a9`; no merge, rebase, cherry-pick, or reset was performed. |
-| Final branch tracking state | `git rev-list --left-right --count HEAD...origin/dev/mmango10` | 112 ahead and 0 behind the branch remote, including this report commit. No push was performed. |
+| Final verified implementation-head diff | `git diff --stat e95f7564..3d07b74f` | 232 files, 44,690 insertions, 13,918 deletions. These totals stop at the verified implementation head; generated Worker declarations and API artifacts account for a large share of insertions. |
+| Initial report snapshot | `git diff --stat e95f7564..6aab2bd2` | 233 files, 45,143 insertions, 13,918 deletions after the initial report commit. This snapshot is not mislabeled as the implementation-head diff. |
+| Verified implementation-head divergence | `git rev-list --left-right --count 3d07b74f...origin/main`; same command against `origin/dev/mmango10` | At the source state actually verified: 108 ahead / 3 behind `origin/main`, and 111 ahead / 0 behind the branch remote. |
+| Terminal post-correction divergence | `git rev-list --left-right --count HEAD...origin/main`; same command against `origin/dev/mmango10` | 110 ahead / 3 behind `origin/main`, and 113 ahead / 0 behind the branch remote after the initial report and this report-only correction. The three unmerged upstream commits remain `16140b45`, `b13591fc`, and `cc7d03a9`; no merge, rebase, cherry-pick, reset, or push was performed. |
 | Final verified implementation/result commit | `3d07b74fd0ad93ac57a46187f7ad3ab4202cd81b` | Every Task 8 gate and trace below was run against this production-source state. |
-| Final report commit | Commit subject `docs: report codebase cleanup results` | This row is intentionally self-identifying: embedding the hash of the commit that contains it is impossible without changing that hash. Resolve it with `git log -1 --format=%H -- docs/superpowers/reports/2026-07-10-cleanup-modernization-report.md`. |
+| Report commits | `6aab2bd2 docs: report codebase cleanup results`; follow-up subject `docs: correct cleanup audit evidence` | The follow-up changes this report only. Its self-referential hash is intentionally omitted; resolve it with `git log -1 --format=%H -- docs/superpowers/reports/2026-07-10-cleanup-modernization-report.md`. |
 
 The range `e95f7564..3d07b74f` is used for implementation before/after accounting.
 Task-level ownership comes from `.superpowers/sdd/progress.md` and the task reports;
@@ -155,7 +156,7 @@ Reviewed Task 2 artifacts and the current build provide the built CSS comparison
 | Reviewed pre-split public entry `index-CXkWcj8R.css` | 27,292 | 5,780 | All 12 authenticated selectors were still in the public entry. |
 | Reviewed Task 2 post-split public entry `index-CfrdwCVn.css` | 23,198 | 4,954 | Public entry after the ownership split. |
 | Current public entry `index-CfrdwCVn.css` | 23,198 | 4,935 | Public raw bytes remain identical; current boundary scan reports zero authenticated selectors. |
-| Current authenticated `authenticated-DZzVJC1c.css` | 3,464 | 1,126 | Loaded before protected UI; absent from public startup. |
+| Current authenticated `authenticated-DZzVJC1c.css` | 3,464 | 1,120 | Loaded before protected UI; absent from public startup. |
 
 The reviewed Task 2 split reduced the public entry by exactly 4,094 raw bytes and
 826 gzip bytes. The current entry remains 4,094 raw bytes smaller than the
@@ -346,9 +347,11 @@ explicitly characterized analyzer rather than an enforcing zero-finding gate.
 | Process cleanup | No Task 8 Vite preview, Playwright, or test Chromium process remained after the traces. |
 
 The exact plan `rg` token list is nonzero because `sessionAccessToken` remains a
-legitimate local/parameter name six times in Worker request-header and proxy code.
-That token is not the deleted frontend module. A focused `test ! -e
-src/services/sessionAccessToken.ts`, import-pattern scan across source/tests/scripts,
+legitimate local/parameter name on eight Worker lines, containing ten token
+occurrences, across `requestHeaders.ts`, `functionProxy.ts`, and
+`supabaseApiProxy.ts`. That token is not the deleted frontend module. A focused
+`test ! -e src/services/sessionAccessToken.ts`, import-pattern scan across
+source/tests/scripts,
 and separate scan for every other removed candidate all passed with no output.
 Renaming live Worker locals to satisfy an overbroad token scan would not improve
 ownership or behavior, so the audit records the command false positive instead.
@@ -438,16 +441,19 @@ preview traces refresh the matrix below at the final implementation head.
    event delivery types) remain review candidates, not proven dead code. The
    separately reviewed deletion of `src/services/superOpsService.ts` reduced the
    unused-file count by one and is absent from the final findings.
-10. The final branch is 109 commits ahead and three commits behind `origin/main` after
-    the required read-only fetch. The behind commits are dependency-only and
+10. At the verified implementation head, the branch was 108 commits ahead and
+    three commits behind `origin/main`; the two report-only commits produce the
+    terminal 110-ahead / 3-behind state recorded in Section 2. The behind commits
+    are dependency-only and
     include exact-pin Cloudflare/Wrangler minor updates outside the reviewed Task 4
     upgrade scope plus packages deliberately removed by this cleanup. Per the
     final audit decision, no merge/rebase/cherry-pick was performed; reconciliation
     remains a separately approvable dependency follow-up, not a failed cleanup gate.
 11. The combined removed-token `rg` command remains overbroad because a live
-    Worker local is also named `sessionAccessToken`. Section 9 records the six
-    legitimate matches and the clean path-qualified replacement scans.
+    Worker local is also named `sessionAccessToken`. Section 9 records the eight
+    matching lines, ten token occurrences, and clean path-qualified replacement
+    scans.
 
 All required Task 8 gates, protected-flow traces, generated hashes, divergence,
-and deploy dry runs are now recorded. The report commit is the only post-verification
-change and does not modify production behavior.
+and deploy dry runs are now recorded. The report-only commits are the only
+post-verification changes and do not modify production behavior.

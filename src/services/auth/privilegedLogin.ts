@@ -19,7 +19,7 @@ import {
 } from "../httpSessionService";
 import { rotateDeviceSession } from "../../utils/deviceSession";
 import { touchTenantAdminSession } from "../adminOpsService";
-import { touchSuperAdminSession } from "../superOpsService";
+import { touchSuperAdminSession } from "../superOps/sessions";
 import {
   fetchCurrentRoleAndTenant,
   fetchProfile,

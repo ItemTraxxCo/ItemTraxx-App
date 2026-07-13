@@ -284,7 +284,7 @@ import {
   handleSuperAdminUnauthorized,
   isUnauthorizedError,
 } from "../../services/authErrorHandling";
-import { setTenantPolicy } from "../../services/superOpsService";
+import { setTenantPolicy } from "../../services/superOps/controlCenter";
 import { toUserFacingErrorMessage } from "../../services/appErrors";
 import {
   createTenant,

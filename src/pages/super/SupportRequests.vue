@@ -206,7 +206,7 @@ import {
   type SupportRequestDetail,
   type SupportRequestListItem,
   type SupportRequestStatus,
-} from "../../services/superOpsService";
+} from "../../services/superOps/support";
 import { safeExternalUrl } from "../../utils/safeUrl";
 
 const statusOptions: Array<{ value: SupportRequestStatus; label: string }> = [

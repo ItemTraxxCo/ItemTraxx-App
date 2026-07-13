@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { readFile } from "node:fs/promises";
 import { mockSystemStatus, mockUnauthenticatedSession } from "./helpers/testHarness";
 
 const forbiddenSdkResponse = (url: string) => {
@@ -446,6 +447,38 @@ test.describe("Public surfaces", () => {
     await expect(page.getByRole("button", { name: "Accept all" })).toHaveCount(0);
   });
 
+  test("essential and custom consent synchronize through storage and custom events", async ({ page }) => {
+    await page.goto("/login");
+    const consentDialog = page.getByRole("dialog", { name: "Cookie preferences" });
+
+    await consentDialog.getByRole("button", { name: "Essential only" }).click();
+    await expect.poll(() =>
+      page.evaluate(() =>
+        JSON.parse(localStorage.getItem("itemtraxx-cookie-consent") ?? "null")?.preferences,
+      ),
+    ).toEqual({ analytics: false, diagnostics: false });
+
+    await page.evaluate(() => {
+      localStorage.removeItem("itemtraxx-cookie-consent");
+      window.dispatchEvent(new StorageEvent("storage", { key: "itemtraxx-cookie-consent" }));
+    });
+    await expect(consentDialog).toBeVisible();
+
+    await consentDialog.getByRole("checkbox", { name: "Analytics" }).check();
+    await consentDialog.getByRole("button", { name: "Save choices" }).click();
+    await expect.poll(() =>
+      page.evaluate(() =>
+        JSON.parse(localStorage.getItem("itemtraxx-cookie-consent") ?? "null")?.preferences,
+      ),
+    ).toEqual({ analytics: true, diagnostics: false });
+
+    await page.evaluate(() => {
+      localStorage.removeItem("itemtraxx-cookie-consent");
+      window.dispatchEvent(new CustomEvent("itemtraxx:cookie-consent"));
+    });
+    await expect(consentDialog).toBeVisible();
+  });
+
   test("broadcast dismissal and top-banner CSS offset follow the rendered banner height", async ({ page }) => {
     await page.route(/\/functions(?:\/v1)?\/system-status(?:\?.*)?$/, async (route) => {
       await route.fulfill({
@@ -546,6 +579,40 @@ test.describe("Public surfaces", () => {
     await expect(overlay).toBeVisible();
     await expect(overlay).toContainText("A new version of ItemTraxx is available.");
     await expect(overlay.getByRole("button", { name: "Update" })).toBeVisible();
+  });
+
+  test("maintenance suppresses forced version and session overlays", async ({ page }) => {
+    await page.route(/\/functions(?:\/v1)?\/system-status(?:\?.*)?$/, async (route) => {
+      await route.fulfill({
+        status: 200,
+        headers: { "access-control-allow-origin": nonDevE2eOrigin },
+        contentType: "application/json",
+        body: JSON.stringify({
+          status: "degraded",
+          maintenance: { enabled: true, message: "Precedence maintenance" },
+        }),
+      });
+    });
+
+    await page.goto(`${nonDevE2eOrigin}/login?force-update-overlay=1`);
+    await page.evaluate(async () => {
+      const { showSessionTermination } = await import("/src/store/sessionTermination.ts");
+      showSessionTermination("/login");
+    });
+
+    const dialogs = page.getByRole("alertdialog");
+    await expect(dialogs.filter({ hasText: "Maintenance currently in Progress" })).toBeVisible();
+    await expect(dialogs.filter({ hasText: "Update Available" })).toHaveCount(0);
+    await expect(dialogs.filter({ hasText: "Session Ended" })).toHaveCount(0);
+  });
+
+  test("forced version overlay is gated to development E2E builds", async () => {
+    const source = await readFile(
+      new URL("../../src/composables/useAppVersionStatus.ts", import.meta.url),
+      "utf8",
+    );
+    expect(source).toContain('import.meta.env.VITE_E2E_TEST_UTILS === "true"');
+    expect(source).toMatch(/import\.meta\.env\.DEV[\s\S]*VITE_E2E_TEST_UTILS[\s\S]*force-update-overlay/);
   });
 
   test("loads unified legal agreement page", async ({ page }) => {

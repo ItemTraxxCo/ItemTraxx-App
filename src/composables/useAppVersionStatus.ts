@@ -75,6 +75,7 @@ export const useAppVersionStatus = (options: AppVersionStatusOptions) => {
   onMounted(() => {
     forceUpdateOverlay.value =
       import.meta.env.DEV &&
+      import.meta.env.VITE_E2E_TEST_UTILS === "true" &&
       new URLSearchParams(window.location.search).get("force-update-overlay") === "1";
     deferredTimer = window.setTimeout(() => {
       deferredTimer = null;

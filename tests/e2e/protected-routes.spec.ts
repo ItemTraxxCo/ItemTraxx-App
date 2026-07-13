@@ -29,7 +29,7 @@ test.describe("Protected route smoke tests", () => {
     await expect(page.getByRole("heading", { name: "Item Status Tracking" })).toBeVisible();
   });
 
-  test("tenant navigation preserves onboarding replay and offline queue chrome", async ({ page }) => {
+  test("offline queue badge follows real queue storage transitions", async ({ page }) => {
     await page.goto("/");
     await page.evaluate(() => {
       localStorage.setItem("itemtraxx:onboarding:v1:tenant_admin", new Date().toISOString());
@@ -45,8 +45,54 @@ test.describe("Protected route smoke tests", () => {
       /auto-syncs them when connection is restored/,
     );
 
+    await page.evaluate(async () => {
+      await window.__itemtraxxTest?.offlineCheckoutQueue.queue({
+        student_id: "student-shell-e2e",
+        gear_barcodes: ["GEAR-SHELL-E2E"],
+        action_type: "checkout",
+        operation_id: "operation-shell-e2e",
+      });
+      window.dispatchEvent(
+        new StorageEvent("storage", { key: "itemtraxx:checkout-offline-buffer:v1" }),
+      );
+    });
+    await expect(page.getByRole("menuitem", { name: "Offline Queue: 1" })).toBeVisible();
+
+    await page.evaluate(async () => {
+      await window.__itemtraxxTest?.offlineCheckoutQueue.write([]);
+      window.dispatchEvent(
+        new StorageEvent("storage", { key: "itemtraxx:checkout-offline-buffer:v1" }),
+      );
+    });
+    await expect(page.getByRole("menuitem", { name: "Offline Queue: 0" })).toBeVisible();
+  });
+
+  test("onboarding completion survives reload and replay reopens the tour", async ({ page }) => {
+    await page.goto("/");
+    await page.evaluate(() => {
+      localStorage.removeItem("itemtraxx:onboarding:v1:tenant_admin");
+    });
+    await setTenantAdminSession(page);
+    await navigateApp(page, "/tenant/checkout");
+
+    const dialog = page.getByRole("dialog", { name: /ItemTraxx onboarding step/ });
+    await expect(dialog).toBeVisible();
+    await dialog.getByRole("button", { name: "Close onboarding" }).click();
+    await expect(dialog).toHaveCount(0);
+    await expect.poll(() =>
+      page.evaluate(() => localStorage.getItem("itemtraxx:onboarding:v1:tenant_admin")),
+    ).not.toBeNull();
+
+    await page.reload();
+    await expect(page).toHaveURL(/\/tenant\/checkout$/);
+    await page.waitForFunction(
+      () => typeof window.__itemtraxxTest?.setTenantAdminSession === "function",
+    );
+    await page.evaluate(() => window.__itemtraxxTest?.setTenantAdminSession("tenant-e2e"));
+    await expect(dialog).toHaveCount(0);
+    await page.getByRole("button", { name: "Open menu" }).click();
     await page.getByRole("menuitem", { name: "Take tour again" }).click();
-    await expect(page.getByRole("dialog")).toBeVisible();
+    await expect(dialog).toBeVisible();
   });
 
   test("authenticated users can dismiss a degraded incident without changing its status link", async ({ page }) => {

@@ -5,15 +5,7 @@ import { isAllowedOrigin, parseAllowedOrigins } from "../_shared/cors.ts";
 import { resolveRateLimitResult } from "../_shared/preloginGuards.ts";
 import { requireTrustedEdgeIngress } from "../_shared/trustedIngress.ts";
 import { readJsonBody } from "../_shared/requestBody.ts";
-import {
-  isMissingPostgrestColumn as isMissingColumn,
-  isMissingPostgrestRelation as isMissingRelation,
-} from "../_shared/postgrestErrors.ts";
-import { resolveTrustedGeneralLocation as resolveGeneralLocation } from "../_shared/requestMetadata.ts";
-import {
-  isTenantAdminTokenBlockedBySessionRevocation,
-  resolveTenantAdminAuthSessionBinding,
-} from "../_shared/tenantAdminSessions.ts";
+import { resolveTenantAdminAuthSessionBinding } from "../_shared/tenantAdminSessions.ts";
 import {
   asRecord,
   BARCODE_PATTERN,
@@ -30,6 +22,10 @@ import {
   normalizeTenantUpdates,
   resolveMaintenance,
 } from "./actions/notifications.ts";
+import {
+  findActiveSession,
+  resolveDeviceSessionContext,
+} from "./actions/sessions.ts";
 import { resolveTenantPolicyState } from "./actions/settings.ts";
 import type { AdminOpsContext } from "./context.ts";
 
@@ -38,15 +34,6 @@ const baseCorsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-request-id",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
   Vary: "Origin",
-};
-
-type DeviceSessionContext = {
-  deviceId: string | null;
-  deviceLabel: string | null;
-  userAgent: string | null;
-  loginMethod: "password" | "magic_link" | "session_handoff" | null;
-  loginLocation: "regular_login" | "admin_login" | null;
-  generalLocation: string | null;
 };
 
 const TRACKED_STATUSES = new Set([
@@ -68,16 +55,6 @@ const ALLOWED_GEAR_STATUSES = new Set(
   ] as const,
 );
 
-type RpcError = {
-  code?: string;
-  message?: string;
-};
-
-const formatRpcError = (error: RpcError | null | undefined) =>
-  error
-    ? `${error.code ?? "unknown"}: ${error.message ?? "Unknown error"}`
-    : "Unknown error";
-
 const resolveCorsHeaders = (req: Request) => {
   const origin = req.headers.get("Origin");
   const allowedOrigins = parseAllowedOrigins(
@@ -94,49 +71,6 @@ const resolveCorsHeaders = (req: Request) => {
 
   return { hasOrigin, originAllowed, headers };
 };
-
-const sanitizeText = (value: unknown, maxLen: number) => {
-  return optionalText(value, { maxLen }) || null;
-};
-
-const sanitizeLoginMethod = (
-  value: unknown,
-): DeviceSessionContext["loginMethod"] =>
-  value === "password" || value === "magic_link" || value === "session_handoff"
-    ? value
-    : null;
-
-const sanitizeLoginLocation = (
-  value: unknown,
-): DeviceSessionContext["loginLocation"] =>
-  value === "regular_login" || value === "admin_login" ? value : null;
-
-const resolveDeviceSessionContext = (
-  payload: Record<string, unknown>,
-  req: Request,
-): DeviceSessionContext => ({
-  deviceId: sanitizeText(payload.device_id, 128),
-  deviceLabel: sanitizeText(payload.device_label, 160),
-  userAgent: sanitizeText(req.headers.get("user-agent"), 255),
-  loginMethod: sanitizeLoginMethod(payload.login_method),
-  loginLocation: sanitizeLoginLocation(payload.login_location),
-  generalLocation: resolveGeneralLocation(req),
-});
-
-const isMissingSessionTable = (error: RpcError | null | undefined) =>
-  isMissingRelation(error, "tenant_admin_sessions");
-
-const isMissingSessionMetadataColumn = (error: RpcError | null | undefined) =>
-  isMissingColumn(error, "login_method") ||
-  isMissingColumn(error, "login_location") ||
-  isMissingColumn(error, "general_location");
-
-const isMissingSessionAuthBindingColumn = (
-  error: RpcError | null | undefined,
-) =>
-  isMissingColumn(error, "auth_session_id") ||
-  isMissingColumn(error, "auth_token_hash") ||
-  isMissingColumn(error, "auth_token_issued_at");
 
 const sha256 = async (value: string) => {
   const encoded = new TextEncoder().encode(value);
@@ -283,357 +217,19 @@ serve(async (req) => {
       tenantStatus.status !== "active";
     const deviceSession = resolveDeviceSessionContext(payloadRecord, req);
 
-    const findActiveSession = async () => {
-      if (!deviceSession.deviceId) {
-        return {
-          exists: false as const,
-          relationMissing: false,
-          revoked: false as const,
-        };
-      }
-      const tokenBlock = await isTenantAdminTokenBlockedBySessionRevocation(
-        adminClient,
-        {
-          tenantId,
-          profileId: user.id,
-          authToken,
-        },
-      );
-      if (tokenBlock.relationMissing) {
-        return {
-          exists: false as const,
-          relationMissing: true as const,
-          revoked: false as const,
-        };
-      }
-      if (tokenBlock.blocked) {
-        return {
-          exists: false as const,
-          relationMissing: false as const,
-          revoked: true as const,
-        };
-      }
-      const { data, error } = await adminClient
-        .from("tenant_admin_sessions")
-        .select("id, auth_session_id, auth_token_hash")
-        .eq("tenant_id", tenantId)
-        .eq("profile_id", user.id)
-        .eq("device_id", deviceSession.deviceId)
-        .is("revoked_at", null)
-        .limit(1)
-        .maybeSingle();
-      if (error) {
-        if (isMissingSessionTable(error as RpcError)) {
-          return {
-            exists: false as const,
-            relationMissing: true as const,
-            revoked: false as const,
-          };
-        }
-        if (isMissingSessionAuthBindingColumn(error as RpcError)) {
-          return {
-            exists: false as const,
-            relationMissing: true as const,
-            revoked: false as const,
-          };
-        }
-        throw new Error("Unable to validate admin session.");
-      }
-      if (
-        data?.id &&
-        (
-          (typeof data.auth_session_id === "string" &&
-            data.auth_session_id.trim().length > 0 &&
-            !!authSessionBinding.sessionId &&
-            data.auth_session_id === authSessionBinding.sessionId) ||
-          ((!data.auth_session_id ||
-            (typeof data.auth_session_id === "string" &&
-              data.auth_session_id.trim().length === 0)) &&
-            typeof data.auth_token_hash === "string" &&
-            data.auth_token_hash.trim() === authTokenBindingKey)
-        )
-      ) {
-        return {
-          exists: true as const,
-          relationMissing: false as const,
-          revoked: false as const,
-        };
-      }
-
-      const { data: revokedRow, error: revokedError } = await adminClient
-        .from("tenant_admin_sessions")
-        .select("id")
-        .eq("tenant_id", tenantId)
-        .eq("profile_id", user.id)
-        .eq("device_id", deviceSession.deviceId)
-        .not("revoked_at", "is", null)
-        .order("revoked_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      if (revokedError) {
-        if (isMissingSessionTable(revokedError as RpcError)) {
-          return {
-            exists: false as const,
-            relationMissing: true as const,
-            revoked: false as const,
-          };
-        }
-        throw new Error("Unable to validate admin session.");
-      }
-
-      return {
-        exists: false as const,
-        relationMissing: false as const,
-        revoked: !!revokedRow?.id,
-      };
-    };
-
-    const touchCurrentSession = async () => {
-      if (!deviceSession.deviceId) {
-        return {
-          ok: false as const,
-          relationMissing: false as const,
-          reason: "missing_device",
-        };
-      }
-      const now = new Date().toISOString();
-      const { data: existing, error: existingError } = await adminClient
-        .from("tenant_admin_sessions")
-        .select("id")
-        .eq("tenant_id", tenantId)
-        .eq("profile_id", user.id)
-        .eq("device_id", deviceSession.deviceId)
-        .is("revoked_at", null)
-        .limit(1)
-        .maybeSingle();
-      if (existingError) {
-        console.error("admin-ops touch_session existing lookup failed", {
-          request_id: requestId,
-          tenant_id: tenantId,
-          profile_id: user.id,
-          device_id: deviceSession.deviceId,
-          error: existingError,
-        });
-        if (isMissingSessionTable(existingError as RpcError)) {
-          return {
-            ok: false as const,
-            relationMissing: true as const,
-            reason: "missing_table",
-          };
-        }
-        throw new Error(
-          `Unable to register admin session: ${
-            formatRpcError(existingError as RpcError)
-          }`,
-        );
-      }
-
-      const tokenBlock = await isTenantAdminTokenBlockedBySessionRevocation(
-        adminClient,
-        {
-          tenantId,
-          profileId: user.id,
-          authToken,
-        },
-      );
-      if (tokenBlock.relationMissing) {
-        return {
-          ok: false as const,
-          relationMissing: true as const,
-          reason: "missing_table",
-        };
-      }
-      if (tokenBlock.blocked) {
-        return {
-          ok: false as const,
-          relationMissing: false as const,
-          reason: "revoked",
-        };
-      }
-
-      if (existing?.id) {
-        const baseUpdate = {
-          last_seen_at: now,
-          device_label: deviceSession.deviceLabel,
-          user_agent: deviceSession.userAgent,
-          auth_session_id: authSessionBinding.sessionId,
-          auth_token_hash: authTokenBindingKey,
-          auth_token_issued_at: authSessionBinding.issuedAt,
-        };
-        const metadataUpdate = {
-          ...baseUpdate,
-          ...(deviceSession.loginMethod
-            ? { login_method: deviceSession.loginMethod }
-            : {}),
-          ...(deviceSession.loginLocation
-            ? { login_location: deviceSession.loginLocation }
-            : {}),
-          ...(deviceSession.generalLocation
-            ? { general_location: deviceSession.generalLocation }
-            : {}),
-        };
-        const shouldTryMetadataUpdate = !!deviceSession.loginMethod ||
-          !!deviceSession.loginLocation || !!deviceSession.generalLocation;
-        const { error: updateError } = await adminClient
-          .from("tenant_admin_sessions")
-          .update(shouldTryMetadataUpdate ? metadataUpdate : baseUpdate)
-          .eq("id", existing.id);
-        if (updateError) {
-          console.error("admin-ops touch_session update failed", {
-            request_id: requestId,
-            session_id: existing.id,
-            tenant_id: tenantId,
-            profile_id: user.id,
-            device_id: deviceSession.deviceId,
-            error: updateError,
-            used_metadata_update: shouldTryMetadataUpdate,
-          });
-          if (isMissingSessionAuthBindingColumn(updateError as RpcError)) {
-            return {
-              ok: false as const,
-              relationMissing: true as const,
-              reason: "missing_table",
-            };
-          }
-          if (
-            shouldTryMetadataUpdate &&
-            isMissingSessionMetadataColumn(updateError as RpcError)
-          ) {
-            const { error: fallbackUpdateError } = await adminClient
-              .from("tenant_admin_sessions")
-              .update({
-                last_seen_at: now,
-                device_label: deviceSession.deviceLabel,
-                user_agent: deviceSession.userAgent,
-              })
-              .eq("id", existing.id);
-            if (fallbackUpdateError) {
-              console.error("admin-ops touch_session fallback update failed", {
-                request_id: requestId,
-                session_id: existing.id,
-                tenant_id: tenantId,
-                profile_id: user.id,
-                device_id: deviceSession.deviceId,
-                error: fallbackUpdateError,
-              });
-              throw new Error(
-                `Unable to update admin session: ${
-                  formatRpcError(fallbackUpdateError as RpcError)
-                }`,
-              );
-            }
-          } else {
-            throw new Error(
-              `Unable to update admin session: ${
-                formatRpcError(updateError as RpcError)
-              }`,
-            );
-          }
-        }
-      } else {
-        const baseInsert = {
-          tenant_id: tenantId,
-          profile_id: user.id,
-          device_id: deviceSession.deviceId,
-          device_label: deviceSession.deviceLabel,
-          user_agent: deviceSession.userAgent,
-          auth_session_id: authSessionBinding.sessionId,
-          auth_token_hash: authTokenBindingKey,
-          auth_token_issued_at: authSessionBinding.issuedAt,
-          created_at: now,
-          last_seen_at: now,
-        };
-        const metadataInsert = {
-          ...baseInsert,
-          ...(deviceSession.loginMethod
-            ? { login_method: deviceSession.loginMethod }
-            : {}),
-          ...(deviceSession.loginLocation
-            ? { login_location: deviceSession.loginLocation }
-            : {}),
-          ...(deviceSession.generalLocation
-            ? { general_location: deviceSession.generalLocation }
-            : {}),
-        };
-        const shouldTryMetadataInsert = !!deviceSession.loginMethod ||
-          !!deviceSession.loginLocation || !!deviceSession.generalLocation;
-        const { error: insertError } = await adminClient
-          .from("tenant_admin_sessions")
-          .insert(shouldTryMetadataInsert ? metadataInsert : baseInsert);
-        if (insertError) {
-          console.error("admin-ops touch_session insert failed", {
-            request_id: requestId,
-            tenant_id: tenantId,
-            profile_id: user.id,
-            device_id: deviceSession.deviceId,
-            error: insertError,
-            used_metadata_insert: shouldTryMetadataInsert,
-          });
-          if (isMissingSessionTable(insertError as RpcError)) {
-            return {
-              ok: false as const,
-              relationMissing: true as const,
-              reason: "missing_table",
-            };
-          }
-          if (isMissingSessionAuthBindingColumn(insertError as RpcError)) {
-            return {
-              ok: false as const,
-              relationMissing: true as const,
-              reason: "missing_table",
-            };
-          }
-          if (
-            shouldTryMetadataInsert &&
-            isMissingSessionMetadataColumn(insertError as RpcError)
-          ) {
-            const { error: fallbackInsertError } = await adminClient
-              .from("tenant_admin_sessions")
-              .insert({
-                tenant_id: tenantId,
-                profile_id: user.id,
-                device_id: deviceSession.deviceId,
-                device_label: deviceSession.deviceLabel,
-                user_agent: deviceSession.userAgent,
-                auth_session_id: authSessionBinding.sessionId,
-                auth_token_hash: authTokenBindingKey,
-                auth_token_issued_at: authSessionBinding.issuedAt,
-                created_at: now,
-                last_seen_at: now,
-              });
-            if (fallbackInsertError) {
-              console.error("admin-ops touch_session fallback insert failed", {
-                request_id: requestId,
-                tenant_id: tenantId,
-                profile_id: user.id,
-                device_id: deviceSession.deviceId,
-                error: fallbackInsertError,
-              });
-              throw new Error(
-                `Unable to register admin session: ${
-                  formatRpcError(fallbackInsertError as RpcError)
-                }`,
-              );
-            }
-          } else {
-            throw new Error(
-              `Unable to register admin session: ${
-                formatRpcError(insertError as RpcError)
-              }`,
-            );
-          }
-        }
-      }
-
-      return {
-        ok: true as const,
-        relationMissing: false as const,
-        reason: "ok",
-      };
+    const sessionSecurityContext = {
+      adminClient,
+      tenantId,
+      user: { id: user.id },
+      authToken,
+      authSessionBinding,
+      authTokenBindingKey,
+      deviceSession,
+      requestId,
     };
 
     if (profile.role === "tenant_admin" && !isSessionAction) {
-      const activeSession = await findActiveSession();
+      const activeSession = await findActiveSession(sessionSecurityContext);
       if (activeSession.relationMissing) {
         return jsonResponse(503, {
           error: "Session controls unavailable. Run latest SQL setup.",
@@ -654,7 +250,7 @@ serve(async (req) => {
         normalizedAction === "revoke_session" ||
         normalizedAction === "revoke_all_sessions")
     ) {
-      const activeSession = await findActiveSession();
+      const activeSession = await findActiveSession(sessionSecurityContext);
       if (activeSession.relationMissing) {
         return jsonResponse(503, {
           error: "Session controls unavailable. Run latest SQL setup.",
@@ -719,217 +315,8 @@ serve(async (req) => {
       tenantUpdates,
       jsonResponse,
     };
-    if (
-      normalizedAction === "get_notifications" ||
-      normalizedAction === "get_tenant_settings" ||
-      normalizedAction === "update_tenant_settings" ||
-      normalizedAction === "get_status_tracking"
-    ) {
+    if (normalizedAction !== "bulk_import_gear") {
       return dispatchAdminOpsAction(context);
-    }
-
-    if (normalizedAction === "touch_session") {
-      const touch = await touchCurrentSession();
-      if (touch.relationMissing) {
-        return jsonResponse(503, {
-          error: "Session controls unavailable. Run latest SQL setup.",
-        });
-      }
-      if (!touch.ok) {
-        if (touch.reason === "revoked") {
-          return jsonResponse(401, { error: "Session revoked" });
-        }
-        return jsonResponse(400, { error: "Device session is required." });
-      }
-      return jsonResponse(200, { data: { ok: true } });
-    }
-
-    if (normalizedAction === "validate_session") {
-      if (!deviceSession.deviceId) {
-        return jsonResponse(400, { error: "Device session is required." });
-      }
-      const activeSession = await findActiveSession();
-      if (activeSession.relationMissing) {
-        return jsonResponse(503, {
-          error: "Session controls unavailable. Run latest SQL setup.",
-        });
-      }
-      if (!activeSession.exists) {
-        return jsonResponse(200, { data: { valid: false } });
-      }
-      const touch = await touchCurrentSession();
-      if (!touch.ok && !touch.relationMissing) {
-        return jsonResponse(400, { error: "Unable to refresh admin session." });
-      }
-      return jsonResponse(200, { data: { valid: true } });
-    }
-
-    if (normalizedAction === "list_sessions") {
-      let sessionQuery: {
-        data:
-          | Array<{
-            id: string;
-            device_id: string;
-            device_label: string | null;
-            user_agent: string | null;
-            login_method?: "password" | "magic_link" | "session_handoff" | null;
-            login_location?: "regular_login" | "admin_login" | null;
-            general_location?: string | null;
-            created_at: string;
-            last_seen_at: string;
-          }>
-          | null;
-        error: RpcError | null;
-      } = await adminClient
-        .from("tenant_admin_sessions")
-        .select(
-          "id, device_id, device_label, user_agent, login_method, login_location, general_location, created_at, last_seen_at",
-        )
-        .eq("tenant_id", tenantId)
-        .eq("profile_id", user.id)
-        .is("revoked_at", null)
-        .order("last_seen_at", { ascending: false })
-        .limit(100);
-      if (
-        sessionQuery.error &&
-        isMissingSessionMetadataColumn(sessionQuery.error as RpcError)
-      ) {
-        sessionQuery = await adminClient
-          .from("tenant_admin_sessions")
-          .select(
-            "id, device_id, device_label, user_agent, created_at, last_seen_at",
-          )
-          .eq("tenant_id", tenantId)
-          .eq("profile_id", user.id)
-          .is("revoked_at", null)
-          .order("last_seen_at", { ascending: false })
-          .limit(100);
-      }
-      const { data, error } = sessionQuery;
-      if (error) {
-        if (isMissingSessionTable(error as RpcError)) {
-          return jsonResponse(400, {
-            error: "Session controls unavailable. Run latest SQL setup.",
-          });
-        }
-        return jsonResponse(400, { error: "Unable to load active devices." });
-      }
-      const rows = (data ?? []) as Array<{
-        id: string;
-        device_id: string;
-        device_label: string | null;
-        user_agent: string | null;
-        login_method?: "password" | "magic_link" | "session_handoff" | null;
-        login_location?: "regular_login" | "admin_login" | null;
-        general_location?: string | null;
-        created_at: string;
-        last_seen_at: string;
-      }>;
-      const dedupedRows = new Map<string, (typeof rows)[number]>();
-      for (const row of rows) {
-        const dedupeKey = row.device_id || row.id;
-        if (!dedupedRows.has(dedupeKey)) {
-          dedupedRows.set(dedupeKey, row);
-        }
-      }
-      return jsonResponse(200, {
-        data: {
-          sessions: Array.from(dedupedRows.values()).map((row) => ({
-            ...row,
-            login_method: row.login_method ?? null,
-            login_location: row.login_location ?? null,
-            general_location: row.general_location ?? null,
-            is_current: !!deviceSession.deviceId &&
-              row.device_id === deviceSession.deviceId,
-          })),
-        },
-      });
-    }
-
-    if (normalizedAction === "revoke_session") {
-      const sessionId = sanitizeText(payloadRecord.session_id, 128);
-      if (!sessionId) {
-        return jsonResponse(400, { error: "Session id is required." });
-      }
-      const { data: revokedRows, error } = await adminClient
-        .from("tenant_admin_sessions")
-        .update({
-          revoked_at: new Date().toISOString(),
-          revoked_by: user.id,
-        })
-        .eq("id", sessionId)
-        .eq("tenant_id", tenantId)
-        .eq("profile_id", user.id)
-        .is("revoked_at", null)
-        .select("id");
-      if (error) {
-        if (isMissingSessionTable(error as RpcError)) {
-          return jsonResponse(400, {
-            error: "Session controls unavailable. Run latest SQL setup.",
-          });
-        }
-        return jsonResponse(400, { error: "Unable to revoke session." });
-      }
-      if (!revokedRows?.length) {
-        return jsonResponse(404, { error: "Session not found." });
-      }
-      return jsonResponse(200, { data: { revoked: true } });
-    }
-
-    if (normalizedAction === "revoke_current_session") {
-      let query = adminClient
-        .from("tenant_admin_sessions")
-        .update({
-          revoked_at: new Date().toISOString(),
-          revoked_by: user.id,
-        })
-        .eq("tenant_id", tenantId)
-        .eq("profile_id", user.id)
-        .is("revoked_at", null);
-      if (authSessionBinding.sessionId) {
-        query = query.eq("auth_session_id", authSessionBinding.sessionId);
-      } else if (deviceSession.deviceId) {
-        query = query.eq("device_id", deviceSession.deviceId);
-      } else {
-        return jsonResponse(401, { error: "Session binding unavailable." });
-      }
-      const { data, error } = await query.select("id");
-      if (error) {
-        return jsonResponse(400, { error: "Unable to revoke session." });
-      }
-      return jsonResponse(200, {
-        data: { revoked: (data ?? []).length > 0 },
-      });
-    }
-
-    if (normalizedAction === "revoke_all_sessions") {
-      const signOutCurrent = payloadRecord.sign_out_current === true;
-      let query = adminClient
-        .from("tenant_admin_sessions")
-        .update({
-          revoked_at: new Date().toISOString(),
-          revoked_by: user.id,
-        })
-        .eq("tenant_id", tenantId)
-        .eq("profile_id", user.id)
-        .is("revoked_at", null);
-      if (!signOutCurrent && deviceSession.deviceId) {
-        query = query.neq("device_id", deviceSession.deviceId);
-      }
-      const { data, error } = await query.select("id");
-      if (error) {
-        if (isMissingSessionTable(error as RpcError)) {
-          return jsonResponse(400, {
-            error: "Session controls unavailable. Run latest SQL setup.",
-          });
-        }
-        return jsonResponse(400, { error: "Unable to revoke sessions." });
-      }
-      return jsonResponse(200, {
-        data: {
-          revoked: (data ?? []).length,
-        },
-      });
     }
 
     if (normalizedAction === "bulk_import_gear") {

@@ -9,6 +9,7 @@ import type {
 } from "../context.ts";
 import { handleNotificationAction } from "./notifications.ts";
 import { handleSettingsAction } from "./settings.ts";
+import { handleSessionAction } from "./sessions.ts";
 import { handleStatusTrackingAction } from "./statusTracking.ts";
 
 export const ADMIN_OPS_ACTIONS = [
@@ -114,6 +115,12 @@ const ACTION_HANDLERS: Partial<Record<AdminOpsAction, ActionHandler>> = {
   get_tenant_settings: handleSettingsAction,
   update_tenant_settings: handleSettingsAction,
   get_status_tracking: handleStatusTrackingAction,
+  touch_session: handleSessionAction,
+  validate_session: handleSessionAction,
+  list_sessions: handleSessionAction,
+  revoke_session: handleSessionAction,
+  revoke_current_session: handleSessionAction,
+  revoke_all_sessions: handleSessionAction,
 };
 
 export const dispatchAdminOpsAction = (context: AdminOpsContext) => {

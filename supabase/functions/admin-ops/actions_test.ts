@@ -293,20 +293,19 @@ Deno.test("touch_session preserves the missing-session-table fallback", async ()
 });
 
 Deno.test("touch_session fails closed when auth-binding columns are missing", async () => {
-  let tenantSessionCall = 0;
   const { client } = queryClient((call) => {
     if (call.table !== "tenant_admin_sessions") {
       return { data: null, error: null };
     }
-    tenantSessionCall += 1;
-    if (tenantSessionCall <= 2) return { data: null, error: null };
-    return {
-      data: null,
-      error: {
-        code: "42703",
-        message: 'column "auth_session_id" does not exist',
-      },
-    };
+    return call.operations.some((operation) => operation.method === "insert")
+      ? {
+        data: null,
+        error: {
+          code: "42703",
+          message: 'column "auth_session_id" does not exist',
+        },
+      }
+      : { data: null, error: null };
   });
   const response = await dispatchAdminOpsAction(
     contextFor("touch_session", client),
@@ -342,7 +341,12 @@ Deno.test("touch_session retries without optional metadata columns", async () =>
     const selected = call.operations.find((operation) =>
       operation.method === "select"
     );
-    if (selected?.args[0] === "id") {
+    const isTokenBlockLookup = call.operations.some((operation) =>
+      (operation.method === "eq" &&
+        operation.args[0] === "auth_session_id") ||
+      operation.method === "not"
+    );
+    if (selected?.args[0] === "id" && !isTokenBlockLookup) {
       return { data: { id: "session-1" }, error: null };
     }
     return { data: null, error: null };

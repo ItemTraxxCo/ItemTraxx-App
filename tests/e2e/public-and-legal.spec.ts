@@ -25,15 +25,130 @@ test.describe("Public surfaces", () => {
     await mockUnauthenticatedSession(page);
   });
 
-  test("loads landing page with primary sections", async ({ page }) => {
-    await page.goto("/");
-    await expect(page.getByRole("heading", { name: "ItemTraxx", exact: true })).toBeVisible();
-    await expect(
-      page.getByRole("navigation", { name: "Primary" }).getByRole("link", { name: "Login", exact: true }),
-    ).toBeVisible();
-    await expect(page.getByRole("heading", { name: "Answers to the common stuff." })).toBeVisible();
-    await expect(page.getByRole("heading", { name: "Get started with ItemTraxx and advance your inventory management." })).toBeVisible();
-  });
+  for (const viewport of [
+    { label: "desktop", width: 1280, height: 900 },
+    { label: "mobile", width: 390, height: 844 },
+  ] as const) {
+    test(`canonical landing preserves its semantic, image, and responsive contracts on ${viewport.label}`, async ({ page }) => {
+      await page.setViewportSize(viewport);
+      await page.addInitScript(() => {
+        Math.random = () => 0;
+      });
+      await page.goto("/");
+      await expect(page.getByRole("heading", { name: "ItemTraxx", exact: true })).toBeVisible();
+
+      const headings = await page.getByRole("heading").evaluateAll((elements) =>
+        elements.map((element) => ({
+          level: Number(element.tagName.slice(1)),
+          name: element.textContent?.trim() ?? "",
+        })),
+      );
+      expect(headings).toEqual([
+        { level: 1, name: "ItemTraxx" },
+        { level: 2, name: "Simple inventory tracking without spreadsheet headaches." },
+        { level: 2, name: "Simple UI keeps everything minimal, sleek, and easy to navigate." },
+        { level: 3, name: "Management workflows without the spreadsheet sprawl." },
+        { level: 3, name: "Master your inventory." },
+        { level: 3, name: "Built for teams, organizations, and individual users." },
+        { level: 2, name: "Answers to the common stuff." },
+        { level: 2, name: "Get started with ItemTraxx and advance your inventory management." },
+      ]);
+
+      const primaryNav = page.getByRole("navigation", { name: "Primary" });
+      await expect(primaryNav.getByRole("link", { name: "Pricing", exact: true })).toHaveAttribute("href", "/pricing");
+      await expect(primaryNav.getByRole("link", { name: "Support", exact: true })).toHaveAttribute("href", "/contact-support");
+      await expect(primaryNav.getByRole("link", { name: "Open system status page" })).toHaveAttribute("href", "https://status.itemtraxx.com/");
+      await expect(primaryNav.getByRole("link", { name: "Open system status page" })).toHaveAttribute("target", "_blank");
+      await expect(primaryNav.getByRole("link", { name: "Open system status page" })).toHaveAttribute("rel", "noreferrer");
+      await expect(primaryNav.getByRole("link", { name: "Login", exact: true })).toHaveAttribute("href", "/login");
+
+      const hero = page.locator("section.hero-grid");
+      await expect(hero.getByRole("link", { name: "Pricing", exact: true })).toHaveAttribute("href", "/pricing");
+      await expect(hero.getByRole("link", { name: "Request Demo", exact: true })).toHaveAttribute("href", "/request-demo");
+      await expect(hero.getByRole("list", { name: "Key product benefits" }).getByRole("listitem")).toHaveCount(6);
+
+      const images = page.locator("main img");
+      await expect(images).toHaveCount(2);
+      await expect(images.nth(0)).toHaveAttribute("alt", "Checkout and return interface preview");
+      await expect(images.nth(0)).toHaveAttribute("src", /checkout_return_ui\.png$/);
+      await expect(images.nth(0)).toHaveAttribute("loading", "lazy");
+      await expect(images.nth(0)).toHaveAttribute("decoding", "async");
+      await expect(images.nth(0)).toHaveAttribute("width", "1600");
+      await expect(images.nth(0)).toHaveAttribute("height", "810");
+      await expect(images.nth(1)).toHaveAttribute("alt", "Admin interface preview");
+      await expect(images.nth(1)).toHaveAttribute("src", /admin_ui\.png$/);
+      await expect(images.nth(1)).toHaveAttribute("loading", "lazy");
+      await expect(images.nth(1)).toHaveAttribute("decoding", "async");
+      await expect(images.nth(1)).toHaveAttribute("width", "1600");
+      await expect(images.nth(1)).toHaveAttribute("height", "934");
+      const imageSources = page.locator("main picture source");
+      await expect(imageSources.nth(0)).toHaveAttribute("type", "image/webp");
+      await expect(imageSources.nth(0)).toHaveAttribute("sizes", "(max-width: 900px) 92vw, 640px");
+      await expect(imageSources.nth(0)).toHaveAttribute(
+        "srcset",
+        /checkout_return_ui-800\.webp 800w, .*checkout_return_ui-1200\.webp 1200w, .*checkout_return_ui-1600\.webp 1600w/,
+      );
+      await expect(imageSources.nth(1)).toHaveAttribute("type", "image/webp");
+      await expect(imageSources.nth(1)).toHaveAttribute("sizes", "(max-width: 900px) 92vw, 700px");
+      await expect(imageSources.nth(1)).toHaveAttribute(
+        "srcset",
+        /admin_ui-800\.webp 800w, .*admin_ui-1200\.webp 1200w, .*admin_ui-1600\.webp 1600w/,
+      );
+
+      const faqToggle = page.getByRole("button", { name: "How quickly can I get started?" });
+      const faqAnswer = page.locator("#landing-new-faq-answer-0");
+      await expect(faqToggle).toHaveAttribute("id", "landing-new-faq-toggle-0");
+      await expect(faqToggle).toHaveAttribute("aria-controls", "landing-new-faq-answer-0");
+      await expect(faqToggle).toHaveAttribute("aria-expanded", "false");
+      await expect(faqAnswer).toHaveAttribute("role", "region");
+      await expect(faqAnswer).toHaveAttribute("aria-labelledby", "landing-new-faq-toggle-0");
+      await faqToggle.click();
+      await expect(faqToggle).toHaveAttribute("aria-expanded", "true");
+      await expect(faqAnswer).toHaveClass(/is-open/);
+      await expect(faqAnswer).toContainText("You can get started with ItemTraxx fast.");
+      await faqToggle.click();
+      await expect(faqToggle).toHaveAttribute("aria-expanded", "false");
+      await expect(faqAnswer).not.toHaveClass(/is-open/);
+
+      const finalCta = page.locator("section.final-strip");
+      await expect(finalCta.getByRole("link", { name: "Go to Login" })).toHaveAttribute("href", "/login");
+      await expect(finalCta.getByRole("link", { name: "Pricing", exact: true })).toHaveAttribute("href", "/pricing");
+      const footer = page.locator("footer.public-footer");
+      await expect(footer.getByRole("link", { name: "Contact Support" })).toHaveAttribute("href", "/contact-support");
+      await expect(footer.getByRole("link", { name: "Status", exact: true })).toHaveAttribute("href", "https://status.itemtraxx.com/");
+
+      const responsiveContract = await page.evaluate(() => {
+        const styles = (selector: string) => getComputedStyle(document.querySelector(selector) as HTMLElement);
+        return {
+          heroColumns: styles(".hero-grid").gridTemplateColumns.split(" ").length,
+          opsColumns: styles(".ops-grid").gridTemplateColumns.split(" ").length,
+          heroPadding: styles(".hero-copy").padding,
+          heroRadius: styles(".hero-copy").borderRadius,
+          headerDirection: styles(".landing-header").flexDirection,
+          navOverflow: styles(".landing-nav").overflowX,
+        };
+      });
+      expect(responsiveContract).toEqual(
+        viewport.label === "desktop"
+          ? {
+              heroColumns: 2,
+              opsColumns: 3,
+              heroPadding: "48px",
+              heroRadius: "28px",
+              headerDirection: "row",
+              navOverflow: "visible",
+            }
+          : {
+              heroColumns: 1,
+              opsColumns: 1,
+              heroPadding: "19.2px",
+              heroRadius: "22px",
+              headerDirection: "row",
+              navOverflow: "auto",
+            },
+      );
+    });
+  }
 
   test("shared public footers render the current year with identical link contracts", async ({ page }) => {
     await page.clock.install();
@@ -68,20 +183,71 @@ test.describe("Public surfaces", () => {
     await expect(page.getByRole("heading", { name: "Request a Demo" })).toBeVisible();
   });
 
+  test("canonical landing emits the exact event contract for every CTA location", async ({ page }) => {
+    await page.route(/\/src\/services\/(analyticsService|posthogService)\.ts(?:\?.*)?$/, async (route) => {
+      const service = route.request().url().includes("posthogService") ? "posthog" : "analytics";
+      await route.fulfill({
+        status: 200,
+        contentType: "application/javascript",
+        body:
+          service === "analytics"
+            ? `export const trackAnalyticsEvent = async (name, properties) => {
+                window.__productEventDeliveries.analytics.push({ name, properties });
+              };`
+            : `export const capturePostHogEvent = (name, properties) => {
+                window.__productEventDeliveries.posthog.push({ name, properties });
+              };`,
+      });
+    });
+    await page.addInitScript(() => {
+      Object.defineProperty(window, "__productEventDeliveries", {
+        configurable: true,
+        value: { analytics: [], posthog: [] },
+        writable: true,
+      });
+    });
+
+    await page.goto("/");
+    const ctas = [
+      { locator: page.locator("header").getByRole("link", { name: "Login", exact: true }), destination: "/login" },
+      { locator: page.locator(".hero-actions").getByRole("link", { name: "Pricing", exact: true }), destination: "/pricing" },
+      { locator: page.locator(".hero-actions").getByRole("link", { name: "Request Demo", exact: true }), destination: "/request-demo" },
+      { locator: page.locator(".final-actions").getByRole("link", { name: "Go to Login" }), destination: "/login" },
+      { locator: page.locator(".final-actions").getByRole("link", { name: "Pricing", exact: true }), destination: "/pricing" },
+    ];
+    for (const { locator, destination } of ctas) {
+      await locator.click();
+      await expect(page).toHaveURL(new RegExp(`${destination}$`));
+      await page.goBack();
+      await expect(page.getByRole("heading", { name: "ItemTraxx", exact: true })).toBeVisible();
+    }
+
+    await expect.poll(() => page.evaluate(() =>
+      (window as Window & {
+        __productEventDeliveries: {
+          analytics: Array<{ name: string; properties: Record<string, unknown> }>;
+          posthog: Array<{ name: string; properties: Record<string, unknown> }>;
+        };
+      }).__productEventDeliveries,
+    )).toEqual({
+      analytics: [
+        { name: "landing_new_cta_click", properties: { cta: "login", location: "header" } },
+        { name: "landing_new_cta_click", properties: { cta: "pricing", location: "hero" } },
+        { name: "landing_new_cta_click", properties: { cta: "demo", location: "hero" } },
+        { name: "landing_new_cta_click", properties: { cta: "login", location: "final" } },
+        { name: "landing_new_cta_click", properties: { cta: "pricing", location: "final" } },
+      ],
+      posthog: [
+        { name: "landing_cta_clicked", properties: { cta: "login", location: "header" } },
+        { name: "landing_cta_clicked", properties: { cta: "pricing", location: "hero" } },
+        { name: "landing_cta_clicked", properties: { cta: "demo", location: "hero" } },
+        { name: "landing_cta_clicked", properties: { cta: "login", location: "final" } },
+        { name: "landing_cta_clicked", properties: { cta: "pricing", location: "final" } },
+      ],
+    });
+  });
+
   for (const contract of [
-    {
-      path: "/",
-      linkName: "Pricing",
-      destination: "/pricing",
-      analytics: {
-        name: "landing_new_cta_click",
-        properties: { cta: "pricing", location: "hero" },
-      },
-      posthog: {
-        name: "landing_cta_clicked",
-        properties: { cta: "pricing", location: "hero" },
-      },
-    },
     {
       path: "/landing-new2",
       linkName: "Request Demo",

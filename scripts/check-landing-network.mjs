@@ -1,5 +1,6 @@
 import { spawn } from "node:child_process";
 import { mkdirSync, writeFileSync } from "node:fs";
+import { createServer as createTcpServer } from "node:net";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
@@ -16,6 +17,20 @@ const PREVIEW_URL = "http://127.0.0.1:4174/";
 const PREVIEW_START_TIMEOUT_MS = 15_000;
 const NAVIGATION_TIMEOUT_MS = 30_000;
 const PROCESS_EXIT_TIMEOUT_MS = 5_000;
+
+export const assertPortAvailable = ({ host, port }) => new Promise((resolveAvailable, rejectAvailable) => {
+  const server = createTcpServer();
+  server.once("error", (error) => {
+    if (error.code === "EADDRINUSE") {
+      rejectAvailable(new Error(`Preview port ${port} is already in use on ${host}`, { cause: error }));
+      return;
+    }
+    rejectAvailable(error);
+  });
+  server.listen({ host, port, exclusive: true }, () => {
+    server.close((error) => error ? rejectAvailable(error) : resolveAvailable());
+  });
+});
 
 export const classifyLandingRequests = (urls) => ({
   directSupabase: urls.filter((url) => /https:\/\/[^/]+\.supabase\.(?:co|in)\//i.test(url)),
@@ -119,6 +134,7 @@ const printViolations = (violations) => {
 const run = async () => {
   const initialLoad = measureInitialLoad();
   const requestUrls = [];
+  await assertPortAvailable({ host: "127.0.0.1", port: 4174 });
   const preview = spawn(process.execPath, [
     "node_modules/vite/bin/vite.js",
     "preview",

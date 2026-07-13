@@ -1,7 +1,9 @@
 import assert from "node:assert/strict";
+import { createServer } from "node:http";
 import test from "node:test";
 
 import {
+  assertPortAvailable,
   classifyLandingRequests,
   evaluateLandingNetwork,
 } from "./check-landing-network.mjs";
@@ -101,4 +103,19 @@ test("rejects direct Supabase, forbidden SDK, and failing static initial load", 
     { type: "forbidden-sdk", urls: [sdkUrl] },
     { type: "initial-load", result: initialLoad },
   ]);
+});
+
+test("rejects an occupied preview port before orchestration", async (t) => {
+  const server = createServer((_request, response) => response.end("occupied"));
+  await new Promise((resolveListen) => server.listen(0, "127.0.0.1", resolveListen));
+  t.after(() => new Promise((resolveClose, rejectClose) => {
+    server.close((error) => error ? rejectClose(error) : resolveClose());
+  }));
+  const address = server.address();
+  assert.ok(address && typeof address === "object");
+
+  await assert.rejects(
+    assertPortAvailable({ host: "127.0.0.1", port: address.port }),
+    new RegExp(`Preview port ${address.port} is already in use`),
+  );
 });

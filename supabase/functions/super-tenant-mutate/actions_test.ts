@@ -69,10 +69,19 @@ Deno.test("tenant validators preserve status, account-category, and plan compati
   assertEquals(isValidTenantStatus("disabled"), false);
   assertEquals(isValidTenantAccountCategory("individual"), true);
   assertEquals(isValidTenantAccountCategory("school"), false);
-  assertEquals(isValidTenantPlanForAccountCategory("individual", "individual_yearly"), true);
-  assertEquals(isValidTenantPlanForAccountCategory("individual", "starter"), false);
+  assertEquals(
+    isValidTenantPlanForAccountCategory("individual", "individual_yearly"),
+    true,
+  );
+  assertEquals(
+    isValidTenantPlanForAccountCategory("individual", "starter"),
+    false,
+  );
   assertEquals(isValidTenantPlanForAccountCategory("district", "growth"), true);
-  assertEquals(isValidTenantPlanForAccountCategory("organization", "scale"), true);
+  assertEquals(
+    isValidTenantPlanForAccountCategory("organization", "scale"),
+    true,
+  );
   assertEquals(isValidTenantPlanForAccountCategory("organization", null), true);
 });
 
@@ -103,24 +112,54 @@ Deno.test("missing-column fallbacks preserve select and upsert retry order", () 
   );
   assertEquals(
     nextTenantPolicyFallback(
-      { includeAccountCategory: true, includePlanCode: true, includeFeatureFlags: true },
-      { code: "PGRST204", message: "Could not find the 'feature_flags' column" },
+      {
+        includeAccountCategory: true,
+        includePlanCode: true,
+        includeFeatureFlags: true,
+      },
+      {
+        code: "PGRST204",
+        message: "Could not find the 'feature_flags' column",
+      },
     ),
-    { includeAccountCategory: true, includePlanCode: true, includeFeatureFlags: false },
+    {
+      includeAccountCategory: true,
+      includePlanCode: true,
+      includeFeatureFlags: false,
+    },
   );
   assertEquals(
     nextTenantPolicyFallback(
-      { includeAccountCategory: true, includePlanCode: true, includeFeatureFlags: false },
-      { code: "PGRST204", message: "Could not find the 'account_category' column" },
+      {
+        includeAccountCategory: true,
+        includePlanCode: true,
+        includeFeatureFlags: false,
+      },
+      {
+        code: "PGRST204",
+        message: "Could not find the 'account_category' column",
+      },
     ),
-    { includeAccountCategory: false, includePlanCode: true, includeFeatureFlags: false },
+    {
+      includeAccountCategory: false,
+      includePlanCode: true,
+      includeFeatureFlags: false,
+    },
   );
   assertEquals(
     nextTenantPolicyFallback(
-      { includeAccountCategory: false, includePlanCode: true, includeFeatureFlags: false },
+      {
+        includeAccountCategory: false,
+        includePlanCode: true,
+        includeFeatureFlags: false,
+      },
       { code: "PGRST204", message: "Could not find the 'plan_code' column" },
     ),
-    { includeAccountCategory: false, includePlanCode: false, includeFeatureFlags: false },
+    {
+      includeAccountCategory: false,
+      includePlanCode: false,
+      includeFeatureFlags: false,
+    },
   );
 });
 
@@ -131,4 +170,229 @@ Deno.test("password resets use only the configured redirect allowlist entry", ()
   );
   assertEquals(resolveResetRedirectTo(""), null);
   assertEquals(resolveResetRedirectTo(undefined), null);
+});
+
+const testJsonResponse = (status: number, body: Record<string, unknown>) =>
+  new Response(JSON.stringify({ ok: status < 400, ...body }), {
+    status,
+    headers: { "Content-Type": "application/json" },
+  });
+
+const contextFor = (
+  action: string,
+  payload: Record<string, unknown>,
+  adminClient: unknown,
+  writeAudit: SuperTenantContext["writeAudit"] = async () => {},
+) =>
+  ({
+    req: new Request(
+      "https://example.test/functions/v1/super-tenant-mutate",
+      { method: "POST" },
+    ),
+    action,
+    payload,
+    userClient: {},
+    adminClient,
+    user: {
+      id: "00000000-0000-4000-8000-000000000001",
+      email: "admin@example.test",
+    },
+    profile: { auth_email: "admin@example.test" },
+    jsonResponse: testJsonResponse,
+    writeAudit,
+    resetRedirectTo: "https://app.example.test/reset-password",
+    supabaseUrl: "https://supabase.example.test",
+    publishableKey: "test-publishable-key",
+  }) as unknown as SuperTenantContext;
+
+const queryResult = (result: Record<string, unknown>) => {
+  const query: Record<string, unknown> = {};
+  for (
+    const method of [
+      "select",
+      "insert",
+      "update",
+      "delete",
+      "upsert",
+      "eq",
+      "in",
+      "gte",
+      "order",
+      "limit",
+    ]
+  ) {
+    query[method] = () => query;
+  }
+  query.single = () => Promise.resolve(result);
+  query.maybeSingle = () => Promise.resolve(result);
+  query.then = (
+    resolve: (value: Record<string, unknown>) => unknown,
+    reject: (reason: unknown) => unknown,
+  ) => Promise.resolve(result).then(resolve, reject);
+  return query;
+};
+
+Deno.test("super tenant dispatcher preserves a representative tenant read", async () => {
+  const adminClient = {
+    from: () => queryResult({ data: [], error: null }),
+  };
+
+  const response = await dispatchSuperTenantAction(
+    contextFor(
+      "list_tenants",
+      { search: "", status: "all" },
+      adminClient,
+    ),
+  );
+
+  assertEquals(response.status, 200);
+  assertEquals(await response.json(), { ok: true, data: [] });
+});
+
+Deno.test("super tenant dispatcher preserves an audited district write", async () => {
+  const district = {
+    id: "00000000-0000-4000-8000-000000000002",
+    name: "North District",
+    slug: "north-district",
+    support_email: null,
+    contact_name: null,
+    is_active: true,
+    created_at: "2026-01-01T00:00:00.000Z",
+    subscription_plan: "district_core",
+    billing_status: "active",
+    renewal_date: null,
+    billing_email: null,
+    invoice_reference: null,
+  };
+  const auditCalls: unknown[][] = [];
+  const adminClient = {
+    from: (table: string) =>
+      queryResult(
+        table === "districts"
+          ? { data: district, error: null }
+          : { data: [], error: null },
+      ),
+  };
+
+  const response = await dispatchSuperTenantAction(
+    contextFor(
+      "update_district",
+      {
+        id: district.id,
+        name: district.name,
+        slug: district.slug,
+        is_active: true,
+        subscription_plan: "district_core",
+        billing_status: "active",
+      },
+      adminClient,
+      async (...args) => {
+        auditCalls.push(args);
+      },
+    ),
+  );
+
+  assertEquals(response.status, 200);
+  assertEquals((await response.json()).data.id, district.id);
+  assertEquals(auditCalls, [[
+    "update_district",
+    "district",
+    district.id,
+    {
+      district_name: district.name,
+      district_slug: district.slug,
+      is_active: true,
+      subscription_plan: "district_core",
+      billing_status: "active",
+    },
+  ]]);
+});
+
+Deno.test("super tenant dispatcher preserves a representative database error", async () => {
+  const adminClient = {
+    from: () => queryResult({ data: null, error: { message: "db down" } }),
+  };
+
+  const response = await dispatchSuperTenantAction(
+    contextFor("list_districts", { search: "" }, adminClient),
+  );
+
+  assertEquals(response.status, 400);
+  assertEquals(await response.json(), {
+    ok: false,
+    error: "Unable to load districts.",
+  });
+});
+
+Deno.test("tenant creation preserves auth-failure tenant rollback", async () => {
+  const tenant = {
+    id: "00000000-0000-4000-8000-000000000003",
+    name: "Demo Tenant",
+    access_code: "DEMO-123",
+    status: "active",
+    created_at: "2026-01-01T00:00:00.000Z",
+    district_id: null,
+    primary_admin_profile_id: null,
+  };
+  const operations: Array<{ table: string; method: string; value?: unknown }> =
+    [];
+  const adminClient = {
+    auth: {
+      admin: {
+        createUser: async () => ({
+          data: { user: null },
+          error: { message: "provider unavailable" },
+        }),
+      },
+    },
+    from: (table: string) => {
+      const methods: string[] = [];
+      const query: Record<string, unknown> = {};
+      for (const method of ["select", "insert", "delete", "eq"]) {
+        query[method] = (value?: unknown) => {
+          methods.push(method);
+          operations.push({ table, method, value });
+          return query;
+        };
+      }
+      const result = () =>
+        table === "tenants" && methods.includes("insert")
+          ? { data: tenant, error: null }
+          : { data: null, error: null };
+      query.single = () => Promise.resolve(result());
+      query.maybeSingle = () => Promise.resolve(result());
+      query.then = (
+        resolve: (value: Record<string, unknown>) => unknown,
+        reject: (reason: unknown) => unknown,
+      ) => Promise.resolve(result()).then(resolve, reject);
+      return query;
+    },
+  };
+
+  const response = await dispatchSuperTenantAction(
+    contextFor(
+      "create_tenant",
+      {
+        name: tenant.name,
+        access_code: tenant.access_code,
+        auth_email: "tenant-admin@example.test",
+        password: "strong-password",
+        status: "active",
+      },
+      adminClient,
+    ),
+  );
+
+  assertEquals(response.status, 400);
+  assertEquals(await response.json(), {
+    ok: false,
+    error: "Unable to create auth user.",
+  });
+  assertEquals(
+    operations.some(
+      (operation) =>
+        operation.table === "tenants" && operation.method === "delete",
+    ),
+    true,
+  );
 });

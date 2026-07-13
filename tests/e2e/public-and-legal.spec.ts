@@ -537,6 +537,14 @@ test.describe("Public surfaces", () => {
     });
 
     await page.goto(`${nonDevE2eOrigin}/login`);
+    const maintenanceBanner = page.getByRole("alert").filter({
+      hasText: "Scheduled inventory maintenance",
+    });
+    await expect(maintenanceBanner).toBeVisible();
+    await expect(maintenanceBanner.locator("strong")).toHaveText("Maintenance Mode");
+    await expect(maintenanceBanner.locator("span")).toHaveText(
+      "Scheduled inventory maintenance",
+    );
     const overlay = page.getByRole("alertdialog").filter({ hasText: "Maintenance currently in Progress" });
     await expect(overlay).toBeVisible();
     await expect(overlay.getByRole("link", { name: "View Live Status" })).toHaveAttribute(

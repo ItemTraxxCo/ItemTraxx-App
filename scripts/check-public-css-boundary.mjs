@@ -63,8 +63,58 @@ const assetFromReference = (reference) => {
   return asset;
 };
 
-const stripCommentsAndStrings = (css) =>
-  css.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'/g, " ");
+const stripCommentsAndStrings = (css) => {
+  let output = "";
+  let state = "normal";
+  let escaped = false;
+
+  for (let index = 0; index < css.length; index += 1) {
+    const character = css[index];
+    const nextCharacter = css[index + 1];
+
+    if (state === "normal") {
+      if (character === "/" && nextCharacter === "*") {
+        output += "  ";
+        state = "comment";
+        index += 1;
+      } else if (character === "'") {
+        output += " ";
+        state = "single-quoted";
+      } else if (character === '"') {
+        output += " ";
+        state = "double-quoted";
+      } else {
+        output += character;
+      }
+      continue;
+    }
+
+    if (state === "comment") {
+      if (character === "*" && nextCharacter === "/") {
+        output += "  ";
+        state = "normal";
+        index += 1;
+      } else {
+        output += character === "\n" ? "\n" : " ";
+      }
+      continue;
+    }
+
+    output += character === "\n" ? "\n" : " ";
+    if (escaped) {
+      escaped = false;
+    } else if (character === "\\") {
+      escaped = true;
+    } else if (
+      (state === "single-quoted" && character === "'") ||
+      (state === "double-quoted" && character === '"')
+    ) {
+      state = "normal";
+    }
+  }
+
+  return output;
+};
 
 const containsSelector = (css, selector) => {
   const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -77,6 +127,9 @@ export const inspectPublicCss = ({
 } = {}) => {
   const html = readFileSync(htmlPath, "utf8");
   const assets = [...new Set(linkedStylesheets(html).map(assetFromReference))].sort(compareText);
+  if (assets.length === 0) {
+    throw new Error("no local CSS assets linked from index HTML");
+  }
   const canonicalAssetsDir = realpathSync(assetsDir);
   const violations = [];
 

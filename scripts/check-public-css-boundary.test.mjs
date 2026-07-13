@@ -39,6 +39,35 @@ test("reports authenticated selectors in entry-linked CSS", () => {
   });
 });
 
+test("does not treat a comment opener inside a string as a real comment", () => {
+  const result = withFixture(
+    {
+      html: '<link rel="stylesheet" href="/assets/index-a.css">',
+      assets: {
+        "index-a.css": 'a{content:"/*"}.admin-grid{}/* closing */',
+      },
+    },
+    inspectPublicCss,
+  );
+
+  assert.deepEqual(result.violations, [{ asset: "index-a.css", selector: ".admin-grid" }]);
+});
+
+test("keeps comment markers inside escaped single- and double-quoted strings isolated", () => {
+  const result = withFixture(
+    {
+      html: '<link rel="stylesheet" href="/assets/index-a.css">',
+      assets: {
+        "index-a.css":
+          'a{content:"escaped \\\" /*"}.admin-card{}b{content:\'escaped \\\' */\'}',
+      },
+    },
+    inspectPublicCss,
+  );
+
+  assert.deepEqual(result.violations, [{ asset: "index-a.css", selector: ".admin-card" }]);
+});
+
 test("accepts public-only entry CSS", () => {
   const result = withFixture(
     {
@@ -113,6 +142,19 @@ test("ignores stylesheet services without a CSS asset path", () => {
     assets: ["index-a.css"],
     violations: [{ asset: "index-a.css", selector: ".admin-hero" }],
   });
+});
+
+test("fails closed when no local CSS asset is linked", () => {
+  assert.throws(
+    () =>
+      withFixture(
+        {
+          html: '<link rel="stylesheet" href="https://fonts.example.com/css2?family=Inter">',
+        },
+        inspectPublicCss,
+      ),
+    /no local CSS assets linked from index HTML/,
+  );
 });
 
 for (const href of [

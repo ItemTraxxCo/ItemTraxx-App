@@ -8,11 +8,7 @@ import {
   requireUuid,
   SLUG_PATTERN,
 } from "../../_shared/validation.ts";
-import type {
-  PgError,
-  SuperTenantContext,
-  TenantRow,
-} from "../context.ts";
+import type { PgError, SuperTenantContext, TenantRow } from "../context.ts";
 import {
   isMissingDistrictIdColumn,
   isMissingDistrictsTable,
@@ -34,25 +30,31 @@ export type TenantPlanCode =
   | "individual_yearly"
   | "individual_monthly";
 
-export const TENANT_STATUSES = new Set([
-  "active",
-  "suspended",
-  "archived",
-] as const);
-export const TENANT_ACCOUNT_CATEGORIES = new Set([
-  "organization",
-  "district",
-  "individual",
-] as const);
-export const TENANT_PLAN_CODES = new Set([
-  "core",
-  "growth",
-  "starter",
-  "scale",
-  "enterprise",
-  "individual_yearly",
-  "individual_monthly",
-] as const);
+export const TENANT_STATUSES = new Set(
+  [
+    "active",
+    "suspended",
+    "archived",
+  ] as const,
+);
+export const TENANT_ACCOUNT_CATEGORIES = new Set(
+  [
+    "organization",
+    "district",
+    "individual",
+  ] as const,
+);
+export const TENANT_PLAN_CODES = new Set(
+  [
+    "core",
+    "growth",
+    "starter",
+    "scale",
+    "enterprise",
+    "individual_yearly",
+    "individual_monthly",
+  ] as const,
+);
 
 export const isValidTenantStatus = (
   value: unknown,
@@ -61,7 +63,8 @@ export const isValidTenantStatus = (
 
 export const isValidTenantAccountCategory = (
   value: unknown,
-): value is TenantAccountCategory => TENANT_ACCOUNT_CATEGORIES.has(value as never);
+): value is TenantAccountCategory =>
+  TENANT_ACCOUNT_CATEGORIES.has(value as never);
 
 export const isValidTenantPlanForAccountCategory = (
   accountCategory: TenantAccountCategory,
@@ -71,9 +74,11 @@ export const isValidTenantPlanForAccountCategory = (
   (accountCategory === "individual" &&
     (planCode === "individual_yearly" || planCode === "individual_monthly")) ||
   (accountCategory === "district" &&
-    (planCode === "core" || planCode === "growth" || planCode === "enterprise")) ||
+    (planCode === "core" || planCode === "growth" ||
+      planCode === "enterprise")) ||
   (accountCategory === "organization" &&
-    (planCode === "starter" || planCode === "scale" || planCode === "enterprise"));
+    (planCode === "starter" || planCode === "scale" ||
+      planCode === "enterprise"));
 
 export const describeTenantWriteError = (
   fallback: string,
@@ -111,7 +116,9 @@ export const nextTenantPolicyFallback = (
   options: TenantPolicyFallbackOptions,
   error: PgError | null | undefined,
 ): TenantPolicyFallbackOptions | null => {
-  if (options.includeFeatureFlags && isMissingNamedColumn(error, "feature_flags")) {
+  if (
+    options.includeFeatureFlags && isMissingNamedColumn(error, "feature_flags")
+  ) {
     return { ...options, includeFeatureFlags: false };
   }
   if (
@@ -123,7 +130,8 @@ export const nextTenantPolicyFallback = (
   }
   if (
     options.includePlanCode &&
-    (isMissingNamedColumn(error, "plan_code") || isPlanCodeConstraintError(error))
+    (isMissingNamedColumn(error, "plan_code") ||
+      isPlanCodeConstraintError(error))
   ) {
     return { ...options, includePlanCode: false };
   }
@@ -250,7 +258,10 @@ const verifySuperPassword = async (
   const authClient = createClient(supabaseUrl, publishableKey, {
     auth: { persistSession: false },
   });
-  const { error } = await authClient.auth.signInWithPassword({ email, password });
+  const { error } = await authClient.auth.signInWithPassword({
+    email,
+    password,
+  });
   return !error;
 };
 
@@ -275,16 +286,15 @@ export const handleTenantWriteAction = async (context: SuperTenantContext) => {
       maxLen: 64,
       pattern: ACCESS_CODE_PATTERN,
     });
-    const accountCategory =
-      next.account_category === undefined ||
+    const accountCategory = next.account_category === undefined ||
         next.account_category === null ||
         next.account_category === ""
-        ? "organization"
-        : requireEnum(next.account_category, TENANT_ACCOUNT_CATEGORIES);
-    const planCode =
-      next.plan_code === undefined || next.plan_code === null || next.plan_code === ""
-        ? null
-        : requireEnum(next.plan_code, TENANT_PLAN_CODES);
+      ? "organization"
+      : requireEnum(next.account_category, TENANT_ACCOUNT_CATEGORIES);
+    const planCode = next.plan_code === undefined || next.plan_code === null ||
+        next.plan_code === ""
+      ? null
+      : requireEnum(next.plan_code, TENANT_PLAN_CODES);
     const districtSlugRaw = optionalText(next.district_slug, { maxLen: 80 });
     const districtSlug = districtSlugRaw
       ? requireText(normalizeDistrictSlug(districtSlugRaw), {
@@ -340,7 +350,10 @@ export const handleTenantWriteAction = async (context: SuperTenantContext) => {
         });
       }
       return jsonResponse(400, {
-        error: describeTenantWriteError("Unable to update tenant.", error as PgError),
+        error: describeTenantWriteError(
+          "Unable to update tenant.",
+          error as PgError,
+        ),
       });
     }
 

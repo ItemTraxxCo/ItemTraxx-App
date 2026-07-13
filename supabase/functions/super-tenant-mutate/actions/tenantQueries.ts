@@ -152,8 +152,8 @@ export const enrichTenants = async (
         ? "district"
         : "organization",
     plan_code: policyByTenant.get(row.id)?.plan_code ?? null,
-    feature_flags:
-      policyByTenant.get(row.id)?.feature_flags ?? defaultFeatureFlags(),
+    feature_flags: policyByTenant.get(row.id)?.feature_flags ??
+      defaultFeatureFlags(),
   }));
 };
 
@@ -214,18 +214,15 @@ export const handleListTenants = async (context: SuperTenantContext) => {
     return jsonResponse(200, {
       data: enriched.filter((row) => {
         const name = typeof row.name === "string" ? row.name.toLowerCase() : "";
-        const code =
-          typeof row.access_code === "string"
-            ? row.access_code.toLowerCase()
-            : "";
-        const districtName =
-          typeof row.district_name === "string"
-            ? row.district_name.toLowerCase()
-            : "";
-        const districtSlug =
-          typeof row.district_slug === "string"
-            ? row.district_slug.toLowerCase()
-            : "";
+        const code = typeof row.access_code === "string"
+          ? row.access_code.toLowerCase()
+          : "";
+        const districtName = typeof row.district_name === "string"
+          ? row.district_name.toLowerCase()
+          : "";
+        const districtSlug = typeof row.district_slug === "string"
+          ? row.district_slug.toLowerCase()
+          : "";
         return (
           name.includes(normalizedSearch) ||
           code.includes(normalizedSearch) ||
@@ -244,16 +241,15 @@ export const handleListTenants = async (context: SuperTenantContext) => {
   return jsonResponse(200, {
     data: enriched.filter((row) => {
       const name = typeof row.name === "string" ? row.name.toLowerCase() : "";
-      const code =
-        typeof row.access_code === "string" ? row.access_code.toLowerCase() : "";
-      const districtName =
-        typeof row.district_name === "string"
-          ? row.district_name.toLowerCase()
-          : "";
-      const districtSlug =
-        typeof row.district_slug === "string"
-          ? row.district_slug.toLowerCase()
-          : "";
+      const code = typeof row.access_code === "string"
+        ? row.access_code.toLowerCase()
+        : "";
+      const districtName = typeof row.district_name === "string"
+        ? row.district_name.toLowerCase()
+        : "";
+      const districtSlug = typeof row.district_slug === "string"
+        ? row.district_slug.toLowerCase()
+        : "";
       return (
         name.includes(normalizedSearch) ||
         code.includes(normalizedSearch) ||

@@ -150,6 +150,44 @@ test.describe("Public surfaces", () => {
     });
   }
 
+  test("canonical page composes focused landing section boundaries without moving integrations", async () => {
+    const pageSource = await readFile(
+      new URL("../../src/pages/LandingPageNew.vue", import.meta.url),
+      "utf8",
+    );
+    const sectionNames = [
+      "LandingHeader",
+      "LandingHero",
+      "LandingShowcase",
+      "LandingFeatureSections",
+      "LandingFaq",
+      "LandingFinalCta",
+    ];
+
+    for (const sectionName of sectionNames) {
+      expect(pageSource).toContain(`../components/landing/${sectionName}.vue`);
+    }
+    expect(pageSource).toContain('import { trackProductEvent } from "../services/productEvents"');
+    expect(pageSource).toContain("const openFaqIndex = ref<number | null>(null)");
+    expect(pageSource).not.toContain('<header class="landing-header shell">');
+    expect(pageSource).not.toContain('<section class="feature-band reveal reveal-up">');
+    expect(pageSource).not.toContain('<section class="faq-section reveal reveal-up">');
+    expect(pageSource).not.toContain('<section class="final-strip reveal reveal-up">');
+
+    const sectionSources = await Promise.all(
+      sectionNames.map((sectionName) =>
+        readFile(
+          new URL(`../../src/components/landing/${sectionName}.vue`, import.meta.url),
+          "utf8",
+        ),
+      ),
+    );
+    for (const sectionSource of sectionSources) {
+      expect(sectionSource).not.toMatch(/from ["']vue-router["']/);
+      expect(sectionSource).not.toMatch(/from ["'][^"']*(?:services|stores?|auth)[^"']*["']/);
+    }
+  });
+
   test("shared public footers render the current year with identical link contracts", async ({ page }) => {
     await page.clock.install();
     await page.clock.setFixedTime(new Date("2027-02-03T12:00:00Z"));

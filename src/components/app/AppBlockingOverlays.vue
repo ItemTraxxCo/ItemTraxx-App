@@ -51,7 +51,7 @@
       </p>
       <p>
         Please try again shortly. Your data is safe and we will restore access as soon as
-        maintenance is complete. Please check the ItemTraxx status page for updates. 
+        maintenance is complete. Please check the ItemTraxx status page for updates.
       </p>
       <div class="maintenance-fullscreen-actions">
         <a

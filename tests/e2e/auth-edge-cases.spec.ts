@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 import { readFile } from "node:fs/promises";
 import {
   mockSystemStatus,
@@ -23,6 +23,186 @@ const authenticatedSessionSummary = () => ({
     is_active: true,
   },
 });
+
+const clearedAuthContext = {
+  isInitialized: true,
+  isAuthenticated: false,
+  userId: null,
+  email: null,
+  signedInAt: null,
+  role: null,
+  sessionTenantId: null,
+  tenantContextId: null,
+  districtContextId: null,
+  isAdmin: false,
+  isDistrictAdmin: false,
+  isSuperAdmin: false,
+  hasSecondaryAuth: false,
+  superVerifiedAt: null,
+  adminVerifiedAt: null,
+  pendingToken: null,
+  pendingEmail: null,
+  persistedAdminVerification: null,
+};
+
+const mockRoleMismatchBoundaries = async (page: Page, mode: "otp" | "passkey") => {
+  const trace: {
+    verificationPayloads: unknown[];
+    exchangePayload: unknown;
+    logoutRequests: number;
+  } = {
+    verificationPayloads: [],
+    exchangePayload: null,
+    logoutRequests: 0,
+  };
+  const suffix = mode === "otp" ? "otp" : "passkey";
+  await page.route(/\/functions(?:\/v1)?\/super-auth-verify(?:\?.*)?$/, async (route) => {
+    const body = route.request().postDataJSON() as { action?: string };
+    trace.verificationPayloads.push(body);
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify(
+        body.action === "start_password_login"
+          ? {
+              challenge_started: true,
+              email: `mismatch.${suffix}@example.com`,
+              challenge_token: `mismatch-${suffix}-challenge`,
+            }
+          : mode === "otp"
+            ? {
+                verified: true,
+                access_token: "mismatch-otp-access",
+                refresh_token: "mismatch-otp-refresh",
+              }
+            : { verified: true }
+      ),
+    });
+  });
+  await page.route("**/auth/session/exchange", async (route) => {
+    trace.exchangePayload = route.request().postDataJSON();
+    await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ ok: true }) });
+  });
+  await page.route("**/auth/session/me", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify(authenticatedSessionSummary()),
+    });
+  });
+  await page.route("**/rest/v1/tenants?**", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify([{ id: "tenant-e2e", status: "active", district_id: "district-e2e" }]),
+    });
+  });
+  await page.route("**/rest/v1/rpc/resolve_public_district_by_id", async (route) => {
+    await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify([]) });
+  });
+  await page.route("**/auth/session/logout", async (route) => {
+    trace.logoutRequests += 1;
+    await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ ok: true }) });
+  });
+  return trace;
+};
+
+const exerciseSuperRoleMismatch = async (page: Page, mode: "otp" | "passkey") =>
+  page.evaluate(async (flow) => {
+    const [
+      auth,
+      { getAuthState, markAdminVerified, setAuthStateFromBackend },
+      { supabase },
+    ] = await Promise.all([
+      import("/src/services/authService.ts"),
+      import("/src/store/authState.ts"),
+      import("/src/services/supabaseClient.ts"),
+    ]);
+    let passkeyCalls = 0;
+    if (flow === "passkey") {
+      Object.defineProperty(supabase.auth, "signInWithPasskey", {
+        configurable: true,
+        value: async () => {
+          passkeyCalls += 1;
+          return {
+            data: {
+              session: {
+                access_token: "mismatch-passkey-access",
+                refresh_token: "mismatch-passkey-refresh",
+              },
+            },
+            error: null,
+          };
+        },
+      });
+    }
+    Object.defineProperty(supabase.auth, "signOut", {
+      configurable: true,
+      value: async () => ({ error: null }),
+    });
+    await auth.superAdminLogin(
+      `mismatch.${flow}@example.com`,
+      "correct horse battery staple",
+      `turnstile-${flow}-mismatch`,
+    );
+    setAuthStateFromBackend({
+      isInitialized: true,
+      isAuthenticated: true,
+      userId: `stale-super-${flow}`,
+      email: "stale.super@example.com",
+      signedInAt: new Date().toISOString(),
+      role: "super_admin",
+      sessionTenantId: "stale-tenant",
+      tenantContextId: "stale-tenant",
+      districtContextId: "stale-district",
+      hasSecondaryAuth: true,
+      superVerifiedAt: new Date().toISOString(),
+    });
+    markAdminVerified();
+    const pendingBefore = {
+      token: auth.getPendingSuperAdminChallengeToken(),
+      email: auth.getPendingSuperAdminVerificationEmail(),
+    };
+    let errorMessage: string | null = null;
+    try {
+      if (flow === "otp") {
+        await auth.verifySuperAdminEmailChallenge("654321");
+      } else {
+        await auth.superAdminPasskeyLogin({
+          sendLoginNotification: false,
+          loginLocation: "super_settings",
+        });
+      }
+    } catch (error) {
+      errorMessage = error instanceof Error ? error.message : String(error);
+    }
+    const state = getAuthState();
+    return {
+      passkeyCalls,
+      pendingBefore,
+      errorMessage,
+      after: {
+        isInitialized: state.isInitialized,
+        isAuthenticated: state.isAuthenticated,
+        userId: state.userId,
+        email: state.email,
+        signedInAt: state.signedInAt,
+        role: state.role,
+        sessionTenantId: state.sessionTenantId,
+        tenantContextId: state.tenantContextId,
+        districtContextId: state.districtContextId,
+        isAdmin: state.isAdmin,
+        isDistrictAdmin: state.isDistrictAdmin,
+        isSuperAdmin: state.isSuperAdmin,
+        hasSecondaryAuth: state.hasSecondaryAuth,
+        superVerifiedAt: state.superVerifiedAt,
+        adminVerifiedAt: state.adminVerifiedAt,
+        pendingToken: auth.getPendingSuperAdminChallengeToken(),
+        pendingEmail: auth.getPendingSuperAdminVerificationEmail(),
+        persistedAdminVerification: sessionStorage.getItem("itemtraxx:admin-verification"),
+      },
+    };
+  }, mode);
 
 test.describe("Auth edge cases", () => {
   test.beforeEach(async ({ page }) => {
@@ -157,31 +337,34 @@ test.describe("Auth edge cases", () => {
   });
 
   test("district handoff consumes only the one-time code and removes auth material from the URL", async ({ page }) => {
-    const authEvents: string[] = [];
     let consumePayload: unknown = null;
     let exchangePayload: unknown = null;
-    await page.exposeFunction("recordDistrictHandoffEvent", (event: string) => {
-      authEvents.push(event);
-    });
     await page.addInitScript(() => {
       const originalReplaceState = window.history.replaceState.bind(window.history);
+      const originalFetch = window.fetch.bind(window);
+      const authEvents: string[] = [];
       const recordedUrls: string[] = [];
+      (window as unknown as { __districtHandoffEvents: string[] }).__districtHandoffEvents = authEvents;
       (window as unknown as { __authReplaceStateUrls: string[] }).__authReplaceStateUrls = recordedUrls;
       window.history.replaceState = (data: unknown, unused: string, url?: string | URL | null) => {
         const nextUrl = String(url ?? "");
         recordedUrls.push(nextUrl);
         if (nextUrl === "/#keep=1") {
-          void (
-            window as unknown as {
-              recordDistrictHandoffEvent: (event: string) => Promise<void>;
-            }
-          ).recordDistrictHandoffEvent("url-scrub");
+          authEvents.push("url-scrub");
         }
         originalReplaceState(data, unused, url);
       };
+      window.fetch = (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+        if (/\/functions(?:\/v1)?\/district-handoff(?:\?.*)?$/.test(url)) {
+          authEvents.push("consume-request");
+        } else if (/\/auth\/session\/exchange(?:\?.*)?$/.test(url)) {
+          authEvents.push("session-exchange");
+        }
+        return originalFetch(input, init);
+      };
     });
     await page.route(/\/functions(?:\/v1)?\/district-handoff(?:\?.*)?$/, async (route) => {
-      authEvents.push("consume-request");
       consumePayload = route.request().postDataJSON();
       await route.fulfill({
         status: 200,
@@ -190,7 +373,6 @@ test.describe("Auth edge cases", () => {
       });
     });
     await page.route("**/auth/session/exchange", async (route) => {
-      authEvents.push("session-exchange");
       exchangePayload = route.request().postDataJSON();
       await route.fulfill({
         status: 200,
@@ -218,7 +400,11 @@ test.describe("Auth edge cases", () => {
         () => (window as unknown as { __authReplaceStateUrls: string[] }).__authReplaceStateUrls
       )
     ).toContain("/#keep=1");
-    expect(authEvents.slice(0, 3)).toEqual([
+    expect(
+      await page.evaluate(
+        () => (window as unknown as { __districtHandoffEvents: string[] }).__districtHandoffEvents
+      )
+    ).toEqual([
       "url-scrub",
       "consume-request",
       "session-exchange",
@@ -560,116 +746,230 @@ test.describe("Auth edge cases", () => {
     expect(result.pendingAfter).toEqual({ token: null, email: null });
   });
 
-  test("missing-session logout preserves cleanup order and clears every auth context", async ({ page }) => {
-    const cleanupEvents: string[] = [];
-    await page.exposeFunction("recordAuthCleanupEvent", (event: string) => {
-      cleanupEvents.push(event);
-    });
-    await page.route(/\/functions(?:\/v1)?\/super-auth-verify(?:\?.*)?$/, async (route) => {
-      await route.fulfill({
-        status: 200,
-        contentType: "application/json",
-        body: JSON.stringify({
-          challenge_started: true,
-          email: "pending.super@example.com",
-          challenge_token: "pending-challenge-e2e",
-        }),
-      });
-    });
-    await page.route(/\/functions(?:\/v1)?\/admin-ops(?:\?.*)?$/, async (route) => {
-      const body = (route.request().postDataJSON() as { action?: string }) ?? {};
-      if (body.action === "revoke_current_session") {
-        cleanupEvents.push("admin-revoke");
-      }
-      await route.fulfill({
-        status: 200,
-        contentType: "application/json",
-        body: JSON.stringify({ data: { revoked: true } }),
-      });
-    });
-    await page.route("**/auth/session/logout", async (route) => {
-      cleanupEvents.push("http-session");
-      await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ ok: true }) });
-    });
+  test("super-admin OTP role mismatch fails closed and clears every auth context", async ({ page }) => {
+    const trace = await mockRoleMismatchBoundaries(page, "otp");
 
     await page.goto("/");
-    await page.waitForFunction(() => window.__itemtraxxTest !== undefined);
-    const result = await page.evaluate(async () => {
-      const [auth, { getAuthState, setDistrictContext }, { supabase }] = await Promise.all([
-        import("/src/services/authService.ts"),
-        import("/src/store/authState.ts"),
-        import("/src/services/supabaseClient.ts"),
-      ]);
-      Object.defineProperty(supabase.auth, "signOut", {
-        configurable: true,
-        value: async () => {
-          await (
-            window as unknown as {
-              recordAuthCleanupEvent: (event: string) => Promise<void>;
-            }
-          ).recordAuthCleanupEvent("local-supabase");
-          return {
-            error: {
-              name: "AuthSessionMissingError",
-              message: "Auth session missing!",
-              status: 403,
-              code: "session_not_found",
-            },
-          };
-        },
-      });
-      await auth.superAdminLogin(
-        "pending.super@example.com",
-        "correct horse battery staple",
-        "turnstile-e2e",
-      );
-      window.__itemtraxxTest?.setTenantAdminSession("tenant-e2e");
-      setDistrictContext("district-e2e");
-      const before = {
-        token: auth.getPendingSuperAdminChallengeToken(),
-        email: auth.getPendingSuperAdminVerificationEmail(),
-        adminVerifiedAt: getAuthState().adminVerifiedAt,
-        tenantContextId: getAuthState().tenantContextId,
-        districtContextId: getAuthState().districtContextId,
-      };
-      await auth.signOut();
-      const state = getAuthState();
-      return {
-        before,
-        after: {
-          isInitialized: state.isInitialized,
-          isAuthenticated: state.isAuthenticated,
-          userId: state.userId,
-          adminVerifiedAt: state.adminVerifiedAt,
-          tenantContextId: state.tenantContextId,
-          districtContextId: state.districtContextId,
-          token: auth.getPendingSuperAdminChallengeToken(),
-          email: auth.getPendingSuperAdminVerificationEmail(),
-          persistedAdminVerification: sessionStorage.getItem("itemtraxx:admin-verification"),
-        },
-      };
-    });
+    await waitForPublicAuthBootstrap(page);
+    const result = await exerciseSuperRoleMismatch(page, "otp");
 
-    expect(result.before).toMatchObject({
-      token: "pending-challenge-e2e",
-      email: "pending.super@example.com",
-      tenantContextId: "tenant-e2e",
-      districtContextId: "district-e2e",
+    expect(trace.verificationPayloads).toEqual([
+      {
+        action: "start_password_login",
+        payload: {
+          email: "mismatch.otp@example.com",
+          password: "correct horse battery staple",
+          turnstile_token: "turnstile-otp-mismatch",
+        },
+      },
+      {
+        action: "verify_email_challenge",
+        payload: { code: "654321", challenge_token: "mismatch-otp-challenge" },
+      },
+    ]);
+    expect(trace.exchangePayload).toEqual({
+      access_token: "mismatch-otp-access",
+      refresh_token: "mismatch-otp-refresh",
     });
-    expect(result.before.adminVerifiedAt).toBeTruthy();
-    expect(cleanupEvents).toEqual(["admin-revoke", "local-supabase", "http-session"]);
-    expect(result.after).toEqual({
-      isInitialized: true,
-      isAuthenticated: false,
-      userId: null,
-      adminVerifiedAt: null,
-      tenantContextId: null,
-      districtContextId: null,
-      token: null,
-      email: null,
-      persistedAdminVerification: null,
+    expect(result.pendingBefore).toEqual({
+      token: "mismatch-otp-challenge",
+      email: "mismatch.otp@example.com",
     });
+    expect(result.errorMessage).toBe("Access denied.");
+    expect(trace.logoutRequests).toBe(1);
+    expect(result.after).toEqual(clearedAuthContext);
   });
+
+  test("super-admin passkey role mismatch fails closed and clears every auth context", async ({ page }) => {
+    const trace = await mockRoleMismatchBoundaries(page, "passkey");
+
+    await page.goto("/");
+    await waitForPublicAuthBootstrap(page);
+    const result = await exerciseSuperRoleMismatch(page, "passkey");
+
+    expect(trace.verificationPayloads).toEqual([
+      {
+        action: "start_password_login",
+        payload: {
+          email: "mismatch.passkey@example.com",
+          password: "correct horse battery staple",
+          turnstile_token: "turnstile-passkey-mismatch",
+        },
+      },
+      { action: "complete_passkey_login", payload: {} },
+    ]);
+    expect(trace.exchangePayload).toEqual({
+      access_token: "mismatch-passkey-access",
+      refresh_token: "mismatch-passkey-refresh",
+    });
+    expect(result.passkeyCalls).toBe(1);
+    expect(result.pendingBefore).toEqual({
+      token: "mismatch-passkey-challenge",
+      email: "mismatch.passkey@example.com",
+    });
+    expect(result.errorMessage).toBe("Access denied.");
+    expect(trace.logoutRequests).toBe(1);
+    expect(result.after).toEqual(clearedAuthContext);
+  });
+
+  for (const missingSessionMode of ["returned", "thrown"] as const) {
+    test(`${missingSessionMode} missing-session logout preserves cleanup order and clears every auth context`, async ({ page }) => {
+      await page.route(/\/functions(?:\/v1)?\/super-auth-verify(?:\?.*)?$/, async (route) => {
+        await route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: JSON.stringify({
+            challenge_started: true,
+            email: "pending.super@example.com",
+            challenge_token: "pending-challenge-e2e",
+          }),
+        });
+      });
+      await page.route(/\/functions(?:\/v1)?\/admin-ops(?:\?.*)?$/, async (route) => {
+        await route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: JSON.stringify({ data: { revoked: true } }),
+        });
+      });
+      await page.route("**/auth/session/logout", async (route) => {
+        await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ ok: true }) });
+      });
+
+      await page.goto("/");
+      await waitForPublicAuthBootstrap(page);
+      const result = await page.evaluate(async (mode) => {
+        const [
+          auth,
+          {
+            getAuthState,
+            markAdminVerified,
+            setAuthStateFromBackend,
+            setDistrictContext,
+            setTenantContext,
+          },
+          { supabase },
+        ] = await Promise.all([
+          import("/src/services/authService.ts"),
+          import("/src/store/authState.ts"),
+          import("/src/services/supabaseClient.ts"),
+        ]);
+        const cleanupEvents: string[] = [];
+        const boundarySnapshots: Array<{ event: string; state: unknown }> = [];
+        const snapshot = () => {
+          const state = getAuthState();
+          return {
+            isInitialized: state.isInitialized,
+            isAuthenticated: state.isAuthenticated,
+            userId: state.userId,
+            email: state.email,
+            signedInAt: state.signedInAt,
+            role: state.role,
+            sessionTenantId: state.sessionTenantId,
+            tenantContextId: state.tenantContextId,
+            districtContextId: state.districtContextId,
+            isAdmin: state.isAdmin,
+            isDistrictAdmin: state.isDistrictAdmin,
+            isSuperAdmin: state.isSuperAdmin,
+            hasSecondaryAuth: state.hasSecondaryAuth,
+            superVerifiedAt: state.superVerifiedAt,
+            adminVerifiedAt: state.adminVerifiedAt,
+            pendingToken: auth.getPendingSuperAdminChallengeToken(),
+            pendingEmail: auth.getPendingSuperAdminVerificationEmail(),
+            persistedAdminVerification: sessionStorage.getItem("itemtraxx:admin-verification"),
+          };
+        };
+        const recordBoundary = (event: string) => {
+          cleanupEvents.push(event);
+          boundarySnapshots.push({ event, state: snapshot() });
+        };
+        const originalFetch = window.fetch.bind(window);
+        window.fetch = (input: RequestInfo | URL, init?: RequestInit) => {
+          const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+          if (/\/functions(?:\/v1)?\/admin-ops(?:\?.*)?$/.test(url)) {
+            const body = typeof init?.body === "string" ? JSON.parse(init.body) as { action?: string } : {};
+            if (body.action === "revoke_current_session") {
+              recordBoundary("admin-revoke");
+            }
+          } else if (/\/auth\/session\/logout(?:\?.*)?$/.test(url)) {
+            recordBoundary("http-session");
+          }
+          return originalFetch(input, init);
+        };
+        const missingSessionError = {
+          name: "AuthSessionMissingError",
+          message: "Auth session missing!",
+          status: 403,
+          code: "session_not_found",
+          __isAuthError: true,
+        };
+        Object.defineProperty(supabase.auth, "signOut", {
+          configurable: true,
+          value: async () => {
+            recordBoundary("local-supabase");
+            if (mode === "thrown") {
+              throw missingSessionError;
+            }
+            return { error: missingSessionError };
+          },
+        });
+        await auth.superAdminLogin(
+          "pending.super@example.com",
+          "correct horse battery staple",
+          "turnstile-e2e",
+        );
+        const signedInAt = new Date(Date.now() - 60_000).toISOString();
+        const superVerifiedAt = new Date(Date.now() - 30_000).toISOString();
+        setAuthStateFromBackend({
+          isInitialized: true,
+          isAuthenticated: true,
+          userId: "tenant-admin-e2e",
+          email: "tenant.admin@example.com",
+          signedInAt,
+          role: "tenant_admin",
+          sessionTenantId: "tenant-e2e",
+          tenantContextId: "tenant-e2e",
+          districtContextId: "district-e2e",
+          hasSecondaryAuth: true,
+          superVerifiedAt,
+        });
+        setTenantContext("tenant-e2e");
+        setDistrictContext("district-e2e");
+        markAdminVerified();
+        const before = snapshot();
+        await auth.signOut();
+        return { before, boundarySnapshots, cleanupEvents, after: snapshot() };
+      }, missingSessionMode);
+
+      expect(result.before).toMatchObject({
+        isInitialized: true,
+        isAuthenticated: true,
+        userId: "tenant-admin-e2e",
+        email: "tenant.admin@example.com",
+        role: "tenant_admin",
+        sessionTenantId: "tenant-e2e",
+        tenantContextId: "tenant-e2e",
+        districtContextId: "district-e2e",
+        isAdmin: true,
+        isDistrictAdmin: false,
+        isSuperAdmin: false,
+        hasSecondaryAuth: true,
+        pendingToken: "pending-challenge-e2e",
+        pendingEmail: "pending.super@example.com",
+      });
+      expect(result.before.signedInAt).toBeTruthy();
+      expect(result.before.superVerifiedAt).toBeTruthy();
+      expect(result.before.adminVerifiedAt).toBeTruthy();
+      expect(result.before.persistedAdminVerification).toBeTruthy();
+      expect(result.cleanupEvents).toEqual(["admin-revoke", "local-supabase", "http-session"]);
+      expect(result.boundarySnapshots).toEqual([
+        { event: "admin-revoke", state: result.before },
+        { event: "local-supabase", state: result.before },
+        { event: "http-session", state: result.before },
+      ]);
+      expect(result.after).toEqual(clearedAuthContext);
+    });
+  }
 
   test("forced tenant-admin termination shows the blocking session message", async ({ page }) => {
     await page.route(/\/functions(?:\/v1)?\/admin-ops(?:\?.*)?$/, async (route) => {

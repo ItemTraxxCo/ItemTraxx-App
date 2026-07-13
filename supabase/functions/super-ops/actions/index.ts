@@ -1,4 +1,5 @@
 import type { SuperOpsContext } from "../context.ts";
+import { handleControlCenterAction } from "./controlCenter.ts";
 import { handleSecuritySessionsAction } from "./securitySessions.ts";
 
 export const SUPER_OPS_ACTIONS = [
@@ -33,6 +34,11 @@ export const SUPER_OPS_ACTIONS = [
 export const dispatchSuperOpsAction = async (
   context: SuperOpsContext,
 ): Promise<Response> => {
-  const response = await handleSecuritySessionsAction(context);
-  return response ?? context.jsonResponse(400, { error: "Invalid action" });
+  for (
+    const handler of [handleSecuritySessionsAction, handleControlCenterAction]
+  ) {
+    const response = await handler(context);
+    if (response) return response;
+  }
+  return context.jsonResponse(400, { error: "Invalid action" });
 };

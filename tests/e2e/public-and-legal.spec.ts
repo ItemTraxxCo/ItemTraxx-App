@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { readFile } from "node:fs/promises";
-import { mockSystemStatus, mockUnauthenticatedSession } from "./helpers/testHarness";
+import { mockSystemStatus, mockUnauthenticatedSession, navigateApp } from "./helpers/testHarness";
 
 const forbiddenSdkResponse = (url: string) => {
   const filename = new URL(url).pathname.split("/").pop()?.toLowerCase() ?? "";
@@ -772,26 +772,33 @@ test.describe("Public surfaces", () => {
         contentType: "application/json",
         body: JSON.stringify({
           status: "operational",
-          kill_switch: { enabled: true, message: "Emergency maintenance" },
+          kill_switch: { enabled: true, message: "" },
           maintenance: { enabled: false, message: "" },
         }),
       });
     });
 
     await page.goto(`${nonDevE2eOrigin}/`);
+    await page.evaluate(async () => {
+      const { default: router } = await import("/src/router/index.ts");
+      router.replace = (() => Promise.resolve()) as typeof router.replace;
+    });
+    await navigateApp(page, "/login");
+    const overlay = page.getByRole("alertdialog").filter({ hasText: "currently unavailable" });
+    await expect(overlay).toBeVisible();
+    await expect(overlay.getByRole("link", { name: "View status page" })).toHaveAttribute(
+      "href",
+      "https://status.itemtraxx.com/?ref=killswitch",
+    );
+    await expect(overlay).toContainText(
+      "Please see the status page (https://status.itemtraxx.com/?ref=killswitch) for more information.",
+    );
+
+    await page.goto(`${nonDevE2eOrigin}/`);
     await expect(page).toHaveURL(`${nonDevE2eOrigin}/`);
     await page.goto(`${nonDevE2eOrigin}/login`);
     await expect(page).toHaveURL(`${nonDevE2eOrigin}/unavailable`);
     await expect(page.getByRole("heading", { name: /currently unavailable/i })).toBeVisible();
-
-    const [blockingOverlaysSource, appSource] = await Promise.all([
-      readFile(new URL("../../src/components/app/AppBlockingOverlays.vue", import.meta.url), "utf8"),
-      readFile(new URL("../../src/App.vue", import.meta.url), "utf8"),
-    ]);
-    expect(blockingOverlaysSource).toContain(
-      'href="https://status.itemtraxx.com/?ref=killswitch"',
-    );
-    expect(appSource).not.toContain("https://status.itemtraxx.com/ref=killswitch");
   });
 
   test("the forced version overlay preserves update copy and precedence", async ({ page }) => {

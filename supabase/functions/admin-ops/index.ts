@@ -10,6 +10,11 @@ import { resolveRateLimitResult } from "../_shared/preloginGuards.ts";
 import { requireTrustedEdgeIngress } from "../_shared/trustedIngress.ts";
 import { readJsonBody } from "../_shared/requestBody.ts";
 import {
+  isMissingPostgrestColumn as isMissingColumn,
+  isMissingPostgrestRelation as isMissingRelation,
+} from "../_shared/postgrestErrors.ts";
+import { resolveTrustedGeneralLocation as resolveGeneralLocation } from "../_shared/requestMetadata.ts";
+import {
   isTenantAdminTokenBlockedBySessionRevocation,
   resolveTenantAdminAuthSessionBinding,
 } from "../_shared/tenantAdminSessions.ts";
@@ -92,16 +97,6 @@ type RpcError = {
   message?: string;
 };
 
-const isMissingRelation = (error: RpcError | null | undefined, relation: string) =>
-  !!error &&
-  error.code === "42P01" &&
-  (error.message ?? "").toLowerCase().includes(relation.toLowerCase());
-
-const isMissingColumn = (error: RpcError | null | undefined, column: string) =>
-  !!error &&
-  error.code === "42703" &&
-  (error.message ?? "").toLowerCase().includes(column.toLowerCase());
-
 const formatRpcError = (error: RpcError | null | undefined) =>
   error ? `${error.code ?? "unknown"}: ${error.message ?? "Unknown error"}` : "Unknown error";
 
@@ -182,50 +177,6 @@ const sanitizeLoginMethod = (value: unknown): DeviceSessionContext["loginMethod"
 
 const sanitizeLoginLocation = (value: unknown): DeviceSessionContext["loginLocation"] =>
   value === "regular_login" || value === "admin_login" ? value : null;
-
-const TITLE_CASE_SKIP_WORDS = new Set(["and", "or", "of", "the", "in"]);
-
-const toTitleCase = (value: string) =>
-  value
-    .toLowerCase()
-    .split(/\s+/)
-    .filter(Boolean)
-    .map((part, index) => {
-      if (part.length <= 3) return part.toUpperCase();
-      if (index > 0 && TITLE_CASE_SKIP_WORDS.has(part)) return part;
-      return part.charAt(0).toUpperCase() + part.slice(1);
-    })
-    .join(" ");
-
-const sanitizeGeoHeader = (value: string | null, maxLen: number) => {
-  if (!value) return null;
-  const trimmed = value.trim();
-  if (!trimmed) return null;
-  return trimmed.slice(0, maxLen);
-};
-
-const resolveGeneralLocation = (req: Request) => {
-  const city = sanitizeGeoHeader(req.headers.get("x-itx-geo-city"), 80);
-  const region = sanitizeGeoHeader(req.headers.get("x-itx-geo-region"), 80);
-  const country = sanitizeGeoHeader(req.headers.get("x-itx-geo-country"), 80);
-
-  if (!city && !region && !country) return null;
-
-  const locationParts = city && region
-    ? [city, region]
-    : city && country
-      ? [city, country]
-      : region && country
-        ? [region, country]
-        : [city ?? region ?? country ?? ""];
-
-  const formatted = locationParts
-    .map((part) => toTitleCase(part))
-    .filter(Boolean)
-    .join(", ");
-
-  return formatted || null;
-};
 
 const resolveDeviceSessionContext = (
   payload: Record<string, unknown>,

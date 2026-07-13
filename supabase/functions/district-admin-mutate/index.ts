@@ -7,6 +7,7 @@ import {
 } from "../_shared/privilegedStepUp.ts";
 import { isAllowedOrigin, parseAllowedOrigins } from "../_shared/cors.ts";
 import { readJsonBody } from "../_shared/requestBody.ts";
+import { isMissingPostgrestColumn } from "../_shared/postgrestErrors.ts";
 import { requireTrustedEdgeIngress } from "../_shared/trustedIngress.ts";
 import {
   ACCESS_CODE_PATTERN,
@@ -45,12 +46,7 @@ const resolveResetRedirectTo = (req: Request) => {
 };
 
 const isMissingUpdatedAtColumn = (error: { code?: string; message?: string } | null | undefined) => {
-  if (!error) return false;
-  const message = (error.message ?? "").toLowerCase();
-  return (
-    (error.code === "42703" || error.code === "PGRST204" || message.includes("schema cache")) &&
-    message.includes("updated_at")
-  );
+  return isMissingPostgrestColumn(error, "updated_at", { allowSchemaCache: true });
 };
 
 const TENANT_STATUSES = new Set(["active", "suspended", "archived"] as const);

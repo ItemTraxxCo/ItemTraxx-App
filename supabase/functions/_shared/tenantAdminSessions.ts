@@ -1,7 +1,8 @@
-type RpcError = {
-  code?: string;
-  message?: string;
-};
+import {
+  isMissingPostgrestColumn as isMissingColumn,
+  isMissingPostgrestRelation as isMissingRelation,
+  type PostgrestErrorLike,
+} from "./postgrestErrors.ts";
 
 type SupabaseLikeClient = {
   auth: {
@@ -12,19 +13,6 @@ type SupabaseLikeClient = {
   };
   from: (table: string) => any;
 };
-
-const isMissingRelation = (
-  error: RpcError | null | undefined,
-  relation: string,
-) =>
-  !!error &&
-  error.code === "42P01" &&
-  (error.message ?? "").toLowerCase().includes(relation.toLowerCase());
-
-const isMissingColumn = (error: RpcError | null | undefined, column: string) =>
-  !!error &&
-  error.code === "42703" &&
-  (error.message ?? "").toLowerCase().includes(column.toLowerCase());
 
 const TENANT_ADMIN_SESSION_COLUMNS =
   "id, auth_session_id, auth_token_hash, auth_token_issued_at";
@@ -107,10 +95,10 @@ export const isTenantAdminTokenBlockedBySessionRevocation = async (
       .maybeSingle();
 
     if (error) {
-      if (isMissingRelation(error as RpcError, "tenant_admin_sessions")) {
+      if (isMissingRelation(error as PostgrestErrorLike, "tenant_admin_sessions")) {
         return { blocked: true as const, relationMissing: true as const };
       }
-      if (isMissingColumn(error as RpcError, "auth_session_id")) {
+      if (isMissingColumn(error as PostgrestErrorLike, "auth_session_id")) {
         return { blocked: true as const, relationMissing: true as const };
       }
       throw new Error("Unable to validate admin session revocation.");
@@ -134,7 +122,7 @@ export const isTenantAdminTokenBlockedBySessionRevocation = async (
       .maybeSingle();
 
     if (error) {
-      if (isMissingRelation(error as RpcError, "tenant_admin_sessions")) {
+      if (isMissingRelation(error as PostgrestErrorLike, "tenant_admin_sessions")) {
         return { blocked: true as const, relationMissing: true as const };
       }
       throw new Error("Unable to validate admin session revocation.");
@@ -216,7 +204,7 @@ export const validateTenantAdminDeviceSession = async (
 
   if (activeSessionError) {
     if (
-      isMissingRelation(activeSessionError as RpcError, "tenant_admin_sessions")
+      isMissingRelation(activeSessionError as PostgrestErrorLike, "tenant_admin_sessions")
     ) {
       return {
         valid: false as const,
@@ -224,7 +212,7 @@ export const validateTenantAdminDeviceSession = async (
         relationMissing: true as const,
       };
     }
-    if (isMissingColumn(activeSessionError as RpcError, "auth_session_id")) {
+    if (isMissingColumn(activeSessionError as PostgrestErrorLike, "auth_session_id")) {
       return {
         valid: false as const,
         reason: "missing_table" as const,

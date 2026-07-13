@@ -9,6 +9,10 @@ import { isAllowedOrigin, parseAllowedOrigins } from "../_shared/cors.ts";
 import { requireTrustedEdgeIngress } from "../_shared/trustedIngress.ts";
 import { readJsonBody } from "../_shared/requestBody.ts";
 import {
+  isMissingPostgrestColumn,
+  isMissingPostgrestRelation,
+} from "../_shared/postgrestErrors.ts";
+import {
   ACCESS_CODE_PATTERN,
   asRecord,
   optionalEmail,
@@ -100,35 +104,22 @@ type PgError = {
 type SupabaseAdminClient = ReturnType<typeof createClient<any>>;
 
 const isMissingStatusColumn = (error: PgError | null | undefined) =>
-  !!error &&
-  error.code === "42703" &&
-  (error.message ?? "").toLowerCase().includes("status");
+  isMissingPostgrestColumn(error, "status");
 
 const isMissingPrimaryAdminColumn = (error: PgError | null | undefined) =>
-  !!error &&
-  error.code === "42703" &&
-  (error.message ?? "").toLowerCase().includes("primary_admin_profile_id");
+  isMissingPostgrestColumn(error, "primary_admin_profile_id");
 
 const isMissingIsActiveColumn = (error: PgError | null | undefined) =>
-  !!error &&
-  error.code === "42703" &&
-  (error.message ?? "").toLowerCase().includes("is_active");
+  isMissingPostgrestColumn(error, "is_active");
 
 const isMissingDistrictIdColumn = (error: PgError | null | undefined) =>
-  !!error &&
-  error.code === "42703" &&
-  (error.message ?? "").toLowerCase().includes("district_id");
+  isMissingPostgrestColumn(error, "district_id");
 
 const isMissingNamedColumn = (
   error: PgError | null | undefined,
   column: string
 ) => {
-  if (!error) return false;
-  const message = (error.message ?? "").toLowerCase();
-  return (
-    message.includes(column.toLowerCase()) &&
-    (error.code === "42703" || error.code === "PGRST204" || message.includes("schema cache"))
-  );
+  return isMissingPostgrestColumn(error, column, { allowSchemaCache: true });
 };
 
 const isMissingFeatureFlagsColumn = (error: PgError | null | undefined) =>
@@ -153,9 +144,7 @@ const isTenantPolicyPlanCodeConstraintError = (error: PgError | null | undefined
   (error.message ?? "").toLowerCase().includes("tenant_policies_plan_code_check");
 
 const isMissingDistrictsTable = (error: PgError | null | undefined) =>
-  !!error &&
-  error.code === "42P01" &&
-  (error.message ?? "").toLowerCase().includes("districts");
+  isMissingPostgrestRelation(error, "districts");
 
 const describeDistrictWriteError = (
   fallback: string,

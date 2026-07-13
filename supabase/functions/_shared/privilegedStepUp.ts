@@ -1,14 +1,13 @@
 import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.108.2";
+import {
+  isMissingPostgrestRelation,
+  type PostgrestErrorLike,
+} from "./postgrestErrors.ts";
 
 export type PrivilegedRoleScope =
   | "super_admin"
   | "tenant_admin"
   | "district_admin";
-
-type PgLikeError = {
-  code?: string;
-  message?: string;
-};
 
 const DEFAULT_STEP_UP_TTL_MS = 15 * 60 * 1000;
 const ADMIN_STEP_UP_REGISTRATION_WINDOW_MS = 5 * 60 * 1000;
@@ -81,11 +80,8 @@ export const canRegisterAdminStepUpFromTrustedHandoff = async (
 };
 
 export const isMissingPrivilegedStepUpTable = (
-  error: PgLikeError | null | undefined,
-) =>
-  !!error &&
-  error.code === "42P01" &&
-  (error.message ?? "").toLowerCase().includes("privileged_session_stepups");
+  error: PostgrestErrorLike | null | undefined,
+) => isMissingPostgrestRelation(error, "privileged_session_stepups");
 
 export const registerPrivilegedStepUp = async (
   adminClient: SupabaseClient,

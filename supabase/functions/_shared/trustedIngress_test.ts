@@ -69,7 +69,10 @@ Deno.test("trusted ingress accepts a fresh matching proxy signature", async () =
     const timestamp = Date.now().toString();
     const requestId = "request-123";
     const target = "tenant-login";
-    const payload = JSON.stringify({ access_code: "tenant-1", password: "secret" });
+    const payload = JSON.stringify({
+      access_code: "tenant-1",
+      password: "secret",
+    });
     const signature = await sign(
       `${timestamp}.${requestId}.POST.${target}.${await bodyHash(payload)}`,
     );
@@ -101,10 +104,18 @@ Deno.test("trusted ingress rejects body replay with modified payload", async () 
     const timestamp = Date.now().toString();
     const requestId = "request-123";
     const target = "tenant-login";
-    const originalPayload = JSON.stringify({ access_code: "tenant-1", password: "secret" });
-    const tamperedPayload = JSON.stringify({ access_code: "tenant-1", password: "changed" });
+    const originalPayload = JSON.stringify({
+      access_code: "tenant-1",
+      password: "secret",
+    });
+    const tamperedPayload = JSON.stringify({
+      access_code: "tenant-1",
+      password: "changed",
+    });
     const signature = await sign(
-      `${timestamp}.${requestId}.POST.${target}.${await bodyHash(originalPayload)}`,
+      `${timestamp}.${requestId}.POST.${target}.${await bodyHash(
+        originalPayload,
+      )}`,
     );
     const request = new Request("https://example.test/functions/tenant-login", {
       method: "POST",

@@ -1,5 +1,5 @@
 export class TimeoutError extends Error {
-  constructor(message = "Request timed out.") {
+  constructor(message = "Request timed out. Unable to reach ItemTraxx servers.") {
     super(message);
     this.name = "TimeoutError";
   }
@@ -8,7 +8,7 @@ export class TimeoutError extends Error {
 export const withTimeout = async <T>(
   promise: PromiseLike<T>,
   timeoutMs: number,
-  message = "Request timed out."
+  message = "Request timed out. Unable to reach ItemTraxx Servers."
 ): Promise<T> => {
   let timeoutId: number | null = null;
 

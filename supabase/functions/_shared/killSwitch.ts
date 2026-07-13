@@ -5,7 +5,10 @@ export const DEFAULT_KILL_SWITCH_MESSAGE =
 
 const isLocalhostHost = (hostname: string) => {
   if (!hostname) return false;
-  if (hostname === "localhost" || hostname === "127.0.0.1" || hostname === "0.0.0.0") {
+  if (
+    hostname === "localhost" || hostname === "127.0.0.1" ||
+    hostname === "0.0.0.0"
+  ) {
     return true;
   }
   return false;

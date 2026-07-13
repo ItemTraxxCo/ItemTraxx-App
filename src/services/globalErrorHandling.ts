@@ -22,11 +22,11 @@ export const installGlobalErrorHandling = (app: App) => {
     }
 
     if (!shouldReportError(error)) {
-      console.warn("[app]", error instanceof Error ? error.message : "Request failed.", info, instance?.$options?.name);
+      console.warn("[app]", error instanceof Error ? error.message : "Oh no! Request failed.", info, instance?.$options?.name);
       return;
     }
 
-    showFatalErrorToast(error, typeof info === "string" ? info : "Vue error handler");
+    showFatalErrorToast(error, typeof info === "string" ? info : "Vue error. Please contact support.");
 
     if (previousErrorHandler) {
       previousErrorHandler(error, instance, info);
@@ -44,11 +44,11 @@ export const installGlobalErrorHandling = (app: App) => {
     }
 
     if (!shouldReportError(event.reason)) {
-      console.warn("[app]", event.reason instanceof Error ? event.reason.message : "Request failed.");
+      console.warn("[app]", event.reason instanceof Error ? event.reason.message : " Oh no! Request failed.");
       event.preventDefault();
       return;
     }
 
-    showFatalErrorToast(event.reason, "Unhandled promise rejection");
+    showFatalErrorToast(event.reason, "Unhandled promise rejection error. Please contact support.");
   });
 };

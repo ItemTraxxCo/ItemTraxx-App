@@ -96,7 +96,7 @@ export const getDistrictAdminDashboard = async () => {
   );
 
   if (!result.ok) {
-    throw edgeFunctionError(result, "Unable to load district dashboard.");
+    throw edgeFunctionError(result, "Unable to load district dashboard. Please contact support.");
   }
 
   return result.data?.data as DistrictAdminDashboard;
@@ -121,7 +121,7 @@ const callDistrictAdminMutate = async <TData>(payload: DistrictAdminMutateReques
   );
 
   if (!result.ok) {
-    throw edgeFunctionError(result, "District admin request failed.");
+    throw edgeFunctionError(result, "Request failed. Please contact support.");
   }
 
   return result.data?.data as TData;

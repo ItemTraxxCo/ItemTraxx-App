@@ -1,6 +1,5 @@
 import { reactive } from "vue";
 import { AppError } from "../services/appErrors";
-import { sendClientErrorReport } from "../services/clientErrorReportService";
 
 type FatalErrorToastState = {
   visible: boolean;
@@ -55,20 +54,20 @@ const deriveReason = (error: unknown) => {
   if (error instanceof AppError) {
     switch (error.code) {
       case "REQUEST_FAILED":
-        return "A backend request failed unexpectedly. Please try again.";
+        return "Oh no! ItemTraxx could not reach its servers. Please try again.";
       case "NETWORK":
-        return "ItemTraxx could not reach the network. Please check your connection and try again.";
+        return "Oh no! ItemTraxx could not reach the network or our servers. Please check your connection and try again.";
       case "TIMEOUT":
-        return "The request took too long and timed out. Please check your connection and try again.";
+        return "Oh no! The request took too long and timed out. Please check your connection and try again.";
       default:
-        return "ItemTraxx hit an unexpected error. Please try again.";
+        return "Oh no! ItemTraxx hit an unexpected error. Please try again.";
     }
   }
-  return "ItemTraxx hit an unexpected error. Please try again.";
+  return "Oh no! ItemTraxx hit an unexpected error. Please try again.";
 };
 
 // Never show raw exception strings to users (they may contain sensitive info).
-const deriveUserFacingMessage = () => "Something went wrong. Please try again.";
+const deriveUserFacingMessage = () => "Oh no! Something went wrong. Please try again.";
 
 const deriveReportMessage = (error: unknown) => {
   if (error instanceof Error && error.message.trim()) {
@@ -125,6 +124,7 @@ export const sendFatalErrorToastReport = async () => {
   state.sendError = "";
 
   try {
+    const { sendClientErrorReport } = await import("../services/clientErrorReportService");
     await sendClientErrorReport({
       title: state.title,
       message: state.reportMessage,

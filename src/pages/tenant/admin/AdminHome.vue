@@ -160,3 +160,29 @@ onMounted(async () => {
   }
 });
 </script>
+
+<style scoped>
+.admin-card {
+  display: block;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 1.2rem 1.3rem;
+  background: var(--surface-2);
+  transition: transform 0.2s ease, border-color 0.2s ease;
+}
+
+.admin-card h2 {
+  margin: 0 0 0.5rem;
+  font-size: 1.2rem;
+}
+
+.admin-card p {
+  margin: 0;
+  color: var(--muted);
+}
+
+.admin-card:hover {
+  border-color: var(--accent);
+  transform: translateY(-2px);
+}
+</style>

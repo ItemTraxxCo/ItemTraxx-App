@@ -1,6 +1,6 @@
 import { reactive } from "vue";
 
-export type UserRole = "tenant_user" | "tenant_admin" | "district_admin" | "super_admin";
+type UserRole = "tenant_user" | "tenant_admin" | "district_admin" | "super_admin";
 
 export type AuthState = {
   isInitialized: boolean;

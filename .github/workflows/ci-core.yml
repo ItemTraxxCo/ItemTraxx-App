@@ -57,6 +57,12 @@ jobs:
           node-version: 22.15.0
           cache: npm
 
+      - name: Setup Deno
+        uses: denoland/setup-deno@22d081ff2d3a40755e97629de92e3bcbfa7cf2ed # v2.0.5
+        with:
+          deno-version: 2.x
+          cache: true
+
       - name: Install dependencies
         # Avoid flaky native/CLI postinstall downloads during CI (for example `supabase` CLI).
         run: npm ci --ignore-scripts
@@ -70,6 +76,15 @@ jobs:
       - name: Check edge contract drift
         run: npm run devops:check:edge-contract-drift
 
+      - name: Check edge action contract parity
+        run: npm run devops:check:edge-action-parity
+
+      - name: Check Supabase function graph with frozen Deno lock
+        run: deno check --frozen supabase/functions/super-ops/index.ts supabase/functions/super-tenant-mutate/index.ts supabase/functions/admin-ops/index.ts
+
+      - name: Test shared Supabase helpers with frozen Deno lock
+        run: deno test --allow-env --frozen supabase/functions/_shared/*_test.ts
+
       - name: Check SQL and function coupling
         env:
           ITX_DIFF_BASE: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
@@ -81,6 +96,18 @@ jobs:
 
       - name: Build
         run: npm run build
+
+      - name: Check public CSS boundary
+        run: npm run perf:css-boundary
+
+      - name: Typecheck Cloudflare Worker
+        run: npm run worker:typecheck
+
+      - name: Test Cloudflare Worker
+        run: npm run worker:test
+
+      - name: Check initial JavaScript budget
+        run: npm run perf:initial
 
       - name: Check bundle budget
         run: npm run perf:budget

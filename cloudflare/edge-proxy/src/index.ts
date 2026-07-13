@@ -1,1295 +1,49 @@
-type KvBinding = {
-  get: <T = string>(key: string, type?: "text" | "json") => Promise<T | null>;
-  put: (key: string, value: string, options?: { expirationTtl?: number }) => Promise<void>;
-  delete: (key: string) => Promise<void>;
-};
+import {
+  DEFAULT_ALLOWED_ORIGINS,
+  DEFAULT_KILL_SWITCH_MESSAGE,
+} from "./constants.ts";
+import { isLocalhostOrigin, parseCsv, withCorsHeaders } from "./cors.ts";
+import { proxyFunctionRequest } from "./functionProxy.ts";
+import {
+  maybeReportWorkerResponse,
+  reportWorkerException,
+} from "./observability.ts";
+import { buildError, buildJson } from "./responses.ts";
+import {
+  getFunctionName,
+  getSessionAction,
+  isBlockedRpcProxyPath,
+  isRestProxyPath,
+  isRpcProxyPath,
+} from "./routing.ts";
+import { handleSessionRequest } from "./session.ts";
+import { proxySupabaseApiRequest } from "./supabaseApiProxy.ts";
 
-type RateLimitBinding = {
-  limit: (options: { key: string }) => Promise<{ success: boolean }>;
-};
+export { checkSessionRateLimit } from "./session.ts";
 
-export interface Env {
-  SUPABASE_URL: string;
-  SUPABASE_ANON_KEY: string;
-  ITX_EDGE_PROXY_SHARED_SECRET?: string;
-  ALLOWED_ORIGINS?: string;
-  ALLOWED_FUNCTIONS?: string;
-  TRUST_LOCAL_ORIGINS?: string;
-  ITX_ITEMTRAXX_KILLSWITCH_ENABLED?: string;
-  ITX_ITEMTRAXX_KILLSWITCH_MESSAGE?: string;
-  SESSION_COOKIE_DOMAIN?: string;
-  SESSION_COOKIE_SAMESITE?: string;
-  SESSION_REFRESH_COOKIE_MAX_AGE_SECONDS?: string;
-  SENTRY_DSN?: string;
-  SENTRY_ENVIRONMENT?: string;
-  MAINTENANCE_FALLBACK_KV?: KvBinding;
-  SESSION_EXCHANGE_RATE_LIMITER?: RateLimitBinding;
-  SESSION_REFRESH_RATE_LIMITER?: RateLimitBinding;
-}
-
-const ACCESS_COOKIE_NAME = "itx_session";
-const REFRESH_COOKIE_NAME = "itx_refresh";
-const REFRESH_GRANT_TYPE = "refresh_token";
-const ACCESS_TOKEN_MAX_AGE_SECONDS = 60 * 60;
-const REFRESH_TOKEN_DEFAULT_MAX_AGE_SECONDS = 60 * 60 * 24 * 14;
-const REFRESH_TOKEN_MAX_ALLOWED_AGE_SECONDS = 60 * 60 * 24 * 14;
-const RATE_LIMIT_RETRY_AFTER_SECONDS = 60;
-const EDGE_PROXY_HEADER = "x-itx-edge-proxy";
-const EDGE_PROXY_TIMESTAMP_HEADER = "x-itx-edge-proxy-ts";
-const EDGE_PROXY_SIGNATURE_HEADER = "x-itx-edge-proxy-signature";
-const DEFAULT_KILL_SWITCH_MESSAGE =
-  "Unfortunately ItemTraxx is currently unavailable. We apologize for any inconvenience and are working to restore access as soon as possible. Please see the status page (https://status.itemtraxx.com/) for more information.";
-const MAINTENANCE_FALLBACK_KEY = "itemtraxx:maintenance_fallback:v1";
-
-const BASE_CORS_HEADERS = {
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-request-id, prefer, x-itx-session-request, x-itx-data-request, aikido-scan-agent",
-  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-  "Access-Control-Allow-Credentials": "true",
-  "Access-Control-Expose-Headers": "content-range, content-profile, x-request-id",
-  "Strict-Transport-Security": "max-age=31536000; includeSubDomains",
-  "Content-Security-Policy": "default-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none';",
-  "Referrer-Policy": "strict-origin-when-cross-origin",
-  "X-Content-Type-Options": "nosniff",
-  "X-Frame-Options": "DENY",
-  "Permissions-Policy": "camera=(), microphone=(), geolocation=()",
-  Vary: "Origin",
-};
-const DEFAULT_ALLOWED_ORIGINS = [
-  "https://itemtraxx.com",
-  "https://www.itemtraxx.com",
-  "https://status.itemtraxx.com",
-  "https://internal.itemtraxx.com",
-  "https://app.itemtraxx.com",
-  "https://itxdemo.app.itemtraxx.com",
-  "https://pentest.app.itemtraxx.com",
-  "https://pentest2.app.itemtraxx.com",
-  "https://dennis.dev.itemtraxx.com",
-  "https://leo.dev.itemtraxx.com",
-  "https://testdist.app.itemtraxx.com",
-  "https://dev.itemtraxx.com",
-  "https://preview.itemtraxx.com",
-];
-
-const toHex = (bytes: Uint8Array) =>
-  Array.from(bytes)
-    .map((byte) => byte.toString(16).padStart(2, "0"))
-    .join("");
-
-const signTrustedIngress = async (secret: string, message: string) => {
-  const key = await crypto.subtle.importKey(
-    "raw",
-    new TextEncoder().encode(secret),
-    { name: "HMAC", hash: "SHA-256" },
-    false,
-    ["sign"]
-  );
-  const signature = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(message));
-  return toHex(new Uint8Array(signature));
-};
-
-const hashTrustedIngressBody = async (body: Uint8Array | null) => {
-  if (!body) {
-    return "no-body";
-  }
-
-  const digest = await crypto.subtle.digest("SHA-256", body);
-  return toHex(new Uint8Array(digest));
-};
-
-const applyTrustedIngressHeaders = async (
-  headers: Headers,
-  env: Env,
-  requestId: string,
-  target: string,
-  method: string,
-  body: Uint8Array | null,
-) => {
-  const secret = env.ITX_EDGE_PROXY_SHARED_SECRET?.trim();
-  if (!secret) return;
-
-  const timestamp = Date.now().toString();
-  const bodyHash = await hashTrustedIngressBody(body);
-  headers.set(EDGE_PROXY_HEADER, "1");
-  headers.set(EDGE_PROXY_TIMESTAMP_HEADER, timestamp);
-  headers.set(
-    EDGE_PROXY_SIGNATURE_HEADER,
-    await signTrustedIngress(
-      secret,
-      `${timestamp}.${requestId}.${method.toUpperCase()}.${target}.${bodyHash}`,
-    )
-  );
-};
-
-type SessionCookies = {
-  accessToken: string | null;
-  refreshToken: string | null;
-};
-
-type SessionSummary = {
-  authenticated: boolean;
-  user: {
-    id: string;
-    email: string | null;
-    last_sign_in_at: string | null;
-  } | null;
-  profile: {
-    role: string | null;
-    tenant_id: string | null;
-    district_id: string | null;
-    auth_email: string | null;
-    is_active: boolean | null;
-  } | null;
-};
-
-type SessionExchangePayload = {
-  access_token?: string;
-  refresh_token?: string;
-};
-
-type TokenRefreshResponse = {
-  access_token?: string;
-  refresh_token?: string;
-  token_type?: string;
-};
-
-type ProfileRow = {
-  id: string;
-  role: string | null;
-  tenant_id: string | null;
-  district_id: string | null;
-  auth_email: string | null;
-  is_active: boolean | null;
-};
-
-type MaintenanceFallbackPayload = {
-  enabled: boolean;
-  message: string;
-  updated_at: string;
-};
-
-const trimTrailingSlash = (value: string) => value.replace(/\/+$/, "");
 const resolveKillSwitchMessage = (env: Env) =>
   env.ITX_ITEMTRAXX_KILLSWITCH_MESSAGE?.trim() || DEFAULT_KILL_SWITCH_MESSAGE;
 
-const asRecord = (value: unknown): Record<string, unknown> | null =>
-  value && typeof value === "object" ? (value as Record<string, unknown>) : null;
-
-const readMaintenanceFallback = async (env: Env): Promise<MaintenanceFallbackPayload | null> => {
-  if (!env.MAINTENANCE_FALLBACK_KV) return null;
-  try {
-    const cached = await env.MAINTENANCE_FALLBACK_KV.get(MAINTENANCE_FALLBACK_KEY, "json");
-    const record = asRecord(cached);
-    if (!record) return null;
-    if (record.enabled !== true) return null;
-    if (typeof record.message !== "string" || typeof record.updated_at !== "string") return null;
-    return {
-      enabled: true,
-      message: record.message.trim() || "Maintenance currently in progress.",
-      updated_at: record.updated_at,
-    };
-  } catch {
-    return null;
-  }
-};
-
-const writeMaintenanceFallback = async (
-  env: Env,
-  payload: MaintenanceFallbackPayload | null
-) => {
-  if (!env.MAINTENANCE_FALLBACK_KV) return;
-  try {
-    if (!payload) {
-      await env.MAINTENANCE_FALLBACK_KV.delete(MAINTENANCE_FALLBACK_KEY);
-      return;
-    }
-    await env.MAINTENANCE_FALLBACK_KV.put(MAINTENANCE_FALLBACK_KEY, JSON.stringify(payload), {
-      expirationTtl: 60 * 60 * 24 * 14,
-    });
-  } catch {
-    // best effort only
-  }
-};
-
-const clearMaintenanceFallbackIfPresent = async (env: Env) => {
-  if (!env.MAINTENANCE_FALLBACK_KV) return;
-  try {
-    const existing = await env.MAINTENANCE_FALLBACK_KV.get(MAINTENANCE_FALLBACK_KEY);
-    if (existing === null) return;
-    await env.MAINTENANCE_FALLBACK_KV.delete(MAINTENANCE_FALLBACK_KEY);
-  } catch {
-    // best effort only
-  }
-};
-
-const extractMaintenanceFromStatusPayload = (
-  payload: Record<string, unknown>
-): MaintenanceFallbackPayload | null => {
-  const maintenance = asRecord(payload.maintenance);
-  if (!maintenance) return null;
-  if (maintenance.enabled !== true) return { enabled: false, message: "", updated_at: new Date().toISOString() };
-  return {
-    enabled: true,
-    message:
-      typeof maintenance.message === "string" && maintenance.message.trim()
-        ? maintenance.message.trim()
-        : "Maintenance currently in progress.",
-    updated_at:
-      typeof maintenance.updated_at === "string" && maintenance.updated_at.trim()
-        ? maintenance.updated_at
-        : new Date().toISOString(),
-  };
-};
-
-const applyMaintenanceFallbackToStatusPayload = async (
-  env: Env,
-  upstreamStatusCode: number,
-  payload: Record<string, unknown>
-) => {
-  const extracted = extractMaintenanceFromStatusPayload(payload);
-  if (extracted?.enabled === true) {
-    await writeMaintenanceFallback(env, extracted);
-    return payload;
-  }
-  if (extracted?.enabled === false) {
-    await clearMaintenanceFallbackIfPresent(env);
-  }
-
-  const status = typeof payload.status === "string" ? payload.status : "";
-  const checks = asRecord(payload.checks);
-  const dbFailed = checks?.db === "failed";
-  const shouldFallback = upstreamStatusCode >= 500 || status === "down" || dbFailed;
-  if (!shouldFallback) return payload;
-
-  const cached = await readMaintenanceFallback(env);
-  if (!cached) return payload;
-  return {
-    ...payload,
-    maintenance: cached,
-    maintenance_fallback: true,
-  };
-};
-
-const parseSentryDsn = (dsn?: string | null) => {
-  if (!dsn) return null;
-  try {
-    const url = new URL(dsn);
-    const publicKey = url.username;
-    const projectId = url.pathname.replace(/^\/+/, "");
-    if (!publicKey || !projectId) return null;
-    return {
-      publicKey,
-      projectId,
-      storeUrl: `${url.protocol}//${url.host}/api/${projectId}/envelope/`,
-    };
-  } catch {
-    return null;
-  }
-};
-
-const buildSentryEnvelope = (dsn: NonNullable<ReturnType<typeof parseSentryDsn>>, event: Record<string, unknown>) => {
-  const eventId = crypto.randomUUID().replace(/-/g, "");
-  const envelopeHeaders = JSON.stringify({
-    event_id: eventId,
-    sent_at: new Date().toISOString(),
-  });
-  const itemHeaders = JSON.stringify({ type: "event" });
-  const payload = JSON.stringify({
-    event_id: eventId,
-    timestamp: Math.floor(Date.now() / 1000),
-    platform: "javascript",
-    logger: "itemtraxx-edge-proxy",
-    ...event,
-  });
-  return `${envelopeHeaders}
-${itemHeaders}
-${payload}`;
-};
-
-const reportWorkerEvent = async (env: Env, event: Record<string, unknown>) => {
-  const sentry = parseSentryDsn(env.SENTRY_DSN?.trim());
-  if (!sentry) return;
-
-  const envelope = buildSentryEnvelope(sentry, event);
-  await fetch(sentry.storeUrl, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/x-sentry-envelope",
-      "X-Sentry-Auth": `Sentry sentry_version=7, sentry_client=itemtraxx-edge-proxy/1.0, sentry_key=${sentry.publicKey}`,
-    },
-    body: envelope,
-  }).catch(() => undefined);
-};
-
-const reportWorkerException = (
-  env: Env,
-  request: Request,
-  requestId: string,
-  error: unknown,
-  extra: Record<string, unknown> = {}
-) => {
-  const message = error instanceof Error ? error.message : String(error);
-  return reportWorkerEvent(env, {
-    level: "error",
-    environment: env.SENTRY_ENVIRONMENT?.trim() || "production",
-    request: {
-      url: request.url,
-      method: request.method,
-      headers: {
-        origin: request.headers.get("origin") ?? undefined,
-      },
-    },
-    tags: {
-      runtime: "cloudflare-worker",
-    },
-    extra: {
-      requestId,
-      ...extra,
-    },
-    exception: {
-      values: [
-        {
-          type: error instanceof Error ? error.name : "WorkerError",
-          value: message,
-        },
-      ],
-    },
-  });
-};
-
-const reportWorkerHttpFailure = (
-  env: Env,
-  request: Request,
-  requestId: string,
-  status: number,
-  message: string,
-  extra: Record<string, unknown> = {}
-) =>
-  reportWorkerEvent(env, {
-    level: status >= 500 ? "error" : "warning",
-    environment: env.SENTRY_ENVIRONMENT?.trim() || "production",
-    request: {
-      url: request.url,
-      method: request.method,
-      headers: {
-        origin: request.headers.get("origin") ?? undefined,
-      },
-    },
-    tags: {
-      runtime: "cloudflare-worker",
-      status: String(status),
-    },
-    extra: {
-      requestId,
-      ...extra,
-    },
-    message,
-  });
-
-const maybeReportWorkerResponse = (
-  env: Env,
-  request: Request,
-  requestId: string,
-  response: Response,
-  ctx: ExecutionContext,
-  extra: Record<string, unknown> = {}
-) => {
-  if (response.status < 500) return;
-  ctx.waitUntil(
-    reportWorkerHttpFailure(env, request, requestId, response.status, `Worker request failed with status ${response.status}.`, extra)
-  );
-};
-
-const parseCsv = (value?: string) =>
-  (value ?? "")
-    .split(",")
-    .map((item) => item.trim())
-    .filter((item) => item.length > 0);
-
-const isLocalhostOrigin = (origin: string | null) => {
-  if (!origin) return false;
-  try {
-    const hostname = new URL(origin).hostname.toLowerCase();
-    if (hostname === "localhost" || hostname === "127.0.0.1" || hostname === "0.0.0.0") {
-      return true;
-    }
-    return false;
-  } catch {
-    return false;
-  }
-};
-
-const shouldTrustLocalOrigins = (env: Env) =>
-  (env.TRUST_LOCAL_ORIGINS ?? "").trim().toLowerCase() === "true";
-
-const isAllowedOrigin = (origin: string | null, allowedOrigins: string[], env: Env) => {
-  if (!origin) {
-    return false;
-  }
-
-  if (shouldTrustLocalOrigins(env) && isLocalhostOrigin(origin)) {
-    return true;
-  }
-
-  return allowedOrigins.some((candidate) => candidate === origin);
-};
-
-const withCorsHeaders = (origin: string | null, allowedOrigins: string[], env: Env) => {
-  const originAllowed =
-    !origin || allowedOrigins.length === 0 || isAllowedOrigin(origin, allowedOrigins, env);
-  const headers = origin && originAllowed
-    ? { ...BASE_CORS_HEADERS, "Access-Control-Allow-Origin": origin }
-    : { ...BASE_CORS_HEADERS };
-  return { originAllowed, headers };
-};
-
-const resolveRequestOrigin = (request: Request) => {
-  return request.headers.get("Origin");
-};
-
-const buildError = (
-  status: number,
-  message: string,
-  headers: Record<string, string>,
-  requestId: string,
-  extraHeaders?: Headers
-) => {
-  const responseHeaders = extraHeaders ? new Headers(extraHeaders) : new Headers();
-  Object.entries(headers).forEach(([key, value]) => responseHeaders.set(key, value));
-  responseHeaders.set("Content-Type", "application/json");
-  responseHeaders.set("x-request-id", requestId);
-  return new Response(JSON.stringify({ error: message }), {
-    status,
-    headers: responseHeaders,
-  });
-};
-
-const buildSessionRateLimitError = (
-  failure: "rate_limited" | "unavailable",
-  headers: Record<string, string>,
-  requestId: string,
-) => {
-  const responseHeaders = new Headers();
-  if (failure === "rate_limited") {
-    responseHeaders.set("Retry-After", RATE_LIMIT_RETRY_AFTER_SECONDS.toString());
-    return buildError(429, "Too many session requests", headers, requestId, responseHeaders);
-  }
-  return buildError(503, "Session protection unavailable", headers, requestId);
-};
-
-const buildJson = (
-  status: number,
-  body: Record<string, unknown>,
-  headers: Record<string, string>,
-  requestId: string,
-  extraHeaders?: Headers
-) => {
-  const responseHeaders = extraHeaders ? new Headers(extraHeaders) : new Headers();
-  Object.entries(headers).forEach(([key, value]) => responseHeaders.set(key, value));
-  responseHeaders.set("Content-Type", "application/json");
-  responseHeaders.set("x-request-id", requestId);
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: responseHeaders,
-  });
-};
-
-const getFunctionName = (pathname: string) => {
-  const segments = pathname.split("/").filter(Boolean);
-  if (segments.length !== 2 || segments[0] !== "functions") {
-    return "";
-  }
-  return segments[1] ?? "";
-};
-
-const getSessionAction = (pathname: string) => {
-  const segments = pathname.split("/").filter(Boolean);
-  if (segments.length !== 3 || segments[0] !== "auth" || segments[1] !== "session") {
-    return "";
-  }
-  return segments[2] ?? "";
-};
-
-const isRestProxyPath = (pathname: string) => pathname.startsWith("/rest/v1/");
-
-const isRpcProxyPath = (pathname: string) => pathname === "/rpc" || pathname.startsWith("/rpc/");
-
-const ALLOWED_RPC_FUNCTIONS = new Set([
-  "consume_rate_limit",
-]);
-
-const getRpcFunctionName = (pathname: string) => {
-  const segments = pathname.split("/").filter(Boolean);
-  if (segments.length === 2 && segments[0] === "rpc") {
-    return segments[1] ?? "";
-  }
-  if (segments.length === 4 && segments[0] === "rest" && segments[1] === "v1" && segments[2] === "rpc") {
-    return segments[3] ?? "";
-  }
-  return "";
-};
-
-const isAllowedRpcProxyPath = (pathname: string) => {
-  const functionName = getRpcFunctionName(pathname);
-  if (!functionName) {
-    return false;
-  }
-  return ALLOWED_RPC_FUNCTIONS.has(functionName.toLowerCase());
-};
-
-const hasRpcCallerAuth = (request: Request, cookies: SessionCookies) => {
-  const authHeader = request.headers.get("Authorization");
-  if (authHeader && authHeader.trim()) {
-    return true;
-  }
-  if (cookies.accessToken || cookies.refreshToken) {
-    return true;
-  }
-  return false;
-};
-
-export const isUnauthorizedRpcProxyPath = (pathname: string, hasCallerAuth: boolean) => {
-  const isRpcPath = isRpcProxyPath(pathname) || pathname === "/rest/v1/rpc" || pathname.startsWith("/rest/v1/rpc/");
-  if (!isRpcPath) {
-    return false;
-  }
-  return !hasCallerAuth;
-};
-
-export const isBlockedRpcProxyPath = (pathname: string) => {
-  const isRpcPath = isRpcProxyPath(pathname) || pathname === "/rest/v1/rpc" || pathname.startsWith("/rest/v1/rpc/");
-  if (!isRpcPath) {
-    return false;
-  }
-  return !isAllowedRpcProxyPath(pathname);
-};
-
-const parseCookies = (request: Request): SessionCookies => {
-  const raw = request.headers.get("cookie") ?? "";
-  const parsed = new Map<string, string>();
-  raw.split(";").forEach((part) => {
-    const [key, ...rest] = part.trim().split("=");
-    if (!key || rest.length === 0) return;
-    parsed.set(key, decodeURIComponent(rest.join("=")));
-  });
-  return {
-    accessToken: parsed.get(ACCESS_COOKIE_NAME) ?? null,
-    refreshToken: parsed.get(REFRESH_COOKIE_NAME) ?? null,
-  };
-};
-
-const resolveSessionCookieSameSite = (env: Env) => {
-  const configured = env.SESSION_COOKIE_SAMESITE?.trim().toLowerCase();
-  if (configured === "strict") return "Strict";
-  if (configured === "none") return "None";
-  return "Lax";
-};
-
-const resolveRefreshCookieMaxAgeSeconds = (env: Env) => {
-  const configured = Number(env.SESSION_REFRESH_COOKIE_MAX_AGE_SECONDS?.trim());
-  if (Number.isFinite(configured) && configured > 0) {
-    return Math.min(Math.floor(configured), REFRESH_TOKEN_MAX_ALLOWED_AGE_SECONDS);
-  }
-  return REFRESH_TOKEN_DEFAULT_MAX_AGE_SECONDS;
-};
-
-const appendCookie = (
-  headers: Headers,
-  name: string,
-  value: string,
-  env: Env,
-  maxAgeSeconds: number
-) => {
-  const cookieParts = [
-    `${name}=${encodeURIComponent(value)}`,
-    "Path=/",
-    `Max-Age=${maxAgeSeconds}`,
-    "HttpOnly",
-    "Secure",
-    `SameSite=${resolveSessionCookieSameSite(env)}`,
-  ];
-  const domain = env.SESSION_COOKIE_DOMAIN?.trim();
-  if (domain) {
-    cookieParts.push(`Domain=${domain}`);
-  }
-  headers.append("Set-Cookie", cookieParts.join("; "));
-};
-
-const clearCookie = (headers: Headers, name: string, env: Env) => {
-  const cookieParts = [
-    `${name}=`,
-    "Path=/",
-    "Max-Age=0",
-    "HttpOnly",
-    "Secure",
-    `SameSite=${resolveSessionCookieSameSite(env)}`,
-  ];
-  const domain = env.SESSION_COOKIE_DOMAIN?.trim();
-  if (domain) {
-    cookieParts.push(`Domain=${domain}`);
-  }
-  headers.append("Set-Cookie", cookieParts.join("; "));
-};
-
-const setSessionCookies = (
-  headers: Headers,
-  env: Env,
-  session: { accessToken: string; refreshToken: string }
-) => {
-  appendCookie(headers, ACCESS_COOKIE_NAME, session.accessToken, env, ACCESS_TOKEN_MAX_AGE_SECONDS);
-  appendCookie(headers, REFRESH_COOKIE_NAME, session.refreshToken, env, resolveRefreshCookieMaxAgeSeconds(env));
-};
-
-const clearSessionCookies = (headers: Headers, env: Env) => {
-  clearCookie(headers, ACCESS_COOKIE_NAME, env);
-  clearCookie(headers, REFRESH_COOKIE_NAME, env);
-};
-
-const appendSetCookies = (target: Headers, source: Headers) => {
-  const maybeExtended = source as Headers & { getSetCookie?: () => string[] };
-  if (typeof maybeExtended.getSetCookie === "function") {
-    maybeExtended.getSetCookie().forEach((cookie) => target.append("Set-Cookie", cookie));
-    return;
-  }
-  const raw = source.get("Set-Cookie");
-  if (raw) {
-    target.append("Set-Cookie", raw);
-  }
-};
-
-const buildSupabaseUrl = (env: Env, path: string) => `${trimTrailingSlash(env.SUPABASE_URL)}${path}`;
-
-const fetchAuthUser = async (env: Env, accessToken: string) => {
-  const response = await fetch(buildSupabaseUrl(env, "/auth/v1/user"), {
-    method: "GET",
-    headers: {
-      apikey: env.SUPABASE_ANON_KEY,
-      Authorization: `Bearer ${accessToken}`,
-      "Content-Type": "application/json",
-    },
-  });
-
-  if (!response.ok) {
-    return null;
-  }
-
-  const payload = (await response.json()) as {
-    id: string;
-    email?: string | null;
-    last_sign_in_at?: string | null;
-  };
-
-  if (!payload?.id) {
-    return null;
-  }
-
-  return {
-    id: payload.id,
-    email: payload.email ?? null,
-    last_sign_in_at: payload.last_sign_in_at ?? null,
-  };
-};
-
-const fetchProfile = async (env: Env, accessToken: string, userId: string) => {
-  const url = new URL(buildSupabaseUrl(env, "/rest/v1/profiles"));
-  url.searchParams.set("id", `eq.${userId}`);
-  url.searchParams.set("select", "id,role,tenant_id,district_id,auth_email,is_active");
-
-  const response = await fetch(url.toString(), {
-    method: "GET",
-    headers: {
-      apikey: env.SUPABASE_ANON_KEY,
-      Authorization: `Bearer ${accessToken}`,
-      Accept: "application/json",
-    },
-  });
-
-  if (!response.ok) {
-    return null;
-  }
-
-  const rows = (await response.json()) as ProfileRow[];
-  return rows[0] ?? null;
-};
-
-const buildSessionSummary = async (env: Env, accessToken: string): Promise<SessionSummary | null> => {
-  const user = await fetchAuthUser(env, accessToken);
-  if (!user) {
-    return null;
-  }
-  const profile = await fetchProfile(env, accessToken, user.id);
-  return {
-    authenticated: true,
-    user,
-    profile: profile
-      ? {
-          role: profile.role ?? null,
-          tenant_id: profile.tenant_id ?? null,
-          district_id: profile.district_id ?? null,
-          auth_email: profile.auth_email ?? null,
-          is_active: profile.is_active ?? null,
-        }
-      : null,
-  };
-};
-
-type SessionRateLimitResult = "allowed" | "limited" | "unavailable";
-
-export const checkSessionRateLimit = async (
-  binding: RateLimitBinding | undefined,
-  request: Request,
-): Promise<SessionRateLimitResult> => {
-  const clientIp = request.headers.get("cf-connecting-ip")?.trim();
-  if (!binding || !clientIp) {
-    return "unavailable";
-  }
-  try {
-    const result = await binding.limit({ key: clientIp });
-    return result.success ? "allowed" : "limited";
-  } catch {
-    return "unavailable";
-  }
-};
-
-type RefreshSessionResult =
-  | { status: "ok"; accessToken: string; refreshToken: string }
-  | { status: "unauthorized" | "rate_limited" | "unavailable" };
-
-const refreshSession = async (
-  request: Request,
-  env: Env,
-  refreshToken: string,
-): Promise<RefreshSessionResult> => {
-  const rateLimit = await checkSessionRateLimit(env.SESSION_REFRESH_RATE_LIMITER, request);
-  if (rateLimit === "limited") {
-    return { status: "rate_limited" };
-  }
-  if (rateLimit === "unavailable") {
-    return { status: "unavailable" };
-  }
-
-  const response = await fetch(buildSupabaseUrl(env, `/auth/v1/token?grant_type=${REFRESH_GRANT_TYPE}`), {
-    method: "POST",
-    headers: {
-      apikey: env.SUPABASE_ANON_KEY,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ refresh_token: refreshToken }),
-  });
-
-  if (!response.ok) {
-    return { status: "unauthorized" };
-  }
-
-  const payload = (await response.json()) as TokenRefreshResponse;
-  if (!payload.access_token || !payload.refresh_token) {
-    return { status: "unauthorized" };
-  }
-
-  return {
-    status: "ok",
-    accessToken: payload.access_token,
-    refreshToken: payload.refresh_token,
-  };
-};
-
-const maybeRefreshSession = async (
-  request: Request,
-  env: Env,
-  cookies: SessionCookies
-): Promise<{
-  session: { accessToken: string; refreshToken: string } | null;
-  headers: Headers | null;
-  failure: "rate_limited" | "unavailable" | null;
-}> => {
-  if (!cookies.refreshToken) {
-    return { session: null, headers: null, failure: null };
-  }
-
-  const refreshed = await refreshSession(request, env, cookies.refreshToken);
-  if (refreshed.status === "rate_limited" || refreshed.status === "unavailable") {
-    return { session: null, headers: null, failure: refreshed.status };
-  }
-  if (refreshed.status === "unauthorized") {
-    const headers = new Headers();
-    clearSessionCookies(headers, env);
-    return { session: null, headers, failure: null };
-  }
-
-  const headers = new Headers();
-  setSessionCookies(headers, env, refreshed);
-  return { session: refreshed, headers, failure: null };
-};
-
-type RequestWithCf = Request & {
-  cf?: {
-    city?: string;
-    region?: string;
-    regionCode?: string;
-    country?: string;
-  };
-};
-
-const sanitizeGeoHeaderValue = (value: string | null | undefined, maxLen: number) => {
-  if (!value) return null;
-  const trimmed = value.trim();
-  if (!trimmed) return null;
-  return trimmed.slice(0, maxLen);
-};
-
-const applyApproxLocationHeaders = (headers: Headers, request: Request) => {
-  const cf = (request as RequestWithCf).cf;
-  const city = sanitizeGeoHeaderValue(cf?.city, 80);
-  const region = sanitizeGeoHeaderValue(cf?.region ?? cf?.regionCode, 80);
-  const country = sanitizeGeoHeaderValue(cf?.country, 80);
-
-  if (city) headers.set('x-itx-geo-city', city);
-  if (region) headers.set('x-itx-geo-region', region);
-  if (country) headers.set('x-itx-geo-country', country);
-};
-
-const sanitizeRequestHeaders = (
-  request: Request,
-  anonKey: string,
-  requestId: string,
-  functionName: string,
-  sessionAccessToken?: string | null
-) => {
-  const headers = new Headers();
-  headers.set("x-request-id", requestId);
-  headers.set("apikey", anonKey);
-  headers.set("Content-Type", request.headers.get("Content-Type") ?? "application/json");
-  const incomingAuth = request.headers.get("Authorization");
-  const resolvedAuth = incomingAuth ?? (sessionAccessToken ? `Bearer ${sessionAccessToken}` : null);
-  if (functionName === "super-ops" && resolvedAuth) {
-    headers.set("x-itx-user-jwt", resolvedAuth);
-    headers.set("Authorization", resolvedAuth);
-  } else if (resolvedAuth) {
-    headers.set("Authorization", resolvedAuth);
-  }
-  const clientInfo = request.headers.get("x-client-info");
-  if (clientInfo) {
-    headers.set("x-client-info", clientInfo);
-  }
-  const userAgent = request.headers.get("user-agent");
-  if (userAgent) {
-    headers.set("user-agent", userAgent);
-  }
-  const scanAgentHeader = request.headers.get("aikido-scan-agent");
-  if (scanAgentHeader) {
-    headers.set("aikido-scan-agent", scanAgentHeader);
-  }
-  const forwardedFor = request.headers.get("x-forwarded-for");
-  if (forwardedFor) {
-    headers.set("x-forwarded-for", forwardedFor);
-  }
-  const connectingIp = request.headers.get("cf-connecting-ip");
-  if (connectingIp) {
-    headers.set("cf-connecting-ip", connectingIp);
-  }
-  applyApproxLocationHeaders(headers, request);
-  return headers;
-};
-
-const sanitizeUpstreamHeaders = (
-  request: Request,
-  anonKey: string,
-  requestId: string,
-  sessionAccessToken?: string | null
-) => {
-  const headers = new Headers();
-  headers.set("x-request-id", requestId);
-  headers.set("apikey", anonKey);
-  const contentType = request.headers.get("Content-Type");
-  if (contentType) {
-    headers.set("Content-Type", contentType);
-  }
-  const incomingAuth = request.headers.get("Authorization");
-  const resolvedAuth = incomingAuth ?? (sessionAccessToken ? `Bearer ${sessionAccessToken}` : null);
-  if (resolvedAuth) {
-    headers.set("Authorization", resolvedAuth);
-  }
-  const accept = request.headers.get("accept");
-  if (accept) {
-    headers.set("accept", accept);
-  }
-  const prefer = request.headers.get("prefer");
-  if (prefer) {
-    headers.set("prefer", prefer);
-  }
-  const range = request.headers.get("range");
-  if (range) {
-    headers.set("range", range);
-  }
-  return headers;
-};
-
-const proxySupabaseApiRequest = async (
-  request: Request,
-  env: Env,
-  headers: Record<string, string>,
-  requestId: string,
-  upstreamPath: string
-) => {
-  const cookies = parseCookies(request);
-  if (isBlockedRpcProxyPath(upstreamPath)) {
-    return buildError(403, "RPC proxy access is not allowed", headers, requestId);
-  }
-  if (isUnauthorizedRpcProxyPath(upstreamPath, hasRpcCallerAuth(request, cookies))) {
-    return buildError(401, "Unauthorized", headers, requestId);
-  }
-  const normalizedUpstreamPath = isRpcProxyPath(upstreamPath)
-    ? `/rest/v1${upstreamPath}`
-    : upstreamPath;
-  const upstreamUrl = buildSupabaseUrl(
-    env,
-    `${normalizedUpstreamPath}${new URL(request.url).search}`
-  );
-  const requestBody = request.method === "GET" || request.method === "HEAD" ? undefined : await request.clone().text();
-  const invoke = async (sessionAccessToken?: string | null) => {
-    const proxiedHeaders = sanitizeUpstreamHeaders(
-      request,
-      env.SUPABASE_ANON_KEY,
-      requestId,
-      sessionAccessToken
-    );
-
-    return fetch(upstreamUrl, {
-      method: request.method,
-      headers: proxiedHeaders,
-      body: requestBody,
-    });
-  };
-
-  let upstreamResponse = await invoke(cookies.accessToken);
-  let sessionHeaders: Headers | null = null;
-
-  if (!request.headers.get("Authorization") && upstreamResponse.status === 401 && cookies.refreshToken) {
-    const refreshed = await maybeRefreshSession(request, env, cookies);
-    if (refreshed.failure) {
-      return buildSessionRateLimitError(refreshed.failure, headers, requestId);
-    }
-    sessionHeaders = refreshed.headers;
-    if (refreshed.session) {
-      upstreamResponse = await invoke(refreshed.session.accessToken);
-    }
-  }
-
-  const responseHeaders = new Headers(upstreamResponse.headers);
-  Object.entries(headers).forEach(([key, value]) => responseHeaders.set(key, value));
-  responseHeaders.set("x-request-id", requestId);
-  if (sessionHeaders) {
-    appendSetCookies(responseHeaders, sessionHeaders);
-  }
-
-  return new Response(upstreamResponse.body, {
-    status: upstreamResponse.status,
-    headers: responseHeaders,
-  });
-};
-
-const proxyFunctionRequest = async (
-  request: Request,
-  env: Env,
-  headers: Record<string, string>,
-  requestId: string,
-  functionName: string
-) => {
-  const cookies = parseCookies(request);
-  const supabaseFunctionUrl = `${trimTrailingSlash(env.SUPABASE_URL)}/functions/v1/${functionName}`;
-  const isSystemStatusGet = functionName === "system-status" && request.method === "GET";
-  const requestBody =
-    request.method === "GET" || request.method === "HEAD"
-      ? null
-      : new Uint8Array(await request.clone().arrayBuffer());
-  const invoke = async (sessionAccessToken?: string | null) => {
-    const proxiedHeaders = sanitizeRequestHeaders(
-      request,
-      env.SUPABASE_ANON_KEY,
-      requestId,
-      functionName,
-      sessionAccessToken
-    );
-    await applyTrustedIngressHeaders(
-      proxiedHeaders,
-      env,
-      requestId,
-      functionName,
-      request.method,
-      requestBody,
-    );
-
-    const init: RequestInit = {
-      method: request.method,
-      headers: proxiedHeaders,
-      body:
-        requestBody ? requestBody.slice() : undefined,
-    };
-
-    return fetch(supabaseFunctionUrl, init);
-  };
-
-  let upstreamResponse: Response;
-  try {
-    upstreamResponse = await invoke(cookies.accessToken);
-  } catch (error) {
-    if (isSystemStatusGet) {
-      const cached = await readMaintenanceFallback(env);
-      if (cached) {
-        const responseHeaders = new Headers();
-        Object.entries(headers).forEach(([key, value]) => responseHeaders.set(key, value));
-        responseHeaders.set("x-request-id", requestId);
-        responseHeaders.set("content-type", "application/json");
-        return new Response(
-          JSON.stringify({
-            status: "down",
-            checks: { config: "ok", db: "failed" },
-            maintenance: cached,
-            maintenance_fallback: true,
-            incident_summary: "system status unavailable; maintenance fallback active",
-            checked_at: new Date().toISOString(),
-          }),
-          {
-            status: 503,
-            headers: responseHeaders,
-          }
-        );
-      }
-    }
-    throw error;
-  }
-  let sessionHeaders: Headers | null = null;
-
-  if (!request.headers.get("Authorization") && upstreamResponse.status === 401 && cookies.refreshToken) {
-    const refreshed = await maybeRefreshSession(request, env, cookies);
-    if (refreshed.failure) {
-      return buildSessionRateLimitError(refreshed.failure, headers, requestId);
-    }
-    sessionHeaders = refreshed.headers;
-    if (refreshed.session) {
-      upstreamResponse = await invoke(refreshed.session.accessToken);
-    }
-  }
-
-  const responseHeaders = new Headers(upstreamResponse.headers);
-  Object.entries(headers).forEach(([key, value]) => responseHeaders.set(key, value));
-  responseHeaders.set("x-request-id", requestId);
-  if (sessionHeaders) {
-    appendSetCookies(responseHeaders, sessionHeaders);
-  }
-
-  if (isSystemStatusGet) {
-    const rawBody = await upstreamResponse.clone().text();
-    try {
-      const parsed = JSON.parse(rawBody) as Record<string, unknown>;
-      const withFallback = await applyMaintenanceFallbackToStatusPayload(
-        env,
-        upstreamResponse.status,
-        parsed
-      );
-      responseHeaders.set("content-type", "application/json");
-      return new Response(JSON.stringify(withFallback), {
-        status: upstreamResponse.status,
-        headers: responseHeaders,
-      });
-    } catch {
-      // preserve original upstream payload when JSON parsing fails
-    }
-  }
-
-  return new Response(upstreamResponse.body, {
-    status: upstreamResponse.status,
-    headers: responseHeaders,
-  });
-};
-
-const handleSessionExchange = async (
-  request: Request,
-  env: Env,
-  headers: Record<string, string>,
-  requestId: string
-) => {
-  const rateLimit = await checkSessionRateLimit(env.SESSION_EXCHANGE_RATE_LIMITER, request);
-  if (rateLimit === "limited") {
-    return buildSessionRateLimitError("rate_limited", headers, requestId);
-  }
-  if (rateLimit === "unavailable") {
-    return buildSessionRateLimitError("unavailable", headers, requestId);
-  }
-
-  const payload = (await request.json().catch(() => ({}))) as SessionExchangePayload;
-  if (!payload.access_token || !payload.refresh_token) {
-    return buildError(400, "Invalid request", headers, requestId);
-  }
-
-  const summary = await buildSessionSummary(env, payload.access_token);
-  if (!summary) {
-    return buildError(401, "Unauthorized", headers, requestId);
-  }
-
-  const responseHeaders = new Headers();
-  setSessionCookies(responseHeaders, env, {
-    accessToken: payload.access_token,
-    refreshToken: payload.refresh_token,
-  });
-
-  return buildJson(200, summary, headers, requestId, responseHeaders);
-};
-
-const handleSessionRefresh = async (
-  request: Request,
-  env: Env,
-  headers: Record<string, string>,
-  requestId: string
-) => {
-  const cookies = parseCookies(request);
-  if (!cookies.refreshToken) {
-    const responseHeaders = new Headers();
-    clearSessionCookies(responseHeaders, env);
-    return buildError(401, "Unauthorized", headers, requestId, responseHeaders);
-  }
-
-  const refreshed = await refreshSession(request, env, cookies.refreshToken);
-  if (refreshed.status === "rate_limited" || refreshed.status === "unavailable") {
-    return buildSessionRateLimitError(refreshed.status, headers, requestId);
-  }
-  if (refreshed.status === "unauthorized") {
-    const responseHeaders = new Headers();
-    clearSessionCookies(responseHeaders, env);
-    return buildError(401, "Unauthorized", headers, requestId, responseHeaders);
-  }
-
-  const summary = await buildSessionSummary(env, refreshed.accessToken);
-  if (!summary) {
-    const responseHeaders = new Headers();
-    clearSessionCookies(responseHeaders, env);
-    return buildError(401, "Unauthorized", headers, requestId, responseHeaders);
-  }
-
-  const responseHeaders = new Headers();
-  setSessionCookies(responseHeaders, env, refreshed);
-  return buildJson(200, summary, headers, requestId, responseHeaders);
-};
-
-const handleSessionMe = async (
-  request: Request,
-  env: Env,
-  headers: Record<string, string>,
-  requestId: string
-) => {
-  const cookies = parseCookies(request);
-  let accessToken = cookies.accessToken;
-  let responseHeaders: Headers | null = null;
-
-  if (!accessToken && cookies.refreshToken) {
-    const refreshed = await maybeRefreshSession(request, env, cookies);
-    if (refreshed.failure) {
-      return buildSessionRateLimitError(refreshed.failure, headers, requestId);
-    }
-    if (refreshed.session) {
-      accessToken = refreshed.session.accessToken;
-      responseHeaders = refreshed.headers;
-    } else if (refreshed.headers) {
-      return buildJson(200, { authenticated: false, user: null, profile: null }, headers, requestId, refreshed.headers);
-    }
-  }
-
-  if (!accessToken) {
-    return buildJson(200, { authenticated: false, user: null, profile: null }, headers, requestId);
-  }
-
-  const summary = await buildSessionSummary(env, accessToken);
-  if (!summary) {
-    const clearHeaders = responseHeaders ?? new Headers();
-    clearSessionCookies(clearHeaders, env);
-    return buildJson(200, { authenticated: false, user: null, profile: null }, headers, requestId, clearHeaders);
-  }
-
-  return buildJson(200, summary, headers, requestId, responseHeaders ?? undefined);
-};
-
-const handleSessionLogout = async (
-  request: Request,
-  env: Env,
-  headers: Record<string, string>,
-  requestId: string
-) => {
-  const cookies = parseCookies(request);
-  const authToken = cookies.accessToken;
-
-  if (authToken) {
-    await fetch(buildSupabaseUrl(env, "/auth/v1/logout"), {
-      method: "POST",
-      headers: {
-        apikey: env.SUPABASE_ANON_KEY,
-        Authorization: `Bearer ${authToken}`,
-        "Content-Type": "application/json",
-      },
-    }).catch(() => undefined);
-  }
-
-  const responseHeaders = new Headers();
-  clearSessionCookies(responseHeaders, env);
-  return buildJson(200, { ok: true }, headers, requestId, responseHeaders);
-};
-
-const validateSessionMutationRequest = (
-  request: Request,
-  env: Env,
-  allowedOrigins: string[],
-  headers: Record<string, string>,
-  requestId: string
-) => {
-  const requestOrigin = resolveRequestOrigin(request);
-  if (!requestOrigin || !isAllowedOrigin(requestOrigin, allowedOrigins, env)) {
-    return buildError(403, "Origin not allowed", headers, requestId);
-  }
-  if (request.headers.get("x-itx-session-request") !== "1") {
-    return buildError(400, "Invalid session request", headers, requestId);
-  }
-  return null;
-};
-
-const handleSessionRequest = async (
-  request: Request,
-  env: Env,
-  headers: Record<string, string>,
-  requestId: string,
-  action: string,
-  allowedOrigins: string[]
-) => {
-  if (action === "exchange" && request.method === "POST") {
-    const error = validateSessionMutationRequest(request, env, allowedOrigins, headers, requestId);
-    if (error) return error;
-    return handleSessionExchange(request, env, headers, requestId);
-  }
-  if (action === "refresh" && request.method === "POST") {
-    const error = validateSessionMutationRequest(request, env, allowedOrigins, headers, requestId);
-    if (error) return error;
-    return handleSessionRefresh(request, env, headers, requestId);
-  }
-  if (action === "logout" && request.method === "POST") {
-    const error = validateSessionMutationRequest(request, env, allowedOrigins, headers, requestId);
-    if (error) return error;
-    return handleSessionLogout(request, env, headers, requestId);
-  }
-  if (action === "me" && request.method === "GET") {
-    return handleSessionMe(request, env, headers, requestId);
-  }
-  return buildError(404, "Not found", headers, requestId);
-};
-
 export default {
-  async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
+  async fetch(
+    request: Request,
+    env: Env,
+    ctx: ExecutionContext,
+  ): Promise<Response> {
     const url = new URL(request.url);
     const origin = request.headers.get("Origin");
-    const requestId =
-      request.headers.get("x-request-id") ??
-      (typeof crypto?.randomUUID === "function" ? crypto.randomUUID() : "itx-edge-request");
+    const requestId = request.headers.get("x-request-id") ??
+      (typeof crypto?.randomUUID === "function"
+        ? crypto.randomUUID()
+        : "itx-edge-request");
     const allowedOrigins = Array.from(
-      new Set([...DEFAULT_ALLOWED_ORIGINS, ...parseCsv(env.ALLOWED_ORIGINS)])
+      new Set([...DEFAULT_ALLOWED_ORIGINS, ...parseCsv(env.ALLOWED_ORIGINS)]),
     );
-    const { originAllowed, headers } = withCorsHeaders(origin, allowedOrigins, env);
+    const { originAllowed, headers } = withCorsHeaders(
+      origin,
+      allowedOrigins,
+      env,
+    );
 
     try {
       if (request.method === "OPTIONS") {
@@ -1304,40 +58,67 @@ export default {
       }
 
       if (url.pathname === "/turnstile-policy" && request.method === "GET") {
-        return buildJson(
-          200,
-          { bypass_turnstile: false },
-          headers,
-          requestId
-        );
+        return buildJson(200, { bypass_turnstile: false }, headers, requestId);
       }
 
       if (!env.SUPABASE_URL || !env.SUPABASE_ANON_KEY) {
-        const response = buildError(500, "Proxy misconfiguration", headers, requestId);
-        maybeReportWorkerResponse(env, request, requestId, response, ctx, { type: "proxy_misconfiguration" });
+        const response = buildError(
+          500,
+          "Proxy misconfiguration",
+          headers,
+          requestId,
+        );
+        maybeReportWorkerResponse(env, request, requestId, response, ctx, {
+          type: "proxy_misconfiguration",
+        });
         return response;
       }
 
       const sessionAction = getSessionAction(url.pathname);
       if (sessionAction) {
-        const response = await handleSessionRequest(request, env, headers, requestId, sessionAction, allowedOrigins);
-        maybeReportWorkerResponse(env, request, requestId, response, ctx, { type: "session", action: sessionAction });
+        const response = await handleSessionRequest(
+          request,
+          env,
+          headers,
+          requestId,
+          sessionAction,
+          allowedOrigins,
+        );
+        maybeReportWorkerResponse(env, request, requestId, response, ctx, {
+          type: "session",
+          action: sessionAction,
+        });
         return response;
       }
 
       if (isBlockedRpcProxyPath(url.pathname)) {
-        return buildError(403, "RPC proxy access is not allowed", headers, requestId);
+        return buildError(
+          403,
+          "RPC proxy access is not allowed",
+          headers,
+          requestId,
+        );
       }
 
       if (isRestProxyPath(url.pathname) || isRpcProxyPath(url.pathname)) {
         if (
-          request.method !== "GET" && request.method !== "HEAD" &&
+          request.method !== "GET" &&
+          request.method !== "HEAD" &&
           request.headers.get("x-itx-data-request") !== "1"
         ) {
           return buildError(400, "Invalid data request", headers, requestId);
         }
-        const response = await proxySupabaseApiRequest(request, env, headers, requestId, url.pathname);
-        maybeReportWorkerResponse(env, request, requestId, response, ctx, { type: "rest", path: url.pathname });
+        const response = await proxySupabaseApiRequest(
+          request,
+          env,
+          headers,
+          requestId,
+          url.pathname,
+        );
+        maybeReportWorkerResponse(env, request, requestId, response, ctx, {
+          type: "rest",
+          path: url.pathname,
+        });
         return response;
       }
 
@@ -1348,28 +129,45 @@ export default {
 
       const killSwitchEnabled =
         (env.ITX_ITEMTRAXX_KILLSWITCH_ENABLED ?? "").toLowerCase() === "true";
-      if (killSwitchEnabled && functionName !== "system-status" && !isLocalhostOrigin(origin)) {
+      if (
+        killSwitchEnabled && functionName !== "system-status" &&
+        !isLocalhostOrigin(origin)
+      ) {
         const response = buildError(
           503,
           resolveKillSwitchMessage(env),
           headers,
-          requestId
+          requestId,
         );
-        maybeReportWorkerResponse(env, request, requestId, response, ctx, { type: "kill_switch", functionName });
+        maybeReportWorkerResponse(env, request, requestId, response, ctx, {
+          type: "kill_switch",
+          functionName,
+        });
         return response;
       }
 
       const allowedFunctions = parseCsv(env.ALLOWED_FUNCTIONS);
-      if (allowedFunctions.length > 0 && !allowedFunctions.includes(functionName)) {
+      if (
+        allowedFunctions.length > 0 && !allowedFunctions.includes(functionName)
+      ) {
         return buildError(403, "Function not allowed", headers, requestId);
       }
 
-      const response = await proxyFunctionRequest(request, env, headers, requestId, functionName);
-      maybeReportWorkerResponse(env, request, requestId, response, ctx, { type: "function", functionName });
+      const response = await proxyFunctionRequest(
+        request,
+        env,
+        headers,
+        requestId,
+        functionName,
+      );
+      maybeReportWorkerResponse(env, request, requestId, response, ctx, {
+        type: "function",
+        functionName,
+      });
       return response;
     } catch (error) {
       ctx.waitUntil(reportWorkerException(env, request, requestId, error));
       return buildError(500, "Internal worker error", headers, requestId);
     }
   },
-};
+} satisfies ExportedHandler<Env>;

@@ -12,20 +12,10 @@ type EdgeFunctionResult<TData> = {
   requestId?: string;
 };
 import { clearAdminVerification, clearAuthState } from "../store/authState";
+import { getEdgeFunctionsBaseUrl } from "./edgeUrls";
 import { captureHandledRequestFailure } from "./sentry";
 import { signOutLocalSupabaseSession } from "./supabaseAuthSession";
 import { supabase } from "./supabaseClient";
-
-const trimTrailingSlash = (value: string) => value.replace(/\/+$/, "");
-
-export const getEdgeFunctionsBaseUrl = () => {
-  const proxyUrl = import.meta.env.VITE_EDGE_PROXY_URL as string | undefined;
-  const trimmedProxyUrl = proxyUrl?.trim();
-  if (trimmedProxyUrl) {
-    return `${trimTrailingSlash(trimmedProxyUrl)}/functions`;
-  }
-  return "/functions";
-};
 
 const getDefaultHeaders = (accessToken?: string) => {
   const headers: Record<string, string> = {};
@@ -63,7 +53,7 @@ const requestEdgeFunction = async <TData = unknown, TBody = unknown>(
       ok: false,
       status: 500,
       data: null,
-      error: "Missing configuration.",
+      error: "Missing configuration. Please contact support.",
     };
   }
 
@@ -106,7 +96,7 @@ const requestEdgeFunction = async <TData = unknown, TBody = unknown>(
         clearAdminVerification();
         clearAuthState(true);
       }
-      const errorMessage = payload?.error || payload?.message || "Request failed.";
+      const errorMessage = payload?.error || payload?.message || "Request failed. Please try again.";
       void captureHandledRequestFailure({
         area: "edge_function",
         name: functionName,

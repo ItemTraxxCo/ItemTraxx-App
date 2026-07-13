@@ -228,7 +228,7 @@ import {
   revokeSuperAdminSession,
   touchSuperAdminSession,
   type SuperAdminSessionItem,
-} from "../../services/superOpsService";
+} from "../../services/superOps/sessions";
 import { superAdminPasskeyLogin } from "../../services/authService";
 import { getPasswordResetRedirectUrl } from "../../utils/passwordResetRedirect";
 

@@ -13,6 +13,15 @@ const edgeEnvelopeSchema = (dataSchema) =>
     data: dataSchema.optional(),
   });
 
+const superTenantEnvelopeSchema = (dataSchema) =>
+  edgeEnvelopeSchema(dataSchema).extend({ ok: z.boolean() });
+
+const superOpsEnvelopeSchema = (dataSchema) =>
+  edgeEnvelopeSchema(dataSchema).extend({ ok: z.boolean() });
+
+const superOpsDirectResponseSchema = (responseSchema) =>
+  responseSchema.extend({ ok: z.boolean() });
+
 const tenantStatusSchema = z.enum(["active", "suspended", "archived"]);
 const accountCategorySchema = z.enum(["organization", "district", "individual"]);
 const tenantPlanCodeSchema = z.enum([
@@ -112,7 +121,7 @@ const tenantSessionSchema = z.object({
   is_current: z.boolean(),
 });
 
-export const adminOpsRequestSchema = z.discriminatedUnion("action", [
+const adminOpsRequestSchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("get_notifications"), payload: adminOpsDevicePayloadSchema }),
   z.object({
     action: z.literal("get_status_tracking"),
@@ -143,6 +152,10 @@ export const adminOpsRequestSchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("validate_session"), payload: adminOpsDevicePayloadSchema }),
   z.object({ action: z.literal("list_sessions"), payload: adminOpsDevicePayloadSchema }),
   z.object({
+    action: z.literal("revoke_current_session"),
+    payload: adminOpsDevicePayloadSchema,
+  }),
+  z.object({
     action: z.literal("revoke_session"),
     payload: adminOpsDevicePayloadSchema.extend({
       session_id: z.string().min(1),
@@ -156,7 +169,7 @@ export const adminOpsRequestSchema = z.discriminatedUnion("action", [
   }),
 ]);
 
-export const adminOpsResponseSchemas = {
+const adminOpsResponseSchemas = {
   get_notifications: edgeEnvelopeSchema(tenantNotificationSchema),
   get_status_tracking: edgeEnvelopeSchema(
     z.object({
@@ -182,6 +195,7 @@ export const adminOpsResponseSchemas = {
   touch_session: edgeEnvelopeSchema(z.object({ ok: z.boolean() })),
   validate_session: edgeEnvelopeSchema(z.object({ valid: z.boolean() })),
   list_sessions: edgeEnvelopeSchema(z.object({ sessions: z.array(tenantSessionSchema) })),
+  revoke_current_session: edgeEnvelopeSchema(z.object({ revoked: z.boolean() })),
   revoke_session: edgeEnvelopeSchema(z.object({ revoked: z.boolean() })),
   revoke_all_sessions: edgeEnvelopeSchema(z.object({ revoked: z.number().int().nonnegative() })),
 };
@@ -283,7 +297,7 @@ const superDistrictDetailSchema = z.object({
   }),
 });
 
-export const superTenantRequestSchema = z.discriminatedUnion("action", [
+const superTenantRequestSchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("list_tenants"), payload: z.object({ search: z.string(), status: z.string() }) }),
   z.object({
     action: z.literal("create_tenant"),
@@ -356,17 +370,17 @@ export const superTenantRequestSchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("get_district_details"), payload: z.object({ id: z.string().uuid() }) }),
 ]);
 
-export const superTenantResponseSchemas = {
-  list_tenants: edgeEnvelopeSchema(z.array(superTenantSchema)),
-  create_tenant: edgeEnvelopeSchema(superTenantSchema),
-  update_tenant: edgeEnvelopeSchema(superTenantSchema),
-  set_tenant_status: edgeEnvelopeSchema(superTenantSchema),
-  send_primary_admin_reset: edgeEnvelopeSchema(z.object({ success: z.boolean(), auth_email: z.string().email() })),
-  set_primary_admin: edgeEnvelopeSchema(superTenantSchema),
-  list_districts: edgeEnvelopeSchema(z.array(superDistrictSchema)),
-  create_district: edgeEnvelopeSchema(superDistrictSchema),
-  update_district: edgeEnvelopeSchema(superDistrictSchema),
-  get_district_details: edgeEnvelopeSchema(superDistrictDetailSchema),
+const superTenantResponseSchemas = {
+  list_tenants: superTenantEnvelopeSchema(z.array(superTenantSchema)),
+  create_tenant: superTenantEnvelopeSchema(superTenantSchema),
+  update_tenant: superTenantEnvelopeSchema(superTenantSchema),
+  set_tenant_status: superTenantEnvelopeSchema(superTenantSchema),
+  send_primary_admin_reset: superTenantEnvelopeSchema(z.object({ success: z.boolean(), auth_email: z.string().email() })),
+  set_primary_admin: superTenantEnvelopeSchema(superTenantSchema),
+  list_districts: superTenantEnvelopeSchema(z.array(superDistrictSchema)),
+  create_district: superTenantEnvelopeSchema(superDistrictSchema),
+  update_district: superTenantEnvelopeSchema(superDistrictSchema),
+  get_district_details: superTenantEnvelopeSchema(superDistrictDetailSchema),
 };
 
 const tenantManagedAdminSchema = z.object({
@@ -379,7 +393,7 @@ const tenantManagedAdminSchema = z.object({
   is_primary_admin: z.boolean(),
 });
 
-export const tenantAdminManageRequestSchema = z.discriminatedUnion("action", [
+const tenantAdminManageRequestSchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("list_tenant_admins"), payload: z.object({}) }),
   z.object({ action: z.literal("create_tenant_admin"), payload: z.object({ auth_email: z.string().email() }) }),
   z.object({ action: z.literal("set_admin_status"), payload: z.object({ id: z.string().uuid(), is_active: z.boolean() }) }),
@@ -387,7 +401,7 @@ export const tenantAdminManageRequestSchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("send_tenant_admin_reset"), payload: z.object({ auth_email: z.string().email() }) }),
 ]);
 
-export const tenantAdminManageResponseSchemas = {
+const tenantAdminManageResponseSchemas = {
   list_tenant_admins: edgeEnvelopeSchema(
     z.object({
       admins: z.array(tenantManagedAdminSchema),
@@ -471,57 +485,188 @@ const customerSchema = salesLeadSchema.extend({
   status_logs: z.array(customerStatusLogSchema),
 });
 
+const superOpsLoginMethodSchema = z.enum(["password", "passkey"]);
+const superOpsLoginLocationSchema = z.enum(["super_auth", "super_settings"]);
+
+const superOpsDevicePayloadSchema = z.object({
+  device_id: z.string().min(1).optional(),
+  device_label: z.string().nullable().optional(),
+  login_method: superOpsLoginMethodSchema.nullable().optional(),
+  login_location: superOpsLoginLocationSchema.nullable().optional(),
+});
+
+const superOpsSessionSchema = z.object({
+  id: z.string(),
+  device_id: z.string(),
+  device_label: z.string().nullable(),
+  user_agent: z.string().nullable(),
+  login_method: superOpsLoginMethodSchema.nullable(),
+  login_location: superOpsLoginLocationSchema.nullable(),
+  general_location: z.string().nullable(),
+  created_at: z.string().nullable(),
+  last_seen_at: z.string().nullable(),
+  is_current: z.boolean(),
+});
+
+const supportRequestStatusSchema = z.enum(["open", "in_progress", "resolved", "spam"]);
+const supportRequestCategorySchema = z.enum(["general", "bug", "billing", "access", "feature", "privacy", "other"]);
+
+const supportRequestListItemSchema = z.object({
+  id: z.string(),
+  requester_name: z.string(),
+  reply_email: z.string(),
+  subject: z.string(),
+  category: supportRequestCategorySchema,
+  status: supportRequestStatusSchema,
+  created_at: z.string(),
+  updated_at: z.string(),
+  assigned_to: z.string().nullable(),
+});
+
+const supportRequestDetailSchema = supportRequestListItemSchema.extend({
+  message: z.string(),
+  source: z.string(),
+  internal_notes: z.string().nullable(),
+  assigned_to_email: z.string().nullable(),
+  attachments: z.array(z.object({
+    id: z.string(),
+    original_filename: z.string().nullable(),
+    stored_filename: z.string(),
+    content_type: z.string(),
+    size_bytes: z.number().int().nonnegative(),
+    signed_url: z.string().nullable(),
+  })),
+  events: z.array(z.object({
+    id: z.string(),
+    actor_id: z.string().nullable(),
+    actor_email: z.string().nullable(),
+    event_type: z.string(),
+    metadata: z.record(z.string(), z.unknown()).nullable(),
+    created_at: z.string(),
+  })),
+});
+
+const subprocessorChangeTypeSchema = z.enum(["added", "replaced", "removed"]);
+const subprocessorNoticePayloadSchema = z.object({
+  vendor: z.string().min(1),
+  change_type: subprocessorChangeTypeSchema,
+  effective_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  description: z.string().optional(),
+});
+
+const subprocessorNoticeSchema = z.object({
+  id: z.string(),
+  vendor: z.string(),
+  change_type: subprocessorChangeTypeSchema,
+  effective_date: z.string(),
+  description: z.string().nullable(),
+  notice_sent_at: z.string().nullable(),
+  objection_deadline: z.string().nullable(),
+  recipients_count: z.number().int().nonnegative(),
+  status: z.enum(["pending", "sent", "failed"]),
+  created_by_email: z.string().nullable(),
+  created_at: z.string(),
+});
+
 const internalOpsSnapshotSchema = z.object({
-  generated_at: z.string(),
-  traffic_15m: z.object({
-    checkout: z.number().int().nonnegative(),
-    return: z.number().int().nonnegative(),
-    active_tenants: z.number().int().nonnegative(),
+  checked_at: z.string(),
+  traffic: z.object({
+    checkout_15m: z.number().int().nonnegative(),
+    return_15m: z.number().int().nonnegative(),
+    active_tenants_15m: z.number().int().nonnegative(),
+    events_24h: z.number().int().nonnegative(),
   }),
   queue: z.object({
-    total: z.number().int().nonnegative(),
     queued: z.number().int().nonnegative(),
     processing: z.number().int().nonnegative(),
     completed: z.number().int().nonnegative(),
     failed: z.number().int().nonnegative(),
   }),
-  leads: z.record(z.string(), z.number().int().nonnegative()),
-  lead_funnel: z.record(z.string(), z.number().int().nonnegative()),
+  leads: z.object({
+    open: z.number().int().nonnegative(),
+    closed: z.number().int().nonnegative(),
+    converted: z.number().int().nonnegative(),
+    waiting_for_quote: z.number().int().nonnegative(),
+    quote_sent: z.number().int().nonnegative(),
+    invoice_sent: z.number().int().nonnegative(),
+    invoice_paid: z.number().int().nonnegative(),
+  }),
+  lead_funnel: z.object({
+    waiting_for_quote: z.number().int().nonnegative(),
+    quote_generated: z.number().int().nonnegative(),
+    quote_sent: z.number().int().nonnegative(),
+    quote_converted_to_invoice: z.number().int().nonnegative(),
+    invoice_sent: z.number().int().nonnegative(),
+    invoice_paid: z.number().int().nonnegative(),
+  }),
   traffic_by_hour: z.array(z.object({
     hour: z.string(),
     checkout: z.number().int().nonnegative(),
     return: z.number().int().nonnegative(),
   })),
-  recent_logs: z.array(z.object({
-    tenant_name: z.string(),
-    action_type: z.string(),
-    action_time: z.string(),
-    gear_name: z.string().nullable().optional(),
-    gear_barcode: z.string().nullable().optional(),
-    borrower_name: z.string().nullable().optional(),
-    borrower_id: z.string().nullable().optional(),
+  sla: z.object({
+    median_latency_ms: z.number().nullable(),
+    p95_latency_ms: z.number().nullable(),
+    error_rate_percent: z.number().nonnegative(),
+    probe_latency_ms: z.number().nullable(),
+  }),
+  needs_attention: z.array(z.object({
+    key: z.string(),
+    level: z.enum(["high", "medium", "low"]),
+    title: z.string(),
+    count: z.number().int().nonnegative(),
+    route: z.string(),
   })),
-  runtime_config: z.record(z.string(), z.unknown()),
+  customer_health: z.object({
+    total_customers: z.number().int().nonnegative(),
+    awaiting_payment: z.number().int().nonnegative(),
+    canceling: z.number().int().nonnegative(),
+    paid_late: z.number().int().nonnegative(),
+    paid_on_time: z.number().int().nonnegative(),
+    no_status: z.number().int().nonnegative(),
+  }),
   recent_audit: z.array(z.object({
     id: z.string(),
-    actor_email: z.string().nullable().optional(),
+    actor_email: z.string().nullable(),
     action_type: z.string(),
-    target_type: z.string().nullable().optional(),
-    target_id: z.string().nullable().optional(),
-    metadata: z.record(z.string(), z.unknown()).or(z.object({}).passthrough()).nullable().optional(),
+    target_type: z.string().nullable(),
+    target_id: z.string().nullable(),
     created_at: z.string(),
   })),
-  customer_health: z.record(z.string(), z.number().int().nonnegative()),
-  tenant_health: z.array(z.object({
-    tenant_id: z.string(),
+  search_index: z.array(z.object({
+    id: z.string(),
+    label: z.string(),
+    type: z.enum(["page", "tenant", "customer", "lead"]),
+    route: z.string(),
+  })),
+  runtime: z.record(z.string(), z.unknown()),
+  recent_events: z.array(z.object({
+    tenant_id: z.string().nullable(),
     tenant_name: z.string(),
-    is_active: z.boolean().optional(),
-    checkout_24h: z.number().int().nonnegative(),
-    return_24h: z.number().int().nonnegative(),
-  })).optional(),
+    action_type: z.enum(["checkout", "return"]),
+    action_time: z.string(),
+    gear_name: z.string().nullable(),
+    gear_barcode: z.string().nullable(),
+    student_username: z.string().nullable(),
+    student_id: z.string().nullable(),
+  })),
 });
 
-export const superOpsRequestSchema = z.discriminatedUnion("action", [
+const superOpsRequestSchema = z.discriminatedUnion("action", [
+  z.object({ action: z.literal("verify_password"), payload: z.object({ password: z.string().min(1) }) }),
+  z.object({
+    action: z.literal("touch_session"),
+    payload: superOpsDevicePayloadSchema.extend({ device_id: z.string().min(1) }),
+  }),
+  z.object({ action: z.literal("list_sessions"), payload: superOpsDevicePayloadSchema }),
+  z.object({
+    action: z.literal("revoke_session"),
+    payload: superOpsDevicePayloadSchema.extend({ session_id: z.string().min(1) }),
+  }),
+  z.object({
+    action: z.literal("revoke_all_sessions"),
+    payload: superOpsDevicePayloadSchema.extend({ sign_out_current: z.boolean().optional() }),
+  }),
   z.object({ action: z.literal("get_control_center"), payload: z.object({}).optional() }),
   z.object({ action: z.literal("set_runtime_config"), payload: z.object({ key: z.string().min(1), value: z.unknown() }) }),
   z.object({ action: z.literal("upsert_alert_rule"), payload: z.object({ id: z.string().optional(), name: z.string().min(1), metric_key: z.string().min(1), threshold: z.number(), is_enabled: z.boolean().optional() }) }),
@@ -529,6 +674,28 @@ export const superOpsRequestSchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("set_tenant_force_reauth"), payload: z.object({ tenant_id: z.string().min(1) }) }),
   z.object({ action: z.literal("create_approval"), payload: z.object({ action_type: z.string().min(1), payload: z.record(z.string(), z.unknown()).or(z.object({}).passthrough()) }) }),
   z.object({ action: z.literal("approve_request"), payload: z.object({ id: z.string().min(1) }) }),
+  z.object({
+    action: z.literal("list_support_requests"),
+    payload: z.object({
+      search: z.string().optional(),
+      status: supportRequestStatusSchema.or(z.literal("")).optional(),
+      limit: z.number().int().min(1).max(200).optional(),
+    }).optional(),
+  }),
+  z.object({
+    action: z.literal("get_support_request"),
+    payload: z.object({ support_request_id: z.string().uuid() }),
+  }),
+  z.object({
+    action: z.literal("update_support_request"),
+    payload: z.object({
+      support_request_id: z.string().uuid(),
+      status: supportRequestStatusSchema.optional(),
+      internal_notes: z.string().optional(),
+      assign_to_me: z.boolean().optional(),
+      clear_assignment: z.boolean().optional(),
+    }),
+  }),
   z.object({ action: z.literal("list_sales_leads"), payload: z.object({ search: z.string().optional(), limit: z.number().int().optional() }).optional() }),
   z.object({ action: z.literal("close_sales_lead"), payload: z.object({ lead_id: z.string().min(1) }) }),
   z.object({ action: z.literal("move_sales_lead_to_customer"), payload: z.object({ lead_id: z.string().min(1) }) }),
@@ -537,29 +704,62 @@ export const superOpsRequestSchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("list_customers"), payload: z.object({ search: z.string().optional(), limit: z.number().int().optional() }).optional() }),
   z.object({ action: z.literal("add_customer_status_entry"), payload: z.object({ lead_id: z.string().min(1), invoice_id: z.string().min(1), status: z.enum(["paid_on_time","paid_late","awaiting_payment","canceling"]) }) }),
   z.object({ action: z.literal("get_internal_ops_snapshot"), payload: z.object({}).optional() }),
+  z.object({ action: z.literal("preview_subprocessor_notice"), payload: subprocessorNoticePayloadSchema }),
+  z.object({ action: z.literal("announce_subprocessor_change"), payload: subprocessorNoticePayloadSchema }),
+  z.object({ action: z.literal("list_subprocessor_notices"), payload: z.object({}).optional() }),
 ]);
 
-export const superOpsResponseSchemas = {
-  get_control_center: edgeEnvelopeSchema(z.object({
+const superOpsResponseSchemas = {
+  verify_password: superOpsEnvelopeSchema(z.object({ verified: z.boolean() })),
+  touch_session: superOpsEnvelopeSchema(z.object({ ok: z.boolean() })),
+  list_sessions: superOpsEnvelopeSchema(z.object({ sessions: z.array(superOpsSessionSchema) })),
+  revoke_session: superOpsEnvelopeSchema(z.object({ revoked: z.boolean() })),
+  revoke_all_sessions: superOpsEnvelopeSchema(z.object({ revoked: z.number().int().nonnegative() })),
+  get_control_center: superOpsEnvelopeSchema(z.object({
     runtime_config: z.record(z.string(), z.unknown()),
     alert_rules: z.array(superOpsAlertRuleSchema),
     approvals: z.array(superOpsApprovalSchema),
     jobs: z.array(superOpsJobSchema),
   })),
-  set_runtime_config: edgeEnvelopeSchema(z.object({ key: z.string(), value: z.unknown() })),
-  upsert_alert_rule: edgeEnvelopeSchema(superOpsAlertRuleSchema),
-  set_tenant_policy: edgeEnvelopeSchema(superOpsTenantPolicySchema),
-  set_tenant_force_reauth: edgeEnvelopeSchema(z.object({ success: z.boolean(), job: superOpsJobSchema.nullable().optional() })),
-  create_approval: edgeEnvelopeSchema(z.object({ id: z.string(), action_type: z.string(), payload: z.record(z.string(), z.unknown()).or(z.object({}).passthrough()), requested_by: z.string().nullable().optional(), status: z.string(), created_at: z.string() })),
-  approve_request: edgeEnvelopeSchema(superOpsApprovalSchema),
-  list_sales_leads: edgeEnvelopeSchema(z.object({ leads: z.array(salesLeadSchema) })),
-  close_sales_lead: edgeEnvelopeSchema(z.object({ lead: salesLeadSchema })),
-  move_sales_lead_to_customer: edgeEnvelopeSchema(z.object({ lead: salesLeadSchema })),
-  set_sales_lead_stage: edgeEnvelopeSchema(z.object({ lead: salesLeadSchema })),
-  delete_sales_lead: edgeEnvelopeSchema(z.object({ deleted: z.boolean() })),
-  list_customers: edgeEnvelopeSchema(z.object({ customers: z.array(customerSchema) })),
-  add_customer_status_entry: edgeEnvelopeSchema(z.object({ entry: customerStatusLogSchema })),
-  get_internal_ops_snapshot: edgeEnvelopeSchema(internalOpsSnapshotSchema),
+  set_runtime_config: superOpsEnvelopeSchema(z.object({ key: z.string(), value: z.unknown() })),
+  upsert_alert_rule: superOpsEnvelopeSchema(superOpsAlertRuleSchema),
+  set_tenant_policy: superOpsEnvelopeSchema(superOpsTenantPolicySchema),
+  set_tenant_force_reauth: superOpsEnvelopeSchema(z.object({ success: z.boolean(), job: superOpsJobSchema.nullable().optional() })),
+  create_approval: superOpsEnvelopeSchema(z.object({ id: z.string(), action_type: z.string(), payload: z.record(z.string(), z.unknown()).or(z.object({}).passthrough()), requested_by: z.string().nullable().optional(), status: z.string(), created_at: z.string() })),
+  approve_request: superOpsEnvelopeSchema(superOpsApprovalSchema),
+  list_support_requests: superOpsEnvelopeSchema(z.object({ requests: z.array(supportRequestListItemSchema) })),
+  get_support_request: superOpsEnvelopeSchema(z.object({ request: supportRequestDetailSchema })),
+  update_support_request: superOpsEnvelopeSchema(z.object({ request: supportRequestDetailSchema })),
+  list_sales_leads: superOpsEnvelopeSchema(z.object({ leads: z.array(salesLeadSchema) })),
+  close_sales_lead: superOpsEnvelopeSchema(z.object({ lead: salesLeadSchema })),
+  move_sales_lead_to_customer: superOpsEnvelopeSchema(z.object({ lead: salesLeadSchema })),
+  set_sales_lead_stage: superOpsEnvelopeSchema(z.object({ lead: salesLeadSchema })),
+  delete_sales_lead: superOpsEnvelopeSchema(z.object({ deleted: z.boolean() })),
+  list_customers: superOpsEnvelopeSchema(z.object({ customers: z.array(customerSchema) })),
+  add_customer_status_entry: superOpsEnvelopeSchema(z.object({ entry: customerStatusLogSchema })),
+  get_internal_ops_snapshot: superOpsEnvelopeSchema(internalOpsSnapshotSchema),
+  preview_subprocessor_notice: superOpsDirectResponseSchema(z.object({
+    preview: z.object({
+      subject: z.string(),
+      html: z.string(),
+      text: z.string(),
+      targetCount: z.number().int().nonnegative(),
+      objectionDeadline: z.string(),
+    }),
+  })),
+  announce_subprocessor_change: superOpsDirectResponseSchema(z.object({
+    changeId: z.string(),
+    vendor: z.string(),
+    changeType: subprocessorChangeTypeSchema,
+    effectiveDate: z.string(),
+    objectionDeadline: z.string(),
+    noticeSentAt: z.string(),
+    recipientsCount: z.number().int().nonnegative(),
+    totalTargets: z.number().int().nonnegative(),
+  })),
+  list_subprocessor_notices: superOpsDirectResponseSchema(
+    z.object({ notices: z.array(subprocessorNoticeSchema) }),
+  ),
 };
 
 const superTenantAdminSchema = z.object({
@@ -574,7 +774,7 @@ const superTenantAdminSchema = z.object({
   district_name: z.string().nullable().optional(),
 });
 
-export const superAdminRequestSchema = z.discriminatedUnion("action", [
+const superAdminRequestSchema = z.discriminatedUnion("action", [
   z.object({
     action: z.literal("list_tenant_admins"),
     payload: z.object({
@@ -619,7 +819,7 @@ export const superAdminRequestSchema = z.discriminatedUnion("action", [
   }),
 ]);
 
-export const superAdminResponseSchemas = {
+const superAdminResponseSchemas = {
   list_tenant_admins: edgeEnvelopeSchema(z.array(superTenantAdminSchema)),
   create_tenant_admin: edgeEnvelopeSchema(superTenantAdminSchema),
   set_admin_status: edgeEnvelopeSchema(superTenantAdminSchema),
@@ -652,7 +852,7 @@ const districtDashboardTenantSchema = z.object({
   primary_admin_email: z.string().nullable().optional(),
 });
 
-export const districtDashboardResponseSchema = z.object({
+const districtDashboardResponseSchema = z.object({
   data: z.object({
     district: districtDashboardDistrictSchema,
     support_requests: z.array(z.object({
@@ -670,13 +870,13 @@ export const districtDashboardResponseSchema = z.object({
   })
 });
 
-export const districtHandoffRequestSchema = z.discriminatedUnion("action", [
+const districtHandoffRequestSchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("create"), auth_email: z.string().email(), password: z.string().min(1), district_slug: z.string().min(1) }),
   z.object({ action: z.literal("create_admin"), email: z.string().email(), password: z.string().min(1) }),
   z.object({ action: z.literal("consume"), code: z.string().min(1) }),
 ]);
 
-export const districtHandoffResponseSchemas = {
+const districtHandoffResponseSchemas = {
   create: z.object({ code: z.string(), expires_at: z.string() }),
   create_admin: z.object({ code: z.string().nullable(), district_slug: z.string().nullable(), role: z.enum(["tenant_admin","district_admin"]), expires_at: z.string().optional(), root_only: z.boolean().optional() }),
   consume: z.object({ access_token: z.string(), refresh_token: z.string(), district_slug: z.string() }),
@@ -685,7 +885,7 @@ export const districtHandoffResponseSchemas = {
 const contactSalesPlanSchema = z.enum(["district_core","district_growth","district_enterprise","organization_starter","organization_scale","organization_enterprise","individual_yearly","individual_monthly","other"]);
 const contactSalesIntentSchema = z.enum(["sales","demo"]);
 
-export const contactSalesSubmitRequestSchema = z.object({
+const contactSalesSubmitRequestSchema = z.object({
   plan: contactSalesPlanSchema,
   schools_count: z.number().int().positive().nullable().optional(),
   name: z.string().min(1),
@@ -697,7 +897,7 @@ export const contactSalesSubmitRequestSchema = z.object({
   intent: contactSalesIntentSchema.optional(),
 });
 
-export const contactSalesSubmitResponseSchema = z.object({
+const contactSalesSubmitResponseSchema = z.object({
   ok: z.boolean(),
   data: z.object({ lead_id: z.string() }).optional(),
   error: z.string().optional(),
@@ -710,18 +910,18 @@ const supportAttachmentSchema = z.object({
   size_bytes: z.number().int().nonnegative().optional(),
 });
 
-export const contactSupportSubmitRequestSchema = z.object({
+const contactSupportSubmitRequestSchema = z.object({
   name: z.string().min(1),
   reply_email: z.string().email(),
   subject: z.string().min(1),
-  category: z.enum(["general","bug","billing","access","feature","other"]),
+  category: supportRequestCategorySchema,
   message: z.string().min(1),
   turnstile_token: z.string().min(1),
   website: z.string().optional(),
   attachments: z.array(supportAttachmentSchema).max(2).optional(),
 });
 
-export const contactSupportSubmitResponseSchema = z.object({
+const contactSupportSubmitResponseSchema = z.object({
   ok: z.boolean(),
   data: z.object({ accepted: z.boolean() }).optional(),
   error: z.string().optional(),

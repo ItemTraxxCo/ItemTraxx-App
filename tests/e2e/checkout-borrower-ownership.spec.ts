@@ -2,6 +2,7 @@ import { expect, test } from "@playwright/test";
 import {
   mockAdminOps,
   mockSystemStatus,
+  mockUnauthenticatedSession,
   navigateApp,
   setTenantAdminSession,
 } from "./helpers/testHarness";
@@ -11,6 +12,7 @@ test.describe("Checkout borrower ownership regression", () => {
     page,
   }) => {
     await mockSystemStatus(page);
+    await mockUnauthenticatedSession(page);
     await mockAdminOps(page);
 
     let checkedOutBy: string | null = null;

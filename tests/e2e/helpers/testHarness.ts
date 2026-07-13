@@ -1,4 +1,4 @@
-import type { Page } from "@playwright/test";
+import type { BrowserContext, Page } from "@playwright/test";
 
 export const mockSystemStatus = async (page: Page) => {
   await page.route(/\/functions(?:\/v1)?\/system-status(?:\?.*)?$/, async (route) => {
@@ -14,6 +14,28 @@ export const mockSystemStatus = async (page: Page) => {
       }),
     });
   });
+};
+
+export const mockUnauthenticatedSession = async (
+  target: Page | BrowserContext,
+  options: { delayMs?: number } = {}
+) => {
+  await target.route("**/auth/session/me", async (route) => {
+    if (options.delayMs) {
+      await new Promise((resolve) => setTimeout(resolve, options.delayMs));
+    }
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ authenticated: false, user: null, profile: null }),
+    });
+  });
+};
+
+export const waitForPublicAuthBootstrap = async (page: Page) => {
+  await page.waitForFunction(
+    () => document.documentElement.dataset.itemtraxxPublicAuth === "settled"
+  );
 };
 
 export const mockAdminOps = async (page: Page) => {
@@ -307,6 +329,7 @@ export const mockSuspendedTenantAdminOps = async (page: Page) => {
 
 export const setTenantAdminSession = async (page: Page, tenantId = "tenant-e2e") => {
   await page.waitForFunction(() => typeof window.__itemtraxxTest?.setTenantAdminSession === "function");
+  await waitForPublicAuthBootstrap(page);
   await page.evaluate((id) => {
     window.__itemtraxxTest?.setTenantAdminSession(id);
   }, tenantId);
@@ -314,6 +337,7 @@ export const setTenantAdminSession = async (page: Page, tenantId = "tenant-e2e")
 
 export const setSuperAdminSession = async (page: Page) => {
   await page.waitForFunction(() => typeof window.__itemtraxxTest?.setSuperAdminSession === "function");
+  await waitForPublicAuthBootstrap(page);
   await page.evaluate(() => {
     window.__itemtraxxTest?.setSuperAdminSession();
   });

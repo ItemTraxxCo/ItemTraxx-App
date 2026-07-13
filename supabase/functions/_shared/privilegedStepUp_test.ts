@@ -4,14 +4,16 @@ const assert = (condition: boolean, message: string) => {
   if (!condition) throw new Error(message);
 };
 
-const authClient = (claims: Record<string, unknown> | null) => ({
-  auth: {
-    getClaims: () => Promise.resolve({
-      data: claims ? { claims } : null,
-      error: claims ? null : new Error("invalid jwt"),
-    }),
-  },
-}) as never;
+const authClient = (claims: Record<string, unknown> | null) =>
+  ({
+    auth: {
+      getClaims: () =>
+        Promise.resolve({
+          data: claims ? { claims } : null,
+          error: claims ? null : new Error("invalid jwt"),
+        }),
+    },
+  }) as never;
 
 Deno.test("admin step-up registration accepts fresh verified handoff claims", async () => {
   const client = authClient({

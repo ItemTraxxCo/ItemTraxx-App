@@ -1,11 +1,12 @@
 import { expect, test } from "@playwright/test";
-import { mockSystemStatus } from "./helpers/testHarness";
+import { mockSystemStatus, mockUnauthenticatedSession } from "./helpers/testHarness";
 
 test.describe("Mobile viewport coverage", () => {
   test.use({ viewport: { width: 390, height: 844 } });
 
   test.beforeEach(async ({ page }) => {
     await mockSystemStatus(page);
+    await mockUnauthenticatedSession(page);
   });
 
   test("landing CTA buttons stay visible on mobile", async ({ page }) => {

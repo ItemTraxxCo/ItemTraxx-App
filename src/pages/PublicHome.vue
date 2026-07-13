@@ -289,7 +289,7 @@
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, ref } from "vue";
 import { RouterLink } from "vue-router";
-import { trackAnalyticsEvent } from "../services/analyticsService";
+import { trackProductEvent } from "../services/productEvents";
 import adminUiImage from "../assets/landing/admin_ui.png";
 import adminUiImage800 from "../assets/landing/admin_ui-800.webp";
 import adminUiImage1200 from "../assets/landing/admin_ui-1200.webp";
@@ -298,12 +298,9 @@ import checkoutReturnUiImage from "../assets/landing/checkout_return_ui.png";
 import checkoutReturnUiImage800 from "../assets/landing/checkout_return_ui-800.webp";
 import checkoutReturnUiImage1200 from "../assets/landing/checkout_return_ui-1200.webp";
 import checkoutReturnUiImage1600 from "../assets/landing/checkout_return_ui-1600.webp";
-import { fetchSystemStatus } from "../services/systemStatusService";
+import { useSystemStatus } from "../composables/useSystemStatus";
 
-const statusLabel = ref("Unknown");
-const statusClass = ref<"status-ok" | "status-warn" | "status-down" | "status-unknown">(
-  "status-unknown",
-);
+const { statusLabel, statusClass } = useSystemStatus();
 
 const faqItems = [
   {
@@ -349,104 +346,19 @@ const trackCta = (
   cta: "view_pricing" | "request_demo" | "go_to_login",
   location: "hero" | "final_cta",
 ) => {
-  void trackAnalyticsEvent("landing_cta_click", { cta, location });
+  trackProductEvent({
+    analytics: {
+      name: "landing_cta_click",
+      properties: { cta, location },
+    },
+  });
 };
 
 let observer: IntersectionObserver | null = null;
-let statusTimer: number | null = null;
-let prefetchTimer: number | null = null;
-
-const scheduleIdle = (callback: () => void, timeout = 1200) => {
-  if (typeof window.requestIdleCallback === "function") {
-    const idleId = window.requestIdleCallback(callback, { timeout });
-    return () => window.cancelIdleCallback(idleId);
-  }
-  const timerId = window.setTimeout(callback, timeout);
-  return () => window.clearTimeout(timerId);
-};
-
-let cancelIdlePrefetch: (() => void) | null = null;
-
-const shouldPrefetchPrimaryRoutes = () => {
-  const connection = (navigator as Navigator & {
-    connection?: { saveData?: boolean; effectiveType?: string };
-  }).connection;
-  if (connection?.saveData) {
-    return false;
-  }
-  return connection?.effectiveType !== "slow-2g" && connection?.effectiveType !== "2g";
-};
-
-const prefetchPrimaryRoutes = () => {
-  if (!shouldPrefetchPrimaryRoutes() || document.visibilityState === "hidden") {
-    return;
-  }
-  void import("./Login.vue");
-  void import("./tenant/Checkout.vue");
-  void import("./tenant/admin/AdminLogin.vue");
-};
-
-const refreshSystemStatus = async () => {
-  const response = await fetchSystemStatus();
-  if (!response) {
-    statusLabel.value = "Unknown";
-    statusClass.value = "status-unknown";
-    return;
-  }
-
-  if (response.ok && response.payload.status === "operational") {
-    statusLabel.value = "Running";
-    statusClass.value = "status-ok";
-    return;
-  }
-
-  if (response.status >= 500 || response.payload.status === "down") {
-    statusLabel.value = "Down";
-    statusClass.value = "status-down";
-    return;
-  }
-
-  statusLabel.value = "Degraded";
-  statusClass.value = "status-warn";
-};
-
-const startStatusPolling = () => {
-  if (statusTimer || document.visibilityState === "hidden") {
-    return;
-  }
-  statusTimer = window.setInterval(() => {
-    void refreshSystemStatus();
-  }, 300_000);
-};
-
-const stopStatusPolling = () => {
-  if (!statusTimer) {
-    return;
-  }
-  window.clearInterval(statusTimer);
-  statusTimer = null;
-};
-
-const handleVisibilityChange = () => {
-  if (document.visibilityState === "hidden") {
-    stopStatusPolling();
-    return;
-  }
-  void refreshSystemStatus();
-  startStatusPolling();
-};
 
 onMounted(() => {
   const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   const revealElements = document.querySelectorAll<HTMLElement>(".reveal");
-  void refreshSystemStatus();
-  startStatusPolling();
-  document.addEventListener("visibilitychange", handleVisibilityChange);
-  // Heavily delay prefetching so we don't compete with first-load and early interactions.
-  // Prefetch is best-effort only; it should never hurt real-user INP/FCP on the landing page.
-  prefetchTimer = window.setTimeout(() => {
-    cancelIdlePrefetch = scheduleIdle(prefetchPrimaryRoutes, 2500);
-  }, 15_000);
 
   if (prefersReducedMotion) {
     revealElements.forEach((el) => el.classList.add("is-visible"));
@@ -471,18 +383,6 @@ onMounted(() => {
 onBeforeUnmount(() => {
   observer?.disconnect();
   observer = null;
-  if (statusTimer) {
-    stopStatusPolling();
-  }
-  if (prefetchTimer) {
-    window.clearTimeout(prefetchTimer);
-    prefetchTimer = null;
-  }
-  if (cancelIdlePrefetch) {
-    cancelIdlePrefetch();
-    cancelIdlePrefetch = null;
-  }
-  document.removeEventListener("visibilitychange", handleVisibilityChange);
 });
 </script>
 

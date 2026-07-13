@@ -112,7 +112,7 @@ import {
   listCustomers,
   type CustomerInvoiceStatus,
   type CustomerRecord,
-} from "../../services/superOpsService";
+} from "../../services/superOps/salesCustomers";
 
 const customers = ref<CustomerRecord[]>([]);
 const search = ref("");

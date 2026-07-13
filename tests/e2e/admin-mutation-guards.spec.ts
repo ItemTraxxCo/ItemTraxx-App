@@ -1,15 +1,20 @@
 import { expect, test, type Page } from "@playwright/test";
-import { mockAdminOps, mockSystemStatus, setTenantAdminSession } from "./helpers/testHarness";
+import {
+  mockAdminOps,
+  mockSystemStatus,
+  mockUnauthenticatedSession,
+  setTenantAdminSession,
+} from "./helpers/testHarness";
 
 type GuardScenario =
   | { kind: "step_up_required"; status: 403; error: "Admin verification required." }
-  | { kind: "session_revoked"; status: 401; error: "Your session expired. Sign in again." }
+  | { kind: "session_revoked"; status: 401; error: "Your session has expired. Please sign in again." }
   | { kind: "inactive_admin"; status: 403; error: "Access denied" }
   | { kind: "ok"; status: 200; error: null };
 
 const guardScenarios: GuardScenario[] = [
   { kind: "step_up_required", status: 403, error: "Admin verification required." },
-  { kind: "session_revoked", status: 401, error: "Your session expired. Sign in again." },
+  { kind: "session_revoked", status: 401, error: "Your session has expired. Please sign in again." },
   { kind: "inactive_admin", status: 403, error: "Access denied" },
   { kind: "ok", status: 200, error: null },
 ];
@@ -52,6 +57,7 @@ test.describe("tenant-admin mutation guard coverage", () => {
   for (const scenario of guardScenarios) {
     test(`admin-gear-mutate + admin-student-mutate: ${scenario.kind}`, async ({ page }) => {
       await mockSystemStatus(page);
+      await mockUnauthenticatedSession(page);
       await mockAdminOps(page);
 
       const capturedDeviceIds: string[] = [];

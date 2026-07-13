@@ -190,6 +190,73 @@ const callAdminOps = async <T>(page: Page, action: string, payload: Record<strin
 
 test.describe("tenant admin device revocation", () => {
 
+  test("HTTP session heartbeat repeats after start and handles server-side termination", async ({ page }) => {
+    let authenticatedPhase = false;
+    let heartbeatRequests = 0;
+    await installSystemStatusMock(page.context());
+    await page.route("**/auth/session/me", async (route) => {
+      if (!authenticatedPhase) {
+        await route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: JSON.stringify({ authenticated: false, user: null, profile: null }),
+        });
+        return;
+      }
+      heartbeatRequests += 1;
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify(
+          heartbeatRequests === 1
+            ? {
+                authenticated: true,
+                user: {
+                  id: "user-heartbeat",
+                  email: "heartbeat@example.com",
+                  last_sign_in_at: "2026-07-13T12:00:00.000Z",
+                },
+                profile: {
+                  role: "tenant_admin",
+                  tenant_id: "tenant-e2e",
+                  district_id: null,
+                  auth_email: "heartbeat@example.com",
+                  is_active: true,
+                },
+              }
+            : { authenticated: false, user: null, profile: null },
+        ),
+      });
+    });
+    await page.route(/\/functions(?:\/v1)?\/admin-ops(?:\?.*)?$/, async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ data: { ok: true, valid: true } }),
+      });
+    });
+
+    await page.goto("/?e2e-session-heartbeat=1");
+    await page.waitForFunction(() => typeof window.__itemtraxxTest?.setTenantAdminSession === "function");
+    await waitForPublicAuthBootstrap(page);
+    authenticatedPhase = true;
+    await page.evaluate(
+      ({ deviceIdKey, deviceLabelKey }) => {
+        localStorage.setItem(deviceIdKey, "device-heartbeat");
+        localStorage.setItem(deviceLabelKey, "Heartbeat browser");
+        window.__itemtraxxTest?.setTenantAdminSession("tenant-e2e");
+      },
+      { deviceIdKey: DEVICE_ID_KEY, deviceLabelKey: DEVICE_LABEL_KEY },
+    );
+    await navigateApp(page, "/tenant/admin");
+
+    await expect.poll(() => heartbeatRequests).toBe(2);
+    const overlay = page.getByRole("alertdialog").filter({ hasText: "Session Ended" });
+    await expect(overlay).toBeVisible({ timeout: 4_000 });
+    await page.waitForTimeout(1_100);
+    expect(heartbeatRequests).toBe(2);
+  });
+
   test("invalid tenant-admin validation shows the session-ended recovery overlay", async ({ page }) => {
     await installSystemStatusMock(page.context());
     await mockUnauthenticatedSession(page);

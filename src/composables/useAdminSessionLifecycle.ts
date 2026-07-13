@@ -24,7 +24,6 @@ type AdminLifecycleAuthState = {
   adminVerifiedAt: string | null;
   superVerifiedAt: string | null;
 };
-
 type AdminSessionLifecycleOptions = {
   auth: AdminLifecycleAuthState;
   route: RouteLocationNormalizedLoaded;
@@ -49,6 +48,16 @@ const effectiveAdminIdleTimeoutMinutes =
       : Math.max(parsedAdminIdleTimeoutMinutes, MIN_ADMIN_IDLE_TIMEOUT_MINUTES)
     : DEFAULT_ADMIN_IDLE_TIMEOUT_MINUTES;
 const ADMIN_IDLE_TIMEOUT_MS = effectiveAdminIdleTimeoutMinutes * 60 * 1000;
+const DEFAULT_SESSION_HEARTBEAT_INTERVAL_MS = 30_000;
+const parsedE2EHeartbeatIntervalMs = Number(
+  import.meta.env.VITE_E2E_SESSION_HEARTBEAT_INTERVAL_MS || DEFAULT_SESSION_HEARTBEAT_INTERVAL_MS,
+);
+const SESSION_HEARTBEAT_INTERVAL_MS =
+  IS_E2E_TEST_MODE &&
+  Number.isFinite(parsedE2EHeartbeatIntervalMs) &&
+  parsedE2EHeartbeatIntervalMs > 0
+    ? parsedE2EHeartbeatIntervalMs
+    : DEFAULT_SESSION_HEARTBEAT_INTERVAL_MS;
 const ADMIN_ACTIVITY_EVENTS: Array<keyof WindowEventMap> = [
   "mousemove",
   "mousedown",
@@ -58,6 +67,9 @@ const ADMIN_ACTIVITY_EVENTS: Array<keyof WindowEventMap> = [
 ];
 
 export const useAdminSessionLifecycle = (options: AdminSessionLifecycleOptions) => {
+  const heartbeatEnabled =
+    !IS_E2E_TEST_MODE ||
+    new URLSearchParams(window.location.search).get("e2e-session-heartbeat") === "1";
   let idleTimer: number | null = null;
   let adminSessionTimer: number | null = null;
   let heartbeatTimer: number | null = null;
@@ -65,6 +77,9 @@ export const useAdminSessionLifecycle = (options: AdminSessionLifecycleOptions) 
   let validationRetryTimer: number | null = null;
   let resolveValidationRetry: (() => void) | null = null;
   let authSessionEpoch = 0;
+  let adminCheckGeneration = 0;
+  let runningAdminCheckGeneration: number | null = null;
+  let disposed = false;
   const isIdleLogoutRunning = ref(false);
   const isAdminSessionCheckRunning = ref(false);
   const isSessionHeartbeatRunning = ref(false);
@@ -77,6 +92,8 @@ export const useAdminSessionLifecycle = (options: AdminSessionLifecycleOptions) 
   const stopAdminSessionPolling = () => {
     if (adminSessionTimer) window.clearInterval(adminSessionTimer);
     adminSessionTimer = null;
+    adminCheckGeneration += 1;
+    clearValidationRetry();
   };
 
   const stopSessionHeartbeat = () => {
@@ -125,6 +142,7 @@ export const useAdminSessionLifecycle = (options: AdminSessionLifecycleOptions) 
   };
 
   const handleSessionTermination = () => {
+    if (disposed) return;
     clearAuthState(true);
     clearAdminVerification();
     options.closeMenu();
@@ -172,7 +190,7 @@ export const useAdminSessionLifecycle = (options: AdminSessionLifecycleOptions) 
   };
 
   const runSessionHeartbeat = async () => {
-    if (IS_E2E_TEST_MODE || isSessionHeartbeatRunning.value) return;
+    if (!heartbeatEnabled || isSessionHeartbeatRunning.value || disposed) return;
     if (!options.auth.isAuthenticated) {
       stopSessionHeartbeat();
       return;
@@ -193,7 +211,7 @@ export const useAdminSessionLifecycle = (options: AdminSessionLifecycleOptions) 
 
   const startSessionHeartbeat = () => {
     if (
-      IS_E2E_TEST_MODE ||
+      !heartbeatEnabled ||
       !options.auth.isAuthenticated ||
       options.sessionTermination.visible ||
       document.visibilityState === "hidden"
@@ -203,7 +221,10 @@ export const useAdminSessionLifecycle = (options: AdminSessionLifecycleOptions) 
     }
     void runSessionHeartbeat();
     if (!heartbeatTimer) {
-      heartbeatTimer = window.setInterval(() => void runSessionHeartbeat(), 30_000);
+      heartbeatTimer = window.setInterval(
+        () => void runSessionHeartbeat(),
+        SESSION_HEARTBEAT_INTERVAL_MS,
+      );
     }
   };
 
@@ -212,8 +233,25 @@ export const useAdminSessionLifecycle = (options: AdminSessionLifecycleOptions) 
     userId !== options.auth.userId ||
     deviceId !== getOrCreateDeviceSession().deviceId;
 
+  const adminCheckCancelled = (
+    generation: number,
+    epoch: number,
+    userId: string | null,
+    deviceId: string,
+  ) =>
+    disposed ||
+    generation !== adminCheckGeneration ||
+    !toValue(options.shouldTrackTenantAdminSession) ||
+    options.sessionTermination.visible ||
+    document.visibilityState === "hidden" ||
+    identityChanged(epoch, userId, deviceId);
+
   const runAdminSessionCheck = async () => {
-    if (isAdminSessionCheckRunning.value) return;
+    const generation = adminCheckGeneration;
+    if (
+      isAdminSessionCheckRunning.value &&
+      runningAdminCheckGeneration === generation
+    ) return;
     if (!toValue(options.shouldTrackTenantAdminSession)) {
       stopAdminSessionPolling();
       return;
@@ -222,32 +260,30 @@ export const useAdminSessionLifecycle = (options: AdminSessionLifecycleOptions) 
     const userId = options.auth.userId;
     const deviceId = getOrCreateDeviceSession().deviceId;
     isAdminSessionCheckRunning.value = true;
+    runningAdminCheckGeneration = generation;
     try {
       const { touchTenantAdminSession, validateTenantAdminSession } = await import(
         "../services/adminOpsService"
       );
-      if (
-        !toValue(options.shouldTrackTenantAdminSession) ||
-        options.sessionTermination.visible ||
-        document.visibilityState === "hidden"
-      ) {
-        stopAdminSessionPolling();
+      if (adminCheckCancelled(generation, epoch, userId, deviceId)) {
         return;
       }
-      if (identityChanged(epoch, userId, deviceId)) return;
       try {
         await touchTenantAdminSession();
       } catch {
         // Best-effort keepalive; validation below is authoritative.
       }
-      if (identityChanged(epoch, userId, deviceId)) return;
+      if (adminCheckCancelled(generation, epoch, userId, deviceId)) return;
       const validation = await validateTenantAdminSession();
-      if (identityChanged(epoch, userId, deviceId)) return;
+      if (adminCheckCancelled(generation, epoch, userId, deviceId)) return;
       if (!validation.valid) {
         await waitForValidationRetry();
-        if (identityChanged(epoch, userId, deviceId)) return;
+        if (adminCheckCancelled(generation, epoch, userId, deviceId)) return;
         const retryValidation = await validateTenantAdminSession();
-        if (!identityChanged(epoch, userId, deviceId) && !retryValidation.valid) {
+        if (
+          !adminCheckCancelled(generation, epoch, userId, deviceId) &&
+          !retryValidation.valid
+        ) {
           handleSessionTermination();
         }
       }
@@ -255,12 +291,15 @@ export const useAdminSessionLifecycle = (options: AdminSessionLifecycleOptions) 
       if (
         error instanceof Error &&
         error.message === "Session revoked" &&
-        !identityChanged(epoch, userId, deviceId)
+        !adminCheckCancelled(generation, epoch, userId, deviceId)
       ) {
         handleSessionTermination();
       }
     } finally {
-      isAdminSessionCheckRunning.value = false;
+      if (runningAdminCheckGeneration === generation) {
+        isAdminSessionCheckRunning.value = false;
+        runningAdminCheckGeneration = null;
+      }
     }
   };
 
@@ -339,6 +378,7 @@ export const useAdminSessionLifecycle = (options: AdminSessionLifecycleOptions) 
   });
 
   onScopeDispose(() => {
+    disposed = true;
     stop();
     if (terminationRedirectTimer) window.clearTimeout(terminationRedirectTimer);
     terminationRedirectTimer = null;

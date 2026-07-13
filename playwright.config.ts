@@ -33,6 +33,7 @@ export default defineConfig({
       VITE_EDGE_PROXY_URL: e2eEdgeProxyUrl,
       VITE_TURNSTILE_SITE_KEY: "",
       VITE_ADMIN_IDLE_TIMEOUT_MINUTES: "0.02",
+      VITE_E2E_SESSION_HEARTBEAT_INTERVAL_MS: "500",
     },
     url: baseURL,
     timeout: 120_000,

@@ -259,9 +259,21 @@ test.describe("Auth edge cases", () => {
 
   test("normal production entry graph does not statically own E2E controls", async () => {
     const mainSource = await readFile(new URL("../../src/main.ts", import.meta.url), "utf8");
+    const adminLifecycleSource = await readFile(
+      new URL("../../src/composables/useAdminSessionLifecycle.ts", import.meta.url),
+      "utf8",
+    );
 
     expect(mainSource).toContain('await import("./e2e/testControls")');
     expect(mainSource).not.toMatch(/from ["']\.\/e2e\/testControls["']/);
+    expect(adminLifecycleSource).toContain(
+      "const DEFAULT_SESSION_HEARTBEAT_INTERVAL_MS = 30_000;",
+    );
+    expect(adminLifecycleSource).toContain("VITE_E2E_SESSION_HEARTBEAT_INTERVAL_MS");
+    expect(adminLifecycleSource).toMatch(
+      /const SESSION_HEARTBEAT_INTERVAL_MS =\s*IS_E2E_TEST_MODE &&/,
+    );
+    expect(adminLifecycleSource).toMatch(/:\s*DEFAULT_SESSION_HEARTBEAT_INTERVAL_MS;/);
   });
 
   test("public session bootstrap preserves the authenticated role redirect", async ({ page }) => {
@@ -1246,28 +1258,43 @@ test.describe("Auth edge cases", () => {
     await expect.poll(() => validationRequests).toBe(1);
   });
 
-  test("admin activity keeps touch and validation heartbeat behavior distinct", async ({ page }) => {
-    const actions: string[] = [];
+  test("leaving admin during the validation retry cancels stale termination and permits restart", async ({ page }) => {
+    let validationRequests = 0;
     await page.route(/\/functions(?:\/v1)?\/admin-ops(?:\?.*)?$/, async (route) => {
       const body = (route.request().postDataJSON() as { action?: string }) ?? {};
-      actions.push(body.action ?? "");
+      if (body.action === "validate_session") validationRequests += 1;
       await route.fulfill({
         status: 200,
         contentType: "application/json",
-        body: JSON.stringify({ data: { ok: true, valid: true } }),
+        body: JSON.stringify({
+          data:
+            body.action === "validate_session"
+              ? { valid: validationRequests !== 1 }
+              : { ok: true },
+        }),
       });
     });
 
     await page.goto("/");
+    await page.clock.install();
     await setTenantAdminSession(page, "tenant-e2e");
     await navigateApp(page, "/tenant/admin");
-    await page.mouse.move(10, 10);
+    await expect.poll(() => validationRequests).toBe(1);
+    await page.clock.fastForward(100);
 
-    await expect.poll(() => actions.filter((action) => action === "touch_session").length).toBe(1);
-    await expect.poll(() => actions.filter((action) => action === "validate_session").length).toBe(1);
+    await navigateApp(page, "/tenant/checkout");
+    await page.clock.fastForward(400);
+    expect(validationRequests).toBe(1);
+    await expect(page.getByRole("alertdialog").filter({ hasText: "Session Ended" })).toHaveCount(0);
+
+    await page.clock.fastForward(5_001);
+    await navigateApp(page, "/tenant/admin");
+    await expect.poll(() => validationRequests).toBe(2);
+    await expect(page).toHaveURL(/\/tenant\/admin$/);
+    await expect(page.getByRole("alertdialog").filter({ hasText: "Session Ended" })).toHaveCount(0);
   });
 
-  test("tenant admin idle timeout removes fresh verification on non-dev hosts", async ({ page }) => {
+  test("tenant admin activity postpones idle logout beyond the original deadline", async ({ page }) => {
     await page.route(/\/functions(?:\/v1)?\/admin-ops(?:\?.*)?$/, async (route) => {
       if (route.request().method() === "OPTIONS") {
         await route.fulfill({
@@ -1293,7 +1320,11 @@ test.describe("Auth edge cases", () => {
     await navigateApp(page, "/tenant/admin");
     await expect(page).toHaveURL(/\/tenant\/admin$/);
 
-    await expect(page).toHaveURL(/\/tenant\/checkout$/, { timeout: 4_000 });
+    await page.waitForTimeout(700);
+    await page.mouse.move(25, 25);
+    await page.waitForTimeout(700);
+    await expect(page).toHaveURL(/\/tenant\/admin$/);
+    await expect(page).toHaveURL(/\/tenant\/checkout$/, { timeout: 2_000 });
   });
 
   test("tenant admin dev hosts disable idle logout behavior", async ({ page }) => {

@@ -7,14 +7,7 @@ export const buildError = (
   requestId: string,
   extraHeaders?: Headers,
 ) => {
-  const responseHeaders = extraHeaders ? new Headers(extraHeaders) : new Headers();
-  Object.entries(headers).forEach(([key, value]) => responseHeaders.set(key, value));
-  responseHeaders.set("Content-Type", "application/json");
-  responseHeaders.set("x-request-id", requestId);
-  return new Response(JSON.stringify({ error: message }), {
-    status,
-    headers: responseHeaders,
-  });
+  return buildJson(status, { error: message }, headers, requestId, extraHeaders);
 };
 
 export const buildSessionRateLimitError = (

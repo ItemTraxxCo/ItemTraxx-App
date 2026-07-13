@@ -39,6 +39,73 @@ Deno.test("response builders preserve JSON envelopes, request IDs, and supplied 
   assertEquals(json.headers.get("x-request-id"), "request-json", "JSON request ID");
 });
 
+Deno.test("response builders clone extra headers and apply canonical precedence", async () => {
+  const extraHeaders = new Headers({
+    "Content-Type": "text/plain",
+    "x-request-id": "stale-request",
+    "x-shared": "from-extra",
+    "x-extra-only": "preserved",
+  });
+  const error = buildError(
+    409,
+    "Already exists",
+    {
+      "Content-Type": "application/problem+json",
+      "x-request-id": "caller-request",
+      "x-shared": "from-caller",
+    },
+    "canonical-request",
+    extraHeaders,
+  );
+  extraHeaders.set("x-extra-only", "mutated-after-build");
+
+  assertEquals(error.status, 409, "error status");
+  assertEquals(
+    await error.json(),
+    { error: "Already exists" },
+    "exact error body",
+  );
+  assertEquals(
+    error.headers.get("x-extra-only"),
+    "preserved",
+    "extra headers are cloned",
+  );
+  assertEquals(
+    error.headers.get("x-shared"),
+    "from-caller",
+    "caller headers override extras",
+  );
+  assertEquals(
+    error.headers.get("content-type"),
+    "application/json",
+    "JSON content type is forced",
+  );
+  assertEquals(
+    error.headers.get("x-request-id"),
+    "canonical-request",
+    "request ID is forced",
+  );
+
+  const json = buildJson(
+    202,
+    { data: ["one", "two"], accepted: true },
+    { "x-shared": "from-json-caller" },
+    "json-request",
+    new Headers({ "x-shared": "from-json-extra" }),
+  );
+  assertEquals(json.status, 202, "arbitrary JSON status");
+  assertEquals(
+    await json.json(),
+    { data: ["one", "two"], accepted: true },
+    "exact arbitrary JSON body",
+  );
+  assertEquals(
+    json.headers.get("x-shared"),
+    "from-json-caller",
+    "JSON caller precedence",
+  );
+});
+
 Deno.test("session rate-limit responses preserve status, messages, and retry guidance", async () => {
   const limited = buildSessionRateLimitError("rate_limited", {}, "request-limited");
   assertEquals(limited.status, 429, "limited status");

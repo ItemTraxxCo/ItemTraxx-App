@@ -9,6 +9,7 @@ import type {
 } from "../context.ts";
 import { handleNotificationAction } from "./notifications.ts";
 import { handleSettingsAction } from "./settings.ts";
+import { handleStatusTrackingAction } from "./statusTracking.ts";
 
 export const ADMIN_OPS_ACTIONS = [
   "get_notifications",
@@ -112,6 +113,7 @@ const ACTION_HANDLERS: Partial<Record<AdminOpsAction, ActionHandler>> = {
   get_notifications: handleNotificationAction,
   get_tenant_settings: handleSettingsAction,
   update_tenant_settings: handleSettingsAction,
+  get_status_tracking: handleStatusTrackingAction,
 };
 
 export const dispatchAdminOpsAction = (context: AdminOpsContext) => {

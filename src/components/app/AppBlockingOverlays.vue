@@ -30,7 +30,7 @@
       <div class="kill-switch-fullscreen-actions">
         <a
           class="kill-switch-action kill-switch-action-primary"
-          href="https://status.itemtraxx.com/ref=killswitch"
+          href="https://status.itemtraxx.com/?ref=killswitch"
           target="_blank"
           rel="noreferrer"
         >

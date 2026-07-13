@@ -151,7 +151,7 @@ const dismissedIncidentId = ref(localStorage.getItem("itemtraxx-incident-dismiss
 const maintenanceEnabled = ref(false);
 const maintenanceMessage = ref("Maintenance currentlyin progress.");
 const killSwitchEnabled = ref(false);
-const killSwitchMessage = ref("Unfortunately ItemTraxx is currently unavailable. We apologize for any inconvenience and are working to restore access as soon as possible. Please see the status page (https://status.itemtraxx.com/ref=killswitch) for more information.");
+const killSwitchMessage = ref("Unfortunately ItemTraxx is currently unavailable. We apologize for any inconvenience and are working to restore access as soon as possible. Please see the status page (https://status.itemtraxx.com/?ref=killswitch) for more information.");
 const backendUnavailable = ref(false);
 const showPageLoading = ref(false);
 let pageLoadingTimer: number | null = null;
@@ -289,7 +289,7 @@ const applySystemStatus = () => {
   if (!systemStatus.hasResult) { backendUnavailable.value = false; return; }
   const payload = systemStatus.payload;
   killSwitchEnabled.value = payload.kill_switch?.enabled === true;
-  if (killSwitchEnabled.value) killSwitchMessage.value = typeof payload.kill_switch?.message === "string" && payload.kill_switch.message.trim() ? payload.kill_switch.message.trim() : "Unfortunately ItemTraxx is currently unavailable. We apologize for any inconvenience and are working to restore access as soon as possible. Please see the status page (https://status.itemtraxx.com/ref=killswitch) for more information.";
+  if (killSwitchEnabled.value) killSwitchMessage.value = typeof payload.kill_switch?.message === "string" && payload.kill_switch.message.trim() ? payload.kill_switch.message.trim() : "Unfortunately ItemTraxx is currently unavailable. We apologize for any inconvenience and are working to restore access as soon as possible. Please see the status page (https://status.itemtraxx.com/?ref=killswitch) for more information.";
   const broadcast = payload.broadcast;
   activeBroadcast.value = broadcast?.enabled && typeof broadcast.message === "string" && broadcast.message.trim() ? {
     id: typeof broadcast.updated_at === "string" && broadcast.updated_at ? broadcast.updated_at : broadcast.message.trim(),

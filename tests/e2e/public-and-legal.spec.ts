@@ -783,6 +783,15 @@ test.describe("Public surfaces", () => {
     await page.goto(`${nonDevE2eOrigin}/login`);
     await expect(page).toHaveURL(`${nonDevE2eOrigin}/unavailable`);
     await expect(page.getByRole("heading", { name: /currently unavailable/i })).toBeVisible();
+
+    const [blockingOverlaysSource, appSource] = await Promise.all([
+      readFile(new URL("../../src/components/app/AppBlockingOverlays.vue", import.meta.url), "utf8"),
+      readFile(new URL("../../src/App.vue", import.meta.url), "utf8"),
+    ]);
+    expect(blockingOverlaysSource).toContain(
+      'href="https://status.itemtraxx.com/?ref=killswitch"',
+    );
+    expect(appSource).not.toContain("https://status.itemtraxx.com/ref=killswitch");
   });
 
   test("the forced version overlay preserves update copy and precedence", async ({ page }) => {

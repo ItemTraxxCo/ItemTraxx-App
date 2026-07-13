@@ -1,9 +1,11 @@
 import {
   checkSessionRateLimit,
   default as worker,
+} from "./index.ts";
+import {
   isBlockedRpcProxyPath,
   isUnauthorizedRpcProxyPath,
-} from "./index.ts";
+} from "./routing.ts";
 
 const sessionRequest = () =>
   new Request("https://edge.itemtraxx.com/auth/session/exchange", {

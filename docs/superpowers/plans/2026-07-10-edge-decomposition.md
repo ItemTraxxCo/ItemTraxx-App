@@ -588,7 +588,7 @@ npm run worker:types:check
 npm run worker:typecheck
 npm run worker:test
 deno fmt --check cloudflare/edge-proxy/src supabase/functions/_shared supabase/functions/super-ops supabase/functions/super-tenant-mutate supabase/functions/admin-ops
-deno test --allow-env --frozen supabase/functions/_shared/*_test.ts supabase/functions/super-ops/*_test.ts supabase/functions/super-tenant-mutate/*_test.ts supabase/functions/admin-ops/*_test.ts
+deno test --allow-env --allow-read --frozen supabase/functions/_shared/*_test.ts supabase/functions/super-ops/*_test.ts supabase/functions/super-tenant-mutate/*_test.ts supabase/functions/admin-ops/*_test.ts
 deno check --frozen supabase/functions/super-ops/index.ts supabase/functions/super-tenant-mutate/index.ts supabase/functions/admin-ops/index.ts
 ```
 

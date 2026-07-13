@@ -1,6 +1,7 @@
 import type { SuperOpsContext } from "../context.ts";
 import { handleControlCenterAction } from "./controlCenter.ts";
 import { handleSecuritySessionsAction } from "./securitySessions.ts";
+import { handleSupportAction } from "./support.ts";
 
 export const SUPER_OPS_ACTIONS = [
   "verify_password",
@@ -35,7 +36,11 @@ export const dispatchSuperOpsAction = async (
   context: SuperOpsContext,
 ): Promise<Response> => {
   for (
-    const handler of [handleSecuritySessionsAction, handleControlCenterAction]
+    const handler of [
+      handleSecuritySessionsAction,
+      handleControlCenterAction,
+      handleSupportAction,
+    ]
   ) {
     const response = await handler(context);
     if (response) return response;

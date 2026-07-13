@@ -20,10 +20,7 @@ import {
   isRestProxyPath,
   isRpcProxyPath,
 } from "./routing.ts";
-import {
-  checkSessionRateLimit,
-  handleSessionRequest,
-} from "./session.ts";
+import { handleSessionRequest } from "./session.ts";
 import { proxySupabaseApiRequest } from "./supabaseApiProxy.ts";
 
 export { checkSessionRateLimit } from "./session.ts";

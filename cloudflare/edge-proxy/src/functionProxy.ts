@@ -10,6 +10,37 @@ import { applyTrustedIngressHeaders } from "./trustedIngress.ts";
 
 const trimTrailingSlash = (value: string) => value.replace(/\/+$/, "");
 
+// The status envelope is small; bound the only upstream response branch that is read.
+export const SYSTEM_STATUS_JSON_MAX_BYTES = 64 * 1024;
+
+const readBoundedSystemStatusText = async (response: Response): Promise<string | null> => {
+  const contentLength = response.headers.get("content-length");
+  if (contentLength !== null) {
+    const declaredBytes = Number(contentLength);
+    if (Number.isFinite(declaredBytes) && declaredBytes > SYSTEM_STATUS_JSON_MAX_BYTES) {
+      return null;
+    }
+  }
+
+  const reader = response.clone().body?.getReader();
+  if (!reader) return "";
+  const decoder = new TextDecoder();
+  let totalBytes = 0;
+  let text = "";
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) {
+      return text + decoder.decode();
+    }
+    totalBytes += value.byteLength;
+    if (totalBytes > SYSTEM_STATUS_JSON_MAX_BYTES) {
+      void reader.cancel("system-status response exceeds JSON read limit").catch(() => undefined);
+      return null;
+    }
+    text += decoder.decode(value, { stream: true });
+  }
+};
+
 export const proxyFunctionRequest = async (
   request: Request,
   env: Env,
@@ -88,17 +119,19 @@ export const proxyFunctionRequest = async (
   if (sessionHeaders) appendSetCookies(responseHeaders, sessionHeaders);
 
   if (isSystemStatusGet) {
-    const rawBody = await upstreamResponse.clone().text();
-    try {
-      const parsed = JSON.parse(rawBody) as Record<string, unknown>;
-      const withFallback = await applyMaintenanceFallbackToStatusPayload(env, upstreamResponse.status, parsed);
-      responseHeaders.set("content-type", "application/json");
-      return new Response(JSON.stringify(withFallback), {
-        status: upstreamResponse.status,
-        headers: responseHeaders,
-      });
-    } catch {
-      // Preserve the original upstream payload when JSON parsing fails.
+    const rawBody = await readBoundedSystemStatusText(upstreamResponse);
+    if (rawBody !== null) {
+      try {
+        const parsed = JSON.parse(rawBody) as Record<string, unknown>;
+        const withFallback = await applyMaintenanceFallbackToStatusPayload(env, upstreamResponse.status, parsed);
+        responseHeaders.set("content-type", "application/json");
+        return new Response(JSON.stringify(withFallback), {
+          status: upstreamResponse.status,
+          headers: responseHeaders,
+        });
+      } catch {
+        // Preserve the original upstream payload when JSON parsing fails.
+      }
     }
   }
 

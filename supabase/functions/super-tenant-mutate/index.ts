@@ -24,6 +24,11 @@ import {
   SLUG_PATTERN,
   ValidationError,
 } from "../_shared/validation.ts";
+import type { SuperTenantContext } from "./context.ts";
+import {
+  enrichTenants as enrichTenantRows,
+  handleListTenants,
+} from "./actions/tenantQueries.ts";
 
 const baseCorsHeaders = {
   "Access-Control-Allow-Headers":
@@ -553,186 +558,27 @@ serve(async (req) => {
       if (error) throw new Error("Unable to write security audit log.");
     };
 
-    const enrichTenants = async (rows: TenantRow[]) => {
-      if (!rows.length) return [];
-      const tenantIds = Array.from(new Set(rows.map((row) => row.id)));
-      const ids = Array.from(
-        new Set(
-          rows
-            .map((row) => row.primary_admin_profile_id)
-            .filter((value): value is string => !!value)
-        )
-      );
-      const districtIds = Array.from(
-        new Set(
-          rows.map((row) => row.district_id).filter((value): value is string => !!value)
-        )
-      );
-      const [profileRowsResult, rawPolicyRowsResult, districtRowsResult] = await Promise.all([
-        ids.length
-          ? adminClient.from("profiles").select("id, auth_email").in("id", ids)
-          : Promise.resolve({ data: [], error: null }),
-        adminClient
-          .from("tenant_policies")
-          .select("tenant_id, checkout_due_hours, account_category, plan_code, feature_flags")
-          .in("tenant_id", tenantIds),
-        districtIds.length
-          ? adminClient.from("districts").select("id, name, slug").in("id", districtIds)
-          : Promise.resolve({ data: [], error: null }),
-      ]);
-
-      let policyRowsResult: {
-        data: Array<Record<string, unknown>> | null;
-        error: PgError | null;
-      } = rawPolicyRowsResult;
-      if (isMissingFeatureFlagsColumn(rawPolicyRowsResult.error as PgError)) {
-        const fallbackPolicyRowsResult = await adminClient
-          .from("tenant_policies")
-          .select("tenant_id, checkout_due_hours, account_category, plan_code")
-          .in("tenant_id", tenantIds);
-
-        policyRowsResult = {
-          data: (fallbackPolicyRowsResult.data ?? []).map((item) => ({
-            ...item,
-            feature_flags: null,
-          })),
-          error: fallbackPolicyRowsResult.error,
-        };
-      }
-
-      const emailById = new Map(
-        (
-          (profileRowsResult.data ?? []) as Array<{
-            id: string;
-            auth_email: string | null;
-          }>
-        ).map((item) => [item.id, item.auth_email])
-      );
-      const policyByTenant = new Map(
-        ((policyRowsResult.data ?? []) as TenantPolicyRow[]).map((item) => [
-          item.tenant_id,
-          item,
-        ])
-      );
-      const districtById = new Map(
-        ((districtRowsResult.data ?? []) as DistrictRow[]).map((item) => [item.id, item])
-      );
-
-      return rows.map((row) => ({
-        ...row,
-        status: row.status ?? "active",
-        district_name: row.district_id ? districtById.get(row.district_id)?.name ?? null : null,
-        district_slug: row.district_id ? districtById.get(row.district_id)?.slug ?? null : null,
-        primary_admin_email: row.primary_admin_profile_id
-          ? emailById.get(row.primary_admin_profile_id) ?? null
-          : null,
-        checkout_due_hours:
-          typeof policyByTenant.get(row.id)?.checkout_due_hours === "number"
-            ? policyByTenant.get(row.id)?.checkout_due_hours
-            : 72,
-        account_category:
-          policyByTenant.get(row.id)?.account_category === "individual"
-            ? "individual"
-            : policyByTenant.get(row.id)?.account_category === "district"
-              ? "district"
-            : "organization",
-        plan_code: policyByTenant.get(row.id)?.plan_code ?? null,
-        feature_flags:
-          policyByTenant.get(row.id)?.feature_flags ?? defaultFeatureFlags(),
-      }));
+    const actionContext: SuperTenantContext = {
+      req,
+      action,
+      payload,
+      userClient,
+      adminClient,
+      user,
+      profile,
+      jsonResponse,
+      writeAudit,
+      resetRedirectTo:
+        (Deno.env.get("ITX_PASSWORD_RESET_REDIRECT_URL") ?? "").trim() || null,
+      supabaseUrl,
+      publishableKey,
     };
 
     if (action === "list_tenants") {
-      const search = optionalText(payload.search, { maxLen: 120 });
-      const status = optionalText(payload.status, { maxLen: 40 }) || "all";
-
-      let query = adminClient
-        .from("tenants")
-        .select("id, name, access_code, status, created_at, district_id, primary_admin_profile_id")
-        .order("created_at", { ascending: false })
-        .limit(300);
-
-      if (status !== "all" && isValidStatus(status)) {
-        query = query.eq("status", status);
-      } else if (status !== "all") {
-        return jsonResponse(400, { error: "Invalid request" });
-      }
-
-      const { data, error } = await query;
-      if (error) {
-        if (
-          !isMissingStatusColumn(error as PgError) &&
-          !isMissingPrimaryAdminColumn(error as PgError) &&
-          !isMissingDistrictIdColumn(error as PgError)
-        ) {
-          return jsonResponse(400, { error: "Unable to load tenants." });
-        }
-
-        let fallbackQuery = adminClient
-          .from("tenants")
-          .select("id, name, access_code, created_at")
-          .order("created_at", { ascending: false })
-          .limit(300);
-
-        const { data: fallbackData, error: fallbackError } = await fallbackQuery;
-        if (fallbackError) {
-          return jsonResponse(400, { error: "Unable to load tenants." });
-        }
-
-        const normalized: TenantRow[] = ((fallbackData ?? []) as Array<TenantRow>).map((row) => ({
-          ...row,
-          status: "active" as const,
-          district_id: null,
-          primary_admin_profile_id: null,
-        }));
-
-        const enriched = await enrichTenants(normalized);
-        if (!search) {
-          return jsonResponse(200, { data: enriched });
-        }
-        const normalizedSearch = search.toLowerCase();
-        return jsonResponse(200, {
-          data: enriched.filter((row) => {
-            const name = typeof row.name === "string" ? row.name.toLowerCase() : "";
-            const code =
-              typeof row.access_code === "string" ? row.access_code.toLowerCase() : "";
-            const districtName =
-              typeof row.district_name === "string" ? row.district_name.toLowerCase() : "";
-            const districtSlug =
-              typeof row.district_slug === "string" ? row.district_slug.toLowerCase() : "";
-            return (
-              name.includes(normalizedSearch) ||
-              code.includes(normalizedSearch) ||
-              districtName.includes(normalizedSearch) ||
-              districtSlug.includes(normalizedSearch)
-            );
-          }),
-        });
-      }
-
-      const enriched = await enrichTenants((data ?? []) as TenantRow[]);
-      if (!search) {
-        return jsonResponse(200, { data: enriched });
-      }
-      const normalizedSearch = search.toLowerCase();
-      return jsonResponse(200, {
-        data: enriched.filter((row) => {
-          const name = typeof row.name === "string" ? row.name.toLowerCase() : "";
-          const code =
-            typeof row.access_code === "string" ? row.access_code.toLowerCase() : "";
-          const districtName =
-            typeof row.district_name === "string" ? row.district_name.toLowerCase() : "";
-          const districtSlug =
-            typeof row.district_slug === "string" ? row.district_slug.toLowerCase() : "";
-          return (
-            name.includes(normalizedSearch) ||
-            code.includes(normalizedSearch) ||
-            districtName.includes(normalizedSearch) ||
-            districtSlug.includes(normalizedSearch)
-          );
-        }),
-      });
+      return await handleListTenants(actionContext);
     }
+    const enrichTenants = (rows: TenantRow[]) =>
+      enrichTenantRows(actionContext, rows);
 
     if (action === "list_districts") {
       const search = optionalText(payload.search, { maxLen: 120, transform: "lowercase" });

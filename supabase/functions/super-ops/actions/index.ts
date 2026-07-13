@@ -4,6 +4,7 @@ import { handleInternalOpsAction } from "./internalOps.ts";
 import { handleSalesCustomersAction } from "./salesCustomers.ts";
 import { handleSecuritySessionsAction } from "./securitySessions.ts";
 import { handleSupportAction } from "./support.ts";
+import { handleSubprocessorsAction } from "./subprocessors.ts";
 
 export const SUPER_OPS_ACTIONS = [
   "verify_password",
@@ -44,6 +45,7 @@ export const dispatchSuperOpsAction = async (
       handleSupportAction,
       handleSalesCustomersAction,
       handleInternalOpsAction,
+      handleSubprocessorsAction,
     ]
   ) {
     const response = await handler(context);

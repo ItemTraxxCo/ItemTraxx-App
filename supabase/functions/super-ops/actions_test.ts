@@ -1,10 +1,5 @@
-import {
-  assertEquals,
-} from "https://deno.land/std@0.177.0/testing/asserts.ts";
-import {
-  dispatchSuperOpsAction,
-  SUPER_OPS_ACTIONS,
-} from "./actions/index.ts";
+import { assertEquals } from "https://deno.land/std@0.177.0/testing/asserts.ts";
+import { dispatchSuperOpsAction, SUPER_OPS_ACTIONS } from "./actions/index.ts";
 import type { SuperOpsContext } from "./context.ts";
 
 const EXPECTED_ACTIONS = [

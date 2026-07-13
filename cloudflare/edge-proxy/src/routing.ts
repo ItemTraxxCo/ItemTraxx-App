@@ -1,4 +1,6 @@
 const ALLOWED_RPC_FUNCTIONS = new Set(["consume_rate_limit"]);
+// Four passes cover deliberately nested encodings while keeping request work linear and bounded.
+const MAX_RPC_PATH_DECODE_PASSES = 4;
 
 const readExactSegment = (pathname: string, prefix: string) => {
   if (!pathname.startsWith(prefix)) return "";
@@ -43,7 +45,7 @@ const canonicalizeForRpcDetection = (pathname: string) => {
   let value = pathname;
   let malformedEncoding = false;
 
-  for (let index = 0; index <= pathname.length; index += 1) {
+  for (let index = 0; index < MAX_RPC_PATH_DECODE_PASSES; index += 1) {
     let decoded: string;
     try {
       decoded = decodeURIComponent(value);
@@ -53,11 +55,21 @@ const canonicalizeForRpcDetection = (pathname: string) => {
         String.fromCharCode(Number.parseInt(hex, 16))
       );
     }
-    if (decoded === value) break;
+    if (decoded === value) {
+      return {
+        pathname: normalizePathShape(value),
+        malformedEncoding,
+        decodeDepthExhausted: false,
+      };
+    }
     value = decoded;
   }
 
-  return { pathname: normalizePathShape(value), malformedEncoding };
+  return {
+    pathname: normalizePathShape(value),
+    malformedEncoding,
+    decodeDepthExhausted: /%[0-9a-f]{2}/i.test(value),
+  };
 };
 
 const isCanonicalRpcPath = (pathname: string) => {
@@ -77,6 +89,7 @@ const hasMalformedRpcSegment = (pathname: string) => {
 const isAnyRpcPath = (pathname: string) => {
   const canonical = canonicalizeForRpcDetection(pathname);
   if (isCanonicalRpcPath(canonical.pathname)) return true;
+  if (canonical.decodeDepthExhausted && isRestProxyPath(pathname)) return true;
   return canonical.malformedEncoding && hasMalformedRpcSegment(canonical.pathname);
 };
 

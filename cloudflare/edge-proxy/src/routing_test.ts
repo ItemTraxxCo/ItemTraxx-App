@@ -133,3 +133,18 @@ Deno.test("malformed RPC-like encoding fails closed without blocking normal REST
     assert(!isBlockedRpcProxyPath(path), `normal REST path was blocked: ${path}`);
   }
 });
+
+Deno.test("deep percent nesting fails closed within a bounded routing budget", () => {
+  let encodedRpc = "%72pc";
+  for (let depth = 0; depth < 10_000; depth += 1) {
+    encodedRpc = encodedRpc.replaceAll("%", "%25");
+  }
+  const path = `/rest/v1/${encodedRpc}/run_data_retention`;
+
+  const startedAt = performance.now();
+  const blocked = isBlockedRpcProxyPath(path);
+  const elapsedMs = performance.now() - startedAt;
+
+  assert(blocked, "deeply nested RPC encoding must fail closed");
+  assert(elapsedMs < 100, `deeply nested RPC detection exceeded its 100ms budget: ${elapsedMs.toFixed(1)}ms`);
+});

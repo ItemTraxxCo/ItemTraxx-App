@@ -233,3 +233,92 @@ Deno.test("edge proxy CORS does not expand wildcard origin patterns", async () =
     throw new Error("Expected wildcard-like origin configuration not to be expanded");
   }
 });
+
+Deno.test("dispatcher blocks canonicalized REST RPC variants without upstream fetch", async () => {
+  const originalFetch = globalThis.fetch;
+  let upstreamFetches = 0;
+  globalThis.fetch = ((_input: string | URL | Request, _init?: RequestInit) => {
+    upstreamFetches += 1;
+    return Promise.resolve(new Response("unexpected upstream fetch", { status: 500 }));
+  }) as typeof fetch;
+
+  try {
+    for (const path of [
+      "/rest/v1/%72pc/run_data_retention",
+      "/rest/v1/rpc%2Frun_data_retention",
+      "/rest/v1//rpc/run_data_retention",
+      "/rest/v1/%2572pc/run_data_retention",
+    ]) {
+      const response = await worker.fetch(
+        new Request(`https://edge.itemtraxx.com${path}`, {
+          headers: {
+            Authorization: "Bearer fixture-token",
+            origin: "https://itemtraxx.com",
+          },
+        }),
+        {
+          SUPABASE_URL: "https://example.supabase.co",
+          SUPABASE_ANON_KEY: "anon-key",
+        },
+        executionContext,
+      );
+
+      if (response.status !== 403) {
+        throw new Error(`Expected canonicalized RPC path to return 403: ${path}`);
+      }
+    }
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+
+  if (upstreamFetches !== 0) {
+    throw new Error(`Expected zero upstream fetches for blocked RPC paths, received ${upstreamFetches}`);
+  }
+});
+
+Deno.test("dispatcher still proxies the literal allowed RPC and normal REST paths", async () => {
+  const originalFetch = globalThis.fetch;
+  const upstreamUrls: string[] = [];
+  globalThis.fetch = ((input: string | URL | Request, _init?: RequestInit) => {
+    upstreamUrls.push(String(input));
+    return Promise.resolve(new Response(JSON.stringify({ ok: true }), {
+      status: 200,
+      headers: { "content-type": "application/json" },
+    }));
+  }) as typeof fetch;
+
+  try {
+    for (const path of [
+      "/rest/v1/rpc/consume_rate_limit",
+      "/rest/v1/profiles?select=id",
+    ]) {
+      const response = await worker.fetch(
+        new Request(`https://edge.itemtraxx.com${path}`, {
+          headers: {
+            Authorization: "Bearer fixture-token",
+            origin: "https://itemtraxx.com",
+          },
+        }),
+        {
+          SUPABASE_URL: "https://example.supabase.co",
+          SUPABASE_ANON_KEY: "anon-key",
+        },
+        executionContext,
+      );
+
+      if (response.status !== 200) {
+        throw new Error(`Expected proxy route to remain available: ${path}`);
+      }
+    }
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+
+  const expected = [
+    "https://example.supabase.co/rest/v1/rpc/consume_rate_limit",
+    "https://example.supabase.co/rest/v1/profiles?select=id",
+  ];
+  if (JSON.stringify(upstreamUrls) !== JSON.stringify(expected)) {
+    throw new Error(`Unexpected upstream URLs: ${JSON.stringify(upstreamUrls)}`);
+  }
+});

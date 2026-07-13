@@ -17,12 +17,27 @@ const PREVIEW_URL = "http://127.0.0.1:4174/";
 const PREVIEW_START_TIMEOUT_MS = 15_000;
 const NAVIGATION_TIMEOUT_MS = 30_000;
 const PROCESS_EXIT_TIMEOUT_MS = 5_000;
+const BROWSER_CLEANUP_STEP_TIMEOUT_MS = 2_000;
+const BROWSER_CLEANUP_TIMEOUT_MS = 5_000;
+const PREVIEW_CLEANUP_TIMEOUT_MS = 12_000;
+
+class LandingCheckError extends Error {
+  constructor(code, message, options) {
+    super(message, options);
+    this.name = "LandingCheckError";
+    this.code = code;
+  }
+}
 
 export const assertPortAvailable = ({ host, port }) => new Promise((resolveAvailable, rejectAvailable) => {
   const server = createTcpServer();
   server.once("error", (error) => {
     if (error.code === "EADDRINUSE") {
-      rejectAvailable(new Error(`Preview port ${port} is already in use on ${host}`, { cause: error }));
+      rejectAvailable(new LandingCheckError(
+        "PREVIEW_PORT_OCCUPIED",
+        `Preview port ${port} is already in use on ${host}`,
+        { cause: error },
+      ));
       return;
     }
     rejectAvailable(error);
@@ -37,6 +52,21 @@ export const classifyLandingRequests = (urls) => ({
   systemStatus: urls.filter((url) => /\/functions(?:\/v1)?\/system-status(?:[?#]|$)/i.test(url)),
   forbiddenSdk: urls.filter((url) => /(?:jspdf|html2canvas|jsbarcode|posthog|sentry|supabase)[^/]*\.js(?:[?#]|$)/i.test(url)),
 });
+
+export const sanitizeReportUrl = (rawUrl) => {
+  try {
+    const url = new URL(rawUrl);
+    url.username = "";
+    url.password = "";
+    const redactedSearch = new URLSearchParams();
+    for (const [key] of url.searchParams) redactedSearch.append(key, "[REDACTED]");
+    url.search = redactedSearch.toString();
+    url.hash = url.hash ? "%5BREDACTED%5D" : "";
+    return url.href;
+  } catch {
+    return "[invalid-url]";
+  }
+};
 
 export const evaluateLandingNetwork = ({ requestUrls, initialLoad }) => {
   const classification = classifyLandingRequests(requestUrls);
@@ -67,28 +97,76 @@ export const evaluateLandingNetwork = ({ requestUrls, initialLoad }) => {
   };
 };
 
+const sanitizeClassification = (classification) => ({
+  direct_supabase: classification.directSupabase.map(sanitizeReportUrl),
+  system_status: classification.systemStatus.map(sanitizeReportUrl),
+  forbidden_sdk: classification.forbiddenSdk.map(sanitizeReportUrl),
+});
+
+const sanitizeViolations = (violations) => violations.map((violation) => {
+  if (!violation.urls) return violation;
+  return { ...violation, urls: violation.urls.map(sanitizeReportUrl) };
+});
+
+export const createLandingNetworkReport = ({ timestamp, pageUrl, requestUrls, initialLoad }) => {
+  const result = evaluateLandingNetwork({ requestUrls, initialLoad });
+  return {
+    timestamp,
+    page_url: sanitizeReportUrl(pageUrl),
+    request_count: requestUrls.length,
+    unique_urls: [...new Set(requestUrls.map(sanitizeReportUrl))].sort(),
+    classification: sanitizeClassification(result.classification),
+    system_status_count: result.systemStatusCount,
+    initial_load: {
+      ...initialLoad,
+      thresholds: {
+        max_minified_bytes: MAX_INITIAL_MINIFIED_BYTES,
+        max_gzip_bytes: MAX_INITIAL_GZIP_BYTES,
+      },
+      pass: !shouldFailInitialLoad(initialLoad),
+    },
+    violations: sanitizeViolations(result.violations),
+    pass: result.pass,
+  };
+};
+
 const delay = (milliseconds) => new Promise((resolveDelay) => setTimeout(resolveDelay, milliseconds));
 
 const waitForPreview = async (child) => {
   const deadline = Date.now() + PREVIEW_START_TIMEOUT_MS;
-  let lastError;
+  let lastHttpStatus;
+  let spawnError;
+  child.once("error", (error) => {
+    spawnError = error;
+  });
 
   while (Date.now() < deadline) {
+    if (spawnError) {
+      throw new LandingCheckError(
+        "PREVIEW_SPAWN_FAILED",
+        "Vite preview process could not be started",
+        { cause: spawnError },
+      );
+    }
     if (child.exitCode !== null || child.signalCode !== null) {
-      throw new Error(`Vite preview exited before startup (code ${child.exitCode}, signal ${child.signalCode})`);
+      throw new LandingCheckError(
+        "PREVIEW_EXITED",
+        `Vite preview exited before startup (code ${child.exitCode}, signal ${child.signalCode})`,
+      );
     }
 
     try {
       const response = await fetch(PREVIEW_URL, { signal: AbortSignal.timeout(1_000) });
       if (response.ok) return;
-      lastError = new Error(`Vite preview returned HTTP ${response.status}`);
-    } catch (error) {
-      lastError = error;
-    }
+      lastHttpStatus = response.status;
+    } catch {}
     await delay(250);
   }
 
-  throw new Error(`Vite preview did not become ready within ${PREVIEW_START_TIMEOUT_MS}ms: ${lastError?.message ?? "unknown error"}`);
+  throw new LandingCheckError(
+    "PREVIEW_START_TIMEOUT",
+    `Vite preview did not become ready within ${PREVIEW_START_TIMEOUT_MS}ms (last HTTP status: ${lastHttpStatus ?? "unavailable"})`,
+  );
 };
 
 const waitForChildExit = (child, timeoutMs) => {
@@ -119,6 +197,80 @@ const terminatePreview = async (child) => {
   }
 };
 
+const safeErrorName = (error) => {
+  const name = error instanceof Error ? error.name : "UnknownError";
+  return /^[A-Za-z][A-Za-z0-9]*Error$/.test(name) || name === "Error" ? name : "Error";
+};
+
+export const toSafeFailureDiagnostic = (error) => {
+  if (error instanceof LandingCheckError) {
+    return { code: error.code, message: error.message };
+  }
+  return { code: "UNEXPECTED_FAILURE", error: safeErrorName(error) };
+};
+
+const runWithSafeFailure = async (code, message, action) => {
+  try {
+    return await action();
+  } catch (error) {
+    if (error instanceof LandingCheckError) throw error;
+    throw new LandingCheckError(code, message, { cause: error });
+  }
+};
+
+const settleCleanupStep = (action, timeoutMs, successStatus) => new Promise((resolveStep) => {
+  let settled = false;
+  const finish = (diagnostic) => {
+    if (settled) return;
+    settled = true;
+    clearTimeout(timeout);
+    resolveStep(diagnostic);
+  };
+  const timeout = setTimeout(() => finish({ status: "timeout" }), Math.max(0, timeoutMs));
+  Promise.resolve()
+    .then(action)
+    .then(
+      () => finish({ status: successStatus }),
+      (error) => finish({ status: "failed", error: safeErrorName(error) }),
+    );
+});
+
+export const cleanupLandingResources = async ({
+  page,
+  context,
+  browser,
+  preview,
+  terminatePreviewFn = terminatePreview,
+  stepTimeoutMs = BROWSER_CLEANUP_STEP_TIMEOUT_MS,
+  browserTimeoutMs = BROWSER_CLEANUP_TIMEOUT_MS,
+  previewTimeoutMs = PREVIEW_CLEANUP_TIMEOUT_MS,
+}) => {
+  const diagnostics = [];
+  const browserDeadline = Date.now() + browserTimeoutMs;
+
+  try {
+    for (const [step, resource] of [["page", page], ["context", context], ["browser", browser]]) {
+      if (!resource) continue;
+      const remainingMs = Math.max(0, browserDeadline - Date.now());
+      const result = await settleCleanupStep(
+        () => resource.close(),
+        Math.min(stepTimeoutMs, remainingMs),
+        "closed",
+      );
+      diagnostics.push({ step, ...result });
+    }
+  } finally {
+    const result = await settleCleanupStep(
+      () => terminatePreviewFn(preview),
+      previewTimeoutMs,
+      "terminated",
+    );
+    diagnostics.push({ step: "preview", ...result });
+  }
+
+  return diagnostics;
+};
+
 const printViolations = (violations) => {
   for (const violation of violations) {
     if (violation.type === "system-status-count") {
@@ -132,7 +284,11 @@ const printViolations = (violations) => {
 };
 
 const run = async () => {
-  const initialLoad = measureInitialLoad();
+  const initialLoad = await runWithSafeFailure(
+    "STATIC_ANALYSIS_FAILED",
+    "Static initial-load analysis could not read the production build",
+    () => measureInitialLoad(),
+  );
   const requestUrls = [];
   await assertPortAvailable({ host: "127.0.0.1", port: 4174 });
   const preview = spawn(process.execPath, [
@@ -144,47 +300,48 @@ const run = async () => {
     "4174",
     "--strictPort",
   ], {
-    stdio: ["ignore", "inherit", "inherit"],
+    stdio: "ignore",
   });
   let browser;
   let context;
   let page;
+  let primaryError;
+  let cleanupDiagnostics = [];
 
   try {
     await waitForPreview(preview);
-    browser = await chromium.launch();
-    context = await browser.newContext();
-    page = await context.newPage();
+    browser = await runWithSafeFailure(
+      "BROWSER_LAUNCH_FAILED",
+      "Fresh Chromium could not be launched",
+      () => chromium.launch(),
+    );
+    context = await runWithSafeFailure(
+      "BROWSER_CONTEXT_FAILED",
+      "Fresh Chromium context could not be created",
+      () => browser.newContext(),
+    );
+    page = await runWithSafeFailure(
+      "BROWSER_PAGE_FAILED",
+      "Fresh Chromium page could not be created",
+      () => context.newPage(),
+    );
     page.on("request", (request) => requestUrls.push(request.url()));
-    await page.goto(PREVIEW_URL, {
-      waitUntil: "domcontentloaded",
-      timeout: NAVIGATION_TIMEOUT_MS,
-    });
+    await runWithSafeFailure(
+      "NAVIGATION_FAILED",
+      `Landing navigation did not reach DOM content within ${NAVIGATION_TIMEOUT_MS}ms`,
+      () => page.goto(PREVIEW_URL, {
+        waitUntil: "domcontentloaded",
+        timeout: NAVIGATION_TIMEOUT_MS,
+      }),
+    );
     await page.waitForTimeout(2_000);
 
-    const result = evaluateLandingNetwork({ requestUrls, initialLoad });
-    const report = {
+    const report = createLandingNetworkReport({
       timestamp: new Date().toISOString(),
-      page_url: page.url(),
-      request_count: requestUrls.length,
-      unique_urls: [...new Set(requestUrls)].sort(),
-      classification: {
-        direct_supabase: result.classification.directSupabase,
-        system_status: result.classification.systemStatus,
-        forbidden_sdk: result.classification.forbiddenSdk,
-      },
-      system_status_count: result.systemStatusCount,
-      initial_load: {
-        ...initialLoad,
-        thresholds: {
-          max_minified_bytes: MAX_INITIAL_MINIFIED_BYTES,
-          max_gzip_bytes: MAX_INITIAL_GZIP_BYTES,
-        },
-        pass: !shouldFailInitialLoad(initialLoad),
-      },
-      violations: result.violations,
-      pass: result.pass,
-    };
+      pageUrl: page.url(),
+      requestUrls,
+      initialLoad,
+    });
 
     mkdirSync(resolve("artifacts"), { recursive: true });
     writeFileSync(
@@ -205,19 +362,26 @@ const run = async () => {
       printViolations(report.violations);
       process.exitCode = 1;
     }
+  } catch (error) {
+    primaryError = error;
   } finally {
-    await Promise.allSettled([
-      page?.close(),
-      context?.close(),
-      browser?.close(),
-    ].filter(Boolean));
-    await terminatePreview(preview);
+    cleanupDiagnostics = await cleanupLandingResources({ page, context, browser, preview });
+  }
+
+  const cleanupFailures = cleanupDiagnostics.filter(({ status }) => status === "failed" || status === "timeout");
+  if (cleanupFailures.length > 0) {
+    console.error("[perf] Landing check cleanup failures", cleanupFailures);
+    process.exitCode = 1;
+  }
+  if (primaryError) throw primaryError;
+  if (cleanupFailures.length > 0) {
+    throw new Error("Landing check cleanup did not complete successfully");
   }
 };
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   run().catch((error) => {
-    console.error("[perf] Fresh production landing network check failed", error);
+    console.error("[perf] Fresh production landing network check failed", toSafeFailureDiagnostic(error));
     process.exitCode = 1;
   });
 }

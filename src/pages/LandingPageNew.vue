@@ -6,92 +6,28 @@
     <div class="ambient ambient-two" aria-hidden="true"></div>
     <div class="grid-noise" aria-hidden="true"></div>
 
-    <header class="landing-header shell">
-      <RouterLink class="brand-mark" to="/">
-        <img class="brand-mark-full" :src="brandLogoUrl" alt="ItemTraxx Co" />
-      </RouterLink>
-      <nav class="landing-nav" aria-label="Primary">
-        <RouterLink to="/pricing">Pricing</RouterLink>
-        <RouterLink to="/contact-support">Support</RouterLink>
-        <a
-          class="status-pill"
-          href="https://status.itemtraxx.com/"
-          target="_blank"
-          rel="noreferrer"
-          aria-label="Open system status page"
-        >
-          <span class="status-dot" :class="statusClass" aria-hidden="true"></span>
-          {{ statusLabel }}
-        </a>
-        <RouterLink class="nav-cta" to="/login" @click="trackCta('login', 'header')">Login</RouterLink>
-      </nav>
-    </header>
+    <LandingHeader
+      :brand-logo-url="brandLogoUrl"
+      home-to="/"
+      pricing-to="/pricing"
+      support-to="/contact-support"
+      login-to="/login"
+      status-href="https://status.itemtraxx.com/"
+      :status-label="statusLabel"
+      :status-class="statusClass"
+      @cta="trackCta"
+    />
 
     <main id="landing-new-main" class="shell landing-main">
       <section class="hero-grid reveal reveal-up">
-        <div class="hero-copy reveal reveal-left">
-          <p class="eyebrow">Inventory tracking made simple</p>
-          <h1>ItemTraxx</h1>
-          <p class="hero-body">
-            Losing track of where stuff goes? ItemTraxx is the right service for you.
-          </p>
-          <p class="hero-support">
-            Contact us to start mastering your inventory with ItemTraxx's
-            checkout, returns, and admin management.
-          </p>
-          <div class="hero-actions">
-            <RouterLink class="cta-primary" to="/pricing" @click="trackCta('pricing', 'hero')">Pricing</RouterLink>
-            <RouterLink
-              class="cta-secondary"
-              to="/request-demo"
-              @click="trackCta('demo', 'hero')"
-            >
-              Request Demo
-            </RouterLink>
-          </div>
-          <ul class="hero-points" aria-label="Key product benefits">
-            <li>Secure sign-ins and protected admin access</li>
-            <li>Clear transaction history and audit visibility</li>
-            <li>Easy item and user management features</li>
-            <li>Designed for teams, organizations, and individual users</li>
-            <li>Built to scale with your inventory and operations</li>
-            <li>Avoid common inventory management fails</li>
-          </ul>
-        </div>
-
-        <div class="hero-showcase">
-          <article class="showcase-card showcase-primary reveal reveal-right reveal-delay-1">
-            <div class="showcase-header">
-              <p class="showcase-label">{{ rotatingShowcase.label }}</p>
-              <span class="showcase-pill">{{ rotatingShowcase.pill }}</span>
-            </div>
-            <h2>{{ rotatingShowcase.title }}</h2>
-            <p>{{ rotatingShowcase.body }}</p>
-            <ul class="showcase-points">
-              <li v-for="point in rotatingShowcase.points" :key="point">{{ point }}</li>
-            </ul>
-          </article>
-
-          <article class="showcase-card showcase-secondary reveal reveal-up reveal-delay-2">
-            <p class="showcase-label">Checkout and return preview</p>
-            <picture>
-              <source
-                type="image/webp"
-                :srcset="`${checkoutReturnUiImage800} 800w, ${checkoutReturnUiImage1200} 1200w, ${checkoutReturnUiImage1600} 1600w`"
-                sizes="(max-width: 900px) 92vw, 640px"
-              />
-              <img
-                class="showcase-image"
-                :src="checkoutReturnUiImage"
-                alt="Checkout and return interface preview"
-                loading="lazy"
-                decoding="async"
-                width="1600"
-                height="810"
-              />
-            </picture>
-          </article>
-        </div>
+        <LandingHero pricing-to="/pricing" demo-to="/request-demo" @cta="trackCta" />
+        <LandingShowcase
+          :showcase="rotatingShowcase"
+          :image-fallback="checkoutReturnUiImage"
+          :image800="checkoutReturnUiImage800"
+          :image1200="checkoutReturnUiImage1200"
+          :image1600="checkoutReturnUiImage1600"
+        />
       </section>
 
       <section class="feature-band reveal reveal-up">
@@ -207,8 +143,10 @@
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, onUnmounted, ref } from 'vue';
-import { RouterLink } from 'vue-router';
 import { trackProductEvent } from "../services/productEvents";
+import LandingHeader from '../components/landing/LandingHeader.vue';
+import LandingHero from '../components/landing/LandingHero.vue';
+import LandingShowcase from '../components/landing/LandingShowcase.vue';
 import adminUiImage from '../assets/landing/admin_ui.png';
 import adminUiImage800 from '../assets/landing/admin_ui-800.webp';
 import adminUiImage1200 from '../assets/landing/admin_ui-1200.webp';

@@ -33,8 +33,6 @@ export const DEFAULT_ALLOWED_ORIGINS = [
   "https://internal.itemtraxx.com",
   "https://app.itemtraxx.com",
   "https://itxdemo.app.itemtraxx.com",
-  "https://pentest.app.itemtraxx.com",
-  "https://pentest2.app.itemtraxx.com",
   "https://dennis.dev.itemtraxx.com",
   "https://leo.dev.itemtraxx.com",
   "https://testdist.app.itemtraxx.com",

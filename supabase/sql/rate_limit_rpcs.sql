@@ -150,10 +150,14 @@ end;
 $$;
 
 revoke all on function public.consume_rate_limit(text, integer, integer) from public;
-revoke all on function public.consume_rate_limit_prelogin(text, text, integer, integer) from public;
+-- Prelogin throttling is only ever invoked server-side with the service role
+-- (every edge function uses the service-key adminClient). Denying anon/authenticated
+-- closes direct-to-PostgREST calls that could flood rate_limits_prelogin.
+revoke all on function public.consume_rate_limit_prelogin(text, text, integer, integer)
+  from public, anon, authenticated;
 
 grant execute on function public.consume_rate_limit(text, integer, integer)
   to authenticated, service_role;
 
 grant execute on function public.consume_rate_limit_prelogin(text, text, integer, integer)
-  to anon, authenticated, service_role;
+  to service_role;

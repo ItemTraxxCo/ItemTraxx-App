@@ -192,7 +192,7 @@ const isSubmitConfirmationRoute = computed(() => route.path === "/submitconfirma
 const isBannerBleedRoute = computed(() => ["/legal", "/security", "/trust", "/compliance", "/faq", "/contact", "/privacy", "/cookies", "/accessibility", "/about", "/pricing", "/forgot-password", "/contact-sales", "/request-demo", "/contact-support", "/report-security-issue", "/getting-started"].includes(route.path));
 const isDarkChromeRoute = computed(() => ["/", "/landing-new", "/pricing", "/changelog", "/itemscanner"].includes(route.path));
 const isUnavailableRoute = computed(() => route.path === "/unavailable" || route.name === "public-unavailable");
-const isKillSwitchAllowedRoute = computed(() => route.path === "/" || isUnavailableRoute.value);
+const isKillSwitchAllowedRoute = computed(() => isUnavailableRoute.value);
 const hiddenMenuRoutes = new Set(["public-home", "public-unavailable", "public-pricing", "public-about", "public-security", "public-report-security-issue", "public-changelog", "public-compliance", "public-privacy", "public-cookies", "public-contact", "public-trust", "public-faq", "public-accessibility", "public-getting-started", "public-itemscanner", "public-legal", "public-forgot-password", "public-reset-password", "public-home-new2", "public-request-demo", "public-contact-sales", "public-contact-support", "public-submit-confirmation"]);
 const showTopMenu = computed(() => !hiddenMenuRoutes.has(String(route.name)));
 const showLogoutUserAction = computed(() => auth.isAuthenticated && !Boolean(route.meta.public) && route.path !== "/login");
@@ -356,7 +356,7 @@ watch(() => routeLoading.isLoading, (loading) => {
   pageLoadingTimer = window.setTimeout(() => { showPageLoading.value = true; pageLoadingTimer = null; }, 350);
 });
 watch(() => [killSwitchEnabled.value, route.path] as const, ([enabled, path]) => {
-  if (enabled && !isLocalDevMaintenanceBypass.value && path !== "/" && path !== "/unavailable") void router.replace("/unavailable");
+  if (enabled && !isLocalDevMaintenanceBypass.value && path !== "/unavailable") void router.replace("/unavailable");
 });
 watch(() => [backendUnavailable.value, route.path] as const, ([unavailable, path]) => {
   if (unavailable && !isLocalDevMaintenanceBypass.value && path !== "/unavailable") void router.replace("/unavailable");

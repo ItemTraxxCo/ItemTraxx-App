@@ -41,8 +41,10 @@ export const withCorsHeaders = (
   allowedOrigins: string[],
   env: Env,
 ) => {
-  const originAllowed = !origin || allowedOrigins.length === 0 ||
-    isAllowedOrigin(origin, allowedOrigins, env);
+  // Requests without an Origin header are non-browser (no CORS to enforce) and
+  // are still gated downstream by trusted-ingress HMAC / auth. A present Origin
+  // must match the allowlist exactly — an empty allowlist denies, never allows.
+  const originAllowed = !origin || isAllowedOrigin(origin, allowedOrigins, env);
   const headers = origin && originAllowed
     ? { ...BASE_CORS_HEADERS, "Access-Control-Allow-Origin": origin }
     : { ...BASE_CORS_HEADERS };

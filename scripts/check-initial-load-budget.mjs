@@ -1,12 +1,23 @@
 import { readFileSync, statSync } from "node:fs";
 import { gzipSync } from "node:zlib";
-import { resolve } from "node:path";
+import { relative, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
 export const MAX_INITIAL_MINIFIED_BYTES = 250_000;
 export const MAX_INITIAL_GZIP_BYTES = 100_000;
 const SAFE_ASSET_NAME_RE = /^[A-Za-z0-9][A-Za-z0-9._-]*\.js$/;
 const FORBIDDEN_INITIAL_MODULE_RE = /node_modules\/(?:jspdf|html2canvas|jsbarcode|posthog-js|@sentry|@supabase)\//;
+
+const resolveAssetPath = (assetsDir, assetName) => {
+  // Asset names come from the generated HTML, but keep the read explicitly
+  // contained in the generated assets directory for defense in depth.
+  const assetPath = resolve(assetsDir, assetName);
+  const relativePath = relative(resolve(assetsDir), assetPath);
+  if (!relativePath || relativePath.startsWith("..") || relativePath.includes("/")) {
+    throw new Error(`asset path escaped assets directory: ${assetName}`);
+  }
+  return assetPath;
+};
 
 const readAssetReferences = (html) => {
   const references = [];
@@ -48,7 +59,7 @@ export const measureInitialLoad = ({
   const moduleMap = readModuleMap(moduleMapPath);
   const totals = assets.reduce(
     (result, assetName) => {
-      const assetPath = resolve(assetsDir, assetName);
+      const assetPath = resolveAssetPath(assetsDir, assetName);
       const bytes = readFileSync(assetPath);
       result.minifiedBytes += statSync(assetPath).size;
       result.gzipBytes += gzipSync(bytes).byteLength;

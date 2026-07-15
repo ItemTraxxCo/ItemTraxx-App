@@ -25,6 +25,9 @@ if "${SEARCH[@]}" "sb_secret_|SUPABASE_SERVICE_ROLE_KEY=.+|CLOUDFLARE_API_TOKEN=
 fi
 echo "No private secret assignments found in .env.example."
 
+echo "[security] checking privileged RLS policy invariants"
+node ./scripts/check-privileged-rls-policies.mjs
+
 echo "[security] running Supabase shared security regression tests"
 deno test --allow-env \
   supabase/functions/_shared/cors_test.ts \

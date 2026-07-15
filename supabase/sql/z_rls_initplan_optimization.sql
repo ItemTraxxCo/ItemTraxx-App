@@ -20,53 +20,53 @@ drop policy if exists gear_read_tenant on public.gear;
 create policy gear_read_tenant on public.gear for select to public
   using (tenant_id = (select current_tenant_id()));
 
+-- All supported gear writes go through step-up-gated Edge Functions. Remove
+-- legacy direct-PostgREST policies so they cannot OR-bypass the canonical
+-- tenant-admin step-up policy below.
 drop policy if exists gear_admin_delete on public.gear;
-create policy gear_admin_delete on public.gear for delete to public
-  using ((select current_user_role()) = 'tenant_admin' and gear.tenant_id = (select current_tenant_id()));
-
 drop policy if exists gear_admin_insert on public.gear;
-create policy gear_admin_insert on public.gear for insert to public
-  with check ((select current_user_role()) = 'tenant_admin' and gear.tenant_id = (select current_tenant_id()));
-
 drop policy if exists gear_admin_update on public.gear;
-create policy gear_admin_update on public.gear for update to public
-  using ((select current_user_role()) = 'tenant_admin' and gear.tenant_id = (select current_tenant_id()));
-
 drop policy if exists gear_tenant_user_update on public.gear;
-create policy gear_tenant_user_update on public.gear for update to public
-  using ((select current_user_role()) = any (array['tenant_user','tenant_admin']) and gear.tenant_id = (select current_tenant_id()));
-
--- "student checkout gear" (with space) is an exact duplicate of
--- student_checkout_gear; drop the legacy spaced name, keep the canonical one.
 drop policy if exists "student checkout gear" on public.gear;
-
 drop policy if exists student_checkout_gear on public.gear;
-create policy student_checkout_gear on public.gear for update to public
-  using (exists (select 1 from students
-    where students.id = (select auth.uid()) and students.tenant_id = gear.tenant_id));
-
 drop policy if exists student_gear_update on public.gear;
-create policy student_gear_update on public.gear for update to public
-  using (exists (select 1 from students
-    where students.id = (select auth.uid()) and students.id = gear.checked_out_by))
-  with check (checked_out_by is null or checked_out_by = (select auth.uid()));
+
+drop policy if exists tenant_admin_write_gear on public.gear;
+create policy tenant_admin_write_gear on public.gear for all to authenticated
+  using (
+    (select current_user_role()) = 'tenant_admin'
+    and gear.tenant_id = (select current_tenant_id())
+    and (select has_recent_privileged_step_up('tenant_admin'))
+  )
+  with check (
+    (select current_user_role()) = 'tenant_admin'
+    and gear.tenant_id = (select current_tenant_id())
+    and (select has_recent_privileged_step_up('tenant_admin'))
+  );
 
 -- ============================ students ============================
 drop policy if exists students_read_tenant on public.students;
 create policy students_read_tenant on public.students for select to public
   using (tenant_id = (select current_tenant_id()));
 
+-- Remove the older per-command policies: permissive RLS policies are ORed, so
+-- retaining them would make the step-up predicate below optional.
 drop policy if exists students_admin_delete on public.students;
-create policy students_admin_delete on public.students for delete to public
-  using ((select current_user_role()) = 'tenant_admin' and students.tenant_id = (select current_tenant_id()));
-
 drop policy if exists students_admin_insert on public.students;
-create policy students_admin_insert on public.students for insert to public
-  with check ((select current_user_role()) = 'tenant_admin' and students.tenant_id = (select current_tenant_id()));
-
 drop policy if exists students_admin_update on public.students;
-create policy students_admin_update on public.students for update to public
-  using ((select current_user_role()) = 'tenant_admin' and students.tenant_id = (select current_tenant_id()));
+
+drop policy if exists tenant_admin_write_students on public.students;
+create policy tenant_admin_write_students on public.students for all to authenticated
+  using (
+    (select current_user_role()) = 'tenant_admin'
+    and students.tenant_id = (select current_tenant_id())
+    and (select has_recent_privileged_step_up('tenant_admin'))
+  )
+  with check (
+    (select current_user_role()) = 'tenant_admin'
+    and students.tenant_id = (select current_tenant_id())
+    and (select has_recent_privileged_step_up('tenant_admin'))
+  );
 
 -- ============================ gear_logs ============================
 drop policy if exists gear_logs_read_tenant on public.gear_logs;

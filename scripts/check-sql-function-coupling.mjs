@@ -33,11 +33,12 @@ const relatedFiles = changedFiles.filter(
     file.startsWith('supabase/functions/') ||
     file.startsWith('src/services/') ||
     file.startsWith('tests/') ||
-    file.startsWith('docs/api/')
+    file.startsWith('docs/api/') ||
+    file === 'scripts/check-privileged-rls-policies.mjs'
 );
 
 if (relatedFiles.length === 0) {
-  console.error('SQL changes were detected without any related Edge Function, service, test, or API contract updates.');
+  console.error('SQL changes were detected without any related Edge Function, service, test, verification, or API contract updates.');
   console.error('Changed SQL files:');
   for (const file of sqlFiles) console.error(`- ${file}`);
   process.exit(1);
@@ -45,4 +46,4 @@ if (relatedFiles.length === 0) {
 
 console.log('SQL/function coupling check passed.');
 console.log(`SQL files changed: ${sqlFiles.length}`);
-console.log(`Related function/service/test/contract files changed: ${relatedFiles.length}`);
+console.log(`Related function/service/test/verification/contract files changed: ${relatedFiles.length}`);

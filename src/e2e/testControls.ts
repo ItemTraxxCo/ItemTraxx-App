@@ -38,6 +38,7 @@ declare global {
         value: string
       ) => Promise<{ modules: number; bars: { start: number; width: number }[] }>;
       offlineCheckoutQueue: {
+        clear: () => Promise<void>;
         consumeWarning: () => Promise<string | null>;
         ensureOperationId: (payload: CheckoutReturnPayload) => Promise<CheckoutReturnPayload>;
         getCount: () => Promise<number>;
@@ -168,6 +169,10 @@ export const attachE2EControls = (router: Router): void => {
       );
     },
     offlineCheckoutQueue: {
+      async clear() {
+        const { clearOfflineCheckoutQueue } = await import("../services/offlineCheckoutQueue");
+        return clearOfflineCheckoutQueue();
+      },
       async consumeWarning() {
         const { consumeCheckoutOfflineWarning } = await import("../services/offlineCheckoutQueue");
         return consumeCheckoutOfflineWarning();

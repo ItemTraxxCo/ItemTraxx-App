@@ -19,6 +19,10 @@ const OFFLINE_QUEUE_KEY = "itemtraxx:checkout-offline-buffer:v1";
 const OFFLINE_QUEUE_KEY_VERSION = "itemtraxx:checkout-offline-buffer:key:v1";
 const OFFLINE_QUEUE_LOCK_KEY = "itemtraxx:checkout-offline-buffer:lock:v1";
 const OFFLINE_QUEUE_ALGO = "AES-GCM";
+const OFFLINE_QUEUE_ENVELOPE_VERSION = 2;
+const OFFLINE_QUEUE_KEY_DATABASE = "itemtraxx-offline-queue";
+const OFFLINE_QUEUE_KEY_STORE = "keys";
+const OFFLINE_QUEUE_KEY_ID = "checkout-buffer";
 const OFFLINE_QUEUE_LOCK_TTL_MS = 30_000;
 const OFFLINE_QUEUE_LOCK_REFRESH_MS = 1_000;
 let offlineQueueWarning: string | null = null;
@@ -38,10 +42,6 @@ const base64ToBytes = (value: string) => {
     bytes[index] = binary.charCodeAt(index);
   }
   return bytes;
-};
-
-const buildFallbackCryptoKey = () => {
-  return bytesToBase64(window.crypto.getRandomValues(new Uint8Array(32)));
 };
 
 const createOperationId = () =>
@@ -143,41 +143,67 @@ export const withOfflineQueueLock = async <T>(callback: () => Promise<T>) => {
   return runWithStorageLease(callback);
 };
 
-const getOrCreateOfflineQueueKey = async () => {
-  let serialized = window.sessionStorage.getItem(OFFLINE_QUEUE_KEY_VERSION);
-  if (!serialized) {
-    const key = await window.crypto.subtle.generateKey(
-      {
-        name: OFFLINE_QUEUE_ALGO,
-        length: 256,
-      },
-      true,
-      ["encrypt", "decrypt"]
-    );
-    const exported = await window.crypto.subtle.exportKey("raw", key);
-    serialized = bytesToBase64(new Uint8Array(exported));
-    window.sessionStorage.setItem(OFFLINE_QUEUE_KEY_VERSION, serialized);
-  }
+const openOfflineQueueKeyDatabase = () =>
+  new Promise<IDBDatabase>((resolve, reject) => {
+    const request = window.indexedDB.open(OFFLINE_QUEUE_KEY_DATABASE, 1);
+    request.onupgradeneeded = () => {
+      if (!request.result.objectStoreNames.contains(OFFLINE_QUEUE_KEY_STORE)) {
+        request.result.createObjectStore(OFFLINE_QUEUE_KEY_STORE);
+      }
+    };
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error ?? new Error("Unable to open secure offline storage."));
+  });
 
+const withOfflineQueueKeyStore = async <T>(
+  mode: IDBTransactionMode,
+  callback: (store: IDBObjectStore) => IDBRequest<T>
+) => {
+  const database = await openOfflineQueueKeyDatabase();
   try {
-    return window.crypto.subtle.importKey(
-      "raw",
-      base64ToBytes(serialized),
-      OFFLINE_QUEUE_ALGO,
-      false,
-      ["encrypt", "decrypt"]
-    );
-  } catch {
-    const fallback = buildFallbackCryptoKey();
-    window.sessionStorage.setItem(OFFLINE_QUEUE_KEY_VERSION, fallback);
-    return window.crypto.subtle.importKey(
-      "raw",
-      base64ToBytes(fallback),
-      OFFLINE_QUEUE_ALGO,
-      false,
-      ["encrypt", "decrypt"]
-    );
+    return await new Promise<T>((resolve, reject) => {
+      const transaction = database.transaction(OFFLINE_QUEUE_KEY_STORE, mode);
+      const request = callback(transaction.objectStore(OFFLINE_QUEUE_KEY_STORE));
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error ?? new Error("Unable to access secure offline storage."));
+      transaction.onerror = () => reject(transaction.error ?? new Error("Unable to access secure offline storage."));
+    });
+  } finally {
+    database.close();
   }
+};
+
+const importLegacyOfflineQueueKey = async () => {
+  const serialized = window.sessionStorage.getItem(OFFLINE_QUEUE_KEY_VERSION);
+  if (!serialized) return null;
+  return window.crypto.subtle.importKey(
+    "raw",
+    base64ToBytes(serialized),
+    OFFLINE_QUEUE_ALGO,
+    false,
+    ["encrypt", "decrypt"]
+  );
+};
+
+const getOrCreateOfflineQueueKey = async () => {
+  const existing = await withOfflineQueueKeyStore<CryptoKey | undefined>("readonly", (store) =>
+    store.get(OFFLINE_QUEUE_KEY_ID)
+  );
+  if (existing instanceof CryptoKey) return existing;
+
+  const legacyKey = await importLegacyOfflineQueueKey();
+  const key =
+    legacyKey ??
+    (await window.crypto.subtle.generateKey(
+      { name: OFFLINE_QUEUE_ALGO, length: 256 },
+      false,
+      ["encrypt", "decrypt"]
+    ));
+  await withOfflineQueueKeyStore<IDBValidKey>("readwrite", (store) =>
+    store.put(key, OFFLINE_QUEUE_KEY_ID)
+  );
+  window.sessionStorage.removeItem(OFFLINE_QUEUE_KEY_VERSION);
+  return key;
 };
 
 const encryptOfflineQueue = async (items: BufferedCheckoutItem[]) => {
@@ -191,7 +217,7 @@ const encryptOfflineQueue = async (items: BufferedCheckoutItem[]) => {
     payload
   );
   return JSON.stringify({
-    version: 1,
+    version: OFFLINE_QUEUE_ENVELOPE_VERSION,
     iv: bytesToBase64(iv),
     cipher: bytesToBase64(new Uint8Array(encrypted)),
   });
@@ -199,7 +225,11 @@ const encryptOfflineQueue = async (items: BufferedCheckoutItem[]) => {
 
 const decryptOfflineQueue = async (raw: string) => {
   const parsed = JSON.parse(raw) as { iv?: string; cipher?: string; version?: number };
-  if (parsed.version !== 1 || !parsed.iv || !parsed.cipher) {
+  if (
+    (parsed.version !== 1 && parsed.version !== OFFLINE_QUEUE_ENVELOPE_VERSION) ||
+    !parsed.iv ||
+    !parsed.cipher
+  ) {
     throw new Error("invalid-offline-queue");
   }
   const key = await getOrCreateOfflineQueueKey();
@@ -224,6 +254,17 @@ const markOfflineQueueCorrupted = () => {
   window.localStorage.removeItem(OFFLINE_QUEUE_KEY);
   offlineQueueWarning =
     "Buffered transaction cache was reset because local data could not be verified. Please retry the failed requests.";
+};
+
+export const clearOfflineCheckoutQueue = async () => {
+  window.localStorage.removeItem(OFFLINE_QUEUE_KEY);
+  window.localStorage.removeItem(OFFLINE_QUEUE_LOCK_KEY);
+  window.sessionStorage.removeItem(OFFLINE_QUEUE_KEY_VERSION);
+  try {
+    await withOfflineQueueKeyStore<undefined>("readwrite", (store) => store.delete(OFFLINE_QUEUE_KEY_ID));
+  } catch {
+    // Local queue data is already removed; never block logout on browser storage cleanup.
+  }
 };
 
 export const consumeCheckoutOfflineWarning = () => {
@@ -275,7 +316,7 @@ export const writeOfflineQueue = async (items: BufferedCheckoutItem[]) => {
     const encrypted = await encryptOfflineQueue(items);
     window.localStorage.setItem(OFFLINE_QUEUE_KEY, encrypted);
   } catch {
-    // Ignore storage failures so checkout path never crashes.
+    throw new Error("Unable to securely save this offline transaction. Please reconnect and try again.");
   }
 };
 

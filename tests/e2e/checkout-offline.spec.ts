@@ -4,6 +4,7 @@ import { mockUnauthenticatedSession } from "./helpers/testHarness";
 const OFFLINE_QUEUE_KEY = "itemtraxx:checkout-offline-buffer:v1";
 const OFFLINE_QUEUE_KEY_VERSION = "itemtraxx:checkout-offline-buffer:key:v1";
 const OFFLINE_QUEUE_LOCK_KEY = "itemtraxx:checkout-offline-buffer:lock:v1";
+const OFFLINE_QUEUE_KEY_DATABASE = "itemtraxx-offline-queue";
 
 type CheckoutReturnPayload = {
   student_id: string;
@@ -21,6 +22,7 @@ type BufferedCheckoutItem = {
 };
 
 type OfflineQueueControl = {
+  clear: () => Promise<void>;
   consumeWarning: () => Promise<string | null>;
   ensureOperationId: (payload: CheckoutReturnPayload) => Promise<CheckoutReturnPayload>;
   getCount: () => Promise<number>;
@@ -70,6 +72,14 @@ const clearQueueStorage = async (page: Page) => {
     },
     [OFFLINE_QUEUE_KEY, OFFLINE_QUEUE_KEY_VERSION, OFFLINE_QUEUE_LOCK_KEY]
   );
+  await page.evaluate(async (databaseName) => {
+    await new Promise<void>((resolve, reject) => {
+      const request = window.indexedDB.deleteDatabase(databaseName);
+      request.onsuccess = () => resolve();
+      request.onerror = () => reject(request.error);
+      request.onblocked = () => reject(new Error("Offline queue key database is blocked."));
+    });
+  }, OFFLINE_QUEUE_KEY_DATABASE);
 };
 
 test.describe("encrypted checkout offline queue contract", () => {
@@ -118,7 +128,7 @@ test.describe("encrypted checkout offline queue contract", () => {
     expect(result).toEqual({
       rawContainsStudentId: false,
       envelopeKeys: ["cipher", "iv", "version"],
-      envelopeVersion: 1,
+      envelopeVersion: 2,
       hasIv: true,
       hasCipher: true,
       items: [bufferedItem()],
@@ -160,6 +170,162 @@ test.describe("encrypted checkout offline queue contract", () => {
     expect(afterReload.items).toEqual([bufferedItem()]);
   });
 
+  test("keeps the encrypted queue readable after the session key is gone", async ({ page }) => {
+    const rawBeforeReload = await page.evaluate(
+      async ({ queueKey, keyVersion, item }) => {
+        const control = (
+          window.__itemtraxxTest as typeof window.__itemtraxxTest & {
+            offlineCheckoutQueue: OfflineQueueControl;
+          }
+        ).offlineCheckoutQueue;
+        await control.write([item]);
+        window.sessionStorage.removeItem(keyVersion);
+        return window.localStorage.getItem(queueKey);
+      },
+      { queueKey: OFFLINE_QUEUE_KEY, keyVersion: OFFLINE_QUEUE_KEY_VERSION, item: bufferedItem() }
+    );
+
+    await page.reload();
+    await openFixture(page);
+
+    const result = await page.evaluate(async (queueKey) => {
+      const control = (
+        window.__itemtraxxTest as typeof window.__itemtraxxTest & {
+          offlineCheckoutQueue: OfflineQueueControl;
+        }
+      ).offlineCheckoutQueue;
+      return { raw: window.localStorage.getItem(queueKey), items: await control.read() };
+    }, OFFLINE_QUEUE_KEY);
+
+    expect(result.raw).toBe(rawBeforeReload);
+    expect(result.items).toEqual([bufferedItem()]);
+  });
+
+  test("preserves an existing encrypted queue while migrating its session key", async ({ page }) => {
+    const items = await page.evaluate(async ({ queueKey, keyVersion, item }) => {
+      const control = (
+        window.__itemtraxxTest as typeof window.__itemtraxxTest & {
+          offlineCheckoutQueue: OfflineQueueControl;
+        }
+      ).offlineCheckoutQueue;
+      const toBase64 = (bytes: Uint8Array) => {
+        let binary = "";
+        for (const value of bytes) binary += String.fromCharCode(value);
+        return window.btoa(binary);
+      };
+      const key = await window.crypto.subtle.generateKey(
+        { name: "AES-GCM", length: 256 },
+        true,
+        ["encrypt", "decrypt"]
+      );
+      const rawKey = await window.crypto.subtle.exportKey("raw", key);
+      window.sessionStorage.setItem(keyVersion, toBase64(new Uint8Array(rawKey)));
+      const iv = window.crypto.getRandomValues(new Uint8Array(12));
+      const plaintext = new TextEncoder().encode(JSON.stringify([item]));
+      const cipher = await window.crypto.subtle.encrypt({ name: "AES-GCM", iv }, key, plaintext);
+      window.localStorage.setItem(
+        queueKey,
+        JSON.stringify({ version: 1, iv: toBase64(iv), cipher: toBase64(new Uint8Array(cipher)) })
+      );
+      const migratedItems = await control.read();
+      window.sessionStorage.removeItem(keyVersion);
+      return migratedItems;
+    }, { queueKey: OFFLINE_QUEUE_KEY, keyVersion: OFFLINE_QUEUE_KEY_VERSION, item: bufferedItem() });
+
+    expect(items).toEqual([bufferedItem()]);
+    await page.reload();
+    await openFixture(page);
+    const afterReload = await page.evaluate(async () => {
+      const control = (
+        window.__itemtraxxTest as typeof window.__itemtraxxTest & {
+          offlineCheckoutQueue: OfflineQueueControl;
+        }
+      ).offlineCheckoutQueue;
+      return control.read();
+    });
+    expect(afterReload).toEqual([bufferedItem()]);
+  });
+
+  test("stores a non-extractable queue key outside web storage", async ({ page }) => {
+    const result = await page.evaluate(async ({ databaseName, storeName, keyVersion, item }) => {
+      const control = (
+        window.__itemtraxxTest as typeof window.__itemtraxxTest & {
+          offlineCheckoutQueue: OfflineQueueControl;
+        }
+      ).offlineCheckoutQueue;
+      await control.write([item]);
+      const key = await new Promise<CryptoKey>((resolve, reject) => {
+        const openRequest = window.indexedDB.open(databaseName);
+        openRequest.onsuccess = () => {
+          const database = openRequest.result;
+          const request = database.transaction(storeName, "readonly").objectStore(storeName).get("checkout-buffer");
+          request.onsuccess = () => {
+            database.close();
+            resolve(request.result as CryptoKey);
+          };
+          request.onerror = () => reject(request.error);
+        };
+        openRequest.onerror = () => reject(openRequest.error);
+      });
+      let exportRejected = false;
+      try {
+        await window.crypto.subtle.exportKey("raw", key);
+      } catch {
+        exportRejected = true;
+      }
+      return {
+        keyIsExtractable: key.extractable,
+        exportRejected,
+        sessionKey: window.sessionStorage.getItem(keyVersion),
+      };
+    }, {
+      databaseName: OFFLINE_QUEUE_KEY_DATABASE,
+      storeName: "keys",
+      keyVersion: OFFLINE_QUEUE_KEY_VERSION,
+      item: bufferedItem(),
+    });
+
+    expect(result).toEqual({ keyIsExtractable: false, exportRejected: true, sessionKey: null });
+  });
+
+  test("clears both the queue and its persistent key for logout", async ({ page }) => {
+    const result = await page.evaluate(async ({ databaseName, storeName, queueKey, keyVersion, item }) => {
+      const control = (
+        window.__itemtraxxTest as typeof window.__itemtraxxTest & {
+          offlineCheckoutQueue: OfflineQueueControl;
+        }
+      ).offlineCheckoutQueue;
+      await control.write([item]);
+      await control.clear();
+      const persistentKey = await new Promise<unknown>((resolve, reject) => {
+        const openRequest = window.indexedDB.open(databaseName);
+        openRequest.onsuccess = () => {
+          const database = openRequest.result;
+          const request = database.transaction(storeName, "readonly").objectStore(storeName).get("checkout-buffer");
+          request.onsuccess = () => {
+            database.close();
+            resolve(request.result);
+          };
+          request.onerror = () => reject(request.error);
+        };
+        openRequest.onerror = () => reject(openRequest.error);
+      });
+      return {
+        queue: window.localStorage.getItem(queueKey),
+        sessionKey: window.sessionStorage.getItem(keyVersion),
+        hasPersistentKey: persistentKey !== undefined,
+      };
+    }, {
+      databaseName: OFFLINE_QUEUE_KEY_DATABASE,
+      storeName: "keys",
+      queueKey: OFFLINE_QUEUE_KEY,
+      keyVersion: OFFLINE_QUEUE_KEY_VERSION,
+      item: bufferedItem(),
+    });
+
+    expect(result).toEqual({ queue: null, sessionKey: null, hasPersistentKey: false });
+  });
+
   test("migrates a legacy plaintext array to the encrypted envelope", async ({ page }) => {
     const result = await page.evaluate(
       async ({ queueKey, item }) => {
@@ -186,7 +352,7 @@ test.describe("encrypted checkout offline queue contract", () => {
     expect(result).toEqual({
       items: [bufferedItem()],
       rawContainsStudentId: false,
-      version: 1,
+      version: 2,
       hasIv: true,
       hasCipher: true,
     });
@@ -201,7 +367,7 @@ test.describe("encrypted checkout offline queue contract", () => {
       ).offlineCheckoutQueue;
       window.localStorage.setItem(
         queueKey,
-        JSON.stringify({ version: 1, iv: "not-valid-base64", cipher: "not-valid-base64" })
+        JSON.stringify({ version: 2, iv: "not-valid-base64", cipher: "not-valid-base64" })
       );
       const items = await control.read();
       return {

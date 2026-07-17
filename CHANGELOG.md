@@ -1,6 +1,6 @@
 # Changelog
 
-Last updated (year-month-day): 2026-07-2
+Last updated (year-month-day): 2026-07-17
 
 This changelog summarizes notable ItemTraxx product, reliability, security, and experience updates.
 
@@ -8,57 +8,123 @@ Changes are dated based on the default timezone: America/Los_Angeles
 
 ---
 
-## 7/2/2026 Development Update
+### 7/17/2026 Development Update
+
+- Improved offline queue management for more reliable work when connectivity is interrupted.
+- Completed routine dependency and GitHub Actions maintenance.
+
+### 7/16/2026 Development Update
+
+- Updated build and automation tooling for continued CI reliability.
+
+### 7/15/2026 Development Update
+
+- Strengthened protection for tenant-admin updates to equipment and student records.
+- Completed related security and CI verification improvements.
+
+### 7/14/2026 Development Update
+
+- Improved maintenance-mode and kill-switch recovery behavior.
+- Resolved related reliability issues and expanded regression coverage.
+
+### 7/13/2026 Development Update
+
+- Modernized the application and improved landing-page loading performance.
+- Improved reliability across administrative, authentication, and edge-request flows.
+
+### 7/12/2026 Development Update
+
+- Improved error-message clarity and continued authentication reliability cleanup.
+- Completed routine dependency maintenance and regression coverage improvements.
+
+### 7/11/2026 Development Update
+
+- Improved public-page and sign-in startup performance by deferring non-critical work.
+- Streamlined shared application lifecycle behavior and removed obsolete frontend code.
+
+### 7/10/2026 Development Update
+
+- Improved initial asset loading and cache-version compatibility.
+- Restored automatic code splitting to reduce initial page weight.
+
+### 7/09/2026 Development Update
+
+- Updated dependencies and build tooling to maintain application and CI compatibility.
+
+### 7/07/2026 Development Update
+
+- Completed analytics and dependency maintenance.
+
+### 7/06/2026 Development Update
+
+- Completed a targeted security maintenance update and CI tooling refresh.
+
+### 7/05/2026 Development Update
+
+- Hardened development-automation and security-review workflows.
+
+### 7/04/2026 Development Update
+
+- Improved audit-log protection and completed routine dependency maintenance.
+- Continued reliability work on shared development automation.
+
+### 7/03/2026 Development Update
+
+- Strengthened request-origin and cross-origin protections.
+- Improved admin-session reliability and expanded security regression checks.
+
+### 7/02/2026 Development Update
+
+- Strengthened security controls and resolved a local sign-out reliability issue.
+- Updated cookie disclosures and completed routine dependency maintenance.
+
+### 7/1/2026 Development Update
 
 - Updated documentation.
 
-## 7/1/2026 Development Update
-
-- Updated documentation.
-
-## 6/30/2026 Development Update
+### 6/30/2026 Development Update
 
 - Completed some cleanup throughout the codebase.
 
-## 6/29/2026 Development Update
+### 6/29/2026 Development Update
 
 - Update documentation.
 
-## 6/28/2026 Development Update
+### 6/28/2026 Development Update
 
 - Redid some error messages around the app for clarity.
 
-## 6/27/2026 Development Update
+### 6/27/2026 Development Update
 
 - Fixed tenant sign-in reliability after a pre-login rate-limiter regression blocked valid login attempts.
 - Completed follow-up backend compatibility updates for the latest rate-limiter response handling across protected function paths.
 
-## 6/26/2026 Development Update
+### 6/26/2026 Development Update
 
 - Hardened internal deployment workflow security by disabling persisted checkout credentials in GitHub Actions.
 - Added SQL-editor-safe database maintenance helpers to support recent advisor and hardening follow-up work.
 
-## 6/25/2026 Development Update
+### 6/25/2026 Development Update
 
 - Improved public site metadata and asset handling, including favicon and social sharing image coverage.
 - Completed a database hardening and performance cleanup pass based on advisor findings and policy reviews.
 
-## 6/24/2026 Development Update
+### 6/24/2026 Development Update
 
 - Reduced noisy error tracking by suppressing a known browser CSP-related EvalError that was not an actionable product failure.
 
-## 6/23/2026 Development Update
+### 6/23/2026 Development Update
 
 - Fixed a browser-specific layout issue that could leave blank space on the right edge of affected pages.
 - Improved sensitive-path request protection and related rate-limiting reliability.
 - Reduced background landing-page status polling frequency to lower unnecessary request volume.
 - Improved support-request processing so attachment handling is more reliable and efficient.
 
-## 6/21/2026 Development Update
+### 6/21/2026 Development Update
 
 - Completed routine dependency maintenance and security updates.
 
-## 6/20/2026 Development Update
+### 6/20/2026 Development Update
 
 - Completed routine dependency security cleanup.
 
@@ -153,7 +219,7 @@ Changes are dated based on the default timezone: America/Los_Angeles
 - Fixed a minor issue with a cloudflare worker config that was causing unexpected delete chruns.
 - Routine dependency maintenance and security updates.
 
-## 5/14/2026 Development Update
+### 5/14/2026 Development Update
 
 - Routine dependency maintenance and security updates.
 - Fixed a minor visual bug with toast notifications.

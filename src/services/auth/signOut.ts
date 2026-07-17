@@ -7,6 +7,7 @@ import {
 import { revokeCurrentTenantAdminSession } from "../adminOpsService";
 import { resolveDistrictHost } from "../districtService";
 import { clearHttpSession } from "../httpSessionService";
+import { clearOfflineCheckoutQueue } from "../offlineCheckoutQueue";
 import { signOutLocalSupabaseSession } from "../supabaseAuthSession";
 import { clearPendingSuperAdminVerificationEmail } from "./sessionState";
 
@@ -23,6 +24,7 @@ export const signOut = async () => {
   }
 
   await signOutLocalSupabaseSession();
+  await clearOfflineCheckoutQueue();
   try {
     await clearHttpSession();
   } catch {

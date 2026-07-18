@@ -7,9 +7,12 @@ This changelog summarizes notable ItemTraxx product, reliability, security, and 
 Changes are dated based on the default timezone: America/Los_Angeles
 
 ---
+### Attempted DDoS Attack on ItemTraxx failed. We survived.
+
 
 ### 7/17/2026 Development Update
 
+- Attempted DDoS attack on ItemTraxx failed. 
 - Improved offline queue management for more reliable work when connectivity is interrupted.
 - Completed routine dependency and GitHub Actions maintenance.
 

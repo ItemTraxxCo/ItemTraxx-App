@@ -99,7 +99,7 @@
                 <Transition name="demo-fade">
                   <div v-if="demoBorrowerVisible" class="demo-summary">
                     <p class="demo-summary-name">
-                      <strong>jordan.m</strong>
+                      <strong>demo name</strong>
                       <span class="demo-muted"> ID: 24187</span>
                     </p>
                     <p class="demo-muted">No items currently checked out.</p>
@@ -111,7 +111,7 @@
                     <span class="demo-label">Item barcode</span>
                     <div class="demo-input-row">
                       <div class="demo-input" :class="{ 'is-focus': demoStage === 'scan' }">
-                        <span v-if="demoStage === 'scan'">ITX-0147</span>
+                        <span v-if="demoStage === 'scan'">ITX-0167</span>
                         <span v-else class="demo-placeholder">Scan or enter barcode</span>
                       </div>
                       <span class="demo-btn" :class="{ 'is-active': demoStage === 'scan' }">Add barcode</span>
@@ -123,8 +123,8 @@
                   <div v-if="demoStage === 'scanned' || demoStage === 'submitting'">
                     <p class="demo-subheading">Items</p>
                     <p class="demo-item-row">
-                      Canon EOS R50
-                      <span class="demo-muted"> (ITX-0147)</span>
+                      Sony a7 III
+                      <span class="demo-muted">  (ITX-0167)</span>
                       <span class="demo-tag">Checkout</span>
                       <span class="demo-remove">Remove</span>
                     </p>
@@ -695,6 +695,15 @@ onBeforeUnmount(() => {
   color: var(--lp-cyan);
 }
 
+/* Below the hero, drop the neon cyan eyebrows to a muted slate. */
+.feature-band .eyebrow,
+.pillars .eyebrow,
+.why .eyebrow,
+.faq .eyebrow,
+.final-strip .eyebrow {
+  color: rgba(160, 180, 210, 0.7);
+}
+
 .eyebrow::before {
   content: "// ";
   color: var(--lp-mute);
@@ -727,6 +736,10 @@ onBeforeUnmount(() => {
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
+  /* Negative letter-spacing pushes the last glyph past the span's paint box,
+     leaving it unpainted (transparent). Pad the box, then pull it back. */
+  padding-right: 0.08em;
+  margin-right: -0.08em;
 }
 
 /* ---------- header ---------- */
@@ -872,12 +885,21 @@ onBeforeUnmount(() => {
   50% { opacity: 0; }
 }
 
+@font-face {
+  font-family: "TT Interphases Pro Trl";
+  src: url("/fonts/TTInterphasesProTrl-Bold.ttf") format("truetype");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
 .hero-title {
   margin: 0;
+  font-family: "TT Interphases Pro Trl", "Inter", "Segoe UI", sans-serif;
   font-size: clamp(3.4rem, 8.5vw, 7rem);
   line-height: 0.96;
   letter-spacing: -0.055em;
-  font-weight: 800;
+  font-weight: 700;
 }
 
 .tagline {
@@ -978,7 +1000,9 @@ onBeforeUnmount(() => {
 }
 
 .demo-app {
-  min-height: 21rem;
+  /* Reserve the height of the demo's tallest stage (~625px) so the page
+     doesn't reflow as demo steps appear and disappear. */
+  min-height: 39.5rem;
   border-radius: 14px;
   background: #f7f7f5;
   color: #171717;
@@ -1233,10 +1257,7 @@ onBeforeUnmount(() => {
 
 .marquee-star {
   margin: 0 1.6rem;
-  background: var(--lp-trace);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
+  color: rgba(150, 178, 220, 0.5);
 }
 
 @keyframes marquee-slide {
@@ -1272,10 +1293,7 @@ onBeforeUnmount(() => {
   left: 0;
   font-family: var(--lp-mono);
   font-weight: 600;
-  background: var(--lp-trace);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
+  color: rgba(160, 180, 210, 0.75);
 }
 
 /* ---------- pillars ---------- */
@@ -1297,7 +1315,7 @@ onBeforeUnmount(() => {
 }
 
 .pillar:hover {
-  border-color: rgba(34, 195, 234, 0.4);
+  border-color: rgba(180, 200, 230, 0.3);
   transform: translateY(-3px);
 }
 
@@ -1308,11 +1326,7 @@ onBeforeUnmount(() => {
   font-weight: 600;
   line-height: 1;
   margin-bottom: 1.1rem;
-  background: var(--lp-trace);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-  opacity: 0.9;
+  color: rgba(150, 178, 220, 0.35);
 }
 
 .pillar h3,
@@ -1351,7 +1365,7 @@ onBeforeUnmount(() => {
 }
 
 .why-card:hover {
-  border-color: rgba(44, 233, 196, 0.38);
+  border-color: rgba(180, 200, 230, 0.3);
   transform: translateY(-3px);
 }
 
@@ -1375,9 +1389,9 @@ onBeforeUnmount(() => {
   text-transform: uppercase;
   padding: 0.28rem 0.65rem;
   border-radius: 999px;
-  color: #8af0d9;
-  background: rgba(44, 233, 196, 0.08);
-  border: 1px solid rgba(44, 233, 196, 0.24);
+  color: rgba(200, 214, 235, 0.8);
+  background: rgba(148, 180, 235, 0.06);
+  border: 1px solid rgba(148, 180, 235, 0.2);
 }
 
 .why-label {
@@ -1386,7 +1400,7 @@ onBeforeUnmount(() => {
   font-size: 0.68rem;
   letter-spacing: 0.18em;
   text-transform: uppercase;
-  color: var(--lp-cyan);
+  color: rgba(160, 180, 210, 0.75);
 }
 
 .why-body {
@@ -1414,7 +1428,7 @@ onBeforeUnmount(() => {
   content: "▸";
   position: absolute;
   left: 0;
-  color: var(--lp-cyan);
+  color: rgba(160, 180, 210, 0.6);
 }
 
 /* ---------- faq ---------- */
@@ -1444,10 +1458,7 @@ onBeforeUnmount(() => {
 }
 
 .faq-toggle:hover .faq-q {
-  background: var(--lp-trace);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
+  color: #ffffff;
 }
 
 .faq-index {
@@ -1467,7 +1478,7 @@ onBeforeUnmount(() => {
   font-family: var(--lp-mono);
   font-size: 1.3rem;
   line-height: 1;
-  color: var(--lp-mint);
+  color: rgba(180, 198, 224, 0.7);
   flex-shrink: 0;
 }
 
@@ -1513,7 +1524,7 @@ onBeforeUnmount(() => {
   width: 34rem;
   height: 14rem;
   transform: translateX(-50%);
-  background: radial-gradient(ellipse, rgba(44, 92, 246, 0.35), rgba(34, 195, 234, 0.12) 55%, transparent 75%);
+  background: radial-gradient(ellipse, rgba(44, 92, 246, 0.1), transparent 70%);
   filter: blur(30px);
   pointer-events: none;
 }
@@ -1523,8 +1534,7 @@ onBeforeUnmount(() => {
   position: absolute;
   inset: 0 0 auto;
   height: 1px;
-  background: var(--lp-trace);
-  opacity: 0.8;
+  background: rgba(180, 200, 230, 0.25);
 }
 
 .final-strip .section-sub {
@@ -1553,6 +1563,11 @@ onBeforeUnmount(() => {
   width: 100%;
   margin-top: 0;
   color: inherit;
+  font-family: "Inter", "Helvetica Neue", Helvetica, "Segoe UI", system-ui, sans-serif;
+}
+
+.lp-footer :deep(.public-footer *) {
+  font-family: inherit;
 }
 
 /* ---------- reveal ---------- */
@@ -1561,6 +1576,9 @@ onBeforeUnmount(() => {
   opacity: 0;
   transform: translateY(30px);
   filter: blur(10px);
+  /* Scroll anchoring latches onto the moving element during the reveal,
+     which visibly shifts the page when animating near the bottom. */
+  overflow-anchor: none;
   transition:
     opacity 0.75s cubic-bezier(0.22, 1, 0.36, 1),
     transform 0.75s cubic-bezier(0.22, 1, 0.36, 1),
@@ -1669,7 +1687,8 @@ onBeforeUnmount(() => {
   }
 
   .demo-app {
-    min-height: 24rem;
+    /* Tallest demo stage is ~684px at narrow widths. */
+    min-height: 43rem;
   }
 
   .final-strip {

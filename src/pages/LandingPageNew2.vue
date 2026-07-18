@@ -943,6 +943,9 @@ onUnmounted(() => {
 .lp-reveal {
   opacity: 0;
   transform: translateY(24px);
+  /* Scroll anchoring latches onto the moving element during the reveal,
+     which visibly shifts the page when animating near the bottom. */
+  overflow-anchor: none;
   transition: opacity 0.55s cubic-bezier(0.22, 1, 0.36, 1), transform 0.55s cubic-bezier(0.22, 1, 0.36, 1);
 }
 

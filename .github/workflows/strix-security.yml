@@ -1,0 +1,121 @@
+name: Strix Security Scan
+
+permissions:
+  contents: read
+
+on:
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: strix-security-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  kill-switch-preflight:
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.pull_request.head.ref == 'preview' }}
+    uses: ./.github/workflows/kill-switch-preflight.yml
+
+  strix-security-scan:
+    needs: kill-switch-preflight
+    if: ${{ (github.event_name == 'workflow_dispatch' || github.event.pull_request.head.ref == 'preview') && needs.kill-switch-preflight.outputs.active != 'true' }}
+    permissions:
+      contents: read
+      pull-requests: write
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      # Full history lets Strix resolve the pull-request diff scope reliably.
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Install Strix
+        env:
+          STRIX_VERSION: 1.1.0
+          # SHA-256 published for strix-1.1.0-linux-x86_64.tar.gz.
+          STRIX_SHA256: 7e8be841b9195a16e038eaa43e69452dc616fb19ca6979afbcaa9d842960e7e7
+        run: |
+          strix_dir="$RUNNER_TEMP/strix-${STRIX_VERSION}"
+          strix_archive="$strix_dir/strix.tar.gz"
+          mkdir -p "$strix_dir/bin"
+          curl --fail --silent --show-error --location --proto '=https' --tlsv1.2 \
+            --output "$strix_archive" \
+            "https://github.com/usestrix/strix/releases/download/v${STRIX_VERSION}/strix-${STRIX_VERSION}-linux-x86_64.tar.gz"
+          echo "${STRIX_SHA256}  ${strix_archive}" | sha256sum --check --status
+          tar -xzf "$strix_archive" -C "$strix_dir"
+          install -m 0755 "$strix_dir/strix-${STRIX_VERSION}-linux-x86_64" "$strix_dir/bin/strix"
+          echo "$strix_dir/bin" >> "$GITHUB_PATH"
+
+      - name: Run Strix security scan
+        id: strix-scan
+        env:
+          STRIX_LLM: nvidia_nim/deepseek-ai/deepseek-v4-flash
+          LLM_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
+          STRIX_REASONING_EFFORT: medium
+        run: |
+          set +e
+          set -o pipefail
+          strix -n --target ./ --scan-mode quick 2>&1 | tee "$RUNNER_TEMP/strix-output.log"
+          strix_exit_code="${PIPESTATUS[0]}"
+          set -e
+          echo "exit_code=$strix_exit_code" >> "$GITHUB_OUTPUT"
+          exit 0
+
+      - name: Prepare Strix PR summary
+        id: strix-summary
+        if: always()
+        env:
+          STRIX_EXIT_CODE: ${{ steps.strix-scan.outputs.exit_code }}
+        run: |
+          python3 scripts/prepare-strix-pr-summary.py \
+            --exit-code "$STRIX_EXIT_CODE" \
+            --output "$RUNNER_TEMP/strix-pr-comment.md"
+          echo "comment_path=$RUNNER_TEMP/strix-pr-comment.md" >> "$GITHUB_OUTPUT"
+
+      - name: Publish Strix PR summary
+        if: ${{ always() && github.event_name == 'pull_request' }}
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3
+        env:
+          STRIX_COMMENT_PATH: ${{ steps.strix-summary.outputs.comment_path }}
+        with:
+          script: |
+            const fs = require("fs");
+            const body = fs.readFileSync(process.env.STRIX_COMMENT_PATH, "utf8");
+            const { owner, repo } = context.repo;
+            const issue_number = context.issue.number;
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner,
+              repo,
+              issue_number,
+              per_page: 100,
+            });
+            const existing = comments.find((comment) =>
+              comment.user?.type === "Bot" &&
+              comment.body?.includes("<!-- itemtraxx-strix-security-scan -->")
+            );
+
+            if (existing) {
+              await github.rest.issues.updateComment({ owner, repo, comment_id: existing.id, body });
+              return;
+            }
+
+            await github.rest.issues.createComment({ owner, repo, issue_number, body });
+
+      - name: Upload Strix results
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.0
+        with:
+          name: strix-results-${{ github.run_id }}
+          path: strix_runs/
+          if-no-files-found: ignore
+          retention-days: 30
+
+      - name: Fail on Strix findings or execution error
+        if: ${{ always() && steps.strix-scan.outputs.exit_code != '0' }}
+        run: exit "${{ steps.strix-scan.outputs.exit_code }}"

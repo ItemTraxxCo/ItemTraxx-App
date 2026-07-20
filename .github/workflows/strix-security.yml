@@ -52,7 +52,7 @@ jobs:
       - name: Run Strix security scan
         id: strix-scan
         env:
-          STRIX_LLM: nvidia_nim/deepseek-ai/deepseek-v4-pro
+          STRIX_LLM: nvidia_nim/deepseek-ai/deepseek-v4-flash
           LLM_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
           STRIX_REASONING_EFFORT: medium
         run: |
@@ -70,7 +70,7 @@ jobs:
         env:
           STRIX_EXIT_CODE: ${{ steps.strix-scan.outputs.exit_code }}
           NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
-          NVIDIA_SUMMARY_MODEL: deepseek-ai/deepseek-v4-pro
+          NVIDIA_SUMMARY_MODEL: deepseek-ai/deepseek-v4-flash
         run: |
           python3 - <<'PY'
           import glob

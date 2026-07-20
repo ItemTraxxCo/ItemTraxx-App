@@ -1,0 +1,63 @@
+name: Strix Security Scan
+
+permissions:
+  contents: read
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: strix-security-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  kill-switch-preflight:
+    uses: ./.github/workflows/kill-switch-preflight.yml
+
+  strix-security-scan:
+    needs: kill-switch-preflight
+    if: ${{ needs.kill-switch-preflight.outputs.active != 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      # Full history lets Strix resolve the pull-request diff scope reliably.
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Install Strix
+        env:
+          STRIX_VERSION: 1.1.0
+          # SHA-256 published for strix-1.1.0-linux-x86_64.tar.gz.
+          STRIX_SHA256: 7e8be841b9195a16e038eaa43e69452dc616fb19ca6979afbcaa9d842960e7e7
+        run: |
+          strix_dir="$RUNNER_TEMP/strix-${STRIX_VERSION}"
+          strix_archive="$strix_dir/strix.tar.gz"
+          mkdir -p "$strix_dir/bin"
+          curl --fail --silent --show-error --location --proto '=https' --tlsv1.2 \
+            --output "$strix_archive" \
+            "https://github.com/usestrix/strix/releases/download/v${STRIX_VERSION}/strix-${STRIX_VERSION}-linux-x86_64.tar.gz"
+          echo "${STRIX_SHA256}  ${strix_archive}" | sha256sum --check --status
+          tar -xzf "$strix_archive" -C "$strix_dir"
+          install -m 0755 "$(find "$strix_dir" -type f -name strix -print -quit)" "$strix_dir/bin/strix"
+          echo "$strix_dir/bin" >> "$GITHUB_PATH"
+
+      - name: Run Strix security scan
+        env:
+          STRIX_LLM: nvidia_nim/nvidia/nemotron-3-ultra-550b-a55b
+          LLM_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
+          STRIX_REASONING_EFFORT: medium
+        run: strix -n --target ./ --scan-mode quick
+
+      - name: Upload Strix results
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.0
+        with:
+          name: strix-results-${{ github.run_id }}
+          path: strix_runs/
+          if-no-files-found: ignore
+          retention-days: 30

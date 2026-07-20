@@ -52,7 +52,9 @@ jobs:
       - name: Run Strix security scan
         id: strix-scan
         env:
-          STRIX_LLM: nvidia_nim/moonshotai/kimi-k2.6
+          # NVIDIA NIM exposes Kimi through its OpenAI-compatible endpoint.
+          STRIX_LLM: openai/moonshotai/kimi-k2.6
+          LLM_API_BASE: https://integrate.api.nvidia.com/v1
           LLM_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
           STRIX_REASONING_EFFORT: medium
         run: |

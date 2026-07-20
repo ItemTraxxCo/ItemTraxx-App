@@ -20,12 +20,12 @@ jobs:
         github.event.workflow_run.event != 'pull_request' &&
         github.event.workflow_run.head_branch == github.event.repository.default_branch
       }}
-    uses: ItemTraxxCo/devops/.github/workflows/reusable-deploy-evidence.yml@4fd58daee1a0fccde29ffc9c896d07ea21e731ab
+    uses: ItemTraxxCo/devops/.github/workflows/reusable-deploy-evidence.yml@e3541101f8eb325db2eb047754ce9003fb6a31c3
     with:
       run_id: ${{ format('{0}', github.event.workflow_run.id) }}
       sha: ${{ github.event.workflow_run.head_sha }}
       workflow_name: ${{ github.event.workflow_run.name }}
       surfaces: ${{ github.event.workflow_run.name == 'Deploy Supabase Functions' && 'supabase-functions' || 'cloudflare-worker' }}
-      hub_ref: 4fd58daee1a0fccde29ffc9c896d07ea21e731ab
+      hub_ref: e3541101f8eb325db2eb047754ce9003fb6a31c3
     secrets:
       AI_API_KEY: ${{ secrets.AI_API_KEY }}

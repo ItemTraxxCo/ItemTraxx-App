@@ -27,11 +27,11 @@ jobs:
         github.event.workflow_run.event != 'pull_request' &&
         github.event.workflow_run.head_branch == github.event.repository.default_branch
       }}
-    uses: ItemTraxxCo/devops/.github/workflows/reusable-ci-triage.yml@4fd58daee1a0fccde29ffc9c896d07ea21e731ab
+    uses: ItemTraxxCo/devops/.github/workflows/reusable-ci-triage.yml@e3541101f8eb325db2eb047754ce9003fb6a31c3
     with:
       run_id: ${{ format('{0}', github.event.workflow_run.id) }}
       workflow_name: ${{ github.event.workflow_run.name }}
-      hub_ref: 4fd58daee1a0fccde29ffc9c896d07ea21e731ab
+      hub_ref: e3541101f8eb325db2eb047754ce9003fb6a31c3
     secrets:
       AI_API_KEY: ${{ secrets.AI_API_KEY }}
       SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}

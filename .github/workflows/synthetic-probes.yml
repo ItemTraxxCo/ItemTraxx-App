@@ -9,9 +9,9 @@ on:
 
 jobs:
   probes:
-    uses: ItemTraxxCo/devops/.github/workflows/reusable-synthetic-probes.yml@4fd58daee1a0fccde29ffc9c896d07ea21e731ab
+    uses: ItemTraxxCo/devops/.github/workflows/reusable-synthetic-probes.yml@e3541101f8eb325db2eb047754ce9003fb6a31c3
     with:
-      hub_ref: 4fd58daee1a0fccde29ffc9c896d07ea21e731ab
+      hub_ref: e3541101f8eb325db2eb047754ce9003fb6a31c3
 
   slack-notify-failure:
     needs:

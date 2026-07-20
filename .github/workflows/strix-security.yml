@@ -43,7 +43,7 @@ jobs:
             "https://github.com/usestrix/strix/releases/download/v${STRIX_VERSION}/strix-${STRIX_VERSION}-linux-x86_64.tar.gz"
           echo "${STRIX_SHA256}  ${strix_archive}" | sha256sum --check --status
           tar -xzf "$strix_archive" -C "$strix_dir"
-          install -m 0755 "$(find "$strix_dir" -type f -name strix -print -quit)" "$strix_dir/bin/strix"
+          install -m 0755 "$strix_dir/strix-${STRIX_VERSION}-linux-x86_64" "$strix_dir/bin/strix"
           echo "$strix_dir/bin" >> "$GITHUB_PATH"
 
       - name: Run Strix security scan

@@ -10,6 +10,9 @@ updates:
     labels:
       - "dependencies"
     ignore:
+      - dependency-name: "typescript"
+        update-types:
+          - "version-update:semver-major"
       - dependency-name: "vue-router"
         update-types:
           - "version-update:semver-major"

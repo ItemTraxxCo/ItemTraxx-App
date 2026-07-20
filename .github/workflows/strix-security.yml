@@ -52,9 +52,7 @@ jobs:
       - name: Run Strix security scan
         id: strix-scan
         env:
-          # NVIDIA NIM exposes Kimi through its OpenAI-compatible endpoint.
-          STRIX_LLM: openai/moonshotai/kimi-k2.6
-          LLM_API_BASE: https://integrate.api.nvidia.com/v1
+          STRIX_LLM: nvidia_nim/deepseek-ai/deepseek-v4-pro
           LLM_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
           STRIX_REASONING_EFFORT: medium
         run: |
@@ -72,7 +70,7 @@ jobs:
         env:
           STRIX_EXIT_CODE: ${{ steps.strix-scan.outputs.exit_code }}
           NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
-          NVIDIA_SUMMARY_MODEL: moonshotai/kimi-k2.6
+          NVIDIA_SUMMARY_MODEL: deepseek-ai/deepseek-v4-pro
         run: |
           python3 - <<'PY'
           import glob

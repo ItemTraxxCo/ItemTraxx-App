@@ -1,7 +1,7 @@
 import { execFileSync } from 'node:child_process';
 
 function getChangedFiles(base, head) {
-  if (!base) return [];
+  if (!base || /^0+$/.test(base)) return [];
   const diffRange = head ? `${base}...${head}` : `${base}...HEAD`;
   const output = execFileSync('git', ['diff', '--name-only', diffRange], {
     encoding: 'utf8',

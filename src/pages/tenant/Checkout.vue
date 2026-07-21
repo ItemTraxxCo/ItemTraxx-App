@@ -19,6 +19,7 @@
         Borrower ID
         <div class="input-row checkout-input-row">
           <input
+            ref="borrowerField"
             v-model="studentId"
             type="text"
             placeholder="Enter borrower ID"
@@ -183,6 +184,7 @@ const checkedOutGear = ref<GearSummary[]>([]);
 const lastSummary = ref("");
 const toastMessage = ref("");
 const toastStatus = ref<"Success" | "Failed" | "Processing">("Success");
+const borrowerField = ref<HTMLInputElement | null>(null);
 const barcodeField = ref<HTMLInputElement | null>(null);
 const borrowerScannerOpen = ref(false);
 const itemScannerOpen = ref(false);
@@ -489,6 +491,8 @@ const submit = async () => {
     studentId.value = "";
     student.value = null;
     checkedOutGear.value = [];
+    await nextTick();
+    borrowerField.value?.focus();
     window.setTimeout(() => {
       lastSummary.value = "";
       toastTitle.value = "";

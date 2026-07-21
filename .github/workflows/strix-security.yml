@@ -58,10 +58,11 @@ jobs:
           STRIX_LLM: nvidia_nim/deepseek-ai/deepseek-v4-flash
           LLM_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
           STRIX_REASONING_EFFORT: medium
+          STRIX_DIFF_BASE: origin/${{ github.base_ref || github.event.repository.default_branch }}
         run: |
           set +e
           set -o pipefail
-          strix -n --target ./ --scan-mode quick 2>&1 | tee "$RUNNER_TEMP/strix-output.log"
+          strix -n --target ./ --scan-mode quick --scope-mode diff --diff-base "$STRIX_DIFF_BASE" 2>&1 | tee "$RUNNER_TEMP/strix-output.log"
           strix_exit_code="${PIPESTATUS[0]}"
           set -e
           echo "exit_code=$strix_exit_code" >> "$GITHUB_OUTPUT"

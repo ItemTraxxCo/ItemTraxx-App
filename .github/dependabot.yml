@@ -2,6 +2,7 @@ version: 2
 updates:
   - package-ecosystem: "npm"
     directory: "/"
+    target-branch: "staging"
     schedule:
       interval: "cron"
       cronjob: "0 6 */2 * *"
@@ -26,6 +27,7 @@ updates:
 
   - package-ecosystem: "github-actions"
     directory: "/"
+    target-branch: "staging"
     schedule:
       interval: "cron"
       cronjob: "30 6 */2 * *"

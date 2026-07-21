@@ -1,7 +1,8 @@
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient, type SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.108.2";
 import { sendLoggedResendEmail } from "../_shared/emailDeliveryLog.ts";
-import { buildEmailBrandHeaderHtml, withEmailBrandLogoAttachment } from "../_shared/emailBranding.ts";
+import { applyEmailTheme, buildEmailBrandHeaderHtml, withEmailBrandLogoAttachment } from "../_shared/emailBranding.ts";
+import { formatLoginEmailPlatform, formatLoginEmailTime } from "../_shared/loginEmailFormat.ts";
 import { isKillSwitchWriteBlocked } from "../_shared/killSwitch.ts";
 import { getRequestId, logError, logInfo } from "../_shared/observability.ts";
 import { isAllowedOrigin, parseAllowedOrigins } from "../_shared/cors.ts";
@@ -197,8 +198,7 @@ const escapeHtml = (value: string) =>
 const buildLoginNotificationHtml = (payload: LoginNotificationPayload, loginTimeLabel: string) => {
   const tenantName = escapeHtml(payload.tenant_name);
   const supportEmail = escapeHtml(payload.support_email);
-  const deviceBrowser = escapeHtml(payload.device_browser || "Unknown");
-  const ipAddress = escapeHtml(payload.ip_address ?? "Unavailable");
+  const deviceBrowser = escapeHtml(formatLoginEmailPlatform(payload.device_browser));
   const loginTime = escapeHtml(loginTimeLabel);
 
   return `<!doctype html>
@@ -217,24 +217,24 @@ const buildLoginNotificationHtml = (payload: LoginNotificationPayload, loginTime
               <td style="padding:28px;">
                 <h2 style="margin:0 0 12px 0;font-size:22px;line-height:1.3;color:#171717;">New Login Detected</h2>
                 <p style="margin:0 0 14px 0;font-size:15px;line-height:1.6;color:#343330;">
-                  A new login to your ItemTraxx account was detected.
+                  We noticed a new sign-in to your ItemTraxx account.
                 </p>
                 <p style="margin:0 0 14px 0;font-size:15px;line-height:1.7;color:#343330;">
                   <strong>Tenant:</strong> ${tenantName}<br />
                   <strong>Login time:</strong> ${loginTime}<br />
                   <strong>Device/Browser:</strong> ${deviceBrowser}<br />
-                  <strong>IP Address:</strong> ${ipAddress}
                 </p>
                 <p style="margin:0;font-size:14px;line-height:1.6;color:#68645f;">
-                  If this wasn't you, please contact support immediately.
+                  If this wasn't you,
+                  <a href="${PASSWORD_RESET_URL}" style="color:#171717;text-decoration:underline;text-underline-offset:2px;">reset your password</a>
+                  and review your account security right away.
                 </p>
               </td>
             </tr>
             <tr>
               <td style="padding:16px 24px;border-top:1px solid #e7e5df;background:#fbfaf8;">
                 <p style="margin:0;font-size:12px;line-height:1.6;color:#68645f;">
-                  Contact support:
-                  <a href="mailto:${supportEmail}" style="color:#171717;text-decoration:underline;text-underline-offset:2px;">${supportEmail}</a>
+                  <a href="${CONTACT_SUPPORT_URL}" style="color:#171717;text-decoration:underline;text-underline-offset:2px;">Contact support</a>
                 </p>
                 <p style="margin:6px 0 0 0;font-size:12px;line-height:1.6;color:#8b8680;">
                   &copy; 2026 ItemTraxx Co. All rights reserved.
@@ -280,16 +280,14 @@ const buildSuperAdminTwoFactorHtml = (payload: SuperAdminTwoFactorPayload) => {
                 <p style="margin:0;font-size:14px;line-height:1.6;color:#68645f;">
                   If this wasn't you,
                   <a href="${PASSWORD_RESET_URL}" style="color:#171717;text-decoration:underline;text-underline-offset:2px;">reset your password</a>
-                  and
-                  <a href="${CONTACT_SUPPORT_URL}" style="color:#171717;text-decoration:underline;text-underline-offset:2px;">contact support immediately</a>.
+                  and review your account security right away.
                 </p>
               </td>
             </tr>
             <tr>
               <td style="padding:16px 24px;border-top:1px solid #e7e5df;background:#fbfaf8;">
                 <p style="margin:0;font-size:12px;line-height:1.6;color:#68645f;">
-                  Need help? Contact
-                  <a href="mailto:${supportEmail}" style="color:#171717;text-decoration:underline;text-underline-offset:2px;">${supportEmail}</a>
+                  <a href="${CONTACT_SUPPORT_URL}" style="color:#171717;text-decoration:underline;text-underline-offset:2px;">Contact support</a>
                 </p>
                 <p style="margin:6px 0 0 0;font-size:12px;line-height:1.6;color:#8b8680;">
                   &copy; 2026 ItemTraxx Co. All rights reserved.
@@ -356,8 +354,7 @@ const buildContactSalesInternalHtml = (payload: ContactSalesPayload) => {
                   <a href="mailto:${replyEmail}" style="color:#171717;text-decoration:underline;text-underline-offset:2px;">${replyEmail}</a>
                 </p>
                 <p style="margin:6px 0 0 0;font-size:12px;line-height:1.6;color:#8b8680;">
-                  Need help? Contact
-                  <a href="mailto:${supportEmail}" style="color:#171717;text-decoration:underline;text-underline-offset:2px;">${supportEmail}</a>
+                  <a href="${CONTACT_SUPPORT_URL}" style="color:#171717;text-decoration:underline;text-underline-offset:2px;">Contact support</a>
                 </p>
               </td>
             </tr>
@@ -408,16 +405,12 @@ const buildContactSalesConfirmationHtml = (payload: ContactSalesPayload) => {
                   <strong>Organization:</strong> ${organization}
                 </p>
                 ${schoolsLine}
-                <p style="margin:0;font-size:14px;line-height:1.6;color:#68645f;">
-                  If you need to add anything else, you can reply directly to this email.
-                </p>
               </td>
             </tr>
             <tr>
               <td style="padding:16px 24px;border-top:1px solid #e7e5df;background:#fbfaf8;">
                 <p style="margin:0;font-size:12px;line-height:1.6;color:#68645f;">
-                  Need help? Contact
-                  <a href="mailto:${supportEmail}" style="color:#171717;text-decoration:underline;text-underline-offset:2px;">${supportEmail}</a>
+                  <a href="${CONTACT_SUPPORT_URL}" style="color:#171717;text-decoration:underline;text-underline-offset:2px;">Contact support</a>
                 </p>
                 <p style="margin:6px 0 0 0;font-size:12px;line-height:1.6;color:#8b8680;">
                   If you do not hear from us within 2 business days, check spam or contact support directly.
@@ -457,7 +450,7 @@ const processContactSalesEmail = async (
     to: [payload.support_email],
     subject: internalSubject,
     reply_to: payload.reply_email,
-    html: buildContactSalesInternalHtml(payload),
+    html: applyEmailTheme(buildContactSalesInternalHtml(payload)),
     text:
       `A new ${payload.intent === "demo" ? "demo" : "sales"} request was submitted.\n\nPlan: ${payload.plan_label}\nName: ${payload.name}${organizationLine}\nReply email: ${payload.reply_email}${schoolsLine}\n\nDetails:\n${payload.details ?? "(none provided)"}\n\nLead ID: ${payload.lead_id}`,
   }, {
@@ -495,9 +488,9 @@ const processContactSalesEmail = async (
     from: payload.from_email,
     to: [payload.reply_email],
     subject: confirmationSubject,
-    html: buildContactSalesConfirmationHtml(payload),
+    html: applyEmailTheme(buildContactSalesConfirmationHtml(payload)),
     text:
-      `Hi ${payload.name},\n\n${payload.intent === "demo" ? "Thanks for requesting an ItemTraxx demo. We've received your request and will follow up to schedule next steps within 2 business days." : "Thanks for contacting the ItemTraxx Sales Team. We've received your request and will follow up with a quote for your selected plan within 2 business days."}\n\nRequest summary:\nPlan: ${payload.plan_label}${schoolsLine}${organizationLine}\n\nIf you need to add anything else, feel free to reply to this email.\nHave a great day,\n\n- ItemTraxx ${payload.intent === "demo" ? "Team" : "Sales"}\n${payload.support_email}\n\nIf you don't hear from us within 2 business days, please check your spam folder or contact us at ${payload.support_email}`,
+      `Hi ${payload.name},\n\n${payload.intent === "demo" ? "Thanks for requesting an ItemTraxx demo. We've received your request and will follow up to schedule next steps within 2 business days." : "Thanks for contacting the ItemTraxx Sales Team. We've received your request and will follow up with a quote for your selected plan within 2 business days."}\n\nRequest summary:\nPlan: ${payload.plan_label}${schoolsLine}${organizationLine}\n\nHave a great day,\n\n- ItemTraxx ${payload.intent === "demo" ? "Team" : "Sales"}\n${payload.support_email}\n\nIf you don't hear from us within 2 business days, please check your spam folder or contact us at ${payload.support_email}`,
   }, {
     emailType: "contact_sales_confirmation",
     recipientEmail: payload.reply_email,
@@ -521,24 +514,20 @@ const processLoginNotificationEmail = async (
   jobId: string,
   requestId: string,
 ) => {
-  const loginTime = new Date(payload.login_time_iso);
-  const loginTimeLabel = Number.isNaN(loginTime.getTime())
-    ? payload.login_time_iso
-    : `${loginTime.toISOString()} (UTC)`;
+  const loginTimeLabel = formatLoginEmailTime(payload.login_time_iso);
 
   const subject = `New ItemTraxx Login - ${payload.tenant_name}`;
   await sendTrackedResendEmail(adminClient, resendApiKey, {
     from: payload.from_email,
     to: [payload.to_email],
     subject,
-    html: buildLoginNotificationHtml(payload, loginTimeLabel),
+    html: applyEmailTheme(buildLoginNotificationHtml(payload, loginTimeLabel)),
     text:
-      `A new login to your ItemTraxx account was detected.\n\n` +
+      `We noticed a new sign-in to your ItemTraxx account.\n\n` +
       `Tenant: ${payload.tenant_name}\n` +
       `Login time: ${loginTimeLabel}\n` +
-      `Device/Browser: ${payload.device_browser || "Unknown"}\n` +
-      `IP Address: ${payload.ip_address ?? "Unavailable"}\n\n` +
-      `If this wasn't you, contact support immediately at ${payload.support_email}.`,
+      `Device/Browser: ${formatLoginEmailPlatform(payload.device_browser)}\n\n` +
+      `If this wasn't you, reset your password at ${PASSWORD_RESET_URL} and review your account security right away.`,
   }, {
     emailType: "login_notification",
     recipientEmail: payload.to_email,
@@ -565,11 +554,11 @@ const processSuperAdminTwoFactorEmail = async (
     from: payload.from_email,
     to: [payload.to_email],
     subject,
-    html: buildSuperAdminTwoFactorHtml(payload),
+    html: applyEmailTheme(buildSuperAdminTwoFactorHtml(payload)),
     text:
       `Your ItemTraxx verification code is: ${payload.code}\n\n` +
       `This code expires in 10 minutes and can only be used once.\n\n` +
-      `If this wasn't you, reset your password at ${PASSWORD_RESET_URL} and contact support immediately at ${CONTACT_SUPPORT_URL}.`,
+      `If this wasn't you, reset your password at ${PASSWORD_RESET_URL} and review your account security right away.`,
   }, {
     emailType: "super_admin_2fa",
     recipientEmail: payload.to_email,
@@ -627,8 +616,7 @@ const buildDistrictSupportHtml = (payload: DistrictSupportPayload, supportEmail:
                   <a href="mailto:${requesterEmail}" style="color:#171717;text-decoration:underline;text-underline-offset:2px;">${requesterEmail}</a>
                 </p>
                 <p style="margin:6px 0 0 0;font-size:12px;line-height:1.6;color:#8b8680;">
-                  Need help? Contact
-                  <a href="mailto:${safeSupportEmail}" style="color:#171717;text-decoration:underline;text-underline-offset:2px;">${safeSupportEmail}</a>
+                  <a href="${CONTACT_SUPPORT_URL}" style="color:#171717;text-decoration:underline;text-underline-offset:2px;">Contact support</a>
                 </p>
               </td>
             </tr>
@@ -690,8 +678,7 @@ const buildSupportRequestInternalHtml = (
                   <a href="mailto:${replyEmail}" style="color:#171717;text-decoration:underline;text-underline-offset:2px;">${replyEmail}</a>
                 </p>
                 <p style="margin:6px 0 0 0;font-size:12px;line-height:1.6;color:#8b8680;">
-                  Need help? Contact
-                  <a href="mailto:${supportEmail}" style="color:#171717;text-decoration:underline;text-underline-offset:2px;">${supportEmail}</a>
+                  <a href="${CONTACT_SUPPORT_URL}" style="color:#171717;text-decoration:underline;text-underline-offset:2px;">Contact support</a>
                 </p>
               </td>
             </tr>
@@ -736,16 +723,12 @@ const buildSupportRequestConfirmationHtml = (payload: SupportRequestPayload) => 
                   <strong>Subject:</strong> ${subject}
                 </p>
                 ${attachmentSummary}
-                <p style="margin:0;font-size:14px;line-height:1.6;color:#68645f;">
-                  If you need to add anything else, reply directly to this email.
-                </p>
               </td>
             </tr>
             <tr>
               <td style="padding:16px 24px;border-top:1px solid #e7e5df;background:#fbfaf8;">
                 <p style="margin:0;font-size:12px;line-height:1.6;color:#68645f;">
-                  Need help? Contact
-                  <a href="mailto:${supportEmail}" style="color:#171717;text-decoration:underline;text-underline-offset:2px;">${supportEmail}</a>
+                  <a href="${CONTACT_SUPPORT_URL}" style="color:#171717;text-decoration:underline;text-underline-offset:2px;">Contact support</a>
                 </p>
                 <p style="margin:6px 0 0 0;font-size:12px;line-height:1.6;color:#8b8680;">
                   © 2026 ItemTraxx Co. All rights reserved.
@@ -865,7 +848,7 @@ const processSupportRequestEmail = async (
     to: [payload.support_email],
     reply_to: payload.reply_email,
     subject: internalSubject,
-    html: buildSupportRequestInternalHtml(payload, attachments.length),
+    html: applyEmailTheme(buildSupportRequestInternalHtml(payload, attachments.length)),
     attachments,
     text:
       `A new support request was submitted.
@@ -914,7 +897,7 @@ const processSupportRequestEmail = async (
     from: payload.from_email,
     to: [payload.reply_email],
     subject: confirmationSubject,
-    html: buildSupportRequestConfirmationHtml(payload),
+    html: applyEmailTheme(buildSupportRequestConfirmationHtml(payload)),
     text:
       `Hi ${payload.name},
 
@@ -922,8 +905,6 @@ We received your support request and will respond as soon as possible.
 
 Category: ${payload.category}
 Subject: ${payload.subject}
-
-If you need to add anything else, reply directly to this email.
 
 - ItemTraxx Support
 ${payload.support_email}`,
@@ -958,7 +939,7 @@ const processDistrictSupportEmail = async (
     to: [supportEmail],
     reply_to: payload.requester_email ? payload.requester_email : undefined,
     subject,
-    html: buildDistrictSupportHtml(payload, supportEmail),
+    html: applyEmailTheme(buildDistrictSupportHtml(payload, supportEmail)),
     text:
       `A district support request was submitted.\n\n` +
       `District ID: ${payload.district_id}\n` +

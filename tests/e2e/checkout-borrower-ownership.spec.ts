@@ -159,6 +159,7 @@ test.describe("Checkout borrower ownership regression", () => {
     await expect(page.locator(".tag-checkout", { hasText: "Checkout" })).toBeVisible();
     await completeTransactionButton.click();
     await expect(page.getByText("Transaction complete (Success).")).toBeVisible();
+    await expect(borrowerInput).toBeFocused();
 
     // 2) Borrower B cannot checkout/return while item is checked out by A.
     await loadBorrower("BRWRB");

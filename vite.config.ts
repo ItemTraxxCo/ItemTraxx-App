@@ -71,7 +71,11 @@ export default defineConfig(({ mode, command }) => {
   }
 
   return {
-    plugins: [vue(), cloudflare(), initialModuleMapPlugin()],
+    plugins: [
+      vue(),
+      ...(env.VITE_E2E_TEST_UTILS === "true" ? [] : [cloudflare()]),
+      initialModuleMapPlugin(),
+    ],
     server:
       process.env.VITE_E2E_TEST_UTILS === "true"
         ? { allowedHosts: ["127.0.0.1.nip.io"] }

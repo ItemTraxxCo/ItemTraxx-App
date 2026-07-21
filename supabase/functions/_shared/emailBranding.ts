@@ -88,3 +88,37 @@ export const withEmailBrandLogoAttachment = (
     attachments: [...existing, buildEmailLogoAttachment()],
   };
 };
+
+/**
+ * Applies the shared ItemTraxx transactional-email presentation layer.
+ *
+ * The individual messages deliberately retain their semantic content and
+ * text-only fallbacks. Keeping the visual tokens here prevents security,
+ * support, and sales messages from slowly drifting apart again.
+ */
+export const applyEmailTheme = (html: string) =>
+  html
+    .replaceAll("background:#f6f5f2", "background:#eef2f7")
+    .replaceAll(
+      "max-width:560px;background:#ffffff;border:1px solid #d8d6d1;border-radius:0;overflow:hidden;",
+      "max-width:640px;background:#ffffff;border:0;border-radius:12px;overflow:hidden;",
+    )
+    .replaceAll(
+      "padding:24px 28px 14px 28px;background:#ffffff;border-bottom:1px solid #e7e5df;color:#171717;",
+      "padding:14px 28px;background:#ffffff;border-bottom:0;color:#0f172a;",
+    )
+    .replaceAll("padding:28px;", "padding:44px 40px 40px;background:#f6f8fb;")
+    .replaceAll("font-size:22px;line-height:1.3;color:#171717;", "font-size:28px;line-height:1.25;color:#0f172a;")
+    .replaceAll("color:#343330", "color:#334155")
+    .replaceAll("color:#68645f", "color:#64748b")
+    .replaceAll("color:#8b8680", "color:#94a3b8")
+    .replaceAll("color:#171717", "color:#0f172a")
+    .replaceAll(
+      "border-radius:0;background:#fbfaf8;border:1px solid #d8d6d1",
+      "border-radius:8px;background:#ffffff;border:1px solid #dbe3ec",
+    )
+    .replaceAll("background:#d8d6d1", "background:#dbe3ec")
+    .replaceAll(
+      "padding:16px 24px;border-top:1px solid #e7e5df;background:#fbfaf8;",
+      "padding:24px 28px;text-align:center;border-top:0;background:#ffffff;",
+    );

@@ -1,7 +1,7 @@
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient, type SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.108.2";
 import { sendLoggedResendEmail } from "../_shared/emailDeliveryLog.ts";
-import { buildEmailBrandHeaderHtml, withEmailBrandLogoAttachment } from "../_shared/emailBranding.ts";
+import { applyEmailTheme, buildEmailBrandHeaderHtml, withEmailBrandLogoAttachment } from "../_shared/emailBranding.ts";
 import { isKillSwitchWriteBlocked } from "../_shared/killSwitch.ts";
 import { getRequestId, logError, logInfo } from "../_shared/observability.ts";
 import {
@@ -254,16 +254,14 @@ const buildSuperAdminTwoFactorHtml = (payload: { code: string; support_email: st
                 <p style="margin:0;font-size:14px;line-height:1.6;color:#68645f;">
                   If this wasn't you,
                   <a href="${PASSWORD_RESET_URL}" style="color:#171717;text-decoration:underline;text-underline-offset:2px;">reset your password</a>
-                  and
-                  <a href="${CONTACT_SUPPORT_URL}" style="color:#171717;text-decoration:underline;text-underline-offset:2px;">contact support immediately</a>.
+                  and review your account security right away.
                 </p>
               </td>
             </tr>
             <tr>
               <td style="padding:16px 24px;border-top:1px solid #e7e5df;background:#fbfaf8;">
                 <p style="margin:0;font-size:12px;line-height:1.6;color:#68645f;">
-                  Need help? Contact
-                  <a href="mailto:${supportEmail}" style="color:#171717;text-decoration:underline;text-underline-offset:2px;">${supportEmail}</a>
+                  <a href="${CONTACT_SUPPORT_URL}" style="color:#171717;text-decoration:underline;text-underline-offset:2px;">Contact support</a>
                 </p>
                 <p style="margin:6px 0 0 0;font-size:12px;line-height:1.6;color:#8b8680;">
                   &copy; 2026 ItemTraxx Co. All rights reserved.
@@ -293,8 +291,8 @@ const sendSuperAdminTwoFactorEmail = async (
     from: payload.from_email,
     to: payload.to_email,
     subject,
-    html: buildSuperAdminTwoFactorHtml({ code: payload.code, support_email: payload.support_email }),
-    text: `Your ItemTraxx verification code is ${payload.code}. It expires in 10 minutes. If this wasn't you, reset your password at ${PASSWORD_RESET_URL} and contact support immediately at ${CONTACT_SUPPORT_URL}.`,
+    html: applyEmailTheme(buildSuperAdminTwoFactorHtml({ code: payload.code, support_email: payload.support_email })),
+    text: `Your ItemTraxx verification code is ${payload.code}. It expires in 10 minutes. If this wasn't you, reset your password at ${PASSWORD_RESET_URL} and review your account security right away.`,
   }), {
     emailType: "super_admin_2fa",
     recipientEmail: payload.to_email,

@@ -1,7 +1,12 @@
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.108.2";
 import { sendLoggedResendEmail } from "../_shared/emailDeliveryLog.ts";
-import { buildEmailBrandHeaderHtml, withEmailBrandLogoAttachment } from "../_shared/emailBranding.ts";
+import { applyEmailTheme, buildEmailBrandHeaderHtml, withEmailBrandLogoAttachment } from "../_shared/emailBranding.ts";
+import {
+  formatLoginEmailLocation,
+  formatLoginEmailPlatform,
+  formatLoginEmailTime,
+} from "../_shared/loginEmailFormat.ts";
 import { isKillSwitchWriteBlocked } from "../_shared/killSwitch.ts";
 import { getRequestId, logError, logInfo } from "../_shared/observability.ts";
 import { isAllowedOrigin, parseAllowedOrigins } from "../_shared/cors.ts";
@@ -108,17 +113,14 @@ const buildLoginNotificationHtml = (payload: {
   supportEmail: string;
   loginTimeLabel: string;
   deviceBrowser: string;
-  ipAddress: string | null;
   generalLocation: string | null;
 }) => {
   const accountName = escapeHtml(payload.accountName);
   const accountLabel = escapeHtml(payload.accountLabel);
   const loginTypeLabel = escapeHtml(payload.loginTypeLabel);
-  const loginTypeBody = escapeHtml(payload.loginTypeLabel.toLowerCase());
   const supportEmail = escapeHtml(payload.supportEmail);
   const deviceBrowser = escapeHtml(payload.deviceBrowser || "Unknown");
-  const ipAddress = escapeHtml(payload.ipAddress ?? "Unavailable");
-  const generalLocation = escapeHtml(payload.generalLocation ?? "Unavailable");
+  const generalLocation = escapeHtml(formatLoginEmailLocation(payload.generalLocation));
   const loginTime = escapeHtml(payload.loginTimeLabel);
 
   return `<!doctype html>
@@ -137,30 +139,28 @@ const buildLoginNotificationHtml = (payload: {
               <td style="padding:28px;">
                 <h2 style="margin:0 0 12px 0;font-size:22px;line-height:1.3;color:#171717;">New login to ItemTraxx</h2>
                 <p style="margin:0 0 22px 0;font-size:15px;line-height:1.6;color:#343330;">
-                  We noticed a ${loginTypeBody} to your ItemTraxx account from a new device or browser.
+                  We noticed a new sign-in to your ItemTraxx account.
                 </p>
                 <div style="height:1px;line-height:1px;background:#d8d6d1;margin:0 0 22px 0;">&nbsp;</div>
                 <p style="margin:0 0 22px 0;font-size:15px;line-height:1.8;color:#343330;">
                   <strong>Sign-in type:</strong> ${loginTypeLabel}<br />
                   <strong>${accountLabel}:</strong> ${accountName}<br />
                   <strong>Platform:</strong> ${deviceBrowser}<br />
-                  <strong>Location:</strong> ${generalLocation} (${ipAddress})<br />
+                  <strong>Location:</strong> ${generalLocation}<br />
                   <strong>Time:</strong> ${loginTime}
                 </p>
                 <div style="height:1px;line-height:1px;background:#d8d6d1;margin:0 0 22px 0;">&nbsp;</div>
                 <p style="margin:0 0 18px 0;font-size:15px;line-height:1.6;color:#343330;">
                   If this wasn't you,
                   <a href="${PASSWORD_RESET_URL}" style="color:#171717;text-decoration:underline;text-underline-offset:2px;">reset your password</a>
-                  and
-                  <a href="${CONTACT_SUPPORT_URL}" style="color:#171717;text-decoration:underline;text-underline-offset:2px;">contact support immediately</a>.
+                  and review your account security right away.
                 </p>
               </td>
             </tr>
             <tr>
               <td style="padding:16px 24px;border-top:1px solid #e7e5df;background:#fbfaf8;">
                 <p style="margin:0;font-size:12px;line-height:1.6;color:#68645f;">
-                  Contact support:
-                  <a href="mailto:${supportEmail}" style="color:#171717;text-decoration:underline;text-underline-offset:2px;">${supportEmail}</a>
+                  <a href="${CONTACT_SUPPORT_URL}" style="color:#171717;text-decoration:underline;text-underline-offset:2px;">Contact support</a>
                 </p>
                 <p style="margin:6px 0 0 0;font-size:12px;line-height:1.6;color:#8b8680;">
                   &copy; 2026 ItemTraxx Co. All rights reserved.
@@ -387,11 +387,8 @@ serve(async (req) => {
 
     const now = Date.now();
     const loginTimeIso = new Date(now).toISOString();
-    const loginTime = new Date(loginTimeIso);
-    const loginTimeLabel = Number.isNaN(loginTime.getTime())
-      ? loginTimeIso
-      : `${loginTime.toISOString()} (UTC)`;
-    const deviceInfo = req.headers.get("user-agent") ?? "Unknown device/browser";
+    const loginTimeLabel = formatLoginEmailTime(loginTimeIso);
+    const deviceInfo = formatLoginEmailPlatform(req.headers.get("user-agent"));
     const generalLocation = resolveGeneralLocation(req);
 
     const subject = `New ItemTraxx ${loginContext.subjectLabel} - ${accountName}`;
@@ -399,24 +396,23 @@ serve(async (req) => {
       from: fromEmail,
       to: [recipientEmail],
       subject,
-      html: buildLoginNotificationHtml({
+      html: applyEmailTheme(buildLoginNotificationHtml({
         accountName,
         accountLabel,
         loginTypeLabel: loginContext.label,
         supportEmail,
         loginTimeLabel,
         deviceBrowser: deviceInfo,
-        ipAddress: clientIp,
         generalLocation,
-      }),
+      })),
       text:
-        `We noticed a ${loginContext.label.toLowerCase()} to your ItemTraxx account from a new device or browser.\n\n` +
+        `We noticed a new sign-in to your ItemTraxx account.\n\n` +
         `Sign-in type: ${loginContext.label}\n` +
         `${accountLabel}: ${accountName}\n` +
         `Platform: ${deviceInfo || "Unknown"}\n` +
-        `Location: ${generalLocation ?? "Unavailable"} (${clientIp ?? "Unavailable"})\n` +
+        `Location: ${formatLoginEmailLocation(generalLocation)}\n` +
         `Time: ${loginTimeLabel}\n\n` +
-        `If this wasn't you, reset your password at ${PASSWORD_RESET_URL} and contact support immediately at ${CONTACT_SUPPORT_URL}.`,
+        `If this wasn't you, reset your password at ${PASSWORD_RESET_URL} and review your account security right away.`,
     }), {
       emailType: "login_notification",
       recipientEmail,

@@ -50,13 +50,11 @@ const callout = (content, large = false) =>
     large ? "center" : "left"
   };">${content}</div>`;
 
-const footer = (supportEmail, prefix = "Need help? Contact") => {
-  const email = escapeHtml(supportEmail);
+const footer = () => {
   return `<tr>
               <td style="padding:16px 24px;border-top:1px solid #e7e5df;background:#fbfaf8;">
                 <p style="margin:0;font-size:12px;line-height:1.6;color:#68645f;">
-                  ${escapeHtml(prefix)}
-                  <a href="mailto:${email}" style="color:#171717;text-decoration:underline;text-underline-offset:2px;">${email}</a>
+                  <a href="${contactSupportUrl}" style="color:#171717;text-decoration:underline;text-underline-offset:2px;">Contact support</a>
                 </p>
                 <p style="margin:6px 0 0 0;font-size:12px;line-height:1.6;color:#8b8680;">
                   &copy; 2026 ItemTraxx Co. All rights reserved.
@@ -65,7 +63,31 @@ const footer = (supportEmail, prefix = "Need help? Contact") => {
             </tr>`;
 };
 
-const shell = ({ title, body, supportEmail = "support@itemtraxx.com", footerPrefix }) => `<!doctype html>
+const applyEmailTheme = (html) =>
+  html
+    .replaceAll("background:#f6f5f2", "background:#eef2f7")
+    .replaceAll(
+      "max-width:560px;background:#ffffff;border:1px solid #d8d6d1;border-radius:0;overflow:hidden;",
+      "max-width:640px;background:#ffffff;border:0;border-radius:12px;overflow:hidden;"
+    )
+    .replaceAll(
+      "padding:24px 28px 14px 28px;background:#ffffff;border-bottom:1px solid #e7e5df;color:#171717;",
+      "padding:14px 28px;background:#ffffff;border-bottom:0;color:#0f172a;"
+    )
+    .replaceAll("padding:28px;", "padding:44px 40px 40px;background:#f6f8fb;")
+    .replaceAll("font-size:22px;line-height:1.3;color:#171717;", "font-size:28px;line-height:1.25;color:#0f172a;")
+    .replaceAll("color:#343330", "color:#334155")
+    .replaceAll("color:#68645f", "color:#64748b")
+    .replaceAll("color:#8b8680", "color:#94a3b8")
+    .replaceAll("color:#171717", "color:#0f172a")
+    .replaceAll("border-radius:0;background:#fbfaf8;border:1px solid #d8d6d1", "border-radius:8px;background:#ffffff;border:1px solid #dbe3ec")
+    .replaceAll("background:#d8d6d1", "background:#dbe3ec")
+    .replaceAll(
+      "padding:16px 24px;border-top:1px solid #e7e5df;background:#fbfaf8;",
+      "padding:24px 28px;text-align:center;border-top:0;background:#ffffff;"
+    );
+
+const shell = ({ title, body }) => `<!doctype html>
 <html>
   <head>
     <meta charset="utf-8" />
@@ -88,7 +110,7 @@ const shell = ({ title, body, supportEmail = "support@itemtraxx.com", footerPref
                 ${body}
               </td>
             </tr>
-            ${footer(supportEmail, footerPrefix)}
+            ${footer()}
           </table>
         </td>
       </tr>
@@ -103,20 +125,19 @@ const previews = [
     html: shell({
       title: "New login to ItemTraxx",
       body:
-        paragraph("We noticed a tenant admin sign in to your ItemTraxx account from a new device or browser.") +
+        paragraph("We noticed a new sign-in to your ItemTraxx account.") +
         divider() +
         details([
           ["Sign-in type", "Tenant admin sign in"],
           ["Tenant", "Demo School Equipment Room"],
-          ["Platform", "Arc on macOS"],
-          ["Location", "Los Angeles, United States (203.0.113.24)"],
-          ["Time", "2026-05-02T23:45:00.000Z (UTC)"],
+          ["Platform", "Chrome on Mac"],
+          ["Location", "San Jose, California"],
+          ["Time", "May 2, 2026, 4:45 PM PDT"],
         ]) +
         divider() +
         mutedParagraph(
-          `If this wasn't you, <a href="${passwordResetUrl}" style="color:#171717;text-decoration:underline;text-underline-offset:2px;">reset your password</a> and <a href="${contactSupportUrl}" style="color:#171717;text-decoration:underline;text-underline-offset:2px;">contact support immediately</a>.`
+          `If this wasn't you, <a href="${passwordResetUrl}" style="color:#171717;text-decoration:underline;text-underline-offset:2px;">reset your password</a> and review your account security right away.`
         ),
-      footerPrefix: "Contact support:",
     }),
   },
   {
@@ -129,7 +150,7 @@ const previews = [
         callout("482913", true) +
         mutedParagraph("This code expires in 10 minutes and can only be used once.") +
         mutedParagraph(
-          `If this wasn't you, <a href="${passwordResetUrl}" style="color:#171717;text-decoration:underline;text-underline-offset:2px;">reset your password</a> and <a href="${contactSupportUrl}" style="color:#171717;text-decoration:underline;text-underline-offset:2px;">contact support immediately</a>.`
+          `If this wasn't you, <a href="${passwordResetUrl}" style="color:#171717;text-decoration:underline;text-underline-offset:2px;">reset your password</a> and review your account security right away.`
         ),
     }),
   },
@@ -149,8 +170,6 @@ const previews = [
         ]) +
         paragraph("<strong>Details</strong>") +
         callout("We need checkout and return tracking for three equipment rooms and a small IT loaner pool."),
-      supportEmail: "sales@itemtraxx.com",
-      footerPrefix: "Reply contact:",
     }),
   },
   {
@@ -164,9 +183,7 @@ const previews = [
         details([
           ["Plan", "ItemTraxx Organization Scale Plan"],
           ["Organization", "Demo High School"],
-        ]) +
-        mutedParagraph("If you need to add anything else, you can reply directly to this email."),
-      supportEmail: "sales@itemtraxx.com",
+        ]),
     }),
   },
   {
@@ -184,7 +201,6 @@ const previews = [
         ]) +
         paragraph("<strong>Message</strong>") +
         callout("The admin login worked yesterday, but today it returns an access denied message."),
-      footerPrefix: "Reply contact:",
     }),
   },
   {
@@ -198,8 +214,7 @@ const previews = [
         details([
           ["Category", "Account access"],
           ["Subject", "Unable to access tenant admin"],
-        ]) +
-        mutedParagraph("If you need to add anything else, reply directly to this email."),
+        ]),
     }),
   },
   {
@@ -218,7 +233,6 @@ const previews = [
         ]) +
         paragraph("<strong>Message</strong>") +
         callout("Operators are unable to complete checkout at the main desk."),
-      footerPrefix: "Reply contact:",
     }),
   },
 ];
@@ -269,7 +283,7 @@ const resolvePreviewOutputPath = (fileName) => {
 };
 
 await Promise.all(
-  previews.map((preview) => writeFile(resolvePreviewOutputPath(preview.file), preview.html))
+  previews.map((preview) => writeFile(resolvePreviewOutputPath(preview.file), applyEmailTheme(preview.html)))
 );
 await writeFile(path.join(outDir, "index.html"), indexHtml);
 

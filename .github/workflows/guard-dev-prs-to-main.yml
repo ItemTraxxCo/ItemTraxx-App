@@ -1,4 +1,4 @@
-name: Guard Dev PRs To Main
+name: Guard Promotion PR Flow
 
 permissions:
   contents: read
@@ -8,6 +8,8 @@ on:
   pull_request:
     branches:
       - main
+      - preview
+      - staging
     types:
       - opened
       - reopened
@@ -28,8 +30,23 @@ jobs:
         run: |
           set -euo pipefail
 
-          if [[ "$BASE_REF" == "main" && "$HEAD_REF" == dev/* ]]; then
+          required_base=""
+
+          case "$HEAD_REF" in
+            dev/*)
+              required_base="staging"
+              ;;
+            staging)
+              required_base="preview"
+              ;;
+            preview)
+              required_base="main"
+              ;;
+          esac
+
+          if [[ -n "$required_base" && "$BASE_REF" != "$required_base" ]]; then
             echo "blocked=true" >> "$GITHUB_OUTPUT"
+            echo "required_base=$required_base" >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
@@ -41,9 +58,9 @@ jobs:
         with:
           script: |
             const body = [
-              "<!-- itx-dev-pr-to-main-guard -->",
-              "Can't merge this PR into `main` from this branch.",
-              "This pull request cannot be merged into main. It must merge into preview before main. Change the base branch to preview."
+              "<!-- itx-promotion-pr-flow-guard -->",
+              "This pull request does not follow the required promotion path.",
+              `Change the base branch to \`${{ steps.guard.outputs.required_base }}\`: \`dev/* → staging → preview → main\`."
             ].join("\n\n");
 
             const { owner, repo } = context.repo;
@@ -57,7 +74,7 @@ jobs:
 
             const existing = comments.find((comment) =>
               comment.user?.type === "Bot" &&
-              comment.body?.includes("<!-- itx-dev-pr-to-main-guard -->")
+              comment.body?.includes("<!-- itx-promotion-pr-flow-guard -->")
             );
 
             if (existing) {
@@ -80,7 +97,7 @@ jobs:
       - name: Fail blocked PR
         if: ${{ steps.guard.outputs.blocked == 'true' }}
         run: |
-          echo "Pull requests from dev/* must target preview before main."
+          echo "This branch must target ${{ steps.guard.outputs.required_base }}. Required path: dev/* -> staging -> preview -> main."
           exit 1
 
       - name: Allow valid PR path

@@ -10,6 +10,7 @@ on:
     branches:
       - main
       - preview
+      - staging
   pull_request:
   schedule:
     - cron: '21 9 * * 1'

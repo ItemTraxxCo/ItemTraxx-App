@@ -10,6 +10,7 @@ type RecoverableAppErrorDetail = {
 const EVENT_NAME = "itemtraxx:recoverable-app-error";
 const CHUNK_RELOAD_KEY = "itemtraxx:chunk-reload-path";
 let lastRecoveryAt = 0;
+let recoveryInstalled = false;
 
 export const isRecoverableChunkLoadError = (error: unknown) => {
   const message = error instanceof Error ? error.message : String(error ?? "");
@@ -60,6 +61,8 @@ export const installAppErrorRecovery = (router: Router) => {
   if (typeof window === "undefined") {
     return;
   }
+  if (recoveryInstalled) return;
+  recoveryInstalled = true;
 
   window.addEventListener(EVENT_NAME, (event) => {
     const now = Date.now();
@@ -86,6 +89,12 @@ export const installAppErrorRecovery = (router: Router) => {
   router.afterEach((to) => {
     if (window.sessionStorage.getItem(CHUNK_RELOAD_KEY) === to.fullPath) {
       window.sessionStorage.removeItem(CHUNK_RELOAD_KEY);
+    }
+  });
+
+  window.addEventListener("vite:preloadError", (event) => {
+    if (recoverFromChunkLoadError(router.currentRoute.value.fullPath)) {
+      event.preventDefault();
     }
   });
 };

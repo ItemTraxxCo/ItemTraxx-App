@@ -113,9 +113,6 @@ export const createClientMonitoring = (router: Router) => {
       void import("../services/globalErrorHandling")
         .then(({ installGlobalErrorHandling }) => installGlobalErrorHandling(app))
         .catch(() => undefined);
-      void import("../services/appErrorRecovery")
-        .then(({ installAppErrorRecovery }) => installAppErrorRecovery(router))
-        .catch(() => undefined);
       void initializePostHog();
       bindConsentDrivenMonitoring(app);
     },

@@ -5,6 +5,7 @@ type SuperOpsAction =
   | "verify_password"
   | "touch_session"
   | "list_sessions"
+  | "list_passkeys"
   | "revoke_session"
   | "revoke_all_sessions"
   | "get_control_center"

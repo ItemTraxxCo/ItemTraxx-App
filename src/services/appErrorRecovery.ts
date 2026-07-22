@@ -8,7 +8,27 @@ type RecoverableAppErrorDetail = {
 };
 
 const EVENT_NAME = "itemtraxx:recoverable-app-error";
+const CHUNK_RELOAD_KEY = "itemtraxx:chunk-reload-path";
 let lastRecoveryAt = 0;
+let recoveryInstalled = false;
+
+export const isRecoverableChunkLoadError = (error: unknown) => {
+  const message = error instanceof Error ? error.message : String(error ?? "");
+  return /failed to fetch dynamically imported module|error loading dynamically imported module|importing a module script failed/i
+    .test(message);
+};
+
+export const recoverFromChunkLoadError = (path: string) => {
+  if (typeof window === "undefined") return false;
+  const target = path || "/";
+  if (window.sessionStorage.getItem(CHUNK_RELOAD_KEY) === target) {
+    window.sessionStorage.removeItem(CHUNK_RELOAD_KEY);
+    return false;
+  }
+  window.sessionStorage.setItem(CHUNK_RELOAD_KEY, target);
+  window.location.assign(target);
+  return true;
+};
 
 export const resolveRecoveryRouteFromPath = (currentPath: string) => {
   if (currentPath.startsWith("/internal")) {
@@ -41,6 +61,8 @@ export const installAppErrorRecovery = (router: Router) => {
   if (typeof window === "undefined") {
     return;
   }
+  if (recoveryInstalled) return;
+  recoveryInstalled = true;
 
   window.addEventListener(EVENT_NAME, (event) => {
     const now = Date.now();
@@ -56,5 +78,23 @@ export const installAppErrorRecovery = (router: Router) => {
     lastRecoveryAt = now;
     clearAuthState(true);
     showSessionTermination(resolveRecoveryRoute(router));
+  });
+
+  router.onError((error, to) => {
+    if (isRecoverableChunkLoadError(error)) {
+      recoverFromChunkLoadError(to.fullPath);
+    }
+  });
+
+  router.afterEach((to) => {
+    if (window.sessionStorage.getItem(CHUNK_RELOAD_KEY) === to.fullPath) {
+      window.sessionStorage.removeItem(CHUNK_RELOAD_KEY);
+    }
+  });
+
+  window.addEventListener("vite:preloadError", (event) => {
+    if (recoverFromChunkLoadError(router.currentRoute.value.fullPath)) {
+      event.preventDefault();
+    }
   });
 };

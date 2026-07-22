@@ -14,6 +14,7 @@ import {
   ValidationError,
 } from "../_shared/validation.ts";
 import { enforcePreloginRateLimit } from "../_shared/preloginGuards.ts";
+import { isSuperAdminTokenBlockedBySessionRevocation } from "../_shared/superAdminSessions.ts";
 import { dispatchSuperOpsAction } from "./actions/index.ts";
 
 const baseCorsHeaders = {
@@ -93,7 +94,10 @@ serve(async (req) => {
     }
 
     const adminClient = createClient(supabaseUrl, serviceKey, {
-      auth: { persistSession: false },
+      auth: {
+        persistSession: false,
+        experimental: { passkey: true },
+      },
     });
 
     const accessToken = authHeader.replace(/^Bearer\s+/i, "").trim();
@@ -123,6 +127,19 @@ serve(async (req) => {
       return jsonResponse(403, { error: "Access denied" });
     }
 
+    const revocation = await isSuperAdminTokenBlockedBySessionRevocation(
+      adminClient,
+      { profileId: user.id, authToken: accessToken },
+    );
+    if (revocation.relationMissing) {
+      return jsonResponse(503, {
+        error: "Session controls unavailable. Run latest SQL setup.",
+      });
+    }
+    if (revocation.blocked) {
+      return jsonResponse(401, { error: "Session revoked." });
+    }
+
     const parsedBody = asRecord(await readJsonBody(req));
     const action = requireText(parsedBody.action, { maxLen: 64 });
     const payload = asRecord(parsedBody.payload ?? {});
@@ -131,6 +148,7 @@ serve(async (req) => {
       "verify_password",
       "touch_session",
       "list_sessions",
+      "list_passkeys",
       "revoke_session",
       "revoke_all_sessions",
     ]);

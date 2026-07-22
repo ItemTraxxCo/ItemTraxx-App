@@ -12,6 +12,7 @@ const EXPECTED_ACTIONS = [
   "verify_password",
   "touch_session",
   "list_sessions",
+  "list_passkeys",
   "revoke_session",
   "revoke_all_sessions",
   "get_control_center",
@@ -37,9 +38,9 @@ const EXPECTED_ACTIONS = [
   "list_subprocessor_notices",
 ] as const;
 
-Deno.test("super ops registry contains exactly the 26 live actions", () => {
-  assertEquals(SUPER_OPS_ACTIONS.length, 26);
-  assertEquals(new Set(SUPER_OPS_ACTIONS).size, 26);
+Deno.test("super ops registry contains exactly the 27 live actions", () => {
+  assertEquals(SUPER_OPS_ACTIONS.length, 27);
+  assertEquals(new Set(SUPER_OPS_ACTIONS).size, 27);
   assertEquals([...SUPER_OPS_ACTIONS].sort(), [...EXPECTED_ACTIONS].sort());
 });
 
@@ -189,6 +190,94 @@ Deno.test("super ops dispatcher preserves a representative database error", asyn
     ok: false,
     error: "Unable to load sales leads.",
   });
+});
+
+Deno.test("super ops lists only the current super admin's passkeys", async () => {
+  let requestedUserId: string | null = null;
+  const adminClient = {
+    auth: {
+      admin: {
+        passkey: {
+          listPasskeys: async ({ userId }: { userId: string }) => {
+            requestedUserId = userId;
+            return {
+              data: [{
+                id: "passkey-1",
+                created_at: "2026-07-22T00:00:00.000Z",
+                last_used_at: "2026-07-22T00:05:00.000Z",
+                credential: "must-not-be-returned",
+              }],
+              error: null,
+            };
+          },
+        },
+      },
+    },
+  };
+
+  const response = await dispatchSuperOpsAction(
+    contextFor("list_passkeys", {}, adminClient),
+  );
+
+  assertEquals(response.status, 200);
+  assertEquals(requestedUserId, "00000000-0000-4000-8000-000000000001");
+  assertEquals(await response.json(), {
+    ok: true,
+    data: {
+      passkeys: [{
+        id: "passkey-1",
+        created_at: "2026-07-22T00:00:00.000Z",
+        last_used_at: "2026-07-22T00:05:00.000Z",
+      }],
+    },
+  });
+});
+
+Deno.test("session refresh does not erase the recorded sign-in method", async () => {
+  let updatePayload: Record<string, unknown> | null = null;
+  const query: Record<string, unknown> = {};
+  for (const method of ["select", "eq", "is"]) {
+    query[method] = () => query;
+  }
+  query.update = (payload: Record<string, unknown>) => {
+    updatePayload = payload;
+    return query;
+  };
+  query.maybeSingle = () => Promise.resolve({ data: { id: "session-1" }, error: null });
+  query.then = (
+    resolve: (value: { data: { id: string }; error: null }) => unknown,
+    reject: (reason: unknown) => unknown,
+  ) => Promise.resolve({ data: { id: "session-1" }, error: null }).then(resolve, reject);
+
+  const adminClient = {
+    auth: {
+      getClaims: async () => ({
+        data: {
+          claims: {
+            session_id: "auth-session-1",
+            iat: 1_784_681_900,
+            amr: [{ method: "password" }],
+          },
+        },
+        error: null,
+      }),
+    },
+    from: () => query,
+  };
+
+  const response = await dispatchSuperOpsAction(
+    contextFor("touch_session", {
+      device_id: "device-1",
+      device_label: "Mac",
+      login_method: null,
+      login_location: "super_settings",
+    }, adminClient),
+  );
+
+  assertEquals(response.status, 200);
+  const updated = updatePayload as Record<string, unknown> | null;
+  assertEquals(updated?.login_method, "password");
+  assertEquals(updated?.login_location, "super_settings");
 });
 
 Deno.test("super ops dispatcher preserves the unknown-action response", async () => {

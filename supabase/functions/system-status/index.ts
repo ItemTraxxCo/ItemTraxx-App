@@ -6,6 +6,7 @@ import {
   resolveKillSwitchMessage,
 } from "../_shared/killSwitch.ts";
 import { isAllowedOrigin, parseAllowedOrigins } from "../_shared/cors.ts";
+import { resolveSystemStatusOverride } from "../_shared/systemStatusOverride.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Headers":
@@ -166,16 +167,26 @@ serve(async (req) => {
       updated_at: string;
     } | null = null;
 
-    const { data: broadcastRow, error: broadcastError } = await adminClient
-      .from("app_runtime_config")
-      .select("key, value, updated_at")
-      .eq("key", "broadcast_message")
-      .maybeSingle();
-    const { data: maintenanceRow } = await adminClient
-      .from("app_runtime_config")
-      .select("value, updated_at")
-      .eq("key", "maintenance_mode")
-      .maybeSingle();
+    const [broadcastResult, maintenanceResult, systemStatusOverrideResult] = await Promise.all([
+      adminClient
+        .from("app_runtime_config")
+        .select("key, value, updated_at")
+        .eq("key", "broadcast_message")
+        .maybeSingle(),
+      adminClient
+        .from("app_runtime_config")
+        .select("value, updated_at")
+        .eq("key", "maintenance_mode")
+        .maybeSingle(),
+      adminClient
+        .from("app_runtime_config")
+        .select("value")
+        .eq("key", "system_status_override")
+        .maybeSingle(),
+    ]);
+    const { data: broadcastRow, error: broadcastError } = broadcastResult;
+    const { data: maintenanceRow } = maintenanceResult;
+    const { data: systemStatusOverrideRow } = systemStatusOverrideResult;
 
     let maintenance: {
       enabled: boolean;
@@ -247,6 +258,13 @@ serve(async (req) => {
         incidentCheck = "unavailable";
         console.error("system-status incident.io fetch failed:", error);
       }
+    }
+
+    const statusOverride = resolveSystemStatusOverride(systemStatusOverrideRow?.value);
+    if (statusOverride) {
+      incidentStatus = statusOverride.status;
+      incidentSummary = statusOverride.summary;
+      incidentCheck = statusOverride.status === "operational" ? "ok" : "warn";
     }
 
     if (killSwitchActive) {

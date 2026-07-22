@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.108.2";
+import { resolveTrustedGeneralLocation } from "../../_shared/requestMetadata.ts";
 import { optionalText, requireText } from "../../_shared/validation.ts";
 import type { SuperOpsContext } from "../context.ts";
 
@@ -6,6 +7,7 @@ export const SECURITY_SESSION_ACTIONS = [
   "verify_password",
   "touch_session",
   "list_sessions",
+  "list_passkeys",
   "revoke_session",
   "revoke_all_sessions",
 ] as const;
@@ -23,11 +25,15 @@ const isMissingColumn = (
 const sanitizeText = (value: unknown, max = 255) =>
   optionalText(value, { maxLen: max });
 
-const resolveGeneralLocation = (req: Request) => {
-  const city = req.headers.get("cf-ipcity")?.trim();
-  const region = req.headers.get("cf-region")?.trim();
-  const country = req.headers.get("cf-ipcountry")?.trim();
-  return [city, region, country].filter(Boolean).join(", ") || null;
+const resolveJwtLoginMethod = (claims: Record<string, unknown>) => {
+  const amr = claims.amr;
+  if (!Array.isArray(amr)) return null;
+  return amr.some(
+    (entry) => entry && typeof entry === "object" &&
+      (entry as Record<string, unknown>).method === "password",
+  )
+    ? "password"
+    : null;
 };
 
 export const handleSecuritySessionsAction = async (
@@ -111,20 +117,31 @@ export const handleSecuritySessionsAction = async (
     const authIssuedAt = typeof jwtPayload?.iat === "number"
       ? new Date(jwtPayload.iat * 1000).toISOString()
       : null;
+    const resolvedLoginMethod = loginMethod ?? resolveJwtLoginMethod(jwtPayload);
 
     const now = new Date().toISOString();
-    const upsertPayload = {
+    const sessionPayload = {
       profile_id: user.id,
       device_id: deviceId,
       device_label: deviceLabel,
       user_agent: sanitizeText(req.headers.get("user-agent"), 1024) || null,
-      login_method: loginMethod,
-      login_location: loginLocation,
-      general_location: resolveGeneralLocation(req),
+      // The edge proxy forwards geo data in these trusted x-itx headers.
+      // Raw Cloudflare headers are not available in the Supabase runtime.
+      general_location: resolveTrustedGeneralLocation(req),
       auth_session_id: authSessionId,
       auth_token_issued_at: authIssuedAt,
       last_seen_at: now,
       revoked_at: null,
+    };
+    const createPayload = {
+      ...sessionPayload,
+      login_method: resolvedLoginMethod,
+      login_location: loginLocation,
+    };
+    const updatePayload = {
+      ...sessionPayload,
+      ...(resolvedLoginMethod ? { login_method: resolvedLoginMethod } : {}),
+      ...(loginLocation ? { login_location: loginLocation } : {}),
     };
 
     const existing = await adminClient
@@ -150,7 +167,7 @@ export const handleSecuritySessionsAction = async (
     if (existing.data?.id) {
       const { error } = await adminClient
         .from("super_admin_sessions")
-        .update(upsertPayload)
+        .update(updatePayload)
         .eq("id", existing.data.id);
       if (error) {
         return jsonResponse(400, { error: "Unable to update session." });
@@ -158,7 +175,7 @@ export const handleSecuritySessionsAction = async (
     } else {
       const { error } = await adminClient
         .from("super_admin_sessions")
-        .insert({ ...upsertPayload, created_at: now });
+        .insert({ ...createPayload, created_at: now });
       if (error && isMissingRelation(error, "super_admin_sessions")) {
         return jsonResponse(400, {
           error: "Session controls unavailable. Run latest SQL setup.",
@@ -245,6 +262,29 @@ export const handleSecuritySessionsAction = async (
           is_current: !!currentDeviceId &&
             typeof row.device_id === "string" &&
             row.device_id === currentDeviceId,
+        })),
+      },
+    });
+  }
+
+  if (action === "list_passkeys") {
+    const { data, error } = await adminClient.auth.admin.passkey.listPasskeys({
+      userId: user.id,
+    });
+    if (error) {
+      console.error("Unable to load super-admin passkeys", {
+        user_id: user.id,
+        message: error.message,
+      });
+      return jsonResponse(400, { error: "Unable to load passkeys." });
+    }
+
+    return jsonResponse(200, {
+      data: {
+        passkeys: (data ?? []).map((passkey) => ({
+          id: passkey.id,
+          created_at: passkey.created_at,
+          last_used_at: passkey.last_used_at ?? null,
         })),
       },
     });

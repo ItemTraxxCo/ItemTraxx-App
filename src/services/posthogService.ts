@@ -1,4 +1,5 @@
 import { allowsAnalytics, readCookieConsent } from "./cookieConsentService";
+import { isRecoverableChunkLoadError } from "./appErrorRecovery";
 
 let initialized = false;
 let posthog: typeof import("posthog-js").default | null = null;
@@ -68,6 +69,19 @@ const isCspUnsafeEvalExceptionEvent = (
   );
 };
 
+const isRecoverableChunkLoadExceptionEvent = (
+  properties?: Record<string, unknown>,
+) => {
+  const exceptionList = properties?.$exception_list;
+  if (!Array.isArray(exceptionList)) return false;
+  return exceptionList.some(
+    (entry) =>
+      !!entry &&
+      typeof entry === "object" &&
+      isRecoverableChunkLoadError((entry as { value?: unknown }).value),
+  );
+};
+
 export const initPostHog = async () => {
   if (initialized) return;
   const token = import.meta.env.VITE_POSTHOG_PROJECT_TOKEN?.trim();
@@ -87,7 +101,10 @@ export const initPostHog = async () => {
       before_send: (event) => {
         if (
           event?.event === "$exception" &&
-          isCspUnsafeEvalExceptionEvent(event.properties)
+          (
+            isCspUnsafeEvalExceptionEvent(event.properties) ||
+            isRecoverableChunkLoadExceptionEvent(event.properties)
+          )
         ) {
           return null;
         }

@@ -508,6 +508,12 @@ const superOpsSessionSchema = z.object({
   is_current: z.boolean(),
 });
 
+const superOpsPasskeySchema = z.object({
+  id: z.string(),
+  created_at: z.string(),
+  last_used_at: z.string().nullable(),
+});
+
 const supportRequestStatusSchema = z.enum(["open", "in_progress", "resolved", "spam"]);
 const supportRequestCategorySchema = z.enum(["general", "bug", "billing", "access", "feature", "privacy", "other"]);
 
@@ -659,6 +665,7 @@ const superOpsRequestSchema = z.discriminatedUnion("action", [
     payload: superOpsDevicePayloadSchema.extend({ device_id: z.string().min(1) }),
   }),
   z.object({ action: z.literal("list_sessions"), payload: superOpsDevicePayloadSchema }),
+  z.object({ action: z.literal("list_passkeys"), payload: z.object({}).optional() }),
   z.object({
     action: z.literal("revoke_session"),
     payload: superOpsDevicePayloadSchema.extend({ session_id: z.string().min(1) }),
@@ -713,6 +720,7 @@ const superOpsResponseSchemas = {
   verify_password: superOpsEnvelopeSchema(z.object({ verified: z.boolean() })),
   touch_session: superOpsEnvelopeSchema(z.object({ ok: z.boolean() })),
   list_sessions: superOpsEnvelopeSchema(z.object({ sessions: z.array(superOpsSessionSchema) })),
+  list_passkeys: superOpsEnvelopeSchema(z.object({ passkeys: z.array(superOpsPasskeySchema) })),
   revoke_session: superOpsEnvelopeSchema(z.object({ revoked: z.boolean() })),
   revoke_all_sessions: superOpsEnvelopeSchema(z.object({ revoked: z.number().int().nonnegative() })),
   get_control_center: superOpsEnvelopeSchema(z.object({

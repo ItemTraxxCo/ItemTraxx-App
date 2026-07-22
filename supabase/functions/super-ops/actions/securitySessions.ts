@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.108.2";
+import { resolveTrustedGeneralLocation } from "../../_shared/requestMetadata.ts";
 import { optionalText, requireText } from "../../_shared/validation.ts";
 import type { SuperOpsContext } from "../context.ts";
 
@@ -22,13 +23,6 @@ const isMissingColumn = (
 
 const sanitizeText = (value: unknown, max = 255) =>
   optionalText(value, { maxLen: max });
-
-const resolveGeneralLocation = (req: Request) => {
-  const city = req.headers.get("cf-ipcity")?.trim();
-  const region = req.headers.get("cf-region")?.trim();
-  const country = req.headers.get("cf-ipcountry")?.trim();
-  return [city, region, country].filter(Boolean).join(", ") || null;
-};
 
 export const handleSecuritySessionsAction = async (
   context: SuperOpsContext,
@@ -120,7 +114,9 @@ export const handleSecuritySessionsAction = async (
       user_agent: sanitizeText(req.headers.get("user-agent"), 1024) || null,
       login_method: loginMethod,
       login_location: loginLocation,
-      general_location: resolveGeneralLocation(req),
+      // The edge proxy forwards geo data in these trusted x-itx headers.
+      // Raw Cloudflare headers are not available in the Supabase runtime.
+      general_location: resolveTrustedGeneralLocation(req),
       auth_session_id: authSessionId,
       auth_token_issued_at: authIssuedAt,
       last_seen_at: now,

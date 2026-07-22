@@ -252,7 +252,13 @@ Deno.test("session refresh does not erase the recorded sign-in method", async ()
   const adminClient = {
     auth: {
       getClaims: async () => ({
-        data: { claims: { session_id: "auth-session-1", iat: 1_784_681_900 } },
+        data: {
+          claims: {
+            session_id: "auth-session-1",
+            iat: 1_784_681_900,
+            amr: [{ method: "password" }],
+          },
+        },
         error: null,
       }),
     },
@@ -270,7 +276,7 @@ Deno.test("session refresh does not erase the recorded sign-in method", async ()
 
   assertEquals(response.status, 200);
   const updated = updatePayload as Record<string, unknown> | null;
-  assertEquals(updated?.login_method, undefined);
+  assertEquals(updated?.login_method, "password");
   assertEquals(updated?.login_location, "super_settings");
 });
 

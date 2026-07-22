@@ -25,6 +25,17 @@ const isMissingColumn = (
 const sanitizeText = (value: unknown, max = 255) =>
   optionalText(value, { maxLen: max });
 
+const resolveJwtLoginMethod = (claims: Record<string, unknown>) => {
+  const amr = claims.amr;
+  if (!Array.isArray(amr)) return null;
+  return amr.some(
+    (entry) => entry && typeof entry === "object" &&
+      (entry as Record<string, unknown>).method === "password",
+  )
+    ? "password"
+    : null;
+};
+
 export const handleSecuritySessionsAction = async (
   context: SuperOpsContext,
 ): Promise<Response | null> => {
@@ -106,6 +117,7 @@ export const handleSecuritySessionsAction = async (
     const authIssuedAt = typeof jwtPayload?.iat === "number"
       ? new Date(jwtPayload.iat * 1000).toISOString()
       : null;
+    const resolvedLoginMethod = loginMethod ?? resolveJwtLoginMethod(jwtPayload);
 
     const now = new Date().toISOString();
     const sessionPayload = {
@@ -123,12 +135,12 @@ export const handleSecuritySessionsAction = async (
     };
     const createPayload = {
       ...sessionPayload,
-      login_method: loginMethod,
+      login_method: resolvedLoginMethod,
       login_location: loginLocation,
     };
     const updatePayload = {
       ...sessionPayload,
-      ...(loginMethod ? { login_method: loginMethod } : {}),
+      ...(resolvedLoginMethod ? { login_method: resolvedLoginMethod } : {}),
       ...(loginLocation ? { login_location: loginLocation } : {}),
     };
 

@@ -145,6 +145,7 @@ serve(async (req) => {
       "verify_password",
       "touch_session",
       "list_sessions",
+      "list_passkeys",
       "revoke_session",
       "revoke_all_sessions",
     ]);

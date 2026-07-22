@@ -7,6 +7,7 @@ export const SECURITY_SESSION_ACTIONS = [
   "verify_password",
   "touch_session",
   "list_sessions",
+  "list_passkeys",
   "revoke_session",
   "revoke_all_sessions",
 ] as const;
@@ -241,6 +242,29 @@ export const handleSecuritySessionsAction = async (
           is_current: !!currentDeviceId &&
             typeof row.device_id === "string" &&
             row.device_id === currentDeviceId,
+        })),
+      },
+    });
+  }
+
+  if (action === "list_passkeys") {
+    const { data, error } = await adminClient.auth.admin.passkey.listPasskeys({
+      userId: user.id,
+    });
+    if (error) {
+      console.error("Unable to load super-admin passkeys", {
+        user_id: user.id,
+        message: error.message,
+      });
+      return jsonResponse(400, { error: "Unable to load passkeys." });
+    }
+
+    return jsonResponse(200, {
+      data: {
+        passkeys: (data ?? []).map((passkey) => ({
+          id: passkey.id,
+          created_at: passkey.created_at,
+          last_used_at: passkey.last_used_at ?? null,
         })),
       },
     });

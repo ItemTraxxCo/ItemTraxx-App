@@ -223,20 +223,16 @@ import { supabase } from "../../services/supabaseClient";
 import { toUserFacingErrorMessage } from "../../services/appErrors";
 import { getAuthState } from "../../store/authState";
 import {
+  listSuperAdminPasskeys,
   listSuperAdminSessions,
   revokeAllSuperAdminSessions,
   revokeSuperAdminSession,
   touchSuperAdminSession,
+  type SuperAdminPasskeyItem,
   type SuperAdminSessionItem,
 } from "../../services/superOps/sessions";
 import { superAdminPasskeyLogin } from "../../services/authService";
 import { getPasswordResetRedirectUrl } from "../../utils/passwordResetRedirect";
-
-type PasskeyListItem = {
-  id: string;
-  created_at: string;
-  last_used_at?: string;
-};
 
 const auth = getAuthState();
 const REAUTH_WINDOW_MS = 5 * 60 * 1000;
@@ -251,7 +247,7 @@ const reauthError = ref("");
 const reauthSuccess = ref("");
 const passkeyManagementAuthorizedUntil = ref<number | null>(null);
 
-const passkeys = ref<PasskeyListItem[]>([]);
+const passkeys = ref<SuperAdminPasskeyItem[]>([]);
 const isPasskeyActionLoading = ref(false);
 const passkeyError = ref("");
 const passkeySuccess = ref("");
@@ -299,11 +295,7 @@ const formatLoginLocation = (value: SuperAdminSessionItem["login_location"]) =>
 const loadPasskeys = async () => {
   passkeyError.value = "";
   try {
-    const result = await supabase.auth.passkey.list();
-    if (result.error) {
-      throw result.error;
-    }
-    passkeys.value = (result.data ?? []) as PasskeyListItem[];
+    passkeys.value = await listSuperAdminPasskeys();
   } catch (err) {
     passkeyError.value = toUserFacingErrorMessage(err, "Unable to load passkeys.");
   }

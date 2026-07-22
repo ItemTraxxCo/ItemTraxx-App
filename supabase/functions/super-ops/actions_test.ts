@@ -12,6 +12,7 @@ const EXPECTED_ACTIONS = [
   "verify_password",
   "touch_session",
   "list_sessions",
+  "list_passkeys",
   "revoke_session",
   "revoke_all_sessions",
   "get_control_center",
@@ -37,9 +38,9 @@ const EXPECTED_ACTIONS = [
   "list_subprocessor_notices",
 ] as const;
 
-Deno.test("super ops registry contains exactly the 26 live actions", () => {
-  assertEquals(SUPER_OPS_ACTIONS.length, 26);
-  assertEquals(new Set(SUPER_OPS_ACTIONS).size, 26);
+Deno.test("super ops registry contains exactly the 27 live actions", () => {
+  assertEquals(SUPER_OPS_ACTIONS.length, 27);
+  assertEquals(new Set(SUPER_OPS_ACTIONS).size, 27);
   assertEquals([...SUPER_OPS_ACTIONS].sort(), [...EXPECTED_ACTIONS].sort());
 });
 
@@ -188,6 +189,47 @@ Deno.test("super ops dispatcher preserves a representative database error", asyn
   assertEquals(await response.json(), {
     ok: false,
     error: "Unable to load sales leads.",
+  });
+});
+
+Deno.test("super ops lists only the current super admin's passkeys", async () => {
+  let requestedUserId: string | null = null;
+  const adminClient = {
+    auth: {
+      admin: {
+        passkey: {
+          listPasskeys: async ({ userId }: { userId: string }) => {
+            requestedUserId = userId;
+            return {
+              data: [{
+                id: "passkey-1",
+                created_at: "2026-07-22T00:00:00.000Z",
+                last_used_at: "2026-07-22T00:05:00.000Z",
+                credential: "must-not-be-returned",
+              }],
+              error: null,
+            };
+          },
+        },
+      },
+    },
+  };
+
+  const response = await dispatchSuperOpsAction(
+    contextFor("list_passkeys", {}, adminClient),
+  );
+
+  assertEquals(response.status, 200);
+  assertEquals(requestedUserId, "00000000-0000-4000-8000-000000000001");
+  assertEquals(await response.json(), {
+    ok: true,
+    data: {
+      passkeys: [{
+        id: "passkey-1",
+        created_at: "2026-07-22T00:00:00.000Z",
+        last_used_at: "2026-07-22T00:05:00.000Z",
+      }],
+    },
   });
 });
 

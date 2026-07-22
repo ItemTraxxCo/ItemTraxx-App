@@ -94,7 +94,10 @@ serve(async (req) => {
     }
 
     const adminClient = createClient(supabaseUrl, serviceKey, {
-      auth: { persistSession: false },
+      auth: {
+        persistSession: false,
+        experimental: { passkey: true },
+      },
     });
 
     const accessToken = authHeader.replace(/^Bearer\s+/i, "").trim();

@@ -233,6 +233,47 @@ Deno.test("super ops lists only the current super admin's passkeys", async () =>
   });
 });
 
+Deno.test("session refresh does not erase the recorded sign-in method", async () => {
+  let updatePayload: Record<string, unknown> | null = null;
+  const query: Record<string, unknown> = {};
+  for (const method of ["select", "eq", "is"]) {
+    query[method] = () => query;
+  }
+  query.update = (payload: Record<string, unknown>) => {
+    updatePayload = payload;
+    return query;
+  };
+  query.maybeSingle = () => Promise.resolve({ data: { id: "session-1" }, error: null });
+  query.then = (
+    resolve: (value: { data: { id: string }; error: null }) => unknown,
+    reject: (reason: unknown) => unknown,
+  ) => Promise.resolve({ data: { id: "session-1" }, error: null }).then(resolve, reject);
+
+  const adminClient = {
+    auth: {
+      getClaims: async () => ({
+        data: { claims: { session_id: "auth-session-1", iat: 1_784_681_900 } },
+        error: null,
+      }),
+    },
+    from: () => query,
+  };
+
+  const response = await dispatchSuperOpsAction(
+    contextFor("touch_session", {
+      device_id: "device-1",
+      device_label: "Mac",
+      login_method: null,
+      login_location: "super_settings",
+    }, adminClient),
+  );
+
+  assertEquals(response.status, 200);
+  const updated = updatePayload as Record<string, unknown> | null;
+  assertEquals(updated?.login_method, undefined);
+  assertEquals(updated?.login_location, "super_settings");
+});
+
 Deno.test("super ops dispatcher preserves the unknown-action response", async () => {
   const jsonResponse = (status: number, body: Record<string, unknown>) =>
     new Response(JSON.stringify({ ok: status < 400, ...body }), {

@@ -108,13 +108,11 @@ export const handleSecuritySessionsAction = async (
       : null;
 
     const now = new Date().toISOString();
-    const upsertPayload = {
+    const sessionPayload = {
       profile_id: user.id,
       device_id: deviceId,
       device_label: deviceLabel,
       user_agent: sanitizeText(req.headers.get("user-agent"), 1024) || null,
-      login_method: loginMethod,
-      login_location: loginLocation,
       // The edge proxy forwards geo data in these trusted x-itx headers.
       // Raw Cloudflare headers are not available in the Supabase runtime.
       general_location: resolveTrustedGeneralLocation(req),
@@ -122,6 +120,16 @@ export const handleSecuritySessionsAction = async (
       auth_token_issued_at: authIssuedAt,
       last_seen_at: now,
       revoked_at: null,
+    };
+    const createPayload = {
+      ...sessionPayload,
+      login_method: loginMethod,
+      login_location: loginLocation,
+    };
+    const updatePayload = {
+      ...sessionPayload,
+      ...(loginMethod ? { login_method: loginMethod } : {}),
+      ...(loginLocation ? { login_location: loginLocation } : {}),
     };
 
     const existing = await adminClient
@@ -147,7 +155,7 @@ export const handleSecuritySessionsAction = async (
     if (existing.data?.id) {
       const { error } = await adminClient
         .from("super_admin_sessions")
-        .update(upsertPayload)
+        .update(updatePayload)
         .eq("id", existing.data.id);
       if (error) {
         return jsonResponse(400, { error: "Unable to update session." });
@@ -155,7 +163,7 @@ export const handleSecuritySessionsAction = async (
     } else {
       const { error } = await adminClient
         .from("super_admin_sessions")
-        .insert({ ...upsertPayload, created_at: now });
+        .insert({ ...createPayload, created_at: now });
       if (error && isMissingRelation(error, "super_admin_sessions")) {
         return jsonResponse(400, {
           error: "Session controls unavailable. Run latest SQL setup.",

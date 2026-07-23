@@ -19,8 +19,8 @@
     </div>
 
     <section class="support-section">
-      <form class="form support-form" @submit.prevent="handleSend">
-        <label class="field">
+      <form class="form support-form" novalidate @submit.prevent="handleSend">
+        <label class="field" :class="{ 'field-invalid': fieldErrors.fullName }">
           Name
           <input
             v-model.trim="fullName"
@@ -28,17 +28,23 @@
             required
             maxlength="120"
             placeholder="Your full name"
+            :aria-invalid="fieldErrors.fullName ? 'true' : undefined"
+            @input="clearFieldError('fullName')"
           />
+          <span v-if="fieldErrors.fullName" class="field-error">{{ fieldErrors.fullName }}</span>
         </label>
 
-        <label class="field">
+        <label class="field" :class="{ 'field-invalid': fieldErrors.replyEmail }">
           Reply email address
           <input
             v-model.trim="replyEmail"
             type="email"
             required
             placeholder="email@email.org"
+            :aria-invalid="fieldErrors.replyEmail ? 'true' : undefined"
+            @input="clearFieldError('replyEmail')"
           />
+          <span v-if="fieldErrors.replyEmail" class="field-error">{{ fieldErrors.replyEmail }}</span>
         </label>
 
         <label class="field">
@@ -54,7 +60,7 @@
           </select>
         </label>
 
-        <label class="field">
+        <label class="field" :class="{ 'field-invalid': fieldErrors.subject }">
           Subject
           <input
             v-model.trim="subject"
@@ -62,17 +68,23 @@
             required
             maxlength="160"
             placeholder="What do you need help with?"
+            :aria-invalid="fieldErrors.subject ? 'true' : undefined"
+            @input="clearFieldError('subject')"
           />
+          <span v-if="fieldErrors.subject" class="field-error">{{ fieldErrors.subject }}</span>
         </label>
 
-        <label class="field field-full">
+        <label class="field field-full" :class="{ 'field-invalid': fieldErrors.message }">
           Message
           <textarea
             v-model.trim="message"
             rows="6"
             maxlength="3000"
             placeholder="Describe the issue or question in as much detail as you need."
+            :aria-invalid="fieldErrors.message ? 'true' : undefined"
+            @input="clearFieldError('message')"
           ></textarea>
+          <span v-if="fieldErrors.message" class="field-error">{{ fieldErrors.message }}</span>
         </label>
 
         <label class="field field-full">
@@ -99,6 +111,7 @@
           
           <div :ref="setTurnstileContainerRef"></div>
           <p class="muted security-note">Complete the security check and ensure all fields are filled out before sending. If you do not see the security check please reload the page and try again.</p>
+          <span v-if="fieldErrors.turnstile" class="field-error">{{ fieldErrors.turnstile }}</span>
         </label>
 
         <input
@@ -111,7 +124,7 @@
         />
 
         <div class="form-actions field-full">
-          <button type="submit" class="button-primary" :disabled="isSending || !canSubmit">
+          <button type="submit" class="button-primary" :disabled="isSending">
             {{ isSending ? "Sending..." : "Submit Support Request" }}
           </button>
         </div>
@@ -127,7 +140,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from "vue";
+import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import { RouterLink, useRoute, useRouter } from "vue-router";
 import PublicFooter from "../components/PublicFooter.vue";
 import { useTurnstile } from "../composables/useTurnstile";
@@ -186,10 +199,32 @@ const setTurnstileContainerRef = (
   turnstileContainerRef.value = null;
 };
 
-const canSubmit = computed(() => {
-  if (!fullName.value || !replyEmail.value || !subject.value || !message.value) return false;
-  if (turnstileSiteKey && !turnstileToken.value) return false;
-  return true;
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const fieldErrors = ref<Record<string, string>>({});
+
+const clearFieldError = (field: string) => {
+  if (fieldErrors.value[field]) {
+    const next = { ...fieldErrors.value };
+    delete next[field];
+    fieldErrors.value = next;
+  }
+};
+
+const validate = () => {
+  const errors: Record<string, string> = {};
+  if (!fullName.value) errors.fullName = "Please enter your name.";
+  if (!replyEmail.value) errors.replyEmail = "Please enter your reply email address.";
+  else if (!EMAIL_PATTERN.test(replyEmail.value)) errors.replyEmail = "Please enter a valid email address.";
+  if (!subject.value) errors.subject = "Please enter a subject.";
+  if (!message.value) errors.message = "Please enter a message.";
+  if (turnstileSiteKey && !turnstileToken.value) errors.turnstile = "Please complete the security check.";
+  fieldErrors.value = errors;
+  return Object.keys(errors).length === 0;
+};
+
+// Clear the security-check error as soon as a Turnstile token arrives.
+watch(turnstileToken, (value) => {
+  if (value) clearFieldError("turnstile");
 });
 
 const formatAttachmentSize = (bytes: number) => {
@@ -259,7 +294,7 @@ const handleSend = () => {
 
 const send = async () => {
   error.value = "";
-  if (!canSubmit.value || (turnstileSiteKey && !turnstileToken.value)) {
+  if (!validate()) {
     error.value = "Complete required fields and security check.";
     return;
   }
@@ -502,5 +537,23 @@ onUnmounted(() => {
   box-shadow: none;
   cursor: not-allowed;
   opacity: 0.8;
+}
+
+.field-invalid :is(input, select, textarea) {
+  border-color: var(--danger);
+}
+
+.field-error {
+  display: block;
+  margin-top: 0.3rem;
+  color: var(--danger);
+  font-size: 0.84rem;
+  font-weight: 500;
+}
+
+.error {
+  margin: 0.6rem 0 0;
+  color: var(--danger);
+  font-weight: 500;
 }
 </style>

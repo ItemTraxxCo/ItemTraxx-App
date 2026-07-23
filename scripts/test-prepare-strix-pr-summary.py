@@ -58,10 +58,11 @@ def main() -> None:
             check=True,
         )
         comment = output.read_text(encoding="utf-8")
-        assert injected_text not in comment
-        assert "`warning`" in comment
-        assert "`test-rule`" in comment
-        assert "`src/example.ts:42`" in comment
+        if injected_text in comment:
+            raise RuntimeError("SARIF injection leaked into PR comment output")
+        for expected in ("`warning`", "`test-rule`", "`src/example.ts:42`"):
+            if expected not in comment:
+                raise RuntimeError(f"expected {expected!r} in PR comment output")
 
 
 if __name__ == "__main__":

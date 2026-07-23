@@ -801,6 +801,30 @@ test.describe("Public surfaces", () => {
     await expect(page.getByRole("heading", { name: /currently unavailable/i })).toBeVisible();
   });
 
+  test("explicit non-production hosts bypass unavailable-state presentation", async ({ page }) => {
+    await page.goto("/");
+    const bypasses = await page.evaluate(async () => {
+      const { isUnavailableBypassHost } = await import("/src/utils/unavailableBypass.ts");
+      return {
+        dennis: isUnavailableBypassHost("dennis.dev.itemtraxx.com"),
+        leo: isUnavailableBypassHost("leo.dev.itemtraxx.com"),
+        dev: isUnavailableBypassHost("dev.itemtraxx.com"),
+        preview: isUnavailableBypassHost("preview.itemtraxx.com"),
+        staging: isUnavailableBypassHost("staging.itemtraxx.com"),
+        production: isUnavailableBypassHost("itemtraxx.com"),
+      };
+    });
+
+    expect(bypasses).toEqual({
+      dennis: true,
+      leo: true,
+      dev: true,
+      preview: true,
+      staging: true,
+      production: false,
+    });
+  });
+
   test("the forced version overlay preserves update copy and precedence", async ({ page }) => {
     await page.goto("/login?force-update-overlay=1");
     const overlay = page.getByRole("alertdialog").filter({ hasText: "Update Available" });

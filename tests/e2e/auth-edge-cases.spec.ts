@@ -505,6 +505,31 @@ test.describe("Auth edge cases", () => {
     ).toEqual({ token: "challenge-e2e", email: "super@example.com" });
   });
 
+  test("super-admin resend resumes through the HTTP session when a new tab has no challenge token", async ({ page }) => {
+    let resendPayload: unknown = null;
+    await page.route(/\/functions(?:\/v1)?\/super-auth-verify(?:\?.*)?$/, async (route) => {
+      resendPayload = route.request().postDataJSON();
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ challenge_started: true, email: "super@example.com" }),
+      });
+    });
+
+    await page.goto("/super-auth");
+    const result = await page.evaluate(async () => {
+      const auth = await import("/src/services/authService.ts");
+      auth.clearPendingSuperAdminVerificationEmail();
+      return auth.resendSuperAdminEmailChallenge();
+    });
+
+    expect(resendPayload).toEqual({
+      action: "resend_email_challenge",
+      payload: {},
+    });
+    expect(result).toEqual({ email: "super@example.com" });
+  });
+
   test("tenant-admin session login marks a fresh 15-minute verification", async ({ page }) => {
     await page.route(/\/functions(?:\/v1)?\/privileged-step-up(?:\?.*)?$/, async (route) => {
       await route.fulfill({

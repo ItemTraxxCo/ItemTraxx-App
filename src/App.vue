@@ -110,6 +110,7 @@ import AuthenticatedNavigation from "./components/app/AuthenticatedNavigation.vu
 import CookieConsentBanner from "./components/CookieConsentBanner.vue";
 import { useAdminSessionLifecycle } from "./composables/useAdminSessionLifecycle";
 import { useAppVersionStatus } from "./composables/useAppVersionStatus";
+import { isUnavailableBypassHost } from "./utils/unavailableBypass";
 import { useCookieConsentTelemetry } from "./composables/useCookieConsentTelemetry";
 import { useOfflineQueueCount } from "./composables/useOfflineQueueCount";
 import { useOnboarding } from "./composables/useOnboarding";
@@ -200,24 +201,18 @@ const isTenantScopedRoute = computed(() => auth.isAuthenticated && !!auth.tenant
 const isTenantAdminArea = computed(() => route.path !== "/tenant/admin-login" && route.path.startsWith("/tenant/admin"));
 const shouldTrackTenantAdminSession = computed(() => auth.isAuthenticated && auth.role === "tenant_admin" && isTenantAdminArea.value);
 const showNotificationBell = computed(() => auth.isAuthenticated && auth.role === "tenant_admin" && route.path !== "/tenant/admin-login" && (route.path.startsWith("/tenant/admin") || route.path.startsWith("/district")));
-const isLocalDevMaintenanceBypass = computed(() => {
-  if (!import.meta.env.DEV || (import.meta.env.VITE_DEV_MAINTENANCE_BYPASS ?? "true") !== "true") return false;
-  const host = window.location.hostname.toLowerCase();
-  if (["localhost", "127.0.0.1", "0.0.0.0"].includes(host) || host.startsWith("192.168.") || host.startsWith("10.")) return true;
-  const secondOctet = Number(host.match(/^172\.(\d{1,3})\./)?.[1]);
-  return Number.isFinite(secondOctet) && secondOctet >= 16 && secondOctet <= 31;
-});
+const isUnavailableBypass = computed(() => isUnavailableBypassHost(window.location.hostname));
 
 const showBroadcast = computed(() => !!activeBroadcast.value && dismissedBroadcastId.value !== activeBroadcast.value.id);
 const showIncidentBanner = computed(() => auth.isAuthenticated && !!incidentBanner.value && dismissedIncidentId.value !== incidentBanner.value.id);
-const showMaintenanceBanner = computed(() => maintenanceEnabled.value && !isLocalDevMaintenanceBypass.value && !isUnavailableRoute.value);
+const showMaintenanceBanner = computed(() => maintenanceEnabled.value && !isUnavailableBypass.value && !isUnavailableRoute.value);
 const showMaintenanceOverlay = computed(() => {
-  if (isLocalDevMaintenanceBypass.value || !maintenanceEnabled.value) return false;
+  if (isUnavailableBypass.value || !maintenanceEnabled.value) return false;
   const name = String(route.name || "");
   if (["public-unavailable", "not-found", "super-auth", "internal-auth"].includes(name) || name.startsWith("internal-")) return false;
   return !name.startsWith("super-admin-");
 });
-const showKillSwitchOverlay = computed(() => !isLocalDevMaintenanceBypass.value && !isKillSwitchAllowedRoute.value && killSwitchEnabled.value);
+const showKillSwitchOverlay = computed(() => !isUnavailableBypass.value && !isKillSwitchAllowedRoute.value && killSwitchEnabled.value);
 const hasTopBanners = computed(() => showMaintenanceBanner.value || showBroadcast.value || showIncidentBanner.value);
 const incidentBannerTitle = computed(() => incidentBanner.value?.level === "down" ? "System Outage" : "System Degraded");
 const incidentSlaLine = computed(() => {
@@ -356,10 +351,10 @@ watch(() => routeLoading.isLoading, (loading) => {
   pageLoadingTimer = window.setTimeout(() => { showPageLoading.value = true; pageLoadingTimer = null; }, 350);
 });
 watch(() => [killSwitchEnabled.value, route.path] as const, ([enabled, path]) => {
-  if (enabled && !isLocalDevMaintenanceBypass.value && path !== "/unavailable") void router.replace("/unavailable");
+  if (enabled && !isUnavailableBypass.value && path !== "/unavailable") void router.replace("/unavailable");
 });
 watch(() => [backendUnavailable.value, route.path] as const, ([unavailable, path]) => {
-  if (unavailable && !isLocalDevMaintenanceBypass.value && path !== "/unavailable") void router.replace("/unavailable");
+  if (unavailable && !isUnavailableBypass.value && path !== "/unavailable") void router.replace("/unavailable");
 });
 watch(() => [route.name, auth.isInitialized, auth.isAuthenticated, auth.role, auth.districtContextId, auth.adminVerifiedAt, auth.hasSecondaryAuth, auth.superVerifiedAt, district.isDistrictHost, district.districtId] as const, () => void maybeRedirectAuthenticatedPublicHome());
 onMounted(() => {

@@ -6,8 +6,8 @@ permissions:
 on:
   pull_request:
     branches:
-      - main
       - preview
+      - main
   workflow_dispatch:
 
 concurrency:
@@ -16,6 +16,7 @@ concurrency:
 
 jobs:
   kill-switch-preflight:
+    # Scan the two promotion PRs: staging -> preview and preview -> main.
     if: ${{ github.event_name == 'workflow_dispatch' || (github.event.pull_request.base.ref == 'preview' && github.event.pull_request.head.ref == 'staging') || (github.event.pull_request.base.ref == 'main' && github.event.pull_request.head.ref == 'preview') }}
     uses: ./.github/workflows/kill-switch-preflight.yml
 

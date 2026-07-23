@@ -24,6 +24,7 @@ import { initializeDistrictContext } from "./services/districtService";
 import { rotateDeviceSession } from "./utils/deviceSession";
 import { routeRecoveryLinksToResetPassword } from "./utils/passwordResetRedirect";
 import { finishRouteLoading, startRouteLoading } from "./store/routeLoading";
+import { installAppErrorRecovery } from "./services/appErrorRecovery";
 import {
   isAdminBootstrapRoute,
   isPublicBootstrapRoute,
@@ -112,6 +113,7 @@ const initializePublicAuth = async () => {
 };
 
 const clientMonitoring = createClientMonitoring(router);
+installAppErrorRecovery(router);
 
 const mountApp = async () => {
   markRouteNavigationStart();

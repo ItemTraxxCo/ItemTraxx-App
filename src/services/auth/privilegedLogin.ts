@@ -49,14 +49,16 @@ const SUPER_ADMIN_2FA_FUNCTION = normalizeFunctionTarget(
 
 export const resendSuperAdminEmailChallenge = async () => {
   const challengeToken = getPendingSuperAdminChallengeToken();
-  if (!challengeToken) {
-    throw new Error("Verification session expired. Sign in again.");
-  }
   const result = await invokeEdgeFunction<{ challenge_started?: boolean; email?: string | null }>(
     SUPER_ADMIN_2FA_FUNCTION,
     {
       method: "POST",
-      body: { action: "resend_email_challenge", payload: { challenge_token: challengeToken } },
+      // A fresh tab does not retain the in-memory challenge token, but the
+      // edge proxy can authenticate the existing HttpOnly session cookie.
+      body: {
+        action: "resend_email_challenge",
+        payload: challengeToken ? { challenge_token: challengeToken } : {},
+      },
     }
   );
 
@@ -71,9 +73,6 @@ export const resendSuperAdminEmailChallenge = async () => {
 
 export const verifySuperAdminEmailChallenge = async (code: string) => {
   const challengeToken = getPendingSuperAdminChallengeToken();
-  if (!challengeToken) {
-    throw new Error("Verification session expired. Sign in again.");
-  }
 
   const result = await invokeEdgeFunction<{
     verified?: boolean;
@@ -83,23 +82,26 @@ export const verifySuperAdminEmailChallenge = async (code: string) => {
     method: "POST",
     body: {
       action: "verify_email_challenge",
-      payload: { code, challenge_token: challengeToken },
+      payload: { code, ...(challengeToken ? { challenge_token: challengeToken } : {}) },
     },
   });
 
   if (
     !result.ok ||
-    !result.data?.verified ||
-    !result.data.access_token ||
-    !result.data.refresh_token
+    !result.data?.verified
   ) {
     throw edgeFunctionError(result, "Unable to verify code. u prob put it in wrong u might wanna check it");
   }
 
-  await exchangeHttpSession({
-    access_token: result.data.access_token,
-    refresh_token: result.data.refresh_token,
-  });
+  // A new tab resumes from the HttpOnly session cookie, so it has no temporary
+  // challenge-session tokens to exchange. The original password-login path
+  // still exchanges those tokens as before.
+  if (result.data.access_token && result.data.refresh_token) {
+    await exchangeHttpSession({
+      access_token: result.data.access_token,
+      refresh_token: result.data.refresh_token,
+    });
+  }
   setSecondaryAuth(true);
   await refreshAuthFromSession();
   const current = getAuthState();
@@ -117,7 +119,7 @@ export const verifySuperAdminEmailChallenge = async (code: string) => {
   } catch {
     // Super-admin session tracking is best-effort and must not block successful login.
   }
-  sendLoginNotification(result.data.access_token, { loginLocation: "super_admin_login" });
+  sendLoginNotification(result.data.access_token ?? null, { loginLocation: "super_admin_login" });
 };
 
 export const adminLoginWithSession = async (

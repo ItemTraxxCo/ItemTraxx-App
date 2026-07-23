@@ -582,7 +582,9 @@ serve(async (req) => {
     }
 
     const authToken = parseAuthToken(req);
-    const challengeToken = body.action === "complete_passkey_login"
+    const challengeToken = body.action === "complete_passkey_login" ||
+      body.action === "resend_email_challenge" ||
+      body.action === "verify_email_challenge"
       ? optionalText((body.payload as { challenge_token?: string } | undefined)?.challenge_token, { maxLen: 8192 })
       : requireText((body.payload as { challenge_token?: string } | undefined)?.challenge_token, { maxLen: 8192 });
 

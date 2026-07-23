@@ -54,7 +54,18 @@ jobs:
           cache: true
 
       - name: Regenerate deno.lock from package.json
-        run: deno install --lockfile-only
+        # --min-dep-age=0 disables Deno's minimum-dependency-age gate, which would
+        # otherwise refuse to lock versions published <24h ago and silently no-op —
+        # exactly the case that matters, since Dependabot bumps to just-published
+        # versions. Safe here: the target versions are already resolved and pinned by
+        # npm in package-lock.json, so syncing deno.lock to match is format parity,
+        # not a new trust decision.
+        run: deno install --lockfile-only --min-dep-age=0
+
+      - name: Verify deno.lock is now in sync
+        # Fail loudly if the lock still does not match package.json (e.g. a resolution
+        # deno could not satisfy), instead of committing an out-of-date lock.
+        run: deno install --lockfile-only --frozen --min-dep-age=0
 
       - name: Commit and push if deno.lock changed
         env:

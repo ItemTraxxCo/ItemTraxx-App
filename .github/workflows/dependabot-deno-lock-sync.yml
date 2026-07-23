@@ -1,0 +1,82 @@
+name: Dependabot Deno Lock Sync
+
+# Dependabot bumps package.json / package-lock.json but never touches deno.lock,
+# so the `deno check --frozen` steps in CI Core fail on every npm dependency PR.
+# This workflow regenerates deno.lock to match the bumped npm specifiers and
+# commits it back to the Dependabot branch.
+#
+# Push uses a fine-grained PAT (Dependabot secret ITX_DEPENDABOT_PAT, Contents:
+# read/write on this repo). A PAT is required because:
+#   - Dependabot `pull_request` runs only see Dependabot secrets, not Actions secrets.
+#   - Pushes made with the default GITHUB_TOKEN cannot re-trigger CI Core, so the
+#     final commit would sit with no passing checks. A PAT push re-triggers CI Core,
+#     which then passes because the lock is in sync.
+#
+# Safe by construction: runs ONLY on Dependabot PRs (version bumps, trusted source),
+# and `deno install --lockfile-only` resolves registry metadata without running any
+# install/postinstall scripts or executing package code.
+
+permissions:
+  contents: read
+
+on:
+  pull_request:
+    branches:
+      - staging
+    paths:
+      - package.json
+      - package-lock.json
+
+concurrency:
+  group: deno-lock-sync-${{ github.head_ref }}
+  cancel-in-progress: true
+
+jobs:
+  sync:
+    # Only Dependabot PRs. The re-triggered run after our own push has a different
+    # actor, so this guard also stops the workflow from looping on itself.
+    if: ${{ github.actor == 'dependabot[bot]' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout PR branch
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ github.head_ref }}
+          token: ${{ secrets.ITX_DEPENDABOT_PAT }}
+          persist-credentials: true
+
+      - name: Setup Deno
+        uses: denoland/setup-deno@22d081ff2d3a40755e97629de92e3bcbfa7cf2ed # v2.0.5
+        with:
+          deno-version: 2.x
+          cache: true
+
+      - name: Regenerate deno.lock from package.json
+        # --min-dep-age=0 disables Deno's minimum-dependency-age gate, which would
+        # otherwise refuse to lock versions published <24h ago and silently no-op —
+        # exactly the case that matters, since Dependabot bumps to just-published
+        # versions. Safe here: the target versions are already resolved and pinned by
+        # npm in package-lock.json, so syncing deno.lock to match is format parity,
+        # not a new trust decision.
+        run: deno install --lockfile-only --min-dep-age=0
+
+      - name: Verify deno.lock is now in sync
+        # Fail loudly if the lock still does not match package.json (e.g. a resolution
+        # deno could not satisfy), instead of committing an out-of-date lock.
+        run: deno install --lockfile-only --frozen --min-dep-age=0
+
+      - name: Commit and push if deno.lock changed
+        env:
+          HEAD_REF: ${{ github.head_ref }}
+        run: |
+          if git diff --quiet -- deno.lock; then
+            echo "deno.lock already in sync — nothing to commit."
+            exit 0
+          fi
+          git config user.name "itemtraxx-deno-lock-sync[bot]"
+          git config user.email "deno-lock-sync@itemtraxx.com"
+          git add deno.lock
+          git commit -m "chore(deps): sync deno.lock with npm bump"
+          git push origin "HEAD:$HEAD_REF"

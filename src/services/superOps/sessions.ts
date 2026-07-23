@@ -4,6 +4,12 @@ import type { SuperAdminSessionItem } from "./types";
 
 export type { SuperAdminSessionItem } from "./types";
 
+export type SuperAdminPasskeyItem = {
+  id: string;
+  created_at: string;
+  last_used_at: string | null;
+};
+
 export const touchSuperAdminSession = async (options: {
   loginMethod?: "password" | "passkey" | null;
   loginLocation?: "super_auth" | "super_settings" | null;
@@ -30,6 +36,14 @@ export const listSuperAdminSessions = async () => {
     },
   });
   return response.sessions ?? [];
+};
+
+export const listSuperAdminPasskeys = async () => {
+  const response = await callSuperOps<{ passkeys: SuperAdminPasskeyItem[] }>({
+    action: "list_passkeys",
+    payload: {},
+  });
+  return response.passkeys ?? [];
 };
 
 export const revokeSuperAdminSession = (sessionId: string) => {

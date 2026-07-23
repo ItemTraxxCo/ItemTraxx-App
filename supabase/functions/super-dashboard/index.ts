@@ -9,6 +9,7 @@ import {
   hasPrivilegedStepUp,
   isMissingPrivilegedStepUpTable,
 } from "../_shared/privilegedStepUp.ts";
+import { isSuperAdminTokenBlockedBySessionRevocation } from "../_shared/superAdminSessions.ts";
 import { isAllowedOrigin, parseAllowedOrigins } from "../_shared/cors.ts";
 import { requireTrustedEdgeIngress } from "../_shared/trustedIngress.ts";
 
@@ -124,6 +125,16 @@ serve(async (req) => {
     const adminClient = createClient(supabaseUrl, serviceKey, {
       auth: { persistSession: false },
     });
+
+    const revocation = await isSuperAdminTokenBlockedBySessionRevocation(
+      adminClient, { profileId: user.id, authToken },
+    );
+    if (revocation.relationMissing) {
+      return jsonResponse(503, { error: "Session controls unavailable. Run latest SQL setup." });
+    }
+    if (revocation.blocked) {
+      return jsonResponse(401, { error: "Session revoked." });
+    }
 
     try {
       const hasStepUp = await hasPrivilegedStepUp(adminClient, {

@@ -4388,6 +4388,24 @@
           "properties": {
             "action": {
               "type": "string",
+              "const": "list_passkeys"
+            },
+            "payload": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "action"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "action": {
+              "type": "string",
               "const": "revoke_session"
             },
             "payload": {
@@ -5426,6 +5444,57 @@
               },
               "required": [
                 "sessions"
+              ],
+              "additionalProperties": false
+            },
+            "ok": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "ok"
+          ],
+          "additionalProperties": false
+        },
+        "list_passkeys": {
+          "type": "object",
+          "properties": {
+            "data": {
+              "type": "object",
+              "properties": {
+                "passkeys": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string"
+                      },
+                      "created_at": {
+                        "type": "string"
+                      },
+                      "last_used_at": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "created_at",
+                      "last_used_at"
+                    ],
+                    "additionalProperties": false
+                  }
+                }
+              },
+              "required": [
+                "passkeys"
               ],
               "additionalProperties": false
             },
@@ -8105,6 +8174,7 @@
         "verify_password",
         "touch_session",
         "list_sessions",
+        "list_passkeys",
         "revoke_session",
         "revoke_all_sessions",
         "get_control_center",

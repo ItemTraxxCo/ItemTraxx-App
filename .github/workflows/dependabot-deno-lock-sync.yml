@@ -1,49 +1,61 @@
-name: Dependabot Deno Lock Sync
+name: Deno Lock Sync
 
-# Dependabot bumps package.json / package-lock.json but never touches deno.lock,
-# so the `deno check --frozen` steps in CI Core fail on every npm dependency PR.
-# This workflow regenerates deno.lock to match the bumped npm specifiers and
-# commits it back to the Dependabot branch.
+# Any npm dependency bump (Dependabot or manual) touches package.json /
+# package-lock.json but never deno.lock, so the `deno check --frozen` steps
+# in CI Core fail. This workflow regenerates deno.lock to match and commits
+# it back — on Dependabot PRs, human PRs, and direct pushes to any branch.
 #
-# Push uses a fine-grained PAT (Dependabot secret ITX_DEPENDABOT_PAT, Contents:
+# Push uses a fine-grained PAT (secret ITX_DEPENDABOT_PAT, Contents:
 # read/write on this repo). A PAT is required because:
 #   - Dependabot `pull_request` runs only see Dependabot secrets, not Actions secrets.
 #   - Pushes made with the default GITHUB_TOKEN cannot re-trigger CI Core, so the
 #     final commit would sit with no passing checks. A PAT push re-triggers CI Core,
 #     which then passes because the lock is in sync.
 #
-# Safe by construction: runs ONLY on Dependabot PRs (version bumps, trusted source),
-# and `deno install --lockfile-only` resolves registry metadata without running any
-# install/postinstall scripts or executing package code.
+# Loop-safe: the bot's own commit only touches deno.lock, never package.json/
+# package-lock.json, so it never re-triggers this workflow's path filter.
+#
+# Safe by construction: `deno install --lockfile-only` resolves registry
+# metadata without running any install/postinstall scripts or executing
+# package code.
+#
+# Fork PRs are excluded (job `if` below): this checks out the PR head with a
+# write-scoped PAT and pushes back to it. For a same-repo branch that's fine
+# (only org members can push branches here). For a fork PR, the head repo is
+# attacker-controlled — checking it out and pushing with our PAT would hand
+# a write-capable credential's actions to that content. Fork PRs still get
+# CI Core's frozen-lockfile failure as a signal; a maintainer can push the
+# branch or re-run manually to sync it.
 
 permissions:
   contents: read
 
 on:
   pull_request:
-    branches:
-      - staging
+    paths:
+      - package.json
+      - package-lock.json
+  push:
     paths:
       - package.json
       - package-lock.json
 
 concurrency:
-  group: deno-lock-sync-${{ github.head_ref }}
+  group: deno-lock-sync-${{ github.head_ref || github.ref_name }}
   cancel-in-progress: true
 
 jobs:
   sync:
-    # Only Dependabot PRs. The re-triggered run after our own push has a different
-    # actor, so this guard also stops the workflow from looping on itself.
-    if: ${{ github.actor == 'dependabot[bot]' }}
+    # Skip fork PRs — see note above. Same-repo PRs and direct pushes proceed.
+    if: ${{ github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
     steps:
-      - name: Checkout PR branch
+      - name: Checkout branch
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
-          ref: ${{ github.head_ref }}
+          ref: ${{ github.head_ref || github.ref_name }}
           token: ${{ secrets.ITX_DEPENDABOT_PAT }}
           persist-credentials: true
 
@@ -69,7 +81,7 @@ jobs:
 
       - name: Commit and push if deno.lock changed
         env:
-          HEAD_REF: ${{ github.head_ref }}
+          HEAD_REF: ${{ github.head_ref || github.ref_name }}
         run: |
           if git diff --quiet -- deno.lock; then
             echo "deno.lock already in sync — nothing to commit."

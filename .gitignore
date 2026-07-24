@@ -70,3 +70,4 @@ AGENTS.md
 # Claude files
 .claude
 .codex/environments/environment.toml
+.vercel

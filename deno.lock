@@ -1,10 +1,8 @@
 {
   "version": "5",
   "specifiers": {
-    "npm:@cloudflare/vite-plugin@1.46.0": "1.46.0_vite@8.1.5__@types+node@26.1.1_wrangler@4.113.0_@types+node@26.1.1",
     "npm:@cyclonedx/cyclonedx-npm@6.0.0": "6.0.0",
     "npm:@playwright/test@^1.61.1": "1.61.1",
-    "npm:@sentry/vue@^10.67.0": "10.67.0_vue@3.5.40__typescript@6.0.3_typescript@6.0.3",
     "npm:@supabase/supabase-js@^2.110.8": "2.110.8",
     "npm:@types/node@^26.1.1": "26.1.1",
     "npm:@vercel/analytics@^2.0.1": "2.0.1_vue@3.5.40__typescript@6.0.3_vue-router@4.6.4__vue@3.5.40___typescript@6.0.3__typescript@6.0.3_typescript@6.0.3",
@@ -14,14 +12,12 @@
     "npm:jsbarcode@^3.12.3": "3.12.3",
     "npm:jspdf-autotable@^5.0.8": "5.0.8_jspdf@4.2.1",
     "npm:jspdf@^4.2.1": "4.2.1",
-    "npm:posthog-js@^1.407.1": "1.407.2",
     "npm:supabase@2.109.1": "2.109.1",
     "npm:typescript@~6.0.3": "6.0.3",
     "npm:vite@^8.1.5": "8.1.5_@types+node@26.1.1",
     "npm:vue-router@^4.6.4": "4.6.4_vue@3.5.40__typescript@6.0.3_typescript@6.0.3",
     "npm:vue-tsc@^3.3.8": "3.3.8_typescript@6.0.3",
     "npm:vue@^3.5.40": "3.5.40_typescript@6.0.3",
-    "npm:wrangler@4.113.0": "4.113.0",
     "npm:zod@^4.4.3": "4.4.3"
   },
   "npm": {
@@ -2446,10 +2442,10 @@
   "workspace": {
     "packageJson": {
       "dependencies": [
-        "npm:@cloudflare/vite-plugin@1.46.0",
+        "npm:@cloudflare/vite-plugin@^1.47.0",
         "npm:@cyclonedx/cyclonedx-npm@6.0.0",
         "npm:@playwright/test@^1.61.1",
-        "npm:@sentry/vue@^10.67.0",
+        "npm:@sentry/vue@^10.68.0",
         "npm:@supabase/supabase-js@^2.110.8",
         "npm:@types/node@^26.1.1",
         "npm:@vercel/analytics@^2.0.1",
@@ -2459,14 +2455,14 @@
         "npm:jsbarcode@^3.12.3",
         "npm:jspdf-autotable@^5.0.8",
         "npm:jspdf@^4.2.1",
-        "npm:posthog-js@^1.407.1",
+        "npm:posthog-js@^1.407.2",
         "npm:supabase@2.109.1",
         "npm:typescript@~6.0.3",
         "npm:vite@^8.1.5",
         "npm:vue-router@^4.6.4",
         "npm:vue-tsc@^3.3.8",
         "npm:vue@^3.5.40",
-        "npm:wrangler@4.113.0",
+        "npm:wrangler@^4.114.0",
         "npm:zod@^4.4.3"
       ],
       "overrides": {

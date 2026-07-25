@@ -26,6 +26,7 @@ type SessionSummary = {
     auth_email: string | null;
     is_active: boolean | null;
   } | null;
+  password_authenticated_at: string | null;
 };
 
 type SessionExchangePayload = {
@@ -96,20 +97,43 @@ const fetchProfile = async (env: Env, accessToken: string, userId: string) => {
   return rows[0] ?? null;
 };
 
-const readJwtSessionId = (accessToken: string) => {
+type JwtSessionClaims = {
+  session_id?: unknown;
+  amr?: unknown;
+};
+
+const readJwtSessionClaims = (accessToken: string): JwtSessionClaims | null => {
   try {
     const payload = accessToken.split(".")[1];
     if (!payload) return null;
     const normalized = payload.replaceAll("-", "+").replaceAll("_", "/");
-    const claims = JSON.parse(atob(normalized.padEnd(Math.ceil(normalized.length / 4) * 4, "="))) as {
-      session_id?: unknown;
-    };
-    return typeof claims.session_id === "string" && claims.session_id.trim()
-      ? claims.session_id.trim()
-      : null;
+    return JSON.parse(
+      atob(normalized.padEnd(Math.ceil(normalized.length / 4) * 4, "=")),
+    ) as JwtSessionClaims;
   } catch {
     return null;
   }
+};
+
+const readJwtSessionId = (accessToken: string) => {
+  const sessionId = readJwtSessionClaims(accessToken)?.session_id;
+  return typeof sessionId === "string" && sessionId.trim()
+    ? sessionId.trim()
+    : null;
+};
+
+const readPasswordAuthenticatedAt = (accessToken: string) => {
+  const amr = readJwtSessionClaims(accessToken)?.amr;
+  if (!Array.isArray(amr)) return null;
+  const passwordEntry = amr.find((entry) =>
+    !!entry && typeof entry === "object" &&
+    (entry as { method?: unknown }).method === "password"
+  ) as { timestamp?: unknown } | undefined;
+  const timestamp = passwordEntry?.timestamp;
+  if (typeof timestamp !== "number" || !Number.isFinite(timestamp) || timestamp <= 0) {
+    return null;
+  }
+  return new Date(timestamp * 1000).toISOString();
 };
 
 const hasActiveApplicationSession = async (
@@ -161,6 +185,7 @@ const buildSessionSummary = async (
         is_active: profile.is_active ?? null,
       }
       : null,
+    password_authenticated_at: readPasswordAuthenticatedAt(accessToken),
   };
 };
 
@@ -319,6 +344,7 @@ const unauthenticatedSummary = {
   authenticated: false,
   user: null,
   profile: null,
+  password_authenticated_at: null,
 };
 
 const handleSessionMe = async (

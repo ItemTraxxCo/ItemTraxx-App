@@ -180,6 +180,37 @@ test.describe("Protected route smoke tests", () => {
     await expect(page).toHaveURL(/\/admin\/login$/);
   });
 
+  test("Workspace Admin password verification survives a workspace host bootstrap", async ({ page }) => {
+    await page.goto("/");
+    await page.evaluate(async () => {
+      const [{ applyHttpSessionSummary }, { clearAdminVerification }] = await Promise.all([
+        import("/src/services/auth/sessionBootstrap.ts"),
+        import("/src/store/authState.ts"),
+      ]);
+      clearAdminVerification();
+      await applyHttpSessionSummary({
+        authenticated: true,
+        user: {
+          id: "user-e2e-admin",
+          email: "tenant.admin@example.com",
+          last_sign_in_at: new Date().toISOString(),
+        },
+        profile: {
+          role: "workspace_admin",
+          workspace_id: "tenant-e2e",
+          auth_email: "tenant.admin@example.com",
+          is_active: true,
+        },
+        password_authenticated_at: new Date().toISOString(),
+      });
+    });
+
+    await navigateApp(page, "/admin");
+
+    await expect(page).toHaveURL(/\/admin$/);
+    await expect(page.getByRole("heading", { name: "Admin Panel", exact: true })).toBeVisible();
+  });
+
   test("super-admin secondary verification expires after 15 minutes", async ({ page }) => {
     await page.goto("/");
     await setSuperAdminSession(page);

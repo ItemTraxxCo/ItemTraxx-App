@@ -20,6 +20,23 @@ export const isLocalhostOrigin = (origin: string | null) => {
 const shouldTrustLocalOrigins = (env: Env) =>
   (env.TRUST_LOCAL_ORIGINS ?? "").trim().toLowerCase() === "true";
 
+const RESERVED_WORKSPACE_SLUGS = new Set(["app", "internal", "status", "www"]);
+
+const isWorkspaceAppOrigin = (origin: string) => {
+  try {
+    const url = new URL(origin);
+    const match = url.hostname.toLowerCase().match(
+      /^([a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)\.app\.itemtraxx\.com$/,
+    );
+    return url.protocol === "https:" &&
+      url.port === "" &&
+      !!match?.[1] &&
+      !RESERVED_WORKSPACE_SLUGS.has(match[1]);
+  } catch {
+    return false;
+  }
+};
+
 export const isAllowedOrigin = (
   origin: string | null,
   allowedOrigins: string[],
@@ -30,6 +47,10 @@ export const isAllowedOrigin = (
   }
 
   if (shouldTrustLocalOrigins(env) && isLocalhostOrigin(origin)) {
+    return true;
+  }
+
+  if (isWorkspaceAppOrigin(origin)) {
     return true;
   }
 

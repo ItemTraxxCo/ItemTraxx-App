@@ -496,7 +496,7 @@
             "properties": {
               "action": {
                 "type": "string",
-                "const": "bulk_import_gear"
+                "const": "bulk_import_items"
               },
               "payload": {
                 "type": "object",
@@ -1044,7 +1044,7 @@
                       "enable_bulk_item_import": {
                         "type": "boolean"
                       },
-                      "enable_bulk_student_tools": {
+                      "enable_bulk_borrower_tools": {
                         "type": "boolean"
                       },
                       "enable_status_tracking": {
@@ -1057,7 +1057,7 @@
                     "required": [
                       "enable_notifications",
                       "enable_bulk_item_import",
-                      "enable_bulk_student_tools",
+                      "enable_bulk_borrower_tools",
                       "enable_status_tracking",
                       "enable_barcode_generator"
                     ],
@@ -1094,7 +1094,7 @@
                         "id": {
                           "type": "string"
                         },
-                        "gear_id": {
+                        "item_id": {
                           "type": "string"
                         },
                         "status": {
@@ -1123,7 +1123,7 @@
                             }
                           ]
                         },
-                        "gear": {
+                        "item": {
                           "anyOf": [
                             {
                               "type": "object",
@@ -1149,12 +1149,12 @@
                       },
                       "required": [
                         "id",
-                        "gear_id",
+                        "item_id",
                         "status",
                         "note",
                         "changed_at",
                         "changed_by",
-                        "gear"
+                        "item"
                       ],
                       "additionalProperties": false
                     }
@@ -1241,7 +1241,7 @@
                         "id": {
                           "type": "string"
                         },
-                        "gear_id": {
+                        "item_id": {
                           "type": "string"
                         },
                         "status": {
@@ -1270,7 +1270,7 @@
                             }
                           ]
                         },
-                        "gear": {
+                        "item": {
                           "anyOf": [
                             {
                               "type": "object",
@@ -1296,12 +1296,12 @@
                       },
                       "required": [
                         "id",
-                        "gear_id",
+                        "item_id",
                         "status",
                         "note",
                         "changed_at",
                         "changed_by",
-                        "gear"
+                        "item"
                       ],
                       "additionalProperties": false
                     }
@@ -1369,7 +1369,7 @@
             },
             "additionalProperties": false
           },
-          "bulk_import_gear": {
+          "bulk_import_items": {
             "type": "object",
             "properties": {
               "data": {
@@ -1523,7 +1523,7 @@
                       "enable_bulk_item_import": {
                         "type": "boolean"
                       },
-                      "enable_bulk_student_tools": {
+                      "enable_bulk_borrower_tools": {
                         "type": "boolean"
                       },
                       "enable_status_tracking": {
@@ -1536,7 +1536,7 @@
                     "required": [
                       "enable_notifications",
                       "enable_bulk_item_import",
-                      "enable_bulk_student_tools",
+                      "enable_bulk_borrower_tools",
                       "enable_status_tracking",
                       "enable_barcode_generator"
                     ],
@@ -1608,7 +1608,7 @@
                       "enable_bulk_item_import": {
                         "type": "boolean"
                       },
-                      "enable_bulk_student_tools": {
+                      "enable_bulk_borrower_tools": {
                         "type": "boolean"
                       },
                       "enable_status_tracking": {
@@ -1621,7 +1621,7 @@
                     "required": [
                       "enable_notifications",
                       "enable_bulk_item_import",
-                      "enable_bulk_student_tools",
+                      "enable_bulk_borrower_tools",
                       "enable_status_tracking",
                       "enable_barcode_generator"
                     ],
@@ -1846,7 +1846,7 @@
           "get_notifications",
           "get_status_tracking",
           "get_workspace_dashboard",
-          "bulk_import_gear",
+          "bulk_import_items",
           "get_workspace_settings",
           "update_workspace_settings",
           "touch_session",
@@ -2230,7 +2230,7 @@
                         "enable_bulk_item_import": {
                           "type": "boolean"
                         },
-                        "enable_bulk_student_tools": {
+                        "enable_bulk_borrower_tools": {
                           "type": "boolean"
                         },
                         "enable_status_tracking": {
@@ -2373,7 +2373,7 @@
                       "enable_bulk_item_import": {
                         "type": "boolean"
                       },
-                      "enable_bulk_student_tools": {
+                      "enable_bulk_borrower_tools": {
                         "type": "boolean"
                       },
                       "enable_status_tracking": {
@@ -2515,7 +2515,7 @@
                       "enable_bulk_item_import": {
                         "type": "boolean"
                       },
-                      "enable_bulk_student_tools": {
+                      "enable_bulk_borrower_tools": {
                         "type": "boolean"
                       },
                       "enable_status_tracking": {
@@ -2657,7 +2657,7 @@
                       "enable_bulk_item_import": {
                         "type": "boolean"
                       },
-                      "enable_bulk_student_tools": {
+                      "enable_bulk_borrower_tools": {
                         "type": "boolean"
                       },
                       "enable_status_tracking": {
@@ -2829,7 +2829,7 @@
                       "enable_bulk_item_import": {
                         "type": "boolean"
                       },
-                      "enable_bulk_student_tools": {
+                      "enable_bulk_borrower_tools": {
                         "type": "boolean"
                       },
                       "enable_status_tracking": {
@@ -4093,7 +4093,7 @@
                       }
                     ]
                   },
-                  "max_students": {
+                  "max_borrowers": {
                     "anyOf": [
                       {
                         "type": "integer",
@@ -4105,7 +4105,7 @@
                       }
                     ]
                   },
-                  "max_gear": {
+                  "max_items": {
                     "anyOf": [
                       {
                         "type": "integer",
@@ -5285,7 +5285,7 @@
                       }
                     ]
                   },
-                  "max_students": {
+                  "max_borrowers": {
                     "anyOf": [
                       {
                         "type": "integer",
@@ -5297,7 +5297,7 @@
                       }
                     ]
                   },
-                  "max_gear": {
+                  "max_items": {
                     "anyOf": [
                       {
                         "type": "integer",
@@ -7327,7 +7327,7 @@
                         "action_time": {
                           "type": "string"
                         },
-                        "gear_name": {
+                        "item_name": {
                           "anyOf": [
                             {
                               "type": "string"
@@ -7337,7 +7337,7 @@
                             }
                           ]
                         },
-                        "gear_barcode": {
+                        "item_barcode": {
                           "anyOf": [
                             {
                               "type": "string"
@@ -7347,7 +7347,7 @@
                             }
                           ]
                         },
-                        "student_username": {
+                        "borrower_username": {
                           "anyOf": [
                             {
                               "type": "string"
@@ -7357,7 +7357,7 @@
                             }
                           ]
                         },
-                        "student_id": {
+                        "borrower_id": {
                           "anyOf": [
                             {
                               "type": "string"
@@ -7373,10 +7373,10 @@
                         "workspace_name",
                         "action_type",
                         "action_time",
-                        "gear_name",
-                        "gear_barcode",
-                        "student_username",
-                        "student_id"
+                        "item_name",
+                        "item_barcode",
+                        "borrower_username",
+                        "borrower_id"
                       ],
                       "additionalProperties": false
                     }

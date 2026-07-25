@@ -101,7 +101,7 @@
         <tbody>
           <tr v-for="event in filteredHistory" :key="event.id">
             <td>{{ formatDate(event.changed_at) }}</td>
-            <td>{{ event.gear?.name || "-" }} ({{ event.gear?.barcode || "-" }})</td>
+            <td>{{ event.item?.name || "-" }} ({{ event.item?.barcode || "-" }})</td>
             <td>{{ event.status }}</td>
             <td>{{ event.note || "-" }}</td>
           </tr>
@@ -175,7 +175,7 @@ const filteredHistory = computed(() => {
     if (statusFilter.value !== "all" && event.status !== statusFilter.value) return false;
     if (!withinDateRange(event.changed_at)) return false;
     if (!query) return true;
-    const haystack = `${event.gear?.name ?? ""} ${event.gear?.barcode ?? ""} ${event.status} ${event.note ?? ""}`.toLowerCase();
+    const haystack = `${event.item?.name ?? ""} ${event.item?.barcode ?? ""} ${event.status} ${event.note ?? ""}`.toLowerCase();
     return haystack.includes(query);
   });
 });
@@ -235,8 +235,8 @@ const exportHistoryCsv = () => {
     ["changed_at", "item", "barcode", "status", "note"],
     filteredHistory.value.map((event) => ({
       changed_at: formatDate(event.changed_at),
-      item: event.gear?.name || "",
-      barcode: event.gear?.barcode || "",
+      item: event.item?.name || "",
+      barcode: event.item?.barcode || "",
       status: event.status,
       note: event.note || "",
     }))
@@ -250,8 +250,8 @@ const exportHistoryPdf = async () => {
     ["changed_at", "item", "barcode", "status", "note"],
     filteredHistory.value.map((event) => ({
       changed_at: formatDate(event.changed_at),
-      item: event.gear?.name || "",
-      barcode: event.gear?.barcode || "",
+      item: event.item?.name || "",
+      barcode: event.item?.barcode || "",
       status: event.status,
       note: event.note || "",
     }))

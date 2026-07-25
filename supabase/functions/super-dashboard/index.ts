@@ -39,7 +39,7 @@ const resolveCorsHeaders = (req: Request) => {
 type WorkspaceMetricRow = {
   workspace_id: string;
   workspace_name: string;
-  gear_total: number;
+  item_total: number;
   borrowers_total: number;
   active_checkouts: number;
   overdue_items: number;
@@ -240,7 +240,7 @@ serve(async (req) => {
     const workspaceMetricsResult = await adminClient
       .from("super_reporting_workspace_metrics")
       .select(
-        "workspace_id, workspace_name, gear_total, borrowers_total, active_checkouts, overdue_items, transactions_7d, computed_at"
+        "workspace_id, workspace_name, item_total, borrowers_total, active_checkouts, overdue_items, transactions_7d, computed_at"
       )
       .order("workspace_name", { ascending: true });
     if (!workspaceMetricsResult.error) {

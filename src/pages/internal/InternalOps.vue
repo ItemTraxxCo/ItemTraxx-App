@@ -207,7 +207,7 @@
             </tr>
           </thead>
           <tbody>
-            <tr v-for="event in snapshot?.recent_events ?? []" :key="`${event.action_time}-${event.workspace_id}-${event.gear_barcode}`">
+            <tr v-for="event in snapshot?.recent_events ?? []" :key="`${event.action_time}-${event.workspace_id}-${event.item_barcode}`">
               <td>{{ formatDateTime(event.action_time) }}</td>
               <td>{{ event.workspace_name }}</td>
               <td>
@@ -215,9 +215,9 @@
                   {{ event.action_type }}
                 </span>
               </td>
-              <td>{{ event.gear_name ?? "-" }}</td>
-              <td>{{ event.gear_barcode ?? "-" }}</td>
-              <td>{{ event.student_username ?? "-" }}</td>
+              <td>{{ event.item_name ?? "-" }}</td>
+              <td>{{ event.item_barcode ?? "-" }}</td>
+              <td>{{ event.borrower_username ?? "-" }}</td>
             </tr>
           </tbody>
         </table>

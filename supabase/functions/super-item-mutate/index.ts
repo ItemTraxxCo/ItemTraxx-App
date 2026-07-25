@@ -1,6 +1,5 @@
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.108.2";
-import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.108.2";
 import { isKillSwitchWriteBlocked } from "../_shared/killSwitch.ts";
 import {
   hasPrivilegedStepUp,
@@ -11,10 +10,11 @@ import { isAllowedOrigin, parseAllowedOrigins } from "../_shared/cors.ts";
 import { readJsonBody } from "../_shared/requestBody.ts";
 import { requireTrustedEdgeIngress } from "../_shared/trustedIngress.ts";
 import {
+  BARCODE_PATTERN,
   optionalText,
+  requireEnum,
+  requireText,
   requireUuid,
-  STUDENT_ID_PATTERN,
-  USERNAME_PATTERN,
   UUID_PATTERN,
   ValidationError,
 } from "../_shared/validation.ts";
@@ -31,130 +31,15 @@ type RateLimitResult = {
   retry_after_seconds: number | null;
 };
 
-type StudentRow = {
-  id: string;
-  workspace_id: string;
-  username: string;
-  student_id: string;
-  created_at: string;
-};
-
-type SuperStudentDatabase = {
-  public: {
-    Tables: {
-      students: {
-        Row: StudentRow;
-        Insert: {
-          workspace_id: string;
-          username: string;
-          student_id: string;
-        };
-        Update: Partial<Pick<StudentRow, "username" | "student_id">>;
-        Relationships: [];
-      };
-    };
-    Views: Record<string, never>;
-    Functions: Record<string, never>;
-    Enums: Record<string, never>;
-    CompositeTypes: Record<string, never>;
-  };
-};
-
-type SupabaseAdminClient = SupabaseClient<SuperStudentDatabase>;
-
-const CODENAME_PREFIXES = [
-  "Nova",
-  "Echo",
-  "Atlas",
-  "Pixel",
-  "Orbit",
-  "Scout",
-  "Comet",
-  "Lumen",
-  "Aster",
-  "Vivid",
-];
-
-const CODENAME_SUFFIXES = [
-  "Fox",
-  "Pine",
-  "Wave",
-  "Maple",
-  "River",
-  "Spark",
-  "Drift",
-  "Cedar",
-  "Birch",
-  "Stone",
-];
-
-const secureRandomInt = (maxExclusive: number): number => {
-  if (!Number.isInteger(maxExclusive) || maxExclusive <= 0) {
-    throw new Error("maxExclusive must be a positive integer");
-  }
-  const uint32Range = 0x1_0000_0000;
-  const maxAllowed = Math.floor(uint32Range / maxExclusive) * maxExclusive;
-  const buffer = new Uint32Array(1);
-  while (true) {
-    crypto.getRandomValues(buffer);
-    const value = buffer[0];
-    if (value < maxAllowed) {
-      return value % maxExclusive;
-    }
-  }
-};
-
-const randomDigits = (len: number) =>
-  Array.from({ length: len }, () => secureRandomInt(10)).join("");
-
-const randomLetters = (len: number) =>
-  Array.from({ length: len }, () =>
-    String.fromCharCode(65 + secureRandomInt(26))
-  ).join("");
-
-const generateStudentId = () => `${randomDigits(4)}${randomLetters(2)}`;
-
-const normalizeNameToken = (token: string) => token.slice(0, 6);
-
-const generateUsername = () => {
-  const prefix =
-    CODENAME_PREFIXES[secureRandomInt(CODENAME_PREFIXES.length)] ?? "Nova";
-  const suffix =
-    CODENAME_SUFFIXES[secureRandomInt(CODENAME_SUFFIXES.length)] ?? "Fox";
-  // Keep usernames short and readable: NameNameNNN
-  return `${normalizeNameToken(prefix)}${normalizeNameToken(suffix)}${randomDigits(3)}`;
-};
-
-const buildUniqueStudentIdentity = async (
-  adminClient: SupabaseAdminClient,
-  workspaceId: string
-) => {
-  for (let attempt = 0; attempt < 12; attempt += 1) {
-    const studentId = generateStudentId();
-    const username = generateUsername();
-    const { data: existingId } = await adminClient
-      .from("students")
-      .select("id")
-      .eq("workspace_id", workspaceId)
-      .eq("student_id", studentId)
-      .limit(1)
-      .maybeSingle();
-    if (existingId?.id) continue;
-
-    const { data: existingUsername } = await adminClient
-      .from("students")
-      .select("id")
-      .eq("workspace_id", workspaceId)
-      .eq("username", username)
-      .limit(1)
-      .maybeSingle();
-    if (existingUsername?.id) continue;
-
-    return { studentId, username };
-  }
-
-  throw new Error("Unable to generate borrower identity.");
-};
+const ALLOWED_ITEM_STATUSES = new Set([
+  "available",
+  "checked_out",
+  "damaged",
+  "lost",
+  "in_repair",
+  "retired",
+  "in_studio_only",
+] as const);
 
 const resolveCorsHeaders = (req: Request) => {
   const origin = req.headers.get("Origin");
@@ -207,7 +92,7 @@ serve(async (req) => {
 
   const ingressError = await requireTrustedEdgeIngress(
     req,
-    "super-student-mutate",
+    "super-item-mutate",
     jsonResponse,
   );
   if (ingressError) return ingressError;
@@ -255,13 +140,9 @@ serve(async (req) => {
       return jsonResponse(403, { error: "Access denied" });
     }
 
-    const adminClient: SupabaseAdminClient = createClient<SuperStudentDatabase>(
-      supabaseUrl,
-      serviceKey,
-      {
-        auth: { persistSession: false },
-      }
-    );
+    const adminClient = createClient(supabaseUrl, serviceKey, {
+      auth: { persistSession: false },
+    });
 
     const revocation = await isSuperAdminTokenBlockedBySessionRevocation(
       adminClient, { profileId: user.id, authToken },
@@ -301,22 +182,19 @@ serve(async (req) => {
     );
 
     if (rateLimitError) {
-      console.warn("super-student-mutate rate limit unavailable", {
-        message: rateLimitError.message,
-        code: (rateLimitError as { code?: string }).code,
+      return jsonResponse(500, { error: "Rate limit check failed" });
+    }
+
+    const rateLimitResult = Array.isArray(rateLimit)
+      ? ((rateLimit[0] as RateLimitResult | undefined) ?? null)
+      : ((rateLimit as RateLimitResult | null) ?? null);
+    if (!rateLimitResult) {
+      return jsonResponse(500, { error: "Rate limit check failed" });
+    }
+    if (!rateLimitResult.allowed) {
+      return jsonResponse(429, {
+        error: "Rate limit exceeded, please try again in a minute.",
       });
-    } else {
-      const rateLimitResult = Array.isArray(rateLimit)
-        ? ((rateLimit[0] as RateLimitResult | undefined) ?? null)
-        : ((rateLimit as RateLimitResult | null) ?? null);
-      if (!rateLimitResult) {
-        return jsonResponse(500, { error: "Rate limit check failed" });
-      }
-      if (!rateLimitResult.allowed) {
-        return jsonResponse(429, {
-          error: "Rate limit exceeded, please try again in a minute.",
-        });
-      }
     }
 
     const { action, payload } = await readJsonBody(req);
@@ -333,8 +211,8 @@ serve(async (req) => {
       const search = optionalText(payloadRecord.search, { maxLen: 120 });
 
       let query = adminClient
-        .from("students")
-        .select("id, workspace_id, username, student_id, created_at")
+        .from("items")
+        .select("id, workspace_id, name, barcode, serial_number, status, notes")
         .order("created_at", { ascending: false })
         .limit(500);
 
@@ -343,98 +221,104 @@ serve(async (req) => {
       }
       const { data, error } = await query;
       if (error) {
-        return jsonResponse(400, { error: "Unable to load students." });
+        return jsonResponse(400, { error: "Unable to load items." });
       }
       const rows = (data ?? []) as Array<{
         id: string;
         workspace_id: string;
-        username: string;
-        student_id: string;
-        created_at: string;
+        name: string;
+        barcode: string;
+        serial_number: string | null;
+        status: string;
+        notes: string | null;
       }>;
       if (!search) {
         return jsonResponse(200, { data: rows });
       }
       const normalized = search.toLowerCase();
       return jsonResponse(200, {
-        data: rows.filter(
-          (row) =>
-            row.username.toLowerCase().includes(normalized) ||
-            row.student_id.toLowerCase().includes(normalized)
-        ),
+        data: rows.filter((row) => {
+          const serial = row.serial_number?.toLowerCase() ?? "";
+          return (
+            row.name.toLowerCase().includes(normalized) ||
+            row.barcode.toLowerCase().includes(normalized) ||
+            serial.includes(normalized)
+          );
+        }),
       });
     }
 
     if (action === "create") {
       const workspaceId = requireUuid(payloadRecord.workspace_id);
-      const providedStudentId = optionalText(payloadRecord.student_id, {
-        maxLen: 6,
-        transform: "uppercase",
-      });
-      const providedUsername = optionalText(payloadRecord.username, { maxLen: 40 });
-
-      const hasValidProvidedId = STUDENT_ID_PATTERN.test(providedStudentId);
-      const hasValidProvidedUsername =
-        providedUsername.length >= 4 && USERNAME_PATTERN.test(providedUsername);
-      let studentId = hasValidProvidedId ? providedStudentId : "";
-      let username = hasValidProvidedUsername ? providedUsername : "";
-
-      if (studentId && username) {
-        const [idConflictResult, usernameConflictResult] = await Promise.all([
-          adminClient
-            .from("students")
-            .select("id")
-            .eq("workspace_id", workspaceId)
-            .eq("student_id", studentId)
-            .limit(1)
-            .maybeSingle(),
-          adminClient
-            .from("students")
-            .select("id")
-            .eq("workspace_id", workspaceId)
-            .eq("username", username)
-            .limit(1)
-            .maybeSingle(),
-        ]);
-        if (idConflictResult.data?.id || usernameConflictResult.data?.id) {
-          studentId = "";
-          username = "";
-        }
-      }
-
-      if (!studentId || !username) {
-        const generated = await buildUniqueStudentIdentity(adminClient, workspaceId);
-        studentId = generated.studentId;
-        username = generated.username;
-      }
+      const name = requireText(payloadRecord.name, { maxLen: 120 });
+      const barcode = requireText(payloadRecord.barcode, { maxLen: 64, pattern: BARCODE_PATTERN });
+      const serial = optionalText(payloadRecord.serial_number, { maxLen: 64 });
+      const status = requireEnum(payloadRecord.status, ALLOWED_ITEM_STATUSES);
+      const notes = optionalText(payloadRecord.notes, { maxLen: 500 });
 
       const { data, error } = await adminClient
-        .from("students")
+        .from("items")
         .insert({
           workspace_id: workspaceId,
-          username,
-          student_id: studentId,
+          name,
+          barcode,
+          serial_number: serial || null,
+          status,
+          notes: notes || null,
         })
-        .select("id, workspace_id, username, student_id, created_at")
+        .select("id, workspace_id, name, barcode, serial_number, status, notes")
         .single();
 
       if (error || !data) {
-        return jsonResponse(400, { error: "Unable to create student." });
+        return jsonResponse(400, { error: "Unable to create item." });
       }
       return jsonResponse(200, { data });
     }
 
     if (action === "update") {
       const id = requireUuid(payloadRecord.id);
+      const name = requireText(payloadRecord.name, { maxLen: 120 });
+      const barcode = requireText(payloadRecord.barcode, { maxLen: 64, pattern: BARCODE_PATTERN });
+      const status = requireEnum(payloadRecord.status, ALLOWED_ITEM_STATUSES);
+      const notes = optionalText(payloadRecord.notes, { maxLen: 500 });
+
+      const needsStepUp = ["lost", "retired"].includes(status);
+      if (needsStepUp) {
+        const password =
+          typeof payloadRecord.super_password === "string" && payloadRecord.super_password.length <= 1024
+            ? payloadRecord.super_password
+            : "";
+        const phrase = optionalText(payloadRecord.confirm_phrase, { maxLen: 32 });
+        if (!password || phrase.trim() !== "CONFIRM") {
+          return jsonResponse(400, {
+            error: "Super password and confirmation are required for this status change.",
+          });
+        }
+        const verified = await verifySuperPassword(
+          supabaseUrl,
+          publishableKey,
+          profile.auth_email ?? user.email ?? "",
+          password
+        );
+        if (!verified) {
+          return jsonResponse(403, { error: "Super password verification failed." });
+        }
+      }
 
       const { data, error } = await adminClient
-        .from("students")
-        .select("id, workspace_id, username, student_id, created_at")
+        .from("items")
+        .update({
+          name,
+          barcode,
+          status,
+          notes: notes || null,
+        })
         .eq("id", id)
+        .select("id, workspace_id, name, barcode, serial_number, status, notes")
         .single();
 
       if (error || !data) {
-        return jsonResponse(400, { error: "Unable to update student." });
+        return jsonResponse(400, { error: "Unable to update item." });
       }
       return jsonResponse(200, { data });
     }
@@ -449,7 +333,7 @@ serve(async (req) => {
 
       if (!password || phrase !== "CONFIRM") {
         return jsonResponse(400, {
-          error: "Super password and confirmation are required to delete student.",
+          error: "Super password and confirmation are required to delete item.",
         });
       }
 
@@ -463,9 +347,9 @@ serve(async (req) => {
         return jsonResponse(403, { error: "Super password verification failed." });
       }
 
-      const { error } = await adminClient.from("students").delete().eq("id", id);
+      const { error } = await adminClient.from("items").delete().eq("id", id);
       if (error) {
-        return jsonResponse(400, { error: "Unable to delete student." });
+        return jsonResponse(400, { error: "Unable to delete item." });
       }
       return jsonResponse(200, { data: { success: true } });
     }
@@ -475,7 +359,7 @@ serve(async (req) => {
     if (error instanceof ValidationError) {
       return jsonResponse(error.status, { error: error.message });
     }
-    console.error("super-student-mutate function error", {
+    console.error("super-item-mutate function error", {
       message: error instanceof Error ? error.message : "Unknown error",
       stack: error instanceof Error ? error.stack : undefined,
     });

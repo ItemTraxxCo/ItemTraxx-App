@@ -147,8 +147,8 @@ export const handleControlCenterAction = async (
     const row = {
       workspace_id: workspaceId,
       max_admins: optionalPositiveInteger(next.max_admins, 1000),
-      max_students: optionalPositiveInteger(next.max_students, 100_000),
-      max_gear: optionalPositiveInteger(next.max_gear, 100_000),
+      max_borrowers: optionalPositiveInteger(next.max_borrowers, 100_000),
+      max_items: optionalPositiveInteger(next.max_items, 100_000),
       checkout_due_hours: optionalInteger(
         next.checkout_due_hours,
         1,
@@ -166,7 +166,7 @@ export const handleControlCenterAction = async (
       .from("workspace_policies")
       .upsert(row, { onConflict: "workspace_id" })
       .select(
-        "workspace_id, max_admins, max_students, max_gear, checkout_due_hours, barcode_pattern, feature_flags",
+        "workspace_id, max_admins, max_borrowers, max_items, checkout_due_hours, barcode_pattern, feature_flags",
       )
       .single();
 
@@ -184,8 +184,8 @@ export const handleControlCenterAction = async (
             {
               workspace_id: workspaceId,
               max_admins: row.max_admins,
-              max_students: row.max_students,
-              max_gear: row.max_gear,
+              max_borrowers: row.max_borrowers,
+              max_items: row.max_items,
               checkout_due_hours: row.checkout_due_hours,
               barcode_pattern: row.barcode_pattern,
               updated_by: row.updated_by,
@@ -194,7 +194,7 @@ export const handleControlCenterAction = async (
             { onConflict: "workspace_id" },
           )
           .select(
-            "workspace_id, max_admins, max_students, max_gear, checkout_due_hours, barcode_pattern",
+            "workspace_id, max_admins, max_borrowers, max_items, checkout_due_hours, barcode_pattern",
           )
           .single();
         if (fallbackError || !fallbackData) {

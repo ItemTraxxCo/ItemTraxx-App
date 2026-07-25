@@ -21,7 +21,7 @@ export type SuperDashboard = {
   workspace_metrics: Array<{
     workspace_id: string;
     workspace_name: string;
-    gear_total: number;
+    item_total: number;
     borrowers_total: number;
     active_checkouts: number;
     overdue_items: number;

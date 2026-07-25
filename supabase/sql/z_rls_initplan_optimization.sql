@@ -12,74 +12,74 @@
 -- files and wins. If your runner does NOT apply in filename order, apply this
 -- file last manually.
 --
--- Scope: gear, students, gear_logs, profiles, admin_audit_logs (the 5 hottest
+-- Scope: item, borrowers, item_logs, profiles, admin_audit_logs (the 5 hottest
 -- of the 38 flagged policies). Lower-traffic tables remain for a follow-up.
 
--- ============================ gear ============================
-drop policy if exists gear_read_tenant on public.gear;
-create policy gear_read_tenant on public.gear for select to public
+-- ============================ item ============================
+drop policy if exists item_read_tenant on public.items;
+create policy item_read_tenant on public.items for select to public
   using (tenant_id = (select current_tenant_id()));
 
--- All supported gear writes go through step-up-gated Edge Functions. Remove
+-- All supported item writes go through step-up-gated Edge Functions. Remove
 -- legacy direct-PostgREST policies so they cannot OR-bypass the canonical
 -- tenant-admin step-up policy below.
-drop policy if exists gear_admin_delete on public.gear;
-drop policy if exists gear_admin_insert on public.gear;
-drop policy if exists gear_admin_update on public.gear;
-drop policy if exists gear_tenant_user_update on public.gear;
-drop policy if exists "student checkout gear" on public.gear;
-drop policy if exists student_checkout_gear on public.gear;
-drop policy if exists student_gear_update on public.gear;
+drop policy if exists item_admin_delete on public.items;
+drop policy if exists item_admin_insert on public.items;
+drop policy if exists item_admin_update on public.items;
+drop policy if exists item_tenant_user_update on public.items;
+drop policy if exists "borrower checkout item" on public.items;
+drop policy if exists borrower_checkout_item on public.items;
+drop policy if exists borrower_item_update on public.items;
 
-drop policy if exists tenant_admin_write_gear on public.gear;
-create policy tenant_admin_write_gear on public.gear for all to authenticated
+drop policy if exists tenant_admin_write_item on public.items;
+create policy tenant_admin_write_item on public.items for all to authenticated
   using (
     (select current_user_role()) = 'tenant_admin'
-    and gear.tenant_id = (select current_tenant_id())
+    and item.tenant_id = (select current_tenant_id())
     and (select has_recent_privileged_step_up('tenant_admin'))
   )
   with check (
     (select current_user_role()) = 'tenant_admin'
-    and gear.tenant_id = (select current_tenant_id())
+    and item.tenant_id = (select current_tenant_id())
     and (select has_recent_privileged_step_up('tenant_admin'))
   );
 
--- ============================ students ============================
-drop policy if exists students_read_tenant on public.students;
-create policy students_read_tenant on public.students for select to public
+-- ============================ borrowers ============================
+drop policy if exists borrowers_read_tenant on public.borrowers;
+create policy borrowers_read_tenant on public.borrowers for select to public
   using (tenant_id = (select current_tenant_id()));
 
 -- Remove the older per-command policies: permissive RLS policies are ORed, so
 -- retaining them would make the step-up predicate below optional.
-drop policy if exists students_admin_delete on public.students;
-drop policy if exists students_admin_insert on public.students;
-drop policy if exists students_admin_update on public.students;
+drop policy if exists borrowers_admin_delete on public.borrowers;
+drop policy if exists borrowers_admin_insert on public.borrowers;
+drop policy if exists borrowers_admin_update on public.borrowers;
 
-drop policy if exists tenant_admin_write_students on public.students;
-create policy tenant_admin_write_students on public.students for all to authenticated
+drop policy if exists tenant_admin_write_borrowers on public.borrowers;
+create policy tenant_admin_write_borrowers on public.borrowers for all to authenticated
   using (
     (select current_user_role()) = 'tenant_admin'
-    and students.tenant_id = (select current_tenant_id())
+    and borrowers.tenant_id = (select current_tenant_id())
     and (select has_recent_privileged_step_up('tenant_admin'))
   )
   with check (
     (select current_user_role()) = 'tenant_admin'
-    and students.tenant_id = (select current_tenant_id())
+    and borrowers.tenant_id = (select current_tenant_id())
     and (select has_recent_privileged_step_up('tenant_admin'))
   );
 
--- ============================ gear_logs ============================
-drop policy if exists gear_logs_read_tenant on public.gear_logs;
-create policy gear_logs_read_tenant on public.gear_logs for select to public
+-- ============================ item_logs ============================
+drop policy if exists item_logs_read_tenant on public.item_logs;
+create policy item_logs_read_tenant on public.item_logs for select to public
   using (tenant_id = (select current_tenant_id()));
 
-drop policy if exists gear_logs_insert on public.gear_logs;
-create policy gear_logs_insert on public.gear_logs for insert to public
-  with check ((select current_user_role()) is not null and gear_logs.tenant_id = (select current_tenant_id()));
+drop policy if exists item_logs_insert on public.item_logs;
+create policy item_logs_insert on public.item_logs for insert to public
+  with check ((select current_user_role()) is not null and item_logs.tenant_id = (select current_tenant_id()));
 
-drop policy if exists gear_logs_insert_tenant_user on public.gear_logs;
-create policy gear_logs_insert_tenant_user on public.gear_logs for insert to public
-  with check ((select current_user_role()) = any (array['tenant_user','tenant_admin']) and gear_logs.tenant_id = (select current_tenant_id()));
+drop policy if exists item_logs_insert_tenant_user on public.item_logs;
+create policy item_logs_insert_tenant_user on public.item_logs for insert to public
+  with check ((select current_user_role()) = any (array['tenant_user','tenant_admin']) and item_logs.tenant_id = (select current_tenant_id()));
 
 -- ============================ profiles ============================
 drop policy if exists profiles_read_own on public.profiles;
@@ -165,18 +165,18 @@ create policy super_admin_all_districts on public.districts for all to authentic
   using ((select current_user_role()) = 'super_admin' and (select has_recent_privileged_step_up('super_admin')))
   with check ((select current_user_role()) = 'super_admin' and (select has_recent_privileged_step_up('super_admin')));
 
--- gear_status_history
-drop policy if exists super_admin_all_gear_status_history on public.gear_status_history;
-create policy super_admin_all_gear_status_history on public.gear_status_history for all to authenticated
+-- item_status_history
+drop policy if exists super_admin_all_item_status_history on public.item_status_history;
+create policy super_admin_all_item_status_history on public.item_status_history for all to authenticated
   using ((select current_user_role()) = 'super_admin' and (select has_recent_privileged_step_up('super_admin')))
   with check ((select current_user_role()) = 'super_admin' and (select has_recent_privileged_step_up('super_admin')));
 
-drop policy if exists tenant_admin_insert_gear_status_history on public.gear_status_history;
-create policy tenant_admin_insert_gear_status_history on public.gear_status_history for insert to authenticated
+drop policy if exists tenant_admin_insert_item_status_history on public.item_status_history;
+create policy tenant_admin_insert_item_status_history on public.item_status_history for insert to authenticated
   with check ((select current_user_role()) = 'tenant_admin' and tenant_id = (select current_tenant_id()) and (select has_recent_privileged_step_up('tenant_admin')));
 
-drop policy if exists tenant_select_gear_status_history on public.gear_status_history;
-create policy tenant_select_gear_status_history on public.gear_status_history for select to authenticated
+drop policy if exists tenant_select_item_status_history on public.item_status_history;
+create policy tenant_select_item_status_history on public.item_status_history for select to authenticated
   using ((select current_user_role()) = any (array['tenant_user','tenant_admin']) and tenant_id = (select current_tenant_id()));
 
 -- rate_limits

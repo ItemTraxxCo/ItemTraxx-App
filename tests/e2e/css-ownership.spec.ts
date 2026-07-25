@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 import {
   mockAdminOps,
   mockSuperDashboard,
-  mockSuperGearMutate,
+  mockSuperItemMutate,
   mockSuperWorkspaceMutate,
   mockSystemStatus,
   mockUnauthenticatedSession,
@@ -18,7 +18,7 @@ test.describe("global CSS ownership contracts", () => {
     await mockAdminOps(page);
     await mockSuperDashboard(page);
     await mockSuperWorkspaceMutate(page);
-    await mockSuperGearMutate(page);
+    await mockSuperItemMutate(page);
   });
 
   test("authenticated CSS is absent from public startup and resolves before protected UI", async ({
@@ -84,7 +84,7 @@ test.describe("global CSS ownership contracts", () => {
 
   test("reduced motion disables authenticated skeleton shimmer", async ({ page }) => {
     await page.emulateMedia({ reducedMotion: "reduce" });
-    await page.route(/\/functions(?:\/v1)?\/super-gear-mutate(?:\?.*)?$/, async (route) => {
+    await page.route(/\/functions(?:\/v1)?\/super-item-mutate(?:\?.*)?$/, async (route) => {
       const body = (route.request().postDataJSON() as { action?: string }) ?? {};
       if (body.action !== "list") {
         await route.fallback();
@@ -100,7 +100,7 @@ test.describe("global CSS ownership contracts", () => {
 
     await page.goto("/");
     await setSuperAdminSession(page);
-    await navigateApp(page, "/super-admin/gear");
+    await navigateApp(page, "/super-admin/items");
 
     const skeleton = page.getByRole("status", { name: "Loading all items" });
     await expect(skeleton).toBeVisible();
@@ -138,13 +138,13 @@ test.describe("global CSS ownership contracts", () => {
         await route.fulfill({ status: 200, headers: { "content-range": "0-0/7" } });
         return;
       }
-      if (new URL(request.url()).pathname.endsWith("/rest/v1/gear")) {
+      if (new URL(request.url()).pathname.endsWith("/rest/v1/items")) {
         await route.fulfill({
           status: 200,
           contentType: "application/json",
           body: JSON.stringify([
             {
-              id: "gear-css-owner",
+              id: "item-css-owner",
               workspace_id: "tenant-e2e",
               name: "CSS owner camera",
               barcode: "CSS-OWNER-1",
@@ -158,7 +158,7 @@ test.describe("global CSS ownership contracts", () => {
       }
       await route.fulfill({ status: 200, contentType: "application/json", body: "[]" });
     });
-    await page.route(/\/functions(?:\/v1)?\/admin-gear-mutate(?:\?.*)?$/, async (route) => {
+    await page.route(/\/functions(?:\/v1)?\/admin-item-mutate(?:\?.*)?$/, async (route) => {
       await route.fulfill({
         status: 200,
         contentType: "application/json",
@@ -197,7 +197,7 @@ test.describe("global CSS ownership contracts", () => {
     expect(await statsGrid.evaluate((element) => getComputedStyle(element).display)).toBe("grid");
     expect(await hasScopedRule("stats-grid")).toBe(true);
 
-    await navigateApp(page, "/admin/gear");
+    await navigateApp(page, "/admin/items");
     const formHelp = page.locator(".form-help-row").first();
     await expect(formHelp).toBeVisible();
     expect(
@@ -208,17 +208,17 @@ test.describe("global CSS ownership contracts", () => {
     ).toEqual({ display: "flex", justifyContent: "space-between" });
     expect(await hasScopedRule("form-help-row")).toBe(true);
 
-    const notesCell = page.locator(".gear-notes-cell");
+    const notesCell = page.locator(".item-notes-cell");
     await expect(notesCell).toHaveText("Route-owned note");
     expect(await notesCell.evaluate((element) => getComputedStyle(element).minWidth)).toBe("220px");
-    expect(await hasScopedRule("gear-notes-cell")).toBe(true);
+    expect(await hasScopedRule("item-notes-cell")).toBe(true);
 
     await page.getByRole("button", { name: "Details" }).click();
-    const notesInput = page.locator(".gear-notes-input");
+    const notesInput = page.locator(".item-notes-input");
     await expect(notesInput).toBeVisible();
     expect(await notesInput.evaluate((element) => getComputedStyle(element).width)).toBe(
       `${await notesInput.evaluate((element) => element.parentElement?.clientWidth ?? 0)}px`,
     );
-    expect(await hasScopedRule("gear-notes-input")).toBe(true);
+    expect(await hasScopedRule("item-notes-input")).toBe(true);
   });
 });

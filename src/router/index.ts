@@ -246,8 +246,8 @@ const routes: RouteRecordRaw[] = [
   },
   {
     path: "/admin/borrowers",
-    name: "workspace-admin-students",
-    component: () => import("../pages/workspace/admin/Students.vue"),
+    name: "workspace-admin-borrowers",
+    component: () => import("../pages/workspace/admin/Borrowers.vue"),
     meta: {
       requiresSession: true,
       requiresWorkspace: true,
@@ -259,15 +259,19 @@ const routes: RouteRecordRaw[] = [
   },
   {
     path: "/admin/gear",
-    name: "workspace-admin-gear",
-    component: () => import("../pages/workspace/admin/Gear.vue"),
+    redirect: "/admin/items",
+  },
+  {
+    path: "/admin/items",
+    name: "workspace-admin-items",
+    component: () => import("../pages/workspace/admin/Items.vue"),
     meta: {
       requiresSession: true,
       requiresWorkspace: true,
       requiresRole: "workspace_admin",
       requiresWorkspaceMatch: true,
     
-      title: "Admin Gear | ItemTraxx",
+      title: "Admin Item | ItemTraxx",
     },
   },
   {
@@ -376,16 +380,16 @@ const routes: RouteRecordRaw[] = [
   },
   { path: "/admin/accounts", name: "workspace-admin-accounts", component: () => import("../pages/workspace/admin/Accounts.vue"), meta: { requiresSession: true, requiresWorkspace: true, requiresRole: "workspace_admin", requiresWorkspaceMatch: true, title: "Tenant Accounts | ItemTraxx" } },
   {
-    path: "/admin/gear-import",
-    name: "workspace-admin-gear-import",
-    component: () => import("../pages/workspace/admin/GearImport.vue"),
+    path: "/admin/item-import",
+    name: "workspace-admin-item-import",
+    component: () => import("../pages/workspace/admin/ItemImport.vue"),
     meta: {
       requiresSession: true,
       requiresWorkspace: true,
       requiresRole: "workspace_admin",
       requiresWorkspaceMatch: true,
     
-      title: "Gear Import | ItemTraxx",
+      title: "Item Import | ItemTraxx",
     },
   },
 
@@ -462,6 +466,16 @@ const routes: RouteRecordRaw[] = [
     },
   },
   {
+    path: "/super-admin/tenant-accounts",
+    name: "super-admin-tenant-accounts",
+    component: () => import("../pages/super/TenantAccounts.vue"),
+    meta: {
+      requiresSession: true,
+      requiresRole: "super_admin",
+      title: "Tenant Accounts | ItemTraxx",
+    },
+  },
+  {
     path: "/super-admin/super-admins",
     name: "super-admin-super-admins",
     component: () => import("../pages/super/SuperAdmins.vue"),
@@ -474,20 +488,24 @@ const routes: RouteRecordRaw[] = [
   },
   {
     path: "/super-admin/gear",
-    name: "super-admin-gear",
-    component: () => import("../pages/super/SuperGear.vue"),
+    redirect: "/super-admin/items",
+  },
+  {
+    path: "/super-admin/items",
+    name: "super-admin-items",
+    component: () => import("../pages/super/SuperItems.vue"),
     meta: {
       requiresSession: true,
       requiresRole: "super_admin",
       requiresSuperAuth: true,
     
-      title: "Super Admin Gear | ItemTraxx",
+      title: "Super Admin Item | ItemTraxx",
     },
   },
   {
     path: "/super-admin/borrowers",
-    name: "super-admin-students",
-    component: () => import("../pages/super/SuperStudents.vue"),
+    name: "super-admin-borrowers",
+    component: () => import("../pages/super/SuperBorrowers.vue"),
     meta: {
       requiresSession: true,
       requiresRole: "super_admin",

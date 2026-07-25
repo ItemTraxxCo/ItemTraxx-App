@@ -8,7 +8,7 @@ create table if not exists public.data_retention_policies (
 
 insert into public.data_retention_policies (key, value)
 values
-  ('soft_delete', '{"students_days": 365, "students_enabled": true, "gear_days": 730, "gear_enabled": true}'::jsonb),
+  ('soft_delete', '{"borrowers_days": 365, "borrowers_enabled": true, "item_days": 730, "item_enabled": true}'::jsonb),
   ('audit_logs', '{"admin_audit_days": 730, "super_audit_days": 1095, "enabled": true}'::jsonb)
 on conflict (key) do nothing;
 
@@ -25,10 +25,10 @@ where key = 'audit_logs';
 update public.data_retention_policies
 set
   value = (value - 'enabled') || jsonb_build_object(
-    'students_days', 365,
-    'students_enabled', true,
-    'gear_days', 730,
-    'gear_enabled', true
+    'borrowers_days', 365,
+    'borrowers_enabled', true,
+    'item_days', 730,
+    'item_enabled', true
   ),
   updated_at = now()
 where key = 'soft_delete';
@@ -43,8 +43,8 @@ declare
   soft_delete_cfg jsonb;
   audit_cfg jsonb;
   now_ts timestamptz := now();
-  students_deleted int := 0;
-  gear_deleted int := 0;
+  borrowers_deleted int := 0;
+  item_deleted int := 0;
   admin_audit_deleted int := 0;
   super_audit_deleted int := 0;
 begin
@@ -52,18 +52,18 @@ begin
   from public.data_retention_policies
   where key = 'soft_delete';
 
-  if coalesce((soft_delete_cfg->>'students_enabled')::boolean, false) then
-    delete from public.students
+  if coalesce((soft_delete_cfg->>'borrowers_enabled')::boolean, false) then
+    delete from public.borrowers
     where deleted_at is not null
-      and deleted_at < now_ts - make_interval(days => greatest(1, coalesce((soft_delete_cfg->>'students_days')::int, 365)));
-    get diagnostics students_deleted = row_count;
+      and deleted_at < now_ts - make_interval(days => greatest(1, coalesce((soft_delete_cfg->>'borrowers_days')::int, 365)));
+    get diagnostics borrowers_deleted = row_count;
   end if;
 
-  if coalesce((soft_delete_cfg->>'gear_enabled')::boolean, false) then
-    delete from public.gear
+  if coalesce((soft_delete_cfg->>'item_enabled')::boolean, false) then
+    delete from public.items
     where deleted_at is not null
-      and deleted_at < now_ts - make_interval(days => greatest(1, coalesce((soft_delete_cfg->>'gear_days')::int, 730)));
-    get diagnostics gear_deleted = row_count;
+      and deleted_at < now_ts - make_interval(days => greatest(1, coalesce((soft_delete_cfg->>'item_days')::int, 730)));
+    get diagnostics item_deleted = row_count;
   end if;
 
   select value into audit_cfg
@@ -82,8 +82,8 @@ begin
 
   return jsonb_build_object(
     'ran_at', now_ts,
-    'students_deleted', students_deleted,
-    'gear_deleted', gear_deleted,
+    'borrowers_deleted', borrowers_deleted,
+    'item_deleted', item_deleted,
     'admin_audit_deleted', admin_audit_deleted,
     'super_audit_deleted', super_audit_deleted
   );

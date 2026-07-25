@@ -64,7 +64,7 @@
             :key="event.id"
             class="notif-item"
           >
-            {{ event.gear?.name || "Item" }} marked {{ event.status }}.
+            {{ event.item?.name || "Item" }} marked {{ event.status }}.
           </li>
           <li v-if="unreadCount === 0" class="notif-item muted">No new notifications.</li>
         </ul>

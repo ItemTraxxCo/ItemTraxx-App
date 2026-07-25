@@ -1,8 +1,8 @@
 import { invokeEdgeFunction } from "./edgeFunctionClient";
-import type { EdgeEnvelope, SuperGearAction } from "../types/edgeContracts";
+import type { EdgeEnvelope, SuperItemAction } from "../types/edgeContracts";
 import { edgeFunctionError } from "./appErrors";
 
-export type SuperGearItem = {
+export type SuperItemRecord = {
   id: string;
   workspace_id: string;
   name: string;
@@ -12,14 +12,14 @@ export type SuperGearItem = {
   notes: string | null;
 };
 
-type SuperGearRequest = {
-  action: SuperGearAction;
+type SuperItemRequest = {
+  action: SuperItemAction;
   payload: Record<string, unknown>;
 };
 
-const callSuperGear = async <TData>(payload: SuperGearRequest) => {
-  const result = await invokeEdgeFunction<EdgeEnvelope<TData>, SuperGearRequest>(
-    "super-gear-mutate",
+const callSuperItem = async <TData>(payload: SuperItemRequest) => {
+  const result = await invokeEdgeFunction<EdgeEnvelope<TData>, SuperItemRequest>(
+    "super-item-mutate",
     {
       method: "POST",
       body: payload,
@@ -33,13 +33,13 @@ const callSuperGear = async <TData>(payload: SuperGearRequest) => {
   return result.data?.data as TData;
 };
 
-export const listSuperGear = async (workspaceId = "all", search = "") =>
-  callSuperGear<SuperGearItem[]>({
+export const listSuperItem = async (workspaceId = "all", search = "") =>
+  callSuperItem<SuperItemRecord[]>({
     action: "list",
     payload: { workspace_id: workspaceId, search },
   });
 
-export const createSuperGear = async (payload: {
+export const createSuperItem = async (payload: {
   workspace_id: string;
   name: string;
   barcode: string;
@@ -47,12 +47,12 @@ export const createSuperGear = async (payload: {
   status: string;
   notes?: string;
 }) =>
-  callSuperGear<SuperGearItem>({
+  callSuperItem<SuperItemRecord>({
     action: "create",
     payload,
   });
 
-export const updateSuperGear = async (payload: {
+export const updateSuperItem = async (payload: {
   id: string;
   name: string;
   barcode: string;
@@ -61,17 +61,17 @@ export const updateSuperGear = async (payload: {
   super_password?: string;
   confirm_phrase?: string;
 }) =>
-  callSuperGear<SuperGearItem>({
+  callSuperItem<SuperItemRecord>({
     action: "update",
     payload,
   });
 
-export const deleteSuperGear = async (payload: {
+export const deleteSuperItem = async (payload: {
   id: string;
   super_password: string;
   confirm_phrase: string;
 }) =>
-  callSuperGear<{ success: boolean }>({
+  callSuperItem<{ success: boolean }>({
     action: "delete",
     payload,
   });

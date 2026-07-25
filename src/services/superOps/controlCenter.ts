@@ -42,7 +42,7 @@ export const setWorkspacePolicy = async (payload: {
   feature_flags: {
     enable_notifications: boolean;
     enable_bulk_item_import: boolean;
-    enable_bulk_student_tools: boolean;
+    enable_bulk_borrower_tools: boolean;
     enable_status_tracking: boolean;
     enable_barcode_generator: boolean;
   };

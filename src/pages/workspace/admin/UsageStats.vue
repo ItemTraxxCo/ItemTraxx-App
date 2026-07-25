@@ -39,11 +39,11 @@
       <div v-else class="stats-grid">
         <div class="stat-card">
           <h3>Total items</h3>
-          <p class="stat-value">{{ stats?.totalGear ?? 0 }}</p>
+          <p class="stat-value">{{ stats?.totalItem ?? 0 }}</p>
         </div>
         <div class="stat-card">
           <h3>Total borrowers</h3>
-          <p class="stat-value">{{ stats?.totalStudents ?? 0 }}</p>
+          <p class="stat-value">{{ stats?.totalBorrowers ?? 0 }}</p>
         </div>
         <div class="stat-card">
           <h3>Currently checked out</h3>

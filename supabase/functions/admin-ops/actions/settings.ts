@@ -16,7 +16,7 @@ type TenantPolicyResult = {
 export const defaultFeatureFlags = (): TenantFeatureFlags => ({
   enable_notifications: true,
   enable_bulk_item_import: true,
-  enable_bulk_student_tools: true,
+  enable_bulk_borrower_tools: true,
   enable_status_tracking: true,
   enable_barcode_generator: true,
 });
@@ -33,10 +33,10 @@ export const normalizeFeatureFlags = (value: unknown): TenantFeatureFlags => {
       typeof payload.enable_bulk_item_import === "boolean"
         ? payload.enable_bulk_item_import
         : fallback.enable_bulk_item_import,
-    enable_bulk_student_tools:
-      typeof payload.enable_bulk_student_tools === "boolean"
-        ? payload.enable_bulk_student_tools
-        : fallback.enable_bulk_student_tools,
+    enable_bulk_borrower_tools:
+      typeof payload.enable_bulk_borrower_tools === "boolean"
+        ? payload.enable_bulk_borrower_tools
+        : fallback.enable_bulk_borrower_tools,
     enable_status_tracking: typeof payload.enable_status_tracking === "boolean"
       ? payload.enable_status_tracking
       : fallback.enable_status_tracking,
@@ -94,41 +94,41 @@ export const handleSettingsAction = async (
   context: AdminOpsContext,
 ): Promise<Response> => {
   if (context.action === "get_workspace_dashboard") {
-    const [accountsResult, gearResult, borrowersResult, gearGrantsResult, borrowerGrantsResult, logsResult] =
+    const [accountsResult, itemResult, borrowersResult, itemGrantsResult, borrowerGrantsResult, logsResult] =
       await Promise.all([
         context.adminClient.from("profiles").select("id,auth_email").eq("workspace_id", context.workspaceId).eq("role", "tenant_account").eq("is_active", true).is("deleted_at", null),
-        context.adminClient.from("gear").select("id,access_mode,status,checked_out_at").eq("workspace_id", context.workspaceId).is("deleted_at", null),
-        context.adminClient.from("students").select("id,access_mode").eq("workspace_id", context.workspaceId).is("deleted_at", null),
-        context.adminClient.from("gear_access_grants").select("gear_id,profile_id"),
-        context.adminClient.from("borrower_access_grants").select("student_id,profile_id"),
-        context.adminClient.from("gear_logs").select("gear_id,performed_by,action_type,action_time").eq("workspace_id", context.workspaceId).order("action_time", { ascending: false }),
+        context.adminClient.from("items").select("id,access_mode,status,checked_out_at").eq("workspace_id", context.workspaceId).is("deleted_at", null),
+        context.adminClient.from("borrowers").select("id,access_mode").eq("workspace_id", context.workspaceId).is("deleted_at", null),
+        context.adminClient.from("item_access_grants").select("item_id,profile_id"),
+        context.adminClient.from("borrower_access_grants").select("borrower_id,profile_id"),
+        context.adminClient.from("item_logs").select("item_id,performed_by,action_type,action_time").eq("workspace_id", context.workspaceId).order("action_time", { ascending: false }),
       ]);
-    const error = [accountsResult, gearResult, borrowersResult, gearGrantsResult, borrowerGrantsResult, logsResult]
+    const error = [accountsResult, itemResult, borrowersResult, itemGrantsResult, borrowerGrantsResult, logsResult]
       .find((result) => result.error)?.error;
     if (error) {
       return context.jsonResponse(400, {
         error: "Unable to load workspace dashboard.",
       });
     }
-    const gear = gearResult.data ?? [];
+    const item = itemResult.data ?? [];
     const borrowers = borrowersResult.data ?? [];
-    const gearGrants = new Set((gearGrantsResult.data ?? []).map((grant) => `${grant.profile_id}:${grant.gear_id}`));
-    const borrowerGrants = new Set((borrowerGrantsResult.data ?? []).map((grant) => `${grant.profile_id}:${grant.student_id}`));
-    const latestByGear = new Map<string, { performed_by: string | null; action_type: string | null }>();
+    const itemGrants = new Set((itemGrantsResult.data ?? []).map((grant) => `${grant.profile_id}:${grant.item_id}`));
+    const borrowerGrants = new Set((borrowerGrantsResult.data ?? []).map((grant) => `${grant.profile_id}:${grant.borrower_id}`));
+    const latestByItem = new Map<string, { performed_by: string | null; action_type: string | null }>();
     for (const log of logsResult.data ?? []) {
-      if (!latestByGear.has(log.gear_id)) latestByGear.set(log.gear_id, log);
+      if (!latestByItem.has(log.item_id)) latestByItem.set(log.item_id, log);
     }
     const overdueCutoff = Date.now() - context.checkoutDueHours * 60 * 60 * 1000;
     const data = (accountsResult.data ?? []).map((account) => {
-      const accessibleGear = gear.filter((item) => item.access_mode === "all" || gearGrants.has(`${account.id}:${item.id}`));
-      const latestForAccount = accessibleGear.filter((item) => {
-        const latest = latestByGear.get(item.id);
+      const accessibleItem = item.filter((item) => item.access_mode === "all" || itemGrants.has(`${account.id}:${item.id}`));
+      const latestForAccount = accessibleItem.filter((item) => {
+        const latest = latestByItem.get(item.id);
         return !!latest && latest.performed_by === account.id && latest.action_type === "checkout";
       });
       return {
         profile_id: account.id,
         auth_email: account.auth_email ?? "",
-        item_count: accessibleGear.length,
+        item_count: accessibleItem.length,
         borrower_count: borrowers.filter((borrower) => borrower.access_mode === "all" || borrowerGrants.has(`${account.id}:${borrower.id}`)).length,
         active_checkouts: latestForAccount.length,
         overdue_count: latestForAccount.filter((item) => item.checked_out_at && Date.parse(item.checked_out_at) < overdueCutoff).length,

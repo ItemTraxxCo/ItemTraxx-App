@@ -85,10 +85,10 @@ type InternalOpsEvent = {
   workspace_name: string;
   action_type: "checkout" | "return";
   action_time: string;
-  gear_name: string | null;
-  gear_barcode: string | null;
-  student_username: string | null;
-  student_id: string | null;
+  item_name: string | null;
+  item_barcode: string | null;
+  borrower_username: string | null;
+  borrower_id: string | null;
 };
 
 export type InternalOpsSnapshot = {

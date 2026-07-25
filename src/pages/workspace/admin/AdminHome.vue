@@ -26,7 +26,7 @@
       </div>
 
     <div class="admin-grid">
-      <RouterLink class="admin-card" to="/admin/gear">
+      <RouterLink class="admin-card" to="/admin/items">
         <h2>Item Management</h2>
         <p>Manage items, barcodes, and status.</p>
       </RouterLink>
@@ -62,7 +62,7 @@
         <h2>Item Status Tracking</h2>
         <p>Track lost, damaged, and repair statuses on items.</p>
       </RouterLink>
-      <RouterLink v-if="featureFlags.enable_bulk_item_import" class="admin-card" to="/admin/gear-import">
+      <RouterLink v-if="featureFlags.enable_bulk_item_import" class="admin-card" to="/admin/item-import">
         <h2>Bulk Item Import</h2>
         <p>Import items in bulk from CSV with preview and validation.</p>
       </RouterLink>
@@ -94,7 +94,7 @@ const adminEmail = computed(() => {
 const featureFlags = reactive({
   enable_notifications: true,
   enable_bulk_item_import: true,
-  enable_bulk_student_tools: true,
+  enable_bulk_borrower_tools: true,
   enable_status_tracking: true,
   enable_barcode_generator: true,
 });

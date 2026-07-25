@@ -2,7 +2,7 @@
 
 > ItemTraxx is a cloud-based inventory, checkout, and administrative control platform for schools, districts, organizations, and individual operators.
 
-ItemTraxx helps teams manage real-world gear, assets, and inventory workflows with barcode-based checkout and return flows, inventory status tracking, borrower and admin management, reporting, audit history, and role-based access controls.
+ItemTraxx helps teams manage real-world items, assets, and inventory workflows with barcode-based checkout and return flows, inventory status tracking, borrower and admin management, reporting, audit history, and role-based access controls.
 
 ## Site
 

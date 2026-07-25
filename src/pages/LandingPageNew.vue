@@ -88,7 +88,7 @@ const showcaseVariants: ShowcaseVariant[] = [
   {
     label: 'Built for operators',
     pill: 'Workflow',
-    title: 'Fast daily usage for the people actually moving gear.',
+    title: 'Fast daily usage for the people actually moving item.',
     body: 'ItemTraxx is designed for real checkout desks and busy equipment rooms, not just admin reporting after the fact.',
     points: ['Quick borrower load and scan flow', 'Low-friction returns', 'Less time spent fixing bad records'],
   },
@@ -103,14 +103,14 @@ const showcaseVariants: ShowcaseVariant[] = [
     label: 'Admin control',
     pill: 'Management',
     title: 'Admin workflows that stay simple as inventory grows.',
-    body: 'Borrowers, gear, logs, and settings stay in one system so admins can manage more without the interface turning into a mess.',
+    body: 'Borrowers, item, logs, and settings stay in one system so admins can manage more without the interface turning into a mess.',
     points: ['Manage borrowers and items', 'Review logs and audits', 'Keep settings and administrative actions in one place'],
   },
   {
     label: 'Designed for teams of any size',
     pill: 'Fit',
     title: 'A better fit for school programs, small teams, and organizations of any size.',
-    body: 'ItemTraxx is built for programs where gear moves constantly and staff need a reliable way to keep things organized.',
+    body: 'ItemTraxx is built for programs where item moves constantly and staff need a reliable way to keep things organized.',
     points: ['Works for classrooms and media rooms', 'Handles shared equipment cleanly', 'Supports day-to-day accountability'],
   },
   {

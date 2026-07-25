@@ -21,7 +21,7 @@ const CONTROL_CHARS =
 export const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 export const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-export const STUDENT_ID_PATTERN = /^[0-9]{4}[A-Z]{2}$/;
+export const BORROWER_ID_PATTERN = /^[0-9]{4}[A-Z]{2}$/;
 export const USERNAME_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]{2,38}[A-Za-z0-9]$/;
 export const BARCODE_PATTERN = /^[A-Za-z0-9._:@/#-]{1,64}$/;
 export const SLUG_PATTERN = /^[a-z0-9][a-z0-9-]{0,62}$/;

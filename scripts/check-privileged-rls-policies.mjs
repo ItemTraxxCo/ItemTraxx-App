@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 
 const migrationPath = new URL(
-  "../supabase/migrations/20260725194622_workspace_model_role_redesign.sql",
+  "../supabase/migrations/20260725221011_item_borrower_physical_rename.sql",
   import.meta.url,
 );
 const migration = readFileSync(migrationPath, "utf8");
@@ -45,7 +45,11 @@ const extractParenthesizedClause = (statement, keyword) => {
   return null;
 };
 
-const normalizeSql = (value) => value.replace(/\s+/g, " ").trim().toLowerCase();
+const normalizeSql = (value) => value
+  .replace(/\s+/g, " ")
+  .replace(/\s*=\s*/g, "=")
+  .trim()
+  .toLowerCase();
 
 const requireStepUpPolicy = (policyName, tableName) => {
   const statement = migration.match(
@@ -102,7 +106,7 @@ const requireStepUpPolicy = (policyName, tableName) => {
   }
 };
 
-requireStepUpPolicy("workspace_admin_write_gear", "gear");
-requireStepUpPolicy("workspace_admin_write_students", "students");
+requireStepUpPolicy("workspace_admin_write_items", "items");
+requireStepUpPolicy("workspace_admin_write_borrowers", "borrowers");
 
-console.log("Gear/student RLS policies require Workspace Admin role, workspace scope, and an active session.");
+console.log("Item/borrower RLS policies require Workspace Admin role, workspace scope, and an active session.");

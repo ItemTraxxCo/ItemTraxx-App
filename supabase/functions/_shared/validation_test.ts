@@ -6,7 +6,7 @@ import {
   requireTextArray,
   requireUuid,
   SLUG_PATTERN,
-  STUDENT_ID_PATTERN,
+  BORROWER_ID_PATTERN,
   ValidationError,
 } from "./validation.ts";
 
@@ -28,7 +28,7 @@ Deno.test("validation rejects malformed emails and IDs", () => {
   assertValidationError(() => requireEmail("not-an-email"));
   assertValidationError(() => requireUuid("not-a-uuid"));
   assertValidationError(() =>
-    requireText("1234567", { maxLen: 6, pattern: STUDENT_ID_PATTERN })
+    requireText("1234567", { maxLen: 6, pattern: BORROWER_ID_PATTERN })
   );
 });
 

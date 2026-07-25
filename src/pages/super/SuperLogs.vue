@@ -3,7 +3,7 @@
     <div class="page-nav-left">
       <RouterLink class="button-link" to="/super-admin">Return to Super Admin</RouterLink>
       <RouterLink class="button-link" to="/super-admin/workspaces">Workspaces</RouterLink>
-      <RouterLink class="button-link" to="/super-admin/gear">All Items</RouterLink>
+      <RouterLink class="button-link" to="/super-admin/items">All Items</RouterLink>
       <RouterLink class="button-link" to="/super-admin/borrowers">All Borrowers</RouterLink>
       <RouterLink class="button-link" to="/super-admin/broadcasts">Broadcasts</RouterLink>
       <RouterLink class="button-link" to="/super-admin/sales-leads">Sales Leads</RouterLink>
@@ -34,8 +34,8 @@
             <td>{{ formatDateTime(row.action_time) }}</td>
             <td>{{ row.workspace?.name || row.workspace_id }}</td>
             <td>{{ row.action_type }}</td>
-            <td>{{ row.gear?.name || "-" }} ({{ row.gear?.barcode || "-" }})</td>
-            <td>{{ row.student ? `${row.student.username} (${row.student.student_id})` : "-" }}</td>
+            <td>{{ row.item?.name || "-" }} ({{ row.item?.barcode || "-" }})</td>
+            <td>{{ row.borrower ? `${row.borrower.username} (${row.borrower.borrower_id})` : "-" }}</td>
           </tr>
         </tbody>
       </table>
@@ -155,9 +155,9 @@ const exportCsv = () => {
     time: formatDateTime(row.action_time),
     workspace: row.workspace?.name ?? row.workspace_id,
     action: row.action_type,
-    item_name: row.gear?.name ?? "",
-    item_barcode: row.gear?.barcode ?? "",
-    borrower: row.student ? `${row.student.username} (${row.student.student_id})` : "",
+    item_name: row.item?.name ?? "",
+    item_barcode: row.item?.barcode ?? "",
+    borrower: row.borrower ? `${row.borrower.username} (${row.borrower.borrower_id})` : "",
   })));
 };
 
@@ -170,9 +170,9 @@ const exportPdf = async () => {
     time: formatDateTime(row.action_time),
     workspace: row.workspace?.name ?? row.workspace_id,
     action: row.action_type,
-    item_name: row.gear?.name ?? "",
-    item_barcode: row.gear?.barcode ?? "",
-    borrower: row.student ? `${row.student.username} (${row.student.student_id})` : "",
+    item_name: row.item?.name ?? "",
+    item_barcode: row.item?.barcode ?? "",
+    borrower: row.borrower ? `${row.borrower.username} (${row.borrower.borrower_id})` : "",
   })));
 };
 

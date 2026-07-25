@@ -30,11 +30,11 @@ const CHECKOUT_ACTIONS = new Set(
   ["checkout", "return", "auto", "admin_return", "quick_return"] as const,
 );
 
-const buildGearLogOperationId = (
+const buildItemLogOperationId = (
   operationId: string,
-  gearId: string,
+  itemId: string,
   actionType: "checkout" | "return" | "admin_return" | "quick_return",
-) => `${operationId}:${gearId}:${actionType}`;
+) => `${operationId}:${itemId}:${actionType}`;
 
 const resolveCorsHeaders = (req: Request) => {
   const origin = req.headers.get("Origin");
@@ -189,10 +189,10 @@ serve(async (req) => {
       });
     }
 
-    const { student_id, gear_barcodes, action_type, device_id, operation_id } =
+    const { borrower_id, item_barcodes, action_type, device_id, operation_id } =
       await readJsonBody(req);
     const actionType = requireEnum(action_type, CHECKOUT_ACTIONS);
-    const gearBarcodes = requireTextArray(gear_barcodes, {
+    const itemBarcodes = requireTextArray(item_barcodes, {
       minItems: 1,
       maxItems: 100,
       maxLen: 64,
@@ -261,67 +261,67 @@ serve(async (req) => {
       });
     }
 
-    let student: { id: string; workspace_id: string; access_mode: string } | null = null;
+    let borrower: { id: string; workspace_id: string; access_mode: string } | null = null;
 
     if (!isAdminReturn && !isQuickReturn) {
-      const studentId = requireText(student_id, { maxLen: 32 });
+      const borrowerId = requireText(borrower_id, { maxLen: 32 });
 
-      const { data: studentData, error: studentError } = await adminClient
-        .from("students")
+      const { data: borrowerData, error: borrowerError } = await adminClient
+        .from("borrowers")
         .select("id, workspace_id, access_mode")
-        .eq("student_id", studentId)
+        .eq("borrower_id", borrowerId)
         .eq("workspace_id", callerProfile.workspace_id)
         .is("deleted_at", null)
         .single();
 
-      if (studentError || !studentData?.id || !studentData.workspace_id) {
-        return jsonResponse(404, { error: "Student not found." });
+      if (borrowerError || !borrowerData?.id || !borrowerData.workspace_id) {
+        return jsonResponse(404, { error: "Borrower not found." });
       }
 
-      if (callerRole === "tenant_account" && studentData.access_mode === "restricted") {
-        const { data: grant } = await adminClient.from("borrower_access_grants").select("student_id").eq("student_id", studentData.id).eq("profile_id", user.id).maybeSingle();
-        if (!grant) return jsonResponse(404, { error: "Student not found." });
+      if (callerRole === "tenant_account" && borrowerData.access_mode === "restricted") {
+        const { data: grant } = await adminClient.from("borrower_access_grants").select("borrower_id").eq("borrower_id", borrowerData.id).eq("profile_id", user.id).maybeSingle();
+        if (!grant) return jsonResponse(404, { error: "Borrower not found." });
       }
-      student = studentData;
+      borrower = borrowerData;
     }
 
     let processed = 0;
     const skippedBarcodes: string[] = [];
 
-    for (const barcode of gearBarcodes) {
-      const { data: gear } = await adminClient
-        .from("gear")
+    for (const barcode of itemBarcodes) {
+      const { data: item } = await adminClient
+        .from("items")
         .select("id, workspace_id, checked_out_by, status, access_mode")
         .eq("barcode", barcode)
         .eq("workspace_id", callerProfile.workspace_id)
         .is("deleted_at", null)
         .single();
 
-      if (!gear) {
+      if (!item) {
         skippedBarcodes.push(barcode);
         continue;
       }
 
-      if (callerRole === "tenant_account" && gear.access_mode === "restricted") {
-        const { data: grant } = await adminClient.from("gear_access_grants").select("gear_id").eq("gear_id", gear.id).eq("profile_id", user.id).maybeSingle();
+      if (callerRole === "tenant_account" && item.access_mode === "restricted") {
+        const { data: grant } = await adminClient.from("item_access_grants").select("item_id").eq("item_id", item.id).eq("profile_id", user.id).maybeSingle();
         if (!grant) { skippedBarcodes.push(barcode); continue; }
       }
 
-      const existingOperationId = buildGearLogOperationId(
+      const existingOperationId = buildItemLogOperationId(
         operationId,
-        gear.id,
+        item.id,
         isAdminReturn ? "admin_return" : isQuickReturn ? "quick_return" : "checkout",
       );
-      const existingReturnOperationId = buildGearLogOperationId(
+      const existingReturnOperationId = buildItemLogOperationId(
         operationId,
-        gear.id,
+        item.id,
         "return",
       );
       const { data: existingOperation } = await adminClient
-        .from("gear_logs")
+        .from("item_logs")
         .select("id")
         .eq("workspace_id", callerProfile.workspace_id)
-        .eq("gear_id", gear.id)
+        .eq("item_id", item.id)
         .in("operation_id", isAdminReturn
           ? [existingOperationId]
           : [existingOperationId, existingReturnOperationId])
@@ -334,46 +334,46 @@ serve(async (req) => {
       }
 
       if (isAdminReturn || isQuickReturn) {
-        const normalizedStatus = String(gear.status ?? "").toLowerCase();
-        if (!gear.checked_out_by || normalizedStatus !== "checked_out") {
+        const normalizedStatus = String(item.status ?? "").toLowerCase();
+        if (!item.checked_out_by || normalizedStatus !== "checked_out") {
           skippedBarcodes.push(barcode);
           continue;
         }
 
-        const { data: updatedGear, error: updateError } = await adminClient
-          .from("gear")
+        const { data: updatedItem, error: updateError } = await adminClient
+          .from("items")
           .update({
             checked_out_by: null,
             checked_out_at: null,
             status: "available",
           })
-          .eq("id", gear.id)
+          .eq("id", item.id)
           .eq("workspace_id", callerProfile.workspace_id)
           .eq("status", "checked_out")
           .not("checked_out_by", "is", null)
           .select("id")
           .maybeSingle();
 
-        if (updateError || !updatedGear?.id) {
+        if (updateError || !updatedItem?.id) {
           skippedBarcodes.push(barcode);
           continue;
         }
 
-        const { error: logError } = await adminClient.from("gear_logs").upsert({
-          gear_id: gear.id,
+        const { error: logError } = await adminClient.from("item_logs").upsert({
+          item_id: item.id,
           action_type: isQuickReturn ? "quick_return" : "admin_return",
-          checked_out_by: gear.checked_out_by,
+          checked_out_by: item.checked_out_by,
           performed_by: user.id,
           workspace_id: callerProfile.workspace_id,
-          operation_id: buildGearLogOperationId(operationId, gear.id, isQuickReturn ? "quick_return" : "admin_return"),
+          operation_id: buildItemLogOperationId(operationId, item.id, isQuickReturn ? "quick_return" : "admin_return"),
         }, {
-          onConflict: "workspace_id,gear_id,action_type,operation_id",
+          onConflict: "workspace_id,item_id,action_type,operation_id",
           ignoreDuplicates: true,
         });
 
         if (logError) {
           console.error("checkoutReturn admin log write failed", {
-            gearId: gear.id,
+            itemId: item.id,
             operationId,
             message: logError.message,
           });
@@ -383,11 +383,11 @@ serve(async (req) => {
         continue;
       }
 
-      const normalizedStatus = String(gear.status ?? "").toLowerCase();
+      const normalizedStatus = String(item.status ?? "").toLowerCase();
       const isCheckout = normalizedStatus === "available" &&
-        !gear.checked_out_by;
+        !item.checked_out_by;
       const isReturn = normalizedStatus === "checked_out" &&
-        gear.checked_out_by === student!.id;
+        item.checked_out_by === borrower!.id;
 
       if (!isCheckout && !isReturn) {
         skippedBarcodes.push(barcode);
@@ -395,42 +395,42 @@ serve(async (req) => {
       }
 
       const updateBuilder = adminClient
-        .from("gear")
+        .from("items")
         .update({
-          checked_out_by: isCheckout ? student!.id : null,
+          checked_out_by: isCheckout ? borrower!.id : null,
           checked_out_at: isCheckout ? new Date().toISOString() : null,
           status: isCheckout ? "checked_out" : "available",
         })
-        .eq("id", gear.id)
+        .eq("id", item.id)
         .eq("workspace_id", callerProfile.workspace_id);
 
-      const { data: updatedGear, error: updateError } = await (isCheckout
+      const { data: updatedItem, error: updateError } = await (isCheckout
         ? updateBuilder.is("checked_out_by", null).eq("status", "available")
-        : updateBuilder.eq("checked_out_by", student!.id).eq("status", "checked_out"))
+        : updateBuilder.eq("checked_out_by", borrower!.id).eq("status", "checked_out"))
         .select("id")
         .maybeSingle();
 
-      if (updateError || !updatedGear?.id) {
+      if (updateError || !updatedItem?.id) {
         skippedBarcodes.push(barcode);
         continue;
       }
 
       const resolvedActionType = isCheckout ? "checkout" : "return";
-      const { error: logError } = await adminClient.from("gear_logs").upsert({
-        gear_id: gear.id,
+      const { error: logError } = await adminClient.from("item_logs").upsert({
+        item_id: item.id,
         action_type: resolvedActionType,
-        checked_out_by: student!.id,
+        checked_out_by: borrower!.id,
         performed_by: user.id,
         workspace_id: callerProfile.workspace_id,
-        operation_id: buildGearLogOperationId(operationId, gear.id, resolvedActionType),
+        operation_id: buildItemLogOperationId(operationId, item.id, resolvedActionType),
       }, {
-        onConflict: "workspace_id,gear_id,action_type,operation_id",
+        onConflict: "workspace_id,item_id,action_type,operation_id",
         ignoreDuplicates: true,
       });
 
       if (logError) {
-        console.error("checkoutReturn gear log write failed", {
-          gearId: gear.id,
+        console.error("checkoutReturn item log write failed", {
+          itemId: item.id,
           operationId,
           actionType: resolvedActionType,
           message: logError.message,

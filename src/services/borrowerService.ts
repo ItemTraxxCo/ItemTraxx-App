@@ -4,18 +4,18 @@ import { getAuthState } from "../store/authState";
 import { edgeFunctionError, missingContextError } from "./appErrors";
 import { getOrCreateDeviceSession } from "../utils/deviceSession";
 
-export type StudentItem = {
+export type BorrowerItem = {
   id: string;
   workspace_id: string;
   username: string;
-  student_id: string;
+  borrower_id: string;
   access_mode?: "all" | "restricted";
 };
 
-export type StudentDetails = {
-  checkedOutGear: { id: string; name: string; barcode: string }[];
-  lastCheckout: { action_time: string; gear_name: string | null } | null;
-  lastReturn: { action_time: string; gear_name: string | null } | null;
+export type BorrowerDetails = {
+  checkedOutItem: { id: string; name: string; barcode: string }[];
+  lastCheckout: { action_time: string; item_name: string | null } | null;
+  lastReturn: { action_time: string; item_name: string | null } | null;
 };
 
 type MaybeRelation<T> = T | T[] | null;
@@ -35,19 +35,19 @@ const getWorkspaceContextId = () => {
   return workspaceId;
 };
 
-export const fetchStudents = async () => {
+export const fetchBorrowers = async () => {
   const workspaceId = getWorkspaceContextId();
-  return (await authenticatedSelect<StudentItem[]>("students", {
-    select: "id,workspace_id,username,student_id",
+  return (await authenticatedSelect<BorrowerItem[]>("borrowers", {
+    select: "id,workspace_id,username,borrower_id",
     workspace_id: `eq.${workspaceId}`,
     deleted_at: "is.null",
     order: "created_at.desc",
   })) ?? [];
 };
 
-export const fetchDeletedStudents = async () => {
-  const result = await invokeEdgeFunction<{ data: StudentItem[] }>(
-    "admin-student-mutate",
+export const fetchDeletedBorrowers = async () => {
+  const result = await invokeEdgeFunction<{ data: BorrowerItem[] }>(
+    "admin-borrower-mutate",
     {
       method: "POST",
       body: {
@@ -61,19 +61,19 @@ export const fetchDeletedStudents = async () => {
     throw edgeFunctionError(result, "Unable to load archived borrowers. Please try again.");
   }
 
-  return (result.data?.data ?? []) as StudentItem[];
+  return (result.data?.data ?? []) as BorrowerItem[];
 };
 
-export const createStudent = async (payload: {
+export const createBorrower = async (payload: {
   workspace_id: string;
   username?: string;
-  student_id?: string;
+  borrower_id?: string;
   access_mode: "all" | "restricted";
   profile_ids: string[];
 }) => {
   const { deviceId } = getOrCreateDeviceSession();
-  const result = await invokeEdgeFunction<{ data: StudentItem }>(
-    "admin-student-mutate",
+  const result = await invokeEdgeFunction<{ data: BorrowerItem }>(
+    "admin-borrower-mutate",
     {
       method: "POST",
       body: {
@@ -82,7 +82,7 @@ export const createStudent = async (payload: {
           device_id: deviceId,
           workspace_id: payload.workspace_id,
           username: payload.username ?? "",
-          student_id: payload.student_id ?? "",
+          borrower_id: payload.borrower_id ?? "",
           access_mode: payload.access_mode,
           profile_ids: payload.profile_ids,
         },
@@ -94,21 +94,21 @@ export const createStudent = async (payload: {
     throw edgeFunctionError(result, "Unable to create borrower. Please try again or contact suppport.");
   }
 
-  return result.data?.data as StudentItem;
+  return result.data?.data as BorrowerItem;
 };
 
-export const bulkCreateStudents = async (
-  rows: Array<{ username?: string; student_id?: string }>
+export const bulkCreateBorrowers = async (
+  rows: Array<{ username?: string; borrower_id?: string }>
 ) => {
   const { deviceId } = getOrCreateDeviceSession();
   const result = await invokeEdgeFunction<{
     data: {
       inserted_count: number;
       skipped_count: number;
-      inserted: StudentItem[];
+      inserted: BorrowerItem[];
       skipped: Array<{ row: number; reason: string }>;
     };
-  }>("admin-student-mutate", {
+  }>("admin-borrower-mutate", {
     method: "POST",
     body: {
       action: "bulk_create",
@@ -123,14 +123,14 @@ export const bulkCreateStudents = async (
   return result.data?.data as {
     inserted_count: number;
     skipped_count: number;
-    inserted: StudentItem[];
+    inserted: BorrowerItem[];
     skipped: Array<{ row: number; reason: string }>;
   };
 };
 
-export const deleteStudent = async (id: string) => {
+export const deleteBorrower = async (id: string) => {
   const { deviceId } = getOrCreateDeviceSession();
-  const result = await invokeEdgeFunction("admin-student-mutate", {
+  const result = await invokeEdgeFunction("admin-borrower-mutate", {
     method: "POST",
     body: {
       action: "delete",
@@ -143,10 +143,10 @@ export const deleteStudent = async (id: string) => {
   }
 };
 
-export const restoreStudent = async (id: string) => {
+export const restoreBorrower = async (id: string) => {
   const { deviceId } = getOrCreateDeviceSession();
-  const result = await invokeEdgeFunction<{ data: StudentItem }>(
-    "admin-student-mutate",
+  const result = await invokeEdgeFunction<{ data: BorrowerItem }>(
+    "admin-borrower-mutate",
     {
       method: "POST",
       body: {
@@ -160,63 +160,63 @@ export const restoreStudent = async (id: string) => {
     throw edgeFunctionError(result, "Unable to restore borrower. Please try again or contact support.");
   }
 
-  return result.data?.data as StudentItem;
+  return result.data?.data as BorrowerItem;
 };
 
-export const fetchStudentDetails = async (studentUuid: string) => {
+export const fetchBorrowerDetails = async (borrowerUuid: string) => {
   const workspaceId = getWorkspaceContextId();
-  const checkedOutGear = await authenticatedSelect<Array<{ id: string; name: string; barcode: string }>>("gear", {
+  const checkedOutItem = await authenticatedSelect<Array<{ id: string; name: string; barcode: string }>>("items", {
     select: "id,name,barcode",
     workspace_id: `eq.${workspaceId}`,
     deleted_at: "is.null",
-    checked_out_by: `eq.${studentUuid}`,
+    checked_out_by: `eq.${borrowerUuid}`,
   });
 
-  const lastCheckoutData = await authenticatedSelect<Array<{ action_time: string; gear: { name: string }[] | { name: string } | null }>>("gear_logs", {
-    select: "action_time,gear:gear_id(name)",
+  const lastCheckoutData = await authenticatedSelect<Array<{ action_time: string; item: { name: string }[] | { name: string } | null }>>("item_logs", {
+    select: "action_time,item:item_id(name)",
     workspace_id: `eq.${workspaceId}`,
-    checked_out_by: `eq.${studentUuid}`,
+    checked_out_by: `eq.${borrowerUuid}`,
     action_type: "eq.checkout",
     order: "action_time.desc",
     limit: "1",
   });
 
-  const lastReturnData = await authenticatedSelect<Array<{ action_time: string; gear: { name: string }[] | { name: string } | null }>>("gear_logs", {
-    select: "action_time,gear:gear_id(name)",
+  const lastReturnData = await authenticatedSelect<Array<{ action_time: string; item: { name: string }[] | { name: string } | null }>>("item_logs", {
+    select: "action_time,item:item_id(name)",
     workspace_id: `eq.${workspaceId}`,
-    checked_out_by: `eq.${studentUuid}`,
+    checked_out_by: `eq.${borrowerUuid}`,
     action_type: "eq.return",
     order: "action_time.desc",
     limit: "1",
   });
 
   const checkoutRow = (lastCheckoutData?.[0] ?? null) as
-    | { action_time: string; gear: MaybeRelation<{ name: string }> }
+    | { action_time: string; item: MaybeRelation<{ name: string }> }
     | null;
   const lastCheckout = checkoutRow
     ? {
         action_time: checkoutRow.action_time,
-        gear_name: pickRelation(checkoutRow.gear)?.name ?? null,
+        item_name: pickRelation(checkoutRow.item)?.name ?? null,
       }
     : null;
 
   const returnRow = (lastReturnData?.[0] ?? null) as
-    | { action_time: string; gear: MaybeRelation<{ name: string }> }
+    | { action_time: string; item: MaybeRelation<{ name: string }> }
     | null;
   const lastReturn = returnRow
     ? {
         action_time: returnRow.action_time,
-        gear_name: pickRelation(returnRow.gear)?.name ?? null,
+        item_name: pickRelation(returnRow.item)?.name ?? null,
       }
     : null;
 
   return {
-    checkedOutGear: (checkedOutGear ?? []) as {
+    checkedOutItem: (checkedOutItem ?? []) as {
       id: string;
       name: string;
       barcode: string;
     }[],
     lastCheckout,
     lastReturn,
-  } as StudentDetails;
+  } as BorrowerDetails;
 };

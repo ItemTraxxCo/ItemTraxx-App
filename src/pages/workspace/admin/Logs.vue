@@ -63,14 +63,14 @@
             <td>{{ formatTime(log.action_time) }}</td>
             <td>{{ log.action_type }}</td>
             <td>
-              <span v-if="log.student">
-                {{ log.student.username }} ({{ log.student.student_id }})
+              <span v-if="log.borrower">
+                {{ log.borrower.username }} ({{ log.borrower.borrower_id }})
               </span>
               <span v-else class="muted">-</span>
             </td>
             <td>
-              <span v-if="log.gear">
-                {{ log.gear.name }} ({{ log.gear.barcode }})
+              <span v-if="log.item">
+                {{ log.item.name }} ({{ log.item.barcode }})
               </span>
               <span v-else class="muted">-</span>
             </td>
@@ -90,10 +90,10 @@
 import { computed, onMounted, ref } from "vue";
 import { RouterLink } from "vue-router";
 import SkeletonLoader from "../../../components/SkeletonLoader.vue";
-import { fetchGearLogs, type GearLog } from "../../../services/gearService";
+import { fetchItemLogs, type ItemLog } from "../../../services/itemService";
 import { exportRowsToCsv, exportRowsToPdf } from "../../../services/exportService";
 
-const logs = ref<GearLog[]>([]);
+const logs = ref<ItemLog[]>([]);
 const isLoading = ref(false);
 const error = ref("");
 const searchQuery = ref("");
@@ -127,11 +127,11 @@ const filteredLogs = computed(() => {
     }
 
     const action = (log.action_type || "").toLowerCase();
-    const student = log.student
-      ? `${log.student.username} ${log.student.student_id}`.toLowerCase()
+    const borrower = log.borrower
+      ? `${log.borrower.username} ${log.borrower.borrower_id}`.toLowerCase()
       : "";
-    const gear = log.gear ? `${log.gear.name} ${log.gear.barcode}`.toLowerCase() : "";
-    return action.includes(query) || student.includes(query) || gear.includes(query);
+    const item = log.item ? `${log.item.name} ${log.item.barcode}`.toLowerCase() : "";
+    return action.includes(query) || borrower.includes(query) || item.includes(query);
   });
 });
 
@@ -139,7 +139,7 @@ const loadLogs = async () => {
   isLoading.value = true;
   error.value = "";
   try {
-    logs.value = await fetchGearLogs();
+    logs.value = await fetchItemLogs();
   } catch (err) {
     error.value = err instanceof Error ? err.message : "Unable to load logs. Please sign out completeley and sign back in.";
   } finally {
@@ -151,10 +151,10 @@ const exportRows = computed(() =>
   filteredLogs.value.map((log) => ({
     action_time: formatTime(log.action_time),
     action_type: log.action_type,
-    borrower: log.student
-      ? `${log.student.username} (${log.student.student_id})`
+    borrower: log.borrower
+      ? `${log.borrower.username} (${log.borrower.borrower_id})`
       : "",
-    item: log.gear ? `${log.gear.name} (${log.gear.barcode})` : "",
+    item: log.item ? `${log.item.name} (${log.item.barcode})` : "",
   }))
 );
 

@@ -9,7 +9,7 @@ export const handleStatusTrackingAction = async (
 ): Promise<Response> => {
   const [flaggedResult, historyBaseResult] = await Promise.all([
     context.adminClient
-      .from("gear")
+      .from("items")
       .select(
         "id, name, barcode, serial_number, status, notes, updated_at, created_at",
       )
@@ -19,8 +19,8 @@ export const handleStatusTrackingAction = async (
       .order("updated_at", { ascending: false })
       .limit(400),
     context.adminClient
-      .from("gear_status_history")
-      .select("id, gear_id, status, note, changed_at, changed_by")
+      .from("item_status_history")
+      .select("id, item_id, status, note, changed_at, changed_by")
       .eq("workspace_id", context.workspaceId)
       .order("changed_at", { ascending: false })
       .limit(600),
@@ -39,7 +39,7 @@ export const handleStatusTrackingAction = async (
   if (flaggedResult.error) {
     if (isMissingColumn(flaggedResult.error as RpcError, "updated_at")) {
       const fallbackFlagged = await context.adminClient
-        .from("gear")
+        .from("items")
         .select("id, name, barcode, serial_number, status, notes, created_at")
         .eq("workspace_id", context.workspaceId)
         .is("deleted_at", null)
@@ -97,19 +97,19 @@ export const handleStatusTrackingAction = async (
 
   let history: Array<{
     id: string;
-    gear_id: string;
+    item_id: string;
     status: string;
     note: string | null;
     changed_at: string;
     changed_by: string | null;
-    gear: { name: string; barcode: string } | null;
+    item: { name: string; barcode: string } | null;
   }> = [];
 
   if (historyBaseResult.error) {
     if (
       !isMissingRelation(
         historyBaseResult.error as RpcError,
-        "gear_status_history",
+        "item_status_history",
       )
     ) {
       console.error("admin-ops get_status_tracking history query failed", {
@@ -123,21 +123,21 @@ export const handleStatusTrackingAction = async (
   } else {
     const historyRows = (historyBaseResult.data ?? []) as Array<{
       id: string;
-      gear_id: string;
+      item_id: string;
       status: string;
       note: string | null;
       changed_at: string;
       changed_by: string | null;
     }>;
-    const gearIds = Array.from(new Set(historyRows.map((row) => row.gear_id)));
-    const { data: gearRows } = gearIds.length
-      ? await context.adminClient.from("gear").select("id, name, barcode").in(
+    const itemIds = Array.from(new Set(historyRows.map((row) => row.item_id)));
+    const { data: itemRows } = itemIds.length
+      ? await context.adminClient.from("items").select("id, name, barcode").in(
         "id",
-        gearIds,
+        itemIds,
       )
       : { data: [] };
-    const gearMap = new Map(
-      ((gearRows ?? []) as Array<{
+    const itemMap = new Map(
+      ((itemRows ?? []) as Array<{
         id: string;
         name: string;
         barcode: string;
@@ -148,7 +148,7 @@ export const handleStatusTrackingAction = async (
     );
     history = historyRows.map((row) => ({
       ...row,
-      gear: gearMap.get(row.gear_id) ?? null,
+      item: itemMap.get(row.item_id) ?? null,
     }));
   }
 

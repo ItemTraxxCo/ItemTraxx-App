@@ -13,8 +13,8 @@ export const AUTHENTICATED_ONLY_SELECTORS = [
   ".table-wrap",
   ".skeleton-loader-table",
   ".checkout-item-row",
-  ".gear-notes-cell",
-  ".gear-notes-input",
+  ".item-notes-cell",
+  ".item-notes-input",
 ];
 
 const SAFE_CSS_RE = /^[A-Za-z0-9_][A-Za-z0-9._-]*\.css$/;

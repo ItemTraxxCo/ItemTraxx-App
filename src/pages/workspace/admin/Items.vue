@@ -3,21 +3,21 @@
     <div class="admin-hero">
       <div class="page-nav-left">
         <RouterLink class="button-link" to="/admin">Return to admin panel</RouterLink>
-        <RouterLink class="button-link" to="/admin/gear-import">Bulk item import wizard</RouterLink>
+        <RouterLink class="button-link" to="/admin/item-import">Bulk item import wizard</RouterLink>
       </div>
       <h1>Item Management</h1>
-      <p class="admin-hero-copy">Add inventory, update item status, and review archived gear without jumping between views.</p>
+      <p class="admin-hero-copy">Add inventory, update item status, and review archived item without jumping between views.</p>
       <div class="admin-summary-grid">
         <div class="admin-summary-card">
-          <strong>{{ gear.length }}</strong>
+          <strong>{{ items.length }}</strong>
           <span>Active items</span>
         </div>
         <div class="admin-summary-card">
-          <strong>{{ archivedGear.length }}</strong>
+          <strong>{{ archivedItem.length }}</strong>
           <span>Archived items</span>
         </div>
         <div class="admin-summary-card">
-          <strong>{{ filteredGear.length }}</strong>
+          <strong>{{ filteredItem.length }}</strong>
           <span>Visible in table</span>
         </div>
       </div>
@@ -40,7 +40,7 @@
           <input v-model="barcode" type="text" placeholder="Barcode" />
           <button
             type="button"
-            class="button-secondary gear-camera-button"
+            class="button-secondary item-camera-button"
             @click="openScanner('admin_item_create')"
           >
             Use device camera to scan barcode
@@ -90,7 +90,7 @@
       <div class="admin-section-header">
         <div>
           <h2>Item List</h2>
-          <p class="admin-section-copy">Search and filter gear, then export or open item details.</p>
+          <p class="admin-section-copy">Search and filter item, then export or open item details.</p>
         </div>
         <div class="admin-toolbar-actions">
           <button type="button" @click="exportCsv">Export CSV</button>
@@ -116,7 +116,7 @@
           </select>
         </label>
       </div>
-      <p class="muted">Showing {{ filteredGear.length }} of {{ gear.length }} items.</p>
+      <p class="muted">Showing {{ filteredItem.length }} of {{ items.length }} items.</p>
       <SkeletonLoader v-if="isLoading" variant="table" :rows="6" :columns="6" label="Loading items" />
       <div v-else class="table-wrap">
       <table class="table">
@@ -132,7 +132,7 @@
           </tr>
         </thead>
         <tbody>
-          <tr v-for="item in filteredGear" :key="item.id">
+          <tr v-for="item in filteredItem" :key="item.id">
             <td>{{ item.name }}</td>
             <td>{{ item.barcode }}</td>
             <td>
@@ -141,7 +141,7 @@
               </span>
             </td>
             <td>{{ item.status }}</td>
-            <td class="gear-notes-cell">{{ item.notes || "-" }}</td>
+            <td class="item-notes-cell">{{ item.notes || "-" }}</td>
             <td>
               <div class="admin-actions">
                 <button type="button" class="link" @click="openDetails(item)">Details</button>
@@ -153,7 +153,7 @@
       </div>
     </div>
 
-    <div v-if="showDetailsModal && selectedGear" class="modal-backdrop">
+    <div v-if="showDetailsModal && selectedItem" class="modal-backdrop">
       <div class="modal">
         <h2>Item details</h2>
         <div class="form-grid-2">
@@ -165,7 +165,7 @@
               type="text"
               placeholder="Name"
             />
-            <input v-else :value="selectedGear.name" type="text" readonly />
+            <input v-else :value="selectedItem.name" type="text" readonly />
           </label>
           <label>
             Barcode
@@ -175,11 +175,11 @@
               type="text"
               placeholder="Barcode"
             />
-            <input v-else :value="selectedGear.barcode" type="text" readonly />
+            <input v-else :value="selectedItem.barcode" type="text" readonly />
             <button
               v-if="isModalEditing"
               type="button"
-              class="button-secondary gear-camera-button"
+              class="button-secondary item-camera-button"
               @click="openScanner('admin_item_edit')"
             >
               Use device camera to scan barcode
@@ -188,7 +188,7 @@
           <label>
             Serial Number
             <input
-              :value="selectedGear.serial_number || '-'"
+              :value="selectedItem.serial_number || '-'"
               type="text"
               readonly
               title="To edit the serial number, contact support with the current serial number, barcode, and requested change."
@@ -204,7 +204,7 @@
                 {{ option }}
               </option>
             </select>
-            <input v-else :value="selectedGear.status" type="text" readonly />
+            <input v-else :value="selectedItem.status" type="text" readonly />
           </label>
         </div>
 
@@ -213,21 +213,21 @@
           <textarea
             v-if="isModalEditing"
             v-model="editNotes"
-            class="gear-notes-input"
+            class="item-notes-input"
             rows="3"
             maxlength="500"
             placeholder="Notes"
           ></textarea>
           <textarea
             v-else
-            :value="selectedGear.notes || '-'"
-            class="gear-notes-input"
+            :value="selectedItem.notes || '-'"
+            class="item-notes-input"
             rows="3"
             readonly
           ></textarea>
           <div class="muted form-help-row">
             <span>Character limit 500</span>
-            <span>{{ (isModalEditing ? editNotes : selectedGear.notes || '').length }}/500</span>
+            <span>{{ (isModalEditing ? editNotes : selectedItem.notes || '').length }}/500</span>
           </div>
         </label>
 
@@ -236,7 +236,7 @@
             v-if="!isModalEditing"
             type="button"
             class="link"
-            @click="startEdit(selectedGear)"
+            @click="startEdit(selectedItem)"
           >
             Edit item
           </button>
@@ -248,7 +248,7 @@
               Cancel edit
             </button>
           </template>
-          <button type="button" class="link" :disabled="isSaving" @click="removeGear(selectedGear)">
+          <button type="button" class="link" :disabled="isSaving" @click="removeItem(selectedItem)">
             Archive item
           </button>
           <button type="button" class="link" @click="closeDetails">Close</button>
@@ -275,7 +275,7 @@
           </tr>
         </thead>
         <tbody>
-          <tr v-for="item in archivedGear" :key="item.id">
+          <tr v-for="item in archivedItem" :key="item.id">
             <td>{{ item.name }}</td>
             <td>{{ item.barcode }}</td>
             <td>{{ item.status }}</td>
@@ -285,7 +285,7 @@
               </button>
             </td>
           </tr>
-          <tr v-if="archivedGear.length === 0">
+          <tr v-if="archivedItem.length === 0">
             <td colspan="4" class="muted">No archived items.</td>
           </tr>
         </tbody>
@@ -312,14 +312,14 @@ import { getAuthState } from "../../../store/authState";
 import { logAdminAction } from "../../../services/auditLogService";
 import { enforceAdminRateLimit } from "../../../services/rateLimitService";
 import {
-  createGear,
-  deleteGear,
-  fetchDeletedGear,
-  fetchGear,
-  restoreGear,
-  updateGear,
-  type GearItem,
-} from "../../../services/gearService";
+  createItem,
+  deleteItem,
+  fetchDeletedItem,
+  fetchItem,
+  restoreItem,
+  updateItem,
+  type ItemRecord,
+} from "../../../services/itemService";
 import { exportRowsToCsv, exportRowsToPdf } from "../../../services/exportService";
 import { sanitizeInput } from "../../../utils/inputSanitizer";
 import { toUserFacingErrorMessage } from "../../../services/appErrors";
@@ -327,8 +327,8 @@ import type { ScannerMode, ScannerScanEvent } from "../../../types/cameraScanner
 import { capturePostHogEvent } from "../../../services/posthogService";
 import { authenticatedSelect } from "../../../services/authenticatedDataClient";
 
-const gear = ref<GearItem[]>([]);
-const archivedGear = ref<GearItem[]>([]);
+const items = ref<ItemRecord[]>([]);
+const archivedItem = ref<ItemRecord[]>([]);
 const isLoading = ref(false);
 const isLoadingArchived = ref(false);
 const isSaving = ref(false);
@@ -339,7 +339,7 @@ const toastMessage = ref("");
 const toastActionLabel = ref("");
 const toastAction = ref<(() => Promise<void>) | null>(null);
 const showDetailsModal = ref(false);
-const selectedGear = ref<GearItem | null>(null);
+const selectedItem = ref<ItemRecord | null>(null);
 const isModalEditing = ref(false);
 
 const name = ref("");
@@ -373,10 +373,10 @@ const scannerTitle = computed(() =>
   scannerMode.value === "admin_item_edit" ? "Scan item barcode for edit" : "Scan item barcode"
 );
 
-const filteredGear = computed(() => {
+const filteredItem = computed(() => {
   const query = searchQuery.value.trim().toLowerCase();
   const status = statusFilter.value;
-  return gear.value.filter((item) => {
+  return items.value.filter((item) => {
     if (status !== "all" && item.status !== status) {
       return false;
     }
@@ -460,15 +460,15 @@ const showInputLimitToast = () => {
   );
 };
 
-const openDetails = (item: GearItem) => {
-  selectedGear.value = item;
+const openDetails = (item: ItemRecord) => {
+  selectedItem.value = item;
   showDetailsModal.value = true;
   isModalEditing.value = false;
 };
 
 const closeDetails = () => {
   showDetailsModal.value = false;
-  selectedGear.value = null;
+  selectedItem.value = null;
   isModalEditing.value = false;
   editName.value = "";
   editBarcode.value = "";
@@ -476,44 +476,44 @@ const closeDetails = () => {
   editNotes.value = "";
 };
 
-const loadArchivedGear = async () => {
+const loadArchivedItem = async () => {
   isLoadingArchived.value = true;
   try {
-    archivedGear.value = await fetchDeletedGear();
+    archivedItem.value = await fetchDeletedItem();
   } catch {
-    archivedGear.value = [];
+    archivedItem.value = [];
   } finally {
     isLoadingArchived.value = false;
   }
 };
 
-const loadGear = async () => {
+const loadItem = async () => {
   isLoading.value = true;
   error.value = "";
   try {
-    gear.value = await fetchGear();
+    items.value = await fetchItem();
   } catch (err) {
     error.value = err instanceof Error ? err.message : "Unable to load items. Please sign out completeley and sign back in. If the issue persists, contact support.";
   } finally {
     isLoading.value = false;
   }
-  await loadArchivedGear();
+  await loadArchivedItem();
 };
 
 const exportCsv = () => {
   exportRowsToCsv(
-    `gear-${new Date().toISOString().slice(0, 10)}.csv`,
+    `item-${new Date().toISOString().slice(0, 10)}.csv`,
     ["name", "barcode", "serial_number", "status", "notes"],
-    filteredGear.value
+    filteredItem.value
   );
 };
 
 const exportPdf = async () => {
   await exportRowsToPdf(
-    `gear-${new Date().toISOString().slice(0, 10)}.pdf`,
+    `item-${new Date().toISOString().slice(0, 10)}.pdf`,
     "Item Export",
     ["name", "barcode", "serial_number", "status", "notes"],
-    filteredGear.value
+    filteredItem.value
   );
 };
 
@@ -547,7 +547,7 @@ const handleCreate = async () => {
   }
   if (!accessMode.value || (accessMode.value === "restricted" && selectedProfileIds.value.length === 0)) { error.value = "Choose All Tenant Accounts or select at least one specific account."; return; }
   const normalizedBarcode = barcode.value.trim().toLowerCase();
-  const isDuplicateBarcode = gear.value.some(
+  const isDuplicateBarcode = items.value.some(
     (item) => item.barcode.trim().toLowerCase() === normalizedBarcode
   );
   if (isDuplicateBarcode) {
@@ -564,7 +564,7 @@ const handleCreate = async () => {
   isSaving.value = true;
   try {
     await enforceAdminRateLimit();
-    const created = await createGear({
+    const created = await createItem({
       workspace_id: auth.workspaceContextId,
       name: name.value.trim(),
       barcode: barcode.value.trim(),
@@ -575,13 +575,13 @@ const handleCreate = async () => {
       profile_ids: selectedProfileIds.value,
     });
     await logAdminAction({
-      action_type: "gear_create",
-      entity_type: "gear",
+      action_type: "item_create",
+      entity_type: "items",
       entity_id: created.id,
       metadata: { name: created.name, barcode: created.barcode },
     });
-    capturePostHogEvent("gear_item_created");
-    gear.value = [created, ...gear.value];
+    capturePostHogEvent("item_item_created");
+    items.value = [created, ...items.value];
     name.value = "";
     barcode.value = "";
     serialNumber.value = "";
@@ -602,7 +602,7 @@ const handleCreate = async () => {
   }
 };
 
-const startEdit = (item: GearItem) => {
+const startEdit = (item: ItemRecord) => {
   isModalEditing.value = true;
   editName.value = item.name;
   editBarcode.value = item.barcode;
@@ -611,12 +611,12 @@ const startEdit = (item: GearItem) => {
 };
 
 const cancelEdit = () => {
-  if (!selectedGear.value) return;
+  if (!selectedItem.value) return;
   isModalEditing.value = false;
-  editName.value = selectedGear.value.name;
-  editBarcode.value = selectedGear.value.barcode;
-  editStatus.value = selectedGear.value.status;
-  editNotes.value = selectedGear.value.notes ?? "";
+  editName.value = selectedItem.value.name;
+  editBarcode.value = selectedItem.value.barcode;
+  editStatus.value = selectedItem.value.status;
+  editNotes.value = selectedItem.value.notes ?? "";
 };
 
 const saveEdit = async (id: string) => {
@@ -644,8 +644,8 @@ const saveEdit = async (id: string) => {
   isSaving.value = true;
   try {
     await enforceAdminRateLimit();
-    const previousStatus = selectedGear.value?.status ?? "";
-    const updated = await updateGear({
+    const previousStatus = selectedItem.value?.status ?? "";
+    const updated = await updateItem({
       id,
       name: editName.value.trim(),
       barcode: editBarcode.value.trim(),
@@ -653,13 +653,13 @@ const saveEdit = async (id: string) => {
       notes: editNotes.value.trim(),
     });
     await logAdminAction({
-      action_type: "gear_update",
-      entity_type: "gear",
+      action_type: "item_update",
+      entity_type: "items",
       entity_id: updated.id,
       metadata: { name: updated.name, barcode: updated.barcode },
     });
-    gear.value = gear.value.map((item) => (item.id === id ? updated : item));
-    selectedGear.value = updated;
+    items.value = items.value.map((item) => (item.id === id ? updated : item));
+    selectedItem.value = updated;
     success.value = "Item updated.";
     isModalEditing.value = false;
     if (previousStatus && previousStatus !== updated.status) {
@@ -669,18 +669,18 @@ const saveEdit = async (id: string) => {
         "Undo status",
         async () => {
           await enforceAdminRateLimit();
-          const reverted = await updateGear({
+          const reverted = await updateItem({
             id: updated.id,
             name: updated.name,
             barcode: updated.barcode,
             status: previousStatus,
             notes: updated.notes ?? "",
           });
-          gear.value = gear.value.map((item) =>
+          items.value = items.value.map((item) =>
             item.id === reverted.id ? reverted : item
           );
-          if (selectedGear.value?.id === reverted.id) {
-            selectedGear.value = reverted;
+          if (selectedItem.value?.id === reverted.id) {
+            selectedItem.value = reverted;
           }
           success.value = "Status reverted.";
         }
@@ -697,7 +697,7 @@ const saveEdit = async (id: string) => {
   }
 };
 
-const removeGear = async (item: GearItem) => {
+const removeItem = async (item: ItemRecord) => {
   const confirmed = window.confirm(`Archive item "${item.name}"? You can restore it later.`);
   if (!confirmed) return;
   error.value = "";
@@ -705,20 +705,20 @@ const removeGear = async (item: GearItem) => {
   isSaving.value = true;
   try {
     await enforceAdminRateLimit();
-    await deleteGear(item.id);
+    await deleteItem(item.id);
     await logAdminAction({
-      action_type: "gear_archive",
-      entity_type: "gear",
+      action_type: "item_archive",
+      entity_type: "items",
       entity_id: item.id,
       metadata: { name: item.name, barcode: item.barcode },
     });
-    gear.value = gear.value.filter((row) => row.id !== item.id);
-    archivedGear.value = [item, ...archivedGear.value];
+    items.value = items.value.filter((row) => row.id !== item.id);
+    archivedItem.value = [item, ...archivedItem.value];
     success.value = "Item archived.";
     showToastWithAction("Item archived", `${item.name} was archived.`, "Undo", async () => {
       await handleRestore(item);
     });
-    if (selectedGear.value?.id === item.id) {
+    if (selectedItem.value?.id === item.id) {
       closeDetails();
     }
   } catch (err) {
@@ -729,25 +729,25 @@ const removeGear = async (item: GearItem) => {
 };
 
 const saveModalEdit = async () => {
-  if (!selectedGear.value) return;
-  await saveEdit(selectedGear.value.id);
+  if (!selectedItem.value) return;
+  await saveEdit(selectedItem.value.id);
 };
 
-const handleRestore = async (item: GearItem) => {
+const handleRestore = async (item: ItemRecord) => {
   error.value = "";
   success.value = "";
   isSaving.value = true;
   try {
     await enforceAdminRateLimit();
-    const restored = await restoreGear(item.id);
+    const restored = await restoreItem(item.id);
     await logAdminAction({
-      action_type: "gear_restore",
-      entity_type: "gear",
+      action_type: "item_restore",
+      entity_type: "items",
       entity_id: item.id,
       metadata: { name: item.name, barcode: item.barcode },
     });
-    archivedGear.value = archivedGear.value.filter((row) => row.id !== item.id);
-    gear.value = [restored, ...gear.value];
+    archivedItem.value = archivedItem.value.filter((row) => row.id !== item.id);
+    items.value = [restored, ...items.value];
     success.value = "Item restored.";
   } catch (err) {
     error.value = err instanceof Error ? err.message : "Unable to restore item.";
@@ -765,7 +765,7 @@ const handleScannerScan = (event: ScannerScanEvent) => {
 };
 
 onMounted(() => {
-  void loadGear();
+  void loadItem();
   void authenticatedSelect<Array<{id:string;auth_email:string}>>("profiles", { select: "id,auth_email", role: "eq.tenant_account", is_active: "eq.true", deleted_at: "is.null", order: "auth_email.asc" }).then((rows) => { tenantAccounts.value = rows; });
 });
 
@@ -785,11 +785,11 @@ onUnmounted(() => {
   font-size: 0.75rem;
 }
 
-.gear-notes-cell {
+.item-notes-cell {
   min-width: 220px;
 }
 
-.gear-notes-input {
+.item-notes-input {
   width: 100%;
 }
 
@@ -841,7 +841,7 @@ onUnmounted(() => {
   flex-wrap: wrap;
 }
 
-.gear-camera-button {
+.item-camera-button {
   margin-top: 0.7rem;
 }
 

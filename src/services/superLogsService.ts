@@ -5,13 +5,13 @@ import { edgeFunctionError } from "./appErrors";
 export type SuperLogEntry = {
   id: string;
   workspace_id: string;
-  gear_id: string;
+  item_id: string;
   checked_out_by: string | null;
   action_type: string;
   action_time: string;
   performed_by: string | null;
-  gear: { id: string; name: string; barcode: string } | null;
-  student: { id: string; username: string; student_id: string } | null;
+  item: { id: string; name: string; barcode: string } | null;
+  borrower: { id: string; username: string; borrower_id: string } | null;
   workspace: { id: string; name: string } | null;
 };
 

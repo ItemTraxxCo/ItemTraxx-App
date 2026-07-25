@@ -47,8 +47,8 @@ test.describe("Protected route smoke tests", () => {
 
     await page.evaluate(async () => {
       await window.__itemtraxxTest?.offlineCheckoutQueue.queue({
-        student_id: "student-shell-e2e",
-        gear_barcodes: ["GEAR-SHELL-E2E"],
+        borrower_id: "borrower-shell-e2e",
+        item_barcodes: ["ITEM-SHELL-E2E"],
         action_type: "checkout",
         operation_id: "operation-shell-e2e",
       });

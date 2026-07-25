@@ -27,7 +27,7 @@ const EXPECTED_ACTIONS = [
   "revoke_session",
   "revoke_current_session",
   "revoke_all_sessions",
-  "bulk_import_gear",
+  "bulk_import_items",
 ] as const;
 
 const jsonResponse: JsonResponse = (status, body) =>
@@ -153,7 +153,7 @@ const contextFor = (
   featureFlags: {
     enable_notifications: true,
     enable_bulk_item_import: true,
-    enable_bulk_student_tools: true,
+    enable_bulk_borrower_tools: true,
     enable_status_tracking: true,
     enable_barcode_generator: true,
   },
@@ -222,7 +222,7 @@ Deno.test("Tenant Accounts can use their own session-management actions", async 
 Deno.test("suspended workspaces remain denied from write actions", async () => {
   const { client } = queryClient(() => ({ data: null, error: null }));
   const response = await authorizeAdminOpsAction({
-    action: "bulk_import_gear",
+    action: "bulk_import_items",
     profileRole: "workspace_admin",
     isWorkspaceSuspended: true,
     adminClient: client,
@@ -462,14 +462,14 @@ Deno.test("tenant policy resolution retries when feature_flags is missing", asyn
   );
 });
 
-Deno.test("bulk_import_gear preserves the 1000-row hard limit", async () => {
+Deno.test("bulk_import_items preserves the 1000-row hard limit", async () => {
   const { client, calls } = queryClient(() => ({ data: null, error: null }));
   const rows = Array.from({ length: 1001 }, (_, index) => ({
     name: `Item ${index}`,
     barcode: `ITEM-${index}`,
   }));
   const response = await dispatchAdminOpsAction(
-    contextFor("bulk_import_gear", client, { rows }),
+    contextFor("bulk_import_items", client, { rows }),
   );
 
   assertEquals(response.status, 400);

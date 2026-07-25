@@ -376,11 +376,11 @@ const randomLetters = (len: number) =>
     String.fromCharCode(65 + secureRandomInt(26))
   ).join("");
 
-const generateStudentId = () => `${randomDigits(4)}${randomLetters(2)}`;
+const generateBorrowerId = () => `${randomDigits(4)}${randomLetters(2)}`;
 
 const normalizeNameToken = (token: string) => token.slice(0, 6);
 
-const generateStudentUsername = () => {
+const generateBorrowerUsername = () => {
   const prefix =
     CODENAME_PREFIXES[secureRandomInt(CODENAME_PREFIXES.length)] ?? "Nova";
   const suffix =
@@ -389,7 +389,7 @@ const generateStudentUsername = () => {
   return `${normalizeNameToken(prefix)}${normalizeNameToken(suffix)}${randomDigits(3)}`;
 };
 
-export const generateStudentIdentity = () => ({
-  username: generateStudentUsername(),
-  studentId: generateStudentId(),
+export const generateBorrowerIdentity = () => ({
+  username: generateBorrowerUsername(),
+  borrowerId: generateBorrowerId(),
 });

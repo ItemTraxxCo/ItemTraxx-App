@@ -12,6 +12,7 @@
       <div class="workspace-actions">
         <RouterLink class="button-link" to="/super-admin/workspaces">Workspaces</RouterLink>
         <RouterLink class="button-link" to="/super-admin/admins">Workspace Admins</RouterLink>
+        <RouterLink class="button-link" to="/super-admin/tenant-accounts">Tenant Accounts</RouterLink>
         <RouterLink class="button-link" to="/super-admin/super-admins">Super Admins</RouterLink>
         <RouterLink class="button-link" to="/super-admin/settings">Settings</RouterLink>
         <RouterLink class="button-link" to="/super-admin/support-requests">Support Requests</RouterLink>
@@ -62,6 +63,10 @@
             <span class="section-link-title">Admins</span>
             <span class="section-link-meta">Workspace operators</span>
           </RouterLink>
+          <RouterLink class="section-link" to="/super-admin/tenant-accounts">
+            <span class="section-link-title">Tenant Accounts</span>
+            <span class="section-link-meta">Checkout-desk accounts across all workspaces</span>
+          </RouterLink>
           <RouterLink class="section-link" to="/super-admin/super-admins">
             <span class="section-link-title">Super Admins</span>
             <span class="section-link-meta">Privileged operator accounts</span>
@@ -75,7 +80,7 @@
           <p class="muted">Inspect global item, borrower, and transaction data.</p>
         </div>
         <div class="section-links">
-          <RouterLink class="section-link" to="/super-admin/gear">
+          <RouterLink class="section-link" to="/super-admin/items">
             <span class="section-link-title">All Items</span>
             <span class="section-link-meta">Global inventory catalogue</span>
           </RouterLink>
@@ -340,7 +345,7 @@
           <tbody>
             <tr v-for="item in (dashboard?.workspace_metrics ?? []).slice(0, 20)" :key="item.workspace_id">
               <td>{{ item.workspace_name }}</td>
-              <td>{{ item.gear_total }}</td>
+              <td>{{ item.item_total }}</td>
               <td>{{ item.borrowers_total }}</td>
               <td>{{ item.active_checkouts }}</td>
               <td>{{ item.overdue_items }}</td>

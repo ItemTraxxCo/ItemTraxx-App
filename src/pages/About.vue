@@ -106,7 +106,7 @@ const brandLogoUrl = computed(() =>
 let themeObserver: MutationObserver | null = null;
 
 const storyParagraphs = [
-  'ItemTraxx started as the kind of idea most people would brush off. In our broadcast class, gear kept going missing, and my broadcast teacher jokingly told me to build an app to track it.',
+  'ItemTraxx started as the kind of idea most people would brush off. In our broadcast class, item kept going missing, and my broadcast teacher jokingly told me to build an app to track it.',
   'I took that seriously and built the first version. It worked as a prototype, but it also had a lot of flaws, rough edges, and structural problems that became obvious once it was used in the real world.',
   'After working through those issues, I realized patching the original build was the wrong path. I scrapped it, rebuilt the product with a cleaner foundation, and that became the ItemTraxx we use today.',
 ];
@@ -133,7 +133,7 @@ const values = [
 const customerSegments = [
   {
     title: 'Schools and classrooms',
-    description: 'Track shared gear cleanly across borrowers, staff, and media or production environments.',
+    description: 'Track shared item cleanly across borrowers, staff, and media or production environments.',
   },
   {
     title: 'Districts/Organizations and multi-site groups',

@@ -147,7 +147,12 @@ test.describe("workspace model role surfaces", () => {
     await navigateApp(page, "/super-admin/tenant-accounts");
 
     await expect(page.getByRole("heading", { name: "Tenant Accounts" })).toBeVisible();
-    await expect(page.getByRole("textbox", { name: "Email for Demo Tenant" })).toHaveValue("desk@demo.test");
+    const emailInput = page.getByRole("textbox", { name: "Email for Demo Tenant" });
+    const saveEmail = page.getByRole("button", { name: "Save email" });
+    await expect(emailInput).toHaveValue("desk@demo.test");
+    await expect(saveEmail).toBeDisabled();
+    await emailInput.fill("new-desk@demo.test");
+    await expect(saveEmail).toBeEnabled();
     await page.getByRole("button", { name: "Suspend" }).click();
     await expect.poll(() => actions).toContain("set_tenant_account_status");
   });

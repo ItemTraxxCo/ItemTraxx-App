@@ -96,6 +96,9 @@ export const handleTenantAccountAction = async (
 
   if (action === "update_tenant_account_email") {
     const email = requireEmail(payload.auth_email);
+    if (email === target.auth_email.toLowerCase()) {
+      return { handled: true, status: 200, data: target };
+    }
     const updated = await repository.updateEmail(id, email);
     await repository.audit(action, id, { auth_email: email });
     return { handled: true, status: 200, data: updated };

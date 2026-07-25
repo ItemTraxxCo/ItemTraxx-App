@@ -13,6 +13,7 @@ export type HttpSessionSummary = {
     auth_email: string | null;
     is_active: boolean | null;
   } | null;
+  password_authenticated_at?: string | null;
 };
 
 const trimTrailingSlash = (value: string) => value.replace(/\/+$/, "");

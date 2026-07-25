@@ -80,6 +80,30 @@ Deno.test("localhost origins require the explicit trust flag", () => {
   assert(!isLocalhostOrigin("not a URL"), "invalid localhost URL should fail");
 });
 
+Deno.test("production workspace app origins are allowed without per-workspace configuration", () => {
+  for (const origin of [
+    "https://new-workspace.app.itemtraxx.com",
+    "https://itxdemo.app.itemtraxx.com",
+  ]) {
+    assert(
+      isAllowedOrigin(origin, [], {} as Env),
+      `workspace app origin should pass: ${origin}`,
+    );
+  }
+  for (const origin of [
+    "http://itxdemo.app.itemtraxx.com",
+    "https://app.itemtraxx.com",
+    "https://app.app.itemtraxx.com",
+    "https://evil.app.itemtraxx.com.attacker.com",
+    "https://two.levels.app.itemtraxx.com",
+  ]) {
+    assert(
+      !isAllowedOrigin(origin, [], {} as Env),
+      `invalid workspace app origin should fail: ${origin}`,
+    );
+  }
+});
+
 Deno.test("CORS headers preserve the exact security set and reflect only allowed origins", () => {
   const origin = "https://itemtraxx.com";
   const allowed = withCorsHeaders(origin, [origin], {} as Env);

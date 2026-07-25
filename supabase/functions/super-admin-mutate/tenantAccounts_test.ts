@@ -25,7 +25,10 @@ const makeRepository = () => {
     create: async (workspaceId, email) => ({ ...account, workspace_id: workspaceId, auth_email: email }),
     findActive: async () => account,
     setStatus: async (_id, isActive) => ({ ...account, is_active: isActive }),
-    updateEmail: async (_id, email) => ({ ...account, auth_email: email }),
+    updateEmail: async (id, email) => {
+      calls.push({ name: "updateEmail", value: { id, email } });
+      return { ...account, auth_email: email };
+    },
     sendReset: async (email) => { calls.push({ name: "sendReset", value: email }); },
     softDelete: async (id, at) => { calls.push({ name: "softDelete", value: { id, at } }); },
     revokeSessions: async (id, actorId, at) => { calls.push({ name: "revokeSessions", value: { id, actorId, at } }); },
@@ -55,6 +58,21 @@ Deno.test("Super Admin Tenant Account creation requires an explicit workspace", 
     Error,
     "Invalid request",
   );
+});
+
+Deno.test("saving an unchanged Tenant Account email preserves the active setup link", async () => {
+  const { repository, calls } = makeRepository();
+  const result = await handleTenantAccountAction("update_tenant_account_email", {
+    id: account.id,
+    auth_email: "  DESK@example.test ",
+  }, {
+    actorId: "30000000-0000-4000-8000-000000000001",
+    now: () => "2026-07-25T01:00:00.000Z",
+    repository,
+  });
+
+  assertEquals(result, { handled: true, status: 200, data: account });
+  assertEquals(calls, []);
 });
 
 Deno.test("Super Admin Tenant Account removal soft-deletes and revokes every active session", async () => {

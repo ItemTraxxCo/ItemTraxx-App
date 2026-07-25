@@ -39,7 +39,7 @@
             <td>{{ account.workspace_name }}</td>
             <td>{{ account.is_active ? 'Active' : 'Suspended' }}</td>
             <td class="row-actions">
-              <button @click="saveEmail(account)">Save email</button>
+              <button :disabled="saving || emailUnchanged(account)" @click="saveEmail(account)">Save email</button>
               <button @click="toggle(account)">{{ account.is_active ? 'Suspend' : 'Restore' }}</button>
               <button @click="reset(account)">Reset password</button>
               <button @click="remove(account)">Remove</button>
@@ -76,6 +76,11 @@ const loading = ref(false);
 const saving = ref(false);
 const message = ref("");
 const error = ref("");
+const savedEmails = ref<Record<string, string>>({});
+
+const normalizeEmail = (value: string) => value.trim().toLowerCase();
+const emailUnchanged = (account: SuperTenantAccount) =>
+  normalizeEmail(account.auth_email) === savedEmails.value[account.id];
 
 const run = async (operation: () => Promise<void>) => {
   saving.value = true;
@@ -88,7 +93,12 @@ const run = async (operation: () => Promise<void>) => {
 const load = async () => {
   loading.value = true;
   error.value = "";
-  try { accounts.value = await listTenantAccounts(search.value, workspaceId.value); }
+  try {
+    accounts.value = await listTenantAccounts(search.value, workspaceId.value);
+    savedEmails.value = Object.fromEntries(
+      accounts.value.map((account) => [account.id, normalizeEmail(account.auth_email)]),
+    );
+  }
   catch (cause) { error.value = cause instanceof Error ? cause.message : "Unable to load Tenant Accounts."; }
   finally { loading.value = false; }
 };

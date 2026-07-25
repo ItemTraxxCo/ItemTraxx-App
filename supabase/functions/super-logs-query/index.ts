@@ -177,8 +177,8 @@ serve(async (req) => {
     }
     const payloadRecord = payload as Record<string, unknown>;
 
-    const tenantId = optionalText(payloadRecord.tenant_id, { maxLen: 36 }) || "all";
-    if (tenantId !== "all" && !UUID_PATTERN.test(tenantId)) {
+    const workspaceId = optionalText(payloadRecord.workspace_id, { maxLen: 36 }) || "all";
+    if (workspaceId !== "all" && !UUID_PATTERN.test(workspaceId)) {
       return jsonResponse(400, { error: "Invalid request" });
     }
     const search = optionalText(payloadRecord.search, { maxLen: 120, transform: "lowercase" });
@@ -191,13 +191,13 @@ serve(async (req) => {
     let query = adminClient
       .from("gear_logs")
       .select(
-        "id, tenant_id, gear_id, checked_out_by, action_type, action_time, performed_by"
+        "id, workspace_id, gear_id, checked_out_by, action_type, action_time, performed_by"
       )
       .order("action_time", { ascending: false })
       .range((page - 1) * pageSize, page * pageSize - 1);
 
-    if (tenantId && tenantId !== "all") {
-      query = query.eq("tenant_id", tenantId);
+    if (workspaceId && workspaceId !== "all") {
+      query = query.eq("workspace_id", workspaceId);
     }
     if (actionType && actionType !== "all") {
       query = query.eq("action_type", actionType);
@@ -216,7 +216,7 @@ serve(async (req) => {
 
     const rows = (data ?? []) as Array<{
       id: string;
-      tenant_id: string;
+      workspace_id: string;
       gear_id: string;
       checked_out_by: string | null;
       action_type: string;
@@ -228,7 +228,7 @@ serve(async (req) => {
     const studentIds = Array.from(
       new Set(rows.map((row) => row.checked_out_by).filter(Boolean))
     ) as string[];
-    const tenantIds = Array.from(new Set(rows.map((row) => row.tenant_id)));
+    const workspaceIds = Array.from(new Set(rows.map((row) => row.workspace_id)));
 
     const [gearResult, studentResult, tenantResult] = await Promise.all([
       gearIds.length
@@ -240,8 +240,8 @@ serve(async (req) => {
             .select("id, username, student_id")
             .in("id", studentIds)
         : Promise.resolve({ data: [], error: null }),
-      tenantIds.length
-        ? adminClient.from("tenants").select("id, name").in("id", tenantIds)
+      workspaceIds.length
+        ? adminClient.from("workspaces").select("id, name").in("id", workspaceIds)
         : Promise.resolve({ data: [], error: null }),
     ]);
 
@@ -271,7 +271,7 @@ serve(async (req) => {
         ...row,
         gear: gearById.get(row.gear_id) ?? null,
         student: row.checked_out_by ? studentById.get(row.checked_out_by) ?? null : null,
-        tenant: tenantById.get(row.tenant_id) ?? null,
+        workspace: tenantById.get(row.workspace_id) ?? null,
       }))
       .filter((row) => {
         if (!search) return true;
@@ -281,7 +281,7 @@ serve(async (req) => {
           row.gear?.barcode,
           row.student?.username,
           row.student?.student_id,
-          row.tenant?.name,
+          row.workspace?.name,
         ]
           .filter(Boolean)
           .join(" ")

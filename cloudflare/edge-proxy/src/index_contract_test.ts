@@ -84,9 +84,8 @@ Deno.test("session exchange validates the user/profile and emits exact configure
     if (url.includes("/rest/v1/profiles?")) {
       return Promise.resolve(Response.json([{
         id: "user-1",
-        role: "tenant_admin",
-        tenant_id: "tenant-1",
-        district_id: null,
+        role: "workspace_admin",
+        workspace_id: "tenant-1",
         auth_email: "user@example.com",
         is_active: true,
       }]));
@@ -116,9 +115,8 @@ Deno.test("session exchange validates the user/profile and emits exact configure
         last_sign_in_at: "stamp",
       },
       profile: {
-        role: "tenant_admin",
-        tenant_id: "tenant-1",
-        district_id: null,
+        role: "workspace_admin",
+        workspace_id: "tenant-1",
         auth_email: "user@example.com",
         is_active: true,
       },

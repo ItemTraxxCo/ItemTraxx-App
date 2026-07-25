@@ -64,9 +64,8 @@ const escapeHtml = (value: string) =>
     .replaceAll("'", "&#39;");
 
 type LoginLocation =
-  | "tenant_login"
-  | "tenant_admin_login"
-  | "district_admin_login"
+  | "account_login"
+  | "workspace_admin_login"
   | "super_admin_login"
   | "regular_login"
   | "admin_login";
@@ -75,12 +74,11 @@ const LOGIN_CONTEXTS: Record<
   LoginLocation,
   { label: string; subjectLabel: string }
 > = {
-  tenant_login: { label: "Tenant sign in", subjectLabel: "Tenant Sign In" },
-  tenant_admin_login: { label: "Tenant admin sign in", subjectLabel: "Tenant Admin Sign In" },
-  district_admin_login: { label: "District admin sign in", subjectLabel: "District Admin Sign In" },
+  account_login: { label: "Tenant Account sign in", subjectLabel: "Tenant Account Sign In" },
+  workspace_admin_login: { label: "Workspace Admin sign in", subjectLabel: "Workspace Admin Sign In" },
   super_admin_login: { label: "Super admin sign in", subjectLabel: "Super Admin Sign In" },
-  regular_login: { label: "Tenant sign in", subjectLabel: "Tenant Sign In" },
-  admin_login: { label: "Tenant admin sign in", subjectLabel: "Tenant Admin Sign In" },
+  regular_login: { label: "Tenant Account sign in", subjectLabel: "Tenant Account Sign In" },
+  admin_login: { label: "Workspace Admin sign in", subjectLabel: "Workspace Admin Sign In" },
 };
 
 const resolveLoginContext = (value: unknown) => {
@@ -292,7 +290,7 @@ serve(async (req) => {
 
     const { data: profile, error: profileError } = await adminClient
       .from("profiles")
-      .select("tenant_id, district_id, role, auth_email")
+      .select("workspace_id, role, auth_email")
       .eq("id", user.id)
       .single();
 
@@ -301,9 +299,8 @@ serve(async (req) => {
     }
 
     if (
-      profile.role !== "tenant_user" &&
-      profile.role !== "tenant_admin" &&
-      profile.role !== "district_admin" &&
+      profile.role !== "tenant_account" &&
+      profile.role !== "workspace_admin" &&
       profile.role !== "super_admin"
     ) {
       return jsonResponse(403, { error: "Access denied" });
@@ -313,31 +310,19 @@ serve(async (req) => {
     let accountLabel: string;
     let accountId: string;
 
-    if ((profile.role === "tenant_user" || profile.role === "tenant_admin") && profile.tenant_id) {
+    if ((profile.role === "tenant_account" || profile.role === "workspace_admin") && profile.workspace_id) {
       const { data: tenant, error: tenantError } = await adminClient
-        .from("tenants")
+        .from("workspaces")
         .select("id, name")
-        .eq("id", profile.tenant_id)
+        .eq("id", profile.workspace_id)
         .single();
 
       if (tenantError || !tenant?.id) {
-        return jsonResponse(400, { error: "Unable to resolve tenant" });
+        return jsonResponse(400, { error: "Unable to resolve workspace" });
       }
       accountName = tenant.name;
-      accountLabel = "Tenant";
+      accountLabel = "Workspace";
       accountId = tenant.id;
-    } else if (profile.role === "district_admin" && profile.district_id) {
-      const { data: district, error: districtError } = await adminClient
-        .from("districts")
-        .select("id, name")
-        .eq("id", profile.district_id)
-        .single();
-      if (districtError || !district?.id) {
-        return jsonResponse(400, { error: "Unable to resolve district" });
-      }
-      accountName = district.name;
-      accountLabel = "District";
-      accountId = district.id;
     } else if (profile.role === "super_admin") {
       accountName = "Super Admin Control Center";
       accountLabel = "Workspace";
@@ -422,8 +407,7 @@ serve(async (req) => {
         request_id: requestId,
       },
       triggeredByUserId: user.id,
-      tenantId: profile.tenant_id ?? null,
-      districtId: profile.district_id ?? null,
+      workspaceId: profile.workspace_id ?? null,
       metadata: {
         role: profile.role,
         account_id: accountId,

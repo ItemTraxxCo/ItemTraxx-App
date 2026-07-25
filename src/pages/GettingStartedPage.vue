@@ -39,7 +39,7 @@
             </li>
             <li>
               <strong>Tenant and district/organization admins</strong>
-              <span>Use the dedicated <RouterLink to="/tenant/admin-login">admin sign in</RouterLink> page with email and password.</span>
+              <span>Use the dedicated <RouterLink to="/admin/login">admin sign in</RouterLink> page with email and password.</span>
             </li>
             <li>
               <strong>Forgot your password?</strong>

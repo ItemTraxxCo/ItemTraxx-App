@@ -4,7 +4,7 @@ import {
   hasCompletedOnboarding,
   markOnboardingCompleted,
   resetOnboarding,
-  type TenantOnboardingRole,
+  type WorkspaceOnboardingRole,
 } from "../services/onboardingService";
 
 type OnboardingAuthState = {
@@ -15,16 +15,19 @@ type OnboardingAuthState = {
 
 export const useOnboarding = (auth: OnboardingAuthState, route: RouteLocationNormalizedLoaded) => {
   const visible = ref(false);
-  const role = ref<TenantOnboardingRole>("tenant_user");
-  const variant = ref<"tenant_checkout" | "tenant_admin">("tenant_checkout");
+  const role = ref<WorkspaceOnboardingRole>("tenant_account");
+  const variant = ref<"tenant_checkout" | "workspace_admin">("tenant_checkout");
   const evaluationDone = ref(false);
 
-  const currentRole = computed<TenantOnboardingRole | null>(() => {
+  const currentRole = computed<WorkspaceOnboardingRole | null>(() => {
     if (!auth.isAuthenticated) return null;
-    return auth.role === "tenant_user" || auth.role === "tenant_admin" ? auth.role : null;
+    return auth.role === "tenant_account" || auth.role === "workspace_admin" ? auth.role : null;
   });
-  const isOnTenantRoute = computed(() => route.path.startsWith("/tenant"));
-  const canReplay = computed(() => !!currentRole.value && isOnTenantRoute.value);
+  const isOnWorkspaceRoute = computed(() =>
+    ["/checkout", "/items", "/borrowers", "/settings"].includes(route.path) ||
+    route.path === "/admin" || route.path.startsWith("/admin/")
+  );
+  const canReplay = computed(() => !!currentRole.value && isOnWorkspaceRoute.value);
 
   const evaluate = () => {
     const nextRole = currentRole.value;
@@ -33,12 +36,12 @@ export const useOnboarding = (auth: OnboardingAuthState, route: RouteLocationNor
       evaluationDone.value = false;
       return;
     }
-    if (!isOnTenantRoute.value) {
+    if (!isOnWorkspaceRoute.value) {
       visible.value = false;
       return;
     }
     role.value = nextRole;
-    variant.value = route.path.startsWith("/tenant/admin") ? "tenant_admin" : "tenant_checkout";
+    variant.value = route.path.startsWith("/admin") ? "workspace_admin" : "tenant_checkout";
     if (evaluationDone.value) return;
     if (!hasCompletedOnboarding(nextRole)) visible.value = true;
     evaluationDone.value = true;
@@ -48,7 +51,7 @@ export const useOnboarding = (auth: OnboardingAuthState, route: RouteLocationNor
     if (!currentRole.value) return;
     resetOnboarding(currentRole.value);
     role.value = currentRole.value;
-    variant.value = route.path.startsWith("/tenant/admin") ? "tenant_admin" : "tenant_checkout";
+    variant.value = route.path.startsWith("/admin") ? "workspace_admin" : "tenant_checkout";
     evaluationDone.value = true;
     visible.value = true;
   };

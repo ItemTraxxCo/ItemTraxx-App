@@ -48,16 +48,16 @@ const openapi = {
   paths: {
     '/functions/v1/admin-ops': {
       post: {
-        summary: 'Tenant admin operations',
+        summary: 'Workspace admin operations',
         requestBody: { required: true, content: jsonContent(envelopeRef('adminOpsRequest')) },
         responses: { '200': { description: 'Successful response', content: jsonContent(envelopeRef('adminOpsResponses')) }, '400': { description: 'Error', content: jsonContent(errorSchema) } },
       },
     },
-    '/functions/v1/super-tenant-mutate': {
+    '/functions/v1/super-workspace-mutate': {
       post: {
-        summary: 'Super admin tenant and district mutations',
-        requestBody: { required: true, content: jsonContent(envelopeRef('superTenantRequest')) },
-        responses: { '200': { description: 'Successful response', content: jsonContent(envelopeRef('superTenantResponses')) }, '400': { description: 'Error', content: jsonContent(errorSchema) } },
+        summary: 'Super admin workspace mutations',
+        requestBody: { required: true, content: jsonContent(envelopeRef('superWorkspaceRequest')) },
+        responses: { '200': { description: 'Successful response', content: jsonContent(envelopeRef('superWorkspaceResponses')) }, '400': { description: 'Error', content: jsonContent(errorSchema) } },
       },
     },
     '/functions/v1/super-admin-mutate': {
@@ -74,24 +74,11 @@ const openapi = {
         responses: { '200': { description: 'Successful response', content: jsonContent(envelopeRef('superOpsResponses')) }, '400': { description: 'Error', content: jsonContent(errorSchema) } },
       },
     },
-    '/functions/v1/tenant-admin-mutate': {
+    '/functions/v1/workspace-admin-mutate': {
       post: {
-        summary: 'Primary-admin tenant admin management',
-        requestBody: { required: true, content: jsonContent(envelopeRef('tenantAdminManageRequest')) },
-        responses: { '200': { description: 'Successful response', content: jsonContent(envelopeRef('tenantAdminManageResponses')) }, '400': { description: 'Error', content: jsonContent(errorSchema) } },
-      },
-    },
-    '/functions/v1/district-dashboard': {
-      get: {
-        summary: 'District dashboard snapshot',
-        responses: { '200': { description: 'Successful response', content: jsonContent(envelopeRef('districtDashboardResponse')) }, '400': { description: 'Error', content: jsonContent(errorSchema) } },
-      },
-    },
-    '/functions/v1/district-handoff': {
-      post: {
-        summary: 'Cross-host district session handoff',
-        requestBody: { required: true, content: jsonContent(envelopeRef('districtHandoffRequest')) },
-        responses: { '200': { description: 'Successful response', content: jsonContent(envelopeRef('districtHandoffResponses')) }, '400': { description: 'Error', content: jsonContent(errorSchema) } },
+        summary: 'Primary Workspace Admin peer management',
+        requestBody: { required: true, content: jsonContent(envelopeRef('workspaceAdminManageRequest')) },
+        responses: { '200': { description: 'Successful response', content: jsonContent(envelopeRef('workspaceAdminManageResponses')) }, '400': { description: 'Error', content: jsonContent(errorSchema) } },
       },
     },
     '/functions/v1/contact-sales-submit': {

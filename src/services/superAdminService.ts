@@ -1,19 +1,5 @@
 import { invokeEdgeFunction } from "./edgeFunctionClient";
-import type { EdgeEnvelope, SuperAdminAction } from "../types/edgeContracts";
 import { edgeFunctionError } from "./appErrors";
-
-export type SuperTenantAdmin = {
-  id: string;
-  tenant_id: string;
-  district_id?: string;
-  auth_email: string;
-  role: "tenant_admin" | "district_admin";
-  is_active: boolean;
-  created_at: string;
-  tenant_name?: string;
-  district_name?: string;
-};
-
 export type SuperAdminAccount = {
   id: string;
   auth_email: string;
@@ -21,117 +7,24 @@ export type SuperAdminAccount = {
   is_active: boolean;
   created_at: string;
 };
-
-type SuperAdminRequest = {
-  action: SuperAdminAction;
-  payload: Record<string, unknown>;
+const call = async <T>(action: string, payload: Record<string, unknown>) => {
+  const r = await invokeEdgeFunction<
+    { data: T },
+    { action: string; payload: Record<string, unknown> }
+  >("super-admin-mutate", { method: "POST", body: { action, payload } });
+  if (!r.ok) throw edgeFunctionError(r, "Super Admin request failed.");
+  return r.data!.data;
 };
-
-const callSuperAdmin = async <TData>(payload: SuperAdminRequest) => {
-  const result = await invokeEdgeFunction<EdgeEnvelope<TData>, SuperAdminRequest>(
-    "super-admin-mutate",
-    {
-      method: "POST",
-      body: payload,
-    }
-  );
-
-  if (!result.ok) {
-    throw edgeFunctionError(result, "Super admin request failed. fix yo code.");
-  }
-
-  return result.data?.data as TData;
-};
-
-export const listTenantAdmins = async (
-  search = "",
-  tenantId = "all",
-  adminScope: "tenant" | "district" = "tenant",
-  districtId = "all"
-) =>
-  callSuperAdmin<SuperTenantAdmin[]>({
-    action: "list_tenant_admins",
-    payload: { search, tenant_id: tenantId, district_id: districtId, admin_scope: adminScope },
-  });
-
-export const createTenantAdmin = async (payload: {
-  tenant_id?: string;
-  district_id?: string;
-  auth_email: string;
-  password: string;
-  admin_scope?: "tenant" | "district";
-}) =>
-  callSuperAdmin<SuperTenantAdmin>({
-    action: "create_tenant_admin",
-    payload,
-  });
-
-export const setTenantAdminStatus = async (payload: {
-  id: string;
-  is_active: boolean;
-  admin_scope?: "tenant" | "district";
-}) =>
-  callSuperAdmin<SuperTenantAdmin>({
-    action: "set_admin_status",
-    payload,
-  });
-
-export const sendTenantAdminReset = async (payload: {
-  auth_email: string;
-  admin_scope?: "tenant" | "district";
-}) =>
-  callSuperAdmin<{ success: boolean }>({
-    action: "send_reset",
-    payload,
-  });
-
-export const updateTenantAdminEmail = async (payload: {
-  id: string;
-  auth_email: string;
-  admin_scope?: "tenant" | "district";
-}) =>
-  callSuperAdmin<SuperTenantAdmin>({
-    action: "update_admin_email",
-    payload,
-  });
-
-export const listSuperAdmins = async (search = "") =>
-  callSuperAdmin<SuperAdminAccount[]>({
-    action: "list_super_admins",
-    payload: { search },
-  });
-
-export const createSuperAdmin = async (payload: {
-  auth_email: string;
-  password: string;
-}) =>
-  callSuperAdmin<SuperAdminAccount>({
-    action: "create_super_admin",
-    payload,
-  });
-
-export const setSuperAdminStatus = async (payload: {
-  id: string;
-  is_active: boolean;
-}) =>
-  callSuperAdmin<SuperAdminAccount>({
-    action: "set_super_admin_status",
-    payload,
-  });
-
-export const updateSuperAdminEmail = async (payload: {
-  id: string;
-  auth_email: string;
-}) =>
-  callSuperAdmin<SuperAdminAccount>({
-    action: "update_super_admin_email",
-    payload,
-  });
-
-export const sendSuperAdminReset = async (payload: {
-  auth_email: string;
-}) =>
-  callSuperAdmin<{ success: boolean }>({
-    action: "send_super_admin_reset",
-    payload,
-  });
+export const listSuperAdmins = (search = "") =>
+  call<SuperAdminAccount[]>("list_super_admins", { search });
+export const createSuperAdmin = (
+  payload: { auth_email: string; password: string },
+) => call<SuperAdminAccount>("create_super_admin", payload);
+export const setSuperAdminStatus = (
+  payload: { id: string; is_active: boolean },
+) => call<SuperAdminAccount>("set_super_admin_status", payload);
+export const updateSuperAdminEmail = (
+  payload: { id: string; auth_email: string },
+) => call<SuperAdminAccount>("update_super_admin_email", payload);
+export const sendSuperAdminReset = (payload: { auth_email: string }) =>
+  call<{ success: boolean }>("send_super_admin_reset", payload);

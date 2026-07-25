@@ -2,7 +2,7 @@
   <div class="page">
     <div class="page-nav-left">
       <RouterLink class="button-link" to="/super-admin">Return to Super Admin</RouterLink>
-      <RouterLink class="button-link" to="/super-admin/tenants">Tenants</RouterLink>
+      <RouterLink class="button-link" to="/super-admin/workspaces">Workspaces</RouterLink>
       <RouterLink class="button-link" to="/super-admin/gear">All Items</RouterLink>
       <RouterLink class="button-link" to="/super-admin/borrowers">All Borrowers</RouterLink>
       <RouterLink class="button-link" to="/super-admin/broadcasts">Broadcasts</RouterLink>
@@ -15,7 +15,7 @@
 
     <div class="card">
       <div class="input-row">
-        <select v-model="tenantFilter"><option value="all">all tenants</option><option v-for="t in tenants" :key="t.id" :value="t.id">{{ t.name }}</option></select>
+        <select v-model="workspaceFilter"><option value="all">all workspaces</option><option v-for="t in workspaces" :key="t.id" :value="t.id">{{ t.name }}</option></select>
         <select v-model="actionFilter"><option value="all">all actions</option><option value="checkout">checkout</option><option value="return">return</option><option value="admin_return">admin_return</option></select>
         <input v-model="startAt" type="datetime-local" />
         <input v-model="endAt" type="datetime-local" />
@@ -28,11 +28,11 @@
       <SkeletonLoader v-if="isLoading" variant="table" :rows="7" :columns="5" label="Loading all logs" />
       <p v-else-if="error" class="error">{{ error }}</p>
       <table v-else class="table">
-        <thead><tr><th>Time</th><th>Tenant</th><th>Action</th><th>Item</th><th>Borrower</th></tr></thead>
+        <thead><tr><th>Time</th><th>Workspace</th><th>Action</th><th>Item</th><th>Borrower</th></tr></thead>
         <tbody>
           <tr v-for="row in rows" :key="row.id">
             <td>{{ formatDateTime(row.action_time) }}</td>
-            <td>{{ row.tenant?.name || row.tenant_id }}</td>
+            <td>{{ row.workspace?.name || row.workspace_id }}</td>
             <td>{{ row.action_type }}</td>
             <td>{{ row.gear?.name || "-" }} ({{ row.gear?.barcode || "-" }})</td>
             <td>{{ row.student ? `${row.student.username} (${row.student.student_id})` : "-" }}</td>
@@ -59,14 +59,14 @@ import {
   isUnauthorizedError,
 } from "../../services/authErrorHandling";
 import { listSuperLogs, type SuperLogEntry } from "../../services/superLogsService";
-import { listTenants, type SuperTenant } from "../../services/superTenantService";
+import { listWorkspaces as listWorkspaces, type SuperWorkspace as SuperWorkspace } from "../../services/superWorkspaceService";
 import { exportRowsToCsv, exportRowsToPdf } from "../../services/exportService";
 import { toUserFacingErrorMessage } from "../../services/appErrors";
 
 const router = useRouter();
-const tenants = ref<SuperTenant[]>([]);
+const workspaces = ref<SuperWorkspace[]>([]);
 const rows = ref<SuperLogEntry[]>([]);
-const tenantFilter = ref("all");
+const workspaceFilter = ref("all");
 const actionFilter = ref("all");
 const search = ref("");
 const page = ref(1);
@@ -98,7 +98,7 @@ const formatDateTime = (value: string) => {
 
 const loadTenants = async () => {
   try {
-    tenants.value = await listTenants("", "all");
+    workspaces.value = await listWorkspaces("", "all");
   } catch (err) {
     if (isUnauthorizedError(err)) {
       error.value = "Your session expired. Sign in again.";
@@ -114,7 +114,7 @@ const loadLogs = async () => {
   error.value = "";
   try {
     const result = await listSuperLogs({
-      tenant_id: tenantFilter.value,
+      workspace_id: workspaceFilter.value,
       action_type: actionFilter.value,
       search: search.value.trim(),
       start_at: startAt.value ? new Date(startAt.value).toISOString() : undefined,
@@ -151,9 +151,9 @@ const exportCsv = () => {
     showToast("Export", "No rows to export.");
     return;
   }
-  exportRowsToCsv(`super-logs-page-${page.value}.csv`, ["time", "tenant", "action", "item_name", "item_barcode", "borrower"], rows.value.map((row) => ({
+  exportRowsToCsv(`super-logs-page-${page.value}.csv`, ["time", "workspace", "action", "item_name", "item_barcode", "borrower"], rows.value.map((row) => ({
     time: formatDateTime(row.action_time),
-    tenant: row.tenant?.name ?? row.tenant_id,
+    workspace: row.workspace?.name ?? row.workspace_id,
     action: row.action_type,
     item_name: row.gear?.name ?? "",
     item_barcode: row.gear?.barcode ?? "",
@@ -166,9 +166,9 @@ const exportPdf = async () => {
     showToast("Export", "No rows to export.");
     return;
   }
-  await exportRowsToPdf(`super-logs-page-${page.value}.pdf`, "Super Logs Export", ["time", "tenant", "action", "item_name", "item_barcode", "borrower"], rows.value.map((row) => ({
+  await exportRowsToPdf(`super-logs-page-${page.value}.pdf`, "Super Logs Export", ["time", "workspace", "action", "item_name", "item_barcode", "borrower"], rows.value.map((row) => ({
     time: formatDateTime(row.action_time),
-    tenant: row.tenant?.name ?? row.tenant_id,
+    workspace: row.workspace?.name ?? row.workspace_id,
     action: row.action_type,
     item_name: row.gear?.name ?? "",
     item_barcode: row.gear?.barcode ?? "",

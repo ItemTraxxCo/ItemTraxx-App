@@ -116,9 +116,9 @@ import { useOfflineQueueCount } from "./composables/useOfflineQueueCount";
 import { useOnboarding } from "./composables/useOnboarding";
 import { useSystemStatus } from "./composables/useSystemStatus";
 import { useTopBannerLayout } from "./composables/useTopBannerLayout";
-import { buildDistrictAppUrl, lookupDistrictById, resolveDistrictHost } from "./services/districtService";
+import { buildWorkspaceAppUrl, lookupWorkspaceById, resolveWorkspaceHost } from "./services/workspaceService";
 import { getAuthState } from "./store/authState";
-import { getDistrictState } from "./store/districtState";
+import { getWorkspaceState } from "./store/workspaceState";
 import { getFatalErrorToastState } from "./store/fatalErrorToast";
 import { getRouteLoadingState } from "./store/routeLoading";
 import { getSessionTerminationState } from "./store/sessionTermination";
@@ -129,7 +129,7 @@ const FatalErrorToast = defineAsyncComponent(async () => (await import("./compon
 const SpeedInsights = defineAsyncComponent(async () => (await import("@vercel/speed-insights/vue")).SpeedInsights);
 
 const auth = getAuthState();
-const district = getDistrictState();
+const district = getWorkspaceState();
 const routeLoading = getRouteLoadingState();
 const fatalErrorToast = getFatalErrorToastState();
 const sessionTermination = getSessionTerminationState();
@@ -187,7 +187,7 @@ const isDevSubdomainHost = computed(() => {
   const secondOctet = Number(match172?.[1]);
   return !!match172 && Number.isFinite(secondOctet) && secondOctet >= 16 && secondOctet <= 31;
 });
-const isFullBleedRoute = computed(() => ["/login", "/tenant/admin-login", "/super-auth", "/internal-auth", "/reset-password"].includes(route.path));
+const isFullBleedRoute = computed(() => ["/login", "/admin/login", "/super-auth", "/internal-auth", "/reset-password"].includes(route.path));
 const isMarketingFullBleedRoute = computed(() => ["/", "/landing-new", "/changelog", "/itemscanner"].includes(route.path));
 const isSubmitConfirmationRoute = computed(() => route.path === "/submitconfirmation");
 const isBannerBleedRoute = computed(() => ["/legal", "/security", "/trust", "/compliance", "/faq", "/contact", "/privacy", "/cookies", "/accessibility", "/about", "/pricing", "/forgot-password", "/contact-sales", "/request-demo", "/contact-support", "/report-security-issue", "/getting-started"].includes(route.path));
@@ -197,10 +197,16 @@ const isKillSwitchAllowedRoute = computed(() => isUnavailableRoute.value);
 const hiddenMenuRoutes = new Set(["public-home", "public-unavailable", "public-pricing", "public-about", "public-security", "public-report-security-issue", "public-changelog", "public-compliance", "public-privacy", "public-cookies", "public-contact", "public-trust", "public-faq", "public-accessibility", "public-getting-started", "public-itemscanner", "public-legal", "public-forgot-password", "public-reset-password", "public-home-new2", "public-request-demo", "public-contact-sales", "public-contact-support", "public-submit-confirmation"]);
 const showTopMenu = computed(() => !hiddenMenuRoutes.has(String(route.name)));
 const showLogoutUserAction = computed(() => auth.isAuthenticated && !Boolean(route.meta.public) && route.path !== "/login");
-const isTenantScopedRoute = computed(() => auth.isAuthenticated && !!auth.tenantContextId && route.path.startsWith("/tenant"));
-const isTenantAdminArea = computed(() => route.path !== "/tenant/admin-login" && route.path.startsWith("/tenant/admin"));
-const shouldTrackTenantAdminSession = computed(() => auth.isAuthenticated && auth.role === "tenant_admin" && isTenantAdminArea.value);
-const showNotificationBell = computed(() => auth.isAuthenticated && auth.role === "tenant_admin" && route.path !== "/tenant/admin-login" && (route.path.startsWith("/tenant/admin") || route.path.startsWith("/district")));
+const isWorkspaceScopedRoute = computed(() =>
+  auth.isAuthenticated &&
+  !!auth.workspaceContextId &&
+  ["/checkout", "/items", "/borrowers", "/settings", "/admin"].some(
+    (prefix) => route.path === prefix || route.path.startsWith(`${prefix}/`),
+  ),
+);
+const isWorkspaceAdminArea = computed(() => route.path !== "/admin/login" && route.path.startsWith("/admin"));
+const shouldTrackAccountSession = computed(() => auth.isAuthenticated && auth.role === "workspace_admin" && isWorkspaceAdminArea.value);
+const showNotificationBell = computed(() => auth.isAuthenticated && auth.role === "workspace_admin" && route.path !== "/admin/login" && route.path.startsWith("/admin"));
 const isUnavailableBypass = computed(() => isUnavailableBypassHost(window.location.hostname));
 
 const showBroadcast = computed(() => !!activeBroadcast.value && dismissedBroadcastId.value !== activeBroadcast.value.id);
@@ -227,10 +233,10 @@ const consent = useCookieConsentTelemetry(auth);
 const version = useAppVersionStatus({ appVersion, isDevHost: isDevSubdomainHost, isNonMainBuild });
 const { isOutdated, latestVersion, forceUpdateOverlay } = version;
 const showVersionOverlay = computed(() => forceUpdateOverlay.value || (!isDevSubdomainHost.value && !isNonMainBuild && isOutdated.value));
-const offlineQueue = useOfflineQueueCount(isTenantScopedRoute);
+const offlineQueue = useOfflineQueueCount(isWorkspaceScopedRoute);
 const onboarding = useOnboarding(auth, route);
 const { appShellStyle, setElements: setTopBannerElements } = useTopBannerLayout();
-const adminSession = useAdminSessionLifecycle({ auth, route, router, sessionTermination, isDevHost: isDevSubdomainHost, isTenantAdminArea, shouldTrackTenantAdminSession, closeMenu: () => { menuOpen.value = false; } });
+const adminSession = useAdminSessionLifecycle({ auth, route, router, sessionTermination, isDevHost: isDevSubdomainHost, isWorkspaceAdminArea, shouldTrackAccountSession, closeMenu: () => { menuOpen.value = false; } });
 const { signInAgain } = adminSession;
 const isRouteNavigating = computed(() => routeLoading.isLoading);
 const themeLabel = computed(() => theme.value === "dark" ? "Light Mode" : "Dark Mode");
@@ -259,7 +265,7 @@ const toggleTheme = () => { applyTheme(theme.value === "dark" ? "light" : "dark"
 const toggleMenu = () => { menuOpen.value = !menuOpen.value; };
 const reloadApp = () => window.location.assign(`${window.location.origin}/`);
 const openOnboardingTour = () => { onboarding.open(); menuOpen.value = false; };
-const openAdminPanel = async () => { menuOpen.value = false; await router.push("/tenant/admin-login"); };
+const openAdminPanel = async () => { menuOpen.value = false; await router.push("/admin/login"); };
 const logoutTenant = async () => {
   if (!window.confirm("Are you sure you want to log out?")) return;
   menuOpen.value = false;
@@ -316,18 +322,18 @@ const hasFreshVerification = (verifiedAt: string | null) => !!verifiedAt && !Num
 let publicHomeRedirectInFlight = false;
 const maybeRedirectAuthenticatedPublicHome = async () => {
   if (publicHomeRedirectInFlight || !["/", "/landing-new", "/about"].includes(route.path) || (killSwitchEnabled.value && route.path === "/") || !auth.isInitialized || !auth.isAuthenticated) return;
-  if (district.isDistrictHost && district.districtId && auth.districtContextId && auth.districtContextId !== district.districtId) return;
+  if (district.isWorkspaceHost && district.workspaceId && auth.workspaceContextId && auth.workspaceContextId !== district.workspaceId) return;
   let targetPath: string | null = null;
   if (auth.role === "super_admin") targetPath = auth.hasSecondaryAuth && hasFreshVerification(auth.superVerifiedAt) ? "/super-admin" : "/super-auth";
-  else if (auth.role === "district_admin") targetPath = hasFreshVerification(auth.adminVerifiedAt) ? "/district" : "/tenant/admin-login";
-  else if ((auth.role === "tenant_admin" || auth.role === "tenant_user") && auth.tenantContextId) targetPath = "/tenant/checkout";
+  else if (auth.role === "workspace_admin") targetPath = hasFreshVerification(auth.adminVerifiedAt) ? "/admin" : "/admin/login";
+  else if (auth.role === "tenant_account" && auth.workspaceContextId) targetPath = "/checkout";
   if (!targetPath) return;
   publicHomeRedirectInFlight = true;
   try {
-    const currentHost = resolveDistrictHost(window.location.hostname);
-    if (!currentHost.isDistrictHost && auth.role !== "super_admin" && auth.districtContextId) {
-      const districtSlug = (await lookupDistrictById(auth.districtContextId))?.slug?.trim().toLowerCase();
-      if (districtSlug) window.location.replace(buildDistrictAppUrl(districtSlug, targetPath));
+    const currentHost = resolveWorkspaceHost(window.location.hostname);
+    if (!currentHost.isWorkspaceHost && auth.role !== "super_admin" && auth.workspaceContextId) {
+      const districtSlug = (await lookupWorkspaceById(auth.workspaceContextId))?.slug?.trim().toLowerCase();
+      if (districtSlug) window.location.replace(buildWorkspaceAppUrl(districtSlug, targetPath));
     }
   } finally { publicHomeRedirectInFlight = false; }
 };
@@ -356,7 +362,7 @@ watch(() => [killSwitchEnabled.value, route.path] as const, ([enabled, path]) =>
 watch(() => [backendUnavailable.value, route.path] as const, ([unavailable, path]) => {
   if (unavailable && !isUnavailableBypass.value && path !== "/unavailable") void router.replace("/unavailable");
 });
-watch(() => [route.name, auth.isInitialized, auth.isAuthenticated, auth.role, auth.districtContextId, auth.adminVerifiedAt, auth.hasSecondaryAuth, auth.superVerifiedAt, district.isDistrictHost, district.districtId] as const, () => void maybeRedirectAuthenticatedPublicHome());
+watch(() => [route.name, auth.isInitialized, auth.isAuthenticated, auth.role, auth.workspaceContextId, auth.adminVerifiedAt, auth.hasSecondaryAuth, auth.superVerifiedAt, district.isWorkspaceHost, district.workspaceId] as const, () => void maybeRedirectAuthenticatedPublicHome());
 onMounted(() => {
   const saved = localStorage.getItem("itemtraxx-theme");
   applyTheme(saved === "light" || saved === "dark" ? saved : "light");

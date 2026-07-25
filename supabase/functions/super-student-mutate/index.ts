@@ -33,7 +33,7 @@ type RateLimitResult = {
 
 type StudentRow = {
   id: string;
-  tenant_id: string;
+  workspace_id: string;
   username: string;
   student_id: string;
   created_at: string;
@@ -45,7 +45,7 @@ type SuperStudentDatabase = {
       students: {
         Row: StudentRow;
         Insert: {
-          tenant_id: string;
+          workspace_id: string;
           username: string;
           student_id: string;
         };
@@ -127,7 +127,7 @@ const generateUsername = () => {
 
 const buildUniqueStudentIdentity = async (
   adminClient: SupabaseAdminClient,
-  tenantId: string
+  workspaceId: string
 ) => {
   for (let attempt = 0; attempt < 12; attempt += 1) {
     const studentId = generateStudentId();
@@ -135,7 +135,7 @@ const buildUniqueStudentIdentity = async (
     const { data: existingId } = await adminClient
       .from("students")
       .select("id")
-      .eq("tenant_id", tenantId)
+      .eq("workspace_id", workspaceId)
       .eq("student_id", studentId)
       .limit(1)
       .maybeSingle();
@@ -144,7 +144,7 @@ const buildUniqueStudentIdentity = async (
     const { data: existingUsername } = await adminClient
       .from("students")
       .select("id")
-      .eq("tenant_id", tenantId)
+      .eq("workspace_id", workspaceId)
       .eq("username", username)
       .limit(1)
       .maybeSingle();
@@ -326,20 +326,20 @@ serve(async (req) => {
     const payloadRecord = payload as Record<string, unknown>;
 
     if (action === "list") {
-      const tenantId = optionalText(payloadRecord.tenant_id, { maxLen: 36 }) || "all";
-      if (tenantId !== "all" && !UUID_PATTERN.test(tenantId)) {
+      const workspaceId = optionalText(payloadRecord.workspace_id, { maxLen: 36 }) || "all";
+      if (workspaceId !== "all" && !UUID_PATTERN.test(workspaceId)) {
         return jsonResponse(400, { error: "Invalid request" });
       }
       const search = optionalText(payloadRecord.search, { maxLen: 120 });
 
       let query = adminClient
         .from("students")
-        .select("id, tenant_id, username, student_id, created_at")
+        .select("id, workspace_id, username, student_id, created_at")
         .order("created_at", { ascending: false })
         .limit(500);
 
-      if (tenantId && tenantId !== "all") {
-        query = query.eq("tenant_id", tenantId);
+      if (workspaceId && workspaceId !== "all") {
+        query = query.eq("workspace_id", workspaceId);
       }
       const { data, error } = await query;
       if (error) {
@@ -347,7 +347,7 @@ serve(async (req) => {
       }
       const rows = (data ?? []) as Array<{
         id: string;
-        tenant_id: string;
+        workspace_id: string;
         username: string;
         student_id: string;
         created_at: string;
@@ -366,7 +366,7 @@ serve(async (req) => {
     }
 
     if (action === "create") {
-      const tenantId = requireUuid(payloadRecord.tenant_id);
+      const workspaceId = requireUuid(payloadRecord.workspace_id);
       const providedStudentId = optionalText(payloadRecord.student_id, {
         maxLen: 6,
         transform: "uppercase",
@@ -384,14 +384,14 @@ serve(async (req) => {
           adminClient
             .from("students")
             .select("id")
-            .eq("tenant_id", tenantId)
+            .eq("workspace_id", workspaceId)
             .eq("student_id", studentId)
             .limit(1)
             .maybeSingle(),
           adminClient
             .from("students")
             .select("id")
-            .eq("tenant_id", tenantId)
+            .eq("workspace_id", workspaceId)
             .eq("username", username)
             .limit(1)
             .maybeSingle(),
@@ -403,7 +403,7 @@ serve(async (req) => {
       }
 
       if (!studentId || !username) {
-        const generated = await buildUniqueStudentIdentity(adminClient, tenantId);
+        const generated = await buildUniqueStudentIdentity(adminClient, workspaceId);
         studentId = generated.studentId;
         username = generated.username;
       }
@@ -411,11 +411,11 @@ serve(async (req) => {
       const { data, error } = await adminClient
         .from("students")
         .insert({
-          tenant_id: tenantId,
+          workspace_id: workspaceId,
           username,
           student_id: studentId,
         })
-        .select("id, tenant_id, username, student_id, created_at")
+        .select("id, workspace_id, username, student_id, created_at")
         .single();
 
       if (error || !data) {
@@ -429,7 +429,7 @@ serve(async (req) => {
 
       const { data, error } = await adminClient
         .from("students")
-        .select("id, tenant_id, username, student_id, created_at")
+        .select("id, workspace_id, username, student_id, created_at")
         .eq("id", id)
         .single();
 

@@ -1,7 +1,7 @@
 import { getClientDiagnosticsSnapshot } from "./clientDiagnostics";
 import { invokeEdgeFunction } from "./edgeFunctionClient";
 import { getAuthState } from "../store/authState";
-import { getDistrictState } from "../store/districtState";
+import { getWorkspaceState } from "../store/workspaceState";
 
 export type FatalErrorReportDraft = {
   title: string;
@@ -26,7 +26,7 @@ const getSafePageUrl = () => {
 
 export const sendClientErrorReport = async (draft: FatalErrorReportDraft) => {
   const auth = getAuthState();
-  const district = getDistrictState();
+  const workspace = getWorkspaceState();
   const diagnostics = getClientDiagnosticsSnapshot();
 
   const result = await invokeEdgeFunction<{ accepted: boolean }>("client-error-report", {
@@ -47,12 +47,11 @@ export const sendClientErrorReport = async (draft: FatalErrorReportDraft) => {
       auth: {
         is_authenticated: auth.isAuthenticated,
         role: auth.role,
-        tenant_context_id: auth.tenantContextId,
-        district_context_id: auth.districtContextId,
+        workspace_id: auth.workspaceContextId,
       },
-      district: {
-        is_district_host: district.isDistrictHost,
-        district_id: district.districtId,
+      workspace: {
+        is_workspace_host: workspace.isWorkspaceHost,
+        workspace_id: workspace.workspaceId,
       },
       diagnostics,
     },

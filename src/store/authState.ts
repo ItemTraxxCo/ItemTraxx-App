@@ -1,6 +1,6 @@
 import { reactive } from "vue";
 
-type UserRole = "tenant_user" | "tenant_admin" | "district_admin" | "super_admin";
+export type UserRole = "tenant_account" | "workspace_admin" | "super_admin";
 
 export type AuthState = {
   isInitialized: boolean;
@@ -9,11 +9,10 @@ export type AuthState = {
   email: string | null;
   signedInAt: string | null;
   role: UserRole | null;
-  sessionTenantId: string | null;
-  tenantContextId: string | null;
-  districtContextId: string | null;
+  sessionWorkspaceId: string | null;
+  workspaceContextId: string | null;
   isAdmin: boolean;
-  isDistrictAdmin: boolean;
+  isWorkspaceAdmin: boolean;
   isSuperAdmin: boolean;
   hasSecondaryAuth: boolean;
   superVerifiedAt: string | null;
@@ -62,11 +61,10 @@ const defaultState: AuthState = {
   email: null,
   signedInAt: null,
   role: null,
-  sessionTenantId: null,
-  tenantContextId: null,
-  districtContextId: null,
+  sessionWorkspaceId: null,
+  workspaceContextId: null,
   isAdmin: false,
-  isDistrictAdmin: false,
+  isWorkspaceAdmin: false,
   isSuperAdmin: false,
   hasSecondaryAuth: false,
   superVerifiedAt: null,
@@ -79,18 +77,14 @@ export const getAuthState = (): AuthState => authState;
 
 export const setAuthStateFromBackend = (next: Partial<AuthState>) => {
   Object.assign(authState, next, {
-    isAdmin: next.role === "tenant_admin",
-    isDistrictAdmin: next.role === "district_admin",
+    isAdmin: next.role === "workspace_admin",
+    isWorkspaceAdmin: next.role === "workspace_admin",
     isSuperAdmin: next.role === "super_admin",
   });
 };
 
-export const setTenantContext = (tenantId: string | null) => {
-  authState.tenantContextId = tenantId;
-};
-
-export const setDistrictContext = (districtId: string | null) => {
-  authState.districtContextId = districtId;
+export const setWorkspaceContext = (workspaceId: string | null) => {
+  authState.workspaceContextId = workspaceId;
 };
 
 export const setSecondaryAuth = (value: boolean) => {

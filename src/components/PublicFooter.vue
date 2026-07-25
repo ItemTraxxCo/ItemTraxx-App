@@ -22,7 +22,7 @@
       <div class="footer-column">
         <p class="footer-heading">Product</p>
         <RouterLink to="/login">Login</RouterLink>
-        <RouterLink to="/tenant/admin-login">Admin Login</RouterLink>
+        <RouterLink to="/admin/login">Admin Login</RouterLink>
         <RouterLink to="/pricing">Pricing</RouterLink>
         <RouterLink to="/contact-sales">Contact Sales</RouterLink>
         <RouterLink to="/request-demo">Request Demo</RouterLink>

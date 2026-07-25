@@ -55,8 +55,8 @@ const withSecret = async (run: () => Promise<void>) => {
 Deno.test("trusted ingress rejects direct requests", async () => {
   await withSecret(async () => {
     const response = await requireTrustedEdgeIngress(
-      new Request("https://example.test/functions/tenant-login"),
-      "tenant-login",
+      new Request("https://example.test/functions/workspace-login"),
+      "workspace-login",
       (status, body) => Response.json(body, { status }),
     );
 
@@ -68,7 +68,7 @@ Deno.test("trusted ingress accepts a fresh matching proxy signature", async () =
   await withSecret(async () => {
     const timestamp = Date.now().toString();
     const requestId = "request-123";
-    const target = "tenant-login";
+    const target = "workspace-login";
     const payload = JSON.stringify({
       access_code: "tenant-1",
       password: "secret",
@@ -76,7 +76,7 @@ Deno.test("trusted ingress accepts a fresh matching proxy signature", async () =
     const signature = await sign(
       `${timestamp}.${requestId}.POST.${target}.${await bodyHash(payload)}`,
     );
-    const request = new Request("https://example.test/functions/tenant-login", {
+    const request = new Request("https://example.test/functions/workspace-login", {
       method: "POST",
       headers: {
         "x-itx-edge-proxy": "1",
@@ -103,7 +103,7 @@ Deno.test("trusted ingress rejects body replay with modified payload", async () 
   await withSecret(async () => {
     const timestamp = Date.now().toString();
     const requestId = "request-123";
-    const target = "tenant-login";
+    const target = "workspace-login";
     const originalPayload = JSON.stringify({
       access_code: "tenant-1",
       password: "secret",
@@ -117,7 +117,7 @@ Deno.test("trusted ingress rejects body replay with modified payload", async () 
         originalPayload,
       )}`,
     );
-    const request = new Request("https://example.test/functions/tenant-login", {
+    const request = new Request("https://example.test/functions/workspace-login", {
       method: "POST",
       headers: {
         "x-itx-edge-proxy": "1",

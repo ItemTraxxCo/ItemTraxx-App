@@ -13,7 +13,7 @@ export const handleStatusTrackingAction = async (
       .select(
         "id, name, barcode, serial_number, status, notes, updated_at, created_at",
       )
-      .eq("tenant_id", context.tenantId)
+      .eq("workspace_id", context.workspaceId)
       .is("deleted_at", null)
       .not("status", "in", "(available,checked_out)")
       .order("updated_at", { ascending: false })
@@ -21,7 +21,7 @@ export const handleStatusTrackingAction = async (
     context.adminClient
       .from("gear_status_history")
       .select("id, gear_id, status, note, changed_at, changed_by")
-      .eq("tenant_id", context.tenantId)
+      .eq("workspace_id", context.workspaceId)
       .order("changed_at", { ascending: false })
       .limit(600),
   ]);
@@ -41,7 +41,7 @@ export const handleStatusTrackingAction = async (
       const fallbackFlagged = await context.adminClient
         .from("gear")
         .select("id, name, barcode, serial_number, status, notes, created_at")
-        .eq("tenant_id", context.tenantId)
+        .eq("workspace_id", context.workspaceId)
         .is("deleted_at", null)
         .not("status", "in", "(available,checked_out)")
         .order("created_at", { ascending: false })

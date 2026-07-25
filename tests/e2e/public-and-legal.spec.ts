@@ -14,7 +14,7 @@ const forbiddenSdkResponse = (url: string) => {
 
 const authenticatedRouteResponse = (url: string) => {
   const pathname = new URL(url).pathname.toLowerCase();
-  return pathname.includes("/tenant/checkout.vue") || pathname.includes("/tenant/admin/adminlogin.vue");
+  return pathname.includes("/checkout.vue") || pathname.includes("/admin/adminlogin.vue");
 };
 
 const nonDevE2eOrigin = "http://127.0.0.1.nip.io:4173";

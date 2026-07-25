@@ -46,7 +46,7 @@ Deno.test("does not block non-RPC REST paths", () => {
     "/rpc/consume_rate_limit",
     "/rest/v1/rpc/consume_rate_limit",
     "/rest/v1/profiles",
-    "/rest/v1/tenants",
+    "/rest/v1/workspaces",
     "/functions/admin-ops",
   ];
 

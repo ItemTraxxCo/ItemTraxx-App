@@ -4,7 +4,7 @@ import { edgeFunctionError } from "./appErrors";
 
 export type SuperStudentItem = {
   id: string;
-  tenant_id: string;
+  workspace_id: string;
   username: string;
   student_id: string;
   created_at: string;
@@ -31,14 +31,14 @@ const callSuperStudent = async <TData>(payload: SuperStudentRequest) => {
   return result.data?.data as TData;
 };
 
-export const listSuperStudents = async (tenantId = "all", search = "") =>
+export const listSuperStudents = async (workspaceId = "all", search = "") =>
   callSuperStudent<SuperStudentItem[]>({
     action: "list",
-    payload: { tenant_id: tenantId, search },
+    payload: { workspace_id: workspaceId, search },
   });
 
 export const createSuperStudent = async (payload: {
-  tenant_id: string;
+  workspace_id: string;
   username?: string;
   student_id?: string;
 }) =>

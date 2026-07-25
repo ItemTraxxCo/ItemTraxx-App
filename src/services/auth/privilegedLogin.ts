@@ -5,11 +5,10 @@ import {
   getAuthState,
   markAdminVerified,
   setAuthStateFromBackend,
-  setDistrictContext,
   setSecondaryAuth,
-  setTenantContext,
+  setWorkspaceContext,
 } from "../../store/authState";
-import { getDistrictState } from "../../store/districtState";
+import { getWorkspaceState } from "../../store/workspaceState";
 import { edgeFunctionError } from "../appErrors";
 import { registerPrivilegedAdminStepUp } from "../privilegedStepUpService";
 import {
@@ -18,16 +17,16 @@ import {
   type HttpSessionSummary,
 } from "../httpSessionService";
 import { rotateDeviceSession } from "../../utils/deviceSession";
-import { touchTenantAdminSession } from "../adminOpsService";
+import { touchAccountSession } from "../adminOpsService";
 import { touchSuperAdminSession } from "../superOps/sessions";
 import {
-  fetchCurrentRoleAndTenant,
+  fetchCurrentRoleAndWorkspace,
   fetchProfile,
-  fetchTenantContext,
+  fetchWorkspaceContext,
   refreshAuthFromSession,
-  resolveDistrictSlug,
+  resolveWorkspaceSlug,
 } from "./sessionBootstrap";
-import { clearLocalSession, sendLoginNotification } from "./tenantLogin";
+import { clearLocalSession, sendLoginNotification } from "./workspaceLogin";
 import { signOut } from "./signOut";
 import {
   clearPendingSuperAdminVerificationEmail,
@@ -37,7 +36,7 @@ import {
 } from "./sessionState";
 import {
   normalizeFunctionTarget,
-  toTenantAdminSessionLocation,
+  toAccountSessionLocation,
   type LoginNotificationLocation,
   type ProfileRow,
 } from "./types";
@@ -133,8 +132,8 @@ export const adminLoginWithSession = async (
     preExchangedSessionSummary?: HttpSessionSummary | null;
   } = {}
 ) => {
-  const priorTenantContextId = getAuthState().tenantContextId;
-  const districtHost = getDistrictState();
+  const priorWorkspaceContextId = getAuthState().workspaceContextId;
+  const workspaceHost = getWorkspaceState();
   const exchangedSessionSummary = sessionTouchOptions.skipExchange
     ? sessionTouchOptions.preExchangedSessionSummary ?? null
     : await exchangeHttpSession({
@@ -157,31 +156,29 @@ export const adminLoginWithSession = async (
     ? {
         id: sessionSummary.user.id,
         role: sessionSummary.profile.role,
-        tenant_id: sessionSummary.profile.tenant_id,
-        district_id: sessionSummary.profile.district_id,
+        workspace_id: sessionSummary.profile.workspace_id,
         auth_email: sessionSummary.profile.auth_email,
         is_active: sessionSummary.profile.is_active,
       }
     : await fetchProfile(sessionSummary.user.id);
   let fallbackRole: ProfileRow["role"] = null;
-  let fallbackTenantId: string | null = null;
+  let fallbackWorkspaceId: string | null = null;
   let resolvedRole = profile?.role ?? null;
-  let resolvedTenantId = profile?.tenant_id ?? null;
-  let resolvedDistrictId = profile?.district_id ?? null;
+  let resolvedWorkspaceId = profile?.workspace_id ?? null;
 
-  if (!resolvedRole || (!resolvedTenantId && !resolvedDistrictId)) {
+  if (!resolvedRole || !resolvedWorkspaceId) {
     try {
-      const fallback = await fetchCurrentRoleAndTenant();
+      const fallback = await fetchCurrentRoleAndWorkspace();
       fallbackRole = fallback.role;
-      fallbackTenantId = fallback.tenantId;
+      fallbackWorkspaceId = fallback.workspaceId;
       resolvedRole = resolvedRole ?? fallbackRole ?? null;
-      resolvedTenantId = resolvedTenantId ?? fallbackTenantId ?? null;
+      resolvedWorkspaceId = resolvedWorkspaceId ?? fallbackWorkspaceId ?? null;
     } catch {
       // Ignore fallback failure and continue with best available values.
     }
   }
 
-  if (resolvedRole !== "tenant_admin" && resolvedRole !== "district_admin") {
+  if (resolvedRole !== "workspace_admin") {
     await signOut();
     throw new Error("Access denied.");
   }
@@ -189,37 +186,36 @@ export const adminLoginWithSession = async (
     await signOut();
     throw new Error("Access denied.");
   }
-  if (resolvedRole === "tenant_admin" && resolvedTenantId) {
-    const tenant = await fetchTenantContext(resolvedTenantId);
-    if (tenant?.status && tenant.status !== "active") {
+  if (resolvedRole === "workspace_admin" && resolvedWorkspaceId) {
+    const workspace = await fetchWorkspaceContext(resolvedWorkspaceId);
+    if (workspace?.status && workspace.status !== "active") {
       await signOut();
-      throw new Error("Tenant disabled.");
+      throw new Error("Workspace disabled.");
     }
-    resolvedDistrictId = resolvedDistrictId ?? tenant?.district_id ?? null;
   }
 
   if (
-    resolvedRole === "tenant_admin" &&
-    priorTenantContextId &&
-    resolvedTenantId &&
-    resolvedTenantId !== priorTenantContextId
+    resolvedRole === "workspace_admin" &&
+    priorWorkspaceContextId &&
+    resolvedWorkspaceId &&
+    resolvedWorkspaceId !== priorWorkspaceContextId
   ) {
     await signOut();
     throw new Error("Access denied.");
   }
 
-  if (districtHost.isDistrictHost) {
-    if (!districtHost.districtId) {
+  if (workspaceHost.isWorkspaceHost) {
+    if (!workspaceHost.workspaceId) {
       await signOut();
       throw new Error("This workspace URL is not configured.");
     }
-    if (!resolvedDistrictId || resolvedDistrictId !== districtHost.districtId) {
+    if (!resolvedWorkspaceId || resolvedWorkspaceId !== workspaceHost.workspaceId) {
       await signOut();
       throw new Error("Access denied.");
     }
   }
 
-  const finalTenantId = resolvedTenantId ?? fallbackTenantId ?? null;
+  const finalWorkspaceId = resolvedWorkspaceId ?? fallbackWorkspaceId ?? null;
 
   try {
     await registerPrivilegedAdminStepUp(accessToken);
@@ -228,13 +224,13 @@ export const adminLoginWithSession = async (
     throw error;
   }
 
-  if (resolvedRole === "tenant_admin") {
+  if (resolvedRole === "workspace_admin") {
     rotateDeviceSession();
     try {
-      await touchTenantAdminSession({
+      await touchAccountSession({
         loginMethod: sessionTouchOptions.loginMethod ?? "password",
         loginLocation:
-          toTenantAdminSessionLocation(sessionTouchOptions.loginLocation) ?? "admin_login",
+          toAccountSessionLocation(sessionTouchOptions.loginLocation) ?? "admin_login",
       });
     } catch {
       // Session tracking is best-effort and must not block successful admin sign-in.
@@ -248,34 +244,28 @@ export const adminLoginWithSession = async (
     email: sessionSummary.user.email ?? null,
     signedInAt: sessionSummary.user.last_sign_in_at ?? null,
     role: resolvedRole,
-    sessionTenantId: finalTenantId,
-    tenantContextId: finalTenantId,
-    districtContextId: resolvedDistrictId ?? null,
+    sessionWorkspaceId: finalWorkspaceId,
+    workspaceContextId: finalWorkspaceId,
     hasSecondaryAuth: false,
     superVerifiedAt: null,
   });
 
-  if (resolvedRole === "tenant_admin" && !getAuthState().tenantContextId) {
-    setTenantContext(finalTenantId);
+  if (resolvedRole === "workspace_admin" && !getAuthState().workspaceContextId) {
+    setWorkspaceContext(finalWorkspaceId);
   }
-  if (resolvedRole === "district_admin") {
-    setDistrictContext(resolvedDistrictId ?? null);
-  }
-
   markAdminVerified();
   if (!sessionTouchOptions.skipLoginNotification) {
     const fallbackLoginLocation: LoginNotificationLocation =
-      resolvedRole === "district_admin" ? "district_admin_login" : "tenant_admin_login";
+      resolvedRole === "workspace_admin" ? "workspace_admin_login" : "workspace_admin_login";
     sendLoginNotification(accessToken, {
       loginLocation: sessionTouchOptions.loginLocation ?? fallbackLoginLocation,
     });
   }
-  const districtSlug = await resolveDistrictSlug(resolvedDistrictId ?? null);
+  const workspaceSlug = await resolveWorkspaceSlug(finalWorkspaceId);
   return {
     role: resolvedRole,
-    tenantId: finalTenantId,
-    districtId: resolvedDistrictId ?? null,
-    districtSlug,
+    workspaceId: finalWorkspaceId,
+    workspaceSlug,
     accessToken,
     refreshToken,
   };

@@ -12,36 +12,36 @@ Deno.test("classifies missing relations without broadening other errors", () => 
     isMissingPostgrestRelation(
       {
         code: "42P01",
-        message: 'relation "tenant_admin_sessions" does not exist',
+        message: 'relation "account_sessions" does not exist',
       },
-      "tenant_admin_sessions",
+      "account_sessions",
     ),
     "expected missing relation",
   );
   assert(
     !isMissingPostgrestRelation(
-      { code: "42501", message: "permission denied for tenant_admin_sessions" },
-      "tenant_admin_sessions",
+      { code: "42501", message: "permission denied for account_sessions" },
+      "account_sessions",
     ),
     "must not hide permission errors",
   );
   assert(
     !isMissingPostgrestRelation(
       { code: "42P01", message: 'relation "other_table" does not exist' },
-      "tenant_admin_sessions",
+      "account_sessions",
     ),
     "must require the named relation",
   );
   assert(
     !isMissingPostgrestRelation(
-      { code: "42703", message: "tenant_admin_sessions does not exist" },
-      "tenant_admin_sessions",
+      { code: "42703", message: "account_sessions does not exist" },
+      "account_sessions",
     ),
     "must require the missing-relation code",
   );
   assert(
-    !isMissingPostgrestRelation(null, "tenant_admin_sessions") &&
-      !isMissingPostgrestRelation(undefined, "tenant_admin_sessions"),
+    !isMissingPostgrestRelation(null, "account_sessions") &&
+      !isMissingPostgrestRelation(undefined, "account_sessions"),
     "nullish errors must not classify",
   );
 });
@@ -51,9 +51,9 @@ Deno.test("relation names are matched case-insensitively while codes remain exac
     isMissingPostgrestRelation(
       {
         code: "42P01",
-        message: 'relation "TENANT_ADMIN_SESSIONS" does not exist',
+        message: 'relation "ACCOUNT_SESSIONS" does not exist',
       },
-      "tenant_admin_sessions",
+      "account_sessions",
     ),
     "relation name matching must remain case-insensitive",
   );
@@ -61,9 +61,9 @@ Deno.test("relation names are matched case-insensitively while codes remain exac
     !isMissingPostgrestRelation(
       {
         code: "42p01",
-        message: 'relation "tenant_admin_sessions" does not exist',
+        message: 'relation "account_sessions" does not exist',
       },
-      "tenant_admin_sessions",
+      "account_sessions",
     ),
     "PostgreSQL error codes must remain case-sensitive",
   );

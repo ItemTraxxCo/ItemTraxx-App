@@ -81,7 +81,7 @@ export const mockAdminOps = async (page: Page) => {
       return;
     }
 
-    if (action === "get_tenant_settings") {
+    if (action === "get_workspace_settings") {
       await route.fulfill({
         status: 200,
         contentType: "application/json",
@@ -133,9 +133,9 @@ export const mockSuperDashboard = async (page: Page) => {
         data: {
           totals: {
             tenants: 12,
-            active_tenants: 11,
-            suspended_tenants: 1,
-            tenant_admins: 14,
+            active_workspaces: 11,
+            suspended_workspaces: 1,
+            workspace_admins: 14,
           },
           alerts: [],
           approvals: [],
@@ -148,10 +148,10 @@ export const mockSuperDashboard = async (page: Page) => {
   });
 };
 
-export const mockSuperTenantMutate = async (page: Page) => {
-  await page.route(/\/functions(?:\/v1)?\/super-tenant-mutate(?:\?.*)?$/, async (route) => {
+export const mockSuperWorkspaceMutate = async (page: Page) => {
+  await page.route(/\/functions(?:\/v1)?\/super-workspace-mutate(?:\?.*)?$/, async (route) => {
     const body = (route.request().postDataJSON() as { action?: string }) ?? {};
-    if (body.action === "list_tenants") {
+    if (body.action === "list_workspaces") {
       await route.fulfill({
         status: 200,
         contentType: "application/json",
@@ -183,7 +183,7 @@ export const mockSuperTenantMutate = async (page: Page) => {
 export const mockSuperAdminMutate = async (page: Page) => {
   await page.route(/\/functions(?:\/v1)?\/super-admin-mutate(?:\?.*)?$/, async (route) => {
     const body = (route.request().postDataJSON() as { action?: string }) ?? {};
-    if (body.action === "list_tenant_admins") {
+    if (body.action === "list_workspace_admins") {
       await route.fulfill({
         status: 200,
         contentType: "application/json",
@@ -192,12 +192,12 @@ export const mockSuperAdminMutate = async (page: Page) => {
           data: [
             {
               id: "admin-1",
-              tenant_id: "tenant-1",
+              workspace_id: "tenant-1",
               auth_email: "admin@demo.test",
-              role: "tenant_admin",
+              role: "workspace_admin",
               is_active: true,
               created_at: new Date().toISOString(),
-              tenant_name: "Demo Tenant",
+              workspace_name: "Demo Tenant",
             },
           ],
         }),
@@ -223,7 +223,7 @@ export const mockSuperGearMutate = async (page: Page) => {
           data: [
             {
               id: "gear-1",
-              tenant_id: "tenant-1",
+              workspace_id: "tenant-1",
               name: "Camera A",
               barcode: "111",
               serial_number: "SN-111",
@@ -254,7 +254,7 @@ export const mockSuperStudentMutate = async (page: Page) => {
           data: [
             {
               id: "student-1",
-              tenant_id: "tenant-1",
+              workspace_id: "tenant-1",
               username: "BlueFalcon12",
               student_id: "1234AB",
               created_at: new Date().toISOString(),
@@ -281,7 +281,7 @@ export const mockSuperLogsQuery = async (page: Page) => {
         data: [
           {
             id: "log-1",
-            tenant_id: "tenant-1",
+            workspace_id: "tenant-1",
             action_type: "checkout",
             action_time: new Date().toISOString(),
             checked_out_by: "student-1",
@@ -299,7 +299,7 @@ export const mockSuperLogsQuery = async (page: Page) => {
   });
 };
 
-export const mockSuspendedTenantAdminOps = async (page: Page) => {
+export const mockSuspendedWorkspaceAdminOps = async (page: Page) => {
   await page.route(/\/functions(?:\/v1)?\/admin-ops(?:\?.*)?$/, async (route) => {
     const request = route.request();
     if (request.method() !== "POST") {
@@ -311,7 +311,7 @@ export const mockSuspendedTenantAdminOps = async (page: Page) => {
       return;
     }
     const body = request.postDataJSON() as { action?: string } | undefined;
-    if (body?.action === "update_tenant_settings" || body?.action === "bulk_import_gear") {
+    if (body?.action === "update_workspace_settings" || body?.action === "bulk_import_gear") {
       await route.fulfill({
         status: 403,
         contentType: "application/json",
@@ -327,12 +327,12 @@ export const mockSuspendedTenantAdminOps = async (page: Page) => {
   });
 };
 
-export const setTenantAdminSession = async (page: Page, tenantId = "tenant-e2e") => {
-  await page.waitForFunction(() => typeof window.__itemtraxxTest?.setTenantAdminSession === "function");
+export const setWorkspaceAdminSession = async (page: Page, workspaceId = "tenant-e2e") => {
+  await page.waitForFunction(() => typeof window.__itemtraxxTest?.setWorkspaceAdminSession === "function");
   await waitForPublicAuthBootstrap(page);
   await page.evaluate((id) => {
-    window.__itemtraxxTest?.setTenantAdminSession(id);
-  }, tenantId);
+    window.__itemtraxxTest?.setWorkspaceAdminSession(id);
+  }, workspaceId);
 };
 
 export const setSuperAdminSession = async (page: Page) => {

@@ -173,12 +173,13 @@ export const fetchGearByBarcode = async (barcode: string) => {
 };
 
 export const fetchStudentByStudentId = async (studentId: string) => {
+  const { deviceId } = getOrCreateDeviceSession();
   const result = await withTimeout(
-    invokeEdgeFunction<{ data: StudentSummary }, { student_id: string }>(
+    invokeEdgeFunction<{ data: StudentSummary }, { student_id: string; device_id: string }>(
       "checkout-borrower-lookup",
       {
         method: "POST",
-        body: { student_id: studentId },
+        body: { student_id: studentId, device_id: deviceId },
       },
     ),
     LOOKUP_TIMEOUT_MS,

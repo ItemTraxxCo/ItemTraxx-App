@@ -7,10 +7,11 @@ import {
   hasPrivilegedStepUp,
   isMissingPrivilegedStepUpTable,
 } from "../_shared/privilegedStepUp.ts";
-import { validateTenantAdminDeviceSession } from "../_shared/tenantAdminSessions.ts";
+import { validateAccountDeviceSession } from "../_shared/accountSessions.ts";
 import { readJsonBody } from "../_shared/requestBody.ts";
 import {
   optionalText,
+  requireEnum,
   requireUuid,
   STUDENT_ID_PATTERN,
   USERNAME_PATTERN,
@@ -33,10 +34,11 @@ type SupabaseAdminClient = ReturnType<typeof createClient<any, "public", any>>;
 
 type StudentRecord = {
   id: string;
-  tenant_id: string;
+  workspace_id: string;
   username: string;
   student_id: string;
 };
+const ACCESS_MODES = new Set(["all", "restricted"] as const);
 
 const CODENAME_PREFIXES = [
   "Nova",
@@ -272,7 +274,7 @@ const generateUsername = () => {
 
 const buildUniqueStudentIdentity = async (
   adminClient: SupabaseAdminClient,
-  tenantId: string
+  workspaceId: string
 ) => {
   for (let attempt = 0; attempt < 12; attempt += 1) {
     const candidateStudentId = generateStudentId();
@@ -280,7 +282,7 @@ const buildUniqueStudentIdentity = async (
     const { data: conflictStudentId } = await adminClient
       .from("students")
       .select("id")
-      .eq("tenant_id", tenantId)
+      .eq("workspace_id", workspaceId)
       .eq("student_id", candidateStudentId)
       .limit(1)
       .maybeSingle();
@@ -290,7 +292,7 @@ const buildUniqueStudentIdentity = async (
     const { data: conflictUsername } = await adminClient
       .from("students")
       .select("id")
-      .eq("tenant_id", tenantId)
+      .eq("workspace_id", workspaceId)
       .eq("username", candidateUsername)
       .limit(1)
       .maybeSingle();
@@ -315,13 +317,13 @@ const isUniqueIdentityConflict = (error: unknown) => {
 
 const createStudentRecord = async (
   adminClient: SupabaseAdminClient,
-  tenantId: string,
+  workspaceId: string,
   username: string,
   studentId: string
 ) => {
   const { data, error } = await (adminClient as any)
     .rpc("create_student_identity", {
-      p_tenant_id: tenantId,
+      p_workspace_id: workspaceId,
       p_username: username,
       p_student_id: studentId,
     })
@@ -336,13 +338,13 @@ const createStudentRecord = async (
 
 const createGeneratedStudentRecord = async (
   adminClient: SupabaseAdminClient,
-  tenantId: string
+  workspaceId: string
 ) => {
   for (let attempt = 0; attempt < 12; attempt += 1) {
-    const generatedIdentity = await buildUniqueStudentIdentity(adminClient, tenantId);
+    const generatedIdentity = await buildUniqueStudentIdentity(adminClient, workspaceId);
     const result = await createStudentRecord(
       adminClient,
-      tenantId,
+      workspaceId,
       generatedIdentity.username,
       generatedIdentity.studentId
     );
@@ -457,27 +459,27 @@ serve(async (req) => {
 
     const { data: profile, error: profileError } = await userClient
       .from("profiles")
-      .select("id, tenant_id, role, is_active")
+      .select("id, workspace_id, role, is_active")
       .eq("id", user.id)
       .single();
 
     if (
       profileError ||
-      !profile?.tenant_id ||
-      profile.role !== "tenant_admin" ||
+      !profile?.workspace_id ||
+      profile.role !== "workspace_admin" ||
       profile.is_active === false
     ) {
       return jsonResponse(403, { error: "Access denied" });
     }
 
-    const { data: tenantStatusRow } = await userClient
-      .from("tenants")
+    const { data: workspaceStatusRow } = await userClient
+      .from("workspaces")
       .select("status")
-      .eq("id", profile.tenant_id)
+      .eq("id", profile.workspace_id)
       .single();
 
-    if (tenantStatusRow?.status && tenantStatusRow.status !== "active") {
-      return jsonResponse(403, { error: "Tenant disabled" });
+    if (workspaceStatusRow?.status && workspaceStatusRow.status !== "active") {
+      return jsonResponse(403, { error: "Workspace disabled" });
     }
 
     const { action, payload } = await readJsonBody(req);
@@ -497,12 +499,22 @@ serve(async (req) => {
     const adminClient = createClient(supabaseUrl, serviceKey, {
       auth: { persistSession: false },
     });
+    const resolveAccess = async () => {
+      const accessMode = requireEnum(payloadRecord.access_mode, ACCESS_MODES);
+      const profileIds = Array.isArray(payloadRecord.profile_ids) ? [...new Set(payloadRecord.profile_ids.map((value) => requireUuid(value)))] : [];
+      if (accessMode === "restricted" && !profileIds.length) throw new ValidationError("Select at least one Tenant Account.");
+      if (profileIds.length) {
+        const { count, error } = await adminClient.from("profiles").select("id", { count: "exact", head: true }).eq("workspace_id", profile.workspace_id).eq("role", "tenant_account").eq("is_active", true).is("deleted_at", null).in("id", profileIds);
+        if (error || count !== profileIds.length) throw new ValidationError("Invalid Tenant Account selection.");
+      }
+      return { accessMode, profileIds };
+    };
 
     if (isMutationAction) {
       try {
         const hasStepUp = await hasPrivilegedStepUp(adminClient, {
           userId: user.id,
-          roleScope: "tenant_admin",
+          roleScope: "workspace_admin",
           authToken,
         });
         if (!hasStepUp) {
@@ -548,8 +560,8 @@ serve(async (req) => {
         });
       }
 
-      const activeSession = await validateTenantAdminDeviceSession(adminClient, {
-        tenantId: profile.tenant_id,
+      const activeSession = await validateAccountDeviceSession(adminClient, {
+        workspaceId: profile.workspace_id,
         profileId: profile.id,
         deviceId,
         authToken,
@@ -585,8 +597,8 @@ serve(async (req) => {
     if (action === "list_deleted") {
       const { data, error } = await adminClient
         .from("students")
-        .select("id, tenant_id, username, student_id")
-        .eq("tenant_id", profile.tenant_id)
+        .select("id, workspace_id, username, student_id")
+        .eq("workspace_id", profile.workspace_id)
         .not("deleted_at", "is", null)
         .order("deleted_at", { ascending: false })
         .limit(300);
@@ -599,6 +611,7 @@ serve(async (req) => {
     }
 
     if (action === "create") {
+      const { accessMode, profileIds } = await resolveAccess();
       const providedStudentId = optionalText(payloadRecord.student_id, {
         maxLen: 6,
         transform: "uppercase",
@@ -615,7 +628,7 @@ serve(async (req) => {
           adminClient
             .from("students")
             .select("id")
-            .eq("tenant_id", profile.tenant_id)
+            .eq("workspace_id", profile.workspace_id)
             .eq("student_id", studentId)
             .is("deleted_at", null)
             .limit(1)
@@ -623,7 +636,7 @@ serve(async (req) => {
           adminClient
             .from("students")
             .select("id")
-            .eq("tenant_id", profile.tenant_id)
+            .eq("workspace_id", profile.workspace_id)
             .eq("username", username)
             .is("deleted_at", null)
             .limit(1)
@@ -636,14 +649,21 @@ serve(async (req) => {
 
       const { data, error } =
         studentId && username
-          ? await createStudentRecord(adminClient, profile.tenant_id, username, studentId)
-          : await createGeneratedStudentRecord(adminClient, profile.tenant_id);
+          ? await createStudentRecord(adminClient, profile.workspace_id, username, studentId)
+          : await createGeneratedStudentRecord(adminClient, profile.workspace_id);
 
       if (error || !data) {
         if (isUniqueIdentityConflict(error)) {
           return jsonResponse(409, { error: "Borrower ID or username already exists." });
         }
         return jsonResponse(400, { error: "Unable to create student." });
+      }
+
+      const { error: modeError } = await adminClient.from("students").update({ access_mode: accessMode }).eq("id", data.id).eq("workspace_id", profile.workspace_id);
+      if (modeError) throw new Error("Unable to set borrower access.");
+      if (accessMode === "restricted") {
+        const { error: grantError } = await adminClient.from("borrower_access_grants").insert(profileIds.map((profileId) => ({ student_id: data.id, profile_id: profileId, granted_by: user.id })));
+        if (grantError) throw new Error("Unable to set borrower access.");
       }
 
       return jsonResponse(200, { data });
@@ -661,7 +681,7 @@ serve(async (req) => {
 
       const inserted: Array<{
         id: string;
-        tenant_id: string;
+        workspace_id: string;
         username: string;
         student_id: string;
       }> = [];
@@ -695,7 +715,7 @@ serve(async (req) => {
           ? adminClient
               .from("students")
               .select("student_id")
-              .eq("tenant_id", profile.tenant_id)
+              .eq("workspace_id", profile.workspace_id)
               .is("deleted_at", null)
               .in("student_id", requestedIds)
           : Promise.resolve({ data: [], error: null }),
@@ -703,7 +723,7 @@ serve(async (req) => {
           ? adminClient
               .from("students")
               .select("username")
-              .eq("tenant_id", profile.tenant_id)
+              .eq("workspace_id", profile.workspace_id)
               .is("deleted_at", null)
               .in("username", requestedUsernames)
           : Promise.resolve({ data: [], error: null }),
@@ -751,7 +771,7 @@ serve(async (req) => {
         if (!studentId || !username) {
           const generated = await createGeneratedStudentRecord(
             adminClient,
-            profile.tenant_id
+            profile.workspace_id
           );
           if (!generated.data) {
             skipped.push({ row: row.row, reason: "Unable to generate identity." });
@@ -765,7 +785,7 @@ serve(async (req) => {
 
         const { data, error } = await createStudentRecord(
           adminClient,
-          profile.tenant_id,
+          profile.workspace_id,
           username,
           studentId
         );
@@ -803,7 +823,7 @@ serve(async (req) => {
         .from("students")
         .select("id")
         .eq("id", normalizedId)
-        .eq("tenant_id", profile.tenant_id)
+        .eq("workspace_id", profile.workspace_id)
         .is("deleted_at", null)
         .maybeSingle();
 
@@ -814,7 +834,7 @@ serve(async (req) => {
       const { count, error: checkedOutError } = await adminClient
         .from("gear")
         .select("id", { count: "exact", head: true })
-        .eq("tenant_id", profile.tenant_id)
+        .eq("workspace_id", profile.workspace_id)
         .eq("checked_out_by", normalizedId)
         .is("deleted_at", null);
 
@@ -835,7 +855,7 @@ serve(async (req) => {
           deleted_by: user.id,
         })
         .eq("id", normalizedId)
-        .eq("tenant_id", profile.tenant_id)
+        .eq("workspace_id", profile.workspace_id)
         .is("deleted_at", null);
 
       if (error) {
@@ -853,7 +873,7 @@ serve(async (req) => {
         .from("students")
         .select("id, username, student_id")
         .eq("id", normalizedId)
-        .eq("tenant_id", profile.tenant_id)
+        .eq("workspace_id", profile.workspace_id)
         .not("deleted_at", "is", null)
         .maybeSingle();
 
@@ -865,7 +885,7 @@ serve(async (req) => {
         adminClient
           .from("students")
           .select("id")
-          .eq("tenant_id", profile.tenant_id)
+          .eq("workspace_id", profile.workspace_id)
           .eq("student_id", archivedStudent.student_id)
           .neq("id", normalizedId)
           .is("deleted_at", null)
@@ -874,7 +894,7 @@ serve(async (req) => {
         adminClient
           .from("students")
           .select("id")
-          .eq("tenant_id", profile.tenant_id)
+          .eq("workspace_id", profile.workspace_id)
           .eq("username", archivedStudent.username)
           .neq("id", normalizedId)
           .is("deleted_at", null)
@@ -890,9 +910,9 @@ serve(async (req) => {
         .from("students")
         .update({ deleted_at: null, deleted_by: null })
         .eq("id", normalizedId)
-        .eq("tenant_id", profile.tenant_id)
+        .eq("workspace_id", profile.workspace_id)
         .not("deleted_at", "is", null)
-        .select("id, tenant_id, username, student_id")
+        .select("id, workspace_id, username, student_id")
         .single();
 
       if (error || !data) {

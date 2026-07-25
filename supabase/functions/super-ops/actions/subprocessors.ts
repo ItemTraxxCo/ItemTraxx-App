@@ -38,9 +38,9 @@ const parseEffectiveDateUtc = (value: string) => {
 const loadSubprocessorNoticeRecipients = async (
   adminClient: SupabaseAdminClient,
 ) => {
-  const [districtResult, leadResult] = await Promise.all([
+  const [workspaceResult, leadResult] = await Promise.all([
     adminClient
-      .from("districts")
+      .from("workspace_policies")
       .select("billing_email")
       .eq("billing_status", "active")
       .not("billing_email", "is", null),
@@ -51,12 +51,12 @@ const loadSubprocessorNoticeRecipients = async (
       .not("reply_email", "is", null),
   ]);
 
-  if (districtResult.error || leadResult.error) {
+  if (workspaceResult.error || leadResult.error) {
     throw new Error("Unable to load subprocessor notice recipients.");
   }
 
   const recipients = new Set<string>();
-  for (const row of districtResult.data ?? []) {
+  for (const row of workspaceResult.data ?? []) {
     if (typeof row.billing_email === "string" && row.billing_email.trim()) {
       recipients.add(row.billing_email.trim().toLowerCase());
     }
@@ -229,8 +229,7 @@ export const handleSubprocessorsAction = async (
                 source: "super-ops/announce_subprocessor_change",
               },
               triggeredByUserId: user.id,
-              tenantId: null,
-              districtId: null,
+              workspaceId: null,
               metadata: { changeId, vendor, changeType, effectiveDate },
             },
           )

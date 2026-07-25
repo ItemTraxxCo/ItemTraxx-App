@@ -7,8 +7,7 @@ import { sha256Hex } from "./sha256.ts";
 
 export type PrivilegedRoleScope =
   | "super_admin"
-  | "tenant_admin"
-  | "district_admin";
+  | "workspace_admin";
 
 const DEFAULT_STEP_UP_TTL_MS = 15 * 60 * 1000;
 const ADMIN_STEP_UP_REGISTRATION_WINDOW_MS = 5 * 60 * 1000;

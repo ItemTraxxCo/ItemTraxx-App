@@ -12,8 +12,8 @@ export const CONTROL_CENTER_ACTIONS = [
   "get_control_center",
   "set_runtime_config",
   "upsert_alert_rule",
-  "set_tenant_policy",
-  "set_tenant_force_reauth",
+  "set_workspace_policy",
+  "set_workspace_force_reauth",
   "create_approval",
   "approve_request",
 ] as const;
@@ -140,12 +140,12 @@ export const handleControlCenterAction = async (
     return jsonResponse(200, { data });
   }
 
-  if (action === "set_tenant_policy") {
+  if (action === "set_workspace_policy") {
     const next = payload;
-    const tenantId = requireUuid(next.tenant_id);
+    const workspaceId = requireUuid(next.workspace_id);
 
     const row = {
-      tenant_id: tenantId,
+      workspace_id: workspaceId,
       max_admins: optionalPositiveInteger(next.max_admins, 1000),
       max_students: optionalPositiveInteger(next.max_students, 100_000),
       max_gear: optionalPositiveInteger(next.max_gear, 100_000),
@@ -163,10 +163,10 @@ export const handleControlCenterAction = async (
     };
 
     const { data, error } = await adminClient
-      .from("tenant_policies")
-      .upsert(row, { onConflict: "tenant_id" })
+      .from("workspace_policies")
+      .upsert(row, { onConflict: "workspace_id" })
       .select(
-        "tenant_id, max_admins, max_students, max_gear, checkout_due_hours, barcode_pattern, feature_flags",
+        "workspace_id, max_admins, max_students, max_gear, checkout_due_hours, barcode_pattern, feature_flags",
       )
       .single();
 
@@ -179,10 +179,10 @@ export const handleControlCenterAction = async (
           message.includes("plan_code"))
       ) {
         const { data: fallbackData, error: fallbackError } = await adminClient
-          .from("tenant_policies")
+          .from("workspace_policies")
           .upsert(
             {
-              tenant_id: tenantId,
+              workspace_id: workspaceId,
               max_admins: row.max_admins,
               max_students: row.max_students,
               max_gear: row.max_gear,
@@ -191,10 +191,10 @@ export const handleControlCenterAction = async (
               updated_by: row.updated_by,
               updated_at: row.updated_at,
             },
-            { onConflict: "tenant_id" },
+            { onConflict: "workspace_id" },
           )
           .select(
-            "tenant_id, max_admins, max_students, max_gear, checkout_due_hours, barcode_pattern",
+            "workspace_id, max_admins, max_students, max_gear, checkout_due_hours, barcode_pattern",
           )
           .single();
         if (fallbackError || !fallbackData) {
@@ -203,9 +203,9 @@ export const handleControlCenterAction = async (
           });
         }
         await writeAudit(
-          "set_tenant_policy",
+          "set_workspace_policy",
           "tenant_policy",
-          tenantId,
+          workspaceId,
           fallbackData as Record<string, unknown>,
         );
         return jsonResponse(200, { data: fallbackData });
@@ -214,27 +214,27 @@ export const handleControlCenterAction = async (
     }
 
     await writeAudit(
-      "set_tenant_policy",
+      "set_workspace_policy",
       "tenant_policy",
-      tenantId,
+      workspaceId,
       data as Record<string, unknown>,
     );
     return jsonResponse(200, { data });
   }
 
-  if (action === "set_tenant_force_reauth") {
+  if (action === "set_workspace_force_reauth") {
     const next = payload;
-    const tenantId = requireUuid(next.tenant_id);
+    const workspaceId = requireUuid(next.workspace_id);
 
     const forceAt = new Date().toISOString();
     const { error } = await adminClient
-      .from("tenant_security_controls")
+      .from("workspace_security_controls")
       .upsert({
-        tenant_id: tenantId,
+        workspace_id: workspaceId,
         force_reauth_after: forceAt,
         updated_by: user.id,
         updated_at: forceAt,
-      }, { onConflict: "tenant_id" });
+      }, { onConflict: "workspace_id" });
 
     if (error) {
       return jsonResponse(400, { error: "Unable to force tenant re-login." });
@@ -243,15 +243,15 @@ export const handleControlCenterAction = async (
     const { data: job } = await adminClient
       .from("super_jobs")
       .insert({
-        job_type: "force_tenant_reauth",
+        job_type: "force_workspace_reauth",
         status: "completed",
-        details: { tenant_id: tenantId, force_reauth_after: forceAt },
+        details: { workspace_id: workspaceId, force_reauth_after: forceAt },
         created_by: user.id,
       })
       .select("id, job_type, status, details, created_at, updated_at")
       .single();
 
-    await writeAudit("force_tenant_reauth", "tenant", tenantId, {
+    await writeAudit("force_workspace_reauth", "workspace", workspaceId, {
       force_reauth_after: forceAt,
     });
 

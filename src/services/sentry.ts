@@ -68,11 +68,11 @@ type HandledRequestFailure = {
 
 const CRITICAL_EDGE_FUNCTIONS = new Set([
   "super-dashboard",
-  "district-dashboard",
+  "super-workspace-mutate",
   "admin-ops",
+  "workspace-admin-mutate",
   "privileged-step-up",
-  "district-handoff",
-  "tenant-login",
+  "workspace-login",
   "super-auth-verify",
   "checkoutReturn",
 ]);

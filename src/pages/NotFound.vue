@@ -11,7 +11,7 @@
         The page you requested does not exist. Check the URL, go back to the previous page,
         or contact support from the menu in the top-right corner.
       </p>
-      <p v-if="district.isDistrictHost && !district.districtId" class="not-found-message">
+      <p v-if="district.isWorkspaceHost && !district.workspaceId" class="not-found-message">
         This district/organization URL is not recognized.
       </p>
 
@@ -26,7 +26,7 @@
         </div>
         <div v-if="showDiagnosticInfo">
           <dt>Tenant ID</dt>
-          <dd>{{ auth.tenantContextId || "-" }}</dd>
+          <dd>{{ auth.workspaceContextId || "-" }}</dd>
         </div>
         <div v-if="showDiagnosticInfo">
           <dt>Role</dt>
@@ -77,10 +77,10 @@
 import { computed, onMounted, onUnmounted, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { getAuthState } from "../store/authState";
-import { getDistrictState } from "../store/districtState";
+import { getWorkspaceState } from "../store/workspaceState";
 
 const auth = getAuthState();
-const district = getDistrictState();
+const district = getWorkspaceState();
 const route = useRoute();
 const router = useRouter();
 const now = ref("");
@@ -115,7 +115,7 @@ const goBack = () => {
 };
 
 const goHome = () => {
-  if (district.isDistrictHost) {
+  if (district.isWorkspaceHost) {
     window.location.assign("https://itemtraxx.com/");
     return;
   }
@@ -123,7 +123,7 @@ const goHome = () => {
 };
 
 const goAdmin = () => {
-  router.push("/tenant/admin-login");
+  router.push("/admin/login");
 };
 
 onMounted(refreshNow);

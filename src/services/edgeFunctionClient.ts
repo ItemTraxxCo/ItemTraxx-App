@@ -38,7 +38,7 @@ const EDGE_FUNCTION_TIMEOUT_MS = 10000;
 const isTenantDisabledError = (payload: unknown) => {
   const parsed = payload as { error?: string; message?: string } | null;
   const message = (parsed?.error ?? parsed?.message ?? "").toLowerCase();
-  return message.includes("tenant disabled");
+  return message.includes("workspace disabled") || message.includes("tenant disabled");
 };
 
 const requestEdgeFunction = async <TData = unknown, TBody = unknown>(

@@ -4,7 +4,7 @@ import { edgeFunctionError } from "./appErrors";
 
 export type SuperLogEntry = {
   id: string;
-  tenant_id: string;
+  workspace_id: string;
   gear_id: string;
   checked_out_by: string | null;
   action_type: string;
@@ -12,11 +12,11 @@ export type SuperLogEntry = {
   performed_by: string | null;
   gear: { id: string; name: string; barcode: string } | null;
   student: { id: string; username: string; student_id: string } | null;
-  tenant: { id: string; name: string } | null;
+  workspace: { id: string; name: string } | null;
 };
 
 export const listSuperLogs = async (payload: {
-  tenant_id?: string;
+  workspace_id?: string;
   action_type?: string;
   search?: string;
   start_at?: string;

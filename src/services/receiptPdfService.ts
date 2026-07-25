@@ -2,7 +2,7 @@ type TransactionReceipt = {
   timestamp: string;
   studentUsername: string;
   studentId: string;
-  tenantId: string | null;
+  workspaceId: string | null;
   operatorEmail: string;
   checkouts: number;
   returns: number;
@@ -74,7 +74,7 @@ export const downloadTransactionReceiptPdf = async (receipt: TransactionReceipt)
   row("Borrower", receipt.studentUsername);
   row("Borrower ID", receipt.studentId);
   row("Tenant", receipt.operatorEmail);
-  row("Tenant ID", receipt.tenantId ?? "Unknown. Please contact support to resolve this.");
+  row("Tenant ID", receipt.workspaceId ?? "Unknown. Please contact support to resolve this.");
   row("Checkout(s)", String(receipt.checkouts));
   row("Return(s)", String(receipt.returns));
 

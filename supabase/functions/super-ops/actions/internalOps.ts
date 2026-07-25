@@ -24,7 +24,7 @@ export const handleInternalOpsAction = async (
       adminClient
         .from("gear_logs")
         .select(
-          "tenant_id, gear_id, checked_out_by, action_type, action_time",
+          "workspace_id, gear_id, checked_out_by, action_type, action_time",
         )
         .in("action_type", ["checkout", "return"])
         .gte("action_time", since24hIso)
@@ -87,7 +87,7 @@ export const handleInternalOpsAction = async (
     const return15m = logs15m.filter((row) =>
       row.action_type === "return"
     ).length;
-    const activeTenants15m = new Set(logs15m.map((row) => row.tenant_id)).size;
+    const activeTenants15m = new Set(logs15m.map((row) => row.workspace_id)).size;
 
     const queueRows = queueRowsResult.data ?? [];
     const queueTotal = queueRows.length;
@@ -148,9 +148,9 @@ export const handleInternalOpsAction = async (
       invoice_paid: leads.filter((row) => row.stage === "invoice_paid").length,
     };
 
-    const tenantIds = Array.from(
+    const workspaceIds = Array.from(
       new Set(
-        recentLogs.map((row) => row.tenant_id).filter((
+        recentLogs.map((row) => row.workspace_id).filter((
           value,
         ): value is string => !!value),
       ),
@@ -171,13 +171,13 @@ export const handleInternalOpsAction = async (
     );
 
     const [
-      tenantRowsResult,
+      workspaceRowsResult,
       gearRowsResult,
       studentRowsResult,
-      allTenantsResult,
+      allWorkspacesResult,
     ] = await Promise.all([
-      tenantIds.length
-        ? adminClient.from("tenants").select("id, name").in("id", tenantIds)
+      workspaceIds.length
+        ? adminClient.from("workspaces").select("id, name").in("id", workspaceIds)
         : Promise.resolve({ data: [], error: null }),
       gearIds.length
         ? adminClient.from("gear").select("id, name, barcode").in(
@@ -192,14 +192,14 @@ export const handleInternalOpsAction = async (
         )
         : Promise.resolve({ data: [], error: null }),
       adminClient
-        .from("tenants")
+        .from("workspaces")
         .select("id, name, status")
         .order("name", { ascending: true })
         .limit(300),
     ]);
 
-    const tenantMap = new Map(
-      (tenantRowsResult.data ?? []).map((
+    const workspaceMap = new Map(
+      (workspaceRowsResult.data ?? []).map((
         tenant,
       ) => [tenant.id as string, tenant.name as string]),
     );
@@ -221,7 +221,7 @@ export const handleInternalOpsAction = async (
         },
       ]),
     );
-    const allTenants = (allTenantsResult.data ?? []) as Array<{
+    const allWorkspaces = (allWorkspacesResult.data ?? []) as Array<{
       id: string;
       name: string;
       status: string | null;
@@ -233,10 +233,10 @@ export const handleInternalOpsAction = async (
         ? studentMap.get(row.checked_out_by)
         : null;
       return {
-        tenant_id: row.tenant_id,
-        tenant_name: row.tenant_id
-          ? tenantMap.get(row.tenant_id) ?? "Unknown tenant"
-          : "Unknown tenant",
+        workspace_id: row.workspace_id,
+        workspace_name: row.workspace_id
+          ? workspaceMap.get(row.workspace_id) ?? "Unknown workspace"
+          : "Unknown workspace",
         action_type: row.action_type,
         action_time: row.action_time,
         gear_name: gear?.name ?? null,
@@ -416,11 +416,11 @@ export const handleInternalOpsAction = async (
         type: "page",
         route: "/super-admin/customers",
       },
-      ...allTenants.slice(0, 40).map((tenant) => ({
+      ...allWorkspaces.slice(0, 40).map((tenant) => ({
         id: `tenant_${tenant.id}`,
         label: tenant.name,
-        type: "tenant",
-        route: "/super-admin/tenants",
+        type: "workspace",
+        route: "/super-admin/workspaces",
       })),
     ];
 
@@ -434,7 +434,7 @@ export const handleInternalOpsAction = async (
         traffic: {
           checkout_15m: checkout15m,
           return_15m: return15m,
-          active_tenants_15m: activeTenants15m,
+          active_workspaces_15m: activeTenants15m,
           events_24h: recentLogs.length,
         },
         queue: queueSummary,

@@ -8,7 +8,7 @@ import {
   authorizeAdminOpsAction,
   dispatchAdminOpsAction,
 } from "./actions/index.ts";
-import { resolveTenantPolicyState } from "./actions/settings.ts";
+import { resolveWorkspacePolicyState } from "./actions/settings.ts";
 import type {
   AdminOpsContext,
   JsonResponse,
@@ -17,9 +17,10 @@ import type {
 
 const EXPECTED_ACTIONS = [
   "get_notifications",
-  "get_tenant_settings",
-  "update_tenant_settings",
+  "get_workspace_settings",
+  "update_workspace_settings",
   "get_status_tracking",
+  "get_workspace_dashboard",
   "touch_session",
   "validate_session",
   "list_sessions",
@@ -132,7 +133,7 @@ const contextFor = (
   payload,
   adminClient,
   user: { id: "00000000-0000-4000-8000-000000000001" },
-  tenantId: "00000000-0000-4000-8000-000000000002",
+  workspaceId: "00000000-0000-4000-8000-000000000002",
   authToken: "test-auth-token",
   authSessionBinding: {
     sessionId: "auth-session-1",
@@ -147,7 +148,7 @@ const contextFor = (
     loginLocation: "admin_login",
     generalLocation: "Seattle, WA, US",
   },
-  tenantPolicy: null,
+  workspacePolicy: null,
   checkoutDueHours: 72,
   featureFlags: {
     enable_notifications: true,
@@ -157,7 +158,7 @@ const contextFor = (
     enable_barcode_generator: true,
   },
   maintenance: { enabled: false, message: "" },
-  tenantUpdates: [],
+  workspaceUpdates: [],
   jsonResponse,
   ...overrides,
 });
@@ -165,9 +166,9 @@ const contextFor = (
 const responseBody = (response: Response) =>
   response.json() as Promise<Record<string, unknown>>;
 
-Deno.test("admin ops registry owns exactly the 11 live actions once", () => {
-  assertEquals(ADMIN_OPS_ACTIONS.length, 11);
-  assertEquals(new Set(ADMIN_OPS_ACTIONS).size, 11);
+Deno.test("admin ops registry owns exactly the 12 live actions once", () => {
+  assertEquals(ADMIN_OPS_ACTIONS.length, 12);
+  assertEquals(new Set(ADMIN_OPS_ACTIONS).size, 12);
   assertEquals([...ADMIN_OPS_ACTIONS].sort(), [...EXPECTED_ACTIONS].sort());
   assertEquals(
     Object.keys(ADMIN_OPS_ACTION_OWNERS).sort(),
@@ -185,12 +186,12 @@ Deno.test("admin ops dispatcher preserves the invalid-action response", async ()
   assertEquals(await responseBody(response), { error: "Invalid action" });
 });
 
-Deno.test("tenant users remain denied from tenant-admin-only actions", async () => {
+Deno.test("tenant users remain denied from workspace-admin-only actions", async () => {
   const { client } = queryClient(() => ({ data: null, error: null }));
   const response = await authorizeAdminOpsAction({
     action: "get_status_tracking",
-    profileRole: "tenant_user",
-    isTenantSuspended: false,
+    profileRole: "tenant_account",
+    isWorkspaceSuspended: false,
     adminClient: client,
     userId: "user-1",
     authToken: "token-1",
@@ -202,12 +203,28 @@ Deno.test("tenant users remain denied from tenant-admin-only actions", async () 
   assertEquals(await responseBody(response), { error: "Access denied" });
 });
 
-Deno.test("suspended tenants remain denied from write actions", async () => {
+Deno.test("Tenant Accounts can use their own session-management actions", async () => {
+  const { client } = queryClient(() => ({ data: null, error: null }));
+  for (const action of ["touch_session", "validate_session", "list_sessions", "revoke_session", "revoke_current_session", "revoke_all_sessions"]) {
+    const response = await authorizeAdminOpsAction({
+      action,
+      profileRole: "tenant_account",
+      isWorkspaceSuspended: false,
+      adminClient: client,
+      userId: "user-1",
+      authToken: "token-1",
+      jsonResponse,
+    });
+    assertEquals(response, null, `${action} should be available to Tenant Accounts`);
+  }
+});
+
+Deno.test("suspended workspaces remain denied from write actions", async () => {
   const { client } = queryClient(() => ({ data: null, error: null }));
   const response = await authorizeAdminOpsAction({
     action: "bulk_import_gear",
-    profileRole: "tenant_admin",
-    isTenantSuspended: true,
+    profileRole: "workspace_admin",
+    isWorkspaceSuspended: true,
     adminClient: client,
     userId: "user-1",
     authToken: "token-1",
@@ -216,7 +233,7 @@ Deno.test("suspended tenants remain denied from write actions", async () => {
 
   assertExists(response);
   assertEquals(response.status, 403);
-  assertEquals(await responseBody(response), { error: "Tenant disabled" });
+  assertEquals(await responseBody(response), { error: "Workspace disabled" });
 });
 
 Deno.test("missing privileged-step-up storage remains a fail-closed 503", async () => {
@@ -233,9 +250,9 @@ Deno.test("missing privileged-step-up storage remains a fail-closed 503", async 
     return { data: null, error: null };
   });
   const response = await authorizeAdminOpsAction({
-    action: "update_tenant_settings",
-    profileRole: "tenant_admin",
-    isTenantSuspended: false,
+    action: "update_workspace_settings",
+    profileRole: "workspace_admin",
+    isWorkspaceSuspended: false,
     adminClient: client,
     userId: "user-1",
     authToken: "token-1",
@@ -265,12 +282,12 @@ Deno.test("touch_session rejects a blocked auth token", async () => {
 
 Deno.test("touch_session preserves the missing-session-table fallback", async () => {
   const { client } = queryClient((call) => {
-    if (call.table === "tenant_admin_sessions") {
+    if (call.table === "account_sessions") {
       return {
         data: null,
         error: {
           code: "42P01",
-          message: 'relation "tenant_admin_sessions" does not exist',
+          message: 'relation "account_sessions" does not exist',
         },
       };
     }
@@ -288,7 +305,7 @@ Deno.test("touch_session preserves the missing-session-table fallback", async ()
 
 Deno.test("touch_session fails closed when auth-binding columns are missing", async () => {
   const { client } = queryClient((call) => {
-    if (call.table !== "tenant_admin_sessions") {
+    if (call.table !== "account_sessions") {
       return { data: null, error: null };
     }
     return call.operations.some((operation) => operation.method === "insert")
@@ -314,7 +331,7 @@ Deno.test("touch_session fails closed when auth-binding columns are missing", as
 Deno.test("touch_session retries without optional metadata columns", async () => {
   let updateCalls = 0;
   const { client, calls } = queryClient((call) => {
-    if (call.table !== "tenant_admin_sessions") {
+    if (call.table !== "account_sessions") {
       return { data: null, error: null };
     }
     const update = call.operations.find((operation) =>
@@ -412,7 +429,7 @@ Deno.test("revoke_all_sessions preserves the revoked-row count", async () => {
 Deno.test("tenant policy resolution retries when feature_flags is missing", async () => {
   let policyQueries = 0;
   const { client, calls } = queryClient((call) => {
-    if (call.table !== "tenant_policies") return { data: null, error: null };
+    if (call.table !== "workspace_policies") return { data: null, error: null };
     policyQueries += 1;
     return policyQueries === 1
       ? {
@@ -431,7 +448,7 @@ Deno.test("tenant policy resolution retries when feature_flags is missing", asyn
         error: null,
       };
   });
-  const resolved = await resolveTenantPolicyState(client, "tenant-1");
+  const resolved = await resolveWorkspacePolicyState(client, "tenant-1");
 
   assertEquals(resolved.checkoutDueHours, 48);
   assertEquals(resolved.featureFlags.enable_notifications, true);

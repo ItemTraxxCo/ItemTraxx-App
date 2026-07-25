@@ -3,12 +3,12 @@ import {
   mockAdminOps,
   mockSuperDashboard,
   mockSuperGearMutate,
-  mockSuperTenantMutate,
+  mockSuperWorkspaceMutate,
   mockSystemStatus,
   mockUnauthenticatedSession,
   navigateApp,
   setSuperAdminSession,
-  setTenantAdminSession,
+  setWorkspaceAdminSession,
 } from "./helpers/testHarness";
 
 test.describe("global CSS ownership contracts", () => {
@@ -17,7 +17,7 @@ test.describe("global CSS ownership contracts", () => {
     await mockUnauthenticatedSession(page);
     await mockAdminOps(page);
     await mockSuperDashboard(page);
-    await mockSuperTenantMutate(page);
+    await mockSuperWorkspaceMutate(page);
     await mockSuperGearMutate(page);
   });
 
@@ -36,8 +36,8 @@ test.describe("global CSS ownership contracts", () => {
     await expect(page.getByRole("heading", { name: "ItemTraxx", exact: true })).toBeVisible();
     expect(authenticatedCssRequests).toEqual([]);
 
-    await setTenantAdminSession(page);
-    await navigateApp(page, "/tenant/admin");
+    await setWorkspaceAdminSession(page);
+    await navigateApp(page, "/admin");
     await expect(page.getByRole("heading", { name: "Admin Panel", exact: true })).toBeVisible();
     await expect.poll(() => authenticatedCssRequests.length).toBe(1);
     expect(
@@ -51,7 +51,7 @@ test.describe("global CSS ownership contracts", () => {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto("/");
     await setSuperAdminSession(page);
-    await navigateApp(page, "/super-admin/tenants");
+    await navigateApp(page, "/super-admin/workspaces");
 
     const tableWrap = page.locator(".table-wrap");
     await expect(tableWrap).toBeVisible();
@@ -145,7 +145,7 @@ test.describe("global CSS ownership contracts", () => {
           body: JSON.stringify([
             {
               id: "gear-css-owner",
-              tenant_id: "tenant-e2e",
+              workspace_id: "tenant-e2e",
               name: "CSS owner camera",
               barcode: "CSS-OWNER-1",
               serial_number: "SERIAL-1",
@@ -168,7 +168,7 @@ test.describe("global CSS ownership contracts", () => {
 
     await page.goto("/");
     await page.evaluate(() => {
-      window.localStorage.setItem("itemtraxx:onboarding:v1:tenant_admin", new Date().toISOString());
+      window.localStorage.setItem("itemtraxx:onboarding:v1:workspace_admin", new Date().toISOString());
       window.localStorage.setItem(
         "itemtraxx-cookie-consent",
         JSON.stringify({
@@ -178,9 +178,9 @@ test.describe("global CSS ownership contracts", () => {
         }),
       );
     });
-    await setTenantAdminSession(page);
+    await setWorkspaceAdminSession(page);
 
-    await navigateApp(page, "/tenant/admin");
+    await navigateApp(page, "/admin");
     const adminCard = page.getByRole("link", { name: /Item Management/ });
     await expect(adminCard).toBeVisible();
     expect(
@@ -191,13 +191,13 @@ test.describe("global CSS ownership contracts", () => {
     ).toEqual({ display: "block", borderRadius: "14px" });
     expect(await hasScopedRule("admin-card")).toBe(true);
 
-    await navigateApp(page, "/tenant/admin/stats");
+    await navigateApp(page, "/admin/stats");
     const statsGrid = page.locator(".stats-grid");
     await expect(statsGrid).toBeVisible();
     expect(await statsGrid.evaluate((element) => getComputedStyle(element).display)).toBe("grid");
     expect(await hasScopedRule("stats-grid")).toBe(true);
 
-    await navigateApp(page, "/tenant/admin/gear");
+    await navigateApp(page, "/admin/gear");
     const formHelp = page.locator(".form-help-row").first();
     await expect(formHelp).toBeVisible();
     expect(

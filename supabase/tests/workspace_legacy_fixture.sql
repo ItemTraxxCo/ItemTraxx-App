@@ -23,6 +23,9 @@ create table public.tenant_admin_sessions(id uuid primary key default gen_random
 create table public.privileged_session_stepups(id uuid primary key default gen_random_uuid(),user_id uuid not null references public.profiles(id) on delete cascade,role_scope text not null check(role_scope in ('super_admin','tenant_admin','district_admin')),binding_key text not null,issued_by text not null,created_at timestamptz not null default now(),updated_at timestamptz not null default now(),expires_at timestamptz not null);
 create table public.support_requests(id uuid primary key,requester_name text,reply_email text,subject text,category text,message text,source text,status text,created_at timestamptz,updated_at timestamptz);
 create table public.district_support_requests(id uuid primary key,district_id uuid references public.districts(id),requester_name text,requester_email text,subject text,message text,status text,created_at timestamptz,updated_at timestamptz);
+alter table public.district_support_requests enable row level security;
+create policy district_admin_select_own_support_requests on public.district_support_requests for select using(exists(select 1 from public.profiles p where p.id=auth.uid() and p.district_id=district_support_requests.district_id));
+create policy district_admin_insert_own_support_requests on public.district_support_requests for insert with check(exists(select 1 from public.profiles p where p.id=auth.uid() and p.district_id=district_support_requests.district_id));
 create table public.email_delivery_logs(id uuid primary key,tenant_id uuid,district_id uuid);
 create table public.client_error_reports(id uuid primary key,tenant_context_id text,district_context_id text,is_district_host boolean,district_id text);
 create table public.cookie_consent_records(id uuid primary key,profile_id uuid references public.profiles(id));

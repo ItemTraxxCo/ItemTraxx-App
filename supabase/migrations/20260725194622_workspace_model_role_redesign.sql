@@ -538,6 +538,7 @@ alter table if exists public.client_error_reports drop column if exists tenant_c
 alter table if exists public.client_error_reports drop column if exists district_context_id;
 alter table if exists public.client_error_reports drop column if exists is_district_host;
 alter table if exists public.client_error_reports drop column if exists district_id;
+drop table if exists public.district_support_requests;
 alter table if exists public.profiles drop column if exists district_id;
 alter table if exists public.workspaces drop column if exists district_id;
 alter table if exists public.workspaces drop column if exists access_code;
@@ -545,7 +546,6 @@ drop table if exists public.district_session_handoffs_v4;
 drop table if exists public.district_session_handoffs_v3;
 drop table if exists public.district_session_handoffs_v2;
 drop table if exists public.district_session_handoffs;
-drop table if exists public.district_support_requests;
 drop table if exists public.district_subscription_plan_alignment;
 drop table if exists public.district_subscription_fields;
 drop table if exists public.districts;

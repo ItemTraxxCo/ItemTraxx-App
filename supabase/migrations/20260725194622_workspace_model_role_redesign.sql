@@ -402,6 +402,9 @@ create table if not exists public.privileged_session_stepups (
   expires_at timestamptz not null
 );
 alter table public.privileged_session_stepups drop constraint if exists privileged_session_stepups_role_scope_check;
+update public.privileged_session_stepups
+set role_scope = 'workspace_admin'
+where role_scope in ('tenant_admin', 'district_admin');
 alter table public.privileged_session_stepups add constraint privileged_session_stepups_role_scope_check
   check (role_scope in ('super_admin','workspace_admin'));
 create unique index if not exists privileged_session_stepups_binding_uidx

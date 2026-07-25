@@ -21,6 +21,10 @@ begin
   if (select account_category from public.workspace_policies where workspace_id='20000000-0000-0000-0000-000000000001') <> 'organization' then
     raise exception 'account_category changed';
   end if;
+  if exists(select 1 from public.privileged_session_stepups where role_scope <> 'workspace_admin')
+     or (select count(*) from public.privileged_session_stepups where role_scope = 'workspace_admin') <> 2 then
+    raise exception 'legacy privileged step-up scopes were not preserved and mapped';
+  end if;
 end $$;
 
 insert into public.workspaces(id,name,slug) values

@@ -81,7 +81,7 @@ jobs:
         run: npm run devops:check:edge-action-parity
 
       - name: Check Supabase function graph with frozen Deno lock
-        run: deno check --frozen supabase/functions/super-ops/index.ts supabase/functions/super-tenant-mutate/index.ts supabase/functions/admin-ops/index.ts
+        run: deno check --frozen supabase/functions/super-ops/index.ts supabase/functions/super-workspace-mutate/index.ts supabase/functions/admin-ops/index.ts
 
       - name: Test shared Supabase helpers with frozen Deno lock
         run: deno test --allow-env --frozen supabase/functions/_shared/*_test.ts

@@ -29,7 +29,7 @@
     <div class="card">
       <h2>Item List</h2>
       <div class="input-row">
-        <select v-model="workspaceFilter" @change="loadGear"><option value="all">all workspaces</option><option v-for="t in workspaces" :key="t.id" :value="t.id">{{ t.name }}</option></select>
+        <select v-model="workspaceFilter" @change="loadItem"><option value="all">all workspaces</option><option v-for="t in workspaces" :key="t.id" :value="t.id">{{ t.name }}</option></select>
         <select v-model="statusFilter">
           <option value="all">all statuses</option>
           <option value="available">available</option>
@@ -41,9 +41,9 @@
           <option value="in_studio_only">in_studio_only</option>
         </select>
         <input v-model="search" type="text" placeholder="Search" />
-        <button type="button" @click="loadGear">Search</button>
+        <button type="button" @click="loadItem">Search</button>
       </div>
-      <p class="muted">Showing {{ filteredGear.length }} of {{ gear.length }} items.</p>
+      <p class="muted">Showing {{ filteredItem.length }} of {{ items.length }} items.</p>
       <div class="form-actions">
         <button type="button" @click="exportCsv">Export CSV</button>
         <button type="button" @click="exportPdf">Export PDF</button>
@@ -53,7 +53,7 @@
       <table v-else class="table">
         <thead><tr><th>Name</th><th>Workspace</th><th>Barcode</th><th>Status</th><th>Actions</th></tr></thead>
         <tbody>
-          <tr v-for="item in filteredGear" :key="item.id">
+          <tr v-for="item in filteredItem" :key="item.id">
             <td>{{ item.name }}</td>
             <td>{{ workspaceNameById.get(item.workspace_id) || item.workspace_id }}</td>
             <td>{{ item.barcode }}</td>
@@ -93,14 +93,14 @@ import {
   handleSuperAdminUnauthorized,
   isUnauthorizedError,
 } from "../../services/authErrorHandling";
-import { createSuperGear, deleteSuperGear, listSuperGear, updateSuperGear, type SuperGearItem } from "../../services/superGearService";
+import { createSuperItem, deleteSuperItem, listSuperItem, updateSuperItem, type SuperItemRecord } from "../../services/superItemService";
 import { listWorkspaces as listWorkspaces, type SuperWorkspace as SuperWorkspace } from "../../services/superWorkspaceService";
 import { exportRowsToCsv, exportRowsToPdf } from "../../services/exportService";
 import { toUserFacingErrorMessage } from "../../services/appErrors";
 
 const router = useRouter();
 const workspaces = ref<SuperWorkspace[]>([]);
-const gear = ref<SuperGearItem[]>([]);
+const items = ref<SuperItemRecord[]>([]);
 const workspaceFilter = ref("all");
 const statusFilter = ref("all");
 const search = ref("");
@@ -113,7 +113,7 @@ const formBarcode = ref("");
 const formSerial = ref("");
 const formStatus = ref("available");
 const formNotes = ref("");
-const editItem = ref<SuperGearItem | null>(null);
+const editItem = ref<SuperItemRecord | null>(null);
 const editName = ref("");
 const editBarcode = ref("");
 const editStatus = ref("available");
@@ -124,13 +124,13 @@ const stepUpVisible = ref(false);
 const stepUpTitle = ref("");
 const stepUpMessage = ref("");
 const stepUpConfirm = ref("Confirm");
-const stepUpAction = ref<null | { type: "delete"; item: SuperGearItem } | { type: "status"; item: SuperGearItem }>(null);
+const stepUpAction = ref<null | { type: "delete"; item: SuperItemRecord } | { type: "status"; item: SuperItemRecord }>(null);
 let toastTimer: number | null = null;
 
 const workspaceNameById = computed(() => new Map(workspaces.value.map((t) => [t.id, t.name])));
-const filteredGear = computed(() => {
-  if (statusFilter.value === "all") return gear.value;
-  return gear.value.filter((item) => item.status === statusFilter.value);
+const filteredItem = computed(() => {
+  if (statusFilter.value === "all") return items.value;
+  return items.value.filter((item) => item.status === statusFilter.value);
 });
 
 const showToast = (title: string, message: string) => {
@@ -157,11 +157,11 @@ const loadTenants = async () => {
   }
 };
 
-const loadGear = async () => {
+const loadItem = async () => {
   isLoading.value = true;
   error.value = "";
   try {
-    gear.value = await listSuperGear(workspaceFilter.value, search.value.trim());
+    items.value = await listSuperItem(workspaceFilter.value, search.value.trim());
   } catch (err) {
     if (isUnauthorizedError(err)) {
       error.value = "Your session expired. Sign in again.";
@@ -176,9 +176,9 @@ const loadGear = async () => {
 
 const exportCsv = () => {
   exportRowsToCsv(
-    `super-gear-${new Date().toISOString().slice(0, 10)}.csv`,
+    `super-item-${new Date().toISOString().slice(0, 10)}.csv`,
     ["workspace", "name", "barcode", "serial_number", "status", "notes"],
-    filteredGear.value.map((item) => ({
+    filteredItem.value.map((item) => ({
       workspace: workspaceNameById.value.get(item.workspace_id) || item.workspace_id,
       name: item.name,
       barcode: item.barcode,
@@ -191,10 +191,10 @@ const exportCsv = () => {
 
 const exportPdf = async () => {
   await exportRowsToPdf(
-    `super-gear-${new Date().toISOString().slice(0, 10)}.pdf`,
+    `super-item-${new Date().toISOString().slice(0, 10)}.pdf`,
     "Super Item Export",
     ["workspace", "name", "barcode", "serial_number", "status", "notes"],
-    filteredGear.value.map((item) => ({
+    filteredItem.value.map((item) => ({
       workspace: workspaceNameById.value.get(item.workspace_id) || item.workspace_id,
       name: item.name,
       barcode: item.barcode,
@@ -212,7 +212,7 @@ const handleCreate = async () => {
   }
   isSaving.value = true;
   try {
-    const created = await createSuperGear({
+    const created = await createSuperItem({
       workspace_id: formWorkspaceId.value,
       name: formName.value.trim(),
       barcode: formBarcode.value.trim(),
@@ -220,7 +220,7 @@ const handleCreate = async () => {
       status: formStatus.value,
       notes: formNotes.value.trim() || undefined,
     });
-    gear.value = [created, ...gear.value];
+    items.value = [created, ...items.value];
     formName.value = "";
     formBarcode.value = "";
     formSerial.value = "";
@@ -233,7 +233,7 @@ const handleCreate = async () => {
   }
 };
 
-const startEdit = (item: SuperGearItem) => {
+const startEdit = (item: SuperItemRecord) => {
   editItem.value = item;
   editName.value = item.name;
   editBarcode.value = item.barcode;
@@ -263,14 +263,14 @@ const saveEdit = async () => {
 
   isSaving.value = true;
   try {
-    const updated = await updateSuperGear({
+    const updated = await updateSuperItem({
       id: editItem.value.id,
       name: editName.value.trim(),
       barcode: editBarcode.value.trim(),
       status: editStatus.value,
       notes: editNotes.value.trim(),
     });
-    gear.value = gear.value.map((item) => (item.id === updated.id ? updated : item));
+    items.value = items.value.map((item) => (item.id === updated.id ? updated : item));
     cancelEdit();
     showToast("Saved", "Item updated.");
   } catch (err) {
@@ -280,7 +280,7 @@ const saveEdit = async () => {
   }
 };
 
-const requestDelete = (item: SuperGearItem) => {
+const requestDelete = (item: SuperItemRecord) => {
   stepUpTitle.value = "Delete Item";
   stepUpMessage.value = `Type CONFIRM and enter super password to delete ${item.name}.`;
   stepUpConfirm.value = "Delete";
@@ -298,15 +298,15 @@ const confirmStepUp = async (payload: { superPassword: string; confirmPhrase: st
   isSaving.value = true;
   try {
     if (stepUpAction.value.type === "delete") {
-      await deleteSuperGear({
+      await deleteSuperItem({
         id: stepUpAction.value.item.id,
         super_password: payload.superPassword,
         confirm_phrase: payload.confirmPhrase,
       });
-      gear.value = gear.value.filter((item) => item.id !== stepUpAction.value!.item.id);
+      items.value = items.value.filter((item) => item.id !== stepUpAction.value!.item.id);
       showToast("Deleted", "Item deleted.");
     } else {
-      const updated = await updateSuperGear({
+      const updated = await updateSuperItem({
         id: stepUpAction.value.item.id,
         name: editName.value.trim(),
         barcode: editBarcode.value.trim(),
@@ -315,7 +315,7 @@ const confirmStepUp = async (payload: { superPassword: string; confirmPhrase: st
         super_password: payload.superPassword,
         confirm_phrase: payload.confirmPhrase,
       });
-      gear.value = gear.value.map((item) => (item.id === updated.id ? updated : item));
+      items.value = items.value.map((item) => (item.id === updated.id ? updated : item));
       cancelEdit();
       showToast("Saved", "Item updated.");
     }
@@ -330,7 +330,7 @@ const confirmStepUp = async (payload: { superPassword: string; confirmPhrase: st
 onMounted(() => {
   void (async () => {
     await loadTenants();
-    await loadGear();
+    await loadItem();
   })();
 });
 </script>

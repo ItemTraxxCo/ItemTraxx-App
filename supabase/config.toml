@@ -283,7 +283,7 @@ verify_jwt = false
 # Keep gateway JWT verification off so proxy/header variations do not block valid requests.
 verify_jwt = false
 
-[functions.super-gear-mutate]
+[functions.super-item-mutate]
 # Authentication is validated inside the function with userClient.auth.getUser(authHeader).
 # Keep gateway JWT verification off so proxy/header variations do not block valid requests.
 verify_jwt = false
@@ -335,15 +335,15 @@ verify_jwt = false
 verify_jwt = false
 
 
-[functions.admin-gear-mutate]
+[functions.admin-item-mutate]
 # Auth is validated inside function via userClient.auth.getUser(authHeader).
 verify_jwt = false
 
-[functions.admin-student-mutate]
+[functions.admin-borrower-mutate]
 # Auth is validated inside function via userClient.auth.getUser(authHeader).
 verify_jwt = false
 
-[functions.super-student-mutate]
+[functions.super-borrower-mutate]
 # Function performs explicit super-admin auth checks internally.
 verify_jwt = false
 

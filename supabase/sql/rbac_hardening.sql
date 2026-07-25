@@ -33,13 +33,13 @@ grant execute on function public.current_tenant_id() to authenticated, service_r
 
 alter table if exists public.tenants enable row level security;
 alter table if exists public.profiles enable row level security;
-alter table if exists public.students enable row level security;
-alter table if exists public.gear enable row level security;
-alter table if exists public.gear_logs enable row level security;
+alter table if exists public.borrowers enable row level security;
+alter table if exists public.items enable row level security;
+alter table if exists public.item_logs enable row level security;
 alter table if exists public.admin_audit_logs enable row level security;
 alter table if exists public.tenant_policies enable row level security;
 alter table if exists public.tenant_security_controls enable row level security;
-alter table if exists public.gear_status_history enable row level security;
+alter table if exists public.item_status_history enable row level security;
 alter table if exists public.app_runtime_config enable row level security;
 alter table if exists public.super_alert_rules enable row level security;
 alter table if exists public.super_approvals enable row level security;
@@ -105,11 +105,11 @@ with check (
   and public.has_recent_privileged_step_up('super_admin')
 );
 
--- students
+-- borrowers
 
-drop policy if exists "tenant_select_students" on public.students;
-create policy "tenant_select_students"
-on public.students
+drop policy if exists "tenant_select_borrowers" on public.borrowers;
+create policy "tenant_select_borrowers"
+on public.borrowers
 for select
 to authenticated
 using (
@@ -117,9 +117,9 @@ using (
   and tenant_id = public.current_tenant_id()
 );
 
-drop policy if exists "tenant_admin_write_students" on public.students;
-create policy "tenant_admin_write_students"
-on public.students
+drop policy if exists "tenant_admin_write_borrowers" on public.borrowers;
+create policy "tenant_admin_write_borrowers"
+on public.borrowers
 for all
 to authenticated
 using (
@@ -133,9 +133,9 @@ with check (
   and public.has_recent_privileged_step_up('tenant_admin')
 );
 
-drop policy if exists "super_admin_all_students" on public.students;
-create policy "super_admin_all_students"
-on public.students
+drop policy if exists "super_admin_all_borrowers" on public.borrowers;
+create policy "super_admin_all_borrowers"
+on public.borrowers
 for all
 to authenticated
 using (
@@ -147,53 +147,11 @@ with check (
   and public.has_recent_privileged_step_up('super_admin')
 );
 
--- gear
+-- item
 
-drop policy if exists "tenant_select_gear" on public.gear;
-create policy "tenant_select_gear"
-on public.gear
-for select
-to authenticated
-using (
-  public.current_user_role() in ('tenant_user', 'tenant_admin')
-  and tenant_id = public.current_tenant_id()
-);
-
-drop policy if exists "tenant_admin_write_gear" on public.gear;
-create policy "tenant_admin_write_gear"
-on public.gear
-for all
-to authenticated
-using (
-  public.current_user_role() = 'tenant_admin'
-  and tenant_id = public.current_tenant_id()
-  and public.has_recent_privileged_step_up('tenant_admin')
-)
-with check (
-  public.current_user_role() = 'tenant_admin'
-  and tenant_id = public.current_tenant_id()
-  and public.has_recent_privileged_step_up('tenant_admin')
-);
-
-drop policy if exists "super_admin_all_gear" on public.gear;
-create policy "super_admin_all_gear"
-on public.gear
-for all
-to authenticated
-using (
-  public.current_user_role() = 'super_admin'
-  and public.has_recent_privileged_step_up('super_admin')
-)
-with check (
-  public.current_user_role() = 'super_admin'
-  and public.has_recent_privileged_step_up('super_admin')
-);
-
--- gear logs
-
-drop policy if exists "tenant_select_gear_logs" on public.gear_logs;
-create policy "tenant_select_gear_logs"
-on public.gear_logs
+drop policy if exists "tenant_select_item" on public.items;
+create policy "tenant_select_item"
+on public.items
 for select
 to authenticated
 using (
@@ -201,9 +159,51 @@ using (
   and tenant_id = public.current_tenant_id()
 );
 
-drop policy if exists "tenant_admin_insert_gear_logs" on public.gear_logs;
-create policy "tenant_admin_insert_gear_logs"
-on public.gear_logs
+drop policy if exists "tenant_admin_write_item" on public.items;
+create policy "tenant_admin_write_item"
+on public.items
+for all
+to authenticated
+using (
+  public.current_user_role() = 'tenant_admin'
+  and tenant_id = public.current_tenant_id()
+  and public.has_recent_privileged_step_up('tenant_admin')
+)
+with check (
+  public.current_user_role() = 'tenant_admin'
+  and tenant_id = public.current_tenant_id()
+  and public.has_recent_privileged_step_up('tenant_admin')
+);
+
+drop policy if exists "super_admin_all_item" on public.items;
+create policy "super_admin_all_item"
+on public.items
+for all
+to authenticated
+using (
+  public.current_user_role() = 'super_admin'
+  and public.has_recent_privileged_step_up('super_admin')
+)
+with check (
+  public.current_user_role() = 'super_admin'
+  and public.has_recent_privileged_step_up('super_admin')
+);
+
+-- item logs
+
+drop policy if exists "tenant_select_item_logs" on public.item_logs;
+create policy "tenant_select_item_logs"
+on public.item_logs
+for select
+to authenticated
+using (
+  public.current_user_role() in ('tenant_user', 'tenant_admin')
+  and tenant_id = public.current_tenant_id()
+);
+
+drop policy if exists "tenant_admin_insert_item_logs" on public.item_logs;
+create policy "tenant_admin_insert_item_logs"
+on public.item_logs
 for insert
 to authenticated
 with check (
@@ -212,9 +212,9 @@ with check (
   and public.has_recent_privileged_step_up('tenant_admin')
 );
 
-drop policy if exists "super_admin_all_gear_logs" on public.gear_logs;
-create policy "super_admin_all_gear_logs"
-on public.gear_logs
+drop policy if exists "super_admin_all_item_logs" on public.item_logs;
+create policy "super_admin_all_item_logs"
+on public.item_logs
 for all
 to authenticated
 using (
@@ -333,11 +333,11 @@ with check (
   and public.has_recent_privileged_step_up('super_admin')
 );
 
--- gear status history
+-- item status history
 
-drop policy if exists "tenant_select_gear_status_history" on public.gear_status_history;
-create policy "tenant_select_gear_status_history"
-on public.gear_status_history
+drop policy if exists "tenant_select_item_status_history" on public.item_status_history;
+create policy "tenant_select_item_status_history"
+on public.item_status_history
 for select
 to authenticated
 using (
@@ -345,9 +345,9 @@ using (
   and tenant_id = public.current_tenant_id()
 );
 
-drop policy if exists "tenant_admin_insert_gear_status_history" on public.gear_status_history;
-create policy "tenant_admin_insert_gear_status_history"
-on public.gear_status_history
+drop policy if exists "tenant_admin_insert_item_status_history" on public.item_status_history;
+create policy "tenant_admin_insert_item_status_history"
+on public.item_status_history
 for insert
 to authenticated
 with check (
@@ -356,9 +356,9 @@ with check (
   and public.has_recent_privileged_step_up('tenant_admin')
 );
 
-drop policy if exists "super_admin_all_gear_status_history" on public.gear_status_history;
-create policy "super_admin_all_gear_status_history"
-on public.gear_status_history
+drop policy if exists "super_admin_all_item_status_history" on public.item_status_history;
+create policy "super_admin_all_item_status_history"
+on public.item_status_history
 for all
 to authenticated
 using (

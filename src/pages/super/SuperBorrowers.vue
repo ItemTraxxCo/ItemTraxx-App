@@ -3,7 +3,7 @@
     <div class="page-nav-left">
       <RouterLink class="button-link" to="/super-admin">Return to Super Admin</RouterLink>
       <RouterLink class="button-link" to="/super-admin/workspaces">Workspaces</RouterLink>
-      <RouterLink class="button-link" to="/super-admin/gear">All Items</RouterLink>
+      <RouterLink class="button-link" to="/super-admin/items">All Items</RouterLink>
       <RouterLink class="button-link" to="/super-admin/logs">All Logs</RouterLink>
       <RouterLink class="button-link" to="/super-admin/broadcasts">Broadcasts</RouterLink>
       <RouterLink class="button-link" to="/super-admin/sales-leads">Sales Leads</RouterLink>
@@ -23,7 +23,7 @@
         </label>
         <label>
           Borrower ID
-          <input v-model="previewStudentId" type="text" readonly title="If you need to change this, contact support." />
+          <input v-model="previewBorrowerId" type="text" readonly title="If you need to change this, contact support." />
         </label>
         <div class="form-actions">
           <button type="button" @click="regenerateIdentity">Regenerate</button>
@@ -35,9 +35,9 @@
     <div class="card">
       <h2>Borrower List</h2>
       <div class="input-row">
-        <select v-model="workspaceFilter" @change="loadStudents"><option value="all">all workspaces</option><option v-for="t in workspaces" :key="t.id" :value="t.id">{{ t.name }}</option></select>
+        <select v-model="workspaceFilter" @change="loadBorrowers"><option value="all">all workspaces</option><option v-for="t in workspaces" :key="t.id" :value="t.id">{{ t.name }}</option></select>
         <input v-model="search" type="text" placeholder="Search" />
-        <button type="button" @click="loadStudents">Search</button>
+        <button type="button" @click="loadBorrowers">Search</button>
       </div>
       <div class="form-actions">
         <button type="button" @click="exportCsv">Export CSV</button>
@@ -48,10 +48,10 @@
       <table v-else class="table">
         <thead><tr><th>Username</th><th>Workspace</th><th>Borrower ID</th><th>Actions</th></tr></thead>
         <tbody>
-          <tr v-for="item in students" :key="item.id">
+          <tr v-for="item in borrowers" :key="item.id">
             <td>{{ item.username }}</td>
             <td>{{ workspaceNameById.get(item.workspace_id) || item.workspace_id }}</td>
-            <td>{{ item.student_id }}</td>
+            <td>{{ item.borrower_id }}</td>
             <td>
               <button type="button" @click="startEdit(item)">Edit</button>
               <span class="button-spacer"></span>
@@ -72,7 +72,7 @@
         </label>
         <label>
           Borrower ID
-          <input v-model="editStudentId" type="text" readonly title="If you need to change this, contact support." />
+          <input v-model="editBorrowerId" type="text" readonly title="If you need to change this, contact support." />
         </label>
         <div class="form-actions"><button type="button" @click="cancelEdit">Close</button></div>
       </form>
@@ -93,15 +93,15 @@ import {
   handleSuperAdminUnauthorized,
   isUnauthorizedError,
 } from "../../services/authErrorHandling";
-import { createSuperStudent, deleteSuperStudent, listSuperStudents, type SuperStudentItem } from "../../services/superStudentService";
+import { createSuperBorrower, deleteSuperBorrower, listSuperBorrowers, type SuperBorrowerItem } from "../../services/superBorrowerService";
 import { listWorkspaces as listWorkspaces, type SuperWorkspace as SuperWorkspace } from "../../services/superWorkspaceService";
 import { exportRowsToCsv, exportRowsToPdf } from "../../services/exportService";
-import { generateStudentIdentity } from "../../utils/studentIdentity";
+import { generateBorrowerIdentity } from "../../utils/borrowerIdentity";
 import { toUserFacingErrorMessage } from "../../services/appErrors";
 
 const router = useRouter();
 const workspaces = ref<SuperWorkspace[]>([]);
-const students = ref<SuperStudentItem[]>([]);
+const borrowers = ref<SuperBorrowerItem[]>([]);
 const workspaceFilter = ref("all");
 const search = ref("");
 const isLoading = ref(false);
@@ -109,23 +109,23 @@ const isSaving = ref(false);
 const error = ref("");
 const formWorkspaceId = ref("");
 const previewUsername = ref("");
-const previewStudentId = ref("");
-const editItem = ref<SuperStudentItem | null>(null);
+const previewBorrowerId = ref("");
+const editItem = ref<SuperBorrowerItem | null>(null);
 const editUsername = ref("");
-const editStudentId = ref("");
+const editBorrowerId = ref("");
 const toastTitle = ref("");
 const toastMessage = ref("");
 const stepUpVisible = ref(false);
 const stepUpMessage = ref("");
-const deleteTarget = ref<SuperStudentItem | null>(null);
+const deleteTarget = ref<SuperBorrowerItem | null>(null);
 let toastTimer: number | null = null;
 
 const workspaceNameById = computed(() => new Map(workspaces.value.map((t) => [t.id, t.name])));
 
 const regenerateIdentity = () => {
-  const identity = generateStudentIdentity();
+  const identity = generateBorrowerIdentity();
   previewUsername.value = identity.username;
-  previewStudentId.value = identity.studentId;
+  previewBorrowerId.value = identity.borrowerId;
 };
 
 const showToast = (title: string, message: string) => {
@@ -152,11 +152,11 @@ const loadTenants = async () => {
   }
 };
 
-const loadStudents = async () => {
+const loadBorrowers = async () => {
   isLoading.value = true;
   error.value = "";
   try {
-    students.value = await listSuperStudents(workspaceFilter.value, search.value.trim());
+    borrowers.value = await listSuperBorrowers(workspaceFilter.value, search.value.trim());
   } catch (err) {
     if (isUnauthorizedError(err)) {
       error.value = "Your session expired. Sign in again.";
@@ -171,25 +171,25 @@ const loadStudents = async () => {
 
 const exportCsv = () => {
   exportRowsToCsv(
-    `super-students-${new Date().toISOString().slice(0, 10)}.csv`,
-    ["workspace", "username", "student_id"],
-    students.value.map((item) => ({
+    `super-borrowers-${new Date().toISOString().slice(0, 10)}.csv`,
+    ["workspace", "username", "borrower_id"],
+    borrowers.value.map((item) => ({
       workspace: workspaceNameById.value.get(item.workspace_id) || item.workspace_id,
       username: item.username,
-      student_id: item.student_id,
+      borrower_id: item.borrower_id,
     }))
   );
 };
 
 const exportPdf = async () => {
   await exportRowsToPdf(
-    `super-students-${new Date().toISOString().slice(0, 10)}.pdf`,
+    `super-borrowers-${new Date().toISOString().slice(0, 10)}.pdf`,
     "Super Borrowers Export",
-    ["workspace", "username", "student_id"],
-    students.value.map((item) => ({
+    ["workspace", "username", "borrower_id"],
+    borrowers.value.map((item) => ({
       workspace: workspaceNameById.value.get(item.workspace_id) || item.workspace_id,
       username: item.username,
-      student_id: item.student_id,
+      borrower_id: item.borrower_id,
     }))
   );
 };
@@ -201,14 +201,14 @@ const handleCreate = async () => {
   }
   isSaving.value = true;
   try {
-    const created = await createSuperStudent({
+    const created = await createSuperBorrower({
       workspace_id: formWorkspaceId.value,
       username: previewUsername.value,
-      student_id: previewStudentId.value,
+      borrower_id: previewBorrowerId.value,
     });
-    students.value = [created, ...students.value];
+    borrowers.value = [created, ...borrowers.value];
     previewUsername.value = created.username;
-    previewStudentId.value = created.student_id;
+    previewBorrowerId.value = created.borrower_id;
     regenerateIdentity();
     showToast("Created", "Borrower created.");
   } catch (err) {
@@ -218,19 +218,19 @@ const handleCreate = async () => {
   }
 };
 
-const startEdit = (item: SuperStudentItem) => {
+const startEdit = (item: SuperBorrowerItem) => {
   editItem.value = item;
   editUsername.value = item.username;
-  editStudentId.value = item.student_id;
+  editBorrowerId.value = item.borrower_id;
 };
 
 const cancelEdit = () => {
   editItem.value = null;
   editUsername.value = "";
-  editStudentId.value = "";
+  editBorrowerId.value = "";
 };
 
-const requestDelete = (item: SuperStudentItem) => {
+const requestDelete = (item: SuperBorrowerItem) => {
   deleteTarget.value = item;
   stepUpMessage.value = `Type CONFIRM and enter super password to delete ${item.username}.`;
   stepUpVisible.value = true;
@@ -245,12 +245,12 @@ const confirmDelete = async (payload: { superPassword: string; confirmPhrase: st
   if (!deleteTarget.value) return;
   isSaving.value = true;
   try {
-    await deleteSuperStudent({
+    await deleteSuperBorrower({
       id: deleteTarget.value.id,
       super_password: payload.superPassword,
       confirm_phrase: payload.confirmPhrase,
     });
-    students.value = students.value.filter((item) => item.id !== deleteTarget.value!.id);
+    borrowers.value = borrowers.value.filter((item) => item.id !== deleteTarget.value!.id);
     showToast("Deleted", "Borrower deleted.");
     closeStepUp();
   } catch (err) {
@@ -264,7 +264,7 @@ onMounted(() => {
   regenerateIdentity();
   void (async () => {
     await loadTenants();
-    await loadStudents();
+    await loadBorrowers();
   })();
 });
 </script>

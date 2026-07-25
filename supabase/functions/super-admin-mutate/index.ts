@@ -12,6 +12,11 @@ import {
   requireUuid,
   ValidationError,
 } from "../_shared/validation.ts";
+import {
+  handleTenantAccountAction,
+  type TenantAccount,
+  type TenantAccountRepository,
+} from "./tenantAccounts.ts";
 const base = {
   "Access-Control-Allow-Headers":
     "authorization, x-client-info, apikey, content-type, x-request-id",
@@ -109,6 +114,145 @@ serve(async (req) => {
           map.get(r.workspace_id)?.primary_admin_profile_id === r.id,
       }));
     };
+    const tenantAccountFields =
+      "id,workspace_id,auth_email,role,is_active,deleted_at,created_at";
+    const enrichTenantAccounts = async (rows: any[]): Promise<TenantAccount[]> =>
+      (await enrich(rows)).map((row) => ({
+        id: row.id,
+        workspace_id: row.workspace_id,
+        workspace_name: row.workspace_name,
+        auth_email: row.auth_email ?? "",
+        role: "tenant_account",
+        is_active: row.is_active !== false,
+        deleted_at: row.deleted_at ?? null,
+        created_at: row.created_at,
+      }));
+    const resetRedirect = () => {
+      const redirect = (Deno.env.get("ITX_PASSWORD_RESET_REDIRECT_URL") ?? "").trim();
+      if (!redirect) throw new ValidationError("Password reset redirect is not configured.", 500);
+      return redirect;
+    };
+    const tenantAccounts: TenantAccountRepository = {
+      list: async ({ workspaceId, search }) => {
+        let query = admin.from("profiles").select(tenantAccountFields)
+          .eq("role", "tenant_account").is("deleted_at", null).order("created_at");
+        if (workspaceId) query = query.eq("workspace_id", workspaceId);
+        const { data, error } = await query;
+        if (error) throw error;
+        let rows = await enrichTenantAccounts(data ?? []);
+        if (search) {
+          rows = rows.filter((row) =>
+            row.auth_email.toLowerCase().includes(search) ||
+            row.workspace_name?.toLowerCase().includes(search)
+          );
+        }
+        return rows;
+      },
+      create: async (workspaceId, email) => {
+        // Validate email delivery configuration before creating either record so
+        // a configuration error cannot leave an orphaned Auth user/profile.
+        const redirectTo = resetRedirect();
+        const { data: workspace } = await admin.from("workspaces").select("id")
+          .eq("id", workspaceId).maybeSingle();
+        if (!workspace) throw new ValidationError("Workspace not found.", 404);
+        const created = await admin.auth.admin.createUser({
+          email,
+          password: password(),
+          email_confirm: true,
+        });
+        if (created.error || !created.data.user) {
+          throw new ValidationError("Unable to create Tenant Account.");
+        }
+        const userId = created.data.user.id;
+        const { data, error } = await admin.from("profiles").insert({
+          id: userId,
+          workspace_id: workspaceId,
+          auth_email: email,
+          role: "tenant_account",
+          is_active: true,
+        }).select(tenantAccountFields).single();
+        if (error || !data) {
+          await admin.auth.admin.deleteUser(userId);
+          throw new ValidationError("Unable to create Tenant Account.");
+        }
+        const reset = await admin.auth.resetPasswordForEmail(email, {
+          redirectTo,
+        });
+        if (reset.error) {
+          await admin.from("profiles").delete().eq("id", userId);
+          await admin.auth.admin.deleteUser(userId);
+          throw new ValidationError("Unable to send Tenant Account setup email.");
+        }
+        return (await enrichTenantAccounts([data]))[0];
+      },
+      findActive: async (id) => {
+        const { data, error } = await admin.from("profiles").select(tenantAccountFields)
+          .eq("id", id).eq("role", "tenant_account").is("deleted_at", null)
+          .maybeSingle();
+        if (error) throw error;
+        return data ? (await enrichTenantAccounts([data]))[0] : null;
+      },
+      setStatus: async (id, isActive) => {
+        const { data, error } = await admin.from("profiles").update({ is_active: isActive })
+          .eq("id", id).eq("role", "tenant_account").is("deleted_at", null)
+          .select(tenantAccountFields).single();
+        if (error || !data) throw new ValidationError("Unable to update Tenant Account.");
+        return (await enrichTenantAccounts([data]))[0];
+      },
+      updateEmail: async (id, email) => {
+        const authUpdate = await admin.auth.admin.updateUserById(id, {
+          email,
+          email_confirm: true,
+        });
+        if (authUpdate.error) throw new ValidationError("Unable to update email.");
+        const { data, error } = await admin.from("profiles").update({ auth_email: email })
+          .eq("id", id).eq("role", "tenant_account").is("deleted_at", null)
+          .select(tenantAccountFields).single();
+        if (error || !data) throw new ValidationError("Unable to update Tenant Account.");
+        return (await enrichTenantAccounts([data]))[0];
+      },
+      sendReset: async (email) => {
+        const { error } = await admin.auth.resetPasswordForEmail(email, {
+          redirectTo: resetRedirect(),
+        });
+        if (error) throw new ValidationError("Unable to send password reset.");
+      },
+      softDelete: async (id, at) => {
+        const { error } = await admin.from("profiles").update({
+          deleted_at: at,
+          is_active: false,
+        }).eq("id", id).eq("role", "tenant_account").is("deleted_at", null);
+        if (error) throw new ValidationError("Unable to remove Tenant Account.");
+      },
+      revokeSessions: async (id, actorId, at) => {
+        const { error } = await admin.from("account_sessions").update({
+          revoked_at: at,
+          revoked_by: actorId,
+        }).eq("profile_id", id).is("revoked_at", null);
+        if (error) throw new ValidationError("Unable to revoke Tenant Account sessions.");
+      },
+      audit: async (actionType, id, metadata) => {
+        const { error } = await admin.from("super_admin_audit_logs").insert({
+          actor_id: user.id,
+          actor_email: user.email ?? null,
+          action_type: actionType,
+          target_type: "tenant_account",
+          target_id: id,
+          metadata,
+        });
+        if (error) throw new Error("Unable to write Super Admin audit log.");
+      },
+    };
+    const tenantAccountResult = await handleTenantAccountAction(action, p, {
+      actorId: user.id,
+      now: () => new Date().toISOString(),
+      repository: tenantAccounts,
+    });
+    if (tenantAccountResult.handled) {
+      return tenantAccountResult.error
+        ? json(tenantAccountResult.status, { error: tenantAccountResult.error })
+        : json(tenantAccountResult.status, { data: tenantAccountResult.data });
+    }
     if (action === "list_super_admins") {
       const search = optionalText(p.search, { maxLen: 120 }).toLowerCase();
       const { data, error } = await admin.from("profiles").select("id,auth_email,role,is_active,created_at").eq("role", "super_admin").order("created_at");

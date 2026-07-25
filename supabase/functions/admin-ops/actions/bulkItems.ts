@@ -14,7 +14,7 @@ const TRACKED_STATUSES = new Set([
   "in_studio_only",
 ]);
 
-const ALLOWED_GEAR_STATUSES = new Set(
+const ALLOWED_ITEM_STATUSES = new Set(
   [
     "available",
     "checked_out",
@@ -26,7 +26,7 @@ const ALLOWED_GEAR_STATUSES = new Set(
   ] as const,
 );
 
-export const handleBulkGearAction = async (
+export const handleBulkItemsAction = async (
   context: AdminOpsContext,
 ): Promise<Response> => {
   const rawRows = Array.isArray(context.payload.rows)
@@ -75,7 +75,7 @@ export const handleBulkGearAction = async (
       serial = optionalText(rowRecord.serial_number, { maxLen: 64 });
       statusRaw = requireEnum(
         rowRecord.status ?? "available",
-        ALLOWED_GEAR_STATUSES,
+        ALLOWED_ITEM_STATUSES,
       );
       notes = optionalText(rowRecord.notes, { maxLen: 500 });
     } catch {
@@ -112,7 +112,7 @@ export const handleBulkGearAction = async (
 
   const lookupBarcodes = normalizedRows.map((row) => row.barcode);
   const { data: existingRows } = await context.adminClient
-    .from("gear")
+    .from("items")
     .select("barcode")
     .eq("workspace_id", context.workspaceId)
     .in("barcode", lookupBarcodes);
@@ -150,7 +150,7 @@ export const handleBulkGearAction = async (
     notes: row.notes,
   }));
   const { data: insertedRows, error: insertError } = await context.adminClient
-    .from("gear")
+    .from("items")
     .insert(insertPayload)
     .select("id, workspace_id, name, barcode, serial_number, status, notes");
   if (insertError) {
@@ -161,13 +161,13 @@ export const handleBulkGearAction = async (
     .filter((item) => TRACKED_STATUSES.has((item as { status: string }).status))
     .map((item) => ({
       workspace_id: context.workspaceId,
-      gear_id: (item as { id: string }).id,
+      item_id: (item as { id: string }).id,
       status: (item as { status: string }).status,
       note: (item as { notes?: string | null }).notes ?? null,
       changed_by: context.user.id,
     }));
   if (historyPayload.length) {
-    await context.adminClient.from("gear_status_history").insert(
+    await context.adminClient.from("item_status_history").insert(
       historyPayload,
     );
   }

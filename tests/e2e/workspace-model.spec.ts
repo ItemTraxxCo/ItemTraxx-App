@@ -1,9 +1,11 @@
 import { expect, test, type Page } from "@playwright/test";
 import {
   mockAdminOps,
+  mockSuperWorkspaceMutate,
   mockSystemStatus,
   mockUnauthenticatedSession,
   navigateApp,
+  setSuperAdminSession,
   setWorkspaceAdminSession,
   waitForPublicAuthBootstrap,
 } from "./helpers/testHarness";
@@ -38,10 +40,10 @@ test.describe("workspace model role surfaces", () => {
     await page.route("**/rest/v1/**", async (route) => {
       const url = new URL(route.request().url());
       const table = url.pathname.split("/").at(-1);
-      const rows = table === "gear"
+      const rows = table === "items"
         ? [{ id: "item-1", name: "Camera", barcode: "CAM-1", status: "available" }]
-        : table === "students"
-        ? [{ id: "borrower-1", username: "Borrower One", student_id: "B-1" }]
+        : table === "borrowers"
+        ? [{ id: "borrower-1", username: "Borrower One", borrower_id: "B-1" }]
         : [];
       await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(rows) });
     });
@@ -80,7 +82,7 @@ test.describe("workspace model role surfaces", () => {
     await page.goto("/");
     await dismissFirstRunSurfaces(page);
     await setWorkspaceAdminSession(page);
-    await navigateApp(page, "/admin/gear");
+    await navigateApp(page, "/admin/items");
 
     const all = page.getByRole("radio", { name: "All Tenant Accounts" });
     const restricted = page.getByRole("radio", { name: "Specific Tenant Accounts" });
@@ -105,5 +107,48 @@ test.describe("workspace model role surfaces", () => {
     await page.getByPlaceholder("Item barcode").first().fill("CAM-1");
     await page.getByRole("button", { name: "Return item" }).click();
     await expect.poll(() => actionType).toBe("quick_return");
+  });
+
+  test("Super Admin can manage Tenant Accounts across workspaces", async ({ page }) => {
+    const actions: string[] = [];
+    await mockSuperWorkspaceMutate(page);
+    await page.route(/\/functions(?:\/v1)?\/super-admin-mutate(?:\?.*)?$/, async (route) => {
+      const body = route.request().postDataJSON() as { action?: string; payload?: Record<string, unknown> };
+      actions.push(body.action ?? "");
+      if (body.action === "list_tenant_accounts") {
+        await route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: JSON.stringify({
+            ok: true,
+            data: [{
+              id: "account-1",
+              workspace_id: "tenant-1",
+              workspace_name: "Demo Tenant",
+              auth_email: "desk@demo.test",
+              role: "tenant_account",
+              is_active: true,
+              deleted_at: null,
+              created_at: new Date().toISOString(),
+            }],
+          }),
+        });
+        return;
+      }
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ ok: true, data: { success: true } }),
+      });
+    });
+    await page.goto("/");
+    await dismissFirstRunSurfaces(page);
+    await setSuperAdminSession(page);
+    await navigateApp(page, "/super-admin/tenant-accounts");
+
+    await expect(page.getByRole("heading", { name: "Tenant Accounts" })).toBeVisible();
+    await expect(page.getByRole("textbox", { name: "Email for Demo Tenant" })).toHaveValue("desk@demo.test");
+    await page.getByRole("button", { name: "Suspend" }).click();
+    await expect.poll(() => actions).toContain("set_tenant_account_status");
   });
 });

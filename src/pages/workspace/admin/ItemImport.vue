@@ -3,7 +3,7 @@
     <div class="admin-hero">
       <div class="page-nav-left">
         <RouterLink class="button-link" to="/admin">Return to admin panel</RouterLink>
-        <RouterLink class="button-link" to="/admin/gear">Return to items</RouterLink>
+        <RouterLink class="button-link" to="/admin/items">Return to items</RouterLink>
       </div>
 
       <h1>Bulk Item Import Wizard</h1>
@@ -124,7 +124,7 @@
 <script setup lang="ts">
 import { onMounted, ref } from "vue";
 import { RouterLink } from "vue-router";
-import { bulkImportGear, fetchWorkspaceSettings } from "../../../services/adminOpsService";
+import { bulkImportItem, fetchWorkspaceSettings } from "../../../services/adminOpsService";
 import { logAdminAction } from "../../../services/auditLogService";
 import { enforceAdminRateLimit } from "../../../services/rateLimitService";
 import { toUserFacingErrorMessage } from "../../../services/appErrors";
@@ -289,7 +289,7 @@ const runImport = async () => {
 
   try {
     await enforceAdminRateLimit();
-    const result = await bulkImportGear(parsedRows.value);
+    const result = await bulkImportItem(parsedRows.value);
     importResult.value = {
       inserted: result.inserted,
       skipped: result.skipped,
@@ -297,15 +297,15 @@ const runImport = async () => {
     };
 
     await logAdminAction({
-      action_type: "gear_bulk_import",
-      entity_type: "gear",
+      action_type: "item_bulk_import",
+      entity_type: "items",
       metadata: {
         inserted: result.inserted,
         skipped: result.skipped,
       },
     });
 
-    capturePostHogEvent("gear_bulk_import_completed", {
+    capturePostHogEvent("item_bulk_import_completed", {
       inserted: result.inserted,
       skipped: result.skipped,
     });

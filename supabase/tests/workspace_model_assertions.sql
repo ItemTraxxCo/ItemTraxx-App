@@ -3,7 +3,7 @@
 do $$
 begin
   if to_regclass('public.workspaces') is null
-     or to_regclass('public.gear_access_grants') is null
+     or to_regclass('public.item_access_grants') is null
      or to_regclass('public.borrower_access_grants') is null
      or to_regclass('public.account_sessions') is null then
     raise exception 'workspace tables missing';
@@ -62,19 +62,19 @@ insert into public.account_sessions(workspace_id,profile_id,device_id,auth_sessi
   ('20000000-0000-0000-0000-000000000002','30000000-0000-0000-0000-000000000003','other-device','40000000-0000-0000-0000-000000000003'),
   ('20000000-0000-0000-0000-000000000001','30000000-0000-0000-0000-000000000004','late-device','40000000-0000-0000-0000-000000000004');
 
-insert into public.gear(id,workspace_id,name,status,barcode,access_mode) values
+insert into public.items(id,workspace_id,name,status,barcode,access_mode) values
   ('50000000-0000-0000-0000-000000000001','20000000-0000-0000-0000-000000000001','All Item','available','ALL-1','all'),
   ('50000000-0000-0000-0000-000000000002','20000000-0000-0000-0000-000000000001','Granted Item','available','GRANT-1','restricted'),
   ('50000000-0000-0000-0000-000000000003','20000000-0000-0000-0000-000000000001','Hidden Item','available','HIDDEN-1','restricted'),
   ('50000000-0000-0000-0000-000000000004','20000000-0000-0000-0000-000000000002','Other Item','available','OTHER-1','all');
-insert into public.students(id,workspace_id,username,student_id,access_mode) values
+insert into public.borrowers(id,workspace_id,username,borrower_id,access_mode) values
   ('60000000-0000-0000-0000-000000000001','20000000-0000-0000-0000-000000000001','All Borrower','ALL-B','all'),
   ('60000000-0000-0000-0000-000000000002','20000000-0000-0000-0000-000000000001','Granted Borrower','GRANT-B','restricted'),
   ('60000000-0000-0000-0000-000000000003','20000000-0000-0000-0000-000000000001','Hidden Borrower','HIDDEN-B','restricted'),
   ('60000000-0000-0000-0000-000000000004','20000000-0000-0000-0000-000000000002','Other Borrower','OTHER-B','all');
-insert into public.gear_access_grants(gear_id,profile_id) values
+insert into public.item_access_grants(item_id,profile_id) values
   ('50000000-0000-0000-0000-000000000002','30000000-0000-0000-0000-000000000002');
-insert into public.borrower_access_grants(student_id,profile_id) values
+insert into public.borrower_access_grants(borrower_id,profile_id) values
   ('60000000-0000-0000-0000-000000000002','30000000-0000-0000-0000-000000000002');
 
 begin;
@@ -82,13 +82,13 @@ set local role authenticated;
 select set_config('request.jwt.claim.sub','30000000-0000-0000-0000-000000000002',true);
 select set_config('request.jwt.claims','{"sub":"30000000-0000-0000-0000-000000000002","session_id":"40000000-0000-0000-0000-000000000002"}',true);
 do $$ begin
-  if (select count(*) from public.gear) <> 2 then raise exception 'grant-filtered gear visibility failed'; end if;
-  if (select count(*) from public.students) <> 2 then raise exception 'grant-filtered borrower visibility failed'; end if;
-  if (select count(*) from public.gear where barcode in ('HIDDEN-1','OTHER-1')) <> 0 then raise exception 'restricted or cross-workspace gear leaked'; end if;
-  if (select count(*) from public.students where student_id in ('HIDDEN-B','OTHER-B')) <> 0 then raise exception 'restricted or cross-workspace borrower leaked'; end if;
+  if (select count(*) from public.items) <> 2 then raise exception 'grant-filtered item visibility failed'; end if;
+  if (select count(*) from public.borrowers) <> 2 then raise exception 'grant-filtered borrower visibility failed'; end if;
+  if (select count(*) from public.items where barcode in ('HIDDEN-1','OTHER-1')) <> 0 then raise exception 'restricted or cross-workspace item leaked'; end if;
+  if (select count(*) from public.borrowers where borrower_id in ('HIDDEN-B','OTHER-B')) <> 0 then raise exception 'restricted or cross-workspace borrower leaked'; end if;
   if (select count(*) from public.account_sessions) <> 1 then raise exception 'own-session isolation failed'; end if;
-  update public.gear set name='forbidden' where id='50000000-0000-0000-0000-000000000001';
-  if found then raise exception 'tenant account wrote gear'; end if;
+  update public.items set name='forbidden' where id='50000000-0000-0000-0000-000000000001';
+  if found then raise exception 'tenant account wrote item'; end if;
 end $$;
 rollback;
 
@@ -97,8 +97,8 @@ set local role authenticated;
 select set_config('request.jwt.claim.sub','30000000-0000-0000-0000-000000000004',true);
 select set_config('request.jwt.claims','{"sub":"30000000-0000-0000-0000-000000000004","session_id":"40000000-0000-0000-0000-000000000004"}',true);
 do $$ begin
-  if (select count(*) from public.gear) <> 1 then raise exception 'all-mode is not live for later accounts'; end if;
-  if (select count(*) from public.students) <> 1 then raise exception 'all-mode borrower is not live for later accounts'; end if;
+  if (select count(*) from public.items) <> 1 then raise exception 'all-mode is not live for later accounts'; end if;
+  if (select count(*) from public.borrowers) <> 1 then raise exception 'all-mode borrower is not live for later accounts'; end if;
 end $$;
 rollback;
 
@@ -107,8 +107,8 @@ set local role authenticated;
 select set_config('request.jwt.claim.sub','30000000-0000-0000-0000-000000000001',true);
 select set_config('request.jwt.claims','{"sub":"30000000-0000-0000-0000-000000000001","session_id":"40000000-0000-0000-0000-000000000001"}',true);
 do $$ begin
-  if (select count(*) from public.gear) <> 3 then raise exception 'workspace admin visibility failed'; end if;
-  update public.gear set name='cross-workspace-write' where id='50000000-0000-0000-0000-000000000004';
+  if (select count(*) from public.items) <> 3 then raise exception 'workspace admin visibility failed'; end if;
+  update public.items set name='cross-workspace-write' where id='50000000-0000-0000-0000-000000000004';
   if found then raise exception 'cross-workspace admin write succeeded'; end if;
 end $$;
 rollback;
@@ -120,7 +120,7 @@ set local role authenticated;
 select set_config('request.jwt.claim.sub','30000000-0000-0000-0000-000000000002',true);
 select set_config('request.jwt.claims','{"sub":"30000000-0000-0000-0000-000000000002","session_id":"40000000-0000-0000-0000-000000000002"}',true);
 do $$ begin
-  if (select count(*) from public.gear) <> 0 then raise exception 'revoked session retained data access'; end if;
+  if (select count(*) from public.items) <> 0 then raise exception 'revoked session retained data access'; end if;
 end $$;
 rollback;
 

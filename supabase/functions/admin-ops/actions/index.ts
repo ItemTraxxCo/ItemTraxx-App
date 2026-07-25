@@ -7,7 +7,7 @@ import type {
   JsonResponse,
   SupabaseClient,
 } from "../context.ts";
-import { handleBulkGearAction } from "./bulkGear.ts";
+import { handleBulkItemsAction } from "./bulkItems.ts";
 import { handleNotificationAction } from "./notifications.ts";
 import { handleSettingsAction } from "./settings.ts";
 import { handleSessionAction } from "./sessions.ts";
@@ -25,7 +25,7 @@ export const ADMIN_OPS_ACTIONS = [
   "revoke_session",
   "revoke_current_session",
   "revoke_all_sessions",
-  "bulk_import_gear",
+  "bulk_import_items",
 ] as const;
 
 export type AdminOpsAction = (typeof ADMIN_OPS_ACTIONS)[number];
@@ -42,7 +42,7 @@ export const ADMIN_OPS_ACTION_OWNERS: Record<AdminOpsAction, string> = {
   revoke_session: "sessions",
   revoke_current_session: "sessions",
   revoke_all_sessions: "sessions",
-  bulk_import_gear: "bulkGear",
+  bulk_import_items: "bulkItems",
 };
 
 const WORKSPACE_ADMIN_ONLY_ACTIONS = new Set<AdminOpsAction>([
@@ -50,7 +50,7 @@ const WORKSPACE_ADMIN_ONLY_ACTIONS = new Set<AdminOpsAction>([
   "update_workspace_settings",
   "get_status_tracking",
   "get_workspace_dashboard",
-  "bulk_import_gear",
+  "bulk_import_items",
 ]);
 
 const SUSPENDED_TENANT_WRITE_ACTIONS = new Set<AdminOpsAction>([
@@ -58,7 +58,7 @@ const SUSPENDED_TENANT_WRITE_ACTIONS = new Set<AdminOpsAction>([
   "revoke_session",
   "revoke_current_session",
   "revoke_all_sessions",
-  "bulk_import_gear",
+  "bulk_import_items",
 ]);
 
 const isAdminOpsAction = (action: string): action is AdminOpsAction =>
@@ -129,7 +129,7 @@ const ACTION_HANDLERS: Partial<Record<AdminOpsAction, ActionHandler>> = {
   revoke_session: handleSessionAction,
   revoke_current_session: handleSessionAction,
   revoke_all_sessions: handleSessionAction,
-  bulk_import_gear: handleBulkGearAction,
+  bulk_import_items: handleBulkItemsAction,
 };
 
 export const dispatchAdminOpsAction = (context: AdminOpsContext) => {

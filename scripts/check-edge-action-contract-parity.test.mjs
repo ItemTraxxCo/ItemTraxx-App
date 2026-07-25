@@ -121,10 +121,10 @@ test("generated internal ops snapshot matches the live response shape", async ()
   assert.deepEqual(keys(snapshot.properties.recent_events.items), [
     "action_time",
     "action_type",
-    "gear_barcode",
-    "gear_name",
-    "student_id",
-    "student_username",
+    "item_barcode",
+    "item_name",
+    "borrower_id",
+    "borrower_username",
     "workspace_id",
     "workspace_name",
   ]);

@@ -268,7 +268,7 @@
           <p class="footer-heading">Legal</p>
           <RouterLink to="/legal">Legal Home</RouterLink>
           <RouterLink to="/privacy">Privacy</RouterLink>
-          <RouterLink to="/legal/student-privacy">Student Privacy</RouterLink>
+          <RouterLink to="/legal/borrower-privacy">Borrower Privacy</RouterLink>
           <RouterLink to="/legal/dpa">Data Processing Addendum</RouterLink>
           <RouterLink to="/cookies">Cookies</RouterLink>
           <RouterLink to="/accessibility">Accessibility</RouterLink>

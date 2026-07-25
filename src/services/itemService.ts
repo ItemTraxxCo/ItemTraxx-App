@@ -4,7 +4,7 @@ import { getAuthState } from "../store/authState";
 import { edgeFunctionError, missingContextError } from "./appErrors";
 import { getOrCreateDeviceSession } from "../utils/deviceSession";
 
-export type GearItem = {
+export type ItemRecord = {
   id: string;
   workspace_id: string;
   name: string;
@@ -15,16 +15,16 @@ export type GearItem = {
   access_mode?: "all" | "restricted";
 };
 
-export type GearLog = {
+export type ItemLog = {
   id: string;
   workspace_id: string;
-  gear_id: string;
+  item_id: string;
   checked_out_by: string | null;
   action_type: string;
   action_time: string;
   performed_by: string | null;
-  gear: { name: string; barcode: string } | null;
-  student: { username: string; student_id: string } | null;
+  item: { name: string; barcode: string } | null;
+  borrower: { username: string; borrower_id: string } | null;
 };
 
 type MaybeRelation<T> = T | T[] | null;
@@ -44,9 +44,9 @@ const getWorkspaceContextId = () => {
   return workspaceId;
 };
 
-export const fetchGear = async () => {
+export const fetchItem = async () => {
   const workspaceId = getWorkspaceContextId();
-  return (await authenticatedSelect<GearItem[]>("gear", {
+  return (await authenticatedSelect<ItemRecord[]>("items", {
     select: "id,workspace_id,name,barcode,serial_number,status,notes",
     workspace_id: `eq.${workspaceId}`,
     deleted_at: "is.null",
@@ -54,8 +54,8 @@ export const fetchGear = async () => {
   })) ?? [];
 };
 
-export const fetchDeletedGear = async () => {
-  const result = await invokeEdgeFunction<{ data: GearItem[] }>("admin-gear-mutate", {
+export const fetchDeletedItem = async () => {
+  const result = await invokeEdgeFunction<{ data: ItemRecord[] }>("admin-item-mutate", {
     method: "POST",
     body: {
       action: "list_deleted",
@@ -67,10 +67,10 @@ export const fetchDeletedGear = async () => {
     throw edgeFunctionError(result, "Unable to load archived items. Please contact support.");
   }
 
-  return (result.data?.data ?? []) as GearItem[];
+  return (result.data?.data ?? []) as ItemRecord[];
 };
 
-export const createGear = async (payload: {
+export const createItem = async (payload: {
   workspace_id: string;
   name: string;
   barcode: string;
@@ -81,7 +81,7 @@ export const createGear = async (payload: {
   profile_ids: string[];
 }) => {
   const { deviceId } = getOrCreateDeviceSession();
-  const result = await invokeEdgeFunction<{ data: GearItem }>("admin-gear-mutate", {
+  const result = await invokeEdgeFunction<{ data: ItemRecord }>("admin-item-mutate", {
     method: "POST",
     body: {
       action: "create",
@@ -103,10 +103,10 @@ export const createGear = async (payload: {
     throw edgeFunctionError(result, "Unable to create item. Please make sure your information is accurate and try again.");
   }
 
-  return result.data?.data as GearItem;
+  return result.data?.data as ItemRecord;
 };
 
-export const updateGear = async (payload: {
+export const updateItem = async (payload: {
   id: string;
   name: string;
   barcode: string;
@@ -114,7 +114,7 @@ export const updateGear = async (payload: {
   notes?: string;
 }) => {
   const { deviceId } = getOrCreateDeviceSession();
-  const result = await invokeEdgeFunction<{ data: GearItem }>("admin-gear-mutate", {
+  const result = await invokeEdgeFunction<{ data: ItemRecord }>("admin-item-mutate", {
     method: "POST",
     body: {
       action: "update",
@@ -133,12 +133,12 @@ export const updateGear = async (payload: {
     throw edgeFunctionError(result, "Unable to update item.");
   }
 
-  return result.data?.data as GearItem;
+  return result.data?.data as ItemRecord;
 };
 
-export const deleteGear = async (id: string) => {
+export const deleteItem = async (id: string) => {
   const { deviceId } = getOrCreateDeviceSession();
-  const result = await invokeEdgeFunction("admin-gear-mutate", {
+  const result = await invokeEdgeFunction("admin-item-mutate", {
     method: "POST",
     body: {
       action: "delete",
@@ -151,9 +151,9 @@ export const deleteGear = async (id: string) => {
   }
 };
 
-export const restoreGear = async (id: string) => {
+export const restoreItem = async (id: string) => {
   const { deviceId } = getOrCreateDeviceSession();
-  const result = await invokeEdgeFunction<{ data: GearItem }>("admin-gear-mutate", {
+  const result = await invokeEdgeFunction<{ data: ItemRecord }>("admin-item-mutate", {
     method: "POST",
     body: {
       action: "restore",
@@ -165,54 +165,54 @@ export const restoreGear = async (id: string) => {
     throw edgeFunctionError(result, "Unable to restore item.");
   }
 
-  return result.data?.data as GearItem;
+  return result.data?.data as ItemRecord;
 };
 
-export const fetchGearLogs = async () => {
+export const fetchItemLogs = async () => {
   const workspaceId = getWorkspaceContextId();
   const rows = ((await authenticatedSelect<Array<{
     id: string;
     workspace_id: string;
-    gear_id: string;
+    item_id: string;
     checked_out_by: string | null;
     action_type: string;
     action_time: string;
     performed_by: string | null;
-    gear: MaybeRelation<{ name: string; barcode: string }>;
-    student: MaybeRelation<{
+    item: MaybeRelation<{ name: string; barcode: string }>;
+    borrower: MaybeRelation<{
       username: string;
-      student_id: string;
+      borrower_id: string;
     }>;
-  }>>("gear_logs", {
+  }>>("item_logs", {
     select:
-      "id,workspace_id,gear_id,checked_out_by,action_type,action_time,performed_by,gear:gear_id(name,barcode),student:checked_out_by(username,student_id)",
+      "id,workspace_id,item_id,checked_out_by,action_type,action_time,performed_by,item:item_id(name,barcode),borrower:checked_out_by(username,borrower_id)",
     workspace_id: `eq.${workspaceId}`,
     order: "action_time.desc",
     limit: "200",
   })) ?? []) as Array<{
     id: string;
     workspace_id: string;
-    gear_id: string;
+    item_id: string;
     checked_out_by: string | null;
     action_type: string;
     action_time: string;
     performed_by: string | null;
-    gear: MaybeRelation<{ name: string; barcode: string }>;
-    student: MaybeRelation<{
+    item: MaybeRelation<{ name: string; barcode: string }>;
+    borrower: MaybeRelation<{
       username: string;
-      student_id: string;
+      borrower_id: string;
     }>;
   }>;
 
   return rows.map((row) => ({
     id: row.id,
     workspace_id: row.workspace_id,
-    gear_id: row.gear_id,
+    item_id: row.item_id,
     checked_out_by: row.checked_out_by,
     action_type: row.action_type,
     action_time: row.action_time,
     performed_by: row.performed_by,
-    gear: pickRelation(row.gear),
-    student: pickRelation(row.student),
+    item: pickRelation(row.item),
+    borrower: pickRelation(row.borrower),
   }));
 };

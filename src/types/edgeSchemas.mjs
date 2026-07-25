@@ -3,7 +3,7 @@ import { z } from "zod";
 const tenantFeatureFlagsSchema = z.object({
   enable_notifications: z.boolean(),
   enable_bulk_item_import: z.boolean(),
-  enable_bulk_student_tools: z.boolean(),
+  enable_bulk_borrower_tools: z.boolean(),
   enable_status_tracking: z.boolean(),
   enable_barcode_generator: z.boolean(),
 });
@@ -83,12 +83,12 @@ const tenantNotificationSchema = z.object({
   recent_status_events: z.array(
     z.object({
       id: z.string(),
-      gear_id: z.string(),
+      item_id: z.string(),
       status: z.string(),
       note: z.string().nullable(),
       changed_at: z.string(),
       changed_by: z.string().nullable(),
-      gear: z
+      item: z
         .object({
           name: z.string(),
           barcode: z.string(),
@@ -132,7 +132,7 @@ const adminOpsRequestSchema = z.discriminatedUnion("action", [
     payload: adminOpsDevicePayloadSchema,
   }),
   z.object({
-    action: z.literal("bulk_import_gear"),
+    action: z.literal("bulk_import_items"),
     payload: adminOpsDevicePayloadSchema.extend({
       rows: z.array(
         z.object({
@@ -189,7 +189,7 @@ const adminOpsResponseSchemas = {
     active_checkouts: z.number().int().nonnegative(),
     overdue_count: z.number().int().nonnegative(),
   }))),
-  bulk_import_gear: edgeEnvelopeSchema(
+  bulk_import_items: edgeEnvelopeSchema(
     z.object({
       inserted: z.number().int().nonnegative(),
       skipped: z.number().int().nonnegative(),
@@ -264,8 +264,8 @@ const superDistrictDetailSchema = z.object({
     z.object({
       workspace_id: z.string(),
       workspace_name: z.string(),
-      gear_total: z.number().int().nonnegative(),
-      students_total: z.number().int().nonnegative(),
+      item_total: z.number().int().nonnegative(),
+      borrowers_total: z.number().int().nonnegative(),
       active_checkouts: z.number().int().nonnegative(),
       overdue_items: z.number().int().nonnegative(),
       transactions_7d: z.number().int().nonnegative(),
@@ -286,10 +286,10 @@ const superDistrictDetailSchema = z.object({
       workspace_name: z.string(),
       action_type: z.enum(["checkout", "return"]),
       action_time: z.string(),
-      gear_name: z.string().nullable(),
-      gear_barcode: z.string().nullable(),
-      student_username: z.string().nullable(),
-      student_id: z.string().nullable(),
+      item_name: z.string().nullable(),
+      item_barcode: z.string().nullable(),
+      borrower_username: z.string().nullable(),
+      borrower_id: z.string().nullable(),
     })
   ),
   needs_attention: z.array(
@@ -301,8 +301,8 @@ const superDistrictDetailSchema = z.object({
     })
   ),
   usage: z.object({
-    gear_total: z.number().int().nonnegative(),
-    students_total: z.number().int().nonnegative(),
+    item_total: z.number().int().nonnegative(),
+    borrowers_total: z.number().int().nonnegative(),
     active_checkouts: z.number().int().nonnegative(),
     overdue_items: z.number().int().nonnegative(),
     transactions_7d: z.number().int().nonnegative(),
@@ -439,8 +439,8 @@ const superOpsAlertRuleSchema = z.object({
 const superOpsTenantPolicySchema = z.object({
   workspace_id: z.string(),
   max_admins: z.number().int().nullable().optional(),
-  max_students: z.number().int().nullable().optional(),
-  max_gear: z.number().int().nullable().optional(),
+  max_borrowers: z.number().int().nullable().optional(),
+  max_items: z.number().int().nullable().optional(),
   checkout_due_hours: z.number().int().nonnegative(),
   barcode_pattern: z.string().nullable().optional(),
   feature_flags: z.record(z.string(), z.unknown()).optional(),
@@ -642,10 +642,10 @@ const internalOpsSnapshotSchema = z.object({
     workspace_name: z.string(),
     action_type: z.enum(["checkout", "return"]),
     action_time: z.string(),
-    gear_name: z.string().nullable(),
-    gear_barcode: z.string().nullable(),
-    student_username: z.string().nullable(),
-    student_id: z.string().nullable(),
+    item_name: z.string().nullable(),
+    item_barcode: z.string().nullable(),
+    borrower_username: z.string().nullable(),
+    borrower_id: z.string().nullable(),
   })),
 });
 
@@ -668,7 +668,7 @@ const superOpsRequestSchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("get_control_center"), payload: z.object({}).optional() }),
   z.object({ action: z.literal("set_runtime_config"), payload: z.object({ key: z.string().min(1), value: z.unknown() }) }),
   z.object({ action: z.literal("upsert_alert_rule"), payload: z.object({ id: z.string().optional(), name: z.string().min(1), metric_key: z.string().min(1), threshold: z.number(), is_enabled: z.boolean().optional() }) }),
-  z.object({ action: z.literal("set_workspace_policy"), payload: z.object({ workspace_id: z.string().min(1), max_admins: z.number().int().nullable().optional(), max_students: z.number().int().nullable().optional(), max_gear: z.number().int().nullable().optional(), checkout_due_hours: z.number().int().nullable().optional(), barcode_pattern: z.string().nullable().optional(), feature_flags: z.record(z.string(), z.unknown()).optional() }) }),
+  z.object({ action: z.literal("set_workspace_policy"), payload: z.object({ workspace_id: z.string().min(1), max_admins: z.number().int().nullable().optional(), max_borrowers: z.number().int().nullable().optional(), max_items: z.number().int().nullable().optional(), checkout_due_hours: z.number().int().nullable().optional(), barcode_pattern: z.string().nullable().optional(), feature_flags: z.record(z.string(), z.unknown()).optional() }) }),
   z.object({ action: z.literal("set_workspace_force_reauth"), payload: z.object({ workspace_id: z.string().min(1) }) }),
   z.object({ action: z.literal("create_approval"), payload: z.object({ action_type: z.string().min(1), payload: z.record(z.string(), z.unknown()).or(z.object({}).passthrough()) }) }),
   z.object({ action: z.literal("approve_request"), payload: z.object({ id: z.string().min(1) }) }),
@@ -866,14 +866,14 @@ const districtDashboardResponseSchema = z.object({
       id: z.string(), requester_email: z.string().nullable().optional(), requester_name: z.string().nullable().optional(), subject: z.string(), message: z.string(), priority: z.enum(["low","normal","high","urgent"]), status: z.enum(["open","in_progress","resolved"]), created_at: z.string()
     })),
     tenant_metrics: z.array(z.object({
-      workspace_id: z.string(), workspace_name: z.string(), gear_total: z.number().int().nonnegative(), students_total: z.number().int().nonnegative(), active_checkouts: z.number().int().nonnegative(), overdue_items: z.number().int().nonnegative(), transactions_7d: z.number().int().nonnegative()
+      workspace_id: z.string(), workspace_name: z.string(), item_total: z.number().int().nonnegative(), borrowers_total: z.number().int().nonnegative(), active_checkouts: z.number().int().nonnegative(), overdue_items: z.number().int().nonnegative(), transactions_7d: z.number().int().nonnegative()
     })),
     traffic: z.object({ checkout_24h: z.number().int().nonnegative(), return_24h: z.number().int().nonnegative(), active_tenants_24h: z.number().int().nonnegative(), events_24h: z.number().int().nonnegative() }),
     traffic_by_hour: z.array(z.object({ hour: z.string(), checkout: z.number().int().nonnegative(), return: z.number().int().nonnegative() })),
-    recent_events: z.array(z.object({ workspace_id: z.string().nullable(), workspace_name: z.string(), action_type: z.enum(["checkout","return"]), action_time: z.string(), gear_name: z.string().nullable(), gear_barcode: z.string().nullable(), student_username: z.string().nullable(), student_id: z.string().nullable() })),
+    recent_events: z.array(z.object({ workspace_id: z.string().nullable(), workspace_name: z.string(), action_type: z.enum(["checkout","return"]), action_time: z.string(), item_name: z.string().nullable(), item_barcode: z.string().nullable(), borrower_username: z.string().nullable(), borrower_id: z.string().nullable() })),
     needs_attention: z.array(z.object({ key: z.string(), level: z.enum(["high","medium","low"]), title: z.string(), count: z.number().int().nonnegative() })),
     workspaces: z.array(districtDashboardTenantSchema),
-    usage: z.object({ gear_total: z.number().int().nonnegative(), students_total: z.number().int().nonnegative(), active_checkouts: z.number().int().nonnegative(), overdue_items: z.number().int().nonnegative(), transactions_7d: z.number().int().nonnegative() })
+    usage: z.object({ item_total: z.number().int().nonnegative(), borrowers_total: z.number().int().nonnegative(), active_checkouts: z.number().int().nonnegative(), overdue_items: z.number().int().nonnegative(), transactions_7d: z.number().int().nonnegative() })
   })
 });
 

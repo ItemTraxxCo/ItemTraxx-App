@@ -99,8 +99,8 @@ create table if not exists public.super_alert_rules (
 create table if not exists public.tenant_policies (
   tenant_id uuid primary key references public.tenants(id) on delete cascade,
   max_admins int,
-  max_students int,
-  max_gear int,
+  max_borrowers int,
+  max_items int,
   checkout_due_hours int not null default 72,
   barcode_pattern text,
   updated_by uuid references auth.users(id) on delete set null,
@@ -135,33 +135,33 @@ create table if not exists public.tenant_security_controls (
   updated_at timestamptz not null default now()
 );
 
-create table if not exists public.gear_status_history (
+create table if not exists public.item_status_history (
   id uuid primary key default gen_random_uuid(),
   tenant_id uuid not null references public.tenants(id) on delete cascade,
-  gear_id uuid not null references public.gear(id) on delete cascade,
+  item_id uuid not null references public.items(id) on delete cascade,
   status text not null,
   note text,
   changed_by uuid references auth.users(id) on delete set null,
   changed_at timestamptz not null default now()
 );
 
-create index if not exists idx_gear_status_history_tenant_changed_at
-  on public.gear_status_history (tenant_id, changed_at desc);
+create index if not exists idx_item_status_history_tenant_changed_at
+  on public.item_status_history (tenant_id, changed_at desc);
 
--- Soft delete support for tenant gear/students
-alter table if exists public.gear
+-- Soft delete support for tenant item/borrowers
+alter table if exists public.items
   add column if not exists deleted_at timestamptz;
 
-alter table if exists public.gear
+alter table if exists public.items
   add column if not exists deleted_by uuid references auth.users(id) on delete set null;
 
-alter table if exists public.students
+alter table if exists public.borrowers
   add column if not exists deleted_at timestamptz;
 
-alter table if exists public.students
+alter table if exists public.borrowers
   add column if not exists deleted_by uuid references auth.users(id) on delete set null;
 
-alter table if exists public.students
+alter table if exists public.borrowers
   add column if not exists username text;
 
 do $$
@@ -170,47 +170,47 @@ begin
     select 1
     from information_schema.columns c
     where c.table_schema = 'public'
-      and c.table_name = 'students'
+      and c.table_name = 'borrowers'
       and c.column_name = 'first_name'
   ) and exists (
     select 1
     from information_schema.columns c
     where c.table_schema = 'public'
-      and c.table_name = 'students'
+      and c.table_name = 'borrowers'
       and c.column_name = 'last_name'
   ) then
     execute $q$
-      update public.students
+      update public.borrowers
       set username = trim(concat_ws(' ', first_name, last_name))
       where username is null or username = ''
     $q$;
   end if;
 end $$;
 
-alter table if exists public.students
+alter table if exists public.borrowers
   alter column username set not null;
 
-alter table if exists public.students
-  drop constraint if exists students_student_id_format_check;
+alter table if exists public.borrowers
+  drop constraint if exists borrowers_borrower_id_format_check;
 
-alter table if exists public.students
-  add constraint students_student_id_format_check
-  check (student_id ~ '^[0-9]{4}[A-Z]{2}$');
+alter table if exists public.borrowers
+  add constraint borrowers_borrower_id_format_check
+  check (borrower_id ~ '^[0-9]{4}[A-Z]{2}$');
 
-alter table if exists public.students
+alter table if exists public.borrowers
   drop column if exists email;
 
-alter table if exists public.students
+alter table if exists public.borrowers
   drop column if exists first_name;
 
-alter table if exists public.students
+alter table if exists public.borrowers
   drop column if exists last_name;
 
-create index if not exists idx_gear_tenant_deleted_at
-  on public.gear (tenant_id, deleted_at);
+create index if not exists idx_item_tenant_deleted_at
+  on public.items (tenant_id, deleted_at);
 
-create index if not exists idx_students_tenant_deleted_at
-  on public.students (tenant_id, deleted_at);
+create index if not exists idx_borrowers_tenant_deleted_at
+  on public.borrowers (tenant_id, deleted_at);
 
 -- Escalation thresholds for overdue reminders
 alter table if exists public.tenant_policies
@@ -226,7 +226,7 @@ alter table if exists public.tenant_policies
   add column if not exists feature_flags jsonb not null default '{
     "enable_notifications": true,
     "enable_bulk_item_import": true,
-    "enable_bulk_student_tools": true,
+    "enable_bulk_borrower_tools": true,
     "enable_status_tracking": true,
     "enable_barcode_generator": true
   }'::jsonb;

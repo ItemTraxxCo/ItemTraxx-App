@@ -5,7 +5,7 @@ export type EdgeEnvelope<TData> = {
 export type TenantFeatureFlags = {
   enable_notifications: boolean;
   enable_bulk_item_import: boolean;
-  enable_bulk_student_tools: boolean;
+  enable_bulk_borrower_tools: boolean;
   enable_status_tracking: boolean;
   enable_barcode_generator: boolean;
 };
@@ -30,14 +30,14 @@ export type SuperAdminAction =
   | "send_workspace_admin_reset"
   | "send_super_admin_reset";
 
-export type SuperGearAction = "list" | "create" | "update" | "delete";
-export type SuperStudentAction = "list" | "create" | "update" | "delete";
+export type SuperItemAction = "list" | "create" | "update" | "delete";
+export type SuperBorrowerAction = "list" | "create" | "update" | "delete";
 
 export type AdminOpsAction =
   | "get_notifications"
   | "get_status_tracking"
   | "get_workspace_dashboard"
-  | "bulk_import_gear"
+  | "bulk_import_items"
   | "get_workspace_settings"
   | "update_workspace_settings"
   | "touch_session"

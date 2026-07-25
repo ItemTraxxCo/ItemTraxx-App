@@ -161,7 +161,7 @@ const storySlides = [
   },
   {
     kicker: "Admin Controls",
-    title: "Keep user activity, gear, status, and more all in one place.",
+    title: "Keep user activity, item, status, and more all in one place.",
     body: "ItemTraxx keeps returns, audits, and issue workflows organized without making admins fight the interface."
   },
   {

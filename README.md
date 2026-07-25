@@ -1,18 +1,18 @@
 # ItemTraxx
 
-Last updated: 2026-04-7 (year-month-day)
+Last updated: 2026-07-25 (year-month-day)
 
-**ItemTraxx** is a cloud-based inventory, checkout, and administrative control platform built for schools, districts, organizations, and individual operators. It supports root-domain access on `itemtraxx.com`, custom-routed workspaces on `*.app.itemtraxx.com`, and role-based admin tooling across user, admin, and district/organization surfacing.
+**ItemTraxx** is a cloud-based inventory, checkout, and administrative control platform built for schools and organizations. It supports root-domain access on `itemtraxx.com`, custom-routed workspaces on `*.app.itemtraxx.com`, and role-based tooling for Tenant Accounts, Workspace Admins, and Super Admins.
 
 ---
 
 ## 1. Product Overview
-ItemTraxx is designed to manage real-world gear and inventory workflows without spreadsheet headaches. The platform currently supports:
+ItemTraxx is designed to manage real-world items and inventory workflows without spreadsheet headaches. The platform currently supports:
 
 - Member and operator checkout / return flows
-- Tenant-admin inventory, student, and reporting tools
-- District/organization-scoped workspaces and district/org admin controls
-- Organization, district, and individual account structures
+- Workspace Admin item, borrower, account, and reporting tools
+- Tenant Account checkout, return, permitted item/borrower views, and personal settings
+- Workspace-scoped access with optional item and borrower grants per Tenant Account
 - Contact sales, request demo, and contact support form flows for easy contact and communication
 
 ---
@@ -20,7 +20,7 @@ ItemTraxx is designed to manage real-world gear and inventory workflows without 
 ## 2. Core Capabilities
 - **Checkout and Return:** Fast barcode-based transaction flows with offline-aware handling for an uninterrupted experience
 - **Inventory Management:** Track active, archived, lost, damaged, and returned assets/items with full transparency 
-- **Student and User Management:** Maintain borrower rosters, admin access, and tenant-level controls
+- **Borrower and Account Management:** Maintain borrower rosters, account access, and workspace controls
 - **Custom Separation:** Route users to custom-specific workspaces on `*.app.itemtraxx.com` when applicable
 - **Reporting and Auditability:** Usage reports, audit logs, and operational history for admins 
 - **Support and Intake Flows:** Built-in sales, demo, and support submission forms with styled transactional emails for maximizing communication
@@ -31,10 +31,10 @@ ItemTraxx is designed to manage real-world gear and inventory workflows without 
 ## 3. Roles and Access Model
 ItemTraxx currently supports multiple operating roles:
 
-- **Tenant Admin:** Manages inventory, students, settings, and tenant reporting
-- **District/Organization Admin:** Oversees district-linked tenants and district/org-level operations (beta)
-- **Individual / Root-Domain Accounts:** Non-district/organization usage on `itemtraxx.com` without custom routing
-- **Custom-Routed Users:** Access workspaces on custom scoped domains `*.app.itemtraxx.com` where applicable
+- **Tenant Account:** Checks out and returns items, views permitted items and borrowers, and manages its own settings
+- **Workspace Admin:** Manages items, borrowers, Tenant Accounts, workspace settings, and reporting
+- **Super Admin:** Manages workspaces and platform-wide administrative controls
+- **Custom-Routed Users:** Access workspaces on scoped domains under `*.app.itemtraxx.com` where applicable
 - Internal ItemTraxx access roles are not listed here for securty purposes.
 ---
 

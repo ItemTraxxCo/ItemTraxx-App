@@ -140,22 +140,22 @@ export const syncBufferedCheckoutQueue = async () =>
     };
   });
 
-export type StudentSummary = {
+export type BorrowerSummary = {
   id: string;
   username: string;
-  student_id: string;
+  borrower_id: string;
 };
 
-export type GearSummary = {
+export type ItemSummary = {
   id: string;
   name: string;
   barcode: string;
   status: string;
 };
 
-export const fetchGearByBarcode = async (barcode: string) => {
+export const fetchItemByBarcode = async (barcode: string) => {
   const rows = await withTimeout(
-    authenticatedSelect<GearSummary[]>("gear", {
+    authenticatedSelect<ItemSummary[]>("items", {
       select: "id,name,barcode,status",
       barcode: `eq.${barcode}`,
       deleted_at: "is.null",
@@ -169,17 +169,17 @@ export const fetchGearByBarcode = async (barcode: string) => {
     throw new Error("Invalid barcode.");
   }
 
-  return rows[0] as GearSummary;
+  return rows[0] as ItemSummary;
 };
 
-export const fetchStudentByStudentId = async (studentId: string) => {
+export const fetchBorrowerByBorrowerId = async (borrowerId: string) => {
   const { deviceId } = getOrCreateDeviceSession();
   const result = await withTimeout(
-    invokeEdgeFunction<{ data: StudentSummary }, { student_id: string; device_id: string }>(
+    invokeEdgeFunction<{ data: BorrowerSummary }, { borrower_id: string; device_id: string }>(
       "checkout-borrower-lookup",
       {
         method: "POST",
-        body: { student_id: studentId, device_id: deviceId },
+        body: { borrower_id: borrowerId, device_id: deviceId },
       },
     ),
     LOOKUP_TIMEOUT_MS,
@@ -193,16 +193,16 @@ export const fetchStudentByStudentId = async (studentId: string) => {
   return result.data.data;
 };
 
-export const fetchCheckedOutGear = async (studentUuid: string) => {
+export const fetchCheckedOutItem = async (borrowerUuid: string) => {
   const rows = await withTimeout(
-    authenticatedSelect<GearSummary[]>("gear", {
+    authenticatedSelect<ItemSummary[]>("items", {
       select: "id,name,barcode,status",
-      checked_out_by: `eq.${studentUuid}`,
+      checked_out_by: `eq.${borrowerUuid}`,
       deleted_at: "is.null",
     }),
     LOOKUP_TIMEOUT_MS,
     "Unable to connect to ItemTraxx servers. Please check your internet connection and try again."
   );
 
-  return (rows ?? []) as GearSummary[];
+  return (rows ?? []) as ItemSummary[];
 };

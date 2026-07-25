@@ -91,7 +91,7 @@ export const mockAdminOps = async (page: Page) => {
             feature_flags: {
               enable_notifications: true,
               enable_bulk_item_import: true,
-              enable_bulk_student_tools: true,
+              enable_bulk_borrower_tools: true,
               enable_status_tracking: true,
               enable_barcode_generator: true,
             },
@@ -212,8 +212,8 @@ export const mockSuperAdminMutate = async (page: Page) => {
   });
 };
 
-export const mockSuperGearMutate = async (page: Page) => {
-  await page.route(/\/functions(?:\/v1)?\/super-gear-mutate(?:\?.*)?$/, async (route) => {
+export const mockSuperItemMutate = async (page: Page) => {
+  await page.route(/\/functions(?:\/v1)?\/super-item-mutate(?:\?.*)?$/, async (route) => {
     const body = (route.request().postDataJSON() as { action?: string }) ?? {};
     if (body.action === "list") {
       await route.fulfill({
@@ -222,7 +222,7 @@ export const mockSuperGearMutate = async (page: Page) => {
         body: JSON.stringify({
           data: [
             {
-              id: "gear-1",
+              id: "item-1",
               workspace_id: "tenant-1",
               name: "Camera A",
               barcode: "111",
@@ -243,8 +243,8 @@ export const mockSuperGearMutate = async (page: Page) => {
   });
 };
 
-export const mockSuperStudentMutate = async (page: Page) => {
-  await page.route(/\/functions(?:\/v1)?\/super-student-mutate(?:\?.*)?$/, async (route) => {
+export const mockSuperBorrowerMutate = async (page: Page) => {
+  await page.route(/\/functions(?:\/v1)?\/super-borrower-mutate(?:\?.*)?$/, async (route) => {
     const body = (route.request().postDataJSON() as { action?: string }) ?? {};
     if (body.action === "list") {
       await route.fulfill({
@@ -253,10 +253,10 @@ export const mockSuperStudentMutate = async (page: Page) => {
         body: JSON.stringify({
           data: [
             {
-              id: "student-1",
+              id: "borrower-1",
               workspace_id: "tenant-1",
               username: "BlueFalcon12",
-              student_id: "1234AB",
+              borrower_id: "1234AB",
               created_at: new Date().toISOString(),
             },
           ],
@@ -284,10 +284,10 @@ export const mockSuperLogsQuery = async (page: Page) => {
             workspace_id: "tenant-1",
             action_type: "checkout",
             action_time: new Date().toISOString(),
-            checked_out_by: "student-1",
+            checked_out_by: "borrower-1",
             performed_by: "admin-1",
-            gear: { id: "gear-1", name: "Camera A", barcode: "111" },
-            student: { id: "student-1", username: "BlueFalcon12", student_id: "1234AB" },
+            item: { id: "item-1", name: "Camera A", barcode: "111" },
+            borrower: { id: "borrower-1", username: "BlueFalcon12", borrower_id: "1234AB" },
             tenant: { id: "tenant-1", name: "Demo Tenant" },
           },
         ],
@@ -311,7 +311,7 @@ export const mockSuspendedWorkspaceAdminOps = async (page: Page) => {
       return;
     }
     const body = request.postDataJSON() as { action?: string } | undefined;
-    if (body?.action === "update_workspace_settings" || body?.action === "bulk_import_gear") {
+    if (body?.action === "update_workspace_settings" || body?.action === "bulk_import_items") {
       await route.fulfill({
         status: 403,
         contentType: "application/json",

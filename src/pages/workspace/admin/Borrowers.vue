@@ -8,15 +8,15 @@
       <p class="admin-hero-copy">Add borrowers, review details, and manage archived records.</p>
       <div class="admin-summary-grid">
         <div class="admin-summary-card">
-          <strong>{{ students.length }}</strong>
+          <strong>{{ borrowers.length }}</strong>
           <span>Active borrowers</span>
         </div>
         <div class="admin-summary-card">
-          <strong>{{ archivedStudents.length }}</strong>
+          <strong>{{ archivedBorrowers.length }}</strong>
           <span>Archived borrowers</span>
         </div>
         <div class="admin-summary-card">
-          <strong>{{ filteredStudents.length }}</strong>
+          <strong>{{ filteredBorrowers.length }}</strong>
           <span>Visible in table</span>
         </div>
       </div>
@@ -42,7 +42,7 @@
         <label>
           Borrower ID
           <input
-            v-model="studentIdPreview"
+            v-model="borrowerIdPreview"
             type="text"
             readonly
             title="If you need to change this, contact support."
@@ -94,7 +94,7 @@
           />
         </label>
       </div>
-      <p class="muted">Showing {{ filteredStudents.length }} of {{ students.length }} borrowers.</p>
+      <p class="muted">Showing {{ filteredBorrowers.length }} of {{ borrowers.length }} borrowers.</p>
       <SkeletonLoader v-if="isLoading" variant="table" :rows="6" :columns="3" label="Loading borrowers" />
       <div v-else class="table-wrap">
       <table class="table">
@@ -106,9 +106,9 @@
           </tr>
         </thead>
         <tbody>
-          <tr v-for="item in filteredStudents" :key="item.id">
+          <tr v-for="item in filteredBorrowers" :key="item.id">
             <td>{{ item.username }}</td>
-            <td>{{ item.student_id }}</td>
+            <td>{{ item.borrower_id }}</td>
             <td>
               <div class="admin-actions">
                 <button type="button" @click="openDetails(item)">Details</button>
@@ -138,16 +138,16 @@
           </tr>
         </thead>
         <tbody>
-          <tr v-for="item in filteredArchivedStudents" :key="item.id">
+          <tr v-for="item in filteredArchivedBorrowers" :key="item.id">
             <td>{{ item.username }}</td>
-            <td>{{ item.student_id }}</td>
+            <td>{{ item.borrower_id }}</td>
             <td>
               <button type="button" class="link" :disabled="isSaving" @click="handleRestore(item)">
                 Restore
               </button>
             </td>
           </tr>
-          <tr v-if="filteredArchivedStudents.length === 0">
+          <tr v-if="filteredArchivedBorrowers.length === 0">
             <td colspan="3" class="muted">No archived borrowers.</td>
           </tr>
         </tbody>
@@ -155,7 +155,7 @@
       </div>
     </div>
 
-    <div v-if="featureFlags.enable_bulk_student_tools" class="card admin-section-card">
+    <div v-if="featureFlags.enable_bulk_borrower_tools" class="card admin-section-card">
       <div class="admin-section-header">
         <div>
           <h2>Bulk Borrower Tools</h2>
@@ -193,7 +193,7 @@
         <h2>Borrower details</h2>
         <p class="muted">View username, borrower ID, and checkout history.</p>
         <h3>{{ selected?.username }}</h3>
-        <p class="muted">Borrower ID: {{ selected?.student_id }}</p>
+        <p class="muted">Borrower ID: {{ selected?.borrower_id }}</p>
         <div class="form-grid-2">
           <label>
             Username
@@ -209,7 +209,7 @@
             Borrower ID
             <input
               class="identity-readonly"
-              :value="selected?.student_id || ''"
+              :value="selected?.borrower_id || ''"
               type="text"
               readonly
               title="If you need to change this, contact support."
@@ -221,10 +221,10 @@
         <div v-else>
           <div>
             <h3>Currently checked out</h3>
-            <ul v-if="details?.checkedOutGear.length">
-              <li v-for="gear in details.checkedOutGear" :key="gear.id">
-                {{ gear.name }}
-                <span class="muted">({{ gear.barcode }})</span>
+            <ul v-if="details?.checkedOutItem.length">
+              <li v-for="item in details.checkedOutItem" :key="item.id">
+                {{ item.name }}
+                <span class="muted">({{ item.barcode }})</span>
               </li>
             </ul>
             <p v-else class="muted">No items currently checked out.</p>
@@ -234,7 +234,7 @@
             <h3>Last checkout</h3>
             <p v-if="details?.lastCheckout">
               {{ formatTime(details.lastCheckout.action_time) }}
-              <span v-if="details.lastCheckout.gear_name"> — {{ details.lastCheckout.gear_name }} </span>
+              <span v-if="details.lastCheckout.item_name"> — {{ details.lastCheckout.item_name }} </span>
             </p>
             <p v-else class="muted">No checkout history.</p>
           </div>
@@ -243,7 +243,7 @@
             <h3>Last return</h3>
             <p v-if="details?.lastReturn">
               {{ formatTime(details.lastReturn.action_time) }}
-              <span v-if="details.lastReturn.gear_name"> — {{ details.lastReturn.gear_name }} </span>
+              <span v-if="details.lastReturn.item_name"> — {{ details.lastReturn.item_name }} </span>
             </p>
             <p v-else class="muted">No return history.</p>
           </div>
@@ -264,25 +264,25 @@ import { RouterLink } from "vue-router";
 import SkeletonLoader from "../../../components/SkeletonLoader.vue";
 import { getAuthState } from "../../../store/authState";
 import {
-  bulkCreateStudents,
-  createStudent,
-  deleteStudent,
-  fetchDeletedStudents,
-  fetchStudentDetails,
-  fetchStudents,
-  restoreStudent,
-  type StudentDetails,
-  type StudentItem,
-} from "../../../services/studentService";
+  bulkCreateBorrowers,
+  createBorrower,
+  deleteBorrower,
+  fetchDeletedBorrowers,
+  fetchBorrowerDetails,
+  fetchBorrowers,
+  restoreBorrower,
+  type BorrowerDetails,
+  type BorrowerItem,
+} from "../../../services/borrowerService";
 import { fetchWorkspaceSettings } from "../../../services/adminOpsService";
 import { logAdminAction } from "../../../services/auditLogService";
 import { enforceAdminRateLimit } from "../../../services/rateLimitService";
 import { exportRowsToCsv, exportRowsToPdf } from "../../../services/exportService";
-import { generateStudentIdentity } from "../../../utils/studentIdentity";
+import { generateBorrowerIdentity } from "../../../utils/borrowerIdentity";
 import { authenticatedSelect } from "../../../services/authenticatedDataClient";
 
-const students = ref<StudentItem[]>([]);
-const archivedStudents = ref<StudentItem[]>([]);
+const borrowers = ref<BorrowerItem[]>([]);
+const archivedBorrowers = ref<BorrowerItem[]>([]);
 const isLoading = ref(false);
 const isLoadingArchived = ref(false);
 const isSaving = ref(false);
@@ -290,15 +290,15 @@ const error = ref("");
 const success = ref("");
 const showDetails = ref(false);
 const detailsLoading = ref(false);
-const details = ref<StudentDetails | null>(null);
-const selected = ref<StudentItem | null>(null);
+const details = ref<BorrowerDetails | null>(null);
+const selected = ref<BorrowerItem | null>(null);
 const toastTitle = ref("");
 const toastMessage = ref("");
 const toastActionLabel = ref("");
 const toastAction = ref<(() => Promise<void>) | null>(null);
 
 const usernamePreview = ref("");
-const studentIdPreview = ref("");
+const borrowerIdPreview = ref("");
 const accessMode = ref<"" | "all" | "restricted">("");
 const selectedProfileIds = ref<string[]>([]);
 const tenantAccounts = ref<Array<{id:string;auth_email:string}>>([]);
@@ -306,28 +306,28 @@ const searchQuery = ref("");
 const featureFlags = ref({
   enable_notifications: true,
   enable_bulk_item_import: true,
-  enable_bulk_student_tools: true,
+  enable_bulk_borrower_tools: true,
   enable_status_tracking: true,
   enable_barcode_generator: true,
 });
 const bulkGenerateCount = ref(20);
-const bulkRows = ref<Array<{ username: string; student_id: string }>>([]);
+const bulkRows = ref<Array<{ username: string; borrower_id: string }>>([]);
 let toastTimer: number | null = null;
 
-const matchesSearch = (item: StudentItem, query: string) => {
+const matchesSearch = (item: BorrowerItem, query: string) => {
   if (!query) return true;
-  const haystack = `${item.username} ${item.student_id}`.toLowerCase();
+  const haystack = `${item.username} ${item.borrower_id}`.toLowerCase();
   return haystack.includes(query);
 };
 
-const filteredStudents = computed(() => {
+const filteredBorrowers = computed(() => {
   const query = searchQuery.value.trim().toLowerCase();
-  return students.value.filter((item) => matchesSearch(item, query));
+  return borrowers.value.filter((item) => matchesSearch(item, query));
 });
 
-const filteredArchivedStudents = computed(() => {
+const filteredArchivedBorrowers = computed(() => {
   const query = searchQuery.value.trim().toLowerCase();
-  return archivedStudents.value.filter((item) => matchesSearch(item, query));
+  return archivedBorrowers.value.filter((item) => matchesSearch(item, query));
 });
 
 const showToast = (title: string, message: string) => {
@@ -375,49 +375,49 @@ const runToastAction = async () => {
   await action();
 };
 
-const showDuplicateStudentToast = () => {
+const showDuplicateBorrowerToast = () => {
   showToast(
     "Unable to add borrower.",
     "Check borrower ID number and make sure it does not match another borrower's ID number. If you believe this is an error, contact support with the current borrower details and the details you want to add."
   );
 };
 
-const loadArchivedStudents = async () => {
+const loadArchivedBorrowers = async () => {
   isLoadingArchived.value = true;
   try {
-    archivedStudents.value = await fetchDeletedStudents();
+    archivedBorrowers.value = await fetchDeletedBorrowers();
   } catch {
-    archivedStudents.value = [];
+    archivedBorrowers.value = [];
   } finally {
     isLoadingArchived.value = false;
   }
 };
 
-const loadStudents = async () => {
+const loadBorrowers = async () => {
   isLoading.value = true;
   error.value = "";
   try {
-    students.value = await fetchStudents();
+    borrowers.value = await fetchBorrowers();
   } catch (err) {
     error.value = err instanceof Error ? err.message : "Unable to load borrowers. Please sign out completeley and sign back in. If issue persists, contact support.";
   } finally {
     isLoading.value = false;
   }
-  await loadArchivedStudents();
+  await loadArchivedBorrowers();
 };
 
 const regenerateIdentity = () => {
-  const next = generateStudentIdentity();
+  const next = generateBorrowerIdentity();
   usernamePreview.value = next.username;
-  studentIdPreview.value = next.studentId;
+  borrowerIdPreview.value = next.borrowerId;
 };
 
 const generateBulkRows = () => {
   const count = Math.min(200, Math.max(1, Math.round(Number(bulkGenerateCount.value) || 0)));
   bulkGenerateCount.value = count;
-  bulkRows.value = Array.from({ length: count }, () => generateStudentIdentity()).map((row) => ({
+  bulkRows.value = Array.from({ length: count }, () => generateBorrowerIdentity()).map((row) => ({
     username: row.username,
-    student_id: row.studentId,
+    borrower_id: row.borrowerId,
   }));
 };
 
@@ -431,8 +431,8 @@ const runBulkImport = async () => {
   isSaving.value = true;
   try {
     await enforceAdminRateLimit();
-    const result = await bulkCreateStudents(bulkRows.value);
-    students.value = [...result.inserted, ...students.value];
+    const result = await bulkCreateBorrowers(bulkRows.value);
+    borrowers.value = [...result.inserted, ...borrowers.value];
     success.value = `Imported ${result.inserted_count} borrower(s).`;
     showToast("Bulk import complete", `Imported ${result.inserted_count}, skipped ${result.skipped_count}.`);
     bulkRows.value = [];
@@ -447,8 +447,8 @@ const runBulkImport = async () => {
 const exportCsv = () => {
   exportRowsToCsv(
     `borrowers-${new Date().toISOString().slice(0, 10)}.csv`,
-    ["username", "student_id"],
-    filteredStudents.value
+    ["username", "borrower_id"],
+    filteredBorrowers.value
   );
 };
 
@@ -456,8 +456,8 @@ const exportPdf = async () => {
   await exportRowsToPdf(
     `borrowers-${new Date().toISOString().slice(0, 10)}.pdf`,
     "Borrower Export",
-    ["username", "student_id"],
-    filteredStudents.value
+    ["username", "borrower_id"],
+    filteredBorrowers.value
   );
 };
 
@@ -475,29 +475,29 @@ const handleCreate = async () => {
   isSaving.value = true;
   try {
     await enforceAdminRateLimit();
-    const created = await createStudent({
+    const created = await createBorrower({
       workspace_id: auth.workspaceContextId,
       username: usernamePreview.value,
-      student_id: studentIdPreview.value,
+      borrower_id: borrowerIdPreview.value,
       access_mode: accessMode.value,
       profile_ids: selectedProfileIds.value,
     });
     await logAdminAction({
-      action_type: "student_create",
-      entity_type: "student",
+      action_type: "borrower_create",
+      entity_type: "borrower",
       entity_id: created.id,
-      metadata: { student_id: created.student_id },
+      metadata: { borrower_id: created.borrower_id },
     });
-    students.value = [created, ...students.value];
+    borrowers.value = [created, ...borrowers.value];
     usernamePreview.value = created.username;
-    studentIdPreview.value = created.student_id;
+    borrowerIdPreview.value = created.borrower_id;
     regenerateIdentity();
     accessMode.value = "";
     selectedProfileIds.value = [];
     success.value = "Borrower added.";
   } catch (err) {
     error.value = err instanceof Error ? err.message : "Unable to create borrower. Please try again. If the issue persists, contact support.";
-    showDuplicateStudentToast();
+    showDuplicateBorrowerToast();
   } finally {
     isSaving.value = false;
   }
@@ -513,17 +513,17 @@ onMounted(() => {
       featureFlags.value = {
         enable_notifications: true,
         enable_bulk_item_import: true,
-        enable_bulk_student_tools: true,
+        enable_bulk_borrower_tools: true,
         enable_status_tracking: true,
         enable_barcode_generator: true,
       };
     }
-    await loadStudents();
+    await loadBorrowers();
     tenantAccounts.value = await authenticatedSelect<Array<{id:string;auth_email:string}>>("profiles", { select: "id,auth_email", role: "eq.tenant_account", is_active: "eq.true", deleted_at: "is.null", order: "auth_email.asc" });
   })();
 });
 
-const openDetails = async (item: StudentItem) => {
+const openDetails = async (item: BorrowerItem) => {
   if (showDetails.value && selected.value?.id === item.id) {
     closeDetails();
     return;
@@ -533,7 +533,7 @@ const openDetails = async (item: StudentItem) => {
   detailsLoading.value = true;
   error.value = "";
   try {
-    details.value = await fetchStudentDetails(item.id);
+    details.value = await fetchBorrowerDetails(item.id);
   } catch (err) {
     error.value = err instanceof Error ? err.message : "Unable to load details. Please sign out completeley and sign back in. If issue persists, contact support.";
     details.value = null;
@@ -558,7 +558,7 @@ const formatTime = (value: string) => {
   });
 };
 
-const removeStudent = async (item: StudentItem) => {
+const removeBorrower = async (item: BorrowerItem) => {
   const confirmed = window.confirm(`Archive borrower "${item.username}"? You can restore them later if needed.`);
   if (!confirmed) return;
   error.value = "";
@@ -566,15 +566,15 @@ const removeStudent = async (item: StudentItem) => {
   isSaving.value = true;
   try {
     await enforceAdminRateLimit();
-    await deleteStudent(item.id);
+    await deleteBorrower(item.id);
     await logAdminAction({
-      action_type: "student_archive",
-      entity_type: "student",
+      action_type: "borrower_archive",
+      entity_type: "borrower",
       entity_id: item.id,
-      metadata: { student_id: item.student_id },
+      metadata: { borrower_id: item.borrower_id },
     });
-    students.value = students.value.filter((row) => row.id !== item.id);
-    archivedStudents.value = [item, ...archivedStudents.value];
+    borrowers.value = borrowers.value.filter((row) => row.id !== item.id);
+    archivedBorrowers.value = [item, ...archivedBorrowers.value];
     success.value = "Borrower archived.";
     showToastWithAction(
       "Borrower archived",
@@ -593,27 +593,27 @@ const removeStudent = async (item: StudentItem) => {
 
 const removeSelected = async () => {
   if (!selected.value) return;
-  await removeStudent(selected.value);
+  await removeBorrower(selected.value);
   if (!error.value) {
     closeDetails();
   }
 };
 
-const handleRestore = async (item: StudentItem) => {
+const handleRestore = async (item: BorrowerItem) => {
   error.value = "";
   success.value = "";
   isSaving.value = true;
   try {
     await enforceAdminRateLimit();
-    const restored = await restoreStudent(item.id);
+    const restored = await restoreBorrower(item.id);
     await logAdminAction({
-      action_type: "student_restore",
-      entity_type: "student",
+      action_type: "borrower_restore",
+      entity_type: "borrower",
       entity_id: item.id,
-      metadata: { student_id: item.student_id },
+      metadata: { borrower_id: item.borrower_id },
     });
-    archivedStudents.value = archivedStudents.value.filter((row) => row.id !== item.id);
-    students.value = [restored, ...students.value];
+    archivedBorrowers.value = archivedBorrowers.value.filter((row) => row.id !== item.id);
+    borrowers.value = [restored, ...borrowers.value];
     success.value = "Borrower restored.";
   } catch (err) {
     error.value = err instanceof Error ? err.message : "Unable to restore borrower. If you believe this is an error, contact support.";

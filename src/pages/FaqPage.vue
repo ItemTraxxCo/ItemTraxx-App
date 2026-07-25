@@ -106,7 +106,7 @@ const faqGroups = [
     items: [
       {
         q: "What kinds of items can I track?",
-        a: "ItemTraxx is intended for shared inventory such as gear, tools, equipment, and other assets that move between people, rooms, or teams.",
+        a: "ItemTraxx is intended for shared inventory such as item, tools, equipment, and other assets that move between people, rooms, or teams.",
       },
       {
         q: "Does ItemTraxx keep transaction history?",
@@ -117,7 +117,7 @@ const faqGroups = [
         a: "Yes. ItemTraxx supports shared operational use with role-based access so the right people can check out inventory or manage admin workflows.",
       },
       {
-        q: "Can admins manage borrowers and gear separately?",
+        q: "Can admins manage borrowers and item separately?",
         a: "Yes. Borrower management, inventory management, logs, and other admin workflows are separated into dedicated operational pages.",
       },
       {
@@ -135,7 +135,7 @@ const faqGroups = [
     items: [
       {
         q: "Can it work for schools and small teams?",
-        a: "Yes. ItemTraxx is designed for school programs, classrooms, districts, organizations, teams, and other environments where shared gear moves constantly.",
+        a: "Yes. ItemTraxx is designed for school programs, classrooms, districts, organizations, teams, and other environments where shared item moves constantly.",
       },
       {
         q: "Can I use ItemTraxx as an individual user?",

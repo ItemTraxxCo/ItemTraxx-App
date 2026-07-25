@@ -7,8 +7,8 @@ const OFFLINE_QUEUE_LOCK_KEY = "itemtraxx:checkout-offline-buffer:lock:v1";
 const OFFLINE_QUEUE_KEY_DATABASE = "itemtraxx-offline-queue";
 
 type CheckoutReturnPayload = {
-  student_id: string;
-  gear_barcodes: string[];
+  borrower_id: string;
+  item_barcodes: string[];
   action_type: "checkout" | "return" | "auto" | "admin_return";
   operation_id?: string;
 };
@@ -33,8 +33,8 @@ type OfflineQueueControl = {
 };
 
 const payload = (operationId?: string): CheckoutReturnPayload => ({
-  student_id: "student-e2e",
-  gear_barcodes: ["GEAR-E2E-001"],
+  borrower_id: "borrower-e2e",
+  item_barcodes: ["ITEM-E2E-001"],
   action_type: "checkout",
   ...(operationId ? { operation_id: operationId } : {}),
 });
@@ -114,7 +114,7 @@ test.describe("encrypted checkout offline queue contract", () => {
         const raw = window.localStorage.getItem(queueKey);
         const envelope = JSON.parse(raw ?? "null") as Record<string, unknown> | null;
         return {
-          rawContainsStudentId: raw?.includes(item.payload.student_id) ?? false,
+          rawContainsBorrowerId: raw?.includes(item.payload.borrower_id) ?? false,
           envelopeKeys: envelope ? Object.keys(envelope).sort() : [],
           envelopeVersion: envelope?.version,
           hasIv: typeof envelope?.iv === "string" && envelope.iv.length > 0,
@@ -126,7 +126,7 @@ test.describe("encrypted checkout offline queue contract", () => {
     );
 
     expect(result).toEqual({
-      rawContainsStudentId: false,
+      rawContainsBorrowerId: false,
       envelopeKeys: ["cipher", "iv", "version"],
       envelopeVersion: 2,
       hasIv: true,
@@ -340,7 +340,7 @@ test.describe("encrypted checkout offline queue contract", () => {
         const migrated = JSON.parse(migratedRaw ?? "null") as Record<string, unknown> | null;
         return {
           items,
-          rawContainsStudentId: migratedRaw?.includes(item.payload.student_id) ?? false,
+          rawContainsBorrowerId: migratedRaw?.includes(item.payload.borrower_id) ?? false,
           version: migrated?.version,
           hasIv: typeof migrated?.iv === "string" && migrated.iv.length > 0,
           hasCipher: typeof migrated?.cipher === "string" && migrated.cipher.length > 0,
@@ -351,7 +351,7 @@ test.describe("encrypted checkout offline queue contract", () => {
 
     expect(result).toEqual({
       items: [bufferedItem()],
-      rawContainsStudentId: false,
+      rawContainsBorrowerId: false,
       version: 2,
       hasIv: true,
       hasCipher: true,

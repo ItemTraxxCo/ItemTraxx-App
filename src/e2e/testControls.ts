@@ -18,7 +18,7 @@ declare global {
       setTenantAccountSession: (workspaceId?: string) => void;
       setWorkspaceAdminSession: (workspaceId?: string, options?: { verified?: boolean }) => void;
       setSuperAdminSession: (options?: { verified?: boolean }) => void;
-      invokeAdminGearCreate: (payload: {
+      invokeAdminItemCreate: (payload: {
         workspace_id: string;
         name: string;
         barcode: string;
@@ -27,10 +27,10 @@ declare global {
         access_mode: "all" | "restricted";
         profile_ids: string[];
       }) => Promise<unknown>;
-      invokeAdminStudentCreate: (payload: {
+      invokeAdminBorrowerCreate: (payload: {
         workspace_id: string;
         username?: string;
-        student_id?: string;
+        borrower_id?: string;
         access_mode: "all" | "restricted";
         profile_ids: string[];
       }) => Promise<unknown>;
@@ -113,13 +113,13 @@ export const attachE2EControls = (router: Router): void => {
       setWorkspaceContext(null);
       setSecondaryAuth(options.verified !== false);
     },
-    async invokeAdminGearCreate(payload) {
-      const { createGear } = await import("../services/gearService");
-      return await createGear(payload);
+    async invokeAdminItemCreate(payload) {
+      const { createItem } = await import("../services/itemService");
+      return await createItem(payload);
     },
-    async invokeAdminStudentCreate(payload) {
-      const { createStudent } = await import("../services/studentService");
-      return await createStudent(payload);
+    async invokeAdminBorrowerCreate(payload) {
+      const { createBorrower } = await import("../services/borrowerService");
+      return await createBorrower(payload);
     },
     clearSession() {
       clearAuthState(true);

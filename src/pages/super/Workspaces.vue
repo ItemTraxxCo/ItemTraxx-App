@@ -88,7 +88,7 @@ import {
 } from "../../services/superWorkspaceService";
 
 type WorkspaceDraft = WorkspacePolicyInput & { name: string; slug: string; auth_email: string; password: string };
-const defaultFlags = () => ({ enable_notifications: true, enable_bulk_item_import: true, enable_bulk_student_tools: true, enable_status_tracking: true, enable_barcode_generator: true });
+const defaultFlags = () => ({ enable_notifications: true, enable_bulk_item_import: true, enable_bulk_borrower_tools: true, enable_status_tracking: true, enable_barcode_generator: true });
 const blankDraft = (): WorkspaceDraft => ({ name: "", slug: "", auth_email: "", password: "", account_category: "organization", plan_code: "starter", checkout_due_hours: 72, feature_flags: defaultFlags(), contact_name: "", support_email: "", billing_email: "", billing_status: "draft", renewal_date: "", invoice_reference: "" });
 
 const WorkspaceFields = defineComponent({
@@ -98,7 +98,7 @@ const WorkspaceFields = defineComponent({
     const update = (key: keyof WorkspaceDraft, value: unknown) => emit("update:modelValue", { ...props.modelValue, [key]: value });
     const plans = computed(() => props.modelValue.account_category === "individual" ? [["individual_yearly", "Individual yearly"], ["individual_monthly", "Individual monthly"]] : props.modelValue.account_category === "district" ? [["core", "Core"], ["growth", "Growth"], ["enterprise", "Enterprise"]] : [["starter", "Starter"], ["scale", "Scale"], ["enterprise", "Enterprise"]]);
     const input = (label: string, key: keyof WorkspaceDraft, type = "text") => h("label", [label, h("input", { type, value: props.modelValue[key] ?? "", onInput: (event: Event) => update(key, (event.target as HTMLInputElement).value) })]);
-    const flagLabels: Record<string, string> = { enable_notifications: "Notifications", enable_bulk_item_import: "Bulk item import", enable_bulk_student_tools: "Bulk borrower tools", enable_status_tracking: "Item status tracking", enable_barcode_generator: "Barcode generator" };
+    const flagLabels: Record<string, string> = { enable_notifications: "Notifications", enable_bulk_item_import: "Bulk item import", enable_bulk_borrower_tools: "Bulk borrower tools", enable_status_tracking: "Item status tracking", enable_barcode_generator: "Barcode generator" };
     return () => h("div", { class: "fields" }, [
       input("Workspace name", "name"), input("Workspace slug", "slug"),
       ...(props.includeCredentials ? [input("Primary admin email", "auth_email", "email"), input("Temporary password", "password", "password")] : []),

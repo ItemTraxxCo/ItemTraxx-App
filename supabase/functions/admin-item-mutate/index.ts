@@ -26,7 +26,7 @@ const baseCorsHeaders = {
   Vary: "Origin",
 };
 
-const ALLOWED_GEAR_STATUSES = new Set([
+const ALLOWED_ITEM_STATUSES = new Set([
   "available",
   "checked_out",
   "damaged",
@@ -90,7 +90,7 @@ serve(async (req) => {
     return jsonResponse(403, { error: "Origin not allowed" });
   }
 
-  const ingressError = await requireTrustedEdgeIngress(req, "admin-gear-mutate", jsonResponse);
+  const ingressError = await requireTrustedEdgeIngress(req, "admin-item-mutate", jsonResponse);
   if (ingressError) return ingressError;
 
   if (isKillSwitchWriteBlocked(req)) {
@@ -180,11 +180,11 @@ serve(async (req) => {
       }
       return { accessMode, profileIds };
     };
-    const replaceAccess = async (gearId: string, accessMode: "all" | "restricted", profileIds: string[]) => {
-      const { error: deleteError } = await adminClient.from("gear_access_grants").delete().eq("gear_id", gearId);
+    const replaceAccess = async (itemId: string, accessMode: "all" | "restricted", profileIds: string[]) => {
+      const { error: deleteError } = await adminClient.from("item_access_grants").delete().eq("item_id", itemId);
       if (deleteError) throw new Error("Unable to update item access.");
       if (accessMode === "restricted") {
-        const { error } = await adminClient.from("gear_access_grants").insert(profileIds.map((profileId) => ({ gear_id: gearId, profile_id: profileId, granted_by: user.id })));
+        const { error } = await adminClient.from("item_access_grants").insert(profileIds.map((profileId) => ({ item_id: itemId, profile_id: profileId, granted_by: user.id })));
         if (error) throw new Error("Unable to update item access.");
       }
     };
@@ -198,7 +198,7 @@ serve(async (req) => {
         workspace_id: profile.workspace_id,
         actor_id: profile.id,
         action_type: actionType,
-        entity_type: "gear",
+        entity_type: "items",
         entity_id: entityId,
         metadata,
       });
@@ -287,7 +287,7 @@ serve(async (req) => {
 
     if (action === "list_deleted") {
       const { data, error } = await adminClient
-        .from("gear")
+        .from("items")
         .select("id, workspace_id, name, barcode, serial_number, status, notes")
         .eq("workspace_id", profile.workspace_id)
         .not("deleted_at", "is", null)
@@ -306,12 +306,12 @@ serve(async (req) => {
       const { name, barcode, serial_number, status, notes } = payloadRecord;
       const normalizedName = requireText(name, { maxLen: 120 });
       const normalizedBarcode = requireText(barcode, { maxLen: 64, pattern: BARCODE_PATTERN });
-      const normalizedStatus = requireEnum(status, ALLOWED_GEAR_STATUSES);
+      const normalizedStatus = requireEnum(status, ALLOWED_ITEM_STATUSES);
       const normalizedSerial = optionalText(serial_number, { maxLen: 64 });
       const normalizedNotes = optionalText(notes, { maxLen: 500 });
 
       const { data, error } = await adminClient
-        .from("gear")
+        .from("items")
         .insert({
           workspace_id: profile.workspace_id,
           name: normalizedName,
@@ -330,16 +330,16 @@ serve(async (req) => {
       await replaceAccess(data.id, accessMode, profileIds);
 
       if (normalizedStatus !== "available" && normalizedStatus !== "checked_out") {
-        await adminClient.from("gear_status_history").insert({
+        await adminClient.from("item_status_history").insert({
           workspace_id: profile.workspace_id,
-          gear_id: data.id,
+          item_id: data.id,
           status: normalizedStatus,
           note: normalizedNotes || null,
           changed_by: user.id,
         });
       }
 
-      await writeAudit("gear_create", data.id, {
+      await writeAudit("item_create", data.id, {
         barcode: normalizedBarcode,
         status: normalizedStatus,
         has_serial_number: !!normalizedSerial,
@@ -354,11 +354,11 @@ serve(async (req) => {
       const normalizedId = requireUuid(id);
       const normalizedName = requireText(name, { maxLen: 120 });
       const normalizedBarcode = requireText(barcode, { maxLen: 64, pattern: BARCODE_PATTERN });
-      const normalizedStatus = requireEnum(status, ALLOWED_GEAR_STATUSES);
+      const normalizedStatus = requireEnum(status, ALLOWED_ITEM_STATUSES);
       const normalizedNotes = optionalText(notes, { maxLen: 500 });
 
-      const { data: existingGear } = await adminClient
-        .from("gear")
+      const { data: existingItem } = await adminClient
+        .from("items")
         .select("status, checked_out_by, checked_out_at")
         .eq("id", normalizedId)
         .eq("workspace_id", profile.workspace_id)
@@ -367,9 +367,9 @@ serve(async (req) => {
 
       if (
         normalizedStatus !== "checked_out" &&
-        (existingGear?.status === "checked_out" ||
-          !!existingGear?.checked_out_by ||
-          !!existingGear?.checked_out_at)
+        (existingItem?.status === "checked_out" ||
+          !!existingItem?.checked_out_by ||
+          !!existingItem?.checked_out_at)
       ) {
         return jsonResponse(400, {
           error: "Return this item before changing its checkout status.",
@@ -377,7 +377,7 @@ serve(async (req) => {
       }
 
       const { data, error } = await adminClient
-        .from("gear")
+        .from("items")
         .update({
           name: normalizedName,
           barcode: normalizedBarcode,
@@ -397,22 +397,22 @@ serve(async (req) => {
       await replaceAccess(data.id, accessMode, profileIds);
 
       if (
-        existingGear?.status !== normalizedStatus &&
+        existingItem?.status !== normalizedStatus &&
         normalizedStatus !== "available" &&
         normalizedStatus !== "checked_out"
       ) {
-        await adminClient.from("gear_status_history").insert({
+        await adminClient.from("item_status_history").insert({
           workspace_id: profile.workspace_id,
-          gear_id: data.id,
+          item_id: data.id,
           status: normalizedStatus,
           note: normalizedNotes || null,
           changed_by: user.id,
         });
       }
 
-      await writeAudit("gear_update", data.id, {
+      await writeAudit("item_update", data.id, {
         barcode: normalizedBarcode,
-        previous_status: existingGear?.status ?? null,
+        previous_status: existingItem?.status ?? null,
         status: normalizedStatus,
       });
 
@@ -423,26 +423,26 @@ serve(async (req) => {
       const { id } = payloadRecord;
       const normalizedId = requireUuid(id);
 
-      const { data: activeGear } = await adminClient
-        .from("gear")
+      const { data: activeItem } = await adminClient
+        .from("items")
         .select("id, status, checked_out_by, checked_out_at")
         .eq("id", normalizedId)
         .eq("workspace_id", profile.workspace_id)
         .is("deleted_at", null)
         .maybeSingle();
 
-      if (!activeGear?.id) {
+      if (!activeItem?.id) {
         return jsonResponse(404, { error: "Item not found." });
       }
 
-      if (activeGear.status === "checked_out" || activeGear.checked_out_by || activeGear.checked_out_at) {
+      if (activeItem.status === "checked_out" || activeItem.checked_out_by || activeItem.checked_out_at) {
         return jsonResponse(400, {
           error: "Return this item before archiving it.",
         });
       }
 
       const { error } = await adminClient
-        .from("gear")
+        .from("items")
         .update({
           deleted_at: new Date().toISOString(),
           deleted_by: user.id,
@@ -455,8 +455,8 @@ serve(async (req) => {
         return jsonResponse(400, { error: "Unable to archive item." });
       }
 
-      await writeAudit("gear_archive", normalizedId, {
-        previous_status: activeGear.status ?? null,
+      await writeAudit("item_archive", normalizedId, {
+        previous_status: activeItem.status ?? null,
       });
 
       return jsonResponse(200, { success: true });
@@ -467,7 +467,7 @@ serve(async (req) => {
       const normalizedId = requireUuid(id);
 
       const { data, error } = await adminClient
-        .from("gear")
+        .from("items")
         .update({ deleted_at: null, deleted_by: null })
         .eq("id", normalizedId)
         .eq("workspace_id", profile.workspace_id)
@@ -479,7 +479,7 @@ serve(async (req) => {
         return jsonResponse(400, { error: "Unable to restore item." });
       }
 
-      await writeAudit("gear_restore", data.id, {
+      await writeAudit("item_restore", data.id, {
         barcode: data.barcode ?? null,
         status: data.status ?? null,
       });
@@ -492,7 +492,7 @@ serve(async (req) => {
     if (error instanceof ValidationError) {
       return jsonResponse(error.status, { error: error.message });
     }
-    console.error("admin-gear-mutate function error", {
+    console.error("admin-item-mutate function error", {
       message: error instanceof Error ? error.message : "Unknown error",
       stack: error instanceof Error ? error.stack : undefined,
     });

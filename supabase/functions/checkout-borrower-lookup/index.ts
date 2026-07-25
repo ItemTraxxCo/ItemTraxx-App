@@ -7,7 +7,7 @@ import { requireTrustedEdgeIngress } from "../_shared/trustedIngress.ts";
 import { validateAccountDeviceSession } from "../_shared/accountSessions.ts";
 import {
   requireText,
-  STUDENT_ID_PATTERN,
+  BORROWER_ID_PATTERN,
   ValidationError,
 } from "../_shared/validation.ts";
 
@@ -106,27 +106,27 @@ serve(async (req) => {
     const activeSession = await validateAccountDeviceSession(adminClient,{workspaceId:profile.workspace_id,profileId:authData.user.id,deviceId,authToken});
     if(activeSession.relationMissing)return jsonResponse(503,{error:"Session controls unavailable"});
     if(!activeSession.valid)return jsonResponse(401,{error:"Session revoked"});
-    const studentId = requireText(body.student_id, {
+    const borrowerId = requireText(body.borrower_id, {
       maxLen: 6,
-      pattern: STUDENT_ID_PATTERN,
+      pattern: BORROWER_ID_PATTERN,
       transform: "uppercase",
     });
-    const { data: student, error: studentError } = await adminClient
-      .from("students")
-      .select("id, username, student_id, access_mode")
+    const { data: borrower, error: borrowerError } = await adminClient
+      .from("borrowers")
+      .select("id, username, borrower_id, access_mode")
       .eq("workspace_id", profile.workspace_id)
-      .eq("student_id", studentId)
+      .eq("borrower_id", borrowerId)
       .is("deleted_at", null)
       .maybeSingle();
-    if (studentError) {
+    if (borrowerError) {
       return jsonResponse(500, { error: "Borrower lookup failed" });
     }
-    if (!student) return jsonResponse(404, { error: "Borrower not found" });
-    if (profile.role === "tenant_account" && student.access_mode === "restricted") {
-      const { data: grant } = await adminClient.from("borrower_access_grants").select("student_id").eq("student_id", student.id).eq("profile_id", authData.user.id).maybeSingle();
+    if (!borrower) return jsonResponse(404, { error: "Borrower not found" });
+    if (profile.role === "tenant_account" && borrower.access_mode === "restricted") {
+      const { data: grant } = await adminClient.from("borrower_access_grants").select("borrower_id").eq("borrower_id", borrower.id).eq("profile_id", authData.user.id).maybeSingle();
       if (!grant) return jsonResponse(404, { error: "Borrower not found" });
     }
-    return jsonResponse(200, { data: student });
+    return jsonResponse(200, { data: borrower });
   } catch (error) {
     if (error instanceof ValidationError) {
       return jsonResponse(error.status, { error: "Invalid request" });

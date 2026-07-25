@@ -13,7 +13,7 @@ import {
   optionalText,
   requireEnum,
   requireUuid,
-  STUDENT_ID_PATTERN,
+  BORROWER_ID_PATTERN,
   USERNAME_PATTERN,
   ValidationError,
 } from "../_shared/validation.ts";
@@ -32,11 +32,11 @@ type RateLimitResult = {
 
 type SupabaseAdminClient = ReturnType<typeof createClient<any, "public", any>>;
 
-type StudentRecord = {
+type BorrowerRecord = {
   id: string;
   workspace_id: string;
   username: string;
-  student_id: string;
+  borrower_id: string;
 };
 const ACCESS_MODES = new Set(["all", "restricted"] as const);
 
@@ -259,7 +259,7 @@ const randomLetters = (len: number) =>
     String.fromCharCode(65 + secureRandomInt(26))
   ).join("");
 
-const generateStudentId = () => `${randomDigits(4)}${randomLetters(2)}`;
+const generateBorrowerId = () => `${randomDigits(4)}${randomLetters(2)}`;
 
 const normalizeNameToken = (token: string) => token.slice(0, 6);
 
@@ -272,25 +272,25 @@ const generateUsername = () => {
   return `${normalizeNameToken(prefix)}${normalizeNameToken(suffix)}${randomDigits(3)}`;
 };
 
-const buildUniqueStudentIdentity = async (
+const buildUniqueBorrowerIdentity = async (
   adminClient: SupabaseAdminClient,
   workspaceId: string
 ) => {
   for (let attempt = 0; attempt < 12; attempt += 1) {
-    const candidateStudentId = generateStudentId();
+    const candidateBorrowerId = generateBorrowerId();
     const candidateUsername = generateUsername();
-    const { data: conflictStudentId } = await adminClient
-      .from("students")
+    const { data: conflictBorrowerId } = await adminClient
+      .from("borrowers")
       .select("id")
       .eq("workspace_id", workspaceId)
-      .eq("student_id", candidateStudentId)
+      .eq("borrower_id", candidateBorrowerId)
       .limit(1)
       .maybeSingle();
-    if ((conflictStudentId as { id?: string } | null)?.id) {
+    if ((conflictBorrowerId as { id?: string } | null)?.id) {
       continue;
     }
     const { data: conflictUsername } = await adminClient
-      .from("students")
+      .from("borrowers")
       .select("id")
       .eq("workspace_id", workspaceId)
       .eq("username", candidateUsername)
@@ -299,7 +299,7 @@ const buildUniqueStudentIdentity = async (
     if ((conflictUsername as { id?: string } | null)?.id) {
       continue;
     }
-    return { studentId: candidateStudentId, username: candidateUsername };
+    return { borrowerId: candidateBorrowerId, username: candidateUsername };
   }
   throw new Error("Unable to generate a unique borrower identity.");
 };
@@ -315,17 +315,17 @@ const isUniqueIdentityConflict = (error: unknown) => {
   );
 };
 
-const createStudentRecord = async (
+const createBorrowerRecord = async (
   adminClient: SupabaseAdminClient,
   workspaceId: string,
   username: string,
-  studentId: string
+  borrowerId: string
 ) => {
   const { data, error } = await (adminClient as any)
-    .rpc("create_student_identity", {
+    .rpc("create_borrower_identity", {
       p_workspace_id: workspaceId,
       p_username: username,
-      p_student_id: studentId,
+      p_borrower_id: borrowerId,
     })
     .single();
 
@@ -333,20 +333,20 @@ const createStudentRecord = async (
     return { data: null, error };
   }
 
-  return { data: data as StudentRecord, error: null };
+  return { data: data as BorrowerRecord, error: null };
 };
 
-const createGeneratedStudentRecord = async (
+const createGeneratedBorrowerRecord = async (
   adminClient: SupabaseAdminClient,
   workspaceId: string
 ) => {
   for (let attempt = 0; attempt < 12; attempt += 1) {
-    const generatedIdentity = await buildUniqueStudentIdentity(adminClient, workspaceId);
-    const result = await createStudentRecord(
+    const generatedIdentity = await buildUniqueBorrowerIdentity(adminClient, workspaceId);
+    const result = await createBorrowerRecord(
       adminClient,
       workspaceId,
       generatedIdentity.username,
-      generatedIdentity.studentId
+      generatedIdentity.borrowerId
     );
     if (result.data) {
       return result;
@@ -417,7 +417,7 @@ serve(async (req) => {
 
   const ingressError = await requireTrustedEdgeIngress(
     req,
-    "admin-student-mutate",
+    "admin-borrower-mutate",
     jsonResponse
   );
   if (ingressError) {
@@ -596,15 +596,15 @@ serve(async (req) => {
 
     if (action === "list_deleted") {
       const { data, error } = await adminClient
-        .from("students")
-        .select("id, workspace_id, username, student_id")
+        .from("borrowers")
+        .select("id, workspace_id, username, borrower_id")
         .eq("workspace_id", profile.workspace_id)
         .not("deleted_at", "is", null)
         .order("deleted_at", { ascending: false })
         .limit(300);
 
       if (error) {
-        return jsonResponse(400, { error: "Unable to load archived students." });
+        return jsonResponse(400, { error: "Unable to load archived borrowers." });
       }
 
       return jsonResponse(200, { data: data ?? [] });
@@ -612,29 +612,29 @@ serve(async (req) => {
 
     if (action === "create") {
       const { accessMode, profileIds } = await resolveAccess();
-      const providedStudentId = optionalText(payloadRecord.student_id, {
+      const providedBorrowerId = optionalText(payloadRecord.borrower_id, {
         maxLen: 6,
         transform: "uppercase",
       });
       const providedUsername = optionalText(payloadRecord.username, { maxLen: 40 });
-      const hasValidProvidedId = STUDENT_ID_PATTERN.test(providedStudentId);
+      const hasValidProvidedId = BORROWER_ID_PATTERN.test(providedBorrowerId);
       const hasValidProvidedUsername =
         providedUsername.length >= 4 && USERNAME_PATTERN.test(providedUsername);
-      let studentId = hasValidProvidedId ? providedStudentId : "";
+      let borrowerId = hasValidProvidedId ? providedBorrowerId : "";
       let username = hasValidProvidedUsername ? providedUsername : "";
 
-      if (studentId && username) {
+      if (borrowerId && username) {
         const [idConflictResult, usernameConflictResult] = await Promise.all([
           adminClient
-            .from("students")
+            .from("borrowers")
             .select("id")
             .eq("workspace_id", profile.workspace_id)
-            .eq("student_id", studentId)
+            .eq("borrower_id", borrowerId)
             .is("deleted_at", null)
             .limit(1)
             .maybeSingle(),
           adminClient
-            .from("students")
+            .from("borrowers")
             .select("id")
             .eq("workspace_id", profile.workspace_id)
             .eq("username", username)
@@ -648,21 +648,21 @@ serve(async (req) => {
       }
 
       const { data, error } =
-        studentId && username
-          ? await createStudentRecord(adminClient, profile.workspace_id, username, studentId)
-          : await createGeneratedStudentRecord(adminClient, profile.workspace_id);
+        borrowerId && username
+          ? await createBorrowerRecord(adminClient, profile.workspace_id, username, borrowerId)
+          : await createGeneratedBorrowerRecord(adminClient, profile.workspace_id);
 
       if (error || !data) {
         if (isUniqueIdentityConflict(error)) {
           return jsonResponse(409, { error: "Borrower ID or username already exists." });
         }
-        return jsonResponse(400, { error: "Unable to create student." });
+        return jsonResponse(400, { error: "Unable to create borrower." });
       }
 
-      const { error: modeError } = await adminClient.from("students").update({ access_mode: accessMode }).eq("id", data.id).eq("workspace_id", profile.workspace_id);
+      const { error: modeError } = await adminClient.from("borrowers").update({ access_mode: accessMode }).eq("id", data.id).eq("workspace_id", profile.workspace_id);
       if (modeError) throw new Error("Unable to set borrower access.");
       if (accessMode === "restricted") {
-        const { error: grantError } = await adminClient.from("borrower_access_grants").insert(profileIds.map((profileId) => ({ student_id: data.id, profile_id: profileId, granted_by: user.id })));
+        const { error: grantError } = await adminClient.from("borrower_access_grants").insert(profileIds.map((profileId) => ({ borrower_id: data.id, profile_id: profileId, granted_by: user.id })));
         if (grantError) throw new Error("Unable to set borrower access.");
       }
 
@@ -683,7 +683,7 @@ serve(async (req) => {
         id: string;
         workspace_id: string;
         username: string;
-        student_id: string;
+        borrower_id: string;
       }> = [];
       const skipped: Array<{ row: number; reason: string }> = [];
       const seenIds = new Set<string>();
@@ -695,17 +695,17 @@ serve(async (req) => {
             ? (row as Record<string, unknown>)
             : {};
         const username = optionalText(rowRecord.username, { maxLen: 40 });
-        const studentId = optionalText(rowRecord.student_id, {
+        const borrowerId = optionalText(rowRecord.borrower_id, {
           maxLen: 6,
           transform: "uppercase",
         });
 
-        return { row: index + 1, username, studentId };
+        return { row: index + 1, username, borrowerId };
       });
 
       const requestedIds = normalizedRows
-        .map((row) => row.studentId)
-        .filter((value) => STUDENT_ID_PATTERN.test(value));
+        .map((row) => row.borrowerId)
+        .filter((value) => BORROWER_ID_PATTERN.test(value));
       const requestedUsernames = normalizedRows
         .map((row) => row.username)
         .filter((value) => value.length >= 4 && USERNAME_PATTERN.test(value));
@@ -713,15 +713,15 @@ serve(async (req) => {
       const [existingByIdResult, existingByUsernameResult] = await Promise.all([
         requestedIds.length
           ? adminClient
-              .from("students")
-              .select("student_id")
+              .from("borrowers")
+              .select("borrower_id")
               .eq("workspace_id", profile.workspace_id)
               .is("deleted_at", null)
-              .in("student_id", requestedIds)
+              .in("borrower_id", requestedIds)
           : Promise.resolve({ data: [], error: null }),
         requestedUsernames.length
           ? adminClient
-              .from("students")
+              .from("borrowers")
               .select("username")
               .eq("workspace_id", profile.workspace_id)
               .is("deleted_at", null)
@@ -730,12 +730,12 @@ serve(async (req) => {
       ]);
 
       if (existingByIdResult.error || existingByUsernameResult.error) {
-        return jsonResponse(400, { error: "Unable to validate student rows." });
+        return jsonResponse(400, { error: "Unable to validate borrower rows." });
       }
 
       const existingIds = new Set(
-        ((existingByIdResult.data ?? []) as Array<{ student_id: string }>).map((row) =>
-          row.student_id.toUpperCase()
+        ((existingByIdResult.data ?? []) as Array<{ borrower_id: string }>).map((row) =>
+          row.borrower_id.toUpperCase()
         )
       );
       const existingUsernames = new Set(
@@ -745,15 +745,15 @@ serve(async (req) => {
       );
 
       for (const row of normalizedRows) {
-        const hasValidId = STUDENT_ID_PATTERN.test(row.studentId);
+        const hasValidId = BORROWER_ID_PATTERN.test(row.borrowerId);
         const hasValidUsername =
           row.username.length >= 4 && USERNAME_PATTERN.test(row.username);
-        let studentId = hasValidId ? row.studentId : "";
+        let borrowerId = hasValidId ? row.borrowerId : "";
         let username = hasValidUsername ? row.username : "";
 
         if (
-          studentId &&
-          (existingIds.has(studentId) || seenIds.has(studentId))
+          borrowerId &&
+          (existingIds.has(borrowerId) || seenIds.has(borrowerId))
         ) {
           skipped.push({ row: row.row, reason: "Borrower ID already exists." });
           continue;
@@ -768,8 +768,8 @@ serve(async (req) => {
           continue;
         }
 
-        if (!studentId || !username) {
-          const generated = await createGeneratedStudentRecord(
+        if (!borrowerId || !username) {
+          const generated = await createGeneratedBorrowerRecord(
             adminClient,
             profile.workspace_id
           );
@@ -778,16 +778,16 @@ serve(async (req) => {
             continue;
           }
           inserted.push(generated.data);
-          seenIds.add(generated.data.student_id);
+          seenIds.add(generated.data.borrower_id);
           seenUsernames.add(generated.data.username.toLowerCase());
           continue;
         }
 
-        const { data, error } = await createStudentRecord(
+        const { data, error } = await createBorrowerRecord(
           adminClient,
           profile.workspace_id,
           username,
-          studentId
+          borrowerId
         );
 
         if (error || !data) {
@@ -801,7 +801,7 @@ serve(async (req) => {
         }
 
         inserted.push(data);
-        seenIds.add(studentId);
+        seenIds.add(borrowerId);
         seenUsernames.add(username.toLowerCase());
       }
 
@@ -819,37 +819,37 @@ serve(async (req) => {
       const { id } = payloadRecord;
       const normalizedId = requireUuid(id);
 
-      const { data: activeStudent } = await adminClient
-        .from("students")
+      const { data: activeBorrower } = await adminClient
+        .from("borrowers")
         .select("id")
         .eq("id", normalizedId)
         .eq("workspace_id", profile.workspace_id)
         .is("deleted_at", null)
         .maybeSingle();
 
-      if (!activeStudent?.id) {
-        return jsonResponse(404, { error: "Student not found." });
+      if (!activeBorrower?.id) {
+        return jsonResponse(404, { error: "Borrower not found." });
       }
 
       const { count, error: checkedOutError } = await adminClient
-        .from("gear")
+        .from("items")
         .select("id", { count: "exact", head: true })
         .eq("workspace_id", profile.workspace_id)
         .eq("checked_out_by", normalizedId)
         .is("deleted_at", null);
 
       if (checkedOutError) {
-        return jsonResponse(400, { error: "Unable to archive student." });
+        return jsonResponse(400, { error: "Unable to archive borrower." });
       }
 
       if ((count ?? 0) > 0) {
         return jsonResponse(400, {
-          error: "Return all checked-out items before archiving this student.",
+          error: "Return all checked-out items before archiving this borrower.",
         });
       }
 
       const { error } = await adminClient
-        .from("students")
+        .from("borrowers")
         .update({
           deleted_at: new Date().toISOString(),
           deleted_by: user.id,
@@ -859,7 +859,7 @@ serve(async (req) => {
         .is("deleted_at", null);
 
       if (error) {
-        return jsonResponse(400, { error: "Unable to archive student." });
+        return jsonResponse(400, { error: "Unable to archive borrower." });
       }
 
       return jsonResponse(200, { success: true });
@@ -869,33 +869,33 @@ serve(async (req) => {
       const { id } = payloadRecord;
       const normalizedId = requireUuid(id);
 
-      const { data: archivedStudent, error: archivedStudentError } = await adminClient
-        .from("students")
-        .select("id, username, student_id")
+      const { data: archivedBorrower, error: archivedBorrowerError } = await adminClient
+        .from("borrowers")
+        .select("id, username, borrower_id")
         .eq("id", normalizedId)
         .eq("workspace_id", profile.workspace_id)
         .not("deleted_at", "is", null)
         .maybeSingle();
 
-      if (archivedStudentError || !archivedStudent?.id) {
-        return jsonResponse(404, { error: "Student not found." });
+      if (archivedBorrowerError || !archivedBorrower?.id) {
+        return jsonResponse(404, { error: "Borrower not found." });
       }
 
       const [idConflictResult, usernameConflictResult] = await Promise.all([
         adminClient
-          .from("students")
+          .from("borrowers")
           .select("id")
           .eq("workspace_id", profile.workspace_id)
-          .eq("student_id", archivedStudent.student_id)
+          .eq("borrower_id", archivedBorrower.borrower_id)
           .neq("id", normalizedId)
           .is("deleted_at", null)
           .limit(1)
           .maybeSingle(),
         adminClient
-          .from("students")
+          .from("borrowers")
           .select("id")
           .eq("workspace_id", profile.workspace_id)
-          .eq("username", archivedStudent.username)
+          .eq("username", archivedBorrower.username)
           .neq("id", normalizedId)
           .is("deleted_at", null)
           .limit(1)
@@ -907,16 +907,16 @@ serve(async (req) => {
       }
 
       const { data, error } = await adminClient
-        .from("students")
+        .from("borrowers")
         .update({ deleted_at: null, deleted_by: null })
         .eq("id", normalizedId)
         .eq("workspace_id", profile.workspace_id)
         .not("deleted_at", "is", null)
-        .select("id, workspace_id, username, student_id")
+        .select("id, workspace_id, username, borrower_id")
         .single();
 
       if (error || !data) {
-        return jsonResponse(400, { error: "Unable to restore student." });
+        return jsonResponse(400, { error: "Unable to restore borrower." });
       }
 
       return jsonResponse(200, { data });
@@ -927,7 +927,7 @@ serve(async (req) => {
     if (error instanceof ValidationError) {
       return jsonResponse(error.status, { error: error.message });
     }
-    console.error("admin-student-mutate function error", {
+    console.error("admin-borrower-mutate function error", {
       message: error instanceof Error ? error.message : "Unknown error",
       stack: error instanceof Error ? error.stack : undefined,
     });

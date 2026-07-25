@@ -1,8 +1,8 @@
 import { authenticatedCount } from "./authenticatedDataClient";
 
 export type UsageStats = {
-  totalGear: number;
-  totalStudents: number;
+  totalItem: number;
+  totalBorrowers: number;
   currentlyCheckedOut: number;
   checkouts7d: number;
   returns7d: number;
@@ -18,26 +18,26 @@ export const fetchUsageStats = async (): Promise<UsageStats> => {
   const since30 = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString();
 
   const [
-    totalGear,
-    totalStudents,
+    totalItem,
+    totalBorrowers,
     currentlyCheckedOut,
     checkouts7d,
     returns7d,
     checkouts30d,
     returns30d,
   ] = await Promise.all([
-    countTable("gear"),
-    countTable("students"),
-    countTable("gear", { checked_out_by: "not.is.null" }),
-    countTable("gear_logs", { action_type: "eq.checkout", action_time: `gte.${since7}` }),
-    countTable("gear_logs", { action_type: "eq.return", action_time: `gte.${since7}` }),
-    countTable("gear_logs", { action_type: "eq.checkout", action_time: `gte.${since30}` }),
-    countTable("gear_logs", { action_type: "eq.return", action_time: `gte.${since30}` }),
+    countTable("items"),
+    countTable("borrowers"),
+    countTable("items", { checked_out_by: "not.is.null" }),
+    countTable("item_logs", { action_type: "eq.checkout", action_time: `gte.${since7}` }),
+    countTable("item_logs", { action_type: "eq.return", action_time: `gte.${since7}` }),
+    countTable("item_logs", { action_type: "eq.checkout", action_time: `gte.${since30}` }),
+    countTable("item_logs", { action_type: "eq.return", action_time: `gte.${since30}` }),
   ]);
 
   return {
-    totalGear,
-    totalStudents,
+    totalItem,
+    totalBorrowers,
     currentlyCheckedOut,
     checkouts7d,
     returns7d,

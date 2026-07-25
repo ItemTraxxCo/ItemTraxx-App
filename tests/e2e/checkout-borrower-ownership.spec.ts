@@ -16,21 +16,21 @@ test.describe("Checkout borrower ownership regression", () => {
     await mockAdminOps(page);
 
     let checkedOutBy: string | null = null;
-    const borrowerByStudentId: Record<string, { id: string; username: string; student_id: string }> = {
-      BRWRA: { id: "student-a", username: "Borrower A", student_id: "BRWRA" },
-      BRWRB: { id: "student-b", username: "Borrower B", student_id: "BRWRB" },
+    const borrowerByBorrowerId: Record<string, { id: string; username: string; borrower_id: string }> = {
+      BRWRA: { id: "borrower-a", username: "Borrower A", borrower_id: "BRWRA" },
+      BRWRB: { id: "borrower-b", username: "Borrower B", borrower_id: "BRWRB" },
     };
 
-    let directStudentLookupAttempted = false;
-    await page.route("**/rest/v1/students?**", async (route) => {
-      directStudentLookupAttempted = true;
+    let directBorrowerLookupAttempted = false;
+    await page.route("**/rest/v1/borrowers?**", async (route) => {
+      directBorrowerLookupAttempted = true;
       await route.fulfill({ status: 403, contentType: "application/json", body: "[]" });
     });
 
     await page.route(/\/functions(?:\/v1)?\/checkout-borrower-lookup(?:\?.*)?$/, async (route) => {
-      const body = route.request().postDataJSON() as { student_id: string };
-      const studentId = body.student_id;
-      const row = borrowerByStudentId[studentId];
+      const body = route.request().postDataJSON() as { borrower_id: string };
+      const borrowerId = body.borrower_id;
+      const row = borrowerByBorrowerId[borrowerId];
       await route.fulfill({
         status: row ? 200 : 404,
         contentType: "application/json",
@@ -38,14 +38,14 @@ test.describe("Checkout borrower ownership regression", () => {
       });
     });
 
-    await page.route("**/rest/v1/gear?**", async (route) => {
+    await page.route("**/rest/v1/items?**", async (route) => {
       const url = new URL(route.request().url());
       const barcodeFilter = url.searchParams.get("barcode");
       const checkedOutByFilter = url.searchParams.get("checked_out_by");
-      const checkedOutByStudent = checkedOutByFilter?.replace("eq.", "") ?? "";
+      const checkedOutByBorrower = checkedOutByFilter?.replace("eq.", "") ?? "";
 
-      const gearRow = {
-        id: "gear-1",
+      const itemRow = {
+        id: "item-1",
         name: "Camera A",
         barcode: "ITEM-1",
         status: checkedOutBy ? "checked_out" : "available",
@@ -56,13 +56,13 @@ test.describe("Checkout borrower ownership regression", () => {
         await route.fulfill({
           status: 200,
           contentType: "application/json",
-          body: JSON.stringify(barcode === "ITEM-1" ? [gearRow] : []),
+          body: JSON.stringify(barcode === "ITEM-1" ? [itemRow] : []),
         });
         return;
       }
 
       if (checkedOutByFilter) {
-        const rows = checkedOutBy === checkedOutByStudent ? [gearRow] : [];
+        const rows = checkedOutBy === checkedOutByBorrower ? [itemRow] : [];
         await route.fulfill({
           status: 200,
           contentType: "application/json",
@@ -80,11 +80,11 @@ test.describe("Checkout borrower ownership regression", () => {
 
     await page.route(/\/functions(?:\/v1)?\/checkoutReturn(?:\?.*)?$/, async (route) => {
       const body = route.request().postDataJSON() as {
-        student_id: string;
-        gear_barcodes: string[];
+        borrower_id: string;
+        item_barcodes: string[];
       };
-      const borrowerId = body.student_id;
-      const barcode = body.gear_barcodes[0];
+      const borrowerId = body.borrower_id;
+      const barcode = body.item_barcodes[0];
 
       if (barcode !== "ITEM-1") {
         await route.fulfill({
@@ -96,7 +96,7 @@ test.describe("Checkout borrower ownership regression", () => {
       }
 
       if (!checkedOutBy) {
-        checkedOutBy = borrowerByStudentId[borrowerId]?.id ?? null;
+        checkedOutBy = borrowerByBorrowerId[borrowerId]?.id ?? null;
         await route.fulfill({
           status: 200,
           contentType: "application/json",
@@ -105,7 +105,7 @@ test.describe("Checkout borrower ownership regression", () => {
         return;
       }
 
-      if (checkedOutBy === borrowerByStudentId[borrowerId]?.id) {
+      if (checkedOutBy === borrowerByBorrowerId[borrowerId]?.id) {
         checkedOutBy = null;
         await route.fulfill({
           status: 200,
@@ -147,7 +147,7 @@ test.describe("Checkout borrower ownership regression", () => {
     const loadBorrower = async (id: "BRWRA" | "BRWRB") => {
       await borrowerInput.fill(id);
       await loadBorrowerButton.click();
-      await expect(page.locator(".checkout-student-summary")).toBeVisible();
+      await expect(page.locator(".checkout-borrower-summary")).toBeVisible();
       await expect(page.getByText(`ID: ${id}`)).toBeVisible();
       await expect(barcodeInput).toBeVisible();
     };
@@ -174,6 +174,6 @@ test.describe("Checkout borrower ownership regression", () => {
     await expect(page.locator(".tag-return", { hasText: "Return" })).toBeVisible();
     await completeTransactionButton.click();
     await expect(page.getByText("Transaction complete (Success).")).toBeVisible();
-    expect(directStudentLookupAttempted).toBe(false);
+    expect(directBorrowerLookupAttempted).toBe(false);
   });
 });

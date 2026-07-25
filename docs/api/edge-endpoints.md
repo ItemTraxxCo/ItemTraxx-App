@@ -35,7 +35,7 @@ Workspace admin operational actions used by the admin panel.
 - `login_method`: string
 - `login_location`: string
 
-#### `bulk_import_gear`
+#### `bulk_import_items`
 
 - `device_id` (required): string
 - `device_label` (required): string
@@ -105,7 +105,7 @@ Workspace admin operational actions used by the admin panel.
 ### Response schema
 
 - Schema: `adminOpsResponses`
-- Top-level keys: `get_notifications`, `get_status_tracking`, `get_workspace_dashboard`, `bulk_import_gear`, `get_workspace_settings`, `update_workspace_settings`, `touch_session`, `validate_session`, `list_sessions`, `revoke_current_session`, `revoke_session`, `revoke_all_sessions`
+- Top-level keys: `get_notifications`, `get_status_tracking`, `get_workspace_dashboard`, `bulk_import_items`, `get_workspace_settings`, `update_workspace_settings`, `touch_session`, `validate_session`, `list_sessions`, `revoke_current_session`, `revoke_session`, `revoke_all_sessions`
 
 ## `POST /functions/v1/super-workspace-mutate`
 
@@ -283,8 +283,8 @@ Super-admin operational controls, approvals, customer ops, and reporting.
 
 - `workspace_id` (required): string
 - `max_admins`: any
-- `max_students`: any
-- `max_gear`: any
+- `max_borrowers`: any
+- `max_items`: any
 - `checkout_due_hours`: any
 - `barcode_pattern`: any
 - `feature_flags`: object

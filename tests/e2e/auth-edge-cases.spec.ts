@@ -1195,7 +1195,7 @@ test.describe("Auth edge cases", () => {
               feature_flags: {
                 enable_notifications: true,
                 enable_bulk_item_import: true,
-                enable_bulk_student_tools: true,
+                enable_bulk_borrower_tools: true,
                 enable_status_tracking: true,
                 enable_barcode_generator: true,
               },

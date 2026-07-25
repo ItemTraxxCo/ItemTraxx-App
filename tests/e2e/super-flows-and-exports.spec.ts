@@ -2,9 +2,9 @@ import { expect, test, type Page } from "@playwright/test";
 import {
   mockSuperAdminMutate,
   mockSuperDashboard,
-  mockSuperGearMutate,
+  mockSuperItemMutate,
   mockSuperLogsQuery,
-  mockSuperStudentMutate,
+  mockSuperBorrowerMutate,
   mockSuperWorkspaceMutate,
   mockSystemStatus,
   mockUnauthenticatedSession,
@@ -58,8 +58,8 @@ test.describe("Super admin flows and export actions", () => {
     await mockSuperDashboard(page);
     await mockSuperWorkspaceMutate(page);
     await mockSuperAdminMutate(page);
-    await mockSuperGearMutate(page);
-    await mockSuperStudentMutate(page);
+    await mockSuperItemMutate(page);
+    await mockSuperBorrowerMutate(page);
     await mockSuperLogsQuery(page);
   });
 
@@ -78,7 +78,7 @@ test.describe("Super admin flows and export actions", () => {
     await expect(page.getByRole("heading", { name: "Workspace Admins" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Create Workspace Admin" })).toBeVisible();
 
-    await navigateApp(page, "/super-admin/gear");
+    await navigateApp(page, "/super-admin/items");
     await expect(page.getByRole("button", { name: "Export CSV" })).toBeVisible();
     await expect(page.getByRole("button", { name: "Export PDF" })).toBeVisible();
 
@@ -130,7 +130,7 @@ test.describe("Super admin flows and export actions", () => {
         feature_flags: {
           enable_notifications: true,
           enable_bulk_item_import: false,
-          enable_bulk_student_tools: true,
+          enable_bulk_borrower_tools: true,
           enable_status_tracking: false,
           enable_barcode_generator: true,
         },
@@ -166,7 +166,7 @@ test.describe("Super admin flows and export actions", () => {
           feature_flags: {
             enable_notifications: true,
             enable_bulk_item_import: false,
-            enable_bulk_student_tools: true,
+            enable_bulk_borrower_tools: true,
             enable_status_tracking: false,
             enable_barcode_generator: true,
           },

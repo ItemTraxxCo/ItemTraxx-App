@@ -86,7 +86,7 @@
 import { computed, onMounted, ref } from "vue";
 import { RouterLink } from "vue-router";
 import CameraBarcodeScannerModal from "../../../components/CameraBarcodeScannerModal.vue";
-import { fetchGearByBarcode, submitCheckoutReturn, type GearSummary } from "../../../services/checkoutService";
+import { fetchItemByBarcode, submitCheckoutReturn, type ItemSummary } from "../../../services/checkoutService";
 import { logAdminAction } from "../../../services/auditLogService";
 import { sanitizeInput } from "../../../utils/inputSanitizer";
 import { toUserFacingErrorMessage } from "../../../services/appErrors";
@@ -94,7 +94,7 @@ import type { ScannerHistoryItem, ScannerScanEvent } from "../../../types/camera
 import { capturePostHogEvent } from "../../../services/posthogService";
 
 const barcodeInput = ref("");
-const barcodes = ref<GearSummary[]>([]);
+const barcodes = ref<ItemSummary[]>([]);
 const barcodeField = ref<HTMLInputElement | null>(null);
 
 const isBarcodeLoading = ref(false);
@@ -128,8 +128,8 @@ const addBarcode = async () => {
   error.value = "";
   isBarcodeLoading.value = true;
   try {
-    const gear = await fetchGearByBarcode(value);
-    barcodes.value = [...barcodes.value, gear];
+    const item = await fetchItemByBarcode(value);
+    barcodes.value = [...barcodes.value, item];
     barcodeInput.value = "";
   } catch (err) {
     error.value = toUserFacingErrorMessage(err, "Invalid barcode. Please check it and try again.");
@@ -161,8 +161,8 @@ const submitReturn = async () => {
   isSubmitting.value = true;
   try {
     const submitResult = await submitCheckoutReturn({
-      student_id: "",
-      gear_barcodes: barcodes.value.map((item) => item.barcode),
+      borrower_id: "",
+      item_barcodes: barcodes.value.map((item) => item.barcode),
       action_type: "admin_return",
     });
     if (submitResult.buffered) {

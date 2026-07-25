@@ -25,16 +25,16 @@
         <div class="input-row checkout-input-row">
           <input
             ref="borrowerField"
-            v-model="studentId"
+            v-model="borrowerId"
             type="text"
             placeholder="Enter borrower ID"
-            @keyup.enter="loadStudent"
+            @keyup.enter="loadBorrower"
           />
           <button
             type="button"
             class="button-primary checkout-inline-button"
-            :disabled="isStudentLoading"
-            @click="loadStudent"
+            :disabled="isBorrowerLoading"
+            @click="loadBorrower"
           >
             Load borrower
           </button>
@@ -47,17 +47,17 @@
           Use device camera to scan barcode
         </button>
       </label>
-      <SkeletonLoader v-if="isStudentLoading" class="checkout-student-skeleton" variant="card" :rows="1" label="Loading borrower" />
+      <SkeletonLoader v-if="isBorrowerLoading" class="checkout-borrower-skeleton" variant="card" :rows="1" label="Loading borrower" />
 
-      <div v-if="student" class="checkout-student-summary">
+      <div v-if="borrower" class="checkout-borrower-summary">
         <p>
-          <strong>{{ student.username }}</strong>
-          <span class="muted"> ID: {{ student.student_id }}</span>
+          <strong>{{ borrower.username }}</strong>
+          <span class="muted"> ID: {{ borrower.borrower_id }}</span>
         </p>
-        <div v-if="checkedOutGear.length">
+        <div v-if="checkedOutItem.length">
           <p class="checkout-subheading">Currently checked out</p>
           <ul class="checkout-inline-list">
-            <li v-for="item in checkedOutGear" :key="item.id">
+            <li v-for="item in checkedOutItem" :key="item.id">
               {{ item.name }}
             </li>
           </ul>
@@ -65,7 +65,7 @@
         <p v-else class="muted">No items currently checked out.</p>
       </div>
 
-      <div v-if="student">
+      <div v-if="borrower">
         <label>
           Item barcode
           <div class="input-row checkout-input-row">
@@ -161,14 +161,14 @@ import CameraBarcodeScannerModal from "../../components/CameraBarcodeScannerModa
 import SkeletonLoader from "../../components/SkeletonLoader.vue";
 import {
   consumeCheckoutOfflineWarning,
-  fetchCheckedOutGear,
-  fetchGearByBarcode,
+  fetchCheckedOutItem,
+  fetchItemByBarcode,
   getBufferedCheckoutCount,
-  fetchStudentByStudentId,
+  fetchBorrowerByBorrowerId,
   submitCheckoutReturn,
   syncBufferedCheckoutQueue,
-  type GearSummary,
-  type StudentSummary,
+  type ItemSummary,
+  type BorrowerSummary,
 } from "../../services/checkoutService";
 import { sanitizeInput } from "../../utils/inputSanitizer";
 import { getAuthState } from "../../store/authState";
@@ -176,17 +176,17 @@ import { toUserFacingErrorMessage } from "../../services/appErrors";
 import { capturePostHogEvent, capturePostHogException } from "../../services/posthogService";
 import type { ScannerHistoryItem, ScannerScanEvent } from "../../types/cameraScanner";
 
-const isStudentLoading = ref(false);
+const isBorrowerLoading = ref(false);
 const isBarcodeLoading = ref(false);
 const isSubmitting = ref(false);
 const error = ref("");
 const success = ref("");
-const studentId = ref("");
+const borrowerId = ref("");
 const barcodeInput = ref("");
 const quickReturnBarcode = ref("");
-const barcodes = ref<GearSummary[]>([]);
-const student = ref<StudentSummary | null>(null);
-const checkedOutGear = ref<GearSummary[]>([]);
+const barcodes = ref<ItemSummary[]>([]);
+const borrower = ref<BorrowerSummary | null>(null);
+const checkedOutItem = ref<ItemSummary[]>([]);
 const lastSummary = ref("");
 const toastMessage = ref("");
 const toastStatus = ref<"Success" | "Failed" | "Processing">("Success");
@@ -207,7 +207,7 @@ const syncInFlight = ref(false);
 let themeObserver: MutationObserver | null = null;
 const itemScannerHistory = computed<ScannerHistoryItem[]>(() =>
   barcodes.value.map((item) => {
-    const isReturn = checkedOutGear.value.some((checkedOutItem) => checkedOutItem.barcode === item.barcode);
+    const isReturn = checkedOutItem.value.some((checkedOutItem) => checkedOutItem.barcode === item.barcode);
     return {
       id: item.barcode,
       label: item.name,
@@ -221,8 +221,8 @@ const itemScannerHistory = computed<ScannerHistoryItem[]>(() =>
 
 const receipt = ref<{
   timestamp: string;
-  studentUsername: string;
-  studentId: string;
+  borrowerUsername: string;
+  borrowerId: string;
   workspaceId: string | null;
   operatorEmail: string;
   checkouts: number;
@@ -232,7 +232,7 @@ const receipt = ref<{
 
 const quickReturn = async () => {
   error.value=""; success.value=""; isSubmitting.value=true;
-  try { await submitCheckoutReturn({ student_id:"", gear_barcodes:[quickReturnBarcode.value.trim()], action_type:"quick_return" }); success.value="Item returned with quick-return audit semantics."; quickReturnBarcode.value=""; }
+  try { await submitCheckoutReturn({ borrower_id:"", item_barcodes:[quickReturnBarcode.value.trim()], action_type:"quick_return" }); success.value="Item returned with quick-return audit semantics."; quickReturnBarcode.value=""; }
   catch(err){error.value=toUserFacingErrorMessage(err,"Unable to return item.");}
   finally{isSubmitting.value=false;}
 };
@@ -281,39 +281,39 @@ const downloadReceiptPdf = async () => {
 };
 
 
-const loadStudent = async () => {
+const loadBorrower = async () => {
   error.value = "";
   success.value = "";
-  const studentSanitized = sanitizeInput(studentId.value, { maxLen: 32 });
-  studentId.value = studentSanitized.value;
-  if (studentSanitized.error) {
-    error.value = studentSanitized.error;
+  const borrowerSanitized = sanitizeInput(borrowerId.value, { maxLen: 32 });
+  borrowerId.value = borrowerSanitized.value;
+  if (borrowerSanitized.error) {
+    error.value = borrowerSanitized.error;
     return;
   }
-  if (!studentId.value.trim()) {
+  if (!borrowerId.value.trim()) {
     error.value = "Enter a borrower ID.";
     return;
   }
-  isStudentLoading.value = true;
+  isBorrowerLoading.value = true;
   try {
-    const studentRow = await fetchStudentByStudentId(studentId.value.trim());
-    student.value = studentRow;
-    checkedOutGear.value = await fetchCheckedOutGear(studentRow.id);
+    const borrowerRow = await fetchBorrowerByBorrowerId(borrowerId.value.trim());
+    borrower.value = borrowerRow;
+    checkedOutItem.value = await fetchCheckedOutItem(borrowerRow.id);
     await nextTick();
     barcodeField.value?.focus();
   } catch (err) {
-    student.value = null;
-    checkedOutGear.value = [];
+    borrower.value = null;
+    checkedOutItem.value = [];
     error.value = toUserFacingErrorMessage(err, "Borrower not found. Please check the borrower ID and try again.");
   } finally {
-    isStudentLoading.value = false;
+    isBorrowerLoading.value = false;
   }
 };
 
 const handleBorrowerScan = async (event: ScannerScanEvent) => {
-  studentId.value = event.value;
+  borrowerId.value = event.value;
   await nextTick();
-  await loadStudent();
+  await loadBorrower();
 };
 
 const showBarcodeError = (message: string) => {
@@ -339,18 +339,18 @@ const addBarcode = async () => {
   error.value = "";
   isBarcodeLoading.value = true;
   try {
-    const gear = await fetchGearByBarcode(value);
-    const normalizedStatus = String(gear.status ?? "").toLowerCase();
-    const isCurrentBorrowerReturn = checkedOutGear.value.some(
-      (item) => item.barcode === gear.barcode
+    const item = await fetchItemByBarcode(value);
+    const normalizedStatus = String(item.status ?? "").toLowerCase();
+    const isCurrentBorrowerReturn = checkedOutItem.value.some(
+      (item) => item.barcode === item.barcode
     );
     if (normalizedStatus === "available") {
-      barcodes.value = [...barcodes.value, gear];
+      barcodes.value = [...barcodes.value, item];
       barcodeInput.value = "";
       return;
     }
     if (normalizedStatus === "checked_out" && isCurrentBorrowerReturn) {
-      barcodes.value = [...barcodes.value, gear];
+      barcodes.value = [...barcodes.value, item];
       barcodeInput.value = "";
       return;
     }
@@ -378,14 +378,14 @@ const removeBarcode = (code: string) => {
 };
 
 const getActionLabel = (barcode: string) => {
-  const checkedOut = checkedOutGear.value.some(
+  const checkedOut = checkedOutItem.value.some(
     (item) => item.barcode === barcode
   );
   return checkedOut ? "Return" : "Checkout";
 };
 
 const getActionClass = (barcode: string) => {
-  const checkedOut = checkedOutGear.value.some(
+  const checkedOut = checkedOutItem.value.some(
     (item) => item.barcode === barcode
   );
   return checkedOut ? "tag-return" : "tag-checkout";
@@ -408,7 +408,7 @@ const submit = async () => {
     if (barcodeInput.value.trim()) {
       await addBarcode();
     }
-    if (!studentId.value.trim() || barcodes.value.length === 0) {
+    if (!borrowerId.value.trim() || barcodes.value.length === 0) {
       error.value = "Enter a borrower ID and at least one barcode.";
       toastStatus.value = "Failed";
       toastTitle.value = "Transaction failed. Please try again. If issue persists, sign out completely and sign back in. If issue still persists, contact support.";
@@ -416,9 +416,9 @@ const submit = async () => {
       return;
     }
 
-    if (!student.value) {
-      await loadStudent();
-      if (!student.value) {
+    if (!borrower.value) {
+      await loadBorrower();
+      if (!borrower.value) {
         toastStatus.value = "Failed";
         toastTitle.value = "Transaction failed.";
         toastMessage.value = error.value || "Unable to load borrower. Please sign out completely and sign back in. If issue persists, contact support.";
@@ -429,15 +429,15 @@ const submit = async () => {
     if (navigator.onLine) {
       await waitForPendingSync();
       await syncOfflineBuffer(false);
-      if (student.value) {
-        checkedOutGear.value = await fetchCheckedOutGear(student.value.id);
+      if (borrower.value) {
+        checkedOutItem.value = await fetchCheckedOutItem(borrower.value.id);
       }
     }
 
     let checkoutCount = 0;
     let returnCount = 0;
     for (const item of barcodes.value) {
-      const isReturn = checkedOutGear.value.some(
+      const isReturn = checkedOutItem.value.some(
         (checkedOutItem) => checkedOutItem.barcode === item.barcode
       );
       if (isReturn) {
@@ -448,8 +448,8 @@ const submit = async () => {
     }
 
     const submitResult = await submitCheckoutReturn({
-      student_id: studentId.value.trim(),
-      gear_barcodes: barcodes.value.map((item) => item.barcode),
+      borrower_id: borrowerId.value.trim(),
+      item_barcodes: barcodes.value.map((item) => item.barcode),
       action_type: "auto",
     });
     if (submitResult.buffered) {
@@ -459,17 +459,17 @@ const submit = async () => {
       receipt.value = null;
       barcodes.value = [];
       barcodeInput.value = "";
-      studentId.value = "";
-      student.value = null;
-      checkedOutGear.value = [];
+      borrowerId.value = "";
+      borrower.value = null;
+      checkedOutItem.value = [];
       toastStatus.value = "Processing";
       toastTitle.value = "Saved offline.";
       toastMessage.value = `No connection. Transaction was buffered and will auto-sync to ItemTraxx Servers when you're online. Buffered: ${bufferedCount}`;
       return;
     }
-    const studentSnapshot = student.value;
+    const borrowerSnapshot = borrower.value;
     const itemsSnapshot = barcodes.value.map((item) => {
-      const wasReturn = checkedOutGear.value.some(
+      const wasReturn = checkedOutItem.value.some(
         (checkedOutItem) => checkedOutItem.barcode === item.barcode
       );
       return {
@@ -481,8 +481,8 @@ const submit = async () => {
     const auth = getAuthState();
     receipt.value = {
       timestamp: new Date().toISOString(),
-      studentUsername: studentSnapshot?.username ?? "Unknown",
-      studentId: studentSnapshot?.student_id ?? studentId.value.trim(),
+      borrowerUsername: borrowerSnapshot?.username ?? "Unknown",
+      borrowerId: borrowerSnapshot?.borrower_id ?? borrowerId.value.trim(),
       workspaceId: auth.workspaceContextId,
       operatorEmail: auth.email ?? "Unknown",
       checkouts: checkoutCount,
@@ -501,9 +501,9 @@ const submit = async () => {
     toastMessage.value = lastSummary.value;
     barcodes.value = [];
     barcodeInput.value = "";
-    studentId.value = "";
-    student.value = null;
-    checkedOutGear.value = [];
+    borrowerId.value = "";
+    borrower.value = null;
+    checkedOutItem.value = [];
     await nextTick();
     borrowerField.value?.focus();
     window.setTimeout(() => {
@@ -641,7 +641,7 @@ onUnmounted(() => {
   min-height: 1.2rem;
 }
 
-.checkout-student-panel {
+.checkout-borrower-panel {
   margin-top: 1rem;
   border-radius: 16px;
   border: 1px solid color-mix(in srgb, var(--border) 78%, var(--accent) 22%);

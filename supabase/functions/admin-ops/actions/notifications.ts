@@ -10,19 +10,19 @@ export const handleNotificationAction = async (
   const [statusCountResult, recentStatusResult, overdueCountResult] =
     await Promise.all([
       context.adminClient
-        .from("gear")
+        .from("items")
         .select("id", { count: "exact", head: true })
         .eq("workspace_id", context.workspaceId)
         .is("deleted_at", null)
         .not("status", "in", "(available,checked_out)"),
       context.adminClient
-        .from("gear_status_history")
-        .select("id, status, changed_at, gear:gear_id(name, barcode)")
+        .from("item_status_history")
+        .select("id, status, changed_at, item:item_id(name, barcode)")
         .eq("workspace_id", context.workspaceId)
         .order("changed_at", { ascending: false })
         .limit(8),
       context.adminClient
-        .from("gear")
+        .from("items")
         .select("id", { count: "exact", head: true })
         .eq("workspace_id", context.workspaceId)
         .is("deleted_at", null)

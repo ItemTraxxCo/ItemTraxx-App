@@ -15,12 +15,12 @@ export type StatusTrackedItem = {
 
 export type StatusHistoryItem = {
   id: string;
-  gear_id: string;
+  item_id: string;
   status: string;
   note: string | null;
   changed_at: string;
   changed_by: string | null;
-  gear: { name: string; barcode: string } | null;
+  item: { name: string; barcode: string } | null;
 };
 
 export type TenantNotificationPayload = {
@@ -173,7 +173,7 @@ export const fetchStatusTracking = async () =>
 export const fetchWorkspaceAccountDashboard = async () =>
   callAdminOps<WorkspaceAccountDashboardRow[]>("get_workspace_dashboard");
 
-export const bulkImportGear = async (
+export const bulkImportItem = async (
   rows: Array<{
     name: string;
     barcode: string;
@@ -187,7 +187,7 @@ export const bulkImportGear = async (
     skipped: number;
     inserted_items: StatusTrackedItem[];
     skipped_rows: Array<{ barcode: string; reason: string }>;
-  }>("bulk_import_gear", { rows });
+  }>("bulk_import_items", { rows });
 
 export const touchAccountSession = async (
   options: AccountSessionTouchOptions = {}

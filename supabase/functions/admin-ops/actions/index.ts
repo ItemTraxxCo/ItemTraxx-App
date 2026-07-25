@@ -15,9 +15,10 @@ import { handleStatusTrackingAction } from "./statusTracking.ts";
 
 export const ADMIN_OPS_ACTIONS = [
   "get_notifications",
-  "get_tenant_settings",
-  "update_tenant_settings",
+  "get_workspace_settings",
+  "update_workspace_settings",
   "get_status_tracking",
+  "get_workspace_dashboard",
   "touch_session",
   "validate_session",
   "list_sessions",
@@ -31,9 +32,10 @@ export type AdminOpsAction = (typeof ADMIN_OPS_ACTIONS)[number];
 
 export const ADMIN_OPS_ACTION_OWNERS: Record<AdminOpsAction, string> = {
   get_notifications: "notifications",
-  get_tenant_settings: "settings",
-  update_tenant_settings: "settings",
+  get_workspace_settings: "settings",
+  update_workspace_settings: "settings",
   get_status_tracking: "statusTracking",
+  get_workspace_dashboard: "settings",
   touch_session: "sessions",
   validate_session: "sessions",
   list_sessions: "sessions",
@@ -43,12 +45,16 @@ export const ADMIN_OPS_ACTION_OWNERS: Record<AdminOpsAction, string> = {
   bulk_import_gear: "bulkGear",
 };
 
-const TENANT_ADMIN_ACTIONS = new Set<AdminOpsAction>(
-  ADMIN_OPS_ACTIONS.filter((action) => action !== "get_notifications"),
-);
+const WORKSPACE_ADMIN_ONLY_ACTIONS = new Set<AdminOpsAction>([
+  "get_workspace_settings",
+  "update_workspace_settings",
+  "get_status_tracking",
+  "get_workspace_dashboard",
+  "bulk_import_gear",
+]);
 
 const SUSPENDED_TENANT_WRITE_ACTIONS = new Set<AdminOpsAction>([
-  "update_tenant_settings",
+  "update_workspace_settings",
   "revoke_session",
   "revoke_current_session",
   "revoke_all_sessions",
@@ -60,8 +66,8 @@ const isAdminOpsAction = (action: string): action is AdminOpsAction =>
 
 export const authorizeAdminOpsAction = async (input: {
   action: string;
-  profileRole: "tenant_admin" | "tenant_user";
-  isTenantSuspended: boolean;
+  profileRole: "workspace_admin" | "tenant_account";
+  isWorkspaceSuspended: boolean;
   adminClient: SupabaseClient;
   userId: string;
   authToken: string;
@@ -69,22 +75,22 @@ export const authorizeAdminOpsAction = async (input: {
 }): Promise<Response | null> => {
   if (!isAdminOpsAction(input.action)) return null;
   if (
-    TENANT_ADMIN_ACTIONS.has(input.action) &&
-    input.profileRole !== "tenant_admin"
+    WORKSPACE_ADMIN_ONLY_ACTIONS.has(input.action) &&
+    input.profileRole !== "workspace_admin"
   ) {
     return input.jsonResponse(403, { error: "Access denied" });
   }
   if (
     SUSPENDED_TENANT_WRITE_ACTIONS.has(input.action) &&
-    input.isTenantSuspended
+    input.isWorkspaceSuspended
   ) {
-    return input.jsonResponse(403, { error: "Tenant disabled" });
+    return input.jsonResponse(403, { error: "Workspace disabled" });
   }
-  if (input.action === "update_tenant_settings") {
+  if (input.action === "update_workspace_settings") {
     try {
       const hasStepUp = await hasPrivilegedStepUp(input.adminClient, {
         userId: input.userId,
-        roleScope: "tenant_admin",
+        roleScope: "workspace_admin",
         authToken: input.authToken,
       });
       if (!hasStepUp) {
@@ -113,9 +119,10 @@ type ActionHandler = (context: AdminOpsContext) => Promise<Response>;
 
 const ACTION_HANDLERS: Partial<Record<AdminOpsAction, ActionHandler>> = {
   get_notifications: handleNotificationAction,
-  get_tenant_settings: handleSettingsAction,
-  update_tenant_settings: handleSettingsAction,
+  get_workspace_settings: handleSettingsAction,
+  update_workspace_settings: handleSettingsAction,
   get_status_tracking: handleStatusTrackingAction,
+  get_workspace_dashboard: handleSettingsAction,
   touch_session: handleSessionAction,
   validate_session: handleSessionAction,
   list_sessions: handleSessionAction,

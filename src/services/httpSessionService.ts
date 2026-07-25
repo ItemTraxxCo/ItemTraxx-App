@@ -8,9 +8,8 @@ export type HttpSessionSummary = {
     last_sign_in_at: string | null;
   } | null;
   profile: {
-    role: "tenant_user" | "tenant_admin" | "district_admin" | "super_admin" | null;
-    tenant_id: string | null;
-    district_id: string | null;
+    role: "tenant_account" | "workspace_admin" | "super_admin" | null;
+    workspace_id: string | null;
     auth_email: string | null;
     is_active: boolean | null;
   } | null;

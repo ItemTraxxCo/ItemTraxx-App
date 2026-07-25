@@ -204,20 +204,20 @@ serve(async (req) => {
     const payloadRecord = payload as Record<string, unknown>;
 
     if (action === "list") {
-      const tenantId = optionalText(payloadRecord.tenant_id, { maxLen: 36 }) || "all";
-      if (tenantId !== "all" && !UUID_PATTERN.test(tenantId)) {
+      const workspaceId = optionalText(payloadRecord.workspace_id, { maxLen: 36 }) || "all";
+      if (workspaceId !== "all" && !UUID_PATTERN.test(workspaceId)) {
         return jsonResponse(400, { error: "Invalid request" });
       }
       const search = optionalText(payloadRecord.search, { maxLen: 120 });
 
       let query = adminClient
         .from("gear")
-        .select("id, tenant_id, name, barcode, serial_number, status, notes")
+        .select("id, workspace_id, name, barcode, serial_number, status, notes")
         .order("created_at", { ascending: false })
         .limit(500);
 
-      if (tenantId && tenantId !== "all") {
-        query = query.eq("tenant_id", tenantId);
+      if (workspaceId && workspaceId !== "all") {
+        query = query.eq("workspace_id", workspaceId);
       }
       const { data, error } = await query;
       if (error) {
@@ -225,7 +225,7 @@ serve(async (req) => {
       }
       const rows = (data ?? []) as Array<{
         id: string;
-        tenant_id: string;
+        workspace_id: string;
         name: string;
         barcode: string;
         serial_number: string | null;
@@ -249,7 +249,7 @@ serve(async (req) => {
     }
 
     if (action === "create") {
-      const tenantId = requireUuid(payloadRecord.tenant_id);
+      const workspaceId = requireUuid(payloadRecord.workspace_id);
       const name = requireText(payloadRecord.name, { maxLen: 120 });
       const barcode = requireText(payloadRecord.barcode, { maxLen: 64, pattern: BARCODE_PATTERN });
       const serial = optionalText(payloadRecord.serial_number, { maxLen: 64 });
@@ -259,14 +259,14 @@ serve(async (req) => {
       const { data, error } = await adminClient
         .from("gear")
         .insert({
-          tenant_id: tenantId,
+          workspace_id: workspaceId,
           name,
           barcode,
           serial_number: serial || null,
           status,
           notes: notes || null,
         })
-        .select("id, tenant_id, name, barcode, serial_number, status, notes")
+        .select("id, workspace_id, name, barcode, serial_number, status, notes")
         .single();
 
       if (error || !data) {
@@ -314,7 +314,7 @@ serve(async (req) => {
           notes: notes || null,
         })
         .eq("id", id)
-        .select("id, tenant_id, name, barcode, serial_number, status, notes")
+        .select("id, workspace_id, name, barcode, serial_number, status, notes")
         .single();
 
       if (error || !data) {

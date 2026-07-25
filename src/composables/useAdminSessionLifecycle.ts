@@ -30,8 +30,8 @@ type AdminSessionLifecycleOptions = {
   router: Router;
   sessionTermination: ReturnType<typeof getSessionTerminationState>;
   isDevHost: MaybeRefOrGetter<boolean>;
-  isTenantAdminArea: MaybeRefOrGetter<boolean>;
-  shouldTrackTenantAdminSession: MaybeRefOrGetter<boolean>;
+  isWorkspaceAdminArea: MaybeRefOrGetter<boolean>;
+  shouldTrackAccountSession: MaybeRefOrGetter<boolean>;
   closeMenu: () => void;
 };
 
@@ -158,15 +158,15 @@ export const useAdminSessionLifecycle = (options: AdminSessionLifecycleOptions) 
     if (isIdleLogoutRunning.value || toValue(options.isDevHost)) return;
     if (
       !options.auth.isAuthenticated ||
-      options.auth.role !== "tenant_admin" ||
-      !toValue(options.isTenantAdminArea)
+      options.auth.role !== "workspace_admin" ||
+      !toValue(options.isWorkspaceAdminArea)
     ) {
       return;
     }
     isIdleLogoutRunning.value = true;
     try {
       clearAdminVerification();
-      await options.router.replace("/tenant/checkout");
+      await options.router.replace("/checkout");
     } finally {
       isIdleLogoutRunning.value = false;
     }
@@ -177,8 +177,8 @@ export const useAdminSessionLifecycle = (options: AdminSessionLifecycleOptions) 
     if (toValue(options.isDevHost)) return;
     if (
       !options.auth.isAuthenticated ||
-      options.auth.role !== "tenant_admin" ||
-      !toValue(options.isTenantAdminArea)
+      options.auth.role !== "workspace_admin" ||
+      !toValue(options.isWorkspaceAdminArea)
     ) {
       return;
     }
@@ -241,7 +241,7 @@ export const useAdminSessionLifecycle = (options: AdminSessionLifecycleOptions) 
   ) =>
     disposed ||
     generation !== adminCheckGeneration ||
-    !toValue(options.shouldTrackTenantAdminSession) ||
+    !toValue(options.shouldTrackAccountSession) ||
     options.sessionTermination.visible ||
     document.visibilityState === "hidden" ||
     identityChanged(epoch, userId, deviceId);
@@ -252,7 +252,7 @@ export const useAdminSessionLifecycle = (options: AdminSessionLifecycleOptions) 
       isAdminSessionCheckRunning.value &&
       runningAdminCheckGeneration === generation
     ) return;
-    if (!toValue(options.shouldTrackTenantAdminSession)) {
+    if (!toValue(options.shouldTrackAccountSession)) {
       stopAdminSessionPolling();
       return;
     }
@@ -262,24 +262,24 @@ export const useAdminSessionLifecycle = (options: AdminSessionLifecycleOptions) 
     isAdminSessionCheckRunning.value = true;
     runningAdminCheckGeneration = generation;
     try {
-      const { touchTenantAdminSession, validateTenantAdminSession } = await import(
+      const { touchAccountSession, validateAccountSession } = await import(
         "../services/adminOpsService"
       );
       if (adminCheckCancelled(generation, epoch, userId, deviceId)) {
         return;
       }
       try {
-        await touchTenantAdminSession();
+        await touchAccountSession();
       } catch {
         // Best-effort keepalive; validation below is authoritative.
       }
       if (adminCheckCancelled(generation, epoch, userId, deviceId)) return;
-      const validation = await validateTenantAdminSession();
+      const validation = await validateAccountSession();
       if (adminCheckCancelled(generation, epoch, userId, deviceId)) return;
       if (!validation.valid) {
         await waitForValidationRetry();
         if (adminCheckCancelled(generation, epoch, userId, deviceId)) return;
-        const retryValidation = await validateTenantAdminSession();
+        const retryValidation = await validateAccountSession();
         if (
           !adminCheckCancelled(generation, epoch, userId, deviceId) &&
           !retryValidation.valid
@@ -305,7 +305,7 @@ export const useAdminSessionLifecycle = (options: AdminSessionLifecycleOptions) 
 
   const startAdminSessionPolling = () => {
     if (
-      !toValue(options.shouldTrackTenantAdminSession) ||
+      !toValue(options.shouldTrackAccountSession) ||
       options.sessionTermination.visible ||
       document.visibilityState === "hidden"
     ) {

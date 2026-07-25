@@ -81,8 +81,8 @@ export type CustomerRecord = {
 };
 
 type InternalOpsEvent = {
-  tenant_id: string | null;
-  tenant_name: string;
+  workspace_id: string | null;
+  workspace_name: string;
   action_type: "checkout" | "return";
   action_time: string;
   gear_name: string | null;
@@ -96,7 +96,7 @@ export type InternalOpsSnapshot = {
   traffic: {
     checkout_15m: number;
     return_15m: number;
-    active_tenants_15m: number;
+    active_workspaces_15m: number;
     events_24h: number;
   };
   queue: {
@@ -159,7 +159,7 @@ export type InternalOpsSnapshot = {
   search_index: Array<{
     id: string;
     label: string;
-    type: "page" | "tenant" | "customer" | "lead";
+    type: "page" | "workspace" | "customer" | "lead";
     route: string;
   }>;
   runtime: Record<string, unknown>;

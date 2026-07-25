@@ -109,7 +109,7 @@
                 v-model.trim="affectedArea"
                 type="text"
                 maxlength="160"
-                placeholder="/login, /tenant/checkout, admin action, checkout, return, etc."
+                placeholder="/login, /checkout, admin action, checkout, return, etc."
               />
             </label>
 

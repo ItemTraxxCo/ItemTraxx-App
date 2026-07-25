@@ -13,16 +13,16 @@ type SuperAuditLog = {
 };
 
 export type SuperDashboard = {
-  total_tenants: number;
-  active_tenants: number;
-  suspended_tenants: number;
-  tenant_admins_count: number;
+  total_workspaces: number;
+  active_workspaces: number;
+  suspended_workspaces: number;
+  workspace_admins_count: number;
   recent_actions: SuperAuditLog[];
-  tenant_metrics: Array<{
-    tenant_id: string;
-    tenant_name: string;
+  workspace_metrics: Array<{
+    workspace_id: string;
+    workspace_name: string;
     gear_total: number;
-    students_total: number;
+    borrowers_total: number;
     active_checkouts: number;
     overdue_items: number;
     transactions_7d: number;

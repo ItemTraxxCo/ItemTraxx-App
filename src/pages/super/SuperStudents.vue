@@ -2,7 +2,7 @@
   <div class="page">
     <div class="page-nav-left">
       <RouterLink class="button-link" to="/super-admin">Return to Super Admin</RouterLink>
-      <RouterLink class="button-link" to="/super-admin/tenants">Tenants</RouterLink>
+      <RouterLink class="button-link" to="/super-admin/workspaces">Workspaces</RouterLink>
       <RouterLink class="button-link" to="/super-admin/gear">All Items</RouterLink>
       <RouterLink class="button-link" to="/super-admin/logs">All Logs</RouterLink>
       <RouterLink class="button-link" to="/super-admin/broadcasts">Broadcasts</RouterLink>
@@ -11,12 +11,12 @@
     </div>
 
     <h1>All Borrowers</h1>
-    <p>Cross-tenant borrower management.</p>
+    <p>Cross-workspace borrower management.</p>
 
     <div class="card">
       <h2>Create Borrower</h2>
       <form class="form" @submit.prevent="handleCreate">
-        <label>Tenant<select v-model="formTenantId"><option value="">Select tenant</option><option v-for="t in tenants" :key="t.id" :value="t.id">{{ t.name }}</option></select></label>
+        <label>Workspace<select v-model="formWorkspaceId"><option value="">Select workspace</option><option v-for="t in workspaces" :key="t.id" :value="t.id">{{ t.name }}</option></select></label>
         <label>
           Username
           <input v-model="previewUsername" type="text" readonly title="If you need to change this, contact support." />
@@ -35,7 +35,7 @@
     <div class="card">
       <h2>Borrower List</h2>
       <div class="input-row">
-        <select v-model="tenantFilter" @change="loadStudents"><option value="all">all tenants</option><option v-for="t in tenants" :key="t.id" :value="t.id">{{ t.name }}</option></select>
+        <select v-model="workspaceFilter" @change="loadStudents"><option value="all">all workspaces</option><option v-for="t in workspaces" :key="t.id" :value="t.id">{{ t.name }}</option></select>
         <input v-model="search" type="text" placeholder="Search" />
         <button type="button" @click="loadStudents">Search</button>
       </div>
@@ -46,11 +46,11 @@
       <SkeletonLoader v-if="isLoading" variant="table" :rows="6" :columns="4" label="Loading all borrowers" />
       <p v-else-if="error" class="error">{{ error }}</p>
       <table v-else class="table">
-        <thead><tr><th>Username</th><th>Tenant</th><th>Borrower ID</th><th>Actions</th></tr></thead>
+        <thead><tr><th>Username</th><th>Workspace</th><th>Borrower ID</th><th>Actions</th></tr></thead>
         <tbody>
           <tr v-for="item in students" :key="item.id">
             <td>{{ item.username }}</td>
-            <td>{{ tenantNameById.get(item.tenant_id) || item.tenant_id }}</td>
+            <td>{{ workspaceNameById.get(item.workspace_id) || item.workspace_id }}</td>
             <td>{{ item.student_id }}</td>
             <td>
               <button type="button" @click="startEdit(item)">Edit</button>
@@ -94,20 +94,20 @@ import {
   isUnauthorizedError,
 } from "../../services/authErrorHandling";
 import { createSuperStudent, deleteSuperStudent, listSuperStudents, type SuperStudentItem } from "../../services/superStudentService";
-import { listTenants, type SuperTenant } from "../../services/superTenantService";
+import { listWorkspaces as listWorkspaces, type SuperWorkspace as SuperWorkspace } from "../../services/superWorkspaceService";
 import { exportRowsToCsv, exportRowsToPdf } from "../../services/exportService";
 import { generateStudentIdentity } from "../../utils/studentIdentity";
 import { toUserFacingErrorMessage } from "../../services/appErrors";
 
 const router = useRouter();
-const tenants = ref<SuperTenant[]>([]);
+const workspaces = ref<SuperWorkspace[]>([]);
 const students = ref<SuperStudentItem[]>([]);
-const tenantFilter = ref("all");
+const workspaceFilter = ref("all");
 const search = ref("");
 const isLoading = ref(false);
 const isSaving = ref(false);
 const error = ref("");
-const formTenantId = ref("");
+const formWorkspaceId = ref("");
 const previewUsername = ref("");
 const previewStudentId = ref("");
 const editItem = ref<SuperStudentItem | null>(null);
@@ -120,7 +120,7 @@ const stepUpMessage = ref("");
 const deleteTarget = ref<SuperStudentItem | null>(null);
 let toastTimer: number | null = null;
 
-const tenantNameById = computed(() => new Map(tenants.value.map((t) => [t.id, t.name])));
+const workspaceNameById = computed(() => new Map(workspaces.value.map((t) => [t.id, t.name])));
 
 const regenerateIdentity = () => {
   const identity = generateStudentIdentity();
@@ -141,7 +141,7 @@ const showToast = (title: string, message: string) => {
 
 const loadTenants = async () => {
   try {
-    tenants.value = await listTenants("", "all");
+    workspaces.value = await listWorkspaces("", "all");
   } catch (err) {
     if (isUnauthorizedError(err)) {
       error.value = "Your session expired. Sign in again.";
@@ -156,7 +156,7 @@ const loadStudents = async () => {
   isLoading.value = true;
   error.value = "";
   try {
-    students.value = await listSuperStudents(tenantFilter.value, search.value.trim());
+    students.value = await listSuperStudents(workspaceFilter.value, search.value.trim());
   } catch (err) {
     if (isUnauthorizedError(err)) {
       error.value = "Your session expired. Sign in again.";
@@ -172,9 +172,9 @@ const loadStudents = async () => {
 const exportCsv = () => {
   exportRowsToCsv(
     `super-students-${new Date().toISOString().slice(0, 10)}.csv`,
-    ["tenant", "username", "student_id"],
+    ["workspace", "username", "student_id"],
     students.value.map((item) => ({
-      tenant: tenantNameById.value.get(item.tenant_id) || item.tenant_id,
+      workspace: workspaceNameById.value.get(item.workspace_id) || item.workspace_id,
       username: item.username,
       student_id: item.student_id,
     }))
@@ -185,9 +185,9 @@ const exportPdf = async () => {
   await exportRowsToPdf(
     `super-students-${new Date().toISOString().slice(0, 10)}.pdf`,
     "Super Borrowers Export",
-    ["tenant", "username", "student_id"],
+    ["workspace", "username", "student_id"],
     students.value.map((item) => ({
-      tenant: tenantNameById.value.get(item.tenant_id) || item.tenant_id,
+      workspace: workspaceNameById.value.get(item.workspace_id) || item.workspace_id,
       username: item.username,
       student_id: item.student_id,
     }))
@@ -195,14 +195,14 @@ const exportPdf = async () => {
 };
 
 const handleCreate = async () => {
-  if (!formTenantId.value) {
+  if (!formWorkspaceId.value) {
     showToast("Invalid input", "Tenant is required.");
     return;
   }
   isSaving.value = true;
   try {
     const created = await createSuperStudent({
-      tenant_id: formTenantId.value,
+      workspace_id: formWorkspaceId.value,
       username: previewUsername.value,
       student_id: previewStudentId.value,
     });

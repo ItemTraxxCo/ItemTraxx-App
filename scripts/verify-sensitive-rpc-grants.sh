@@ -105,11 +105,9 @@ begin
     and has_function_privilege('anon', p.oid, 'EXECUTE')
     and format('%I.%I(%s)', n.nspname, p.proname, pg_get_function_identity_arguments(p.oid)) not in (
       'public.consume_rate_limit_prelogin(p_key text, p_scope text, p_limit integer, p_window_seconds integer)',
-      'public.current_district_id()',
-      'public.current_tenant_id()',
       'public.current_user_role()',
-      'public.resolve_public_district_by_id(input_id uuid)',
-      'public.resolve_public_district_by_slug(input_slug text)'
+      'public.resolve_public_workspace_by_id(p_id uuid)',
+      'public.resolve_public_workspace_by_slug(p_slug text)'
     )
   limit 1;
 
@@ -127,13 +125,12 @@ begin
     and format('%I.%I(%s)', n.nspname, p.proname, pg_get_function_identity_arguments(p.oid)) not in (
       'public.consume_rate_limit(p_scope text, p_limit integer, p_window_seconds integer)',
       'public.consume_rate_limit_prelogin(p_key text, p_scope text, p_limit integer, p_window_seconds integer)',
-      'public.current_district_id()',
       'public.current_session_binding_key()',
-      'public.current_tenant_id()',
+      'public.current_workspace_id()',
       'public.current_user_role()',
       'public.has_recent_privileged_step_up(p_role_scope text)',
-      'public.resolve_public_district_by_id(input_id uuid)',
-      'public.resolve_public_district_by_slug(input_slug text)'
+      'public.resolve_public_workspace_by_id(p_id uuid)',
+      'public.resolve_public_workspace_by_slug(p_slug text)'
     )
   limit 1;
 

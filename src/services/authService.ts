@@ -1,9 +1,4 @@
-export { tenantLogin } from "./auth/tenantLogin";
-export {
-  consumeDistrictSessionHandoff,
-  createDistrictAdminSessionHandoff,
-  createDistrictSessionHandoff,
-} from "./auth/districtHandoff";
+export { workspaceLogin } from "./auth/workspaceLogin";
 export {
   applyHttpSessionSummary,
   initAuthListener,

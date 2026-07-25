@@ -114,7 +114,7 @@ export const handleBulkGearAction = async (
   const { data: existingRows } = await context.adminClient
     .from("gear")
     .select("barcode")
-    .eq("tenant_id", context.tenantId)
+    .eq("workspace_id", context.workspaceId)
     .in("barcode", lookupBarcodes);
   const existing = new Set(
     (existingRows ?? []).map((row) => (row as { barcode: string }).barcode),
@@ -142,7 +142,7 @@ export const handleBulkGearAction = async (
   }
 
   const insertPayload = toInsert.map((row) => ({
-    tenant_id: context.tenantId,
+    workspace_id: context.workspaceId,
     name: row.name,
     barcode: row.barcode,
     serial_number: row.serial_number,
@@ -152,7 +152,7 @@ export const handleBulkGearAction = async (
   const { data: insertedRows, error: insertError } = await context.adminClient
     .from("gear")
     .insert(insertPayload)
-    .select("id, tenant_id, name, barcode, serial_number, status, notes");
+    .select("id, workspace_id, name, barcode, serial_number, status, notes");
   if (insertError) {
     return context.jsonResponse(400, { error: "Unable to import item rows." });
   }
@@ -160,7 +160,7 @@ export const handleBulkGearAction = async (
   const historyPayload = (insertedRows ?? [])
     .filter((item) => TRACKED_STATUSES.has((item as { status: string }).status))
     .map((item) => ({
-      tenant_id: context.tenantId,
+      workspace_id: context.workspaceId,
       gear_id: (item as { id: string }).id,
       status: (item as { status: string }).status,
       note: (item as { notes?: string | null }).notes ?? null,

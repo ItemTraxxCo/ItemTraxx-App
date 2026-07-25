@@ -3,7 +3,7 @@ import { getAuthState } from "../store/authState";
 
 export type AdminAuditLog = {
   id: string;
-  tenant_id: string;
+  workspace_id: string;
   actor_id: string;
   action_type: string;
   entity_type: string | null;
@@ -19,14 +19,14 @@ type ActorProfileRow = {
 };
 
 export const fetchAdminAuditLogs = async (): Promise<AdminAuditLog[]> => {
-  const tenantId = getAuthState().tenantContextId;
-  if (!tenantId) {
+  const workspaceId = getAuthState().workspaceContextId;
+  if (!workspaceId) {
     throw new Error("Missing requored account data. Please sign out and sign in again and try again. If error persists, please contact support.");
   }
 
   const data = await authenticatedSelect<AdminAuditLog[]>("admin_audit_logs", {
-    select: "id,tenant_id,actor_id,action_type,entity_type,entity_id,metadata,created_at",
-    tenant_id: `eq.${tenantId}`,
+    select: "id,workspace_id,actor_id,action_type,entity_type,entity_id,metadata,created_at",
+    workspace_id: `eq.${workspaceId}`,
     order: "created_at.desc",
     limit: "200",
   }).catch(() => null);

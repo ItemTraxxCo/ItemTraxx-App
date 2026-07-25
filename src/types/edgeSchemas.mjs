@@ -128,6 +128,10 @@ const adminOpsRequestSchema = z.discriminatedUnion("action", [
     payload: adminOpsDevicePayloadSchema,
   }),
   z.object({
+    action: z.literal("get_workspace_dashboard"),
+    payload: adminOpsDevicePayloadSchema,
+  }),
+  z.object({
     action: z.literal("bulk_import_gear"),
     payload: adminOpsDevicePayloadSchema.extend({
       rows: z.array(
@@ -141,9 +145,9 @@ const adminOpsRequestSchema = z.discriminatedUnion("action", [
       ),
     }),
   }),
-  z.object({ action: z.literal("get_tenant_settings"), payload: adminOpsDevicePayloadSchema }),
+  z.object({ action: z.literal("get_workspace_settings"), payload: adminOpsDevicePayloadSchema }),
   z.object({
-    action: z.literal("update_tenant_settings"),
+    action: z.literal("update_workspace_settings"),
     payload: adminOpsDevicePayloadSchema.extend({
       checkout_due_hours: z.number().int().nonnegative(),
     }),
@@ -177,6 +181,14 @@ const adminOpsResponseSchemas = {
       history: tenantNotificationSchema.shape.recent_status_events,
     })
   ),
+  get_workspace_dashboard: edgeEnvelopeSchema(z.array(z.object({
+    profile_id: z.string().uuid(),
+    auth_email: z.string().email(),
+    item_count: z.number().int().nonnegative(),
+    borrower_count: z.number().int().nonnegative(),
+    active_checkouts: z.number().int().nonnegative(),
+    overdue_count: z.number().int().nonnegative(),
+  }))),
   bulk_import_gear: edgeEnvelopeSchema(
     z.object({
       inserted: z.number().int().nonnegative(),
@@ -190,8 +202,8 @@ const adminOpsResponseSchemas = {
       ),
     })
   ),
-  get_tenant_settings: edgeEnvelopeSchema(tenantSettingsSchema),
-  update_tenant_settings: edgeEnvelopeSchema(tenantSettingsSchema),
+  get_workspace_settings: edgeEnvelopeSchema(tenantSettingsSchema),
+  update_workspace_settings: edgeEnvelopeSchema(tenantSettingsSchema),
   touch_session: edgeEnvelopeSchema(z.object({ ok: z.boolean() })),
   validate_session: edgeEnvelopeSchema(z.object({ valid: z.boolean() })),
   list_sessions: edgeEnvelopeSchema(z.object({ sessions: z.array(tenantSessionSchema) })),
@@ -200,15 +212,15 @@ const adminOpsResponseSchemas = {
   revoke_all_sessions: edgeEnvelopeSchema(z.object({ revoked: z.number().int().nonnegative() })),
 };
 
-const superTenantSchema = z.object({
+const superWorkspaceSchema = z.object({
   id: z.string(),
   name: z.string(),
-  access_code: z.string(),
+  slug: z.string(),
   status: tenantStatusSchema,
   created_at: z.string(),
-  district_id: z.string().nullable().optional(),
-  district_name: z.string().nullable().optional(),
-  district_slug: z.string().nullable().optional(),
+  archived_at: z.string().nullable(),
+  purge_after: z.string().nullable().optional(),
+  purge_state: z.string().optional(),
   primary_admin_profile_id: z.string().nullable().optional(),
   primary_admin_email: z.string().nullable().optional(),
   checkout_due_hours: z.number().int().nonnegative().optional(),
@@ -235,7 +247,7 @@ const superDistrictSchema = z.object({
 
 const superDistrictDetailSchema = z.object({
   district: superDistrictSchema,
-  tenants: z.array(superTenantSchema),
+  workspaces: z.array(superWorkspaceSchema),
   support_requests: z.array(
     z.object({
       id: z.string(),
@@ -250,8 +262,8 @@ const superDistrictDetailSchema = z.object({
   ),
   tenant_metrics: z.array(
     z.object({
-      tenant_id: z.string(),
-      tenant_name: z.string(),
+      workspace_id: z.string(),
+      workspace_name: z.string(),
       gear_total: z.number().int().nonnegative(),
       students_total: z.number().int().nonnegative(),
       active_checkouts: z.number().int().nonnegative(),
@@ -270,8 +282,8 @@ const superDistrictDetailSchema = z.object({
   ),
   recent_events: z.array(
     z.object({
-      tenant_id: z.string().nullable(),
-      tenant_name: z.string(),
+      workspace_id: z.string().nullable(),
+      workspace_name: z.string(),
       action_type: z.enum(["checkout", "return"]),
       action_time: z.string(),
       gear_name: z.string().nullable(),
@@ -297,122 +309,101 @@ const superDistrictDetailSchema = z.object({
   }),
 });
 
-const superTenantRequestSchema = z.discriminatedUnion("action", [
-  z.object({ action: z.literal("list_tenants"), payload: z.object({ search: z.string(), status: z.string() }) }),
+const superWorkspaceRequestSchema = z.discriminatedUnion("action", [
+  z.object({ action: z.literal("list_workspaces"), payload: z.object({ search: z.string(), status: z.string() }) }),
   z.object({
-    action: z.literal("create_tenant"),
+    action: z.literal("create_workspace"),
     payload: z.object({
       name: z.string().min(1),
-      access_code: z.string().min(1),
+      slug: z.string().min(1),
       auth_email: z.string().email(),
-      password: z.string().min(8),
-      status: tenantStatusSchema,
+      password: z.string().min(8).optional(),
       account_category: accountCategorySchema.optional(),
       plan_code: tenantPlanCodeSchema.optional(),
-      district_name: z.string().optional(),
-      district_slug: z.string().optional(),
     }),
   }),
   z.object({
-    action: z.literal("update_tenant"),
-    payload: z.object({
-      id: z.string().uuid(),
-      name: z.string().min(1),
-      access_code: z.string().min(1),
-      account_category: accountCategorySchema.optional(),
-      plan_code: tenantPlanCodeSchema.optional(),
-      district_name: z.string().optional(),
-      district_slug: z.string().optional(),
-    }),
-  }),
-  z.object({
-    action: z.literal("set_tenant_status"),
-    payload: z.object({
-      id: z.string().uuid(),
-      status: tenantStatusSchema,
-      super_password: z.string().min(1),
-      confirm_phrase: z.string().min(1),
-    }),
-  }),
-  z.object({ action: z.literal("send_primary_admin_reset"), payload: z.object({ tenant_id: z.string().uuid() }) }),
-  z.object({ action: z.literal("set_primary_admin"), payload: z.object({ tenant_id: z.string().uuid(), profile_id: z.string().uuid() }) }),
-  z.object({ action: z.literal("list_districts"), payload: z.object({ search: z.string() }) }),
-  z.object({
-    action: z.literal("create_district"),
-    payload: z.object({
-      name: z.string().min(1),
-      slug: z.string().min(1),
-      support_email: z.string().email().optional(),
-      contact_name: z.string().optional(),
-      subscription_plan: districtSubscriptionPlanSchema.optional(),
-      billing_status: districtBillingStatusSchema.optional(),
-      renewal_date: z.string().optional(),
-      billing_email: z.string().email().optional(),
-      invoice_reference: z.string().optional(),
-    }),
-  }),
-  z.object({
-    action: z.literal("update_district"),
+    action: z.literal("update_workspace"),
     payload: z.object({
       id: z.string().uuid(),
       name: z.string().min(1),
       slug: z.string().min(1),
-      support_email: z.string().email().optional(),
-      contact_name: z.string().optional(),
-      is_active: z.boolean(),
-      subscription_plan: districtSubscriptionPlanSchema.optional(),
-      billing_status: districtBillingStatusSchema.optional(),
-      renewal_date: z.string().optional(),
-      billing_email: z.string().email().optional(),
-      invoice_reference: z.string().optional(),
+      account_category: accountCategorySchema.optional(),
+      plan_code: tenantPlanCodeSchema.optional(),
     }),
   }),
-  z.object({ action: z.literal("get_district_details"), payload: z.object({ id: z.string().uuid() }) }),
+  z.object({
+    action: z.literal("set_workspace_status"),
+    payload: z.object({
+      id: z.string().uuid(),
+      status: z.enum(["active", "suspended", "archived"]),
+    }),
+  }),
+  z.object({ action: z.literal("send_primary_admin_reset"), payload: z.object({ workspace_id: z.string().uuid() }) }),
+  z.object({ action: z.literal("set_primary_admin"), payload: z.object({ workspace_id: z.string().uuid(), profile_id: z.string().uuid() }) }),
 ]);
 
-const superTenantResponseSchemas = {
-  list_tenants: superTenantEnvelopeSchema(z.array(superTenantSchema)),
-  create_tenant: superTenantEnvelopeSchema(superTenantSchema),
-  update_tenant: superTenantEnvelopeSchema(superTenantSchema),
-  set_tenant_status: superTenantEnvelopeSchema(superTenantSchema),
+const superWorkspaceResponseSchemas = {
+  list_workspaces: superTenantEnvelopeSchema(z.array(superWorkspaceSchema)),
+  create_workspace: superTenantEnvelopeSchema(superWorkspaceSchema),
+  update_workspace: superTenantEnvelopeSchema(superWorkspaceSchema),
+  set_workspace_status: superTenantEnvelopeSchema(superWorkspaceSchema),
   send_primary_admin_reset: superTenantEnvelopeSchema(z.object({ success: z.boolean(), auth_email: z.string().email() })),
-  set_primary_admin: superTenantEnvelopeSchema(superTenantSchema),
-  list_districts: superTenantEnvelopeSchema(z.array(superDistrictSchema)),
-  create_district: superTenantEnvelopeSchema(superDistrictSchema),
-  update_district: superTenantEnvelopeSchema(superDistrictSchema),
-  get_district_details: superTenantEnvelopeSchema(superDistrictDetailSchema),
+  set_primary_admin: superTenantEnvelopeSchema(superWorkspaceSchema),
 };
 
 const tenantManagedAdminSchema = z.object({
   id: z.string().uuid(),
-  tenant_id: z.string().uuid(),
+  workspace_id: z.string().uuid(),
   auth_email: z.string().email(),
-  role: z.literal("tenant_admin"),
+  role: z.literal("workspace_admin"),
   is_active: z.boolean(),
   created_at: z.string(),
   is_primary_admin: z.boolean(),
 });
 
-const tenantAdminManageRequestSchema = z.discriminatedUnion("action", [
-  z.object({ action: z.literal("list_tenant_admins"), payload: z.object({}) }),
-  z.object({ action: z.literal("create_tenant_admin"), payload: z.object({ auth_email: z.string().email() }) }),
+const tenantAccountSchema = z.object({
+  id: z.string().uuid(),
+  workspace_id: z.string().uuid(),
+  auth_email: z.string().email(),
+  role: z.literal("tenant_account"),
+  is_active: z.boolean(),
+  deleted_at: z.string().nullable().optional(),
+  created_at: z.string(),
+});
+
+const workspaceAdminManageRequestSchema = z.discriminatedUnion("action", [
+  z.object({ action: z.literal("list_workspace_admins"), payload: z.object({}) }),
+  z.object({ action: z.literal("create_workspace_admin"), payload: z.object({ auth_email: z.string().email() }) }),
   z.object({ action: z.literal("set_admin_status"), payload: z.object({ id: z.string().uuid(), is_active: z.boolean() }) }),
   z.object({ action: z.literal("update_admin_email"), payload: z.object({ id: z.string().uuid(), auth_email: z.string().email() }) }),
-  z.object({ action: z.literal("send_tenant_admin_reset"), payload: z.object({ auth_email: z.string().email() }) }),
+  z.object({ action: z.literal("send_workspace_admin_reset"), payload: z.object({ auth_email: z.string().email() }) }),
+  z.object({ action: z.literal("list_tenant_accounts"), payload: adminOpsDevicePayloadSchema }),
+  z.object({ action: z.literal("create_tenant_account"), payload: adminOpsDevicePayloadSchema.extend({ auth_email: z.string().email() }) }),
+  z.object({ action: z.literal("set_tenant_account_status"), payload: adminOpsDevicePayloadSchema.extend({ id: z.string().uuid(), is_active: z.boolean() }) }),
+  z.object({ action: z.literal("update_tenant_account_email"), payload: adminOpsDevicePayloadSchema.extend({ id: z.string().uuid(), auth_email: z.string().email() }) }),
+  z.object({ action: z.literal("remove_tenant_account"), payload: adminOpsDevicePayloadSchema.extend({ id: z.string().uuid() }) }),
+  z.object({ action: z.literal("send_tenant_account_reset"), payload: adminOpsDevicePayloadSchema.extend({ id: z.string().uuid() }) }),
 ]);
 
-const tenantAdminManageResponseSchemas = {
-  list_tenant_admins: edgeEnvelopeSchema(
+const workspaceAdminManageResponseSchemas = {
+  list_workspace_admins: edgeEnvelopeSchema(
     z.object({
       admins: z.array(tenantManagedAdminSchema),
       can_manage_admins: z.boolean(),
       primary_admin_profile_id: z.string().uuid().nullable(),
     })
   ),
-  create_tenant_admin: edgeEnvelopeSchema(z.object({ success: z.boolean(), auth_email: z.string().email(), message: z.string().optional() })),
+  create_workspace_admin: edgeEnvelopeSchema(z.object({ success: z.boolean(), auth_email: z.string().email(), message: z.string().optional() })),
   set_admin_status: edgeEnvelopeSchema(tenantManagedAdminSchema),
   update_admin_email: edgeEnvelopeSchema(tenantManagedAdminSchema),
-  send_tenant_admin_reset: edgeEnvelopeSchema(z.object({ success: z.boolean() })),
+  send_workspace_admin_reset: edgeEnvelopeSchema(z.object({ success: z.boolean() })),
+  list_tenant_accounts: edgeEnvelopeSchema(z.array(tenantAccountSchema)),
+  create_tenant_account: edgeEnvelopeSchema(tenantAccountSchema),
+  set_tenant_account_status: edgeEnvelopeSchema(tenantAccountSchema),
+  update_tenant_account_email: edgeEnvelopeSchema(tenantAccountSchema),
+  remove_tenant_account: edgeEnvelopeSchema(z.object({ success: z.boolean() })),
+  send_tenant_account_reset: edgeEnvelopeSchema(z.object({ success: z.boolean() })),
 };
 
 
@@ -446,7 +437,7 @@ const superOpsAlertRuleSchema = z.object({
 });
 
 const superOpsTenantPolicySchema = z.object({
-  tenant_id: z.string(),
+  workspace_id: z.string(),
   max_admins: z.number().int().nullable().optional(),
   max_students: z.number().int().nullable().optional(),
   max_gear: z.number().int().nullable().optional(),
@@ -579,7 +570,7 @@ const internalOpsSnapshotSchema = z.object({
   traffic: z.object({
     checkout_15m: z.number().int().nonnegative(),
     return_15m: z.number().int().nonnegative(),
-    active_tenants_15m: z.number().int().nonnegative(),
+    active_workspaces_15m: z.number().int().nonnegative(),
     events_24h: z.number().int().nonnegative(),
   }),
   queue: z.object({
@@ -642,13 +633,13 @@ const internalOpsSnapshotSchema = z.object({
   search_index: z.array(z.object({
     id: z.string(),
     label: z.string(),
-    type: z.enum(["page", "tenant", "customer", "lead"]),
+    type: z.enum(["page", "workspace", "customer", "lead"]),
     route: z.string(),
   })),
   runtime: z.record(z.string(), z.unknown()),
   recent_events: z.array(z.object({
-    tenant_id: z.string().nullable(),
-    tenant_name: z.string(),
+    workspace_id: z.string().nullable(),
+    workspace_name: z.string(),
     action_type: z.enum(["checkout", "return"]),
     action_time: z.string(),
     gear_name: z.string().nullable(),
@@ -677,8 +668,8 @@ const superOpsRequestSchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("get_control_center"), payload: z.object({}).optional() }),
   z.object({ action: z.literal("set_runtime_config"), payload: z.object({ key: z.string().min(1), value: z.unknown() }) }),
   z.object({ action: z.literal("upsert_alert_rule"), payload: z.object({ id: z.string().optional(), name: z.string().min(1), metric_key: z.string().min(1), threshold: z.number(), is_enabled: z.boolean().optional() }) }),
-  z.object({ action: z.literal("set_tenant_policy"), payload: z.object({ tenant_id: z.string().min(1), max_admins: z.number().int().nullable().optional(), max_students: z.number().int().nullable().optional(), max_gear: z.number().int().nullable().optional(), checkout_due_hours: z.number().int().nullable().optional(), barcode_pattern: z.string().nullable().optional(), feature_flags: z.record(z.string(), z.unknown()).optional() }) }),
-  z.object({ action: z.literal("set_tenant_force_reauth"), payload: z.object({ tenant_id: z.string().min(1) }) }),
+  z.object({ action: z.literal("set_workspace_policy"), payload: z.object({ workspace_id: z.string().min(1), max_admins: z.number().int().nullable().optional(), max_students: z.number().int().nullable().optional(), max_gear: z.number().int().nullable().optional(), checkout_due_hours: z.number().int().nullable().optional(), barcode_pattern: z.string().nullable().optional(), feature_flags: z.record(z.string(), z.unknown()).optional() }) }),
+  z.object({ action: z.literal("set_workspace_force_reauth"), payload: z.object({ workspace_id: z.string().min(1) }) }),
   z.object({ action: z.literal("create_approval"), payload: z.object({ action_type: z.string().min(1), payload: z.record(z.string(), z.unknown()).or(z.object({}).passthrough()) }) }),
   z.object({ action: z.literal("approve_request"), payload: z.object({ id: z.string().min(1) }) }),
   z.object({
@@ -731,8 +722,8 @@ const superOpsResponseSchemas = {
   })),
   set_runtime_config: superOpsEnvelopeSchema(z.object({ key: z.string(), value: z.unknown() })),
   upsert_alert_rule: superOpsEnvelopeSchema(superOpsAlertRuleSchema),
-  set_tenant_policy: superOpsEnvelopeSchema(superOpsTenantPolicySchema),
-  set_tenant_force_reauth: superOpsEnvelopeSchema(z.object({ success: z.boolean(), job: superOpsJobSchema.nullable().optional() })),
+  set_workspace_policy: superOpsEnvelopeSchema(superOpsTenantPolicySchema),
+  set_workspace_force_reauth: superOpsEnvelopeSchema(z.object({ success: z.boolean(), job: superOpsJobSchema.nullable().optional() })),
   create_approval: superOpsEnvelopeSchema(z.object({ id: z.string(), action_type: z.string(), payload: z.record(z.string(), z.unknown()).or(z.object({}).passthrough()), requested_by: z.string().nullable().optional(), status: z.string(), created_at: z.string() })),
   approve_request: superOpsEnvelopeSchema(superOpsApprovalSchema),
   list_support_requests: superOpsEnvelopeSchema(z.object({ requests: z.array(supportRequestListItemSchema) })),
@@ -770,69 +761,77 @@ const superOpsResponseSchemas = {
   ),
 };
 
-const superTenantAdminSchema = z.object({
+const superWorkspaceAdminSchema = z.object({
   id: z.string().uuid(),
-  tenant_id: z.string(),
-  district_id: z.string().optional(),
+  workspace_id: z.string(),
   auth_email: z.string().email(),
-  role: z.enum(["tenant_admin", "district_admin"]),
+  role: z.literal("workspace_admin"),
+  is_active: z.boolean(),
+  deleted_at: z.string().nullable().optional(),
+  created_at: z.string(),
+  workspace_name: z.string().nullable().optional(),
+  is_primary_admin: z.boolean().optional(),
+});
+
+const superAdminProfileSchema = z.object({
+  id: z.string().uuid(),
+  auth_email: z.string().email(),
+  role: z.literal("super_admin"),
   is_active: z.boolean(),
   created_at: z.string(),
-  tenant_name: z.string().nullable().optional(),
-  district_name: z.string().nullable().optional(),
 });
 
 const superAdminRequestSchema = z.discriminatedUnion("action", [
   z.object({
-    action: z.literal("list_tenant_admins"),
+    action: z.literal("list_workspace_admins"),
     payload: z.object({
       search: z.string(),
-      tenant_id: z.string(),
-      district_id: z.string(),
-      admin_scope: z.enum(["tenant", "district"]),
+      workspace_id: z.string(),
     }),
   }),
   z.object({
-    action: z.literal("create_tenant_admin"),
+    action: z.literal("create_workspace_admin"),
     payload: z.object({
-      tenant_id: z.string().optional(),
-      district_id: z.string().optional(),
+      workspace_id: z.string().optional(),
       auth_email: z.string().email(),
-      password: z.string().min(8),
-      admin_scope: z.enum(["tenant", "district"]).optional(),
     }),
   }),
   z.object({
-    action: z.literal("set_admin_status"),
+    action: z.literal("set_workspace_admin_status"),
     payload: z.object({
       id: z.string().uuid(),
       is_active: z.boolean(),
-      admin_scope: z.enum(["tenant", "district"]).optional(),
     }),
   }),
   z.object({
-    action: z.literal("update_admin_email"),
+    action: z.literal("update_workspace_admin_email"),
     payload: z.object({
       id: z.string().uuid(),
       auth_email: z.string().email(),
-      admin_scope: z.enum(["tenant", "district"]).optional(),
     }),
   }),
   z.object({
-    action: z.literal("send_reset"),
-    payload: z.object({
-      auth_email: z.string().email(),
-      admin_scope: z.enum(["tenant", "district"]).optional(),
-    }),
+    action: z.literal("send_workspace_admin_reset"),
+    payload: z.object({ id: z.string().uuid() }),
   }),
+  z.object({ action: z.literal("list_super_admins"), payload: z.object({ search: z.string() }) }),
+  z.object({ action: z.literal("create_super_admin"), payload: z.object({ auth_email: z.string().email(), password: z.string().min(8) }) }),
+  z.object({ action: z.literal("set_super_admin_status"), payload: z.object({ id: z.string().uuid(), is_active: z.boolean() }) }),
+  z.object({ action: z.literal("update_super_admin_email"), payload: z.object({ id: z.string().uuid(), auth_email: z.string().email() }) }),
+  z.object({ action: z.literal("send_super_admin_reset"), payload: z.object({ auth_email: z.string().email() }) }),
 ]);
 
 const superAdminResponseSchemas = {
-  list_tenant_admins: edgeEnvelopeSchema(z.array(superTenantAdminSchema)),
-  create_tenant_admin: edgeEnvelopeSchema(superTenantAdminSchema),
-  set_admin_status: edgeEnvelopeSchema(superTenantAdminSchema),
-  update_admin_email: edgeEnvelopeSchema(superTenantAdminSchema),
-  send_reset: edgeEnvelopeSchema(z.object({ success: z.boolean() })),
+  list_workspace_admins: edgeEnvelopeSchema(z.array(superWorkspaceAdminSchema)),
+  create_workspace_admin: edgeEnvelopeSchema(superWorkspaceAdminSchema),
+  set_workspace_admin_status: edgeEnvelopeSchema(superWorkspaceAdminSchema),
+  update_workspace_admin_email: edgeEnvelopeSchema(superWorkspaceAdminSchema),
+  send_workspace_admin_reset: edgeEnvelopeSchema(z.object({ success: z.boolean() })),
+  list_super_admins: edgeEnvelopeSchema(z.array(superAdminProfileSchema)),
+  create_super_admin: edgeEnvelopeSchema(superAdminProfileSchema),
+  set_super_admin_status: edgeEnvelopeSchema(superAdminProfileSchema),
+  update_super_admin_email: edgeEnvelopeSchema(superAdminProfileSchema),
+  send_super_admin_reset: edgeEnvelopeSchema(z.object({ success: z.boolean() })),
 };
 
 
@@ -867,13 +866,13 @@ const districtDashboardResponseSchema = z.object({
       id: z.string(), requester_email: z.string().nullable().optional(), requester_name: z.string().nullable().optional(), subject: z.string(), message: z.string(), priority: z.enum(["low","normal","high","urgent"]), status: z.enum(["open","in_progress","resolved"]), created_at: z.string()
     })),
     tenant_metrics: z.array(z.object({
-      tenant_id: z.string(), tenant_name: z.string(), gear_total: z.number().int().nonnegative(), students_total: z.number().int().nonnegative(), active_checkouts: z.number().int().nonnegative(), overdue_items: z.number().int().nonnegative(), transactions_7d: z.number().int().nonnegative()
+      workspace_id: z.string(), workspace_name: z.string(), gear_total: z.number().int().nonnegative(), students_total: z.number().int().nonnegative(), active_checkouts: z.number().int().nonnegative(), overdue_items: z.number().int().nonnegative(), transactions_7d: z.number().int().nonnegative()
     })),
     traffic: z.object({ checkout_24h: z.number().int().nonnegative(), return_24h: z.number().int().nonnegative(), active_tenants_24h: z.number().int().nonnegative(), events_24h: z.number().int().nonnegative() }),
     traffic_by_hour: z.array(z.object({ hour: z.string(), checkout: z.number().int().nonnegative(), return: z.number().int().nonnegative() })),
-    recent_events: z.array(z.object({ tenant_id: z.string().nullable(), tenant_name: z.string(), action_type: z.enum(["checkout","return"]), action_time: z.string(), gear_name: z.string().nullable(), gear_barcode: z.string().nullable(), student_username: z.string().nullable(), student_id: z.string().nullable() })),
+    recent_events: z.array(z.object({ workspace_id: z.string().nullable(), workspace_name: z.string(), action_type: z.enum(["checkout","return"]), action_time: z.string(), gear_name: z.string().nullable(), gear_barcode: z.string().nullable(), student_username: z.string().nullable(), student_id: z.string().nullable() })),
     needs_attention: z.array(z.object({ key: z.string(), level: z.enum(["high","medium","low"]), title: z.string(), count: z.number().int().nonnegative() })),
-    tenants: z.array(districtDashboardTenantSchema),
+    workspaces: z.array(districtDashboardTenantSchema),
     usage: z.object({ gear_total: z.number().int().nonnegative(), students_total: z.number().int().nonnegative(), active_checkouts: z.number().int().nonnegative(), overdue_items: z.number().int().nonnegative(), transactions_7d: z.number().int().nonnegative() })
   })
 });
@@ -886,7 +885,7 @@ const districtHandoffRequestSchema = z.discriminatedUnion("action", [
 
 const districtHandoffResponseSchemas = {
   create: z.object({ code: z.string(), expires_at: z.string() }),
-  create_admin: z.object({ code: z.string().nullable(), district_slug: z.string().nullable(), role: z.enum(["tenant_admin","district_admin"]), expires_at: z.string().optional(), root_only: z.boolean().optional() }),
+  create_admin: z.object({ code: z.string().nullable(), district_slug: z.string().nullable(), role: z.enum(["workspace_admin","workspace_admin"]), expires_at: z.string().optional(), root_only: z.boolean().optional() }),
   consume: z.object({ access_token: z.string(), refresh_token: z.string(), district_slug: z.string() }),
 };
 
@@ -938,17 +937,14 @@ const contactSupportSubmitResponseSchema = z.object({
 export const generatedEdgeSchemas = {
   adminOpsRequest: adminOpsRequestSchema,
   adminOpsResponses: z.object(adminOpsResponseSchemas),
-  superTenantRequest: superTenantRequestSchema,
-  superTenantResponses: z.object(superTenantResponseSchemas),
+  superWorkspaceRequest: superWorkspaceRequestSchema,
+  superWorkspaceResponses: z.object(superWorkspaceResponseSchemas),
   superAdminRequest: superAdminRequestSchema,
   superAdminResponses: z.object(superAdminResponseSchemas),
   superOpsRequest: superOpsRequestSchema,
   superOpsResponses: z.object(superOpsResponseSchemas),
-  tenantAdminManageRequest: tenantAdminManageRequestSchema,
-  tenantAdminManageResponses: z.object(tenantAdminManageResponseSchemas),
-  districtDashboardResponse: districtDashboardResponseSchema,
-  districtHandoffRequest: districtHandoffRequestSchema,
-  districtHandoffResponses: z.object(districtHandoffResponseSchemas),
+  workspaceAdminManageRequest: workspaceAdminManageRequestSchema,
+  workspaceAdminManageResponses: z.object(workspaceAdminManageResponseSchemas),
   contactSalesSubmitRequest: contactSalesSubmitRequestSchema,
   contactSalesSubmitResponse: contactSalesSubmitResponseSchema,
   contactSupportSubmitRequest: contactSupportSubmitRequestSchema,

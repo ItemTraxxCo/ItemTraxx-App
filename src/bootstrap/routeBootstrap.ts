@@ -5,5 +5,5 @@ export const isPublicBootstrapRoute = (router: Router, path: string): boolean =>
 
 export const isAdminBootstrapRoute = (router: Router, path: string): boolean => {
   const resolved = router.resolve(path || "/");
-  return resolved.path.startsWith("/tenant/admin") || resolved.path === "/district";
+  return resolved.path.startsWith("/admin");
 };

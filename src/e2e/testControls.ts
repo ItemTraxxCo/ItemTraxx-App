@@ -8,29 +8,31 @@ import {
   clearAuthState,
   markAdminVerified,
   setAuthStateFromBackend,
-  setDistrictContext,
   setSecondaryAuth,
-  setTenantContext,
+  setWorkspaceContext,
 } from "../store/authState";
 
 declare global {
   interface Window {
     __itemtraxxTest?: {
-      setTenantUserSession: (tenantId?: string) => void;
-      setTenantAdminSession: (tenantId?: string, options?: { verified?: boolean }) => void;
-      setDistrictAdminSession: (districtId?: string, options?: { verified?: boolean }) => void;
+      setTenantAccountSession: (workspaceId?: string) => void;
+      setWorkspaceAdminSession: (workspaceId?: string, options?: { verified?: boolean }) => void;
       setSuperAdminSession: (options?: { verified?: boolean }) => void;
       invokeAdminGearCreate: (payload: {
-        tenant_id: string;
+        workspace_id: string;
         name: string;
         barcode: string;
         status: string;
         notes?: string;
+        access_mode: "all" | "restricted";
+        profile_ids: string[];
       }) => Promise<unknown>;
       invokeAdminStudentCreate: (payload: {
-        tenant_id: string;
+        workspace_id: string;
         username?: string;
         student_id?: string;
+        access_mode: "all" | "restricted";
+        profile_ids: string[];
       }) => Promise<unknown>;
       clearSession: () => void;
       navigate: (path: string) => Promise<void>;
@@ -61,60 +63,35 @@ export const attachE2EControls = (router: Router): void => {
   }
 
   window.__itemtraxxTest = {
-    setTenantUserSession(tenantId = "tenant-e2e") {
+    setTenantAccountSession(workspaceId = "tenant-e2e") {
       setAuthStateFromBackend({
         isInitialized: true,
         isAuthenticated: true,
         userId: "user-e2e-tenant",
         email: "tenant.user@example.com",
         signedInAt: new Date().toISOString(),
-        role: "tenant_user",
-        sessionTenantId: tenantId,
-        tenantContextId: tenantId,
-        districtContextId: null,
+        role: "tenant_account",
+        sessionWorkspaceId: workspaceId,
+        workspaceContextId: null,
         hasSecondaryAuth: false,
         superVerifiedAt: null,
       });
-      setTenantContext(tenantId);
+      setWorkspaceContext(workspaceId);
     },
-    setTenantAdminSession(tenantId = "tenant-e2e", options = { verified: true }) {
+    setWorkspaceAdminSession(workspaceId = "tenant-e2e", options = { verified: true }) {
       setAuthStateFromBackend({
         isInitialized: true,
         isAuthenticated: true,
         userId: "user-e2e-admin",
         email: "tenant.admin@example.com",
         signedInAt: new Date().toISOString(),
-        role: "tenant_admin",
-        sessionTenantId: tenantId,
-        tenantContextId: tenantId,
-        districtContextId: null,
+        role: "workspace_admin",
+        sessionWorkspaceId: workspaceId,
+        workspaceContextId: null,
         hasSecondaryAuth: false,
         superVerifiedAt: null,
       });
-      setTenantContext(tenantId);
-      setDistrictContext(null);
-      if (options.verified === false) {
-        clearAdminVerification();
-        return;
-      }
-      markAdminVerified();
-    },
-    setDistrictAdminSession(districtId = "district-e2e", options = { verified: true }) {
-      setAuthStateFromBackend({
-        isInitialized: true,
-        isAuthenticated: true,
-        userId: "user-e2e-district-admin",
-        email: "district.admin@example.com",
-        signedInAt: new Date().toISOString(),
-        role: "district_admin",
-        sessionTenantId: null,
-        tenantContextId: null,
-        districtContextId: districtId,
-        hasSecondaryAuth: false,
-        superVerifiedAt: null,
-      });
-      setTenantContext(null);
-      setDistrictContext(districtId);
+      setWorkspaceContext(workspaceId);
       if (options.verified === false) {
         clearAdminVerification();
         return;
@@ -129,13 +106,11 @@ export const attachE2EControls = (router: Router): void => {
         email: "super.admin@example.com",
         signedInAt: new Date().toISOString(),
         role: "super_admin",
-        sessionTenantId: null,
-        tenantContextId: null,
-        districtContextId: null,
+        sessionWorkspaceId: null,
+        workspaceContextId: null,
         hasSecondaryAuth: options.verified !== false,
       });
-      setTenantContext(null);
-      setDistrictContext(null);
+      setWorkspaceContext(null);
       setSecondaryAuth(options.verified !== false);
     },
     async invokeAdminGearCreate(payload) {
@@ -148,8 +123,7 @@ export const attachE2EControls = (router: Router): void => {
     },
     clearSession() {
       clearAuthState(true);
-      setTenantContext(null);
-      setDistrictContext(null);
+      setWorkspaceContext(null);
     },
     async navigate(path: string) {
       await router.push(path);

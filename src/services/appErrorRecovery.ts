@@ -37,11 +37,8 @@ export const resolveRecoveryRouteFromPath = (currentPath: string) => {
   if (currentPath.startsWith("/super-admin")) {
     return { name: "super-auth" as const, query: { reason: "session-expired" } };
   }
-  if (currentPath.startsWith("/district")) {
-    return { name: "tenant-admin-login" as const, query: { reason: "session-expired" } };
-  }
-  if (currentPath.startsWith("/tenant/admin")) {
-    return { name: "tenant-admin-login" as const, query: { reason: "session-expired" } };
+  if (currentPath.startsWith("/admin")) {
+    return { name: "workspace-admin-login" as const, query: { reason: "session-expired" } };
   }
   return { name: "public-login" as const, query: { reason: "session-expired" } };
 };

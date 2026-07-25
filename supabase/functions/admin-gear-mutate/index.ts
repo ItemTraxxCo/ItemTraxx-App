@@ -8,7 +8,7 @@ import {
   isMissingPrivilegedStepUpTable,
 } from "../_shared/privilegedStepUp.ts";
 import { resolveRateLimitResult } from "../_shared/preloginGuards.ts";
-import { validateTenantAdminDeviceSession } from "../_shared/tenantAdminSessions.ts";
+import { validateAccountDeviceSession } from "../_shared/accountSessions.ts";
 import { readJsonBody } from "../_shared/requestBody.ts";
 import {
   BARCODE_PATTERN,
@@ -35,6 +35,7 @@ const ALLOWED_GEAR_STATUSES = new Set([
   "retired",
   "in_studio_only",
 ] as const);
+const ACCESS_MODES = new Set(["all", "restricted"] as const);
 
 const resolveCorsHeaders = (req: Request) => {
   const origin = req.headers.get("Origin");
@@ -127,27 +128,27 @@ serve(async (req) => {
 
     const { data: profile, error: profileError } = await userClient
       .from("profiles")
-      .select("id, tenant_id, role, is_active")
+      .select("id, workspace_id, role, is_active")
       .eq("id", user.id)
       .single();
 
     if (
       profileError ||
-      !profile?.tenant_id ||
-      profile.role !== "tenant_admin" ||
+      !profile?.workspace_id ||
+      profile.role !== "workspace_admin" ||
       profile.is_active === false
     ) {
       return jsonResponse(403, { error: "Access denied" });
     }
 
-    const { data: tenantStatusRow } = await userClient
-      .from("tenants")
+    const { data: workspaceStatusRow } = await userClient
+      .from("workspaces")
       .select("status")
-      .eq("id", profile.tenant_id)
+      .eq("id", profile.workspace_id)
       .single();
 
-    if (tenantStatusRow?.status && tenantStatusRow.status !== "active") {
-      return jsonResponse(403, { error: "Tenant disabled" });
+    if (workspaceStatusRow?.status && workspaceStatusRow.status !== "active") {
+      return jsonResponse(403, { error: "Workspace disabled" });
     }
 
     const { action, payload } = await readJsonBody(req);
@@ -167,6 +168,26 @@ serve(async (req) => {
     const adminClient = createClient(supabaseUrl, serviceKey, {
       auth: { persistSession: false },
     });
+    const resolveAccess = async () => {
+      const accessMode = requireEnum(payloadRecord.access_mode, ACCESS_MODES);
+      const profileIds = Array.isArray(payloadRecord.profile_ids)
+        ? [...new Set(payloadRecord.profile_ids.map((value) => requireUuid(value)))]
+        : [];
+      if (accessMode === "restricted" && profileIds.length === 0) throw new ValidationError("Select at least one Tenant Account.");
+      if (profileIds.length) {
+        const { count, error } = await adminClient.from("profiles").select("id", { count: "exact", head: true }).eq("workspace_id", profile.workspace_id).eq("role", "tenant_account").eq("is_active", true).is("deleted_at", null).in("id", profileIds);
+        if (error || count !== profileIds.length) throw new ValidationError("Invalid Tenant Account selection.");
+      }
+      return { accessMode, profileIds };
+    };
+    const replaceAccess = async (gearId: string, accessMode: "all" | "restricted", profileIds: string[]) => {
+      const { error: deleteError } = await adminClient.from("gear_access_grants").delete().eq("gear_id", gearId);
+      if (deleteError) throw new Error("Unable to update item access.");
+      if (accessMode === "restricted") {
+        const { error } = await adminClient.from("gear_access_grants").insert(profileIds.map((profileId) => ({ gear_id: gearId, profile_id: profileId, granted_by: user.id })));
+        if (error) throw new Error("Unable to update item access.");
+      }
+    };
 
     const writeAudit = async (
       actionType: string,
@@ -174,7 +195,7 @@ serve(async (req) => {
       metadata: Record<string, unknown>,
     ) => {
       const { error } = await adminClient.from("admin_audit_logs").insert({
-        tenant_id: profile.tenant_id,
+        workspace_id: profile.workspace_id,
         actor_id: profile.id,
         action_type: actionType,
         entity_type: "gear",
@@ -188,7 +209,7 @@ serve(async (req) => {
       try {
         const hasStepUp = await hasPrivilegedStepUp(adminClient, {
           userId: user.id,
-          roleScope: "tenant_admin",
+          roleScope: "workspace_admin",
           authToken,
         });
         if (!hasStepUp) {
@@ -230,8 +251,8 @@ serve(async (req) => {
         });
       }
 
-      const activeSession = await validateTenantAdminDeviceSession(adminClient, {
-        tenantId: profile.tenant_id,
+      const activeSession = await validateAccountDeviceSession(adminClient, {
+        workspaceId: profile.workspace_id,
         profileId: profile.id,
         deviceId,
         authToken,
@@ -267,8 +288,8 @@ serve(async (req) => {
     if (action === "list_deleted") {
       const { data, error } = await adminClient
         .from("gear")
-        .select("id, tenant_id, name, barcode, serial_number, status, notes")
-        .eq("tenant_id", profile.tenant_id)
+        .select("id, workspace_id, name, barcode, serial_number, status, notes")
+        .eq("workspace_id", profile.workspace_id)
         .not("deleted_at", "is", null)
         .order("deleted_at", { ascending: false })
         .limit(300);
@@ -281,6 +302,7 @@ serve(async (req) => {
     }
 
     if (action === "create") {
+      const { accessMode, profileIds } = await resolveAccess();
       const { name, barcode, serial_number, status, notes } = payloadRecord;
       const normalizedName = requireText(name, { maxLen: 120 });
       const normalizedBarcode = requireText(barcode, { maxLen: 64, pattern: BARCODE_PATTERN });
@@ -291,23 +313,25 @@ serve(async (req) => {
       const { data, error } = await adminClient
         .from("gear")
         .insert({
-          tenant_id: profile.tenant_id,
+          workspace_id: profile.workspace_id,
           name: normalizedName,
           barcode: normalizedBarcode,
           serial_number: normalizedSerial || null,
           status: normalizedStatus,
           notes: normalizedNotes || null,
+          access_mode: accessMode,
         })
-        .select("id, tenant_id, name, barcode, serial_number, status, notes")
+        .select("id, workspace_id, name, barcode, serial_number, status, notes")
         .single();
 
       if (error || !data) {
         return jsonResponse(400, { error: "Unable to create item." });
       }
+      await replaceAccess(data.id, accessMode, profileIds);
 
       if (normalizedStatus !== "available" && normalizedStatus !== "checked_out") {
         await adminClient.from("gear_status_history").insert({
-          tenant_id: profile.tenant_id,
+          workspace_id: profile.workspace_id,
           gear_id: data.id,
           status: normalizedStatus,
           note: normalizedNotes || null,
@@ -325,6 +349,7 @@ serve(async (req) => {
     }
 
     if (action === "update") {
+      const { accessMode, profileIds } = await resolveAccess();
       const { id, name, barcode, status, notes } = payloadRecord;
       const normalizedId = requireUuid(id);
       const normalizedName = requireText(name, { maxLen: 120 });
@@ -336,7 +361,7 @@ serve(async (req) => {
         .from("gear")
         .select("status, checked_out_by, checked_out_at")
         .eq("id", normalizedId)
-        .eq("tenant_id", profile.tenant_id)
+        .eq("workspace_id", profile.workspace_id)
         .is("deleted_at", null)
         .single();
 
@@ -358,16 +383,18 @@ serve(async (req) => {
           barcode: normalizedBarcode,
           status: normalizedStatus,
           notes: normalizedNotes || null,
+          access_mode: accessMode,
         })
         .eq("id", normalizedId)
-        .eq("tenant_id", profile.tenant_id)
+        .eq("workspace_id", profile.workspace_id)
         .is("deleted_at", null)
-        .select("id, tenant_id, name, barcode, serial_number, status, notes")
+        .select("id, workspace_id, name, barcode, serial_number, status, notes")
         .single();
 
       if (error || !data) {
         return jsonResponse(400, { error: "Unable to update item." });
       }
+      await replaceAccess(data.id, accessMode, profileIds);
 
       if (
         existingGear?.status !== normalizedStatus &&
@@ -375,7 +402,7 @@ serve(async (req) => {
         normalizedStatus !== "checked_out"
       ) {
         await adminClient.from("gear_status_history").insert({
-          tenant_id: profile.tenant_id,
+          workspace_id: profile.workspace_id,
           gear_id: data.id,
           status: normalizedStatus,
           note: normalizedNotes || null,
@@ -400,7 +427,7 @@ serve(async (req) => {
         .from("gear")
         .select("id, status, checked_out_by, checked_out_at")
         .eq("id", normalizedId)
-        .eq("tenant_id", profile.tenant_id)
+        .eq("workspace_id", profile.workspace_id)
         .is("deleted_at", null)
         .maybeSingle();
 
@@ -421,7 +448,7 @@ serve(async (req) => {
           deleted_by: user.id,
         })
         .eq("id", normalizedId)
-        .eq("tenant_id", profile.tenant_id)
+        .eq("workspace_id", profile.workspace_id)
         .is("deleted_at", null);
 
       if (error) {
@@ -443,9 +470,9 @@ serve(async (req) => {
         .from("gear")
         .update({ deleted_at: null, deleted_by: null })
         .eq("id", normalizedId)
-        .eq("tenant_id", profile.tenant_id)
+        .eq("workspace_id", profile.workspace_id)
         .not("deleted_at", "is", null)
-        .select("id, tenant_id, name, barcode, serial_number, status, notes")
+        .select("id, workspace_id, name, barcode, serial_number, status, notes")
         .single();
 
       if (error || !data) {

@@ -10,7 +10,7 @@ import {
   requireTextArray,
   ValidationError,
 } from "../_shared/validation.ts";
-import { validateTenantAdminDeviceSession } from "../_shared/tenantAdminSessions.ts";
+import { validateAccountDeviceSession } from "../_shared/accountSessions.ts";
 import { readJsonBody } from "../_shared/requestBody.ts";
 import { requireTrustedEdgeIngress } from "../_shared/trustedIngress.ts";
 
@@ -27,13 +27,13 @@ type RateLimitResult = {
 };
 
 const CHECKOUT_ACTIONS = new Set(
-  ["checkout", "return", "auto", "admin_return"] as const,
+  ["checkout", "return", "auto", "admin_return", "quick_return"] as const,
 );
 
 const buildGearLogOperationId = (
   operationId: string,
   gearId: string,
-  actionType: "checkout" | "return" | "admin_return",
+  actionType: "checkout" | "return" | "admin_return" | "quick_return",
 ) => `${operationId}:${gearId}:${actionType}`;
 
 const resolveCorsHeaders = (req: Request) => {
@@ -139,35 +139,35 @@ serve(async (req) => {
 
     const { data: callerProfile, error: profileError } = await userClient
       .from("profiles")
-      .select("tenant_id, role, is_active")
+      .select("workspace_id, role, is_active")
       .eq("id", user.id)
       .single();
 
     const callerRole = callerProfile?.role;
     if (
       profileError ||
-      !callerProfile?.tenant_id ||
+      !callerProfile?.workspace_id ||
       callerProfile.is_active === false ||
       !callerRole ||
-      !["tenant_user", "tenant_admin"].includes(callerRole)
+      !["tenant_account", "workspace_admin"].includes(callerRole)
     ) {
       return jsonResponse(403, { error: "Access denied" });
     }
 
-    const { data: tenantStatusRow } = await userClient
-      .from("tenants")
+    const { data: workspaceStatusRow } = await userClient
+      .from("workspaces")
       .select("status")
-      .eq("id", callerProfile.tenant_id)
+      .eq("id", callerProfile.workspace_id)
       .single();
 
-    if (tenantStatusRow?.status && tenantStatusRow.status !== "active") {
-      return jsonResponse(403, { error: "Tenant disabled" });
+    if (workspaceStatusRow?.status && workspaceStatusRow.status !== "active") {
+      return jsonResponse(403, { error: "Workspace disabled" });
     }
 
     const { data: rateLimit, error: rateLimitError } = await userClient.rpc(
       "consume_rate_limit",
       {
-        p_scope: "tenant",
+        p_scope: "workspace",
         p_limit: 10,
         p_window_seconds: 60,
       },
@@ -210,20 +210,21 @@ serve(async (req) => {
     });
 
     const isAdminReturn = actionType === "admin_return";
-    if (isAdminReturn && callerRole !== "tenant_admin") {
+    const isQuickReturn = actionType === "quick_return";
+    if (isAdminReturn && callerRole !== "workspace_admin") {
       return jsonResponse(403, { error: "Access denied" });
     }
 
-    if (callerRole === "tenant_admin") {
+    {
       const deviceId = optionalText(device_id, { maxLen: 128 });
       if (!deviceId) {
         return jsonResponse(400, { error: "Device session is required." });
       }
 
-      const activeAdminSession = await validateTenantAdminDeviceSession(
+      const activeAdminSession = await validateAccountDeviceSession(
         adminClient,
         {
-          tenantId: callerProfile.tenant_id,
+          workspaceId: callerProfile.workspace_id,
           profileId: user.id,
           deviceId,
           authToken,
@@ -260,23 +261,27 @@ serve(async (req) => {
       });
     }
 
-    let student: { id: string; tenant_id: string } | null = null;
+    let student: { id: string; workspace_id: string; access_mode: string } | null = null;
 
-    if (!isAdminReturn) {
+    if (!isAdminReturn && !isQuickReturn) {
       const studentId = requireText(student_id, { maxLen: 32 });
 
       const { data: studentData, error: studentError } = await adminClient
         .from("students")
-        .select("id, tenant_id")
+        .select("id, workspace_id, access_mode")
         .eq("student_id", studentId)
-        .eq("tenant_id", callerProfile.tenant_id)
+        .eq("workspace_id", callerProfile.workspace_id)
         .is("deleted_at", null)
         .single();
 
-      if (studentError || !studentData?.id || !studentData.tenant_id) {
+      if (studentError || !studentData?.id || !studentData.workspace_id) {
         return jsonResponse(404, { error: "Student not found." });
       }
 
+      if (callerRole === "tenant_account" && studentData.access_mode === "restricted") {
+        const { data: grant } = await adminClient.from("borrower_access_grants").select("student_id").eq("student_id", studentData.id).eq("profile_id", user.id).maybeSingle();
+        if (!grant) return jsonResponse(404, { error: "Student not found." });
+      }
       student = studentData;
     }
 
@@ -286,9 +291,9 @@ serve(async (req) => {
     for (const barcode of gearBarcodes) {
       const { data: gear } = await adminClient
         .from("gear")
-        .select("id, tenant_id, checked_out_by, status")
+        .select("id, workspace_id, checked_out_by, status, access_mode")
         .eq("barcode", barcode)
-        .eq("tenant_id", callerProfile.tenant_id)
+        .eq("workspace_id", callerProfile.workspace_id)
         .is("deleted_at", null)
         .single();
 
@@ -297,10 +302,15 @@ serve(async (req) => {
         continue;
       }
 
+      if (callerRole === "tenant_account" && gear.access_mode === "restricted") {
+        const { data: grant } = await adminClient.from("gear_access_grants").select("gear_id").eq("gear_id", gear.id).eq("profile_id", user.id).maybeSingle();
+        if (!grant) { skippedBarcodes.push(barcode); continue; }
+      }
+
       const existingOperationId = buildGearLogOperationId(
         operationId,
         gear.id,
-        isAdminReturn ? "admin_return" : "checkout",
+        isAdminReturn ? "admin_return" : isQuickReturn ? "quick_return" : "checkout",
       );
       const existingReturnOperationId = buildGearLogOperationId(
         operationId,
@@ -310,7 +320,7 @@ serve(async (req) => {
       const { data: existingOperation } = await adminClient
         .from("gear_logs")
         .select("id")
-        .eq("tenant_id", callerProfile.tenant_id)
+        .eq("workspace_id", callerProfile.workspace_id)
         .eq("gear_id", gear.id)
         .in("operation_id", isAdminReturn
           ? [existingOperationId]
@@ -323,7 +333,7 @@ serve(async (req) => {
         continue;
       }
 
-      if (isAdminReturn) {
+      if (isAdminReturn || isQuickReturn) {
         const normalizedStatus = String(gear.status ?? "").toLowerCase();
         if (!gear.checked_out_by || normalizedStatus !== "checked_out") {
           skippedBarcodes.push(barcode);
@@ -338,7 +348,7 @@ serve(async (req) => {
             status: "available",
           })
           .eq("id", gear.id)
-          .eq("tenant_id", callerProfile.tenant_id)
+          .eq("workspace_id", callerProfile.workspace_id)
           .eq("status", "checked_out")
           .not("checked_out_by", "is", null)
           .select("id")
@@ -351,13 +361,13 @@ serve(async (req) => {
 
         const { error: logError } = await adminClient.from("gear_logs").upsert({
           gear_id: gear.id,
-          action_type: "admin_return",
+          action_type: isQuickReturn ? "quick_return" : "admin_return",
           checked_out_by: gear.checked_out_by,
           performed_by: user.id,
-          tenant_id: callerProfile.tenant_id,
-          operation_id: buildGearLogOperationId(operationId, gear.id, "admin_return"),
+          workspace_id: callerProfile.workspace_id,
+          operation_id: buildGearLogOperationId(operationId, gear.id, isQuickReturn ? "quick_return" : "admin_return"),
         }, {
-          onConflict: "tenant_id,gear_id,action_type,operation_id",
+          onConflict: "workspace_id,gear_id,action_type,operation_id",
           ignoreDuplicates: true,
         });
 
@@ -392,7 +402,7 @@ serve(async (req) => {
           status: isCheckout ? "checked_out" : "available",
         })
         .eq("id", gear.id)
-        .eq("tenant_id", callerProfile.tenant_id);
+        .eq("workspace_id", callerProfile.workspace_id);
 
       const { data: updatedGear, error: updateError } = await (isCheckout
         ? updateBuilder.is("checked_out_by", null).eq("status", "available")
@@ -411,10 +421,10 @@ serve(async (req) => {
         action_type: resolvedActionType,
         checked_out_by: student!.id,
         performed_by: user.id,
-        tenant_id: callerProfile.tenant_id,
+        workspace_id: callerProfile.workspace_id,
         operation_id: buildGearLogOperationId(operationId, gear.id, resolvedActionType),
       }, {
-        onConflict: "tenant_id,gear_id,action_type,operation_id",
+        onConflict: "workspace_id,gear_id,action_type,operation_id",
         ignoreDuplicates: true,
       });
 

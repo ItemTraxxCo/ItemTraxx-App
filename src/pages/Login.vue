@@ -41,16 +41,16 @@
           />
           <RouterLink class="story-back-link compact-back-link" to="/">Back</RouterLink>
           <h1>Sign in</h1>
-          <p class="login-panel-copy">Use your access code and password to enter your ItemTraxx app.</p>
+          <p class="login-panel-copy">Use your email and password to enter your workspace.</p>
 
-          <form class="form login-form" @submit.prevent="handleTenantLogin">
+          <form class="form login-form" @submit.prevent="handleWorkspaceLogin">
             <label>
                
               <input
-                v-model="accessCode"
-                type="text"
-                placeholder="Enter access code"
-                autocomplete="off"
+                v-model="email"
+                type="email"
+                placeholder="Email address"
+                autocomplete="email"
                 autocapitalize="off"
                 autocorrect="off"
                 spellcheck="false"
@@ -105,7 +105,7 @@
             </div>
 
             <p class="admin-login-note">
-              Admin? <RouterLink to="/tenant/admin-login">Go to admin sign in</RouterLink>
+              Workspace Admin? <RouterLink to="/admin/login">Go to admin sign in</RouterLink>
             </p>
 
             <p class="muted support-note">
@@ -137,14 +137,11 @@ import { computed, onMounted, onUnmounted, ref } from "vue";
 import { RouterLink, useRouter } from "vue-router";
 import SafeExternalLink from "../components/SafeExternalLink.vue";
 import { useTurnstile } from "../composables/useTurnstile";
-import { buildDistrictAppHandoffUrl } from "../services/districtService";
-import { getDistrictState } from "../store/districtState";
 import { getAuthState } from "../store/authState";
 import { safeExternalUrl } from "../utils/safeUrl";
 
 const router = useRouter();
-const district = getDistrictState();
-const accessCode = ref("");
+const email = ref("");
 const password = ref("");
 const showPassword = ref(false);
 const error = ref("");
@@ -218,10 +215,10 @@ const {
   reset: resetTurnstile,
 } = useTurnstile(turnstileSiteKey);
 const canSubmit = computed(() => {
-  const hasAccessCode = accessCode.value.trim().length > 0;
+  const hasEmail = email.value.trim().length > 0;
   const hasPassword = password.value.length > 0;
   const hasTurnstile = !turnstileSiteKey || Boolean(turnstileToken.value);
-  return hasAccessCode && hasPassword && hasTurnstile;
+  return hasEmail && hasPassword && hasTurnstile;
 });
 const setTurnstileContainerRef = (
   el: Element | { $el?: Element } | null
@@ -281,7 +278,7 @@ const getTenantSignInErrorMessage = (message: string) => {
   return null;
 };
 
-const handleTenantLogin = async () => {
+const handleWorkspaceLogin = async () => {
   error.value = "";
   isLoading.value = true;
   try {
@@ -289,9 +286,9 @@ const handleTenantLogin = async () => {
       error.value = "Complete the security check and try again.";
       return;
     }
-    const { createDistrictSessionHandoff, tenantLogin } = await import("../services/authService");
-    const session = await tenantLogin(
-      accessCode.value.trim(),
+    const { workspaceLogin } = await import("../services/authService");
+    const session = await workspaceLogin(
+      email.value.trim(),
       password.value,
       turnstileToken.value || undefined
     );
@@ -305,22 +302,11 @@ const handleTenantLogin = async () => {
     void runPostHog(({ capturePostHogEvent }) =>
       capturePostHogEvent("tenant_login_succeeded", { login_method: "password" })
     );
-    if (!district.isDistrictHost && session?.districtSlug) {
-      const handoffCode = await createDistrictSessionHandoff(session.districtSlug);
-      window.location.replace(
-        buildDistrictAppHandoffUrl(
-          session.districtSlug,
-          "/tenant/checkout",
-          {
-            tokenHash: handoffCode.tokenHash,
-            loginMethod: "password",
-            loginLocation: "tenant_login",
-          }
-        )
-      );
+    if (session.workspaceSlug && window.location.hostname !== `${session.workspaceSlug}.app.itemtraxx.com`) {
+      window.location.replace(`https://${session.workspaceSlug}.app.itemtraxx.com/checkout`);
       return;
     }
-    await router.push("/tenant/checkout");
+    await router.push("/checkout");
   } catch (err) {
     if (err instanceof Error && err.message === "LIMITER_UNAVAILABLE") {
       error.value = "";

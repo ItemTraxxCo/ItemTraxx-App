@@ -6,7 +6,7 @@ type RateLimitResult = {
 };
 
 const consumeRateLimit = async (
-  scope: "tenant" | "admin",
+  scope: "workspace" | "admin",
   limit: number,
   windowSeconds: number
 ) => {

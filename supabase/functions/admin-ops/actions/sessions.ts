@@ -3,7 +3,7 @@ import {
   isMissingPostgrestRelation as isMissingRelation,
 } from "../../_shared/postgrestErrors.ts";
 import { resolveTrustedGeneralLocation as resolveGeneralLocation } from "../../_shared/requestMetadata.ts";
-import { isTenantAdminTokenBlockedBySessionRevocation } from "../../_shared/tenantAdminSessions.ts";
+import { isAccountTokenBlockedBySessionRevocation } from "../../_shared/accountSessions.ts";
 import { optionalText } from "../../_shared/validation.ts";
 import type {
   AdminOpsContext,
@@ -14,7 +14,7 @@ import type {
 export type SessionSecurityContext = Pick<
   AdminOpsContext,
   | "adminClient"
-  | "tenantId"
+  | "workspaceId"
   | "user"
   | "authToken"
   | "authSessionBinding"
@@ -51,7 +51,7 @@ export const resolveDeviceSessionContext = (
 });
 
 const isMissingSessionTable = (error: RpcError | null | undefined) =>
-  isMissingRelation(error, "tenant_admin_sessions");
+  isMissingRelation(error, "account_sessions");
 
 const isMissingSessionMetadataColumn = (
   error: RpcError | null | undefined,
@@ -75,10 +75,10 @@ export const findActiveSession = async (context: SessionSecurityContext) => {
       revoked: false as const,
     };
   }
-  const tokenBlock = await isTenantAdminTokenBlockedBySessionRevocation(
+  const tokenBlock = await isAccountTokenBlockedBySessionRevocation(
     context.adminClient,
     {
-      tenantId: context.tenantId,
+      workspaceId: context.workspaceId,
       profileId: context.user.id,
       authToken: context.authToken,
     },
@@ -98,9 +98,9 @@ export const findActiveSession = async (context: SessionSecurityContext) => {
     };
   }
   const { data, error } = await context.adminClient
-    .from("tenant_admin_sessions")
+    .from("account_sessions")
     .select("id, auth_session_id, auth_token_hash")
-    .eq("tenant_id", context.tenantId)
+    .eq("workspace_id", context.workspaceId)
     .eq("profile_id", context.user.id)
     .eq("device_id", context.deviceSession.deviceId)
     .is("revoked_at", null)
@@ -143,9 +143,9 @@ export const findActiveSession = async (context: SessionSecurityContext) => {
   }
 
   const { data: revokedRow, error: revokedError } = await context.adminClient
-    .from("tenant_admin_sessions")
+    .from("account_sessions")
     .select("id")
-    .eq("tenant_id", context.tenantId)
+    .eq("workspace_id", context.workspaceId)
     .eq("profile_id", context.user.id)
     .eq("device_id", context.deviceSession.deviceId)
     .not("revoked_at", "is", null)
@@ -181,9 +181,9 @@ export const touchCurrentSession = async (
   }
   const now = new Date().toISOString();
   const { data: existing, error: existingError } = await context.adminClient
-    .from("tenant_admin_sessions")
+    .from("account_sessions")
     .select("id")
-    .eq("tenant_id", context.tenantId)
+    .eq("workspace_id", context.workspaceId)
     .eq("profile_id", context.user.id)
     .eq("device_id", context.deviceSession.deviceId)
     .is("revoked_at", null)
@@ -192,7 +192,7 @@ export const touchCurrentSession = async (
   if (existingError) {
     console.error("admin-ops touch_session existing lookup failed", {
       request_id: context.requestId,
-      tenant_id: context.tenantId,
+      workspace_id: context.workspaceId,
       profile_id: context.user.id,
       device_id: context.deviceSession.deviceId,
       error: existingError,
@@ -211,10 +211,10 @@ export const touchCurrentSession = async (
     );
   }
 
-  const tokenBlock = await isTenantAdminTokenBlockedBySessionRevocation(
+  const tokenBlock = await isAccountTokenBlockedBySessionRevocation(
     context.adminClient,
     {
-      tenantId: context.tenantId,
+      workspaceId: context.workspaceId,
       profileId: context.user.id,
       authToken: context.authToken,
     },
@@ -262,7 +262,7 @@ export const touchCurrentSession = async (
       ...baseBinding,
     };
     const { error: updateError } = await context.adminClient
-      .from("tenant_admin_sessions")
+      .from("account_sessions")
       .update(
         shouldTryMetadata ? { ...baseUpdate, ...optionalMetadata } : baseUpdate,
       )
@@ -271,7 +271,7 @@ export const touchCurrentSession = async (
       console.error("admin-ops touch_session update failed", {
         request_id: context.requestId,
         session_id: existing.id,
-        tenant_id: context.tenantId,
+        workspace_id: context.workspaceId,
         profile_id: context.user.id,
         device_id: context.deviceSession.deviceId,
         error: updateError,
@@ -289,7 +289,7 @@ export const touchCurrentSession = async (
         isMissingSessionMetadataColumn(updateError as RpcError)
       ) {
         const { error: fallbackUpdateError } = await context.adminClient
-          .from("tenant_admin_sessions")
+          .from("account_sessions")
           .update({
             last_seen_at: now,
             device_label: context.deviceSession.deviceLabel,
@@ -300,7 +300,7 @@ export const touchCurrentSession = async (
           console.error("admin-ops touch_session fallback update failed", {
             request_id: context.requestId,
             session_id: existing.id,
-            tenant_id: context.tenantId,
+            workspace_id: context.workspaceId,
             profile_id: context.user.id,
             device_id: context.deviceSession.deviceId,
             error: fallbackUpdateError,
@@ -321,7 +321,7 @@ export const touchCurrentSession = async (
     }
   } else {
     const baseInsert = {
-      tenant_id: context.tenantId,
+      workspace_id: context.workspaceId,
       profile_id: context.user.id,
       device_id: context.deviceSession.deviceId,
       device_label: context.deviceSession.deviceLabel,
@@ -331,14 +331,14 @@ export const touchCurrentSession = async (
       last_seen_at: now,
     };
     const { error: insertError } = await context.adminClient
-      .from("tenant_admin_sessions")
+      .from("account_sessions")
       .insert(
         shouldTryMetadata ? { ...baseInsert, ...optionalMetadata } : baseInsert,
       );
     if (insertError) {
       console.error("admin-ops touch_session insert failed", {
         request_id: context.requestId,
-        tenant_id: context.tenantId,
+        workspace_id: context.workspaceId,
         profile_id: context.user.id,
         device_id: context.deviceSession.deviceId,
         error: insertError,
@@ -359,12 +359,12 @@ export const touchCurrentSession = async (
         isMissingSessionMetadataColumn(insertError as RpcError)
       ) {
         const { error: fallbackInsertError } = await context.adminClient
-          .from("tenant_admin_sessions")
+          .from("account_sessions")
           .insert(baseInsert);
         if (fallbackInsertError) {
           console.error("admin-ops touch_session fallback insert failed", {
             request_id: context.requestId,
-            tenant_id: context.tenantId,
+            workspace_id: context.workspaceId,
             profile_id: context.user.id,
             device_id: context.deviceSession.deviceId,
             error: fallbackInsertError,
@@ -443,11 +443,11 @@ export const handleSessionAction = async (
         | null;
       error: RpcError | null;
     } = await context.adminClient
-      .from("tenant_admin_sessions")
+      .from("account_sessions")
       .select(
         "id, device_id, device_label, user_agent, login_method, login_location, general_location, created_at, last_seen_at",
       )
-      .eq("tenant_id", context.tenantId)
+      .eq("workspace_id", context.workspaceId)
       .eq("profile_id", context.user.id)
       .is("revoked_at", null)
       .order("last_seen_at", { ascending: false })
@@ -457,11 +457,11 @@ export const handleSessionAction = async (
       isMissingSessionMetadataColumn(sessionQuery.error as RpcError)
     ) {
       sessionQuery = await context.adminClient
-        .from("tenant_admin_sessions")
+        .from("account_sessions")
         .select(
           "id, device_id, device_label, user_agent, created_at, last_seen_at",
         )
-        .eq("tenant_id", context.tenantId)
+        .eq("workspace_id", context.workspaceId)
         .eq("profile_id", context.user.id)
         .is("revoked_at", null)
         .order("last_seen_at", { ascending: false })
@@ -501,13 +501,13 @@ export const handleSessionAction = async (
       return context.jsonResponse(400, { error: "Session id is required." });
     }
     const { data: revokedRows, error } = await context.adminClient
-      .from("tenant_admin_sessions")
+      .from("account_sessions")
       .update({
         revoked_at: new Date().toISOString(),
         revoked_by: context.user.id,
       })
       .eq("id", sessionId)
-      .eq("tenant_id", context.tenantId)
+      .eq("workspace_id", context.workspaceId)
       .eq("profile_id", context.user.id)
       .is("revoked_at", null)
       .select("id");
@@ -524,12 +524,12 @@ export const handleSessionAction = async (
 
   if (context.action === "revoke_current_session") {
     let query = context.adminClient
-      .from("tenant_admin_sessions")
+      .from("account_sessions")
       .update({
         revoked_at: new Date().toISOString(),
         revoked_by: context.user.id,
       })
-      .eq("tenant_id", context.tenantId)
+      .eq("workspace_id", context.workspaceId)
       .eq("profile_id", context.user.id)
       .is("revoked_at", null);
     if (context.authSessionBinding.sessionId) {
@@ -552,12 +552,12 @@ export const handleSessionAction = async (
 
   const signOutCurrent = context.payload.sign_out_current === true;
   let query = context.adminClient
-    .from("tenant_admin_sessions")
+    .from("account_sessions")
     .update({
       revoked_at: new Date().toISOString(),
       revoked_by: context.user.id,
     })
-    .eq("tenant_id", context.tenantId)
+    .eq("workspace_id", context.workspaceId)
     .eq("profile_id", context.user.id)
     .is("revoked_at", null);
   if (!signOutCurrent && context.deviceSession.deviceId) {

@@ -3,7 +3,7 @@ import {
   mockAdminOps,
   mockSystemStatus,
   mockUnauthenticatedSession,
-  setTenantAdminSession,
+  setWorkspaceAdminSession,
 } from "./helpers/testHarness";
 
 type GuardScenario =
@@ -53,7 +53,7 @@ const callAdminMutation = async (
   );
 };
 
-test.describe("tenant-admin mutation guard coverage", () => {
+test.describe("Workspace Admin mutation guard coverage", () => {
   for (const scenario of guardScenarios) {
     test(`admin-gear-mutate + admin-student-mutate: ${scenario.kind}`, async ({ page }) => {
       await mockSystemStatus(page);
@@ -93,7 +93,7 @@ test.describe("tenant-admin mutation guard coverage", () => {
               data: isGearCreate
                 ? {
                     id: "gear-1",
-                    tenant_id: "tenant-e2e",
+                    workspace_id: "tenant-e2e",
                     name: payload.name,
                     barcode: payload.barcode,
                     serial_number: null,
@@ -102,7 +102,7 @@ test.describe("tenant-admin mutation guard coverage", () => {
                   }
                 : {
                     id: "student-1",
-                    tenant_id: "tenant-e2e",
+                    workspace_id: "tenant-e2e",
                     username: payload.username ?? "BorrowerOne",
                     student_id: payload.student_id ?? "1234AB",
                   },
@@ -125,8 +125,8 @@ test.describe("tenant-admin mutation guard coverage", () => {
       await page.evaluate(() => {
         window.localStorage.setItem("itemtraxx-device-id", "device-guard-test");
         window.localStorage.setItem("itemtraxx-device-label", "Test device");
-        window.localStorage.setItem("itemtraxx:onboarding:v1:tenant_user", new Date().toISOString());
-        window.localStorage.setItem("itemtraxx:onboarding:v1:tenant_admin", new Date().toISOString());
+        window.localStorage.setItem("itemtraxx:onboarding:v1:tenant_account", new Date().toISOString());
+        window.localStorage.setItem("itemtraxx:onboarding:v1:workspace_admin", new Date().toISOString());
         window.localStorage.setItem(
           "itemtraxx-cookie-consent",
           JSON.stringify({
@@ -136,17 +136,17 @@ test.describe("tenant-admin mutation guard coverage", () => {
           })
         );
       });
-      await setTenantAdminSession(page, "tenant-e2e");
+      await setWorkspaceAdminSession(page, "tenant-e2e");
 
       const gearResult = await callAdminMutation(page, "invokeAdminGearCreate", {
-        tenant_id: "tenant-e2e",
+        workspace_id: "tenant-e2e",
         name: "Camera A",
         barcode: "CAM-1",
         status: "available",
       });
 
       const studentResult = await callAdminMutation(page, "invokeAdminStudentCreate", {
-        tenant_id: "tenant-e2e",
+        workspace_id: "tenant-e2e",
         username: "BorrowerOne",
         student_id: "1234AB",
       });

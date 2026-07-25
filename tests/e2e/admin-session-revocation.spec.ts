@@ -156,18 +156,18 @@ const installAdminOpsMock = async (context: BrowserContext, state: AdminOpsState
   });
 };
 
-const seedTenantAdminState = async (page: Page, deviceId: string, deviceLabel: string) => {
+const seedWorkspaceAdminState = async (page: Page, deviceId: string, deviceLabel: string) => {
   await page.goto("/");
-  await page.waitForFunction(() => typeof window.__itemtraxxTest?.setTenantAdminSession === "function");
+  await page.waitForFunction(() => typeof window.__itemtraxxTest?.setWorkspaceAdminSession === "function");
   await waitForPublicAuthBootstrap(page);
   await page.evaluate(
-    ({ tenantId, deviceId: id, deviceLabel: label, deviceIdKey, deviceLabelKey }) => {
+    ({ workspaceId, deviceId: id, deviceLabel: label, deviceIdKey, deviceLabelKey }) => {
       localStorage.setItem(deviceIdKey, id);
       localStorage.setItem(deviceLabelKey, label);
-      window.__itemtraxxTest?.setTenantAdminSession(tenantId);
+      window.__itemtraxxTest?.setWorkspaceAdminSession(workspaceId);
     },
     {
-      tenantId: "tenant-e2e",
+      workspaceId: "tenant-e2e",
       deviceId,
       deviceLabel,
       deviceIdKey: DEVICE_ID_KEY,
@@ -188,7 +188,7 @@ const callAdminOps = async <T>(page: Page, action: string, payload: Record<strin
   }, { action, payload }) as { status: number; body: { data?: T; error?: string } };
 };
 
-test.describe("tenant admin device revocation", () => {
+test.describe("Workspace Admin device revocation", () => {
 
   test("HTTP session heartbeat repeats after start and handles server-side termination", async ({ page }) => {
     let authenticatedPhase = false;
@@ -217,8 +217,8 @@ test.describe("tenant admin device revocation", () => {
                   last_sign_in_at: "2026-07-13T12:00:00.000Z",
                 },
                 profile: {
-                  role: "tenant_admin",
-                  tenant_id: "tenant-e2e",
+                  role: "workspace_admin",
+                  workspace_id: "tenant-e2e",
                   district_id: null,
                   auth_email: "heartbeat@example.com",
                   is_active: true,
@@ -237,18 +237,18 @@ test.describe("tenant admin device revocation", () => {
     });
 
     await page.goto("/?e2e-session-heartbeat=1");
-    await page.waitForFunction(() => typeof window.__itemtraxxTest?.setTenantAdminSession === "function");
+    await page.waitForFunction(() => typeof window.__itemtraxxTest?.setWorkspaceAdminSession === "function");
     await waitForPublicAuthBootstrap(page);
     authenticatedPhase = true;
     await page.evaluate(
       ({ deviceIdKey, deviceLabelKey }) => {
         localStorage.setItem(deviceIdKey, "device-heartbeat");
         localStorage.setItem(deviceLabelKey, "Heartbeat browser");
-        window.__itemtraxxTest?.setTenantAdminSession("tenant-e2e");
+        window.__itemtraxxTest?.setWorkspaceAdminSession("tenant-e2e");
       },
       { deviceIdKey: DEVICE_ID_KEY, deviceLabelKey: DEVICE_LABEL_KEY },
     );
-    await navigateApp(page, "/tenant/admin");
+    await navigateApp(page, "/admin");
 
     await expect.poll(() => heartbeatRequests).toBe(2);
     const overlay = page.getByRole("alertdialog").filter({ hasText: "Session Ended" });
@@ -257,7 +257,7 @@ test.describe("tenant admin device revocation", () => {
     expect(heartbeatRequests).toBe(2);
   });
 
-  test("invalid tenant-admin validation shows the session-ended recovery overlay", async ({ page }) => {
+  test("invalid Workspace Admin validation shows the session-ended recovery overlay", async ({ page }) => {
     await installSystemStatusMock(page.context());
     await mockUnauthenticatedSession(page);
     await page.route(/\/functions(?:\/v1)?\/admin-ops(?:\?.*)?$/, async (route) => {
@@ -271,8 +271,8 @@ test.describe("tenant admin device revocation", () => {
       });
     });
 
-    await seedTenantAdminState(page, "device-invalid", "Test browser");
-    await navigateApp(page, "/tenant/admin");
+    await seedWorkspaceAdminState(page, "device-invalid", "Test browser");
+    await navigateApp(page, "/admin");
 
     const overlay = page.getByRole("alertdialog").filter({ hasText: "Session Ended" });
     await expect(overlay).toBeVisible();
@@ -288,10 +288,10 @@ test.describe("tenant admin device revocation", () => {
 
     const pageA = await contextA.newPage();
 
-    await seedTenantAdminState(pageA, "device-a", "Mac");
+    await seedWorkspaceAdminState(pageA, "device-a", "Mac");
     await waitForPublicAuthBootstrap(pageA);
-    await navigateApp(pageA, "/tenant/admin");
-    await expect(pageA).toHaveURL(/\/tenant\/admin$/);
+    await navigateApp(pageA, "/admin");
+    await expect(pageA).toHaveURL(/\/admin$/);
 
     const touchA = await callAdminOps<{ ok: boolean }>(pageA, "touch_session", {
       device_id: "device-a",

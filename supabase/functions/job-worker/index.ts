@@ -71,8 +71,8 @@ type SupportRequestPayload = {
 
 type LoginNotificationPayload = {
   user_id: string;
-  tenant_id: string;
-  tenant_name: string;
+  workspace_id: string;
+  workspace_name: string;
   to_email: string;
   from_email: string;
   support_email: string;
@@ -81,8 +81,8 @@ type LoginNotificationPayload = {
   ip_address: string | null;
 };
 
-type DistrictSupportPayload = {
-  district_id: string;
+type WorkspaceSupportPayload = {
+  workspace_id: string;
   requester_email: string | null;
   requester_name: string | null;
   subject: string;
@@ -151,8 +151,7 @@ const sendTrackedResendEmail = async (
     subject: string;
     requestId: string;
     jobId: string;
-    tenantId?: string | null;
-    districtId?: string | null;
+    workspaceId?: string | null;
     triggeredByUserId?: string | null;
     metadata?: Record<string, unknown> | null;
   },
@@ -167,8 +166,7 @@ const sendTrackedResendEmail = async (
     },
     triggeredByUserId: context.triggeredByUserId ?? null,
     jobId: context.jobId,
-    tenantId: context.tenantId ?? null,
-    districtId: context.districtId ?? null,
+    workspaceId: context.workspaceId ?? null,
     metadata: context.metadata ?? null,
   });
   await new Promise((resolve) => setTimeout(resolve, 1000));
@@ -196,7 +194,7 @@ const escapeHtml = (value: string) =>
     .replaceAll("'", "&#39;");
 
 const buildLoginNotificationHtml = (payload: LoginNotificationPayload, loginTimeLabel: string) => {
-  const tenantName = escapeHtml(payload.tenant_name);
+  const tenantName = escapeHtml(payload.workspace_name);
   const supportEmail = escapeHtml(payload.support_email);
   const deviceBrowser = escapeHtml(formatLoginEmailPlatform(payload.device_browser));
   const loginTime = escapeHtml(loginTimeLabel);
@@ -516,7 +514,7 @@ const processLoginNotificationEmail = async (
 ) => {
   const loginTimeLabel = formatLoginEmailTime(payload.login_time_iso);
 
-  const subject = `New ItemTraxx Login - ${payload.tenant_name}`;
+  const subject = `New ItemTraxx Login - ${payload.workspace_name}`;
   await sendTrackedResendEmail(adminClient, resendApiKey, {
     from: payload.from_email,
     to: [payload.to_email],
@@ -524,7 +522,7 @@ const processLoginNotificationEmail = async (
     html: applyEmailTheme(buildLoginNotificationHtml(payload, loginTimeLabel)),
     text:
       `We noticed a new sign-in to your ItemTraxx account.\n\n` +
-      `Tenant: ${payload.tenant_name}\n` +
+      `Tenant: ${payload.workspace_name}\n` +
       `Login time: ${loginTimeLabel}\n` +
       `Device/Browser: ${formatLoginEmailPlatform(payload.device_browser)}\n\n` +
       `If this wasn't you, reset your password at ${PASSWORD_RESET_URL} and review your account security right away.`,
@@ -535,9 +533,9 @@ const processLoginNotificationEmail = async (
     requestId,
     jobId,
     triggeredByUserId: payload.user_id,
-    tenantId: payload.tenant_id,
+    workspaceId: payload.workspace_id,
     metadata: {
-      tenant_name: payload.tenant_name,
+      workspace_name: payload.workspace_name,
     },
   });
 };
@@ -571,12 +569,12 @@ const processSuperAdminTwoFactorEmail = async (
   });
 };
 
-const buildDistrictSupportHtml = (payload: DistrictSupportPayload, supportEmail: string) => {
+const buildWorkspaceSupportHtml = (payload: WorkspaceSupportPayload, supportEmail: string) => {
   const requesterEmail = escapeHtml(payload.requester_email ?? "Unavailable");
-  const requesterName = escapeHtml(payload.requester_name ?? "District admin");
+  const requesterName = escapeHtml(payload.requester_name ?? "Workspace Admin");
   const subject = escapeHtml(payload.subject);
   const message = escapeHtml(payload.message).replaceAll("\n", "<br />");
-  const districtId = escapeHtml(payload.district_id);
+  const workspaceId = escapeHtml(payload.workspace_id);
   const priority = escapeHtml(payload.priority);
   const safeSupportEmail = escapeHtml(supportEmail);
 
@@ -594,12 +592,12 @@ const buildDistrictSupportHtml = (payload: DistrictSupportPayload, supportEmail:
             </tr>
             <tr>
               <td style="padding:28px;">
-                <h2 style="margin:0 0 12px 0;font-size:22px;line-height:1.3;color:#171717;">District Support Request</h2>
+                <h2 style="margin:0 0 12px 0;font-size:22px;line-height:1.3;color:#171717;">Workspace Support Request</h2>
                 <p style="margin:0 0 14px 0;font-size:15px;line-height:1.6;color:#343330;">
-                  A district admin submitted a support request through the district workspace.
+                  A Workspace Admin submitted a support request through the workspace.
                 </p>
                 <p style="margin:0 0 14px 0;font-size:15px;line-height:1.7;color:#343330;">
-                  <strong>District ID:</strong> ${districtId}<br />
+                  <strong>Workspace ID:</strong> ${workspaceId}<br />
                   <strong>Requester:</strong> ${requesterName}<br />
                   <strong>Requester Email:</strong> ${requesterEmail}<br />
                   <strong>Priority:</strong> ${priority}<br />
@@ -922,39 +920,39 @@ ${payload.support_email}`,
   });
 };
 
-const processDistrictSupportEmail = async (
+const processWorkspaceSupportEmail = async (
   adminClient: SupabaseClient,
   resendApiKey: string,
-  payload: DistrictSupportPayload,
+  payload: WorkspaceSupportPayload,
   supportEmail: string,
   fromEmail: string,
   jobId: string,
   requestId: string,
 ) => {
   const requesterEmail = payload.requester_email ?? "Unavailable";
-  const requesterName = payload.requester_name ?? "District admin";
-  const subject = `District Support Request - ${payload.subject}`;
+  const requesterName = payload.requester_name ?? "Workspace Admin";
+  const subject = `Workspace Support Request - ${payload.subject}`;
   await sendTrackedResendEmail(adminClient, resendApiKey, {
     from: fromEmail,
     to: [supportEmail],
     reply_to: payload.requester_email ? payload.requester_email : undefined,
     subject,
-    html: applyEmailTheme(buildDistrictSupportHtml(payload, supportEmail)),
+    html: applyEmailTheme(buildWorkspaceSupportHtml(payload, supportEmail)),
     text:
-      `A district support request was submitted.\n\n` +
-      `District ID: ${payload.district_id}\n` +
+      `A workspace support request was submitted.\n\n` +
+      `Workspace ID: ${payload.workspace_id}\n` +
       `Requester: ${requesterName}\n` +
       `Requester Email: ${requesterEmail}\n` +
       `Priority: ${payload.priority}\n` +
       `Subject: ${payload.subject}\n\n` +
       `${payload.message}`,
   }, {
-    emailType: "district_support_internal",
+    emailType: "workspace_support_internal",
     recipientEmail: supportEmail,
     subject,
     requestId,
     jobId,
-    districtId: payload.district_id,
+    workspaceId: payload.workspace_id,
     metadata: {
       priority: payload.priority,
       requester_email: payload.requester_email,
@@ -1072,11 +1070,11 @@ serve(async (req) => {
             job.id,
             requestId,
           );
-        } else if (job.job_type === "district_support_email") {
-          await processDistrictSupportEmail(
+        } else if (job.job_type === "workspace_support_email") {
+          await processWorkspaceSupportEmail(
             adminClient,
             resendApiKey,
-            job.payload as DistrictSupportPayload,
+            job.payload as WorkspaceSupportPayload,
             supportEmail,
             fromEmail,
             job.id,

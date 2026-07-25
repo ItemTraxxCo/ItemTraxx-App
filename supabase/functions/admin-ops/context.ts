@@ -54,16 +54,16 @@ export type AdminOpsContext = {
   payload: Record<string, unknown>;
   adminClient: SupabaseClient;
   user: { id: string };
-  tenantId: string;
+  workspaceId: string;
   authToken: string;
   authSessionBinding: { sessionId: string | null; issuedAt: string | null };
   authTokenBindingKey: string;
   deviceSession: DeviceSessionContext;
-  tenantPolicy: TenantPolicyRow | null;
+  workspacePolicy: TenantPolicyRow | null;
   checkoutDueHours: number;
   featureFlags: TenantFeatureFlags;
   maintenance: { enabled: boolean; message: string };
-  tenantUpdates: RuntimeUpdateItem[];
+  workspaceUpdates: RuntimeUpdateItem[];
   jsonResponse: JsonResponse;
 };
 

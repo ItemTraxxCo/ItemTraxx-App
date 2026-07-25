@@ -6,7 +6,7 @@ import { resolveRateLimitResult } from "../_shared/preloginGuards.ts";
 import { requireTrustedEdgeIngress } from "../_shared/trustedIngress.ts";
 import { readJsonBody } from "../_shared/requestBody.ts";
 import { sha256Hex } from "../_shared/sha256.ts";
-import { resolveTenantAdminAuthSessionBinding } from "../_shared/tenantAdminSessions.ts";
+import { resolveAccountAuthSessionBinding } from "../_shared/accountSessions.ts";
 import {
   asRecord,
   requireText,
@@ -17,14 +17,14 @@ import {
   dispatchAdminOpsAction,
 } from "./actions/index.ts";
 import {
-  normalizeTenantUpdates,
+  normalizeWorkspaceUpdates,
   resolveMaintenance,
 } from "./actions/notifications.ts";
 import {
   findActiveSession,
   resolveDeviceSessionContext,
 } from "./actions/sessions.ts";
-import { resolveTenantPolicyState } from "./actions/settings.ts";
+import { resolveWorkspacePolicyState } from "./actions/settings.ts";
 import type { AdminOpsContext } from "./context.ts";
 
 const baseCorsHeaders = {
@@ -107,7 +107,7 @@ serve(async (req) => {
     const adminClient = createClient(supabaseUrl, serviceKey, {
       auth: { persistSession: false },
     });
-    const authSessionBinding = await resolveTenantAdminAuthSessionBinding(
+    const authSessionBinding = await resolveAccountAuthSessionBinding(
       adminClient,
       authToken,
     );
@@ -129,17 +129,17 @@ serve(async (req) => {
       return jsonResponse(401, { error: "Unauthorized" });
     }
 
-    const { data: profile, error: profileError } = await userClient
+    const { data: profile, error: profileError } = await adminClient
       .from("profiles")
-      .select("tenant_id, role, is_active")
+      .select("workspace_id, role, is_active")
       .eq("id", user.id)
       .single();
 
-    if (profileError || !profile?.tenant_id) {
+    if (profileError || !profile?.workspace_id) {
       return jsonResponse(403, { error: "Access denied" });
     }
 
-    if (profile.role !== "tenant_admin" && profile.role !== "tenant_user") {
+    if (profile.role !== "workspace_admin" && profile.role !== "tenant_account") {
       return jsonResponse(403, { error: "Access denied" });
     }
     if (profile.is_active === false) {
@@ -149,8 +149,8 @@ serve(async (req) => {
     const { data: rateLimit, error: rateLimitError } = await userClient.rpc(
       "consume_rate_limit",
       {
-        p_scope: profile.role === "tenant_admin" ? "admin" : "tenant",
-        p_limit: profile.role === "tenant_admin" ? 30 : 25,
+        p_scope: profile.role === "workspace_admin" ? "admin" : "workspace",
+        p_limit: profile.role === "workspace_admin" ? 30 : 25,
         p_window_seconds: 60,
       },
     );
@@ -178,19 +178,19 @@ serve(async (req) => {
       normalizedAction === "revoke_session" ||
       normalizedAction === "revoke_all_sessions";
 
-    const tenantId = profile.tenant_id as string;
-    const { data: tenantStatus } = await userClient
-      .from("tenants")
+    const workspaceId = profile.workspace_id as string;
+    const { data: workspaceStatus } = await userClient
+      .from("workspaces")
       .select("status")
-      .eq("id", tenantId)
+      .eq("id", workspaceId)
       .maybeSingle();
-    const isTenantSuspended = !!tenantStatus?.status &&
-      tenantStatus.status !== "active";
+    const isWorkspaceSuspended = !!workspaceStatus?.status &&
+      workspaceStatus.status !== "active";
     const deviceSession = resolveDeviceSessionContext(payloadRecord, req);
 
     const sessionSecurityContext = {
       adminClient,
-      tenantId,
+      workspaceId,
       user: { id: user.id },
       authToken,
       authSessionBinding,
@@ -199,7 +199,7 @@ serve(async (req) => {
       requestId,
     };
 
-    if (profile.role === "tenant_admin" && !isSessionAction) {
+    if (!isSessionAction) {
       const activeSession = await findActiveSession(sessionSecurityContext);
       if (activeSession.relationMissing) {
         return jsonResponse(503, {
@@ -215,12 +215,10 @@ serve(async (req) => {
     }
 
     if (
-      profile.role === "tenant_admin" &&
-      (normalizedAction === "list_sessions" ||
+      normalizedAction === "list_sessions" ||
         normalizedAction === "revoke_current_session" ||
         normalizedAction === "revoke_session" ||
-        normalizedAction === "revoke_all_sessions")
-    ) {
+        normalizedAction === "revoke_all_sessions") {
       const activeSession = await findActiveSession(sessionSecurityContext);
       if (activeSession.relationMissing) {
         return jsonResponse(503, {
@@ -241,23 +239,23 @@ serve(async (req) => {
       adminClient
         .from("app_runtime_config")
         .select("value")
-        .eq("key", "tenant_updates")
+        .eq("key", "workspace_updates")
         .maybeSingle(),
     ]);
     const maintenance = resolveMaintenance(
       maintenanceRuntimeResult.data?.value,
     );
 
-    const { tenantPolicy, checkoutDueHours, featureFlags } =
-      await resolveTenantPolicyState(adminClient, tenantId);
+    const { workspacePolicy, checkoutDueHours, featureFlags } =
+      await resolveWorkspacePolicyState(adminClient, workspaceId);
 
     const updateRuntimeValue = updateRuntimeResult.data?.value;
-    const tenantUpdates = normalizeTenantUpdates(updateRuntimeValue);
+    const workspaceUpdates = normalizeWorkspaceUpdates(updateRuntimeValue);
 
     const actionAuthorizationFailure = await authorizeAdminOpsAction({
       action: normalizedAction,
       profileRole: profile.role,
-      isTenantSuspended,
+      isWorkspaceSuspended,
       adminClient,
       userId: user.id,
       authToken,
@@ -271,16 +269,16 @@ serve(async (req) => {
       payload: payloadRecord,
       adminClient,
       user: { id: user.id },
-      tenantId,
+      workspaceId,
       authToken,
       authSessionBinding,
       authTokenBindingKey,
       deviceSession,
-      tenantPolicy,
+      workspacePolicy,
       checkoutDueHours,
       featureFlags,
       maintenance,
-      tenantUpdates,
+      workspaceUpdates,
       jsonResponse,
     };
     return dispatchAdminOpsAction(context);

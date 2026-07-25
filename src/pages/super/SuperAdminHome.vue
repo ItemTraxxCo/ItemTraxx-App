@@ -5,14 +5,13 @@
         <p class="workspace-eyebrow">Platform Control Center</p>
         <h1>Super Admin</h1>
         <p class="workspace-summary">
-          Manage districts, tenants, runtime controls, and platform health from a smaller set of
+          Manage workspaces, runtime controls, and platform health from a smaller set of
           focused entry points.
         </p>
       </div>
       <div class="workspace-actions">
-        <RouterLink class="button-link" to="/super-admin/districts">Districts</RouterLink>
-        <RouterLink class="button-link" to="/super-admin/tenants">Tenants</RouterLink>
-        <RouterLink class="button-link" to="/super-admin/admins">Admins</RouterLink>
+        <RouterLink class="button-link" to="/super-admin/workspaces">Workspaces</RouterLink>
+        <RouterLink class="button-link" to="/super-admin/admins">Workspace Admins</RouterLink>
         <RouterLink class="button-link" to="/super-admin/super-admins">Super Admins</RouterLink>
         <RouterLink class="button-link" to="/super-admin/settings">Settings</RouterLink>
         <RouterLink class="button-link" to="/super-admin/support-requests">Support Requests</RouterLink>
@@ -23,20 +22,20 @@
 
     <div class="admin-grid">
       <div class="stat-card">
-        <h3>Total tenants</h3>
-        <p class="stat-value">{{ dashboard?.total_tenants ?? "-" }}</p>
+        <h3>Total workspaces</h3>
+        <p class="stat-value">{{ dashboard?.total_workspaces ?? "-" }}</p>
       </div>
       <div class="stat-card">
-        <h3>Active tenants</h3>
-        <p class="stat-value">{{ dashboard?.active_tenants ?? "-" }}</p>
+        <h3>Active workspaces</h3>
+        <p class="stat-value">{{ dashboard?.active_workspaces ?? "-" }}</p>
       </div>
       <div class="stat-card">
-        <h3>Disabled tenants</h3>
-        <p class="stat-value">{{ dashboard?.suspended_tenants ?? "-" }}</p>
+        <h3>Disabled workspaces</h3>
+        <p class="stat-value">{{ dashboard?.suspended_workspaces ?? "-" }}</p>
       </div>
       <div class="stat-card">
-        <h3>Tenant admins</h3>
-        <p class="stat-value">{{ dashboard?.tenant_admins_count ?? "-" }}</p>
+        <h3>Workspace Admins</h3>
+        <p class="stat-value">{{ dashboard?.workspace_admins_count ?? "-" }}</p>
       </div>
       <div class="stat-card">
         <h3>Active alerts</h3>
@@ -52,20 +51,16 @@
       <section class="card section-card">
         <div class="section-header">
           <h2>Tenant Operations</h2>
-          <p class="muted">Manage districts, tenants, and delegated admins.</p>
+          <p class="muted">Manage workspaces and their delegated admins.</p>
         </div>
         <div class="section-links">
-          <RouterLink class="section-link" to="/super-admin/districts">
-            <span class="section-link-title">Districts</span>
-            <span class="section-link-meta">Subdomains, plans, support</span>
-          </RouterLink>
-          <RouterLink class="section-link" to="/super-admin/tenants">
-            <span class="section-link-title">Tenants</span>
-            <span class="section-link-meta">Provisioning and lifecycle</span>
+          <RouterLink class="section-link" to="/super-admin/workspaces">
+            <span class="section-link-title">Workspaces</span>
+            <span class="section-link-meta">Subdomains, provisioning, plans, and lifecycle</span>
           </RouterLink>
           <RouterLink class="section-link" to="/super-admin/admins">
             <span class="section-link-title">Admins</span>
-            <span class="section-link-meta">Tenant and district operators</span>
+            <span class="section-link-meta">Workspace operators</span>
           </RouterLink>
           <RouterLink class="section-link" to="/super-admin/super-admins">
             <span class="section-link-title">Super Admins</span>
@@ -86,7 +81,7 @@
           </RouterLink>
           <RouterLink class="section-link" to="/super-admin/borrowers">
             <span class="section-link-title">All Borrowers</span>
-            <span class="section-link-meta">Cross-tenant borrower records</span>
+            <span class="section-link-meta">Cross-workspace borrower records</span>
           </RouterLink>
           <RouterLink class="section-link" to="/super-admin/logs">
             <span class="section-link-title">All Logs</span>
@@ -206,7 +201,7 @@
             <label>
               Metric
               <select v-model="alertMetricKey">
-                <option value="suspended_tenants">suspended_tenants</option>
+                <option value="suspended_workspaces">suspended_workspaces</option>
                 <option value="overdue_items">overdue_items</option>
                 <option value="active_checkouts">active_checkouts</option>
                 <option value="transactions_7d">transactions_7d</option>
@@ -235,7 +230,7 @@
           <h3>Emergency Controls</h3>
           <label>
             Tenant ID
-            <input v-model="forceReauthTenantId" type="text" placeholder="Tenant UUID" />
+            <input v-model="forceReauthWorkspaceId" type="text" placeholder="Tenant UUID" />
           </label>
           <div class="form-actions">
             <button type="button" :disabled="isSaving" @click="forceTenantSignOut">
@@ -334,7 +329,7 @@
         <table class="table">
           <thead>
             <tr>
-              <th>Tenant</th>
+              <th>Workspace</th>
               <th>Items</th>
               <th>Borrowers</th>
               <th>Active Checkouts</th>
@@ -343,16 +338,16 @@
             </tr>
           </thead>
           <tbody>
-            <tr v-for="item in (dashboard?.tenant_metrics ?? []).slice(0, 20)" :key="item.tenant_id">
-              <td>{{ item.tenant_name }}</td>
+            <tr v-for="item in (dashboard?.workspace_metrics ?? []).slice(0, 20)" :key="item.workspace_id">
+              <td>{{ item.workspace_name }}</td>
               <td>{{ item.gear_total }}</td>
-              <td>{{ item.students_total }}</td>
+              <td>{{ item.borrowers_total }}</td>
               <td>{{ item.active_checkouts }}</td>
               <td>{{ item.overdue_items }}</td>
               <td>{{ item.transactions_7d }}</td>
             </tr>
-            <tr v-if="(dashboard?.tenant_metrics?.length ?? 0) === 0">
-              <td colspan="6" class="muted">No tenant metrics available.</td>
+            <tr v-if="(dashboard?.workspace_metrics?.length ?? 0) === 0">
+              <td colspan="6" class="muted">No workspace metrics available.</td>
             </tr>
           </tbody>
         </table>
@@ -434,7 +429,7 @@ import { fetchSuperDashboard, type SuperDashboard } from "../../services/superAu
 import { toUserFacingErrorMessage } from "../../services/appErrors";
 import {
   approveRequest,
-  forceTenantReauth,
+  forceWorkspaceReauth,
   getControlCenter,
   setRuntimeConfig,
   upsertAlertRule,
@@ -456,7 +451,7 @@ const alertName = ref("");
 const alertMetricKey = ref("overdue_items");
 const alertThreshold = ref(5);
 const alertEnabled = ref(true);
-const forceReauthTenantId = ref("");
+const forceReauthWorkspaceId = ref("");
 let toastTimer: number | null = null;
 
 const showToast = (title: string, message: string) => {
@@ -585,16 +580,16 @@ const saveAlertRule = async () => {
 };
 
 const forceTenantSignOut = async () => {
-  const tenantId = forceReauthTenantId.value.trim();
-  if (!tenantId) {
+  const workspaceId = forceReauthWorkspaceId.value.trim();
+  if (!workspaceId) {
     showToast("Invalid input", "Enter a tenant ID.");
     return;
   }
 
   isSaving.value = true;
   try {
-    await forceTenantReauth({ tenant_id: tenantId });
-    forceReauthTenantId.value = "";
+    await forceWorkspaceReauth({ workspace_id: workspaceId });
+    forceReauthWorkspaceId.value = "";
     showToast("Done", "Tenant sessions were invalidated.");
     await loadAll();
   } catch (err) {

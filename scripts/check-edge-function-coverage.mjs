@@ -10,7 +10,6 @@ const workflowsDir = path.join(root, '.github/workflows');
 
 const allowedDirectFetchFiles = new Set(['src/services/systemStatusService.ts']);
 const expectedUnreferencedFunctions = new Set([
-  'create-tenant-admin',
   'job-worker',
   'system-status',
   'login-notify',

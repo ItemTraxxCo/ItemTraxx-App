@@ -36,11 +36,11 @@ const resolveCorsHeaders = (req: Request) => {
   return { hasOrigin, originAllowed, headers };
 };
 
-type TenantMetricRow = {
-  tenant_id: string;
-  tenant_name: string;
+type WorkspaceMetricRow = {
+  workspace_id: string;
+  workspace_name: string;
   gear_total: number;
-  students_total: number;
+  borrowers_total: number;
   active_checkouts: number;
   overdue_items: number;
   transactions_7d: number;
@@ -154,48 +154,48 @@ serve(async (req) => {
       throw error;
     }
 
-    const totalTenantsResult = await adminClient
-      .from("tenants")
+    const totalWorkspacesResult = await adminClient
+      .from("workspaces")
       .select("id", { count: "exact", head: true });
-    const totalTenants =
-      totalTenantsResult.error === null ? totalTenantsResult.count ?? 0 : 0;
+    const totalWorkspaces =
+      totalWorkspacesResult.error === null ? totalWorkspacesResult.count ?? 0 : 0;
 
-    let activeTenants = totalTenants;
-    let suspendedTenants = 0;
+    let activeWorkspaces = totalWorkspaces;
+    let suspendedWorkspaces = 0;
     const activeResult = await adminClient
-      .from("tenants")
+      .from("workspaces")
       .select("id", { count: "exact", head: true })
       .eq("status", "active");
     const suspendedResult = await adminClient
-      .from("tenants")
+      .from("workspaces")
       .select("id", { count: "exact", head: true })
       .eq("status", "suspended");
     if (!activeResult.error && !suspendedResult.error) {
-      activeTenants = activeResult.count ?? 0;
-      suspendedTenants = suspendedResult.count ?? 0;
+      activeWorkspaces = activeResult.count ?? 0;
+      suspendedWorkspaces = suspendedResult.count ?? 0;
     } else if (
       !isMissingColumn(activeResult.error, "status") ||
       !isMissingColumn(suspendedResult.error, "status")
     ) {
-      activeTenants = 0;
-      suspendedTenants = 0;
+      activeWorkspaces = 0;
+      suspendedWorkspaces = 0;
     }
 
-    let tenantAdminsCount = 0;
+    let workspaceAdminsCount = 0;
     const activeAdminsResult = await adminClient
       .from("profiles")
       .select("id", { count: "exact", head: true })
-      .eq("role", "tenant_admin")
+      .eq("role", "workspace_admin")
       .neq("is_active", false);
     if (!activeAdminsResult.error) {
-      tenantAdminsCount = activeAdminsResult.count ?? 0;
+      workspaceAdminsCount = activeAdminsResult.count ?? 0;
     } else if (isMissingColumn(activeAdminsResult.error, "is_active")) {
       const adminsFallbackResult = await adminClient
         .from("profiles")
         .select("id", { count: "exact", head: true })
-        .eq("role", "tenant_admin");
+        .eq("role", "workspace_admin");
       if (!adminsFallbackResult.error) {
-        tenantAdminsCount = adminsFallbackResult.count ?? 0;
+        workspaceAdminsCount = adminsFallbackResult.count ?? 0;
       }
     }
 
@@ -235,38 +235,38 @@ serve(async (req) => {
       ? {}
       : Object.fromEntries((runtimeResult.data ?? []).map((item) => [item.key, item.value]));
 
-    let tenantMetrics: TenantMetricRow[] = [];
+    let workspaceMetrics: WorkspaceMetricRow[] = [];
 
-    const tenantMetricsResult = await adminClient
-      .from("super_reporting_tenant_metrics")
+    const workspaceMetricsResult = await adminClient
+      .from("super_reporting_workspace_metrics")
       .select(
-        "tenant_id, tenant_name, gear_total, students_total, active_checkouts, overdue_items, transactions_7d, computed_at"
+        "workspace_id, workspace_name, gear_total, borrowers_total, active_checkouts, overdue_items, transactions_7d, computed_at"
       )
-      .order("tenant_name", { ascending: true });
-    if (!tenantMetricsResult.error) {
-      tenantMetrics = (tenantMetricsResult.data ?? []) as TenantMetricRow[];
+      .order("workspace_name", { ascending: true });
+    if (!workspaceMetricsResult.error) {
+      workspaceMetrics = (workspaceMetricsResult.data ?? []) as WorkspaceMetricRow[];
     } else if (
-      !isMissingRelation(tenantMetricsResult.error, "super_reporting_tenant_metrics")
+      !isMissingRelation(workspaceMetricsResult.error, "super_reporting_workspace_metrics")
     ) {
       logError(
-        "super-dashboard tenant metrics query failed",
+        "super-dashboard workspace metrics query failed",
         requestId,
-        tenantMetricsResult.error
+        workspaceMetricsResult.error
       );
     }
 
     const alerts: Array<{ id: string; name: string; metric_key: string; threshold: number; current: number; severity: "warn" | "critical" }> = [];
     const aggregate = {
-      suspended_tenants: suspendedTenants,
-      overdue_items: tenantMetrics.reduce(
+      suspended_workspaces: suspendedWorkspaces,
+      overdue_items: workspaceMetrics.reduce(
         (acc, metric) => acc + Number(metric.overdue_items ?? 0),
         0
       ),
-      active_checkouts: tenantMetrics.reduce(
+      active_checkouts: workspaceMetrics.reduce(
         (acc, metric) => acc + Number(metric.active_checkouts ?? 0),
         0
       ),
-      transactions_7d: tenantMetrics.reduce(
+      transactions_7d: workspaceMetrics.reduce(
         (acc, metric) => acc + Number(metric.transactions_7d ?? 0),
         0
       ),
@@ -290,12 +290,12 @@ serve(async (req) => {
 
     return jsonResponse(200, {
       data: {
-        total_tenants: totalTenants,
-        active_tenants: activeTenants,
-        suspended_tenants: suspendedTenants,
-        tenant_admins_count: tenantAdminsCount,
+        total_workspaces: totalWorkspaces,
+        active_workspaces: activeWorkspaces,
+        suspended_workspaces: suspendedWorkspaces,
+        workspace_admins_count: workspaceAdminsCount,
         recent_actions: recentActions,
-        tenant_metrics: tenantMetrics,
+        workspace_metrics: workspaceMetrics,
         alert_events: alerts,
         runtime_config: runtimeConfig,
         pending_approvals: approvalsResult.error ? [] : approvalsResult.data ?? [],

@@ -7,7 +7,7 @@
       <RouterLink class="button-link" to="/super-admin">Return to Super Admin</RouterLink>
       <RouterLink class="button-link" to="/super-admin/sales-leads">Sales Leads</RouterLink>
       <RouterLink class="button-link" to="/super-admin/customers">Customers</RouterLink>
-      <RouterLink class="button-link" to="/super-admin/tenants">Tenants</RouterLink>
+      <RouterLink class="button-link" to="/super-admin/workspaces">Workspaces</RouterLink>
       <RouterLink class="button-link" to="/super-admin/admins">Tenant Admins</RouterLink>
     </nav>
 

@@ -72,8 +72,8 @@ export const edgeFunctionError = (result: EdgeLikeResult, fallbackMessage: strin
       reportToSentry: false,
     });
   }
-  if (/tenant disabled/i.test(message)) {
-    return new AppError("TENANT_DISABLED", "Tenant is disabled. Access is blocked. Please contact support.", {
+  if (/(?:workspace|tenant) disabled/i.test(message)) {
+    return new AppError("TENANT_DISABLED", "Workspace is disabled. Access is blocked. Please contact support.", {
       status: result.status || 403,
       reportToSentry: false,
     });
@@ -125,7 +125,7 @@ export const toUserFacingErrorMessage = (error: unknown, fallbackMessage: string
   if (normalized.includes("rate limit") || normalized.includes("too many requests")) {
     return "Too many requests right now. Please try again in a moment.";
   }
-  if (normalized.includes("tenant disabled")) {
+  if (normalized.includes("workspace disabled") || normalized.includes("tenant disabled")) {
     return "This account cannot be used right now. Please contact support.";
   }
   if (normalized.includes("invalid barcode")) {

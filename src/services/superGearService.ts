@@ -4,7 +4,7 @@ import { edgeFunctionError } from "./appErrors";
 
 export type SuperGearItem = {
   id: string;
-  tenant_id: string;
+  workspace_id: string;
   name: string;
   barcode: string;
   serial_number: string | null;
@@ -33,14 +33,14 @@ const callSuperGear = async <TData>(payload: SuperGearRequest) => {
   return result.data?.data as TData;
 };
 
-export const listSuperGear = async (tenantId = "all", search = "") =>
+export const listSuperGear = async (workspaceId = "all", search = "") =>
   callSuperGear<SuperGearItem[]>({
     action: "list",
-    payload: { tenant_id: tenantId, search },
+    payload: { workspace_id: workspaceId, search },
   });
 
 export const createSuperGear = async (payload: {
-  tenant_id: string;
+  workspace_id: string;
   name: string;
   barcode: string;
   serial_number?: string;

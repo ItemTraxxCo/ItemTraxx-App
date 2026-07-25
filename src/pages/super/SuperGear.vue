@@ -2,7 +2,7 @@
   <div class="page">
     <div class="page-nav-left">
       <RouterLink class="button-link" to="/super-admin">Return to Super Admin</RouterLink>
-      <RouterLink class="button-link" to="/super-admin/tenants">Tenants</RouterLink>
+      <RouterLink class="button-link" to="/super-admin/workspaces">Workspaces</RouterLink>
       <RouterLink class="button-link" to="/super-admin/borrowers">All Borrowers</RouterLink>
       <RouterLink class="button-link" to="/super-admin/logs">All Logs</RouterLink>
       <RouterLink class="button-link" to="/super-admin/broadcasts">Broadcasts</RouterLink>
@@ -11,12 +11,12 @@
     </div>
 
     <h1>All Items</h1>
-    <p>Cross-tenant item management.</p>
+    <p>Cross-workspace item management.</p>
 
     <div class="card">
       <h2>Create Item</h2>
       <form class="form" @submit.prevent="handleCreate">
-        <label>Tenant<select v-model="formTenantId"><option value="">Select tenant</option><option v-for="t in tenants" :key="t.id" :value="t.id">{{ t.name }}</option></select></label>
+        <label>Workspace<select v-model="formWorkspaceId"><option value="">Select workspace</option><option v-for="t in workspaces" :key="t.id" :value="t.id">{{ t.name }}</option></select></label>
         <label>Name<input v-model="formName" type="text" /></label>
         <label>Barcode<input v-model="formBarcode" type="text" /></label>
         <label>Serial Number<input v-model="formSerial" type="text" /></label>
@@ -29,7 +29,7 @@
     <div class="card">
       <h2>Item List</h2>
       <div class="input-row">
-        <select v-model="tenantFilter" @change="loadGear"><option value="all">all tenants</option><option v-for="t in tenants" :key="t.id" :value="t.id">{{ t.name }}</option></select>
+        <select v-model="workspaceFilter" @change="loadGear"><option value="all">all workspaces</option><option v-for="t in workspaces" :key="t.id" :value="t.id">{{ t.name }}</option></select>
         <select v-model="statusFilter">
           <option value="all">all statuses</option>
           <option value="available">available</option>
@@ -51,11 +51,11 @@
       <SkeletonLoader v-if="isLoading" variant="table" :rows="6" :columns="5" label="Loading all items" />
       <p v-else-if="error" class="error">{{ error }}</p>
       <table v-else class="table">
-        <thead><tr><th>Name</th><th>Tenant</th><th>Barcode</th><th>Status</th><th>Actions</th></tr></thead>
+        <thead><tr><th>Name</th><th>Workspace</th><th>Barcode</th><th>Status</th><th>Actions</th></tr></thead>
         <tbody>
           <tr v-for="item in filteredGear" :key="item.id">
             <td>{{ item.name }}</td>
-            <td>{{ tenantNameById.get(item.tenant_id) || item.tenant_id }}</td>
+            <td>{{ workspaceNameById.get(item.workspace_id) || item.workspace_id }}</td>
             <td>{{ item.barcode }}</td>
             <td>{{ item.status }}</td>
             <td>
@@ -94,20 +94,20 @@ import {
   isUnauthorizedError,
 } from "../../services/authErrorHandling";
 import { createSuperGear, deleteSuperGear, listSuperGear, updateSuperGear, type SuperGearItem } from "../../services/superGearService";
-import { listTenants, type SuperTenant } from "../../services/superTenantService";
+import { listWorkspaces as listWorkspaces, type SuperWorkspace as SuperWorkspace } from "../../services/superWorkspaceService";
 import { exportRowsToCsv, exportRowsToPdf } from "../../services/exportService";
 import { toUserFacingErrorMessage } from "../../services/appErrors";
 
 const router = useRouter();
-const tenants = ref<SuperTenant[]>([]);
+const workspaces = ref<SuperWorkspace[]>([]);
 const gear = ref<SuperGearItem[]>([]);
-const tenantFilter = ref("all");
+const workspaceFilter = ref("all");
 const statusFilter = ref("all");
 const search = ref("");
 const isLoading = ref(false);
 const isSaving = ref(false);
 const error = ref("");
-const formTenantId = ref("");
+const formWorkspaceId = ref("");
 const formName = ref("");
 const formBarcode = ref("");
 const formSerial = ref("");
@@ -127,7 +127,7 @@ const stepUpConfirm = ref("Confirm");
 const stepUpAction = ref<null | { type: "delete"; item: SuperGearItem } | { type: "status"; item: SuperGearItem }>(null);
 let toastTimer: number | null = null;
 
-const tenantNameById = computed(() => new Map(tenants.value.map((t) => [t.id, t.name])));
+const workspaceNameById = computed(() => new Map(workspaces.value.map((t) => [t.id, t.name])));
 const filteredGear = computed(() => {
   if (statusFilter.value === "all") return gear.value;
   return gear.value.filter((item) => item.status === statusFilter.value);
@@ -146,7 +146,7 @@ const showToast = (title: string, message: string) => {
 
 const loadTenants = async () => {
   try {
-    tenants.value = await listTenants("", "all");
+    workspaces.value = await listWorkspaces("", "all");
   } catch (err) {
     if (isUnauthorizedError(err)) {
       error.value = "Your session expired. Sign in again.";
@@ -161,7 +161,7 @@ const loadGear = async () => {
   isLoading.value = true;
   error.value = "";
   try {
-    gear.value = await listSuperGear(tenantFilter.value, search.value.trim());
+    gear.value = await listSuperGear(workspaceFilter.value, search.value.trim());
   } catch (err) {
     if (isUnauthorizedError(err)) {
       error.value = "Your session expired. Sign in again.";
@@ -177,9 +177,9 @@ const loadGear = async () => {
 const exportCsv = () => {
   exportRowsToCsv(
     `super-gear-${new Date().toISOString().slice(0, 10)}.csv`,
-    ["tenant", "name", "barcode", "serial_number", "status", "notes"],
+    ["workspace", "name", "barcode", "serial_number", "status", "notes"],
     filteredGear.value.map((item) => ({
-      tenant: tenantNameById.value.get(item.tenant_id) || item.tenant_id,
+      workspace: workspaceNameById.value.get(item.workspace_id) || item.workspace_id,
       name: item.name,
       barcode: item.barcode,
       serial_number: item.serial_number,
@@ -193,9 +193,9 @@ const exportPdf = async () => {
   await exportRowsToPdf(
     `super-gear-${new Date().toISOString().slice(0, 10)}.pdf`,
     "Super Item Export",
-    ["tenant", "name", "barcode", "serial_number", "status", "notes"],
+    ["workspace", "name", "barcode", "serial_number", "status", "notes"],
     filteredGear.value.map((item) => ({
-      tenant: tenantNameById.value.get(item.tenant_id) || item.tenant_id,
+      workspace: workspaceNameById.value.get(item.workspace_id) || item.workspace_id,
       name: item.name,
       barcode: item.barcode,
       serial_number: item.serial_number,
@@ -206,14 +206,14 @@ const exportPdf = async () => {
 };
 
 const handleCreate = async () => {
-  if (!formTenantId.value || !formName.value.trim() || !formBarcode.value.trim()) {
+  if (!formWorkspaceId.value || !formName.value.trim() || !formBarcode.value.trim()) {
     showToast("Invalid input", "Tenant, name, and barcode are required.");
     return;
   }
   isSaving.value = true;
   try {
     const created = await createSuperGear({
-      tenant_id: formTenantId.value,
+      workspace_id: formWorkspaceId.value,
       name: formName.value.trim(),
       barcode: formBarcode.value.trim(),
       serial_number: formSerial.value.trim() || undefined,

@@ -6,9 +6,10 @@ import { getOrCreateDeviceSession } from "../utils/deviceSession";
 
 export type StudentItem = {
   id: string;
-  tenant_id: string;
+  workspace_id: string;
   username: string;
   student_id: string;
+  access_mode?: "all" | "restricted";
 };
 
 export type StudentDetails = {
@@ -26,19 +27,19 @@ const pickRelation = <T>(value: MaybeRelation<T>): T | null => {
   return value ?? null;
 };
 
-const getTenantContextId = () => {
-  const tenantId = getAuthState().tenantContextId;
-  if (!tenantId) {
-    throw missingContextError("Missing tenant context. Please try again or contact support.");
+const getWorkspaceContextId = () => {
+  const workspaceId = getAuthState().workspaceContextId;
+  if (!workspaceId) {
+    throw missingContextError("Missing workspace context. Please try again or contact support.");
   }
-  return tenantId;
+  return workspaceId;
 };
 
 export const fetchStudents = async () => {
-  const tenantId = getTenantContextId();
+  const workspaceId = getWorkspaceContextId();
   return (await authenticatedSelect<StudentItem[]>("students", {
-    select: "id,tenant_id,username,student_id",
-    tenant_id: `eq.${tenantId}`,
+    select: "id,workspace_id,username,student_id",
+    workspace_id: `eq.${workspaceId}`,
     deleted_at: "is.null",
     order: "created_at.desc",
   })) ?? [];
@@ -64,9 +65,11 @@ export const fetchDeletedStudents = async () => {
 };
 
 export const createStudent = async (payload: {
-  tenant_id: string;
+  workspace_id: string;
   username?: string;
   student_id?: string;
+  access_mode: "all" | "restricted";
+  profile_ids: string[];
 }) => {
   const { deviceId } = getOrCreateDeviceSession();
   const result = await invokeEdgeFunction<{ data: StudentItem }>(
@@ -77,9 +80,11 @@ export const createStudent = async (payload: {
         action: "create",
         payload: {
           device_id: deviceId,
-          tenant_id: payload.tenant_id,
+          workspace_id: payload.workspace_id,
           username: payload.username ?? "",
           student_id: payload.student_id ?? "",
+          access_mode: payload.access_mode,
+          profile_ids: payload.profile_ids,
         },
       },
     }
@@ -159,17 +164,17 @@ export const restoreStudent = async (id: string) => {
 };
 
 export const fetchStudentDetails = async (studentUuid: string) => {
-  const tenantId = getTenantContextId();
+  const workspaceId = getWorkspaceContextId();
   const checkedOutGear = await authenticatedSelect<Array<{ id: string; name: string; barcode: string }>>("gear", {
     select: "id,name,barcode",
-    tenant_id: `eq.${tenantId}`,
+    workspace_id: `eq.${workspaceId}`,
     deleted_at: "is.null",
     checked_out_by: `eq.${studentUuid}`,
   });
 
   const lastCheckoutData = await authenticatedSelect<Array<{ action_time: string; gear: { name: string }[] | { name: string } | null }>>("gear_logs", {
     select: "action_time,gear:gear_id(name)",
-    tenant_id: `eq.${tenantId}`,
+    workspace_id: `eq.${workspaceId}`,
     checked_out_by: `eq.${studentUuid}`,
     action_type: "eq.checkout",
     order: "action_time.desc",
@@ -178,7 +183,7 @@ export const fetchStudentDetails = async (studentUuid: string) => {
 
   const lastReturnData = await authenticatedSelect<Array<{ action_time: string; gear: { name: string }[] | { name: string } | null }>>("gear_logs", {
     select: "action_time,gear:gear_id(name)",
-    tenant_id: `eq.${tenantId}`,
+    workspace_id: `eq.${workspaceId}`,
     checked_out_by: `eq.${studentUuid}`,
     action_type: "eq.return",
     order: "action_time.desc",

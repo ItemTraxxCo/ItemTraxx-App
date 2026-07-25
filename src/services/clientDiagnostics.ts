@@ -31,7 +31,7 @@ const redactSensitiveText = (value: string) =>
     .replace(/\beyJ[A-Za-z0-9._-]+\b/g, "[REDACTED_JWT]")
     .replace(/\bsb_(publishable|secret)_[A-Za-z0-9._-]+\b/g, "sb_[REDACTED]")
     .replace(/\b(?:apikey|api_key|x-api-key)\s*[:=]\s*[^\s,;]+/gi, "api_key=[REDACTED]")
-    .replace(/\b(?:tenant|tenant_id|profile_id)\s*[:=]\s*[0-9a-f-]{16,}/gi, "[REDACTED_ID]")
+    .replace(/\b(?:tenant|workspace_id|profile_id)\s*[:=]\s*[0-9a-f-]{16,}/gi, "[REDACTED_ID]")
     .replace(/\b(?:\d[ -]*?){13,19}\b/g, "[REDACTED_CARD]")
     .replace(/https?:\/\/[^\s"']+/gi, "[REDACTED_URL]")
     .replace(/\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi, "[REDACTED_EMAIL]")

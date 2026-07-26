@@ -511,10 +511,12 @@ const applyBulkAccess = async () => {
       items.value = items.value.map((row) => (row.id === updated.id ? updated : row));
     }
     success.value = "Tenant account access updated.";
+    showToast("Access updated", "Tenant account access updated for the selected items.");
     showBulkAccessModal.value = false;
     selectedItemIds.value = new Set();
   } catch (err) {
     error.value = toUserFacingErrorMessage(err, "Unable to update tenant account access.");
+    showToast("Update failed", error.value);
   } finally {
     isSaving.value = false;
   }
@@ -537,10 +539,12 @@ const applyBulkStatus = async () => {
       items.value = items.value.map((row) => (row.id === updated.id ? updated : row));
     }
     success.value = "Status updated.";
+    showToast("Status updated", "Status updated for the selected items.");
     bulkStatusValue.value = "";
     selectedItemIds.value = new Set();
   } catch (err) {
     error.value = toUserFacingErrorMessage(err, "Unable to update status.");
+    showToast("Update failed", error.value);
   } finally {
     isSaving.value = false;
   }
@@ -559,9 +563,11 @@ const applyBulkArchive = async () => {
       archivedItem.value = [item, ...archivedItem.value];
     }
     success.value = "Selected items archived.";
+    showToast("Items archived", `${targets.length} item(s) archived.`);
     selectedItemIds.value = new Set();
   } catch (err) {
     error.value = err instanceof Error ? err.message : "Unable to archive selected items.";
+    showToast("Archive failed", error.value);
   } finally {
     isSaving.value = false;
   }

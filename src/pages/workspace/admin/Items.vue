@@ -310,7 +310,6 @@ import CameraBarcodeScannerModal from "../../../components/CameraBarcodeScannerM
 import SkeletonLoader from "../../../components/SkeletonLoader.vue";
 import { getAuthState } from "../../../store/authState";
 import { logAdminAction } from "../../../services/auditLogService";
-import { enforceAdminRateLimit } from "../../../services/rateLimitService";
 import {
   createItem,
   deleteItem,
@@ -563,7 +562,6 @@ const handleCreate = async () => {
 
   isSaving.value = true;
   try {
-    await enforceAdminRateLimit();
     const created = await createItem({
       workspace_id: auth.workspaceContextId,
       name: name.value.trim(),
@@ -643,7 +641,6 @@ const saveEdit = async (id: string) => {
   }
   isSaving.value = true;
   try {
-    await enforceAdminRateLimit();
     const previousStatus = selectedItem.value?.status ?? "";
     const updated = await updateItem({
       id,
@@ -668,7 +665,6 @@ const saveEdit = async (id: string) => {
         `Status changed to ${updated.status}.`,
         "Undo status",
         async () => {
-          await enforceAdminRateLimit();
           const reverted = await updateItem({
             id: updated.id,
             name: updated.name,
@@ -704,7 +700,6 @@ const removeItem = async (item: ItemRecord) => {
   success.value = "";
   isSaving.value = true;
   try {
-    await enforceAdminRateLimit();
     await deleteItem(item.id);
     await logAdminAction({
       action_type: "item_archive",
@@ -738,7 +733,6 @@ const handleRestore = async (item: ItemRecord) => {
   success.value = "";
   isSaving.value = true;
   try {
-    await enforceAdminRateLimit();
     const restored = await restoreItem(item.id);
     await logAdminAction({
       action_type: "item_restore",

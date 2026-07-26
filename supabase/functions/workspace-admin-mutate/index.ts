@@ -1,10 +1,6 @@
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.108.2";
 import { isKillSwitchWriteBlocked } from "../_shared/killSwitch.ts";
-import {
-  hasPrivilegedStepUp,
-  isMissingPrivilegedStepUpTable,
-} from "../_shared/privilegedStepUp.ts";
 import { isAllowedOrigin, parseAllowedOrigins } from "../_shared/cors.ts";
 import { requireTrustedEdgeIngress } from "../_shared/trustedIngress.ts";
 import { readJsonBody } from "../_shared/requestBody.ts";
@@ -131,24 +127,6 @@ serve(async (req) => {
     const adminClient = createClient(supabaseUrl, serviceKey, {
       auth: { persistSession: false },
     });
-
-    try {
-      const hasStepUp = await hasPrivilegedStepUp(adminClient, {
-        userId: user.id,
-        roleScope: "workspace_admin",
-        authToken,
-      });
-      if (!hasStepUp) {
-        return jsonResponse(403, { error: "Admin verification required." });
-      }
-    } catch (error) {
-      if (isMissingPrivilegedStepUpTable(error as { code?: string; message?: string })) {
-        return jsonResponse(503, {
-          error: "Privileged verification controls unavailable. Run latest SQL setup.",
-        });
-      }
-      throw error;
-    }
 
     const { data: tenant, error: tenantError } = await adminClient
       .from("workspaces")

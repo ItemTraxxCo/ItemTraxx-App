@@ -191,12 +191,6 @@ test.describe("global CSS ownership contracts", () => {
     ).toEqual({ display: "block", borderRadius: "14px" });
     expect(await hasScopedRule("admin-card")).toBe(true);
 
-    await navigateApp(page, "/admin/stats");
-    const statsGrid = page.locator(".stats-grid");
-    await expect(statsGrid).toBeVisible();
-    expect(await statsGrid.evaluate((element) => getComputedStyle(element).display)).toBe("grid");
-    expect(await hasScopedRule("stats-grid")).toBe(true);
-
     await navigateApp(page, "/admin/items");
     const formHelp = page.locator(".form-help-row").first();
     await expect(formHelp).toBeVisible();

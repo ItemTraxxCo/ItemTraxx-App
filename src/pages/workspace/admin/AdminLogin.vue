@@ -221,8 +221,8 @@ const handleAdminLogin = async () => {
     void runPostHog(({ capturePostHogEvent }) =>
       capturePostHogEvent("admin_login_succeeded", { role: session.role })
     );
-    if (session.workspaceSlug && window.location.hostname !== `${session.workspaceSlug}.app.itemtraxx.com`) window.location.replace(`https://${session.workspaceSlug}.app.itemtraxx.com/admin`);
-    else window.location.replace("/admin");
+    if (session.workspaceSlug && window.location.hostname !== `${session.workspaceSlug}.app.itemtraxx.com`) window.location.replace(`https://${session.workspaceSlug}.app.itemtraxx.com/admin?login_ctx=admin_login`);
+    else window.location.replace("/admin?login_ctx=admin_login");
     void logAdminAction({
       action_type: "admin_login",
       metadata: { email: email.value.trim() },

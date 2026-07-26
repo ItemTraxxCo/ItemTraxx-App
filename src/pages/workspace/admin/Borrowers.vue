@@ -276,7 +276,6 @@ import {
 } from "../../../services/borrowerService";
 import { fetchWorkspaceSettings } from "../../../services/adminOpsService";
 import { logAdminAction } from "../../../services/auditLogService";
-import { enforceAdminRateLimit } from "../../../services/rateLimitService";
 import { exportRowsToCsv, exportRowsToPdf } from "../../../services/exportService";
 import { generateBorrowerIdentity } from "../../../utils/borrowerIdentity";
 import { authenticatedSelect } from "../../../services/authenticatedDataClient";
@@ -430,7 +429,6 @@ const runBulkImport = async () => {
   success.value = "";
   isSaving.value = true;
   try {
-    await enforceAdminRateLimit();
     const result = await bulkCreateBorrowers(bulkRows.value);
     borrowers.value = [...result.inserted, ...borrowers.value];
     success.value = `Imported ${result.inserted_count} borrower(s).`;
@@ -474,7 +472,6 @@ const handleCreate = async () => {
 
   isSaving.value = true;
   try {
-    await enforceAdminRateLimit();
     const created = await createBorrower({
       workspace_id: auth.workspaceContextId,
       username: usernamePreview.value,
@@ -565,7 +562,6 @@ const removeBorrower = async (item: BorrowerItem) => {
   success.value = "";
   isSaving.value = true;
   try {
-    await enforceAdminRateLimit();
     await deleteBorrower(item.id);
     await logAdminAction({
       action_type: "borrower_archive",
@@ -604,7 +600,6 @@ const handleRestore = async (item: BorrowerItem) => {
   success.value = "";
   isSaving.value = true;
   try {
-    await enforceAdminRateLimit();
     const restored = await restoreBorrower(item.id);
     await logAdminAction({
       action_type: "borrower_restore",

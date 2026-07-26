@@ -126,7 +126,6 @@ import { onMounted, ref } from "vue";
 import { RouterLink } from "vue-router";
 import { bulkImportItem, fetchWorkspaceSettings } from "../../../services/adminOpsService";
 import { logAdminAction } from "../../../services/auditLogService";
-import { enforceAdminRateLimit } from "../../../services/rateLimitService";
 import { toUserFacingErrorMessage } from "../../../services/appErrors";
 import { capturePostHogEvent } from "../../../services/posthogService";
 
@@ -288,7 +287,6 @@ const runImport = async () => {
   importResult.value = null;
 
   try {
-    await enforceAdminRateLimit();
     const result = await bulkImportItem(parsedRows.value);
     importResult.value = {
       inserted: result.inserted,

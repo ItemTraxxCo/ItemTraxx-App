@@ -1,7 +1,3 @@
-import {
-  hasPrivilegedStepUp,
-  isMissingPrivilegedStepUpTable,
-} from "../../_shared/privilegedStepUp.ts";
 import type {
   AdminOpsContext,
   JsonResponse,
@@ -85,32 +81,6 @@ export const authorizeAdminOpsAction = async (input: {
     input.isWorkspaceSuspended
   ) {
     return input.jsonResponse(403, { error: "Workspace disabled" });
-  }
-  if (input.action === "update_workspace_settings") {
-    try {
-      const hasStepUp = await hasPrivilegedStepUp(input.adminClient, {
-        userId: input.userId,
-        roleScope: "workspace_admin",
-        authToken: input.authToken,
-      });
-      if (!hasStepUp) {
-        return input.jsonResponse(403, {
-          error: "Admin verification required.",
-        });
-      }
-    } catch (error) {
-      if (
-        isMissingPrivilegedStepUpTable(
-          error as { code?: string; message?: string },
-        )
-      ) {
-        return input.jsonResponse(503, {
-          error:
-            "Privileged verification controls unavailable. Run latest SQL setup.",
-        });
-      }
-      throw error;
-    }
   }
   return null;
 };

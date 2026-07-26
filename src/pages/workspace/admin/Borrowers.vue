@@ -15,10 +15,6 @@
           <strong>{{ archivedBorrowers.length }}</strong>
           <span>Archived borrowers</span>
         </div>
-        <div class="admin-summary-card">
-          <strong>{{ filteredBorrowers.length }}</strong>
-          <span>Visible in table</span>
-        </div>
       </div>
     </div>
 
@@ -48,12 +44,11 @@
             title="If you need to change this, contact support."
           />
         </label>
-        <fieldset>
-          <legend>Tenant Account access</legend>
-          <label><input v-model="accessMode" type="radio" value="all" /> All Tenant Accounts</label>
-          <label><input v-model="accessMode" type="radio" value="restricted" /> Specific Tenant Accounts</label>
-          <div v-if="accessMode === 'restricted'"><label v-for="account in tenantAccounts" :key="account.id"><input v-model="selectedProfileIds" type="checkbox" :value="account.id" /> {{ account.auth_email }}</label></div>
-        </fieldset>
+        <TenantAccessPicker
+          v-model:access-mode="accessMode"
+          v-model:selected-ids="selectedProfileIds"
+          :accounts="tenantAccounts"
+        />
         <div class="form-actions">
           <button type="button" @click="regenerateIdentity">Regenerate</button>
           <button type="submit" class="button-primary" :disabled="isSaving">Add borrower</button>
@@ -82,7 +77,16 @@
         <div class="admin-toolbar-actions">
           <button type="button" @click="exportCsv">Export CSV</button>
           <button type="button" @click="exportPdf">Export PDF</button>
+          <button type="button" @click="toggleBulkMode">
+            {{ bulkMode ? "Exit bulk actions" : "Bulk actions" }}
+          </button>
         </div>
+      </div>
+
+      <div v-if="bulkMode && selectedBorrowerIds.size > 0" class="bulk-action-bar">
+        <span>{{ selectedBorrowerIds.size }} selected</span>
+        <button type="button" @click="openBulkAccessModal">Change tenant account access</button>
+        <button type="button" :disabled="isSaving" @click="applyBulkArchive">Archive selected</button>
       </div>
       <div class="form-grid-2">
         <label>
@@ -100,13 +104,29 @@
       <table class="table">
         <thead>
           <tr>
+            <th v-if="bulkMode">
+              <input
+                type="checkbox"
+                :checked="allFilteredSelected"
+                @change="toggleSelectAll"
+                aria-label="Select all borrowers"
+              />
+            </th>
             <th>Username</th>
             <th>Borrower ID</th>
             <th>Details</th>
           </tr>
         </thead>
         <tbody>
-          <tr v-for="item in filteredBorrowers" :key="item.id">
+          <tr v-for="(item, index) in filteredBorrowers" :key="item.id">
+            <td v-if="bulkMode">
+              <input
+                type="checkbox"
+                :checked="selectedBorrowerIds.has(item.id)"
+                @click="toggleBorrowerSelection(item.id, index, $event)"
+                :aria-label="`Select ${item.username}`"
+              />
+            </td>
             <td>{{ item.username }}</td>
             <td>{{ item.borrower_id }}</td>
             <td>
@@ -188,34 +208,30 @@
       </p>
     </div>
 
+    <div v-if="showBulkAccessModal" class="modal-backdrop">
+      <div class="modal">
+        <h2>Change tenant account access</h2>
+        <p class="admin-section-copy">Applies to {{ selectedBorrowerIds.size }} selected borrower(s).</p>
+        <TenantAccessPicker
+          v-model:access-mode="bulkAccessMode"
+          v-model:selected-ids="bulkAccessProfileIds"
+          :accounts="tenantAccounts"
+        />
+        <div class="admin-actions">
+          <button type="button" class="link" :disabled="!bulkAccessMode || isSaving" @click="applyBulkAccess">
+            Apply
+          </button>
+          <button type="button" class="link" @click="showBulkAccessModal = false">Cancel</button>
+        </div>
+      </div>
+    </div>
+
     <div v-if="showDetails" class="modal-backdrop">
       <div class="modal">
         <h2>Borrower details</h2>
         <p class="muted">View username, borrower ID, and checkout history.</p>
         <h3>{{ selected?.username }}</h3>
         <p class="muted">Borrower ID: {{ selected?.borrower_id }}</p>
-        <div class="form-grid-2">
-          <label>
-            Username
-            <input
-              class="identity-readonly"
-              :value="selected?.username || ''"
-              type="text"
-              readonly
-              title="If you need to change this, contact support."
-            />
-          </label>
-          <label>
-            Borrower ID
-            <input
-              class="identity-readonly"
-              :value="selected?.borrower_id || ''"
-              type="text"
-              readonly
-              title="If you need to change this, contact support."
-            />
-          </label>
-        </div>
 
         <SkeletonLoader v-if="detailsLoading" variant="lines" :rows="3" label="Loading borrower details" />
         <div v-else>
@@ -262,6 +278,7 @@
 import { computed, onMounted, onUnmounted, ref } from "vue";
 import { RouterLink } from "vue-router";
 import SkeletonLoader from "../../../components/SkeletonLoader.vue";
+import TenantAccessPicker from "../../../components/app/TenantAccessPicker.vue";
 import { getAuthState } from "../../../store/authState";
 import {
   bulkCreateBorrowers,
@@ -271,6 +288,7 @@ import {
   fetchBorrowerDetails,
   fetchBorrowers,
   restoreBorrower,
+  updateBorrowerAccess,
   type BorrowerDetails,
   type BorrowerItem,
 } from "../../../services/borrowerService";
@@ -311,6 +329,12 @@ const featureFlags = ref({
 });
 const bulkGenerateCount = ref(20);
 const bulkRows = ref<Array<{ username: string; borrower_id: string }>>([]);
+const bulkMode = ref(false);
+const selectedBorrowerIds = ref<Set<string>>(new Set());
+const lastSelectedIndex = ref<number | null>(null);
+const showBulkAccessModal = ref(false);
+const bulkAccessMode = ref<"" | "all" | "restricted">("");
+const bulkAccessProfileIds = ref<string[]>([]);
 let toastTimer: number | null = null;
 
 const matchesSearch = (item: BorrowerItem, query: string) => {
@@ -328,6 +352,85 @@ const filteredArchivedBorrowers = computed(() => {
   const query = searchQuery.value.trim().toLowerCase();
   return archivedBorrowers.value.filter((item) => matchesSearch(item, query));
 });
+
+const allFilteredSelected = computed(
+  () =>
+    filteredBorrowers.value.length > 0 &&
+    filteredBorrowers.value.every((item) => selectedBorrowerIds.value.has(item.id))
+);
+
+const toggleBulkMode = () => {
+  bulkMode.value = !bulkMode.value;
+  selectedBorrowerIds.value = new Set();
+  lastSelectedIndex.value = null;
+};
+
+const toggleSelectAll = () => {
+  selectedBorrowerIds.value = allFilteredSelected.value
+    ? new Set()
+    : new Set(filteredBorrowers.value.map((item) => item.id));
+};
+
+const toggleBorrowerSelection = (id: string, index: number, event: MouseEvent) => {
+  const next = new Set(selectedBorrowerIds.value);
+  if (event.shiftKey && lastSelectedIndex.value !== null) {
+    const [start, end] = [lastSelectedIndex.value, index].sort((a, b) => a - b);
+    for (let i = start; i <= end; i++) {
+      next.add(filteredBorrowers.value[i].id);
+    }
+  } else if (next.has(id)) {
+    next.delete(id);
+  } else {
+    next.add(id);
+  }
+  selectedBorrowerIds.value = next;
+  lastSelectedIndex.value = index;
+};
+
+const openBulkAccessModal = () => {
+  bulkAccessMode.value = "";
+  bulkAccessProfileIds.value = [];
+  showBulkAccessModal.value = true;
+};
+
+const applyBulkAccess = async () => {
+  const accessMode = bulkAccessMode.value;
+  if (accessMode !== "all" && accessMode !== "restricted") return;
+  isSaving.value = true;
+  try {
+    for (const id of selectedBorrowerIds.value) {
+      await updateBorrowerAccess({ id, access_mode: accessMode, profile_ids: bulkAccessProfileIds.value });
+    }
+    success.value = "Tenant account access updated.";
+    showBulkAccessModal.value = false;
+    selectedBorrowerIds.value = new Set();
+  } catch (err) {
+    error.value = err instanceof Error ? err.message : "Unable to update tenant account access.";
+  } finally {
+    isSaving.value = false;
+  }
+};
+
+const applyBulkArchive = async () => {
+  const targets = borrowers.value.filter((row) => selectedBorrowerIds.value.has(row.id));
+  if (targets.length === 0) return;
+  const confirmed = window.confirm(`Archive ${targets.length} selected borrower(s)? You can restore them later.`);
+  if (!confirmed) return;
+  isSaving.value = true;
+  try {
+    for (const item of targets) {
+      await deleteBorrower(item.id);
+      borrowers.value = borrowers.value.filter((row) => row.id !== item.id);
+      archivedBorrowers.value = [item, ...archivedBorrowers.value];
+    }
+    success.value = "Selected borrowers archived.";
+    selectedBorrowerIds.value = new Set();
+  } catch (err) {
+    error.value = err instanceof Error ? err.message : "Unable to archive selected borrowers.";
+  } finally {
+    isSaving.value = false;
+  }
+};
 
 const showToast = (title: string, message: string) => {
   toastTitle.value = title;
@@ -656,9 +759,15 @@ onUnmounted(() => {
   margin-top: 0.75rem;
 }
 
-.identity-readonly {
-  width: auto;
-  min-width: 120px;
-  max-width: 100%;
+.bulk-action-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.85rem;
+  padding: 0.6rem 0.8rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface-2);
 }
 </style>

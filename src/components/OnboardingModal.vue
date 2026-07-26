@@ -97,7 +97,7 @@ const tenantUserSteps: OnboardingStep[] = [
   },
   {
     title: "Need help later?",
-    body: "Open the top-right menu any time and select 'Take tour' to replay these steps. If you need help or have questions, contact ItemTraxx support by clicking the menu in the top right and then 'Contact Support'.",
+    body: "If you need help or have questions, contact ItemTraxx support.",
   },
 ];
 
@@ -119,8 +119,8 @@ const workspaceAdminSteps: OnboardingStep[] = [
     body: "Use Settings for device sessions, notification policies, and other security-sensitive controls.",
   },
   {
-    title: "Support and replay",
-    body: "From the top-right menu, use 'Take tour' to replay onboarding. If you need help or have questions, contact ItemTraxx support by clicking the menu in the top right and then 'Contact Support'.",
+    title: "Support",
+    body: "If you need help or have questions, contact ItemTraxx support.",
   },
 ];
 

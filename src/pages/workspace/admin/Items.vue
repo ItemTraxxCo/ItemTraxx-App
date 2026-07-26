@@ -124,7 +124,7 @@
         </label>
       </div>
       <p class="muted">Showing {{ filteredItem.length }} of {{ items.length }} items.</p>
-      <SkeletonLoader v-if="isLoading" variant="table" :rows="6" :columns="6" label="Loading items" />
+      <SkeletonLoader v-if="isLoading" variant="table" :rows="6" :columns="7" label="Loading items" />
       <div v-else class="table-wrap">
       <table class="table">
         <thead>
@@ -142,6 +142,7 @@
             <th>Serial</th>
             <th>Status</th>
             <th>Notes</th>
+            <th>Tenant Accounts</th>
             <th></th>
             <th></th>
           </tr>
@@ -165,6 +166,11 @@
             </td>
             <td>{{ item.status }}</td>
             <td class="item-notes-cell">{{ item.notes || "-" }}</td>
+            <td>
+              <span class="scoped-accounts-cell" :title="scopedAccountsTitle(item)">
+                {{ scopedAccountsLabel(item) }}
+              </span>
+            </td>
             <td>
               <div class="admin-actions">
                 <button type="button" class="link" @click="openDetails(item)">Details</button>
@@ -664,11 +670,55 @@ const loadArchivedItem = async () => {
   }
 };
 
+const itemAccessGrants = ref<Record<string, string[]>>({});
+
+const loadItemAccessGrants = async () => {
+  const restrictedIds = items.value.filter((row) => row.access_mode === "restricted").map((row) => row.id);
+  if (restrictedIds.length === 0) {
+    itemAccessGrants.value = {};
+    return;
+  }
+  try {
+    const grants = await authenticatedSelect<Array<{ item_id: string; profile_id: string }>>("item_access_grants", {
+      select: "item_id,profile_id",
+      item_id: `in.(${restrictedIds.join(",")})`,
+    });
+    const map: Record<string, string[]> = {};
+    for (const grant of grants) {
+      (map[grant.item_id] ??= []).push(grant.profile_id);
+    }
+    itemAccessGrants.value = map;
+  } catch {
+    itemAccessGrants.value = {};
+  }
+};
+
+const tenantAccountEmailById = computed(() => {
+  const map = new Map<string, string>();
+  for (const account of tenantAccounts.value) {
+    map.set(account.id, account.auth_email);
+  }
+  return map;
+});
+
+const scopedAccountsLabel = (item: ItemRecord) => {
+  if (item.access_mode !== "restricted") return "All";
+  const ids = itemAccessGrants.value[item.id] ?? [];
+  if (ids.length === 0) return "No tenant accounts";
+  return ids.map((id) => tenantAccountEmailById.value.get(id) ?? id).join(", ");
+};
+
+const scopedAccountsTitle = (item: ItemRecord) => {
+  if (item.access_mode !== "restricted") return "";
+  return scopedAccountsLabel(item);
+};
+
 const loadItem = async () => {
   isLoading.value = true;
   error.value = "";
   try {
     items.value = await fetchItem();
+    await loadItemAccessGrants();
   } catch (err) {
     error.value = err instanceof Error ? err.message : "Unable to load items. Please sign out completeley and sign back in. If the issue persists, contact support.";
   } finally {
@@ -977,6 +1027,15 @@ onUnmounted(() => {
 
 .item-notes-cell {
   min-width: 220px;
+}
+
+.scoped-accounts-cell {
+  display: inline-block;
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: bottom;
 }
 
 .item-notes-input {

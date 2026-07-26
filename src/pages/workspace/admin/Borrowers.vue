@@ -99,7 +99,7 @@
         </label>
       </div>
       <p class="muted">Showing {{ filteredBorrowers.length }} of {{ borrowers.length }} borrowers.</p>
-      <SkeletonLoader v-if="isLoading" variant="table" :rows="6" :columns="3" label="Loading borrowers" />
+      <SkeletonLoader v-if="isLoading" variant="table" :rows="6" :columns="4" label="Loading borrowers" />
       <div v-else class="table-wrap">
       <table class="table">
         <thead>
@@ -114,6 +114,7 @@
             </th>
             <th>Username</th>
             <th>Borrower ID</th>
+            <th>Tenant Accounts</th>
             <th>Details</th>
           </tr>
         </thead>
@@ -129,6 +130,11 @@
             </td>
             <td>{{ item.username }}</td>
             <td>{{ item.borrower_id }}</td>
+            <td>
+              <span class="scoped-accounts-cell" :title="scopedAccountsTitle(item)">
+                {{ scopedAccountsLabel(item) }}
+              </span>
+            </td>
             <td>
               <div class="admin-actions">
                 <button type="button" @click="openDetails(item)">Details</button>
@@ -499,11 +505,55 @@ const loadArchivedBorrowers = async () => {
   }
 };
 
+const borrowerAccessGrants = ref<Record<string, string[]>>({});
+
+const loadBorrowerAccessGrants = async () => {
+  const restrictedIds = borrowers.value.filter((row) => row.access_mode === "restricted").map((row) => row.id);
+  if (restrictedIds.length === 0) {
+    borrowerAccessGrants.value = {};
+    return;
+  }
+  try {
+    const grants = await authenticatedSelect<Array<{ borrower_id: string; profile_id: string }>>("borrower_access_grants", {
+      select: "borrower_id,profile_id",
+      borrower_id: `in.(${restrictedIds.join(",")})`,
+    });
+    const map: Record<string, string[]> = {};
+    for (const grant of grants) {
+      (map[grant.borrower_id] ??= []).push(grant.profile_id);
+    }
+    borrowerAccessGrants.value = map;
+  } catch {
+    borrowerAccessGrants.value = {};
+  }
+};
+
+const tenantAccountEmailById = computed(() => {
+  const map = new Map<string, string>();
+  for (const account of tenantAccounts.value) {
+    map.set(account.id, account.auth_email);
+  }
+  return map;
+});
+
+const scopedAccountsLabel = (item: BorrowerItem) => {
+  if (item.access_mode !== "restricted") return "All";
+  const ids = borrowerAccessGrants.value[item.id] ?? [];
+  if (ids.length === 0) return "No tenant accounts";
+  return ids.map((id) => tenantAccountEmailById.value.get(id) ?? id).join(", ");
+};
+
+const scopedAccountsTitle = (item: BorrowerItem) => {
+  if (item.access_mode !== "restricted") return "";
+  return scopedAccountsLabel(item);
+};
+
 const loadBorrowers = async () => {
   isLoading.value = true;
   error.value = "";
   try {
     borrowers.value = await fetchBorrowers();
+    await loadBorrowerAccessGrants();
   } catch (err) {
     error.value = err instanceof Error ? err.message : "Unable to load borrowers. Please sign out completeley and sign back in. If issue persists, contact support.";
   } finally {
@@ -761,6 +811,15 @@ onUnmounted(() => {
 
 .modal .admin-actions {
   margin-top: 0.75rem;
+}
+
+.scoped-accounts-cell {
+  display: inline-block;
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: bottom;
 }
 
 .bulk-action-bar {

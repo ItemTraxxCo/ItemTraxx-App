@@ -312,14 +312,14 @@ const isUniqueIdentityConflict = (error: unknown) => {
 };
 
 const createBorrowerRecord = async (
-  rpcClient: SupabaseAdminClient,
+  adminClient: SupabaseAdminClient,
   workspaceId: string,
   username: string,
   borrowerId: string,
   accessMode: "all" | "restricted" = "all",
   profileIds: string[] = []
 ) => {
-  const { data, error } = await (rpcClient as any)
+  const { data, error } = await (adminClient as any)
     .rpc("create_borrower_identity", {
       p_workspace_id: workspaceId,
       p_username: username,
@@ -338,7 +338,6 @@ const createBorrowerRecord = async (
 
 const createGeneratedBorrowerRecord = async (
   adminClient: SupabaseAdminClient,
-  rpcClient: SupabaseAdminClient,
   workspaceId: string,
   accessMode: "all" | "restricted" = "all",
   profileIds: string[] = []
@@ -346,7 +345,7 @@ const createGeneratedBorrowerRecord = async (
   for (let attempt = 0; attempt < 12; attempt += 1) {
     const generatedIdentity = await buildUniqueBorrowerIdentity(adminClient, workspaceId);
     const result = await createBorrowerRecord(
-      rpcClient,
+      adminClient,
       workspaceId,
       generatedIdentity.username,
       generatedIdentity.borrowerId,
@@ -634,8 +633,8 @@ serve(async (req) => {
 
       const { data, error } =
         borrowerId && username
-          ? await createBorrowerRecord(userClient as unknown as SupabaseAdminClient, profile.workspace_id, username, borrowerId, accessMode, profileIds)
-          : await createGeneratedBorrowerRecord(adminClient, userClient as unknown as SupabaseAdminClient, profile.workspace_id, accessMode, profileIds);
+          ? await createBorrowerRecord(adminClient, profile.workspace_id, username, borrowerId, accessMode, profileIds)
+          : await createGeneratedBorrowerRecord(adminClient, profile.workspace_id, accessMode, profileIds);
 
       if (error || !data) {
         if (isUniqueIdentityConflict(error)) {
@@ -749,7 +748,6 @@ serve(async (req) => {
         if (!borrowerId || !username) {
           const generated = await createGeneratedBorrowerRecord(
             adminClient,
-            userClient as unknown as SupabaseAdminClient,
             profile.workspace_id
           );
           if (!generated.data) {
@@ -763,7 +761,7 @@ serve(async (req) => {
         }
 
         const { data, error } = await createBorrowerRecord(
-          userClient as unknown as SupabaseAdminClient,
+          adminClient,
           profile.workspace_id,
           username,
           borrowerId

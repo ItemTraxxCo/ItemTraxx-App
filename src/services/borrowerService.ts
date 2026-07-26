@@ -38,7 +38,7 @@ const getWorkspaceContextId = () => {
 export const fetchBorrowers = async () => {
   const workspaceId = getWorkspaceContextId();
   return (await authenticatedSelect<BorrowerItem[]>("borrowers", {
-    select: "id,workspace_id,username,borrower_id",
+    select: "id,workspace_id,username,borrower_id,access_mode",
     workspace_id: `eq.${workspaceId}`,
     deleted_at: "is.null",
     order: "created_at.desc",

@@ -238,6 +238,10 @@
         <p class="muted">View username, borrower ID, and checkout history.</p>
         <h3>{{ selected?.username }}</h3>
         <p class="muted">Borrower ID: {{ selected?.borrower_id }}</p>
+        <p v-if="selected" class="muted">
+          Tenant Accounts:
+          <span class="scoped-accounts-cell" :title="scopedAccountsTitle(selected)">{{ scopedAccountsLabel(selected) }}</span>
+        </p>
 
         <SkeletonLoader v-if="detailsLoading" variant="lines" :rows="3" label="Loading borrower details" />
         <div v-else>

@@ -402,10 +402,12 @@ const applyBulkAccess = async () => {
       await updateBorrowerAccess({ id, access_mode: accessMode, profile_ids: bulkAccessProfileIds.value });
     }
     success.value = "Tenant account access updated.";
+    showToast("Access updated", "Tenant account access updated for the selected borrowers.");
     showBulkAccessModal.value = false;
     selectedBorrowerIds.value = new Set();
   } catch (err) {
     error.value = err instanceof Error ? err.message : "Unable to update tenant account access.";
+    showToast("Update failed", error.value);
   } finally {
     isSaving.value = false;
   }
@@ -424,9 +426,11 @@ const applyBulkArchive = async () => {
       archivedBorrowers.value = [item, ...archivedBorrowers.value];
     }
     success.value = "Selected borrowers archived.";
+    showToast("Borrowers archived", `${targets.length} borrower(s) archived.`);
     selectedBorrowerIds.value = new Set();
   } catch (err) {
     error.value = err instanceof Error ? err.message : "Unable to archive selected borrowers.";
+    showToast("Archive failed", error.value);
   } finally {
     isSaving.value = false;
   }

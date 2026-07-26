@@ -3,10 +3,6 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.108.2";
 import { isKillSwitchWriteBlocked } from "../_shared/killSwitch.ts";
 import { isAllowedOrigin, parseAllowedOrigins } from "../_shared/cors.ts";
 import { requireTrustedEdgeIngress } from "../_shared/trustedIngress.ts";
-import {
-  hasPrivilegedStepUp,
-  isMissingPrivilegedStepUpTable,
-} from "../_shared/privilegedStepUp.ts";
 import { resolveRateLimitResult } from "../_shared/preloginGuards.ts";
 import { validateAccountDeviceSession } from "../_shared/accountSessions.ts";
 import { readJsonBody } from "../_shared/requestBody.ts";
@@ -204,26 +200,6 @@ serve(async (req) => {
       });
       if (error) throw new Error("Unable to write security audit log.");
     };
-
-    if (isMutationAction) {
-      try {
-        const hasStepUp = await hasPrivilegedStepUp(adminClient, {
-          userId: user.id,
-          roleScope: "workspace_admin",
-          authToken,
-        });
-        if (!hasStepUp) {
-          return jsonResponse(403, { error: "Admin verification required." });
-        }
-      } catch (error) {
-        if (isMissingPrivilegedStepUpTable(error as { code?: string; message?: string })) {
-          return jsonResponse(503, {
-            error: "Privileged verification controls unavailable. Run latest SQL setup.",
-          });
-        }
-        throw error;
-      }
-    }
 
     if (isMutationAction) {
       if (!deviceId) {

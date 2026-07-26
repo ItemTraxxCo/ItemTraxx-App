@@ -50,14 +50,6 @@
         <h2>Quick Return</h2>
         <p>Quick return items without a borrower ID.</p>
       </RouterLink>
-      <RouterLink class="admin-card" to="/admin/stats">
-        <h2>Usage Stats</h2>
-        <p>View recent usage statistics and inventory activity.</p>
-      </RouterLink>
-      <RouterLink class="admin-card" to="/admin/audit-logs">
-        <h2>Admin Audit Logs</h2>
-        <p>Track admin actions.</p>
-      </RouterLink>
       <RouterLink v-if="featureFlags.enable_status_tracking" class="admin-card" to="/admin/item-status">
         <h2>Item Status Tracking</h2>
         <p>Track lost, damaged, and repair statuses on items.</p>

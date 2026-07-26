@@ -301,32 +301,6 @@ const routes: RouteRecordRaw[] = [
     },
   },
   {
-    path: "/admin/stats",
-    name: "workspace-admin-stats",
-    component: () => import("../pages/workspace/admin/UsageStats.vue"),
-    meta: {
-      requiresSession: true,
-      requiresWorkspace: true,
-      requiresRole: "workspace_admin",
-      requiresWorkspaceMatch: true,
-    
-      title: "Usage Stats | ItemTraxx",
-    },
-  },
-  {
-    path: "/admin/audit-logs",
-    name: "workspace-admin-audit-logs",
-    component: () => import("../pages/workspace/admin/AdminAuditLogs.vue"),
-    meta: {
-      requiresSession: true,
-      requiresWorkspace: true,
-      requiresRole: "workspace_admin",
-      requiresWorkspaceMatch: true,
-    
-      title: "Audit Logs | ItemTraxx",
-    },
-  },
-  {
     path: "/admin/item-status",
     name: "workspace-admin-item-status",
     component: () => import("../pages/workspace/admin/ItemStatusTracking.vue"),

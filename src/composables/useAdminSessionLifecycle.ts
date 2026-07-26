@@ -58,6 +58,9 @@ const SESSION_HEARTBEAT_INTERVAL_MS =
   parsedE2EHeartbeatIntervalMs > 0
     ? parsedE2EHeartbeatIntervalMs
     : DEFAULT_SESSION_HEARTBEAT_INTERVAL_MS;
+const LOGIN_CONTEXT_QUERY_KEY = "login_ctx";
+const LOGIN_CONTEXT_VALUES = new Set(["admin_login", "regular_login"]);
+
 const ADMIN_ACTIVITY_EVENTS: Array<keyof WindowEventMap> = [
   "mousemove",
   "mousedown",
@@ -228,6 +231,15 @@ export const useAdminSessionLifecycle = (options: AdminSessionLifecycleOptions) 
     }
   };
 
+  const consumeLoginContext = () => {
+    const raw = options.route.query[LOGIN_CONTEXT_QUERY_KEY];
+    const value = Array.isArray(raw) ? raw[0] : raw;
+    if (typeof value !== "string" || !LOGIN_CONTEXT_VALUES.has(value)) return null;
+    const { [LOGIN_CONTEXT_QUERY_KEY]: _discard, ...restQuery } = options.route.query;
+    void options.router.replace({ path: options.route.path, query: restQuery });
+    return value as "admin_login" | "regular_login";
+  };
+
   const identityChanged = (epoch: number, userId: string | null, deviceId: string) =>
     epoch !== authSessionEpoch ||
     userId !== options.auth.userId ||
@@ -269,7 +281,10 @@ export const useAdminSessionLifecycle = (options: AdminSessionLifecycleOptions) 
         return;
       }
       try {
-        await touchAccountSession();
+        const loginContext = consumeLoginContext();
+        await touchAccountSession(
+          loginContext ? { loginMethod: "password", loginLocation: loginContext } : {}
+        );
       } catch {
         // Best-effort keepalive; validation below is authoritative.
       }

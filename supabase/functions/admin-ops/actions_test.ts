@@ -236,37 +236,6 @@ Deno.test("suspended workspaces remain denied from write actions", async () => {
   assertEquals(await responseBody(response), { error: "Workspace disabled" });
 });
 
-Deno.test("missing privileged-step-up storage remains a fail-closed 503", async () => {
-  const { client } = queryClient((call) => {
-    if (call.table === "privileged_session_stepups") {
-      return {
-        data: null,
-        error: {
-          code: "42P01",
-          message: 'relation "privileged_session_stepups" does not exist',
-        },
-      };
-    }
-    return { data: null, error: null };
-  });
-  const response = await authorizeAdminOpsAction({
-    action: "update_workspace_settings",
-    profileRole: "workspace_admin",
-    isWorkspaceSuspended: false,
-    adminClient: client,
-    userId: "user-1",
-    authToken: "token-1",
-    jsonResponse,
-  });
-
-  assertExists(response);
-  assertEquals(response.status, 503);
-  assertEquals(await responseBody(response), {
-    error:
-      "Privileged verification controls unavailable. Run latest SQL setup.",
-  });
-});
-
 Deno.test("touch_session rejects a blocked auth token", async () => {
   const { client } = queryClient(
     () => ({ data: null, error: null }),

@@ -303,10 +303,10 @@ const handleWorkspaceLogin = async () => {
       capturePostHogEvent("tenant_login_succeeded", { login_method: "password" })
     );
     if (session.workspaceSlug && window.location.hostname !== `${session.workspaceSlug}.app.itemtraxx.com`) {
-      window.location.replace(`https://${session.workspaceSlug}.app.itemtraxx.com/checkout`);
+      window.location.replace(`https://${session.workspaceSlug}.app.itemtraxx.com/checkout?login_ctx=regular_login`);
       return;
     }
-    await router.push("/checkout");
+    await router.push({ path: "/checkout", query: { login_ctx: "regular_login" } });
   } catch (err) {
     if (err instanceof Error && err.message === "LIMITER_UNAVAILABLE") {
       error.value = "";

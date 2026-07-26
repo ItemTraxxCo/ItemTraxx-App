@@ -603,11 +603,15 @@ const runBulkImport = async () => {
   }
 };
 
+const exportRows = computed(() =>
+  filteredBorrowers.value.map((item) => ({ ...item, tenant_accounts: scopedAccountsLabel(item) }))
+);
+
 const exportCsv = () => {
   exportRowsToCsv(
     `borrowers-${new Date().toISOString().slice(0, 10)}.csv`,
-    ["username", "borrower_id"],
-    filteredBorrowers.value
+    ["username", "borrower_id", "tenant_accounts"],
+    exportRows.value
   );
 };
 
@@ -615,8 +619,8 @@ const exportPdf = async () => {
   await exportRowsToPdf(
     `borrowers-${new Date().toISOString().slice(0, 10)}.pdf`,
     "Borrower Export",
-    ["username", "borrower_id"],
-    filteredBorrowers.value
+    ["username", "borrower_id", "tenant_accounts"],
+    exportRows.value
   );
 };
 

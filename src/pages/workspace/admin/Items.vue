@@ -738,11 +738,15 @@ const loadItem = async () => {
   await loadArchivedItem();
 };
 
+const exportRows = computed(() =>
+  filteredItem.value.map((item) => ({ ...item, tenant_accounts: scopedAccountsLabel(item) }))
+);
+
 const exportCsv = () => {
   exportRowsToCsv(
     `item-${new Date().toISOString().slice(0, 10)}.csv`,
-    ["name", "barcode", "serial_number", "status", "notes"],
-    filteredItem.value
+    ["name", "barcode", "serial_number", "status", "notes", "tenant_accounts"],
+    exportRows.value
   );
 };
 
@@ -750,8 +754,8 @@ const exportPdf = async () => {
   await exportRowsToPdf(
     `item-${new Date().toISOString().slice(0, 10)}.pdf`,
     "Item Export",
-    ["name", "barcode", "serial_number", "status", "notes"],
-    filteredItem.value
+    ["name", "barcode", "serial_number", "status", "notes", "tenant_accounts"],
+    exportRows.value
   );
 };
 

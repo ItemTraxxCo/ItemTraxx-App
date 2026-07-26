@@ -262,6 +262,17 @@
           </div>
         </label>
 
+        <label v-if="!isModalEditing">
+          Tenant Accounts
+          <input
+            :value="scopedAccountsLabel(selectedItem)"
+            :title="scopedAccountsTitle(selectedItem)"
+            type="text"
+            readonly
+            class="field-plain scoped-accounts-field"
+          />
+        </label>
+
         <TenantAccessPicker
           v-if="isModalEditing"
           v-model:access-mode="editAccessMode"
@@ -1036,6 +1047,13 @@ onUnmounted(() => {
   text-overflow: ellipsis;
   white-space: nowrap;
   vertical-align: bottom;
+}
+
+.scoped-accounts-field {
+  width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .item-notes-input {

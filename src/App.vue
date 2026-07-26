@@ -205,7 +205,12 @@ const isWorkspaceScopedRoute = computed(() =>
   ),
 );
 const isWorkspaceAdminArea = computed(() => route.path !== "/admin/login" && route.path.startsWith("/admin"));
-const shouldTrackAccountSession = computed(() => auth.isAuthenticated && auth.role === "workspace_admin" && isWorkspaceAdminArea.value);
+const shouldTrackAccountSession = computed(() => {
+  if (!auth.isAuthenticated) return false;
+  if (auth.role === "workspace_admin") return isWorkspaceAdminArea.value;
+  if (auth.role === "tenant_account") return isWorkspaceScopedRoute.value;
+  return false;
+});
 const showNotificationBell = computed(() => auth.isAuthenticated && auth.role === "workspace_admin" && route.path !== "/admin/login" && route.path.startsWith("/admin"));
 const isUnavailableBypass = computed(() => isUnavailableBypassHost(window.location.hostname));
 

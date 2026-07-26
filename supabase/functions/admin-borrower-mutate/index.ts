@@ -498,6 +498,7 @@ serve(async (req) => {
     const isMutationAction =
       action === "create" ||
       action === "bulk_create" ||
+      action === "update_access" ||
       action === "delete" ||
       action === "restore";
 
@@ -901,6 +902,54 @@ serve(async (req) => {
       }
 
       return jsonResponse(200, { data });
+    }
+
+    if (action === "update_access") {
+      const { accessMode, profileIds } = await resolveAccess();
+      const { id } = payloadRecord;
+      const normalizedId = requireUuid(id);
+
+      const { data: activeBorrower } = await adminClient
+        .from("borrowers")
+        .select("id")
+        .eq("id", normalizedId)
+        .eq("workspace_id", profile.workspace_id)
+        .is("deleted_at", null)
+        .maybeSingle();
+
+      if (!activeBorrower?.id) {
+        return jsonResponse(404, { error: "Borrower not found." });
+      }
+
+      const { error: updateError } = await adminClient
+        .from("borrowers")
+        .update({ access_mode: accessMode })
+        .eq("id", normalizedId)
+        .eq("workspace_id", profile.workspace_id)
+        .is("deleted_at", null);
+
+      if (updateError) {
+        return jsonResponse(400, { error: "Unable to update tenant account access." });
+      }
+
+      const { error: deleteGrantsError } = await adminClient
+        .from("borrower_access_grants")
+        .delete()
+        .eq("borrower_id", normalizedId);
+      if (deleteGrantsError) {
+        return jsonResponse(400, { error: "Unable to update tenant account access." });
+      }
+
+      if (accessMode === "restricted" && profileIds.length) {
+        const { error: insertGrantsError } = await adminClient
+          .from("borrower_access_grants")
+          .insert(profileIds.map((profileId) => ({ borrower_id: normalizedId, profile_id: profileId, granted_by: user.id })));
+        if (insertGrantsError) {
+          return jsonResponse(400, { error: "Unable to update tenant account access." });
+        }
+      }
+
+      return jsonResponse(200, { success: true });
     }
 
     return jsonResponse(400, { error: "Invalid action" });

@@ -97,6 +97,33 @@ export const createBorrower = async (payload: {
   return result.data?.data as BorrowerItem;
 };
 
+export const updateBorrowerAccess = async (payload: {
+  id: string;
+  access_mode: "all" | "restricted";
+  profile_ids: string[];
+}) => {
+  const { deviceId } = getOrCreateDeviceSession();
+  const result = await invokeEdgeFunction<{ success: boolean }>(
+    "admin-borrower-mutate",
+    {
+      method: "POST",
+      body: {
+        action: "update_access",
+        payload: {
+          device_id: deviceId,
+          id: payload.id,
+          access_mode: payload.access_mode,
+          profile_ids: payload.profile_ids,
+        },
+      },
+    }
+  );
+
+  if (!result.ok) {
+    throw edgeFunctionError(result, "Unable to update tenant account access.");
+  }
+};
+
 export const bulkCreateBorrowers = async (
   rows: Array<{ username?: string; borrower_id?: string }>
 ) => {

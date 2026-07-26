@@ -38,7 +38,7 @@ test.describe("global CSS ownership contracts", () => {
 
     await setWorkspaceAdminSession(page);
     await navigateApp(page, "/admin");
-    await expect(page.getByRole("heading", { name: "Admin Panel", exact: true })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Workspace Overview", exact: true })).toBeVisible();
     await expect.poll(() => authenticatedCssRequests.length).toBe(1);
     expect(
       await page.locator(".admin-grid").evaluate((element) => getComputedStyle(element).display),

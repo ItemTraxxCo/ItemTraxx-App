@@ -61,17 +61,10 @@
       :is-outdated="isOutdated"
       :menu-open="menuOpen"
       :theme-label="themeLabel"
-      :can-replay-onboarding="onboarding.canReplay.value"
+      :show-account-panel="showAccountPanel"
       :show-logout-user-action="showLogoutUserAction"
-      :app-version="appVersion"
-      :offline-queue-count="offlineQueue.count.value"
-      :offline-queue-tooltip="offlineQueue.tooltip.value"
-      :status-class="statusClass"
-      :status-label="statusLabel"
       @toggle-menu="toggleMenu"
       @toggle-theme="toggleTheme"
-      @open-admin-panel="openAdminPanel"
-      @open-onboarding="openOnboardingTour"
       @logout="logoutTenant"
       @close-menu="menuOpen = false"
     />
@@ -96,6 +89,7 @@
       @save-preferences="consent.savePreferences"
     />
     <FatalErrorToast v-if="fatalErrorToast.visible" />
+    <OfflineQueueToast :count="offlineQueue.count.value" :tooltip="offlineQueue.tooltip.value" />
     <Analytics v-if="consent.showTelemetry.value" />
     <SpeedInsights v-if="consent.showTelemetry.value" />
   </div>
@@ -126,6 +120,7 @@ import { getSessionTerminationState } from "./store/sessionTermination";
 const OnboardingModal = defineAsyncComponent(() => import("./components/OnboardingModal.vue"));
 const Analytics = defineAsyncComponent(async () => (await import("@vercel/analytics/vue")).Analytics);
 const FatalErrorToast = defineAsyncComponent(async () => (await import("./components/FatalErrorToast.vue")).default);
+const OfflineQueueToast = defineAsyncComponent(async () => (await import("./components/OfflineQueueToast.vue")).default);
 const SpeedInsights = defineAsyncComponent(async () => (await import("@vercel/speed-insights/vue")).SpeedInsights);
 
 const auth = getAuthState();
@@ -133,7 +128,7 @@ const district = getWorkspaceState();
 const routeLoading = getRouteLoadingState();
 const fatalErrorToast = getFatalErrorToastState();
 const sessionTermination = getSessionTerminationState();
-const { state: systemStatus, statusLabel, statusClass } = useSystemStatus();
+const { state: systemStatus } = useSystemStatus();
 const router = useRouter();
 const route = useRoute();
 const menuOpen = ref(false);
@@ -269,8 +264,7 @@ const applyTheme = (next: "light" | "dark") => {
 const toggleTheme = () => { applyTheme(theme.value === "dark" ? "light" : "dark"); menuOpen.value = false; };
 const toggleMenu = () => { menuOpen.value = !menuOpen.value; };
 const reloadApp = () => window.location.assign(`${window.location.origin}/`);
-const openOnboardingTour = () => { onboarding.open(); menuOpen.value = false; };
-const openAdminPanel = async () => { menuOpen.value = false; await router.push("/admin/login"); };
+const showAccountPanel = computed(() => auth.role === "tenant_account");
 const logoutTenant = async () => {
   if (!window.confirm("Are you sure you want to log out?")) return;
   menuOpen.value = false;

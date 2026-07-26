@@ -15,12 +15,12 @@ export type StatusTrackedItem = {
 
 export type StatusHistoryItem = {
   id: string;
-  gear_id: string;
+  item_id: string;
   status: string;
   note: string | null;
   changed_at: string;
   changed_by: string | null;
-  gear: { name: string; barcode: string } | null;
+  item: { name: string; barcode: string } | null;
 };
 
 export type TenantNotificationPayload = {
@@ -40,7 +40,7 @@ export type TenantNotificationPayload = {
   recent_status_events: StatusHistoryItem[];
 };
 
-export type TenantSettingsPayload = {
+export type WorkspaceSettingsPayload = {
   checkout_due_hours: number;
   account_category: "organization" | "district" | "individual" | null;
   plan_code:
@@ -55,7 +55,7 @@ export type TenantSettingsPayload = {
   feature_flags: TenantFeatureFlags;
 };
 
-export type TenantSessionItem = {
+export type AccountSessionItem = {
   id: string;
   device_id: string;
   device_label: string | null;
@@ -68,9 +68,18 @@ export type TenantSessionItem = {
   is_current: boolean;
 };
 
-export type TenantAdminSessionTouchOptions = {
-  loginMethod?: TenantSessionItem["login_method"];
-  loginLocation?: TenantSessionItem["login_location"];
+export type AccountSessionTouchOptions = {
+  loginMethod?: AccountSessionItem["login_method"];
+  loginLocation?: AccountSessionItem["login_location"];
+};
+
+export type WorkspaceAccountDashboardRow = {
+  profile_id: string;
+  auth_email: string;
+  item_count: number;
+  borrower_count: number;
+  active_checkouts: number;
+  overdue_count: number;
 };
 
 const requestCache = new Map<
@@ -144,16 +153,16 @@ const callAdminOps = async <TData>(
   return result.data?.data as TData;
 };
 
-export const fetchTenantNotifications = async () =>
+export const fetchWorkspaceNotifications = async () =>
   withCachedAdminOp("get_notifications", 15_000, () =>
     callAdminOps<TenantNotificationPayload>("get_notifications")
   );
 
-export const fetchTenantSettings = async () =>
-  callAdminOps<TenantSettingsPayload>("get_tenant_settings");
+export const fetchWorkspaceSettings = async () =>
+  callAdminOps<WorkspaceSettingsPayload>("get_workspace_settings");
 
-export const updateTenantSettings = async (payload: { checkout_due_hours: number }) =>
-  callAdminOps<TenantSettingsPayload>("update_tenant_settings", payload);
+export const updateWorkspaceSettings = async (payload: { checkout_due_hours: number }) =>
+  callAdminOps<WorkspaceSettingsPayload>("update_workspace_settings", payload);
 
 export const fetchStatusTracking = async () =>
   callAdminOps<{
@@ -161,7 +170,10 @@ export const fetchStatusTracking = async () =>
     history: StatusHistoryItem[];
   }>("get_status_tracking");
 
-export const bulkImportGear = async (
+export const fetchWorkspaceAccountDashboard = async () =>
+  callAdminOps<WorkspaceAccountDashboardRow[]>("get_workspace_dashboard");
+
+export const bulkImportItem = async (
   rows: Array<{
     name: string;
     barcode: string;
@@ -175,10 +187,10 @@ export const bulkImportGear = async (
     skipped: number;
     inserted_items: StatusTrackedItem[];
     skipped_rows: Array<{ barcode: string; reason: string }>;
-  }>("bulk_import_gear", { rows });
+  }>("bulk_import_items", { rows });
 
-export const touchTenantAdminSession = async (
-  options: TenantAdminSessionTouchOptions = {}
+export const touchAccountSession = async (
+  options: AccountSessionTouchOptions = {}
 ) =>
   withCachedAdminOp(
     getAdminOpCacheKey(
@@ -193,19 +205,19 @@ export const touchTenantAdminSession = async (
       })
   );
 
-export const validateTenantAdminSession = async () =>
+export const validateAccountSession = async () =>
   withCachedAdminOp(getAdminOpCacheKey("validate_session"), 5_000, () =>
     callAdminOps<{ valid: boolean }>("validate_session")
   );
 
-export const listTenantAdminSessions = async () =>
-  callAdminOps<{ sessions: TenantSessionItem[] }>("list_sessions");
+export const listAccountSessions = async () =>
+  callAdminOps<{ sessions: AccountSessionItem[] }>("list_sessions");
 
-export const revokeTenantAdminSession = async (sessionId: string) =>
+export const revokeAccountSession = async (sessionId: string) =>
   callAdminOps<{ revoked: boolean }>("revoke_session", { session_id: sessionId });
 
-export const revokeAllTenantAdminSessions = async (signOutCurrent = false) =>
+export const revokeAllAccountSessions = async (signOutCurrent = false) =>
   callAdminOps<{ revoked: number }>("revoke_all_sessions", { sign_out_current: signOutCurrent });
 
-export const revokeCurrentTenantAdminSession = async () =>
+export const revokeCurrentAccountSession = async () =>
   callAdminOps<{ revoked: boolean }>("revoke_current_session");

@@ -69,6 +69,15 @@ const sessionMutation = (
 Deno.test("session exchange validates the user/profile and emits exact configured cookies", async () => {
   const originalFetch = globalThis.fetch;
   const calls: string[] = [];
+  const amrTimestampSeconds = 1_785_021_234;
+  const accessToken = [
+    "header",
+    btoa(JSON.stringify({
+      session_id: "auth-session-1",
+      amr: [{ method: "password", timestamp: amrTimestampSeconds }],
+    })).replaceAll("+", "-").replaceAll("/", "_").replaceAll("=", ""),
+    "signature",
+  ].join(".");
   globalThis.fetch = ((input: string | URL | Request) => {
     const url = String(input);
     calls.push(url);
@@ -84,9 +93,8 @@ Deno.test("session exchange validates the user/profile and emits exact configure
     if (url.includes("/rest/v1/profiles?")) {
       return Promise.resolve(Response.json([{
         id: "user-1",
-        role: "tenant_admin",
-        tenant_id: "tenant-1",
-        district_id: null,
+        role: "workspace_admin",
+        workspace_id: "tenant-1",
         auth_email: "user@example.com",
         is_active: true,
       }]));
@@ -97,7 +105,7 @@ Deno.test("session exchange validates the user/profile and emits exact configure
   try {
     const response = await worker.fetch(
       sessionMutation("exchange", {
-        access_token: "access token",
+        access_token: accessToken,
         refresh_token: "refresh/token",
       }),
       baseEnv({
@@ -116,15 +124,18 @@ Deno.test("session exchange validates the user/profile and emits exact configure
         last_sign_in_at: "stamp",
       },
       profile: {
-        role: "tenant_admin",
-        tenant_id: "tenant-1",
-        district_id: null,
+        role: "workspace_admin",
+        workspace_id: "tenant-1",
         auth_email: "user@example.com",
         is_active: true,
       },
+      password_authenticated_at: new Date(amrTimestampSeconds * 1000)
+        .toISOString(),
     }, "exchange response");
     assertEquals(setCookies(response), [
-      "itx_session=access%20token; Path=/; Max-Age=3600; HttpOnly; Secure; SameSite=Strict; Domain=.itemtraxx.com",
+      "itx_session=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Strict",
+      "itx_refresh=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Strict",
+      `itx_session=${accessToken}; Path=/; Max-Age=3600; HttpOnly; Secure; SameSite=Strict; Domain=.itemtraxx.com`,
       "itx_refresh=refresh%2Ftoken; Path=/; Max-Age=1209600; HttpOnly; Secure; SameSite=Strict; Domain=.itemtraxx.com",
     ], "exchange cookies");
   } finally {

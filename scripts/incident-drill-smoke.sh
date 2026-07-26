@@ -4,7 +4,7 @@ set -euo pipefail
 SITE_BASE="${1:-https://itemtraxx.com}"
 EDGE_BASE="${2:-https://edge.itemtraxx.com}"
 
-for path in / /login /tenant/checkout /super-auth; do
+for path in / /login /checkout /super-auth; do
   url="${SITE_BASE}${path}"
   echo "[drill] checking ${url}"
   curl -fsSI "$url" >/dev/null

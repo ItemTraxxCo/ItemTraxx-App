@@ -62,7 +62,7 @@ const RESET_ERROR_MESSAGE = "Unable to send reset link. Please try again.";
 
 const BACK_LINK_BY_SOURCE: Record<string, { to: string; label: string }> = {
   "admin-login": {
-    to: "/tenant/admin-login",
+    to: "/admin/login",
     label: "Back to admin login",
   },
   "super-auth": {

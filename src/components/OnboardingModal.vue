@@ -62,7 +62,7 @@ import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
 import { capturePostHogEvent } from "../services/posthogService";
 
 type OnboardingStep = { title: string; body: string };
-type OnboardingVariant = "tenant_checkout" | "tenant_admin";
+type OnboardingVariant = "tenant_checkout" | "workspace_admin";
 
 const props = defineProps<{
   visible: boolean;
@@ -101,7 +101,7 @@ const tenantUserSteps: OnboardingStep[] = [
   },
 ];
 
-const tenantAdminSteps: OnboardingStep[] = [
+const workspaceAdminSteps: OnboardingStep[] = [
   {
     title: "Welcome to the admin panel",
     body: "This area gives you control over borrowers, items, logs, and admin-level operations of your workspace.",
@@ -125,7 +125,7 @@ const tenantAdminSteps: OnboardingStep[] = [
 ];
 
 const steps = computed(() =>
-  props.variant === "tenant_admin" ? tenantAdminSteps : tenantUserSteps
+  props.variant === "workspace_admin" ? workspaceAdminSteps : tenantUserSteps
 );
 
 const currentStep = computed<OnboardingStep>(

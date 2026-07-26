@@ -1,7 +1,7 @@
 export type CheckoutReturnPayload = {
-  student_id: string;
-  gear_barcodes: string[];
-  action_type: "checkout" | "return" | "auto" | "admin_return";
+  borrower_id: string;
+  item_barcodes: string[];
+  action_type: "checkout" | "return" | "auto" | "admin_return" | "quick_return";
   device_id?: string;
   device_label?: string;
   operation_id?: string;

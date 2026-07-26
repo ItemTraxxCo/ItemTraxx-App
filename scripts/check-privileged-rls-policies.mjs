@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 
 const migrationPath = new URL(
-  "../supabase/sql/z_rls_initplan_optimization.sql",
+  "../supabase/migrations/20260725221011_item_borrower_physical_rename.sql",
   import.meta.url,
 );
 const migration = readFileSync(migrationPath, "utf8");
@@ -45,7 +45,11 @@ const extractParenthesizedClause = (statement, keyword) => {
   return null;
 };
 
-const normalizeSql = (value) => value.replace(/\s+/g, " ").trim().toLowerCase();
+const normalizeSql = (value) => value
+  .replace(/\s+/g, " ")
+  .replace(/\s*=\s*/g, "=")
+  .trim()
+  .toLowerCase();
 
 const requireStepUpPolicy = (policyName, tableName) => {
   const statement = migration.match(
@@ -73,9 +77,9 @@ const requireStepUpPolicy = (policyName, tableName) => {
   }
 
   const requiredPredicates = [
-    /current_user_role\(\)\)\s*=\s*'tenant_admin'/i,
-    /tenant_id\s*=\s*\(select\s+current_tenant_id\(\)\)/i,
-    /has_recent_privileged_step_up\('tenant_admin'\)/i,
+    /current_user_role\(\)\)\s*=\s*'workspace_admin'/i,
+    /workspace_id\s*=\s*\(select\s+public\.current_workspace_id\(\)\)/i,
+    /private\.current_account_session_is_active\(\)/i,
   ];
 
   for (const predicate of requiredPredicates) {
@@ -87,9 +91,9 @@ const requireStepUpPolicy = (policyName, tableName) => {
   }
 
   const expectedClause = [
-    "(select current_user_role()) = 'tenant_admin'",
-    `${tableName}.tenant_id = (select current_tenant_id())`,
-    "(select has_recent_privileged_step_up('tenant_admin'))",
+    "(select public.current_user_role())='workspace_admin'",
+    "workspace_id=(select public.current_workspace_id())",
+    "(select private.current_account_session_is_active())",
   ].join(" and ");
 
   if (
@@ -97,27 +101,12 @@ const requireStepUpPolicy = (policyName, tableName) => {
     normalizeSql(withCheckClause) !== normalizeSql(expectedClause)
   ) {
     throw new Error(
-      `${policyName} must AND-connect only the tenant-admin, tenant, and step-up predicates in both USING and WITH CHECK`,
+      `${policyName} must AND-connect only the Workspace Admin, workspace, and active-session predicates in both USING and WITH CHECK`,
     );
   }
 };
 
-for (const policyName of [
-  "gear_admin_delete",
-  "gear_admin_insert",
-  "gear_admin_update",
-  "gear_tenant_user_update",
-  "student checkout gear",
-  "student_checkout_gear",
-  "student_gear_update",
-  "students_admin_delete",
-  "students_admin_insert",
-  "students_admin_update",
-]) {
-  requireDroppedOnly(policyName);
-}
+requireStepUpPolicy("workspace_admin_write_items", "items");
+requireStepUpPolicy("workspace_admin_write_borrowers", "borrowers");
 
-requireStepUpPolicy("tenant_admin_write_gear", "gear");
-requireStepUpPolicy("tenant_admin_write_students", "students");
-
-console.log("Privileged gear/student RLS policies require tenant-admin step-up.");
+console.log("Item/borrower RLS policies require Workspace Admin role, workspace scope, and an active session.");

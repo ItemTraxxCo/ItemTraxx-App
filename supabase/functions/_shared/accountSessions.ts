@@ -1,0 +1,272 @@
+import {
+  isMissingPostgrestColumn as isMissingColumn,
+  isMissingPostgrestRelation as isMissingRelation,
+  type PostgrestErrorLike,
+} from "./postgrestErrors.ts";
+import { sha256Hex } from "./sha256.ts";
+
+type SupabaseLikeClient = {
+  auth: {
+    getClaims: (token: string) => Promise<{
+      data: { claims: Record<string, unknown> } | null;
+      error: unknown | null;
+    }>;
+  };
+  from: (table: string) => any;
+};
+
+const ACCOUNT_SESSION_COLUMNS =
+  "id, auth_session_id, auth_token_hash, auth_token_issued_at";
+
+export const resolveAccountAuthSessionBinding = async (
+  client: SupabaseLikeClient,
+  authToken: string,
+) => {
+  const { data, error } = await client.auth.getClaims(authToken);
+  if (error || !data?.claims) {
+    return { sessionId: null, issuedAt: null };
+  }
+  const payload = data.claims;
+  const sessionId = typeof payload?.session_id === "string"
+    ? payload.session_id.trim()
+    : "";
+  const issuedAt =
+    typeof payload?.iat === "number" && Number.isFinite(payload.iat)
+      ? new Date(payload.iat * 1000).toISOString()
+      : null;
+
+  return {
+    sessionId: sessionId || null,
+    issuedAt,
+  };
+};
+
+const resolveAccountAuthBindingKey = async (
+  client: SupabaseLikeClient,
+  authToken: string,
+) => {
+  const binding = await resolveAccountAuthSessionBinding(client, authToken);
+  if (binding.sessionId) {
+    return {
+      ...binding,
+      bindingKey: `session:${binding.sessionId}`,
+    };
+  }
+
+  return {
+    ...binding,
+    bindingKey: `token:${await sha256Hex(authToken)}`,
+  };
+};
+
+export const isAccountTokenBlockedBySessionRevocation = async (
+  client: SupabaseLikeClient,
+  params: {
+    workspaceId: string;
+    profileId: string;
+    authToken: string;
+  },
+) => {
+  const binding = await resolveAccountAuthSessionBinding(
+    client,
+    params.authToken,
+  );
+  if (!binding.sessionId && !binding.issuedAt) {
+    return { blocked: true as const, relationMissing: false as const };
+  }
+
+  if (binding.sessionId) {
+    const { data, error } = await client
+      .from("account_sessions")
+      .select("id")
+      .eq("workspace_id", params.workspaceId)
+      .eq("profile_id", params.profileId)
+      .eq("auth_session_id", binding.sessionId)
+      .not("revoked_at", "is", null)
+      .order("revoked_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (error) {
+      if (
+        isMissingRelation(error as PostgrestErrorLike, "account_sessions")
+      ) {
+        return { blocked: true as const, relationMissing: true as const };
+      }
+      if (isMissingColumn(error as PostgrestErrorLike, "auth_session_id")) {
+        return { blocked: true as const, relationMissing: true as const };
+      }
+      throw new Error("Unable to validate admin session revocation.");
+    }
+
+    if (data?.id) {
+      return { blocked: true as const, relationMissing: false as const };
+    }
+  }
+
+  if (binding.issuedAt) {
+    const { data, error } = await client
+      .from("account_sessions")
+      .select("id")
+      .eq("workspace_id", params.workspaceId)
+      .eq("profile_id", params.profileId)
+      .not("revoked_at", "is", null)
+      .gte("revoked_at", binding.issuedAt)
+      .order("revoked_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (error) {
+      if (
+        isMissingRelation(error as PostgrestErrorLike, "account_sessions")
+      ) {
+        return { blocked: true as const, relationMissing: true as const };
+      }
+      throw new Error("Unable to validate admin session revocation.");
+    }
+
+    return { blocked: !!data?.id, relationMissing: false as const };
+  }
+
+  return { blocked: false as const, relationMissing: false as const };
+};
+
+export const validateAccountDeviceSession = async (
+  client: SupabaseLikeClient,
+  params: {
+    workspaceId: string;
+    profileId: string;
+    deviceId: string | null;
+    authToken: string;
+  },
+) => {
+  if (!params.deviceId) {
+    return {
+      valid: false as const,
+      reason: "missing_device" as const,
+      relationMissing: false as const,
+    };
+  }
+
+  const binding = await resolveAccountAuthBindingKey(
+    client,
+    params.authToken,
+  );
+  if (!binding.issuedAt) {
+    return {
+      valid: false as const,
+      reason: "revoked_token" as const,
+      relationMissing: false as const,
+    };
+  }
+
+  const tokenBlock = await isAccountTokenBlockedBySessionRevocation(
+    client,
+    params,
+  );
+  if (tokenBlock.relationMissing) {
+    return {
+      valid: false as const,
+      reason: "missing_table" as const,
+      relationMissing: true as const,
+    };
+  }
+  if (tokenBlock.blocked) {
+    return {
+      valid: false as const,
+      reason: "revoked_token" as const,
+      relationMissing: false as const,
+    };
+  }
+
+  let activeSessionQuery = client
+    .from("account_sessions")
+    .select(ACCOUNT_SESSION_COLUMNS)
+    .eq("workspace_id", params.workspaceId)
+    .eq("profile_id", params.profileId)
+    .eq("device_id", params.deviceId)
+    .is("revoked_at", null);
+
+  if (binding.sessionId) {
+    activeSessionQuery = activeSessionQuery.eq(
+      "auth_session_id",
+      binding.sessionId,
+    );
+  }
+
+  const { data: activeSession, error: activeSessionError } =
+    await activeSessionQuery
+      .limit(1)
+      .maybeSingle();
+
+  if (activeSessionError) {
+    if (
+      isMissingRelation(
+        activeSessionError as PostgrestErrorLike,
+        "account_sessions",
+      )
+    ) {
+      return {
+        valid: false as const,
+        reason: "missing_table" as const,
+        relationMissing: true as const,
+      };
+    }
+    if (
+      isMissingColumn(
+        activeSessionError as PostgrestErrorLike,
+        "auth_session_id",
+      )
+    ) {
+      return {
+        valid: false as const,
+        reason: "missing_table" as const,
+        relationMissing: true as const,
+      };
+    }
+    throw new Error("Unable to validate admin session.");
+  }
+
+  if (activeSession?.id) {
+    const sessionAuthId = typeof activeSession.auth_session_id === "string"
+      ? activeSession.auth_session_id.trim()
+      : "";
+    const sessionTokenHash = typeof activeSession.auth_token_hash === "string"
+      ? activeSession.auth_token_hash.trim()
+      : "";
+    const sessionTokenIssuedAt =
+      typeof activeSession.auth_token_issued_at === "string"
+        ? activeSession.auth_token_issued_at
+        : null;
+    if (binding.sessionId) {
+      return sessionAuthId === binding.sessionId
+        ? {
+          valid: true as const,
+          reason: "active" as const,
+          relationMissing: false as const,
+        }
+        : {
+          valid: false as const,
+          reason: "missing_session" as const,
+          relationMissing: false as const,
+        };
+    }
+    if (
+      !sessionAuthId &&
+      sessionTokenHash === binding.bindingKey &&
+      sessionTokenIssuedAt === binding.issuedAt
+    ) {
+      return {
+        valid: true as const,
+        reason: "active" as const,
+        relationMissing: false as const,
+      };
+    }
+  }
+
+  return {
+    valid: false as const,
+    reason: "missing_session" as const,
+    relationMissing: false as const,
+  };
+};

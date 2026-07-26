@@ -44,6 +44,8 @@ Deno.test("session cookie writers preserve exact set and clear attributes", () =
     refreshToken: "refresh",
   });
   assertEquals(values(setHeaders), [
+    "itx_session=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=None",
+    "itx_refresh=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=None",
     "itx_session=access; Path=/; Max-Age=3600; HttpOnly; Secure; SameSite=None; Domain=.itemtraxx.com",
     "itx_refresh=refresh; Path=/; Max-Age=7200; HttpOnly; Secure; SameSite=None; Domain=.itemtraxx.com",
   ], "set cookie values");
@@ -51,6 +53,8 @@ Deno.test("session cookie writers preserve exact set and clear attributes", () =
   const clearHeaders = new Headers();
   clearSessionCookies(clearHeaders, env);
   assertEquals(values(clearHeaders), [
+    "itx_session=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=None",
+    "itx_refresh=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=None",
     "itx_session=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=None; Domain=.itemtraxx.com",
     "itx_refresh=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=None; Domain=.itemtraxx.com",
   ], "clear cookie values");

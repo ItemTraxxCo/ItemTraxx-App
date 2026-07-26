@@ -10,7 +10,7 @@ export type JsonResponse = (
 export type TenantFeatureFlags = {
   enable_notifications: boolean;
   enable_bulk_item_import: boolean;
-  enable_bulk_student_tools: boolean;
+  enable_bulk_borrower_tools: boolean;
   enable_status_tracking: boolean;
   enable_barcode_generator: boolean;
 };
@@ -54,16 +54,16 @@ export type AdminOpsContext = {
   payload: Record<string, unknown>;
   adminClient: SupabaseClient;
   user: { id: string };
-  tenantId: string;
+  workspaceId: string;
   authToken: string;
   authSessionBinding: { sessionId: string | null; issuedAt: string | null };
   authTokenBindingKey: string;
   deviceSession: DeviceSessionContext;
-  tenantPolicy: TenantPolicyRow | null;
+  workspacePolicy: TenantPolicyRow | null;
   checkoutDueHours: number;
   featureFlags: TenantFeatureFlags;
   maintenance: { enabled: boolean; message: string };
-  tenantUpdates: RuntimeUpdateItem[];
+  workspaceUpdates: RuntimeUpdateItem[];
   jsonResponse: JsonResponse;
 };
 

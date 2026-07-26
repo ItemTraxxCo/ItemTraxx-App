@@ -4,7 +4,7 @@ import { isRecoverableChunkLoadError } from "./appErrorRecovery";
 let initialized = false;
 let posthog: typeof import("posthog-js").default | null = null;
 const EMAIL_PATTERN = /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/i;
-const SENSITIVE_PROPERTY_KEY = /(email|phone|name|tenant|profile|student|user_id|address|token|secret)/i;
+const SENSITIVE_PROPERTY_KEY = /(email|phone|name|tenant|profile|borrower|user_id|address|token|secret)/i;
 
 const scrubProperties = (
   properties?: Record<string, string | number | boolean | null | undefined>

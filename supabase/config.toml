@@ -219,7 +219,7 @@ otp_expiry = 900
 # port = 587
 # user = "apikey"
 
-[functions.tenant-admin-mutate]
+[functions.workspace-admin-mutate]
 # Auth is validated inside function via userClient.auth.getUser(authHeader).
 verify_jwt = false
 # pass = "env(SENDGRID_API_KEY)"
@@ -268,7 +268,7 @@ max_frequency = "5s"
 # Keep gateway JWT verification off so proxy/header variations do not block valid requests.
 verify_jwt = false
 
-[functions.super-tenant-mutate]
+[functions.super-workspace-mutate]
 # Authentication is validated inside the function with userClient.auth.getUser(authHeader).
 # Keep gateway JWT verification off so proxy/header variations do not block valid requests.
 verify_jwt = false
@@ -283,7 +283,7 @@ verify_jwt = false
 # Keep gateway JWT verification off so proxy/header variations do not block valid requests.
 verify_jwt = false
 
-[functions.super-gear-mutate]
+[functions.super-item-mutate]
 # Authentication is validated inside the function with userClient.auth.getUser(authHeader).
 # Keep gateway JWT verification off so proxy/header variations do not block valid requests.
 verify_jwt = false
@@ -293,22 +293,12 @@ verify_jwt = false
 # Keep gateway JWT verification off so proxy/header variations do not block valid requests.
 verify_jwt = false
 
-[functions.district-dashboard]
-# Authentication is validated inside the function with userClient.auth.getUser(authHeader).
-# Keep gateway JWT verification off so proxy/header variations do not block valid requests.
-verify_jwt = false
-
-[functions.district-admin-mutate]
-# Authentication is validated inside the function with userClient.auth.getUser(authHeader).
-# Keep gateway JWT verification off so proxy/header variations do not block valid requests.
-verify_jwt = false
-
 [functions.system-status]
 # Public health endpoint consumed by app shell before user auth.
 verify_jwt = false
 
-[functions.tenant-login]
-# Pre-auth login resolver (access code + turnstile); no JWT available yet.
+[functions.workspace-login]
+# Pre-auth email/password login resolver; no JWT available yet.
 verify_jwt = false
 
 [functions.contact-sales-submit]
@@ -344,19 +334,16 @@ verify_jwt = false
 # Keep gateway JWT verification off so proxy/header variations do not block valid requests.
 verify_jwt = false
 
-[functions.district-handoff]
-# Root-host login creates/consumes one-time district handoff codes; auth is verified inside.
-verify_jwt = false
 
-[functions.admin-gear-mutate]
+[functions.admin-item-mutate]
 # Auth is validated inside function via userClient.auth.getUser(authHeader).
 verify_jwt = false
 
-[functions.admin-student-mutate]
+[functions.admin-borrower-mutate]
 # Auth is validated inside function via userClient.auth.getUser(authHeader).
 verify_jwt = false
 
-[functions.super-student-mutate]
+[functions.super-borrower-mutate]
 # Function performs explicit super-admin auth checks internally.
 verify_jwt = false
 

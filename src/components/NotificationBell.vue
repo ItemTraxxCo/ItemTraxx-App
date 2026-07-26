@@ -7,7 +7,7 @@
       aria-label="Notifications"
       aria-haspopup="dialog"
       :aria-expanded="isOpen"
-      aria-controls="tenant-notifications-panel"
+      aria-controls="workspace-notifications-panel"
     >
       <svg class="notif-icon" viewBox="0 0 24 24" aria-hidden="true">
         <path
@@ -31,10 +31,10 @@
 
     <div
       v-if="isOpen"
-      id="tenant-notifications-panel"
+      id="workspace-notifications-panel"
       class="notif-dropdown"
       role="dialog"
-      aria-label="Tenant notifications"
+      aria-label="Workspace notifications"
     >
       <div class="notif-header">Notifications</div>
       <p v-if="isLoading" class="muted">Loading notifications...</p>
@@ -64,7 +64,7 @@
             :key="event.id"
             class="notif-item"
           >
-            {{ event.gear?.name || "Item" }} marked {{ event.status }}.
+            {{ event.item?.name || "Item" }} marked {{ event.status }}.
           </li>
           <li v-if="unreadCount === 0" class="notif-item muted">No new notifications.</li>
         </ul>
@@ -75,7 +75,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from "vue";
-import { fetchTenantNotifications, type StatusHistoryItem } from "../services/adminOpsService";
+import { fetchWorkspaceNotifications, type StatusHistoryItem } from "../services/adminOpsService";
 
 const isOpen = ref(false);
 const isLoading = ref(false);
@@ -145,7 +145,7 @@ const loadNotifications = async (showLoading = true) => {
   }
   error.value = "";
   try {
-    const payload = await fetchTenantNotifications();
+    const payload = await fetchWorkspaceNotifications();
     if (payload.feature_flags?.enable_notifications === false) {
       flaggedCount.value = 0;
       overdueCount.value = 0;

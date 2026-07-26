@@ -14,34 +14,29 @@ const schemaDoc = JSON.parse(await fs.readFile(schemaPath, 'utf8'));
 const schemas = schemaDoc.schemas ?? {};
 
 const endpointNotes = {
-  '/functions/v1/admin-ops': 'Tenant admin operational actions used by the tenant admin panel.',
-  '/functions/v1/super-tenant-mutate': 'Super-admin tenant and district creation/update actions.',
-  '/functions/v1/super-admin-mutate': 'Super-admin account management for tenant and district admins.',
+  '/functions/v1/admin-ops': 'Workspace admin operational actions used by the admin panel.',
+  '/functions/v1/super-workspace-mutate': 'Super-admin workspace creation and lifecycle actions.',
+  '/functions/v1/super-admin-mutate': 'Super-admin account management for Workspace Admins and Super Admins.',
   '/functions/v1/super-ops': 'Super-admin operational controls, approvals, customer ops, and reporting.',
-  '/functions/v1/tenant-admin-mutate': 'Primary-admin-only tenant admin management for the current tenant.',
-  '/functions/v1/district-dashboard': 'District dashboard snapshot and analytics feed.',
-  '/functions/v1/district-handoff': 'Cross-host login handoff for district-routed auth flows.',
+  '/functions/v1/workspace-admin-mutate': 'Primary Workspace Admin-only peer management for the current workspace.',
   '/functions/v1/contact-sales-submit': 'Public contact-sales and request-demo form submit endpoint.',
   '/functions/v1/contact-support-submit': 'Public support form submit endpoint.',
 };
 
 const requestSchemaNameByPath = {
   '/functions/v1/admin-ops': 'adminOpsRequest',
-  '/functions/v1/super-tenant-mutate': 'superTenantRequest',
+  '/functions/v1/super-workspace-mutate': 'superWorkspaceRequest',
   '/functions/v1/super-admin-mutate': 'superAdminRequest',
   '/functions/v1/super-ops': 'superOpsRequest',
-  '/functions/v1/tenant-admin-mutate': 'tenantAdminManageRequest',
-  '/functions/v1/district-handoff': 'districtHandoffRequest',
+  '/functions/v1/workspace-admin-mutate': 'workspaceAdminManageRequest',
 };
 
 const responseSchemaNameByPath = {
   '/functions/v1/admin-ops': 'adminOpsResponses',
-  '/functions/v1/super-tenant-mutate': 'superTenantResponses',
+  '/functions/v1/super-workspace-mutate': 'superWorkspaceResponses',
   '/functions/v1/super-admin-mutate': 'superAdminResponses',
   '/functions/v1/super-ops': 'superOpsResponses',
-  '/functions/v1/tenant-admin-mutate': 'tenantAdminManageResponses',
-  '/functions/v1/district-dashboard': 'districtDashboardResponse',
-  '/functions/v1/district-handoff': 'districtHandoffResponses',
+  '/functions/v1/workspace-admin-mutate': 'workspaceAdminManageResponses',
   '/functions/v1/contact-sales-submit': 'contactSalesSubmitResponse',
   '/functions/v1/contact-support-submit': 'contactSupportSubmitResponse',
 };

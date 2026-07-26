@@ -68,17 +68,17 @@ type HandledRequestFailure = {
 
 const CRITICAL_EDGE_FUNCTIONS = new Set([
   "super-dashboard",
-  "district-dashboard",
+  "super-workspace-mutate",
   "admin-ops",
+  "workspace-admin-mutate",
   "privileged-step-up",
-  "district-handoff",
-  "tenant-login",
+  "workspace-login",
   "super-auth-verify",
   "checkoutReturn",
 ]);
 
 const CRITICAL_DATA_PATH_PATTERNS = [
-  /^\/rest\/v1\/(profiles|students|gear|admin_audit_logs|audit_logs)/i,
+  /^\/rest\/v1\/(profiles|borrowers|items|admin_audit_logs|audit_logs)/i,
   /^\/rest\/v1\/rpc\/(consume_rate_limit)/i,
   /^\/auth\/session\/(exchange|refresh)/i,
 ];

@@ -79,11 +79,21 @@ const clearCookie = (headers: Headers, name: string, env: Env) => {
   headers.append("Set-Cookie", cookieParts.join("; "));
 };
 
+const clearLegacyHostOnlyCookies = (headers: Headers, env: Env) => {
+  if (!env.SESSION_COOKIE_DOMAIN?.trim()) return;
+  const hostOnlyEnv = {
+    SESSION_COOKIE_SAMESITE: env.SESSION_COOKIE_SAMESITE,
+  } as Env;
+  clearCookie(headers, ACCESS_COOKIE_NAME, hostOnlyEnv);
+  clearCookie(headers, REFRESH_COOKIE_NAME, hostOnlyEnv);
+};
+
 export const setSessionCookies = (
   headers: Headers,
   env: Env,
   session: { accessToken: string; refreshToken: string },
 ) => {
+  clearLegacyHostOnlyCookies(headers, env);
   appendCookie(
     headers,
     ACCESS_COOKIE_NAME,
@@ -101,6 +111,7 @@ export const setSessionCookies = (
 };
 
 export const clearSessionCookies = (headers: Headers, env: Env) => {
+  clearLegacyHostOnlyCookies(headers, env);
   clearCookie(headers, ACCESS_COOKIE_NAME, env);
   clearCookie(headers, REFRESH_COOKIE_NAME, env);
 };

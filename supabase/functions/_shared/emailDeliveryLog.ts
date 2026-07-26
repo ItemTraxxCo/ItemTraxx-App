@@ -10,8 +10,7 @@ export type EmailLogContext = {
   requestContext?: Record<string, unknown> | null;
   triggeredByUserId?: string | null;
   jobId?: string | null;
-  tenantId?: string | null;
-  districtId?: string | null;
+  workspaceId?: string | null;
   metadata?: Record<string, unknown> | null;
 };
 
@@ -38,8 +37,7 @@ const insertEmailLog = async (
       request_context: context.requestContext ?? null,
       triggered_by_user_id: context.triggeredByUserId ?? null,
       job_id: context.jobId ?? null,
-      tenant_id: context.tenantId ?? null,
-      district_id: context.districtId ?? null,
+      workspace_id: context.workspaceId ?? null,
       metadata: context.metadata ?? null,
     })
     .select("id")

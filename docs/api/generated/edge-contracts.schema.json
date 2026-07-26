@@ -107,7 +107,54 @@
           "properties": {
             "action": {
               "type": "string",
-              "const": "bulk_import_gear"
+              "const": "get_workspace_dashboard"
+            },
+            "payload": {
+              "type": "object",
+              "properties": {
+                "device_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "device_label": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "login_method": {
+                  "type": "string",
+                  "enum": [
+                    "password",
+                    "magic_link",
+                    "session_handoff"
+                  ]
+                },
+                "login_location": {
+                  "type": "string",
+                  "enum": [
+                    "regular_login",
+                    "admin_login"
+                  ]
+                }
+              },
+              "required": [
+                "device_id",
+                "device_label"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "action",
+            "payload"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "action": {
+              "type": "string",
+              "const": "bulk_import_items"
             },
             "payload": {
               "type": "object",
@@ -185,7 +232,7 @@
           "properties": {
             "action": {
               "type": "string",
-              "const": "get_tenant_settings"
+              "const": "get_workspace_settings"
             },
             "payload": {
               "type": "object",
@@ -232,7 +279,7 @@
           "properties": {
             "action": {
               "type": "string",
-              "const": "update_tenant_settings"
+              "const": "update_workspace_settings"
             },
             "payload": {
               "type": "object",
@@ -655,7 +702,7 @@
                     "enable_bulk_item_import": {
                       "type": "boolean"
                     },
-                    "enable_bulk_student_tools": {
+                    "enable_bulk_borrower_tools": {
                       "type": "boolean"
                     },
                     "enable_status_tracking": {
@@ -668,7 +715,7 @@
                   "required": [
                     "enable_notifications",
                     "enable_bulk_item_import",
-                    "enable_bulk_student_tools",
+                    "enable_bulk_borrower_tools",
                     "enable_status_tracking",
                     "enable_barcode_generator"
                   ],
@@ -705,7 +752,7 @@
                       "id": {
                         "type": "string"
                       },
-                      "gear_id": {
+                      "item_id": {
                         "type": "string"
                       },
                       "status": {
@@ -734,7 +781,7 @@
                           }
                         ]
                       },
-                      "gear": {
+                      "item": {
                         "anyOf": [
                           {
                             "type": "object",
@@ -760,12 +807,12 @@
                     },
                     "required": [
                       "id",
-                      "gear_id",
+                      "item_id",
                       "status",
                       "note",
                       "changed_at",
                       "changed_by",
-                      "gear"
+                      "item"
                     ],
                     "additionalProperties": false
                   }
@@ -852,7 +899,7 @@
                       "id": {
                         "type": "string"
                       },
-                      "gear_id": {
+                      "item_id": {
                         "type": "string"
                       },
                       "status": {
@@ -881,7 +928,7 @@
                           }
                         ]
                       },
-                      "gear": {
+                      "item": {
                         "anyOf": [
                           {
                             "type": "object",
@@ -907,12 +954,12 @@
                     },
                     "required": [
                       "id",
-                      "gear_id",
+                      "item_id",
                       "status",
                       "note",
                       "changed_at",
                       "changed_by",
-                      "gear"
+                      "item"
                     ],
                     "additionalProperties": false
                   }
@@ -927,7 +974,60 @@
           },
           "additionalProperties": false
         },
-        "bulk_import_gear": {
+        "get_workspace_dashboard": {
+          "type": "object",
+          "properties": {
+            "data": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "profile_id": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "auth_email": {
+                    "type": "string",
+                    "format": "email",
+                    "pattern": "^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+                  },
+                  "item_count": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "borrower_count": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "active_checkouts": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "overdue_count": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  }
+                },
+                "required": [
+                  "profile_id",
+                  "auth_email",
+                  "item_count",
+                  "borrower_count",
+                  "active_checkouts",
+                  "overdue_count"
+                ],
+                "additionalProperties": false
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        "bulk_import_items": {
           "type": "object",
           "properties": {
             "data": {
@@ -1027,7 +1127,7 @@
           },
           "additionalProperties": false
         },
-        "get_tenant_settings": {
+        "get_workspace_settings": {
           "type": "object",
           "properties": {
             "data": {
@@ -1081,7 +1181,7 @@
                     "enable_bulk_item_import": {
                       "type": "boolean"
                     },
-                    "enable_bulk_student_tools": {
+                    "enable_bulk_borrower_tools": {
                       "type": "boolean"
                     },
                     "enable_status_tracking": {
@@ -1094,7 +1194,7 @@
                   "required": [
                     "enable_notifications",
                     "enable_bulk_item_import",
-                    "enable_bulk_student_tools",
+                    "enable_bulk_borrower_tools",
                     "enable_status_tracking",
                     "enable_barcode_generator"
                   ],
@@ -1112,7 +1212,7 @@
           },
           "additionalProperties": false
         },
-        "update_tenant_settings": {
+        "update_workspace_settings": {
           "type": "object",
           "properties": {
             "data": {
@@ -1166,7 +1266,7 @@
                     "enable_bulk_item_import": {
                       "type": "boolean"
                     },
-                    "enable_bulk_student_tools": {
+                    "enable_bulk_borrower_tools": {
                       "type": "boolean"
                     },
                     "enable_status_tracking": {
@@ -1179,7 +1279,7 @@
                   "required": [
                     "enable_notifications",
                     "enable_bulk_item_import",
-                    "enable_bulk_student_tools",
+                    "enable_bulk_borrower_tools",
                     "enable_status_tracking",
                     "enable_barcode_generator"
                   ],
@@ -1403,9 +1503,10 @@
       "required": [
         "get_notifications",
         "get_status_tracking",
-        "bulk_import_gear",
-        "get_tenant_settings",
-        "update_tenant_settings",
+        "get_workspace_dashboard",
+        "bulk_import_items",
+        "get_workspace_settings",
+        "update_workspace_settings",
         "touch_session",
         "validate_session",
         "list_sessions",
@@ -1415,8 +1516,8 @@
       ],
       "additionalProperties": false
     },
-    "superTenantRequest": {
-      "title": "superTenantRequest",
+    "superWorkspaceRequest": {
+      "title": "superWorkspaceRequest",
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "oneOf": [
         {
@@ -1424,7 +1525,7 @@
           "properties": {
             "action": {
               "type": "string",
-              "const": "list_tenants"
+              "const": "list_workspaces"
             },
             "payload": {
               "type": "object",
@@ -1454,7 +1555,7 @@
           "properties": {
             "action": {
               "type": "string",
-              "const": "create_tenant"
+              "const": "create_workspace"
             },
             "payload": {
               "type": "object",
@@ -1463,7 +1564,7 @@
                   "type": "string",
                   "minLength": 1
                 },
-                "access_code": {
+                "slug": {
                   "type": "string",
                   "minLength": 1
                 },
@@ -1476,14 +1577,6 @@
                   "type": "string",
                   "minLength": 8
                 },
-                "status": {
-                  "type": "string",
-                  "enum": [
-                    "active",
-                    "suspended",
-                    "archived"
-                  ]
-                },
                 "account_category": {
                   "type": "string",
                   "enum": [
@@ -1503,20 +1596,12 @@
                     "individual_yearly",
                     "individual_monthly"
                   ]
-                },
-                "district_name": {
-                  "type": "string"
-                },
-                "district_slug": {
-                  "type": "string"
                 }
               },
               "required": [
                 "name",
-                "access_code",
-                "auth_email",
-                "password",
-                "status"
+                "slug",
+                "auth_email"
               ],
               "additionalProperties": false
             }
@@ -1532,7 +1617,7 @@
           "properties": {
             "action": {
               "type": "string",
-              "const": "update_tenant"
+              "const": "update_workspace"
             },
             "payload": {
               "type": "object",
@@ -1546,7 +1631,7 @@
                   "type": "string",
                   "minLength": 1
                 },
-                "access_code": {
+                "slug": {
                   "type": "string",
                   "minLength": 1
                 },
@@ -1569,18 +1654,12 @@
                     "individual_yearly",
                     "individual_monthly"
                   ]
-                },
-                "district_name": {
-                  "type": "string"
-                },
-                "district_slug": {
-                  "type": "string"
                 }
               },
               "required": [
                 "id",
                 "name",
-                "access_code"
+                "slug"
               ],
               "additionalProperties": false
             }
@@ -1596,7 +1675,7 @@
           "properties": {
             "action": {
               "type": "string",
-              "const": "set_tenant_status"
+              "const": "set_workspace_status"
             },
             "payload": {
               "type": "object",
@@ -1613,21 +1692,11 @@
                     "suspended",
                     "archived"
                   ]
-                },
-                "super_password": {
-                  "type": "string",
-                  "minLength": 1
-                },
-                "confirm_phrase": {
-                  "type": "string",
-                  "minLength": 1
                 }
               },
               "required": [
                 "id",
-                "status",
-                "super_password",
-                "confirm_phrase"
+                "status"
               ],
               "additionalProperties": false
             }
@@ -1648,14 +1717,14 @@
             "payload": {
               "type": "object",
               "properties": {
-                "tenant_id": {
+                "workspace_id": {
                   "type": "string",
                   "format": "uuid",
                   "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
                 }
               },
               "required": [
-                "tenant_id"
+                "workspace_id"
               ],
               "additionalProperties": false
             }
@@ -1676,7 +1745,7 @@
             "payload": {
               "type": "object",
               "properties": {
-                "tenant_id": {
+                "workspace_id": {
                   "type": "string",
                   "format": "uuid",
                   "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
@@ -1688,214 +1757,8 @@
                 }
               },
               "required": [
-                "tenant_id",
+                "workspace_id",
                 "profile_id"
-              ],
-              "additionalProperties": false
-            }
-          },
-          "required": [
-            "action",
-            "payload"
-          ],
-          "additionalProperties": false
-        },
-        {
-          "type": "object",
-          "properties": {
-            "action": {
-              "type": "string",
-              "const": "list_districts"
-            },
-            "payload": {
-              "type": "object",
-              "properties": {
-                "search": {
-                  "type": "string"
-                }
-              },
-              "required": [
-                "search"
-              ],
-              "additionalProperties": false
-            }
-          },
-          "required": [
-            "action",
-            "payload"
-          ],
-          "additionalProperties": false
-        },
-        {
-          "type": "object",
-          "properties": {
-            "action": {
-              "type": "string",
-              "const": "create_district"
-            },
-            "payload": {
-              "type": "object",
-              "properties": {
-                "name": {
-                  "type": "string",
-                  "minLength": 1
-                },
-                "slug": {
-                  "type": "string",
-                  "minLength": 1
-                },
-                "support_email": {
-                  "type": "string",
-                  "format": "email",
-                  "pattern": "^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
-                },
-                "contact_name": {
-                  "type": "string"
-                },
-                "subscription_plan": {
-                  "type": "string",
-                  "enum": [
-                    "district_core",
-                    "district_growth",
-                    "district_enterprise",
-                    "organization_starter",
-                    "organization_scale",
-                    "organization_enterprise"
-                  ]
-                },
-                "billing_status": {
-                  "type": "string",
-                  "enum": [
-                    "draft",
-                    "active",
-                    "past_due",
-                    "canceled"
-                  ]
-                },
-                "renewal_date": {
-                  "type": "string"
-                },
-                "billing_email": {
-                  "type": "string",
-                  "format": "email",
-                  "pattern": "^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
-                },
-                "invoice_reference": {
-                  "type": "string"
-                }
-              },
-              "required": [
-                "name",
-                "slug"
-              ],
-              "additionalProperties": false
-            }
-          },
-          "required": [
-            "action",
-            "payload"
-          ],
-          "additionalProperties": false
-        },
-        {
-          "type": "object",
-          "properties": {
-            "action": {
-              "type": "string",
-              "const": "update_district"
-            },
-            "payload": {
-              "type": "object",
-              "properties": {
-                "id": {
-                  "type": "string",
-                  "format": "uuid",
-                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-                },
-                "name": {
-                  "type": "string",
-                  "minLength": 1
-                },
-                "slug": {
-                  "type": "string",
-                  "minLength": 1
-                },
-                "support_email": {
-                  "type": "string",
-                  "format": "email",
-                  "pattern": "^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
-                },
-                "contact_name": {
-                  "type": "string"
-                },
-                "is_active": {
-                  "type": "boolean"
-                },
-                "subscription_plan": {
-                  "type": "string",
-                  "enum": [
-                    "district_core",
-                    "district_growth",
-                    "district_enterprise",
-                    "organization_starter",
-                    "organization_scale",
-                    "organization_enterprise"
-                  ]
-                },
-                "billing_status": {
-                  "type": "string",
-                  "enum": [
-                    "draft",
-                    "active",
-                    "past_due",
-                    "canceled"
-                  ]
-                },
-                "renewal_date": {
-                  "type": "string"
-                },
-                "billing_email": {
-                  "type": "string",
-                  "format": "email",
-                  "pattern": "^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
-                },
-                "invoice_reference": {
-                  "type": "string"
-                }
-              },
-              "required": [
-                "id",
-                "name",
-                "slug",
-                "is_active"
-              ],
-              "additionalProperties": false
-            }
-          },
-          "required": [
-            "action",
-            "payload"
-          ],
-          "additionalProperties": false
-        },
-        {
-          "type": "object",
-          "properties": {
-            "action": {
-              "type": "string",
-              "const": "get_district_details"
-            },
-            "payload": {
-              "type": "object",
-              "properties": {
-                "id": {
-                  "type": "string",
-                  "format": "uuid",
-                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-                }
-              },
-              "required": [
-                "id"
               ],
               "additionalProperties": false
             }
@@ -1908,12 +1771,12 @@
         }
       ]
     },
-    "superTenantResponses": {
-      "title": "superTenantResponses",
+    "superWorkspaceResponses": {
+      "title": "superWorkspaceResponses",
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
       "properties": {
-        "list_tenants": {
+        "list_workspaces": {
           "type": "object",
           "properties": {
             "data": {
@@ -1927,7 +1790,7 @@
                   "name": {
                     "type": "string"
                   },
-                  "access_code": {
+                  "slug": {
                     "type": "string"
                   },
                   "status": {
@@ -1941,7 +1804,7 @@
                   "created_at": {
                     "type": "string"
                   },
-                  "district_id": {
+                  "archived_at": {
                     "anyOf": [
                       {
                         "type": "string"
@@ -1951,7 +1814,7 @@
                       }
                     ]
                   },
-                  "district_name": {
+                  "purge_after": {
                     "anyOf": [
                       {
                         "type": "string"
@@ -1961,15 +1824,8 @@
                       }
                     ]
                   },
-                  "district_slug": {
-                    "anyOf": [
-                      {
-                        "type": "string"
-                      },
-                      {
-                        "type": "null"
-                      }
-                    ]
+                  "purge_state": {
+                    "type": "string"
                   },
                   "primary_admin_profile_id": {
                     "anyOf": [
@@ -2032,7 +1888,7 @@
                       "enable_bulk_item_import": {
                         "type": "boolean"
                       },
-                      "enable_bulk_student_tools": {
+                      "enable_bulk_borrower_tools": {
                         "type": "boolean"
                       },
                       "enable_status_tracking": {
@@ -2048,9 +1904,10 @@
                 "required": [
                   "id",
                   "name",
-                  "access_code",
+                  "slug",
                   "status",
-                  "created_at"
+                  "created_at",
+                  "archived_at"
                 ],
                 "additionalProperties": false
               }
@@ -2064,7 +1921,7 @@
           ],
           "additionalProperties": false
         },
-        "create_tenant": {
+        "create_workspace": {
           "type": "object",
           "properties": {
             "data": {
@@ -2076,7 +1933,7 @@
                 "name": {
                   "type": "string"
                 },
-                "access_code": {
+                "slug": {
                   "type": "string"
                 },
                 "status": {
@@ -2090,7 +1947,7 @@
                 "created_at": {
                   "type": "string"
                 },
-                "district_id": {
+                "archived_at": {
                   "anyOf": [
                     {
                       "type": "string"
@@ -2100,7 +1957,7 @@
                     }
                   ]
                 },
-                "district_name": {
+                "purge_after": {
                   "anyOf": [
                     {
                       "type": "string"
@@ -2110,15 +1967,8 @@
                     }
                   ]
                 },
-                "district_slug": {
-                  "anyOf": [
-                    {
-                      "type": "string"
-                    },
-                    {
-                      "type": "null"
-                    }
-                  ]
+                "purge_state": {
+                  "type": "string"
                 },
                 "primary_admin_profile_id": {
                   "anyOf": [
@@ -2181,7 +2031,7 @@
                     "enable_bulk_item_import": {
                       "type": "boolean"
                     },
-                    "enable_bulk_student_tools": {
+                    "enable_bulk_borrower_tools": {
                       "type": "boolean"
                     },
                     "enable_status_tracking": {
@@ -2197,9 +2047,10 @@
               "required": [
                 "id",
                 "name",
-                "access_code",
+                "slug",
                 "status",
-                "created_at"
+                "created_at",
+                "archived_at"
               ],
               "additionalProperties": false
             },
@@ -2212,7 +2063,7 @@
           ],
           "additionalProperties": false
         },
-        "update_tenant": {
+        "update_workspace": {
           "type": "object",
           "properties": {
             "data": {
@@ -2224,7 +2075,7 @@
                 "name": {
                   "type": "string"
                 },
-                "access_code": {
+                "slug": {
                   "type": "string"
                 },
                 "status": {
@@ -2238,7 +2089,7 @@
                 "created_at": {
                   "type": "string"
                 },
-                "district_id": {
+                "archived_at": {
                   "anyOf": [
                     {
                       "type": "string"
@@ -2248,7 +2099,7 @@
                     }
                   ]
                 },
-                "district_name": {
+                "purge_after": {
                   "anyOf": [
                     {
                       "type": "string"
@@ -2258,15 +2109,8 @@
                     }
                   ]
                 },
-                "district_slug": {
-                  "anyOf": [
-                    {
-                      "type": "string"
-                    },
-                    {
-                      "type": "null"
-                    }
-                  ]
+                "purge_state": {
+                  "type": "string"
                 },
                 "primary_admin_profile_id": {
                   "anyOf": [
@@ -2329,7 +2173,7 @@
                     "enable_bulk_item_import": {
                       "type": "boolean"
                     },
-                    "enable_bulk_student_tools": {
+                    "enable_bulk_borrower_tools": {
                       "type": "boolean"
                     },
                     "enable_status_tracking": {
@@ -2345,9 +2189,10 @@
               "required": [
                 "id",
                 "name",
-                "access_code",
+                "slug",
                 "status",
-                "created_at"
+                "created_at",
+                "archived_at"
               ],
               "additionalProperties": false
             },
@@ -2360,7 +2205,7 @@
           ],
           "additionalProperties": false
         },
-        "set_tenant_status": {
+        "set_workspace_status": {
           "type": "object",
           "properties": {
             "data": {
@@ -2372,7 +2217,7 @@
                 "name": {
                   "type": "string"
                 },
-                "access_code": {
+                "slug": {
                   "type": "string"
                 },
                 "status": {
@@ -2386,7 +2231,7 @@
                 "created_at": {
                   "type": "string"
                 },
-                "district_id": {
+                "archived_at": {
                   "anyOf": [
                     {
                       "type": "string"
@@ -2396,7 +2241,7 @@
                     }
                   ]
                 },
-                "district_name": {
+                "purge_after": {
                   "anyOf": [
                     {
                       "type": "string"
@@ -2406,15 +2251,8 @@
                     }
                   ]
                 },
-                "district_slug": {
-                  "anyOf": [
-                    {
-                      "type": "string"
-                    },
-                    {
-                      "type": "null"
-                    }
-                  ]
+                "purge_state": {
+                  "type": "string"
                 },
                 "primary_admin_profile_id": {
                   "anyOf": [
@@ -2477,7 +2315,7 @@
                     "enable_bulk_item_import": {
                       "type": "boolean"
                     },
-                    "enable_bulk_student_tools": {
+                    "enable_bulk_borrower_tools": {
                       "type": "boolean"
                     },
                     "enable_status_tracking": {
@@ -2493,9 +2331,10 @@
               "required": [
                 "id",
                 "name",
-                "access_code",
+                "slug",
                 "status",
-                "created_at"
+                "created_at",
+                "archived_at"
               ],
               "additionalProperties": false
             },
@@ -2550,7 +2389,7 @@
                 "name": {
                   "type": "string"
                 },
-                "access_code": {
+                "slug": {
                   "type": "string"
                 },
                 "status": {
@@ -2564,7 +2403,7 @@
                 "created_at": {
                   "type": "string"
                 },
-                "district_id": {
+                "archived_at": {
                   "anyOf": [
                     {
                       "type": "string"
@@ -2574,7 +2413,7 @@
                     }
                   ]
                 },
-                "district_name": {
+                "purge_after": {
                   "anyOf": [
                     {
                       "type": "string"
@@ -2584,15 +2423,8 @@
                     }
                   ]
                 },
-                "district_slug": {
-                  "anyOf": [
-                    {
-                      "type": "string"
-                    },
-                    {
-                      "type": "null"
-                    }
-                  ]
+                "purge_state": {
+                  "type": "string"
                 },
                 "primary_admin_profile_id": {
                   "anyOf": [
@@ -2655,7 +2487,7 @@
                     "enable_bulk_item_import": {
                       "type": "boolean"
                     },
-                    "enable_bulk_student_tools": {
+                    "enable_bulk_borrower_tools": {
                       "type": "boolean"
                     },
                     "enable_status_tracking": {
@@ -2671,1012 +2503,10 @@
               "required": [
                 "id",
                 "name",
-                "access_code",
+                "slug",
                 "status",
-                "created_at"
-              ],
-              "additionalProperties": false
-            },
-            "ok": {
-              "type": "boolean"
-            }
-          },
-          "required": [
-            "ok"
-          ],
-          "additionalProperties": false
-        },
-        "list_districts": {
-          "type": "object",
-          "properties": {
-            "data": {
-              "type": "array",
-              "items": {
-                "type": "object",
-                "properties": {
-                  "id": {
-                    "type": "string"
-                  },
-                  "name": {
-                    "type": "string"
-                  },
-                  "slug": {
-                    "type": "string"
-                  },
-                  "support_email": {
-                    "anyOf": [
-                      {
-                        "type": "string"
-                      },
-                      {
-                        "type": "null"
-                      }
-                    ]
-                  },
-                  "contact_name": {
-                    "anyOf": [
-                      {
-                        "type": "string"
-                      },
-                      {
-                        "type": "null"
-                      }
-                    ]
-                  },
-                  "is_active": {
-                    "type": "boolean"
-                  },
-                  "created_at": {
-                    "type": "string"
-                  },
-                  "tenants_count": {
-                    "type": "integer",
-                    "minimum": 0,
-                    "maximum": 9007199254740991
-                  },
-                  "subscription_plan": {
-                    "anyOf": [
-                      {
-                        "type": "string",
-                        "enum": [
-                          "district_core",
-                          "district_growth",
-                          "district_enterprise",
-                          "organization_starter",
-                          "organization_scale",
-                          "organization_enterprise"
-                        ]
-                      },
-                      {
-                        "type": "null"
-                      }
-                    ]
-                  },
-                  "billing_status": {
-                    "anyOf": [
-                      {
-                        "type": "string",
-                        "enum": [
-                          "draft",
-                          "active",
-                          "past_due",
-                          "canceled"
-                        ]
-                      },
-                      {
-                        "type": "null"
-                      }
-                    ]
-                  },
-                  "renewal_date": {
-                    "anyOf": [
-                      {
-                        "type": "string"
-                      },
-                      {
-                        "type": "null"
-                      }
-                    ]
-                  },
-                  "billing_email": {
-                    "anyOf": [
-                      {
-                        "type": "string"
-                      },
-                      {
-                        "type": "null"
-                      }
-                    ]
-                  },
-                  "invoice_reference": {
-                    "anyOf": [
-                      {
-                        "type": "string"
-                      },
-                      {
-                        "type": "null"
-                      }
-                    ]
-                  }
-                },
-                "required": [
-                  "id",
-                  "name",
-                  "slug",
-                  "is_active",
-                  "created_at"
-                ],
-                "additionalProperties": false
-              }
-            },
-            "ok": {
-              "type": "boolean"
-            }
-          },
-          "required": [
-            "ok"
-          ],
-          "additionalProperties": false
-        },
-        "create_district": {
-          "type": "object",
-          "properties": {
-            "data": {
-              "type": "object",
-              "properties": {
-                "id": {
-                  "type": "string"
-                },
-                "name": {
-                  "type": "string"
-                },
-                "slug": {
-                  "type": "string"
-                },
-                "support_email": {
-                  "anyOf": [
-                    {
-                      "type": "string"
-                    },
-                    {
-                      "type": "null"
-                    }
-                  ]
-                },
-                "contact_name": {
-                  "anyOf": [
-                    {
-                      "type": "string"
-                    },
-                    {
-                      "type": "null"
-                    }
-                  ]
-                },
-                "is_active": {
-                  "type": "boolean"
-                },
-                "created_at": {
-                  "type": "string"
-                },
-                "tenants_count": {
-                  "type": "integer",
-                  "minimum": 0,
-                  "maximum": 9007199254740991
-                },
-                "subscription_plan": {
-                  "anyOf": [
-                    {
-                      "type": "string",
-                      "enum": [
-                        "district_core",
-                        "district_growth",
-                        "district_enterprise",
-                        "organization_starter",
-                        "organization_scale",
-                        "organization_enterprise"
-                      ]
-                    },
-                    {
-                      "type": "null"
-                    }
-                  ]
-                },
-                "billing_status": {
-                  "anyOf": [
-                    {
-                      "type": "string",
-                      "enum": [
-                        "draft",
-                        "active",
-                        "past_due",
-                        "canceled"
-                      ]
-                    },
-                    {
-                      "type": "null"
-                    }
-                  ]
-                },
-                "renewal_date": {
-                  "anyOf": [
-                    {
-                      "type": "string"
-                    },
-                    {
-                      "type": "null"
-                    }
-                  ]
-                },
-                "billing_email": {
-                  "anyOf": [
-                    {
-                      "type": "string"
-                    },
-                    {
-                      "type": "null"
-                    }
-                  ]
-                },
-                "invoice_reference": {
-                  "anyOf": [
-                    {
-                      "type": "string"
-                    },
-                    {
-                      "type": "null"
-                    }
-                  ]
-                }
-              },
-              "required": [
-                "id",
-                "name",
-                "slug",
-                "is_active",
-                "created_at"
-              ],
-              "additionalProperties": false
-            },
-            "ok": {
-              "type": "boolean"
-            }
-          },
-          "required": [
-            "ok"
-          ],
-          "additionalProperties": false
-        },
-        "update_district": {
-          "type": "object",
-          "properties": {
-            "data": {
-              "type": "object",
-              "properties": {
-                "id": {
-                  "type": "string"
-                },
-                "name": {
-                  "type": "string"
-                },
-                "slug": {
-                  "type": "string"
-                },
-                "support_email": {
-                  "anyOf": [
-                    {
-                      "type": "string"
-                    },
-                    {
-                      "type": "null"
-                    }
-                  ]
-                },
-                "contact_name": {
-                  "anyOf": [
-                    {
-                      "type": "string"
-                    },
-                    {
-                      "type": "null"
-                    }
-                  ]
-                },
-                "is_active": {
-                  "type": "boolean"
-                },
-                "created_at": {
-                  "type": "string"
-                },
-                "tenants_count": {
-                  "type": "integer",
-                  "minimum": 0,
-                  "maximum": 9007199254740991
-                },
-                "subscription_plan": {
-                  "anyOf": [
-                    {
-                      "type": "string",
-                      "enum": [
-                        "district_core",
-                        "district_growth",
-                        "district_enterprise",
-                        "organization_starter",
-                        "organization_scale",
-                        "organization_enterprise"
-                      ]
-                    },
-                    {
-                      "type": "null"
-                    }
-                  ]
-                },
-                "billing_status": {
-                  "anyOf": [
-                    {
-                      "type": "string",
-                      "enum": [
-                        "draft",
-                        "active",
-                        "past_due",
-                        "canceled"
-                      ]
-                    },
-                    {
-                      "type": "null"
-                    }
-                  ]
-                },
-                "renewal_date": {
-                  "anyOf": [
-                    {
-                      "type": "string"
-                    },
-                    {
-                      "type": "null"
-                    }
-                  ]
-                },
-                "billing_email": {
-                  "anyOf": [
-                    {
-                      "type": "string"
-                    },
-                    {
-                      "type": "null"
-                    }
-                  ]
-                },
-                "invoice_reference": {
-                  "anyOf": [
-                    {
-                      "type": "string"
-                    },
-                    {
-                      "type": "null"
-                    }
-                  ]
-                }
-              },
-              "required": [
-                "id",
-                "name",
-                "slug",
-                "is_active",
-                "created_at"
-              ],
-              "additionalProperties": false
-            },
-            "ok": {
-              "type": "boolean"
-            }
-          },
-          "required": [
-            "ok"
-          ],
-          "additionalProperties": false
-        },
-        "get_district_details": {
-          "type": "object",
-          "properties": {
-            "data": {
-              "type": "object",
-              "properties": {
-                "district": {
-                  "type": "object",
-                  "properties": {
-                    "id": {
-                      "type": "string"
-                    },
-                    "name": {
-                      "type": "string"
-                    },
-                    "slug": {
-                      "type": "string"
-                    },
-                    "support_email": {
-                      "anyOf": [
-                        {
-                          "type": "string"
-                        },
-                        {
-                          "type": "null"
-                        }
-                      ]
-                    },
-                    "contact_name": {
-                      "anyOf": [
-                        {
-                          "type": "string"
-                        },
-                        {
-                          "type": "null"
-                        }
-                      ]
-                    },
-                    "is_active": {
-                      "type": "boolean"
-                    },
-                    "created_at": {
-                      "type": "string"
-                    },
-                    "tenants_count": {
-                      "type": "integer",
-                      "minimum": 0,
-                      "maximum": 9007199254740991
-                    },
-                    "subscription_plan": {
-                      "anyOf": [
-                        {
-                          "type": "string",
-                          "enum": [
-                            "district_core",
-                            "district_growth",
-                            "district_enterprise",
-                            "organization_starter",
-                            "organization_scale",
-                            "organization_enterprise"
-                          ]
-                        },
-                        {
-                          "type": "null"
-                        }
-                      ]
-                    },
-                    "billing_status": {
-                      "anyOf": [
-                        {
-                          "type": "string",
-                          "enum": [
-                            "draft",
-                            "active",
-                            "past_due",
-                            "canceled"
-                          ]
-                        },
-                        {
-                          "type": "null"
-                        }
-                      ]
-                    },
-                    "renewal_date": {
-                      "anyOf": [
-                        {
-                          "type": "string"
-                        },
-                        {
-                          "type": "null"
-                        }
-                      ]
-                    },
-                    "billing_email": {
-                      "anyOf": [
-                        {
-                          "type": "string"
-                        },
-                        {
-                          "type": "null"
-                        }
-                      ]
-                    },
-                    "invoice_reference": {
-                      "anyOf": [
-                        {
-                          "type": "string"
-                        },
-                        {
-                          "type": "null"
-                        }
-                      ]
-                    }
-                  },
-                  "required": [
-                    "id",
-                    "name",
-                    "slug",
-                    "is_active",
-                    "created_at"
-                  ],
-                  "additionalProperties": false
-                },
-                "tenants": {
-                  "type": "array",
-                  "items": {
-                    "type": "object",
-                    "properties": {
-                      "id": {
-                        "type": "string"
-                      },
-                      "name": {
-                        "type": "string"
-                      },
-                      "access_code": {
-                        "type": "string"
-                      },
-                      "status": {
-                        "type": "string",
-                        "enum": [
-                          "active",
-                          "suspended",
-                          "archived"
-                        ]
-                      },
-                      "created_at": {
-                        "type": "string"
-                      },
-                      "district_id": {
-                        "anyOf": [
-                          {
-                            "type": "string"
-                          },
-                          {
-                            "type": "null"
-                          }
-                        ]
-                      },
-                      "district_name": {
-                        "anyOf": [
-                          {
-                            "type": "string"
-                          },
-                          {
-                            "type": "null"
-                          }
-                        ]
-                      },
-                      "district_slug": {
-                        "anyOf": [
-                          {
-                            "type": "string"
-                          },
-                          {
-                            "type": "null"
-                          }
-                        ]
-                      },
-                      "primary_admin_profile_id": {
-                        "anyOf": [
-                          {
-                            "type": "string"
-                          },
-                          {
-                            "type": "null"
-                          }
-                        ]
-                      },
-                      "primary_admin_email": {
-                        "anyOf": [
-                          {
-                            "type": "string"
-                          },
-                          {
-                            "type": "null"
-                          }
-                        ]
-                      },
-                      "checkout_due_hours": {
-                        "type": "integer",
-                        "minimum": 0,
-                        "maximum": 9007199254740991
-                      },
-                      "account_category": {
-                        "type": "string",
-                        "enum": [
-                          "organization",
-                          "district",
-                          "individual"
-                        ]
-                      },
-                      "plan_code": {
-                        "anyOf": [
-                          {
-                            "type": "string",
-                            "enum": [
-                              "core",
-                              "growth",
-                              "starter",
-                              "scale",
-                              "enterprise",
-                              "individual_yearly",
-                              "individual_monthly"
-                            ]
-                          },
-                          {
-                            "type": "null"
-                          }
-                        ]
-                      },
-                      "feature_flags": {
-                        "type": "object",
-                        "properties": {
-                          "enable_notifications": {
-                            "type": "boolean"
-                          },
-                          "enable_bulk_item_import": {
-                            "type": "boolean"
-                          },
-                          "enable_bulk_student_tools": {
-                            "type": "boolean"
-                          },
-                          "enable_status_tracking": {
-                            "type": "boolean"
-                          },
-                          "enable_barcode_generator": {
-                            "type": "boolean"
-                          }
-                        },
-                        "additionalProperties": false
-                      }
-                    },
-                    "required": [
-                      "id",
-                      "name",
-                      "access_code",
-                      "status",
-                      "created_at"
-                    ],
-                    "additionalProperties": false
-                  }
-                },
-                "support_requests": {
-                  "type": "array",
-                  "items": {
-                    "type": "object",
-                    "properties": {
-                      "id": {
-                        "type": "string"
-                      },
-                      "requester_email": {
-                        "anyOf": [
-                          {
-                            "type": "string"
-                          },
-                          {
-                            "type": "null"
-                          }
-                        ]
-                      },
-                      "requester_name": {
-                        "anyOf": [
-                          {
-                            "type": "string"
-                          },
-                          {
-                            "type": "null"
-                          }
-                        ]
-                      },
-                      "subject": {
-                        "type": "string"
-                      },
-                      "message": {
-                        "type": "string"
-                      },
-                      "priority": {
-                        "type": "string",
-                        "enum": [
-                          "low",
-                          "normal",
-                          "high",
-                          "urgent"
-                        ]
-                      },
-                      "status": {
-                        "type": "string",
-                        "enum": [
-                          "open",
-                          "in_progress",
-                          "resolved"
-                        ]
-                      },
-                      "created_at": {
-                        "type": "string"
-                      }
-                    },
-                    "required": [
-                      "id",
-                      "subject",
-                      "message",
-                      "priority",
-                      "status",
-                      "created_at"
-                    ],
-                    "additionalProperties": false
-                  }
-                },
-                "tenant_metrics": {
-                  "type": "array",
-                  "items": {
-                    "type": "object",
-                    "properties": {
-                      "tenant_id": {
-                        "type": "string"
-                      },
-                      "tenant_name": {
-                        "type": "string"
-                      },
-                      "gear_total": {
-                        "type": "integer",
-                        "minimum": 0,
-                        "maximum": 9007199254740991
-                      },
-                      "students_total": {
-                        "type": "integer",
-                        "minimum": 0,
-                        "maximum": 9007199254740991
-                      },
-                      "active_checkouts": {
-                        "type": "integer",
-                        "minimum": 0,
-                        "maximum": 9007199254740991
-                      },
-                      "overdue_items": {
-                        "type": "integer",
-                        "minimum": 0,
-                        "maximum": 9007199254740991
-                      },
-                      "transactions_7d": {
-                        "type": "integer",
-                        "minimum": 0,
-                        "maximum": 9007199254740991
-                      }
-                    },
-                    "required": [
-                      "tenant_id",
-                      "tenant_name",
-                      "gear_total",
-                      "students_total",
-                      "active_checkouts",
-                      "overdue_items",
-                      "transactions_7d"
-                    ],
-                    "additionalProperties": false
-                  }
-                },
-                "traffic": {
-                  "type": "object",
-                  "properties": {
-                    "checkout_24h": {
-                      "type": "integer",
-                      "minimum": 0,
-                      "maximum": 9007199254740991
-                    },
-                    "return_24h": {
-                      "type": "integer",
-                      "minimum": 0,
-                      "maximum": 9007199254740991
-                    },
-                    "active_tenants_24h": {
-                      "type": "integer",
-                      "minimum": 0,
-                      "maximum": 9007199254740991
-                    },
-                    "events_24h": {
-                      "type": "integer",
-                      "minimum": 0,
-                      "maximum": 9007199254740991
-                    }
-                  },
-                  "required": [
-                    "checkout_24h",
-                    "return_24h",
-                    "active_tenants_24h",
-                    "events_24h"
-                  ],
-                  "additionalProperties": false
-                },
-                "traffic_by_hour": {
-                  "type": "array",
-                  "items": {
-                    "type": "object",
-                    "properties": {
-                      "hour": {
-                        "type": "string"
-                      },
-                      "checkout": {
-                        "type": "integer",
-                        "minimum": 0,
-                        "maximum": 9007199254740991
-                      },
-                      "return": {
-                        "type": "integer",
-                        "minimum": 0,
-                        "maximum": 9007199254740991
-                      }
-                    },
-                    "required": [
-                      "hour",
-                      "checkout",
-                      "return"
-                    ],
-                    "additionalProperties": false
-                  }
-                },
-                "recent_events": {
-                  "type": "array",
-                  "items": {
-                    "type": "object",
-                    "properties": {
-                      "tenant_id": {
-                        "anyOf": [
-                          {
-                            "type": "string"
-                          },
-                          {
-                            "type": "null"
-                          }
-                        ]
-                      },
-                      "tenant_name": {
-                        "type": "string"
-                      },
-                      "action_type": {
-                        "type": "string",
-                        "enum": [
-                          "checkout",
-                          "return"
-                        ]
-                      },
-                      "action_time": {
-                        "type": "string"
-                      },
-                      "gear_name": {
-                        "anyOf": [
-                          {
-                            "type": "string"
-                          },
-                          {
-                            "type": "null"
-                          }
-                        ]
-                      },
-                      "gear_barcode": {
-                        "anyOf": [
-                          {
-                            "type": "string"
-                          },
-                          {
-                            "type": "null"
-                          }
-                        ]
-                      },
-                      "student_username": {
-                        "anyOf": [
-                          {
-                            "type": "string"
-                          },
-                          {
-                            "type": "null"
-                          }
-                        ]
-                      },
-                      "student_id": {
-                        "anyOf": [
-                          {
-                            "type": "string"
-                          },
-                          {
-                            "type": "null"
-                          }
-                        ]
-                      }
-                    },
-                    "required": [
-                      "tenant_id",
-                      "tenant_name",
-                      "action_type",
-                      "action_time",
-                      "gear_name",
-                      "gear_barcode",
-                      "student_username",
-                      "student_id"
-                    ],
-                    "additionalProperties": false
-                  }
-                },
-                "needs_attention": {
-                  "type": "array",
-                  "items": {
-                    "type": "object",
-                    "properties": {
-                      "key": {
-                        "type": "string"
-                      },
-                      "level": {
-                        "type": "string",
-                        "enum": [
-                          "high",
-                          "medium",
-                          "low"
-                        ]
-                      },
-                      "title": {
-                        "type": "string"
-                      },
-                      "count": {
-                        "type": "integer",
-                        "minimum": 0,
-                        "maximum": 9007199254740991
-                      }
-                    },
-                    "required": [
-                      "key",
-                      "level",
-                      "title",
-                      "count"
-                    ],
-                    "additionalProperties": false
-                  }
-                },
-                "usage": {
-                  "type": "object",
-                  "properties": {
-                    "gear_total": {
-                      "type": "integer",
-                      "minimum": 0,
-                      "maximum": 9007199254740991
-                    },
-                    "students_total": {
-                      "type": "integer",
-                      "minimum": 0,
-                      "maximum": 9007199254740991
-                    },
-                    "active_checkouts": {
-                      "type": "integer",
-                      "minimum": 0,
-                      "maximum": 9007199254740991
-                    },
-                    "overdue_items": {
-                      "type": "integer",
-                      "minimum": 0,
-                      "maximum": 9007199254740991
-                    },
-                    "transactions_7d": {
-                      "type": "integer",
-                      "minimum": 0,
-                      "maximum": 9007199254740991
-                    }
-                  },
-                  "required": [
-                    "gear_total",
-                    "students_total",
-                    "active_checkouts",
-                    "overdue_items",
-                    "transactions_7d"
-                  ],
-                  "additionalProperties": false
-                }
-              },
-              "required": [
-                "district",
-                "tenants",
-                "support_requests",
-                "tenant_metrics",
-                "traffic",
-                "traffic_by_hour",
-                "recent_events",
-                "needs_attention",
-                "usage"
+                "created_at",
+                "archived_at"
               ],
               "additionalProperties": false
             },
@@ -3691,16 +2521,12 @@
         }
       },
       "required": [
-        "list_tenants",
-        "create_tenant",
-        "update_tenant",
-        "set_tenant_status",
+        "list_workspaces",
+        "create_workspace",
+        "update_workspace",
+        "set_workspace_status",
         "send_primary_admin_reset",
-        "set_primary_admin",
-        "list_districts",
-        "create_district",
-        "update_district",
-        "get_district_details"
+        "set_primary_admin"
       ],
       "additionalProperties": false
     },
@@ -3713,7 +2539,7 @@
           "properties": {
             "action": {
               "type": "string",
-              "const": "list_tenant_admins"
+              "const": "list_workspace_admins"
             },
             "payload": {
               "type": "object",
@@ -3721,25 +2547,13 @@
                 "search": {
                   "type": "string"
                 },
-                "tenant_id": {
+                "workspace_id": {
                   "type": "string"
-                },
-                "district_id": {
-                  "type": "string"
-                },
-                "admin_scope": {
-                  "type": "string",
-                  "enum": [
-                    "tenant",
-                    "district"
-                  ]
                 }
               },
               "required": [
                 "search",
-                "tenant_id",
-                "district_id",
-                "admin_scope"
+                "workspace_id"
               ],
               "additionalProperties": false
             }
@@ -3755,37 +2569,22 @@
           "properties": {
             "action": {
               "type": "string",
-              "const": "create_tenant_admin"
+              "const": "create_workspace_admin"
             },
             "payload": {
               "type": "object",
               "properties": {
-                "tenant_id": {
-                  "type": "string"
-                },
-                "district_id": {
+                "workspace_id": {
                   "type": "string"
                 },
                 "auth_email": {
                   "type": "string",
                   "format": "email",
                   "pattern": "^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
-                },
-                "password": {
-                  "type": "string",
-                  "minLength": 8
-                },
-                "admin_scope": {
-                  "type": "string",
-                  "enum": [
-                    "tenant",
-                    "district"
-                  ]
                 }
               },
               "required": [
-                "auth_email",
-                "password"
+                "auth_email"
               ],
               "additionalProperties": false
             }
@@ -3801,7 +2600,7 @@
           "properties": {
             "action": {
               "type": "string",
-              "const": "set_admin_status"
+              "const": "set_workspace_admin_status"
             },
             "payload": {
               "type": "object",
@@ -3813,13 +2612,6 @@
                 },
                 "is_active": {
                   "type": "boolean"
-                },
-                "admin_scope": {
-                  "type": "string",
-                  "enum": [
-                    "tenant",
-                    "district"
-                  ]
                 }
               },
               "required": [
@@ -3840,7 +2632,7 @@
           "properties": {
             "action": {
               "type": "string",
-              "const": "update_admin_email"
+              "const": "update_workspace_admin_email"
             },
             "payload": {
               "type": "object",
@@ -3854,13 +2646,6 @@
                   "type": "string",
                   "format": "email",
                   "pattern": "^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
-                },
-                "admin_scope": {
-                  "type": "string",
-                  "enum": [
-                    "tenant",
-                    "district"
-                  ]
                 }
               },
               "required": [
@@ -3881,7 +2666,61 @@
           "properties": {
             "action": {
               "type": "string",
-              "const": "send_reset"
+              "const": "send_workspace_admin_reset"
+            },
+            "payload": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "format": "uuid",
+                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                }
+              },
+              "required": [
+                "id"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "action",
+            "payload"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "action": {
+              "type": "string",
+              "const": "list_super_admins"
+            },
+            "payload": {
+              "type": "object",
+              "properties": {
+                "search": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "search"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "action",
+            "payload"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "action": {
+              "type": "string",
+              "const": "create_super_admin"
             },
             "payload": {
               "type": "object",
@@ -3891,12 +2730,104 @@
                   "format": "email",
                   "pattern": "^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
                 },
-                "admin_scope": {
+                "password": {
                   "type": "string",
-                  "enum": [
-                    "tenant",
-                    "district"
-                  ]
+                  "minLength": 8
+                }
+              },
+              "required": [
+                "auth_email",
+                "password"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "action",
+            "payload"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "action": {
+              "type": "string",
+              "const": "set_super_admin_status"
+            },
+            "payload": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "format": "uuid",
+                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                },
+                "is_active": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "id",
+                "is_active"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "action",
+            "payload"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "action": {
+              "type": "string",
+              "const": "update_super_admin_email"
+            },
+            "payload": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "format": "uuid",
+                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                },
+                "auth_email": {
+                  "type": "string",
+                  "format": "email",
+                  "pattern": "^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+                }
+              },
+              "required": [
+                "id",
+                "auth_email"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "action",
+            "payload"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "action": {
+              "type": "string",
+              "const": "send_super_admin_reset"
+            },
+            "payload": {
+              "type": "object",
+              "properties": {
+                "auth_email": {
+                  "type": "string",
+                  "format": "email",
+                  "pattern": "^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
                 }
               },
               "required": [
@@ -3918,7 +2849,7 @@
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
       "properties": {
-        "list_tenant_admins": {
+        "list_workspace_admins": {
           "type": "object",
           "properties": {
             "data": {
@@ -3931,10 +2862,7 @@
                     "format": "uuid",
                     "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
                   },
-                  "tenant_id": {
-                    "type": "string"
-                  },
-                  "district_id": {
+                  "workspace_id": {
                     "type": "string"
                   },
                   "auth_email": {
@@ -3944,18 +2872,25 @@
                   },
                   "role": {
                     "type": "string",
-                    "enum": [
-                      "tenant_admin",
-                      "district_admin"
-                    ]
+                    "const": "workspace_admin"
                   },
                   "is_active": {
                     "type": "boolean"
                   },
+                  "deleted_at": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
                   "created_at": {
                     "type": "string"
                   },
-                  "tenant_name": {
+                  "workspace_name": {
                     "anyOf": [
                       {
                         "type": "string"
@@ -3965,20 +2900,13 @@
                       }
                     ]
                   },
-                  "district_name": {
-                    "anyOf": [
-                      {
-                        "type": "string"
-                      },
-                      {
-                        "type": "null"
-                      }
-                    ]
+                  "is_primary_admin": {
+                    "type": "boolean"
                   }
                 },
                 "required": [
                   "id",
-                  "tenant_id",
+                  "workspace_id",
                   "auth_email",
                   "role",
                   "is_active",
@@ -3990,7 +2918,7 @@
           },
           "additionalProperties": false
         },
-        "create_tenant_admin": {
+        "create_workspace_admin": {
           "type": "object",
           "properties": {
             "data": {
@@ -4001,10 +2929,7 @@
                   "format": "uuid",
                   "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
                 },
-                "tenant_id": {
-                  "type": "string"
-                },
-                "district_id": {
+                "workspace_id": {
                   "type": "string"
                 },
                 "auth_email": {
@@ -4014,18 +2939,25 @@
                 },
                 "role": {
                   "type": "string",
-                  "enum": [
-                    "tenant_admin",
-                    "district_admin"
-                  ]
+                  "const": "workspace_admin"
                 },
                 "is_active": {
                   "type": "boolean"
                 },
+                "deleted_at": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
                 "created_at": {
                   "type": "string"
                 },
-                "tenant_name": {
+                "workspace_name": {
                   "anyOf": [
                     {
                       "type": "string"
@@ -4035,20 +2967,13 @@
                     }
                   ]
                 },
-                "district_name": {
-                  "anyOf": [
-                    {
-                      "type": "string"
-                    },
-                    {
-                      "type": "null"
-                    }
-                  ]
+                "is_primary_admin": {
+                  "type": "boolean"
                 }
               },
               "required": [
                 "id",
-                "tenant_id",
+                "workspace_id",
                 "auth_email",
                 "role",
                 "is_active",
@@ -4059,7 +2984,7 @@
           },
           "additionalProperties": false
         },
-        "set_admin_status": {
+        "set_workspace_admin_status": {
           "type": "object",
           "properties": {
             "data": {
@@ -4070,10 +2995,7 @@
                   "format": "uuid",
                   "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
                 },
-                "tenant_id": {
-                  "type": "string"
-                },
-                "district_id": {
+                "workspace_id": {
                   "type": "string"
                 },
                 "auth_email": {
@@ -4083,18 +3005,25 @@
                 },
                 "role": {
                   "type": "string",
-                  "enum": [
-                    "tenant_admin",
-                    "district_admin"
-                  ]
+                  "const": "workspace_admin"
                 },
                 "is_active": {
                   "type": "boolean"
                 },
+                "deleted_at": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
                 "created_at": {
                   "type": "string"
                 },
-                "tenant_name": {
+                "workspace_name": {
                   "anyOf": [
                     {
                       "type": "string"
@@ -4104,20 +3033,13 @@
                     }
                   ]
                 },
-                "district_name": {
-                  "anyOf": [
-                    {
-                      "type": "string"
-                    },
-                    {
-                      "type": "null"
-                    }
-                  ]
+                "is_primary_admin": {
+                  "type": "boolean"
                 }
               },
               "required": [
                 "id",
-                "tenant_id",
+                "workspace_id",
                 "auth_email",
                 "role",
                 "is_active",
@@ -4128,7 +3050,7 @@
           },
           "additionalProperties": false
         },
-        "update_admin_email": {
+        "update_workspace_admin_email": {
           "type": "object",
           "properties": {
             "data": {
@@ -4139,10 +3061,7 @@
                   "format": "uuid",
                   "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
                 },
-                "tenant_id": {
-                  "type": "string"
-                },
-                "district_id": {
+                "workspace_id": {
                   "type": "string"
                 },
                 "auth_email": {
@@ -4152,18 +3071,25 @@
                 },
                 "role": {
                   "type": "string",
-                  "enum": [
-                    "tenant_admin",
-                    "district_admin"
-                  ]
+                  "const": "workspace_admin"
                 },
                 "is_active": {
                   "type": "boolean"
                 },
+                "deleted_at": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
                 "created_at": {
                   "type": "string"
                 },
-                "tenant_name": {
+                "workspace_name": {
                   "anyOf": [
                     {
                       "type": "string"
@@ -4173,20 +3099,13 @@
                     }
                   ]
                 },
-                "district_name": {
-                  "anyOf": [
-                    {
-                      "type": "string"
-                    },
-                    {
-                      "type": "null"
-                    }
-                  ]
+                "is_primary_admin": {
+                  "type": "boolean"
                 }
               },
               "required": [
                 "id",
-                "tenant_id",
+                "workspace_id",
                 "auth_email",
                 "role",
                 "is_active",
@@ -4197,7 +3116,184 @@
           },
           "additionalProperties": false
         },
-        "send_reset": {
+        "send_workspace_admin_reset": {
+          "type": "object",
+          "properties": {
+            "data": {
+              "type": "object",
+              "properties": {
+                "success": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "success"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "additionalProperties": false
+        },
+        "list_super_admins": {
+          "type": "object",
+          "properties": {
+            "data": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "auth_email": {
+                    "type": "string",
+                    "format": "email",
+                    "pattern": "^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+                  },
+                  "role": {
+                    "type": "string",
+                    "const": "super_admin"
+                  },
+                  "is_active": {
+                    "type": "boolean"
+                  },
+                  "created_at": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "id",
+                  "auth_email",
+                  "role",
+                  "is_active",
+                  "created_at"
+                ],
+                "additionalProperties": false
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        "create_super_admin": {
+          "type": "object",
+          "properties": {
+            "data": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "format": "uuid",
+                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                },
+                "auth_email": {
+                  "type": "string",
+                  "format": "email",
+                  "pattern": "^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+                },
+                "role": {
+                  "type": "string",
+                  "const": "super_admin"
+                },
+                "is_active": {
+                  "type": "boolean"
+                },
+                "created_at": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "auth_email",
+                "role",
+                "is_active",
+                "created_at"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "additionalProperties": false
+        },
+        "set_super_admin_status": {
+          "type": "object",
+          "properties": {
+            "data": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "format": "uuid",
+                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                },
+                "auth_email": {
+                  "type": "string",
+                  "format": "email",
+                  "pattern": "^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+                },
+                "role": {
+                  "type": "string",
+                  "const": "super_admin"
+                },
+                "is_active": {
+                  "type": "boolean"
+                },
+                "created_at": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "auth_email",
+                "role",
+                "is_active",
+                "created_at"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "additionalProperties": false
+        },
+        "update_super_admin_email": {
+          "type": "object",
+          "properties": {
+            "data": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "format": "uuid",
+                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                },
+                "auth_email": {
+                  "type": "string",
+                  "format": "email",
+                  "pattern": "^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+                },
+                "role": {
+                  "type": "string",
+                  "const": "super_admin"
+                },
+                "is_active": {
+                  "type": "boolean"
+                },
+                "created_at": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "auth_email",
+                "role",
+                "is_active",
+                "created_at"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "additionalProperties": false
+        },
+        "send_super_admin_reset": {
           "type": "object",
           "properties": {
             "data": {
@@ -4217,11 +3313,16 @@
         }
       },
       "required": [
-        "list_tenant_admins",
-        "create_tenant_admin",
-        "set_admin_status",
-        "update_admin_email",
-        "send_reset"
+        "list_workspace_admins",
+        "create_workspace_admin",
+        "set_workspace_admin_status",
+        "update_workspace_admin_email",
+        "send_workspace_admin_reset",
+        "list_super_admins",
+        "create_super_admin",
+        "set_super_admin_status",
+        "update_super_admin_email",
+        "send_super_admin_reset"
       ],
       "additionalProperties": false
     },
@@ -4629,12 +3730,12 @@
           "properties": {
             "action": {
               "type": "string",
-              "const": "set_tenant_policy"
+              "const": "set_workspace_policy"
             },
             "payload": {
               "type": "object",
               "properties": {
-                "tenant_id": {
+                "workspace_id": {
                   "type": "string",
                   "minLength": 1
                 },
@@ -4650,7 +3751,7 @@
                     }
                   ]
                 },
-                "max_students": {
+                "max_borrowers": {
                   "anyOf": [
                     {
                       "type": "integer",
@@ -4662,7 +3763,7 @@
                     }
                   ]
                 },
-                "max_gear": {
+                "max_items": {
                   "anyOf": [
                     {
                       "type": "integer",
@@ -4705,7 +3806,7 @@
                 }
               },
               "required": [
-                "tenant_id"
+                "workspace_id"
               ],
               "additionalProperties": false
             }
@@ -4721,18 +3822,18 @@
           "properties": {
             "action": {
               "type": "string",
-              "const": "set_tenant_force_reauth"
+              "const": "set_workspace_force_reauth"
             },
             "payload": {
               "type": "object",
               "properties": {
-                "tenant_id": {
+                "workspace_id": {
                   "type": "string",
                   "minLength": 1
                 }
               },
               "required": [
-                "tenant_id"
+                "workspace_id"
               ],
               "additionalProperties": false
             }
@@ -5821,13 +4922,13 @@
           ],
           "additionalProperties": false
         },
-        "set_tenant_policy": {
+        "set_workspace_policy": {
           "type": "object",
           "properties": {
             "data": {
               "type": "object",
               "properties": {
-                "tenant_id": {
+                "workspace_id": {
                   "type": "string"
                 },
                 "max_admins": {
@@ -5842,7 +4943,7 @@
                     }
                   ]
                 },
-                "max_students": {
+                "max_borrowers": {
                   "anyOf": [
                     {
                       "type": "integer",
@@ -5854,7 +4955,7 @@
                     }
                   ]
                 },
-                "max_gear": {
+                "max_items": {
                   "anyOf": [
                     {
                       "type": "integer",
@@ -5890,7 +4991,7 @@
                 }
               },
               "required": [
-                "tenant_id",
+                "workspace_id",
                 "checkout_due_hours"
               ],
               "additionalProperties": false
@@ -5904,7 +5005,7 @@
           ],
           "additionalProperties": false
         },
-        "set_tenant_force_reauth": {
+        "set_workspace_force_reauth": {
           "type": "object",
           "properties": {
             "data": {
@@ -7460,7 +6561,7 @@
                       "minimum": 0,
                       "maximum": 9007199254740991
                     },
-                    "active_tenants_15m": {
+                    "active_workspaces_15m": {
                       "type": "integer",
                       "minimum": 0,
                       "maximum": 9007199254740991
@@ -7474,7 +6575,7 @@
                   "required": [
                     "checkout_15m",
                     "return_15m",
-                    "active_tenants_15m",
+                    "active_workspaces_15m",
                     "events_24h"
                   ],
                   "additionalProperties": false
@@ -7831,7 +6932,7 @@
                         "type": "string",
                         "enum": [
                           "page",
-                          "tenant",
+                          "workspace",
                           "customer",
                           "lead"
                         ]
@@ -7861,7 +6962,7 @@
                   "items": {
                     "type": "object",
                     "properties": {
-                      "tenant_id": {
+                      "workspace_id": {
                         "anyOf": [
                           {
                             "type": "string"
@@ -7871,7 +6972,7 @@
                           }
                         ]
                       },
-                      "tenant_name": {
+                      "workspace_name": {
                         "type": "string"
                       },
                       "action_type": {
@@ -7884,7 +6985,7 @@
                       "action_time": {
                         "type": "string"
                       },
-                      "gear_name": {
+                      "item_name": {
                         "anyOf": [
                           {
                             "type": "string"
@@ -7894,7 +6995,7 @@
                           }
                         ]
                       },
-                      "gear_barcode": {
+                      "item_barcode": {
                         "anyOf": [
                           {
                             "type": "string"
@@ -7904,7 +7005,7 @@
                           }
                         ]
                       },
-                      "student_username": {
+                      "borrower_username": {
                         "anyOf": [
                           {
                             "type": "string"
@@ -7914,7 +7015,7 @@
                           }
                         ]
                       },
-                      "student_id": {
+                      "borrower_id": {
                         "anyOf": [
                           {
                             "type": "string"
@@ -7926,14 +7027,14 @@
                       }
                     },
                     "required": [
-                      "tenant_id",
-                      "tenant_name",
+                      "workspace_id",
+                      "workspace_name",
                       "action_type",
                       "action_time",
-                      "gear_name",
-                      "gear_barcode",
-                      "student_username",
-                      "student_id"
+                      "item_name",
+                      "item_barcode",
+                      "borrower_username",
+                      "borrower_id"
                     ],
                     "additionalProperties": false
                   }
@@ -8180,8 +7281,8 @@
         "get_control_center",
         "set_runtime_config",
         "upsert_alert_rule",
-        "set_tenant_policy",
-        "set_tenant_force_reauth",
+        "set_workspace_policy",
+        "set_workspace_force_reauth",
         "create_approval",
         "approve_request",
         "list_support_requests",
@@ -8201,8 +7302,8 @@
       ],
       "additionalProperties": false
     },
-    "tenantAdminManageRequest": {
-      "title": "tenantAdminManageRequest",
+    "workspaceAdminManageRequest": {
+      "title": "workspaceAdminManageRequest",
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "oneOf": [
         {
@@ -8210,7 +7311,7 @@
           "properties": {
             "action": {
               "type": "string",
-              "const": "list_tenant_admins"
+              "const": "list_workspace_admins"
             },
             "payload": {
               "type": "object",
@@ -8229,7 +7330,7 @@
           "properties": {
             "action": {
               "type": "string",
-              "const": "create_tenant_admin"
+              "const": "create_workspace_admin"
             },
             "payload": {
               "type": "object",
@@ -8323,7 +7424,7 @@
           "properties": {
             "action": {
               "type": "string",
-              "const": "send_tenant_admin_reset"
+              "const": "send_workspace_admin_reset"
             },
             "payload": {
               "type": "object",
@@ -8345,15 +7446,337 @@
             "payload"
           ],
           "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "action": {
+              "type": "string",
+              "const": "list_tenant_accounts"
+            },
+            "payload": {
+              "type": "object",
+              "properties": {
+                "device_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "device_label": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "login_method": {
+                  "type": "string",
+                  "enum": [
+                    "password",
+                    "magic_link",
+                    "session_handoff"
+                  ]
+                },
+                "login_location": {
+                  "type": "string",
+                  "enum": [
+                    "regular_login",
+                    "admin_login"
+                  ]
+                }
+              },
+              "required": [
+                "device_id",
+                "device_label"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "action",
+            "payload"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "action": {
+              "type": "string",
+              "const": "create_tenant_account"
+            },
+            "payload": {
+              "type": "object",
+              "properties": {
+                "device_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "device_label": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "login_method": {
+                  "type": "string",
+                  "enum": [
+                    "password",
+                    "magic_link",
+                    "session_handoff"
+                  ]
+                },
+                "login_location": {
+                  "type": "string",
+                  "enum": [
+                    "regular_login",
+                    "admin_login"
+                  ]
+                },
+                "auth_email": {
+                  "type": "string",
+                  "format": "email",
+                  "pattern": "^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+                }
+              },
+              "required": [
+                "device_id",
+                "device_label",
+                "auth_email"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "action",
+            "payload"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "action": {
+              "type": "string",
+              "const": "set_tenant_account_status"
+            },
+            "payload": {
+              "type": "object",
+              "properties": {
+                "device_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "device_label": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "login_method": {
+                  "type": "string",
+                  "enum": [
+                    "password",
+                    "magic_link",
+                    "session_handoff"
+                  ]
+                },
+                "login_location": {
+                  "type": "string",
+                  "enum": [
+                    "regular_login",
+                    "admin_login"
+                  ]
+                },
+                "id": {
+                  "type": "string",
+                  "format": "uuid",
+                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                },
+                "is_active": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "device_id",
+                "device_label",
+                "id",
+                "is_active"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "action",
+            "payload"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "action": {
+              "type": "string",
+              "const": "update_tenant_account_email"
+            },
+            "payload": {
+              "type": "object",
+              "properties": {
+                "device_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "device_label": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "login_method": {
+                  "type": "string",
+                  "enum": [
+                    "password",
+                    "magic_link",
+                    "session_handoff"
+                  ]
+                },
+                "login_location": {
+                  "type": "string",
+                  "enum": [
+                    "regular_login",
+                    "admin_login"
+                  ]
+                },
+                "id": {
+                  "type": "string",
+                  "format": "uuid",
+                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                },
+                "auth_email": {
+                  "type": "string",
+                  "format": "email",
+                  "pattern": "^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+                }
+              },
+              "required": [
+                "device_id",
+                "device_label",
+                "id",
+                "auth_email"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "action",
+            "payload"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "action": {
+              "type": "string",
+              "const": "remove_tenant_account"
+            },
+            "payload": {
+              "type": "object",
+              "properties": {
+                "device_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "device_label": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "login_method": {
+                  "type": "string",
+                  "enum": [
+                    "password",
+                    "magic_link",
+                    "session_handoff"
+                  ]
+                },
+                "login_location": {
+                  "type": "string",
+                  "enum": [
+                    "regular_login",
+                    "admin_login"
+                  ]
+                },
+                "id": {
+                  "type": "string",
+                  "format": "uuid",
+                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                }
+              },
+              "required": [
+                "device_id",
+                "device_label",
+                "id"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "action",
+            "payload"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "action": {
+              "type": "string",
+              "const": "send_tenant_account_reset"
+            },
+            "payload": {
+              "type": "object",
+              "properties": {
+                "device_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "device_label": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "login_method": {
+                  "type": "string",
+                  "enum": [
+                    "password",
+                    "magic_link",
+                    "session_handoff"
+                  ]
+                },
+                "login_location": {
+                  "type": "string",
+                  "enum": [
+                    "regular_login",
+                    "admin_login"
+                  ]
+                },
+                "id": {
+                  "type": "string",
+                  "format": "uuid",
+                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                }
+              },
+              "required": [
+                "device_id",
+                "device_label",
+                "id"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "action",
+            "payload"
+          ],
+          "additionalProperties": false
         }
       ]
     },
-    "tenantAdminManageResponses": {
-      "title": "tenantAdminManageResponses",
+    "workspaceAdminManageResponses": {
+      "title": "workspaceAdminManageResponses",
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
       "properties": {
-        "list_tenant_admins": {
+        "list_workspace_admins": {
           "type": "object",
           "properties": {
             "data": {
@@ -8369,7 +7792,7 @@
                         "format": "uuid",
                         "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
                       },
-                      "tenant_id": {
+                      "workspace_id": {
                         "type": "string",
                         "format": "uuid",
                         "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
@@ -8381,7 +7804,7 @@
                       },
                       "role": {
                         "type": "string",
-                        "const": "tenant_admin"
+                        "const": "workspace_admin"
                       },
                       "is_active": {
                         "type": "boolean"
@@ -8395,7 +7818,7 @@
                     },
                     "required": [
                       "id",
-                      "tenant_id",
+                      "workspace_id",
                       "auth_email",
                       "role",
                       "is_active",
@@ -8431,7 +7854,7 @@
           },
           "additionalProperties": false
         },
-        "create_tenant_admin": {
+        "create_workspace_admin": {
           "type": "object",
           "properties": {
             "data": {
@@ -8469,7 +7892,7 @@
                   "format": "uuid",
                   "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
                 },
-                "tenant_id": {
+                "workspace_id": {
                   "type": "string",
                   "format": "uuid",
                   "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
@@ -8481,7 +7904,7 @@
                 },
                 "role": {
                   "type": "string",
-                  "const": "tenant_admin"
+                  "const": "workspace_admin"
                 },
                 "is_active": {
                   "type": "boolean"
@@ -8495,7 +7918,7 @@
               },
               "required": [
                 "id",
-                "tenant_id",
+                "workspace_id",
                 "auth_email",
                 "role",
                 "is_active",
@@ -8518,7 +7941,7 @@
                   "format": "uuid",
                   "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
                 },
-                "tenant_id": {
+                "workspace_id": {
                   "type": "string",
                   "format": "uuid",
                   "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
@@ -8530,7 +7953,7 @@
                 },
                 "role": {
                   "type": "string",
-                  "const": "tenant_admin"
+                  "const": "workspace_admin"
                 },
                 "is_active": {
                   "type": "boolean"
@@ -8544,7 +7967,7 @@
               },
               "required": [
                 "id",
-                "tenant_id",
+                "workspace_id",
                 "auth_email",
                 "role",
                 "is_active",
@@ -8556,7 +7979,266 @@
           },
           "additionalProperties": false
         },
-        "send_tenant_admin_reset": {
+        "send_workspace_admin_reset": {
+          "type": "object",
+          "properties": {
+            "data": {
+              "type": "object",
+              "properties": {
+                "success": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "success"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "additionalProperties": false
+        },
+        "list_tenant_accounts": {
+          "type": "object",
+          "properties": {
+            "data": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "workspace_id": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "auth_email": {
+                    "type": "string",
+                    "format": "email",
+                    "pattern": "^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+                  },
+                  "role": {
+                    "type": "string",
+                    "const": "tenant_account"
+                  },
+                  "is_active": {
+                    "type": "boolean"
+                  },
+                  "deleted_at": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "created_at": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "id",
+                  "workspace_id",
+                  "auth_email",
+                  "role",
+                  "is_active",
+                  "created_at"
+                ],
+                "additionalProperties": false
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        "create_tenant_account": {
+          "type": "object",
+          "properties": {
+            "data": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "format": "uuid",
+                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                },
+                "workspace_id": {
+                  "type": "string",
+                  "format": "uuid",
+                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                },
+                "auth_email": {
+                  "type": "string",
+                  "format": "email",
+                  "pattern": "^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+                },
+                "role": {
+                  "type": "string",
+                  "const": "tenant_account"
+                },
+                "is_active": {
+                  "type": "boolean"
+                },
+                "deleted_at": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "created_at": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "workspace_id",
+                "auth_email",
+                "role",
+                "is_active",
+                "created_at"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "additionalProperties": false
+        },
+        "set_tenant_account_status": {
+          "type": "object",
+          "properties": {
+            "data": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "format": "uuid",
+                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                },
+                "workspace_id": {
+                  "type": "string",
+                  "format": "uuid",
+                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                },
+                "auth_email": {
+                  "type": "string",
+                  "format": "email",
+                  "pattern": "^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+                },
+                "role": {
+                  "type": "string",
+                  "const": "tenant_account"
+                },
+                "is_active": {
+                  "type": "boolean"
+                },
+                "deleted_at": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "created_at": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "workspace_id",
+                "auth_email",
+                "role",
+                "is_active",
+                "created_at"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "additionalProperties": false
+        },
+        "update_tenant_account_email": {
+          "type": "object",
+          "properties": {
+            "data": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "format": "uuid",
+                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                },
+                "workspace_id": {
+                  "type": "string",
+                  "format": "uuid",
+                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                },
+                "auth_email": {
+                  "type": "string",
+                  "format": "email",
+                  "pattern": "^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+                },
+                "role": {
+                  "type": "string",
+                  "const": "tenant_account"
+                },
+                "is_active": {
+                  "type": "boolean"
+                },
+                "deleted_at": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "created_at": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "workspace_id",
+                "auth_email",
+                "role",
+                "is_active",
+                "created_at"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "additionalProperties": false
+        },
+        "remove_tenant_account": {
+          "type": "object",
+          "properties": {
+            "data": {
+              "type": "object",
+              "properties": {
+                "success": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "success"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "additionalProperties": false
+        },
+        "send_tenant_account_reset": {
           "type": "object",
           "properties": {
             "data": {
@@ -8576,701 +8258,17 @@
         }
       },
       "required": [
-        "list_tenant_admins",
-        "create_tenant_admin",
+        "list_workspace_admins",
+        "create_workspace_admin",
         "set_admin_status",
         "update_admin_email",
-        "send_tenant_admin_reset"
-      ],
-      "additionalProperties": false
-    },
-    "districtDashboardResponse": {
-      "title": "districtDashboardResponse",
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "properties": {
-        "data": {
-          "type": "object",
-          "properties": {
-            "district": {
-              "type": "object",
-              "properties": {
-                "id": {
-                  "type": "string"
-                },
-                "name": {
-                  "type": "string"
-                },
-                "slug": {
-                  "type": "string"
-                },
-                "support_email": {
-                  "anyOf": [
-                    {
-                      "type": "string"
-                    },
-                    {
-                      "type": "null"
-                    }
-                  ]
-                },
-                "contact_name": {
-                  "anyOf": [
-                    {
-                      "type": "string"
-                    },
-                    {
-                      "type": "null"
-                    }
-                  ]
-                },
-                "is_active": {
-                  "type": "boolean"
-                },
-                "subscription_plan": {
-                  "anyOf": [
-                    {
-                      "type": "string",
-                      "enum": [
-                        "district_core",
-                        "district_growth",
-                        "district_enterprise",
-                        "organization_starter",
-                        "organization_scale",
-                        "organization_enterprise"
-                      ]
-                    },
-                    {
-                      "type": "null"
-                    }
-                  ]
-                },
-                "billing_status": {
-                  "anyOf": [
-                    {
-                      "type": "string",
-                      "enum": [
-                        "draft",
-                        "active",
-                        "past_due",
-                        "canceled"
-                      ]
-                    },
-                    {
-                      "type": "null"
-                    }
-                  ]
-                },
-                "renewal_date": {
-                  "anyOf": [
-                    {
-                      "type": "string"
-                    },
-                    {
-                      "type": "null"
-                    }
-                  ]
-                },
-                "billing_email": {
-                  "anyOf": [
-                    {
-                      "type": "string"
-                    },
-                    {
-                      "type": "null"
-                    }
-                  ]
-                },
-                "invoice_reference": {
-                  "anyOf": [
-                    {
-                      "type": "string"
-                    },
-                    {
-                      "type": "null"
-                    }
-                  ]
-                }
-              },
-              "required": [
-                "id",
-                "name",
-                "slug",
-                "is_active"
-              ],
-              "additionalProperties": false
-            },
-            "support_requests": {
-              "type": "array",
-              "items": {
-                "type": "object",
-                "properties": {
-                  "id": {
-                    "type": "string"
-                  },
-                  "requester_email": {
-                    "anyOf": [
-                      {
-                        "type": "string"
-                      },
-                      {
-                        "type": "null"
-                      }
-                    ]
-                  },
-                  "requester_name": {
-                    "anyOf": [
-                      {
-                        "type": "string"
-                      },
-                      {
-                        "type": "null"
-                      }
-                    ]
-                  },
-                  "subject": {
-                    "type": "string"
-                  },
-                  "message": {
-                    "type": "string"
-                  },
-                  "priority": {
-                    "type": "string",
-                    "enum": [
-                      "low",
-                      "normal",
-                      "high",
-                      "urgent"
-                    ]
-                  },
-                  "status": {
-                    "type": "string",
-                    "enum": [
-                      "open",
-                      "in_progress",
-                      "resolved"
-                    ]
-                  },
-                  "created_at": {
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "id",
-                  "subject",
-                  "message",
-                  "priority",
-                  "status",
-                  "created_at"
-                ],
-                "additionalProperties": false
-              }
-            },
-            "tenant_metrics": {
-              "type": "array",
-              "items": {
-                "type": "object",
-                "properties": {
-                  "tenant_id": {
-                    "type": "string"
-                  },
-                  "tenant_name": {
-                    "type": "string"
-                  },
-                  "gear_total": {
-                    "type": "integer",
-                    "minimum": 0,
-                    "maximum": 9007199254740991
-                  },
-                  "students_total": {
-                    "type": "integer",
-                    "minimum": 0,
-                    "maximum": 9007199254740991
-                  },
-                  "active_checkouts": {
-                    "type": "integer",
-                    "minimum": 0,
-                    "maximum": 9007199254740991
-                  },
-                  "overdue_items": {
-                    "type": "integer",
-                    "minimum": 0,
-                    "maximum": 9007199254740991
-                  },
-                  "transactions_7d": {
-                    "type": "integer",
-                    "minimum": 0,
-                    "maximum": 9007199254740991
-                  }
-                },
-                "required": [
-                  "tenant_id",
-                  "tenant_name",
-                  "gear_total",
-                  "students_total",
-                  "active_checkouts",
-                  "overdue_items",
-                  "transactions_7d"
-                ],
-                "additionalProperties": false
-              }
-            },
-            "traffic": {
-              "type": "object",
-              "properties": {
-                "checkout_24h": {
-                  "type": "integer",
-                  "minimum": 0,
-                  "maximum": 9007199254740991
-                },
-                "return_24h": {
-                  "type": "integer",
-                  "minimum": 0,
-                  "maximum": 9007199254740991
-                },
-                "active_tenants_24h": {
-                  "type": "integer",
-                  "minimum": 0,
-                  "maximum": 9007199254740991
-                },
-                "events_24h": {
-                  "type": "integer",
-                  "minimum": 0,
-                  "maximum": 9007199254740991
-                }
-              },
-              "required": [
-                "checkout_24h",
-                "return_24h",
-                "active_tenants_24h",
-                "events_24h"
-              ],
-              "additionalProperties": false
-            },
-            "traffic_by_hour": {
-              "type": "array",
-              "items": {
-                "type": "object",
-                "properties": {
-                  "hour": {
-                    "type": "string"
-                  },
-                  "checkout": {
-                    "type": "integer",
-                    "minimum": 0,
-                    "maximum": 9007199254740991
-                  },
-                  "return": {
-                    "type": "integer",
-                    "minimum": 0,
-                    "maximum": 9007199254740991
-                  }
-                },
-                "required": [
-                  "hour",
-                  "checkout",
-                  "return"
-                ],
-                "additionalProperties": false
-              }
-            },
-            "recent_events": {
-              "type": "array",
-              "items": {
-                "type": "object",
-                "properties": {
-                  "tenant_id": {
-                    "anyOf": [
-                      {
-                        "type": "string"
-                      },
-                      {
-                        "type": "null"
-                      }
-                    ]
-                  },
-                  "tenant_name": {
-                    "type": "string"
-                  },
-                  "action_type": {
-                    "type": "string",
-                    "enum": [
-                      "checkout",
-                      "return"
-                    ]
-                  },
-                  "action_time": {
-                    "type": "string"
-                  },
-                  "gear_name": {
-                    "anyOf": [
-                      {
-                        "type": "string"
-                      },
-                      {
-                        "type": "null"
-                      }
-                    ]
-                  },
-                  "gear_barcode": {
-                    "anyOf": [
-                      {
-                        "type": "string"
-                      },
-                      {
-                        "type": "null"
-                      }
-                    ]
-                  },
-                  "student_username": {
-                    "anyOf": [
-                      {
-                        "type": "string"
-                      },
-                      {
-                        "type": "null"
-                      }
-                    ]
-                  },
-                  "student_id": {
-                    "anyOf": [
-                      {
-                        "type": "string"
-                      },
-                      {
-                        "type": "null"
-                      }
-                    ]
-                  }
-                },
-                "required": [
-                  "tenant_id",
-                  "tenant_name",
-                  "action_type",
-                  "action_time",
-                  "gear_name",
-                  "gear_barcode",
-                  "student_username",
-                  "student_id"
-                ],
-                "additionalProperties": false
-              }
-            },
-            "needs_attention": {
-              "type": "array",
-              "items": {
-                "type": "object",
-                "properties": {
-                  "key": {
-                    "type": "string"
-                  },
-                  "level": {
-                    "type": "string",
-                    "enum": [
-                      "high",
-                      "medium",
-                      "low"
-                    ]
-                  },
-                  "title": {
-                    "type": "string"
-                  },
-                  "count": {
-                    "type": "integer",
-                    "minimum": 0,
-                    "maximum": 9007199254740991
-                  }
-                },
-                "required": [
-                  "key",
-                  "level",
-                  "title",
-                  "count"
-                ],
-                "additionalProperties": false
-              }
-            },
-            "tenants": {
-              "type": "array",
-              "items": {
-                "type": "object",
-                "properties": {
-                  "id": {
-                    "type": "string"
-                  },
-                  "name": {
-                    "type": "string"
-                  },
-                  "access_code": {
-                    "type": "string"
-                  },
-                  "status": {
-                    "type": "string",
-                    "enum": [
-                      "active",
-                      "suspended",
-                      "archived"
-                    ]
-                  },
-                  "created_at": {
-                    "type": "string"
-                  },
-                  "primary_admin_profile_id": {
-                    "anyOf": [
-                      {
-                        "type": "string"
-                      },
-                      {
-                        "type": "null"
-                      }
-                    ]
-                  },
-                  "primary_admin_email": {
-                    "anyOf": [
-                      {
-                        "type": "string"
-                      },
-                      {
-                        "type": "null"
-                      }
-                    ]
-                  }
-                },
-                "required": [
-                  "id",
-                  "name",
-                  "access_code",
-                  "status",
-                  "created_at"
-                ],
-                "additionalProperties": false
-              }
-            },
-            "usage": {
-              "type": "object",
-              "properties": {
-                "gear_total": {
-                  "type": "integer",
-                  "minimum": 0,
-                  "maximum": 9007199254740991
-                },
-                "students_total": {
-                  "type": "integer",
-                  "minimum": 0,
-                  "maximum": 9007199254740991
-                },
-                "active_checkouts": {
-                  "type": "integer",
-                  "minimum": 0,
-                  "maximum": 9007199254740991
-                },
-                "overdue_items": {
-                  "type": "integer",
-                  "minimum": 0,
-                  "maximum": 9007199254740991
-                },
-                "transactions_7d": {
-                  "type": "integer",
-                  "minimum": 0,
-                  "maximum": 9007199254740991
-                }
-              },
-              "required": [
-                "gear_total",
-                "students_total",
-                "active_checkouts",
-                "overdue_items",
-                "transactions_7d"
-              ],
-              "additionalProperties": false
-            }
-          },
-          "required": [
-            "district",
-            "support_requests",
-            "tenant_metrics",
-            "traffic",
-            "traffic_by_hour",
-            "recent_events",
-            "needs_attention",
-            "tenants",
-            "usage"
-          ],
-          "additionalProperties": false
-        }
-      },
-      "required": [
-        "data"
-      ],
-      "additionalProperties": false
-    },
-    "districtHandoffRequest": {
-      "title": "districtHandoffRequest",
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "oneOf": [
-        {
-          "type": "object",
-          "properties": {
-            "action": {
-              "type": "string",
-              "const": "create"
-            },
-            "auth_email": {
-              "type": "string",
-              "format": "email",
-              "pattern": "^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
-            },
-            "password": {
-              "type": "string",
-              "minLength": 1
-            },
-            "district_slug": {
-              "type": "string",
-              "minLength": 1
-            }
-          },
-          "required": [
-            "action",
-            "auth_email",
-            "password",
-            "district_slug"
-          ],
-          "additionalProperties": false
-        },
-        {
-          "type": "object",
-          "properties": {
-            "action": {
-              "type": "string",
-              "const": "create_admin"
-            },
-            "email": {
-              "type": "string",
-              "format": "email",
-              "pattern": "^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
-            },
-            "password": {
-              "type": "string",
-              "minLength": 1
-            }
-          },
-          "required": [
-            "action",
-            "email",
-            "password"
-          ],
-          "additionalProperties": false
-        },
-        {
-          "type": "object",
-          "properties": {
-            "action": {
-              "type": "string",
-              "const": "consume"
-            },
-            "code": {
-              "type": "string",
-              "minLength": 1
-            }
-          },
-          "required": [
-            "action",
-            "code"
-          ],
-          "additionalProperties": false
-        }
-      ]
-    },
-    "districtHandoffResponses": {
-      "title": "districtHandoffResponses",
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "properties": {
-        "create": {
-          "type": "object",
-          "properties": {
-            "code": {
-              "type": "string"
-            },
-            "expires_at": {
-              "type": "string"
-            }
-          },
-          "required": [
-            "code",
-            "expires_at"
-          ],
-          "additionalProperties": false
-        },
-        "create_admin": {
-          "type": "object",
-          "properties": {
-            "code": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ]
-            },
-            "district_slug": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ]
-            },
-            "role": {
-              "type": "string",
-              "enum": [
-                "tenant_admin",
-                "district_admin"
-              ]
-            },
-            "expires_at": {
-              "type": "string"
-            },
-            "root_only": {
-              "type": "boolean"
-            }
-          },
-          "required": [
-            "code",
-            "district_slug",
-            "role"
-          ],
-          "additionalProperties": false
-        },
-        "consume": {
-          "type": "object",
-          "properties": {
-            "access_token": {
-              "type": "string"
-            },
-            "refresh_token": {
-              "type": "string"
-            },
-            "district_slug": {
-              "type": "string"
-            }
-          },
-          "required": [
-            "access_token",
-            "refresh_token",
-            "district_slug"
-          ],
-          "additionalProperties": false
-        }
-      },
-      "required": [
-        "create",
-        "create_admin",
-        "consume"
+        "send_workspace_admin_reset",
+        "list_tenant_accounts",
+        "create_tenant_account",
+        "set_tenant_account_status",
+        "update_tenant_account_email",
+        "remove_tenant_account",
+        "send_tenant_account_reset"
       ],
       "additionalProperties": false
     },

@@ -2,9 +2,9 @@
   <div class="page">
     <div class="page-nav-left">
       <RouterLink class="button-link" to="/super-admin">Return to Super Admin</RouterLink>
-      <RouterLink class="button-link" to="/super-admin/tenants">Tenants</RouterLink>
+      <RouterLink class="button-link" to="/super-admin/workspaces">Workspaces</RouterLink>
       <RouterLink class="button-link" to="/super-admin/admins">Tenant Admins</RouterLink>
-      <RouterLink class="button-link" to="/super-admin/gear">All Items</RouterLink>
+      <RouterLink class="button-link" to="/super-admin/items">All Items</RouterLink>
       <RouterLink class="button-link" to="/super-admin/borrowers">All Borrowers</RouterLink>
       <RouterLink class="button-link" to="/super-admin/logs">All Logs</RouterLink>
       <RouterLink class="button-link" to="/super-admin/sales-leads">Sales Leads</RouterLink>
@@ -51,7 +51,7 @@
 
     <div class="card">
       <h2>Tenant Notification Update</h2>
-      <form class="form" @submit.prevent="saveTenantUpdate">
+      <form class="form" @submit.prevent="saveWorkspaceUpdate">
         <label>
           Title
           <input v-model="updateTitle" type="text" maxlength="80" placeholder="What changed?" />
@@ -62,7 +62,7 @@
             v-model="updateMessage"
             rows="3"
             maxlength="240"
-            placeholder="Short update shown in tenant notification bell."
+            placeholder="Short update shown in workspace notification bell."
           />
         </label>
         <label>
@@ -79,7 +79,7 @@
         </label>
         <div class="form-actions">
           <button type="submit" class="button-primary" :disabled="isSaving">Publish Update</button>
-          <button type="button" :disabled="isSaving" @click="clearTenantUpdates">Clear Updates</button>
+          <button type="button" :disabled="isSaving" @click="clearWorkspaceUpdates">Clear Updates</button>
         </div>
       </form>
     </div>
@@ -195,7 +195,7 @@ const clearBroadcast = async () => {
   }
 };
 
-const saveTenantUpdate = async () => {
+const saveWorkspaceUpdate = async () => {
   if (!updateMessage.value.trim()) {
     showToast("Invalid input", "Enter an update message.");
     return;
@@ -205,7 +205,7 @@ const saveTenantUpdate = async () => {
   try {
     const nowIso = new Date().toISOString();
     await setRuntimeConfig({
-      key: "tenant_updates",
+      key: "workspace_updates",
       value: {
         enabled: true,
         items: [
@@ -233,11 +233,11 @@ const saveTenantUpdate = async () => {
   }
 };
 
-const clearTenantUpdates = async () => {
+const clearWorkspaceUpdates = async () => {
   isSaving.value = true;
   try {
     await setRuntimeConfig({
-      key: "tenant_updates",
+      key: "workspace_updates",
       value: {
         enabled: false,
         items: [],
@@ -246,7 +246,7 @@ const clearTenantUpdates = async () => {
     });
     showToast("Cleared", "Tenant notification updates cleared.");
   } catch (err) {
-    showToast("Action failed", toUserFacingErrorMessage(err, "Unable to clear tenant updates."));
+    showToast("Action failed", toUserFacingErrorMessage(err, "Unable to clear workspace updates."));
   } finally {
     isSaving.value = false;
   }

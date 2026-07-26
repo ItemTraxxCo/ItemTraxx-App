@@ -30,29 +30,29 @@ export const upsertAlertRule = async (payload: {
     payload,
   });
 
-export const forceTenantReauth = async (payload: { tenant_id: string }) =>
+export const forceWorkspaceReauth = async (payload: { workspace_id: string }) =>
   callSuperOps<{ success: boolean; job: SuperJob | null }>({
-    action: "set_tenant_force_reauth",
+    action: "set_workspace_force_reauth",
     payload,
   });
 
-export const setTenantPolicy = async (payload: {
-  tenant_id: string;
+export const setWorkspacePolicy = async (payload: {
+  workspace_id: string;
   checkout_due_hours: number;
   feature_flags: {
     enable_notifications: boolean;
     enable_bulk_item_import: boolean;
-    enable_bulk_student_tools: boolean;
+    enable_bulk_borrower_tools: boolean;
     enable_status_tracking: boolean;
     enable_barcode_generator: boolean;
   };
 }) =>
   callSuperOps<{
-    tenant_id: string;
+    workspace_id: string;
     checkout_due_hours: number;
     feature_flags: Record<string, unknown>;
   }>({
-    action: "set_tenant_policy",
+    action: "set_workspace_policy",
     payload,
   });
 

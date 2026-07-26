@@ -22,11 +22,11 @@ type SessionSummary = {
   } | null;
   profile: {
     role: string | null;
-    tenant_id: string | null;
-    district_id: string | null;
+    workspace_id: string | null;
     auth_email: string | null;
     is_active: boolean | null;
   } | null;
+  password_authenticated_at: string | null;
 };
 
 type SessionExchangePayload = {
@@ -43,10 +43,10 @@ type TokenRefreshResponse = {
 type ProfileRow = {
   id: string;
   role: string | null;
-  tenant_id: string | null;
-  district_id: string | null;
+  workspace_id: string | null;
   auth_email: string | null;
   is_active: boolean | null;
+  deleted_at: string | null;
 };
 
 const trimTrailingSlash = (value: string) => value.replace(/\/+$/, "");
@@ -82,7 +82,7 @@ const fetchProfile = async (env: Env, accessToken: string, userId: string) => {
   url.searchParams.set("id", `eq.${userId}`);
   url.searchParams.set(
     "select",
-    "id,role,tenant_id,district_id,auth_email,is_active",
+    "id,role,workspace_id,auth_email,is_active,deleted_at",
   );
   const response = await fetch(url.toString(), {
     method: "GET",
@@ -97,25 +97,95 @@ const fetchProfile = async (env: Env, accessToken: string, userId: string) => {
   return rows[0] ?? null;
 };
 
+type JwtSessionClaims = {
+  session_id?: unknown;
+  amr?: unknown;
+};
+
+const readJwtSessionClaims = (accessToken: string): JwtSessionClaims | null => {
+  try {
+    const payload = accessToken.split(".")[1];
+    if (!payload) return null;
+    const normalized = payload.replaceAll("-", "+").replaceAll("_", "/");
+    return JSON.parse(
+      atob(normalized.padEnd(Math.ceil(normalized.length / 4) * 4, "=")),
+    ) as JwtSessionClaims;
+  } catch {
+    return null;
+  }
+};
+
+const readJwtSessionId = (accessToken: string) => {
+  const sessionId = readJwtSessionClaims(accessToken)?.session_id;
+  return typeof sessionId === "string" && sessionId.trim()
+    ? sessionId.trim()
+    : null;
+};
+
+const readPasswordAuthenticatedAt = (accessToken: string) => {
+  const amr = readJwtSessionClaims(accessToken)?.amr;
+  if (!Array.isArray(amr)) return null;
+  const passwordEntry = amr.find((entry) =>
+    !!entry && typeof entry === "object" &&
+    (entry as { method?: unknown }).method === "password"
+  ) as { timestamp?: unknown } | undefined;
+  const timestamp = passwordEntry?.timestamp;
+  if (typeof timestamp !== "number" || !Number.isFinite(timestamp) || timestamp <= 0) {
+    return null;
+  }
+  return new Date(timestamp * 1000).toISOString();
+};
+
+const hasActiveApplicationSession = async (
+  env: Env,
+  accessToken: string,
+  profile: ProfileRow,
+) => {
+  if (profile.role === "super_admin") return true;
+  const sessionId = readJwtSessionId(accessToken);
+  if (!sessionId) return false;
+  const url = new URL(buildSupabaseUrl(env, "/rest/v1/account_sessions"));
+  url.searchParams.set("profile_id", `eq.${profile.id}`);
+  url.searchParams.set("auth_session_id", `eq.${sessionId}`);
+  url.searchParams.set("revoked_at", "is.null");
+  url.searchParams.set("select", "id");
+  url.searchParams.set("limit", "1");
+  const response = await fetch(url.toString(), {
+    headers: {
+      apikey: env.SUPABASE_ANON_KEY,
+      Authorization: `Bearer ${accessToken}`,
+      Accept: "application/json",
+    },
+  });
+  if (!response.ok) return false;
+  const rows = await response.json() as Array<{ id?: string }>;
+  return !!rows[0]?.id;
+};
+
 const buildSessionSummary = async (
   env: Env,
   accessToken: string,
+  requireActiveApplicationSession = false,
 ): Promise<SessionSummary | null> => {
   const user = await fetchAuthUser(env, accessToken);
   if (!user) return null;
   const profile = await fetchProfile(env, accessToken, user.id);
+  if (
+    profile && requireActiveApplicationSession &&
+    !await hasActiveApplicationSession(env, accessToken, profile)
+  ) return null;
   return {
     authenticated: true,
     user,
     profile: profile
       ? {
         role: profile.role ?? null,
-        tenant_id: profile.tenant_id ?? null,
-        district_id: profile.district_id ?? null,
+        workspace_id: profile.workspace_id ?? null,
         auth_email: profile.auth_email ?? null,
         is_active: profile.is_active ?? null,
       }
       : null,
+    password_authenticated_at: readPasswordAuthenticatedAt(accessToken),
   };
 };
 
@@ -259,7 +329,7 @@ const handleSessionRefresh = async (
     clearSessionCookies(responseHeaders, env);
     return buildError(401, "Unauthorized", headers, requestId, responseHeaders);
   }
-  const summary = await buildSessionSummary(env, refreshed.accessToken);
+  const summary = await buildSessionSummary(env, refreshed.accessToken, true);
   if (!summary) {
     const responseHeaders = new Headers();
     clearSessionCookies(responseHeaders, env);
@@ -274,6 +344,7 @@ const unauthenticatedSummary = {
   authenticated: false,
   user: null,
   profile: null,
+  password_authenticated_at: null,
 };
 
 const handleSessionMe = async (
@@ -306,6 +377,10 @@ const handleSessionMe = async (
   if (!accessToken) {
     return buildJson(200, unauthenticatedSummary, headers, requestId);
   }
+  // No requireActiveApplicationSession here: a brand-new session (fresh
+  // login, not yet touched on this device/origin) must not be treated the
+  // same as a revoked one. Device/session revocation is enforced where it
+  // actually matters (checkoutReturn, admin-ops) via validateAccountDeviceSession.
   const summary = await buildSessionSummary(env, accessToken);
   if (!summary) {
     const clearHeaders = responseHeaders ?? new Headers();

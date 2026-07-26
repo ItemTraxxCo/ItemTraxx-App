@@ -19,7 +19,7 @@ Deno.test("prelogin rate limit uses the service-side RPC contract", async () => 
   const result = await enforcePreloginRateLimit(
     client,
     "ip-203-0-113-42",
-    "tenant-login",
+    "workspace-login",
     5,
     60,
   );
@@ -29,7 +29,7 @@ Deno.test("prelogin rate limit uses the service-side RPC contract", async () => 
   if (!observedCall) throw new Error("expected an observed RPC call");
   assert(observedCall.name === "consume_rate_limit_prelogin", "expected the prelogin RPC");
   assert(observedCall.p_key === "ip-203-0-113-42", "expected the client key");
-  assert(observedCall.p_scope === "tenant-login", "expected the rate-limit scope");
+  assert(observedCall.p_scope === "workspace-login", "expected the rate-limit scope");
   assert(observedCall.p_limit === 5, "expected the rate-limit limit");
   assert(observedCall.p_window_seconds === 60, "expected the rate-limit window");
 });

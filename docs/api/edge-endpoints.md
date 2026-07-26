@@ -8,9 +8,9 @@ Generated from:
 
 ## `POST /functions/v1/admin-ops`
 
-Tenant admin operations
+Workspace admin operations
 
-Tenant admin operational actions used by the tenant admin panel.
+Workspace admin operational actions used by the admin panel.
 
 ### Supported actions
 
@@ -28,7 +28,14 @@ Tenant admin operational actions used by the tenant admin panel.
 - `login_method`: string
 - `login_location`: string
 
-#### `bulk_import_gear`
+#### `get_workspace_dashboard`
+
+- `device_id` (required): string
+- `device_label` (required): string
+- `login_method`: string
+- `login_location`: string
+
+#### `bulk_import_items`
 
 - `device_id` (required): string
 - `device_label` (required): string
@@ -36,14 +43,14 @@ Tenant admin operational actions used by the tenant admin panel.
 - `login_location`: string
 - `rows` (required): array
 
-#### `get_tenant_settings`
+#### `get_workspace_settings`
 
 - `device_id` (required): string
 - `device_label` (required): string
 - `login_method`: string
 - `login_location`: string
 
-#### `update_tenant_settings`
+#### `update_workspace_settings`
 
 - `device_id` (required): string
 - `device_label` (required): string
@@ -98,142 +105,116 @@ Tenant admin operational actions used by the tenant admin panel.
 ### Response schema
 
 - Schema: `adminOpsResponses`
-- Top-level keys: `get_notifications`, `get_status_tracking`, `bulk_import_gear`, `get_tenant_settings`, `update_tenant_settings`, `touch_session`, `validate_session`, `list_sessions`, `revoke_current_session`, `revoke_session`, `revoke_all_sessions`
+- Top-level keys: `get_notifications`, `get_status_tracking`, `get_workspace_dashboard`, `bulk_import_items`, `get_workspace_settings`, `update_workspace_settings`, `touch_session`, `validate_session`, `list_sessions`, `revoke_current_session`, `revoke_session`, `revoke_all_sessions`
 
-## `POST /functions/v1/super-tenant-mutate`
+## `POST /functions/v1/super-workspace-mutate`
 
-Super admin tenant and district mutations
+Super admin workspace mutations
 
-Super-admin tenant and district creation/update actions.
+Super-admin workspace creation and lifecycle actions.
 
 ### Supported actions
 
-#### `list_tenants`
+#### `list_workspaces`
 
 - `search` (required): string
 - `status` (required): string
 
-#### `create_tenant`
+#### `create_workspace`
 
 - `name` (required): string
-- `access_code` (required): string
+- `slug` (required): string
 - `auth_email` (required): string
-- `password` (required): string
-- `status` (required): string
+- `password`: string
 - `account_category`: string
 - `plan_code`: string
-- `district_name`: string
-- `district_slug`: string
 
-#### `update_tenant`
+#### `update_workspace`
 
 - `id` (required): string
 - `name` (required): string
-- `access_code` (required): string
+- `slug` (required): string
 - `account_category`: string
 - `plan_code`: string
-- `district_name`: string
-- `district_slug`: string
 
-#### `set_tenant_status`
+#### `set_workspace_status`
 
 - `id` (required): string
 - `status` (required): string
-- `super_password` (required): string
-- `confirm_phrase` (required): string
 
 #### `send_primary_admin_reset`
 
-- `tenant_id` (required): string
+- `workspace_id` (required): string
 
 #### `set_primary_admin`
 
-- `tenant_id` (required): string
+- `workspace_id` (required): string
 - `profile_id` (required): string
-
-#### `list_districts`
-
-- `search` (required): string
-
-#### `create_district`
-
-- `name` (required): string
-- `slug` (required): string
-- `support_email`: string
-- `contact_name`: string
-- `subscription_plan`: string
-- `billing_status`: string
-- `renewal_date`: string
-- `billing_email`: string
-- `invoice_reference`: string
-
-#### `update_district`
-
-- `id` (required): string
-- `name` (required): string
-- `slug` (required): string
-- `support_email`: string
-- `contact_name`: string
-- `is_active` (required): boolean
-- `subscription_plan`: string
-- `billing_status`: string
-- `renewal_date`: string
-- `billing_email`: string
-- `invoice_reference`: string
-
-#### `get_district_details`
-
-- `id` (required): string
 
 ### Response schema
 
-- Schema: `superTenantResponses`
-- Top-level keys: `list_tenants`, `create_tenant`, `update_tenant`, `set_tenant_status`, `send_primary_admin_reset`, `set_primary_admin`, `list_districts`, `create_district`, `update_district`, `get_district_details`
+- Schema: `superWorkspaceResponses`
+- Top-level keys: `list_workspaces`, `create_workspace`, `update_workspace`, `set_workspace_status`, `send_primary_admin_reset`, `set_primary_admin`
 
 ## `POST /functions/v1/super-admin-mutate`
 
 Super admin account mutations
 
-Super-admin account management for tenant and district admins.
+Super-admin account management for Workspace Admins and Super Admins.
 
 ### Supported actions
 
-#### `list_tenant_admins`
+#### `list_workspace_admins`
 
 - `search` (required): string
-- `tenant_id` (required): string
-- `district_id` (required): string
-- `admin_scope` (required): string
+- `workspace_id` (required): string
 
-#### `create_tenant_admin`
+#### `create_workspace_admin`
 
-- `tenant_id`: string
-- `district_id`: string
+- `workspace_id`: string
 - `auth_email` (required): string
-- `password` (required): string
-- `admin_scope`: string
 
-#### `set_admin_status`
+#### `set_workspace_admin_status`
 
 - `id` (required): string
 - `is_active` (required): boolean
-- `admin_scope`: string
 
-#### `update_admin_email`
+#### `update_workspace_admin_email`
 
 - `id` (required): string
 - `auth_email` (required): string
-- `admin_scope`: string
 
-#### `send_reset`
+#### `send_workspace_admin_reset`
+
+- `id` (required): string
+
+#### `list_super_admins`
+
+- `search` (required): string
+
+#### `create_super_admin`
 
 - `auth_email` (required): string
-- `admin_scope`: string
+- `password` (required): string
+
+#### `set_super_admin_status`
+
+- `id` (required): string
+- `is_active` (required): boolean
+
+#### `update_super_admin_email`
+
+- `id` (required): string
+- `auth_email` (required): string
+
+#### `send_super_admin_reset`
+
+- `auth_email` (required): string
 
 ### Response schema
 
 - Schema: `superAdminResponses`
-- Top-level keys: `list_tenant_admins`, `create_tenant_admin`, `set_admin_status`, `update_admin_email`, `send_reset`
+- Top-level keys: `list_workspace_admins`, `create_workspace_admin`, `set_workspace_admin_status`, `update_workspace_admin_email`, `send_workspace_admin_reset`, `list_super_admins`, `create_super_admin`, `set_super_admin_status`, `update_super_admin_email`, `send_super_admin_reset`
 
 ## `POST /functions/v1/super-ops`
 
@@ -298,19 +279,19 @@ Super-admin operational controls, approvals, customer ops, and reporting.
 - `threshold` (required): number
 - `is_enabled`: boolean
 
-#### `set_tenant_policy`
+#### `set_workspace_policy`
 
-- `tenant_id` (required): string
+- `workspace_id` (required): string
 - `max_admins`: any
-- `max_students`: any
-- `max_gear`: any
+- `max_borrowers`: any
+- `max_items`: any
 - `checkout_due_hours`: any
 - `barcode_pattern`: any
 - `feature_flags`: object
 
-#### `set_tenant_force_reauth`
+#### `set_workspace_force_reauth`
 
-- `tenant_id` (required): string
+- `workspace_id` (required): string
 
 #### `create_approval`
 
@@ -397,21 +378,21 @@ Super-admin operational controls, approvals, customer ops, and reporting.
 ### Response schema
 
 - Schema: `superOpsResponses`
-- Top-level keys: `verify_password`, `touch_session`, `list_sessions`, `list_passkeys`, `revoke_session`, `revoke_all_sessions`, `get_control_center`, `set_runtime_config`, `upsert_alert_rule`, `set_tenant_policy`, `set_tenant_force_reauth`, `create_approval`, `approve_request`, `list_support_requests`, `get_support_request`, `update_support_request`, `list_sales_leads`, `close_sales_lead`, `move_sales_lead_to_customer`, `set_sales_lead_stage`, `delete_sales_lead`, `list_customers`, `add_customer_status_entry`, `get_internal_ops_snapshot`, `preview_subprocessor_notice`, `announce_subprocessor_change`, `list_subprocessor_notices`
+- Top-level keys: `verify_password`, `touch_session`, `list_sessions`, `list_passkeys`, `revoke_session`, `revoke_all_sessions`, `get_control_center`, `set_runtime_config`, `upsert_alert_rule`, `set_workspace_policy`, `set_workspace_force_reauth`, `create_approval`, `approve_request`, `list_support_requests`, `get_support_request`, `update_support_request`, `list_sales_leads`, `close_sales_lead`, `move_sales_lead_to_customer`, `set_sales_lead_stage`, `delete_sales_lead`, `list_customers`, `add_customer_status_entry`, `get_internal_ops_snapshot`, `preview_subprocessor_notice`, `announce_subprocessor_change`, `list_subprocessor_notices`
 
-## `POST /functions/v1/tenant-admin-mutate`
+## `POST /functions/v1/workspace-admin-mutate`
 
-Primary-admin tenant admin management
+Primary Workspace Admin peer management
 
-Primary-admin-only tenant admin management for the current tenant.
+Primary Workspace Admin-only peer management for the current workspace.
 
 ### Supported actions
 
-#### `list_tenant_admins`
+#### `list_workspace_admins`
 
 - No additional fields.
 
-#### `create_tenant_admin`
+#### `create_workspace_admin`
 
 - `auth_email` (required): string
 
@@ -425,57 +406,63 @@ Primary-admin-only tenant admin management for the current tenant.
 - `id` (required): string
 - `auth_email` (required): string
 
-#### `send_tenant_admin_reset`
+#### `send_workspace_admin_reset`
 
 - `auth_email` (required): string
 
-### Response schema
+#### `list_tenant_accounts`
 
-- Schema: `tenantAdminManageResponses`
-- Top-level keys: `list_tenant_admins`, `create_tenant_admin`, `set_admin_status`, `update_admin_email`, `send_tenant_admin_reset`
+- `device_id` (required): string
+- `device_label` (required): string
+- `login_method`: string
+- `login_location`: string
 
-## `GET /functions/v1/district-dashboard`
+#### `create_tenant_account`
 
-District dashboard snapshot
-
-District dashboard snapshot and analytics feed.
-
-### Request
-
-- No action-based request body.
-
-### Response schema
-
-- Schema: `districtDashboardResponse`
-- Top-level keys: `data`
-
-## `POST /functions/v1/district-handoff`
-
-Cross-host district session handoff
-
-Cross-host login handoff for district-routed auth flows.
-
-### Supported actions
-
-#### `create`
-
+- `device_id` (required): string
+- `device_label` (required): string
+- `login_method`: string
+- `login_location`: string
 - `auth_email` (required): string
-- `password` (required): string
-- `district_slug` (required): string
 
-#### `create_admin`
+#### `set_tenant_account_status`
 
-- `email` (required): string
-- `password` (required): string
+- `device_id` (required): string
+- `device_label` (required): string
+- `login_method`: string
+- `login_location`: string
+- `id` (required): string
+- `is_active` (required): boolean
 
-#### `consume`
+#### `update_tenant_account_email`
 
-- `code` (required): string
+- `device_id` (required): string
+- `device_label` (required): string
+- `login_method`: string
+- `login_location`: string
+- `id` (required): string
+- `auth_email` (required): string
+
+#### `remove_tenant_account`
+
+- `device_id` (required): string
+- `device_label` (required): string
+- `login_method`: string
+- `login_location`: string
+- `id` (required): string
+
+#### `send_tenant_account_reset`
+
+- `device_id` (required): string
+- `device_label` (required): string
+- `login_method`: string
+- `login_location`: string
+- `id` (required): string
 
 ### Response schema
 
-- Schema: `districtHandoffResponses`
-- Top-level keys: `create`, `create_admin`, `consume`
+- Schema: `workspaceAdminManageResponses`
+- Top-level keys: `list_workspace_admins`, `create_workspace_admin`, `set_admin_status`, `update_admin_email`, `send_workspace_admin_reset`, `list_tenant_accounts`, `create_tenant_account`, `set_tenant_account_status`, `update_tenant_account_email`, `remove_tenant_account`, `send_tenant_account_reset`
 
 ## `POST /functions/v1/contact-sales-submit`
 

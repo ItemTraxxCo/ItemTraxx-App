@@ -46,9 +46,9 @@ test("rejects duplicate declarations in an authoritative response map", () => {
 
 test("runtime registries have exact generated request and response coverage", async () => {
   assert.deepEqual(await inspectEdgeActionContractParity(), [
-    { endpoint: "admin-ops", count: 11 },
-    { endpoint: "super-ops", count: 26 },
-    { endpoint: "super-tenant-mutate", count: 10 },
+    { endpoint: "admin-ops", count: 12 },
+    { endpoint: "super-ops", count: 27 },
+    { endpoint: "super-workspace-mutate", count: 6 },
   ]);
 });
 
@@ -74,12 +74,12 @@ test("all generated super-ops action responses require top-level boolean ok", as
   assertRequiredBooleanOk(contracts.schemas.superOpsResponses, "super-ops");
 });
 
-test("all generated super-tenant action responses require top-level boolean ok", async () => {
+test("all generated super-workspace action responses require top-level boolean ok", async () => {
   const contracts = JSON.parse(
     await readFile(new URL("../docs/api/generated/edge-contracts.schema.json", import.meta.url), "utf8"),
   );
 
-  assertRequiredBooleanOk(contracts.schemas.superTenantResponses, "super-tenant-mutate");
+  assertRequiredBooleanOk(contracts.schemas.superWorkspaceResponses, "super-workspace-mutate");
 });
 
 test("generated internal ops snapshot matches the live response shape", async () => {
@@ -106,7 +106,7 @@ test("generated internal ops snapshot matches the live response shape", async ()
     "traffic_by_hour",
   ]);
   assert.deepEqual(keys(snapshot.properties.traffic), [
-    "active_tenants_15m",
+    "active_workspaces_15m",
     "checkout_15m",
     "events_24h",
     "return_15m",
@@ -121,12 +121,12 @@ test("generated internal ops snapshot matches the live response shape", async ()
   assert.deepEqual(keys(snapshot.properties.recent_events.items), [
     "action_time",
     "action_type",
-    "gear_barcode",
-    "gear_name",
-    "student_id",
-    "student_username",
-    "tenant_id",
-    "tenant_name",
+    "item_barcode",
+    "item_name",
+    "borrower_id",
+    "borrower_username",
+    "workspace_id",
+    "workspace_name",
   ]);
 });
 

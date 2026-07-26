@@ -2,10 +2,10 @@ import {
   clearAdminVerification,
   clearAuthState,
   getAuthState,
-  setDistrictContext,
+  setWorkspaceContext,
 } from "../../store/authState";
-import { revokeCurrentTenantAdminSession } from "../adminOpsService";
-import { resolveDistrictHost } from "../districtService";
+import { revokeCurrentAccountSession } from "../adminOpsService";
+import { resolveWorkspaceHost } from "../workspaceService";
 import { clearHttpSession } from "../httpSessionService";
 import { clearOfflineCheckoutQueue } from "../offlineCheckoutQueue";
 import { signOutLocalSupabaseSession } from "../supabaseAuthSession";
@@ -13,11 +13,11 @@ import { clearPendingSuperAdminVerificationEmail } from "./sessionState";
 
 export const signOut = async () => {
   const current = getAuthState();
-  const shouldRevokeTenantAdminSession = current.role === "tenant_admin" && !!current.adminVerifiedAt;
+  const shouldRevokeAccountSession = current.role === "workspace_admin" && !!current.adminVerifiedAt;
 
-  if (shouldRevokeTenantAdminSession) {
+  if (shouldRevokeAccountSession) {
     try {
-      await revokeCurrentTenantAdminSession();
+      await revokeCurrentAccountSession();
     } catch {
       // Ignore device-session revocation failures during sign-out.
     }
@@ -33,7 +33,7 @@ export const signOut = async () => {
   clearAdminVerification();
   clearPendingSuperAdminVerificationEmail();
   clearAuthState(true);
-  setDistrictContext(null);
+  setWorkspaceContext(null);
 };
 
 export const getPostSignOutUrl = () => {
@@ -41,7 +41,7 @@ export const getPostSignOutUrl = () => {
     return "/login";
   }
 
-  const { host, isDistrictHost } = resolveDistrictHost(window.location.hostname);
+  const { host, isWorkspaceHost } = resolveWorkspaceHost(window.location.hostname);
   const normalizedHost = host.trim().toLowerCase();
   if (!normalizedHost) {
     return "/login";
@@ -58,7 +58,7 @@ export const getPostSignOutUrl = () => {
     return "/login";
   }
 
-  if (isDistrictHost || normalizedHost !== "app.itemtraxx.com") {
+  if (isWorkspaceHost || normalizedHost !== "app.itemtraxx.com") {
     return "https://itemtraxx.com/login";
   }
 

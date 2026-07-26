@@ -3,6 +3,6 @@
 -- Apply during a low-traffic window because plain DROP INDEX can take stronger locks.
 
 drop index if exists public.idx_districts_slug;
-drop index if exists public.idx_gear_tenant_barcode;
+drop index if exists public.idx_item_tenant_barcode;
 drop index if exists public.idx_tenant_policies_tenant;
 drop index if exists public.admin_audit_logs_tenant_time_idx;

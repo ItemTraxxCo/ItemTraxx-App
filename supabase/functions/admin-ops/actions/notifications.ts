@@ -10,21 +10,21 @@ export const handleNotificationAction = async (
   const [statusCountResult, recentStatusResult, overdueCountResult] =
     await Promise.all([
       context.adminClient
-        .from("gear")
+        .from("items")
         .select("id", { count: "exact", head: true })
-        .eq("tenant_id", context.tenantId)
+        .eq("workspace_id", context.workspaceId)
         .is("deleted_at", null)
         .not("status", "in", "(available,checked_out)"),
       context.adminClient
-        .from("gear_status_history")
-        .select("id, status, changed_at, gear:gear_id(name, barcode)")
-        .eq("tenant_id", context.tenantId)
+        .from("item_status_history")
+        .select("id, status, changed_at, item:item_id(name, barcode)")
+        .eq("workspace_id", context.workspaceId)
         .order("changed_at", { ascending: false })
         .limit(8),
       context.adminClient
-        .from("gear")
+        .from("items")
         .select("id", { count: "exact", head: true })
-        .eq("tenant_id", context.tenantId)
+        .eq("workspace_id", context.workspaceId)
         .is("deleted_at", null)
         .not("checked_out_by", "is", null)
         .lte("checked_out_at", dueCutoffIso),
@@ -40,14 +40,14 @@ export const handleNotificationAction = async (
       recent_status_events: recentStatusResult.error
         ? []
         : recentStatusResult.data ?? [],
-      updates: context.tenantUpdates,
+      updates: context.workspaceUpdates,
       checkout_due_hours: context.checkoutDueHours,
       feature_flags: context.featureFlags,
     },
   });
 };
 
-export const normalizeTenantUpdates = (value: unknown): RuntimeUpdateItem[] => {
+export const normalizeWorkspaceUpdates = (value: unknown): RuntimeUpdateItem[] => {
   if (!value || typeof value !== "object") return [];
   const payload = value as Record<string, unknown>;
   if (payload.enabled === false || !Array.isArray(payload.items)) return [];

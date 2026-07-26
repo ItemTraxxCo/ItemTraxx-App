@@ -4,7 +4,7 @@ import {
   mockSystemStatus,
   mockUnauthenticatedSession,
   navigateApp,
-  setTenantAdminSession,
+  setWorkspaceAdminSession,
   waitForPublicAuthBootstrap,
 } from "./helpers/testHarness";
 
@@ -16,8 +16,8 @@ const authenticatedSessionSummary = () => ({
     last_sign_in_at: new Date().toISOString(),
   },
   profile: {
-    role: "tenant_user",
-    tenant_id: "tenant-e2e",
+    role: "tenant_account",
+    workspace_id: "tenant-e2e",
     district_id: null,
     auth_email: "tenant.user@example.com",
     is_active: true,
@@ -31,11 +31,9 @@ const clearedAuthContext = {
   email: null,
   signedInAt: null,
   role: null,
-  sessionTenantId: null,
-  tenantContextId: null,
-  districtContextId: null,
+  sessionWorkspaceId: null,
+  workspaceContextId: null,
   isAdmin: false,
-  isDistrictAdmin: false,
   isSuperAdmin: false,
   hasSecondaryAuth: false,
   superVerifiedAt: null,
@@ -90,14 +88,14 @@ const mockRoleMismatchBoundaries = async (page: Page, mode: "otp" | "passkey") =
       body: JSON.stringify(authenticatedSessionSummary()),
     });
   });
-  await page.route("**/rest/v1/tenants?**", async (route) => {
+  await page.route("**/rest/v1/workspaces?**", async (route) => {
     await route.fulfill({
       status: 200,
       contentType: "application/json",
-      body: JSON.stringify([{ id: "tenant-e2e", status: "active", district_id: "district-e2e" }]),
+      body: JSON.stringify([{ id: "tenant-e2e", status: "active" }]),
     });
   });
-  await page.route("**/rest/v1/rpc/resolve_public_district_by_id", async (route) => {
+  await page.route("**/rest/v1/rpc/resolve_public_workspace_by_id", async (route) => {
     await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify([]) });
   });
   await page.route("**/auth/session/logout", async (route) => {
@@ -152,9 +150,8 @@ const exerciseSuperRoleMismatch = async (page: Page, mode: "otp" | "passkey") =>
       email: "stale.super@example.com",
       signedInAt: new Date().toISOString(),
       role: "super_admin",
-      sessionTenantId: "stale-tenant",
-      tenantContextId: "stale-tenant",
-      districtContextId: "stale-district",
+      sessionWorkspaceId: "stale-tenant",
+      workspaceContextId: "stale-tenant",
       hasSecondaryAuth: true,
       superVerifiedAt: new Date().toISOString(),
     });
@@ -188,11 +185,9 @@ const exerciseSuperRoleMismatch = async (page: Page, mode: "otp" | "passkey") =>
         email: state.email,
         signedInAt: state.signedInAt,
         role: state.role,
-        sessionTenantId: state.sessionTenantId,
-        tenantContextId: state.tenantContextId,
-        districtContextId: state.districtContextId,
+        sessionWorkspaceId: state.sessionWorkspaceId,
+        workspaceContextId: state.workspaceContextId,
         isAdmin: state.isAdmin,
-        isDistrictAdmin: state.isDistrictAdmin,
         isSuperAdmin: state.isSuperAdmin,
         hasSecondaryAuth: state.hasSecondaryAuth,
         superVerifiedAt: state.superVerifiedAt,
@@ -210,9 +205,9 @@ test.describe("Auth edge cases", () => {
     await mockUnauthenticatedSession(page);
   });
 
-  test("unauthenticated tenant admin route redirects to public home", async ({ page }) => {
+  test("unauthenticated Workspace Admin route redirects to public home", async ({ page }) => {
     await page.goto("/");
-    await navigateApp(page, "/tenant/admin");
+    await navigateApp(page, "/admin");
     await expect(page).toHaveURL(/\/$/);
   });
 
@@ -286,16 +281,16 @@ test.describe("Auth edge cases", () => {
         body: JSON.stringify(authenticatedSessionSummary()),
       });
     });
-    await page.route("**/rest/v1/tenants?**", async (route) => {
+    await page.route("**/rest/v1/workspaces?**", async (route) => {
       await route.fulfill({
         status: 200,
         contentType: "application/json",
         body: JSON.stringify([
-          { id: "tenant-e2e", status: "active", district_id: "district-e2e" },
+          { id: "tenant-e2e", status: "active" },
         ]),
       });
     });
-    await page.route("**/rest/v1/rpc/resolve_public_district_by_id", async (route) => {
+    await page.route("**/rest/v1/rpc/resolve_public_workspace_by_id", async (route) => {
       await route.fulfill({
         status: 200,
         contentType: "application/json",
@@ -303,23 +298,23 @@ test.describe("Auth edge cases", () => {
           {
             id: "district-e2e",
             name: "E2E District",
-            slug: "e2e-district",
+            slug: "e2e-workspace",
             is_active: true,
           },
         ]),
       });
     });
-    await page.route("https://e2e-district.app.itemtraxx.com/tenant/checkout", async (route) => {
+    await page.route("https://e2e-workspace.app.itemtraxx.com/checkout", async (route) => {
       await route.fulfill({ status: 200, contentType: "text/html", body: "<!doctype html>" });
     });
 
     await page.goto("/");
 
     await expect.poll(() => sessionSummaryRequests).toBe(1);
-    await expect(page).toHaveURL("https://e2e-district.app.itemtraxx.com/tenant/checkout");
+    await expect(page).toHaveURL("https://e2e-workspace.app.itemtraxx.com/checkout");
   });
 
-  test("suspended tenant bootstrap fails closed and clears the authenticated state", async ({ page }) => {
+  test("suspended workspace bootstrap fails closed and clears the authenticated state", async ({ page }) => {
     await page.route("**/auth/session/me", async (route) => {
       await route.fulfill({
         status: 200,
@@ -327,12 +322,12 @@ test.describe("Auth edge cases", () => {
         body: JSON.stringify(authenticatedSessionSummary()),
       });
     });
-    await page.route("**/rest/v1/tenants?**", async (route) => {
+    await page.route("**/rest/v1/workspaces?**", async (route) => {
       await route.fulfill({
         status: 200,
         contentType: "application/json",
         body: JSON.stringify([
-          { id: "tenant-e2e", status: "suspended", district_id: "district-e2e" },
+          { id: "tenant-e2e", status: "suspended" },
         ]),
       });
     });
@@ -344,11 +339,11 @@ test.describe("Auth edge cases", () => {
     expect(
       await page.evaluate(() => window.__itemtraxxTest !== undefined)
     ).toBe(true);
-    await navigateApp(page, "/tenant/checkout");
+    await navigateApp(page, "/checkout");
     await expect(page).toHaveURL(/\/$/);
   });
 
-  test("district handoff consumes only the one-time code and removes auth material from the URL", async ({ page }) => {
+  test.skip("retired district handoff is removed from the workspace model", async ({ page }) => {
     let consumePayload: unknown = null;
     let exchangePayload: unknown = null;
     await page.addInitScript(() => {
@@ -395,8 +390,8 @@ test.describe("Auth edge cases", () => {
     await page.route(/\/functions(?:\/v1)?\/login-notify(?:\?.*)?$/, async (route) => {
       await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ data: {} }) });
     });
-    await page.route("**/rest/v1/tenants?**", async (route) => {
-      await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify([{ id: "tenant-e2e", status: "active", district_id: null }]) });
+    await page.route("**/rest/v1/workspaces?**", async (route) => {
+      await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify([{ id: "tenant-e2e", status: "active" }]) });
     });
 
     await page.goto("/#itx_hc=one-time-code&itx_lm=password&itx_ll=tenant_login&keep=1");
@@ -530,7 +525,7 @@ test.describe("Auth edge cases", () => {
     expect(result).toEqual({ email: "super@example.com" });
   });
 
-  test("tenant-admin session login marks a fresh 15-minute verification", async ({ page }) => {
+  test("Workspace Admin session login marks a fresh 15-minute verification", async ({ page }) => {
     await page.route(/\/functions(?:\/v1)?\/privileged-step-up(?:\?.*)?$/, async (route) => {
       await route.fulfill({
         status: 200,
@@ -544,11 +539,11 @@ test.describe("Auth edge cases", () => {
     await page.route(/\/functions(?:\/v1)?\/login-notify(?:\?.*)?$/, async (route) => {
       await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({}) });
     });
-    await page.route("**/rest/v1/tenants?**", async (route) => {
+    await page.route("**/rest/v1/workspaces?**", async (route) => {
       await route.fulfill({
         status: 200,
         contentType: "application/json",
-        body: JSON.stringify([{ id: "tenant-admin-e2e", status: "active", district_id: null }]),
+        body: JSON.stringify([{ id: "workspace-admin-e2e", status: "active" }]),
       });
     });
 
@@ -561,13 +556,13 @@ test.describe("Auth edge cases", () => {
         preExchangedSessionSummary: {
           authenticated: true,
           user: {
-            id: "tenant-admin-user-e2e",
+            id: "workspace-admin-user-e2e",
             email: "tenant.admin@example.com",
             last_sign_in_at: new Date().toISOString(),
           },
           profile: {
-            role: "tenant_admin",
-            tenant_id: "tenant-admin-e2e",
+            role: "workspace_admin",
+            workspace_id: "workspace-admin-e2e",
             district_id: null,
             auth_email: "tenant.admin@example.com",
             is_active: true,
@@ -577,17 +572,17 @@ test.describe("Auth edge cases", () => {
       const state = getAuthState();
       return {
         role: login.role,
-        tenantId: login.tenantId,
+        workspaceId: login.workspaceId,
         verifiedAt: state.adminVerifiedAt,
         persisted: sessionStorage.getItem("itemtraxx:admin-verification"),
       };
     });
 
-    expect(result.role).toBe("tenant_admin");
-    expect(result.tenantId).toBe("tenant-admin-e2e");
+    expect(result.role).toBe("workspace_admin");
+    expect(result.workspaceId).toBe("workspace-admin-e2e");
     expect(Date.now() - Date.parse(result.verifiedAt ?? "")).toBeLessThanOrEqual(15 * 60_000);
     expect(JSON.parse(result.persisted ?? "null")).toMatchObject({
-      userId: "tenant-admin-user-e2e",
+      userId: "workspace-admin-user-e2e",
       verifiedAt: result.verifiedAt,
     });
   });
@@ -631,7 +626,7 @@ test.describe("Auth edge cases", () => {
           },
           profile: {
             role: "super_admin",
-            tenant_id: null,
+            workspace_id: null,
             district_id: null,
             auth_email: "super@example.com",
             is_active: true,
@@ -738,7 +733,7 @@ test.describe("Auth edge cases", () => {
           },
           profile: {
             role: "super_admin",
-            tenant_id: null,
+            workspace_id: null,
             district_id: null,
             auth_email: "pending.otp@example.com",
             is_active: true,
@@ -871,8 +866,7 @@ test.describe("Auth edge cases", () => {
             getAuthState,
             markAdminVerified,
             setAuthStateFromBackend,
-            setDistrictContext,
-            setTenantContext,
+            setWorkspaceContext,
           },
           { supabase },
         ] = await Promise.all([
@@ -892,11 +886,9 @@ test.describe("Auth edge cases", () => {
             email: state.email,
             signedInAt: state.signedInAt,
             role: state.role,
-            sessionTenantId: state.sessionTenantId,
-            tenantContextId: state.tenantContextId,
-            districtContextId: state.districtContextId,
+            sessionWorkspaceId: state.sessionWorkspaceId,
+            workspaceContextId: state.workspaceContextId,
             isAdmin: state.isAdmin,
-            isDistrictAdmin: state.isDistrictAdmin,
             isSuperAdmin: state.isSuperAdmin,
             hasSecondaryAuth: state.hasSecondaryAuth,
             superVerifiedAt: state.superVerifiedAt,
@@ -999,18 +991,16 @@ test.describe("Auth edge cases", () => {
         setAuthStateFromBackend({
           isInitialized: true,
           isAuthenticated: true,
-          userId: "tenant-admin-e2e",
+          userId: "workspace-admin-e2e",
           email: "tenant.admin@example.com",
           signedInAt,
-          role: "tenant_admin",
-          sessionTenantId: "tenant-e2e",
-          tenantContextId: "tenant-e2e",
-          districtContextId: "district-e2e",
+          role: "workspace_admin",
+          sessionWorkspaceId: "tenant-e2e",
+          workspaceContextId: "tenant-e2e",
           hasSecondaryAuth: true,
           superVerifiedAt,
         });
-        setTenantContext("tenant-e2e");
-        setDistrictContext("district-e2e");
+        setWorkspaceContext("tenant-e2e");
         markAdminVerified();
         const before = snapshot();
         const signOutPromise = auth.signOut();
@@ -1043,14 +1033,12 @@ test.describe("Auth edge cases", () => {
       expect(result.before).toMatchObject({
         isInitialized: true,
         isAuthenticated: true,
-        userId: "tenant-admin-e2e",
+        userId: "workspace-admin-e2e",
         email: "tenant.admin@example.com",
-        role: "tenant_admin",
-        sessionTenantId: "tenant-e2e",
-        tenantContextId: "tenant-e2e",
-        districtContextId: "district-e2e",
+        role: "workspace_admin",
+        sessionWorkspaceId: "tenant-e2e",
+        workspaceContextId: "tenant-e2e",
         isAdmin: true,
-        isDistrictAdmin: false,
         isSuperAdmin: false,
         hasSecondaryAuth: true,
         pendingToken: "pending-challenge-e2e",
@@ -1075,7 +1063,7 @@ test.describe("Auth edge cases", () => {
     });
   }
 
-  test("forced tenant-admin termination shows the blocking session message", async ({ page }) => {
+  test("forced Workspace Admin termination shows the blocking session message", async ({ page }) => {
     await page.route(/\/functions(?:\/v1)?\/admin-ops(?:\?.*)?$/, async (route) => {
       const body = (route.request().postDataJSON() as { action?: string }) ?? {};
       await route.fulfill({
@@ -1086,20 +1074,19 @@ test.describe("Auth edge cases", () => {
     });
 
     await page.goto("/");
-    await setTenantAdminSession(page, "tenant-e2e");
-    await navigateApp(page, "/tenant/admin");
+    await setWorkspaceAdminSession(page, "tenant-e2e");
+    await navigateApp(page, "/admin");
 
     await expect(page.getByRole("heading", { name: "This session has been terminated or expired." })).toBeVisible();
   });
 
-  test("role normalization accepts only the four authenticated roles", async ({ page }) => {
+  test("role normalization accepts only the three authenticated roles", async ({ page }) => {
     await page.goto("/");
     const result = await page.evaluate(async () => {
       const { toKnownRole } = await import("/src/services/auth/types.ts");
       const allowed = [
-        "tenant_user",
-        "tenant_admin",
-        "district_admin",
+        "tenant_account",
+        "workspace_admin",
         "super_admin",
       ];
       const rejected: unknown[] = [
@@ -1118,15 +1105,14 @@ test.describe("Auth edge cases", () => {
     });
 
     expect(result.allowed).toEqual([
-      ["tenant_user", "tenant_user"],
-      ["tenant_admin", "tenant_admin"],
-      ["district_admin", "district_admin"],
+      ["tenant_account", "tenant_account"],
+      ["workspace_admin", "workspace_admin"],
       ["super_admin", "super_admin"],
     ]);
     expect(result.rejected).toEqual([null, null, null, null, null, null, null]);
   });
 
-  test("authenticated tenant checkout survives refresh when tenant bootstrap lookup returns 401", async ({ page }) => {
+  test("authenticated Tenant Account checkout survives refresh when workspace bootstrap lookup returns 401", async ({ page }) => {
     await page.route("**/auth/session/me", async (route) => {
       await route.fulfill({
         status: 200,
@@ -1135,7 +1121,7 @@ test.describe("Auth edge cases", () => {
       });
     });
 
-    await page.route("**/rest/v1/tenants?**", async (route) => {
+    await page.route("**/rest/v1/workspaces?**", async (route) => {
       await route.fulfill({
         status: 401,
         contentType: "application/json",
@@ -1143,15 +1129,15 @@ test.describe("Auth edge cases", () => {
       });
     });
 
-    await page.goto("/tenant/checkout");
-    await expect(page).toHaveURL(/\/tenant\/checkout$/);
+    await page.goto("/checkout");
+    await expect(page).toHaveURL(/\/checkout$/);
 
     await page.reload();
-    await expect(page).toHaveURL(/\/tenant\/checkout$/);
+    await expect(page).toHaveURL(/\/checkout$/);
     await expect(page).not.toHaveURL(/\/login$/);
   });
 
-  test("tenant admin on checkout is not logged out by admin-session validation", async ({ page }) => {
+  test("Workspace Admin on checkout is not logged out by admin-session validation", async ({ page }) => {
     await page.route(/\/functions(?:\/v1)?\/admin-ops(?:\?.*)?$/, async (route) => {
       const body = (route.request().postDataJSON() as { action?: string }) ?? {};
       if (body.action === "validate_session") {
@@ -1170,23 +1156,23 @@ test.describe("Auth edge cases", () => {
     });
 
     await page.goto("/");
-    await setTenantAdminSession(page, "tenant-e2e");
-    await navigateApp(page, "/tenant/checkout");
-    await expect(page).toHaveURL(/\/tenant\/checkout$/);
+    await setWorkspaceAdminSession(page, "tenant-e2e");
+    await navigateApp(page, "/checkout");
+    await expect(page).toHaveURL(/\/checkout$/);
     await page.reload();
-    await expect(page).toHaveURL(/\/tenant\/checkout$/);
+    await expect(page).toHaveURL(/\/checkout$/);
     await expect(page).not.toHaveURL(/\/login$/);
   });
 
-  test("authenticated tenant admin on public marketing routes is not forced to checkout or login", async ({ page }) => {
+  test("authenticated Workspace Admin on public marketing routes is not forced to checkout or login", async ({ page }) => {
     await page.goto("/");
-    await setTenantAdminSession(page, "tenant-e2e");
+    await setWorkspaceAdminSession(page, "tenant-e2e");
     await navigateApp(page, "/about");
     await expect(page).toHaveURL(/\/about$/);
     await expect(page).not.toHaveURL(/\/login$/);
   });
 
-  test("tenant admin does not bounce from admin home to checkout immediately", async ({ page }) => {
+  test("Workspace Admin does not bounce from admin home to checkout immediately", async ({ page }) => {
     await page.route(/\/functions(?:\/v1)?\/admin-ops(?:\?.*)?$/, async (route) => {
       const body = (route.request().postDataJSON() as { action?: string }) ?? {};
       if (body.action === "validate_session") {
@@ -1197,7 +1183,7 @@ test.describe("Auth edge cases", () => {
         });
         return;
       }
-      if (body.action === "get_tenant_settings") {
+      if (body.action === "get_workspace_settings") {
         await route.fulfill({
           status: 200,
           contentType: "application/json",
@@ -1209,7 +1195,7 @@ test.describe("Auth edge cases", () => {
               feature_flags: {
                 enable_notifications: true,
                 enable_bulk_item_import: true,
-                enable_bulk_student_tools: true,
+                enable_bulk_borrower_tools: true,
                 enable_status_tracking: true,
                 enable_barcode_generator: true,
               },
@@ -1226,15 +1212,15 @@ test.describe("Auth edge cases", () => {
     });
 
     await page.goto("/");
-    await setTenantAdminSession(page, "tenant-e2e");
-    await navigateApp(page, "/tenant/admin");
-    await expect(page).toHaveURL(/\/tenant\/admin$/);
+    await setWorkspaceAdminSession(page, "tenant-e2e");
+    await navigateApp(page, "/admin");
+    await expect(page).toHaveURL(/\/admin$/);
     await page.waitForTimeout(6000);
-    await expect(page).toHaveURL(/\/tenant\/admin$/);
-    await expect(page).not.toHaveURL(/\/tenant\/checkout$/);
+    await expect(page).toHaveURL(/\/admin$/);
+    await expect(page).not.toHaveURL(/\/checkout$/);
   });
 
-  test("hidden tenant admin navigation defers session polling until visibility returns", async ({ page }) => {
+  test("hidden Workspace Admin navigation defers session polling until visibility returns", async ({ page }) => {
     let touchRequests = 0;
     let validationRequests = 0;
     await page.route(/\/functions(?:\/v1)?\/admin-ops(?:\?.*)?$/, async (route) => {
@@ -1249,7 +1235,7 @@ test.describe("Auth edge cases", () => {
     });
 
     await page.goto("/");
-    await setTenantAdminSession(page, "tenant-e2e");
+    await setWorkspaceAdminSession(page, "tenant-e2e");
     await page.evaluate(() => {
       Object.defineProperty(document, "visibilityState", {
         configurable: true,
@@ -1261,7 +1247,7 @@ test.describe("Auth edge cases", () => {
       });
       document.dispatchEvent(new Event("visibilitychange"));
     });
-    await navigateApp(page, "/tenant/admin");
+    await navigateApp(page, "/admin");
     await page.waitForTimeout(250);
 
     expect(touchRequests).toBe(0);
@@ -1302,24 +1288,24 @@ test.describe("Auth edge cases", () => {
 
     await page.goto("/");
     await page.clock.install();
-    await setTenantAdminSession(page, "tenant-e2e");
-    await navigateApp(page, "/tenant/admin");
+    await setWorkspaceAdminSession(page, "tenant-e2e");
+    await navigateApp(page, "/admin");
     await expect.poll(() => validationRequests).toBe(1);
     await page.clock.fastForward(100);
 
-    await navigateApp(page, "/tenant/checkout");
+    await navigateApp(page, "/checkout");
     await page.clock.fastForward(400);
     expect(validationRequests).toBe(1);
     await expect(page.getByRole("alertdialog").filter({ hasText: "Session Ended" })).toHaveCount(0);
 
     await page.clock.fastForward(5_001);
-    await navigateApp(page, "/tenant/admin");
+    await navigateApp(page, "/admin");
     await expect.poll(() => validationRequests).toBe(2);
-    await expect(page).toHaveURL(/\/tenant\/admin$/);
+    await expect(page).toHaveURL(/\/admin$/);
     await expect(page.getByRole("alertdialog").filter({ hasText: "Session Ended" })).toHaveCount(0);
   });
 
-  test("tenant admin activity postpones idle logout beyond the original deadline", async ({ page }) => {
+  test("Workspace Admin activity postpones idle logout beyond the original deadline", async ({ page }) => {
     await page.route(/\/functions(?:\/v1)?\/admin-ops(?:\?.*)?$/, async (route) => {
       if (route.request().method() === "OPTIONS") {
         await route.fulfill({
@@ -1341,18 +1327,18 @@ test.describe("Auth edge cases", () => {
     });
 
     await page.goto("http://127.0.0.1.nip.io:4173/");
-    await setTenantAdminSession(page, "tenant-e2e");
-    await navigateApp(page, "/tenant/admin");
-    await expect(page).toHaveURL(/\/tenant\/admin$/);
+    await setWorkspaceAdminSession(page, "tenant-e2e");
+    await navigateApp(page, "/admin");
+    await expect(page).toHaveURL(/\/admin$/);
 
     await page.waitForTimeout(700);
     await page.mouse.move(25, 25);
     await page.waitForTimeout(700);
-    await expect(page).toHaveURL(/\/tenant\/admin$/);
-    await expect(page).toHaveURL(/\/tenant\/checkout$/, { timeout: 2_000 });
+    await expect(page).toHaveURL(/\/admin$/);
+    await expect(page).toHaveURL(/\/checkout$/, { timeout: 2_000 });
   });
 
-  test("tenant admin dev hosts disable idle logout behavior", async ({ page }) => {
+  test("Workspace Admin dev hosts disable idle logout behavior", async ({ page }) => {
     await page.route(/\/functions(?:\/v1)?\/admin-ops(?:\?.*)?$/, async (route) => {
       await route.fulfill({
         status: 200,
@@ -1362,13 +1348,13 @@ test.describe("Auth edge cases", () => {
     });
 
     await page.goto("/");
-    await setTenantAdminSession(page, "tenant-e2e");
+    await setWorkspaceAdminSession(page, "tenant-e2e");
     await page.evaluate(() => {
-      window.history.replaceState({}, "", "/tenant/admin");
+      window.history.replaceState({}, "", "/admin");
     });
     await page.reload();
-    await expect(page).toHaveURL(/\/tenant\/admin$/);
+    await expect(page).toHaveURL(/\/admin$/);
     await page.waitForTimeout(3500);
-    await expect(page).toHaveURL(/\/tenant\/admin$/);
+    await expect(page).toHaveURL(/\/admin$/);
   });
 });

@@ -4,31 +4,20 @@ import "./styles/base.css";
 import "./styles/app-shell.css";
 import App from "./App.vue";
 import router from "./router";
-import {
-  clearAuthState,
-  getAuthState,
-  markAdminVerified,
-} from "./store/authState";
-import { getDistrictState } from "./store/districtState";
-import {
-  hasDistrictSessionHandoff,
-  refreshPublicAuthFromSession,
-} from "./services/publicAuthBootstrap";
+import { clearAuthState, getAuthState } from "./store/authState";
+import { getWorkspaceState } from "./store/workspaceState";
+import { refreshPublicAuthFromSession, scrubLegacyAuthFragment } from "./services/publicAuthBootstrap";
 import { TimeoutError, withTimeout } from "./services/asyncUtils";
 import {
   captureInitialPerfMetrics,
   markRouteNavigationEnd,
   markRouteNavigationStart,
 } from "./services/perfTelemetry";
-import { initializeDistrictContext } from "./services/districtService";
-import { rotateDeviceSession } from "./utils/deviceSession";
+import { initializeWorkspaceContext } from "./services/workspaceService";
 import { routeRecoveryLinksToResetPassword } from "./utils/passwordResetRedirect";
 import { finishRouteLoading, startRouteLoading } from "./store/routeLoading";
 import { installAppErrorRecovery } from "./services/appErrorRecovery";
-import {
-  isAdminBootstrapRoute,
-  isPublicBootstrapRoute,
-} from "./bootstrap/routeBootstrap";
+import { isPublicBootstrapRoute } from "./bootstrap/routeBootstrap";
 import { createClientMonitoring } from "./bootstrap/clientMonitoring";
 
 const redirectCanonicalHost = () => {
@@ -41,18 +30,6 @@ const redirectCanonicalHost = () => {
   target.hostname = "itemtraxx.com";
   window.location.replace(target.toString());
   return true;
-};
-
-const toAdminSessionLoginLocation = (value: string | null | undefined) => {
-  if (value === "regular_login" || value === "tenant_login") return "regular_login";
-  if (
-    value === "admin_login" ||
-    value === "tenant_admin_login" ||
-    value === "district_admin_login"
-  ) {
-    return "admin_login";
-  }
-  return null;
 };
 
 const initializeAuth = async () => {
@@ -151,27 +128,17 @@ const mountApp = async () => {
 };
 
 const bootstrap = async () => {
+  scrubLegacyAuthFragment();
   routeRecoveryLinksToResetPassword();
   if (redirectCanonicalHost()) {
     return;
   }
-  const consumedDistrictHandoff = hasDistrictSessionHandoff()
-    ? await (async () => {
-        const { consumeDistrictSessionHandoff } = await import("./services/authService");
-        return consumeDistrictSessionHandoff();
-      })()
-    : false;
-  await initializeDistrictContext();
-  const districtContext = getDistrictState();
+  await initializeWorkspaceContext();
+  const workspaceContext = getWorkspaceState();
   const isE2ETestMode = import.meta.env.VITE_E2E_TEST_UTILS === "true";
-  const shouldPreloadAdminSession =
-    consumedDistrictHandoff &&
-    isAdminBootstrapRoute(router, window.location.pathname);
   const canMountPublicBootstrap =
-    isPublicBootstrapRoute(router, window.location.pathname) && !districtContext.isDistrictHost;
+    isPublicBootstrapRoute(router, window.location.pathname) && !workspaceContext.isWorkspaceHost;
   const canMountFirst =
-    !consumedDistrictHandoff &&
-    !shouldPreloadAdminSession &&
     (isE2ETestMode || canMountPublicBootstrap);
   if (canMountFirst) {
     // Avoid flashing the temporary logout screen during normal public-route bootstrap.
@@ -182,60 +149,7 @@ const bootstrap = async () => {
     void (canMountPublicBootstrap ? initializePublicAuth() : initializeAuth());
     return;
   }
-  if (
-    consumedDistrictHandoff &&
-    isAdminBootstrapRoute(router, window.location.pathname)
-  ) {
-    try {
-      const { adminLoginWithSession } = await import("./services/authService");
-      const session = await adminLoginWithSession(
-        consumedDistrictHandoff.accessToken,
-        consumedDistrictHandoff.refreshToken,
-        {
-          loginMethod: consumedDistrictHandoff.loginMethod,
-          loginLocation: consumedDistrictHandoff.loginLocation,
-          skipExchange: true,
-          skipLoginNotification: true,
-          preExchangedSessionSummary: consumedDistrictHandoff.sessionSummary,
-        }
-      );
-      if (session.role === "tenant_admin") {
-        try {
-          const { touchTenantAdminSession } = await import("./services/adminOpsService");
-          await touchTenantAdminSession({
-            loginMethod: consumedDistrictHandoff.loginMethod,
-            loginLocation: toAdminSessionLoginLocation(consumedDistrictHandoff.loginLocation),
-          });
-        } catch {
-          // Best-effort session registration after district handoff.
-        }
-      }
-    } catch {
-      await initializeAuth();
-    }
-  } else {
-    await initializeAuth();
-  }
-  if (
-    consumedDistrictHandoff &&
-    !isAdminBootstrapRoute(router, window.location.pathname)
-  ) {
-    if (getAuthState().role === "tenant_admin" || getAuthState().role === "district_admin") {
-      markAdminVerified();
-    }
-    if (getAuthState().role === "tenant_admin") {
-      rotateDeviceSession();
-      try {
-        const { touchTenantAdminSession } = await import("./services/adminOpsService");
-        await touchTenantAdminSession({
-          loginMethod: consumedDistrictHandoff.loginMethod,
-          loginLocation: toAdminSessionLoginLocation(consumedDistrictHandoff.loginLocation),
-        });
-      } catch {
-        // Best-effort session registration after district handoff.
-      }
-    }
-  }
+  await initializeAuth();
   await mountApp();
 };
 

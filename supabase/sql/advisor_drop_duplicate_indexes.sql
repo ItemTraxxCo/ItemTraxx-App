@@ -8,8 +8,8 @@
 -- (slug) — duplicates unique districts_slug_key
 drop index concurrently if exists public.idx_districts_slug;
 
--- (tenant_id, barcode) — duplicates unique gear_unique_barcode_per_tenant
-drop index concurrently if exists public.idx_gear_tenant_barcode;
+-- (tenant_id, barcode) — duplicates unique item_unique_barcode_per_tenant
+drop index concurrently if exists public.idx_item_tenant_barcode;
 
 -- (tenant_id) — duplicates tenant_policies_pkey
 drop index concurrently if exists public.idx_tenant_policies_tenant;

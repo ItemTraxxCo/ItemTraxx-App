@@ -1,8 +1,8 @@
 type TransactionReceipt = {
   timestamp: string;
-  studentUsername: string;
-  studentId: string;
-  tenantId: string | null;
+  borrowerUsername: string;
+  borrowerId: string;
+  workspaceId: string | null;
   operatorEmail: string;
   checkouts: number;
   returns: number;
@@ -71,10 +71,10 @@ export const downloadTransactionReceiptPdf = async (receipt: TransactionReceipt)
   y += logoAsset ? 38 : 26;
   doc.setFontSize(11);
   row("Time", new Date(receipt.timestamp).toLocaleString());
-  row("Borrower", receipt.studentUsername);
-  row("Borrower ID", receipt.studentId);
+  row("Borrower", receipt.borrowerUsername);
+  row("Borrower ID", receipt.borrowerId);
   row("Tenant", receipt.operatorEmail);
-  row("Tenant ID", receipt.tenantId ?? "Unknown. Please contact support to resolve this.");
+  row("Tenant ID", receipt.workspaceId ?? "Unknown. Please contact support to resolve this.");
   row("Checkout(s)", String(receipt.checkouts));
   row("Return(s)", String(receipt.returns));
 

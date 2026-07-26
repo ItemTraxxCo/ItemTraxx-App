@@ -1,7 +1,8 @@
 import { createRouter, createWebHistory } from "vue-router";
 import type { RouteRecordRaw } from "vue-router";
 import { getAuthState } from "../store/authState";
-import { getDistrictState } from "../store/districtState";
+import { getWorkspaceState } from "../store/workspaceState";
+import { buildWorkspaceAppUrl, lookupWorkspaceById } from "../services/workspaceService";
 
 const ADMIN_VERIFICATION_TTL_MS = 15 * 60 * 1000;
 const SUPER_VERIFICATION_TTL_MS = 15 * 60 * 1000;
@@ -212,192 +213,157 @@ const routes: RouteRecordRaw[] = [
     meta: { public: true, title: "Accessibility | ItemTraxx" },
   },
   {
-    path: "/tenant",
-    name: "tenant-home",
-    redirect: "/tenant/checkout",
-    meta: { requiresSession: true, requiresTenant: true, title: "Tenant | ItemTraxx" },
+    path: "/checkout",
+    name: "workspace-checkout",
+    component: () => import("../pages/workspace/Checkout.vue"),
+    meta: { requiresSession: true, requiresWorkspace: true, title: "Checkout | ItemTraxx" },
   },
   {
-    path: "/tenant/checkout",
-    name: "tenant-checkout",
-    component: () => import("../pages/tenant/Checkout.vue"),
-    meta: { requiresSession: true, requiresTenant: true, title: "Checkout | ItemTraxx" },
-  },
-  {
-    path: "/tenant/admin-login",
-    name: "tenant-admin-login",
-    component: () => import("../pages/tenant/admin/AdminLogin.vue"),
+    path: "/admin/login",
+    name: "workspace-admin-login",
+    component: () => import("../pages/workspace/admin/AdminLogin.vue"),
     meta: { public: true, title: "Admin | ItemTraxx" },
   },
   {
-    path: "/tenant/admin",
-    name: "tenant-admin-home",
-    component: () => import("../pages/tenant/admin/AdminHome.vue"),
+    path: "/admin",
+    name: "workspace-admin-home",
+    component: () => import("../pages/workspace/admin/AdminHome.vue"),
     meta: {
       requiresSession: true,
-      requiresTenant: true,
-      requiresRole: "tenant_admin",
-      requiresTenantMatch: true,
+      requiresWorkspace: true,
+      requiresRole: "workspace_admin",
+      requiresWorkspaceMatch: true,
     
       title: "Admin | ItemTraxx",
     },
   },
+  { path: "/items", name: "workspace-items", component: () => import("../pages/workspace/Items.vue"), meta: { requiresSession: true, requiresWorkspace: true, requiresRole: "tenant_account", title: "Items | ItemTraxx" } },
+  { path: "/borrowers", name: "workspace-borrowers", component: () => import("../pages/workspace/Borrowers.vue"), meta: { requiresSession: true, requiresWorkspace: true, requiresRole: "tenant_account", title: "Borrowers | ItemTraxx" } },
+  { path: "/settings", name: "workspace-settings", component: () => import("../pages/workspace/Settings.vue"), meta: { requiresSession: true, requiresWorkspace: true, requiresRole: "tenant_account", title: "Settings | ItemTraxx" } },
   {
-    path: "/district",
-    name: "district-admin-home",
-    component: () => import("../pages/district/DistrictAdminHome.vue"),
-    meta: {
-      requiresSession: true,
-      requiresRole: "district_admin",
-    
-      title: "District Admin | ItemTraxx",
-    },
+    path: "/admin/students",
+    redirect: "/admin/borrowers",
   },
   {
-    path: "/tenant/admin/students",
-    redirect: "/tenant/admin/borrowers",
-  },
-  {
-    path: "/tenant/admin/borrowers",
-    name: "tenant-admin-students",
-    component: () => import("../pages/tenant/admin/Students.vue"),
+    path: "/admin/borrowers",
+    name: "workspace-admin-borrowers",
+    component: () => import("../pages/workspace/admin/Borrowers.vue"),
     meta: {
       requiresSession: true,
-      requiresTenant: true,
-      requiresRole: "tenant_admin",
-      requiresTenantMatch: true,
+      requiresWorkspace: true,
+      requiresRole: "workspace_admin",
+      requiresWorkspaceMatch: true,
     
       title: "Borrower Management | ItemTraxx",
     },
   },
   {
-    path: "/tenant/admin/gear",
-    name: "tenant-admin-gear",
-    component: () => import("../pages/tenant/admin/Gear.vue"),
+    path: "/admin/gear",
+    redirect: "/admin/items",
+  },
+  {
+    path: "/admin/items",
+    name: "workspace-admin-items",
+    component: () => import("../pages/workspace/admin/Items.vue"),
     meta: {
       requiresSession: true,
-      requiresTenant: true,
-      requiresRole: "tenant_admin",
-      requiresTenantMatch: true,
+      requiresWorkspace: true,
+      requiresRole: "workspace_admin",
+      requiresWorkspaceMatch: true,
     
-      title: "Admin Gear | ItemTraxx",
+      title: "Admin Item | ItemTraxx",
     },
   },
   {
-    path: "/tenant/admin/logs",
-    name: "tenant-admin-logs",
-    component: () => import("../pages/tenant/admin/Logs.vue"),
+    path: "/admin/logs",
+    name: "workspace-admin-logs",
+    component: () => import("../pages/workspace/admin/Logs.vue"),
     meta: {
       requiresSession: true,
-      requiresTenant: true,
-      requiresRole: "tenant_admin",
-      requiresTenantMatch: true,
+      requiresWorkspace: true,
+      requiresRole: "workspace_admin",
+      requiresWorkspaceMatch: true,
     
       title: "Admin Logs | ItemTraxx",
     },
   },
   {
-    path: "/tenant/admin/return",
-    name: "tenant-admin-return",
-    component: () => import("../pages/tenant/admin/QuickReturn.vue"),
+    path: "/admin/return",
+    name: "workspace-admin-return",
+    component: () => import("../pages/workspace/admin/QuickReturn.vue"),
     meta: {
       requiresSession: true,
-      requiresTenant: true,
-      requiresRole: "tenant_admin",
-      requiresTenantMatch: true,
+      requiresWorkspace: true,
+      requiresRole: "workspace_admin",
+      requiresWorkspaceMatch: true,
     
       title: "Quick Return | ItemTraxx",
     },
   },
   {
-    path: "/tenant/admin/stats",
-    name: "tenant-admin-stats",
-    component: () => import("../pages/tenant/admin/UsageStats.vue"),
+    path: "/admin/item-status",
+    name: "workspace-admin-item-status",
+    component: () => import("../pages/workspace/admin/ItemStatusTracking.vue"),
     meta: {
       requiresSession: true,
-      requiresTenant: true,
-      requiresRole: "tenant_admin",
-      requiresTenantMatch: true,
-    
-      title: "Usage Stats | ItemTraxx",
-    },
-  },
-  {
-    path: "/tenant/admin/audit-logs",
-    name: "tenant-admin-audit-logs",
-    component: () => import("../pages/tenant/admin/AdminAuditLogs.vue"),
-    meta: {
-      requiresSession: true,
-      requiresTenant: true,
-      requiresRole: "tenant_admin",
-      requiresTenantMatch: true,
-    
-      title: "Audit Logs | ItemTraxx",
-    },
-  },
-  {
-    path: "/tenant/admin/item-status",
-    name: "tenant-admin-item-status",
-    component: () => import("../pages/tenant/admin/ItemStatusTracking.vue"),
-    meta: {
-      requiresSession: true,
-      requiresTenant: true,
-      requiresRole: "tenant_admin",
-      requiresTenantMatch: true,
+      requiresWorkspace: true,
+      requiresRole: "workspace_admin",
+      requiresWorkspaceMatch: true,
     
       title: "Item Status | ItemTraxx",
     },
   },
   {
-    path: "/tenant/admin/barcodes",
-    name: "tenant-admin-barcodes",
-    component: () => import("../pages/tenant/admin/BarcodeGenerator.vue"),
+    path: "/admin/barcodes",
+    name: "workspace-admin-barcodes",
+    component: () => import("../pages/workspace/admin/BarcodeGenerator.vue"),
     meta: {
       requiresSession: true,
-      requiresTenant: true,
-      requiresRole: "tenant_admin",
-      requiresTenantMatch: true,
+      requiresWorkspace: true,
+      requiresRole: "workspace_admin",
+      requiresWorkspaceMatch: true,
     
       title: "Barcode Generator | ItemTraxx",
     },
   },
   {
-    path: "/tenant/admin/settings",
-    name: "tenant-admin-settings",
-    component: () => import("../pages/tenant/admin/Settings.vue"),
+    path: "/admin/settings",
+    name: "workspace-admin-settings",
+    component: () => import("../pages/workspace/admin/Settings.vue"),
     meta: {
       requiresSession: true,
-      requiresTenant: true,
-      requiresRole: "tenant_admin",
-      requiresTenantMatch: true,
+      requiresWorkspace: true,
+      requiresRole: "workspace_admin",
+      requiresWorkspaceMatch: true,
     
       title: "Admin Settings | ItemTraxx",
     },
   },
   {
-    path: "/tenant/admin/admins",
-    name: "tenant-admin-admins",
-    component: () => import("../pages/tenant/admin/Admins.vue"),
+    path: "/admin/admins",
+    name: "workspace-admin-admins",
+    component: () => import("../pages/workspace/admin/Admins.vue"),
     meta: {
       requiresSession: true,
-      requiresTenant: true,
-      requiresRole: "tenant_admin",
-      requiresTenantMatch: true,
+      requiresWorkspace: true,
+      requiresRole: "workspace_admin",
+      requiresWorkspaceMatch: true,
 
       title: "Admin Access | ItemTraxx",
     },
   },
+  { path: "/admin/accounts", name: "workspace-admin-accounts", component: () => import("../pages/workspace/admin/Accounts.vue"), meta: { requiresSession: true, requiresWorkspace: true, requiresRole: "workspace_admin", requiresWorkspaceMatch: true, title: "Tenant Accounts | ItemTraxx" } },
   {
-    path: "/tenant/admin/gear-import",
-    name: "tenant-admin-gear-import",
-    component: () => import("../pages/tenant/admin/GearImport.vue"),
+    path: "/admin/item-import",
+    name: "workspace-admin-item-import",
+    component: () => import("../pages/workspace/admin/ItemImport.vue"),
     meta: {
       requiresSession: true,
-      requiresTenant: true,
-      requiresRole: "tenant_admin",
-      requiresTenantMatch: true,
+      requiresWorkspace: true,
+      requiresRole: "workspace_admin",
+      requiresWorkspaceMatch: true,
     
-      title: "Gear Import | ItemTraxx",
+      title: "Item Import | ItemTraxx",
     },
   },
 
@@ -450,39 +416,15 @@ const routes: RouteRecordRaw[] = [
     },
   },
   {
-    path: "/super-admin/tenants",
-    name: "super-admin-tenants",
-    component: () => import("../pages/super/Tenants.vue"),
+    path: "/super-admin/workspaces",
+    name: "super-admin-workspaces",
+    component: () => import("../pages/super/Workspaces.vue"),
     meta: {
       requiresSession: true,
       requiresRole: "super_admin",
       requiresSuperAuth: true,
     
-      title: "Super Admin Tenants | ItemTraxx",
-    },
-  },
-  {
-    path: "/super-admin/districts",
-    name: "super-admin-districts",
-    component: () => import("../pages/super/Districts.vue"),
-    meta: {
-      requiresSession: true,
-      requiresRole: "super_admin",
-      requiresSuperAuth: true,
-    
-      title: "Super Admin Districts | ItemTraxx",
-    },
-  },
-  {
-    path: "/super-admin/districts/:id",
-    name: "super-admin-district-detail",
-    component: () => import("../pages/super/DistrictDetail.vue"),
-    meta: {
-      requiresSession: true,
-      requiresRole: "super_admin",
-      requiresSuperAuth: true,
-    
-      title: "District Detail | ItemTraxx",
+      title: "Super Admin Workspaces | ItemTraxx",
     },
   },
   {
@@ -498,6 +440,16 @@ const routes: RouteRecordRaw[] = [
     },
   },
   {
+    path: "/super-admin/tenant-accounts",
+    name: "super-admin-tenant-accounts",
+    component: () => import("../pages/super/TenantAccounts.vue"),
+    meta: {
+      requiresSession: true,
+      requiresRole: "super_admin",
+      title: "Tenant Accounts | ItemTraxx",
+    },
+  },
+  {
     path: "/super-admin/super-admins",
     name: "super-admin-super-admins",
     component: () => import("../pages/super/SuperAdmins.vue"),
@@ -510,20 +462,24 @@ const routes: RouteRecordRaw[] = [
   },
   {
     path: "/super-admin/gear",
-    name: "super-admin-gear",
-    component: () => import("../pages/super/SuperGear.vue"),
+    redirect: "/super-admin/items",
+  },
+  {
+    path: "/super-admin/items",
+    name: "super-admin-items",
+    component: () => import("../pages/super/SuperItems.vue"),
     meta: {
       requiresSession: true,
       requiresRole: "super_admin",
       requiresSuperAuth: true,
     
-      title: "Super Admin Gear | ItemTraxx",
+      title: "Super Admin Item | ItemTraxx",
     },
   },
   {
     path: "/super-admin/borrowers",
-    name: "super-admin-students",
-    component: () => import("../pages/super/SuperStudents.vue"),
+    name: "super-admin-borrowers",
+    component: () => import("../pages/super/SuperBorrowers.vue"),
     meta: {
       requiresSession: true,
       requiresRole: "super_admin",
@@ -654,9 +610,9 @@ router.beforeEach(async (to) => {
   const meta = to.meta as {
     public?: boolean;
     requiresSession?: boolean;
-    requiresTenant?: boolean;
+    requiresWorkspace?: boolean;
     requiresRole?: string;
-    requiresTenantMatch?: boolean;
+    requiresWorkspaceMatch?: boolean;
     requiresSuperAuth?: boolean;
     title?: string;
   };
@@ -678,17 +634,31 @@ router.beforeEach(async (to) => {
     return true;
   }
 
-  const district = getDistrictState();
+  const workspace = getWorkspaceState();
   const auth = getAuthState();
 
-  if (district.isDistrictHost && to.name !== "not-found") {
-    if (!district.districtId) {
+  if (
+    workspace.isWorkspaceHost && workspace.workspaceId && auth.isInitialized &&
+    auth.isAuthenticated && auth.workspaceContextId &&
+    auth.workspaceContextId !== workspace.workspaceId
+  ) {
+    const ownWorkspace = await lookupWorkspaceById(auth.workspaceContextId);
+    if (ownWorkspace?.slug) {
+      const destination = auth.role === "workspace_admin" ? "/admin" : "/checkout";
+      window.location.replace(buildWorkspaceAppUrl(ownWorkspace.slug, destination));
+      return false;
+    }
+    return { name: "public-login", query: { reason: "workspace-mismatch" } };
+  }
+
+  if (workspace.isWorkspaceHost && to.name !== "not-found") {
+    if (!workspace.workspaceId) {
       return notFoundFor(to.path);
     }
     if (!auth.isInitialized) {
       return false;
     }
-    if (!auth.isAuthenticated || auth.districtContextId !== district.districtId) {
+    if (!meta.public && (!auth.isAuthenticated || auth.workspaceContextId !== workspace.workspaceId)) {
       return notFoundFor(to.path);
     }
   }
@@ -709,19 +679,15 @@ router.beforeEach(async (to) => {
       return { name: "super-auth" };
     }
 
-    if (auth.role === "district_admin") {
+    if (auth.role === "workspace_admin") {
       if (hasFreshAdminVerification(auth.adminVerifiedAt)) {
-        return { name: "district-admin-home" };
+        return { name: "workspace-admin-home" };
       }
-      return { name: "tenant-admin-login" };
+      return { name: "workspace-admin-login" };
     }
 
-    if (auth.role === "tenant_admin" && auth.tenantContextId) {
-      return { name: "tenant-checkout" };
-    }
-
-    if (auth.role === "tenant_user" && auth.tenantContextId) {
-      return { name: "tenant-checkout" };
+    if (auth.role === "tenant_account" && auth.workspaceContextId) {
+      return { name: "workspace-checkout" };
     }
   }
 
@@ -735,11 +701,11 @@ router.beforeEach(async (to) => {
     return { name: "public-home" };
   }
 
-  if (meta?.requiresTenant && !auth.tenantContextId) {
+  if (meta?.requiresWorkspace && !auth.workspaceContextId) {
     return { name: "public-home" };
   }
 
-  if (district.isDistrictHost && meta?.requiresSession && !district.districtId) {
+  if (workspace.isWorkspaceHost && meta?.requiresSession && !workspace.workspaceId) {
     return notFoundFor(to.path);
   }
 
@@ -748,33 +714,26 @@ router.beforeEach(async (to) => {
   }
 
   if (
-    meta?.requiresRole === "tenant_admin" &&
+    meta?.requiresRole === "workspace_admin" &&
     !hasFreshAdminVerification(auth.adminVerifiedAt)
   ) {
-    return { name: "tenant-admin-login" };
+    return { name: "workspace-admin-login" };
   }
 
   if (
-    meta?.requiresRole === "district_admin" &&
-    !hasFreshAdminVerification(auth.adminVerifiedAt)
-  ) {
-    return { name: "tenant-admin-login" };
-  }
-
-  if (
-    meta?.requiresTenantMatch &&
-    auth.sessionTenantId &&
-    auth.tenantContextId &&
-    auth.sessionTenantId !== auth.tenantContextId
+    meta?.requiresWorkspaceMatch &&
+    auth.sessionWorkspaceId &&
+    auth.workspaceContextId &&
+    auth.sessionWorkspaceId !== auth.workspaceContextId
   ) {
     return { name: "public-home" };
   }
 
   if (
-    district.isDistrictHost &&
-    district.districtId &&
+    workspace.isWorkspaceHost &&
+    workspace.workspaceId &&
     auth.isAuthenticated &&
-    auth.districtContextId !== district.districtId
+    auth.workspaceContextId !== workspace.workspaceId
   ) {
     return notFoundFor(to.path);
   }

@@ -25,8 +25,12 @@
             type="password"
             placeholder="Enter new password"
             autocomplete="new-password"
+            aria-describedby="new-password-requirements"
           />
         </label>
+        <small id="new-password-requirements" class="password-hint">
+          Use at least 12 characters with lowercase, uppercase, a number, and a symbol.
+        </small>
         <label>
           Confirm Password
           <input
@@ -76,6 +80,33 @@ const hasRecoveryLinkContext = () => {
   return queryParams.get("type") === "recovery" || hashParams.get("type") === "recovery";
 };
 
+const passwordPolicyMessage =
+  "Password must be at least 12 characters and include lowercase, uppercase, a number, and a symbol.";
+
+const meetsPasswordPolicy = (value: string) =>
+  value.length >= 12 &&
+  /[a-z]/.test(value) &&
+  /[A-Z]/.test(value) &&
+  /[0-9]/.test(value) &&
+  /[^A-Za-z0-9]/.test(value);
+
+const passwordUpdateErrorMessage = (cause: unknown) => {
+  if (!cause || typeof cause !== "object") {
+    return "Unable to update password. Please try again. If the issue persists, contact support.";
+  }
+  const authError = cause as { code?: unknown; name?: unknown };
+  if (authError.code === "weak_password" || authError.name === "AuthWeakPasswordError") {
+    return passwordPolicyMessage;
+  }
+  if (authError.code === "same_password") {
+    return "New password must be different from your current password.";
+  }
+  if (["bad_jwt", "session_not_found", "otp_expired"].includes(String(authError.code))) {
+    return "Invalid or expired reset link. Request a new reset email.";
+  }
+  return "Unable to update password. Please try again. If the issue persists, contact support.";
+};
+
 const showBlockedState = computed(
   () => hasCheckedRecoverySession.value && !isReady.value && !success.value
 );
@@ -112,8 +143,8 @@ const handleReset = async () => {
     error.value = "Invalid or expired reset link. Request a new reset email.";
     return;
   }
-  if (newPassword.value.length < 8) {
-    error.value = "Password must be at least 8 characters.";
+  if (!meetsPasswordPolicy(newPassword.value)) {
+    error.value = passwordPolicyMessage;
     return;
   }
   if (newPassword.value !== confirmPassword.value) {
@@ -127,7 +158,7 @@ const handleReset = async () => {
       password: newPassword.value,
     });
     if (updateError) {
-      error.value = "Unable to update password. Request a new reset link and try again. If the issue persists, contact support.";
+      error.value = passwordUpdateErrorMessage(updateError);
       return;
     }
     success.value = true;
@@ -222,6 +253,13 @@ onUnmounted(() => {
   border-color: var(--reset-border);
   background: var(--reset-input-bg);
   color: var(--reset-text);
+}
+
+.password-hint {
+  display: block;
+  margin-top: 0.45rem;
+  color: var(--reset-muted);
+  font-weight: 400;
 }
 
 .reset-form .button-primary {

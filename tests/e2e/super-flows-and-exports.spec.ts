@@ -2,10 +2,10 @@ import { expect, test, type Page } from "@playwright/test";
 import {
   mockSuperAdminMutate,
   mockSuperDashboard,
-  mockSuperGearMutate,
+  mockSuperItemMutate,
   mockSuperLogsQuery,
-  mockSuperStudentMutate,
-  mockSuperTenantMutate,
+  mockSuperBorrowerMutate,
+  mockSuperWorkspaceMutate,
   mockSystemStatus,
   mockUnauthenticatedSession,
   navigateApp,
@@ -56,10 +56,10 @@ test.describe("Super admin flows and export actions", () => {
     await mockSystemStatus(page);
     await mockUnauthenticatedSession(page);
     await mockSuperDashboard(page);
-    await mockSuperTenantMutate(page);
+    await mockSuperWorkspaceMutate(page);
     await mockSuperAdminMutate(page);
-    await mockSuperGearMutate(page);
-    await mockSuperStudentMutate(page);
+    await mockSuperItemMutate(page);
+    await mockSuperBorrowerMutate(page);
     await mockSuperLogsQuery(page);
   });
 
@@ -67,16 +67,18 @@ test.describe("Super admin flows and export actions", () => {
     await page.goto("/");
     await setSuperAdminSession(page);
 
-    await navigateApp(page, "/super-admin/tenants");
-    await expect(page.getByRole("heading", { name: "Tenant Management" })).toBeVisible();
+    await navigateApp(page, "/super-admin/workspaces");
+    await expect(page.getByRole("heading", { name: "Workspaces", exact: true })).toBeVisible();
+    await expect(page.getByLabel("Account category").first()).toBeVisible();
+    await expect(page.getByLabel("Checkout due limit (hours)").first()).toBeVisible();
+    await expect(page.getByLabel("Billing status").first()).toBeVisible();
+    await expect(page.getByRole("group", { name: "Feature flags" }).first()).toBeVisible();
 
     await navigateApp(page, "/super-admin/admins");
-    await expect(page.getByRole("heading", { name: "Admin Management" })).toBeVisible();
-    await expect(
-      page.getByText("Manage tenant and district/organization admins from one place, with scope-aware filters and actions."),
-    ).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Workspace Admins" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Create Workspace Admin" })).toBeVisible();
 
-    await navigateApp(page, "/super-admin/gear");
+    await navigateApp(page, "/super-admin/items");
     await expect(page.getByRole("button", { name: "Export CSV" })).toBeVisible();
     await expect(page.getByRole("button", { name: "Export PDF" })).toBeVisible();
 
@@ -121,14 +123,14 @@ test.describe("Super admin flows and export actions", () => {
         threshold: 5,
         is_enabled: true,
       });
-      await controlCenter.forceTenantReauth({ tenant_id: "tenant-e2e" });
-      await controlCenter.setTenantPolicy({
-        tenant_id: "tenant-e2e",
+      await controlCenter.forceWorkspaceReauth({ workspace_id: "tenant-e2e" });
+      await controlCenter.setWorkspacePolicy({
+        workspace_id: "tenant-e2e",
         checkout_due_hours: 48,
         feature_flags: {
           enable_notifications: true,
           enable_bulk_item_import: false,
-          enable_bulk_student_tools: true,
+          enable_bulk_borrower_tools: true,
           enable_status_tracking: false,
           enable_barcode_generator: true,
         },
@@ -155,16 +157,16 @@ test.describe("Super admin flows and export actions", () => {
           is_enabled: true,
         },
       },
-      { action: "set_tenant_force_reauth", payload: { tenant_id: "tenant-e2e" } },
+      { action: "set_workspace_force_reauth", payload: { workspace_id: "tenant-e2e" } },
       {
-        action: "set_tenant_policy",
+        action: "set_workspace_policy",
         payload: {
-          tenant_id: "tenant-e2e",
+          workspace_id: "tenant-e2e",
           checkout_due_hours: 48,
           feature_flags: {
             enable_notifications: true,
             enable_bulk_item_import: false,
-            enable_bulk_student_tools: true,
+            enable_bulk_borrower_tools: true,
             enable_status_tracking: false,
             enable_barcode_generator: true,
           },

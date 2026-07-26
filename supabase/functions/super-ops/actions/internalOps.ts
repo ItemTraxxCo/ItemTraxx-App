@@ -22,9 +22,9 @@ export const handleInternalOpsAction = async (
       customerLeadRowsResult,
     ] = await Promise.all([
       adminClient
-        .from("gear_logs")
+        .from("item_logs")
         .select(
-          "tenant_id, gear_id, checked_out_by, action_type, action_time",
+          "workspace_id, item_id, checked_out_by, action_type, action_time",
         )
         .in("action_type", ["checkout", "return"])
         .gte("action_time", since24hIso)
@@ -87,7 +87,7 @@ export const handleInternalOpsAction = async (
     const return15m = logs15m.filter((row) =>
       row.action_type === "return"
     ).length;
-    const activeTenants15m = new Set(logs15m.map((row) => row.tenant_id)).size;
+    const activeTenants15m = new Set(logs15m.map((row) => row.workspace_id)).size;
 
     const queueRows = queueRowsResult.data ?? [];
     const queueTotal = queueRows.length;
@@ -148,21 +148,21 @@ export const handleInternalOpsAction = async (
       invoice_paid: leads.filter((row) => row.stage === "invoice_paid").length,
     };
 
-    const tenantIds = Array.from(
+    const workspaceIds = Array.from(
       new Set(
-        recentLogs.map((row) => row.tenant_id).filter((
+        recentLogs.map((row) => row.workspace_id).filter((
           value,
         ): value is string => !!value),
       ),
     );
-    const gearIds = Array.from(
+    const itemIds = Array.from(
       new Set(
-        recentLogs.map((row) => row.gear_id).filter((
+        recentLogs.map((row) => row.item_id).filter((
           value,
         ): value is string => !!value),
       ),
     );
-    const studentIds = Array.from(
+    const borrowerIds = Array.from(
       new Set(
         recentLogs.map((row) => row.checked_out_by).filter((
           value,
@@ -171,78 +171,78 @@ export const handleInternalOpsAction = async (
     );
 
     const [
-      tenantRowsResult,
-      gearRowsResult,
-      studentRowsResult,
-      allTenantsResult,
+      workspaceRowsResult,
+      itemRowsResult,
+      borrowerRowsResult,
+      allWorkspacesResult,
     ] = await Promise.all([
-      tenantIds.length
-        ? adminClient.from("tenants").select("id, name").in("id", tenantIds)
+      workspaceIds.length
+        ? adminClient.from("workspaces").select("id, name").in("id", workspaceIds)
         : Promise.resolve({ data: [], error: null }),
-      gearIds.length
-        ? adminClient.from("gear").select("id, name, barcode").in(
+      itemIds.length
+        ? adminClient.from("items").select("id, name, barcode").in(
           "id",
-          gearIds,
+          itemIds,
         )
         : Promise.resolve({ data: [], error: null }),
-      studentIds.length
-        ? adminClient.from("students").select("id, username, student_id").in(
+      borrowerIds.length
+        ? adminClient.from("borrowers").select("id, username, borrower_id").in(
           "id",
-          studentIds,
+          borrowerIds,
         )
         : Promise.resolve({ data: [], error: null }),
       adminClient
-        .from("tenants")
+        .from("workspaces")
         .select("id, name, status")
         .order("name", { ascending: true })
         .limit(300),
     ]);
 
-    const tenantMap = new Map(
-      (tenantRowsResult.data ?? []).map((
+    const workspaceMap = new Map(
+      (workspaceRowsResult.data ?? []).map((
         tenant,
       ) => [tenant.id as string, tenant.name as string]),
     );
-    const gearMap = new Map(
-      (gearRowsResult.data ?? []).map((gear) => [
-        gear.id as string,
+    const itemMap = new Map(
+      (itemRowsResult.data ?? []).map((item) => [
+        item.id as string,
         {
-          name: gear.name as string | null,
-          barcode: gear.barcode as string | null,
+          name: item.name as string | null,
+          barcode: item.barcode as string | null,
         },
       ]),
     );
-    const studentMap = new Map(
-      (studentRowsResult.data ?? []).map((student) => [
-        student.id as string,
+    const borrowerMap = new Map(
+      (borrowerRowsResult.data ?? []).map((borrower) => [
+        borrower.id as string,
         {
-          username: student.username as string | null,
-          student_id: student.student_id as string | null,
+          username: borrower.username as string | null,
+          borrower_id: borrower.borrower_id as string | null,
         },
       ]),
     );
-    const allTenants = (allTenantsResult.data ?? []) as Array<{
+    const allWorkspaces = (allWorkspacesResult.data ?? []) as Array<{
       id: string;
       name: string;
       status: string | null;
     }>;
 
     const recentEvents = recentLogs.slice(0, 40).map((row) => {
-      const gear = row.gear_id ? gearMap.get(row.gear_id) : null;
-      const student = row.checked_out_by
-        ? studentMap.get(row.checked_out_by)
+      const item = row.item_id ? itemMap.get(row.item_id) : null;
+      const borrower = row.checked_out_by
+        ? borrowerMap.get(row.checked_out_by)
         : null;
       return {
-        tenant_id: row.tenant_id,
-        tenant_name: row.tenant_id
-          ? tenantMap.get(row.tenant_id) ?? "Unknown tenant"
-          : "Unknown tenant",
+        workspace_id: row.workspace_id,
+        workspace_name: row.workspace_id
+          ? workspaceMap.get(row.workspace_id) ?? "Unknown workspace"
+          : "Unknown workspace",
         action_type: row.action_type,
         action_time: row.action_time,
-        gear_name: gear?.name ?? null,
-        gear_barcode: gear?.barcode ?? null,
-        student_username: student?.username ?? null,
-        student_id: student?.student_id ?? null,
+        item_name: item?.name ?? null,
+        item_barcode: item?.barcode ?? null,
+        borrower_username: borrower?.username ?? null,
+        borrower_id: borrower?.borrower_id ?? null,
       };
     });
 
@@ -416,11 +416,11 @@ export const handleInternalOpsAction = async (
         type: "page",
         route: "/super-admin/customers",
       },
-      ...allTenants.slice(0, 40).map((tenant) => ({
+      ...allWorkspaces.slice(0, 40).map((tenant) => ({
         id: `tenant_${tenant.id}`,
         label: tenant.name,
-        type: "tenant",
-        route: "/super-admin/tenants",
+        type: "workspace",
+        route: "/super-admin/workspaces",
       })),
     ];
 
@@ -434,7 +434,7 @@ export const handleInternalOpsAction = async (
         traffic: {
           checkout_15m: checkout15m,
           return_15m: return15m,
-          active_tenants_15m: activeTenants15m,
+          active_workspaces_15m: activeTenants15m,
           events_24h: recentLogs.length,
         },
         queue: queueSummary,

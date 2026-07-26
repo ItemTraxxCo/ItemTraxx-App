@@ -6,7 +6,7 @@ import {
   mockSystemStatus,
   mockUnauthenticatedSession,
   setSuperAdminSession,
-  setTenantAdminSession,
+  setWorkspaceAdminSession,
 } from "./helpers/testHarness";
 
 test.describe("Protected route smoke tests", () => {
@@ -17,25 +17,25 @@ test.describe("Protected route smoke tests", () => {
     await mockSuperDashboard(page);
   });
 
-  test("tenant admin can reach admin home and status tracking", async ({ page }) => {
+  test("Workspace Admin can reach admin home and status tracking", async ({ page }) => {
     await page.goto("/");
-    await setTenantAdminSession(page);
+    await setWorkspaceAdminSession(page);
 
-    await navigateApp(page, "/tenant/admin");
+    await navigateApp(page, "/admin");
     await expect(page.getByRole("heading", { name: "Admin Panel", exact: true })).toBeVisible();
     await expect(page.getByRole("link", { name: "Item Status Tracking" })).toBeVisible();
 
-    await navigateApp(page, "/tenant/admin/item-status");
+    await navigateApp(page, "/admin/item-status");
     await expect(page.getByRole("heading", { name: "Item Status Tracking" })).toBeVisible();
   });
 
   test("offline queue badge follows real queue storage transitions", async ({ page }) => {
     await page.goto("/");
     await page.evaluate(() => {
-      localStorage.setItem("itemtraxx:onboarding:v1:tenant_admin", new Date().toISOString());
+      localStorage.setItem("itemtraxx:onboarding:v1:workspace_admin", new Date().toISOString());
     });
-    await setTenantAdminSession(page);
-    await navigateApp(page, "/tenant/checkout");
+    await setWorkspaceAdminSession(page);
+    await navigateApp(page, "/checkout");
 
     await page.getByRole("button", { name: "Open menu" }).click();
     await expect(page.getByRole("menuitem", { name: "Open Admin Panel" })).toBeVisible();
@@ -47,8 +47,8 @@ test.describe("Protected route smoke tests", () => {
 
     await page.evaluate(async () => {
       await window.__itemtraxxTest?.offlineCheckoutQueue.queue({
-        student_id: "student-shell-e2e",
-        gear_barcodes: ["GEAR-SHELL-E2E"],
+        borrower_id: "borrower-shell-e2e",
+        item_barcodes: ["ITEM-SHELL-E2E"],
         action_type: "checkout",
         operation_id: "operation-shell-e2e",
       });
@@ -56,6 +56,9 @@ test.describe("Protected route smoke tests", () => {
         new StorageEvent("storage", { key: "itemtraxx:checkout-offline-buffer:v1" }),
       );
     });
+    if (!(await page.getByRole("menuitem", { name: "Offline Queue: 1" }).isVisible())) {
+      await page.getByRole("button", { name: "Open menu" }).click();
+    }
     await expect(page.getByRole("menuitem", { name: "Offline Queue: 1" })).toBeVisible();
 
     await page.evaluate(async () => {
@@ -64,31 +67,34 @@ test.describe("Protected route smoke tests", () => {
         new StorageEvent("storage", { key: "itemtraxx:checkout-offline-buffer:v1" }),
       );
     });
+    if (!(await page.getByRole("menuitem", { name: "Offline Queue: 0" }).isVisible())) {
+      await page.getByRole("button", { name: "Open menu" }).click();
+    }
     await expect(page.getByRole("menuitem", { name: "Offline Queue: 0" })).toBeVisible();
   });
 
   test("onboarding completion survives reload and replay reopens the tour", async ({ page }) => {
     await page.goto("/");
     await page.evaluate(() => {
-      localStorage.removeItem("itemtraxx:onboarding:v1:tenant_admin");
+      localStorage.removeItem("itemtraxx:onboarding:v1:workspace_admin");
     });
-    await setTenantAdminSession(page);
-    await navigateApp(page, "/tenant/checkout");
+    await setWorkspaceAdminSession(page);
+    await navigateApp(page, "/checkout");
 
     const dialog = page.getByRole("dialog", { name: /ItemTraxx onboarding step/ });
     await expect(dialog).toBeVisible();
     await dialog.getByRole("button", { name: "Close onboarding" }).click();
     await expect(dialog).toHaveCount(0);
     await expect.poll(() =>
-      page.evaluate(() => localStorage.getItem("itemtraxx:onboarding:v1:tenant_admin")),
+      page.evaluate(() => localStorage.getItem("itemtraxx:onboarding:v1:workspace_admin")),
     ).not.toBeNull();
 
     await page.reload();
-    await expect(page).toHaveURL(/\/tenant\/checkout$/);
+    await expect(page).toHaveURL(/\/checkout$/);
     await page.waitForFunction(
-      () => typeof window.__itemtraxxTest?.setTenantAdminSession === "function",
+      () => typeof window.__itemtraxxTest?.setWorkspaceAdminSession === "function",
     );
-    await page.evaluate(() => window.__itemtraxxTest?.setTenantAdminSession("tenant-e2e"));
+    await page.evaluate(() => window.__itemtraxxTest?.setWorkspaceAdminSession("tenant-e2e"));
     await expect(dialog).toHaveCount(0);
     await page.getByRole("button", { name: "Open menu" }).click();
     await page.getByRole("menuitem", { name: "Take tour again" }).click();
@@ -109,8 +115,8 @@ test.describe("Protected route smoke tests", () => {
       });
     });
     await page.goto("/");
-    await setTenantAdminSession(page);
-    await navigateApp(page, "/tenant/checkout");
+    await setWorkspaceAdminSession(page);
+    await navigateApp(page, "/checkout");
 
     const banner = page.getByRole("status").filter({ hasText: "Checkout latency is elevated" });
     await expect(banner).toBeVisible();
@@ -125,7 +131,7 @@ test.describe("Protected route smoke tests", () => {
     );
   });
 
-  for (const path of ["/tenant/checkout", "/district"]) {
+  for (const path of ["/checkout", "/admin"]) {
     test(`E2E first mount of protected ${path} does not use public auth bootstrap`, async ({ page }) => {
       let publicSessionRequests = 0;
       await page.route("**/auth/session/me", async (route) => {
@@ -158,20 +164,51 @@ test.describe("Protected route smoke tests", () => {
     await expect(page.getByRole("heading", { name: "Control Center" })).toBeVisible();
   });
 
-  test("tenant admin verification expires after 15 minutes", async ({ page }) => {
+  test("Workspace Admin verification expires after 15 minutes", async ({ page }) => {
     await page.goto("/");
-    await setTenantAdminSession(page);
+    await setWorkspaceAdminSession(page);
     await page.evaluate(async () => {
       const { setAuthStateFromBackend } = await import("/src/store/authState.ts");
       setAuthStateFromBackend({
-        role: "tenant_admin",
+        role: "workspace_admin",
         adminVerifiedAt: new Date(Date.now() - 15 * 60_000 - 1).toISOString(),
       });
     });
 
-    await navigateApp(page, "/tenant/admin");
+    await navigateApp(page, "/admin");
 
-    await expect(page).toHaveURL(/\/tenant\/admin-login$/);
+    await expect(page).toHaveURL(/\/admin\/login$/);
+  });
+
+  test("Workspace Admin password verification survives a workspace host bootstrap", async ({ page }) => {
+    await page.goto("/");
+    await page.evaluate(async () => {
+      const [{ applyHttpSessionSummary }, { clearAdminVerification }] = await Promise.all([
+        import("/src/services/auth/sessionBootstrap.ts"),
+        import("/src/store/authState.ts"),
+      ]);
+      clearAdminVerification();
+      await applyHttpSessionSummary({
+        authenticated: true,
+        user: {
+          id: "user-e2e-admin",
+          email: "tenant.admin@example.com",
+          last_sign_in_at: new Date().toISOString(),
+        },
+        profile: {
+          role: "workspace_admin",
+          workspace_id: "tenant-e2e",
+          auth_email: "tenant.admin@example.com",
+          is_active: true,
+        },
+        password_authenticated_at: new Date().toISOString(),
+      });
+    });
+
+    await navigateApp(page, "/admin");
+
+    await expect(page).toHaveURL(/\/admin$/);
+    await expect(page.getByRole("heading", { name: "Admin Panel", exact: true })).toBeVisible();
   });
 
   test("super-admin secondary verification expires after 15 minutes", async ({ page }) => {

@@ -128,7 +128,7 @@ const previews = [
         paragraph("We noticed a new sign-in to your ItemTraxx account.") +
         divider() +
         details([
-          ["Sign-in type", "Tenant admin sign in"],
+          ["Sign-in type", "Workspace admin sign in"],
           ["Tenant", "Demo School Equipment Room"],
           ["Platform", "Chrome on Mac"],
           ["Location", "San Jose, California"],
@@ -197,7 +197,7 @@ const previews = [
           ["Name", "Alex Rivera"],
           ["Reply email", "alex@example.com"],
           ["Category", "Account access"],
-          ["Subject", "Unable to access tenant admin"],
+          ["Subject", "Unable to access Workspace admin"],
         ]) +
         paragraph("<strong>Message</strong>") +
         callout("The admin login worked yesterday, but today it returns an access denied message."),
@@ -213,12 +213,12 @@ const previews = [
         paragraph("We received your support request and will respond as soon as possible.") +
         details([
           ["Category", "Account access"],
-          ["Subject", "Unable to access tenant admin"],
+          ["Subject", "Unable to access Workspace admin"],
         ]),
     }),
   },
   {
-    file: "district-support.html",
+    file: "workspace-support.html",
     label: "District support request",
     html: shell({
       title: "District Support Request",

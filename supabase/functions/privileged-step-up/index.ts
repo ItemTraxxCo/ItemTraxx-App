@@ -99,7 +99,7 @@ serve(async (req) => {
 
     const { data: profile, error: profileError } = await userClient
       .from("profiles")
-      .select("id, role, tenant_id, district_id, is_active")
+      .select("id, role, workspace_id, is_active, deleted_at")
       .eq("id", user.id)
       .single();
 
@@ -107,20 +107,13 @@ serve(async (req) => {
       return jsonResponse(403, { error: "Access denied" });
     }
 
-    if (profile.role !== "tenant_admin" && profile.role !== "district_admin") {
+    if (profile.role !== "workspace_admin") {
       return jsonResponse(403, { error: "Access denied" });
     }
 
     if (
-      profile.role === "tenant_admin" &&
-      (!profile.tenant_id || profile.is_active === false)
-    ) {
-      return jsonResponse(403, { error: "Access denied" });
-    }
-
-    if (
-      profile.role === "district_admin" &&
-      (!profile.district_id || profile.is_active === false)
+      profile.role === "workspace_admin" &&
+      (!profile.workspace_id || profile.is_active === false || profile.deleted_at)
     ) {
       return jsonResponse(403, { error: "Access denied" });
     }

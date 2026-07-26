@@ -150,8 +150,8 @@ test.describe("password recovery", () => {
 
     await navigateApp(page, "/reset-password?type=recovery");
     await expect(page.getByRole("button", { name: "Update Password" })).toBeEnabled();
-    await page.getByLabel("New Password", { exact: true }).fill("new-password-123");
-    await page.getByLabel("Confirm Password").fill("new-password-123");
+    await page.getByLabel("New Password", { exact: true }).fill("New-password-123!");
+    await page.getByLabel("Confirm Password").fill("New-password-123!");
     await page.getByRole("button", { name: "Update Password" }).click();
 
     await expect(page.getByText("Password successfully updated.")).toBeVisible();
@@ -164,8 +164,99 @@ test.describe("password recovery", () => {
       )
       .toEqual([
         { method: "getSession" },
-        { method: "updateUser", payload: { password: "new-password-123" } },
+        { method: "updateUser", payload: { password: "New-password-123!" } },
         { method: "signOut", payload: { scope: "local" } },
       ]);
+  });
+
+  test("reset-password explains password policy failures without blaming the recovery link", async ({
+    page,
+  }) => {
+    await openPublicShell(page);
+    await page.evaluate(async () => {
+      const { supabase } = await import("/src/services/supabaseClient.ts");
+      Object.defineProperty(supabase.auth, "getSession", {
+        configurable: true,
+        value: async () => ({
+          data: {
+            session: {
+              access_token: "recovery-access-token",
+              refresh_token: "recovery-refresh-token",
+              expires_in: 3600,
+              expires_at: Math.floor(Date.now() / 1000) + 3600,
+              token_type: "bearer",
+              user: {
+                id: "recovery-user",
+                aud: "authenticated",
+                role: "authenticated",
+                email: "person@example.com",
+                app_metadata: {},
+                user_metadata: {},
+                identities: [],
+                created_at: new Date().toISOString(),
+              },
+            },
+          },
+          error: null,
+        }),
+      });
+      Object.defineProperty(supabase.auth, "updateUser", {
+        configurable: true,
+        value: async () => ({
+          data: { user: null },
+          error: {
+            name: "AuthWeakPasswordError",
+            message: "Password should contain at least one character of each: abc, ABC, 123, symbols",
+            status: 422,
+            code: "weak_password",
+            reasons: ["characters"],
+          },
+        }),
+      });
+    });
+
+    await navigateApp(page, "/reset-password?type=recovery");
+    await page.getByLabel("New Password", { exact: true }).fill("ValidLength1!");
+    await page.getByLabel("Confirm Password").fill("ValidLength1!");
+    await page.getByRole("button", { name: "Update Password" }).click();
+
+    await expect(page.getByText(
+      "Password must be at least 12 characters and include lowercase, uppercase, a number, and a symbol.",
+    )).toBeVisible();
+    await expect(page.getByText(/Request a new reset link/)).toHaveCount(0);
+  });
+
+  test("reset-password rejects passwords that do not meet the configured policy before submission", async ({
+    page,
+  }) => {
+    await openPublicShell(page);
+    await page.evaluate(async () => {
+      const { supabase } = await import("/src/services/supabaseClient.ts");
+      const calls: unknown[] = [];
+      (window as unknown as { __passwordPolicyCalls: unknown[] }).__passwordPolicyCalls = calls;
+      Object.defineProperty(supabase.auth, "getSession", {
+        configurable: true,
+        value: async () => ({ data: { session: { access_token: "recovery-access-token" } }, error: null }),
+      });
+      Object.defineProperty(supabase.auth, "updateUser", {
+        configurable: true,
+        value: async (payload: unknown) => {
+          calls.push(payload);
+          return { data: { user: null }, error: null };
+        },
+      });
+    });
+
+    await navigateApp(page, "/reset-password?type=recovery");
+    await page.getByLabel("New Password", { exact: true }).fill("alllowercasepassword");
+    await page.getByLabel("Confirm Password").fill("alllowercasepassword");
+    await page.getByRole("button", { name: "Update Password" }).click();
+
+    await expect(page.getByText(
+      "Password must be at least 12 characters and include lowercase, uppercase, a number, and a symbol.",
+    )).toBeVisible();
+    await expect.poll(() => page.evaluate(
+      () => (window as unknown as { __passwordPolicyCalls: unknown[] }).__passwordPolicyCalls,
+    )).toEqual([]);
   });
 });

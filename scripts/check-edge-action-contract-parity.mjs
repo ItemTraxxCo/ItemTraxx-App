@@ -26,12 +26,12 @@ const endpoints = [
     responseMapName: "superOpsResponseSchemas",
   },
   {
-    name: "super-tenant-mutate",
-    registryPath: "supabase/functions/super-tenant-mutate/actions/index.ts",
-    registryName: "SUPER_TENANT_ACTIONS",
-    requestSchema: "superTenantRequest",
-    responseSchema: "superTenantResponses",
-    responseMapName: "superTenantResponseSchemas",
+    name: "super-workspace-mutate",
+    registryPath: "supabase/functions/super-workspace-mutate/index.ts",
+    registryName: "SUPER_WORKSPACE_ACTIONS",
+    requestSchema: "superWorkspaceRequest",
+    responseSchema: "superWorkspaceResponses",
+    responseMapName: "superWorkspaceResponseSchemas",
   },
 ];
 

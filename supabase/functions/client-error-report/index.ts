@@ -57,12 +57,11 @@ type ReportPayload = {
   auth?: {
     is_authenticated?: boolean;
     role?: string | null;
-    tenant_context_id?: string | null;
-    district_context_id?: string | null;
+    workspace_id?: string | null;
   };
-  district?: {
-    is_district_host?: boolean;
-    district_id?: string | null;
+  workspace?: {
+    is_workspace_host?: boolean;
+    workspace_id?: string | null;
   };
   diagnostics?: {
     console?: ConsoleEntry[];
@@ -191,8 +190,7 @@ serve(async (req) => {
     const userAgent = normalizeText(page.user_agent, 255);
     let isVerifiedAuthenticated = false;
     let authRole = "none";
-    let tenantContextId = "-";
-    let districtContextId = "-";
+    let workspaceId = "-";
     const authHeader = req.headers.get("authorization");
     if (authHeader && publishableKey) {
       const userClient = createClient(supabaseUrl, publishableKey, {
@@ -205,14 +203,13 @@ serve(async (req) => {
       if (user?.id) {
         const { data: profile } = await userClient
           .from("profiles")
-          .select("role, tenant_id, district_id")
+          .select("role, workspace_id")
           .eq("id", user.id)
           .maybeSingle();
         if (profile?.role) {
           isVerifiedAuthenticated = true;
           authRole = normalizeText(profile.role, 40) || "authenticated";
-          tenantContextId = normalizeText(profile.tenant_id, 80) || "-";
-          districtContextId = normalizeText(profile.district_id, 80) || "-";
+          workspaceId = normalizeText(profile.workspace_id, 80) || "-";
         }
       }
     }
@@ -233,14 +230,7 @@ serve(async (req) => {
         user_agent: userAgent || null,
         is_authenticated: isVerifiedAuthenticated,
         auth_role: authRole === "none" ? null : authRole,
-        tenant_context_id: tenantContextId === "-" ? null : tenantContextId,
-        district_context_id: districtContextId === "-" ? null : districtContextId,
-        is_district_host:
-          body.district !== undefined && asRecord(body.district).is_district_host === true,
-        district_id:
-          body.district !== undefined
-            ? normalizeText(asRecord(body.district).district_id, 80) || null
-            : null,
+        workspace_id: workspaceId === "-" ? null : workspaceId,
         request_id: requestId,
         client_fingerprint_hash: requestHash,
         ip_hash: ipHash,
@@ -261,8 +251,7 @@ serve(async (req) => {
       `Environment: ${environment}\n` +
       `Release: ${release}\n` +
       `Role: ${authRole}${isVerifiedAuthenticated ? "" : " (unverified)"}\n` +
-      `Tenant Context: ${tenantContextId}\n` +
-      `District Context: ${districtContextId}\n` +
+      `Workspace: ${workspaceId}\n` +
       `Request ID: ${requestId}\n` +
       `Diagnostics stored: yes`;
 

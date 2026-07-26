@@ -47,7 +47,7 @@ const getWorkspaceContextId = () => {
 export const fetchItem = async () => {
   const workspaceId = getWorkspaceContextId();
   return (await authenticatedSelect<ItemRecord[]>("items", {
-    select: "id,workspace_id,name,barcode,serial_number,status,notes",
+    select: "id,workspace_id,name,barcode,serial_number,status,notes,access_mode",
     workspace_id: `eq.${workspaceId}`,
     deleted_at: "is.null",
     order: "created_at.desc",
@@ -112,6 +112,8 @@ export const updateItem = async (payload: {
   barcode: string;
   status: string;
   notes?: string;
+  access_mode: "all" | "restricted";
+  profile_ids: string[];
 }) => {
   const { deviceId } = getOrCreateDeviceSession();
   const result = await invokeEdgeFunction<{ data: ItemRecord }>("admin-item-mutate", {
@@ -125,6 +127,8 @@ export const updateItem = async (payload: {
         barcode: payload.barcode,
         status: payload.status,
         notes: payload.notes ?? null,
+        access_mode: payload.access_mode,
+        profile_ids: payload.profile_ids,
       },
     },
   });

@@ -12,14 +12,6 @@
           <span>Due window (hours)</span>
         </div>
         <div class="admin-summary-card">
-          <strong>{{ accountCategoryLabel }}</strong>
-          <span>Account category</span>
-        </div>
-        <div class="admin-summary-card">
-          <strong>{{ planLabel }}</strong>
-          <span>Plan</span>
-        </div>
-        <div class="admin-summary-card">
           <strong>{{ sessions.length }}</strong>
           <span>Active devices</span>
         </div>
@@ -44,7 +36,7 @@
           <span>Assigned plan</span>
         </div>
       </div>
-      <p class="muted">
+      <p class="muted account-overview-copy">
         {{
           accountCategory === "individual"
             ? "This account uses the root ItemTraxx url and is not attached to a custom subdomain."
@@ -375,4 +367,9 @@ onUnmounted(() => {
 });
 </script>
 
-<style scoped></style>
+<style scoped>
+.account-overview-copy {
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+</style>

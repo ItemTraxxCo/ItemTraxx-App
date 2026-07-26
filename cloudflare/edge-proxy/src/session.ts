@@ -377,7 +377,11 @@ const handleSessionMe = async (
   if (!accessToken) {
     return buildJson(200, unauthenticatedSummary, headers, requestId);
   }
-  const summary = await buildSessionSummary(env, accessToken, true);
+  // No requireActiveApplicationSession here: a brand-new session (fresh
+  // login, not yet touched on this device/origin) must not be treated the
+  // same as a revoked one. Device/session revocation is enforced where it
+  // actually matters (checkoutReturn, admin-ops) via validateAccountDeviceSession.
+  const summary = await buildSessionSummary(env, accessToken);
   if (!summary) {
     const clearHeaders = responseHeaders ?? new Headers();
     clearSessionCookies(clearHeaders, env);

@@ -15,11 +15,6 @@
     <p class="checkout-page-copy">Checkout and return</p>
 
     <div class="card checkout-card">
-      <section>
-        <h2>Quick return</h2>
-        <p class="muted">Return an item by barcode without selecting a borrower.</p>
-        <div class="input-row checkout-input-row"><input v-model="quickReturnBarcode" placeholder="Item barcode" @keyup.enter="quickReturn"/><button type="button" :disabled="isSubmitting || !quickReturnBarcode.trim()" @click="quickReturn">Return item</button></div>
-      </section>
       <label>
         Borrower ID
         <div class="input-row checkout-input-row">
@@ -183,7 +178,6 @@ const error = ref("");
 const success = ref("");
 const borrowerId = ref("");
 const barcodeInput = ref("");
-const quickReturnBarcode = ref("");
 const barcodes = ref<ItemSummary[]>([]);
 const borrower = ref<BorrowerSummary | null>(null);
 const checkedOutItem = ref<ItemSummary[]>([]);
@@ -229,13 +223,6 @@ const receipt = ref<{
   returns: number;
   items: Array<{ name: string; barcode: string; action: "checkout" | "return" }>;
 } | null>(null);
-
-const quickReturn = async () => {
-  error.value=""; success.value=""; isSubmitting.value=true;
-  try { await submitCheckoutReturn({ borrower_id:"", item_barcodes:[quickReturnBarcode.value.trim()], action_type:"quick_return" }); success.value="Item returned with quick-return audit semantics."; quickReturnBarcode.value=""; }
-  catch(err){error.value=toUserFacingErrorMessage(err,"Unable to return item.");}
-  finally{isSubmitting.value=false;}
-};
 
 const syncOfflineBuffer = async (showWhenNoOps = false) => {
   if (syncInFlight.value) return;

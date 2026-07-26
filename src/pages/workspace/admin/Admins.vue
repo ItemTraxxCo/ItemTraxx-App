@@ -380,6 +380,32 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(10, 14, 25, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  z-index: 1000;
+}
+
+.modal {
+  width: min(680px, 100%);
+  max-height: 90vh;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  padding: 1rem;
+}
+
+.modal h3 {
+  margin-top: 0.25rem;
+  margin-bottom: 0.5rem;
+}
+
 .admin-email-cell {
   display: inline-flex;
   align-items: center;

@@ -315,13 +315,17 @@ const createBorrowerRecord = async (
   adminClient: SupabaseAdminClient,
   workspaceId: string,
   username: string,
-  borrowerId: string
+  borrowerId: string,
+  accessMode: "all" | "restricted" = "all",
+  profileIds: string[] = []
 ) => {
   const { data, error } = await (adminClient as any)
     .rpc("create_borrower_identity", {
       p_workspace_id: workspaceId,
       p_username: username,
       p_borrower_id: borrowerId,
+      p_access_mode: accessMode,
+      p_profile_ids: profileIds,
     })
     .single();
 
@@ -334,7 +338,9 @@ const createBorrowerRecord = async (
 
 const createGeneratedBorrowerRecord = async (
   adminClient: SupabaseAdminClient,
-  workspaceId: string
+  workspaceId: string,
+  accessMode: "all" | "restricted" = "all",
+  profileIds: string[] = []
 ) => {
   for (let attempt = 0; attempt < 12; attempt += 1) {
     const generatedIdentity = await buildUniqueBorrowerIdentity(adminClient, workspaceId);
@@ -342,7 +348,9 @@ const createGeneratedBorrowerRecord = async (
       adminClient,
       workspaceId,
       generatedIdentity.username,
-      generatedIdentity.borrowerId
+      generatedIdentity.borrowerId,
+      accessMode,
+      profileIds
     );
     if (result.data) {
       return result;
@@ -625,21 +633,14 @@ serve(async (req) => {
 
       const { data, error } =
         borrowerId && username
-          ? await createBorrowerRecord(adminClient, profile.workspace_id, username, borrowerId)
-          : await createGeneratedBorrowerRecord(adminClient, profile.workspace_id);
+          ? await createBorrowerRecord(adminClient, profile.workspace_id, username, borrowerId, accessMode, profileIds)
+          : await createGeneratedBorrowerRecord(adminClient, profile.workspace_id, accessMode, profileIds);
 
       if (error || !data) {
         if (isUniqueIdentityConflict(error)) {
           return jsonResponse(409, { error: "Borrower ID or username already exists." });
         }
         return jsonResponse(400, { error: "Unable to create borrower." });
-      }
-
-      const { error: modeError } = await adminClient.from("borrowers").update({ access_mode: accessMode }).eq("id", data.id).eq("workspace_id", profile.workspace_id);
-      if (modeError) throw new Error("Unable to set borrower access.");
-      if (accessMode === "restricted") {
-        const { error: grantError } = await adminClient.from("borrower_access_grants").insert(profileIds.map((profileId) => ({ borrower_id: data.id, profile_id: profileId, granted_by: user.id })));
-        if (grantError) throw new Error("Unable to set borrower access.");
       }
 
       return jsonResponse(200, { data });

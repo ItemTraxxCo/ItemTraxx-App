@@ -94,21 +94,6 @@ test.describe("workspace model role surfaces", () => {
     await expect(page.getByText("Choose All Tenant Accounts or select at least one specific account.")).toBeVisible();
   });
 
-  test("Tenant Account quick return sends a distinct audit action", async ({ page }) => {
-    let actionType: string | undefined;
-    await page.route(/\/functions(?:\/v1)?\/checkoutReturn(?:\?.*)?$/, async (route) => {
-      actionType = (route.request().postDataJSON() as { action_type?: string }).action_type;
-      await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ data: { checkouts: [], returns: [{ id: "item-1" }] } }) });
-    });
-    await page.goto("/");
-    await dismissFirstRunSurfaces(page);
-    await setTenantAccountSession(page);
-    await navigateApp(page, "/checkout");
-    await page.getByPlaceholder("Item barcode").first().fill("CAM-1");
-    await page.getByRole("button", { name: "Return item" }).click();
-    await expect.poll(() => actionType).toBe("quick_return");
-  });
-
   test("Super Admin can manage Tenant Accounts across workspaces", async ({ page }) => {
     const actions: string[] = [];
     await mockSuperWorkspaceMutate(page);

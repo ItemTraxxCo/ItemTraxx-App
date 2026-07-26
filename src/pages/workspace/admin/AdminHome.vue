@@ -2,12 +2,7 @@
     <div class="page admin-shell">
       <div class="admin-hero">
         <div class="admin-toolbar">
-          <div class="page-nav-left">
-        <button type="button" class="button-link" @click="returnToCheckout">
-          Exit admin panel and return to checkout
-        </button>
-          </div>
-          <div class="muted">Signed in as {{ adminEmail }}</div>
+            <div class="muted">Signed in as {{ adminEmail }}</div>
         </div>
       <h1>Admin Panel</h1>
         <p class="admin-hero-copy">
@@ -72,11 +67,8 @@
 
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from "vue";
-import { RouterLink, useRouter } from "vue-router";
-import {
-  clearAdminVerification,
-  getAuthState,
-} from "../../../store/authState";
+import { RouterLink } from "vue-router";
+import { getAuthState } from "../../../store/authState";
 import { fetchWorkspaceSettings } from "../../../services/adminOpsService";
 
 const adminEmail = computed(() => {
@@ -102,7 +94,6 @@ const planCode = ref<
   | null
 >(null);
 
-const router = useRouter();
 const accountCategoryLabel = computed(() =>
   accountCategory.value === "individual"
     ? "Individual"
@@ -132,11 +123,6 @@ const planLabel = computed(() => {
       return "Unavailable";
   }
 });
-
-const returnToCheckout = async () => {
-  clearAdminVerification();
-  await router.replace("/checkout");
-};
 
 onMounted(async () => {
   try {

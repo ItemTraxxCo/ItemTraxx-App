@@ -157,9 +157,18 @@
           ×
         </button>
         <h3>Primary Admin Email</h3>
-        <p class="primary-admin-email-value">{{ primaryAdminEmailValue }}</p>
-        <div class="form-actions">
-          <button type="button" class="button-primary" @click="copyPrimaryAdminEmail">Copy email</button>
+        <div class="primary-admin-email-row">
+          <button
+            type="button"
+            class="primary-admin-copy-button"
+            :class="{ copied: primaryAdminEmailCopied }"
+            :aria-label="primaryAdminEmailCopied ? 'Email copied' : 'Copy email'"
+            @click="copyPrimaryAdminEmail"
+          >
+            <span v-if="primaryAdminEmailCopied" aria-hidden="true">✓</span>
+            <span v-else aria-hidden="true">⧉</span>
+          </button>
+          <span class="primary-admin-email-value">{{ primaryAdminEmailValue }}</span>
         </div>
       </div>
     </div>
@@ -279,13 +288,26 @@ const openPrimaryAdminModal = () => {
 
 const closePrimaryAdminModal = () => {
   primaryAdminModalVisible.value = false;
+  primaryAdminEmailCopied.value = false;
+  if (primaryAdminCopyTimer) {
+    window.clearTimeout(primaryAdminCopyTimer);
+    primaryAdminCopyTimer = null;
+  }
 };
+
+const primaryAdminEmailCopied = ref(false);
+let primaryAdminCopyTimer: number | null = null;
 
 const copyPrimaryAdminEmail = async () => {
   if (!primaryAdminEmailValue.value) return;
   try {
     await navigator.clipboard.writeText(primaryAdminEmailValue.value);
-    showToast("Copied", "Email copied.");
+    primaryAdminEmailCopied.value = true;
+    if (primaryAdminCopyTimer) window.clearTimeout(primaryAdminCopyTimer);
+    primaryAdminCopyTimer = window.setTimeout(() => {
+      primaryAdminEmailCopied.value = false;
+      primaryAdminCopyTimer = null;
+    }, 1500);
   } catch {
     showToast("Copy failed", "Unable to copy email. Please copy manually.");
   }
@@ -349,6 +371,10 @@ onUnmounted(() => {
   if (toastTimer) {
     window.clearTimeout(toastTimer);
     toastTimer = null;
+  }
+  if (primaryAdminCopyTimer) {
+    window.clearTimeout(primaryAdminCopyTimer);
+    primaryAdminCopyTimer = null;
   }
 });
 </script>
@@ -431,11 +457,36 @@ onUnmounted(() => {
   justify-content: center;
 }
 
-.primary-admin-email-value {
+.primary-admin-email-row {
   margin: 0.75rem 0 1rem;
   padding: 0.75rem 0.9rem;
   border: 1px solid var(--border);
   background: var(--surface-2);
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.primary-admin-copy-button {
+  flex-shrink: 0;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1rem;
+  transition: background-color 160ms ease, border-color 160ms ease;
+}
+
+.primary-admin-copy-button.copied {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.primary-admin-email-value {
   white-space: nowrap;
   overflow-x: auto;
   font-weight: 700;

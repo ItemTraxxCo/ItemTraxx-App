@@ -16,10 +16,6 @@
           <strong>{{ archivedItem.length }}</strong>
           <span>Archived items</span>
         </div>
-        <div class="admin-summary-card">
-          <strong>{{ filteredItem.length }}</strong>
-          <span>Visible in table</span>
-        </div>
       </div>
     </div>
 
@@ -63,14 +59,11 @@
             <span>{{ notes.length }}/500</span>
           </div>
         </label>
-        <fieldset>
-          <legend>Tenant Account access</legend>
-          <label><input v-model="accessMode" type="radio" value="all" /> All Tenant Accounts</label>
-          <label><input v-model="accessMode" type="radio" value="restricted" /> Specific Tenant Accounts</label>
-          <div v-if="accessMode === 'restricted'">
-            <label v-for="account in tenantAccounts" :key="account.id"><input v-model="selectedProfileIds" type="checkbox" :value="account.id" /> {{ account.auth_email }}</label>
-          </div>
-        </fieldset>
+        <TenantAccessPicker
+          v-model:access-mode="accessMode"
+          v-model:selected-ids="selectedProfileIds"
+          :accounts="tenantAccounts"
+        />
         <button type="submit" class="button-primary" :disabled="isSaving">Add item</button>
       </form>
       <p v-if="error" class="error">{{ error }}</p>
@@ -95,7 +88,21 @@
         <div class="admin-toolbar-actions">
           <button type="button" @click="exportCsv">Export CSV</button>
           <button type="button" @click="exportPdf">Export PDF</button>
+          <button type="button" @click="toggleBulkMode">
+            {{ bulkMode ? "Exit bulk actions" : "Bulk actions" }}
+          </button>
         </div>
+      </div>
+
+      <div v-if="bulkMode && selectedItemIds.size > 0" class="bulk-action-bar">
+        <span>{{ selectedItemIds.size }} selected</span>
+        <button type="button" @click="openBulkAccessModal">Change tenant account access</button>
+        <select v-model="bulkStatusValue">
+          <option value="">Change status…</option>
+          <option v-for="option in editableStatusOptions" :key="option" :value="option">{{ option }}</option>
+        </select>
+        <button type="button" :disabled="!bulkStatusValue || isSaving" @click="applyBulkStatus">Apply status</button>
+        <button type="button" :disabled="isSaving" @click="applyBulkArchive">Archive selected</button>
       </div>
       <div class="form-grid-2">
         <label>
@@ -122,6 +129,14 @@
       <table class="table">
         <thead>
           <tr>
+            <th v-if="bulkMode">
+              <input
+                type="checkbox"
+                :checked="allFilteredSelected"
+                @change="toggleSelectAll"
+                aria-label="Select all items"
+              />
+            </th>
             <th>Name</th>
             <th>Barcode</th>
             <th>Serial</th>
@@ -132,7 +147,15 @@
           </tr>
         </thead>
         <tbody>
-          <tr v-for="item in filteredItem" :key="item.id">
+          <tr v-for="(item, index) in filteredItem" :key="item.id">
+            <td v-if="bulkMode">
+              <input
+                type="checkbox"
+                :checked="selectedItemIds.has(item.id)"
+                @click="toggleItemSelection(item.id, index, $event)"
+                :aria-label="`Select ${item.name}`"
+              />
+            </td>
             <td>{{ item.name }}</td>
             <td>{{ item.barcode }}</td>
             <td>
@@ -165,7 +188,7 @@
               type="text"
               placeholder="Name"
             />
-            <input v-else :value="selectedItem.name" type="text" readonly />
+            <input v-else :value="selectedItem.name" type="text" readonly class="field-plain" />
           </label>
           <label>
             Barcode
@@ -175,7 +198,7 @@
               type="text"
               placeholder="Barcode"
             />
-            <input v-else :value="selectedItem.barcode" type="text" readonly />
+            <input v-else :value="selectedItem.barcode" type="text" readonly class="field-plain" />
             <button
               v-if="isModalEditing"
               type="button"
@@ -191,7 +214,9 @@
               :value="selectedItem.serial_number || '-'"
               type="text"
               readonly
-              title="To edit the serial number, contact support with the current serial number, barcode, and requested change."
+              disabled
+              class="field-plain field-disabled"
+              title="Serial numbers can't be edited here. Contact support with the current serial number, barcode, and requested change."
             />
           </label>
           <label>
@@ -204,7 +229,7 @@
                 {{ option }}
               </option>
             </select>
-            <input v-else :value="selectedItem.status" type="text" readonly />
+            <input v-else :value="selectedItem.status" type="text" readonly class="field-plain" />
           </label>
         </div>
 
@@ -221,7 +246,7 @@
           <textarea
             v-else
             :value="selectedItem.notes || '-'"
-            class="item-notes-input"
+            class="item-notes-input field-plain"
             rows="3"
             readonly
           ></textarea>
@@ -230,6 +255,13 @@
             <span>{{ (isModalEditing ? editNotes : selectedItem.notes || '').length }}/500</span>
           </div>
         </label>
+
+        <TenantAccessPicker
+          v-if="isModalEditing"
+          v-model:access-mode="editAccessMode"
+          v-model:selected-ids="editSelectedProfileIds"
+          :accounts="tenantAccounts"
+        />
 
         <div class="admin-actions">
           <button
@@ -252,6 +284,24 @@
             Archive item
           </button>
           <button type="button" class="link" @click="closeDetails">Close</button>
+        </div>
+      </div>
+    </div>
+
+    <div v-if="showBulkAccessModal" class="modal-backdrop">
+      <div class="modal">
+        <h2>Change tenant account access</h2>
+        <p class="admin-section-copy">Applies to {{ selectedItemIds.size }} selected item(s).</p>
+        <TenantAccessPicker
+          v-model:access-mode="bulkAccessMode"
+          v-model:selected-ids="bulkAccessProfileIds"
+          :accounts="tenantAccounts"
+        />
+        <div class="admin-actions">
+          <button type="button" class="link" :disabled="!bulkAccessMode || isSaving" @click="applyBulkAccess">
+            Apply
+          </button>
+          <button type="button" class="link" @click="showBulkAccessModal = false">Cancel</button>
         </div>
       </div>
     </div>
@@ -308,6 +358,7 @@ import { computed, onMounted, onUnmounted, ref } from "vue";
 import { RouterLink } from "vue-router";
 import CameraBarcodeScannerModal from "../../../components/CameraBarcodeScannerModal.vue";
 import SkeletonLoader from "../../../components/SkeletonLoader.vue";
+import TenantAccessPicker from "../../../components/app/TenantAccessPicker.vue";
 import { getAuthState } from "../../../store/authState";
 import { logAdminAction } from "../../../services/auditLogService";
 import {
@@ -364,6 +415,15 @@ const editName = ref("");
 const editBarcode = ref("");
 const editStatus = ref(statusOptions[0] ?? "available");
 const editNotes = ref("");
+const editAccessMode = ref<"" | "all" | "restricted">("all");
+const editSelectedProfileIds = ref<string[]>([]);
+const bulkMode = ref(false);
+const selectedItemIds = ref<Set<string>>(new Set());
+const lastSelectedIndex = ref<number | null>(null);
+const bulkStatusValue = ref("");
+const showBulkAccessModal = ref(false);
+const bulkAccessMode = ref<"" | "all" | "restricted">("");
+const bulkAccessProfileIds = ref<string[]>([]);
 const scannerOpen = ref(false);
 const scannerMode = ref<ScannerMode>("admin_item_create");
 let toastTimer: number | null = null;
@@ -394,6 +454,118 @@ const filteredItem = computed(() => {
     return haystack.includes(query);
   });
 });
+
+const allFilteredSelected = computed(
+  () => filteredItem.value.length > 0 && filteredItem.value.every((item) => selectedItemIds.value.has(item.id))
+);
+
+const toggleBulkMode = () => {
+  bulkMode.value = !bulkMode.value;
+  selectedItemIds.value = new Set();
+  lastSelectedIndex.value = null;
+};
+
+const toggleSelectAll = () => {
+  selectedItemIds.value = allFilteredSelected.value
+    ? new Set()
+    : new Set(filteredItem.value.map((item) => item.id));
+};
+
+const toggleItemSelection = (id: string, index: number, event: MouseEvent) => {
+  const next = new Set(selectedItemIds.value);
+  if (event.shiftKey && lastSelectedIndex.value !== null) {
+    const [start, end] = [lastSelectedIndex.value, index].sort((a, b) => a - b);
+    for (let i = start; i <= end; i++) {
+      next.add(filteredItem.value[i].id);
+    }
+  } else if (next.has(id)) {
+    next.delete(id);
+  } else {
+    next.add(id);
+  }
+  selectedItemIds.value = next;
+  lastSelectedIndex.value = index;
+};
+
+const openBulkAccessModal = () => {
+  bulkAccessMode.value = "";
+  bulkAccessProfileIds.value = [];
+  showBulkAccessModal.value = true;
+};
+
+const applyBulkAccess = async () => {
+  const accessMode = bulkAccessMode.value;
+  if (accessMode !== "all" && accessMode !== "restricted") return;
+  isSaving.value = true;
+  try {
+    for (const item of items.value.filter((row) => selectedItemIds.value.has(row.id))) {
+      const updated = await updateItem({
+        id: item.id,
+        name: item.name,
+        barcode: item.barcode,
+        status: item.status,
+        notes: item.notes ?? "",
+        access_mode: accessMode,
+        profile_ids: bulkAccessProfileIds.value,
+      });
+      items.value = items.value.map((row) => (row.id === updated.id ? updated : row));
+    }
+    success.value = "Tenant account access updated.";
+    showBulkAccessModal.value = false;
+    selectedItemIds.value = new Set();
+  } catch (err) {
+    error.value = toUserFacingErrorMessage(err, "Unable to update tenant account access.");
+  } finally {
+    isSaving.value = false;
+  }
+};
+
+const applyBulkStatus = async () => {
+  if (!bulkStatusValue.value) return;
+  isSaving.value = true;
+  try {
+    for (const item of items.value.filter((row) => selectedItemIds.value.has(row.id))) {
+      const updated = await updateItem({
+        id: item.id,
+        name: item.name,
+        barcode: item.barcode,
+        status: bulkStatusValue.value,
+        notes: item.notes ?? "",
+        access_mode: item.access_mode ?? "all",
+        profile_ids: [],
+      });
+      items.value = items.value.map((row) => (row.id === updated.id ? updated : row));
+    }
+    success.value = "Status updated.";
+    bulkStatusValue.value = "";
+    selectedItemIds.value = new Set();
+  } catch (err) {
+    error.value = toUserFacingErrorMessage(err, "Unable to update status.");
+  } finally {
+    isSaving.value = false;
+  }
+};
+
+const applyBulkArchive = async () => {
+  const targets = items.value.filter((row) => selectedItemIds.value.has(row.id));
+  if (targets.length === 0) return;
+  const confirmed = window.confirm(`Archive ${targets.length} selected item(s)? You can restore them later.`);
+  if (!confirmed) return;
+  isSaving.value = true;
+  try {
+    for (const item of targets) {
+      await deleteItem(item.id);
+      items.value = items.value.filter((row) => row.id !== item.id);
+      archivedItem.value = [item, ...archivedItem.value];
+    }
+    success.value = "Selected items archived.";
+    selectedItemIds.value = new Set();
+  } catch (err) {
+    error.value = err instanceof Error ? err.message : "Unable to archive selected items.";
+  } finally {
+    isSaving.value = false;
+  }
+};
 
 const showToast = (title: string, message: string) => {
   toastTitle.value = title;
@@ -600,12 +772,21 @@ const handleCreate = async () => {
   }
 };
 
-const startEdit = (item: ItemRecord) => {
+const startEdit = async (item: ItemRecord) => {
   isModalEditing.value = true;
   editName.value = item.name;
   editBarcode.value = item.barcode;
   editStatus.value = item.status;
   editNotes.value = item.notes ?? "";
+  editAccessMode.value = item.access_mode ?? "all";
+  editSelectedProfileIds.value = [];
+  if (editAccessMode.value === "restricted") {
+    const grants = await authenticatedSelect<Array<{ profile_id: string }>>("item_access_grants", {
+      select: "profile_id",
+      item_id: `eq.${item.id}`,
+    });
+    editSelectedProfileIds.value = grants.map((grant) => grant.profile_id);
+  }
 };
 
 const cancelEdit = () => {
@@ -639,6 +820,11 @@ const saveEdit = async (id: string) => {
     error.value = "Name and barcode fields cannot be blank.";
     return;
   }
+  const accessMode = editAccessMode.value;
+  if (!accessMode || (accessMode === "restricted" && editSelectedProfileIds.value.length === 0)) {
+    error.value = "Choose All Tenant Accounts or select at least one specific account.";
+    return;
+  }
   isSaving.value = true;
   try {
     const previousStatus = selectedItem.value?.status ?? "";
@@ -648,6 +834,8 @@ const saveEdit = async (id: string) => {
       barcode: editBarcode.value.trim(),
       status: editStatus.value,
       notes: editNotes.value.trim(),
+      access_mode: accessMode,
+      profile_ids: editSelectedProfileIds.value,
     });
     await logAdminAction({
       action_type: "item_update",
@@ -671,6 +859,8 @@ const saveEdit = async (id: string) => {
             barcode: updated.barcode,
             status: previousStatus,
             notes: updated.notes ?? "",
+            access_mode: editAccessMode.value || "all",
+            profile_ids: editSelectedProfileIds.value,
           });
           items.value = items.value.map((item) =>
             item.id === reverted.id ? reverted : item
@@ -837,6 +1027,29 @@ onUnmounted(() => {
 
 .item-camera-button {
   margin-top: 0.7rem;
+}
+
+.field-plain {
+  border-color: transparent;
+  background: transparent;
+  padding-left: 0;
+}
+
+.field-disabled {
+  color: var(--muted);
+  opacity: 0.65;
+}
+
+.bulk-action-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.85rem;
+  padding: 0.6rem 0.8rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface-2);
 }
 
 @media (max-width: 760px) {

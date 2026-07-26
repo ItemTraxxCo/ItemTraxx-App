@@ -989,6 +989,11 @@ body.auth-route-active #app {
   animation: toast-in 0.45s ease-out forwards;
 }
 
+.toast.toast-bottom-left {
+  right: auto;
+  left: 24px;
+}
+
 :root[data-theme="light"] .toast {
   background: #ffffff;
   color: #171717;

@@ -84,10 +84,10 @@ test.describe("workspace model role surfaces", () => {
     await setWorkspaceAdminSession(page);
     await navigateApp(page, "/admin/items");
 
-    const all = page.getByRole("radio", { name: "All Tenant Accounts" });
-    const restricted = page.getByRole("radio", { name: "Specific Tenant Accounts" });
-    await expect(all).not.toBeChecked();
-    await expect(restricted).not.toBeChecked();
+    const all = page.getByRole("button", { name: "All Tenant Accounts" });
+    const restricted = page.getByRole("button", { name: "Specific Tenant Accounts" });
+    await expect(all).toHaveAttribute("aria-pressed", "false");
+    await expect(restricted).toHaveAttribute("aria-pressed", "false");
     await page.getByPlaceholder("Item name").fill("Explicit choice item");
     await page.getByPlaceholder("Barcode", { exact: true }).fill("EXPLICIT-1");
     await page.getByRole("button", { name: "Add item" }).click();

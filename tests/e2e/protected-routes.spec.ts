@@ -22,14 +22,14 @@ test.describe("Protected route smoke tests", () => {
     await setWorkspaceAdminSession(page);
 
     await navigateApp(page, "/admin");
-    await expect(page.getByRole("heading", { name: "Admin Panel", exact: true })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Workspace Overview", exact: true })).toBeVisible();
     await expect(page.getByRole("link", { name: "Item Status Tracking" })).toBeVisible();
 
     await navigateApp(page, "/admin/item-status");
     await expect(page.getByRole("heading", { name: "Item Status Tracking" })).toBeVisible();
   });
 
-  test("offline queue badge follows real queue storage transitions", async ({ page }) => {
+  test("offline queue toast follows real queue storage transitions", async ({ page }) => {
     await page.goto("/");
     await page.evaluate(() => {
       localStorage.setItem("itemtraxx:onboarding:v1:workspace_admin", new Date().toISOString());
@@ -37,13 +37,8 @@ test.describe("Protected route smoke tests", () => {
     await setWorkspaceAdminSession(page);
     await navigateApp(page, "/checkout");
 
-    await page.getByRole("button", { name: "Open menu" }).click();
-    await expect(page.getByRole("menuitem", { name: "Open Admin Panel" })).toBeVisible();
-    await expect(page.getByRole("menuitem", { name: "Take tour again" })).toBeVisible();
-    await expect(page.getByRole("menuitem", { name: "Offline Queue: 0" })).toHaveAttribute(
-      "title",
-      /auto-syncs them when connection is restored/,
-    );
+    const toast = page.locator(".toast-bottom-left");
+    await expect(toast).toHaveCount(0);
 
     await page.evaluate(async () => {
       await window.__itemtraxxTest?.offlineCheckoutQueue.queue({
@@ -56,10 +51,8 @@ test.describe("Protected route smoke tests", () => {
         new StorageEvent("storage", { key: "itemtraxx:checkout-offline-buffer:v1" }),
       );
     });
-    if (!(await page.getByRole("menuitem", { name: "Offline Queue: 1" }).isVisible())) {
-      await page.getByRole("button", { name: "Open menu" }).click();
-    }
-    await expect(page.getByRole("menuitem", { name: "Offline Queue: 1" })).toBeVisible();
+    await expect(toast).toBeVisible();
+    await expect(toast).toContainText("1 checkout waiting to sync.");
 
     await page.evaluate(async () => {
       await window.__itemtraxxTest?.offlineCheckoutQueue.write([]);
@@ -67,13 +60,10 @@ test.describe("Protected route smoke tests", () => {
         new StorageEvent("storage", { key: "itemtraxx:checkout-offline-buffer:v1" }),
       );
     });
-    if (!(await page.getByRole("menuitem", { name: "Offline Queue: 0" }).isVisible())) {
-      await page.getByRole("button", { name: "Open menu" }).click();
-    }
-    await expect(page.getByRole("menuitem", { name: "Offline Queue: 0" })).toBeVisible();
+    await expect(toast).toHaveCount(0);
   });
 
-  test("onboarding completion survives reload and replay reopens the tour", async ({ page }) => {
+  test("onboarding completion survives reload", async ({ page }) => {
     await page.goto("/");
     await page.evaluate(() => {
       localStorage.removeItem("itemtraxx:onboarding:v1:workspace_admin");
@@ -96,9 +86,6 @@ test.describe("Protected route smoke tests", () => {
     );
     await page.evaluate(() => window.__itemtraxxTest?.setWorkspaceAdminSession("tenant-e2e"));
     await expect(dialog).toHaveCount(0);
-    await page.getByRole("button", { name: "Open menu" }).click();
-    await page.getByRole("menuitem", { name: "Take tour again" }).click();
-    await expect(dialog).toBeVisible();
   });
 
   test("authenticated users can dismiss a degraded incident without changing its status link", async ({ page }) => {
@@ -208,7 +195,7 @@ test.describe("Protected route smoke tests", () => {
     await navigateApp(page, "/admin");
 
     await expect(page).toHaveURL(/\/admin$/);
-    await expect(page.getByRole("heading", { name: "Admin Panel", exact: true })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Workspace Overview", exact: true })).toBeVisible();
   });
 
   test("super-admin secondary verification expires after 15 minutes", async ({ page }) => {

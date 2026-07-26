@@ -240,6 +240,7 @@ const routes: RouteRecordRaw[] = [
   { path: "/items", name: "workspace-items", component: () => import("../pages/workspace/Items.vue"), meta: { requiresSession: true, requiresWorkspace: true, requiresRole: "tenant_account", title: "Items | ItemTraxx" } },
   { path: "/borrowers", name: "workspace-borrowers", component: () => import("../pages/workspace/Borrowers.vue"), meta: { requiresSession: true, requiresWorkspace: true, requiresRole: "tenant_account", title: "Borrowers | ItemTraxx" } },
   { path: "/settings", name: "workspace-settings", component: () => import("../pages/workspace/Settings.vue"), meta: { requiresSession: true, requiresWorkspace: true, requiresRole: "tenant_account", title: "Settings | ItemTraxx" } },
+  { path: "/account", name: "workspace-account", component: () => import("../pages/workspace/Account.vue"), meta: { requiresSession: true, requiresWorkspace: true, requiresRole: "tenant_account", title: "My Account | ItemTraxx" } },
   {
     path: "/admin/students",
     redirect: "/admin/borrowers",

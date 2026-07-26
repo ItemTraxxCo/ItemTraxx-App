@@ -6,12 +6,6 @@
       </div>
       <h1>Quick Return</h1>
       <p class="admin-hero-copy">Return items by barcode without needing a borrower ID.</p>
-      <div class="admin-summary-grid">
-        <div class="admin-summary-card">
-          <strong>{{ barcodes.length }}</strong>
-          <span>Queued items</span>
-        </div>
-      </div>
     </div>
 
     <div class="card admin-section-card">

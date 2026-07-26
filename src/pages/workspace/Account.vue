@@ -3,10 +3,7 @@
     <header>
       <h1>My Account</h1>
       <nav>
-        <RouterLink to="/checkout">Checkout</RouterLink> ·
-        <RouterLink to="/items">Items</RouterLink> ·
-        <RouterLink to="/borrowers">Borrowers</RouterLink> ·
-        <RouterLink to="/settings">Settings</RouterLink>
+        <RouterLink class="button-link" to="/checkout">Back to checkout</RouterLink>
       </nav>
     </header>
 

@@ -6,6 +6,10 @@ import {
   resolveKillSwitchMessage,
 } from "../_shared/killSwitch.ts";
 import { isAllowedOrigin, parseAllowedOrigins } from "../_shared/cors.ts";
+import {
+  enforcePreloginRateLimit,
+  resolveClientFingerprint,
+} from "../_shared/preloginGuards.ts";
 import { resolveSystemStatusOverride } from "../_shared/systemStatusOverride.ts";
 
 const corsHeaders = {
@@ -51,6 +55,34 @@ type IncidentWidgetPayload = {
   in_progress_maintenances?: unknown[];
   scheduled_maintenances?: unknown[];
 };
+
+// This endpoint is intentionally public and unauthenticated -- the app shell
+// probes it before any session exists, and the synthetic uptime checks call it
+// from outside Cloudflare. What it should not be is a free amplifier: each
+// request otherwise cost a service-role DB probe, three app_runtime_config
+// reads, and an outbound incident.io fetch.
+//
+// Two bounds, neither of which changes the public contract:
+//   1. a short in-memory cache of the derived incident.io verdict, shared by
+//      every request an isolate serves;
+//   2. a generous per-IP rate limit, well above any legitimate prober.
+const INCIDENT_CACHE_TTL_MS = 20_000;
+const STATUS_RATE_LIMIT_PER_MINUTE = 60;
+
+type CachedIncidentStatus = {
+  status: "operational" | "degraded" | "down";
+  summary: string;
+  check: "ok" | "warn" | "unavailable";
+  fetchedAt: number;
+};
+
+let cachedIncidentStatus: CachedIncidentStatus | null = null;
+
+const readCachedIncidentStatus = () =>
+  cachedIncidentStatus &&
+    Date.now() - cachedIncidentStatus.fetchedAt < INCIDENT_CACHE_TTL_MS
+    ? cachedIncidentStatus
+    : null;
 
 const resolveIncidentStatus = (
   payload: IncidentWidgetPayload
@@ -138,6 +170,25 @@ serve(async (req) => {
     const adminClient = createClient(supabaseUrl, serviceKey, {
       auth: { persistSession: false },
     });
+
+    // Bound the unauthenticated request cost. Fails open: a limiter outage must
+    // never take the public status page down with it.
+    const rateLimit = await enforcePreloginRateLimit(
+      adminClient,
+      resolveClientFingerprint(req, req.headers.get("origin")),
+      "system-status",
+      STATUS_RATE_LIMIT_PER_MINUTE,
+      60
+    ).catch(() => ({ ok: true as const, error: null }));
+    if (!rateLimit.ok && !rateLimit.error) {
+      return jsonResponse(429, {
+        status: "unknown",
+        checks: { config: "ok", db: "unknown" },
+        incident_summary: "rate limited",
+        duration_ms: Date.now() - startedAt,
+        checked_at: new Date().toISOString(),
+      });
+    }
 
     const { error } = await adminClient
       .from("profiles")
@@ -228,7 +279,12 @@ serve(async (req) => {
       }
     }
 
-    if (incidentWidgetUrl) {
+    const cachedIncident = readCachedIncidentStatus();
+    if (incidentWidgetUrl && cachedIncident) {
+      incidentStatus = cachedIncident.status;
+      incidentSummary = cachedIncident.summary;
+      incidentCheck = cachedIncident.check;
+    } else if (incidentWidgetUrl) {
       try {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 3500);
@@ -252,10 +308,24 @@ serve(async (req) => {
         incidentStatus = mapped.status;
         incidentSummary = mapped.summary;
         incidentCheck = mapped.status === "operational" ? "ok" : "warn";
+        cachedIncidentStatus = {
+          status: incidentStatus,
+          summary: incidentSummary,
+          check: incidentCheck,
+          fetchedAt: Date.now(),
+        };
       } catch (error) {
         incidentStatus = "operational";
         incidentSummary = "incident source unavailable";
         incidentCheck = "unavailable";
+        // Cache the failure too, so an incident.io outage does not turn into a
+        // per-request outbound retry storm.
+        cachedIncidentStatus = {
+          status: incidentStatus,
+          summary: incidentSummary,
+          check: incidentCheck,
+          fetchedAt: Date.now(),
+        };
         console.error("system-status incident.io fetch failed:", error);
       }
     }

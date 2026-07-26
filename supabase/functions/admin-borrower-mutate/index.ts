@@ -317,7 +317,8 @@ const createBorrowerRecord = async (
   username: string,
   borrowerId: string,
   accessMode: "all" | "restricted" = "all",
-  profileIds: string[] = []
+  profileIds: string[] = [],
+  grantedBy: string | null = null
 ) => {
   const { data, error } = await (adminClient as any)
     .rpc("create_borrower_identity", {
@@ -326,6 +327,7 @@ const createBorrowerRecord = async (
       p_borrower_id: borrowerId,
       p_access_mode: accessMode,
       p_profile_ids: profileIds,
+      p_granted_by: grantedBy,
     })
     .single();
 
@@ -340,7 +342,8 @@ const createGeneratedBorrowerRecord = async (
   adminClient: SupabaseAdminClient,
   workspaceId: string,
   accessMode: "all" | "restricted" = "all",
-  profileIds: string[] = []
+  profileIds: string[] = [],
+  grantedBy: string | null = null
 ) => {
   for (let attempt = 0; attempt < 12; attempt += 1) {
     const generatedIdentity = await buildUniqueBorrowerIdentity(adminClient, workspaceId);
@@ -350,7 +353,8 @@ const createGeneratedBorrowerRecord = async (
       generatedIdentity.username,
       generatedIdentity.borrowerId,
       accessMode,
-      profileIds
+      profileIds,
+      grantedBy
     );
     if (result.data) {
       return result;
@@ -633,8 +637,8 @@ serve(async (req) => {
 
       const { data, error } =
         borrowerId && username
-          ? await createBorrowerRecord(adminClient, profile.workspace_id, username, borrowerId, accessMode, profileIds)
-          : await createGeneratedBorrowerRecord(adminClient, profile.workspace_id, accessMode, profileIds);
+          ? await createBorrowerRecord(adminClient, profile.workspace_id, username, borrowerId, accessMode, profileIds, profile.id)
+          : await createGeneratedBorrowerRecord(adminClient, profile.workspace_id, accessMode, profileIds, profile.id);
 
       if (error || !data) {
         if (isUniqueIdentityConflict(error)) {

@@ -254,10 +254,42 @@ const expanded = ref(false);
 
 @media (max-width: 480px) {
   .cookie-consent-banner {
-    left: 0.75rem;
-    right: 0.75rem;
-    bottom: 0.75rem;
+    left: 0.6rem;
+    right: 0.6rem;
+    bottom: 0.6rem;
     width: auto;
+    padding: 0.9rem;
+    border-radius: 14px;
+  }
+
+  .cookie-consent-title {
+    font-size: 0.88rem;
+    margin-bottom: 0.45rem;
+  }
+
+  .cookie-consent-body {
+    font-size: 0.8rem;
+    line-height: 1.45;
+    margin-bottom: 0.7rem;
+  }
+
+  .cookie-consent-legal {
+    font-size: 0.74rem;
+    margin-bottom: 0.75rem;
+  }
+
+  .cookie-consent-actions .button-link {
+    min-height: 2.25rem;
+    font-size: 0.85rem;
+  }
+
+  .cookie-consent-prefs-toggle {
+    padding: 0.55rem 0 0.1rem;
+    font-size: 0.78rem;
+  }
+
+  .cookie-consent-option-name {
+    font-size: 0.8rem;
   }
 }
 </style>

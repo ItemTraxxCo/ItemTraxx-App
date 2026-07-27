@@ -1,12 +1,20 @@
 # Changelog
 
-Last updated (year-month-day): 2026-07-25
+Last updated (year-month-day): 2026-07-26
 
 This changelog summarizes notable ItemTraxx product, reliability, security, and experience updates.
 
 Changes are dated based on the default timezone: America/Los_Angeles
 
 ---
+
+### 7/26/2026 Development Update
+
+- Strengthened database permissions so records can only be changed through verified server paths.
+- Admin actions now confirm recent sign-in on the server, matching the existing admin verification prompt.
+- Narrowed the data gateway to only the records the app actually uses.
+- Improved status page efficiency with short-term caching and request limits.
+- Expanded automated security checks in CI.
 
 ### 7/25/2026 Development Update
 

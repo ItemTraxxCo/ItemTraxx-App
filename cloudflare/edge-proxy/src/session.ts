@@ -141,6 +141,17 @@ const hasActiveApplicationSession = async (
   accessToken: string,
   profile: ProfileRow,
 ) => {
+  // Super admins have no account_sessions row -- their device sessions live in
+  // super_admin_sessions, which the `authenticated` role cannot read, so the
+  // worker cannot consult it with the caller's own token. Refreshing is
+  // therefore allowed here on role alone; revocation is enforced where it
+  // grants access rather than where it mints a token:
+  //   - RLS: every super_admin_* policy requires
+  //     private.super_admin_session_not_revoked() and a live step-up
+  //     (20260726120000_least_privilege_rest_surface.sql)
+  //   - edge functions: isSuperAdminTokenBlockedBySessionRevocation() on every
+  //     super-* entrypoint
+  // A refreshed token for a revoked super admin therefore opens nothing.
   if (profile.role === "super_admin") return true;
   const sessionId = readJwtSessionId(accessToken);
   if (!sessionId) return false;

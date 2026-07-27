@@ -5,6 +5,7 @@ import { isAllowedOrigin, parseAllowedOrigins } from "../_shared/cors.ts";
 import { requireTrustedEdgeIngress } from "../_shared/trustedIngress.ts";
 import { readJsonBody } from "../_shared/requestBody.ts";
 import { validateAccountDeviceSession } from "../_shared/accountSessions.ts";
+import { requireRecentAdminAuth } from "../_shared/adminReauth.ts";
 import {
   optionalText,
   requireEmail,
@@ -50,6 +51,10 @@ const resolveResetRedirectTo = (req: Request) => {
 };
 
 const randomPassword = () => `${crypto.randomUUID()}-Aa1!`;
+const WORKSPACE_ADMIN_READ_ACTIONS = new Set([
+  "list_workspace_admins",
+  "list_tenant_accounts",
+]);
 const WORKSPACE_ADMIN_INVITE_ACCEPTED_MESSAGE =
   "If this email is eligible, a workspace admin invitation will be sent.";
 
@@ -212,6 +217,19 @@ serve(async (req) => {
     }
     if (!activeSession.valid) {
       return jsonResponse(401, { error: "Session revoked" });
+    }
+
+    // Admin management is the highest-impact workspace surface (creating admins,
+    // resetting Tenant Account passwords, removing accounts), so every mutation
+    // requires a recent interactive authentication. The two list actions are
+    // exempt so the admin screens still load and can prompt for re-auth.
+    if (!WORKSPACE_ADMIN_READ_ACTIONS.has(action)) {
+      const reauthFailure = await requireRecentAdminAuth(
+        adminClient,
+        authToken,
+        jsonResponse,
+      );
+      if (reauthFailure) return reauthFailure;
     }
 
     if (action === "list_workspace_admins") {

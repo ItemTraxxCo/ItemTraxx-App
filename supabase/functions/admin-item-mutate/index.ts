@@ -5,6 +5,7 @@ import { isAllowedOrigin, parseAllowedOrigins } from "../_shared/cors.ts";
 import { requireTrustedEdgeIngress } from "../_shared/trustedIngress.ts";
 import { resolveRateLimitResult } from "../_shared/preloginGuards.ts";
 import { validateAccountDeviceSession } from "../_shared/accountSessions.ts";
+import { requireRecentAdminAuth } from "../_shared/adminReauth.ts";
 import { readJsonBody } from "../_shared/requestBody.ts";
 import {
   BARCODE_PATTERN,
@@ -241,6 +242,13 @@ serve(async (req) => {
       if (!activeSession.valid) {
         return jsonResponse(401, { error: "Session revoked" });
       }
+
+      const reauthFailure = await requireRecentAdminAuth(
+        adminClient,
+        authToken,
+        jsonResponse,
+      );
+      if (reauthFailure) return reauthFailure;
     }
 
     const { data: maintenanceRow } = await adminClient

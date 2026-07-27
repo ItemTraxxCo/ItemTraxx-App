@@ -858,6 +858,16 @@ body.auth-route-active #app {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  border-radius: 10px;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.menu-button:hover {
+  background: var(--surface-2);
 }
 
 .menu-button-wrap {
@@ -870,23 +880,6 @@ body.auth-route-active #app {
 .menu-notification {
   display: inline-flex;
   align-items: center;
-}
-
-.menu-alert {
-  position: absolute;
-  right: 44px;
-  top: -4px;
-  width: 16px;
-  height: 16px;
-  border-radius: 999px;
-  background: #f5b700;
-  color: #000000;
-  font-size: 0.7rem;
-  font-weight: 800;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border: 1px solid rgba(0, 0, 0, 0.3);
 }
 
 .menu-icon {
@@ -909,18 +902,37 @@ body.auth-route-active #app {
   backdrop-filter: none;
   min-width: 220px;
   padding: 0.4rem;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.28);
+}
+
+.menu-dropdown-enter-active,
+.menu-dropdown-leave-active {
+  transition: clip-path 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.menu-dropdown-enter-from,
+.menu-dropdown-leave-to {
+  clip-path: inset(0 0 100% 0 round 16px);
+}
+
+.menu-dropdown-enter-to,
+.menu-dropdown-leave-from {
+  clip-path: inset(0 0 0% 0 round 16px);
 }
 
 .menu-item {
-  display: block;
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
   width: 100%;
   text-align: left;
-  padding: 0.5rem 0.6rem;
-  border-radius: 8px;
+  padding: 0.55rem 0.65rem;
+  border-radius: 10px;
   border: none;
   background: transparent;
   color: inherit;
-  font-size: 0.95rem;
+  font-size: 0.9rem;
+  cursor: pointer;
 }
 
 .menu-item:hover {
@@ -928,7 +940,24 @@ body.auth-route-active #app {
 }
 
 .menu-item.danger {
-  color: #d83a3a;
+  color: var(--danger);
+}
+
+.menu-item-icon {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.menu-divider {
+  height: 1px;
+  background: var(--border);
+  margin: 0.35rem 0.2rem;
 }
 
 .status-warning {

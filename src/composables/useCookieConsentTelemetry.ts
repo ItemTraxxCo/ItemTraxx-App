@@ -50,20 +50,14 @@ export const useCookieConsentTelemetry = (auth: ConsentAuthState) => {
     savePreferences({ analytics: true, diagnostics: true });
   };
 
-  const handleStorage = (event: StorageEvent) => {
-    if (!event.key || event.key === "itemtraxx-cookie-consent") sync();
-  };
-
   watch(() => auth.role, syncConsentRecord);
 
   onMounted(() => {
     sync();
-    window.addEventListener("storage", handleStorage);
     window.addEventListener("itemtraxx:cookie-consent", sync);
   });
 
   onScopeDispose(() => {
-    window.removeEventListener("storage", handleStorage);
     window.removeEventListener("itemtraxx:cookie-consent", sync);
   });
 

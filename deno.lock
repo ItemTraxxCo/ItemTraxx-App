@@ -14,7 +14,7 @@
     "npm:jsbarcode@^3.12.3": "3.12.3",
     "npm:jspdf-autotable@^5.0.8": "5.0.8_jspdf@4.2.1",
     "npm:jspdf@^4.2.1": "4.2.1",
-    "npm:posthog-js@^1.407.2": "1.407.2",
+    "npm:posthog-js@^1.407.3": "1.407.3",
     "npm:supabase@2.109.1": "2.109.1",
     "npm:typescript@~6.0.3": "6.0.3",
     "npm:vite@^8.1.5": "8.1.5_@types+node@26.1.1",
@@ -587,8 +587,8 @@
     "@poppinss/exception@1.2.3": {
       "integrity": "sha512-dCED+QRChTVatE9ibtoaxc+WkdzOSjYTKi/+uacHWIsfodVfpsueo3+DKpgU5Px8qXjgmXkSvhXvSCz3fnP9lw=="
     },
-    "@posthog/browser-common@0.2.1": {
-      "integrity": "sha512-FTVPsRw6GBKWvFwN26TNIQNNYPR9FsUj+B+CKhk/ht63IRzn4yYFtFOjcmW+bfXvNHuRADs6APbZ6Haz1kpoAw==",
+    "@posthog/browser-common@0.2.2": {
+      "integrity": "sha512-4NHumu2lx7pMeucDLfXnDmeP5CV2oVWY8jBpXBwBUjoYwkQxB7Z3A6q9oDydw+/iSAGl6MaPqW9gsnRK8AvqLA==",
       "dependencies": [
         "@posthog/core",
         "@posthog/types"
@@ -1797,8 +1797,8 @@
         "source-map-js"
       ]
     },
-    "posthog-js@1.407.2": {
-      "integrity": "sha512-5deTvXopn+NJWEmCUw8Ix/ms3cv2+60WJ73Vgbvu2wSkZY/FIj2uqAgCnq7IewGpGC+tH7CAbPYFzH6hw8eW1w==",
+    "posthog-js@1.407.3": {
+      "integrity": "sha512-b9Kc7HVN6nh+xsh1JrcLYHv9bbYLwYUM9belJtNVUFZSJWWfFcZRJJP6L+KeanAeu2VxSFSpioVA39pjjolv4A==",
       "dependencies": [
         "@posthog/browser-common",
         "@posthog/core",
@@ -2459,7 +2459,7 @@
         "npm:jsbarcode@^3.12.3",
         "npm:jspdf-autotable@^5.0.8",
         "npm:jspdf@^4.2.1",
-        "npm:posthog-js@^1.407.2",
+        "npm:posthog-js@^1.407.3",
         "npm:supabase@2.109.1",
         "npm:typescript@~6.0.3",
         "npm:vite@^8.1.5",

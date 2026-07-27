@@ -38,9 +38,13 @@ jobs:
 
       - name: Install Strix
         env:
-          STRIX_VERSION: 1.1.0
-          # SHA-256 published for strix-1.1.0-linux-x86_64.tar.gz.
-          STRIX_SHA256: 7e8be841b9195a16e038eaa43e69452dc616fb19ca6979afbcaa9d842960e7e7
+          # Pinned below v1.1.0: Caido was introduced in v1.1.0 and its sandbox
+          # bootstrap race ("Could not acquire a connection to the database")
+          # 500s all outbound sandbox traffic, including the LLM warm-up call.
+          # See https://github.com/usestrix/strix/issues/830.
+          STRIX_VERSION: 1.0.4
+          # SHA-256 published for strix-1.0.4-linux-x86_64.tar.gz.
+          STRIX_SHA256: cdde264d2163684ca07168252130df154842d5fb22cd8e00bc6d19f1c74d5dae
         run: |
           strix_dir="$RUNNER_TEMP/strix-${STRIX_VERSION}"
           strix_archive="$strix_dir/strix.tar.gz"

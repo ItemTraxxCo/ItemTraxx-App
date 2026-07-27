@@ -62,6 +62,8 @@ jobs:
             ghcr.io/usestrix/strix-sandbox:1.0.0 \
             sh -c '
               set -x
+              curl -sS --max-time 10 https://ifconfig.me || echo "ifconfig.me curl failed rc=$?"
+              echo
               curl -sS -o /dev/null -w "models_endpoint http_code=%{http_code} time=%{time_total}s\n" --max-time 20 \
                 https://integrate.api.nvidia.com/v1/models || echo "models endpoint curl failed rc=$?"
               curl -sS -o /tmp/chat_resp.json -w "chat_completions http_code=%{http_code} time=%{time_total}s\n" --max-time 60 \

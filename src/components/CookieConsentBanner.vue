@@ -31,22 +31,22 @@
         <div class="cookie-consent-collapse" :class="{ 'is-open': expanded }">
           <div class="cookie-consent-panel">
             <div class="cookie-consent-panel-inner">
-              <div class="cookie-consent-option">
+              <label class="cookie-consent-option">
                 <span class="cookie-consent-option-name">Analytics</span>
-                <label class="cookie-consent-switch">
+                <span class="cookie-consent-switch">
                   <input v-model="analytics" type="checkbox" />
                   <span class="cookie-consent-switch-track"></span>
                   <span class="cookie-consent-switch-thumb"></span>
-                </label>
-              </div>
-              <div class="cookie-consent-option">
+                </span>
+              </label>
+              <label class="cookie-consent-option">
                 <span class="cookie-consent-option-name">Diagnostics</span>
-                <label class="cookie-consent-switch">
+                <span class="cookie-consent-switch">
                   <input v-model="diagnostics" type="checkbox" />
                   <span class="cookie-consent-switch-track"></span>
                   <span class="cookie-consent-switch-thumb"></span>
-                </label>
-              </div>
+                </span>
+              </label>
               <div class="cookie-consent-panel-actions">
                 <button
                   type="button"
@@ -188,6 +188,7 @@ const expanded = ref(false);
   justify-content: space-between;
   padding: 0.55rem 0;
   border-bottom: 1px solid var(--border);
+  cursor: pointer;
 }
 
 .cookie-consent-option:last-of-type {
@@ -211,6 +212,7 @@ const expanded = ref(false);
   height: 100%;
   margin: 0;
   position: absolute;
+  z-index: 1;
   cursor: pointer;
 }
 

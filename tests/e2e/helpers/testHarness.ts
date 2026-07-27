@@ -1,5 +1,17 @@
 import type { BrowserContext, Page } from "@playwright/test";
 
+export const readCookieConsentPreferences = (page: Page) =>
+  page.evaluate(() => {
+    const match = document.cookie.match(/(?:^|; )itemtraxx-cookie-consent=([^;]*)/);
+    if (!match) return undefined;
+    return JSON.parse(decodeURIComponent(match[1]))?.preferences;
+  });
+
+export const clearCookieConsentCookie = (page: Page) =>
+  page.evaluate(() => {
+    document.cookie = "itemtraxx-cookie-consent=; Max-Age=0; Path=/; SameSite=Lax";
+  });
+
 export const mockSystemStatus = async (page: Page) => {
   await page.route(/\/functions(?:\/v1)?\/system-status(?:\?.*)?$/, async (route) => {
     await route.fulfill({

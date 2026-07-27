@@ -21,7 +21,14 @@ jobs:
 
   strix-security-scan:
     needs: kill-switch-preflight
-    if: ${{ (github.event_name == 'workflow_dispatch' || (github.event.pull_request.base.ref == 'preview' && github.event.pull_request.head.ref == 'staging')) && needs.kill-switch-preflight.outputs.active != 'true' }}
+    # Disabled: Strix's sandbox image has a Caido bootstrap race
+    # ("Could not acquire a connection to the database") that 500s all
+    # outbound sandbox traffic, including the LLM warm-up call. Confirmed
+    # this is independent of the Strix CLI version (reproduces on both
+    # v1.1.0 and v1.0.4), so it lives in the shared sandbox image, not
+    # something we can pin around. Re-enable once fixed upstream:
+    # https://github.com/usestrix/strix/issues/830
+    if: false && ((github.event_name == 'workflow_dispatch' || (github.event.pull_request.base.ref == 'preview' && github.event.pull_request.head.ref == 'staging')) && needs.kill-switch-preflight.outputs.active != 'true')
     permissions:
       contents: read
       pull-requests: write
@@ -52,6 +59,27 @@ jobs:
           tar -xzf "$strix_archive" -C "$strix_dir"
           install -m 0755 "$strix_dir/strix-${STRIX_VERSION}-linux-x86_64" "$strix_dir/bin/strix"
           echo "$strix_dir/bin" >> "$GITHUB_PATH"
+
+      - name: Debug - NIM reachability from sandbox container
+        env:
+          LLM_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
+        run: |
+          docker pull ghcr.io/usestrix/strix-sandbox:1.0.0
+          docker run --rm -e LLM_API_KEY \
+            ghcr.io/usestrix/strix-sandbox:1.0.0 \
+            sh -c '
+              set -x
+              curl -sS --max-time 10 https://ifconfig.me || echo "ifconfig.me curl failed rc=$?"
+              echo
+              curl -sS -o /dev/null -w "models_endpoint http_code=%{http_code} time=%{time_total}s\n" --max-time 20 \
+                https://integrate.api.nvidia.com/v1/models || echo "models endpoint curl failed rc=$?"
+              curl -sS -o /tmp/chat_resp.json -w "chat_completions http_code=%{http_code} time=%{time_total}s\n" --max-time 60 \
+                -H "Authorization: Bearer $LLM_API_KEY" \
+                -H "Content-Type: application/json" \
+                -d "{\"model\":\"deepseek-ai/deepseek-v4-flash\",\"messages\":[{\"role\":\"user\",\"content\":\"hi\"}],\"max_tokens\":8}" \
+                https://integrate.api.nvidia.com/v1/chat/completions || echo "chat completions curl failed rc=$?"
+              cat /tmp/chat_resp.json || true
+            '
 
       - name: Run Strix security scan
         id: strix-scan

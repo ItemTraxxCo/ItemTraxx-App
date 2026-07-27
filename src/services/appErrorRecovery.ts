@@ -14,7 +14,7 @@ let recoveryInstalled = false;
 
 export const isRecoverableChunkLoadError = (error: unknown) => {
   const message = error instanceof Error ? error.message : String(error ?? "");
-  return /failed to fetch dynamically imported module|error loading dynamically imported module|importing a module script failed/i
+  return /failed to fetch dynamically imported module|error loading dynamically imported module|importing a module script failed|couldn't resolve component/i
     .test(message);
 };
 

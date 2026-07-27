@@ -40,24 +40,37 @@ def finding_summary(result: object) -> tuple[str, str, str]:
     return (severity, rule_id, location)
 
 
-def collect_findings(findings_root: Path) -> list[tuple[str, str, str]]:
+def collect_findings(findings_root: Path) -> tuple[list[tuple[str, str, str]], bool]:
     findings = []
+    sarif_found = False
     for path in findings_root.glob("**/findings.sarif"):
+        sarif_found = True
         with path.open(encoding="utf-8") as report_file:
             report = json.load(report_file)
         for sarif_run in report.get("runs", []):
             if isinstance(sarif_run, dict):
                 for result in sarif_run.get("results", []):
                     findings.append(finding_summary(result))
-    return findings
+    return findings, sarif_found
 
 
-def build_comment(exit_code: str, findings: list[tuple[str, str, str]]) -> str:
-    if exit_code == "0" and not findings:
+def build_comment(
+    exit_code: str,
+    findings: list[tuple[str, str, str]],
+    sarif_found: bool,
+) -> str:
+    if exit_code == "0" and not findings and sarif_found:
         lines = [
             MARKER,
             "## Strix security scan",
             "Strix completed the security scan and found no exploitable vulnerabilities.",
+        ]
+    elif exit_code == "0" and not findings and not sarif_found:
+        lines = [
+            MARKER,
+            "## Strix security scan",
+            "Strix completed, but no SARIF report was found, so results can't be summarized here. "
+            "Review the Strix results artifact on this workflow run for the actual output.",
         ]
     elif findings:
         visible_findings = findings[:MAX_FINDINGS_IN_COMMENT]
@@ -88,7 +101,8 @@ def main() -> None:
     parser.add_argument("--output", type=Path)
     args = parser.parse_args()
 
-    comment = build_comment(args.exit_code, collect_findings(args.findings_root))
+    findings, sarif_found = collect_findings(args.findings_root)
+    comment = build_comment(args.exit_code, findings, sarif_found)
     output = args.output or Path(os.environ.get("RUNNER_TEMP", ".")) / "strix-pr-comment.md"
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(comment, encoding="utf-8")

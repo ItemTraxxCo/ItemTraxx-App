@@ -15,6 +15,9 @@ Changes are dated based on the default timezone: America/Los_Angeles
 - Narrowed the data gateway to only the records the app actually uses.
 - Improved status page efficiency with short-term caching and request limits.
 - Expanded automated security checks in CI.
+- Refreshed the cookie preferences banner and top navigation menu with a cleaner look and smoother animations.
+- Cookie preference choices now stay consistent as you move between the marketing site and your workspace.
+- Minor accessibility improvements to cookie preference controls.
 
 ### 7/25/2026 Development Update
 

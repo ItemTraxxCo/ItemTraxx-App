@@ -1,6 +1,7 @@
 const COOKIE_CONSENT_STORAGE_KEY = "itemtraxx-cookie-consent";
 const COOKIE_CONSENT_VERSION = 2;
 const COOKIE_CONSENT_SUBJECT_KEY = "itemtraxx-cookie-consent-subject";
+const COOKIE_MAX_AGE_SECONDS = 60 * 60 * 24 * 365;
 
 export type CookieConsentPreferences = {
   analytics: boolean;
@@ -13,18 +14,54 @@ export type CookieConsentState = {
   updatedAt: string;
 };
 
-const isBrowser = () => typeof window !== "undefined" && typeof window.localStorage !== "undefined";
+const isBrowser = () => typeof window !== "undefined" && typeof document !== "undefined";
+
+const getCookieDomain = (): string | undefined => {
+  const hostname = window.location.hostname.toLowerCase();
+  if (hostname === "itemtraxx.com" || hostname.endsWith(".itemtraxx.com")) return ".itemtraxx.com";
+  return undefined;
+};
+
+const readCookie = (name: string): string | null => {
+  const match = document.cookie.match(new RegExp(`(?:^|; )${name}=([^;]*)`));
+  return match ? decodeURIComponent(match[1]) : null;
+};
+
+const writeCookie = (name: string, value: string) => {
+  const domain = getCookieDomain();
+  const parts = [
+    `${name}=${encodeURIComponent(value)}`,
+    "Path=/",
+    `Max-Age=${COOKIE_MAX_AGE_SECONDS}`,
+    "SameSite=Lax",
+  ];
+  if (domain) parts.push(`Domain=${domain}`);
+  if (window.location.protocol === "https:") parts.push("Secure");
+  document.cookie = parts.join("; ");
+};
+
+const migrateFromLocalStorage = (key: string): string | null => {
+  if (typeof window.localStorage === "undefined") return null;
+  try {
+    const legacy = window.localStorage.getItem(key);
+    if (!legacy) return null;
+    window.localStorage.removeItem(key);
+    return legacy;
+  } catch {
+    return null;
+  }
+};
 
 export const readCookieConsent = (): CookieConsentState | null => {
   if (!isBrowser()) return null;
   try {
-    const raw = window.localStorage.getItem(COOKIE_CONSENT_STORAGE_KEY);
+    const raw = readCookie(COOKIE_CONSENT_STORAGE_KEY) ?? migrateFromLocalStorage(COOKIE_CONSENT_STORAGE_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw) as Partial<CookieConsentState>;
     if (parsed.version === 1 && (parsed as { choice?: unknown }).choice) {
       const choice = (parsed as { choice?: unknown }).choice;
       if ((choice === "essential" || choice === "all") && typeof parsed.updatedAt === "string") {
-        return {
+        const migrated: CookieConsentState = {
           version: COOKIE_CONSENT_VERSION,
           preferences: {
             analytics: choice === "all",
@@ -32,6 +69,8 @@ export const readCookieConsent = (): CookieConsentState | null => {
           },
           updatedAt: parsed.updatedAt,
         };
+        writeCookie(COOKIE_CONSENT_STORAGE_KEY, JSON.stringify(migrated));
+        return migrated;
       }
     }
     if (
@@ -42,11 +81,13 @@ export const readCookieConsent = (): CookieConsentState | null => {
     ) {
       return null;
     }
-    return {
+    const state: CookieConsentState = {
       version: COOKIE_CONSENT_VERSION,
       preferences: parsed.preferences,
       updatedAt: parsed.updatedAt,
     };
+    writeCookie(COOKIE_CONSENT_STORAGE_KEY, JSON.stringify(state));
+    return state;
   } catch {
     return null;
   }
@@ -60,19 +101,22 @@ export const writeCookieConsent = (preferences: CookieConsentPreferences) => {
     updatedAt: new Date().toISOString(),
   };
   try {
-    window.localStorage.setItem(COOKIE_CONSENT_STORAGE_KEY, JSON.stringify(next));
+    writeCookie(COOKIE_CONSENT_STORAGE_KEY, JSON.stringify(next));
     window.dispatchEvent(new CustomEvent("itemtraxx:cookie-consent", { detail: next }));
   } catch {
-    // Ignore localStorage failures.
+    // Ignore cookie write failures.
   }
 };
 
 export const getOrCreateCookieConsentSubject = () => {
   if (!isBrowser()) return "";
-  const existing = window.localStorage.getItem(COOKIE_CONSENT_SUBJECT_KEY);
-  if (existing) return existing;
+  const existing = readCookie(COOKIE_CONSENT_SUBJECT_KEY) ?? migrateFromLocalStorage(COOKIE_CONSENT_SUBJECT_KEY);
+  if (existing) {
+    writeCookie(COOKIE_CONSENT_SUBJECT_KEY, existing);
+    return existing;
+  }
   const subject = crypto.randomUUID();
-  window.localStorage.setItem(COOKIE_CONSENT_SUBJECT_KEY, subject);
+  writeCookie(COOKIE_CONSENT_SUBJECT_KEY, subject);
   return subject;
 };
 

@@ -199,6 +199,7 @@ onUnmounted(() => {
   color: inherit;
   font: inherit;
   cursor: pointer;
+  outline: none;
   transition: transform 160ms ease;
 }
 

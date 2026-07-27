@@ -1,5 +1,10 @@
 import { expect, test } from "@playwright/test";
-import { mockSystemStatus, mockUnauthenticatedSession } from "./helpers/testHarness";
+import {
+  clearCookieConsentCookie,
+  mockSystemStatus,
+  mockUnauthenticatedSession,
+  readCookieConsentPreferences,
+} from "./helpers/testHarness";
 
 test.describe("Privacy and legal controls", () => {
   test.beforeEach(async ({ page }) => {
@@ -10,16 +15,11 @@ test.describe("Privacy and legal controls", () => {
   test("stores independent analytics and diagnostics preferences", async ({ page }) => {
     await page.goto("/");
 
-    await page.getByLabel("Optional cookie categories").getByLabel("Analytics").check();
+    await page.getByRole("button", { name: "Manage preferences" }).click();
+    await page.getByRole("checkbox", { name: "Analytics" }).check();
     await page.getByRole("button", { name: "Save choices" }).click();
 
-    const stored = await page.evaluate(() =>
-      JSON.parse(localStorage.getItem("itemtraxx-cookie-consent") ?? "null")
-    );
-    expect(stored).toMatchObject({
-      version: 2,
-      preferences: { analytics: true, diagnostics: false },
-    });
+    await expect.poll(() => readCookieConsentPreferences(page)).toEqual({ analytics: true, diagnostics: false });
     await page.reload();
     await expect(page.getByRole("dialog", { name: "Cookie preferences" })).toHaveCount(0);
   });
@@ -27,16 +27,12 @@ test.describe("Privacy and legal controls", () => {
   test("stores essential-only and accept-all choices accurately", async ({ page }) => {
     await page.goto("/");
     await page.getByRole("button", { name: "Essential only" }).click();
-    await expect.poll(() => page.evaluate(() =>
-      JSON.parse(localStorage.getItem("itemtraxx-cookie-consent") ?? "null")?.preferences
-    )).toEqual({ analytics: false, diagnostics: false });
+    await expect.poll(() => readCookieConsentPreferences(page)).toEqual({ analytics: false, diagnostics: false });
 
-    await page.evaluate(() => localStorage.removeItem("itemtraxx-cookie-consent"));
+    await clearCookieConsentCookie(page);
     await page.reload();
     await page.getByRole("button", { name: "Accept all" }).click();
-    await expect.poll(() => page.evaluate(() =>
-      JSON.parse(localStorage.getItem("itemtraxx-cookie-consent") ?? "null")?.preferences
-    )).toEqual({ analytics: true, diagnostics: true });
+    await expect.poll(() => readCookieConsentPreferences(page)).toEqual({ analytics: true, diagnostics: true });
   });
 
   test("does not load PostHog or retain its persistence before consent", async ({ page, context }) => {

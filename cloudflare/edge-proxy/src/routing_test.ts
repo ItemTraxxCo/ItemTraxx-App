@@ -1,7 +1,9 @@
 import {
   getFunctionName,
+  getRestTableName,
   getRpcFunctionName,
   getSessionAction,
+  isAllowedRestRequest,
   isAllowedRpcProxyPath,
   isBlockedRpcProxyPath,
   isRestProxyPath,
@@ -262,5 +264,74 @@ Deno.test("deep percent nesting fails closed within a bounded routing budget", (
     `deeply nested RPC detection exceeded its 100ms budget: ${
       elapsedMs.toFixed(1)
     }ms`,
+  );
+});
+
+Deno.test("REST allowlist admits only the relations and methods the SPA uses", () => {
+  const readable = [
+    "items",
+    "borrowers",
+    "item_logs",
+    "item_access_grants",
+    "borrower_access_grants",
+    "profiles",
+    "workspaces",
+    "admin_audit_logs",
+  ];
+  for (const table of readable) {
+    assert(
+      isAllowedRestRequest(`/rest/v1/${table}`, "GET"),
+      `${table} must stay readable`,
+    );
+    assert(
+      isAllowedRestRequest(`/rest/v1/${table}`, "HEAD"),
+      `${table} must stay countable`,
+    );
+  }
+
+  assert(
+    isAllowedRestRequest("/rest/v1/admin_audit_logs", "POST"),
+    "browser audit-log insert must stay allowed",
+  );
+  assert(
+    !isAllowedRestRequest("/rest/v1/items", "POST"),
+    "item writes must go through admin-item-mutate",
+  );
+  assert(
+    !isAllowedRestRequest("/rest/v1/borrowers", "PATCH"),
+    "borrower writes must go through admin-borrower-mutate",
+  );
+  assert(
+    !isAllowedRestRequest("/rest/v1/workspace_policies", "PATCH"),
+    "entitlement writes must go through admin-ops/super-ops",
+  );
+  assert(
+    !isAllowedRestRequest("/rest/v1/admin_audit_logs", "DELETE"),
+    "audit rows must not be deletable from a browser",
+  );
+});
+
+Deno.test("REST allowlist rejects unlisted, nested, and encoded relation names", () => {
+  for (const path of [
+    "/rest/v1/super_admin_sessions",
+    "/rest/v1/privileged_session_stepups",
+    "/rest/v1/account_sessions",
+    "/rest/v1/workspace_security_controls",
+    "/rest/v1/rpc/run_data_retention",
+    "/rest/v1/items/extra",
+    "/rest/v1/it%65ms",
+    "/rest/v1/",
+  ]) {
+    assert(
+      !isAllowedRestRequest(path, "GET"),
+      `unlisted or non-canonical path must be denied: ${path}`,
+    );
+  }
+
+  assertEquals(getRestTableName("/rest/v1/items"), "items", "table extraction");
+  assertEquals(
+    getRestTableName("/rest/v1/rpc/consume_rate_limit"),
+    "",
+    "rpc subpaths are not tables",
   );
 });

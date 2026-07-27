@@ -58,7 +58,6 @@
     <AuthenticatedNavigation
       :visible="showTopMenu"
       :show-notification-bell="showNotificationBell"
-      :is-outdated="isOutdated"
       :menu-open="menuOpen"
       :theme-label="themeLabel"
       :show-account-panel="showAccountPanel"

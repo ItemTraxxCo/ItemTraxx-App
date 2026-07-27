@@ -97,7 +97,7 @@ test.describe("Super admin flows and export actions", () => {
     await navigateApp(page, "/super-admin");
 
     await page.getByRole("button", { name: "Open menu" }).click();
-    await expect(page.getByRole("menuitem", { name: "Log Out User" })).toBeVisible();
+    await expect(page.getByRole("menuitem", { name: "Sign out" })).toBeVisible();
   });
 
   test("control-center actions preserve their exact request envelopes", async ({ page }) => {

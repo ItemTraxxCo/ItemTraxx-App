@@ -1,6 +1,12 @@
 import { expect, test } from "@playwright/test";
 import { readFile } from "node:fs/promises";
-import { mockSystemStatus, mockUnauthenticatedSession, navigateApp } from "./helpers/testHarness";
+import {
+  clearCookieConsentCookie,
+  mockSystemStatus,
+  mockUnauthenticatedSession,
+  navigateApp,
+  readCookieConsentPreferences,
+} from "./helpers/testHarness";
 
 const forbiddenSdkResponse = (url: string) => {
   const filename = new URL(url).pathname.split("/").pop()?.toLowerCase() ?? "";
@@ -52,6 +58,7 @@ test.describe("Public surfaces", () => {
         { level: 3, name: "Built for teams, organizations, and individual users." },
         { level: 2, name: "Answers to the common stuff." },
         { level: 2, name: "Get started with ItemTraxx and advance your inventory management." },
+        { level: 2, name: "Cookie preferences" },
       ]);
 
       const primaryNav = page.getByRole("navigation", { name: "Primary" });
@@ -635,11 +642,7 @@ test.describe("Public surfaces", () => {
     await page.goto("/login");
 
     await page.getByRole("button", { name: "Accept all" }).click();
-    await expect.poll(() =>
-      page.evaluate(() =>
-        JSON.parse(localStorage.getItem("itemtraxx-cookie-consent") ?? "null")?.preferences,
-      ),
-    ).toEqual({ analytics: true, diagnostics: true });
+    await expect.poll(() => readCookieConsentPreferences(page)).toEqual({ analytics: true, diagnostics: true });
 
     await page.getByRole("button", { name: "Open menu" }).click();
     await page.getByRole("menuitem", { name: "Dark Mode" }).click();
@@ -651,35 +654,24 @@ test.describe("Public surfaces", () => {
     await expect(page.getByRole("button", { name: "Accept all" })).toHaveCount(0);
   });
 
-  test("essential and custom consent synchronize through storage and custom events", async ({ page }) => {
+  test("essential and custom consent synchronize through custom events", async ({ page }) => {
     await page.goto("/login");
     const consentDialog = page.getByRole("dialog", { name: "Cookie preferences" });
 
     await consentDialog.getByRole("button", { name: "Essential only" }).click();
-    await expect.poll(() =>
-      page.evaluate(() =>
-        JSON.parse(localStorage.getItem("itemtraxx-cookie-consent") ?? "null")?.preferences,
-      ),
-    ).toEqual({ analytics: false, diagnostics: false });
+    await expect.poll(() => readCookieConsentPreferences(page)).toEqual({ analytics: false, diagnostics: false });
 
-    await page.evaluate(() => {
-      localStorage.removeItem("itemtraxx-cookie-consent");
-      window.dispatchEvent(new StorageEvent("storage", { key: "itemtraxx-cookie-consent" }));
-    });
+    await clearCookieConsentCookie(page);
+    await page.evaluate(() => window.dispatchEvent(new CustomEvent("itemtraxx:cookie-consent")));
     await expect(consentDialog).toBeVisible();
 
+    await consentDialog.getByRole("button", { name: "Manage preferences" }).click();
     await consentDialog.getByRole("checkbox", { name: "Analytics" }).check();
     await consentDialog.getByRole("button", { name: "Save choices" }).click();
-    await expect.poll(() =>
-      page.evaluate(() =>
-        JSON.parse(localStorage.getItem("itemtraxx-cookie-consent") ?? "null")?.preferences,
-      ),
-    ).toEqual({ analytics: true, diagnostics: false });
+    await expect.poll(() => readCookieConsentPreferences(page)).toEqual({ analytics: true, diagnostics: false });
 
-    await page.evaluate(() => {
-      localStorage.removeItem("itemtraxx-cookie-consent");
-      window.dispatchEvent(new CustomEvent("itemtraxx:cookie-consent"));
-    });
+    await clearCookieConsentCookie(page);
+    await page.evaluate(() => window.dispatchEvent(new CustomEvent("itemtraxx:cookie-consent")));
     await expect(consentDialog).toBeVisible();
   });
 

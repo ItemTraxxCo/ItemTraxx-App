@@ -12,6 +12,8 @@ import { buildError, buildJson } from "./responses.ts";
 import {
   getFunctionName,
   getSessionAction,
+  isAllowedRestRequest,
+  isAllowedRpcProxyPath,
   isBlockedRpcProxyPath,
   isRestProxyPath,
   isRpcProxyPath,
@@ -107,6 +109,15 @@ export default {
           request.headers.get("x-itx-data-request") !== "1"
         ) {
           return buildError(400, "Invalid data request", headers, requestId);
+        }
+        // Table/method allowlist for the PostgREST pass-through. RPC paths keep
+        // their own allowlist (checked above); everything else must be a
+        // relation the SPA actually uses, so schema-level privilege drift
+        // cannot become a browser-reachable data path.
+        const isRpcPath = isRpcProxyPath(url.pathname) ||
+          isAllowedRpcProxyPath(url.pathname);
+        if (!isRpcPath && !isAllowedRestRequest(url.pathname, request.method)) {
+          return buildError(403, "Data request not allowed", headers, requestId);
         }
         const response = await proxySupabaseApiRequest(
           request,

@@ -18,6 +18,42 @@ export const getSessionAction = (pathname: string) =>
 export const isRestProxyPath = (pathname: string) =>
   pathname.startsWith("/rest/v1/");
 
+// The SPA reaches PostgREST through exactly one client
+// (src/services/authenticatedDataClient.ts) and touches a small, fixed set of
+// relations. Enumerating them here keeps the proxy from being a generic
+// database gateway: a future over-broad GRANT or policy is no longer reachable
+// from a browser just because it exists in the schema.
+const READABLE_REST_TABLES = new Set([
+  "items",
+  "borrowers",
+  "item_logs",
+  "item_access_grants",
+  "borrower_access_grants",
+  "profiles",
+  "workspaces",
+]);
+
+// admin_audit_logs is the one relation the browser writes directly
+// (src/services/auditLogService.ts). Its INSERT policy pins actor_id to
+// auth.uid() and the row's workspace, and no UPDATE/DELETE policy exists.
+const WRITABLE_REST_TABLES = new Set(["admin_audit_logs"]);
+
+export const getRestTableName = (pathname: string) =>
+  readExactSegment(pathname, "/rest/v1/");
+
+export const isAllowedRestRequest = (pathname: string, method: string) => {
+  const table = getRestTableName(pathname);
+  if (!table) return false;
+  const normalizedMethod = method.toUpperCase();
+  if (normalizedMethod === "GET" || normalizedMethod === "HEAD") {
+    return READABLE_REST_TABLES.has(table) || WRITABLE_REST_TABLES.has(table);
+  }
+  if (normalizedMethod === "POST") {
+    return WRITABLE_REST_TABLES.has(table);
+  }
+  return false;
+};
+
 export const isRpcProxyPath = (pathname: string) =>
   pathname === "/rpc" || pathname.startsWith("/rpc/");
 

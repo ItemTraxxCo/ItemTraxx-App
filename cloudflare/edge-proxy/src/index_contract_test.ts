@@ -403,7 +403,7 @@ Deno.test("Data API mutations require the explicit mutation header", async () =>
   }) as typeof fetch;
   try {
     const rejected = await worker.fetch(
-      new Request("https://edge.itemtraxx.com/rest/v1/items", {
+      new Request("https://edge.itemtraxx.com/rest/v1/admin_audit_logs", {
         method: "POST",
         headers: { origin: ORIGIN, authorization: "Bearer caller" },
         body: "fixture",
@@ -413,8 +413,27 @@ Deno.test("Data API mutations require the explicit mutation header", async () =>
     );
     assertEquals(rejected.status, 400, "missing data mutation header");
 
-    const allowed = await worker.fetch(
+    // items is deliberately not writable through the Data API proxy: item
+    // mutations must go through admin-item-mutate, which enforces barcode
+    // format, the checkout guards, soft-delete semantics, and audit logging.
+    const notWritable = await worker.fetch(
       new Request("https://edge.itemtraxx.com/rest/v1/items", {
+        method: "POST",
+        headers: {
+          origin: ORIGIN,
+          authorization: "Bearer caller",
+          "content-type": "application/octet-stream",
+          "x-itx-data-request": "1",
+        },
+        body: "fixture",
+      }),
+      baseEnv(),
+      createContext().ctx,
+    );
+    assertEquals(notWritable.status, 403, "unlisted table write is refused");
+
+    const allowed = await worker.fetch(
+      new Request("https://edge.itemtraxx.com/rest/v1/admin_audit_logs", {
         method: "POST",
         headers: {
           origin: ORIGIN,

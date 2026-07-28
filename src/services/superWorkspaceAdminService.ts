@@ -37,7 +37,5 @@ export const createWorkspaceAdmin = (
   });
 export const setWorkspaceAdminStatus = (id: string, is_active: boolean) =>
   call<SuperWorkspaceAdmin>("set_workspace_admin_status", { id, is_active });
-export const updateWorkspaceAdminEmail = (id: string, auth_email: string) =>
-  call<SuperWorkspaceAdmin>("update_workspace_admin_email", { id, auth_email });
 export const sendWorkspaceAdminReset = (id: string) =>
   call<{ success: boolean }>("send_workspace_admin_reset", { id });

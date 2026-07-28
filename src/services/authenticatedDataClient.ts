@@ -176,19 +176,3 @@ export const authenticatedRpc = async <TData>(
     options
   );
 };
-
-export const authenticatedCount = async (table: string, query: Record<string, string>) => {
-  const search = new URLSearchParams({ ...query, select: query.select ?? "id" });
-  const response = await request(`/rest/v1/${table}?${search.toString()}`, {
-    method: "HEAD",
-    headers: {
-      Prefer: "count=exact",
-    },
-  });
-  const contentRange = response.headers.get("content-range") ?? "";
-  const match = contentRange.match(/\/(\d+)$/);
-  if (!match) {
-    throw new Error("Authenticated count request missing content-range. Please contact support.");
-  }
-  return Number(match[1]);
-};

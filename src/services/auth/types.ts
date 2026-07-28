@@ -8,8 +8,6 @@ export const normalizeFunctionTarget = (value: string | undefined, fallback: str
   try { const parts=new URL(trimmed).pathname.split("/").filter(Boolean); return parts.at(-1)||fallback; }
   catch { const parts=trimmed.split("/").filter(Boolean); return parts.at(-1)||fallback; }
 };
-export const normalizeLoginNotificationLocation = (value: string|null): LoginNotificationLocation|null =>
-  ["account_login","workspace_admin_login","super_admin_login","regular_login","admin_login"].includes(value??"") ? value as LoginNotificationLocation : null;
 export const toAccountSessionLocation = (value: LoginNotificationLocation|null|undefined): AccountSessionLocation|null => {
   if (!value) return null; return value === "admin_login" || value === "workspace_admin_login" ? "admin_login" : value === "super_admin_login" ? null : "regular_login";
 };

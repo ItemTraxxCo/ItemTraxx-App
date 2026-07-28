@@ -29,7 +29,7 @@
       <div class="admin-summary-grid">
         <div class="admin-summary-card">
           <strong>{{ accountCategoryLabel }}</strong>
-          <span>Workspace type</span>
+          <span></span>
         </div>
         <div class="admin-summary-card">
           <strong>{{ planLabel }}</strong>

@@ -13,9 +13,49 @@ function getChangedFiles(base, head) {
     .filter(Boolean);
 }
 
+function getChangedEntries(base, head) {
+  if (!base || /^0+$/.test(base)) return [];
+  const diffRange = head ? `${base}...${head}` : `${base}...HEAD`;
+  const output = execFileSync('git', ['diff', '--name-status', '--find-renames', diffRange], {
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'inherit'],
+  });
+  return output
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => {
+      const parts = line.split('\t');
+      const status = parts[0] ?? '';
+      if (status.startsWith('R') || status.startsWith('C')) {
+        return {
+          status,
+          oldPath: parts[1] ?? '',
+          path: parts[2] ?? '',
+        };
+      }
+
+      return {
+        status,
+        oldPath: null,
+        path: parts[1] ?? '',
+      };
+    });
+}
+
+function isLegacySqlRelocation(entry) {
+  if (!entry.status.startsWith('R')) return false;
+  if (!entry.oldPath?.startsWith('supabase/sql/')) return false;
+  return (
+    entry.path.startsWith('supabase/manual/sql/') ||
+    entry.path.startsWith('supabase/archive/sql-legacy/')
+  );
+}
+
 const base = process.env.ITX_DIFF_BASE || process.argv[2] || 'HEAD~1';
 const head = process.env.ITX_DIFF_HEAD || process.argv[3] || 'HEAD';
 const changedFiles = getChangedFiles(base, head);
+const changedEntries = getChangedEntries(base, head);
 
 if (changedFiles.length === 0) {
   console.log(`No changed files detected for ${base}...${head}; skipping SQL/function coupling check.`);
@@ -40,6 +80,19 @@ const relatedFiles = changedFiles.filter(
     file.startsWith('docs/api/') ||
     file === 'scripts/check-privileged-rls-policies.mjs'
 );
+
+const sqlEntries = changedEntries.filter(
+  (entry) =>
+    entry.path.startsWith('supabase/sql/') ||
+    entry.path.startsWith('supabase/manual/sql/') ||
+    entry.path.startsWith('supabase/archive/sql-legacy/')
+);
+
+if (relatedFiles.length === 0 && sqlEntries.length > 0 && sqlEntries.every(isLegacySqlRelocation)) {
+  console.log('Only legacy SQL file relocations were detected; SQL/function coupling check passed.');
+  console.log(`Legacy SQL relocations: ${sqlEntries.length}`);
+  process.exit(0);
+}
 
 if (relatedFiles.length === 0) {
   console.error('SQL changes were detected without any related Edge Function, service, test, verification, or API contract updates.');

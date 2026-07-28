@@ -23,6 +23,7 @@ export type ItemLog = {
   action_type: string;
   action_time: string;
   performed_by: string | null;
+  tenant_account: { auth_email: string | null } | null;
   item: { name: string; barcode: string } | null;
   borrower: { username: string; borrower_id: string } | null;
 };
@@ -208,6 +209,16 @@ export const fetchItemLogs = async () => {
     }>;
   }>;
 
+  const performerIds = [...new Set(rows.flatMap((row) => row.performed_by ? [row.performed_by] : []))];
+  const performers = performerIds.length > 0
+    ? (await authenticatedSelect<Array<{ id: string; auth_email: string | null }>>("profiles", {
+      select: "id,auth_email",
+      workspace_id: `eq.${workspaceId}`,
+      id: `in.(${performerIds.join(",")})`,
+    })) ?? []
+    : [];
+  const performersById = new Map(performers.map((performer) => [performer.id, performer]));
+
   return rows.map((row) => ({
     id: row.id,
     workspace_id: row.workspace_id,
@@ -216,6 +227,7 @@ export const fetchItemLogs = async () => {
     action_type: row.action_type,
     action_time: row.action_time,
     performed_by: row.performed_by,
+    tenant_account: row.performed_by ? performersById.get(row.performed_by) ?? null : null,
     item: pickRelation(row.item),
     borrower: pickRelation(row.borrower),
   }));

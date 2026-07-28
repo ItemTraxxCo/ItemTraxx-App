@@ -870,6 +870,35 @@ test.describe("prepared offline checkout workflow contract", () => {
     await expect(page.getByText("You're offline. Keep this tab open—do not refresh, close it, log out, or clear browser data until you reconnect.")).toBeVisible();
   });
 
+  test("uses only the Offline Queue toast when buffering an offline checkout", async ({ page, context }) => {
+    await mockSystemStatus(page);
+    await page.evaluate(() => {
+      window.localStorage.setItem("itemtraxx-device-id", "device-e2e");
+      window.localStorage.setItem("itemtraxx:onboarding:v1:workspace_admin", new Date().toISOString());
+    });
+    await setWorkspaceAdminSession(page, "workspace-e2e");
+    await page.evaluate(async (pack) => {
+      const workflow = (window.__itemtraxxTest as typeof window.__itemtraxxTest & {
+        offlineCheckoutWorkflow: { writePack: (pack: unknown) => Promise<void> };
+      }).offlineCheckoutWorkflow;
+      await workflow.writePack(pack);
+    }, workflowPack());
+    await navigateApp(page, "/checkout");
+    const consentButton = page.getByRole("button", { name: "Essential only" });
+    if (await consentButton.isVisible()) await consentButton.click();
+    await context.setOffline(true);
+
+    await page.getByPlaceholder("Enter borrower ID").fill("STU-100");
+    await page.getByRole("button", { name: "Load borrower" }).click();
+    await expect(page.getByText("Maya Chen")).toBeVisible();
+    await page.getByPlaceholder("Scan or enter barcode").fill("ITEM-1");
+    await page.getByRole("button", { name: "Add barcode" }).click();
+    await page.getByRole("button", { name: "Complete transaction" }).click();
+
+    await expect(page.getByText("Offline Queue")).toBeVisible();
+    await expect(page.getByText("Transaction processing...")).toHaveCount(0);
+  });
+
   test("waits for a new account session without showing a disabled-account error or re-preparing a restored pack", async ({ page }) => {
     await mockSystemStatus(page);
     await mockAdminOps(page);

@@ -378,9 +378,11 @@ const submit = async () => {
   isSubmitting.value = true;
 
   try {
-    toastStatus.value = "Processing";
-    toastTitle.value = "Transaction processing...";
-    toastMessage.value = "Please wait while your transaction is processed.";
+    if (navigator.onLine) {
+      toastStatus.value = "Processing";
+      toastTitle.value = "Transaction processing...";
+      toastMessage.value = "Please wait while your transaction is processed.";
+    }
 
     if (barcodeInput.value.trim()) {
       await addBarcode();

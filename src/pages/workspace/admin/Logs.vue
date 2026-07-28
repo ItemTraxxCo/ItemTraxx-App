@@ -47,13 +47,14 @@
         </label>
       </div>
       <p class="muted">Showing {{ filteredLogs.length }} of {{ logs.length }} log entries.</p>
-      <SkeletonLoader v-if="isLoading" variant="table" :rows="7" :columns="4" label="Loading item logs" />
+      <SkeletonLoader v-if="isLoading" variant="table" :rows="7" :columns="5" label="Loading item logs" />
       <div v-else class="table-wrap">
       <table class="table">
         <thead>
           <tr>
             <th>Time</th>
             <th>Action</th>
+            <th class="tenant-account-column">Tenant Account</th>
             <th>Borrower</th>
             <th>Item</th>
           </tr>
@@ -62,6 +63,11 @@
           <tr v-for="log in filteredLogs" :key="log.id">
             <td>{{ formatTime(log.action_time) }}</td>
             <td>{{ log.action_type }}</td>
+            <td>
+              <span class="tenant-account-cell" :title="log.tenant_account?.auth_email || 'Unknown account'">
+                {{ log.tenant_account?.auth_email || "Unknown account" }}
+              </span>
+            </td>
             <td>
               <span v-if="log.borrower">
                 {{ log.borrower.username }} ({{ log.borrower.borrower_id }})
@@ -76,7 +82,7 @@
             </td>
           </tr>
           <tr v-if="!filteredLogs.length">
-            <td colspan="4" class="muted">No logs match your search. If you believe this is an error, please contact support.</td>
+            <td colspan="5" class="muted">No logs match your search. If you believe this is an error, please contact support.</td>
           </tr>
         </tbody>
       </table>
@@ -131,7 +137,8 @@ const filteredLogs = computed(() => {
       ? `${log.borrower.username} ${log.borrower.borrower_id}`.toLowerCase()
       : "";
     const item = log.item ? `${log.item.name} ${log.item.barcode}`.toLowerCase() : "";
-    return action.includes(query) || borrower.includes(query) || item.includes(query);
+    const tenantAccount = log.tenant_account?.auth_email?.toLowerCase() ?? "";
+    return action.includes(query) || borrower.includes(query) || item.includes(query) || tenantAccount.includes(query);
   });
 });
 
@@ -151,6 +158,7 @@ const exportRows = computed(() =>
   filteredLogs.value.map((log) => ({
     action_time: formatTime(log.action_time),
     action_type: log.action_type,
+    tenant_account: log.tenant_account?.auth_email ?? "",
     borrower: log.borrower
       ? `${log.borrower.username} (${log.borrower.borrower_id})`
       : "",
@@ -161,7 +169,7 @@ const exportRows = computed(() =>
 const exportCsv = () => {
   exportRowsToCsv(
     `item-logs-${new Date().toISOString().slice(0, 10)}.csv`,
-    ["action_time", "action_type", "borrower", "item"],
+    ["action_time", "action_type", "tenant_account", "borrower", "item"],
     exportRows.value
   );
 };
@@ -170,7 +178,7 @@ const exportPdf = async () => {
   await exportRowsToPdf(
     `item-logs-${new Date().toISOString().slice(0, 10)}.pdf`,
     "Item Logs Export",
-    ["action_time", "action_type", "borrower", "item"],
+    ["action_time", "action_type", "tenant_account", "borrower", "item"],
     exportRows.value
   );
 };
@@ -182,3 +190,15 @@ const formatTime = (value: string) => {
 
 onMounted(loadLogs);
 </script>
+
+<style scoped>
+.tenant-account-column { width: 13rem; }
+.tenant-account-cell {
+  display: inline-block;
+  max-width: min(24vw, 13rem);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  vertical-align: bottom;
+  white-space: nowrap;
+}
+</style>

@@ -148,14 +148,6 @@ serve(async (req) => {
     }
     const profile = profileRow as Profile;
 
-    const { data: workspace } = await userClient.from("workspaces").select(
-      "status",
-    )
-      .eq("id", profile.workspace_id).single();
-    if (!workspace || workspace.status !== "active") {
-      return jsonResponse(403, { error: "Workspace disabled" });
-    }
-
     const body = await readJsonBody(req, 256 * 1024);
     const action = requireEnum(body.action, ACTIONS);
     const deviceId = parseDeviceId(body.device_id);
@@ -173,7 +165,24 @@ serve(async (req) => {
         error: "Session controls unavailable. Run latest SQL setup.",
       });
     }
-    if (!session.valid) return jsonResponse(401, { error: "Session revoked" });
+    if (!session.valid) {
+      if (session.reason === "missing_session") {
+        return jsonResponse(409, {
+          error: "Offline session is still initializing. Please retry.",
+        });
+      }
+      return jsonResponse(401, { error: "Session revoked" });
+    }
+
+    const { data: workspace, error: workspaceError } = await adminClient
+      .from("workspaces")
+      .select("status")
+      .eq("id", profile.workspace_id)
+      .maybeSingle();
+    if (workspaceError) throw new Error("Unable to verify workspace status.");
+    if (!workspace || workspace.status !== "active") {
+      return jsonResponse(403, { error: "Workspace disabled" });
+    }
 
     const { data: maintenanceRow } = await adminClient
       .from("app_runtime_config").select("value")

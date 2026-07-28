@@ -89,7 +89,7 @@
       @save-preferences="consent.savePreferences"
     />
     <FatalErrorToast v-if="fatalErrorToast.visible" />
-    <OfflineQueueToast :count="offlineQueue.count.value" :tooltip="offlineQueue.tooltip.value" />
+    <OfflineQueueToast :count="offlineQueue.count.value" :syncing-count="offlineQueue.syncingCount.value" :tooltip="offlineQueue.tooltip.value" />
     <Analytics v-if="consent.showTelemetry.value" />
     <SpeedInsights v-if="consent.showTelemetry.value" />
   </div>

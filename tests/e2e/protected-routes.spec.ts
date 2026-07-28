@@ -52,7 +52,7 @@ test.describe("Protected route smoke tests", () => {
       );
     });
     await expect(toast).toBeVisible();
-    await expect(toast).toContainText("1 checkout waiting to sync.");
+    await expect(toast).toContainText("1 transaction waiting to sync.");
 
     await page.evaluate(async () => {
       await window.__itemtraxxTest?.offlineCheckoutQueue.write([]);

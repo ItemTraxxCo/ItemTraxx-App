@@ -73,15 +73,6 @@ export type AccountSessionTouchOptions = {
   loginLocation?: AccountSessionItem["login_location"];
 };
 
-export type WorkspaceAccountDashboardRow = {
-  profile_id: string;
-  auth_email: string;
-  item_count: number;
-  borrower_count: number;
-  active_checkouts: number;
-  overdue_count: number;
-};
-
 const requestCache = new Map<
   string,
   {
@@ -169,9 +160,6 @@ export const fetchStatusTracking = async () =>
     flagged_items: StatusTrackedItem[];
     history: StatusHistoryItem[];
   }>("get_status_tracking");
-
-export const fetchWorkspaceAccountDashboard = async () =>
-  callAdminOps<WorkspaceAccountDashboardRow[]>("get_workspace_dashboard");
 
 export const bulkImportItem = async (
   rows: Array<{

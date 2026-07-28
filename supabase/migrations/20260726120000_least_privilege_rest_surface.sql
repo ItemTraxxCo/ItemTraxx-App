@@ -104,23 +104,10 @@ $$;
 -- (verified -- all super pages call edge functions), and a super admin's own
 -- profile row is served by the role-independent self_select_profile policy.
 -- ---------------------------------------------------------------------------
--- has_recent_privileged_step_up() isn't provisioned on every environment yet.
--- Include the step-up predicate where it exists (prod); fall back to
--- role + non-revoked-session only where it doesn't (staging).
 do $$
 declare
   target record;
-  has_step_up boolean := to_regprocedure('public.has_recent_privileged_step_up(text)') is not null;
-  predicate text;
 begin
-  predicate := case when has_step_up then
-    $pred$(select public.current_user_role()) = 'super_admin'
-        and (select public.has_recent_privileged_step_up('super_admin'))
-        and (select private.super_admin_session_not_revoked())$pred$
-  else
-    $pred$(select public.current_user_role()) = 'super_admin'
-        and (select private.super_admin_session_not_revoked())$pred$
-  end;
   for target in
     select * from (values
       ('workspaces',                 'super_admin_all_workspaces'),
@@ -135,10 +122,20 @@ begin
     ) as t(table_name, policy_name)
   loop
     execute format('drop policy if exists %I on public.%I', target.policy_name, target.table_name);
-    execute format(
-      'create policy %I on public.%I for all to authenticated using (%s) with check (%s)',
-      target.policy_name, target.table_name, predicate, predicate
-    );
+    execute format($fmt$
+      create policy %I on public.%I
+      for all to authenticated
+      using (
+        (select public.current_user_role()) = 'super_admin'
+        and (select public.has_recent_privileged_step_up('super_admin'))
+        and (select private.super_admin_session_not_revoked())
+      )
+      with check (
+        (select public.current_user_role()) = 'super_admin'
+        and (select public.has_recent_privileged_step_up('super_admin'))
+        and (select private.super_admin_session_not_revoked())
+      )
+    $fmt$, target.policy_name, target.table_name);
   end loop;
 end $$;
 

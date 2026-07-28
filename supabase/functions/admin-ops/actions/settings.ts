@@ -144,10 +144,12 @@ export const handleSettingsAction = async (
         account_category:
           context.workspacePolicy?.account_category === "individual"
             ? "individual"
-            : context.workspacePolicy?.account_category === "district"
-            ? "district"
-            : context.workspacePolicy?.account_category === "organization"
-            ? "organization"
+            : context.workspacePolicy?.account_category === "education"
+            ? "education"
+            : context.workspacePolicy?.account_category === "custom"
+            ? "custom"
+            : context.workspacePolicy?.account_category === "workspace"
+            ? "workspace"
             : null,
         plan_code: context.workspacePolicy?.plan_code ?? null,
         feature_flags: context.featureFlags,
@@ -201,10 +203,12 @@ export const handleSettingsAction = async (
         : checkoutDueHoursNext,
       account_category: data.account_category === "individual"
         ? "individual"
-        : data.account_category === "district"
-        ? "district"
-        : data.account_category === "organization"
-        ? "organization"
+        : data.account_category === "education"
+        ? "education"
+        : data.account_category === "custom"
+        ? "custom"
+        : data.account_category === "workspace"
+        ? "workspace"
         : null,
       plan_code: data.plan_code ?? null,
       feature_flags: normalizeFeatureFlags(data.feature_flags),

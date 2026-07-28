@@ -411,8 +411,8 @@ Deno.test("tenant policy resolution retries when feature_flags is missing", asyn
       : {
         data: {
           checkout_due_hours: 48,
-          account_category: "organization",
-          plan_code: "growth",
+          account_category: "workspace",
+          plan_code: "workspace_growth",
         },
         error: null,
       };

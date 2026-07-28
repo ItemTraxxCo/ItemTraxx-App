@@ -9,6 +9,7 @@
     </div>
 
     <div class="card admin-section-card">
+      <OfflineWorkflowStatus />
       <div class="admin-section-header">
         <div>
           <h2>Return Queue</h2>
@@ -80,6 +81,7 @@
 import { computed, onMounted, ref } from "vue";
 import { RouterLink } from "vue-router";
 import CameraBarcodeScannerModal from "../../../components/CameraBarcodeScannerModal.vue";
+import OfflineWorkflowStatus from "../../../components/OfflineWorkflowStatus.vue";
 import { fetchItemByBarcode, submitCheckoutReturn, type ItemSummary } from "../../../services/checkoutService";
 import { logAdminAction } from "../../../services/auditLogService";
 import { sanitizeInput } from "../../../utils/inputSanitizer";
@@ -154,11 +156,20 @@ const submitReturn = async () => {
 
   isSubmitting.value = true;
   try {
-    const submitResult = await submitCheckoutReturn({
-      borrower_id: "",
-      item_barcodes: barcodes.value.map((item) => item.barcode),
-      action_type: "admin_return",
-    });
+    const submitResult = await submitCheckoutReturn(
+      {
+        borrower_id: "",
+        item_barcodes: barcodes.value.map((item) => item.barcode),
+        action_type: "admin_return",
+      },
+      {
+        borrower: null,
+        items: barcodes.value.map((item) => ({
+          item: { ...item, checked_out_by: item.checked_out_by ?? null },
+          intent: "quick_return" as const,
+        })),
+      },
+    );
     if (submitResult.buffered) {
       success.value = "";
       lastSummary.value = "";

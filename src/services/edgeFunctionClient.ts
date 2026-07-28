@@ -2,6 +2,7 @@ type EdgeFunctionOptions<TBody> = {
   method?: "GET" | "POST";
   body?: TBody;
   accessToken?: string;
+  preserveErrorData?: boolean;
 };
 
 type EdgeFunctionResult<TData> = {
@@ -109,7 +110,7 @@ const requestEdgeFunction = async <TData = unknown, TBody = unknown>(
       return {
         ok: false,
         status: response.status,
-        data: null,
+        data: options.preserveErrorData ? (parsed as TData) : null,
         error: errorMessage,
         requestId,
       };

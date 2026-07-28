@@ -2,6 +2,7 @@ import { computed, onMounted, onScopeDispose, ref, toValue, watch, type MaybeRef
 
 export const useOfflineQueueCount = (isTenantScopedRoute: MaybeRefOrGetter<boolean>) => {
   const count = ref(0);
+  const syncingCount = ref(0);
   let pollTimer: number | null = null;
   const tooltip = computed(
     () =>
@@ -16,6 +17,7 @@ export const useOfflineQueueCount = (isTenantScopedRoute: MaybeRefOrGetter<boole
   const refresh = async () => {
     if (!toValue(isTenantScopedRoute)) {
       count.value = 0;
+      syncingCount.value = 0;
       return;
     }
     try {
@@ -28,8 +30,10 @@ export const useOfflineQueueCount = (isTenantScopedRoute: MaybeRefOrGetter<boole
         getOfflineWorkflowSummary(),
       ]);
       count.value = legacyCount + workflow.pendingCount + workflow.reviewCount;
+      syncingCount.value = workflow.syncingCount;
     } catch {
       count.value = 0;
+      syncingCount.value = 0;
     }
   };
 
@@ -37,6 +41,7 @@ export const useOfflineQueueCount = (isTenantScopedRoute: MaybeRefOrGetter<boole
     if (!toValue(isTenantScopedRoute) || document.visibilityState === "hidden") {
       stop();
       count.value = 0;
+      syncingCount.value = 0;
       return;
     }
     void refresh();
@@ -55,10 +60,15 @@ export const useOfflineQueueCount = (isTenantScopedRoute: MaybeRefOrGetter<boole
     else start();
   };
 
+  const handleWorkflowChange = () => {
+    void refresh();
+  };
+
   watch(() => toValue(isTenantScopedRoute), start);
 
   onMounted(() => {
     window.addEventListener("storage", handleStorage);
+    window.addEventListener("itemtraxx:offline-workflow-changed", handleWorkflowChange);
     document.addEventListener("visibilitychange", handleVisibility);
     start();
   });
@@ -66,8 +76,9 @@ export const useOfflineQueueCount = (isTenantScopedRoute: MaybeRefOrGetter<boole
   onScopeDispose(() => {
     stop();
     window.removeEventListener("storage", handleStorage);
+    window.removeEventListener("itemtraxx:offline-workflow-changed", handleWorkflowChange);
     document.removeEventListener("visibilitychange", handleVisibility);
   });
 
-  return { count, refresh, start, stop, tooltip };
+  return { count, syncingCount, refresh, start, stop, tooltip };
 };

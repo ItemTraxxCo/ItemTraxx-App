@@ -870,6 +870,95 @@ test.describe("prepared offline checkout workflow contract", () => {
     await expect(page.getByText("You're offline. Keep this tab open—do not refresh, close it, log out, or clear browser data until you reconnect.")).toBeVisible();
   });
 
+  test("waits for a new account session without showing a disabled-account error or re-preparing a restored pack", async ({ page }) => {
+    await mockSystemStatus(page);
+    await mockAdminOps(page);
+    await page.evaluate(() => window.localStorage.setItem("itemtraxx-device-id", "device-e2e"));
+    let prepareAttempts = 0;
+    await page.route(/\/functions(?:\/v1)?\/offline-checkout(?:\?.*)?$/, async (route) => {
+      prepareAttempts += 1;
+      if (prepareAttempts === 1) {
+        await route.fulfill({
+          status: 409,
+          contentType: "application/json",
+          body: JSON.stringify({ error: "Offline session is still initializing. Please retry." }),
+        });
+        return;
+      }
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          data: {
+            pack_version: "session-retry-pack-e2e",
+            workspace_id: "workspace-e2e",
+            prepared_at: new Date().toISOString(),
+            expires_at: new Date(Date.now() + 86_400_000).toISOString(),
+            borrowers: [{ id: "borrower-1", username: "Maya Chen", borrower_id: "STU-100" }],
+            items: [{ id: "item-1", name: "Camera", barcode: "ITEM-1", status: "available", checked_out_by: null }],
+          },
+        }),
+      });
+    });
+    await setWorkspaceAdminSession(page, "workspace-e2e");
+    await navigateApp(page, "/checkout");
+
+    await expect(page.getByText("Ready for offline use in the case of an outage.")).toBeVisible();
+    expect(prepareAttempts).toBe(2);
+    await expect(page.getByText("Offline setup needs attention")).toHaveCount(0);
+
+    await navigateApp(page, "/admin/return");
+    await expect(page.getByText("Preparing this device for offline use in the case of an outage.")).toHaveCount(0);
+    expect(prepareAttempts).toBe(2);
+  });
+
+  test("uses the Offline Queue toast for sync progress and completion", async ({ page }) => {
+    await mockSystemStatus(page);
+    await page.evaluate(async ({ pack, entry }) => {
+      window.localStorage.setItem("itemtraxx-device-id", "device-e2e");
+      window.__itemtraxxTest?.setWorkspaceAdminSession("workspace-e2e");
+      const workflow = (window.__itemtraxxTest as typeof window.__itemtraxxTest & {
+        offlineCheckoutWorkflow: {
+          writePack: (pack: unknown) => Promise<void>;
+          writeLedger: (entries: unknown[]) => Promise<void>;
+        };
+      }).offlineCheckoutWorkflow;
+      await workflow.writePack(pack);
+      await workflow.writeLedger([entry]);
+    }, {
+      pack: {
+        ...workflowPack(),
+        prepared_at: new Date().toISOString(),
+        expires_at: new Date(Date.now() + 86_400_000).toISOString(),
+      },
+      entry: workflowEntry(),
+    });
+    await page.route(/\/functions(?:\/v1)?\/offline-checkout(?:\?.*)?$/, async (route) => {
+      const body = route.request().postDataJSON() as { action?: string };
+      expect(body.action).toBe("sync");
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          data: {
+            operations: [{
+              operation_id: "op-workflow-e2e",
+              status: "synced",
+              item_results: [{ item_id: "item-1", barcode: "ITEM-1", status: "synced" }],
+            }],
+          },
+        }),
+      });
+    });
+    await navigateApp(page, "/checkout");
+
+    await expect(page.getByText("Syncing offline queue")).toBeVisible();
+    await expect(page.getByText("Syncing 1 transaction to ItemTraxx Servers.")).toBeVisible();
+    await expect(page.getByText("Offline queue synced")).toBeVisible();
+    await expect(page.getByText("1 transaction synced to ItemTraxx Servers.")).toBeVisible();
+  });
+
   test("queues Quick Return with an explicit quick_return intent and current borrower", async ({ page, context }) => {
     await mockSystemStatus(page);
     await mockAdminOps(page);

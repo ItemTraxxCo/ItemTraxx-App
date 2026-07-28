@@ -1,6 +1,6 @@
 const UNAVAILABLE_BYPASS_HOSTS = new Set([
-  "dennis.dev.itemtraxx.com",
-  "leo.dev.itemtraxx.com",
+  "dennis-dev.itemtraxx.com",
+  "leo-dev.itemtraxx.com",
   "dev.itemtraxx.com",
   "preview.itemtraxx.com",
   "staging.itemtraxx.com",

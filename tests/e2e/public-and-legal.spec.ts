@@ -798,8 +798,8 @@ test.describe("Public surfaces", () => {
     const bypasses = await page.evaluate(async () => {
       const { isUnavailableBypassHost } = await import("/src/utils/unavailableBypass.ts");
       return {
-        dennis: isUnavailableBypassHost("dennis.dev.itemtraxx.com"),
-        leo: isUnavailableBypassHost("leo.dev.itemtraxx.com"),
+        dennis: isUnavailableBypassHost("dennis-dev.itemtraxx.com"),
+        leo: isUnavailableBypassHost("leo-dev.itemtraxx.com"),
         dev: isUnavailableBypassHost("dev.itemtraxx.com"),
         preview: isUnavailableBypassHost("preview.itemtraxx.com"),
         staging: isUnavailableBypassHost("staging.itemtraxx.com"),

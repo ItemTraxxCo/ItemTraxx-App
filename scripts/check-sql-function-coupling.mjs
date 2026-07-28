@@ -22,7 +22,11 @@ if (changedFiles.length === 0) {
   process.exit(0);
 }
 
-const sqlFiles = changedFiles.filter((file) => file.startsWith('supabase/sql/'));
+const sqlFiles = changedFiles.filter(
+  (file) =>
+    file.startsWith('supabase/sql/') ||
+    file.startsWith('supabase/manual/sql/')
+);
 if (sqlFiles.length === 0) {
   console.log('No SQL files changed; SQL/function coupling check passed.');
   process.exit(0);

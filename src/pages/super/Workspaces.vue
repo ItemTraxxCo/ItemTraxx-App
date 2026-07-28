@@ -44,7 +44,7 @@
           <tr v-for="workspace in workspaces" :key="workspace.id">
             <td>{{ workspace.name }}</td>
             <td><a :href="workspaceUrl(workspace.slug)" target="_blank" rel="noreferrer">{{ workspace.slug }}.app.itemtraxx.com</a></td>
-            <td>{{ workspace.account_category || 'organization' }} / {{ workspace.plan_code || 'unassigned' }}</td>
+            <td>{{ workspace.account_category || 'workspace' }} / {{ workspace.plan_code || 'unassigned' }}</td>
             <td>{{ workspace.archived_at ? 'archived' : workspace.status }}</td>
             <td>{{ workspace.primary_admin_email || 'Not assigned' }}</td>
             <td class="row-actions">
@@ -89,20 +89,20 @@ import {
 
 type WorkspaceDraft = WorkspacePolicyInput & { name: string; slug: string; auth_email: string; password: string };
 const defaultFlags = () => ({ enable_notifications: true, enable_bulk_item_import: true, enable_bulk_borrower_tools: true, enable_status_tracking: true, enable_barcode_generator: true });
-const blankDraft = (): WorkspaceDraft => ({ name: "", slug: "", auth_email: "", password: "", account_category: "organization", plan_code: "starter", checkout_due_hours: 72, feature_flags: defaultFlags(), contact_name: "", support_email: "", billing_email: "", billing_status: "draft", renewal_date: "", invoice_reference: "" });
+const blankDraft = (): WorkspaceDraft => ({ name: "", slug: "", auth_email: "", password: "", account_category: "workspace", plan_code: "workspace_core", checkout_due_hours: 72, feature_flags: defaultFlags(), contact_name: "", support_email: "", billing_email: "", billing_status: "draft", renewal_date: "", invoice_reference: "" });
 
 const WorkspaceFields = defineComponent({
   props: { modelValue: { type: Object as PropType<WorkspaceDraft>, required: true }, includeCredentials: Boolean },
   emits: ["update:modelValue"],
   setup(props, { emit }) {
     const update = (key: keyof WorkspaceDraft, value: unknown) => emit("update:modelValue", { ...props.modelValue, [key]: value });
-    const plans = computed(() => props.modelValue.account_category === "individual" ? [["individual_yearly", "Individual yearly"], ["individual_monthly", "Individual monthly"]] : props.modelValue.account_category === "district" ? [["core", "Core"], ["growth", "Growth"], ["enterprise", "Enterprise"]] : [["starter", "Starter"], ["scale", "Scale"], ["enterprise", "Enterprise"]]);
+    const plans = computed(() => props.modelValue.account_category === "individual" ? [["individual_yearly", "Individual yearly"], ["individual_monthly", "Individual monthly"]] : props.modelValue.account_category === "education" ? [["education", "Education"]] : props.modelValue.account_category === "custom" ? [["custom", "Custom"]] : [["workspace_core", "Workspace Core"], ["workspace_growth", "Workspace Growth"], ["workspace_enterprise", "Workspace Enterprise"]]);
     const input = (label: string, key: keyof WorkspaceDraft, type = "text") => h("label", [label, h("input", { type, value: props.modelValue[key] ?? "", onInput: (event: Event) => update(key, (event.target as HTMLInputElement).value) })]);
     const flagLabels: Record<string, string> = { enable_notifications: "Notifications", enable_bulk_item_import: "Bulk item import", enable_bulk_borrower_tools: "Bulk borrower tools", enable_status_tracking: "Item status tracking", enable_barcode_generator: "Barcode generator" };
     return () => h("div", { class: "fields" }, [
       input("Workspace name", "name"), input("Workspace slug", "slug"),
       ...(props.includeCredentials ? [input("Primary admin email", "auth_email", "email"), input("Temporary password", "password", "password")] : []),
-      h("label", ["Account category", h("select", { value: props.modelValue.account_category, onChange: (event: Event) => { const account_category = (event.target as HTMLSelectElement).value as WorkspaceDraft["account_category"]; const plan_code = account_category === "individual" ? "individual_yearly" : account_category === "district" ? "core" : "starter"; emit("update:modelValue", { ...props.modelValue, account_category, plan_code }); } }, [h("option", { value: "organization" }, "Organization"), h("option", { value: "district" }, "District"), h("option", { value: "individual" }, "Individual")])]),
+      h("label", ["Account category", h("select", { value: props.modelValue.account_category, onChange: (event: Event) => { const account_category = (event.target as HTMLSelectElement).value as WorkspaceDraft["account_category"]; const plan_code = account_category === "individual" ? "individual_yearly" : account_category === "education" ? "education" : account_category === "custom" ? "custom" : "workspace_core"; emit("update:modelValue", { ...props.modelValue, account_category, plan_code }); } }, [h("option", { value: "workspace" }, "Workspace"), h("option", { value: "education" }, "Education"), h("option", { value: "custom" }, "Custom"), h("option", { value: "individual" }, "Individual")])]),
       h("label", ["Plan", h("select", { value: props.modelValue.plan_code ?? "", onChange: (event: Event) => update("plan_code", (event.target as HTMLSelectElement).value) }, plans.value.map(([value, label]) => h("option", { value }, label)))]),
       h("label", ["Checkout due limit (hours)", h("input", { type: "number", min: 1, max: 720, value: props.modelValue.checkout_due_hours, onInput: (event: Event) => update("checkout_due_hours", Number((event.target as HTMLInputElement).value)) })]),
       input("Contact name", "contact_name"), input("Support email", "support_email", "email"), input("Billing email", "billing_email", "email"),

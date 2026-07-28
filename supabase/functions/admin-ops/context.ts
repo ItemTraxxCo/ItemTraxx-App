@@ -17,13 +17,13 @@ export type TenantFeatureFlags = {
 
 export type TenantPolicyRow = {
   checkout_due_hours: number | null;
-  account_category: "organization" | "district" | "individual" | null;
+  account_category: "workspace" | "education" | "custom" | "individual" | null;
   plan_code:
-    | "core"
-    | "growth"
-    | "starter"
-    | "scale"
-    | "enterprise"
+    | "workspace_core"
+    | "workspace_growth"
+    | "workspace_enterprise"
+    | "education"
+    | "custom"
     | "individual_yearly"
     | "individual_monthly"
     | null;

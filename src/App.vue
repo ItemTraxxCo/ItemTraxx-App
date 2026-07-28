@@ -74,6 +74,7 @@
       </div>
     </div>
     <router-view v-else />
+    <OfflineWorkflowOverlays :enabled="isWorkspaceScopedRoute" />
     <OnboardingModal
       v-if="onboarding.visible.value"
       :visible="onboarding.visible.value"
@@ -101,6 +102,7 @@ import AppBlockingOverlays from "./components/app/AppBlockingOverlays.vue";
 import AppTopBanners from "./components/app/AppTopBanners.vue";
 import AuthenticatedNavigation from "./components/app/AuthenticatedNavigation.vue";
 import CookieConsentBanner from "./components/CookieConsentBanner.vue";
+import OfflineWorkflowOverlays from "./components/OfflineWorkflowOverlays.vue";
 import { useAdminSessionLifecycle } from "./composables/useAdminSessionLifecycle";
 import { useAppVersionStatus } from "./composables/useAppVersionStatus";
 import { isUnavailableBypassHost } from "./utils/unavailableBypass";

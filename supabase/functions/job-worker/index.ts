@@ -32,12 +32,11 @@ type ContactSalesPayload = {
   lead_id: string;
   plan_label: string;
   plan_key:
-    | "district_core"
-    | "district_growth"
-    | "district_enterprise"
-    | "organization_starter"
-    | "organization_scale"
-    | "organization_enterprise"
+    | "workspace_core"
+    | "workspace_growth"
+    | "workspace_enterprise"
+    | "education"
+    | "custom"
     | "individual_yearly"
     | "individual_monthly"
     | "other";
@@ -308,11 +307,8 @@ const buildContactSalesInternalHtml = (payload: ContactSalesPayload) => {
   const details = escapeHtml(payload.details ?? "(none provided)").replaceAll("\n", "<br />");
   const supportEmail = escapeHtml(payload.support_email);
   const schoolsLine =
-    (payload.plan_key === "district_enterprise" || payload.plan_key === "organization_enterprise") &&
-      payload.schools_count
-      ? `<p style="margin:0 0 14px 0;font-size:15px;line-height:1.6;color:#343330;"><strong>${
-          payload.plan_key === "district_enterprise" ? "Number of schools" : "Number of locations or teams"
-        }:</strong> ${payload.schools_count}</p>`
+    payload.plan_key === "workspace_enterprise" && payload.schools_count
+      ? `<p style="margin:0 0 14px 0;font-size:15px;line-height:1.6;color:#343330;"><strong>Number of tenant accounts:</strong> ${payload.schools_count}</p>`
       : "";
 
   return `<!doctype html>
@@ -370,11 +366,8 @@ const buildContactSalesConfirmationHtml = (payload: ContactSalesPayload) => {
   const organization = escapeHtml(payload.organization);
   const supportEmail = escapeHtml(payload.support_email);
   const schoolsLine =
-    (payload.plan_key === "district_enterprise" || payload.plan_key === "organization_enterprise") &&
-      payload.schools_count
-      ? `<p style="margin:0 0 14px 0;font-size:15px;line-height:1.6;color:#343330;"><strong>${
-          payload.plan_key === "district_enterprise" ? "Number of schools" : "Number of locations or teams"
-        }:</strong> ${payload.schools_count}</p>`
+    payload.plan_key === "workspace_enterprise" && payload.schools_count
+      ? `<p style="margin:0 0 14px 0;font-size:15px;line-height:1.6;color:#343330;"><strong>Number of tenant accounts:</strong> ${payload.schools_count}</p>`
       : "";
 
   return `<!doctype html>
@@ -435,11 +428,8 @@ const processContactSalesEmail = async (
     ? `\nOrganization: ${payload.organization}`
     : "\nOrganization: (not provided)";
   const schoolsLine =
-    (payload.plan_key === "district_enterprise" || payload.plan_key === "organization_enterprise") &&
-      payload.schools_count
-      ? `\n${
-          payload.plan_key === "district_enterprise" ? "Number of schools" : "Number of locations or teams"
-        }: ${payload.schools_count}`
+    payload.plan_key === "workspace_enterprise" && payload.schools_count
+      ? `\nNumber of tenant accounts: ${payload.schools_count}`
       : "";
 
   const internalSubject = `${payload.intent === "demo" ? "Demo Request" : "Contact Sales Request"} - ${payload.organization || payload.name}`;

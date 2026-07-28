@@ -62,6 +62,20 @@ test.describe("Checkout borrower ownership regression", () => {
       }
 
       if (checkedOutByFilter) {
+        if (checkedOutByBorrower === "borrower-b" && checkedOutBy === "borrower-a") {
+          await route.fulfill({
+            status: 200,
+            contentType: "application/json",
+            body: JSON.stringify([{
+              id: "item-2",
+              name: "Laptop B",
+              barcode: "ITEM-2",
+              status: "checked_out",
+              checked_out_by: "borrower-b",
+            }]),
+          });
+          return;
+        }
         const rows = checkedOutBy === checkedOutByBorrower ? [itemRow] : [];
         await route.fulfill({
           status: 200,
@@ -161,7 +175,7 @@ test.describe("Checkout borrower ownership regression", () => {
     await expect(page.getByText("Transaction complete (Success).")).toBeVisible();
     await expect(borrowerInput).toBeFocused();
 
-    // 2) Borrower B cannot checkout/return while item is checked out by A.
+    // 2) Borrower B cannot return A's item even though B has another item checked out.
     await loadBorrower("BRWRB");
     await barcodeInput.fill("ITEM-1");
     await addBarcodeButton.click();

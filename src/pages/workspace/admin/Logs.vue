@@ -54,7 +54,7 @@
           <tr>
             <th>Time</th>
             <th>Action</th>
-            <th>Tenant Account</th>
+            <th class="tenant-account-column">Tenant Account</th>
             <th>Borrower</th>
             <th>Item</th>
           </tr>
@@ -63,7 +63,11 @@
           <tr v-for="log in filteredLogs" :key="log.id">
             <td>{{ formatTime(log.action_time) }}</td>
             <td>{{ log.action_type }}</td>
-            <td>{{ log.tenant_account?.auth_email || "Unknown account" }}</td>
+            <td>
+              <span class="tenant-account-cell" :title="log.tenant_account?.auth_email || 'Unknown account'">
+                {{ log.tenant_account?.auth_email || "Unknown account" }}
+              </span>
+            </td>
             <td>
               <span v-if="log.borrower">
                 {{ log.borrower.username }} ({{ log.borrower.borrower_id }})
@@ -186,3 +190,15 @@ const formatTime = (value: string) => {
 
 onMounted(loadLogs);
 </script>
+
+<style scoped>
+.tenant-account-column { width: 13rem; }
+.tenant-account-cell {
+  display: inline-block;
+  max-width: min(24vw, 13rem);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  vertical-align: bottom;
+  white-space: nowrap;
+}
+</style>

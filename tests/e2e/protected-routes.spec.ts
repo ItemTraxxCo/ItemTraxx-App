@@ -51,7 +51,7 @@ test.describe("Protected route smoke tests", () => {
       await route.fulfill({
         status: 200,
         contentType: "application/json",
-        body: JSON.stringify([{ id: "tenant-account-e2e", auth_email: "library@example.edu" }]),
+        body: JSON.stringify([{ id: "tenant-account-e2e", auth_email: "long-tenant-account-name-for-library@example.edu" }]),
       });
     });
 
@@ -60,7 +60,8 @@ test.describe("Protected route smoke tests", () => {
     await navigateApp(page, "/admin/logs");
 
     await expect(page.getByRole("columnheader", { name: "Tenant Account" })).toBeVisible();
-    await expect(page.getByText("library@example.edu")).toBeVisible();
+    await expect(page.getByText("long-tenant-account-name-for-library@example.edu")).toBeVisible();
+    await expect(page.locator(".tenant-account-cell")).toHaveAttribute("title", "long-tenant-account-name-for-library@example.edu");
   });
 
   test("offline queue toast follows real queue storage transitions", async ({ page }) => {

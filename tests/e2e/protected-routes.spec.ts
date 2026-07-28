@@ -29,6 +29,40 @@ test.describe("Protected route smoke tests", () => {
     await expect(page.getByRole("heading", { name: "Item Status Tracking" })).toBeVisible();
   });
 
+  test("Workspace Admin item logs show the tenant account that completed each transaction", async ({ page }) => {
+    await page.route(/\/rest\/v1\/item_logs(?:\?.*)?$/, async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify([{
+          id: "log-e2e",
+          workspace_id: "tenant-e2e",
+          item_id: "item-e2e",
+          checked_out_by: "borrower-e2e",
+          action_type: "checkout",
+          action_time: "2026-07-28T12:00:00.000Z",
+          performed_by: "tenant-account-e2e",
+          item: { name: "Camera", barcode: "CAM-100" },
+          borrower: { username: "Maya Chen", borrower_id: "STU-100" },
+        }]),
+      });
+    });
+    await page.route(/\/rest\/v1\/profiles(?:\?.*)?$/, async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify([{ id: "tenant-account-e2e", auth_email: "library@example.edu" }]),
+      });
+    });
+
+    await page.goto("/");
+    await setWorkspaceAdminSession(page);
+    await navigateApp(page, "/admin/logs");
+
+    await expect(page.getByRole("columnheader", { name: "Tenant Account" })).toBeVisible();
+    await expect(page.getByText("library@example.edu")).toBeVisible();
+  });
+
   test("offline queue toast follows real queue storage transitions", async ({ page }) => {
     await page.goto("/");
     await page.evaluate(() => {

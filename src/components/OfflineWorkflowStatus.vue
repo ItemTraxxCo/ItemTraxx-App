@@ -15,6 +15,7 @@
 import { computed, onMounted, onScopeDispose, ref } from "vue";
 import {
   getOfflineWorkflowSummary,
+  isOfflineSessionInitializingError,
   OFFLINE_PACK_REFRESH_INTERVAL_MS,
   refreshOfflineCheckoutPackIfNeeded,
 } from "../services/offlineCheckoutWorkflow";
@@ -22,7 +23,7 @@ import { markItemTraxxServerUnreachable, readOfflineConnectionState } from "../s
 import { toUserFacingErrorMessage } from "../services/appErrors";
 
 type Summary = Awaited<ReturnType<typeof getOfflineWorkflowSummary>>;
-const summary = ref<Summary>({ pack: null, packExpired: false, pendingCount: 0, reviewCount: 0 });
+const summary = ref<Summary>({ pack: null, packExpired: false, pendingCount: 0, syncingCount: 0, reviewCount: 0 });
 const connection = ref(readOfflineConnectionState());
 const message = ref("");
 const messageKind = ref<"success" | "error" | "info">("success");
@@ -31,6 +32,9 @@ let refreshTimer: number | null = null;
 let toastTimer: number | null = null;
 let offlineSafetyNoticeShown = false;
 let preparationNoticeShown = false;
+let initialSummaryLoaded = false;
+let sessionInitializationRetryTimer: number | null = null;
+let sessionInitializationRetryUsed = false;
 
 const formatTime = (value: string | null | undefined) => {
   if (!value) return "never";
@@ -48,8 +52,9 @@ const statusTitle = computed(() => {
 const isOffline = computed(() => !!connection.value.unreachable_since);
 const messageTitle = computed(() => {
   if (messageKind.value === "error") return "Offline setup needs attention";
+  if (message.value.startsWith("Preparing")) return "Preparing for offline use";
   if (messageKind.value === "info") return "Offline checkout active";
-  return message.value.startsWith("Preparing") ? "Preparing for offline use" : "Offline pack ready";
+  return "Offline pack ready";
 });
 
 const statusDetail = computed(() => {
@@ -64,15 +69,27 @@ const statusDetail = computed(() => {
 const refresh = async () => {
   summary.value = await getOfflineWorkflowSummary();
   connection.value = readOfflineConnectionState();
+  initialSummaryLoaded = true;
+};
+
+const retryAfterSessionInitialization = () => {
+  if (sessionInitializationRetryUsed || sessionInitializationRetryTimer) return false;
+  sessionInitializationRetryUsed = true;
+  sessionInitializationRetryTimer = window.setTimeout(() => {
+    sessionInitializationRetryTimer = null;
+    void automaticallyRefreshPack();
+  }, 1_000);
+  return true;
 };
 
 const automaticallyRefreshPack = async () => {
   if (!navigator.onLine) return;
   try {
+    if (!initialSummaryLoaded) await refresh();
     if (!summary.value.pack && !preparationNoticeShown) {
       preparationNoticeShown = true;
       messageKind.value = "info";
-      message.value = "Preparing this device for offline use.";
+      message.value = "Preparing this device for offline use in the case of an outage.";
     }
     const result = await refreshOfflineCheckoutPackIfNeeded();
     if (result.refreshed && result.firstPreparation) {
@@ -83,6 +100,7 @@ const automaticallyRefreshPack = async () => {
     }
     await refresh();
   } catch (error) {
+    if (isOfflineSessionInitializingError(error) && retryAfterSessionInitialization()) return;
     messageKind.value = "error";
     message.value = toUserFacingErrorMessage(error, "Unable to prepare offline checkout.");
   }
@@ -112,8 +130,10 @@ const handleBrowserOffline = () => {
   handleChange();
 };
 onMounted(() => {
-  void refresh();
-  void automaticallyRefreshPack();
+  void (async () => {
+    await refresh();
+    await automaticallyRefreshPack();
+  })();
   pollTimer = window.setInterval(() => void refresh(), 10_000);
   refreshTimer = window.setInterval(() => void automaticallyRefreshPack(), OFFLINE_PACK_REFRESH_INTERVAL_MS);
   window.addEventListener("online", handleChange);
@@ -125,6 +145,7 @@ onScopeDispose(() => {
   if (pollTimer) window.clearInterval(pollTimer);
   if (refreshTimer) window.clearInterval(refreshTimer);
   if (toastTimer) window.clearTimeout(toastTimer);
+  if (sessionInitializationRetryTimer) window.clearTimeout(sessionInitializationRetryTimer);
   window.removeEventListener("online", handleChange);
   window.removeEventListener("offline", handleBrowserOffline);
   window.removeEventListener("itemtraxx:offline-workflow-changed", handleChange);

@@ -5,7 +5,8 @@
 -- Context. The workspace-model redesign (20260725194622) rebuilt every policy
 -- from scratch and, in the process, (a) granted the `authenticated` role
 -- table-wide INSERT/UPDATE/DELETE on the core workspace tables and (b) dropped
--- the has_recent_privileged_step_up() predicate that supabase/sql/rbac_hardening.sql
+-- the has_recent_privileged_step_up() predicate that the legacy
+-- RBAC hardening baseline had carried on every privileged policy. Because the
 -- had carried in every privileged policy. Because the edge proxy exposes a
 -- generic /rest/v1/* pass-through, both became reachable from any browser
 -- holding a session cookie.
@@ -95,7 +96,7 @@ $$;
 -- ---------------------------------------------------------------------------
 -- 3. Super-admin policies now require a live step-up and a non-revoked session.
 --
--- Restores the control that supabase/sql/rbac_hardening.sql enforced before the
+-- Restores the control that the legacy RBAC hardening baseline enforced before the
 -- redesign, and brings the RLS path in line with what every super-* edge
 -- function already checks (role + revocation + hasPrivilegedStepUp).
 --

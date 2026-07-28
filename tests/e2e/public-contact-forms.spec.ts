@@ -22,7 +22,7 @@ test.describe("Public contact forms", () => {
     await page.goto("/contact-sales");
     await page.getByRole("textbox", { name: "Name", exact: true }).fill("Taylor Smith");
     await page.getByLabel("Reply email address").fill("taylor@example.edu");
-    await page.getByLabel("Please Select Plan").selectOption("organization_starter");
+    await page.getByLabel("Please Select Plan").selectOption("workspace_core");
     await page
       .getByLabel("School, district or organization name (leave blank for individual plans)")
       .fill("Example School");
@@ -32,7 +32,7 @@ test.describe("Public contact forms", () => {
     await expect(page.getByRole("heading", { name: "Thanks for reaching out." })).toBeVisible();
     await expect(page).toHaveURL(/\/submitconfirmation$/);
     expect(capturedPayload).toMatchObject({
-      plan: "organization_starter",
+      plan: "workspace_core",
       name: "Taylor Smith",
       organization: "Example School",
       reply_email: "taylor@example.edu",

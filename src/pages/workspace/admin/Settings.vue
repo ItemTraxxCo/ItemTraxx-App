@@ -40,8 +40,8 @@
         {{
           accountCategory === "individual"
             ? "This account uses the root ItemTraxx url and is not attached to a custom subdomain."
-            : accountCategory === "organization"
-              ? "Organization-linked accounts inherit their routing and billing context from tenant configuration."
+            : accountCategory === "workspace" || accountCategory === "education" || accountCategory === "custom"
+              ? "Workspace-linked accounts inherit their routing and billing context from tenant configuration."
               : "Account plan metadata has not been configured for this tenant yet. If you believe this is an error, please contact support to resolve this."
         }}
       </p>
@@ -165,13 +165,13 @@ const isSaving = ref(false);
 const error = ref("");
 const success = ref("");
 const checkoutDueHours = ref(72);
-const accountCategory = ref<"organization" | "district" | "individual" | null>(null);
+const accountCategory = ref<"workspace" | "education" | "custom" | "individual" | null>(null);
 const planCode = ref<
-  | "core"
-  | "growth"
-  | "starter"
-  | "scale"
-  | "enterprise"
+  | "workspace_core"
+  | "workspace_growth"
+  | "workspace_enterprise"
+  | "education"
+  | "custom"
   | "individual_yearly"
   | "individual_monthly"
   | null
@@ -203,10 +203,12 @@ const applySettings = (settings: WorkspaceSettingsPayload) => {
   accountCategory.value =
     settings.account_category === "individual"
       ? "individual"
-      : settings.account_category === "district"
-        ? "district"
-      : settings.account_category === "organization"
-        ? "organization"
+      : settings.account_category === "education"
+        ? "education"
+      : settings.account_category === "custom"
+        ? "custom"
+      : settings.account_category === "workspace"
+        ? "workspace"
         : null;
   planCode.value = settings.plan_code ?? null;
 };
@@ -233,25 +235,27 @@ const formatGeneralLocation = (value: AccountSessionItem["general_location"]) =>
 const accountCategoryLabel = computed(() =>
   accountCategory.value === "individual"
     ? "Individual"
-    : accountCategory.value === "district"
-      ? "District"
-    : accountCategory.value === "organization"
-      ? "Organization"
+    : accountCategory.value === "education"
+      ? "Education"
+    : accountCategory.value === "custom"
+      ? "Custom"
+    : accountCategory.value === "workspace"
+      ? "Workspace"
       : "Unavailable"
 );
 
 const planLabel = computed(() => {
   switch (planCode.value) {
-    case "core":
-      return "Core";
-    case "growth":
-      return "Growth";
-    case "starter":
-      return "Starter";
-    case "scale":
-      return "Scale";
-    case "enterprise":
-      return "Enterprise";
+    case "workspace_core":
+      return "Workspace Core";
+    case "workspace_growth":
+      return "Workspace Growth";
+    case "workspace_enterprise":
+      return "Workspace Enterprise";
+    case "education":
+      return "Education";
+    case "custom":
+      return "Custom";
     case "individual_yearly":
       return "Individual Yearly";
     case "individual_monthly":

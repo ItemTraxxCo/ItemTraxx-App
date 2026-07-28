@@ -1485,8 +1485,9 @@
                       {
                         "type": "string",
                         "enum": [
-                          "organization",
-                          "district",
+                          "workspace",
+                          "education",
+                          "custom",
                           "individual"
                         ]
                       },
@@ -1500,11 +1501,11 @@
                       {
                         "type": "string",
                         "enum": [
-                          "core",
-                          "growth",
-                          "starter",
-                          "scale",
-                          "enterprise",
+                          "workspace_core",
+                          "workspace_growth",
+                          "workspace_enterprise",
+                          "education",
+                          "custom",
                           "individual_yearly",
                           "individual_monthly"
                         ]
@@ -1570,8 +1571,9 @@
                       {
                         "type": "string",
                         "enum": [
-                          "organization",
-                          "district",
+                          "workspace",
+                          "education",
+                          "custom",
                           "individual"
                         ]
                       },
@@ -1585,11 +1587,11 @@
                       {
                         "type": "string",
                         "enum": [
-                          "core",
-                          "growth",
-                          "starter",
-                          "scale",
-                          "enterprise",
+                          "workspace_core",
+                          "workspace_growth",
+                          "workspace_enterprise",
+                          "education",
+                          "custom",
                           "individual_yearly",
                           "individual_monthly"
                         ]
@@ -1922,19 +1924,20 @@
                   "account_category": {
                     "type": "string",
                     "enum": [
-                      "organization",
-                      "district",
+                      "workspace",
+                      "education",
+                      "custom",
                       "individual"
                     ]
                   },
                   "plan_code": {
                     "type": "string",
                     "enum": [
-                      "core",
-                      "growth",
-                      "starter",
-                      "scale",
-                      "enterprise",
+                      "workspace_core",
+                      "workspace_growth",
+                      "workspace_enterprise",
+                      "education",
+                      "custom",
                       "individual_yearly",
                       "individual_monthly"
                     ]
@@ -1980,19 +1983,20 @@
                   "account_category": {
                     "type": "string",
                     "enum": [
-                      "organization",
-                      "district",
+                      "workspace",
+                      "education",
+                      "custom",
                       "individual"
                     ]
                   },
                   "plan_code": {
                     "type": "string",
                     "enum": [
-                      "core",
-                      "growth",
-                      "starter",
-                      "scale",
-                      "enterprise",
+                      "workspace_core",
+                      "workspace_growth",
+                      "workspace_enterprise",
+                      "education",
+                      "custom",
                       "individual_yearly",
                       "individual_monthly"
                     ]
@@ -2197,8 +2201,9 @@
                     "account_category": {
                       "type": "string",
                       "enum": [
-                        "organization",
-                        "district",
+                        "workspace",
+                        "education",
+                        "custom",
                         "individual"
                       ]
                     },
@@ -2207,11 +2212,11 @@
                         {
                           "type": "string",
                           "enum": [
-                            "core",
-                            "growth",
-                            "starter",
-                            "scale",
-                            "enterprise",
+                            "workspace_core",
+                            "workspace_growth",
+                            "workspace_enterprise",
+                            "education",
+                            "custom",
                             "individual_yearly",
                             "individual_monthly"
                           ]
@@ -2340,8 +2345,9 @@
                   "account_category": {
                     "type": "string",
                     "enum": [
-                      "organization",
-                      "district",
+                      "workspace",
+                      "education",
+                      "custom",
                       "individual"
                     ]
                   },
@@ -2350,11 +2356,11 @@
                       {
                         "type": "string",
                         "enum": [
-                          "core",
-                          "growth",
-                          "starter",
-                          "scale",
-                          "enterprise",
+                          "workspace_core",
+                          "workspace_growth",
+                          "workspace_enterprise",
+                          "education",
+                          "custom",
                           "individual_yearly",
                           "individual_monthly"
                         ]
@@ -2482,8 +2488,9 @@
                   "account_category": {
                     "type": "string",
                     "enum": [
-                      "organization",
-                      "district",
+                      "workspace",
+                      "education",
+                      "custom",
                       "individual"
                     ]
                   },
@@ -2492,11 +2499,11 @@
                       {
                         "type": "string",
                         "enum": [
-                          "core",
-                          "growth",
-                          "starter",
-                          "scale",
-                          "enterprise",
+                          "workspace_core",
+                          "workspace_growth",
+                          "workspace_enterprise",
+                          "education",
+                          "custom",
                           "individual_yearly",
                           "individual_monthly"
                         ]
@@ -2624,8 +2631,9 @@
                   "account_category": {
                     "type": "string",
                     "enum": [
-                      "organization",
-                      "district",
+                      "workspace",
+                      "education",
+                      "custom",
                       "individual"
                     ]
                   },
@@ -2634,11 +2642,11 @@
                       {
                         "type": "string",
                         "enum": [
-                          "core",
-                          "growth",
-                          "starter",
-                          "scale",
-                          "enterprise",
+                          "workspace_core",
+                          "workspace_growth",
+                          "workspace_enterprise",
+                          "education",
+                          "custom",
                           "individual_yearly",
                           "individual_monthly"
                         ]
@@ -2796,8 +2804,9 @@
                   "account_category": {
                     "type": "string",
                     "enum": [
-                      "organization",
-                      "district",
+                      "workspace",
+                      "education",
+                      "custom",
                       "individual"
                     ]
                   },
@@ -2806,11 +2815,11 @@
                       {
                         "type": "string",
                         "enum": [
-                          "core",
-                          "growth",
-                          "starter",
-                          "scale",
-                          "enterprise",
+                          "workspace_core",
+                          "workspace_growth",
+                          "workspace_enterprise",
+                          "education",
+                          "custom",
                           "individual_yearly",
                           "individual_monthly"
                         ]
@@ -8622,12 +8631,11 @@
           "plan": {
             "type": "string",
             "enum": [
-              "district_core",
-              "district_growth",
-              "district_enterprise",
-              "organization_starter",
-              "organization_scale",
-              "organization_enterprise",
+              "workspace_core",
+              "workspace_growth",
+              "workspace_enterprise",
+              "education",
+              "custom",
               "individual_yearly",
               "individual_monthly",
               "other"

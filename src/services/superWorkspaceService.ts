@@ -9,7 +9,7 @@ export type SuperWorkspace = {
   created_at: string;
   primary_admin_profile_id: string | null;
   primary_admin_email: string | null;
-  account_category?: "organization" | "district" | "individual";
+  account_category?: "workspace" | "education" | "custom" | "individual";
   plan_code?: string | null;
   checkout_due_hours?: number;
   feature_flags?: Record<string, boolean>;
@@ -21,7 +21,7 @@ export type SuperWorkspace = {
   invoice_reference?: string | null;
 };
 export type WorkspacePolicyInput = {
-  account_category: "organization" | "district" | "individual";
+  account_category: "workspace" | "education" | "custom" | "individual";
   plan_code?: string | null;
   checkout_due_hours: number;
   feature_flags: Record<string, boolean>;

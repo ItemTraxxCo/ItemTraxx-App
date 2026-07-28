@@ -11,6 +11,11 @@ import {
   setSecondaryAuth,
   setWorkspaceContext,
 } from "../store/authState";
+import type {
+  OfflineCheckoutPack,
+  OfflineLedgerEntry,
+  OfflineWorkflowScope,
+} from "../services/offlineCheckoutWorkflow";
 
 declare global {
   interface Window {
@@ -48,6 +53,21 @@ declare global {
         read: () => Promise<BufferedCheckoutItem[]>;
         withLock: <T>(callback: () => Promise<T>) => Promise<T>;
         write: (items: BufferedCheckoutItem[]) => Promise<void>;
+      };
+      offlineCheckoutWorkflow: {
+        writePack: (pack: OfflineCheckoutPack) => Promise<void>;
+        readPack: (scope: OfflineWorkflowScope) => Promise<OfflineCheckoutPack | null>;
+        writeLedger: (entries: OfflineLedgerEntry[]) => Promise<void>;
+        readLedger: () => Promise<OfflineLedgerEntry[]>;
+        findBorrower: (scope: OfflineWorkflowScope, borrowerId: string) => Promise<unknown>;
+        findItem: (scope: OfflineWorkflowScope, barcode: string) => Promise<unknown>;
+        checkedOutItems: (scope: OfflineWorkflowScope, borrowerUuid: string) => Promise<unknown[]>;
+        markNeedsReview: (id: string, reason: string, serverState: unknown) => Promise<void>;
+        listReviewItems: () => Promise<OfflineLedgerEntry[]>;
+        keepServerState: (id: string) => Promise<void>;
+        sync: () => Promise<unknown>;
+        resolve: (id: string, resolution: "keep_server" | "apply_offline") => Promise<void>;
+        clear: () => Promise<void>;
       };
     };
   }
@@ -174,6 +194,60 @@ export const attachE2EControls = (router: Router): void => {
       async write(items) {
         const { writeOfflineQueue } = await import("../services/offlineCheckoutQueue");
         return writeOfflineQueue(items);
+      },
+    },
+    offlineCheckoutWorkflow: {
+      async writePack(pack) {
+        const { writeOfflinePack } = await import("../services/offlineCheckoutWorkflow");
+        return writeOfflinePack(pack);
+      },
+      async readPack(scope) {
+        const { readOfflinePack } = await import("../services/offlineCheckoutWorkflow");
+        return readOfflinePack(scope);
+      },
+      async writeLedger(entries) {
+        const { writeOfflineLedger } = await import("../services/offlineCheckoutWorkflow");
+        return writeOfflineLedger(entries);
+      },
+      async readLedger() {
+        const { readOfflineLedger } = await import("../services/offlineCheckoutWorkflow");
+        return readOfflineLedger();
+      },
+      async findBorrower(scope, borrowerId) {
+        const { findOfflineBorrower } = await import("../services/offlineCheckoutWorkflow");
+        return findOfflineBorrower(scope, borrowerId);
+      },
+      async findItem(scope, barcode) {
+        const { findOfflineItem } = await import("../services/offlineCheckoutWorkflow");
+        return findOfflineItem(scope, barcode);
+      },
+      async checkedOutItems(scope, borrowerUuid) {
+        const { getOfflineCheckedOutItems } = await import("../services/offlineCheckoutWorkflow");
+        return getOfflineCheckedOutItems(scope, borrowerUuid);
+      },
+      async markNeedsReview(id, reason, serverState) {
+        const { markOfflineEntryNeedsReview } = await import("../services/offlineCheckoutWorkflow");
+        await markOfflineEntryNeedsReview(id, reason, serverState);
+      },
+      async listReviewItems() {
+        const { listOfflineReviewEntries } = await import("../services/offlineCheckoutWorkflow");
+        return listOfflineReviewEntries();
+      },
+      async keepServerState(id) {
+        const { keepOfflineServerStateLocally } = await import("../services/offlineCheckoutWorkflow");
+        await keepOfflineServerStateLocally(id);
+      },
+      async sync() {
+        const { syncOfflineCheckoutLedger } = await import("../services/offlineCheckoutWorkflow");
+        return syncOfflineCheckoutLedger();
+      },
+      async resolve(id, resolution) {
+        const { resolveOfflineCheckoutConflict } = await import("../services/offlineCheckoutWorkflow");
+        return resolveOfflineCheckoutConflict(id, resolution);
+      },
+      async clear() {
+        const { clearOfflineCheckoutWorkflow } = await import("../services/offlineCheckoutWorkflow");
+        return clearOfflineCheckoutWorkflow();
       },
     },
   };

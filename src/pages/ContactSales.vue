@@ -44,12 +44,11 @@
         <label v-if="!isDemoIntent" class="field field-plan">
           <span class="field-label">Please Select Plan</span>
           <select v-model="plan" required>
-            <option value="district_core">ItemTraxx District Core Plan</option>
-            <option value="district_growth">ItemTraxx District Growth Plan</option>
-            <option value="district_enterprise">ItemTraxx District Enterprise Plan</option>
-            <option value="organization_starter">ItemTraxx Organization Starter Plan</option>
-            <option value="organization_scale">ItemTraxx Organization Scale Plan</option>
-            <option value="organization_enterprise">ItemTraxx Organization Enterprise Plan</option>
+            <option value="workspace_core">ItemTraxx Workspace Core Plan</option>
+            <option value="workspace_growth">ItemTraxx Workspace Growth Plan</option>
+            <option value="workspace_enterprise">ItemTraxx Workspace Enterprise Plan</option>
+            <option value="education">ItemTraxx Education Plan</option>
+            <option value="custom">ItemTraxx Custom Plan</option>
             <option value="individual_yearly">ItemTraxx Individual Yearly Plan</option>
             <option value="individual_monthly">ItemTraxx Individual Monthly Plan</option>
             <option value="other">Other</option>
@@ -123,12 +122,11 @@ import { toUserFacingErrorMessage } from "../services/appErrors";
 import { saveSubmissionConfirmation } from "../services/submissionConfirmation";
 
 type PlanId =
-  | "district_core"
-  | "district_growth"
-  | "district_enterprise"
-  | "organization_starter"
-  | "organization_scale"
-  | "organization_enterprise"
+  | "workspace_core"
+  | "workspace_growth"
+  | "workspace_enterprise"
+  | "education"
+  | "custom"
   | "individual_yearly"
   | "individual_monthly"
   | "other";
@@ -136,7 +134,7 @@ type PlanId =
 const route = useRoute();
 const router = useRouter();
 
-const plan = ref<PlanId>("district_core");
+const plan = ref<PlanId>("workspace_core");
 const fullName = ref("");
 const organization = ref("");
 const schoolCount = ref<number | null>(null);
@@ -200,24 +198,17 @@ const requiresOrganization = computed(
   () => !isDemoIntent.value && !["individual_yearly", "individual_monthly", "other"].includes(effectivePlan.value)
 );
 
-const requiresUnits = computed(
-  () => effectivePlan.value === "district_enterprise" || effectivePlan.value === "organization_enterprise"
-);
+const requiresUnits = computed(() => effectivePlan.value === "workspace_enterprise");
 
-const unitsLabel = computed(() =>
-  effectivePlan.value === "district_enterprise"
-    ? "Number of schools (7 or above)"
-    : "Number of locations or teams (7 or above)"
-);
+const unitsLabel = computed(() => "Number of tenant accounts (10 or above)");
 
-const unitsPlaceholder = computed(() =>
-  effectivePlan.value === "district_enterprise" ? "Enter number of schools" : "Enter number of locations or teams"
-);
+const unitsPlaceholder = computed(() => "Enter number of tenant accounts");
 
 const organizationPlaceholder = computed(() => {
   if (isDemoIntent.value) return "School, district, or organization (optional)";
-  if (effectivePlan.value.startsWith("district_")) return "District name";
-  if (effectivePlan.value.startsWith("organization_")) return "Organization or team name";
+  if (effectivePlan.value.startsWith("workspace_")) return "Workspace or organization name";
+  if (effectivePlan.value === "education") return "School or district name";
+  if (effectivePlan.value === "custom") return "Organization or team name";
   if (effectivePlan.value.startsWith("individual_")) return "Optional";
   return "School, district, organization, or leave blank";
 });

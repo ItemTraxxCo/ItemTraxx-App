@@ -34,12 +34,11 @@ type RateLimitResult = {
 
 type ContactPayload = {
   plan?:
-    | "district_core"
-    | "district_growth"
-    | "district_enterprise"
-    | "organization_starter"
-    | "organization_scale"
-    | "organization_enterprise"
+    | "workspace_core"
+    | "workspace_growth"
+    | "workspace_enterprise"
+    | "education"
+    | "custom"
     | "individual_yearly"
     | "individual_monthly"
     | "other";
@@ -60,12 +59,11 @@ const normalizeText = (value: unknown, max = 5000) => {
 
 const isEmail = (value: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 const SALES_PLAN_LABELS = {
-  district_core: "ItemTraxx District Core Plan",
-  district_growth: "ItemTraxx District Growth Plan",
-  district_enterprise: "ItemTraxx District Enterprise Plan",
-  organization_starter: "ItemTraxx Organization Starter Plan",
-  organization_scale: "ItemTraxx Organization Scale Plan",
-  organization_enterprise: "ItemTraxx Organization Enterprise Plan",
+  workspace_core: "ItemTraxx Workspace Core Plan",
+  workspace_growth: "ItemTraxx Workspace Growth Plan",
+  workspace_enterprise: "ItemTraxx Workspace Enterprise Plan",
+  education: "ItemTraxx Education Plan",
+  custom: "ItemTraxx Custom Plan",
   individual_yearly: "ItemTraxx Individual Yearly Plan",
   individual_monthly: "ItemTraxx Individual Monthly Plan",
   other: "Other",
@@ -178,16 +176,11 @@ serve(async (req) => {
         error: "Organization is required for this plan.",
       });
     }
-    if (
-      (plan === "district_enterprise" || plan === "organization_enterprise") &&
-      !schoolsCount
-    ) {
+    if (plan === "workspace_enterprise" && !schoolsCount) {
       return jsonResponse(
         400,
         {
-          error: plan === "district_enterprise"
-            ? "Number of schools is required for district enterprise."
-            : "Number of locations or teams is required for organization enterprise.",
+          error: "Number of tenant accounts is required for the Workspace Enterprise plan.",
         },
       );
     }
@@ -241,10 +234,7 @@ serve(async (req) => {
       .from("sales_leads")
       .insert({
         plan,
-        schools_count:
-          plan === "district_enterprise" || plan === "organization_enterprise"
-            ? schoolsCount
-            : null,
+        schools_count: plan === "workspace_enterprise" ? schoolsCount : null,
         name,
         organization: organization || null,
         reply_email: replyEmail,
@@ -271,10 +261,7 @@ serve(async (req) => {
         lead_id: lead.id,
         plan_label: planLabel,
         plan_key: plan,
-        schools_count:
-          plan === "district_enterprise" || plan === "organization_enterprise"
-            ? schoolsCount
-            : null,
+        schools_count: plan === "workspace_enterprise" ? schoolsCount : null,
         name,
         organization: organization || "Not provided",
         reply_email: replyEmail,

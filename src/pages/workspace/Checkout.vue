@@ -13,6 +13,7 @@
     </div>
 
     <p class="checkout-page-copy">Checkout and return</p>
+    <OfflineWorkflowStatus />
 
     <div class="card checkout-card">
       <label>
@@ -154,6 +155,7 @@
 import { computed, nextTick, onMounted, onUnmounted, ref } from "vue";
 import CameraBarcodeScannerModal from "../../components/CameraBarcodeScannerModal.vue";
 import SkeletonLoader from "../../components/SkeletonLoader.vue";
+import OfflineWorkflowStatus from "../../components/OfflineWorkflowStatus.vue";
 import {
   consumeCheckoutOfflineWarning,
   fetchCheckedOutItem,
@@ -234,6 +236,12 @@ const syncOfflineBuffer = async (showWhenNoOps = false) => {
       toastStatus.value = "Success";
       toastTitle.value = "Offline transactions synced.";
       toastMessage.value = `${result.processed} buffered transaction(s) sent.`;
+      return;
+    }
+    if (result.review > 0) {
+      toastStatus.value = "Failed";
+      toastTitle.value = "Offline sync needs review.";
+      toastMessage.value = `${result.review} transaction(s) need a decision before sync can finish.`;
       return;
     }
     if (showWhenNoOps && result.remaining === 0) {
@@ -329,7 +337,7 @@ const addBarcode = async () => {
     const item = await fetchItemByBarcode(value);
     const normalizedStatus = String(item.status ?? "").toLowerCase();
     const isCurrentBorrowerReturn = checkedOutItem.value.some(
-      (item) => item.barcode === item.barcode
+      (checkedOut) => checkedOut.barcode === item.barcode
     );
     if (normalizedStatus === "available") {
       barcodes.value = [...barcodes.value, item];
@@ -434,11 +442,26 @@ const submit = async () => {
       }
     }
 
-    const submitResult = await submitCheckoutReturn({
-      borrower_id: borrowerId.value.trim(),
-      item_barcodes: barcodes.value.map((item) => item.barcode),
-      action_type: "auto",
-    });
+    const submitResult = await submitCheckoutReturn(
+      {
+        borrower_id: borrowerId.value.trim(),
+        item_barcodes: barcodes.value.map((item) => item.barcode),
+        action_type: "auto",
+      },
+      {
+        borrower: borrower.value,
+        items: barcodes.value.map((item) => {
+          const isReturn = checkedOutItem.value.some((checkedOut) => checkedOut.barcode === item.barcode);
+          return {
+            item: {
+              ...item,
+              checked_out_by: item.checked_out_by ?? (isReturn ? borrower.value?.id ?? null : null),
+            },
+            intent: isReturn ? "return" as const : "checkout" as const,
+          };
+        }),
+      },
+    );
     if (submitResult.buffered) {
       const bufferedCount = submitResult.queuedCount;
       capturePostHogEvent("checkout_transaction_buffered", { buffered_count: bufferedCount });

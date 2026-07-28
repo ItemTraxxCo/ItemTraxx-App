@@ -355,6 +355,11 @@ verify_jwt = false
 # Auth is validated inside function via userClient.auth.getUser(authHeader).
 verify_jwt = false
 
+[functions.offline-checkout]
+# Auth, active account/device session, workspace state, and pack ownership are
+# validated inside the function after trusted edge ingress verification.
+verify_jwt = false
+
 [functions.consent-record]
 # Supports anonymous and authenticated consent audit records; validation is internal.
 verify_jwt = false

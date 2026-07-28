@@ -23,13 +23,13 @@ const superOpsDirectResponseSchema = (responseSchema) =>
   responseSchema.extend({ ok: z.boolean() });
 
 const tenantStatusSchema = z.enum(["active", "suspended", "archived"]);
-const accountCategorySchema = z.enum(["organization", "district", "individual"]);
+const accountCategorySchema = z.enum(["workspace", "education", "custom", "individual"]);
 const tenantPlanCodeSchema = z.enum([
-  "core",
-  "growth",
-  "starter",
-  "scale",
-  "enterprise",
+  "workspace_core",
+  "workspace_growth",
+  "workspace_enterprise",
+  "education",
+  "custom",
   "individual_yearly",
   "individual_monthly",
 ]);
@@ -889,7 +889,7 @@ const districtHandoffResponseSchemas = {
   consume: z.object({ access_token: z.string(), refresh_token: z.string(), district_slug: z.string() }),
 };
 
-const contactSalesPlanSchema = z.enum(["district_core","district_growth","district_enterprise","organization_starter","organization_scale","organization_enterprise","individual_yearly","individual_monthly","other"]);
+const contactSalesPlanSchema = z.enum(["workspace_core","workspace_growth","workspace_enterprise","education","custom","individual_yearly","individual_monthly","other"]);
 const contactSalesIntentSchema = z.enum(["sales","demo"]);
 
 const contactSalesSubmitRequestSchema = z.object({

@@ -20,13 +20,13 @@ const corsBase = {
   Vary: "Origin",
 };
 const randomPassword = () => `${crypto.randomUUID()}-Aa1!`;
-const ACCOUNT_CATEGORIES = new Set(["organization", "district", "individual"]);
+const ACCOUNT_CATEGORIES = new Set(["workspace", "education", "custom", "individual"]);
 const PLAN_CODES = new Set([
-  "core",
-  "growth",
-  "starter",
-  "scale",
-  "enterprise",
+  "workspace_core",
+  "workspace_growth",
+  "workspace_enterprise",
+  "education",
+  "custom",
   "individual_yearly",
   "individual_monthly",
 ]);
@@ -49,13 +49,14 @@ const normalizeFeatureFlags = (value: unknown) => {
 const policyValues = (p: Record<string, unknown>) => {
   const category = ACCOUNT_CATEGORIES.has(String(p.account_category))
     ? String(p.account_category)
-    : "organization";
+    : "workspace";
   const plan = optionalText(p.plan_code, { maxLen: 40 }) || null;
   if (plan && !PLAN_CODES.has(plan)) throw new ValidationError("Invalid workspace plan.");
   const planMatchesCategory = !plan ||
     (category === "individual" && ["individual_yearly", "individual_monthly"].includes(plan)) ||
-    (category === "district" && ["core", "growth", "enterprise"].includes(plan)) ||
-    (category === "organization" && ["starter", "scale", "enterprise"].includes(plan));
+    (category === "workspace" && ["workspace_core", "workspace_growth", "workspace_enterprise"].includes(plan)) ||
+    (category === "education" && plan === "education") ||
+    (category === "custom" && plan === "custom");
   if (!planMatchesCategory) throw new ValidationError("Invalid plan for workspace account category.");
   const checkoutHours = Number(p.checkout_due_hours ?? 72);
   if (!Number.isInteger(checkoutHours) || checkoutHours < 1 || checkoutHours > 720) {

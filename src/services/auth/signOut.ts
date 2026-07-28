@@ -8,6 +8,8 @@ import { revokeCurrentAccountSession } from "../adminOpsService";
 import { resolveWorkspaceHost } from "../workspaceService";
 import { clearHttpSession } from "../httpSessionService";
 import { clearOfflineCheckoutQueue } from "../offlineCheckoutQueue";
+import { clearOfflineCheckoutWorkflow } from "../offlineCheckoutWorkflow";
+import { clearOfflineConnectionState } from "../offlineConnectionState";
 import { signOutLocalSupabaseSession } from "../supabaseAuthSession";
 import { clearPendingSuperAdminVerificationEmail } from "./sessionState";
 
@@ -25,6 +27,8 @@ export const signOut = async () => {
 
   await signOutLocalSupabaseSession();
   await clearOfflineCheckoutQueue();
+  await clearOfflineCheckoutWorkflow();
+  clearOfflineConnectionState();
   try {
     await clearHttpSession();
   } catch {

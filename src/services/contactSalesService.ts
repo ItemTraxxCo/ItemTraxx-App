@@ -3,12 +3,11 @@ import { edgeFunctionError } from "./appErrors";
 
 type ContactSalesPayload = {
   plan:
-    | "district_core"
-    | "district_growth"
-    | "district_enterprise"
-    | "organization_starter"
-    | "organization_scale"
-    | "organization_enterprise"
+    | "workspace_core"
+    | "workspace_growth"
+    | "workspace_enterprise"
+    | "education"
+    | "custom"
     | "individual_yearly"
     | "individual_monthly"
     | "other";

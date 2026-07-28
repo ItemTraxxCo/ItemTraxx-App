@@ -28,7 +28,7 @@
     <h1>ItemTraxx Subscription Agreement and Policies</h1>
 
     <p><strong>Effective Date:</strong> June 11, 2026</p>
-    <p><strong>Last Updated:</strong> June 11, 2026</p>
+    <p><strong>Last Updated:</strong> July 28, 2026</p>
 
   <p>
   This page contains the ItemTraxx subscription terms and serves as the central hub for
@@ -211,13 +211,19 @@
             writing, all payments are non-refundable.
           </li>
           <li>
+            <strong>Onboarding fee:</strong> Workspace and Education plans require a one-time,
+            non-refundable onboarding fee billed during year one (1) only, in addition to the
+            listed subscription price. Individual plans do not offer or require onboarding. Final
+            onboarding pricing is confirmed through the quote and invoice process.
+          </li>
+          <li>
             <strong>Renewal:</strong> Subscriptions renew according to the accepted commercial
             terms unless canceled before the renewal date under the applicable cancellation window.
           </li>
           <li>
-            <strong>Renewal cycle and payment terms:</strong> Plans renew annually for School District and Organization plans. 
-            Individual plans are billed annually or monthly based on the plan selected by the customer at time of purchase. Unless
-            otherwise agreed in writing, invoice payment terms are Net 15.
+            <strong>Renewal cycle and payment terms:</strong> Workspace plans (Core, Growth, Enterprise) and Education plans
+            renew annually. Individual plans are billed annually or monthly based on the plan selected by the customer at
+            time of purchase. Unless otherwise agreed in writing, invoice payment terms are Net 15.
           </li>
           <li>
             <strong>Late payment:</strong> ItemTraxx Co may suspend or restrict service access for

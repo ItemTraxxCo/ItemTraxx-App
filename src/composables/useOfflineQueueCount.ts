@@ -19,8 +19,15 @@ export const useOfflineQueueCount = (isTenantScopedRoute: MaybeRefOrGetter<boole
       return;
     }
     try {
-      const { getBufferedCheckoutCount } = await import("../services/offlineCheckoutQueue");
-      count.value = await getBufferedCheckoutCount();
+      const [{ getBufferedCheckoutCount }, { getOfflineWorkflowSummary }] = await Promise.all([
+        import("../services/offlineCheckoutQueue"),
+        import("../services/offlineCheckoutWorkflow"),
+      ]);
+      const [legacyCount, workflow] = await Promise.all([
+        getBufferedCheckoutCount(),
+        getOfflineWorkflowSummary(),
+      ]);
+      count.value = legacyCount + workflow.pendingCount + workflow.reviewCount;
     } catch {
       count.value = 0;
     }

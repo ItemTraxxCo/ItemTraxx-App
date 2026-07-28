@@ -53,10 +53,7 @@
           <p class="changelog-section-label"></p>
           <h2>{{ entry.title }}</h2>
           <ul class="changelog-list">
-            <li v-for="item in entry.items" :key="item.title + item.body">
-              <strong>{{ item.title }}</strong>
-              <span v-if="item.body">{{ item.body }}</span>
-            </li>
+            <li v-for="item in entry.items" :key="item">{{ item }}</li>
           </ul>
         </article>
       </section>
@@ -80,14 +77,9 @@ type DocLink = {
   href: string | null;
 };
 
-type EntryItem = {
-  title: string;
-  body: string;
-};
-
 type ChangelogEntry = {
   title: string;
-  items: EntryItem[];
+  items: string[];
 };
 
 const lines = changelogRaw.split(/\r?\n/);
@@ -166,18 +158,6 @@ const docLinks = computed<DocLink[]>(() => {
   return result;
 });
 
-const normalizeBullet = (text: string) => {
-  const trimmed = text.trim();
-  const parts = trimmed.split(":");
-  if (parts.length > 1) {
-    return {
-      title: `${parts.shift()?.trim()}:`,
-      body: parts.join(":").trim(),
-    };
-  }
-  return { title: trimmed, body: "" };
-};
-
 const entries = computed<ChangelogEntry[]>(() => {
   const result: ChangelogEntry[] = [];
   let current: ChangelogEntry | null = null;
@@ -193,11 +173,11 @@ const entries = computed<ChangelogEntry[]>(() => {
     const trimmed = line.trim();
     if (!trimmed || trimmed === "---") continue;
     if (trimmed.startsWith("- ")) {
-      current.items.push(normalizeBullet(trimmed.replace(/^-\s+/, "")));
+      current.items.push(trimmed.replace(/^-\s+/, "").trim());
       continue;
     }
     if (trimmed.startsWith("  - ")) {
-      current.items.push(normalizeBullet(trimmed.replace(/^\-\s+/, "")));
+      current.items.push(trimmed.replace(/^-\s+/, "").trim());
       continue;
     }
   }
@@ -421,20 +401,15 @@ const entries = computed<ChangelogEntry[]>(() => {
 }
 
 .changelog-list {
-  list-style: none;
+  list-style: disc;
   margin: 1rem 0 0;
-  padding: 0;
+  padding-left: 1.35rem;
   display: grid;
-  gap: 0.85rem;
+  gap: 0.7rem;
 }
 
 .changelog-list li {
-  display: grid;
-  gap: 0.25rem;
-}
-
-.changelog-list strong {
-  color: var(--text);
+  padding-left: 0.1rem;
 }
 
 @media (max-width: 980px) {

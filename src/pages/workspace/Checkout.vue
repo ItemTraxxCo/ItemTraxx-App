@@ -160,7 +160,6 @@ import {
   consumeCheckoutOfflineWarning,
   fetchCheckedOutItem,
   fetchItemByBarcode,
-  getBufferedCheckoutCount,
   fetchBorrowerByBorrowerId,
   submitCheckoutReturn,
   syncBufferedCheckoutQueue,
@@ -226,29 +225,12 @@ const receipt = ref<{
   items: Array<{ name: string; barcode: string; action: "checkout" | "return" }>;
 } | null>(null);
 
-const syncOfflineBuffer = async (showWhenNoOps = false) => {
+const syncOfflineBuffer = async () => {
   if (syncInFlight.value) return;
   if (!navigator.onLine) return;
   syncInFlight.value = true;
   try {
-    const result = await syncBufferedCheckoutQueue();
-    if (result.processed > 0) {
-      toastStatus.value = "Success";
-      toastTitle.value = "Offline transactions synced.";
-      toastMessage.value = `${result.processed} buffered transaction(s) sent.`;
-      return;
-    }
-    if (result.review > 0) {
-      toastStatus.value = "Failed";
-      toastTitle.value = "Offline sync needs review.";
-      toastMessage.value = `${result.review} transaction(s) need a decision before sync can finish.`;
-      return;
-    }
-    if (showWhenNoOps && result.remaining === 0) {
-      toastStatus.value = "Success";
-      toastTitle.value = "No buffered transactions.";
-      toastMessage.value = "Everything is up to date.";
-    }
+    await syncBufferedCheckoutQueue();
     const queueWarning = consumeCheckoutOfflineWarning();
     if (queueWarning) {
       toastStatus.value = "Failed";
@@ -423,7 +405,7 @@ const submit = async () => {
 
     if (navigator.onLine) {
       await waitForPendingSync();
-      await syncOfflineBuffer(false);
+      await syncOfflineBuffer();
       if (borrower.value) {
         checkedOutItem.value = await fetchCheckedOutItem(borrower.value.id);
       }
@@ -472,9 +454,6 @@ const submit = async () => {
       borrowerId.value = "";
       borrower.value = null;
       checkedOutItem.value = [];
-      toastStatus.value = "Processing";
-      toastTitle.value = "Saved offline.";
-      toastMessage.value = `No connection. Transaction was buffered and will auto-sync to ItemTraxx Servers when you're online. Buffered: ${bufferedCount}`;
       return;
     }
     const borrowerSnapshot = borrower.value;
@@ -540,7 +519,7 @@ const submit = async () => {
 };
 
 const handleOnline = () => {
-  void syncOfflineBuffer(false);
+  void syncOfflineBuffer();
 };
 
 onMounted(() => {
@@ -556,14 +535,7 @@ onMounted(() => {
   });
 
   window.addEventListener("online", handleOnline);
-  void getBufferedCheckoutCount().then((buffered) => {
-    if (buffered > 0) {
-      toastStatus.value = "Processing";
-      toastTitle.value = "Buffered transactions detected.";
-      toastMessage.value = `${buffered} transaction(s) pending sync.`;
-    }
-  });
-  void syncOfflineBuffer(false);
+  void syncOfflineBuffer();
 });
 
 onUnmounted(() => {

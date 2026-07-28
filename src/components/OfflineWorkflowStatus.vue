@@ -23,7 +23,7 @@ import { markItemTraxxServerUnreachable, readOfflineConnectionState } from "../s
 import { toUserFacingErrorMessage } from "../services/appErrors";
 
 type Summary = Awaited<ReturnType<typeof getOfflineWorkflowSummary>>;
-const summary = ref<Summary>({ pack: null, packExpired: false, pendingCount: 0, reviewCount: 0 });
+const summary = ref<Summary>({ pack: null, packExpired: false, pendingCount: 0, syncingCount: 0, reviewCount: 0 });
 const connection = ref(readOfflineConnectionState());
 const message = ref("");
 const messageKind = ref<"success" | "error" | "info">("success");

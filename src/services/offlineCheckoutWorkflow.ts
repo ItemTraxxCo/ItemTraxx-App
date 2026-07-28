@@ -490,6 +490,7 @@ export const getOfflineWorkflowSummary = async () => {
     pack,
     packExpired: !!pack && Date.parse(pack.expires_at) <= Date.now(),
     pendingCount: ledger.filter((entry) => entry.status === "pending" || entry.status === "syncing").length,
+    syncingCount: ledger.filter((entry) => entry.status === "syncing").length,
     reviewCount: ledger.filter((entry) => entry.status === "needs_review").length,
   };
 };

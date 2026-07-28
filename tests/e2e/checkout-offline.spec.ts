@@ -912,6 +912,53 @@ test.describe("prepared offline checkout workflow contract", () => {
     expect(prepareAttempts).toBe(2);
   });
 
+  test("uses the Offline Queue toast for sync progress and completion", async ({ page }) => {
+    await mockSystemStatus(page);
+    await page.evaluate(async ({ pack, entry }) => {
+      window.localStorage.setItem("itemtraxx-device-id", "device-e2e");
+      window.__itemtraxxTest?.setWorkspaceAdminSession("workspace-e2e");
+      const workflow = (window.__itemtraxxTest as typeof window.__itemtraxxTest & {
+        offlineCheckoutWorkflow: {
+          writePack: (pack: unknown) => Promise<void>;
+          writeLedger: (entries: unknown[]) => Promise<void>;
+        };
+      }).offlineCheckoutWorkflow;
+      await workflow.writePack(pack);
+      await workflow.writeLedger([entry]);
+    }, {
+      pack: {
+        ...workflowPack(),
+        prepared_at: new Date().toISOString(),
+        expires_at: new Date(Date.now() + 86_400_000).toISOString(),
+      },
+      entry: workflowEntry(),
+    });
+    await page.route(/\/functions(?:\/v1)?\/offline-checkout(?:\?.*)?$/, async (route) => {
+      const body = route.request().postDataJSON() as { action?: string };
+      expect(body.action).toBe("sync");
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          data: {
+            operations: [{
+              operation_id: "op-workflow-e2e",
+              status: "synced",
+              item_results: [{ item_id: "item-1", barcode: "ITEM-1", status: "synced" }],
+            }],
+          },
+        }),
+      });
+    });
+    await navigateApp(page, "/checkout");
+
+    await expect(page.getByText("Syncing offline queue")).toBeVisible();
+    await expect(page.getByText("Syncing 1 transaction to ItemTraxx Servers.")).toBeVisible();
+    await expect(page.getByText("Offline queue synced")).toBeVisible();
+    await expect(page.getByText("1 transaction synced to ItemTraxx Servers.")).toBeVisible();
+  });
+
   test("queues Quick Return with an explicit quick_return intent and current borrower", async ({ page, context }) => {
     await mockSystemStatus(page);
     await mockAdminOps(page);

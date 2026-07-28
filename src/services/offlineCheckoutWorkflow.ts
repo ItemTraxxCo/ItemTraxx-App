@@ -94,6 +94,11 @@ const LOCK_NAME = "itemtraxx-offline-workflow";
 const LOCK_STORAGE_KEY = "itemtraxx:offline-workflow:lock:v1";
 const LOCK_TTL_MS = 30_000;
 export const OFFLINE_PACK_REFRESH_INTERVAL_MS = 5 * 60 * 1_000;
+export const OFFLINE_SESSION_INITIALIZING_ERROR = "Offline session is still initializing. Please retry.";
+
+export const isOfflineSessionInitializingError = (error: unknown) =>
+  error instanceof Error && error.message.trim() === OFFLINE_SESSION_INITIALIZING_ERROR;
+
 const ACTIVE_LEDGER_STATES = new Set<OfflineLedgerEntry["status"]>([
   "pending",
   "syncing",

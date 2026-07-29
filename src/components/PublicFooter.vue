@@ -6,6 +6,7 @@
       <span class="footer-version">v-{{ appVersion }}</span>
       <span v-if="showBranchName" class="footer-version footer-branch">{{ appBranch }}</span>
       <button
+        v-if="!isLandingRoute"
         type="button"
         class="footer-theme-toggle"
         :aria-label="themeMode === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'"
@@ -61,8 +62,11 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref } from "vue";
-import { RouterLink } from "vue-router";
+import { computed, onMounted, onUnmounted, ref } from "vue";
+import { RouterLink, useRoute } from "vue-router";
+
+const route = useRoute();
+const isLandingRoute = computed(() => route.path === "/" || route.path === "/landing-new");
 
 const appVersion = import.meta.env.VITE_GIT_COMMIT || "n/a";
 const appBranch = import.meta.env.VITE_GIT_BRANCH || "n/a";

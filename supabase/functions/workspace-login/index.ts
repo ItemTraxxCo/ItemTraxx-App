@@ -4,7 +4,7 @@ import { isAllowedOrigin, parseAllowedOrigins } from "../_shared/cors.ts";
 import { readJsonBody } from "../_shared/requestBody.ts";
 import { resolveClientFingerprint, resolveClientIp } from "../_shared/preloginGuards.ts";
 import { requireTrustedEdgeIngress } from "../_shared/trustedIngress.ts";
-import { optionalText, requireText, SLUG_PATTERN, ValidationError } from "../_shared/validation.ts";
+import { optionalText, requireEmail, SLUG_PATTERN, ValidationError } from "../_shared/validation.ts";
 
 type RateLimitResult={allowed:boolean};
 const corsBase={"Access-Control-Allow-Headers":"authorization, x-client-info, apikey, content-type, x-request-id, aikido-scan-agent","Access-Control-Allow-Methods":"POST, OPTIONS",Vary:"Origin"};
@@ -15,8 +15,8 @@ serve(async(req)=>{
   if(req.method==="OPTIONS")return originAllowed?new Response("ok",{headers}):new Response("Origin not allowed",{status:403,headers});
   if(origin&&!originAllowed)return json(403,{error:"Origin not allowed"}); const ingress=await requireTrustedEdgeIngress(req,"workspace-login",json);if(ingress)return ingress;
   try{
-    const body=await readJsonBody(req,32*1024); const email=requireText(body.email,{maxLen:320,transform:"lowercase"}); const password=typeof body.password==="string"?body.password:""; const workspaceSlug=optionalText(body.workspace_slug,{maxLen:63,pattern:SLUG_PATTERN,transform:"lowercase"})||null; const token=optionalText(body.turnstile_token,{maxLen:4096});
-    if(!email.includes("@")||!password||password.length>1024)return json(400,{error:"Invalid request"});
+    const body=await readJsonBody(req,32*1024); const email=requireEmail(body.email); const password=typeof body.password==="string"?body.password:""; const workspaceSlug=optionalText(body.workspace_slug,{maxLen:63,pattern:SLUG_PATTERN,transform:"lowercase"})||null; const token=optionalText(body.turnstile_token,{maxLen:4096});
+    if(!password||password.length>1024)return json(400,{error:"Invalid request"});
     const secret=Deno.env.get("ITX_TURNSTILE_SECRET")??"";if(!secret||!token)return json(400,{error:"Turnstile verification required"});if(!await verifyTurnstile(secret,token,resolveClientIp(req)))return json(403,{error:"Turnstile verification failed"});
     const url=Deno.env.get("ITX_SUPABASE_URL");const publishable=Deno.env.get("ITX_PUBLISHABLE_KEY");const service=Deno.env.get("ITX_SECRET_KEY");if(!url||!publishable||!service)return json(500,{error:"Server misconfiguration"});
     const admin=createClient(url,service,{auth:{persistSession:false,autoRefreshToken:false}});const fingerprint=await resolveClientFingerprint(req, origin);const rate=await admin.rpc("consume_rate_limit_prelogin",{p_key:fingerprint,p_scope:"workspace-login",p_limit:20,p_window_seconds:900});const rateRow=(Array.isArray(rate.data)?rate.data[0]:rate.data) as RateLimitResult|null;if(rate.error)return json(503,{error:"Rate limit check failed"});if(!rateRow?.allowed)return json(429,{error:"Too many attempts"});

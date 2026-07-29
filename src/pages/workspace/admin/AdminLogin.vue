@@ -104,7 +104,7 @@ import { useTurnstile } from "../../../composables/useTurnstile";
 import { clearAdminVerification } from "../../../store/authState";
 import { safeExternalUrl } from "../../../utils/safeUrl";
 
-const themeMode = ref<"light" | "dark">("dark");
+const themeMode = ref<"light" | "dark">(document.documentElement.getAttribute("data-theme") === "light" ? "light" : "dark");
 const themeClass = computed(() =>
   themeMode.value === "light" ? "theme-light" : "theme-dark"
 );

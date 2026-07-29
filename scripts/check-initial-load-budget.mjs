@@ -7,6 +7,12 @@ export const MAX_INITIAL_MINIFIED_BYTES = 250_000;
 export const MAX_INITIAL_GZIP_BYTES = 100_000;
 const SAFE_ASSET_NAME_RE = /^[A-Za-z0-9][A-Za-z0-9._-]*\.js$/;
 const FORBIDDEN_INITIAL_MODULE_RE = /node_modules\/(?:jspdf|html2canvas|jsbarcode|posthog-js|@sentry|@supabase)\//;
+// Static, unbundled scripts served verbatim from /public that are allowed to
+// appear in the initial HTML outside the hashed /assets/ pipeline. Each entry
+// must be a small, dependency-free, audited bootstrap script (no npm imports,
+// so it can never trip FORBIDDEN_INITIAL_MODULE_RE) — its bytes still count
+// against the initial-load budget below.
+const ALLOWED_STATIC_ROOT_SCRIPTS = new Set(["theme-init.js"]);
 
 const resolveAssetPath = (assetsDir, assetName) => {
   // Asset names come from the generated HTML, but keep the read explicitly
@@ -15,6 +21,16 @@ const resolveAssetPath = (assetsDir, assetName) => {
   const relativePath = relative(resolve(assetsDir), assetPath);
   if (!relativePath || relativePath.startsWith("..") || relativePath.includes("/")) {
     throw new Error(`asset path escaped assets directory: ${assetName}`);
+  }
+  return assetPath;
+};
+
+const resolveStaticRootAssetPath = (htmlPath, assetName) => {
+  const rootDir = resolve(htmlPath, "..");
+  const assetPath = resolve(rootDir, assetName);
+  const relativePath = relative(rootDir, assetPath);
+  if (!relativePath || relativePath.startsWith("..") || relativePath.includes("/")) {
+    throw new Error(`static asset path escaped output root: ${assetName}`);
   }
   return assetPath;
 };
@@ -30,14 +46,19 @@ const readAssetReferences = (html) => {
   return references;
 };
 
-const toSafeAssetName = (reference) => {
+const toSafeAsset = (reference) => {
   const withoutQuery = reference.split(/[?#]/, 1)[0];
-  const match = withoutQuery.match(/^(?:\/|\.\/)?assets\/([^/]+)$/);
-  const assetName = match?.[1] ?? "";
-  if (!SAFE_ASSET_NAME_RE.test(assetName)) {
-    throw new Error(`unsafe initial asset reference: ${reference}`);
+  const assetsMatch = withoutQuery.match(/^(?:\/|\.\/)?assets\/([^/]+)$/);
+  const assetName = assetsMatch?.[1];
+  if (assetName && SAFE_ASSET_NAME_RE.test(assetName)) {
+    return { kind: "bundled", assetName };
   }
-  return assetName;
+  const rootMatch = withoutQuery.match(/^\/([^/]+)$/);
+  const rootName = rootMatch?.[1];
+  if (rootName && SAFE_ASSET_NAME_RE.test(rootName) && ALLOWED_STATIC_ROOT_SCRIPTS.has(rootName)) {
+    return { kind: "static", assetName: rootName };
+  }
+  throw new Error(`unsafe initial asset reference: ${reference}`);
 };
 
 const readModuleMap = (moduleMapPath) => {
@@ -55,11 +76,17 @@ export const measureInitialLoad = ({
   moduleMapPath = resolve("artifacts/initial-module-map.json"),
 } = {}) => {
   const html = readFileSync(htmlPath, "utf8");
-  const assets = [...new Set(readAssetReferences(html).map(toSafeAssetName))].sort();
+  const resolvedAssets = readAssetReferences(html).map(toSafeAsset);
+  const assetKindByName = new Map(resolvedAssets.map((asset) => [asset.assetName, asset.kind]));
+  const assets = [...assetKindByName.keys()].sort();
   const moduleMap = readModuleMap(moduleMapPath);
   const totals = assets.reduce(
     (result, assetName) => {
-      const assetPath = resolveAssetPath(assetsDir, assetName);
+      const kind = assetKindByName.get(assetName);
+      const assetPath =
+        kind === "static"
+          ? resolveStaticRootAssetPath(htmlPath, assetName)
+          : resolveAssetPath(assetsDir, assetName);
       const bytes = readFileSync(assetPath);
       result.minifiedBytes += statSync(assetPath).size;
       result.gzipBytes += gzipSync(bytes).byteLength;

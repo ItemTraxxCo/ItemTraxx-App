@@ -8,6 +8,10 @@ Changes are dated based on the default timezone: America/Los_Angeles
 
 ---
 
+### 7/28/2026
+
+- Added a more capable offline checkout and return experience so users can continue tracking checkout and returns even when offline.
+
 ### 7/26/2026
 
 - Refined the public site with cleaner navigation.

@@ -236,7 +236,7 @@ import { useSystemStatus } from "../composables/useSystemStatus";
 
 const lightBrandLogoUrl = import.meta.env.VITE_BRAND_LOGO_LIGHT_URL as string | undefined;
 const darkBrandLogoUrl = import.meta.env.VITE_BRAND_LOGO_DARK_URL as string | undefined;
-const themeMode = ref<"light" | "dark">("dark");
+const themeMode = ref<"light" | "dark">(document.documentElement.getAttribute("data-theme") === "light" ? "light" : "dark");
 const brandLogoUrl = computed(() =>
   themeMode.value === "light"
     ? lightBrandLogoUrl || darkBrandLogoUrl || ""

@@ -21,14 +21,10 @@ jobs:
 
   strix-security-scan:
     needs: kill-switch-preflight
-    # Disabled: Strix's sandbox image has a Caido bootstrap race
-    # ("Could not acquire a connection to the database") that 500s all
-    # outbound sandbox traffic, including the LLM warm-up call. Confirmed
-    # this is independent of the Strix CLI version (reproduces on both
-    # v1.1.0 and v1.0.4), so it lives in the shared sandbox image, not
-    # something we can pin around. Re-enable once fixed upstream:
-    # https://github.com/usestrix/strix/issues/830
-    if: false && ((github.event_name == 'workflow_dispatch' || (github.event.pull_request.base.ref == 'preview' && github.event.pull_request.head.ref == 'staging')) && needs.kill-switch-preflight.outputs.active != 'true')
+    # Re-enabled for retest on Strix v1.4.1 (was gated off due to a Caido
+    # bootstrap race on the shared sandbox image, confirmed independent of
+    # CLI version on v1.1.0/v1.0.4): https://github.com/usestrix/strix/issues/927
+    if: (github.event_name == 'workflow_dispatch' || (github.event.pull_request.base.ref == 'preview' && github.event.pull_request.head.ref == 'staging')) && needs.kill-switch-preflight.outputs.active != 'true'
     permissions:
       contents: read
       pull-requests: write
@@ -45,9 +41,9 @@ jobs:
 
       - name: Install Strix
         env:
-          STRIX_VERSION: 1.1.0
-          # SHA-256 published for strix-1.1.0-linux-x86_64.tar.gz.
-          STRIX_SHA256: 7e8be841b9195a16e038eaa43e69452dc616fb19ca6979afbcaa9d842960e7e7
+          STRIX_VERSION: 1.4.1
+          # SHA-256 published for strix-1.4.1-linux-x86_64.tar.gz.
+          STRIX_SHA256: 6a50b8444700ee311d155b3828f0ed7e7876dcbe60404934b16d9aa0f442c1fe
         run: |
           strix_dir="$RUNNER_TEMP/strix-${STRIX_VERSION}"
           strix_archive="$strix_dir/strix.tar.gz"

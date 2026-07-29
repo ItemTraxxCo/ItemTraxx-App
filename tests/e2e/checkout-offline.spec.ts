@@ -479,8 +479,8 @@ test.describe("prepared offline checkout workflow contract", () => {
         workspace_id: "workspace-e2e",
         profile_id: "profile-e2e",
         device_id: "device-e2e",
-        prepared_at: "2026-07-28T08:00:00.000Z",
-        expires_at: "2026-07-29T08:00:00.000Z",
+        prepared_at: new Date(Date.now() - 60_000).toISOString(),
+        expires_at: new Date(Date.now() + 86_400_000).toISOString(),
         borrowers: [{ id: "borrower-1", username: "Maya Chen", borrower_id: "STU-100" }],
         items: [{ id: "item-1", name: "Camera", barcode: "CAM-014", status: "available", checked_out_by: null }],
       };

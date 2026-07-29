@@ -78,7 +78,7 @@ const email = ref("");
 const error = ref("");
 const success = ref(false);
 const isLoading = ref(false);
-const themeMode = ref<"light" | "dark">("dark");
+const themeMode = ref<"light" | "dark">(document.documentElement.getAttribute("data-theme") === "light" ? "light" : "dark");
 let themeObserver: MutationObserver | null = null;
 
 const routeSource = computed(() =>

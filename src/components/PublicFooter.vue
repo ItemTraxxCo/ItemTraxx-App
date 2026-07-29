@@ -90,7 +90,7 @@ const releaseChannel =
 
 const showBranchName = !!appBranch && appBranch !== "n/a" && appBranch !== "main";
 
-const themeMode = ref<"light" | "dark">("light");
+const themeMode = ref<"light" | "dark">(document.documentElement.getAttribute("data-theme") === "light" ? "light" : "dark");
 let themeObserver: MutationObserver | null = null;
 
 const syncThemeMode = () => {

@@ -46,7 +46,7 @@ const DEFAULT_KILL_SWITCH_MESSAGE =
 const message = ref(DEFAULT_KILL_SWITCH_MESSAGE);
 const lightBrandLogoUrl = import.meta.env.VITE_BRAND_LOGO_LIGHT_URL as string | undefined;
 const darkBrandLogoUrl = import.meta.env.VITE_BRAND_LOGO_DARK_URL as string | undefined;
-const themeMode = ref<"light" | "dark">("light");
+const themeMode = ref<"light" | "dark">(document.documentElement.getAttribute("data-theme") === "light" ? "light" : "dark");
 const brandLogoUrl = computed(() =>
   themeMode.value === "light"
     ? lightBrandLogoUrl || darkBrandLogoUrl || ""

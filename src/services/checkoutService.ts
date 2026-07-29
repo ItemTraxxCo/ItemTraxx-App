@@ -12,6 +12,7 @@ import {
   type CheckoutReturnPayload,
 } from "./offlineCheckoutQueue";
 import {
+  applyConfirmedTransactionToOfflinePack,
   findOfflineBorrower,
   findOfflineItem,
   getOfflineCheckedOutItems,
@@ -132,6 +133,7 @@ export const submitCheckoutReturn = async (
   const payloadWithOperationId = ensureCheckoutOperationId(payload);
   try {
     await executeCheckoutReturn(payloadWithOperationId);
+    if (offlineContext) await applyConfirmedTransactionToOfflinePack(offlineContext);
     void refreshOfflineCheckoutPackIfNeeded({ force: true }).catch(() => undefined);
     return {
       buffered: false,
@@ -142,6 +144,7 @@ export const submitCheckoutReturn = async (
       if (navigator.onLine) {
         try {
           await executeCheckoutReturn(payloadWithOperationId);
+          if (offlineContext) await applyConfirmedTransactionToOfflinePack(offlineContext);
           void refreshOfflineCheckoutPackIfNeeded({ force: true }).catch(() => undefined);
           return {
             buffered: false,

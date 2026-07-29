@@ -441,6 +441,36 @@ export const getOfflineCheckedOutItems = async (scope: OfflineWorkflowScope, bor
   return items.filter((item) => item.status.toLowerCase() === "checked_out" && item.checked_out_by === borrowerUuid);
 };
 
+/**
+ * Applies a server-confirmed checkout or return to this device's encrypted pack
+ * before the next background refresh completes. This keeps an immediate outage
+ * from reverting the user to the stale pre-transaction snapshot.
+ */
+export const applyConfirmedTransactionToOfflinePack = async (draft: {
+  borrower: OfflinePackBorrower | null;
+  items: Array<{ item: OfflinePackItem; intent: "checkout" | "return" | "quick_return" }>;
+}) => {
+  const scope = currentScope();
+  return withOfflineWorkflowLock(async () => {
+    const pack = await readRecord<OfflineCheckoutPack | null>(PACK_ID, null);
+    if (!pack || !scopeMatches(pack, scope)) return false;
+    const updates = new Map(draft.items.map(({ item, intent }) => [item.id, {
+      status: intent === "checkout" ? "checked_out" : "available",
+      checked_out_by: intent === "checkout" ? draft.borrower?.id ?? null : null,
+    }]));
+    const next: OfflineCheckoutPack = {
+      ...pack,
+      items: pack.items.map((item) => {
+        const update = updates.get(item.id);
+        return update ? { ...item, ...update } : item;
+      }),
+    };
+    await writeRecord(PACK_ID, next);
+    window.dispatchEvent(new CustomEvent("itemtraxx:offline-workflow-changed"));
+    return true;
+  });
+};
+
 export const queueOfflineOperation = async (draft: {
   operationId: string;
   borrower: OfflinePackBorrower | null;

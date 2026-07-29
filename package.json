@@ -42,14 +42,14 @@
     "deploy": "npm run build && wrangler deploy"
   },
   "dependencies": {
-    "@sentry/vue": "^10.68.0",
+    "@sentry/vue": "^10.69.0",
     "@supabase/supabase-js": "^2.111.0",
     "@vercel/analytics": "^2.0.1",
     "@vercel/speed-insights": "^2.0.0",
     "jsbarcode": "^3.12.3",
     "jspdf": "^4.2.1",
     "jspdf-autotable": "^5.0.8",
-    "posthog-js": "^1.407.5",
+    "posthog-js": "^1.407.6",
     "vue": "^3.5.40",
     "vue-router": "^4.6.4",
     "zod": "^4.4.3"
@@ -61,7 +61,7 @@
     "@types/node": "^26.1.2",
     "@vitejs/plugin-vue": "^6.0.8",
     "@vue/tsconfig": "^0.9.1",
-    "supabase": "2.109.1",
+    "supabase": "2.110.0",
     "typescript": "~6.0.3",
     "vite": "^8.1.5",
     "vue-tsc": "^3.3.8",

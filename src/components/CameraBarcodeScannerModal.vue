@@ -205,7 +205,7 @@ const scanHistoryItems = computed(() => {
   return props.scanHistoryItems ?? [];
 });
 
-const themeMode = ref<"light" | "dark">("dark");
+const themeMode = ref<"light" | "dark">(document.documentElement.getAttribute("data-theme") === "light" ? "light" : "dark");
 let themeObserver: MutationObserver | null = null;
 
 const syncTheme = () => {

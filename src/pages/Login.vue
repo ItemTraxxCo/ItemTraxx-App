@@ -195,7 +195,7 @@ const storySlides = [
 },
 ] as const;
 const activeStoryIndex = ref(0);
-const themeMode = ref<"light" | "dark">("dark");
+const themeMode = ref<"light" | "dark">(document.documentElement.getAttribute("data-theme") === "light" ? "light" : "dark");
 const themeClass = computed(() =>
   themeMode.value === "light" ? "theme-light" : "theme-dark"
 );

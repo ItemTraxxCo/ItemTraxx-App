@@ -66,7 +66,7 @@ import checkoutReturnUiImage1600 from '../assets/landing/checkout_return_ui-1600
 import { useSystemStatus } from '../composables/useSystemStatus';
 import PublicFooter from "../components/PublicFooter.vue";
 
-const themeMode = ref<"light" | "dark">("dark");
+const themeMode = ref<"light" | "dark">(document.documentElement.getAttribute("data-theme") === "light" ? "light" : "dark");
 const brandLogoUrl = computed(() => import.meta.env.VITE_BRAND_LOGO_DARK_URL || "");
 
 type ShowcaseVariant = {

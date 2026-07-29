@@ -85,7 +85,7 @@ const route = useRoute();
 const router = useRouter();
 const now = ref("");
 const currentUrl = ref(route.fullPath);
-const themeMode = ref<"light" | "dark">("light");
+const themeMode = ref<"light" | "dark">(document.documentElement.getAttribute("data-theme") === "light" ? "light" : "dark");
 const showDiagnosticInfo = import.meta.env.DEV;
 let themeObserver: MutationObserver | null = null;
 const canGoBack = computed(() => {

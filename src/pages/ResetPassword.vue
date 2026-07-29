@@ -69,7 +69,7 @@ const isLoading = ref(false);
 const isReady = ref(false);
 const hasCheckedRecoverySession = ref(false);
 const success = ref(false);
-const themeMode = ref<"light" | "dark">("dark");
+const themeMode = ref<"light" | "dark">(document.documentElement.getAttribute("data-theme") === "light" ? "light" : "dark");
 let themeObserver: MutationObserver | null = null;
 
 const hasRecoveryLinkContext = () => {

@@ -117,7 +117,7 @@ const isLoading = ref(false);
 const isCodeStep = ref(false);
 const toastTitle = ref("");
 const toastMessage = ref("");
-const themeMode = ref<"light" | "dark">("dark");
+const themeMode = ref<"light" | "dark">(document.documentElement.getAttribute("data-theme") === "light" ? "light" : "dark");
 const turnstileSiteKey = import.meta.env.VITE_TURNSTILE_SITE_KEY as string | undefined;
 const {
   containerRef: turnstileContainerRef,

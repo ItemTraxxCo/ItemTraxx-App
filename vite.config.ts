@@ -28,6 +28,23 @@ const initialModuleMapPlugin = (): Plugin => ({
   },
 });
 
+const disableRocketLoaderPlugin = (): Plugin => ({
+  name: "itemtraxx-disable-rocket-loader",
+  apply: "build" as const,
+  transformIndexHtml(html) {
+    // Cloudflare Rocket Loader rewrites every <script> tag's type attribute
+    // (including type="module") to defer execution through its own async
+    // loader, discarding the browser's native module timing guarantees.
+    // data-cfasync="false" opts a script out of that rewrite; theme-init.js
+    // already carries it — do the same for Vite's generated entry script so
+    // the app boots with predictable, native module-script timing.
+    return html.replace(
+      /(<script\s+type="module"\s+crossorigin\s+src="[^"]+")>/,
+      '$1 data-cfasync="false">'
+    );
+  },
+});
+
 const resolveBuildCommit = (env: Record<string, string>) => {
   const vercelCommit = env.VERCEL_GIT_COMMIT_SHA?.trim();
   if (vercelCommit) {
@@ -75,6 +92,7 @@ export default defineConfig(({ mode, command }) => {
       vue(),
       ...(env.VITE_E2E_TEST_UTILS === "true" ? [] : [cloudflare()]),
       initialModuleMapPlugin(),
+      disableRocketLoaderPlugin(),
     ],
     server:
       process.env.VITE_E2E_TEST_UTILS === "true"

@@ -62,6 +62,7 @@ declare global {
         findBorrower: (scope: OfflineWorkflowScope, borrowerId: string) => Promise<unknown>;
         findItem: (scope: OfflineWorkflowScope, barcode: string) => Promise<unknown>;
         checkedOutItems: (scope: OfflineWorkflowScope, borrowerUuid: string) => Promise<unknown[]>;
+        applyConfirmed: (draft: { borrower: OfflineCheckoutPack["borrowers"][number] | null; items: Array<{ item: OfflineCheckoutPack["items"][number]; intent: "checkout" | "return" | "quick_return" }> }) => Promise<boolean>;
         markNeedsReview: (id: string, reason: string, serverState: unknown) => Promise<void>;
         listReviewItems: () => Promise<OfflineLedgerEntry[]>;
         keepServerState: (id: string) => Promise<void>;
@@ -224,6 +225,10 @@ export const attachE2EControls = (router: Router): void => {
       async checkedOutItems(scope, borrowerUuid) {
         const { getOfflineCheckedOutItems } = await import("../services/offlineCheckoutWorkflow");
         return getOfflineCheckedOutItems(scope, borrowerUuid);
+      },
+      async applyConfirmed(draft) {
+        const { applyConfirmedTransactionToOfflinePack } = await import("../services/offlineCheckoutWorkflow");
+        return applyConfirmedTransactionToOfflinePack(draft);
       },
       async markNeedsReview(id, reason, serverState) {
         const { markOfflineEntryNeedsReview } = await import("../services/offlineCheckoutWorkflow");

@@ -589,6 +589,35 @@ test.describe("prepared offline checkout workflow contract", () => {
     expect(result.tripod).toMatchObject({ status: "available", checked_out_by: null });
   });
 
+  test("updates the offline pack immediately after a server-confirmed checkout or return", async ({ page }) => {
+    const result = await page.evaluate(async (pack) => {
+      window.localStorage.setItem("itemtraxx-device-id", "device-e2e");
+      window.__itemtraxxTest?.setWorkspaceAdminSession("workspace-e2e");
+      const workflow = (window.__itemtraxxTest as typeof window.__itemtraxxTest & {
+        offlineCheckoutWorkflow: {
+          writePack: (pack: unknown) => Promise<void>;
+          findItem: (scope: unknown, barcode: string) => Promise<unknown>;
+          applyConfirmed: (draft: unknown) => Promise<boolean>;
+        };
+      }).offlineCheckoutWorkflow;
+      await workflow.writePack(pack);
+      const borrower = pack.borrowers[0];
+      const item = pack.items[0];
+      const checkedOut = await workflow.applyConfirmed({ borrower, items: [{ item, intent: "checkout" }] });
+      const afterCheckout = await workflow.findItem({ workspaceId: "workspace-e2e", profileId: "user-e2e-admin", deviceId: "device-e2e" }, item.barcode);
+      const returned = await workflow.applyConfirmed({ borrower, items: [{ item, intent: "return" }] });
+      const afterReturn = await workflow.findItem({ workspaceId: "workspace-e2e", profileId: "user-e2e-admin", deviceId: "device-e2e" }, item.barcode);
+      return { checkedOut, afterCheckout, returned, afterReturn };
+    }, workflowPack());
+
+    expect(result).toMatchObject({
+      checkedOut: true,
+      afterCheckout: { status: "checked_out", checked_out_by: "borrower-1" },
+      returned: true,
+      afterReturn: { status: "available", checked_out_by: null },
+    });
+  });
+
   test("retains a rejected replay for manual review and resolves it explicitly", async ({ page }) => {
     const result = await page.evaluate(async () => {
       const control = (window.__itemtraxxTest as typeof window.__itemtraxxTest & {

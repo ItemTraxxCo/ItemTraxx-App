@@ -6,6 +6,7 @@
       <span class="footer-version">v-{{ appVersion }}</span>
       <span v-if="showBranchName" class="footer-version footer-branch">{{ appBranch }}</span>
       <button
+        v-if="!isLandingRoute"
         type="button"
         class="footer-theme-toggle"
         :aria-label="themeMode === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'"
@@ -102,9 +103,9 @@ const syncThemeMode = () => {
 
 const toggleTheme = () => {
   const next = themeMode.value === "dark" ? "light" : "dark";
-  document.documentElement.setAttribute("data-theme", isLandingRoute.value ? "dark" : next);
+  document.documentElement.setAttribute("data-theme", next);
   localStorage.setItem("itemtraxx-theme", next);
-  themeMode.value = isLandingRoute.value ? "dark" : next;
+  themeMode.value = next;
 };
 
 onMounted(() => {

@@ -2,9 +2,7 @@
 
 Last updated (year-month-day): 2026-07-28
 
-This changelog highlights major ItemTraxx updates in plain language.
-
-Changes are dated based on the default timezone: America/Los_Angeles
+This changelog highlights major user-facing ItemTraxx updates.
 
 ---
 

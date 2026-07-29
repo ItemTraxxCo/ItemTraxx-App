@@ -189,6 +189,7 @@ const isMarketingFullBleedRoute = computed(() => ["/", "/landing-new", "/changel
 const isSubmitConfirmationRoute = computed(() => route.path === "/submitconfirmation");
 const isBannerBleedRoute = computed(() => ["/legal", "/security", "/trust", "/compliance", "/faq", "/contact", "/privacy", "/cookies", "/accessibility", "/about", "/pricing", "/forgot-password", "/contact-sales", "/request-demo", "/contact-support", "/report-security-issue", "/getting-started"].includes(route.path));
 const isDarkChromeRoute = computed(() => ["/", "/landing-new", "/pricing", "/changelog", "/itemscanner"].includes(route.path));
+const isLandingRoute = computed(() => route.path === "/" || route.path === "/landing-new");
 const isUnavailableRoute = computed(() => route.path === "/unavailable" || route.name === "public-unavailable");
 const isKillSwitchAllowedRoute = computed(() => isUnavailableRoute.value);
 const hiddenMenuRoutes = new Set(["public-home", "public-unavailable", "public-pricing", "public-about", "public-security", "public-report-security-issue", "public-changelog", "public-compliance", "public-privacy", "public-cookies", "public-contact", "public-trust", "public-faq", "public-accessibility", "public-getting-started", "public-itemscanner", "public-legal", "public-forgot-password", "public-reset-password", "public-home-new2", "public-request-demo", "public-contact-sales", "public-contact-support", "public-submit-confirmation"]);
@@ -259,7 +260,7 @@ const updateBrowserChromeColor = () => {
 };
 const applyTheme = (next: "light" | "dark") => {
   theme.value = next;
-  document.documentElement.setAttribute("data-theme", next);
+  document.documentElement.setAttribute("data-theme", isLandingRoute.value ? "dark" : next);
   localStorage.setItem("itemtraxx-theme", next);
   updateBrowserChromeColor();
 };
@@ -364,6 +365,10 @@ watch(() => [backendUnavailable.value, route.path] as const, ([unavailable, path
   if (unavailable && !isUnavailableBypass.value && path !== "/unavailable") void router.replace("/unavailable");
 });
 watch(() => [route.name, auth.isInitialized, auth.isAuthenticated, auth.role, auth.workspaceContextId, auth.adminVerifiedAt, auth.hasSecondaryAuth, auth.superVerifiedAt, district.isWorkspaceHost, district.workspaceId] as const, () => void maybeRedirectAuthenticatedPublicHome());
+watch(isLandingRoute, () => {
+  document.documentElement.setAttribute("data-theme", isLandingRoute.value ? "dark" : theme.value);
+  updateBrowserChromeColor();
+});
 onMounted(() => {
   const saved = localStorage.getItem("itemtraxx-theme");
   applyTheme(saved === "light" || saved === "dark" ? saved : "light");

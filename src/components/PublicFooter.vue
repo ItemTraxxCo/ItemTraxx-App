@@ -61,8 +61,11 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref } from "vue";
-import { RouterLink } from "vue-router";
+import { computed, onMounted, onUnmounted, ref } from "vue";
+import { RouterLink, useRoute } from "vue-router";
+
+const route = useRoute();
+const isLandingRoute = computed(() => route.path === "/" || route.path === "/landing-new");
 
 const appVersion = import.meta.env.VITE_GIT_COMMIT || "n/a";
 const appBranch = import.meta.env.VITE_GIT_BRANCH || "n/a";
@@ -99,9 +102,9 @@ const syncThemeMode = () => {
 
 const toggleTheme = () => {
   const next = themeMode.value === "dark" ? "light" : "dark";
-  document.documentElement.setAttribute("data-theme", next);
+  document.documentElement.setAttribute("data-theme", isLandingRoute.value ? "dark" : next);
   localStorage.setItem("itemtraxx-theme", next);
-  themeMode.value = next;
+  themeMode.value = isLandingRoute.value ? "dark" : next;
 };
 
 onMounted(() => {

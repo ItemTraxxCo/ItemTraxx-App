@@ -5,6 +5,12 @@ permissions:
 
 on:
   workflow_call:
+    inputs:
+      status_source:
+        description: "Status source used to read the kill-switch state."
+        required: false
+        type: string
+        default: edge
     outputs:
       active:
         description: "Kill-switch state: true, false, or unknown. Protected jobs run only on false."
@@ -23,23 +29,12 @@ jobs:
     steps:
       - name: Check ItemTraxx kill switch
         id: kill-switch
+        env:
+          STATUS_SOURCE: ${{ inputs.status_source }}
         run: |
           set -euo pipefail
 
           STATUS_BODY="$(mktemp)"
-          set +e
-          STATUS_CODE="$(curl -sS -o "$STATUS_BODY" -w '%{http_code}' \
-            --connect-timeout 5 \
-            --max-time 15 \
-            --retry 2 \
-            --retry-delay 2 \
-            --retry-all-errors \
-            -H "Accept: application/json" \
-            -H "Origin: https://itemtraxx.com" \
-            "https://edge.itemtraxx.com/functions/system-status")"
-          CURL_EC="$?"
-          set -e
-
           write_unknown_output() {
             local message="$1"
             {
@@ -49,6 +44,33 @@ jobs:
               echo "EOF"
             } >> "$GITHUB_OUTPUT"
           }
+
+          case "$STATUS_SOURCE" in
+            edge)
+              STATUS_URL="https://edge.itemtraxx.com/functions/system-status"
+              ;;
+            supabase)
+              STATUS_URL="https://mlaspkufocikfcbjgpof.supabase.co/functions/v1/system-status"
+              ;;
+            *)
+              echo "Unknown kill-switch preflight status source: $STATUS_SOURCE; protected work will remain blocked."
+              write_unknown_output "Kill-switch preflight configuration was invalid; protected work was blocked."
+              exit 0
+              ;;
+          esac
+
+          set +e
+          STATUS_CODE="$(curl -sS -o "$STATUS_BODY" -w '%{http_code}' \
+            --connect-timeout 5 \
+            --max-time 15 \
+            --retry 2 \
+            --retry-delay 2 \
+            --retry-all-errors \
+            -H "Accept: application/json" \
+            -H "Origin: https://itemtraxx.com" \
+            "$STATUS_URL")"
+          CURL_EC="$?"
+          set -e
 
           if [ "$CURL_EC" -ne 0 ]; then
             echo "system-status kill-switch preflight failed with curl exit $CURL_EC; protected work will remain blocked."

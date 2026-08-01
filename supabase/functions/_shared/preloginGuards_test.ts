@@ -42,11 +42,31 @@ Deno.test("resolveClientFingerprint prefers trusted Cloudflare IP", () => {
     },
   });
 
-  const fingerprint = resolveClientFingerprint(request, null);
+  const fingerprint = resolveClientFingerprint(request, null, {
+    trustProxyHeader: true,
+  });
   assert(
     fingerprint === "ip-203-0-113-42",
     "expected trusted Cloudflare IP fingerprint",
   );
+});
+
+Deno.test("per-IP status buckets keep distinct client addresses separate", () => {
+  const first = resolveClientFingerprint(
+    new Request("https://example.com", {
+      headers: { "cf-connecting-ip": "203.0.113.42" },
+    }),
+    null,
+    { trustProxyHeader: true },
+  );
+  const second = resolveClientFingerprint(
+    new Request("https://example.com", {
+      headers: { "cf-connecting-ip": "198.51.100.7" },
+    }),
+    null,
+    { trustProxyHeader: true },
+  );
+  assert(first !== second, "expected distinct client IPs to use distinct buckets");
 });
 
 Deno.test("resolveClientFingerprint does not fall back to user-agent", () => {
@@ -60,5 +80,19 @@ Deno.test("resolveClientFingerprint does not fall back to user-agent", () => {
   assert(
     fingerprint === "unknown-client",
     "expected non-IP clients to share the unknown-client bucket",
+  );
+});
+
+Deno.test("resolveClientFingerprint ignores proxy headers for direct callers", () => {
+  const request = new Request("https://example.com", {
+    headers: { "cf-connecting-ip": "203.0.113.42" },
+  });
+
+  const fingerprint = resolveClientFingerprint(request, null, {
+    trustProxyHeader: false,
+  });
+  assert(
+    fingerprint === "unknown-client",
+    "expected forged direct proxy headers to remain in the anonymous bucket",
   );
 });

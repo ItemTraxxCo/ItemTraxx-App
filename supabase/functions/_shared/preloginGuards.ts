@@ -43,8 +43,11 @@ export const resolveClientIp = (req: Request) => {
 export const resolveClientFingerprint = (
   req: Request,
   _origin: string | null,
+  options: { trustProxyHeader?: boolean } = { trustProxyHeader: false },
 ) => {
-  const ipCandidate = resolveClientIp(req);
+  const ipCandidate = options.trustProxyHeader === false
+    ? ""
+    : resolveClientIp(req);
 
   if (ipCandidate) {
     return `ip-${normalizeScopePart(ipCandidate, "unknown-ip", 24)}`;

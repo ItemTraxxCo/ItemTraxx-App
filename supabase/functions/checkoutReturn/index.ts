@@ -211,7 +211,10 @@ serve(async (req) => {
 
     const isAdminReturn = actionType === "admin_return";
     const isQuickReturn = actionType === "quick_return";
-    if (isAdminReturn && callerRole !== "workspace_admin") {
+    if (
+      (isAdminReturn || isQuickReturn) &&
+      callerRole !== "workspace_admin"
+    ) {
       return jsonResponse(403, { error: "Access denied" });
     }
 

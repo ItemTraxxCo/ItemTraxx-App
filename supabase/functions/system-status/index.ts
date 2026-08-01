@@ -11,6 +11,7 @@ import {
   resolveClientFingerprint,
 } from "../_shared/preloginGuards.ts";
 import { resolveSystemStatusOverride } from "../_shared/systemStatusOverride.ts";
+import { hasTrustedEdgeIngress } from "../_shared/trustedIngress.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Headers":
@@ -57,15 +58,16 @@ type IncidentWidgetPayload = {
 };
 
 // This endpoint is intentionally public and unauthenticated -- the app shell
-// probes it before any session exists, and the synthetic uptime checks call it
-// from outside Cloudflare. What it should not be is a free amplifier: each
-// request otherwise cost a service-role DB probe, three app_runtime_config
-// reads, and an outbound incident.io fetch.
+// probes it before any session exists, and external status consumers may call
+// the origin directly. What it should not be is a free amplifier: each request
+// otherwise costs a service-role DB probe, three app_runtime_config reads, and
+// an outbound incident.io fetch.
 //
 // Two bounds, neither of which changes the public contract:
 //   1. a short in-memory cache of the derived incident.io verdict, shared by
 //      every request an isolate serves;
-//   2. a generous per-IP rate limit, well above any legitimate prober.
+//   2. a generous per-IP rate limit for Worker and direct traffic; callers
+//      without an IP remain in a bounded anonymous fallback bucket.
 const INCIDENT_CACHE_TTL_MS = 20_000;
 const STATUS_RATE_LIMIT_PER_MINUTE = 60;
 
@@ -171,12 +173,26 @@ serve(async (req) => {
       auth: { persistSession: false },
     });
 
+    // Keep direct status consumers isolated per client IP as well as Worker
+    // traffic. This preserves availability for unrelated real users; a caller
+    // that rotates addresses can rotate buckets too, which is an accepted
+    // tradeoff for this public, unauthenticated status endpoint.
+    const trustedEdgeIngress = await hasTrustedEdgeIngress(
+      req,
+      "system-status",
+    ).catch(() => false);
+    const clientFingerprint = resolveClientFingerprint(
+      req,
+      req.headers.get("origin"),
+      { trustProxyHeader: true },
+    );
+
     // Bound the unauthenticated request cost. Fails open: a limiter outage must
     // never take the public status page down with it.
     const rateLimit = await enforcePreloginRateLimit(
       adminClient,
-      resolveClientFingerprint(req, req.headers.get("origin")),
-      "system-status",
+      clientFingerprint,
+      trustedEdgeIngress ? "system-status-edge" : "system-status-direct",
       STATUS_RATE_LIMIT_PER_MINUTE,
       60
     ).catch(() => ({ ok: true as const, error: null }));

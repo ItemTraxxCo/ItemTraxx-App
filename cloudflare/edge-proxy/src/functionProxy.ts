@@ -3,8 +3,13 @@ import {
   applyMaintenanceFallbackToStatusPayload,
   readMaintenanceFallback,
 } from "./maintenanceFallback.ts";
+import {
+  getFunctionRequestBodyLimit,
+  readBoundedRequestBody,
+  RequestBodyLimitError,
+} from "./requestBody.ts";
 import { sanitizeRequestHeaders } from "./requestHeaders.ts";
-import { buildSessionRateLimitError } from "./responses.ts";
+import { buildError, buildSessionRateLimitError } from "./responses.ts";
 import { maybeRefreshSession } from "./session.ts";
 import { applyTrustedIngressHeaders } from "./trustedIngress.ts";
 
@@ -60,9 +65,21 @@ export const proxyFunctionRequest = async (
   }/functions/v1/${functionName}`;
   const isSystemStatusGet = functionName === "system-status" &&
     request.method === "GET";
-  const requestBody = request.method === "GET" || request.method === "HEAD"
-    ? null
-    : new Uint8Array(await request.clone().arrayBuffer());
+  let requestBody: Uint8Array | null = null;
+  if (request.method !== "GET" && request.method !== "HEAD") {
+    try {
+      requestBody = await readBoundedRequestBody(
+        request,
+        getFunctionRequestBodyLimit(functionName),
+      );
+    } catch (error) {
+      if (error instanceof RequestBodyLimitError) {
+        return buildError(error.status, error.message, headers, requestId);
+      }
+      throw error;
+    }
+  }
+  let invocationCount = 0;
   const invoke = async (sessionAccessToken?: string | null) => {
     const proxiedHeaders = sanitizeRequestHeaders(
       request,
@@ -82,7 +99,9 @@ export const proxyFunctionRequest = async (
     return fetch(supabaseFunctionUrl, {
       method: request.method,
       headers: proxiedHeaders,
-      body: requestBody ? requestBody.slice() : undefined,
+      body: requestBody
+        ? invocationCount++ === 0 ? requestBody : requestBody.slice()
+        : undefined,
     });
   };
 

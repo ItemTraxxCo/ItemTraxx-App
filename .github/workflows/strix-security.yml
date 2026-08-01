@@ -18,13 +18,15 @@ jobs:
     # Scan the promotion PR: staging -> preview.
     if: ${{ github.event_name == 'workflow_dispatch' || (github.event.pull_request.base.ref == 'preview' && github.event.pull_request.head.ref == 'staging') }}
     uses: ./.github/workflows/kill-switch-preflight.yml
+    with:
+      status_source: supabase
 
   strix-security-scan:
     needs: kill-switch-preflight
     # Re-enabled for retest on Strix v1.4.1 (was gated off due to a Caido
     # bootstrap race on the shared sandbox image, confirmed independent of
     # CLI version on v1.1.0/v1.0.4): https://github.com/usestrix/strix/issues/927
-    if: (github.event_name == 'workflow_dispatch' || (github.event.pull_request.base.ref == 'preview' && github.event.pull_request.head.ref == 'staging')) && needs.kill-switch-preflight.outputs.active != 'true'
+    if: (github.event_name == 'workflow_dispatch' || (github.event.pull_request.base.ref == 'preview' && github.event.pull_request.head.ref == 'staging')) && needs.kill-switch-preflight.outputs.active == 'false'
     permissions:
       contents: read
       pull-requests: write

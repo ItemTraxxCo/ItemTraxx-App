@@ -443,7 +443,9 @@ serve(async (req) => {
 
       const origin = req.headers.get("Origin");
       const clientIp = resolveClientIp(req);
-      const clientFingerprint = resolveClientFingerprint(req, origin);
+      const clientFingerprint = resolveClientFingerprint(req, origin, {
+        trustProxyHeader: true,
+      });
       const emailHash = await hashString(email);
 
       const perClientLimit = await enforcePreloginRateLimit(

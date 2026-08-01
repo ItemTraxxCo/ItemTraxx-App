@@ -148,7 +148,7 @@ jobs:
     needs:
       - kill-switch-preflight
       - apply
-    if: ${{ always() && needs.kill-switch-preflight.outputs.active != 'true' && (needs.apply.result == 'failure' || needs.apply.result == 'cancelled') }}
+    if: ${{ always() && (needs.kill-switch-preflight.outputs.active == 'false' || needs.kill-switch-preflight.outputs.active == 'unknown') && (needs.apply.result == 'failure' || needs.apply.result == 'cancelled') }}
     uses: ./.github/workflows/incidentio-workflow-alert.yml
     with:
       status: ${{ needs.apply.result }}

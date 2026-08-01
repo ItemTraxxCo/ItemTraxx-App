@@ -5,9 +5,15 @@ permissions:
 
 on:
   workflow_call:
+    inputs:
+      status_source:
+        description: "Status source used to read the kill-switch state."
+        required: false
+        type: string
+        default: edge
     outputs:
       active:
-        description: Check whether the ItemTraxx kill switch is active.
+        description: "Kill-switch state: true, false, or unknown. Protected jobs run only on false."
         value: ${{ jobs.check.outputs.active }}
       message:
         description: Kill-switch message from system-status.
@@ -23,10 +29,36 @@ jobs:
     steps:
       - name: Check ItemTraxx kill switch
         id: kill-switch
+        env:
+          STATUS_SOURCE: ${{ inputs.status_source }}
         run: |
           set -euo pipefail
 
           STATUS_BODY="$(mktemp)"
+          write_unknown_output() {
+            local message="$1"
+            {
+              echo "active=unknown"
+              echo "message<<EOF"
+              printf '%s\n' "$message"
+              echo "EOF"
+            } >> "$GITHUB_OUTPUT"
+          }
+
+          case "$STATUS_SOURCE" in
+            edge)
+              STATUS_URL="https://edge.itemtraxx.com/functions/system-status"
+              ;;
+            supabase)
+              STATUS_URL="https://mlaspkufocikfcbjgpof.supabase.co/functions/v1/system-status"
+              ;;
+            *)
+              echo "Unknown kill-switch preflight status source: $STATUS_SOURCE; protected work will remain blocked."
+              write_unknown_output "Kill-switch preflight configuration was invalid; protected work was blocked."
+              exit 0
+              ;;
+          esac
+
           set +e
           STATUS_CODE="$(curl -sS -o "$STATUS_BODY" -w '%{http_code}' \
             --connect-timeout 5 \
@@ -36,37 +68,33 @@ jobs:
             --retry-all-errors \
             -H "Accept: application/json" \
             -H "Origin: https://itemtraxx.com" \
-            "https://edge.itemtraxx.com/functions/system-status")"
+            "$STATUS_URL")"
           CURL_EC="$?"
           set -e
 
-          write_inactive_output() {
-            local message="$1"
-            {
-              echo "active=false"
-              echo "message<<EOF"
-              printf '%s\n' "$message"
-              echo "EOF"
-            } >> "$GITHUB_OUTPUT"
-          }
-
           if [ "$CURL_EC" -ne 0 ]; then
-            echo "system-status kill-switch preflight failed with curl exit $CURL_EC; running scheduled work normally."
-            write_inactive_output "Kill-switch preflight unavailable; scheduled work was not suppressed."
+            echo "system-status kill-switch preflight failed with curl exit $CURL_EC; protected work will remain blocked."
+            write_unknown_output "Kill-switch preflight unavailable; protected work was blocked."
             exit 0
           fi
 
           if [ "$STATUS_CODE" -lt 200 ] || [ "$STATUS_CODE" -ge 300 ]; then
-            echo "system-status returned HTTP $STATUS_CODE during kill-switch preflight; running scheduled work normally."
+            echo "system-status returned HTTP $STATUS_CODE during kill-switch preflight; protected work will remain blocked."
             cat "$STATUS_BODY" || true
-            write_inactive_output "Kill-switch preflight returned HTTP $STATUS_CODE; scheduled work was not suppressed."
+            write_unknown_output "Kill-switch preflight returned HTTP $STATUS_CODE; protected work was blocked."
             exit 0
           fi
 
-          if ! ACTIVE="$(jq -r 'if .kill_switch.enabled == true then "true" else "false" end' "$STATUS_BODY" 2>/dev/null)"; then
-            echo "system-status returned invalid JSON during kill-switch preflight; running scheduled work normally."
+          if ! ACTIVE="$(jq -er '
+            .kill_switch.enabled as $enabled
+            | if ($enabled | type) == "boolean"
+              then (if $enabled then "true" else "false" end)
+              else error("kill_switch.enabled must be boolean")
+              end
+          ' "$STATUS_BODY" 2>/dev/null)"; then
+            echo "system-status returned invalid or incomplete JSON during kill-switch preflight; protected work will remain blocked."
             cat "$STATUS_BODY" || true
-            write_inactive_output "Kill-switch preflight returned invalid JSON; scheduled work was not suppressed."
+            write_unknown_output "Kill-switch preflight returned invalid or incomplete JSON; protected work was blocked."
             exit 0
           fi
           MESSAGE="$(jq -r '.kill_switch.message // "ItemTraxx kill switch is active."' "$STATUS_BODY" 2>/dev/null | tr '\r\n' ' ' | sed 's/[[:space:]][[:space:]]*/ /g' | cut -c1-300)"

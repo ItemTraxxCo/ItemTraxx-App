@@ -12,8 +12,12 @@ jobs:
     uses: ItemTraxxCo/devops/.github/workflows/reusable-synthetic-probes.yml@e3541101f8eb325db2eb047754ce9003fb6a31c3
     with:
       hub_ref: e3541101f8eb325db2eb047754ce9003fb6a31c3
+      # GitHub-hosted runners are challenged by Cloudflare's managed firewall
+      # before the public edge can return an application response. Keep this
+      # required check on the origin health signal; Deployment Health covers
+      # the public routes separately with challenge-aware handling.
       probes_config: >-
-        {"statusUrl":"https://edge.itemtraxx.com/functions/system-status","origin":"https://itemtraxx.com","probes":[{"name":"edge-system-status","url":"https://edge.itemtraxx.com/functions/system-status","headers":{"Accept":"application/json"},"expect":{"statusRange":[200,299]},"bodyContains":"kill_switch","attempts":3,"allowKillSwitchSkip":true},{"name":"origin-contact-sales-validation","url":"https://mlaspkufocikfcbjgpof.supabase.co/functions/v1/contact-sales-submit","method":"POST","body":"{\"plan\":\"core\"}","expect":{"statusRange":[200,499]},"attempts":3,"allowKillSwitchSkip":true}]}
+        {"statusUrl":"https://mlaspkufocikfcbjgpof.supabase.co/functions/v1/system-status","origin":"https://itemtraxx.com","probes":[{"name":"origin-system-status","url":"https://mlaspkufocikfcbjgpof.supabase.co/functions/v1/system-status","headers":{"Accept":"application/json"},"expect":{"statusRange":[200,299]},"bodyContains":"kill_switch","attempts":3,"allowKillSwitchSkip":true},{"name":"origin-contact-sales-validation","url":"https://mlaspkufocikfcbjgpof.supabase.co/functions/v1/contact-sales-submit","method":"POST","body":"{\"plan\":\"core\"}","expect":{"statusRange":[200,499]},"attempts":3,"allowKillSwitchSkip":true}]}
 
   slack-notify-failure:
     needs:

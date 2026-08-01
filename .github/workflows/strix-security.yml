@@ -18,6 +18,8 @@ jobs:
     # Scan the promotion PR: staging -> preview.
     if: ${{ github.event_name == 'workflow_dispatch' || (github.event.pull_request.base.ref == 'preview' && github.event.pull_request.head.ref == 'staging') }}
     uses: ./.github/workflows/kill-switch-preflight.yml
+    with:
+      status_source: supabase
 
   strix-security-scan:
     needs: kill-switch-preflight

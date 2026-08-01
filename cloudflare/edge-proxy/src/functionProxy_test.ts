@@ -1,4 +1,5 @@
 import { proxyFunctionRequest } from "./functionProxy.ts";
+import { MAX_PROXY_REQUEST_BODY_BYTES } from "./requestBody.ts";
 
 const assertEquals = (actual: unknown, expected: unknown, message: string) => {
   if (JSON.stringify(actual) !== JSON.stringify(expected)) {
@@ -51,6 +52,65 @@ Deno.test("non-status function proxy preserves streamed response bytes, status, 
       "request-2",
       "request ID",
     );
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+Deno.test("support function proxy preserves the attachment payload limit", async () => {
+  const originalFetch = globalThis.fetch;
+  let receivedBytes = 0;
+  const body = "x".repeat(MAX_PROXY_REQUEST_BODY_BYTES + 1);
+  globalThis.fetch = ((_input: RequestInfo | URL, init?: RequestInit) => {
+    const forwardedBody = init?.body as Uint8Array | undefined;
+    receivedBytes = forwardedBody?.byteLength ?? 0;
+    return Promise.resolve(new Response("ok", { status: 200 }));
+  }) as typeof fetch;
+  try {
+    const response = await proxyFunctionRequest(
+      new Request("https://edge.itemtraxx.com/functions/contact-support-submit", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body,
+      }),
+      {
+        SUPABASE_URL: "https://example.supabase.co",
+        SUPABASE_ANON_KEY: "anon",
+      } as Env,
+      {},
+      "request-support-large",
+      "contact-support-submit",
+    );
+    assertEquals(response.status, 200, "support response status");
+    assertEquals(receivedBytes, body.length, "support forwarded body size");
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+Deno.test("default function proxy limit still rejects oversized non-support bodies", async () => {
+  const originalFetch = globalThis.fetch;
+  let upstreamCalled = false;
+  globalThis.fetch = (() => {
+    upstreamCalled = true;
+    return Promise.resolve(new Response("unexpected", { status: 200 }));
+  }) as typeof fetch;
+  try {
+    const response = await proxyFunctionRequest(
+      new Request("https://edge.itemtraxx.com/functions/admin-ops", {
+        method: "POST",
+        body: "x".repeat(MAX_PROXY_REQUEST_BODY_BYTES + 1),
+      }),
+      {
+        SUPABASE_URL: "https://example.supabase.co",
+        SUPABASE_ANON_KEY: "anon",
+      } as Env,
+      {},
+      "request-admin-large",
+      "admin-ops",
+    );
+    assertEquals(response.status, 413, "default oversized response status");
+    assertEquals(upstreamCalled, false, "default oversized request must not reach upstream");
   } finally {
     globalThis.fetch = originalFetch;
   }

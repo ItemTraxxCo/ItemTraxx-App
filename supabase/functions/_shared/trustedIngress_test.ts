@@ -1,4 +1,5 @@
 import {
+  getTrustedIngressBodyLimit,
   hasTrustedEdgeIngress,
   requireTrustedEdgeIngress,
 } from "./trustedIngress.ts";
@@ -95,6 +96,38 @@ Deno.test("trusted ingress accepts a fresh matching proxy signature", async () =
     assert(
       !(await hasTrustedEdgeIngress(request, "different-target")),
       "expected target-bound signature rejection",
+    );
+  });
+});
+
+Deno.test("trusted ingress preserves the support attachment payload limit", async () => {
+  await withSecret(async () => {
+    const payload = "x".repeat(1024 * 1024 + 1);
+    const timestamp = Date.now().toString();
+    const requestId = "request-support-large";
+    const target = "contact-support-submit";
+    const signature = await sign(
+      `${timestamp}.${requestId}.POST.${target}.${await bodyHash(payload)}`,
+    );
+    const request = new Request("https://example.test/functions/contact-support-submit", {
+      method: "POST",
+      headers: {
+        "x-itx-edge-proxy": "1",
+        "x-itx-edge-proxy-ts": timestamp,
+        "x-itx-edge-proxy-signature": signature,
+        "x-request-id": requestId,
+        "content-type": "application/json",
+      },
+      body: payload,
+    });
+
+    assert(
+      getTrustedIngressBodyLimit(target) > 1024 * 1024,
+      "expected support ingress limit to exceed the default cap",
+    );
+    assert(
+      await hasTrustedEdgeIngress(request, target),
+      "expected large support request to retain a valid ingress signature",
     );
   });
 });

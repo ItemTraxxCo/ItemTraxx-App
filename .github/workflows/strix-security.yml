@@ -23,10 +23,11 @@ jobs:
 
   strix-security-scan:
     needs: kill-switch-preflight
-    # Re-enabled for retest on Strix v1.4.1 (was gated off due to a Caido
-    # bootstrap race on the shared sandbox image, confirmed independent of
-    # CLI version on v1.1.0/v1.0.4): https://github.com/usestrix/strix/issues/927
-    if: (github.event_name == 'workflow_dispatch' || (github.event.pull_request.base.ref == 'preview' && github.event.pull_request.head.ref == 'staging')) && needs.kill-switch-preflight.outputs.active == 'false'
+    # Temporarily disabled: Strix v1.4.1 aborts on the known unknown-tool
+    # ModelBehaviorError reproduced in ItemTraxx CI. Re-enable after the
+    # upstream recovery fix lands: https://github.com/usestrix/strix/issues/580
+    # and https://github.com/usestrix/strix/pull/613
+    if: false && ((github.event_name == 'workflow_dispatch' || (github.event.pull_request.base.ref == 'preview' && github.event.pull_request.head.ref == 'staging')) && needs.kill-switch-preflight.outputs.active == 'false')
     permissions:
       contents: read
       pull-requests: write

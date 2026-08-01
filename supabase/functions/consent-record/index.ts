@@ -68,7 +68,9 @@ serve(async (req) => {
   const adminClient = createClient(supabaseUrl, serviceKey, {
     auth: { persistSession: false },
   });
-  const fingerprint = resolveClientFingerprint(req, origin);
+  const fingerprint = resolveClientFingerprint(req, origin, {
+    trustProxyHeader: true,
+  });
   const rateLimit = await enforcePreloginRateLimit(
     adminClient,
     fingerprint,

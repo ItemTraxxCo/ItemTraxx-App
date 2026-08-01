@@ -19,7 +19,7 @@ jobs:
 
   check-stale-schedules:
     needs: kill-switch-preflight
-    if: ${{ needs.kill-switch-preflight.outputs.active != 'true' }}
+    if: ${{ needs.kill-switch-preflight.outputs.active == 'false' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     env:
@@ -265,7 +265,7 @@ jobs:
     needs:
       - kill-switch-preflight
       - check-stale-schedules
-    if: ${{ always() && needs.kill-switch-preflight.outputs.active != 'true' && (needs.check-stale-schedules.result == 'failure' || needs.check-stale-schedules.result == 'cancelled') }}
+    if: ${{ always() && (needs.kill-switch-preflight.outputs.active == 'false' || needs.kill-switch-preflight.outputs.active == 'unknown') && (needs.check-stale-schedules.result == 'failure' || needs.check-stale-schedules.result == 'cancelled') }}
     uses: ./.github/workflows/incidentio-workflow-alert.yml
     with:
       status: ${{ needs.check-stale-schedules.result }}

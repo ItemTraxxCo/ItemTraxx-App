@@ -12,6 +12,26 @@ const CHUNK_RELOAD_KEY = "itemtraxx:chunk-reload-path";
 let lastRecoveryAt = 0;
 let recoveryInstalled = false;
 
+const resolveSameOriginRecoveryTarget = (path: string) => {
+  if (typeof window === "undefined") return null;
+
+  try {
+    const resolved = new URL(path || "/", window.location.origin);
+    const decodedPathname = decodeURIComponent(resolved.pathname);
+    if (
+      resolved.origin !== window.location.origin ||
+      !decodedPathname.startsWith("/") ||
+      decodedPathname.startsWith("//")
+    ) {
+      return null;
+    }
+
+    return `${resolved.pathname}${resolved.search}${resolved.hash}`;
+  } catch {
+    return null;
+  }
+};
+
 export const isRecoverableChunkLoadError = (error: unknown) => {
   const message = error instanceof Error ? error.message : String(error ?? "");
   return /failed to fetch dynamically imported module|error loading dynamically imported module|importing a module script failed|couldn't resolve component/i
@@ -20,7 +40,8 @@ export const isRecoverableChunkLoadError = (error: unknown) => {
 
 export const recoverFromChunkLoadError = (path: string) => {
   if (typeof window === "undefined") return false;
-  const target = path || "/";
+  const target = resolveSameOriginRecoveryTarget(path);
+  if (!target) return false;
   if (window.sessionStorage.getItem(CHUNK_RELOAD_KEY) === target) {
     window.sessionStorage.removeItem(CHUNK_RELOAD_KEY);
     return false;

@@ -1,7 +1,16 @@
+import { readBoundedBodyBytes } from "./requestBody.ts";
+
 const EDGE_PROXY_HEADER = "x-itx-edge-proxy";
 const EDGE_PROXY_TIMESTAMP_HEADER = "x-itx-edge-proxy-ts";
 const EDGE_PROXY_SIGNATURE_HEADER = "x-itx-edge-proxy-signature";
 const MAX_CLOCK_SKEW_MS = 30 * 1000;
+const MAX_TRUSTED_INGRESS_BODY_BYTES = 1024 * 1024;
+const MAX_SUPPORT_REQUEST_BODY_BYTES = 12 * 1024 * 1024;
+
+export const getTrustedIngressBodyLimit = (target: string) =>
+  target === "contact-support-submit"
+    ? MAX_SUPPORT_REQUEST_BODY_BYTES
+    : MAX_TRUSTED_INGRESS_BODY_BYTES;
 
 const toHex = (bytes: Uint8Array) =>
   Array.from(bytes)
@@ -33,12 +42,15 @@ const sign = async (secret: string, message: string) => {
   return toHex(new Uint8Array(signature));
 };
 
-const hashRequestBody = async (req: Request) => {
+const hashRequestBody = async (req: Request, target: string) => {
   if (req.method === "GET" || req.method === "HEAD") {
     return "no-body";
   }
 
-  const body = await req.clone().arrayBuffer();
+  const body = await readBoundedBodyBytes(
+    req.clone(),
+    getTrustedIngressBodyLimit(target),
+  );
   const digest = await crypto.subtle.digest("SHA-256", body);
   return toHex(new Uint8Array(digest));
 };
@@ -68,7 +80,7 @@ export const hasTrustedEdgeIngress = async (req: Request, target: string) => {
   if (!requestId) {
     return false;
   }
-  const bodyHash = await hashRequestBody(req);
+  const bodyHash = await hashRequestBody(req, target);
   const expected = await sign(
     secret,
     `${timestamp}.${requestId}.${req.method.toUpperCase()}.${target}.${bodyHash}`,
@@ -88,6 +100,16 @@ export const requireTrustedEdgeIngress = async (
     }
     return null;
   } catch (error) {
+    if (
+      error instanceof Error &&
+      "status" in error &&
+      typeof (error as { status?: unknown }).status === "number"
+    ) {
+      return jsonResponse(
+        (error as { status: number }).status,
+        { error: error.message },
+      );
+    }
     if (
       error instanceof Error &&
       error.message === "Missing ITX_EDGE_PROXY_SHARED_SECRET"

@@ -34,7 +34,7 @@ jobs:
     needs:
       - kill-switch-preflight
       - slack-notify-start
-    if: ${{ needs.kill-switch-preflight.outputs.active != 'true' }}
+    if: ${{ needs.kill-switch-preflight.outputs.active == 'false' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
@@ -132,7 +132,7 @@ jobs:
         run: |
           set -euo pipefail
           BODY="$(mktemp)"
-          STATUS="$(curl -sS -o "$BODY" -w '%{http_code}' "https://mlaspkufocikfcbjgpof.supabase.co/functions/v1/system-status" \
+          STATUS="$(curl -sS -o "$BODY" -w '%{http_code}' "https://edge.itemtraxx.com/functions/system-status" \
             -H "Origin: https://itemtraxx.com" \
             || true)"
           if [ "$STATUS" -eq 503 ] && jq -e '.kill_switch.enabled == true' "$BODY" >/dev/null 2>&1; then
@@ -200,7 +200,7 @@ jobs:
     needs:
       - kill-switch-preflight
       - health-check
-    if: ${{ always() && needs.kill-switch-preflight.outputs.active != 'true' && (needs.health-check.result == 'failure' || needs.health-check.result == 'cancelled') }}
+    if: ${{ always() && (needs.kill-switch-preflight.outputs.active == 'false' || needs.kill-switch-preflight.outputs.active == 'unknown') && (needs.health-check.result == 'failure' || needs.health-check.result == 'cancelled') }}
     uses: ./.github/workflows/incidentio-workflow-alert.yml
     with:
       status: ${{ needs.health-check.result }}

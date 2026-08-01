@@ -155,7 +155,9 @@ serve(async (req) => {
     });
 
     const origin = req.headers.get("origin");
-    const fingerprint = resolveClientFingerprint(req, origin);
+    const fingerprint = resolveClientFingerprint(req, origin, {
+      trustProxyHeader: true,
+    });
     const ip = resolveClientIp(req);
     const requestHash = await hashString(
       `${fingerprint}|${normalizeText(req.headers.get("user-agent"), 255)}`

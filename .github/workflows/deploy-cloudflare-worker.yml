@@ -43,7 +43,7 @@ jobs:
     needs:
       - kill-switch-preflight
       - slack-notify-start
-    if: ${{ needs.kill-switch-preflight.outputs.active != 'true' }}
+    if: ${{ needs.kill-switch-preflight.outputs.active == 'false' }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     environment: production
@@ -121,7 +121,7 @@ jobs:
     needs:
       - kill-switch-preflight
       - deploy
-    if: ${{ always() && needs.kill-switch-preflight.outputs.active != 'true' && (needs.deploy.result == 'failure' || needs.deploy.result == 'cancelled') }}
+    if: ${{ always() && (needs.kill-switch-preflight.outputs.active == 'false' || needs.kill-switch-preflight.outputs.active == 'unknown') && (needs.deploy.result == 'failure' || needs.deploy.result == 'cancelled') }}
     uses: ./.github/workflows/incidentio-workflow-alert.yml
     with:
       status: ${{ needs.deploy.result }}

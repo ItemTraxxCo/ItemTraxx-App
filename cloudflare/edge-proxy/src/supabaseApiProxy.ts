@@ -1,5 +1,10 @@
 import { appendSetCookies, parseCookies } from "./cookies.ts";
 import { hasRpcCallerAuth, sanitizeUpstreamHeaders } from "./requestHeaders.ts";
+import {
+  MAX_PROXY_REQUEST_BODY_BYTES,
+  readBoundedRequestBody,
+  RequestBodyLimitError,
+} from "./requestBody.ts";
 import { buildError, buildSessionRateLimitError } from "./responses.ts";
 import {
   isBlockedRpcProxyPath,
@@ -37,9 +42,21 @@ export const proxySupabaseApiRequest = async (
   const upstreamUrl = `${
     trimTrailingSlash(env.SUPABASE_URL)
   }${normalizedUpstreamPath}${new URL(request.url).search}`;
-  const requestBody = request.method === "GET" || request.method === "HEAD"
-    ? undefined
-    : await request.clone().text();
+  let requestBody: string | undefined;
+  if (request.method !== "GET" && request.method !== "HEAD") {
+    try {
+      const bytes = await readBoundedRequestBody(
+        request,
+        MAX_PROXY_REQUEST_BODY_BYTES,
+      );
+      requestBody = new TextDecoder().decode(bytes);
+    } catch (error) {
+      if (error instanceof RequestBodyLimitError) {
+        return buildError(error.status, error.message, headers, requestId);
+      }
+      throw error;
+    }
+  }
   const invoke = async (sessionAccessToken?: string | null) => {
     const proxiedHeaders = sanitizeUpstreamHeaders(
       request,

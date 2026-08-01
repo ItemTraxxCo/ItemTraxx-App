@@ -84,7 +84,11 @@ serve(async (req) => {
 
     const { data: rateLimit, error: rateLimitError } = await userClient.rpc(
       "consume_rate_limit",
-      { p_scope: "workspace", p_limit: 20, p_window_seconds: 30 },
+      {
+        p_scope: "checkout_borrower_lookup",
+        p_limit: 20,
+        p_window_seconds: 30,
+      },
     );
     const { result: limit, response: rateLimitFailure } = resolveRateLimitResult({
       data: rateLimit,

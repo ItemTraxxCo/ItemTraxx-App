@@ -1,5 +1,6 @@
 import {
   isAccountTokenBlockedBySessionRevocation,
+  resolveAccountAuthSessionBinding,
   validateAccountDeviceSession,
 } from "./accountSessions.ts";
 
@@ -263,4 +264,345 @@ Deno.test("workspace admin revocation check fails closed when session table is m
 
   assert(result.blocked, "expected missing session schema to block access");
   assert(result.relationMissing, "expected relationMissing marker");
+});
+
+Deno.test("resolveAccountAuthSessionBinding returns nulls when claims cannot be verified", async () => {
+  const client = new MockClient([], null);
+  const binding = await resolveAccountAuthSessionBinding(client, "forged-token");
+  assert(binding.sessionId === null, "expected null sessionId for unverified token");
+  assert(binding.issuedAt === null, "expected null issuedAt for unverified token");
+});
+
+Deno.test("resolveAccountAuthSessionBinding returns nulls when claims omit session_id and iat", async () => {
+  const client = new MockClient([], { sub: "user-1" });
+  const binding = await resolveAccountAuthSessionBinding(client, "verified-token");
+  assert(binding.sessionId === null, "expected null sessionId when absent from claims");
+  assert(binding.issuedAt === null, "expected null issuedAt when absent from claims");
+});
+
+Deno.test("resolveAccountAuthSessionBinding normalizes a valid session and issuedAt", async () => {
+  const iat = Math.floor(Date.now() / 1000);
+  const client = new MockClient([], {
+    iat,
+    session_id: "  session-77  ",
+  });
+  const binding = await resolveAccountAuthSessionBinding(client, "verified-token");
+  assert(binding.sessionId === "session-77", "expected trimmed session id");
+  assert(
+    binding.issuedAt === new Date(iat * 1000).toISOString(),
+    "expected issuedAt to be converted to an ISO string",
+  );
+});
+
+Deno.test("isAccountTokenBlockedBySessionRevocation blocks fully unverified tokens without a query", async () => {
+  const client = new MockClient([], null);
+  const result = await isAccountTokenBlockedBySessionRevocation(client, {
+    workspaceId: "tenant-1",
+    profileId: "profile-1",
+    authToken: "forged-token",
+  });
+  assert(result.blocked, "expected unverified tokens to block access");
+  assert(!result.relationMissing, "expected no relationMissing marker");
+});
+
+Deno.test("isAccountTokenBlockedBySessionRevocation blocks immediately when the session-id row is revoked", async () => {
+  const claims = {
+    iat: Math.floor(Date.now() / 1000),
+    session_id: "current-session",
+  };
+  const client = new MockClient([
+    { data: { id: "revoked-row" }, error: null },
+  ], claims);
+
+  const result = await isAccountTokenBlockedBySessionRevocation(client, {
+    workspaceId: "tenant-1",
+    profileId: "profile-1",
+    authToken: "verified-token",
+  });
+
+  assert(result.blocked, "expected a revoked session-id row to block access");
+  assert(!result.relationMissing, "expected no relationMissing marker");
+});
+
+Deno.test("isAccountTokenBlockedBySessionRevocation surfaces missing auth_session_id column as relationMissing", async () => {
+  const claims = {
+    iat: Math.floor(Date.now() / 1000),
+    session_id: "current-session",
+  };
+  const client = new MockClient([
+    {
+      data: null,
+      error: {
+        code: "42703",
+        message: 'column "auth_session_id" does not exist',
+      },
+    },
+  ], claims);
+
+  const result = await isAccountTokenBlockedBySessionRevocation(client, {
+    workspaceId: "tenant-1",
+    profileId: "profile-1",
+    authToken: "verified-token",
+  });
+
+  assert(result.blocked, "expected missing column to block access");
+  assert(result.relationMissing, "expected relationMissing marker");
+});
+
+Deno.test("isAccountTokenBlockedBySessionRevocation throws on unrelated session-id query errors", async () => {
+  const claims = {
+    iat: Math.floor(Date.now() / 1000),
+    session_id: "current-session",
+  };
+  const client = new MockClient([
+    { data: null, error: { code: "08006", message: "connection failure" } },
+  ], claims);
+
+  try {
+    await isAccountTokenBlockedBySessionRevocation(client, {
+      workspaceId: "tenant-1",
+      profileId: "profile-1",
+      authToken: "verified-token",
+    });
+  } catch (error) {
+    assert(
+      error instanceof Error &&
+        error.message === "Unable to validate admin session revocation.",
+      "expected the generic revocation failure message",
+    );
+    return;
+  }
+  throw new Error("expected unrelated session-id query error to throw");
+});
+
+Deno.test("isAccountTokenBlockedBySessionRevocation falls through to unblocked when no issuedAt is available", async () => {
+  const claims = { session_id: "current-session" };
+  const client = new MockClient([
+    { data: null, error: null },
+  ], claims);
+
+  const result = await isAccountTokenBlockedBySessionRevocation(client, {
+    workspaceId: "tenant-1",
+    profileId: "profile-1",
+    authToken: "verified-token",
+  });
+
+  assert(!result.blocked, "expected no issuedAt fallback to remain unblocked");
+  assert(!result.relationMissing, "expected no relationMissing marker");
+});
+
+Deno.test("isAccountTokenBlockedBySessionRevocation blocks via the issuedAt-only revocation check", async () => {
+  const claims = { iat: Math.floor(Date.now() / 1000) };
+  const client = new MockClient([
+    { data: { id: "revoked-row" }, error: null },
+  ], claims);
+
+  const result = await isAccountTokenBlockedBySessionRevocation(client, {
+    workspaceId: "tenant-1",
+    profileId: "profile-1",
+    authToken: "verified-token",
+  });
+
+  assert(result.blocked, "expected a revoked issuedAt-bound row to block access");
+  assert(!result.relationMissing, "expected no relationMissing marker");
+});
+
+Deno.test("isAccountTokenBlockedBySessionRevocation is not blocked when the issuedAt-only check finds nothing", async () => {
+  const claims = { iat: Math.floor(Date.now() / 1000) };
+  const client = new MockClient([
+    { data: null, error: null },
+  ], claims);
+
+  const result = await isAccountTokenBlockedBySessionRevocation(client, {
+    workspaceId: "tenant-1",
+    profileId: "profile-1",
+    authToken: "verified-token",
+  });
+
+  assert(!result.blocked, "expected no revoked row to remain unblocked");
+});
+
+Deno.test("isAccountTokenBlockedBySessionRevocation surfaces missing relation on the issuedAt-only path", async () => {
+  const claims = { iat: Math.floor(Date.now() / 1000) };
+  const client = new MockClient([
+    {
+      data: null,
+      error: {
+        code: "42P01",
+        message: 'relation "account_sessions" does not exist',
+      },
+    },
+  ], claims);
+
+  const result = await isAccountTokenBlockedBySessionRevocation(client, {
+    workspaceId: "tenant-1",
+    profileId: "profile-1",
+    authToken: "verified-token",
+  });
+
+  assert(result.blocked, "expected missing relation to block access");
+  assert(result.relationMissing, "expected relationMissing marker");
+});
+
+Deno.test("isAccountTokenBlockedBySessionRevocation throws on unrelated issuedAt-only query errors", async () => {
+  const claims = { iat: Math.floor(Date.now() / 1000) };
+  const client = new MockClient([
+    { data: null, error: { code: "08006", message: "connection failure" } },
+  ], claims);
+
+  try {
+    await isAccountTokenBlockedBySessionRevocation(client, {
+      workspaceId: "tenant-1",
+      profileId: "profile-1",
+      authToken: "verified-token",
+    });
+  } catch (error) {
+    assert(
+      error instanceof Error &&
+        error.message === "Unable to validate admin session revocation.",
+      "expected the generic revocation failure message",
+    );
+    return;
+  }
+  throw new Error("expected unrelated issuedAt-only query error to throw");
+});
+
+Deno.test("validateAccountDeviceSession rejects requests without a device id", async () => {
+  const client = new MockClient([], { iat: Math.floor(Date.now() / 1000) });
+  const result = await validateAccountDeviceSession(client, {
+    workspaceId: "tenant-1",
+    profileId: "profile-1",
+    deviceId: null,
+    authToken: "verified-token",
+  });
+  assert(!result.valid, "expected missing device id to be rejected");
+  assert(result.reason === "missing_device", "expected missing_device reason");
+});
+
+Deno.test("validateAccountDeviceSession reports missing_table when the revocation check finds no schema", async () => {
+  const claims = {
+    iat: Math.floor(Date.now() / 1000),
+    session_id: "current-session",
+  };
+  const client = new MockClient([
+    {
+      data: null,
+      error: {
+        code: "42P01",
+        message: 'relation "account_sessions" does not exist',
+      },
+    },
+  ], claims);
+
+  const result = await validateAccountDeviceSession(client, {
+    workspaceId: "tenant-1",
+    profileId: "profile-1",
+    deviceId: "device-1",
+    authToken: "verified-token",
+  });
+
+  assert(!result.valid, "expected missing schema to be rejected");
+  assert(result.reason === "missing_table", "expected missing_table reason");
+  assert(result.relationMissing, "expected relationMissing marker");
+});
+
+Deno.test("validateAccountDeviceSession reports revoked_token when the session-id row is revoked", async () => {
+  const claims = {
+    iat: Math.floor(Date.now() / 1000),
+    session_id: "current-session",
+  };
+  const client = new MockClient([
+    { data: { id: "revoked-row" }, error: null },
+  ], claims);
+
+  const result = await validateAccountDeviceSession(client, {
+    workspaceId: "tenant-1",
+    profileId: "profile-1",
+    deviceId: "device-1",
+    authToken: "verified-token",
+  });
+
+  assert(!result.valid, "expected a revoked binding to be rejected");
+  assert(result.reason === "revoked_token", "expected revoked_token reason");
+  assert(!result.relationMissing, "expected no relationMissing marker");
+});
+
+Deno.test("validateAccountDeviceSession reports missing_table when the active-session lookup finds no schema", async () => {
+  const claims = {
+    iat: Math.floor(Date.now() / 1000),
+    session_id: "current-session",
+  };
+  const client = new MockClient([
+    { data: null, error: null },
+    { data: null, error: null },
+    {
+      data: null,
+      error: {
+        code: "42P01",
+        message: 'relation "account_sessions" does not exist',
+      },
+    },
+  ], claims);
+
+  const result = await validateAccountDeviceSession(client, {
+    workspaceId: "tenant-1",
+    profileId: "profile-1",
+    deviceId: "device-1",
+    authToken: "verified-token",
+  });
+
+  assert(!result.valid, "expected missing schema to be rejected");
+  assert(result.reason === "missing_table", "expected missing_table reason");
+  assert(result.relationMissing, "expected relationMissing marker");
+});
+
+Deno.test("validateAccountDeviceSession throws when the active-session lookup errors unexpectedly", async () => {
+  const claims = {
+    iat: Math.floor(Date.now() / 1000),
+    session_id: "current-session",
+  };
+  const client = new MockClient([
+    { data: null, error: null },
+    { data: null, error: null },
+    { data: null, error: { code: "08006", message: "connection failure" } },
+  ], claims);
+
+  try {
+    await validateAccountDeviceSession(client, {
+      workspaceId: "tenant-1",
+      profileId: "profile-1",
+      deviceId: "device-1",
+      authToken: "verified-token",
+    });
+  } catch (error) {
+    assert(
+      error instanceof Error &&
+        error.message === "Unable to validate admin session.",
+      "expected the generic session validation failure message",
+    );
+    return;
+  }
+  throw new Error("expected unrelated active-session query error to throw");
+});
+
+Deno.test("validateAccountDeviceSession reports missing_session when no active row exists", async () => {
+  const claims = {
+    iat: Math.floor(Date.now() / 1000),
+    session_id: "current-session",
+  };
+  const client = new MockClient([
+    { data: null, error: null },
+    { data: null, error: null },
+    { data: null, error: null },
+  ], claims);
+
+  const result = await validateAccountDeviceSession(client, {
+    workspaceId: "tenant-1",
+    profileId: "profile-1",
+    deviceId: "device-1",
+    authToken: "verified-token",
+  });
+
+  assert(!result.valid, "expected no active row to be rejected");
+  assert(result.reason === "missing_session", "expected missing_session reason");
 });

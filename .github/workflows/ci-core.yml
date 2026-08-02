@@ -83,8 +83,8 @@ jobs:
       - name: Check Supabase function graph with frozen Deno lock
         run: deno check --frozen supabase/functions/super-ops/index.ts supabase/functions/super-workspace-mutate/index.ts supabase/functions/admin-ops/index.ts
 
-      - name: Test shared Supabase helpers with frozen Deno lock
-        run: deno test --allow-env --frozen supabase/functions/_shared/*_test.ts
+      - name: Deno test coverage gate (Supabase functions + Cloudflare edge-proxy)
+        run: npm run devops:check:deno-coverage
 
       - name: Check SQL and function coupling
         env:
@@ -104,8 +104,8 @@ jobs:
       - name: Typecheck Cloudflare Worker
         run: npm run worker:typecheck
 
-      - name: Test Cloudflare Worker
-        run: npm run worker:test
+      - name: Test frontend units (Vitest)
+        run: npm run test:unit
 
       - name: Check initial JavaScript budget
         run: npm run perf:initial

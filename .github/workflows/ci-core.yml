@@ -18,7 +18,12 @@ concurrency:
 
 jobs:
   kill-switch-preflight:
+    # GitHub-hosted runners receive a Cloudflare challenge (HTTP 403) from
+    # the edge system-status URL. Use the direct Supabase origin, as Strix
+    # does, while keeping CI Core fail-closed on an unknown state.
     uses: ./.github/workflows/kill-switch-preflight.yml
+    with:
+      status_source: supabase
 
   slack-notify-start:
     needs: kill-switch-preflight

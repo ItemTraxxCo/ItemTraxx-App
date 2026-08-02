@@ -18,7 +18,12 @@ concurrency:
 
 jobs:
   kill-switch-preflight:
+    # GitHub-hosted runners receive a Cloudflare challenge (HTTP 403) from
+    # the edge system-status URL. Use the direct Supabase origin, as Strix
+    # does, while keeping CI Core fail-closed on an unknown state.
     uses: ./.github/workflows/kill-switch-preflight.yml
+    with:
+      status_source: supabase
 
   slack-notify-start:
     needs: kill-switch-preflight
@@ -55,7 +60,8 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
         with:
-          node-version: 22.15.0
+          # package.json requires Node 24.x; jsdom 30 also requires 24.15+.
+          node-version: 24.15.0
           cache: npm
 
       - name: Setup Deno
@@ -83,8 +89,8 @@ jobs:
       - name: Check Supabase function graph with frozen Deno lock
         run: deno check --frozen supabase/functions/super-ops/index.ts supabase/functions/super-workspace-mutate/index.ts supabase/functions/admin-ops/index.ts
 
-      - name: Test shared Supabase helpers with frozen Deno lock
-        run: deno test --allow-env --frozen supabase/functions/_shared/*_test.ts
+      - name: Deno test coverage gate (Supabase functions + Cloudflare edge-proxy)
+        run: npm run devops:check:deno-coverage
 
       - name: Check SQL and function coupling
         env:
@@ -104,8 +110,15 @@ jobs:
       - name: Typecheck Cloudflare Worker
         run: npm run worker:typecheck
 
-      - name: Test Cloudflare Worker
-        run: npm run worker:test
+      - name: Test frontend units (Vitest)
+        # Unit tests need configuration to import the Supabase client and to
+        # exercise authenticated requests. These are non-secret placeholders;
+        # the suite mocks network calls and never contacts these origins.
+        env:
+          VITE_SUPABASE_URL: https://example.supabase.co
+          VITE_SUPABASE_ANON_KEY: ci-test-anon-key
+          VITE_EDGE_PROXY_URL: https://proxy.example.com
+        run: npm run test:unit
 
       - name: Check initial JavaScript budget
         run: npm run perf:initial

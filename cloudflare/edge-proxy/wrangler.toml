@@ -22,7 +22,7 @@ TRUST_LOCAL_ORIGINS = "false"
 SESSION_COOKIE_DOMAIN = ".itemtraxx.com"
 SESSION_COOKIE_SAMESITE = "lax"
 # Optional hard allowlist of function names (comma-separated).
-ALLOWED_FUNCTIONS = "workspace-login,checkoutReturn,checkout-borrower-lookup,offline-checkout,admin-item-mutate,admin-borrower-mutate,admin-ops,system-status,super-workspace-mutate,super-admin-mutate,super-dashboard,super-item-mutate,super-borrower-mutate,super-logs-query,super-ops,contact-sales-submit,contact-support-submit,client-error-report,consent-record,job-worker,login-notify,super-auth-verify,workspace-admin-mutate,privileged-step-up"
+ALLOWED_FUNCTIONS = "workspace-login,checkoutReturn,checkout-borrower-lookup,offline-checkout,admin-item-mutate,admin-borrower-mutate,admin-ops,system-status,super-workspace-mutate,super-admin-mutate,super-dashboard,super-item-mutate,super-borrower-mutate,super-logs-query,super-ops,contact-sales-submit,contact-support-submit,client-error-report,consent-record,job-worker,login-notify,intercom-jwt,super-auth-verify,workspace-admin-mutate,privileged-step-up"
 ITX_ITEMTRAXX_KILLSWITCH_ENABLED = "false"
 SENTRY_ENVIRONMENT = "production"
 

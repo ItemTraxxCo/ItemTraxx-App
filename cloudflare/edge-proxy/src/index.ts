@@ -20,6 +20,7 @@ import {
 } from "./routing.ts";
 import { handleSessionRequest } from "./session.ts";
 import { proxySupabaseApiRequest } from "./supabaseApiProxy.ts";
+import { handleMtaStsRequest, isMtaStsRequest } from "./mtaSts.ts";
 
 export { checkSessionRateLimit } from "./session.ts";
 
@@ -33,6 +34,14 @@ export default {
     ctx: ExecutionContext,
   ): Promise<Response> {
     const url = new URL(request.url);
+
+    // MTA-STS policy retrieval is deliberately isolated from the API proxy's
+    // CORS/auth/origin checks. Mail senders do not send a browser Origin, and
+    // the policy host must serve a small unauthenticated HTTPS document.
+    if (isMtaStsRequest(url)) {
+      return handleMtaStsRequest(request, url);
+    }
+
     const origin = request.headers.get("Origin");
     const requestId = request.headers.get("x-request-id") ??
       (typeof crypto?.randomUUID === "function"

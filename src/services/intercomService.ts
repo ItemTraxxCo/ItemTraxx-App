@@ -11,6 +11,13 @@ type IntercomSettings = {
   app_id: string;
   user_id?: string;
   email?: string;
+  intercom_user_jwt?: string;
+};
+
+type IntercomJwtResponse = {
+  data?: {
+    token?: string;
+  };
 };
 
 // Messenger identity-verification tokens must be generated server-side. Keep
@@ -25,6 +32,21 @@ let activeIdentity: { userId: string | null; email: string | null } | null = nul
 let syncGeneration = 0;
 
 const isBrowser = () => typeof window !== "undefined" && typeof document !== "undefined";
+
+const fetchIntercomUserJwt = async () => {
+  // Keep the authenticated-only edge client out of the public initial bundle.
+  // Anonymous visitors only need the Intercom SDK, while this path is loaded
+  // after a signed-in user is detected.
+  const { invokeEdgeFunction } = await import("./edgeFunctionClient");
+  const result = await invokeEdgeFunction<IntercomJwtResponse>("intercom-jwt", {
+    method: "POST",
+  });
+  const token = result.data?.data?.token?.trim();
+  if (!result.ok || !token) {
+    throw new Error(result.error || "Messenger security token unavailable.");
+  }
+  return token;
+};
 
 export const isIntercomConfigured = () => isBrowser() && !isE2ETestMode && appId.length > 0;
 
@@ -99,9 +121,19 @@ export const initializeIntercom = async (user?: IntercomUser | null) => {
   }
 
   try {
+    const bootSettings = settings.user_id
+      ? {
+          // Keep identifying attributes inside the signed JWT. Intercom can
+          // enforce that these values are only updated by a verified request.
+          app_id: settings.app_id,
+          intercom_user_jwt: await fetchIntercomUserJwt(),
+        }
+      : settings;
+    if (generation !== syncGeneration) return;
+
     const intercom = await loadSdk();
     if (generation !== syncGeneration) return;
-    intercom.default(settings);
+    intercom.default(bootSettings);
     activeIdentity = { userId: nextUserId, email: nextEmail };
   } catch (error) {
     console.warn("[intercom] initialization failed; continuing without Messenger.", error);

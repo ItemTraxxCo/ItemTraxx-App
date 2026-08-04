@@ -12,8 +12,10 @@ import { clearOfflineCheckoutWorkflow } from "../offlineCheckoutWorkflow";
 import { clearOfflineConnectionState } from "../offlineConnectionState";
 import { signOutLocalSupabaseSession } from "../supabaseAuthSession";
 import { clearPendingSuperAdminVerificationEmail } from "./sessionState";
+import { shutdownIntercom } from "../intercomService";
 
 export const signOut = async () => {
+  shutdownIntercom();
   const current = getAuthState();
   const shouldRevokeAccountSession = current.role === "workspace_admin" && !!current.adminVerifiedAt;
 

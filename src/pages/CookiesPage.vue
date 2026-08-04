@@ -17,11 +17,12 @@
       <section class="cookies-hero">
         <p class="cookies-eyebrow">ItemTraxx cookies notice</p>
         <h1>How ItemTraxx uses cookies and similar browser storage.</h1>
-        <p class="cookies-lead-meta" style="margin:0 0 0.5rem;font-size:0.8rem;color:var(--muted);">Last updated: July 2, 2026</p>
+        <p class="cookies-lead-meta" style="margin:0 0 0.5rem;font-size:0.8rem;color:var(--muted);">Last updated: August 3, 2026</p>
         <p class="cookies-lead">
           ItemTraxx uses cookies and similar browser storage for secure sign-in, anti-abuse controls,
-          product telemetry, and diagnostics. Essential cookies stay on because the app cannot work
-          securely without them; analytics and diagnostics are only enabled after consent.
+          product telemetry, diagnostics, and support conversations. Essential cookies stay
+          on because the app cannot work securely without them; analytics and diagnostics are only enabled
+          after consent. Intercom Messenger may be available to both signed-in and anonymous visitors.
         </p>
       </section>
 
@@ -108,8 +109,9 @@
         </p>
         <p class="cookies-consent-note">
           We do not use third-party advertising or remarketing cookies. ItemTraxx may use third-party security,
-          analytics, and diagnostics technologies — including Cloudflare, PostHog, Sentry, Vercel Analytics, and
-          Speed Insights — and optional analytics/diagnostics tools are enabled only after consent where required.
+          support, analytics, and diagnostics technologies — including Cloudflare, Intercom, PostHog, Sentry,
+          Vercel Analytics, and Speed Insights — and optional analytics/diagnostics tools are enabled only after
+          consent where required.
         </p>
       </section>
 
@@ -207,6 +209,11 @@ const operationalCookies = [
     title: "Reliability and abuse protection",
     description:
       "ItemTraxx and Cloudflare may use essential security or challenge cookies, browser storage, and request-layer controls for rate limiting, anti-abuse, platform stability, and approximate IP-based session location for device history.",
+  },
+  {
+    title: "Intercom support Messenger",
+    description:
+      "Intercom may be available to signed-in and anonymous visitors for ItemTraxx support. Signed-in users may share their account ID and email when available; anonymous conversations are associated with an Intercom browser cookie, and Intercom may set support-session cookies.",
   },
 ];
 

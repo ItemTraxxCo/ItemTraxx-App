@@ -1,6 +1,6 @@
 # Privacy Policy
 
-Last updated: 2026-06-15 (year-month-day)
+Last updated: 2026-08-03 (year-month-day)
 
 ItemTraxx Co ("we", "our", or "us") provides ItemTraxx, a cloud-based inventory, checkout, borrower-management, and administrative operations platform. This Privacy Policy explains what information we collect, how we use it, how we share it, and the choices available to users and customers.
 
@@ -28,7 +28,7 @@ We may collect the following categories of information:
 - **Usage Data:** App interactions, page usage, timestamps, route access, workflow activity, and operational events generated while using the service
 - **Product analytics and diagnostics (after consent):** If you enable analytics or diagnostics in the consent banner, ItemTraxx may collect product analytics through PostHog and Vercel and diagnostic events through PostHog and Sentry. This can include event names, scrubbed event properties, page or route information, timestamps, error reports and stack traces, performance measurements, and device/browser metadata. ItemTraxx may associate a non-email account identifier and role with authorized adult account activity. Sensitive property names and email-form identifiers are filtered from PostHog events. If Sentry Replay or PostHog Replay is enabled in the active environment, replay data may be collected only when diagnostics consent is enabled.
 - **Device and Technical Data:** Browser type, operating system, approximate device metadata, IP-derived network and security context, approximate IP-based location used for account security and session review, request identifiers, and verification or abuse-prevention signals
-- **Communications Data:** Messages submitted through contact support, contact sales, password-reset, and related support workflows, including optional attachments where supported
+- **Communications Data:** Messages submitted through contact support, contact sales, password-reset, Intercom Messenger, and related support workflows, including optional attachments where supported
 - **Transactional Data:** Plan metadata, billing-related plan classification, subscription records, and onboarding or support request metadata used to manage service delivery
 
 We do not intentionally collect more information than is reasonably necessary to operate, secure, and support the service.
@@ -106,8 +106,9 @@ ItemTraxx relies on third-party infrastructure and service providers to operate 
 Current systems include Supabase for database, authentication, storage, and Edge Functions;
 Cloudflare for edge proxying, request filtering, DNS, and Turnstile; Vercel for frontend hosting,
 analytics, and performance measurements; PostHog and Sentry for consent-controlled analytics and
-diagnostics; transactional email providers configured through server-side email services; GitHub for
-source control and CI/CD; and Slack and incident.io for operational notifications where configured.
+diagnostics; Intercom for support Messenger conversations for anonymous visitors and authenticated users;
+transactional email providers configured through server-side email services; GitHub for source control and
+CI/CD; and Slack and incident.io for operational notifications where configured.
 Provider use depends on the active environment and feature configuration.
 
 ---

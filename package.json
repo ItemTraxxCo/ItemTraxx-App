@@ -46,6 +46,7 @@
     "deploy": "npm run build && wrangler deploy"
   },
   "dependencies": {
+    "@intercom/messenger-js-sdk": "^0.0.20",
     "@sentry/vue": "^10.69.0",
     "@supabase/supabase-js": "^2.111.0",
     "@vercel/analytics": "^2.0.1",

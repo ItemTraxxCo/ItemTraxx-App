@@ -37,8 +37,8 @@
 
       <section class="changelog-version-strip" aria-label="Latest build version">
         <p class="changelog-version-label">Latest version</p>
-        <p class="changelog-version-lead">Please make sure your ItemTraxx is updated.</p>
-        <p class="changelog-version-value">Current release version: {{ appVersion }}</p>
+        <p class="changelog-version-lead">Keep ItemTraxx up to date to get the latest quality-of-life improvements and bug fixes.</p>
+        <p class="changelog-version-value">Latest release: {{ appVersion }}</p>
         <p class="changelog-version-meta">
           {{ releaseChannel }}
           <span v-if="showBranchName"> • {{ appBranch }}</span>

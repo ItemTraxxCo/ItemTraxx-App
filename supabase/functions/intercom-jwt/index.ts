@@ -54,7 +54,13 @@ serve(async (req) => {
 
   const supabaseUrl = Deno.env.get("ITX_SUPABASE_URL")?.trim();
   const publishableKey = Deno.env.get("ITX_PUBLISHABLE_KEY")?.trim();
-  const intercomSecret = Deno.env.get("ITX_INTERCOM_MESSENGER_SECRET")?.trim();
+  // ITX_ is the documented canonical prefix. Keep the previously provisioned
+  // TX_ name as a server-side fallback so an existing deployment keeps working
+  // while the secret is migrated without exposing either value to the client.
+  const intercomSecret = (
+    Deno.env.get("ITX_INTERCOM_MESSENGER_SECRET") ??
+    Deno.env.get("TX_INTERCOM_MESSENGER_SECRET")
+  )?.trim();
   if (!supabaseUrl || !publishableKey || !intercomSecret) {
     return jsonResponse(500, { error: "Server misconfiguration." });
   }

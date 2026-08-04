@@ -3,6 +3,7 @@
   "specifiers": {
     "npm:@cloudflare/vite-plugin@^1.50.0": "1.50.0_vite@8.2.0__@types+node@26.1.2_wrangler@4.118.0",
     "npm:@cyclonedx/cyclonedx-npm@6.0.0": "6.0.0",
+    "npm:@intercom/messenger-js-sdk@^0.0.20": "0.0.20",
     "npm:@playwright/test@^1.62.1": "1.62.1",
     "npm:@sentry/vue@^10.69.0": "10.69.0_vue@3.5.40__typescript@6.0.3",
     "npm:@supabase/supabase-js@^2.111.0": "2.111.0",
@@ -546,6 +547,9 @@
       "integrity": "sha512-D4y1vNeZrIIJCN+uHaWVtH86B+aCrdMYYjicy9pXHvbGZeGYLLSd3wdVuC37FxVXlU1ARsk84eKWfWMXGYEqvA==",
       "os": ["win32"],
       "cpu": ["x64"]
+    },
+    "@intercom/messenger-js-sdk@0.0.20": {
+      "integrity": "sha512-99ixqRcsX4ZL+HnH3xxpQewKqdN9/mtptsnxk5vDd31TQG4x1o0gvp6aNPJm5iX3SPSJldQhA/uqW66NV1LO1w=="
     },
     "@isaacs/cliui@8.0.2": {
       "integrity": "sha512-O8jcjabXaleOG9DQ0+ARXWZBTfnP4WNAqzuiJK7ll44AmxGKv/J2M4TPjxjY3znBCfvBXFzucm1twdyFybFqEA==",
@@ -2960,6 +2964,7 @@
       "dependencies": [
         "npm:@cloudflare/vite-plugin@^1.50.0",
         "npm:@cyclonedx/cyclonedx-npm@6.0.0",
+        "npm:@intercom/messenger-js-sdk@^0.0.20",
         "npm:@playwright/test@^1.62.1",
         "npm:@sentry/vue@^10.69.0",
         "npm:@supabase/supabase-js@^2.111.0",

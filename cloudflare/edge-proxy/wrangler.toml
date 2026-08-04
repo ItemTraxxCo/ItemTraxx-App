@@ -50,3 +50,8 @@ namespace_id = "2026061102"
 pattern = "edge.itemtraxx.com"
 zone_name = "itemtraxx.com"
 custom_domain = true
+
+[[routes]]
+pattern = "mta-sts.itemtraxx.com"
+zone_name = "itemtraxx.com"
+custom_domain = true

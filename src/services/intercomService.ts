@@ -3,7 +3,10 @@ export type IntercomUser = {
   email?: string | null;
 };
 
-type IntercomSdk = typeof import("@intercom/messenger-js-sdk");
+type IntercomSdk = {
+  default: (settings: IntercomSettings) => void;
+  shutdown: () => void;
+};
 type IntercomSettings = {
   app_id: string;
   user_id?: string;
@@ -45,8 +48,24 @@ const loadSdk = () => {
   if (!sdkPromise) {
     sdkPromise = import("@intercom/messenger-js-sdk")
       .then((module) => {
-        sdk = module;
-        return module;
+        // Vite/Rolldown can wrap this CommonJS package twice in production,
+        // yielding either module.default(settings) or
+        // module.default.default(settings). Normalize both shapes here.
+        const candidate = module.default as unknown;
+        if (typeof candidate === "function") {
+          sdk = module as unknown as IntercomSdk;
+          return sdk;
+        }
+
+        if (candidate && typeof candidate === "object") {
+          const nested = candidate as Partial<IntercomSdk>;
+          if (typeof nested.default === "function" && typeof nested.shutdown === "function") {
+            sdk = nested as IntercomSdk;
+            return sdk;
+          }
+        }
+
+        throw new TypeError("Unexpected Intercom SDK module shape.");
       })
       .catch((error) => {
         sdkPromise = null;

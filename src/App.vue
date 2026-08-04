@@ -106,6 +106,7 @@ import { useAdminSessionLifecycle } from "./composables/useAdminSessionLifecycle
 import { useAppVersionStatus } from "./composables/useAppVersionStatus";
 import { isUnavailableBypassHost } from "./utils/unavailableBypass";
 import { useCookieConsentTelemetry } from "./composables/useCookieConsentTelemetry";
+import { useIntercom } from "./composables/useIntercom";
 import { useOfflineQueueCount } from "./composables/useOfflineQueueCount";
 import { useOnboarding } from "./composables/useOnboarding";
 import { useSystemStatus } from "./composables/useSystemStatus";
@@ -233,6 +234,7 @@ const incidentSlaLine = computed(() => {
 });
 
 const consent = useCookieConsentTelemetry(auth);
+useIntercom(auth);
 const version = useAppVersionStatus({ appVersion, isDevHost: isDevSubdomainHost, isNonMainBuild });
 const { isOutdated, latestVersion, forceUpdateOverlay } = version;
 const showVersionOverlay = computed(() => forceUpdateOverlay.value || (!isDevSubdomainHost.value && !isNonMainBuild && isOutdated.value));

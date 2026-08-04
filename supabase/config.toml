@@ -364,6 +364,11 @@ verify_jwt = false
 # Supports anonymous and authenticated consent audit records; validation is internal.
 verify_jwt = false
 
+[functions.intercom-jwt]
+# Auth is validated inside the function via the Supabase session token.
+# The Intercom signing secret is read only from server-side function secrets.
+verify_jwt = false
+
 # This hook runs before a token is issued and allows you to add additional claims based on the authentication method used.
 # [auth.hook.custom_access_token]
 # enabled = true

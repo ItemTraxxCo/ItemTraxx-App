@@ -1,5 +1,3 @@
-import { invokeEdgeFunction } from "./edgeFunctionClient";
-
 export type IntercomUser = {
   userId: string;
   email?: string | null;
@@ -36,6 +34,10 @@ let syncGeneration = 0;
 const isBrowser = () => typeof window !== "undefined" && typeof document !== "undefined";
 
 const fetchIntercomUserJwt = async () => {
+  // Keep the authenticated-only edge client out of the public initial bundle.
+  // Anonymous visitors only need the Intercom SDK, while this path is loaded
+  // after a signed-in user is detected.
+  const { invokeEdgeFunction } = await import("./edgeFunctionClient");
   const result = await invokeEdgeFunction<IntercomJwtResponse>("intercom-jwt", {
     method: "POST",
   });

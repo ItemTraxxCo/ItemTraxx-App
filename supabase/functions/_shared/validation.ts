@@ -20,12 +20,11 @@ const CONTROL_CHARS =
   /[\u0000-\u001F\u007F\u200B-\u200F\u202A-\u202E\u2060-\u206F\uFEFF]/;
 export const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-export const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 export const BORROWER_ID_PATTERN = /^[0-9]{4}[A-Z]{2}$/;
 export const USERNAME_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]{2,38}[A-Za-z0-9]$/;
 export const BARCODE_PATTERN = /^[A-Za-z0-9._:@/#-]{1,64}$/;
 export const SLUG_PATTERN = /^[a-z0-9][a-z0-9-]{0,62}$/;
-export const ACCESS_CODE_PATTERN = /^[A-Za-z0-9._-]{1,64}$/;
 
 export const asRecord = (value: unknown, message = "Invalid request") => {
   if (!value || typeof value !== "object" || Array.isArray(value)) {

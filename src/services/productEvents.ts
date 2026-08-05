@@ -1,6 +1,6 @@
-export type ProductEventProperties = Record<string, string | number | boolean>;
+type ProductEventProperties = Record<string, string | number | boolean>;
 
-export type ProductEventDelivery = {
+type ProductEventDelivery = {
   name: string;
   properties?: ProductEventProperties;
 };

@@ -43,7 +43,7 @@ const resolveCorsHeaders = (req: Request) => {
   return { hasOrigin, originAllowed, headers };
 };
 
-const resolveResetRedirectTo = (req: Request) => {
+const resolveResetRedirectTo = () => {
   const configured = (Deno.env.get("ITX_PASSWORD_RESET_REDIRECT_URL") ?? "").trim();
   if (configured) return configured;
   console.error("workspace-admin-mutate missing ITX_PASSWORD_RESET_REDIRECT_URL");
@@ -280,13 +280,13 @@ serve(async (req) => {
       if (createError || !createdAuth.user) return jsonResponse(400, { error: "Unable to create Tenant Account." });
       const { data: created, error } = await adminClient.from("profiles").insert({ id: createdAuth.user.id, workspace_id: requesterProfile.workspace_id, auth_email: authEmail, role: "tenant_account", is_active: true }).select("id,workspace_id,auth_email,role,is_active,deleted_at,created_at").single();
       if (error || !created) { await adminClient.auth.admin.deleteUser(createdAuth.user.id); return jsonResponse(400, { error: "Unable to create Tenant Account." }); }
-      const redirectTo=resolveResetRedirectTo(req); if (!redirectTo) return jsonResponse(500,{error:"Password reset redirect is not configured."});
+      const redirectTo=resolveResetRedirectTo(); if (!redirectTo) return jsonResponse(500,{error:"Password reset redirect is not configured."});
       await adminClient.auth.resetPasswordForEmail(authEmail,{redirectTo}); await writeAudit("create_tenant_account",created.id,{auth_email:authEmail}); return jsonResponse(200,{data:created});
     }
 
     if (["set_tenant_account_status","update_tenant_account_email","remove_tenant_account","send_tenant_account_reset"].includes(action)) {
       const id=requireUuid(next.id); const { data: target }=await adminClient.from("profiles").select("id,auth_email").eq("id",id).eq("workspace_id",requesterProfile.workspace_id).eq("role","tenant_account").is("deleted_at",null).maybeSingle(); if(!target)return jsonResponse(404,{error:"Tenant Account not found."});
-      if(action==="send_tenant_account_reset"){const redirectTo=resolveResetRedirectTo(req);if(!redirectTo)return jsonResponse(500,{error:"Password reset redirect is not configured."});const{error}=await adminClient.auth.resetPasswordForEmail(target.auth_email,{redirectTo});if(error)return jsonResponse(400,{error:"Unable to send password reset."});await writeAudit(action,id,{});return jsonResponse(200,{data:{success:true}});}
+      if(action==="send_tenant_account_reset"){const redirectTo=resolveResetRedirectTo();if(!redirectTo)return jsonResponse(500,{error:"Password reset redirect is not configured."});const{error}=await adminClient.auth.resetPasswordForEmail(target.auth_email,{redirectTo});if(error)return jsonResponse(400,{error:"Unable to send password reset."});await writeAudit(action,id,{});return jsonResponse(200,{data:{success:true}});}
       if(action==="set_tenant_account_status"){if(typeof next.is_active!=="boolean")return jsonResponse(400,{error:"Invalid request"});const{data,error}=await adminClient.from("profiles").update({is_active:next.is_active}).eq("id",id).select("id,workspace_id,auth_email,role,is_active,deleted_at,created_at").single();if(error)return jsonResponse(400,{error:"Unable to update Tenant Account."});await writeAudit(action,id,{is_active:next.is_active});return jsonResponse(200,{data});}
       if(action==="update_tenant_account_email"){const authEmail=requireEmail(next.auth_email);const{error:authError}=await adminClient.auth.admin.updateUserById(id,{email:authEmail,email_confirm:true});if(authError)return jsonResponse(400,{error:"Unable to update email."});const{data,error}=await adminClient.from("profiles").update({auth_email:authEmail}).eq("id",id).select("id,workspace_id,auth_email,role,is_active,deleted_at,created_at").single();if(error)return jsonResponse(400,{error:"Unable to update Tenant Account."});await writeAudit(action,id,{auth_email:authEmail});return jsonResponse(200,{data});}
       const now=new Date().toISOString();const{error}=await adminClient.from("profiles").update({deleted_at:now,is_active:false}).eq("id",id);if(error)return jsonResponse(400,{error:"Unable to remove Tenant Account."});await adminClient.from("account_sessions").update({revoked_at:now,revoked_by:user.id}).eq("profile_id",id).is("revoked_at",null);await writeAudit(action,id,{});return jsonResponse(200,{data:{success:true}});
@@ -368,7 +368,7 @@ serve(async (req) => {
         });
       }
 
-      const redirectTo = resolveResetRedirectTo(req);
+      const redirectTo = resolveResetRedirectTo();
       if (!redirectTo) {
         await adminClient.from("profiles").delete().eq("id", userId);
         await adminClient.auth.admin.deleteUser(userId);
@@ -531,7 +531,7 @@ serve(async (req) => {
         return jsonResponse(400, { error: "Primary admin reset must be handled separately." });
       }
 
-      const redirectTo = resolveResetRedirectTo(req);
+      const redirectTo = resolveResetRedirectTo();
       if (!redirectTo) {
         return jsonResponse(500, {
           error: "Password reset redirect is not configured.",

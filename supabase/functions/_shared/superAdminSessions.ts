@@ -14,7 +14,7 @@ type SupabaseLikeClient = {
   from: (table: string) => any;
 };
 
-export const resolveSuperAdminAuthSessionBinding = async (
+const resolveSuperAdminAuthSessionBinding = async (
   client: SupabaseLikeClient,
   authToken: string,
 ) => {

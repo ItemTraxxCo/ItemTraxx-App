@@ -194,7 +194,6 @@ const escapeHtml = (value: string) =>
 
 const buildLoginNotificationHtml = (payload: LoginNotificationPayload, loginTimeLabel: string) => {
   const tenantName = escapeHtml(payload.workspace_name);
-  const supportEmail = escapeHtml(payload.support_email);
   const deviceBrowser = escapeHtml(formatLoginEmailPlatform(payload.device_browser));
   const loginTime = escapeHtml(loginTimeLabel);
 
@@ -247,7 +246,6 @@ const buildLoginNotificationHtml = (payload: LoginNotificationPayload, loginTime
 };
 
 const buildSuperAdminTwoFactorHtml = (payload: SuperAdminTwoFactorPayload) => {
-  const supportEmail = escapeHtml(payload.support_email);
   const code = escapeHtml(payload.code);
 
   return `<!doctype html>
@@ -305,7 +303,6 @@ const buildContactSalesInternalHtml = (payload: ContactSalesPayload) => {
   const organization = escapeHtml(payload.organization);
   const replyEmail = escapeHtml(payload.reply_email);
   const details = escapeHtml(payload.details ?? "(none provided)").replaceAll("\n", "<br />");
-  const supportEmail = escapeHtml(payload.support_email);
   const schoolsLine =
     payload.plan_key === "workspace_enterprise" && payload.schools_count
       ? `<p style="margin:0 0 14px 0;font-size:15px;line-height:1.6;color:#343330;"><strong>Number of tenant accounts:</strong> ${payload.schools_count}</p>`
@@ -364,7 +361,6 @@ const buildContactSalesConfirmationHtml = (payload: ContactSalesPayload) => {
   const planLabel = escapeHtml(payload.plan_label);
   const name = escapeHtml(payload.name);
   const organization = escapeHtml(payload.organization);
-  const supportEmail = escapeHtml(payload.support_email);
   const schoolsLine =
     payload.plan_key === "workspace_enterprise" && payload.schools_count
       ? `<p style="margin:0 0 14px 0;font-size:15px;line-height:1.6;color:#343330;"><strong>Number of tenant accounts:</strong> ${payload.schools_count}</p>`
@@ -559,14 +555,13 @@ const processSuperAdminTwoFactorEmail = async (
   });
 };
 
-const buildWorkspaceSupportHtml = (payload: WorkspaceSupportPayload, supportEmail: string) => {
+const buildWorkspaceSupportHtml = (payload: WorkspaceSupportPayload) => {
   const requesterEmail = escapeHtml(payload.requester_email ?? "Unavailable");
   const requesterName = escapeHtml(payload.requester_name ?? "Workspace Admin");
   const subject = escapeHtml(payload.subject);
   const message = escapeHtml(payload.message).replaceAll("\n", "<br />");
   const workspaceId = escapeHtml(payload.workspace_id);
   const priority = escapeHtml(payload.priority);
-  const safeSupportEmail = escapeHtml(supportEmail);
 
   return `<!doctype html>
 <html>
@@ -625,7 +620,6 @@ const buildSupportRequestInternalHtml = (
   const subject = escapeHtml(payload.subject);
   const category = escapeHtml(payload.category);
   const message = escapeHtml(payload.message).replaceAll("\n", "<br />");
-  const supportEmail = escapeHtml(payload.support_email);
   const attachmentSummary = deliveredAttachmentCount
     ? `<p style="margin:14px 0 0 0;font-size:14px;line-height:1.6;color:#68645f;"><strong>Attachments:</strong> ${deliveredAttachmentCount} image${deliveredAttachmentCount === 1 ? "" : "s"} included.</p>`
     : "";
@@ -682,7 +676,6 @@ const buildSupportRequestConfirmationHtml = (payload: SupportRequestPayload) => 
   const name = escapeHtml(payload.name);
   const subject = escapeHtml(payload.subject);
   const category = escapeHtml(payload.category);
-  const supportEmail = escapeHtml(payload.support_email);
   const attachmentSummary = payload.attachments?.length
     ? `<p style="margin:0 0 14px 0;font-size:15px;line-height:1.6;color:#343330;">We also received ${payload.attachments.length} image attachment${payload.attachments.length === 1 ? "" : "s"} with your request.</p>`
     : "";
@@ -927,7 +920,7 @@ const processWorkspaceSupportEmail = async (
     to: [supportEmail],
     reply_to: payload.requester_email ? payload.requester_email : undefined,
     subject,
-    html: applyEmailTheme(buildWorkspaceSupportHtml(payload, supportEmail)),
+    html: applyEmailTheme(buildWorkspaceSupportHtml(payload)),
     text:
       `A workspace support request was submitted.\n\n` +
       `Workspace ID: ${payload.workspace_id}\n` +

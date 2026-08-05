@@ -94,8 +94,8 @@ export const checkRecentAdminAuth = async (
 // `step_up_required` as 403 with exactly this message. Using 401 instead would
 // trigger the token-refresh retry in src/services/edgeFunctionClient.ts:160,
 // which cannot help -- a refreshed token carries the same amr timestamps.
-export const ADMIN_REAUTH_REQUIRED_STATUS = 403;
-export const ADMIN_REAUTH_REQUIRED_MESSAGE = "Admin verification required.";
+const ADMIN_REAUTH_REQUIRED_STATUS = 403;
+const ADMIN_REAUTH_REQUIRED_MESSAGE = "Admin verification required.";
 
 /**
  * Returns a 403 response when the caller has not re-authenticated recently, or

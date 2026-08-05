@@ -224,7 +224,6 @@ const escapeHtml = (value: string) =>
     .replaceAll("'", "&#39;");
 
 const buildSuperAdminTwoFactorHtml = (payload: { code: string; support_email: string }) => {
-  const supportEmail = escapeHtml(payload.support_email);
   const code = escapeHtml(payload.code);
 
   return `<!doctype html>

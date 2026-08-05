@@ -10,26 +10,6 @@ export type TenantFeatureFlags = {
   enable_barcode_generator: boolean;
 };
 
-export type SuperWorkspaceAction =
-  | "list_workspaces"
-  | "create_workspace"
-  | "update_workspace"
-  | "set_workspace_status"
-  | "send_primary_admin_reset"
-  | "set_primary_admin";
-
-export type SuperAdminAction =
-  | "list_workspace_admins"
-  | "list_super_admins"
-  | "create_workspace_admin"
-  | "create_super_admin"
-  | "set_workspace_admin_status"
-  | "set_super_admin_status"
-  | "update_workspace_admin_email"
-  | "update_super_admin_email"
-  | "send_workspace_admin_reset"
-  | "send_super_admin_reset";
-
 export type SuperItemAction = "list" | "create" | "update" | "delete";
 export type SuperBorrowerAction = "list" | "create" | "update" | "delete";
 

@@ -26,7 +26,7 @@ import {
 import { getAuthState } from "../store/authState";
 import { markItemTraxxServerConfirmed, markItemTraxxServerUnreachable } from "./offlineConnectionState";
 
-export { consumeCheckoutOfflineWarning, getBufferedCheckoutCount } from "./offlineCheckoutQueue";
+export { consumeCheckoutOfflineWarning } from "./offlineCheckoutQueue";
 export type { CheckoutReturnPayload } from "./offlineCheckoutQueue";
 
 type SubmitCheckoutReturnResult = {

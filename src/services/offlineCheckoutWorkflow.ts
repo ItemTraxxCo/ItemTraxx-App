@@ -35,7 +35,7 @@ export type OfflineWorkflowScope = {
   deviceId?: string;
 };
 
-export type OfflineItemIntent = {
+type OfflineItemIntent = {
   item_id: string;
   barcode: string;
   name: string;
@@ -251,7 +251,7 @@ const fallbackLock = async <T>(callback: () => Promise<T>) => {
   }
 };
 
-export const withOfflineWorkflowLock = <T>(callback: () => Promise<T>) => {
+const withOfflineWorkflowLock = <T>(callback: () => Promise<T>) => {
   if (typeof navigator !== "undefined" && "locks" in navigator && navigator.locks) {
     return navigator.locks.request(LOCK_NAME, { mode: "exclusive" }, callback);
   }

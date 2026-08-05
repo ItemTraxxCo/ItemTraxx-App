@@ -328,7 +328,7 @@ serve(async (req) => {
     if (attachmentsRaw.length > 2) {
       return jsonResponse(400, { error: "Attach up to 2 images." });
     }
-    for (const [index, attachment] of attachmentsRaw.entries()) {
+    for (const attachment of attachmentsRaw) {
       if (
         !attachment || typeof attachment !== "object" ||
         Array.isArray(attachment)

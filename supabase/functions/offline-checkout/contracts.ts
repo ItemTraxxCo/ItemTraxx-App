@@ -1,22 +1,20 @@
 import {
   asRecord,
-  optionalText,
-  optionalUuid,
   requireEnum,
   requireText,
   requireUuid,
   ValidationError,
 } from "../_shared/validation.ts";
 
-export const OFFLINE_INTENTS = new Set(
+const OFFLINE_INTENTS = new Set(
   ["checkout", "return", "quick_return"] as const,
 );
-export const OFFLINE_RESOLUTIONS = new Set(
+const OFFLINE_RESOLUTIONS = new Set(
   ["keep_server", "apply_offline"] as const,
 );
 
-export type OfflineIntent = "checkout" | "return" | "quick_return";
-export type OfflineResolution = "keep_server" | "apply_offline";
+type OfflineIntent = "checkout" | "return" | "quick_return";
+type OfflineResolution = "keep_server" | "apply_offline";
 
 export type OfflineSyncItem = {
   item_id: string;
@@ -140,7 +138,7 @@ export const intendedState = (item: OfflineSyncItem): OfflineItemState =>
     ? { status: "checked_out", checked_out_by: item.borrower_id }
     : { status: "available", checked_out_by: null };
 
-export const statesEqual = (left: OfflineItemState, right: OfflineItemState) =>
+const statesEqual = (left: OfflineItemState, right: OfflineItemState) =>
   left.status.toLowerCase() === right.status.toLowerCase() &&
   left.checked_out_by === right.checked_out_by;
 
@@ -156,8 +154,3 @@ export const classifyOfflineItem = (
   if (statesEqual(current, expected)) return "apply" as const;
   return "needs_review" as const;
 };
-
-export const parseOptionalUuid = (value: unknown) =>
-  optionalUuid(value) || null;
-export const parseOptionalText = (value: unknown, maxLen: number) =>
-  optionalText(value, { maxLen }) || null;

@@ -116,7 +116,6 @@ const buildLoginNotificationHtml = (payload: {
   const accountName = escapeHtml(payload.accountName);
   const accountLabel = escapeHtml(payload.accountLabel);
   const loginTypeLabel = escapeHtml(payload.loginTypeLabel);
-  const supportEmail = escapeHtml(payload.supportEmail);
   const deviceBrowser = escapeHtml(payload.deviceBrowser || "Unknown");
   const generalLocation = escapeHtml(formatLoginEmailLocation(payload.generalLocation));
   const loginTime = escapeHtml(payload.loginTimeLabel);

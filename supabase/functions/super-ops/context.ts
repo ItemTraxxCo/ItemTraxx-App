@@ -2,12 +2,12 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.108.2";
 
 export type SupabaseAdminClient = ReturnType<typeof createClient<any>>;
 
-export type JsonResponse = (
+type JsonResponse = (
   status: number,
   body: Record<string, unknown>,
 ) => Response;
 
-export type WriteSuperAudit = (
+type WriteSuperAudit = (
   actionType: string,
   targetType: string,
   targetId: string | null,

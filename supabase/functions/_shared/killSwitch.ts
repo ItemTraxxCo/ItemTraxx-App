@@ -1,6 +1,6 @@
 const lower = (value: string | null | undefined) => (value ?? "").toLowerCase();
 
-export const DEFAULT_KILL_SWITCH_MESSAGE =
+const DEFAULT_KILL_SWITCH_MESSAGE =
   "Unfortunately ItemTraxx is currently unavailable. We apologize for any inconvenience and are working to restore access as soon as possible. Please see the status page for more information.";
 
 const isLocalhostHost = (hostname: string) => {

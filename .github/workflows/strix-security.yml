@@ -23,11 +23,9 @@ jobs:
 
   strix-security-scan:
     needs: kill-switch-preflight
-    # Temporarily disabled: Strix v1.4.1 aborts on the known unknown-tool
-    # ModelBehaviorError reproduced in ItemTraxx CI. Re-enable after the
-    # upstream recovery fix lands: https://github.com/usestrix/strix/issues/580
-    # and https://github.com/usestrix/strix/pull/613
-    if: false && ((github.event_name == 'workflow_dispatch' || (github.event.pull_request.base.ref == 'preview' && github.event.pull_request.head.ref == 'staging')) && needs.kill-switch-preflight.outputs.active == 'false')
+    # Strix v1.5.1 includes recoverable unknown-tool handling for the
+    # ModelBehaviorError reproduced in ItemTraxx CI.
+    if: ((github.event_name == 'workflow_dispatch' || (github.event.pull_request.base.ref == 'preview' && github.event.pull_request.head.ref == 'staging')) && needs.kill-switch-preflight.outputs.active == 'false')
     permissions:
       contents: read
       pull-requests: write
@@ -44,9 +42,9 @@ jobs:
 
       - name: Install Strix
         env:
-          STRIX_VERSION: 1.4.1
-          # SHA-256 published for strix-1.4.1-linux-x86_64.tar.gz.
-          STRIX_SHA256: 6a50b8444700ee311d155b3828f0ed7e7876dcbe60404934b16d9aa0f442c1fe
+          STRIX_VERSION: 1.5.1
+          # SHA-256 published for strix-1.5.1-linux-x86_64.tar.gz.
+          STRIX_SHA256: f898f2913fc470986df3e903403b8b54409dc26c40caf2f8759e08d3814a3322
         run: |
           strix_dir="$RUNNER_TEMP/strix-${STRIX_VERSION}"
           strix_archive="$strix_dir/strix.tar.gz"

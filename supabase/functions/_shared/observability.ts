@@ -6,7 +6,7 @@ export const logInfo = (
   requestId: string,
   extra: Record<string, unknown> = {},
 ) => {
-  console.info(event, { request_id: requestId, ...extra });
+  console.info(JSON.stringify({ event, request_id: requestId, ...extra }));
 };
 
 export const logError = (
@@ -15,10 +15,13 @@ export const logError = (
   error: unknown,
   extra: Record<string, unknown> = {},
 ) => {
-  console.error(event, {
-    request_id: requestId,
-    message: error instanceof Error ? error.message : "Unknown error",
-    stack: error instanceof Error ? error.stack : undefined,
-    ...extra,
-  });
+  console.error(
+    JSON.stringify({
+      event,
+      request_id: requestId,
+      message: error instanceof Error ? error.message : "Unknown error",
+      stack: error instanceof Error ? error.stack : undefined,
+      ...extra,
+    }),
+  );
 };

@@ -60,9 +60,41 @@ def main() -> None:
         comment = output.read_text(encoding="utf-8")
         if injected_text in comment:
             raise RuntimeError("SARIF injection leaked into PR comment output")
-        for expected in ("`warning`", "`test-rule`", "`src/example.ts:42`"):
+        for expected in (
+            "## Strix Penetration Test and Security Scanning",
+            "`warning`",
+            "`test-rule`",
+            "`src/example.ts:42`",
+        ):
             if expected not in comment:
                 raise RuntimeError(f"expected {expected!r} in PR comment output")
+
+        clean_findings_root = temporary_root / "clean-strix_runs" / "run"
+        clean_findings_root.mkdir(parents=True)
+        (clean_findings_root / "findings.sarif").write_text(
+            json.dumps({"runs": [{"results": []}]}),
+            encoding="utf-8",
+        )
+        clean_output = temporary_root / "clean-comment.md"
+        subprocess.run(
+            [
+                "python3",
+                str(SCRIPT),
+                "--exit-code",
+                "0",
+                "--findings-root",
+                str(temporary_root / "clean-strix_runs"),
+                "--output",
+                str(clean_output),
+            ],
+            check=True,
+        )
+        clean_comment = clean_output.read_text(encoding="utf-8")
+        expected_clean_message = (
+            "Strix completed the penetration test and security scan and found no exploitable vulnerabilities."
+        )
+        if expected_clean_message not in clean_comment:
+            raise RuntimeError(f"expected {expected_clean_message!r} in clean PR comment output")
 
 
 if __name__ == "__main__":

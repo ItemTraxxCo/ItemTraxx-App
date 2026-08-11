@@ -22,6 +22,8 @@ jobs:
   # Retain the health signal for diagnostics; deployment does not gate on it.
   kill-switch-preflight:
     uses: ./.github/workflows/kill-switch-preflight.yml
+    with:
+      status_source: supabase
 
   slack-notify-start:
     needs: kill-switch-preflight

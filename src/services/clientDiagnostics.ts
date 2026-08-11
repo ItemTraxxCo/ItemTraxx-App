@@ -121,34 +121,42 @@ export const installClientDiagnostics = () => {
       init?.method ??
       "GET";
     const rawUrl = input instanceof Request ? input.url : String(input);
+    // Check the original URL before redaction. Absolute URLs are intentionally
+    // collapsed to [REDACTED_URL], which would otherwise hide this endpoint and
+    // make the diagnostics upload capture itself.
+    const skipCapture = shouldSkipNetworkCapture(rawUrl);
     const url = normalizeUrl(rawUrl);
 
     try {
       const response = await originalFetch(input, init);
-      recordNetworkEntry({
-        method,
-        url: redactSensitiveText(url),
-        status: response.status,
-        ok: response.ok,
-        duration_ms: Math.round(performance.now() - startedAt),
-        request_id: response.headers.get("x-request-id"),
-        timestamp: new Date().toISOString(),
-      });
+      if (!skipCapture) {
+        recordNetworkEntry({
+          method,
+          url: redactSensitiveText(url),
+          status: response.status,
+          ok: response.ok,
+          duration_ms: Math.round(performance.now() - startedAt),
+          request_id: response.headers.get("x-request-id"),
+          timestamp: new Date().toISOString(),
+        });
+      }
       return response;
     } catch (error) {
-      recordNetworkEntry({
-        method,
-        url: redactSensitiveText(url),
-        status: null,
-        ok: false,
-        duration_ms: Math.round(performance.now() - startedAt),
-        request_id: null,
-        timestamp: new Date().toISOString(),
-        error:
-          error instanceof Error
-            ? redactSensitiveText(error.message)
-            : "Network request failed.",
-      });
+      if (!skipCapture) {
+        recordNetworkEntry({
+          method,
+          url: redactSensitiveText(url),
+          status: null,
+          ok: false,
+          duration_ms: Math.round(performance.now() - startedAt),
+          request_id: null,
+          timestamp: new Date().toISOString(),
+          error:
+            error instanceof Error
+              ? redactSensitiveText(error.message)
+              : "Network request failed.",
+        });
+      }
       throw error;
     }
   };

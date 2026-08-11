@@ -89,7 +89,11 @@ const mockedGetAuthState = vi.mocked(getAuthState);
 const mockedMarkConfirmed = vi.mocked(markItemTraxxServerConfirmed);
 const mockedMarkUnreachable = vi.mocked(markItemTraxxServerUnreachable);
 
-const AUTH_SCOPE = { workspaceContextId: "ws-1", userId: "profile-1" } as ReturnType<typeof getAuthState>;
+const AUTH_SCOPE = {
+  isAuthenticated: true,
+  workspaceContextId: "ws-1",
+  userId: "profile-1",
+} as ReturnType<typeof getAuthState>;
 
 const okResponse = <T,>(data: T) => ({ ok: true, status: 200, error: "", data });
 const failResponse = (status: number, error = "boom") => ({ ok: false, status, error, data: null });
@@ -262,6 +266,23 @@ describe("submitCheckoutReturn", () => {
 });
 
 describe("syncBufferedCheckoutQueue", () => {
+  it("does not sync before an authenticated workspace session is ready", async () => {
+    mockedGetAuthState.mockReturnValue({
+      isAuthenticated: false,
+      workspaceContextId: null,
+      userId: null,
+    } as never);
+
+    await expect(syncBufferedCheckoutQueue()).resolves.toEqual({
+      processed: 0,
+      failed: 0,
+      remaining: 0,
+      review: 0,
+    });
+    expect(mockedSyncLedger).not.toHaveBeenCalled();
+    expect(mockedReadQueue).not.toHaveBeenCalled();
+  });
+
   it("combines workflow-ledger sync stats with an empty legacy queue", async () => {
     mockedSyncLedger.mockResolvedValue({ processed: 2, failed: 1, remaining: 1, review: 1 });
     mockedReadQueue.mockResolvedValue([]);

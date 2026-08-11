@@ -91,20 +91,14 @@ describe("network capture", () => {
     expect(last.error).toBe("network down");
   });
 
-  // shouldSkipNetworkCapture is meant to prevent client-error-report calls from
-  // being captured into diagnostics (avoiding a feedback loop), but it runs against
-  // entry.url *after* redactSensitiveText has already collapsed any absolute
-  // http(s) URL down to the literal "[REDACTED_URL]" placeholder, so the substring
-  // check against "/functions/.../client-error-report" can never match in practice.
-  // This test documents the actual (buggy) behavior rather than the intent.
-  it("does not currently skip client-error-report requests, because the URL is redacted before the skip check runs", async () => {
+  it("skips client-error-report requests to avoid capturing the diagnostics upload itself", async () => {
     mockedAllows.mockReturnValue(true);
     fetchMock.mockResolvedValueOnce({ ok: true, status: 200, headers: { get: () => null } });
     const before = getClientDiagnosticsSnapshot().network.length;
 
     await fetch("https://api.example.com/functions/v1/client-error-report");
 
-    expect(getClientDiagnosticsSnapshot().network.length).toBe(before + 1);
+    expect(getClientDiagnosticsSnapshot().network.length).toBe(before);
   });
 
   it("does not record network entries when diagnostics consent is not granted", async () => {

@@ -169,6 +169,14 @@ export const submitCheckoutReturn = async (
 };
 
 export const syncBufferedCheckoutQueue = async () => {
+  const auth = getAuthState();
+  if (!auth.isAuthenticated || !auth.workspaceContextId || !auth.userId) {
+    // Checkout can mount while auth is still settling (for example after a
+    // session expires). Preserve the local queue and wait for the next session
+    // or online event instead of starting a scope-dependent sync that throws.
+    return { processed: 0, failed: 0, remaining: 0, review: 0 };
+  }
+
   const workflow = await syncOfflineCheckoutLedger();
   const legacy = await withOfflineQueueLock(async () => {
     const queue = await readOfflineQueue();

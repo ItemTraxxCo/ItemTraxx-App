@@ -16,6 +16,8 @@ concurrency:
 jobs:
   kill-switch-preflight:
     uses: ./.github/workflows/kill-switch-preflight.yml
+    with:
+      status_source: supabase
 
   check-stale-schedules:
     needs: kill-switch-preflight

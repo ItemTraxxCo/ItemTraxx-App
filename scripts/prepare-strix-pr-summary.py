@@ -9,6 +9,7 @@ from pathlib import Path
 
 
 MARKER = "<!-- itemtraxx-strix-security-scan -->"
+COMMENT_HEADING = "## Strix Penetration Test and Security Scanning"
 MAX_FINDINGS_IN_COMMENT = 20
 SAFE_DISPLAY = re.compile(r"[^A-Za-z0-9._/@:+-]")
 
@@ -62,13 +63,13 @@ def build_comment(
     if exit_code == "0" and not findings and sarif_found:
         lines = [
             MARKER,
-            "## Strix security scan",
-            "Strix completed the security scan and found no exploitable vulnerabilities.",
+            COMMENT_HEADING,
+            "Strix completed the penetration test and security scan and found no exploitable vulnerabilities.",
         ]
     elif exit_code == "0" and not findings and not sarif_found:
         lines = [
             MARKER,
-            "## Strix security scan",
+            COMMENT_HEADING,
             "Strix completed, but no SARIF report was found, so results can't be summarized here. "
             "Review the Strix results artifact on this workflow run for the actual output.",
         ]
@@ -76,7 +77,7 @@ def build_comment(
         visible_findings = findings[:MAX_FINDINGS_IN_COMMENT]
         lines = [
             MARKER,
-            "## Strix security scan",
+            COMMENT_HEADING,
             f"Strix reported {len(findings)} finding(s). Review the attached SARIF artifact for complete evidence and remediation guidance.",
             "",
             "### Findings",
@@ -88,7 +89,7 @@ def build_comment(
     else:
         lines = [
             MARKER,
-            "## Strix security scan",
+            COMMENT_HEADING,
             "Strix did not complete successfully, so this run cannot claim a clean result. Review the workflow log and Strix results artifact.",
         ]
     return "\n".join(lines) + "\n"

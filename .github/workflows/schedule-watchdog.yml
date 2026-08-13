@@ -42,16 +42,23 @@ jobs:
 
           fetch_workflow_runs() {
             local workflow_file="$1"
-            local url="${API_BASE}/actions/workflows/${workflow_file}/runs?event=schedule&branch=main&status=completed&per_page=50"
+            local url="${API_BASE}/actions/workflows/${workflow_file}/runs?event=schedule&branch=main&status=completed&sort=created&direction=desc&per_page=50"
             local attempt
             local max_attempts=4
             local delay_seconds=5
+            local response
 
             for attempt in $(seq 1 "$max_attempts"); do
-              if curl -fsSL \
+              # GitHub's Actions run endpoint can serve an old 200 response; bypass intermediary caches.
+              if response="$(curl -fsSL \
                 -H "Authorization: Bearer ${GITHUB_TOKEN}" \
                 -H "Accept: application/vnd.github+json" \
-                "$url"; then
+                -H "X-GitHub-Api-Version: 2022-11-28" \
+                -H "Cache-Control: no-cache" \
+                -H "Pragma: no-cache" \
+                "$url")" && \
+                printf '%s' "$response" | jq -e '.workflow_runs | type == "array"' >/dev/null; then
+                printf '%s' "$response"
                 return 0
               fi
 
@@ -66,6 +73,15 @@ jobs:
             return 1
           }
 
+          latest_run_timestamps() {
+            printf '%s' "$1" | jq -r '
+              [
+                (.workflow_runs | sort_by(.created_at) | reverse | .[0].created_at // ""),
+                (.workflow_runs | map(select(.conclusion == "success")) | sort_by(.created_at) | reverse | .[0].created_at // "")
+              ] | @tsv
+            '
+          }
+
           check_workflow() {
             local workflow_file="$1"
             local workflow_name="$2"
@@ -73,32 +89,42 @@ jobs:
             local success_max_age_seconds="$4"
 
             local response
-            response="$(fetch_workflow_runs "$workflow_file")"
+            local latest_completed latest_success
+            local latest_completed_epoch latest_success_epoch
+            local timestamps
+            local refresh_attempt=0
+            local max_refresh_attempts=2
 
-            local latest_completed
-            latest_completed="$(printf '%s' "$response" | jq -r '
-              .workflow_runs
-              | sort_by(.created_at)
-              | reverse
-              | .[0].created_at // empty
-            ')"
+            while true; do
+              response="$(fetch_workflow_runs "$workflow_file")"
+              timestamps="$(latest_run_timestamps "$response")"
+              IFS=$'\t' read -r latest_completed latest_success <<< "$timestamps"
 
-            local latest_success
-            latest_success="$(printf '%s' "$response" | jq -r '
-              .workflow_runs
-              | map(select(.conclusion == "success"))
-              | sort_by(.created_at)
-              | reverse
-              | .[0].created_at // empty
-            ')"
+              if [ -n "$latest_completed" ] && [ -n "$latest_success" ]; then
+                latest_completed_epoch="$(python3 -c 'from datetime import datetime; import sys; print(int(datetime.fromisoformat(sys.argv[1].replace("Z", "+00:00")).timestamp()))' "$latest_completed")"
+                latest_success_epoch="$(python3 -c 'from datetime import datetime; import sys; print(int(datetime.fromisoformat(sys.argv[1].replace("Z", "+00:00")).timestamp()))' "$latest_success")"
+                if [ $(( CURRENT_EPOCH - latest_completed_epoch )) -le "$heartbeat_max_age_seconds" ] && \
+                  [ $(( CURRENT_EPOCH - latest_success_epoch )) -le "$success_max_age_seconds" ]; then
+                  break
+                fi
+              fi
+
+              # A stale-but-valid API snapshot must not become a fatal watchdog alert on the first read.
+              if [ "$refresh_attempt" -ge "$max_refresh_attempts" ]; then
+                break
+              fi
+
+              refresh_attempt="$(( refresh_attempt + 1 ))"
+              echo "Freshness response for ${workflow_name} exceeded its threshold or was incomplete; refetching (${refresh_attempt}/${max_refresh_attempts})." >&2
+              sleep 2
+            done
 
             if [ -z "$latest_completed" ]; then
               STALE_REPORT="${STALE_REPORT}\n- ${workflow_name}: no completed scheduled runs found"
               return
             fi
 
-            local latest_completed_epoch completed_age_minutes heartbeat_max_age_minutes
-            latest_completed_epoch="$(python3 -c 'from datetime import datetime; import sys; print(int(datetime.fromisoformat(sys.argv[1].replace("Z", "+00:00")).timestamp()))' "$latest_completed")"
+            local completed_age_minutes heartbeat_max_age_minutes
             completed_age_minutes="$(( (CURRENT_EPOCH - latest_completed_epoch) / 60 ))"
             heartbeat_max_age_minutes="$(( heartbeat_max_age_seconds / 60 ))"
 
@@ -111,8 +137,7 @@ jobs:
               return
             fi
 
-            local latest_success_epoch success_age_minutes success_max_age_minutes
-            latest_success_epoch="$(python3 -c 'from datetime import datetime; import sys; print(int(datetime.fromisoformat(sys.argv[1].replace("Z", "+00:00")).timestamp()))' "$latest_success")"
+            local success_age_minutes success_max_age_minutes
             success_age_minutes="$(( (CURRENT_EPOCH - latest_success_epoch) / 60 ))"
             success_max_age_minutes="$(( success_max_age_seconds / 60 ))"
 

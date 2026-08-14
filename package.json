@@ -48,20 +48,20 @@
   },
   "dependencies": {
     "@intercom/messenger-js-sdk": "^0.0.20",
-    "@sentry/vue": "^10.69.0",
-    "@supabase/supabase-js": "^2.112.2",
+    "@sentry/vue": "^10.70.0",
+    "@supabase/supabase-js": "^2.112.3",
     "@vercel/analytics": "^2.0.1",
     "@vercel/speed-insights": "^2.0.0",
     "jsbarcode": "^3.12.3",
     "jspdf": "^4.2.1",
     "jspdf-autotable": "^5.0.8",
-    "posthog-js": "^1.414.0",
+    "posthog-js": "^1.417.0",
     "vue": "^3.5.41",
     "vue-router": "^4.6.4",
     "zod": "^4.4.3"
   },
   "devDependencies": {
-    "@cloudflare/vite-plugin": "^1.51.1",
+    "@cloudflare/vite-plugin": "^1.52.1",
     "@cyclonedx/cyclonedx-npm": "6.0.0",
     "@playwright/test": "^1.62.1",
     "@types/node": "^26.2.0",
@@ -71,12 +71,12 @@
     "@vue/tsconfig": "^0.9.1",
     "fake-indexeddb": "^6.2.5",
     "jsdom": "^30.0.1",
-    "supabase": "^2.113.0",
+    "supabase": "^2.114.0",
     "typescript": "~6.0.3",
     "vite": "^8.2.1",
     "vitest": "^4.1.10",
     "vue-tsc": "^3.3.9",
-    "wrangler": "^4.120.0"
+    "wrangler": "^4.123.0"
   },
   "overrides": {
     "esbuild": "0.28.1",

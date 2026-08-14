@@ -14,6 +14,22 @@ begin
   if exists(select 1 from public.profiles where role in ('tenant_admin','tenant_user','district_admin')) then
     raise exception 'legacy roles remain';
   end if;
+  if to_regclass('public.super_reporting_tenant_metrics') is not null
+     or to_regclass('public.super_reporting_workspace_metrics') is null then
+    raise exception 'reporting materialized view names are not aligned with the workspace model';
+  end if;
+  if to_regprocedure('public.refresh_super_reporting_views()') is null
+     or position(
+       'super_reporting_workspace_metrics'
+       in lower(pg_get_functiondef(to_regprocedure('public.refresh_super_reporting_views()')))
+     ) = 0 then
+    raise exception 'reporting refresh RPC is not aligned with the workspace materialized view';
+  end if;
+  if has_function_privilege('anon', 'public.refresh_super_reporting_views()', 'EXECUTE')
+     or has_function_privilege('authenticated', 'public.refresh_super_reporting_views()', 'EXECUTE')
+     or not has_function_privilege('service_role', 'public.refresh_super_reporting_views()', 'EXECUTE') then
+    raise exception 'reporting refresh RPC grants are not service-role-only';
+  end if;
   if (select role from public.profiles where id='30000000-0000-0000-0000-000000000001') <> 'workspace_admin'
      or (select role from public.profiles where id='30000000-0000-0000-0000-000000000002') <> 'tenant_account' then
     raise exception 'legacy roles were not mapped';

@@ -1,0 +1,101 @@
+name: Deploy Supabase Target
+
+permissions:
+  contents: read
+
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: Supabase target to migrate and deploy
+        required: true
+        type: choice
+        options:
+          - staging
+          - production
+        default: staging
+
+concurrency:
+  group: deploy-supabase-target-${{ inputs.target }}
+  cancel-in-progress: false
+
+jobs:
+  migrate-and-deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Resolve target
+        id: target
+        env:
+          TARGET: ${{ inputs.target }}
+        run: |
+          set -euo pipefail
+          case "$TARGET" in
+            staging)
+              project_ref="nwuhjxicaopkmqydjlas"
+              ;;
+            production)
+              project_ref="mlaspkufocikfcbjgpof"
+              ;;
+            *)
+              echo "Unsupported Supabase target: $TARGET" >&2
+              exit 1
+              ;;
+          esac
+          echo "project_ref=$project_ref" >> "$GITHUB_OUTPUT"
+          echo "Deploying checked-in migration and job-worker to $TARGET."
+
+      - name: Apply reporting refresh migration
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_PROJECT_REF: ${{ steps.target.outputs.project_ref }}
+          MIGRATION_PATH: supabase/migrations/20260814010000_fix_reporting_refresh_rpc.sql
+          MIGRATION_NAME: 20260814010000_fix_reporting_refresh_rpc
+        run: |
+          set -euo pipefail
+          test -s "$MIGRATION_PATH"
+          payload="$(jq -n \
+            --rawfile query "$MIGRATION_PATH" \
+            --arg name "$MIGRATION_NAME" \
+            '{query: $query, name: $name}')"
+          response_file="$(mktemp)"
+          trap 'rm -f "$response_file"' EXIT
+          http_status="$(curl -sS \
+            -X POST "https://api.supabase.com/v1/projects/${SUPABASE_PROJECT_REF}/database/migrations" \
+            -H "Authorization: Bearer ${SUPABASE_ACCESS_TOKEN}" \
+            -H "Content-Type: application/json" \
+            --data "$payload" \
+            -o "$response_file" \
+            -w '%{http_code}' || true)"
+          printf 'Supabase migration API response (HTTP %s):\n' "$http_status"
+          cut -c1-2000 "$response_file"
+          if [[ ! "$http_status" =~ ^2[0-9][0-9]$ ]]; then
+            echo "Supabase migration API request failed."
+            exit 1
+          fi
+
+      - name: Setup Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.12'
+
+      - name: Setup Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
+        with:
+          node-version: 24.15.0
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Deploy job-worker
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_PROJECT_REF: ${{ steps.target.outputs.project_ref }}
+        run: python3 ./scripts/deploy-supabase-functions.py --project-ref "$SUPABASE_PROJECT_REF" job-worker

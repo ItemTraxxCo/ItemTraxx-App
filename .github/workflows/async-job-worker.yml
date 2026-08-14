@@ -46,13 +46,19 @@ jobs:
           ITX_JOB_WORKER_SECRET: ${{ secrets.ITX_JOB_WORKER_SECRET }}
         run: |
           set -euo pipefail
-          curl -fsS \
+          RESPONSE="$(curl -fsS \
             -X POST "https://mlaspkufocikfcbjgpof.supabase.co/functions/v1/job-worker" \
             -H "Origin: https://itemtraxx.com" \
             -H "Authorization: Bearer ${ITX_JOB_WORKER_SECRET}" \
             -H "Content-Type: application/json" \
-            --data '{"limit": 30, "run_reporting_refresh": true}' \
-            | head -c 500
+            --data '{"limit": 30, "run_reporting_refresh": true}')"
+          printf '%s\n' "$RESPONSE" | cut -c1-500
+          if ! printf '%s' "$RESPONSE" | jq -e \
+            '.ok == true and (.data.failed // 0) == 0 and .data.reporting_refreshed == true' \
+            >/dev/null; then
+            echo "Async Job Worker reported a failed or incomplete reporting refresh."
+            exit 1
+          fi
 
   slack-notify-finish:
     needs:

@@ -7,6 +7,7 @@ import { isKillSwitchWriteBlocked } from "../_shared/killSwitch.ts";
 import { getRequestId, logError, logInfo } from "../_shared/observability.ts";
 import { isAllowedOrigin, parseAllowedOrigins } from "../_shared/cors.ts";
 import { readJsonBody } from "../_shared/requestBody.ts";
+import { rpcErrorToError, throwOnRpcError } from "./reportingRefresh.ts";
 import {
   asRecord,
   optionalInteger,
@@ -1073,7 +1074,10 @@ serve(async (req) => {
             supportSlackWebhookUrl || undefined,
           );
         } else if (job.job_type === "refresh_reporting_views") {
-          await adminClient.rpc("refresh_super_reporting_views");
+          const { error: refreshError } = await adminClient.rpc(
+            "refresh_super_reporting_views",
+          );
+          throwOnRpcError("refresh_super_reporting_views", refreshError);
         }
 
         const { error: completeError } = await adminClient
@@ -1116,6 +1120,15 @@ serve(async (req) => {
       const { error: refreshError } = await adminClient.rpc("refresh_super_reporting_views");
       if (refreshError) {
         failed += 1;
+        const normalizedError = rpcErrorToError(
+          "refresh_super_reporting_views",
+          refreshError,
+        );
+        logError(
+          "job-worker reporting refresh failed",
+          requestId,
+          normalizedError ?? refreshError,
+        );
       } else {
         reportingRefreshed = true;
       }

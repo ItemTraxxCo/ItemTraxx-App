@@ -5,6 +5,7 @@ import {
   resolveRequestOrigin,
   withCorsHeaders,
 } from "./cors.ts";
+import { DEFAULT_ALLOWED_ORIGINS } from "./constants.ts";
 
 const assert = (condition: unknown, message: string) => {
   if (!condition) throw new Error(message);
@@ -83,7 +84,6 @@ Deno.test("localhost origins require the explicit trust flag", () => {
 Deno.test("production workspace app origins are allowed without per-workspace configuration", () => {
   for (const origin of [
     "https://new-workspace.app.itemtraxx.com",
-    "https://itxdemo.app.itemtraxx.com",
   ]) {
     assert(
       isAllowedOrigin(origin, [], {} as Env),
@@ -94,12 +94,47 @@ Deno.test("production workspace app origins are allowed without per-workspace co
     "http://itxdemo.app.itemtraxx.com",
     "https://app.itemtraxx.com",
     "https://app.app.itemtraxx.com",
+    "https://itxdemo.app.itemtraxx.com",
+    "https://pentest.app.itemtraxx.com",
+    "https://pentest2.app.itemtraxx.com",
+    "https://testdist.app.itemtraxx.com",
+    "https://testtenant-15da6e97.app.itemtraxx.com",
     "https://evil.app.itemtraxx.com.attacker.com",
     "https://two.levels.app.itemtraxx.com",
   ]) {
     assert(
       !isAllowedOrigin(origin, [], {} as Env),
       `invalid workspace app origin should fail: ${origin}`,
+    );
+  }
+});
+
+Deno.test("the default production allowlist keeps required surfaces and excludes non-production hosts", () => {
+  for (const origin of [
+    "https://itemtraxx.com",
+    "https://www.itemtraxx.com",
+    "https://app.itemtraxx.com",
+    "https://internal.itemtraxx.com",
+    "https://status.itemtraxx.com",
+    "https://preview.itemtraxx.com",
+    "https://staging.itemtraxx.com",
+  ]) {
+    assert(
+      DEFAULT_ALLOWED_ORIGINS.includes(origin),
+      `required production origin missing: ${origin}`,
+    );
+  }
+  for (const origin of [
+    "https://itxdemo.app.itemtraxx.com",
+    "https://pentest.app.itemtraxx.com",
+    "https://testdist.app.itemtraxx.com",
+    "https://dennis-dev.itemtraxx.com",
+    "https://leo-dev.itemtraxx.com",
+    "https://dev.itemtraxx.com",
+  ]) {
+    assert(
+      !DEFAULT_ALLOWED_ORIGINS.includes(origin),
+      `non-production origin remained in default allowlist: ${origin}`,
     );
   }
 });
@@ -130,7 +165,7 @@ Deno.test("CORS headers preserve the exact security set and reflect only allowed
   );
   assertEquals(
     allowed.headers["Access-Control-Allow-Headers"],
-    "authorization, x-client-info, apikey, content-type, x-request-id, prefer, x-itx-session-request, x-itx-data-request, aikido-scan-agent",
+    "authorization, x-client-info, apikey, content-type, x-request-id, prefer, x-itx-session-request, x-itx-data-request",
     "allowed headers",
   );
   assertEquals(allowed.headers["Vary"], "Origin", "vary header");

@@ -2,21 +2,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { defineComponent, h } from "vue";
 import { mount } from "@vue/test-utils";
 import { useTurnstile } from "./useTurnstile";
-import { AIKIDO_TURNSTILE_BYPASS_TOKEN } from "../utils/aikidoPentest";
-
-vi.mock("../utils/aikidoPentest", async () => {
-  const actual = await vi.importActual<typeof import("../utils/aikidoPentest")>("../utils/aikidoPentest");
-  return {
-    ...actual,
-    isAikidoPentestUserAgent: vi.fn(),
-    shouldBypassTurnstileForAikido: vi.fn(),
-  };
-});
-
-import { isAikidoPentestUserAgent, shouldBypassTurnstileForAikido } from "../utils/aikidoPentest";
-
-const mockedIsAikidoPentestUserAgent = vi.mocked(isAikidoPentestUserAgent);
-const mockedShouldBypassTurnstileForAikido = vi.mocked(shouldBypassTurnstileForAikido);
 
 type TurnstileApiMock = {
   render: ReturnType<typeof vi.fn>;
@@ -42,8 +27,6 @@ describe("useTurnstile", () => {
   let turnstileApi: TurnstileApiMock;
 
   beforeEach(() => {
-    mockedIsAikidoPentestUserAgent.mockReset().mockReturnValue(false);
-    mockedShouldBypassTurnstileForAikido.mockReset().mockResolvedValue(false);
     turnstileApi = {
       render: vi.fn().mockReturnValue("widget-1"),
       reset: vi.fn(),
@@ -65,27 +48,6 @@ describe("useTurnstile", () => {
 
     expect(get().isReady.value).toBe(false);
     expect(document.head.querySelector("script[src*='turnstile']")).toBeNull();
-    wrapper.unmount();
-  });
-
-  it("applies the Aikido bypass immediately for a pentest user agent, without loading the script", async () => {
-    mockedIsAikidoPentestUserAgent.mockReturnValue(true);
-    const { wrapper, get } = mountHost("site-key-1");
-    await flush();
-
-    expect(get().isReady.value).toBe(true);
-    expect(get().token.value).toBe(AIKIDO_TURNSTILE_BYPASS_TOKEN);
-    expect(document.head.querySelector("script[src*='turnstile']")).toBeNull();
-    wrapper.unmount();
-  });
-
-  it("applies the bypass when the edge policy says to bypass, without loading the script", async () => {
-    mockedShouldBypassTurnstileForAikido.mockResolvedValue(true);
-    const { wrapper, get } = mountHost("site-key-1");
-    await flush();
-
-    expect(get().isReady.value).toBe(true);
-    expect(get().token.value).toBe(AIKIDO_TURNSTILE_BYPASS_TOKEN);
     wrapper.unmount();
   });
 
@@ -165,14 +127,13 @@ describe("useTurnstile", () => {
     wrapper.unmount();
   });
 
-  it("reset() without a mounted widget falls back to an empty token (or bypass token if bypassed)", async () => {
-    mockedIsAikidoPentestUserAgent.mockReturnValue(true);
+  it("reset() without a mounted widget clears the token", async () => {
     const { wrapper, get } = mountHost("site-key-1");
     await flush();
 
     get().reset();
 
-    expect(get().token.value).toBe(AIKIDO_TURNSTILE_BYPASS_TOKEN);
+    expect(get().token.value).toBe("");
     wrapper.unmount();
   });
 

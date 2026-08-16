@@ -1,9 +1,4 @@
 import { onMounted, onUnmounted, ref, type Ref } from "vue";
-import {
-  AIKIDO_TURNSTILE_BYPASS_TOKEN,
-  isAikidoPentestUserAgent,
-  shouldBypassTurnstileForAikido,
-} from "../utils/aikidoPentest";
 
 type RenderOptions = {
   sitekey: string;
@@ -58,7 +53,6 @@ export const useTurnstile = (siteKey?: string) => {
   const token = ref("");
   const isReady = ref(false);
   const loadError = ref("");
-  let isBypassed = isAikidoPentestUserAgent();
   let widgetId: string | null = null;
   let bootTimer: number | null = null;
 
@@ -104,7 +98,7 @@ export const useTurnstile = (siteKey?: string) => {
 
   const reset = () => {
     if (!widgetId || !window.turnstile) {
-      token.value = isBypassed ? AIKIDO_TURNSTILE_BYPASS_TOKEN : "";
+      token.value = "";
       return;
     }
     try {
@@ -112,14 +106,7 @@ export const useTurnstile = (siteKey?: string) => {
     } catch {
       // Keep login flow resilient even if Turnstile script glitches.
     }
-    token.value = isBypassed ? AIKIDO_TURNSTILE_BYPASS_TOKEN : "";
-  };
-
-  const applyBypass = () => {
-    isBypassed = true;
-    token.value = AIKIDO_TURNSTILE_BYPASS_TOKEN;
-    isReady.value = true;
-    loadError.value = "";
+    token.value = "";
   };
 
   const loadWidget = () => {
@@ -152,18 +139,7 @@ export const useTurnstile = (siteKey?: string) => {
   };
 
   onMounted(() => {
-    if (isBypassed) {
-      applyBypass();
-      return;
-    }
-
-    void shouldBypassTurnstileForAikido().then((shouldBypass) => {
-      if (shouldBypass) {
-        applyBypass();
-        return;
-      }
-      loadWidget();
-    });
+    loadWidget();
   });
 
   onUnmounted(() => {
@@ -179,7 +155,6 @@ export const useTurnstile = (siteKey?: string) => {
     token,
     isReady,
     loadError,
-    isBypassed,
     reset,
   };
 };

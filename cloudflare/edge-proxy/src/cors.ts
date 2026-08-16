@@ -20,7 +20,18 @@ export const isLocalhostOrigin = (origin: string | null) => {
 const shouldTrustLocalOrigins = (env: Env) =>
   (env.TRUST_LOCAL_ORIGINS ?? "").trim().toLowerCase() === "true";
 
-const RESERVED_WORKSPACE_SLUGS = new Set(["app", "internal", "status", "www"]);
+const RESERVED_WORKSPACE_SLUGS = new Set([
+  "app",
+  "internal",
+  "status",
+  "www",
+  // Scanner, demo, and test tenants are not production browser surfaces.
+  "itxdemo",
+  "pentest",
+  "pentest2",
+  "testdist",
+  "testtenant-15da6e97",
+]);
 
 const isWorkspaceAppOrigin = (origin: string) => {
   try {

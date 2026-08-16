@@ -298,6 +298,75 @@ Deno.test("verifyTurnstileToken accepts a successful initial verification", asyn
   });
 });
 
+Deno.test("verifyTurnstileToken rejects an empty token without contacting Turnstile", async () => {
+  await withTurnstileSecret(async () => {
+    let fetchCalled = false;
+    await withStubbedFetch(
+      async () => {
+        fetchCalled = true;
+        return new Response(JSON.stringify({ success: true }), { status: 200 });
+      },
+      async () => {
+        const result = await verifyTurnstileToken("   ", "203.0.113.1", "ctx");
+        assert(!result, "expected whitespace-only token to fail closed");
+      },
+    );
+    assert(!fetchCalled, "expected empty token to skip remote verification");
+  });
+});
+
+Deno.test("verifyTurnstileToken rejects a synthetic token returned as invalid", async () => {
+  await withTurnstileSecret(async () => {
+    await withStubbedFetch(
+      async () =>
+        new Response(
+          JSON.stringify({ success: false, "error-codes": ["invalid-input-response"] }),
+          { status: 200 },
+        ),
+      async () => {
+        const result = await verifyTurnstileToken(
+          "synthetic-turnstile-token",
+          "",
+          "ctx",
+        );
+        assert(!result, "expected synthetic token to fail closed");
+      },
+    );
+  });
+});
+
+Deno.test("verifyTurnstileToken rejects malformed tokens", async () => {
+  await withTurnstileSecret(async () => {
+    await withStubbedFetch(
+      async () =>
+        new Response(
+          JSON.stringify({ success: false, "error-codes": ["invalid-input-response"] }),
+          { status: 200 },
+        ),
+      async () => {
+        const result = await verifyTurnstileToken("not-a-turnstile-token", "", "ctx");
+        assert(!result, "expected malformed token to fail closed");
+      },
+    );
+  });
+});
+
+Deno.test("verifyTurnstileToken rejects expired or replayed tokens", async () => {
+  await withTurnstileSecret(async () => {
+    await withStubbedFetch(
+      async () =>
+        new Response(
+          JSON.stringify({ success: false, "error-codes": ["timeout-or-duplicate"] }),
+          { status: 200 },
+        ),
+      async () => {
+        const result = await verifyTurnstileToken("expired-token", "", "ctx");
+        assert(!result, "expected expired token to fail closed");
+      },
+    );
+  });
+});
+
 Deno.test("verifyTurnstileToken retries without remote IP and succeeds", async () => {
   await withTurnstileSecret(async () => {
     let callCount = 0;

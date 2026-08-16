@@ -30,12 +30,6 @@ const CHECKOUT_ACTIONS = new Set(
   ["checkout", "return", "auto", "admin_return", "quick_return"] as const,
 );
 
-const buildItemLogOperationId = (
-  operationId: string,
-  itemId: string,
-  actionType: "checkout" | "return" | "admin_return" | "quick_return",
-) => `${operationId}:${itemId}:${actionType}`;
-
 const resolveCorsHeaders = (req: Request) => {
   const origin = req.headers.get("Origin");
   const allowedOrigins = parseAllowedOrigins(
@@ -310,137 +304,36 @@ serve(async (req) => {
         if (!grant) { skippedBarcodes.push(barcode); continue; }
       }
 
-      const existingOperationId = buildItemLogOperationId(
-        operationId,
-        item.id,
-        isAdminReturn ? "admin_return" : isQuickReturn ? "quick_return" : "checkout",
+      const { data: transition, error: transitionError } = await adminClient.rpc(
+        "apply_checkout_return_item",
+        {
+          p_workspace_id: callerProfile.workspace_id,
+          p_profile_id: user.id,
+          p_item_id: item.id,
+          p_operation_id: operationId,
+          p_action_type: actionType,
+          p_borrower_id: borrower?.id ?? null,
+        },
       );
-      const existingReturnOperationId = buildItemLogOperationId(
-        operationId,
-        item.id,
-        "return",
-      );
-      const { data: existingOperation } = await adminClient
-        .from("item_logs")
-        .select("id")
-        .eq("workspace_id", callerProfile.workspace_id)
-        .eq("item_id", item.id)
-        .in("operation_id", isAdminReturn
-          ? [existingOperationId]
-          : [existingOperationId, existingReturnOperationId])
-        .limit(1)
-        .maybeSingle();
 
-      if (existingOperation?.id) {
-        processed += 1;
-        continue;
-      }
-
-      if (isAdminReturn || isQuickReturn) {
-        const normalizedStatus = String(item.status ?? "").toLowerCase();
-        if (!item.checked_out_by || normalizedStatus !== "checked_out") {
-          skippedBarcodes.push(barcode);
-          continue;
-        }
-
-        const { data: updatedItem, error: updateError } = await adminClient
-          .from("items")
-          .update({
-            checked_out_by: null,
-            checked_out_at: null,
-            status: "available",
-          })
-          .eq("id", item.id)
-          .eq("workspace_id", callerProfile.workspace_id)
-          .eq("status", "checked_out")
-          .not("checked_out_by", "is", null)
-          .select("id")
-          .maybeSingle();
-
-        if (updateError || !updatedItem?.id) {
-          skippedBarcodes.push(barcode);
-          continue;
-        }
-
-        const { error: logError } = await adminClient.from("item_logs").upsert({
-          item_id: item.id,
-          action_type: isQuickReturn ? "quick_return" : "admin_return",
-          checked_out_by: item.checked_out_by,
-          performed_by: user.id,
-          workspace_id: callerProfile.workspace_id,
-          operation_id: buildItemLogOperationId(operationId, item.id, isQuickReturn ? "quick_return" : "admin_return"),
-        }, {
-          onConflict: "workspace_id,item_id,action_type,operation_id",
-          ignoreDuplicates: true,
-        });
-
-        if (logError) {
-          console.error("checkoutReturn admin log write failed", {
-            itemId: item.id,
-            operationId,
-            message: logError.message,
-          });
-        }
-
-        processed += 1;
-        continue;
-      }
-
-      const normalizedStatus = String(item.status ?? "").toLowerCase();
-      const isCheckout = normalizedStatus === "available" &&
-        !item.checked_out_by;
-      const isReturn = normalizedStatus === "checked_out" &&
-        item.checked_out_by === borrower!.id;
-
-      if (!isCheckout && !isReturn) {
-        skippedBarcodes.push(barcode);
-        continue;
-      }
-
-      const updateBuilder = adminClient
-        .from("items")
-        .update({
-          checked_out_by: isCheckout ? borrower!.id : null,
-          checked_out_at: isCheckout ? new Date().toISOString() : null,
-          status: isCheckout ? "checked_out" : "available",
-        })
-        .eq("id", item.id)
-        .eq("workspace_id", callerProfile.workspace_id);
-
-      const { data: updatedItem, error: updateError } = await (isCheckout
-        ? updateBuilder.is("checked_out_by", null).eq("status", "available")
-        : updateBuilder.eq("checked_out_by", borrower!.id).eq("status", "checked_out"))
-        .select("id")
-        .maybeSingle();
-
-      if (updateError || !updatedItem?.id) {
-        skippedBarcodes.push(barcode);
-        continue;
-      }
-
-      const resolvedActionType = isCheckout ? "checkout" : "return";
-      const { error: logError } = await adminClient.from("item_logs").upsert({
-        item_id: item.id,
-        action_type: resolvedActionType,
-        checked_out_by: borrower!.id,
-        performed_by: user.id,
-        workspace_id: callerProfile.workspace_id,
-        operation_id: buildItemLogOperationId(operationId, item.id, resolvedActionType),
-      }, {
-        onConflict: "workspace_id,item_id,action_type,operation_id",
-        ignoreDuplicates: true,
-      });
-
-      if (logError) {
-        console.error("checkoutReturn item log write failed", {
+      if (transitionError) {
+        console.error("checkoutReturn atomic transition failed", {
           itemId: item.id,
           operationId,
-          actionType: resolvedActionType,
-          message: logError.message,
+          actionType,
+          message: transitionError.message,
         });
+        return jsonResponse(500, { error: "Checkout/return operation failed" });
       }
 
-      processed += 1;
+      const transitionStatus = transition && typeof transition === "object"
+        ? (transition as { status?: unknown }).status
+        : null;
+      if (transitionStatus === "processed" || transitionStatus === "idempotent") {
+        processed += 1;
+      } else {
+        skippedBarcodes.push(barcode);
+      }
     }
 
     return jsonResponse(200, {

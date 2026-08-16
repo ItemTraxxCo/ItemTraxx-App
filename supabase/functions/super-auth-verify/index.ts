@@ -29,7 +29,7 @@ const CONTACT_SUPPORT_URL = "https://itemtraxx.com/contact-support";
 
 const baseCorsHeaders = {
   "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-request-id, aikido-scan-agent",
+    "authorization, x-client-info, apikey, content-type, x-request-id",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
   Vary: "Origin",
 };

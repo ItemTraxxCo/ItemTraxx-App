@@ -165,7 +165,7 @@ the browser and do not create a server-side consent identity record.
 Because many ItemTraxx accounts are controlled by schools, districts, or organizations, some requests may need to be directed through the applicable account owner or administrator first.
 
 Submit a request through [itemtraxx.com/privacy-request](https://itemtraxx.com/privacy-request) or
-email `support@itemtraxx.com`. We verify requests before disclosing, correcting, or deleting data.
+email `privacy@itemtraxx.com`. We verify requests before disclosing, correcting, or deleting data.
 We target acknowledgment within 10 business days and a substantive response within 45 calendar
 days, unless a different period applies or a permitted extension is necessary. We will explain any
 denial or limitation required by law, contract, security, or a school customer's instructions.
@@ -205,7 +205,7 @@ For privacy questions or data-related inquiries, contact:
 
 Contact Support via Website: [itemtraxx.com/contact-support](https://itemtraxx.com/contact-support)
 Privacy Request Form: [itemtraxx.com/privacy-request](https://itemtraxx.com/privacy-request)
-Email: `support@itemtraxx.com`
+Email: `privacy@itemtraxx.com`
 
 ---
 

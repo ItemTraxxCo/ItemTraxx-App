@@ -122,7 +122,7 @@
             If you believe you found a security issue in ItemTraxx, report it through
             <RouterLink to="/report-security-issue">the security issue reporting page</RouterLink>
             or email
-            <a href="mailto:support@itemtraxx.com">support@itemtraxx.com</a>.
+            <a href="mailto:security@itemtraxx.com">security@itemtraxx.com</a>.
           </p>
           <p>
             Contact details are published in

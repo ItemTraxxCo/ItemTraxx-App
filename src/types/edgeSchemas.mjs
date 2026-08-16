@@ -506,7 +506,7 @@ const superOpsPasskeySchema = z.object({
 });
 
 const supportRequestStatusSchema = z.enum(["open", "in_progress", "resolved", "spam"]);
-const supportRequestCategorySchema = z.enum(["general", "bug", "billing", "access", "feature", "privacy", "other"]);
+const supportRequestCategorySchema = z.enum(["general", "bug", "billing", "access", "feature", "privacy", "security", "other"]);
 
 const supportRequestListItemSchema = z.object({
   id: z.string(),

@@ -247,6 +247,10 @@ const categoryLabel = (value: SupportRequestListItem["category"]) => {
       return "Access";
     case "feature":
       return "Feature";
+    case "privacy":
+      return "Privacy";
+    case "security":
+      return "Security";
     case "other":
       return "Other";
     default:

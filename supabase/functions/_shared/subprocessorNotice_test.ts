@@ -131,6 +131,14 @@ Deno.test("buildSubprocessorNoticeHtml: custom contactSupportUrl used", () => {
   assertStringIncludes(html, "https://example.com/support");
 });
 
+Deno.test("buildSubprocessorNoticeHtml: custom contactEmail used", () => {
+  const html = buildSubprocessorNoticeHtml({
+    ...BASE,
+    contactEmail: "legal@example.test",
+  });
+  assertStringIncludes(html, "legal@example.test");
+});
+
 Deno.test("buildSubprocessorNoticeHtml: falls back to default URLs", () => {
   const html = buildSubprocessorNoticeHtml(BASE);
   assertStringIncludes(html, "https://www.itemtraxx.com/legal");
@@ -178,6 +186,14 @@ Deno.test("buildSubprocessorNoticePlainText: contract terms section present", ()
     text,
     "If your executed agreement includes objection or approval rights",
   );
+});
+
+Deno.test("buildSubprocessorNoticePlainText: custom contactEmail used", () => {
+  const text = buildSubprocessorNoticePlainText({
+    ...BASE,
+    contactEmail: "legal@example.test",
+  });
+  assertStringIncludes(text, "legal@example.test");
 });
 
 // --- preview ---

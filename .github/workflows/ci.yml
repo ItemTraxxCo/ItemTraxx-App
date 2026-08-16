@@ -312,6 +312,7 @@ jobs:
 
   slack-notify-finish:
     needs:
+      - kill-switch-preflight
       - slack-notify-start
       - validate
     # Always finish the single CI status message when the start message exists.

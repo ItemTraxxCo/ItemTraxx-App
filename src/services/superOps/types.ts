@@ -180,6 +180,7 @@ export type SupportRequestListItem = {
     | "access"
     | "feature"
     | "privacy"
+    | "security"
     | "other";
   status: SupportRequestStatus;
   created_at: string;

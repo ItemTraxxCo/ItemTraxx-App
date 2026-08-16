@@ -5,6 +5,7 @@ import { resolveRateLimitResult } from "../_shared/preloginGuards.ts";
 import { readJsonBody } from "../_shared/requestBody.ts";
 import { requireTrustedEdgeIngress } from "../_shared/trustedIngress.ts";
 import { validateAccountDeviceSession } from "../_shared/accountSessions.ts";
+import { resolveWorkspaceAccess } from "../_shared/workspaceAccess.ts";
 import {
   requireText,
   BORROWER_ID_PATTERN,
@@ -80,6 +81,22 @@ serve(async (req) => {
       !["tenant_account", "workspace_admin"].includes(profile.role)
     ) {
       return jsonResponse(403, { error: "Access denied" });
+    }
+
+    const { data: workspaceStatusRow, error: workspaceStatusError } =
+      await userClient
+        .from("workspaces")
+        .select("status")
+        .eq("id", profile.workspace_id)
+        .single();
+    const workspaceAccess = resolveWorkspaceAccess(
+      workspaceStatusRow,
+      workspaceStatusError,
+    );
+    if (!workspaceAccess.allowed) {
+      return workspaceAccess.reason === "disabled"
+        ? jsonResponse(403, { error: "Workspace disabled" })
+        : jsonResponse(503, { error: "Workspace status unavailable" });
     }
 
     const { data: rateLimit, error: rateLimitError } = await userClient.rpc(

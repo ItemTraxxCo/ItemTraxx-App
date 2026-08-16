@@ -52,9 +52,13 @@ test.describe("workspace model role surfaces", () => {
   test("Tenant Account receives flat reduced views and its own session controls", async ({ page }) => {
     await page.route(/\/functions(?:\/v1)?\/admin-ops(?:\?.*)?$/, async (route) => {
       const body = route.request().postDataJSON() as { action?: string };
+      if (body.action !== "list_sessions" && body.action !== "revoke_session") {
+        await route.fallback();
+        return;
+      }
       const data = body.action === "list_sessions"
         ? { sessions: [{ id: "session-1", device_id: "device-1", device_label: "Front desk", user_agent: null, login_method: "password", login_location: "regular_login", general_location: null, created_at: new Date().toISOString(), last_seen_at: new Date().toISOString(), is_current: true }] }
-        : body.action === "revoke_session" ? { revoked: true } : {};
+        : { revoked: true };
       await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ data }) });
     });
     await page.goto("/");

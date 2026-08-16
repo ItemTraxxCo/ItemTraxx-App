@@ -8,6 +8,7 @@ export interface SubprocessorNoticePayload {
   logoUrl?: string | null;
   legalHubUrl?: string;
   contactSupportUrl?: string;
+  contactEmail?: string;
 }
 
 export interface SubprocessorPreview {
@@ -81,6 +82,7 @@ export function buildSubprocessorNoticeHtml(
   const legalHubUrl = p.legalHubUrl ?? "https://www.itemtraxx.com/legal";
   const contactSupportUrl = p.contactSupportUrl ??
     "https://www.itemtraxx.com/contact-support";
+  const contactEmail = p.contactEmail ?? "legal@itemtraxx.com";
   const effectiveDateLabel = formatDateLabel(p.effectiveDate);
   const vendorSafe = escapeHtml(p.vendor);
   const descriptionBlock = p.description
@@ -188,7 +190,7 @@ export function buildSubprocessorNoticeHtml(
           <tr>
             <td style="padding:18px 32px;border-top:1px solid #e5e5e5;font-size:12px;color:#888888;line-height:1.5;">
               This notice is sent to customers whose executed agreement requires subprocessor-change notice.
-              ItemTraxx Co &middot; 670 San Antonio Rd, Palo Alto, CA 94306, USA &middot; support@itemtraxx.com
+              ItemTraxx Co &middot; 670 San Antonio Rd, Palo Alto, CA 94306, USA &middot; ${escapeHtml(contactEmail)}
             </td>
           </tr>
         </table>
@@ -205,6 +207,7 @@ export function buildSubprocessorNoticePlainText(
   const legalHubUrl = p.legalHubUrl ?? "https://www.itemtraxx.com/legal";
   const contactSupportUrl = p.contactSupportUrl ??
     "https://www.itemtraxx.com/contact-support";
+  const contactEmail = p.contactEmail ?? "legal@itemtraxx.com";
   const effectiveDateLabel = formatDateLabel(p.effectiveDate);
   const descriptionLine = p.description ? `Details: ${p.description}\n` : "";
 
@@ -232,7 +235,7 @@ View DPA & Legal Docs: ${legalHubUrl}
 
 ---
 This notice is sent to customers whose executed agreement requires subprocessor-change notice.
-ItemTraxx Co · 670 San Antonio Rd, Palo Alto, CA 94306, USA · support@itemtraxx.com
+ItemTraxx Co · 670 San Antonio Rd, Palo Alto, CA 94306, USA · ${contactEmail}
 `;
 }
 

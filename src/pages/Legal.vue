@@ -133,7 +133,7 @@
         </p>
         <p>
           If you discover a potential vulnerability, report it responsibly to
-          <a href="mailto:support@itemtraxx.com">support@itemtraxx.com</a> with reproduction steps and attachments (if available).
+          <a href="mailto:security@itemtraxx.com">security@itemtraxx.com</a> with reproduction steps and attachments (if available).
           If you discover a potential vulnerability, you must never publicly disclose it without prior written coordination and written consent with ItemTraxx Co.
         </p>
         <p>
@@ -369,9 +369,10 @@
           670 San Antonio Rd, Palo Alto, CA 94306, USA
         </p>
         <p>
-          For legal, privacy, and security inquiries, please
-          <a href="https://www.itemtraxx.com/contact-support" target="_blank" rel="noreferrer noopener">contact support here</a>
-          or email <a href="mailto:support@itemtraxx.com">support@itemtraxx.com</a>.
+          For legal inquiries, email <a href="mailto:legal@itemtraxx.com">legal@itemtraxx.com</a>.
+          For privacy inquiries, email <a href="mailto:privacy@itemtraxx.com">privacy@itemtraxx.com</a>.
+          For security inquiries, email <a href="mailto:security@itemtraxx.com">security@itemtraxx.com</a>.
+          For product support, <a href="https://www.itemtraxx.com/contact-support" target="_blank" rel="noreferrer noopener">contact support here</a>.
         </p>
       </section>
       </div>

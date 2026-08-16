@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient, type SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.108.2";
 import { sendLoggedResendEmail } from "../_shared/emailDeliveryLog.ts";
 import { applyEmailTheme, buildEmailBrandHeaderHtml, withEmailBrandLogoAttachment } from "../_shared/emailBranding.ts";
+import { resolveEmailAddress, resolveEmailFrom } from "../_shared/emailConfig.ts";
 import { isKillSwitchWriteBlocked } from "../_shared/killSwitch.ts";
 import { getRequestId, logError, logInfo } from "../_shared/observability.ts";
 import {
@@ -28,7 +29,7 @@ const CONTACT_SUPPORT_URL = "https://itemtraxx.com/contact-support";
 
 const baseCorsHeaders = {
   "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-request-id, aikido-scan-agent",
+    "authorization, x-client-info, apikey, content-type, x-request-id",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
   Vary: "Origin",
 };
@@ -289,6 +290,7 @@ const sendSuperAdminTwoFactorEmail = async (
   await sendLoggedResendEmail(adminClient, resendApiKey, withEmailBrandLogoAttachment({
     from: payload.from_email,
     to: payload.to_email,
+    reply_to: payload.support_email,
     subject,
     html: applyEmailTheme(buildSuperAdminTwoFactorHtml({ code: payload.code, support_email: payload.support_email })),
     text: `Your ItemTraxx verification code is ${payload.code}. It expires in 10 minutes. If this wasn't you, reset your password at ${PASSWORD_RESET_URL} and review your account security right away.`,
@@ -417,11 +419,8 @@ serve(async (req) => {
     const supabaseUrl = Deno.env.get("ITX_SUPABASE_URL") ?? Deno.env.get("SUPABASE_URL");
     const publishableKey = Deno.env.get("ITX_PUBLISHABLE_KEY") ?? Deno.env.get("SUPABASE_ANON_KEY");
     const serviceKey = Deno.env.get("ITX_SECRET_KEY") ?? Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-    const supportEmail = Deno.env.get("ITX_SUPPORT_EMAIL") ?? "support@itemtraxx.com";
-    const fromEmail =
-      Deno.env.get("ITX_EMAIL_FROM") ??
-      Deno.env.get("ITX_RESEND_FROM") ??
-      "ItemTraxx Security <support@itemtraxx.com>";
+    const supportEmail = resolveEmailAddress("support", "ITX_SUPPORT_EMAIL");
+    const fromEmail = resolveEmailFrom("security");
     const resendApiKey = Deno.env.get("ITX_RESEND_API_KEY");
 
     if (!supabaseUrl || !publishableKey || !serviceKey || !resendApiKey) {

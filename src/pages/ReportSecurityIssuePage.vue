@@ -326,7 +326,7 @@ const send = async () => {
       name: fullName.value,
       reply_email: replyEmail.value,
       subject: `[Security Report] ${summary.value}`,
-      category: "bug",
+      category: "security",
       message: renderedMessage,
       turnstile_token: turnstileToken.value ?? "",
       website: website.value,

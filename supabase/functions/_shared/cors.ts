@@ -4,7 +4,17 @@ export const parseAllowedOrigins = (value?: string | null) =>
     .map((item) => item.trim())
     .filter((item) => item.length > 0);
 
-const RESERVED_WORKSPACE_SLUGS = new Set(["app", "internal", "status", "www"]);
+const RESERVED_WORKSPACE_SLUGS = new Set([
+  "app",
+  "internal",
+  "status",
+  "www",
+  "itxdemo",
+  "pentest",
+  "pentest2",
+  "testdist",
+  "testtenant-15da6e97",
+]);
 
 const isWorkspaceAppOrigin = (origin: string) => {
   try {

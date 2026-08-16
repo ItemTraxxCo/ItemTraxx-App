@@ -11,7 +11,7 @@ export const MAINTENANCE_FALLBACK_KEY = "itemtraxx:maintenance_fallback:v1";
 
 export const BASE_CORS_HEADERS = {
   "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-request-id, prefer, x-itx-session-request, x-itx-data-request, aikido-scan-agent",
+    "authorization, x-client-info, apikey, content-type, x-request-id, prefer, x-itx-session-request, x-itx-data-request",
   "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
   "Access-Control-Allow-Credentials": "true",
   "Access-Control-Expose-Headers":
@@ -32,11 +32,6 @@ export const DEFAULT_ALLOWED_ORIGINS = [
   "https://status.itemtraxx.com",
   "https://internal.itemtraxx.com",
   "https://app.itemtraxx.com",
-  "https://itxdemo.app.itemtraxx.com",
-  "https://dennis-dev.itemtraxx.com",
-  "https://leo-dev.itemtraxx.com",
-  "https://testdist.app.itemtraxx.com",
-  "https://dev.itemtraxx.com",
   "https://preview.itemtraxx.com",
   "https://staging.itemtraxx.com",
 ];

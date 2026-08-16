@@ -7,7 +7,7 @@ import { requireTrustedEdgeIngress } from "../_shared/trustedIngress.ts";
 import { optionalText, requireEmail, SLUG_PATTERN, ValidationError } from "../_shared/validation.ts";
 
 type RateLimitResult={allowed:boolean};
-const corsBase={"Access-Control-Allow-Headers":"authorization, x-client-info, apikey, content-type, x-request-id, aikido-scan-agent","Access-Control-Allow-Methods":"POST, OPTIONS",Vary:"Origin"};
+const corsBase={"Access-Control-Allow-Headers":"authorization, x-client-info, apikey, content-type, x-request-id","Access-Control-Allow-Methods":"POST, OPTIONS",Vary:"Origin"};
 const verifyTurnstile=async(secret:string,token:string,ip:string)=>{const body=new URLSearchParams({secret,response:token});if(ip)body.set("remoteip",ip);const response=await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify",{method:"POST",headers:{"Content-Type":"application/x-www-form-urlencoded"},body});return response.ok&&Boolean((await response.json() as {success?:boolean}).success);};
 serve(async(req)=>{
   const requestId=req.headers.get("x-request-id")??crypto.randomUUID(); const origin=req.headers.get("origin"); const allowed=parseAllowedOrigins(Deno.env.get("ITX_ALLOWED_ORIGINS")??""); const originAllowed=!!origin&&isAllowedOrigin(origin,allowed); const headers={...corsBase,...(originAllowed?{"Access-Control-Allow-Origin":origin!}:{})};

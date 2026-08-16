@@ -13,11 +13,11 @@ Deno.test("parseAllowedOrigins trims blank entries", () => {
 
 Deno.test("isAllowedOrigin requires exact configured origins", () => {
   const allowedOrigins = parseAllowedOrigins(
-    "https://app.itemtraxx.com,https://testdist.app.itemtraxx.com",
+    "https://app.itemtraxx.com,https://staging.itemtraxx.com",
   );
 
   assert(isAllowedOrigin("https://app.itemtraxx.com", allowedOrigins));
-  assert(isAllowedOrigin("https://testdist.app.itemtraxx.com", allowedOrigins));
+  assert(isAllowedOrigin("https://staging.itemtraxx.com", allowedOrigins));
 });
 
 Deno.test("isAllowedOrigin does not expand wildcard origin patterns", () => {
@@ -38,4 +38,7 @@ Deno.test("isAllowedOrigin accepts only valid production workspace app origins",
   assert(!isAllowedOrigin("https://app.app.itemtraxx.com", []));
   assert(!isAllowedOrigin("https://two.levels.app.itemtraxx.com", []));
   assert(!isAllowedOrigin("https://workspace.app.itemtraxx.com.attacker.com", []));
+  for (const reserved of ["itxdemo", "pentest", "pentest2", "testdist"]) {
+    assert(!isAllowedOrigin(`https://${reserved}.app.itemtraxx.com`, []));
+  }
 });

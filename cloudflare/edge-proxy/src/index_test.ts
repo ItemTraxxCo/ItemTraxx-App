@@ -179,7 +179,7 @@ Deno.test("edge proxy CORS requires exact configured origins", async () => {
       SUPABASE_URL: "https://example.supabase.co",
       SUPABASE_ANON_KEY: "anon-key",
       ALLOWED_ORIGINS:
-        "https://app.itemtraxx.com,https://testdist.app.itemtraxx.com",
+        "https://app.itemtraxx.com,https://staging.itemtraxx.com",
     },
     executionContext,
   );

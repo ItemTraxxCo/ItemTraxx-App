@@ -8,7 +8,7 @@ import {
   maybeReportWorkerResponse,
   reportWorkerException,
 } from "./observability.ts";
-import { buildError, buildJson } from "./responses.ts";
+import { buildError } from "./responses.ts";
 import {
   getFunctionName,
   getSessionAction,
@@ -66,10 +66,6 @@ export default {
 
       if (!originAllowed) {
         return buildError(403, "Origin not allowed", headers, requestId);
-      }
-
-      if (url.pathname === "/turnstile-policy" && request.method === "GET") {
-        return buildJson(200, { bypass_turnstile: false }, headers, requestId);
       }
 
       if (!env.SUPABASE_URL || !env.SUPABASE_ANON_KEY) {

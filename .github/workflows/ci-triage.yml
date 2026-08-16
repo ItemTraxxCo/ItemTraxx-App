@@ -7,10 +7,7 @@ permissions:
 on:
   workflow_run:
     workflows:
-      - CI Core
-      - E2E Tests
-      - Security Audit
-      - CodeQL
+      - CI
       - Deploy Supabase Functions
       - Deploy Cloudflare Worker
       - Deployment Health

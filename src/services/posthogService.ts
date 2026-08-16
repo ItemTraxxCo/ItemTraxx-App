@@ -69,6 +69,31 @@ const isCspUnsafeEvalExceptionEvent = (
   );
 };
 
+// A script served cross-origin without CORS strips the error the browser hands
+// to window.onerror down to a bare synthetic "Script error." with no message,
+// source, or stack. These entries carry no information to triage, so drop them
+// here. The crossorigin="anonymous" attribute on the Turnstile script
+// (useTurnstile.ts) lets real errors through with a full stack instead.
+const isOpaqueScriptExceptionEvent = (
+  properties?: Record<string, unknown>,
+) => {
+  const exceptionList = properties?.$exception_list;
+  if (!Array.isArray(exceptionList) || exceptionList.length !== 1) return false;
+  const entry = exceptionList[0] as {
+    value?: unknown;
+    stacktrace?: { frames?: unknown[] };
+    mechanism?: { synthetic?: unknown };
+  } | null;
+  if (!entry || typeof entry !== "object") return false;
+  const frames = entry.stacktrace?.frames;
+  return (
+    typeof entry.value === "string" &&
+    entry.value.trim() === "Script error." &&
+    entry.mechanism?.synthetic === true &&
+    (!Array.isArray(frames) || frames.length === 0)
+  );
+};
+
 const isRecoverableChunkLoadExceptionEvent = (
   properties?: Record<string, unknown>,
 ) => {
@@ -103,7 +128,8 @@ export const initPostHog = async () => {
           event?.event === "$exception" &&
           (
             isCspUnsafeEvalExceptionEvent(event.properties) ||
-            isRecoverableChunkLoadExceptionEvent(event.properties)
+            isRecoverableChunkLoadExceptionEvent(event.properties) ||
+            isOpaqueScriptExceptionEvent(event.properties)
           )
         ) {
           return null;

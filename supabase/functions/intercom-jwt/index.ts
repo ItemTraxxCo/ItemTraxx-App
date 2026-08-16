@@ -52,8 +52,8 @@ serve(async (req) => {
   const ingressError = await requireTrustedEdgeIngress(req, "intercom-jwt", jsonResponse);
   if (ingressError) return ingressError;
 
-  const supabaseUrl = Deno.env.get("ITX_SUPABASE_URL")?.trim();
-  const publishableKey = Deno.env.get("ITX_PUBLISHABLE_KEY")?.trim();
+  const supabaseUrl = (Deno.env.get("ITX_SUPABASE_URL") ?? Deno.env.get("SUPABASE_URL"))?.trim();
+  const publishableKey = (Deno.env.get("ITX_PUBLISHABLE_KEY") ?? Deno.env.get("SUPABASE_ANON_KEY"))?.trim();
   // ITX_ is the documented canonical prefix. Keep the previously provisioned
   // TX_ name as a server-side fallback so an existing deployment keeps working
   // while the secret is migrated without exposing either value to the client.

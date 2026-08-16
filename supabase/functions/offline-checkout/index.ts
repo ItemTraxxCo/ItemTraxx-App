@@ -113,9 +113,9 @@ serve(async (req) => {
   try {
     const authHeader = req.headers.get("authorization");
     const authToken = authHeader?.replace(/^Bearer\s+/i, "").trim() ?? "";
-    const supabaseUrl = Deno.env.get("ITX_SUPABASE_URL");
-    const publishableKey = Deno.env.get("ITX_PUBLISHABLE_KEY");
-    const serviceKey = Deno.env.get("ITX_SECRET_KEY");
+    const supabaseUrl = Deno.env.get("ITX_SUPABASE_URL") ?? Deno.env.get("SUPABASE_URL");
+    const publishableKey = Deno.env.get("ITX_PUBLISHABLE_KEY") ?? Deno.env.get("SUPABASE_ANON_KEY");
+    const serviceKey = Deno.env.get("ITX_SECRET_KEY") ?? Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
     if (!authHeader || !authToken) {
       return jsonResponse(401, { error: "Unauthorized" });
     }

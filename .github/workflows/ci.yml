@@ -1,0 +1,338 @@
+name: CI
+
+permissions:
+  actions: read
+  contents: read
+  security-events: write
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - preview
+      - staging
+  schedule:
+    # CodeQL still runs weekly; the other suites are skipped on this event.
+    - cron: '21 9 * * 1'
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  kill-switch-preflight:
+    # GitHub-hosted runners receive a Cloudflare challenge (HTTP 403) from
+    # the edge system-status URL. Use the direct Supabase origin while
+    # keeping CI fail-closed on an unknown state.
+    uses: ./.github/workflows/kill-switch-preflight.yml
+    with:
+      status_source: supabase
+
+  slack-notify-start:
+    needs: kill-switch-preflight
+    uses: ./.github/workflows/slack-notify-status.yml
+    with:
+      mode: start
+      workflow_name: CI
+      job_name: validate
+      run_url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+      ref_name: ${{ github.ref_name }}
+      sha: ${{ github.sha }}
+    secrets:
+      SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+      SLACK_CHANNEL_ID: ${{ secrets.SLACK_CHANNEL_ID }}
+      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+      INCIDENT_IO_WEBHOOK_URL: ${{ secrets.INCIDENT_IO_WEBHOOK_URL }}
+      INCIDENT_IO_WEBHOOK_TOKEN: ${{ secrets.INCIDENT_IO_WEBHOOK_TOKEN }}
+
+  validate:
+    needs:
+      - kill-switch-preflight
+      - slack-notify-start
+    if: ${{ needs.kill-switch-preflight.outputs.active == 'false' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
+        with:
+          # package.json requires Node 24.x; jsdom 30 also requires 24.15+.
+          node-version: 24.15.0
+          cache: npm
+
+      - name: Setup Deno
+        uses: denoland/setup-deno@22d081ff2d3a40755e97629de92e3bcbfa7cf2ed # v2.0.5
+        with:
+          deno-version: 2.x
+          cache: true
+
+      - name: Install dependencies
+        # Avoid flaky native/CLI postinstall downloads during CI (for example
+        # the Supabase CLI). The shared install serves every suite below.
+        run: npm ci --ignore-scripts
+
+      - name: Initialize CodeQL
+        if: ${{ !cancelled() }}
+        uses: github/codeql-action/init@5595ccaf912efad79be6eef63a5619ff05969be3 # v4
+        with:
+          languages: actions,javascript-typescript
+          build-mode: none
+
+      # Core validation runs on pull requests and protected branch pushes.
+      # The scheduled run is reserved for CodeQL so it does not spend a
+      # weekly runner on the full validation suite.
+      - name: Verify env parity
+        if: ${{ !cancelled() && github.event_name != 'schedule' }}
+        run: bash ./scripts/check-env-parity.sh
+
+      - name: Check edge-function coverage
+        if: ${{ !cancelled() && github.event_name != 'schedule' }}
+        run: npm run devops:check:edge-coverage
+
+      - name: Check edge contract drift
+        if: ${{ !cancelled() && github.event_name != 'schedule' }}
+        run: npm run devops:check:edge-contract-drift
+
+      - name: Check edge action contract parity
+        if: ${{ !cancelled() && github.event_name != 'schedule' }}
+        run: npm run devops:check:edge-action-parity
+
+      - name: Check Supabase function graph with frozen Deno lock
+        if: ${{ !cancelled() && github.event_name != 'schedule' }}
+        run: deno check --frozen supabase/functions/super-ops/index.ts supabase/functions/super-workspace-mutate/index.ts supabase/functions/admin-ops/index.ts
+
+      - name: Deno test coverage gate (Supabase functions + Cloudflare edge-proxy)
+        if: ${{ !cancelled() && github.event_name != 'schedule' }}
+        run: npm run devops:check:deno-coverage
+
+      - name: Check SQL and function coupling
+        if: ${{ !cancelled() && github.event_name != 'schedule' }}
+        env:
+          ITX_DIFF_BASE: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
+          ITX_DIFF_HEAD: ${{ github.sha }}
+        run: npm run devops:check:sql-coupling
+
+      - name: Clean dist
+        if: ${{ !cancelled() && github.event_name != 'schedule' }}
+        run: rm -rf dist artifacts
+
+      - name: Build
+        if: ${{ !cancelled() && github.event_name != 'schedule' }}
+        run: npm run build
+
+      - name: Check public CSS boundary
+        if: ${{ !cancelled() && github.event_name != 'schedule' }}
+        run: npm run perf:css-boundary
+
+      - name: Typecheck Cloudflare Worker
+        if: ${{ !cancelled() && github.event_name != 'schedule' }}
+        run: npm run worker:typecheck
+
+      - name: Test frontend units (Vitest)
+        if: ${{ !cancelled() && github.event_name != 'schedule' }}
+        # Unit tests need configuration to import the Supabase client and to
+        # exercise authenticated requests. These are non-secret placeholders;
+        # the suite mocks network calls and never contacts these origins.
+        env:
+          VITE_SUPABASE_URL: https://example.supabase.co
+          VITE_SUPABASE_ANON_KEY: ci-test-anon-key
+          VITE_EDGE_PROXY_URL: https://proxy.example.com
+        run: npm run test:unit
+
+      - name: Check initial JavaScript budget
+        if: ${{ !cancelled() && github.event_name != 'schedule' }}
+        run: npm run perf:initial
+
+      - name: Check bundle budget
+        if: ${{ !cancelled() && github.event_name != 'schedule' }}
+        run: npm run perf:budget
+
+      - name: Check image budget
+        if: ${{ !cancelled() && github.event_name != 'schedule' }}
+        run: npm run perf:images
+
+      - name: Generate perf report
+        if: ${{ !cancelled() && github.event_name != 'schedule' }}
+        run: npm run perf:report
+
+      - name: Upload perf report artifact
+        if: ${{ always() && github.event_name != 'schedule' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: perf-report
+          path: artifacts/perf-report.json
+          if-no-files-found: ignore
+          retention-days: 14
+
+      # Security validation shares the already-installed dependency tree but
+      # remains a separate, clearly labelled gate in this single CI check.
+      - name: Run security gate
+        if: ${{ !cancelled() && github.event_name != 'schedule' }}
+        run: npm run security:gate
+
+      - name: Generate SBOM
+        if: ${{ !cancelled() && github.event_name != 'schedule' }}
+        run: npm run security:sbom
+
+      - name: Upload SBOM artifact
+        if: ${{ always() && github.event_name != 'schedule' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: sbom
+          path: artifacts/sbom.cdx.json
+          if-no-files-found: error
+          retention-days: 30
+
+      # E2E validation shares the Node install but retains its browser cache
+      # and report artifact. It is skipped only for the weekly CodeQL run.
+      - name: Cache Playwright browsers
+        if: ${{ !cancelled() && github.event_name != 'schedule' }}
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            playwright-${{ runner.os }}-
+
+      - name: Install Playwright Chromium
+        if: ${{ !cancelled() && github.event_name != 'schedule' }}
+        timeout-minutes: 5
+        run: npx playwright install chromium
+
+      - name: Install Playwright system dependencies
+        if: ${{ !cancelled() && github.event_name != 'schedule' }}
+        run: |
+          timeout 180s npx playwright install-deps chromium || {
+            echo "::warning::Playwright system dependency install failed or timed out; continuing so E2E can verify whether the runner already has the required libraries."
+          }
+
+      - name: Run E2E tests
+        if: ${{ !cancelled() && github.event_name != 'schedule' }}
+        run: npm run test:e2e
+
+      - name: Upload Playwright report
+        if: ${{ always() && github.event_name != 'schedule' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: playwright-report
+          path: |
+            playwright-report
+            test-results
+          if-no-files-found: ignore
+          retention-days: 7
+
+      # CodeQL runs for every event in this workflow. On the weekly schedule
+      # it needs its own build; PR/push runs already performed the core build
+      # after CodeQL initialization, so no duplicate build is required.
+      - name: Build app for CodeQL-only run
+        if: ${{ !cancelled() && github.event_name == 'schedule' }}
+        run: npm run build
+
+      - name: Perform CodeQL Analysis
+        if: ${{ !cancelled() }}
+        uses: github/codeql-action/analyze@5595ccaf912efad79be6eef63a5619ff05969be3 # v4
+
+      # Keep failure alerting inside the validation job so a normal run does
+      # not publish a separate skipped incident-notification check.
+      - name: Notify incident.io of CI failure
+        if: ${{ always() && (job.status == 'failure' || (github.event_name != 'pull_request' && job.status == 'cancelled')) }}
+        continue-on-error: true
+        env:
+          INCIDENT_IO_WEBHOOK_URL: ${{ secrets.INCIDENT_IO_WEBHOOK_URL }}
+          INCIDENT_IO_WEBHOOK_TOKEN: ${{ secrets.INCIDENT_IO_WEBHOOK_TOKEN }}
+          STATUS: ${{ job.status }}
+          SEVERITY: high
+          WORKFLOW_NAME: CI
+          JOB_NAME: validate
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          REPOSITORY: ${{ github.repository }}
+          BRANCH: ${{ github.ref_name }}
+          SHA: ${{ github.sha }}
+          ENVIRONMENT: production
+        run: |
+          set -euo pipefail
+
+          if [ -z "${INCIDENT_IO_WEBHOOK_URL:-}" ]; then
+            echo "INCIDENT_IO_WEBHOOK_URL is not configured; skipping incident.io alert."
+            exit 0
+          fi
+
+          if [ -z "${INCIDENT_IO_WEBHOOK_TOKEN:-}" ]; then
+            echo "INCIDENT_IO_WEBHOOK_TOKEN is not configured; skipping incident.io alert."
+            exit 0
+          fi
+
+          SHORT_SHA="$(printf '%s' "$SHA" | cut -c1-7)"
+          DEDUPE_KEY="${REPOSITORY}:${WORKFLOW_NAME}:${JOB_NAME}:${BRANCH}"
+
+          jq -n \
+            --arg title "GitHub Actions workflow ${STATUS}: ${WORKFLOW_NAME} / ${JOB_NAME}" \
+            --arg workflow_status "$STATUS" \
+            --arg severity "$SEVERITY" \
+            --arg workflow "$WORKFLOW_NAME" \
+            --arg job "$JOB_NAME" \
+            --arg repo "$REPOSITORY" \
+            --arg branch "$BRANCH" \
+            --arg sha "$SHA" \
+            --arg short_sha "$SHORT_SHA" \
+            --arg run_url "$RUN_URL" \
+            --arg environment "$ENVIRONMENT" \
+            --arg dedupe_key "$DEDUPE_KEY" \
+            '{
+              title: $title,
+              description: ("GitHub Actions workflow `" + $workflow + "` job `" + $job + "` in `" + $repo + "` is `" + $workflow_status + "` on branch `" + $branch + "`."),
+              deduplication_key: $dedupe_key,
+              status: "firing",
+              metadata: {
+                workflow_status: $workflow_status,
+                severity: $severity,
+                repository: $repo,
+                workflow: $workflow,
+                job: $job,
+                branch: $branch,
+                sha: $sha,
+                short_sha: $short_sha,
+                run_url: $run_url,
+                environment: $environment
+              }
+            }' \
+          | curl -fsSL -X POST "$INCIDENT_IO_WEBHOOK_URL" \
+              -H "Authorization: Bearer ${INCIDENT_IO_WEBHOOK_TOKEN}" \
+              -H "Content-Type: application/json" \
+              --data-binary @-
+
+  slack-notify-finish:
+    needs:
+      - slack-notify-start
+      - validate
+    # Always finish the single CI status message when the start message exists.
+    # A kill-switch block is reported in that same message instead of creating
+    # a second, normally skipped, notification check.
+    if: ${{ always() && needs.slack-notify-start.result == 'success' }}
+    uses: ./.github/workflows/slack-notify-status.yml
+    with:
+      mode: finish
+      workflow_name: CI
+      job_name: validate
+      run_url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+      ref_name: ${{ github.ref_name }}
+      sha: ${{ github.sha }}
+      status: ${{ needs.validate.result == 'success' && 'success' || needs.validate.result == 'failure' && 'failure' || needs.validate.result == 'cancelled' && 'cancelled' || needs.kill-switch-preflight.outputs.active == 'true' && 'success' || 'failure' }}
+      status_message: ${{ needs.validate.result == 'skipped' && needs.kill-switch-preflight.outputs.active == 'true' && format('Intentionally skipped because the ItemTraxx kill switch is active. {0}', needs.kill-switch-preflight.outputs.message) || needs.validate.result == 'skipped' && format('Validation was blocked because kill-switch preflight returned {0}. {1}', needs.kill-switch-preflight.outputs.active, needs.kill-switch-preflight.outputs.message) || '' }}
+      slack_channel_id: ${{ needs.slack-notify-start.outputs.slack_channel_id }}
+      slack_message_ts: ${{ needs.slack-notify-start.outputs.slack_message_ts }}
+    secrets:
+      SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+      SLACK_CHANNEL_ID: ${{ secrets.SLACK_CHANNEL_ID }}
+      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+      INCIDENT_IO_WEBHOOK_URL: ${{ secrets.INCIDENT_IO_WEBHOOK_URL }}
+      INCIDENT_IO_WEBHOOK_TOKEN: ${{ secrets.INCIDENT_IO_WEBHOOK_TOKEN }}

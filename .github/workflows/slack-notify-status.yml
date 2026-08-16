@@ -44,10 +44,10 @@ on:
     outputs:
       slack_channel_id:
         description: Slack channel used for the status message.
-        value: ${{ jobs.notify_start.outputs.slack_channel_id }}
+        value: ${{ jobs.notify.outputs.slack_channel_id }}
       slack_message_ts:
         description: Slack timestamp for the posted status message.
-        value: ${{ jobs.notify_start.outputs.slack_message_ts }}
+        value: ${{ jobs.notify.outputs.slack_message_ts }}
     secrets:
       SLACK_BOT_TOKEN:
         required: false
@@ -61,15 +61,17 @@ on:
         required: false
 
 jobs:
-  notify_start:
-    if: ${{ inputs.mode == 'start' }}
+  # Keep the mode branches as steps in one job. Separate jobs make GitHub
+  # publish skipped checks for every non-selected start/finish/alert branch.
+  notify:
     runs-on: ubuntu-latest
     outputs:
-      slack_channel_id: ${{ steps.post.outputs.channel_id }}
-      slack_message_ts: ${{ steps.post.outputs.message_ts }}
+      slack_channel_id: ${{ steps.notify_start.outputs.channel_id }}
+      slack_message_ts: ${{ steps.notify_start.outputs.message_ts }}
     steps:
       - name: Post Slack start notification
-        id: post
+        id: notify_start
+        if: ${{ inputs.mode == 'start' }}
         env:
           SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
           SLACK_CHANNEL_ID: ${{ secrets.SLACK_CHANNEL_ID }}
@@ -157,30 +159,75 @@ jobs:
 
           send_webhook_fallback
 
-  incidentio-notify-start-failure:
-    needs:
-      - notify_start
-    if: ${{ always() && inputs.incident_alerts_enabled && inputs.mode == 'start' && (needs.notify_start.result == 'failure' || needs.notify_start.result == 'cancelled') }}
-    uses: ./.github/workflows/incidentio-workflow-alert.yml
-    with:
-      status: ${{ needs.notify_start.result }}
-      severity: high
-      workflow_name: Slack Notify Status
-      job_name: notify_start
-      run_url: ${{ inputs.run_url }}
-      repository: ${{ github.repository }}
-      branch: ${{ inputs.ref_name }}
-      sha: ${{ inputs.sha }}
-      environment: production
-    secrets:
-      INCIDENT_IO_WEBHOOK_URL: ${{ secrets.INCIDENT_IO_WEBHOOK_URL }}
-      INCIDENT_IO_WEBHOOK_TOKEN: ${{ secrets.INCIDENT_IO_WEBHOOK_TOKEN }}
+      - name: Send incident alert when start notification fails
+        if: ${{ always() && inputs.incident_alerts_enabled && inputs.mode == 'start' && (steps.notify_start.outcome == 'failure' || steps.notify_start.outcome == 'cancelled') }}
+        env:
+          INCIDENT_IO_WEBHOOK_URL: ${{ secrets.INCIDENT_IO_WEBHOOK_URL }}
+          INCIDENT_IO_WEBHOOK_TOKEN: ${{ secrets.INCIDENT_IO_WEBHOOK_TOKEN }}
+          STATUS: ${{ steps.notify_start.outcome }}
+          SEVERITY: high
+          WORKFLOW_NAME: Slack Notify Status
+          JOB_NAME: notify_start
+          RUN_URL: ${{ inputs.run_url }}
+          REPOSITORY: ${{ github.repository }}
+          BRANCH: ${{ inputs.ref_name }}
+          SHA: ${{ inputs.sha }}
+          ENVIRONMENT: production
+        run: |
+          set -euo pipefail
 
-  notify_finish:
-    if: ${{ inputs.mode == 'finish' }}
-    runs-on: ubuntu-latest
-    steps:
+          if [ -z "${INCIDENT_IO_WEBHOOK_URL:-}" ]; then
+            echo "INCIDENT_IO_WEBHOOK_URL is not configured; skipping incident.io alert."
+            exit 0
+          fi
+
+          if [ -z "${INCIDENT_IO_WEBHOOK_TOKEN:-}" ]; then
+            echo "INCIDENT_IO_WEBHOOK_TOKEN is not configured; skipping incident.io alert."
+            exit 0
+          fi
+
+          SHORT_SHA="$(printf '%s' "$SHA" | cut -c1-7)"
+          DEDUPE_KEY="${REPOSITORY}:${WORKFLOW_NAME}:${JOB_NAME}:${BRANCH}"
+
+          jq -n \
+            --arg title "GitHub Actions workflow ${STATUS}: ${WORKFLOW_NAME} / ${JOB_NAME}" \
+            --arg workflow_status "$STATUS" \
+            --arg severity "$SEVERITY" \
+            --arg workflow "$WORKFLOW_NAME" \
+            --arg job "$JOB_NAME" \
+            --arg repo "$REPOSITORY" \
+            --arg branch "$BRANCH" \
+            --arg sha "$SHA" \
+            --arg short_sha "$SHORT_SHA" \
+            --arg run_url "$RUN_URL" \
+            --arg environment "$ENVIRONMENT" \
+            --arg dedupe_key "$DEDUPE_KEY" \
+            '{
+              title: $title,
+              description: ("GitHub Actions workflow `" + $workflow + "` job `" + $job + "` in `" + $repo + "` is `" + $workflow_status + "` on branch `" + $branch + "`."),
+              deduplication_key: $dedupe_key,
+              status: "firing",
+              metadata: {
+                workflow_status: $workflow_status,
+                severity: $severity,
+                repository: $repo,
+                workflow: $workflow,
+                job: $job,
+                branch: $branch,
+                sha: $sha,
+                short_sha: $short_sha,
+                run_url: $run_url,
+                environment: $environment
+              }
+            }' \
+          | curl -fsSL -X POST "$INCIDENT_IO_WEBHOOK_URL" \
+              -H "Authorization: Bearer ${INCIDENT_IO_WEBHOOK_TOKEN}" \
+              -H "Content-Type: application/json" \
+              --data-binary @-
+
       - name: Send Slack finish notification
+        id: notify_finish
+        if: ${{ inputs.mode == 'finish' }}
         env:
           GITHUB_TOKEN: ${{ github.token }}
           SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
@@ -280,21 +327,68 @@ jobs:
             exit 0
           fi
 
-  incidentio-notify-finish-failure:
-    needs:
-      - notify_finish
-    if: ${{ always() && inputs.incident_alerts_enabled && inputs.mode == 'finish' && (needs.notify_finish.result == 'failure' || needs.notify_finish.result == 'cancelled') }}
-    uses: ./.github/workflows/incidentio-workflow-alert.yml
-    with:
-      status: ${{ needs.notify_finish.result }}
-      severity: high
-      workflow_name: Slack Notify Status
-      job_name: notify_finish
-      run_url: ${{ inputs.run_url }}
-      repository: ${{ github.repository }}
-      branch: ${{ inputs.ref_name }}
-      sha: ${{ inputs.sha }}
-      environment: production
-    secrets:
-      INCIDENT_IO_WEBHOOK_URL: ${{ secrets.INCIDENT_IO_WEBHOOK_URL }}
-      INCIDENT_IO_WEBHOOK_TOKEN: ${{ secrets.INCIDENT_IO_WEBHOOK_TOKEN }}
+      - name: Send incident alert when finish notification fails
+        if: ${{ always() && inputs.incident_alerts_enabled && inputs.mode == 'finish' && (steps.notify_finish.outcome == 'failure' || steps.notify_finish.outcome == 'cancelled') }}
+        env:
+          INCIDENT_IO_WEBHOOK_URL: ${{ secrets.INCIDENT_IO_WEBHOOK_URL }}
+          INCIDENT_IO_WEBHOOK_TOKEN: ${{ secrets.INCIDENT_IO_WEBHOOK_TOKEN }}
+          STATUS: ${{ steps.notify_finish.outcome }}
+          SEVERITY: high
+          WORKFLOW_NAME: Slack Notify Status
+          JOB_NAME: notify_finish
+          RUN_URL: ${{ inputs.run_url }}
+          REPOSITORY: ${{ github.repository }}
+          BRANCH: ${{ inputs.ref_name }}
+          SHA: ${{ inputs.sha }}
+          ENVIRONMENT: production
+        run: |
+          set -euo pipefail
+
+          if [ -z "${INCIDENT_IO_WEBHOOK_URL:-}" ]; then
+            echo "INCIDENT_IO_WEBHOOK_URL is not configured; skipping incident.io alert."
+            exit 0
+          fi
+
+          if [ -z "${INCIDENT_IO_WEBHOOK_TOKEN:-}" ]; then
+            echo "INCIDENT_IO_WEBHOOK_TOKEN is not configured; skipping incident.io alert."
+            exit 0
+          fi
+
+          SHORT_SHA="$(printf '%s' "$SHA" | cut -c1-7)"
+          DEDUPE_KEY="${REPOSITORY}:${WORKFLOW_NAME}:${JOB_NAME}:${BRANCH}"
+
+          jq -n \
+            --arg title "GitHub Actions workflow ${STATUS}: ${WORKFLOW_NAME} / ${JOB_NAME}" \
+            --arg workflow_status "$STATUS" \
+            --arg severity "$SEVERITY" \
+            --arg workflow "$WORKFLOW_NAME" \
+            --arg job "$JOB_NAME" \
+            --arg repo "$REPOSITORY" \
+            --arg branch "$BRANCH" \
+            --arg sha "$SHA" \
+            --arg short_sha "$SHORT_SHA" \
+            --arg run_url "$RUN_URL" \
+            --arg environment "$ENVIRONMENT" \
+            --arg dedupe_key "$DEDUPE_KEY" \
+            '{
+              title: $title,
+              description: ("GitHub Actions workflow `" + $workflow + "` job `" + $job + "` in `" + $repo + "` is `" + $workflow_status + "` on branch `" + $branch + "`."),
+              deduplication_key: $dedupe_key,
+              status: "firing",
+              metadata: {
+                workflow_status: $workflow_status,
+                severity: $severity,
+                repository: $repo,
+                workflow: $workflow,
+                job: $job,
+                branch: $branch,
+                sha: $sha,
+                short_sha: $short_sha,
+                run_url: $run_url,
+                environment: $environment
+              }
+            }' \
+          | curl -fsSL -X POST "$INCIDENT_IO_WEBHOOK_URL" \
+              -H "Authorization: Bearer ${INCIDENT_IO_WEBHOOK_TOKEN}" \
+              -H "Content-Type: application/json" \
+              --data-binary @-

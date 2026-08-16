@@ -5274,6 +5274,7 @@
                           "access",
                           "feature",
                           "privacy",
+                          "security",
                           "other"
                         ]
                       },
@@ -5362,6 +5363,7 @@
                         "access",
                         "feature",
                         "privacy",
+                        "security",
                         "other"
                       ]
                     },
@@ -5592,6 +5594,7 @@
                         "access",
                         "feature",
                         "privacy",
+                        "security",
                         "other"
                       ]
                     },
@@ -8405,6 +8408,7 @@
             "access",
             "feature",
             "privacy",
+            "security",
             "other"
           ]
         },

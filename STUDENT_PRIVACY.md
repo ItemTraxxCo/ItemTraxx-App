@@ -59,4 +59,4 @@ are honored to the extent applicable to ItemTraxx's operations in those jurisdic
 
 ## Contact
 
-Email: `support@itemtraxx.com`
+Email: `privacy@itemtraxx.com`

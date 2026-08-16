@@ -132,6 +132,12 @@ export const verifyTurnstileToken = async (
   remoteIp: string,
   logContext: string,
 ) => {
+  const normalizedToken = token.trim();
+  if (!normalizedToken) {
+    console.error(`${logContext} turnstile token is empty`);
+    return false;
+  }
+
   const secret = Deno.env.get("ITX_TURNSTILE_SECRET") ??
     Deno.env.get("ITX_TURNSTILE_SECRET_KEY") ?? "";
   if (!secret) {
@@ -141,7 +147,7 @@ export const verifyTurnstileToken = async (
   const submitVerification = async (ip?: string) => {
     const params = new URLSearchParams();
     params.set("secret", secret);
-    params.set("response", token);
+    params.set("response", normalizedToken);
     if (ip) {
       params.set("remoteip", ip);
     }

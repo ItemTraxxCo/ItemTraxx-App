@@ -68,8 +68,6 @@ export const sanitizeRequestHeaders = (
   if (clientInfo) headers.set("x-client-info", clientInfo);
   const userAgent = request.headers.get("user-agent");
   if (userAgent) headers.set("user-agent", userAgent);
-  const scanAgentHeader = request.headers.get("aikido-scan-agent");
-  if (scanAgentHeader) headers.set("aikido-scan-agent", scanAgentHeader);
   const forwardedFor = request.headers.get("x-forwarded-for");
   if (forwardedFor) headers.set("x-forwarded-for", forwardedFor);
   const connectingIp = request.headers.get("cf-connecting-ip");

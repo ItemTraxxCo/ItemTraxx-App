@@ -11,6 +11,11 @@ import {
 } from "../_shared/preloginGuards.ts";
 import { requireTrustedEdgeIngress } from "../_shared/trustedIngress.ts";
 import {
+  emailPurposeFromSupportCategory,
+  resolveEmailAddress,
+  resolveEmailFrom,
+} from "../_shared/emailConfig.ts";
+import {
   optionalText,
   requireEmail,
   requireEnum,
@@ -41,6 +46,7 @@ type SupportPayload = {
     | "access"
     | "feature"
     | "privacy"
+    | "security"
     | "other";
   message?: string;
   turnstile_token?: string;
@@ -87,6 +93,7 @@ const SUPPORT_CATEGORIES = new Set(
     "access",
     "feature",
     "privacy",
+    "security",
     "other",
   ] as const,
 );
@@ -252,12 +259,6 @@ serve(async (req) => {
     const supabaseUrl = Deno.env.get("ITX_SUPABASE_URL") ?? Deno.env.get("SUPABASE_URL");
     const publishableKey = Deno.env.get("ITX_PUBLISHABLE_KEY") ?? Deno.env.get("SUPABASE_ANON_KEY");
     const serviceKey = Deno.env.get("ITX_SECRET_KEY") ?? Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-    const supportEmail = Deno.env.get("ITX_SUPPORT_EMAIL") ??
-      "support@itemtraxx.com";
-    const fromEmail = Deno.env.get("ITX_EMAIL_FROM") ??
-      Deno.env.get("ITX_RESEND_FROM") ??
-      "ItemTraxx Support <support@itemtraxx.com>";
-
     if (!supabaseUrl || !publishableKey || !serviceKey) {
       return jsonResponse(500, { error: "Server misconfiguration." });
     }
@@ -272,6 +273,12 @@ serve(async (req) => {
     const replyEmail = requireEmail(body.reply_email);
     const subject = requireText(body.subject, { maxLen: 160 });
     const category = requireEnum(body.category, SUPPORT_CATEGORIES);
+    const emailPurpose = emailPurposeFromSupportCategory(category);
+    const supportEmail = resolveEmailAddress(
+      emailPurpose,
+      emailPurpose === "support" ? "ITX_SUPPORT_EMAIL" : undefined,
+    );
+    const fromEmail = resolveEmailFrom(emailPurpose);
     const message = requireText(body.message, { maxLen: 3000 });
     const turnstileToken = requireText(body.turnstile_token, { maxLen: 4000 });
     const attachmentsRaw = Array.isArray(body.attachments)
@@ -285,7 +292,7 @@ serve(async (req) => {
       });
     }
     if (
-      !["general", "bug", "billing", "access", "feature", "privacy", "other"]
+      !["general", "bug", "billing", "access", "feature", "privacy", "security", "other"]
         .includes(category)
     ) {
       return jsonResponse(400, { error: "Invalid category." });
@@ -525,6 +532,7 @@ serve(async (req) => {
         support_request_id: supportRequest.id,
         support_email: supportEmail,
         from_email: fromEmail,
+        email_purpose: emailPurpose,
       },
       p_priority: 20,
       p_max_attempts: 5,

@@ -10,6 +10,7 @@ import {
   verifyTurnstileToken,
 } from "../_shared/preloginGuards.ts";
 import { requireTrustedEdgeIngress } from "../_shared/trustedIngress.ts";
+import { resolveEmailAddress, resolveEmailFrom } from "../_shared/emailConfig.ts";
 import {
   optionalEnum,
   optionalPositiveInteger,
@@ -137,11 +138,8 @@ serve(async (req) => {
     const supabaseUrl = Deno.env.get("ITX_SUPABASE_URL") ?? Deno.env.get("SUPABASE_URL");
     const publishableKey = Deno.env.get("ITX_PUBLISHABLE_KEY") ?? Deno.env.get("SUPABASE_ANON_KEY");
     const serviceKey = Deno.env.get("ITX_SECRET_KEY") ?? Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-    const supportEmail = Deno.env.get("ITX_SUPPORT_EMAIL") ??
-      "support@itemtraxx.com";
-    const fromEmail = Deno.env.get("ITX_EMAIL_FROM") ??
-      Deno.env.get("ITX_RESEND_FROM") ??
-      "ItemTraxx Sales <support@itemtraxx.com>";
+    const salesEmail = resolveEmailAddress("sales");
+    const fromEmail = resolveEmailFrom("sales");
 
     if (!supabaseUrl || !publishableKey || !serviceKey) {
       return jsonResponse(500, { error: "Server misconfiguration." });
@@ -266,7 +264,7 @@ serve(async (req) => {
         organization: organization || "Not provided",
         reply_email: replyEmail,
         details: details || null,
-        support_email: supportEmail,
+        sales_email: salesEmail,
         from_email: fromEmail,
         intent,
       },

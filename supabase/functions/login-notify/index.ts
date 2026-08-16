@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.108.2";
 import { sendLoggedResendEmail } from "../_shared/emailDeliveryLog.ts";
 import { applyEmailTheme, buildEmailBrandHeaderHtml, withEmailBrandLogoAttachment } from "../_shared/emailBranding.ts";
+import { resolveEmailAddress, resolveEmailFrom } from "../_shared/emailConfig.ts";
 import {
   formatLoginEmailLocation,
   formatLoginEmailPlatform,
@@ -224,8 +225,8 @@ serve(async (req) => {
     const supabaseUrl = Deno.env.get("ITX_SUPABASE_URL") ?? Deno.env.get("SUPABASE_URL");
     const serviceKey = Deno.env.get("ITX_SECRET_KEY") ?? Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
     const resendApiKey = Deno.env.get("ITX_RESEND_API_KEY");
-    const supportEmail = Deno.env.get("ITX_SUPPORT_EMAIL") ?? "support@itemtraxx.com";
-    const fromEmail = Deno.env.get("ITX_EMAIL_FROM") ?? "ItemTraxx <noreply@itemtraxx.com>";
+    const supportEmail = resolveEmailAddress("support", "ITX_SUPPORT_EMAIL");
+    const fromEmail = resolveEmailFrom("notifications");
 
     if (!supabaseUrl || !serviceKey || !resendApiKey) {
       return jsonResponse(500, { error: "Server misconfiguration" });
@@ -379,6 +380,7 @@ serve(async (req) => {
     await sendLoggedResendEmail(adminClient, resendApiKey, withEmailBrandLogoAttachment({
       from: fromEmail,
       to: [recipientEmail],
+      reply_to: supportEmail,
       subject,
       html: applyEmailTheme(buildLoginNotificationHtml({
         accountName,

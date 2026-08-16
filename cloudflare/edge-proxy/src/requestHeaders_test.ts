@@ -51,7 +51,6 @@ Deno.test("function request headers preserve the allowlist, geo bounds, and supe
     "https://edge.itemtraxx.com/functions/super-ops",
     {
       headers: {
-        "aikido-scan-agent": "scanner",
         "cf-connecting-ip": "203.0.113.42",
         "content-type": "application/json-patch+json",
         "user-agent": "fixture-agent",
@@ -90,7 +89,6 @@ Deno.test("function request headers preserve the allowlist, geo bounds, and supe
   );
   assertEquals(headers.get("x-client-info"), "fixture-client", "client info");
   assertEquals(headers.get("user-agent"), "fixture-agent", "user agent");
-  assertEquals(headers.get("aikido-scan-agent"), "scanner", "scan agent");
   assertEquals(
     headers.get("x-forwarded-for"),
     "198.51.100.10",

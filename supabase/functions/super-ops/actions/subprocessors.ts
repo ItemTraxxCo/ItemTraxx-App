@@ -1,4 +1,5 @@
 import { sendLoggedResendEmail } from "../../_shared/emailDeliveryLog.ts";
+import { resolveEmailAddress, resolveEmailFrom } from "../../_shared/emailConfig.ts";
 import {
   buildSubprocessorEmailSubject,
   buildSubprocessorNoticeHtml,
@@ -162,8 +163,8 @@ export const handleSubprocessorsAction = async (
     if (!resendApiKey) {
       return jsonResponse(503, { error: "Email service not configured." });
     }
-    const emailFrom = Deno.env.get("ITX_EMAIL_FROM") ??
-      "ItemTraxx <noreply@itemtraxx.com>";
+    const emailFrom = resolveEmailFrom("legal");
+    const contactEmail = resolveEmailAddress("legal");
     const logoUrl = Deno.env.get("ITX_EMAIL_LOGO_URL")?.trim() || null;
     const legalHubUrl = Deno.env.get("ITX_LEGAL_HUB_URL")?.trim() ||
       "https://www.itemtraxx.com/legal";
@@ -201,6 +202,7 @@ export const handleSubprocessorsAction = async (
       logoUrl,
       legalHubUrl,
       contactSupportUrl,
+      contactEmail,
     };
     const subject = buildSubprocessorEmailSubject(vendor, changeType);
     const html = buildSubprocessorNoticeHtml(noticePayload);
@@ -219,7 +221,14 @@ export const handleSubprocessorsAction = async (
           sendLoggedResendEmail(
             adminClient,
             resendApiKey,
-            { from: emailFrom, to: [recipientEmail], subject, html, text },
+            {
+              from: emailFrom,
+              to: [recipientEmail],
+              reply_to: contactEmail,
+              subject,
+              html,
+              text,
+            },
             {
               emailType: "subprocessor_change_notice",
               recipientEmail,

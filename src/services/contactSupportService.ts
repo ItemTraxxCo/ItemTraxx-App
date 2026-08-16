@@ -5,7 +5,7 @@ export type ContactSupportPayload = {
   name: string;
   reply_email: string;
   subject: string;
-  category: "general" | "bug" | "billing" | "access" | "feature" | "privacy" | "other";
+  category: "general" | "bug" | "billing" | "access" | "feature" | "privacy" | "security" | "other";
   message: string;
   turnstile_token: string;
   website?: string;

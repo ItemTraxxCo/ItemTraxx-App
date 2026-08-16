@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient, type SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.108.2";
 import { sendLoggedResendEmail } from "../_shared/emailDeliveryLog.ts";
 import { applyEmailTheme, buildEmailBrandHeaderHtml, withEmailBrandLogoAttachment } from "../_shared/emailBranding.ts";
+import { resolveEmailAddress, resolveEmailFrom } from "../_shared/emailConfig.ts";
 import { formatLoginEmailPlatform, formatLoginEmailTime } from "../_shared/loginEmailFormat.ts";
 import { isKillSwitchWriteBlocked } from "../_shared/killSwitch.ts";
 import { getRequestId, logError, logInfo } from "../_shared/observability.ts";
@@ -46,7 +47,8 @@ type ContactSalesPayload = {
   organization: string;
   reply_email: string;
   details: string | null;
-  support_email: string;
+  sales_email?: string;
+  support_email?: string;
   from_email: string;
   intent?: "sales" | "demo";
 };
@@ -55,7 +57,7 @@ type SupportRequestPayload = {
   name: string;
   reply_email: string;
   subject: string;
-  category: "general" | "bug" | "billing" | "access" | "feature" | "privacy" | "other";
+  category: "general" | "bug" | "billing" | "access" | "feature" | "privacy" | "security" | "other";
   message: string;
   attachments?: Array<{
     filename: string;
@@ -67,6 +69,7 @@ type SupportRequestPayload = {
   support_request_id?: string;
   support_email: string;
   from_email: string;
+  email_purpose?: "support" | "privacy" | "security";
 };
 
 type LoginNotificationPayload = {
@@ -421,6 +424,7 @@ const processContactSalesEmail = async (
   requestId: string,
   slackWebhookUrl?: string,
 ) => {
+  const salesEmail = payload.sales_email ?? payload.support_email ?? resolveEmailAddress("sales");
   const organizationLine = payload.organization
     ? `\nOrganization: ${payload.organization}`
     : "\nOrganization: (not provided)";
@@ -432,7 +436,7 @@ const processContactSalesEmail = async (
   const internalSubject = `${payload.intent === "demo" ? "Demo Request" : "Contact Sales Request"} - ${payload.organization || payload.name}`;
   await sendTrackedResendEmail(adminClient, resendApiKey, {
     from: payload.from_email,
-    to: [payload.support_email],
+    to: [salesEmail],
     subject: internalSubject,
     reply_to: payload.reply_email,
     html: applyEmailTheme(buildContactSalesInternalHtml(payload)),
@@ -440,7 +444,7 @@ const processContactSalesEmail = async (
       `A new ${payload.intent === "demo" ? "demo" : "sales"} request was submitted.\n\nPlan: ${payload.plan_label}\nName: ${payload.name}${organizationLine}\nReply email: ${payload.reply_email}${schoolsLine}\n\nDetails:\n${payload.details ?? "(none provided)"}\n\nLead ID: ${payload.lead_id}`,
   }, {
     emailType: "contact_sales_internal",
-    recipientEmail: payload.support_email,
+    recipientEmail: salesEmail,
     subject: internalSubject,
     requestId,
     jobId,
@@ -475,7 +479,7 @@ const processContactSalesEmail = async (
     subject: confirmationSubject,
     html: applyEmailTheme(buildContactSalesConfirmationHtml(payload)),
     text:
-      `Hi ${payload.name},\n\n${payload.intent === "demo" ? "Thanks for requesting an ItemTraxx demo. We've received your request and will follow up to schedule next steps within 2 business days." : "Thanks for contacting the ItemTraxx Sales Team. We've received your request and will follow up with a quote for your selected plan within 2 business days."}\n\nRequest summary:\nPlan: ${payload.plan_label}${schoolsLine}${organizationLine}\n\nHave a great day,\n\n- ItemTraxx ${payload.intent === "demo" ? "Team" : "Sales"}\n${payload.support_email}\n\nIf you don't hear from us within 2 business days, please check your spam folder or contact us at ${payload.support_email}`,
+      `Hi ${payload.name},\n\n${payload.intent === "demo" ? "Thanks for requesting an ItemTraxx demo. We've received your request and will follow up to schedule next steps within 2 business days." : "Thanks for contacting the ItemTraxx Sales Team. We've received your request and will follow up with a quote for your selected plan within 2 business days."}\n\nRequest summary:\nPlan: ${payload.plan_label}${schoolsLine}${organizationLine}\n\nHave a great day,\n\n- ItemTraxx ${payload.intent === "demo" ? "Team" : "Sales"}\n${salesEmail}\n\nIf you don't hear from us within 2 business days, please check your spam folder or contact us at ${salesEmail}`,
   }, {
     emailType: "contact_sales_confirmation",
     recipientEmail: payload.reply_email,
@@ -616,6 +620,16 @@ const buildSupportRequestInternalHtml = (
   payload: SupportRequestPayload,
   deliveredAttachmentCount: number,
 ) => {
+  const teamLabel = payload.email_purpose === "security"
+    ? "Security"
+    : payload.email_purpose === "privacy"
+    ? "Privacy"
+    : "Support";
+  const contactUrl = payload.email_purpose === "security"
+    ? "https://itemtraxx.com/report-security-issue"
+    : payload.email_purpose === "privacy"
+    ? "https://itemtraxx.com/privacy-request"
+    : CONTACT_SUPPORT_URL;
   const name = escapeHtml(payload.name);
   const replyEmail = escapeHtml(payload.reply_email);
   const subject = escapeHtml(payload.subject);
@@ -639,9 +653,9 @@ const buildSupportRequestInternalHtml = (
             </tr>
             <tr>
               <td style="padding:28px;">
-                <h2 style="margin:0 0 12px 0;font-size:22px;line-height:1.3;color:#171717;">New Support Request</h2>
+                <h2 style="margin:0 0 12px 0;font-size:22px;line-height:1.3;color:#171717;">New ${teamLabel} Request</h2>
                 <p style="margin:0 0 14px 0;font-size:15px;line-height:1.6;color:#343330;">
-                  A new support request was submitted through the ItemTraxx support form.
+                  A new ${teamLabel.toLowerCase()} request was submitted through ItemTraxx.
                 </p>
                 <p style="margin:0 0 14px 0;font-size:15px;line-height:1.7;color:#343330;">
                   <strong>Name:</strong> ${name}<br />
@@ -661,7 +675,7 @@ const buildSupportRequestInternalHtml = (
                   <a href="mailto:${replyEmail}" style="color:#171717;text-decoration:underline;text-underline-offset:2px;">${replyEmail}</a>
                 </p>
                 <p style="margin:6px 0 0 0;font-size:12px;line-height:1.6;color:#8b8680;">
-                  <a href="${CONTACT_SUPPORT_URL}" style="color:#171717;text-decoration:underline;text-underline-offset:2px;">Contact support</a>
+                  <a href="${contactUrl}" style="color:#171717;text-decoration:underline;text-underline-offset:2px;">Contact ${teamLabel.toLowerCase()}</a>
                 </p>
               </td>
             </tr>
@@ -674,6 +688,16 @@ const buildSupportRequestInternalHtml = (
 };
 
 const buildSupportRequestConfirmationHtml = (payload: SupportRequestPayload) => {
+  const teamLabel = payload.email_purpose === "security"
+    ? "Security"
+    : payload.email_purpose === "privacy"
+    ? "Privacy"
+    : "Support";
+  const contactUrl = payload.email_purpose === "security"
+    ? "https://itemtraxx.com/report-security-issue"
+    : payload.email_purpose === "privacy"
+    ? "https://itemtraxx.com/privacy-request"
+    : CONTACT_SUPPORT_URL;
   const name = escapeHtml(payload.name);
   const subject = escapeHtml(payload.subject);
   const category = escapeHtml(payload.category);
@@ -695,10 +719,10 @@ const buildSupportRequestConfirmationHtml = (payload: SupportRequestPayload) => 
             </tr>
             <tr>
               <td style="padding:28px;">
-                <h2 style="margin:0 0 12px 0;font-size:22px;line-height:1.3;color:#171717;">We Received Your Support Request</h2>
+                <h2 style="margin:0 0 12px 0;font-size:22px;line-height:1.3;color:#171717;">We Received Your ${teamLabel} Request</h2>
                 <p style="margin:0 0 14px 0;font-size:15px;line-height:1.6;color:#343330;">Hi ${name},</p>
                 <p style="margin:0 0 14px 0;font-size:15px;line-height:1.6;color:#343330;">
-                  We received your support request and will respond as soon as possible.
+                  We received your ${teamLabel.toLowerCase()} request and will respond as soon as possible.
                 </p>
                 <p style="margin:0 0 14px 0;font-size:15px;line-height:1.7;color:#343330;">
                   <strong>Category:</strong> ${category}<br />
@@ -710,7 +734,7 @@ const buildSupportRequestConfirmationHtml = (payload: SupportRequestPayload) => 
             <tr>
               <td style="padding:16px 24px;border-top:1px solid #e7e5df;background:#fbfaf8;">
                 <p style="margin:0;font-size:12px;line-height:1.6;color:#68645f;">
-                  <a href="${CONTACT_SUPPORT_URL}" style="color:#171717;text-decoration:underline;text-underline-offset:2px;">Contact support</a>
+                  <a href="${contactUrl}" style="color:#171717;text-decoration:underline;text-underline-offset:2px;">Contact ${teamLabel.toLowerCase()}</a>
                 </p>
                 <p style="margin:6px 0 0 0;font-size:12px;line-height:1.6;color:#8b8680;">
                   © 2026 ItemTraxx Co. All rights reserved.
@@ -733,6 +757,11 @@ const processSupportRequestEmail = async (
   requestId: string,
   slackWebhookUrl?: string,
 ) => {
+  const teamLabel = payload.email_purpose === "security"
+    ? "Security"
+    : payload.email_purpose === "privacy"
+    ? "Privacy"
+    : "Support";
   const normalizeAttachmentValue = (value: unknown, maxLength = 4096) => {
     if (typeof value !== "string") return null;
     const trimmed = value.trim();
@@ -824,7 +853,7 @@ const processSupportRequestEmail = async (
       throw error;
     }
   }
-  const internalSubject = `Support Request - ${payload.subject}`;
+  const internalSubject = `${teamLabel} Request - ${payload.subject}`;
   await sendTrackedResendEmail(adminClient, resendApiKey, {
     from: payload.from_email,
     to: [payload.support_email],
@@ -833,7 +862,7 @@ const processSupportRequestEmail = async (
     html: applyEmailTheme(buildSupportRequestInternalHtml(payload, attachments.length)),
     attachments,
     text:
-      `A new support request was submitted.
+      `A new ${teamLabel.toLowerCase()} request was submitted.
 
 ` +
       `Name: ${payload.name}
@@ -848,7 +877,7 @@ const processSupportRequestEmail = async (
       `${payload.message}` +
       (attachments.length ? `\n\nAttachments: ${attachments.length} image file(s) included.` : ""),
   }, {
-    emailType: "support_internal",
+    emailType: `${payload.email_purpose ?? "support"}_internal`,
     recipientEmail: payload.support_email,
     subject: internalSubject,
     requestId,
@@ -856,13 +885,14 @@ const processSupportRequestEmail = async (
     metadata: {
       category: payload.category,
       direction: "internal",
+      email_purpose: payload.email_purpose ?? "support",
       attachment_count: attachments.length,
     },
   });
 
   if (slackWebhookUrl) {
     const slackText =
-      `New support inquiry submitted\n` +
+      `New ${teamLabel.toLowerCase()} inquiry submitted\n` +
       `Category: ${payload.category}\n` +
       `Attachments: ${attachments.length}\n` +
       `Job ID: ${jobId}\n` +
@@ -874,7 +904,7 @@ const processSupportRequestEmail = async (
     }
   }
 
-  const confirmationSubject = "We received your ItemTraxx support request.";
+  const confirmationSubject = `We received your ItemTraxx ${teamLabel.toLowerCase()} request.`;
   await sendTrackedResendEmail(adminClient, resendApiKey, {
     from: payload.from_email,
     to: [payload.reply_email],
@@ -883,15 +913,15 @@ const processSupportRequestEmail = async (
     text:
       `Hi ${payload.name},
 
-We received your support request and will respond as soon as possible.
+We received your ${teamLabel.toLowerCase()} request and will respond as soon as possible.
 
 Category: ${payload.category}
 Subject: ${payload.subject}
 
-- ItemTraxx Support
+- ItemTraxx ${teamLabel}
 ${payload.support_email}`,
   }, {
-    emailType: "support_confirmation",
+    emailType: `${payload.email_purpose ?? "support"}_confirmation`,
     recipientEmail: payload.reply_email,
     subject: confirmationSubject,
     requestId,
@@ -899,6 +929,7 @@ ${payload.support_email}`,
     metadata: {
       category: payload.category,
       direction: "confirmation",
+      email_purpose: payload.email_purpose ?? "support",
       attachment_count: attachments.length,
     },
   });
@@ -991,11 +1022,8 @@ serve(async (req) => {
       Deno.env.get("ITX_SUPPORT_SLACK_WEBHOOK_URL")?.trim() ||
       Deno.env.get("ITX_SLACK_WEBHOOK_URL")?.trim() ||
       "";
-    const supportEmail = Deno.env.get("ITX_SUPPORT_EMAIL") ?? "support@itemtraxx.com";
-    const fromEmail =
-      Deno.env.get("ITX_EMAIL_FROM") ??
-      Deno.env.get("ITX_RESEND_FROM") ??
-      "ItemTraxx Support <support@itemtraxx.com>";
+    const supportEmail = resolveEmailAddress("support", "ITX_SUPPORT_EMAIL");
+    const fromEmail = resolveEmailFrom("support");
     const workerAuth = req.headers.get("authorization") ?? "";
 
     if (!supabaseUrl || !serviceKey || !workerSecret || !resendApiKey) {

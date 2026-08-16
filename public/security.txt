@@ -1,4 +1,4 @@
-Contact: mailto:support@itemtraxx.com
+Contact: mailto:security@itemtraxx.com
 Canonical: https://itemtraxx.com/.well-known/security.txt
 Policy: https://itemtraxx.com/legal
 Preferred-Languages: en

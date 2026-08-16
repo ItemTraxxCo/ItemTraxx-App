@@ -12,6 +12,12 @@ on:
 jobs:
   kill-switch-preflight:
     uses: ./.github/workflows/kill-switch-preflight.yml
+    # GitHub-hosted runners receive Cloudflare's managed challenge before the
+    # public edge can return the application status response. Read the
+    # kill-switch from the direct Supabase origin so the public-route checks
+    # below still run and handle edge challenges independently.
+    with:
+      status_source: supabase
 
   slack-notify-start:
     needs: kill-switch-preflight
@@ -131,21 +137,30 @@ jobs:
       - name: Check status endpoint
         run: |
           set -euo pipefail
+          STATUS_HEADERS="$(mktemp)"
           BODY="$(mktemp)"
-          STATUS="$(curl -sS -o "$BODY" -w '%{http_code}' "https://edge.itemtraxx.com/functions/system-status" \
+          STATUS="$(curl -sS -D "$STATUS_HEADERS" -o "$BODY" -w '%{http_code}' "https://edge.itemtraxx.com/functions/system-status" \
             -H "Origin: https://itemtraxx.com" \
             || true)"
+          if [ "$STATUS" -eq 403 ] && grep -qi '^cf-mitigated:[[:space:]]*challenge' "$STATUS_HEADERS"; then
+            echo "Cloudflare challenge for the public status endpoint (non-browser CI request). Skipping this probe."
+            rm -f "$STATUS_HEADERS" "$BODY"
+            exit 0
+          fi
           if [ "$STATUS" -eq 503 ] && jq -e '.kill_switch.enabled == true' "$BODY" >/dev/null 2>&1; then
             echo "Kill switch active; treating system-status 503 as intentional maintenance skip."
             head -c 300 "$BODY"
+            rm -f "$STATUS_HEADERS" "$BODY"
             exit 0
           fi
           if [ "$STATUS" -lt 200 ] || [ "$STATUS" -ge 300 ]; then
             echo "system-status returned HTTP $STATUS"
             cat "$BODY" || true
+            rm -f "$STATUS_HEADERS" "$BODY"
             exit 1
           fi
           head -c 300 "$BODY"
+          rm -f "$STATUS_HEADERS" "$BODY"
 
   slack-notify-finish:
     needs:

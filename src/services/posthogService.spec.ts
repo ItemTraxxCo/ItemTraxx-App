@@ -224,6 +224,94 @@ describe("capturePostHogException", () => {
   });
 });
 
+describe("before_send exception filter", () => {
+  const getBeforeSend = () => {
+    const options = posthogMock.init.mock.calls[0][1] as {
+      before_send: (event: unknown) => unknown;
+    };
+    return options.before_send;
+  };
+
+  const opaqueScriptEvent = {
+    event: "$exception",
+    properties: {
+      $exception_list: [
+        {
+          type: "Error",
+          value: "Script error.",
+          stacktrace: { frames: [] },
+          mechanism: { synthetic: true, handled: false },
+        },
+      ],
+    },
+  };
+
+  it("drops an opaque cross-origin \"Script error.\" exception", async () => {
+    const mod = await initializedModule();
+    void mod;
+
+    expect(getBeforeSend()(opaqueScriptEvent)).toBeNull();
+  });
+
+  it("keeps a \"Script error.\" event that carries a real stack", async () => {
+    const mod = await initializedModule();
+    void mod;
+
+    const event = {
+      event: "$exception",
+      properties: {
+        $exception_list: [
+          {
+            type: "Error",
+            value: "Script error.",
+            stacktrace: { frames: [{ filename: "app.js" }] },
+            mechanism: { synthetic: true },
+          },
+        ],
+      },
+    };
+
+    expect(getBeforeSend()(event)).toBe(event);
+  });
+
+  it("keeps a non-synthetic \"Script error.\" event", async () => {
+    const mod = await initializedModule();
+    void mod;
+
+    const event = {
+      event: "$exception",
+      properties: {
+        $exception_list: [
+          {
+            type: "Error",
+            value: "Script error.",
+            stacktrace: { frames: [] },
+            mechanism: { synthetic: false },
+          },
+        ],
+      },
+    };
+
+    expect(getBeforeSend()(event)).toBe(event);
+  });
+
+  it("keeps a regular exception event", async () => {
+    const mod = await initializedModule();
+    void mod;
+
+    const event = {
+      event: "$exception",
+      properties: {
+        $exception_list: [
+          { type: "TypeError", value: "x is not a function", mechanism: { synthetic: false } },
+        ],
+      },
+    };
+
+    expect(getBeforeSend()(event)).toBe(event);
+  });
+});
+
 describe("syncPostHogConsent", () => {
   it("opts in when analytics consent is granted", async () => {
     const mod = await initializedModule();

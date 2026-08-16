@@ -137,9 +137,9 @@ serve(async (req) => {
   if (ingressError) return ingressError;
 
   try {
-    const supabaseUrl = Deno.env.get("ITX_SUPABASE_URL");
-    const publishableKey = Deno.env.get("ITX_PUBLISHABLE_KEY");
-    const serviceKey = Deno.env.get("ITX_SECRET_KEY");
+    const supabaseUrl = Deno.env.get("ITX_SUPABASE_URL") ?? Deno.env.get("SUPABASE_URL");
+    const publishableKey = Deno.env.get("ITX_PUBLISHABLE_KEY") ?? Deno.env.get("SUPABASE_ANON_KEY");
+    const serviceKey = Deno.env.get("ITX_SECRET_KEY") ?? Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
     const slackWebhookUrl =
       Deno.env.get("ITX_CLIENT_ERROR_SLACK_WEBHOOK_URL")?.trim() ||
       Deno.env.get("ITX_SUPPORT_SLACK_WEBHOOK_URL")?.trim() ||

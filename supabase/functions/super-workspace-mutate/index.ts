@@ -118,9 +118,9 @@ serve(async (req) => {
     const authHeader = req.headers.get("authorization");
     if (!authHeader) return json(401, { error: "Unauthorized" });
     const token = authHeader.replace(/^Bearer\s+/i, "").trim(),
-      url = Deno.env.get("ITX_SUPABASE_URL"),
-      publishable = Deno.env.get("ITX_PUBLISHABLE_KEY"),
-      service = Deno.env.get("ITX_SECRET_KEY");
+      url = Deno.env.get("ITX_SUPABASE_URL") ?? Deno.env.get("SUPABASE_URL"),
+      publishable = Deno.env.get("ITX_PUBLISHABLE_KEY") ?? Deno.env.get("SUPABASE_ANON_KEY"),
+      service = Deno.env.get("ITX_SECRET_KEY") ?? Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
     if (!url || !publishable || !service) {
       return json(500, { error: "Server misconfiguration" });
     }

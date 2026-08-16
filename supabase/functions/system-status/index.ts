@@ -151,8 +151,8 @@ serve(async (req) => {
   }
 
   const startedAt = Date.now();
-  const supabaseUrl = Deno.env.get("ITX_SUPABASE_URL");
-  const serviceKey = Deno.env.get("ITX_SECRET_KEY");
+  const supabaseUrl = Deno.env.get("ITX_SUPABASE_URL") ?? Deno.env.get("SUPABASE_URL");
+  const serviceKey = Deno.env.get("ITX_SECRET_KEY") ?? Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
   const incidentWidgetUrl = Deno.env.get("ITX_INCIDENT_IO_WIDGET_URL");
   const killSwitchMessage = resolveKillSwitchMessage();
 

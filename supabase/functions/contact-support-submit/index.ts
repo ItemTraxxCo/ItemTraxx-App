@@ -249,9 +249,9 @@ serve(async (req) => {
   }
 
   try {
-    const supabaseUrl = Deno.env.get("ITX_SUPABASE_URL");
-    const publishableKey = Deno.env.get("ITX_PUBLISHABLE_KEY");
-    const serviceKey = Deno.env.get("ITX_SECRET_KEY");
+    const supabaseUrl = Deno.env.get("ITX_SUPABASE_URL") ?? Deno.env.get("SUPABASE_URL");
+    const publishableKey = Deno.env.get("ITX_PUBLISHABLE_KEY") ?? Deno.env.get("SUPABASE_ANON_KEY");
+    const serviceKey = Deno.env.get("ITX_SECRET_KEY") ?? Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
     const supportEmail = Deno.env.get("ITX_SUPPORT_EMAIL") ??
       "support@itemtraxx.com";
     const fromEmail = Deno.env.get("ITX_EMAIL_FROM") ??

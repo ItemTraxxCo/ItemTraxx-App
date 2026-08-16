@@ -979,8 +979,8 @@ serve(async (req) => {
   }
 
   try {
-    const supabaseUrl = Deno.env.get("ITX_SUPABASE_URL");
-    const serviceKey = Deno.env.get("ITX_SECRET_KEY");
+    const supabaseUrl = Deno.env.get("ITX_SUPABASE_URL") ?? Deno.env.get("SUPABASE_URL");
+    const serviceKey = Deno.env.get("ITX_SECRET_KEY") ?? Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
     const workerSecret = Deno.env.get("ITX_JOB_WORKER_SECRET");
     const resendApiKey = Deno.env.get("ITX_RESEND_API_KEY");
     const salesSlackWebhookUrl =

@@ -2,14 +2,14 @@ name: Deno Lock Sync
 
 # Any npm dependency bump (Dependabot or manual) touches package.json /
 # package-lock.json but never deno.lock, so the `deno check --frozen` steps
-# in CI Core fail. This workflow regenerates deno.lock to match and commits
+# in CI fail. This workflow regenerates deno.lock to match and commits
 # it back — on Dependabot PRs, human PRs, and direct pushes to any branch.
 #
 # Push uses a fine-grained PAT (secret ITX_DEPENDABOT_PAT, Contents:
 # read/write on this repo). A PAT is required because:
 #   - Dependabot `pull_request` runs only see Dependabot secrets, not Actions secrets.
-#   - Pushes made with the default GITHUB_TOKEN cannot re-trigger CI Core, so the
-#     final commit would sit with no passing checks. A PAT push re-triggers CI Core,
+#   - Pushes made with the default GITHUB_TOKEN cannot re-trigger CI, so the
+#     final commit would sit with no passing checks. A PAT push re-triggers CI,
 #     which then passes because the lock is in sync.
 #
 # Loop-safe: the bot's own commit only touches deno.lock, never package.json/
@@ -24,7 +24,7 @@ name: Deno Lock Sync
 # (only org members can push branches here). For a fork PR, the head repo is
 # attacker-controlled — checking it out and pushing with our PAT would hand
 # a write-capable credential's actions to that content. Fork PRs still get
-# CI Core's frozen-lockfile failure as a signal; a maintainer can push the
+# CI's frozen-lockfile failure as a signal; a maintainer can push the
 # branch or re-run manually to sync it.
 
 permissions:

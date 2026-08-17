@@ -18,6 +18,22 @@ begin
      or to_regclass('public.super_reporting_workspace_metrics') is null then
     raise exception 'reporting materialized view names are not aligned with the workspace model';
   end if;
+  if not exists (
+       select 1
+       from pg_attribute
+       where attrelid = 'public.super_reporting_workspace_metrics'::regclass
+         and attname = 'item_total'
+         and not attisdropped
+     )
+     or exists (
+       select 1
+       from pg_attribute
+       where attrelid = 'public.super_reporting_workspace_metrics'::regclass
+         and attname = 'gear_total'
+         and not attisdropped
+     ) then
+    raise exception 'reporting materialized view item count column is not item_total';
+  end if;
   if to_regprocedure('public.refresh_super_reporting_views()') is null
      or position(
        'super_reporting_workspace_metrics'

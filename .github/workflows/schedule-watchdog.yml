@@ -61,14 +61,19 @@ jobs:
 
           fetch_workflow_runs() {
             local workflow_file="$1"
-            local url="${API_BASE}/actions/workflows/${workflow_file}/runs?event=schedule&branch=main&status=completed&sort=created&direction=desc&per_page=50"
+            local base_url="${API_BASE}/actions/workflows/${workflow_file}/runs?event=schedule&branch=main&status=completed&sort=created&direction=desc&per_page=50"
+            local url
+            local cache_bust
             local attempt
             local max_attempts=4
             local delay_seconds=5
             local response
 
             for attempt in $(seq 1 "$max_attempts"); do
-              # GitHub's Actions run endpoint can serve an old 200 response; bypass intermediary caches.
+              # GitHub's Actions run endpoint can serve an old 200 response. Vary the URL
+              # on every attempt so an intermediary cannot reuse the same stale snapshot.
+              cache_bust="${CURRENT_EPOCH}-${RANDOM}-${attempt}"
+              url="${base_url}&watchdog_cache_bust=${cache_bust}"
               if response="$(curl -fsSL \
                 -H "Authorization: Bearer ${GITHUB_TOKEN}" \
                 -H "Accept: application/vnd.github+json" \

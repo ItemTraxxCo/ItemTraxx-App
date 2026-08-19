@@ -187,15 +187,24 @@ serve(async (req) => {
       { trustProxyHeader: true },
     );
 
-    // Bound the unauthenticated request cost. Fails open: a limiter outage must
-    // never take the public status page down with it.
+    // Bound the unauthenticated request cost. A limiter outage must fail closed
+    // so an attacker cannot turn an unavailable guard into an unbounded probe.
     const rateLimit = await enforcePreloginRateLimit(
       adminClient,
       clientFingerprint,
       trustedEdgeIngress ? "system-status-edge" : "system-status-direct",
       STATUS_RATE_LIMIT_PER_MINUTE,
       60
-    ).catch(() => ({ ok: true as const, error: null }));
+    );
+    if (rateLimit.error) {
+      return jsonResponse(503, {
+        status: "unknown",
+        checks: { config: "ok", db: "unknown", rate_limit: "unavailable" },
+        incident_summary: "rate limiter unavailable",
+        duration_ms: Date.now() - startedAt,
+        checked_at: new Date().toISOString(),
+      });
+    }
     if (!rateLimit.ok && !rateLimit.error) {
       return jsonResponse(429, {
         status: "unknown",

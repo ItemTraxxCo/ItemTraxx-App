@@ -26,6 +26,37 @@ export const touchSuperAdminSession = async (options: {
   });
 };
 
+export const verifySuperAdminPassword = (password: string) =>
+  callSuperOps<{ verified: boolean }>({
+    action: "verify_password",
+    payload: { password },
+  });
+
+export const startSuperAdminPasskeyRegistration = () =>
+  callSuperOps<{
+    challenge_id: string;
+    options: Record<string, unknown>;
+    expires_at: number;
+  }>({
+    action: "start_passkey_registration",
+    payload: {},
+  });
+
+export const verifySuperAdminPasskeyRegistration = (
+  challengeId: string,
+  credential: Record<string, unknown>,
+) =>
+  callSuperOps<Record<string, unknown>>({
+    action: "verify_passkey_registration",
+    payload: { challenge_id: challengeId, credential },
+  });
+
+export const deleteSuperAdminPasskey = (passkeyId: string) =>
+  callSuperOps<{ deleted: boolean }>({
+    action: "delete_passkey",
+    payload: { passkey_id: passkeyId },
+  });
+
 export const listSuperAdminSessions = async () => {
   const { deviceId, deviceLabel } = getOrCreateDeviceSession();
   const response = await callSuperOps<{ sessions: SuperAdminSessionItem[] }>({

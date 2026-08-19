@@ -501,7 +501,8 @@ serve(async (req) => {
       action === "bulk_create" ||
       action === "update_access" ||
       action === "delete" ||
-      action === "restore";
+      action === "restore" ||
+      action === "list_deleted";
 
     const payloadRecord = payload as Record<string, unknown>;
     const deviceId = optionalText(payloadRecord.device_id, { maxLen: 128 }) || null;

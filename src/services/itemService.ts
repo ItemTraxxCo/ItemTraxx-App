@@ -56,11 +56,12 @@ export const fetchItem = async () => {
 };
 
 export const fetchDeletedItem = async () => {
+  const { deviceId } = getOrCreateDeviceSession();
   const result = await invokeEdgeFunction<{ data: ItemRecord[] }>("admin-item-mutate", {
     method: "POST",
     body: {
       action: "list_deleted",
-      payload: {},
+      payload: { device_id: deviceId },
     },
   });
 

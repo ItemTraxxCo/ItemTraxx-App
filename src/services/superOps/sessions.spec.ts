@@ -14,7 +14,9 @@ import {
   listSuperAdminSessions,
   revokeAllSuperAdminSessions,
   revokeSuperAdminSession,
+  startSuperAdminPasskeyRegistration,
   touchSuperAdminSession,
+  verifySuperAdminPasskeyRegistration,
 } from "./sessions";
 import type { SuperAdminSessionItem } from "./types";
 
@@ -115,6 +117,34 @@ describe("listSuperAdminPasskeys", () => {
     const result = await listSuperAdminPasskeys();
 
     expect(result).toEqual([]);
+  });
+});
+
+describe("server-side passkey registration", () => {
+  it("starts registration through the step-up protected super-ops action", async () => {
+    const response = {
+      challenge_id: "challenge-1",
+      options: { challenge: "abc" },
+      expires_at: 123,
+    };
+    mockedCall.mockResolvedValueOnce(response);
+
+    await expect(startSuperAdminPasskeyRegistration()).resolves.toBe(response);
+    expect(mockedCall).toHaveBeenCalledWith({
+      action: "start_passkey_registration",
+      payload: {},
+    });
+  });
+
+  it("verifies the serialized credential through the step-up protected action", async () => {
+    const credential = { id: "credential-1", response: { clientDataJSON: "abc" } };
+    mockedCall.mockResolvedValueOnce({ id: "passkey-1" });
+
+    await expect(verifySuperAdminPasskeyRegistration("challenge-1", credential)).resolves.toEqual({ id: "passkey-1" });
+    expect(mockedCall).toHaveBeenCalledWith({
+      action: "verify_passkey_registration",
+      payload: { challenge_id: "challenge-1", credential },
+    });
   });
 });
 

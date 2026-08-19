@@ -7,6 +7,7 @@ const baseEnv = (overrides: Record<string, unknown> = {}) =>
   ({
     SUPABASE_URL,
     SUPABASE_ANON_KEY: "anon-key",
+    ALLOWED_FUNCTIONS: "admin-ops,checkout,system-status",
     SESSION_EXCHANGE_RATE_LIMITER: {
       limit: () => Promise.resolve({ success: true }),
     },
@@ -490,6 +491,29 @@ Deno.test("function allowlist and kill switch deny before the upstream", async (
     globalThis.fetch = originalFetch;
   }
   assertEquals(fetches, 0, "function gates must precede upstream fetch");
+});
+
+Deno.test("function routing fails closed when the allowlist is missing", async () => {
+  const originalFetch = globalThis.fetch;
+  let fetches = 0;
+  globalThis.fetch = (() => {
+    fetches += 1;
+    return Promise.resolve(new Response("unexpected", { status: 200 }));
+  }) as typeof fetch;
+  try {
+    const response = await worker.fetch(
+      new Request("https://edge.itemtraxx.com/functions/admin-ops", {
+        headers: { origin: ORIGIN },
+      }),
+      baseEnv({ ALLOWED_FUNCTIONS: "" }),
+      createContext().ctx,
+    );
+    assertEquals(response.status, 503, "missing function allowlist status");
+    assertEquals(await response.json(), { error: "Function allowlist unavailable" }, "missing allowlist response");
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+  assertEquals(fetches, 0, "missing function allowlist must block upstream access");
 });
 
 Deno.test("function proxy signs exact cloned bytes and streams upstream response", async () => {

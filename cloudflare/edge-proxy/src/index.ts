@@ -164,9 +164,16 @@ export default {
 
       const allowedFunctions = parseCsv(env.ALLOWED_FUNCTIONS);
       if (
-        allowedFunctions.length > 0 && !allowedFunctions.includes(functionName)
+        allowedFunctions.length === 0 || !allowedFunctions.includes(functionName)
       ) {
-        return buildError(403, "Function not allowed", headers, requestId);
+        return buildError(
+          allowedFunctions.length === 0 ? 503 : 403,
+          allowedFunctions.length === 0
+            ? "Function allowlist unavailable"
+            : "Function not allowed",
+          headers,
+          requestId,
+        );
       }
 
       const response = await proxyFunctionRequest(

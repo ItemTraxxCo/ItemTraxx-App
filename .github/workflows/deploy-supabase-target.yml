@@ -23,12 +23,24 @@ jobs:
   migrate-and-deploy:
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    environment: ${{ inputs.target }}
 
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+
+      - name: Require trusted production ref
+        if: ${{ inputs.target == 'production' }}
+        env:
+          DEPLOY_REF: ${{ github.ref }}
+        run: |
+          set -euo pipefail
+          test "$DEPLOY_REF" = "refs/heads/main" || {
+            echo "Production deployments must run from refs/heads/main (received $DEPLOY_REF)." >&2
+            exit 1
+          }
 
       - name: Resolve target
         id: target
@@ -92,7 +104,7 @@ jobs:
           cache: npm
 
       - name: Install dependencies
-        run: npm ci
+        run: npm ci --ignore-scripts
 
       - name: Deploy job-worker
         env:

@@ -59,14 +59,37 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Require trusted production ref
+        if: ${{ github.event_name == 'workflow_dispatch' }}
+        env:
+          DEPLOY_REF: ${{ github.ref }}
+        run: |
+          set -euo pipefail
+          test "$DEPLOY_REF" = "refs/heads/main" || {
+            echo "Production deployments must run from refs/heads/main (received $DEPLOY_REF)." >&2
+            exit 1
+          }
+
       - name: Setup Node
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
         with:
           node-version: 24.15.0
           cache: npm
 
+      - name: Setup Deno
+        uses: denoland/setup-deno@22d081ff2d3a40755e97629de92e3bcbfa7cf2ed # v2.0.5
+        with:
+          deno-version: 2.x
+          cache: true
+
       - name: Install dependencies
-        run: npm ci
+        run: npm ci --ignore-scripts
+
+      - name: Typecheck Cloudflare Worker
+        run: npm run worker:typecheck
+
+      - name: Test Cloudflare Worker
+        run: npm run worker:test
 
       - name: Deploy worker
         env:

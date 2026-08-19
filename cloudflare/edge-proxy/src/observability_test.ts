@@ -2,6 +2,7 @@ import {
   buildSentryEnvelope,
   maybeReportWorkerResponse,
   parseSentryDsn,
+  reportWorkerException,
   reportWorkerEvent,
 } from "./observability.ts";
 
@@ -157,4 +158,28 @@ Deno.test("5xx response reporting keeps ExecutionContext waitUntil ownership", (
     ownedContext,
     "waitUntil must be invoked on its ExecutionContext owner",
   );
+});
+
+Deno.test("request telemetry strips query strings before export", async () => {
+  const originalFetch = globalThis.fetch;
+  let payload = "";
+  globalThis.fetch = ((_input: string | URL | Request, init?: RequestInit) => {
+    payload = String(init?.body ?? "");
+    return Promise.resolve(new Response(null, { status: 200 }));
+  }) as typeof fetch;
+  try {
+    const request = new Request(
+      "https://edge.itemtraxx.com/functions/system-status?token=secret",
+    );
+    await reportWorkerException(
+      { SENTRY_DSN: "https://public-key@o123.ingest.sentry.io/456" } as Env,
+      request,
+      "request-1",
+      new Error("boom"),
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+  assert(payload.includes('"url":"https://edge.itemtraxx.com/functions/system-status"'), "telemetry URL should omit query strings");
+  assert(!payload.includes("token=secret"), "telemetry must not export query secrets");
 });

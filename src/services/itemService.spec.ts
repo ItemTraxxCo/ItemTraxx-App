@@ -79,7 +79,7 @@ describe("fetchDeletedItem", () => {
 
     expect(mockedInvoke).toHaveBeenCalledWith("admin-item-mutate", {
       method: "POST",
-      body: { action: "list_deleted", payload: {} },
+      body: { action: "list_deleted", payload: { device_id: "device-1" } },
     });
     expect(result).toEqual([{ id: "item-2" }]);
   });

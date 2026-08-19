@@ -59,6 +59,16 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Require trusted production ref
+        env:
+          DEPLOY_REF: ${{ github.ref }}
+        run: |
+          set -euo pipefail
+          test "$DEPLOY_REF" = "refs/heads/main" || {
+            echo "Production kill-switch changes must run from refs/heads/main (received $DEPLOY_REF)." >&2
+            exit 1
+          }
+
       - name: Setup Node
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
         with:
@@ -66,7 +76,7 @@ jobs:
           cache: npm
 
       - name: Install dependencies
-        run: npm ci
+        run: npm ci --ignore-scripts
 
       - name: Resolve kill-switch inputs
         id: config

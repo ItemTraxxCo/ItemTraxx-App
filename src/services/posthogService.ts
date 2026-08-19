@@ -113,10 +113,10 @@ export const initPostHog = async () => {
       logs: {
         captureConsoleLogs: true,
       },
-      disable_session_recording: false,
-      session_recording: {
-        maskAllInputs: true,
-      },
+      // Session replay is disabled globally: authenticated/admin DOM text can
+      // contain support requests and other tenant-sensitive data that input
+      // masking does not cover.
+      disable_session_recording: true,
       disable_surveys: true,
       disable_surveys_automatic_display: true,
       disable_product_tours: true,

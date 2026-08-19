@@ -7,6 +7,7 @@ import { resolveRateLimitResult } from "../_shared/preloginGuards.ts";
 import { validateAccountDeviceSession } from "../_shared/accountSessions.ts";
 import { requireRecentAdminAuth } from "../_shared/adminReauth.ts";
 import { readJsonBody } from "../_shared/requestBody.ts";
+import { resolveWorkspaceAccess } from "../_shared/workspaceAccess.ts";
 import {
   BARCODE_PATTERN,
   optionalText,
@@ -138,14 +139,20 @@ serve(async (req) => {
       return jsonResponse(403, { error: "Access denied" });
     }
 
-    const { data: workspaceStatusRow } = await userClient
+    const { data: workspaceStatusRow, error: workspaceStatusError } = await userClient
       .from("workspaces")
       .select("status")
       .eq("id", profile.workspace_id)
       .single();
 
-    if (workspaceStatusRow?.status && workspaceStatusRow.status !== "active") {
-      return jsonResponse(403, { error: "Workspace disabled" });
+    const workspaceAccess = resolveWorkspaceAccess(
+      workspaceStatusRow,
+      workspaceStatusError,
+    );
+    if (!workspaceAccess.allowed) {
+      return workspaceAccess.reason === "disabled"
+        ? jsonResponse(403, { error: "Workspace disabled" })
+        : jsonResponse(503, { error: "Workspace status unavailable" });
     }
 
     const { action, payload } = await readJsonBody(req);

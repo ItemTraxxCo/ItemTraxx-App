@@ -19,15 +19,34 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  require-trusted-ref:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require trusted ref for manual deployments
+        env:
+          RUN_EVENT: ${{ github.event_name }}
+          RUN_REF: ${{ github.ref }}
+        run: |
+          set -euo pipefail
+          if [ "$RUN_EVENT" = "workflow_dispatch" ]; then
+            test "$RUN_REF" = "refs/heads/main" || {
+              echo "Production deployments must use refs/heads/main (received $RUN_REF)." >&2
+              exit 1
+            }
+          fi
+
   # Retain the health signal for diagnostics; deployment does not gate on it.
   kill-switch-preflight:
+    needs: require-trusted-ref
     uses: ./.github/workflows/kill-switch-preflight.yml
     with:
       status_source: supabase
 
   slack-notify-start:
-    needs: kill-switch-preflight
-    if: ${{ !cancelled() }}
+    needs:
+      - require-trusted-ref
+      - kill-switch-preflight
+    if: ${{ !cancelled() && needs.require-trusted-ref.result == 'success' }}
     uses: ./.github/workflows/slack-notify-status.yml
     with:
       mode: start
@@ -45,10 +64,11 @@ jobs:
 
   deploy:
     needs:
+      - require-trusted-ref
       - kill-switch-preflight
       - slack-notify-start
     # Publishing a reviewed deployment is independent of the application kill switch.
-    if: ${{ !cancelled() }}
+    if: ${{ !cancelled() && needs.require-trusted-ref.result == 'success' }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     environment: production
@@ -99,9 +119,10 @@ jobs:
 
   slack-notify-finish:
     needs:
+      - require-trusted-ref
       - slack-notify-start
       - deploy
-    if: ${{ always() && needs.slack-notify-start.result == 'success' && needs.deploy.result != 'skipped' }}
+    if: ${{ always() && needs.require-trusted-ref.result == 'success' && needs.slack-notify-start.result == 'success' && needs.deploy.result != 'skipped' }}
     uses: ./.github/workflows/slack-notify-status.yml
     with:
       mode: finish
@@ -122,8 +143,9 @@ jobs:
 
   incidentio-notify-failure:
     needs:
+      - require-trusted-ref
       - deploy
-    if: ${{ always() && (needs.deploy.result == 'failure' || needs.deploy.result == 'cancelled') }}
+    if: ${{ always() && needs.require-trusted-ref.result == 'success' && (needs.deploy.result == 'failure' || needs.deploy.result == 'cancelled') }}
     uses: ./.github/workflows/incidentio-workflow-alert.yml
     with:
       status: ${{ needs.deploy.result }}

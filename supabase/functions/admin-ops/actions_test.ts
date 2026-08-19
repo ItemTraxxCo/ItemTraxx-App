@@ -188,19 +188,21 @@ Deno.test("admin ops dispatcher preserves the invalid-action response", async ()
 
 Deno.test("tenant users remain denied from workspace-admin-only actions", async () => {
   const { client } = queryClient(() => ({ data: null, error: null }));
-  const response = await authorizeAdminOpsAction({
-    action: "get_status_tracking",
-    profileRole: "tenant_account",
-    isWorkspaceSuspended: false,
-    adminClient: client,
-    userId: "user-1",
-    authToken: "token-1",
-    jsonResponse,
-  });
+  for (const action of ["get_notifications", "get_status_tracking"]) {
+    const response = await authorizeAdminOpsAction({
+      action,
+      profileRole: "tenant_account",
+      isWorkspaceSuspended: false,
+      adminClient: client,
+      userId: "user-1",
+      authToken: "token-1",
+      jsonResponse,
+    });
 
-  assertExists(response);
-  assertEquals(response.status, 403);
-  assertEquals(await responseBody(response), { error: "Access denied" });
+    assertExists(response);
+    assertEquals(response.status, 403);
+    assertEquals(await responseBody(response), { error: "Access denied" });
+  }
 });
 
 Deno.test("Tenant Accounts can use their own session-management actions", async () => {

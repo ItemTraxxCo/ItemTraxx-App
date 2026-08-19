@@ -14,14 +14,33 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  require-trusted-ref:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require trusted ref for manual runs
+        env:
+          RUN_EVENT: ${{ github.event_name }}
+          RUN_REF: ${{ github.ref }}
+        run: |
+          set -euo pipefail
+          if [ "$RUN_EVENT" = "workflow_dispatch" ]; then
+            test "$RUN_REF" = "refs/heads/main" || {
+              echo "Secret-bearing schedule watchdog runs must use refs/heads/main (received $RUN_REF)." >&2
+              exit 1
+            }
+          fi
+
   kill-switch-preflight:
+    needs: require-trusted-ref
     uses: ./.github/workflows/kill-switch-preflight.yml
     with:
       status_source: supabase
 
   check-stale-schedules:
-    needs: kill-switch-preflight
-    if: ${{ needs.kill-switch-preflight.outputs.active == 'false' }}
+    needs:
+      - require-trusted-ref
+      - kill-switch-preflight
+    if: ${{ needs.require-trusted-ref.result == 'success' && needs.kill-switch-preflight.outputs.active == 'false' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     env:
@@ -243,9 +262,10 @@ jobs:
 
   slack-notify-kill-switch-skip:
     needs:
+      - require-trusted-ref
       - kill-switch-preflight
       - check-stale-schedules
-    if: ${{ always() && needs.kill-switch-preflight.outputs.active == 'true' && needs.check-stale-schedules.result == 'skipped' }}
+    if: ${{ always() && needs.require-trusted-ref.result == 'success' && needs.kill-switch-preflight.outputs.active == 'true' && needs.check-stale-schedules.result == 'skipped' }}
     runs-on: ubuntu-latest
     steps:
       - name: Send Slack kill-switch skip notification
@@ -290,9 +310,10 @@ jobs:
 
   incidentio-notify-failure:
     needs:
+      - require-trusted-ref
       - kill-switch-preflight
       - check-stale-schedules
-    if: ${{ always() && (needs.kill-switch-preflight.outputs.active == 'false' || needs.kill-switch-preflight.outputs.active == 'unknown') && (needs.check-stale-schedules.result == 'failure' || needs.check-stale-schedules.result == 'cancelled') }}
+    if: ${{ always() && needs.require-trusted-ref.result == 'success' && (needs.kill-switch-preflight.outputs.active == 'false' || needs.kill-switch-preflight.outputs.active == 'unknown') && (needs.check-stale-schedules.result == 'failure' || needs.check-stale-schedules.result == 'cancelled') }}
     uses: ./.github/workflows/incidentio-workflow-alert.yml
     with:
       status: ${{ needs.check-stale-schedules.result }}

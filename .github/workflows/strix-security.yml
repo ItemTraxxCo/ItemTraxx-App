@@ -14,18 +14,35 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  require-trusted-ref:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require trusted ref for manual scans
+        if: ${{ github.event_name == 'workflow_dispatch' }}
+        env:
+          RUN_REF: ${{ github.ref }}
+        run: |
+          set -euo pipefail
+          test "$RUN_REF" = "refs/heads/main" || {
+            echo "Secret-bearing Strix scans must use refs/heads/main (received $RUN_REF)." >&2
+            exit 1
+          }
+
   kill-switch-preflight:
     # Scan the promotion PR: staging -> preview.
-    if: ${{ github.event_name == 'workflow_dispatch' || (github.event.pull_request.base.ref == 'preview' && github.event.pull_request.head.ref == 'staging') }}
+    needs: require-trusted-ref
+    if: ${{ needs.require-trusted-ref.result == 'success' && (github.event_name == 'workflow_dispatch' || (github.event.pull_request.base.ref == 'preview' && github.event.pull_request.head.ref == 'staging')) }}
     uses: ./.github/workflows/kill-switch-preflight.yml
     with:
       status_source: supabase
 
   strix-security-scan:
-    needs: kill-switch-preflight
+    needs:
+      - require-trusted-ref
+      - kill-switch-preflight
     # Strix v1.5.1 includes recoverable unknown-tool handling for the
     # ModelBehaviorError reproduced in ItemTraxx CI.
-    if: ((github.event_name == 'workflow_dispatch' || (github.event.pull_request.base.ref == 'preview' && github.event.pull_request.head.ref == 'staging')) && needs.kill-switch-preflight.outputs.active == 'false')
+    if: ((needs.require-trusted-ref.result == 'success' && needs.kill-switch-preflight.result == 'success') && (github.event_name == 'workflow_dispatch' || (github.event.pull_request.base.ref == 'preview' && github.event.pull_request.head.ref == 'staging')) && needs.kill-switch-preflight.outputs.active == 'false')
     permissions:
       contents: read
       pull-requests: write

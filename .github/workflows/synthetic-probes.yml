@@ -8,7 +8,24 @@ on:
     - cron: "17 */2 * * *"
 
 jobs:
+  require-trusted-ref:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require trusted ref for manual runs
+        env:
+          RUN_EVENT: ${{ github.event_name }}
+          RUN_REF: ${{ github.ref }}
+        run: |
+          set -euo pipefail
+          if [ "$RUN_EVENT" = "workflow_dispatch" ]; then
+            test "$RUN_REF" = "refs/heads/main" || {
+              echo "Secret-bearing synthetic probe runs must use refs/heads/main (received $RUN_REF)." >&2
+              exit 1
+            }
+          fi
+
   probes:
+    needs: require-trusted-ref
     uses: ItemTraxxCo/devops/.github/workflows/reusable-synthetic-probes.yml@fc9f2c08e50965b0a5fa2db9b57ff367da75f699
     with:
       hub_ref: fc9f2c08e50965b0a5fa2db9b57ff367da75f699
@@ -21,8 +38,9 @@ jobs:
 
   slack-notify-failure:
     needs:
+      - require-trusted-ref
       - probes
-    if: ${{ always() && (needs.probes.result == 'failure' || needs.probes.result == 'cancelled') }}
+    if: ${{ always() && needs.require-trusted-ref.result == 'success' && (needs.probes.result == 'failure' || needs.probes.result == 'cancelled') }}
     uses: ./.github/workflows/slack-notify-failure.yml
     with:
       workflow_name: Synthetic Probes (Hub)

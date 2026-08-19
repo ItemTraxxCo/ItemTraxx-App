@@ -10,13 +10,32 @@ on:
     - cron: "7,37 * * * *"
 
 jobs:
+  require-trusted-ref:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require trusted ref for manual runs
+        env:
+          RUN_EVENT: ${{ github.event_name }}
+          RUN_REF: ${{ github.ref }}
+        run: |
+          set -euo pipefail
+          if [ "$RUN_EVENT" = "workflow_dispatch" ]; then
+            test "$RUN_REF" = "refs/heads/main" || {
+              echo "Secret-bearing synthetic journey runs must use refs/heads/main (received $RUN_REF)." >&2
+              exit 1
+            }
+          fi
+
   kill-switch-preflight:
+    needs: require-trusted-ref
     uses: ./.github/workflows/kill-switch-preflight.yml
     with:
       status_source: supabase
 
   slack-notify-start:
-    needs: kill-switch-preflight
+    needs:
+      - require-trusted-ref
+      - kill-switch-preflight
     uses: ./.github/workflows/slack-notify-status.yml
     with:
       mode: start
@@ -34,9 +53,10 @@ jobs:
 
   synthetic-smoke:
     needs:
+      - require-trusted-ref
       - kill-switch-preflight
       - slack-notify-start
-    if: ${{ needs.kill-switch-preflight.outputs.active == 'false' }}
+    if: ${{ needs.require-trusted-ref.result == 'success' && needs.kill-switch-preflight.outputs.active == 'false' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
@@ -51,9 +71,10 @@ jobs:
 
   slack-notify-finish:
     needs:
+      - require-trusted-ref
       - slack-notify-start
       - synthetic-smoke
-    if: ${{ always() && needs.slack-notify-start.result == 'success' && needs.synthetic-smoke.result != 'skipped' }}
+    if: ${{ always() && needs.require-trusted-ref.result == 'success' && needs.slack-notify-start.result == 'success' && needs.synthetic-smoke.result != 'skipped' }}
     uses: ./.github/workflows/slack-notify-status.yml
     with:
       mode: finish
@@ -74,10 +95,11 @@ jobs:
 
   slack-notify-kill-switch-skip:
     needs:
+      - require-trusted-ref
       - kill-switch-preflight
       - slack-notify-start
       - synthetic-smoke
-    if: ${{ always() && needs.slack-notify-start.result == 'success' && needs.kill-switch-preflight.outputs.active == 'true' && needs.synthetic-smoke.result == 'skipped' }}
+    if: ${{ always() && needs.require-trusted-ref.result == 'success' && needs.slack-notify-start.result == 'success' && needs.kill-switch-preflight.outputs.active == 'true' && needs.synthetic-smoke.result == 'skipped' }}
     uses: ./.github/workflows/slack-notify-status.yml
     with:
       mode: finish
@@ -100,9 +122,10 @@ jobs:
 
   incidentio-notify-failure:
     needs:
+      - require-trusted-ref
       - kill-switch-preflight
       - synthetic-smoke
-    if: ${{ always() && (needs.kill-switch-preflight.outputs.active == 'false' || needs.kill-switch-preflight.outputs.active == 'unknown') && (needs.synthetic-smoke.result == 'failure' || needs.synthetic-smoke.result == 'cancelled') }}
+    if: ${{ always() && needs.require-trusted-ref.result == 'success' && (needs.kill-switch-preflight.outputs.active == 'false' || needs.kill-switch-preflight.outputs.active == 'unknown') && (needs.synthetic-smoke.result == 'failure' || needs.synthetic-smoke.result == 'cancelled') }}
     uses: ./.github/workflows/incidentio-workflow-alert.yml
     with:
       status: ${{ needs.synthetic-smoke.result }}

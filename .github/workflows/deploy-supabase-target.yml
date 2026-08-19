@@ -20,7 +20,21 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  require-trusted-ref:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require trusted ref for manual deployments
+        env:
+          RUN_REF: ${{ github.ref }}
+        run: |
+          set -euo pipefail
+          test "$RUN_REF" = "refs/heads/main" || {
+            echo "Supabase target deployments must use refs/heads/main (received $RUN_REF)." >&2
+            exit 1
+          }
+
   migrate-and-deploy:
+    needs: require-trusted-ref
     runs-on: ubuntu-latest
     timeout-minutes: 30
     environment: ${{ inputs.target }}
@@ -30,17 +44,6 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-
-      - name: Require trusted production ref
-        if: ${{ inputs.target == 'production' }}
-        env:
-          DEPLOY_REF: ${{ github.ref }}
-        run: |
-          set -euo pipefail
-          test "$DEPLOY_REF" = "refs/heads/main" || {
-            echo "Production deployments must run from refs/heads/main (received $DEPLOY_REF)." >&2
-            exit 1
-          }
 
       - name: Resolve target
         id: target

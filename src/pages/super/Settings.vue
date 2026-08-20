@@ -70,7 +70,7 @@
           </button>
         </div>
       </div>
-      <p class="muted">Authorization lasts 5 minutes.</p>
+      <p class="muted">Authorization is bound to this session and expires automatically.</p>
       <p v-if="reauthError" class="error">{{ reauthError }}</p>
       <p v-if="reauthSuccess" class="success">{{ reauthSuccess }}</p>
     </div>
@@ -225,17 +225,21 @@ import { getAuthState } from "../../store/authState";
 import {
   listSuperAdminPasskeys,
   listSuperAdminSessions,
+  deleteSuperAdminPasskey,
   revokeAllSuperAdminSessions,
   revokeSuperAdminSession,
+  startSuperAdminPasskeyRegistration,
   touchSuperAdminSession,
+  verifySuperAdminPasskeyRegistration,
+  verifySuperAdminPassword,
   type SuperAdminPasskeyItem,
   type SuperAdminSessionItem,
 } from "../../services/superOps/sessions";
+import { registerPasskeyWithOptions } from "../../services/superOps/passkeyWebAuthn";
 import { superAdminPasskeyLogin } from "../../services/authService";
 import { getPasswordResetRedirectUrl } from "../../utils/passwordResetRedirect";
 
 const auth = getAuthState();
-const REAUTH_WINDOW_MS = 5 * 60 * 1000;
 
 const isPasswordResetSending = ref(false);
 const passwordResetMessage = ref("");
@@ -245,7 +249,7 @@ const reauthPassword = ref("");
 const isReauthLoading = ref(false);
 const reauthError = ref("");
 const reauthSuccess = ref("");
-const passkeyManagementAuthorizedUntil = ref<number | null>(null);
+const passkeyManagementVerified = ref(false);
 
 const passkeys = ref<SuperAdminPasskeyItem[]>([]);
 const isPasskeyActionLoading = ref(false);
@@ -269,8 +273,7 @@ const isPasskeySupported = computed(
 const canManagePasskeys = computed(
   () =>
     isPasskeySupported.value &&
-    !!passkeyManagementAuthorizedUntil.value &&
-    passkeyManagementAuthorizedUntil.value > Date.now()
+    passkeyManagementVerified.value
 );
 
 const reauthLabel = computed(() =>
@@ -335,10 +338,6 @@ const sendPasswordReset = async () => {
   }
 };
 
-const grantPasskeyManagementWindow = () => {
-  passkeyManagementAuthorizedUntil.value = Date.now() + REAUTH_WINDOW_MS;
-};
-
 const reauthWithPassword = async () => {
   reauthError.value = "";
   reauthSuccess.value = "";
@@ -349,20 +348,14 @@ const reauthWithPassword = async () => {
     if (!email) {
       throw new Error("No account email found for this session.");
     }
-    const signIn = await supabase.auth.signInWithPassword({
-      email,
-      password: reauthPassword.value,
-    });
-    if (signIn.error || !signIn.data.session?.access_token) {
-      throw signIn.error || new Error("Invalid password.");
-    }
+    await verifySuperAdminPassword(reauthPassword.value);
     await touchSuperAdminSession({
       loginMethod: "password",
       loginLocation: "super_settings",
     });
-    grantPasskeyManagementWindow();
+    passkeyManagementVerified.value = true;
     reauthPassword.value = "";
-    reauthSuccess.value = "Password verified. You can now manage passkeys for 5 minutes.";
+    reauthSuccess.value = "Password verified. You can now manage passkeys.";
   } catch (err) {
     reauthError.value = toUserFacingErrorMessage(err, "Password verification failed.");
   } finally {
@@ -384,8 +377,8 @@ const reauthWithPasskey = async () => {
       loginMethod: "passkey",
       loginLocation: "super_settings",
     });
-    grantPasskeyManagementWindow();
-    reauthSuccess.value = "Passkey verified. You can now manage passkeys for 5 minutes.";
+    passkeyManagementVerified.value = true;
+    reauthSuccess.value = "Passkey verified. You can now manage passkeys.";
     await Promise.all([loadPasskeys(), loadSessions()]);
   } catch (err) {
     reauthError.value = toUserFacingErrorMessage(err, "Passkey verification failed.");
@@ -394,15 +387,27 @@ const reauthWithPasskey = async () => {
   }
 };
 
-const runProtectedAction = async (action: () => Promise<void>) => {
-  if (canManagePasskeys.value) {
+const runProtectedAction = async (
+  action: () => Promise<void>,
+) => {
+  try {
     await action();
-    return;
+    passkeyManagementVerified.value = true;
+  } catch (err) {
+    if (
+      err instanceof Error &&
+      "status" in err &&
+      (err as { status?: number }).status === 403
+    ) {
+      pendingProtectedAction = () => runProtectedAction(action);
+      modalReauthPassword.value = "";
+      modalReauthError.value = "";
+      reauthModalOpen.value = true;
+      passkeyManagementVerified.value = false;
+      return;
+    }
+    passkeyError.value = toUserFacingErrorMessage(err, "Unable to authorize passkey changes.");
   }
-  pendingProtectedAction = action;
-  modalReauthPassword.value = "";
-  modalReauthError.value = "";
-  reauthModalOpen.value = true;
 };
 
 const closeReauthModal = () => {
@@ -451,8 +456,12 @@ const addPasskey = async () => {
   await runProtectedAction(async () => {
     isPasskeyActionLoading.value = true;
     try {
-      const result = await supabase.auth.registerPasskey();
-      if (result.error) throw result.error;
+      const registration = await startSuperAdminPasskeyRegistration();
+      const credential = await registerPasskeyWithOptions(registration.options);
+      await verifySuperAdminPasskeyRegistration(
+        registration.challenge_id,
+        credential,
+      );
       await touchSuperAdminSession({
         loginMethod: "passkey",
         loginLocation: "super_settings",
@@ -473,8 +482,7 @@ const removePasskey = async (passkeyId: string) => {
   await runProtectedAction(async () => {
     isPasskeyActionLoading.value = true;
     try {
-      const result = await supabase.auth.passkey.delete({ passkeyId });
-      if (result.error) throw result.error;
+      await deleteSuperAdminPasskey(passkeyId);
       passkeySuccess.value = "Passkey removed.";
       await loadPasskeys();
     } catch (err) {

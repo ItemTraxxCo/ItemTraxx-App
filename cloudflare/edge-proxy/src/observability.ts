@@ -10,6 +10,15 @@ export type ObservabilityDependencies = {
   currentDate?: () => Date;
 };
 
+const sanitizeRequestUrl = (request: Request) => {
+  try {
+    const url = new URL(request.url);
+    return `${url.origin}${url.pathname}`;
+  } catch {
+    return "[invalid-url]";
+  }
+};
+
 const defaultDependencies: ObservabilityDependencies = {
   randomUUID: () => crypto.randomUUID(),
   now: () => Date.now(),
@@ -88,7 +97,7 @@ export const reportWorkerException = (
     level: "error",
     environment: env.SENTRY_ENVIRONMENT?.trim() || "production",
     request: {
-      url: request.url,
+      url: sanitizeRequestUrl(request),
       method: request.method,
       headers: { origin: request.headers.get("origin") ?? undefined },
     },
@@ -115,7 +124,7 @@ export const reportWorkerHttpFailure = (
     level: status >= 500 ? "error" : "warning",
     environment: env.SENTRY_ENVIRONMENT?.trim() || "production",
     request: {
-      url: request.url,
+      url: sanitizeRequestUrl(request),
       method: request.method,
       headers: { origin: request.headers.get("origin") ?? undefined },
     },

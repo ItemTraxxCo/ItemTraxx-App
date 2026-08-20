@@ -43,6 +43,7 @@ export const ADMIN_OPS_ACTION_OWNERS: Record<AdminOpsAction, string> = {
 };
 
 const WORKSPACE_ADMIN_ONLY_ACTIONS = new Set<AdminOpsAction>([
+  "get_notifications",
   "get_workspace_settings",
   "update_workspace_settings",
   "get_status_tracking",

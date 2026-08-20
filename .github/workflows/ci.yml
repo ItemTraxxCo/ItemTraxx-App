@@ -22,16 +22,35 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  require-trusted-ref:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require trusted ref for manual runs
+        env:
+          RUN_EVENT: ${{ github.event_name }}
+          RUN_REF: ${{ github.ref }}
+        run: |
+          set -euo pipefail
+          if [ "$RUN_EVENT" = "workflow_dispatch" ]; then
+            test "$RUN_REF" = "refs/heads/main" || {
+              echo "Secret-bearing CI runs must use refs/heads/main (received $RUN_REF)." >&2
+              exit 1
+            }
+          fi
+
   kill-switch-preflight:
     # GitHub-hosted runners receive a Cloudflare challenge (HTTP 403) from
     # the edge system-status URL. Use the direct Supabase origin while
     # keeping CI fail-closed on an unknown state.
+    needs: require-trusted-ref
     uses: ./.github/workflows/kill-switch-preflight.yml
     with:
       status_source: supabase
 
   slack-notify-start:
-    needs: kill-switch-preflight
+    needs:
+      - require-trusted-ref
+      - kill-switch-preflight
     uses: ./.github/workflows/slack-notify-status.yml
     with:
       mode: start
@@ -49,9 +68,10 @@ jobs:
 
   validate:
     needs:
+      - require-trusted-ref
       - kill-switch-preflight
       - slack-notify-start
-    if: ${{ needs.kill-switch-preflight.outputs.active == 'false' }}
+    if: ${{ needs.require-trusted-ref.result == 'success' && needs.kill-switch-preflight.outputs.active == 'false' }}
     runs-on: ubuntu-latest
     timeout-minutes: 90
 
@@ -312,13 +332,14 @@ jobs:
 
   slack-notify-finish:
     needs:
+      - require-trusted-ref
       - kill-switch-preflight
       - slack-notify-start
       - validate
     # Always finish the single CI status message when the start message exists.
     # A kill-switch block is reported in that same message instead of creating
     # a second, normally skipped, notification check.
-    if: ${{ always() && needs.slack-notify-start.result == 'success' }}
+    if: ${{ always() && needs.require-trusted-ref.result == 'success' && needs.slack-notify-start.result == 'success' }}
     uses: ./.github/workflows/slack-notify-status.yml
     with:
       mode: finish

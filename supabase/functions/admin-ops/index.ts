@@ -7,6 +7,7 @@ import { requireTrustedEdgeIngress } from "../_shared/trustedIngress.ts";
 import { readJsonBody } from "../_shared/requestBody.ts";
 import { sha256Hex } from "../_shared/sha256.ts";
 import { resolveAccountAuthSessionBinding } from "../_shared/accountSessions.ts";
+import { resolveWorkspaceAccess } from "../_shared/workspaceAccess.ts";
 import {
   asRecord,
   requireText,
@@ -179,13 +180,19 @@ serve(async (req) => {
       normalizedAction === "revoke_all_sessions";
 
     const workspaceId = profile.workspace_id as string;
-    const { data: workspaceStatus } = await userClient
+    const { data: workspaceStatus, error: workspaceStatusError } = await adminClient
       .from("workspaces")
       .select("status")
       .eq("id", workspaceId)
       .maybeSingle();
-    const isWorkspaceSuspended = !!workspaceStatus?.status &&
-      workspaceStatus.status !== "active";
+    const workspaceAccess = resolveWorkspaceAccess(
+      workspaceStatus,
+      workspaceStatusError,
+    );
+    if (workspaceAccess.reason === "unavailable") {
+      return jsonResponse(503, { error: "Workspace status unavailable" });
+    }
+    const isWorkspaceSuspended = workspaceAccess.reason === "disabled";
     const deviceSession = resolveDeviceSessionContext(payloadRecord, req);
 
     const sessionSecurityContext = {

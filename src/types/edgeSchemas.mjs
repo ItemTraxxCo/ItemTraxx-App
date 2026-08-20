@@ -657,6 +657,9 @@ const superOpsRequestSchema = z.discriminatedUnion("action", [
   }),
   z.object({ action: z.literal("list_sessions"), payload: superOpsDevicePayloadSchema }),
   z.object({ action: z.literal("list_passkeys"), payload: z.object({}).optional() }),
+  z.object({ action: z.literal("start_passkey_registration"), payload: z.object({}).optional() }),
+  z.object({ action: z.literal("verify_passkey_registration"), payload: z.object({ challenge_id: z.string().min(1), credential: z.record(z.string(), z.unknown()) }) }),
+  z.object({ action: z.literal("delete_passkey"), payload: z.object({ passkey_id: z.string().min(1) }) }),
   z.object({
     action: z.literal("revoke_session"),
     payload: superOpsDevicePayloadSchema.extend({ session_id: z.string().min(1) }),
@@ -712,6 +715,9 @@ const superOpsResponseSchemas = {
   touch_session: superOpsEnvelopeSchema(z.object({ ok: z.boolean() })),
   list_sessions: superOpsEnvelopeSchema(z.object({ sessions: z.array(superOpsSessionSchema) })),
   list_passkeys: superOpsEnvelopeSchema(z.object({ passkeys: z.array(superOpsPasskeySchema) })),
+  start_passkey_registration: superOpsEnvelopeSchema(z.object({ challenge_id: z.string(), options: z.record(z.string(), z.unknown()), expires_at: z.number() })),
+  verify_passkey_registration: superOpsEnvelopeSchema(z.record(z.string(), z.unknown())),
+  delete_passkey: superOpsEnvelopeSchema(z.object({ deleted: z.boolean() })),
   revoke_session: superOpsEnvelopeSchema(z.object({ revoked: z.boolean() })),
   revoke_all_sessions: superOpsEnvelopeSchema(z.object({ revoked: z.number().int().nonnegative() })),
   get_control_center: superOpsEnvelopeSchema(z.object({

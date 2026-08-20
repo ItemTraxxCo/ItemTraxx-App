@@ -20,9 +20,24 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  require-trusted-ref:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require trusted ref for manual deployments
+        env:
+          RUN_REF: ${{ github.ref }}
+        run: |
+          set -euo pipefail
+          test "$RUN_REF" = "refs/heads/main" || {
+            echo "Supabase target deployments must use refs/heads/main (received $RUN_REF)." >&2
+            exit 1
+          }
+
   migrate-and-deploy:
+    needs: require-trusted-ref
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    environment: ${{ inputs.target }}
 
     steps:
       - name: Checkout
@@ -92,7 +107,7 @@ jobs:
           cache: npm
 
       - name: Install dependencies
-        run: npm ci
+        run: npm ci --ignore-scripts
 
       - name: Deploy job-worker
         env:

@@ -10,8 +10,13 @@ import {
   buildJson,
   buildSessionRateLimitError,
 } from "./responses.ts";
+import {
+  readBoundedRequestBody,
+  RequestBodyLimitError,
+} from "./requestBody.ts";
 
 const REFRESH_GRANT_TYPE = "refresh_token";
+export const MAX_SESSION_EXCHANGE_BODY_BYTES = 32 * 1024;
 
 type SessionSummary = {
   authenticated: boolean;
@@ -301,8 +306,22 @@ const handleSessionExchange = async (
     return buildSessionRateLimitError("unavailable", headers, requestId);
   }
 
-  const payload =
-    (await request.json().catch(() => ({}))) as SessionExchangePayload;
+  let payload: SessionExchangePayload;
+  try {
+    const body = await readBoundedRequestBody(
+      request,
+      MAX_SESSION_EXCHANGE_BODY_BYTES,
+    );
+    const parsed = JSON.parse(new TextDecoder().decode(body));
+    payload = parsed && typeof parsed === "object" && !Array.isArray(parsed)
+      ? parsed as SessionExchangePayload
+      : {};
+  } catch (error) {
+    if (error instanceof RequestBodyLimitError) {
+      return buildError(error.status, error.message, headers, requestId);
+    }
+    payload = {};
+  }
   if (!payload.access_token || !payload.refresh_token) {
     return buildError(400, "Invalid request", headers, requestId);
   }

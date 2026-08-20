@@ -47,7 +47,7 @@ test("rejects duplicate declarations in an authoritative response map", () => {
 test("runtime registries have exact generated request and response coverage", async () => {
   assert.deepEqual(await inspectEdgeActionContractParity(), [
     { endpoint: "admin-ops", count: 12 },
-    { endpoint: "super-ops", count: 27 },
+    { endpoint: "super-ops", count: 30 },
     { endpoint: "super-workspace-mutate", count: 6 },
   ]);
 });

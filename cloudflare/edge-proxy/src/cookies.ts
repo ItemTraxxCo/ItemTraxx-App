@@ -15,7 +15,12 @@ export const parseCookies = (request: Request): SessionCookies => {
   raw.split(";").forEach((part) => {
     const [key, ...rest] = part.trim().split("=");
     if (!key || rest.length === 0) return;
-    parsed.set(key, decodeURIComponent(rest.join("=")));
+    try {
+      parsed.set(key, decodeURIComponent(rest.join("=")));
+    } catch {
+      // Ignore malformed untrusted cookie values instead of turning the whole
+      // request into a Worker exception.
+    }
   });
   return {
     accessToken: parsed.get(ACCESS_COOKIE_NAME) ?? null,

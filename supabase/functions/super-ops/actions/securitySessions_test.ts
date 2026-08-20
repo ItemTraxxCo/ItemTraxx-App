@@ -112,6 +112,7 @@ const makeAdminClient = (
           passkey: {
             listPasskeys: () =>
               Promise.resolve(options.passkeys ?? { data: [], error: null }),
+            deletePasskey: () => Promise.resolve({ data: null, error: null }),
           },
         },
       },
@@ -187,6 +188,25 @@ const withMockedAuthFetch = async (
   }
 };
 
+const withMockedPasskeyFetch = async (
+  handler: (url: string, init?: RequestInit) => Response | Promise<Response>,
+  run: () => Promise<void>,
+) => {
+  const original = globalThis.fetch;
+  globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = typeof input === "string" ? input : (input as URL).toString();
+    if (url.includes("/auth/v1/passkeys/")) {
+      return handler(url, init);
+    }
+    return original(input as Parameters<typeof fetch>[0], init);
+  }) as typeof fetch;
+  try {
+    await run();
+  } finally {
+    globalThis.fetch = original;
+  }
+};
+
 const signInSuccessResponse = (userId: string) =>
   new Response(
     JSON.stringify({
@@ -206,9 +226,9 @@ const signInErrorResponse = () =>
     { status: 400, headers: { "Content-Type": "application/json" } },
   );
 
-Deno.test("securitySessions registry owns exactly the 6 live actions", () => {
-  assertEquals(SECURITY_SESSION_ACTIONS.length, 6);
-  assertEquals(new Set(SECURITY_SESSION_ACTIONS).size, 6);
+Deno.test("securitySessions registry owns exactly the 9 live actions", () => {
+  assertEquals(SECURITY_SESSION_ACTIONS.length, 9);
+  assertEquals(new Set(SECURITY_SESSION_ACTIONS).size, 9);
 });
 
 Deno.test("handleSecuritySessionsAction returns null for actions it does not own", async () => {
@@ -315,6 +335,89 @@ Deno.test("verify_password succeeds and records an audit entry", async () => {
         "00000000-0000-4000-8000-000000000001",
         {},
       ]]);
+    },
+  );
+});
+
+Deno.test("start_passkey_registration proxies the server-side ceremony", async () => {
+  let requestUrl = "";
+  let requestInit: RequestInit | undefined;
+  await withMockedPasskeyFetch(
+    (url, init) => {
+      requestUrl = url;
+      requestInit = init;
+      return new Response(
+        JSON.stringify({
+          challenge_id: "challenge-1",
+          options: { challenge: "abc", user: { id: "user" } },
+          expires_at: 123,
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      );
+    },
+    async () => {
+      const { client } = makeAdminClient(sequence([]));
+      const auditCalls: unknown[][] = [];
+      const response = await handleSecuritySessionsAction(
+        contextFor("start_passkey_registration", {}, client, {
+          writeAudit: async (...args) => {
+            auditCalls.push(args);
+          },
+        }),
+      );
+
+      assert(response !== null, "expected a response");
+      assertEquals(response!.status, 200);
+      assertEquals(await responseBody(response!), {
+        data: {
+          challenge_id: "challenge-1",
+          options: { challenge: "abc", user: { id: "user" } },
+          expires_at: 123,
+        },
+      });
+      assertEquals(requestUrl, "https://example.test/auth/v1/passkeys/registration/options");
+      assertEquals(requestInit?.method, "POST");
+      assertEquals(JSON.parse(String(requestInit?.body)), {});
+      assertEquals(auditCalls[0]?.[0], "super_admin_passkey_registration_started");
+    },
+  );
+});
+
+Deno.test("verify_passkey_registration proxies the credential and audits success", async () => {
+  let requestBody: Record<string, unknown> | null = null;
+  await withMockedPasskeyFetch(
+    (_url, init) => {
+      requestBody = JSON.parse(String(init?.body)) as Record<string, unknown>;
+      return new Response(
+        JSON.stringify({ id: "passkey-1", created_at: "2026-01-01T00:00:00Z" }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      );
+    },
+    async () => {
+      const { client } = makeAdminClient(sequence([]));
+      const auditCalls: unknown[][] = [];
+      const credential = { id: "credential-1", response: { clientDataJSON: "abc" } };
+      const response = await handleSecuritySessionsAction(
+        contextFor("verify_passkey_registration", {
+          challenge_id: "challenge-1",
+          credential,
+        }, client, {
+          writeAudit: async (...args) => {
+            auditCalls.push(args);
+          },
+        }),
+      );
+
+      assert(response !== null, "expected a response");
+      assertEquals(response!.status, 200);
+      assertEquals(await responseBody(response!), {
+        data: { id: "passkey-1", created_at: "2026-01-01T00:00:00Z" },
+      });
+      assertEquals(requestBody, {
+        challenge_id: "challenge-1",
+        credential,
+      });
+      assertEquals(auditCalls[0]?.[0], "super_admin_passkey_registered");
     },
   );
 });
@@ -613,6 +716,28 @@ Deno.test("list_passkeys reports a generic failure on error", async () => {
   assert(response !== null, "expected a response");
   assertEquals(response!.status, 400);
   assertEquals(await responseBody(response!), { error: "Unable to load passkeys." });
+});
+
+Deno.test("delete_passkey deletes only through the server admin API", async () => {
+  const { client } = makeAdminClient(sequence([]));
+  const auditCalls: unknown[][] = [];
+  const response = await handleSecuritySessionsAction(
+    contextFor("delete_passkey", { passkey_id: "passkey-1" }, client, {
+      writeAudit: async (...args) => {
+        auditCalls.push(args);
+      },
+    }),
+  );
+
+  assert(response !== null, "expected a response");
+  assertEquals(response!.status, 200);
+  assertEquals(await responseBody(response!), { data: { deleted: true } });
+  assertEquals(auditCalls, [[
+    "super_admin_passkey_deleted",
+    "super_admin_auth",
+    "00000000-0000-4000-8000-000000000001",
+    { passkey_id: "passkey-1" },
+  ]]);
 });
 
 // =====================================================================

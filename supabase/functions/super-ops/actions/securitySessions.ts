@@ -1,6 +1,10 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.108.2";
 import { resolveTrustedGeneralLocation } from "../../_shared/requestMetadata.ts";
-import { optionalText, requireText } from "../../_shared/validation.ts";
+import {
+  isMissingPrivilegedStepUpTable,
+  registerPrivilegedStepUp,
+} from "../../_shared/privilegedStepUp.ts";
+import { asRecord, optionalText, requireText } from "../../_shared/validation.ts";
 import type { SuperOpsContext } from "../context.ts";
 
 export const SECURITY_SESSION_ACTIONS = [
@@ -10,6 +14,9 @@ export const SECURITY_SESSION_ACTIONS = [
   "list_passkeys",
   "revoke_session",
   "revoke_all_sessions",
+  "start_passkey_registration",
+  "verify_passkey_registration",
+  "delete_passkey",
 ] as const;
 
 const isMissingRelation = (
@@ -34,6 +41,44 @@ const resolveJwtLoginMethod = (claims: Record<string, unknown>) => {
   )
     ? "password"
     : null;
+};
+
+const requestPasskeyAuth = async (
+  context: Pick<SuperOpsContext, "supabaseUrl" | "publishableKey" | "accessToken">,
+  path: "registration/options" | "registration/verify",
+  body: Record<string, unknown>,
+) => {
+  if (!context.publishableKey) {
+    return { ok: false as const, status: 500, data: null };
+  }
+
+  try {
+    const response = await fetch(
+      `${context.supabaseUrl.replace(/\/+$/, "")}/auth/v1/passkeys/${path}`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${context.accessToken}`,
+          apikey: context.publishableKey,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(body),
+      },
+    );
+    let data: unknown = null;
+    try {
+      data = await response.json();
+    } catch {
+      data = null;
+    }
+    return { ok: response.ok as boolean, status: response.status, data };
+  } catch (error) {
+    console.error("Passkey registration request failed", {
+      path,
+      message: error instanceof Error ? error.message : "Unknown error",
+    });
+    return { ok: false as const, status: 503, data: null };
+  }
 };
 
 export const handleSecuritySessionsAction = async (
@@ -79,6 +124,22 @@ export const handleSecuritySessionsAction = async (
       return jsonResponse(401, { error: "Invalid password." });
     }
 
+    try {
+      await registerPrivilegedStepUp(adminClient, {
+        userId: user.id,
+        roleScope: "super_admin",
+        authToken: accessToken,
+        source: "super_admin_settings_password",
+      });
+    } catch (error) {
+      if (isMissingPrivilegedStepUpTable(error as { code?: string; message?: string })) {
+        return jsonResponse(503, {
+          error: "Privileged verification controls unavailable. Run latest SQL setup.",
+        });
+      }
+      throw error;
+    }
+
     await writeAudit(
       "super_admin_settings_password_verified",
       "super_admin_auth",
@@ -86,6 +147,48 @@ export const handleSecuritySessionsAction = async (
       {},
     );
     return jsonResponse(200, { data: { verified: true } });
+  }
+
+  if (action === "start_passkey_registration") {
+    const result = await requestPasskeyAuth(
+      { supabaseUrl, publishableKey, accessToken },
+      "registration/options",
+      {},
+    );
+    if (!result.ok || !result.data || typeof result.data !== "object") {
+      return jsonResponse(result.status >= 500 ? 503 : result.status === 429 ? 429 : 400, {
+        error: "Unable to start passkey registration.",
+      });
+    }
+    await writeAudit(
+      "super_admin_passkey_registration_started",
+      "super_admin_auth",
+      user.id,
+      {},
+    );
+    return jsonResponse(200, { data: result.data as Record<string, unknown> });
+  }
+
+  if (action === "verify_passkey_registration") {
+    const challengeId = requireText(payload.challenge_id, { maxLen: 256 });
+    const credential = asRecord(payload.credential);
+    const result = await requestPasskeyAuth(
+      { supabaseUrl, publishableKey, accessToken },
+      "registration/verify",
+      { challenge_id: challengeId, credential },
+    );
+    if (!result.ok || !result.data || typeof result.data !== "object") {
+      return jsonResponse(result.status >= 500 ? 503 : result.status === 429 ? 429 : 400, {
+        error: "Unable to verify passkey registration.",
+      });
+    }
+    await writeAudit(
+      "super_admin_passkey_registered",
+      "super_admin_auth",
+      user.id,
+      {},
+    );
+    return jsonResponse(200, { data: result.data as Record<string, unknown> });
   }
 
   if (action === "touch_session") {
@@ -288,6 +391,29 @@ export const handleSecuritySessionsAction = async (
         })),
       },
     });
+  }
+
+  if (action === "delete_passkey") {
+    const passkeyId = requireText(payload.passkey_id, { maxLen: 128 });
+    const { error } = await adminClient.auth.admin.passkey.deletePasskey({
+      userId: user.id,
+      passkeyId,
+    });
+    if (error) {
+      console.error("Unable to delete super-admin passkey", {
+        user_id: user.id,
+        passkey_id: passkeyId,
+        message: error.message,
+      });
+      return jsonResponse(400, { error: "Unable to remove passkey." });
+    }
+    await writeAudit(
+      "super_admin_passkey_deleted",
+      "super_admin_auth",
+      user.id,
+      { passkey_id: passkeyId },
+    );
+    return jsonResponse(200, { data: { deleted: true } });
   }
 
   if (action === "revoke_session") {

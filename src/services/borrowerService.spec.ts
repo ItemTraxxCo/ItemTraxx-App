@@ -76,6 +76,10 @@ describe("fetchDeletedBorrowers", () => {
     } as never);
 
     const result = await fetchDeletedBorrowers();
+    expect(mockedInvoke).toHaveBeenCalledWith("admin-borrower-mutate", {
+      method: "POST",
+      body: { action: "list_deleted", payload: { device_id: "device-1" } },
+    });
     expect(result).toEqual([{ id: "b-2" }]);
   });
 

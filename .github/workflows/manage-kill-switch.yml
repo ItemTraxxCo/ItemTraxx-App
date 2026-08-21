@@ -25,11 +25,27 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  require-trusted-ref:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require trusted ref for manual changes
+        env:
+          RUN_REF: ${{ github.ref }}
+        run: |
+          set -euo pipefail
+          test "$RUN_REF" = "refs/heads/main" || {
+            echo "Kill-switch changes must use refs/heads/main (received $RUN_REF)." >&2
+            exit 1
+          }
+
   kill-switch-preflight:
+    needs: require-trusted-ref
     uses: ./.github/workflows/kill-switch-preflight.yml
 
   slack-notify-start:
-    needs: kill-switch-preflight
+    needs:
+      - require-trusted-ref
+      - kill-switch-preflight
     uses: ./.github/workflows/slack-notify-status.yml
     with:
       mode: start
@@ -47,6 +63,7 @@ jobs:
 
   apply:
     needs:
+      - require-trusted-ref
       - kill-switch-preflight
       - slack-notify-start
     runs-on: ubuntu-latest
@@ -59,6 +76,16 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Require trusted production ref
+        env:
+          DEPLOY_REF: ${{ github.ref }}
+        run: |
+          set -euo pipefail
+          test "$DEPLOY_REF" = "refs/heads/main" || {
+            echo "Production kill-switch changes must run from refs/heads/main (received $DEPLOY_REF)." >&2
+            exit 1
+          }
+
       - name: Setup Node
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
         with:
@@ -66,7 +93,7 @@ jobs:
           cache: npm
 
       - name: Install dependencies
-        run: npm ci
+        run: npm ci --ignore-scripts
 
       - name: Resolve kill-switch inputs
         id: config
@@ -123,9 +150,10 @@ jobs:
 
   slack-notify-finish:
     needs:
+      - require-trusted-ref
       - slack-notify-start
       - apply
-    if: ${{ always() && needs.slack-notify-start.result == 'success' && needs.apply.result != 'skipped' }}
+    if: ${{ always() && needs.require-trusted-ref.result == 'success' && needs.slack-notify-start.result == 'success' && needs.apply.result != 'skipped' }}
     uses: ./.github/workflows/slack-notify-status.yml
     with:
       mode: finish
@@ -146,9 +174,10 @@ jobs:
 
   incidentio-notify-failure:
     needs:
+      - require-trusted-ref
       - kill-switch-preflight
       - apply
-    if: ${{ always() && (needs.kill-switch-preflight.outputs.active == 'false' || needs.kill-switch-preflight.outputs.active == 'unknown') && (needs.apply.result == 'failure' || needs.apply.result == 'cancelled') }}
+    if: ${{ always() && needs.require-trusted-ref.result == 'success' && (needs.kill-switch-preflight.outputs.active == 'false' || needs.kill-switch-preflight.outputs.active == 'unknown') && (needs.apply.result == 'failure' || needs.apply.result == 'cancelled') }}
     uses: ./.github/workflows/incidentio-workflow-alert.yml
     with:
       status: ${{ needs.apply.result }}

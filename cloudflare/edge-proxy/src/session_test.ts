@@ -1,6 +1,7 @@
 import {
   checkSessionRateLimit,
   handleSessionRequest,
+  MAX_SESSION_EXCHANGE_BODY_BYTES,
   maybeRefreshSession,
 } from "./session.ts";
 
@@ -239,6 +240,44 @@ Deno.test("session exchange: unmarshalled JSON body falls back to empty payload 
   } finally {
     fetchMock.restore();
   }
+});
+
+Deno.test("session exchange: JSON null payload is rejected without a Worker exception", async () => {
+  const fetchMock = installFetch(() =>
+    Promise.resolve(new Response(null, { status: 500 }))
+  );
+  try {
+    const response = await call(
+      mutationRequest("/auth/session/exchange", {}, null),
+      baseEnv({ SESSION_EXCHANGE_RATE_LIMITER: ALLOWED_LIMITER }),
+      "exchange",
+    );
+    assertEquals(response.status, 400, "null exchange status");
+  } finally {
+    fetchMock.restore();
+  }
+  assertEquals(fetchMock.calls.length, 0, "null body no upstream call");
+});
+
+Deno.test("session exchange: oversized declared bodies are rejected before parsing", async () => {
+  const fetchMock = installFetch(() =>
+    Promise.resolve(new Response(null, { status: 500 }))
+  );
+  try {
+    const response = await call(
+      mutationRequest(
+        "/auth/session/exchange",
+        { "content-length": String(MAX_SESSION_EXCHANGE_BODY_BYTES + 1) },
+        { access_token: "a", refresh_token: "r" },
+      ),
+      baseEnv({ SESSION_EXCHANGE_RATE_LIMITER: ALLOWED_LIMITER }),
+      "exchange",
+    );
+    assertEquals(response.status, 413, "oversized exchange status");
+  } finally {
+    fetchMock.restore();
+  }
+  assertEquals(fetchMock.calls.length, 0, "oversized body no upstream call");
 });
 
 Deno.test("session exchange: failed upstream auth lookup short-circuits before loading the profile", async () => {

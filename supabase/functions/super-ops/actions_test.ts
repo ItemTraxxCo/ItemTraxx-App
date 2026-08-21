@@ -15,6 +15,9 @@ const EXPECTED_ACTIONS = [
   "list_passkeys",
   "revoke_session",
   "revoke_all_sessions",
+  "start_passkey_registration",
+  "verify_passkey_registration",
+  "delete_passkey",
   "get_control_center",
   "set_runtime_config",
   "upsert_alert_rule",
@@ -38,9 +41,9 @@ const EXPECTED_ACTIONS = [
   "list_subprocessor_notices",
 ] as const;
 
-Deno.test("super ops registry contains exactly the 27 live actions", () => {
-  assertEquals(SUPER_OPS_ACTIONS.length, 27);
-  assertEquals(new Set(SUPER_OPS_ACTIONS).size, 27);
+Deno.test("super ops registry contains exactly the 30 live actions", () => {
+  assertEquals(SUPER_OPS_ACTIONS.length, 30);
+  assertEquals(new Set(SUPER_OPS_ACTIONS).size, 30);
   assertEquals([...SUPER_OPS_ACTIONS].sort(), [...EXPECTED_ACTIONS].sort());
 });
 

@@ -32,6 +32,18 @@ Deno.test("cookie parsing preserves encoded values and ignores malformed pairs",
   }, "parsed session cookies");
 });
 
+Deno.test("cookie parsing ignores malformed percent encoding", () => {
+  const request = new Request("https://edge.itemtraxx.com", {
+    headers: {
+      cookie: "itx_session=%ZZ; itx_refresh=refresh%2Ftoken",
+    },
+  });
+  assertEquals(parseCookies(request), {
+    accessToken: null,
+    refreshToken: "refresh/token",
+  }, "malformed encoded cookie");
+});
+
 Deno.test("session cookie writers preserve exact set and clear attributes", () => {
   const env = {
     SESSION_COOKIE_DOMAIN: ".itemtraxx.com",

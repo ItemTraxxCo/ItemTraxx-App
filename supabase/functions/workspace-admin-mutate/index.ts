@@ -6,6 +6,7 @@ import { requireTrustedEdgeIngress } from "../_shared/trustedIngress.ts";
 import { readJsonBody } from "../_shared/requestBody.ts";
 import { validateAccountDeviceSession } from "../_shared/accountSessions.ts";
 import { requireRecentAdminAuth } from "../_shared/adminReauth.ts";
+import { resolveWorkspaceAccess } from "../_shared/workspaceAccess.ts";
 import {
   optionalText,
   requireEmail,
@@ -135,12 +136,19 @@ serve(async (req) => {
 
     const { data: tenant, error: tenantError } = await adminClient
       .from("workspaces")
-      .select("id, primary_admin_profile_id")
+      .select("id, status, primary_admin_profile_id")
       .eq("id", requesterProfile.workspace_id)
       .single();
 
     if (tenantError || !tenant?.id) {
       return jsonResponse(400, { error: "Unable to load workspace." });
+    }
+
+    const workspaceAccess = resolveWorkspaceAccess(tenant, tenantError);
+    if (!workspaceAccess.allowed) {
+      return workspaceAccess.reason === "disabled"
+        ? jsonResponse(403, { error: "Workspace disabled" })
+        : jsonResponse(503, { error: "Workspace status unavailable" });
     }
 
     const canManageAdmins =

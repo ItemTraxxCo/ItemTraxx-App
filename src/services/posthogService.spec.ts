@@ -74,7 +74,11 @@ describe("initPostHog", () => {
 
     expect(posthogMock.init).toHaveBeenCalledWith(
       "tok_123",
-      expect.objectContaining({ capture_exceptions: true, autocapture: false })
+      expect.objectContaining({
+        capture_exceptions: true,
+        autocapture: false,
+        disable_session_recording: true,
+      })
     );
   });
 

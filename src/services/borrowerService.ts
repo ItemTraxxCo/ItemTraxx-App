@@ -46,13 +46,14 @@ export const fetchBorrowers = async () => {
 };
 
 export const fetchDeletedBorrowers = async () => {
+  const { deviceId } = getOrCreateDeviceSession();
   const result = await invokeEdgeFunction<{ data: BorrowerItem[] }>(
     "admin-borrower-mutate",
     {
       method: "POST",
       body: {
         action: "list_deleted",
-        payload: {},
+        payload: { device_id: deviceId },
       },
     }
   );

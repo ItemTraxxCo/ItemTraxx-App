@@ -3858,6 +3858,86 @@
             "properties": {
               "action": {
                 "type": "string",
+                "const": "start_passkey_registration"
+              },
+              "payload": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "action"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "action": {
+                "type": "string",
+                "const": "verify_passkey_registration"
+              },
+              "payload": {
+                "type": "object",
+                "properties": {
+                  "challenge_id": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "credential": {
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string"
+                    },
+                    "additionalProperties": {}
+                  }
+                },
+                "required": [
+                  "challenge_id",
+                  "credential"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "action",
+              "payload"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "action": {
+                "type": "string",
+                "const": "delete_passkey"
+              },
+              "payload": {
+                "type": "object",
+                "properties": {
+                  "passkey_id": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [
+                  "passkey_id"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "action",
+              "payload"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "action": {
+                "type": "string",
                 "const": "revoke_session"
               },
               "payload": {
@@ -4947,6 +5027,85 @@
                 },
                 "required": [
                   "passkeys"
+                ],
+                "additionalProperties": false
+              },
+              "ok": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "ok"
+            ],
+            "additionalProperties": false
+          },
+          "start_passkey_registration": {
+            "type": "object",
+            "properties": {
+              "data": {
+                "type": "object",
+                "properties": {
+                  "challenge_id": {
+                    "type": "string"
+                  },
+                  "options": {
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string"
+                    },
+                    "additionalProperties": {}
+                  },
+                  "expires_at": {
+                    "type": "number"
+                  }
+                },
+                "required": [
+                  "challenge_id",
+                  "options",
+                  "expires_at"
+                ],
+                "additionalProperties": false
+              },
+              "ok": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "ok"
+            ],
+            "additionalProperties": false
+          },
+          "verify_passkey_registration": {
+            "type": "object",
+            "properties": {
+              "data": {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {}
+              },
+              "ok": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "ok"
+            ],
+            "additionalProperties": false
+          },
+          "delete_passkey": {
+            "type": "object",
+            "properties": {
+              "data": {
+                "type": "object",
+                "properties": {
+                  "deleted": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "deleted"
                 ],
                 "additionalProperties": false
               },
@@ -7630,6 +7789,9 @@
           "touch_session",
           "list_sessions",
           "list_passkeys",
+          "start_passkey_registration",
+          "verify_passkey_registration",
+          "delete_passkey",
           "revoke_session",
           "revoke_all_sessions",
           "get_control_center",

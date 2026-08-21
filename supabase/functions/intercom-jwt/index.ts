@@ -5,8 +5,15 @@ import {
   createIntercomJwt,
   INTERCOM_JWT_TTL_SECONDS,
 } from "../_shared/intercomJwt.ts";
+import {
+  isAccountTokenBlockedBySessionRevocation,
+} from "../_shared/accountSessions.ts";
+import {
+  isSuperAdminTokenBlockedBySessionRevocation,
+} from "../_shared/superAdminSessions.ts";
 import { getRequestId } from "../_shared/observability.ts";
 import { requireTrustedEdgeIngress } from "../_shared/trustedIngress.ts";
+import { resolveWorkspaceAccess } from "../_shared/workspaceAccess.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Headers":
@@ -54,6 +61,7 @@ serve(async (req) => {
 
   const supabaseUrl = (Deno.env.get("ITX_SUPABASE_URL") ?? Deno.env.get("SUPABASE_URL"))?.trim();
   const publishableKey = (Deno.env.get("ITX_PUBLISHABLE_KEY") ?? Deno.env.get("SUPABASE_ANON_KEY"))?.trim();
+  const serviceKey = (Deno.env.get("ITX_SECRET_KEY") ?? Deno.env.get("SUPABASE_SERVICE_ROLE_KEY"))?.trim();
   // ITX_ is the documented canonical prefix. Keep the previously provisioned
   // TX_ name as a server-side fallback so an existing deployment keeps working
   // while the secret is migrated without exposing either value to the client.
@@ -61,7 +69,7 @@ serve(async (req) => {
     Deno.env.get("ITX_INTERCOM_MESSENGER_SECRET") ??
     Deno.env.get("TX_INTERCOM_MESSENGER_SECRET")
   )?.trim();
-  if (!supabaseUrl || !publishableKey || !intercomSecret) {
+  if (!supabaseUrl || !publishableKey || !serviceKey || !intercomSecret) {
     return jsonResponse(500, { error: "Server misconfiguration." });
   }
 
@@ -78,6 +86,60 @@ serve(async (req) => {
   }
 
   try {
+    const adminClient = createClient(supabaseUrl, serviceKey, {
+      auth: { persistSession: false },
+    });
+    const { data: profile, error: profileError } = await adminClient
+      .from("profiles")
+      .select("id, role, workspace_id, is_active, deleted_at")
+      .eq("id", data.user.id)
+      .maybeSingle();
+    if (profileError) {
+      return jsonResponse(503, { error: "Account status unavailable." });
+    }
+    if (
+      !profile ||
+      profile.is_active !== true ||
+      profile.deleted_at ||
+      !["tenant_account", "workspace_admin", "district_admin", "super_admin"].includes(profile.role)
+    ) {
+      return jsonResponse(403, { error: "Account access denied." });
+    }
+    if (profile.role !== "super_admin" && !profile.workspace_id) {
+      return jsonResponse(403, { error: "Account access denied." });
+    }
+
+    if (profile.workspace_id) {
+      const { data: workspace, error: workspaceError } = await adminClient
+        .from("workspaces")
+        .select("status")
+        .eq("id", profile.workspace_id)
+        .maybeSingle();
+      const workspaceAccess = resolveWorkspaceAccess(workspace, workspaceError);
+      if (!workspaceAccess.allowed) {
+        return workspaceAccess.reason === "disabled"
+          ? jsonResponse(403, { error: "Workspace disabled." })
+          : jsonResponse(503, { error: "Workspace status unavailable." });
+      }
+    }
+
+    const revocation = profile.role === "super_admin"
+      ? await isSuperAdminTokenBlockedBySessionRevocation(adminClient, {
+        profileId: data.user.id,
+        authToken: accessToken,
+      })
+      : await isAccountTokenBlockedBySessionRevocation(adminClient, {
+        workspaceId: profile.workspace_id ?? "",
+        profileId: data.user.id,
+        authToken: accessToken,
+      });
+    if (revocation.relationMissing) {
+      return jsonResponse(503, { error: "Session controls unavailable." });
+    }
+    if (revocation.blocked) {
+      return jsonResponse(401, { error: "Session revoked." });
+    }
+
     const nowSeconds = Math.floor(Date.now() / 1000);
     const token = await createIntercomJwt(
       { id: data.user.id, email: data.user.email },

@@ -17,6 +17,19 @@ SECTION_RE = re.compile(r"^\[functions\.([A-Za-z0-9_-]+)\]\s*$")
 VERIFY_FALSE_RE = re.compile(r"^verify_jwt\s*=\s*false\s*$", re.IGNORECASE)
 
 
+class SingleValueAction(argparse.Action):
+    def __call__(
+        self,
+        parser: argparse.ArgumentParser,
+        namespace: argparse.Namespace,
+        values: str,
+        option_string: str | None = None,
+    ) -> None:
+        if getattr(namespace, self.dest, None) is not None:
+            parser.error(f"{option_string or self.dest} may be specified only once")
+        setattr(namespace, self.dest, values)
+
+
 def load_verify_jwt_flags() -> dict[str, bool]:
     flags: dict[str, bool] = {}
     current: str | None = None
@@ -59,15 +72,21 @@ def supabase_cli() -> str:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Deploy Supabase Edge Functions from this repo.")
+    parser = argparse.ArgumentParser(
+        description="Deploy Supabase Edge Functions from this repo.",
+        allow_abbrev=False,
+    )
     parser.add_argument("functions", nargs="*", help="Specific function names to deploy. Defaults to all repo functions.")
     parser.add_argument(
         "--project-ref",
-        default=os.environ.get("SUPABASE_PROJECT_REF", "").strip(),
+        action=SingleValueAction,
+        default=None,
         help="Supabase project ref. Optional if your local CLI is already linked.",
     )
     parser.add_argument("--dry-run", action="store_true", help="Print deploy commands without executing them.")
     args = parser.parse_args()
+    if args.project_ref is None:
+        args.project_ref = os.environ.get("SUPABASE_PROJECT_REF", "").strip()
 
     verify_jwt_flags = load_verify_jwt_flags()
     available = discover_functions()

@@ -95,5 +95,13 @@
     "ip-address": "^10.3.1",
     "workerd": "1.20260811.1",
     "@noble/curves": "2.3.0"
+  },
+  "allowScripts": {
+    "core-js@3.50.0": true,
+    "esbuild@0.28.1": true,
+    "fsevents@2.3.2": true,
+    "fsevents@2.3.3": true,
+    "libxmljs2@0.37.0": true,
+    "workerd@1.20260811.1": true
   }
 }

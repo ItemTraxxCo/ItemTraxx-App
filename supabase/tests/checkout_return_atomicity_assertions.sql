@@ -40,6 +40,10 @@ begin
      or position('actor_role <> ''workspace_admin''' in function_definition) = 0 then
     raise exception 'online checkout/return function is missing locking, audit, idempotency, or role checks';
   end if;
+  if position('  v_operation_id text :=' in function_definition) = 0
+     or position('  operation_id text :=' in function_definition) > 0 then
+    raise exception 'online checkout/return function must avoid ambiguous operation_id variable references';
+  end if;
 end $$;
 
 select 'online checkout/return atomicity assertions passed' as result;

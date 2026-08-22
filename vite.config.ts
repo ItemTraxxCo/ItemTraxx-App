@@ -94,6 +94,12 @@ export default defineConfig(({ mode, command }) => {
       initialModuleMapPlugin(),
       disableRocketLoaderPlugin(),
     ],
+    // Keep the registry import and the Vue adapter on the same module graph;
+    // pre-bundling the package root separately would create two bone registries
+    // during dev capture/runtime.
+    optimizeDeps: {
+      exclude: ["boneyard-js"],
+    },
     server:
       process.env.VITE_E2E_TEST_UTILS === "true"
         ? { allowedHosts: ["127.0.0.1.nip.io"] }

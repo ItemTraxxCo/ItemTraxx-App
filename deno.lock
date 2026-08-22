@@ -2777,6 +2777,7 @@
         "npm:@vitest/coverage-v8@^4.1.11",
         "npm:@vue/test-utils@^2.4.11",
         "npm:@vue/tsconfig@~0.9.1",
+        "npm:boneyard-js@^1.9.0",
         "npm:fake-indexeddb@^6.2.5",
         "npm:jsbarcode@^3.12.3",
         "npm:jsdom@^30.0.1",

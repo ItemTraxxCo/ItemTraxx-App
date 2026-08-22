@@ -87,6 +87,7 @@
               <th>Last seen</th>
               <th>Signed in</th>
               <th>Status</th>
+              <th class="session-actions-header">Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -98,38 +99,56 @@
               <td>{{ formatDate(session.last_seen_at) }}</td>
               <td>{{ formatDate(session.created_at) }}</td>
               <td>{{ session.is_current ? "Current" : "Active" }}</td>
+              <td class="session-actions-cell">
+                <div v-if="!session.is_current" class="session-actions">
+                  <button
+                    type="button"
+                    class="session-menu-trigger"
+                    :aria-label="`Open actions for ${session.device_label || 'Unknown device'}`"
+                    aria-haspopup="menu"
+                    :aria-expanded="openSessionMenuId === session.id"
+                    :aria-controls="`session-menu-${session.id}`"
+                    :disabled="isSessionSaving"
+                    @click.stop="toggleSessionMenu(session.id)"
+                    @keydown.esc.stop="closeSessionMenu"
+                  >
+                    <svg viewBox="0 0 20 20" aria-hidden="true">
+                      <circle cx="10" cy="4" r="1.5" />
+                      <circle cx="10" cy="10" r="1.5" />
+                      <circle cx="10" cy="16" r="1.5" />
+                    </svg>
+                  </button>
+                  <div
+                    v-if="openSessionMenuId === session.id"
+                    :id="`session-menu-${session.id}`"
+                    class="session-menu"
+                    role="menu"
+                    @click.stop
+                  >
+                    <button
+                      type="button"
+                      class="session-menu-item session-menu-item--danger"
+                      role="menuitem"
+                      :disabled="isSessionSaving"
+                      @click="handleRevokeSession(session)"
+                    >
+                      Revoke device
+                    </button>
+                  </div>
+                </div>
+                <span v-else class="session-current-action">This device</span>
+              </td>
             </tr>
             <tr v-if="!sessions.length">
-              <td colspan="7" class="muted">No active sessions found.</td>
+              <td colspan="8" class="muted">No active sessions found.</td>
             </tr>
           </tbody>
         </table>
       </div>
-      <div class="form-actions">
-        <label class="session-select">
-          Select device
-          <select v-model="selectedSessionId">
-            <option value="">Choose a device</option>
-            <option
-              v-for="session in removableSessions"
-              :key="session.id"
-              :value="session.id"
-            >
-              {{ session.device_label || "Unknown device" }} — {{ formatDate(session.last_seen_at) }}
-            </option>
-          </select>
-        </label>
-      </div>
-      <div class="form-actions">
+      <div class="form-actions session-bulk-actions">
         <button
           type="button"
-          :disabled="isSessionSaving || !selectedSessionId"
-          @click="handleSignOutSelected"
-        >
-          Sign out selected device
-        </button>
-        <button
-          type="button"
+          class="session-bulk-revoke"
           :disabled="isSessionSaving || !removableSessions.length"
           @click="handleSignOutAllOthers"
         >
@@ -177,7 +196,7 @@ const planCode = ref<
   | null
 >(null);
 const sessions = ref<AccountSessionItem[]>([]);
-const selectedSessionId = ref("");
+const openSessionMenuId = ref<string | null>(null);
 const isSessionSaving = ref(false);
 const sessionError = ref("");
 const sessionSuccess = ref("");
@@ -269,6 +288,19 @@ const removableSessions = computed(() =>
   sessions.value.filter((session) => !session.is_current)
 );
 
+const closeSessionMenu = () => {
+  openSessionMenuId.value = null;
+};
+
+const toggleSessionMenu = (sessionId: string) => {
+  if (isSessionSaving.value) return;
+  openSessionMenuId.value = openSessionMenuId.value === sessionId ? null : sessionId;
+};
+
+const handleSessionMenuKeydown = (event: KeyboardEvent) => {
+  if (event.key === "Escape") closeSessionMenu();
+};
+
 const formatDate = (value: string) => {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "Unknown";
@@ -281,8 +313,8 @@ const loadSessions = async () => {
   try {
     const data = await listAccountSessions();
     sessions.value = data.sessions ?? [];
-    if (selectedSessionId.value && !sessions.value.some((row) => row.id === selectedSessionId.value)) {
-      selectedSessionId.value = "";
+    if (openSessionMenuId.value && !sessions.value.some((row) => row.id === openSessionMenuId.value)) {
+      closeSessionMenu();
     }
   } catch (err) {
     sessionError.value = toUserFacingErrorMessage(err, "Unable to load sessions.");
@@ -323,34 +355,37 @@ const handleSave = async () => {
   }
 };
 
-const handleSignOutSelected = async () => {
-  if (!selectedSessionId.value) return;
+const handleRevokeSession = async (session: AccountSessionItem) => {
+  if (isSessionSaving.value) return;
+  closeSessionMenu();
+  const deviceLabel = session.device_label || "this device";
+  if (!window.confirm(`Revoke ${deviceLabel}? This device will be signed out.`)) return;
   isSessionSaving.value = true;
   sessionError.value = "";
   sessionSuccess.value = "";
   try {
-    await revokeAccountSession(selectedSessionId.value);
-    selectedSessionId.value = "";
-    sessionSuccess.value = "Selected device signed out.";
+    await revokeAccountSession(session.id);
     showToast("Session revoked", "Selected device has been signed out.");
     await loadSessions();
+    if (!sessionError.value) sessionSuccess.value = "Device revoked.";
   } catch (err) {
-    sessionError.value = toUserFacingErrorMessage(err, "Unable to sign out selected device.");
+    sessionError.value = toUserFacingErrorMessage(err, "Unable to revoke device.");
   } finally {
     isSessionSaving.value = false;
   }
 };
 
 const handleSignOutAllOthers = async () => {
+  if (!removableSessions.value.length) return;
+  if (!window.confirm("Sign out all other devices? This will end every other active session.")) return;
   isSessionSaving.value = true;
   sessionError.value = "";
   sessionSuccess.value = "";
   try {
     await revokeAllAccountSessions(false);
-    selectedSessionId.value = "";
-    sessionSuccess.value = "All other devices signed out.";
     showToast("Sessions revoked", "All other devices have been signed out.");
     await loadSessions();
+    if (!sessionError.value) sessionSuccess.value = "All other devices signed out.";
   } catch (err) {
     sessionError.value = toUserFacingErrorMessage(err, "Unable to sign out all other devices.");
   } finally {
@@ -359,11 +394,15 @@ const handleSignOutAllOthers = async () => {
 };
 
 onMounted(() => {
+  document.addEventListener("click", closeSessionMenu);
+  document.addEventListener("keydown", handleSessionMenuKeydown);
   void loadSettings();
   void loadSessions();
 });
 
 onUnmounted(() => {
+  document.removeEventListener("click", closeSessionMenu);
+  document.removeEventListener("keydown", handleSessionMenuKeydown);
   if (toastTimer) {
     window.clearTimeout(toastTimer);
     toastTimer = null;
@@ -375,5 +414,112 @@ onUnmounted(() => {
 .account-overview-copy {
   font-size: 0.82rem;
   color: var(--muted);
+}
+
+.session-actions-header,
+.session-actions-cell {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.session-actions-cell {
+  width: 1%;
+}
+
+.session-actions {
+  position: relative;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.session-menu-trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  transition: border-color 150ms ease, background-color 150ms ease, color 150ms ease;
+}
+
+.session-menu-trigger:hover:not(:disabled),
+.session-menu-trigger:focus-visible {
+  border-color: var(--text);
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+.session-menu-trigger:disabled {
+  cursor: wait;
+  opacity: 0.55;
+}
+
+.session-menu-trigger svg {
+  width: 1.1rem;
+  height: 1.1rem;
+  fill: currentColor;
+}
+
+.session-menu {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 0.35rem);
+  right: 0;
+  min-width: 9.5rem;
+  padding: 0.35rem;
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
+  background: var(--surface);
+}
+
+.session-menu-item {
+  width: 100%;
+  padding: 0.55rem 0.65rem;
+  border: 0;
+  border-radius: 0.5rem;
+  background: transparent;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.session-menu-item--danger {
+  color: var(--danger);
+}
+
+.session-menu-item--danger:hover:not(:disabled),
+.session-menu-item--danger:focus-visible {
+  background: color-mix(in srgb, var(--danger) 12%, transparent);
+}
+
+.session-menu-item:disabled {
+  cursor: wait;
+  opacity: 0.55;
+}
+
+.session-current-action {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.session-bulk-actions {
+  justify-content: flex-end;
+  margin-top: 0;
+}
+
+.session-bulk-revoke {
+  color: var(--danger);
+  border-color: color-mix(in srgb, var(--danger) 46%, var(--button-border) 54%);
+}
+
+.session-bulk-revoke:hover:not(:disabled) {
+  color: var(--danger);
+  border-color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 10%, var(--surface-2) 90%);
 }
 </style>

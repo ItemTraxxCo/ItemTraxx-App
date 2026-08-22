@@ -288,7 +288,7 @@ onUnmounted(() => {
 }
 
 .contact-link:focus-visible {
-  outline: 2px solid color-mix(in srgb, var(--accent) 62%, transparent);
+  outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
 }
 

@@ -219,7 +219,7 @@ button.footer-theme-toggle:hover:not(:disabled) {
 }
 
 .footer-theme-toggle:focus-visible {
-  outline: 2px solid color-mix(in srgb, var(--accent) 62%, transparent);
+  outline: 2px solid var(--focus-ring);
   outline-offset: 3px;
 }
 

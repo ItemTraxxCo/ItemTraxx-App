@@ -2,6 +2,7 @@
   font-family: "Inter", "Segoe UI", sans-serif;
   line-height: 1.5;
   font-weight: 400;
+  --focus-ring: #7c7c76;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
@@ -27,6 +28,7 @@
   --link-color: #f3f3f0;
   --accent: #f3f3f0;
   --accent-strong: #a7a7a0;
+  --focus-ring: color-mix(in srgb, var(--accent) 38%, var(--surface) 62%);
   --danger: #f87171;
   --warning: #f6c453;
   --success: #4ade80;
@@ -51,6 +53,7 @@
   --link-color: #171717;
   --accent: #171717;
   --accent-strong: #5f6368;
+  --focus-ring: color-mix(in srgb, var(--accent) 38%, var(--surface) 62%);
   --danger: #b91c1c;
   --warning: #8a5a00;
   --success: #15803d;

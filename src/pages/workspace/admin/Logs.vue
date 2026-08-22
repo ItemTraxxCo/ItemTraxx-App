@@ -47,46 +47,61 @@
         </label>
       </div>
       <p class="muted">Showing {{ filteredLogs.length }} of {{ logs.length }} log entries.</p>
-      <SkeletonLoader v-if="isLoading" variant="table" :rows="7" :columns="5" label="Loading item logs" />
-      <div v-else class="table-wrap">
-      <table class="table">
-        <thead>
-          <tr>
-            <th>Time</th>
-            <th>Action</th>
-            <th class="tenant-account-column">Tenant Account</th>
-            <th>Borrower</th>
-            <th>Item</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="log in filteredLogs" :key="log.id">
-            <td>{{ formatTime(log.action_time) }}</td>
-            <td>{{ log.action_type }}</td>
-            <td>
-              <span class="tenant-account-cell" :title="log.tenant_account?.auth_email || 'Unknown account'">
-                {{ log.tenant_account?.auth_email || "Unknown account" }}
-              </span>
-            </td>
-            <td>
-              <span v-if="log.borrower">
-                {{ log.borrower.username }} ({{ log.borrower.borrower_id }})
-              </span>
-              <span v-else class="muted">-</span>
-            </td>
-            <td>
-              <span v-if="log.item">
-                {{ log.item.name }} ({{ log.item.barcode }})
-              </span>
-              <span v-else class="muted">-</span>
-            </td>
-          </tr>
-          <tr v-if="!filteredLogs.length">
-            <td colspan="5" class="muted">No logs match your search. If you believe this is an error, please contact support.</td>
-          </tr>
-        </tbody>
-      </table>
-      </div>
+      <BoneyardSkeleton
+        name="admin-item-logs-table"
+        :loading="isLoading"
+        variant="table"
+        :rows="7"
+        :columns="5"
+        label="Loading item logs"
+      >
+        <template #fixture>
+          <BoneyardTableFixture :headers="logFixtureHeaders" :rows="7" />
+        </template>
+
+        <div v-if="isLoading">
+          <BoneyardTableFixture :headers="logFixtureHeaders" :rows="7" />
+        </div>
+        <div v-else class="table-wrap">
+          <table class="table">
+            <thead>
+              <tr>
+                <th>Time</th>
+                <th>Action</th>
+                <th class="tenant-account-column">Tenant Account</th>
+                <th>Borrower</th>
+                <th>Item</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="log in filteredLogs" :key="log.id">
+                <td>{{ formatTime(log.action_time) }}</td>
+                <td>{{ log.action_type }}</td>
+                <td>
+                  <span class="tenant-account-cell" :title="log.tenant_account?.auth_email || 'Unknown account'">
+                    {{ log.tenant_account?.auth_email || "Unknown account" }}
+                  </span>
+                </td>
+                <td>
+                  <span v-if="log.borrower">
+                    {{ log.borrower.username }} ({{ log.borrower.borrower_id }})
+                  </span>
+                  <span v-else class="muted">-</span>
+                </td>
+                <td>
+                  <span v-if="log.item">
+                    {{ log.item.name }} ({{ log.item.barcode }})
+                  </span>
+                  <span v-else class="muted">-</span>
+                </td>
+              </tr>
+              <tr v-if="!filteredLogs.length">
+                <td colspan="5" class="muted">No logs match your search. If you believe this is an error, please contact support.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </BoneyardSkeleton>
       <p v-if="error" class="error">{{ error }}</p>
     </div>
   </div>
@@ -95,7 +110,8 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
 import { RouterLink } from "vue-router";
-import SkeletonLoader from "../../../components/SkeletonLoader.vue";
+import BoneyardSkeleton from "../../../components/BoneyardSkeleton.vue";
+import BoneyardTableFixture from "../../../components/BoneyardTableFixture.vue";
 import { fetchItemLogs, type ItemLog } from "../../../services/itemService";
 import { exportRowsToCsv, exportRowsToPdf } from "../../../services/exportService";
 
@@ -106,6 +122,10 @@ const searchQuery = ref("");
 const actionFilter = ref("all");
 const dateFrom = ref("");
 const dateTo = ref("");
+const logFixtureHeaders = ["Time", "Action", "Tenant Account", "Borrower", "Item"];
+const isBoneyardCapture =
+  import.meta.env.VITE_E2E_TEST_UTILS === "true" &&
+  new URLSearchParams(window.location.search).has("boneyard");
 
 const filteredLogs = computed(() => {
   const query = searchQuery.value.trim().toLowerCase();
@@ -188,7 +208,10 @@ const formatTime = (value: string) => {
   return date.toLocaleString();
 };
 
-onMounted(loadLogs);
+onMounted(() => {
+  if (isBoneyardCapture) return;
+  void loadLogs();
+});
 </script>
 
 <style scoped>

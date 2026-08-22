@@ -39,6 +39,7 @@ vi.mock("../store/authState", () => ({
   getAuthState: vi.fn(),
 }));
 vi.mock("./offlineConnectionState", () => ({
+  isServerUnreachableStatus: (status: number) => status === 0,
   markItemTraxxServerConfirmed: vi.fn(),
   markItemTraxxServerUnreachable: vi.fn(),
 }));
@@ -150,7 +151,7 @@ describe("submitCheckoutReturn", () => {
     await expect(submitCheckoutReturn(payload)).resolves.toEqual({ buffered: false, queuedCount: 0 });
   });
 
-  it("treats a 429 as queueable: retries online, then surfaces the offline-unavailable error without an offline context", async () => {
+  it("treats a 429 as queueable without labeling the reachable server offline", async () => {
     setOnline(true);
     mockedInvoke.mockResolvedValue(failResponse(429) as never);
 
@@ -158,7 +159,7 @@ describe("submitCheckoutReturn", () => {
     // with no offline context to buffer into, surfaces the generic offline-unavailable
     // error rather than the underlying "rate limit exceeded" message.
     await expect(submitCheckoutReturn(payload)).rejects.toThrow(/offline checkout is unavailable/i);
-    expect(mockedMarkUnreachable).toHaveBeenCalled();
+    expect(mockedMarkUnreachable).not.toHaveBeenCalled();
     expect(mockedInvoke).toHaveBeenCalledTimes(2);
   });
 
@@ -215,6 +216,7 @@ describe("submitCheckoutReturn", () => {
     expect(mockedQueueOfflineOperation).toHaveBeenCalledWith(
       expect.objectContaining({ operationId: "op-mock", borrower: null, items: [] })
     );
+    expect(mockedMarkUnreachable).not.toHaveBeenCalled();
   });
 
   it("buffers immediately without retrying when offline", async () => {
@@ -419,14 +421,14 @@ describe("fetchBorrowerByBorrowerId", () => {
     expect(mockedMarkConfirmed).toHaveBeenCalled();
   });
 
-  it("falls back offline on a 5xx/429/0 status without throwing when an offline match exists", async () => {
+  it("falls back to the offline pack on a server failure without labeling the reachable server offline", async () => {
     setOnline(true);
     mockedInvoke.mockResolvedValue(failResponse(503) as never);
     mockedFindOfflineBorrower.mockResolvedValue({ id: "b-1", username: "jdoe", borrower_id: "1234AB" });
 
     const result = await fetchBorrowerByBorrowerId("1234AB");
     expect(result).toMatchObject({ id: "b-1" });
-    expect(mockedMarkUnreachable).toHaveBeenCalled();
+    expect(mockedMarkUnreachable).not.toHaveBeenCalled();
   });
 
   it("throws a mapped error when the status is a retryable failure but there is no offline match", async () => {

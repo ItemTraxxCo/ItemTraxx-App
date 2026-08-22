@@ -118,6 +118,7 @@ Deno.test("the default production allowlist keeps required surfaces and excludes
     "https://status.itemtraxx.com",
     "https://preview.itemtraxx.com",
     "https://staging.itemtraxx.com",
+    "https://itxdemo.app.itemtraxx.com",
   ]) {
     assert(
       DEFAULT_ALLOWED_ORIGINS.includes(origin),
@@ -125,7 +126,6 @@ Deno.test("the default production allowlist keeps required surfaces and excludes
     );
   }
   for (const origin of [
-    "https://itxdemo.app.itemtraxx.com",
     "https://pentest.app.itemtraxx.com",
     "https://testdist.app.itemtraxx.com",
     "https://dennis-dev.itemtraxx.com",

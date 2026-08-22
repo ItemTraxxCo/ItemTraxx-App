@@ -193,6 +193,32 @@ Deno.test("edge proxy CORS requires exact configured origins", async () => {
   }
 });
 
+Deno.test("edge proxy CORS allows the explicitly configured demo workspace", async () => {
+  const demoOrigin = "https://itxdemo.app.itemtraxx.com";
+  const response = await worker.fetch(
+    new Request("https://edge.itemtraxx.com/auth/session/me", {
+      method: "OPTIONS",
+      headers: {
+        origin: demoOrigin,
+        "access-control-request-method": "GET",
+        "access-control-request-headers": "content-type",
+      },
+    }),
+    {
+      SUPABASE_URL: "https://example.supabase.co",
+      SUPABASE_ANON_KEY: "anon-key",
+    },
+    executionContext,
+  );
+
+  if (
+    response.status !== 200 ||
+    response.headers.get("Access-Control-Allow-Origin") !== demoOrigin
+  ) {
+    throw new Error("Expected the demo workspace origin to be allowed");
+  }
+});
+
 Deno.test("edge proxy CORS does not expand wildcard origin patterns", async () => {
   const response = await worker.fetch(
     new Request("https://edge.itemtraxx.com/functions/v1/system-status", {

@@ -6,6 +6,11 @@ export type OfflineConnectionState = {
 
 const STORAGE_KEY = "itemtraxx:offline-connection:v1";
 
+// An HTTP response proves that ItemTraxx was reachable. Only fetch-level
+// failures (status 0) should switch the UI into the offline workflow; server
+// application errors such as 4xx/5xx must remain visible as request failures.
+export const isServerUnreachableStatus = (status: number) => status === 0;
+
 const emptyState = (): OfflineConnectionState => ({
   last_confirmed_at: null,
   unreachable_since: null,
@@ -62,4 +67,3 @@ export const clearOfflineConnectionState = () => {
   window.localStorage.removeItem(STORAGE_KEY);
   window.dispatchEvent(new CustomEvent("itemtraxx:offline-connection-changed"));
 };
-

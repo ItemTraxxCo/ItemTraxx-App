@@ -34,4 +34,5 @@ export const DEFAULT_ALLOWED_ORIGINS = [
   "https://app.itemtraxx.com",
   "https://preview.itemtraxx.com",
   "https://staging.itemtraxx.com",
+  "https://itxdemo.app.itemtraxx.com",
 ];

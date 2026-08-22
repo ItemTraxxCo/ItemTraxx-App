@@ -3,12 +3,21 @@ import {
   acknowledgeOfflineWarning,
   clearOfflineConnectionState,
   getOfflineWarningThreshold,
+  isServerUnreachableStatus,
   markItemTraxxServerConfirmed,
   markItemTraxxServerUnreachable,
   readOfflineConnectionState,
 } from "./offlineConnectionState";
 
 const STORAGE_KEY = "itemtraxx:offline-connection:v1";
+
+describe("isServerUnreachableStatus", () => {
+  it("only treats a fetch-level status 0 as unreachable", () => {
+    expect(isServerUnreachableStatus(0)).toBe(true);
+    expect(isServerUnreachableStatus(429)).toBe(false);
+    expect(isServerUnreachableStatus(500)).toBe(false);
+  });
+});
 
 // Node's own experimental global `localStorage` (gated behind --localstorage-file,
 // see the "ExperimentalWarning: localStorage is not available" log) shadows jsdom's

@@ -1,7 +1,11 @@
 import { invokeEdgeFunction } from "./edgeFunctionClient";
 import { getOrCreateDeviceSession } from "../utils/deviceSession";
 import { getAuthState } from "../store/authState";
-import { markItemTraxxServerConfirmed, markItemTraxxServerUnreachable } from "./offlineConnectionState";
+import {
+  isServerUnreachableStatus,
+  markItemTraxxServerConfirmed,
+  markItemTraxxServerUnreachable,
+} from "./offlineConnectionState";
 
 export type OfflinePackBorrower = {
   id: string;
@@ -114,7 +118,7 @@ const isRetryableWorkflowStatus = (status: number) => status === 0 || status ===
 
 const recordWorkflowResponse = (ok: boolean, status: number) => {
   if (ok) markItemTraxxServerConfirmed();
-  else if (isRetryableWorkflowStatus(status)) markItemTraxxServerUnreachable();
+  else if (isServerUnreachableStatus(status)) markItemTraxxServerUnreachable();
 };
 
 const createId = () =>

@@ -18,6 +18,8 @@ Deno.test("isAllowedOrigin requires exact configured origins", () => {
 
   assert(isAllowedOrigin("https://app.itemtraxx.com", allowedOrigins));
   assert(isAllowedOrigin("https://staging.itemtraxx.com", allowedOrigins));
+  const demoOrigin = parseAllowedOrigins("https://itxdemo.app.itemtraxx.com");
+  assert(isAllowedOrigin("https://itxdemo.app.itemtraxx.com", demoOrigin));
 });
 
 Deno.test("isAllowedOrigin does not expand wildcard origin patterns", () => {

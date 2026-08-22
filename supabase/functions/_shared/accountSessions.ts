@@ -102,6 +102,14 @@ export const isAccountTokenBlockedBySessionRevocation = async (
     if (data?.id) {
       return { blocked: true as const, relationMissing: false as const };
     }
+
+    // A verified session_id is the authoritative binding for modern Supabase
+    // JWTs. Do not fall back to the issued-at timestamp here: that timestamp
+    // is shared by the token's lifetime, so a revocation belonging to another
+    // device would otherwise invalidate this session as well. The issued-at
+    // fallback below is retained only for legacy tokens that have no
+    // session_id claim.
+    return { blocked: false as const, relationMissing: false as const };
   }
 
   if (binding.issuedAt) {

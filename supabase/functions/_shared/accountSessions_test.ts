@@ -75,7 +75,6 @@ Deno.test("workspace admin device session rejects active row bound to another au
   };
   const client = new MockClient([
     { data: null, error: null },
-    { data: null, error: null },
     {
       data: { id: "active-row", auth_session_id: "other-session" },
       error: null,
@@ -102,7 +101,6 @@ Deno.test("workspace admin device session accepts active row bound to presented 
     session_id: "current-session",
   };
   const client = new MockClient([
-    { data: null, error: null },
     { data: null, error: null },
     {
       data: { id: "active-row", auth_session_id: "current-session" },
@@ -324,6 +322,25 @@ Deno.test("isAccountTokenBlockedBySessionRevocation blocks immediately when the 
   assert(!result.relationMissing, "expected no relationMissing marker");
 });
 
+Deno.test("isAccountTokenBlockedBySessionRevocation ignores revocations for other session ids", async () => {
+  const claims = {
+    iat: Math.floor(Date.now() / 1000),
+    session_id: "current-session",
+  };
+  const client = new MockClient([
+    { data: null, error: null },
+  ], claims);
+
+  const result = await isAccountTokenBlockedBySessionRevocation(client, {
+    workspaceId: "tenant-1",
+    profileId: "profile-1",
+    authToken: "verified-token",
+  });
+
+  assert(!result.blocked, "expected another device revocation not to block the current session");
+  assert(!result.relationMissing, "expected no relationMissing marker");
+});
+
 Deno.test("isAccountTokenBlockedBySessionRevocation surfaces missing auth_session_id column as relationMissing", async () => {
   const claims = {
     iat: Math.floor(Date.now() / 1000),
@@ -534,7 +551,6 @@ Deno.test("validateAccountDeviceSession reports missing_table when the active-se
   };
   const client = new MockClient([
     { data: null, error: null },
-    { data: null, error: null },
     {
       data: null,
       error: {
@@ -563,7 +579,6 @@ Deno.test("validateAccountDeviceSession throws when the active-session lookup er
   };
   const client = new MockClient([
     { data: null, error: null },
-    { data: null, error: null },
     { data: null, error: { code: "08006", message: "connection failure" } },
   ], claims);
 
@@ -591,7 +606,6 @@ Deno.test("validateAccountDeviceSession reports missing_session when no active r
     session_id: "current-session",
   };
   const client = new MockClient([
-    { data: null, error: null },
     { data: null, error: null },
     { data: null, error: null },
   ], claims);

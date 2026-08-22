@@ -1,0 +1,14 @@
+{
+  "breakpoints": [375, 640, 768, 1024, 1280],
+  "out": "./src/bones",
+  "wait": 800,
+  "color": "#e9e9e3",
+  "darkColor": "#282824",
+  "animate": "shimmer",
+  "routes": [
+    "/admin/borrowers?boneyard=workspace-admin",
+    "/admin/borrowers?boneyard=workspace-admin&boneyard-bulk=true",
+    "/admin/logs?boneyard=workspace-admin",
+    "/super-admin/logs?boneyard=super-admin"
+  ]
+}

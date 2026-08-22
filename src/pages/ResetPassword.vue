@@ -315,7 +315,7 @@ onUnmounted(() => {
 }
 
 .reset-blocked-action:focus-visible {
-  outline: 2px solid var(--reset-button-bg);
+  outline: 2px solid var(--focus-ring);
   outline-offset: 3px;
 }
 </style>

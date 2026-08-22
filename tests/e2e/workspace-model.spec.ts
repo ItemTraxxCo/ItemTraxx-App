@@ -50,14 +50,42 @@ test.describe("workspace model role surfaces", () => {
   });
 
   test("Tenant Account receives flat reduced views and its own session controls", async ({ page }) => {
+    const revokedSessionIds: string[] = [];
+    const currentSession = {
+      id: "session-1",
+      device_id: "device-1",
+      device_label: "Front desk",
+      user_agent: null,
+      login_method: "password",
+      login_location: "regular_login",
+      general_location: "Portland, OR",
+      created_at: new Date().toISOString(),
+      last_seen_at: new Date().toISOString(),
+      is_current: true,
+    };
+    const remoteSession = {
+      id: "session-2",
+      device_id: "device-2",
+      device_label: "Home laptop",
+      user_agent: null,
+      login_method: "magic_link",
+      login_location: "regular_login",
+      general_location: "Seattle, WA",
+      created_at: new Date().toISOString(),
+      last_seen_at: new Date().toISOString(),
+      is_current: false,
+    };
     await page.route(/\/functions(?:\/v1)?\/admin-ops(?:\?.*)?$/, async (route) => {
-      const body = route.request().postDataJSON() as { action?: string };
+      const body = route.request().postDataJSON() as { action?: string; payload?: { session_id?: string } };
       if (body.action !== "list_sessions" && body.action !== "revoke_session") {
         await route.fallback();
         return;
       }
+      if (body.action === "revoke_session" && body.payload?.session_id) {
+        revokedSessionIds.push(body.payload.session_id);
+      }
       const data = body.action === "list_sessions"
-        ? { sessions: [{ id: "session-1", device_id: "device-1", device_label: "Front desk", user_agent: null, login_method: "password", login_location: "regular_login", general_location: null, created_at: new Date().toISOString(), last_seen_at: new Date().toISOString(), is_current: true }] }
+        ? { sessions: [currentSession, ...(revokedSessionIds.includes(remoteSession.id) ? [] : [remoteSession])] }
         : { revoked: true };
       await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ data }) });
     });
@@ -77,6 +105,33 @@ test.describe("workspace model role surfaces", () => {
     await navigateApp(page, "/settings");
     await expect(page.getByRole("heading", { name: "Device sessions" })).toBeVisible();
     await expect(page.getByText(/Front desk/)).toBeVisible();
+
+    await navigateApp(page, "/account");
+    await expect(page.getByRole("heading", { name: "Active Devices" })).toBeVisible();
+    await expect(page.getByText("Select device")).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Open actions for Front desk" })).toHaveCount(0);
+
+    const remoteActions = page.getByRole("button", { name: "Open actions for Home laptop" });
+    await expect(remoteActions).toBeVisible();
+    await remoteActions.click();
+    const revokeMenuItem = page.getByRole("menuitem", { name: "Revoke device" });
+    await expect(revokeMenuItem).toBeVisible();
+    expect(await revokeMenuItem.evaluate((element) => getComputedStyle(element).color)).toMatch(
+      /rgb\((185, 28, 28|248, 113, 113)\)/,
+    );
+    await revokeMenuItem.scrollIntoViewIfNeeded();
+    await page.screenshot({ path: "artifacts/session-revocation-ui.png", fullPage: false });
+    let confirmationSeen = false;
+    page.once("dialog", async (dialog) => {
+      confirmationSeen = true;
+      expect(dialog.type()).toBe("confirm");
+      expect(dialog.message()).toContain("Home laptop");
+      await dialog.accept();
+    });
+    await revokeMenuItem.click();
+    expect(confirmationSeen).toBe(true);
+    await expect.poll(() => revokedSessionIds).toContain("session-2");
+    await expect(page.getByText("Home laptop")).toHaveCount(0);
   });
 
   test("Workspace Admin item creation requires an explicit access choice", async ({ page }) => {

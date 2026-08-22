@@ -174,9 +174,14 @@
 
 .skeleton-line,
 .skeleton-card {
+  --skeleton-fill: color-mix(in srgb, var(--surface-3) 78%, var(--surface-2) 22%);
+  --skeleton-highlight: color-mix(in srgb, var(--surface) 65%, transparent);
   position: relative;
   overflow: hidden;
-  background: color-mix(in srgb, var(--surface-3) 72%, var(--surface-2) 28%);
+  isolation: isolate;
+  background: var(--skeleton-fill);
+  animation: skeleton-pulse 2.4s ease-in-out infinite;
+  animation-delay: var(--skeleton-delay, 0ms);
 }
 
 .skeleton-line::after,
@@ -188,10 +193,11 @@
   background: linear-gradient(
     90deg,
     transparent,
-    color-mix(in srgb, var(--surface) 42%, transparent),
+    var(--skeleton-highlight),
     transparent
   );
-  animation: skeleton-shimmer 1.25s ease-in-out infinite;
+  animation: skeleton-shimmer 1.8s ease-in-out infinite;
+  animation-delay: var(--skeleton-delay, 0ms);
 }
 
 .skeleton-line {
@@ -199,6 +205,11 @@
   width: 100%;
   height: 0.85rem;
   border-radius: 999px;
+}
+
+.skeleton-line-header {
+  height: 0.58rem;
+  opacity: 0.8;
 }
 
 .skeleton-line-title {
@@ -210,22 +221,43 @@
   width: min(12rem, 48%);
 }
 
+.skeleton-line-action {
+  width: 4.5rem;
+  height: 2rem;
+  border-radius: 999px;
+}
+
 .skeleton-table {
-  min-width: 560px;
+  --skeleton-action-width: 4.5rem;
+  min-width: min(560px, 100%);
   border: 1px solid var(--border);
-  border-radius: 14px;
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--surface) 72%, var(--surface-2) 28%);
   overflow: hidden;
 }
 
 .skeleton-table-row {
   display: grid;
   gap: 1rem;
-  padding: 0.75rem 0.8rem;
+  align-items: center;
+  min-height: 3.1rem;
+  padding: 0.7rem 0.8rem;
   border-bottom: 1px solid var(--border);
+}
+
+.skeleton-table-header {
+  min-height: 2.25rem;
+  background: color-mix(in srgb, var(--surface-2) 48%, transparent);
 }
 
 .skeleton-table-row:last-child {
   border-bottom: 0;
+}
+
+.skeleton-table-cell {
+  min-width: 0;
+  display: flex;
+  align-items: center;
 }
 
 .skeleton-card {
@@ -233,17 +265,58 @@
   gap: 0.75rem;
   padding: 1rem;
   border: 1px solid var(--border);
-  border-radius: 14px;
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--surface) 78%, var(--surface-2) 22%);
+}
+
+.skeleton-card-heading {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+}
+
+.skeleton-avatar {
+  flex: 0 0 auto;
+  width: 2.2rem;
+  height: 2.2rem;
+  border-radius: 50%;
+  background: var(--skeleton-fill);
+  animation: skeleton-pulse 2.4s ease-in-out infinite;
 }
 
 .skeleton-card .skeleton-line {
-  background: color-mix(in srgb, var(--surface-2) 80%, var(--surface-3) 20%);
+  background: color-mix(in srgb, var(--surface-2) 70%, var(--surface-3) 30%);
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .skeleton-line,
+  .skeleton-card,
+  .skeleton-avatar,
   .skeleton-line::after,
   .skeleton-card::after {
     animation: none;
+  }
+}
+
+@media (max-width: 640px) {
+  .skeleton-table {
+    --skeleton-action-width: 3.8rem;
+  }
+
+  .skeleton-table-row {
+    gap: 0.65rem;
+    padding-inline: 0.65rem;
+  }
+}
+
+@keyframes skeleton-pulse {
+  0%,
+  100% {
+    opacity: 0.72;
+  }
+
+  50% {
+    opacity: 1;
   }
 }
 

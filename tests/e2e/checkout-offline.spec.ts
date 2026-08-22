@@ -993,6 +993,14 @@ test.describe("prepared offline checkout workflow contract", () => {
     });
     await page.route(/\/functions(?:\/v1)?\/offline-checkout(?:\?.*)?$/, async (route) => {
       const body = route.request().postDataJSON() as { action?: string };
+      if (body.action === "prepare_pack") {
+        await route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: JSON.stringify({ data: { ...workflowPack(), prepared_at: new Date().toISOString() } }),
+        });
+        return;
+      }
       expect(body.action).toBe("sync");
       await new Promise((resolve) => setTimeout(resolve, 500));
       await route.fulfill({
@@ -1015,6 +1023,116 @@ test.describe("prepared offline checkout workflow contract", () => {
     await expect(page.getByText("Syncing 1 transaction to ItemTraxx Servers.")).toBeVisible();
     await expect(page.getByText("Offline queue synced")).toBeVisible();
     await expect(page.getByText("1 transaction synced to ItemTraxx Servers.")).toBeVisible();
+  });
+
+  test("lets an operator manually retry a pending sync from the checkout status bar", async ({ page }) => {
+    await mockSystemStatus(page);
+    await setWorkspaceAdminSession(page, "workspace-e2e");
+    await page.evaluate(async ({ pack, entry }) => {
+      window.localStorage.setItem("itemtraxx-device-id", "device-e2e");
+      window.localStorage.setItem("itemtraxx:onboarding:v1:workspace_admin", new Date().toISOString());
+      window.localStorage.setItem("itemtraxx:offline-connection:v1", JSON.stringify({
+        last_confirmed_at: new Date(Date.now() - 60_000).toISOString(),
+        unreachable_since: new Date(Date.now() - 30_000).toISOString(),
+        acknowledged_hours: 0,
+      }));
+      const workflow = (window.__itemtraxxTest as typeof window.__itemtraxxTest & {
+        offlineCheckoutWorkflow: {
+          writePack: (pack: unknown) => Promise<void>;
+          writeLedger: (entries: unknown[]) => Promise<void>;
+          readPack: (scope: { workspaceId: string; profileId: string; deviceId: string }) => Promise<unknown>;
+        };
+      }).offlineCheckoutWorkflow;
+      await workflow.writePack(pack);
+      await workflow.writeLedger([entry]);
+    }, {
+      pack: {
+        ...workflowPack(),
+        prepared_at: new Date().toISOString(),
+        expires_at: new Date(Date.now() + 86_400_000).toISOString(),
+      },
+      entry: workflowEntry(),
+    });
+
+    let syncAttempts = 0;
+    let preparePackAttempts = 0;
+    await page.route(/\/functions(?:\/v1)?\/offline-checkout(?:\?.*)?$/, async (route) => {
+      const body = route.request().postDataJSON() as { action?: string };
+      if (body.action === "prepare_pack") {
+        preparePackAttempts += 1;
+        await route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: JSON.stringify({
+            data: {
+              pack_version: "refreshed-pack-workflow-e2e",
+              workspace_id: "workspace-e2e",
+              prepared_at: new Date().toISOString(),
+              expires_at: new Date(Date.now() + 86_400_000).toISOString(),
+              borrowers: [
+                { id: "borrower-1", username: "Maya Chen (updated)", borrower_id: "STU-100" },
+                { id: "borrower-2", username: "Jon Bell", borrower_id: "STU-200" },
+              ],
+              items: [
+                { id: "item-1", name: "Camera", barcode: "ITEM-1", status: "checked_out", checked_out_by: "borrower-1" },
+                { id: "item-2", name: "Tripod", barcode: "ITEM-2", status: "available", checked_out_by: null },
+              ],
+            },
+          }),
+        });
+        return;
+      }
+      expect(body.action).toBe("sync");
+      syncAttempts += 1;
+      if (syncAttempts === 1) {
+        await route.fulfill({
+          status: 503,
+          contentType: "application/json",
+          body: JSON.stringify({ error: "Temporary sync outage." }),
+        });
+        return;
+      }
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          data: {
+            operations: [{
+              operation_id: "op-workflow-e2e",
+              status: "synced",
+              item_results: [{ item_id: "item-1", barcode: "ITEM-1", status: "synced" }],
+            }],
+          },
+        }),
+      });
+    });
+    await navigateApp(page, "/checkout");
+
+    const syncButton = page.getByRole("button", { name: "Sync now" });
+    await expect(syncButton).toBeVisible();
+    await expect(syncButton).toBeEnabled();
+    await syncButton.click();
+
+    await expect(page.getByText("Connected to ItemTraxx servers. Offline queue is synced.")).toBeVisible();
+    await expect.poll(() => syncAttempts).toBeGreaterThanOrEqual(2);
+    await expect.poll(() => preparePackAttempts).toBe(1);
+    await expect.poll(async () => page.evaluate(async () => {
+      const workflow = (window.__itemtraxxTest as typeof window.__itemtraxxTest & {
+        offlineCheckoutWorkflow: {
+          readPack: (scope: { workspaceId: string; profileId: string; deviceId: string }) => Promise<unknown>;
+        };
+      }).offlineCheckoutWorkflow;
+      return workflow.readPack({ workspaceId: "workspace-e2e", profileId: "user-e2e-admin", deviceId: "device-e2e" });
+    })).toMatchObject({
+      pack_version: "refreshed-pack-workflow-e2e",
+      borrowers: expect.arrayContaining([expect.objectContaining({ borrower_id: "STU-200" })]),
+      items: expect.arrayContaining([expect.objectContaining({ barcode: "ITEM-1", status: "checked_out", checked_out_by: "borrower-1" })]),
+    });
+    await expect(page.getByRole("button", { name: "Sync now" })).toHaveCount(0);
+    await expect.poll(async () => page.evaluate(() => {
+      const raw = window.localStorage.getItem("itemtraxx:offline-connection:v1");
+      return (JSON.parse(raw ?? "null") as { unreachable_since?: string | null } | null)?.unreachable_since ?? null;
+    })).toBeNull();
   });
 
   test("queues Quick Return with an explicit quick_return intent and current borrower", async ({ page, context }) => {

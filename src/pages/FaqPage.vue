@@ -327,7 +327,7 @@ onUnmounted(() => {
 }
 
 .faq-toggle-public:focus-visible {
-  outline: 2px solid color-mix(in srgb, var(--accent) 60%, transparent);
+  outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
 }
 

@@ -25,20 +25,37 @@
         <button type="button" @click="exportPdf">Export PDF</button>
       </div>
 
-      <SkeletonLoader v-if="isLoading" variant="table" :rows="7" :columns="5" label="Loading all logs" />
-      <p v-else-if="error" class="error">{{ error }}</p>
-      <table v-else class="table">
-        <thead><tr><th>Time</th><th>Workspace</th><th>Action</th><th>Item</th><th>Borrower</th></tr></thead>
-        <tbody>
-          <tr v-for="row in rows" :key="row.id">
-            <td>{{ formatDateTime(row.action_time) }}</td>
-            <td>{{ row.workspace?.name || row.workspace_id }}</td>
-            <td>{{ row.action_type }}</td>
-            <td>{{ row.item?.name || "-" }} ({{ row.item?.barcode || "-" }})</td>
-            <td>{{ row.borrower ? `${row.borrower.username} (${row.borrower.borrower_id})` : "-" }}</td>
-          </tr>
-        </tbody>
-      </table>
+      <BoneyardSkeleton
+        name="super-admin-logs-table"
+        :loading="isLoading"
+        variant="table"
+        :rows="7"
+        :columns="5"
+        label="Loading all logs"
+      >
+        <template #fixture>
+          <BoneyardTableFixture :headers="logFixtureHeaders" :rows="7" />
+        </template>
+
+        <div v-if="isLoading">
+          <BoneyardTableFixture :headers="logFixtureHeaders" :rows="7" />
+        </div>
+        <template v-else>
+          <p v-if="error" class="error">{{ error }}</p>
+          <table v-else class="table">
+            <thead><tr><th>Time</th><th>Workspace</th><th>Action</th><th>Item</th><th>Borrower</th></tr></thead>
+            <tbody>
+              <tr v-for="row in rows" :key="row.id">
+                <td>{{ formatDateTime(row.action_time) }}</td>
+                <td>{{ row.workspace?.name || row.workspace_id }}</td>
+                <td>{{ row.action_type }}</td>
+                <td>{{ row.item?.name || "-" }} ({{ row.item?.barcode || "-" }})</td>
+                <td>{{ row.borrower ? `${row.borrower.username} (${row.borrower.borrower_id})` : "-" }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </template>
+      </BoneyardSkeleton>
       <div class="form-actions">
         <button type="button" @click="prevPage" :disabled="page <= 1 || isLoading">Prev</button>
         <span class="muted">Page {{ page }}</span>
@@ -53,7 +70,8 @@
 <script setup lang="ts">
 import { onMounted, ref } from "vue";
 import { RouterLink, useRouter } from "vue-router";
-import SkeletonLoader from "../../components/SkeletonLoader.vue";
+import BoneyardSkeleton from "../../components/BoneyardSkeleton.vue";
+import BoneyardTableFixture from "../../components/BoneyardTableFixture.vue";
 import {
   handleSuperAdminUnauthorized,
   isUnauthorizedError,
@@ -77,6 +95,10 @@ const isLoading = ref(false);
 const error = ref("");
 const toastTitle = ref("");
 const toastMessage = ref("");
+const logFixtureHeaders = ["Time", "Workspace", "Action", "Item", "Borrower"];
+const isBoneyardCapture =
+  import.meta.env.VITE_E2E_TEST_UTILS === "true" &&
+  new URLSearchParams(window.location.search).has("boneyard");
 let toastTimer: number | null = null;
 
 const showToast = (title: string, message: string) => {
@@ -177,6 +199,7 @@ const exportPdf = async () => {
 };
 
 onMounted(() => {
+  if (isBoneyardCapture) return;
   void (async () => {
     await loadTenants();
     await loadLogs();

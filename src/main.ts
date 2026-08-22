@@ -2,6 +2,7 @@ import { createApp } from "vue";
 import "./styles/tokens.css";
 import "./styles/base.css";
 import "./styles/app-shell.css";
+import "./bones/registry";
 import App from "./App.vue";
 import router from "./router";
 import { clearAuthState, getAuthState } from "./store/authState";
@@ -124,6 +125,24 @@ const mountApp = async () => {
   if (import.meta.env.VITE_E2E_TEST_UTILS === "true") {
     const { attachE2EControls } = await import("./e2e/testControls");
     attachE2EControls(router);
+
+    // Boneyard captures protected pages through the existing E2E controls. This
+    // branch is only present in the non-production E2E build and is activated
+    // by the query string used in boneyard.config.json.
+    const captureRole = new URLSearchParams(window.location.search).get("boneyard");
+    if (captureRole) {
+      // The protected route guard normally lazy-loads this stylesheet after a
+      // real authenticated navigation. Capture mode seeds auth after mount, so
+      // load it explicitly to keep fixture geometry identical to production.
+      await import("./styles/authenticated.css");
+      window.setTimeout(() => {
+        if (captureRole === "super-admin") {
+          window.__itemtraxxTest?.setSuperAdminSession();
+        } else {
+          window.__itemtraxxTest?.setWorkspaceAdminSession();
+        }
+      }, 0);
+    }
   }
 };
 

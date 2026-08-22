@@ -24,7 +24,11 @@ import {
   type OfflinePackItem,
 } from "./offlineCheckoutWorkflow";
 import { getAuthState } from "../store/authState";
-import { markItemTraxxServerConfirmed, markItemTraxxServerUnreachable } from "./offlineConnectionState";
+import {
+  isServerUnreachableStatus,
+  markItemTraxxServerConfirmed,
+  markItemTraxxServerUnreachable,
+} from "./offlineConnectionState";
 
 export { consumeCheckoutOfflineWarning } from "./offlineCheckoutQueue";
 export type { CheckoutReturnPayload } from "./offlineCheckoutQueue";
@@ -75,7 +79,7 @@ const isQueueableFailure = (error: unknown) => {
 
 const recordCheckoutResponse = (ok: boolean, status: number) => {
   if (ok) markItemTraxxServerConfirmed();
-  else if (status === 0 || status === 429 || status >= 500) markItemTraxxServerUnreachable();
+  else if (isServerUnreachableStatus(status)) markItemTraxxServerUnreachable();
 };
 
 const isLookupConnectivityFailure = (error: unknown) => {
@@ -304,7 +308,7 @@ export const fetchBorrowerByBorrowerId = async (borrowerId: string) => {
   }
 
   if (result.status === 0 || result.status === 429 || result.status >= 500) {
-    markItemTraxxServerUnreachable();
+    if (isServerUnreachableStatus(result.status)) markItemTraxxServerUnreachable();
     const offline = await findOfflineBorrower(getOfflineScope(), borrowerId);
     if (offline) return offline as BorrowerSummary;
   } else if (result.ok) {

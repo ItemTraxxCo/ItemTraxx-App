@@ -25,10 +25,10 @@ import {
 } from "./offlineCheckoutWorkflow";
 import { getAuthState } from "../store/authState";
 import {
-  isServerUnreachableStatus,
   markItemTraxxServerConfirmed,
   markItemTraxxServerUnreachable,
 } from "./offlineConnectionState";
+import { fetchSystemStatus, probeSystemStatusTransport } from "./systemStatusService";
 
 export { consumeCheckoutOfflineWarning } from "./offlineCheckoutQueue";
 export type { CheckoutReturnPayload } from "./offlineCheckoutQueue";
@@ -37,6 +37,16 @@ type SubmitCheckoutReturnResult = {
   buffered: boolean;
   queuedCount: number;
 };
+
+export type CheckoutQueueSyncResult = {
+  processed: number;
+  failed: number;
+  remaining: number;
+  review: number;
+  serverReachable: boolean | null;
+};
+
+type BufferedCheckoutQueueSyncResult = Omit<CheckoutQueueSyncResult, "serverReachable">;
 
 export type OfflineSubmitContext = {
   borrower: OfflinePackBorrower | null;
@@ -52,6 +62,7 @@ type CheckoutReturnResponse = {
 };
 
 const LOOKUP_TIMEOUT_MS = 7000;
+const SERVER_PROBE_TIMEOUT_MS = 2000;
 
 const isRetryableNetworkFailure = (status: number, message: string) => {
   if (status === 0) return true;
@@ -77,9 +88,8 @@ const isQueueableFailure = (error: unknown) => {
   return isRetryableNetworkFailure(0, message);
 };
 
-const recordCheckoutResponse = (ok: boolean, status: number) => {
+const recordCheckoutResponse = (ok: boolean) => {
   if (ok) markItemTraxxServerConfirmed();
-  else if (isServerUnreachableStatus(status)) markItemTraxxServerUnreachable();
 };
 
 const isLookupConnectivityFailure = (error: unknown) => {
@@ -105,7 +115,7 @@ const executeCheckoutReturn = async (payload: CheckoutReturnPayload) => {
     },
   });
 
-  recordCheckoutResponse(result.ok, result.status);
+  recordCheckoutResponse(result.ok);
 
   if (!result.ok) {
     const message = result.status === 429
@@ -156,6 +166,12 @@ export const submitCheckoutReturn = async (
           };
         } catch (retryError) {
           if (!isQueueableFailure(retryError)) throw retryError;
+          if (retryError instanceof CheckoutRequestError && retryError.status === 0 && await probeItemTraxxServer()) {
+            // A CORS/WAF failure can look like a network outage to fetch even
+            // while the edge is reachable. Do not silently turn that request
+            // into an offline transaction; let the operator retry it.
+            throw retryError;
+          }
         }
       }
       if (!offlineContext || !payloadWithOperationId.operation_id) {
@@ -172,7 +188,7 @@ export const submitCheckoutReturn = async (
   }
 };
 
-export const syncBufferedCheckoutQueue = async () => {
+const syncBufferedCheckoutQueueInternal = async () => {
   const auth = getAuthState();
   if (!auth.isAuthenticated || !auth.workspaceContextId || !auth.userId) {
     // Checkout can mount while auth is still settling (for example after a
@@ -229,6 +245,80 @@ export const syncBufferedCheckoutQueue = async () => {
   };
 };
 
+let bufferedCheckoutQueueSyncInFlight: Promise<BufferedCheckoutQueueSyncResult> | null = null;
+let checkoutQueueSyncInFlight: Promise<CheckoutQueueSyncResult> | null = null;
+
+const refreshOfflinePackAfterQueueSync = async (
+  result: BufferedCheckoutQueueSyncResult,
+  serverReachable: boolean | null = true,
+) => {
+  if (result.processed === 0 || result.remaining > 0 || result.review > 0 || serverReachable === false) return;
+  await refreshOfflineCheckoutPackIfNeeded({ force: true }).catch(() => undefined);
+};
+
+export const probeItemTraxxServer = async () => {
+  try {
+    const result = await fetchSystemStatus({ force: true, timeoutMs: SERVER_PROBE_TIMEOUT_MS });
+    if (result) {
+      // Any HTTP response proves the edge is reachable. Application-level
+      // failures must not turn into a misleading offline label.
+      markItemTraxxServerConfirmed();
+      return true;
+    }
+  } catch {
+    // A failed status probe is the only place a fetch-level failure is
+    // promoted to the persistent offline state.
+  }
+  if (await probeSystemStatusTransport(SERVER_PROBE_TIMEOUT_MS)) {
+    // A CORS/WAF challenge can make the application probe look like a network
+    // failure even though the edge is reachable. Keep that distinct from an
+    // actual outage so a borrower lookup cannot flash an offline warning.
+    markItemTraxxServerConfirmed();
+    return true;
+  }
+  markItemTraxxServerUnreachable();
+  return false;
+};
+
+export const syncBufferedCheckoutQueue = () => {
+  if (!bufferedCheckoutQueueSyncInFlight) {
+    bufferedCheckoutQueueSyncInFlight = (async () => {
+      const result = await syncBufferedCheckoutQueueInternal();
+      await refreshOfflinePackAfterQueueSync(result);
+      return result;
+    })().finally(() => { bufferedCheckoutQueueSyncInFlight = null; });
+  }
+  return bufferedCheckoutQueueSyncInFlight;
+};
+
+/**
+ * Replays both offline queue formats and actively verifies that ItemTraxx is
+ * reachable. `force` is used by the manual Sync now control so a stale
+ * navigator.onLine value cannot prevent the request.
+ */
+export const syncCheckoutQueues = (options: { force?: boolean } = {}) => {
+  if (!options.force && typeof navigator !== "undefined" && !navigator.onLine) {
+    return Promise.resolve<CheckoutQueueSyncResult>({
+      processed: 0,
+      failed: 0,
+      remaining: 0,
+      review: 0,
+      serverReachable: null,
+    });
+  }
+  if (!checkoutQueueSyncInFlight) {
+    checkoutQueueSyncInFlight = (async () => {
+      const result = await syncBufferedCheckoutQueueInternal();
+      const serverReachable = await probeItemTraxxServer();
+      await refreshOfflinePackAfterQueueSync(result, serverReachable);
+      return { ...result, serverReachable };
+    })().finally(() => {
+      checkoutQueueSyncInFlight = null;
+    });
+  }
+  return checkoutQueueSyncInFlight;
+};
+
 export type BorrowerSummary = {
   id: string;
   username: string;
@@ -265,7 +355,7 @@ export const fetchItemByBarcode = async (barcode: string) => {
     markItemTraxxServerConfirmed();
   } catch (error) {
     if (!isLookupConnectivityFailure(error)) throw error;
-    markItemTraxxServerUnreachable();
+    if (await probeItemTraxxServer()) throw error;
     const offline = await findOfflineItem(getOfflineScope(), barcode);
     if (offline) return offline as ItemSummary;
     throw error;
@@ -301,14 +391,15 @@ export const fetchBorrowerByBorrowerId = async (borrowerId: string) => {
     );
   } catch (error) {
     if (!isLookupConnectivityFailure(error)) throw error;
-    markItemTraxxServerUnreachable();
+    if (await probeItemTraxxServer()) throw error;
     const offline = await findOfflineBorrower(getOfflineScope(), borrowerId);
     if (offline) return offline as BorrowerSummary;
     throw error;
   }
 
-  if (result.status === 0 || result.status === 429 || result.status >= 500) {
-    if (isServerUnreachableStatus(result.status)) markItemTraxxServerUnreachable();
+  if (result.status === 0) {
+    const serverReachable = await probeItemTraxxServer();
+    if (serverReachable) throw edgeFunctionError(result, "Borrower lookup failed. Please try again.");
     const offline = await findOfflineBorrower(getOfflineScope(), borrowerId);
     if (offline) return offline as BorrowerSummary;
   } else if (result.ok) {
@@ -341,7 +432,7 @@ export const fetchCheckedOutItem = async (borrowerUuid: string) => {
     markItemTraxxServerConfirmed();
   } catch (error) {
     if (!isLookupConnectivityFailure(error)) throw error;
-    markItemTraxxServerUnreachable();
+    if (await probeItemTraxxServer()) throw error;
     const offline = await getOfflineCheckedOutItems(getOfflineScope(), borrowerUuid);
     if (offline) return offline as ItemSummary[];
     throw error;

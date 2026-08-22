@@ -99,51 +99,75 @@
         </label>
       </div>
       <p class="muted">Showing {{ filteredBorrowers.length }} of {{ borrowers.length }} borrowers.</p>
-      <SkeletonLoader v-if="isLoading" variant="table" :rows="6" :columns="4" label="Loading borrowers" />
-      <div v-else class="table-wrap">
-      <table class="table">
-        <thead>
-          <tr>
-            <th v-if="bulkMode">
-              <input
-                type="checkbox"
-                :checked="allFilteredSelected"
-                @change="toggleSelectAll"
-                aria-label="Select all borrowers"
-              />
-            </th>
-            <th>Username</th>
-            <th>Borrower ID</th>
-            <th>Tenant Accounts</th>
-            <th>Details</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="(item, index) in filteredBorrowers" :key="item.id">
-            <td v-if="bulkMode">
-              <input
-                type="checkbox"
-                :checked="selectedBorrowerIds.has(item.id)"
-                @click="toggleBorrowerSelection(item.id, index, $event)"
-                :aria-label="`Select ${item.username}`"
-              />
-            </td>
-            <td>{{ item.username }}</td>
-            <td>{{ item.borrower_id }}</td>
-            <td>
-              <span class="scoped-accounts-cell" :title="scopedAccountsTitle(item)">
-                {{ scopedAccountsLabel(item) }}
-              </span>
-            </td>
-            <td>
-              <div class="admin-actions">
-                <button type="button" @click="openDetails(item)">Details</button>
-              </div>
-            </td>
-          </tr>
-        </tbody>
-      </table>
-      </div>
+      <BoneyardSkeleton
+        :name="bulkMode ? 'admin-borrowers-table-bulk' : 'admin-borrowers-table'"
+        :loading="isLoading"
+        variant="table"
+        :rows="6"
+        :columns="bulkMode ? 5 : 4"
+        action-column
+        label="Loading borrowers"
+      >
+        <template #fixture>
+          <BoneyardTableFixture
+            :headers="bulkMode ? borrowerBulkFixtureHeaders : borrowerFixtureHeaders"
+            :rows="6"
+            action-column
+          />
+        </template>
+
+        <div v-if="isLoading">
+          <BoneyardTableFixture
+            :headers="bulkMode ? borrowerBulkFixtureHeaders : borrowerFixtureHeaders"
+            :rows="6"
+            action-column
+          />
+        </div>
+        <div v-else class="table-wrap">
+          <table class="table">
+            <thead>
+              <tr>
+                <th v-if="bulkMode">
+                  <input
+                    type="checkbox"
+                    :checked="allFilteredSelected"
+                    @change="toggleSelectAll"
+                    aria-label="Select all borrowers"
+                  />
+                </th>
+                <th>Username</th>
+                <th>Borrower ID</th>
+                <th>Tenant Accounts</th>
+                <th>Details</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="(item, index) in filteredBorrowers" :key="item.id">
+                <td v-if="bulkMode">
+                  <input
+                    type="checkbox"
+                    :checked="selectedBorrowerIds.has(item.id)"
+                    @click="toggleBorrowerSelection(item.id, index, $event)"
+                    :aria-label="`Select ${item.username}`"
+                  />
+                </td>
+                <td>{{ item.username }}</td>
+                <td>{{ item.borrower_id }}</td>
+                <td>
+                  <span class="scoped-accounts-cell" :title="scopedAccountsTitle(item)">
+                    {{ scopedAccountsLabel(item) }}
+                  </span>
+                </td>
+                <td>
+                  <div class="admin-actions">
+                    <button type="button" @click="openDetails(item)">Details</button>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </BoneyardSkeleton>
     </div>
 
     <div class="card admin-section-card">
@@ -153,32 +177,48 @@
           <p class="admin-section-copy">Archived borrowers can be restored at any time.</p>
         </div>
       </div>
-      <SkeletonLoader v-if="isLoadingArchived" variant="table" :rows="4" :columns="3" label="Loading archived borrowers" />
-      <div v-else class="table-wrap">
-      <table class="table">
-        <thead>
-          <tr>
-            <th>Username</th>
-            <th>Borrower ID</th>
-            <th></th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="item in filteredArchivedBorrowers" :key="item.id">
-            <td>{{ item.username }}</td>
-            <td>{{ item.borrower_id }}</td>
-            <td>
-              <button type="button" class="link" :disabled="isSaving" @click="handleRestore(item)">
-                Restore
-              </button>
-            </td>
-          </tr>
-          <tr v-if="filteredArchivedBorrowers.length === 0">
-            <td colspan="3" class="muted">No archived borrowers.</td>
-          </tr>
-        </tbody>
-      </table>
-      </div>
+      <BoneyardSkeleton
+        name="admin-archived-borrowers-table"
+        :loading="isLoadingArchived"
+        variant="table"
+        :rows="4"
+        :columns="3"
+        action-column
+        label="Loading archived borrowers"
+      >
+        <template #fixture>
+          <BoneyardTableFixture :headers="archivedBorrowerFixtureHeaders" :rows="4" action-column />
+        </template>
+
+        <div v-if="isLoadingArchived">
+          <BoneyardTableFixture :headers="archivedBorrowerFixtureHeaders" :rows="4" action-column />
+        </div>
+        <div v-else class="table-wrap">
+          <table class="table">
+            <thead>
+              <tr>
+                <th>Username</th>
+                <th>Borrower ID</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="item in filteredArchivedBorrowers" :key="item.id">
+                <td>{{ item.username }}</td>
+                <td>{{ item.borrower_id }}</td>
+                <td>
+                  <button type="button" class="link" :disabled="isSaving" @click="handleRestore(item)">
+                    Restore
+                  </button>
+                </td>
+              </tr>
+              <tr v-if="filteredArchivedBorrowers.length === 0">
+                <td colspan="3" class="muted">No archived borrowers.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </BoneyardSkeleton>
     </div>
 
     <div v-if="featureFlags.enable_bulk_borrower_tools" class="card admin-section-card">
@@ -287,6 +327,8 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from "vue";
 import { RouterLink } from "vue-router";
+import BoneyardSkeleton from "../../../components/BoneyardSkeleton.vue";
+import BoneyardTableFixture from "../../../components/BoneyardTableFixture.vue";
 import SkeletonLoader from "../../../components/SkeletonLoader.vue";
 import TenantAccessPicker from "../../../components/app/TenantAccessPicker.vue";
 import { getAuthState } from "../../../store/authState";
@@ -339,12 +381,21 @@ const featureFlags = ref({
 });
 const bulkGenerateCount = ref(20);
 const bulkRows = ref<Array<{ username: string; borrower_id: string }>>([]);
-const bulkMode = ref(false);
+const bulkMode = ref(
+  import.meta.env.VITE_E2E_TEST_UTILS === "true" &&
+    new URLSearchParams(window.location.search).get("boneyard-bulk") === "true"
+);
 const selectedBorrowerIds = ref<Set<string>>(new Set());
 const lastSelectedIndex = ref<number | null>(null);
 const showBulkAccessModal = ref(false);
 const bulkAccessMode = ref<"" | "all" | "restricted">("");
 const bulkAccessProfileIds = ref<string[]>([]);
+const borrowerFixtureHeaders = ["Username", "Borrower ID", "Tenant Accounts", "Details"];
+const borrowerBulkFixtureHeaders = ["Select", ...borrowerFixtureHeaders];
+const archivedBorrowerFixtureHeaders = ["Username", "Borrower ID", ""];
+const isBoneyardCapture =
+  import.meta.env.VITE_E2E_TEST_UTILS === "true" &&
+  new URLSearchParams(window.location.search).has("boneyard");
 let toastTimer: number | null = null;
 
 const matchesSearch = (item: BorrowerItem, query: string) => {
@@ -667,6 +718,7 @@ const handleCreate = async () => {
 
 onMounted(() => {
   regenerateIdentity();
+  if (isBoneyardCapture) return;
   void (async () => {
     try {
       const settings = await fetchWorkspaceSettings();

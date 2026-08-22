@@ -14,6 +14,7 @@
     "npm:@vitest/coverage-v8@^4.1.11": "4.1.11_vitest@4.1.11_@types+node@26.2.0_jsdom@30.0.1_vite@8.2.1__@types+node@26.2.0",
     "npm:@vue/test-utils@^2.4.11": "2.4.11_vue@3.5.41__typescript@6.0.3_typescript@6.0.3",
     "npm:@vue/tsconfig@~0.9.1": "0.9.1_typescript@6.0.3_vue@3.5.41__typescript@6.0.3",
+    "npm:boneyard-js@^1.9.0": "1.9.0_vite@8.2.1__@types+node@26.2.0_vue@3.5.41__typescript@6.0.3",
     "npm:fake-indexeddb@^6.2.5": "6.2.5",
     "npm:jsbarcode@^3.12.3": "3.12.3",
     "npm:jsdom@^30.0.1": "30.0.1",
@@ -82,6 +83,9 @@
         "css-tree"
       ],
       "bin": true
+    },
+    "@chenglou/pretext@0.0.5": {
+      "integrity": "sha512-A8GZN10REdFGsyuiUgLV8jjPDDFMg5GmgxGWV0I3igxBOnzj+jgz2VMmVD7g+SFyoctfeqHFxbNatKSzVRWtRg=="
     },
     "@cloudflare/kv-asset-handler@0.5.0": {
       "integrity": "sha512-jxQYkj8dSIzc0cD6cMMNdOc1UVjqSqu8BZdor5s8cGjW2I8BjODt/kWPVdY+u9zj3ms75Q5qaZgnxUad83+eAg=="
@@ -1270,6 +1274,22 @@
     },
     "blake3-wasm@2.1.5": {
       "integrity": "sha512-F1+K8EbfOZE49dtoPtmxUQrpXaBIl3ICvasLh+nJta0xkz+9kF/7uet9fLnwKqhDrmj6g+6K3Tw9yQPUg2ka5g=="
+    },
+    "boneyard-js@1.9.0_vite@8.2.1__@types+node@26.2.0_vue@3.5.41__typescript@6.0.3": {
+      "integrity": "sha512-FlIHm7YyQ6GMBPaNY6um5ESHNyZGONoSZ0IMhayuyemBsCUhhDl4nC/gMTOi/25ojtrlnRInTWKqFKb7hGK6Cg==",
+      "dependencies": [
+        "playwright",
+        "vite",
+        "vue"
+      ],
+      "optionalDependencies": [
+        "@chenglou/pretext"
+      ],
+      "optionalPeers": [
+        "vite",
+        "vue"
+      ],
+      "bin": true
     },
     "brace-expansion@2.1.4": {
       "integrity": "sha512-hGfVzPxthbf3+2yjg/RBs60cB0FhqBS/zvdV/4wn4/BmN0bNMMHPc4V/BbFieqf1TKAGGAHnY4eSjajCl0f2Xg==",
@@ -2777,6 +2797,7 @@
         "npm:@vitest/coverage-v8@^4.1.11",
         "npm:@vue/test-utils@^2.4.11",
         "npm:@vue/tsconfig@~0.9.1",
+        "npm:boneyard-js@^1.9.0",
         "npm:fake-indexeddb@^6.2.5",
         "npm:jsbarcode@^3.12.3",
         "npm:jsdom@^30.0.1",

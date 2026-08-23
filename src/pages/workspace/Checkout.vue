@@ -162,7 +162,7 @@ import {
   fetchItemByBarcode,
   fetchBorrowerByBorrowerId,
   submitCheckoutReturn,
-  syncBufferedCheckoutQueue,
+  syncCheckoutQueues,
   type ItemSummary,
   type BorrowerSummary,
 } from "../../services/checkoutService";
@@ -225,12 +225,12 @@ const receipt = ref<{
   items: Array<{ name: string; barcode: string; action: "checkout" | "return" }>;
 } | null>(null);
 
-const syncOfflineBuffer = async () => {
+const syncOfflineBuffer = async (force = false) => {
   if (syncInFlight.value) return;
-  if (!navigator.onLine) return;
+  if (!force && !navigator.onLine) return;
   syncInFlight.value = true;
   try {
-    await syncBufferedCheckoutQueue();
+    await syncCheckoutQueues({ force });
     const queueWarning = consumeCheckoutOfflineWarning();
     if (queueWarning) {
       toastStatus.value = "Failed";

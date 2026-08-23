@@ -43,6 +43,10 @@ vi.mock("./offlineConnectionState", () => ({
   markItemTraxxServerConfirmed: vi.fn(),
   markItemTraxxServerUnreachable: vi.fn(),
 }));
+vi.mock("./systemStatusService", () => ({
+  fetchSystemStatus: vi.fn(),
+  probeSystemStatusTransport: vi.fn(),
+}));
 
 import { invokeEdgeFunction } from "./edgeFunctionClient";
 import { authenticatedSelect } from "./authenticatedDataClient";
@@ -63,6 +67,7 @@ import {
 } from "./offlineCheckoutWorkflow";
 import { getAuthState } from "../store/authState";
 import { markItemTraxxServerConfirmed, markItemTraxxServerUnreachable } from "./offlineConnectionState";
+import { fetchSystemStatus, probeSystemStatusTransport } from "./systemStatusService";
 import {
   fetchBorrowerByBorrowerId,
   fetchCheckedOutItem,
@@ -70,6 +75,7 @@ import {
   getCheckoutOfflineSummary,
   submitCheckoutReturn,
   syncBufferedCheckoutQueue,
+  syncCheckoutQueues,
   type CheckoutReturnPayload,
 } from "./checkoutService";
 
@@ -89,6 +95,8 @@ const mockedSyncLedger = vi.mocked(syncOfflineCheckoutLedger);
 const mockedGetAuthState = vi.mocked(getAuthState);
 const mockedMarkConfirmed = vi.mocked(markItemTraxxServerConfirmed);
 const mockedMarkUnreachable = vi.mocked(markItemTraxxServerUnreachable);
+const mockedFetchSystemStatus = vi.mocked(fetchSystemStatus);
+const mockedProbeSystemStatusTransport = vi.mocked(probeSystemStatusTransport);
 
 const AUTH_SCOPE = {
   isAuthenticated: true,
@@ -124,6 +132,8 @@ beforeEach(() => {
   mockedGetAuthState.mockReturnValue(AUTH_SCOPE);
   mockedMarkConfirmed.mockReset();
   mockedMarkUnreachable.mockReset();
+  mockedFetchSystemStatus.mockReset().mockResolvedValue(null);
+  mockedProbeSystemStatusTransport.mockReset().mockResolvedValue(false);
 });
 
 afterEach(() => {
@@ -228,6 +238,17 @@ describe("submitCheckoutReturn", () => {
 
     expect(result).toEqual({ buffered: true, queuedCount: 1 });
     expect(mockedInvoke).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not silently buffer a status-zero transaction when the edge transport is reachable", async () => {
+    setOnline(true);
+    mockedInvoke.mockResolvedValue(failResponse(0, "Network request failed.") as never);
+    mockedFetchSystemStatus.mockResolvedValue(null);
+    mockedProbeSystemStatusTransport.mockResolvedValue(true);
+
+    await expect(submitCheckoutReturn(payload, { borrower: null, items: [] })).rejects.toThrow(/network request failed/i);
+    expect(mockedQueueOfflineOperation).not.toHaveBeenCalled();
+    expect(mockedMarkUnreachable).not.toHaveBeenCalled();
   });
 
   it("throws when a queueable failure occurs but there is no offline context to buffer into", async () => {
@@ -335,6 +356,66 @@ describe("syncBufferedCheckoutQueue", () => {
   });
 });
 
+describe("syncCheckoutQueues", () => {
+  it("does not start a sync while the browser is explicitly offline", async () => {
+    setOnline(false);
+
+    await expect(syncCheckoutQueues()).resolves.toEqual({
+      processed: 0,
+      failed: 0,
+      remaining: 0,
+      review: 0,
+      serverReachable: null,
+    });
+    expect(mockedSyncLedger).not.toHaveBeenCalled();
+    expect(mockedFetchSystemStatus).not.toHaveBeenCalled();
+  });
+
+  it("treats an HTTP application error as reachable instead of marking the browser offline", async () => {
+    setOnline(true);
+    mockedSyncLedger.mockResolvedValue({ processed: 0, failed: 0, remaining: 0, review: 0 });
+    mockedFetchSystemStatus.mockResolvedValue({ ok: false, status: 503, payload: {} });
+
+    await expect(syncCheckoutQueues({ force: true })).resolves.toMatchObject({ serverReachable: true });
+    expect(mockedMarkConfirmed).toHaveBeenCalled();
+    expect(mockedMarkUnreachable).not.toHaveBeenCalled();
+  });
+
+  it("forces a fresh borrower and item pack after a reconnect drains the offline queue", async () => {
+    setOnline(true);
+    mockedSyncLedger.mockResolvedValue({ processed: 1, failed: 0, remaining: 0, review: 0 });
+    mockedFetchSystemStatus.mockResolvedValue({ ok: true, status: 200, payload: {} });
+
+    await expect(syncCheckoutQueues({ force: true })).resolves.toMatchObject({
+      processed: 1,
+      remaining: 0,
+      review: 0,
+      serverReachable: true,
+    });
+    expect(mockedRefreshPack).toHaveBeenCalledWith({ force: true });
+  });
+
+  it("does not replace the local pack while replay still has pending or review work", async () => {
+    setOnline(true);
+    mockedSyncLedger.mockResolvedValue({ processed: 1, failed: 1, remaining: 1, review: 0 });
+    mockedFetchSystemStatus.mockResolvedValue({ ok: true, status: 200, payload: {} });
+
+    await syncCheckoutQueues({ force: true });
+
+    expect(mockedRefreshPack).not.toHaveBeenCalled();
+  });
+
+  it("keeps a failed transport probe offline only when both application and no-cors probes fail", async () => {
+    setOnline(true);
+    mockedSyncLedger.mockResolvedValue({ processed: 0, failed: 0, remaining: 0, review: 0 });
+    mockedFetchSystemStatus.mockResolvedValue(null);
+    mockedProbeSystemStatusTransport.mockResolvedValue(false);
+
+    await expect(syncCheckoutQueues({ force: true })).resolves.toMatchObject({ serverReachable: false });
+    expect(mockedMarkUnreachable).toHaveBeenCalled();
+  });
+});
+
 describe("fetchItemByBarcode", () => {
   it("looks up the item offline immediately when the browser reports offline", async () => {
     setOnline(false);
@@ -421,13 +502,31 @@ describe("fetchBorrowerByBorrowerId", () => {
     expect(mockedMarkConfirmed).toHaveBeenCalled();
   });
 
-  it("falls back to the offline pack on a server failure without labeling the reachable server offline", async () => {
+  it("surfaces a server failure without labeling the reachable server offline", async () => {
     setOnline(true);
     mockedInvoke.mockResolvedValue(failResponse(503) as never);
-    mockedFindOfflineBorrower.mockResolvedValue({ id: "b-1", username: "jdoe", borrower_id: "1234AB" });
 
-    const result = await fetchBorrowerByBorrowerId("1234AB");
-    expect(result).toMatchObject({ id: "b-1" });
+    await expect(fetchBorrowerByBorrowerId("1234AB")).rejects.toThrow("boom");
+    expect(mockedMarkUnreachable).not.toHaveBeenCalled();
+  });
+
+  it("surfaces a borrower authorization 403 without showing the offline workflow", async () => {
+    setOnline(true);
+    mockedInvoke.mockResolvedValue(failResponse(403, "Forbidden.") as never);
+
+    await expect(fetchBorrowerByBorrowerId("1234AB")).rejects.toThrow("Forbidden.");
+    expect(mockedFindOfflineBorrower).not.toHaveBeenCalled();
+    expect(mockedMarkUnreachable).not.toHaveBeenCalled();
+  });
+
+  it("does not turn a CORS/WAF-looking status-zero lookup into an offline warning when the edge is reachable", async () => {
+    setOnline(true);
+    mockedInvoke.mockResolvedValue(failResponse(0, "Network request failed.") as never);
+    mockedFetchSystemStatus.mockResolvedValue(null);
+    mockedProbeSystemStatusTransport.mockResolvedValue(true);
+
+    await expect(fetchBorrowerByBorrowerId("1234AB")).rejects.toThrow(/network request failed/i);
+    expect(mockedFindOfflineBorrower).not.toHaveBeenCalled();
     expect(mockedMarkUnreachable).not.toHaveBeenCalled();
   });
 

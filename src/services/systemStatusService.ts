@@ -77,6 +77,33 @@ const triggerRevalidate = (timeoutMs: number) => {
   return pendingRequest;
 };
 
+/**
+ * Check whether the edge host can be reached without requiring a CORS
+ * response. A managed edge challenge can reject a normal browser fetch before
+ * application code sees the HTTP status; a no-cors request still distinguishes
+ * that reachable edge from an actual network outage.
+ */
+export const probeSystemStatusTransport = async (timeoutMs = 3500) => {
+  const functionsBaseUrl = getEdgeFunctionsBaseUrl();
+  if (!functionsBaseUrl) return false;
+
+  const controller = new AbortController();
+  const timeoutId = window.setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    await fetch(`${functionsBaseUrl}/${STATUS_FUNCTION_NAME}`, {
+      method: "GET",
+      mode: "no-cors",
+      cache: "no-store",
+      signal: controller.signal,
+    });
+    return true;
+  } catch {
+    return false;
+  } finally {
+    window.clearTimeout(timeoutId);
+  }
+};
+
 export const fetchSystemStatus = async (options: {
   force?: boolean;
   timeoutMs?: number;

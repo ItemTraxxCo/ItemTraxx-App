@@ -5,7 +5,7 @@ vi.mock("./edgeUrls", () => ({
 }));
 
 import { getEdgeFunctionsBaseUrl } from "./edgeUrls";
-import { fetchSystemStatus } from "./systemStatusService";
+import { fetchSystemStatus, probeSystemStatusTransport } from "./systemStatusService";
 
 const mockedBaseUrl = vi.mocked(getEdgeFunctionsBaseUrl);
 
@@ -119,5 +119,33 @@ describe("fetchSystemStatus", () => {
     await Promise.all([first, second]);
 
     expect(fetch).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("probeSystemStatusTransport", () => {
+  beforeEach(() => {
+    vi.stubGlobal("fetch", vi.fn());
+    mockedBaseUrl.mockReturnValue("/functions");
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.clearAllMocks();
+  });
+
+  it("recognizes an opaque/no-cors response as reachable", async () => {
+    vi.mocked(fetch).mockResolvedValue({ type: "opaque" } as Response);
+
+    await expect(probeSystemStatusTransport()).resolves.toBe(true);
+    expect(fetch).toHaveBeenCalledWith(
+      "/functions/system-status",
+      expect.objectContaining({ method: "GET", mode: "no-cors", cache: "no-store" }),
+    );
+  });
+
+  it("returns false when the transport request fails", async () => {
+    vi.mocked(fetch).mockRejectedValue(new Error("network down"));
+
+    await expect(probeSystemStatusTransport()).resolves.toBe(false);
   });
 });

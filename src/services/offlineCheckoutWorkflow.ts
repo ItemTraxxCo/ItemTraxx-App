@@ -2,9 +2,7 @@ import { invokeEdgeFunction } from "./edgeFunctionClient";
 import { getOrCreateDeviceSession } from "../utils/deviceSession";
 import { getAuthState } from "../store/authState";
 import {
-  isServerUnreachableStatus,
   markItemTraxxServerConfirmed,
-  markItemTraxxServerUnreachable,
 } from "./offlineConnectionState";
 
 export type OfflinePackBorrower = {
@@ -86,6 +84,11 @@ type SyncOperationResult = {
   resolution?: "keep_server" | "apply_offline";
   item_results: SyncItemResult[];
 };
+type OfflinePackRefreshResult = {
+  refreshed: boolean;
+  firstPreparation: boolean;
+  skippedReason?: "offline" | "unauthenticated" | "pending_transactions" | "up_to_date";
+};
 
 const DATABASE_NAME = "itemtraxx-offline-workflow";
 const DATABASE_VERSION = 1;
@@ -108,17 +111,13 @@ const ACTIVE_LEDGER_STATES = new Set<OfflineLedgerEntry["status"]>([
   "syncing",
   "needs_review",
 ]);
-let automaticPackRefresh: Promise<{
-  refreshed: boolean;
-  firstPreparation: boolean;
-  skippedReason?: "offline" | "unauthenticated" | "pending_transactions" | "up_to_date";
-}> | null = null;
+let automaticPackRefresh: Promise<OfflinePackRefreshResult> | null = null;
+let automaticPackRefreshWasForced = false;
 
 const isRetryableWorkflowStatus = (status: number) => status === 0 || status === 429 || status >= 500;
 
-const recordWorkflowResponse = (ok: boolean, status: number) => {
+const recordWorkflowResponse = (ok: boolean) => {
   if (ok) markItemTraxxServerConfirmed();
-  else if (isServerUnreachableStatus(status)) markItemTraxxServerUnreachable();
 };
 
 const createId = () =>
@@ -337,7 +336,7 @@ export const prepareOfflineCheckoutPack = async () => {
     "offline-checkout",
     { method: "POST", body: { action: "prepare_pack", device_id: deviceId } },
   );
-  recordWorkflowResponse(response.ok, response.status);
+  recordWorkflowResponse(response.ok);
   if (!response.ok || !response.data?.data) throw new Error(response.error || "Unable to prepare offline checkout.");
   const pack: OfflineCheckoutPack = {
     ...response.data.data,
@@ -357,8 +356,16 @@ export const prepareOfflineCheckoutPack = async () => {
  */
 export const refreshOfflineCheckoutPackIfNeeded = (
   options: { force?: boolean } = {},
-) => {
-  if (automaticPackRefresh) return automaticPackRefresh;
+): Promise<OfflinePackRefreshResult> => {
+  if (automaticPackRefresh) {
+    if (!options.force || automaticPackRefreshWasForced) return automaticPackRefresh;
+    // A forced refresh requested while a non-forced timer refresh is in
+    // flight must run again after that stale check completes. Returning the
+    // in-flight promise would otherwise turn the forced refresh into a no-op.
+    return automaticPackRefresh.catch(() => undefined).then(() => refreshOfflineCheckoutPackIfNeeded(options));
+  }
+
+  automaticPackRefreshWasForced = !!options.force;
 
   automaticPackRefresh = (async () => {
     if (typeof navigator !== "undefined" && !navigator.onLine) {
@@ -389,6 +396,7 @@ export const refreshOfflineCheckoutPackIfNeeded = (
     return { refreshed: true, firstPreparation: !existingPack };
   })().finally(() => {
     automaticPackRefresh = null;
+    automaticPackRefreshWasForced = false;
   });
 
   return automaticPackRefresh;
@@ -421,6 +429,34 @@ const applyLedgerOverlay = (pack: OfflineCheckoutPack, entries: OfflineLedgerEnt
     }
   }
   return [...items.values()];
+};
+
+/**
+ * Materializes the current ledger overlay and the action's borrower into the
+ * encrypted pack immediately after an offline action. The ledger remains the
+ * source of truth for replay, while the pack itself stays useful to any code
+ * that reads the snapshot without applying the overlay first.
+ */
+export const refreshOfflineCheckoutCacheFromLedger = async (borrower: OfflinePackBorrower | null = null) => {
+  const auth = getAuthState();
+  if (!auth.workspaceContextId || !auth.userId) return false;
+  const { deviceId } = getOrCreateDeviceSession();
+  const scope = { workspaceId: auth.workspaceContextId, profileId: auth.userId, deviceId };
+
+  return withOfflineWorkflowLock(async () => {
+    const pack = await readRecord<OfflineCheckoutPack | null>(PACK_ID, null);
+    if (!pack || !scopeMatches(pack, scope) || Date.parse(pack.expires_at) <= Date.now()) return false;
+    const nextItems = applyLedgerOverlay(pack, await readOfflineLedger());
+    const nextBorrowers = borrower
+      ? [
+          ...pack.borrowers.filter((item) => item.id !== borrower.id && item.borrower_id !== borrower.borrower_id),
+          borrower,
+        ]
+      : pack.borrowers;
+    await writeRecord(PACK_ID, { ...pack, borrowers: nextBorrowers, items: nextItems });
+    window.dispatchEvent(new CustomEvent("itemtraxx:offline-workflow-changed"));
+    return true;
+  });
 };
 
 const getOverlay = async (scope: OfflineWorkflowScope) => {
@@ -509,6 +545,12 @@ export const queueOfflineOperation = async (draft: {
     })),
   };
   const next = await updateLedger((entries) => [...entries, entry]);
+  try {
+    await refreshOfflineCheckoutCacheFromLedger(draft.borrower);
+  } catch {
+    // The encrypted ledger is already durable; a snapshot write failure must
+    // not turn a successfully queued offline action into a failed transaction.
+  }
   return next.filter((item) => ACTIVE_LEDGER_STATES.has(item.status)).length;
 };
 
@@ -622,7 +664,7 @@ export const syncOfflineCheckoutLedger = async () => {
       })),
     },
   });
-  recordWorkflowResponse(response.ok, response.status);
+  recordWorkflowResponse(response.ok);
   if (!response.ok || !response.data?.data) {
     const retryable = isRetryableWorkflowStatus(response.status);
     const reason = response.error || "Unable to sync offline transactions.";
@@ -680,7 +722,7 @@ export const resolveOfflineCheckoutConflict = async (
     },
     preserveErrorData: true,
   });
-  recordWorkflowResponse(response.ok, response.status);
+  recordWorkflowResponse(response.ok);
   if (response.data?.data) {
     await updateLedger((entries) => entries.map((item) => item.id === entryId
       ? applyOperationResult({ ...item, resolution }, response.data!.data)

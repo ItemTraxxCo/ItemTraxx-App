@@ -7,11 +7,11 @@
     <section class="admin-login-panel">
       <div class="admin-login-content">
         <div class="admin-login-copy">
-          <RouterLink class="admin-login-back" to="/checkout" aria-label="Back to checkout">
+          <button type="button" class="admin-login-back" aria-label="Go back" @click="goBack">
             <svg viewBox="0 0 24 24" aria-hidden="true">
               <path d="M15 5 8 12l7 7" />
             </svg>
-          </RouterLink>
+          </button>
           <p class="admin-login-kicker">Workspace Admin Access</p>
           <h1>Admin sign in</h1>
           <p class="admin-login-subtitle">
@@ -72,15 +72,14 @@
               Sign in
             </button>
           </div>
-          <p class="muted support-note">
-            Trouble signing in? Contact our support team from the top-right menu for help.
-            <br />
-            By using this software, you agree to our
-            <SafeExternalLink :url="legalUrl">legal terms and policies</SafeExternalLink>.
-          </p>
         </form>
         <p v-if="error" class="error admin-login-error">{{ error }}</p>
       </div>
+
+      <p class="muted admin-legal-note">
+        By using this software, you agree to our
+        <SafeExternalLink :url="legalUrl">legal terms and policies</SafeExternalLink>.
+      </p>
     </section>
 
     <div v-if="isLoading" class="toast toast-persist">
@@ -120,6 +119,9 @@ const error = ref("");
 const isLoading = ref(false);
 const toastTitle = ref("");
 const toastMessage = ref("");
+const goBack = () => {
+  window.history.back();
+};
 const turnstileSiteKey = import.meta.env.VITE_TURNSTILE_SITE_KEY as
   | string
   | undefined;
@@ -340,9 +342,10 @@ onUnmounted(() => {
 .admin-login-panel {
   width: min(100%, 54rem);
   min-height: min(42rem, calc(100dvh - 4rem));
+  box-sizing: border-box;
   display: grid;
-  grid-template-rows: auto 1fr;
-  padding: 1.8rem 1.9rem 2rem;
+  grid-template-rows: minmax(0, 1fr) auto;
+  padding: 1.8rem 1.9rem 1.25rem;
   border: 0;
   background: transparent;
 }
@@ -379,10 +382,13 @@ onUnmounted(() => {
   height: 2.3rem;
   margin-bottom: 1rem;
   padding: 0;
+  min-height: 0;
   border-radius: 999px;
+  border: 0;
   background: transparent;
   color: var(--admin-login-back-text);
   text-decoration: none;
+  font: inherit;
   font-weight: 500;
   transition: transform 0.16s ease, background-color 0.16s ease, color 0.16s ease;
 }
@@ -520,7 +526,15 @@ onUnmounted(() => {
 
 .admin-security-check {
   display: block;
-  margin-top: 1.6rem;
+  margin-top: 1.1rem;
+}
+
+.admin-security-check + .form-actions {
+  margin-top: 0.5rem;
+}
+
+.admin-security-check + .form-actions .admin-login-submit {
+  margin-top: 0.2rem;
 }
 
 .admin-terms-acceptance {
@@ -562,6 +576,19 @@ onUnmounted(() => {
 
 .admin-login-error {
   margin-top: 1rem;
+}
+
+.admin-legal-note {
+  width: min(100%, 34rem);
+  margin: 1rem auto 0;
+  text-align: center;
+  color: var(--admin-login-copy);
+  font-size: 0.8rem;
+  line-height: 1.55;
+}
+
+.admin-legal-note a {
+  color: var(--admin-login-heading);
 }
 
 .turnstile-help {

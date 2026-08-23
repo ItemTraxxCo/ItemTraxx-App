@@ -107,17 +107,15 @@
             <p class="admin-login-note">
               Workspace Admin? <RouterLink to="/admin/login">Go to admin sign in</RouterLink>
             </p>
-
-            <p class="muted support-note">
-              Trouble signing in? Contact our support team from the top-right menu for help.
-              <br />
-              By using this software, you agree to our
-              <SafeExternalLink :url="legalUrl">legal terms and policies</SafeExternalLink>.
-            </p>
           </form>
 
           <p v-if="error" class="error">{{ error }}</p>
         </div>
+
+        <p class="muted legal-note">
+          By using this software, you agree to our
+          <SafeExternalLink :url="legalUrl">legal terms and policies</SafeExternalLink>.
+        </p>
       </section>
     </div>
 
@@ -603,10 +601,14 @@ onMounted(() => {
 }
 
 .login-form-panel {
+  min-height: 100vh;
+  min-height: 100dvh;
+  box-sizing: border-box;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 2rem 1.75rem;
+  padding: 2rem 1.75rem 1.25rem;
   background: var(--login-form-bg);
   color: var(--login-heading);
   border-radius: 0;
@@ -614,6 +616,7 @@ onMounted(() => {
 
 .login-form-wrap {
   width: min(100%, 34rem);
+  margin: auto 0;
 }
 
 .compact-brand-logo {
@@ -727,8 +730,16 @@ onMounted(() => {
 
 .security-check-field {
   display: block;
-  margin-top: 2.25rem;
+  margin-top: 1.25rem;
   color: var(--login-label);
+}
+
+.security-check-field + .form-actions {
+  margin-top: 0.5rem;
+}
+
+.security-check-field + .form-actions .login-submit-button {
+  margin-top: 0.35rem;
 }
 
 .login-submit-button {
@@ -770,15 +781,16 @@ onMounted(() => {
   color: var(--login-help-link-hover);
 }
 
-.support-note {
-  max-width: 34rem;
+.legal-note {
+  width: min(100%, 34rem);
   font-size: 0.8rem;
   line-height: 1.55;
-  margin-top: 0.95rem;
+  margin: 1rem 0 0;
+  text-align: center;
   color: var(--login-support);
 }
 
-.support-note a {
+.legal-note a {
   color: var(--login-support-link);
 }
 
@@ -808,7 +820,7 @@ onMounted(() => {
   }
 
   .login-form-panel {
-    padding: 1.5rem;
+    padding: 1.5rem 1.5rem 1.25rem;
   }
 
   .login-form-wrap {
@@ -854,7 +866,7 @@ onMounted(() => {
   }
 
   .security-check-field {
-    margin-top: 1rem;
+    margin-top: 0.75rem;
   }
 }
 </style>

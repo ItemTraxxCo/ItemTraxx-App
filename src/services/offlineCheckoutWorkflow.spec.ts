@@ -238,6 +238,30 @@ describe("queueOfflineOperation", () => {
       expected_status: "available",
     });
   });
+
+  it("materializes every queued offline action into the cached item snapshot", async () => {
+    const pack = makePack();
+    await writeOfflinePack(pack);
+
+    await queueOfflineOperation({
+      operationId: "op-checkout",
+      borrower: { id: "b-2", username: "new-borrower", borrower_id: "9999ZZ" },
+      items: [{ item: pack.items[0]!, intent: "checkout" }],
+    });
+    let cached = await readOfflinePack({ workspaceId: WORKSPACE_ID, profileId: PROFILE_ID, deviceId: DEVICE_ID });
+    expect(cached!.borrowers).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: "b-2", borrower_id: "9999ZZ" }),
+    ]));
+    expect(cached!.items[0]).toMatchObject({ status: "checked_out", checked_out_by: "b-2" });
+
+    await queueOfflineOperation({
+      operationId: "op-return",
+      borrower: { id: "b-2", username: "new-borrower", borrower_id: "9999ZZ" },
+      items: [{ item: cached!.items[0]!, intent: "return" }],
+    });
+    cached = await readOfflinePack({ workspaceId: WORKSPACE_ID, profileId: PROFILE_ID, deviceId: DEVICE_ID });
+    expect(cached!.items[0]).toMatchObject({ status: "available", checked_out_by: null });
+  });
 });
 
 describe("getOfflineWorkflowSummary", () => {
@@ -572,6 +596,25 @@ describe("refreshOfflineCheckoutPackIfNeeded", () => {
 
     resolveInvoke({ ok: true, status: 200, error: "", data: { data: prepared } });
     await first;
+    expect(mockedInvoke).toHaveBeenCalledTimes(1);
+  });
+
+  it("runs a forced refresh after an in-flight timer check reports the pack is current", async () => {
+    setAuthStateFromBackend({ isAuthenticated: true, userId: PROFILE_ID, workspaceContextId: WORKSPACE_ID });
+    const existing = makePack({ prepared_at: new Date().toISOString() });
+    await writeOfflinePack(existing);
+    mockedInvoke.mockResolvedValue({
+      ok: true,
+      status: 200,
+      error: "",
+      data: { data: { ...existing, pack_version: "v2" } },
+    });
+
+    const timerRefresh = refreshOfflineCheckoutPackIfNeeded();
+    const forcedRefresh = refreshOfflineCheckoutPackIfNeeded({ force: true });
+
+    await expect(timerRefresh).resolves.toEqual({ refreshed: false, firstPreparation: false, skippedReason: "up_to_date" });
+    await expect(forcedRefresh).resolves.toEqual({ refreshed: true, firstPreparation: false });
     expect(mockedInvoke).toHaveBeenCalledTimes(1);
   });
 });

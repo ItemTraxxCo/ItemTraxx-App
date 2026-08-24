@@ -1,6 +1,6 @@
 import { allowsAnalytics, readCookieConsent } from "./cookieConsentService";
 import { isRecoverableChunkLoadError } from "./appErrorRecovery";
-import { shouldReportError } from "./appErrors";
+import { AppError } from "./appErrors";
 
 let initialized = false;
 let posthog: typeof import("posthog-js").default | null = null;
@@ -49,6 +49,12 @@ const isCspUnsafeEvalError = (error: unknown) => {
     isCspUnsafeEvalMessage(message)
   );
 };
+
+// PostHog's exception feed has its own policy. Keep the expected borrower/item
+// lookup miss out of it without inheriting Sentry's broader suppression rules
+// for network, auth, and other operational errors.
+const shouldCapturePostHogException = (error: unknown) =>
+  !(error instanceof AppError && error.code === "NOT_FOUND");
 
 // PostHog's exception autocapture installs its own global onerror/onunhandledrejection
 // handlers and reports directly, bypassing the guards in globalErrorHandling.ts and
@@ -212,13 +218,11 @@ export const resetPostHog = () => {
   }
 };
 
-// Expected outcomes an operator already sees as a message (a mistyped borrower ID,
-// an unknown barcode, an expired session) are marked non-reporting on the AppError.
-// Filing them as exceptions opens fresh error tracking issues and buries real faults,
-// so the same guard that keeps them out of Sentry keeps them out of error tracking.
+// A missing borrower/item lookup is an expected operator input outcome, not an
+// exception. Other operational failures still belong in PostHog for diagnosis.
 export const capturePostHogException = (error: unknown) => {
   if (!initialized || !posthog || !allowsAnalytics(readCookieConsent())) return;
-  if (isCspUnsafeEvalError(error) || !shouldReportError(error)) return;
+  if (isCspUnsafeEvalError(error) || !shouldCapturePostHogException(error)) return;
   try {
     posthog.captureException(error);
   } catch (captureError) {

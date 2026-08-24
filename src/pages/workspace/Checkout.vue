@@ -282,9 +282,14 @@ const loadBorrower = async () => {
   try {
     const borrowerRow = await fetchBorrowerByBorrowerId(borrowerId.value.trim());
     borrower.value = borrowerRow;
-    checkedOutItem.value = await fetchCheckedOutItem(borrowerRow.id);
-    await nextTick();
-    barcodeField.value?.focus();
+    try {
+      checkedOutItem.value = await fetchCheckedOutItem(borrowerRow.id);
+      await nextTick();
+      barcodeField.value?.focus();
+    } catch (err) {
+      checkedOutItem.value = [];
+      error.value = toUserFacingErrorMessage(err, "Unable to load checked-out items. Please try again.");
+    }
   } catch (err) {
     borrower.value = null;
     checkedOutItem.value = [];

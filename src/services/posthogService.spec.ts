@@ -230,6 +230,16 @@ describe("capturePostHogException", () => {
     expect(posthogMock.captureException).not.toHaveBeenCalled();
   });
 
+  it("still forwards non-NOT_FOUND AppErrors", async () => {
+    const mod = await initializedModule();
+    const { AppError } = await import("./appErrors");
+    const error = new AppError("NETWORK", "Network request failed", { reportToSentry: false });
+
+    mod.capturePostHogException(error);
+
+    expect(posthogMock.captureException).toHaveBeenCalledWith(error);
+  });
+
   it("swallows a thrown captureException error", async () => {
     const mod = await initializedModule();
     posthogMock.captureException.mockImplementationOnce(() => {

@@ -4,6 +4,7 @@ import {
   edgeFunctionError,
   isUnauthorizedError,
   missingContextError,
+  notFoundError,
   shouldReportError,
   toUserFacingErrorMessage,
   unauthorizedError,
@@ -34,6 +35,16 @@ describe("missingContextError", () => {
     expect(error.status).toBe(400);
     expect(error.reportToSentry).toBe(false);
     expect(error.message).toBe("Missing tenant context");
+  });
+});
+
+describe("notFoundError", () => {
+  it("builds a 404 non-reporting AppError", () => {
+    const error = notFoundError("Borrower not found.");
+    expect(error.code).toBe("NOT_FOUND");
+    expect(error.status).toBe(404);
+    expect(error.reportToSentry).toBe(false);
+    expect(shouldReportError(error)).toBe(false);
   });
 });
 
@@ -74,6 +85,19 @@ describe("edgeFunctionError", () => {
   it("preserves a non-zero status for TENANT_DISABLED when provided", () => {
     const error = edgeFunctionError({ status: 451, error: "tenant disabled for policy reasons" }, "fallback");
     expect(error.status).toBe(451);
+  });
+
+  it("maps a 404 to a non-reporting NOT_FOUND so an operator typo is not an exception", () => {
+    const error = edgeFunctionError({ status: 404, error: "Borrower not found" }, "fallback");
+    expect(error.code).toBe("NOT_FOUND");
+    expect(error.status).toBe(404);
+    expect(error.reportToSentry).toBe(false);
+  });
+
+  it("maps a 403 to a non-reporting FORBIDDEN", () => {
+    const error = edgeFunctionError({ status: 403, error: "You do not have access to this borrower." }, "fallback");
+    expect(error.code).toBe("FORBIDDEN");
+    expect(error.reportToSentry).toBe(false);
   });
 
   it("falls back to REQUEST_FAILED and reports to Sentry only for 5xx", () => {
@@ -142,6 +166,19 @@ describe("toUserFacingErrorMessage", () => {
     expect(toUserFacingErrorMessage(new AppError("NETWORK", "x"), fallback)).toMatch(/network issue/i);
     expect(toUserFacingErrorMessage(new AppError("TIMEOUT", "x"), fallback)).toMatch(/timed out/i);
     expect(toUserFacingErrorMessage(new AppError("TENANT_DISABLED", "x"), fallback)).toMatch(/cannot be used/i);
+  });
+
+  it("tells the operator a restricted borrower is a permission problem, not a typo", () => {
+    const accessDenied = new AppError("FORBIDDEN", "You do not have access to this borrower.");
+    expect(toUserFacingErrorMessage(accessDenied, fallback)).toMatch(/do not have access to this borrower/i);
+    expect(toUserFacingErrorMessage(accessDenied, fallback)).not.toMatch(/borrower not found/i);
+  });
+
+  it("keeps the borrower-not-found copy for a NOT_FOUND lookup", () => {
+    expect(toUserFacingErrorMessage(new AppError("NOT_FOUND", "Borrower not found."), fallback))
+      .toMatch(/borrower not found/i);
+    expect(toUserFacingErrorMessage(new AppError("NOT_FOUND", "Invalid barcode."), fallback))
+      .toMatch(/invalid barcode/i);
   });
 
   it("pattern-matches REQUEST_FAILED messages to specific copy", () => {

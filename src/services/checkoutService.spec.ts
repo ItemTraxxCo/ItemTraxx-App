@@ -487,10 +487,35 @@ describe("fetchBorrowerByBorrowerId", () => {
     expect(result).toMatchObject({ id: "b-1" });
   });
 
-  it("throws 'Borrower not found.' offline when there is no local match", async () => {
+  it("throws a non-reporting NOT_FOUND offline when there is no local match", async () => {
     setOnline(false);
     mockedFindOfflineBorrower.mockResolvedValue(null);
-    await expect(fetchBorrowerByBorrowerId("1234AB")).rejects.toThrow("Borrower not found.");
+    await expect(fetchBorrowerByBorrowerId("1234AB")).rejects.toMatchObject({
+      message: "Borrower not found.",
+      code: "NOT_FOUND",
+      reportToSentry: false,
+    });
+  });
+
+  it("keeps an unknown borrower ID out of error tracking as a non-reporting NOT_FOUND", async () => {
+    setOnline(true);
+    mockedInvoke.mockResolvedValue(failResponse(404, "Borrower not found") as never);
+
+    await expect(fetchBorrowerByBorrowerId("1234AB")).rejects.toMatchObject({
+      code: "NOT_FOUND",
+      reportToSentry: false,
+    });
+    expect(mockedFindOfflineBorrower).not.toHaveBeenCalled();
+  });
+
+  it("surfaces a restricted-borrower access denial as FORBIDDEN, not as a missing borrower", async () => {
+    setOnline(true);
+    mockedInvoke.mockResolvedValue(failResponse(403, "You do not have access to this borrower.") as never);
+
+    await expect(fetchBorrowerByBorrowerId("1234AB")).rejects.toMatchObject({
+      code: "FORBIDDEN",
+      reportToSentry: false,
+    });
   });
 
   it("returns the borrower on a successful online lookup", async () => {

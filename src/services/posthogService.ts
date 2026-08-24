@@ -1,5 +1,6 @@
 import { allowsAnalytics, readCookieConsent } from "./cookieConsentService";
 import { isRecoverableChunkLoadError } from "./appErrorRecovery";
+import { shouldReportError } from "./appErrors";
 
 let initialized = false;
 let posthog: typeof import("posthog-js").default | null = null;
@@ -211,8 +212,13 @@ export const resetPostHog = () => {
   }
 };
 
+// Expected outcomes an operator already sees as a message (a mistyped borrower ID,
+// an unknown barcode, an expired session) are marked non-reporting on the AppError.
+// Filing them as exceptions opens fresh error tracking issues and buries real faults,
+// so the same guard that keeps them out of Sentry keeps them out of error tracking.
 export const capturePostHogException = (error: unknown) => {
-  if (!initialized || !posthog || !allowsAnalytics(readCookieConsent()) || isCspUnsafeEvalError(error)) return;
+  if (!initialized || !posthog || !allowsAnalytics(readCookieConsent())) return;
+  if (isCspUnsafeEvalError(error) || !shouldReportError(error)) return;
   try {
     posthog.captureException(error);
   } catch (captureError) {

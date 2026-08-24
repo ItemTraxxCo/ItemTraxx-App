@@ -6,6 +6,7 @@ vi.mock("./cookieConsentService", () => ({
 }));
 vi.mock("./appErrorRecovery", () => ({
   isRecoverableChunkLoadError: vi.fn(() => false),
+  dispatchRecoverableAppError: vi.fn(),
 }));
 
 const posthogMock = {
@@ -216,6 +217,17 @@ describe("capturePostHogException", () => {
     mod.capturePostHogException(error);
 
     expect(posthogMock.captureException).toHaveBeenCalledWith(error);
+  });
+
+  it("drops an expected, non-reporting AppError instead of opening an error tracking issue", async () => {
+    const mod = await initializedModule();
+    // Loaded after initializedModule's resetModules so the AppError class the guard
+    // checks against is the same instance the service imported.
+    const { notFoundError } = await import("./appErrors");
+
+    mod.capturePostHogException(notFoundError("Borrower not found."));
+
+    expect(posthogMock.captureException).not.toHaveBeenCalled();
   });
 
   it("swallows a thrown captureException error", async () => {

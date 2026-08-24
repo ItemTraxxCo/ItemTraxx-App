@@ -2,7 +2,6 @@ import { dispatchRecoverableAppError } from "./appErrorRecovery";
 
 export type AppErrorCode =
   | "UNAUTHORIZED"
-  | "FORBIDDEN"
   | "RATE_LIMIT"
   | "NETWORK"
   | "TIMEOUT"
@@ -90,9 +89,6 @@ export const edgeFunctionError = (result: EdgeLikeResult, fallbackMessage: strin
   if (result.status === 404) {
     return new AppError("NOT_FOUND", message, { status: 404, reportToSentry: false });
   }
-  if (result.status === 403) {
-    return new AppError("FORBIDDEN", message, { status: 403, reportToSentry: false });
-  }
 
   return new AppError("REQUEST_FAILED", message, {
     status: result.status,
@@ -118,8 +114,7 @@ export const toUserFacingErrorMessage = (error: unknown, fallbackMessage: string
     if (error.code === "NETWORK") return "Network issue. Unable to reach ItemTraxx servers. Check your connection and try again.";
     if (error.code === "TIMEOUT") return "Request timed out. Unable to reach ItemTraxx servers. Please try again.";
     if (error.code === "TENANT_DISABLED") return "This account cannot be used right now. Please contact support.";
-    if (error.code === "REQUEST_FAILED" || error.code === "NOT_FOUND" || error.code === "FORBIDDEN") {
-      if (normalized.includes("access to this borrower")) return "You do not have access to this borrower. Ask a workspace admin to grant you access.";
+    if (error.code === "REQUEST_FAILED" || error.code === "NOT_FOUND") {
       if (normalized.includes("invalid barcode")) return "Invalid barcode. Please check the barcode and try again.";
       if (normalized.includes("borrower not found")) return "Borrower not found. Please check the borrower ID and try again.";
       if (normalized.includes("missing tenant context")) return "Your session is missing required account information. Please sign out and sign in again.";
@@ -146,9 +141,6 @@ export const toUserFacingErrorMessage = (error: unknown, fallbackMessage: string
   }
   if (normalized.includes("invalid barcode")) {
     return "Invalid barcode. Please check the barcode and try again.";
-  }
-  if (normalized.includes("access to this borrower")) {
-    return "You do not have access to this borrower. Ask a workspace admin to grant you access.";
   }
   if (normalized.includes("borrower not found")) {
     return "Borrower not found. Please check the borrower ID and try again.";

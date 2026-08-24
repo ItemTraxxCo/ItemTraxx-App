@@ -94,12 +94,6 @@ describe("edgeFunctionError", () => {
     expect(error.reportToSentry).toBe(false);
   });
 
-  it("maps a 403 to a non-reporting FORBIDDEN", () => {
-    const error = edgeFunctionError({ status: 403, error: "You do not have access to this borrower." }, "fallback");
-    expect(error.code).toBe("FORBIDDEN");
-    expect(error.reportToSentry).toBe(false);
-  });
-
   it("falls back to REQUEST_FAILED and reports to Sentry only for 5xx", () => {
     const clientError = edgeFunctionError({ status: 422, error: "Invalid barcode format" }, "fallback");
     expect(clientError.code).toBe("REQUEST_FAILED");
@@ -166,12 +160,6 @@ describe("toUserFacingErrorMessage", () => {
     expect(toUserFacingErrorMessage(new AppError("NETWORK", "x"), fallback)).toMatch(/network issue/i);
     expect(toUserFacingErrorMessage(new AppError("TIMEOUT", "x"), fallback)).toMatch(/timed out/i);
     expect(toUserFacingErrorMessage(new AppError("TENANT_DISABLED", "x"), fallback)).toMatch(/cannot be used/i);
-  });
-
-  it("tells the operator a restricted borrower is a permission problem, not a typo", () => {
-    const accessDenied = new AppError("FORBIDDEN", "You do not have access to this borrower.");
-    expect(toUserFacingErrorMessage(accessDenied, fallback)).toMatch(/do not have access to this borrower/i);
-    expect(toUserFacingErrorMessage(accessDenied, fallback)).not.toMatch(/borrower not found/i);
   });
 
   it("keeps the borrower-not-found copy for a NOT_FOUND lookup", () => {

@@ -497,6 +497,8 @@ describe("fetchBorrowerByBorrowerId", () => {
     });
   });
 
+  // The edge function returns this same 404 both for an unknown borrower ID and for a
+  // restricted borrower the caller has no grant for, so neither is an exception.
   it("keeps an unknown borrower ID out of error tracking as a non-reporting NOT_FOUND", async () => {
     setOnline(true);
     mockedInvoke.mockResolvedValue(failResponse(404, "Borrower not found") as never);
@@ -506,16 +508,6 @@ describe("fetchBorrowerByBorrowerId", () => {
       reportToSentry: false,
     });
     expect(mockedFindOfflineBorrower).not.toHaveBeenCalled();
-  });
-
-  it("surfaces a restricted-borrower access denial as FORBIDDEN, not as a missing borrower", async () => {
-    setOnline(true);
-    mockedInvoke.mockResolvedValue(failResponse(403, "You do not have access to this borrower.") as never);
-
-    await expect(fetchBorrowerByBorrowerId("1234AB")).rejects.toMatchObject({
-      code: "FORBIDDEN",
-      reportToSentry: false,
-    });
   });
 
   it("returns the borrower on a successful online lookup", async () => {

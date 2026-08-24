@@ -145,11 +145,9 @@ serve(async (req) => {
     if (!borrower) return jsonResponse(404, { error: "Borrower not found" });
     if (profile.role === "tenant_account" && borrower.access_mode === "restricted") {
       const { data: grant } = await adminClient.from("borrower_access_grants").select("borrower_id").eq("borrower_id", borrower.id).eq("profile_id", authData.user.id).maybeSingle();
-      // A missing access grant is a permission outcome, not a missing record. Reporting
-      // it as a 404 left the operator retyping a borrower ID that was never the problem.
-      // The caller is already authenticated into this workspace, so naming the reason
-      // tells them to ask for a grant instead.
-      if (!grant) return jsonResponse(403, { error: "You do not have access to this borrower." });
+      // Deliberately the same 404 as an unknown borrower: a caller without a grant must
+      // not be able to tell a restricted borrower apart from one that does not exist.
+      if (!grant) return jsonResponse(404, { error: "Borrower not found" });
     }
     return jsonResponse(200, { data: borrower });
   } catch (error) {

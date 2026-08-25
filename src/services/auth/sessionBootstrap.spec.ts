@@ -47,6 +47,7 @@ import {
   resolveWorkspaceSlug,
 } from "./sessionBootstrap";
 import {
+  type AuthState,
   clearAdminVerification,
   clearAuthState,
   getAuthState,
@@ -316,7 +317,19 @@ describe("applyHttpSessionSummary", () => {
 
   it("does not apply a stale summary when the auth state changes during workspace validation", async () => {
     let resolveWorkspace!: (rows: Array<{ id: string; status: "active"; slug: string }>) => void;
-    const authState = {
+    // Annotated rather than inferred: the test mutates userId partway through,
+    // and an inferred literal would pin the field to `null`.
+    const authState: Pick<
+      AuthState,
+      | "isAuthenticated"
+      | "userId"
+      | "role"
+      | "sessionWorkspaceId"
+      | "workspaceContextId"
+      | "hasSecondaryAuth"
+      | "superVerifiedAt"
+      | "adminVerifiedAt"
+    > = {
       isAuthenticated: false,
       userId: null,
       role: null,

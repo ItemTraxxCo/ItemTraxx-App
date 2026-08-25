@@ -217,6 +217,25 @@ describe("refreshPublicAuthFromSession", () => {
       expect(fetchHttpSessionSummary).toHaveBeenCalledTimes(1);
     });
 
+    // main.ts aborts the probe from its `finally`, so a bootstrap that has
+    // already timed out must not leave a retry running behind it.
+    it("cancels a pending retry when the caller aborts during the backoff", async () => {
+      const controller = new AbortController();
+      vi.mocked(fetchHttpSessionSummary).mockRejectedValueOnce(new SessionNetworkError("me"));
+
+      const pending = refreshPublicAuthFromSession(controller.signal);
+      pending.catch(() => undefined);
+      await vi.advanceTimersByTimeAsync(100);
+      controller.abort();
+
+      await expect(pending).rejects.toMatchObject({ name: "AbortError" });
+
+      expect(fetchHttpSessionSummary).toHaveBeenCalledTimes(1);
+      expect(fetchHttpSessionSummary).toHaveBeenCalledWith({ signal: controller.signal });
+      expect(applyHttpSessionSummary).not.toHaveBeenCalled();
+      expect(initAuthListener).not.toHaveBeenCalled();
+    });
+
     it("ignores a late retry result after a newer auth state has been established", async () => {
       let resolveRetry!: (summary: { authenticated: boolean; user: null; profile: null }) => void;
       vi.mocked(fetchHttpSessionSummary)

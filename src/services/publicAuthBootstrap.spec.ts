@@ -4,9 +4,14 @@ vi.mock("../store/authState", () => ({
   clearAuthState: vi.fn(),
 }));
 
-vi.mock("./httpSessionService", () => ({
-  fetchHttpSessionSummary: vi.fn(),
-}));
+vi.mock("./httpSessionService", async () => {
+  const actual = await vi.importActual<typeof import("./httpSessionService")>("./httpSessionService");
+  return {
+    fetchHttpSessionSummary: vi.fn(),
+    isSessionNetworkError: actual.isSessionNetworkError,
+    SessionNetworkError: actual.SessionNetworkError,
+  };
+});
 
 vi.mock("./authService", () => ({
   applyHttpSessionSummary: vi.fn(),
@@ -19,8 +24,14 @@ import {
   scrubLegacyAuthFragment,
 } from "./publicAuthBootstrap";
 import { clearAuthState } from "../store/authState";
-import { fetchHttpSessionSummary } from "./httpSessionService";
+import { fetchHttpSessionSummary, SessionNetworkError } from "./httpSessionService";
 import { applyHttpSessionSummary, initAuthListener } from "./authService";
+
+const authenticatedSummary = {
+  authenticated: true,
+  user: { id: "u1", email: "a@b.com", last_sign_in_at: null },
+  profile: null,
+};
 
 describe("hasLegacyAuthFragment", () => {
   it("detects each known legacy key in a given hash", () => {
@@ -114,17 +125,67 @@ describe("refreshPublicAuthFromSession", () => {
   });
 
   it("applies the session and starts the auth listener when authenticated with a user", async () => {
-    const summary = {
-      authenticated: true,
-      user: { id: "u1", email: "a@b.com", last_sign_in_at: null },
-      profile: null,
-    };
-    vi.mocked(fetchHttpSessionSummary).mockResolvedValueOnce(summary);
+    vi.mocked(fetchHttpSessionSummary).mockResolvedValueOnce(authenticatedSummary);
 
     await refreshPublicAuthFromSession();
 
     expect(clearAuthState).not.toHaveBeenCalled();
-    expect(applyHttpSessionSummary).toHaveBeenCalledWith(summary);
+    expect(applyHttpSessionSummary).toHaveBeenCalledWith(authenticatedSummary);
     expect(initAuthListener).toHaveBeenCalledTimes(1);
+  });
+
+  describe("transient transport failures", () => {
+    beforeEach(() => {
+      vi.useFakeTimers();
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    // The retry delay only advances under fake timers, so drive the clock before
+    // handing the promise back. The rejection is asserted by each caller; this
+    // no-op handler just keeps it from surfacing as an unhandled rejection while
+    // the timers run.
+    const runWithTimers = (promise: Promise<unknown>) => {
+      promise.catch(() => undefined);
+      return vi.runAllTimersAsync().then(() => promise);
+    };
+
+    // The failure mode this guards: one blip on the session probe used to leave
+    // an already signed-in admin looking anonymous on /admin/login, forcing them
+    // to re-enter credentials they did not actually need.
+    it("retries once and recognises the existing session when the first probe cannot reach the server", async () => {
+      vi.mocked(fetchHttpSessionSummary)
+        .mockRejectedValueOnce(new SessionNetworkError("me", new TypeError("Failed to fetch")))
+        .mockResolvedValueOnce(authenticatedSummary);
+
+      await runWithTimers(refreshPublicAuthFromSession());
+
+      expect(fetchHttpSessionSummary).toHaveBeenCalledTimes(2);
+      expect(applyHttpSessionSummary).toHaveBeenCalledWith(authenticatedSummary);
+      expect(clearAuthState).not.toHaveBeenCalled();
+    });
+
+    it("gives up after a single retry when the server stays unreachable", async () => {
+      vi.mocked(fetchHttpSessionSummary).mockRejectedValue(new SessionNetworkError("me"));
+
+      await expect(runWithTimers(refreshPublicAuthFromSession())).rejects.toBeInstanceOf(
+        SessionNetworkError,
+      );
+
+      expect(fetchHttpSessionSummary).toHaveBeenCalledTimes(2);
+      expect(applyHttpSessionSummary).not.toHaveBeenCalled();
+    });
+
+    it("does not retry when the server answered and refused", async () => {
+      vi.mocked(fetchHttpSessionSummary).mockRejectedValue(new Error("Session request failed (401)."));
+
+      await expect(runWithTimers(refreshPublicAuthFromSession())).rejects.toThrow(
+        "Session request failed (401).",
+      );
+
+      expect(fetchHttpSessionSummary).toHaveBeenCalledTimes(1);
+    });
   });
 });

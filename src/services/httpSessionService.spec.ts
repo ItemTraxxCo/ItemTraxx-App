@@ -1,5 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { clearHttpSession, exchangeHttpSession, fetchHttpSessionSummary } from "./httpSessionService";
+import {
+  clearHttpSession,
+  exchangeHttpSession,
+  fetchHttpSessionSummary,
+  isSessionNetworkError,
+  SessionNetworkError,
+} from "./httpSessionService";
 
 // captureHandledRequestFailure pulls in Sentry/cookie-consent machinery that's
 // irrelevant to this service's own logic, so it's mocked at the module boundary
@@ -127,6 +133,37 @@ describe("httpSessionService", () => {
       expect(captureHandledRequestFailure).toHaveBeenCalledWith(
         expect.objectContaining({ requestId: undefined, status: 500, name: "logout", method: "POST" })
       );
+    });
+
+    // A `TypeError: Failed to fetch` reaching the bootstrap logger as a generic
+    // error is what made an unreachable edge proxy look like an application bug.
+    it("wraps a transport-level fetch rejection in SessionNetworkError", async () => {
+      const cause = new TypeError("Failed to fetch");
+      vi.mocked(fetch).mockRejectedValue(cause);
+
+      const error = await fetchHttpSessionSummary().catch((thrown: unknown) => thrown);
+
+      expect(isSessionNetworkError(error)).toBe(true);
+      expect(error).toBeInstanceOf(SessionNetworkError);
+      expect((error as SessionNetworkError).action).toBe("me");
+      expect((error as SessionNetworkError).cause).toBe(cause);
+      expect((error as SessionNetworkError).message).toContain("Unable to reach");
+    });
+
+    it("does not report a transport failure to Sentry, since no request reached the server", async () => {
+      vi.mocked(fetch).mockRejectedValue(new TypeError("Failed to fetch"));
+
+      await expect(fetchHttpSessionSummary()).rejects.toBeInstanceOf(SessionNetworkError);
+
+      expect(captureHandledRequestFailure).not.toHaveBeenCalled();
+    });
+
+    it("treats a refused response as a server answer rather than a transport failure", async () => {
+      vi.mocked(fetch).mockResolvedValue(jsonResponse({}, { ok: false, status: 401 }) as unknown as Response);
+
+      const error = await fetchHttpSessionSummary().catch((thrown: unknown) => thrown);
+
+      expect(isSessionNetworkError(error)).toBe(false);
     });
   });
 });

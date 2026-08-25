@@ -8,6 +8,7 @@ import router from "./router";
 import { clearAuthState, getAuthState } from "./store/authState";
 import { getWorkspaceState } from "./store/workspaceState";
 import { refreshPublicAuthFromSession, scrubLegacyAuthFragment } from "./services/publicAuthBootstrap";
+import { isSessionNetworkError } from "./services/httpSessionService";
 import { TimeoutError, withTimeout } from "./services/asyncUtils";
 import {
   captureInitialPerfMetrics,
@@ -33,6 +34,22 @@ const redirectCanonicalHost = () => {
   return true;
 };
 
+const reportAuthInitFailure = (error: unknown) => {
+  if (error instanceof TimeoutError) {
+    console.error("Auth initialization timeout:", error.message);
+    return;
+  }
+  if (isSessionNetworkError(error)) {
+    // The session service was never reached — the visitor is offline, something
+    // blocked the call to the edge proxy, or a dev machine has no proxy running.
+    // The app is fine and the visitor is simply treated as signed out, so this
+    // stays out of the error stream that genuine auth failures live in.
+    console.warn("Auth initialization skipped; session service unreachable:", error.message);
+    return;
+  }
+  console.error("Auth initialization failed:", error);
+};
+
 const initializeAuth = async () => {
   const isE2ETestMode = import.meta.env.VITE_E2E_TEST_UTILS === "true";
   if (isE2ETestMode) {
@@ -51,11 +68,7 @@ const initializeAuth = async () => {
     );
     initAuthListener();
   } catch (error) {
-    if (error instanceof TimeoutError) {
-      console.error("Auth initialization timeout:", error.message);
-    } else {
-      console.error("Auth initialization failed:", error);
-    }
+    reportAuthInitFailure(error);
   } finally {
     if (!getAuthState().isInitialized) {
       clearAuthState(true);
@@ -77,11 +90,7 @@ const initializePublicAuth = async () => {
       "Authentication initialization timed out."
     );
   } catch (error) {
-    if (error instanceof TimeoutError) {
-      console.error("Auth initialization timeout:", error.message);
-    } else {
-      console.error("Auth initialization failed:", error);
-    }
+    reportAuthInitFailure(error);
   } finally {
     if (!getAuthState().isInitialized) {
       clearAuthState(true);

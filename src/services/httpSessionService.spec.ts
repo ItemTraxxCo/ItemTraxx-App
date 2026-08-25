@@ -54,6 +54,18 @@ describe("httpSessionService", () => {
       expect((init as RequestInit).headers).not.toHaveProperty("x-itx-session-request");
     });
 
+    it("forwards an abort signal to the session probe", async () => {
+      vi.stubEnv("VITE_EDGE_PROXY_URL", "");
+      const signal = new AbortController().signal;
+      vi.mocked(fetch).mockResolvedValue(
+        jsonResponse({ authenticated: false, user: null, profile: null }) as unknown as Response,
+      );
+
+      await fetchHttpSessionSummary({ signal });
+
+      expect((vi.mocked(fetch).mock.calls[0]?.[1] as RequestInit).signal).toBe(signal);
+    });
+
     it("routes through the configured edge proxy origin when VITE_EDGE_PROXY_URL is set", async () => {
       vi.stubEnv("VITE_EDGE_PROXY_URL", "https://proxy.example.com/some/path");
       vi.mocked(fetch).mockResolvedValue(jsonResponse({ authenticated: false, user: null, profile: null }) as unknown as Response);

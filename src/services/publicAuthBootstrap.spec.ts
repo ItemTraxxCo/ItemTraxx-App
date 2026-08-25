@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../store/authState", () => ({
   clearAuthState: vi.fn(),
+  getAuthState: vi.fn(),
 }));
 
 vi.mock("./httpSessionService", async () => {
@@ -23,7 +24,7 @@ import {
   refreshPublicAuthFromSession,
   scrubLegacyAuthFragment,
 } from "./publicAuthBootstrap";
-import { clearAuthState } from "../store/authState";
+import { clearAuthState, getAuthState } from "../store/authState";
 import { fetchHttpSessionSummary, SessionNetworkError } from "./httpSessionService";
 import { applyHttpSessionSummary, initAuthListener } from "./authService";
 
@@ -31,6 +32,17 @@ const authenticatedSummary = {
   authenticated: true,
   user: { id: "u1", email: "a@b.com", last_sign_in_at: null },
   profile: null,
+};
+
+const authState = {
+  isAuthenticated: false,
+  userId: null,
+  role: null,
+  sessionWorkspaceId: null,
+  workspaceContextId: null,
+  hasSecondaryAuth: false,
+  superVerifiedAt: null,
+  adminVerifiedAt: null,
 };
 
 describe("hasLegacyAuthFragment", () => {
@@ -95,6 +107,17 @@ describe("scrubLegacyAuthFragment", () => {
 describe("refreshPublicAuthFromSession", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    Object.assign(authState, {
+      isAuthenticated: false,
+      userId: null,
+      role: null,
+      sessionWorkspaceId: null,
+      workspaceContextId: null,
+      hasSecondaryAuth: false,
+      superVerifiedAt: null,
+      adminVerifiedAt: null,
+    });
+    vi.mocked(getAuthState).mockReturnValue(authState as never);
   });
 
   it("clears auth state when the session summary is not authenticated", async () => {
@@ -130,7 +153,10 @@ describe("refreshPublicAuthFromSession", () => {
     await refreshPublicAuthFromSession();
 
     expect(clearAuthState).not.toHaveBeenCalled();
-    expect(applyHttpSessionSummary).toHaveBeenCalledWith(authenticatedSummary);
+    expect(applyHttpSessionSummary).toHaveBeenCalledWith(
+      authenticatedSummary,
+      expect.objectContaining({ isCurrent: expect.any(Function) }),
+    );
     expect(initAuthListener).toHaveBeenCalledTimes(1);
   });
 
@@ -163,7 +189,10 @@ describe("refreshPublicAuthFromSession", () => {
       await runWithTimers(refreshPublicAuthFromSession());
 
       expect(fetchHttpSessionSummary).toHaveBeenCalledTimes(2);
-      expect(applyHttpSessionSummary).toHaveBeenCalledWith(authenticatedSummary);
+      expect(applyHttpSessionSummary).toHaveBeenCalledWith(
+        authenticatedSummary,
+        expect.objectContaining({ isCurrent: expect.any(Function) }),
+      );
       expect(clearAuthState).not.toHaveBeenCalled();
     });
 
@@ -186,6 +215,34 @@ describe("refreshPublicAuthFromSession", () => {
       );
 
       expect(fetchHttpSessionSummary).toHaveBeenCalledTimes(1);
+    });
+
+    it("ignores a late retry result after a newer auth state has been established", async () => {
+      let resolveRetry!: (summary: { authenticated: boolean; user: null; profile: null }) => void;
+      vi.mocked(fetchHttpSessionSummary)
+        .mockRejectedValueOnce(new SessionNetworkError("me"))
+        .mockImplementationOnce(
+          () =>
+            new Promise((resolve) => {
+              resolveRetry = resolve;
+            }),
+        );
+
+      const pending = refreshPublicAuthFromSession();
+      await vi.advanceTimersByTimeAsync(500);
+      expect(resolveRetry).toBeTypeOf("function");
+
+      Object.assign(authState, {
+        isAuthenticated: true,
+        userId: "new-user",
+        role: "workspace_admin",
+      });
+      resolveRetry({ authenticated: false, user: null, profile: null });
+      await pending;
+
+      expect(clearAuthState).not.toHaveBeenCalled();
+      expect(applyHttpSessionSummary).not.toHaveBeenCalled();
+      expect(initAuthListener).not.toHaveBeenCalled();
     });
   });
 });

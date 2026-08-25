@@ -111,8 +111,8 @@ const requestHttpSession = async <TData>(
   return (await response.json()) as TData;
 };
 
-export const fetchHttpSessionSummary = async () =>
-  requestHttpSession<HttpSessionSummary>("me", { method: "GET" });
+export const fetchHttpSessionSummary = async (options: Pick<RequestInit, "signal"> = {}) =>
+  requestHttpSession<HttpSessionSummary>("me", { method: "GET", ...options });
 
 export const exchangeHttpSession = async (payload: {
   access_token: string;

@@ -79,19 +79,21 @@ const initializeAuth = async () => {
 const initializePublicAuth = async () => {
   document.documentElement.dataset.itemtraxxPublicAuth = "pending";
   const isE2ETestMode = import.meta.env.VITE_E2E_TEST_UTILS === "true";
+  const publicAuthController = new AbortController();
   if (isE2ETestMode) {
     clearAuthState(true);
   }
 
   try {
     await withTimeout(
-      refreshPublicAuthFromSession(),
+      refreshPublicAuthFromSession(publicAuthController.signal),
       6000,
       "Authentication initialization timed out."
     );
   } catch (error) {
     reportAuthInitFailure(error);
   } finally {
+    publicAuthController.abort();
     if (!getAuthState().isInitialized) {
       clearAuthState(true);
     }

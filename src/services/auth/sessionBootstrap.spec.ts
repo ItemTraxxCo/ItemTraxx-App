@@ -313,6 +313,44 @@ describe("applyHttpSessionSummary", () => {
       })
     );
   });
+
+  it("does not apply a stale summary when the auth state changes during workspace validation", async () => {
+    let resolveWorkspace!: (rows: Array<{ id: string; status: "active"; slug: string }>) => void;
+    const authState = {
+      isAuthenticated: false,
+      userId: null,
+      role: null,
+      sessionWorkspaceId: null,
+      workspaceContextId: null,
+      hasSecondaryAuth: false,
+      superVerifiedAt: null,
+      adminVerifiedAt: null,
+    };
+    vi.mocked(getAuthState).mockReturnValue(authState as never);
+    vi.mocked(authenticatedSelect).mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveWorkspace = resolve;
+        }),
+    );
+
+    const pending = applyHttpSessionSummary(
+      {
+        authenticated: true,
+        user: { id: "u1", email: "a@b.com", last_sign_in_at: null },
+        profile: { role: "workspace_admin", workspace_id: "ws-1", auth_email: "a@b.com", is_active: true },
+      },
+      { isCurrent: () => !authState.isAuthenticated && authState.userId === null },
+    );
+
+    authState.isAuthenticated = true;
+    authState.userId = "new-user";
+    resolveWorkspace([{ id: "ws-1", status: "active", slug: "acme" }]);
+    await pending;
+
+    expect(setAuthStateFromBackend).not.toHaveBeenCalled();
+    expect(clearSessionTermination).not.toHaveBeenCalled();
+  });
 });
 
 describe("refreshAuthFromSession", () => {

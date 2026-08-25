@@ -277,6 +277,8 @@ serve(async (req) => {
 
       if (callerRole === "tenant_account" && borrowerData.access_mode === "restricted") {
         const { data: grant } = await adminClient.from("borrower_access_grants").select("borrower_id").eq("borrower_id", borrowerData.id).eq("profile_id", user.id).maybeSingle();
+        // Matches checkout-borrower-lookup: a missing grant returns the same 404 as an
+        // unknown borrower so a restricted borrower's existence is not revealed.
         if (!grant) return jsonResponse(404, { error: "Borrower not found." });
       }
       borrower = borrowerData;

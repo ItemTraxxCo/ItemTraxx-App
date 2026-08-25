@@ -145,6 +145,8 @@ serve(async (req) => {
     if (!borrower) return jsonResponse(404, { error: "Borrower not found" });
     if (profile.role === "tenant_account" && borrower.access_mode === "restricted") {
       const { data: grant } = await adminClient.from("borrower_access_grants").select("borrower_id").eq("borrower_id", borrower.id).eq("profile_id", authData.user.id).maybeSingle();
+      // Deliberately the same 404 as an unknown borrower: a caller without a grant must
+      // not be able to tell a restricted borrower apart from one that does not exist.
       if (!grant) return jsonResponse(404, { error: "Borrower not found" });
     }
     return jsonResponse(200, { data: borrower });

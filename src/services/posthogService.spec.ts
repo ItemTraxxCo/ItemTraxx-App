@@ -6,6 +6,7 @@ vi.mock("./cookieConsentService", () => ({
 }));
 vi.mock("./appErrorRecovery", () => ({
   isRecoverableChunkLoadError: vi.fn(() => false),
+  dispatchRecoverableAppError: vi.fn(),
 }));
 
 const posthogMock = {
@@ -77,6 +78,7 @@ describe("initPostHog", () => {
       expect.objectContaining({
         capture_exceptions: true,
         autocapture: false,
+        capture_pageleave: true,
         disable_session_recording: true,
       })
     );
@@ -212,6 +214,27 @@ describe("capturePostHogException", () => {
   it("forwards a regular error to posthog.captureException", async () => {
     const mod = await initializedModule();
     const error = new Error("boom");
+
+    mod.capturePostHogException(error);
+
+    expect(posthogMock.captureException).toHaveBeenCalledWith(error);
+  });
+
+  it("drops an expected, non-reporting AppError instead of opening an error tracking issue", async () => {
+    const mod = await initializedModule();
+    // Loaded after initializedModule's resetModules so the AppError class the guard
+    // checks against is the same instance the service imported.
+    const { notFoundError } = await import("./appErrors");
+
+    mod.capturePostHogException(notFoundError("Borrower not found."));
+
+    expect(posthogMock.captureException).not.toHaveBeenCalled();
+  });
+
+  it("still forwards non-NOT_FOUND AppErrors", async () => {
+    const mod = await initializedModule();
+    const { AppError } = await import("./appErrors");
+    const error = new AppError("NETWORK", "Network request failed", { reportToSentry: false });
 
     mod.capturePostHogException(error);
 

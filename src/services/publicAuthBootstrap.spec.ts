@@ -2,11 +2,17 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../store/authState", () => ({
   clearAuthState: vi.fn(),
+  getAuthState: vi.fn(),
 }));
 
-vi.mock("./httpSessionService", () => ({
-  fetchHttpSessionSummary: vi.fn(),
-}));
+vi.mock("./httpSessionService", async () => {
+  const actual = await vi.importActual<typeof import("./httpSessionService")>("./httpSessionService");
+  return {
+    fetchHttpSessionSummary: vi.fn(),
+    isSessionNetworkError: actual.isSessionNetworkError,
+    SessionNetworkError: actual.SessionNetworkError,
+  };
+});
 
 vi.mock("./authService", () => ({
   applyHttpSessionSummary: vi.fn(),
@@ -18,9 +24,26 @@ import {
   refreshPublicAuthFromSession,
   scrubLegacyAuthFragment,
 } from "./publicAuthBootstrap";
-import { clearAuthState } from "../store/authState";
-import { fetchHttpSessionSummary } from "./httpSessionService";
+import { clearAuthState, getAuthState } from "../store/authState";
+import { fetchHttpSessionSummary, SessionNetworkError } from "./httpSessionService";
 import { applyHttpSessionSummary, initAuthListener } from "./authService";
+
+const authenticatedSummary = {
+  authenticated: true,
+  user: { id: "u1", email: "a@b.com", last_sign_in_at: null },
+  profile: null,
+};
+
+const authState = {
+  isAuthenticated: false,
+  userId: null,
+  role: null,
+  sessionWorkspaceId: null,
+  workspaceContextId: null,
+  hasSecondaryAuth: false,
+  superVerifiedAt: null,
+  adminVerifiedAt: null,
+};
 
 describe("hasLegacyAuthFragment", () => {
   it("detects each known legacy key in a given hash", () => {
@@ -84,6 +107,17 @@ describe("scrubLegacyAuthFragment", () => {
 describe("refreshPublicAuthFromSession", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    Object.assign(authState, {
+      isAuthenticated: false,
+      userId: null,
+      role: null,
+      sessionWorkspaceId: null,
+      workspaceContextId: null,
+      hasSecondaryAuth: false,
+      superVerifiedAt: null,
+      adminVerifiedAt: null,
+    });
+    vi.mocked(getAuthState).mockReturnValue(authState as never);
   });
 
   it("clears auth state when the session summary is not authenticated", async () => {
@@ -114,17 +148,120 @@ describe("refreshPublicAuthFromSession", () => {
   });
 
   it("applies the session and starts the auth listener when authenticated with a user", async () => {
-    const summary = {
-      authenticated: true,
-      user: { id: "u1", email: "a@b.com", last_sign_in_at: null },
-      profile: null,
-    };
-    vi.mocked(fetchHttpSessionSummary).mockResolvedValueOnce(summary);
+    vi.mocked(fetchHttpSessionSummary).mockResolvedValueOnce(authenticatedSummary);
 
     await refreshPublicAuthFromSession();
 
     expect(clearAuthState).not.toHaveBeenCalled();
-    expect(applyHttpSessionSummary).toHaveBeenCalledWith(summary);
+    expect(applyHttpSessionSummary).toHaveBeenCalledWith(
+      authenticatedSummary,
+      expect.objectContaining({ isCurrent: expect.any(Function) }),
+    );
     expect(initAuthListener).toHaveBeenCalledTimes(1);
+  });
+
+  describe("transient transport failures", () => {
+    beforeEach(() => {
+      vi.useFakeTimers();
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    // The retry delay only advances under fake timers, so drive the clock before
+    // handing the promise back. The rejection is asserted by each caller; this
+    // no-op handler just keeps it from surfacing as an unhandled rejection while
+    // the timers run.
+    const runWithTimers = (promise: Promise<unknown>) => {
+      promise.catch(() => undefined);
+      return vi.runAllTimersAsync().then(() => promise);
+    };
+
+    // The failure mode this guards: one blip on the session probe used to leave
+    // an already signed-in admin looking anonymous on /admin/login, forcing them
+    // to re-enter credentials they did not actually need.
+    it("retries once and recognises the existing session when the first probe cannot reach the server", async () => {
+      vi.mocked(fetchHttpSessionSummary)
+        .mockRejectedValueOnce(new SessionNetworkError("me", new TypeError("Failed to fetch")))
+        .mockResolvedValueOnce(authenticatedSummary);
+
+      await runWithTimers(refreshPublicAuthFromSession());
+
+      expect(fetchHttpSessionSummary).toHaveBeenCalledTimes(2);
+      expect(applyHttpSessionSummary).toHaveBeenCalledWith(
+        authenticatedSummary,
+        expect.objectContaining({ isCurrent: expect.any(Function) }),
+      );
+      expect(clearAuthState).not.toHaveBeenCalled();
+    });
+
+    it("gives up after a single retry when the server stays unreachable", async () => {
+      vi.mocked(fetchHttpSessionSummary).mockRejectedValue(new SessionNetworkError("me"));
+
+      await expect(runWithTimers(refreshPublicAuthFromSession())).rejects.toBeInstanceOf(
+        SessionNetworkError,
+      );
+
+      expect(fetchHttpSessionSummary).toHaveBeenCalledTimes(2);
+      expect(applyHttpSessionSummary).not.toHaveBeenCalled();
+    });
+
+    it("does not retry when the server answered and refused", async () => {
+      vi.mocked(fetchHttpSessionSummary).mockRejectedValue(new Error("Session request failed (401)."));
+
+      await expect(runWithTimers(refreshPublicAuthFromSession())).rejects.toThrow(
+        "Session request failed (401).",
+      );
+
+      expect(fetchHttpSessionSummary).toHaveBeenCalledTimes(1);
+    });
+
+    // main.ts aborts the probe from its `finally`, so a bootstrap that has
+    // already timed out must not leave a retry running behind it.
+    it("cancels a pending retry when the caller aborts during the backoff", async () => {
+      const controller = new AbortController();
+      vi.mocked(fetchHttpSessionSummary).mockRejectedValueOnce(new SessionNetworkError("me"));
+
+      const pending = refreshPublicAuthFromSession(controller.signal);
+      pending.catch(() => undefined);
+      await vi.advanceTimersByTimeAsync(100);
+      controller.abort();
+
+      await expect(pending).rejects.toMatchObject({ name: "AbortError" });
+
+      expect(fetchHttpSessionSummary).toHaveBeenCalledTimes(1);
+      expect(fetchHttpSessionSummary).toHaveBeenCalledWith({ signal: controller.signal });
+      expect(applyHttpSessionSummary).not.toHaveBeenCalled();
+      expect(initAuthListener).not.toHaveBeenCalled();
+    });
+
+    it("ignores a late retry result after a newer auth state has been established", async () => {
+      let resolveRetry!: (summary: { authenticated: boolean; user: null; profile: null }) => void;
+      vi.mocked(fetchHttpSessionSummary)
+        .mockRejectedValueOnce(new SessionNetworkError("me"))
+        .mockImplementationOnce(
+          () =>
+            new Promise((resolve) => {
+              resolveRetry = resolve;
+            }),
+        );
+
+      const pending = refreshPublicAuthFromSession();
+      await vi.advanceTimersByTimeAsync(500);
+      expect(resolveRetry).toBeTypeOf("function");
+
+      Object.assign(authState, {
+        isAuthenticated: true,
+        userId: "new-user",
+        role: "workspace_admin",
+      });
+      resolveRetry({ authenticated: false, user: null, profile: null });
+      await pending;
+
+      expect(clearAuthState).not.toHaveBeenCalled();
+      expect(applyHttpSessionSummary).not.toHaveBeenCalled();
+      expect(initAuthListener).not.toHaveBeenCalled();
+    });
   });
 });

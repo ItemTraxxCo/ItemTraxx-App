@@ -127,7 +127,7 @@ export const initPostHog = async () => {
       autocapture: false,
       rageclick: false,
       capture_pageview: "history_change",
-      capture_pageleave: false,
+      capture_pageleave: true,
       capture_dead_clicks: false,
       capture_exceptions: true,
       before_send: (event) => {

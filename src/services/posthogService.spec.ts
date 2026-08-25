@@ -78,6 +78,7 @@ describe("initPostHog", () => {
       expect.objectContaining({
         capture_exceptions: true,
         autocapture: false,
+        capture_pageleave: true,
         disable_session_recording: true,
       })
     );

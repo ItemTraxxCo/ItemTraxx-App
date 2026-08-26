@@ -74,6 +74,7 @@
         "@type": "Organization",
         "name": "ItemTraxx Co",
         "alternateName": ["ItemTraxx", "ItemTrax", "Item Traxx"],
+        "description": "ItemTraxx helps schools, districts, organizations, and individual operators manage inventory with clear checkout, return, and audit workflows.",
         "url": "https://itemtraxx.com/",
         "logo": "%VITE_LOGO_URL%",
         "email": "support@itemtraxx.com",
@@ -89,12 +90,113 @@
         "@type": "WebSite",
         "name": "ItemTraxx",
         "alternateName": ["ItemTrax", "Item Traxx"],
+        "description": "Modern inventory tracking with simple workflows, secure access, and management tools built for real operations.",
         "url": "https://itemtraxx.com/"
       }
     </script>
+    <script data-cfasync="false">
+      (() => {
+        const root = document.documentElement;
+        const connection = typeof navigator !== "undefined" ? navigator.connection : undefined;
+        const effectiveType = typeof connection?.effectiveType === "string" ? connection.effectiveType : "";
+        const isSlowConnection =
+          Boolean(connection?.saveData) || effectiveType === "slow-2g" || effectiveType === "2g";
+
+        root.dataset.itemtraxxFallbackState = "pending";
+        window.setTimeout(() => {
+          if (root.dataset.itemtraxxAppMounted !== "true") {
+            root.dataset.itemtraxxFallbackState = "slow";
+          }
+        }, isSlowConnection ? 400 : 3000);
+      })();
+    </script>
+    <style>
+      .agent-readable-fallback {
+        box-sizing: border-box;
+        max-width: 72rem;
+        margin: 0 auto;
+        padding: 4rem 1.25rem;
+        color: #171717;
+        font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        line-height: 1.65;
+      }
+      /* Keep the crawler-readable HTML in the DOM, but avoid flashing it while Vue mounts. */
+      html[data-itemtraxx-fallback-state="pending"] .agent-readable-fallback {
+        opacity: 0;
+        visibility: hidden;
+        pointer-events: none;
+      }
+      html[data-itemtraxx-fallback-state="slow"] .agent-readable-fallback {
+        opacity: 1;
+        visibility: visible;
+        pointer-events: auto;
+      }
+      html[data-itemtraxx-app-mounted="true"] .agent-readable-fallback {
+        display: none;
+      }
+      .agent-readable-fallback h1,
+      .agent-readable-fallback h2 {
+        line-height: 1.15;
+        letter-spacing: -0.02em;
+      }
+      .agent-readable-fallback h1 {
+        max-width: 52rem;
+        margin: 0.5rem 0 1rem;
+        font-size: clamp(2.25rem, 6vw, 4.75rem);
+      }
+      .agent-readable-fallback h2 {
+        margin-top: 2rem;
+        font-size: 1.35rem;
+      }
+      .agent-readable-fallback p {
+        max-width: 68rem;
+      }
+      .agent-readable-eyebrow {
+        margin: 0;
+        color: #5e6873;
+        font-size: 0.78rem;
+        font-weight: 700;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+      .agent-readable-fallback a {
+        color: inherit;
+        font-weight: 600;
+        text-underline-offset: 0.2em;
+      }
+      @media (prefers-color-scheme: dark) {
+        .agent-readable-fallback {
+          color: #f4f4f0;
+          background: #090d14;
+        }
+        .agent-readable-eyebrow {
+          color: #b6c1cc;
+        }
+      }
+    </style>
   </head>
   <body>
-    <div id="app"></div>
+    <div id="app">
+      <main class="agent-readable-fallback" data-agent-prerendered="true" data-agent-path="/">
+        <p class="agent-readable-eyebrow">Inventory tracking made simple</p>
+        <h1>ItemTraxx</h1>
+        <p>ItemTraxx is a cloud-based inventory, checkout, and administrative control platform for schools, districts, organizations, teams, and individual operators.</p>
+        <p>Teams can record who has each item, when it moved, and when it was returned. Barcode-friendly checkout and return flows, inventory status, borrower management, reporting, and audit history keep day-to-day operations easier to follow.</p>
+        <p>ItemTraxx is designed for real equipment rooms, classrooms, shared assets, and other workflows where accountability matters. Public product, pricing, support, security, privacy, and trust information is available through the links below.</p>
+        <section>
+          <h2>Core workflows</h2>
+          <p>Use ItemTraxx to manage items and borrowers, run checkout and return workflows, review transaction history, and keep administrative actions organized. The application supports role-based access and workspace-aware operations for the teams that use it.</p>
+        </section>
+        <section>
+          <h2>Getting started</h2>
+          <p>ItemTraxx is currently support-led. Contact the team for account setup, a demonstration, pricing questions, or help with an existing workspace.</p>
+        </section>
+        <nav aria-label="Public ItemTraxx pages">
+          <h2>Public ItemTraxx pages</h2>
+          <p><a href="/about">About</a> · <a href="/pricing">Pricing</a> · <a href="/contact">Contact</a> · <a href="/security">Security</a> · <a href="/trust">Trust</a> · <a href="/privacy">Privacy</a> · <a href="/faq">FAQ</a> · <a href="/getting-started">Getting started</a> · <a href="/contact-support">Support</a> · <a href="/llms.txt">llms.txt</a></p>
+        </nav>
+      </main>
+    </div>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

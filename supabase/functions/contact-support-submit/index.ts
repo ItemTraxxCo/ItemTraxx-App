@@ -9,6 +9,7 @@ import {
   resolveClientIp,
   verifyTurnstileToken,
 } from "../_shared/preloginGuards.ts";
+import { buildPublicRateLimitHeaders } from "../_shared/publicRateLimit.ts";
 import { requireTrustedEdgeIngress } from "../_shared/trustedIngress.ts";
 import {
   emailPurposeFromSupportCategory,
@@ -28,6 +29,11 @@ const baseCorsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-request-id",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
   Vary: "Origin",
+};
+
+const PUBLIC_RATE_LIMIT = {
+  limit: 5,
+  windowSeconds: 3600,
 };
 
 type RateLimitResult = {
@@ -217,11 +223,21 @@ serve(async (req) => {
   const { hasOrigin, originAllowed, headers } = resolveCorsHeaders(req);
   const requestId = getRequestId(req);
 
-  const jsonResponse = (status: number, body: Record<string, unknown>) =>
+  const jsonResponse = (
+    status: number,
+    body: Record<string, unknown>,
+    rateLimit: RateLimitResult | null = null,
+  ) =>
     new Response(JSON.stringify({ ok: status < 400, ...body }), {
       status,
       headers: {
         ...headers,
+        ...buildPublicRateLimitHeaders({
+          ...PUBLIC_RATE_LIMIT,
+          retryAfterSeconds: rateLimit?.retry_after_seconds ??
+            (status === 429 ? PUBLIC_RATE_LIMIT.windowSeconds : null),
+          remaining: status === 429 ? 0 : null,
+        }),
         "Content-Type": "application/json",
         "x-request-id": requestId,
       },
@@ -313,8 +329,8 @@ serve(async (req) => {
       {
         p_key: fingerprint,
         p_scope: "contact_support_submit",
-        p_limit: 5,
-        p_window_seconds: 3600,
+        p_limit: PUBLIC_RATE_LIMIT.limit,
+        p_window_seconds: PUBLIC_RATE_LIMIT.windowSeconds,
       },
     );
     if (rateLimitError) {
@@ -329,7 +345,7 @@ serve(async (req) => {
     if (!rateLimitResult.allowed) {
       return jsonResponse(429, {
         error: "Too many requests. Please try again later.",
-      });
+      }, rateLimitResult);
     }
 
     if (attachmentsRaw.length > 2) {

@@ -149,6 +149,10 @@ jobs:
         if: ${{ !cancelled() && github.event_name != 'schedule' }}
         run: npm run build
 
+      - name: Test prerendered public content
+        if: ${{ !cancelled() && github.event_name != 'schedule' }}
+        run: npm run test:prerender
+
       - name: Check public CSS boundary
         if: ${{ !cancelled() && github.event_name != 'schedule' }}
         run: npm run perf:css-boundary

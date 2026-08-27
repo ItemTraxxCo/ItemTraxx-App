@@ -12,6 +12,7 @@
     "build": "vue-tsc -b && vite build",
     "postbuild": "node ./scripts/prerender-public.mjs",
     "preview": "npm run build && wrangler dev",
+    "test:prerender": "node --test scripts/prerender-public.test.mjs",
     "test:e2e": "playwright test",
     "test:e2e:headed": "playwright test --headed",
     "test:e2e:ui": "playwright test --ui",

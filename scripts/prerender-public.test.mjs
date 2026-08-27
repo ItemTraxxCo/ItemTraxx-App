@@ -19,6 +19,7 @@ const textLength = (html) =>
 
 const sourceIndexHtml = readFileSync(new URL("../index.html", import.meta.url), "utf8");
 const sourceMainTs = readFileSync(new URL("../src/main.ts", import.meta.url), "utf8");
+const sourcePrerender = readFileSync(new URL("./prerender-public.mjs", import.meta.url), "utf8");
 
 test("defines the public trust and discovery routes", () => {
   assert.deepEqual(
@@ -52,6 +53,30 @@ test("keeps meaningful H1 content above the crawler threshold", () => {
     const html = renderPublicFallback(byPath(path));
     assert.match(html, /<h1>/);
     assert.ok(textLength(html) > 500, `${path} should contain more than 500 readable characters`);
+  }
+});
+
+test("preserves every pricing paragraph in the prerendered fallback", () => {
+  const pricingStart = sourcePrerender.indexOf('path: "/pricing"');
+  const nextPageStart = sourcePrerender.indexOf('path: "/legal"', pricingStart);
+  assert.ok(pricingStart >= 0, "the pricing prerender definition should exist");
+  assert.ok(nextPageStart > pricingStart, "the pricing prerender definition should be bounded");
+
+  const pricingSource = sourcePrerender.slice(pricingStart, nextPageStart);
+  assert.equal(
+    (pricingSource.match(/^\s+paragraphs:\s*\[/gm) ?? []).length,
+    1,
+    "the pricing page should define one paragraphs key",
+  );
+
+  const pricingPage = byPath("/pricing");
+  const html = renderPublicFallback(pricingPage);
+  for (const phrase of [
+    "ItemTraxx publishes plan categories",
+    "Workspace plans are intended",
+    "Contact Sales for current pricing",
+  ]) {
+    assert.ok(html.includes(phrase), `pricing fallback should include: ${phrase}`);
   }
 });
 

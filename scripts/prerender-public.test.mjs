@@ -82,6 +82,7 @@ test("publishes machine-readable identity descriptions", () => {
 });
 
 test("keeps the fallback available while preventing a normal-load flash", () => {
+  assert.match(sourceIndexHtml, /\.agent-readable-fallback\s*\{[\s\S]*opacity:\s*0;[\s\S]*visibility:\s*hidden;/);
   assert.match(sourceIndexHtml, /data-itemtraxx-fallback-state="pending"/);
   assert.match(sourceIndexHtml, /data-itemtraxx-fallback-state="slow"/);
   assert.match(sourceIndexHtml, /data-itemtraxx-app-mounted="true"/);

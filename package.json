@@ -10,6 +10,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vue-tsc -b && vite build",
+    "postbuild": "node ./scripts/prerender-public.mjs",
     "preview": "npm run build && wrangler dev",
     "test:e2e": "playwright test",
     "test:e2e:headed": "playwright test --headed",

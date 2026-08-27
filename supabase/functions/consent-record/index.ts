@@ -8,6 +8,7 @@ import {
   enforcePreloginRateLimit,
   resolveClientFingerprint,
 } from "../_shared/preloginGuards.ts";
+import { buildPublicRateLimitHeaders } from "../_shared/publicRateLimit.ts";
 
 const corsBase = {
   "Access-Control-Allow-Headers":
@@ -16,14 +17,33 @@ const corsBase = {
   Vary: "Origin",
 };
 
+const PUBLIC_RATE_LIMIT = {
+  limit: 30,
+  windowSeconds: 60,
+};
+
+type RateLimitResult = {
+  retryAfterSeconds?: number | null;
+};
+
 const jsonResponse = (
   status: number,
   body: unknown,
   headers: HeadersInit = corsBase,
+  rateLimit: RateLimitResult | null = null,
 ) =>
   new Response(JSON.stringify(body), {
     status,
-    headers: { ...headers, "Content-Type": "application/json" },
+    headers: {
+      ...headers,
+      ...buildPublicRateLimitHeaders({
+        ...PUBLIC_RATE_LIMIT,
+        retryAfterSeconds: rateLimit?.retryAfterSeconds ??
+          (status === 429 ? PUBLIC_RATE_LIMIT.windowSeconds : null),
+        remaining: status === 429 ? 0 : null,
+      }),
+      "Content-Type": "application/json",
+    },
   });
 
 serve(async (req) => {
@@ -75,13 +95,13 @@ serve(async (req) => {
     adminClient,
     fingerprint,
     `consent-record-${fingerprint}`,
-    30,
-    60,
+    PUBLIC_RATE_LIMIT.limit,
+    PUBLIC_RATE_LIMIT.windowSeconds,
   );
   if (!rateLimit.ok) {
     return rateLimit.error
       ? jsonResponse(503, { error: "Rate limit check failed" }, headers)
-      : jsonResponse(429, { error: "Too many requests" }, headers);
+      : jsonResponse(429, { error: "Too many requests" }, headers, rateLimit);
   }
   let body: Record<string, unknown>;
   try {

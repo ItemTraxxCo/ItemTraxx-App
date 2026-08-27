@@ -1410,8 +1410,8 @@
     "discontinuous-range@1.0.0": {
       "integrity": "sha512-c68LpLbO+7kP/b1Hr1qs8/BJ09F5khZGTxqxZuhzxpmwJKOgRFHJWIb9/KmqnqHhLdO55aOxFH/EGBvUQbL/RQ=="
     },
-    "dompurify@3.4.13": {
-      "integrity": "sha512-2vmYIoqjze2d+kakP8S/nS5shfsl587kzwEjcGlTdiksUVgFHnFCsLYDVj/JNqJVOQZGSYBTmuycv0PodwmnMQ==",
+    "dompurify@3.4.14": {
+      "integrity": "sha512-dVoH9z+MY+C9IilgGCk3YfFqjLi3fChm2OiKJMzh6axrJ5qwxqWaZamgmHrpv22CN/KdbZJuGEGgfQoL00LTdg==",
       "optionalDependencies": [
         "@types/trusted-types"
       ]
@@ -2820,7 +2820,7 @@
         "tar-fs": "^2.1.5",
         "protobufjs@<=8.2.0": "8.2.0",
         "ws": "^8.20.1",
-        "dompurify": "3.4.13",
+        "dompurify": "3.4.14",
         "fast-uri": "3.1.5",
         "sharp": "0.35.3",
         "undici": "7.29.0",

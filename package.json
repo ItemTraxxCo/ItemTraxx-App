@@ -10,7 +10,9 @@
   "scripts": {
     "dev": "vite",
     "build": "vue-tsc -b && vite build",
+    "postbuild": "node ./scripts/prerender-public.mjs",
     "preview": "npm run build && wrangler dev",
+    "test:prerender": "node --test scripts/prerender-public.test.mjs",
     "test:e2e": "playwright test",
     "test:e2e:headed": "playwright test --headed",
     "test:e2e:ui": "playwright test --ui",
@@ -86,7 +88,7 @@
     "tar-fs": "^2.1.5",
     "protobufjs@<=8.2.0": "8.2.0",
     "ws": "^8.20.1",
-    "dompurify": "3.4.13",
+    "dompurify": "3.4.14",
     "fast-uri": "3.1.5",
     "sharp": "0.35.3",
     "undici": "7.29.0",

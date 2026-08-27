@@ -10,6 +10,7 @@ import {
   enforcePreloginRateLimit,
   resolveClientFingerprint,
 } from "../_shared/preloginGuards.ts";
+import { buildPublicRateLimitHeaders } from "../_shared/publicRateLimit.ts";
 import { resolveSystemStatusOverride } from "../_shared/systemStatusOverride.ts";
 import { hasTrustedEdgeIngress } from "../_shared/trustedIngress.ts";
 
@@ -70,6 +71,7 @@ type IncidentWidgetPayload = {
 //      without an IP remain in a bounded anonymous fallback bucket.
 const INCIDENT_CACHE_TTL_MS = 20_000;
 const STATUS_RATE_LIMIT_PER_MINUTE = 60;
+const STATUS_RATE_LIMIT_WINDOW_SECONDS = 60;
 
 type CachedIncidentStatus = {
   status: "operational" | "degraded" | "down";
@@ -129,10 +131,23 @@ const resolveIncidentStatus = (
 serve(async (req) => {
   const { hasOrigin, originAllowed, headers } = resolveCorsHeaders(req);
 
-  const jsonResponse = (status: number, body: Record<string, unknown>) =>
+  const jsonResponse = (
+    status: number,
+    body: Record<string, unknown>,
+    rateLimit: { retryAfterSeconds?: number | null; remaining?: number | null } = {},
+  ) =>
     new Response(JSON.stringify(body), {
       status,
-      headers: { ...headers, "Content-Type": "application/json" },
+      headers: {
+        ...headers,
+        ...buildPublicRateLimitHeaders({
+          limit: STATUS_RATE_LIMIT_PER_MINUTE,
+          windowSeconds: STATUS_RATE_LIMIT_WINDOW_SECONDS,
+          retryAfterSeconds: rateLimit.retryAfterSeconds,
+          remaining: rateLimit.remaining,
+        }),
+        "Content-Type": "application/json",
+      },
     });
 
   if (req.method === "OPTIONS") {
@@ -194,7 +209,7 @@ serve(async (req) => {
       clientFingerprint,
       trustedEdgeIngress ? "system-status-edge" : "system-status-direct",
       STATUS_RATE_LIMIT_PER_MINUTE,
-      60
+      STATUS_RATE_LIMIT_WINDOW_SECONDS
     );
     if (rateLimit.error) {
       return jsonResponse(503, {
@@ -212,6 +227,9 @@ serve(async (req) => {
         incident_summary: "rate limited",
         duration_ms: Date.now() - startedAt,
         checked_at: new Date().toISOString(),
+      }, {
+        retryAfterSeconds: rateLimit.retryAfterSeconds ?? STATUS_RATE_LIMIT_WINDOW_SECONDS,
+        remaining: 0,
       });
     }
 

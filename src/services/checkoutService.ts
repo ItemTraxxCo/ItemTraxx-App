@@ -1,7 +1,7 @@
 import { authenticatedSelect } from "./authenticatedDataClient";
 import { invokeEdgeFunction } from "./edgeFunctionClient";
 import { withTimeout } from "./asyncUtils";
-import { AppError, edgeFunctionError } from "./appErrors";
+import { AppError, edgeFunctionError, notFoundError } from "./appErrors";
 import { getOrCreateDeviceSession } from "../utils/deviceSession";
 import {
   ensureCheckoutOperationId,
@@ -337,7 +337,7 @@ export const fetchItemByBarcode = async (barcode: string) => {
   if (!navigator.onLine) {
     markItemTraxxServerUnreachable();
     const offline = await findOfflineItem(getOfflineScope(), barcode);
-    if (!offline) throw new Error("Invalid barcode.");
+    if (!offline) throw notFoundError("Invalid barcode.");
     return offline as ItemSummary;
   }
   let rows: ItemSummary[];
@@ -362,7 +362,7 @@ export const fetchItemByBarcode = async (barcode: string) => {
   }
 
   if (!rows?.length) {
-    throw new Error("Invalid barcode.");
+    throw notFoundError("Invalid barcode.");
   }
 
   return rows[0] as ItemSummary;
@@ -372,7 +372,7 @@ export const fetchBorrowerByBorrowerId = async (borrowerId: string) => {
   if (!navigator.onLine) {
     markItemTraxxServerUnreachable();
     const offline = await findOfflineBorrower(getOfflineScope(), borrowerId);
-    if (!offline) throw new Error("Borrower not found.");
+    if (!offline) throw notFoundError("Borrower not found.");
     return offline as BorrowerSummary;
   }
   const { deviceId } = getOrCreateDeviceSession();

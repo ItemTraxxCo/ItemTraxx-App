@@ -219,6 +219,35 @@ Deno.test("edge proxy CORS allows the explicitly configured demo workspace", asy
   }
 });
 
+Deno.test("edge proxy CORS allows the explicitly routed development origins", async () => {
+  for (const devOrigin of [
+    "https://dennis-dev.itemtraxx.com",
+    "https://leo-dev.itemtraxx.com",
+    "https://dev.itemtraxx.com",
+  ]) {
+    const response = await worker.fetch(
+      new Request("https://edge.itemtraxx.com/functions/system-status", {
+        method: "OPTIONS",
+        headers: {
+          origin: devOrigin,
+        },
+      }),
+      {
+        SUPABASE_URL: "https://example.supabase.co",
+        SUPABASE_ANON_KEY: "anon-key",
+      },
+      executionContext,
+    );
+
+    if (
+      response.status !== 200 ||
+      response.headers.get("Access-Control-Allow-Origin") !== devOrigin
+    ) {
+      throw new Error(`Expected development origin to be allowed: ${devOrigin}`);
+    }
+  }
+});
+
 Deno.test("edge proxy CORS does not expand wildcard origin patterns", async () => {
   const response = await worker.fetch(
     new Request("https://edge.itemtraxx.com/functions/v1/system-status", {

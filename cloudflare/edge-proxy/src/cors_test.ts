@@ -109,32 +109,32 @@ Deno.test("production workspace app origins are allowed without per-workspace co
   }
 });
 
-Deno.test("the default production allowlist keeps required surfaces and excludes non-production hosts", () => {
+Deno.test("the default allowlist keeps routed surfaces and excludes reserved test hosts", () => {
   for (const origin of [
     "https://itemtraxx.com",
     "https://www.itemtraxx.com",
     "https://app.itemtraxx.com",
     "https://internal.itemtraxx.com",
     "https://status.itemtraxx.com",
+    "https://dennis-dev.itemtraxx.com",
+    "https://leo-dev.itemtraxx.com",
+    "https://dev.itemtraxx.com",
     "https://preview.itemtraxx.com",
     "https://staging.itemtraxx.com",
     "https://itxdemo.app.itemtraxx.com",
   ]) {
     assert(
       DEFAULT_ALLOWED_ORIGINS.includes(origin),
-      `required production origin missing: ${origin}`,
+      `required routed origin missing: ${origin}`,
     );
   }
   for (const origin of [
     "https://pentest.app.itemtraxx.com",
     "https://testdist.app.itemtraxx.com",
-    "https://dennis-dev.itemtraxx.com",
-    "https://leo-dev.itemtraxx.com",
-    "https://dev.itemtraxx.com",
   ]) {
     assert(
       !DEFAULT_ALLOWED_ORIGINS.includes(origin),
-      `non-production origin remained in default allowlist: ${origin}`,
+      `reserved test origin remained in default allowlist: ${origin}`,
     );
   }
 });

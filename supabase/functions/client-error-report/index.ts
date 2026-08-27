@@ -16,6 +16,7 @@ import {
   optionalText,
   ValidationError,
 } from "../_shared/validation.ts";
+import { buildPublicRateLimitHeaders } from "../_shared/publicRateLimit.ts";
 
 const baseCorsHeaders = {
   "Access-Control-Allow-Headers":
@@ -73,6 +74,11 @@ type StoredReportRow = {
   id: string;
 };
 
+const PUBLIC_RATE_LIMIT = {
+  limit: 6,
+  windowSeconds: 3600,
+};
+
 const normalizeText = (value: unknown, max = 5000) => optionalText(value, { maxLen: max });
 
 const resolveCorsHeaders = (req: Request) => {
@@ -108,11 +114,21 @@ serve(async (req) => {
   const { hasOrigin, originAllowed, headers } = resolveCorsHeaders(req);
   const requestId = getRequestId(req);
 
-  const jsonResponse = (status: number, body: Record<string, unknown>) =>
+  const jsonResponse = (
+    status: number,
+    body: Record<string, unknown>,
+    rateLimit: { retryAfterSeconds?: number | null; remaining?: number | null } = {},
+  ) =>
     new Response(JSON.stringify({ ok: status < 400, ...body }), {
       status,
       headers: {
         ...headers,
+        ...buildPublicRateLimitHeaders({
+          ...PUBLIC_RATE_LIMIT,
+          retryAfterSeconds: rateLimit.retryAfterSeconds ??
+            (status === 429 ? PUBLIC_RATE_LIMIT.windowSeconds : null),
+          remaining: status === 429 ? 0 : null,
+        }),
         "Content-Type": "application/json",
         "x-request-id": requestId,
       },
@@ -167,15 +183,19 @@ serve(async (req) => {
       adminClient,
       requestHash,
       "client_error_report",
-      6,
-      3600
+      PUBLIC_RATE_LIMIT.limit,
+      PUBLIC_RATE_LIMIT.windowSeconds,
     );
     if (!rateLimit.ok) {
       if (rateLimit.error) {
         logError("client-error-report rate limit failed", requestId, rateLimit.error);
         return jsonResponse(500, { error: "Rate limit check failed." });
       }
-      return jsonResponse(429, { error: "Too many reports. Please try again later." });
+      return jsonResponse(
+        429,
+        { error: "Too many reports. Please try again later." },
+        rateLimit,
+      );
     }
 
     const body = asRecord(await readJsonBody(req, 128 * 1024)) as ReportPayload;

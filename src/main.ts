@@ -21,6 +21,7 @@ import { finishRouteLoading, startRouteLoading } from "./store/routeLoading";
 import { installAppErrorRecovery } from "./services/appErrorRecovery";
 import { isPublicBootstrapRoute } from "./bootstrap/routeBootstrap";
 import { createClientMonitoring } from "./bootstrap/clientMonitoring";
+import { markAgentFallbackMounted } from "./bootstrap/agentFallback";
 
 const redirectCanonicalHost = () => {
   if (typeof window === "undefined") return false;
@@ -131,6 +132,7 @@ const mountApp = async () => {
   await router.isReady();
   await clientMonitoring.initializeBeforeMount(app);
   app.mount("#app");
+  markAgentFallbackMounted();
   clientMonitoring.initializeAfterMount(app);
   captureInitialPerfMetrics();
   if (import.meta.env.VITE_E2E_TEST_UTILS === "true") {

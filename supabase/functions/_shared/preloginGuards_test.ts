@@ -28,6 +28,7 @@ Deno.test("prelogin rate limit uses the service-side RPC contract", async () => 
   );
 
   assert(result.ok, "expected the allowed RPC result");
+  assert(result.retryAfterSeconds === null, "expected no retry delay for an allowed request");
   const observedCall = calls[0];
   if (!observedCall) throw new Error("expected an observed RPC call");
   assert(observedCall.name === "consume_rate_limit_prelogin", "expected the prelogin RPC");
@@ -152,6 +153,7 @@ Deno.test("prelogin rate limit rejects when the limit is exceeded", async () => 
   const result = await enforcePreloginRateLimit(client, "ip-1", "scope", 5, 60);
   assert(!result.ok, "expected disallowed result to fail");
   assert(result.error === null, "expected no error object for a clean denial");
+  assert(result.retryAfterSeconds === 30, "expected the RPC retry delay to be preserved");
 });
 
 Deno.test("resolveRateLimitResult returns a failure response on RPC error", () => {

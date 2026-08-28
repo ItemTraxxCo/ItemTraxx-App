@@ -220,9 +220,7 @@ const routes: RouteRecordRaw[] = [
   },
   {
     path: "/admin/login",
-    name: "workspace-admin-login",
-    component: () => import("../pages/workspace/admin/AdminLogin.vue"),
-    meta: { public: true, title: "Admin | ItemTraxx" },
+    redirect: (to) => ({ name: "public-login", query: to.query }),
   },
   {
     path: "/admin",
@@ -684,7 +682,7 @@ router.beforeEach(async (to) => {
       if (hasFreshAdminVerification(auth.adminVerifiedAt)) {
         return { name: "workspace-admin-home" };
       }
-      return { name: "workspace-admin-login" };
+      return { name: "public-login" };
     }
 
     if (auth.role === "tenant_account" && auth.workspaceContextId) {
@@ -718,7 +716,7 @@ router.beforeEach(async (to) => {
     meta?.requiresRole === "workspace_admin" &&
     !hasFreshAdminVerification(auth.adminVerifiedAt)
   ) {
-    return { name: "workspace-admin-login" };
+    return { name: "public-login" };
   }
 
   if (

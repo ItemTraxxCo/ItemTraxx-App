@@ -2,6 +2,8 @@ import { invokeEdgeFunction } from "../edgeFunctionClient";
 import { getWorkspaceState } from "../../store/workspaceState";
 import { getAuthState, setWorkspaceContext } from "../../store/authState";
 import { exchangeHttpSession, fetchHttpSessionSummary } from "../httpSessionService";
+import { touchAccountSession } from "../adminOpsService";
+import { logAdminAction } from "../auditLogService";
 import { applyHttpSessionSummary, resolveWorkspaceSlug } from "./sessionBootstrap";
 import { normalizeFunctionTarget, type LoginNotificationLocation } from "./types";
 const loginFunction=()=>normalizeFunctionTarget(import.meta.env.VITE_WORKSPACE_LOGIN_FUNCTION,"workspace-login");
@@ -14,6 +16,14 @@ export const workspaceLogin=async(email:string,password:string,turnstileToken?:s
   if(!result.data?.access_token||!result.data.refresh_token)throw new Error("Invalid email or password.");
   const summary=await exchangeHttpSession({access_token:result.data.access_token,refresh_token:result.data.refresh_token}).catch(()=>fetchHttpSessionSummary());
   await applyHttpSessionSummary(summary); const current=getAuthState(); setWorkspaceContext(current.sessionWorkspaceId);
+  if(current.role==="workspace_admin"){
+    try{await touchAccountSession({loginMethod:"password",loginLocation:"admin_login"});}catch{
+      // Session tracking must not block a successful sign in.
+    }
+    try{await logAdminAction({action_type:"admin_login",metadata:{email:email.trim()}});}catch{
+      // Audit logging must not block a successful sign in.
+    }
+  }
   sendLoginNotification(result.data.access_token,{loginLocation:current.role==="workspace_admin"?"workspace_admin_login":"account_login"});
   return {workspaceId:current.workspaceContextId,workspaceSlug:result.data.workspace_slug??await resolveWorkspaceSlug(current.workspaceContextId),role:current.role};
 };

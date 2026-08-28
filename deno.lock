@@ -1497,8 +1497,8 @@
         "pako"
       ]
     },
-    "fast-uri@3.1.5": {
-      "integrity": "sha512-gHwA1O9LDIcKunMKhObS/HimwtehO1nPUECKAu5TpKgaO19fcWEl4bliWe1jWxVFvIXztJjjQ4L8XQ1EU9f7Jw=="
+    "fast-uri@3.1.6": {
+      "integrity": "sha512-7Ical1vFEMr0onbVzEDIreM22I4khW+fzyQPwvAFWBp1iwdshSZRsL4jjRvPG9JP1uiqMHRto+YU6R2/CzDz5Q=="
     },
     "fdir@6.5.0_picomatch@4.0.5": {
       "integrity": "sha512-tIbYtZbucOs0BRGqPJkshJUYdL+SDH7dVM8gjy+ERp3WAUjLEFJE+02kanyHtwjWOnwrKYBiwAmM0p4kLJAnXg==",
@@ -2785,7 +2785,7 @@
         "protobufjs@<=8.2.0": "8.2.0",
         "ws": "^8.20.1",
         "dompurify": "3.4.14",
-        "fast-uri": "3.1.5",
+        "fast-uri": "3.1.6",
         "sharp": "0.35.3",
         "undici": "7.29.0",
         "js-yaml": "4.3.1",

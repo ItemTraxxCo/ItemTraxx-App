@@ -63,9 +63,9 @@ describe("resolveRecoveryRouteFromPath", () => {
     });
   });
 
-  it("routes admin paths to workspace-admin-login with reason", () => {
+  it("routes admin paths to the unified public login with reason", () => {
     expect(resolveRecoveryRouteFromPath("/admin/items")).toEqual({
-      name: "workspace-admin-login",
+      name: "public-login",
       query: { reason: "session-expired" },
     });
   });
@@ -182,7 +182,7 @@ describe("installAppErrorRecovery", () => {
     const termination = getSessionTerminationState();
     expect(termination.visible).toBe(true);
     expect(termination.recoveryRoute).toEqual({
-      name: "workspace-admin-login",
+      name: "public-login",
       query: { reason: "session-expired" },
     });
 

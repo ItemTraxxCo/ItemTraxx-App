@@ -18,6 +18,14 @@ vi.mock("../httpSessionService", () => ({
   fetchHttpSessionSummary: vi.fn(),
 }));
 
+vi.mock("../adminOpsService", () => ({
+  touchAccountSession: vi.fn(),
+}));
+
+vi.mock("../auditLogService", () => ({
+  logAdminAction: vi.fn(),
+}));
+
 vi.mock("./sessionBootstrap", () => ({
   applyHttpSessionSummary: vi.fn(),
   resolveWorkspaceSlug: vi.fn(),
@@ -28,6 +36,8 @@ import { invokeEdgeFunction } from "../edgeFunctionClient";
 import { getWorkspaceState } from "../../store/workspaceState";
 import { getAuthState, setWorkspaceContext } from "../../store/authState";
 import { exchangeHttpSession, fetchHttpSessionSummary } from "../httpSessionService";
+import { touchAccountSession } from "../adminOpsService";
+import { logAdminAction } from "../auditLogService";
 import { applyHttpSessionSummary, resolveWorkspaceSlug } from "./sessionBootstrap";
 
 describe("sendLoginNotification", () => {
@@ -86,6 +96,8 @@ describe("workspaceLogin", () => {
     vi.mocked(exchangeHttpSession).mockResolvedValue({ authenticated: true, user: { id: "u1", email: "a@b.com", last_sign_in_at: null }, profile: null });
     vi.mocked(applyHttpSessionSummary).mockResolvedValue(undefined);
     vi.mocked(resolveWorkspaceSlug).mockResolvedValue("resolved-slug");
+    vi.mocked(touchAccountSession).mockResolvedValue({ ok: true });
+    vi.mocked(logAdminAction).mockResolvedValue(undefined);
   });
 
   it("logs in successfully, exchanges the session, and notifies with an account_login location for a tenant", async () => {
@@ -110,6 +122,8 @@ describe("workspaceLogin", () => {
     expect(exchangeHttpSession).toHaveBeenCalledWith({ access_token: "at-1", refresh_token: "rt-1" });
     expect(applyHttpSessionSummary).toHaveBeenCalled();
     expect(setWorkspaceContext).toHaveBeenCalledWith("ws-1");
+    expect(touchAccountSession).not.toHaveBeenCalled();
+    expect(logAdminAction).not.toHaveBeenCalled();
     // workspace_slug came back from the login response, so resolveWorkspaceSlug is skipped.
     expect(resolveWorkspaceSlug).not.toHaveBeenCalled();
     expect(invokeEdgeFunction).toHaveBeenNthCalledWith(2, "login-notify", {
@@ -132,9 +146,26 @@ describe("workspaceLogin", () => {
       error: "",
       data: { access_token: "at-1", refresh_token: "rt-1" },
     });
+    const trackingOrder: string[] = [];
+    vi.mocked(touchAccountSession).mockImplementation(async () => {
+      trackingOrder.push("touch");
+      return { ok: true };
+    });
+    vi.mocked(logAdminAction).mockImplementation(async () => {
+      trackingOrder.push("audit");
+    });
 
     const result = await workspaceLogin("admin@example.com", "hunter2");
 
+    expect(touchAccountSession).toHaveBeenCalledWith({
+      loginMethod: "password",
+      loginLocation: "admin_login",
+    });
+    expect(logAdminAction).toHaveBeenCalledWith({
+      action_type: "admin_login",
+      metadata: { email: "admin@example.com" },
+    });
+    expect(trackingOrder).toEqual(["touch", "audit"]);
     expect(resolveWorkspaceSlug).toHaveBeenCalledWith("ws-2");
     expect(invokeEdgeFunction).toHaveBeenNthCalledWith(2, "login-notify", {
       method: "POST",
@@ -142,6 +173,28 @@ describe("workspaceLogin", () => {
       body: { login_location: "workspace_admin_login" },
     });
     expect(result.workspaceSlug).toBe("resolved-slug");
+  });
+
+  it("keeps admin login successful when session or audit tracking fails", async () => {
+    vi.mocked(getAuthState).mockReturnValue({
+      role: "workspace_admin",
+      sessionWorkspaceId: "ws-2",
+      workspaceContextId: "ws-2",
+    } as never);
+    vi.mocked(invokeEdgeFunction).mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      error: "",
+      data: { access_token: "at-1", refresh_token: "rt-1", workspace_slug: "acme" },
+    });
+    vi.mocked(touchAccountSession).mockRejectedValueOnce(new Error("tracking unavailable"));
+    vi.mocked(logAdminAction).mockRejectedValueOnce(new Error("audit unavailable"));
+
+    await expect(workspaceLogin("admin@example.com", "hunter2")).resolves.toMatchObject({
+      role: "workspace_admin",
+    });
+    expect(touchAccountSession).toHaveBeenCalled();
+    expect(logAdminAction).toHaveBeenCalled();
   });
 
   it("omits workspace_slug and turnstile_token from the request when not applicable", async () => {

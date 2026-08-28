@@ -31,15 +31,11 @@
       <section class="getting-started-grid">
         <article class="getting-started-card getting-started-card-wide">
           <p class="getting-started-section-label">Step 1</p>
-          <h2>Sign in with the right page for your role.</h2>
+          <h2>Sign in from the main login page.</h2>
           <ul class="getting-started-list">
             <li>
-              <strong>Borrowers and regular tenant access</strong>
-              <span>Use the main <RouterLink to="/login">sign in page</RouterLink> with your access code and password.</span>
-            </li>
-            <li>
-              <strong>Tenant and district/organization admins</strong>
-              <span>Use the dedicated <RouterLink to="/admin/login">admin sign in</RouterLink> page with email and password.</span>
+              <strong>All workspace accounts</strong>
+              <span>Use the main <RouterLink to="/login">sign in page</RouterLink> with your email and password. ItemTraxx sends you to the right workspace for your role.</span>
             </li>
             <li>
               <strong>Forgot your password?</strong>

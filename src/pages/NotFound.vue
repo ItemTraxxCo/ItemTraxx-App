@@ -64,9 +64,9 @@
           v-if="auth.isAuthenticated"
           type="button"
           class="not-found-action"
-          @click="goAdmin"
+          @click="goLogin"
         >
-          Open admin login
+          Open login
         </button>
       </div>
     </section>
@@ -122,8 +122,8 @@ const goHome = () => {
   router.push("/");
 };
 
-const goAdmin = () => {
-  router.push("/admin/login");
+const goLogin = () => {
+  router.push("/login");
 };
 
 onMounted(refreshNow);

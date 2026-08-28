@@ -199,7 +199,7 @@ test.describe("Protected route smoke tests", () => {
 
     await navigateApp(page, "/admin");
 
-    await expect(page).toHaveURL(/\/admin\/login$/);
+    await expect(page).toHaveURL(/\/login$/);
   });
 
   test("Workspace Admin password verification survives a workspace host bootstrap", async ({ page }) => {

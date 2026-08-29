@@ -137,6 +137,7 @@ import {
 import { acknowledgeOfflineWarning, getOfflineWarningThreshold } from "../services/offlineConnectionState";
 import { toUserFacingErrorMessage } from "../services/appErrors";
 import { getAuthState } from "../store/authState";
+import { getOrCreateDeviceSession } from "../utils/deviceSession";
 
 const props = defineProps<{ enabled: boolean }>();
 
@@ -162,7 +163,16 @@ const legacyReviewEnabled = computed(() =>
   (auth.role === "tenant_account" || auth.role === "workspace_admin"),
 );
 
-const authScopeKey = () => `${auth.isAuthenticated}:${auth.userId ?? ""}:${auth.workspaceContextId ?? ""}:${auth.role ?? ""}`;
+const authScopeKey = () => {
+  let deviceId = "";
+  try {
+    deviceId = getOrCreateDeviceSession().deviceId;
+  } catch {
+    // Storage/device availability is handled by the queue API; keep stale UI out
+    // of scope transitions even when the device identifier cannot be read here.
+  }
+  return `${auth.isAuthenticated}:${auth.userId ?? ""}:${auth.workspaceContextId ?? ""}:${auth.role ?? ""}:${deviceId}`;
+};
 
 const refresh = async () => {
   if (!props.enabled) {

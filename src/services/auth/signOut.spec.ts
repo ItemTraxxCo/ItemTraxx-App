@@ -93,6 +93,16 @@ describe("signOut", () => {
     expect(clearAuthState).toHaveBeenCalledWith(true);
   });
 
+  it("continues clearing the HttpOnly session when local Supabase sign-out fails", async () => {
+    vi.mocked(signOutLocalSupabaseSession).mockRejectedValueOnce(new Error("local sign-out unavailable"));
+
+    await expect(signOut()).resolves.toBeUndefined();
+
+    expect(clearHttpSession).toHaveBeenCalledTimes(1);
+    expect(clearAuthState).toHaveBeenCalledWith(true);
+    expect(setWorkspaceContext).toHaveBeenCalledWith(null);
+  });
+
   it("continues cleanup even when clearing the HttpOnly cookie session fails", async () => {
     vi.mocked(clearHttpSession).mockRejectedValueOnce(new Error("cookie logout down"));
 

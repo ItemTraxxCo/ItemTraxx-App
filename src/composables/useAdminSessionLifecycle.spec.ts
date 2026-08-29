@@ -17,16 +17,18 @@ vi.mock("../services/adminOpsService", () => ({
 }));
 vi.mock("../services/authService", () => ({
   getPostSignOutUrl: vi.fn(),
+  signOut: vi.fn(),
 }));
 
 import { fetchHttpSessionSummary } from "../services/httpSessionService";
 import { touchAccountSession, validateAccountSession } from "../services/adminOpsService";
-import { getPostSignOutUrl } from "../services/authService";
+import { getPostSignOutUrl, signOut } from "../services/authService";
 
 const mockedFetchHttpSessionSummary = vi.mocked(fetchHttpSessionSummary);
 const mockedTouchAccountSession = vi.mocked(touchAccountSession);
 const mockedValidateAccountSession = vi.mocked(validateAccountSession);
 const mockedGetPostSignOutUrl = vi.mocked(getPostSignOutUrl);
+const mockedSignOut = vi.mocked(signOut);
 
 const ADMIN_IDLE_TIMEOUT_MS = 20 * 60 * 1000;
 const ADMIN_POLL_INTERVAL_MS = 45_000;
@@ -102,6 +104,7 @@ describe("useAdminSessionLifecycle", () => {
     mockedTouchAccountSession.mockReset().mockResolvedValue({ ok: true });
     mockedValidateAccountSession.mockReset().mockResolvedValue({ valid: true });
     mockedGetPostSignOutUrl.mockReset().mockReturnValue(null as never);
+    mockedSignOut.mockReset().mockResolvedValue(undefined);
   });
 
   afterEach(() => {
@@ -262,6 +265,35 @@ describe("useAdminSessionLifecycle", () => {
     await get().signInAgain();
 
     expect(router.replace).toHaveBeenCalledWith("/public-login");
+    wrapper.unmount();
+  });
+
+  it("clears the stale server session before navigating back to sign-in", async () => {
+    const auth = buildAuth({ isAuthenticated: true, role: "tenant_account", userId: "u1" });
+    const route = buildRoute("/checkout");
+    mockedGetPostSignOutUrl.mockReturnValue("/login");
+    const { wrapper, get, router } = mountHost({ auth, route });
+    await vi.advanceTimersByTimeAsync(0);
+
+    let releaseSignOut!: () => void;
+    const signOutStarted = new Promise<void>((resolve) => {
+      mockedSignOut.mockImplementationOnce(
+        () =>
+          new Promise<void>((release) => {
+            resolve();
+            releaseSignOut = release;
+          }),
+      );
+    });
+    const recovery = get().signInAgain();
+    await signOutStarted;
+
+    expect(mockedSignOut).toHaveBeenCalledTimes(1);
+    expect(router.replace).not.toHaveBeenCalled();
+
+    releaseSignOut();
+    await recovery;
+    expect(router.replace).toHaveBeenCalledWith("/login");
     wrapper.unmount();
   });
 

@@ -2,7 +2,6 @@ import { invokeEdgeFunction } from "../edgeFunctionClient";
 import { getWorkspaceState } from "../../store/workspaceState";
 import { getAuthState, setWorkspaceContext } from "../../store/authState";
 import { exchangeHttpSession, fetchHttpSessionSummary } from "../httpSessionService";
-import { touchAccountSession } from "../adminOpsService";
 import { logAdminAction } from "../auditLogService";
 import { applyHttpSessionSummary, resolveWorkspaceSlug } from "./sessionBootstrap";
 import { normalizeFunctionTarget, type LoginNotificationLocation } from "./types";
@@ -17,9 +16,13 @@ export const workspaceLogin=async(email:string,password:string,turnstileToken?:s
   const summary=await exchangeHttpSession({access_token:result.data.access_token,refresh_token:result.data.refresh_token}).catch(()=>fetchHttpSessionSummary());
   await applyHttpSessionSummary(summary); const current=getAuthState(); setWorkspaceContext(current.sessionWorkspaceId);
   if(current.role==="workspace_admin"){
-    try{await touchAccountSession({loginMethod:"password",loginLocation:"admin_login"});}catch{
-      // Session tracking must not block a successful sign in.
-    }
+    // Do not register an account_sessions row here: workspace_admin logins
+    // that aren't already on the workspace's subdomain get a full-page
+    // redirect (see Login.vue) to {slug}.app.itemtraxx.com, a different
+    // origin with its own localStorage device_id. Touching the session on
+    // this (pre-redirect) origin would create an orphan row that's never
+    // touched again, sharing the same auth_session_id as the real device
+    // row created on the destination page via its login_ctx handling.
     try{await logAdminAction({action_type:"admin_login",metadata:{email:email.trim()}});}catch{
       // Audit logging must not block a successful sign in.
     }

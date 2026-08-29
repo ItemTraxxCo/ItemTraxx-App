@@ -124,13 +124,19 @@ export const useAdminSessionLifecycle = (options: AdminSessionLifecycleOptions) 
   const signInAgain = async () => {
     const recoveryRoute =
       options.sessionTermination.recoveryRoute ?? resolveRecoveryRouteFromPath(options.route.path);
+    const authService = await import("../services/authService");
     const getPostSignOutUrl =
       options.route.path.startsWith("/super-admin") || options.route.path.startsWith("/internal")
         ? null
-        : (await import("../services/authService")).getPostSignOutUrl;
+        : authService.getPostSignOutUrl;
     const nextUrl = getPostSignOutUrl === null ? null : getPostSignOutUrl();
     if (terminationRedirectTimer) window.clearTimeout(terminationRedirectTimer);
     terminationRedirectTimer = null;
+    // A revoked application session can still have a valid HttpOnly auth
+    // cookie. Clear that server session before navigating so a fresh tab
+    // cannot bootstrap the revoked identity and redirect back into the
+    // workspace again.
+    await authService.signOut();
     clearSessionTermination();
     options.closeMenu();
     if (nextUrl) {

@@ -440,7 +440,10 @@ const handleSessionLogout = async (
 ) => {
   const cookies = parseCookies(request);
   if (cookies.accessToken) {
-    await fetch(buildSupabaseUrl(env, "/auth/v1/logout"), {
+    // Supabase defaults logout to the global scope, which would invalidate
+    // every device for this user. The HttpOnly cookie belongs to only this
+    // browser, so revoke only the corresponding Supabase auth session.
+    await fetch(buildSupabaseUrl(env, "/auth/v1/logout?scope=local"), {
       method: "POST",
       headers: {
         apikey: env.SUPABASE_ANON_KEY,

@@ -588,9 +588,22 @@ Deno.test("session refresh: staff profile with a matching live device session su
 
 // ---- logout ----
 
-Deno.test("session logout: with an access-token cookie notifies Supabase and always clears cookies", async () => {
-  const fetchMock = installFetch((url) => {
-    if (url.endsWith("/auth/v1/logout")) {
+Deno.test("session logout: with an access-token cookie revokes only this session and clears cookies", async () => {
+  // Model two independent Supabase sessions so this contract catches a
+  // regression to the API's global (default) logout scope.
+  const activeSupabaseSessions = new Set(["access-1", "access-2"]);
+  const fetchMock = installFetch((url, init) => {
+    const upstreamUrl = new URL(url);
+    if (upstreamUrl.pathname.endsWith("/auth/v1/logout")) {
+      const token = new Headers(init?.headers).get("authorization")?.replace(
+        /^Bearer\s+/i,
+        "",
+      );
+      if (upstreamUrl.searchParams.get("scope") === "local" && token) {
+        activeSupabaseSessions.delete(token);
+      } else {
+        activeSupabaseSessions.clear();
+      }
       return Promise.resolve(new Response(null, { status: 204 }));
     }
     return Promise.resolve(new Response("unexpected", { status: 500 }));
@@ -613,6 +626,21 @@ Deno.test("session logout: with an access-token cookie notifies Supabase and alw
     fetchMock.restore();
   }
   assertEquals(fetchMock.calls.length, 1, "logout notifies Supabase once");
+  assertEquals(
+    activeSupabaseSessions.has("access-1"),
+    false,
+    "logout revokes the current device session",
+  );
+  assertEquals(
+    activeSupabaseSessions.has("access-2"),
+    true,
+    "logout preserves the other device session",
+  );
+  assertEquals(
+    fetchMock.calls[0].url,
+    `${SUPABASE_URL}/auth/v1/logout?scope=local`,
+    "logout uses the local Supabase scope so other devices remain signed in",
+  );
   assertEquals(
     new Headers(fetchMock.calls[0].init?.headers).get("authorization"),
     "Bearer access-1",

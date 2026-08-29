@@ -270,7 +270,7 @@ Deno.test("session me refreshes a missing access token and logout remains best e
     if (url.includes("/rest/v1/profiles?")) {
       return Promise.resolve(Response.json([]));
     }
-    if (url.endsWith("/auth/v1/logout")) {
+    if (url.endsWith("/auth/v1/logout?scope=local")) {
       return Promise.reject(new Error("upstream logout unavailable"));
     }
     return Promise.resolve(new Response(null, { status: 500 }));
@@ -319,7 +319,14 @@ Deno.test("session me refreshes a missing access token and logout remains best e
   } finally {
     globalThis.fetch = originalFetch;
   }
-  const logoutCall = calls.find((call) => call.url.endsWith("/auth/v1/logout"));
+  const logoutCall = calls.find((call) =>
+    call.url.endsWith("/auth/v1/logout?scope=local")
+  );
+  assertEquals(
+    logoutCall?.url,
+    `${SUPABASE_URL}/auth/v1/logout?scope=local`,
+    "logout uses the local Supabase scope",
+  );
   assertEquals(
     new Headers(logoutCall?.init?.headers).get("authorization"),
     "Bearer access",

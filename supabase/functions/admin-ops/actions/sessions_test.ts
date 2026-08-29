@@ -849,6 +849,58 @@ Deno.test("handleSessionAction list_sessions dedupes rows and flags the current 
   assertEquals(sessions[1].is_current, false);
 });
 
+Deno.test("handleSessionAction list_sessions flags a sibling-origin row sharing the current auth session as current", async () => {
+  // Regression test: the main app host and a tenant's custom subdomain each
+  // track their own device_id in per-origin localStorage while sharing one
+  // Supabase auth session. A row for a *different* device_id must still be
+  // treated as "this session" when its auth_session_id matches, so it's
+  // never surfaced as a revokable "other" device and never strips out the
+  // browser's own row from a bulk "sign out others" exclusion.
+  const rows = [
+    {
+      id: "session-1",
+      device_id: "device-1",
+      device_label: "Front Desk",
+      user_agent: "ua-1",
+      auth_session_id: "auth-session-1",
+      created_at: "2026-07-01T00:00:00.000Z",
+      last_seen_at: "2026-07-02T00:00:00.000Z",
+    },
+    {
+      id: "session-2",
+      device_id: "device-2",
+      device_label: "Workspace subdomain",
+      user_agent: "ua-2",
+      auth_session_id: "auth-session-1",
+      created_at: "2026-07-01T00:00:00.000Z",
+      last_seen_at: "2026-07-01T00:00:00.000Z",
+    },
+    {
+      id: "session-3",
+      device_id: "device-3",
+      device_label: "Genuinely another device",
+      user_agent: "ua-3",
+      auth_session_id: "auth-session-other",
+      created_at: "2026-07-01T00:00:00.000Z",
+      last_seen_at: "2026-07-01T00:00:00.000Z",
+    },
+  ];
+  const { client } = makeClient(sequence([{ data: rows, error: null }]));
+  const response = await handleSessionAction(adminOpsContextFor("list_sessions", client));
+
+  assertEquals(response.status, 200);
+  const body = await responseBody(response);
+  const sessions = (body.data as { sessions: Array<Record<string, unknown>> }).sessions;
+  assertEquals(sessions.length, 3);
+  assertEquals(sessions[0].is_current, true);
+  assertEquals(sessions[1].is_current, true, "expected the sibling-origin row to be flagged current too");
+  assertEquals(sessions[2].is_current, false);
+  assert(
+    sessions.every((session) => !("auth_session_id" in session)),
+    "expected auth_session_id to never be exposed in the response",
+  );
+});
+
 Deno.test("handleSessionAction list_sessions retries without optional metadata columns", async () => {
   const { client, calls } = makeClient(
     sequence([
@@ -1021,10 +1073,33 @@ Deno.test("handleSessionAction revoke_all_sessions preserves the other-devices d
   assert(
     calls.some((call) =>
       call.operations.some((op) =>
+        op.method === "neq" && op.args[0] === "auth_session_id" &&
+        op.args[1] === "auth-session-1"
+      )
+    ),
+    "expected the current auth session to be excluded by default",
+  );
+});
+
+Deno.test("handleSessionAction revoke_all_sessions falls back to excluding by device_id when there is no auth session binding", async () => {
+  const { client, calls } = makeClient(
+    sequence([{ data: [{ id: "session-1" }, { id: "session-2" }], error: null }]),
+  );
+  const response = await handleSessionAction(
+    adminOpsContextFor("revoke_all_sessions", client, {}, {
+      authSessionBinding: { sessionId: null, issuedAt: null },
+    }),
+  );
+
+  assertEquals(response.status, 200);
+  assertEquals(await responseBody(response), { data: { revoked: 2 } });
+  assert(
+    calls.some((call) =>
+      call.operations.some((op) =>
         op.method === "neq" && op.args[0] === "device_id" && op.args[1] === "device-1"
       )
     ),
-    "expected the current device to be excluded by default",
+    "expected the current device to be excluded when no auth session binding is available",
   );
 });
 

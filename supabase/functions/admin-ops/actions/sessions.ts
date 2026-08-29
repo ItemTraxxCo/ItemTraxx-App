@@ -434,6 +434,7 @@ export const handleSessionAction = async (
           device_id: string;
           device_label: string | null;
           user_agent: string | null;
+          auth_session_id?: string | null;
           login_method?: "password" | "magic_link" | "session_handoff" | null;
           login_location?: "regular_login" | "admin_login" | null;
           general_location?: string | null;
@@ -445,7 +446,7 @@ export const handleSessionAction = async (
     } = await context.adminClient
       .from("account_sessions")
       .select(
-        "id, device_id, device_label, user_agent, login_method, login_location, general_location, created_at, last_seen_at",
+        "id, device_id, device_label, user_agent, auth_session_id, login_method, login_location, general_location, created_at, last_seen_at",
       )
       .eq("workspace_id", context.workspaceId)
       .eq("profile_id", context.user.id)
@@ -459,7 +460,7 @@ export const handleSessionAction = async (
       sessionQuery = await context.adminClient
         .from("account_sessions")
         .select(
-          "id, device_id, device_label, user_agent, created_at, last_seen_at",
+          "id, device_id, device_label, user_agent, auth_session_id, created_at, last_seen_at",
         )
         .eq("workspace_id", context.workspaceId)
         .eq("profile_id", context.user.id)
@@ -469,7 +470,8 @@ export const handleSessionAction = async (
     }
     const { data, error } = sessionQuery;
     if (error) {
-      return isMissingSessionTable(error as RpcError)
+      return isMissingSessionTable(error as RpcError) ||
+          isMissingSessionAuthBindingColumn(error as RpcError)
         ? sessionUnavailable(context, 400)
         : context.jsonResponse(400, {
           error: "Unable to load active devices.",
@@ -483,14 +485,28 @@ export const handleSessionAction = async (
     }
     return context.jsonResponse(200, {
       data: {
-        sessions: Array.from(dedupedRows.values()).map((row) => ({
-          ...row,
-          login_method: row.login_method ?? null,
-          login_location: row.login_location ?? null,
-          general_location: row.general_location ?? null,
-          is_current: !!context.deviceSession.deviceId &&
-            row.device_id === context.deviceSession.deviceId,
-        })),
+        sessions: Array.from(dedupedRows.values()).map((row) => {
+          // A row counts as "current" if its device_id matches this request's
+          // device, or if it shares this request's auth_session_id. The
+          // latter covers sibling rows created from a different origin under
+          // the same Supabase auth session (e.g. the main app host vs a
+          // tenant's custom subdomain, which track device_id separately in
+          // per-origin localStorage) so they're never surfaced as a
+          // revokable "other" device.
+          const { auth_session_id: rowAuthSessionId, ...publicRow } = row;
+          return {
+            ...publicRow,
+            login_method: row.login_method ?? null,
+            login_location: row.login_location ?? null,
+            general_location: row.general_location ?? null,
+            is_current:
+              (!!context.deviceSession.deviceId &&
+                row.device_id === context.deviceSession.deviceId) ||
+              (!!context.authSessionBinding.sessionId &&
+                !!rowAuthSessionId &&
+                rowAuthSessionId === context.authSessionBinding.sessionId),
+          };
+        }),
       },
     });
   }
@@ -560,8 +576,19 @@ export const handleSessionAction = async (
     .eq("workspace_id", context.workspaceId)
     .eq("profile_id", context.user.id)
     .is("revoked_at", null);
-  if (!signOutCurrent && context.deviceSession.deviceId) {
-    query = query.neq("device_id", context.deviceSession.deviceId);
+  if (!signOutCurrent) {
+    // Prefer excluding by auth_session_id: the same Supabase auth session can
+    // back more than one account_sessions row (e.g. the main app host and a
+    // tenant's custom subdomain each track their own device_id in
+    // localStorage while sharing one login). Excluding only by device_id
+    // would leave the current browser's *other* row eligible for
+    // revocation, which then blocks this very request's session too. Fall
+    // back to device_id only when the auth session binding is unavailable.
+    if (context.authSessionBinding.sessionId) {
+      query = query.neq("auth_session_id", context.authSessionBinding.sessionId);
+    } else if (context.deviceSession.deviceId) {
+      query = query.neq("device_id", context.deviceSession.deviceId);
+    }
   }
   const { data, error } = await query.select("id");
   if (error) {

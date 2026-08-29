@@ -27,7 +27,13 @@ export const signOut = async () => {
     }
   }
 
-  await signOutLocalSupabaseSession();
+  try {
+    await signOutLocalSupabaseSession();
+  } catch {
+    // The browser session is also represented by the HttpOnly cookie below;
+    // continue cleanup even when the local Supabase client has no session or
+    // cannot complete its best-effort sign-out call.
+  }
   await clearOfflineCheckoutQueue();
   await clearOfflineCheckoutWorkflow();
   clearOfflineConnectionState();

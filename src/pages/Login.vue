@@ -41,9 +41,11 @@
           />
           <RouterLink class="story-back-link compact-back-link" to="/">Back</RouterLink>
           <h1>Sign in</h1>
-          <p class="login-panel-copy">Use your email and password to enter your workspace.</p>
+          <p class="login-panel-copy">
+            Use your email and password to sign in.
+          </p>
 
-          <form class="form login-form" @submit.prevent="handleWorkspaceLogin">
+          <form class="form login-form" @submit.prevent="handleLogin">
             <label>
                
               <input
@@ -103,10 +105,6 @@
                 Sign in
               </button>
             </div>
-
-            <p class="admin-login-note">
-              Workspace Admin? <RouterLink to="/admin/login">Go to admin sign in</RouterLink>
-            </p>
           </form>
 
           <p v-if="error" class="error">{{ error }}</p>
@@ -135,7 +133,7 @@ import { computed, onMounted, onUnmounted, ref } from "vue";
 import { RouterLink, useRouter } from "vue-router";
 import SafeExternalLink from "../components/SafeExternalLink.vue";
 import { useTurnstile } from "../composables/useTurnstile";
-import { getAuthState } from "../store/authState";
+import { clearAdminVerification, getAuthState } from "../store/authState";
 import { safeExternalUrl } from "../utils/safeUrl";
 
 const router = useRouter();
@@ -259,16 +257,17 @@ const showToast = (title: string, message: string) => {
   }, 4000);
 };
 
-const getTenantSignInErrorMessage = (message: string) => {
+const getSignInErrorMessage = (message: string) => {
   const normalized = message.trim().toLowerCase();
   if (
     normalized.includes("invalid tenant access code") ||
     normalized.includes("invalid access code") ||
     normalized.includes("invalid credentials") ||
     normalized.includes("invalid password") ||
+    normalized.includes("invalid email") ||
     normalized === "unauthorized"
   ) {
-    return "Invalid access code or password.";
+    return "Invalid email or password.";
   }
   if (normalized.includes("timed out")) {
     return "Sign in timed out. Please try again.";
@@ -276,7 +275,7 @@ const getTenantSignInErrorMessage = (message: string) => {
   return null;
 };
 
-const handleWorkspaceLogin = async () => {
+const handleLogin = async () => {
   error.value = "";
   isLoading.value = true;
   try {
@@ -297,14 +296,29 @@ const handleWorkspaceLogin = async () => {
         identifyPostHogUser(userId, { role: auth.role ?? undefined })
       );
     }
-    void runPostHog(({ capturePostHogEvent }) =>
-      capturePostHogEvent("tenant_login_succeeded", { login_method: "password" })
-    );
+
+    if (session.role === "workspace_admin") {
+      void runPostHog(({ capturePostHogEvent }) =>
+        capturePostHogEvent("admin_login_succeeded", { role: session.role })
+      );
+    } else if (session.role === "tenant_account") {
+      void runPostHog(({ capturePostHogEvent }) =>
+        capturePostHogEvent("tenant_login_succeeded", { login_method: "password" })
+      );
+    } else {
+      throw new Error("This account cannot sign in here.");
+    }
+
+    const destination = session.role === "workspace_admin"
+      ? { path: "/admin", loginContext: "admin_login" as const }
+      : { path: "/checkout", loginContext: "regular_login" as const };
     if (session.workspaceSlug && window.location.hostname !== `${session.workspaceSlug}.app.itemtraxx.com`) {
-      window.location.replace(`https://${session.workspaceSlug}.app.itemtraxx.com/checkout?login_ctx=regular_login`);
+      window.location.replace(
+        `https://${session.workspaceSlug}.app.itemtraxx.com${destination.path}?login_ctx=${destination.loginContext}`
+      );
       return;
     }
-    await router.push({ path: "/checkout", query: { login_ctx: "regular_login" } });
+    await router.push({ path: destination.path, query: { login_ctx: destination.loginContext } });
   } catch (err) {
     if (err instanceof Error && err.message === "LIMITER_UNAVAILABLE") {
       error.value = "";
@@ -318,7 +332,10 @@ const handleWorkspaceLogin = async () => {
       error.value = "Security check failed. Please try again.";
       return;
     }
-    if (err instanceof Error && err.message === "TENANT_DISABLED") {
+    if (
+      err instanceof Error &&
+      (err.message === "TENANT_DISABLED" || err.message === "WORKSPACE_DISABLED")
+    ) {
       error.value = "";
       showToast("Access blocked", "This account cannot sign in right now. Please contact support.");
       return;
@@ -334,17 +351,18 @@ const handleWorkspaceLogin = async () => {
       showToast("Admin verification required", "Please sign in again to continue.");
       return;
     }
-    const signInErrorMessage = getTenantSignInErrorMessage(errorMessage);
+    const signInErrorMessage = getSignInErrorMessage(errorMessage);
     if (signInErrorMessage) {
       error.value = "";
       showToast("Sign in failed.", signInErrorMessage);
       void runPostHog(({ capturePostHogEvent }) =>
-        capturePostHogEvent("tenant_login_failed", { error_type: errorMessage })
+        capturePostHogEvent("login_failed", { error_type: errorMessage })
       );
       return;
     }
     void runPostHog(({ capturePostHogEvent }) =>
-      capturePostHogEvent("tenant_login_failed", { error_type: errorMessage })
+      // The role is intentionally unknown for failed authentication attempts.
+      capturePostHogEvent("login_failed", { error_type: errorMessage })
     );
     error.value = errorMessage;
   } finally {
@@ -375,6 +393,7 @@ onUnmounted(() => {
 });
 
 onMounted(() => {
+  clearAdminVerification();
   const syncTheme = () => {
     themeMode.value = document.documentElement.getAttribute("data-theme") === "light" ? "light" : "dark";
   };
@@ -764,21 +783,6 @@ onMounted(() => {
 .login-submit-button:hover:not(:disabled) {
   background: var(--login-button-bg);
   border-color: var(--login-button-bg);
-}
-
-.admin-login-note {
-  margin: 0.15rem 0 0;
-  font-size: 0.9rem;
-  color: var(--login-copy);
-}
-
-.admin-login-note a {
-  color: var(--login-help-link);
-  font-weight: 600;
-}
-
-.admin-login-note a:hover {
-  color: var(--login-help-link-hover);
 }
 
 .legal-note {

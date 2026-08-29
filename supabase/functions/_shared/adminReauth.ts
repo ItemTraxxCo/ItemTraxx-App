@@ -1,6 +1,6 @@
 // Server-side enforcement of the Workspace Admin re-authentication window.
 //
-// The product presents /admin/login as a verification step before admin
+// The product presents /login as a verification step before admin
 // functions become available, and the SPA enforces a 15-minute freshness
 // window on it (src/router/index.ts hasFreshAdminVerification, fed by
 // authState.adminVerifiedAt <- session summary password_authenticated_at).

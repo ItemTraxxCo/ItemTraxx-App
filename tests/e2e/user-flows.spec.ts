@@ -97,6 +97,73 @@ test.describe("core user flows", () => {
     ]);
   });
 
+  test("workspace admin sign-in uses the unified login page and lands on admin", async ({ page }) => {
+    await mockSystemStatus(page);
+    await mockUnauthenticatedSession(page);
+    await mockAdminOps(page);
+    await page.route("**/rest/v1/**", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({}),
+      });
+    });
+    await page.goto("/");
+    await dismissFirstRunSurfaces(page);
+
+    await page.route(/\/functions(?:\/v1)?\/workspace-login(?:\?.*)?$/, async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          access_token: "admin-access-token-e2e",
+          refresh_token: "admin-refresh-token-e2e",
+          workspace_slug: "",
+        }),
+      });
+    });
+    await page.route("**/auth/session/exchange", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          authenticated: true,
+          user: {
+            id: "user-e2e-admin",
+            email: "tenant.admin@example.com",
+            last_sign_in_at: new Date().toISOString(),
+          },
+          profile: {
+            role: "workspace_admin",
+            workspace_id: "tenant-e2e",
+            auth_email: "tenant.admin@example.com",
+            is_active: true,
+          },
+          password_authenticated_at: new Date().toISOString(),
+        }),
+      });
+    });
+    await page.route(/\/functions(?:\/v1)?\/login-notify(?:\?.*)?$/, async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ ok: true }),
+      });
+    });
+
+    await page.goto("/admin/login");
+    await expect(page).toHaveURL(/\/login$/);
+    await expect(page.getByRole("heading", { name: "Sign in", exact: true })).toBeVisible();
+    await expect(page.getByText("Go to admin sign in", { exact: true })).toHaveCount(0);
+
+    await page.getByPlaceholder("Email address").fill("tenant.admin@example.com");
+    await page.getByPlaceholder("Enter password").fill("correct horse battery staple");
+    await page.getByRole("button", { name: "Sign in", exact: true }).click();
+
+    await expect(page).toHaveURL(/\/admin$/);
+    await expect(page.getByRole("heading", { name: "Workspace Overview", exact: true })).toBeVisible();
+  });
+
   test("workspace admin can add an item and see it in the inventory list", async ({ page }) => {
     const items: Array<Record<string, unknown>> = [];
     const createRequests: Array<Record<string, unknown>> = [];

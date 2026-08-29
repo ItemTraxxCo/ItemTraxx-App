@@ -185,7 +185,7 @@ const isDevSubdomainHost = computed(() => {
   const secondOctet = Number(match172?.[1]);
   return !!match172 && Number.isFinite(secondOctet) && secondOctet >= 16 && secondOctet <= 31;
 });
-const isFullBleedRoute = computed(() => ["/login", "/admin/login", "/super-auth", "/internal-auth", "/reset-password"].includes(route.path));
+const isFullBleedRoute = computed(() => ["/login", "/super-auth", "/internal-auth", "/reset-password"].includes(route.path));
 const isMarketingFullBleedRoute = computed(() => ["/", "/landing-new", "/changelog", "/itemscanner"].includes(route.path));
 const isSubmitConfirmationRoute = computed(() => route.path === "/submitconfirmation");
 const isBannerBleedRoute = computed(() => ["/legal", "/security", "/trust", "/compliance", "/faq", "/contact", "/privacy", "/cookies", "/accessibility", "/about", "/pricing", "/forgot-password", "/contact-sales", "/request-demo", "/contact-support", "/report-security-issue", "/getting-started"].includes(route.path));
@@ -203,14 +203,14 @@ const isWorkspaceScopedRoute = computed(() =>
     (prefix) => route.path === prefix || route.path.startsWith(`${prefix}/`),
   ),
 );
-const isWorkspaceAdminArea = computed(() => route.path !== "/admin/login" && route.path.startsWith("/admin"));
+const isWorkspaceAdminArea = computed(() => route.path.startsWith("/admin"));
 const shouldTrackAccountSession = computed(() => {
   if (!auth.isAuthenticated) return false;
   if (auth.role === "workspace_admin") return isWorkspaceAdminArea.value;
   if (auth.role === "tenant_account") return isWorkspaceScopedRoute.value;
   return false;
 });
-const showNotificationBell = computed(() => auth.isAuthenticated && auth.role === "workspace_admin" && route.path !== "/admin/login" && route.path.startsWith("/admin"));
+const showNotificationBell = computed(() => auth.isAuthenticated && auth.role === "workspace_admin" && route.path.startsWith("/admin"));
 const isUnavailableBypass = computed(() => isUnavailableBypassHost(window.location.hostname));
 
 const showBroadcast = computed(() => !!activeBroadcast.value && dismissedBroadcastId.value !== activeBroadcast.value.id);
@@ -329,7 +329,7 @@ const maybeRedirectAuthenticatedPublicHome = async () => {
   if (district.isWorkspaceHost && district.workspaceId && auth.workspaceContextId && auth.workspaceContextId !== district.workspaceId) return;
   let targetPath: string | null = null;
   if (auth.role === "super_admin") targetPath = auth.hasSecondaryAuth && hasFreshVerification(auth.superVerifiedAt) ? "/super-admin" : "/super-auth";
-  else if (auth.role === "workspace_admin") targetPath = hasFreshVerification(auth.adminVerifiedAt) ? "/admin" : "/admin/login";
+  else if (auth.role === "workspace_admin") targetPath = hasFreshVerification(auth.adminVerifiedAt) ? "/admin" : "/login";
   else if (auth.role === "tenant_account" && auth.workspaceContextId) targetPath = "/checkout";
   if (!targetPath) return;
   publicHomeRedirectInFlight = true;

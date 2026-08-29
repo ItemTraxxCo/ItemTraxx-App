@@ -1,10 +1,125 @@
 import { allowsAnalytics, readCookieConsent } from "./cookieConsentService";
 import { isRecoverableChunkLoadError } from "./appErrorRecovery";
+import type { CaptureResult } from "posthog-js";
 
 let initialized = false;
 let posthog: typeof import("posthog-js").default | null = null;
 const EMAIL_PATTERN = /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/i;
-const SENSITIVE_PROPERTY_KEY = /(email|phone|name|tenant|profile|borrower|user_id|address|token|secret)/i;
+const SENSITIVE_PROPERTY_KEY =
+  /(email|phone|name|tenant|profile|borrower|user_id|address|token|secret|error_message|error_type|error_stack|error_context|error_cause|exception|message|stack|context|cause)/i;
+
+export type PostHogErrorCode =
+  | "unauthorized"
+  | "invalid_credentials"
+  | "rate_limit"
+  | "network"
+  | "timeout"
+  | "workspace_disabled"
+  | "missing_context"
+  | "invalid_barcode"
+  | "borrower_not_found"
+  | "server_error"
+  | "request_failed"
+  | "authentication_failed"
+  | "unknown_error";
+
+const POSTHOG_ERROR_CODES = new Set<PostHogErrorCode>([
+  "unauthorized",
+  "invalid_credentials",
+  "rate_limit",
+  "network",
+  "timeout",
+  "workspace_disabled",
+  "missing_context",
+  "invalid_barcode",
+  "borrower_not_found",
+  "server_error",
+  "request_failed",
+  "authentication_failed",
+  "unknown_error",
+]);
+
+const isPostHogErrorCode = (value: unknown): value is PostHogErrorCode =>
+  typeof value === "string" && POSTHOG_ERROR_CODES.has(value as PostHogErrorCode);
+
+const getErrorCodeField = (error: unknown) => {
+  if (!error || typeof error !== "object") return undefined;
+  const value = (error as Record<string, unknown>).code;
+  return typeof value === "string" ? value : undefined;
+};
+
+const getErrorStatusField = (error: unknown) => {
+  if (!error || typeof error !== "object") return undefined;
+  const value = (error as Record<string, unknown>).status;
+  return typeof value === "number" ? value : undefined;
+};
+
+export const getPostHogErrorCode = (error: unknown): PostHogErrorCode => {
+  const rawCode = getErrorCodeField(error);
+  switch (rawCode?.toUpperCase()) {
+    case "UNAUTHORIZED":
+      return "unauthorized";
+    case "RATE_LIMIT":
+      return "rate_limit";
+    case "NETWORK":
+      return "network";
+    case "TIMEOUT":
+      return "timeout";
+    case "TENANT_DISABLED":
+      return "workspace_disabled";
+    case "MISSING_CONTEXT":
+      return "missing_context";
+  }
+
+  const status = getErrorStatusField(error);
+  if (status === 401 || status === 403) return "unauthorized";
+  if (status === 408) return "timeout";
+  if (status === 429) return "rate_limit";
+  if (status !== undefined && status >= 500) return "server_error";
+
+  const message = error instanceof Error ? error.message.trim().toLowerCase() : "";
+  if (message.includes("invalid barcode") || message.includes("barcode")) return "invalid_barcode";
+  if (message.includes("borrower not found")) return "borrower_not_found";
+  if (message.includes("invalid email") || message.includes("invalid password") || message.includes("invalid credentials")) {
+    return "invalid_credentials";
+  }
+  if (message === "unauthorized" || message.includes("session expired") || message.includes("session revoked")) {
+    return "unauthorized";
+  }
+  if (message.includes("rate limit") || message.includes("too many requests")) return "rate_limit";
+  if (message.includes("timed out")) return "timeout";
+  if (message.includes("network request failed") || message.includes("unable to reach")) return "network";
+  if (message.includes("workspace disabled") || message.includes("tenant disabled")) return "workspace_disabled";
+  if (message.includes("missing tenant context")) return "missing_context";
+  if (message) return "request_failed";
+  return "unknown_error";
+};
+
+const sanitizeExceptionEvent = (event: CaptureResult): CaptureResult => {
+  if (event.event !== "$exception") return event;
+
+  const properties = event.properties;
+  const errorCode = isPostHogErrorCode(properties?.error_code)
+    ? properties.error_code
+    : "unknown_error";
+  const safeProperties: CaptureResult["properties"] = {};
+  if (typeof properties?.token === "string") {
+    // PostHog requires its project token to remain on the event. It is not a
+    // user/session bearer and is safe to preserve here.
+    safeProperties.token = properties.token;
+  }
+  safeProperties.$exception_list = [
+    {
+      type: "ItemTraxxClientError",
+      value: errorCode,
+      mechanism: { type: "generic", handled: true, synthetic: true },
+    },
+  ];
+  safeProperties.$exception_level = "error";
+  safeProperties.error_code = errorCode;
+
+  return { ...event, properties: safeProperties };
+};
 
 const scrubProperties = (
   properties?: Record<string, string | number | boolean | null | undefined>
@@ -99,8 +214,9 @@ export const initPostHog = async () => {
       capture_dead_clicks: false,
       capture_exceptions: true,
       before_send: (event) => {
+        if (!event) return null;
         if (
-          event?.event === "$exception" &&
+          event.event === "$exception" &&
           (
             isCspUnsafeEvalExceptionEvent(event.properties) ||
             isRecoverableChunkLoadExceptionEvent(event.properties)
@@ -108,10 +224,13 @@ export const initPostHog = async () => {
         ) {
           return null;
         }
-        return event;
+        return sanitizeExceptionEvent(event);
       },
       logs: {
-        captureConsoleLogs: true,
+        captureConsoleLogs: false,
+        // Remote config can opt console capture back in; keep that alternate
+        // sink disabled even if the project setting changes later.
+        beforeSend: () => null,
       },
       // Session replay is disabled globally: authenticated/admin DOM text can
       // contain support requests and other tenant-sensitive data that input
@@ -188,7 +307,11 @@ export const resetPostHog = () => {
 export const capturePostHogException = (error: unknown) => {
   if (!initialized || !posthog || !allowsAnalytics(readCookieConsent()) || isCspUnsafeEvalError(error)) return;
   try {
-    posthog.captureException(error);
+    const errorCode = getPostHogErrorCode(error);
+    const safeError = new Error(errorCode);
+    safeError.name = "ItemTraxxClientError";
+    safeError.stack = undefined;
+    posthog.captureException(safeError, { error_code: errorCode });
   } catch (captureError) {
     console.warn("[posthog] exception capture failed; continuing without analytics. Please contact support.", captureError);
   }

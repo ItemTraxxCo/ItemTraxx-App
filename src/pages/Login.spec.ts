@@ -71,7 +71,7 @@ describe("Login", () => {
     await settle();
 
     expect(mocks.capturePostHogEvent).toHaveBeenCalledWith("login_failed", {
-      error_type: "Invalid email or password.",
+      error_code: "invalid_credentials",
     });
     expect(mocks.capturePostHogEvent).not.toHaveBeenCalledWith(
       "tenant_login_failed",
@@ -81,7 +81,9 @@ describe("Login", () => {
   });
 
   it("uses login_failed for unexpected authentication errors too", async () => {
-    mocks.workspaceLogin.mockRejectedValueOnce(new Error("Unexpected auth failure."));
+    mocks.workspaceLogin.mockRejectedValueOnce(
+      new Error("Backend diagnostic token=secret for person@example.com")
+    );
     const wrapper = mountLogin();
 
     await wrapper.get('input[placeholder="Email address"]').setValue("person@example.com");
@@ -90,7 +92,7 @@ describe("Login", () => {
     await settle();
 
     expect(mocks.capturePostHogEvent).toHaveBeenCalledWith("login_failed", {
-      error_type: "Unexpected auth failure.",
+      error_code: "authentication_failed",
     });
     expect(mocks.capturePostHogEvent).not.toHaveBeenCalledWith(
       "tenant_login_failed",

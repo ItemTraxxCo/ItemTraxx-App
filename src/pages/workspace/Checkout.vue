@@ -169,7 +169,11 @@ import {
 import { sanitizeInput } from "../../utils/inputSanitizer";
 import { getAuthState } from "../../store/authState";
 import { toUserFacingErrorMessage } from "../../services/appErrors";
-import { capturePostHogEvent, capturePostHogException } from "../../services/posthogService";
+import {
+  capturePostHogEvent,
+  capturePostHogException,
+  getPostHogErrorCode,
+} from "../../services/posthogService";
 import type { ScannerHistoryItem, ScannerScanEvent } from "../../types/cameraScanner";
 
 const isBorrowerLoading = ref(false);
@@ -505,7 +509,7 @@ const submit = async () => {
   } catch (err) {
     capturePostHogException(err);
     capturePostHogEvent("checkout_transaction_failed", {
-      error_message: err instanceof Error ? err.message : "Unknown error",
+      error_code: getPostHogErrorCode(err),
     });
     error.value = toUserFacingErrorMessage(err, "Request failed.");
     toastStatus.value = "Failed";

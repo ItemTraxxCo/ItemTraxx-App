@@ -78,9 +78,14 @@ describe("initPostHog", () => {
         capture_exceptions: true,
         autocapture: false,
         capture_pageleave: true,
+        logs: expect.objectContaining({ captureConsoleLogs: false }),
         disable_session_recording: true,
       })
     );
+    const options = posthogMock.init.mock.calls[0]?.[1] as {
+      logs?: { beforeSend?: (record: { body: string }) => unknown };
+    } | undefined;
+    expect(options?.logs?.beforeSend?.({ body: "backend diagnostic token=secret" })).toBeNull();
   });
 
   it("is idempotent: a second call does not re-init", async () => {
@@ -139,6 +144,22 @@ describe("capturePostHogEvent", () => {
     mod.capturePostHogEvent("evt", { borrower_name: "Jane", user_id: "u1", quantity: 3 });
 
     expect(posthogMock.capture).toHaveBeenCalledWith("evt", { quantity: 3 });
+  });
+
+  it("drops raw error fields while retaining a fixed error code", async () => {
+    const mod = await initializedModule();
+
+    mod.capturePostHogEvent("checkout_transaction_failed", {
+      error_message: "barcode BC-123 for person@example.com",
+      error_type: "backend token secret-diagnostic",
+      error_code: "invalid_barcode",
+      error_count: 1,
+    });
+
+    expect(posthogMock.capture).toHaveBeenCalledWith("checkout_transaction_failed", {
+      error_code: "invalid_barcode",
+      error_count: 1,
+    });
   });
 
   it("drops properties whose string value looks like an email even if the key is benign", async () => {
@@ -210,13 +231,38 @@ describe("resetPostHog", () => {
 });
 
 describe("capturePostHogException", () => {
-  it("forwards a regular error to posthog.captureException", async () => {
+  it("captures only a fixed code without the original message, stack, cause, or context", async () => {
     const mod = await initializedModule();
-    const error = new Error("boom");
+    const error = new Error("barcode BC-123 email person@example.com token=secret backend diagnostic");
+    error.stack = "sensitive stack with person@example.com";
+    error.cause = { message: "sensitive cause" };
 
     mod.capturePostHogException(error);
 
-    expect(posthogMock.captureException).toHaveBeenCalledWith(error);
+    const [capturedError, properties] = posthogMock.captureException.mock.calls[0] ?? [];
+    expect(capturedError).toBeInstanceOf(Error);
+    expect(capturedError).not.toBe(error);
+    expect(capturedError).toMatchObject({
+      name: "ItemTraxxClientError",
+      message: "invalid_barcode",
+      stack: undefined,
+    });
+    expect(capturedError).not.toHaveProperty("cause");
+    expect(properties).toEqual({ error_code: "invalid_barcode" });
+  });
+
+  it("maps an unexpected error to an opaque fixed category", async () => {
+    const mod = await initializedModule();
+
+    mod.capturePostHogException({ message: "backend diagnostic with token secret" });
+
+    const [capturedError, properties] = posthogMock.captureException.mock.calls[0] ?? [];
+    expect(capturedError).toMatchObject({
+      name: "ItemTraxxClientError",
+      message: "unknown_error",
+      stack: undefined,
+    });
+    expect(properties).toEqual({ error_code: "unknown_error" });
   });
 
   it("swallows a thrown captureException error", async () => {
@@ -226,6 +272,51 @@ describe("capturePostHogException", () => {
     });
 
     expect(() => mod.capturePostHogException(new Error("boom"))).not.toThrow();
+  });
+});
+
+describe("PostHog exception before_send", () => {
+  it("removes exception values, stack frames, context, and arbitrary properties", async () => {
+    const mod = await initializedModule();
+    void mod;
+    const options = posthogMock.init.mock.calls[0]?.[1] as {
+      before_send?: (event: unknown) => unknown;
+    } | undefined;
+
+    const result = options?.before_send?.({
+      event: "$exception",
+      properties: {
+        token: "project-token",
+        error_message: "barcode BC-123 email person@example.com",
+        $exception_list: [
+          {
+            type: "Error",
+            value: "backend diagnostic token=secret",
+            stacktrace: {
+              type: "raw",
+              frames: [{ context_line: "email person@example.com", vars: { token: "secret" } }],
+            },
+          },
+        ],
+        raw_context: "borrower name and backend details",
+      },
+    }) as { event: string; properties: Record<string, unknown> } | null;
+
+    expect(result).toEqual({
+      event: "$exception",
+      properties: {
+        token: "project-token",
+        $exception_list: [
+          {
+            type: "ItemTraxxClientError",
+            value: "unknown_error",
+            mechanism: { type: "generic", handled: true, synthetic: true },
+          },
+        ],
+        $exception_level: "error",
+        error_code: "unknown_error",
+      },
+    });
   });
 });
 

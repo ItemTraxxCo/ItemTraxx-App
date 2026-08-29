@@ -4,8 +4,11 @@ import {
   consumeCheckoutOfflineWarning,
   ensureCheckoutOperationId,
   getOfflineQueueScope,
+  getOfflineQueueSummary,
   getBufferedCheckoutCount,
   isOfflineQueueItemScopedTo,
+  listOfflineQueueReviewItems,
+  discardOfflineQueueReviewItem,
   queueCheckoutPayload,
   quarantineOfflineCheckoutQueueForCurrentSession,
   readOfflineQueue,
@@ -178,6 +181,63 @@ describe("legacy queue identity quarantine", () => {
     ]);
     expect(isOfflineQueueItemScopedTo(queue[0]!, getOfflineQueueScope()!)).toBe(true);
     expect(isOfflineQueueItemScopedTo(queue[1]!, getOfflineQueueScope()!)).toBe(false);
+  });
+
+  it("lists only safe generic metadata and discards exactly one review-required item", async () => {
+    window.localStorage.setItem("itemtraxx-device-id", "device-1");
+    setAuthStateFromBackend({
+      isAuthenticated: true,
+      userId: "profile-1",
+      workspaceContextId: "workspace-1",
+    });
+    const pending = {
+      id: "pending",
+      payload: payload("PENDING"),
+      created_at: "2026-01-01T00:00:00Z",
+      attempts: 0,
+      last_error: null,
+    };
+    const review = {
+      id: "legacy-review",
+      payload: {
+        ...payload("PRIVATE-ITEM"),
+        borrower_id: "PRIVATE-BORROWER",
+        action_type: "checkout" as const,
+      },
+      created_at: "2026-01-01T00:00:00Z",
+      attempts: 2,
+      last_error: "PRIVATE ERROR DETAILS",
+      review_required: true,
+    };
+    const malformedReview = {
+      id: "legacy-invalid-date",
+      payload: { action_type: "unknown-action", item_barcodes: ["SAFE-COUNT"] },
+      created_at: "not-a-date",
+      attempts: 0,
+      last_error: "PRIVATE ERROR DETAILS",
+      review_required: true,
+    };
+    await writeOfflineQueue([null, pending, review, malformedReview] as never);
+
+    await expect(getOfflineQueueSummary()).resolves.toEqual({ totalCount: 4, pendingCount: 2, reviewCount: 2 });
+    const reviewItems = await listOfflineQueueReviewItems();
+    expect(reviewItems).toEqual([
+      { id: "legacy-review", created_at: "2026-01-01T00:00:00Z", action_type: "checkout", item_count: 1 },
+      { id: "legacy-invalid-date", created_at: null, action_type: "legacy", item_count: 1 },
+    ]);
+    expect(JSON.stringify(reviewItems)).not.toContain("PRIVATE");
+
+    await expect(discardOfflineQueueReviewItem("legacy-review")).resolves.toBe(1);
+    await expect(readOfflineQueue()).resolves.toEqual([
+      null,
+      pending,
+      malformedReview,
+    ]);
+    await expect(discardOfflineQueueReviewItem("pending")).rejects.toThrow(/no longer available/i);
+
+    clearAuthState(true);
+    await expect(listOfflineQueueReviewItems()).resolves.toEqual([]);
+    await expect(discardOfflineQueueReviewItem("legacy-invalid-date")).rejects.toThrow(/workspace session/i);
   });
 });
 

@@ -27,6 +27,7 @@ type BufferedCheckoutItem = {
   created_at: string;
   attempts: number;
   last_error: string | null;
+  review_required?: boolean;
 };
 
 type OfflineQueueControl = {
@@ -926,6 +927,58 @@ test.describe("prepared offline checkout workflow contract", () => {
 
     await expect(page.getByText("Offline Queue")).toBeVisible();
     await expect(page.getByText("Transaction processing...")).toHaveCount(0);
+  });
+
+  test("shows legacy review records without payload details and discards only the selected record", async ({ page }) => {
+    await mockSystemStatus(page);
+    await mockAdminOps(page);
+    await page.evaluate(() => window.localStorage.setItem("itemtraxx-device-id", "device-e2e"));
+    await setWorkspaceAdminSession(page, "workspace-e2e");
+    await page.evaluate(async (pack) => {
+      const workflow = (window.__itemtraxxTest as typeof window.__itemtraxxTest & {
+        offlineCheckoutWorkflow: { writePack: (value: unknown) => Promise<void> };
+      }).offlineCheckoutWorkflow;
+      await workflow.writePack(pack);
+    }, workflowPack());
+
+    const legacyItem: BufferedCheckoutItem = {
+      ...bufferedItem("op-legacy-review-e2e"),
+      id: "legacy-review-e2e",
+      payload: {
+        ...payload("op-legacy-review-e2e"),
+        borrower_id: "PRIVATE-BORROWER",
+        item_barcodes: ["PRIVATE-ITEM"],
+      },
+      review_required: true,
+    };
+    await page.evaluate(async (item) => {
+      const control = (window.__itemtraxxTest as typeof window.__itemtraxxTest & {
+        offlineCheckoutQueue: OfflineQueueControl;
+      }).offlineCheckoutQueue;
+      await control.write([item]);
+    }, legacyItem);
+
+    const checkoutReturnRequests: string[] = [];
+    page.on("request", (request) => {
+      if (/\/checkoutReturn(?:\?|$)/.test(request.url())) checkoutReturnRequests.push(request.url());
+    });
+    await navigateApp(page, "/checkout");
+
+    await expect(page.getByRole("heading", { name: /transaction need review/i })).toBeVisible();
+    await expect(page.getByText("PRIVATE-BORROWER", { exact: true })).toHaveCount(0);
+    await expect(page.getByText("PRIVATE-ITEM", { exact: true })).toHaveCount(0);
+    await expect(page.getByText(/Checkout · 1 item/)).toBeVisible();
+
+    page.once("dialog", (dialog) => dialog.accept());
+    await page.getByRole("button", { name: "Discard and start a new transaction" }).click();
+    await expect(page.getByRole("heading", { name: /transaction need review/i })).toHaveCount(0);
+    await expect.poll(async () => page.evaluate(async () => {
+      const control = (window.__itemtraxxTest as typeof window.__itemtraxxTest & {
+        offlineCheckoutQueue: OfflineQueueControl;
+      }).offlineCheckoutQueue;
+      return control.read();
+    })).toEqual([]);
+    expect(checkoutReturnRequests).toEqual([]);
   });
 
   test("waits for a new account session without showing a disabled-account error or re-preparing a restored pack", async ({ page }) => {

@@ -316,10 +316,13 @@ const syncBufferedCheckoutQueueInternal = async () => {
     }
 
     await writeOfflineQueue(remaining);
+    window.dispatchEvent(new CustomEvent("itemtraxx:offline-queue-changed"));
     return {
       processed,
       failed,
-      remaining: remaining.length,
+      // Review-required records remain stored for the local review surface,
+      // but are not retryable work and must not be counted as pending.
+      remaining: remaining.filter((item) => item.review_required !== true).length,
       review,
     };
   });

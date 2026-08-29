@@ -360,7 +360,7 @@ describe("syncBufferedCheckoutQueue", () => {
 
     const result = await syncBufferedCheckoutQueue();
 
-    expect(result).toMatchObject({ processed: 0, failed: 1, remaining: 1, review: 1 });
+    expect(result).toMatchObject({ processed: 0, failed: 1, remaining: 0, review: 1 });
     expect(mockedInvoke).not.toHaveBeenCalled();
     expect(mockedWriteQueue).toHaveBeenCalledWith([
       expect.objectContaining({ id: "q-1", review_required: true, last_error: expect.stringMatching(/manual review/i) }),
@@ -381,7 +381,7 @@ describe("syncBufferedCheckoutQueue", () => {
 
     const result = await syncBufferedCheckoutQueue();
 
-    expect(result).toEqual({ processed: 0, failed: 1, remaining: 1, review: 1 });
+    expect(result).toEqual({ processed: 0, failed: 1, remaining: 0, review: 1 });
     expect(mockedInvoke).not.toHaveBeenCalled();
     expect(mockedWriteQueue).toHaveBeenCalledWith([
       expect.objectContaining({
@@ -467,7 +467,7 @@ describe("syncBufferedCheckoutQueue", () => {
 
     const result = await syncBufferedCheckoutQueue();
 
-    expect(result).toEqual({ processed: 1, failed: 1, remaining: 1, review: 1 });
+    expect(result).toEqual({ processed: 1, failed: 1, remaining: 0, review: 1 });
     expect(mockedInvoke).toHaveBeenCalledTimes(1);
     expect(mockedWriteQueue).toHaveBeenCalledWith([
       expect.objectContaining({ id: "q-after-switch", review_required: true }),

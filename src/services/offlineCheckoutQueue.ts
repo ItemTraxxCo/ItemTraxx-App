@@ -28,6 +28,21 @@ export type OfflineQueueScope = {
   deviceId: string;
 };
 
+export type OfflineQueueReviewAction = "checkout" | "return" | "quick_return" | "automatic" | "legacy";
+
+export type OfflineQueueReviewItem = {
+  id: string;
+  created_at: string | null;
+  action_type: OfflineQueueReviewAction;
+  item_count: number;
+};
+
+export type OfflineQueueSummary = {
+  totalCount: number;
+  pendingCount: number;
+  reviewCount: number;
+};
+
 const LEGACY_QUEUE_REVIEW_MESSAGE =
   "Legacy offline transaction is not bound to this session and needs manual review before replay.";
 
@@ -361,6 +376,76 @@ export const writeOfflineQueue = async (items: BufferedCheckoutItem[]) => {
   }
 };
 
+const toOfflineQueueReviewItem = (item: BufferedCheckoutItem): OfflineQueueReviewItem => {
+  const payload = item && typeof item === "object"
+    ? item.payload as Partial<CheckoutReturnPayload> | null | undefined
+    : undefined;
+  const barcodes = Array.isArray(payload?.item_barcodes)
+    ? payload.item_barcodes.filter((barcode) => typeof barcode === "string").slice(0, 999)
+    : [];
+  const actionType = payload?.action_type;
+  const action_type: OfflineQueueReviewAction = actionType === "checkout"
+    ? "checkout"
+    : actionType === "return" || actionType === "admin_return"
+      ? "return"
+      : actionType === "quick_return"
+        ? "quick_return"
+        : actionType === "auto"
+          ? "automatic"
+          : "legacy";
+  const createdAt = typeof item?.created_at === "string" && Number.isFinite(Date.parse(item.created_at))
+    ? item.created_at
+    : null;
+  return {
+    id: typeof item?.id === "string" ? item.id : "",
+    created_at: createdAt,
+    action_type,
+    item_count: barcodes.length,
+  };
+};
+
+export const getOfflineQueueSummary = async (): Promise<OfflineQueueSummary> =>
+  withOfflineQueueLock(async () => {
+    const queue = await readOfflineQueue();
+    const reviewCount = queue.filter((item) => item && typeof item === "object" && item.review_required === true).length;
+    return {
+      totalCount: queue.length,
+      pendingCount: queue.length - reviewCount,
+      reviewCount,
+    };
+  });
+
+export const listOfflineQueueReviewItems = async () =>
+  withOfflineQueueLock(async () => {
+    if (!getOfflineQueueScope()) return [];
+    return (await readOfflineQueue())
+      .filter((item) => item && typeof item === "object" && item.review_required === true && typeof item.id === "string" && item.id.trim())
+      .map(toOfflineQueueReviewItem);
+  });
+
+export const discardOfflineQueueReviewItem = async (itemId: string) => {
+  const normalizedId = typeof itemId === "string" ? itemId.trim() : "";
+  if (!normalizedId) throw new Error("A legacy offline transaction id is required.");
+  return withOfflineQueueLock(async () => {
+    if (!getOfflineQueueScope()) throw new Error("A workspace session is required to manage legacy offline transactions.");
+    const queue = await readOfflineQueue();
+    const matchingIndex = queue.findIndex((item) =>
+      item &&
+      typeof item === "object" &&
+      item.review_required === true &&
+      typeof item.id === "string" &&
+      item.id.trim() === normalizedId
+    );
+    if (matchingIndex < 0) {
+      throw new Error("This legacy offline transaction is no longer available.");
+    }
+    const next = [...queue.slice(0, matchingIndex), ...queue.slice(matchingIndex + 1)];
+    await writeOfflineQueue(next);
+    window.dispatchEvent(new CustomEvent("itemtraxx:offline-queue-changed"));
+    return 1;
+  });
+};
+
 export const quarantineOfflineCheckoutQueueForCurrentSession = async () => {
   return withOfflineQueueLock(async () => {
     const scope = getOfflineQueueScope();
@@ -379,7 +464,10 @@ export const quarantineOfflineCheckoutQueueForCurrentSession = async () => {
       };
     });
 
-    if (quarantined > 0) await writeOfflineQueue(next);
+    if (quarantined > 0) {
+      await writeOfflineQueue(next);
+      window.dispatchEvent(new CustomEvent("itemtraxx:offline-queue-changed"));
+    }
     return quarantined;
   });
 };
@@ -410,6 +498,7 @@ export const queueCheckoutPayload = async (
     };
     queue.push(item);
     await writeOfflineQueue(queue);
+    window.dispatchEvent(new CustomEvent("itemtraxx:offline-queue-changed"));
     return queue.length;
   });
 

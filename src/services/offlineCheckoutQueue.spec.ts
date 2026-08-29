@@ -3,12 +3,16 @@ import {
   clearOfflineCheckoutQueue,
   consumeCheckoutOfflineWarning,
   ensureCheckoutOperationId,
+  getOfflineQueueScope,
   getBufferedCheckoutCount,
+  isOfflineQueueItemScopedTo,
   queueCheckoutPayload,
+  quarantineOfflineCheckoutQueueForCurrentSession,
   readOfflineQueue,
   writeOfflineQueue,
   type CheckoutReturnPayload,
 } from "./offlineCheckoutQueue";
+import { clearAuthState, setAuthStateFromBackend } from "../store/authState";
 
 const QUEUE_KEY = "itemtraxx:checkout-offline-buffer:v1";
 const LOCK_KEY = "itemtraxx:checkout-offline-buffer:lock:v1";
@@ -20,6 +24,7 @@ const payload = (barcode: string): CheckoutReturnPayload => ({
 });
 
 beforeEach(async () => {
+  clearAuthState(true);
   window.localStorage.clear();
   window.sessionStorage.clear();
   await clearOfflineCheckoutQueue();
@@ -29,6 +34,7 @@ afterEach(async () => {
   window.localStorage.clear();
   window.sessionStorage.clear();
   await clearOfflineCheckoutQueue();
+  clearAuthState(true);
 });
 
 describe("ensureCheckoutOperationId", () => {
@@ -63,6 +69,25 @@ describe("encrypted queue round trip", () => {
     expect(queue[0]!.attempts).toBe(0);
     expect(queue[0]!.last_error).toBeNull();
     expect(typeof queue[0]!.payload.operation_id).toBe("string");
+  });
+
+  it("binds newly queued legacy entries to the current workspace, profile, and device", async () => {
+    window.localStorage.setItem("itemtraxx-device-id", "device-1");
+    setAuthStateFromBackend({
+      isAuthenticated: true,
+      userId: "profile-1",
+      workspaceContextId: "workspace-1",
+    });
+
+    await queueCheckoutPayload(payload("ITEM-1"));
+
+    await expect(readOfflineQueue()).resolves.toEqual([
+      expect.objectContaining({
+        workspace_id: "workspace-1",
+        profile_id: "profile-1",
+        device_id: "device-1",
+      }),
+    ]);
   });
 
   it("appends multiple queued items and reflects the growing count", async () => {
@@ -104,6 +129,55 @@ describe("legacy plaintext migration", () => {
 
     // A second read must decrypt correctly rather than re-treating it as legacy.
     expect(await readOfflineQueue()).toEqual([legacyItem]);
+  });
+});
+
+describe("legacy queue identity quarantine", () => {
+  it("marks unbound and mismatched entries for review while preserving exact-scope entries", async () => {
+    window.localStorage.setItem("itemtraxx-device-id", "device-1");
+    setAuthStateFromBackend({
+      isAuthenticated: true,
+      userId: "profile-1",
+      workspaceContextId: "workspace-1",
+    });
+    const current = {
+      id: "current",
+      payload: payload("CURRENT"),
+      created_at: "2026-01-01T00:00:00Z",
+      attempts: 0,
+      last_error: null,
+      workspace_id: "workspace-1",
+      profile_id: "profile-1",
+      device_id: "device-1",
+    };
+    const unbound = {
+      id: "unbound",
+      payload: payload("UNBOUND"),
+      created_at: "2026-01-01T00:00:00Z",
+      attempts: 0,
+      last_error: null,
+    };
+    const otherUser = {
+      id: "other-user",
+      payload: payload("OTHER"),
+      created_at: "2026-01-01T00:00:00Z",
+      attempts: 0,
+      last_error: null,
+      workspace_id: "workspace-1",
+      profile_id: "profile-2",
+      device_id: "device-1",
+    };
+    await writeOfflineQueue([current, unbound, otherUser]);
+
+    await expect(quarantineOfflineCheckoutQueueForCurrentSession()).resolves.toBe(2);
+    const queue = await readOfflineQueue();
+    expect(queue[0]).toEqual(current);
+    expect(queue.slice(1)).toEqual([
+      expect.objectContaining({ id: "unbound", review_required: true, last_error: expect.stringMatching(/manual review/i) }),
+      expect.objectContaining({ id: "other-user", review_required: true, last_error: expect.stringMatching(/manual review/i) }),
+    ]);
+    expect(isOfflineQueueItemScopedTo(queue[0]!, getOfflineQueueScope()!)).toBe(true);
+    expect(isOfflineQueueItemScopedTo(queue[1]!, getOfflineQueueScope()!)).toBe(false);
   });
 });
 

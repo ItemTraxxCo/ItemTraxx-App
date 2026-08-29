@@ -1,3 +1,6 @@
+import { getAuthState } from "../store/authState";
+import { getOrCreateDeviceSession } from "../utils/deviceSession";
+
 export type CheckoutReturnPayload = {
   borrower_id: string;
   item_barcodes: string[];
@@ -13,7 +16,20 @@ export type BufferedCheckoutItem = {
   created_at: string;
   attempts: number;
   last_error: string | null;
+  workspace_id?: string;
+  profile_id?: string;
+  device_id?: string;
+  review_required?: boolean;
 };
+
+export type OfflineQueueScope = {
+  workspaceId: string;
+  profileId: string;
+  deviceId: string;
+};
+
+const LEGACY_QUEUE_REVIEW_MESSAGE =
+  "Legacy offline transaction is not bound to this session and needs manual review before replay.";
 
 const OFFLINE_QUEUE_KEY = "itemtraxx:checkout-offline-buffer:v1";
 const OFFLINE_QUEUE_KEY_VERSION = "itemtraxx:checkout-offline-buffer:key:v1";
@@ -55,6 +71,31 @@ export const ensureCheckoutOperationId = (
   ...payload,
   operation_id: payload.operation_id ?? createOperationId(),
 });
+
+export const getOfflineQueueScope = (): OfflineQueueScope | null => {
+  if (typeof window === "undefined") return null;
+  const auth = getAuthState();
+  if (!auth.isAuthenticated || !auth.workspaceContextId || !auth.userId) return null;
+  const { deviceId } = getOrCreateDeviceSession();
+  return {
+    workspaceId: auth.workspaceContextId,
+    profileId: auth.userId,
+    deviceId,
+  };
+};
+
+export const isOfflineQueueItemScopedTo = (
+  item: BufferedCheckoutItem,
+  scope: OfflineQueueScope,
+) => {
+  if (!item || typeof item !== "object") return false;
+  return typeof item.workspace_id === "string" &&
+    typeof item.profile_id === "string" &&
+    typeof item.device_id === "string" &&
+    item.workspace_id === scope.workspaceId &&
+    item.profile_id === scope.profileId &&
+    item.device_id === scope.deviceId;
+};
 
 const sleep = (ms: number) => new Promise((resolve) => window.setTimeout(resolve, ms));
 
@@ -320,12 +361,36 @@ export const writeOfflineQueue = async (items: BufferedCheckoutItem[]) => {
   }
 };
 
+export const quarantineOfflineCheckoutQueueForCurrentSession = async () => {
+  return withOfflineQueueLock(async () => {
+    const scope = getOfflineQueueScope();
+    if (!scope) return 0;
+    const queue = await readOfflineQueue();
+    let quarantined = 0;
+    const next = queue.map((item) => {
+      if (isOfflineQueueItemScopedTo(item, scope)) {
+        return item;
+      }
+      quarantined += 1;
+      return {
+        ...item,
+        review_required: true,
+        last_error: LEGACY_QUEUE_REVIEW_MESSAGE,
+      };
+    });
+
+    if (quarantined > 0) await writeOfflineQueue(next);
+    return quarantined;
+  });
+};
+
 export const queueCheckoutPayload = async (
   payload: CheckoutReturnPayload,
   error: string | null = null
 ) =>
   withOfflineQueueLock(async () => {
     const queue = await readOfflineQueue();
+    const scope = getOfflineQueueScope();
     const item: BufferedCheckoutItem = {
       id:
         typeof crypto !== "undefined" && "randomUUID" in crypto
@@ -335,6 +400,13 @@ export const queueCheckoutPayload = async (
       created_at: new Date().toISOString(),
       attempts: 0,
       last_error: error,
+      ...(scope
+        ? {
+            workspace_id: scope.workspaceId,
+            profile_id: scope.profileId,
+            device_id: scope.deviceId,
+          }
+        : {}),
     };
     queue.push(item);
     await writeOfflineQueue(queue);

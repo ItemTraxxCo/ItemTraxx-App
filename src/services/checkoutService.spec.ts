@@ -19,6 +19,11 @@ vi.mock("../utils/deviceSession", () => ({
 }));
 vi.mock("./offlineCheckoutQueue", () => ({
   ensureCheckoutOperationId: vi.fn((payload) => ({ ...payload, operation_id: payload.operation_id ?? "op-mock" })),
+  isOfflineQueueItemScopedTo: vi.fn((item, scope) =>
+    item?.workspace_id === scope.workspaceId &&
+    item?.profile_id === scope.profileId &&
+    item?.device_id === scope.deviceId
+  ),
   readOfflineQueue: vi.fn(),
   withOfflineQueueLock: vi.fn((callback: () => Promise<unknown>) => callback()),
   writeOfflineQueue: vi.fn(),
@@ -47,11 +52,15 @@ vi.mock("./systemStatusService", () => ({
   fetchSystemStatus: vi.fn(),
   probeSystemStatusTransport: vi.fn(),
 }));
+vi.mock("./httpSessionService", () => ({
+  fetchHttpSessionSummary: vi.fn(),
+}));
 
 import { invokeEdgeFunction } from "./edgeFunctionClient";
 import { authenticatedSelect } from "./authenticatedDataClient";
 import {
   ensureCheckoutOperationId,
+  isOfflineQueueItemScopedTo,
   readOfflineQueue,
   writeOfflineQueue,
 } from "./offlineCheckoutQueue";
@@ -68,6 +77,7 @@ import {
 import { getAuthState } from "../store/authState";
 import { markItemTraxxServerConfirmed, markItemTraxxServerUnreachable } from "./offlineConnectionState";
 import { fetchSystemStatus, probeSystemStatusTransport } from "./systemStatusService";
+import { fetchHttpSessionSummary } from "./httpSessionService";
 import {
   fetchBorrowerByBorrowerId,
   fetchCheckedOutItem,
@@ -82,6 +92,7 @@ import {
 const mockedInvoke = vi.mocked(invokeEdgeFunction);
 const mockedSelect = vi.mocked(authenticatedSelect);
 const mockedEnsureOpId = vi.mocked(ensureCheckoutOperationId);
+const mockedIsQueueItemScoped = vi.mocked(isOfflineQueueItemScopedTo);
 const mockedReadQueue = vi.mocked(readOfflineQueue);
 const mockedWriteQueue = vi.mocked(writeOfflineQueue);
 const mockedApplyConfirmed = vi.mocked(applyConfirmedTransactionToOfflinePack);
@@ -97,6 +108,7 @@ const mockedMarkConfirmed = vi.mocked(markItemTraxxServerConfirmed);
 const mockedMarkUnreachable = vi.mocked(markItemTraxxServerUnreachable);
 const mockedFetchSystemStatus = vi.mocked(fetchSystemStatus);
 const mockedProbeSystemStatusTransport = vi.mocked(probeSystemStatusTransport);
+const mockedFetchHttpSessionSummary = vi.mocked(fetchHttpSessionSummary);
 
 const AUTH_SCOPE = {
   isAuthenticated: true,
@@ -119,6 +131,11 @@ beforeEach(() => {
   mockedInvoke.mockReset();
   mockedSelect.mockReset();
   mockedEnsureOpId.mockImplementation((p) => ({ ...p, operation_id: p.operation_id ?? "op-mock" }));
+  mockedIsQueueItemScoped.mockImplementation((item, scope) =>
+    item?.workspace_id === scope.workspaceId &&
+    item?.profile_id === scope.profileId &&
+    item?.device_id === scope.deviceId
+  );
   mockedReadQueue.mockReset().mockResolvedValue([]);
   mockedWriteQueue.mockReset();
   mockedApplyConfirmed.mockReset();
@@ -134,6 +151,16 @@ beforeEach(() => {
   mockedMarkUnreachable.mockReset();
   mockedFetchSystemStatus.mockReset().mockResolvedValue(null);
   mockedProbeSystemStatusTransport.mockReset().mockResolvedValue(false);
+  mockedFetchHttpSessionSummary.mockReset().mockResolvedValue({
+    authenticated: true,
+    user: { id: "profile-1", email: null, last_sign_in_at: null },
+    profile: {
+      role: "tenant_account",
+      workspace_id: "ws-1",
+      auth_email: null,
+      is_active: true,
+    },
+  });
 });
 
 afterEach(() => {
@@ -325,23 +352,69 @@ describe("syncBufferedCheckoutQueue", () => {
         created_at: "2026-01-01T00:00:00Z",
         attempts: 0,
         last_error: null,
+        workspace_id: "ws-1",
+        profile_id: "profile-1",
+        device_id: "device-1",
       },
     ]);
 
     const result = await syncBufferedCheckoutQueue();
 
-    expect(result).toMatchObject({ processed: 0, failed: 1, remaining: 1 });
+    expect(result).toMatchObject({ processed: 0, failed: 1, remaining: 1, review: 1 });
     expect(mockedInvoke).not.toHaveBeenCalled();
     expect(mockedWriteQueue).toHaveBeenCalledWith([
-      expect.objectContaining({ id: "q-1", last_error: expect.stringMatching(/manual review/i) }),
+      expect.objectContaining({ id: "q-1", review_required: true, last_error: expect.stringMatching(/manual review/i) }),
+    ]);
+  });
+
+  it("quarantines an unbound legacy item instead of replaying it under the current session", async () => {
+    mockedSyncLedger.mockResolvedValue({ processed: 0, failed: 0, remaining: 0, review: 0 });
+    mockedReadQueue.mockResolvedValue([
+      {
+        id: "q-unbound",
+        payload,
+        created_at: "2026-01-01T00:00:00Z",
+        attempts: 0,
+        last_error: null,
+      },
+    ]);
+
+    const result = await syncBufferedCheckoutQueue();
+
+    expect(result).toEqual({ processed: 0, failed: 1, remaining: 1, review: 1 });
+    expect(mockedInvoke).not.toHaveBeenCalled();
+    expect(mockedWriteQueue).toHaveBeenCalledWith([
+      expect.objectContaining({
+        id: "q-unbound",
+        review_required: true,
+        last_error: expect.stringMatching(/manual review/i),
+      }),
     ]);
   });
 
   it("replays legacy queued items, counting successes and requeuing failures with incremented attempts", async () => {
     mockedSyncLedger.mockResolvedValue({ processed: 0, failed: 0, remaining: 0, review: 0 });
     mockedReadQueue.mockResolvedValue([
-      { id: "q-1", payload: { ...payload, borrower_id: "b-1" }, created_at: "t", attempts: 0, last_error: null },
-      { id: "q-2", payload: { ...payload, borrower_id: "b-2" }, created_at: "t", attempts: 1, last_error: null },
+      {
+        id: "q-1",
+        payload: { ...payload, borrower_id: "b-1" },
+        created_at: "t",
+        attempts: 0,
+        last_error: null,
+        workspace_id: "ws-1",
+        profile_id: "profile-1",
+        device_id: "device-1",
+      },
+      {
+        id: "q-2",
+        payload: { ...payload, borrower_id: "b-2" },
+        created_at: "t",
+        attempts: 1,
+        last_error: null,
+        workspace_id: "ws-1",
+        profile_id: "profile-1",
+        device_id: "device-1",
+      },
     ]);
     mockedInvoke
       .mockResolvedValueOnce(okResponse({ success: true, processed: 1 }) as never)
@@ -353,6 +426,112 @@ describe("syncBufferedCheckoutQueue", () => {
     expect(mockedWriteQueue).toHaveBeenCalledWith([
       expect.objectContaining({ id: "q-2", attempts: 2, last_error: "still down" }),
     ]);
+  });
+
+  it("re-checks the authoritative identity before each legacy replay", async () => {
+    mockedSyncLedger.mockResolvedValue({ processed: 0, failed: 0, remaining: 0, review: 0 });
+    mockedReadQueue.mockResolvedValue([
+      {
+        id: "q-current",
+        payload,
+        created_at: "t",
+        attempts: 0,
+        last_error: null,
+        workspace_id: "ws-1",
+        profile_id: "profile-1",
+        device_id: "device-1",
+      },
+      {
+        id: "q-after-switch",
+        payload: { ...payload, borrower_id: "b-2" },
+        created_at: "t",
+        attempts: 0,
+        last_error: null,
+        workspace_id: "ws-1",
+        profile_id: "profile-1",
+        device_id: "device-1",
+      },
+    ]);
+    mockedFetchHttpSessionSummary
+      .mockResolvedValueOnce({
+        authenticated: true,
+        user: { id: "profile-1", email: null, last_sign_in_at: null },
+        profile: { role: "tenant_account", workspace_id: "ws-1", auth_email: null, is_active: true },
+      })
+      .mockResolvedValueOnce({
+        authenticated: true,
+        user: { id: "profile-2", email: null, last_sign_in_at: null },
+        profile: { role: "tenant_account", workspace_id: "ws-2", auth_email: null, is_active: true },
+      });
+    mockedInvoke.mockResolvedValueOnce(okResponse({ success: true, processed: 1 }) as never);
+
+    const result = await syncBufferedCheckoutQueue();
+
+    expect(result).toEqual({ processed: 1, failed: 1, remaining: 1, review: 1 });
+    expect(mockedInvoke).toHaveBeenCalledTimes(1);
+    expect(mockedWriteQueue).toHaveBeenCalledWith([
+      expect.objectContaining({ id: "q-after-switch", review_required: true }),
+    ]);
+  });
+
+  it("keeps legacy items pending when the authoritative session cannot be read", async () => {
+    mockedSyncLedger.mockResolvedValue({ processed: 0, failed: 0, remaining: 0, review: 0 });
+    mockedReadQueue.mockResolvedValue([
+      {
+        id: "q-pending",
+        payload,
+        created_at: "t",
+        attempts: 0,
+        last_error: null,
+        workspace_id: "ws-1",
+        profile_id: "profile-1",
+        device_id: "device-1",
+      },
+    ]);
+    mockedFetchHttpSessionSummary.mockRejectedValueOnce(new Error("session unavailable"));
+
+    const result = await syncBufferedCheckoutQueue();
+
+    expect(result).toEqual({ processed: 0, failed: 1, remaining: 1, review: 0 });
+    expect(mockedInvoke).not.toHaveBeenCalled();
+    expect(mockedWriteQueue).toHaveBeenCalledWith([
+      expect.objectContaining({
+        id: "q-pending",
+        last_error: expect.stringMatching(/verify.*session/i),
+      }),
+    ]);
+  });
+
+  it("fails closed when the tab identity changes while the authoritative session is loading", async () => {
+    mockedSyncLedger.mockResolvedValue({ processed: 0, failed: 0, remaining: 0, review: 0 });
+    mockedReadQueue.mockResolvedValue([
+      {
+        id: "q-during-switch",
+        payload,
+        created_at: "t",
+        attempts: 0,
+        last_error: null,
+        workspace_id: "ws-1",
+        profile_id: "profile-1",
+        device_id: "device-1",
+      },
+    ]);
+    const tabAuthState = { ...AUTH_SCOPE };
+    mockedGetAuthState.mockImplementation(() => tabAuthState);
+    mockedFetchHttpSessionSummary.mockImplementationOnce(async () => {
+      tabAuthState.userId = "profile-2";
+      tabAuthState.workspaceContextId = "ws-2";
+      return {
+        authenticated: true,
+        user: { id: "profile-1", email: null, last_sign_in_at: null },
+        profile: { role: "tenant_account", workspace_id: "ws-1", auth_email: null, is_active: true },
+      };
+    });
+
+    const result = await syncBufferedCheckoutQueue();
+
+    expect(result).toEqual({ processed: 0, failed: 1, remaining: 1, review: 0 });
+    expect(mockedInvoke).not.toHaveBeenCalled();
   });
 });
 

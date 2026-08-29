@@ -27,6 +27,7 @@ import {
   resolveWorkspaceSlug,
 } from "./sessionBootstrap";
 import { clearLocalSession, sendLoginNotification } from "./workspaceLogin";
+import { quarantineOfflineCheckoutQueueForCurrentSession } from "../offlineCheckoutQueue";
 import { signOut } from "./signOut";
 import {
   clearPendingSuperAdminVerificationEmail,
@@ -132,7 +133,10 @@ export const adminLoginWithSession = async (
     preExchangedSessionSummary?: HttpSessionSummary | null;
   } = {}
 ) => {
-  const priorWorkspaceContextId = getAuthState().workspaceContextId;
+  const priorAuth = getAuthState();
+  const priorIsAuthenticated = priorAuth.isAuthenticated;
+  const priorUserId = priorAuth.userId;
+  const priorWorkspaceContextId = priorAuth.workspaceContextId;
   const workspaceHost = getWorkspaceState();
   const exchangedSessionSummary = sessionTouchOptions.skipExchange
     ? sessionTouchOptions.preExchangedSessionSummary ?? null
@@ -249,6 +253,18 @@ export const adminLoginWithSession = async (
     hasSecondaryAuth: false,
     superVerifiedAt: null,
   });
+
+  if (
+    priorIsAuthenticated &&
+    (priorUserId !== sessionSummary.user.id ||
+      (priorWorkspaceContextId && finalWorkspaceId && priorWorkspaceContextId !== finalWorkspaceId))
+  ) {
+    try {
+      await quarantineOfflineCheckoutQueueForCurrentSession();
+    } catch {
+      // Legacy replay re-checks the authoritative identity before every send.
+    }
+  }
 
   if (resolvedRole === "workspace_admin" && !getAuthState().workspaceContextId) {
     setWorkspaceContext(finalWorkspaceId);

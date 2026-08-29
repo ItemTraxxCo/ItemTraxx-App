@@ -6,6 +6,7 @@ import { fetchHttpSessionSummary } from "../httpSessionService";
 import { signOutLocalSupabaseSession } from "../supabaseAuthSession";
 import { authenticatedRpc, authenticatedSelect } from "../authenticatedDataClient";
 import { toKnownRole, type ProfileRow, type WorkspaceRow } from "./types";
+import { quarantineOfflineCheckoutQueueForCurrentSession } from "../offlineCheckoutQueue";
 const AUTH_QUERY_TIMEOUT_MS=15000;
 const timed=<T>(promise:Promise<T>,label:string)=>withTimeout(promise,AUTH_QUERY_TIMEOUT_MS,label);
 export const fetchCurrentRoleAndWorkspace=async()=>{
@@ -27,8 +28,9 @@ export const applyHttpSessionSummary=async(summary:Awaited<ReturnType<typeof fet
   if(!summary.authenticated||!summary.user){clearAuthState(true);return;}
   const profile:ProfileRow|null=summary.profile?{id:summary.user.id,role:summary.profile.role,workspace_id:summary.profile.workspace_id,auth_email:summary.profile.auth_email,is_active:summary.profile.is_active}:null;
   if(await terminateSuspended(profile)) return;
-  const current=getAuthState(); const same=current.userId===summary.user.id; const role=profile?.role??(same?current.role:null); const workspaceId=profile?.workspace_id??(same?current.sessionWorkspaceId:null);
+  const current=getAuthState(); const same=current.userId===summary.user.id; const previousWorkspaceId=current.workspaceContextId??current.sessionWorkspaceId??null; const workspaceChanged=Boolean(profile?.workspace_id&&previousWorkspaceId&&profile.workspace_id!==previousWorkspaceId); const identityChanged=Boolean(current.isAuthenticated&&(current.userId!==summary.user.id||workspaceChanged)); const role=profile?.role??(same?current.role:null); const workspaceId=profile?.workspace_id??(same?current.sessionWorkspaceId:null);
   setAuthStateFromBackend({isInitialized:true,isAuthenticated:true,userId:summary.user.id,email:summary.user.email,signedInAt:summary.user.last_sign_in_at,role,sessionWorkspaceId:workspaceId,workspaceContextId:workspaceId,hasSecondaryAuth:same&&role==="super_admin"?current.hasSecondaryAuth:false,superVerifiedAt:same&&role==="super_admin"?current.superVerifiedAt:null,adminVerifiedAt:(same?current.adminVerifiedAt:null)??(role==="workspace_admin"?(getPersistedAdminVerification(summary.user.id)??summary.password_authenticated_at):null)}); clearSessionTermination();
+  if(identityChanged){try{await quarantineOfflineCheckoutQueueForCurrentSession();}catch{/* Legacy replay re-checks authoritative identity before every send. */}}
 };
 export const refreshAuthFromSession=async()=>{try{await applyHttpSessionSummary(await timed(fetchHttpSessionSummary(),"Session refresh timed out."));}catch{clearAuthState(true);}};
 export const initAuthListener=()=>{};

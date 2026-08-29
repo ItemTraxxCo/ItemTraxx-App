@@ -18,10 +18,6 @@ vi.mock("../httpSessionService", () => ({
   fetchHttpSessionSummary: vi.fn(),
 }));
 
-vi.mock("../adminOpsService", () => ({
-  touchAccountSession: vi.fn(),
-}));
-
 vi.mock("../auditLogService", () => ({
   logAdminAction: vi.fn(),
 }));
@@ -36,7 +32,6 @@ import { invokeEdgeFunction } from "../edgeFunctionClient";
 import { getWorkspaceState } from "../../store/workspaceState";
 import { getAuthState, setWorkspaceContext } from "../../store/authState";
 import { exchangeHttpSession, fetchHttpSessionSummary } from "../httpSessionService";
-import { touchAccountSession } from "../adminOpsService";
 import { logAdminAction } from "../auditLogService";
 import { applyHttpSessionSummary, resolveWorkspaceSlug } from "./sessionBootstrap";
 
@@ -96,7 +91,6 @@ describe("workspaceLogin", () => {
     vi.mocked(exchangeHttpSession).mockResolvedValue({ authenticated: true, user: { id: "u1", email: "a@b.com", last_sign_in_at: null }, profile: null });
     vi.mocked(applyHttpSessionSummary).mockResolvedValue(undefined);
     vi.mocked(resolveWorkspaceSlug).mockResolvedValue("resolved-slug");
-    vi.mocked(touchAccountSession).mockResolvedValue({ ok: true });
     vi.mocked(logAdminAction).mockResolvedValue(undefined);
   });
 
@@ -122,7 +116,6 @@ describe("workspaceLogin", () => {
     expect(exchangeHttpSession).toHaveBeenCalledWith({ access_token: "at-1", refresh_token: "rt-1" });
     expect(applyHttpSessionSummary).toHaveBeenCalled();
     expect(setWorkspaceContext).toHaveBeenCalledWith("ws-1");
-    expect(touchAccountSession).not.toHaveBeenCalled();
     expect(logAdminAction).not.toHaveBeenCalled();
     // workspace_slug came back from the login response, so resolveWorkspaceSlug is skipped.
     expect(resolveWorkspaceSlug).not.toHaveBeenCalled();
@@ -146,26 +139,18 @@ describe("workspaceLogin", () => {
       error: "",
       data: { access_token: "at-1", refresh_token: "rt-1" },
     });
-    const trackingOrder: string[] = [];
-    vi.mocked(touchAccountSession).mockImplementation(async () => {
-      trackingOrder.push("touch");
-      return { ok: true };
-    });
-    vi.mocked(logAdminAction).mockImplementation(async () => {
-      trackingOrder.push("audit");
-    });
 
     const result = await workspaceLogin("admin@example.com", "hunter2");
 
-    expect(touchAccountSession).toHaveBeenCalledWith({
-      loginMethod: "password",
-      loginLocation: "admin_login",
-    });
+    // Session registration happens on the destination page's login_ctx
+    // handling (see useAdminSessionLifecycle), not here: workspace_admin
+    // logins that aren't already on the workspace subdomain get a full-page
+    // redirect to a different origin, so touching the session on this
+    // (pre-redirect) origin would create an orphan device row.
     expect(logAdminAction).toHaveBeenCalledWith({
       action_type: "admin_login",
       metadata: { email: "admin@example.com" },
     });
-    expect(trackingOrder).toEqual(["touch", "audit"]);
     expect(resolveWorkspaceSlug).toHaveBeenCalledWith("ws-2");
     expect(invokeEdgeFunction).toHaveBeenNthCalledWith(2, "login-notify", {
       method: "POST",
@@ -175,7 +160,7 @@ describe("workspaceLogin", () => {
     expect(result.workspaceSlug).toBe("resolved-slug");
   });
 
-  it("keeps admin login successful when session or audit tracking fails", async () => {
+  it("keeps admin login successful when audit tracking fails", async () => {
     vi.mocked(getAuthState).mockReturnValue({
       role: "workspace_admin",
       sessionWorkspaceId: "ws-2",
@@ -187,13 +172,11 @@ describe("workspaceLogin", () => {
       error: "",
       data: { access_token: "at-1", refresh_token: "rt-1", workspace_slug: "acme" },
     });
-    vi.mocked(touchAccountSession).mockRejectedValueOnce(new Error("tracking unavailable"));
     vi.mocked(logAdminAction).mockRejectedValueOnce(new Error("audit unavailable"));
 
     await expect(workspaceLogin("admin@example.com", "hunter2")).resolves.toMatchObject({
       role: "workspace_admin",
     });
-    expect(touchAccountSession).toHaveBeenCalled();
     expect(logAdminAction).toHaveBeenCalled();
   });
 

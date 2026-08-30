@@ -6,6 +6,7 @@ import {
 import { isRecoverableChunkLoadError } from "./appErrorRecovery";
 import type { CaptureResult } from "posthog-js";
 import { scrubSensitiveRecoveryUrlValue } from "../utils/passwordResetRedirect";
+import { AppError } from "./appErrors";
 
 let initialized = false;
 let posthog: typeof import("posthog-js").default | null = null;
@@ -188,6 +189,12 @@ const isCspUnsafeEvalError = (error: unknown) => {
   );
 };
 
+// PostHog's exception feed has its own policy. Keep the expected borrower/item
+// lookup miss out of it without inheriting Sentry's broader suppression rules
+// for network, auth, and other operational errors.
+const shouldCapturePostHogException = (error: unknown) =>
+  !(error instanceof AppError && error.code === "NOT_FOUND");
+
 // PostHog's exception autocapture installs its own global onerror/onunhandledrejection
 // handlers and reports directly, bypassing the guards in globalErrorHandling.ts and
 // capturePostHogException. Drop the benign CSP unsafe-eval EvalError here too so the
@@ -205,6 +212,31 @@ const isCspUnsafeEvalExceptionEvent = (
       (entry as { type?: unknown }).type === "EvalError" &&
       typeof (entry as { value?: unknown }).value === "string" &&
       isCspUnsafeEvalMessage((entry as { value: string }).value)
+  );
+};
+
+// A script served cross-origin without CORS strips the error the browser hands
+// to window.onerror down to a bare synthetic "Script error." with no message,
+// source, or stack. These entries carry no information to triage, so drop them
+// here. The crossorigin="anonymous" attribute on the Turnstile script
+// (useTurnstile.ts) lets real errors through with a full stack instead.
+const isOpaqueScriptExceptionEvent = (
+  properties?: Record<string, unknown>,
+) => {
+  const exceptionList = properties?.$exception_list;
+  if (!Array.isArray(exceptionList) || exceptionList.length !== 1) return false;
+  const entry = exceptionList[0] as {
+    value?: unknown;
+    stacktrace?: { frames?: unknown[] };
+    mechanism?: { synthetic?: unknown };
+  } | null;
+  if (!entry || typeof entry !== "object") return false;
+  const frames = entry.stacktrace?.frames;
+  return (
+    typeof entry.value === "string" &&
+    entry.value.trim() === "Script error." &&
+    entry.mechanism?.synthetic === true &&
+    (!Array.isArray(frames) || frames.length === 0)
   );
 };
 
@@ -250,7 +282,8 @@ export const initPostHog = async () => {
           safeEvent.event === "$exception" &&
           (
             isCspUnsafeEvalExceptionEvent(safeEvent.properties) ||
-            isRecoverableChunkLoadExceptionEvent(safeEvent.properties)
+            isRecoverableChunkLoadExceptionEvent(safeEvent.properties) ||
+            isOpaqueScriptExceptionEvent(safeEvent.properties)
           )
         ) {
           return null;
@@ -338,12 +371,16 @@ export const resetPostHog = () => {
   }
 };
 
+// A missing borrower/item lookup is an expected operator input outcome, not an
+// exception. Other operational failures still belong in PostHog for diagnosis.
 export const capturePostHogException = (error: unknown) => {
   if (
     !initialized ||
     !posthog ||
+    !allowsAnalytics(readCookieConsent()) ||
     !allowsDiagnostics(readCookieConsent()) ||
-    isCspUnsafeEvalError(error)
+    isCspUnsafeEvalError(error) ||
+    !shouldCapturePostHogException(error)
   ) return;
   try {
     const errorCode = getPostHogErrorCode(error);

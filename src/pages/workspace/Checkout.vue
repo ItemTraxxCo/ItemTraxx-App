@@ -168,7 +168,7 @@ import {
 } from "../../services/checkoutService";
 import { sanitizeInput } from "../../utils/inputSanitizer";
 import { getAuthState } from "../../store/authState";
-import { toUserFacingErrorMessage } from "../../services/appErrors";
+import { AppError, toUserFacingErrorMessage } from "../../services/appErrors";
 import {
   capturePostHogEvent,
   capturePostHogException,
@@ -262,6 +262,13 @@ const downloadReceiptPdf = async () => {
 };
 
 
+// A borrower miss is a product signal, not an exception. Bucket it so typos stay
+// countable without a borrower ID ever leaving the device.
+const borrowerLookupFailureReason = (err: unknown) => {
+  if (!(err instanceof AppError)) return "unknown";
+  return err.code.toLowerCase();
+};
+
 const loadBorrower = async () => {
   error.value = "";
   success.value = "";
@@ -279,13 +286,19 @@ const loadBorrower = async () => {
   try {
     const borrowerRow = await fetchBorrowerByBorrowerId(borrowerId.value.trim());
     borrower.value = borrowerRow;
-    checkedOutItem.value = await fetchCheckedOutItem(borrowerRow.id);
-    await nextTick();
-    barcodeField.value?.focus();
+    try {
+      checkedOutItem.value = await fetchCheckedOutItem(borrowerRow.id);
+      await nextTick();
+      barcodeField.value?.focus();
+    } catch (err) {
+      checkedOutItem.value = [];
+      error.value = toUserFacingErrorMessage(err, "Unable to load checked-out items. Please try again.");
+    }
   } catch (err) {
     borrower.value = null;
     checkedOutItem.value = [];
     error.value = toUserFacingErrorMessage(err, "Borrower not found. Please check the borrower ID and try again.");
+    capturePostHogEvent("checkout_borrower_lookup_failed", { reason: borrowerLookupFailureReason(err) });
   } finally {
     isBorrowerLoading.value = false;
   }

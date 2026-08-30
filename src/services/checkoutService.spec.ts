@@ -666,10 +666,27 @@ describe("fetchBorrowerByBorrowerId", () => {
     expect(result).toMatchObject({ id: "b-1" });
   });
 
-  it("throws 'Borrower not found.' offline when there is no local match", async () => {
+  it("throws a non-reporting NOT_FOUND offline when there is no local match", async () => {
     setOnline(false);
     mockedFindOfflineBorrower.mockResolvedValue(null);
-    await expect(fetchBorrowerByBorrowerId("1234AB")).rejects.toThrow("Borrower not found.");
+    await expect(fetchBorrowerByBorrowerId("1234AB")).rejects.toMatchObject({
+      message: "Borrower not found.",
+      code: "NOT_FOUND",
+      reportToSentry: false,
+    });
+  });
+
+  // The edge function returns this same 404 both for an unknown borrower ID and for a
+  // restricted borrower the caller has no grant for, so neither is an exception.
+  it("keeps an unknown borrower ID out of error tracking as a non-reporting NOT_FOUND", async () => {
+    setOnline(true);
+    mockedInvoke.mockResolvedValue(failResponse(404, "Borrower not found") as never);
+
+    await expect(fetchBorrowerByBorrowerId("1234AB")).rejects.toMatchObject({
+      code: "NOT_FOUND",
+      reportToSentry: false,
+    });
+    expect(mockedFindOfflineBorrower).not.toHaveBeenCalled();
   });
 
   it("returns the borrower on a successful online lookup", async () => {

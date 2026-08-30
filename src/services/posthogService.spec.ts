@@ -7,6 +7,7 @@ vi.mock("./cookieConsentService", () => ({
 }));
 vi.mock("./appErrorRecovery", () => ({
   isRecoverableChunkLoadError: vi.fn(() => false),
+  dispatchRecoverableAppError: vi.fn(),
 }));
 
 const posthogMock = {
@@ -297,6 +298,34 @@ describe("capturePostHogException", () => {
     expect(properties).toEqual({ error_code: "unknown_error" });
   });
 
+  it("drops an expected, non-reporting AppError instead of opening an error tracking issue", async () => {
+    const mod = await initializedModule();
+    // Loaded after initializedModule's resetModules so the AppError class the guard
+    // checks against is the same instance the service imported.
+    const { notFoundError } = await import("./appErrors");
+
+    mod.capturePostHogException(notFoundError("Borrower not found."));
+
+    expect(posthogMock.captureException).not.toHaveBeenCalled();
+  });
+
+  it("captures non-NOT_FOUND AppErrors as a fixed diagnostic code", async () => {
+    const mod = await initializedModule();
+    const { AppError } = await import("./appErrors");
+    const error = new AppError("NETWORK", "Network request failed", { reportToSentry: false });
+
+    mod.capturePostHogException(error);
+
+    const [capturedError, properties] = posthogMock.captureException.mock.calls[0] ?? [];
+    expect(capturedError).toMatchObject({
+      name: "ItemTraxxClientError",
+      message: "network",
+      stack: undefined,
+    });
+    expect(capturedError).not.toBe(error);
+    expect(properties).toEqual({ error_code: "network" });
+  });
+
   it("swallows a thrown captureException error", async () => {
     const mod = await initializedModule();
     posthogMock.captureException.mockImplementationOnce(() => {
@@ -304,6 +333,109 @@ describe("capturePostHogException", () => {
     });
 
     expect(() => mod.capturePostHogException(new Error("boom"))).not.toThrow();
+  });
+});
+
+describe("before_send exception filter", () => {
+  const getBeforeSend = () => {
+    const options = posthogMock.init.mock.calls[0][1] as {
+      before_send: (event: unknown) => unknown;
+    };
+    return options.before_send;
+  };
+
+  const opaqueScriptEvent = {
+    event: "$exception",
+    properties: {
+      $exception_list: [
+        {
+          type: "Error",
+          value: "Script error.",
+          stacktrace: { frames: [] },
+          mechanism: { synthetic: true, handled: false },
+        },
+      ],
+    },
+  };
+
+  it("drops an opaque cross-origin \"Script error.\" exception", async () => {
+    const mod = await initializedModule();
+    void mod;
+
+    expect(getBeforeSend()(opaqueScriptEvent)).toBeNull();
+  });
+
+  it("keeps a \"Script error.\" event that carries a real stack", async () => {
+    const mod = await initializedModule();
+    void mod;
+
+    const event = {
+      event: "$exception",
+      properties: {
+        $exception_list: [
+          {
+            type: "Error",
+            value: "Script error.",
+            stacktrace: { frames: [{ filename: "app.js" }] },
+            mechanism: { synthetic: true },
+          },
+        ],
+      },
+    };
+
+    expect(getBeforeSend()(event)).toMatchObject({
+      event: "$exception",
+      properties: {
+        $exception_list: [{ value: "unknown_error" }],
+      },
+    });
+  });
+
+  it("keeps a non-synthetic \"Script error.\" event", async () => {
+    const mod = await initializedModule();
+    void mod;
+
+    const event = {
+      event: "$exception",
+      properties: {
+        $exception_list: [
+          {
+            type: "Error",
+            value: "Script error.",
+            stacktrace: { frames: [] },
+            mechanism: { synthetic: false },
+          },
+        ],
+      },
+    };
+
+    expect(getBeforeSend()(event)).toMatchObject({
+      event: "$exception",
+      properties: {
+        $exception_list: [{ value: "unknown_error" }],
+      },
+    });
+  });
+
+  it("keeps a regular exception event", async () => {
+    const mod = await initializedModule();
+    void mod;
+
+    const event = {
+      event: "$exception",
+      properties: {
+        $exception_list: [
+          { type: "TypeError", value: "x is not a function", mechanism: { synthetic: false } },
+        ],
+      },
+    };
+
+    expect(getBeforeSend()(event)).toMatchObject({
+      event: "$exception",
+      properties: {
+        $exception_list: [{ value: "unknown_error" }],
+      },
+    });
   });
 });
 

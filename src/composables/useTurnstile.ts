@@ -37,6 +37,10 @@ const ensureTurnstileScript = () => {
     script.src = TURNSTILE_SCRIPT_SRC;
     script.async = true;
     script.defer = true;
+    // Let the browser report full messages and stacks for errors thrown inside
+    // the cross-origin Turnstile script. Without it, such errors reach
+    // window.onerror redacted to a bare synthetic "Script error.".
+    script.crossOrigin = "anonymous";
     script.onload = () => resolve();
     script.onerror = () => reject(new Error("Failed to load Turnstile script."));
     document.head.appendChild(script);

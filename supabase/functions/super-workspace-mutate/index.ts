@@ -5,6 +5,7 @@ import { requireTrustedEdgeIngress } from "../_shared/trustedIngress.ts";
 import { readJsonBody } from "../_shared/requestBody.ts";
 import { hasPrivilegedStepUp } from "../_shared/privilegedStepUp.ts";
 import { isSuperAdminTokenBlockedBySessionRevocation } from "../_shared/superAdminSessions.ts";
+import { writeSuperAdminAudit } from "../_shared/superAdminAudit.ts";
 import {
   optionalText,
   requireEmail,
@@ -159,15 +160,14 @@ serve(async (req) => {
         ? body.payload
         : {}) as Record<string, unknown>;
     const writeAudit = async (actionType: string, workspaceId: string, metadata: Record<string, unknown> = {}) => {
-      const { error } = await admin.from("admin_audit_logs").insert({
-        workspace_id: workspaceId,
-        actor_id: user.id,
-        action_type: actionType,
-        entity_type: "workspace",
-        entity_id: workspaceId,
+      await writeSuperAdminAudit(admin, {
+        actorId: user.id,
+        actorEmail: user.email ?? null,
+        actionType,
+        targetType: "workspace",
+        targetId: workspaceId,
         metadata,
       });
-      if (error) console.error("super-workspace-mutate audit failed", error);
     };
     const load = async (id?: string) => {
       let q = admin.from("workspaces").select(

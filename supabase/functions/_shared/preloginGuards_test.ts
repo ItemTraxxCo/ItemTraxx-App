@@ -1,7 +1,9 @@
 import {
+  enforcePublicRateLimits,
   enforcePreloginRateLimit,
   resolveClientFingerprint,
   resolveClientIp,
+  resolvePublicStatusClient,
   resolveRateLimitResult,
   verifyTurnstileToken,
 } from "./preloginGuards.ts";
@@ -38,6 +40,51 @@ Deno.test("prelogin rate limit uses the service-side RPC contract", async () => 
   assert(observedCall.p_window_seconds === 60, "expected the rate-limit window");
 });
 
+Deno.test("public rate limits add a fixed global budget after the client bucket", async () => {
+  const calls: Array<Record<string, unknown>> = [];
+  const client = {
+    rpc: async (name: string, args: Record<string, unknown>) => {
+      calls.push({ name, ...args });
+      return { data: [{ allowed: true, retry_after_seconds: null }], error: null };
+    },
+  };
+
+  const result = await enforcePublicRateLimits(
+    client,
+    "ip-203-0-113-42",
+    "public-submit",
+    5,
+    3600,
+    120,
+  );
+
+  assert(result.ok, "expected both buckets to allow the request");
+  assert(calls.length === 2, "expected a per-client and global RPC call");
+  assert(calls[0]?.p_key === "ip-203-0-113-42", "expected client key first");
+  assert(calls[0]?.p_scope === "public-submit", "expected client scope");
+  assert(calls[0]?.p_limit === 5, "expected client limit");
+  assert(calls[1]?.p_key === "global", "expected fixed global key");
+  assert(calls[1]?.p_scope === "public-submit:global", "expected global scope");
+  assert(calls[1]?.p_limit === 120, "expected global limit");
+});
+
+Deno.test("public rate limits stop before the global bucket when a client is denied", async () => {
+  const calls: Array<Record<string, unknown>> = [];
+  const client = {
+    rpc: async (name: string, args: Record<string, unknown>) => {
+      calls.push({ name, ...args });
+      return {
+        data: [{ allowed: false, retry_after_seconds: 30 }],
+        error: null,
+      };
+    },
+  };
+
+  const result = await enforcePublicRateLimits(client, "ip-1", "scope", 1, 60, 10);
+  assert(!result.ok, "expected the client bucket denial");
+  assert(calls.length === 1, "expected no global call after a client denial");
+});
+
 Deno.test("resolveClientFingerprint prefers trusted Cloudflare IP", () => {
   const request = new Request("https://example.com", {
     headers: {
@@ -71,6 +118,30 @@ Deno.test("per-IP status buckets keep distinct client addresses separate", () =>
     { trustProxyHeader: true },
   );
   assert(first !== second, "expected distinct client IPs to use distinct buckets");
+});
+
+Deno.test("client fingerprints remain stable when User-Agent changes", () => {
+  const first = resolveClientFingerprint(
+    new Request("https://example.com", {
+      headers: {
+        "cf-connecting-ip": "203.0.113.42",
+        "user-agent": "Browser-A",
+      },
+    }),
+    null,
+    { trustProxyHeader: true },
+  );
+  const second = resolveClientFingerprint(
+    new Request("https://example.com", {
+      headers: {
+        "cf-connecting-ip": "203.0.113.42",
+        "user-agent": "AttackerBot/rotated",
+      },
+    }),
+    null,
+    { trustProxyHeader: true },
+  );
+  assert(first === second, "expected User-Agent changes to keep one client bucket");
 });
 
 Deno.test("resolveClientFingerprint does not fall back to user-agent", () => {
@@ -114,6 +185,41 @@ Deno.test("resolveClientIp trims and returns the trusted Cloudflare header", () 
 Deno.test("resolveClientIp returns empty string when header is absent", () => {
   const request = new Request("https://example.com");
   assert(resolveClientIp(request) === "", "expected empty client IP fallback");
+});
+
+Deno.test("public status identity ignores forged IP headers for direct callers", () => {
+  const client = resolvePublicStatusClient(
+    new Request("https://example.com", {
+      headers: { "cf-connecting-ip": "203.0.113.42" },
+    }),
+    false,
+  );
+  assert(client.key.startsWith("status-"), "expected a server-issued direct identity");
+  assert(client.setCookie?.includes("itx-status-client=") === true, "expected a client cookie");
+  assert(!client.key.includes("203-0-113-42"), "must not use an untrusted IP");
+});
+
+Deno.test("public status identity remains stable for a valid direct client cookie", () => {
+  const first = resolvePublicStatusClient(new Request("https://example.com"), false);
+  const cookie = first.setCookie?.split(";", 1)[0];
+  if (!cookie) throw new Error("expected a status client cookie");
+  const second = resolvePublicStatusClient(
+    new Request("https://example.com", { headers: { cookie } }),
+    false,
+  );
+  assert(second.key === first.key, "expected the issued cookie to keep one bucket");
+  assert(!second.setCookie, "must not rotate a valid client cookie");
+});
+
+Deno.test("public status identity uses the Cloudflare IP only after trusted ingress", () => {
+  const client = resolvePublicStatusClient(
+    new Request("https://example.com", {
+      headers: { "cf-connecting-ip": "203.0.113.42" },
+    }),
+    true,
+  );
+  assert(client.key === "ip-203-0-113-42", "expected the trusted edge IP bucket");
+  assert(!client.setCookie, "trusted edge callers do not need a nonce cookie");
 });
 
 Deno.test("prelogin rate limit surfaces RPC errors", async () => {

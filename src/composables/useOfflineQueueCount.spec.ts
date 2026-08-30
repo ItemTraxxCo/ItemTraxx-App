@@ -7,16 +7,16 @@ import { useOfflineQueueCount } from "./useOfflineQueueCount";
 // a tenant-scoped route needs the badge. Mock both at the module boundary so we
 // control the counts without touching real storage/crypto.
 vi.mock("../services/offlineCheckoutQueue", () => ({
-  getBufferedCheckoutCount: vi.fn(),
+  getOfflineQueueSummary: vi.fn(),
 }));
 vi.mock("../services/offlineCheckoutWorkflow", () => ({
   getOfflineWorkflowSummary: vi.fn(),
 }));
 
-import { getBufferedCheckoutCount } from "../services/offlineCheckoutQueue";
+import { getOfflineQueueSummary } from "../services/offlineCheckoutQueue";
 import { getOfflineWorkflowSummary } from "../services/offlineCheckoutWorkflow";
 
-const mockedGetBufferedCheckoutCount = vi.mocked(getBufferedCheckoutCount);
+const mockedGetOfflineQueueSummary = vi.mocked(getOfflineQueueSummary);
 const mockedGetOfflineWorkflowSummary = vi.mocked(getOfflineWorkflowSummary);
 
 const emptySummary = {
@@ -24,6 +24,12 @@ const emptySummary = {
   packExpired: false,
   pendingCount: 0,
   syncingCount: 0,
+  reviewCount: 0,
+};
+
+const emptyLegacySummary = {
+  totalCount: 0,
+  pendingCount: 0,
   reviewCount: 0,
 };
 
@@ -41,7 +47,7 @@ const mountHost = (isTenantScopedRoute: Ref<boolean>) => {
 
 describe("useOfflineQueueCount", () => {
   beforeEach(() => {
-    mockedGetBufferedCheckoutCount.mockReset();
+    mockedGetOfflineQueueSummary.mockReset();
     mockedGetOfflineWorkflowSummary.mockReset();
     document.dispatchEvent(new Event("visibilitychange")); // no-op safety, keeps state real
   });
@@ -55,12 +61,12 @@ describe("useOfflineQueueCount", () => {
     const { wrapper } = mountHost(isTenantScopedRoute);
     await nextTick();
 
-    expect(mockedGetBufferedCheckoutCount).not.toHaveBeenCalled();
+    expect(mockedGetOfflineQueueSummary).not.toHaveBeenCalled();
     wrapper.unmount();
   });
 
   it("sums the legacy buffered count with the workflow's pending + review counts once mounted on a tenant-scoped route", async () => {
-    mockedGetBufferedCheckoutCount.mockResolvedValue(2);
+    mockedGetOfflineQueueSummary.mockResolvedValue({ ...emptyLegacySummary, totalCount: 2, pendingCount: 2 });
     mockedGetOfflineWorkflowSummary.mockResolvedValue({ ...emptySummary, pendingCount: 3, reviewCount: 1, syncingCount: 1 });
 
     const isTenantScopedRoute = ref(true);
@@ -68,11 +74,12 @@ describe("useOfflineQueueCount", () => {
 
     await vi.waitFor(() => expect(get().count.value).toBe(6)); // 2 legacy + 3 pending + 1 review
     expect(get().syncingCount.value).toBe(1);
+    expect(get().reviewCount.value).toBe(1);
     wrapper.unmount();
   });
 
   it("resets to zero and stops polling when the route stops being tenant-scoped", async () => {
-    mockedGetBufferedCheckoutCount.mockResolvedValue(4);
+    mockedGetOfflineQueueSummary.mockResolvedValue({ ...emptyLegacySummary, totalCount: 4, pendingCount: 4 });
     mockedGetOfflineWorkflowSummary.mockResolvedValue({ ...emptySummary, pendingCount: 0 });
 
     const isTenantScopedRoute = ref(true);
@@ -84,11 +91,12 @@ describe("useOfflineQueueCount", () => {
 
     expect(get().count.value).toBe(0);
     expect(get().syncingCount.value).toBe(0);
+    expect(get().reviewCount.value).toBe(0);
     wrapper.unmount();
   });
 
   it("resets to zero on any refresh failure instead of surfacing a stale or partial count", async () => {
-    mockedGetBufferedCheckoutCount.mockRejectedValue(new Error("storage unavailable"));
+    mockedGetOfflineQueueSummary.mockRejectedValue(new Error("storage unavailable"));
     mockedGetOfflineWorkflowSummary.mockResolvedValue(emptySummary);
 
     const isTenantScopedRoute = ref(true);
@@ -97,30 +105,31 @@ describe("useOfflineQueueCount", () => {
     await vi.waitFor(() => expect(mockedGetOfflineWorkflowSummary).toHaveBeenCalled());
     expect(get().count.value).toBe(0);
     expect(get().syncingCount.value).toBe(0);
+    expect(get().reviewCount.value).toBe(0);
     wrapper.unmount();
   });
 
   it("re-polls on a storage event for the offline buffer key and ignores unrelated storage events", async () => {
-    mockedGetBufferedCheckoutCount.mockResolvedValue(1);
+    mockedGetOfflineQueueSummary.mockResolvedValue({ ...emptyLegacySummary, totalCount: 1, pendingCount: 1 });
     mockedGetOfflineWorkflowSummary.mockResolvedValue(emptySummary);
 
     const isTenantScopedRoute = ref(true);
     const { wrapper, get } = mountHost(isTenantScopedRoute);
     await vi.waitFor(() => expect(get().count.value).toBe(1));
-    const callsBefore = mockedGetBufferedCheckoutCount.mock.calls.length;
+    const callsBefore = mockedGetOfflineQueueSummary.mock.calls.length;
 
     window.dispatchEvent(new StorageEvent("storage", { key: "some-unrelated-key" }));
     await nextTick();
-    expect(mockedGetBufferedCheckoutCount.mock.calls.length).toBe(callsBefore);
+    expect(mockedGetOfflineQueueSummary.mock.calls.length).toBe(callsBefore);
 
     window.dispatchEvent(new StorageEvent("storage", { key: "itemtraxx:checkout-offline-buffer:v1" }));
-    await vi.waitFor(() => expect(mockedGetBufferedCheckoutCount.mock.calls.length).toBe(callsBefore + 1));
+    await vi.waitFor(() => expect(mockedGetOfflineQueueSummary.mock.calls.length).toBe(callsBefore + 1));
 
     wrapper.unmount();
   });
 
   it("re-polls when the offline-workflow-changed event fires", async () => {
-    mockedGetBufferedCheckoutCount.mockResolvedValue(0);
+    mockedGetOfflineQueueSummary.mockResolvedValue(emptyLegacySummary);
     mockedGetOfflineWorkflowSummary.mockResolvedValue(emptySummary);
 
     const isTenantScopedRoute = ref(true);
@@ -134,8 +143,23 @@ describe("useOfflineQueueCount", () => {
     wrapper.unmount();
   });
 
+  it("re-polls when a legacy queue review item is created or discarded", async () => {
+    mockedGetOfflineQueueSummary.mockResolvedValue(emptyLegacySummary);
+    mockedGetOfflineWorkflowSummary.mockResolvedValue(emptySummary);
+
+    const isTenantScopedRoute = ref(true);
+    const { wrapper } = mountHost(isTenantScopedRoute);
+    await vi.waitFor(() => expect(mockedGetOfflineQueueSummary).toHaveBeenCalled());
+    const callsBefore = mockedGetOfflineQueueSummary.mock.calls.length;
+
+    window.dispatchEvent(new CustomEvent("itemtraxx:offline-queue-changed"));
+    await vi.waitFor(() => expect(mockedGetOfflineQueueSummary.mock.calls.length).toBe(callsBefore + 1));
+
+    wrapper.unmount();
+  });
+
   it("stops polling when the tab becomes hidden and resumes when it becomes visible again", async () => {
-    mockedGetBufferedCheckoutCount.mockResolvedValue(0);
+    mockedGetOfflineQueueSummary.mockResolvedValue(emptyLegacySummary);
     mockedGetOfflineWorkflowSummary.mockResolvedValue(emptySummary);
 
     const isTenantScopedRoute = ref(true);
@@ -165,7 +189,7 @@ describe("useOfflineQueueCount", () => {
   });
 
   it("removes its listeners and stops the poll timer on unmount", async () => {
-    mockedGetBufferedCheckoutCount.mockResolvedValue(0);
+    mockedGetOfflineQueueSummary.mockResolvedValue(emptyLegacySummary);
     mockedGetOfflineWorkflowSummary.mockResolvedValue(emptySummary);
     const removeEventListenerSpy = vi.spyOn(window, "removeEventListener");
 
@@ -176,6 +200,7 @@ describe("useOfflineQueueCount", () => {
     wrapper.unmount();
 
     expect(removeEventListenerSpy).toHaveBeenCalledWith("storage", expect.any(Function));
+    expect(removeEventListenerSpy).toHaveBeenCalledWith("itemtraxx:offline-queue-changed", expect.any(Function));
     expect(removeEventListenerSpy).toHaveBeenCalledWith("itemtraxx:offline-workflow-changed", expect.any(Function));
   });
 });

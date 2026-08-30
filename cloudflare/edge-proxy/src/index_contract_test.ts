@@ -136,8 +136,10 @@ Deno.test("session exchange validates the user/profile and emits exact configure
     assertEquals(setCookies(response), [
       "itx_session=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Strict",
       "itx_refresh=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Strict",
-      `itx_session=${accessToken}; Path=/; Max-Age=3600; HttpOnly; Secure; SameSite=Strict; Domain=.itemtraxx.com`,
-      "itx_refresh=refresh%2Ftoken; Path=/; Max-Age=1209600; HttpOnly; Secure; SameSite=Strict; Domain=.itemtraxx.com",
+      "itx_session=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Strict; Domain=.itemtraxx.com",
+      "itx_refresh=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Strict; Domain=.itemtraxx.com",
+      `__Host-itx_session=${accessToken}; Path=/; Max-Age=3600; HttpOnly; Secure; SameSite=Strict`,
+      "__Host-itx_refresh=refresh%2Ftoken; Path=/; Max-Age=1209600; HttpOnly; Secure; SameSite=Strict",
     ], "exchange cookies");
   } finally {
     globalThis.fetch = originalFetch;
@@ -223,34 +225,38 @@ Deno.test("session refresh rotates cookies and rejects invalid or expired refres
   try {
     const success = await worker.fetch(
       sessionMutation("refresh", undefined, {
-        cookie: "itx_refresh=old-refresh",
+        cookie: "__Host-itx_refresh=old-refresh",
       }),
       baseEnv(),
       createContext().ctx,
     );
     assertEquals(success.status, 200, "refresh status");
     assertEquals(setCookies(success), [
-      "itx_session=new-access; Path=/; Max-Age=3600; HttpOnly; Secure; SameSite=Lax",
-      "itx_refresh=new-refresh; Path=/; Max-Age=1209600; HttpOnly; Secure; SameSite=Lax",
+      "itx_session=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Lax",
+      "itx_refresh=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Lax",
+      "itx_session=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Lax; Domain=.itemtraxx.com",
+      "itx_refresh=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Lax; Domain=.itemtraxx.com",
+      "__Host-itx_session=new-access; Path=/; Max-Age=3600; HttpOnly; Secure; SameSite=Lax",
+      "__Host-itx_refresh=new-refresh; Path=/; Max-Age=1209600; HttpOnly; Secure; SameSite=Lax",
     ], "rotated cookies");
 
     mode = "invalid";
     const expired = await worker.fetch(
-      sessionMutation("refresh", undefined, { cookie: "itx_refresh=expired" }),
+      sessionMutation("refresh", undefined, { cookie: "__Host-itx_refresh=expired" }),
       baseEnv(),
       createContext().ctx,
     );
     assertEquals(expired.status, 401, "expired refresh status");
     assertEquals(setCookies(expired), [
-      "itx_session=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Lax",
-      "itx_refresh=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Lax",
+      "__Host-itx_session=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Lax",
+      "__Host-itx_refresh=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Lax",
     ], "expired refresh clears cookies");
   } finally {
     globalThis.fetch = originalFetch;
   }
 });
 
-Deno.test("session me refreshes a missing access token and logout remains best effort", async () => {
+Deno.test("session me refreshes a missing access token and logout fails closed on upstream errors", async () => {
   const originalFetch = globalThis.fetch;
   const calls: Array<{ url: string; init?: RequestInit }> = [];
   globalThis.fetch = ((input: string | URL | Request, init?: RequestInit) => {
@@ -282,7 +288,7 @@ Deno.test("session me refreshes a missing access token and logout remains best e
         headers: {
           origin: ORIGIN,
           "cf-connecting-ip": "203.0.113.42",
-          cookie: "itx_refresh=refresh",
+          cookie: "__Host-itx_refresh=refresh",
         },
       }),
       baseEnv(),
@@ -295,26 +301,30 @@ Deno.test("session me refreshes a missing access token and logout remains best e
       "me authenticated",
     );
     assertEquals(setCookies(me), [
-      "itx_session=fresh-access; Path=/; Max-Age=3600; HttpOnly; Secure; SameSite=Lax",
-      "itx_refresh=fresh-refresh; Path=/; Max-Age=1209600; HttpOnly; Secure; SameSite=Lax",
+      "itx_session=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Lax",
+      "itx_refresh=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Lax",
+      "itx_session=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Lax; Domain=.itemtraxx.com",
+      "itx_refresh=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Lax; Domain=.itemtraxx.com",
+      "__Host-itx_session=fresh-access; Path=/; Max-Age=3600; HttpOnly; Secure; SameSite=Lax",
+      "__Host-itx_refresh=fresh-refresh; Path=/; Max-Age=1209600; HttpOnly; Secure; SameSite=Lax",
     ], "me refresh cookies");
 
     const logout = await worker.fetch(
       sessionMutation("logout", undefined, {
-        cookie: "itx_session=access; itx_refresh=refresh",
+        cookie: "__Host-itx_session=access; __Host-itx_refresh=refresh",
       }),
       baseEnv(),
       createContext().ctx,
     );
-    assertEquals(logout.status, 200, "best effort logout status");
+    assertEquals(logout.status, 503, "failed logout status");
     assertEquals(
       await logout.json(),
-      { ok: true },
-      "best effort logout payload",
+      { error: "Unable to complete logout" },
+      "failed logout payload",
     );
     assertEquals(setCookies(logout), [
-      "itx_session=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Lax",
-      "itx_refresh=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Lax",
+      "__Host-itx_session=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Lax",
+      "__Host-itx_refresh=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Lax",
     ], "logout cookies");
   } finally {
     globalThis.fetch = originalFetch;
@@ -616,7 +626,7 @@ Deno.test("function proxy retries one upstream 401 after a fail-closed refresh",
         headers: {
           origin: ORIGIN,
           "cf-connecting-ip": "203.0.113.42",
-          cookie: "itx_session=old-access; itx_refresh=old-refresh",
+          cookie: "__Host-itx_session=old-access; __Host-itx_refresh=old-refresh",
         },
       }),
       baseEnv(),
@@ -630,8 +640,12 @@ Deno.test("function proxy retries one upstream 401 after a fail-closed refresh",
       "refresh retry authorization",
     );
     assertEquals(setCookies(response), [
-      "itx_session=new-access; Path=/; Max-Age=3600; HttpOnly; Secure; SameSite=Lax",
-      "itx_refresh=new-refresh; Path=/; Max-Age=1209600; HttpOnly; Secure; SameSite=Lax",
+      "itx_session=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Lax",
+      "itx_refresh=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Lax",
+      "itx_session=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Lax; Domain=.itemtraxx.com",
+      "itx_refresh=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Lax; Domain=.itemtraxx.com",
+      "__Host-itx_session=new-access; Path=/; Max-Age=3600; HttpOnly; Secure; SameSite=Lax",
+      "__Host-itx_refresh=new-refresh; Path=/; Max-Age=1209600; HttpOnly; Secure; SameSite=Lax",
     ], "refresh retry cookies");
   } finally {
     globalThis.fetch = originalFetch;

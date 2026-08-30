@@ -3,6 +3,7 @@ import { computed, onMounted, onScopeDispose, ref, toValue, watch, type MaybeRef
 export const useOfflineQueueCount = (isTenantScopedRoute: MaybeRefOrGetter<boolean>) => {
   const count = ref(0);
   const syncingCount = ref(0);
+  const reviewCount = ref(0);
   let pollTimer: number | null = null;
   const tooltip = computed(
     () =>
@@ -18,22 +19,25 @@ export const useOfflineQueueCount = (isTenantScopedRoute: MaybeRefOrGetter<boole
     if (!toValue(isTenantScopedRoute)) {
       count.value = 0;
       syncingCount.value = 0;
+      reviewCount.value = 0;
       return;
     }
     try {
-      const [{ getBufferedCheckoutCount }, { getOfflineWorkflowSummary }] = await Promise.all([
+      const [{ getOfflineQueueSummary }, { getOfflineWorkflowSummary }] = await Promise.all([
         import("../services/offlineCheckoutQueue"),
         import("../services/offlineCheckoutWorkflow"),
       ]);
-      const [legacyCount, workflow] = await Promise.all([
-        getBufferedCheckoutCount(),
+      const [legacy, workflow] = await Promise.all([
+        getOfflineQueueSummary(),
         getOfflineWorkflowSummary(),
       ]);
-      count.value = legacyCount + workflow.pendingCount + workflow.reviewCount;
+      count.value = legacy.totalCount + workflow.pendingCount + workflow.reviewCount;
       syncingCount.value = workflow.syncingCount;
+      reviewCount.value = legacy.reviewCount + workflow.reviewCount;
     } catch {
       count.value = 0;
       syncingCount.value = 0;
+      reviewCount.value = 0;
     }
   };
 
@@ -42,6 +46,7 @@ export const useOfflineQueueCount = (isTenantScopedRoute: MaybeRefOrGetter<boole
       stop();
       count.value = 0;
       syncingCount.value = 0;
+      reviewCount.value = 0;
       return;
     }
     void refresh();
@@ -68,6 +73,7 @@ export const useOfflineQueueCount = (isTenantScopedRoute: MaybeRefOrGetter<boole
 
   onMounted(() => {
     window.addEventListener("storage", handleStorage);
+    window.addEventListener("itemtraxx:offline-queue-changed", handleWorkflowChange);
     window.addEventListener("itemtraxx:offline-workflow-changed", handleWorkflowChange);
     document.addEventListener("visibilitychange", handleVisibility);
     start();
@@ -76,9 +82,10 @@ export const useOfflineQueueCount = (isTenantScopedRoute: MaybeRefOrGetter<boole
   onScopeDispose(() => {
     stop();
     window.removeEventListener("storage", handleStorage);
+    window.removeEventListener("itemtraxx:offline-queue-changed", handleWorkflowChange);
     window.removeEventListener("itemtraxx:offline-workflow-changed", handleWorkflowChange);
     document.removeEventListener("visibilitychange", handleVisibility);
   });
 
-  return { count, syncingCount, refresh, start, stop, tooltip };
+  return { count, syncingCount, reviewCount, refresh, start, stop, tooltip };
 };

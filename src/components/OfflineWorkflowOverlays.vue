@@ -26,7 +26,7 @@
       <h2 id="offline-review-title">{{ reviewEntries.length }} transaction{{ reviewEntries.length === 1 ? "" : "s" }} need review</h2>
       <p>Choose which state ItemTraxx should keep for every unresolved transaction.</p>
       <div class="offline-review-list">
-        <article v-for="entry in reviewEntries" :key="entry.id" class="offline-review-entry">
+        <article v-for="entry in reviewEntries" :key="`modern-${entry.id}`" class="offline-review-entry">
           <button type="button" class="offline-review-row" :aria-expanded="expandedId === entry.id" @click="expandedId = expandedId === entry.id ? null : entry.id">
             <span class="offline-review-chevron" aria-hidden="true">›</span>
             <span>
@@ -78,10 +78,49 @@
       </div>
     </div>
   </div>
+
+  <div v-else-if="legacyReviewItems.length" class="version-update-fullscreen offline-review-overlay" role="dialog" aria-modal="true" aria-labelledby="legacy-offline-review-title">
+    <div class="version-update-card offline-review-card offline-legacy-review-card">
+      <p class="version-update-eyebrow">Legacy Offline Transactions</p>
+      <h2 id="legacy-offline-review-title">{{ legacyReviewItems.length }} transaction{{ legacyReviewItems.length === 1 ? "" : "s" }} need review</h2>
+      <p>These older records are not bound to an account and cannot be replayed safely under the current session. Discard each record; if the work is still needed, start a new transaction manually.</p>
+      <div class="offline-review-list">
+        <article v-for="item in legacyReviewItems" :key="`legacy-${item.id}`" class="offline-review-entry">
+          <div class="offline-review-row offline-legacy-review-row">
+            <span class="offline-review-chevron" aria-hidden="true">•</span>
+            <span>
+              <strong>{{ legacyActionLabel(item.action_type) }} · {{ item.item_count }} item{{ item.item_count === 1 ? "" : "s" }}</strong>
+              <small>Legacy record requires manual review{{ item.created_at ? ` · Recorded ${formatTime(item.created_at)}` : "" }}</small>
+            </span>
+          </div>
+          <p v-if="legacyEntryError[item.id]" class="error">{{ legacyEntryError[item.id] }}</p>
+          <div class="offline-overlay-actions offline-legacy-review-actions">
+            <button
+              type="button"
+              class="button-primary"
+              :disabled="legacyResolvingId === item.id"
+              @click="discardLegacy(item, true)"
+            >
+              {{ legacyResolvingId === item.id ? "Discarding…" : "Discard and start a new transaction" }}
+            </button>
+            <button
+              type="button"
+              class="button-secondary"
+              :disabled="legacyResolvingId === item.id"
+              @click="discardLegacy(item, false)"
+            >
+              Discard transaction
+            </button>
+          </div>
+        </article>
+      </div>
+    </div>
+  </div>
 </template>
 
 <script setup lang="ts">
-import { onMounted, onScopeDispose, ref, watch } from "vue";
+import { computed, onMounted, onScopeDispose, ref, watch } from "vue";
+import { useRouter } from "vue-router";
 import {
   getOfflineWorkflowSummary,
   listOfflineReviewEntries,
@@ -89,8 +128,16 @@ import {
   syncOfflineCheckoutLedger,
   type OfflineLedgerEntry,
 } from "../services/offlineCheckoutWorkflow";
+import {
+  discardOfflineQueueReviewItem,
+  listOfflineQueueReviewItems,
+  type OfflineQueueReviewAction,
+  type OfflineQueueReviewItem,
+} from "../services/offlineCheckoutQueue";
 import { acknowledgeOfflineWarning, getOfflineWarningThreshold } from "../services/offlineConnectionState";
 import { toUserFacingErrorMessage } from "../services/appErrors";
+import { getAuthState } from "../store/authState";
+import { getOrCreateDeviceSession } from "../utils/deviceSession";
 
 const props = defineProps<{ enabled: boolean }>();
 
@@ -102,17 +149,52 @@ const expandedId = ref<string | null>(null);
 const resolvingId = ref<string | null>(null);
 const entryError = ref<Record<string, string>>({});
 const selectedResolution = ref<Record<string, "keep_server" | "apply_offline">>({});
+const legacyReviewItems = ref<OfflineQueueReviewItem[]>([]);
+const legacyResolvingId = ref<string | null>(null);
+const legacyEntryError = ref<Record<string, string>>({});
+const auth = getAuthState();
+const router = useRouter();
 let pollTimer: number | null = null;
+
+const legacyReviewEnabled = computed(() =>
+  props.enabled &&
+  auth.isAuthenticated &&
+  !!auth.workspaceContextId &&
+  (auth.role === "tenant_account" || auth.role === "workspace_admin"),
+);
+
+const authScopeKey = () => {
+  let deviceId = "";
+  try {
+    deviceId = getOrCreateDeviceSession().deviceId;
+  } catch {
+    // Storage/device availability is handled by the queue API; keep stale UI out
+    // of scope transitions even when the device identifier cannot be read here.
+  }
+  return `${auth.isAuthenticated}:${auth.userId ?? ""}:${auth.workspaceContextId ?? ""}:${auth.role ?? ""}:${deviceId}`;
+};
 
 const refresh = async () => {
   if (!props.enabled) {
     warningHours.value = null;
     reviewEntries.value = [];
+    legacyReviewItems.value = [];
     return;
   }
-  const summary = await getOfflineWorkflowSummary();
+  const scopeAtStart = authScopeKey();
+  const [summary, modernEntries, legacyEntries] = await Promise.all([
+    getOfflineWorkflowSummary(),
+    listOfflineReviewEntries(),
+    legacyReviewEnabled.value ? listOfflineQueueReviewItems() : Promise.resolve([]),
+  ]);
+  if (scopeAtStart !== authScopeKey()) {
+    reviewEntries.value = [];
+    legacyReviewItems.value = [];
+    return;
+  }
   warningHours.value = summary.pack ? getOfflineWarningThreshold() : null;
-  reviewEntries.value = await listOfflineReviewEntries();
+  reviewEntries.value = modernEntries;
+  legacyReviewItems.value = legacyEntries;
   if (!expandedId.value && reviewEntries.value[0]) expandedId.value = reviewEntries.value[0].id;
 };
 
@@ -157,6 +239,32 @@ const confirmResolution = async (id: string) => {
   if (resolution) await resolve(id, resolution);
 };
 
+const legacyActionLabel = (action: OfflineQueueReviewAction) => {
+  if (action === "checkout") return "Checkout";
+  if (action === "return") return "Return";
+  if (action === "quick_return") return "Quick return";
+  if (action === "automatic") return "Automatic transaction";
+  return "Offline transaction";
+};
+
+const discardLegacy = async (item: OfflineQueueReviewItem, startNewTransaction: boolean) => {
+  if (!window.confirm("This legacy transaction cannot be replayed safely. Discard it from this device?")) return;
+  legacyResolvingId.value = item.id;
+  legacyEntryError.value = { ...legacyEntryError.value, [item.id]: "" };
+  try {
+    await discardOfflineQueueReviewItem(item.id);
+    await refresh();
+    if (startNewTransaction) await router.push("/checkout");
+  } catch (error) {
+    legacyEntryError.value = {
+      ...legacyEntryError.value,
+      [item.id]: toUserFacingErrorMessage(error, "Unable to discard this legacy transaction."),
+    };
+  } finally {
+    legacyResolvingId.value = null;
+  }
+};
+
 const formatTime = (value: string | null | undefined) => {
   if (!value) return "Not available";
   const date = new Date(value);
@@ -196,16 +304,25 @@ const serverStateTimeLabel = (value: unknown) => {
 
 const handleChange = () => void refresh();
 watch(() => props.enabled, () => void refresh());
+watch(authScopeKey, (next, previous) => {
+  if (next === previous) return;
+  reviewEntries.value = [];
+  legacyReviewItems.value = [];
+  expandedId.value = null;
+  void refresh();
+});
 onMounted(() => {
   void refresh();
   pollTimer = window.setInterval(() => void refresh(), 30_000);
   window.addEventListener("online", handleChange);
+  window.addEventListener("itemtraxx:offline-queue-changed", handleChange);
   window.addEventListener("itemtraxx:offline-workflow-changed", handleChange);
   window.addEventListener("itemtraxx:offline-connection-changed", handleChange);
 });
 onScopeDispose(() => {
   if (pollTimer) window.clearInterval(pollTimer);
   window.removeEventListener("online", handleChange);
+  window.removeEventListener("itemtraxx:offline-queue-changed", handleChange);
   window.removeEventListener("itemtraxx:offline-workflow-changed", handleChange);
   window.removeEventListener("itemtraxx:offline-connection-changed", handleChange);
 });
@@ -221,6 +338,11 @@ onScopeDispose(() => {
 .offline-review-list { display: grid; gap: 0.65rem; margin-top: 1rem; }
 .offline-review-entry { overflow: hidden; border: 1px solid var(--border); border-radius: 14px; background: var(--surface); }
 .offline-review-row { width: 100%; display: grid; grid-template-columns: auto 1fr; gap: 0.7rem; align-items: start; padding: 0.85rem; border: 0; background: transparent; color: inherit; text-align: left; cursor: pointer; }
+.offline-legacy-review-row { cursor: default; }
+.offline-legacy-review-row .offline-review-chevron { font-size: 1rem; line-height: 1.4; }
+.offline-legacy-review-actions { padding: 0 0.85rem 0.85rem 2.9rem; }
+.offline-legacy-review-actions button { flex: 1 1 14rem; }
+.offline-legacy-review-card > p:not(.version-update-eyebrow) { max-width: 62rem; }
 .offline-review-row span:nth-child(2) { display: grid; gap: 0.2rem; }
 .offline-review-row small, .offline-review-comparison span, .offline-review-comparison small { color: var(--muted); }
 .offline-review-chevron { font-size: 1.5rem; line-height: 1; transform: rotate(0deg); transition: transform 150ms ease; }

@@ -59,6 +59,10 @@ vi.mock("./workspaceLogin", () => ({
   sendLoginNotification: vi.fn(),
 }));
 
+vi.mock("../offlineCheckoutQueue", () => ({
+  quarantineOfflineCheckoutQueueForCurrentSession: vi.fn(),
+}));
+
 vi.mock("./signOut", () => ({
   signOut: vi.fn(),
 }));
@@ -100,6 +104,7 @@ import {
   resolveWorkspaceSlug,
 } from "./sessionBootstrap";
 import { sendLoginNotification } from "./workspaceLogin";
+import { quarantineOfflineCheckoutQueueForCurrentSession } from "../offlineCheckoutQueue";
 import { signOut } from "./signOut";
 import {
   clearPendingSuperAdminVerificationEmail,
@@ -273,6 +278,7 @@ describe("adminLoginWithSession", () => {
     vi.mocked(registerPrivilegedAdminStepUp).mockResolvedValue({ registered: true, expires_at: "x" });
     vi.mocked(resolveWorkspaceSlug).mockResolvedValue("acme");
     vi.mocked(touchAccountSession).mockResolvedValue({ ok: true });
+    vi.mocked(quarantineOfflineCheckoutQueueForCurrentSession).mockResolvedValue(0);
   });
 
   it("logs an admin in end to end: exchanges the session, verifies the workspace, and sets auth state", async () => {
@@ -295,6 +301,18 @@ describe("adminLoginWithSession", () => {
       accessToken: "at-1",
       refreshToken: "rt-1",
     });
+  });
+
+  it("quarantines legacy offline entries when the authenticated admin changes", async () => {
+    vi.mocked(getAuthState).mockReturnValue({
+      isAuthenticated: true,
+      userId: "previous-user",
+      workspaceContextId: "ws-1",
+    } as never);
+
+    await adminLoginWithSession("at-1", "rt-1");
+
+    expect(quarantineOfflineCheckoutQueueForCurrentSession).toHaveBeenCalledTimes(1);
   });
 
   it("skips the exchange and clearLocalSession when skipExchange is set with a pre-exchanged summary", async () => {

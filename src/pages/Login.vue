@@ -275,6 +275,13 @@ const getSignInErrorMessage = (message: string) => {
   return null;
 };
 
+const getLoginErrorCode = (message: string) => {
+  const normalized = message.trim().toLowerCase();
+  if (normalized.includes("timed out")) return "timeout";
+  if (getSignInErrorMessage(message)) return "invalid_credentials";
+  return "authentication_failed";
+};
+
 const handleLogin = async () => {
   error.value = "";
   isLoading.value = true;
@@ -356,13 +363,13 @@ const handleLogin = async () => {
       error.value = "";
       showToast("Sign in failed.", signInErrorMessage);
       void runPostHog(({ capturePostHogEvent }) =>
-        capturePostHogEvent("login_failed", { error_type: errorMessage })
+        capturePostHogEvent("login_failed", { error_code: getLoginErrorCode(errorMessage) })
       );
       return;
     }
     void runPostHog(({ capturePostHogEvent }) =>
       // The role is intentionally unknown for failed authentication attempts.
-      capturePostHogEvent("login_failed", { error_type: errorMessage })
+      capturePostHogEvent("login_failed", { error_code: getLoginErrorCode(errorMessage) })
     );
     error.value = errorMessage;
   } finally {

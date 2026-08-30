@@ -2,6 +2,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   getPasswordResetRedirectUrl,
   routeRecoveryLinksToResetPassword,
+  scrubSensitiveRecoveryUrl,
+  scrubSensitiveRecoveryUrlValue,
 } from "./passwordResetRedirect";
 
 // jsdom's window.location properties are non-configurable individually, so the
@@ -131,5 +133,65 @@ describe("routeRecoveryLinksToResetPassword", () => {
     delete globalThis.window;
     expect(() => routeRecoveryLinksToResetPassword()).not.toThrow();
     globalThis.window = originalWindow;
+  });
+});
+
+describe("scrubSensitiveRecoveryUrl", () => {
+  it("replaces recovery query and hash material with the path only", () => {
+    stubLocation({
+      pathname: "/reset-password",
+      search: "?provider_payload=opaque-secret",
+      hash: "#unrecognized_token=secret",
+    });
+    const replaceStateSpy = vi.spyOn(window.history, "replaceState");
+
+    expect(scrubSensitiveRecoveryUrl()).toBe(true);
+    expect(replaceStateSpy).toHaveBeenCalledWith(
+      window.history.state,
+      document.title,
+      "/reset-password",
+    );
+  });
+
+  it("does not rewrite unrelated paths or query strings", () => {
+    stubLocation({ pathname: "/login", search: "?code=not-recovery" });
+    const replaceStateSpy = vi.spyOn(window.history, "replaceState");
+
+    expect(scrubSensitiveRecoveryUrl()).toBe(false);
+    expect(replaceStateSpy).not.toHaveBeenCalled();
+  });
+
+  it("scrubs reset URLs with trailing slashes and case variants", () => {
+    stubLocation({ pathname: "/RESET-PASSWORD/", search: "?code=secret" });
+    const replaceStateSpy = vi.spyOn(window.history, "replaceState");
+
+    expect(scrubSensitiveRecoveryUrl()).toBe(true);
+    expect(replaceStateSpy).toHaveBeenCalledWith(
+      window.history.state,
+      document.title,
+      "/reset-password",
+    );
+  });
+});
+
+describe("scrubSensitiveRecoveryUrlValue", () => {
+  it("scrubs absolute and relative reset URLs while preserving unrelated URLs", () => {
+    expect(
+      scrubSensitiveRecoveryUrlValue(
+        "https://www.itemtraxx.com/reset-password?type=recovery&code=secret#access_token=secret",
+      ),
+    ).toBe("https://www.itemtraxx.com/reset-password");
+    expect(scrubSensitiveRecoveryUrlValue("/reset-password?token=secret")).toBe(
+      "/reset-password",
+    );
+    expect(scrubSensitiveRecoveryUrlValue("https://www.itemtraxx.com/login?next=1")).toBe(
+      "https://www.itemtraxx.com/login?next=1",
+    );
+    expect(scrubSensitiveRecoveryUrlValue("/reset-password/?code=secret")).toBe(
+      "/reset-password",
+    );
+    expect(scrubSensitiveRecoveryUrlValue("/RESET-PASSWORD?code=secret")).toBe(
+      "/reset-password",
+    );
   });
 });

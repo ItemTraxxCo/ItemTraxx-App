@@ -61,6 +61,7 @@ import { computed, onMounted, onUnmounted, ref } from "vue";
 import { RouterLink } from "vue-router";
 import { signOutLocalSupabaseSession } from "../services/supabaseAuthSession";
 import { supabase } from "../services/supabaseClient";
+import { scrubSensitiveRecoveryUrl } from "../utils/passwordResetRedirect";
 
 const newPassword = ref("");
 const confirmPassword = ref("");
@@ -112,7 +113,9 @@ const showBlockedState = computed(
 );
 
 const checkRecoverySession = async () => {
-  if (!hasRecoveryLinkContext()) {
+  const recoveryLinkContext = hasRecoveryLinkContext();
+  if (!recoveryLinkContext) {
+    scrubSensitiveRecoveryUrl();
     isReady.value = false;
     return;
   }
@@ -122,18 +125,19 @@ const checkRecoverySession = async () => {
     return !!data.session;
   };
 
-  // Give Supabase a moment to parse recovery hash tokens from URL.
-  if (await attempt()) {
-    isReady.value = true;
-    if (window.location.hash) {
-      window.history.replaceState({}, document.title, `${window.location.pathname}${window.location.search}`);
+  try {
+    // Give Supabase a moment to parse recovery hash tokens from URL.
+    if (await attempt()) {
+      isReady.value = true;
+      return;
     }
-    return;
-  }
-  await new Promise((resolve) => window.setTimeout(resolve, 250));
-  isReady.value = await attempt();
-  if (isReady.value && window.location.hash) {
-    window.history.replaceState({}, document.title, `${window.location.pathname}${window.location.search}`);
+    await new Promise((resolve) => window.setTimeout(resolve, 250));
+    isReady.value = await attempt();
+  } finally {
+    // Supabase has now had its first/second chance to parse the link. Always
+    // leave the address bar with a path-only recovery route, including on an
+    // expired or failed link.
+    scrubSensitiveRecoveryUrl();
   }
 };
 

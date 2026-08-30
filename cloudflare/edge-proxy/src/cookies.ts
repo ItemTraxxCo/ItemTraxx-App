@@ -1,5 +1,13 @@
-const ACCESS_COOKIE_NAME = "itx_session";
-const REFRESH_COOKIE_NAME = "itx_refresh";
+// `__Host-` cookies are host-only by construction: browsers reject them when
+// a Domain attribute is present. This keeps bearer tokens on the edge host and
+// prevents sibling itemtraxx.com subdomains from receiving them.
+const ACCESS_COOKIE_NAME = "__Host-itx_session";
+const REFRESH_COOKIE_NAME = "__Host-itx_refresh";
+const LEGACY_ACCESS_COOKIE_NAME = "itx_session";
+const LEGACY_REFRESH_COOKIE_NAME = "itx_refresh";
+// Migration-only deletion target for cookies emitted by the old parent-domain
+// configuration. No non-empty cookie is ever emitted with this Domain.
+const LEGACY_COOKIE_DOMAIN = ".itemtraxx.com";
 const ACCESS_TOKEN_MAX_AGE_SECONDS = 60 * 60;
 const REFRESH_TOKEN_DEFAULT_MAX_AGE_SECONDS = 60 * 60 * 24 * 14;
 const REFRESH_TOKEN_MAX_ALLOWED_AGE_SECONDS = 60 * 60 * 24 * 14;
@@ -7,14 +15,22 @@ const REFRESH_TOKEN_MAX_ALLOWED_AGE_SECONDS = 60 * 60 * 24 * 14;
 export type SessionCookies = {
   accessToken: string | null;
   refreshToken: string | null;
+  legacyCookiePresent?: boolean;
 };
 
 export const parseCookies = (request: Request): SessionCookies => {
   const raw = request.headers.get("cookie") ?? "";
   const parsed = new Map<string, string>();
+  let legacyCookiePresent = false;
   raw.split(";").forEach((part) => {
     const [key, ...rest] = part.trim().split("=");
     if (!key || rest.length === 0) return;
+    if (
+      key === LEGACY_ACCESS_COOKIE_NAME ||
+      key === LEGACY_REFRESH_COOKIE_NAME
+    ) {
+      legacyCookiePresent = true;
+    }
     try {
       parsed.set(key, decodeURIComponent(rest.join("=")));
     } catch {
@@ -25,6 +41,7 @@ export const parseCookies = (request: Request): SessionCookies => {
   return {
     accessToken: parsed.get(ACCESS_COOKIE_NAME) ?? null,
     refreshToken: parsed.get(REFRESH_COOKIE_NAME) ?? null,
+    legacyCookiePresent,
   };
 };
 
@@ -61,14 +78,15 @@ const appendCookie = (
     "Secure",
     `SameSite=${resolveSessionCookieSameSite(env)}`,
   ];
-  const domain = env.SESSION_COOKIE_DOMAIN?.trim();
-  if (domain) {
-    cookieParts.push(`Domain=${domain}`);
-  }
   headers.append("Set-Cookie", cookieParts.join("; "));
 };
 
-const clearCookie = (headers: Headers, name: string, env: Env) => {
+const clearCookie = (
+  headers: Headers,
+  name: string,
+  env: Env,
+  domain?: string,
+) => {
   const cookieParts = [
     `${name}=`,
     "Path=/",
@@ -77,20 +95,19 @@ const clearCookie = (headers: Headers, name: string, env: Env) => {
     "Secure",
     `SameSite=${resolveSessionCookieSameSite(env)}`,
   ];
-  const domain = env.SESSION_COOKIE_DOMAIN?.trim();
   if (domain) {
     cookieParts.push(`Domain=${domain}`);
   }
   headers.append("Set-Cookie", cookieParts.join("; "));
 };
 
-const clearLegacyHostOnlyCookies = (headers: Headers, env: Env) => {
-  if (!env.SESSION_COOKIE_DOMAIN?.trim()) return;
-  const hostOnlyEnv = {
-    SESSION_COOKIE_SAMESITE: env.SESSION_COOKIE_SAMESITE,
-  } as Env;
-  clearCookie(headers, ACCESS_COOKIE_NAME, hostOnlyEnv);
-  clearCookie(headers, REFRESH_COOKIE_NAME, hostOnlyEnv);
+export const clearLegacySessionCookies = (headers: Headers, env: Env) => {
+  // Clear both possible scopes of the old names. The parent-domain variant is
+  // retained only as a Max-Age=0 migration tombstone.
+  clearCookie(headers, LEGACY_ACCESS_COOKIE_NAME, env);
+  clearCookie(headers, LEGACY_REFRESH_COOKIE_NAME, env);
+  clearCookie(headers, LEGACY_ACCESS_COOKIE_NAME, env, LEGACY_COOKIE_DOMAIN);
+  clearCookie(headers, LEGACY_REFRESH_COOKIE_NAME, env, LEGACY_COOKIE_DOMAIN);
 };
 
 export const setSessionCookies = (
@@ -98,7 +115,7 @@ export const setSessionCookies = (
   env: Env,
   session: { accessToken: string; refreshToken: string },
 ) => {
-  clearLegacyHostOnlyCookies(headers, env);
+  clearLegacySessionCookies(headers, env);
   appendCookie(
     headers,
     ACCESS_COOKIE_NAME,
@@ -115,8 +132,12 @@ export const setSessionCookies = (
   );
 };
 
-export const clearSessionCookies = (headers: Headers, env: Env) => {
-  clearLegacyHostOnlyCookies(headers, env);
+export const clearSessionCookies = (
+  headers: Headers,
+  env: Env,
+  clearLegacy = false,
+) => {
+  if (clearLegacy) clearLegacySessionCookies(headers, env);
   clearCookie(headers, ACCESS_COOKIE_NAME, env);
   clearCookie(headers, REFRESH_COOKIE_NAME, env);
 };

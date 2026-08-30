@@ -20,34 +20,6 @@ export const isLocalhostOrigin = (origin: string | null) => {
 const shouldTrustLocalOrigins = (env: Env) =>
   (env.TRUST_LOCAL_ORIGINS ?? "").trim().toLowerCase() === "true";
 
-const RESERVED_WORKSPACE_SLUGS = new Set([
-  "app",
-  "internal",
-  "status",
-  "www",
-  // Scanner, demo, and test tenants are not production browser surfaces.
-  "itxdemo",
-  "pentest",
-  "pentest2",
-  "testdist",
-  "testtenant-15da6e97",
-]);
-
-const isWorkspaceAppOrigin = (origin: string) => {
-  try {
-    const url = new URL(origin);
-    const match = url.hostname.toLowerCase().match(
-      /^([a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)\.app\.itemtraxx\.com$/,
-    );
-    return url.protocol === "https:" &&
-      url.port === "" &&
-      !!match?.[1] &&
-      !RESERVED_WORKSPACE_SLUGS.has(match[1]);
-  } catch {
-    return false;
-  }
-};
-
 export const isAllowedOrigin = (
   origin: string | null,
   allowedOrigins: string[],
@@ -61,10 +33,10 @@ export const isAllowedOrigin = (
     return true;
   }
 
-  if (isWorkspaceAppOrigin(origin)) {
-    return true;
-  }
-
+  // Workspace app origins are intentionally not inferred from their hostname.
+  // The allowlist is provider-managed and is removed when a workspace is
+  // archived, so a newly-created or stale DNS record cannot gain credentialed
+  // browser access by matching a naming convention.
   return allowedOrigins.some((candidate) => candidate === origin);
 };
 

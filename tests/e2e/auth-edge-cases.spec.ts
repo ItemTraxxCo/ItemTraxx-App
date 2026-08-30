@@ -1010,15 +1010,18 @@ test.describe("Auth edge cases", () => {
         boundaries.adminRevoke.release();
         await boundaries.adminRevoke.resolved;
 
-        await boundaries.localSupabase.reached;
-        recordPending("local-supabase");
-        boundaries.localSupabase.release();
-        await boundaries.localSupabase.resolved;
-
+        // Clear the server-side HttpOnly session before local cleanup. This
+        // keeps normal logout fail-closed when the server session cannot be
+        // revoked, while still allowing the local SDK sign-out to be best effort.
         await boundaries.httpSession.reached;
         recordPending("http-session");
         boundaries.httpSession.release();
         await boundaries.httpSession.resolved;
+
+        await boundaries.localSupabase.reached;
+        recordPending("local-supabase");
+        boundaries.localSupabase.release();
+        await boundaries.localSupabase.resolved;
 
         await signOutPromise;
         return {
@@ -1048,16 +1051,16 @@ test.describe("Auth edge cases", () => {
       expect(result.before.superVerifiedAt).toBeTruthy();
       expect(result.before.adminVerifiedAt).toBeTruthy();
       expect(result.before.persistedAdminVerification).toBeTruthy();
-      expect(result.cleanupEvents).toEqual(["admin-revoke", "local-supabase", "http-session"]);
+      expect(result.cleanupEvents).toEqual(["admin-revoke", "http-session", "local-supabase"]);
       expect(result.pendingSnapshots).toEqual([
         { event: "admin-revoke", state: result.before },
-        { event: "local-supabase", state: result.before },
         { event: "http-session", state: result.before },
+        { event: "local-supabase", state: result.before },
       ]);
       expect(result.resolutionSnapshots).toEqual([
         { event: "admin-revoke", state: result.before },
-        { event: "local-supabase", state: result.before },
         { event: "http-session", state: result.before },
+        { event: "local-supabase", state: result.before },
       ]);
       expect(result.after).toEqual(clearedAuthContext);
     });

@@ -136,7 +136,14 @@ export const useAdminSessionLifecycle = (options: AdminSessionLifecycleOptions) 
     // cookie. Clear that server session before navigating so a fresh tab
     // cannot bootstrap the revoked identity and redirect back into the
     // workspace again.
-    await authService.signOut();
+    const signOutResult = await authService.signOut();
+    if (signOutResult && !signOutResult.ok) {
+      showSessionTermination(recoveryRoute, {
+        title: "Unable to complete logout.",
+        message: "Please try again when the connection is available.",
+      });
+      return;
+    }
     clearSessionTermination();
     options.closeMenu();
     if (nextUrl) {

@@ -322,8 +322,8 @@ Deno.test("session refresh: missing refresh cookie clears cookies without contac
     );
     assertEquals(response.status, 401, "missing refresh cookie status");
     assertEquals(getSetCookies(response), [
-      "itx_session=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Lax",
-      "itx_refresh=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Lax",
+      "__Host-itx_session=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Lax",
+      "__Host-itx_refresh=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Lax",
     ], "missing refresh cookie clears cookies");
   } finally {
     fetchMock.restore();
@@ -333,7 +333,7 @@ Deno.test("session refresh: missing refresh cookie clears cookies without contac
 
 Deno.test("session refresh: rate-limited request is rejected", async () => {
   const response = await call(
-    mutationRequest("/auth/session/refresh", { cookie: "itx_refresh=old" }),
+    mutationRequest("/auth/session/refresh", { cookie: "__Host-itx_refresh=old" }),
     baseEnv({ SESSION_REFRESH_RATE_LIMITER: LIMITED_LIMITER }),
     "refresh",
   );
@@ -342,7 +342,7 @@ Deno.test("session refresh: rate-limited request is rejected", async () => {
 
 Deno.test("session refresh: missing rate limiter binding fails closed", async () => {
   const response = await call(
-    mutationRequest("/auth/session/refresh", { cookie: "itx_refresh=old" }),
+    mutationRequest("/auth/session/refresh", { cookie: "__Host-itx_refresh=old" }),
     baseEnv(),
     "refresh",
   );
@@ -359,22 +359,22 @@ Deno.test("session refresh: rejected refresh token clears cookies", async () => 
   try {
     const response = await call(
       mutationRequest("/auth/session/refresh", {
-        cookie: "itx_refresh=expired",
+        cookie: "__Host-itx_refresh=expired",
       }),
       baseEnv({ SESSION_REFRESH_RATE_LIMITER: ALLOWED_LIMITER }),
       "refresh",
     );
     assertEquals(response.status, 401, "rejected refresh status");
     assertEquals(getSetCookies(response), [
-      "itx_session=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Lax",
-      "itx_refresh=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Lax",
+      "__Host-itx_session=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Lax",
+      "__Host-itx_refresh=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Lax",
     ], "rejected refresh clears cookies");
   } finally {
     fetchMock.restore();
   }
 });
 
-Deno.test("session refresh: token response missing fields is treated as unauthorized", async () => {
+Deno.test("session refresh: malformed successful token response is treated as unavailable", async () => {
   const fetchMock = installFetch((url) => {
     if (url.includes("/auth/v1/token?grant_type=refresh_token")) {
       return Promise.resolve(Response.json({ access_token: "only-access" }));
@@ -384,12 +384,12 @@ Deno.test("session refresh: token response missing fields is treated as unauthor
   try {
     const response = await call(
       mutationRequest("/auth/session/refresh", {
-        cookie: "itx_refresh=partial",
+        cookie: "__Host-itx_refresh=partial",
       }),
       baseEnv({ SESSION_REFRESH_RATE_LIMITER: ALLOWED_LIMITER }),
       "refresh",
     );
-    assertEquals(response.status, 401, "incomplete token payload status");
+    assertEquals(response.status, 503, "incomplete token payload status");
   } finally {
     fetchMock.restore();
   }
@@ -421,7 +421,7 @@ Deno.test("session refresh: successful rotation with no matching profile skips t
   const fetchMock = refreshFixture([], jwt({ session_id: "sess-1" }));
   try {
     const response = await call(
-      mutationRequest("/auth/session/refresh", { cookie: "itx_refresh=old" }),
+      mutationRequest("/auth/session/refresh", { cookie: "__Host-itx_refresh=old" }),
       baseEnv({ SESSION_REFRESH_RATE_LIMITER: ALLOWED_LIMITER }),
       "refresh",
     );
@@ -453,14 +453,14 @@ Deno.test("session refresh: non-super-admin profile with no active application s
   );
   try {
     const response = await call(
-      mutationRequest("/auth/session/refresh", { cookie: "itx_refresh=old" }),
+      mutationRequest("/auth/session/refresh", { cookie: "__Host-itx_refresh=old" }),
       baseEnv({ SESSION_REFRESH_RATE_LIMITER: ALLOWED_LIMITER }),
       "refresh",
     );
     assertEquals(response.status, 401, "no active session refresh status");
     assertEquals(getSetCookies(response), [
-      "itx_session=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Lax",
-      "itx_refresh=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Lax",
+      "__Host-itx_session=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Lax",
+      "__Host-itx_refresh=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Lax",
     ], "revoked-session refresh clears cookies");
   } finally {
     fetchMock.restore();
@@ -487,7 +487,7 @@ Deno.test("session refresh: staff profile whose access token has no session clai
   );
   try {
     const response = await call(
-      mutationRequest("/auth/session/refresh", { cookie: "itx_refresh=old" }),
+      mutationRequest("/auth/session/refresh", { cookie: "__Host-itx_refresh=old" }),
       baseEnv({ SESSION_REFRESH_RATE_LIMITER: ALLOWED_LIMITER }),
       "refresh",
     );
@@ -517,7 +517,7 @@ Deno.test("session refresh: super_admin profile bypasses the account_sessions lo
   );
   try {
     const response = await call(
-      mutationRequest("/auth/session/refresh", { cookie: "itx_refresh=old" }),
+      mutationRequest("/auth/session/refresh", { cookie: "__Host-itx_refresh=old" }),
       baseEnv({ SESSION_REFRESH_RATE_LIMITER: ALLOWED_LIMITER }),
       "refresh",
     );
@@ -566,7 +566,7 @@ Deno.test("session refresh: staff profile with a matching live device session su
   });
   try {
     const response = await call(
-      mutationRequest("/auth/session/refresh", { cookie: "itx_refresh=old" }),
+      mutationRequest("/auth/session/refresh", { cookie: "__Host-itx_refresh=old" }),
       baseEnv({ SESSION_REFRESH_RATE_LIMITER: ALLOWED_LIMITER }),
       "refresh",
     );
@@ -611,7 +611,7 @@ Deno.test("session logout: with an access-token cookie revokes only this session
   try {
     const response = await call(
       mutationRequest("/auth/session/logout", {
-        cookie: "itx_session=access-1",
+        cookie: "__Host-itx_session=access-1",
       }),
       baseEnv(),
       "logout",
@@ -619,8 +619,8 @@ Deno.test("session logout: with an access-token cookie revokes only this session
     assertEquals(response.status, 200, "logout status");
     assertEquals(await response.json(), { ok: true }, "logout body");
     assertEquals(getSetCookies(response), [
-      "itx_session=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Lax",
-      "itx_refresh=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Lax",
+      "__Host-itx_session=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Lax",
+      "__Host-itx_refresh=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Lax",
     ], "logout clears cookies");
   } finally {
     fetchMock.restore();
@@ -666,6 +666,191 @@ Deno.test("session logout: without an access-token cookie skips the upstream cal
   assertEquals(fetchMock.calls.length, 0, "no upstream call without a cookie");
 });
 
+Deno.test("session logout: refresh-only cookies are exchanged and revoked locally", async () => {
+  const fetchMock = installFetch((url, init) => {
+    if (url.includes("/auth/v1/token?grant_type=refresh_token")) {
+      return Promise.resolve(Response.json({
+        access_token: "exchanged-access",
+        refresh_token: "rotated-refresh",
+      }));
+    }
+    if (url.endsWith("/auth/v1/logout?scope=local")) {
+      assert(
+        new Headers(init?.headers).get("authorization") ===
+          "Bearer exchanged-access",
+        "logout must use the exchanged access token",
+      );
+      return Promise.resolve(new Response(null, { status: 204 }));
+    }
+    return Promise.resolve(new Response("unexpected", { status: 500 }));
+  });
+  try {
+    const response = await call(
+      mutationRequest("/auth/session/logout", {
+        cookie: "__Host-itx_refresh=refresh-only",
+      }),
+      baseEnv({ SESSION_REFRESH_RATE_LIMITER: ALLOWED_LIMITER }),
+      "logout",
+    );
+    assertEquals(response.status, 200, "refresh-only logout status");
+    assertEquals(await response.json(), { ok: true }, "refresh-only logout body");
+    assertEquals(getSetCookies(response), [
+      "__Host-itx_session=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Lax",
+      "__Host-itx_refresh=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Lax",
+    ], "refresh-only logout clears cookies");
+  } finally {
+    fetchMock.restore();
+  }
+  assertEquals(fetchMock.calls.length, 2, "refresh-only logout exchanges then revokes");
+  assert(
+    fetchMock.calls[0]?.url.includes("/auth/v1/token?grant_type=refresh_token"),
+    "refresh exchange must happen first",
+  );
+  assert(
+    fetchMock.calls[1]?.url.endsWith("/auth/v1/logout?scope=local"),
+    "local logout must happen after refresh exchange",
+  );
+});
+
+Deno.test("session logout: upstream revocation failure is returned instead of a false success", async () => {
+  const fetchMock = installFetch(() =>
+    Promise.resolve(new Response("upstream unavailable", { status: 503 }))
+  );
+  try {
+    const response = await call(
+      mutationRequest("/auth/session/logout", {
+        cookie: "__Host-itx_session=access-1",
+      }),
+      baseEnv(),
+      "logout",
+    );
+    assertEquals(response.status, 503, "failed revocation status");
+    assertEquals(
+      await response.json(),
+      { error: "Unable to complete logout" },
+      "failed revocation body",
+    );
+    assertEquals(getSetCookies(response), [
+      "__Host-itx_session=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Lax",
+      "__Host-itx_refresh=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Lax",
+    ], "failed revocation still clears browser cookies");
+  } finally {
+    fetchMock.restore();
+  }
+});
+
+Deno.test("session logout: refresh-only limiter failure is surfaced and does not claim success", async () => {
+  const fetchMock = installFetch(() =>
+    Promise.resolve(new Response("unexpected", { status: 500 }))
+  );
+  try {
+    const response = await call(
+      mutationRequest("/auth/session/logout", {
+        cookie: "__Host-itx_refresh=refresh-only",
+      }),
+      baseEnv(),
+      "logout",
+    );
+    assertEquals(response.status, 503, "unavailable refresh limiter status");
+    assertEquals(
+      await response.json(),
+      { error: "Session protection unavailable" },
+      "unavailable refresh limiter body",
+    );
+    assertEquals(getSetCookies(response), [
+      "__Host-itx_session=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Lax",
+      "__Host-itx_refresh=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Lax",
+    ], "limiter failure still clears browser cookies");
+  } finally {
+    fetchMock.restore();
+  }
+  assertEquals(fetchMock.calls.length, 0, "limiter failure avoids token exchange");
+});
+
+Deno.test("session logout: refresh endpoint failure is not treated as an expired token", async () => {
+  const fetchMock = installFetch(() =>
+    Promise.resolve(new Response("upstream unavailable", { status: 503 }))
+  );
+  try {
+    const response = await call(
+      mutationRequest("/auth/session/logout", {
+        cookie: "__Host-itx_refresh=refresh-only",
+      }),
+      baseEnv({ SESSION_REFRESH_RATE_LIMITER: ALLOWED_LIMITER }),
+      "logout",
+    );
+    assertEquals(response.status, 503, "refresh endpoint failure status");
+    assertEquals(
+      await response.json(),
+      { error: "Session protection unavailable" },
+      "refresh endpoint failure body",
+    );
+    assertEquals(getSetCookies(response), [
+      "__Host-itx_session=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Lax",
+      "__Host-itx_refresh=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Lax",
+    ], "refresh endpoint failure clears browser cookies");
+  } finally {
+    fetchMock.restore();
+  }
+});
+
+Deno.test("session logout: malformed successful refresh response does not claim success", async () => {
+  const fetchMock = installFetch((url) => {
+    if (url.includes("/auth/v1/token?grant_type=refresh_token")) {
+      return Response.json({ access_token: "only-access" });
+    }
+    return new Response("unexpected", { status: 500 });
+  });
+  try {
+    const response = await call(
+      mutationRequest("/auth/session/logout", {
+        cookie: "__Host-itx_refresh=malformed-response",
+      }),
+      baseEnv({ SESSION_REFRESH_RATE_LIMITER: ALLOWED_LIMITER }),
+      "logout",
+    );
+    assertEquals(response.status, 503, "malformed refresh status");
+    assertEquals(await response.json(), {
+      error: "Session protection unavailable",
+    }, "malformed refresh body");
+    assertEquals(getSetCookies(response), [
+      "__Host-itx_session=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Lax",
+      "__Host-itx_refresh=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Lax",
+    ], "malformed refresh clears browser cookies");
+  } finally {
+    fetchMock.restore();
+  }
+  assertEquals(fetchMock.calls.length, 1, "malformed response must not call revocation");
+});
+
+Deno.test("session logout: refresh endpoint rate limit is surfaced", async () => {
+  const fetchMock = installFetch((url) => {
+    if (url.includes("/auth/v1/token")) {
+      return new Response(JSON.stringify({ error: "rate limited" }), { status: 429 });
+    }
+    return new Response("unexpected", { status: 500 });
+  });
+  try {
+    const response = await call(
+      mutationRequest("/auth/session/logout", {
+        cookie: "__Host-itx_refresh=refresh-only",
+      }),
+      baseEnv({ SESSION_REFRESH_RATE_LIMITER: ALLOWED_LIMITER }),
+      "logout",
+    );
+    assertEquals(response.status, 429, "upstream refresh rate limit status");
+    assertEquals(await response.json(), {
+      error: "Too many session requests",
+    }, "upstream refresh rate limit body");
+    assertEquals(getSetCookies(response), [
+      "__Host-itx_session=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Lax",
+      "__Host-itx_refresh=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Lax",
+    ], "upstream refresh rate limit clears cookies");
+  } finally {
+    fetchMock.restore();
+  }
+});
+
 // ---- me ----
 
 Deno.test("session me: no cookies returns the unauthenticated summary without any Set-Cookie header", async () => {
@@ -700,7 +885,7 @@ Deno.test("session me: a valid access-token cookie is used directly without refr
   });
   try {
     const response = await call(
-      meRequest({ cookie: "itx_session=good-access" }),
+      meRequest({ cookie: "__Host-itx_session=good-access" }),
       baseEnv(),
       "me",
     );
@@ -727,7 +912,7 @@ Deno.test("session me: an invalid access-token cookie falls back to the unauthen
   });
   try {
     const response = await call(
-      meRequest({ cookie: "itx_session=stale-access" }),
+      meRequest({ cookie: "__Host-itx_session=stale-access" }),
       baseEnv(),
       "me",
     );
@@ -735,8 +920,8 @@ Deno.test("session me: an invalid access-token cookie falls back to the unauthen
     const body = await response.json() as { authenticated: boolean };
     assertEquals(body.authenticated, false, "invalid access token unauthenticated");
     assertEquals(getSetCookies(response), [
-      "itx_session=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Lax",
-      "itx_refresh=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Lax",
+      "__Host-itx_session=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Lax",
+      "__Host-itx_refresh=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Lax",
     ], "invalid access token clears cookies");
   } finally {
     fetchMock.restore();
@@ -745,7 +930,7 @@ Deno.test("session me: an invalid access-token cookie falls back to the unauthen
 
 Deno.test("session me: rate-limited implicit refresh surfaces the rate-limit error", async () => {
   const response = await call(
-    meRequest({ cookie: "itx_refresh=old" }),
+    meRequest({ cookie: "__Host-itx_refresh=old" }),
     baseEnv({ SESSION_REFRESH_RATE_LIMITER: LIMITED_LIMITER }),
     "me",
   );
@@ -772,14 +957,18 @@ Deno.test("session me: only a refresh-token cookie present rotates cookies on su
   });
   try {
     const response = await call(
-      meRequest({ cookie: "itx_refresh=old" }),
+      meRequest({ cookie: "__Host-itx_refresh=old" }),
       baseEnv({ SESSION_REFRESH_RATE_LIMITER: ALLOWED_LIMITER }),
       "me",
     );
     assertEquals(response.status, 200, "me implicit refresh status");
     assertEquals(getSetCookies(response), [
-      "itx_session=fresh-access; Path=/; Max-Age=3600; HttpOnly; Secure; SameSite=Lax",
-      "itx_refresh=fresh-refresh; Path=/; Max-Age=1209600; HttpOnly; Secure; SameSite=Lax",
+      "itx_session=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Lax",
+      "itx_refresh=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Lax",
+      "itx_session=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Lax; Domain=.itemtraxx.com",
+      "itx_refresh=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Lax; Domain=.itemtraxx.com",
+      "__Host-itx_session=fresh-access; Path=/; Max-Age=3600; HttpOnly; Secure; SameSite=Lax",
+      "__Host-itx_refresh=fresh-refresh; Path=/; Max-Age=1209600; HttpOnly; Secure; SameSite=Lax",
     ], "me implicit refresh cookies");
   } finally {
     fetchMock.restore();
@@ -801,7 +990,7 @@ Deno.test("session me: an expired refresh token falls back to the unauthenticate
   });
   try {
     const response = await call(
-      meRequest({ cookie: "itx_refresh=expired" }),
+      meRequest({ cookie: "__Host-itx_refresh=expired" }),
       baseEnv({ SESSION_REFRESH_RATE_LIMITER: ALLOWED_LIMITER }),
       "me",
     );
@@ -809,8 +998,8 @@ Deno.test("session me: an expired refresh token falls back to the unauthenticate
     const body = await response.json() as { authenticated: boolean };
     assertEquals(body.authenticated, false, "me expired refresh unauthenticated");
     assertEquals(getSetCookies(response), [
-      "itx_session=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Lax",
-      "itx_refresh=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Lax",
+      "__Host-itx_session=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Lax",
+      "__Host-itx_refresh=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Lax",
     ], "me expired refresh clears cookies");
   } finally {
     fetchMock.restore();

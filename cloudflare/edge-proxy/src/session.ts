@@ -1,5 +1,6 @@
 import { isAllowedOrigin, resolveRequestOrigin } from "./cors.ts";
 import {
+  clearLegacySessionCookies,
   clearSessionCookies,
   parseCookies,
   type SessionCookies,
@@ -248,16 +249,29 @@ const refreshSession = async (
       body: JSON.stringify({ refresh_token: refreshToken }),
     },
   );
-  if (!response.ok) return { status: "unauthorized" };
-  const payload = (await response.json()) as TokenRefreshResponse;
-  if (!payload.access_token || !payload.refresh_token) {
-    return { status: "unauthorized" };
+  if (response.status >= 500) return { status: "unavailable" };
+  if (response.status === 429) return { status: "rate_limited" };
+  if (response.ok) {
+    const payload = (await response.json()) as TokenRefreshResponse;
+    if (!payload.access_token || !payload.refresh_token) {
+      // A successful HTTP status with an unusable token payload is an
+      // upstream protocol failure, not proof that the refresh token expired.
+      // Treating it as unauthorized would let refresh-only logout claim
+      // success without ever reaching the revocation endpoint.
+      return { status: "unavailable" };
+    }
+    return {
+      status: "ok",
+      accessToken: payload.access_token,
+      refreshToken: payload.refresh_token,
+    };
   }
-  return {
-    status: "ok",
-    accessToken: payload.access_token,
-    refreshToken: payload.refresh_token,
-  };
+  // Only the provider's normal invalid/expired-token responses are safe to
+  // treat as an idempotent unauthorised session. Other non-2xx responses are
+  // upstream failures and must not make logout claim success.
+  return response.status === 400 || response.status === 401
+    ? { status: "unauthorized" }
+    : { status: "unavailable" };
 };
 
 export const maybeRefreshSession = async (
@@ -281,7 +295,7 @@ export const maybeRefreshSession = async (
       return { session: null, headers: null, failure: refreshed.status };
     }
     const headers = new Headers();
-    clearSessionCookies(headers, env);
+    clearSessionCookies(headers, env, cookies.legacyCookiePresent);
     return { session: null, headers, failure: null };
   }
   const headers = new Headers();
@@ -345,7 +359,7 @@ const handleSessionRefresh = async (
   const cookies = parseCookies(request);
   if (!cookies.refreshToken) {
     const responseHeaders = new Headers();
-    clearSessionCookies(responseHeaders, env);
+    clearSessionCookies(responseHeaders, env, cookies.legacyCookiePresent);
     return buildError(401, "Unauthorized", headers, requestId, responseHeaders);
   }
   const refreshed = await refreshSession(request, env, cookies.refreshToken);
@@ -356,13 +370,13 @@ const handleSessionRefresh = async (
       return buildSessionRateLimitError(refreshed.status, headers, requestId);
     }
     const responseHeaders = new Headers();
-    clearSessionCookies(responseHeaders, env);
+    clearSessionCookies(responseHeaders, env, cookies.legacyCookiePresent);
     return buildError(401, "Unauthorized", headers, requestId, responseHeaders);
   }
   const summary = await buildSessionSummary(env, refreshed.accessToken, true);
   if (!summary) {
     const responseHeaders = new Headers();
-    clearSessionCookies(responseHeaders, env);
+    clearSessionCookies(responseHeaders, env, cookies.legacyCookiePresent);
     return buildError(401, "Unauthorized", headers, requestId, responseHeaders);
   }
   const responseHeaders = new Headers();
@@ -405,6 +419,17 @@ const handleSessionMe = async (
     }
   }
   if (!accessToken) {
+    if (cookies.legacyCookiePresent) {
+      const migrationHeaders = new Headers();
+      clearLegacySessionCookies(migrationHeaders, env);
+      return buildJson(
+        200,
+        unauthenticatedSummary,
+        headers,
+        requestId,
+        migrationHeaders,
+      );
+    }
     return buildJson(200, unauthenticatedSummary, headers, requestId);
   }
   // No requireActiveApplicationSession here: a brand-new session (fresh
@@ -414,7 +439,7 @@ const handleSessionMe = async (
   const summary = await buildSessionSummary(env, accessToken);
   if (!summary) {
     const clearHeaders = responseHeaders ?? new Headers();
-    clearSessionCookies(clearHeaders, env);
+    clearSessionCookies(clearHeaders, env, cookies.legacyCookiePresent);
     return buildJson(
       200,
       unauthenticatedSummary,
@@ -422,6 +447,11 @@ const handleSessionMe = async (
       requestId,
       clearHeaders,
     );
+  }
+  if (cookies.legacyCookiePresent) {
+    const migrationHeaders = responseHeaders ?? new Headers();
+    clearLegacySessionCookies(migrationHeaders, env);
+    responseHeaders = migrationHeaders;
   }
   return buildJson(
     200,
@@ -439,22 +469,95 @@ const handleSessionLogout = async (
   requestId: string,
 ) => {
   const cookies = parseCookies(request);
-  if (cookies.accessToken) {
-    // Supabase defaults logout to the global scope, which would invalidate
-    // every device for this user. The HttpOnly cookie belongs to only this
-    // browser, so revoke only the corresponding Supabase auth session.
-    await fetch(buildSupabaseUrl(env, "/auth/v1/logout?scope=local"), {
-      method: "POST",
-      headers: {
-        apikey: env.SUPABASE_ANON_KEY,
-        Authorization: `Bearer ${cookies.accessToken}`,
-        "Content-Type": "application/json",
-      },
-    }).catch(() => undefined);
-  }
   const responseHeaders = new Headers();
-  clearSessionCookies(responseHeaders, env);
-  return buildJson(200, { ok: true }, headers, requestId, responseHeaders);
+  clearSessionCookies(responseHeaders, env, cookies.legacyCookiePresent);
+  const success = () =>
+    buildJson(200, { ok: true }, headers, requestId, responseHeaders);
+
+  if (!cookies.accessToken && !cookies.refreshToken) return success();
+
+  const requestLocalLogout = async (accessToken: string) => {
+    try {
+      const response = await fetch(
+        buildSupabaseUrl(env, "/auth/v1/logout?scope=local"),
+        {
+          method: "POST",
+          headers: {
+            apikey: env.SUPABASE_ANON_KEY,
+            Authorization: `Bearer ${accessToken}`,
+            "Content-Type": "application/json",
+          },
+        },
+      );
+      if (response.ok) return "revoked" as const;
+      if (response.status === 401) {
+        return "unauthorized" as const;
+      }
+      return "failed" as const;
+    } catch {
+      return "failed" as const;
+    }
+  };
+
+  // Supabase's local logout endpoint accepts an access token, not a refresh
+  // token. Try the access cookie first, then recover a short-lived access
+  // token from a refresh-only session so that refresh-only browsers are also
+  // revoked server-side.
+  if (cookies.accessToken) {
+    const logoutResult = await requestLocalLogout(cookies.accessToken);
+    if (logoutResult === "revoked") return success();
+    if (logoutResult === "failed") {
+      return buildError(
+        503,
+        "Unable to complete logout",
+        headers,
+        requestId,
+        responseHeaders,
+      );
+    }
+    if (!cookies.refreshToken) return success();
+  }
+
+  let refreshed: RefreshSessionResult;
+  try {
+    refreshed = await refreshSession(request, env, cookies.refreshToken!);
+  } catch {
+    return buildError(
+      503,
+      "Unable to complete logout",
+      headers,
+      requestId,
+      responseHeaders,
+    );
+  }
+  if (refreshed.status !== "ok") {
+    if (
+      refreshed.status === "rate_limited" ||
+      refreshed.status === "unavailable"
+    ) {
+      return buildSessionRateLimitError(
+        refreshed.status,
+        headers,
+        requestId,
+        responseHeaders,
+      );
+    }
+    // An expired/invalid refresh token is already unable to mint a session.
+    // The operation is therefore safely idempotent once browser cookies clear.
+    return success();
+  }
+
+  const refreshedLogout = await requestLocalLogout(refreshed.accessToken);
+  if (refreshedLogout === "revoked" || refreshedLogout === "unauthorized") {
+    return success();
+  }
+  return buildError(
+    503,
+    "Unable to complete logout",
+    headers,
+    requestId,
+    responseHeaders,
+  );
 };
 
 const validateSessionMutationRequest = (

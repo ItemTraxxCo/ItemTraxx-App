@@ -28,6 +28,7 @@ import {
   OFFLINE_PACK_REFRESH_INTERVAL_MS,
   refreshOfflineCheckoutPackIfNeeded,
 } from "../services/offlineCheckoutWorkflow";
+import { getOfflineQueueSummary } from "../services/offlineCheckoutQueue";
 import { markItemTraxxServerUnreachable, readOfflineConnectionState } from "../services/offlineConnectionState";
 import { toUserFacingErrorMessage } from "../services/appErrors";
 
@@ -88,7 +89,15 @@ const statusDetail = computed(() => {
 });
 
 const refresh = async () => {
-  summary.value = await getOfflineWorkflowSummary();
+  const [workflow, legacy] = await Promise.all([
+    getOfflineWorkflowSummary(),
+    getOfflineQueueSummary().catch(() => ({ totalCount: 0, pendingCount: 0, reviewCount: 0 })),
+  ]);
+  summary.value = {
+    ...workflow,
+    pendingCount: workflow.pendingCount + legacy.pendingCount,
+    reviewCount: workflow.reviewCount + legacy.reviewCount,
+  };
   connection.value = readOfflineConnectionState();
   initialSummaryLoaded = true;
 };
@@ -198,6 +207,7 @@ onMounted(() => {
   syncTimer = window.setInterval(() => void syncNow(), 15_000);
   window.addEventListener("online", handleChange);
   window.addEventListener("offline", handleBrowserOffline);
+  window.addEventListener("itemtraxx:offline-queue-changed", handleChange);
   window.addEventListener("itemtraxx:offline-workflow-changed", handleChange);
   window.addEventListener("itemtraxx:offline-connection-changed", handleChange);
 });
@@ -209,6 +219,7 @@ onScopeDispose(() => {
   if (sessionInitializationRetryTimer) window.clearTimeout(sessionInitializationRetryTimer);
   window.removeEventListener("online", handleChange);
   window.removeEventListener("offline", handleBrowserOffline);
+  window.removeEventListener("itemtraxx:offline-queue-changed", handleChange);
   window.removeEventListener("itemtraxx:offline-workflow-changed", handleChange);
   window.removeEventListener("itemtraxx:offline-connection-changed", handleChange);
 });

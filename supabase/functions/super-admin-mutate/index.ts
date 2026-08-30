@@ -5,6 +5,7 @@ import { requireTrustedEdgeIngress } from "../_shared/trustedIngress.ts";
 import { readJsonBody } from "../_shared/requestBody.ts";
 import { hasPrivilegedStepUp } from "../_shared/privilegedStepUp.ts";
 import { isSuperAdminTokenBlockedBySessionRevocation } from "../_shared/superAdminSessions.ts";
+import { writeSuperAdminAudit } from "../_shared/superAdminAudit.ts";
 import {
   optionalText,
   requireEmail,
@@ -232,15 +233,14 @@ serve(async (req) => {
         if (error) throw new ValidationError("Unable to revoke Tenant Account sessions.");
       },
       audit: async (actionType, id, metadata) => {
-        const { error } = await admin.from("super_admin_audit_logs").insert({
-          actor_id: user.id,
-          actor_email: user.email ?? null,
-          action_type: actionType,
-          target_type: "tenant_account",
-          target_id: id,
+        await writeSuperAdminAudit(admin, {
+          actorId: user.id,
+          actorEmail: user.email ?? null,
+          actionType,
+          targetType: "tenant_account",
+          targetId: id,
           metadata,
         });
-        if (error) throw new Error("Unable to write Super Admin audit log.");
       },
     };
     const tenantAccountResult = await handleTenantAccountAction(action, p, {
@@ -265,13 +265,30 @@ serve(async (req) => {
       if (created.error || !created.data.user) return json(400, { error: "Unable to create Super Admin." });
       const { data, error } = await admin.from("profiles").insert({ id: created.data.user.id, workspace_id: null, auth_email: email, role: "super_admin", is_active: true }).select("id,auth_email,role,is_active,created_at").single();
       if (error) { await admin.auth.admin.deleteUser(created.data.user.id); return json(400, { error: "Unable to create Super Admin." }); }
+      await writeSuperAdminAudit(admin, {
+        actorId: user.id,
+        actorEmail: user.email ?? null,
+        actionType: "create_super_admin",
+        targetType: "super_admin",
+        targetId: created.data.user.id,
+        metadata: { auth_email: email },
+      });
       return json(200, { data });
     }
     if (action === "send_super_admin_reset") {
       const email = requireEmail(p.auth_email), redirect = (Deno.env.get("ITX_PASSWORD_RESET_REDIRECT_URL") ?? "").trim();
       if (!redirect) return json(500, { error: "Password reset redirect is not configured." });
       const { error } = await admin.auth.resetPasswordForEmail(email, { redirectTo: redirect });
-      return error ? json(400, { error: "Unable to send reset." }) : json(200, { data: { success: true } });
+      if (error) return json(400, { error: "Unable to send reset." });
+      await writeSuperAdminAudit(admin, {
+        actorId: user.id,
+        actorEmail: user.email ?? null,
+        actionType: "send_super_admin_reset",
+        targetType: "super_admin",
+        targetId: email,
+        metadata: {},
+      });
+      return json(200, { data: { success: true } });
     }
     if (action === "set_super_admin_status" || action === "update_super_admin_email") {
       const id = requireUuid(p.id);
@@ -279,12 +296,30 @@ serve(async (req) => {
         if (id === user.id && p.is_active === false) return json(400, { error: "You cannot suspend your own account." });
         if (typeof p.is_active !== "boolean") return json(400, { error: "Invalid request" });
         const { data, error } = await admin.from("profiles").update({ is_active: p.is_active }).eq("id", id).eq("role", "super_admin").select("id,auth_email,role,is_active,created_at").single();
-        return error ? json(400, { error: "Unable to update Super Admin." }) : json(200, { data });
+        if (error || !data) return json(400, { error: "Unable to update Super Admin." });
+        await writeSuperAdminAudit(admin, {
+          actorId: user.id,
+          actorEmail: user.email ?? null,
+          actionType: "set_super_admin_status",
+          targetType: "super_admin",
+          targetId: id,
+          metadata: { is_active: p.is_active },
+        });
+        return json(200, { data });
       }
       const email = requireEmail(p.auth_email); const authUpdate = await admin.auth.admin.updateUserById(id, { email, email_confirm: true });
       if (authUpdate.error) return json(400, { error: "Unable to update email." });
       const { data, error } = await admin.from("profiles").update({ auth_email: email }).eq("id", id).eq("role", "super_admin").select("id,auth_email,role,is_active,created_at").single();
-      return error ? json(400, { error: "Unable to update Super Admin." }) : json(200, { data });
+      if (error || !data) return json(400, { error: "Unable to update Super Admin." });
+      await writeSuperAdminAudit(admin, {
+        actorId: user.id,
+        actorEmail: user.email ?? null,
+        actionType: "update_super_admin_email",
+        targetType: "super_admin",
+        targetId: id,
+        metadata: { auth_email: email },
+      });
+      return json(200, { data });
     }
     if (action === "list_workspace_admins") {
       const search = optionalText(p.search, { maxLen: 120 }).toLowerCase(),
@@ -330,6 +365,14 @@ serve(async (req) => {
         await admin.auth.admin.deleteUser(created.data.user.id);
         return json(400, { error: "Unable to create Workspace Admin." });
       }
+      await writeSuperAdminAudit(admin, {
+        actorId: user.id,
+        actorEmail: user.email ?? null,
+        actionType: "create_workspace_admin",
+        targetType: "workspace_admin",
+        targetId: created.data.user.id,
+        metadata: { workspace_id: workspaceId, auth_email: email },
+      });
       return json(200, { data: (await enrich([data]))[0] });
     }
     const id = requireUuid(p.id);
@@ -350,11 +393,20 @@ serve(async (req) => {
       if (typeof p.is_active !== "boolean") {
         return json(400, { error: "Invalid request" });
       }
-      const { data } = await admin.from("profiles").update({
+      const { data, error } = await admin.from("profiles").update({
         is_active: p.is_active,
       }).eq("id", id).select(
         "id,workspace_id,auth_email,role,is_active,deleted_at,created_at",
       ).single();
+      if (error || !data) return json(400, { error: "Unable to update Workspace Admin." });
+      await writeSuperAdminAudit(admin, {
+        actorId: user.id,
+        actorEmail: user.email ?? null,
+        actionType: "set_workspace_admin_status",
+        targetType: "workspace_admin",
+        targetId: id,
+        metadata: { workspace_id: target.workspace_id, is_active: p.is_active },
+      });
       return json(200, { data: (await enrich([data]))[0] });
     }
     if (action === "update_workspace_admin_email") {
@@ -364,11 +416,20 @@ serve(async (req) => {
         email_confirm: true,
       });
       if (ae.error) return json(400, { error: "Unable to update email." });
-      const { data } = await admin.from("profiles").update({
+      const { data, error } = await admin.from("profiles").update({
         auth_email: email,
       }).eq("id", id).select(
         "id,workspace_id,auth_email,role,is_active,deleted_at,created_at",
       ).single();
+      if (error || !data) return json(400, { error: "Unable to update Workspace Admin." });
+      await writeSuperAdminAudit(admin, {
+        actorId: user.id,
+        actorEmail: user.email ?? null,
+        actionType: "update_workspace_admin_email",
+        targetType: "workspace_admin",
+        targetId: id,
+        metadata: { workspace_id: target.workspace_id, auth_email: email },
+      });
       return json(200, { data: (await enrich([data]))[0] });
     }
     if (action === "send_workspace_admin_reset") {
@@ -383,9 +444,16 @@ serve(async (req) => {
         target.auth_email,
         { redirectTo: redirect },
       );
-      return error
-        ? json(400, { error: "Unable to send reset." })
-        : json(200, { data: { success: true } });
+      if (error) return json(400, { error: "Unable to send reset." });
+      await writeSuperAdminAudit(admin, {
+        actorId: user.id,
+        actorEmail: user.email ?? null,
+        actionType: "send_workspace_admin_reset",
+        targetType: "workspace_admin",
+        targetId: id,
+        metadata: { workspace_id: target.workspace_id },
+      });
+      return json(200, { data: { success: true } });
     }
     return json(400, { error: "Invalid action" });
   } catch (e) {

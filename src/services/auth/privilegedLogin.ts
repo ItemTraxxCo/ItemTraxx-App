@@ -27,6 +27,7 @@ import {
   resolveWorkspaceSlug,
 } from "./sessionBootstrap";
 import { clearLocalSession, sendLoginNotification } from "./workspaceLogin";
+import { quarantineOfflineCheckoutQueueForCurrentSession } from "../offlineCheckoutQueue";
 import { signOut } from "./signOut";
 import {
   clearPendingSuperAdminVerificationEmail,
@@ -105,7 +106,7 @@ export const verifySuperAdminEmailChallenge = async (code: string) => {
   await refreshAuthFromSession();
   const current = getAuthState();
   if (current.role !== "super_admin") {
-    await signOut();
+    await signOut({ bestEffort: true });
     throw new Error("Access denied.");
   }
   setSecondaryAuth(true);
@@ -132,7 +133,10 @@ export const adminLoginWithSession = async (
     preExchangedSessionSummary?: HttpSessionSummary | null;
   } = {}
 ) => {
-  const priorWorkspaceContextId = getAuthState().workspaceContextId;
+  const priorAuth = getAuthState();
+  const priorIsAuthenticated = priorAuth.isAuthenticated;
+  const priorUserId = priorAuth.userId;
+  const priorWorkspaceContextId = priorAuth.workspaceContextId;
   const workspaceHost = getWorkspaceState();
   const exchangedSessionSummary = sessionTouchOptions.skipExchange
     ? sessionTouchOptions.preExchangedSessionSummary ?? null
@@ -179,17 +183,17 @@ export const adminLoginWithSession = async (
   }
 
   if (resolvedRole !== "workspace_admin") {
-    await signOut();
+    await signOut({ bestEffort: true });
     throw new Error("Access denied.");
   }
   if (profile && profile.is_active === false) {
-    await signOut();
+    await signOut({ bestEffort: true });
     throw new Error("Access denied.");
   }
   if (resolvedRole === "workspace_admin" && resolvedWorkspaceId) {
     const workspace = await fetchWorkspaceContext(resolvedWorkspaceId);
     if (workspace?.status && workspace.status !== "active") {
-      await signOut();
+      await signOut({ bestEffort: true });
       throw new Error("Workspace disabled.");
     }
   }
@@ -200,17 +204,17 @@ export const adminLoginWithSession = async (
     resolvedWorkspaceId &&
     resolvedWorkspaceId !== priorWorkspaceContextId
   ) {
-    await signOut();
+    await signOut({ bestEffort: true });
     throw new Error("Access denied.");
   }
 
   if (workspaceHost.isWorkspaceHost) {
     if (!workspaceHost.workspaceId) {
-      await signOut();
+      await signOut({ bestEffort: true });
       throw new Error("This workspace URL is not configured.");
     }
     if (!resolvedWorkspaceId || resolvedWorkspaceId !== workspaceHost.workspaceId) {
-      await signOut();
+      await signOut({ bestEffort: true });
       throw new Error("Access denied.");
     }
   }
@@ -220,7 +224,7 @@ export const adminLoginWithSession = async (
   try {
     await registerPrivilegedAdminStepUp(accessToken);
   } catch (error) {
-    await signOut();
+    await signOut({ bestEffort: true });
     throw error;
   }
 
@@ -249,6 +253,18 @@ export const adminLoginWithSession = async (
     hasSecondaryAuth: false,
     superVerifiedAt: null,
   });
+
+  if (
+    priorIsAuthenticated &&
+    (priorUserId !== sessionSummary.user.id ||
+      (priorWorkspaceContextId && finalWorkspaceId && priorWorkspaceContextId !== finalWorkspaceId))
+  ) {
+    try {
+      await quarantineOfflineCheckoutQueueForCurrentSession();
+    } catch {
+      // Legacy replay re-checks the authoritative identity before every send.
+    }
+  }
 
   if (resolvedRole === "workspace_admin" && !getAuthState().workspaceContextId) {
     setWorkspaceContext(finalWorkspaceId);
@@ -347,7 +363,7 @@ export const superAdminPasskeyLogin = async (options: {
   await refreshAuthFromSession();
   const current = getAuthState();
   if (current.role !== "super_admin") {
-    await signOut();
+    await signOut({ bestEffort: true });
     throw new Error("Access denied.");
   }
 

@@ -1,7 +1,7 @@
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.108.2";
 import {
-  enforcePreloginRateLimit,
+  enforcePublicRateLimits,
   hashString,
   resolveClientFingerprint,
   resolveClientIp,
@@ -77,6 +77,10 @@ type StoredReportRow = {
 const PUBLIC_RATE_LIMIT = {
   limit: 6,
   windowSeconds: 3600,
+};
+const PUBLIC_GLOBAL_RATE_LIMIT = {
+  limit: 120,
+  windowSeconds: PUBLIC_RATE_LIMIT.windowSeconds,
 };
 
 const normalizeText = (value: unknown, max = 5000) => optionalText(value, { maxLen: max });
@@ -175,16 +179,18 @@ serve(async (req) => {
       trustProxyHeader: true,
     });
     const ip = resolveClientIp(req);
-    const requestHash = await hashString(
-      `${fingerprint}|${normalizeText(req.headers.get("user-agent"), 255)}`
-    );
+    // The quota key is derived only from the server-observed client
+    // fingerprint. User-Agent is caller-controlled and must not create new
+    // buckets for the same client.
+    const requestHash = await hashString(fingerprint);
 
-    const rateLimit = await enforcePreloginRateLimit(
+    const rateLimit = await enforcePublicRateLimits(
       adminClient,
       requestHash,
       "client_error_report",
       PUBLIC_RATE_LIMIT.limit,
       PUBLIC_RATE_LIMIT.windowSeconds,
+      PUBLIC_GLOBAL_RATE_LIMIT.limit,
     );
     if (!rateLimit.ok) {
       if (rateLimit.error) {

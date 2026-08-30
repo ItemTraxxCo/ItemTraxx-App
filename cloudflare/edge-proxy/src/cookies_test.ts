@@ -23,30 +23,31 @@ Deno.test("cookie parsing preserves encoded values and ignores malformed pairs",
   const request = new Request("https://edge.itemtraxx.com", {
     headers: {
       cookie:
-        "other=ignored; itx_session=access%20token; malformed; itx_refresh=refresh%2Ftoken",
+        "other=ignored; __Host-itx_session=access%20token; malformed; __Host-itx_refresh=refresh%2Ftoken",
     },
   });
   assertEquals(parseCookies(request), {
     accessToken: "access token",
     refreshToken: "refresh/token",
+    legacyCookiePresent: false,
   }, "parsed session cookies");
 });
 
 Deno.test("cookie parsing ignores malformed percent encoding", () => {
   const request = new Request("https://edge.itemtraxx.com", {
     headers: {
-      cookie: "itx_session=%ZZ; itx_refresh=refresh%2Ftoken",
+      cookie: "__Host-itx_session=%ZZ; __Host-itx_refresh=refresh%2Ftoken",
     },
   });
   assertEquals(parseCookies(request), {
     accessToken: null,
     refreshToken: "refresh/token",
+    legacyCookiePresent: false,
   }, "malformed encoded cookie");
 });
 
 Deno.test("session cookie writers preserve exact set and clear attributes", () => {
   const env = {
-    SESSION_COOKIE_DOMAIN: ".itemtraxx.com",
     SESSION_COOKIE_SAMESITE: "none",
     SESSION_REFRESH_COOKIE_MAX_AGE_SECONDS: "7200",
   } as Env;
@@ -58,18 +59,31 @@ Deno.test("session cookie writers preserve exact set and clear attributes", () =
   assertEquals(values(setHeaders), [
     "itx_session=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=None",
     "itx_refresh=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=None",
-    "itx_session=access; Path=/; Max-Age=3600; HttpOnly; Secure; SameSite=None; Domain=.itemtraxx.com",
-    "itx_refresh=refresh; Path=/; Max-Age=7200; HttpOnly; Secure; SameSite=None; Domain=.itemtraxx.com",
+    "itx_session=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=None; Domain=.itemtraxx.com",
+    "itx_refresh=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=None; Domain=.itemtraxx.com",
+    "__Host-itx_session=access; Path=/; Max-Age=3600; HttpOnly; Secure; SameSite=None",
+    "__Host-itx_refresh=refresh; Path=/; Max-Age=7200; HttpOnly; Secure; SameSite=None",
   ], "set cookie values");
 
   const clearHeaders = new Headers();
   clearSessionCookies(clearHeaders, env);
   assertEquals(values(clearHeaders), [
-    "itx_session=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=None",
-    "itx_refresh=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=None",
-    "itx_session=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=None; Domain=.itemtraxx.com",
-    "itx_refresh=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=None; Domain=.itemtraxx.com",
+    "__Host-itx_session=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=None",
+    "__Host-itx_refresh=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=None",
   ], "clear cookie values");
+});
+
+Deno.test("cookie parsing ignores legacy parent-domain bearer cookies", () => {
+  const request = new Request("https://edge.itemtraxx.com", {
+    headers: {
+      cookie: "itx_session=old-access; itx_refresh=old-refresh",
+    },
+  });
+  assertEquals(parseCookies(request), {
+    accessToken: null,
+    refreshToken: null,
+    legacyCookiePresent: true,
+  }, "legacy cookies are not accepted as a session");
 });
 
 Deno.test("Set-Cookie forwarding preserves each independent cookie", () => {

@@ -7,6 +7,7 @@ import {
   isMissingPrivilegedStepUpTable,
 } from "../_shared/privilegedStepUp.ts";
 import { isSuperAdminTokenBlockedBySessionRevocation } from "../_shared/superAdminSessions.ts";
+import { writeSuperAdminAudit } from "../_shared/superAdminAudit.ts";
 import { isAllowedOrigin, parseAllowedOrigins } from "../_shared/cors.ts";
 import { readJsonBody } from "../_shared/requestBody.ts";
 import { requireTrustedEdgeIngress } from "../_shared/trustedIngress.ts";
@@ -421,6 +422,17 @@ serve(async (req) => {
       if (error || !data) {
         return jsonResponse(400, { error: "Unable to create borrower." });
       }
+      await writeSuperAdminAudit(adminClient, {
+        actorId: user.id,
+        actorEmail: profile.auth_email ?? user.email ?? null,
+        actionType: "create_borrower",
+        targetType: "borrower",
+        targetId: data.id,
+        metadata: {
+          workspace_id: data.workspace_id,
+          borrower_id: data.borrower_id,
+        },
+      });
       return jsonResponse(200, { data });
     }
 
@@ -463,10 +475,30 @@ serve(async (req) => {
         return jsonResponse(403, { error: "Super password verification failed." });
       }
 
+      const { data: target, error: targetError } = await adminClient
+        .from("borrowers")
+        .select("id, workspace_id, borrower_id")
+        .eq("id", id)
+        .maybeSingle();
+      if (targetError || !target) {
+        return jsonResponse(404, { error: "Borrower not found." });
+      }
+
       const { error } = await adminClient.from("borrowers").delete().eq("id", id);
       if (error) {
         return jsonResponse(400, { error: "Unable to delete borrower." });
       }
+      await writeSuperAdminAudit(adminClient, {
+        actorId: user.id,
+        actorEmail: profile.auth_email ?? user.email ?? null,
+        actionType: "delete_borrower",
+        targetType: "borrower",
+        targetId: id,
+        metadata: {
+          workspace_id: target.workspace_id,
+          borrower_id: target.borrower_id,
+        },
+      });
       return jsonResponse(200, { data: { success: true } });
     }
 

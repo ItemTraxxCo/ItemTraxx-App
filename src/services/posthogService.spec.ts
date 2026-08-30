@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("./cookieConsentService", () => ({
   allowsAnalytics: vi.fn(),
+  allowsDiagnostics: vi.fn(),
   readCookieConsent: vi.fn(),
 }));
 vi.mock("./appErrorRecovery", () => ({
@@ -17,13 +18,15 @@ const posthogMock = {
   capture: vi.fn(),
   identify: vi.fn(),
   reset: vi.fn(),
+  set_config: vi.fn(),
   captureException: vi.fn(),
 };
 vi.mock("posthog-js", () => ({ default: posthogMock }));
 
-import { allowsAnalytics } from "./cookieConsentService";
+import { allowsAnalytics, allowsDiagnostics } from "./cookieConsentService";
 
 const mockedAllows = vi.mocked(allowsAnalytics);
+const mockedDiagnostics = vi.mocked(allowsDiagnostics);
 
 // `initialized`/`posthog` are module-level singletons in posthogService, so each
 // describe block that needs a distinct lifecycle state (never-initialized vs.
@@ -37,6 +40,7 @@ const loadFreshModule = async () => {
 const initializedModule = async () => {
   vi.stubEnv("VITE_POSTHOG_PROJECT_TOKEN", "tok_123");
   mockedAllows.mockReturnValue(true);
+  mockedDiagnostics.mockReturnValue(true);
   const mod = await loadFreshModule();
   await mod.initPostHog();
   return mod;
@@ -61,6 +65,7 @@ describe("initPostHog", () => {
   it("does not initialize when analytics consent has not been granted", async () => {
     vi.stubEnv("VITE_POSTHOG_PROJECT_TOKEN", "tok_123");
     mockedAllows.mockReturnValue(false);
+    mockedDiagnostics.mockReturnValue(true);
     const mod = await loadFreshModule();
 
     await mod.initPostHog();
@@ -86,6 +91,24 @@ describe("initPostHog", () => {
       logs?: { beforeSend?: (record: { body: string }) => unknown };
     } | undefined;
     expect(options?.logs?.beforeSend?.({ body: "backend diagnostic token=secret" })).toBeNull();
+  });
+
+  it("keeps every PostHog diagnostic sink disabled when diagnostics consent is declined", async () => {
+    vi.stubEnv("VITE_POSTHOG_PROJECT_TOKEN", "tok_123");
+    mockedAllows.mockReturnValue(true);
+    mockedDiagnostics.mockReturnValue(false);
+    const mod = await loadFreshModule();
+
+    await mod.initPostHog();
+
+    expect(posthogMock.init).toHaveBeenCalledWith(
+      "tok_123",
+      expect.objectContaining({
+        capture_exceptions: false,
+        logs: expect.objectContaining({ captureConsoleLogs: false }),
+        disable_session_recording: true,
+      }),
+    );
   });
 
   it("is idempotent: a second call does not re-init", async () => {
@@ -251,6 +274,15 @@ describe("capturePostHogException", () => {
     expect(properties).toEqual({ error_code: "invalid_barcode" });
   });
 
+  it("does not capture diagnostics when diagnostics consent is revoked", async () => {
+    const mod = await initializedModule();
+    mockedDiagnostics.mockReturnValue(false);
+
+    mod.capturePostHogException(new Error("diagnostic detail"));
+
+    expect(posthogMock.captureException).not.toHaveBeenCalled();
+  });
+
   it("maps an unexpected error to an opaque fixed category", async () => {
     const mod = await initializedModule();
 
@@ -352,6 +384,7 @@ describe("syncPostHogConsent", () => {
 
     expect(posthogMock.opt_in_capturing).toHaveBeenCalledOnce();
     expect(posthogMock.opt_out_capturing).not.toHaveBeenCalled();
+    expect(posthogMock.set_config).toHaveBeenCalledWith({ capture_exceptions: true });
   });
 
   it("opts out when analytics consent is not granted", async () => {
@@ -361,5 +394,15 @@ describe("syncPostHogConsent", () => {
     mod.syncPostHogConsent();
 
     expect(posthogMock.opt_out_capturing).toHaveBeenCalledOnce();
+    expect(posthogMock.set_config).toHaveBeenCalledWith({ capture_exceptions: true });
+  });
+
+  it("disables PostHog exception autocapture when diagnostics consent is revoked", async () => {
+    const mod = await initializedModule();
+    mockedDiagnostics.mockReturnValue(false);
+
+    mod.syncPostHogConsent();
+
+    expect(posthogMock.set_config).toHaveBeenCalledWith({ capture_exceptions: false });
   });
 });

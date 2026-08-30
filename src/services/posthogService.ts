@@ -1,4 +1,8 @@
-import { allowsAnalytics, readCookieConsent } from "./cookieConsentService";
+import {
+  allowsAnalytics,
+  allowsDiagnostics,
+  readCookieConsent,
+} from "./cookieConsentService";
 import { isRecoverableChunkLoadError } from "./appErrorRecovery";
 import type { CaptureResult } from "posthog-js";
 import { scrubSensitiveRecoveryUrlValue } from "../utils/passwordResetRedirect";
@@ -232,7 +236,9 @@ export const initPostHog = async () => {
       capture_pageview: "history_change",
       capture_pageleave: true,
       capture_dead_clicks: false,
-      capture_exceptions: true,
+      // Exception autocapture is diagnostics, not analytics. Keep the SDK's
+      // global handlers disabled unless that separate consent is present.
+      capture_exceptions: allowsDiagnostics(readCookieConsent()),
       before_send: (event) => {
         if (!event) return null;
         const safeEvent: CaptureResult = {
@@ -285,6 +291,9 @@ export const initPostHog = async () => {
 
 export const syncPostHogConsent = () => {
   if (!initialized || !posthog) return;
+  posthog.set_config({
+    capture_exceptions: allowsDiagnostics(readCookieConsent()),
+  });
   if (allowsAnalytics(readCookieConsent())) {
     posthog.opt_in_capturing();
     return;
@@ -330,7 +339,12 @@ export const resetPostHog = () => {
 };
 
 export const capturePostHogException = (error: unknown) => {
-  if (!initialized || !posthog || !allowsAnalytics(readCookieConsent()) || isCspUnsafeEvalError(error)) return;
+  if (
+    !initialized ||
+    !posthog ||
+    !allowsDiagnostics(readCookieConsent()) ||
+    isCspUnsafeEvalError(error)
+  ) return;
   try {
     const errorCode = getPostHogErrorCode(error);
     const safeError = new Error(errorCode);

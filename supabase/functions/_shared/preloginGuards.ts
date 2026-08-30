@@ -40,6 +40,58 @@ export const resolveClientIp = (req: Request) => {
   return "";
 };
 
+const STATUS_CLIENT_COOKIE = "itx-status-client";
+const STATUS_CLIENT_COOKIE_MAX_AGE_SECONDS = 15 * 60;
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+const readCookie = (req: Request, name: string) => {
+  const raw = req.headers.get("cookie") ?? "";
+  for (const part of raw.split(";")) {
+    const separator = part.indexOf("=");
+    if (separator < 0) continue;
+    if (part.slice(0, separator).trim() !== name) continue;
+    return part.slice(separator + 1).trim();
+  }
+  return "";
+};
+
+export type PublicStatusClient = {
+  key: string;
+  setCookie?: string;
+};
+
+/**
+ * Resolve the public status limiter identity only after the caller's edge
+ * proof has been established. Direct callers receive a server-issued,
+ * HttpOnly nonce so unrelated browsers do not share the anonymous bucket.
+ * A separate direct global budget still bounds callers that rotate cookies.
+ */
+export const resolvePublicStatusClient = (
+  req: Request,
+  trustedEdgeIngress: boolean,
+): PublicStatusClient => {
+  if (trustedEdgeIngress) {
+    const ip = resolveClientIp(req);
+    if (ip) {
+      return {
+        key: `ip-${normalizeScopePart(ip, "unknown-ip", 24)}`,
+      };
+    }
+  }
+
+  const existing = readCookie(req, STATUS_CLIENT_COOKIE);
+  if (UUID_PATTERN.test(existing)) {
+    return { key: `status-${existing.toLowerCase()}` };
+  }
+
+  const nonce = crypto.randomUUID();
+  return {
+    key: `status-${nonce}`,
+    setCookie:
+      `${STATUS_CLIENT_COOKIE}=${nonce}; Max-Age=${STATUS_CLIENT_COOKIE_MAX_AGE_SECONDS}; Path=/; HttpOnly; Secure; SameSite=Lax`,
+  };
+};
+
 export const resolveClientFingerprint = (
   req: Request,
   _origin: string | null,

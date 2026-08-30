@@ -3,6 +3,7 @@ import {
   enforcePreloginRateLimit,
   resolveClientFingerprint,
   resolveClientIp,
+  resolvePublicStatusClient,
   resolveRateLimitResult,
   verifyTurnstileToken,
 } from "./preloginGuards.ts";
@@ -184,6 +185,41 @@ Deno.test("resolveClientIp trims and returns the trusted Cloudflare header", () 
 Deno.test("resolveClientIp returns empty string when header is absent", () => {
   const request = new Request("https://example.com");
   assert(resolveClientIp(request) === "", "expected empty client IP fallback");
+});
+
+Deno.test("public status identity ignores forged IP headers for direct callers", () => {
+  const client = resolvePublicStatusClient(
+    new Request("https://example.com", {
+      headers: { "cf-connecting-ip": "203.0.113.42" },
+    }),
+    false,
+  );
+  assert(client.key.startsWith("status-"), "expected a server-issued direct identity");
+  assert(client.setCookie?.includes("itx-status-client=") === true, "expected a client cookie");
+  assert(!client.key.includes("203-0-113-42"), "must not use an untrusted IP");
+});
+
+Deno.test("public status identity remains stable for a valid direct client cookie", () => {
+  const first = resolvePublicStatusClient(new Request("https://example.com"), false);
+  const cookie = first.setCookie?.split(";", 1)[0];
+  if (!cookie) throw new Error("expected a status client cookie");
+  const second = resolvePublicStatusClient(
+    new Request("https://example.com", { headers: { cookie } }),
+    false,
+  );
+  assert(second.key === first.key, "expected the issued cookie to keep one bucket");
+  assert(!second.setCookie, "must not rotate a valid client cookie");
+});
+
+Deno.test("public status identity uses the Cloudflare IP only after trusted ingress", () => {
+  const client = resolvePublicStatusClient(
+    new Request("https://example.com", {
+      headers: { "cf-connecting-ip": "203.0.113.42" },
+    }),
+    true,
+  );
+  assert(client.key === "ip-203-0-113-42", "expected the trusted edge IP bucket");
+  assert(!client.setCookie, "trusted edge callers do not need a nonce cookie");
 });
 
 Deno.test("prelogin rate limit surfaces RPC errors", async () => {

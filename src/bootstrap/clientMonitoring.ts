@@ -60,7 +60,7 @@ export const createClientMonitoring = (router: Router) => {
   };
 
   const getPostHogExceptionCapture = async () => {
-    if (!allowsAnalytics(readCookieConsent())) {
+    if (!allowsDiagnostics(readCookieConsent())) {
       return () => undefined;
     }
     return loadPostHogService()

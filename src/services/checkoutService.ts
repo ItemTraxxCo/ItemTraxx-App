@@ -5,11 +5,13 @@ import { AppError, edgeFunctionError, notFoundError } from "./appErrors";
 import { getOrCreateDeviceSession } from "../utils/deviceSession";
 import {
   ensureCheckoutOperationId,
+  isOfflineQueueItemScopedTo,
   readOfflineQueue,
   withOfflineQueueLock,
   writeOfflineQueue,
   type BufferedCheckoutItem,
   type CheckoutReturnPayload,
+  type OfflineQueueScope,
 } from "./offlineCheckoutQueue";
 import {
   applyConfirmedTransactionToOfflinePack,
@@ -29,6 +31,7 @@ import {
   markItemTraxxServerUnreachable,
 } from "./offlineConnectionState";
 import { fetchSystemStatus, probeSystemStatusTransport } from "./systemStatusService";
+import { fetchHttpSessionSummary } from "./httpSessionService";
 
 export { consumeCheckoutOfflineWarning } from "./offlineCheckoutQueue";
 export type { CheckoutReturnPayload } from "./offlineCheckoutQueue";
@@ -63,6 +66,10 @@ type CheckoutReturnResponse = {
 
 const LOOKUP_TIMEOUT_MS = 7000;
 const SERVER_PROBE_TIMEOUT_MS = 2000;
+const LEGACY_QUEUE_REVIEW_MESSAGE =
+  "Legacy offline transaction is not bound to this session and needs manual review before replay.";
+const LEGACY_QUEUE_SCOPE_UNAVAILABLE_MESSAGE =
+  "Unable to verify the current session for legacy offline replay; retry when connected.";
 
 const isRetryableNetworkFailure = (status: number, message: string) => {
   if (status === 0) return true;
@@ -102,6 +109,49 @@ const getOfflineScope = () => {
   const auth = getAuthState();
   if (!auth.workspaceContextId || !auth.userId) throw new Error("A workspace session is required.");
   return { workspaceId: auth.workspaceContextId, profileId: auth.userId };
+};
+
+type AuthoritativeOfflineQueueScopeResult = {
+  scope: OfflineQueueScope | null;
+  unavailable: boolean;
+};
+
+const getAuthoritativeOfflineQueueScope = async (): Promise<AuthoritativeOfflineQueueScopeResult> => {
+  const authBefore = getAuthState();
+  const identityBefore = {
+    isAuthenticated: authBefore.isAuthenticated,
+    userId: authBefore.userId,
+    workspaceId: authBefore.workspaceContextId ?? authBefore.sessionWorkspaceId ?? null,
+  };
+  try {
+    const session = await fetchHttpSessionSummary();
+    const authAfter = getAuthState();
+    const workspaceAfter = authAfter.workspaceContextId ?? authAfter.sessionWorkspaceId ?? null;
+    if (
+      identityBefore.isAuthenticated !== authAfter.isAuthenticated ||
+      identityBefore.userId !== authAfter.userId ||
+      identityBefore.workspaceId !== workspaceAfter
+    ) {
+      return { scope: null, unavailable: true };
+    }
+    if (!session.authenticated || !session.user?.id || !session.profile?.workspace_id) {
+      return { scope: null, unavailable: false };
+    }
+    const { deviceId } = getOrCreateDeviceSession();
+    if (!deviceId) return { scope: null, unavailable: false };
+    return {
+      scope: {
+        workspaceId: session.profile.workspace_id,
+        profileId: session.user.id,
+        deviceId,
+      },
+      unavailable: false,
+    };
+  } catch {
+    // A failed session read is not evidence that the record is unbound. Keep
+    // it pending and fail closed until the authoritative identity is known.
+    return { scope: null, unavailable: true };
+  }
 };
 
 const executeCheckoutReturn = async (payload: CheckoutReturnPayload) => {
@@ -201,18 +251,53 @@ const syncBufferedCheckoutQueueInternal = async () => {
   const legacy = await withOfflineQueueLock(async () => {
     const queue = await readOfflineQueue();
     if (queue.length === 0) {
-      return { processed: 0, failed: 0, remaining: 0 };
+      return { processed: 0, failed: 0, remaining: 0, review: 0 };
     }
 
     let processed = 0;
     let failed = 0;
+    let review = 0;
     const remaining: BufferedCheckoutItem[] = [];
 
     for (const item of queue) {
+      if (item.review_required === true) {
+        failed += 1;
+        review += 1;
+        remaining.push({
+          ...item,
+          last_error: item.last_error || LEGACY_QUEUE_REVIEW_MESSAGE,
+        });
+        continue;
+      }
+      const { scope, unavailable } = await getAuthoritativeOfflineQueueScope();
+      if (unavailable) {
+        failed += 1;
+        remaining.push({
+          ...item,
+          last_error: LEGACY_QUEUE_SCOPE_UNAVAILABLE_MESSAGE,
+        });
+        continue;
+      }
+      if (!scope || !isOfflineQueueItemScopedTo(item, scope)) {
+        failed += 1;
+        review += 1;
+        remaining.push({
+          ...item,
+          review_required: true,
+          last_error: LEGACY_QUEUE_REVIEW_MESSAGE,
+        });
+        continue;
+      }
       const payload = ensureCheckoutOperationId(item.payload);
       if (payload.action_type === "auto") {
         failed += 1;
-        remaining.push({ ...item, payload, last_error: "Legacy automatic transaction needs manual review before replay." });
+        review += 1;
+        remaining.push({
+          ...item,
+          payload,
+          review_required: true,
+          last_error: "Legacy automatic transaction needs manual review before replay.",
+        });
         continue;
       }
       try {
@@ -231,17 +316,21 @@ const syncBufferedCheckoutQueueInternal = async () => {
     }
 
     await writeOfflineQueue(remaining);
+    window.dispatchEvent(new CustomEvent("itemtraxx:offline-queue-changed"));
     return {
       processed,
       failed,
-      remaining: remaining.length,
+      // Review-required records remain stored for the local review surface,
+      // but are not retryable work and must not be counted as pending.
+      remaining: remaining.filter((item) => item.review_required !== true).length,
+      review,
     };
   });
   return {
     processed: workflow.processed + legacy.processed,
     failed: workflow.failed + legacy.failed,
     remaining: workflow.remaining + legacy.remaining,
-    review: workflow.review,
+    review: workflow.review + legacy.review,
   };
 };
 

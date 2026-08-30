@@ -3,6 +3,8 @@
 do $$
 declare
   target_table text;
+  atomic_function text;
+  unchecked_function text;
 begin
   foreach target_table in array array[
     'offline_checkout_packs',
@@ -61,34 +63,35 @@ begin
     raise exception 'offline conflict operation dedupe constraint missing';
   end if;
 
-  if to_regprocedure(
-    'public.apply_offline_checkout_item(uuid,uuid,text,uuid,text,uuid,text,text,uuid,text,uuid,uuid,boolean)'
-  ) is null then
+  atomic_function := 'public.apply_offline_checkout_item(uuid,uuid,text,uuid,text,uuid,text,text,uuid,text,uuid,uuid,boolean)';
+  unchecked_function := 'public.apply_offline_checkout_item_unchecked(uuid,uuid,text,uuid,text,uuid,text,text,uuid,text,uuid,uuid,boolean)';
+  if to_regprocedure(atomic_function) is null
+     or to_regprocedure(unchecked_function) is null then
     raise exception 'atomic offline item replay function missing';
   end if;
   if has_function_privilege(
     'authenticated',
-    'public.apply_offline_checkout_item(uuid,uuid,text,uuid,text,uuid,text,text,uuid,text,uuid,uuid,boolean)',
+    atomic_function,
     'EXECUTE'
   ) then
     raise exception 'authenticated can call atomic offline item replay directly';
   end if;
   if not has_function_privilege(
     'service_role',
-    'public.apply_offline_checkout_item(uuid,uuid,text,uuid,text,uuid,text,text,uuid,text,uuid,uuid,boolean)',
+    atomic_function,
     'EXECUTE'
   ) then
     raise exception 'service role cannot call atomic offline item replay';
   end if;
-  if position('pack.invalidated_at is null' in lower(pg_get_functiondef(to_regprocedure(
-    'public.apply_offline_checkout_item(uuid,uuid,text,uuid,text,uuid,text,text,uuid,text,uuid,uuid,boolean)'
-  )))) = 0 or position('for update' in lower(pg_get_functiondef(to_regprocedure(
-    'public.apply_offline_checkout_item(uuid,uuid,text,uuid,text,uuid,text,text,uuid,text,uuid,uuid,boolean)'
-  )))) = 0 or position('insert into public.admin_audit_logs' in lower(pg_get_functiondef(to_regprocedure(
-    'public.apply_offline_checkout_item(uuid,uuid,text,uuid,text,uuid,text,text,uuid,text,uuid,uuid,boolean)'
-  )))) = 0 or position('actor_role <> ''workspace_admin''' in lower(pg_get_functiondef(to_regprocedure(
-    'public.apply_offline_checkout_item(uuid,uuid,text,uuid,text,uuid,text,text,uuid,text,uuid,uuid,boolean)'
-  )))) = 0 then
+  if has_function_privilege('service_role', unchecked_function, 'EXECUTE') then
+    raise exception 'service role can bypass the guarded atomic replay wrapper';
+  end if;
+  if position('borrower_access_grants' in lower(pg_get_functiondef(to_regprocedure(atomic_function)))) = 0
+     or position('workspace.status = ''active''' in lower(pg_get_functiondef(to_regprocedure(atomic_function)))) = 0
+     or position('pack.invalidated_at is null' in lower(pg_get_functiondef(to_regprocedure(unchecked_function)))) = 0
+     or position('for update' in lower(pg_get_functiondef(to_regprocedure(unchecked_function)))) = 0
+     or position('insert into public.admin_audit_logs' in lower(pg_get_functiondef(to_regprocedure(unchecked_function)))) = 0
+     or position('actor_role <> ''workspace_admin''' in lower(pg_get_functiondef(to_regprocedure(unchecked_function)))) = 0 then
     raise exception 'atomic replay does not enforce active pack, row locking, admin-only Quick Return, and audit';
   end if;
 end $$;

@@ -81,15 +81,16 @@ Deno.test("localhost origins require the explicit trust flag", () => {
   assert(!isLocalhostOrigin("not a URL"), "invalid localhost URL should fail");
 });
 
-Deno.test("production workspace app origins are allowed without per-workspace configuration", () => {
-  for (const origin of [
-    "https://new-workspace.app.itemtraxx.com",
-  ]) {
-    assert(
-      isAllowedOrigin(origin, [], {} as Env),
-      `workspace app origin should pass: ${origin}`,
-    );
-  }
+Deno.test("workspace app origins require an exact provider-managed entry", () => {
+  const registeredOrigin = "https://new-workspace.app.itemtraxx.com";
+  assert(
+    !isAllowedOrigin(registeredOrigin, [], {} as Env),
+    "unregistered workspace app origin should fail",
+  );
+  assert(
+    isAllowedOrigin(registeredOrigin, [registeredOrigin], {} as Env),
+    "registered workspace app origin should pass",
+  );
   for (const origin of [
     "http://itxdemo.app.itemtraxx.com",
     "https://app.itemtraxx.com",

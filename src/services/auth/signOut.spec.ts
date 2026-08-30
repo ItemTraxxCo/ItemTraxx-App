@@ -87,7 +87,11 @@ describe("signOut", () => {
     vi.mocked(getAuthState).mockReturnValue({ role: "workspace_admin", adminVerifiedAt: "2026-08-01T00:00:00Z" } as never);
     vi.mocked(revokeCurrentAccountSession).mockRejectedValueOnce(new Error("network down"));
 
-    await expect(signOut()).resolves.toBeUndefined();
+    await expect(signOut()).resolves.toMatchObject({
+      ok: true,
+      httpSessionCleared: true,
+      accountSessionRevoked: false,
+    });
 
     expect(signOutLocalSupabaseSession).toHaveBeenCalledTimes(1);
     expect(clearAuthState).toHaveBeenCalledWith(true);
@@ -96,17 +100,40 @@ describe("signOut", () => {
   it("continues clearing the HttpOnly session when local Supabase sign-out fails", async () => {
     vi.mocked(signOutLocalSupabaseSession).mockRejectedValueOnce(new Error("local sign-out unavailable"));
 
-    await expect(signOut()).resolves.toBeUndefined();
+    await expect(signOut()).resolves.toMatchObject({
+      ok: true,
+      httpSessionCleared: true,
+      accountSessionRevoked: true,
+    });
 
     expect(clearHttpSession).toHaveBeenCalledTimes(1);
     expect(clearAuthState).toHaveBeenCalledWith(true);
     expect(setWorkspaceContext).toHaveBeenCalledWith(null);
   });
 
-  it("continues cleanup even when clearing the HttpOnly cookie session fails", async () => {
+  it("returns a failed result and keeps local auth state when clearing the HttpOnly session fails", async () => {
     vi.mocked(clearHttpSession).mockRejectedValueOnce(new Error("cookie logout down"));
 
-    await expect(signOut()).resolves.toBeUndefined();
+    await expect(signOut()).resolves.toEqual({
+      ok: false,
+      httpSessionCleared: false,
+      accountSessionRevoked: true,
+    });
+
+    expect(clearAdminVerification).not.toHaveBeenCalled();
+    expect(clearPendingSuperAdminVerificationEmail).not.toHaveBeenCalled();
+    expect(clearAuthState).not.toHaveBeenCalled();
+    expect(setWorkspaceContext).not.toHaveBeenCalled();
+  });
+
+  it("supports best-effort cleanup for login/error recovery when the HttpOnly session fails", async () => {
+    vi.mocked(clearHttpSession).mockRejectedValueOnce(new Error("cookie logout down"));
+
+    await expect(signOut({ bestEffort: true })).resolves.toEqual({
+      ok: false,
+      httpSessionCleared: false,
+      accountSessionRevoked: true,
+    });
 
     expect(clearAdminVerification).toHaveBeenCalledTimes(1);
     expect(clearPendingSuperAdminVerificationEmail).toHaveBeenCalledTimes(1);

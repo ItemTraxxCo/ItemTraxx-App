@@ -1,4 +1,8 @@
-import { appendSetCookies, parseCookies } from "./cookies.ts";
+import {
+  appendSetCookies,
+  clearLegacySessionCookies,
+  parseCookies,
+} from "./cookies.ts";
 import {
   applyMaintenanceFallbackToStatusPayload,
   readMaintenanceFallback,
@@ -156,6 +160,11 @@ export const proxyFunctionRequest = async (
   );
   responseHeaders.set("x-request-id", requestId);
   if (sessionHeaders) appendSetCookies(responseHeaders, sessionHeaders);
+  if (cookies.legacyCookiePresent) {
+    const migrationHeaders = new Headers();
+    clearLegacySessionCookies(migrationHeaders, env);
+    appendSetCookies(responseHeaders, migrationHeaders);
+  }
 
   if (isSystemStatusGet) {
     const rawBody = await readBoundedSystemStatusText(upstreamResponse);

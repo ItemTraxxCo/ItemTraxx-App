@@ -57,7 +57,10 @@ const publicItemState = (item: ItemRow | null) =>
       name: item.name,
       barcode: item.barcode,
       status: item.status,
-      checked_out_by: item.checked_out_by,
+      // A conflict can be returned after the actor's borrower grant has been
+      // revoked. Keep the review envelope useful without exposing the current
+      // borrower's identifier across that boundary.
+      checked_out_by: null,
     }
     : { missing: true };
 
@@ -336,6 +339,11 @@ serve(async (req) => {
     const describeServerState = async (itemId: string) => {
       const current = await loadItem(itemId);
       if (!current) return publicItemState(null);
+      if (!(await canAccessItem(current))) return publicItemState(current);
+      if (
+        current.checked_out_by &&
+        !(await canAccessBorrower(current.checked_out_by))
+      ) return publicItemState(current);
       const [borrowerResult, logResult] = await Promise.all([
         current.checked_out_by
           ? adminClient.from("borrowers")
@@ -366,12 +374,41 @@ serve(async (req) => {
         : { data: null };
       return {
         ...publicItemState(current),
+        checked_out_by: current.checked_out_by,
         borrower_username: borrowerResult.data?.username ?? null,
         borrower_display_id: borrowerResult.data?.borrower_id ?? null,
         performed_by_email: actor?.auth_email ?? null,
         action_type: log?.action_type ?? null,
         action_time: log?.action_time ?? null,
       };
+    };
+    const sanitizeStoredItemResults = (value: unknown) => {
+      if (!Array.isArray(value)) return [];
+      return value.map((entry) => {
+        if (!entry || typeof entry !== "object" || Array.isArray(entry)) {
+          return { status: "needs_review" };
+        }
+        const source = entry as Record<string, unknown>;
+        const safe: Record<string, unknown> = {};
+        for (const key of ["item_id", "barcode", "status", "reason"]) {
+          if (typeof source[key] === "string") safe[key] = source[key];
+        }
+        if (source.server_state && typeof source.server_state === "object") {
+          const state = source.server_state as Record<string, unknown>;
+          safe.server_state = {
+            ...(typeof state.id === "string" ? { id: state.id } : {}),
+            ...(typeof state.name === "string" ? { name: state.name } : {}),
+            ...(typeof state.barcode === "string"
+              ? { barcode: state.barcode }
+              : {}),
+            ...(typeof state.status === "string"
+              ? { status: state.status }
+              : {}),
+            checked_out_by: null,
+          };
+        }
+        return safe;
+      });
     };
     const applyItemAtomically = async (
       packId: string,
@@ -495,8 +532,9 @@ serve(async (req) => {
               ? "needs_review"
               : "synced",
             resolution: existingConflict.resolution,
-            item_results: existingConflict.resolution_result ??
-              existingConflict.server_state,
+            item_results: sanitizeStoredItemResults(
+              existingConflict.resolution_result ?? existingConflict.server_state,
+            ),
           });
           continue;
         }
@@ -559,8 +597,7 @@ serve(async (req) => {
               barcode: item.barcode,
               status: "needs_review",
               reason: atomicResult.reason ?? "server_state_changed",
-              server_state: atomicResult.server_state ??
-                await describeServerState(item.item_id),
+              server_state: await describeServerState(item.item_id),
             });
             continue;
           }
@@ -626,7 +663,7 @@ serve(async (req) => {
           operation_id: operationId,
           status: "resolved",
           resolution: conflict.resolution,
-          item_results: conflict.resolution_result ?? [],
+          item_results: sanitizeStoredItemResults(conflict.resolution_result),
         },
       });
     }
@@ -679,6 +716,29 @@ serve(async (req) => {
         });
         continue;
       }
+      let resolutionAccessFailure: string | undefined;
+      if (!current || current.deleted_at) {
+        resolutionAccessFailure = "item_unavailable";
+      } else if (current.barcode !== item.barcode) {
+        resolutionAccessFailure = "item_identity_changed";
+      } else if (
+        !(await canAccessItem(current)) ||
+        (item.intent !== "quick_return" &&
+          !(await canAccessBorrower(item.borrower_id)))
+      ) {
+        resolutionAccessFailure = "access_changed";
+      }
+      if (resolutionAccessFailure) {
+        allResolved = false;
+        resolutionResults.push(
+          await resultForCurrentState(
+            item,
+            "needs_review",
+            resolutionAccessFailure,
+          ),
+        );
+        continue;
+      }
       const atomicResult = await applyItemAtomically(
         conflict.pack_id,
         operationId,
@@ -693,8 +753,7 @@ serve(async (req) => {
         ...(atomicResult.status === "needs_review"
           ? {
             reason: atomicResult.reason ?? "resolution_failed",
-            server_state: atomicResult.server_state ??
-                await describeServerState(item.item_id),
+            server_state: await describeServerState(item.item_id),
           }
           : {}),
       });

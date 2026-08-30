@@ -46,7 +46,7 @@ Deno.test("Data API proxy retries 401 with a refreshed cookie session and stream
         method: "POST",
         headers: {
           "cf-connecting-ip": "203.0.113.42",
-          cookie: "itx_session=old-access; itx_refresh=old-refresh",
+          cookie: "__Host-itx_session=old-access; __Host-itx_refresh=old-refresh",
           "content-type": "application/json",
         },
         body: '{"fixture":true}',

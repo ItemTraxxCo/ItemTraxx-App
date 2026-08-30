@@ -1,4 +1,8 @@
-import { appendSetCookies, parseCookies } from "./cookies.ts";
+import {
+  appendSetCookies,
+  clearLegacySessionCookies,
+  parseCookies,
+} from "./cookies.ts";
 import { hasRpcCallerAuth, sanitizeUpstreamHeaders } from "./requestHeaders.ts";
 import {
   MAX_PROXY_REQUEST_BODY_BYTES,
@@ -93,6 +97,11 @@ export const proxySupabaseApiRequest = async (
   );
   responseHeaders.set("x-request-id", requestId);
   if (sessionHeaders) appendSetCookies(responseHeaders, sessionHeaders);
+  if (cookies.legacyCookiePresent) {
+    const migrationHeaders = new Headers();
+    clearLegacySessionCookies(migrationHeaders, env);
+    appendSetCookies(responseHeaders, migrationHeaders);
+  }
   return new Response(upstreamResponse.body, {
     status: upstreamResponse.status,
     headers: responseHeaders,

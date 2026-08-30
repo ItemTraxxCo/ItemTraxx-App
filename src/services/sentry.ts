@@ -2,6 +2,7 @@ import type { App } from "vue";
 import type { Router } from "vue-router";
 import { shouldReportError } from "./appErrors";
 import { allowsDiagnostics, allowsSessionReplay, readCookieConsent } from "./cookieConsentService";
+import { scrubSensitiveRecoveryUrlValue } from "../utils/passwordResetRedirect";
 
 const SENTRY_DSN = import.meta.env.VITE_SENTRY_DSN?.trim();
 const SENTRY_ENVIRONMENT = import.meta.env.VITE_SENTRY_ENVIRONMENT || import.meta.env.MODE;
@@ -20,6 +21,44 @@ const replayEnabled =
   (Number.isFinite(SENTRY_REPLAY_ON_ERROR_SAMPLE_RATE) && SENTRY_REPLAY_ON_ERROR_SAMPLE_RATE > 0);
 
 let sentryInitialized = false;
+
+type EventWithRequest = {
+  request?: {
+    url?: unknown;
+    headers?: Record<string, unknown>;
+  };
+};
+
+const sanitizeRecoveryUrls = <T extends EventWithRequest>(event: T): T => {
+  const request = event.request;
+  if (!request) return event;
+  let changed = false;
+  const safeRequest = { ...request };
+  if (typeof request.url === "string") {
+    const safeUrl = scrubSensitiveRecoveryUrlValue(request.url);
+    if (safeUrl !== request.url) {
+      safeRequest.url = safeUrl;
+      changed = true;
+    }
+  }
+  if (request.headers) {
+    const safeHeaders = { ...request.headers };
+    for (const key of Object.keys(safeHeaders)) {
+      if (!/^(referer|referrer)$/i.test(key)) continue;
+      const value = safeHeaders[key];
+      if (typeof value !== "string") continue;
+      const safeValue = scrubSensitiveRecoveryUrlValue(value);
+      if (safeValue !== value) {
+        safeHeaders[key] = safeValue;
+        changed = true;
+      }
+    }
+    if (changed) safeRequest.headers = safeHeaders;
+  }
+  return changed ? { ...event, request: safeRequest } : event;
+};
+
+export { sanitizeRecoveryUrls };
 
 const getTracePropagationTargets = () => {
   const targets: Array<string | RegExp> = ["localhost"];
@@ -181,10 +220,12 @@ export const initializeSentry = async (app: App, router: Router, appMounted = fa
       if (!shouldReportError(hint.originalException)) {
         return null;
       }
-      return event;
+      return sanitizeRecoveryUrls(event);
     },
     beforeSendTransaction(event) {
-      return allowsDiagnostics(readCookieConsent()) ? event : null;
+      return allowsDiagnostics(readCookieConsent())
+        ? sanitizeRecoveryUrls(event)
+        : null;
     },
   });
 

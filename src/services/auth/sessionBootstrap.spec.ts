@@ -37,6 +37,10 @@ vi.mock("../httpSessionService", () => ({
   fetchHttpSessionSummary: vi.fn(),
 }));
 
+vi.mock("../offlineCheckoutQueue", () => ({
+  quarantineOfflineCheckoutQueueForCurrentSession: vi.fn(),
+}));
+
 import {
   applyHttpSessionSummary,
   fetchCurrentRoleAndWorkspace,
@@ -59,6 +63,7 @@ import { lookupWorkspaceById } from "../workspaceService";
 import { signOutLocalSupabaseSession } from "../supabaseAuthSession";
 import { authenticatedRpc, authenticatedSelect } from "../authenticatedDataClient";
 import { fetchHttpSessionSummary } from "../httpSessionService";
+import { quarantineOfflineCheckoutQueueForCurrentSession } from "../offlineCheckoutQueue";
 
 describe("fetchCurrentRoleAndWorkspace", () => {
   beforeEach(() => vi.clearAllMocks());
@@ -171,6 +176,7 @@ describe("resolveWorkspaceSlug", () => {
 describe("applyHttpSessionSummary", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(quarantineOfflineCheckoutQueueForCurrentSession).mockResolvedValue(0);
     vi.mocked(getAuthState).mockReturnValue({
       userId: null,
       role: null,
@@ -243,6 +249,24 @@ describe("applyHttpSessionSummary", () => {
       })
     );
     expect(clearSessionTermination).toHaveBeenCalledTimes(1);
+  });
+
+  it("quarantines legacy offline entries when the session identity changes", async () => {
+    vi.mocked(getAuthState).mockReturnValue({
+      isAuthenticated: true,
+      userId: "previous-user",
+      workspaceContextId: "ws-1",
+      sessionWorkspaceId: "ws-1",
+      role: "tenant_account",
+    } as never);
+
+    await applyHttpSessionSummary({
+      authenticated: true,
+      user: { id: "u1", email: "a@b.com", last_sign_in_at: null },
+      profile: { role: "tenant_account", workspace_id: "ws-1", auth_email: "a@b.com", is_active: true },
+    });
+
+    expect(quarantineOfflineCheckoutQueueForCurrentSession).toHaveBeenCalledTimes(1);
   });
 
   it("falls back to persisted admin verification's summary timestamp when nothing is stored locally", async () => {

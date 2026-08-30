@@ -8,7 +8,7 @@ import {
 import { isAllowedOrigin, parseAllowedOrigins } from "../_shared/cors.ts";
 import {
   enforcePreloginRateLimit,
-  resolveClientFingerprint,
+  resolvePublicStatusClient,
 } from "../_shared/preloginGuards.ts";
 import { buildPublicRateLimitHeaders } from "../_shared/publicRateLimit.ts";
 import { resolveSystemStatusOverride } from "../_shared/systemStatusOverride.ts";
@@ -67,11 +67,12 @@ type IncidentWidgetPayload = {
 // Two bounds, neither of which changes the public contract:
 //   1. a short in-memory cache of the derived incident.io verdict, shared by
 //      every request an isolate serves;
-//   2. a generous per-IP rate limit for Worker and direct traffic; callers
-//      without an IP remain in a bounded anonymous fallback bucket.
+//   2. a per-client rate limit for trusted Worker traffic and server-issued
+//      identities for direct callers, plus a separate direct aggregate budget.
 const INCIDENT_CACHE_TTL_MS = 20_000;
 const STATUS_RATE_LIMIT_PER_MINUTE = 60;
 const STATUS_RATE_LIMIT_WINDOW_SECONDS = 60;
+const STATUS_DIRECT_GLOBAL_LIMIT_PER_MINUTE = 600;
 
 type CachedIncidentStatus = {
   status: "operational" | "degraded" | "down";
@@ -130,25 +131,31 @@ const resolveIncidentStatus = (
 
 serve(async (req) => {
   const { hasOrigin, originAllowed, headers } = resolveCorsHeaders(req);
+  let statusClientCookie: string | null = null;
 
   const jsonResponse = (
     status: number,
     body: Record<string, unknown>,
     rateLimit: { retryAfterSeconds?: number | null; remaining?: number | null } = {},
-  ) =>
-    new Response(JSON.stringify(body), {
-      status,
-      headers: {
-        ...headers,
-        ...buildPublicRateLimitHeaders({
-          limit: STATUS_RATE_LIMIT_PER_MINUTE,
-          windowSeconds: STATUS_RATE_LIMIT_WINDOW_SECONDS,
-          retryAfterSeconds: rateLimit.retryAfterSeconds,
-          remaining: rateLimit.remaining,
-        }),
-        "Content-Type": "application/json",
-      },
+  ) => {
+    const responseHeaders = new Headers({
+      ...headers,
+      ...buildPublicRateLimitHeaders({
+        limit: STATUS_RATE_LIMIT_PER_MINUTE,
+        windowSeconds: STATUS_RATE_LIMIT_WINDOW_SECONDS,
+        retryAfterSeconds: rateLimit.retryAfterSeconds,
+        remaining: rateLimit.remaining,
+      }),
+      "Content-Type": "application/json",
     });
+    if (statusClientCookie) {
+      responseHeaders.append("Set-Cookie", statusClientCookie);
+    }
+    return new Response(JSON.stringify(body), {
+      status,
+      headers: responseHeaders,
+    });
+  };
 
   if (req.method === "OPTIONS") {
     if (!originAllowed) {
@@ -188,25 +195,18 @@ serve(async (req) => {
       auth: { persistSession: false },
     });
 
-    // Keep direct status consumers isolated per client IP as well as Worker
-    // traffic. This preserves availability for unrelated real users; a caller
-    // that rotates addresses can rotate buckets too, which is an accepted
-    // tradeoff for this public, unauthenticated status endpoint.
     const trustedEdgeIngress = await hasTrustedEdgeIngress(
       req,
       "system-status",
     ).catch(() => false);
-    const clientFingerprint = resolveClientFingerprint(
-      req,
-      req.headers.get("origin"),
-      { trustProxyHeader: true },
-    );
+    const statusClient = resolvePublicStatusClient(req, trustedEdgeIngress);
+    statusClientCookie = statusClient.setCookie ?? null;
 
     // Bound the unauthenticated request cost. A limiter outage must fail closed
     // so an attacker cannot turn an unavailable guard into an unbounded probe.
     const rateLimit = await enforcePreloginRateLimit(
       adminClient,
-      clientFingerprint,
+      statusClient.key,
       trustedEdgeIngress ? "system-status-edge" : "system-status-direct",
       STATUS_RATE_LIMIT_PER_MINUTE,
       STATUS_RATE_LIMIT_WINDOW_SECONDS
@@ -219,6 +219,38 @@ serve(async (req) => {
         duration_ms: Date.now() - startedAt,
         checked_at: new Date().toISOString(),
       });
+    }
+
+    if (!trustedEdgeIngress) {
+      const directGlobalRateLimit = await enforcePreloginRateLimit(
+        adminClient,
+        "global",
+        "system-status-direct-global",
+        STATUS_DIRECT_GLOBAL_LIMIT_PER_MINUTE,
+        STATUS_RATE_LIMIT_WINDOW_SECONDS,
+      );
+      if (directGlobalRateLimit.error) {
+        return jsonResponse(503, {
+          status: "unknown",
+          checks: { config: "ok", db: "unknown", rate_limit: "unavailable" },
+          incident_summary: "rate limiter unavailable",
+          duration_ms: Date.now() - startedAt,
+          checked_at: new Date().toISOString(),
+        });
+      }
+      if (!directGlobalRateLimit.ok) {
+        return jsonResponse(429, {
+          status: "unknown",
+          checks: { config: "ok", db: "unknown" },
+          incident_summary: "rate limited",
+          duration_ms: Date.now() - startedAt,
+          checked_at: new Date().toISOString(),
+        }, {
+          retryAfterSeconds: directGlobalRateLimit.retryAfterSeconds ??
+            STATUS_RATE_LIMIT_WINDOW_SECONDS,
+          remaining: 0,
+        });
+      }
     }
     if (!rateLimit.ok && !rateLimit.error) {
       return jsonResponse(429, {

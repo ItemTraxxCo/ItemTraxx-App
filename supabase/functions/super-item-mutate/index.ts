@@ -6,6 +6,7 @@ import {
   isMissingPrivilegedStepUpTable,
 } from "../_shared/privilegedStepUp.ts";
 import { isSuperAdminTokenBlockedBySessionRevocation } from "../_shared/superAdminSessions.ts";
+import { writeSuperAdminAudit } from "../_shared/superAdminAudit.ts";
 import { isAllowedOrigin, parseAllowedOrigins } from "../_shared/cors.ts";
 import { readJsonBody } from "../_shared/requestBody.ts";
 import { requireTrustedEdgeIngress } from "../_shared/trustedIngress.ts";
@@ -272,6 +273,17 @@ serve(async (req) => {
       if (error || !data) {
         return jsonResponse(400, { error: "Unable to create item." });
       }
+      await writeSuperAdminAudit(adminClient, {
+        actorId: user.id,
+        actorEmail: profile.auth_email ?? user.email ?? null,
+        actionType: "create_item",
+        targetType: "item",
+        targetId: data.id,
+        metadata: {
+          workspace_id: data.workspace_id,
+          barcode: data.barcode,
+        },
+      });
       return jsonResponse(200, { data });
     }
 
@@ -320,6 +332,18 @@ serve(async (req) => {
       if (error || !data) {
         return jsonResponse(400, { error: "Unable to update item." });
       }
+      await writeSuperAdminAudit(adminClient, {
+        actorId: user.id,
+        actorEmail: profile.auth_email ?? user.email ?? null,
+        actionType: "update_item",
+        targetType: "item",
+        targetId: data.id,
+        metadata: {
+          workspace_id: data.workspace_id,
+          barcode: data.barcode,
+          status: data.status,
+        },
+      });
       return jsonResponse(200, { data });
     }
 
@@ -347,10 +371,30 @@ serve(async (req) => {
         return jsonResponse(403, { error: "Super password verification failed." });
       }
 
+      const { data: target, error: targetError } = await adminClient
+        .from("items")
+        .select("id, workspace_id, barcode")
+        .eq("id", id)
+        .maybeSingle();
+      if (targetError || !target) {
+        return jsonResponse(404, { error: "Item not found." });
+      }
+
       const { error } = await adminClient.from("items").delete().eq("id", id);
       if (error) {
         return jsonResponse(400, { error: "Unable to delete item." });
       }
+      await writeSuperAdminAudit(adminClient, {
+        actorId: user.id,
+        actorEmail: profile.auth_email ?? user.email ?? null,
+        actionType: "delete_item",
+        targetType: "item",
+        targetId: id,
+        metadata: {
+          workspace_id: target.workspace_id,
+          barcode: target.barcode,
+        },
+      });
       return jsonResponse(200, { data: { success: true } });
     }
 

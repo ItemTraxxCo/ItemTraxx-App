@@ -34,8 +34,10 @@ Deno.test("isAllowedOrigin does not expand wildcard origin patterns", () => {
   );
 });
 
-Deno.test("isAllowedOrigin accepts only valid production workspace app origins", () => {
-  assert(isAllowedOrigin("https://new-workspace.app.itemtraxx.com", []));
+Deno.test("isAllowedOrigin requires provider-managed workspace app origins", () => {
+  const workspaceOrigin = "https://new-workspace.app.itemtraxx.com";
+  assert(!isAllowedOrigin(workspaceOrigin, []));
+  assert(isAllowedOrigin(workspaceOrigin, [workspaceOrigin]));
   assert(!isAllowedOrigin("http://new-workspace.app.itemtraxx.com", []));
   assert(!isAllowedOrigin("https://app.app.itemtraxx.com", []));
   assert(!isAllowedOrigin("https://two.levels.app.itemtraxx.com", []));

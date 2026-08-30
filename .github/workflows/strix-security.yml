@@ -48,8 +48,8 @@ jobs:
       pull-requests: write
     runs-on: ubuntu-latest
     # Serializing Strix's agent fan-out needs more wall-clock budget than the
-    # previous parallel run, while staying well below GitHub-hosted runner limits.
-    timeout-minutes: 120
+    # previous parallel run, using the full GitHub-hosted runner job limit.
+    timeout-minutes: 360
 
     steps:
       # Full history lets Strix resolve the pull-request diff scope reliably.

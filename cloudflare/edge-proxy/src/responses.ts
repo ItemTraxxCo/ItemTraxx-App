@@ -20,8 +20,11 @@ export const buildSessionRateLimitError = (
   failure: "rate_limited" | "unavailable",
   headers: Record<string, string>,
   requestId: string,
+  extraHeaders?: Headers,
 ) => {
-  const responseHeaders = new Headers();
+  const responseHeaders = extraHeaders
+    ? new Headers(extraHeaders)
+    : new Headers();
   if (failure === "rate_limited") {
     responseHeaders.set(
       "Retry-After",
@@ -35,7 +38,13 @@ export const buildSessionRateLimitError = (
       responseHeaders,
     );
   }
-  return buildError(503, "Session protection unavailable", headers, requestId);
+  return buildError(
+    503,
+    "Session protection unavailable",
+    headers,
+    requestId,
+    responseHeaders,
+  );
 };
 
 export const buildJson = (

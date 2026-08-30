@@ -106,7 +106,7 @@ export const verifySuperAdminEmailChallenge = async (code: string) => {
   await refreshAuthFromSession();
   const current = getAuthState();
   if (current.role !== "super_admin") {
-    await signOut();
+    await signOut({ bestEffort: true });
     throw new Error("Access denied.");
   }
   setSecondaryAuth(true);
@@ -183,17 +183,17 @@ export const adminLoginWithSession = async (
   }
 
   if (resolvedRole !== "workspace_admin") {
-    await signOut();
+    await signOut({ bestEffort: true });
     throw new Error("Access denied.");
   }
   if (profile && profile.is_active === false) {
-    await signOut();
+    await signOut({ bestEffort: true });
     throw new Error("Access denied.");
   }
   if (resolvedRole === "workspace_admin" && resolvedWorkspaceId) {
     const workspace = await fetchWorkspaceContext(resolvedWorkspaceId);
     if (workspace?.status && workspace.status !== "active") {
-      await signOut();
+      await signOut({ bestEffort: true });
       throw new Error("Workspace disabled.");
     }
   }
@@ -204,17 +204,17 @@ export const adminLoginWithSession = async (
     resolvedWorkspaceId &&
     resolvedWorkspaceId !== priorWorkspaceContextId
   ) {
-    await signOut();
+    await signOut({ bestEffort: true });
     throw new Error("Access denied.");
   }
 
   if (workspaceHost.isWorkspaceHost) {
     if (!workspaceHost.workspaceId) {
-      await signOut();
+      await signOut({ bestEffort: true });
       throw new Error("This workspace URL is not configured.");
     }
     if (!resolvedWorkspaceId || resolvedWorkspaceId !== workspaceHost.workspaceId) {
-      await signOut();
+      await signOut({ bestEffort: true });
       throw new Error("Access denied.");
     }
   }
@@ -224,7 +224,7 @@ export const adminLoginWithSession = async (
   try {
     await registerPrivilegedAdminStepUp(accessToken);
   } catch (error) {
-    await signOut();
+    await signOut({ bestEffort: true });
     throw error;
   }
 
@@ -363,7 +363,7 @@ export const superAdminPasskeyLogin = async (options: {
   await refreshAuthFromSession();
   const current = getAuthState();
   if (current.role !== "super_admin") {
-    await signOut();
+    await signOut({ bestEffort: true });
     throw new Error("Access denied.");
   }
 

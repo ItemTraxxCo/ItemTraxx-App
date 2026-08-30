@@ -275,7 +275,11 @@ const logoutTenant = async () => {
   menuOpen.value = false;
   const { getPostSignOutUrl, signOut } = await import("./services/authService");
   const nextUrl = getPostSignOutUrl();
-  await signOut();
+  const result = await signOut();
+  if (!result.ok) {
+    window.alert("Unable to complete logout. Please try again.");
+    return;
+  }
   if (nextUrl.startsWith("http")) window.location.assign(nextUrl);
   else await router.push(nextUrl);
 };

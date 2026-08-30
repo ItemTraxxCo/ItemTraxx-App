@@ -103,6 +103,38 @@ export const enforcePreloginRateLimit = async (
   };
 };
 
+/**
+ * Apply a stable per-client limit and an independent fixed global budget.
+ * Public callers must not be able to mint new buckets by changing a browser
+ * supplied header such as User-Agent. The global bucket also caps aggregate
+ * work when requests arrive from many addresses.
+ */
+export const enforcePublicRateLimits = async (
+  client: any,
+  clientKey: string,
+  scope: string,
+  perClientLimit: number,
+  windowSeconds: number,
+  globalLimit: number,
+) => {
+  const perClient = await enforcePreloginRateLimit(
+    client,
+    clientKey,
+    scope,
+    perClientLimit,
+    windowSeconds,
+  );
+  if (!perClient.ok) return perClient;
+
+  return enforcePreloginRateLimit(
+    client,
+    "global",
+    `${scope}:global`,
+    globalLimit,
+    windowSeconds,
+  );
+};
+
 export const resolveRateLimitResult = ({
   data,
   error,

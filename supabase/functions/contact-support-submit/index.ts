@@ -4,8 +4,10 @@ import { isKillSwitchWriteBlocked } from "../_shared/killSwitch.ts";
 import { getRequestId, logError, logInfo } from "../_shared/observability.ts";
 import { isAllowedOrigin, parseAllowedOrigins } from "../_shared/cors.ts";
 import { readJsonBody } from "../_shared/requestBody.ts";
-import { sha256Hex } from "../_shared/sha256.ts";
 import {
+  enforcePublicRateLimits,
+  hashString,
+  resolveClientFingerprint,
   resolveClientIp,
   verifyTurnstileToken,
 } from "../_shared/preloginGuards.ts";
@@ -35,10 +37,9 @@ const PUBLIC_RATE_LIMIT = {
   limit: 5,
   windowSeconds: 3600,
 };
-
-type RateLimitResult = {
-  allowed: boolean;
-  retry_after_seconds: number | null;
+const PUBLIC_GLOBAL_RATE_LIMIT = {
+  limit: 120,
+  windowSeconds: PUBLIC_RATE_LIMIT.windowSeconds,
 };
 
 type SupportPayload = {
@@ -226,7 +227,10 @@ serve(async (req) => {
   const jsonResponse = (
     status: number,
     body: Record<string, unknown>,
-    rateLimit: RateLimitResult | null = null,
+    rateLimit: {
+      retryAfterSeconds?: number | null;
+      retry_after_seconds?: number | null;
+    } | null = null,
   ) =>
     new Response(JSON.stringify({ ok: status < 400, ...body }), {
       status,
@@ -234,7 +238,8 @@ serve(async (req) => {
         ...headers,
         ...buildPublicRateLimitHeaders({
           ...PUBLIC_RATE_LIMIT,
-          retryAfterSeconds: rateLimit?.retry_after_seconds ??
+          retryAfterSeconds: rateLimit?.retryAfterSeconds ??
+            rateLimit?.retry_after_seconds ??
             (status === 429 ? PUBLIC_RATE_LIMIT.windowSeconds : null),
           remaining: status === 429 ? 0 : null,
         }),
@@ -319,33 +324,40 @@ serve(async (req) => {
     });
 
     const clientIp = resolveClientIp(req);
-    const fingerprintSource = `${clientIp}|${
-      req.headers.get("user-agent") ?? ""
-    }`;
-    const fingerprint = await sha256Hex(fingerprintSource);
-
-    const { data: rateLimit, error: rateLimitError } = await adminClient.rpc(
-      "consume_rate_limit_prelogin",
-      {
-        p_key: fingerprint,
-        p_scope: "contact_support_submit",
-        p_limit: PUBLIC_RATE_LIMIT.limit,
-        p_window_seconds: PUBLIC_RATE_LIMIT.windowSeconds,
-      },
+    // Use only the server-derived fingerprint for quotas. A browser-supplied
+    // User-Agent must not let one client mint unlimited independent buckets.
+    const fingerprint = await hashString(
+      resolveClientFingerprint(req, req.headers.get("origin"), {
+        trustProxyHeader: true,
+      }),
     );
-    if (rateLimitError) {
-      return jsonResponse(500, { error: "Rate limit check failed." });
-    }
-    const rateLimitResult = Array.isArray(rateLimit)
-      ? ((rateLimit[0] as RateLimitResult | undefined) ?? null)
-      : ((rateLimit as RateLimitResult | null) ?? null);
-    if (!rateLimitResult) {
-      return jsonResponse(500, { error: "Rate limit check failed." });
-    }
-    if (!rateLimitResult.allowed) {
+    const rateLimit = await enforcePublicRateLimits(
+      adminClient,
+      fingerprint,
+      "contact_support_submit",
+      PUBLIC_RATE_LIMIT.limit,
+      PUBLIC_RATE_LIMIT.windowSeconds,
+      PUBLIC_GLOBAL_RATE_LIMIT.limit,
+    );
+    if (!rateLimit.ok) {
+      if (rateLimit.error) {
+        return jsonResponse(500, { error: "Rate limit check failed." });
+      }
       return jsonResponse(429, {
         error: "Too many requests. Please try again later.",
-      }, rateLimitResult);
+      }, rateLimit);
+    }
+
+    // Verify the challenge before decoding or storing any attachment bytes so
+    // unauthenticated callers cannot turn the public form into an expensive
+    // image-processing primitive.
+    const verified = await verifyTurnstileToken(
+      turnstileToken,
+      clientIp,
+      "contact-support-submit",
+    );
+    if (!verified) {
+      return jsonResponse(403, { error: "Security check failed." });
     }
 
     if (attachmentsRaw.length > 2) {
@@ -405,15 +417,6 @@ serve(async (req) => {
         size_bytes: bytes.length,
         bytes,
       });
-    }
-
-    const verified = await verifyTurnstileToken(
-      turnstileToken,
-      clientIp,
-      "contact-support-submit",
-    );
-    if (!verified) {
-      return jsonResponse(403, { error: "Security check failed." });
     }
 
     const { data: supportRequest, error: supportRequestError } =

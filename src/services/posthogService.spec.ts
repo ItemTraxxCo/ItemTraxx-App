@@ -318,6 +318,30 @@ describe("PostHog exception before_send", () => {
       },
     });
   });
+
+  it("scrubs recovery query and hash material from URL properties", async () => {
+    const mod = await initializedModule();
+    void mod;
+    const options = posthogMock.init.mock.calls[0]?.[1] as {
+      before_send?: (event: unknown) => unknown;
+    } | undefined;
+
+    const result = options?.before_send?.({
+      event: "$pageview",
+      properties: {
+        $current_url:
+          "https://www.itemtraxx.com/reset-password?type=recovery&access_token=secret#refresh_token=refresh-secret",
+        $referrer: "/reset-password?code=one-time-code",
+        safe_url: "https://www.itemtraxx.com/login?next=/reset-password",
+      },
+    }) as { properties: Record<string, unknown> } | null;
+
+    expect(result?.properties).toEqual({
+      $current_url: "https://www.itemtraxx.com/reset-password",
+      $referrer: "/reset-password",
+      safe_url: "https://www.itemtraxx.com/login?next=/reset-password",
+    });
+  });
 });
 
 describe("syncPostHogConsent", () => {

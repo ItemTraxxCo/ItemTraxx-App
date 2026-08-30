@@ -23,6 +23,7 @@ vi.mock("../services/authService", () => ({
 import { fetchHttpSessionSummary } from "../services/httpSessionService";
 import { touchAccountSession, validateAccountSession } from "../services/adminOpsService";
 import { getPostSignOutUrl, signOut } from "../services/authService";
+import type { SignOutResult } from "../services/auth/signOut";
 
 const mockedFetchHttpSessionSummary = vi.mocked(fetchHttpSessionSummary);
 const mockedTouchAccountSession = vi.mocked(touchAccountSession);
@@ -104,7 +105,11 @@ describe("useAdminSessionLifecycle", () => {
     mockedTouchAccountSession.mockReset().mockResolvedValue({ ok: true });
     mockedValidateAccountSession.mockReset().mockResolvedValue({ valid: true });
     mockedGetPostSignOutUrl.mockReset().mockReturnValue(null as never);
-    mockedSignOut.mockReset().mockResolvedValue(undefined);
+    mockedSignOut.mockReset().mockResolvedValue({
+      ok: true,
+      httpSessionCleared: true,
+      accountSessionRevoked: true,
+    });
   });
 
   afterEach(() => {
@@ -275,11 +280,11 @@ describe("useAdminSessionLifecycle", () => {
     const { wrapper, get, router } = mountHost({ auth, route });
     await vi.advanceTimersByTimeAsync(0);
 
-    let releaseSignOut!: () => void;
+    let releaseSignOut!: (result: SignOutResult) => void;
     const signOutStarted = new Promise<void>((resolve) => {
       mockedSignOut.mockImplementationOnce(
         () =>
-          new Promise<void>((release) => {
+          new Promise<SignOutResult>((release) => {
             resolve();
             releaseSignOut = release;
           }),
@@ -291,7 +296,7 @@ describe("useAdminSessionLifecycle", () => {
     expect(mockedSignOut).toHaveBeenCalledTimes(1);
     expect(router.replace).not.toHaveBeenCalled();
 
-    releaseSignOut();
+    releaseSignOut({ ok: true, httpSessionCleared: true, accountSessionRevoked: true });
     await recovery;
     expect(router.replace).toHaveBeenCalledWith("/login");
     wrapper.unmount();

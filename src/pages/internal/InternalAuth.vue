@@ -258,7 +258,11 @@ const handleResendCode = async () => {
 
 const handleStartOver = async () => {
   clearPendingSuperAdminVerificationEmail();
-  await signOut();
+  const result = await signOut();
+  if (!result.ok) {
+    showToast("Sign out failed", "Unable to complete logout. Please try again.");
+    return;
+  }
   isCodeStep.value = false;
   verificationCode.value = "";
   verificationEmail.value = null;

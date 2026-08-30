@@ -1,6 +1,7 @@
 import { allowsAnalytics, readCookieConsent } from "./cookieConsentService";
 import { isRecoverableChunkLoadError } from "./appErrorRecovery";
 import type { CaptureResult } from "posthog-js";
+import { scrubSensitiveRecoveryUrlValue } from "../utils/passwordResetRedirect";
 
 let initialized = false;
 let posthog: typeof import("posthog-js").default | null = null;
@@ -121,6 +122,25 @@ const sanitizeExceptionEvent = (event: CaptureResult): CaptureResult => {
   return { ...event, properties: safeProperties };
 };
 
+const URL_PROPERTY_KEY = /(url|uri|href|referrer|path)/i;
+
+export const sanitizeRecoveryUrlProperties = (
+  properties: Record<string, unknown> | undefined,
+) => {
+  if (!properties) return properties;
+  let changed = false;
+  const safeProperties: Record<string, unknown> = { ...properties };
+  for (const [key, value] of Object.entries(properties)) {
+    if (!URL_PROPERTY_KEY.test(key) || typeof value !== "string") continue;
+    const safeValue = scrubSensitiveRecoveryUrlValue(value);
+    if (safeValue !== value) {
+      safeProperties[key] = safeValue;
+      changed = true;
+    }
+  }
+  return changed ? safeProperties : properties;
+};
+
 const scrubProperties = (
   properties?: Record<string, string | number | boolean | null | undefined>
 ) =>
@@ -215,16 +235,21 @@ export const initPostHog = async () => {
       capture_exceptions: true,
       before_send: (event) => {
         if (!event) return null;
+        const safeEvent: CaptureResult = {
+          ...event,
+          properties: (sanitizeRecoveryUrlProperties(event.properties) ?? {}) as
+            CaptureResult["properties"],
+        };
         if (
-          event.event === "$exception" &&
+          safeEvent.event === "$exception" &&
           (
-            isCspUnsafeEvalExceptionEvent(event.properties) ||
-            isRecoverableChunkLoadExceptionEvent(event.properties)
+            isCspUnsafeEvalExceptionEvent(safeEvent.properties) ||
+            isRecoverableChunkLoadExceptionEvent(safeEvent.properties)
           )
         ) {
           return null;
         }
-        return sanitizeExceptionEvent(event);
+        return sanitizeExceptionEvent(safeEvent);
       },
       logs: {
         captureConsoleLogs: false,

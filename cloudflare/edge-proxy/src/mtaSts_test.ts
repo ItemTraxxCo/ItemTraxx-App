@@ -3,7 +3,7 @@ import {
   isMtaStsRequest,
 } from "./mtaSts.ts";
 
-Deno.test("serves the Zoho MTA-STS policy on the exact policy host", async () => {
+Deno.test("serves the Cloudflare MTA-STS policy on the exact policy host", async () => {
   const url = new URL(
     "https://mta-sts.itemtraxx.com/.well-known/mta-sts.txt",
   );
@@ -19,9 +19,7 @@ Deno.test("serves the Zoho MTA-STS policy on the exact policy host", async () =>
   for (const line of [
     "version: STSv1",
     "mode: enforce",
-    "mx: mx.zoho.com",
-    "mx: mx2.zoho.com",
-    "mx: mx3.zoho.com",
+    "mx: *.mx.cloudflare.net",
     "max_age: 86400",
   ]) {
     if (!body.includes(line)) {

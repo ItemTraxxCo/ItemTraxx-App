@@ -87,12 +87,16 @@ jobs:
           headers_file="$RUNNER_TEMP/nvidia-nim-headers.txt"
           route_response_file="$RUNNER_TEMP/nvidia-nim-route-response.json"
           route_headers_file="$RUNNER_TEMP/nvidia-nim-route-headers.txt"
+          control_response_file="$RUNNER_TEMP/nvidia-nim-control-response.json"
+          control_headers_file="$RUNNER_TEMP/nvidia-nim-control-headers.txt"
           summary_file="$RUNNER_TEMP/nvidia-nim-preflight.log"
           request_body="$RUNNER_TEMP/nvidia-nim-request.json"
+          control_request_body="$RUNNER_TEMP/nvidia-nim-control-request.json"
           connect_timeout=15
-          request_timeout=45
+          request_timeout=180
+          control_request_timeout=30
           route_timeout=20
-          max_attempts=4
+          max_attempts=2
           max_polls=6
           poll_delay=5
 
@@ -101,6 +105,7 @@ jobs:
           # the probe answers "can this runner/key invoke this model?" without
           # spending the free endpoint's capacity on a high-reasoning request.
           printf '%s\n' "{\"model\":\"${NVIDIA_NIM_MODEL}\",\"messages\":[{\"role\":\"user\",\"content\":\"Reply with exactly: pong\"}],\"reasoning_effort\":\"none\",\"temperature\":0,\"max_tokens\":1,\"stream\":false}" > "$request_body"
+          printf '%s\n' '{"model":"google/gemma-3-4b-it","messages":[{"role":"user","content":"Reply with exactly: pong"}],"temperature":0,"max_tokens":1,"stream":false}' > "$control_request_body"
 
           status_code=000
           curl_exit_code=0
@@ -115,6 +120,8 @@ jobs:
           : > "$headers_file"
           : > "$route_response_file"
           : > "$route_headers_file"
+          : > "$control_response_file"
+          : > "$control_headers_file"
 
           # Check the runner's route to NVIDIA separately from model
           # invocation. A non-zero HTTP response still proves the route is
@@ -161,12 +168,16 @@ jobs:
           probe_endpoint() {
             local method="$1"
             local url="$2"
+            local body_file="${3:-$request_body}"
+            local timeout="${4:-$request_timeout}"
+            local output_file="${5:-$response_file}"
+            local output_headers="${6:-$headers_file}"
             local -a curl_args=(
               --silent --show-error --location --ipv4 --http1.1
               --connect-timeout "$connect_timeout"
-              --max-time "$request_timeout"
-              --dump-header "$headers_file"
-              --output "$response_file"
+              --max-time "$timeout"
+              --dump-header "$output_headers"
+              --output "$output_file"
               --write-out '%{http_code}'
               -H "Authorization: Bearer ${NVIDIA_API_KEY}"
               -H 'Accept: application/json'
@@ -175,7 +186,7 @@ jobs:
             if [[ "$method" == "POST" ]]; then
               curl_args+=(
                 -H 'Content-Type: application/json'
-                --data-binary "@$request_body"
+                --data-binary "@$body_file"
               )
             fi
 
@@ -185,6 +196,20 @@ jobs:
             set -e
             status_code="${status_code:-000}"
           }
+
+          control_status_code=skipped
+          control_curl_exit_code=skipped
+          if [[ "$route_unavailable" != "true" ]]; then
+            # A small, unrelated model tells us whether POST inference works
+            # on this runner at all. Keep this diagnostic separate from the
+            # target model's response and never use it as a fallback for
+            # Strix's configured model.
+            probe_endpoint POST https://integrate.api.nvidia.com/v1/chat/completions \
+              "$control_request_body" "$control_request_timeout" \
+              "$control_response_file" "$control_headers_file"
+            control_status_code="$status_code"
+            control_curl_exit_code="$curl_exit_code"
+          fi
 
           if [[ "$route_unavailable" == "true" ]]; then
             # The route probe already established that this runner cannot
@@ -218,7 +243,8 @@ jobs:
                   for ((poll=1; poll<=max_polls; poll++)); do
                     poll_count=$((poll_count + 1))
                     sleep "$poll_delay"
-                    probe_endpoint GET "https://integrate.api.nvidia.com/v1/status/${request_id}"
+                    probe_endpoint GET "https://integrate.api.nvidia.com/v1/status/${request_id}" \
+                      "$request_body" "$control_request_timeout"
                     if [[ "$status_code" == "200" && "$curl_exit_code" == "0" ]]; then
                       probe_success=true
                       success_phase=pending
@@ -254,6 +280,9 @@ jobs:
             echo "route_http_status=${route_status_code}"
             echo "route_curl_exit_code=${route_curl_exit_code}"
             echo "route_timing=${route_timing}"
+            echo "control_model=google/gemma-3-4b-it"
+            echo "control_http_status=${control_status_code}"
+            echo "control_curl_exit_code=${control_curl_exit_code}"
             echo "attempts=${attempt}"
             echo "polls=${poll_count}"
             echo "phase=${phase}"
@@ -404,6 +433,8 @@ jobs:
             ${{ runner.temp }}/nvidia-nim-response.json
             ${{ runner.temp }}/nvidia-nim-route-headers.txt
             ${{ runner.temp }}/nvidia-nim-route-response.json
+            ${{ runner.temp }}/nvidia-nim-control-headers.txt
+            ${{ runner.temp }}/nvidia-nim-control-response.json
             ${{ runner.temp }}/strix-output.log
           if-no-files-found: ignore
           retention-days: 30

@@ -1,30 +1,30 @@
 {
   "version": "5",
   "specifiers": {
-    "npm:@cloudflare/vite-plugin@^1.53.1": "1.54.2_vite@8.2.2_wrangler@4.127.1",
+    "npm:@cloudflare/vite-plugin@^1.53.1": "1.54.2_vite@8.2.2__@types+node@26.4.0_wrangler@4.127.1_@types+node@26.4.0",
     "npm:@cyclonedx/cyclonedx-npm@6.0.1": "6.0.1",
     "npm:@intercom/messenger-js-sdk@^0.0.20": "0.0.20",
     "npm:@playwright/test@^1.62.1": "1.62.1",
     "npm:@sentry/vue@^10.71.0": "10.72.0_vue@3.5.41",
     "npm:@supabase/supabase-js@^2.112.4": "2.112.4",
-    "npm:@types/node@^26.2.0": "26.2.0",
+    "npm:@types/node@^26.3.0": "26.4.0",
     "npm:@vercel/analytics@^2.0.1": "2.0.1_vue@3.5.41_vue-router@4.6.4_typescript@6.0.3",
     "npm:@vercel/speed-insights@2": "2.0.0_vue@3.5.41_vue-router@4.6.4_typescript@6.0.3",
-    "npm:@vitejs/plugin-vue@^6.0.8": "6.0.8_vite@8.2.2_vue@3.5.41_@types+node@26.2.0",
-    "npm:@vitest/coverage-v8@^4.1.11": "4.1.11_vitest@4.1.11_vite@8.2.2",
+    "npm:@vitejs/plugin-vue@^6.0.8": "6.0.8_vite@8.2.2__@types+node@26.4.0_vue@3.5.41_@types+node@26.4.0",
+    "npm:@vitest/coverage-v8@^4.1.11": "4.1.11_vitest@4.1.11_@types+node@26.4.0",
     "npm:@vue/test-utils@^2.4.11": "2.4.11_vue@3.5.41_typescript@6.0.3",
     "npm:@vue/tsconfig@~0.9.1": "0.9.1_typescript@6.0.3_vue@3.5.41",
-    "npm:boneyard-js@^1.9.0": "1.9.0_vite@8.2.2_vue@3.5.41_@types+node@26.2.0",
+    "npm:boneyard-js@^1.9.0": "1.9.0_vite@8.2.2__@types+node@26.4.0_vue@3.5.41_@types+node@26.4.0",
     "npm:fake-indexeddb@^6.2.5": "6.2.5",
     "npm:jsbarcode@^3.12.3": "3.12.3",
     "npm:jsdom@^30.0.1": "30.0.1",
     "npm:jspdf-autotable@^5.0.8": "5.0.8_jspdf@4.2.1",
     "npm:jspdf@^4.2.1": "4.2.1",
-    "npm:posthog-js@^1.418.13": "1.422.5",
+    "npm:posthog-js@^1.418.16": "1.423.0",
     "npm:supabase@^2.115.0": "2.115.0",
     "npm:typescript@~6.0.3": "6.0.3",
-    "npm:vite@^8.2.2": "8.2.2_@types+node@26.2.0",
-    "npm:vitest@^4.1.11": "4.1.11_@types+node@26.2.0_@vitest+coverage-v8@4.1.11_jsdom@30.0.1_vite@8.2.2",
+    "npm:vite@^8.2.2": "8.2.2_@types+node@26.4.0",
+    "npm:vitest@^4.1.11": "4.1.11_@types+node@26.4.0_@vitest+coverage-v8@4.1.11_jsdom@30.0.1_vite@8.2.2__@types+node@26.4.0",
     "npm:vue-router@^4.6.4": "4.6.4_vue@3.5.41_typescript@6.0.3",
     "npm:vue-tsc@^3.3.11": "3.3.11_typescript@6.0.3",
     "npm:vue@^3.5.41": "3.5.41_typescript@6.0.3",
@@ -100,7 +100,7 @@
         "workerd"
       ]
     },
-    "@cloudflare/vite-plugin@1.54.2_vite@8.2.2_wrangler@4.127.1": {
+    "@cloudflare/vite-plugin@1.54.2_vite@8.2.2__@types+node@26.4.0_wrangler@4.127.1_@types+node@26.4.0": {
       "integrity": "sha512-15mH5ARHTkNZAqa5GhedjLAt/MCiGBEo09Hgf82EiWuIm/5yOaMVL6ABSun/W8C3Vbw1clzW/2i9IfH5zT/Kvg==",
       "dependencies": [
         "@cloudflare/unenv-preset",
@@ -645,15 +645,15 @@
     "@poppinss/exception@1.2.3": {
       "integrity": "sha512-dCED+QRChTVatE9ibtoaxc+WkdzOSjYTKi/+uacHWIsfodVfpsueo3+DKpgU5Px8qXjgmXkSvhXvSCz3fnP9lw=="
     },
-    "@posthog/browser-common@0.7.0": {
-      "integrity": "sha512-Kr6j9sH7NisT3fC3w7jZlonYeCFjPXZrDwHl3usFpjNEdgbHUrxPAmekEkTt+zRAa2huldFPIAmibZ3KC4hXoQ==",
+    "@posthog/browser-common@0.7.1": {
+      "integrity": "sha512-JO/5dIVx3NTrbg0W2VciDDmmizsvwaYYHE5cnJE1Gra+UqBnEuVGH9DTE/kBFgVMp+08z5uj/aAprsYD2WG/QQ==",
       "dependencies": [
         "@posthog/core",
         "@posthog/types"
       ]
     },
-    "@posthog/core@1.49.2": {
-      "integrity": "sha512-AXHDo/4nisUg7OPG1TQNgREK7n+chBQXLQyttp7bDTDsDg2k9lV06TmnpvuNbwJs53q9mP9hjezKEZu4fYadfg==",
+    "@posthog/core@1.50.0": {
+      "integrity": "sha512-25SnQycZbqqLodQs+GaDPGDC1oxT8+XOSGlyhiS2rtdVON9Opg2hmfJ/fpFNgMBL7YDi0rpvJiR/fudy96W4pA==",
       "dependencies": [
         "@posthog/types"
       ]
@@ -902,8 +902,8 @@
     "@types/estree@1.0.9": {
       "integrity": "sha512-GhdPgy1el4/ImP05X05Uw4cw2/M93BCUmnEvWZNStlCzEKME4Fkk+YpoA5OiHNQmoS7Cafb8Xa3Pya8m1Qrzeg=="
     },
-    "@types/node@26.2.0": {
-      "integrity": "sha512-5IviulTZeRNp2vAJ514cc/HUlY5nZ9fCbq9DMyC52BrhFZACo3nI0R7qBxhQmo/d27NFe96ur/b7Wwxklda+kg==",
+    "@types/node@26.4.0": {
+      "integrity": "sha512-faiGnoIrLH/V8cibOMEAZ8pMw6oXqSukl29ra4mN8GdaB2ZewzeaLj+INpV5N+Z1eKWzY+IzaIZH2EIR6YZRNQ==",
       "dependencies": [
         "undici-types"
       ]
@@ -939,7 +939,7 @@
         "vue-router"
       ]
     },
-    "@vitejs/plugin-vue@6.0.8_vite@8.2.2_vue@3.5.41_@types+node@26.2.0": {
+    "@vitejs/plugin-vue@6.0.8_vite@8.2.2__@types+node@26.4.0_vue@3.5.41_@types+node@26.4.0": {
       "integrity": "sha512-0ZjgOg7oO6farnNGup7yvoM/YXZV84OZxHAwtflItNa/6zzQyVb5LNxyea3FEKEX2XlagIKzrlH7wwxkKgtiew==",
       "dependencies": [
         "@rolldown/pluginutils",
@@ -947,7 +947,7 @@
         "vue"
       ]
     },
-    "@vitest/coverage-v8@4.1.11_vitest@4.1.11_vite@8.2.2": {
+    "@vitest/coverage-v8@4.1.11_vitest@4.1.11_@types+node@26.4.0": {
       "integrity": "sha512-8MVGEFnJIcdGjcbfKmeq8z0pZHH0JlVtoVZH9Q/qwUp6wyFnEJUBMrw9DCaj+ra3vShGmhavjalMIhPNxZAUcw==",
       "dependencies": [
         "@bcoe/v8-coverage",
@@ -974,7 +974,7 @@
         "tinyrainbow"
       ]
     },
-    "@vitest/mocker@4.1.11_vite@8.2.2_@types+node@26.2.0": {
+    "@vitest/mocker@4.1.11_vite@8.2.2__@types+node@26.4.0_@types+node@26.4.0": {
       "integrity": "sha512-2XJVD55d1o5AZous5CCGKS74g/riOj9odEt2bQpCVZeblHyHdnMeFl4jl0XjU21stf4mbjUkew2eXQZt65g5CQ==",
       "dependencies": [
         "@vitest/spy",
@@ -1239,7 +1239,7 @@
     "blake3-wasm@2.1.5": {
       "integrity": "sha512-F1+K8EbfOZE49dtoPtmxUQrpXaBIl3ICvasLh+nJta0xkz+9kF/7uet9fLnwKqhDrmj6g+6K3Tw9yQPUg2ka5g=="
     },
-    "boneyard-js@1.9.0_vite@8.2.2_vue@3.5.41_@types+node@26.2.0": {
+    "boneyard-js@1.9.0_vite@8.2.2__@types+node@26.4.0_vue@3.5.41_@types+node@26.4.0": {
       "integrity": "sha512-FlIHm7YyQ6GMBPaNY6um5ESHNyZGONoSZ0IMhayuyemBsCUhhDl4nC/gMTOi/25ojtrlnRInTWKqFKb7hGK6Cg==",
       "dependencies": [
         "playwright",
@@ -2010,8 +2010,8 @@
         "source-map-js"
       ]
     },
-    "posthog-js@1.422.5": {
-      "integrity": "sha512-p1CLXsGoHwNkdElxXtd1KzNP/df8sIrp8CRII+lAPRhaHdpi1HfNxrybqLSzWvJLw2w5Nou5vpXfGABUI5BVwA==",
+    "posthog-js@1.423.0": {
+      "integrity": "sha512-r9s9uFhGDoftboOfTxD0ePtDE6s9xROxvjr3bGzZ1QcCbm6kZOZB/S708zkOjSufEUDGCuUOMluc9XKYixFBtA==",
       "dependencies": [
         "@posthog/browser-common",
         "@posthog/core",
@@ -2021,8 +2021,8 @@
         "fflate@0.4.9",
         "preact",
         "query-selector-shadow-dom",
-        "web-vitals@5.3.0",
-        "web-vitals-soft-navs@npm:web-vitals@6.0.0"
+        "web-vitals",
+        "web-vitals-soft-navs@npm:web-vitals@6.2.1"
       ]
     },
     "preact@10.29.8": {
@@ -2445,7 +2445,7 @@
         "spdx-expression-parse"
       ]
     },
-    "vite@8.2.2_@types+node@26.2.0": {
+    "vite@8.2.2_@types+node@26.4.0": {
       "integrity": "sha512-cFKLV/PRgAUlIRm5WjMjJ86jrftzpqcgH+Us+DS8mI3CDNiH30Whrz8uHL3+MOLPAgqbMBAqWdAHAphOAM+z/Q==",
       "dependencies": [
         "@types/node",
@@ -2463,7 +2463,7 @@
       ],
       "bin": true
     },
-    "vitest@4.1.11_@types+node@26.2.0_@vitest+coverage-v8@4.1.11_jsdom@30.0.1_vite@8.2.2": {
+    "vitest@4.1.11_@types+node@26.4.0_@vitest+coverage-v8@4.1.11_jsdom@30.0.1_vite@8.2.2__@types+node@26.4.0": {
       "integrity": "sha512-fhACrNXUidIbGSBr5FlbuBkO7VWC1ZyLl0DO4CU2DrQoAPxX84Ysxs+HeGQpii5lZWV1Q4gBZTTu49mF+A6Edw==",
       "dependencies": [
         "@types/node",
@@ -2539,11 +2539,8 @@
         "xml-name-validator"
       ]
     },
-    "web-vitals@5.3.0": {
-      "integrity": "sha512-q6LWsLatGYZp5VGBIOvbTj6JBV2nOmC8KvWztXBmwJcfFAzhwKwbOxhUH306XY3CcaZDUlSmSuNPBsCn0bFu+g=="
-    },
-    "web-vitals@6.0.0": {
-      "integrity": "sha512-Guaibvy/+uNtL6Bsu4jmMJGzuSl91oeRH5iO9pPRbYftnFUr3yqT1TUNX/OE4o9HexuEMU3Kb/Wg7iKhlffZUA=="
+    "web-vitals@6.2.1": {
+      "integrity": "sha512-rLcLXA2sx6+9dE88NHFubwTtGxpK4yYBLj6qHPdFoCaLr0cXGb4efOqtKLlm4loGA4OEKHIQKMKzZkKyOh5ctw=="
     },
     "webidl-conversions@8.0.1": {
       "integrity": "sha512-BMhLD/Sw+GbJC21C/UgyaZX41nPt8bUTg+jWyDeg7e7YN4xOM05YPSIXceACnXVtqyEw/LMClUQMtMZ+PGGpqQ=="
@@ -2754,7 +2751,7 @@
         "npm:@playwright/test@^1.62.1",
         "npm:@sentry/vue@^10.71.0",
         "npm:@supabase/supabase-js@^2.112.4",
-        "npm:@types/node@^26.2.0",
+        "npm:@types/node@^26.3.0",
         "npm:@vercel/analytics@^2.0.1",
         "npm:@vercel/speed-insights@2",
         "npm:@vitejs/plugin-vue@^6.0.8",
@@ -2767,7 +2764,7 @@
         "npm:jsdom@^30.0.1",
         "npm:jspdf-autotable@^5.0.8",
         "npm:jspdf@^4.2.1",
-        "npm:posthog-js@^1.418.13",
+        "npm:posthog-js@^1.418.16",
         "npm:supabase@^2.115.0",
         "npm:typescript@~6.0.3",
         "npm:vite@^8.2.2",

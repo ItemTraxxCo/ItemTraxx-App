@@ -76,8 +76,99 @@ jobs:
           install -m 0755 "$strix_dir/strix-${STRIX_VERSION}-linux-x86_64" "$strix_dir/bin/strix"
           echo "$strix_dir/bin" >> "$GITHUB_PATH"
 
+      - name: Preflight NVIDIA NIM endpoint
+        id: nim-preflight
+        env:
+          NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
+          NVIDIA_NIM_MODEL: deepseek-ai/deepseek-v4-pro-0813
+        run: |
+          set -euo pipefail
+          response_file="$RUNNER_TEMP/nvidia-nim-response.json"
+          headers_file="$RUNNER_TEMP/nvidia-nim-headers.txt"
+          summary_file="$RUNNER_TEMP/nvidia-nim-preflight.log"
+
+          set +e
+          status_code="$(
+            curl --silent --show-error --location \
+              --connect-timeout 15 \
+              --max-time 90 \
+              --dump-header "$headers_file" \
+              --output "$response_file" \
+              --write-out '%{http_code}' \
+              -H "Authorization: Bearer ${NVIDIA_API_KEY}" \
+              -H 'Content-Type: application/json' \
+              --data "{\"model\":\"${NVIDIA_NIM_MODEL}\",\"messages\":[{\"role\":\"user\",\"content\":\"Reply with exactly: pong\"}],\"reasoning_effort\":\"high\",\"temperature\":0,\"max_tokens\":8,\"stream\":false}" \
+              https://integrate.api.nvidia.com/v1/chat/completions
+          )"
+          curl_exit_code=$?
+          set -e
+          status_code="${status_code:-000}"
+
+          response_summary=""
+          if [[ -s "$response_file" ]]; then
+            response_summary="$(tr '\r\n' '  ' < "$response_file" | sed -E 's/[[:space:]]+/ /g' | cut -c1-500)"
+          fi
+          retry_after="$(awk 'BEGIN {IGNORECASE=1} /^retry-after:/ {sub(/\r$/, ""); sub(/^[^:]*:[[:space:]]*/, ""); print; exit}' "$headers_file" 2>/dev/null | sed -E 's/[^0-9A-Za-z .:+-]/_/g' | cut -c1-100 || true)"
+          {
+            echo "model=${NVIDIA_NIM_MODEL}"
+            echo "http_status=${status_code}"
+            echo "curl_exit_code=${curl_exit_code}"
+            if [[ -n "$retry_after" ]]; then
+              echo "retry_after=${retry_after}"
+            fi
+            if [[ -n "$response_summary" ]]; then
+              echo "response=${response_summary}"
+            fi
+          } > "$summary_file"
+
+          echo "http_status=$status_code" >> "$GITHUB_OUTPUT"
+          echo "curl_exit_code=$curl_exit_code" >> "$GITHUB_OUTPUT"
+
+          if [[ "$status_code" == "200" && "$curl_exit_code" == "0" ]]; then
+            echo "ok=true" >> "$GITHUB_OUTPUT"
+            {
+              echo "### NVIDIA NIM preflight"
+              echo
+              echo "The exact Strix model/API key accepted a non-streaming chat-completion probe (HTTP 200)."
+              echo
+              echo "- Model: \`${NVIDIA_NIM_MODEL}\`"
+              echo "- Reasoning effort: \`high\`"
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          echo "ok=false" >> "$GITHUB_OUTPUT"
+          case "$status_code" in
+            000) failure_class="network/connection failure" ;;
+            401|403) failure_class="authentication/authorization failure" ;;
+            408|425|429|5??) failure_class="provider capacity or transient service failure" ;;
+            4??) failure_class="request rejected by provider" ;;
+            *) failure_class="unexpected provider response" ;;
+          esac
+          echo "failure_class=$failure_class" >> "$GITHUB_OUTPUT"
+          echo "NVIDIA NIM preflight failed: ${failure_class} (HTTP ${status_code}, curl ${curl_exit_code}). Strix will not start." >&2
+          if [[ -n "$response_summary" ]]; then
+            echo "NVIDIA NIM response (truncated): ${response_summary}" >&2
+          fi
+          if [[ -n "$retry_after" ]]; then
+            echo "NVIDIA NIM Retry-After: ${retry_after}" >&2
+          fi
+          {
+            echo "### NVIDIA NIM preflight"
+            echo
+            echo "**Failed before Strix started:** ${failure_class} (HTTP \`${status_code}\`, curl \`${curl_exit_code}\`)."
+            if [[ -n "$retry_after" ]]; then
+              echo
+              echo "Provider \`Retry-After\`: \`${retry_after}\`."
+            fi
+            echo
+            echo "The preflight log and response are attached to the workflow artifact."
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit 1
+
       - name: Run Strix security scan
         id: strix-scan
+        if: ${{ always() && steps.nim-preflight.outputs.ok == 'true' }}
         env:
           STRIX_LLM: nvidia_nim/deepseek-ai/deepseek-v4-pro-0813
           LLM_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
@@ -107,8 +198,9 @@ jobs:
         env:
           STRIX_EXIT_CODE: ${{ steps.strix-scan.outputs.exit_code }}
         run: |
+          strix_exit_code="${STRIX_EXIT_CODE:-1}"
           python3 scripts/prepare-strix-pr-summary.py \
-            --exit-code "$STRIX_EXIT_CODE" \
+            --exit-code "$strix_exit_code" \
             --output "$RUNNER_TEMP/strix-pr-comment.md"
           echo "comment_path=$RUNNER_TEMP/strix-pr-comment.md" >> "$GITHUB_OUTPUT"
 
@@ -117,10 +209,17 @@ jobs:
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3
         env:
           STRIX_COMMENT_PATH: ${{ steps.strix-summary.outputs.comment_path }}
+          NIM_PREFLIGHT_OK: ${{ steps.nim-preflight.outputs.ok }}
+          NIM_PREFLIGHT_STATUS: ${{ steps.nim-preflight.outputs.http_status }}
+          NIM_PREFLIGHT_CLASS: ${{ steps.nim-preflight.outputs.failure_class }}
         with:
           script: |
             const fs = require("fs");
-            const body = fs.readFileSync(process.env.STRIX_COMMENT_PATH, "utf8");
+            const strixBody = fs.readFileSync(process.env.STRIX_COMMENT_PATH, "utf8");
+            const preflightNote = process.env.NIM_PREFLIGHT_OK === "true"
+              ? ""
+              : `NVIDIA NIM preflight failed before Strix started (HTTP ${process.env.NIM_PREFLIGHT_STATUS || "unknown"}; ${process.env.NIM_PREFLIGHT_CLASS || "unknown cause"}).`;
+            const body = preflightNote ? `${preflightNote}\n\n${strixBody}` : strixBody;
             const { owner, repo } = context.repo;
             const issue_number = context.issue.number;
             const comments = await github.paginate(github.rest.issues.listComments, {
@@ -146,10 +245,25 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.0
         with:
           name: strix-results-${{ github.run_id }}
-          path: strix_runs/
+          path: |
+            strix_runs/
+            ${{ runner.temp }}/nvidia-nim-preflight.log
+            ${{ runner.temp }}/nvidia-nim-response.json
+            ${{ runner.temp }}/strix-output.log
           if-no-files-found: ignore
           retention-days: 30
 
       - name: Fail on Strix findings or execution error
-        if: ${{ always() && steps.strix-scan.outputs.exit_code != '0' }}
-        run: exit "${{ steps.strix-scan.outputs.exit_code }}"
+        if: ${{ always() && (steps.nim-preflight.outputs.ok != 'true' || steps.strix-scan.outputs.exit_code != '0') }}
+        env:
+          NIM_PREFLIGHT_OK: ${{ steps.nim-preflight.outputs.ok }}
+          STRIX_EXIT_CODE: ${{ steps.strix-scan.outputs.exit_code }}
+        run: |
+          set -euo pipefail
+          if [[ "$NIM_PREFLIGHT_OK" != "true" ]]; then
+            echo "NVIDIA NIM preflight failed; Strix did not run."
+            exit 1
+          fi
+          echo "Strix exit code: ${STRIX_EXIT_CODE:-unknown}"
+          test "$STRIX_EXIT_CODE" = "0"
+

@@ -86,23 +86,104 @@ jobs:
           response_file="$RUNNER_TEMP/nvidia-nim-response.json"
           headers_file="$RUNNER_TEMP/nvidia-nim-headers.txt"
           summary_file="$RUNNER_TEMP/nvidia-nim-preflight.log"
+          request_body="$RUNNER_TEMP/nvidia-nim-request.json"
+          connect_timeout=15
+          request_timeout=45
+          max_attempts=4
+          max_polls=6
+          poll_delay=5
 
-          set +e
-          status_code="$(
-            curl --silent --show-error --location \
-              --connect-timeout 15 \
-              --max-time 90 \
-              --dump-header "$headers_file" \
-              --output "$response_file" \
-              --write-out '%{http_code}' \
-              -H "Authorization: Bearer ${NVIDIA_API_KEY}" \
-              -H 'Content-Type: application/json' \
-              --data "{\"model\":\"${NVIDIA_NIM_MODEL}\",\"messages\":[{\"role\":\"user\",\"content\":\"Reply with exactly: pong\"}],\"reasoning_effort\":\"high\",\"temperature\":0,\"max_tokens\":8,\"stream\":false}" \
-              https://integrate.api.nvidia.com/v1/chat/completions
-          )"
-          curl_exit_code=$?
-          set -e
-          status_code="${status_code:-000}"
+          # NVIDIA's catalog example disables thinking for its lightweight
+          # endpoint probe. Keep this separate from Strix's configured effort:
+          # the probe answers "can this runner/key invoke this model?" without
+          # spending the free endpoint's capacity on a high-reasoning request.
+          printf '%s\n' "{\"model\":\"${NVIDIA_NIM_MODEL}\",\"messages\":[{\"role\":\"user\",\"content\":\"Reply with exactly: pong\"}],\"reasoning_effort\":\"none\",\"temperature\":0,\"max_tokens\":1,\"stream\":false}" > "$request_body"
+
+          status_code=000
+          curl_exit_code=0
+          attempt=0
+          poll_count=0
+          request_id=""
+          phase=initial
+          probe_success=false
+          success_phase=""
+          failure_class=""
+          : > "$response_file"
+          : > "$headers_file"
+
+          probe_endpoint() {
+            local method="$1"
+            local url="$2"
+            local -a curl_args=(
+              --silent --show-error --location
+              --connect-timeout "$connect_timeout"
+              --max-time "$request_timeout"
+              --dump-header "$headers_file"
+              --output "$response_file"
+              --write-out '%{http_code}'
+              -H "Authorization: Bearer ${NVIDIA_API_KEY}"
+              -H 'Accept: application/json'
+              --request "$method"
+            )
+            if [[ "$method" == "POST" ]]; then
+              curl_args+=(
+                -H 'Content-Type: application/json'
+                --data-binary "@$request_body"
+              )
+            fi
+
+            set +e
+            status_code="$(curl "${curl_args[@]}" "$url")"
+            curl_exit_code=$?
+            set -e
+            status_code="${status_code:-000}"
+          }
+
+          while (( attempt < max_attempts )); do
+            attempt=$((attempt + 1))
+            phase=initial
+            request_id=""
+            probe_endpoint POST https://integrate.api.nvidia.com/v1/chat/completions
+
+            if [[ "$status_code" == "200" && "$curl_exit_code" == "0" ]]; then
+              probe_success=true
+              success_phase=initial
+              break
+            fi
+
+            # NIM may accept the invocation asynchronously. Follow its
+            # documented requestId status endpoint before retrying the POST.
+            if [[ "$status_code" == "202" && "$curl_exit_code" == "0" ]]; then
+              phase=pending
+              request_id="$(jq -r '.requestId // .request_id // empty' "$response_file" 2>/dev/null || true)"
+              if [[ ! "$request_id" =~ ^[0-9A-Fa-f-]{36}$ ]]; then
+                failure_class="pending response missing request ID"
+                request_id=""
+              else
+                for ((poll=1; poll<=max_polls; poll++)); do
+                  poll_count=$((poll_count + 1))
+                  sleep "$poll_delay"
+                  probe_endpoint GET "https://integrate.api.nvidia.com/v1/status/${request_id}"
+                  if [[ "$status_code" == "200" && "$curl_exit_code" == "0" ]]; then
+                    probe_success=true
+                    success_phase=pending
+                    break 2
+                  fi
+                  [[ "$status_code" == "202" && "$curl_exit_code" == "0" ]] || break
+                done
+                [[ "$status_code" == "202" ]] && failure_class="provider invocation still pending after polling"
+              fi
+            fi
+
+            case "$status_code" in
+              000|202|408|425|429|5??) transient=true ;;
+              *) transient=false ;;
+            esac
+            if [[ "$transient" != "true" || "$attempt" -ge "$max_attempts" ]]; then
+              break
+            fi
+            sleep "$((attempt * 5))"
+          done
 
           response_summary=""
           if [[ -s "$response_file" ]]; then
@@ -111,8 +192,12 @@ jobs:
           retry_after="$(awk 'BEGIN {IGNORECASE=1} /^retry-after:/ {sub(/\r$/, ""); sub(/^[^:]*:[[:space:]]*/, ""); print; exit}' "$headers_file" 2>/dev/null | sed -E 's/[^0-9A-Za-z .:+-]/_/g' | cut -c1-100 || true)"
           {
             echo "model=${NVIDIA_NIM_MODEL}"
+            echo "probe_reasoning_effort=none"
             echo "http_status=${status_code}"
             echo "curl_exit_code=${curl_exit_code}"
+            echo "attempts=${attempt}"
+            echo "polls=${poll_count}"
+            echo "phase=${phase}"
             if [[ -n "$retry_after" ]]; then
               echo "retry_after=${retry_after}"
             fi
@@ -123,30 +208,39 @@ jobs:
 
           echo "http_status=$status_code" >> "$GITHUB_OUTPUT"
           echo "curl_exit_code=$curl_exit_code" >> "$GITHUB_OUTPUT"
+          echo "attempts=$attempt" >> "$GITHUB_OUTPUT"
+          echo "polls=$poll_count" >> "$GITHUB_OUTPUT"
 
-          if [[ "$status_code" == "200" && "$curl_exit_code" == "0" ]]; then
+          if [[ "$probe_success" == "true" ]]; then
             echo "ok=true" >> "$GITHUB_OUTPUT"
+            echo "failure_class=" >> "$GITHUB_OUTPUT"
             {
               echo "### NVIDIA NIM preflight"
               echo
-              echo "The exact Strix model/API key accepted a non-streaming chat-completion probe (HTTP 200)."
+              echo "The exact Strix model/API key completed a lightweight non-streaming probe (HTTP 200)."
               echo
               echo "- Model: \`${NVIDIA_NIM_MODEL}\`"
-              echo "- Reasoning effort: \`high\`"
+              echo "- Probe reasoning effort: \`none\`"
+              echo "- Attempts: \`${attempt}\`; status polls: \`${poll_count}\`"
+              if [[ "$success_phase" == "pending" ]]; then
+                echo "- The provider accepted the request asynchronously and completed it through the status endpoint."
+              fi
             } >> "$GITHUB_STEP_SUMMARY"
             exit 0
           fi
 
           echo "ok=false" >> "$GITHUB_OUTPUT"
-          case "$status_code" in
-            000) failure_class="network/connection failure" ;;
-            401|403) failure_class="authentication/authorization failure" ;;
-            408|425|429|5??) failure_class="provider capacity or transient service failure" ;;
-            4??) failure_class="request rejected by provider" ;;
-            *) failure_class="unexpected provider response" ;;
-          esac
+          if [[ -z "$failure_class" ]]; then
+            case "$status_code" in
+              000) failure_class="network/connection failure" ;;
+              401|403) failure_class="authentication/authorization failure" ;;
+              408|425|429|5??) failure_class="provider capacity or transient service failure" ;;
+              4??) failure_class="request rejected by provider" ;;
+              *) failure_class="unexpected provider response" ;;
+            esac
+          fi
           echo "failure_class=$failure_class" >> "$GITHUB_OUTPUT"
-          echo "NVIDIA NIM preflight failed: ${failure_class} (HTTP ${status_code}, curl ${curl_exit_code}). Strix will not start." >&2
+          echo "NVIDIA NIM preflight failed: ${failure_class} (HTTP ${status_code}, curl ${curl_exit_code}) after ${attempt} attempt(s). Strix will not start." >&2
           if [[ -n "$response_summary" ]]; then
             echo "NVIDIA NIM response (truncated): ${response_summary}" >&2
           fi
@@ -156,7 +250,7 @@ jobs:
           {
             echo "### NVIDIA NIM preflight"
             echo
-            echo "**Failed before Strix started:** ${failure_class} (HTTP \`${status_code}\`, curl \`${curl_exit_code}\`)."
+            echo "**Failed before Strix started:** ${failure_class} (HTTP \`${status_code}\`, curl \`${curl_exit_code}\`) after \`${attempt}\` attempt(s)."
             if [[ -n "$retry_after" ]]; then
               echo
               echo "Provider \`Retry-After\`: \`${retry_after}\`."
@@ -266,4 +360,3 @@ jobs:
           fi
           echo "Strix exit code: ${STRIX_EXIT_CODE:-unknown}"
           test "$STRIX_EXIT_CODE" = "0"
-

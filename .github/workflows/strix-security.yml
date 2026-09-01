@@ -85,10 +85,13 @@ jobs:
           set -euo pipefail
           response_file="$RUNNER_TEMP/nvidia-nim-response.json"
           headers_file="$RUNNER_TEMP/nvidia-nim-headers.txt"
+          route_response_file="$RUNNER_TEMP/nvidia-nim-route-response.json"
+          route_headers_file="$RUNNER_TEMP/nvidia-nim-route-headers.txt"
           summary_file="$RUNNER_TEMP/nvidia-nim-preflight.log"
           request_body="$RUNNER_TEMP/nvidia-nim-request.json"
           connect_timeout=15
           request_timeout=45
+          route_timeout=20
           max_attempts=4
           max_polls=6
           poll_delay=5
@@ -110,12 +113,56 @@ jobs:
           failure_class=""
           : > "$response_file"
           : > "$headers_file"
+          : > "$route_response_file"
+          : > "$route_headers_file"
+
+          # Check the runner's route to NVIDIA separately from model
+          # invocation. A non-zero HTTP response still proves the route is
+          # reachable; only a no-byte curl failure should classify it as an
+          # egress/connection problem.
+          route_status_code=000
+          route_curl_exit_code=0
+          route_timing=""
+          route_unavailable=false
+          route_probe() {
+            local route_metrics
+            set +e
+            route_metrics="$(curl --silent --show-error --location --ipv4 --http1.1 \
+              --connect-timeout "$connect_timeout" \
+              --max-time "$route_timeout" \
+              --dump-header "$route_headers_file" \
+              --output "$route_response_file" \
+              --write-out '%{http_code}\t%{time_namelookup}\t%{time_connect}\t%{time_appconnect}\t%{time_starttransfer}\t%{time_total}' \
+              -H "Authorization: Bearer ${NVIDIA_API_KEY}" \
+              -H 'Accept: application/json' \
+              --request GET \
+              https://integrate.api.nvidia.com/v1/models)"
+            route_curl_exit_code=$?
+            set -e
+            IFS=$'\t' read -r route_status_code route_dns_seconds route_connect_seconds route_tls_seconds route_first_byte_seconds route_total_seconds <<< "$route_metrics"
+            route_status_code="${route_status_code:-000}"
+            route_timing="dns=${route_dns_seconds:-unknown}s connect=${route_connect_seconds:-unknown}s tls=${route_tls_seconds:-unknown}s first_byte=${route_first_byte_seconds:-unknown}s total=${route_total_seconds:-unknown}s"
+          }
+
+          route_probe
+          if [[ "$route_curl_exit_code" != "0" || "$route_status_code" == "000" ]]; then
+            route_unavailable=true
+            failure_class="NVIDIA API route unavailable from GitHub runner"
+            {
+              echo "### NVIDIA NIM route diagnostic"
+              echo
+              echo "The runner could not receive bytes from \`integrate.api.nvidia.com\` before model invocation."
+              echo
+              echo "- HTTP status: \`${route_status_code}\`; curl exit: \`${route_curl_exit_code}\`"
+              echo "- Timing: \`${route_timing}\`"
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
 
           probe_endpoint() {
             local method="$1"
             local url="$2"
             local -a curl_args=(
-              --silent --show-error --location
+              --silent --show-error --location --ipv4 --http1.1
               --connect-timeout "$connect_timeout"
               --max-time "$request_timeout"
               --dump-header "$headers_file"
@@ -139,51 +186,60 @@ jobs:
             status_code="${status_code:-000}"
           }
 
-          while (( attempt < max_attempts )); do
-            attempt=$((attempt + 1))
-            phase=initial
-            request_id=""
-            probe_endpoint POST https://integrate.api.nvidia.com/v1/chat/completions
+          if [[ "$route_unavailable" == "true" ]]; then
+            # The route probe already established that this runner cannot
+            # receive bytes from NVIDIA. Avoid four redundant 45-second POSTs
+            # and preserve the route diagnostic as the failure evidence.
+            status_code="$route_status_code"
+            curl_exit_code="$route_curl_exit_code"
+            attempt=1
+          else
+            while (( attempt < max_attempts )); do
+              attempt=$((attempt + 1))
+              phase=initial
+              request_id=""
+              probe_endpoint POST https://integrate.api.nvidia.com/v1/chat/completions
 
-            if [[ "$status_code" == "200" && "$curl_exit_code" == "0" ]]; then
-              probe_success=true
-              success_phase=initial
-              break
-            fi
-
-            # NIM may accept the invocation asynchronously. Follow its
-            # documented requestId status endpoint before retrying the POST.
-            if [[ "$status_code" == "202" && "$curl_exit_code" == "0" ]]; then
-              phase=pending
-              request_id="$(jq -r '.requestId // .request_id // empty' "$response_file" 2>/dev/null || true)"
-              if [[ ! "$request_id" =~ ^[0-9A-Fa-f-]{36}$ ]]; then
-                failure_class="pending response missing request ID"
-                request_id=""
-              else
-                for ((poll=1; poll<=max_polls; poll++)); do
-                  poll_count=$((poll_count + 1))
-                  sleep "$poll_delay"
-                  probe_endpoint GET "https://integrate.api.nvidia.com/v1/status/${request_id}"
-                  if [[ "$status_code" == "200" && "$curl_exit_code" == "0" ]]; then
-                    probe_success=true
-                    success_phase=pending
-                    break 2
-                  fi
-                  [[ "$status_code" == "202" && "$curl_exit_code" == "0" ]] || break
-                done
-                [[ "$status_code" == "202" ]] && failure_class="provider invocation still pending after polling"
+              if [[ "$status_code" == "200" && "$curl_exit_code" == "0" ]]; then
+                probe_success=true
+                success_phase=initial
+                break
               fi
-            fi
 
-            case "$status_code" in
-              000|202|408|425|429|5??) transient=true ;;
-              *) transient=false ;;
-            esac
-            if [[ "$transient" != "true" || "$attempt" -ge "$max_attempts" ]]; then
-              break
-            fi
-            sleep "$((attempt * 5))"
-          done
+              # NIM may accept the invocation asynchronously. Follow its
+              # documented requestId status endpoint before retrying the POST.
+              if [[ "$status_code" == "202" && "$curl_exit_code" == "0" ]]; then
+                phase=pending
+                request_id="$(jq -r '.requestId // .request_id // empty' "$response_file" 2>/dev/null || true)"
+                if [[ ! "$request_id" =~ ^[0-9A-Fa-f-]{36}$ ]]; then
+                  failure_class="pending response missing request ID"
+                  request_id=""
+                else
+                  for ((poll=1; poll<=max_polls; poll++)); do
+                    poll_count=$((poll_count + 1))
+                    sleep "$poll_delay"
+                    probe_endpoint GET "https://integrate.api.nvidia.com/v1/status/${request_id}"
+                    if [[ "$status_code" == "200" && "$curl_exit_code" == "0" ]]; then
+                      probe_success=true
+                      success_phase=pending
+                      break 2
+                    fi
+                    [[ "$status_code" == "202" && "$curl_exit_code" == "0" ]] || break
+                  done
+                  [[ "$status_code" == "202" ]] && failure_class="provider invocation still pending after polling"
+                fi
+              fi
+
+              case "$status_code" in
+                000|202|408|425|429|5??) transient=true ;;
+                *) transient=false ;;
+              esac
+              if [[ "$transient" != "true" || "$attempt" -ge "$max_attempts" ]]; then
+                break
+              fi
+              sleep "$((attempt * 5))"
+            done
+          fi
 
           response_summary=""
           if [[ -s "$response_file" ]]; then
@@ -195,6 +251,9 @@ jobs:
             echo "probe_reasoning_effort=none"
             echo "http_status=${status_code}"
             echo "curl_exit_code=${curl_exit_code}"
+            echo "route_http_status=${route_status_code}"
+            echo "route_curl_exit_code=${route_curl_exit_code}"
+            echo "route_timing=${route_timing}"
             echo "attempts=${attempt}"
             echo "polls=${poll_count}"
             echo "phase=${phase}"
@@ -343,6 +402,8 @@ jobs:
             strix_runs/
             ${{ runner.temp }}/nvidia-nim-preflight.log
             ${{ runner.temp }}/nvidia-nim-response.json
+            ${{ runner.temp }}/nvidia-nim-route-headers.txt
+            ${{ runner.temp }}/nvidia-nim-route-response.json
             ${{ runner.temp }}/strix-output.log
           if-no-files-found: ignore
           retention-days: 30

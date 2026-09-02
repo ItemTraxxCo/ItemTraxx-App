@@ -80,7 +80,7 @@ jobs:
         id: nim-preflight
         env:
           NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
-          NVIDIA_NIM_MODEL: deepseek-ai/deepseek-v4-pro-0813
+          NVIDIA_NIM_MODEL: deepseek-ai/deepseek-v4-flash-0731
         run: |
           set -euo pipefail
           response_file="$RUNNER_TEMP/nvidia-nim-response.json"
@@ -352,7 +352,7 @@ jobs:
         id: strix-scan
         if: ${{ always() && steps.nim-preflight.outputs.ok == 'true' }}
         env:
-          STRIX_LLM: nvidia_nim/deepseek-ai/deepseek-v4-pro-0813
+          STRIX_LLM: nvidia_nim/deepseek-ai/deepseek-v4-flash-0731
           LLM_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
           STRIX_REASONING_EFFORT: high
           STRIX_DIFF_BASE: origin/${{ github.base_ref || github.event.repository.default_branch }}

@@ -40,7 +40,7 @@ jobs:
     needs:
       - require-trusted-ref
       - kill-switch-preflight
-    # Strix v1.5.1 includes recoverable unknown-tool handling for the
+    # Strix v1.6.1 includes recoverable unknown-tool handling for the
     # ModelBehaviorError reproduced in ItemTraxx CI.
     if: ((needs.require-trusted-ref.result == 'success' && needs.kill-switch-preflight.result == 'success') && (github.event_name == 'workflow_dispatch' || (github.event.pull_request.base.ref == 'preview' && github.event.pull_request.head.ref == 'staging')) && needs.kill-switch-preflight.outputs.active == 'false')
     permissions:
@@ -61,9 +61,9 @@ jobs:
 
       - name: Install Strix
         env:
-          STRIX_VERSION: 1.5.1
-          # SHA-256 published for strix-1.5.1-linux-x86_64.tar.gz.
-          STRIX_SHA256: f898f2913fc470986df3e903403b8b54409dc26c40caf2f8759e08d3814a3322
+          STRIX_VERSION: 1.6.1
+          # SHA-256 published for strix-1.6.1-linux-x86_64.tar.gz.
+          STRIX_SHA256: c07eda3b6a7673fa151f8b38c0b59eb30ea36fd9f7d130e887bcefc423e9f90b
         run: |
           strix_dir="$RUNNER_TEMP/strix-${STRIX_VERSION}"
           strix_archive="$strix_dir/strix.tar.gz"
@@ -359,7 +359,7 @@ jobs:
         run: |
           set +e
           set -o pipefail
-          # Strix v1.5.1 has no hard max-agent/concurrency flag. Keep the
+          # Strix v1.6.1 has no hard max-agent/concurrency flag. Keep the
           # graph at one active child so NVIDIA NIM is not hit by the four-way
           # root/child fan-out seen in the timed-out scan.
           strix -n \

@@ -72,6 +72,7 @@ describe("Login", () => {
 
     expect(mocks.capturePostHogEvent).toHaveBeenCalledWith("login_failed", {
       error_code: "invalid_credentials",
+      consecutive_failures: 1,
     });
     expect(mocks.capturePostHogEvent).not.toHaveBeenCalledWith(
       "tenant_login_failed",
@@ -93,11 +94,62 @@ describe("Login", () => {
 
     expect(mocks.capturePostHogEvent).toHaveBeenCalledWith("login_failed", {
       error_code: "authentication_failed",
+      consecutive_failures: 1,
     });
     expect(mocks.capturePostHogEvent).not.toHaveBeenCalledWith(
       "tenant_login_failed",
       expect.anything(),
     );
+    wrapper.unmount();
+  });
+
+  it("surfaces a password-reset prompt after repeated sign-in failures", async () => {
+    mocks.workspaceLogin.mockRejectedValue(new Error("Invalid email or password."));
+    const wrapper = mountLogin();
+
+    const submitOnce = async () => {
+      await wrapper.get('input[placeholder="Email address"]').setValue("admin@example.com");
+      await wrapper.get('input[placeholder="Enter password"]').setValue("wrong-password");
+      await wrapper.get("form").trigger("submit");
+      await settle();
+    };
+
+    await submitOnce();
+    await submitOnce();
+    expect(wrapper.find(".login-reset-hint").exists()).toBe(false);
+
+    await submitOnce();
+    expect(wrapper.find(".login-reset-hint").exists()).toBe(true);
+    expect(mocks.capturePostHogEvent).toHaveBeenCalledWith("login_failed", {
+      error_code: "invalid_credentials",
+      consecutive_failures: 3,
+    });
+    wrapper.unmount();
+  });
+
+  it("clears the failure counter after a successful sign-in", async () => {
+    mocks.workspaceLogin
+      .mockRejectedValueOnce(new Error("Invalid email or password."))
+      .mockRejectedValueOnce(new Error("Invalid email or password."))
+      .mockRejectedValueOnce(new Error("Invalid email or password."))
+      .mockResolvedValueOnce({ role: "workspace_admin", workspaceSlug: null });
+    mocks.getAuthState.mockReturnValue({ userId: "user-1", role: "workspace_admin" });
+    const wrapper = mountLogin();
+
+    const submitOnce = async () => {
+      await wrapper.get('input[placeholder="Email address"]').setValue("admin@example.com");
+      await wrapper.get('input[placeholder="Enter password"]').setValue("secret");
+      await wrapper.get("form").trigger("submit");
+      await settle();
+    };
+
+    await submitOnce();
+    await submitOnce();
+    await submitOnce();
+    expect(wrapper.find(".login-reset-hint").exists()).toBe(true);
+
+    await submitOnce();
+    expect(wrapper.find(".login-reset-hint").exists()).toBe(false);
     wrapper.unmount();
   });
 });

@@ -108,6 +108,13 @@
           </form>
 
           <p v-if="error" class="error">{{ error }}</p>
+          <p v-if="showPasswordResetHint" class="login-reset-hint">
+            Having trouble signing in?
+            <RouterLink class="link-button" to="/forgot-password">
+              Reset your password
+            </RouterLink>
+            to regain access.
+          </p>
         </div>
 
         <p class="muted legal-note">
@@ -142,6 +149,14 @@ const password = ref("");
 const showPassword = ref(false);
 const error = ref("");
 const isLoading = ref(false);
+// After several consecutive failed sign-ins we surface the reset path more
+// prominently: repeated wrong-password retries are the dominant login friction,
+// and the "Forgot password?" link alone is easy to miss mid-retry.
+const CONSECUTIVE_FAILURE_HINT_THRESHOLD = 3;
+const consecutiveFailures = ref(0);
+const showPasswordResetHint = computed(
+  () => consecutiveFailures.value >= CONSECUTIVE_FAILURE_HINT_THRESHOLD
+);
 const toastTitle = ref("");
 const toastMessage = ref("");
 const lightBrandLogoUrl = import.meta.env.VITE_BRAND_LOGO_LIGHT_URL as string | undefined;
@@ -296,6 +311,7 @@ const handleLogin = async () => {
       password.value,
       turnstileToken.value || undefined
     );
+    consecutiveFailures.value = 0;
     const auth = getAuthState();
     if (auth.userId) {
       const userId = auth.userId;
@@ -362,14 +378,22 @@ const handleLogin = async () => {
     if (signInErrorMessage) {
       error.value = "";
       showToast("Sign in failed.", signInErrorMessage);
+      consecutiveFailures.value += 1;
       void runPostHog(({ capturePostHogEvent }) =>
-        capturePostHogEvent("login_failed", { error_code: getLoginErrorCode(errorMessage) })
+        capturePostHogEvent("login_failed", {
+          error_code: getLoginErrorCode(errorMessage),
+          consecutive_failures: consecutiveFailures.value,
+        })
       );
       return;
     }
+    consecutiveFailures.value += 1;
     void runPostHog(({ capturePostHogEvent }) =>
       // The role is intentionally unknown for failed authentication attempts.
-      capturePostHogEvent("login_failed", { error_code: getLoginErrorCode(errorMessage) })
+      capturePostHogEvent("login_failed", {
+        error_code: getLoginErrorCode(errorMessage),
+        consecutive_failures: consecutiveFailures.value,
+      })
     );
     error.value = errorMessage;
   } finally {

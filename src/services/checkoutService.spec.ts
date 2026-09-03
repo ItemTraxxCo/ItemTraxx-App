@@ -56,6 +56,10 @@ vi.mock("./httpSessionService", () => ({
   fetchHttpSessionSummary: vi.fn(),
 }));
 
+vi.mock("./productEvents", () => ({
+  trackProductEvent: vi.fn(),
+}));
+
 import { invokeEdgeFunction } from "./edgeFunctionClient";
 import { authenticatedSelect } from "./authenticatedDataClient";
 import {
@@ -78,6 +82,7 @@ import { getAuthState } from "../store/authState";
 import { markItemTraxxServerConfirmed, markItemTraxxServerUnreachable } from "./offlineConnectionState";
 import { fetchSystemStatus, probeSystemStatusTransport } from "./systemStatusService";
 import { fetchHttpSessionSummary } from "./httpSessionService";
+import { trackProductEvent } from "./productEvents";
 import {
   fetchBorrowerByBorrowerId,
   fetchCheckedOutItem,
@@ -89,6 +94,7 @@ import {
   type CheckoutReturnPayload,
 } from "./checkoutService";
 
+const mockedTrackProductEvent = vi.mocked(trackProductEvent);
 const mockedInvoke = vi.mocked(invokeEdgeFunction);
 const mockedSelect = vi.mocked(authenticatedSelect);
 const mockedEnsureOpId = vi.mocked(ensureCheckoutOperationId);
@@ -161,6 +167,7 @@ beforeEach(() => {
       is_active: true,
     },
   });
+  mockedTrackProductEvent.mockReset();
 });
 
 afterEach(() => {
@@ -592,6 +599,52 @@ describe("syncCheckoutQueues", () => {
 
     await expect(syncCheckoutQueues({ force: true })).resolves.toMatchObject({ serverReachable: false });
     expect(mockedMarkUnreachable).toHaveBeenCalled();
+  });
+
+  it("reports a checkout_transaction_synced event when buffered transactions drain", async () => {
+    setOnline(true);
+    mockedSyncLedger.mockResolvedValue({ processed: 2, failed: 0, remaining: 0, review: 0 });
+    mockedFetchSystemStatus.mockResolvedValue({ ok: true, status: 200, payload: {} });
+
+    await syncCheckoutQueues({ force: true });
+
+    expect(mockedTrackProductEvent).toHaveBeenCalledWith({
+      posthog: {
+        name: "checkout_transaction_synced",
+        properties: { synced_count: 2, remaining_count: 0, review_count: 0 },
+      },
+    });
+  });
+
+  it("reports a checkout_transaction_sync_failed event when a flush fails", async () => {
+    setOnline(true);
+    mockedSyncLedger.mockResolvedValue({ processed: 0, failed: 1, remaining: 1, review: 0 });
+    mockedFetchSystemStatus.mockResolvedValue(null);
+    mockedProbeSystemStatusTransport.mockResolvedValue(false);
+
+    await syncCheckoutQueues({ force: true });
+
+    expect(mockedTrackProductEvent).toHaveBeenCalledWith({
+      posthog: {
+        name: "checkout_transaction_sync_failed",
+        properties: {
+          failed_count: 1,
+          remaining_count: 1,
+          review_count: 0,
+          server_reachable: false,
+        },
+      },
+    });
+  });
+
+  it("emits no sync product events when nothing drained or failed", async () => {
+    setOnline(true);
+    mockedSyncLedger.mockResolvedValue({ processed: 0, failed: 0, remaining: 0, review: 0 });
+    mockedFetchSystemStatus.mockResolvedValue({ ok: true, status: 200, payload: {} });
+
+    await syncCheckoutQueues({ force: true });
+
+    expect(mockedTrackProductEvent).not.toHaveBeenCalled();
   });
 });
 

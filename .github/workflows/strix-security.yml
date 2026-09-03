@@ -359,15 +359,15 @@ jobs:
         run: |
           set +e
           set -o pipefail
-          # Strix v1.6.1 has no hard max-agent/concurrency flag. Keep the
-          # graph at one active child so NVIDIA NIM is not hit by the four-way
-          # root/child fan-out seen in the timed-out scan.
+          # Keep a diff review in one root-agent pass. Delegation can leave a
+          # child stalled while the root waits, which made the previous small
+          # review spend hours in orchestration instead of analysis.
           strix -n \
             --target ./ \
             --scan-mode quick \
             --scope-mode diff \
             --diff-base "$STRIX_DIFF_BASE" \
-            --instruction "Provider-capacity constraint for this CI scan: serialize agent execution. Keep at most one child agent active at a time. After spawning a child, immediately wait for it to finish before spawning another. Do not spawn grandchildren or multiple children in one turn, and have the root wait instead of doing parallel work while a child is active. Preserve the full authorized diff scope and finish the scan and report." \
+            --instruction "CI diff review: use one root-agent pass. Do not create child agents, wait for agents, or run parallel sub-reviews. Review every changed file against the diff base, record coverage for each relevant risk area, and call finish_scan when the review and report are complete. Preserve the full authorized diff scope and finish with a concise report." \
             2>&1 | tee "$RUNNER_TEMP/strix-output.log"
           strix_exit_code="${PIPESTATUS[0]}"
           set -e

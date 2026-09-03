@@ -96,6 +96,65 @@ def main() -> None:
         if expected_clean_message not in clean_comment:
             raise RuntimeError(f"expected {expected_clean_message!r} in clean PR comment output")
 
+        coverage_findings_root = temporary_root / "coverage-strix_runs" / "run"
+        coverage_findings_root.mkdir(parents=True)
+        (coverage_findings_root / "findings.sarif").write_text(
+            json.dumps(
+                {
+                    "runs": [
+                        {
+                            "results": [
+                                {
+                                    "kind": "pass",
+                                    "level": "none",
+                                    "ruleId": "strix-coverage/test-pass",
+                                    "properties": {"strix": {"coverage_outcome": "no_issue_found"}},
+                                }
+                            ]
+                        }
+                    ]
+                }
+            ),
+            encoding="utf-8",
+        )
+        (coverage_findings_root / "coverage.json").write_text(
+            json.dumps(
+                {
+                    "gaps": [
+                        {
+                            "risk_area": "information disclosure",
+                            "detail": "An assigned risk class was not recorded as assessed.",
+                        }
+                    ]
+                }
+            ),
+            encoding="utf-8",
+        )
+        coverage_output = temporary_root / "coverage-comment.md"
+        subprocess.run(
+            [
+                "python3",
+                str(SCRIPT),
+                "--exit-code",
+                "0",
+                "--findings-root",
+                str(temporary_root / "coverage-strix_runs"),
+                "--output",
+                str(coverage_output),
+            ],
+            check=True,
+        )
+        coverage_comment = coverage_output.read_text(encoding="utf-8")
+        if "finding(s)" in coverage_comment:
+            raise RuntimeError("SARIF pass/coverage records were incorrectly reported as findings")
+        for expected in (
+            expected_clean_message,
+            "coverage gaps",
+            "information_disclosure",
+        ):
+            if expected not in coverage_comment:
+                raise RuntimeError(f"expected {expected!r} in coverage comment output")
+
 
 if __name__ == "__main__":
     main()

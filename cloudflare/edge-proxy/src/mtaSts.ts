@@ -1,14 +1,13 @@
 const MTA_STS_HOST = "mta-sts.itemtraxx.com";
 const MTA_STS_PATH = "/.well-known/mta-sts.txt";
 
-// The MX set is the live Zoho configuration for itemtraxx.com. Keep this
-// policy explicit so an unexpected MX is never silently trusted by senders.
+// Cloudflare Email Service owns inbound delivery for itemtraxx.com. Keep this
+// aligned with Cloudflare's supported MTA-STS policy so enforcing senders do
+// not reject the live Cloudflare MX hosts before a message reaches routing.
 const MTA_STS_POLICY = [
   "version: STSv1",
   "mode: enforce",
-  "mx: mx.zoho.com",
-  "mx: mx2.zoho.com",
-  "mx: mx3.zoho.com",
+  "mx: *.mx.cloudflare.net",
   "max_age: 86400",
 ].join("\n") + "\n";
 

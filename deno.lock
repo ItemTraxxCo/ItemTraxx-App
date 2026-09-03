@@ -29,7 +29,7 @@
     "npm:vue-tsc@^3.3.11": "3.3.11_typescript@6.0.3",
     "npm:vue@^3.5.42": "3.5.42_typescript@6.0.3",
     "npm:wrangler@^4.124.0": "4.128.0",
-    "npm:zod@^4.4.3": "4.4.3"
+    "npm:zod@^4.5.0": "4.5.4"
   },
   "npm": {
     "@asamuzakjp/css-color@6.0.5": {
@@ -2672,8 +2672,8 @@
         "youch-core"
       ]
     },
-    "zod@4.4.3": {
-      "integrity": "sha512-ytENFjIJFl2UwYglde2jchW2Hwm4GJFLDiSXWdTrJQBIN9Fcyp7n4DhxJEiWNAJMV1/BqWfW/kkg71UDcHJyTQ=="
+    "zod@4.5.4": {
+      "integrity": "sha512-sC95tT5iHHH9gtpj6A81kh+NEaRAUFN+qlUPDUbRfOMvNf5QCBqsb3WgvnpVtK5Y+4UfA6KqufotuTvMGiTlsA=="
     }
   },
   "redirects": {
@@ -2773,7 +2773,7 @@
         "npm:vue-tsc@^3.3.11",
         "npm:vue@^3.5.42",
         "npm:wrangler@^4.124.0",
-        "npm:zod@^4.4.3"
+        "npm:zod@^4.5.0"
       ],
       "overrides": {
         "esbuild": "0.28.1",

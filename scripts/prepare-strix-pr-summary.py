@@ -2,7 +2,6 @@
 """Create a safe, deterministic PR comment from Strix SARIF results."""
 
 import argparse
-from html import escape
 import json
 import os
 import re
@@ -31,9 +30,12 @@ def normalized_display(value: object, fallback: str) -> str:
     return WHITESPACE.sub(" ", value).strip()[:200] or fallback
 
 
-def safe_html_display(value: object, fallback: str) -> str:
-    """Preserve readable scanner text while keeping it inert in HTML/Markdown."""
-    return escape(normalized_display(value, fallback), quote=False)
+def safe_markdown_code(value: object, fallback: str) -> str:
+    """Preserve readable scanner text inside a Markdown code span."""
+    # Backticks would terminate the code span used at the render sites below.
+    # GFM escapes HTML inside code spans, so keep the remaining punctuation
+    # literal to avoid displaying escaped entities such as ``&lt;``.
+    return normalized_display(value, fallback).replace("`", "'")
 
 
 def report_paths(findings_root: Path, filename: str) -> list[Path]:
@@ -184,7 +186,7 @@ def build_comment(
                     "",
                     "### Coverage gaps",
                     *[
-                        f"- <code>{safe_html_display(gap, 'unexamined coverage')}</code>"
+                        f"- `{safe_markdown_code(gap, 'unexamined coverage')}`"
                         for gap in coverage_gaps[:MAX_FINDINGS_IN_COMMENT]
                     ],
                 ]
@@ -199,7 +201,7 @@ def build_comment(
                     "",
                     "### Report parsing issues",
                     *[
-                        f"- <code>{safe_html_display(error, 'unreadable scanner report')}</code>"
+                        f"- `{safe_markdown_code(error, 'unreadable scanner report')}`"
                         for error in report_errors[:MAX_FINDINGS_IN_COMMENT]
                     ],
                 ]

@@ -133,7 +133,11 @@ def main() -> None:
                     "gaps": [
                         {
                             "risk_area": "information disclosure",
-                            "detail": "An assigned risk class was not recorded as assessed.\n<script>",
+                            "detail": (
+                                "An assigned risk class was not recorded as assessed.\n<script> "
+                                "[see details](https://evil.example/steal): **urgent** follow "
+                                "https://evil.example/plain `break`"
+                            ),
                         }
                     ]
                 }
@@ -161,13 +165,16 @@ def main() -> None:
             "Strix reported no exploitable vulnerabilities, but the assessment is incomplete.",
             "Do not treat this run as a complete clean security assessment.",
             "Coverage gaps",
-            "information disclosure",
-            "&lt;script&gt;",
+            "`information disclosure: An assigned risk class was not recorded as assessed. &lt;script&gt; "
+            "[see details](https://evil.example/steal): **urgent** follow "
+            "https://evil.example/plain 'break'`",
         ):
             if expected not in coverage_comment:
                 raise RuntimeError(f"expected {expected!r} in coverage comment output")
         if "information_disclosure" in coverage_comment or "<script>" in coverage_comment:
             raise RuntimeError("coverage gap text was not rendered readably and safely")
+        if "<code>" in coverage_comment or "</code>" in coverage_comment:
+            raise RuntimeError("coverage gap text still uses a Markdown-parsed raw HTML code tag")
 
         malformed_findings_root = temporary_root / "malformed-strix_runs" / "run"
         malformed_findings_root.mkdir(parents=True)

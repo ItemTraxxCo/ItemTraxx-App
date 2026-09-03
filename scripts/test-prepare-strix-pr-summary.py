@@ -75,6 +75,10 @@ def main() -> None:
             json.dumps({"runs": [{"results": []}]}),
             encoding="utf-8",
         )
+        (clean_findings_root / "coverage.json").write_text(
+            json.dumps({"completeness": {"complete": True}, "gaps": []}),
+            encoding="utf-8",
+        )
         clean_output = temporary_root / "clean-comment.md"
         subprocess.run(
             [
@@ -120,10 +124,11 @@ def main() -> None:
         (coverage_findings_root / "coverage.json").write_text(
             json.dumps(
                 {
+                    "completeness": {"complete": False},
                     "gaps": [
                         {
                             "risk_area": "information disclosure",
-                            "detail": "An assigned risk class was not recorded as assessed.",
+                            "detail": "An assigned risk class was not recorded as assessed.\n<script>",
                         }
                     ]
                 }
@@ -148,12 +153,39 @@ def main() -> None:
         if "finding(s)" in coverage_comment:
             raise RuntimeError("SARIF pass/coverage records were incorrectly reported as findings")
         for expected in (
-            expected_clean_message,
-            "coverage gaps",
-            "information_disclosure",
+            "Strix reported no exploitable vulnerabilities, but the assessment is incomplete.",
+            "Do not treat this run as a complete clean security assessment.",
+            "Coverage gaps",
+            "information disclosure",
+            "&lt;script&gt;",
         ):
             if expected not in coverage_comment:
                 raise RuntimeError(f"expected {expected!r} in coverage comment output")
+        if "information_disclosure" in coverage_comment or "<script>" in coverage_comment:
+            raise RuntimeError("coverage gap text was not rendered readably and safely")
+
+        malformed_findings_root = temporary_root / "malformed-strix_runs" / "run"
+        malformed_findings_root.mkdir(parents=True)
+        (malformed_findings_root / "findings.sarif").write_text("{not-json", encoding="utf-8")
+        (malformed_findings_root / "coverage.json").write_text("[not-an-object]", encoding="utf-8")
+        malformed_output = temporary_root / "malformed-comment.md"
+        subprocess.run(
+            [
+                "python3",
+                str(SCRIPT),
+                "--exit-code",
+                "0",
+                "--findings-root",
+                str(temporary_root / "malformed-strix_runs"),
+                "--output",
+                str(malformed_output),
+            ],
+            check=True,
+        )
+        malformed_comment = malformed_output.read_text(encoding="utf-8")
+        for expected in ("assessment is incomplete", "Report parsing issues", "findings.sarif", "coverage.json"):
+            if expected not in malformed_comment:
+                raise RuntimeError(f"expected {expected!r} in malformed-report comment output")
 
 
 if __name__ == "__main__":

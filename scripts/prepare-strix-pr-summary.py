@@ -2,16 +2,19 @@
 """Create a safe, deterministic PR comment from Strix SARIF results."""
 
 import argparse
+from html import escape
 import json
 import os
 import re
 from pathlib import Path
+from typing import Optional
 
 
 MARKER = "<!-- itemtraxx-strix-security-scan -->"
 COMMENT_HEADING = "## Strix Penetration Test and Security Scanning"
 MAX_FINDINGS_IN_COMMENT = 20
 SAFE_DISPLAY = re.compile(r"[^A-Za-z0-9._/@:+-]")
+WHITESPACE = re.compile(r"\s+")
 
 
 def safe_display(value: object, fallback: str) -> str:
@@ -19,6 +22,18 @@ def safe_display(value: object, fallback: str) -> str:
     if not isinstance(value, str) or not value:
         return fallback
     return SAFE_DISPLAY.sub("_", value)[:200] or fallback
+
+
+def normalized_display(value: object, fallback: str) -> str:
+    """Normalize scanner text without changing readable punctuation."""
+    if not isinstance(value, str) or not value:
+        return fallback
+    return WHITESPACE.sub(" ", value).strip()[:200] or fallback
+
+
+def safe_html_display(value: object, fallback: str) -> str:
+    """Preserve readable scanner text while keeping it inert in HTML/Markdown."""
+    return escape(normalized_display(value, fallback), quote=False)
 
 
 def finding_summary(result: object) -> tuple[str, str, str]:
@@ -54,36 +69,78 @@ def is_coverage_result(result: object) -> bool:
     return isinstance(strix_properties, dict) and bool(strix_properties.get("coverage_outcome"))
 
 
-def collect_findings(findings_root: Path) -> tuple[list[tuple[str, str, str]], bool]:
+def collect_findings(
+    findings_root: Path,
+) -> tuple[list[tuple[str, str, str]], bool, list[str]]:
     findings = []
     sarif_found = False
+    parse_errors = []
     for path in findings_root.glob("**/findings.sarif"):
         sarif_found = True
-        with path.open(encoding="utf-8") as report_file:
-            report = json.load(report_file)
-        for sarif_run in report.get("runs", []):
+        try:
+            with path.open(encoding="utf-8") as report_file:
+                report = json.load(report_file)
+        except (OSError, json.JSONDecodeError, TypeError) as error:
+            parse_errors.append(f"{path.name}: {type(error).__name__}")
+            continue
+        if not isinstance(report, dict):
+            parse_errors.append(f"{path.name}: top-level JSON is not an object")
+            continue
+        runs = report.get("runs", [])
+        if not isinstance(runs, list):
+            parse_errors.append(f"{path.name}: runs is not an array")
+            continue
+        for sarif_run in runs:
             if isinstance(sarif_run, dict):
-                for result in sarif_run.get("results", []):
+                results = sarif_run.get("results", [])
+                if not isinstance(results, list):
+                    parse_errors.append(f"{path.name}: results is not an array")
+                    continue
+                for result in results:
                     if not is_coverage_result(result):
                         findings.append(finding_summary(result))
-    return findings, sarif_found
+    return findings, sarif_found, parse_errors
 
 
-def collect_coverage_gaps(findings_root: Path) -> list[str]:
+def collect_coverage_gaps(findings_root: Path) -> tuple[list[str], Optional[bool], list[str]]:
     """Collect scanner-reported coverage gaps for an honest clean-result summary."""
     gaps = []
+    coverage_complete = None
+    parse_errors = []
+    coverage_seen = False
     for path in findings_root.glob("**/coverage.json"):
-        with path.open(encoding="utf-8") as report_file:
-            coverage = json.load(report_file)
-        if not isinstance(coverage, dict):
+        coverage_seen = True
+        try:
+            with path.open(encoding="utf-8") as report_file:
+                coverage = json.load(report_file)
+        except (OSError, json.JSONDecodeError, TypeError) as error:
+            coverage_complete = False
+            parse_errors.append(f"{path.name}: {type(error).__name__}")
             continue
-        for gap in coverage.get("gaps", []):
+        if not isinstance(coverage, dict):
+            coverage_complete = False
+            parse_errors.append(f"{path.name}: top-level JSON is not an object")
+            continue
+        completeness = coverage.get("completeness")
+        if isinstance(completeness, dict) and completeness.get("complete") is True:
+            if coverage_complete is not False:
+                coverage_complete = True
+        else:
+            coverage_complete = False
+        raw_gaps = coverage.get("gaps", [])
+        if not isinstance(raw_gaps, list):
+            coverage_complete = False
+            parse_errors.append(f"{path.name}: gaps is not an array")
+            raw_gaps = []
+        for gap in raw_gaps:
             if not isinstance(gap, dict):
                 continue
-            risk_area = safe_display(gap.get("risk_area"), "unknown-risk-area")
-            detail = safe_display(gap.get("detail"), "unexamined coverage").strip()
+            risk_area = normalized_display(gap.get("risk_area"), "unknown-risk-area")
+            detail = normalized_display(gap.get("detail"), "unexamined coverage")
             gaps.append(f"{risk_area}: {detail}")
-    return gaps
+    if not coverage_seen:
+        coverage_complete = None
+    return gaps, coverage_complete, parse_errors
 
 
 def build_comment(
@@ -91,24 +148,54 @@ def build_comment(
     findings: list[tuple[str, str, str]],
     sarif_found: bool,
     coverage_gaps: list[str],
+    coverage_complete: Optional[bool] = None,
+    report_errors: Optional[list[str]] = None,
 ) -> str:
+    report_errors = report_errors or []
+    assessment_incomplete = coverage_complete is not True or bool(coverage_gaps) or bool(report_errors)
     if exit_code == "0" and not findings and sarif_found:
-        lines = [
-            MARKER,
-            COMMENT_HEADING,
-            "Strix completed the penetration test and security scan and found no exploitable vulnerabilities.",
-        ]
+        if assessment_incomplete:
+            lines = [
+                MARKER,
+                COMMENT_HEADING,
+                "Strix reported no exploitable vulnerabilities, but the assessment is incomplete.",
+                "Do not treat this run as a complete clean security assessment.",
+            ]
+        else:
+            lines = [
+                MARKER,
+                COMMENT_HEADING,
+                "Strix completed the penetration test and security scan and found no exploitable vulnerabilities.",
+            ]
         if coverage_gaps:
             lines.extend(
                 [
                     "",
-                    "However, the run reported coverage gaps, so this is not a complete clean assessment:",
-                    *[f"- {gap}" for gap in coverage_gaps[:MAX_FINDINGS_IN_COMMENT]],
+                    "### Coverage gaps",
+                    *[
+                        f"- <code>{safe_html_display(gap, 'unexamined coverage')}</code>"
+                        for gap in coverage_gaps[:MAX_FINDINGS_IN_COMMENT]
+                    ],
                 ]
             )
             if len(coverage_gaps) > MAX_FINDINGS_IN_COMMENT:
                 lines.append(
                     f"- {len(coverage_gaps) - MAX_FINDINGS_IN_COMMENT} additional coverage gap(s) are in the artifact."
+                )
+        if report_errors:
+            lines.extend(
+                [
+                    "",
+                    "### Report parsing issues",
+                    *[
+                        f"- <code>{safe_html_display(error, 'unreadable scanner report')}</code>"
+                        for error in report_errors[:MAX_FINDINGS_IN_COMMENT]
+                    ],
+                ]
+            )
+            if len(report_errors) > MAX_FINDINGS_IN_COMMENT:
+                lines.append(
+                    f"- {len(report_errors) - MAX_FINDINGS_IN_COMMENT} additional report parsing issue(s) are in the artifact."
                 )
     elif exit_code == "0" and not findings and not sarif_found:
         lines = [
@@ -130,6 +217,13 @@ def build_comment(
             lines.append(f"- Severity: `{severity}` | Rule: `{rule_id}` | Location: `{location}`")
         if len(findings) > MAX_FINDINGS_IN_COMMENT:
             lines.append(f"- {len(findings) - MAX_FINDINGS_IN_COMMENT} additional finding(s) are in the SARIF artifact.")
+        if assessment_incomplete:
+            lines.extend(
+                [
+                    "",
+                    "Coverage is incomplete; review the artifact before treating these findings as a complete assessment.",
+                ]
+            )
     else:
         lines = [
             MARKER,
@@ -146,9 +240,16 @@ def main() -> None:
     parser.add_argument("--output", type=Path)
     args = parser.parse_args()
 
-    findings, sarif_found = collect_findings(args.findings_root)
-    coverage_gaps = collect_coverage_gaps(args.findings_root)
-    comment = build_comment(args.exit_code, findings, sarif_found, coverage_gaps)
+    findings, sarif_found, finding_errors = collect_findings(args.findings_root)
+    coverage_gaps, coverage_complete, coverage_errors = collect_coverage_gaps(args.findings_root)
+    comment = build_comment(
+        args.exit_code,
+        findings,
+        sarif_found,
+        coverage_gaps,
+        coverage_complete,
+        finding_errors + coverage_errors,
+    )
     output = args.output or Path(os.environ.get("RUNNER_TEMP", ".")) / "strix-pr-comment.md"
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(comment, encoding="utf-8")

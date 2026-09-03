@@ -297,6 +297,17 @@ const getLoginErrorCode = (message: string) => {
   return "authentication_failed";
 };
 
+// Sign-in can be refused without the password ever being checked: a failed bot
+// check, the rate limiter, a disabled workspace, or maintenance mode. These
+// branches return early, so without this they leave no trace and a blocked
+// operator looks identical to one who simply never tried. The code is a fixed
+// enum and carries nothing about who was blocked.
+const recordBlockedLogin = (errorCode: string) => {
+  void runPostHog(({ capturePostHogEvent }) =>
+    capturePostHogEvent("login_failed", { error_code: errorCode })
+  );
+};
+
 const handleLogin = async () => {
   error.value = "";
   isLoading.value = true;
@@ -344,6 +355,7 @@ const handleLogin = async () => {
     await router.push({ path: destination.path, query: { login_ctx: destination.loginContext } });
   } catch (err) {
     if (err instanceof Error && err.message === "LIMITER_UNAVAILABLE") {
+      recordBlockedLogin("rate_limit");
       error.value = "";
       showToast(
         "Rate Limit reached. Please try again later.",
@@ -352,6 +364,7 @@ const handleLogin = async () => {
       return;
     }
     if (err instanceof Error && err.message === "TURNSTILE_FAILED") {
+      recordBlockedLogin("turnstile_failed");
       error.value = "Security check failed. Please try again.";
       return;
     }
@@ -359,17 +372,20 @@ const handleLogin = async () => {
       err instanceof Error &&
       (err.message === "TENANT_DISABLED" || err.message === "WORKSPACE_DISABLED")
     ) {
+      recordBlockedLogin("workspace_disabled");
       error.value = "";
       showToast("Access blocked", "This account cannot sign in right now. Please contact support.");
       return;
     }
     if (err instanceof Error && err.message === "MAINTENANCE_MODE") {
+      recordBlockedLogin("maintenance_mode");
       error.value = "";
       showToast("Maintenance mode", "Sign in is temporarily unavailable. Please try again later.");
       return;
     }
     const errorMessage = err instanceof Error ? err.message : "Sign in failed.";
     if (errorMessage === "Admin verification required.") {
+      recordBlockedLogin("admin_verification_required");
       error.value = "";
       showToast("Admin verification required", "Please sign in again to continue.");
       return;

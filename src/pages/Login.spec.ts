@@ -152,4 +152,41 @@ describe("Login", () => {
     expect(wrapper.find(".login-reset-hint").exists()).toBe(false);
     wrapper.unmount();
   });
+
+  it.each([
+    ["TURNSTILE_FAILED", "turnstile_failed"],
+    ["LIMITER_UNAVAILABLE", "rate_limit"],
+    ["WORKSPACE_DISABLED", "workspace_disabled"],
+    ["MAINTENANCE_MODE", "maintenance_mode"],
+  ])("reports %s as a blocked login instead of staying silent", async (thrown, code) => {
+    mocks.workspaceLogin.mockRejectedValueOnce(new Error(thrown));
+    const wrapper = mountLogin();
+
+    await wrapper.get('input[placeholder="Email address"]').setValue("admin@example.com");
+    await wrapper.get('input[placeholder="Enter password"]').setValue("secret");
+    await wrapper.get("form").trigger("submit");
+    await settle();
+
+    expect(mocks.capturePostHogEvent).toHaveBeenCalledWith("login_failed", {
+      error_code: code,
+    });
+    wrapper.unmount();
+  });
+
+  it("does not count a blocked login toward the password-reset prompt", async () => {
+    mocks.workspaceLogin.mockRejectedValue(new Error("TURNSTILE_FAILED"));
+    const wrapper = mountLogin();
+
+    for (let attempt = 0; attempt < 4; attempt += 1) {
+      await wrapper.get('input[placeholder="Email address"]').setValue("admin@example.com");
+      await wrapper.get('input[placeholder="Enter password"]').setValue("secret");
+      await wrapper.get("form").trigger("submit");
+      await settle();
+    }
+
+    // A failed bot check says nothing about the password, so it must not push
+    // the operator toward resetting a credential that already works.
+    expect(wrapper.find(".login-reset-hint").exists()).toBe(false);
+    wrapper.unmount();
+  });
 });

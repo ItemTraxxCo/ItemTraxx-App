@@ -70,7 +70,9 @@ test.describe("Protected route smoke tests", () => {
       localStorage.setItem("itemtraxx:onboarding:v1:workspace_admin", new Date().toISOString());
     });
     await setWorkspaceAdminSession(page);
-    await navigateApp(page, "/checkout");
+    // Use the admin shell so this app-level queue test does not race the
+    // checkout page's independent background replay loop.
+    await navigateApp(page, "/admin");
 
     const toast = page.locator(".toast-bottom-left");
     await expect(toast).toHaveCount(0);

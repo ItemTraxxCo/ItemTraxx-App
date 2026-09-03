@@ -40,7 +40,7 @@ jobs:
     needs:
       - require-trusted-ref
       - kill-switch-preflight
-    # Strix v1.5.1 includes recoverable unknown-tool handling for the
+    # Strix v1.6.1 includes recoverable unknown-tool handling for the
     # ModelBehaviorError reproduced in ItemTraxx CI.
     if: ((needs.require-trusted-ref.result == 'success' && needs.kill-switch-preflight.result == 'success') && (github.event_name == 'workflow_dispatch' || (github.event.pull_request.base.ref == 'preview' && github.event.pull_request.head.ref == 'staging')) && needs.kill-switch-preflight.outputs.active == 'false')
     permissions:
@@ -61,9 +61,9 @@ jobs:
 
       - name: Install Strix
         env:
-          STRIX_VERSION: 1.5.1
-          # SHA-256 published for strix-1.5.1-linux-x86_64.tar.gz.
-          STRIX_SHA256: f898f2913fc470986df3e903403b8b54409dc26c40caf2f8759e08d3814a3322
+          STRIX_VERSION: 1.6.1
+          # SHA-256 published for strix-1.6.1-linux-x86_64.tar.gz.
+          STRIX_SHA256: c07eda3b6a7673fa151f8b38c0b59eb30ea36fd9f7d130e887bcefc423e9f90b
         run: |
           strix_dir="$RUNNER_TEMP/strix-${STRIX_VERSION}"
           strix_archive="$strix_dir/strix.tar.gz"
@@ -76,25 +76,298 @@ jobs:
           install -m 0755 "$strix_dir/strix-${STRIX_VERSION}-linux-x86_64" "$strix_dir/bin/strix"
           echo "$strix_dir/bin" >> "$GITHUB_PATH"
 
+      - name: Preflight NVIDIA NIM endpoint
+        id: nim-preflight
+        env:
+          NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
+          NVIDIA_NIM_MODEL: deepseek-ai/deepseek-v4-flash-0731
+        run: |
+          set -euo pipefail
+          response_file="$RUNNER_TEMP/nvidia-nim-response.json"
+          headers_file="$RUNNER_TEMP/nvidia-nim-headers.txt"
+          route_response_file="$RUNNER_TEMP/nvidia-nim-route-response.json"
+          route_headers_file="$RUNNER_TEMP/nvidia-nim-route-headers.txt"
+          control_response_file="$RUNNER_TEMP/nvidia-nim-control-response.json"
+          control_headers_file="$RUNNER_TEMP/nvidia-nim-control-headers.txt"
+          summary_file="$RUNNER_TEMP/nvidia-nim-preflight.log"
+          request_body="$RUNNER_TEMP/nvidia-nim-request.json"
+          control_request_body="$RUNNER_TEMP/nvidia-nim-control-request.json"
+          connect_timeout=15
+          request_timeout=180
+          control_request_timeout=30
+          route_timeout=20
+          max_attempts=2
+          max_polls=6
+          poll_delay=5
+
+          # NVIDIA's catalog example disables thinking for its lightweight
+          # endpoint probe. Keep this separate from Strix's configured effort:
+          # the probe answers "can this runner/key invoke this model?" without
+          # spending the free endpoint's capacity on a high-reasoning request.
+          printf '%s\n' "{\"model\":\"${NVIDIA_NIM_MODEL}\",\"messages\":[{\"role\":\"user\",\"content\":\"Reply with exactly: pong\"}],\"reasoning_effort\":\"none\",\"temperature\":0,\"max_tokens\":1,\"stream\":false}" > "$request_body"
+          printf '%s\n' '{"model":"google/gemma-3-4b-it","messages":[{"role":"user","content":"Reply with exactly: pong"}],"temperature":0,"max_tokens":1,"stream":false}' > "$control_request_body"
+
+          status_code=000
+          curl_exit_code=0
+          attempt=0
+          poll_count=0
+          request_id=""
+          phase=initial
+          probe_success=false
+          success_phase=""
+          failure_class=""
+          : > "$response_file"
+          : > "$headers_file"
+          : > "$route_response_file"
+          : > "$route_headers_file"
+          : > "$control_response_file"
+          : > "$control_headers_file"
+
+          # Check the runner's route to NVIDIA separately from model
+          # invocation. A non-zero HTTP response still proves the route is
+          # reachable; only a no-byte curl failure should classify it as an
+          # egress/connection problem.
+          route_status_code=000
+          route_curl_exit_code=0
+          route_timing=""
+          route_unavailable=false
+          route_probe() {
+            local route_metrics
+            set +e
+            route_metrics="$(curl --silent --show-error --location --ipv4 --http1.1 \
+              --connect-timeout "$connect_timeout" \
+              --max-time "$route_timeout" \
+              --dump-header "$route_headers_file" \
+              --output "$route_response_file" \
+              --write-out '%{http_code}\t%{time_namelookup}\t%{time_connect}\t%{time_appconnect}\t%{time_starttransfer}\t%{time_total}' \
+              -H "Authorization: Bearer ${NVIDIA_API_KEY}" \
+              -H 'Accept: application/json' \
+              --request GET \
+              https://integrate.api.nvidia.com/v1/models)"
+            route_curl_exit_code=$?
+            set -e
+            IFS=$'\t' read -r route_status_code route_dns_seconds route_connect_seconds route_tls_seconds route_first_byte_seconds route_total_seconds <<< "$route_metrics"
+            route_status_code="${route_status_code:-000}"
+            route_timing="dns=${route_dns_seconds:-unknown}s connect=${route_connect_seconds:-unknown}s tls=${route_tls_seconds:-unknown}s first_byte=${route_first_byte_seconds:-unknown}s total=${route_total_seconds:-unknown}s"
+          }
+
+          route_probe
+          if [[ "$route_curl_exit_code" != "0" || "$route_status_code" == "000" ]]; then
+            route_unavailable=true
+            failure_class="NVIDIA API route unavailable from GitHub runner"
+            {
+              echo "### NVIDIA NIM route diagnostic"
+              echo
+              echo "The runner could not receive bytes from \`integrate.api.nvidia.com\` before model invocation."
+              echo
+              echo "- HTTP status: \`${route_status_code}\`; curl exit: \`${route_curl_exit_code}\`"
+              echo "- Timing: \`${route_timing}\`"
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+          probe_endpoint() {
+            local method="$1"
+            local url="$2"
+            local body_file="${3:-$request_body}"
+            local timeout="${4:-$request_timeout}"
+            local output_file="${5:-$response_file}"
+            local output_headers="${6:-$headers_file}"
+            local -a curl_args=(
+              --silent --show-error --location --ipv4 --http1.1
+              --connect-timeout "$connect_timeout"
+              --max-time "$timeout"
+              --dump-header "$output_headers"
+              --output "$output_file"
+              --write-out '%{http_code}'
+              -H "Authorization: Bearer ${NVIDIA_API_KEY}"
+              -H 'Accept: application/json'
+              --request "$method"
+            )
+            if [[ "$method" == "POST" ]]; then
+              curl_args+=(
+                -H 'Content-Type: application/json'
+                --data-binary "@$body_file"
+              )
+            fi
+
+            set +e
+            status_code="$(curl "${curl_args[@]}" "$url")"
+            curl_exit_code=$?
+            set -e
+            status_code="${status_code:-000}"
+          }
+
+          control_status_code=skipped
+          control_curl_exit_code=skipped
+          if [[ "$route_unavailable" != "true" ]]; then
+            # A small, unrelated model tells us whether POST inference works
+            # on this runner at all. Keep this diagnostic separate from the
+            # target model's response and never use it as a fallback for
+            # Strix's configured model.
+            probe_endpoint POST https://integrate.api.nvidia.com/v1/chat/completions \
+              "$control_request_body" "$control_request_timeout" \
+              "$control_response_file" "$control_headers_file"
+            control_status_code="$status_code"
+            control_curl_exit_code="$curl_exit_code"
+          fi
+
+          if [[ "$route_unavailable" == "true" ]]; then
+            # The route probe already established that this runner cannot
+            # receive bytes from NVIDIA. Avoid four redundant 45-second POSTs
+            # and preserve the route diagnostic as the failure evidence.
+            status_code="$route_status_code"
+            curl_exit_code="$route_curl_exit_code"
+            attempt=1
+          else
+            while (( attempt < max_attempts )); do
+              attempt=$((attempt + 1))
+              phase=initial
+              request_id=""
+              probe_endpoint POST https://integrate.api.nvidia.com/v1/chat/completions
+
+              if [[ "$status_code" == "200" && "$curl_exit_code" == "0" ]]; then
+                probe_success=true
+                success_phase=initial
+                break
+              fi
+
+              # NIM may accept the invocation asynchronously. Follow its
+              # documented requestId status endpoint before retrying the POST.
+              if [[ "$status_code" == "202" && "$curl_exit_code" == "0" ]]; then
+                phase=pending
+                request_id="$(jq -r '.requestId // .request_id // empty' "$response_file" 2>/dev/null || true)"
+                if [[ ! "$request_id" =~ ^[0-9A-Fa-f-]{36}$ ]]; then
+                  failure_class="pending response missing request ID"
+                  request_id=""
+                else
+                  for ((poll=1; poll<=max_polls; poll++)); do
+                    poll_count=$((poll_count + 1))
+                    sleep "$poll_delay"
+                    probe_endpoint GET "https://integrate.api.nvidia.com/v1/status/${request_id}" \
+                      "$request_body" "$control_request_timeout"
+                    if [[ "$status_code" == "200" && "$curl_exit_code" == "0" ]]; then
+                      probe_success=true
+                      success_phase=pending
+                      break 2
+                    fi
+                    [[ "$status_code" == "202" && "$curl_exit_code" == "0" ]] || break
+                  done
+                  [[ "$status_code" == "202" ]] && failure_class="provider invocation still pending after polling"
+                fi
+              fi
+
+              case "$status_code" in
+                000|202|408|425|429|5??) transient=true ;;
+                *) transient=false ;;
+              esac
+              if [[ "$transient" != "true" || "$attempt" -ge "$max_attempts" ]]; then
+                break
+              fi
+              sleep "$((attempt * 5))"
+            done
+          fi
+
+          response_summary=""
+          if [[ -s "$response_file" ]]; then
+            response_summary="$(tr '\r\n' '  ' < "$response_file" | sed -E 's/[[:space:]]+/ /g' | cut -c1-500)"
+          fi
+          retry_after="$(awk 'BEGIN {IGNORECASE=1} /^retry-after:/ {sub(/\r$/, ""); sub(/^[^:]*:[[:space:]]*/, ""); print; exit}' "$headers_file" 2>/dev/null | sed -E 's/[^0-9A-Za-z .:+-]/_/g' | cut -c1-100 || true)"
+          {
+            echo "model=${NVIDIA_NIM_MODEL}"
+            echo "probe_reasoning_effort=none"
+            echo "http_status=${status_code}"
+            echo "curl_exit_code=${curl_exit_code}"
+            echo "route_http_status=${route_status_code}"
+            echo "route_curl_exit_code=${route_curl_exit_code}"
+            echo "route_timing=${route_timing}"
+            echo "control_model=google/gemma-3-4b-it"
+            echo "control_http_status=${control_status_code}"
+            echo "control_curl_exit_code=${control_curl_exit_code}"
+            echo "attempts=${attempt}"
+            echo "polls=${poll_count}"
+            echo "phase=${phase}"
+            if [[ -n "$retry_after" ]]; then
+              echo "retry_after=${retry_after}"
+            fi
+            if [[ -n "$response_summary" ]]; then
+              echo "response=${response_summary}"
+            fi
+          } > "$summary_file"
+
+          echo "http_status=$status_code" >> "$GITHUB_OUTPUT"
+          echo "curl_exit_code=$curl_exit_code" >> "$GITHUB_OUTPUT"
+          echo "attempts=$attempt" >> "$GITHUB_OUTPUT"
+          echo "polls=$poll_count" >> "$GITHUB_OUTPUT"
+
+          if [[ "$probe_success" == "true" ]]; then
+            echo "ok=true" >> "$GITHUB_OUTPUT"
+            echo "failure_class=" >> "$GITHUB_OUTPUT"
+            {
+              echo "### NVIDIA NIM preflight"
+              echo
+              echo "The exact Strix model/API key completed a lightweight non-streaming probe (HTTP 200)."
+              echo
+              echo "- Model: \`${NVIDIA_NIM_MODEL}\`"
+              echo "- Probe reasoning effort: \`none\`"
+              echo "- Attempts: \`${attempt}\`; status polls: \`${poll_count}\`"
+              if [[ "$success_phase" == "pending" ]]; then
+                echo "- The provider accepted the request asynchronously and completed it through the status endpoint."
+              fi
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          echo "ok=false" >> "$GITHUB_OUTPUT"
+          if [[ -z "$failure_class" ]]; then
+            case "$status_code" in
+              000) failure_class="network/connection failure" ;;
+              401|403) failure_class="authentication/authorization failure" ;;
+              408|425|429|5??) failure_class="provider capacity or transient service failure" ;;
+              4??) failure_class="request rejected by provider" ;;
+              *) failure_class="unexpected provider response" ;;
+            esac
+          fi
+          echo "failure_class=$failure_class" >> "$GITHUB_OUTPUT"
+          echo "NVIDIA NIM preflight failed: ${failure_class} (HTTP ${status_code}, curl ${curl_exit_code}) after ${attempt} attempt(s). Strix will not start." >&2
+          if [[ -n "$response_summary" ]]; then
+            echo "NVIDIA NIM response (truncated): ${response_summary}" >&2
+          fi
+          if [[ -n "$retry_after" ]]; then
+            echo "NVIDIA NIM Retry-After: ${retry_after}" >&2
+          fi
+          {
+            echo "### NVIDIA NIM preflight"
+            echo
+            echo "**Failed before Strix started:** ${failure_class} (HTTP \`${status_code}\`, curl \`${curl_exit_code}\`) after \`${attempt}\` attempt(s)."
+            if [[ -n "$retry_after" ]]; then
+              echo
+              echo "Provider \`Retry-After\`: \`${retry_after}\`."
+            fi
+            echo
+            echo "The preflight log and response are attached to the workflow artifact."
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit 1
+
       - name: Run Strix security scan
         id: strix-scan
+        if: ${{ always() && steps.nim-preflight.outputs.ok == 'true' }}
         env:
-          STRIX_LLM: nvidia_nim/deepseek-ai/deepseek-v4-pro-0813
+          STRIX_LLM: nvidia_nim/deepseek-ai/deepseek-v4-flash-0731
           LLM_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
           STRIX_REASONING_EFFORT: high
           STRIX_DIFF_BASE: origin/${{ github.base_ref || github.event.repository.default_branch }}
         run: |
           set +e
           set -o pipefail
-          # Strix v1.5.1 has no hard max-agent/concurrency flag. Keep the
-          # graph at one active child so NVIDIA NIM is not hit by the four-way
-          # root/child fan-out seen in the timed-out scan.
+          # Keep a diff review in one root-agent pass. Delegation can leave a
+          # child stalled while the root waits, which made the previous small
+          # review spend hours in orchestration instead of analysis.
           strix -n \
             --target ./ \
             --scan-mode quick \
             --scope-mode diff \
             --diff-base "$STRIX_DIFF_BASE" \
-            --instruction "Provider-capacity constraint for this CI scan: serialize agent execution. Keep at most one child agent active at a time. After spawning a child, immediately wait for it to finish before spawning another. Do not spawn grandchildren or multiple children in one turn, and have the root wait instead of doing parallel work while a child is active. Preserve the full authorized diff scope and finish the scan and report." \
+            --instruction "CI diff review: use one root-agent pass. Do not create child agents, wait for agents, or run parallel sub-reviews. Review every changed file against the diff base, record coverage for each relevant risk area, and call finish_scan when the review and report are complete. Preserve the full authorized diff scope and finish with a concise report." \
             2>&1 | tee "$RUNNER_TEMP/strix-output.log"
           strix_exit_code="${PIPESTATUS[0]}"
           set -e
@@ -107,20 +380,73 @@ jobs:
         env:
           STRIX_EXIT_CODE: ${{ steps.strix-scan.outputs.exit_code }}
         run: |
+          strix_exit_code="${STRIX_EXIT_CODE:-1}"
           python3 scripts/prepare-strix-pr-summary.py \
-            --exit-code "$STRIX_EXIT_CODE" \
+            --exit-code "$strix_exit_code" \
             --output "$RUNNER_TEMP/strix-pr-comment.md"
           echo "comment_path=$RUNNER_TEMP/strix-pr-comment.md" >> "$GITHUB_OUTPUT"
+
+      - name: Validate Strix coverage completeness
+        id: strix-coverage
+        if: always()
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          import sys
+
+          report_root = Path("strix_runs")
+          reports = sorted(
+              path
+              for path in report_root.glob("**/coverage.json")
+              if not any(part.startswith(".") for part in path.relative_to(report_root).parts[:-1])
+          )
+          problems = []
+          if not reports:
+              problems.append("no coverage.json report found")
+
+          for report_path in reports:
+              try:
+                  report = json.loads(report_path.read_text(encoding="utf-8"))
+              except (OSError, json.JSONDecodeError, TypeError) as error:
+                  problems.append(f"{report_path}: {type(error).__name__}")
+                  continue
+
+              completeness = report.get("completeness") if isinstance(report, dict) else None
+              if not isinstance(completeness, dict) or completeness.get("complete") is not True:
+                  observed = completeness.get("complete") if isinstance(completeness, dict) else "missing"
+                  problems.append(f"{report_path}: completeness.complete={observed!r}")
+
+          output_path = os.environ["GITHUB_OUTPUT"]
+          with open(output_path, "a", encoding="utf-8") as output:
+              output.write(f"complete={'false' if problems else 'true'}\n")
+
+          if problems:
+              print("Strix coverage is incomplete; refusing a clean CI result:")
+              for problem in problems:
+                  print(f" - {problem}")
+              sys.exit(1)
+          print(f"Validated {len(reports)} complete Strix coverage report(s).")
+          PY
 
       - name: Publish Strix PR summary
         if: ${{ always() && github.event_name == 'pull_request' }}
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3
         env:
           STRIX_COMMENT_PATH: ${{ steps.strix-summary.outputs.comment_path }}
+          NIM_PREFLIGHT_OK: ${{ steps.nim-preflight.outputs.ok }}
+          NIM_PREFLIGHT_STATUS: ${{ steps.nim-preflight.outputs.http_status }}
+          NIM_PREFLIGHT_CLASS: ${{ steps.nim-preflight.outputs.failure_class }}
         with:
           script: |
             const fs = require("fs");
-            const body = fs.readFileSync(process.env.STRIX_COMMENT_PATH, "utf8");
+            const strixBody = fs.readFileSync(process.env.STRIX_COMMENT_PATH, "utf8");
+            const preflightNote = process.env.NIM_PREFLIGHT_OK === "true"
+              ? ""
+              : `NVIDIA NIM preflight failed before Strix started (HTTP ${process.env.NIM_PREFLIGHT_STATUS || "unknown"}; ${process.env.NIM_PREFLIGHT_CLASS || "unknown cause"}).`;
+            const body = preflightNote ? `${preflightNote}\n\n${strixBody}` : strixBody;
             const { owner, repo } = context.repo;
             const issue_number = context.issue.number;
             const comments = await github.paginate(github.rest.issues.listComments, {
@@ -146,10 +472,33 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.0
         with:
           name: strix-results-${{ github.run_id }}
-          path: strix_runs/
+          path: |
+            strix_runs/
+            ${{ runner.temp }}/nvidia-nim-preflight.log
+            ${{ runner.temp }}/nvidia-nim-response.json
+            ${{ runner.temp }}/nvidia-nim-route-headers.txt
+            ${{ runner.temp }}/nvidia-nim-route-response.json
+            ${{ runner.temp }}/nvidia-nim-control-headers.txt
+            ${{ runner.temp }}/nvidia-nim-control-response.json
+            ${{ runner.temp }}/strix-output.log
           if-no-files-found: ignore
           retention-days: 30
 
       - name: Fail on Strix findings or execution error
-        if: ${{ always() && steps.strix-scan.outputs.exit_code != '0' }}
-        run: exit "${{ steps.strix-scan.outputs.exit_code }}"
+        if: ${{ always() && (steps.nim-preflight.outputs.ok != 'true' || steps.strix-scan.outputs.exit_code != '0' || steps.strix-coverage.outputs.complete != 'true') }}
+        env:
+          NIM_PREFLIGHT_OK: ${{ steps.nim-preflight.outputs.ok }}
+          STRIX_EXIT_CODE: ${{ steps.strix-scan.outputs.exit_code }}
+          STRIX_COVERAGE_COMPLETE: ${{ steps.strix-coverage.outputs.complete }}
+        run: |
+          set -euo pipefail
+          if [[ "$NIM_PREFLIGHT_OK" != "true" ]]; then
+            echo "NVIDIA NIM preflight failed; Strix did not run."
+            exit 1
+          fi
+          if [[ "$STRIX_COVERAGE_COMPLETE" != "true" ]]; then
+            echo "Strix coverage is incomplete; the scan cannot be treated as clean."
+            exit 1
+          fi
+          echo "Strix exit code: ${STRIX_EXIT_CODE:-unknown}"
+          test "$STRIX_EXIT_CODE" = "0"

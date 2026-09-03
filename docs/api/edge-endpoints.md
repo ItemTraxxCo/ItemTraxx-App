@@ -231,14 +231,14 @@ Super-admin operational controls, approvals, customer ops, and reporting.
 #### `touch_session`
 
 - `device_id` (required): string
-- `device_label`: any
+- `device_label`: string|null
 - `login_method`: any
 - `login_location`: any
 
 #### `list_sessions`
 
 - `device_id`: string
-- `device_label`: any
+- `device_label`: string|null
 - `login_method`: any
 - `login_location`: any
 
@@ -262,7 +262,7 @@ Super-admin operational controls, approvals, customer ops, and reporting.
 #### `revoke_session`
 
 - `device_id`: string
-- `device_label`: any
+- `device_label`: string|null
 - `login_method`: any
 - `login_location`: any
 - `session_id` (required): string
@@ -270,7 +270,7 @@ Super-admin operational controls, approvals, customer ops, and reporting.
 #### `revoke_all_sessions`
 
 - `device_id`: string
-- `device_label`: any
+- `device_label`: string|null
 - `login_method`: any
 - `login_location`: any
 - `sign_out_current`: boolean
@@ -299,7 +299,7 @@ Super-admin operational controls, approvals, customer ops, and reporting.
 - `max_borrowers`: any
 - `max_items`: any
 - `checkout_due_hours`: any
-- `barcode_pattern`: any
+- `barcode_pattern`: string|null
 - `feature_flags`: object
 
 #### `set_workspace_force_reauth`

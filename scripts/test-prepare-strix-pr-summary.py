@@ -79,6 +79,11 @@ def main() -> None:
             json.dumps({"completeness": {"complete": True}, "gaps": []}),
             encoding="utf-8",
         )
+        (clean_findings_root / ".state").mkdir()
+        (clean_findings_root / ".state" / "coverage.json").write_text(
+            json.dumps({"internal": "state-only"}),
+            encoding="utf-8",
+        )
         clean_output = temporary_root / "clean-comment.md"
         subprocess.run(
             [

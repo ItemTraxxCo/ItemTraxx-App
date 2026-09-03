@@ -386,6 +386,46 @@ jobs:
             --output "$RUNNER_TEMP/strix-pr-comment.md"
           echo "comment_path=$RUNNER_TEMP/strix-pr-comment.md" >> "$GITHUB_OUTPUT"
 
+      - name: Validate Strix coverage completeness
+        id: strix-coverage
+        if: always()
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          import sys
+
+          reports = sorted(Path("strix_runs").glob("**/coverage.json"))
+          problems = []
+          if not reports:
+              problems.append("no coverage.json report found")
+
+          for report_path in reports:
+              try:
+                  report = json.loads(report_path.read_text(encoding="utf-8"))
+              except (OSError, json.JSONDecodeError, TypeError) as error:
+                  problems.append(f"{report_path}: {type(error).__name__}")
+                  continue
+
+              completeness = report.get("completeness") if isinstance(report, dict) else None
+              if not isinstance(completeness, dict) or completeness.get("complete") is not True:
+                  observed = completeness.get("complete") if isinstance(completeness, dict) else "missing"
+                  problems.append(f"{report_path}: completeness.complete={observed!r}")
+
+          output_path = os.environ["GITHUB_OUTPUT"]
+          with open(output_path, "a", encoding="utf-8") as output:
+              output.write(f"complete={'false' if problems else 'true'}\n")
+
+          if problems:
+              print("Strix coverage is incomplete; refusing a clean CI result:")
+              for problem in problems:
+                  print(f" - {problem}")
+              sys.exit(1)
+          print(f"Validated {len(reports)} complete Strix coverage report(s).")
+          PY
+
       - name: Publish Strix PR summary
         if: ${{ always() && github.event_name == 'pull_request' }}
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3
@@ -440,14 +480,19 @@ jobs:
           retention-days: 30
 
       - name: Fail on Strix findings or execution error
-        if: ${{ always() && (steps.nim-preflight.outputs.ok != 'true' || steps.strix-scan.outputs.exit_code != '0') }}
+        if: ${{ always() && (steps.nim-preflight.outputs.ok != 'true' || steps.strix-scan.outputs.exit_code != '0' || steps.strix-coverage.outputs.complete != 'true') }}
         env:
           NIM_PREFLIGHT_OK: ${{ steps.nim-preflight.outputs.ok }}
           STRIX_EXIT_CODE: ${{ steps.strix-scan.outputs.exit_code }}
+          STRIX_COVERAGE_COMPLETE: ${{ steps.strix-coverage.outputs.complete }}
         run: |
           set -euo pipefail
           if [[ "$NIM_PREFLIGHT_OK" != "true" ]]; then
             echo "NVIDIA NIM preflight failed; Strix did not run."
+            exit 1
+          fi
+          if [[ "$STRIX_COVERAGE_COMPLETE" != "true" ]]; then
+            echo "Strix coverage is incomplete; the scan cannot be treated as clean."
             exit 1
           fi
           echo "Strix exit code: ${STRIX_EXIT_CODE:-unknown}"

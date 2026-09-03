@@ -36,6 +36,17 @@ def safe_html_display(value: object, fallback: str) -> str:
     return escape(normalized_display(value, fallback), quote=False)
 
 
+def report_paths(findings_root: Path, filename: str) -> list[Path]:
+    """Return public per-run reports, excluding Strix's hidden internal state."""
+    paths = []
+    for path in findings_root.glob(f"**/{filename}"):
+        relative_parts = path.relative_to(findings_root).parts
+        if any(part.startswith(".") for part in relative_parts[:-1]):
+            continue
+        paths.append(path)
+    return sorted(paths)
+
+
 def finding_summary(result: object) -> tuple[str, str, str]:
     if not isinstance(result, dict):
         return ("unknown", "unknown-rule", "unknown-location")
@@ -75,7 +86,7 @@ def collect_findings(
     findings = []
     sarif_found = False
     parse_errors = []
-    for path in findings_root.glob("**/findings.sarif"):
+    for path in report_paths(findings_root, "findings.sarif"):
         sarif_found = True
         try:
             with path.open(encoding="utf-8") as report_file:
@@ -108,7 +119,7 @@ def collect_coverage_gaps(findings_root: Path) -> tuple[list[str], Optional[bool
     coverage_complete = None
     parse_errors = []
     coverage_seen = False
-    for path in findings_root.glob("**/coverage.json"):
+    for path in report_paths(findings_root, "coverage.json"):
         coverage_seen = True
         try:
             with path.open(encoding="utf-8") as report_file:

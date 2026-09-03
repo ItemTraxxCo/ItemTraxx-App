@@ -397,7 +397,12 @@ jobs:
           from pathlib import Path
           import sys
 
-          reports = sorted(Path("strix_runs").glob("**/coverage.json"))
+          report_root = Path("strix_runs")
+          reports = sorted(
+              path
+              for path in report_root.glob("**/coverage.json")
+              if not any(part.startswith(".") for part in path.relative_to(report_root).parts[:-1])
+          )
           problems = []
           if not reports:
               problems.append("no coverage.json report found")

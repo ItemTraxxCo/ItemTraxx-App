@@ -153,6 +153,9 @@ test.describe("Checkout borrower ownership regression", () => {
     await navigateApp(page, "/checkout");
     await expect(page).toHaveURL(/\/checkout$/);
 
+    const consentButton = page.getByRole("button", { name: "Essential only" });
+    if (await consentButton.isVisible()) await consentButton.click();
+
     const borrowerInput = page.getByPlaceholder("Enter borrower ID");
     const loadBorrowerButton = page.getByRole("button", { name: "Load borrower" });
     const barcodeInput = page.getByPlaceholder("Scan or enter barcode");

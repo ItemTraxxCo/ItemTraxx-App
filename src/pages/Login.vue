@@ -108,6 +108,13 @@
           </form>
 
           <p v-if="error" class="error">{{ error }}</p>
+          <p v-if="showPasswordResetHint" class="login-reset-hint">
+            Having trouble signing in?
+            <RouterLink class="link-button" to="/forgot-password">
+              Reset your password
+            </RouterLink>
+            to regain access.
+          </p>
         </div>
 
         <p class="muted legal-note">
@@ -142,6 +149,14 @@ const password = ref("");
 const showPassword = ref(false);
 const error = ref("");
 const isLoading = ref(false);
+// After several consecutive failed sign-ins we surface the reset path more
+// prominently: repeated wrong-password retries are the dominant login friction,
+// and the "Forgot password?" link alone is easy to miss mid-retry.
+const CONSECUTIVE_FAILURE_HINT_THRESHOLD = 3;
+const consecutiveFailures = ref(0);
+const showPasswordResetHint = computed(
+  () => consecutiveFailures.value >= CONSECUTIVE_FAILURE_HINT_THRESHOLD
+);
 const toastTitle = ref("");
 const toastMessage = ref("");
 const lightBrandLogoUrl = import.meta.env.VITE_BRAND_LOGO_LIGHT_URL as string | undefined;
@@ -282,6 +297,17 @@ const getLoginErrorCode = (message: string) => {
   return "authentication_failed";
 };
 
+// Sign-in can be refused without the password ever being checked: a failed bot
+// check, the rate limiter, a disabled workspace, or maintenance mode. These
+// branches return early, so without this they leave no trace and a blocked
+// operator looks identical to one who simply never tried. The code is a fixed
+// enum and carries nothing about who was blocked.
+const recordBlockedLogin = (errorCode: string) => {
+  void runPostHog(({ capturePostHogEvent }) =>
+    capturePostHogEvent("login_failed", { error_code: errorCode })
+  );
+};
+
 const handleLogin = async () => {
   error.value = "";
   isLoading.value = true;
@@ -296,6 +322,7 @@ const handleLogin = async () => {
       password.value,
       turnstileToken.value || undefined
     );
+    consecutiveFailures.value = 0;
     const auth = getAuthState();
     if (auth.userId) {
       const userId = auth.userId;
@@ -328,6 +355,7 @@ const handleLogin = async () => {
     await router.push({ path: destination.path, query: { login_ctx: destination.loginContext } });
   } catch (err) {
     if (err instanceof Error && err.message === "LIMITER_UNAVAILABLE") {
+      recordBlockedLogin("rate_limit");
       error.value = "";
       showToast(
         "Rate Limit reached. Please try again later.",
@@ -336,6 +364,7 @@ const handleLogin = async () => {
       return;
     }
     if (err instanceof Error && err.message === "TURNSTILE_FAILED") {
+      recordBlockedLogin("turnstile_failed");
       error.value = "Security check failed. Please try again.";
       return;
     }
@@ -343,17 +372,20 @@ const handleLogin = async () => {
       err instanceof Error &&
       (err.message === "TENANT_DISABLED" || err.message === "WORKSPACE_DISABLED")
     ) {
+      recordBlockedLogin("workspace_disabled");
       error.value = "";
       showToast("Access blocked", "This account cannot sign in right now. Please contact support.");
       return;
     }
     if (err instanceof Error && err.message === "MAINTENANCE_MODE") {
+      recordBlockedLogin("maintenance_mode");
       error.value = "";
       showToast("Maintenance mode", "Sign in is temporarily unavailable. Please try again later.");
       return;
     }
     const errorMessage = err instanceof Error ? err.message : "Sign in failed.";
     if (errorMessage === "Admin verification required.") {
+      recordBlockedLogin("admin_verification_required");
       error.value = "";
       showToast("Admin verification required", "Please sign in again to continue.");
       return;
@@ -362,14 +394,22 @@ const handleLogin = async () => {
     if (signInErrorMessage) {
       error.value = "";
       showToast("Sign in failed.", signInErrorMessage);
+      consecutiveFailures.value += 1;
       void runPostHog(({ capturePostHogEvent }) =>
-        capturePostHogEvent("login_failed", { error_code: getLoginErrorCode(errorMessage) })
+        capturePostHogEvent("login_failed", {
+          error_code: getLoginErrorCode(errorMessage),
+          consecutive_failures: consecutiveFailures.value,
+        })
       );
       return;
     }
+    consecutiveFailures.value += 1;
     void runPostHog(({ capturePostHogEvent }) =>
       // The role is intentionally unknown for failed authentication attempts.
-      capturePostHogEvent("login_failed", { error_code: getLoginErrorCode(errorMessage) })
+      capturePostHogEvent("login_failed", {
+        error_code: getLoginErrorCode(errorMessage),
+        consecutive_failures: consecutiveFailures.value,
+      })
     );
     error.value = errorMessage;
   } finally {

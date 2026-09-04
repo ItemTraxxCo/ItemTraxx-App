@@ -32,6 +32,7 @@ import {
 } from "./offlineConnectionState";
 import { fetchSystemStatus, probeSystemStatusTransport } from "./systemStatusService";
 import { fetchHttpSessionSummary } from "./httpSessionService";
+import { trackProductEvent } from "./productEvents";
 
 export { consumeCheckoutOfflineWarning } from "./offlineCheckoutQueue";
 export type { CheckoutReturnPayload } from "./offlineCheckoutQueue";
@@ -345,6 +346,39 @@ const refreshOfflinePackAfterQueueSync = async (
   await refreshOfflineCheckoutPackIfNeeded({ force: true }).catch(() => undefined);
 };
 
+// A buffered transaction is only safe once the server accepts it. Report the
+// outcome of every real sync run so a queue that never drains is visible
+// instead of silent. This lives here, not at the call sites, because
+// syncCheckoutQueues hands the same in-flight promise to each caller and would
+// otherwise report one flush once per caller.
+const reportQueueSyncOutcome = (result: CheckoutQueueSyncResult) => {
+  if (result.processed > 0) {
+    trackProductEvent({
+      posthog: {
+        name: "checkout_transaction_synced",
+        properties: {
+          synced_count: result.processed,
+          remaining_count: result.remaining,
+          review_count: result.review,
+        },
+      },
+    });
+  }
+  if (result.failed > 0) {
+    trackProductEvent({
+      posthog: {
+        name: "checkout_transaction_sync_failed",
+        properties: {
+          failed_count: result.failed,
+          remaining_count: result.remaining,
+          review_count: result.review,
+          server_reachable: result.serverReachable === true,
+        },
+      },
+    });
+  }
+};
+
 export const probeItemTraxxServer = async () => {
   try {
     const result = await fetchSystemStatus({ force: true, timeoutMs: SERVER_PROBE_TIMEOUT_MS });
@@ -400,7 +434,9 @@ export const syncCheckoutQueues = (options: { force?: boolean } = {}) => {
       const result = await syncBufferedCheckoutQueueInternal();
       const serverReachable = await probeItemTraxxServer();
       await refreshOfflinePackAfterQueueSync(result, serverReachable);
-      return { ...result, serverReachable };
+      const outcome = { ...result, serverReachable };
+      reportQueueSyncOutcome(outcome);
+      return outcome;
     })().finally(() => {
       checkoutQueueSyncInFlight = null;
     });

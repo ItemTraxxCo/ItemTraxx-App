@@ -8,8 +8,8 @@
     "npm:@sentry/vue@^10.71.0": "10.72.0_vue@3.5.42_typescript@6.0.3",
     "npm:@supabase/supabase-js@^2.112.4": "2.112.4",
     "npm:@types/node@^26.3.0": "26.4.0",
-    "npm:@vercel/analytics@^2.0.1": "2.0.1_vue@3.5.42_vue-router@4.6.4__vue@3.5.42__typescript@6.0.3_typescript@6.0.3",
-    "npm:@vercel/speed-insights@2": "2.0.0_vue@3.5.42_vue-router@4.6.4__vue@3.5.42__typescript@6.0.3_typescript@6.0.3",
+    "npm:@vercel/analytics@^2.0.1": "2.0.1_vue@3.5.42_vue-router@4.6.4_typescript@6.0.3",
+    "npm:@vercel/speed-insights@2": "2.0.0_vue@3.5.42_vue-router@4.6.4_typescript@6.0.3",
     "npm:@vitejs/plugin-vue@^6.0.8": "6.0.8_vite@8.2.2_vue@3.5.42_typescript@6.0.3",
     "npm:@vitest/coverage-v8@^4.1.11": "4.1.11_vitest@4.1.11_@types+node@26.4.0",
     "npm:@vue/test-utils@^2.4.11": "2.4.11_vue@3.5.42_typescript@6.0.3",
@@ -20,7 +20,7 @@
     "npm:jsdom@^30.0.1": "30.0.1",
     "npm:jspdf-autotable@^5.0.8": "5.0.8_jspdf@4.2.1",
     "npm:jspdf@^4.2.1": "4.2.1",
-    "npm:posthog-js@^1.418.16": "1.423.0",
+    "npm:posthog-js@^1.427.2": "1.427.2",
     "npm:supabase@^2.115.0": "2.115.0",
     "npm:typescript@~6.0.3": "6.0.3",
     "npm:vite@^8.2.2": "8.2.2_@types+node@26.4.0",
@@ -645,21 +645,21 @@
     "@poppinss/exception@1.2.3": {
       "integrity": "sha512-dCED+QRChTVatE9ibtoaxc+WkdzOSjYTKi/+uacHWIsfodVfpsueo3+DKpgU5Px8qXjgmXkSvhXvSCz3fnP9lw=="
     },
-    "@posthog/browser-common@0.7.1": {
-      "integrity": "sha512-JO/5dIVx3NTrbg0W2VciDDmmizsvwaYYHE5cnJE1Gra+UqBnEuVGH9DTE/kBFgVMp+08z5uj/aAprsYD2WG/QQ==",
+    "@posthog/browser-common@0.7.2": {
+      "integrity": "sha512-ukDmETXy6fTBE4ZpaO8ccscrNz5SvTaUnhQ0Ze2JX/oYILa89rrNwqUH7lDAuhFKa+NY6EoJ9kZMuOvuu4WwLQ==",
       "dependencies": [
         "@posthog/core",
         "@posthog/types"
       ]
     },
-    "@posthog/core@1.50.0": {
-      "integrity": "sha512-25SnQycZbqqLodQs+GaDPGDC1oxT8+XOSGlyhiS2rtdVON9Opg2hmfJ/fpFNgMBL7YDi0rpvJiR/fudy96W4pA==",
+    "@posthog/core@1.50.5": {
+      "integrity": "sha512-afEchuShDaVIoxAIj76kDZQ1DhfesDmgfVp+mtTzsA3wlc8DF5uoz8YjuTjnxOicWkpP5HCDqYidK/1kT125Cg==",
       "dependencies": [
         "@posthog/types"
       ]
     },
-    "@posthog/types@1.407.1": {
-      "integrity": "sha512-WhbkXPC2rgylXqmxHqv70ffI3k+KxyR6s7DBIfr5NvIqHkxp6v0pk31D/jbz0DNVbzwkLjyll2pxr4FNbJiYzg=="
+    "@posthog/types@1.409.0": {
+      "integrity": "sha512-239umoaZVb2GBaXeEyJpwFvjhrrChJH8NHCwiao23EBSu3NA6EN0MTMoaHSmMEf4yjiXEFFoYJA6FjJAXF5HGA=="
     },
     "@rolldown/binding-android-arm-eabi@1.2.6": {
       "integrity": "sha512-b+jTcARdTiFLI6jB4a5XjTm0RWd6KcRfQj/I2356fxUZemiho9zQLxo0RtCuMDAyKcLo6cEltkgbQp6d1+sjjQ==",
@@ -917,7 +917,7 @@
     "@types/trusted-types@2.0.7": {
       "integrity": "sha512-ScaPdn1dQczgbl0QFTeTOmVHFULt394XJgOQNoyVhZ6r2vLnMLJfBPd53SB52T/3G36VI1/g2MZaX0cwDuXsfw=="
     },
-    "@vercel/analytics@2.0.1_vue@3.5.42_vue-router@4.6.4__vue@3.5.42__typescript@6.0.3_typescript@6.0.3": {
+    "@vercel/analytics@2.0.1_vue@3.5.42_vue-router@4.6.4_typescript@6.0.3": {
       "integrity": "sha512-MTQG6V9qQrt1tsDeF+2Uoo5aPjqbVPys1xvnIftXSJYG2SrwXRHnqEvVoYID7BTruDz4lCd2Z7rM1BdkUehk2g==",
       "dependencies": [
         "vue",
@@ -928,7 +928,7 @@
         "vue-router"
       ]
     },
-    "@vercel/speed-insights@2.0.0_vue@3.5.42_vue-router@4.6.4__vue@3.5.42__typescript@6.0.3_typescript@6.0.3": {
+    "@vercel/speed-insights@2.0.0_vue@3.5.42_vue-router@4.6.4_typescript@6.0.3": {
       "integrity": "sha512-jwkNcrTeafWxjmWq4AHBaptSqZiJkYU5adLC9QBSqeim0GcqDMgN5Ievh8OG1rJ6W3A4l1oiP7qr9CWxGuzu3w==",
       "dependencies": [
         "vue",
@@ -2010,8 +2010,8 @@
         "source-map-js"
       ]
     },
-    "posthog-js@1.423.0": {
-      "integrity": "sha512-r9s9uFhGDoftboOfTxD0ePtDE6s9xROxvjr3bGzZ1QcCbm6kZOZB/S708zkOjSufEUDGCuUOMluc9XKYixFBtA==",
+    "posthog-js@1.427.2": {
+      "integrity": "sha512-/jRg3ChHuxcHTTJ/xb+IbpXLYxiBKIWdjrsNNqY1tAwjnFoijmz58i4mIR4A2P5MWx+4R7LlpK9vQfBr8v292g==",
       "dependencies": [
         "@posthog/browser-common",
         "@posthog/core",
@@ -2764,7 +2764,7 @@
         "npm:jsdom@^30.0.1",
         "npm:jspdf-autotable@^5.0.8",
         "npm:jspdf@^4.2.1",
-        "npm:posthog-js@^1.418.16",
+        "npm:posthog-js@^1.427.2",
         "npm:supabase@^2.115.0",
         "npm:typescript@~6.0.3",
         "npm:vite@^8.2.2",

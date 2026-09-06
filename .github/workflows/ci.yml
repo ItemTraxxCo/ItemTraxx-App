@@ -118,6 +118,10 @@ jobs:
         if: ${{ !cancelled() && github.event_name != 'schedule' }}
         run: npm run devops:check:edge-coverage
 
+      - name: Check documented empty catches
+        if: ${{ !cancelled() && github.event_name != 'schedule' }}
+        run: npm run devops:check:empty-catches
+
       - name: Check edge contract drift
         if: ${{ !cancelled() && github.event_name != 'schedule' }}
         run: npm run devops:check:edge-contract-drift

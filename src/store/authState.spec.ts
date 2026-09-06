@@ -41,6 +41,26 @@ describe("setAuthStateFromBackend", () => {
     expect(state.email).toBe("a@b.com");
     expect(state.isAuthenticated).toBe(true);
   });
+
+  it("preserves role-derived flags when a partial update omits role", () => {
+    setAuthStateFromBackend({ role: "workspace_admin" });
+
+    setAuthStateFromBackend({ email: "admin@example.com" });
+
+    const state = getAuthState();
+    expect(state.role).toBe("workspace_admin");
+    expect(state.isAdmin).toBe(true);
+    expect(state.isWorkspaceAdmin).toBe(true);
+    expect(state.isSuperAdmin).toBe(false);
+  });
+
+  it("ignores derived flags supplied by a caller instead of trusting them", () => {
+    setAuthStateFromBackend({ role: "workspace_admin" });
+
+    setAuthStateFromBackend({ isAdmin: false } as never);
+
+    expect(getAuthState().isAdmin).toBe(true);
+  });
 });
 
 describe("setWorkspaceContext / setSecondaryAuth", () => {

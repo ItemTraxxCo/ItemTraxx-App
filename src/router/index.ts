@@ -1,6 +1,6 @@
 import { createRouter, createWebHistory } from "vue-router";
-import type { RouteRecordRaw } from "vue-router";
-import { getAuthState } from "../store/authState";
+import type { RouteLocationNormalized, RouteRecordRaw } from "vue-router";
+import { getAuthState, type AuthState } from "../store/authState";
 import { getWorkspaceState } from "../store/workspaceState";
 import { buildWorkspaceAppUrl, lookupWorkspaceById } from "../services/workspaceService";
 
@@ -605,129 +605,117 @@ const notFoundFor = (path: string) => ({
   },
 });
 
-router.beforeEach(async (to) => {
-  const meta = to.meta as {
-    public?: boolean;
-    requiresSession?: boolean;
-    requiresWorkspace?: boolean;
-    requiresRole?: string;
-    requiresWorkspaceMatch?: boolean;
-    requiresSuperAuth?: boolean;
-    title?: string;
-  };
+type AppRouteMeta = {
+  public?: boolean;
+  requiresSession?: boolean;
+  requiresWorkspace?: boolean;
+  requiresRole?: string;
+  requiresWorkspaceMatch?: boolean;
+  requiresSuperAuth?: boolean;
+  title?: string;
+};
 
-  const isInternalHost = isInternalHostRuntime();
-
-  if (isInternalHost && to.name === "public-home") {
-    const auth = getAuthState();
-    if (!auth.isInitialized) {
-      return false;
-    }
-    if (!auth.isAuthenticated || auth.role !== "super_admin") {
-      return { name: "internal-auth" };
-    }
-    if (!auth.hasSecondaryAuth || !hasFreshSuperVerification(auth.superVerifiedAt)) {
-      return { name: "internal-auth" };
-    }
-    await loadAuthenticatedStyles();
-    return true;
+const resolveInternalHostRoute = async (
+  to: RouteLocationNormalized,
+  auth: AuthState,
+  isInternalHost: boolean,
+) => {
+  if (!isInternalHost || to.name !== "public-home") return undefined;
+  if (!auth.isInitialized) return false;
+  if (!auth.isAuthenticated || auth.role !== "super_admin") {
+    return { name: "internal-auth" };
   }
+  if (!auth.hasSecondaryAuth || !hasFreshSuperVerification(auth.superVerifiedAt)) {
+    return { name: "internal-auth" };
+  }
+  await loadAuthenticatedStyles();
+  return true;
+};
 
-  const workspace = getWorkspaceState();
-  const auth = getAuthState();
-
+const resolveWorkspaceMismatchRoute = async (
+  workspace: ReturnType<typeof getWorkspaceState>,
+  auth: AuthState,
+) => {
   if (
-    workspace.isWorkspaceHost && workspace.workspaceId && auth.isInitialized &&
-    auth.isAuthenticated && auth.workspaceContextId &&
-    auth.workspaceContextId !== workspace.workspaceId
+    !workspace.isWorkspaceHost || !workspace.workspaceId || !auth.isInitialized ||
+    !auth.isAuthenticated || !auth.workspaceContextId ||
+    auth.workspaceContextId === workspace.workspaceId
   ) {
-    const ownWorkspace = await lookupWorkspaceById(auth.workspaceContextId);
-    if (ownWorkspace?.slug) {
-      const destination = auth.role === "workspace_admin" ? "/admin" : "/checkout";
-      window.location.replace(buildWorkspaceAppUrl(ownWorkspace.slug, destination));
-      return false;
-    }
-    return { name: "public-login", query: { reason: "workspace-mismatch" } };
+    return undefined;
   }
 
-  if (workspace.isWorkspaceHost && to.name !== "not-found") {
-    if (!workspace.workspaceId) {
-      return notFoundFor(to.path);
-    }
-    if (!auth.isInitialized) {
-      return false;
-    }
-    if (!meta.public && (!auth.isAuthenticated || auth.workspaceContextId !== workspace.workspaceId)) {
-      return notFoundFor(to.path);
-    }
+  const ownWorkspace = await lookupWorkspaceById(auth.workspaceContextId);
+  if (ownWorkspace?.slug) {
+    const destination = auth.role === "workspace_admin" ? "/admin" : "/checkout";
+    window.location.replace(buildWorkspaceAppUrl(ownWorkspace.slug, destination));
+    return false;
   }
+  return { name: "public-login", query: { reason: "workspace-mismatch" } };
+};
 
-  // Redirect authenticated users away from home page to their appropriate dashboard
-  // Note: We only redirect from public-home, not public-login, so users can still
-  // access the login page to switch accounts if needed
-  if (
-    auth.isInitialized &&
-    auth.isAuthenticated &&
-    to.name === "public-home"
-  ) {
-    // Redirect based on role
-    if (auth.role === "super_admin") {
-      if (auth.hasSecondaryAuth && hasFreshSuperVerification(auth.superVerifiedAt)) {
-        return { name: "super-admin-home" };
-      }
-      return { name: "super-auth" };
-    }
-
-    if (auth.role === "workspace_admin") {
-      if (hasFreshAdminVerification(auth.adminVerifiedAt)) {
-        return { name: "workspace-admin-home" };
-      }
-      return { name: "public-login" };
-    }
-
-    if (auth.role === "tenant_account" && auth.workspaceContextId) {
-      return { name: "workspace-checkout" };
-    }
-  }
-
-  if (meta?.public) return true;
-
-  if (!auth.isInitialized) {
-    return true;
-  }
-
-  if (meta?.requiresSession && !auth.isAuthenticated) {
-    return { name: "public-home" };
-  }
-
-  if (meta?.requiresWorkspace && !auth.workspaceContextId) {
-    return { name: "public-home" };
-  }
-
-  if (workspace.isWorkspaceHost && meta?.requiresSession && !workspace.workspaceId) {
+const resolveWorkspaceHostRoute = (
+  to: RouteLocationNormalized,
+  meta: AppRouteMeta,
+  workspace: ReturnType<typeof getWorkspaceState>,
+  auth: AuthState,
+) => {
+  if (!workspace.isWorkspaceHost || to.name === "not-found") return undefined;
+  if (!workspace.workspaceId) return notFoundFor(to.path);
+  if (!auth.isInitialized) return false;
+  if (!meta.public && (!auth.isAuthenticated || auth.workspaceContextId !== workspace.workspaceId)) {
     return notFoundFor(to.path);
   }
+  return undefined;
+};
 
-  if (meta?.requiresRole && auth.role !== meta.requiresRole) {
-    return { name: "public-home" };
+// Redirect authenticated users away from the public home page while leaving
+// the login page available so users can intentionally switch accounts.
+const resolveAuthenticatedHomeRoute = (
+  to: RouteLocationNormalized,
+  auth: AuthState,
+) => {
+  if (!auth.isInitialized || !auth.isAuthenticated || to.name !== "public-home") return undefined;
+  if (auth.role === "super_admin") {
+    return auth.hasSecondaryAuth && hasFreshSuperVerification(auth.superVerifiedAt)
+      ? { name: "super-admin-home" }
+      : { name: "super-auth" };
   }
+  if (auth.role === "workspace_admin") {
+    return hasFreshAdminVerification(auth.adminVerifiedAt)
+      ? { name: "workspace-admin-home" }
+      : { name: "public-login" };
+  }
+  if (auth.role === "tenant_account" && auth.workspaceContextId) {
+    return { name: "workspace-checkout" };
+  }
+  return undefined;
+};
 
-  if (
-    meta?.requiresRole === "workspace_admin" &&
-    !hasFreshAdminVerification(auth.adminVerifiedAt)
-  ) {
+const resolveProtectedRoute = (
+  to: RouteLocationNormalized,
+  meta: AppRouteMeta,
+  workspace: ReturnType<typeof getWorkspaceState>,
+  auth: AuthState,
+) => {
+  if (meta.public) return true;
+  if (!auth.isInitialized) return true;
+  if (meta.requiresSession && !auth.isAuthenticated) return { name: "public-home" };
+  if (meta.requiresWorkspace && !auth.workspaceContextId) return { name: "public-home" };
+  if (workspace.isWorkspaceHost && meta.requiresSession && !workspace.workspaceId) {
+    return notFoundFor(to.path);
+  }
+  if (meta.requiresRole && auth.role !== meta.requiresRole) return { name: "public-home" };
+  if (meta.requiresRole === "workspace_admin" && !hasFreshAdminVerification(auth.adminVerifiedAt)) {
     return { name: "public-login" };
   }
-
   if (
-    meta?.requiresWorkspaceMatch &&
+    meta.requiresWorkspaceMatch &&
     auth.sessionWorkspaceId &&
     auth.workspaceContextId &&
     auth.sessionWorkspaceId !== auth.workspaceContextId
   ) {
     return { name: "public-home" };
   }
-
   if (
     workspace.isWorkspaceHost &&
     workspace.workspaceId &&
@@ -736,26 +724,40 @@ router.beforeEach(async (to) => {
   ) {
     return notFoundFor(to.path);
   }
-
-  if (meta?.requiresSuperAuth && !auth.hasSecondaryAuth) {
+  if (meta.requiresSuperAuth && !auth.hasSecondaryAuth) {
     return to.path.startsWith("/internal")
       ? { name: "internal-auth" }
       : { name: "super-auth" };
   }
-
-  if (
-    meta?.requiresSuperAuth &&
-    !hasFreshSuperVerification(auth.superVerifiedAt)
-  ) {
+  if (meta.requiresSuperAuth && !hasFreshSuperVerification(auth.superVerifiedAt)) {
     return to.path.startsWith("/internal")
       ? { name: "internal-auth" }
       : { name: "super-auth" };
   }
+  return undefined;
+};
 
-  if (meta?.requiresSession) {
-    await loadAuthenticatedStyles();
-  }
+router.beforeEach(async (to) => {
+  const meta = to.meta as AppRouteMeta;
+  const auth = getAuthState();
+  const workspace = getWorkspaceState();
 
+  const internalRoute = await resolveInternalHostRoute(to, auth, isInternalHostRuntime());
+  if (internalRoute !== undefined) return internalRoute;
+
+  const mismatchRoute = await resolveWorkspaceMismatchRoute(workspace, auth);
+  if (mismatchRoute !== undefined) return mismatchRoute;
+
+  const workspaceRoute = resolveWorkspaceHostRoute(to, meta, workspace, auth);
+  if (workspaceRoute !== undefined) return workspaceRoute;
+
+  const homeRoute = resolveAuthenticatedHomeRoute(to, auth);
+  if (homeRoute !== undefined) return homeRoute;
+
+  const protectedRoute = resolveProtectedRoute(to, meta, workspace, auth);
+  if (protectedRoute !== undefined) return protectedRoute;
+
+  if (meta.requiresSession) await loadAuthenticatedStyles();
   return true;
 });
 

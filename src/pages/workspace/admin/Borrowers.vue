@@ -338,6 +338,7 @@ import {
   deleteBorrower,
   fetchDeletedBorrowers,
   fetchBorrowerDetails,
+  fetchBorrowerAccessGrants,
   fetchBorrowers,
   restoreBorrower,
   updateBorrowerAccess,
@@ -348,7 +349,7 @@ import { fetchWorkspaceSettings } from "../../../services/adminOpsService";
 import { logAdminAction } from "../../../services/auditLogService";
 import { exportRowsToCsv, exportRowsToPdf } from "../../../services/exportService";
 import { generateBorrowerIdentity } from "../../../utils/borrowerIdentity";
-import { authenticatedSelect } from "../../../services/authenticatedDataClient";
+import { listTenantAccounts } from "../../../services/workspaceAdminManageService";
 
 const borrowers = ref<BorrowerItem[]>([]);
 const archivedBorrowers = ref<BorrowerItem[]>([]);
@@ -569,10 +570,7 @@ const loadBorrowerAccessGrants = async () => {
     return;
   }
   try {
-    const grants = await authenticatedSelect<Array<{ borrower_id: string; profile_id: string }>>("borrower_access_grants", {
-      select: "borrower_id,profile_id",
-      borrower_id: `in.(${restrictedIds.join(",")})`,
-    });
+    const grants = await fetchBorrowerAccessGrants(restrictedIds);
     const map: Record<string, string[]> = {};
     for (const grant of grants) {
       (map[grant.borrower_id] ??= []).push(grant.profile_id);
@@ -733,7 +731,11 @@ onMounted(() => {
       };
     }
     await loadBorrowers();
-    tenantAccounts.value = await authenticatedSelect<Array<{id:string;auth_email:string}>>("profiles", { select: "id,auth_email", role: "eq.tenant_account", is_active: "eq.true", deleted_at: "is.null", order: "auth_email.asc" });
+    const accounts = await listTenantAccounts();
+    tenantAccounts.value = accounts
+      .filter((account) => account.is_active)
+      .map(({ id, auth_email }) => ({ id, auth_email }));
+    tenantAccounts.value.sort((left, right) => left.auth_email.localeCompare(right.auth_email));
   })();
 });
 

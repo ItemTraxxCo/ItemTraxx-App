@@ -382,6 +382,8 @@ import {
   createItem,
   deleteItem,
   fetchDeletedItem,
+  fetchItemAccessGrantProfiles,
+  fetchItemAccessGrants,
   fetchItem,
   restoreItem,
   updateItem,
@@ -392,7 +394,7 @@ import { sanitizeInput } from "../../../utils/inputSanitizer";
 import { toUserFacingErrorMessage } from "../../../services/appErrors";
 import type { ScannerMode, ScannerScanEvent } from "../../../types/cameraScanner";
 import { capturePostHogEvent } from "../../../services/posthogService";
-import { authenticatedSelect } from "../../../services/authenticatedDataClient";
+import { listTenantAccounts } from "../../../services/workspaceAdminManageService";
 
 const items = ref<ItemRecord[]>([]);
 const archivedItem = ref<ItemRecord[]>([]);
@@ -690,10 +692,7 @@ const loadItemAccessGrants = async () => {
     return;
   }
   try {
-    const grants = await authenticatedSelect<Array<{ item_id: string; profile_id: string }>>("item_access_grants", {
-      select: "item_id,profile_id",
-      item_id: `in.(${restrictedIds.join(",")})`,
-    });
+    const grants = await fetchItemAccessGrants(restrictedIds);
     const map: Record<string, string[]> = {};
     for (const grant of grants) {
       (map[grant.item_id] ??= []).push(grant.profile_id);
@@ -852,10 +851,7 @@ const startEdit = async (item: ItemRecord) => {
   editAccessMode.value = item.access_mode ?? "all";
   editSelectedProfileIds.value = [];
   if (editAccessMode.value === "restricted") {
-    const grants = await authenticatedSelect<Array<{ profile_id: string }>>("item_access_grants", {
-      select: "profile_id",
-      item_id: `eq.${item.id}`,
-    });
+    const grants = await fetchItemAccessGrantProfiles(item.id);
     editSelectedProfileIds.value = grants.map((grant) => grant.profile_id);
   }
 };
@@ -1021,7 +1017,12 @@ const handleScannerScan = (event: ScannerScanEvent) => {
 
 onMounted(() => {
   void loadItem();
-  void authenticatedSelect<Array<{id:string;auth_email:string}>>("profiles", { select: "id,auth_email", role: "eq.tenant_account", is_active: "eq.true", deleted_at: "is.null", order: "auth_email.asc" }).then((rows) => { tenantAccounts.value = rows; });
+  void listTenantAccounts().then((rows) => {
+    tenantAccounts.value = rows
+      .filter((account) => account.is_active)
+      .map(({ id, auth_email }) => ({ id, auth_email }));
+    tenantAccounts.value.sort((left, right) => left.auth_email.localeCompare(right.auth_email));
+  });
 });
 
 onUnmounted(() => {

@@ -38,6 +38,7 @@
     "docs:edge-openapi": "node ./scripts/generate-edge-schemas.mjs",
     "docs:edge-reference": "node ./scripts/generate-edge-reference.mjs",
     "devops:check:edge-coverage": "node ./scripts/check-edge-function-coverage.mjs",
+    "devops:check:empty-catches": "node ./scripts/check-empty-catches.mjs",
     "devops:check:deno-coverage": "node ./scripts/check-deno-coverage.mjs",
     "devops:check:edge-action-parity": "node ./scripts/check-edge-action-contract-parity.mjs",
     "devops:check:edge-contract-drift": "node ./scripts/check-edge-contract-drift.mjs",

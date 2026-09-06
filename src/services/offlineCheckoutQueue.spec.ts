@@ -12,6 +12,7 @@ import {
   queueCheckoutPayload,
   quarantineOfflineCheckoutQueueForCurrentSession,
   readOfflineQueue,
+  withOfflineQueueLock,
   writeOfflineQueue,
   type CheckoutReturnPayload,
 } from "./offlineCheckoutQueue";
@@ -290,6 +291,45 @@ describe("lock acquire/release across sequential operations", () => {
     const count = await queueCheckoutPayload(payload("ITEM-2"));
     expect(count).toBe(2);
     expect(window.localStorage.getItem(LOCK_KEY)).toBeNull();
+  });
+
+  it("serializes concurrent callers through the IndexedDB fallback when Web Locks are unavailable", async () => {
+    const originalLocks = (navigator as Navigator & { locks?: unknown }).locks;
+    Object.defineProperty(navigator, "locks", { configurable: true, value: undefined });
+
+    let releaseFirst!: () => void;
+    let firstEntered!: () => void;
+    const entered = new Promise<void>((resolve) => {
+      firstEntered = resolve;
+    });
+    const order: string[] = [];
+
+    const first = withOfflineQueueLock(async () => {
+      order.push("first-start");
+      firstEntered();
+      await new Promise<void>((resolve) => {
+        releaseFirst = resolve;
+      });
+      order.push("first-end");
+    });
+    await entered;
+
+    const second = withOfflineQueueLock(async () => {
+      order.push("second-start");
+      order.push("second-end");
+    });
+
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(order).toEqual(["first-start"]);
+    releaseFirst();
+    await Promise.all([first, second]);
+    expect(order).toEqual(["first-start", "first-end", "second-start", "second-end"]);
+
+    if (originalLocks === undefined) {
+      Reflect.deleteProperty(navigator, "locks");
+    } else {
+      Object.defineProperty(navigator, "locks", { configurable: true, value: originalLocks });
+    }
   });
 });
 

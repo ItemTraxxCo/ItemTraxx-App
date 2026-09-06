@@ -6,19 +6,23 @@ vi.mock("./edgeFunctionClient", () => ({
 }));
 vi.mock("./authenticatedDataClient", () => ({
   authenticatedSelect: vi.fn(),
+  authenticatedSelectPage: vi.fn(),
 }));
 vi.mock("../utils/deviceSession", () => ({
   getOrCreateDeviceSession: vi.fn(() => ({ deviceId: "device-1", deviceLabel: "Mac" })),
 }));
 
 import { invokeEdgeFunction } from "./edgeFunctionClient";
-import { authenticatedSelect } from "./authenticatedDataClient";
+import { authenticatedSelect, authenticatedSelectPage } from "./authenticatedDataClient";
 import { getOrCreateDeviceSession } from "../utils/deviceSession";
 import {
   createItem,
   deleteItem,
   fetchDeletedItem,
   fetchItem,
+  fetchItemAccessGrantProfiles,
+  fetchItemAccessGrants,
+  fetchItemPage,
   fetchItemLogs,
   restoreItem,
   updateItem,
@@ -26,6 +30,7 @@ import {
 
 const mockedInvoke = vi.mocked(invokeEdgeFunction);
 const mockedSelect = vi.mocked(authenticatedSelect);
+const mockedSelectPage = vi.mocked(authenticatedSelectPage);
 const mockedDeviceSession = vi.mocked(getOrCreateDeviceSession);
 
 const WORKSPACE_ID = "ws-1";
@@ -33,6 +38,7 @@ const WORKSPACE_ID = "ws-1";
 beforeEach(() => {
   mockedInvoke.mockReset();
   mockedSelect.mockReset();
+  mockedSelectPage.mockReset();
   mockedDeviceSession.mockReturnValue({ deviceId: "device-1", deviceLabel: "Mac" });
   clearAuthState();
   setAuthStateFromBackend({ isAuthenticated: true, userId: "profile-1" });
@@ -43,26 +49,98 @@ describe("fetchItem", () => {
   it("throws a missing-context error when there is no workspace in scope", async () => {
     setWorkspaceContext(null);
     await expect(fetchItem()).rejects.toThrow(/missing workspace context/i);
-    expect(mockedSelect).not.toHaveBeenCalled();
+    expect(mockedSelectPage).not.toHaveBeenCalled();
   });
 
   it("requests items scoped to the current workspace, excluding soft-deleted rows", async () => {
-    mockedSelect.mockResolvedValue([{ id: "item-1" }] as never);
+    mockedSelectPage.mockResolvedValue({ rows: [{ id: "item-1" }], hasMore: false } as never);
 
     const result = await fetchItem();
 
-    expect(mockedSelect).toHaveBeenCalledWith("items", {
+    expect(mockedSelectPage).toHaveBeenCalledWith("items", {
       select: "id,workspace_id,name,barcode,serial_number,status,notes,access_mode",
       workspace_id: `eq.${WORKSPACE_ID}`,
       deleted_at: "is.null",
       order: "created_at.desc",
-    });
+    }, { page: 0, pageSize: 500 });
     expect(result).toEqual([{ id: "item-1" }]);
   });
 
   it("normalizes a null response to an empty array", async () => {
-    mockedSelect.mockResolvedValue(null as never);
+    mockedSelectPage.mockResolvedValue({ rows: [], hasMore: false } as never);
     expect(await fetchItem()).toEqual([]);
+  });
+
+  it("accumulates bounded pages for admin search and export", async () => {
+    mockedSelectPage
+      .mockResolvedValueOnce({
+        rows: Array.from({ length: 500 }, (_, index) => ({ id: `item-${index}` })),
+        hasMore: true,
+      } as never)
+      .mockResolvedValueOnce({ rows: [{ id: "item-500" }], hasMore: false } as never);
+
+    const result = await fetchItem();
+
+    expect(result).toHaveLength(501);
+    expect(mockedSelectPage).toHaveBeenNthCalledWith(2, "items", expect.any(Object), {
+      page: 1,
+      pageSize: 500,
+    });
+  });
+});
+
+describe("fetchItemPage", () => {
+  it("requests a bounded workspace-scoped page", async () => {
+    mockedSelectPage.mockResolvedValue({ rows: [{ id: "item-1" }], hasMore: true } as never);
+
+    const result = await fetchItemPage(2, 20, "name.asc");
+
+    expect(mockedSelectPage).toHaveBeenCalledWith("items", {
+      select: "id,workspace_id,name,barcode,serial_number,status,notes,access_mode",
+      workspace_id: `eq.${WORKSPACE_ID}`,
+      deleted_at: "is.null",
+      order: "name.asc",
+    }, { page: 2, pageSize: 20 });
+    expect(result).toEqual({ rows: [{ id: "item-1" }], hasMore: true });
+  });
+});
+
+describe("item access grants", () => {
+  it("does not query when there are no restricted items", async () => {
+    await expect(fetchItemAccessGrants([])).resolves.toEqual([]);
+    expect(mockedSelect).not.toHaveBeenCalled();
+  });
+
+  it("loads grants through the service boundary", async () => {
+    mockedSelect
+      .mockResolvedValueOnce([{ item_id: "item-1", profile_id: "profile-1" }] as never)
+      .mockResolvedValueOnce([{ profile_id: "profile-1" }] as never);
+
+    await expect(fetchItemAccessGrants(["item-1"])).resolves.toEqual([
+      { item_id: "item-1", profile_id: "profile-1" },
+    ]);
+    await expect(fetchItemAccessGrantProfiles("item-1")).resolves.toEqual([{ profile_id: "profile-1" }]);
+    expect(mockedSelect).toHaveBeenNthCalledWith(1, "item_access_grants", {
+      select: "item_id,profile_id",
+      item_id: "in.(item-1)",
+    });
+    expect(mockedSelect).toHaveBeenNthCalledWith(2, "item_access_grants", {
+      select: "profile_id",
+      item_id: "eq.item-1",
+    });
+  });
+
+  it("chunks large grant lookups to keep query URLs bounded", async () => {
+    mockedSelect.mockResolvedValue([] as never);
+    const itemIds = Array.from({ length: 101 }, (_, index) => `item-${index}`);
+
+    await expect(fetchItemAccessGrants(itemIds)).resolves.toEqual([]);
+
+    expect(mockedSelect).toHaveBeenCalledTimes(2);
+    expect(mockedSelect.mock.calls[0]?.[1]?.item_id).toBe(
+      `in.(${itemIds.slice(0, 100).join(",")})`,
+    );
+    expect(mockedSelect.mock.calls[1]?.[1]?.item_id).toBe("in.(item-100)");
   });
 });
 

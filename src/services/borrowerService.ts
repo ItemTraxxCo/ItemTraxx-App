@@ -1,5 +1,5 @@
 import { invokeEdgeFunction } from "./edgeFunctionClient";
-import { authenticatedSelect } from "./authenticatedDataClient";
+import { authenticatedSelect, authenticatedSelectPage } from "./authenticatedDataClient";
 import { getAuthState } from "../store/authState";
 import { edgeFunctionError, missingContextError } from "./appErrors";
 import { getOrCreateDeviceSession } from "../utils/deviceSession";
@@ -19,6 +19,8 @@ export type BorrowerDetails = {
 };
 
 type MaybeRelation<T> = T | T[] | null;
+const ADMIN_LIST_PAGE_SIZE = 500;
+const ACCESS_GRANT_BATCH_SIZE = 100;
 
 const pickRelation = <T>(value: MaybeRelation<T>): T | null => {
   if (Array.isArray(value)) {
@@ -36,13 +38,46 @@ const getWorkspaceContextId = () => {
 };
 
 export const fetchBorrowers = async () => {
+  // Admin search/export currently needs the complete active set. Keep that
+  // compatibility contract while bounding every individual PostgREST request;
+  // interactive pages should use fetchBorrowerPage instead.
+  const rows: BorrowerItem[] = [];
+  let page = 0;
+  while (true) {
+    const result = await fetchBorrowerPage(page, ADMIN_LIST_PAGE_SIZE);
+    rows.push(...result.rows);
+    if (!result.hasMore) return rows;
+    page += 1;
+  }
+};
+
+export const fetchBorrowerPage = async (
+  page = 0,
+  pageSize = 20,
+  order = "created_at.desc",
+) => {
   const workspaceId = getWorkspaceContextId();
-  return (await authenticatedSelect<BorrowerItem[]>("borrowers", {
+  return authenticatedSelectPage<BorrowerItem>("borrowers", {
     select: "id,workspace_id,username,borrower_id,access_mode",
     workspace_id: `eq.${workspaceId}`,
     deleted_at: "is.null",
-    order: "created_at.desc",
-  })) ?? [];
+    order,
+  }, { page, pageSize });
+};
+
+export type BorrowerAccessGrant = { borrower_id: string; profile_id: string };
+
+export const fetchBorrowerAccessGrants = async (borrowerIds: string[]) => {
+  if (borrowerIds.length === 0) return [] as BorrowerAccessGrant[];
+  const grants: BorrowerAccessGrant[] = [];
+  for (let index = 0; index < borrowerIds.length; index += ACCESS_GRANT_BATCH_SIZE) {
+    const batch = borrowerIds.slice(index, index + ACCESS_GRANT_BATCH_SIZE);
+    grants.push(...((await authenticatedSelect<BorrowerAccessGrant[]>("borrower_access_grants", {
+      select: "borrower_id,profile_id",
+      borrower_id: `in.(${batch.join(",")})`,
+    })) ?? []));
+  }
+  return grants;
 };
 
 export const fetchDeletedBorrowers = async () => {

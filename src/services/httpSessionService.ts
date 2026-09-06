@@ -1,5 +1,11 @@
 import { captureHandledRequestFailure } from "./sentry";
 
+// The session protocol intentionally has its own transport: /auth/session
+// manages the edge-issued HTTP-only cookie and session exchange, whereas
+// invokeEdgeFunction targets Supabase function routes with bearer tokens.
+// Keeping those contracts separate avoids making auth bootstrap depend on the
+// authenticated function dispatcher.
+
 export type HttpSessionSummary = {
   authenticated: boolean;
   user: {

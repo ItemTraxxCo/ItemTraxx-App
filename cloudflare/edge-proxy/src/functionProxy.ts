@@ -177,6 +177,11 @@ export const proxyFunctionRequest = async (
           parsed,
         );
         responseHeaders.set("content-type", "application/json");
+        // The clone in readBoundedSystemStatusText tees the upstream body so
+        // the fall-through paths below can still stream the original. On this
+        // path we re-serialize instead, so the original branch is never read
+        // and the tee would buffer it for the life of the response. Release it.
+        void upstreamResponse.body?.cancel().catch(() => undefined);
         return new Response(JSON.stringify(withFallback), {
           status: upstreamResponse.status,
           headers: responseHeaders,

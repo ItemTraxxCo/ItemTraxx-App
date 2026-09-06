@@ -1,5 +1,5 @@
 import { invokeEdgeFunction } from "./edgeFunctionClient";
-import { authenticatedSelect } from "./authenticatedDataClient";
+import { authenticatedSelect, authenticatedSelectPage } from "./authenticatedDataClient";
 import { getAuthState } from "../store/authState";
 import { edgeFunctionError, missingContextError } from "./appErrors";
 import { getOrCreateDeviceSession } from "../utils/deviceSession";
@@ -29,6 +29,8 @@ export type ItemLog = {
 };
 
 type MaybeRelation<T> = T | T[] | null;
+const ADMIN_LIST_PAGE_SIZE = 500;
+const ACCESS_GRANT_BATCH_SIZE = 100;
 
 const pickRelation = <T>(value: MaybeRelation<T>): T | null => {
   if (Array.isArray(value)) {
@@ -46,14 +48,53 @@ const getWorkspaceContextId = () => {
 };
 
 export const fetchItem = async () => {
+  // Admin search/export currently needs the complete active set. Keep that
+  // compatibility contract while bounding every individual PostgREST request;
+  // interactive pages should use fetchItemPage instead.
+  const rows: ItemRecord[] = [];
+  let page = 0;
+  while (true) {
+    const result = await fetchItemPage(page, ADMIN_LIST_PAGE_SIZE);
+    rows.push(...result.rows);
+    if (!result.hasMore) return rows;
+    page += 1;
+  }
+};
+
+export const fetchItemPage = async (
+  page = 0,
+  pageSize = 20,
+  order = "created_at.desc",
+) => {
   const workspaceId = getWorkspaceContextId();
-  return (await authenticatedSelect<ItemRecord[]>("items", {
+  return authenticatedSelectPage<ItemRecord>("items", {
     select: "id,workspace_id,name,barcode,serial_number,status,notes,access_mode",
     workspace_id: `eq.${workspaceId}`,
     deleted_at: "is.null",
-    order: "created_at.desc",
-  })) ?? [];
+    order,
+  }, { page, pageSize });
 };
+
+export type ItemAccessGrant = { item_id: string; profile_id: string };
+
+export const fetchItemAccessGrants = async (itemIds: string[]) => {
+  if (itemIds.length === 0) return [] as ItemAccessGrant[];
+  const grants: ItemAccessGrant[] = [];
+  for (let index = 0; index < itemIds.length; index += ACCESS_GRANT_BATCH_SIZE) {
+    const batch = itemIds.slice(index, index + ACCESS_GRANT_BATCH_SIZE);
+    grants.push(...((await authenticatedSelect<ItemAccessGrant[]>("item_access_grants", {
+      select: "item_id,profile_id",
+      item_id: `in.(${batch.join(",")})`,
+    })) ?? []));
+  }
+  return grants;
+};
+
+export const fetchItemAccessGrantProfiles = async (itemId: string) =>
+  (await authenticatedSelect<Array<{ profile_id: string }>>("item_access_grants", {
+    select: "profile_id",
+    item_id: `eq.${itemId}`,
+  })) ?? [];
 
 export const fetchDeletedItem = async () => {
   const { deviceId } = getOrCreateDeviceSession();

@@ -143,6 +143,47 @@ describe("useCameraBarcodeScanner", () => {
     wrapper.unmount();
   });
 
+  it("does not start a second camera stream when open is triggered while startup is pending", async () => {
+    let resolveStream!: (stream: ReturnType<typeof makeStream>) => void;
+    getUserMedia.mockImplementationOnce(
+      () => new Promise((resolve) => {
+        resolveStream = resolve;
+      }),
+    );
+    const { wrapper, get } = mountHost();
+
+    const firstOpen = get().open();
+    const secondOpen = get().open();
+
+    expect(getUserMedia).toHaveBeenCalledTimes(1);
+    resolveStream(makeStream(track));
+    await Promise.all([firstOpen, secondOpen]);
+
+    expect(get().isStarting.value).toBe(false);
+    expect(get().isOpen.value).toBe(true);
+    wrapper.unmount();
+  });
+
+  it("stops a late stream when the scanner unmounts during startup", async () => {
+    let resolveStream!: (stream: ReturnType<typeof makeStream>) => void;
+    getUserMedia.mockImplementationOnce(
+      () => new Promise((resolve) => {
+        resolveStream = resolve;
+      }),
+    );
+    const { wrapper, get } = mountHost();
+    const opening = get().open();
+    const lateTrack = makeTrack();
+    const lateStream = makeStream(lateTrack);
+
+    wrapper.unmount();
+    resolveStream(lateStream);
+    await opening;
+
+    expect(lateTrack.stop).toHaveBeenCalled();
+    expect(get().isStarting.value).toBe(false);
+  });
+
   it("open() falls back to minimal constraints when the preferred constraints are rejected", async () => {
     getUserMedia.mockRejectedValueOnce(new Error("OverconstrainedError")).mockResolvedValueOnce(makeStream(track));
     const { wrapper, get } = mountHost();
@@ -219,6 +260,36 @@ describe("useCameraBarcodeScanner", () => {
     expect(getUserMedia).toHaveBeenCalledWith(
       expect.objectContaining({ video: expect.objectContaining({ deviceId: { exact: "cam-2" } }) }),
     );
+    wrapper.unmount();
+  });
+
+  it("serializes double-tap camera flips so only one replacement stream is acquired", async () => {
+    enumerateDevices.mockResolvedValue([
+      { kind: "videoinput", deviceId: "cam-1" },
+      { kind: "videoinput", deviceId: "cam-2" },
+    ]);
+    const { wrapper, get } = mountHost();
+    await get().open();
+    getUserMedia.mockClear();
+
+    let resolveStream!: (stream: ReturnType<typeof makeStream>) => void;
+    getUserMedia.mockImplementationOnce(
+      () => new Promise((resolve) => {
+        resolveStream = resolve;
+      }),
+    );
+
+    const firstFlip = get().flipCamera();
+    const secondFlip = get().flipCamera();
+
+    expect(getUserMedia).toHaveBeenCalledTimes(1);
+    expect(getUserMedia).toHaveBeenCalledWith(
+      expect.objectContaining({ video: expect.objectContaining({ deviceId: { exact: "cam-2" } }) }),
+    );
+    resolveStream(makeStream(makeTrack()));
+    await Promise.all([firstFlip, secondFlip]);
+
+    expect(get().isStarting.value).toBe(false);
     wrapper.unmount();
   });
 

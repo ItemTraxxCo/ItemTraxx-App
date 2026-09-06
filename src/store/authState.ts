@@ -75,12 +75,27 @@ const authState = reactive<AuthState>({ ...defaultState });
 
 export const getAuthState = (): AuthState => authState;
 
-export const setAuthStateFromBackend = (next: Partial<AuthState>) => {
-  Object.assign(authState, next, {
-    isAdmin: next.role === "workspace_admin",
-    isWorkspaceAdmin: next.role === "workspace_admin",
-    isSuperAdmin: next.role === "super_admin",
-  });
+type AuthStateBackendPatch = Partial<
+  Omit<AuthState, "isAdmin" | "isWorkspaceAdmin" | "isSuperAdmin">
+>;
+
+export const setAuthStateFromBackend = (next: AuthStateBackendPatch) => {
+  // Keep derived flags out of the merge even if a JavaScript caller bypasses
+  // the TypeScript boundary. They must never be accepted as backend data.
+  const backendPatch = { ...next } as Partial<AuthState>;
+  delete backendPatch.isAdmin;
+  delete backendPatch.isWorkspaceAdmin;
+  delete backendPatch.isSuperAdmin;
+  Object.assign(authState, backendPatch);
+
+  // Role-derived flags are only authoritative when the backend patch includes
+  // a role. Partial updates (for example, refreshing a session timestamp) must
+  // not infer a missing role as "no role" and silently clear existing access.
+  if (Object.prototype.hasOwnProperty.call(next, "role") && next.role !== undefined) {
+    authState.isAdmin = next.role === "workspace_admin";
+    authState.isWorkspaceAdmin = next.role === "workspace_admin";
+    authState.isSuperAdmin = next.role === "super_admin";
+  }
 };
 
 export const setWorkspaceContext = (workspaceId: string | null) => {

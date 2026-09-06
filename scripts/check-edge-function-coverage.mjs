@@ -4,7 +4,9 @@ import ts from 'typescript';
 
 const root = process.cwd();
 const servicesDir = path.join(root, 'src/services');
+const srcDir = path.join(root, 'src');
 const functionsDir = path.join(root, 'supabase/functions');
+const routingFile = path.join(root, 'cloudflare/edge-proxy/src/routing.ts');
 const testsDir = path.join(root, 'tests');
 const workflowsDir = path.join(root, '.github/workflows');
 
@@ -156,6 +158,70 @@ async function loadTextSearchCorpus() {
   return contents;
 }
 
+function collectRestTableReferences(sourceFile) {
+  const references = new Set();
+
+  function visit(node) {
+    if (
+      ts.isCallExpression(node) &&
+      ts.isIdentifier(node.expression) &&
+      ['authenticatedSelect', 'authenticatedSelectPage', 'authenticatedInsert'].includes(node.expression.text)
+    ) {
+      const table = node.arguments[0];
+      if (table && (ts.isStringLiteralLike(table) || ts.isNoSubstitutionTemplateLiteral(table))) {
+        references.add(table.text);
+      }
+    }
+    ts.forEachChild(node, visit);
+  }
+
+  ts.forEachChild(sourceFile, visit);
+  return references;
+}
+
+function parseRoutingTableSet(routingText, setName) {
+  const match = routingText.match(
+    new RegExp(`const\\s+${setName}\\s*=\\s*new Set\\(\\[([\\s\\S]*?)\\]\\)`),
+  );
+  if (!match) return new Set();
+  return new Set(
+    [...match[1].matchAll(/["']([A-Za-z0-9_]+)["']/g)].map((entry) => entry[1]),
+  );
+}
+
+async function collectBrowserRestTableReferences() {
+  const references = new Set();
+  const sourceFiles = (await walkFiles(srcDir)).filter(
+    (file) =>
+      (file.endsWith('.ts') || file.endsWith('.vue')) &&
+      !file.endsWith('.spec.ts') &&
+      !file.endsWith('.test.ts'),
+  );
+
+  for (const file of sourceFiles) {
+    const text = await fs.readFile(file, 'utf8');
+    const scripts = file.endsWith('.vue')
+      // HTML tag names are case-insensitive, and browsers tolerate trailing
+      // junk in an end tag (`</script >`, `</script foo="bar">`). Match all of
+      // those: a block this regex misses extracts nothing and silently drops
+      // that file's REST table references from this gate, which turns a miss
+      // into a false pass rather than a visible failure.
+      ? [...text.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script\b[^>]*>/gi)].map((match) => match[1])
+      : [text];
+    for (const script of scripts) {
+      const sourceFile = ts.createSourceFile(
+        file,
+        script,
+        ts.ScriptTarget.Latest,
+        true,
+        ts.ScriptKind.TS,
+      );
+      for (const table of collectRestTableReferences(sourceFile)) references.add(table);
+    }
+  }
+  return references;
+}
+
 async function main() {
   const serviceFiles = (await walkFiles(servicesDir)).filter((file) => file.endsWith('.ts'));
   const functionEntries = await fs.readdir(functionsDir, { withFileTypes: true });
@@ -208,6 +274,17 @@ async function main() {
     }
     if (callers.length > 0 && referencedInCorpus.length === 0) {
       issues.push(`No test/workflow/probe references found for "${functionName}" (callers: ${callers.join(', ')}).`);
+    }
+  }
+
+  const routingText = await fs.readFile(routingFile, 'utf8');
+  const readableTables = parseRoutingTableSet(routingText, 'READABLE_REST_TABLES');
+  const writableTables = parseRoutingTableSet(routingText, 'WRITABLE_REST_TABLES');
+  const allowedRestTables = new Set([...readableTables, ...writableTables]);
+  const browserRestTables = await collectBrowserRestTableReferences();
+  for (const table of browserRestTables) {
+    if (!allowedRestTables.has(table)) {
+      issues.push(`Browser authenticated data caller references REST table "${table}" but cloudflare/edge-proxy/src/routing.ts does not allow it.`);
     }
   }
 

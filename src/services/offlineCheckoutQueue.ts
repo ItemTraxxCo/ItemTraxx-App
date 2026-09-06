@@ -56,6 +56,7 @@ const OFFLINE_QUEUE_KEY_STORE = "keys";
 const OFFLINE_QUEUE_KEY_ID = "checkout-buffer";
 const OFFLINE_QUEUE_LOCK_TTL_MS = 30_000;
 const OFFLINE_QUEUE_LOCK_REFRESH_MS = 1_000;
+const OFFLINE_QUEUE_LOCK_ID = "checkout-buffer-lock";
 let offlineQueueWarning: string | null = null;
 
 const bytesToBase64 = (bytes: Uint8Array) => {
@@ -114,50 +115,161 @@ export const isOfflineQueueItemScopedTo = (
 
 const sleep = (ms: number) => new Promise((resolve) => window.setTimeout(resolve, ms));
 
-const runWithStorageLease = async <T>(callback: () => Promise<T>) => {
+type OfflineQueueLease = {
+  owner: string;
+  expires_at: number;
+};
+
+const parseOfflineQueueLease = (value: unknown): OfflineQueueLease | null => {
+  if (!value || typeof value !== "object") return null;
+  const candidate = value as { owner?: unknown; expires_at?: unknown };
+  return typeof candidate.owner === "string" &&
+      Number.isFinite(candidate.expires_at)
+    ? { owner: candidate.owner, expires_at: Number(candidate.expires_at) }
+    : null;
+};
+
+// IndexedDB read/write transactions are serialized across tabs. Performing the
+// lease read and conditional write in one transaction closes the check-then-set
+// race that makes a localStorage-only fallback split-brain under interleaving.
+const tryAcquireIndexedDbLease = async (owner: string) => {
+  const database = await openOfflineQueueKeyDatabase();
+  try {
+    return await new Promise<boolean>((resolve, reject) => {
+      let settled = false;
+      let acquired = false;
+      const transaction = database.transaction(OFFLINE_QUEUE_KEY_STORE, "readwrite");
+      const store = transaction.objectStore(OFFLINE_QUEUE_KEY_STORE);
+      const fail = (error: unknown) => {
+        if (settled) return;
+        settled = true;
+        reject(error instanceof Error ? error : new Error("Unable to access offline queue lock."));
+      };
+
+      transaction.oncomplete = () => {
+        if (settled) return;
+        settled = true;
+        resolve(acquired);
+      };
+      transaction.onerror = () => fail(
+        transaction.error ?? new Error("Unable to access offline queue lock."),
+      );
+      transaction.onabort = () => fail(
+        transaction.error ?? new Error("Unable to access offline queue lock."),
+      );
+
+      const request = store.get(OFFLINE_QUEUE_LOCK_ID);
+      request.onerror = () => fail(
+        request.error ?? new Error("Unable to access offline queue lock."),
+      );
+      request.onsuccess = () => {
+        const current = parseOfflineQueueLease(request.result);
+        const now = Date.now();
+        if (!current || current.expires_at <= now || current.owner === owner) {
+          store.put({ owner, expires_at: now + OFFLINE_QUEUE_LOCK_TTL_MS }, OFFLINE_QUEUE_LOCK_ID);
+          acquired = true;
+        }
+      };
+    });
+  } finally {
+    database.close();
+  }
+};
+
+const renewIndexedDbLease = async (owner: string) => {
+  const database = await openOfflineQueueKeyDatabase();
+  try {
+    return await new Promise<boolean>((resolve, reject) => {
+      let settled = false;
+      let renewed = false;
+      const transaction = database.transaction(OFFLINE_QUEUE_KEY_STORE, "readwrite");
+      const store = transaction.objectStore(OFFLINE_QUEUE_KEY_STORE);
+      const fail = (error: unknown) => {
+        if (settled) return;
+        settled = true;
+        reject(error instanceof Error ? error : new Error("Unable to renew offline queue lock."));
+      };
+
+      transaction.oncomplete = () => {
+        if (settled) return;
+        settled = true;
+        resolve(renewed);
+      };
+      transaction.onerror = () => fail(
+        transaction.error ?? new Error("Unable to renew offline queue lock."),
+      );
+      transaction.onabort = () => fail(
+        transaction.error ?? new Error("Unable to renew offline queue lock."),
+      );
+
+      const request = store.get(OFFLINE_QUEUE_LOCK_ID);
+      request.onerror = () => fail(
+        request.error ?? new Error("Unable to renew offline queue lock."),
+      );
+      request.onsuccess = () => {
+        const current = parseOfflineQueueLease(request.result);
+        if (current?.owner !== owner || current.expires_at <= Date.now()) return;
+        store.put({ owner, expires_at: Date.now() + OFFLINE_QUEUE_LOCK_TTL_MS }, OFFLINE_QUEUE_LOCK_ID);
+        renewed = true;
+      };
+    });
+  } finally {
+    database.close();
+  }
+};
+
+const releaseIndexedDbLease = async (owner: string) => {
+  const database = await openOfflineQueueKeyDatabase();
+  try {
+    await new Promise<void>((resolve, reject) => {
+      let settled = false;
+      const transaction = database.transaction(OFFLINE_QUEUE_KEY_STORE, "readwrite");
+      const store = transaction.objectStore(OFFLINE_QUEUE_KEY_STORE);
+      const fail = (error: unknown) => {
+        if (settled) return;
+        settled = true;
+        reject(error instanceof Error ? error : new Error("Unable to release offline queue lock."));
+      };
+
+      transaction.oncomplete = () => {
+        if (settled) return;
+        settled = true;
+        resolve();
+      };
+      transaction.onerror = () => fail(
+        transaction.error ?? new Error("Unable to release offline queue lock."),
+      );
+      transaction.onabort = () => fail(
+        transaction.error ?? new Error("Unable to release offline queue lock."),
+      );
+
+      const request = store.get(OFFLINE_QUEUE_LOCK_ID);
+      request.onerror = () => fail(
+        request.error ?? new Error("Unable to release offline queue lock."),
+      );
+      request.onsuccess = () => {
+        const current = parseOfflineQueueLease(request.result);
+        if (current?.owner === owner) store.delete(OFFLINE_QUEUE_LOCK_ID);
+      };
+    });
+  } finally {
+    database.close();
+  }
+};
+
+const runWithIndexedDbLease = async <T>(callback: () => Promise<T>) => {
   const owner = createOperationId();
   const acquireStartedAt = Date.now();
   let heartbeatId: number | null = null;
 
-  const renewLease = () => {
-    window.localStorage.setItem(
-      OFFLINE_QUEUE_LOCK_KEY,
-      JSON.stringify({
-        owner,
-        expires_at: Date.now() + OFFLINE_QUEUE_LOCK_TTL_MS,
-      })
-    );
-  };
-
   while (true) {
-    const now = Date.now();
-    const raw = window.localStorage.getItem(OFFLINE_QUEUE_LOCK_KEY);
-    let currentOwner = "";
-    let expiresAt = 0;
-
-    if (raw) {
-      try {
-        const parsed = JSON.parse(raw) as { owner?: string; expires_at?: number };
-        currentOwner = typeof parsed.owner === "string" ? parsed.owner : "";
-        expiresAt = typeof parsed.expires_at === "number" ? parsed.expires_at : 0;
-      } catch {
-        window.localStorage.removeItem(OFFLINE_QUEUE_LOCK_KEY);
-      }
-    }
-
-    if (!currentOwner || expiresAt <= now || currentOwner === owner) {
-      renewLease();
-      try {
-        const confirmed = JSON.parse(
-          window.localStorage.getItem(OFFLINE_QUEUE_LOCK_KEY) ?? "{}"
-        ) as { owner?: string };
-        if (confirmed.owner === owner) {
-          heartbeatId = window.setInterval(renewLease, OFFLINE_QUEUE_LOCK_REFRESH_MS);
-          break;
-        }
-      } catch {
-        window.localStorage.removeItem(OFFLINE_QUEUE_LOCK_KEY);
-      }
+    if (await tryAcquireIndexedDbLease(owner)) {
+      heartbeatId = window.setInterval(() => {
+        // A transient renewal failure leaves the existing lease in place; the
+        // next heartbeat can recover without allowing an unconditional write.
+        void renewIndexedDbLease(owner).catch(() => undefined);
+      }, OFFLINE_QUEUE_LOCK_REFRESH_MS);
+      break;
     }
 
     if (Date.now() - acquireStartedAt > OFFLINE_QUEUE_LOCK_TTL_MS * 2) {
@@ -173,16 +285,7 @@ const runWithStorageLease = async <T>(callback: () => Promise<T>) => {
     if (heartbeatId !== null) {
       window.clearInterval(heartbeatId);
     }
-    try {
-      const current = JSON.parse(
-        window.localStorage.getItem(OFFLINE_QUEUE_LOCK_KEY) ?? "{}"
-      ) as { owner?: string };
-      if (current.owner === owner) {
-        window.localStorage.removeItem(OFFLINE_QUEUE_LOCK_KEY);
-      }
-    } catch {
-      window.localStorage.removeItem(OFFLINE_QUEUE_LOCK_KEY);
-    }
+    await releaseIndexedDbLease(owner).catch(() => undefined);
   }
 };
 
@@ -194,9 +297,10 @@ export const withOfflineQueueLock = async <T>(callback: () => Promise<T>) => {
       callback
     );
   }
-  // Fallback only for browsers without Web Locks support. This localStorage lease is
-  // best-effort and may still allow rare split-brain acquisition under tight interleaving.
-  return runWithStorageLease(callback);
+  // IndexedDB's serialized read/write transaction provides an atomic
+  // compare-and-set fallback for browsers without Web Locks. Do not fall back
+  // to localStorage: its separate get/set operations cannot provide ownership.
+  return runWithIndexedDbLease(callback);
 };
 
 const openOfflineQueueKeyDatabase = () =>

@@ -27,6 +27,37 @@ export { checkSessionRateLimit } from "./session.ts";
 const resolveKillSwitchMessage = (env: Env) =>
   env.ITX_ITEMTRAXX_KILLSWITCH_MESSAGE?.trim() || DEFAULT_KILL_SWITCH_MESSAGE;
 
+// `env` is fixed for the life of an isolate, but these two allowlists were
+// rebuilt on every request: a CSV split plus a Set union for origins, and a
+// second CSV split of ~24 entries for functions. Memoize per isolate, keyed on
+// the raw string so a different env (tests, a config change) recomputes rather
+// than serving a stale allowlist. Functions become a Set for O(1) membership.
+let cachedOriginsKey: string | null = null;
+let cachedOrigins: string[] = [];
+
+const resolveAllowedOrigins = (env: Env) => {
+  const raw = env.ALLOWED_ORIGINS ?? "";
+  if (raw !== cachedOriginsKey) {
+    cachedOriginsKey = raw;
+    cachedOrigins = Array.from(
+      new Set([...DEFAULT_ALLOWED_ORIGINS, ...parseCsv(raw)]),
+    );
+  }
+  return cachedOrigins;
+};
+
+let cachedFunctionsKey: string | null = null;
+let cachedFunctions: Set<string> = new Set();
+
+const resolveAllowedFunctions = (env: Env) => {
+  const raw = env.ALLOWED_FUNCTIONS ?? "";
+  if (raw !== cachedFunctionsKey) {
+    cachedFunctionsKey = raw;
+    cachedFunctions = new Set(parseCsv(raw));
+  }
+  return cachedFunctions;
+};
+
 export default {
   async fetch(
     request: Request,
@@ -47,9 +78,7 @@ export default {
       (typeof crypto?.randomUUID === "function"
         ? crypto.randomUUID()
         : "itx-edge-request");
-    const allowedOrigins = Array.from(
-      new Set([...DEFAULT_ALLOWED_ORIGINS, ...parseCsv(env.ALLOWED_ORIGINS)]),
-    );
+    const allowedOrigins = resolveAllowedOrigins(env);
     const { originAllowed, headers } = withCorsHeaders(
       origin,
       allowedOrigins,
@@ -98,6 +127,34 @@ export default {
         return response;
       }
 
+      const killSwitchEnabled =
+        (env.ITX_ITEMTRAXX_KILLSWITCH_ENABLED ?? "").toLowerCase() === "true";
+      const killSwitchBlocksRequest = killSwitchEnabled &&
+        !isLocalhostOrigin(origin);
+      const buildKillSwitchResponse = (extra: Record<string, unknown>) => {
+        const response = buildError(
+          503,
+          resolveKillSwitchMessage(env),
+          headers,
+          requestId,
+        );
+        maybeReportWorkerResponse(env, request, requestId, response, ctx, {
+          type: "kill_switch",
+          ...extra,
+        });
+        return response;
+      };
+
+      // REST and RPC requests return from this branch, so they must be checked
+      // before dispatch. Otherwise a kill-switch incident still permits table
+      // reads and direct audit-log writes through the PostgREST pass-through.
+      if (
+        killSwitchBlocksRequest &&
+        (isRestProxyPath(url.pathname) || isRpcProxyPath(url.pathname))
+      ) {
+        return buildKillSwitchResponse({ path: url.pathname });
+      }
+
       if (isBlockedRpcProxyPath(url.pathname)) {
         return buildError(
           403,
@@ -143,32 +200,19 @@ export default {
         return buildError(404, "Not found", headers, requestId);
       }
 
-      const killSwitchEnabled =
-        (env.ITX_ITEMTRAXX_KILLSWITCH_ENABLED ?? "").toLowerCase() === "true";
       if (
-        killSwitchEnabled && functionName !== "system-status" &&
-        !isLocalhostOrigin(origin)
+        killSwitchBlocksRequest && functionName !== "system-status"
       ) {
-        const response = buildError(
-          503,
-          resolveKillSwitchMessage(env),
-          headers,
-          requestId,
-        );
-        maybeReportWorkerResponse(env, request, requestId, response, ctx, {
-          type: "kill_switch",
-          functionName,
-        });
-        return response;
+        return buildKillSwitchResponse({ functionName });
       }
 
-      const allowedFunctions = parseCsv(env.ALLOWED_FUNCTIONS);
+      const allowedFunctions = resolveAllowedFunctions(env);
       if (
-        allowedFunctions.length === 0 || !allowedFunctions.includes(functionName)
+        allowedFunctions.size === 0 || !allowedFunctions.has(functionName)
       ) {
         return buildError(
-          allowedFunctions.length === 0 ? 503 : 403,
-          allowedFunctions.length === 0
+          allowedFunctions.size === 0 ? 503 : 403,
+          allowedFunctions.size === 0
             ? "Function allowlist unavailable"
             : "Function not allowed",
           headers,

@@ -37,9 +37,9 @@
           </table>
         </div>
         <div class="account-pagination">
-          <button type="button" :disabled="borrowerPage === 0" @click="borrowerPage--">‹ Previous 20</button>
+          <button type="button" :disabled="borrowerPage === 0 || borrowersLoading" @click="goToBorrowerPage(-1)">‹ Previous 20</button>
           <span>{{ borrowerPageLabel }}</span>
-          <button type="button" :disabled="!hasMoreBorrowers" @click="borrowerPage++">Next 20 ›</button>
+          <button type="button" :disabled="!hasMoreBorrowers || borrowersLoading" @click="goToBorrowerPage(1)">Next 20 ›</button>
         </div>
       </template>
     </section>
@@ -76,9 +76,9 @@
           </table>
         </div>
         <div class="account-pagination">
-          <button type="button" :disabled="itemPage === 0" @click="itemPage--">‹ Previous 20</button>
+          <button type="button" :disabled="itemPage === 0 || itemsLoading" @click="goToItemPage(-1)">‹ Previous 20</button>
           <span>{{ itemPageLabel }}</span>
-          <button type="button" :disabled="!hasMoreItems" @click="itemPage++">Next 20 ›</button>
+          <button type="button" :disabled="!hasMoreItems || itemsLoading" @click="goToItemPage(1)">Next 20 ›</button>
         </div>
       </template>
     </section>
@@ -176,10 +176,11 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from "vue";
+import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import { RouterLink } from "vue-router";
-import { authenticatedSelect } from "../../services/authenticatedDataClient";
 import { toUserFacingErrorMessage } from "../../services/appErrors";
+import { fetchBorrowerPage } from "../../services/borrowerService";
+import { fetchItemPage } from "../../services/itemService";
 import {
   listAccountSessions,
   revokeAccountSession,
@@ -196,11 +197,13 @@ const borrowers = ref<BorrowerRow[]>([]);
 const borrowersLoading = ref(true);
 const borrowersError = ref("");
 const borrowerPage = ref(0);
+const hasMoreBorrowers = ref(false);
 
 const items = ref<ItemRow[]>([]);
 const itemsLoading = ref(true);
 const itemsError = ref("");
 const itemPage = ref(0);
+const hasMoreItems = ref(false);
 
 const sessions = ref<AccountSessionItem[]>([]);
 const openSessionMenuId = ref<string | null>(null);
@@ -208,26 +211,20 @@ const isSessionSaving = ref(false);
 const sessionError = ref("");
 const sessionSuccess = ref("");
 
-const pagedBorrowers = computed(() =>
-  borrowers.value.slice(borrowerPage.value * PAGE_SIZE, (borrowerPage.value + 1) * PAGE_SIZE),
-);
-const hasMoreBorrowers = computed(() => (borrowerPage.value + 1) * PAGE_SIZE < borrowers.value.length);
+const pagedBorrowers = computed(() => borrowers.value);
 const borrowerPageLabel = computed(() => {
   if (!borrowers.value.length) return "No borrowers";
   const start = borrowerPage.value * PAGE_SIZE + 1;
-  const end = Math.min(borrowers.value.length, (borrowerPage.value + 1) * PAGE_SIZE);
-  return `${start}–${end} of ${borrowers.value.length}`;
+  const end = start + borrowers.value.length - 1;
+  return `${start}–${end}${hasMoreBorrowers.value ? "+" : ""}`;
 });
 
-const pagedItems = computed(() =>
-  items.value.slice(itemPage.value * PAGE_SIZE, (itemPage.value + 1) * PAGE_SIZE),
-);
-const hasMoreItems = computed(() => (itemPage.value + 1) * PAGE_SIZE < items.value.length);
+const pagedItems = computed(() => items.value);
 const itemPageLabel = computed(() => {
   if (!items.value.length) return "No items";
   const start = itemPage.value * PAGE_SIZE + 1;
-  const end = Math.min(items.value.length, (itemPage.value + 1) * PAGE_SIZE);
-  return `${start}–${end} of ${items.value.length}`;
+  const end = start + items.value.length - 1;
+  return `${start}–${end}${hasMoreItems.value ? "+" : ""}`;
 });
 
 const removableSessions = computed(() => sessions.value.filter((session) => !session.is_current));
@@ -270,32 +267,48 @@ const formatDate = (value: string) => {
   return date.toLocaleString();
 };
 
-const loadBorrowers = async () => {
+const loadBorrowers = async (page = borrowerPage.value) => {
+  borrowersLoading.value = true;
+  borrowersError.value = "";
   try {
-    borrowers.value = await authenticatedSelect<BorrowerRow[]>("borrowers", {
-      select: "id,username,borrower_id",
-      deleted_at: "is.null",
-      order: "username.asc",
-    });
+    const result = await fetchBorrowerPage(page, PAGE_SIZE, "username.asc");
+    if (page !== borrowerPage.value) return;
+    borrowers.value = result.rows;
+    hasMoreBorrowers.value = result.hasMore;
   } catch {
+    if (page !== borrowerPage.value) return;
     borrowersError.value = "Unable to load borrowers.";
   } finally {
-    borrowersLoading.value = false;
+    if (page === borrowerPage.value) borrowersLoading.value = false;
   }
 };
 
-const loadItems = async () => {
+const loadItems = async (page = itemPage.value) => {
+  itemsLoading.value = true;
+  itemsError.value = "";
   try {
-    items.value = await authenticatedSelect<ItemRow[]>("items", {
-      select: "id,name,barcode,status",
-      deleted_at: "is.null",
-      order: "name.asc",
-    });
+    const result = await fetchItemPage(page, PAGE_SIZE, "name.asc");
+    if (page !== itemPage.value) return;
+    items.value = result.rows;
+    hasMoreItems.value = result.hasMore;
   } catch {
+    if (page !== itemPage.value) return;
     itemsError.value = "Unable to load items.";
   } finally {
-    itemsLoading.value = false;
+    if (page === itemPage.value) itemsLoading.value = false;
   }
+};
+
+const goToBorrowerPage = (delta: number) => {
+  const nextPage = borrowerPage.value + delta;
+  if (nextPage < 0 || (delta > 0 && !hasMoreBorrowers.value) || borrowersLoading.value) return;
+  borrowerPage.value = nextPage;
+};
+
+const goToItemPage = (delta: number) => {
+  const nextPage = itemPage.value + delta;
+  if (nextPage < 0 || (delta > 0 && !hasMoreItems.value) || itemsLoading.value) return;
+  itemPage.value = nextPage;
 };
 
 const loadSessions = async () => {
@@ -354,6 +367,14 @@ onMounted(() => {
   void loadBorrowers();
   void loadItems();
   void loadSessions();
+});
+
+watch(borrowerPage, (page, previousPage) => {
+  if (page !== previousPage) void loadBorrowers(page);
+});
+
+watch(itemPage, (page, previousPage) => {
+  if (page !== previousPage) void loadItems(page);
 });
 
 onUnmounted(() => {

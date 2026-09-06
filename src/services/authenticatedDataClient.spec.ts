@@ -4,7 +4,12 @@ vi.mock("./sentry", () => ({
   captureHandledRequestFailure: vi.fn(),
 }));
 
-import { authenticatedInsert, authenticatedRpc, authenticatedSelect } from "./authenticatedDataClient";
+import {
+  authenticatedInsert,
+  authenticatedRpc,
+  authenticatedSelect,
+  authenticatedSelectPage,
+} from "./authenticatedDataClient";
 import { captureHandledRequestFailure } from "./sentry";
 import { AppError } from "./appErrors";
 
@@ -75,6 +80,33 @@ describe("authenticatedDataClient", () => {
       vi.mocked(fetch).mockResolvedValueOnce(makeResponse({ ok: true, status: 204, text: "" }) as unknown as Response);
       const result = await authenticatedSelect("items", {});
       expect(result).toBeNull();
+    });
+  });
+
+  describe("authenticatedSelectPage", () => {
+    it("requests a bounded page plus a sentinel row", async () => {
+      vi.mocked(fetch).mockResolvedValueOnce(
+        makeResponse({ ok: true, status: 200, text: JSON.stringify([{ id: 1 }, { id: 2 }, { id: 3 }]) }) as unknown as Response,
+      );
+
+      const result = await authenticatedSelectPage<{ id: number }>(
+        "items",
+        { select: "id", deleted_at: "is.null" },
+        { page: 2, pageSize: 2 },
+      );
+
+      expect(result).toEqual({ rows: [{ id: 1 }, { id: 2 }], hasMore: true });
+      expect(String(vi.mocked(fetch).mock.calls[0]?.[0])).toContain(
+        "/rest/v1/items?select=id&deleted_at=is.null&limit=3&offset=4",
+      );
+    });
+
+    it("normalizes an empty response and reports no next page", async () => {
+      vi.mocked(fetch).mockResolvedValueOnce(makeResponse({ ok: true, status: 204 }) as unknown as Response);
+
+      await expect(
+        authenticatedSelectPage<{ id: string }>("items", { select: "id" }),
+      ).resolves.toEqual({ rows: [], hasMore: false });
     });
   });
 

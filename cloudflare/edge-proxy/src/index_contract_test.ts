@@ -510,6 +510,60 @@ Deno.test("function allowlist and kill switch deny before the upstream", async (
   assertEquals(fetches, 0, "function gates must precede upstream fetch");
 });
 
+const expectKillSwitchMessage = () =>
+  "Unfortunately ItemTraxx is currently unavailable. We apologize for any inconvenience and are working to restore access as soon as possible. Please see the status page (https://status.itemtraxx.com/) for more information.";
+
+Deno.test("kill switch blocks REST and RPC pass-through before the upstream", async () => {
+  const originalFetch = globalThis.fetch;
+  let fetches = 0;
+  globalThis.fetch = (() => {
+    fetches += 1;
+    return Promise.resolve(new Response("unexpected"));
+  }) as typeof fetch;
+
+  try {
+    for (const request of [
+      new Request("https://edge.itemtraxx.com/rest/v1/items?select=id", {
+        headers: { origin: ORIGIN },
+      }),
+      new Request("https://edge.itemtraxx.com/rest/v1/admin_audit_logs", {
+        method: "POST",
+        headers: {
+          origin: ORIGIN,
+          "content-type": "application/json",
+          "x-itx-data-request": "1",
+        },
+        body: "{}",
+      }),
+      new Request("https://edge.itemtraxx.com/rpc/consume_rate_limit", {
+        method: "POST",
+        headers: {
+          origin: ORIGIN,
+          authorization: "Bearer caller",
+          "content-type": "application/json",
+          "x-itx-data-request": "1",
+        },
+        body: "{}",
+      }),
+    ]) {
+      const response = await worker.fetch(
+        request,
+        baseEnv({ ITX_ITEMTRAXX_KILLSWITCH_ENABLED: "true" }),
+        createContext().ctx,
+      );
+      assertEquals(response.status, 503, "kill switch status");
+      assertEquals(
+        await response.json(),
+        { error: expectKillSwitchMessage() },
+        "kill switch response",
+      );
+    }
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+  assertEquals(fetches, 0, "kill switch must block data upstream access");
+});
+
 Deno.test("function routing fails closed when the allowlist is missing", async () => {
   const originalFetch = globalThis.fetch;
   let fetches = 0;

@@ -152,6 +152,7 @@ export const useCameraBarcodeScanner = (options: UseCameraBarcodeScannerOptions)
   let scanInFlight = false;
   let loopActive = false;
   let loopGeneration = 0;
+  let cameraStartGeneration = 0;
   let lastScanValue = "";
   let lastScanAt = 0;
   let lastStatusKey = "";
@@ -448,6 +449,10 @@ export const useCameraBarcodeScanner = (options: UseCameraBarcodeScannerOptions)
   };
 
   const startCamera = async () => {
+    // Camera startup crosses several async browser APIs. Keep one startup in
+    // flight so a double-click (especially on the camera flip control) cannot
+    // acquire a second stream before the first one has been attached/stopped.
+    if (isStarting.value) return;
     if (!capabilities.value.cameraSupported) {
       errorMessage.value = "This device or browser does not support camera access here.";
       return;
@@ -463,11 +468,13 @@ export const useCameraBarcodeScanner = (options: UseCameraBarcodeScannerOptions)
     }
 
     isStarting.value = true;
+    const startGeneration = ++cameraStartGeneration;
     permissionDenied.value = false;
     errorMessage.value = "";
     currentDetection.value = null;
     previewBox.value = null;
 
+    let acquiredStream: MediaStream | null = null;
     try {
       stopStream();
       detector = new DetectorCtor({ formats: [...FORMATS] });
@@ -495,10 +502,17 @@ export const useCameraBarcodeScanner = (options: UseCameraBarcodeScannerOptions)
         audio: false,
       };
       try {
-        stream = await navigator.mediaDevices.getUserMedia(constraints);
+        acquiredStream = await navigator.mediaDevices.getUserMedia(constraints);
       } catch {
-        stream = await navigator.mediaDevices.getUserMedia(fallbackConstraints);
+        acquiredStream = await navigator.mediaDevices.getUserMedia(fallbackConstraints);
       }
+      // The modal may have been closed while getUserMedia was pending. Do not
+      // attach a late stream to a closed modal (or let it become an orphan).
+      if (startGeneration !== cameraStartGeneration || !isOpen.value) {
+        acquiredStream.getTracks().forEach((track) => track.stop());
+        return;
+      }
+      stream = acquiredStream;
       currentTrack = stream.getVideoTracks()[0] ?? null;
       if (!currentTrack) {
         throw new Error("No camera track available.");
@@ -509,12 +523,25 @@ export const useCameraBarcodeScanner = (options: UseCameraBarcodeScannerOptions)
       }
       await applyContinuousFocus(currentTrack);
       await refreshCapabilities();
+      // Closing or unmounting can happen while video playback, focus setup,
+      // or device enumeration is still pending. Re-check ownership before
+      // starting the loop so a stale startup cannot resurrect scanning after
+      // cleanup.
+      if (startGeneration !== cameraStartGeneration || !isOpen.value) {
+        acquiredStream.getTracks().forEach((track) => track.stop());
+        if (stream === acquiredStream) stopStream();
+        return;
+      }
       // Skip starting the loop if the tab went hidden during async startup;
       // the visibilitychange handler resumes scanning on foreground.
       if (typeof document === "undefined" || !document.hidden) {
         startLoop();
       }
     } catch (error) {
+      if (startGeneration !== cameraStartGeneration || !isOpen.value) {
+        acquiredStream?.getTracks().forEach((track) => track.stop());
+        return;
+      }
       permissionDenied.value = true;
       errorMessage.value =
         error instanceof Error && error.message
@@ -522,7 +549,9 @@ export const useCameraBarcodeScanner = (options: UseCameraBarcodeScannerOptions)
           : "Camera access was blocked or unavailable. Use manual entry if camera scanning cannot be enabled.";
       stopStream();
     } finally {
-      isStarting.value = false;
+      if (startGeneration === cameraStartGeneration || !isOpen.value) {
+        isStarting.value = false;
+      }
     }
   };
 
@@ -533,6 +562,8 @@ export const useCameraBarcodeScanner = (options: UseCameraBarcodeScannerOptions)
 
   const close = () => {
     isOpen.value = false;
+    cameraStartGeneration += 1;
+    isStarting.value = false;
     stopStream();
     currentDetection.value = null;
     previewBox.value = null;
@@ -551,7 +582,7 @@ export const useCameraBarcodeScanner = (options: UseCameraBarcodeScannerOptions)
   };
 
   const flipCamera = async () => {
-    if (!capabilities.value.canFlipCamera) return;
+    if (isStarting.value || !capabilities.value.canFlipCamera) return;
     if (devices.length > 1) {
       deviceIndex = (deviceIndex + 1) % devices.length;
     } else {
@@ -585,6 +616,9 @@ export const useCameraBarcodeScanner = (options: UseCameraBarcodeScannerOptions)
     if (typeof document !== "undefined") {
       document.removeEventListener("visibilitychange", handleVisibilityChange);
     }
+    isOpen.value = false;
+    cameraStartGeneration += 1;
+    isStarting.value = false;
     stopStream();
   });
 

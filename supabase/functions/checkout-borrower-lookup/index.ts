@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.108.2";
+import { isKillSwitchWriteBlocked } from "../_shared/killSwitch.ts";
 import { isAllowedOrigin, parseAllowedOrigins } from "../_shared/cors.ts";
 import { resolveRateLimitResult } from "../_shared/preloginGuards.ts";
 import { readJsonBody } from "../_shared/requestBody.ts";
@@ -49,6 +50,9 @@ serve(async (req) => {
     jsonResponse,
   );
   if (ingressError) return ingressError;
+  if (isKillSwitchWriteBlocked(req)) {
+    return jsonResponse(503, { error: "Unfortunately ItemTraxx is currently unavailable." });
+  }
 
   try {
     const authHeader = req.headers.get("authorization");

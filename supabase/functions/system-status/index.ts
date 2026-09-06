@@ -69,7 +69,13 @@ type IncidentWidgetPayload = {
 //      every request an isolate serves;
 //   2. a per-client rate limit for trusted Worker traffic and server-issued
 //      identities for direct callers, plus a separate direct aggregate budget.
-const INCIDENT_CACHE_TTL_MS = 20_000;
+// The uptime probe polls this endpoint every ~15-20s. At a 20s TTL the cache
+// expired at roughly the probe interval and, being per-isolate, most requests
+// missed it and made a live incident.io call inside the request path. 120s
+// keeps that outbound call off the large majority of requests; incident.io ->
+// Slack remains the real-time alerting path, so a status payload up to two
+// minutes stale here costs nothing operationally.
+const INCIDENT_CACHE_TTL_MS = 120_000;
 const STATUS_RATE_LIMIT_PER_MINUTE = 60;
 const STATUS_RATE_LIMIT_WINDOW_SECONDS = 60;
 const STATUS_DIRECT_GLOBAL_LIMIT_PER_MINUTE = 600;
@@ -173,6 +179,17 @@ serve(async (req) => {
   }
 
   const startedAt = Date.now();
+  // TEMPORARY phase instrumentation. Remove once the latency question is
+  // settled. Wall time here sits around 600ms; removing a sequential query and
+  // widening the incident cache both failed to move it, which means the cost
+  // is somewhere these marks will show and inference has not. Comparing
+  // handler_ms against the platform's own execution_time_ms also reveals how
+  // much is spent before this handler runs at all (isolate boot, client init).
+  let tIngress = startedAt;
+  let tRateLimit = startedAt;
+  let tConfig = startedAt;
+  let tIncident = startedAt;
+  let incidentServedFromCache = false;
   const supabaseUrl = Deno.env.get("ITX_SUPABASE_URL") ?? Deno.env.get("SUPABASE_URL");
   const serviceKey = Deno.env.get("ITX_SECRET_KEY") ?? Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
   const incidentWidgetUrl = Deno.env.get("ITX_INCIDENT_IO_WIDGET_URL");
@@ -199,6 +216,7 @@ serve(async (req) => {
       req,
       "system-status",
     ).catch(() => false);
+    tIngress = Date.now();
     const statusClient = resolvePublicStatusClient(req, trustedEdgeIngress);
     statusClientCookie = statusClient.setCookie ?? null;
 
@@ -211,6 +229,7 @@ serve(async (req) => {
       STATUS_RATE_LIMIT_PER_MINUTE,
       STATUS_RATE_LIMIT_WINDOW_SECONDS
     );
+    tRateLimit = Date.now();
     if (rateLimit.error) {
       return jsonResponse(503, {
         status: "unknown",
@@ -265,23 +284,6 @@ serve(async (req) => {
       });
     }
 
-    const { error } = await adminClient
-      .from("profiles")
-      .select("id", { head: true, count: "exact" })
-      .limit(1);
-
-    if (error) {
-      return jsonResponse(503, {
-        status: "down",
-        checks: {
-          config: "ok",
-          db: "failed",
-        },
-        duration_ms: Date.now() - startedAt,
-        checked_at: new Date().toISOString(),
-      });
-    }
-
     let incidentStatus: "operational" | "degraded" | "down" = "operational";
     let incidentSummary = "not configured";
     let incidentCheck: "ok" | "warn" | "unavailable" = "unavailable";
@@ -310,9 +312,29 @@ serve(async (req) => {
         .eq("key", "system_status_override")
         .maybeSingle(),
     ]);
+    tConfig = Date.now();
     const { data: broadcastRow, error: broadcastError } = broadcastResult;
-    const { data: maintenanceRow } = maintenanceResult;
-    const { data: systemStatusOverrideRow } = systemStatusOverrideResult;
+    const { data: maintenanceRow, error: maintenanceError } = maintenanceResult;
+    const { data: systemStatusOverrideRow, error: systemStatusOverrideError } =
+      systemStatusOverrideResult;
+
+    // These three reads are the database liveness check. A dedicated
+    // `profiles` count used to run sequentially ahead of them for the same
+    // purpose, which cost a full extra round trip on every request. Every
+    // query failing is what "the database is unreachable" looks like; a single
+    // failure is a per-key problem and is handled by the readers below, which
+    // already tolerate a missing row.
+    if (broadcastError && maintenanceError && systemStatusOverrideError) {
+      return jsonResponse(503, {
+        status: "down",
+        checks: {
+          config: "ok",
+          db: "failed",
+        },
+        duration_ms: Date.now() - startedAt,
+        checked_at: new Date().toISOString(),
+      });
+    }
 
     let maintenance: {
       enabled: boolean;
@@ -356,6 +378,7 @@ serve(async (req) => {
 
     const cachedIncident = readCachedIncidentStatus();
     if (incidentWidgetUrl && cachedIncident) {
+      incidentServedFromCache = true;
       incidentStatus = cachedIncident.status;
       incidentSummary = cachedIncident.summary;
       incidentCheck = cachedIncident.check;
@@ -405,6 +428,8 @@ serve(async (req) => {
       }
     }
 
+    tIncident = Date.now();
+
     const statusOverride = resolveSystemStatusOverride(systemStatusOverrideRow?.value);
     if (statusOverride) {
       incidentStatus = statusOverride.status;
@@ -417,6 +442,16 @@ serve(async (req) => {
       incidentSummary = "global killswitch enabled";
       incidentCheck = "warn";
     }
+
+    console.log(JSON.stringify({
+      evt: "system_status_timing",
+      ingress_ms: tIngress - startedAt,
+      ratelimit_ms: tRateLimit - tIngress,
+      config_ms: tConfig - tRateLimit,
+      incident_ms: tIncident - tConfig,
+      incident_cached: incidentServedFromCache,
+      handler_ms: Date.now() - startedAt,
+    }));
 
     return jsonResponse(200, {
       status: incidentStatus,

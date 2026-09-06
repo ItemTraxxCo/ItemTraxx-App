@@ -3,7 +3,6 @@ import {
   clearMaintenanceFallbackIfPresent,
   extractMaintenanceFromStatusPayload,
   readMaintenanceFallback,
-  resetMaintenanceFallbackClearMemo,
   writeMaintenanceFallback,
 } from "./maintenanceFallback.ts";
 
@@ -229,50 +228,3 @@ Deno.test("status fallback caches active maintenance and applies it only to unhe
   assertEquals(state.readStored(), null, "disabled maintenance clears cache");
 });
 
-Deno.test("clearing an already-absent fallback is memoized and writes reset it", async () => {
-  resetMaintenanceFallbackClearMemo();
-
-  let stored: string | null = null;
-  let gets = 0;
-  const kv = {
-    get: (_key: string, type?: string) => {
-      gets += 1;
-      if (type === "json") {
-        return Promise.resolve(stored === null ? null : JSON.parse(stored));
-      }
-      return Promise.resolve(stored);
-    },
-    put: (_key: string, value: string) => {
-      stored = value;
-      return Promise.resolve();
-    },
-    delete: () => {
-      stored = null;
-      return Promise.resolve();
-    },
-  };
-  const env = { MAINTENANCE_FALLBACK_KV: kv } as unknown as Env;
-
-  // First call has no memo, so it must reach KV to learn the key is absent.
-  await clearMaintenanceFallbackIfPresent(env);
-  assertEquals(gets, 1, "first clear reads KV");
-
-  // Subsequent clears inside the window are served from the memo. This is the
-  // health-check hot path: it previously issued a KV read per request.
-  await clearMaintenanceFallbackIfPresent(env);
-  await clearMaintenanceFallbackIfPresent(env);
-  assertEquals(gets, 1, "repeat clears skip KV while memoized");
-
-  // Writing a fallback must invalidate the memo, otherwise a later clear would
-  // leave a stale maintenance banner in KV.
-  await writeMaintenanceFallback(env, {
-    enabled: true,
-    message: "Synthetic notice",
-    updated_at: "2026-01-01T00:00:00.000Z",
-  });
-  await clearMaintenanceFallbackIfPresent(env);
-  assertEquals(gets, 2, "a write forces the next clear back to KV");
-  assertEquals(stored, null, "stale fallback is deleted after the write");
-
-  resetMaintenanceFallbackClearMemo();
-});

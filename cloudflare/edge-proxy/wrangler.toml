@@ -4,8 +4,14 @@ compatibility_date = "2026-02-11"
 workers_dev = false
 preview_urls = false
 
-[placement]
-mode = "smart"
+# Smart placement moves the Worker close to the origin it talks to, which pays
+# off when a request makes several sequential subrequests. This Worker makes a
+# single fetch to Supabase per request, so placement has little to optimise and
+# may be adding a hop instead. Disabled as a measured experiment: compare
+# Worker wall time grouped by script version before and after, and restore
+# `mode = "smart"` if the numbers get worse.
+# [placement]
+# mode = "smart"
 
 # Persist Worker invocation and console logs in Cloudflare Workers Logs.
 # Keep full sampling for the initial rollout; lower this if traffic volume

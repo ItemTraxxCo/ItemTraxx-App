@@ -179,6 +179,17 @@ serve(async (req) => {
   }
 
   const startedAt = Date.now();
+  // TEMPORARY phase instrumentation. Remove once the latency question is
+  // settled. Wall time here sits around 600ms; removing a sequential query and
+  // widening the incident cache both failed to move it, which means the cost
+  // is somewhere these marks will show and inference has not. Comparing
+  // handler_ms against the platform's own execution_time_ms also reveals how
+  // much is spent before this handler runs at all (isolate boot, client init).
+  let tIngress = startedAt;
+  let tRateLimit = startedAt;
+  let tConfig = startedAt;
+  let tIncident = startedAt;
+  let incidentServedFromCache = false;
   const supabaseUrl = Deno.env.get("ITX_SUPABASE_URL") ?? Deno.env.get("SUPABASE_URL");
   const serviceKey = Deno.env.get("ITX_SECRET_KEY") ?? Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
   const incidentWidgetUrl = Deno.env.get("ITX_INCIDENT_IO_WIDGET_URL");
@@ -205,6 +216,7 @@ serve(async (req) => {
       req,
       "system-status",
     ).catch(() => false);
+    tIngress = Date.now();
     const statusClient = resolvePublicStatusClient(req, trustedEdgeIngress);
     statusClientCookie = statusClient.setCookie ?? null;
 
@@ -217,6 +229,7 @@ serve(async (req) => {
       STATUS_RATE_LIMIT_PER_MINUTE,
       STATUS_RATE_LIMIT_WINDOW_SECONDS
     );
+    tRateLimit = Date.now();
     if (rateLimit.error) {
       return jsonResponse(503, {
         status: "unknown",
@@ -299,6 +312,7 @@ serve(async (req) => {
         .eq("key", "system_status_override")
         .maybeSingle(),
     ]);
+    tConfig = Date.now();
     const { data: broadcastRow, error: broadcastError } = broadcastResult;
     const { data: maintenanceRow, error: maintenanceError } = maintenanceResult;
     const { data: systemStatusOverrideRow, error: systemStatusOverrideError } =
@@ -364,6 +378,7 @@ serve(async (req) => {
 
     const cachedIncident = readCachedIncidentStatus();
     if (incidentWidgetUrl && cachedIncident) {
+      incidentServedFromCache = true;
       incidentStatus = cachedIncident.status;
       incidentSummary = cachedIncident.summary;
       incidentCheck = cachedIncident.check;
@@ -413,6 +428,8 @@ serve(async (req) => {
       }
     }
 
+    tIncident = Date.now();
+
     const statusOverride = resolveSystemStatusOverride(systemStatusOverrideRow?.value);
     if (statusOverride) {
       incidentStatus = statusOverride.status;
@@ -425,6 +442,16 @@ serve(async (req) => {
       incidentSummary = "global killswitch enabled";
       incidentCheck = "warn";
     }
+
+    console.log(JSON.stringify({
+      evt: "system_status_timing",
+      ingress_ms: tIngress - startedAt,
+      ratelimit_ms: tRateLimit - tIngress,
+      config_ms: tConfig - tRateLimit,
+      incident_ms: tIncident - tConfig,
+      incident_cached: incidentServedFromCache,
+      handler_ms: Date.now() - startedAt,
+    }));
 
     return jsonResponse(200, {
       status: incidentStatus,

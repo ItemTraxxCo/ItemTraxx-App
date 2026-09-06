@@ -69,7 +69,13 @@ type IncidentWidgetPayload = {
 //      every request an isolate serves;
 //   2. a per-client rate limit for trusted Worker traffic and server-issued
 //      identities for direct callers, plus a separate direct aggregate budget.
-const INCIDENT_CACHE_TTL_MS = 20_000;
+// The uptime probe polls this endpoint every ~15-20s. At a 20s TTL the cache
+// expired at roughly the probe interval and, being per-isolate, most requests
+// missed it and made a live incident.io call inside the request path. 120s
+// keeps that outbound call off the large majority of requests; incident.io ->
+// Slack remains the real-time alerting path, so a status payload up to two
+// minutes stale here costs nothing operationally.
+const INCIDENT_CACHE_TTL_MS = 120_000;
 const STATUS_RATE_LIMIT_PER_MINUTE = 60;
 const STATUS_RATE_LIMIT_WINDOW_SECONDS = 60;
 const STATUS_DIRECT_GLOBAL_LIMIT_PER_MINUTE = 600;
@@ -265,23 +271,6 @@ serve(async (req) => {
       });
     }
 
-    const { error } = await adminClient
-      .from("profiles")
-      .select("id", { head: true, count: "exact" })
-      .limit(1);
-
-    if (error) {
-      return jsonResponse(503, {
-        status: "down",
-        checks: {
-          config: "ok",
-          db: "failed",
-        },
-        duration_ms: Date.now() - startedAt,
-        checked_at: new Date().toISOString(),
-      });
-    }
-
     let incidentStatus: "operational" | "degraded" | "down" = "operational";
     let incidentSummary = "not configured";
     let incidentCheck: "ok" | "warn" | "unavailable" = "unavailable";
@@ -311,8 +300,27 @@ serve(async (req) => {
         .maybeSingle(),
     ]);
     const { data: broadcastRow, error: broadcastError } = broadcastResult;
-    const { data: maintenanceRow } = maintenanceResult;
-    const { data: systemStatusOverrideRow } = systemStatusOverrideResult;
+    const { data: maintenanceRow, error: maintenanceError } = maintenanceResult;
+    const { data: systemStatusOverrideRow, error: systemStatusOverrideError } =
+      systemStatusOverrideResult;
+
+    // These three reads are the database liveness check. A dedicated
+    // `profiles` count used to run sequentially ahead of them for the same
+    // purpose, which cost a full extra round trip on every request. Every
+    // query failing is what "the database is unreachable" looks like; a single
+    // failure is a per-key problem and is handled by the readers below, which
+    // already tolerate a missing row.
+    if (broadcastError && maintenanceError && systemStatusOverrideError) {
+      return jsonResponse(503, {
+        status: "down",
+        checks: {
+          config: "ok",
+          db: "failed",
+        },
+        duration_ms: Date.now() - startedAt,
+        checked_at: new Date().toISOString(),
+      });
+    }
 
     let maintenance: {
       enabled: boolean;

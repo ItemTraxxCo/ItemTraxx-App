@@ -201,11 +201,12 @@ async function collectBrowserRestTableReferences() {
   for (const file of sourceFiles) {
     const text = await fs.readFile(file, 'utf8');
     const scripts = file.endsWith('.vue')
-      // Case-insensitive: HTML tag names are case-insensitive, so a block
-      // written as <Script setup> or <SCRIPT> is still a script block. Without
-      // the `i` flag those files extract nothing and silently drop their REST
-      // table references from this gate, turning a miss into a false pass.
-      ? [...text.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)].map((match) => match[1])
+      // HTML tag names are case-insensitive and an end tag may carry trailing
+      // whitespace, so <Script setup>, <SCRIPT> and </script > are all valid
+      // script blocks. Without the `i` flag and the `\s*`, those files extract
+      // nothing and silently drop their REST table references from this gate,
+      // turning a miss into a false pass rather than a visible failure.
+      ? [...text.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script\s*>/gi)].map((match) => match[1])
       : [text];
     for (const script of scripts) {
       const sourceFile = ts.createSourceFile(

@@ -24,7 +24,7 @@
       <span>{{ theme === "dark" ? "Light" : "Dark" }}</span>
     </button>
     <div class="kill-switch-fullscreen-card">
-      <p class="kill-switch-status">Service unavailable</p>
+      <p class="kill-switch-status">Service unavailable.</p>
       <h2>ItemTraxx is currently unavailable. We're sorry for the inconvenience.</h2>
       <p>{{ killSwitchMessage }}</p>
       <div class="kill-switch-fullscreen-actions">

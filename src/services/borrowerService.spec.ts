@@ -6,19 +6,22 @@ vi.mock("./edgeFunctionClient", () => ({
 }));
 vi.mock("./authenticatedDataClient", () => ({
   authenticatedSelect: vi.fn(),
+  authenticatedSelectPage: vi.fn(),
 }));
 vi.mock("../utils/deviceSession", () => ({
   getOrCreateDeviceSession: vi.fn(() => ({ deviceId: "device-1", deviceLabel: "Mac" })),
 }));
 
 import { invokeEdgeFunction } from "./edgeFunctionClient";
-import { authenticatedSelect } from "./authenticatedDataClient";
+import { authenticatedSelect, authenticatedSelectPage } from "./authenticatedDataClient";
 import { getOrCreateDeviceSession } from "../utils/deviceSession";
 import {
   bulkCreateBorrowers,
   createBorrower,
   deleteBorrower,
+  fetchBorrowerAccessGrants,
   fetchBorrowerDetails,
+  fetchBorrowerPage,
   fetchBorrowers,
   fetchDeletedBorrowers,
   restoreBorrower,
@@ -27,6 +30,7 @@ import {
 
 const mockedInvoke = vi.mocked(invokeEdgeFunction);
 const mockedSelect = vi.mocked(authenticatedSelect);
+const mockedSelectPage = vi.mocked(authenticatedSelectPage);
 const mockedDeviceSession = vi.mocked(getOrCreateDeviceSession);
 
 const WORKSPACE_ID = "ws-1";
@@ -34,6 +38,7 @@ const WORKSPACE_ID = "ws-1";
 beforeEach(() => {
   mockedInvoke.mockReset();
   mockedSelect.mockReset();
+  mockedSelectPage.mockReset();
   mockedDeviceSession.mockReturnValue({ deviceId: "device-1", deviceLabel: "Mac" });
   clearAuthState();
   setAuthStateFromBackend({ isAuthenticated: true, userId: "profile-1" });
@@ -44,25 +49,91 @@ describe("fetchBorrowers", () => {
   it("throws a missing-context error without a workspace", async () => {
     setWorkspaceContext(null);
     await expect(fetchBorrowers()).rejects.toThrow(/missing workspace context/i);
+    expect(mockedSelectPage).not.toHaveBeenCalled();
   });
 
   it("requests borrowers scoped to the current workspace, excluding soft-deleted rows", async () => {
-    mockedSelect.mockResolvedValue([{ id: "b-1" }] as never);
+    mockedSelectPage.mockResolvedValue({ rows: [{ id: "b-1" }], hasMore: false } as never);
 
     const result = await fetchBorrowers();
 
-    expect(mockedSelect).toHaveBeenCalledWith("borrowers", {
+    expect(mockedSelectPage).toHaveBeenCalledWith("borrowers", {
       select: "id,workspace_id,username,borrower_id,access_mode",
       workspace_id: `eq.${WORKSPACE_ID}`,
       deleted_at: "is.null",
       order: "created_at.desc",
-    });
+    }, { page: 0, pageSize: 500 });
     expect(result).toEqual([{ id: "b-1" }]);
   });
 
   it("normalizes a null response to an empty array", async () => {
-    mockedSelect.mockResolvedValue(null as never);
+    mockedSelectPage.mockResolvedValue({ rows: [], hasMore: false } as never);
     expect(await fetchBorrowers()).toEqual([]);
+  });
+
+  it("accumulates bounded pages for admin search and export", async () => {
+    mockedSelectPage
+      .mockResolvedValueOnce({
+        rows: Array.from({ length: 500 }, (_, index) => ({ id: `borrower-${index}` })),
+        hasMore: true,
+      } as never)
+      .mockResolvedValueOnce({ rows: [{ id: "borrower-500" }], hasMore: false } as never);
+
+    const result = await fetchBorrowers();
+
+    expect(result).toHaveLength(501);
+    expect(mockedSelectPage).toHaveBeenNthCalledWith(2, "borrowers", expect.any(Object), {
+      page: 1,
+      pageSize: 500,
+    });
+  });
+});
+
+describe("fetchBorrowerPage", () => {
+  it("requests a bounded workspace-scoped page", async () => {
+    mockedSelectPage.mockResolvedValue({ rows: [{ id: "b-1" }], hasMore: false } as never);
+
+    const result = await fetchBorrowerPage(1, 20, "username.asc");
+
+    expect(mockedSelectPage).toHaveBeenCalledWith("borrowers", {
+      select: "id,workspace_id,username,borrower_id,access_mode",
+      workspace_id: `eq.${WORKSPACE_ID}`,
+      deleted_at: "is.null",
+      order: "username.asc",
+    }, { page: 1, pageSize: 20 });
+    expect(result).toEqual({ rows: [{ id: "b-1" }], hasMore: false });
+  });
+});
+
+describe("borrower access grants", () => {
+  it("does not query when there are no restricted borrowers", async () => {
+    await expect(fetchBorrowerAccessGrants([])).resolves.toEqual([]);
+    expect(mockedSelect).not.toHaveBeenCalled();
+  });
+
+  it("loads grants through the service boundary", async () => {
+    mockedSelect.mockResolvedValueOnce([{ borrower_id: "b-1", profile_id: "profile-1" }] as never);
+
+    await expect(fetchBorrowerAccessGrants(["b-1"])).resolves.toEqual([
+      { borrower_id: "b-1", profile_id: "profile-1" },
+    ]);
+    expect(mockedSelect).toHaveBeenCalledWith("borrower_access_grants", {
+      select: "borrower_id,profile_id",
+      borrower_id: "in.(b-1)",
+    });
+  });
+
+  it("chunks large grant lookups to keep query URLs bounded", async () => {
+    mockedSelect.mockResolvedValue([] as never);
+    const borrowerIds = Array.from({ length: 101 }, (_, index) => `borrower-${index}`);
+
+    await expect(fetchBorrowerAccessGrants(borrowerIds)).resolves.toEqual([]);
+
+    expect(mockedSelect).toHaveBeenCalledTimes(2);
+    expect(mockedSelect.mock.calls[0]?.[1]?.borrower_id).toBe(
+      `in.(${borrowerIds.slice(0, 100).join(",")})`,
+    );
+    expect(mockedSelect.mock.calls[1]?.[1]?.borrower_id).toBe("in.(borrower-100)");
   });
 });
 

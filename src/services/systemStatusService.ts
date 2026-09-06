@@ -40,6 +40,10 @@ const fetchAndCacheSystemStatus = async (timeoutMs: number) => {
     return null;
   }
 
+  // This is the unauthenticated health path. Keep it independent from
+  // invokeEdgeFunction so it can report edge reachability when authenticated
+  // dispatch is unavailable; check-edge-function-coverage explicitly permits
+  // this one direct fetch.
   const controller = new AbortController();
   const timeoutId = window.setTimeout(() => controller.abort(), timeoutMs);
   try {

@@ -1,0 +1,20 @@
+{
+  "name": "itemtraxx-edge-proxy",
+  "private": true,
+  "version": "0.0.0",
+  "description": "ItemTraxx Cloudflare edge proxy Worker. Kept as its own manifest so Workers Builds installs only wrangler + typescript instead of the full application dependency tree.",
+  "type": "module",
+  "engines": {
+    "node": "24.x"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json",
+    "types:check": "wrangler types worker-configuration.d.ts --config wrangler.toml --env-file .dev.vars.example --strict-vars false --check",
+    "deploy": "wrangler deploy --config wrangler.toml",
+    "versions:upload": "wrangler versions upload --config wrangler.toml"
+  },
+  "devDependencies": {
+    "typescript": "~6.0.3",
+    "wrangler": "^4.124.0"
+  }
+}

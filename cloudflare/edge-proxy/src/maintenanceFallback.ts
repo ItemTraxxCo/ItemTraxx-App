@@ -11,6 +11,28 @@ const asRecord = (value: unknown): Record<string, unknown> | null =>
     ? (value as Record<string, unknown>)
     : null;
 
+// Almost every system-status request reports maintenance disabled, which asks
+// this module to clear a fallback key that is already absent. That turned into
+// one KV read per request on the hottest path in the Worker. Remember when we
+// last confirmed the key is gone and skip the read until the window lapses.
+// The memo is per-isolate and time-bounded rather than permanent: another
+// isolate can write a fallback at any time, so a stale entry is still cleared
+// within one window instead of never.
+const FALLBACK_CLEAR_RECHECK_MS = 60_000;
+let fallbackConfirmedClearAt = 0;
+
+const markFallbackClear = () => {
+  fallbackConfirmedClearAt = Date.now();
+};
+
+// Any write invalidates the memo so the next clear always reaches KV.
+const invalidateFallbackClearMemo = () => {
+  fallbackConfirmedClearAt = 0;
+};
+
+// Exposed for tests: isolate-level state would otherwise leak between cases.
+export const resetMaintenanceFallbackClearMemo = invalidateFallbackClearMemo;
+
 export const readMaintenanceFallback = async (
   env: Env,
 ): Promise<MaintenanceFallbackPayload | null> => {
@@ -44,6 +66,7 @@ export const writeMaintenanceFallback = async (
   try {
     if (!payload) {
       await env.MAINTENANCE_FALLBACK_KV.delete(MAINTENANCE_FALLBACK_KEY);
+      markFallbackClear();
       return;
     }
     await env.MAINTENANCE_FALLBACK_KV.put(
@@ -53,6 +76,7 @@ export const writeMaintenanceFallback = async (
         expirationTtl: 60 * 60 * 24 * 14,
       },
     );
+    invalidateFallbackClearMemo();
   } catch {
     // best effort only
   }
@@ -60,14 +84,19 @@ export const writeMaintenanceFallback = async (
 
 export const clearMaintenanceFallbackIfPresent = async (env: Env) => {
   if (!env.MAINTENANCE_FALLBACK_KV) return;
+  if (Date.now() - fallbackConfirmedClearAt < FALLBACK_CLEAR_RECHECK_MS) return;
   try {
     const existing = await env.MAINTENANCE_FALLBACK_KV.get(
       MAINTENANCE_FALLBACK_KEY,
     );
-    if (existing === null) return;
+    if (existing === null) {
+      markFallbackClear();
+      return;
+    }
     await env.MAINTENANCE_FALLBACK_KV.delete(MAINTENANCE_FALLBACK_KEY);
+    markFallbackClear();
   } catch {
-    // best effort only
+    // best effort only: leave the memo untouched so the next call retries.
   }
 };
 

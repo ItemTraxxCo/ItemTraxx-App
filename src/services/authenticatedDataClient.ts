@@ -141,6 +141,44 @@ export const authenticatedSelect = async <TData>(
   );
 };
 
+export type AuthenticatedPage<TData> = {
+  rows: TData[];
+  hasMore: boolean;
+};
+
+/**
+ * Read one bounded PostgREST page. The extra sentinel row lets callers know
+ * whether another page exists without downloading an unbounded relation or
+ * relying on an exact-count query for every navigation.
+ */
+export const authenticatedSelectPage = async <TData>(
+  table: string,
+  query: Record<string, string>,
+  options: {
+    page?: number;
+    pageSize?: number;
+    prefer?: string;
+    suppressUnauthorizedRecovery?: boolean;
+  } = {},
+): Promise<AuthenticatedPage<TData>> => {
+  const page = Number.isFinite(options.page)
+    ? Math.max(0, Math.floor(options.page!))
+    : 0;
+  const pageSize = Number.isFinite(options.pageSize)
+    ? Math.min(500, Math.max(1, Math.floor(options.pageSize!)))
+    : 20;
+  const rows = await authenticatedSelect<TData[]>(table, {
+    ...query,
+    limit: String(pageSize + 1),
+    offset: String(page * pageSize),
+  }, options);
+  const normalizedRows = Array.isArray(rows) ? rows : [];
+  return {
+    rows: normalizedRows.slice(0, pageSize),
+    hasMore: normalizedRows.length > pageSize,
+  };
+};
+
 export const authenticatedInsert = async <TData>(
   table: string,
   payload: Record<string, unknown> | Record<string, unknown>[],

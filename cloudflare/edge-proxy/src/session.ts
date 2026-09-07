@@ -15,6 +15,7 @@ import {
   readBoundedRequestBody,
   RequestBodyLimitError,
 } from "./requestBody.ts";
+import { trimTrailingSlash } from "./url.ts";
 
 const REFRESH_GRANT_TYPE = "refresh_token";
 export const MAX_SESSION_EXCHANGE_BODY_BYTES = 32 * 1024;
@@ -55,7 +56,6 @@ type ProfileRow = {
   deleted_at: string | null;
 };
 
-const trimTrailingSlash = (value: string) => value.replace(/\/+$/, "");
 const buildSupabaseUrl = (env: Env, path: string) =>
   `${trimTrailingSlash(env.SUPABASE_URL)}${path}`;
 

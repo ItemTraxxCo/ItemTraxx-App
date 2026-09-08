@@ -16,8 +16,7 @@ import {
   isUnauthorizedRpcProxyPath,
 } from "./routing.ts";
 import { maybeRefreshSession } from "./session.ts";
-
-const trimTrailingSlash = (value: string) => value.replace(/\/+$/, "");
+import { trimTrailingSlash } from "./url.ts";
 
 export const proxySupabaseApiRequest = async (
   request: Request,

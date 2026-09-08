@@ -16,8 +16,7 @@ import { sanitizeRequestHeaders } from "./requestHeaders.ts";
 import { buildError, buildSessionRateLimitError } from "./responses.ts";
 import { maybeRefreshSession } from "./session.ts";
 import { applyTrustedIngressHeaders } from "./trustedIngress.ts";
-
-const trimTrailingSlash = (value: string) => value.replace(/\/+$/, "");
+import { trimTrailingSlash } from "./url.ts";
 
 // The status envelope is small; bound the only upstream response branch that is read.
 export const SYSTEM_STATUS_JSON_MAX_BYTES = 64 * 1024;

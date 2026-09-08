@@ -60,7 +60,7 @@
     "jsbarcode": "^3.12.3",
     "jspdf": "^4.2.1",
     "jspdf-autotable": "^5.0.8",
-    "posthog-js": "^1.427.2",
+    "posthog-js": "^1.428.7",
     "vue": "^3.5.42",
     "vue-router": "^4.6.4",
     "zod": "^4.5.0"

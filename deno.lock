@@ -20,7 +20,7 @@
     "npm:jsdom@^30.0.1": "30.0.1",
     "npm:jspdf-autotable@^5.0.8": "5.0.8_jspdf@4.2.1",
     "npm:jspdf@^4.2.1": "4.2.1",
-    "npm:posthog-js@^1.427.2": "1.427.2",
+    "npm:posthog-js@^1.428.7": "1.428.7",
     "npm:supabase@^2.116.0": "2.116.0",
     "npm:typescript@~6.0.3": "6.0.3",
     "npm:vite@^8.2.2": "8.2.2_@types+node@26.4.0",
@@ -631,21 +631,21 @@
     "@poppinss/exception@1.2.3": {
       "integrity": "sha512-dCED+QRChTVatE9ibtoaxc+WkdzOSjYTKi/+uacHWIsfodVfpsueo3+DKpgU5Px8qXjgmXkSvhXvSCz3fnP9lw=="
     },
-    "@posthog/browser-common@0.7.2": {
-      "integrity": "sha512-ukDmETXy6fTBE4ZpaO8ccscrNz5SvTaUnhQ0Ze2JX/oYILa89rrNwqUH7lDAuhFKa+NY6EoJ9kZMuOvuu4WwLQ==",
+    "@posthog/browser-common@0.8.2": {
+      "integrity": "sha512-8g7+ijrx8bfWmpDjmP07e0ZmdRnJoFqZ6PCcMQvfBTUrr422GRXvQWpQn7yD028zIJHIIn/rUTipKgUC5UkWpw==",
       "dependencies": [
         "@posthog/core",
         "@posthog/types"
       ]
     },
-    "@posthog/core@1.50.5": {
-      "integrity": "sha512-afEchuShDaVIoxAIj76kDZQ1DhfesDmgfVp+mtTzsA3wlc8DF5uoz8YjuTjnxOicWkpP5HCDqYidK/1kT125Cg==",
+    "@posthog/core@1.51.0": {
+      "integrity": "sha512-LilmmtjcrjV1LgaVNQXrAUt4IXcWIYMrwEtx6VJUUFDeBBdmeI99jshKGtAWugYeB3Wkcp9xQIVCrxIYRpNiRA==",
       "dependencies": [
         "@posthog/types"
       ]
     },
-    "@posthog/types@1.409.0": {
-      "integrity": "sha512-239umoaZVb2GBaXeEyJpwFvjhrrChJH8NHCwiao23EBSu3NA6EN0MTMoaHSmMEf4yjiXEFFoYJA6FjJAXF5HGA=="
+    "@posthog/types@1.409.2": {
+      "integrity": "sha512-hZ4EXZ1+BstMaxUkmAEg3qvgMR/S00Xb+wEwY/Tx2Dr9dBgiBWrERxaq2UwICh/Fh/vVXpKZT/0SkRtO8JKQ2A=="
     },
     "@rolldown/binding-android-arm-eabi@1.2.6": {
       "integrity": "sha512-b+jTcARdTiFLI6jB4a5XjTm0RWd6KcRfQj/I2356fxUZemiho9zQLxo0RtCuMDAyKcLo6cEltkgbQp6d1+sjjQ==",
@@ -1907,8 +1907,8 @@
         "source-map-js"
       ]
     },
-    "posthog-js@1.427.2": {
-      "integrity": "sha512-/jRg3ChHuxcHTTJ/xb+IbpXLYxiBKIWdjrsNNqY1tAwjnFoijmz58i4mIR4A2P5MWx+4R7LlpK9vQfBr8v292g==",
+    "posthog-js@1.428.7": {
+      "integrity": "sha512-ztFOoipQ1eOEl1xkkEldy1x8TEPKhNRb6ZZbuODoXqILqcHgHCUF1hATENY36HBuSV7TwXq16pQ3QYYI1rBCuQ==",
       "dependencies": [
         "@posthog/browser-common",
         "@posthog/core",
@@ -2598,7 +2598,7 @@
         "npm:jsdom@^30.0.1",
         "npm:jspdf-autotable@^5.0.8",
         "npm:jspdf@^4.2.1",
-        "npm:posthog-js@^1.427.2",
+        "npm:posthog-js@^1.428.7",
         "npm:supabase@^2.116.0",
         "npm:typescript@~6.0.3",
         "npm:vite@^8.2.2",

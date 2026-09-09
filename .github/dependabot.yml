@@ -9,6 +9,10 @@ updates:
       timezone: "America/Los_Angeles"
     cooldown:
       default-days: 7
+      # posthog-js ships several releases a week, so a 7-day cooldown keeps the
+      # app permanently behind and trips the PostHog "SDK outdated" health check.
+      exclude:
+        - "posthog-js"
     open-pull-requests-limit: 5
     labels:
       - "dependencies"

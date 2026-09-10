@@ -1,4 +1,3 @@
-import { authClient } from "../auth/client";
 import { authenticatedSelect } from "./authenticatedDataClient";
 
 export type HttpSessionSummary = {
@@ -42,7 +41,10 @@ export class SessionNetworkError extends Error {
 export const isSessionNetworkError = (error: unknown): error is SessionNetworkError =>
   error instanceof SessionNetworkError;
 
+const getAuthClient = async () => (await import("../auth/client")).authClient;
+
 export const fetchHttpSessionSummary = async (_options: Pick<RequestInit, "signal"> = {}): Promise<HttpSessionSummary> => {
+  const authClient = await getAuthClient();
   const { data, error } = await authClient.getSession();
   if (error || !data?.user || !data.session) {
     return { authenticated: false, user: null, profile: null, password_authenticated_at: null };
@@ -67,6 +69,7 @@ export const fetchHttpSessionSummary = async (_options: Pick<RequestInit, "signa
 };
 
 export const clearHttpSession = async () => {
+  const authClient = await getAuthClient();
   const { error } = await authClient.signOut();
   if (error) throw new Error(error.message ?? "Unable to complete logout");
   return { ok: true };

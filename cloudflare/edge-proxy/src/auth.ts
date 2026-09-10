@@ -13,6 +13,7 @@ import {
   organizationRoles,
 } from "./auth/permissions.ts";
 import { parseCsv } from "./cors.ts";
+import { isItemTraxxHostname, trimTrailingSlash } from "./url.ts";
 import {
   createBetterAuthDataClient,
   supabaseBetterAuthAdapter,
@@ -78,7 +79,7 @@ export const getBetterAuth = (rawEnv: Env) => {
   const dataClient = createBetterAuthDataClient(supabaseUrl, serviceRoleKey);
   cachedDataClient = dataClient;
   const configuredUrl = new URL(env.BETTER_AUTH_URL);
-  const isProductionOrigin = configuredUrl.protocol === "https:" && configuredUrl.hostname.endsWith("itemtraxx.com");
+  const isProductionOrigin = configuredUrl.protocol === "https:" && isItemTraxxHostname(configuredUrl.hostname);
   const passkeyOrigins = parseCsv(env.BETTER_AUTH_PASSKEY_ORIGIN);
   cachedAuth = betterAuth({
     appName: "ItemTraxx",
@@ -445,7 +446,7 @@ export const handleInternalAuthAdminRequest = async (request: Request, rawEnv: E
       return Response.json({ success: (deleted?.length ?? 0) === 1 });
     }
     if (action === "request_password_reset") {
-      await getBetterAuth(env).api.requestPasswordReset({ body: { email: target.email, redirectTo: `${env.BETTER_AUTH_URL.replace(/\/+$/, "")}/reset-password` } });
+      await getBetterAuth(env).api.requestPasswordReset({ body: { email: target.email, redirectTo: `${trimTrailingSlash(env.BETTER_AUTH_URL)}/reset-password` } });
       return Response.json({ success: true });
     }
     return Response.json({ error: "Invalid action" }, { status: 400 });

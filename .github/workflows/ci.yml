@@ -100,12 +100,6 @@ jobs:
         # the Supabase CLI). The shared install serves every suite below.
         run: npm ci --ignore-scripts
 
-      - name: Materialize Deno npm dependencies
-        # Deno 2 uses its managed node_modules layout for npm: imports. The
-        # shared npm install above does not create that layout, so explicitly
-        # materialize it before Deno check/test steps and their npm binaries.
-        run: deno install --frozen
-
       - name: Initialize CodeQL
         if: ${{ !cancelled() }}
         uses: github/codeql-action/init@cdf488f595d80d6e07e03d4674febd5ab45fa938 # v4
@@ -138,7 +132,7 @@ jobs:
 
       - name: Check Supabase function graph with frozen Deno lock
         if: ${{ !cancelled() && github.event_name != 'schedule' }}
-        run: deno check --frozen supabase/functions/super-ops/index.ts supabase/functions/super-workspace-mutate/index.ts supabase/functions/admin-ops/index.ts
+        run: deno check --node-modules-dir=none --frozen supabase/functions/super-ops/index.ts supabase/functions/super-workspace-mutate/index.ts supabase/functions/admin-ops/index.ts
 
       - name: Deno test coverage gate (Supabase functions + Cloudflare edge-proxy)
         if: ${{ !cancelled() && github.event_name != 'schedule' }}

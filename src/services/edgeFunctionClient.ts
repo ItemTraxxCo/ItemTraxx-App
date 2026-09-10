@@ -15,7 +15,6 @@ type EdgeFunctionResult<TData> = {
 import { clearAdminVerification, clearAuthState } from "../store/authState";
 import { getEdgeFunctionsBaseUrl } from "./edgeUrls";
 import { captureHandledRequestFailure } from "./sentry";
-import { authClient } from "../auth/client";
 
 const getDefaultHeaders = (accessToken?: string) => {
   const headers: Record<string, string> = {};
@@ -92,7 +91,9 @@ const requestEdgeFunction = async <TData = unknown, TBody = unknown>(
 
     if (!response.ok) {
       if (isTenantDisabledError(payload)) {
-        await authClient.signOut().catch(() => undefined);
+        await import("../auth/client")
+          .then(({ authClient }) => authClient.signOut())
+          .catch(() => undefined);
         clearAdminVerification();
         clearAuthState(true);
       }

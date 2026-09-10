@@ -365,7 +365,15 @@ export const handleSecuritySessionsAction = async (
   }
 
   if (action === "list_passkeys") {
-    const data = await callBetterAuthAdmin<{passkeys:Array<{id:string;created_at:string|null;name:string|null}>}>({action:"list_passkeys",profileId:user.id});
+    let data: { passkeys: Array<{ id: string; created_at: string | null; name: string | null }> };
+    try {
+      data = await callBetterAuthAdmin({ action: "list_passkeys", profileId: user.id });
+    } catch (error) {
+      console.error("Unable to load super-admin passkeys", {
+        message: error instanceof Error ? error.message : "Unknown error",
+      });
+      return jsonResponse(503, { error: "Unable to load passkeys." });
+    }
 
     return jsonResponse(200, {
       data: {
@@ -380,7 +388,16 @@ export const handleSecuritySessionsAction = async (
 
   if (action === "delete_passkey") {
     const passkeyId = requireText(payload.passkey_id, { maxLen: 128 });
-    const deleted = await callBetterAuthAdmin<{success:boolean}>({action:"delete_passkey",profileId:user.id,passkeyId});
+    let deleted: { success: boolean };
+    try {
+      deleted = await callBetterAuthAdmin({ action: "delete_passkey", profileId: user.id, passkeyId });
+    } catch (error) {
+      console.error("Unable to delete super-admin passkey", {
+        passkey_id: passkeyId,
+        message: error instanceof Error ? error.message : "Unknown error",
+      });
+      return jsonResponse(503, { error: "Unable to remove passkey." });
+    }
     if (!deleted.success) return jsonResponse(404,{error:"Passkey not found."});
     await writeAudit(
       "super_admin_passkey_deleted",

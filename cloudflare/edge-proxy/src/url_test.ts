@@ -1,4 +1,4 @@
-import { trimTrailingSlash } from "./url.ts";
+import { isItemTraxxHostname, trimTrailingSlash } from "./url.ts";
 
 const assertEquals = (actual: string, expected: string, message: string) => {
   if (actual !== expected) {
@@ -39,4 +39,15 @@ Deno.test("trimTrailingSlash handles large slash runs without regex backtracking
     "https://example.supabase.co",
     "trailing slash run",
   );
+});
+
+Deno.test("isItemTraxxHostname enforces the domain label boundary", () => {
+  const allowed = ["itemtraxx.com", "app.itemtraxx.com", "ORG.APP.ITEMTRAXX.COM"];
+  const rejected = ["evilitemtraxx.com", "itemtraxx.com.attacker.example", ".itemtraxx.com", "itemtraxx.com."];
+  for (const hostname of allowed) {
+    if (!isItemTraxxHostname(hostname)) throw new Error(`expected ${hostname} to be allowed`);
+  }
+  for (const hostname of rejected) {
+    if (isItemTraxxHostname(hostname)) throw new Error(`expected ${hostname} to be rejected`);
+  }
 });

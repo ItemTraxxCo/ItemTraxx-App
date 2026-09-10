@@ -1,12 +1,6 @@
 import { expect, test, type BrowserContext } from "@playwright/test";
 import { navigateApp, waitForPublicAuthBootstrap } from "./helpers/testHarness";
 
-const unauthenticatedSummary = {
-  authenticated: false,
-  user: null,
-  profile: null,
-};
-
 const installSessionRecoveryMocks = async (context: BrowserContext) => {
   let serverSession = false;
   let logoutRequests = 0;
@@ -25,30 +19,18 @@ const installSessionRecoveryMocks = async (context: BrowserContext) => {
     });
   });
 
-  await context.route("**/auth/session/me", async (route) => {
+  await context.route("**/api/auth/get-session", async (route) => {
     await route.fulfill({
       status: 200,
       contentType: "application/json",
-      body: JSON.stringify(serverSession
-        ? {
-            authenticated: true,
-            user: {
-              id: "user-session-recovery",
-              email: "admin@example.com",
-              last_sign_in_at: new Date().toISOString(),
-            },
-            profile: {
-              role: "workspace_admin",
-              workspace_id: "tenant-e2e",
-              auth_email: "admin@example.com",
-              is_active: true,
-            },
-          }
-        : unauthenticatedSummary),
+      body: JSON.stringify(serverSession ? {
+        user: { id: "better-auth-recovery", email: "admin@example.com", name: "Admin", emailVerified: true, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+        session: { id: "session-recovery", userId: "better-auth-recovery", token: "token", expiresAt: new Date(Date.now()+3600000).toISOString(), createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+      } : null),
     });
   });
 
-  await context.route("**/auth/session/logout", async (route) => {
+  await context.route("**/api/auth/sign-out", async (route) => {
     logoutRequests += 1;
     serverSession = false;
     await route.fulfill({
@@ -56,6 +38,10 @@ const installSessionRecoveryMocks = async (context: BrowserContext) => {
       contentType: "application/json",
       body: JSON.stringify({ ok: true }),
     });
+  });
+
+  await context.route("**/rest/v1/profiles?**", async (route) => {
+    await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify([{ id: "user-session-recovery", role: "workspace_admin", workspace_id: "tenant-e2e", auth_email: "admin@example.com", is_active: true }]) });
   });
 
   await context.route("**/rest/v1/workspaces?**", async (route) => {
@@ -94,15 +80,6 @@ test("session-ended recovery clears the server session before a new tab bootstra
   await waitForPublicAuthBootstrap(page);
   await page.evaluate(() => {
     window.__itemtraxxTest?.setWorkspaceAdminSession("tenant-e2e");
-  });
-  // Keep the local Supabase sign-out deterministic; the browser session that
-  // must be cleared for this regression is the HttpOnly cookie session.
-  await page.evaluate(async () => {
-    const { supabase } = await import("/src/services/supabaseClient.ts");
-    Object.defineProperty(supabase.auth, "signOut", {
-      configurable: true,
-      value: async () => ({ error: null }),
-    });
   });
   mocks.setServerSession();
   await navigateApp(page, "/admin");

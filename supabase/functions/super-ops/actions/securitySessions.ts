@@ -6,6 +6,7 @@ import {
 } from "../../_shared/privilegedStepUp.ts";
 import { asRecord, optionalText, requireText } from "../../_shared/validation.ts";
 import type { SuperOpsContext } from "../context.ts";
+import { callBetterAuthAdmin } from "../../_shared/betterAuthAdmin.ts";
 
 export const SECURITY_SESSION_ACTIONS = [
   "verify_password",
@@ -111,16 +112,9 @@ export const handleSecuritySessionsAction = async (
       return jsonResponse(500, { error: "Server misconfiguration" });
     }
 
-    const signInClient = createClient(supabaseUrl, publishableKey, {
-      auth: { persistSession: false },
-    });
-    const signIn = await signInClient.auth.signInWithPassword({
-      email,
-      password,
-    });
-    const verifiedUserId = signIn.data.user?.id ??
-      signIn.data.session?.user?.id ?? null;
-    if (signIn.error || !verifiedUserId || verifiedUserId !== user.id) {
+    void email; void supabaseUrl; void publishableKey;
+    const verification = await callBetterAuthAdmin<{verified:boolean}>({action:"verify_password",profileId:user.id,password});
+    if (!verification.verified) {
       return jsonResponse(401, { error: "Invalid password." });
     }
 
@@ -371,23 +365,14 @@ export const handleSecuritySessionsAction = async (
   }
 
   if (action === "list_passkeys") {
-    const { data, error } = await adminClient.auth.admin.passkey.listPasskeys({
-      userId: user.id,
-    });
-    if (error) {
-      console.error("Unable to load super-admin passkeys", {
-        user_id: user.id,
-        message: error.message,
-      });
-      return jsonResponse(400, { error: "Unable to load passkeys." });
-    }
+    const data = await callBetterAuthAdmin<{passkeys:Array<{id:string;created_at:string|null;name:string|null}>}>({action:"list_passkeys",profileId:user.id});
 
     return jsonResponse(200, {
       data: {
-        passkeys: (data ?? []).map((passkey) => ({
+        passkeys: data.passkeys.map((passkey) => ({
           id: passkey.id,
           created_at: passkey.created_at,
-          last_used_at: passkey.last_used_at ?? null,
+          last_used_at: null,
         })),
       },
     });
@@ -395,18 +380,8 @@ export const handleSecuritySessionsAction = async (
 
   if (action === "delete_passkey") {
     const passkeyId = requireText(payload.passkey_id, { maxLen: 128 });
-    const { error } = await adminClient.auth.admin.passkey.deletePasskey({
-      userId: user.id,
-      passkeyId,
-    });
-    if (error) {
-      console.error("Unable to delete super-admin passkey", {
-        user_id: user.id,
-        passkey_id: passkeyId,
-        message: error.message,
-      });
-      return jsonResponse(400, { error: "Unable to remove passkey." });
-    }
+    const deleted = await callBetterAuthAdmin<{success:boolean}>({action:"delete_passkey",profileId:user.id,passkeyId});
+    if (!deleted.success) return jsonResponse(404,{error:"Passkey not found."});
     await writeAudit(
       "super_admin_passkey_deleted",
       "super_admin_auth",

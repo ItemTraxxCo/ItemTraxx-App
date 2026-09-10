@@ -25,14 +25,14 @@ Deno.test("non-status function proxy preserves streamed response bytes, status, 
     )) as typeof fetch;
   try {
     const response = await proxyFunctionRequest(
-      new Request("https://edge.itemtraxx.com/functions/admin-ops"),
+      new Request("https://edge.itemtraxx.com/functions/contact-support-submit"),
       {
         SUPABASE_URL: "https://example.supabase.co",
         SUPABASE_ANON_KEY: "anon",
       } as Env,
       { "Access-Control-Allow-Credentials": "true" },
       "request-2",
-      "admin-ops",
+      "contact-support-submit",
     );
     assertEquals(response.status, 418, "response status");
     assertEquals(Array.from(new Uint8Array(await response.arrayBuffer())), [

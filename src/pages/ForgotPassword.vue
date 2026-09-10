@@ -55,7 +55,7 @@
 import { computed, onMounted, onUnmounted, ref } from "vue";
 import { RouterLink, useRoute } from "vue-router";
 import PublicFooter from "../components/PublicFooter.vue";
-import { supabase } from "../services/supabaseClient";
+import { authClient } from "../auth/client";
 import { getPasswordResetRedirectUrl } from "../utils/passwordResetRedirect";
 
 const RESET_ERROR_MESSAGE = "Unable to send reset link. Please try again.";
@@ -116,7 +116,8 @@ const sendResetEmail = async () => {
   isLoading.value = true;
   try {
     const redirectTo = getPasswordResetRedirectUrl();
-    const { error: resetError } = await supabase.auth.resetPasswordForEmail(normalizedEmail, {
+    const { error: resetError } = await authClient.requestPasswordReset({
+      email: normalizedEmail,
       redirectTo,
     });
 

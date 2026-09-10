@@ -24,6 +24,7 @@ const claimsClient = (
   claims: Record<string, unknown> | null,
   error: unknown = null,
 ) => ({
+  __verifyExternalAuthClaimsForTest: () => Promise.resolve(error ? null : claims),
   auth: {
     getClaims: () =>
       Promise.resolve({

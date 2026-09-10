@@ -5,7 +5,6 @@ export {
   refreshAuthFromSession,
 } from "./auth/sessionBootstrap";
 export {
-  adminLoginWithSession,
   resendSuperAdminEmailChallenge,
   superAdminLogin,
   superAdminPasskeyLogin,

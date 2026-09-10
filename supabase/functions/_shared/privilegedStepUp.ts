@@ -4,6 +4,7 @@ import {
   type PostgrestErrorLike,
 } from "./postgrestErrors.ts";
 import { sha256Hex } from "./sha256.ts";
+import { verifyExternalAuthClaims } from "./externalAuth.ts";
 
 export type PrivilegedRoleScope =
   | "super_admin"
@@ -22,11 +23,14 @@ const getVerifiedClaims = async (
   authClient: SupabaseClient,
   authToken: string,
 ) => {
-  const { data, error } = await authClient.auth.getClaims(authToken);
-  if (error || !data?.claims) {
+  const injectedVerifier = (authClient as SupabaseClient & {
+    verifyExternalAuthClaims?: (authorization: string) => Promise<Record<string, unknown> | null>;
+  }).verifyExternalAuthClaims;
+  const claims = await (injectedVerifier ?? verifyExternalAuthClaims)(`Bearer ${authToken}`);
+  if (!claims) {
     throw new Error("Unable to verify authentication claims.");
   }
-  return data.claims as Record<string, unknown>;
+  return claims as Record<string, unknown>;
 };
 
 const resolveBindingKey = async (

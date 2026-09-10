@@ -1,20 +1,8 @@
-import { checkSessionRateLimit, default as worker } from "./index.ts";
+import worker from "./index.ts";
 import {
   isBlockedRpcProxyPath,
   isUnauthorizedRpcProxyPath,
 } from "./routing.ts";
-
-const sessionRequest = () =>
-  new Request("https://edge.itemtraxx.com/auth/session/exchange", {
-    method: "POST",
-    headers: {
-      "cf-connecting-ip": "203.0.113.42",
-      "content-type": "application/json",
-      origin: "https://itemtraxx.com",
-      "x-itx-session-request": "1",
-    },
-    body: JSON.stringify({ access_token: "access", refresh_token: "refresh" }),
-  });
 
 const executionContext = {
   waitUntil: (_promise: Promise<unknown>) => {},
@@ -75,98 +63,6 @@ Deno.test("requires caller auth on RPC proxy paths", () => {
   }
 });
 
-Deno.test("session rate limit uses the trusted Cloudflare client IP", async () => {
-  let observedKey = "";
-  const result = await checkSessionRateLimit(
-    {
-      limit: ({ key }) => {
-        observedKey = key;
-        return Promise.resolve({ success: true });
-      },
-    },
-    new Request("https://edge.itemtraxx.com/auth/session/exchange", {
-      headers: { "cf-connecting-ip": "203.0.113.42" },
-    }),
-  );
-
-  if (result !== "allowed" || observedKey !== "203.0.113.42") {
-    throw new Error("Expected the trusted Cloudflare IP to be rate limited");
-  }
-});
-
-Deno.test("session rate limit reports exceeded limits", async () => {
-  const result = await checkSessionRateLimit(
-    { limit: () => Promise.resolve({ success: false }) },
-    new Request("https://edge.itemtraxx.com/auth/session/refresh", {
-      headers: { "cf-connecting-ip": "203.0.113.42" },
-    }),
-  );
-
-  if (result !== "limited") {
-    throw new Error("Expected the request to be rate limited");
-  }
-});
-
-Deno.test("session rate limit fails closed without a binding or trusted IP", async () => {
-  const request = new Request(
-    "https://edge.itemtraxx.com/auth/session/refresh",
-  );
-  if (await checkSessionRateLimit(undefined, request) !== "unavailable") {
-    throw new Error("Expected a missing binding to fail closed");
-  }
-
-  const binding = { limit: () => Promise.resolve({ success: true }) };
-  if (await checkSessionRateLimit(binding, request) !== "unavailable") {
-    throw new Error("Expected a missing trusted IP to fail closed");
-  }
-});
-
-Deno.test("session rate limit fails closed when Cloudflare errors", async () => {
-  const result = await checkSessionRateLimit(
-    { limit: () => Promise.reject(new Error("binding unavailable")) },
-    new Request("https://edge.itemtraxx.com/auth/session/refresh", {
-      headers: { "cf-connecting-ip": "203.0.113.42" },
-    }),
-  );
-
-  if (result !== "unavailable") {
-    throw new Error("Expected binding errors to fail closed");
-  }
-});
-
-Deno.test("session exchange returns 429 with retry guidance when limited", async () => {
-  const response = await worker.fetch(
-    sessionRequest(),
-    {
-      SUPABASE_URL: "https://example.supabase.co",
-      SUPABASE_ANON_KEY: "anon-key",
-      SESSION_EXCHANGE_RATE_LIMITER: {
-        limit: () => Promise.resolve({ success: false }),
-      },
-    },
-    executionContext,
-  );
-
-  if (response.status !== 429 || response.headers.get("Retry-After") !== "60") {
-    throw new Error("Expected a 429 response with a 60-second retry window");
-  }
-});
-
-Deno.test("session exchange returns 503 when rate limiting is unavailable", async () => {
-  const response = await worker.fetch(
-    sessionRequest(),
-    {
-      SUPABASE_URL: "https://example.supabase.co",
-      SUPABASE_ANON_KEY: "anon-key",
-    },
-    executionContext,
-  );
-
-  if (response.status !== 503) {
-    throw new Error("Expected session exchange to fail closed");
-  }
-});
-
 Deno.test("edge proxy CORS requires exact configured origins", async () => {
   const response = await worker.fetch(
     new Request("https://edge.itemtraxx.com/functions/v1/system-status", {
@@ -196,7 +92,7 @@ Deno.test("edge proxy CORS requires exact configured origins", async () => {
 Deno.test("edge proxy CORS allows the explicitly configured demo workspace", async () => {
   const demoOrigin = "https://itxdemo.app.itemtraxx.com";
   const response = await worker.fetch(
-    new Request("https://edge.itemtraxx.com/auth/session/me", {
+    new Request("https://edge.itemtraxx.com/api/auth/get-session", {
       method: "OPTIONS",
       headers: {
         origin: demoOrigin,
@@ -342,7 +238,7 @@ Deno.test("dispatcher blocks canonicalized REST RPC variants without upstream fe
   }
 });
 
-Deno.test("dispatcher still proxies the literal allowed RPC and normal REST paths", async () => {
+Deno.test("dispatcher rejects allowed data paths without a verified Better Auth session", async () => {
   const originalFetch = globalThis.fetch;
   const upstreamUrls: string[] = [];
   globalThis.fetch = ((input: string | URL | Request, _init?: RequestInit) => {
@@ -376,18 +272,15 @@ Deno.test("dispatcher still proxies the literal allowed RPC and normal REST path
         executionContext,
       );
 
-      if (response.status !== 200) {
-        throw new Error(`Expected proxy route to remain available: ${path}`);
+      if (response.status !== 401) {
+        throw new Error(`Expected unverified request to be rejected: ${path}`);
       }
     }
   } finally {
     globalThis.fetch = originalFetch;
   }
 
-  const expected = [
-    "https://example.supabase.co/rest/v1/rpc/consume_rate_limit",
-    "https://example.supabase.co/rest/v1/profiles?select=id",
-  ];
+  const expected: string[] = [];
   if (JSON.stringify(upstreamUrls) !== JSON.stringify(expected)) {
     throw new Error(
       `Unexpected upstream URLs: ${JSON.stringify(upstreamUrls)}`,

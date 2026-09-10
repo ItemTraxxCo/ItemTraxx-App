@@ -238,6 +238,8 @@ const routes: RouteRecordRaw[] = [
   { path: "/items", name: "workspace-items", component: () => import("../pages/workspace/Items.vue"), meta: { requiresSession: true, requiresWorkspace: true, requiresRole: "tenant_account", title: "Items | ItemTraxx" } },
   { path: "/borrowers", name: "workspace-borrowers", component: () => import("../pages/workspace/Borrowers.vue"), meta: { requiresSession: true, requiresWorkspace: true, requiresRole: "tenant_account", title: "Borrowers | ItemTraxx" } },
   { path: "/settings", name: "workspace-settings", component: () => import("../pages/workspace/Settings.vue"), meta: { requiresSession: true, requiresWorkspace: true, requiresRole: "tenant_account", title: "Settings | ItemTraxx" } },
+  { path: "/account/security", name: "account-security", component: () => import("../pages/AccountSecurity.vue"), meta: { requiresSession: true, title: "Account Security | ItemTraxx" } },
+  { path: "/login/two-factor", name: "two-factor-challenge", component: () => import("../pages/TwoFactorChallenge.vue"), meta: { title: "Two-factor verification | ItemTraxx" } },
   { path: "/account", name: "workspace-account", component: () => import("../pages/workspace/Account.vue"), meta: { requiresSession: true, requiresWorkspace: true, requiresRole: "tenant_account", title: "My Account | ItemTraxx" } },
   {
     path: "/admin/students",
@@ -339,6 +341,12 @@ const routes: RouteRecordRaw[] = [
     },
   },
   {
+    path: "/admin/settings/sso",
+    name: "workspace-admin-sso",
+    component: () => import("../pages/EnterpriseSsoSettings.vue"),
+    meta: { requiresSession: true, requiresWorkspace: true, requiresRole: "workspace_admin", requiresWorkspaceMatch: true, title: "Enterprise SSO | ItemTraxx" },
+  },
+  {
     path: "/admin/admins",
     name: "workspace-admin-admins",
     component: () => import("../pages/workspace/admin/Admins.vue"),
@@ -413,6 +421,12 @@ const routes: RouteRecordRaw[] = [
       requiresSuperAuth: true,
       title: "Super Admin Settings | ItemTraxx",
     },
+  },
+  {
+    path: "/super-admin/settings/sso",
+    name: "super-admin-sso",
+    component: () => import("../pages/EnterpriseSsoSettings.vue"),
+    meta: { requiresSession: true, requiresRole: "super_admin", requiresSuperAuth: true, title: "Enterprise SSO | ItemTraxx" },
   },
   {
     path: "/super-admin/workspaces",

@@ -17,13 +17,9 @@
 // user to sign themselves out, and checkoutReturn, which is the daily-driver
 // workflow for both roles.
 
+import { verifyExternalAuthClaims } from "./externalAuth.ts";
 type ClaimsClient = {
-  auth: {
-    getClaims: (token: string) => Promise<{
-      data: { claims: Record<string, unknown> } | null;
-      error: unknown | null;
-    }>;
-  };
+  __verifyExternalAuthClaimsForTest?: (token: string) => Promise<Record<string, unknown> | null>;
 };
 
 export const ADMIN_REAUTH_MAX_AGE_MS = 15 * 60 * 1000;
@@ -72,12 +68,15 @@ export const checkRecentAdminAuth = async (
   authToken: string,
   maxAgeMs: number = ADMIN_REAUTH_MAX_AGE_MS,
 ): Promise<AdminReauthResult> => {
-  const { data, error } = await authClient.auth.getClaims(authToken);
-  if (error || !data?.claims) {
+  const claims = await (
+    authClient.__verifyExternalAuthClaimsForTest?.(authToken) ??
+    verifyExternalAuthClaims(`Bearer ${authToken}`)
+  );
+  if (!claims) {
     return { fresh: false, reason: "unverified" };
   }
 
-  const authenticatedAtMs = readLatestAuthTimestampMs(data.claims);
+  const authenticatedAtMs = readLatestAuthTimestampMs(claims);
   if (authenticatedAtMs === null) {
     return { fresh: false, reason: "no_auth_timestamp" };
   }

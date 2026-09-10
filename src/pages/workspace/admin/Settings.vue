@@ -6,6 +6,7 @@
       </div>
       <h1>Settings</h1>
       <p class="admin-hero-copy">Configure checkout defaults and manage active admin sessions from one place.</p>
+      <p><RouterLink class="button-link" to="/account/security">Account Security</RouterLink> · <RouterLink class="button-link" to="/admin/settings/sso">Enterprise SSO</RouterLink></p>
       <div class="admin-summary-grid">
         <div class="admin-summary-card">
           <strong>{{ checkoutDueHours }}</strong>

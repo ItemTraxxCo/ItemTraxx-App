@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
+import { getExternalAuthUser } from "../_shared/externalAuth.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.108.2";
 import { isKillSwitchWriteBlocked } from "../_shared/killSwitch.ts";
 import { isAllowedOrigin, parseAllowedOrigins } from "../_shared/cors.ts";
@@ -7,6 +8,7 @@ import { readJsonBody } from "../_shared/requestBody.ts";
 import { hasPrivilegedStepUp } from "../_shared/privilegedStepUp.ts";
 import { isSuperAdminTokenBlockedBySessionRevocation } from "../_shared/superAdminSessions.ts";
 import { writeSuperAdminAudit } from "../_shared/superAdminAudit.ts";
+import { callBetterAuthAdmin } from "../_shared/betterAuthAdmin.ts";
 import {
   optionalText,
   requireEmail,
@@ -72,7 +74,7 @@ serve(async (req) => {
         auth: { persistSession: false },
       }),
       admin = createClient(url, secret, { auth: { persistSession: false } }),
-      { data: { user } } = await uc.auth.getUser();
+      { data: { user } } = await getExternalAuthUser(uc, req.headers.get("Authorization") ?? "");
     if (!user) return json(401, { error: "Unauthorized" });
     const { data: self } = await admin.from("profiles").select("role,is_active")
       .eq("id", user.id).maybeSingle();
@@ -160,32 +162,23 @@ serve(async (req) => {
         const { data: workspace } = await admin.from("workspaces").select("id")
           .eq("id", workspaceId).maybeSingle();
         if (!workspace) throw new ValidationError("Workspace not found.", 404);
-        const created = await admin.auth.admin.createUser({
-          email,
-          password: password(),
-          email_confirm: true,
-        });
-        if (created.error || !created.data.user) {
-          throw new ValidationError("Unable to create Tenant Account.");
-        }
-        const userId = created.data.user.id;
+        const userId = crypto.randomUUID();
+        const created = await callBetterAuthAdmin<{user:{betterAuthUserId:string}}>({action:"create_user",profileId:userId,email,password:password(),role:"user",profileRole:"tenant_account",workspaceId});
         const { data, error } = await admin.from("profiles").insert({
           id: userId,
+          better_auth_user_id: created.user.betterAuthUserId,
           workspace_id: workspaceId,
           auth_email: email,
           role: "tenant_account",
           is_active: true,
         }).select(tenantAccountFields).single();
         if (error || !data) {
-          await admin.auth.admin.deleteUser(userId);
+          await callBetterAuthAdmin({action:"delete_user",profileId:userId,betterAuthUserId:created.user.betterAuthUserId}).catch(()=>undefined);
           throw new ValidationError("Unable to create Tenant Account.");
         }
-        const reset = await admin.auth.resetPasswordForEmail(email, {
-          redirectTo,
-        });
-        if (reset.error) {
+        try { await callBetterAuthAdmin({action:"request_password_reset",profileId:userId}); } catch {
           await admin.from("profiles").delete().eq("id", userId);
-          await admin.auth.admin.deleteUser(userId);
+          await callBetterAuthAdmin({action:"delete_user",profileId:userId,betterAuthUserId:created.user.betterAuthUserId}).catch(()=>undefined);
           throw new ValidationError("Unable to send Tenant Account setup email.");
         }
         return (await enrichTenantAccounts([data]))[0];
@@ -205,11 +198,7 @@ serve(async (req) => {
         return (await enrichTenantAccounts([data]))[0];
       },
       updateEmail: async (id, email) => {
-        const authUpdate = await admin.auth.admin.updateUserById(id, {
-          email,
-          email_confirm: true,
-        });
-        if (authUpdate.error) throw new ValidationError("Unable to update email.");
+        await callBetterAuthAdmin({action:"update_email",profileId:id,email});
         const { data, error } = await admin.from("profiles").update({ auth_email: email })
           .eq("id", id).eq("role", "tenant_account").is("deleted_at", null)
           .select(tenantAccountFields).single();
@@ -217,10 +206,10 @@ serve(async (req) => {
         return (await enrichTenantAccounts([data]))[0];
       },
       sendReset: async (email) => {
-        const { error } = await admin.auth.resetPasswordForEmail(email, {
-          redirectTo: resetRedirect(),
-        });
-        if (error) throw new ValidationError("Unable to send password reset.");
+        resetRedirect();
+        const { data: target } = await admin.from("profiles").select("id").eq("auth_email",email).eq("role","tenant_account").maybeSingle();
+        if (!target?.id) throw new ValidationError("Tenant Account not found.",404);
+        await callBetterAuthAdmin({action:"request_password_reset",profileId:target.id});
       },
       softDelete: async (id, at) => {
         const { error } = await admin.from("profiles").update({
@@ -265,16 +254,16 @@ serve(async (req) => {
     }
     if (action === "create_super_admin") {
       const email = requireEmail(p.auth_email), temporaryPassword = requireText(p.password, { maxLen: 1024 });
-      const created = await admin.auth.admin.createUser({ email, password: temporaryPassword, email_confirm: true });
-      if (created.error || !created.data.user) return json(400, { error: "Unable to create Super Admin." });
-      const { data, error } = await admin.from("profiles").insert({ id: created.data.user.id, workspace_id: null, auth_email: email, role: "super_admin", is_active: true }).select("id,auth_email,role,is_active,created_at").single();
-      if (error) { await admin.auth.admin.deleteUser(created.data.user.id); return json(400, { error: "Unable to create Super Admin." }); }
+      const profileId=crypto.randomUUID();
+      let created:{user:{betterAuthUserId:string}};try{created=await callBetterAuthAdmin({action:"create_user",profileId,email,password:temporaryPassword,role:"super_admin",profileRole:"super_admin"});}catch{return json(400,{error:"Unable to create Super Admin."});}
+      const { data, error } = await admin.from("profiles").insert({ id: profileId, better_auth_user_id:created.user.betterAuthUserId,workspace_id: null, auth_email: email, role: "super_admin", is_active: true }).select("id,auth_email,role,is_active,created_at").single();
+      if (error) { await callBetterAuthAdmin({action:"delete_user",profileId,betterAuthUserId:created.user.betterAuthUserId}).catch(()=>undefined); return json(400, { error: "Unable to create Super Admin." }); }
       await writeSuperAdminAudit(admin, {
         actorId: user.id,
         actorEmail: user.email ?? null,
         actionType: "create_super_admin",
         targetType: "super_admin",
-        targetId: created.data.user.id,
+        targetId: profileId,
         metadata: { auth_email: email },
       });
       return json(200, { data });
@@ -282,8 +271,8 @@ serve(async (req) => {
     if (action === "send_super_admin_reset") {
       const email = requireEmail(p.auth_email), redirect = (Deno.env.get("ITX_PASSWORD_RESET_REDIRECT_URL") ?? "").trim();
       if (!redirect) return json(500, { error: "Password reset redirect is not configured." });
-      const { error } = await admin.auth.resetPasswordForEmail(email, { redirectTo: redirect });
-      if (error) return json(400, { error: "Unable to send reset." });
+      const {data:target}=await admin.from("profiles").select("id").eq("auth_email",email).eq("role","super_admin").maybeSingle();if(!target?.id)return json(404,{error:"Super Admin not found."});
+      try{await callBetterAuthAdmin({action:"request_password_reset",profileId:target.id});}catch{return json(400,{error:"Unable to send reset."});}
       await writeSuperAdminAudit(admin, {
         actorId: user.id,
         actorEmail: user.email ?? null,
@@ -311,8 +300,7 @@ serve(async (req) => {
         });
         return json(200, { data });
       }
-      const email = requireEmail(p.auth_email); const authUpdate = await admin.auth.admin.updateUserById(id, { email, email_confirm: true });
-      if (authUpdate.error) return json(400, { error: "Unable to update email." });
+      const email = requireEmail(p.auth_email); try{await callBetterAuthAdmin({action:"update_email",profileId:id,email});}catch{return json(400,{error:"Unable to update email."});}
       const { data, error } = await admin.from("profiles").update({ auth_email: email }).eq("id", id).eq("role", "super_admin").select("id,auth_email,role,is_active,created_at").single();
       if (error || !data) return json(400, { error: "Unable to update Super Admin." });
       await writeSuperAdminAudit(admin, {
@@ -346,18 +334,11 @@ serve(async (req) => {
       return json(200, { data: rows });
     }
     if (action === "create_workspace_admin") {
-      const workspaceId = requireUuid(p.workspace_id),
-        email = requireEmail(p.auth_email),
-        created = await admin.auth.admin.createUser({
-          email,
-          password: password(),
-          email_confirm: true,
-        });
-      if (created.error || !created.data.user) {
-        return json(400, { error: "Unable to create Workspace Admin." });
-      }
+      const workspaceId = requireUuid(p.workspace_id), email = requireEmail(p.auth_email), profileId=crypto.randomUUID();
+      let created:{user:{betterAuthUserId:string}};try{created=await callBetterAuthAdmin({action:"create_user",profileId,email,password:password(),role:"user",profileRole:"workspace_admin",workspaceId});}catch{return json(400,{error:"Unable to create Workspace Admin."});}
       const { data, error } = await admin.from("profiles").insert({
-        id: created.data.user.id,
+        id: profileId,
+        better_auth_user_id:created.user.betterAuthUserId,
         workspace_id: workspaceId,
         auth_email: email,
         role: "workspace_admin",
@@ -366,7 +347,7 @@ serve(async (req) => {
         "id,workspace_id,auth_email,role,is_active,deleted_at,created_at",
       ).single();
       if (error) {
-        await admin.auth.admin.deleteUser(created.data.user.id);
+        await callBetterAuthAdmin({action:"delete_user",profileId,betterAuthUserId:created.user.betterAuthUserId}).catch(()=>undefined);
         return json(400, { error: "Unable to create Workspace Admin." });
       }
       await writeSuperAdminAudit(admin, {
@@ -374,7 +355,7 @@ serve(async (req) => {
         actorEmail: user.email ?? null,
         actionType: "create_workspace_admin",
         targetType: "workspace_admin",
-        targetId: created.data.user.id,
+        targetId: profileId,
         metadata: { workspace_id: workspaceId, auth_email: email },
       });
       return json(200, { data: (await enrich([data]))[0] });
@@ -415,11 +396,7 @@ serve(async (req) => {
     }
     if (action === "update_workspace_admin_email") {
       const email = requireEmail(p.auth_email);
-      const ae = await admin.auth.admin.updateUserById(id, {
-        email,
-        email_confirm: true,
-      });
-      if (ae.error) return json(400, { error: "Unable to update email." });
+      try{await callBetterAuthAdmin({action:"update_email",profileId:id,email});}catch{return json(400,{error:"Unable to update email."});}
       const { data, error } = await admin.from("profiles").update({
         auth_email: email,
       }).eq("id", id).select(
@@ -444,11 +421,7 @@ serve(async (req) => {
           error: "Password reset redirect is not configured.",
         });
       }
-      const { error } = await admin.auth.resetPasswordForEmail(
-        target.auth_email,
-        { redirectTo: redirect },
-      );
-      if (error) return json(400, { error: "Unable to send reset." });
+      try{await callBetterAuthAdmin({action:"request_password_reset",profileId:id});}catch{return json(400,{error:"Unable to send reset."});}
       await writeSuperAdminAudit(admin, {
         actorId: user.id,
         actorEmail: user.email ?? null,

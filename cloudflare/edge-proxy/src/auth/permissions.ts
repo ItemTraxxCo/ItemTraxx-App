@@ -11,7 +11,7 @@ import {
   superAdminRoleStatements,
   tenantAccountRoleStatements,
   workspaceAdminRoleStatements,
-} from "./permissionDefinitions";
+} from "../../../../src/auth/permissionDefinitions.ts";
 
 export const organizationAccess = createAccessControl({
   ...organizationStatements,
@@ -19,7 +19,6 @@ export const organizationAccess = createAccessControl({
 } as const);
 
 export const tenantAccountRole = organizationAccess.newRole(tenantAccountRoleStatements);
-
 export const workspaceAdminRole = organizationAccess.newRole(workspaceAdminRoleStatements);
 
 export const globalAccess = createAccessControl(adminStatements);
@@ -37,5 +36,3 @@ export const globalRoles = {
   user: regularUserRole,
   super_admin: superAdminRole,
 } as const;
-
-export type ItemTraxxRole = "tenant_account" | "workspace_admin" | "super_admin";

@@ -100,6 +100,12 @@ jobs:
         # the Supabase CLI). The shared install serves every suite below.
         run: npm ci --ignore-scripts
 
+      - name: Materialize Deno npm dependencies
+        # Deno 2 uses its managed node_modules layout for npm: imports. The
+        # shared npm install above does not create that layout, so explicitly
+        # materialize it before Deno check/test steps and their npm binaries.
+        run: deno install --frozen
+
       - name: Initialize CodeQL
         if: ${{ !cancelled() }}
         uses: github/codeql-action/init@cdf488f595d80d6e07e03d4674febd5ab45fa938 # v4

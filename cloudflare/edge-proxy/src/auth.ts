@@ -11,7 +11,7 @@ import {
   globalRoles,
   organizationAccess,
   organizationRoles,
-} from "../../../src/auth/permissions.ts";
+} from "./auth/permissions.ts";
 import { parseCsv } from "./cors.ts";
 import {
   createBetterAuthDataClient,

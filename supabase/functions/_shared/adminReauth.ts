@@ -64,12 +64,16 @@ export type AdminReauthResult =
  * timestamp, is treated as not re-authenticated.
  */
 export const checkRecentAdminAuth = async (
-  authClient: ClaimsClient,
+  authClient: unknown,
   authToken: string,
   maxAgeMs: number = ADMIN_REAUTH_MAX_AGE_MS,
 ): Promise<AdminReauthResult> => {
+  // The production caller supplies a SupabaseClient; tests may inject the
+  // optional verifier hook. Keep the boundary broad and inspect only that
+  // explicitly named hook after a local structural cast.
+  const testVerifier = (authClient as ClaimsClient).__verifyExternalAuthClaimsForTest;
   const claims = await (
-    authClient.__verifyExternalAuthClaimsForTest?.(authToken) ??
+    testVerifier?.(authToken) ??
     verifyExternalAuthClaims(`Bearer ${authToken}`)
   );
   if (!claims) {
@@ -101,7 +105,7 @@ const ADMIN_REAUTH_REQUIRED_MESSAGE = "Admin verification required.";
  * null to continue.
  */
 export const requireRecentAdminAuth = async (
-  authClient: ClaimsClient,
+  authClient: unknown,
   authToken: string,
   jsonResponse: (status: number, body: Record<string, unknown>) => Response,
   maxAgeMs: number = ADMIN_REAUTH_MAX_AGE_MS,

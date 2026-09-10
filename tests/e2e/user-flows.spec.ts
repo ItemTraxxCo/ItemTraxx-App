@@ -40,38 +40,27 @@ test.describe("core user flows", () => {
     await dismissFirstRunSurfaces(page);
 
     const loginRequests: Array<Record<string, unknown>> = [];
-    await page.route(/\/functions(?:\/v1)?\/workspace-login(?:\?.*)?$/, async (route) => {
+    await page.route("**/api/auth/sign-in/email", async (route) => {
       loginRequests.push(route.request().postDataJSON() as Record<string, unknown>);
       await route.fulfill({
         status: 200,
         contentType: "application/json",
-        body: JSON.stringify({
-          access_token: "access-token-e2e",
-          refresh_token: "refresh-token-e2e",
-          workspace_slug: "",
-        }),
+        body: JSON.stringify({ user: { id: "better-auth-tenant", email: "tenant.user@example.com" }, token: "session-token" }),
       });
     });
-    await page.route("**/auth/session/exchange", async (route) => {
+    await page.route("**/api/auth/get-session", async (route) => {
       await route.fulfill({
         status: 200,
         contentType: "application/json",
         body: JSON.stringify({
-          authenticated: true,
-          user: {
-            id: "user-e2e-tenant",
-            email: "tenant.user@example.com",
-            last_sign_in_at: new Date().toISOString(),
-          },
-          profile: {
-            role: "tenant_account",
-            workspace_id: "tenant-e2e",
-            auth_email: "tenant.user@example.com",
-            is_active: true,
-          },
+          user: { id: "better-auth-tenant", email: "tenant.user@example.com", name: "Tenant User", emailVerified: true, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+          session: { id: "session-tenant", userId: "better-auth-tenant", token: "session-token", expiresAt: new Date(Date.now()+3600000).toISOString(), createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
         }),
       });
     });
+    await page.route(/\/rest\/v1\/profiles(?:\?.*)?$/, (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify([{ id: "user-e2e-tenant", role: "tenant_account", workspace_id: "tenant-e2e", auth_email: "tenant.user@example.com", is_active: true }]) }));
+    await page.route(/\/rest\/v1\/workspaces(?:\?.*)?$/, (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify([{ id: "tenant-e2e", slug: "", status: "active" }]) }));
+    await page.route("**/api/auth/organization/set-active", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({}) }));
     await page.route(/\/functions(?:\/v1)?\/login-notify(?:\?.*)?$/, async (route) => {
       await route.fulfill({
         status: 200,
@@ -111,38 +100,25 @@ test.describe("core user flows", () => {
     await page.goto("/");
     await dismissFirstRunSurfaces(page);
 
-    await page.route(/\/functions(?:\/v1)?\/workspace-login(?:\?.*)?$/, async (route) => {
+    await page.route("**/api/auth/sign-in/email", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ user: { id: "better-auth-admin", email: "tenant.admin@example.com" }, token: "admin-session-token" }),
+      });
+    });
+    await page.route("**/api/auth/get-session", async (route) => {
       await route.fulfill({
         status: 200,
         contentType: "application/json",
         body: JSON.stringify({
-          access_token: "admin-access-token-e2e",
-          refresh_token: "admin-refresh-token-e2e",
-          workspace_slug: "",
+          user: { id: "better-auth-admin", email: "tenant.admin@example.com", name: "Admin", emailVerified: true, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+          session: { id: "session-admin", userId: "better-auth-admin", token: "admin-session-token", expiresAt: new Date(Date.now()+3600000).toISOString(), createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
         }),
       });
     });
-    await page.route("**/auth/session/exchange", async (route) => {
-      await route.fulfill({
-        status: 200,
-        contentType: "application/json",
-        body: JSON.stringify({
-          authenticated: true,
-          user: {
-            id: "user-e2e-admin",
-            email: "tenant.admin@example.com",
-            last_sign_in_at: new Date().toISOString(),
-          },
-          profile: {
-            role: "workspace_admin",
-            workspace_id: "tenant-e2e",
-            auth_email: "tenant.admin@example.com",
-            is_active: true,
-          },
-          password_authenticated_at: new Date().toISOString(),
-        }),
-      });
-    });
+    await page.route(/\/rest\/v1\/profiles(?:\?.*)?$/, (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify([{ id: "user-e2e-admin", role: "workspace_admin", workspace_id: "tenant-e2e", auth_email: "tenant.admin@example.com", is_active: true }]) }));
+    await page.route("**/api/auth/organization/set-active", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({}) }));
     await page.route(/\/functions(?:\/v1)?\/login-notify(?:\?.*)?$/, async (route) => {
       await route.fulfill({
         status: 200,
@@ -150,6 +126,11 @@ test.describe("core user flows", () => {
         body: JSON.stringify({ ok: true }),
       });
     });
+    await page.route(/\/functions(?:\/v1)?\/privileged-step-up(?:\?.*)?$/, (route) => route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ data: { verified: true } }),
+    }));
 
     await page.goto("/admin/login");
     await expect(page).toHaveURL(/\/login$/);

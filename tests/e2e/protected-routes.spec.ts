@@ -158,12 +158,12 @@ test.describe("Protected route smoke tests", () => {
   for (const path of ["/checkout", "/admin"]) {
     test(`E2E first mount of protected ${path} does not use public auth bootstrap`, async ({ page }) => {
       let publicSessionRequests = 0;
-      await page.route("**/auth/session/me", async (route) => {
+      await page.route("**/api/auth/get-session", async (route) => {
         publicSessionRequests += 1;
         await route.fulfill({
           status: 200,
           contentType: "application/json",
-          body: JSON.stringify({ authenticated: false, user: null, profile: null }),
+          body: "null",
         });
       });
 
@@ -204,14 +204,11 @@ test.describe("Protected route smoke tests", () => {
     await expect(page).toHaveURL(/\/login$/);
   });
 
-  test("Workspace Admin password verification survives a workspace host bootstrap", async ({ page }) => {
+  test("Workspace Admin verification survives a same-session bootstrap", async ({ page }) => {
     await page.goto("/");
+    await setWorkspaceAdminSession(page);
     await page.evaluate(async () => {
-      const [{ applyHttpSessionSummary }, { clearAdminVerification }] = await Promise.all([
-        import("/src/services/auth/sessionBootstrap.ts"),
-        import("/src/store/authState.ts"),
-      ]);
-      clearAdminVerification();
+      const { applyHttpSessionSummary } = await import("/src/services/auth/sessionBootstrap.ts");
       await applyHttpSessionSummary({
         authenticated: true,
         user: {
@@ -225,7 +222,6 @@ test.describe("Protected route smoke tests", () => {
           auth_email: "tenant.admin@example.com",
           is_active: true,
         },
-        password_authenticated_at: new Date().toISOString(),
       });
     });
 

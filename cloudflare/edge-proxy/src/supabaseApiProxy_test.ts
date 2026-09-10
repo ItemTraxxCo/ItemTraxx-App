@@ -10,7 +10,7 @@ const assertEquals = (actual: unknown, expected: unknown, message: string) => {
   }
 };
 
-Deno.test("Data API proxy retries 401 with a refreshed cookie session and streams response bytes", async () => {
+Deno.test("Data API proxy rejects legacy Supabase cookies", async () => {
   const originalFetch = globalThis.fetch;
   const calls: Array<
     { url: string; auth: string | null; body: string | null }
@@ -65,37 +65,10 @@ Deno.test("Data API proxy retries 401 with a refreshed cookie session and stream
       "request-1",
       "/rest/v1/items",
     );
-    assertEquals(response.status, 206, "response status");
-    assertEquals(Array.from(new Uint8Array(await response.arrayBuffer())), [
-      0,
-      255,
-      7,
-    ], "streamed bytes");
-    assertEquals(response.headers.get("x-upstream"), "kept", "upstream header");
-    assertEquals(
-      response.headers.get("x-request-id"),
-      "request-1",
-      "request ID",
-    );
+    assertEquals(response.status, 401, "response status");
   } finally {
     globalThis.fetch = originalFetch;
   }
 
-  assertEquals(calls.map(({ url, auth, body }) => ({ url, auth, body })), [
-    {
-      url: "https://example.supabase.co/rest/v1/items?select=id",
-      auth: "Bearer old-access",
-      body: '{"fixture":true}',
-    },
-    {
-      url: "https://example.supabase.co/auth/v1/token?grant_type=refresh_token",
-      auth: null,
-      body: '{"refresh_token":"old-refresh"}',
-    },
-    {
-      url: "https://example.supabase.co/rest/v1/items?select=id",
-      auth: "Bearer new-access",
-      body: '{"fixture":true}',
-    },
-  ], "refresh retry calls");
+  assertEquals(calls, [], "legacy tokens never reach upstream");
 });

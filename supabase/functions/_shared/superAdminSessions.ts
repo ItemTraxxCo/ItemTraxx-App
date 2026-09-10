@@ -3,14 +3,9 @@ import {
   isMissingPostgrestRelation as isMissingRelation,
   type PostgrestErrorLike,
 } from "./postgrestErrors.ts";
+import { verifyExternalAuthClaims } from "./externalAuth.ts";
 
 type SupabaseLikeClient = {
-  auth: {
-    getClaims: (token: string) => Promise<{
-      data: { claims: Record<string, unknown> } | null;
-      error: unknown | null;
-    }>;
-  };
   from: (table: string) => any;
 };
 
@@ -18,12 +13,14 @@ const resolveSuperAdminAuthSessionBinding = async (
   client: SupabaseLikeClient,
   authToken: string,
 ) => {
-  const { data, error } = await client.auth.getClaims(authToken);
-  if (error || !data?.claims) {
+  const injectedVerifier = (client as SupabaseLikeClient & {
+    verifyExternalAuthClaims?: (authorization: string) => Promise<Record<string, unknown> | null>;
+  }).verifyExternalAuthClaims;
+  const claims = await (injectedVerifier ?? verifyExternalAuthClaims)(`Bearer ${authToken}`);
+  if (!claims) {
     return { sessionId: null, issuedAt: null };
   }
 
-  const claims = data.claims;
   const sessionId = typeof claims.session_id === "string"
     ? claims.session_id.trim()
     : "";

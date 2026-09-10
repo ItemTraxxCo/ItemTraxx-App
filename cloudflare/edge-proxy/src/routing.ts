@@ -12,9 +12,6 @@ const readExactSegment = (pathname: string, prefix: string) => {
 export const getFunctionName = (pathname: string) =>
   readExactSegment(pathname, "/functions/");
 
-export const getSessionAction = (pathname: string) =>
-  readExactSegment(pathname, "/auth/session/");
-
 export const isRestProxyPath = (pathname: string) =>
   pathname.startsWith("/rest/v1/");
 

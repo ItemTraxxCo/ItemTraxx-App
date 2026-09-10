@@ -10,7 +10,6 @@ import { clearHttpSession } from "../httpSessionService";
 import { clearOfflineCheckoutQueue } from "../offlineCheckoutQueue";
 import { clearOfflineCheckoutWorkflow } from "../offlineCheckoutWorkflow";
 import { clearOfflineConnectionState } from "../offlineConnectionState";
-import { signOutLocalSupabaseSession } from "../supabaseAuthSession";
 import { clearPendingSuperAdminVerificationEmail } from "./sessionState";
 import { shutdownIntercom } from "../intercomService";
 
@@ -58,12 +57,6 @@ export const signOut = async ({ bestEffort = false }: SignOutOptions = {}): Prom
     }
   }
 
-  try {
-    await signOutLocalSupabaseSession();
-  } catch {
-    // The server-side HttpOnly session was already cleared; continue local
-    // cleanup when the SDK has no session or cannot complete its sign-out.
-  }
   await clearOfflineCheckoutQueue();
   await clearOfflineCheckoutWorkflow();
   clearOfflineConnectionState();

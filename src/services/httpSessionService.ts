@@ -1,10 +1,4 @@
-import { captureHandledRequestFailure } from "./sentry";
-
-// The session protocol intentionally has its own transport: /auth/session
-// manages the edge-issued HTTP-only cookie and session exchange, whereas
-// invokeEdgeFunction targets Supabase function routes with bearer tokens.
-// Keeping those contracts separate avoids making auth bootstrap depend on the
-// authenticated function dispatcher.
+import { authenticatedSelect } from "./authenticatedDataClient";
 
 export type HttpSessionSummary = {
   authenticated: boolean;
@@ -47,87 +41,36 @@ export class SessionNetworkError extends Error {
 export const isSessionNetworkError = (error: unknown): error is SessionNetworkError =>
   error instanceof SessionNetworkError;
 
-const trimTrailingSlash = (value: string) => value.replace(/\/+$/, "");
+const getAuthClient = async () => (await import("../auth/client")).authClient;
 
-const getEdgeProxyOrigin = () => {
-  const proxyUrl = (import.meta.env.VITE_EDGE_PROXY_URL as string | undefined)?.trim();
-  if (!proxyUrl) {
-    return "";
+export const fetchHttpSessionSummary = async (_options: Pick<RequestInit, "signal"> = {}): Promise<HttpSessionSummary> => {
+  const authClient = await getAuthClient();
+  const { data, error } = await authClient.getSession();
+  if (error || !data?.user || !data.session) {
+    return { authenticated: false, user: null, profile: null, password_authenticated_at: null };
   }
-  try {
-    return new URL(proxyUrl).origin;
-  } catch {
-    return trimTrailingSlash(proxyUrl);
-  }
+  const profiles = await authenticatedSelect<Array<NonNullable<HttpSessionSummary["profile"]> & { id: string }>>(
+    "profiles",
+    { select: "id,role,workspace_id,auth_email,is_active", better_auth_user_id: `eq.${data.user.id}`, limit: "1" },
+    { suppressUnauthorizedRecovery: true },
+  ).catch(() => []);
+  return {
+    authenticated: true,
+    user: {
+      id: profiles[0]?.id ?? data.user.id,
+      email: data.user.email ?? null,
+      last_sign_in_at: data.session.createdAt instanceof Date
+        ? data.session.createdAt.toISOString()
+        : data.session.createdAt ? String(data.session.createdAt) : null,
+    },
+    profile: profiles[0] ?? null,
+    password_authenticated_at: null,
+  } satisfies HttpSessionSummary;
 };
 
-const getHttpSessionBaseUrl = () => {
-  const proxyOrigin = getEdgeProxyOrigin();
-  if (!import.meta.env.DEV && proxyOrigin) {
-    return `${proxyOrigin}/auth/session`;
-  }
-  if (!import.meta.env.DEV) {
-    return "/auth/session";
-  }
-  if (proxyOrigin) {
-    return `${proxyOrigin}/auth/session`;
-  }
-
-  return "/auth/session";
+export const clearHttpSession = async () => {
+  const authClient = await getAuthClient();
+  const { error } = await authClient.signOut();
+  if (error) throw new Error(error.message ?? "Unable to complete logout");
+  return { ok: true };
 };
-
-const requestHttpSession = async <TData>(
-  action: string,
-  init?: RequestInit
-): Promise<TData> => {
-  const isMutation = (init?.method ?? "GET").toUpperCase() !== "GET";
-  let response: Response;
-  try {
-    response = await fetch(`${getHttpSessionBaseUrl()}/${action}`, {
-      ...init,
-      credentials: "include",
-      headers: {
-        "Content-Type": "application/json",
-        ...(isMutation ? { "x-itx-session-request": "1" } : {}),
-        ...(init?.headers ?? {}),
-      },
-    });
-  } catch (error) {
-    // The request never reached the edge proxy, so there is no status to report
-    // and nothing for Sentry to act on. Re-throw as a typed transport failure so
-    // callers can retry or degrade quietly instead of treating a flaky network
-    // as an application error.
-    throw new SessionNetworkError(action, error);
-  }
-
-  if (!response.ok) {
-    const message = `Session request failed (${response.status}).`;
-    void captureHandledRequestFailure({
-      area: "http_session",
-      name: action,
-      path: `/auth/session/${action}`,
-      method: init?.method ?? "GET",
-      status: response.status,
-      message,
-      requestId: response.headers.get("x-request-id") ?? undefined,
-    });
-    throw new Error(message);
-  }
-
-  return (await response.json()) as TData;
-};
-
-export const fetchHttpSessionSummary = async (options: Pick<RequestInit, "signal"> = {}) =>
-  requestHttpSession<HttpSessionSummary>("me", { method: "GET", ...options });
-
-export const exchangeHttpSession = async (payload: {
-  access_token: string;
-  refresh_token: string;
-}) =>
-  requestHttpSession<HttpSessionSummary>("exchange", {
-    method: "POST",
-    body: JSON.stringify(payload),
-  });
-
-export const clearHttpSession = async () =>
-  requestHttpSession<{ ok: boolean }>("logout", { method: "POST", body: JSON.stringify({}) });

@@ -100,6 +100,18 @@ const makeAdminClient = (
   return {
     client: {
       from,
+      __verifyExternalAuthClaimsForTest: () =>
+        Promise.resolve(
+          options.claimsError || options.claims === null
+            ? null
+            : options.claims ?? { session_id: "auth-session-1", iat: 1_700_000_000 },
+        ),
+      verifyExternalAuthClaims: () =>
+        Promise.resolve(
+          options.claimsError || options.claims === null
+            ? null
+            : options.claims ?? { session_id: "auth-session-1", iat: 1_700_000_000 },
+        ),
       auth: {
         getClaims: () =>
           Promise.resolve({
@@ -169,14 +181,18 @@ const contextFor = (
 const responseBody = (response: Response) =>
   response.json() as Promise<Record<string, unknown>>;
 
-const withMockedAuthFetch = async (
+const withMockedBetterAuthFetch = async (
   handler: (url: string, init?: RequestInit) => Response | Promise<Response>,
   run: () => Promise<void>,
 ) => {
   const original = globalThis.fetch;
+  const previousUrl = Deno.env.get("BETTER_AUTH_URL");
+  const previousSecret = Deno.env.get("ITX_INTERNAL_AUTH_SECRET");
+  Deno.env.set("BETTER_AUTH_URL", "https://better-auth.example.test");
+  Deno.env.set("ITX_INTERNAL_AUTH_SECRET", "test-internal-secret");
   globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = typeof input === "string" ? input : (input as URL).toString();
-    if (url.includes("/auth/v1/token")) {
+    if (url.includes("/api/internal/auth-admin")) {
       return handler(url, init);
     }
     return original(input as Parameters<typeof fetch>[0], init);
@@ -185,6 +201,10 @@ const withMockedAuthFetch = async (
     await run();
   } finally {
     globalThis.fetch = original;
+    if (previousUrl === undefined) Deno.env.delete("BETTER_AUTH_URL");
+    else Deno.env.set("BETTER_AUTH_URL", previousUrl);
+    if (previousSecret === undefined) Deno.env.delete("ITX_INTERNAL_AUTH_SECRET");
+    else Deno.env.set("ITX_INTERNAL_AUTH_SECRET", previousSecret);
   }
 };
 
@@ -207,24 +227,14 @@ const withMockedPasskeyFetch = async (
   }
 };
 
-const signInSuccessResponse = (userId: string) =>
-  new Response(
-    JSON.stringify({
-      access_token: "test-access-token",
-      token_type: "bearer",
-      expires_in: 3600,
-      expires_at: Math.floor(Date.now() / 1000) + 3600,
-      refresh_token: "test-refresh-token",
-      user: { id: userId, aud: "authenticated", email: "admin@example.test" },
-    }),
-    { status: 200, headers: { "Content-Type": "application/json" } },
-  );
-
-const signInErrorResponse = () =>
-  new Response(
-    JSON.stringify({ error: "invalid_grant", error_description: "Invalid login credentials" }),
-    { status: 400, headers: { "Content-Type": "application/json" } },
-  );
+const betterAuthAdminResponse = (
+  body: Record<string, unknown>,
+  status = 200,
+) =>
+  new Response(JSON.stringify(body), {
+    status,
+    headers: { "Content-Type": "application/json" },
+  });
 
 Deno.test("securitySessions registry owns exactly the 9 live actions", () => {
   assertEquals(SECURITY_SESSION_ACTIONS.length, 9);
@@ -280,9 +290,9 @@ Deno.test("verify_password requires a configured publishable key", async () => {
   assertEquals(await responseBody(response!), { error: "Server misconfiguration" });
 });
 
-Deno.test("verify_password rejects invalid credentials from the auth provider", async () => {
-  await withMockedAuthFetch(
-    () => signInErrorResponse(),
+Deno.test("verify_password rejects invalid credentials from Better Auth", async () => {
+  await withMockedBetterAuthFetch(
+    () => betterAuthAdminResponse({ verified: false }),
     async () => {
       const { client } = makeAdminClient(sequence([]));
       const response = await handleSecuritySessionsAction(
@@ -296,9 +306,9 @@ Deno.test("verify_password rejects invalid credentials from the auth provider", 
   );
 });
 
-Deno.test("verify_password rejects a sign-in that resolves to a different user", async () => {
-  await withMockedAuthFetch(
-    () => signInSuccessResponse("00000000-0000-4000-8000-000000000099"),
+Deno.test("verify_password rejects a failed Better Auth verification", async () => {
+  await withMockedBetterAuthFetch(
+    () => betterAuthAdminResponse({ verified: false }),
     async () => {
       const { client } = makeAdminClient(sequence([]));
       const response = await handleSecuritySessionsAction(
@@ -313,8 +323,8 @@ Deno.test("verify_password rejects a sign-in that resolves to a different user",
 });
 
 Deno.test("verify_password succeeds and records an audit entry", async () => {
-  await withMockedAuthFetch(
-    () => signInSuccessResponse("00000000-0000-4000-8000-000000000001"),
+  await withMockedBetterAuthFetch(
+    () => betterAuthAdminResponse({ verified: true }),
     async () => {
       const { client } = makeAdminClient(sequence([]));
       const auditCalls: unknown[][] = [];
@@ -677,67 +687,89 @@ Deno.test("list_sessions reports a generic failure for other errors", async () =
 // =====================================================================
 
 Deno.test("list_passkeys returns only the safe passkey fields", async () => {
-  const { client } = makeAdminClient(sequence([]), {
-    passkeys: {
-      data: [{
-        id: "passkey-1",
-        created_at: "2026-07-01T00:00:00.000Z",
-        last_used_at: "2026-07-02T00:00:00.000Z",
-        credential: "must-not-be-returned",
-      }],
-      error: null,
+  await withMockedBetterAuthFetch(
+    (_url, init) => {
+      assertEquals(JSON.parse(String(init?.body)), {
+        action: "list_passkeys",
+        profileId: "00000000-0000-4000-8000-000000000001",
+      });
+      return betterAuthAdminResponse({
+        passkeys: [{
+          id: "passkey-1",
+          name: "MacBook",
+          created_at: "2026-07-01T00:00:00.000Z",
+        }],
+      });
     },
-  });
-  const response = await handleSecuritySessionsAction(
-    contextFor("list_passkeys", {}, client),
-  );
+    async () => {
+      const { client } = makeAdminClient(sequence([]));
+      const response = await handleSecuritySessionsAction(
+        contextFor("list_passkeys", {}, client),
+      );
 
-  assert(response !== null, "expected a response");
-  assertEquals(response!.status, 200);
-  assertEquals(await responseBody(response!), {
-    data: {
-      passkeys: [{
-        id: "passkey-1",
-        created_at: "2026-07-01T00:00:00.000Z",
-        last_used_at: "2026-07-02T00:00:00.000Z",
-      }],
+      assert(response !== null, "expected a response");
+      assertEquals(response!.status, 200);
+      assertEquals(await responseBody(response!), {
+        data: {
+          passkeys: [{
+            id: "passkey-1",
+            created_at: "2026-07-01T00:00:00.000Z",
+            last_used_at: null,
+          }],
+        },
+      });
     },
-  });
+  );
 });
 
 Deno.test("list_passkeys reports a generic failure on error", async () => {
-  const { client } = makeAdminClient(sequence([]), {
-    passkeys: { data: null, error: { message: "boom" } },
-  });
-  const response = await handleSecuritySessionsAction(
-    contextFor("list_passkeys", {}, client),
-  );
+  await withMockedBetterAuthFetch(
+    () => betterAuthAdminResponse({ error: "boom" }, 500),
+    async () => {
+      const { client } = makeAdminClient(sequence([]));
+      const response = await handleSecuritySessionsAction(
+        contextFor("list_passkeys", {}, client),
+      );
 
-  assert(response !== null, "expected a response");
-  assertEquals(response!.status, 400);
-  assertEquals(await responseBody(response!), { error: "Unable to load passkeys." });
+      assert(response !== null, "expected a response");
+      assertEquals(response!.status, 503);
+      assertEquals(await responseBody(response!), { error: "Unable to load passkeys." });
+    },
+  );
 });
 
 Deno.test("delete_passkey deletes only through the server admin API", async () => {
-  const { client } = makeAdminClient(sequence([]));
-  const auditCalls: unknown[][] = [];
-  const response = await handleSecuritySessionsAction(
-    contextFor("delete_passkey", { passkey_id: "passkey-1" }, client, {
-      writeAudit: async (...args) => {
-        auditCalls.push(args);
-      },
-    }),
-  );
+  await withMockedBetterAuthFetch(
+    (_url, init) => {
+      assertEquals(JSON.parse(String(init?.body)), {
+        action: "delete_passkey",
+        profileId: "00000000-0000-4000-8000-000000000001",
+        passkeyId: "passkey-1",
+      });
+      return betterAuthAdminResponse({ success: true });
+    },
+    async () => {
+      const { client } = makeAdminClient(sequence([]));
+      const auditCalls: unknown[][] = [];
+      const response = await handleSecuritySessionsAction(
+        contextFor("delete_passkey", { passkey_id: "passkey-1" }, client, {
+          writeAudit: async (...args) => {
+            auditCalls.push(args);
+          },
+        }),
+      );
 
-  assert(response !== null, "expected a response");
-  assertEquals(response!.status, 200);
-  assertEquals(await responseBody(response!), { data: { deleted: true } });
-  assertEquals(auditCalls, [[
-    "super_admin_passkey_deleted",
-    "super_admin_auth",
-    "00000000-0000-4000-8000-000000000001",
-    { passkey_id: "passkey-1" },
-  ]]);
+      assert(response !== null, "expected a response");
+      assertEquals(response!.status, 200);
+      assertEquals(await responseBody(response!), { data: { deleted: true } });
+      assertEquals(auditCalls, [[
+        "super_admin_passkey_deleted",
+        "super_admin_auth",
+        "00000000-0000-4000-8000-000000000001",
+        { passkey_id: "passkey-1" },
+      ]]);
+    },
+  );
 });
 
 // =====================================================================

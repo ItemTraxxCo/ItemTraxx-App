@@ -248,8 +248,7 @@ const handleCredentialSubmit = async () => {
       password.value,
       turnstileToken.value ?? ""
     );
-    enableCodeStep(result.email ?? email.value.trim());
-    showToast("Code sent", "Check your email for the verification code.");
+    await router.push(result.requiresTwoFactor ? "/two-factor" : "/super-admin");
   } catch (err) {
     const message = err instanceof Error ? err.message : "Sign in failed.";
     if (message === "Invalid credentials.") {

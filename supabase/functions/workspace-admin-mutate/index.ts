@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
+import { getExternalAuthUser } from "../_shared/externalAuth.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.108.2";
 import { isKillSwitchWriteBlocked } from "../_shared/killSwitch.ts";
 import { isAllowedOrigin, parseAllowedOrigins } from "../_shared/cors.ts";
@@ -6,6 +7,7 @@ import { requireTrustedEdgeIngress } from "../_shared/trustedIngress.ts";
 import { readJsonBody } from "../_shared/requestBody.ts";
 import { validateAccountDeviceSession } from "../_shared/accountSessions.ts";
 import { requireRecentAdminAuth } from "../_shared/adminReauth.ts";
+import { callBetterAuthAdmin } from "../_shared/betterAuthAdmin.ts";
 import { resolveWorkspaceAccess } from "../_shared/workspaceAccess.ts";
 import {
   optionalText,
@@ -109,7 +111,7 @@ serve(async (req) => {
     const {
       data: { user },
       error: authError,
-    } = await userClient.auth.getUser();
+    } = await getExternalAuthUser(userClient, req.headers.get("Authorization") ?? "");
 
     if (authError || !user) {
       return jsonResponse(401, { error: "Unauthorized" });
@@ -284,19 +286,19 @@ serve(async (req) => {
 
     if (action === "create_tenant_account") {
       const authEmail = requireEmail(next.auth_email);
-      const { data: createdAuth, error: createError } = await adminClient.auth.admin.createUser({ email: authEmail, password: randomPassword(), email_confirm: true });
-      if (createError || !createdAuth.user) return jsonResponse(400, { error: "Unable to create Tenant Account." });
-      const { data: created, error } = await adminClient.from("profiles").insert({ id: createdAuth.user.id, workspace_id: requesterProfile.workspace_id, auth_email: authEmail, role: "tenant_account", is_active: true }).select("id,workspace_id,auth_email,role,is_active,deleted_at,created_at").single();
-      if (error || !created) { await adminClient.auth.admin.deleteUser(createdAuth.user.id); return jsonResponse(400, { error: "Unable to create Tenant Account." }); }
+      const profileId = crypto.randomUUID(), temporaryPassword = randomPassword();
+      const createdAuth = await callBetterAuthAdmin<{user:{id:string;betterAuthUserId:string}}>({ action:"create_user",profileId,email:authEmail,password:temporaryPassword,role:"user",profileRole:"tenant_account",workspaceId:requesterProfile.workspace_id });
+      const { data: created, error } = await adminClient.from("profiles").insert({ id: profileId, better_auth_user_id: createdAuth.user.betterAuthUserId, workspace_id: requesterProfile.workspace_id, auth_email: authEmail, role: "tenant_account", is_active: true }).select("id,workspace_id,auth_email,role,is_active,deleted_at,created_at").single();
+      if (error || !created) { await callBetterAuthAdmin({action:"delete_user",profileId,betterAuthUserId:createdAuth.user.betterAuthUserId}).catch(()=>undefined); return jsonResponse(400, { error: "Unable to create Tenant Account." }); }
       const redirectTo=resolveResetRedirectTo(); if (!redirectTo) return jsonResponse(500,{error:"Password reset redirect is not configured."});
-      await adminClient.auth.resetPasswordForEmail(authEmail,{redirectTo}); await writeAudit("create_tenant_account",created.id,{auth_email:authEmail}); return jsonResponse(200,{data:created});
+      await callBetterAuthAdmin({action:"request_password_reset",profileId}); await writeAudit("create_tenant_account",created.id,{auth_email:authEmail}); return jsonResponse(200,{data:created});
     }
 
     if (["set_tenant_account_status","update_tenant_account_email","remove_tenant_account","send_tenant_account_reset"].includes(action)) {
       const id=requireUuid(next.id); const { data: target }=await adminClient.from("profiles").select("id,auth_email").eq("id",id).eq("workspace_id",requesterProfile.workspace_id).eq("role","tenant_account").is("deleted_at",null).maybeSingle(); if(!target)return jsonResponse(404,{error:"Tenant Account not found."});
-      if(action==="send_tenant_account_reset"){const redirectTo=resolveResetRedirectTo();if(!redirectTo)return jsonResponse(500,{error:"Password reset redirect is not configured."});const{error}=await adminClient.auth.resetPasswordForEmail(target.auth_email,{redirectTo});if(error)return jsonResponse(400,{error:"Unable to send password reset."});await writeAudit(action,id,{});return jsonResponse(200,{data:{success:true}});}
+      if(action==="send_tenant_account_reset"){await callBetterAuthAdmin({action:"request_password_reset",profileId:id});await writeAudit(action,id,{});return jsonResponse(200,{data:{success:true}});}
       if(action==="set_tenant_account_status"){if(typeof next.is_active!=="boolean")return jsonResponse(400,{error:"Invalid request"});const{data,error}=await adminClient.from("profiles").update({is_active:next.is_active}).eq("id",id).select("id,workspace_id,auth_email,role,is_active,deleted_at,created_at").single();if(error)return jsonResponse(400,{error:"Unable to update Tenant Account."});await writeAudit(action,id,{is_active:next.is_active});return jsonResponse(200,{data});}
-      if(action==="update_tenant_account_email"){const authEmail=requireEmail(next.auth_email);const{error:authError}=await adminClient.auth.admin.updateUserById(id,{email:authEmail,email_confirm:true});if(authError)return jsonResponse(400,{error:"Unable to update email."});const{data,error}=await adminClient.from("profiles").update({auth_email:authEmail}).eq("id",id).select("id,workspace_id,auth_email,role,is_active,deleted_at,created_at").single();if(error)return jsonResponse(400,{error:"Unable to update Tenant Account."});await writeAudit(action,id,{auth_email:authEmail});return jsonResponse(200,{data});}
+      if(action==="update_tenant_account_email"){const authEmail=requireEmail(next.auth_email);await callBetterAuthAdmin({action:"update_email",profileId:id,email:authEmail});const{data,error}=await adminClient.from("profiles").update({auth_email:authEmail}).eq("id",id).select("id,workspace_id,auth_email,role,is_active,deleted_at,created_at").single();if(error)return jsonResponse(400,{error:"Unable to update Tenant Account."});await writeAudit(action,id,{auth_email:authEmail});return jsonResponse(200,{data});}
       const now=new Date().toISOString();const{error}=await adminClient.from("profiles").update({deleted_at:now,is_active:false}).eq("id",id);if(error)return jsonResponse(400,{error:"Unable to remove Tenant Account."});await adminClient.from("account_sessions").update({revoked_at:now,revoked_by:user.id}).eq("profile_id",id).is("revoked_at",null);await writeAudit(action,id,{});return jsonResponse(200,{data:{success:true}});
     }
 
@@ -330,37 +332,15 @@ serve(async (req) => {
         return acceptedInviteResponse();
       }
 
-      const { data: createdAuth, error: createUserError } = await adminClient.auth.admin.createUser(
-        {
-          email: authEmail,
-          password: randomPassword(),
-          email_confirm: true,
-        }
-      );
-
-      if (createUserError || !createdAuth.user?.id) {
-        const message = lower(createUserError?.message);
-        if (
-          message.includes("already") ||
-          message.includes("registered") ||
-          message.includes("exists")
-        ) {
-          console.info("workspace-admin-mutate invite skipped for existing auth user", {
-            workspace_id: requesterProfile.workspace_id,
-            actor_id: requesterProfile.id,
-          });
-          return acceptedInviteResponse();
-        }
-        return jsonResponse(400, {
-          error: "Unable to process workspace admin invitation.",
-        });
-      }
-
-      const userId = createdAuth.user.id;
+      const userId = crypto.randomUUID();
+      let createdAuth: { user: { betterAuthUserId: string } };
+      try { createdAuth = await callBetterAuthAdmin({action:"create_user",profileId:userId,email:authEmail,password:randomPassword(),role:"user",profileRole:"workspace_admin",workspaceId:requesterProfile.workspace_id}); }
+      catch { return jsonResponse(400,{error:"Unable to process workspace admin invitation."}); }
       const { data: createdProfile, error: insertProfileError } = await adminClient
         .from("profiles")
         .insert({
           id: userId,
+          better_auth_user_id: createdAuth.user.betterAuthUserId,
           workspace_id: requesterProfile.workspace_id,
           auth_email: authEmail,
           role: "workspace_admin",
@@ -370,7 +350,7 @@ serve(async (req) => {
         .single();
 
       if (insertProfileError || !createdProfile) {
-        await adminClient.auth.admin.deleteUser(userId);
+        await callBetterAuthAdmin({action:"delete_user",profileId:userId,betterAuthUserId:createdAuth.user.betterAuthUserId}).catch(()=>undefined);
         return jsonResponse(400, {
           error: "Unable to process workspace admin invitation.",
         });
@@ -379,19 +359,14 @@ serve(async (req) => {
       const redirectTo = resolveResetRedirectTo();
       if (!redirectTo) {
         await adminClient.from("profiles").delete().eq("id", userId);
-        await adminClient.auth.admin.deleteUser(userId);
+        await callBetterAuthAdmin({action:"delete_user",profileId:userId,betterAuthUserId:createdAuth.user.betterAuthUserId}).catch(()=>undefined);
         return jsonResponse(500, {
           error: "Password reset redirect is not configured.",
         });
       }
-      const { error: resetError } = await adminClient.auth.resetPasswordForEmail(
-        authEmail,
-        { redirectTo }
-      );
-
-      if (resetError) {
+      try { await callBetterAuthAdmin({action:"request_password_reset",profileId:userId}); } catch {
         await adminClient.from("profiles").delete().eq("id", userId);
-        await adminClient.auth.admin.deleteUser(userId);
+        await callBetterAuthAdmin({action:"delete_user",profileId:userId,betterAuthUserId:createdAuth.user.betterAuthUserId}).catch(()=>undefined);
         return jsonResponse(400, {
           error: "Unable to send workspace admin invitation.",
         });
@@ -480,11 +455,7 @@ serve(async (req) => {
         });
       }
 
-      const { error: authUpdateError } = await adminClient.auth.admin.updateUserById(id, {
-        email: authEmail,
-        email_confirm: true,
-      });
-      if (authUpdateError) {
+      try { await callBetterAuthAdmin({action:"update_email",profileId:id,email:authEmail}); } catch {
         return jsonResponse(400, {
           error: "Unable to update auth email.",
         });
@@ -545,14 +516,9 @@ serve(async (req) => {
           error: "Password reset redirect is not configured.",
         });
       }
-      const { error: resetError } = await adminClient.auth.resetPasswordForEmail(
-        target.auth_email,
-        { redirectTo }
-      );
-
-      if (resetError) {
+      try { await callBetterAuthAdmin({action:"request_password_reset",profileId:target.id}); } catch {
         return jsonResponse(400, {
-          error: `Unable to send password reset. ${resetError.message}`,
+          error: "Unable to send password reset.",
         });
       }
 

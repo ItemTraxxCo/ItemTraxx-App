@@ -15,7 +15,7 @@ import {
   isRpcProxyPath,
   isUnauthorizedRpcProxyPath,
 } from "./routing.ts";
-import { maybeRefreshSession } from "./session.ts";
+import { getSupabaseAccessToken } from "./auth.ts";
 import { trimTrailingSlash } from "./url.ts";
 
 export const proxySupabaseApiRequest = async (
@@ -74,28 +74,15 @@ export const proxySupabaseApiRequest = async (
     });
   };
 
-  let upstreamResponse = await invoke(cookies.accessToken);
-  let sessionHeaders: Headers | null = null;
-  if (
-    !request.headers.get("Authorization") && upstreamResponse.status === 401 &&
-    cookies.refreshToken
-  ) {
-    const refreshed = await maybeRefreshSession(request, env, cookies);
-    if (refreshed.failure) {
-      return buildSessionRateLimitError(refreshed.failure, headers, requestId);
-    }
-    sessionHeaders = refreshed.headers;
-    if (refreshed.session) {
-      upstreamResponse = await invoke(refreshed.session.accessToken);
-    }
-  }
+  const betterAuthToken = await getSupabaseAccessToken(request, env).catch(() => null);
+  if (!betterAuthToken) return buildError(401, "Unauthorized", headers, requestId);
+  const upstreamResponse = await invoke(betterAuthToken);
 
   const responseHeaders = new Headers(upstreamResponse.headers);
   Object.entries(headers).forEach(([key, value]) =>
     responseHeaders.set(key, value)
   );
   responseHeaders.set("x-request-id", requestId);
-  if (sessionHeaders) appendSetCookies(responseHeaders, sessionHeaders);
   if (cookies.legacyCookiePresent) {
     const migrationHeaders = new Headers();
     clearLegacySessionCookies(migrationHeaders, env);

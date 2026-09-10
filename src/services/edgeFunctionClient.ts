@@ -15,8 +15,6 @@ type EdgeFunctionResult<TData> = {
 import { clearAdminVerification, clearAuthState } from "../store/authState";
 import { getEdgeFunctionsBaseUrl } from "./edgeUrls";
 import { captureHandledRequestFailure } from "./sentry";
-import { signOutLocalSupabaseSession } from "./supabaseAuthSession";
-import { supabase } from "./supabaseClient";
 
 const getDefaultHeaders = (accessToken?: string) => {
   const headers: Record<string, string> = {};
@@ -93,7 +91,9 @@ const requestEdgeFunction = async <TData = unknown, TBody = unknown>(
 
     if (!response.ok) {
       if (isTenantDisabledError(payload)) {
-        await signOutLocalSupabaseSession();
+        await import("../auth/client")
+          .then(({ authClient }) => authClient.signOut())
+          .catch(() => undefined);
         clearAdminVerification();
         clearAuthState(true);
       }
@@ -156,20 +156,6 @@ export const invokeEdgeFunction = async <TData = unknown, TBody = unknown>(
     current.error.toLowerCase().includes("timed out")
   ) {
     return requestEdgeFunction<TData, TBody>(functionName, options);
-  }
-
-  if (current.status === 401 && options.accessToken) {
-    // Retry once with a freshly refreshed session token.
-    // Some upstream paths return generic 401 "Unauthorized" instead of "Invalid JWT".
-    const { data, error } = await supabase.auth.refreshSession();
-    const refreshedToken = data.session?.access_token;
-    if (!error && refreshedToken) {
-      current = await requestEdgeFunction<TData, TBody>(
-        functionName,
-        options,
-        refreshedToken
-      );
-    }
   }
 
   return current;

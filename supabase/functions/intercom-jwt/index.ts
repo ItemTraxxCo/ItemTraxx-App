@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
+import { getExternalAuthUser } from "../_shared/externalAuth.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.108.2";
 import { isAllowedOrigin, parseAllowedOrigins } from "../_shared/cors.ts";
 import {
@@ -80,7 +81,7 @@ serve(async (req) => {
     auth: { persistSession: false },
     global: { headers: { Authorization: `Bearer ${accessToken}` } },
   });
-  const { data, error } = await authClient.auth.getUser(accessToken);
+  const { data, error } = await getExternalAuthUser(authClient, accessToken);
   if (error || !data.user?.id) {
     return jsonResponse(401, { error: "Authentication required." });
   }

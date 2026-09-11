@@ -45,6 +45,24 @@ describe("invokeEdgeFunction CORS transport", () => {
     expect(JSON.parse(init?.body as string)).toEqual({ action: "list_workspaces" });
   });
 
+  it("uses a CORS-simple GET for cookie-authenticated dashboard requests", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(
+      jsonResponse({ data: { ok: true } }, { "x-request-id": "worker-request" }) as unknown as Response,
+    );
+
+    const result = await invokeEdgeFunction("super-dashboard", {
+      method: "GET",
+      avoidCorsPreflight: true,
+    });
+
+    expect(result).toMatchObject({ ok: true, requestId: "worker-request" });
+    const [url, init] = vi.mocked(fetch).mock.calls[0]!;
+    expect(url).toBe("https://edge.example.com/functions/super-dashboard");
+    const headers = init?.headers as Record<string, string>;
+    expect(headers["x-request-id"]).toBeUndefined();
+    expect(init?.credentials).toBe("include");
+  });
+
   it("keeps the authenticated bearer transport and request id when a token is supplied", async () => {
     vi.mocked(fetch).mockResolvedValueOnce(jsonResponse({ data: { ok: true } }) as unknown as Response);
 

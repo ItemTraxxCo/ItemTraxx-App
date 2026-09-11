@@ -28,6 +28,7 @@ describe("callSuperOps", () => {
     expect(mockedInvoke).toHaveBeenCalledWith("super-ops", {
       method: "POST",
       body: { action: "get_control_center", payload: { foo: "bar" } },
+      avoidCorsPreflight: true,
     });
   });
 

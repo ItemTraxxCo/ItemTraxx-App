@@ -11,7 +11,7 @@ export const MAINTENANCE_FALLBACK_KEY = "itemtraxx:maintenance_fallback:v1";
 
 export const BASE_CORS_HEADERS = {
   "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-request-id, prefer, x-itx-session-request, x-itx-data-request",
+    "authorization, x-client-info, apikey, content-type, x-request-id, prefer, x-itx-session-request, x-itx-data-request, x-captcha-response",
   "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
   "Access-Control-Allow-Credentials": "true",
   "Access-Control-Expose-Headers":

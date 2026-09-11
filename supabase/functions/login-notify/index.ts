@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
+import { getExternalAuthUser } from "../_shared/externalAuth.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.108.2";
 import { sendLoggedResendEmail } from "../_shared/emailDeliveryLog.ts";
 import { applyEmailTheme, buildEmailBrandHeaderHtml, withEmailBrandLogoAttachment } from "../_shared/emailBranding.ts";
@@ -239,7 +240,7 @@ serve(async (req) => {
     const {
       data: { user },
       error: userError,
-    } = await adminClient.auth.getUser(accessToken);
+    } = await getExternalAuthUser(adminClient, accessToken);
 
     if (userError || !user) {
       return jsonResponse(401, { error: "Unauthorized" });

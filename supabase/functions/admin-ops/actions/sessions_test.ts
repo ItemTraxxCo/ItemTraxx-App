@@ -102,6 +102,16 @@ const makeClient = (
   return {
     client: {
       from,
+      // Production session validation verifies the Better Auth JWT through the
+      // external-auth bridge. Keep the test double on that same boundary so
+      // query sequences exercise the intended session logic instead of
+      // falling through to a real network/env lookup.
+      __verifyExternalAuthClaimsForTest: () =>
+        Promise.resolve(
+          options.claimsError || options.claims === null
+            ? null
+            : options.claims ?? { session_id: "auth-session-1" },
+        ),
       auth: {
         getClaims: () =>
           Promise.resolve({

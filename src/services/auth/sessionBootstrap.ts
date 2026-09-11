@@ -3,7 +3,7 @@ import { clearAdminVerification, clearAuthState, getAuthState, getPersistedAdmin
 import { clearSessionTermination } from "../../store/sessionTermination";
 import { lookupWorkspaceById } from "../workspaceService";
 import { fetchHttpSessionSummary } from "../httpSessionService";
-import { signOutLocalSupabaseSession } from "../supabaseAuthSession";
+import { clearHttpSession } from "../httpSessionService";
 import { authenticatedRpc, authenticatedSelect } from "../authenticatedDataClient";
 import { toKnownRole, type ProfileRow, type WorkspaceRow } from "./types";
 import { quarantineOfflineCheckoutQueueForCurrentSession } from "../offlineCheckoutQueue";
@@ -24,7 +24,7 @@ export const fetchWorkspaceContext=async(workspaceId:string):Promise<WorkspaceRo
 };
 export const resolveWorkspaceSlug=async(workspaceId:string|null)=>workspaceId?(await lookupWorkspaceById(workspaceId))?.slug?.trim()||null:null;
 export type ApplyHttpSessionSummaryOptions = { isCurrent?: () => boolean };
-const terminateSuspended=async(profile:ProfileRow|null,isCurrent=()=>true)=>{ if(!profile?.workspace_id||profile.role==="super_admin") return false; const workspace=await fetchWorkspaceContext(profile.workspace_id); if(!isCurrent()) return true; if(workspace?.status&&workspace.status!=="active"){await signOutLocalSupabaseSession();clearAdminVerification();clearAuthState(true);return true;}return false; };
+const terminateSuspended=async(profile:ProfileRow|null,isCurrent=()=>true)=>{ if(!profile?.workspace_id||profile.role==="super_admin") return false; const workspace=await fetchWorkspaceContext(profile.workspace_id); if(!isCurrent()) return true; if(workspace?.status&&workspace.status!=="active"){await clearHttpSession().catch(()=>undefined);clearAdminVerification();clearAuthState(true);return true;}return false; };
 export const applyHttpSessionSummary=async(summary:Awaited<ReturnType<typeof fetchHttpSessionSummary>>,options:ApplyHttpSessionSummaryOptions={})=>{
   const isCurrent=options.isCurrent??(()=>true);
   if(!isCurrent()) return;

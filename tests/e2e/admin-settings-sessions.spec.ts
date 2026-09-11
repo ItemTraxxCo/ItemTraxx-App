@@ -73,6 +73,8 @@ test.describe("admin settings device sessions repro", () => {
     });
     await setWorkspaceAdminSession(page);
     await navigateApp(page, "/admin/settings");
+    const consent = page.getByRole("dialog", { name: "Cookie preferences" });
+    if (await consent.isVisible()) await consent.getByRole("button", { name: "Essential only" }).click();
 
     await expect(page.getByRole("heading", { name: "Active Devices" })).toBeVisible();
     await expect(page.getByText("Home laptop")).toBeVisible();

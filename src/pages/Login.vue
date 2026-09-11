@@ -104,6 +104,12 @@
               >
                 Sign in
               </button>
+              <button type="button" :disabled="isLoading" @click="handlePasskeyLogin">
+                Sign in with a passkey
+              </button>
+              <button type="button" :disabled="isLoading || !email.trim()" @click="handleSsoLogin">
+                Continue with workspace SSO
+              </button>
             </div>
           </form>
 
@@ -135,6 +141,7 @@ import SafeExternalLink from "../components/SafeExternalLink.vue";
 import { useTurnstile } from "../composables/useTurnstile";
 import { clearAdminVerification, getAuthState } from "../store/authState";
 import { safeExternalUrl } from "../utils/safeUrl";
+import { authClient } from "../auth/client";
 
 const router = useRouter();
 const email = ref("");
@@ -381,6 +388,28 @@ const handleLogin = async () => {
         console.error("Please reload the page. Failed to reset Turnstile widget:", turnstileError);
       }
     }
+  }
+};
+
+const handlePasskeyLogin = async () => {
+  error.value = ""; isLoading.value = true;
+  try {
+    const result = await authClient.signIn.passkey();
+    if (result.error) throw new Error(result.error.message ?? "Passkey sign-in failed.");
+    window.location.assign("/");
+  } catch (cause) {
+    error.value = cause instanceof Error ? cause.message : "Passkey sign-in failed.";
+  } finally { isLoading.value = false; }
+};
+
+const handleSsoLogin = async () => {
+  error.value = ""; isLoading.value = true;
+  try {
+    const result = await authClient.signIn.sso({ email: email.value.trim().toLowerCase(), callbackURL: `${location.origin}/` });
+    if (result.error) throw new Error(result.error.message ?? "SSO sign-in failed.");
+  } catch (cause) {
+    error.value = cause instanceof Error ? cause.message : "SSO sign-in failed.";
+    isLoading.value = false;
   }
 };
 

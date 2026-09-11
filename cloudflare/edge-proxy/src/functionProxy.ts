@@ -14,12 +14,21 @@ import {
 } from "./requestBody.ts";
 import { sanitizeRequestHeaders } from "./requestHeaders.ts";
 import { buildError, buildSessionRateLimitError } from "./responses.ts";
-import { maybeRefreshSession } from "./session.ts";
+import { getSupabaseAccessToken } from "./auth.ts";
 import { applyTrustedIngressHeaders } from "./trustedIngress.ts";
 import { trimTrailingSlash } from "./url.ts";
 
 // The status envelope is small; bound the only upstream response branch that is read.
 export const SYSTEM_STATUS_JSON_MAX_BYTES = 64 * 1024;
+const PUBLIC_FUNCTIONS = new Set([
+  "system-status",
+  "checkout-borrower-lookup",
+  "contact-sales-submit",
+  "contact-support-submit",
+  "client-error-report",
+  "consent-record",
+  "job-worker",
+]);
 
 const readBoundedSystemStatusText = async (
   response: Response,
@@ -102,15 +111,19 @@ export const proxyFunctionRequest = async (
     return fetch(supabaseFunctionUrl, {
       method: request.method,
       headers: proxiedHeaders,
-      body: requestBody
+      body: (requestBody
         ? invocationCount++ === 0 ? requestBody : requestBody.slice()
-        : undefined,
+        : undefined) as BodyInit | undefined,
     });
   };
 
+  const betterAuthToken = await getSupabaseAccessToken(request, env).catch(() => null);
+  if (!betterAuthToken && !PUBLIC_FUNCTIONS.has(functionName)) {
+    return buildError(401, "Authentication required", headers, requestId);
+  }
   let upstreamResponse: Response;
   try {
-    upstreamResponse = await invoke(cookies.accessToken);
+    upstreamResponse = await invoke(betterAuthToken);
   } catch (error) {
     if (isSystemStatusGet) {
       const cached = await readMaintenanceFallback(env);
@@ -138,27 +151,11 @@ export const proxyFunctionRequest = async (
     throw error;
   }
 
-  let sessionHeaders: Headers | null = null;
-  if (
-    !request.headers.get("Authorization") && upstreamResponse.status === 401 &&
-    cookies.refreshToken
-  ) {
-    const refreshed = await maybeRefreshSession(request, env, cookies);
-    if (refreshed.failure) {
-      return buildSessionRateLimitError(refreshed.failure, headers, requestId);
-    }
-    sessionHeaders = refreshed.headers;
-    if (refreshed.session) {
-      upstreamResponse = await invoke(refreshed.session.accessToken);
-    }
-  }
-
   const responseHeaders = new Headers(upstreamResponse.headers);
   Object.entries(headers).forEach(([key, value]) =>
     responseHeaders.set(key, value)
   );
   responseHeaders.set("x-request-id", requestId);
-  if (sessionHeaders) appendSetCookies(responseHeaders, sessionHeaders);
   if (cookies.legacyCookiePresent) {
     const migrationHeaders = new Headers();
     clearLegacySessionCookies(migrationHeaders, env);

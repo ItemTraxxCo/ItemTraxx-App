@@ -17,13 +17,9 @@
 // user to sign themselves out, and checkoutReturn, which is the daily-driver
 // workflow for both roles.
 
+import { verifyExternalAuthClaims } from "./externalAuth.ts";
 type ClaimsClient = {
-  auth: {
-    getClaims: (token: string) => Promise<{
-      data: { claims: Record<string, unknown> } | null;
-      error: unknown | null;
-    }>;
-  };
+  __verifyExternalAuthClaimsForTest?: (token: string) => Promise<Record<string, unknown> | null>;
 };
 
 export const ADMIN_REAUTH_MAX_AGE_MS = 15 * 60 * 1000;
@@ -68,16 +64,23 @@ export type AdminReauthResult =
  * timestamp, is treated as not re-authenticated.
  */
 export const checkRecentAdminAuth = async (
-  authClient: ClaimsClient,
+  authClient: unknown,
   authToken: string,
   maxAgeMs: number = ADMIN_REAUTH_MAX_AGE_MS,
 ): Promise<AdminReauthResult> => {
-  const { data, error } = await authClient.auth.getClaims(authToken);
-  if (error || !data?.claims) {
+  // The production caller supplies a SupabaseClient; tests may inject the
+  // optional verifier hook. Keep the boundary broad and inspect only that
+  // explicitly named hook after a local structural cast.
+  const testVerifier = (authClient as ClaimsClient).__verifyExternalAuthClaimsForTest;
+  const claims = await (
+    testVerifier?.(authToken) ??
+    verifyExternalAuthClaims(`Bearer ${authToken}`)
+  );
+  if (!claims) {
     return { fresh: false, reason: "unverified" };
   }
 
-  const authenticatedAtMs = readLatestAuthTimestampMs(data.claims);
+  const authenticatedAtMs = readLatestAuthTimestampMs(claims);
   if (authenticatedAtMs === null) {
     return { fresh: false, reason: "no_auth_timestamp" };
   }
@@ -102,7 +105,7 @@ const ADMIN_REAUTH_REQUIRED_MESSAGE = "Admin verification required.";
  * null to continue.
  */
 export const requireRecentAdminAuth = async (
-  authClient: ClaimsClient,
+  authClient: unknown,
   authToken: string,
   jsonResponse: (status: number, body: Record<string, unknown>) => Response,
   maxAgeMs: number = ADMIN_REAUTH_MAX_AGE_MS,

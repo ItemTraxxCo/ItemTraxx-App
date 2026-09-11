@@ -29,7 +29,7 @@ echo "[security] checking privileged RLS policy invariants"
 node ./scripts/check-privileged-rls-policies.mjs
 
 echo "[security] running Supabase shared security regression tests"
-deno test --allow-env \
+deno test --node-modules-dir=none --allow-env \
   supabase/functions/_shared/cors_test.ts \
   supabase/functions/_shared/accountSessions_test.ts \
   supabase/functions/_shared/adminReauth_test.ts \

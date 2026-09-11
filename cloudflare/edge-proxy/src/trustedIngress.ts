@@ -30,7 +30,7 @@ export const hashTrustedIngressBody = async (body: Uint8Array | null) => {
     return "no-body";
   }
 
-  const digest = await crypto.subtle.digest("SHA-256", body);
+  const digest = await crypto.subtle.digest("SHA-256", body as Uint8Array<ArrayBuffer>);
   return toHex(new Uint8Array(digest));
 };
 

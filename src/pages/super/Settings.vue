@@ -8,6 +8,7 @@
       <p class="admin-hero-copy">
         Manage account security, passkeys, and active sessions for your super admin access.
       </p>
+      <p><RouterLink class="button-link" to="/account/security">Account Security</RouterLink> · <RouterLink class="button-link" to="/super-admin/settings/sso">Enterprise SSO oversight</RouterLink></p>
       <div class="admin-summary-grid">
         <div class="admin-summary-card">
           <strong>{{ passkeys.length }}</strong>
@@ -219,7 +220,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
 import { RouterLink } from "vue-router";
-import { supabase } from "../../services/supabaseClient";
+import { authClient } from "../../auth/client";
 import { toUserFacingErrorMessage } from "../../services/appErrors";
 import { getAuthState } from "../../store/authState";
 import {
@@ -328,7 +329,7 @@ const sendPasswordReset = async () => {
   isPasswordResetSending.value = true;
   try {
     const redirectTo = getPasswordResetRedirectUrl();
-    const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo });
+    const { error } = await authClient.requestPasswordReset({ email, redirectTo });
     if (error) throw error;
     passwordResetMessage.value = "Password reset email sent.";
   } catch (err) {

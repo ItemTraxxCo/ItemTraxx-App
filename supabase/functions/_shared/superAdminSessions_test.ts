@@ -15,9 +15,9 @@ class QueryBuilder {
 }
 
 class MockClient {
-  auth: { getClaims: () => Promise<{ data: { claims: Record<string, unknown> } | null; error: Error | null }> };
+  verifyExternalAuthClaims: () => Promise<Record<string, unknown> | null>;
   constructor(private readonly responses: QueryResponse[], claims: Record<string, unknown> | null) {
-    this.auth = { getClaims: () => Promise.resolve({ data: claims ? { claims } : null, error: claims ? null : new Error("invalid jwt") }) };
+    this.verifyExternalAuthClaims = () => Promise.resolve(claims);
   }
   from() {
     const response = this.responses.shift();

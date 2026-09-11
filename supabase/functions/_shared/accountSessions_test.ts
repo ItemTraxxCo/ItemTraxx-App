@@ -42,6 +42,7 @@ class QueryBuilder {
 }
 
 class MockClient {
+  __verifyExternalAuthClaimsForTest: () => Promise<Record<string, unknown> | null>;
   auth: {
     getClaims: () => Promise<{
       data: { claims: Record<string, unknown> } | null;
@@ -53,6 +54,7 @@ class MockClient {
     private readonly responses: QueryResponse[],
     claims: Record<string, unknown> | null,
   ) {
+    this.__verifyExternalAuthClaimsForTest = () => Promise.resolve(claims);
     this.auth = {
       getClaims: () =>
         Promise.resolve({

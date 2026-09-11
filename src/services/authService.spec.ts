@@ -15,7 +15,6 @@ vi.mock("./auth/sessionBootstrap", () => ({
 }));
 
 vi.mock("./auth/privilegedLogin", () => ({
-  adminLoginWithSession: vi.fn(),
   resendSuperAdminEmailChallenge: vi.fn(),
   superAdminLogin: vi.fn(),
   superAdminPasskeyLogin: vi.fn(),
@@ -41,7 +40,6 @@ import {
   refreshAuthFromSession,
 } from "./auth/sessionBootstrap";
 import {
-  adminLoginWithSession,
   resendSuperAdminEmailChallenge,
   superAdminLogin,
   superAdminPasskeyLogin,
@@ -66,7 +64,6 @@ describe("authService barrel exports", () => {
   });
 
   it("re-exports privileged login helpers from auth/privilegedLogin", () => {
-    expect(authService.adminLoginWithSession).toBe(adminLoginWithSession);
     expect(authService.resendSuperAdminEmailChallenge).toBe(resendSuperAdminEmailChallenge);
     expect(authService.superAdminLogin).toBe(superAdminLogin);
     expect(authService.superAdminPasskeyLogin).toBe(superAdminPasskeyLogin);

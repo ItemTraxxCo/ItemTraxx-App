@@ -1,5 +1,7 @@
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
+import { getExternalAuthUser } from "../_shared/externalAuth.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.108.2";
+import { callBetterAuthAdmin } from "../_shared/betterAuthAdmin.ts";
 import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.108.2";
 import { isKillSwitchWriteBlocked } from "../_shared/killSwitch.ts";
 import {
@@ -177,13 +179,12 @@ const verifySuperPassword = async (
   supabaseUrl: string,
   publishableKey: string,
   email: string,
-  password: string
+  password: string,
+  profileId: string,
 ) => {
-  const authClient = createClient(supabaseUrl, publishableKey, {
-    auth: { persistSession: false },
-  });
-  const { error } = await authClient.auth.signInWithPassword({ email, password });
-  return !error;
+  void supabaseUrl; void publishableKey; void email;
+  const result = await callBetterAuthAdmin<{verified:boolean}>({action:"verify_password",profileId,password});
+  return result.verified;
 };
 
 serve(async (req) => {
@@ -240,7 +241,7 @@ serve(async (req) => {
     const {
       data: { user },
       error: authError,
-    } = await userClient.auth.getUser();
+    } = await getExternalAuthUser(userClient, req.headers.get("Authorization") ?? "");
 
     if (authError || !user) {
       return jsonResponse(401, { error: "Unauthorized" });
@@ -469,7 +470,8 @@ serve(async (req) => {
         supabaseUrl,
         publishableKey,
         profile.auth_email ?? user.email ?? "",
-        password
+        password,
+        user.id,
       );
       if (!verified) {
         return jsonResponse(403, { error: "Super password verification failed." });

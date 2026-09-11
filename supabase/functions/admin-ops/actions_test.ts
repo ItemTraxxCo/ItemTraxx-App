@@ -107,6 +107,12 @@ const queryClient = (
   return {
     client: {
       from,
+      __verifyExternalAuthClaimsForTest: () =>
+        Promise.resolve(
+          options.claimsError || options.claims === null
+            ? null
+            : options.claims ?? { session_id: "auth-session-1", iat: 1_700_000_000 },
+        ),
       auth: {
         getClaims: () =>
           Promise.resolve({

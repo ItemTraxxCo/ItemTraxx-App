@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
+import { getExternalAuthUser } from "../_shared/externalAuth.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.108.2";
 import { isKillSwitchWriteBlocked } from "../_shared/killSwitch.ts";
 import { isAllowedOrigin, parseAllowedOrigins } from "../_shared/cors.ts";
@@ -7,6 +8,7 @@ import { readJsonBody } from "../_shared/requestBody.ts";
 import { hasPrivilegedStepUp } from "../_shared/privilegedStepUp.ts";
 import { isSuperAdminTokenBlockedBySessionRevocation } from "../_shared/superAdminSessions.ts";
 import { writeSuperAdminAudit } from "../_shared/superAdminAudit.ts";
+import { callBetterAuthAdmin } from "../_shared/betterAuthAdmin.ts";
 import {
   optionalText,
   requireEmail,
@@ -134,7 +136,7 @@ serve(async (req) => {
         auth: { persistSession: false },
       }),
       admin = createClient(url, service, { auth: { persistSession: false } });
-    const { data: { user } } = await userClient.auth.getUser();
+    const { data: { user } } = await getExternalAuthUser(userClient, req.headers.get("Authorization") ?? "");
     if (!user) return json(401, { error: "Unauthorized" });
     const { data: profile } = await admin.from("profiles").select(
       "role,is_active",
@@ -241,31 +243,32 @@ serve(async (req) => {
       if (error || !w) {
         return json(400, { error: "Unable to create workspace." });
       }
-      const created = await admin.auth.admin.createUser({
-        email,
-        password: typeof p.password === "string" && p.password
-          ? p.password
-          : randomPassword(),
-        email_confirm: true,
-      });
-      if (created.error || !created.data.user) {
+      let organization: { organization: { id: string } };
+      try { organization = await callBetterAuthAdmin({action:"create_organization",workspaceId:w.id,name,slug}); }
+      catch { await admin.from("workspaces").delete().eq("id", w.id); return json(400,{error:"Unable to create workspace identity."}); }
+      const profileId = crypto.randomUUID();
+      let created: { user: { betterAuthUserId: string } };
+      try { created = await callBetterAuthAdmin({action:"create_user",profileId,email,password:typeof p.password === "string"&&p.password?p.password:randomPassword(),role:"user",profileRole:"workspace_admin",workspaceId:w.id}); }
+      catch {
+        await callBetterAuthAdmin({action:"delete_organization",organizationId:organization.organization.id}).catch(()=>undefined);
         await admin.from("workspaces").delete().eq("id", w.id);
         return json(400, { error: "Unable to create primary admin." });
       }
       const { error: pe } = await admin.from("profiles").insert({
-        id: created.data.user.id,
+        id: profileId,
+        better_auth_user_id: created.user.betterAuthUserId,
         workspace_id: w.id,
         role: "workspace_admin",
         auth_email: email,
         is_active: true,
       });
       if (pe) {
-        await admin.auth.admin.deleteUser(created.data.user.id);
+        await callBetterAuthAdmin({action:"delete_user",profileId,betterAuthUserId:created.user.betterAuthUserId}).catch(()=>undefined);
         await admin.from("workspaces").delete().eq("id", w.id);
         return json(400, { error: "Unable to create workspace." });
       }
       await admin.from("workspaces").update({
-        primary_admin_profile_id: created.data.user.id,
+        primary_admin_profile_id: profileId,
       }).eq("id", w.id);
       const { error: policyError } = await admin.from("workspace_policies").upsert({
         workspace_id: w.id,
@@ -274,7 +277,7 @@ serve(async (req) => {
         updated_at: new Date().toISOString(),
       });
       if (policyError) {
-        await admin.auth.admin.deleteUser(created.data.user.id);
+        await callBetterAuthAdmin({action:"delete_user",profileId,betterAuthUserId:created.user.betterAuthUserId}).catch(()=>undefined);
         await admin.from("workspaces").delete().eq("id", w.id);
         return json(400, { error: "Unable to create workspace settings." });
       }
@@ -361,11 +364,9 @@ serve(async (req) => {
           error: "Password reset redirect is not configured.",
         });
       }
-      const { error } = await admin.auth.resetPasswordForEmail(
-        row.primary_admin_email,
-        { redirectTo: redirect },
-      );
-      if (error) return json(400, { error: "Unable to send password reset." });
+      const { data: primary } = await admin.from("profiles").select("id").eq("workspace_id",workspaceId).eq("auth_email",row.primary_admin_email).maybeSingle();
+      if (!primary?.id) return json(404,{error:"Primary admin not found."});
+      try { await callBetterAuthAdmin({action:"request_password_reset",profileId:primary.id}); } catch { return json(400,{error:"Unable to send password reset."}); }
       await writeAudit("send_primary_admin_reset", workspaceId, {});
       return json(200, {
         data: { success: true, auth_email: row.primary_admin_email },

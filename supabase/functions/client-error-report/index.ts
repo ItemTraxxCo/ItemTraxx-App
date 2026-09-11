@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
+import { getExternalAuthUser } from "../_shared/externalAuth.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.108.2";
 import {
   enforcePublicRateLimits,
@@ -227,7 +228,7 @@ serve(async (req) => {
       });
       const {
         data: { user },
-      } = await userClient.auth.getUser();
+    } = await getExternalAuthUser(userClient, req.headers.get("Authorization") ?? "");
       if (user?.id) {
         const { data: profile } = await userClient
           .from("profiles")

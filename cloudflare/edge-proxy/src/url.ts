@@ -11,3 +11,16 @@ export const trimTrailingSlash = (value: string) => {
   }
   return value.slice(0, end);
 };
+
+/**
+ * Return true only for the ItemTraxx apex domain and its real subdomains.
+ *
+ * The label boundary is intentional: `evilitemtraxx.com` and
+ * `itemtraxx.com.attacker.example` must never be treated as ItemTraxx hosts.
+ */
+export const isItemTraxxHostname = (hostname: string) => {
+  const normalized = hostname.trim().toLowerCase();
+  const root = "itemtraxx.com";
+  return normalized === root ||
+    (normalized.length > root.length + 1 && normalized.endsWith(`.${root}`));
+};

@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
+import { getExternalAuthUser } from "../_shared/externalAuth.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.108.2";
 import { isAllowedOrigin, parseAllowedOrigins } from "../_shared/cors.ts";
 import { readJsonBody } from "../_shared/requestBody.ts";
@@ -131,7 +132,7 @@ serve(async (req) => {
       auth: { persistSession: false },
       global: { headers: { Authorization: `Bearer ${token}` } },
     });
-    const { data: userData } = await authClient.auth.getUser(token);
+    const { data: userData } = await getExternalAuthUser(authClient, token);
     profileId = userData.user?.id ?? null;
   }
 

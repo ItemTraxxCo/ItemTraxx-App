@@ -59,8 +59,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from "vue";
 import { RouterLink } from "vue-router";
-import { signOutLocalSupabaseSession } from "../services/supabaseAuthSession";
-import { supabase } from "../services/supabaseClient";
+import { authClient } from "../auth/client";
 import { scrubSensitiveRecoveryUrl } from "../utils/passwordResetRedirect";
 
 const newPassword = ref("");
@@ -75,11 +74,10 @@ let themeObserver: MutationObserver | null = null;
 
 const hasRecoveryLinkContext = () => {
   const queryParams = new URLSearchParams(window.location.search);
-  const hashParams = new URLSearchParams(
-    window.location.hash.startsWith("#") ? window.location.hash.slice(1) : window.location.hash
-  );
-  return queryParams.get("type") === "recovery" || hashParams.get("type") === "recovery";
+  return Boolean(queryParams.get("token"));
 };
+
+const recoveryToken = () => new URLSearchParams(window.location.search).get("token") ?? "";
 
 const passwordPolicyMessage =
   "Password must be at least 12 characters and include lowercase, uppercase, a number, and a symbol.";
@@ -120,25 +118,9 @@ const checkRecoverySession = async () => {
     return;
   }
 
-  const attempt = async () => {
-    const { data } = await supabase.auth.getSession();
-    return !!data.session;
-  };
-
   try {
-    // Give Supabase a moment to parse recovery hash tokens from URL.
-    if (await attempt()) {
-      isReady.value = true;
-      return;
-    }
-    await new Promise((resolve) => window.setTimeout(resolve, 250));
-    isReady.value = await attempt();
-  } finally {
-    // Supabase has now had its first/second chance to parse the link. Always
-    // leave the address bar with a path-only recovery route, including on an
-    // expired or failed link.
-    scrubSensitiveRecoveryUrl();
-  }
+    isReady.value = Boolean(recoveryToken());
+  } catch { isReady.value = false; }
 };
 
 const handleReset = async () => {
@@ -158,15 +140,16 @@ const handleReset = async () => {
 
   isLoading.value = true;
   try {
-    const { error: updateError } = await supabase.auth.updateUser({
-      password: newPassword.value,
+    const { error: updateError } = await authClient.resetPassword({
+      newPassword: newPassword.value,
+      token: recoveryToken(),
     });
     if (updateError) {
       error.value = passwordUpdateErrorMessage(updateError);
       return;
     }
     success.value = true;
-    await signOutLocalSupabaseSession();
+    scrubSensitiveRecoveryUrl();
   } finally {
     isLoading.value = false;
   }

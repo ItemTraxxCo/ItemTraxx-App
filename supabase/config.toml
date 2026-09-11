@@ -220,7 +220,7 @@ otp_expiry = 900
 # user = "apikey"
 
 [functions.workspace-admin-mutate]
-# Auth is validated inside function via userClient.auth.getUser(authHeader).
+# Better Auth JWT and profile authorization are validated inside the function.
 verify_jwt = false
 # pass = "env(SENDGRID_API_KEY)"
 # admin_email = "admin@email.com"
@@ -264,41 +264,37 @@ max_frequency = "5s"
 # uri = "pg-functions://postgres/auth/before-user-created-hook"
 
 [functions.super-ops]
-# Authentication is validated inside the function with adminClient.auth.getUser(token).
+# Better Auth JWT and super-admin authorization are validated inside the function.
 # Keep gateway JWT verification off so proxy/header variations do not block valid requests.
 verify_jwt = false
 
 [functions.super-workspace-mutate]
-# Authentication is validated inside the function with userClient.auth.getUser(authHeader).
+# Better Auth JWT and profile authorization are validated inside the function.
 # Keep gateway JWT verification off so proxy/header variations do not block valid requests.
 verify_jwt = false
 
 [functions.super-admin-mutate]
-# Authentication is validated inside the function with userClient.auth.getUser(authHeader).
+# Better Auth JWT and profile authorization are validated inside the function.
 # Keep gateway JWT verification off so proxy/header variations do not block valid requests.
 verify_jwt = false
 
 [functions.super-dashboard]
-# Authentication is validated inside the function with userClient.auth.getUser(authHeader).
+# Better Auth JWT and profile authorization are validated inside the function.
 # Keep gateway JWT verification off so proxy/header variations do not block valid requests.
 verify_jwt = false
 
 [functions.super-item-mutate]
-# Authentication is validated inside the function with userClient.auth.getUser(authHeader).
+# Better Auth JWT and profile authorization are validated inside the function.
 # Keep gateway JWT verification off so proxy/header variations do not block valid requests.
 verify_jwt = false
 
 [functions.super-logs-query]
-# Authentication is validated inside the function with userClient.auth.getUser(authHeader).
+# Better Auth JWT and profile authorization are validated inside the function.
 # Keep gateway JWT verification off so proxy/header variations do not block valid requests.
 verify_jwt = false
 
 [functions.system-status]
 # Public health endpoint consumed by app shell before user auth.
-verify_jwt = false
-
-[functions.workspace-login]
-# Pre-auth email/password login resolver; no JWT available yet.
 verify_jwt = false
 
 [functions.contact-sales-submit]
@@ -318,29 +314,25 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.admin-ops]
-# Auth is validated inside function via auth.getUser(authHeader).
+# Better Auth JWT and profile authorization are validated inside the function.
 verify_jwt = false
 
 [functions.login-notify]
-# Auth is validated inside function via adminClient.auth.getUser(accessToken).
-verify_jwt = false
-
-[functions.super-auth-verify]
-# Auth is validated inside function via userClient.auth.getUser(authHeader).
+# Better Auth JWT and profile authorization are validated inside the function.
 verify_jwt = false
 
 [functions.privileged-step-up]
-# Auth is validated inside function via userClient.auth.getUser(authHeader).
+# Better Auth JWT and profile authorization are validated inside the function.
 # Keep gateway JWT verification off so proxy/header variations do not block valid requests.
 verify_jwt = false
 
 
 [functions.admin-item-mutate]
-# Auth is validated inside function via userClient.auth.getUser(authHeader).
+# Better Auth JWT and profile authorization are validated inside the function.
 verify_jwt = false
 
 [functions.admin-borrower-mutate]
-# Auth is validated inside function via userClient.auth.getUser(authHeader).
+# Better Auth JWT and profile authorization are validated inside the function.
 verify_jwt = false
 
 [functions.super-borrower-mutate]
@@ -348,11 +340,11 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.checkoutReturn]
-# Auth is validated inside function via userClient.auth.getUser(authHeader).
+# Better Auth JWT and profile authorization are validated inside the function.
 verify_jwt = false
 
 [functions.checkout-borrower-lookup]
-# Auth is validated inside function via userClient.auth.getUser(authHeader).
+# Better Auth JWT and profile authorization are validated inside the function.
 verify_jwt = false
 
 [functions.offline-checkout]

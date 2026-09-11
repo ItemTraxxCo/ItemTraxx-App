@@ -25,6 +25,20 @@ export const fetchWorkspaceContext=async(workspaceId:string):Promise<WorkspaceRo
 export const resolveWorkspaceSlug=async(workspaceId:string|null)=>workspaceId?(await lookupWorkspaceById(workspaceId))?.slug?.trim()||null:null;
 export type ApplyHttpSessionSummaryOptions = { isCurrent?: () => boolean };
 const terminateSuspended=async(profile:ProfileRow|null,isCurrent=()=>true)=>{ if(!profile?.workspace_id||profile.role==="super_admin") return false; const workspace=await fetchWorkspaceContext(profile.workspace_id); if(!isCurrent()) return true; if(workspace?.status&&workspace.status!=="active"){await clearHttpSession().catch(()=>undefined);clearAdminVerification();clearAuthState(true);return true;}return false; };
+// The admin verification marker is intentionally kept in browser state so the
+// router can provide a fast UX guard. A full-page login handoff moves from the
+// root app origin to `{workspace}.app.itemtraxx.com`, though, and
+// sessionStorage is isolated between those origins. Better Auth's session
+// `createdAt` is the server-issued authentication timestamp used by the
+// server-side admin re-auth check as well, so use the summary's
+// `last_sign_in_at` as the cross-origin fallback. Never replace a newer marker
+// from the current origin or a deliberately persisted verification.
+type AuthenticatedSessionUser = NonNullable<Awaited<ReturnType<typeof fetchHttpSessionSummary>>["user"]>;
+const resolveAdminVerificationAt = (summaryUser:AuthenticatedSessionUser, passwordAuthenticatedAt:string|null|undefined, current:ReturnType<typeof getAuthState>, role:ProfileRow["role"]) => {
+  if (role !== "workspace_admin") return null;
+  if (current.userId === summaryUser.id && current.adminVerifiedAt) return current.adminVerifiedAt;
+  return getPersistedAdminVerification(summaryUser.id) ?? passwordAuthenticatedAt ?? summaryUser.last_sign_in_at ?? null;
+};
 export const applyHttpSessionSummary=async(summary:Awaited<ReturnType<typeof fetchHttpSessionSummary>>,options:ApplyHttpSessionSummaryOptions={})=>{
   const isCurrent=options.isCurrent??(()=>true);
   if(!isCurrent()) return;
@@ -33,7 +47,7 @@ export const applyHttpSessionSummary=async(summary:Awaited<ReturnType<typeof fet
   if(await terminateSuspended(profile,isCurrent)) return;
   if(!isCurrent()) return;
   const current=getAuthState(); const same=current.userId===summary.user.id; const previousWorkspaceId=current.workspaceContextId??current.sessionWorkspaceId??null; const workspaceChanged=Boolean(profile?.workspace_id&&previousWorkspaceId&&profile.workspace_id!==previousWorkspaceId); const identityChanged=Boolean(current.isAuthenticated&&(current.userId!==summary.user.id||workspaceChanged)); const role=profile?.role??(same?current.role:null); const workspaceId=profile?.workspace_id??(same?current.sessionWorkspaceId:null);
-  setAuthStateFromBackend({isInitialized:true,isAuthenticated:true,userId:summary.user.id,email:summary.user.email,signedInAt:summary.user.last_sign_in_at,role,sessionWorkspaceId:workspaceId,workspaceContextId:workspaceId,hasSecondaryAuth:same&&role==="super_admin"?current.hasSecondaryAuth:false,superVerifiedAt:same&&role==="super_admin"?current.superVerifiedAt:null,adminVerifiedAt:(same?current.adminVerifiedAt:null)??(role==="workspace_admin"?(getPersistedAdminVerification(summary.user.id)??summary.password_authenticated_at):null)}); clearSessionTermination();
+  setAuthStateFromBackend({isInitialized:true,isAuthenticated:true,userId:summary.user.id,email:summary.user.email,signedInAt:summary.user.last_sign_in_at,role,sessionWorkspaceId:workspaceId,workspaceContextId:workspaceId,hasSecondaryAuth:same&&role==="super_admin"?current.hasSecondaryAuth:false,superVerifiedAt:same&&role==="super_admin"?current.superVerifiedAt:null,adminVerifiedAt:resolveAdminVerificationAt(summary.user,summary.password_authenticated_at,current,role)}); clearSessionTermination();
   if(identityChanged){try{await quarantineOfflineCheckoutQueueForCurrentSession();}catch{/* Legacy replay re-checks authoritative identity before every send. */}}
 };
 export const refreshAuthFromSession=async()=>{try{await applyHttpSessionSummary(await timed(fetchHttpSessionSummary(),"Session refresh timed out."));}catch{clearAuthState(true);}};

@@ -20,3 +20,5 @@ BETTER_AUTH_JWT_AUDIENCE="itemtraxx-supabase"
 BETTER_AUTH_PASSKEY_RP_ID="localhost"
 BETTER_AUTH_PASSKEY_ORIGIN="http://localhost:5173"
 BETTER_AUTH_TURNSTILE_SECRET_KEY=""
+# Non-secret verified sender identity used by Better Auth password-reset mail.
+ITX_EMAIL_NOTIFICATIONS="ItemTraxx Notifications <notifications@itemtraxx.com>"

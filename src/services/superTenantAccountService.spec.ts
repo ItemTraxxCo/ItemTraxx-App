@@ -41,6 +41,7 @@ describe("listTenantAccounts", () => {
     expect(invokeEdgeFunction).toHaveBeenCalledWith("super-admin-mutate", {
       method: "POST",
       body: { action: "list_tenant_accounts", payload: { search: "", workspace_id: "all" } },
+      avoidCorsPreflight: true,
     });
     expect(result).toEqual([tenantAccount]);
   });
@@ -74,6 +75,7 @@ describe("createTenantAccount", () => {
     expect(invokeEdgeFunction).toHaveBeenCalledWith("super-admin-mutate", {
       method: "POST",
       body: { action: "create_tenant_account", payload: { workspace_id: "ws-1", auth_email: "tenant@example.com" } },
+      avoidCorsPreflight: true,
     });
     expect(result).toEqual(tenantAccount);
   });
@@ -94,6 +96,7 @@ describe("setTenantAccountStatus", () => {
     expect(invokeEdgeFunction).toHaveBeenCalledWith("super-admin-mutate", {
       method: "POST",
       body: { action: "set_tenant_account_status", payload: { id: "ta-1", is_active: false } },
+      avoidCorsPreflight: true,
     });
   });
 });
@@ -107,6 +110,7 @@ describe("updateTenantAccountEmail", () => {
     expect(invokeEdgeFunction).toHaveBeenCalledWith("super-admin-mutate", {
       method: "POST",
       body: { action: "update_tenant_account_email", payload: { id: "ta-1", auth_email: "new@example.com" } },
+      avoidCorsPreflight: true,
     });
   });
 });
@@ -120,6 +124,7 @@ describe("sendTenantAccountReset", () => {
     expect(invokeEdgeFunction).toHaveBeenCalledWith("super-admin-mutate", {
       method: "POST",
       body: { action: "send_tenant_account_reset", payload: { id: "ta-1" } },
+      avoidCorsPreflight: true,
     });
     expect(result).toEqual({ success: true });
   });
@@ -134,6 +139,7 @@ describe("removeTenantAccount", () => {
     expect(invokeEdgeFunction).toHaveBeenCalledWith("super-admin-mutate", {
       method: "POST",
       body: { action: "remove_tenant_account", payload: { id: "ta-1" } },
+      avoidCorsPreflight: true,
     });
     expect(result).toEqual({ success: true });
   });

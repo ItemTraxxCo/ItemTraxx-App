@@ -18,7 +18,11 @@ const call = async <T>(
   const r = await invokeEdgeFunction<
     { data: T },
     { action: string; payload: Record<string, unknown> }
-  >("super-admin-mutate", { method: "POST", body: { action, payload } });
+  >("super-admin-mutate", {
+    method: "POST",
+    body: { action, payload },
+    avoidCorsPreflight: true,
+  });
   if (!r.ok) throw edgeFunctionError(r, "Workspace Admin request failed.");
   return r.data!.data;
 };

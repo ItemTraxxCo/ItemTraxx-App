@@ -4,6 +4,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.108.2";
 import { isKillSwitchWriteBlocked } from "../_shared/killSwitch.ts";
 import {
   canRegisterAdminStepUpFromTrustedHandoff,
+  isEligiblePrivilegedProfile,
   isMissingPrivilegedStepUpTable,
   registerPrivilegedStepUp,
 } from "../_shared/privilegedStepUp.ts";
@@ -108,18 +109,7 @@ serve(async (req) => {
       return jsonResponse(403, { error: "Access denied" });
     }
 
-    if (profile.role !== "workspace_admin" && profile.role !== "super_admin") {
-      return jsonResponse(403, { error: "Access denied" });
-    }
-
-    if (profile.is_active === false || profile.deleted_at) {
-      return jsonResponse(403, { error: "Access denied" });
-    }
-
-    if (
-      profile.role === "workspace_admin" &&
-      !profile.workspace_id
-    ) {
+    if (!isEligiblePrivilegedProfile(profile)) {
       return jsonResponse(403, { error: "Access denied" });
     }
 

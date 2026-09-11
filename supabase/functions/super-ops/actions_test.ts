@@ -131,7 +131,7 @@ const withMockedBetterAuthAdmin = async (run: () => Promise<void>) => {
   Deno.env.set("ITX_INTERNAL_AUTH_SECRET", "test-internal-secret");
   globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = typeof input === "string" ? input : input.toString();
-    if (url.includes("/api/internal/auth-admin")) {
+    if (url.includes("/api/auth/internal-admin")) {
       const request = JSON.parse(String(init?.body)) as Record<string, unknown>;
       return new Response(JSON.stringify({
         passkeys: request.action === "list_passkeys"

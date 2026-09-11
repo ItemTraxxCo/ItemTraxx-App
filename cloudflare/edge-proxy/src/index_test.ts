@@ -115,6 +115,30 @@ Deno.test("edge proxy CORS allows the explicitly configured demo workspace", asy
   }
 });
 
+Deno.test("routes the internal Better Auth bridge before the public auth handler", async () => {
+  const response = await worker.fetch(
+    new Request("https://edge.itemtraxx.com/api/auth/internal-admin", {
+      method: "POST",
+      headers: {
+        origin: "https://itemtraxx.com",
+        "x-itx-internal-auth": "wrong-secret",
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({ action: "list_passkeys", profileId: "profile-1" }),
+    }),
+    {
+      ITX_INTERNAL_AUTH_SECRET: "expected-secret",
+    },
+    executionContext,
+  );
+
+  if (response.status !== 401) {
+    throw new Error(
+      `Expected the internal bridge to reject an invalid secret, received ${response.status}`,
+    );
+  }
+});
+
 Deno.test("edge proxy CORS allows the explicitly routed development origins", async () => {
   for (const devOrigin of [
     "https://dennis-dev.itemtraxx.com",

@@ -236,6 +236,7 @@ Deno.test("super ops lists only the current super admin's passkeys", async () =>
       data: {
         passkeys: [{
           id: "passkey-1",
+          name: "MacBook",
           created_at: "2026-07-22T00:00:00.000Z",
           last_used_at: null,
         }],

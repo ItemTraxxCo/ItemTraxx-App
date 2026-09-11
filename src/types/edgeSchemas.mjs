@@ -501,7 +501,8 @@ const superOpsSessionSchema = z.object({
 
 const superOpsPasskeySchema = z.object({
   id: z.string(),
-  created_at: z.string(),
+  name: z.string().nullable(),
+  created_at: z.string().nullable(),
   last_used_at: z.string().nullable(),
 });
 

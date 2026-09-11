@@ -713,6 +713,7 @@ Deno.test("list_passkeys returns only the safe passkey fields", async () => {
         data: {
           passkeys: [{
             id: "passkey-1",
+            name: "MacBook",
             created_at: "2026-07-01T00:00:00.000Z",
             last_used_at: null,
           }],

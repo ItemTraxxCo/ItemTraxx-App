@@ -379,6 +379,7 @@ export const handleSecuritySessionsAction = async (
       data: {
         passkeys: data.passkeys.map((passkey) => ({
           id: passkey.id,
+          name: passkey.name,
           created_at: passkey.created_at,
           last_used_at: null,
         })),

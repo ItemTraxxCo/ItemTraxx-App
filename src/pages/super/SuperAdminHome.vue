@@ -140,7 +140,7 @@
           </RouterLink>
           <RouterLink class="section-link" to="/super-admin/settings">
             <span class="section-link-title">Settings</span>
-            <span class="section-link-meta">Password, passkeys, and sessions</span>
+            <span class="section-link-meta">Password, passkey inventory, and sessions</span>
           </RouterLink>
         </div>
       </section>

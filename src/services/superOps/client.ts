@@ -41,6 +41,10 @@ export const callSuperOps = async <TData>(payload: SuperOpsRequest) => {
     {
       method: "POST",
       body: payload,
+      // Super-ops is cookie-authenticated. Keep this request CORS-simple so
+      // Cloudflare's managed challenge cannot block the OPTIONS preflight
+      // before the Worker can enforce the session and super-admin checks.
+      avoidCorsPreflight: true,
     }
   );
 

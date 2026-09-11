@@ -1,6 +1,6 @@
 <template>
   <main class="page sso-settings">
-    <RouterLink to="/workspace/settings">Back to settings</RouterLink>
+    <RouterLink :to="backTarget">{{ backLabel }}</RouterLink>
     <h1>Enterprise SSO</h1>
     <p class="muted">Configure a verified SAML 2.0 or OIDC provider for the selected ItemTraxx workspace.</p>
 
@@ -56,8 +56,8 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref } from "vue";
-import { RouterLink } from "vue-router";
+import { computed, onMounted, ref } from "vue";
+import { RouterLink, useRoute } from "vue-router";
 import { authClient } from "../auth/client";
 
 type Provider = { providerId: string; domain: string; domainVerified: boolean; organizationId: string | null; samlConfig: object | null; oidcConfig: object | null };
@@ -68,6 +68,10 @@ const protocol = ref<"saml" | "oidc">("saml"), providerId = ref(""), domain = re
 const entryPoint = ref(""), certificate = ref(""), discoveryEndpoint = ref(""), clientId = ref(""), clientSecret = ref("");
 const saving = ref(false), message = ref(""), error = ref(false);
 const domainVerificationToken = ref("");
+const route = useRoute();
+const isSuperAdminSettings = computed(() => route.path.startsWith("/super-admin"));
+const backTarget = computed(() => isSuperAdminSettings.value ? "/super-admin/settings" : "/admin/settings");
+const backLabel = computed(() => isSuperAdminSettings.value ? "Back to super admin settings" : "Back to admin settings");
 const metadataUrl = (id: string) => `${edgeOrigin}/api/auth/sso/saml2/sp/metadata?providerId=${encodeURIComponent(id)}`;
 const loadProviders = async () => {
   const query = organizationId.value ? `?organizationId=${encodeURIComponent(organizationId.value)}` : "";

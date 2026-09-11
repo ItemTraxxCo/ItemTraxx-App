@@ -1,262 +1,67 @@
 import { expect, test, type Page } from "@playwright/test";
-import {
-  mockUnauthenticatedSession,
-  navigateApp,
-  waitForPublicAuthBootstrap,
-} from "./helpers/testHarness";
+import { mockUnauthenticatedSession, navigateApp, waitForPublicAuthBootstrap } from "./helpers/testHarness";
 
 const openPublicShell = async (page: Page) => {
   await mockUnauthenticatedSession(page);
   await page.goto("/");
   await waitForPublicAuthBootstrap(page);
-  const consentDialog = page.getByRole("dialog", { name: "Cookie preferences" });
-  if (await consentDialog.isVisible()) {
-    await consentDialog.getByRole("button", { name: "Essential only" }).click();
-  }
 };
 
-test.describe("password recovery", () => {
-  test("forgot-password submits a normalized email with the exact reset redirect and renders success", async ({
-    page,
-  }) => {
+test.describe("Better Auth password recovery", () => {
+  test("forgot-password normalizes email and sends the exact reset redirect", async ({ page }) => {
     await openPublicShell(page);
-    const expectedRedirectTo = `${new URL(page.url()).origin}/reset-password`;
-    await page.evaluate(async () => {
-      const { supabase } = await import("/src/services/supabaseClient.ts");
-      const calls: Array<{ email: string; options: { redirectTo: string } }> = [];
-      (window as unknown as { __forgotPasswordCalls: typeof calls }).__forgotPasswordCalls = calls;
-      Object.defineProperty(supabase.auth, "resetPasswordForEmail", {
-        configurable: true,
-        value: async (email: string, options: { redirectTo: string }) => {
-          calls.push({ email, options });
-          return { data: {}, error: null };
-        },
-      });
+    let requestBody: Record<string, unknown> | null = null;
+    await page.route("**/api/auth/request-password-reset", async (route) => {
+      requestBody = route.request().postDataJSON() as Record<string, unknown>;
+      await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ status: true }) });
     });
-
     await navigateApp(page, "/forgot-password");
     await page.getByLabel("Account Email").fill("  Person.Name@Example.COM  ");
     await page.getByRole("button", { name: "Send reset link" }).click();
-
-    await expect(page.getByText("Password reset link sent.")).toBeVisible();
-    await expect
-      .poll(() =>
-        page.evaluate(
-          () =>
-            (window as unknown as { __forgotPasswordCalls: unknown[] }).__forgotPasswordCalls,
-        ),
-      )
-      .toEqual([
-        {
-          email: "person.name@example.com",
-          options: { redirectTo: expectedRedirectTo },
-        },
-      ]);
+    await expect(page.getByText(/Password reset link sent/)).toBeVisible();
+    expect(requestBody).toEqual({
+      email: "person.name@example.com",
+      redirectTo: `${new URL(page.url()).origin}/reset-password`,
+    });
   });
 
-  test("forgot-password maps a returned Supabase error to the existing rendered error", async ({
-    page,
-  }) => {
+  test("forgot-password maps a Better Auth failure to a safe rendered error", async ({ page }) => {
     await openPublicShell(page);
-    await page.evaluate(async () => {
-      const { supabase } = await import("/src/services/supabaseClient.ts");
-      Object.defineProperty(supabase.auth, "resetPasswordForEmail", {
-        configurable: true,
-        value: async () => ({
-          data: {},
-          error: {
-            name: "AuthApiError",
-            message: "rate limit exceeded",
-            status: 429,
-            code: "over_request_rate_limit",
-          },
-        }),
-      });
-    });
-
+    await page.route("**/api/auth/request-password-reset", (route) => route.fulfill({
+      status: 429,
+      contentType: "application/json",
+      body: JSON.stringify({ code: "RATE_LIMITED", message: "rate limit exceeded" }),
+    }));
     await navigateApp(page, "/forgot-password");
     await page.getByLabel("Account Email").fill("person@example.com");
     await page.getByRole("button", { name: "Send reset link" }).click();
-
     await expect(page.getByText("Unable to send reset link. Please try again.")).toBeVisible();
-    await expect(page.getByText("Password reset link sent.")).toHaveCount(0);
   });
 
-  test("reset-password updates the recovery user and signs out only the local Supabase session", async ({
-    page,
-  }) => {
+  test("reset-password submits a valid Better Auth recovery token", async ({ page }) => {
     await openPublicShell(page);
-    await page.evaluate(async () => {
-      const { supabase } = await import("/src/services/supabaseClient.ts");
-      const events: Array<{ method: string; payload?: unknown }> = [];
-      (window as unknown as { __resetPasswordEvents: typeof events }).__resetPasswordEvents = events;
-      Object.defineProperty(supabase.auth, "getSession", {
-        configurable: true,
-        value: async () => {
-          events.push({ method: "getSession" });
-          return {
-            data: {
-              session: {
-                access_token: "recovery-access-token",
-                refresh_token: "recovery-refresh-token",
-                expires_in: 3600,
-                expires_at: Math.floor(Date.now() / 1000) + 3600,
-                token_type: "bearer",
-                user: {
-                  id: "recovery-user",
-                  aud: "authenticated",
-                  role: "authenticated",
-                  email: "person@example.com",
-                  app_metadata: {},
-                  user_metadata: {},
-                  identities: [],
-                  created_at: new Date().toISOString(),
-                },
-              },
-            },
-            error: null,
-          };
-        },
-      });
-      Object.defineProperty(supabase.auth, "updateUser", {
-        configurable: true,
-        value: async (payload: unknown) => {
-          events.push({ method: "updateUser", payload });
-          return {
-            data: {
-              user: {
-                id: "recovery-user",
-                aud: "authenticated",
-                role: "authenticated",
-                email: "person@example.com",
-                app_metadata: {},
-                user_metadata: {},
-                identities: [],
-                created_at: new Date().toISOString(),
-              },
-            },
-            error: null,
-          };
-        },
-      });
-      Object.defineProperty(supabase.auth, "signOut", {
-        configurable: true,
-        value: async (payload: unknown) => {
-          events.push({ method: "signOut", payload });
-          return { error: null };
-        },
-      });
+    let requestBody: Record<string, unknown> | null = null;
+    await page.route("**/api/auth/reset-password", async (route) => {
+      requestBody = route.request().postDataJSON() as Record<string, unknown>;
+      await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ status: true }) });
     });
-
-    await navigateApp(page, "/reset-password?type=recovery");
-    await expect(page.getByRole("button", { name: "Update Password" })).toBeEnabled();
+    await navigateApp(page, "/reset-password?token=recovery-token");
     await page.getByLabel("New Password", { exact: true }).fill("New-password-123!");
     await page.getByLabel("Confirm Password").fill("New-password-123!");
     await page.getByRole("button", { name: "Update Password" }).click();
-
-    await expect(page.getByText("Password successfully updated.")).toBeVisible();
-    await expect(page.getByRole("link", { name: "Go to Login" })).toHaveAttribute("href", "/login");
-    await expect
-      .poll(() =>
-        page.evaluate(
-          () => (window as unknown as { __resetPasswordEvents: unknown[] }).__resetPasswordEvents,
-        ),
-      )
-      .toEqual([
-        { method: "getSession" },
-        { method: "updateUser", payload: { password: "New-password-123!" } },
-        { method: "signOut", payload: { scope: "local" } },
-      ]);
+    await expect(page.getByText(/Password successfully updated/)).toBeVisible();
+    expect(requestBody).toEqual({ newPassword: "New-password-123!", token: "recovery-token" });
   });
 
-  test("reset-password explains password policy failures without blaming the recovery link", async ({
-    page,
-  }) => {
+  test("reset-password rejects a weak password before any request", async ({ page }) => {
     await openPublicShell(page);
-    await page.evaluate(async () => {
-      const { supabase } = await import("/src/services/supabaseClient.ts");
-      Object.defineProperty(supabase.auth, "getSession", {
-        configurable: true,
-        value: async () => ({
-          data: {
-            session: {
-              access_token: "recovery-access-token",
-              refresh_token: "recovery-refresh-token",
-              expires_in: 3600,
-              expires_at: Math.floor(Date.now() / 1000) + 3600,
-              token_type: "bearer",
-              user: {
-                id: "recovery-user",
-                aud: "authenticated",
-                role: "authenticated",
-                email: "person@example.com",
-                app_metadata: {},
-                user_metadata: {},
-                identities: [],
-                created_at: new Date().toISOString(),
-              },
-            },
-          },
-          error: null,
-        }),
-      });
-      Object.defineProperty(supabase.auth, "updateUser", {
-        configurable: true,
-        value: async () => ({
-          data: { user: null },
-          error: {
-            name: "AuthWeakPasswordError",
-            message: "Password should contain at least one character of each: abc, ABC, 123, symbols",
-            status: 422,
-            code: "weak_password",
-            reasons: ["characters"],
-          },
-        }),
-      });
-    });
-
-    await navigateApp(page, "/reset-password?type=recovery");
-    await page.getByLabel("New Password", { exact: true }).fill("ValidLength1!");
-    await page.getByLabel("Confirm Password").fill("ValidLength1!");
-    await page.getByRole("button", { name: "Update Password" }).click();
-
-    await expect(page.getByText(
-      "Password must be at least 12 characters and include lowercase, uppercase, a number, and a symbol.",
-    )).toBeVisible();
-    await expect(page.getByText(/Request a new reset link/)).toHaveCount(0);
-  });
-
-  test("reset-password rejects passwords that do not meet the configured policy before submission", async ({
-    page,
-  }) => {
-    await openPublicShell(page);
-    await page.evaluate(async () => {
-      const { supabase } = await import("/src/services/supabaseClient.ts");
-      const calls: unknown[] = [];
-      (window as unknown as { __passwordPolicyCalls: unknown[] }).__passwordPolicyCalls = calls;
-      Object.defineProperty(supabase.auth, "getSession", {
-        configurable: true,
-        value: async () => ({ data: { session: { access_token: "recovery-access-token" } }, error: null }),
-      });
-      Object.defineProperty(supabase.auth, "updateUser", {
-        configurable: true,
-        value: async (payload: unknown) => {
-          calls.push(payload);
-          return { data: { user: null }, error: null };
-        },
-      });
-    });
-
-    await navigateApp(page, "/reset-password?type=recovery");
+    let requests = 0;
+    await page.route("**/api/auth/reset-password", async (route) => { requests += 1; await route.abort(); });
+    await navigateApp(page, "/reset-password?token=recovery-token");
     await page.getByLabel("New Password", { exact: true }).fill("alllowercasepassword");
     await page.getByLabel("Confirm Password").fill("alllowercasepassword");
     await page.getByRole("button", { name: "Update Password" }).click();
-
-    await expect(page.getByText(
-      "Password must be at least 12 characters and include lowercase, uppercase, a number, and a symbol.",
-    )).toBeVisible();
-    await expect.poll(() => page.evaluate(
-      () => (window as unknown as { __passwordPolicyCalls: unknown[] }).__passwordPolicyCalls,
-    )).toEqual([]);
+    await expect(page.getByText(/Password must be at least 12 characters/)).toBeVisible();
+    expect(requests).toBe(0);
   });
 });

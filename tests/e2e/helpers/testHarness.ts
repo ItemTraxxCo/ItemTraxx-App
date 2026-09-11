@@ -32,14 +32,14 @@ export const mockUnauthenticatedSession = async (
   target: Page | BrowserContext,
   options: { delayMs?: number } = {}
 ) => {
-  await target.route("**/auth/session/me", async (route) => {
+  await target.route("**/api/auth/get-session", async (route) => {
     if (options.delayMs) {
       await new Promise((resolve) => setTimeout(resolve, options.delayMs));
     }
     await route.fulfill({
       status: 200,
       contentType: "application/json",
-      body: JSON.stringify({ authenticated: false, user: null, profile: null }),
+      body: JSON.stringify(null),
     });
   });
 };
@@ -345,6 +345,12 @@ export const setWorkspaceAdminSession = async (page: Page, workspaceId = "tenant
   await page.evaluate((id) => {
     window.__itemtraxxTest?.setWorkspaceAdminSession(id);
   }, workspaceId);
+};
+
+export const setTenantAccountSession = async (page: Page, workspaceId = "tenant-e2e") => {
+  await page.waitForFunction(() => typeof window.__itemtraxxTest?.setTenantAccountSession === "function");
+  await waitForPublicAuthBootstrap(page);
+  await page.evaluate((id) => window.__itemtraxxTest?.setTenantAccountSession(id), workspaceId);
 };
 
 export const setSuperAdminSession = async (page: Page) => {

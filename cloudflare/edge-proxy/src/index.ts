@@ -11,18 +11,15 @@ import {
 import { buildError } from "./responses.ts";
 import {
   getFunctionName,
-  getSessionAction,
   isAllowedRestRequest,
   isAllowedRpcProxyPath,
   isBlockedRpcProxyPath,
   isRestProxyPath,
   isRpcProxyPath,
 } from "./routing.ts";
-import { handleSessionRequest } from "./session.ts";
 import { proxySupabaseApiRequest } from "./supabaseApiProxy.ts";
 import { handleMtaStsRequest, isMtaStsRequest } from "./mtaSts.ts";
-
-export { checkSessionRateLimit } from "./session.ts";
+import { handleBetterAuthRequest, handleInternalAuthAdminRequest, handleSsoManagementRequest } from "./auth.ts";
 
 const resolveKillSwitchMessage = (env: Env) =>
   env.ITX_ITEMTRAXX_KILLSWITCH_MESSAGE?.trim() || DEFAULT_KILL_SWITCH_MESSAGE;
@@ -97,6 +94,31 @@ export default {
         return buildError(403, "Origin not allowed", headers, requestId);
       }
 
+      if (url.pathname.startsWith("/api/auth/")) {
+        const authResponse = await handleBetterAuthRequest(request, env);
+        const responseHeaders = new Headers(authResponse.headers);
+        Object.entries(headers).forEach(([key, value]) => responseHeaders.set(key, value));
+        responseHeaders.set("x-request-id", requestId);
+        return new Response(authResponse.body, {
+          status: authResponse.status,
+          headers: responseHeaders,
+        });
+      }
+
+      if (url.pathname === "/api/itemtraxx/sso/providers") {
+        const managementResponse = await handleSsoManagementRequest(request, env);
+        const responseHeaders = new Headers(managementResponse.headers);
+        Object.entries(headers).forEach(([key, value]) => responseHeaders.set(key, value));
+        return new Response(managementResponse.body, {
+          status: managementResponse.status,
+          headers: responseHeaders,
+        });
+      }
+
+      if (url.pathname === "/api/internal/auth-admin") {
+        return handleInternalAuthAdminRequest(request, env);
+      }
+
       if (!env.SUPABASE_URL || !env.SUPABASE_ANON_KEY) {
         const response = buildError(
           500,
@@ -106,23 +128,6 @@ export default {
         );
         maybeReportWorkerResponse(env, request, requestId, response, ctx, {
           type: "proxy_misconfiguration",
-        });
-        return response;
-      }
-
-      const sessionAction = getSessionAction(url.pathname);
-      if (sessionAction) {
-        const response = await handleSessionRequest(
-          request,
-          env,
-          headers,
-          requestId,
-          sessionAction,
-          allowedOrigins,
-        );
-        maybeReportWorkerResponse(env, request, requestId, response, ctx, {
-          type: "session",
-          action: sessionAction,
         });
         return response;
       }
@@ -233,6 +238,16 @@ export default {
       });
       return response;
     } catch (error) {
+      console.error("Worker request failed", {
+        requestId,
+        path: url.pathname,
+        name: error instanceof Error ? error.name : "UnknownError",
+        message: error instanceof Error ? error.message : "Unknown worker error",
+        code:
+          typeof error === "object" && error !== null && "code" in error
+            ? String(error.code)
+            : undefined,
+      });
       ctx.waitUntil(reportWorkerException(env, request, requestId, error));
       return buildError(500, "Internal worker error", headers, requestId);
     }

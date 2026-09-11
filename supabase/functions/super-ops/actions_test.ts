@@ -123,6 +123,35 @@ const queryResult = (result: Record<string, unknown>) => {
   return query;
 };
 
+const withMockedBetterAuthAdmin = async (run: () => Promise<void>) => {
+  const originalFetch = globalThis.fetch;
+  const previousUrl = Deno.env.get("BETTER_AUTH_URL");
+  const previousSecret = Deno.env.get("ITX_INTERNAL_AUTH_SECRET");
+  Deno.env.set("BETTER_AUTH_URL", "https://better-auth.example.test");
+  Deno.env.set("ITX_INTERNAL_AUTH_SECRET", "test-internal-secret");
+  globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = typeof input === "string" ? input : input.toString();
+    if (url.includes("/api/internal/auth-admin")) {
+      const request = JSON.parse(String(init?.body)) as Record<string, unknown>;
+      return new Response(JSON.stringify({
+        passkeys: request.action === "list_passkeys"
+          ? [{ id: "passkey-1", name: "MacBook", created_at: "2026-07-22T00:00:00.000Z" }]
+          : [],
+      }), { status: 200, headers: { "Content-Type": "application/json" } });
+    }
+    return originalFetch(input as Parameters<typeof fetch>[0], init);
+  }) as typeof fetch;
+  try {
+    await run();
+  } finally {
+    globalThis.fetch = originalFetch;
+    if (previousUrl === undefined) Deno.env.delete("BETTER_AUTH_URL");
+    else Deno.env.set("BETTER_AUTH_URL", previousUrl);
+    if (previousSecret === undefined) Deno.env.delete("ITX_INTERNAL_AUTH_SECRET");
+    else Deno.env.set("ITX_INTERNAL_AUTH_SECRET", previousSecret);
+  }
+};
+
 Deno.test("super ops dispatcher preserves a representative control-center read", async () => {
   const rowsByTable: Record<string, Record<string, unknown>> = {
     app_runtime_config: {
@@ -196,43 +225,22 @@ Deno.test("super ops dispatcher preserves a representative database error", asyn
 });
 
 Deno.test("super ops lists only the current super admin's passkeys", async () => {
-  let requestedUserId: string | null = null;
-  const adminClient = {
-    auth: {
-      admin: {
-        passkey: {
-          listPasskeys: async ({ userId }: { userId: string }) => {
-            requestedUserId = userId;
-            return {
-              data: [{
-                id: "passkey-1",
-                created_at: "2026-07-22T00:00:00.000Z",
-                last_used_at: "2026-07-22T00:05:00.000Z",
-                credential: "must-not-be-returned",
-              }],
-              error: null,
-            };
-          },
-        },
+  await withMockedBetterAuthAdmin(async () => {
+    const response = await dispatchSuperOpsAction(
+      contextFor("list_passkeys", {}, {}),
+    );
+
+    assertEquals(response.status, 200);
+    assertEquals(await response.json(), {
+      ok: true,
+      data: {
+        passkeys: [{
+          id: "passkey-1",
+          created_at: "2026-07-22T00:00:00.000Z",
+          last_used_at: null,
+        }],
       },
-    },
-  };
-
-  const response = await dispatchSuperOpsAction(
-    contextFor("list_passkeys", {}, adminClient),
-  );
-
-  assertEquals(response.status, 200);
-  assertEquals(requestedUserId, "00000000-0000-4000-8000-000000000001");
-  assertEquals(await response.json(), {
-    ok: true,
-    data: {
-      passkeys: [{
-        id: "passkey-1",
-        created_at: "2026-07-22T00:00:00.000Z",
-        last_used_at: "2026-07-22T00:05:00.000Z",
-      }],
-    },
+    });
   });
 });
 
@@ -253,6 +261,11 @@ Deno.test("session refresh does not erase the recorded sign-in method", async ()
   ) => Promise.resolve({ data: { id: "session-1" }, error: null }).then(resolve, reject);
 
   const adminClient = {
+    __verifyExternalAuthClaimsForTest: async () => ({
+      session_id: "auth-session-1",
+      iat: 1_784_681_900,
+      amr: [{ method: "password" }],
+    }),
     auth: {
       getClaims: async () => ({
         data: {

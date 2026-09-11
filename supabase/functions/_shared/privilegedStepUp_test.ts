@@ -12,13 +12,7 @@ const assert = (condition: boolean, message: string) => {
 
 const authClient = (claims: Record<string, unknown> | null) =>
   ({
-    auth: {
-      getClaims: () =>
-        Promise.resolve({
-          data: claims ? { claims } : null,
-          error: claims ? null : new Error("invalid jwt"),
-        }),
-    },
+    verifyExternalAuthClaims: () => Promise.resolve(claims),
   }) as never;
 
 Deno.test("admin step-up registration accepts fresh verified handoff claims", async () => {
@@ -145,13 +139,7 @@ const adminClient = (options: {
 }) => {
   const upsertCalls: Array<{ payload: Record<string, unknown>; opts: unknown }> = [];
   const client = {
-    auth: {
-      getClaims: () =>
-        Promise.resolve({
-          data: options.claims ? { claims: options.claims } : null,
-          error: options.claims ? null : new Error("invalid jwt"),
-        }),
-    },
+    verifyExternalAuthClaims: () => Promise.resolve(options.claims),
     from: () => ({
       upsert: (payload: Record<string, unknown>, opts: unknown) => {
         upsertCalls.push({ payload, opts });

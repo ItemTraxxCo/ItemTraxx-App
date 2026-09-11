@@ -1,372 +1,64 @@
-import { supabase } from "../supabaseClient";
-import { invokeEdgeFunction } from "../edgeFunctionClient";
-import {
-  clearAuthState,
-  getAuthState,
-  markAdminVerified,
-  setAuthStateFromBackend,
-  setSecondaryAuth,
-  setWorkspaceContext,
-} from "../../store/authState";
-import { getWorkspaceState } from "../../store/workspaceState";
-import { edgeFunctionError } from "../appErrors";
+import { authClient } from "../../auth/client";
+import { getAuthState, setSecondaryAuth } from "../../store/authState";
 import { registerPrivilegedAdminStepUp } from "../privilegedStepUpService";
-import {
-  exchangeHttpSession,
-  fetchHttpSessionSummary,
-  type HttpSessionSummary,
-} from "../httpSessionService";
-import { rotateDeviceSession } from "../../utils/deviceSession";
-import { touchAccountSession } from "../adminOpsService";
 import { touchSuperAdminSession } from "../superOps/sessions";
-import {
-  fetchCurrentRoleAndWorkspace,
-  fetchProfile,
-  fetchWorkspaceContext,
-  refreshAuthFromSession,
-  resolveWorkspaceSlug,
-} from "./sessionBootstrap";
-import { clearLocalSession, sendLoginNotification } from "./workspaceLogin";
-import { quarantineOfflineCheckoutQueueForCurrentSession } from "../offlineCheckoutQueue";
+import { refreshAuthFromSession } from "./sessionBootstrap";
 import { signOut } from "./signOut";
-import {
-  clearPendingSuperAdminVerificationEmail,
-  getPendingSuperAdminChallengeToken,
-  setPendingSuperAdminChallengeToken,
-  setPendingSuperAdminVerificationEmail,
-} from "./sessionState";
-import {
-  normalizeFunctionTarget,
-  toAccountSessionLocation,
-  type LoginNotificationLocation,
-  type ProfileRow,
-} from "./types";
+import { clearPendingSuperAdminVerificationEmail } from "./sessionState";
+import { sendLoginNotification } from "./workspaceLogin";
 
-const SUPER_ADMIN_2FA_FUNCTION = normalizeFunctionTarget(
-  import.meta.env.VITE_SUPER_ADMIN_2FA_FUNCTION,
-  "super-auth-verify"
-);
-
-export const resendSuperAdminEmailChallenge = async () => {
-  const challengeToken = getPendingSuperAdminChallengeToken();
-  const result = await invokeEdgeFunction<{ challenge_started?: boolean; email?: string | null }>(
-    SUPER_ADMIN_2FA_FUNCTION,
-    {
-      method: "POST",
-      // A fresh tab does not retain the in-memory challenge token, but the
-      // edge proxy can authenticate the existing HttpOnly session cookie.
-      body: {
-        action: "resend_email_challenge",
-        payload: challengeToken ? { challenge_token: challengeToken } : {},
-      },
-    }
-  );
-
-  if (!result.ok || !result.data?.challenge_started) {
-    throw edgeFunctionError(result, "Unable to send verification code. fix yo code.");
-  }
-
-  const recipientEmail = result.data.email ?? null;
-  setPendingSuperAdminVerificationEmail(recipientEmail);
-  return { email: recipientEmail };
-};
-
-export const verifySuperAdminEmailChallenge = async (code: string) => {
-  const challengeToken = getPendingSuperAdminChallengeToken();
-
-  const result = await invokeEdgeFunction<{
-    verified?: boolean;
-    access_token?: string | null;
-    refresh_token?: string | null;
-  }>(SUPER_ADMIN_2FA_FUNCTION, {
-    method: "POST",
-    body: {
-      action: "verify_email_challenge",
-      payload: { code, ...(challengeToken ? { challenge_token: challengeToken } : {}) },
-    },
-  });
-
-  if (
-    !result.ok ||
-    !result.data?.verified
-  ) {
-    throw edgeFunctionError(result, "Unable to verify code. u prob put it in wrong u might wanna check it");
-  }
-
-  // A new tab resumes from the HttpOnly session cookie, so it has no temporary
-  // challenge-session tokens to exchange. The original password-login path
-  // still exchanges those tokens as before.
-  if (result.data.access_token && result.data.refresh_token) {
-    await exchangeHttpSession({
-      access_token: result.data.access_token,
-      refresh_token: result.data.refresh_token,
-    });
-  }
-  setSecondaryAuth(true);
+const requireSuperAdmin = async (loginMethod: "password" | "passkey") => {
   await refreshAuthFromSession();
   const current = getAuthState();
   if (current.role !== "super_admin") {
     await signOut({ bestEffort: true });
     throw new Error("Access denied.");
   }
+  await registerPrivilegedAdminStepUp();
   setSecondaryAuth(true);
   clearPendingSuperAdminVerificationEmail();
   try {
-    await touchSuperAdminSession({
-      loginMethod: "password",
-      loginLocation: "super_auth",
-    });
+    await touchSuperAdminSession({ loginMethod, loginLocation: "super_auth" });
   } catch {
-    // Super-admin session tracking is best-effort and must not block successful login.
+    // Session tracking is best-effort and must not weaken successful auth.
   }
-  sendLoginNotification(result.data.access_token ?? null, { loginLocation: "super_admin_login" });
-};
-
-export const adminLoginWithSession = async (
-  accessToken: string,
-  refreshToken: string,
-  sessionTouchOptions: {
-    loginMethod?: "password" | "magic_link" | "session_handoff" | null;
-    loginLocation?: LoginNotificationLocation | null;
-    skipExchange?: boolean;
-    skipLoginNotification?: boolean;
-    preExchangedSessionSummary?: HttpSessionSummary | null;
-  } = {}
-) => {
-  const priorAuth = getAuthState();
-  const priorIsAuthenticated = priorAuth.isAuthenticated;
-  const priorUserId = priorAuth.userId;
-  const priorWorkspaceContextId = priorAuth.workspaceContextId;
-  const workspaceHost = getWorkspaceState();
-  const exchangedSessionSummary = sessionTouchOptions.skipExchange
-    ? sessionTouchOptions.preExchangedSessionSummary ?? null
-    : await exchangeHttpSession({
-        access_token: accessToken,
-        refresh_token: refreshToken,
-      });
-  if (!sessionTouchOptions.skipExchange) {
-    await clearLocalSession();
-  }
-
-  const sessionSummary =
-    exchangedSessionSummary?.authenticated && exchangedSessionSummary?.user
-      ? exchangedSessionSummary
-      : await fetchHttpSessionSummary();
-  if (!sessionSummary.authenticated || !sessionSummary.user) {
-    throw new Error("Invalid credentials.");
-  }
-
-  let profile = sessionSummary.profile
-    ? {
-        id: sessionSummary.user.id,
-        role: sessionSummary.profile.role,
-        workspace_id: sessionSummary.profile.workspace_id,
-        auth_email: sessionSummary.profile.auth_email,
-        is_active: sessionSummary.profile.is_active,
-      }
-    : await fetchProfile(sessionSummary.user.id);
-  let fallbackRole: ProfileRow["role"] = null;
-  let fallbackWorkspaceId: string | null = null;
-  let resolvedRole = profile?.role ?? null;
-  let resolvedWorkspaceId = profile?.workspace_id ?? null;
-
-  if (!resolvedRole || !resolvedWorkspaceId) {
-    try {
-      const fallback = await fetchCurrentRoleAndWorkspace();
-      fallbackRole = fallback.role;
-      fallbackWorkspaceId = fallback.workspaceId;
-      resolvedRole = resolvedRole ?? fallbackRole ?? null;
-      resolvedWorkspaceId = resolvedWorkspaceId ?? fallbackWorkspaceId ?? null;
-    } catch {
-      // Ignore fallback failure and continue with best available values.
-    }
-  }
-
-  if (resolvedRole !== "workspace_admin") {
-    await signOut({ bestEffort: true });
-    throw new Error("Access denied.");
-  }
-  if (profile && profile.is_active === false) {
-    await signOut({ bestEffort: true });
-    throw new Error("Access denied.");
-  }
-  if (resolvedRole === "workspace_admin" && resolvedWorkspaceId) {
-    const workspace = await fetchWorkspaceContext(resolvedWorkspaceId);
-    if (workspace?.status && workspace.status !== "active") {
-      await signOut({ bestEffort: true });
-      throw new Error("Workspace disabled.");
-    }
-  }
-
-  if (
-    resolvedRole === "workspace_admin" &&
-    priorWorkspaceContextId &&
-    resolvedWorkspaceId &&
-    resolvedWorkspaceId !== priorWorkspaceContextId
-  ) {
-    await signOut({ bestEffort: true });
-    throw new Error("Access denied.");
-  }
-
-  if (workspaceHost.isWorkspaceHost) {
-    if (!workspaceHost.workspaceId) {
-      await signOut({ bestEffort: true });
-      throw new Error("This workspace URL is not configured.");
-    }
-    if (!resolvedWorkspaceId || resolvedWorkspaceId !== workspaceHost.workspaceId) {
-      await signOut({ bestEffort: true });
-      throw new Error("Access denied.");
-    }
-  }
-
-  const finalWorkspaceId = resolvedWorkspaceId ?? fallbackWorkspaceId ?? null;
-
-  try {
-    await registerPrivilegedAdminStepUp(accessToken);
-  } catch (error) {
-    await signOut({ bestEffort: true });
-    throw error;
-  }
-
-  if (resolvedRole === "workspace_admin") {
-    rotateDeviceSession();
-    try {
-      await touchAccountSession({
-        loginMethod: sessionTouchOptions.loginMethod ?? "password",
-        loginLocation:
-          toAccountSessionLocation(sessionTouchOptions.loginLocation) ?? "admin_login",
-      });
-    } catch {
-      // Session tracking is best-effort and must not block successful admin sign-in.
-    }
-  }
-
-  setAuthStateFromBackend({
-    isInitialized: true,
-    isAuthenticated: true,
-    userId: sessionSummary.user.id,
-    email: sessionSummary.user.email ?? null,
-    signedInAt: sessionSummary.user.last_sign_in_at ?? null,
-    role: resolvedRole,
-    sessionWorkspaceId: finalWorkspaceId,
-    workspaceContextId: finalWorkspaceId,
-    hasSecondaryAuth: false,
-    superVerifiedAt: null,
-  });
-
-  if (
-    priorIsAuthenticated &&
-    (priorUserId !== sessionSummary.user.id ||
-      (priorWorkspaceContextId && finalWorkspaceId && priorWorkspaceContextId !== finalWorkspaceId))
-  ) {
-    try {
-      await quarantineOfflineCheckoutQueueForCurrentSession();
-    } catch {
-      // Legacy replay re-checks the authoritative identity before every send.
-    }
-  }
-
-  if (resolvedRole === "workspace_admin" && !getAuthState().workspaceContextId) {
-    setWorkspaceContext(finalWorkspaceId);
-  }
-  markAdminVerified();
-  if (!sessionTouchOptions.skipLoginNotification) {
-    const fallbackLoginLocation: LoginNotificationLocation =
-      resolvedRole === "workspace_admin" ? "workspace_admin_login" : "workspace_admin_login";
-    sendLoginNotification(accessToken, {
-      loginLocation: sessionTouchOptions.loginLocation ?? fallbackLoginLocation,
-    });
-  }
-  const workspaceSlug = await resolveWorkspaceSlug(finalWorkspaceId);
-  return {
-    role: resolvedRole,
-    workspaceId: finalWorkspaceId,
-    workspaceSlug,
-    accessToken,
-    refreshToken,
-  };
+  return current;
 };
 
 export const superAdminLogin = async (
   email: string,
   password: string,
-  turnstileToken: string
+  turnstileToken: string,
 ) => {
-  const result = await invokeEdgeFunction<{
-    challenge_started?: boolean;
-    email?: string | null;
-    challenge_token?: string | null;
-  }>(SUPER_ADMIN_2FA_FUNCTION, {
-    method: "POST",
-    body: {
-      action: "start_password_login",
-      payload: {
-        email,
-        password,
-        turnstile_token: turnstileToken,
-      },
-    },
-  });
-
-  if (
-    !result.ok ||
-    !result.data?.challenge_started ||
-    !result.data.challenge_token
-  ) {
-    throw edgeFunctionError(result, "Unable to send verification code.");
-  }
-
-  await clearLocalSession();
   setSecondaryAuth(false);
-  clearAuthState(true);
-  setPendingSuperAdminChallengeToken(result.data.challenge_token);
-  const challenge = { email: result.data.email ?? email };
-  setPendingSuperAdminVerificationEmail(challenge.email);
-  return {
-    email: challenge.email,
-  };
+  const result = await authClient.signIn.email(
+    { email: email.trim().toLowerCase(), password },
+    { headers: { "x-captcha-response": turnstileToken } },
+  );
+  if (result.error) throw new Error(result.error.message || "Invalid credentials.");
+
+  // Better Auth withholds the full session until its TOTP/backup challenge is
+  // complete, so the caller routes that state to /two-factor.
+  await refreshAuthFromSession();
+  if (!getAuthState().isAuthenticated) return { email, requiresTwoFactor: true };
+  const current = await requireSuperAdmin("password");
+  sendLoginNotification(null, { loginLocation: "super_admin_login" });
+  return { email: current.email ?? email, requiresTwoFactor: false };
 };
 
 export const superAdminPasskeyLogin = async (options: {
   sendLoginNotification?: boolean;
   loginLocation?: "super_auth" | "super_settings";
 } = {}) => {
-  const passkeySignIn = await supabase.auth.signInWithPasskey();
-  if (passkeySignIn.error || !passkeySignIn.data?.session) {
-    throw new Error(passkeySignIn.error?.message || "Passkey sign in failed.");
-  }
-
-  const session = passkeySignIn.data.session;
-  const accessToken = session.access_token;
-  const refreshToken = session.refresh_token;
-  if (!accessToken || !refreshToken) {
-    throw new Error("Passkey sign in failed.");
-  }
-
-  const verify = await invokeEdgeFunction<{ verified?: boolean }>(SUPER_ADMIN_2FA_FUNCTION, {
-    method: "POST",
-    accessToken,
-    body: {
-      action: "complete_passkey_login",
-      payload: {},
-    },
-  });
-  if (!verify.ok || !verify.data?.verified) {
-    throw edgeFunctionError(verify, "Passkey verification failed.");
-  }
-
-  await exchangeHttpSession({
-    access_token: accessToken,
-    refresh_token: refreshToken,
-  });
-  await clearLocalSession();
+  const result = await authClient.signIn.passkey();
+  if (result.error) throw new Error(result.error.message || "Passkey sign in failed.");
   await refreshAuthFromSession();
   const current = getAuthState();
   if (current.role !== "super_admin") {
     await signOut({ bestEffort: true });
     throw new Error("Access denied.");
   }
-
+  await registerPrivilegedAdminStepUp();
   setSecondaryAuth(true);
   clearPendingSuperAdminVerificationEmail();
   try {
@@ -375,9 +67,21 @@ export const superAdminPasskeyLogin = async (options: {
       loginLocation: options.loginLocation ?? "super_auth",
     });
   } catch {
-    // Super-admin session tracking is best-effort and must not block successful login.
+    // Session tracking is best-effort and must not weaken successful auth.
   }
   if (options.sendLoginNotification !== false) {
-    sendLoginNotification(accessToken, { loginLocation: "super_admin_login" });
+    sendLoginNotification(null, { loginLocation: "super_admin_login" });
   }
+};
+
+/** @deprecated The UI now routes Better Auth challenges to /two-factor. */
+export const verifySuperAdminEmailChallenge = async (code: string) => {
+  const result = await authClient.twoFactor.verifyTotp({ code, trustDevice: false });
+  if (result.error) throw new Error(result.error.message || "Unable to verify code.");
+  await requireSuperAdmin("password");
+};
+
+/** @deprecated TOTP codes are generated by the user's authenticator app. */
+export const resendSuperAdminEmailChallenge = async (): Promise<{ email: string | null }> => {
+  throw new Error("Authenticator codes cannot be resent.");
 };

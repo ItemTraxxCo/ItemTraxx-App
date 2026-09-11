@@ -44,7 +44,7 @@ if (!allTests.length) {
 console.log(`[coverage] Running ${allTests.length} Deno test files (Supabase + Cloudflare edge-proxy)...`);
 const testRun = spawnSync(
   "deno",
-  ["test", "--no-check", "--allow-env", "--allow-read", "--frozen", `--coverage=${coverageDir}`, ...allTests],
+  ["test", "--node-modules-dir=none", "--no-check", "--allow-env", "--allow-read", "--frozen", `--coverage=${coverageDir}`, ...allTests],
   { stdio: "inherit" }
 );
 if (testRun.status !== 0) {

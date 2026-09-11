@@ -4,16 +4,16 @@ import {
   type PostgrestErrorLike,
 } from "./postgrestErrors.ts";
 import { sha256Hex } from "./sha256.ts";
+import { verifyExternalAuthClaims } from "./externalAuth.ts";
 
 type SupabaseLikeClient = {
-  auth: {
-    getClaims: (token: string) => Promise<{
-      data: { claims: Record<string, unknown> } | null;
-      error: unknown | null;
-    }>;
-  };
   from: (table: string) => any;
+  __verifyExternalAuthClaimsForTest?: (token: string) => Promise<Record<string, unknown> | null>;
 };
+
+const verifiedClaims = (client: SupabaseLikeClient, authToken: string) =>
+  client.__verifyExternalAuthClaimsForTest?.(authToken) ??
+  verifyExternalAuthClaims(`Bearer ${authToken}`);
 
 const ACCOUNT_SESSION_COLUMNS =
   "id, auth_session_id, auth_token_hash, auth_token_issued_at";
@@ -22,11 +22,11 @@ export const resolveAccountAuthSessionBinding = async (
   client: SupabaseLikeClient,
   authToken: string,
 ) => {
-  const { data, error } = await client.auth.getClaims(authToken);
-  if (error || !data?.claims) {
+  void client;
+  const payload = await verifiedClaims(client, authToken);
+  if (!payload) {
     return { sessionId: null, issuedAt: null };
   }
-  const payload = data.claims;
   const sessionId = typeof payload?.session_id === "string"
     ? payload.session_id.trim()
     : "";

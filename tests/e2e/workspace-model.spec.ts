@@ -107,6 +107,8 @@ test.describe("workspace model role surfaces", () => {
     await expect(page.getByText(/Front desk/)).toBeVisible();
 
     await navigateApp(page, "/account");
+    const consent = page.getByRole("dialog", { name: "Cookie preferences" });
+    if (await consent.isVisible()) await consent.getByRole("button", { name: "Essential only" }).click();
     await expect(page.getByRole("heading", { name: "Active Devices" })).toBeVisible();
     await expect(page.getByText("Select device")).toHaveCount(0);
     await expect(page.getByRole("button", { name: "Open actions for Front desk" })).toHaveCount(0);

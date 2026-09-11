@@ -194,12 +194,12 @@ test.describe("Workspace Admin device revocation", () => {
     let authenticatedPhase = false;
     let heartbeatRequests = 0;
     await installSystemStatusMock(page.context());
-    await page.route("**/auth/session/me", async (route) => {
+    await page.route("**/api/auth/get-session", async (route) => {
       if (!authenticatedPhase) {
         await route.fulfill({
           status: 200,
           contentType: "application/json",
-          body: JSON.stringify({ authenticated: false, user: null, profile: null }),
+          body: JSON.stringify(null),
         });
         return;
       }
@@ -207,27 +207,17 @@ test.describe("Workspace Admin device revocation", () => {
       await route.fulfill({
         status: 200,
         contentType: "application/json",
-        body: JSON.stringify(
-          heartbeatRequests === 1
-            ? {
-                authenticated: true,
-                user: {
-                  id: "user-heartbeat",
-                  email: "heartbeat@example.com",
-                  last_sign_in_at: "2026-07-13T12:00:00.000Z",
-                },
-                profile: {
-                  role: "workspace_admin",
-                  workspace_id: "tenant-e2e",
-                  district_id: null,
-                  auth_email: "heartbeat@example.com",
-                  is_active: true,
-                },
-              }
-            : { authenticated: false, user: null, profile: null },
-        ),
+        body: JSON.stringify(heartbeatRequests === 1 ? {
+          user: { id: "better-auth-heartbeat", email: "heartbeat@example.com", name: "Heartbeat", emailVerified: true, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+          session: { id: "session-heartbeat", userId: "better-auth-heartbeat", token: "token", expiresAt: new Date(Date.now()+3600000).toISOString(), createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+        } : null),
       });
     });
+    await page.route(/\/rest\/v1\/profiles(?:\?.*)?$/, (route) => route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify([{ id: "user-heartbeat", role: "workspace_admin", workspace_id: "tenant-e2e", auth_email: "heartbeat@example.com", is_active: true }]),
+    }));
     await page.route(/\/functions(?:\/v1)?\/admin-ops(?:\?.*)?$/, async (route) => {
       await route.fulfill({
         status: 200,

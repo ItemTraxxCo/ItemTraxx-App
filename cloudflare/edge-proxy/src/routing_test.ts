@@ -2,7 +2,6 @@ import {
   getFunctionName,
   getRestTableName,
   getRpcFunctionName,
-  getSessionAction,
   isAllowedRestRequest,
   isAllowedRpcProxyPath,
   isBlockedRpcProxyPath,
@@ -23,7 +22,7 @@ const assertEquals = (actual: unknown, expected: unknown, message: string) => {
   }
 };
 
-Deno.test("function and session parsers accept only exact unencoded route shapes", () => {
+Deno.test("function parser accepts only exact unencoded route shapes", () => {
   assertEquals(
     getFunctionName("/functions/system-status"),
     "system-status",
@@ -50,26 +49,6 @@ Deno.test("function and session parsers accept only exact unencoded route shapes
     "function empty segment",
   );
 
-  assertEquals(
-    getSessionAction("/auth/session/exchange"),
-    "exchange",
-    "session route",
-  );
-  assertEquals(
-    getSessionAction("/auth/session/exchange/"),
-    "",
-    "session trailing slash",
-  );
-  assertEquals(
-    getSessionAction("/auth/session/%65xchange"),
-    "",
-    "encoded session action",
-  );
-  assertEquals(
-    getSessionAction("/auth//session/exchange"),
-    "",
-    "session empty segment",
-  );
 });
 
 Deno.test("REST and RPC path family detection preserves exact prefixes", () => {

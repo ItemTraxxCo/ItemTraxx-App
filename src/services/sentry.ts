@@ -111,8 +111,6 @@ const CRITICAL_EDGE_FUNCTIONS = new Set([
   "admin-ops",
   "workspace-admin-mutate",
   "privileged-step-up",
-  "workspace-login",
-  "super-auth-verify",
   "checkoutReturn",
 ]);
 

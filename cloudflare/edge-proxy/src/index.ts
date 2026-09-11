@@ -94,6 +94,16 @@ export default {
         return buildError(403, "Origin not allowed", headers, requestId);
       }
 
+      // Keep the server-to-server Better Auth administration bridge under the
+      // authenticated API namespace. Cloudflare's managed bot challenge can
+      // challenge non-browser requests to otherwise-unrecognised `/api/*`
+      // paths (including calls originating in Supabase Edge Functions). The
+      // bridge still requires ITX_INTERNAL_AUTH_SECRET; this path placement
+      // only makes the request routable and does not grant any access.
+      if (url.pathname === "/api/auth/internal-admin") {
+        return handleInternalAuthAdminRequest(request, env);
+      }
+
       if (url.pathname.startsWith("/api/auth/")) {
         const authResponse = await handleBetterAuthRequest(request, env);
         const responseHeaders = new Headers(authResponse.headers);

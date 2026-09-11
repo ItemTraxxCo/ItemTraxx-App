@@ -15,7 +15,11 @@ export type BetterAuthAdminAction =
 
 export const callBetterAuthAdmin = async <T = Record<string, unknown>>(payload: BetterAuthAdminAction): Promise<T> => {
   const baseUrl = requiredEnv("BETTER_AUTH_URL").replace(/\/+$/, "");
-  const response = await fetch(`${baseUrl}/api/internal/auth-admin`, {
+  // Keep this bridge under Better Auth's API namespace. The edge hostname's
+  // managed bot protection challenges unknown `/api/*` paths, which blocks
+  // server-to-server calls from Supabase Edge Functions before the Worker can
+  // validate this shared secret.
+  const response = await fetch(`${baseUrl}/api/auth/internal-admin`, {
     method: "POST",
     headers: { "Content-Type": "application/json", "x-itx-internal-auth": requiredEnv("ITX_INTERNAL_AUTH_SECRET") },
     body: JSON.stringify(payload),

@@ -9,7 +9,8 @@ export type BetterAuthAdminAction =
   | { action: "delete_organization"; organizationId: string }
   | { action: "create_user"; profileId: string; email: string; password: string; name?: string; role: string; profileRole: string; workspaceId?: string | null }
   | { action: "update_email"; profileId: string; email: string }
-  | { action: "delete_user" | "revoke_sessions" | "verify_password" | "request_password_reset" | "list_passkeys"; profileId: string; betterAuthUserId?: string; password?: string }
+  | { action: "delete_user" | "revoke_sessions" | "verify_password" | "list_passkeys"; profileId: string; betterAuthUserId?: string; password?: string }
+  | { action: "request_password_reset"; profileId: string; redirectTo?: string; betterAuthUserId?: string }
   | { action: "delete_passkey"; profileId: string; passkeyId: string };
 
 export const callBetterAuthAdmin = async <T = Record<string, unknown>>(payload: BetterAuthAdminAction): Promise<T> => {

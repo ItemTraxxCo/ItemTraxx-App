@@ -3,18 +3,13 @@
     <div class="internal-auth-panel">
       <div class="internal-auth-copy">
         <p class="internal-auth-kicker">Internal Console</p>
-        <h1>{{ isCodeStep ? 'Email Verification' : 'ItemTraxx Internal Access' }}</h1>
+        <h1>ItemTraxx Internal Access</h1>
         <p class="internal-auth-subtitle">
-          <template v-if="isCodeStep">
-            Check your email for a 6-digit verification code to continue into internal operations.
-          </template>
-          <template v-else>
-            Sign in with your existing super admin account to access internal operations.
-          </template>
+          Sign in with your existing super admin account to access internal operations.
         </p>
       </div>
 
-      <form v-if="!isCodeStep" class="form internal-auth-form" @submit.prevent="handleCredentialSubmit">
+      <form class="form internal-auth-form" @submit.prevent="handleCredentialSubmit">
         <label>
           Email
           <input v-model="email" type="email" placeholder="Enter email" autocomplete="username" />
@@ -60,27 +55,6 @@
         </div>
       </form>
 
-      <form v-else class="form internal-auth-form" @submit.prevent="handleCodeSubmit">
-        <p class="verification-copy">
-          Code sent to <strong>{{ verificationEmailLabel }}</strong>.
-        </p>
-        <label>
-          Verification Code
-          <input
-            v-model="verificationCode"
-            type="text"
-            inputmode="numeric"
-            autocomplete="one-time-code"
-            placeholder="Enter 6-digit code"
-            maxlength="6"
-          />
-        </label>
-        <div class="form-actions verification-actions">
-          <button type="submit" class="button-primary" :disabled="!canSubmitCode">Verify Code</button>
-          <button type="button" class="button-link" :disabled="isLoading" @click="handleResendCode">Resend code</button>
-          <button type="button" class="button-link" :disabled="isLoading" @click="handleStartOver">Start over</button>
-        </div>
-      </form>
       <p v-if="error" class="error">{{ error }}</p>
     </div>
 
@@ -95,12 +69,7 @@
 import { computed, onMounted, onUnmounted, ref } from "vue";
 import { useRouter } from "vue-router";
 import {
-  clearPendingSuperAdminVerificationEmail,
-  getPendingSuperAdminVerificationEmail,
-  resendSuperAdminEmailChallenge,
-  signOut,
   superAdminLogin,
-  verifySuperAdminEmailChallenge,
 } from "../../services/authService";
 import { useTurnstile } from "../../composables/useTurnstile";
 import { getAuthState } from "../../store/authState";
@@ -110,11 +79,8 @@ const auth = getAuthState();
 const email = ref("");
 const password = ref("");
 const showPassword = ref(false);
-const verificationCode = ref("");
-const verificationEmail = ref<string | null>(null);
 const error = ref("");
 const isLoading = ref(false);
-const isCodeStep = ref(false);
 const toastTitle = ref("");
 const toastMessage = ref("");
 const themeMode = ref<"light" | "dark">(document.documentElement.getAttribute("data-theme") === "light" ? "light" : "dark");
@@ -147,13 +113,6 @@ const canSubmitCredentials = computed(() => {
   return true;
 });
 
-const canSubmitCode = computed(() => {
-  if (isLoading.value) return false;
-  return /^\d{6}$/.test(verificationCode.value.trim());
-});
-
-const verificationEmailLabel = computed(() => verificationEmail.value || auth.email || "your email");
-
 const showToast = (title: string, message: string) => {
   toastTitle.value = title;
   toastMessage.value = message;
@@ -165,12 +124,6 @@ const showToast = (title: string, message: string) => {
     toastMessage.value = "";
     toastTimer = null;
   }, 4000);
-};
-
-const enableCodeStep = (nextEmail: string | null) => {
-  isCodeStep.value = true;
-  verificationEmail.value = nextEmail;
-  verificationCode.value = "";
 };
 
 const handleCredentialSubmit = async () => {
@@ -217,57 +170,6 @@ const handleCredentialSubmit = async () => {
   }
 };
 
-const handleCodeSubmit = async () => {
-  error.value = "";
-  if (!/^\d{6}$/.test(verificationCode.value.trim())) {
-    error.value = "Enter the 6-digit verification code.";
-    return;
-  }
-
-  isLoading.value = true;
-  try {
-    await verifySuperAdminEmailChallenge(verificationCode.value.trim());
-    await router.push("/internal");
-  } catch (err) {
-    const message = err instanceof Error ? err.message : "Verification failed.";
-    const userMessage = message.toLowerCase().includes("verify") || message.toLowerCase().includes("code")
-      ? "Invalid or expired verification code."
-      : "Unable to verify code. Please try again.";
-    error.value = userMessage;
-    showToast("Verification failed", userMessage);
-  } finally {
-    isLoading.value = false;
-  }
-};
-
-const handleResendCode = async () => {
-  error.value = "";
-  isLoading.value = true;
-  try {
-    const result = await resendSuperAdminEmailChallenge();
-    enableCodeStep(result.email ?? verificationEmail.value);
-    showToast("Code sent", "A new verification code was emailed.");
-  } catch (err) {
-    error.value = "Unable to resend the verification code right now. Please try again.";
-    showToast("Resend failed", "Unable to resend the verification code right now. Please try again.");
-  } finally {
-    isLoading.value = false;
-  }
-};
-
-const handleStartOver = async () => {
-  clearPendingSuperAdminVerificationEmail();
-  const result = await signOut();
-  if (!result.ok) {
-    showToast("Sign out failed", "Unable to complete logout. Please try again.");
-    return;
-  }
-  isCodeStep.value = false;
-  verificationCode.value = "";
-  verificationEmail.value = null;
-  password.value = "";
-};
-
 onMounted(() => {
   const syncTheme = () => {
     themeMode.value =
@@ -280,9 +182,10 @@ onMounted(() => {
     attributeFilter: ["data-theme"],
   });
 
-  const pendingEmail = getPendingSuperAdminVerificationEmail();
-  if (pendingEmail || (auth.isAuthenticated && auth.role === "super_admin" && !auth.hasSecondaryAuth)) {
-    enableCodeStep(pendingEmail ?? auth.email);
+  // Better Auth handles TOTP and backup-code challenges on /login/two-factor;
+  // this page is only the fresh credential step for internal access.
+  if (auth.isAuthenticated && auth.role === "super_admin" && auth.email) {
+    email.value = auth.email;
   }
 });
 
@@ -414,16 +317,6 @@ onUnmounted(() => {
   fill: none;
   stroke-linecap: round;
   stroke-linejoin: round;
-}
-
-.verification-copy {
-  margin: 0 0 1rem;
-  color: var(--muted);
-}
-
-.verification-actions {
-  flex-wrap: wrap;
-  gap: 0.75rem;
 }
 
 .turnstile-help {

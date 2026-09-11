@@ -166,7 +166,7 @@ Deno.test("CORS headers preserve the exact security set and reflect only allowed
   );
   assertEquals(
     allowed.headers["Access-Control-Allow-Headers"],
-    "authorization, x-client-info, apikey, content-type, x-request-id, prefer, x-itx-session-request, x-itx-data-request",
+    "authorization, x-client-info, apikey, content-type, x-request-id, prefer, x-itx-session-request, x-itx-data-request, x-captcha-response",
     "allowed headers",
   );
   assertEquals(allowed.headers["Vary"], "Origin", "vary header");

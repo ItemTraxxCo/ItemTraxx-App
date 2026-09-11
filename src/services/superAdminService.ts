@@ -11,7 +11,14 @@ const call = async <T>(action: string, payload: Record<string, unknown>) => {
   const r = await invokeEdgeFunction<
     { data: T },
     { action: string; payload: Record<string, unknown> }
-  >("super-admin-mutate", { method: "POST", body: { action, payload } });
+  >("super-admin-mutate", {
+    method: "POST",
+    body: { action, payload },
+    // This endpoint authenticates with the Better Auth session cookie. Keep
+    // the browser request CORS-simple so an edge challenge cannot block its
+    // OPTIONS preflight before the function enforces the actor's role.
+    avoidCorsPreflight: true,
+  });
   if (!r.ok) throw edgeFunctionError(r, "Super Admin request failed.");
   return r.data!.data;
 };

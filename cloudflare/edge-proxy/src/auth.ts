@@ -19,6 +19,10 @@ import {
   supabaseBetterAuthAdapter,
 } from "./supabaseBetterAuthAdapter.ts";
 import { resolveInternalAuthAdminTarget } from "./authAdmin.ts";
+import {
+  getPasswordResetDelivery,
+  sendPasswordResetEmail,
+} from "./passwordResetDelivery.ts";
 
 type BetterAuthEnv = Env & {
   SUPABASE_SERVICE_ROLE_KEY?: string;
@@ -35,7 +39,10 @@ type BetterAuthEnv = Env & {
   BETTER_AUTH_PASSKEY_ORIGIN: string;
   BETTER_AUTH_TURNSTILE_SECRET_KEY?: string;
   RESEND_API_KEY?: string;
+  ITX_RESEND_API_KEY?: string;
   ITX_RESEND_FROM?: string;
+  ITX_EMAIL_NOREPLY?: string;
+  ITX_EMAIL_FROM?: string;
   ITX_INTERNAL_AUTH_SECRET?: string;
 };
 
@@ -94,25 +101,8 @@ export const getBetterAuth = (rawEnv: Env) => {
       disableSignUp: true,
       minPasswordLength: 12,
       revokeSessionsOnPasswordReset: true,
-      sendResetPassword: async ({ user, url }) => {
-        if (!env.RESEND_API_KEY || !env.ITX_RESEND_FROM) {
-          throw new Error("Password reset email delivery is not configured");
-        }
-        const response = await fetch("https://api.resend.com/emails", {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${env.RESEND_API_KEY}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            from: env.ITX_RESEND_FROM,
-            to: [user.email],
-            subject: "Reset your ItemTraxx password",
-            text: `Use this single-use link to reset your ItemTraxx password. It expires in 60 minutes: ${url}`,
-          }),
-        });
-        if (!response.ok) throw new Error(`Password reset email delivery failed (${response.status})`);
-      },
+      sendResetPassword: async ({ user, url }, request) =>
+        sendPasswordResetEmail({ env, user, url, request }),
     },
     session: {
       expiresIn: 60 * 60 * 24 * 7,
@@ -462,12 +452,26 @@ export const handleInternalAuthAdminRequest = async (request: Request, rawEnv: E
       return Response.json({ success: (deleted?.length ?? 0) === 1 });
     }
     if (action === "request_password_reset") {
+      // Better Auth's direct API call accepts a Request so the reset callback
+      // can record delivery against this invocation. This request carries no
+      // user-controlled body; the validated payload below remains authoritative.
+      const authRequest = new Request(request.url, {
+        method: "POST",
+        headers: request.headers,
+      });
       await getBetterAuth(env).api.requestPasswordReset({
         body: {
           email: target.email,
           redirectTo: resolvePasswordResetRedirect(env, body?.redirectTo),
         },
+        request: authRequest,
       });
+      const delivery = getPasswordResetDelivery(authRequest);
+      if (delivery?.status !== "sent") {
+        throw new Error(
+          delivery?.message ?? "Password reset email delivery did not complete",
+        );
+      }
       return Response.json({ success: true });
     }
     return Response.json({ error: "Invalid action" }, { status: 400 });
@@ -477,13 +481,17 @@ export const handleInternalAuthAdminRequest = async (request: Request, rawEnv: E
   }
 };
 
-export const handleBetterAuthRequest = (request: Request, rawEnv: Env) => {
+export const handleBetterAuthRequest = async (request: Request, rawEnv: Env) => {
   const env = rawEnv as BetterAuthEnv;
   const url = new URL(request.url);
   if (url.pathname === "/api/auth/.well-known/jwks.json") {
     const publicJwk = parseJwk(env.BETTER_AUTH_JWT_PUBLIC_JWK, "BETTER_AUTH_JWT_PUBLIC_JWK");
     return Response.json({ keys: [{ ...publicJwk, use: "sig", alg: "ES256" }] });
   }
+  // Keep Better Auth's generic reset response for public requests so an email
+  // delivery failure cannot be used to enumerate registered accounts. The
+  // internal administration bridge above checks the delivery outcome and
+  // returns an actionable failure to trusted callers instead.
   return getBetterAuth(env).handler(request);
 };
 

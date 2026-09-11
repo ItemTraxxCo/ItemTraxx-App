@@ -58,6 +58,10 @@ export const fetchSuperDashboard = async () => {
     "super-dashboard",
     {
       method: "GET",
+      // The dashboard is cookie-authenticated. Keep this GET CORS-simple so
+      // Cloudflare's managed challenge cannot block the OPTIONS preflight
+      // before the Worker can enforce the session and super-admin checks.
+      avoidCorsPreflight: true,
     }
   );
 

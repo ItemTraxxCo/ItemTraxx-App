@@ -192,7 +192,7 @@ const withMockedBetterAuthFetch = async (
   Deno.env.set("ITX_INTERNAL_AUTH_SECRET", "test-internal-secret");
   globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = typeof input === "string" ? input : (input as URL).toString();
-    if (url.includes("/api/internal/auth-admin")) {
+    if (url.includes("/api/auth/internal-admin")) {
       return handler(url, init);
     }
     return original(input as Parameters<typeof fetch>[0], init);

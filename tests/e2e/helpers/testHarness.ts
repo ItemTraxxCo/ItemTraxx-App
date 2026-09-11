@@ -353,12 +353,12 @@ export const setTenantAccountSession = async (page: Page, workspaceId = "tenant-
   await page.evaluate((id) => window.__itemtraxxTest?.setTenantAccountSession(id), workspaceId);
 };
 
-export const setSuperAdminSession = async (page: Page) => {
+export const setSuperAdminSession = async (page: Page, options: { verified?: boolean } = {}) => {
   await page.waitForFunction(() => typeof window.__itemtraxxTest?.setSuperAdminSession === "function");
   await waitForPublicAuthBootstrap(page);
-  await page.evaluate(() => {
-    window.__itemtraxxTest?.setSuperAdminSession();
-  });
+  await page.evaluate((sessionOptions) => {
+    window.__itemtraxxTest?.setSuperAdminSession(sessionOptions);
+  }, options);
 };
 
 export const navigateApp = async (page: Page, path: string) => {

@@ -18,6 +18,7 @@ import {
   createBetterAuthDataClient,
   supabaseBetterAuthAdapter,
 } from "./supabaseBetterAuthAdapter.ts";
+import { resolveInternalAuthAdminTarget } from "./authAdmin.ts";
 
 type BetterAuthEnv = Env & {
   SUPABASE_SERVICE_ROLE_KEY?: string;
@@ -345,6 +346,24 @@ const constantTimeSecretMatches = async (provided: string, expected: string) => 
   return a.length === b.length && a.every((value, index) => value === b[index]);
 };
 
+const resolvePasswordResetRedirect = (env: BetterAuthEnv, requested: unknown) => {
+  const configured = typeof requested === "string" && requested.trim()
+    ? requested.trim()
+    : isItemTraxxHostname(new URL(env.BETTER_AUTH_URL).hostname)
+    ? "https://itemtraxx.com/reset-password"
+    : `${trimTrailingSlash(env.BETTER_AUTH_URL)}/reset-password`;
+  const redirect = new URL(configured);
+  const isLocal = ["localhost", "127.0.0.1"].includes(redirect.hostname);
+  if (
+    redirect.pathname !== "/reset-password" || redirect.search || redirect.hash ||
+    (!isItemTraxxHostname(redirect.hostname) && !(isLocal && redirect.protocol === "http:")) ||
+    (isItemTraxxHostname(redirect.hostname) && redirect.protocol !== "https:")
+  ) {
+    throw new Error("Invalid password reset redirect");
+  }
+  return redirect.toString();
+};
+
 export const handleInternalAuthAdminRequest = async (request: Request, rawEnv: Env) => {
   const env = rawEnv as BetterAuthEnv;
   if (!env.ITX_INTERNAL_AUTH_SECRET) return Response.json({ error: "Unavailable" }, { status: 503 });
@@ -397,15 +416,12 @@ export const handleInternalAuthAdminRequest = async (request: Request, rawEnv: E
       return Response.json({ user: { id: profileId, betterAuthUserId: userId, email } });
     }
     const explicitBetterAuthUserId = typeof body?.betterAuthUserId === "string" ? body.betterAuthUserId : "";
-    const { data: profileMapping, error: mappingError } = await cachedDataClient.schema("public").from("profiles")
-      .select("better_auth_user_id").eq("id", profileId).maybeSingle();
-    if (mappingError) throw mappingError;
-    const userIdForLookup = profileMapping?.better_auth_user_id ?? explicitBetterAuthUserId;
-    const { data: userMapping, error: userError } = userIdForLookup
-      ? await cachedDataClient.schema("better_auth").from("user").select("id,email").eq("id", userIdForLookup).maybeSingle()
-      : { data: null, error: null };
-    if (userError) throw userError;
-    const target = userMapping ? { user_id: userMapping.id, email: userMapping.email } : undefined;
+    const target = await resolveInternalAuthAdminTarget({
+      dataClient: cachedDataClient,
+      action,
+      profileId,
+      explicitBetterAuthUserId,
+    });
     if (!target) return Response.json({ error: "User not found" }, { status: 404 });
     if (action === "update_email") {
       const email = typeof body?.email === "string" ? body.email.trim().toLowerCase() : "";
@@ -446,7 +462,12 @@ export const handleInternalAuthAdminRequest = async (request: Request, rawEnv: E
       return Response.json({ success: (deleted?.length ?? 0) === 1 });
     }
     if (action === "request_password_reset") {
-      await getBetterAuth(env).api.requestPasswordReset({ body: { email: target.email, redirectTo: `${trimTrailingSlash(env.BETTER_AUTH_URL)}/reset-password` } });
+      await getBetterAuth(env).api.requestPasswordReset({
+        body: {
+          email: target.email,
+          redirectTo: resolvePasswordResetRedirect(env, body?.redirectTo),
+        },
+      });
       return Response.json({ success: true });
     }
     return Response.json({ error: "Invalid action" }, { status: 400 });

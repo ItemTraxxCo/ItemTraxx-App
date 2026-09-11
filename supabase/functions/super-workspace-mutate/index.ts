@@ -247,22 +247,30 @@ serve(async (req) => {
       try { organization = await callBetterAuthAdmin({action:"create_organization",workspaceId:w.id,name,slug}); }
       catch { await admin.from("workspaces").delete().eq("id", w.id); return json(400,{error:"Unable to create workspace identity."}); }
       const profileId = crypto.randomUUID();
-      let created: { user: { betterAuthUserId: string } };
-      try { created = await callBetterAuthAdmin({action:"create_user",profileId,email,password:typeof p.password === "string"&&p.password?p.password:randomPassword(),role:"user",profileRole:"workspace_admin",workspaceId:w.id}); }
-      catch {
-        await callBetterAuthAdmin({action:"delete_organization",organizationId:organization.organization.id}).catch(()=>undefined);
-        await admin.from("workspaces").delete().eq("id", w.id);
-        return json(400, { error: "Unable to create primary admin." });
-      }
-      const { error: pe } = await admin.from("profiles").insert({
+      const { error: profileError } = await admin.from("profiles").insert({
         id: profileId,
-        better_auth_user_id: created.user.betterAuthUserId,
         workspace_id: w.id,
         role: "workspace_admin",
         auth_email: email,
         is_active: true,
       });
-      if (pe) {
+      if (profileError) {
+        await callBetterAuthAdmin({action:"delete_organization",organizationId:organization.organization.id}).catch(()=>undefined);
+        await admin.from("workspaces").delete().eq("id", w.id);
+        return json(400, { error: "Unable to create workspace." });
+      }
+      let created: { user: { betterAuthUserId: string } };
+      try { created = await callBetterAuthAdmin({action:"create_user",profileId,email,password:typeof p.password === "string"&&p.password?p.password:randomPassword(),role:"user",profileRole:"workspace_admin",workspaceId:w.id}); }
+      catch {
+        await admin.from("profiles").delete().eq("id", profileId);
+        await callBetterAuthAdmin({action:"delete_organization",organizationId:organization.organization.id}).catch(()=>undefined);
+        await admin.from("workspaces").delete().eq("id", w.id);
+        return json(400, { error: "Unable to create primary admin." });
+      }
+      const { data: linkedProfile, error: pe } = await admin.from("profiles").select("id")
+        .eq("id", profileId).maybeSingle();
+      if (pe || !linkedProfile) {
+        await admin.from("profiles").delete().eq("id", profileId);
         await callBetterAuthAdmin({action:"delete_user",profileId,betterAuthUserId:created.user.betterAuthUserId}).catch(()=>undefined);
         await admin.from("workspaces").delete().eq("id", w.id);
         return json(400, { error: "Unable to create workspace." });
@@ -277,6 +285,7 @@ serve(async (req) => {
         updated_at: new Date().toISOString(),
       });
       if (policyError) {
+        await admin.from("profiles").delete().eq("id", profileId);
         await callBetterAuthAdmin({action:"delete_user",profileId,betterAuthUserId:created.user.betterAuthUserId}).catch(()=>undefined);
         await admin.from("workspaces").delete().eq("id", w.id);
         return json(400, { error: "Unable to create workspace settings." });
@@ -366,7 +375,7 @@ serve(async (req) => {
       }
       const { data: primary } = await admin.from("profiles").select("id").eq("workspace_id",workspaceId).eq("auth_email",row.primary_admin_email).maybeSingle();
       if (!primary?.id) return json(404,{error:"Primary admin not found."});
-      try { await callBetterAuthAdmin({action:"request_password_reset",profileId:primary.id}); } catch { return json(400,{error:"Unable to send password reset."}); }
+      try { await callBetterAuthAdmin({action:"request_password_reset",profileId:primary.id,redirectTo:redirect}); } catch { return json(400,{error:"Unable to send password reset."}); }
       await writeAudit("send_primary_admin_reset", workspaceId, {});
       return json(200, {
         data: { success: true, auth_email: row.primary_admin_email },

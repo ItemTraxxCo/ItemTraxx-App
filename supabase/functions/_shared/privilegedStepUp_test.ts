@@ -28,7 +28,20 @@ Deno.test("admin step-up registration accepts fresh verified handoff claims", as
   );
 });
 
-Deno.test("admin step-up registration rejects fresh password-only claims", async () => {
+Deno.test("admin step-up registration accepts a fresh Better Auth session claim", async () => {
+  const client = authClient({
+    iat: Math.floor(Date.now() / 1000),
+    session_id: "session-1",
+    amr: [{ method: "session", timestamp: Math.floor(Date.now() / 1000) }],
+  });
+
+  assert(
+    await canRegisterAdminStepUpFromTrustedHandoff(client, "verified-token"),
+    "expected a fresh Better Auth session token",
+  );
+});
+
+Deno.test("admin step-up registration accepts fresh password claims", async () => {
   const client = authClient({
     iat: Math.floor(Date.now() / 1000),
     session_id: "session-1",
@@ -36,8 +49,21 @@ Deno.test("admin step-up registration rejects fresh password-only claims", async
   });
 
   assert(
+    await canRegisterAdminStepUpFromTrustedHandoff(client, "verified-token"),
+    "expected a fresh password token",
+  );
+});
+
+Deno.test("admin step-up registration rejects a freshly minted token for an old session", async () => {
+  const client = authClient({
+    iat: Math.floor(Date.now() / 1000),
+    session_id: "session-1",
+    amr: [{ method: "session", timestamp: Math.floor((Date.now() - 10 * 60 * 1000) / 1000) }],
+  });
+
+  assert(
     !await canRegisterAdminStepUpFromTrustedHandoff(client, "verified-token"),
-    "expected password-only token rejection",
+    "expected stale Better Auth session authentication to be rejected",
   );
 });
 

@@ -12,11 +12,19 @@ export type PrivilegedRoleScope =
 
 const DEFAULT_STEP_UP_TTL_MS = 15 * 60 * 1000;
 const ADMIN_STEP_UP_REGISTRATION_WINDOW_MS = 5 * 60 * 1000;
+const AUTH_TIMESTAMP_CLOCK_SKEW_MS = 30 * 1000;
 const ADMIN_HANDOFF_AUTH_METHODS = new Set([
+  "password",
   "magiclink",
   "magic_link",
   "otp",
   "email_link",
+  "passkey",
+  "webauthn",
+  // Better Auth's JWT plugin emits a signed session AMR entry whose
+  // timestamp is the session's createdAt. This is the authentication
+  // freshness signal used by the Better Auth -> Supabase handoff.
+  "session",
 ]);
 
 const getVerifiedClaims = async (
@@ -70,8 +78,20 @@ export const canRegisterAdminStepUpFromTrustedHandoff = async (
   return amr.some((entry) => {
     if (!entry || typeof entry !== "object") return false;
     const method = (entry as { method?: unknown }).method;
-    return typeof method === "string" &&
-      ADMIN_HANDOFF_AUTH_METHODS.has(method.toLowerCase());
+    const timestamp = (entry as { timestamp?: unknown }).timestamp;
+    if (
+      typeof method !== "string" ||
+      !ADMIN_HANDOFF_AUTH_METHODS.has(method.toLowerCase()) ||
+      typeof timestamp !== "number" ||
+      !Number.isFinite(timestamp) ||
+      timestamp <= 0
+    ) {
+      return false;
+    }
+
+    const ageMs = Date.now() - timestamp * 1000;
+    return ageMs >= -AUTH_TIMESTAMP_CLOCK_SKEW_MS &&
+      ageMs <= ADMIN_STEP_UP_REGISTRATION_WINDOW_MS;
   });
 };
 

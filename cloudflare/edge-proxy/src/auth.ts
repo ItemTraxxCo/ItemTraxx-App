@@ -41,6 +41,7 @@ type BetterAuthEnv = Env & {
   RESEND_API_KEY?: string;
   ITX_RESEND_API_KEY?: string;
   ITX_RESEND_FROM?: string;
+  ITX_EMAIL_NOTIFICATIONS?: string;
   ITX_EMAIL_NOREPLY?: string;
   ITX_EMAIL_FROM?: string;
   ITX_INTERNAL_AUTH_SECRET?: string;

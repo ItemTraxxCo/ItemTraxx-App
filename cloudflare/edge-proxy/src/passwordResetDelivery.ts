@@ -4,6 +4,7 @@ export type PasswordResetDeliveryEnvironment = {
   RESEND_API_KEY?: string;
   ITX_RESEND_API_KEY?: string;
   ITX_RESEND_FROM?: string;
+  ITX_EMAIL_NOTIFICATIONS?: string;
   ITX_EMAIL_NOREPLY?: string;
   ITX_EMAIL_FROM?: string;
 };
@@ -62,6 +63,7 @@ export const sendPasswordResetEmail = async ({
   const apiKey = firstConfiguredValue(env.RESEND_API_KEY, env.ITX_RESEND_API_KEY);
   const from = firstConfiguredValue(
     env.ITX_RESEND_FROM,
+    env.ITX_EMAIL_NOTIFICATIONS,
     env.ITX_EMAIL_NOREPLY,
     env.ITX_EMAIL_FROM,
   );

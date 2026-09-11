@@ -71,6 +71,43 @@ Deno.test("password reset delivery fails closed when configuration is incomplete
   assert(getPasswordResetDelivery(deliveryRequest)?.status === "failed", "configuration failure was not recorded");
 });
 
+Deno.test("password reset delivery accepts the shared notifications sender", async () => {
+  const originalFetch = globalThis.fetch;
+  let request: Request | undefined;
+  try {
+    globalThis.fetch = async (input, init) => {
+      request = new Request(input, init);
+      return new Response(JSON.stringify({ id: "re_notifications" }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      });
+    };
+
+    const deliveryRequest = new Request("https://edge.itemtraxx.com/api/auth/request-password-reset", {
+      method: "POST",
+    });
+    await sendPasswordResetEmail({
+      env: {
+        RESEND_API_KEY: "test-key",
+        ITX_EMAIL_NOTIFICATIONS: "ItemTraxx Notifications <notifications@itemtraxx.com>",
+      },
+      user,
+      url,
+      request: deliveryRequest,
+    });
+
+    assert(request, "Resend was not called for the notifications sender");
+    const payload = await request.json() as Record<string, unknown>;
+    assert(
+      payload.from === "ItemTraxx Notifications <notifications@itemtraxx.com>",
+      "notifications sender was not selected",
+    );
+    assert(getPasswordResetDelivery(deliveryRequest)?.status === "sent", "notifications delivery was not recorded");
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 Deno.test("password reset delivery records provider rejection without leaking secrets", async () => {
   const originalFetch = globalThis.fetch;
   const deliveryRequest = new Request("https://edge.itemtraxx.com/api/auth/request-password-reset", {

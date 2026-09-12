@@ -87,7 +87,11 @@ import { logAdminAction } from "../../../services/auditLogService";
 import { sanitizeInput } from "../../../utils/inputSanitizer";
 import { toUserFacingErrorMessage } from "../../../services/appErrors";
 import type { ScannerHistoryItem, ScannerScanEvent } from "../../../types/cameraScanner";
-import { capturePostHogEvent } from "../../../services/posthogService";
+import {
+  capturePostHogEvent,
+  capturePostHogException,
+  getPostHogErrorCode,
+} from "../../../services/posthogService";
 
 const barcodeInput = ref("");
 const barcodes = ref<ItemSummary[]>([]);
@@ -171,6 +175,9 @@ const submitReturn = async () => {
       },
     );
     if (submitResult.buffered) {
+      capturePostHogEvent("quick_return_buffered", {
+        buffered_count: submitResult.queuedCount,
+      });
       success.value = "";
       lastSummary.value = "";
       error.value = `No connection. Return request buffered for auto-sync. Buffered: ${submitResult.queuedCount}`;
@@ -191,6 +198,10 @@ const submitReturn = async () => {
     barcodes.value = [];
     barcodeInput.value = "";
   } catch (err) {
+    capturePostHogException(err);
+    capturePostHogEvent("quick_return_failed", {
+      error_code: getPostHogErrorCode(err),
+    });
     error.value = toUserFacingErrorMessage(err, "Request failed. Please try again.");
   } finally {
     isSubmitting.value = false;

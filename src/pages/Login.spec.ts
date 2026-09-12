@@ -72,6 +72,7 @@ describe("Login", () => {
 
     expect(mocks.capturePostHogEvent).toHaveBeenCalledWith("login_failed", {
       error_code: "invalid_credentials",
+      consecutive_failures: 1,
     });
     expect(mocks.capturePostHogEvent).not.toHaveBeenCalledWith(
       "tenant_login_failed",
@@ -93,11 +94,99 @@ describe("Login", () => {
 
     expect(mocks.capturePostHogEvent).toHaveBeenCalledWith("login_failed", {
       error_code: "authentication_failed",
+      consecutive_failures: 1,
     });
     expect(mocks.capturePostHogEvent).not.toHaveBeenCalledWith(
       "tenant_login_failed",
       expect.anything(),
     );
+    wrapper.unmount();
+  });
+
+  it("surfaces a password-reset prompt after repeated sign-in failures", async () => {
+    mocks.workspaceLogin.mockRejectedValue(new Error("Invalid email or password."));
+    const wrapper = mountLogin();
+
+    const submitOnce = async () => {
+      await wrapper.get('input[placeholder="Email address"]').setValue("admin@example.com");
+      await wrapper.get('input[placeholder="Enter password"]').setValue("wrong-password");
+      await wrapper.get("form").trigger("submit");
+      await settle();
+    };
+
+    await submitOnce();
+    await submitOnce();
+    expect(wrapper.find(".login-reset-hint").exists()).toBe(false);
+
+    await submitOnce();
+    expect(wrapper.find(".login-reset-hint").exists()).toBe(true);
+    expect(mocks.capturePostHogEvent).toHaveBeenCalledWith("login_failed", {
+      error_code: "invalid_credentials",
+      consecutive_failures: 3,
+    });
+    wrapper.unmount();
+  });
+
+  it("clears the failure counter after a successful sign-in", async () => {
+    mocks.workspaceLogin
+      .mockRejectedValueOnce(new Error("Invalid email or password."))
+      .mockRejectedValueOnce(new Error("Invalid email or password."))
+      .mockRejectedValueOnce(new Error("Invalid email or password."))
+      .mockResolvedValueOnce({ role: "workspace_admin", workspaceSlug: null });
+    mocks.getAuthState.mockReturnValue({ userId: "user-1", role: "workspace_admin" });
+    const wrapper = mountLogin();
+
+    const submitOnce = async () => {
+      await wrapper.get('input[placeholder="Email address"]').setValue("admin@example.com");
+      await wrapper.get('input[placeholder="Enter password"]').setValue("secret");
+      await wrapper.get("form").trigger("submit");
+      await settle();
+    };
+
+    await submitOnce();
+    await submitOnce();
+    await submitOnce();
+    expect(wrapper.find(".login-reset-hint").exists()).toBe(true);
+
+    await submitOnce();
+    expect(wrapper.find(".login-reset-hint").exists()).toBe(false);
+    wrapper.unmount();
+  });
+
+  it.each([
+    ["TURNSTILE_FAILED", "turnstile_failed"],
+    ["LIMITER_UNAVAILABLE", "rate_limit"],
+    ["WORKSPACE_DISABLED", "workspace_disabled"],
+    ["MAINTENANCE_MODE", "maintenance_mode"],
+  ])("reports %s as a blocked login instead of staying silent", async (thrown, code) => {
+    mocks.workspaceLogin.mockRejectedValueOnce(new Error(thrown));
+    const wrapper = mountLogin();
+
+    await wrapper.get('input[placeholder="Email address"]').setValue("admin@example.com");
+    await wrapper.get('input[placeholder="Enter password"]').setValue("secret");
+    await wrapper.get("form").trigger("submit");
+    await settle();
+
+    expect(mocks.capturePostHogEvent).toHaveBeenCalledWith("login_failed", {
+      error_code: code,
+    });
+    wrapper.unmount();
+  });
+
+  it("does not count a blocked login toward the password-reset prompt", async () => {
+    mocks.workspaceLogin.mockRejectedValue(new Error("TURNSTILE_FAILED"));
+    const wrapper = mountLogin();
+
+    for (let attempt = 0; attempt < 4; attempt += 1) {
+      await wrapper.get('input[placeholder="Email address"]').setValue("admin@example.com");
+      await wrapper.get('input[placeholder="Enter password"]').setValue("secret");
+      await wrapper.get("form").trigger("submit");
+      await settle();
+    }
+
+    // A failed bot check says nothing about the password, so it must not push
+    // the operator toward resetting a credential that already works.
+    expect(wrapper.find(".login-reset-hint").exists()).toBe(false);
     wrapper.unmount();
   });
 });

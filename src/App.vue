@@ -193,6 +193,7 @@ const isBannerBleedRoute = computed(() => ["/legal", "/security", "/trust", "/co
 const isDarkChromeRoute = computed(() => ["/", "/landing-new", "/pricing", "/changelog", "/itemscanner"].includes(route.path));
 const isLandingRoute = computed(() => route.path === "/" || route.path === "/landing-new");
 const isUnavailableRoute = computed(() => route.path === "/unavailable" || route.name === "public-unavailable");
+const isSuperAdminShellRoute = computed(() => String(route.name || "").startsWith("super-admin-"));
 const isKillSwitchAllowedRoute = computed(() => isUnavailableRoute.value);
 const hiddenMenuRoutes = new Set(["public-home", "public-unavailable", "public-pricing", "public-about", "public-security", "public-report-security-issue", "public-changelog", "public-compliance", "public-privacy", "public-cookies", "public-contact", "public-trust", "public-faq", "public-accessibility", "public-getting-started", "public-itemscanner", "public-legal", "public-forgot-password", "public-reset-password", "public-home-new2", "public-request-demo", "public-contact-sales", "public-contact-support", "public-submit-confirmation"]);
 const showTopMenu = computed(() => !hiddenMenuRoutes.has(String(route.name)) && !String(route.name || "").startsWith("super-admin-"));
@@ -348,6 +349,8 @@ watchEffect(() => {
   document.body.classList.toggle("confirmation-route-active", isSubmitConfirmationRoute.value);
   document.documentElement.classList.toggle("unavailable-route-active", isUnavailableRoute.value);
   document.body.classList.toggle("unavailable-route-active", isUnavailableRoute.value);
+  document.documentElement.classList.toggle("super-admin-route-active", isSuperAdminShellRoute.value);
+  document.body.classList.toggle("super-admin-route-active", isSuperAdminShellRoute.value);
   updateBrowserChromeColor();
 });
 watch(() => [systemStatus.hasResult, systemStatus.responseOk, systemStatus.responseStatus, systemStatus.payload] as const, applySystemStatus, { immediate: true });

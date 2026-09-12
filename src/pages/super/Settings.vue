@@ -1,58 +1,45 @@
 <template>
-  <div class="page admin-shell">
-    <div class="admin-hero">
-      <div class="page-nav-left">
-        <RouterLink class="button-link" to="/super-admin">Return to super admin</RouterLink>
-      </div>
-      <h1>Super Admin Settings</h1>
-      <p class="admin-hero-copy">
-        Review account security, passkeys, and active sessions for your super admin access.
-      </p>
-      <p><RouterLink class="button-link" to="/account/security">Account Security</RouterLink> · <RouterLink class="button-link" to="/super-admin/settings/sso">Enterprise SSO oversight</RouterLink></p>
-      <div class="admin-summary-grid">
-        <div class="admin-summary-card">
-          <strong>{{ passkeys.length }}</strong>
-          <span>Registered passkeys</span>
-        </div>
-        <div class="admin-summary-card">
-          <strong>{{ sessions.length }}</strong>
-          <span>Active sessions</span>
-        </div>
+  <main class="page">
+    <div class="sa-toolbar">
+      <div>
+        <RouterLink to="/super-admin" class="sa-back-link">&larr; Back to Control Center</RouterLink>
+        <h1 class="sa-toolbar-title">Super Admin Settings</h1>
+        <p class="sa-toolbar-sub">
+          Review account security, passkeys, and active sessions for your super admin access.
+        </p>
+        <p class="links-row"><RouterLink to="/account/security" class="sa-back-link">Account Security</RouterLink> · <RouterLink to="/super-admin/settings/sso" class="sa-back-link">Enterprise SSO oversight</RouterLink></p>
       </div>
     </div>
 
-    <div class="card admin-section-card">
-      <div class="admin-section-header">
-        <div>
-          <h2>Password reset</h2>
-          <p class="admin-section-copy">Send yourself a reset link if you want to rotate your password.</p>
-        </div>
-      </div>
+    <div class="sa-stat-strip" aria-label="Settings summary">
+      <div class="sa-stat"><div class="n">{{ passkeys.length }}</div><div class="l">Registered passkeys</div></div>
+      <div class="sa-stat"><div class="n">{{ sessions.length }}</div><div class="l">Active sessions</div></div>
+    </div>
+
+    <section class="sa-panel">
+      <h2>Password reset</h2>
+      <p class="sa-toolbar-sub">Send yourself a reset link if you want to rotate your password.</p>
       <p class="muted">Reset links are sent to <strong>{{ auth.email || "your account email" }}</strong>.</p>
-      <div class="form-actions">
-        <button type="button" class="button-primary" :disabled="isPasswordResetSending" @click="sendPasswordReset">
+      <div class="panel-actions">
+        <button type="button" class="sa-btn primary" :disabled="isPasswordResetSending" @click="sendPasswordReset">
           Send reset password email
         </button>
       </div>
-      <p v-if="passwordResetMessage" class="success">{{ passwordResetMessage }}</p>
-      <p v-if="passwordResetError" class="error">{{ passwordResetError }}</p>
-    </div>
+      <p v-if="passwordResetMessage" class="sa-notice">{{ passwordResetMessage }}</p>
+      <p v-if="passwordResetError" class="sa-error">{{ passwordResetError }}</p>
+    </section>
 
-    <div class="card admin-section-card">
-      <div class="admin-section-header">
-        <div>
-          <h2>Passkeys</h2>
-          <p class="admin-section-copy">
-            Passkeys registered to this account. Add, rename, or remove passkeys from Account Security.
-          </p>
-        </div>
+    <section class="sa-panel">
+      <h2>Passkeys</h2>
+      <p class="sa-toolbar-sub">
+        Passkeys registered to this account. Add, rename, or remove passkeys from Account Security.
+      </p>
+      <div class="panel-actions">
+        <RouterLink class="sa-btn" to="/account/security">Manage passkeys in Account Security</RouterLink>
+        <button type="button" class="sa-btn" :disabled="isPasskeyLoading" @click="loadPasskeys">Reload passkeys</button>
       </div>
-      <div class="form-actions">
-        <RouterLink class="button-link" to="/account/security">Manage passkeys in Account Security</RouterLink>
-        <button type="button" :disabled="isPasskeyLoading" @click="loadPasskeys">Reload passkeys</button>
-      </div>
-      <div class="table-wrap">
-        <table class="table">
+      <div class="sa-table-wrap">
+        <table class="sa-table">
           <thead>
             <tr>
               <th>Name</th>
@@ -75,18 +62,14 @@
       <p class="muted passkey-inventory-note">
         Last-used timestamps are shown when available. Passkey changes are intentionally limited to Account Security.
       </p>
-      <p v-if="passkeyError" class="error">{{ passkeyError }}</p>
-    </div>
+      <p v-if="passkeyError" class="sa-error">{{ passkeyError }}</p>
+    </section>
 
-    <div class="card admin-section-card">
-      <div class="admin-section-header">
-        <div>
-          <h2>Active sessions</h2>
-          <p class="admin-section-copy">Review and revoke active super admin sessions for this account.</p>
-        </div>
-      </div>
-      <div class="table-wrap">
-        <table class="table">
+    <section class="sa-panel">
+      <h2>Active sessions</h2>
+      <p class="sa-toolbar-sub">Review and revoke active super admin sessions for this account.</p>
+      <div class="sa-table-wrap">
+        <table class="sa-table">
           <thead>
             <tr>
               <th>Device</th>
@@ -112,7 +95,7 @@
           </tbody>
         </table>
       </div>
-      <div class="form-actions">
+      <div class="panel-actions">
         <label class="session-select">
           Select session
           <select v-model="selectedSessionId">
@@ -123,20 +106,20 @@
           </select>
         </label>
       </div>
-      <div class="form-actions">
-        <button type="button" :disabled="isSessionSaving || !selectedSessionId" @click="revokeSelectedSession">
+      <div class="panel-actions">
+        <button type="button" class="sa-btn" :disabled="isSessionSaving || !selectedSessionId" @click="revokeSelectedSession">
           Sign out selected session
         </button>
-        <button type="button" :disabled="isSessionSaving || !removableSessions.length" @click="revokeAllOtherSessions">
+        <button type="button" class="sa-btn" :disabled="isSessionSaving || !removableSessions.length" @click="revokeAllOtherSessions">
           Sign out all other sessions
         </button>
-        <button type="button" :disabled="isSessionSaving" @click="loadSessions">Reload sessions</button>
+        <button type="button" class="sa-btn" :disabled="isSessionSaving" @click="loadSessions">Reload sessions</button>
       </div>
-      <p v-if="sessionError" class="error">{{ sessionError }}</p>
-      <p v-if="sessionSuccess" class="success">{{ sessionSuccess }}</p>
-    </div>
+      <p v-if="sessionError" class="sa-error">{{ sessionError }}</p>
+      <p v-if="sessionSuccess" class="sa-notice">{{ sessionSuccess }}</p>
+    </section>
 
-  </div>
+  </main>
 </template>
 
 <script setup lang="ts">
@@ -279,9 +262,27 @@ onMounted(async () => {
 </script>
 
 <style scoped>
+.page {
+  max-width: 1320px;
+  margin: 0 auto;
+  padding: 2rem;
+}
+
+.panel-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+
+.links-row {
+  font-size: 0.85rem;
+  margin-top: 0.75rem;
+}
+
 .session-select {
   max-width: 28rem;
 }
+
 .passkey-inventory-note {
   margin-top: 0.75rem;
 }

@@ -608,6 +608,14 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
+/* The global .form-actions (src/styles/base.css) only adds margin-top, not
+   margin-bottom, so a button row followed directly by another element has
+   zero gap between them. Add the missing space here rather than changing
+   the global rule, which is used by other pages too. */
+.form-actions {
+  margin-bottom: 1rem;
+}
+
 .workspace-hero {
   margin-bottom: 1rem;
 }

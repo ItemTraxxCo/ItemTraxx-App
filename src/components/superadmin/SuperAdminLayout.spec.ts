@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 import { mount } from "@vue/test-utils";
 import { createMemoryHistory, createRouter } from "vue-router";
 import SuperAdminLayout from "./SuperAdminLayout.vue";
@@ -38,27 +38,21 @@ const mountAt = async (routeName: string) => {
 };
 
 describe("SuperAdminLayout", () => {
-  beforeEach(() => {
-    localStorage.clear();
-  });
-
   it("renders the sidebar and the matched child route", async () => {
     const wrapper = await mountAt("super-admin-home");
     expect(wrapper.find(".sa-side").exists()).toBe(true);
     expect(wrapper.text()).toContain("Home content");
   });
 
-  it("starts expanded by default and collapses on toggle, persisting the choice", async () => {
+  it("starts collapsed and expands while the pointer is over the sidebar, collapsing again on mouseleave", async () => {
     const wrapper = await mountAt("super-admin-home");
-    expect(wrapper.find(".sa-side").classes()).not.toContain("collapsed");
-    await wrapper.find(".sa-toggle").trigger("click");
-    expect(wrapper.find(".sa-side").classes()).toContain("collapsed");
-    expect(localStorage.getItem("super-admin-sidebar-collapsed")).toBe("true");
-  });
+    const side = wrapper.find(".sa-side");
+    expect(side.classes()).toContain("collapsed");
 
-  it("restores a previously collapsed state from localStorage", async () => {
-    localStorage.setItem("super-admin-sidebar-collapsed", "true");
-    const wrapper = await mountAt("super-admin-home");
+    await side.trigger("mouseenter");
+    expect(wrapper.find(".sa-side").classes()).not.toContain("collapsed");
+
+    await side.trigger("mouseleave");
     expect(wrapper.find(".sa-side").classes()).toContain("collapsed");
   });
 });

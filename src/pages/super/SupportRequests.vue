@@ -1,83 +1,93 @@
 <template>
   <div class="page">
-    <h1>Support Requests</h1>
-    <p>Review support submissions, attachments, and follow-up context from the contact support form.</p>
-
-    <nav class="page-nav-left">
-      <RouterLink class="button-link" to="/super-admin">Return to Super Admin</RouterLink>
-      <RouterLink class="button-link" to="/super-admin/support-requests">Support Requests</RouterLink>
-      <RouterLink class="button-link" to="/super-admin/sales-leads">Sales Leads</RouterLink>
-      <RouterLink class="button-link" to="/super-admin/customers">Customers</RouterLink>
-      <RouterLink class="button-link" to="/internal">Internal Ops</RouterLink>
-    </nav>
-
-    <div class="admin-grid">
-      <div v-for="option in statusOptions" :key="option.value" class="stat-card">
-        <h3>{{ option.label }}</h3>
-        <p class="stat-value">{{ countByStatus(option.value) }}</p>
+    <div class="sa-toolbar">
+      <div>
+        <RouterLink to="/super-admin" class="sa-back-link">&larr; Back to Control Center</RouterLink>
+        <h1 class="sa-toolbar-title">Support Requests</h1>
+        <p class="sa-toolbar-sub">Review support submissions, attachments, and follow-up context from the contact support form.</p>
       </div>
     </div>
 
-    <div class="card">
-      <div class="filters">
-        <input
-          v-model.trim="search"
-          type="text"
-          placeholder="Search requester, email, subject, or message"
-          @keyup.enter="loadRequests"
-        />
-        <select v-model="statusFilter">
-          <option value="">All statuses</option>
-          <option v-for="option in statusOptions" :key="option.value" :value="option.value">
-            {{ option.label }}
-          </option>
-        </select>
-        <button type="button" :disabled="isLoading" @click="loadRequests">
+    <div class="sa-stat-strip" aria-label="Support request summary">
+      <div v-for="option in statusOptions" :key="option.value" class="sa-stat">
+        <div class="n">{{ countByStatus(option.value) }}</div>
+        <div class="l">{{ option.label }}</div>
+      </div>
+    </div>
+
+    <section class="sa-panel">
+      <div class="sa-filters">
+        <label>
+          Search
+          <input
+            v-model.trim="search"
+            type="text"
+            placeholder="Search requester, email, subject, or message"
+            @keyup.enter="loadRequests"
+          />
+        </label>
+        <label>
+          Status
+          <select v-model="statusFilter">
+            <option value="">All statuses</option>
+            <option v-for="option in statusOptions" :key="option.value" :value="option.value">
+              {{ option.label }}
+            </option>
+          </select>
+        </label>
+        <button class="sa-btn" type="button" :disabled="isLoading" @click="loadRequests">
           {{ isLoading ? "Loading..." : "Search" }}
         </button>
       </div>
 
-      <p v-if="error" class="error">{{ error }}</p>
+      <p v-if="error" class="sa-error">{{ error }}</p>
       <p v-else-if="isLoading" class="muted">Loading support requests...</p>
 
-      <table v-else class="table">
-        <thead>
-          <tr>
-            <th>Requester</th>
-            <th>Category</th>
-            <th>Subject</th>
-            <th>Status</th>
-            <th>Created</th>
-            <th>Open</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="request in requests" :key="request.id">
-            <td>
-              <div>{{ request.requester_name }}</div>
-              <div class="muted small">{{ request.reply_email }}</div>
-            </td>
-            <td>{{ categoryLabel(request.category) }}</td>
-            <td>{{ request.subject }}</td>
-            <td>
-              <span class="status-pill" :class="statusClass(request.status)">
-                {{ statusLabel(request.status) }}
-              </span>
-            </td>
-            <td>{{ formatDate(request.created_at) }}</td>
-            <td>
-              <button type="button" @click="openRequest(request.id)">Details</button>
-            </td>
-          </tr>
-          <tr v-if="!requests.length">
-            <td colspan="6" class="muted">No support requests found.</td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
+      <div v-else class="sa-table-wrap">
+        <table class="sa-table">
+          <thead>
+            <tr>
+              <th>Requester</th>
+              <th>Category</th>
+              <th>Subject</th>
+              <th>Status</th>
+              <th>Created</th>
+              <th>Open</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="request in requests" :key="request.id">
+              <td>
+                <div>{{ request.requester_name }}</div>
+                <div class="muted small">{{ request.reply_email }}</div>
+              </td>
+              <td>{{ categoryLabel(request.category) }}</td>
+              <td>{{ request.subject }}</td>
+              <td>
+                <span
+                  class="sa-tag"
+                  :class="statusClass(request.status) === 'status-resolved' ? 'ok' : statusClass(request.status) === 'status-spam' ? 'info' : 'warn'"
+                >
+                  {{ statusLabel(request.status) }}
+                </span>
+              </td>
+              <td>{{ formatDate(request.created_at) }}</td>
+              <td>
+                <div class="sa-table-row-actions">
+                  <button class="sa-btn" type="button" @click="openRequest(request.id)">Details</button>
+                </div>
+              </td>
+            </tr>
+            <tr v-if="!requests.length">
+              <td colspan="6" class="muted">No support requests found.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
 
-    <div v-if="selectedRequest" class="modal-overlay" @click.self="closeRequest">
-      <div class="modal-card">
+    <div v-if="selectedRequest" class="sa-modal-backdrop" @click.self="closeRequest">
+      <section class="sa-modal">
         <h2>Support Request Details</h2>
         <div class="modal-body">
           <div class="kv-row"><span>Requester</span><strong>{{ selectedRequest.requester_name }}</strong></div>
@@ -166,14 +176,15 @@
           </ul>
         </section>
 
-        <p v-if="modalError" class="error">{{ modalError }}</p>
-        <p v-if="success" class="success">{{ success }}</p>
+        <p v-if="modalError" class="sa-error">{{ modalError }}</p>
+        <p v-if="success" class="sa-notice">{{ success }}</p>
 
-        <div class="row-actions modal-actions">
-          <button type="button" :disabled="isSaving" @click="saveRequest">
+        <div class="panel-actions">
+          <button class="sa-btn primary" type="button" :disabled="isSaving" @click="saveRequest">
             {{ isSaving ? "Saving..." : "Save changes" }}
           </button>
           <button
+            class="sa-btn"
             type="button"
             :disabled="isSaving || selectedRequest.assigned_to_email !== null"
             @click="assignToMe"
@@ -181,16 +192,17 @@
             Assign to me
           </button>
           <button
+            class="sa-btn"
             type="button"
             :disabled="isSaving || selectedRequest.assigned_to_email === null"
             @click="clearAssignment"
           >
             Clear assignment
           </button>
-          <button type="button" @click="copyEmail(selectedRequest.reply_email)">Copy email</button>
-          <button type="button" @click="closeRequest">Close</button>
+          <button class="sa-btn" type="button" @click="copyEmail(selectedRequest.reply_email)">Copy email</button>
+          <button class="sa-btn" type="button" @click="closeRequest">Close</button>
         </div>
-      </div>
+      </section>
     </div>
   </div>
 </template>
@@ -432,68 +444,15 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.filters {
-  display: grid;
-  gap: 0.75rem;
-  grid-template-columns: minmax(0, 1.8fr) minmax(180px, 0.8fr) auto;
-  margin-bottom: 1rem;
-}
-
 .small {
   font-size: 0.9rem;
 }
 
-.status-pill {
-  display: inline-flex;
-  align-items: center;
-  border-radius: 999px;
-  padding: 0.2rem 0.65rem;
-  font-size: 0.85rem;
-  font-weight: 600;
-  border: 1px solid color-mix(in srgb, currentColor 24%, transparent);
-}
-
-.status-open {
-  color: #1d4ed8;
-  background: color-mix(in srgb, #dbeafe 82%, var(--surface) 18%);
-}
-
-.status-in_progress {
-  color: #92400e;
-  background: color-mix(in srgb, #fef3c7 82%, var(--surface) 18%);
-}
-
-.status-resolved {
-  color: #166534;
-  background: color-mix(in srgb, #dcfce7 82%, var(--surface) 18%);
-}
-
-.status-spam {
-  color: #7f1d1d;
-  background: color-mix(in srgb, #fee2e2 82%, var(--surface) 18%);
-}
-
-.modal-overlay {
-  position: fixed;
-  inset: 0;
-  background: color-mix(in srgb, #0f172a 34%, transparent);
+.panel-actions {
   display: flex;
-  align-items: flex-start;
-  justify-content: center;
-  padding: 2.5rem 1.25rem;
-  z-index: 30;
-  overflow-y: auto;
-}
-
-.modal-card {
-  width: min(920px, 100%);
-  max-height: min(82vh, 760px);
-  overflow: auto;
-  background: var(--surface);
-  color: var(--text);
-  border: 1px solid color-mix(in srgb, var(--text) 10%, transparent);
-  border-radius: 24px;
-  padding: 1.5rem;
+  gap: 0.5rem;
+  margin-top: 1rem;
+  flex-wrap: wrap;
 }
 
 .modal-body {
@@ -534,15 +493,15 @@ onMounted(() => {
 }
 
 .attachment-card {
-  border: 1px solid color-mix(in srgb, var(--text) 12%, transparent);
-  border-radius: 18px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
   overflow: hidden;
-  background: color-mix(in srgb, var(--surface) 88%, var(--surface-2) 12%);
+  background: var(--surface);
 }
 
 .attachment-preview-link {
   display: block;
-  background: color-mix(in srgb, var(--surface-2) 88%, var(--text) 12%);
+  background: var(--surface-2);
 }
 
 .attachment-preview {
@@ -567,10 +526,10 @@ onMounted(() => {
 }
 
 .event-item {
-  border: 1px solid color-mix(in srgb, var(--text) 12%, transparent);
-  border-radius: 16px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
   padding: 0.9rem 1rem;
-  background: color-mix(in srgb, var(--surface) 86%, var(--surface-2) 14%);
+  background: var(--surface);
 }
 
 .event-header {
@@ -583,33 +542,17 @@ onMounted(() => {
 .event-metadata {
   margin: 0.6rem 0 0;
   padding: 0.75rem;
-  border-radius: 12px;
-  background: color-mix(in srgb, var(--surface-2) 70%, #020617 30%);
-  color: color-mix(in srgb, var(--text) 92%, white 8%);
+  border-radius: 6px;
+  background: var(--surface-3);
+  color: var(--text);
   overflow: auto;
   font-size: 0.85rem;
 }
 
-.modal-actions {
-  margin-top: 1.5rem;
-  flex-wrap: wrap;
-}
-
 @media (max-width: 760px) {
-  .filters {
-    grid-template-columns: 1fr;
-  }
-
   .kv-row {
     grid-template-columns: 1fr;
     gap: 0.35rem;
-  }
-
-  .modal-card {
-    width: 100%;
-    max-height: calc(100vh - 5rem);
-    padding: 1rem;
-    border-radius: 18px;
   }
 }
 </style>

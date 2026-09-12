@@ -1,10 +1,14 @@
 <template>
   <main class="page">
-    <RouterLink to="/super-admin">Back to Control Center</RouterLink>
-    <h1>Tenant Accounts</h1>
-    <p>Manage checkout-desk accounts across every workspace.</p>
+    <div class="sa-toolbar">
+      <div>
+        <RouterLink to="/super-admin" class="sa-back-link">&larr; Back to Control Center</RouterLink>
+        <h1 class="sa-toolbar-title">Tenant Accounts</h1>
+        <p class="sa-toolbar-sub">Manage checkout-desk accounts across every workspace.</p>
+      </div>
+    </div>
 
-    <section class="card filters">
+    <section class="sa-panel sa-filters">
       <label>Search <input v-model="search" placeholder="Email or workspace" @keyup.enter="load" /></label>
       <label>Workspace
         <select v-model="workspaceId" @change="load">
@@ -12,37 +16,45 @@
           <option v-for="workspace in workspaces" :key="workspace.id" :value="workspace.id">{{ workspace.name }}</option>
         </select>
       </label>
-      <button :disabled="loading" @click="load">Search</button>
+      <button class="sa-btn" :disabled="loading" @click="load">Search</button>
     </section>
 
-    <section class="card">
+    <section class="sa-panel">
       <h2>Create Tenant Account</h2>
-      <form class="actions" @submit.prevent="create">
+      <form @submit.prevent="create">
         <select v-model="createWorkspaceId" required>
           <option value="" disabled>Select workspace</option>
           <option v-for="workspace in workspaces" :key="workspace.id" :value="workspace.id">{{ workspace.name }}</option>
         </select>
         <input v-model="createEmail" type="email" placeholder="account@example.com" required />
-        <button class="button-primary" :disabled="saving">Create and send setup</button>
+        <div class="panel-actions">
+          <button class="sa-btn primary" :disabled="saving">Create and send setup</button>
+        </div>
       </form>
     </section>
 
-    <p v-if="message" class="notice" role="status">{{ message }}</p>
-    <p v-if="error" class="error" role="alert">{{ error }}</p>
+    <p v-if="message" class="sa-notice" role="status">{{ message }}</p>
+    <p v-if="error" class="sa-error" role="alert">{{ error }}</p>
 
-    <div class="table-wrap">
-      <table>
+    <div class="sa-table-wrap">
+      <table class="sa-table">
         <thead><tr><th>Email</th><th>Workspace</th><th>Status</th><th>Actions</th></tr></thead>
         <tbody>
           <tr v-for="account in accounts" :key="account.id">
             <td><input v-model="account.auth_email" type="email" :aria-label="`Email for ${account.workspace_name}`" /></td>
             <td>{{ account.workspace_name }}</td>
-            <td>{{ account.is_active ? 'Active' : 'Suspended' }}</td>
-            <td class="row-actions">
-              <button :disabled="saving || emailUnchanged(account)" @click="saveEmail(account)">Save email</button>
-              <button @click="toggle(account)">{{ account.is_active ? 'Suspend' : 'Restore' }}</button>
-              <button @click="reset(account)">Reset password</button>
-              <button @click="remove(account)">Remove</button>
+            <td>
+              <span class="sa-tag" :class="account.is_active ? 'ok' : 'warn'">
+                {{ account.is_active ? 'Active' : 'Suspended' }}
+              </span>
+            </td>
+            <td>
+              <div class="sa-table-row-actions">
+                <button class="sa-btn" :disabled="saving || emailUnchanged(account)" @click="saveEmail(account)">Save email</button>
+                <button class="sa-btn" @click="toggle(account)">{{ account.is_active ? 'Suspend' : 'Restore' }}</button>
+                <button class="sa-btn" @click="reset(account)">Reset password</button>
+                <button class="sa-btn danger" @click="remove(account)">Remove</button>
+              </div>
             </td>
           </tr>
           <tr v-if="!loading && !accounts.length"><td colspan="4">No Tenant Accounts found.</td></tr>
@@ -135,3 +147,43 @@ onMounted(async () => {
   await load();
 });
 </script>
+
+<style scoped>
+.page {
+  max-width: 1320px;
+  margin: 0 auto;
+  padding: 2rem;
+}
+
+.panel-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+
+.sa-panel form {
+  display: flex;
+  gap: 0.75rem;
+  align-items: flex-end;
+  flex-wrap: wrap;
+}
+
+.sa-panel form select,
+.sa-panel form input {
+  padding: 0.4rem 0.6rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+}
+
+.sa-table td input {
+  padding: 0.4rem 0.6rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+}
+</style>

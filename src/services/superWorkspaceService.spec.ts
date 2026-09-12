@@ -48,6 +48,7 @@ describe("listWorkspaces", () => {
     expect(invokeEdgeFunction).toHaveBeenCalledWith("super-workspace-mutate", {
       method: "POST",
       body: { action: "list_workspaces", payload: { search: "", status: "all" } },
+      avoidCorsPreflight: true,
     });
     expect(result).toEqual([workspace]);
   });
@@ -59,7 +60,10 @@ describe("listWorkspaces", () => {
 
     expect(invokeEdgeFunction).toHaveBeenCalledWith(
       "super-workspace-mutate",
-      expect.objectContaining({ body: { action: "list_workspaces", payload: { search: "acme", status: "suspended" } } })
+      expect.objectContaining({
+        body: { action: "list_workspaces", payload: { search: "acme", status: "suspended" } },
+        avoidCorsPreflight: true,
+      })
     );
   });
 
@@ -86,6 +90,7 @@ describe("createWorkspace", () => {
     expect(invokeEdgeFunction).toHaveBeenCalledWith("super-workspace-mutate", {
       method: "POST",
       body: { action: "create_workspace", payload },
+      avoidCorsPreflight: true,
     });
     expect(result).toEqual(workspace);
   });
@@ -109,6 +114,7 @@ describe("updateWorkspace", () => {
     expect(invokeEdgeFunction).toHaveBeenCalledWith("super-workspace-mutate", {
       method: "POST",
       body: { action: "update_workspace", payload },
+      avoidCorsPreflight: true,
     });
   });
 });
@@ -122,6 +128,7 @@ describe("setWorkspaceStatus", () => {
     expect(invokeEdgeFunction).toHaveBeenCalledWith("super-workspace-mutate", {
       method: "POST",
       body: { action: "set_workspace_status", payload: { id: "ws-1", status: "suspended" } },
+      avoidCorsPreflight: true,
     });
   });
 });
@@ -135,6 +142,7 @@ describe("setPrimaryWorkspaceAdmin", () => {
     expect(invokeEdgeFunction).toHaveBeenCalledWith("super-workspace-mutate", {
       method: "POST",
       body: { action: "set_primary_admin", payload: { workspace_id: "ws-1", profile_id: "profile-1" } },
+      avoidCorsPreflight: true,
     });
   });
 });
@@ -153,6 +161,7 @@ describe("sendPrimaryWorkspaceAdminReset", () => {
     expect(invokeEdgeFunction).toHaveBeenCalledWith("super-workspace-mutate", {
       method: "POST",
       body: { action: "send_primary_admin_reset", payload: { workspace_id: "ws-1" } },
+      avoidCorsPreflight: true,
     });
     expect(result).toEqual({ success: true, auth_email: "admin@acme.edu" });
   });

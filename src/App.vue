@@ -89,7 +89,7 @@
       @save-preferences="consent.savePreferences"
     />
     <FatalErrorToast v-if="fatalErrorToast.visible" />
-    <OfflineQueueToast :enabled="isWorkspaceScopedRoute" :count="offlineQueue.count.value" :syncing-count="offlineQueue.syncingCount.value" :review-count="offlineQueue.reviewCount.value" :tooltip="offlineQueue.tooltip.value" />
+    <OfflineQueueToast :enabled="showOfflineQueueToast" :count="offlineQueue.count.value" :syncing-count="offlineQueue.syncingCount.value" :review-count="offlineQueue.reviewCount.value" :tooltip="offlineQueue.tooltip.value" />
     <Analytics v-if="consent.showTelemetry.value" />
     <SpeedInsights v-if="consent.showTelemetry.value" />
   </div>
@@ -202,6 +202,9 @@ const isWorkspaceScopedRoute = computed(() =>
   ["/checkout", "/items", "/borrowers", "/settings", "/admin"].some(
     (prefix) => route.path === prefix || route.path.startsWith(`${prefix}/`),
   ),
+);
+const showOfflineQueueToast = computed(() =>
+  isWorkspaceScopedRoute.value && !["/checkout", "/admin/return"].includes(route.path),
 );
 const isWorkspaceAdminArea = computed(() => route.path.startsWith("/admin"));
 const shouldTrackAccountSession = computed(() => {

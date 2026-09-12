@@ -36,7 +36,14 @@ const call = async <T>(action: string, payload: Record<string, unknown>) => {
   const result = await invokeEdgeFunction<
     { data: T },
     { action: string; payload: Record<string, unknown> }
-  >("super-workspace-mutate", { method: "POST", body: { action, payload } });
+  >("super-workspace-mutate", {
+    method: "POST",
+    body: { action, payload },
+    // This endpoint is cookie-authenticated and the Worker enforces the
+    // trusted origin and super-admin step-up. Keep it CORS-simple so a
+    // Cloudflare challenge on OPTIONS cannot prevent the actual request.
+    avoidCorsPreflight: true,
+  });
   if (!result.ok) {
     throw edgeFunctionError(result, "Super Admin workspace request failed.");
   }

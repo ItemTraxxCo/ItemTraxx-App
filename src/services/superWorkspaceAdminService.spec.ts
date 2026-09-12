@@ -38,6 +38,7 @@ describe("listWorkspaceAdmins", () => {
     expect(invokeEdgeFunction).toHaveBeenCalledWith("super-admin-mutate", {
       method: "POST",
       body: { action: "list_workspace_admins", payload: { search: "", workspace_id: "all" } },
+      avoidCorsPreflight: true,
     });
     expect(result).toEqual([admin]);
   });
@@ -77,6 +78,7 @@ describe("createWorkspaceAdmin", () => {
     expect(invokeEdgeFunction).toHaveBeenCalledWith("super-admin-mutate", {
       method: "POST",
       body: { action: "create_workspace_admin", payload: { workspace_id: "ws-1", auth_email: "admin@example.com" } },
+      avoidCorsPreflight: true,
     });
     expect(result).toEqual(admin);
   });
@@ -97,6 +99,7 @@ describe("setWorkspaceAdminStatus", () => {
     expect(invokeEdgeFunction).toHaveBeenCalledWith("super-admin-mutate", {
       method: "POST",
       body: { action: "set_workspace_admin_status", payload: { id: "wa-1", is_active: false } },
+      avoidCorsPreflight: true,
     });
   });
 });
@@ -110,6 +113,7 @@ describe("sendWorkspaceAdminReset", () => {
     expect(invokeEdgeFunction).toHaveBeenCalledWith("super-admin-mutate", {
       method: "POST",
       body: { action: "send_workspace_admin_reset", payload: { id: "wa-1" } },
+      avoidCorsPreflight: true,
     });
     expect(result).toEqual({ success: true });
   });

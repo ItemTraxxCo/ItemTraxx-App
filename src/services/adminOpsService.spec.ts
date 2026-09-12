@@ -9,6 +9,7 @@ vi.mock("../utils/deviceSession", () => ({
 
 import { invokeEdgeFunction } from "./edgeFunctionClient";
 import { getOrCreateDeviceSession } from "../utils/deviceSession";
+import { clearAuthState, setAuthStateFromBackend } from "../store/authState";
 import {
   bulkImportItem,
   fetchStatusTracking,
@@ -34,16 +35,14 @@ const okResponse = <T,>(data: T) => ({ ok: true, status: 200, error: "", data: {
 let deviceCounter = 0;
 beforeEach(() => {
   mockedInvoke.mockReset();
+  clearAuthState(true);
   deviceCounter += 1;
   mockedDeviceSession.mockReturnValue({ deviceId: `device-${deviceCounter}`, deviceLabel: "Mac" });
 });
 
 describe("fetchWorkspaceNotifications", () => {
-  // fetchWorkspaceNotifications caches under a fixed "get_notifications" key (unlike
-  // touchAccountSession/validateAccountSession, it is not device-scoped), so its cache
-  // persists across tests in this file. A Date.now spy that only ever moves forward
-  // (never reset between tests) lets each test reliably bust the 15s TTL left over
-  // from the previous test before exercising its own scenario.
+  // Cache time only needs to move forward between tests so this module-level
+  // service cache cannot satisfy a later test from an earlier identity.
   let fakeNow = Date.now();
   const dateNowSpy = vi.spyOn(Date, "now");
 
@@ -80,7 +79,7 @@ describe("fetchWorkspaceNotifications", () => {
     ]);
 
     expect(first).toEqual(second);
-    expect(mockedInvoke).toHaveBeenCalledTimes(1);
+    expect(mockedInvoke).toHaveBeenCalledTimes(2);
   });
 
   it("serves a cached value on a later call within the TTL", async () => {
@@ -91,7 +90,29 @@ describe("fetchWorkspaceNotifications", () => {
     const second = await fetchWorkspaceNotifications();
 
     expect(second).toEqual(first);
-    expect(mockedInvoke).toHaveBeenCalledTimes(1);
+    expect(mockedInvoke).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not reuse notifications across authenticated session identities", async () => {
+    fakeNow += 20_000;
+    mockedInvoke.mockResolvedValue(okResponse({ overdue_count: 4 }) as never);
+    setAuthStateFromBackend({
+      isAuthenticated: true,
+      userId: "profile-1",
+      workspaceContextId: "workspace-1",
+      signedInAt: "2026-09-12T17:00:00.000Z",
+    });
+    await fetchWorkspaceNotifications();
+
+    setAuthStateFromBackend({
+      isAuthenticated: true,
+      userId: "profile-2",
+      workspaceContextId: "workspace-2",
+      signedInAt: "2026-09-12T17:01:00.000Z",
+    });
+    await fetchWorkspaceNotifications();
+
+    expect(mockedInvoke).toHaveBeenCalledTimes(4);
   });
 
   it("throws a mapped error when the request fails", async () => {
@@ -102,6 +123,30 @@ describe("fetchWorkspaceNotifications", () => {
 });
 
 describe("fetchWorkspaceSettings / updateWorkspaceSettings", () => {
+  it("waits for account-session bootstrap before sending protected actions", async () => {
+    const actions: string[] = [];
+    let releaseTouch!: () => void;
+    const touchFinished = new Promise<void>((resolve) => {
+      releaseTouch = resolve;
+    });
+    mockedInvoke.mockImplementation(async (_functionName, options) => {
+      const action = (options as { body: { action: string } }).body.action;
+      actions.push(action);
+      if (action === "touch_session") {
+        await touchFinished;
+        return okResponse({ ok: true }) as never;
+      }
+      return okResponse({ checkout_due_hours: 24 }) as never;
+    });
+
+    const request = fetchWorkspaceSettings();
+    expect(actions).toEqual(["touch_session"]);
+
+    releaseTouch();
+    await expect(request).resolves.toEqual({ checkout_due_hours: 24 });
+    expect(actions).toEqual(["touch_session", "get_workspace_settings"]);
+  });
+
   it("fetches workspace settings uncached", async () => {
     mockedInvoke.mockResolvedValue(okResponse({ checkout_due_hours: 24 }) as never);
     const result = await fetchWorkspaceSettings();
@@ -182,6 +227,7 @@ describe("touchAccountSession", () => {
           device_label: "Mac",
         },
       },
+      avoidCorsPreflight: true,
     });
     expect(result).toEqual({ ok: true });
   });
@@ -202,6 +248,29 @@ describe("touchAccountSession", () => {
         body: expect.objectContaining({ payload: expect.objectContaining({ login_method: undefined, login_location: undefined }) }),
       })
     );
+  });
+
+  it("does not reuse a cached touch across authenticated session identities", async () => {
+    mockedInvoke.mockResolvedValue(okResponse({ ok: true }) as never);
+    mockedDeviceSession.mockReturnValue({ deviceId: "shared-device", deviceLabel: "Mac" });
+
+    setAuthStateFromBackend({
+      isAuthenticated: true,
+      userId: "profile-1",
+      workspaceContextId: "workspace-1",
+      signedInAt: "2026-09-12T17:00:00.000Z",
+    });
+    await touchAccountSession();
+
+    setAuthStateFromBackend({
+      isAuthenticated: true,
+      userId: "profile-1",
+      workspaceContextId: "workspace-1",
+      signedInAt: "2026-09-12T17:01:00.000Z",
+    });
+    await touchAccountSession();
+
+    expect(mockedInvoke).toHaveBeenCalledTimes(2);
   });
 });
 

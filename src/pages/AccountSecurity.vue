@@ -1,5 +1,6 @@
 <template>
   <main class="page auth-security-page">
+    <RouterLink class="back-link" :to="backTarget">Back to settings</RouterLink>
     <header>
       <h1>Account security</h1>
       <p>Manage the security methods attached to your ItemTraxx account.</p>
@@ -54,9 +55,11 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref } from "vue";
+import { computed, onMounted, ref } from "vue";
 import QRCode from "qrcode";
+import { RouterLink } from "vue-router";
 import { authClient } from "../auth/client";
+import { getAuthState } from "../store/authState";
 
 type PasskeyItem = { id: string; name?: string | null };
 const passkeys = ref<PasskeyItem[]>([]);
@@ -70,6 +73,12 @@ const twoFactorEnabled = ref(false);
 const busy = ref(false);
 const message = ref("");
 const error = ref("");
+const authState = getAuthState();
+const backTarget = computed(() => {
+  if (authState.role === "super_admin") return "/super-admin/settings";
+  if (authState.role === "workspace_admin") return "/admin/settings";
+  return "/settings";
+});
 
 const run = async (action: () => Promise<void>) => {
   busy.value = true; error.value = ""; message.value = "";
@@ -132,5 +141,5 @@ onMounted(() => void run(load));
 </script>
 
 <style scoped>
-.auth-security-page{max-width:58rem;margin:0 auto}.card{margin:1rem 0;padding:1.25rem}.card label{display:grid;gap:.35rem;max-width:28rem;margin:.75rem 0}.card li{display:flex;gap:.5rem;align-items:center;margin:.5rem 0}.backup-codes{display:grid;gap:.35rem;margin-top:1rem;padding:1rem;border:1px solid currentColor}.backup-codes code{user-select:all}
+.auth-security-page{max-width:58rem;margin:0 auto}.back-link{display:inline-block;margin-bottom:1rem}.card{margin:1rem 0;padding:1.25rem}.card label{display:grid;gap:.35rem;max-width:28rem;margin:.75rem 0}.card li{display:flex;gap:.5rem;align-items:center;margin:.5rem 0}.backup-codes{display:grid;gap:.35rem;margin-top:1rem;padding:1rem;border:1px solid currentColor}.backup-codes code{user-select:all}
 </style>

@@ -1008,7 +1008,10 @@ body.auth-route-active #app {
   padding: 0.9rem 1.1rem;
   min-width: 240px;
   box-shadow: none;
-  z-index: 1100;
+  /* Intercom's launcher uses a very high fixed stacking level. Keep ItemTraxx
+     feedback in the same bottom-right position while ensuring it remains
+     readable when the launcher sits underneath it. */
+  z-index: 2147483647;
   opacity: 0;
   transform: translateY(10px);
   animation: toast-in 0.45s ease-out forwards, toast-out 0.4s ease-in forwards 3.4s;

@@ -7,9 +7,13 @@ vi.mock("./edgeFunctionClient", () => ({
 vi.mock("../utils/deviceSession", () => ({
   getOrCreateDeviceSession: vi.fn(() => ({ deviceId: "device-1" })),
 }));
+vi.mock("./accountSessionService", () => ({
+  ensureAccountSessionReady: vi.fn(),
+}));
 
 import { invokeEdgeFunction } from "./edgeFunctionClient";
 import { getOrCreateDeviceSession } from "../utils/deviceSession";
+import { ensureAccountSessionReady } from "./accountSessionService";
 import {
   applyConfirmedTransactionToOfflinePack,
   clearOfflineCheckoutWorkflow,
@@ -37,6 +41,7 @@ import {
 
 const mockedInvoke = vi.mocked(invokeEdgeFunction);
 const mockedDeviceSession = vi.mocked(getOrCreateDeviceSession);
+const mockedEnsureAccountSessionReady = vi.mocked(ensureAccountSessionReady);
 
 const WORKSPACE_ID = "ws-1";
 const PROFILE_ID = "profile-1";
@@ -92,6 +97,7 @@ beforeEach(async () => {
   window.sessionStorage.clear();
   mockedInvoke.mockReset();
   mockedDeviceSession.mockReturnValue({ deviceId: DEVICE_ID } as ReturnType<typeof getOrCreateDeviceSession>);
+  mockedEnsureAccountSessionReady.mockReset().mockResolvedValue({ ok: true });
   await clearOfflineCheckoutWorkflow();
   clearAuthState();
 });
@@ -376,6 +382,7 @@ describe("syncOfflineCheckoutLedger", () => {
 
     const result = await syncOfflineCheckoutLedger();
     expect(result).toEqual({ processed: 1, failed: 0, remaining: 0, review: 0 });
+    expect(mockedEnsureAccountSessionReady).toHaveBeenCalledTimes(1);
     const [entry] = await readOfflineLedger();
     expect(entry!.status).toBe("synced");
   });
@@ -417,6 +424,17 @@ describe("syncOfflineCheckoutLedger", () => {
     const [entry] = await readOfflineLedger();
     expect(entry!.status).toBe("pending");
     expect(entry!.attempts).toBe(1);
+  });
+
+  it("leaves pending entries retryable when session bootstrap fails", async () => {
+    await writeOfflinePack(makePack());
+    await writeOfflineLedger([makeLedgerEntry({ id: "e1" })]);
+    mockedEnsureAccountSessionReady.mockRejectedValueOnce(new Error("Session revoked"));
+
+    await expect(syncOfflineCheckoutLedger()).rejects.toThrow("Session revoked");
+    const [entry] = await readOfflineLedger();
+    expect(entry!.status).toBe("pending");
+    expect(mockedInvoke).not.toHaveBeenCalled();
   });
 
   it("moves entries to needs_review on a non-retryable server failure", async () => {
@@ -463,6 +481,7 @@ describe("resolveOfflineCheckoutConflict", () => {
 
     await resolveOfflineCheckoutConflict("e1", "apply_offline");
 
+    expect(mockedEnsureAccountSessionReady).toHaveBeenCalledTimes(1);
     expect(mockedInvoke).toHaveBeenCalledWith(
       "offline-checkout",
       expect.objectContaining({ method: "POST", body: expect.objectContaining({ action: "resolve", resolution: "apply_offline" }) })
@@ -518,6 +537,7 @@ describe("prepareOfflineCheckoutPack", () => {
     const pack = await prepareOfflineCheckoutPack();
     expect(pack.workspace_id).toBe(WORKSPACE_ID);
     expect(pack.device_id).toBe(DEVICE_ID);
+    expect(mockedEnsureAccountSessionReady).toHaveBeenCalledTimes(1);
     expect(await readOfflineLedger()).toEqual([]);
   });
 

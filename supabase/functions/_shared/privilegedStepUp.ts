@@ -12,12 +12,45 @@ export type PrivilegedRoleScope =
 
 const DEFAULT_STEP_UP_TTL_MS = 15 * 60 * 1000;
 const ADMIN_STEP_UP_REGISTRATION_WINDOW_MS = 5 * 60 * 1000;
+const AUTH_TIMESTAMP_CLOCK_SKEW_MS = 30 * 1000;
 const ADMIN_HANDOFF_AUTH_METHODS = new Set([
+  "password",
   "magiclink",
   "magic_link",
   "otp",
   "email_link",
+  "passkey",
+  "webauthn",
+  // Better Auth's JWT plugin emits a signed session AMR entry whose
+  // timestamp is the session's createdAt. This is the authentication
+  // freshness signal used by the Better Auth -> Supabase handoff.
+  "session",
 ]);
+
+export type PrivilegedProfileLike = {
+  role?: unknown;
+  workspace_id?: unknown;
+  is_active?: unknown;
+  deleted_at?: unknown;
+};
+
+/**
+ * Keep the profile boundary independent from request input. Super admins are
+ * global and therefore do not need a workspace_id; workspace admins do.
+ */
+export const isEligiblePrivilegedProfile = (
+  profile: PrivilegedProfileLike,
+) => {
+  if (profile.role !== "workspace_admin" && profile.role !== "super_admin") {
+    return false;
+  }
+  if (profile.is_active === false || profile.deleted_at) return false;
+  if (profile.role === "workspace_admin") {
+    return typeof profile.workspace_id === "string" &&
+      profile.workspace_id.trim().length > 0;
+  }
+  return true;
+};
 
 const getVerifiedClaims = async (
   authClient: SupabaseClient,
@@ -59,6 +92,36 @@ export const canRegisterAdminStepUp = async (
   return ageMs >= -30_000 && ageMs <= ADMIN_STEP_UP_REGISTRATION_WINDOW_MS;
 };
 
+/**
+ * Better Auth's JWT plugin emits a signed authentication-method reference
+ * timestamp. This check prevents a freshly minted JWT for an old session from
+ * being mistaken for a fresh privileged sign-in.
+ */
+export const hasFreshAdminStepUpAuthMethod = (
+  payload: Record<string, unknown>,
+  nowMs: number = Date.now(),
+) => {
+  const amr = Array.isArray(payload.amr) ? payload.amr : [];
+  return amr.some((entry) => {
+    if (!entry || typeof entry !== "object") return false;
+    const method = (entry as { method?: unknown }).method;
+    const timestamp = (entry as { timestamp?: unknown }).timestamp;
+    if (
+      typeof method !== "string" ||
+      !ADMIN_HANDOFF_AUTH_METHODS.has(method.toLowerCase()) ||
+      typeof timestamp !== "number" ||
+      !Number.isFinite(timestamp) ||
+      timestamp <= 0
+    ) {
+      return false;
+    }
+
+    const ageMs = nowMs - timestamp * 1000;
+    return ageMs >= -AUTH_TIMESTAMP_CLOCK_SKEW_MS &&
+      ageMs <= ADMIN_STEP_UP_REGISTRATION_WINDOW_MS;
+  });
+};
+
 export const canRegisterAdminStepUpFromTrustedHandoff = async (
   authClient: SupabaseClient,
   authToken: string,
@@ -66,13 +129,7 @@ export const canRegisterAdminStepUpFromTrustedHandoff = async (
   if (!await canRegisterAdminStepUp(authClient, authToken)) return false;
 
   const payload = await getVerifiedClaims(authClient, authToken);
-  const amr = Array.isArray(payload?.amr) ? payload.amr : [];
-  return amr.some((entry) => {
-    if (!entry || typeof entry !== "object") return false;
-    const method = (entry as { method?: unknown }).method;
-    return typeof method === "string" &&
-      ADMIN_HANDOFF_AUTH_METHODS.has(method.toLowerCase());
-  });
+  return hasFreshAdminStepUpAuthMethod(payload);
 };
 
 export const isMissingPrivilegedStepUpTable = (

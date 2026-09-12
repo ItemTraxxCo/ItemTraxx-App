@@ -8,7 +8,14 @@ import type { LoginNotificationLocation } from "./types";
 import { invokeEdgeFunction } from "../edgeFunctionClient";
 import { registerPrivilegedAdminStepUp } from "../privilegedStepUpService";
 export const sendLoginNotification=(_accessToken:string|null,options:{loginLocation?:LoginNotificationLocation|null}={})=>{
-  void invokeEdgeFunction("login-notify",{method:"POST",body:{login_location:options.loginLocation??"regular_login"}});
+  // This endpoint is cookie-authenticated. Keep the notification request
+  // CORS-simple so Cloudflare's managed challenge cannot block its OPTIONS
+  // preflight before the Worker can enforce the session and trusted ingress.
+  void invokeEdgeFunction("login-notify",{
+    method:"POST",
+    body:{login_location:options.loginLocation??"regular_login"},
+    avoidCorsPreflight:true,
+  });
 };
 export const clearLocalSession=async()=>{};
 export const workspaceLogin=async(email:string,password:string,turnstileToken?:string)=>{

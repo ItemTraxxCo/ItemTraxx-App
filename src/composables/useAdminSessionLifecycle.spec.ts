@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { defineComponent, h, reactive, ref } from "vue";
+import { defineComponent, h, onMounted, reactive, ref } from "vue";
 import { mount } from "@vue/test-utils";
 import { useAdminSessionLifecycle } from "./useAdminSessionLifecycle";
 import { clearAuthState, clearAdminVerification as realClearAdminVerification } from "../store/authState";
@@ -130,6 +130,43 @@ describe("useAdminSessionLifecycle", () => {
     expect(mockedTouchAccountSession).toHaveBeenCalled();
     expect(mockedValidateAccountSession).toHaveBeenCalled();
     expect(mockedFetchHttpSessionSummary).toHaveBeenCalled();
+    wrapper.unmount();
+  });
+
+  it("starts the account-session bootstrap before protected descendants mount", async () => {
+    const order: string[] = [];
+    mockedTouchAccountSession.mockImplementation(async () => {
+      order.push("touch");
+      return { ok: true };
+    });
+    const auth = buildAuth({ isAuthenticated: true, role: "workspace_admin", userId: "u1" });
+    const route = buildRoute();
+    const Child = defineComponent({
+      setup() {
+        onMounted(() => order.push("child"));
+        return () => h("span");
+      },
+    });
+    const router = { replace: vi.fn().mockResolvedValue(undefined) };
+    const Host = defineComponent({
+      setup() {
+        useAdminSessionLifecycle({
+          auth,
+          route: route as never,
+          router: router as never,
+          sessionTermination: getSessionTerminationState(),
+          isDevHost: ref(false),
+          isWorkspaceAdminArea: ref(true),
+          shouldTrackAccountSession: ref(true),
+          closeMenu: vi.fn(),
+        });
+        return () => h("div", [h(Child)]);
+      },
+    });
+
+    const wrapper = mount(Host);
+    expect(order[0]).toBe("touch");
+    await vi.advanceTimersByTimeAsync(0);
     wrapper.unmount();
   });
 

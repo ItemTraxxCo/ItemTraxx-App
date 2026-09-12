@@ -6,7 +6,7 @@
       </div>
       <h1>Super Admin Settings</h1>
       <p class="admin-hero-copy">
-        Manage account security, passkeys, and active sessions for your super admin access.
+        Review account security, passkeys, and active sessions for your super admin access.
       </p>
       <p><RouterLink class="button-link" to="/account/security">Account Security</RouterLink> · <RouterLink class="button-link" to="/super-admin/settings/sso">Enterprise SSO oversight</RouterLink></p>
       <div class="admin-summary-grid">
@@ -17,10 +17,6 @@
         <div class="admin-summary-card">
           <strong>{{ sessions.length }}</strong>
           <span>Active sessions</span>
-        </div>
-        <div class="admin-summary-card">
-          <strong>{{ reauthLabel }}</strong>
-          <span>Passkey changes</span>
         </div>
       </div>
     </div>
@@ -45,83 +41,41 @@
     <div class="card admin-section-card">
       <div class="admin-section-header">
         <div>
-          <h2>Passkey security gate</h2>
+          <h2>Passkeys</h2>
           <p class="admin-section-copy">
-            Protected changes require re-authentication. If needed, you will be prompted automatically.
+            Passkeys registered to this account. Add, rename, or remove passkeys from Account Security.
           </p>
         </div>
       </div>
-
-      <div class="security-gate-grid">
-        <label>
-          Current password
-          <input
-            v-model="reauthPassword"
-            type="password"
-            placeholder="Enter current password"
-            autocomplete="current-password"
-          />
-        </label>
-        <div class="form-actions">
-          <button type="button" :disabled="isReauthLoading || !reauthPassword.trim()" @click="reauthWithPassword">
-            Verify password
-          </button>
-          <button type="button" :disabled="isReauthLoading || !isPasskeySupported" @click="reauthWithPasskey">
-            Verify with passkey
-          </button>
-        </div>
-      </div>
-      <p class="muted">Authorization is bound to this session and expires automatically.</p>
-      <p v-if="reauthError" class="error">{{ reauthError }}</p>
-      <p v-if="reauthSuccess" class="success">{{ reauthSuccess }}</p>
-    </div>
-
-    <div class="card admin-section-card">
-      <div class="admin-section-header">
-        <div>
-          <h2>Passkeys</h2>
-          <p class="admin-section-copy">Add or remove passkeys for super admin sign-in.</p>
-        </div>
-      </div>
       <div class="form-actions">
-        <button type="button" class="button-primary" :disabled="isPasskeyActionLoading" @click="addPasskey">
-          Add passkey
-        </button>
-        <button type="button" :disabled="isPasskeyActionLoading" @click="loadPasskeys">Reload passkeys</button>
+        <RouterLink class="button-link" to="/account/security">Manage passkeys in Account Security</RouterLink>
+        <button type="button" :disabled="isPasskeyLoading" @click="loadPasskeys">Reload passkeys</button>
       </div>
       <div class="table-wrap">
         <table class="table">
           <thead>
             <tr>
-              <th>Passkey ID</th>
+              <th>Name</th>
               <th>Created</th>
               <th>Last used</th>
-              <th></th>
             </tr>
           </thead>
           <tbody>
             <tr v-for="passkey in passkeys" :key="passkey.id">
-              <td>{{ passkey.id }}</td>
+              <td>{{ passkey.name?.trim() || "Unnamed passkey" }}</td>
               <td>{{ formatDate(passkey.created_at) }}</td>
-              <td>{{ formatDate(passkey.last_used_at) }}</td>
-              <td>
-                <button
-                  type="button"
-                  :disabled="isPasskeyActionLoading"
-                  @click="removePasskey(passkey.id)"
-                >
-                  Remove
-                </button>
-              </td>
+              <td>{{ formatLastUsed(passkey.last_used_at) }}</td>
             </tr>
             <tr v-if="!passkeys.length">
-              <td colspan="4" class="muted">No passkeys registered.</td>
+              <td colspan="3" class="muted">No passkeys registered.</td>
             </tr>
           </tbody>
         </table>
       </div>
+      <p class="muted passkey-inventory-note">
+        Last-used timestamps are shown when available. Passkey changes are intentionally limited to Account Security.
+      </p>
       <p v-if="passkeyError" class="error">{{ passkeyError }}</p>
-      <p v-if="passkeySuccess" class="success">{{ passkeySuccess }}</p>
     </div>
 
     <div class="card admin-section-card">
@@ -182,38 +136,6 @@
       <p v-if="sessionSuccess" class="success">{{ sessionSuccess }}</p>
     </div>
 
-    <div v-if="reauthModalOpen" class="settings-reauth-modal-backdrop" role="dialog" aria-modal="true">
-      <div class="settings-reauth-modal">
-        <h3>Re-authentication required</h3>
-        <p class="muted">
-          For security, confirm your identity before making this settings change.
-        </p>
-        <label>
-          Current password
-          <input
-            v-model="modalReauthPassword"
-            type="password"
-            placeholder="Enter current password"
-            autocomplete="current-password"
-          />
-        </label>
-        <div class="form-actions">
-          <button
-            type="button"
-            class="button-primary"
-            :disabled="isReauthLoading || !modalReauthPassword.trim()"
-            @click="handleModalPasswordReauth"
-          >
-            Verify password
-          </button>
-          <button type="button" :disabled="isReauthLoading || !isPasskeySupported" @click="handleModalPasskeyReauth">
-            Verify with passkey
-          </button>
-          <button type="button" :disabled="isReauthLoading" @click="closeReauthModal">Cancel</button>
-        </div>
-        <p v-if="modalReauthError" class="error">{{ modalReauthError }}</p>
-      </div>
-    </div>
   </div>
 </template>
 
@@ -226,18 +148,12 @@ import { getAuthState } from "../../store/authState";
 import {
   listSuperAdminPasskeys,
   listSuperAdminSessions,
-  deleteSuperAdminPasskey,
   revokeAllSuperAdminSessions,
   revokeSuperAdminSession,
-  startSuperAdminPasskeyRegistration,
   touchSuperAdminSession,
-  verifySuperAdminPasskeyRegistration,
-  verifySuperAdminPassword,
   type SuperAdminPasskeyItem,
   type SuperAdminSessionItem,
 } from "../../services/superOps/sessions";
-import { registerPasskeyWithOptions } from "../../services/superOps/passkeyWebAuthn";
-import { superAdminPasskeyLogin } from "../../services/authService";
 import { getPasswordResetRedirectUrl } from "../../utils/passwordResetRedirect";
 
 const auth = getAuthState();
@@ -246,40 +162,15 @@ const isPasswordResetSending = ref(false);
 const passwordResetMessage = ref("");
 const passwordResetError = ref("");
 
-const reauthPassword = ref("");
-const isReauthLoading = ref(false);
-const reauthError = ref("");
-const reauthSuccess = ref("");
-const passkeyManagementVerified = ref(false);
-
 const passkeys = ref<SuperAdminPasskeyItem[]>([]);
-const isPasskeyActionLoading = ref(false);
+const isPasskeyLoading = ref(false);
 const passkeyError = ref("");
-const passkeySuccess = ref("");
-const reauthModalOpen = ref(false);
-const modalReauthPassword = ref("");
-const modalReauthError = ref("");
-let pendingProtectedAction: null | (() => Promise<void>) = null;
 
 const sessions = ref<SuperAdminSessionItem[]>([]);
 const selectedSessionId = ref("");
 const isSessionSaving = ref(false);
 const sessionError = ref("");
 const sessionSuccess = ref("");
-
-const isPasskeySupported = computed(
-  () => typeof window !== "undefined" && "PublicKeyCredential" in window
-);
-
-const canManagePasskeys = computed(
-  () =>
-    isPasskeySupported.value &&
-    passkeyManagementVerified.value
-);
-
-const reauthLabel = computed(() =>
-  canManagePasskeys.value ? "Verified" : "Re-auth required"
-);
 
 const removableSessions = computed(() => sessions.value.filter((session) => !session.is_current));
 
@@ -290,6 +181,9 @@ const formatDate = (value: string | null | undefined) => {
   return date.toLocaleString();
 };
 
+const formatLastUsed = (value: string | null | undefined) =>
+  value ? formatDate(value) : "Not recorded";
+
 const formatLoginMethod = (value: SuperAdminSessionItem["login_method"]) =>
   value === "password" ? "Password" : value === "passkey" ? "Passkey" : "Unknown";
 
@@ -298,10 +192,13 @@ const formatLoginLocation = (value: SuperAdminSessionItem["login_location"]) =>
 
 const loadPasskeys = async () => {
   passkeyError.value = "";
+  isPasskeyLoading.value = true;
   try {
     passkeys.value = await listSuperAdminPasskeys();
   } catch (err) {
     passkeyError.value = toUserFacingErrorMessage(err, "Unable to load passkeys.");
+  } finally {
+    isPasskeyLoading.value = false;
   }
 };
 
@@ -337,161 +234,6 @@ const sendPasswordReset = async () => {
   } finally {
     isPasswordResetSending.value = false;
   }
-};
-
-const reauthWithPassword = async () => {
-  reauthError.value = "";
-  reauthSuccess.value = "";
-  passkeyError.value = "";
-  isReauthLoading.value = true;
-  try {
-    const email = (auth.email || "").trim().toLowerCase();
-    if (!email) {
-      throw new Error("No account email found for this session.");
-    }
-    await verifySuperAdminPassword(reauthPassword.value);
-    await touchSuperAdminSession({
-      loginMethod: "password",
-      loginLocation: "super_settings",
-    });
-    passkeyManagementVerified.value = true;
-    reauthPassword.value = "";
-    reauthSuccess.value = "Password verified. You can now manage passkeys.";
-  } catch (err) {
-    reauthError.value = toUserFacingErrorMessage(err, "Password verification failed.");
-  } finally {
-    isReauthLoading.value = false;
-  }
-};
-
-const reauthWithPasskey = async () => {
-  reauthError.value = "";
-  reauthSuccess.value = "";
-  passkeyError.value = "";
-  isReauthLoading.value = true;
-  try {
-    await superAdminPasskeyLogin({
-      sendLoginNotification: false,
-      loginLocation: "super_settings",
-    });
-    await touchSuperAdminSession({
-      loginMethod: "passkey",
-      loginLocation: "super_settings",
-    });
-    passkeyManagementVerified.value = true;
-    reauthSuccess.value = "Passkey verified. You can now manage passkeys.";
-    await Promise.all([loadPasskeys(), loadSessions()]);
-  } catch (err) {
-    reauthError.value = toUserFacingErrorMessage(err, "Passkey verification failed.");
-  } finally {
-    isReauthLoading.value = false;
-  }
-};
-
-const runProtectedAction = async (
-  action: () => Promise<void>,
-) => {
-  try {
-    await action();
-    passkeyManagementVerified.value = true;
-  } catch (err) {
-    if (
-      err instanceof Error &&
-      "status" in err &&
-      (err as { status?: number }).status === 403
-    ) {
-      pendingProtectedAction = () => runProtectedAction(action);
-      modalReauthPassword.value = "";
-      modalReauthError.value = "";
-      reauthModalOpen.value = true;
-      passkeyManagementVerified.value = false;
-      return;
-    }
-    passkeyError.value = toUserFacingErrorMessage(err, "Unable to authorize passkey changes.");
-  }
-};
-
-const closeReauthModal = () => {
-  if (isReauthLoading.value) return;
-  reauthModalOpen.value = false;
-  modalReauthPassword.value = "";
-  modalReauthError.value = "";
-  pendingProtectedAction = null;
-};
-
-const completeModalReauth = async () => {
-  const action = pendingProtectedAction;
-  pendingProtectedAction = null;
-  reauthModalOpen.value = false;
-  modalReauthPassword.value = "";
-  modalReauthError.value = "";
-  if (action) {
-    await action();
-  }
-};
-
-const handleModalPasswordReauth = async () => {
-  modalReauthError.value = "";
-  reauthPassword.value = modalReauthPassword.value;
-  await reauthWithPassword();
-  if (!canManagePasskeys.value) {
-    modalReauthError.value = reauthError.value || "Password verification failed.";
-    return;
-  }
-  await completeModalReauth();
-};
-
-const handleModalPasskeyReauth = async () => {
-  modalReauthError.value = "";
-  await reauthWithPasskey();
-  if (!canManagePasskeys.value) {
-    modalReauthError.value = reauthError.value || "Passkey verification failed.";
-    return;
-  }
-  await completeModalReauth();
-};
-
-const addPasskey = async () => {
-  passkeyError.value = "";
-  passkeySuccess.value = "";
-  await runProtectedAction(async () => {
-    isPasskeyActionLoading.value = true;
-    try {
-      const registration = await startSuperAdminPasskeyRegistration();
-      const credential = await registerPasskeyWithOptions(registration.options);
-      await verifySuperAdminPasskeyRegistration(
-        registration.challenge_id,
-        credential,
-      );
-      await touchSuperAdminSession({
-        loginMethod: "passkey",
-        loginLocation: "super_settings",
-      });
-      passkeySuccess.value = "Passkey added successfully.";
-      await loadPasskeys();
-    } catch (err) {
-      passkeyError.value = toUserFacingErrorMessage(err, "Unable to add passkey.");
-    } finally {
-      isPasskeyActionLoading.value = false;
-    }
-  });
-};
-
-const removePasskey = async (passkeyId: string) => {
-  passkeyError.value = "";
-  passkeySuccess.value = "";
-  await runProtectedAction(async () => {
-    isPasskeyActionLoading.value = true;
-    try {
-      await deleteSuperAdminPasskey(passkeyId);
-      passkeySuccess.value = "Passkey removed.";
-      await loadPasskeys();
-    } catch (err) {
-      passkeyError.value = toUserFacingErrorMessage(err, "Unable to remove passkey.");
-    } finally {
-      isPasskeyActionLoading.value = false;
-    }
-  });
 };
 
 const revokeSelectedSession = async () => {
@@ -537,35 +279,10 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-.security-gate-grid {
-  display: grid;
-  gap: 0.75rem;
-}
-
 .session-select {
   max-width: 28rem;
 }
-
-.settings-reauth-modal-backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 1300;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 1rem;
-  background: color-mix(in srgb, #000 32%, transparent);
-}
-
-.settings-reauth-modal {
-  width: min(100%, 28rem);
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 14px;
-  padding: 1rem;
-}
-
-.settings-reauth-modal h3 {
-  margin: 0 0 0.4rem;
+.passkey-inventory-note {
+  margin-top: 0.75rem;
 }
 </style>

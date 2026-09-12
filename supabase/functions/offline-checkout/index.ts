@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.108.2";
 import { validateAccountDeviceSession } from "../_shared/accountSessions.ts";
+import { getExternalAuthUser } from "../_shared/externalAuth.ts";
 import { isAllowedOrigin, parseAllowedOrigins } from "../_shared/cors.ts";
 import { isKillSwitchWriteBlocked } from "../_shared/killSwitch.ts";
 import { resolveRateLimitResult } from "../_shared/preloginGuards.ts";
@@ -130,8 +131,14 @@ serve(async (req) => {
       global: { headers: { Authorization: authHeader } },
       auth: { persistSession: false },
     });
-    const { data: authData, error: authError } = await userClient.auth
-      .getUser();
+    // Better Auth issues the external JWT consumed by Supabase RLS; it is not
+    // a GoTrue auth.users token. Resolve the caller through the verified
+    // external subject and the ItemTraxx profile mapping instead of asking
+    // GoTrue to look up a user that intentionally does not exist there.
+    const { data: authData, error: authError } = await getExternalAuthUser(
+      userClient,
+      authHeader,
+    );
     if (authError || !authData.user) {
       return jsonResponse(401, { error: "Unauthorized" });
     }

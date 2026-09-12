@@ -77,6 +77,17 @@ test.describe("Better Auth authorization boundaries", () => {
     await expect(page.getByRole("heading", { name: "Enterprise SSO" })).toBeVisible();
     await expect(page.getByRole("option", { name: "Workspace A" })).toHaveCount(1);
   });
+
+  test("super-auth uses credential re-verification instead of the retired email-code flow", async ({ page }) => {
+    await page.goto("/");
+    await setSuperAdminSession(page, { verified: false });
+    await navigateApp(page, "/super-admin");
+
+    await expect(page).toHaveURL(/\/super-auth$/);
+    await expect(page.getByRole("heading", { name: "Super Admin Verification" })).toBeVisible();
+    await expect(page.getByPlaceholder("Enter password")).toBeVisible();
+    await expect(page.getByPlaceholder("Enter 6-digit code")).toHaveCount(0);
+  });
 });
 
 test.describe("Better Auth two-factor challenge", () => {

@@ -3,6 +3,13 @@ type EdgeFunctionOptions<TBody> = {
   body?: TBody;
   accessToken?: string;
   preserveErrorData?: boolean;
+  /**
+   * Use a CORS-simple request for cookie-authenticated endpoints that do not
+   * need a caller-supplied request id. This avoids an OPTIONS preflight being
+   * challenged by an upstream WAF. The Worker still generates and signs its
+   * own request id and enforces the origin, session, and authorization checks.
+   */
+  avoidCorsPreflight?: boolean;
 };
 
 type EdgeFunctionResult<TData> = {
@@ -57,12 +64,20 @@ const requestEdgeFunction = async <TData = unknown, TBody = unknown>(
   }
 
   const method = options.method ?? "POST";
-  const headers = getDefaultHeaders(accessTokenOverride ?? options.accessToken);
-  headers["x-request-id"] = createRequestId();
+  const accessToken = accessTokenOverride ?? options.accessToken;
+  const useSimpleCorsRequest = Boolean(options.avoidCorsPreflight && !accessToken);
+  const headers = getDefaultHeaders(accessToken);
+  const requestId = createRequestId();
+  if (!useSimpleCorsRequest) headers["x-request-id"] = requestId;
   const init: RequestInit = { method, headers };
 
   if (options.body !== undefined && method !== "GET") {
-    headers["Content-Type"] = "application/json";
+    // `text/plain` is a CORS-safelisted content type. The Worker and the
+    // function both parse the body as JSON bytes, so this changes only the
+    // browser preflight behavior, not the request contract.
+    headers["Content-Type"] = useSimpleCorsRequest
+      ? "text/plain;charset=UTF-8"
+      : "application/json";
     init.body = JSON.stringify(options.body);
   }
 
@@ -87,7 +102,8 @@ const requestEdgeFunction = async <TData = unknown, TBody = unknown>(
     }
 
     const payload = parsed as { error?: string; message?: string } | null;
-    const requestId = response.headers.get("x-request-id") ?? headers["x-request-id"];
+    const responseRequestId = response.headers.get("x-request-id") ??
+      headers["x-request-id"] ?? requestId;
 
     if (!response.ok) {
       if (isTenantDisabledError(payload)) {
@@ -105,14 +121,14 @@ const requestEdgeFunction = async <TData = unknown, TBody = unknown>(
         method,
         status: response.status,
         message: errorMessage,
-        requestId,
+        requestId: responseRequestId,
       });
       return {
         ok: false,
         status: response.status,
         data: options.preserveErrorData ? (parsed as TData) : null,
         error: errorMessage,
-        requestId,
+        requestId: responseRequestId,
       };
     }
 
@@ -121,7 +137,7 @@ const requestEdgeFunction = async <TData = unknown, TBody = unknown>(
       status: response.status,
       data: (parsed as TData) ?? null,
       error: "",
-      requestId,
+      requestId: responseRequestId,
     };
   } catch (error) {
     if (error instanceof DOMException && error.name === "AbortError") {
@@ -130,7 +146,7 @@ const requestEdgeFunction = async <TData = unknown, TBody = unknown>(
         status: 0,
         data: null,
         error: "Request timed out. Please try again.",
-        requestId: headers["x-request-id"],
+        requestId,
       };
     }
     return {
@@ -138,7 +154,7 @@ const requestEdgeFunction = async <TData = unknown, TBody = unknown>(
       status: 0,
       data: null,
       error: "Network request failed.",
-      requestId: headers["x-request-id"],
+      requestId,
     };
   }
 };

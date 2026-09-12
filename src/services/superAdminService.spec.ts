@@ -36,6 +36,7 @@ describe("listSuperAdmins", () => {
     expect(invokeEdgeFunction).toHaveBeenCalledWith("super-admin-mutate", {
       method: "POST",
       body: { action: "list_super_admins", payload: { search: "" } },
+      avoidCorsPreflight: true,
     });
     expect(result).toEqual([account]);
   });
@@ -76,6 +77,7 @@ describe("createSuperAdmin", () => {
         action: "create_super_admin",
         payload: { auth_email: "root@itemtraxx.com", password: "hunter2" },
       },
+      avoidCorsPreflight: true,
     });
     expect(result).toEqual(account);
   });
@@ -98,6 +100,7 @@ describe("setSuperAdminStatus", () => {
     expect(invokeEdgeFunction).toHaveBeenCalledWith("super-admin-mutate", {
       method: "POST",
       body: { action: "set_super_admin_status", payload: { id: "sa-1", is_active: false } },
+      avoidCorsPreflight: true,
     });
   });
 });
@@ -111,6 +114,7 @@ describe("updateSuperAdminEmail", () => {
     expect(invokeEdgeFunction).toHaveBeenCalledWith("super-admin-mutate", {
       method: "POST",
       body: { action: "update_super_admin_email", payload: { id: "sa-1", auth_email: "new@itemtraxx.com" } },
+      avoidCorsPreflight: true,
     });
   });
 });
@@ -124,6 +128,7 @@ describe("sendSuperAdminReset", () => {
     expect(invokeEdgeFunction).toHaveBeenCalledWith("super-admin-mutate", {
       method: "POST",
       body: { action: "send_super_admin_reset", payload: { auth_email: "root@itemtraxx.com" } },
+      avoidCorsPreflight: true,
     });
     expect(result).toEqual({ success: true });
   });

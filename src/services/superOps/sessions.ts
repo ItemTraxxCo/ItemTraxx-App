@@ -6,7 +6,8 @@ export type { SuperAdminSessionItem } from "./types";
 
 export type SuperAdminPasskeyItem = {
   id: string;
-  created_at: string;
+  name: string | null;
+  created_at: string | null;
   last_used_at: string | null;
 };
 

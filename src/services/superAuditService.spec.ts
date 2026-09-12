@@ -32,7 +32,10 @@ describe("fetchSuperDashboard", () => {
 
     const result = await fetchSuperDashboard();
 
-    expect(invokeEdgeFunction).toHaveBeenCalledWith("super-dashboard", { method: "GET" });
+    expect(invokeEdgeFunction).toHaveBeenCalledWith("super-dashboard", {
+      method: "GET",
+      avoidCorsPreflight: true,
+    });
     expect(result).toEqual(dashboard);
   });
 

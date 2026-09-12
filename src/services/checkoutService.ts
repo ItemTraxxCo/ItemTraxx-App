@@ -1,4 +1,5 @@
 import { authenticatedSelect } from "./authenticatedDataClient";
+import { ensureAccountSessionReady } from "./accountSessionService";
 import { invokeEdgeFunction } from "./edgeFunctionClient";
 import { withTimeout } from "./asyncUtils";
 import { AppError, edgeFunctionError, notFoundError } from "./appErrors";
@@ -155,6 +156,7 @@ const getAuthoritativeOfflineQueueScope = async (): Promise<AuthoritativeOffline
 };
 
 const executeCheckoutReturn = async (payload: CheckoutReturnPayload) => {
+  await ensureAccountSessionReady();
   const { deviceId, deviceLabel } = getOrCreateDeviceSession();
   const result = await invokeEdgeFunction<CheckoutReturnResponse>("checkoutReturn", {
     method: "POST",
@@ -468,13 +470,16 @@ export const fetchBorrowerByBorrowerId = async (borrowerId: string) => {
   let result;
   try {
     result = await withTimeout(
-      invokeEdgeFunction<{ data: BorrowerSummary }, { borrower_id: string; device_id: string }>(
-        "checkout-borrower-lookup",
-        {
-          method: "POST",
-          body: { borrower_id: borrowerId, device_id: deviceId },
-        },
-      ),
+      (async () => {
+        await ensureAccountSessionReady();
+        return invokeEdgeFunction<{ data: BorrowerSummary }, { borrower_id: string; device_id: string }>(
+          "checkout-borrower-lookup",
+          {
+            method: "POST",
+            body: { borrower_id: borrowerId, device_id: deviceId },
+          },
+        );
+      })(),
       LOOKUP_TIMEOUT_MS,
       "Unable to connect to ItemTraxx servers. Please check your internet connection and try again."
     );

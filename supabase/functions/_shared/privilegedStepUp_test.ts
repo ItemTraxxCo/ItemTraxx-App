@@ -1,6 +1,8 @@
 import {
   canRegisterAdminStepUp,
   canRegisterAdminStepUpFromTrustedHandoff,
+  hasFreshAdminStepUpAuthMethod,
+  isEligiblePrivilegedProfile,
   hasPrivilegedStepUp,
   isMissingPrivilegedStepUpTable,
   registerPrivilegedStepUp,
@@ -28,7 +30,20 @@ Deno.test("admin step-up registration accepts fresh verified handoff claims", as
   );
 });
 
-Deno.test("admin step-up registration rejects fresh password-only claims", async () => {
+Deno.test("admin step-up registration accepts a fresh Better Auth session claim", async () => {
+  const client = authClient({
+    iat: Math.floor(Date.now() / 1000),
+    session_id: "session-1",
+    amr: [{ method: "session", timestamp: Math.floor(Date.now() / 1000) }],
+  });
+
+  assert(
+    await canRegisterAdminStepUpFromTrustedHandoff(client, "verified-token"),
+    "expected a fresh Better Auth session token",
+  );
+});
+
+Deno.test("admin step-up registration accepts fresh password claims", async () => {
   const client = authClient({
     iat: Math.floor(Date.now() / 1000),
     session_id: "session-1",
@@ -36,8 +51,21 @@ Deno.test("admin step-up registration rejects fresh password-only claims", async
   });
 
   assert(
+    await canRegisterAdminStepUpFromTrustedHandoff(client, "verified-token"),
+    "expected a fresh password token",
+  );
+});
+
+Deno.test("admin step-up registration rejects a freshly minted token for an old session", async () => {
+  const client = authClient({
+    iat: Math.floor(Date.now() / 1000),
+    session_id: "session-1",
+    amr: [{ method: "session", timestamp: Math.floor((Date.now() - 10 * 60 * 1000) / 1000) }],
+  });
+
+  assert(
     !await canRegisterAdminStepUpFromTrustedHandoff(client, "verified-token"),
-    "expected password-only token rejection",
+    "expected stale Better Auth session authentication to be rejected",
   );
 });
 
@@ -163,8 +191,91 @@ const adminClient = (options: {
       }),
     }),
   } as never;
+
   return { client, upsertCalls };
 };
+
+const nowMs = 10_000_000_000;
+const timestampForAge = (ageMs: number) => (nowMs - ageMs) / 1000;
+
+Deno.test("privileged profile eligibility preserves workspace and global boundaries", () => {
+  assert(
+    isEligiblePrivilegedProfile({ role: "super_admin" }),
+    "super admins are global and do not need a workspace",
+  );
+  assert(
+    !isEligiblePrivilegedProfile({ role: "super_admin", is_active: false }),
+    "inactive super admins must be blocked",
+  );
+  assert(
+    !isEligiblePrivilegedProfile({ role: "super_admin", deleted_at: new Date().toISOString() }),
+    "deleted super admins must be blocked",
+  );
+  assert(
+    isEligiblePrivilegedProfile({ role: "workspace_admin", workspace_id: "workspace-1" }),
+    "workspace admins need an assigned workspace",
+  );
+  assert(
+    !isEligiblePrivilegedProfile({ role: "workspace_admin", workspace_id: "" }),
+    "workspace admins without a workspace must be blocked",
+  );
+  assert(
+    !isEligiblePrivilegedProfile({ role: "tenant_account", workspace_id: "workspace-1" }),
+    "tenant accounts must not register privileged step-up",
+  );
+});
+
+Deno.test("freshness predicate accepts every supported interactive auth method", () => {
+  for (const method of [
+    "password",
+    "magiclink",
+    "magic_link",
+    "otp",
+    "email_link",
+    "passkey",
+    "webauthn",
+    "session",
+  ]) {
+    assert(
+      hasFreshAdminStepUpAuthMethod(
+        { amr: [{ method, timestamp: timestampForAge(60_000) }] },
+        nowMs,
+      ),
+      `${method} should be accepted while fresh`,
+    );
+  }
+});
+
+Deno.test("freshness predicate honors the exact skew and age boundaries", () => {
+  assert(
+    hasFreshAdminStepUpAuthMethod(
+      { amr: [{ method: "session", timestamp: timestampForAge(-30_000) }] },
+      nowMs,
+    ),
+    "30 seconds of future clock skew should be tolerated",
+  );
+  assert(
+    !hasFreshAdminStepUpAuthMethod(
+      { amr: [{ method: "session", timestamp: timestampForAge(-30_001) }] },
+      nowMs,
+    ),
+    "more than 30 seconds of future skew should be rejected",
+  );
+  assert(
+    hasFreshAdminStepUpAuthMethod(
+      { amr: [{ method: "session", timestamp: timestampForAge(5 * 60 * 1000) }] },
+      nowMs,
+    ),
+    "five-minute-old authentication should remain fresh at the boundary",
+  );
+  assert(
+    !hasFreshAdminStepUpAuthMethod(
+      { amr: [{ method: "session", timestamp: timestampForAge(5 * 60 * 1000 + 1) }] },
+      nowMs,
+    ),
+    "authentication older than five minutes should be rejected",
+  );
+});
 
 Deno.test("registerPrivilegedStepUp binds to the session id when present", async () => {
   const { client, upsertCalls } = adminClient({

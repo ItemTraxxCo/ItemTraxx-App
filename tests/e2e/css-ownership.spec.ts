@@ -53,7 +53,7 @@ test.describe("global CSS ownership contracts", () => {
     await setSuperAdminSession(page);
     await navigateApp(page, "/super-admin/workspaces");
 
-    const tableWrap = page.locator(".table-wrap");
+    const tableWrap = page.locator(".sa-table-wrap");
     await expect(tableWrap).toBeVisible();
     await expect
       .poll(() =>
@@ -70,16 +70,26 @@ test.describe("global CSS ownership contracts", () => {
     }));
     expect(tableMetrics.scrollWidth).toBeGreaterThan(tableMetrics.clientWidth);
 
-    const menu = page.locator(".top-menu");
-    await expect(menu).toBeVisible();
-    expect(await menu.evaluate((element) => getComputedStyle(element).position)).toBe("fixed");
-    await page.getByRole("button", { name: "Open menu" }).click();
-    const dropdown = page.getByRole("menu");
-    await expect(dropdown).toBeVisible();
-    const dropdownBox = await dropdown.boundingBox();
-    expect(dropdownBox).not.toBeNull();
-    expect(dropdownBox!.x).toBeGreaterThanOrEqual(0);
-    expect(dropdownBox!.x + dropdownBox!.width).toBeLessThanOrEqual(390);
+    // The global .top-menu dropdown is intentionally hidden on /super-admin/*
+    // routes (App.vue's showTopMenu) — the sidebar's own profile menu is the
+    // equivalent protected-area nav control here, and carries the same
+    // role="menu" popover contract the old dropdown did.
+    const sidebar = page.locator(".sa-side");
+    await expect(sidebar).toBeVisible();
+    expect(await sidebar.evaluate((element) => getComputedStyle(element).position)).toBe("fixed");
+
+    // Unlike the old top-right menu, the profile trigger sits at the bottom
+    // of the sidebar, under where the cookie consent banner renders.
+    const consent = page.getByRole("dialog", { name: "Cookie preferences" });
+    if (await consent.isVisible()) await consent.getByRole("button", { name: "Essential only" }).click();
+
+    await page.locator(".sa-profile-trigger").click();
+    const popover = page.getByRole("menu");
+    await expect(popover).toBeVisible();
+    const popoverBox = await popover.boundingBox();
+    expect(popoverBox).not.toBeNull();
+    expect(popoverBox!.x).toBeGreaterThanOrEqual(0);
+    expect(popoverBox!.x + popoverBox!.width).toBeLessThanOrEqual(390);
   });
 
   test("reduced motion disables authenticated skeleton shimmer", async ({ page }) => {

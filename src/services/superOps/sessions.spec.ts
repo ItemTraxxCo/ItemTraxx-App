@@ -102,7 +102,12 @@ describe("listSuperAdminSessions", () => {
 
 describe("listSuperAdminPasskeys", () => {
   it("returns the passkeys array and does not send device info", async () => {
-    const passkeys = [{ id: "pk-1", name: "MacBook", created_at: "2026-01-01T00:00:00Z", last_used_at: null }];
+    const passkeys = [{
+      id: "pk-1",
+      name: "MacBook",
+      created_at: "2026-01-01T00:00:00Z",
+      last_used_at: "2026-09-12T12:00:00Z",
+    }];
     mockedCall.mockResolvedValueOnce({ passkeys });
 
     const result = await listSuperAdminPasskeys();

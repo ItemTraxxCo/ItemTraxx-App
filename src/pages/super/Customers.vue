@@ -1,26 +1,31 @@
 <template>
-  <div class="page">
-    <h1>Customers</h1>
-    <p>Leads moved to customers and invoice/payment tracking.</p>
+  <main class="page">
+    <div class="sa-toolbar">
+      <div>
+        <RouterLink to="/super-admin" class="sa-back-link">&larr; Back to Control Center</RouterLink>
+        <h1 class="sa-toolbar-title">Customers</h1>
+        <p class="sa-toolbar-sub">Leads moved to customers and invoice/payment tracking.</p>
+      </div>
+    </div>
 
     <nav class="page-nav-left">
-      <RouterLink class="button-link" to="/super-admin">Return to Super Admin</RouterLink>
-      <RouterLink class="button-link" to="/super-admin/sales-leads">Sales Leads</RouterLink>
-      <RouterLink class="button-link" to="/super-admin/customers">Customers</RouterLink>
-      <RouterLink class="button-link" to="/super-admin/workspaces">Workspaces</RouterLink>
-      <RouterLink class="button-link" to="/super-admin/admins">Tenant Admins</RouterLink>
+      <RouterLink class="sa-btn" to="/super-admin">Return to Super Admin</RouterLink>
+      <RouterLink class="sa-btn" to="/super-admin/sales-leads">Sales Leads</RouterLink>
+      <RouterLink class="sa-btn" to="/super-admin/customers">Customers</RouterLink>
+      <RouterLink class="sa-btn" to="/super-admin/workspaces">Workspaces</RouterLink>
+      <RouterLink class="sa-btn" to="/super-admin/admins">Tenant Admins</RouterLink>
     </nav>
 
-    <div class="card">
-      <div class="form-actions">
-        <input v-model.trim="search" type="text" placeholder="Search organization, name, or email" />
-        <button type="button" :disabled="isLoading" @click="loadCustomers">Search</button>
-      </div>
+    <section class="sa-panel sa-filters">
+      <label>Search <input v-model.trim="search" type="text" placeholder="Search organization, name, or email" /></label>
+      <button class="sa-btn" type="button" :disabled="isLoading" @click="loadCustomers">Search</button>
+    </section>
 
-      <p v-if="error" class="error">{{ error }}</p>
-      <p v-else-if="isLoading" class="muted">Loading customers...</p>
+    <p v-if="error" class="sa-error">{{ error }}</p>
+    <p v-else-if="isLoading" class="muted">Loading customers...</p>
 
-      <table v-else class="table">
+    <div v-else class="sa-table-wrap">
+      <table class="sa-table">
         <thead>
           <tr>
             <th>Organization</th>
@@ -34,19 +39,24 @@
             <td>{{ customer.organization }}</td>
             <td>{{ planLabel(customer.plan) }}</td>
             <td>{{ statusLabel(customer.latest_status) }}</td>
-            <td><button type="button" @click="openCustomer(customer.id)">Details</button></td>
+            <td>
+              <div class="sa-table-row-actions">
+                <button class="sa-btn" type="button" @click="openCustomer(customer.id)">Details</button>
+              </div>
+            </td>
           </tr>
           <tr v-if="!customers.length">
             <td colspan="4" class="muted">No customers found.</td>
           </tr>
         </tbody>
       </table>
-      <p v-if="success" class="success">{{ success }}</p>
     </div>
 
-    <div v-if="selectedCustomer" class="modal-overlay" @click.self="closeCustomer">
-      <div class="modal-card">
-        <h2>Customer Details</h2>
+    <p v-if="success" class="sa-notice">{{ success }}</p>
+
+    <div v-if="selectedCustomer" class="sa-modal-backdrop" @click.self="closeCustomer">
+      <section class="sa-modal" role="dialog" aria-modal="true" aria-labelledby="customer-details-title">
+        <h2 id="customer-details-title">Customer Details</h2>
         <div class="modal-body">
           <div class="kv-row"><span>Plan</span><strong>{{ planLabel(selectedCustomer.plan) }}</strong></div>
           <div class="kv-row"><span>Schools</span><strong>{{ selectedCustomer.schools_count ?? "-" }}</strong></div>
@@ -58,49 +68,53 @@
           <div class="kv-row"><span>Status</span><strong>{{ statusLabel(selectedCustomer.latest_status) }}</strong></div>
         </div>
 
-        <div class="status-entry card">
-          <h3>Add Invoice Status Entry</h3>
-          <div class="form-actions">
-            <input v-model.trim="invoiceIdDraft" type="text" placeholder="Invoice ID" />
-            <select v-model="invoiceStatusDraft">
-              <option value="paid_on_time">Paid, on time</option>
-              <option value="paid_late">Paid, late</option>
-              <option value="awaiting_payment">Awaiting payment</option>
-              <option value="canceling">Canceling</option>
-            </select>
-            <button type="button" :disabled="isSaving" @click="addStatusEntry">Add Entry</button>
+        <section class="sa-panel">
+          <h2>Add Invoice Status Entry</h2>
+          <div class="sa-filters">
+            <label>Invoice ID <input v-model.trim="invoiceIdDraft" type="text" placeholder="Enter invoice ID" /></label>
+            <label>Status
+              <select v-model="invoiceStatusDraft">
+                <option value="paid_on_time">Paid, on time</option>
+                <option value="paid_late">Paid, late</option>
+                <option value="awaiting_payment">Awaiting payment</option>
+                <option value="canceling">Canceling</option>
+              </select>
+            </label>
+            <button class="sa-btn primary" type="button" :disabled="isSaving" @click="addStatusEntry">Add Entry</button>
           </div>
-        </div>
+        </section>
 
-        <div class="card">
-          <h3>Status History</h3>
-          <table class="table">
-            <thead>
-              <tr>
-                <th>Created</th>
-                <th>Invoice ID</th>
-                <th>Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="entry in selectedCustomer.status_logs" :key="entry.id">
-                <td>{{ formatDate(entry.created_at) }}</td>
-                <td>{{ entry.invoice_id }}</td>
-                <td>{{ statusLabel(entry.status) }}</td>
-              </tr>
-              <tr v-if="!selectedCustomer.status_logs.length">
-                <td colspan="3" class="muted">No status entries yet.</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
+        <section class="sa-panel">
+          <h2>Status History</h2>
+          <div class="sa-table-wrap">
+            <table class="sa-table">
+              <thead>
+                <tr>
+                  <th>Created</th>
+                  <th>Invoice ID</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="entry in selectedCustomer.status_logs" :key="entry.id">
+                  <td>{{ formatDate(entry.created_at) }}</td>
+                  <td>{{ entry.invoice_id }}</td>
+                  <td>{{ statusLabel(entry.status) }}</td>
+                </tr>
+                <tr v-if="!selectedCustomer.status_logs.length">
+                  <td colspan="3" class="muted">No status entries yet.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
 
-        <div class="form-actions">
-          <button type="button" @click="closeCustomer">Close</button>
+        <div class="panel-actions">
+          <button class="sa-btn" type="button" @click="closeCustomer">Close</button>
         </div>
-      </div>
+      </section>
     </div>
-  </div>
+  </main>
 </template>
 
 <script setup lang="ts">
@@ -215,30 +229,29 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.modal-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(5, 12, 24, 0.62);
-  z-index: 2100;
-  display: flex;
-  justify-content: center;
-  align-items: flex-start;
-  padding: 2rem 1rem;
+.page {
+  max-width: 1320px;
+  margin: 0 auto;
+  padding: 2rem;
 }
 
-.modal-card {
-  width: min(860px, 100%);
-  max-height: calc(100vh - 4rem);
-  overflow-y: auto;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 14px;
-  padding: 1rem;
+.page-nav-left {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-bottom: 1.25rem;
+}
+
+.panel-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 1rem;
 }
 
 .modal-body {
   display: grid;
   gap: 0.5rem;
+  margin-bottom: 1.25rem;
 }
 
 .kv-row {
@@ -256,14 +269,6 @@ onMounted(() => {
 .kv-row p {
   margin: 0;
   word-break: break-word;
-}
-
-.status-entry {
-  margin-top: 0.9rem;
-}
-
-.status-entry h3 {
-  margin-top: 0;
 }
 
 @media (max-width: 980px) {

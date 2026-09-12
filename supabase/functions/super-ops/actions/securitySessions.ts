@@ -365,7 +365,14 @@ export const handleSecuritySessionsAction = async (
   }
 
   if (action === "list_passkeys") {
-    let data: { passkeys: Array<{ id: string; created_at: string | null; name: string | null }> };
+    let data: {
+      passkeys: Array<{
+        id: string;
+        created_at: string | null;
+        last_used_at: string | null;
+        name: string | null;
+      }>;
+    };
     try {
       data = await callBetterAuthAdmin({ action: "list_passkeys", profileId: user.id });
     } catch (error) {
@@ -381,7 +388,7 @@ export const handleSecuritySessionsAction = async (
           id: passkey.id,
           name: passkey.name,
           created_at: passkey.created_at,
-          last_used_at: null,
+          last_used_at: passkey.last_used_at,
         })),
       },
     });

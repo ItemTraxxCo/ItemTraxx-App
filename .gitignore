@@ -70,5 +70,6 @@ AGENTS.md
 
 # Claude files
 .claude
+.superpowers/
 .codex/environments/environment.toml
 .vercel

@@ -1,20 +1,26 @@
 <template>
-  <div class="page">
-    <div class="page-nav-left">
-      <RouterLink class="button-link" to="/super-admin">Return to Super Admin</RouterLink>
-      <RouterLink class="button-link" to="/super-admin/workspaces">Workspaces</RouterLink>
-      <RouterLink class="button-link" to="/super-admin/admins">Tenant Admins</RouterLink>
-      <RouterLink class="button-link" to="/super-admin/items">All Items</RouterLink>
-      <RouterLink class="button-link" to="/super-admin/borrowers">All Borrowers</RouterLink>
-      <RouterLink class="button-link" to="/super-admin/logs">All Logs</RouterLink>
-      <RouterLink class="button-link" to="/super-admin/sales-leads">Sales Leads</RouterLink>
-      <RouterLink class="button-link" to="/super-admin/customers">Customers</RouterLink>
+  <main class="page">
+    <div class="page-nav">
+      <RouterLink to="/super-admin" class="sa-back-link">&larr; Back to Control Center</RouterLink>
+      <div class="page-nav-quick">
+        <RouterLink to="/super-admin/workspaces" class="sa-btn">Workspaces</RouterLink>
+        <RouterLink to="/super-admin/admins" class="sa-btn">Tenant Admins</RouterLink>
+        <RouterLink to="/super-admin/items" class="sa-btn">All Items</RouterLink>
+        <RouterLink to="/super-admin/borrowers" class="sa-btn">All Borrowers</RouterLink>
+        <RouterLink to="/super-admin/logs" class="sa-btn">All Logs</RouterLink>
+        <RouterLink to="/super-admin/sales-leads" class="sa-btn">Sales Leads</RouterLink>
+        <RouterLink to="/super-admin/customers" class="sa-btn">Customers</RouterLink>
+      </div>
     </div>
 
-    <h1>Broadcasts</h1>
-    <p>Push a message banner to all users until they dismiss it.</p>
+    <div class="sa-toolbar">
+      <div>
+        <h1 class="sa-toolbar-title">Broadcasts</h1>
+        <p class="sa-toolbar-sub">Push a message banner to all users until they dismiss it.</p>
+      </div>
+    </div>
 
-    <div class="card">
+    <section class="sa-panel">
       <h2>Broadcast Message</h2>
       <form class="form" @submit.prevent="saveBroadcast">
         <label>
@@ -41,15 +47,15 @@
             <option :value="false">false</option>
           </select>
         </label>
-        <div class="form-actions">
-          <button type="submit" class="button-primary" :disabled="isSaving">Save Broadcast</button>
-          <button type="button" :disabled="isSaving" @click="clearBroadcast">Disable Broadcast</button>
+        <div class="panel-actions">
+          <button type="submit" class="sa-btn primary" :disabled="isSaving">Save Broadcast</button>
+          <button type="button" class="sa-btn" :disabled="isSaving" @click="clearBroadcast">Disable Broadcast</button>
         </div>
       </form>
-      <p class="muted" v-if="lastUpdated">Last updated: {{ formatDateTime(lastUpdated) }}</p>
-    </div>
+      <p class="form-meta" v-if="lastUpdated">Last updated: {{ formatDateTime(lastUpdated) }}</p>
+    </section>
 
-    <div class="card">
+    <section class="sa-panel">
       <h2>Tenant Notification Update</h2>
       <form class="form" @submit.prevent="saveWorkspaceUpdate">
         <label>
@@ -77,18 +83,18 @@
           Optional link
           <input v-model="updateLinkUrl" type="url" placeholder="https://status.itemtraxx.com/" />
         </label>
-        <div class="form-actions">
-          <button type="submit" class="button-primary" :disabled="isSaving">Publish Update</button>
-          <button type="button" :disabled="isSaving" @click="clearWorkspaceUpdates">Clear Updates</button>
+        <div class="panel-actions">
+          <button type="submit" class="sa-btn primary" :disabled="isSaving">Publish Update</button>
+          <button type="button" class="sa-btn" :disabled="isSaving" @click="clearWorkspaceUpdates">Clear Updates</button>
         </div>
       </form>
-    </div>
+    </section>
 
     <div v-if="toastMessage" class="toast">
       <div class="toast-title">{{ toastTitle }}</div>
       <div class="toast-body">{{ toastMessage }}</div>
     </div>
-  </div>
+  </main>
 </template>
 
 <script setup lang="ts">
@@ -263,3 +269,84 @@ onUnmounted(() => {
   }
 });
 </script>
+
+<style scoped>
+.page {
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 2rem;
+}
+
+.page-nav {
+  margin-bottom: 1.5rem;
+}
+
+.page-nav-quick {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-top: 0.75rem;
+}
+
+.panel-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+
+.form {
+  display: grid;
+  gap: 1rem;
+}
+
+.form label {
+  display: grid;
+  gap: 0.35rem;
+  font-size: 0.85rem;
+}
+
+.form input,
+.form textarea,
+.form select {
+  font: inherit;
+  padding: 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--text);
+}
+
+.form textarea {
+  resize: vertical;
+}
+
+.form-meta {
+  font-size: 0.8rem;
+  color: var(--muted);
+  margin-top: 0.75rem;
+}
+
+.toast {
+  position: fixed;
+  bottom: 1rem;
+  right: 1rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 1rem;
+  background: var(--surface);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  z-index: 50;
+  max-width: 300px;
+}
+
+.toast-title {
+  font-weight: 600;
+  font-size: 0.85rem;
+  margin-bottom: 0.25rem;
+}
+
+.toast-body {
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+</style>

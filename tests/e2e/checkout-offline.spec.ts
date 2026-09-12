@@ -454,6 +454,10 @@ test.describe("encrypted checkout offline queue contract", () => {
 test.describe("prepared offline checkout workflow contract", () => {
   test.beforeEach(async ({ page }) => {
     await mockUnauthenticatedSession(page);
+    // Session-bound checkout operations bootstrap the account session before
+    // contacting the Edge Function. Keep that bootstrap deterministic in the
+    // browser contract tests instead of letting it reach a real endpoint.
+    await mockAdminOps(page);
     await openFixture(page);
     await clearQueueStorage(page);
     await page.evaluate(async (databaseName) => {

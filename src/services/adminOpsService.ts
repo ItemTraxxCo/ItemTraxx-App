@@ -1,5 +1,6 @@
 import { invokeEdgeFunction } from "./edgeFunctionClient";
 import type { AdminOpsAction, EdgeEnvelope, TenantFeatureFlags } from "../types/edgeContracts";
+import { getAuthState } from "../store/authState";
 import { getOrCreateDeviceSession } from "../utils/deviceSession";
 import { edgeFunctionError } from "./appErrors";
 
@@ -73,6 +74,10 @@ export type AccountSessionTouchOptions = {
   loginLocation?: AccountSessionItem["login_location"];
 };
 
+type AdminOpsRequestOptions = {
+  avoidCorsPreflight?: boolean;
+};
+
 const requestCache = new Map<
   string,
   {
@@ -86,13 +91,21 @@ const requestInflight = new Map<string, Promise<unknown>>();
 // Protected admin operations must not race the account-session bootstrap. The
 // page lifecycle starts the touch during setup, but child components can still
 // issue their first request while that network call is in flight. Coalescing
-// touches per device lets those requests share the same bootstrap promise and
-// keeps the first login's context (method/location) intact.
+// touches per authenticated identity lets those requests share the same
+// bootstrap promise without reusing a prior user's session on a shared device.
 const sessionTouchInflight = new Map<string, Promise<{ ok: boolean }>>();
 
-const getAdminOpCacheKey = (action: string, suffix = "") => {
+const getAdminOpIdentityKey = () => {
   const { deviceId } = getOrCreateDeviceSession();
-  return `${action}:${deviceId}:${suffix}`;
+  const auth = getAuthState();
+  const userId = auth.userId ?? "anonymous";
+  const workspaceId = auth.workspaceContextId ?? auth.sessionWorkspaceId ?? "none";
+  const sessionCreatedAt = auth.signedInAt ?? "unknown";
+  return `${userId}:${workspaceId}:${sessionCreatedAt}:${deviceId}`;
+};
+
+const getAdminOpCacheKey = (action: string, suffix = "") => {
+  return `${action}:${getAdminOpIdentityKey()}:${suffix}`;
 };
 
 const withCachedAdminOp = async <TData>(
@@ -126,7 +139,8 @@ const withCachedAdminOp = async <TData>(
 
 const sendAdminOps = async <TData>(
   action: AdminOpsAction,
-  payload: Record<string, unknown> = {}
+  payload: Record<string, unknown> = {},
+  options: AdminOpsRequestOptions = {}
 ) => {
   const { deviceId, deviceLabel } = getOrCreateDeviceSession();
   const result = await invokeEdgeFunction<EdgeEnvelope<TData>, { action: string; payload: Record<string, unknown> }>(
@@ -141,6 +155,7 @@ const sendAdminOps = async <TData>(
           device_label: deviceLabel,
         },
       },
+      ...options,
     }
   );
 
@@ -154,8 +169,8 @@ const sendAdminOps = async <TData>(
 export const touchAccountSession = async (
   options: AccountSessionTouchOptions = {}
 ) => {
-  const { deviceId } = getOrCreateDeviceSession();
-  const inflight = sessionTouchInflight.get(deviceId);
+  const identityKey = getAdminOpIdentityKey();
+  const inflight = sessionTouchInflight.get(identityKey);
   if (inflight) return inflight;
 
   const pending = withCachedAdminOp(
@@ -168,14 +183,14 @@ export const touchAccountSession = async (
       sendAdminOps<{ ok: boolean }>("touch_session", {
         login_method: options.loginMethod,
         login_location: options.loginLocation,
-      })
+      }, { avoidCorsPreflight: true })
   );
   const tracked = pending.finally(() => {
-    if (sessionTouchInflight.get(deviceId) === tracked) {
-      sessionTouchInflight.delete(deviceId);
+    if (sessionTouchInflight.get(identityKey) === tracked) {
+      sessionTouchInflight.delete(identityKey);
     }
   });
-  sessionTouchInflight.set(deviceId, tracked);
+  sessionTouchInflight.set(identityKey, tracked);
   return tracked;
 };
 
@@ -200,7 +215,7 @@ const callAdminOps = async <TData>(
 };
 
 export const fetchWorkspaceNotifications = async () =>
-  withCachedAdminOp("get_notifications", 15_000, () =>
+  withCachedAdminOp(getAdminOpCacheKey("get_notifications"), 15_000, () =>
     callAdminOps<TenantNotificationPayload>("get_notifications")
   );
 

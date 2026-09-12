@@ -60,7 +60,7 @@
         </table>
       </div>
       <p class="muted passkey-inventory-note">
-        Last-used timestamps are shown when available. Passkey changes are intentionally limited to Account Security.
+        Last-used timestamps are recorded after a successful passkey sign-in. Existing passkeys may show “Not recorded” until they are used again. Passkey changes are intentionally limited to Account Security.
       </p>
       <p v-if="passkeyError" class="sa-error">{{ passkeyError }}</p>
     </section>

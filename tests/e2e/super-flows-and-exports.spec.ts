@@ -91,13 +91,50 @@ test.describe("Super admin flows and export actions", () => {
     await expect(page.getByRole("button", { name: "Export PDF" })).toBeVisible();
   });
 
-  test("super-admin top navigation preserves role actions", async ({ page }) => {
+  test("super-admin sidebar profile menu preserves role actions", async ({ page }) => {
     await page.goto("/");
     await setSuperAdminSession(page);
     await navigateApp(page, "/super-admin");
 
-    await page.getByRole("button", { name: "Open menu" }).click();
+    // The global top-right menu is hidden on /super-admin/* routes; the
+    // sidebar's own profile menu (bottom-left) is the equivalent control.
+    const consent = page.getByRole("dialog", { name: "Cookie preferences" });
+    if (await consent.isVisible()) await consent.getByRole("button", { name: "Essential only" }).click();
+
+    await page.locator(".sa-profile-trigger").click();
     await expect(page.getByRole("menuitem", { name: "Sign out" })).toBeVisible();
+  });
+
+  test("super-admin settings displays a recorded passkey last-used timestamp", async ({ page }) => {
+    await page.route(/\/functions(?:\/v1)?\/super-ops(?:\?.*)?$/, async (route) => {
+      const request = route.request().postDataJSON() as SuperOpsRequest;
+      const data = request.action === "list_passkeys"
+        ? {
+            passkeys: [{
+              id: "passkey-e2e",
+              name: "MacBook",
+              created_at: "2026-07-22T00:00:00.000Z",
+              last_used_at: "2026-09-12T12:00:00.000Z",
+            }],
+          }
+        : request.action === "list_sessions"
+        ? { sessions: [] }
+        : { ok: true };
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ data }),
+      });
+    });
+
+    await page.goto("/");
+    await setSuperAdminSession(page);
+    await navigateApp(page, "/super-admin/settings");
+
+    await expect(page.getByRole("heading", { name: "Super Admin Settings" })).toBeVisible();
+    const passkeyRow = page.getByRole("row").filter({ hasText: "MacBook" });
+    await expect(passkeyRow).toContainText("2026");
+    await expect(passkeyRow).not.toContainText("Not recorded");
   });
 
   test("control-center actions preserve their exact request envelopes", async ({ page }) => {

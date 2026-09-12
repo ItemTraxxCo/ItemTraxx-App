@@ -1,19 +1,22 @@
 <template>
   <div class="page">
-    <div class="page-nav-left">
-      <RouterLink class="button-link" to="/super-admin">Return to Super Admin</RouterLink>
-      <RouterLink class="button-link" to="/super-admin/workspaces">Workspaces</RouterLink>
-      <RouterLink class="button-link" to="/super-admin/borrowers">All Borrowers</RouterLink>
-      <RouterLink class="button-link" to="/super-admin/logs">All Logs</RouterLink>
-      <RouterLink class="button-link" to="/super-admin/broadcasts">Broadcasts</RouterLink>
-      <RouterLink class="button-link" to="/super-admin/sales-leads">Sales Leads</RouterLink>
-      <RouterLink class="button-link" to="/super-admin/customers">Customers</RouterLink>
+    <div class="sa-toolbar">
+      <div>
+        <RouterLink to="/super-admin" class="sa-back-link">&larr; Back to Control Center</RouterLink>
+        <h1 class="sa-toolbar-title">All Items</h1>
+        <p class="sa-toolbar-sub">Cross-workspace item management.</p>
+      </div>
+      <div class="sa-toolbar-actions">
+        <RouterLink class="sa-btn" to="/super-admin/workspaces">Workspaces</RouterLink>
+        <RouterLink class="sa-btn" to="/super-admin/borrowers">All Borrowers</RouterLink>
+        <RouterLink class="sa-btn" to="/super-admin/logs">All Logs</RouterLink>
+        <RouterLink class="sa-btn" to="/super-admin/broadcasts">Broadcasts</RouterLink>
+        <RouterLink class="sa-btn" to="/super-admin/sales-leads">Sales Leads</RouterLink>
+        <RouterLink class="sa-btn" to="/super-admin/customers">Customers</RouterLink>
+      </div>
     </div>
 
-    <h1>All Items</h1>
-    <p>Cross-workspace item management.</p>
-
-    <div class="card">
+    <section class="sa-panel">
       <h2>Create Item</h2>
       <form class="form" @submit.prevent="handleCreate">
         <label>Workspace<select v-model="formWorkspaceId"><option value="">Select workspace</option><option v-for="t in workspaces" :key="t.id" :value="t.id">{{ t.name }}</option></select></label>
@@ -22,13 +25,13 @@
         <label>Serial Number<input v-model="formSerial" type="text" /></label>
         <label>Status<select v-model="formStatus"><option value="available">available</option><option value="checked_out">checked_out</option><option value="damaged">damaged</option><option value="lost">lost</option><option value="in_repair">in_repair</option><option value="retired">retired</option><option value="in_studio_only">in_studio_only</option></select></label>
         <label>Notes<textarea v-model="formNotes" rows="3" /></label>
-        <div class="form-actions"><button type="submit" class="button-primary" :disabled="isSaving">Create</button></div>
+        <div class="form-actions"><button type="submit" class="sa-btn primary" :disabled="isSaving">Create</button></div>
       </form>
-    </div>
+    </section>
 
-    <div class="card">
+    <section class="sa-panel">
       <h2>Item List</h2>
-      <div class="input-row">
+      <div class="sa-filters">
         <select v-model="workspaceFilter" @change="loadItem"><option value="all">all workspaces</option><option v-for="t in workspaces" :key="t.id" :value="t.id">{{ t.name }}</option></select>
         <select v-model="statusFilter">
           <option value="all">all statuses</option>
@@ -41,42 +44,51 @@
           <option value="in_studio_only">in_studio_only</option>
         </select>
         <input v-model="search" type="text" placeholder="Search" />
-        <button type="button" @click="loadItem">Search</button>
+        <button type="button" class="sa-btn" @click="loadItem">Search</button>
       </div>
       <p class="muted">Showing {{ filteredItem.length }} of {{ items.length }} items.</p>
       <div class="form-actions">
-        <button type="button" @click="exportCsv">Export CSV</button>
-        <button type="button" @click="exportPdf">Export PDF</button>
+        <button type="button" class="sa-btn" @click="exportCsv">Export CSV</button>
+        <button type="button" class="sa-btn" @click="exportPdf">Export PDF</button>
       </div>
       <SkeletonLoader v-if="isLoading" variant="table" :rows="6" :columns="5" label="Loading all items" />
-      <p v-else-if="error" class="error">{{ error }}</p>
-      <table v-else class="table">
-        <thead><tr><th>Name</th><th>Workspace</th><th>Barcode</th><th>Status</th><th>Actions</th></tr></thead>
-        <tbody>
-          <tr v-for="item in filteredItem" :key="item.id">
-            <td>{{ item.name }}</td>
-            <td>{{ workspaceNameById.get(item.workspace_id) || item.workspace_id }}</td>
-            <td>{{ item.barcode }}</td>
-            <td>{{ item.status }}</td>
-            <td>
-              <button type="button" @click="startEdit(item)">Edit</button>
-              <button type="button" @click="requestDelete(item)">Delete</button>
-            </td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
+      <p v-else-if="error" class="sa-error">{{ error }}</p>
+      <div v-else class="sa-table-wrap">
+        <table class="sa-table">
+          <thead><tr><th>Name</th><th>Workspace</th><th>Barcode</th><th>Status</th><th>Actions</th></tr></thead>
+          <tbody>
+            <tr v-for="item in filteredItem" :key="item.id">
+              <td>{{ item.name }}</td>
+              <td>{{ workspaceNameById.get(item.workspace_id) || item.workspace_id }}</td>
+              <td>{{ item.barcode }}</td>
+              <td>
+                <span
+                  class="sa-tag"
+                  :class="item.status === 'available' ? 'ok' : ['checked_out', 'in_repair'].includes(item.status) ? 'warn' : ['damaged', 'lost'].includes(item.status) ? 'critical' : 'info'"
+                >{{ item.status }}</span>
+              </td>
+              <td>
+                <div class="sa-table-row-actions">
+                  <button type="button" class="sa-btn" @click="startEdit(item)">Edit</button>
+                  <button type="button" class="sa-btn danger" @click="requestDelete(item)">Delete</button>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
 
-    <div v-if="editItem" class="card">
+    <section v-if="editItem" class="sa-panel">
       <h2>Edit Item</h2>
       <form class="form" @submit.prevent="saveEdit">
         <label>Name<input v-model="editName" type="text" /></label>
         <label>Barcode<input v-model="editBarcode" type="text" /></label>
         <label>Status<select v-model="editStatus"><option value="available">available</option><option value="checked_out">checked_out</option><option value="damaged">damaged</option><option value="lost">lost</option><option value="in_repair">in_repair</option><option value="retired">retired</option><option value="in_studio_only">in_studio_only</option></select></label>
         <label>Notes<textarea v-model="editNotes" rows="3" /></label>
-        <div class="form-actions"><button type="submit" class="button-primary" :disabled="isSaving">Save</button><button type="button" @click="cancelEdit">Cancel</button></div>
+        <div class="form-actions"><button type="submit" class="sa-btn primary" :disabled="isSaving">Save</button><button type="button" class="sa-btn" @click="cancelEdit">Cancel</button></div>
       </form>
-    </div>
+    </section>
 
     <div v-if="toastMessage" class="toast"><div class="toast-title">{{ toastTitle }}</div><div class="toast-body">{{ toastMessage }}</div></div>
 
@@ -334,3 +346,13 @@ onMounted(() => {
   })();
 });
 </script>
+
+<style scoped>
+/* The global .form-actions (src/styles/base.css) only adds margin-top, not
+   margin-bottom, so a button row followed directly by another element (e.g.
+   a table) has zero gap between them. Add the missing space here rather
+   than changing the global rule, which is used by other pages too. */
+.form-actions {
+  margin-bottom: 1rem;
+}
+</style>

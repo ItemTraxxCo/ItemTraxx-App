@@ -1,46 +1,42 @@
 <template>
   <div class="page">
-    <h1>Sales Leads</h1>
-    <p>Requests submitted from the public pricing contact form.</p>
-
-    <nav class="page-nav-left">
-      <RouterLink class="button-link" to="/super-admin">Return to Super Admin</RouterLink>
-      <RouterLink class="button-link" to="/super-admin/workspaces">Workspaces</RouterLink>
-      <RouterLink class="button-link" to="/super-admin/admins">Tenant Admins</RouterLink>
-      <RouterLink class="button-link" to="/super-admin/broadcasts">Broadcasts</RouterLink>
-      <RouterLink class="button-link" to="/super-admin/sales-leads">Sales Leads</RouterLink>
-      <RouterLink class="button-link" to="/super-admin/customers">Customers</RouterLink>
-    </nav>
-
-    <div class="admin-grid lead-stats">
-      <div v-for="option in stageOptions" :key="option.value" class="stat-card">
-        <h3>{{ option.label }}</h3>
-        <p class="stat-value">{{ countByStage(option.value) }}</p>
+    <div class="sa-toolbar">
+      <div>
+        <RouterLink to="/super-admin" class="sa-back-link">&larr; Back to Control Center</RouterLink>
+        <h1 class="sa-toolbar-title">Sales Leads</h1>
+        <p class="sa-toolbar-sub">Requests submitted from the public pricing contact form.</p>
       </div>
     </div>
 
-    <div class="card">
-      <div class="filters">
-        <input v-model.trim="search" type="text" placeholder="Search name, organization, or email" />
-        <select v-model="leadStateFilter">
-          <option value="open">Open leads</option>
-          <option value="">All lead states</option>
-          <option value="closed">Closed</option>
-          <option value="converted_to_customer">Moved to customers</option>
-        </select>
-        <select v-model="stageFilter">
-          <option value="">All stages</option>
-          <option v-for="option in stageOptions" :key="option.value" :value="option.value">
-            {{ option.label }}
-          </option>
-        </select>
-        <button type="button" @click="loadLeads" :disabled="isLoading">Search</button>
+    <div class="sa-stat-strip" aria-label="Lead stage summary">
+      <div v-for="option in stageOptions" :key="option.value" class="sa-stat">
+        <div class="n">{{ countByStage(option.value) }}</div>
+        <div class="l">{{ option.label }}</div>
       </div>
+    </div>
 
-      <p v-if="error" class="error">{{ error }}</p>
-      <p v-else-if="isLoading" class="muted">Loading leads...</p>
+    <section class="sa-panel sa-filters">
+      <input v-model.trim="search" type="text" placeholder="Search name, organization, or email" />
+      <select v-model="leadStateFilter">
+        <option value="open">Open leads</option>
+        <option value="">All lead states</option>
+        <option value="closed">Closed</option>
+        <option value="converted_to_customer">Moved to customers</option>
+      </select>
+      <select v-model="stageFilter">
+        <option value="">All stages</option>
+        <option v-for="option in stageOptions" :key="option.value" :value="option.value">
+          {{ option.label }}
+        </option>
+      </select>
+      <button type="button" class="sa-btn" @click="loadLeads" :disabled="isLoading">Search</button>
+    </section>
 
-      <table v-else class="table">
+    <p v-if="error" class="sa-error">{{ error }}</p>
+    <p v-else-if="isLoading" class="muted">Loading leads...</p>
+
+    <div v-else class="sa-table-wrap">
+      <table class="sa-table">
         <thead>
           <tr>
             <th>Plan</th>
@@ -57,7 +53,9 @@
             <td>{{ lead.organization }}</td>
             <td class="email-cell">{{ lead.reply_email }}</td>
             <td>
-              <button type="button" @click="openLead(lead.id)">Details</button>
+              <div class="sa-table-row-actions">
+                <button type="button" class="sa-btn" @click="openLead(lead.id)">Details</button>
+              </div>
             </td>
           </tr>
           <tr v-if="!filteredLeads.length">
@@ -65,13 +63,13 @@
           </tr>
         </tbody>
       </table>
-
-      <p v-if="success" class="success">{{ success }}</p>
     </div>
 
-    <div v-if="selectedLead" class="modal-overlay" @click.self="closeLeadModal">
-      <div class="modal-card">
-        <h2>Lead Details</h2>
+    <p v-if="success" class="sa-notice">{{ success }}</p>
+
+    <div v-if="selectedLead" class="sa-modal-backdrop" @click.self="closeLeadModal">
+      <section class="sa-modal" role="dialog" aria-modal="true" aria-labelledby="lead-details-title">
+        <h2 id="lead-details-title">Lead Details</h2>
         <div class="modal-body">
           <div class="kv-row"><span>Created</span><strong>{{ formatDate(selectedLead.created_at) }}</strong></div>
           <div class="kv-row"><span>Plan</span><strong>{{ planLabel(selectedLead.plan) }}</strong></div>
@@ -101,18 +99,19 @@
           </div>
         </div>
 
-        <div class="row-actions modal-actions">
+        <div class="panel-actions">
           <button
             type="button"
+            class="sa-btn primary"
             :disabled="isSavingStageId === selectedLead.id || stageDrafts[selectedLead.id] === selectedLead.stage"
             @click="saveStage(selectedLead.id)"
           >
             {{ isSavingStageId === selectedLead.id ? "Saving..." : "Save stage" }}
           </button>
-          <button type="button" @click="copyEmail(selectedLead.reply_email)">Copy email</button>
+          <button type="button" class="sa-btn" @click="copyEmail(selectedLead.reply_email)">Copy email</button>
           <button
             type="button"
-            class="danger"
+            class="sa-btn danger"
             :disabled="isSavingStageId === selectedLead.id || selectedLead.lead_state === 'closed'"
             @click="closeLead(selectedLead.id)"
           >
@@ -120,14 +119,15 @@
           </button>
           <button
             type="button"
+            class="sa-btn"
             :disabled="isSavingStageId === selectedLead.id || selectedLead.lead_state === 'converted_to_customer'"
             @click="moveToCustomers(selectedLead.id)"
           >
             Move to customers
           </button>
-          <button type="button" @click="closeLeadModal">Close</button>
+          <button type="button" class="sa-btn" @click="closeLeadModal">Close</button>
         </div>
-      </div>
+      </section>
     </div>
   </div>
 </template>
@@ -298,52 +298,15 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.lead-stats {
-  margin-top: 1rem;
-}
-
-.filters {
-  display: grid;
-  grid-template-columns: minmax(280px, 1fr) minmax(190px, 230px) auto;
-  gap: 0.6rem;
-  align-items: center;
-  margin-bottom: 0.9rem;
-}
-
-.row-actions {
+.panel-actions {
   display: flex;
   gap: 0.5rem;
-  align-items: center;
+  margin-top: 1rem;
   flex-wrap: wrap;
 }
 
 .email-cell {
   word-break: break-word;
-}
-
-.modal-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(5, 12, 24, 0.62);
-  z-index: 2100;
-  display: flex;
-  justify-content: center;
-  align-items: flex-start;
-  padding: 2rem 1rem;
-}
-
-.modal-card {
-  width: min(760px, 100%);
-  max-height: calc(100vh - 4rem);
-  overflow-y: auto;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 14px;
-  padding: 1rem;
-}
-
-.modal-card h2 {
-  margin: 0 0 0.8rem;
 }
 
 .modal-body {
@@ -377,20 +340,7 @@ onMounted(() => {
   max-width: 100%;
 }
 
-.modal-actions {
-  margin-top: 1rem;
-}
-
 @media (max-width: 980px) {
-  .filters {
-    grid-template-columns: 1fr;
-  }
-
-  .row-actions {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
   .kv-row {
     grid-template-columns: 1fr;
   }

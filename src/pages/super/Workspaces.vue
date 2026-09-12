@@ -1,29 +1,29 @@
 <template>
   <main class="page">
-    <header class="page-header">
+    <div class="sa-toolbar">
       <div>
-        <RouterLink to="/super-admin">Back to Control Center</RouterLink>
-        <h1>Workspaces</h1>
-        <p>Manage workspace identity, billing classification, feature access, lifecycle, and Primary Workspace Admins.</p>
+        <RouterLink to="/super-admin" class="sa-back-link">&larr; Back to Control Center</RouterLink>
+        <h1 class="sa-toolbar-title">Workspaces</h1>
+        <p class="sa-toolbar-sub">Manage workspace identity, billing classification, feature access, lifecycle, and Primary Workspace Admins.</p>
       </div>
-    </header>
+    </div>
 
-    <section class="summary-grid" aria-label="Workspace summary">
-      <article><strong>{{ workspaces.length }}</strong><span>Total</span></article>
-      <article><strong>{{ activeCount }}</strong><span>Active</span></article>
-      <article><strong>{{ suspendedCount }}</strong><span>Suspended</span></article>
-      <article><strong>{{ archivedCount }}</strong><span>Archived</span></article>
-    </section>
+    <div class="sa-stat-strip" aria-label="Workspace summary">
+      <div class="sa-stat"><div class="n">{{ workspaces.length }}</div><div class="l">Total</div></div>
+      <div class="sa-stat"><div class="n">{{ activeCount }}</div><div class="l">Active</div></div>
+      <div class="sa-stat"><div class="n">{{ suspendedCount }}</div><div class="l">Suspended</div></div>
+      <div class="sa-stat"><div class="n">{{ archivedCount }}</div><div class="l">Archived</div></div>
+    </div>
 
-    <section class="card">
+    <section class="sa-panel">
       <h2>Create workspace</h2>
       <WorkspaceFields v-model="draft" :include-credentials="true" />
-      <div class="actions">
-        <button class="button-primary" :disabled="saving" @click="create">Create workspace</button>
+      <div class="panel-actions">
+        <button class="sa-btn primary" :disabled="saving" @click="create">Create workspace</button>
       </div>
     </section>
 
-    <section class="card filters">
+    <section class="sa-panel sa-filters">
       <label>Search <input v-model="search" placeholder="Name or slug" @keyup.enter="load" /></label>
       <label>Status
         <select v-model="status" @change="load">
@@ -31,28 +31,35 @@
           <option value="suspended">Suspended</option><option value="archived">Archived</option>
         </select>
       </label>
-      <button :disabled="loading" @click="load">Search</button>
+      <button class="sa-btn" :disabled="loading" @click="load">Search</button>
     </section>
 
-    <p v-if="message" class="notice" role="status">{{ message }}</p>
-    <p v-if="error" class="error" role="alert">{{ error }}</p>
+    <p v-if="message" class="sa-notice" role="status">{{ message }}</p>
+    <p v-if="error" class="sa-error" role="alert">{{ error }}</p>
 
-    <div class="table-wrap">
-      <table>
+    <div class="sa-table-wrap">
+      <table class="sa-table">
         <thead><tr><th>Name</th><th>Subdomain</th><th>Classification</th><th>Status</th><th>Primary Workspace Admin</th><th>Actions</th></tr></thead>
         <tbody>
           <tr v-for="workspace in workspaces" :key="workspace.id">
             <td>{{ workspace.name }}</td>
             <td><a :href="workspaceUrl(workspace.slug)" target="_blank" rel="noreferrer">{{ workspace.slug }}.app.itemtraxx.com</a></td>
             <td>{{ workspace.account_category || 'workspace' }} / {{ workspace.plan_code || 'unassigned' }}</td>
-            <td>{{ workspace.archived_at ? 'archived' : workspace.status }}</td>
+            <td>
+              <span
+                class="sa-tag"
+                :class="workspace.archived_at ? 'info' : workspace.status === 'active' ? 'ok' : 'warn'"
+              >{{ workspace.archived_at ? 'archived' : workspace.status }}</span>
+            </td>
             <td>{{ workspace.primary_admin_email || 'Not assigned' }}</td>
-            <td class="row-actions">
-              <button @click="openEdit(workspace)">Edit</button>
-              <button @click="toggle(workspace)">{{ workspace.status === 'active' ? 'Suspend' : 'Activate' }}</button>
-              <button @click="archiveWorkspace(workspace)">Archive</button>
-              <button @click="reset(workspace)">Reset primary password</button>
-              <button @click="reassign(workspace)">Reassign primary</button>
+            <td>
+              <div class="sa-table-row-actions">
+                <button class="sa-btn" @click="openEdit(workspace)">Edit</button>
+                <button class="sa-btn" @click="toggle(workspace)">{{ workspace.status === 'active' ? 'Suspend' : 'Activate' }}</button>
+                <button class="sa-btn danger" @click="archiveWorkspace(workspace)">Archive</button>
+                <button class="sa-btn" @click="reset(workspace)">Reset primary password</button>
+                <button class="sa-btn" @click="reassign(workspace)">Reassign primary</button>
+              </div>
             </td>
           </tr>
           <tr v-if="!loading && !workspaces.length"><td colspan="6">No workspaces found.</td></tr>
@@ -60,13 +67,13 @@
       </table>
     </div>
 
-    <div v-if="editing" class="modal-backdrop" @click.self="editing = null">
-      <section class="modal" role="dialog" aria-modal="true" aria-labelledby="edit-workspace-title">
+    <div v-if="editing" class="sa-modal-backdrop" @click.self="editing = null">
+      <section class="sa-modal" role="dialog" aria-modal="true" aria-labelledby="edit-workspace-title">
         <h2 id="edit-workspace-title">Edit workspace</h2>
         <WorkspaceFields v-model="editDraft" :include-credentials="false" />
-        <div class="actions">
-          <button class="button-primary" :disabled="saving" @click="saveEdit">Save changes</button>
-          <button @click="editing = null">Cancel</button>
+        <div class="panel-actions">
+          <button class="sa-btn primary" :disabled="saving" @click="saveEdit">Save changes</button>
+          <button class="sa-btn" @click="editing = null">Cancel</button>
         </div>
       </section>
     </div>
@@ -108,12 +115,17 @@ const WorkspaceFields = defineComponent({
       input("Contact name", "contact_name"), input("Support email", "support_email", "email"), input("Billing email", "billing_email", "email"),
       h("label", ["Billing status", h("select", { value: props.modelValue.billing_status ?? "", onChange: (event: Event) => update("billing_status", (event.target as HTMLSelectElement).value) }, ["draft", "active", "past_due", "canceled"].map((value) => h("option", { value }, value.replace("_", " "))))]),
       input("Renewal date", "renewal_date", "date"), input("Invoice reference", "invoice_reference"),
-      h("fieldset", [
+      h("fieldset", { class: "sa-flag-fieldset" }, [
         h("legend", "Feature flags"),
-        ...Object.entries(flagLabels).map(([key, label]) => h("label", { class: "check" }, [
-          h("input", { type: "checkbox", checked: props.modelValue.feature_flags[key] !== false, onChange: (event: Event) => update("feature_flags", { ...props.modelValue.feature_flags, [key]: (event.target as HTMLInputElement).checked }) }),
-          label,
-        ])),
+        h("div", { class: "sa-flag-grid" }, Object.entries(flagLabels).map(([key, label]) => h("label", { class: "sa-flag-row" }, [
+          h("input", {
+            type: "checkbox",
+            class: "sa-flag-checkbox",
+            checked: props.modelValue.feature_flags[key] !== false,
+            onChange: (event: Event) => update("feature_flags", { ...props.modelValue.feature_flags, [key]: (event.target as HTMLInputElement).checked }),
+          }),
+          h("span", label),
+        ]))),
       ]),
     ]);
   },
@@ -138,5 +150,39 @@ onMounted(() => void load());
 </script>
 
 <style scoped>
-.page{max-width:1320px;margin:0 auto;padding:2rem}.page-header,.actions,.filters,.row-actions{display:flex;gap:.75rem;align-items:end;flex-wrap:wrap}.summary-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:1rem;margin:1rem 0}.summary-grid article,.card{border:1px solid var(--border-color,#d7dce2);border-radius:12px;padding:1rem;background:var(--surface,#fff)}.summary-grid strong,.summary-grid span{display:block}.summary-grid strong{font-size:1.7rem}.fields{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:1rem}.fields label{display:grid;gap:.35rem}.fields fieldset{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:1rem}.fields .check{display:flex;align-items:center}.table-wrap{overflow:auto;margin-top:1rem}table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:.75rem;border-bottom:1px solid var(--border-color,#d7dce2);vertical-align:top}.row-actions{min-width:260px}.notice{color:#176b3a}.error{color:#a21d24}.modal-backdrop{position:fixed;inset:0;background:#0008;display:grid;place-items:center;padding:1rem;z-index:100}.modal{background:var(--surface,#fff);border-radius:12px;padding:1.5rem;max-width:1000px;width:100%;max-height:90vh;overflow:auto}@media(max-width:800px){.summary-grid,.fields{grid-template-columns:1fr 1fr}}@media(max-width:520px){.summary-grid,.fields{grid-template-columns:1fr}}
+.page {
+  max-width: 1320px;
+  margin: 0 auto;
+  padding: 2rem;
+}
+
+.panel-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+
+.fields {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.fields label {
+  display: grid;
+  gap: 0.35rem;
+}
+
+
+@media (max-width: 800px) {
+  .fields {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 520px) {
+  .fields {
+    grid-template-columns: 1fr;
+  }
+}
 </style>

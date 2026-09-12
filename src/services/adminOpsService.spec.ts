@@ -80,7 +80,7 @@ describe("fetchWorkspaceNotifications", () => {
     ]);
 
     expect(first).toEqual(second);
-    expect(mockedInvoke).toHaveBeenCalledTimes(1);
+    expect(mockedInvoke).toHaveBeenCalledTimes(2);
   });
 
   it("serves a cached value on a later call within the TTL", async () => {
@@ -91,7 +91,7 @@ describe("fetchWorkspaceNotifications", () => {
     const second = await fetchWorkspaceNotifications();
 
     expect(second).toEqual(first);
-    expect(mockedInvoke).toHaveBeenCalledTimes(1);
+    expect(mockedInvoke).toHaveBeenCalledTimes(2);
   });
 
   it("throws a mapped error when the request fails", async () => {
@@ -102,6 +102,30 @@ describe("fetchWorkspaceNotifications", () => {
 });
 
 describe("fetchWorkspaceSettings / updateWorkspaceSettings", () => {
+  it("waits for account-session bootstrap before sending protected actions", async () => {
+    const actions: string[] = [];
+    let releaseTouch!: () => void;
+    const touchFinished = new Promise<void>((resolve) => {
+      releaseTouch = resolve;
+    });
+    mockedInvoke.mockImplementation(async (_functionName, options) => {
+      const action = (options as { body: { action: string } }).body.action;
+      actions.push(action);
+      if (action === "touch_session") {
+        await touchFinished;
+        return okResponse({ ok: true }) as never;
+      }
+      return okResponse({ checkout_due_hours: 24 }) as never;
+    });
+
+    const request = fetchWorkspaceSettings();
+    expect(actions).toEqual(["touch_session"]);
+
+    releaseTouch();
+    await expect(request).resolves.toEqual({ checkout_due_hours: 24 });
+    expect(actions).toEqual(["touch_session", "get_workspace_settings"]);
+  });
+
   it("fetches workspace settings uncached", async () => {
     mockedInvoke.mockResolvedValue(okResponse({ checkout_due_hours: 24 }) as never);
     const result = await fetchWorkspaceSettings();

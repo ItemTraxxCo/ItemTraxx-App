@@ -6,6 +6,7 @@ import {
   mockSystemStatus,
   mockUnauthenticatedSession,
   setSuperAdminSession,
+  setTenantAccountSession,
   setWorkspaceAdminSession,
 } from "./helpers/testHarness";
 
@@ -98,6 +99,72 @@ test.describe("Protected route smoke tests", () => {
       );
     });
     await expect(toast).toHaveCount(0);
+  });
+
+  test("tenant account links to account security and reflects available pagination", async ({ page }) => {
+    let itemPage = 0;
+    await page.route(/\/rest\/v1\/borrowers(?:\?.*)?$/, async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify([{
+          id: "borrower-1",
+          workspace_id: "tenant-e2e",
+          username: "Maya Chen",
+          borrower_id: "STU-100",
+          access_mode: "all",
+        }]),
+      });
+    });
+    await page.route(/\/rest\/v1\/items(?:\?.*)?$/, async (route) => {
+      const offset = Number(new URL(route.request().url()).searchParams.get("offset") ?? "0");
+      itemPage = offset / 20;
+      const rows = offset === 0
+        ? Array.from({ length: 21 }, (_, index) => ({
+            id: `item-${index + 1}`,
+            workspace_id: "tenant-e2e",
+            name: `Camera ${index + 1}`,
+            barcode: `CAM-${index + 1}`,
+            serial_number: null,
+            status: "available",
+            notes: null,
+            access_mode: "all",
+          }))
+        : [{
+            id: "item-21",
+            workspace_id: "tenant-e2e",
+            name: "Camera 21",
+            barcode: "CAM-21",
+            serial_number: null,
+            status: "available",
+            notes: null,
+            access_mode: "all",
+          }];
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify(rows),
+      });
+    });
+
+    await page.goto("/");
+    await setTenantAccountSession(page);
+    await navigateApp(page, "/account");
+
+    await expect(page.getByRole("link", { name: "Account security" })).toHaveAttribute("href", "/account/security");
+    const paginations = page.locator(".account-pagination");
+    const borrowerPagination = paginations.nth(0);
+    const itemPagination = paginations.nth(1);
+    await expect(borrowerPagination.getByRole("button", { name: "‹ Previous 20" })).toBeDisabled();
+    await expect(borrowerPagination.getByRole("button", { name: "Next 20 ›" })).toBeDisabled();
+    await expect(itemPagination.getByRole("button", { name: "‹ Previous 20" })).toBeDisabled();
+    await expect(itemPagination.getByRole("button", { name: "Next 20 ›" })).toBeEnabled();
+    await expect(itemPagination.getByRole("button", { name: "‹ Previous 20" })).toHaveCSS("opacity", "0.55");
+
+    await itemPagination.getByRole("button", { name: "Next 20 ›" }).click();
+    await expect.poll(() => itemPage).toBe(1);
+    await expect(itemPagination.getByRole("button", { name: "‹ Previous 20" })).toBeEnabled();
+    await expect(itemPagination.getByRole("button", { name: "Next 20 ›" })).toBeDisabled();
   });
 
   test("onboarding completion survives reload", async ({ page }) => {

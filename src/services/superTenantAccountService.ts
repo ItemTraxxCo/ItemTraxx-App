@@ -16,7 +16,11 @@ const call = async <T>(action: string, payload: Record<string, unknown> = {}) =>
   const result = await invokeEdgeFunction<
     { data: T },
     { action: string; payload: Record<string, unknown> }
-  >("super-admin-mutate", { method: "POST", body: { action, payload } });
+  >("super-admin-mutate", {
+    method: "POST",
+    body: { action, payload },
+    avoidCorsPreflight: true,
+  });
   if (!result.ok) throw edgeFunctionError(result, "Tenant Account request failed.");
   return result.data!.data;
 };

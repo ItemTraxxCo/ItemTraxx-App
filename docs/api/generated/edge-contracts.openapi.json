@@ -4802,8 +4802,17 @@
                         "id": {
                           "type": "string"
                         },
+                        "name": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
                         "created_at": {
-                          "type": "string"
+                          "type": [
+                            "string",
+                            "null"
+                          ]
                         },
                         "last_used_at": {
                           "type": [
@@ -4814,6 +4823,7 @@
                       },
                       "required": [
                         "id",
+                        "name",
                         "created_at",
                         "last_used_at"
                       ],

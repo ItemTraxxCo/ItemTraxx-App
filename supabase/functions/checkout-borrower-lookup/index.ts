@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.108.2";
+import { getExternalAuthUser } from "../_shared/externalAuth.ts";
 import { isKillSwitchWriteBlocked } from "../_shared/killSwitch.ts";
 import { isAllowedOrigin, parseAllowedOrigins } from "../_shared/cors.ts";
 import { resolveRateLimitResult } from "../_shared/preloginGuards.ts";
@@ -69,8 +70,14 @@ serve(async (req) => {
       global: { headers: { Authorization: authHeader } },
       auth: { persistSession: false },
     });
-    const { data: authData, error: authError } = await userClient.auth
-      .getUser();
+    // Better Auth users are mapped to ItemTraxx profiles and are not present
+    // in Supabase GoTrue's auth.users table. Use the shared external JWT
+    // verifier so the subject is checked against the profile mapping while
+    // preserving the caller's RLS context for subsequent queries.
+    const { data: authData, error: authError } = await getExternalAuthUser(
+      userClient,
+      authHeader,
+    );
     if (authError || !authData.user) {
       return jsonResponse(401, { error: "Unauthorized" });
     }

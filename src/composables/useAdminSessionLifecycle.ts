@@ -8,6 +8,10 @@ import {
 } from "vue";
 import type { RouteLocationNormalizedLoaded, Router } from "vue-router";
 import { fetchHttpSessionSummary } from "../services/httpSessionService";
+import {
+  touchAccountSession,
+  validateAccountSession,
+} from "../services/adminOpsService";
 import { resolveRecoveryRouteFromPath } from "../services/appErrorRecovery";
 import { clearAdminVerification, clearAuthState } from "../store/authState";
 import {
@@ -287,9 +291,6 @@ export const useAdminSessionLifecycle = (options: AdminSessionLifecycleOptions) 
     isAdminSessionCheckRunning.value = true;
     runningAdminCheckGeneration = generation;
     try {
-      const { touchAccountSession, validateAccountSession } = await import(
-        "../services/adminOpsService"
-      );
       if (adminCheckCancelled(generation, epoch, userId, deviceId)) {
         return;
       }
@@ -397,12 +398,20 @@ export const useAdminSessionLifecycle = (options: AdminSessionLifecycleOptions) 
     },
   );
 
+  // Start the account-session bootstrap during setup, before descendant
+  // components mount. Workspace-admin pages load settings and notifications
+  // from their own onMounted hooks; starting only from this component's
+  // onMounted hook allowed those requests to race the initial touch_session
+  // call and be rejected as "Session revoked" because no device row existed
+  // yet. The setup-time start preserves the existing revocation/validation
+  // checks while making the first protected request deterministic.
+  start();
+
   onMounted(() => {
     for (const eventName of ADMIN_ACTIVITY_EVENTS) {
       window.addEventListener(eventName, recordActivity, { passive: true });
     }
     document.addEventListener("visibilitychange", handleVisibility);
-    start();
   });
 
   onScopeDispose(() => {

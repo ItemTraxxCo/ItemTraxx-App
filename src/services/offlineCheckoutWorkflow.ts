@@ -1,6 +1,7 @@
 import { invokeEdgeFunction } from "./edgeFunctionClient";
 import { getOrCreateDeviceSession } from "../utils/deviceSession";
 import { getAuthState } from "../store/authState";
+import { ensureAccountSessionReady } from "./accountSessionService";
 import {
   markItemTraxxServerConfirmed,
 } from "./offlineConnectionState";
@@ -331,6 +332,7 @@ export const prepareOfflineCheckoutPack = async () => {
   if (activeEntries.length > 0) {
     throw new Error("Sync or resolve pending offline transactions before refreshing this device's offline pack.");
   }
+  await ensureAccountSessionReady();
   const { deviceId } = getOrCreateDeviceSession();
   const response = await invokeEdgeFunction<{ data: PreparedPackResponse }, { action: "prepare_pack"; device_id: string }>(
     "offline-checkout",
@@ -643,6 +645,10 @@ export const syncOfflineCheckoutLedger = async () => {
     const review = (await listOfflineReviewEntries()).length;
     return { processed: 0, failed: 0, remaining: 0, review };
   }
+  // The offline endpoint validates the Better Auth session against this
+  // device-bound application session. Bootstrap it before marking entries as
+  // syncing so a failed bootstrap leaves durable work retryable as pending.
+  await ensureAccountSessionReady();
   await updateLedger((entries) => entries.map((entry) => pending.some((item) => item.id === entry.id) ? { ...entry, status: "syncing" } : entry));
   const response = await invokeEdgeFunction<{ data: { operations: SyncOperationResult[] } }>("offline-checkout", {
     method: "POST",
@@ -712,6 +718,7 @@ export const resolveOfflineCheckoutConflict = async (
     await keepOfflineServerStateLocally(entryId);
     return;
   }
+  await ensureAccountSessionReady();
   const response = await invokeEdgeFunction<{ data: SyncOperationResult }>("offline-checkout", {
     method: "POST",
     body: {

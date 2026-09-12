@@ -14,6 +14,9 @@ vi.mock("./edgeFunctionClient", () => ({
 vi.mock("./authenticatedDataClient", () => ({
   authenticatedSelect: vi.fn(),
 }));
+vi.mock("./accountSessionService", () => ({
+  ensureAccountSessionReady: vi.fn(),
+}));
 vi.mock("../utils/deviceSession", () => ({
   getOrCreateDeviceSession: vi.fn(() => ({ deviceId: "device-1", deviceLabel: "Mac" })),
 }));
@@ -58,6 +61,7 @@ vi.mock("./httpSessionService", () => ({
 
 import { invokeEdgeFunction } from "./edgeFunctionClient";
 import { authenticatedSelect } from "./authenticatedDataClient";
+import { ensureAccountSessionReady } from "./accountSessionService";
 import {
   ensureCheckoutOperationId,
   isOfflineQueueItemScopedTo,
@@ -91,6 +95,7 @@ import {
 
 const mockedInvoke = vi.mocked(invokeEdgeFunction);
 const mockedSelect = vi.mocked(authenticatedSelect);
+const mockedEnsureAccountSessionReady = vi.mocked(ensureAccountSessionReady);
 const mockedEnsureOpId = vi.mocked(ensureCheckoutOperationId);
 const mockedIsQueueItemScoped = vi.mocked(isOfflineQueueItemScopedTo);
 const mockedReadQueue = vi.mocked(readOfflineQueue);
@@ -130,6 +135,7 @@ const payload: CheckoutReturnPayload = {
 beforeEach(() => {
   mockedInvoke.mockReset();
   mockedSelect.mockReset();
+  mockedEnsureAccountSessionReady.mockReset().mockResolvedValue({ ok: true });
   mockedEnsureOpId.mockImplementation((p) => ({ ...p, operation_id: p.operation_id ?? "op-mock" }));
   mockedIsQueueItemScoped.mockImplementation((item, scope) =>
     item?.workspace_id === scope.workspaceId &&
@@ -695,6 +701,7 @@ describe("fetchBorrowerByBorrowerId", () => {
 
     const result = await fetchBorrowerByBorrowerId("1234AB");
     expect(result).toMatchObject({ id: "b-1" });
+    expect(mockedEnsureAccountSessionReady).toHaveBeenCalledTimes(1);
     expect(mockedMarkConfirmed).toHaveBeenCalled();
   });
 

@@ -83,6 +83,13 @@ const requestCache = new Map<
 
 const requestInflight = new Map<string, Promise<unknown>>();
 
+// Protected admin operations must not race the account-session bootstrap. The
+// page lifecycle starts the touch during setup, but child components can still
+// issue their first request while that network call is in flight. Coalescing
+// touches per device lets those requests share the same bootstrap promise and
+// keeps the first login's context (method/location) intact.
+const sessionTouchInflight = new Map<string, Promise<{ ok: boolean }>>();
+
 const getAdminOpCacheKey = (action: string, suffix = "") => {
   const { deviceId } = getOrCreateDeviceSession();
   return `${action}:${deviceId}:${suffix}`;
@@ -117,7 +124,7 @@ const withCachedAdminOp = async <TData>(
   return (await pending) as TData;
 };
 
-const callAdminOps = async <TData>(
+const sendAdminOps = async <TData>(
   action: AdminOpsAction,
   payload: Record<string, unknown> = {}
 ) => {
@@ -142,6 +149,54 @@ const callAdminOps = async <TData>(
   }
 
   return result.data?.data as TData;
+};
+
+export const touchAccountSession = async (
+  options: AccountSessionTouchOptions = {}
+) => {
+  const { deviceId } = getOrCreateDeviceSession();
+  const inflight = sessionTouchInflight.get(deviceId);
+  if (inflight) return inflight;
+
+  const pending = withCachedAdminOp(
+    getAdminOpCacheKey(
+      "touch_session",
+      `${options.loginMethod ?? "none"}:${options.loginLocation ?? "none"}`
+    ),
+    20_000,
+    () =>
+      sendAdminOps<{ ok: boolean }>("touch_session", {
+        login_method: options.loginMethod,
+        login_location: options.loginLocation,
+      })
+  );
+  const tracked = pending.finally(() => {
+    if (sessionTouchInflight.get(deviceId) === tracked) {
+      sessionTouchInflight.delete(deviceId);
+    }
+  });
+  sessionTouchInflight.set(deviceId, tracked);
+  return tracked;
+};
+
+const SESSION_BOOTSTRAP_ACTIONS = new Set<AdminOpsAction>([
+  "touch_session",
+  "validate_session",
+]);
+
+const callAdminOps = async <TData>(
+  action: AdminOpsAction,
+  payload: Record<string, unknown> = {}
+) => {
+  // A valid Better Auth cookie is not enough for admin-ops: the function also
+  // requires an active account_sessions row bound to this device and JWT
+  // session. Wait for that row to be created before sending any other action.
+  // The bootstrap/validation actions themselves are deliberately exempt to
+  // avoid recursion and to preserve validation's authoritative semantics.
+  if (!SESSION_BOOTSTRAP_ACTIONS.has(action)) {
+    await touchAccountSession();
+  }
+  return sendAdminOps<TData>(action, payload);
 };
 
 export const fetchWorkspaceNotifications = async () =>
@@ -176,22 +231,6 @@ export const bulkImportItem = async (
     inserted_items: StatusTrackedItem[];
     skipped_rows: Array<{ barcode: string; reason: string }>;
   }>("bulk_import_items", { rows });
-
-export const touchAccountSession = async (
-  options: AccountSessionTouchOptions = {}
-) =>
-  withCachedAdminOp(
-    getAdminOpCacheKey(
-      "touch_session",
-      `${options.loginMethod ?? "none"}:${options.loginLocation ?? "none"}`
-    ),
-    20_000,
-    () =>
-      callAdminOps<{ ok: boolean }>("touch_session", {
-        login_method: options.loginMethod,
-        login_location: options.loginLocation,
-      })
-  );
 
 export const validateAccountSession = async () =>
   withCachedAdminOp(getAdminOpCacheKey("validate_session"), 5_000, () =>

@@ -904,7 +904,7 @@ test.describe("prepared offline checkout workflow contract", () => {
     await expect(page.getByText("You're offline. Keep this tab open—do not refresh, close it, log out, or clear browser data until you reconnect.")).toBeVisible();
   });
 
-  test("uses only the Offline Queue toast when buffering an offline checkout", async ({ page, context }) => {
+  test("uses the checkout status bar instead of the Offline Queue toast when buffering an offline checkout", async ({ page, context }) => {
     await mockSystemStatus(page);
     await page.evaluate(() => {
       window.localStorage.setItem("itemtraxx-device-id", "device-e2e");
@@ -929,7 +929,8 @@ test.describe("prepared offline checkout workflow contract", () => {
     await page.getByRole("button", { name: "Add barcode" }).click();
     await page.getByRole("button", { name: "Complete transaction" }).click();
 
-    await expect(page.getByText("Offline Queue")).toBeVisible();
+    await expect(page.getByRole("region", { name: "Offline checkout status" })).toBeVisible();
+    await expect(page.locator(".toast-bottom-left")).toHaveCount(0);
     await expect(page.getByText("Transaction processing...")).toHaveCount(0);
   });
 
@@ -1027,7 +1028,7 @@ test.describe("prepared offline checkout workflow contract", () => {
     expect(prepareAttempts).toBe(2);
   });
 
-  test("uses the Offline Queue toast for sync progress and completion", async ({ page }) => {
+  test("uses the checkout status bar for sync progress and completion", async ({ page }) => {
     await mockSystemStatus(page);
     await page.evaluate(async ({ pack, entry }) => {
       window.localStorage.setItem("itemtraxx-device-id", "device-e2e");
@@ -1048,6 +1049,7 @@ test.describe("prepared offline checkout workflow contract", () => {
       },
       entry: workflowEntry(),
     });
+    let syncAttempts = 0;
     await page.route(/\/functions(?:\/v1)?\/offline-checkout(?:\?.*)?$/, async (route) => {
       const body = route.request().postDataJSON() as { action?: string };
       if (body.action === "prepare_pack") {
@@ -1059,6 +1061,7 @@ test.describe("prepared offline checkout workflow contract", () => {
         return;
       }
       expect(body.action).toBe("sync");
+      syncAttempts += 1;
       await new Promise((resolve) => setTimeout(resolve, 500));
       await route.fulfill({
         status: 200,
@@ -1076,10 +1079,13 @@ test.describe("prepared offline checkout workflow contract", () => {
     });
     await navigateApp(page, "/checkout");
 
-    await expect(page.getByText("Syncing offline queue")).toBeVisible();
-    await expect(page.getByText("Syncing 1 transaction to ItemTraxx Servers.")).toBeVisible();
-    await expect(page.getByText("Offline queue synced")).toBeVisible();
-    await expect(page.getByText("1 transaction synced to ItemTraxx Servers.")).toBeVisible();
+    const offlineStatus = page.getByRole("region", { name: "Offline checkout status" });
+    await expect(offlineStatus).toBeVisible();
+    await expect(offlineStatus).toContainText(/Offline transactions pending|Syncing offline transactions/);
+    await expect(page.locator(".toast-bottom-left")).toHaveCount(0);
+    await expect(page.getByText("Syncing offline queue")).toHaveCount(0);
+    await expect.poll(() => syncAttempts).toBeGreaterThanOrEqual(1);
+    await expect(offlineStatus).toHaveCount(0);
   });
 
   test("lets an operator manually retry a pending sync from the checkout status bar", async ({ page }) => {

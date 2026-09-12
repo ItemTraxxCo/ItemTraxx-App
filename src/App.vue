@@ -107,9 +107,11 @@ import { useAppVersionStatus } from "./composables/useAppVersionStatus";
 import { isUnavailableBypassHost } from "./utils/unavailableBypass";
 import { useCookieConsentTelemetry } from "./composables/useCookieConsentTelemetry";
 import { useIntercom } from "./composables/useIntercom";
+import { useLogout } from "./composables/useLogout";
 import { useOfflineQueueCount } from "./composables/useOfflineQueueCount";
 import { useOnboarding } from "./composables/useOnboarding";
 import { useSystemStatus } from "./composables/useSystemStatus";
+import { useTheme } from "./composables/useTheme";
 import { useTopBannerLayout } from "./composables/useTopBannerLayout";
 import { buildWorkspaceAppUrl, lookupWorkspaceById, resolveWorkspaceHost } from "./services/workspaceService";
 import { getAuthState } from "./store/authState";
@@ -134,8 +136,7 @@ const { state: systemStatus } = useSystemStatus();
 const router = useRouter();
 const route = useRoute();
 const menuOpen = ref(false);
-const initialSavedTheme = localStorage.getItem("itemtraxx-theme");
-const theme = ref<"light" | "dark">(initialSavedTheme === "dark" || initialSavedTheme === "light" ? initialSavedTheme : "light");
+const { theme, themeLabel, setTheme } = useTheme();
 const appVersion = import.meta.env.VITE_GIT_COMMIT || "n/a";
 const appBranch = (import.meta.env.VITE_GIT_BRANCH || "n/a").trim();
 const isNonMainBuild = appBranch !== "" && appBranch !== "n/a" && appBranch !== "main";
@@ -194,7 +195,7 @@ const isLandingRoute = computed(() => route.path === "/" || route.path === "/lan
 const isUnavailableRoute = computed(() => route.path === "/unavailable" || route.name === "public-unavailable");
 const isKillSwitchAllowedRoute = computed(() => isUnavailableRoute.value);
 const hiddenMenuRoutes = new Set(["public-home", "public-unavailable", "public-pricing", "public-about", "public-security", "public-report-security-issue", "public-changelog", "public-compliance", "public-privacy", "public-cookies", "public-contact", "public-trust", "public-faq", "public-accessibility", "public-getting-started", "public-itemscanner", "public-legal", "public-forgot-password", "public-reset-password", "public-home-new2", "public-request-demo", "public-contact-sales", "public-contact-support", "public-submit-confirmation"]);
-const showTopMenu = computed(() => !hiddenMenuRoutes.has(String(route.name)));
+const showTopMenu = computed(() => !hiddenMenuRoutes.has(String(route.name)) && !String(route.name || "").startsWith("super-admin-"));
 const showLogoutUserAction = computed(() => auth.isAuthenticated && !Boolean(route.meta.public) && route.path !== "/login");
 const isWorkspaceScopedRoute = computed(() =>
   auth.isAuthenticated &&
@@ -247,7 +248,6 @@ const { appShellStyle, setElements: setTopBannerElements } = useTopBannerLayout(
 const adminSession = useAdminSessionLifecycle({ auth, route, router, sessionTermination, isDevHost: isDevSubdomainHost, isWorkspaceAdminArea, shouldTrackAccountSession, closeMenu: () => { menuOpen.value = false; } });
 const { signInAgain } = adminSession;
 const isRouteNavigating = computed(() => routeLoading.isLoading);
-const themeLabel = computed(() => theme.value === "dark" ? "Light Mode" : "Dark Mode");
 const brandLogoUrl = computed(() => theme.value === "light" ? lightBrandLogoUrl || darkBrandLogoUrl || "" : darkBrandLogoUrl || lightBrandLogoUrl || "");
 
 const updateBrowserChromeColor = () => {
@@ -264,27 +264,17 @@ const updateBrowserChromeColor = () => {
   appleStatus?.setAttribute("content", appleStyle);
 };
 const applyTheme = (next: "light" | "dark") => {
-  theme.value = next;
+  setTheme(next);
   document.documentElement.setAttribute("data-theme", isLandingRoute.value ? "dark" : next);
-  localStorage.setItem("itemtraxx-theme", next);
   updateBrowserChromeColor();
 };
 const toggleTheme = () => { applyTheme(theme.value === "dark" ? "light" : "dark"); menuOpen.value = false; };
 const toggleMenu = () => { menuOpen.value = !menuOpen.value; };
 const reloadApp = () => window.location.assign(`${window.location.origin}/`);
 const showAccountPanel = computed(() => auth.role === "tenant_account");
+const { logout } = useLogout();
 const logoutTenant = async () => {
-  if (!window.confirm("Are you sure you want to log out?")) return;
-  menuOpen.value = false;
-  const { getPostSignOutUrl, signOut } = await import("./services/authService");
-  const nextUrl = getPostSignOutUrl();
-  const result = await signOut();
-  if (!result.ok) {
-    window.alert("Unable to complete logout. Please try again.");
-    return;
-  }
-  if (nextUrl.startsWith("http")) window.location.assign(nextUrl);
-  else await router.push(nextUrl);
+  if (await logout()) menuOpen.value = false;
 };
 const dismissBroadcast = () => {
   if (!activeBroadcast.value) return;
@@ -379,8 +369,10 @@ watch(isLandingRoute, () => {
   updateBrowserChromeColor();
 });
 onMounted(() => {
-  const saved = localStorage.getItem("itemtraxx-theme");
-  applyTheme(saved === "light" || saved === "dark" ? saved : "light");
+  // theme.value is already initialized from storage by useTheme()'s module-level
+  // singleton; re-apply it here only to run this component's own side effects
+  // (the landing-route override and the browser-chrome-color meta tags).
+  applyTheme(theme.value);
   void maybeRedirectAuthenticatedPublicHome();
 });
 onScopeDispose(() => { if (pageLoadingTimer) window.clearTimeout(pageLoadingTimer); });

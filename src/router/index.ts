@@ -401,168 +401,174 @@ const routes: RouteRecordRaw[] = [
   },
   {
     path: "/super-admin",
-    name: "super-admin-home",
-    component: () => import("../pages/super/SuperAdminHome.vue"),
-    meta: {
-      requiresSession: true,
-      requiresRole: "super_admin",
-      requiresSuperAuth: true,
-    
-      title: "Super Admin | ItemTraxx",
-    },
-  },
-  {
-    path: "/super-admin/settings",
-    name: "super-admin-settings",
-    component: () => import("../pages/super/Settings.vue"),
-    meta: {
-      requiresSession: true,
-      requiresRole: "super_admin",
-      requiresSuperAuth: true,
-      title: "Super Admin Settings | ItemTraxx",
-    },
-  },
-  {
-    path: "/super-admin/settings/sso",
-    name: "super-admin-sso",
-    component: () => import("../pages/EnterpriseSsoSettings.vue"),
-    meta: { requiresSession: true, requiresRole: "super_admin", requiresSuperAuth: true, title: "Enterprise SSO | ItemTraxx" },
-  },
-  {
-    path: "/super-admin/workspaces",
-    name: "super-admin-workspaces",
-    component: () => import("../pages/super/Workspaces.vue"),
-    meta: {
-      requiresSession: true,
-      requiresRole: "super_admin",
-      requiresSuperAuth: true,
-    
-      title: "Super Admin Workspaces | ItemTraxx",
-    },
-  },
-  {
-    path: "/super-admin/admins",
-    name: "super-admin-admins",
-    component: () => import("../pages/super/Admins.vue"),
-    meta: {
-      requiresSession: true,
-      requiresRole: "super_admin",
-      requiresSuperAuth: true,
-    
-      title: "Super Admin Admins | ItemTraxx",
-    },
-  },
-  {
-    path: "/super-admin/tenant-accounts",
-    name: "super-admin-tenant-accounts",
-    component: () => import("../pages/super/TenantAccounts.vue"),
-    meta: {
-      requiresSession: true,
-      requiresRole: "super_admin",
-      title: "Tenant Accounts | ItemTraxx",
-    },
-  },
-  {
-    path: "/super-admin/super-admins",
-    name: "super-admin-super-admins",
-    component: () => import("../pages/super/SuperAdmins.vue"),
-    meta: {
-      requiresSession: true,
-      requiresRole: "super_admin",
-      requiresSuperAuth: true,
-      title: "Super Admins | ItemTraxx",
-    },
-  },
-  {
-    path: "/super-admin/gear",
-    redirect: "/super-admin/items",
-  },
-  {
-    path: "/super-admin/items",
-    name: "super-admin-items",
-    component: () => import("../pages/super/SuperItems.vue"),
-    meta: {
-      requiresSession: true,
-      requiresRole: "super_admin",
-      requiresSuperAuth: true,
-    
-      title: "Super Admin Item | ItemTraxx",
-    },
-  },
-  {
-    path: "/super-admin/borrowers",
-    name: "super-admin-borrowers",
-    component: () => import("../pages/super/SuperBorrowers.vue"),
-    meta: {
-      requiresSession: true,
-      requiresRole: "super_admin",
-      requiresSuperAuth: true,
-    
-      title: "Super Admin Borrowers | ItemTraxx",
-    },
-  },
-  {
-    path: "/super-admin/students",
-    redirect: "/super-admin/borrowers",
-  },
-  {
-    path: "/super-admin/logs",
-    name: "super-admin-logs",
-    component: () => import("../pages/super/SuperLogs.vue"),
-    meta: {
-      requiresSession: true,
-      requiresRole: "super_admin",
-      requiresSuperAuth: true,
-    
-      title: "Super Admin Logs | ItemTraxx",
-    },
-  },
-  {
-    path: "/super-admin/broadcasts",
-    name: "super-admin-broadcasts",
-    component: () => import("../pages/super/Broadcasts.vue"),
-    meta: {
-      requiresSession: true,
-      requiresRole: "super_admin",
-      requiresSuperAuth: true,
-    
-      title: "Broadcasts | ItemTraxx",
-    },
-  },
-  {
-    path: "/super-admin/sales-leads",
-    name: "super-admin-sales-leads",
-    component: () => import("../pages/super/SalesLeads.vue"),
-    meta: {
-      requiresSession: true,
-      requiresRole: "super_admin",
-      requiresSuperAuth: true,
-    
-      title: "Sales Leads | ItemTraxx",
-    },
-  },
-  {
-    path: "/super-admin/customers",
-    name: "super-admin-customers",
-    component: () => import("../pages/super/Customers.vue"),
-    meta: {
-      requiresSession: true,
-      requiresRole: "super_admin",
-      requiresSuperAuth: true,
-    
-      title: "Customers | ItemTraxx",
-    },
-  },
-  {
-    path: "/super-admin/support-requests",
-    name: "super-admin-support-requests",
-    component: () => import("../pages/super/SupportRequests.vue"),
-    meta: {
-      requiresSession: true,
-      requiresRole: "super_admin",
-      requiresSuperAuth: true,
-      title: "Support Requests | ItemTraxx",
-    },
+    component: () => import("../components/superadmin/SuperAdminLayout.vue"),
+    children: [
+      {
+        path: "",
+        name: "super-admin-home",
+        component: () => import("../pages/super/SuperAdminHome.vue"),
+        meta: {
+          requiresSession: true,
+          requiresRole: "super_admin",
+          requiresSuperAuth: true,
+
+          title: "Super Admin | ItemTraxx",
+        },
+      },
+      {
+        path: "settings",
+        name: "super-admin-settings",
+        component: () => import("../pages/super/Settings.vue"),
+        meta: {
+          requiresSession: true,
+          requiresRole: "super_admin",
+          requiresSuperAuth: true,
+          title: "Super Admin Settings | ItemTraxx",
+        },
+      },
+      {
+        path: "settings/sso",
+        name: "super-admin-sso",
+        component: () => import("../pages/EnterpriseSsoSettings.vue"),
+        meta: { requiresSession: true, requiresRole: "super_admin", requiresSuperAuth: true, title: "Enterprise SSO | ItemTraxx" },
+      },
+      {
+        path: "workspaces",
+        name: "super-admin-workspaces",
+        component: () => import("../pages/super/Workspaces.vue"),
+        meta: {
+          requiresSession: true,
+          requiresRole: "super_admin",
+          requiresSuperAuth: true,
+
+          title: "Super Admin Workspaces | ItemTraxx",
+        },
+      },
+      {
+        path: "admins",
+        name: "super-admin-admins",
+        component: () => import("../pages/super/Admins.vue"),
+        meta: {
+          requiresSession: true,
+          requiresRole: "super_admin",
+          requiresSuperAuth: true,
+
+          title: "Super Admin Admins | ItemTraxx",
+        },
+      },
+      {
+        path: "tenant-accounts",
+        name: "super-admin-tenant-accounts",
+        component: () => import("../pages/super/TenantAccounts.vue"),
+        meta: {
+          requiresSession: true,
+          requiresRole: "super_admin",
+          title: "Tenant Accounts | ItemTraxx",
+        },
+      },
+      {
+        path: "super-admins",
+        name: "super-admin-super-admins",
+        component: () => import("../pages/super/SuperAdmins.vue"),
+        meta: {
+          requiresSession: true,
+          requiresRole: "super_admin",
+          requiresSuperAuth: true,
+          title: "Super Admins | ItemTraxx",
+        },
+      },
+      {
+        path: "gear",
+        redirect: { name: "super-admin-items" },
+      },
+      {
+        path: "items",
+        name: "super-admin-items",
+        component: () => import("../pages/super/SuperItems.vue"),
+        meta: {
+          requiresSession: true,
+          requiresRole: "super_admin",
+          requiresSuperAuth: true,
+
+          title: "Super Admin Item | ItemTraxx",
+        },
+      },
+      {
+        path: "borrowers",
+        name: "super-admin-borrowers",
+        component: () => import("../pages/super/SuperBorrowers.vue"),
+        meta: {
+          requiresSession: true,
+          requiresRole: "super_admin",
+          requiresSuperAuth: true,
+
+          title: "Super Admin Borrowers | ItemTraxx",
+        },
+      },
+      {
+        path: "students",
+        redirect: { name: "super-admin-borrowers" },
+      },
+      {
+        path: "logs",
+        name: "super-admin-logs",
+        component: () => import("../pages/super/SuperLogs.vue"),
+        meta: {
+          requiresSession: true,
+          requiresRole: "super_admin",
+          requiresSuperAuth: true,
+
+          title: "Super Admin Logs | ItemTraxx",
+        },
+      },
+      {
+        path: "broadcasts",
+        name: "super-admin-broadcasts",
+        component: () => import("../pages/super/Broadcasts.vue"),
+        meta: {
+          requiresSession: true,
+          requiresRole: "super_admin",
+          requiresSuperAuth: true,
+
+          title: "Broadcasts | ItemTraxx",
+        },
+      },
+      {
+        path: "sales-leads",
+        name: "super-admin-sales-leads",
+        component: () => import("../pages/super/SalesLeads.vue"),
+        meta: {
+          requiresSession: true,
+          requiresRole: "super_admin",
+          requiresSuperAuth: true,
+
+          title: "Sales Leads | ItemTraxx",
+        },
+      },
+      {
+        path: "customers",
+        name: "super-admin-customers",
+        component: () => import("../pages/super/Customers.vue"),
+        meta: {
+          requiresSession: true,
+          requiresRole: "super_admin",
+          requiresSuperAuth: true,
+
+          title: "Customers | ItemTraxx",
+        },
+      },
+      {
+        path: "support-requests",
+        name: "super-admin-support-requests",
+        component: () => import("../pages/super/SupportRequests.vue"),
+        meta: {
+          requiresSession: true,
+          requiresRole: "super_admin",
+          requiresSuperAuth: true,
+          title: "Support Requests | ItemTraxx",
+        },
+      },
+    ],
   },
   {
     path: "/:pathMatch(.*)*",

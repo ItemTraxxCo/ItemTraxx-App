@@ -23,6 +23,7 @@ import {
   getPasswordResetDelivery,
   sendPasswordResetEmail,
 } from "./passwordResetDelivery.ts";
+import { recordPasskeyUsage } from "./passkeyUsage.ts";
 
 type BetterAuthEnv = Env & {
   SUPABASE_SERVICE_ROLE_KEY?: string;
@@ -169,6 +170,15 @@ export const getBetterAuth = (rawEnv: Env) => {
         rpID: env.BETTER_AUTH_PASSKEY_RP_ID,
         rpName: "ItemTraxx",
         origin: passkeyOrigins.length === 1 ? passkeyOrigins[0] : passkeyOrigins,
+        authentication: {
+          afterVerification: async ({ ctx, clientData }) => {
+            await recordPasskeyUsage({
+              adapter: ctx.context.adapter,
+              logger: ctx.context.logger,
+              credentialId: clientData.id,
+            });
+          },
+        },
       }),
       twoFactor({ issuer: "ItemTraxx", skipVerificationOnEnable: false }),
       sso({
@@ -440,10 +450,25 @@ export const handleInternalAuthAdminRequest = async (request: Request, rawEnv: E
       return Response.json({ verified: Boolean(account?.password && await verifyPassword({ hash: account.password, password })) });
     }
     if (action === "list_passkeys") {
-      const { data: passkeys, error } = await cachedDataClient.schema("better_auth").from("passkey")
-        .select("id,name,createdAt").eq("userId", target.user_id).order("createdAt", { ascending: false });
+      let { data: passkeys, error } = await cachedDataClient.schema("better_auth").from("passkey")
+        .select("id,name,createdAt,lastUsedAt").eq("userId", target.user_id).order("createdAt", { ascending: false });
+      // Keep the inventory endpoint compatible during a rolling deployment in
+      // which the Worker is updated before the nullable metadata column. The
+      // authentication hook is already best-effort, so older rows can safely
+      // be listed as unrecorded until the migration is applied.
+      if (error?.code === "42703" && /lastUsedAt/i.test(error.message ?? "")) {
+        const fallback = await cachedDataClient.schema("better_auth").from("passkey")
+          .select("id,name,createdAt").eq("userId", target.user_id).order("createdAt", { ascending: false });
+        passkeys = fallback.data?.map((row) => ({ ...row, lastUsedAt: null })) ?? null;
+        error = fallback.error;
+      }
       if (error) throw error;
-      return Response.json({ passkeys: (passkeys ?? []).map((row) => ({ id: row.id, name: row.name, created_at: row.createdAt })) });
+      return Response.json({ passkeys: (passkeys ?? []).map((row) => ({
+        id: row.id,
+        name: row.name,
+        created_at: row.createdAt,
+        last_used_at: row.lastUsedAt ?? null,
+      })) });
     }
     if (action === "delete_passkey") {
       const passkeyId = typeof body?.passkeyId === "string" ? body.passkeyId : "";

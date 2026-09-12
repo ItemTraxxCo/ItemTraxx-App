@@ -698,6 +698,7 @@ Deno.test("list_passkeys returns only the safe passkey fields", async () => {
           id: "passkey-1",
           name: "MacBook",
           created_at: "2026-07-01T00:00:00.000Z",
+          last_used_at: "2026-09-12T12:00:00.000Z",
         }],
       });
     },
@@ -715,7 +716,7 @@ Deno.test("list_passkeys returns only the safe passkey fields", async () => {
             id: "passkey-1",
             name: "MacBook",
             created_at: "2026-07-01T00:00:00.000Z",
-            last_used_at: null,
+            last_used_at: "2026-09-12T12:00:00.000Z",
           }],
         },
       });

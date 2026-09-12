@@ -1,48 +1,53 @@
 <template>
-  <div class="page">
-    <div class="page-nav-left">
-      <RouterLink class="button-link" to="/super-admin">Return to Super Admin</RouterLink>
-      <RouterLink class="button-link" to="/super-admin/workspaces">Workspaces</RouterLink>
-      <RouterLink class="button-link" to="/super-admin/items">All Items</RouterLink>
-      <RouterLink class="button-link" to="/super-admin/borrowers">All Borrowers</RouterLink>
-      <RouterLink class="button-link" to="/super-admin/broadcasts">Broadcasts</RouterLink>
-      <RouterLink class="button-link" to="/super-admin/sales-leads">Sales Leads</RouterLink>
-      <RouterLink class="button-link" to="/super-admin/customers">Customers</RouterLink>
+  <main class="page">
+    <div class="sa-toolbar">
+      <div>
+        <RouterLink to="/super-admin" class="sa-back-link">&larr; Back to Super Admin</RouterLink>
+        <h1 class="sa-toolbar-title">All Logs</h1>
+        <p class="sa-toolbar-sub">Read-only, immutable cross-tenant logs.</p>
+      </div>
     </div>
 
-    <h1>All Logs</h1>
-    <p>Read-only, immutable cross-tenant logs.</p>
-
-    <div class="card">
-      <div class="input-row">
+    <section class="sa-panel sa-filters">
+      <label>Workspace
         <select v-model="workspaceFilter"><option value="all">all workspaces</option><option v-for="t in workspaces" :key="t.id" :value="t.id">{{ t.name }}</option></select>
+      </label>
+      <label>Action
         <select v-model="actionFilter"><option value="all">all actions</option><option value="checkout">checkout</option><option value="return">return</option><option value="admin_return">admin_return</option></select>
+      </label>
+      <label>From
         <input v-model="startAt" type="datetime-local" />
+      </label>
+      <label>To
         <input v-model="endAt" type="datetime-local" />
+      </label>
+      <label>Search
         <input v-model="search" type="text" placeholder="Search logs" />
-        <button type="button" @click="loadLogs">Search</button>
-        <button type="button" @click="exportCsv">Export CSV</button>
-        <button type="button" @click="exportPdf">Export PDF</button>
+      </label>
+      <button class="sa-btn" @click="loadLogs">Search</button>
+      <button class="sa-btn" @click="exportCsv">Export CSV</button>
+      <button class="sa-btn" @click="exportPdf">Export PDF</button>
+    </section>
+
+    <BoneyardSkeleton
+      name="super-admin-logs-table"
+      :loading="isLoading"
+      variant="table"
+      :rows="7"
+      :columns="5"
+      label="Loading all logs"
+    >
+      <template #fixture>
+        <BoneyardTableFixture :headers="logFixtureHeaders" :rows="7" />
+      </template>
+
+      <div v-if="isLoading">
+        <BoneyardTableFixture :headers="logFixtureHeaders" :rows="7" />
       </div>
-
-      <BoneyardSkeleton
-        name="super-admin-logs-table"
-        :loading="isLoading"
-        variant="table"
-        :rows="7"
-        :columns="5"
-        label="Loading all logs"
-      >
-        <template #fixture>
-          <BoneyardTableFixture :headers="logFixtureHeaders" :rows="7" />
-        </template>
-
-        <div v-if="isLoading">
-          <BoneyardTableFixture :headers="logFixtureHeaders" :rows="7" />
-        </div>
-        <template v-else>
-          <p v-if="error" class="error">{{ error }}</p>
-          <table v-else class="table">
+      <template v-else>
+        <p v-if="error" class="sa-error">{{ error }}</p>
+        <div v-else class="sa-table-wrap">
+          <table class="sa-table">
             <thead><tr><th>Time</th><th>Workspace</th><th>Action</th><th>Item</th><th>Borrower</th></tr></thead>
             <tbody>
               <tr v-for="row in rows" :key="row.id">
@@ -54,17 +59,18 @@
               </tr>
             </tbody>
           </table>
-        </template>
-      </BoneyardSkeleton>
-      <div class="form-actions">
-        <button type="button" @click="prevPage" :disabled="page <= 1 || isLoading">Prev</button>
-        <span class="muted">Page {{ page }}</span>
-        <button type="button" @click="nextPage" :disabled="isLoading">Next</button>
-      </div>
+        </div>
+      </template>
+    </BoneyardSkeleton>
+
+    <div class="form-actions">
+      <button class="sa-btn" @click="prevPage" :disabled="page <= 1 || isLoading">Prev</button>
+      <span class="muted">Page {{ page }}</span>
+      <button class="sa-btn" @click="nextPage" :disabled="isLoading">Next</button>
     </div>
 
     <div v-if="toastMessage" class="toast"><div class="toast-title">{{ toastTitle }}</div><div class="toast-body">{{ toastMessage }}</div></div>
-  </div>
+  </main>
 </template>
 
 <script setup lang="ts">
@@ -206,3 +212,46 @@ onMounted(() => {
   })();
 });
 </script>
+
+<style scoped>
+.page {
+  max-width: 1320px;
+  margin: 0 auto;
+  padding: 2rem;
+}
+
+.form-actions {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  margin-top: 1rem;
+  margin-bottom: 1rem;
+}
+
+.form-actions .muted {
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.toast {
+  position: fixed;
+  bottom: 1rem;
+  right: 1rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 1rem;
+  max-width: 20rem;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  z-index: 99;
+}
+
+.toast-title {
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+}
+
+.toast-body {
+  font-size: 0.85rem;
+}
+</style>

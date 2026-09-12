@@ -1,19 +1,22 @@
 <template>
-  <div class="page">
-    <div class="page-nav-left">
-      <RouterLink class="button-link" to="/super-admin">Return to Super Admin</RouterLink>
-      <RouterLink class="button-link" to="/super-admin/workspaces">Workspaces</RouterLink>
-      <RouterLink class="button-link" to="/super-admin/items">All Items</RouterLink>
-      <RouterLink class="button-link" to="/super-admin/logs">All Logs</RouterLink>
-      <RouterLink class="button-link" to="/super-admin/broadcasts">Broadcasts</RouterLink>
-      <RouterLink class="button-link" to="/super-admin/sales-leads">Sales Leads</RouterLink>
-      <RouterLink class="button-link" to="/super-admin/customers">Customers</RouterLink>
+  <main class="page">
+    <div class="sa-toolbar">
+      <div>
+        <RouterLink to="/super-admin" class="sa-back-link">&larr; Back to Control Center</RouterLink>
+        <h1 class="sa-toolbar-title">All Borrowers</h1>
+        <p class="sa-toolbar-sub">Cross-workspace borrower management.</p>
+      </div>
+      <div class="sa-toolbar-actions">
+        <RouterLink to="/super-admin/workspaces" class="sa-btn">Workspaces</RouterLink>
+        <RouterLink to="/super-admin/items" class="sa-btn">All Items</RouterLink>
+        <RouterLink to="/super-admin/logs" class="sa-btn">All Logs</RouterLink>
+        <RouterLink to="/super-admin/broadcasts" class="sa-btn">Broadcasts</RouterLink>
+        <RouterLink to="/super-admin/sales-leads" class="sa-btn">Sales Leads</RouterLink>
+        <RouterLink to="/super-admin/customers" class="sa-btn">Customers</RouterLink>
+      </div>
     </div>
 
-    <h1>All Borrowers</h1>
-    <p>Cross-workspace borrower management.</p>
-
-    <div class="card">
+    <section class="sa-panel">
       <h2>Create Borrower</h2>
       <form class="form" @submit.prevent="handleCreate">
         <label>Workspace<select v-model="formWorkspaceId"><option value="">Select workspace</option><option v-for="t in workspaces" :key="t.id" :value="t.id">{{ t.name }}</option></select></label>
@@ -25,44 +28,47 @@
           Borrower ID
           <input v-model="previewBorrowerId" type="text" readonly title="If you need to change this, contact support." />
         </label>
-        <div class="form-actions">
-          <button type="button" @click="regenerateIdentity">Regenerate</button>
-          <button type="submit" class="button-primary" :disabled="isSaving">Create</button>
+        <div class="panel-actions">
+          <button type="button" class="sa-btn" @click="regenerateIdentity">Regenerate</button>
+          <button type="submit" class="sa-btn primary" :disabled="isSaving">Create</button>
         </div>
       </form>
-    </div>
+    </section>
 
-    <div class="card">
+    <section class="sa-panel">
       <h2>Borrower List</h2>
-      <div class="input-row">
-        <select v-model="workspaceFilter" @change="loadBorrowers"><option value="all">all workspaces</option><option v-for="t in workspaces" :key="t.id" :value="t.id">{{ t.name }}</option></select>
-        <input v-model="search" type="text" placeholder="Search" />
-        <button type="button" @click="loadBorrowers">Search</button>
+      <div class="sa-filters">
+        <label>Workspace <select v-model="workspaceFilter" @change="loadBorrowers"><option value="all">all workspaces</option><option v-for="t in workspaces" :key="t.id" :value="t.id">{{ t.name }}</option></select></label>
+        <label>Search <input v-model="search" type="text" placeholder="Username or ID" /></label>
+        <button type="button" class="sa-btn" @click="loadBorrowers">Search</button>
       </div>
-      <div class="form-actions">
-        <button type="button" @click="exportCsv">Export CSV</button>
-        <button type="button" @click="exportPdf">Export PDF</button>
+      <div class="panel-actions">
+        <button type="button" class="sa-btn" @click="exportCsv">Export CSV</button>
+        <button type="button" class="sa-btn" @click="exportPdf">Export PDF</button>
       </div>
       <SkeletonLoader v-if="isLoading" variant="table" :rows="6" :columns="4" label="Loading all borrowers" />
-      <p v-else-if="error" class="error">{{ error }}</p>
-      <table v-else class="table">
-        <thead><tr><th>Username</th><th>Workspace</th><th>Borrower ID</th><th>Actions</th></tr></thead>
-        <tbody>
-          <tr v-for="item in borrowers" :key="item.id">
-            <td>{{ item.username }}</td>
-            <td>{{ workspaceNameById.get(item.workspace_id) || item.workspace_id }}</td>
-            <td>{{ item.borrower_id }}</td>
-            <td>
-              <button type="button" @click="startEdit(item)">Edit</button>
-              <span class="button-spacer"></span>
-              <button type="button" @click="requestDelete(item)">Delete</button>
-            </td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
+      <p v-else-if="error" class="sa-error">{{ error }}</p>
+      <div v-else class="sa-table-wrap">
+        <table class="sa-table">
+          <thead><tr><th>Username</th><th>Workspace</th><th>Borrower ID</th><th>Actions</th></tr></thead>
+          <tbody>
+            <tr v-for="item in borrowers" :key="item.id">
+              <td>{{ item.username }}</td>
+              <td>{{ workspaceNameById.get(item.workspace_id) || item.workspace_id }}</td>
+              <td>{{ item.borrower_id }}</td>
+              <td>
+                <div class="sa-table-row-actions">
+                  <button type="button" class="sa-btn" @click="startEdit(item)">Edit</button>
+                  <button type="button" class="sa-btn danger" @click="requestDelete(item)">Delete</button>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
 
-    <div v-if="editItem" class="card">
+    <section v-if="editItem" class="sa-panel">
       <h2>Edit Borrower</h2>
       <p class="muted">Borrower identifiers are locked. If you need to change them, contact support.</p>
       <form class="form">
@@ -74,14 +80,14 @@
           Borrower ID
           <input v-model="editBorrowerId" type="text" readonly title="If you need to change this, contact support." />
         </label>
-        <div class="form-actions"><button type="button" @click="cancelEdit">Close</button></div>
+        <div class="panel-actions"><button type="button" class="sa-btn" @click="cancelEdit">Close</button></div>
       </form>
-    </div>
+    </section>
 
     <div v-if="toastMessage" class="toast"><div class="toast-title">{{ toastTitle }}</div><div class="toast-body">{{ toastMessage }}</div></div>
 
     <StepUpModal :visible="stepUpVisible" title="Delete Borrower" :message="stepUpMessage" confirm-label="Delete" @cancel="closeStepUp" @confirm="confirmDelete" />
-  </div>
+  </main>
 </template>
 
 <script setup lang="ts">
@@ -270,8 +276,38 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.button-spacer {
-  display: inline-block;
-  width: 0.5rem;
+.page {
+  max-width: 1320px;
+  margin: 0 auto;
+  padding: 2rem;
+}
+
+.panel-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+
+.form {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.form label {
+  display: grid;
+  gap: 0.35rem;
+}
+
+@media (max-width: 800px) {
+  .form {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 520px) {
+  .form {
+    grid-template-columns: 1fr;
+  }
 }
 </style>

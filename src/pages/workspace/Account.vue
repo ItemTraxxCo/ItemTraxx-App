@@ -1,9 +1,10 @@
 <template>
   <main class="page">
-    <header>
+    <header class="account-header">
       <h1>My Account</h1>
-      <nav>
+      <nav aria-label="Account navigation">
         <RouterLink class="button-link" to="/checkout">Back to checkout</RouterLink>
+        <RouterLink class="button-link" to="/account/security">Account security</RouterLink>
       </nav>
     </header>
 
@@ -389,6 +390,24 @@ onUnmounted(() => {
   align-items: center;
   gap: 0.75rem;
   margin-top: 0.6rem;
+}
+
+.account-header {
+  margin-bottom: 1.5rem;
+}
+
+.account-header nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+
+.account-pagination button:disabled {
+  background: var(--surface-2);
+  border-color: var(--border);
+  color: var(--muted);
+  cursor: not-allowed;
+  opacity: 0.55;
 }
 
 .session-actions-header,

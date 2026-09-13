@@ -61,7 +61,7 @@
     "@vercel/speed-insights": "^2.0.0",
     "better-auth": "^1.7.3",
     "boneyard-js": "^1.10.0",
-    "jose": "^6.2.11",
+    "jose": "^6.2.12",
     "jsbarcode": "^3.12.3",
     "jspdf": "^4.2.1",
     "jspdf-autotable": "^5.0.8",

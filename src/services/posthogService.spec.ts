@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 vi.mock("./cookieConsentService", () => ({
   allowsAnalytics: vi.fn(),
   allowsDiagnostics: vi.fn(),
+  allowsSessionReplay: vi.fn(),
   readCookieConsent: vi.fn(),
 }));
 vi.mock("./appErrorRecovery", () => ({
@@ -26,10 +27,11 @@ const posthogMock = {
 };
 vi.mock("posthog-js", () => ({ default: posthogMock }));
 
-import { allowsAnalytics, allowsDiagnostics } from "./cookieConsentService";
+import { allowsAnalytics, allowsDiagnostics, allowsSessionReplay } from "./cookieConsentService";
 
 const mockedAllows = vi.mocked(allowsAnalytics);
 const mockedDiagnostics = vi.mocked(allowsDiagnostics);
+const mockedSessionReplay = vi.mocked(allowsSessionReplay);
 
 // `initialized`/`posthog` are module-level singletons in posthogService, so each
 // describe block that needs a distinct lifecycle state (never-initialized vs.
@@ -44,6 +46,7 @@ const initializedModule = async () => {
   vi.stubEnv("VITE_POSTHOG_PROJECT_TOKEN", "tok_123");
   mockedAllows.mockReturnValue(true);
   mockedDiagnostics.mockReturnValue(true);
+  mockedSessionReplay.mockReturnValue(true);
   const mod = await loadFreshModule();
   await mod.initPostHog();
   return mod;
@@ -91,11 +94,26 @@ describe("initPostHog", () => {
         session_recording: expect.objectContaining({
           maskAllInputs: true,
           maskTextSelector: "*",
+          maskAllElementAttributes: true,
           recordHeaders: false,
           recordBody: false,
+          maskCapturedNetworkRequestFn: expect.any(Function),
         }),
       })
     );
+    const sessionRecording = posthogMock.init.mock.calls[0]?.[1] as {
+      session_recording?: {
+        maskCapturedNetworkRequestFn?: (request: { name: string }) => { name?: string };
+      };
+    } | undefined;
+    const maskedRequest = sessionRecording?.session_recording?.maskCapturedNetworkRequestFn?.({
+      name: "https://www.itemtraxx.com/reset-password?token=secret",
+    });
+    expect(maskedRequest).toMatchObject({ name: "https://www.itemtraxx.com/reset-password" });
+    const ordinaryRequest = sessionRecording?.session_recording?.maskCapturedNetworkRequestFn?.({
+      name: "https://www.itemtraxx.com/login?next=/workspace",
+    });
+    expect(ordinaryRequest).toMatchObject({ name: "https://www.itemtraxx.com/login?next=/workspace" });
     const options = posthogMock.init.mock.calls[0]?.[1] as {
       logs?: { beforeSend?: (record: { body: string }) => unknown };
     } | undefined;
@@ -106,6 +124,7 @@ describe("initPostHog", () => {
     vi.stubEnv("VITE_POSTHOG_PROJECT_TOKEN", "tok_123");
     mockedAllows.mockReturnValue(true);
     mockedDiagnostics.mockReturnValue(false);
+    mockedSessionReplay.mockReturnValue(false);
     const mod = await loadFreshModule();
 
     await mod.initPostHog();
@@ -286,6 +305,7 @@ describe("capturePostHogException", () => {
   it("does not capture diagnostics when diagnostics consent is revoked", async () => {
     const mod = await initializedModule();
     mockedDiagnostics.mockReturnValue(false);
+    mockedSessionReplay.mockReturnValue(false);
 
     mod.capturePostHogException(new Error("diagnostic detail"));
 
@@ -544,6 +564,7 @@ describe("syncPostHogConsent", () => {
   it("disables PostHog exception autocapture when diagnostics consent is revoked", async () => {
     const mod = await initializedModule();
     mockedDiagnostics.mockReturnValue(false);
+    mockedSessionReplay.mockReturnValue(false);
 
     mod.syncPostHogConsent();
 
@@ -553,6 +574,7 @@ describe("syncPostHogConsent", () => {
   it("stops session replay when diagnostics consent is revoked but analytics stays granted", async () => {
     const mod = await initializedModule();
     mockedDiagnostics.mockReturnValue(false);
+    mockedSessionReplay.mockReturnValue(false);
 
     mod.syncPostHogConsent();
 

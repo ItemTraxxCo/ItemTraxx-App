@@ -1,6 +1,7 @@
 import {
   allowsAnalytics,
   allowsDiagnostics,
+  allowsSessionReplay,
   readCookieConsent,
 } from "./cookieConsentService";
 import { isRecoverableChunkLoadError } from "./appErrorRecovery";
@@ -256,9 +257,12 @@ const isRecoverableChunkLoadExceptionEvent = (
 export const initPostHog = async () => {
   if (initialized) return;
   const token = import.meta.env.VITE_POSTHOG_PROJECT_TOKEN?.trim();
-  if (!token || !allowsAnalytics(readCookieConsent())) return;
+  const consent = readCookieConsent();
+  if (!token || !allowsAnalytics(consent)) return;
   try {
     posthog = (await import("posthog-js")).default;
+    const currentConsent = readCookieConsent();
+    if (!allowsAnalytics(currentConsent)) return;
     const posthogConfig: NonNullable<Parameters<typeof posthog.init>[1]> = {
       api_host: import.meta.env.VITE_POSTHOG_HOST?.trim() || "https://j.itemtraxx.com",
       ui_host: "https://us.posthog.com",
@@ -270,7 +274,7 @@ export const initPostHog = async () => {
       capture_dead_clicks: false,
       // Exception autocapture is diagnostics, not analytics. Keep the SDK's
       // global handlers disabled unless that separate consent is present.
-      capture_exceptions: allowsDiagnostics(readCookieConsent()),
+      capture_exceptions: allowsDiagnostics(currentConsent),
       before_send: (event) => {
         if (!event) return null;
         const safeEvent: CaptureResult = {
@@ -301,10 +305,19 @@ export const initPostHog = async () => {
       // contain support requests and other tenant-sensitive data, so every text
       // node and input is masked: the recording keeps layout, navigation, and
       // interaction shape without the content.
-      disable_session_recording: !allowsDiagnostics(readCookieConsent()),
+      disable_session_recording: !allowsSessionReplay(currentConsent),
       session_recording: {
         maskAllInputs: true,
         maskTextSelector: "*",
+        // Attribute values (for example title, aria-label, and href) can carry
+        // tenant or user content even when visible text is masked.
+        maskAllElementAttributes: true,
+        // Replay captures page and request URLs separately from event
+        // properties. Redact reset-link query/hash material at that boundary.
+        maskCapturedNetworkRequestFn: (request) => {
+          const safeName = scrubSensitiveRecoveryUrlValue(request.name);
+          return safeName === request.name ? request : { ...request, name: safeName };
+        },
         // Network capture would put back the content that text masking removes.
         recordHeaders: false,
         recordBody: false,
@@ -333,13 +346,16 @@ export const initPostHog = async () => {
 
 export const syncPostHogConsent = () => {
   if (!initialized || !posthog) return;
-  const diagnosticsAllowed = allowsDiagnostics(readCookieConsent());
+  const consent = readCookieConsent();
+  const analyticsAllowed = allowsAnalytics(consent);
+  const diagnosticsAllowed = allowsDiagnostics(consent);
+  const sessionReplayAllowed = allowsSessionReplay(consent);
   posthog.set_config({
     capture_exceptions: diagnosticsAllowed,
   });
-  if (allowsAnalytics(readCookieConsent())) {
+  if (analyticsAllowed) {
     posthog.opt_in_capturing();
-    if (diagnosticsAllowed) {
+    if (sessionReplayAllowed) {
       posthog.startSessionRecording();
     } else {
       posthog.stopSessionRecording();

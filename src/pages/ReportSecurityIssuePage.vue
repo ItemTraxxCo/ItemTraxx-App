@@ -128,6 +128,7 @@
               <input
                 ref="attachmentsInput"
                 type="file"
+                class="ph-no-capture"
                 accept="image/*"
                 multiple
                 @change="handleAttachmentChange"

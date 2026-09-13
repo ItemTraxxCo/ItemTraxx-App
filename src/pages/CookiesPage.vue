@@ -162,7 +162,7 @@ const analyticsCookies = [
   {
     title: "PostHog Replay when enabled*",
     description:
-      "If PostHog session replay is enabled in the active environment, masked browser session replay may be collected after Analytics consent for product analysis and troubleshooting.",
+      "If PostHog session replay is enabled in the active environment, masked browser session replay may be collected after Analytics and Diagnostics consent for product analysis and troubleshooting.",
   },
   {
     title: "Vercel Analytics*",

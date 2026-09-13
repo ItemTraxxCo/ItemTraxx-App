@@ -1,7 +1,9 @@
 const COOKIE_CONSENT_STORAGE_KEY = "itemtraxx-cookie-consent";
+export const COOKIE_CONSENT_SYNC_KEY = "itemtraxx-cookie-consent-sync";
 const COOKIE_CONSENT_VERSION = 2;
 const COOKIE_CONSENT_SUBJECT_KEY = "itemtraxx-cookie-consent-subject";
 const COOKIE_MAX_AGE_SECONDS = 60 * 60 * 24 * 365;
+const COOKIE_CONSENT_POLL_INTERVAL_MS = 2000;
 
 export type CookieConsentPreferences = {
   analytics: boolean;
@@ -52,7 +54,7 @@ const migrateFromLocalStorage = (key: string): string | null => {
   }
 };
 
-export const readCookieConsent = (): CookieConsentState | null => {
+const readCookieConsentValue = (persistValidCookie = true): CookieConsentState | null => {
   if (!isBrowser()) return null;
   try {
     const raw = readCookie(COOKIE_CONSENT_STORAGE_KEY) ?? migrateFromLocalStorage(COOKIE_CONSENT_STORAGE_KEY);
@@ -86,11 +88,57 @@ export const readCookieConsent = (): CookieConsentState | null => {
       preferences: parsed.preferences,
       updatedAt: parsed.updatedAt,
     };
-    writeCookie(COOKIE_CONSENT_STORAGE_KEY, JSON.stringify(state));
+    if (persistValidCookie) writeCookie(COOKIE_CONSENT_STORAGE_KEY, JSON.stringify(state));
     return state;
   } catch {
     return null;
   }
+};
+
+export const readCookieConsent = () => readCookieConsentValue();
+
+const consentFingerprint = (state: CookieConsentState | null) =>
+  state
+    ? `${state.version}:${state.preferences.analytics ? "1" : "0"}:${state.preferences.diagnostics ? "1" : "0"}:${state.updatedAt}`
+    : "none";
+
+export type CookieConsentListener = (state: CookieConsentState | null) => void;
+
+/**
+ * Observe consent changes in this window and in other tabs or subdomains.
+ * Cookies do not emit browser events, so storage/focus/visibility hooks provide
+ * fast same-origin updates while the poll closes the cross-subdomain gap.
+ */
+export const subscribeCookieConsent = (listener: CookieConsentListener) => {
+  if (!isBrowser()) return () => undefined;
+
+  let previous = consentFingerprint(readCookieConsentValue(false));
+  const notifyIfChanged = () => {
+    const state = readCookieConsentValue(false);
+    const next = consentFingerprint(state);
+    if (next === previous) return;
+    previous = next;
+    listener(state);
+  };
+  const handleStorage = (event: StorageEvent) => {
+    if (event.key === COOKIE_CONSENT_SYNC_KEY) notifyIfChanged();
+  };
+
+  window.addEventListener("itemtraxx:cookie-consent", notifyIfChanged);
+  window.addEventListener("storage", handleStorage);
+  window.addEventListener("focus", notifyIfChanged);
+  window.addEventListener("pageshow", notifyIfChanged);
+  document.addEventListener("visibilitychange", notifyIfChanged);
+  const pollTimer = window.setInterval(notifyIfChanged, COOKIE_CONSENT_POLL_INTERVAL_MS);
+
+  return () => {
+    window.removeEventListener("itemtraxx:cookie-consent", notifyIfChanged);
+    window.removeEventListener("storage", handleStorage);
+    window.removeEventListener("focus", notifyIfChanged);
+    window.removeEventListener("pageshow", notifyIfChanged);
+    document.removeEventListener("visibilitychange", notifyIfChanged);
+    window.clearInterval(pollTimer);
+  };
 };
 
 export const writeCookieConsent = (preferences: CookieConsentPreferences) => {
@@ -102,6 +150,14 @@ export const writeCookieConsent = (preferences: CookieConsentPreferences) => {
   };
   try {
     writeCookie(COOKIE_CONSENT_STORAGE_KEY, JSON.stringify(next));
+    // A cookie is shared across ItemTraxx subdomains, while localStorage is
+    // origin-scoped. The pulse is only a same-origin fast path; subscribers
+    // also poll the shared cookie for subdomain changes.
+    try {
+      window.localStorage.setItem(COOKIE_CONSENT_SYNC_KEY, next.updatedAt);
+    } catch {
+      // Storage access is optional; the window event and cookie remain authoritative.
+    }
     window.dispatchEvent(new CustomEvent("itemtraxx:cookie-consent", { detail: next }));
   } catch {
     // Ignore cookie write failures.

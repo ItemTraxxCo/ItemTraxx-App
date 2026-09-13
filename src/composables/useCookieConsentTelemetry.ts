@@ -4,6 +4,7 @@ import {
   clearAnalyticsPersistence,
   hasCookieConsent,
   readCookieConsent,
+  subscribeCookieConsent,
   writeCookieConsent,
   type CookieConsentPreferences,
   type CookieConsentState,
@@ -17,6 +18,7 @@ export const useCookieConsentTelemetry = (auth: ConsentAuthState) => {
   const cookieConsent: Ref<CookieConsentState | null> = ref(null);
   const showTelemetry = ref(false);
   const showCookieConsentBanner = computed(() => !hasCookieConsent(cookieConsent.value));
+  let unsubscribeCookieConsent: (() => void) | null = null;
 
   const sync = () => {
     cookieConsent.value = readCookieConsent();
@@ -54,11 +56,16 @@ export const useCookieConsentTelemetry = (auth: ConsentAuthState) => {
 
   onMounted(() => {
     sync();
-    window.addEventListener("itemtraxx:cookie-consent", sync);
+    unsubscribeCookieConsent = subscribeCookieConsent((state) => {
+      cookieConsent.value = state;
+      showTelemetry.value = allowsAnalytics(state);
+      if (!showTelemetry.value) clearAnalyticsPersistence();
+    });
   });
 
   onScopeDispose(() => {
-    window.removeEventListener("itemtraxx:cookie-consent", sync);
+    unsubscribeCookieConsent?.();
+    unsubscribeCookieConsent = null;
   });
 
   return {

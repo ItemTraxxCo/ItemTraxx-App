@@ -23,7 +23,7 @@
       </div>
       <label>
         Import CSV file
-        <input type="file" accept=".csv,text/csv" @change="handleCsvFileSelect" />
+        <input class="ph-no-capture" type="file" accept=".csv,text/csv" @change="handleCsvFileSelect" />
       </label>
       <p class="muted">Selecting a CSV file will auto-fill the text box below.</p>
       <textarea

@@ -585,32 +585,33 @@ test.describe("Public surfaces", () => {
     );
     expect(statusRequestCount).toBe(1);
     await expect.poll(activeStatusIntervalCount).toBe(1);
-    // Version, offline queue, admin session, PostHog, and status own distinct lifecycles.
-    await expect.poll(activeVisibilityListenerCount).toBe(5);
+    // Version, offline queue, admin session, PostHog, status, and the two
+    // consent observers own distinct lifecycles.
+    await expect.poll(activeVisibilityListenerCount).toBe(7);
 
     await page.clock.fastForward(10_001);
     await setVisibility("hidden");
     expect(statusRequestCount).toBe(1);
     await expect.poll(activeStatusIntervalCount).toBe(0);
-    await expect.poll(activeVisibilityListenerCount).toBe(5);
+    await expect.poll(activeVisibilityListenerCount).toBe(7);
     await expect.poll(statusLifecycleVisibilityListenerCount).toBe(1);
     await setVisibility("visible");
     await expect.poll(() => statusRequestCount).toBe(2);
     await expect.poll(activeStatusIntervalCount).toBe(1);
-    await expect.poll(activeVisibilityListenerCount).toBe(5);
+    await expect.poll(activeVisibilityListenerCount).toBe(7);
     await expect.poll(statusLifecycleVisibilityListenerCount).toBe(1);
 
     await page.clock.fastForward(100_000);
     await navigateWithinApp("/landing-old");
     await expect.poll(activeStatusIntervalCount).toBe(1);
-    await expect.poll(activeVisibilityListenerCount).toBe(5);
+    await expect.poll(activeVisibilityListenerCount).toBe(7);
     await expect.poll(statusLifecycleVisibilityListenerCount).toBe(1);
     await page.clock.fastForward(300_000);
     await expect.poll(() => statusRequestCount).toBe(3);
 
     await navigateWithinApp("/landing-new2");
     await expect.poll(activeStatusIntervalCount).toBe(1);
-    await expect.poll(activeVisibilityListenerCount).toBe(5);
+    await expect.poll(activeVisibilityListenerCount).toBe(7);
     await expect.poll(statusLifecycleVisibilityListenerCount).toBe(1);
     await page.clock.fastForward(300_000);
     await expect.poll(() => statusRequestCount).toBe(4);

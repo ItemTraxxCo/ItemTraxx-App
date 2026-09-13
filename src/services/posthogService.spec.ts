@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 vi.mock("./cookieConsentService", () => ({
   allowsAnalytics: vi.fn(),
   allowsDiagnostics: vi.fn(),
+  allowsSessionReplay: vi.fn(),
   readCookieConsent: vi.fn(),
 }));
 vi.mock("./appErrorRecovery", () => ({
@@ -21,13 +22,16 @@ const posthogMock = {
   reset: vi.fn(),
   set_config: vi.fn(),
   captureException: vi.fn(),
+  startSessionRecording: vi.fn(),
+  stopSessionRecording: vi.fn(),
 };
 vi.mock("posthog-js", () => ({ default: posthogMock }));
 
-import { allowsAnalytics, allowsDiagnostics } from "./cookieConsentService";
+import { allowsAnalytics, allowsDiagnostics, allowsSessionReplay } from "./cookieConsentService";
 
 const mockedAllows = vi.mocked(allowsAnalytics);
 const mockedDiagnostics = vi.mocked(allowsDiagnostics);
+const mockedSessionReplay = vi.mocked(allowsSessionReplay);
 
 // `initialized`/`posthog` are module-level singletons in posthogService, so each
 // describe block that needs a distinct lifecycle state (never-initialized vs.
@@ -42,6 +46,7 @@ const initializedModule = async () => {
   vi.stubEnv("VITE_POSTHOG_PROJECT_TOKEN", "tok_123");
   mockedAllows.mockReturnValue(true);
   mockedDiagnostics.mockReturnValue(true);
+  mockedSessionReplay.mockReturnValue(true);
   const mod = await loadFreshModule();
   await mod.initPostHog();
   return mod;
@@ -85,9 +90,30 @@ describe("initPostHog", () => {
         autocapture: false,
         capture_pageleave: true,
         logs: expect.objectContaining({ captureConsoleLogs: false }),
-        disable_session_recording: true,
+        disable_session_recording: false,
+        session_recording: expect.objectContaining({
+          maskAllInputs: true,
+          maskTextSelector: "*",
+          maskAllElementAttributes: true,
+          recordHeaders: false,
+          recordBody: false,
+          maskCapturedNetworkRequestFn: expect.any(Function),
+        }),
       })
     );
+    const sessionRecording = posthogMock.init.mock.calls[0]?.[1] as {
+      session_recording?: {
+        maskCapturedNetworkRequestFn?: (request: { name: string }) => { name?: string };
+      };
+    } | undefined;
+    const maskedRequest = sessionRecording?.session_recording?.maskCapturedNetworkRequestFn?.({
+      name: "https://www.itemtraxx.com/reset-password?token=secret",
+    });
+    expect(maskedRequest).toMatchObject({ name: "https://www.itemtraxx.com/reset-password" });
+    const ordinaryRequest = sessionRecording?.session_recording?.maskCapturedNetworkRequestFn?.({
+      name: "https://www.itemtraxx.com/login?next=/workspace",
+    });
+    expect(ordinaryRequest).toMatchObject({ name: "https://www.itemtraxx.com/login?next=/workspace" });
     const options = posthogMock.init.mock.calls[0]?.[1] as {
       logs?: { beforeSend?: (record: { body: string }) => unknown };
     } | undefined;
@@ -98,6 +124,7 @@ describe("initPostHog", () => {
     vi.stubEnv("VITE_POSTHOG_PROJECT_TOKEN", "tok_123");
     mockedAllows.mockReturnValue(true);
     mockedDiagnostics.mockReturnValue(false);
+    mockedSessionReplay.mockReturnValue(false);
     const mod = await loadFreshModule();
 
     await mod.initPostHog();
@@ -278,6 +305,7 @@ describe("capturePostHogException", () => {
   it("does not capture diagnostics when diagnostics consent is revoked", async () => {
     const mod = await initializedModule();
     mockedDiagnostics.mockReturnValue(false);
+    mockedSessionReplay.mockReturnValue(false);
 
     mod.capturePostHogException(new Error("diagnostic detail"));
 
@@ -517,6 +545,8 @@ describe("syncPostHogConsent", () => {
     expect(posthogMock.opt_in_capturing).toHaveBeenCalledOnce();
     expect(posthogMock.opt_out_capturing).not.toHaveBeenCalled();
     expect(posthogMock.set_config).toHaveBeenCalledWith({ capture_exceptions: true });
+    expect(posthogMock.startSessionRecording).toHaveBeenCalledOnce();
+    expect(posthogMock.stopSessionRecording).not.toHaveBeenCalled();
   });
 
   it("opts out when analytics consent is not granted", async () => {
@@ -527,14 +557,29 @@ describe("syncPostHogConsent", () => {
 
     expect(posthogMock.opt_out_capturing).toHaveBeenCalledOnce();
     expect(posthogMock.set_config).toHaveBeenCalledWith({ capture_exceptions: true });
+    expect(posthogMock.stopSessionRecording).toHaveBeenCalledOnce();
+    expect(posthogMock.startSessionRecording).not.toHaveBeenCalled();
   });
 
   it("disables PostHog exception autocapture when diagnostics consent is revoked", async () => {
     const mod = await initializedModule();
     mockedDiagnostics.mockReturnValue(false);
+    mockedSessionReplay.mockReturnValue(false);
 
     mod.syncPostHogConsent();
 
     expect(posthogMock.set_config).toHaveBeenCalledWith({ capture_exceptions: false });
+  });
+
+  it("stops session replay when diagnostics consent is revoked but analytics stays granted", async () => {
+    const mod = await initializedModule();
+    mockedDiagnostics.mockReturnValue(false);
+    mockedSessionReplay.mockReturnValue(false);
+
+    mod.syncPostHogConsent();
+
+    expect(posthogMock.opt_in_capturing).toHaveBeenCalledOnce();
+    expect(posthogMock.stopSessionRecording).toHaveBeenCalledOnce();
+    expect(posthogMock.startSessionRecording).not.toHaveBeenCalled();
   });
 });

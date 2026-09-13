@@ -8,8 +8,8 @@
     "npm:@cyclonedx/cyclonedx-npm@6.0.1": "6.0.1",
     "npm:@intercom/messenger-js-sdk@^0.0.20": "0.0.20",
     "npm:@playwright/test@^1.63.0": "1.63.0",
-    "npm:@sentry/vue@^10.73.0": "10.73.0_vue@3.5.42",
-    "npm:@supabase/supabase-js@^2.115.0": "2.116.0",
+    "npm:@sentry/vue@^10.74.0": "10.74.0_vue@3.5.42",
+    "npm:@supabase/supabase-js@^2.116.0": "2.116.0",
     "npm:@types/node@^26.4.1": "26.5.0",
     "npm:@types/qrcode@^1.5.6": "1.5.6",
     "npm:@vercel/analytics@^2.0.1": "2.0.1_vue@3.5.42_vue-router@4.6.4_typescript@6.0.3",
@@ -27,7 +27,7 @@
     "npm:jsdom@^30.0.1": "30.0.1_@noble+hashes@2.3.0",
     "npm:jspdf-autotable@^5.0.8": "5.0.8_jspdf@4.2.1",
     "npm:jspdf@^4.2.1": "4.2.1",
-    "npm:posthog-js@^1.427.2": "1.427.2",
+    "npm:posthog-js@^1.430.3": "1.430.3",
     "npm:qrcode@^1.5.4": "1.5.4",
     "npm:supabase@^2.116.0": "2.116.0",
     "npm:typescript@~6.0.3": "6.0.3",
@@ -945,21 +945,21 @@
     "@poppinss/exception@1.2.3": {
       "integrity": "sha512-dCED+QRChTVatE9ibtoaxc+WkdzOSjYTKi/+uacHWIsfodVfpsueo3+DKpgU5Px8qXjgmXkSvhXvSCz3fnP9lw=="
     },
-    "@posthog/browser-common@0.7.2": {
-      "integrity": "sha512-ukDmETXy6fTBE4ZpaO8ccscrNz5SvTaUnhQ0Ze2JX/oYILa89rrNwqUH7lDAuhFKa+NY6EoJ9kZMuOvuu4WwLQ==",
+    "@posthog/browser-common@0.8.3": {
+      "integrity": "sha512-4Hlbwyn+Hioc2+pjqSGWMTDrA5XsDshssPnGfv34khPKoJaeBe2YvPvsEPoH78jezOS6Wo3LJvCPhqyolg3S8w==",
       "dependencies": [
         "@posthog/core",
         "@posthog/types"
       ]
     },
-    "@posthog/core@1.50.5": {
-      "integrity": "sha512-afEchuShDaVIoxAIj76kDZQ1DhfesDmgfVp+mtTzsA3wlc8DF5uoz8YjuTjnxOicWkpP5HCDqYidK/1kT125Cg==",
+    "@posthog/core@1.53.2": {
+      "integrity": "sha512-Knx8442G2LyPVIzLvhcBX/TIdeHpZhrYrtZou3Uw8FWfbr9gQtQeOZDCog3MWcDxJ+4vAnMAAOzf5cYpc7Gxyw==",
       "dependencies": [
         "@posthog/types"
       ]
     },
-    "@posthog/types@1.409.0": {
-      "integrity": "sha512-239umoaZVb2GBaXeEyJpwFvjhrrChJH8NHCwiao23EBSu3NA6EN0MTMoaHSmMEf4yjiXEFFoYJA6FjJAXF5HGA=="
+    "@posthog/types@1.411.1": {
+      "integrity": "sha512-Gd7tnSYctcSXup3naVlAgavvenByRao6rsSYdMgWgP35KE9jFn+rMHNRJeI5LNjJuLzMXHEVcgzAN7xcATefdw=="
     },
     "@rolldown/binding-android-arm-eabi@1.2.6": {
       "integrity": "sha512-b+jTcARdTiFLI6jB4a5XjTm0RWd6KcRfQj/I2356fxUZemiho9zQLxo0RtCuMDAyKcLo6cEltkgbQp6d1+sjjQ==",
@@ -1039,15 +1039,15 @@
     "@rolldown/pluginutils@1.0.1": {
       "integrity": "sha512-2j9bGt5Jh8hj+vPtgzPtl72j0yRxHAyumoo6TNfAjsLB04UtpSvPbPcDcBMxz7n+9CYB0c1GxQFxYRg2jimqGw=="
     },
-    "@sentry/browser-utils@10.73.0": {
-      "integrity": "sha512-qQygxJZ+RV779+iL1+lrJ4f4sZLgbgW0/JWPNp0YlcEAE62yCsdKbqoTEjB/EugdS4mSjBMX0chZC6rblu2Ycw==",
+    "@sentry/browser-utils@10.74.0": {
+      "integrity": "sha512-/Rh3WH4i2nStdOqHpaWocbpSMFPjKhlxKQgp9vkJBSolqjJzXlIpLYXOrldZHHZLG1iDoX3PFBQkNDYcPXCg0A==",
       "dependencies": [
         "@sentry/conventions",
         "@sentry/core"
       ]
     },
-    "@sentry/browser@10.73.0": {
-      "integrity": "sha512-HqTe1S5RrWLufhX2LaFP3yNoMxfNDroh120bq1zdGHZfFDBMJQ0CDXxHO+L4UJfQ5dWdCCzWbXIAiZuWGa/DFQ==",
+    "@sentry/browser@10.74.0": {
+      "integrity": "sha512-U6Zn+YcAgnR7bXZmpjMxivptPSsOeDKV+SlSqbJZqViOaCcZSG/vJiQr50UrdTccCwiU1LnwuOOoclJOvW+cLQ==",
       "dependencies": [
         "@sentry/browser-utils",
         "@sentry/conventions",
@@ -1060,34 +1060,34 @@
     "@sentry/conventions@0.16.0": {
       "integrity": "sha512-fO9PLmHdVURcSPUpWCItWAtgKiMwGdJHbovoSEyLplX5sxs2ugvI4CBPTrkkgqhObnZOD0CnWBKDzSVQYBKEyQ=="
     },
-    "@sentry/core@10.73.0": {
-      "integrity": "sha512-FLO1UgH19RyasVpofu612WCOgb2nEH0dZy+R72d7p65XU9i0wxlMKm3+sgfwKmiSJp1Qhilaaxs4Jg6BbiM5HA==",
+    "@sentry/core@10.74.0": {
+      "integrity": "sha512-u9rY8vcZfktccwm6LznfCZlqP5C9A+p76r4/pFS1grqpuTO0m21Cl8rosnlESrDGP/Xd9tfr91rWYk0jPH8jeQ==",
       "dependencies": [
         "@sentry/conventions"
       ]
     },
-    "@sentry/feedback@10.73.0": {
-      "integrity": "sha512-D6nSngX+e46Mae2/oh2bxBvxNK1z2NERbuMAhB5sx9x4xMBWIyGnYYTECehvEqV9+AqGAgxxhOZoYIG3AmRwww==",
+    "@sentry/feedback@10.74.0": {
+      "integrity": "sha512-WwUao9K2XgRIxTUTaBhm7aglhsyP7LQTGi2lxvFbXzlSagUzwew/EL2c5oqQ23Mjn94i5SY+rM4wMdgyWdtpAw==",
       "dependencies": [
         "@sentry/core"
       ]
     },
-    "@sentry/replay-canvas@10.73.0": {
-      "integrity": "sha512-sxa2lKkHPfF/j5xFpW7gocthWXRqyoHz8KCPy6yGc8plT477nl57iGSKhQDYsx1Ny10TLjs7YkIuPP1GY/Ax2Q==",
+    "@sentry/replay-canvas@10.74.0": {
+      "integrity": "sha512-HAdu4ViRsuOD5ifphQR24HugL0geZXV8LnGQVkA8vlzZWiuYgGNqDRoUWI75IgVcCYLYSaVBoKN+jTimdzG/sQ==",
       "dependencies": [
         "@sentry/core",
         "@sentry/replay"
       ]
     },
-    "@sentry/replay@10.73.0": {
-      "integrity": "sha512-nN2wjN/Y0J5BOJV5hqRHUEBfxwUsipp1PKjcDHh6Fpxnrtfldu3Y99E8cQInseo5heFdzEvrOHBBrqWZXOHVKQ==",
+    "@sentry/replay@10.74.0": {
+      "integrity": "sha512-amIu0zKzhQJZoWmlwfFnn/uKRGyF+Tikph3lBgYwj5XbHv4U94PQXi9Ll8CYzzLVS7BkrCVc2Hl7RvpRg5M2Yg==",
       "dependencies": [
         "@sentry/browser-utils",
         "@sentry/core"
       ]
     },
-    "@sentry/vue@10.73.0_vue@3.5.42": {
-      "integrity": "sha512-pbUt65YO7mcLT8q0geK62K4HxlKQkya3ZNqXo+BRz99uMvC78BdNSK+ME4jvTYeHwRJdLqQfAwrcXvKgAQlweg==",
+    "@sentry/vue@10.74.0_vue@3.5.42": {
+      "integrity": "sha512-wiRuCDT1HXAyla1np6zp9C3UA5cJ4VrMT0GpMdAtdvVsTRDTDdjTRHCcTbKddOIpMxqvcfOBgAde7fUNv23ffA==",
       "dependencies": [
         "@sentry/browser",
         "@sentry/conventions",
@@ -2487,8 +2487,8 @@
         "source-map-js"
       ]
     },
-    "posthog-js@1.427.2": {
-      "integrity": "sha512-/jRg3ChHuxcHTTJ/xb+IbpXLYxiBKIWdjrsNNqY1tAwjnFoijmz58i4mIR4A2P5MWx+4R7LlpK9vQfBr8v292g==",
+    "posthog-js@1.430.3": {
+      "integrity": "sha512-+j/0wa36fXdXsiKhN7ghHOA4z9/ik893ZpMOLeqCluqXZSt/oe+iClIavWqLRcYhvvmJvl2D3EfKpt8Kg8GbUQ==",
       "dependencies": [
         "@posthog/browser-common",
         "@posthog/core",
@@ -3342,8 +3342,8 @@
         "npm:@cyclonedx/cyclonedx-npm@6.0.1",
         "npm:@intercom/messenger-js-sdk@^0.0.20",
         "npm:@playwright/test@^1.63.0",
-        "npm:@sentry/vue@^10.73.0",
-        "npm:@supabase/supabase-js@^2.115.0",
+        "npm:@sentry/vue@^10.74.0",
+        "npm:@supabase/supabase-js@^2.116.0",
         "npm:@types/node@^26.4.1",
         "npm:@types/qrcode@^1.5.6",
         "npm:@vercel/analytics@^2.0.1",
@@ -3360,7 +3360,7 @@
         "npm:jsdom@^30.0.1",
         "npm:jspdf-autotable@^5.0.8",
         "npm:jspdf@^4.2.1",
-        "npm:posthog-js@^1.427.2",
+        "npm:posthog-js@^1.430.3",
         "npm:qrcode@^1.5.4",
         "npm:supabase@^2.116.0",
         "npm:typescript@~6.0.3",

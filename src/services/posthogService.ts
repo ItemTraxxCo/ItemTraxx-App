@@ -296,10 +296,19 @@ export const initPostHog = async () => {
         // sink disabled even if the project setting changes later.
         beforeSend: () => null,
       },
-      // Session replay is disabled globally: authenticated/admin DOM text can
-      // contain support requests and other tenant-sensitive data that input
-      // masking does not cover.
-      disable_session_recording: true,
+      // Session replay is a diagnostic sink, so it follows diagnostics consent
+      // like exception autocapture above. Authenticated and admin DOM text can
+      // contain support requests and other tenant-sensitive data, so every text
+      // node and input is masked: the recording keeps layout, navigation, and
+      // interaction shape without the content.
+      disable_session_recording: !allowsDiagnostics(readCookieConsent()),
+      session_recording: {
+        maskAllInputs: true,
+        maskTextSelector: "*",
+        // Network capture would put back the content that text masking removes.
+        recordHeaders: false,
+        recordBody: false,
+      },
       disable_surveys: true,
       disable_surveys_automatic_display: true,
       disable_product_tours: true,
@@ -324,13 +333,20 @@ export const initPostHog = async () => {
 
 export const syncPostHogConsent = () => {
   if (!initialized || !posthog) return;
+  const diagnosticsAllowed = allowsDiagnostics(readCookieConsent());
   posthog.set_config({
-    capture_exceptions: allowsDiagnostics(readCookieConsent()),
+    capture_exceptions: diagnosticsAllowed,
   });
   if (allowsAnalytics(readCookieConsent())) {
     posthog.opt_in_capturing();
+    if (diagnosticsAllowed) {
+      posthog.startSessionRecording();
+    } else {
+      posthog.stopSessionRecording();
+    }
     return;
   }
+  posthog.stopSessionRecording();
   posthog.opt_out_capturing();
 };
 

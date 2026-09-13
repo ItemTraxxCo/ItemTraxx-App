@@ -21,6 +21,8 @@ const posthogMock = {
   reset: vi.fn(),
   set_config: vi.fn(),
   captureException: vi.fn(),
+  startSessionRecording: vi.fn(),
+  stopSessionRecording: vi.fn(),
 };
 vi.mock("posthog-js", () => ({ default: posthogMock }));
 
@@ -85,7 +87,13 @@ describe("initPostHog", () => {
         autocapture: false,
         capture_pageleave: true,
         logs: expect.objectContaining({ captureConsoleLogs: false }),
-        disable_session_recording: true,
+        disable_session_recording: false,
+        session_recording: expect.objectContaining({
+          maskAllInputs: true,
+          maskTextSelector: "*",
+          recordHeaders: false,
+          recordBody: false,
+        }),
       })
     );
     const options = posthogMock.init.mock.calls[0]?.[1] as {
@@ -517,6 +525,8 @@ describe("syncPostHogConsent", () => {
     expect(posthogMock.opt_in_capturing).toHaveBeenCalledOnce();
     expect(posthogMock.opt_out_capturing).not.toHaveBeenCalled();
     expect(posthogMock.set_config).toHaveBeenCalledWith({ capture_exceptions: true });
+    expect(posthogMock.startSessionRecording).toHaveBeenCalledOnce();
+    expect(posthogMock.stopSessionRecording).not.toHaveBeenCalled();
   });
 
   it("opts out when analytics consent is not granted", async () => {
@@ -527,6 +537,8 @@ describe("syncPostHogConsent", () => {
 
     expect(posthogMock.opt_out_capturing).toHaveBeenCalledOnce();
     expect(posthogMock.set_config).toHaveBeenCalledWith({ capture_exceptions: true });
+    expect(posthogMock.stopSessionRecording).toHaveBeenCalledOnce();
+    expect(posthogMock.startSessionRecording).not.toHaveBeenCalled();
   });
 
   it("disables PostHog exception autocapture when diagnostics consent is revoked", async () => {
@@ -536,5 +548,16 @@ describe("syncPostHogConsent", () => {
     mod.syncPostHogConsent();
 
     expect(posthogMock.set_config).toHaveBeenCalledWith({ capture_exceptions: false });
+  });
+
+  it("stops session replay when diagnostics consent is revoked but analytics stays granted", async () => {
+    const mod = await initializedModule();
+    mockedDiagnostics.mockReturnValue(false);
+
+    mod.syncPostHogConsent();
+
+    expect(posthogMock.opt_in_capturing).toHaveBeenCalledOnce();
+    expect(posthogMock.stopSessionRecording).toHaveBeenCalledOnce();
+    expect(posthogMock.startSessionRecording).not.toHaveBeenCalled();
   });
 });

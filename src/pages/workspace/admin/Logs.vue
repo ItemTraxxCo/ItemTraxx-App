@@ -83,7 +83,7 @@
                   </span>
                 </td>
                 <td>
-                  <span v-if="log.borrower">
+                  <span v-if="log.borrower" data-session-replay-mask>
                     {{ log.borrower.username }} ({{ log.borrower.borrower_id }})
                   </span>
                   <span v-else class="muted">-</span>

@@ -836,7 +836,7 @@ Deno.test("revoke_session succeeds", async () => {
 // revoke_all_sessions
 // =====================================================================
 
-Deno.test("revoke_all_sessions excludes the current device by default", async () => {
+Deno.test("revoke_all_sessions excludes the current auth session by default", async () => {
   const { client, calls } = makeAdminClient(
     sequence([{ data: [{ id: "session-1" }, { id: "session-2" }], error: null }]),
   );
@@ -850,10 +850,31 @@ Deno.test("revoke_all_sessions excludes the current device by default", async ()
   assert(
     calls.some((call) =>
       call.operations.some((op) =>
+        op.method === "neq" && op.args[0] === "auth_session_id" && op.args[1] === "auth-session-1"
+      )
+    ),
+    "expected the current auth session to be excluded",
+  );
+});
+
+Deno.test("revoke_all_sessions falls back to excluding the current device when auth claims are unavailable", async () => {
+  const { client, calls } = makeAdminClient(
+    sequence([{ data: [{ id: "session-1" }], error: null }]),
+    { claims: null },
+  );
+  const response = await handleSecuritySessionsAction(
+    contextFor("revoke_all_sessions", { device_id: "device-1" }, client),
+  );
+
+  assert(response !== null, "expected a response");
+  assertEquals(response!.status, 200);
+  assert(
+    calls.some((call) =>
+      call.operations.some((op) =>
         op.method === "neq" && op.args[0] === "device_id" && op.args[1] === "device-1"
       )
     ),
-    "expected the current device to be excluded",
+    "expected the current device fallback to be excluded",
   );
 });
 

@@ -33,6 +33,18 @@ const isMissingColumn = (
 const sanitizeText = (value: unknown, max = 255) =>
   optionalText(value, { maxLen: max });
 
+const resolveAuthSessionId = async (
+  adminClient: SuperOpsContext["adminClient"],
+  accessToken: string,
+) => {
+  const { data, error } = await adminClient.auth.getClaims(accessToken);
+  if (error || !data?.claims) return null;
+  const sessionId = data.claims.session_id;
+  return typeof sessionId === "string" && sessionId.trim()
+    ? sessionId.trim()
+    : null;
+};
+
 const resolveJwtLoginMethod = (claims: Record<string, unknown>) => {
   const amr = claims.amr;
   if (!Array.isArray(amr)) return null;
@@ -442,15 +454,37 @@ export const handleSecuritySessionsAction = async (
   if (action === "revoke_all_sessions") {
     const signOutCurrent = payload.sign_out_current === true;
     const currentDeviceId = sanitizeText(payload.device_id, 128);
-    let query = adminClient
+    const currentAuthSessionId = signOutCurrent
+      ? null
+      : await resolveAuthSessionId(adminClient, accessToken);
+    const buildQuery = () => adminClient
       .from("super_admin_sessions")
       .update({ revoked_at: new Date().toISOString(), revoked_by: user.id })
       .eq("profile_id", user.id)
       .is("revoked_at", null);
-    if (!signOutCurrent && currentDeviceId) {
-      query = query.neq("device_id", currentDeviceId);
+    let query = buildQuery();
+    if (!signOutCurrent) {
+      // Prefer the auth-session binding. A single Better Auth session can be
+      // represented by multiple device rows across sibling hosts; excluding
+      // only the localStorage device id can revoke the current auth session's
+      // other row and immediately block this browser.
+      if (currentAuthSessionId) {
+        query = query.neq("auth_session_id", currentAuthSessionId);
+      } else if (currentDeviceId) {
+        query = query.neq("device_id", currentDeviceId);
+      }
     }
-    const { data, error } = await query.select("id");
+    let { data, error } = await query.select("id");
+    if (
+      error && currentAuthSessionId && currentDeviceId &&
+      isMissingColumn(error, "auth_session_id")
+    ) {
+      const fallback = await buildQuery()
+        .neq("device_id", currentDeviceId)
+        .select("id");
+      data = fallback.data;
+      error = fallback.error;
+    }
     if (error && isMissingRelation(error, "super_admin_sessions")) {
       return jsonResponse(400, {
         error: "Session controls unavailable. Run latest SQL setup.",

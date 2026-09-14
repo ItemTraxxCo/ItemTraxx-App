@@ -59,6 +59,7 @@ import { computed, onMounted, ref } from "vue";
 import QRCode from "qrcode";
 import { RouterLink } from "vue-router";
 import { authClient } from "../auth/client";
+import { revokeAllSuperAdminSessions } from "../services/superOps/sessions";
 import { getAuthState } from "../store/authState";
 
 type PasskeyItem = { id: string; name?: string | null };
@@ -133,8 +134,12 @@ const disableTwoFactor = () => run(async () => {
   twoFactorEnabled.value = false; backupCodes.value = []; message.value = "Two-factor authentication disabled.";
 });
 const signOutOthers = () => run(async () => {
-  const result = await authClient.revokeOtherSessions();
-  if (result.error) throw new Error(result.error.message ?? "Unable to revoke sessions.");
+  if (authState.role === "super_admin") {
+    await revokeAllSuperAdminSessions(false);
+  } else {
+    const result = await authClient.revokeOtherSessions();
+    if (result.error) throw new Error(result.error.message ?? "Unable to revoke sessions.");
+  }
   message.value = "Other sessions signed out.";
 });
 onMounted(() => void run(load));

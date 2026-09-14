@@ -154,7 +154,7 @@
                 <td data-session-replay-mask>{{ item.username }}</td>
                 <td data-session-replay-mask>{{ item.borrower_id }}</td>
                 <td>
-                  <span class="scoped-accounts-cell" :title="scopedAccountsTitle(item)">
+                  <span class="scoped-accounts-cell" data-session-replay-mask :title="scopedAccountsTitle(item)">
                     {{ scopedAccountsLabel(item) }}
                   </span>
                 </td>
@@ -280,7 +280,7 @@
         <p class="muted">Borrower ID: <span data-session-replay-mask>{{ selected?.borrower_id }}</span></p>
         <p v-if="selected" class="muted">
           Tenant Accounts:
-          <span class="scoped-accounts-cell" :title="scopedAccountsTitle(selected)">{{ scopedAccountsLabel(selected) }}</span>
+          <span class="scoped-accounts-cell" data-session-replay-mask :title="scopedAccountsTitle(selected)">{{ scopedAccountsLabel(selected) }}</span>
         </p>
 
         <SkeletonLoader v-if="detailsLoading" variant="lines" :rows="3" label="Loading borrower details" />

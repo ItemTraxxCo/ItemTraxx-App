@@ -47,8 +47,8 @@
 
       <div v-if="borrower" class="checkout-borrower-summary">
         <p>
-          <strong>{{ borrower.username }}</strong>
-          <span class="muted"> ID: {{ borrower.borrower_id }}</span>
+          <strong data-session-replay-mask>{{ borrower.username }}</strong>
+          <span class="muted"> ID: <span data-session-replay-mask>{{ borrower.borrower_id }}</span></span>
         </p>
         <div v-if="checkedOutItem.length">
           <p class="checkout-subheading">Currently checked out</p>

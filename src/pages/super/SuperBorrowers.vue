@@ -53,9 +53,9 @@
           <thead><tr><th>Username</th><th>Workspace</th><th>Borrower ID</th><th>Actions</th></tr></thead>
           <tbody>
             <tr v-for="item in borrowers" :key="item.id">
-              <td>{{ item.username }}</td>
+              <td data-session-replay-mask>{{ item.username }}</td>
               <td>{{ workspaceNameById.get(item.workspace_id) || item.workspace_id }}</td>
-              <td>{{ item.borrower_id }}</td>
+              <td data-session-replay-mask>{{ item.borrower_id }}</td>
               <td>
                 <div class="sa-table-row-actions">
                   <button type="button" class="sa-btn" @click="startEdit(item)">Edit</button>

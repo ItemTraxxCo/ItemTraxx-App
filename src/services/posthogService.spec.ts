@@ -93,8 +93,9 @@ describe("initPostHog", () => {
         disable_session_recording: false,
         session_recording: expect.objectContaining({
           maskAllInputs: true,
-          maskTextSelector: "*",
-          maskAllElementAttributes: true,
+          maskTextSelector: "[data-session-replay-mask]",
+          maskAllElementAttributes: false,
+          maskAttributeFn: expect.any(Function),
           recordHeaders: false,
           recordBody: false,
           maskCapturedNetworkRequestFn: expect.any(Function),
@@ -103,9 +104,14 @@ describe("initPostHog", () => {
     );
     const sessionRecording = posthogMock.init.mock.calls[0]?.[1] as {
       session_recording?: {
+        maskAttributeFn?: (name: string, value: string, element?: Element) => string;
         maskCapturedNetworkRequestFn?: (request: { name: string }) => { name?: string };
       };
     } | undefined;
+    const image = document.createElement("img");
+    image.setAttribute("data-session-replay-mask", "");
+    expect(sessionRecording?.session_recording?.maskAttributeFn?.("src", "/logo.svg", image)).toBe("/logo.svg");
+    expect(sessionRecording?.session_recording?.maskAttributeFn?.("title", "Borrower name", image)).toBe("*".repeat("Borrower name".length));
     const maskedRequest = sessionRecording?.session_recording?.maskCapturedNetworkRequestFn?.({
       name: "https://www.itemtraxx.com/reset-password?token=secret",
     });

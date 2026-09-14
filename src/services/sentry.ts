@@ -3,6 +3,7 @@ import type { Router } from "vue-router";
 import { shouldReportError } from "./appErrors";
 import { allowsDiagnostics, allowsSessionReplay, readCookieConsent } from "./cookieConsentService";
 import { scrubSensitiveRecoveryUrlValue } from "../utils/passwordResetRedirect";
+import { SESSION_REPLAY_MASK_SELECTOR } from "./sessionReplayPrivacy";
 
 const SENTRY_DSN = import.meta.env.VITE_SENTRY_DSN?.trim();
 const SENTRY_ENVIRONMENT = import.meta.env.VITE_SENTRY_ENVIRONMENT || import.meta.env.MODE;
@@ -86,7 +87,9 @@ const loadSentryReplay = async () => {
     const { addIntegration, replayIntegration } = await import("@sentry/vue");
     addIntegration(
       replayIntegration({
-        maskAllText: true,
+        maskAllText: false,
+        maskAllInputs: true,
+        mask: [SESSION_REPLAY_MASK_SELECTOR],
         blockAllMedia: true,
       })
     );

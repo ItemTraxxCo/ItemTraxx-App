@@ -60,7 +60,7 @@
 
     <div v-if="toastMessage" class="toast">
       <div class="toast-title">{{ toastTitle }}</div>
-      <div class="toast-body">{{ toastMessage }}</div>
+      <div class="toast-body" data-session-replay-mask>{{ toastMessage }}</div>
       <div v-if="toastActionLabel" class="toast-actions">
         <button type="button" class="toast-action-button" @click="runToastAction">
           {{ toastActionLabel }}
@@ -151,8 +151,8 @@
                     :aria-label="`Select ${item.username}`"
                   />
                 </td>
-                <td>{{ item.username }}</td>
-                <td>{{ item.borrower_id }}</td>
+                <td data-session-replay-mask>{{ item.username }}</td>
+                <td data-session-replay-mask>{{ item.borrower_id }}</td>
                 <td>
                   <span class="scoped-accounts-cell" :title="scopedAccountsTitle(item)">
                     {{ scopedAccountsLabel(item) }}
@@ -204,8 +204,8 @@
             </thead>
             <tbody>
               <tr v-for="item in filteredArchivedBorrowers" :key="item.id">
-                <td>{{ item.username }}</td>
-                <td>{{ item.borrower_id }}</td>
+                <td data-session-replay-mask>{{ item.username }}</td>
+                <td data-session-replay-mask>{{ item.borrower_id }}</td>
                 <td>
                   <button type="button" class="link" :disabled="isSaving" @click="handleRestore(item)">
                     Restore
@@ -276,8 +276,8 @@
       <div class="modal">
         <h2>Borrower details</h2>
         <p class="muted">View username, borrower ID, and checkout history.</p>
-        <h3>{{ selected?.username }}</h3>
-        <p class="muted">Borrower ID: {{ selected?.borrower_id }}</p>
+        <h3 data-session-replay-mask>{{ selected?.username }}</h3>
+        <p class="muted">Borrower ID: <span data-session-replay-mask>{{ selected?.borrower_id }}</span></p>
         <p v-if="selected" class="muted">
           Tenant Accounts:
           <span class="scoped-accounts-cell" :title="scopedAccountsTitle(selected)">{{ scopedAccountsLabel(selected) }}</span>

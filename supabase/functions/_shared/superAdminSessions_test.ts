@@ -37,14 +37,23 @@ Deno.test("super-admin revocation blocks the matching auth session", async () =>
 });
 
 Deno.test("super-admin revocation permits an unrelated active auth session", async () => {
-  const client = new MockClient([
-    { data: null, error: null },
-    { data: null, error: null },
-  ], { iat: Math.floor(Date.now() / 1000), session_id: "active-auth-session" });
+  const client = new MockClient([{ data: null, error: null }], {
+    iat: Math.floor(Date.now() / 1000), session_id: "active-auth-session",
+  });
   const result = await isSuperAdminTokenBlockedBySessionRevocation(client, {
     profileId: "profile-1", authToken: "verified-token",
   });
   assertEquals(result, { blocked: false, relationMissing: false });
+});
+
+Deno.test("super-admin revocation uses the timestamp fallback only for legacy tokens", async () => {
+  const client = new MockClient([{ data: { id: "revoked-row" }, error: null }], {
+    iat: Math.floor(Date.now() / 1000),
+  });
+  const result = await isSuperAdminTokenBlockedBySessionRevocation(client, {
+    profileId: "profile-1", authToken: "legacy-token",
+  });
+  assertEquals(result, { blocked: true, relationMissing: false });
 });
 
 Deno.test("super-admin revocation fails closed when the session schema is absent", async () => {

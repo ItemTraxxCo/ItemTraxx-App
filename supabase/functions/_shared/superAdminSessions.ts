@@ -72,6 +72,11 @@ export const isSuperAdminTokenBlockedBySessionRevocation = async (
     if (data?.id) {
       return { blocked: true as const, relationMissing: false as const };
     }
+
+    // A session id is the authoritative binding for current Better Auth JWTs.
+    // Do not fall back to a timestamp here: revoking another device creates a
+    // newer revoked_at value and would otherwise block this unrelated session.
+    return { blocked: false as const, relationMissing: false as const };
   }
 
   if (binding.issuedAt) {

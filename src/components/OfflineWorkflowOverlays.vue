@@ -67,7 +67,7 @@
                   </template>
                 </strong>
                 <small>Borrower: <span data-session-replay-mask>{{ serverBorrowerLabel(entry.items[0]?.server_state) }}</span></small>
-                <small>Tenant account: {{ serverTenantAccountLabel(entry.items[0]?.server_state) }}</small>
+                <small>Tenant account: <span data-session-replay-mask>{{ serverTenantAccountLabel(entry.items[0]?.server_state) }}</span></small>
                 <small>Server update: {{ serverStateTimeLabel(entry.items[0]?.server_state) }}</small>
               </button>
             </div>

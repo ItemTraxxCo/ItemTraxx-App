@@ -4,11 +4,13 @@ import {
   allowsAnalytics,
   allowsDiagnostics,
   readCookieConsent,
+  subscribeCookieConsent,
 } from "../services/cookieConsentService";
 
 export const createClientMonitoring = (router: Router) => {
   let appMounted = false;
   let posthogServicePromise: Promise<typeof import("../services/posthogService")> | null = null;
+  let unsubscribeConsent: (() => void) | null = null;
 
   const initializeSentry = async (app: App) => {
     if (!import.meta.env.VITE_SENTRY_DSN?.trim() || !allowsDiagnostics(readCookieConsent())) {
@@ -100,8 +102,15 @@ export const createClientMonitoring = (router: Router) => {
       }
     };
 
-    window.addEventListener("itemtraxx:cookie-consent", maybeEnableDiagnostics);
-    window.addEventListener("itemtraxx:cookie-consent", maybeEnableAnalytics);
+    // Consent is stored in a domain cookie, so a window event alone misses
+    // changes made in another tab or on another ItemTraxx subdomain. The
+    // shared subscription uses same-origin storage/focus signals plus a small
+    // cookie poll to stop replay and update PostHog after revocation.
+    unsubscribeConsent?.();
+    unsubscribeConsent = subscribeCookieConsent(() => {
+      maybeEnableDiagnostics();
+      maybeEnableAnalytics();
+    });
   };
 
   return {

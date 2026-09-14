@@ -116,6 +116,10 @@ describe("initPostHog", () => {
       name: "https://www.itemtraxx.com/reset-password?token=secret",
     });
     expect(maskedRequest).toMatchObject({ name: "https://www.itemtraxx.com/reset-password" });
+    const ordinaryRequest = sessionRecording?.session_recording?.maskCapturedNetworkRequestFn?.({
+      name: "https://www.itemtraxx.com/login?next=/workspace",
+    });
+    expect(ordinaryRequest).toMatchObject({ name: "https://www.itemtraxx.com/login?next=/workspace" });
     const options = posthogMock.init.mock.calls[0]?.[1] as {
       logs?: { beforeSend?: (record: { body: string }) => unknown };
     } | undefined;
@@ -307,6 +311,7 @@ describe("capturePostHogException", () => {
   it("does not capture diagnostics when diagnostics consent is revoked", async () => {
     const mod = await initializedModule();
     mockedDiagnostics.mockReturnValue(false);
+    mockedSessionReplay.mockReturnValue(false);
 
     mod.capturePostHogException(new Error("diagnostic detail"));
 
@@ -572,7 +577,7 @@ describe("syncPostHogConsent", () => {
     expect(posthogMock.set_config).toHaveBeenCalledWith({ capture_exceptions: false });
   });
 
-  it("stops session replay when diagnostics consent is revoked but analytics remains granted", async () => {
+  it("stops session replay when diagnostics consent is revoked but analytics stays granted", async () => {
     const mod = await initializedModule();
     mockedDiagnostics.mockReturnValue(false);
     mockedSessionReplay.mockReturnValue(false);

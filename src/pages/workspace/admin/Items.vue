@@ -165,9 +165,9 @@
               </span>
             </td>
             <td>{{ item.status }}</td>
-            <td class="item-notes-cell">{{ item.notes || "-" }}</td>
+            <td class="item-notes-cell" data-session-replay-mask>{{ item.notes || "-" }}</td>
             <td>
-              <span class="scoped-accounts-cell" :title="scopedAccountsTitle(item)">
+              <span class="scoped-accounts-cell" data-session-replay-mask :title="scopedAccountsTitle(item)">
                 {{ scopedAccountsLabel(item) }}
               </span>
             </td>

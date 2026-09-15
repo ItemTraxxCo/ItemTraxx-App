@@ -49,9 +49,9 @@
         <tbody>
           <tr v-for="lead in filteredLeads" :key="lead.id">
             <td>{{ planLabel(lead.plan) }}</td>
-            <td>{{ lead.name }}</td>
-            <td>{{ lead.organization }}</td>
-            <td class="email-cell">{{ lead.reply_email }}</td>
+            <td><span data-session-replay-mask>{{ lead.name }}</span></td>
+            <td><span data-session-replay-mask>{{ lead.organization }}</span></td>
+            <td class="email-cell"><span data-session-replay-mask>{{ lead.reply_email }}</span></td>
             <td>
               <div class="sa-table-row-actions">
                 <button type="button" class="sa-btn" @click="openLead(lead.id)">Details</button>
@@ -74,9 +74,9 @@
           <div class="kv-row"><span>Created</span><strong>{{ formatDate(selectedLead.created_at) }}</strong></div>
           <div class="kv-row"><span>Plan</span><strong>{{ planLabel(selectedLead.plan) }}</strong></div>
           <div class="kv-row"><span>Schools</span><strong>{{ selectedLead.schools_count ?? "-" }}</strong></div>
-          <div class="kv-row"><span>Name</span><strong>{{ selectedLead.name }}</strong></div>
-          <div class="kv-row"><span>Organization</span><strong>{{ selectedLead.organization }}</strong></div>
-          <div class="kv-row"><span>Reply Email</span><strong>{{ selectedLead.reply_email }}</strong></div>
+          <div class="kv-row"><span>Name</span><strong data-session-replay-mask>{{ selectedLead.name }}</strong></div>
+          <div class="kv-row"><span>Organization</span><strong data-session-replay-mask>{{ selectedLead.organization }}</strong></div>
+          <div class="kv-row"><span>Reply Email</span><strong data-session-replay-mask>{{ selectedLead.reply_email }}</strong></div>
           <div class="kv-row"><span>Lead State</span><strong>{{ leadStateLabel(selectedLead.lead_state) }}</strong></div>
           <div class="kv-row kv-row-stage">
             <span>Stage</span>
@@ -95,7 +95,7 @@
           </div>
           <div class="kv-row kv-row-details">
             <span>Details</span>
-            <p>{{ selectedLead.details || "-" }}</p>
+            <p data-session-replay-mask>{{ selectedLead.details || "-" }}</p>
           </div>
         </div>
 

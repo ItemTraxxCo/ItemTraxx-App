@@ -47,7 +47,7 @@
         <thead><tr><th>Email</th><th>Workspace</th><th>Primary</th><th>Status</th><th>Actions</th></tr></thead>
         <tbody>
           <tr v-for="a in admins" :key="a.id">
-            <td>{{ a.auth_email }}</td>
+            <td><span data-session-replay-mask>{{ a.auth_email }}</span></td>
             <td>{{ a.workspace_name }}</td>
             <td><span class="sa-tag" :class="a.is_primary_admin ? 'ok' : 'info'">{{ a.is_primary_admin ? 'Yes' : 'No' }}</span></td>
             <td><span class="sa-tag" :class="a.is_active ? 'ok' : 'warn'">{{ a.is_active ? 'Active' : 'Suspended' }}</span></td>

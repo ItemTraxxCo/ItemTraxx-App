@@ -2,7 +2,7 @@
     <div class="page admin-shell">
       <div class="admin-hero">
         <div class="admin-toolbar">
-            <div class="muted">Signed in as {{ adminEmail }}</div>
+            <div class="muted">Signed in as <span data-session-replay-mask>{{ adminEmail }}</span></div>
         </div>
       <h1>Workspace Overview</h1>
         <p class="admin-hero-copy">

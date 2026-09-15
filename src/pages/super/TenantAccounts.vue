@@ -33,7 +33,7 @@
       </form>
     </section>
 
-    <p v-if="message" class="sa-notice" role="status">{{ message }}</p>
+    <p v-if="message" class="sa-notice" role="status" data-session-replay-mask>{{ message }}</p>
     <p v-if="error" class="sa-error" role="alert">{{ error }}</p>
 
     <div class="sa-table-wrap">
@@ -41,7 +41,7 @@
         <thead><tr><th>Email</th><th>Workspace</th><th>Status</th><th>Actions</th></tr></thead>
         <tbody>
           <tr v-for="account in accounts" :key="account.id">
-            <td><input v-model="account.auth_email" type="email" :aria-label="`Email for ${account.workspace_name}`" /></td>
+            <td><input v-model="account.auth_email" data-session-replay-mask type="email" :aria-label="`Email for ${account.workspace_name}`" /></td>
             <td>{{ account.workspace_name }}</td>
             <td>
               <span class="sa-tag" :class="account.is_active ? 'ok' : 'warn'">

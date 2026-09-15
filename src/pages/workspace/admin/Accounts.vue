@@ -23,7 +23,7 @@
           </thead>
           <tbody>
             <tr v-for="account in accounts" :key="account.id">
-              <td>{{ account.auth_email }}</td>
+              <td><span data-session-replay-mask>{{ account.auth_email }}</span></td>
               <td>{{ account.is_active ? "Active" : "Suspended" }}</td>
               <td class="accounts-actions">
                 <button type="button" @click="toggle(account)">

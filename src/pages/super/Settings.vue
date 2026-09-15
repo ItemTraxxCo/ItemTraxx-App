@@ -19,7 +19,7 @@
     <section class="sa-panel">
       <h2>Password reset</h2>
       <p class="sa-toolbar-sub">Send yourself a reset link if you want to rotate your password.</p>
-      <p class="muted">Reset links are sent to <strong>{{ auth.email || "your account email" }}</strong>.</p>
+      <p class="muted">Reset links are sent to <strong data-session-replay-mask>{{ auth.email || "your account email" }}</strong>.</p>
       <div class="panel-actions">
         <button type="button" class="sa-btn primary" :disabled="isPasswordResetSending" @click="sendPasswordReset">
           Send reset password email

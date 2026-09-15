@@ -99,7 +99,7 @@
             <tr v-for="admin in admins" :key="admin.id">
               <td>
                 <div class="admin-email-cell">
-                  <span>{{ admin.auth_email }}</span>
+                  <span data-session-replay-mask>{{ admin.auth_email }}</span>
                   <span v-if="admin.is_primary_admin" class="status-pill is-primary">Primary admin</span>
                 </div>
               </td>
@@ -168,7 +168,7 @@
             <span v-if="primaryAdminEmailCopied" aria-hidden="true">✓</span>
             <span v-else aria-hidden="true">⧉</span>
           </button>
-          <span class="primary-admin-email-value">{{ primaryAdminEmailValue }}</span>
+          <span class="primary-admin-email-value" data-session-replay-mask>{{ primaryAdminEmailValue }}</span>
         </div>
       </div>
     </div>

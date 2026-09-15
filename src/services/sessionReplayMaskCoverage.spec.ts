@@ -14,6 +14,7 @@ const coverageCases = [
       "data-session-replay-mask>{{ selectedRequest.assigned_to_email || \"Unassigned\" }}",
       "data-session-replay-mask>{{ selectedRequest.subject }}",
       "data-session-replay-mask>{{ selectedRequest.message }}",
+      ':href="safeExternalUrl(attachment.signed_url)"\n                data-session-replay-mask\n                data-sentry-block',
       'data-session-replay-mask\n                  :alt="attachment.original_filename || attachment.stored_filename"',
       "<div class=\"attachment-meta\" data-session-replay-mask>",
       'class="muted small" data-session-replay-mask>{{ event.actor_email || "System" }}',

@@ -140,6 +140,8 @@
               <a
                 v-if="safeExternalUrl(attachment.signed_url)"
                 :href="safeExternalUrl(attachment.signed_url)"
+                data-session-replay-mask
+                data-sentry-block
                 target="_blank"
                 rel="noreferrer"
                 class="attachment-preview-link"

@@ -131,6 +131,17 @@ const coverageCases = [
     path: "../pages/workspace/admin/AdminHome.vue",
     snippets: ["<span data-session-replay-mask>{{ adminEmail }}</span>"],
   },
+  {
+    name: "account security secrets",
+    path: "../pages/AccountSecurity.vue",
+    snippets: [
+      '<img\n          v-if="qrCode"\n          data-session-replay-mask',
+      '<details data-session-replay-mask>',
+      '<code data-session-replay-mask>{{ totpUri }}</code>',
+      '<div v-if="backupCodes.length" class="backup-codes" data-session-replay-mask role="status">',
+      '<code v-for="code in backupCodes" :key="code" data-session-replay-mask>{{ code }}</code>',
+    ],
+  },
 ] as const;
 
 describe("session replay sensitive-text coverage", () => {

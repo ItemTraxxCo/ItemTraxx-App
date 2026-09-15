@@ -6,10 +6,10 @@ import {
 } from "./cookieConsentService";
 import { isRecoverableChunkLoadError } from "./appErrorRecovery";
 import type { CaptureResult } from "posthog-js";
-import { scrubSensitiveRecoveryUrlValue } from "../utils/passwordResetRedirect";
 import { AppError } from "./appErrors";
 import {
   maskSessionReplayAttribute,
+  scrubSensitiveReplayUrlValue,
   SESSION_REPLAY_MASK_SELECTOR,
 } from "./sessionReplayPrivacy";
 
@@ -142,7 +142,7 @@ export const sanitizeRecoveryUrlProperties = (
   const safeProperties: Record<string, unknown> = { ...properties };
   for (const [key, value] of Object.entries(properties)) {
     if (!URL_PROPERTY_KEY.test(key) || typeof value !== "string") continue;
-    const safeValue = scrubSensitiveRecoveryUrlValue(value);
+    const safeValue = scrubSensitiveReplayUrlValue(value);
     if (safeValue !== value) {
       safeProperties[key] = safeValue;
       changed = true;
@@ -320,9 +320,10 @@ export const initPostHog = async () => {
         recordHeaders: false,
         recordBody: false,
         // Replay captures page and request URLs separately from event
-        // properties. Redact reset-link query/hash material at that boundary.
+        // properties. Redact reset-link and signed-storage query/hash material
+        // at that boundary while keeping ordinary request URLs intact.
         maskCapturedNetworkRequestFn: (request) => {
-          const safeName = scrubSensitiveRecoveryUrlValue(request.name);
+          const safeName = scrubSensitiveReplayUrlValue(request.name);
           return safeName === request.name ? request : { ...request, name: safeName };
         },
       },

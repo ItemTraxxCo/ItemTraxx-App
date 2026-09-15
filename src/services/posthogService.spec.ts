@@ -113,12 +113,22 @@ describe("initPostHog", () => {
     const qrDataUrl = "data:image/png;base64,totp-secret";
     expect(sessionRecording?.session_recording?.maskAttributeFn?.("src", qrDataUrl, markedImage)).toBe("*".repeat(qrDataUrl.length));
     expect(sessionRecording?.session_recording?.maskAttributeFn?.("title", "Borrower name", markedImage)).toBe("*".repeat("Borrower name".length));
+    const markedAnchor = document.createElement("a");
+    markedAnchor.setAttribute("data-session-replay-mask", "");
+    const signedAttachmentUrl = "https://project.supabase.co/storage/v1/object/sign/support-attachments/ticket-42/evidence.png?token=secret";
+    expect(sessionRecording?.session_recording?.maskAttributeFn?.("href", signedAttachmentUrl, markedAnchor)).toBe("*".repeat(signedAttachmentUrl.length));
     const ordinaryImage = document.createElement("img");
     expect(sessionRecording?.session_recording?.maskAttributeFn?.("src", "/logo.svg", ordinaryImage)).toBe("/logo.svg");
     const maskedRequest = sessionRecording?.session_recording?.maskCapturedNetworkRequestFn?.({
       name: "https://www.itemtraxx.com/reset-password?token=secret",
     });
     expect(maskedRequest).toMatchObject({ name: "https://www.itemtraxx.com/reset-password" });
+    const maskedSignedRequest = sessionRecording?.session_recording?.maskCapturedNetworkRequestFn?.({
+      name: `${signedAttachmentUrl}&download=1`,
+    });
+    expect(maskedSignedRequest).toMatchObject({
+      name: "https://project.supabase.co/storage/v1/object/sign/support-attachments/ticket-42/evidence.png",
+    });
     const ordinaryRequest = sessionRecording?.session_recording?.maskCapturedNetworkRequestFn?.({
       name: "https://www.itemtraxx.com/login?next=/workspace",
     });

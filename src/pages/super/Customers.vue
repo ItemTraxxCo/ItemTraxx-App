@@ -36,7 +36,7 @@
         </thead>
         <tbody>
           <tr v-for="customer in customers" :key="customer.id">
-            <td>{{ customer.organization }}</td>
+            <td><span data-session-replay-mask>{{ customer.organization }}</span></td>
             <td>{{ planLabel(customer.plan) }}</td>
             <td>{{ statusLabel(customer.latest_status) }}</td>
             <td>
@@ -60,11 +60,11 @@
         <div class="modal-body">
           <div class="kv-row"><span>Plan</span><strong>{{ planLabel(selectedCustomer.plan) }}</strong></div>
           <div class="kv-row"><span>Schools</span><strong>{{ selectedCustomer.schools_count ?? "-" }}</strong></div>
-          <div class="kv-row"><span>Name</span><strong>{{ selectedCustomer.name }}</strong></div>
-          <div class="kv-row"><span>Organization</span><strong>{{ selectedCustomer.organization }}</strong></div>
-          <div class="kv-row"><span>Reply Email</span><strong>{{ selectedCustomer.reply_email }}</strong></div>
+          <div class="kv-row"><span>Name</span><strong data-session-replay-mask>{{ selectedCustomer.name }}</strong></div>
+          <div class="kv-row"><span>Organization</span><strong data-session-replay-mask>{{ selectedCustomer.organization }}</strong></div>
+          <div class="kv-row"><span>Reply Email</span><strong data-session-replay-mask>{{ selectedCustomer.reply_email }}</strong></div>
           <div class="kv-row"><span>Stage</span><strong>{{ stageLabel(selectedCustomer.stage) }}</strong></div>
-          <div class="kv-row"><span>Details</span><p>{{ selectedCustomer.details || "-" }}</p></div>
+          <div class="kv-row"><span>Details</span><p data-session-replay-mask>{{ selectedCustomer.details || "-" }}</p></div>
           <div class="kv-row"><span>Status</span><strong>{{ statusLabel(selectedCustomer.latest_status) }}</strong></div>
         </div>
 

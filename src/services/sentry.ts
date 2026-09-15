@@ -2,7 +2,11 @@ import type { App } from "vue";
 import type { Router } from "vue-router";
 import { shouldReportError } from "./appErrors";
 import { allowsDiagnostics, allowsSessionReplay, readCookieConsent } from "./cookieConsentService";
-import { scrubSensitiveRecoveryUrlValue } from "../utils/passwordResetRedirect";
+import {
+  sanitizeSentryReplayEvent,
+  scrubSensitiveReplayUrlValue,
+  SESSION_REPLAY_MASK_SELECTOR,
+} from "./sessionReplayPrivacy";
 
 const SENTRY_DSN = import.meta.env.VITE_SENTRY_DSN?.trim();
 const SENTRY_ENVIRONMENT = import.meta.env.VITE_SENTRY_ENVIRONMENT || import.meta.env.MODE;
@@ -35,7 +39,7 @@ const sanitizeRecoveryUrls = <T extends EventWithRequest>(event: T): T => {
   let changed = false;
   const safeRequest = { ...request };
   if (typeof request.url === "string") {
-    const safeUrl = scrubSensitiveRecoveryUrlValue(request.url);
+    const safeUrl = scrubSensitiveReplayUrlValue(request.url);
     if (safeUrl !== request.url) {
       safeRequest.url = safeUrl;
       changed = true;
@@ -47,7 +51,7 @@ const sanitizeRecoveryUrls = <T extends EventWithRequest>(event: T): T => {
       if (!/^(referer|referrer)$/i.test(key)) continue;
       const value = safeHeaders[key];
       if (typeof value !== "string") continue;
-      const safeValue = scrubSensitiveRecoveryUrlValue(value);
+      const safeValue = scrubSensitiveReplayUrlValue(value);
       if (safeValue !== value) {
         safeHeaders[key] = safeValue;
         changed = true;
@@ -86,8 +90,17 @@ const loadSentryReplay = async () => {
     const { addIntegration, replayIntegration } = await import("@sentry/vue");
     addIntegration(
       replayIntegration({
-        maskAllText: true,
+        maskAllText: false,
+        maskAllInputs: true,
+        mask: [SESSION_REPLAY_MASK_SELECTOR],
+        // The signed attachment preview is marked with Sentry's block
+        // selector. Blocking just that anchor removes its href and preserves
+        // the rest of the page (including ordinary links) in replay.
+        block: ["[data-sentry-block]"],
         blockAllMedia: true,
+        // Resource timing entries are custom replay events and can retain the
+        // raw image URL even when the corresponding DOM node is blocked.
+        beforeAddRecordingEvent: sanitizeSentryReplayEvent,
       })
     );
   } catch (error) {

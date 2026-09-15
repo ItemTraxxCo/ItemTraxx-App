@@ -78,12 +78,12 @@
                 <td>{{ formatTime(log.action_time) }}</td>
                 <td>{{ log.action_type }}</td>
                 <td>
-                  <span class="tenant-account-cell" :title="log.tenant_account?.auth_email || 'Unknown account'">
+                  <span class="tenant-account-cell" data-session-replay-mask :title="log.tenant_account?.auth_email || 'Unknown account'">
                     {{ log.tenant_account?.auth_email || "Unknown account" }}
                   </span>
                 </td>
                 <td>
-                  <span v-if="log.borrower">
+                  <span v-if="log.borrower" data-session-replay-mask>
                     {{ log.borrower.username }} ({{ log.borrower.borrower_id }})
                   </span>
                   <span v-else class="muted">-</span>

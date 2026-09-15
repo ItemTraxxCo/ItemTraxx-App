@@ -63,7 +63,7 @@
             </thead>
             <tbody>
               <tr v-for="admin in admins" :key="admin.id">
-                <td>{{ admin.auth_email }}</td>
+                <td><span data-session-replay-mask>{{ admin.auth_email }}</span></td>
                 <td><span class="sa-tag" :class="admin.is_active ? 'ok' : 'critical'">{{ admin.is_active ? "active" : "disabled" }}</span></td>
                 <td>{{ formatDate(admin.created_at) }}</td>
                 <td>
@@ -103,7 +103,7 @@
 
     <div v-if="toastMessage" class="toast">
       <div class="toast-title">{{ toastTitle }}</div>
-      <div class="toast-body">{{ toastMessage }}</div>
+      <div class="toast-body" data-session-replay-mask>{{ toastMessage }}</div>
     </div>
   </div>
 </template>

@@ -2,7 +2,7 @@
   <div v-if="visible" class="stepup-overlay" @click.self="$emit('cancel')">
     <div class="stepup-modal">
       <h3>{{ title }}</h3>
-      <p class="muted">{{ message }}</p>
+      <p class="muted" data-session-replay-mask>{{ message }}</p>
       <label>
         Confirm phrase
         <input

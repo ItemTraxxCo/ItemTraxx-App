@@ -55,7 +55,7 @@
                 <td>{{ row.workspace?.name || row.workspace_id }}</td>
                 <td>{{ row.action_type }}</td>
                 <td>{{ row.item?.name || "-" }} ({{ row.item?.barcode || "-" }})</td>
-                <td>{{ row.borrower ? `${row.borrower.username} (${row.borrower.borrower_id})` : "-" }}</td>
+                <td data-session-replay-mask>{{ row.borrower ? `${row.borrower.username} (${row.borrower.borrower_id})` : "-" }}</td>
               </tr>
             </tbody>
           </table>

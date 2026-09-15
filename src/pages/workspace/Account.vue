@@ -28,8 +28,8 @@
             </thead>
             <tbody>
               <tr v-for="borrower in pagedBorrowers" :key="borrower.id">
-                <td>{{ borrower.username }}</td>
-                <td>{{ borrower.borrower_id }}</td>
+                <td data-session-replay-mask>{{ borrower.username }}</td>
+                <td data-session-replay-mask>{{ borrower.borrower_id }}</td>
               </tr>
               <tr v-if="!pagedBorrowers.length">
                 <td colspan="2" class="muted">No borrowers found.</td>

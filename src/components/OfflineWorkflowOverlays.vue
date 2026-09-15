@@ -30,7 +30,11 @@
           <button type="button" class="offline-review-row" :aria-expanded="expandedId === entry.id" @click="expandedId = expandedId === entry.id ? null : entry.id">
             <span class="offline-review-chevron" aria-hidden="true">›</span>
             <span>
-              <strong>{{ entry.items[0]?.intent === "checkout" ? "Checkout" : "Return" }} · {{ entry.items[0]?.borrower_username || entry.items[0]?.borrower_display_id || "Quick Return" }} · {{ entry.items.length }} item{{ entry.items.length === 1 ? "" : "s" }}</strong>
+              <strong>
+                {{ entry.items[0]?.intent === "checkout" ? "Checkout" : "Return" }} ·
+                <span data-session-replay-mask>{{ entry.items[0]?.borrower_username || entry.items[0]?.borrower_display_id || "Quick Return" }}</span>
+                · {{ entry.items.length }} item{{ entry.items.length === 1 ? "" : "s" }}
+              </strong>
               <small>Needs review — {{ entry.last_error || "server state changed" }}</small>
             </span>
           </button>
@@ -45,7 +49,7 @@
               >
                 <span>Your offline transaction</span>
                 <strong>{{ offlineTransactionLabel(entry) }}</strong>
-                <small>Borrower: {{ offlineBorrowerLabel(entry) }}</small>
+                <small>Borrower: <span data-session-replay-mask>{{ offlineBorrowerLabel(entry) }}</span></small>
                 <small>Recorded: {{ formatTime(entry.created_at) }}</small>
               </button>
               <button
@@ -56,9 +60,14 @@
                 @click="selectResolution(entry.id, 'keep_server')"
               >
                 <span>Current server state</span>
-                <strong>{{ serverStateLabel(entry.items[0]?.server_state) }}</strong>
-                <small>Borrower: {{ serverBorrowerLabel(entry.items[0]?.server_state) }}</small>
-                <small>Tenant account: {{ serverTenantAccountLabel(entry.items[0]?.server_state) }}</small>
+                <strong>
+                  {{ serverStateLabel(entry.items[0]?.server_state) }}
+                  <template v-if="serverBorrowerValue(entry.items[0]?.server_state)">
+                    to <span data-session-replay-mask>{{ serverBorrowerValue(entry.items[0]?.server_state) }}</span>
+                  </template>
+                </strong>
+                <small>Borrower: <span data-session-replay-mask>{{ serverBorrowerLabel(entry.items[0]?.server_state) }}</span></small>
+                <small>Tenant account: <span data-session-replay-mask>{{ serverTenantAccountLabel(entry.items[0]?.server_state) }}</span></small>
                 <small>Server update: {{ serverStateTimeLabel(entry.items[0]?.server_state) }}</small>
               </button>
             </div>
@@ -280,17 +289,20 @@ const offlineBorrowerLabel = (entry: OfflineLedgerEntry) =>
 const serverStateLabel = (value: unknown) => {
   if (!value || typeof value !== "object") return "Current state could not be summarized.";
   const state = value as { status?: string; borrower_id?: string | null; checked_out_by?: string | null };
-  if (state.status === "checked_out") return `Checked out${state.borrower_id || state.checked_out_by ? ` to ${state.borrower_id || state.checked_out_by}` : ""}`;
+  if (state.status === "checked_out") return "Checked out";
   return state.status ? state.status.replaceAll("_", " ") : "Current state available from the server.";
 };
 
 const serverStateDetails = (value: unknown) =>
   value && typeof value === "object" ? value as Record<string, unknown> : {};
 
-const serverBorrowerLabel = (value: unknown) => {
+const serverBorrowerValue = (value: unknown) => {
   const state = serverStateDetails(value);
-  return String(state.borrower_username || state.borrower_id || state.checked_out_by || "Not available");
+  const borrowerValue = state.borrower_username || state.borrower_id || state.checked_out_by;
+  return typeof borrowerValue === "string" && borrowerValue ? borrowerValue : null;
 };
+
+const serverBorrowerLabel = (value: unknown) => serverBorrowerValue(value) || "Not available";
 
 const serverTenantAccountLabel = (value: unknown) => {
   const state = serverStateDetails(value);

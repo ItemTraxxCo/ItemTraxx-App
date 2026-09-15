@@ -34,7 +34,7 @@
         @click="toggleAccount(account.id)"
       >
         <span class="access-chip-check" aria-hidden="true"></span>
-        {{ account.auth_email }}
+        <span data-session-replay-mask>{{ account.auth_email }}</span>
       </button>
     </div>
   </fieldset>

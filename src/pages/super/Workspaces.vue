@@ -51,7 +51,7 @@
                 :class="workspace.archived_at ? 'info' : workspace.status === 'active' ? 'ok' : 'warn'"
               >{{ workspace.archived_at ? 'archived' : workspace.status }}</span>
             </td>
-            <td>{{ workspace.primary_admin_email || 'Not assigned' }}</td>
+            <td><span data-session-replay-mask>{{ workspace.primary_admin_email || 'Not assigned' }}</span></td>
             <td>
               <div class="sa-table-row-actions">
                 <button class="sa-btn" @click="openEdit(workspace)">Edit</button>

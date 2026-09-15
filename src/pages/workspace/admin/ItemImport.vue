@@ -58,7 +58,7 @@
             <td>{{ row.name }}</td>
             <td>{{ row.barcode }}</td>
             <td>{{ row.serial_number || "-" }}</td>
-            <td>{{ row.notes || "-" }}</td>
+            <td data-session-replay-mask>{{ row.notes || "-" }}</td>
           </tr>
         </tbody>
       </table>

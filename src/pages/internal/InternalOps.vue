@@ -217,7 +217,7 @@
               </td>
               <td>{{ event.item_name ?? "-" }}</td>
               <td>{{ event.item_barcode ?? "-" }}</td>
-              <td>{{ event.borrower_username ?? "-" }}</td>
+              <td data-session-replay-mask>{{ event.borrower_username ?? "-" }}</td>
             </tr>
           </tbody>
         </table>
@@ -239,7 +239,7 @@
           <tbody>
             <tr v-for="row in snapshot?.recent_audit ?? []" :key="row.id">
               <td>{{ formatDateTime(row.created_at) }}</td>
-              <td>{{ row.actor_email ?? "-" }}</td>
+              <td data-session-replay-mask>{{ row.actor_email ?? "-" }}</td>
               <td>{{ row.action_type }}</td>
               <td>{{ row.target_type ?? "-" }} {{ row.target_id ?? "" }}</td>
             </tr>

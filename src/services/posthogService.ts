@@ -6,8 +6,12 @@ import {
 } from "./cookieConsentService";
 import { isRecoverableChunkLoadError } from "./appErrorRecovery";
 import type { CaptureResult } from "posthog-js";
-import { scrubSensitiveRecoveryUrlValue } from "../utils/passwordResetRedirect";
 import { AppError } from "./appErrors";
+import {
+  maskSessionReplayAttribute,
+  scrubSensitiveReplayUrlValue,
+  SESSION_REPLAY_MASK_SELECTOR,
+} from "./sessionReplayPrivacy";
 
 let initialized = false;
 let posthog: typeof import("posthog-js").default | null = null;
@@ -138,7 +142,7 @@ export const sanitizeRecoveryUrlProperties = (
   const safeProperties: Record<string, unknown> = { ...properties };
   for (const [key, value] of Object.entries(properties)) {
     if (!URL_PROPERTY_KEY.test(key) || typeof value !== "string") continue;
-    const safeValue = scrubSensitiveRecoveryUrlValue(value);
+    const safeValue = scrubSensitiveReplayUrlValue(value);
     if (safeValue !== value) {
       safeProperties[key] = safeValue;
       changed = true;
@@ -301,26 +305,27 @@ export const initPostHog = async () => {
         beforeSend: () => null,
       },
       // Session replay is a diagnostic sink, so it follows diagnostics consent
-      // like exception autocapture above. Authenticated and admin DOM text can
-      // contain support requests and other tenant-sensitive data, so every text
-      // node and input is masked: the recording keeps layout, navigation, and
-      // interaction shape without the content.
+      // like exception autocapture above. Keep input values masked, but redact
+      // only explicitly marked borrower/user data so the rest of the page stays
+      // useful in the replay viewer.
       disable_session_recording: !allowsSessionReplay(currentConsent),
       session_recording: {
         maskAllInputs: true,
-        maskTextSelector: "*",
-        // Attribute values (for example title, aria-label, and href) can carry
-        // tenant or user content even when visible text is masked.
-        maskAllElementAttributes: true,
-        // Replay captures page and request URLs separately from event
-        // properties. Redact reset-link query/hash material at that boundary.
-        maskCapturedNetworkRequestFn: (request) => {
-          const safeName = scrubSensitiveRecoveryUrlValue(request.name);
-          return safeName === request.name ? request : { ...request, name: safeName };
-        },
-        // Network capture would put back the content that text masking removes.
+        maskTextSelector: SESSION_REPLAY_MASK_SELECTOR,
+        // Explicitly disable the project-wide blanket attribute setting so it
+        // cannot override the selective callback below and blank images/links.
+        maskAllElementAttributes: false,
+        maskAttributeFn: maskSessionReplayAttribute,
+        // Network capture would put back the content that DOM masking removes.
         recordHeaders: false,
         recordBody: false,
+        // Replay captures page and request URLs separately from event
+        // properties. Redact reset-link and signed-storage query/hash material
+        // at that boundary while keeping ordinary request URLs intact.
+        maskCapturedNetworkRequestFn: (request) => {
+          const safeName = scrubSensitiveReplayUrlValue(request.name);
+          return safeName === request.name ? request : { ...request, name: safeName };
+        },
       },
       disable_surveys: true,
       disable_surveys_automatic_display: true,

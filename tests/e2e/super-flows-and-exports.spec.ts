@@ -137,6 +137,108 @@ test.describe("Super admin flows and export actions", () => {
     await expect(passkeyRow).not.toContainText("Not recorded");
   });
 
+  test("super-admin account security signs out other devices without losing the current session", async ({ page }) => {
+    const requests = await captureSuperOpsRequests(page);
+    let genericRevokeCalls = 0;
+    await page.route("**/api/auth/revoke-other-sessions", async (route) => {
+      genericRevokeCalls += 1;
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ status: true }),
+      });
+    });
+
+    await page.goto("/");
+    await setSuperAdminSession(page);
+    await navigateApp(page, "/account/security");
+
+    await page.getByRole("button", { name: "Sign out other sessions" }).click();
+    await expect(page.getByText("Other sessions signed out.")).toBeVisible();
+    await expect.poll(() => requests.filter(({ action }) => action === "revoke_all_sessions")).toHaveLength(1);
+    expect(genericRevokeCalls).toBe(0);
+    expect(requests.find(({ action }) => action === "revoke_all_sessions")).toEqual({
+      action: "revoke_all_sessions",
+      payload: expect.objectContaining({
+        sign_out_current: false,
+        device_id: expect.any(String),
+        device_label: expect.any(String),
+      }),
+    });
+
+    await navigateApp(page, "/");
+    await expect(page).toHaveURL(/\/super-admin$/);
+    await expect(page).not.toHaveURL(/\/super-auth$/);
+  });
+
+  test("super-admin settings bulk revocation keeps the current device active", async ({ page }) => {
+    const requests: SuperOpsRequest[] = [];
+    let remoteRevoked = false;
+    await page.route(/\/functions(?:\/v1)?\/super-ops(?:\?.*)?$/, async (route) => {
+      const request = route.request().postDataJSON() as SuperOpsRequest;
+      requests.push(request);
+      const data = request.action === "list_sessions"
+        ? {
+            sessions: [
+              {
+                id: "session-current",
+                device_id: "device-current",
+                device_label: "Current device",
+                user_agent: "Playwright",
+                login_method: "password",
+                login_location: "super_settings",
+                general_location: "Test Lab",
+                created_at: "2026-07-13T00:00:00.000Z",
+                last_seen_at: "2026-07-13T00:01:00.000Z",
+                is_current: true,
+              },
+              ...(remoteRevoked
+                ? []
+                : [{
+                    id: "session-remote",
+                    device_id: "device-remote",
+                    device_label: "Remote device",
+                    user_agent: "Playwright",
+                    login_method: "passkey",
+                    login_location: "super_auth",
+                    general_location: "Test Lab",
+                    created_at: "2026-07-12T00:00:00.000Z",
+                    last_seen_at: "2026-07-12T00:01:00.000Z",
+                    is_current: false,
+                  }]),
+            ],
+          }
+        : request.action === "revoke_all_sessions"
+        ? (remoteRevoked = true, { revoked: 1 })
+        : {};
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ data }),
+      });
+    });
+
+    await page.goto("/");
+    await setSuperAdminSession(page);
+    await navigateApp(page, "/super-admin/settings");
+
+    await expect(page.getByRole("heading", { name: "Super Admin Settings" })).toBeVisible();
+    await expect(page.getByRole("cell", { name: "Remote device" })).toBeVisible();
+    await page.getByRole("button", { name: "Sign out all other sessions" }).click();
+    await expect(page.getByText("1 session(s) revoked.")).toBeVisible();
+    await expect(page.getByRole("cell", { name: "Current device" })).toBeVisible();
+    await expect(page.getByRole("cell", { name: "Remote device" })).toHaveCount(0);
+
+    const revokeRequest = requests.find(({ action }) => action === "revoke_all_sessions");
+    expect(revokeRequest).toEqual({
+      action: "revoke_all_sessions",
+      payload: expect.objectContaining({ sign_out_current: false }),
+    });
+    await navigateApp(page, "/");
+    await expect(page).toHaveURL(/\/super-admin$/);
+    await expect(page).not.toHaveURL(/\/super-auth$/);
+  });
+
   test("control-center actions preserve their exact request envelopes", async ({ page }) => {
     const requests = await captureSuperOpsRequests(page);
     await page.goto("/");

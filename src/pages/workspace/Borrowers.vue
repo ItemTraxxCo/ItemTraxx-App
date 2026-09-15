@@ -18,8 +18,8 @@
         </thead>
         <tbody>
           <tr v-for="borrower in borrowers" :key="borrower.id">
-            <td>{{ borrower.username }}</td>
-            <td>{{ borrower.borrower_id }}</td>
+            <td data-session-replay-mask>{{ borrower.username }}</td>
+            <td data-session-replay-mask>{{ borrower.borrower_id }}</td>
           </tr>
           <tr v-if="!borrowers.length"><td colspan="2">No borrowers found.</td></tr>
         </tbody>

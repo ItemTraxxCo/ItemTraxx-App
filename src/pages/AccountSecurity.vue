@@ -26,8 +26,18 @@
       <label>Current password <input v-model="password" type="password" autocomplete="current-password" /></label>
       <button v-if="!twoFactorEnabled" :disabled="busy || !password" @click="beginTwoFactor">Set up authenticator</button>
       <template v-if="totpUri">
-        <img v-if="qrCode" :src="qrCode" alt="Authenticator enrollment QR code" width="220" height="220" />
-        <details><summary>Manual setup code</summary><code>{{ totpUri }}</code></details>
+        <img
+          v-if="qrCode"
+          data-session-replay-mask
+          :src="qrCode"
+          alt="Authenticator enrollment QR code"
+          width="220"
+          height="220"
+        />
+        <details data-session-replay-mask>
+          <summary>Manual setup code</summary>
+          <code data-session-replay-mask>{{ totpUri }}</code>
+        </details>
         <label>Verification code <input v-model="totpCode" inputmode="numeric" autocomplete="one-time-code" /></label>
         <button :disabled="busy || totpCode.length < 6" @click="verifyEnrollment">Verify and enable</button>
       </template>
@@ -36,10 +46,10 @@
         <button :disabled="busy || !password" @click="regenerateBackupCodes">Regenerate backup codes</button>
         <button :disabled="busy || !password" @click="disableTwoFactor">Disable two-factor authentication</button>
       </template>
-      <div v-if="backupCodes.length" class="backup-codes" role="status">
+      <div v-if="backupCodes.length" class="backup-codes" data-session-replay-mask role="status">
         <h3>Save these backup codes now</h3>
         <p>Each code works once. Store them somewhere secure.</p>
-        <code v-for="code in backupCodes" :key="code">{{ code }}</code>
+        <code v-for="code in backupCodes" :key="code" data-session-replay-mask>{{ code }}</code>
       </div>
     </section>
 
@@ -59,6 +69,7 @@ import { computed, onMounted, ref } from "vue";
 import QRCode from "qrcode";
 import { RouterLink } from "vue-router";
 import { authClient } from "../auth/client";
+import { revokeAllSuperAdminSessions } from "../services/superOps/sessions";
 import { getAuthState } from "../store/authState";
 
 type PasskeyItem = { id: string; name?: string | null };
@@ -133,8 +144,12 @@ const disableTwoFactor = () => run(async () => {
   twoFactorEnabled.value = false; backupCodes.value = []; message.value = "Two-factor authentication disabled.";
 });
 const signOutOthers = () => run(async () => {
-  const result = await authClient.revokeOtherSessions();
-  if (result.error) throw new Error(result.error.message ?? "Unable to revoke sessions.");
+  if (authState.role === "super_admin") {
+    await revokeAllSuperAdminSessions(false);
+  } else {
+    const result = await authClient.revokeOtherSessions();
+    if (result.error) throw new Error(result.error.message ?? "Unable to revoke sessions.");
+  }
   message.value = "Other sessions signed out.";
 });
 onMounted(() => void run(load));

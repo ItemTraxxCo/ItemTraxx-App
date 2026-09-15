@@ -67,7 +67,7 @@
             <td>{{ item.barcode }}</td>
             <td>{{ item.status }}</td>
             <td>{{ formatDate(item.updated_at) }}</td>
-            <td>{{ item.notes || "-" }}</td>
+            <td data-session-replay-mask>{{ item.notes || "-" }}</td>
           </tr>
           <tr v-if="filteredFlaggedItems.length === 0">
             <td colspan="5" class="muted">No flagged items.</td>
@@ -103,7 +103,7 @@
             <td>{{ formatDate(event.changed_at) }}</td>
             <td>{{ event.item?.name || "-" }} ({{ event.item?.barcode || "-" }})</td>
             <td>{{ event.status }}</td>
-            <td>{{ event.note || "-" }}</td>
+            <td data-session-replay-mask>{{ event.note || "-" }}</td>
           </tr>
           <tr v-if="filteredHistory.length === 0">
             <td colspan="4" class="muted">No status history found. If you believe this is an error, please contact support.</td>

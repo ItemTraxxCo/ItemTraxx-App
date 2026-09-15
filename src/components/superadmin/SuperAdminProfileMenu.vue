@@ -9,7 +9,7 @@
     >
       <span class="sa-avatar">{{ initials }}</span>
       <span v-if="!collapsed" class="sa-profile-meta">
-        <span class="sa-profile-name">{{ auth.email || "Super Admin" }}</span>
+        <span class="sa-profile-name" data-session-replay-mask>{{ auth.email || "Super Admin" }}</span>
         <span class="sa-profile-role">Super Admin</span>
       </span>
       <SuperAdminIcon v-if="!collapsed" name="chevronDown" />

@@ -108,10 +108,13 @@ describe("initPostHog", () => {
         maskCapturedNetworkRequestFn?: (request: { name: string }) => { name?: string };
       };
     } | undefined;
-    const image = document.createElement("img");
-    image.setAttribute("data-session-replay-mask", "");
-    expect(sessionRecording?.session_recording?.maskAttributeFn?.("src", "/logo.svg", image)).toBe("/logo.svg");
-    expect(sessionRecording?.session_recording?.maskAttributeFn?.("title", "Borrower name", image)).toBe("*".repeat("Borrower name".length));
+    const markedImage = document.createElement("img");
+    markedImage.setAttribute("data-session-replay-mask", "");
+    const qrDataUrl = "data:image/png;base64,totp-secret";
+    expect(sessionRecording?.session_recording?.maskAttributeFn?.("src", qrDataUrl, markedImage)).toBe("*".repeat(qrDataUrl.length));
+    expect(sessionRecording?.session_recording?.maskAttributeFn?.("title", "Borrower name", markedImage)).toBe("*".repeat("Borrower name".length));
+    const ordinaryImage = document.createElement("img");
+    expect(sessionRecording?.session_recording?.maskAttributeFn?.("src", "/logo.svg", ordinaryImage)).toBe("/logo.svg");
     const maskedRequest = sessionRecording?.session_recording?.maskCapturedNetworkRequestFn?.({
       name: "https://www.itemtraxx.com/reset-password?token=secret",
     });

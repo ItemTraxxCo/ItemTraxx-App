@@ -12,8 +12,8 @@ export const SESSION_REPLAY_MASK_SELECTOR = "[data-session-replay-mask]";
 const maskValue = (value: string) => "*".repeat(value.length);
 
 /**
- * Preserve normal DOM attributes (especially image src and link href values)
- * while removing sensitive metadata from replay snapshots.
+ * Preserve normal DOM attributes (especially ordinary image src and link href
+ * values) while removing sensitive metadata from replay snapshots.
  */
 export const maskSessionReplayAttribute = (
   name: string,
@@ -34,13 +34,19 @@ export const maskSessionReplayAttribute = (
     return maskValue(value);
   }
 
-  // If an explicitly marked node carries an alternate label or serialized
-  // value, redact that metadata without touching classes, styles, src, or href.
-  if (
-    element?.matches(SESSION_REPLAY_MASK_SELECTOR) &&
-    (normalizedName === "alt" || normalizedName === "value")
-  ) {
-    return maskValue(value);
+  if (element?.matches(SESSION_REPLAY_MASK_SELECTOR)) {
+    // A marked image can encode a secret in a data URL (for example, a TOTP
+    // enrollment QR). Mask the source itself while leaving ordinary images
+    // untouched when they are not marked.
+    if (normalizedName === "src" && element.localName === "img") {
+      return maskValue(value);
+    }
+
+    // Marked alternate labels and serialized values can contain the same
+    // sensitive text as the visible node.
+    if (normalizedName === "alt" || normalizedName === "value") {
+      return maskValue(value);
+    }
   }
 
   return value;

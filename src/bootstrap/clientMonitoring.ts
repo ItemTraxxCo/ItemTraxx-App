@@ -40,8 +40,12 @@ export const createClientMonitoring = (router: Router) => {
       return;
     }
     try {
-      const { initPostHog } = await loadPostHogService();
+      const { initPostHog, syncPostHogConsent } = await loadPostHogService();
       await initPostHog();
+      // Reconcile the consent cookie immediately after init. PostHog keeps
+      // opt-in/opt-out state in origin-local persistence, so a stale opt-out
+      // from this host must not suppress an otherwise-consented replay.
+      syncPostHogConsent();
     } catch (error) {
       // Analytics must never break login or core flows.
       console.warn("[posthog] initialization failed; continuing without analytics.", error);

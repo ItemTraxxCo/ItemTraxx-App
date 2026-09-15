@@ -80,7 +80,8 @@
         <p v-if="(dashboard?.recent_actions?.length ?? 0) === 0" class="muted">No recent actions.</p>
         <ul v-else class="attention-list">
           <li v-for="item in (dashboard?.recent_actions ?? []).slice(0, 5)" :key="item.id" class="attention-item">
-            {{ item.actor_email || item.actor_id }} — {{ item.action_type }}
+            <span v-if="item.actor_email" data-session-replay-mask>{{ item.actor_email }}</span>
+            <span v-else>{{ item.actor_id }}</span> — {{ item.action_type }}
           </li>
         </ul>
       </section>
@@ -318,7 +319,10 @@
             <tr v-for="item in dashboard?.recent_actions ?? []" :key="item.id">
               <td>{{ formatDateTime(item.created_at) }}</td>
               <td>{{ item.action_type }}</td>
-              <td>{{ item.actor_email || item.actor_id }}</td>
+              <td>
+                <span v-if="item.actor_email" data-session-replay-mask>{{ item.actor_email }}</span>
+                <span v-else>{{ item.actor_id }}</span>
+              </td>
               <td>{{ item.target_type || "-" }} {{ item.target_id || "" }}</td>
             </tr>
             <tr v-if="(dashboard?.recent_actions?.length ?? 0) === 0">

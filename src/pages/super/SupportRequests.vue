@@ -58,11 +58,11 @@
           <tbody>
             <tr v-for="request in requests" :key="request.id">
               <td>
-                <div>{{ request.requester_name }}</div>
-                <div class="muted small">{{ request.reply_email }}</div>
+                <div data-session-replay-mask>{{ request.requester_name }}</div>
+                <div class="muted small" data-session-replay-mask>{{ request.reply_email }}</div>
               </td>
               <td>{{ categoryLabel(request.category) }}</td>
-              <td>{{ request.subject }}</td>
+              <td><span data-session-replay-mask>{{ request.subject }}</span></td>
               <td>
                 <span
                   class="sa-tag"
@@ -90,8 +90,8 @@
       <section class="sa-modal">
         <h2>Support Request Details</h2>
         <div class="modal-body">
-          <div class="kv-row"><span>Requester</span><strong>{{ selectedRequest.requester_name }}</strong></div>
-          <div class="kv-row"><span>Reply Email</span><strong>{{ selectedRequest.reply_email }}</strong></div>
+          <div class="kv-row"><span>Requester</span><strong data-session-replay-mask>{{ selectedRequest.requester_name }}</strong></div>
+          <div class="kv-row"><span>Reply Email</span><strong data-session-replay-mask>{{ selectedRequest.reply_email }}</strong></div>
           <div class="kv-row"><span>Category</span><strong>{{ categoryLabel(selectedRequest.category) }}</strong></div>
           <div class="kv-row"><span>Created</span><strong>{{ formatDate(selectedRequest.created_at) }}</strong></div>
           <div class="kv-row">
@@ -104,15 +104,15 @@
           </div>
           <div class="kv-row">
             <span>Assigned</span>
-            <strong>{{ selectedRequest.assigned_to_email || "Unassigned" }}</strong>
+            <strong data-session-replay-mask>{{ selectedRequest.assigned_to_email || "Unassigned" }}</strong>
           </div>
           <div class="kv-row kv-row-details">
             <span>Subject</span>
-            <p>{{ selectedRequest.subject }}</p>
+            <p data-session-replay-mask>{{ selectedRequest.subject }}</p>
           </div>
           <div class="kv-row kv-row-details">
             <span>Message</span>
-            <p>{{ selectedRequest.message }}</p>
+            <p data-session-replay-mask>{{ selectedRequest.message }}</p>
           </div>
           <div class="kv-row kv-row-details">
             <span>Internal Notes</span>
@@ -146,11 +146,12 @@
               >
                 <img
                   :src="safeExternalUrl(attachment.signed_url)"
+                  data-session-replay-mask
                   :alt="attachment.original_filename || attachment.stored_filename"
                   class="attachment-preview"
                 />
               </a>
-              <div class="attachment-meta">
+              <div class="attachment-meta" data-session-replay-mask>
                 <strong>{{ attachment.original_filename || attachment.stored_filename }}</strong>
                 <span class="muted small">{{ formatBytes(attachment.size_bytes) }} · {{ attachment.content_type }}</span>
               </div>
@@ -169,8 +170,8 @@
                 <strong>{{ event.event_type }}</strong>
                 <span class="muted">{{ formatDate(event.created_at) }}</span>
               </div>
-              <div class="muted small">{{ event.actor_email || "System" }}</div>
-              <pre v-if="event.metadata" class="event-metadata">{{ formatEventMetadata(event.metadata) }}</pre>
+              <div class="muted small" data-session-replay-mask>{{ event.actor_email || "System" }}</div>
+              <pre v-if="event.metadata" class="event-metadata" data-session-replay-mask>{{ formatEventMetadata(event.metadata) }}</pre>
             </li>
             <li v-if="!selectedRequest.events.length" class="muted">No events yet.</li>
           </ul>

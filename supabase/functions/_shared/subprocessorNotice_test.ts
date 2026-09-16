@@ -33,8 +33,8 @@ Deno.test("buildSubprocessorEmailSubject: replaced", () => {
 
 Deno.test("buildSubprocessorEmailSubject: removed", () => {
   assertEquals(
-    buildSubprocessorEmailSubject("Sentry", "removed"),
-    "ItemTraxx Data Processing Notice: Subprocessor Removed — Sentry",
+    buildSubprocessorEmailSubject("Legacy Monitoring Vendor", "removed"),
+    "ItemTraxx Data Processing Notice: Subprocessor Removed — Legacy Monitoring Vendor",
   );
 });
 

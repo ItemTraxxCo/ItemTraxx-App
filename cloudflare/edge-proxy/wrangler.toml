@@ -34,7 +34,12 @@ SESSION_COOKIE_SAMESITE = "lax"
 # Optional hard allowlist of function names (comma-separated).
 ALLOWED_FUNCTIONS = "checkoutReturn,checkout-borrower-lookup,offline-checkout,admin-item-mutate,admin-borrower-mutate,admin-ops,system-status,super-workspace-mutate,super-admin-mutate,super-dashboard,super-item-mutate,super-borrower-mutate,super-logs-query,super-ops,contact-sales-submit,contact-support-submit,client-error-report,consent-record,job-worker,login-notify,intercom-jwt,workspace-admin-mutate,privileged-step-up"
 ITX_ITEMTRAXX_KILLSWITCH_ENABLED = "false"
-SENTRY_ENVIRONMENT = "production"
+# W3C trace context is propagated to Supabase. Direct PostHog trace export is
+# intentionally owned by the Supabase service; Cloudflare Observability sends
+# Worker console records through the existing log bridge.
+ITX_ENVIRONMENT = "production"
+ITX_OTEL_TRACE_SAMPLE_RATE = "0.1"
+ITX_LOG_SUCCESS_SAMPLE_RATE = "0.01"
 BETTER_AUTH_URL = "https://edge.itemtraxx.com"
 BETTER_AUTH_TRUSTED_ORIGINS = "https://itemtraxx.com,https://www.itemtraxx.com,https://internal.itemtraxx.com,https://app.itemtraxx.com,https://dennis-dev.itemtraxx.com,https://leo-dev.itemtraxx.com,https://dev.itemtraxx.com,https://preview.itemtraxx.com,https://staging.itemtraxx.com,https://itxdemo.app.itemtraxx.com"
 BETTER_AUTH_JWT_ISSUER = "https://edge.itemtraxx.com/api/auth"

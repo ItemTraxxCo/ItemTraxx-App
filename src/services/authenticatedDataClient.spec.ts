@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("./sentry", () => ({
+vi.mock("./posthogService", () => ({
   captureHandledRequestFailure: vi.fn(),
+  capturePostHogLog: vi.fn(),
 }));
 
 import {
@@ -10,7 +11,7 @@ import {
   authenticatedSelect,
   authenticatedSelectPage,
 } from "./authenticatedDataClient";
-import { captureHandledRequestFailure } from "./sentry";
+import { captureHandledRequestFailure, capturePostHogLog } from "./posthogService";
 import { AppError } from "./appErrors";
 
 type FakeResponseInit = {
@@ -176,7 +177,7 @@ describe("authenticatedDataClient", () => {
 
       await expect(
         authenticatedSelect("items", {}, { suppressUnauthorizedRecovery: true })
-      ).rejects.toMatchObject({ code: "UNAUTHORIZED", status: 401, reportToSentry: false });
+      ).rejects.toMatchObject({ code: "UNAUTHORIZED", status: 401, reportToErrorTracking: false });
       await flushMicrotasks();
       expect(listener).not.toHaveBeenCalled();
       window.removeEventListener("itemtraxx:recoverable-app-error", listener as EventListener);
@@ -206,20 +207,20 @@ describe("authenticatedDataClient", () => {
       );
       await expect(
         authenticatedSelect("items", {}, { suppressUnauthorizedRecovery: true })
-      ).rejects.toMatchObject({ code: "UNAUTHORIZED", status: 403, reportToSentry: false });
+      ).rejects.toMatchObject({ code: "UNAUTHORIZED", status: 403, reportToErrorTracking: false });
     });
 
     it("marks 5xx failures as reportable and non-5xx failures as not", async () => {
       vi.mocked(fetch).mockResolvedValueOnce(makeResponse({ ok: false, status: 500, text: "{}" }) as unknown as Response);
       const serverError = (await authenticatedSelect("items", {}).catch((error) => error)) as AppError;
       expect(serverError).toBeInstanceOf(AppError);
-      expect(serverError.reportToSentry).toBe(true);
+      expect(serverError.reportToErrorTracking).toBe(true);
 
       vi.mocked(fetch).mockResolvedValueOnce(
         makeResponse({ ok: false, status: 422, text: JSON.stringify({ error: "bad input" }) }) as unknown as Response
       );
       const clientError = (await authenticatedSelect("items", {}).catch((error) => error)) as AppError;
-      expect(clientError.reportToSentry).toBe(false);
+      expect(clientError.reportToErrorTracking).toBe(false);
     });
 
     it("falls back to a generic message when the error body is empty or not JSON", async () => {
@@ -234,6 +235,22 @@ describe("authenticatedDataClient", () => {
         makeResponse({ ok: false, status: 500, text: JSON.stringify({ error: "db down" }) }) as unknown as Response
       );
       await expect(authenticatedSelect("items", {})).rejects.toMatchObject({ message: "db down" });
+    });
+
+    it("logs a network failure without changing the original rejection", async () => {
+      const networkError = new Error("fetch failed");
+      vi.mocked(fetch).mockRejectedValueOnce(networkError);
+
+      await expect(authenticatedSelect("items", {})).rejects.toBe(networkError);
+      expect(capturePostHogLog).toHaveBeenCalledWith(expect.objectContaining({
+        body: "authenticated data request failed before response",
+        level: "error",
+        attributes: expect.objectContaining({
+          status: 0,
+          error_code: "network",
+          attempt: 1,
+        }),
+      }));
     });
   });
 

@@ -12,21 +12,21 @@ export type AppErrorCode =
 
 type AppErrorOptions = {
   status?: number;
-  reportToSentry?: boolean;
+  reportToErrorTracking?: boolean;
   cause?: unknown;
 };
 
 export class AppError extends Error {
   code: AppErrorCode;
   status?: number;
-  reportToSentry: boolean;
+  reportToErrorTracking: boolean;
 
   constructor(code: AppErrorCode, message: string, options: AppErrorOptions = {}) {
     super(message);
     this.name = "AppError";
     this.code = code;
     this.status = options.status;
-    this.reportToSentry = options.reportToSentry ?? true;
+    this.reportToErrorTracking = options.reportToErrorTracking ?? true;
     if ("cause" in options) {
       this.cause = options.cause;
     }
@@ -46,17 +46,17 @@ const isUnauthorizedMessage = (message: string) => message.trim().toLowerCase() 
 export const unauthorizedError = (message = "Your session has expired. Please sign in again.") =>
   (() => {
     dispatchRecoverableAppError({ code: "UNAUTHORIZED", message });
-    return new AppError("UNAUTHORIZED", message, { status: 401, reportToSentry: false });
+    return new AppError("UNAUTHORIZED", message, { status: 401, reportToErrorTracking: false });
   })();
 
 export const missingContextError = (message: string) =>
-  new AppError("MISSING_CONTEXT", message, { status: 400, reportToSentry: false });
+  new AppError("MISSING_CONTEXT", message, { status: 400, reportToErrorTracking: false });
 
 // A lookup that finds nothing is an expected outcome of operator input (a mistyped
 // borrower ID, an unknown barcode), not a fault. Typing it keeps it out of error
 // tracking while the page still renders a friendly message.
 export const notFoundError = (message: string) =>
-  new AppError("NOT_FOUND", message, { status: 404, reportToSentry: false });
+  new AppError("NOT_FOUND", message, { status: 404, reportToErrorTracking: false });
 
 export const edgeFunctionError = (result: EdgeLikeResult, fallbackMessage: string) => {
   const message = (result.error || fallbackMessage).trim() || fallbackMessage;
@@ -65,34 +65,34 @@ export const edgeFunctionError = (result: EdgeLikeResult, fallbackMessage: strin
     return unauthorizedError();
   }
   if (result.status === 429 || isRateLimitMessage(message)) {
-    return new AppError("RATE_LIMIT", message, { status: 429, reportToSentry: false });
+    return new AppError("RATE_LIMIT", message, { status: 429, reportToErrorTracking: false });
   }
   if (isTimeoutMessage(message)) {
     return new AppError("TIMEOUT", "Request timed out. Unable to reach ItemTraxx servers. Please try again.", {
       status: result.status,
-      reportToSentry: false,
+      reportToErrorTracking: false,
     });
   }
   if (isNetworkMessage(message)) {
     return new AppError("NETWORK", "Network request failed. Unable to reach ItemTraxx servers. Check your connection and try again.", {
       status: result.status,
-      reportToSentry: false,
+      reportToErrorTracking: false,
     });
   }
   if (/(?:workspace|tenant) disabled/i.test(message)) {
     return new AppError("TENANT_DISABLED", "Workspace is disabled. Access is blocked. Please contact support.", {
       status: result.status || 403,
-      reportToSentry: false,
+      reportToErrorTracking: false,
     });
   }
 
   if (result.status === 404) {
-    return new AppError("NOT_FOUND", message, { status: 404, reportToSentry: false });
+    return new AppError("NOT_FOUND", message, { status: 404, reportToErrorTracking: false });
   }
 
   return new AppError("REQUEST_FAILED", message, {
     status: result.status,
-    reportToSentry: result.status >= 500,
+    reportToErrorTracking: result.status >= 500,
   });
 };
 
@@ -170,4 +170,4 @@ export const toUserFacingErrorMessage = (error: unknown, fallbackMessage: string
 };
 
 export const shouldReportError = (error: unknown) =>
-  error instanceof AppError ? error.reportToSentry : true;
+  error instanceof AppError ? error.reportToErrorTracking : true;

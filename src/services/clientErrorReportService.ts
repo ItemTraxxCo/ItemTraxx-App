@@ -41,7 +41,7 @@ export const sendClientErrorReport = async (draft: FatalErrorReportDraft) => {
       page: {
         url: getSafePageUrl(),
         user_agent: typeof navigator !== "undefined" ? navigator.userAgent : "",
-        environment: import.meta.env.VITE_SENTRY_ENVIRONMENT || import.meta.env.MODE,
+        environment: import.meta.env.MODE,
         release: import.meta.env.VITE_GIT_COMMIT || "n/a",
       },
       auth: {

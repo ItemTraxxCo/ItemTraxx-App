@@ -13,10 +13,11 @@ import {
 import { buildPublicRateLimitHeaders } from "../_shared/publicRateLimit.ts";
 import { resolveSystemStatusOverride } from "../_shared/systemStatusOverride.ts";
 import { hasTrustedEdgeIngress } from "../_shared/trustedIngress.ts";
+import { withRequestSpan } from "../_shared/observability.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-request-id",
+    "authorization, x-client-info, apikey, content-type, x-request-id, traceparent, tracestate",
   "Access-Control-Allow-Methods": "GET, OPTIONS",
   Vary: "Origin",
 };
@@ -135,7 +136,7 @@ const resolveIncidentStatus = (
   return { status: "operational", summary: "no active incidents" as const };
 };
 
-serve(async (req) => {
+serve((req) => withRequestSpan(req, "GET /functions/system-status", async (span, requestId) => {
   const { hasOrigin, originAllowed, headers } = resolveCorsHeaders(req);
   let statusClientCookie: string | null = null;
 
@@ -153,6 +154,7 @@ serve(async (req) => {
         remaining: rateLimit.remaining,
       }),
       "Content-Type": "application/json",
+      "x-request-id": requestId,
     });
     if (statusClientCookie) {
       responseHeaders.append("Set-Cookie", statusClientCookie);
@@ -209,6 +211,7 @@ serve(async (req) => {
 
   try {
     const adminClient = createClient(supabaseUrl, serviceKey, {
+      global: { headers: { traceparent: span.traceparent() } },
       auth: { persistSession: false },
     });
 
@@ -485,4 +488,4 @@ serve(async (req) => {
       checked_at: new Date().toISOString(),
     });
   }
-});
+}));

@@ -5,7 +5,7 @@ import { applyEmailTheme, buildEmailBrandHeaderHtml, withEmailBrandLogoAttachmen
 import { resolveEmailAddress, resolveEmailFrom } from "../_shared/emailConfig.ts";
 import { formatLoginEmailPlatform, formatLoginEmailTime } from "../_shared/loginEmailFormat.ts";
 import { isKillSwitchWriteBlocked } from "../_shared/killSwitch.ts";
-import { getRequestId, logError, logInfo } from "../_shared/observability.ts";
+import { logError, logInfo, withRequestSpan } from "../_shared/observability.ts";
 import { isAllowedOrigin, parseAllowedOrigins } from "../_shared/cors.ts";
 import { readJsonBody } from "../_shared/requestBody.ts";
 import { rpcErrorToError, throwOnRpcError } from "./reportingRefresh.ts";
@@ -102,7 +102,7 @@ type SuperAdminTwoFactorPayload = {
 
 const baseCorsHeaders = {
   "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-request-id",
+    "authorization, x-client-info, apikey, content-type, x-request-id, traceparent, tracestate",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
   Vary: "Origin",
 };
@@ -468,7 +468,7 @@ const processContactSalesEmail = async (
     try {
       await sendSlackWebhook(slackWebhookUrl, slackText);
     } catch (error) {
-      logError("contact sales slack notify failed", payload.lead_id, error);
+      logError("contact sales slack notify failed", requestId, error);
     }
   }
 
@@ -976,9 +976,8 @@ const processWorkspaceSupportEmail = async (
   });
 };
 
-serve(async (req) => {
+serve((req) => withRequestSpan(req, "POST /functions/job-worker", async (span, requestId) => {
   const { hasOrigin, originAllowed, headers } = resolveCorsHeaders(req);
-  const requestId = getRequestId(req);
 
   const jsonResponse = (status: number, body: Record<string, unknown>) =>
     new Response(JSON.stringify({ ok: status < 400, ...body }), {
@@ -1038,6 +1037,7 @@ serve(async (req) => {
     const workerId = crypto.randomUUID();
 
     const adminClient = createClient(supabaseUrl, serviceKey, {
+      global: { headers: { traceparent: span.traceparent() } },
       auth: { persistSession: false },
     });
 
@@ -1167,7 +1167,7 @@ serve(async (req) => {
       completed,
       failed,
       reporting_refreshed: reportingRefreshed,
-    });
+    }, span.context);
     return jsonResponse(200, {
       data: {
         claimed: jobs.length,
@@ -1180,7 +1180,7 @@ serve(async (req) => {
     if (error instanceof ValidationError) {
       return jsonResponse(error.status, { error: error.message });
     }
-    logError("job-worker error", requestId, error);
+    logError("job-worker error", requestId, error, {}, span.context);
     return jsonResponse(500, { error: "Request failed." });
   }
-});
+}));

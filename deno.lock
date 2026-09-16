@@ -8,7 +8,6 @@
     "npm:@cyclonedx/cyclonedx-npm@6.0.1": "6.0.1",
     "npm:@intercom/messenger-js-sdk@^0.0.20": "0.0.20",
     "npm:@playwright/test@^1.63.0": "1.63.0",
-    "npm:@sentry/vue@^10.74.0": "10.74.0_vue@3.5.42_typescript@6.0.3",
     "npm:@supabase/supabase-js@^2.116.0": "2.116.0",
     "npm:@types/node@^26.5.0": "26.5.1",
     "npm:@types/qrcode@^1.5.6": "1.5.6",
@@ -1026,62 +1025,6 @@
     },
     "@rolldown/pluginutils@1.0.1": {
       "integrity": "sha512-2j9bGt5Jh8hj+vPtgzPtl72j0yRxHAyumoo6TNfAjsLB04UtpSvPbPcDcBMxz7n+9CYB0c1GxQFxYRg2jimqGw=="
-    },
-    "@sentry/browser-utils@10.74.0": {
-      "integrity": "sha512-/Rh3WH4i2nStdOqHpaWocbpSMFPjKhlxKQgp9vkJBSolqjJzXlIpLYXOrldZHHZLG1iDoX3PFBQkNDYcPXCg0A==",
-      "dependencies": [
-        "@sentry/conventions",
-        "@sentry/core"
-      ]
-    },
-    "@sentry/browser@10.74.0": {
-      "integrity": "sha512-U6Zn+YcAgnR7bXZmpjMxivptPSsOeDKV+SlSqbJZqViOaCcZSG/vJiQr50UrdTccCwiU1LnwuOOoclJOvW+cLQ==",
-      "dependencies": [
-        "@sentry/browser-utils",
-        "@sentry/conventions",
-        "@sentry/core",
-        "@sentry/feedback",
-        "@sentry/replay",
-        "@sentry/replay-canvas"
-      ]
-    },
-    "@sentry/conventions@0.16.0": {
-      "integrity": "sha512-fO9PLmHdVURcSPUpWCItWAtgKiMwGdJHbovoSEyLplX5sxs2ugvI4CBPTrkkgqhObnZOD0CnWBKDzSVQYBKEyQ=="
-    },
-    "@sentry/core@10.74.0": {
-      "integrity": "sha512-u9rY8vcZfktccwm6LznfCZlqP5C9A+p76r4/pFS1grqpuTO0m21Cl8rosnlESrDGP/Xd9tfr91rWYk0jPH8jeQ==",
-      "dependencies": [
-        "@sentry/conventions"
-      ]
-    },
-    "@sentry/feedback@10.74.0": {
-      "integrity": "sha512-WwUao9K2XgRIxTUTaBhm7aglhsyP7LQTGi2lxvFbXzlSagUzwew/EL2c5oqQ23Mjn94i5SY+rM4wMdgyWdtpAw==",
-      "dependencies": [
-        "@sentry/core"
-      ]
-    },
-    "@sentry/replay-canvas@10.74.0": {
-      "integrity": "sha512-HAdu4ViRsuOD5ifphQR24HugL0geZXV8LnGQVkA8vlzZWiuYgGNqDRoUWI75IgVcCYLYSaVBoKN+jTimdzG/sQ==",
-      "dependencies": [
-        "@sentry/core",
-        "@sentry/replay"
-      ]
-    },
-    "@sentry/replay@10.74.0": {
-      "integrity": "sha512-amIu0zKzhQJZoWmlwfFnn/uKRGyF+Tikph3lBgYwj5XbHv4U94PQXi9Ll8CYzzLVS7BkrCVc2Hl7RvpRg5M2Yg==",
-      "dependencies": [
-        "@sentry/browser-utils",
-        "@sentry/core"
-      ]
-    },
-    "@sentry/vue@10.74.0_vue@3.5.42_typescript@6.0.3": {
-      "integrity": "sha512-wiRuCDT1HXAyla1np6zp9C3UA5cJ4VrMT0GpMdAtdvVsTRDTDdjTRHCcTbKddOIpMxqvcfOBgAde7fUNv23ffA==",
-      "dependencies": [
-        "@sentry/browser",
-        "@sentry/conventions",
-        "@sentry/core",
-        "vue"
-      ]
     },
     "@simplewebauthn/browser@13.3.0": {
       "integrity": "sha512-BE/UWv6FOToAdVk0EokzkqQQDOWtNydYlY6+OrmiZ5SCNmb41VehttboTetUM3T/fr6EAFYVXjz4My2wg230rQ=="
@@ -3098,7 +3041,6 @@
         "npm:@cyclonedx/cyclonedx-npm@6.0.1",
         "npm:@intercom/messenger-js-sdk@^0.0.20",
         "npm:@playwright/test@^1.63.0",
-        "npm:@sentry/vue@^10.74.0",
         "npm:@supabase/supabase-js@^2.116.0",
         "npm:@types/node@^26.5.0",
         "npm:@types/qrcode@^1.5.6",

@@ -109,7 +109,7 @@
         </p>
         <p class="cookies-consent-note">
           We do not use third-party advertising or remarketing cookies. ItemTraxx may use third-party security,
-          support, analytics, and diagnostics technologies — including Cloudflare, Intercom, PostHog, Sentry,
+          support, analytics, and diagnostics technologies — including Cloudflare, Intercom, PostHog,
           Vercel Analytics, and Speed Insights — and optional analytics/diagnostics tools are enabled only after
           consent where required.
         </p>
@@ -162,7 +162,7 @@ const analyticsCookies = [
   {
     title: "PostHog Replay when enabled*",
     description:
-      "If PostHog session replay is enabled in the active environment, masked browser session replay may be collected after Analytics and Diagnostics consent for product analysis and troubleshooting.",
+      "If PostHog session replay is enabled in the active environment, masked browser session replay may be collected after Diagnostics consent for product analysis and troubleshooting.",
   },
   {
     title: "Vercel Analytics*",
@@ -178,14 +178,9 @@ const analyticsCookies = [
 
 const diagnosticsCookies = [
   {
-    title: "Sentry error monitoring*",
+    title: "PostHog Error Tracking*",
     description:
-      "Used to capture application errors, failed requests, and runtime diagnostics after consent so reliability issues can be investigated.",
-  },
-  {
-    title: "Sentry Replay when enabled*",
-    description:
-      "If replay sampling is enabled in the active environment, browser session replay data may be collected after consent for debugging and incident investigation.",
+      "Used to capture application errors, rejected promises, failed requests, and selected runtime diagnostics after consent so reliability issues can be investigated.",
   },
   {
     title: "ItemTraxx client diagnostics*",

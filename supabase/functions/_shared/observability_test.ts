@@ -1,4 +1,9 @@
-import { logError, logInfo } from "./observability.ts";
+import {
+  flushTraceExports,
+  logError,
+  logInfo,
+  startRequestSpan,
+} from "./observability.ts";
 
 const assert = (condition: boolean, message: string) => {
   if (!condition) throw new Error(message);
@@ -81,4 +86,62 @@ Deno.test("observability logs control characters as one JSON line", () => {
     parsedError.message === "failure\nforged",
     "error message should round-trip through JSON",
   );
+});
+
+Deno.test("sampled request spans export OTLP with W3C correlation and resource identity", async () => {
+  const originalFetch = globalThis.fetch;
+  const previous = {
+    token: Deno.env.get("ITX_POSTHOG_PROJECT_TOKEN"),
+    endpoint: Deno.env.get("ITX_POSTHOG_TRACES_ENDPOINT"),
+    service: Deno.env.get("ITX_OTEL_SERVICE_NAME"),
+    environment: Deno.env.get("ITX_ENVIRONMENT"),
+  };
+  const calls: Array<{ url: string; init?: RequestInit }> = [];
+  globalThis.fetch = ((input: string | URL | Request, init?: RequestInit) => {
+    calls.push({ url: String(input), init });
+    return Promise.resolve(new Response("{}", { status: 200 }));
+  }) as typeof fetch;
+  Deno.env.set("ITX_POSTHOG_PROJECT_TOKEN", "project-token");
+  Deno.env.set("ITX_POSTHOG_TRACES_ENDPOINT", "https://posthog.example/i/v1/traces");
+  Deno.env.set("ITX_OTEL_SERVICE_NAME", "itemtraxx-test-function");
+  Deno.env.set("ITX_ENVIRONMENT", "test");
+  try {
+    const request = new Request("https://edge.itemtraxx.com/functions/admin-ops", {
+      method: "POST",
+      headers: {
+        "x-request-id": "request-1",
+        traceparent: "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01",
+      },
+    });
+    const span = startRequestSpan(request, "POST /functions/admin-ops", "request-1");
+    span.setStatus("ok").end();
+    await flushTraceExports();
+
+    assert(calls.length === 1, "expected one OTLP export");
+    assert(calls[0].url === "https://posthog.example/i/v1/traces", "trace endpoint");
+    assert(new Headers(calls[0].init?.headers).get("authorization") === "Bearer project-token", "trace auth header");
+    const payload = JSON.parse(String(calls[0].init?.body)) as {
+      resourceSpans?: Array<{
+        resource?: { attributes?: Array<{ key: string; value: Record<string, unknown> }> };
+        scopeSpans?: Array<{ spans?: Array<Record<string, unknown>> }>;
+      }>;
+    };
+    const resourceAttributes = payload.resourceSpans?.[0]?.resource?.attributes ?? [];
+    const spanRecord = payload.resourceSpans?.[0]?.scopeSpans?.[0]?.spans?.[0];
+    assert(resourceAttributes.some((attribute) => attribute.key === "service.name"), "service resource attribute");
+    assert(resourceAttributes.some((attribute) => attribute.key === "deployment.environment"), "environment resource attribute");
+    assert(spanRecord?.traceId === "4bf92f3577b34da6a3ce929d0e0e4736", "continued trace id");
+    assert(spanRecord?.parentSpanId === "00f067aa0ba902b7", "continued parent span id");
+  } finally {
+    globalThis.fetch = originalFetch;
+    for (const [name, value] of Object.entries({
+      ITX_POSTHOG_PROJECT_TOKEN: previous.token,
+      ITX_POSTHOG_TRACES_ENDPOINT: previous.endpoint,
+      ITX_OTEL_SERVICE_NAME: previous.service,
+      ITX_ENVIRONMENT: previous.environment,
+    })) {
+      if (value === undefined) Deno.env.delete(name);
+      else Deno.env.set(name, value);
+    }
+  }
 });

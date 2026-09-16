@@ -72,6 +72,10 @@ export const sanitizeRequestHeaders = (
   if (forwardedFor) headers.set("x-forwarded-for", forwardedFor);
   const connectingIp = request.headers.get("cf-connecting-ip");
   if (connectingIp) headers.set("cf-connecting-ip", connectingIp);
+  const traceparent = request.headers.get("traceparent");
+  if (traceparent) headers.set("traceparent", traceparent);
+  const tracestate = request.headers.get("tracestate");
+  if (tracestate) headers.set("tracestate", tracestate);
   applyApproxLocationHeaders(headers, request);
   return headers;
 };
@@ -97,5 +101,9 @@ export const sanitizeUpstreamHeaders = (
   if (prefer) headers.set("prefer", prefer);
   const range = request.headers.get("range");
   if (range) headers.set("range", range);
+  const traceparent = request.headers.get("traceparent");
+  if (traceparent) headers.set("traceparent", traceparent);
+  const tracestate = request.headers.get("tracestate");
+  if (tracestate) headers.set("tracestate", tracestate);
   return headers;
 };

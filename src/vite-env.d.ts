@@ -15,13 +15,9 @@ interface ImportMetaEnv {
   readonly VITE_GIT_COMMIT?: string;
   readonly VITE_STATUS_FUNCTION?: string;
   readonly VITE_TURNSTILE_SITE_KEY?: string;
-  readonly VITE_SENTRY_DSN?: string;
-  readonly VITE_SENTRY_ENVIRONMENT?: string;
-  readonly VITE_SENTRY_TRACES_SAMPLE_RATE?: string;
-  readonly VITE_SENTRY_REPLAYS_SESSION_SAMPLE_RATE?: string;
-  readonly VITE_SENTRY_REPLAYS_ON_ERROR_SAMPLE_RATE?: string;
   readonly VITE_POSTHOG_PROJECT_TOKEN?: string;
   readonly VITE_POSTHOG_HOST?: string;
+  readonly VITE_POSTHOG_ENVIRONMENT?: string;
   readonly VITE_INTERCOM_APP_ID?: string;
 }
 

@@ -56,6 +56,8 @@ Deno.test("function request headers preserve the allowlist, geo bounds, and supe
         "user-agent": "fixture-agent",
         "x-client-info": "fixture-client",
         "x-forwarded-for": "198.51.100.10",
+        traceparent: "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01",
+        tracestate: "vendor=value",
         "x-secret": "must-not-forward",
       },
     },
@@ -103,6 +105,12 @@ Deno.test("function request headers preserve the allowlist, geo bounds, and supe
   assertEquals(headers.get("x-itx-geo-region"), "California", "region");
   assertEquals(headers.get("x-itx-geo-country"), "US", "country");
   assertEquals(headers.get("x-secret"), null, "unlisted header");
+  assertEquals(
+    headers.get("traceparent"),
+    "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01",
+    "traceparent",
+  );
+  assertEquals(headers.get("tracestate"), "vendor=value", "tracestate");
 });
 
 Deno.test("Data API request headers preserve only the supported upstream set", () => {
@@ -112,6 +120,8 @@ Deno.test("Data API request headers preserve only the supported upstream set", (
       prefer: "return=representation",
       range: "0-9",
       "content-type": "application/json",
+      traceparent: "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01",
+      tracestate: "vendor=value",
       "x-secret": "must-not-forward",
     },
   });
@@ -128,6 +138,8 @@ Deno.test("Data API request headers preserve only the supported upstream set", (
     "content-type": "application/json",
     prefer: "return=representation",
     range: "0-9",
+    traceparent: "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01",
+    tracestate: "vendor=value",
     "x-request-id": "request-2",
   }, "Data API headers");
 });

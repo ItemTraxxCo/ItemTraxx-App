@@ -86,7 +86,7 @@ const lines = changelogRaw.split(/\r?\n/);
 const appVersion = import.meta.env.VITE_GIT_COMMIT || "n/a";
 const appBranch = import.meta.env.VITE_GIT_BRANCH || "n/a";
 const runtimeEnvironment = (
-  import.meta.env.VITE_SENTRY_ENVIRONMENT ||
+  import.meta.env.VITE_POSTHOG_ENVIRONMENT ||
   import.meta.env.MODE ||
   ""
 ).trim().toLowerCase();

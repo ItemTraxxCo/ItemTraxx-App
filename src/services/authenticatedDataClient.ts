@@ -1,5 +1,5 @@
 import { AppError, unauthorizedError } from "./appErrors";
-import { captureHandledRequestFailure } from "./sentry";
+import { captureHandledRequestFailure, capturePostHogLog } from "./posthogDiagnostics";
 
 const trimTrailingSlash = (value: string) => value.replace(/\/+$/, "");
 
@@ -42,17 +42,36 @@ const request = async (
   options: AuthenticatedRequestOptions = {}
 ) => {
   const method = (init.method ?? "GET").toUpperCase();
-  const response = await fetch(`${getBaseUrl()}${path}`, {
-    ...init,
-    credentials: "include",
-    headers: {
-      Accept: "application/json",
-      ...(method !== "GET" && method !== "HEAD"
-        ? { "x-itx-data-request": "1" }
-        : {}),
-      ...(init.headers ?? {}),
-    },
-  });
+  const startedAt = performance.now();
+  let response: Response;
+  try {
+    response = await fetch(`${getBaseUrl()}${path}`, {
+      ...init,
+      credentials: "include",
+      headers: {
+        Accept: "application/json",
+        ...(method !== "GET" && method !== "HEAD"
+          ? { "x-itx-data-request": "1" }
+          : {}),
+        ...(init.headers ?? {}),
+      },
+    });
+  } catch (error) {
+    capturePostHogLog({
+      body: "authenticated data request failed before response",
+      level: "error",
+      attributes: {
+        route: sanitizePathForTelemetry(path),
+        operation: `${method} ${sanitizePathForTelemetry(path)}`,
+        status: 0,
+        latency_ms: Math.round(performance.now() - startedAt),
+        retry_count: 0,
+        attempt: 1,
+        error_code: error instanceof DOMException && error.name === "AbortError" ? "timeout" : "network",
+      },
+    });
+    throw error;
+  }
 
   if (!response.ok) {
     let message = `Whoops! Authenticated data request failed (${response.status}).`;
@@ -74,11 +93,25 @@ const request = async (
       message,
       requestId: response.headers.get("x-request-id") ?? undefined,
     });
+    capturePostHogLog({
+      body: "authenticated data request completed",
+      level: response.status >= 500 ? "error" : "warn",
+      attributes: {
+        route: sanitizePathForTelemetry(path),
+        operation: `${method} ${sanitizePathForTelemetry(path)}`,
+        status: response.status,
+        latency_ms: Math.round(performance.now() - startedAt),
+        request_id: response.headers.get("x-request-id") ?? undefined,
+        retry_count: 0,
+        attempt: 1,
+        error_code: response.status >= 500 ? "server_error" : "request_failed",
+      },
+    });
     if (response.status === 401) {
       if (options.suppressUnauthorizedRecovery) {
         throw new AppError("UNAUTHORIZED", "Your session has expired. Please sign in again.", {
           status: 401,
-          reportToSentry: false,
+          reportToErrorTracking: false,
         });
       }
       throw unauthorizedError();
@@ -87,14 +120,31 @@ const request = async (
       if (options.suppressUnauthorizedRecovery) {
         throw new AppError("UNAUTHORIZED", "Your session has expired. Please sign in again.", {
           status: 403,
-          reportToSentry: false,
+          reportToErrorTracking: false,
         });
       }
       throw unauthorizedError();
     }
     throw new AppError("REQUEST_FAILED", message, {
       status: response.status,
-      reportToSentry: response.status >= 500,
+      reportToErrorTracking: response.status >= 500,
+    });
+  }
+
+  const latencyMs = Math.round(performance.now() - startedAt);
+  if (latencyMs >= 1500 || Math.random() < 0.01) {
+    capturePostHogLog({
+      body: "authenticated data request completed",
+      level: latencyMs >= 1500 ? "warn" : "info",
+      attributes: {
+        route: sanitizePathForTelemetry(path),
+        operation: `${method} ${sanitizePathForTelemetry(path)}`,
+        status: response.status,
+        latency_ms: latencyMs,
+        request_id: response.headers.get("x-request-id") ?? undefined,
+        retry_count: 0,
+        attempt: 1,
+      },
     });
   }
 

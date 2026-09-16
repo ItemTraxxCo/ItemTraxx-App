@@ -1,7 +1,7 @@
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { getExternalAuthUser } from "../_shared/externalAuth.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.108.2";
-import { getRequestId, logError } from "../_shared/observability.ts";
+import { logError, withRequestSpan } from "../_shared/observability.ts";
 import {
   isMissingPostgrestColumn as isMissingColumn,
   isMissingPostgrestRelation as isMissingRelation,
@@ -16,7 +16,7 @@ import { requireTrustedEdgeIngress } from "../_shared/trustedIngress.ts";
 
 const baseCorsHeaders = {
   "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-request-id",
+    "authorization, x-client-info, apikey, content-type, x-request-id, traceparent, tracestate",
   "Access-Control-Allow-Methods": "GET, OPTIONS",
   Vary: "Origin",
 };
@@ -48,9 +48,8 @@ type WorkspaceMetricRow = {
   computed_at?: string;
 };
 
-serve(async (req) => {
+serve((req) => withRequestSpan(req, "GET /functions/super-dashboard", async (span, requestId) => {
   const { hasOrigin, originAllowed, headers } = resolveCorsHeaders(req);
-  const requestId = getRequestId(req);
 
   const jsonResponse = (status: number, body: Record<string, unknown>) =>
     new Response(JSON.stringify(body), {
@@ -100,7 +99,7 @@ serve(async (req) => {
     }
 
     const userClient = createClient(supabaseUrl, publishableKey, {
-      global: { headers: { Authorization: authHeader } },
+      global: { headers: { Authorization: authHeader, traceparent: span.traceparent() } },
       auth: { persistSession: false },
     });
 
@@ -124,6 +123,7 @@ serve(async (req) => {
     }
 
     const adminClient = createClient(supabaseUrl, serviceKey, {
+      global: { headers: { traceparent: span.traceparent() } },
       auth: { persistSession: false },
     });
 
@@ -252,7 +252,9 @@ serve(async (req) => {
       logError(
         "super-dashboard workspace metrics query failed",
         requestId,
-        workspaceMetricsResult.error
+        workspaceMetricsResult.error,
+        {},
+        span.context,
       );
     }
 
@@ -304,7 +306,7 @@ serve(async (req) => {
       },
     });
   } catch (error) {
-    logError("super-dashboard function error", requestId, error);
+    logError("super-dashboard function error", requestId, error, {}, span.context);
     return jsonResponse(500, { error: "Request failed" });
   }
-});
+}));

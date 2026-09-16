@@ -17,10 +17,11 @@ import {
 import { enforcePreloginRateLimit } from "../_shared/preloginGuards.ts";
 import { isSuperAdminTokenBlockedBySessionRevocation } from "../_shared/superAdminSessions.ts";
 import { dispatchSuperOpsAction } from "./actions/index.ts";
+import { logError, withRequestSpan } from "../_shared/observability.ts";
 
 const baseCorsHeaders = {
   "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-request-id",
+    "authorization, x-client-info, apikey, content-type, x-request-id, traceparent, tracestate",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
   Vary: "Origin",
 };
@@ -42,7 +43,7 @@ const resolveCorsHeaders = (req: Request) => {
   return { hasOrigin, originAllowed, headers };
 };
 
-serve(async (req) => {
+serve((req) => withRequestSpan(req, "POST /functions/super-ops", async (span, requestId) => {
   const { hasOrigin, originAllowed, headers } = resolveCorsHeaders(req);
 
   const jsonResponse = (status: number, body: Record<string, unknown>) =>
@@ -95,6 +96,7 @@ serve(async (req) => {
     }
 
     const adminClient = createClient(supabaseUrl, serviceKey, {
+      global: { headers: { traceparent: span.traceparent() } },
       auth: {
         persistSession: false,
         autoRefreshToken: false,
@@ -188,9 +190,7 @@ serve(async (req) => {
 
     if (!rateLimit.ok) {
       if (rateLimit.error) {
-        console.error("super-ops rate limit rpc failed", {
-          message: rateLimit.error.message,
-        });
+        logError("super-ops rate limit rpc failed", requestId, rateLimit.error, {}, span.context);
         return jsonResponse(503, { error: "Rate limit check failed." });
       }
       return jsonResponse(429, {
@@ -234,10 +234,7 @@ serve(async (req) => {
     if (error instanceof ValidationError) {
       return jsonResponse(error.status, { error: error.message });
     }
-    console.error("super-ops function error", {
-      message: error instanceof Error ? error.message : "Unknown error",
-      stack: error instanceof Error ? error.stack : undefined,
-    });
+    logError("super-ops function error", requestId, error, {}, span.context);
     return jsonResponse(500, { error: "Request failed" });
   }
-});
+}));

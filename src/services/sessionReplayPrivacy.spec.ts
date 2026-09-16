@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   maskSessionReplayAttribute,
-  sanitizeSentryReplayEvent,
+  sanitizeReplayPerformanceEvent,
   scrubSensitiveReplayUrlValue,
 } from "./sessionReplayPrivacy";
 
@@ -28,7 +28,7 @@ describe("session replay URL privacy", () => {
     expect(scrubSensitiveReplayUrlValue(ordinaryUrl)).toBe(ordinaryUrl);
   });
 
-  it("scrubs signed URLs from Sentry performance-span descriptions", () => {
+  it("scrubs signed URLs from replay performance-span descriptions", () => {
     const event = {
       type: 5,
       timestamp: 1,
@@ -43,7 +43,7 @@ describe("session replay URL privacy", () => {
       },
     };
 
-    expect(sanitizeSentryReplayEvent(event)).toMatchObject({
+    expect(sanitizeReplayPerformanceEvent(event)).toMatchObject({
       data: {
         payload: {
           description: "https://project.supabase.co/storage/v1/object/sign/support/file.png",
@@ -52,9 +52,9 @@ describe("session replay URL privacy", () => {
     });
   });
 
-  it("leaves non-URL Sentry custom events unchanged", () => {
+  it("leaves non-URL replay custom events unchanged", () => {
     const event = { type: 5, timestamp: 1, data: { tag: "breadcrumb", payload: { message: "ok" } } };
 
-    expect(sanitizeSentryReplayEvent(event)).toBe(event);
+    expect(sanitizeReplayPerformanceEvent(event)).toBe(event);
   });
 });

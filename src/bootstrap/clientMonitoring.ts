@@ -8,22 +8,10 @@ import {
 } from "../services/cookieConsentService";
 
 export const createClientMonitoring = (router: Router) => {
-  let appMounted = false;
   let posthogServicePromise: Promise<typeof import("../services/posthogService")> | null = null;
   let unsubscribeConsent: (() => void) | null = null;
 
-  const initializeSentry = async (app: App) => {
-    if (!import.meta.env.VITE_SENTRY_DSN?.trim() || !allowsDiagnostics(readCookieConsent())) {
-      return;
-    }
-    try {
-      const { initializeSentry: initializeSentryMonitoring } = await import("../services/sentry");
-      await initializeSentryMonitoring(app, router, appMounted);
-    } catch (error) {
-      // Diagnostics must never break login or core flows.
-      console.warn("[sentry] initialization failed; continuing without diagnostics.", error);
-    }
-  };
+  void router;
 
   const loadPostHogService = () => {
     if (!posthogServicePromise) {
@@ -36,7 +24,11 @@ export const createClientMonitoring = (router: Router) => {
   };
 
   const initializePostHog = async () => {
-    if (!import.meta.env.VITE_POSTHOG_PROJECT_TOKEN?.trim() || !allowsAnalytics(readCookieConsent())) {
+    const consent = readCookieConsent();
+    if (
+      !import.meta.env.VITE_POSTHOG_PROJECT_TOKEN?.trim() ||
+      (!allowsAnalytics(consent) && !allowsDiagnostics(consent))
+    ) {
       return;
     }
     try {
@@ -78,12 +70,12 @@ export const createClientMonitoring = (router: Router) => {
     void getPostHogExceptionCapture().then((capture) => capture(error));
   };
 
-  const bindConsentDrivenMonitoring = (app: App) => {
+  const bindConsentDrivenMonitoring = (_app: App) => {
     const maybeEnableDiagnostics = () => {
       if (!allowsDiagnostics(readCookieConsent())) {
         return;
       }
-      void initializeSentry(app);
+      void initializePostHog();
       void initializeClientDiagnostics();
     };
 
@@ -119,9 +111,11 @@ export const createClientMonitoring = (router: Router) => {
 
   return {
     captureException,
-    initializeBeforeMount: (app: App) => initializeSentry(app),
+    // Load PostHog before mount when analytics consent is already present so
+    // its native window.onerror and unhandledrejection hooks cover the full
+    // application lifetime. With no consent this remains a no-op.
+    initializeBeforeMount: (_app: App) => initializePostHog(),
     initializeAfterMount: (app: App) => {
-      appMounted = true;
       void initializeClientDiagnostics().catch(() => undefined);
       void import("../services/globalErrorHandling")
         .then(({ installGlobalErrorHandling }) => installGlobalErrorHandling(app))

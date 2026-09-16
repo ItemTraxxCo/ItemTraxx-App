@@ -14,10 +14,11 @@ import {
 import { validateAccountDeviceSession } from "../_shared/accountSessions.ts";
 import { readJsonBody } from "../_shared/requestBody.ts";
 import { requireTrustedEdgeIngress } from "../_shared/trustedIngress.ts";
+import { logError, withRequestSpan } from "../_shared/observability.ts";
 
 const baseCorsHeaders = {
   "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-request-id",
+    "authorization, x-client-info, apikey, content-type, x-request-id, traceparent, tracestate",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
   Vary: "Origin",
 };
@@ -71,7 +72,7 @@ const isLocalhostMaintenanceBypassRequest = (req: Request) => {
   }
 };
 
-serve(async (req) => {
+serve((req) => withRequestSpan(req, "POST /functions/checkoutReturn", async (span, requestId) => {
   const { hasOrigin, originAllowed, headers } = resolveCorsHeaders(req);
 
   const jsonResponse = (status: number, body: Record<string, unknown>) =>
@@ -119,7 +120,7 @@ serve(async (req) => {
     }
 
     const userClient = createClient(supabaseUrl, publishableKey, {
-      global: { headers: { Authorization: authHeader } },
+      global: { headers: { Authorization: authHeader, traceparent: span.traceparent() } },
       auth: { persistSession: false },
     });
 
@@ -201,6 +202,7 @@ serve(async (req) => {
       crypto.randomUUID();
 
     const adminClient = createClient(supabaseUrl, serviceKey, {
+      global: { headers: { traceparent: span.traceparent() } },
       auth: { persistSession: false },
     });
 
@@ -320,12 +322,9 @@ serve(async (req) => {
       );
 
       if (transitionError) {
-        console.error("checkoutReturn atomic transition failed", {
-          itemId: item.id,
-          operationId,
-          actionType,
-          message: transitionError.message,
-        });
+        logError("checkoutReturn atomic transition failed", requestId, transitionError, {
+          action_type: actionType,
+        }, span.context);
         return jsonResponse(500, { error: "Checkout/return operation failed" });
       }
 
@@ -348,10 +347,7 @@ serve(async (req) => {
     if (error instanceof ValidationError) {
       return jsonResponse(error.status, { error: error.message });
     }
-    console.error("checkoutReturn function error", {
-      message: error instanceof Error ? error.message : "Unknown error",
-      stack: error instanceof Error ? error.stack : undefined,
-    });
+    logError("checkoutReturn function error", requestId, error, {}, span.context);
     return jsonResponse(500, { error: "Request failed" });
   }
-});
+}));

@@ -28,10 +28,11 @@ import {
 } from "./actions/sessions.ts";
 import { resolveWorkspacePolicyState } from "./actions/settings.ts";
 import type { AdminOpsContext } from "./context.ts";
+import { logError, withRequestSpan } from "../_shared/observability.ts";
 
 const baseCorsHeaders = {
   "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-request-id",
+    "authorization, x-client-info, apikey, content-type, x-request-id, traceparent, tracestate",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
   Vary: "Origin",
 };
@@ -53,9 +54,8 @@ const resolveCorsHeaders = (req: Request) => {
   return { hasOrigin, originAllowed, headers };
 };
 
-serve(async (req) => {
+serve((req) => withRequestSpan(req, "POST /functions/admin-ops", async (span, requestId) => {
   const { hasOrigin, originAllowed, headers } = resolveCorsHeaders(req);
-  const requestId = req.headers.get("x-request-id") ?? crypto.randomUUID();
 
   const jsonResponse = (status: number, body: Record<string, unknown>) =>
     new Response(JSON.stringify(body), {
@@ -107,6 +107,7 @@ serve(async (req) => {
     }
 
     const adminClient = createClient(supabaseUrl, serviceKey, {
+      global: { headers: { traceparent: span.traceparent() } },
       auth: { persistSession: false },
     });
     const authSessionBinding = await resolveAccountAuthSessionBinding(
@@ -118,7 +119,7 @@ serve(async (req) => {
       : `token:${await sha256Hex(authToken)}`;
 
     const userClient = createClient(supabaseUrl, publishableKey, {
-      global: { headers: { Authorization: authHeader } },
+      global: { headers: { Authorization: authHeader, traceparent: span.traceparent() } },
       auth: { persistSession: false },
     });
 
@@ -294,12 +295,7 @@ serve(async (req) => {
     if (error instanceof ValidationError) {
       return jsonResponse(error.status, { error: error.message });
     }
-    const message = error instanceof Error ? error.message : "Unknown error";
-    console.error("admin-ops function error", {
-      request_id: requestId,
-      message,
-      stack: error instanceof Error ? error.stack : undefined,
-    });
+    logError("admin-ops function error", requestId, error, {}, span.context);
     return jsonResponse(500, { error: "Request failed" });
   }
-});
+}));

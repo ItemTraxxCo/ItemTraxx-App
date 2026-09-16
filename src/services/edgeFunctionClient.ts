@@ -21,7 +21,7 @@ type EdgeFunctionResult<TData> = {
 };
 import { clearAdminVerification, clearAuthState } from "../store/authState";
 import { getEdgeFunctionsBaseUrl } from "./edgeUrls";
-import { captureHandledRequestFailure } from "./sentry";
+import { captureHandledRequestFailure, capturePostHogLog } from "./posthogDiagnostics";
 
 const getDefaultHeaders = (accessToken?: string) => {
   const headers: Record<string, string> = {};
@@ -51,7 +51,8 @@ const requestEdgeFunction = async <TData = unknown, TBody = unknown>(
   functionName: string,
   options: EdgeFunctionOptions<TBody>,
   accessTokenOverride?: string,
-  baseUrlOverride?: string
+  baseUrlOverride?: string,
+  retryCount = 0,
 ) => {
   const baseUrl = baseUrlOverride ?? getEdgeFunctionsBaseUrl();
   if (!baseUrl) {
@@ -68,6 +69,7 @@ const requestEdgeFunction = async <TData = unknown, TBody = unknown>(
   const useSimpleCorsRequest = Boolean(options.avoidCorsPreflight && !accessToken);
   const headers = getDefaultHeaders(accessToken);
   const requestId = createRequestId();
+  const startedAt = performance.now();
   if (!useSimpleCorsRequest) headers["x-request-id"] = requestId;
   const init: RequestInit = { method, headers };
 
@@ -104,6 +106,7 @@ const requestEdgeFunction = async <TData = unknown, TBody = unknown>(
     const payload = parsed as { error?: string; message?: string } | null;
     const responseRequestId = response.headers.get("x-request-id") ??
       headers["x-request-id"] ?? requestId;
+    const latencyMs = Math.round(performance.now() - startedAt);
 
     if (!response.ok) {
       if (isTenantDisabledError(payload)) {
@@ -123,6 +126,20 @@ const requestEdgeFunction = async <TData = unknown, TBody = unknown>(
         message: errorMessage,
         requestId: responseRequestId,
       });
+      capturePostHogLog({
+        body: "edge function request completed",
+        level: response.status >= 500 ? "error" : "warn",
+        attributes: {
+          route: `/functions/${functionName}`,
+          operation: `${method} ${functionName}`,
+          status: response.status,
+          latency_ms: latencyMs,
+          request_id: responseRequestId,
+          retry_count: retryCount,
+          attempt: retryCount + 1,
+          error_code: response.status >= 500 ? "server_error" : "request_failed",
+        },
+      });
       return {
         ok: false,
         status: response.status,
@@ -130,6 +147,22 @@ const requestEdgeFunction = async <TData = unknown, TBody = unknown>(
         error: errorMessage,
         requestId: responseRequestId,
       };
+    }
+
+    if (latencyMs >= 1500 || Math.random() < 0.01) {
+      capturePostHogLog({
+        body: "edge function request completed",
+        level: latencyMs >= 1500 ? "warn" : "info",
+        attributes: {
+          route: `/functions/${functionName}`,
+          operation: `${method} ${functionName}`,
+          status: response.status,
+          latency_ms: latencyMs,
+          request_id: responseRequestId,
+          retry_count: retryCount,
+          attempt: retryCount + 1,
+        },
+      });
     }
 
     return {
@@ -140,6 +173,20 @@ const requestEdgeFunction = async <TData = unknown, TBody = unknown>(
       requestId: responseRequestId,
     };
   } catch (error) {
+    capturePostHogLog({
+      body: "edge function request failed before response",
+      level: "error",
+      attributes: {
+        route: `/functions/${functionName}`,
+        operation: `${method} ${functionName}`,
+        status: 0,
+        latency_ms: Math.round(performance.now() - startedAt),
+        request_id: requestId,
+        retry_count: retryCount,
+        attempt: retryCount + 1,
+        error_code: error instanceof DOMException && error.name === "AbortError" ? "timeout" : "network",
+      },
+    });
     if (error instanceof DOMException && error.name === "AbortError") {
       return {
         ok: false,
@@ -171,7 +218,7 @@ export const invokeEdgeFunction = async <TData = unknown, TBody = unknown>(
     current.status === 0 &&
     current.error.toLowerCase().includes("timed out")
   ) {
-    return requestEdgeFunction<TData, TBody>(functionName, options);
+    return requestEdgeFunction<TData, TBody>(functionName, options, undefined, undefined, 1);
   }
 
   return current;

@@ -52,12 +52,12 @@ type ReplayRecordingEvent = {
 };
 
 /**
- * Sentry stores PerformanceObserver entries as custom performance-span
+ * Replay recorders store PerformanceObserver entries as custom performance
  * events. Scrub their URL descriptions before they enter the replay buffer;
- * DOM blocking cannot remove a resource timing entry that was already
- * recorded by the browser.
+ * DOM masking cannot remove a resource timing entry already recorded by the
+ * browser.
  */
-export const sanitizeSentryReplayEvent = <T extends ReplayRecordingEvent>(event: T): T => {
+export const sanitizeReplayPerformanceEvent = <T extends ReplayRecordingEvent>(event: T): T => {
   if (!event.data || typeof event.data !== "object") return event;
   const data = event.data as Record<string, unknown>;
   if (data.tag !== "performanceSpan" || !data.payload || typeof data.payload !== "object") {

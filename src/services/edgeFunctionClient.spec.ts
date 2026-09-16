@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("./posthogService", () => ({
+vi.mock("./posthogDiagnostics", () => ({
   captureHandledRequestFailure: vi.fn(),
   capturePostHogLog: vi.fn(),
 }));

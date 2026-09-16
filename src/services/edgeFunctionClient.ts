@@ -21,7 +21,7 @@ type EdgeFunctionResult<TData> = {
 };
 import { clearAdminVerification, clearAuthState } from "../store/authState";
 import { getEdgeFunctionsBaseUrl } from "./edgeUrls";
-import { captureHandledRequestFailure, capturePostHogLog } from "./posthogService";
+import { captureHandledRequestFailure, capturePostHogLog } from "./posthogDiagnostics";
 
 const getDefaultHeaders = (accessToken?: string) => {
   const headers: Record<string, string> = {};

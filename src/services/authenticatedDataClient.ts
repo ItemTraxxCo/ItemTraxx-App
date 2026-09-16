@@ -1,5 +1,5 @@
 import { AppError, unauthorizedError } from "./appErrors";
-import { captureHandledRequestFailure, capturePostHogLog } from "./posthogService";
+import { captureHandledRequestFailure, capturePostHogLog } from "./posthogDiagnostics";
 
 const trimTrailingSlash = (value: string) => value.replace(/\/+$/, "");
 

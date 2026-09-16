@@ -132,6 +132,26 @@ Deno.test("sampled request spans export OTLP with W3C correlation and resource i
     assert(resourceAttributes.some((attribute) => attribute.key === "deployment.environment"), "environment resource attribute");
     assert(spanRecord?.traceId === "4bf92f3577b34da6a3ce929d0e0e4736", "continued trace id");
     assert(spanRecord?.parentSpanId === "00f067aa0ba902b7", "continued parent span id");
+
+    const rootRequest = new Request("https://edge.itemtraxx.com/functions/admin-ops", {
+      method: "POST",
+      headers: {
+        "x-request-id": "request-2",
+        traceparent: "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01",
+        "x-itx-trace-parent-exported": "false",
+      },
+    });
+    const rootSpan = startRequestSpan(rootRequest, "POST /functions/admin-ops", "request-2");
+    rootSpan.setStatus("ok").end();
+    await flushTraceExports();
+
+    assert(calls.length === 2, "expected one export per sampled span");
+    const rootPayload = JSON.parse(String(calls[1].init?.body)) as {
+      resourceSpans?: Array<{ scopeSpans?: Array<{ spans?: Array<Record<string, unknown>> }> }>;
+    };
+    const rootSpanRecord = rootPayload.resourceSpans?.[0]?.scopeSpans?.[0]?.spans?.[0];
+    assert(rootSpanRecord?.traceId === "4bf92f3577b34da6a3ce929d0e0e4736", "root span keeps trace id");
+    assert(rootSpanRecord?.parentSpanId === undefined, "unexported Worker parent is omitted");
   } finally {
     globalThis.fetch = originalFetch;
     for (const [name, value] of Object.entries({

@@ -1,3 +1,8 @@
+import {
+  TRACE_PARENT_EXPORTED_HEADER,
+  TRACE_PARENT_EXPORTED_VALUE,
+} from "./requestHeaders.ts";
+
 /** Structured Worker telemetry and W3C trace propagation.
  *
  * Cloudflare Workers Observability forwards these JSON console records to the
@@ -106,6 +111,10 @@ export const createWorkerTraceContext = (request: Request, env: Env): WorkerTrac
 export const withTraceHeaders = (request: Request, trace: WorkerTraceContext) => {
   const headers = new Headers(request.headers);
   headers.set("traceparent", trace.traceparent);
+  // Cloudflare Observability forwards the Worker log record, not an OTLP
+  // parent span. Tell the downstream function to keep this trace ID but make
+  // its exported span the PostHog trace root.
+  headers.set(TRACE_PARENT_EXPORTED_HEADER, TRACE_PARENT_EXPORTED_VALUE);
   if (trace.tracestate) headers.set("tracestate", trace.tracestate);
   return new Request(request, { headers });
 };

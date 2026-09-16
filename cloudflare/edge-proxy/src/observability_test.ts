@@ -61,6 +61,11 @@ Deno.test("Worker trace context continues inbound W3C context and injects a chil
   const traced = withTraceHeaders(request, trace);
   assertEquals(traced.headers.get("traceparent"), trace.traceparent, "injected traceparent");
   assertEquals(traced.headers.get("tracestate"), "vendor=value", "injected tracestate");
+  assertEquals(
+    traced.headers.get("x-itx-trace-parent-exported"),
+    "false",
+    "Worker parent export marker",
+  );
 });
 
 Deno.test("worker exception logs redact query secrets and do not send a remote payload", async () => {

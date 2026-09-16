@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("./sentry", () => ({
+vi.mock("./posthogDiagnostics", () => ({
   captureHandledRequestFailure: vi.fn(),
+  capturePostHogLog: vi.fn(),
 }));
 
 import { invokeEdgeFunction } from "./edgeFunctionClient";

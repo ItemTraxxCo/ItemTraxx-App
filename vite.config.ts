@@ -100,6 +100,11 @@ export default defineConfig(({ mode, command }) => {
     optimizeDeps: {
       exclude: ["boneyard-js"],
     },
+    // Keep production maps available for PostHog Error Tracking upload while
+    // omitting sourceMappingURL comments so the maps are not served publicly.
+    build: {
+      sourcemap: "hidden",
+    },
     server:
       process.env.VITE_E2E_TEST_UTILS === "true"
         ? { allowedHosts: ["127.0.0.1.nip.io"] }

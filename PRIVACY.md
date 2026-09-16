@@ -26,7 +26,7 @@ We may collect the following categories of information:
 - **Account Information:** Name, email address, role, tenant or role assignment, organization name, authentication metadata, and session/device metadata used to secure access
 - **Operational Data:** Inventory records, item status, barcodes, borrower identifiers, borrower profile details entered by customer admins, checkout and return history, audit logs, and administrative actions
 - **Usage Data:** App interactions, page usage, timestamps, route access, workflow activity, and operational events generated while using the service
-- **Product analytics and diagnostics (after consent):** If you enable analytics or diagnostics in the consent banner, ItemTraxx may collect product analytics through PostHog and Vercel and diagnostic events through PostHog and Sentry. This can include event names, scrubbed event properties, page or route information, timestamps, error reports and stack traces, performance measurements, and device/browser metadata. ItemTraxx may associate a non-email account identifier and role with authorized adult account activity. Sensitive property names and email-form identifiers are filtered from PostHog events. If Sentry Replay or PostHog Replay is enabled in the active environment, replay data may be collected only when both analytics and diagnostics consent are enabled.
+- **Product analytics and diagnostics (after consent):** If you enable analytics or diagnostics in the consent banner, ItemTraxx may collect product analytics through PostHog and Vercel and diagnostic events through PostHog Error Tracking and Logs. This can include event names, scrubbed event properties, page or route information, timestamps, error reports and source-map stack traces, performance measurements, and device/browser metadata. ItemTraxx may associate a non-email account identifier and role with authorized adult account activity. Sensitive property names and email-form identifiers are filtered from PostHog events. If PostHog Replay is enabled in the active environment, masked replay data may be collected after Diagnostics consent.
 - **Device and Technical Data:** Browser type, operating system, approximate device metadata, IP-derived network and security context, approximate IP-based location used for account security and session review, request identifiers, and verification or abuse-prevention signals
 - **Communications Data:** Messages submitted through contact support, contact sales, password-reset, Intercom Messenger, and related support workflows, including optional attachments where supported
 - **Transactional Data:** Plan metadata, billing-related plan classification, subscription records, and onboarding or support request metadata used to manage service delivery
@@ -104,9 +104,9 @@ ItemTraxx relies on third-party infrastructure and service providers to operate 
 - security scanning, vulnerability monitoring, and security operations support
 
 Current systems include Supabase for database, authentication, storage, and Edge Functions;
-Cloudflare for edge proxying, request filtering, DNS, and Turnstile; Vercel for frontend hosting,
-analytics, and performance measurements; PostHog and Sentry for consent-controlled analytics and
-diagnostics; Intercom for support Messenger conversations for anonymous visitors and authenticated users;
+Cloudflare for edge proxying, request filtering, DNS, Turnstile, and Worker log delivery; Vercel for frontend hosting,
+analytics, and performance measurements; PostHog for consent-controlled analytics, Error Tracking, Logs,
+and optional Replay; Intercom for support Messenger conversations for anonymous visitors and authenticated users;
 transactional email providers configured through server-side email services; GitHub for source control and
 CI/CD; and Slack and incident.io for operational notifications where configured.
 Provider use depends on the active environment and feature configuration.
@@ -156,7 +156,7 @@ Depending on your jurisdiction and relationship to the service, you may have rig
 
 You can independently enable or decline analytics and diagnostics in the cookie consent banner.
 Declining analytics prevents optional product analytics from running. Declining diagnostics prevents
-optional Sentry and PostHog diagnostic collection, including replay sampling when enabled.
+optional PostHog Error Tracking, Logs, and Replay collection. Replay follows Diagnostics consent.
 
 For authenticated adult administrators, the selected consent version and category choices are also
 recorded server-side. Anonymous visitors and student borrower workflows store the preference only in

@@ -20,7 +20,7 @@ describe("unauthorizedError", () => {
     expect(error).toBeInstanceOf(AppError);
     expect(error.code).toBe("UNAUTHORIZED");
     expect(error.status).toBe(401);
-    expect(error.reportToSentry).toBe(false);
+    expect(error.reportToErrorTracking).toBe(false);
 
     await new Promise((resolve) => queueMicrotask(() => resolve(undefined)));
     expect(listener).toHaveBeenCalledTimes(1);
@@ -33,7 +33,7 @@ describe("missingContextError", () => {
     const error = missingContextError("Missing tenant context");
     expect(error.code).toBe("MISSING_CONTEXT");
     expect(error.status).toBe(400);
-    expect(error.reportToSentry).toBe(false);
+    expect(error.reportToErrorTracking).toBe(false);
     expect(error.message).toBe("Missing tenant context");
   });
 });
@@ -43,7 +43,7 @@ describe("notFoundError", () => {
     const error = notFoundError("Borrower not found.");
     expect(error.code).toBe("NOT_FOUND");
     expect(error.status).toBe(404);
-    expect(error.reportToSentry).toBe(false);
+    expect(error.reportToErrorTracking).toBe(false);
     expect(shouldReportError(error)).toBe(false);
   });
 });
@@ -67,13 +67,13 @@ describe("edgeFunctionError", () => {
   it("maps a timed-out message to TIMEOUT", () => {
     const error = edgeFunctionError({ status: 0, error: "Request timed out" }, "fallback");
     expect(error.code).toBe("TIMEOUT");
-    expect(error.reportToSentry).toBe(false);
+    expect(error.reportToErrorTracking).toBe(false);
   });
 
   it("maps a network-failure message to NETWORK", () => {
     const error = edgeFunctionError({ status: 0, error: "Network request failed" }, "fallback");
     expect(error.code).toBe("NETWORK");
-    expect(error.reportToSentry).toBe(false);
+    expect(error.reportToErrorTracking).toBe(false);
   });
 
   it("maps a workspace/tenant disabled message to TENANT_DISABLED with a 403 default status", () => {
@@ -91,17 +91,17 @@ describe("edgeFunctionError", () => {
     const error = edgeFunctionError({ status: 404, error: "Borrower not found" }, "fallback");
     expect(error.code).toBe("NOT_FOUND");
     expect(error.status).toBe(404);
-    expect(error.reportToSentry).toBe(false);
+    expect(error.reportToErrorTracking).toBe(false);
   });
 
-  it("falls back to REQUEST_FAILED and reports to Sentry only for 5xx", () => {
+  it("falls back to REQUEST_FAILED and reports to error tracking only for 5xx", () => {
     const clientError = edgeFunctionError({ status: 422, error: "Invalid barcode format" }, "fallback");
     expect(clientError.code).toBe("REQUEST_FAILED");
-    expect(clientError.reportToSentry).toBe(false);
+    expect(clientError.reportToErrorTracking).toBe(false);
 
     const serverError = edgeFunctionError({ status: 502, error: "upstream exploded" }, "fallback");
     expect(serverError.code).toBe("REQUEST_FAILED");
-    expect(serverError.reportToSentry).toBe(true);
+    expect(serverError.reportToErrorTracking).toBe(true);
   });
 
   it("uses the fallback message when the result has no error text", () => {
@@ -137,9 +137,9 @@ describe("isUnauthorizedError", () => {
 });
 
 describe("shouldReportError", () => {
-  it("respects AppError.reportToSentry", () => {
-    expect(shouldReportError(new AppError("NETWORK", "x", { reportToSentry: false }))).toBe(false);
-    expect(shouldReportError(new AppError("REQUEST_FAILED", "x", { reportToSentry: true }))).toBe(true);
+  it("respects AppError.reportToErrorTracking", () => {
+    expect(shouldReportError(new AppError("NETWORK", "x", { reportToErrorTracking: false }))).toBe(false);
+    expect(shouldReportError(new AppError("REQUEST_FAILED", "x", { reportToErrorTracking: true }))).toBe(true);
   });
 
   it("defaults to reporting for non-AppError errors", () => {

@@ -1,9 +1,11 @@
 import {
-  buildSentryEnvelope,
+  createWorkerTraceContext,
+  logWorkerRequestCompletion,
   maybeReportWorkerResponse,
-  parseSentryDsn,
+  parseWorkerTraceparent,
   reportWorkerException,
-  reportWorkerEvent,
+  reportWorkerHttpFailure,
+  withTraceHeaders,
 } from "./observability.ts";
 
 const assert = (condition: unknown, message: string) => {
@@ -13,110 +15,77 @@ const assert = (condition: unknown, message: string) => {
 const assertEquals = (actual: unknown, expected: unknown, message: string) => {
   if (JSON.stringify(actual) !== JSON.stringify(expected)) {
     throw new Error(
-      `${message}: expected ${JSON.stringify(expected)}, received ${
-        JSON.stringify(actual)
-      }`,
+      `${message}: expected ${JSON.stringify(expected)}, received ${JSON.stringify(actual)}`,
     );
   }
 };
 
-Deno.test("Sentry DSN parsing preserves public key, project ID, and envelope endpoint", () => {
-  assertEquals(parseSentryDsn("https://public-key@o123.ingest.sentry.io/456"), {
-    publicKey: "public-key",
-    projectId: "456",
-    storeUrl: "https://o123.ingest.sentry.io/api/456/envelope/",
-  }, "valid DSN");
+const env = (extra: Partial<Env> = {}) => ({
+  ITX_ENVIRONMENT: "test",
+  ITX_OTEL_TRACE_SAMPLE_RATE: "1",
+  ITX_LOG_SUCCESS_SAMPLE_RATE: "1",
+  ...extra,
+} as Env);
 
-  for (
-    const dsn of [
-      undefined,
-      null,
-      "",
-      "not a URL",
-      "https://o123.ingest.sentry.io/456",
-      "https://public@o123.ingest.sentry.io/",
-    ]
-  ) {
-    assertEquals(parseSentryDsn(dsn), null, `invalid DSN: ${String(dsn)}`);
-  }
-});
-
-Deno.test("Sentry envelope creation uses deterministic UUID and timestamp dependencies", () => {
-  const sentry = parseSentryDsn("https://public-key@o123.ingest.sentry.io/456");
-  if (!sentry) throw new Error("Expected valid fixture DSN");
-  const envelope = buildSentryEnvelope(
-    sentry,
-    {
-      level: "error",
-      message: "fixture failure",
-      extra: { requestId: "request-123" },
-    },
-    {
-      randomUUID: () => "123e4567-e89b-12d3-a456-426614174000",
-      now: () => 1712345678901,
-    },
-  );
-  const [rawEnvelopeHeaders, rawItemHeaders, rawPayload] = envelope.split("\n");
-  assertEquals(JSON.parse(rawEnvelopeHeaders ?? ""), {
-    event_id: "123e4567e89b12d3a456426614174000",
-    sent_at: "2024-04-05T19:34:38.901Z",
-  }, "envelope headers");
+Deno.test("W3C traceparent parsing validates IDs, version, and sampled flag", () => {
   assertEquals(
-    JSON.parse(rawItemHeaders ?? ""),
-    { type: "event" },
-    "item headers",
+    parseWorkerTraceparent("00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01"),
+    {
+      traceId: "4bf92f3577b34da6a3ce929d0e0e4736",
+      spanId: "00f067aa0ba902b7",
+      traceFlags: "01",
+    },
+    "valid traceparent",
   );
-  assertEquals(JSON.parse(rawPayload ?? ""), {
-    event_id: "123e4567e89b12d3a456426614174000",
-    timestamp: 1712345678,
-    platform: "javascript",
-    logger: "itemtraxx-edge-proxy",
-    level: "error",
-    message: "fixture failure",
-    extra: { requestId: "request-123" },
-  }, "event payload");
+  assertEquals(
+    parseWorkerTraceparent("00-00000000000000000000000000000000-00f067aa0ba902b7-01"),
+    undefined,
+    "zero trace id",
+  );
+  assertEquals(parseWorkerTraceparent("ff-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01"), undefined, "invalid version");
+  assertEquals(parseWorkerTraceparent("not-a-trace"), undefined, "malformed header");
 });
 
-Deno.test("worker event reporting sends the unchanged Sentry envelope request", async () => {
-  const originalFetch = globalThis.fetch;
-  let capturedUrl = "";
-  let capturedInit: RequestInit | undefined;
-  globalThis.fetch = ((input: string | URL | Request, init?: RequestInit) => {
-    capturedUrl = String(input);
-    capturedInit = init;
-    return Promise.resolve(new Response(null, { status: 200 }));
-  }) as typeof fetch;
+Deno.test("Worker trace context continues inbound W3C context and injects a child header", () => {
+  const request = new Request("https://edge.itemtraxx.com/functions/checkoutReturn", {
+    headers: {
+      "x-request-id": "request-1",
+      traceparent: "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01",
+      tracestate: "vendor=value",
+    },
+  });
+  const trace = createWorkerTraceContext(request, env());
+  assertEquals(trace.traceId, "4bf92f3577b34da6a3ce929d0e0e4736", "trace id continuation");
+  assertEquals(trace.parentSpanId, "00f067aa0ba902b7", "parent span continuation");
+  assert(trace.spanId.length === 16 && trace.spanId !== trace.parentSpanId, "new span id");
+  const traced = withTraceHeaders(request, trace);
+  assertEquals(traced.headers.get("traceparent"), trace.traceparent, "injected traceparent");
+  assertEquals(traced.headers.get("tracestate"), "vendor=value", "injected tracestate");
+  assertEquals(
+    traced.headers.get("x-itx-trace-parent-exported"),
+    "false",
+    "Worker parent export marker",
+  );
+});
+
+Deno.test("worker exception logs redact query secrets and do not send a remote payload", async () => {
+  const originalError = console.error;
+  let output = "";
+  console.error = (value?: unknown) => {
+    output = String(value);
+  };
   try {
-    await reportWorkerEvent(
-      { SENTRY_DSN: " https://public-key@o123.ingest.sentry.io/456 " } as Env,
-      { message: "fixture failure" },
+    await reportWorkerException(
+      env(),
+      new Request("https://edge.itemtraxx.com/functions/system-status?token=secret"),
+      "request-1",
+      new Error("backend token=secret"),
     );
   } finally {
-    globalThis.fetch = originalFetch;
+    console.error = originalError;
   }
-
-  assertEquals(
-    capturedUrl,
-    "https://o123.ingest.sentry.io/api/456/envelope/",
-    "Sentry endpoint",
-  );
-  assertEquals(capturedInit?.method, "POST", "Sentry method");
-  const headers = new Headers(capturedInit?.headers);
-  assertEquals(
-    headers.get("content-type"),
-    "application/x-sentry-envelope",
-    "Sentry content type",
-  );
-  assertEquals(
-    headers.get("x-sentry-auth"),
-    "Sentry sentry_version=7, sentry_client=itemtraxx-edge-proxy/1.0, sentry_key=public-key",
-    "Sentry auth header",
-  );
-  assert(
-    typeof capturedInit?.body === "string" &&
-      capturedInit.body.split("\n").length === 3,
-    "Sentry envelope body",
-  );
+  assert(output.includes("worker.request.exception"), "structured exception event");
+  assert(!output.includes("token=secret"), "query secret redacted");
 });
 
 Deno.test("5xx response reporting keeps ExecutionContext waitUntil ownership", () => {
@@ -129,57 +98,64 @@ Deno.test("5xx response reporting keeps ExecutionContext waitUntil ownership", (
       void promise;
     },
   } as unknown as ExecutionContext;
-  const request = new Request(
-    "https://edge.itemtraxx.com/functions/system-status",
-    {
-      headers: { origin: "https://itemtraxx.com" },
-    },
-  );
+  const request = new Request("https://edge.itemtraxx.com/functions/system-status", {
+    headers: { origin: "https://itemtraxx.com" },
+  });
 
-  maybeReportWorkerResponse(
-    {} as Env,
-    request,
-    "request-ok",
-    new Response(null, { status: 499 }),
-    ctx,
-  );
+  maybeReportWorkerResponse(env(), request, "request-ok", new Response(null, { status: 499 }), ctx);
   assertEquals(waitCount, 0, "non-5xx wait count");
-
-  maybeReportWorkerResponse(
-    {} as Env,
-    request,
-    "request-failed",
-    new Response(null, { status: 503 }),
-    ctx,
-    { type: "function" },
-  );
+  maybeReportWorkerResponse(env(), request, "request-failed", new Response(null, { status: 503 }), ctx, { type: "function" });
   assertEquals(waitCount, 1, "5xx wait count");
-  assert(
-    ownedContext,
-    "waitUntil must be invoked on its ExecutionContext owner",
-  );
+  assert(ownedContext, "waitUntil must be invoked on its ExecutionContext owner");
 });
 
-Deno.test("request telemetry strips query strings before export", async () => {
-  const originalFetch = globalThis.fetch;
-  let payload = "";
-  globalThis.fetch = ((_input: string | URL | Request, init?: RequestInit) => {
-    payload = String(init?.body ?? "");
-    return Promise.resolve(new Response(null, { status: 200 }));
-  }) as typeof fetch;
+Deno.test("Worker HTTP failure records carry the request trace correlation", async () => {
+  const originalError = console.error;
+  let output = "";
+  console.error = (value?: unknown) => {
+    output = String(value);
+  };
   try {
-    const request = new Request(
-      "https://edge.itemtraxx.com/functions/system-status?token=secret",
-    );
-    await reportWorkerException(
-      { SENTRY_DSN: "https://public-key@o123.ingest.sentry.io/456" } as Env,
+    const request = new Request("https://edge.itemtraxx.com/functions/checkoutReturn");
+    const trace = createWorkerTraceContext(request, env());
+    await reportWorkerHttpFailure(
+      env(),
       request,
-      "request-1",
-      new Error("boom"),
+      "request-failed",
+      503,
+      "upstream failed",
+      { type: "function" },
+      trace,
     );
+    const parsed = JSON.parse(output) as Record<string, unknown>;
+    assertEquals(parsed.trace_id, trace.traceId, "failure trace id");
+    assertEquals(parsed.span_id, trace.spanId, "failure span id");
   } finally {
-    globalThis.fetch = originalFetch;
+    console.error = originalError;
   }
-  assert(payload.includes('"url":"https://edge.itemtraxx.com/functions/system-status"'), "telemetry URL should omit query strings");
-  assert(!payload.includes("token=secret"), "telemetry must not export query secrets");
+});
+
+Deno.test("request completion emits a wide structured event with trace correlation", () => {
+  const originalInfo = console.info;
+  let output = "";
+  console.info = (value?: unknown) => {
+    output = String(value);
+  };
+  try {
+    const request = new Request("https://edge.itemtraxx.com/functions/checkoutReturn?token=secret");
+    const trace = createWorkerTraceContext(request, env());
+    logWorkerRequestCompletion(env(), request, "request-1", trace, "POST /functions/checkoutReturn", 200, 42, {
+      retry_count: 0,
+      error_code: undefined,
+    });
+  } finally {
+    console.info = originalInfo;
+  }
+  const parsed = JSON.parse(output) as Record<string, unknown>;
+  assertEquals(parsed.service, "itemtraxx-edge-proxy", "service");
+  assertEquals(parsed.route, "/functions/checkoutReturn", "query-free route");
+  assertEquals(parsed.status, 200, "status");
+  assertEquals(parsed.request_id, "request-1", "request id");
+  assert(typeof parsed.trace_id === "string" && typeof parsed.span_id === "string", "trace fields");
+  assert(!output.includes("token=secret"), "telemetry must not export query secrets");
 });

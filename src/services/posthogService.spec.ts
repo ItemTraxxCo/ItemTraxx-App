@@ -22,6 +22,7 @@ const posthogMock = {
   reset: vi.fn(),
   set_config: vi.fn(),
   captureException: vi.fn(),
+  captureLog: vi.fn(),
   startSessionRecording: vi.fn(),
   stopSessionRecording: vi.fn(),
 };
@@ -68,7 +69,7 @@ describe("initPostHog", () => {
     expect(posthogMock.init).not.toHaveBeenCalled();
   });
 
-  it("does not initialize when analytics consent has not been granted", async () => {
+  it("initializes diagnostics-only tracking without enabling analytics", async () => {
     vi.stubEnv("VITE_POSTHOG_PROJECT_TOKEN", "tok_123");
     mockedAllows.mockReturnValue(false);
     mockedDiagnostics.mockReturnValue(true);
@@ -76,7 +77,16 @@ describe("initPostHog", () => {
 
     await mod.initPostHog();
 
-    expect(posthogMock.init).not.toHaveBeenCalled();
+    expect(posthogMock.init).toHaveBeenCalledWith(
+      "tok_123",
+      expect.objectContaining({
+        capture_exceptions: true,
+        capture_pageview: false,
+        capture_pageleave: false,
+        persistence: "memory",
+        disable_persistence: true,
+      }),
+    );
   });
 
   it("initializes posthog-js with the configured token once token + consent are both present", async () => {
@@ -134,9 +144,15 @@ describe("initPostHog", () => {
     });
     expect(ordinaryRequest).toMatchObject({ name: "https://www.itemtraxx.com/login?next=/workspace" });
     const options = posthogMock.init.mock.calls[0]?.[1] as {
-      logs?: { beforeSend?: (record: { body: string }) => unknown };
+      logs?: { beforeSend?: (record: { body: string; attributes?: Record<string, unknown> }) => unknown };
     } | undefined;
-    expect(options?.logs?.beforeSend?.({ body: "backend diagnostic token=secret" })).toBeNull();
+    expect(options?.logs?.beforeSend?.({ body: "backend diagnostic token=secret" })).toMatchObject({
+      body: "backend diagnostic token=[REDACTED]",
+    });
+    expect(options?.logs?.beforeSend?.({
+      body: "raw console detail",
+      attributes: { "log.source": "console.error" },
+    })).toBeNull();
   });
 
   it("keeps every PostHog diagnostic sink disabled when diagnostics consent is declined", async () => {
@@ -261,6 +277,50 @@ describe("capturePostHogEvent", () => {
   });
 });
 
+describe("capturePostHogLog", () => {
+  it("captures only an explicit, scrubbed structured record", async () => {
+    const mod = await initializedModule();
+
+    mod.capturePostHogLog({
+      body: "request completed for person@example.com token=secret",
+      level: "error",
+      trace_id: "4bf92f3577b34da6a3ce929d0e0e4736",
+      span_id: "00f067aa0ba902b7",
+      attributes: {
+        route: "/functions/admin-ops",
+        status: 500,
+        request_id: "request-1",
+        error_code: "server_error",
+        email: "person@example.com",
+        detail: "not in the allowlist",
+      },
+    });
+
+    expect(posthogMock.captureLog).toHaveBeenCalledWith({
+      body: "request completed for [REDACTED_EMAIL] token=[REDACTED]",
+      level: "error",
+      trace_id: "4bf92f3577b34da6a3ce929d0e0e4736",
+      span_id: "00f067aa0ba902b7",
+      attributes: {
+        route: "/functions/admin-ops",
+        status: 500,
+        request_id: "request-1",
+        error_code: "server_error",
+      },
+    });
+  });
+
+  it("does nothing after analytics consent is revoked", async () => {
+    const mod = await initializedModule();
+    mockedAllows.mockReturnValue(false);
+    mockedDiagnostics.mockReturnValue(false);
+
+    mod.capturePostHogLog({ body: "request completed", level: "info" });
+
+    expect(posthogMock.captureLog).not.toHaveBeenCalled();
+  });
+});
+
 describe("identifyPostHogUser", () => {
   it("identifies with scrubbed properties for a non-email distinct id", async () => {
     const mod = await initializedModule();
@@ -301,7 +361,7 @@ describe("resetPostHog", () => {
 });
 
 describe("capturePostHogException", () => {
-  it("captures only a fixed code without the original message, stack, cause, or context", async () => {
+  it("captures the original error for source-map grouping while adding only a fixed code", async () => {
     const mod = await initializedModule();
     const error = new Error("barcode BC-123 email person@example.com token=secret backend diagnostic");
     error.stack = "sensitive stack with person@example.com";
@@ -314,9 +374,9 @@ describe("capturePostHogException", () => {
     expect(capturedError).not.toBe(error);
     expect(capturedError).toMatchObject({
       name: "ItemTraxxClientError",
-      message: "invalid_barcode",
-      stack: undefined,
+      message: "barcode BC-123 email [REDACTED_EMAIL] token=[REDACTED] backend diagnostic",
     });
+    expect(capturedError).toHaveProperty("stack", "sensitive stack with [REDACTED_EMAIL]");
     expect(capturedError).not.toHaveProperty("cause");
     expect(properties).toEqual({ error_code: "invalid_barcode" });
   });
@@ -340,8 +400,8 @@ describe("capturePostHogException", () => {
     expect(capturedError).toMatchObject({
       name: "ItemTraxxClientError",
       message: "unknown_error",
-      stack: undefined,
     });
+    expect(capturedError).toHaveProperty("stack");
     expect(properties).toEqual({ error_code: "unknown_error" });
   });
 
@@ -359,17 +419,17 @@ describe("capturePostHogException", () => {
   it("captures non-NOT_FOUND AppErrors as a fixed diagnostic code", async () => {
     const mod = await initializedModule();
     const { AppError } = await import("./appErrors");
-    const error = new AppError("NETWORK", "Network request failed", { reportToSentry: false });
+    const error = new AppError("NETWORK", "Network request failed", { reportToErrorTracking: false });
 
     mod.capturePostHogException(error);
 
     const [capturedError, properties] = posthogMock.captureException.mock.calls[0] ?? [];
-    expect(capturedError).toMatchObject({
-      name: "ItemTraxxClientError",
-      message: "network",
-      stack: undefined,
-    });
     expect(capturedError).not.toBe(error);
+    expect(capturedError).toMatchObject({
+      name: "AppError",
+      message: "Network request failed",
+    });
+    expect(capturedError).toHaveProperty("stack");
     expect(properties).toEqual({ error_code: "network" });
   });
 
@@ -433,7 +493,7 @@ describe("before_send exception filter", () => {
     expect(getBeforeSend()(event)).toMatchObject({
       event: "$exception",
       properties: {
-        $exception_list: [{ value: "unknown_error" }],
+        $exception_list: [{ value: "Script error." }],
       },
     });
   });
@@ -459,7 +519,7 @@ describe("before_send exception filter", () => {
     expect(getBeforeSend()(event)).toMatchObject({
       event: "$exception",
       properties: {
-        $exception_list: [{ value: "unknown_error" }],
+        $exception_list: [{ value: "Script error." }],
       },
     });
   });
@@ -480,14 +540,14 @@ describe("before_send exception filter", () => {
     expect(getBeforeSend()(event)).toMatchObject({
       event: "$exception",
       properties: {
-        $exception_list: [{ value: "unknown_error" }],
+        $exception_list: [{ value: "x is not a function" }],
       },
     });
   });
 });
 
 describe("PostHog exception before_send", () => {
-  it("removes exception values, stack frames, context, and arbitrary properties", async () => {
+  it("scrubs exception values and context while retaining source-map frames", async () => {
     const mod = await initializedModule();
     void mod;
     const options = posthogMock.init.mock.calls[0]?.[1] as {
@@ -510,6 +570,9 @@ describe("PostHog exception before_send", () => {
           },
         ],
         raw_context: "borrower name and backend details",
+        route: "/functions/admin-ops",
+        request_id: "request-1",
+        request_status: 500,
       },
     }) as { event: string; properties: Record<string, unknown> } | null;
 
@@ -519,13 +582,16 @@ describe("PostHog exception before_send", () => {
         token: "project-token",
         $exception_list: [
           {
-            type: "ItemTraxxClientError",
-            value: "unknown_error",
-            mechanism: { type: "generic", handled: true, synthetic: true },
+            type: "Error",
+            value: "backend diagnostic token=[REDACTED]",
+            stacktrace: { type: "raw", frames: [{}] },
           },
         ],
         $exception_level: "error",
         error_code: "unknown_error",
+        route: "/functions/admin-ops",
+        request_id: "request-1",
+        request_status: 500,
       },
     });
   });
@@ -553,6 +619,26 @@ describe("PostHog exception before_send", () => {
       safe_url: "https://www.itemtraxx.com/login?next=/reset-password",
     });
   });
+
+  it("scrubs secret-looking URL parameters without dropping ordinary navigation state", async () => {
+    const mod = await initializedModule();
+    void mod;
+    const options = posthogMock.init.mock.calls[0]?.[1] as {
+      before_send?: (event: unknown) => unknown;
+    } | undefined;
+
+    const result = options?.before_send?.({
+      event: "$pageview",
+      properties: {
+        $current_url:
+          "https://www.itemtraxx.com/invite?workspace=demo&code=one-time-code#next=/workspace&token=secret",
+      },
+    }) as { properties: Record<string, unknown> } | null;
+
+    expect(result?.properties).toEqual({
+      $current_url: "https://www.itemtraxx.com/invite?workspace=demo#next=%2Fworkspace",
+    });
+  });
 });
 
 describe("syncPostHogConsent", () => {
@@ -563,21 +649,44 @@ describe("syncPostHogConsent", () => {
 
     expect(posthogMock.opt_in_capturing).toHaveBeenCalledOnce();
     expect(posthogMock.opt_out_capturing).not.toHaveBeenCalled();
-    expect(posthogMock.set_config).toHaveBeenCalledWith({ capture_exceptions: true });
+    expect(posthogMock.set_config).toHaveBeenCalledWith(expect.objectContaining({ capture_exceptions: true }));
     expect(posthogMock.startSessionRecording).toHaveBeenCalledOnce();
     expect(posthogMock.stopSessionRecording).not.toHaveBeenCalled();
   });
 
-  it("opts out when analytics consent is not granted", async () => {
+  it("keeps diagnostics enabled while analytics consent is not granted", async () => {
     const mod = await initializedModule();
     mockedAllows.mockReturnValue(false);
 
     mod.syncPostHogConsent();
 
+    expect(posthogMock.opt_in_capturing).toHaveBeenCalledWith({ captureEventName: false });
+    expect(posthogMock.opt_out_capturing).not.toHaveBeenCalled();
+    expect(posthogMock.set_config).toHaveBeenCalledWith(expect.objectContaining({
+      capture_exceptions: true,
+      capture_pageview: false,
+      capture_pageleave: false,
+      disable_persistence: true,
+    }));
+    expect(posthogMock.startSessionRecording).toHaveBeenCalledOnce();
+    expect(posthogMock.stopSessionRecording).not.toHaveBeenCalled();
+  });
+
+  it("opts out of every PostHog sink when both optional consents are declined", async () => {
+    const mod = await initializedModule();
+    mockedAllows.mockReturnValue(false);
+    mockedDiagnostics.mockReturnValue(false);
+
+    mod.syncPostHogConsent();
+
     expect(posthogMock.opt_out_capturing).toHaveBeenCalledOnce();
-    expect(posthogMock.set_config).toHaveBeenCalledWith({ capture_exceptions: true });
+    expect(posthogMock.set_config).toHaveBeenCalledWith(expect.objectContaining({
+      capture_exceptions: false,
+      capture_pageview: false,
+      capture_pageleave: false,
+      disable_persistence: true,
+    }));
     expect(posthogMock.stopSessionRecording).toHaveBeenCalledOnce();
-    expect(posthogMock.startSessionRecording).not.toHaveBeenCalled();
   });
 
   it("disables PostHog exception autocapture when diagnostics consent is revoked", async () => {
@@ -587,7 +696,7 @@ describe("syncPostHogConsent", () => {
 
     mod.syncPostHogConsent();
 
-    expect(posthogMock.set_config).toHaveBeenCalledWith({ capture_exceptions: false });
+    expect(posthogMock.set_config).toHaveBeenCalledWith(expect.objectContaining({ capture_exceptions: false }));
   });
 
   it("stops session replay when diagnostics consent is revoked but analytics stays granted", async () => {

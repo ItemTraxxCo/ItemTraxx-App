@@ -13,15 +13,16 @@ import {
   BORROWER_ID_PATTERN,
   ValidationError,
 } from "../_shared/validation.ts";
+import { logError, withRequestSpan } from "../_shared/observability.ts";
 
 const baseCorsHeaders = {
   "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-request-id",
+    "authorization, x-client-info, apikey, content-type, x-request-id, traceparent, tracestate",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
   Vary: "Origin",
 };
 
-serve(async (req) => {
+serve((req) => withRequestSpan(req, "POST /functions/checkout-borrower-lookup", async (span, requestId) => {
   const origin = req.headers.get("Origin");
   const allowedOrigins = parseAllowedOrigins(
     Deno.env.get("ITX_ALLOWED_ORIGINS"),
@@ -33,7 +34,7 @@ serve(async (req) => {
   const jsonResponse = (status: number, body: Record<string, unknown>) =>
     new Response(JSON.stringify(body), {
       status,
-      headers: { ...headers, "Content-Type": "application/json" },
+      headers: { ...headers, "Content-Type": "application/json", "x-request-id": requestId },
     });
 
   if (req.method === "OPTIONS") {
@@ -67,7 +68,7 @@ serve(async (req) => {
     }
 
     const userClient = createClient(supabaseUrl, publishableKey, {
-      global: { headers: { Authorization: authHeader } },
+      global: { headers: { Authorization: authHeader, traceparent: span.traceparent() } },
       auth: { persistSession: false },
     });
     // Better Auth users are mapped to ItemTraxx profiles and are not present
@@ -134,7 +135,10 @@ serve(async (req) => {
 
     const body = await readJsonBody(req, 8 * 1024);
     const deviceId = typeof body.device_id === "string" ? body.device_id.trim() : "";
-    const adminClient = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false } });
+    const adminClient = createClient(supabaseUrl, serviceKey, {
+      global: { headers: { traceparent: span.traceparent() } },
+      auth: { persistSession: false },
+    });
     const activeSession = await validateAccountDeviceSession(adminClient,{workspaceId:profile.workspace_id,profileId:authData.user.id,deviceId,authToken});
     if(activeSession.relationMissing)return jsonResponse(503,{error:"Session controls unavailable"});
     if(!activeSession.valid)return jsonResponse(401,{error:"Session revoked"});
@@ -165,9 +169,7 @@ serve(async (req) => {
     if (error instanceof ValidationError) {
       return jsonResponse(error.status, { error: "Invalid request" });
     }
-    console.error("checkout-borrower-lookup failed", {
-      message: error instanceof Error ? error.message : "unknown",
-    });
+    logError("checkout-borrower-lookup failed", requestId, error, {}, span.context);
     return jsonResponse(500, { error: "Request failed" });
   }
-});
+}));

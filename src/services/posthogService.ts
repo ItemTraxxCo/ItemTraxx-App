@@ -5,7 +5,7 @@ import {
   readCookieConsent,
 } from "./cookieConsentService";
 import { isRecoverableChunkLoadError } from "./appErrorRecovery";
-import type { CaptureResult } from "posthog-js";
+import type { CaptureLogOptions, CaptureResult } from "posthog-js";
 import { AppError } from "./appErrors";
 import {
   maskSessionReplayAttribute,
@@ -15,9 +15,14 @@ import {
 
 let initialized = false;
 let posthog: typeof import("posthog-js").default | null = null;
+const SERVICE_NAME = "itemtraxx-web";
+const APP_ENVIRONMENT = import.meta.env.VITE_POSTHOG_ENVIRONMENT?.trim() || import.meta.env.MODE || "production";
+const APP_VERSION = import.meta.env.VITE_GIT_COMMIT?.trim() || "n/a";
 const EMAIL_PATTERN = /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/i;
+const EMAIL_REDACTION_PATTERN = /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi;
 const SENSITIVE_PROPERTY_KEY =
   /(email|phone|name|tenant|profile|borrower|user_id|address|token|secret|error_message|error_type|error_stack|error_context|error_cause|exception|message|stack|context|cause)/i;
+const EXCEPTION_CONTEXT_KEY = /^(route|operation|status|latency_ms|duration_ms|request_id|provider|retry_count|error_code|trace_id|span_id|service|environment|method|component|outcome|sampled|slow|attempt|job_type|result|request_area|request_operation|request_method|request_status)$/i;
 
 export type PostHogErrorCode =
   | "unauthorized"
@@ -106,33 +111,167 @@ export const getPostHogErrorCode = (error: unknown): PostHogErrorCode => {
   return "unknown_error";
 };
 
+const redactLogText = (value: string, maxLength = 512) =>
+  value
+    .replace(EMAIL_REDACTION_PATTERN, "[REDACTED_EMAIL]")
+    .replace(/\b(?:bearer\s+)?[a-z0-9_-]{24,}\.[a-z0-9_-]{12,}\.[a-z0-9_-]{12,}\b/gi, "[REDACTED_TOKEN]")
+    .replace(/\b(access_token|refresh_token|id_token|token|secret|signature|code)=([^&#\s]+)/gi, "$1=[REDACTED]")
+    .replace(/[\u0000-\u001f\u007f]/g, " ")
+    .slice(0, maxLength);
+
+const safeExceptionString = (value: unknown, maxLength = 512) =>
+  typeof value === "string" ? redactLogText(value).slice(0, maxLength) : undefined;
+
+const sanitizeExceptionFrame = (frame: unknown) => {
+  if (!frame || typeof frame !== "object") return undefined;
+  const source = frame as Record<string, unknown>;
+  const safe: Record<string, unknown> = {};
+  for (const key of ["filename", "function", "lineno", "colno", "in_app"]) {
+    const value = source[key];
+    if (typeof value === "string") {
+      safe[key] = key === "filename"
+        ? safeExceptionString(scrubSensitiveReplayUrlValue(value), 256)
+        : safeExceptionString(value, 256);
+    } else if (typeof value === "number" || typeof value === "boolean") {
+      safe[key] = value;
+    }
+  }
+  return safe;
+};
+
+const sanitizeExceptionList = (
+  value: unknown,
+  errorCode?: PostHogErrorCode,
+) => {
+  if (!Array.isArray(value)) return [];
+  const entries = value.flatMap((entry) => {
+    if (!entry || typeof entry !== "object") return [];
+    const source = entry as Record<string, unknown>;
+    const safe: Record<string, unknown> = {};
+    const type = safeExceptionString(source.type, 120);
+    const exceptionValue = safeExceptionString(source.value, 512);
+    if (type) safe.type = type;
+    if (exceptionValue) safe.value = exceptionValue;
+    const stacktrace = source.stacktrace;
+    if (stacktrace && typeof stacktrace === "object") {
+      const stack = stacktrace as Record<string, unknown>;
+      const frames = Array.isArray(stack.frames)
+        ? stack.frames.flatMap((frame) => {
+            const safeFrame = sanitizeExceptionFrame(frame);
+            return safeFrame ? [safeFrame] : [];
+          }).slice(0, 100)
+        : [];
+      if (frames.length > 0) safe.stacktrace = { type: "raw", frames };
+    }
+    const mechanism = source.mechanism;
+    if (mechanism && typeof mechanism === "object") {
+      const sourceMechanism = mechanism as Record<string, unknown>;
+      safe.mechanism = {
+        ...(typeof sourceMechanism.type === "string" ? { type: safeExceptionString(sourceMechanism.type, 64) } : {}),
+        ...(typeof sourceMechanism.handled === "boolean" ? { handled: sourceMechanism.handled } : {}),
+        ...(typeof sourceMechanism.synthetic === "boolean" ? { synthetic: sourceMechanism.synthetic } : {}),
+      };
+    }
+    return [safe];
+  });
+
+  if (!errorCode) return entries;
+  const first = entries[0] as Record<string, unknown> | undefined;
+  return [{
+    type: "ItemTraxxClientError",
+    value: errorCode,
+    ...(first?.stacktrace ? { stacktrace: first.stacktrace } : {}),
+    mechanism: { type: "generic", handled: true, synthetic: false },
+  }];
+};
+
 const sanitizeExceptionEvent = (event: CaptureResult): CaptureResult => {
   if (event.event !== "$exception") return event;
 
   const properties = event.properties;
   const errorCode = isPostHogErrorCode(properties?.error_code)
     ? properties.error_code
-    : "unknown_error";
+    : undefined;
   const safeProperties: CaptureResult["properties"] = {};
   if (typeof properties?.token === "string") {
     // PostHog requires its project token to remain on the event. It is not a
     // user/session bearer and is safe to preserve here.
     safeProperties.token = properties.token;
   }
-  safeProperties.$exception_list = [
-    {
-      type: "ItemTraxxClientError",
-      value: errorCode,
-      mechanism: { type: "generic", handled: true, synthetic: true },
-    },
-  ];
-  safeProperties.$exception_level = "error";
-  safeProperties.error_code = errorCode;
+  for (const [key, value] of Object.entries(properties ?? {})) {
+    if (
+      !EXCEPTION_CONTEXT_KEY.test(key) ||
+      SENSITIVE_PROPERTY_KEY.test(key) ||
+      key === "error_code"
+    ) continue;
+    if (typeof value === "string") {
+      safeProperties[key] = redactLogText(value, 256);
+    } else if (typeof value === "number" && Number.isFinite(value)) {
+      safeProperties[key] = value;
+    } else if (typeof value === "boolean" || value === null) {
+      safeProperties[key] = value;
+    }
+    if (Object.keys(safeProperties).length >= 32) break;
+  }
+  safeProperties.$exception_list = sanitizeExceptionList(
+    properties?.$exception_list,
+    errorCode,
+  );
+  safeProperties.$exception_level = properties?.$exception_level === "warning"
+    ? "warning"
+    : "error";
+  safeProperties.error_code = errorCode ?? "unknown_error";
+  if (typeof properties?.$release_id === "string") {
+    safeProperties.$release_id = properties.$release_id.slice(0, 128);
+  } else if (APP_VERSION !== "n/a") {
+    safeProperties.$release_id = APP_VERSION;
+  }
 
   return { ...event, properties: safeProperties };
 };
 
 const URL_PROPERTY_KEY = /(url|uri|href|referrer|path)/i;
+const SENSITIVE_URL_PARAMETER = /^(?:access_token|refresh_token|id_token|token|secret|signature|code|api[_-]?key)$/i;
+
+const scrubTelemetryUrlValue = (value: string) => {
+  const replaySafe = scrubSensitiveReplayUrlValue(value);
+  const isAbsolute = /^[a-z][a-z0-9+.-]*:\/\//i.test(replaySafe);
+  const isProtocolRelative = replaySafe.startsWith("//");
+  try {
+    const base = typeof window !== "undefined"
+      ? window.location.origin
+      : "https://www.itemtraxx.com";
+    const url = new URL(replaySafe, base);
+    let changed = replaySafe !== value;
+    for (const key of [...url.searchParams.keys()]) {
+      if (!SENSITIVE_URL_PARAMETER.test(key)) continue;
+      url.searchParams.delete(key);
+      changed = true;
+    }
+    if (url.hash.includes("=")) {
+      const hashParams = new URLSearchParams(url.hash.slice(1));
+      let hashChanged = false;
+      for (const key of [...hashParams.keys()]) {
+        if (!SENSITIVE_URL_PARAMETER.test(key)) continue;
+        hashParams.delete(key);
+        hashChanged = true;
+      }
+      if (hashChanged) {
+        url.hash = hashParams.toString();
+        changed = true;
+      }
+    }
+    if (!changed) return value;
+    if (isAbsolute) return url.toString();
+    if (isProtocolRelative) return `//${url.host}${url.pathname}${url.search}${url.hash}`;
+    const pathname = replaySafe.startsWith("/")
+      ? url.pathname
+      : url.pathname.replace(/^\/+/, "");
+    return `${pathname}${url.search}${url.hash}`;
+  } catch {
+    return replaySafe;
+  }
+};
 
 export const sanitizeRecoveryUrlProperties = (
   properties: Record<string, unknown> | undefined,
@@ -142,7 +281,7 @@ export const sanitizeRecoveryUrlProperties = (
   const safeProperties: Record<string, unknown> = { ...properties };
   for (const [key, value] of Object.entries(properties)) {
     if (!URL_PROPERTY_KEY.test(key) || typeof value !== "string") continue;
-    const safeValue = scrubSensitiveReplayUrlValue(value);
+    const safeValue = scrubTelemetryUrlValue(value);
     if (safeValue !== value) {
       safeProperties[key] = safeValue;
       changed = true;
@@ -165,6 +304,59 @@ const scrubProperties = (
         {}
       )
     : undefined;
+
+const LOG_ATTRIBUTE_KEY = /^(route|operation|status|latency_ms|duration_ms|request_id|provider|retry_count|error_code|trace_id|span_id|service|environment|method|component|outcome|sampled|slow|attempt|job_type|result)$/i;
+
+const scrubLogAttributes = (attributes?: Record<string, unknown>) => {
+  if (!attributes) return undefined;
+  const safe: Record<string, string | number | boolean | null> = {};
+  for (const [key, value] of Object.entries(attributes)) {
+    if (!LOG_ATTRIBUTE_KEY.test(key) || SENSITIVE_PROPERTY_KEY.test(key)) continue;
+    if (typeof value === "string") {
+      safe[key] = redactLogText(value);
+    } else if (typeof value === "number" && Number.isFinite(value)) {
+      safe[key] = value;
+    } else if (typeof value === "boolean" || value === null) {
+      safe[key] = value;
+    }
+    if (Object.keys(safe).length >= 32) break;
+  }
+  return safe;
+};
+
+type PostHogLogInput = Omit<CaptureLogOptions, "body" | "attributes"> & {
+  body: string;
+  attributes?: Record<string, unknown>;
+};
+
+/**
+ * Send only explicitly authored, high-signal application logs. PostHog's
+ * console integration remains disabled; this helper never patches or forwards
+ * browser console output.
+ */
+export const capturePostHogLog = (input: PostHogLogInput) => {
+  if (!initialized || !posthog || !allowsDiagnostics(readCookieConsent())) return;
+  try {
+    const record: CaptureLogOptions = {
+      body: redactLogText(input.body),
+      ...(input.level ? { level: input.level } : {}),
+      ...(typeof input.trace_id === "string" && /^[0-9a-f]{32}$/i.test(input.trace_id)
+        ? { trace_id: input.trace_id }
+        : {}),
+      ...(typeof input.span_id === "string" && /^[0-9a-f]{16}$/i.test(input.span_id)
+        ? { span_id: input.span_id }
+        : {}),
+      ...(typeof input.trace_flags === "number" && Number.isFinite(input.trace_flags)
+        ? { trace_flags: input.trace_flags }
+        : {}),
+      attributes: scrubLogAttributes(input.attributes),
+    };
+    posthog.captureLog(record);
+  } catch (error) {
+    // Observability must never break a user flow.
+    console.warn("[posthog] log capture failed; continuing without logs.", error);
+  }
+};
 
 const CSP_UNSAFE_EVAL_PATTERNS = [
   /unsafe-eval/i,
@@ -195,10 +387,27 @@ const isCspUnsafeEvalError = (error: unknown) => {
 };
 
 // PostHog's exception feed has its own policy. Keep the expected borrower/item
-// lookup miss out of it without inheriting Sentry's broader suppression rules
-// for network, auth, and other operational errors.
+// lookup miss out of it without suppressing other operational failures.
 const shouldCapturePostHogException = (error: unknown) =>
   !(error instanceof AppError && error.code === "NOT_FOUND");
+
+const cloneErrorForPostHog = (error: unknown, errorCode: PostHogErrorCode) => {
+  if (!(error instanceof Error)) {
+    const safeError = new Error(errorCode);
+    safeError.name = "ItemTraxxClientError";
+    return safeError;
+  }
+
+  // Keep the original message/stack for PostHog's source-map grouping, but do
+  // not pass the application Error object (and its cause/custom fields) into a
+  // third-party SDK or mutate it while normalizing its grouping name.
+  const safeError = new Error(redactLogText(error.message, 2_000));
+  safeError.name = error.name && error.name !== "Error"
+    ? error.name
+    : "ItemTraxxClientError";
+  if (error.stack) safeError.stack = redactLogText(error.stack, 6_000);
+  return safeError;
+};
 
 // PostHog's exception autocapture installs its own global onerror/onunhandledrejection
 // handlers and reports directly, bypassing the guards in globalErrorHandling.ts and
@@ -262,25 +471,39 @@ export const initPostHog = async () => {
   if (initialized) return;
   const token = import.meta.env.VITE_POSTHOG_PROJECT_TOKEN?.trim();
   const consent = readCookieConsent();
-  if (!token || !allowsAnalytics(consent)) return;
+  const analyticsAllowed = allowsAnalytics(consent);
+  const diagnosticsAllowed = allowsDiagnostics(consent);
+  if (!token || (!analyticsAllowed && !diagnosticsAllowed)) return;
   try {
     posthog = (await import("posthog-js")).default;
     const currentConsent = readCookieConsent();
-    if (!allowsAnalytics(currentConsent)) return;
+    const currentAnalyticsAllowed = allowsAnalytics(currentConsent);
+    const currentDiagnosticsAllowed = allowsDiagnostics(currentConsent);
+    if (!currentAnalyticsAllowed && !currentDiagnosticsAllowed) return;
+    if (APP_VERSION !== "n/a" && typeof globalThis !== "undefined") {
+      // posthog-cli uses this same runtime hook after source-map injection. Set
+      // the build release only when no injected release row is present; the
+      // CLI's ID is the authoritative source-map foreign key.
+      const releaseTarget = globalThis as typeof globalThis & { _posthogReleaseId?: string };
+      if (!releaseTarget._posthogReleaseId) releaseTarget._posthogReleaseId = APP_VERSION;
+    }
     const posthogConfig: NonNullable<Parameters<typeof posthog.init>[1]> = {
       api_host: import.meta.env.VITE_POSTHOG_HOST?.trim() || "https://j.itemtraxx.com",
       ui_host: "https://us.posthog.com",
       defaults: "2026-01-30",
       autocapture: false,
       rageclick: false,
-      capture_pageview: "history_change",
-      capture_pageleave: true,
+      capture_pageview: currentAnalyticsAllowed ? "history_change" : false,
+      capture_pageleave: currentAnalyticsAllowed,
       capture_dead_clicks: false,
       // Exception autocapture is diagnostics, not analytics. Keep the SDK's
       // global handlers disabled unless that separate consent is present.
       capture_exceptions: allowsDiagnostics(currentConsent),
       before_send: (event) => {
         if (!event) return null;
+        if (event.event === "$exception" && !allowsDiagnostics(readCookieConsent())) {
+          return null;
+        }
         const safeEvent: CaptureResult = {
           ...event,
           properties: (sanitizeRecoveryUrlProperties(event.properties) ?? {}) as
@@ -299,15 +522,41 @@ export const initPostHog = async () => {
         return sanitizeExceptionEvent(safeEvent);
       },
       logs: {
+        serviceName: SERVICE_NAME,
+        environment: APP_ENVIRONMENT,
+        serviceVersion: APP_VERSION,
+        resourceAttributes: {
+          "deployment.environment": APP_ENVIRONMENT,
+        },
         captureConsoleLogs: false,
         // Remote config can opt console capture back in; keep that alternate
-        // sink disabled even if the project setting changes later.
-        beforeSend: () => null,
+        // sink disabled even if the project setting changes later. Explicit
+        // capturePostHogLog calls are scrubbed before they reach the SDK.
+        beforeSend: (record) => {
+          if (!allowsDiagnostics(readCookieConsent())) return null;
+          const rawAttributes = (record.attributes ?? {}) as Record<string, unknown>;
+          if (typeof rawAttributes["log.source"] === "string" && rawAttributes["log.source"].startsWith("console.")) {
+            return null;
+          }
+          return {
+            ...record,
+            body: redactLogText(record.body),
+            attributes: scrubLogAttributes(rawAttributes),
+          };
+        },
       },
+      // A diagnostics-only session uses an in-memory PostHog identity and has
+      // no automatic analytics events. Explicit exception/log calls remain
+      // gated by diagnostics consent below.
+      persistence: currentAnalyticsAllowed ? "localStorage+cookie" : "memory",
+      disable_persistence: !currentAnalyticsAllowed,
       // Session replay is a diagnostic sink, so it follows diagnostics consent
       // like exception autocapture above. Keep input values masked, but redact
       // only explicitly marked borrower/user data so the rest of the page stays
       // useful in the replay viewer.
+      // Replay is a diagnostics sink, so diagnostics consent is sufficient.
+      // Diagnostics-only sessions use memory persistence above and therefore
+      // do not create a persistent analytics identity.
       disable_session_recording: !allowsSessionReplay(currentConsent),
       session_recording: {
         maskAllInputs: true,
@@ -351,24 +600,43 @@ export const initPostHog = async () => {
 
 export const syncPostHogConsent = () => {
   if (!initialized || !posthog) return;
-  const consent = readCookieConsent();
-  const analyticsAllowed = allowsAnalytics(consent);
-  const diagnosticsAllowed = allowsDiagnostics(consent);
-  const sessionReplayAllowed = allowsSessionReplay(consent);
-  posthog.set_config({
-    capture_exceptions: diagnosticsAllowed,
-  });
-  if (analyticsAllowed) {
-    posthog.opt_in_capturing();
-    if (sessionReplayAllowed) {
-      posthog.startSessionRecording();
-    } else {
-      posthog.stopSessionRecording();
+  try {
+    const consent = readCookieConsent();
+    const analyticsAllowed = allowsAnalytics(consent);
+    const diagnosticsAllowed = allowsDiagnostics(consent);
+    const sessionReplayAllowed = allowsSessionReplay(consent);
+    posthog.set_config({
+      capture_exceptions: diagnosticsAllowed,
+      capture_pageview: analyticsAllowed ? "history_change" : false,
+      capture_pageleave: analyticsAllowed,
+      disable_persistence: !analyticsAllowed,
+      disable_session_recording: !sessionReplayAllowed,
+    });
+    if (analyticsAllowed) {
+      posthog.opt_in_capturing();
+      if (sessionReplayAllowed) {
+        posthog.startSessionRecording();
+      } else {
+        posthog.stopSessionRecording();
+      }
+      return;
     }
-    return;
+    if (diagnosticsAllowed) {
+      // Keep the SDK able to deliver explicitly captured diagnostics without
+      // enabling product analytics or writing a persistent identity.
+      posthog.opt_in_capturing({ captureEventName: false });
+      if (sessionReplayAllowed) {
+        posthog.startSessionRecording();
+      } else {
+        posthog.stopSessionRecording();
+      }
+      return;
+    }
+    posthog.stopSessionRecording();
+    posthog.opt_out_capturing();
+  } catch (error) {
+    console.warn("[posthog] consent sync failed; continuing without analytics.", error);
   }
-  posthog.stopSessionRecording();
-  posthog.opt_out_capturing();
 };
 
 export const capturePostHogEvent = (
@@ -410,22 +678,87 @@ export const resetPostHog = () => {
 
 // A missing borrower/item lookup is an expected operator input outcome, not an
 // exception. Other operational failures still belong in PostHog for diagnosis.
-export const capturePostHogException = (error: unknown) => {
+export const capturePostHogException = (
+  error: unknown,
+  additionalProperties?: Record<string, string | number | boolean | null | undefined>,
+) => {
   if (
     !initialized ||
     !posthog ||
-    !allowsAnalytics(readCookieConsent()) ||
     !allowsDiagnostics(readCookieConsent()) ||
     isCspUnsafeEvalError(error) ||
     !shouldCapturePostHogException(error)
   ) return;
   try {
     const errorCode = getPostHogErrorCode(error);
-    const safeError = new Error(errorCode);
-    safeError.name = "ItemTraxxClientError";
-    safeError.stack = undefined;
-    posthog.captureException(safeError, { error_code: errorCode });
+    const safeError = cloneErrorForPostHog(error, errorCode);
+    const safeProperties = {
+      ...(scrubProperties(additionalProperties) ?? {}),
+      error_code: errorCode,
+    };
+    posthog.captureException(safeError, safeProperties);
   } catch (captureError) {
     console.warn("[posthog] exception capture failed; continuing without analytics. Please contact support.", captureError);
   }
+};
+
+export type HandledRequestFailure = {
+  area: "edge_function" | "authenticated_data" | "http_session";
+  name: string;
+  path: string;
+  method: string;
+  status: number;
+  message: string;
+  requestId?: string;
+};
+
+const CRITICAL_EDGE_FUNCTIONS = new Set([
+  "super-dashboard",
+  "super-workspace-mutate",
+  "admin-ops",
+  "workspace-admin-mutate",
+  "privileged-step-up",
+  "checkoutReturn",
+]);
+
+const CRITICAL_DATA_PATH_PATTERNS = [
+  /^\/rest\/v1\/(profiles|borrowers|items|admin_audit_logs|audit_logs)(?:\/|$)/i,
+  /^\/rest\/v1\/rpc\/consume_rate_limit(?:\/|$)/i,
+  /^\/auth\/session\/(exchange|refresh)(?:\/|$)/i,
+];
+
+const shouldCaptureHandledRequestFailure = (failure: HandledRequestFailure) => {
+  if (failure.status >= 500) return true;
+  if (failure.area === "edge_function") {
+    return (failure.status === 401 || failure.status === 403 || failure.status === 429) &&
+      CRITICAL_EDGE_FUNCTIONS.has(failure.name);
+  }
+  return (failure.status === 401 || failure.status === 403 || failure.status === 429) &&
+    CRITICAL_DATA_PATH_PATTERNS.some((pattern) => pattern.test(failure.path));
+};
+
+/** Capture an expected request failure at a high-value boundary without the raw response body. */
+export const captureHandledRequestFailure = async (failure: HandledRequestFailure) => {
+  if (!shouldCaptureHandledRequestFailure(failure)) return;
+  const errorCode = failure.status >= 500
+    ? "server_error"
+    : failure.status === 429
+    ? "rate_limit"
+    : failure.status === 401 || failure.status === 403
+    ? "unauthorized"
+    : "request_failed";
+  capturePostHogException(
+    Object.assign(new Error(`Handled request failure: ${errorCode}`), {
+      name: "ItemTraxxHandledRequestFailure",
+    }),
+    {
+      error_code: errorCode,
+      request_area: failure.area,
+      request_operation: failure.name,
+      request_method: failure.method.toUpperCase(),
+      request_status: failure.status,
+      request_id: failure.requestId,
+      path: failure.path.replace(/[?#].*$/, ""),
+    },
+  );
 };

@@ -678,7 +678,7 @@ describe("fetchBorrowerByBorrowerId", () => {
     await expect(fetchBorrowerByBorrowerId("1234AB")).rejects.toMatchObject({
       message: "Borrower not found.",
       code: "NOT_FOUND",
-      reportToSentry: false,
+      reportToErrorTracking: false,
     });
   });
 
@@ -690,7 +690,7 @@ describe("fetchBorrowerByBorrowerId", () => {
 
     await expect(fetchBorrowerByBorrowerId("1234AB")).rejects.toMatchObject({
       code: "NOT_FOUND",
-      reportToSentry: false,
+      reportToErrorTracking: false,
     });
     expect(mockedFindOfflineBorrower).not.toHaveBeenCalled();
   });

@@ -1,5 +1,11 @@
 import type { SessionCookies } from "./cookies.ts";
 
+// This private marker is set by withTraceHeaders. It is allowlisted here so
+// the marker survives the Worker -> Supabase hop without forwarding arbitrary
+// client-controlled headers.
+export const TRACE_PARENT_EXPORTED_HEADER = "x-itx-trace-parent-exported";
+export const TRACE_PARENT_EXPORTED_VALUE = "false";
+
 export const hasRpcCallerAuth = (request: Request, cookies: SessionCookies) => {
   const authHeader = request.headers.get("Authorization");
   if (authHeader && authHeader.trim()) {
@@ -76,6 +82,9 @@ export const sanitizeRequestHeaders = (
   if (traceparent) headers.set("traceparent", traceparent);
   const tracestate = request.headers.get("tracestate");
   if (tracestate) headers.set("tracestate", tracestate);
+  if (request.headers.get(TRACE_PARENT_EXPORTED_HEADER) === TRACE_PARENT_EXPORTED_VALUE) {
+    headers.set(TRACE_PARENT_EXPORTED_HEADER, TRACE_PARENT_EXPORTED_VALUE);
+  }
   applyApproxLocationHeaders(headers, request);
   return headers;
 };
@@ -105,5 +114,8 @@ export const sanitizeUpstreamHeaders = (
   if (traceparent) headers.set("traceparent", traceparent);
   const tracestate = request.headers.get("tracestate");
   if (tracestate) headers.set("tracestate", tracestate);
+  if (request.headers.get(TRACE_PARENT_EXPORTED_HEADER) === TRACE_PARENT_EXPORTED_VALUE) {
+    headers.set(TRACE_PARENT_EXPORTED_HEADER, TRACE_PARENT_EXPORTED_VALUE);
+  }
   return headers;
 };

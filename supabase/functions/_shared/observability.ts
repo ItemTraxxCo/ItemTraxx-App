@@ -37,6 +37,8 @@ export type ServerRequestSpan = TraceContext & {
 const DEFAULT_SERVICE_NAME = "itemtraxx-supabase-functions";
 const DEFAULT_ENVIRONMENT = "production";
 const DEFAULT_TRACE_ENDPOINT = "https://us.i.posthog.com/i/v1/traces";
+const TRACE_PARENT_EXPORTED_HEADER = "x-itx-trace-parent-exported";
+const TRACE_PARENT_EXPORTED_VALUE = "false";
 const TRACEPARENT_RE = /^([0-9a-f]{2})-([0-9a-f]{32})-([0-9a-f]{16})-([0-9a-f]{2})(-.*)?$/;
 const EMAIL_PATTERN = /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi;
 const TOKEN_PATTERN = /\b(?:eyJ[a-z0-9_-]{10,}|[a-z0-9_-]{24,}\.[a-z0-9_-]{12,}\.[a-z0-9_-]{12,})\b/gi;
@@ -128,7 +130,12 @@ const resolveSampleRate = () => {
 const traceContextFromRequest = (req: Request): TraceContext => {
   const parent = parseTraceparent(req.headers.get("traceparent"));
   const traceId = parent?.traceId ?? randomHex(16);
-  const parentSpanId = parent?.spanId;
+  // The Worker emits its completion record through Cloudflare Observability,
+  // not as an OTLP span. Keep its trace ID for log correlation, but root the
+  // Supabase span so PostHog can display the trace instead of an orphan child.
+  const workerParentWasNotExported = req.headers.get(TRACE_PARENT_EXPORTED_HEADER)
+    ?.trim().toLowerCase() === TRACE_PARENT_EXPORTED_VALUE;
+  const parentSpanId = parent && !workerParentWasNotExported ? parent.spanId : undefined;
   const traceFlags = parent?.traceFlags ?? (Math.random() < resolveSampleRate() ? "01" : "00");
   return {
     traceId,

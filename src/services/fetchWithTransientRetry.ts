@@ -58,12 +58,13 @@ export const fetchWithTransientRetry = async (
   const delayMs = Math.max(0, options.delayMs ?? DEFAULT_RETRY_DELAY_MS);
   const canRetry = isSafeRetryMethod(method) &&
     !(typeof navigator !== "undefined" && navigator.onLine === false);
+  const shouldRetry = () => canRetry && !init.signal?.aborted;
   let retryCount = 0;
 
   while (true) {
     try {
       const response = await fetch(input, init);
-      if (canRetry && retryCount < maxRetries && isCloudflareChallenge(response)) {
+      if (shouldRetry() && retryCount < maxRetries && isCloudflareChallenge(response)) {
         retryCount += 1;
         options.onRetry?.(retryCount);
         await waitBeforeRetry(delayMs, init.signal);
@@ -71,7 +72,7 @@ export const fetchWithTransientRetry = async (
       }
       return response;
     } catch (error) {
-      if (!canRetry || retryCount >= maxRetries || !isTransientFetchError(error)) {
+      if (!shouldRetry() || retryCount >= maxRetries || !isTransientFetchError(error)) {
         throw error;
       }
       retryCount += 1;

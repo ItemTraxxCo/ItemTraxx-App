@@ -50,7 +50,7 @@ describe("invokeEdgeFunction CORS transport", () => {
       jsonResponse({ data: { ok: true } }) as unknown as Response,
     );
 
-    await invokeEdgeFunction("requires-json", {
+    await invokeEdgeFunction("offline-checkout", {
       method: "POST",
       body: { ok: true },
       avoidCorsPreflight: false,

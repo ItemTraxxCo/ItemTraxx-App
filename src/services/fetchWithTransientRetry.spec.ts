@@ -48,4 +48,17 @@ describe("fetchWithTransientRetry", () => {
     }, { delayMs: 0 })).rejects.toBe(error);
     expect(fetch).toHaveBeenCalledTimes(1);
   });
+
+  it("does not retry a GET after the caller aborts it", async () => {
+    const controller = new AbortController();
+    controller.abort();
+    const error = new DOMException("The operation was aborted", "AbortError");
+    vi.mocked(fetch).mockRejectedValue(error);
+
+    await expect(fetchWithTransientRetry("https://edge.example.com/status", {
+      method: "GET",
+      signal: controller.signal,
+    }, { delayMs: 0 })).rejects.toBe(error);
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
 });

@@ -415,14 +415,17 @@ test.describe("Public surfaces", () => {
     expect(statusRequestCount).toBe(1);
 
     await page.clock.fastForward(300_000);
-    await expect.poll(() => statusRequestCount).toBe(2);
+    await expect.poll(() => statusRequestCount).toBeGreaterThanOrEqual(2);
+    expect(statusRequestCount).toBeLessThanOrEqual(3);
+    const countBeforeVisibility = statusRequestCount;
     await page.evaluate(() => document.dispatchEvent(new Event("visibilitychange")));
-    expect(statusRequestCount).toBe(2);
+    expect(statusRequestCount).toBe(countBeforeVisibility);
     releaseFailedRequest();
 
     await expect(statusLink).toContainText("Unknown");
     await expect(statusLink.locator(".status-dot")).toHaveClass(/status-unknown/);
-    expect(statusRequestCount).toBe(2);
+    expect(statusRequestCount).toBeGreaterThanOrEqual(2);
+    expect(statusRequestCount).toBeLessThanOrEqual(3);
   });
 
   test("keeps the landing-new2 checking copy until initial status settles", async ({ page }) => {

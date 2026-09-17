@@ -3,9 +3,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("./edgeUrls", () => ({
   getEdgeFunctionsBaseUrl: vi.fn(),
 }));
+vi.mock("./posthogDiagnostics", () => ({
+  captureHandledRequestFailure: vi.fn(),
+  capturePostHogLog: vi.fn(),
+}));
 
 import { getEdgeFunctionsBaseUrl } from "./edgeUrls";
 import { fetchSystemStatus, probeSystemStatusTransport } from "./systemStatusService";
+import { captureHandledRequestFailure } from "./posthogDiagnostics";
 
 const mockedBaseUrl = vi.mocked(getEdgeFunctionsBaseUrl);
 
@@ -56,6 +61,12 @@ describe("fetchSystemStatus", () => {
     const result = await fetchSystemStatus({ force: true });
 
     expect(result).toEqual({ ok: false, status: 503, payload: { status: "down" } });
+    expect(captureHandledRequestFailure).toHaveBeenCalledWith(expect.objectContaining({
+      area: "edge_function",
+      name: "system-status",
+      path: "/functions/system-status",
+      status: 503,
+    }));
   });
 
   it("falls back to an empty payload when the response body is not valid JSON", async () => {
@@ -78,6 +89,13 @@ describe("fetchSystemStatus", () => {
     const result = await fetchSystemStatus({ force: true });
 
     expect(result).toBeNull();
+    expect(captureHandledRequestFailure).toHaveBeenCalledWith(expect.objectContaining({
+      area: "edge_function",
+      name: "system-status",
+      path: "/functions/system-status",
+      status: 0,
+      errorCode: "network",
+    }));
   });
 
   it("serves a cached result without calling fetch again within the TTL window", async () => {

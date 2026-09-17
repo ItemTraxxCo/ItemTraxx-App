@@ -251,6 +251,13 @@ describe("authenticatedDataClient", () => {
           attempt: 1,
         }),
       }));
+      expect(captureHandledRequestFailure).toHaveBeenCalledWith(expect.objectContaining({
+        area: "authenticated_data",
+        name: "/rest/v1/items",
+        path: "/rest/v1/items",
+        status: 0,
+        errorCode: "network",
+      }));
     });
   });
 

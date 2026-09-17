@@ -177,6 +177,20 @@ const requestEdgeFunction = async <TData = unknown, TBody = unknown>(
       requestId: responseRequestId,
     };
   } catch (error) {
+    const isAbortError = typeof DOMException !== "undefined" &&
+      error instanceof DOMException &&
+      error.name === "AbortError";
+    const errorCode = isAbortError ? "timeout" : "network";
+    void captureHandledRequestFailure({
+      area: "edge_function",
+      name: functionName,
+      path: `/functions/${functionName}`,
+      method,
+      status: 0,
+      message: isAbortError ? "Request timed out before response." : "Network request failed before response.",
+      errorCode,
+      requestId,
+    });
     capturePostHogLog({
       body: "edge function request failed before response",
       level: "error",
@@ -188,10 +202,10 @@ const requestEdgeFunction = async <TData = unknown, TBody = unknown>(
         request_id: requestId,
         retry_count: retryCount,
         attempt: retryCount + 1,
-        error_code: error instanceof DOMException && error.name === "AbortError" ? "timeout" : "network",
+        error_code: errorCode,
       },
     });
-    if (error instanceof DOMException && error.name === "AbortError") {
+    if (isAbortError) {
       return {
         ok: false,
         status: 0,

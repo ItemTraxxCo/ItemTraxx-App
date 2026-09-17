@@ -443,6 +443,54 @@ describe("capturePostHogException", () => {
   });
 });
 
+describe("captureHandledRequestFailure", () => {
+  it("captures a critical transport failure with its endpoint context and deduplicates retries", async () => {
+    const mod = await initializedModule();
+    const failure = {
+      area: "edge_function" as const,
+      name: "offline-checkout",
+      path: "/functions/offline-checkout",
+      method: "POST",
+      status: 0,
+      message: "Network request failed before response.",
+      errorCode: "network" as const,
+      requestId: "request-1",
+    };
+
+    await mod.captureHandledRequestFailure(failure);
+    await mod.captureHandledRequestFailure(failure);
+
+    expect(posthogMock.captureException).toHaveBeenCalledOnce();
+    const [capturedError, properties] = posthogMock.captureException.mock.calls[0] ?? [];
+    expect(capturedError).toMatchObject({
+      name: "ItemTraxxHandledRequestFailure",
+      message: "Handled request failure: network",
+    });
+    expect(properties).toEqual(expect.objectContaining({
+      error_code: "network",
+      request_area: "edge_function",
+      request_operation: "offline-checkout",
+      request_status: 0,
+      path: "/functions/offline-checkout",
+    }));
+  });
+
+  it("does not promote expected auth responses to error tracking", async () => {
+    const mod = await initializedModule();
+
+    await mod.captureHandledRequestFailure({
+      area: "http_session",
+      name: "/api/auth/sign-in/email",
+      path: "/api/auth/sign-in/email",
+      method: "POST",
+      status: 401,
+      message: "Invalid credentials.",
+    });
+
+    expect(posthogMock.captureException).not.toHaveBeenCalled();
+  });
+});
+
 describe("before_send exception filter", () => {
   const getBeforeSend = () => {
     const options = posthogMock.init.mock.calls[0][1] as {

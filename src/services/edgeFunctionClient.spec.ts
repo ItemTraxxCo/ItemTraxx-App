@@ -6,6 +6,7 @@ vi.mock("./posthogDiagnostics", () => ({
 }));
 
 import { invokeEdgeFunction } from "./edgeFunctionClient";
+import { captureHandledRequestFailure } from "./posthogDiagnostics";
 
 const jsonResponse = (body: unknown, headers: Record<string, string> = {}) => ({
   ok: true,
@@ -16,6 +17,7 @@ const jsonResponse = (body: unknown, headers: Record<string, string> = {}) => ({
 
 describe("invokeEdgeFunction CORS transport", () => {
   beforeEach(() => {
+    vi.clearAllMocks();
     vi.stubGlobal("fetch", vi.fn());
     vi.stubEnv("VITE_EDGE_PROXY_URL", "https://edge.example.com");
   });
@@ -95,5 +97,24 @@ describe("invokeEdgeFunction CORS transport", () => {
     expect(headers.Authorization).toBe("Bearer token");
     expect(headers["Content-Type"]).toBe("application/json");
     expect(headers["x-request-id"]).toEqual(expect.any(String));
+  });
+
+  it("promotes a critical transport failure to PostHog error tracking", async () => {
+    vi.mocked(fetch).mockRejectedValueOnce(new TypeError("Failed to fetch"));
+
+    const result = await invokeEdgeFunction("offline-checkout", {
+      method: "POST",
+      body: { action: "checkout" },
+    });
+
+    expect(result).toMatchObject({ ok: false, status: 0, error: "Network request failed." });
+    expect(captureHandledRequestFailure).toHaveBeenCalledWith(expect.objectContaining({
+      area: "edge_function",
+      name: "offline-checkout",
+      path: "/functions/offline-checkout",
+      method: "POST",
+      status: 0,
+      errorCode: "network",
+    }));
   });
 });

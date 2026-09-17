@@ -12,6 +12,7 @@ import { clearOfflineCheckoutWorkflow } from "../offlineCheckoutWorkflow";
 import { clearOfflineConnectionState } from "../offlineConnectionState";
 import { clearPendingSuperAdminVerificationEmail } from "./sessionState";
 import { shutdownIntercom } from "../intercomService";
+import { clearReplaySessionHandoff } from "../sessionReplayHandoff";
 
 export type SignOutOptions = {
   /** Login/error cleanup may continue locally when the server is unreachable. */
@@ -26,6 +27,7 @@ export type SignOutResult = {
 
 export const signOut = async ({ bestEffort = false }: SignOutOptions = {}): Promise<SignOutResult> => {
   shutdownIntercom();
+  clearReplaySessionHandoff();
   const current = getAuthState();
   const shouldRevokeAccountSession = current.role === "workspace_admin" && !!current.adminVerifiedAt;
   let accountSessionRevoked = !shouldRevokeAccountSession;

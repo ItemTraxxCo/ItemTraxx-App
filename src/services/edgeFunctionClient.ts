@@ -4,10 +4,12 @@ type EdgeFunctionOptions<TBody> = {
   accessToken?: string;
   preserveErrorData?: boolean;
   /**
-   * Use a CORS-simple request for cookie-authenticated endpoints that do not
-   * need a caller-supplied request id. This avoids an OPTIONS preflight being
-   * challenged by an upstream WAF. The Worker still generates and signs its
-   * own request id and enforces the origin, session, and authorization checks.
+   * Use a CORS-simple request for cookie-authenticated endpoints. This avoids
+   * an OPTIONS preflight being challenged by an upstream WAF. The Worker still
+   * generates and signs its own request id and enforces the origin, session,
+   * and authorization checks. This is enabled by default for cookie requests;
+   * set it to false only for an endpoint that explicitly requires a custom
+   * request header or JSON content type.
    */
   avoidCorsPreflight?: boolean;
 };
@@ -66,7 +68,9 @@ const requestEdgeFunction = async <TData = unknown, TBody = unknown>(
 
   const method = options.method ?? "POST";
   const accessToken = accessTokenOverride ?? options.accessToken;
-  const useSimpleCorsRequest = Boolean(options.avoidCorsPreflight && !accessToken);
+  const useSimpleCorsRequest = Boolean(
+    !accessToken && options.avoidCorsPreflight !== false,
+  );
   const headers = getDefaultHeaders(accessToken);
   const requestId = createRequestId();
   const startedAt = performance.now();

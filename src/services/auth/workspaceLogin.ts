@@ -21,8 +21,13 @@ export const clearLocalSession=async()=>{};
 export const workspaceLogin=async(email:string,password:string,turnstileToken?:string)=>{
   void getWorkspaceState();
   const normalizedEmail=email.trim().toLowerCase();
+  // Better Auth accepts URL-encoded form bodies. Keeping the sign-in request
+  // CORS-simple avoids a Cloudflare OPTIONS challenge; the Worker promotes the
+  // optional form captcha field back to x-captcha-response before invoking
+  // Better Auth's captcha middleware.
   const result=await authClient.signIn.email({email:normalizedEmail,password},{
-    headers: turnstileToken ? {"x-captcha-response":turnstileToken} : undefined,
+    headers: {"content-type":"application/x-www-form-urlencoded"},
+    ...(turnstileToken ? { body: { captchaResponse: turnstileToken } } : {}),
   });
   if(result.error)throw new Error(result.error.message??"Invalid email or password.");
   const summary=await fetchHttpSessionSummary();

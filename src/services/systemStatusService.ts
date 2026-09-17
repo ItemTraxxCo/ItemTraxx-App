@@ -1,4 +1,5 @@
 import { getEdgeFunctionsBaseUrl } from "./edgeUrls";
+import { fetchWithTransientRetry } from "./fetchWithTransientRetry";
 
 export type SystemStatusPayload = {
   status?: string;
@@ -47,7 +48,7 @@ const fetchAndCacheSystemStatus = async (timeoutMs: number) => {
   const controller = new AbortController();
   const timeoutId = window.setTimeout(() => controller.abort(), timeoutMs);
   try {
-    const response = await fetch(`${functionsBaseUrl}/${STATUS_FUNCTION_NAME}`, {
+    const response = await fetchWithTransientRetry(`${functionsBaseUrl}/${STATUS_FUNCTION_NAME}`, {
       method: "GET",
       signal: controller.signal,
     });

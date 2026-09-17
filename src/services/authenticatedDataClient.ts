@@ -1,5 +1,6 @@
 import { AppError, unauthorizedError } from "./appErrors";
 import { captureHandledRequestFailure, capturePostHogLog } from "./posthogDiagnostics";
+import { fetchWithTransientRetry } from "./fetchWithTransientRetry";
 
 const trimTrailingSlash = (value: string) => value.replace(/\/+$/, "");
 
@@ -44,16 +45,22 @@ const request = async (
   const method = (init.method ?? "GET").toUpperCase();
   const startedAt = performance.now();
   let response: Response;
+  let retryCount = 0;
+  const requestInit: RequestInit = {
+    ...init,
+    credentials: "include",
+    headers: {
+      Accept: "application/json",
+      ...(method !== "GET" && method !== "HEAD"
+        ? { "x-itx-data-request": "1" }
+        : {}),
+      ...(init.headers ?? {}),
+    },
+  };
   try {
-    response = await fetch(`${getBaseUrl()}${path}`, {
-      ...init,
-      credentials: "include",
-      headers: {
-        Accept: "application/json",
-        ...(method !== "GET" && method !== "HEAD"
-          ? { "x-itx-data-request": "1" }
-          : {}),
-        ...(init.headers ?? {}),
+    response = await fetchWithTransientRetry(`${getBaseUrl()}${path}`, requestInit, {
+      onRetry: (count) => {
+        retryCount = count;
       },
     });
   } catch (error) {
@@ -65,8 +72,8 @@ const request = async (
         operation: `${method} ${sanitizePathForTelemetry(path)}`,
         status: 0,
         latency_ms: Math.round(performance.now() - startedAt),
-        retry_count: 0,
-        attempt: 1,
+        retry_count: retryCount,
+        attempt: retryCount + 1,
         error_code: error instanceof DOMException && error.name === "AbortError" ? "timeout" : "network",
       },
     });
@@ -102,8 +109,8 @@ const request = async (
         status: response.status,
         latency_ms: Math.round(performance.now() - startedAt),
         request_id: response.headers.get("x-request-id") ?? undefined,
-        retry_count: 0,
-        attempt: 1,
+        retry_count: retryCount,
+        attempt: retryCount + 1,
         error_code: response.status >= 500 ? "server_error" : "request_failed",
       },
     });
@@ -142,8 +149,8 @@ const request = async (
         status: response.status,
         latency_ms: latencyMs,
         request_id: response.headers.get("x-request-id") ?? undefined,
-        retry_count: 0,
-        attempt: 1,
+        retry_count: retryCount,
+        attempt: retryCount + 1,
       },
     });
   }

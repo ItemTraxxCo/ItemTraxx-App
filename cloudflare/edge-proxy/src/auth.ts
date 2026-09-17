@@ -24,6 +24,9 @@ import {
   sendPasswordResetEmail,
 } from "./passwordResetDelivery.ts";
 import { recordPasskeyUsage } from "./passkeyUsage.ts";
+import { normalizeBetterAuthCaptchaRequest } from "./authCaptcha.ts";
+
+export { normalizeBetterAuthCaptchaRequest } from "./authCaptcha.ts";
 
 type BetterAuthEnv = Env & {
   SUPABASE_SERVICE_ROLE_KEY?: string;
@@ -518,7 +521,7 @@ export const handleBetterAuthRequest = async (request: Request, rawEnv: Env) => 
   // delivery failure cannot be used to enumerate registered accounts. The
   // internal administration bridge above checks the delivery outcome and
   // returns an actionable failure to trusted callers instead.
-  return getBetterAuth(env).handler(request);
+  return getBetterAuth(env).handler(await normalizeBetterAuthCaptchaRequest(request));
 };
 
 export const getSupabaseAccessToken = async (request: Request, env: Env) => {

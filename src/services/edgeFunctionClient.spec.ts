@@ -25,7 +25,7 @@ describe("invokeEdgeFunction CORS transport", () => {
     vi.unstubAllEnvs();
   });
 
-  it("uses a CORS-simple JSON body for cookie-authenticated requests", async () => {
+  it("uses a CORS-simple JSON body by default for cookie-authenticated requests", async () => {
     vi.mocked(fetch).mockResolvedValueOnce(
       jsonResponse({ data: { ok: true } }, { "x-request-id": "worker-request" }) as unknown as Response,
     );
@@ -33,7 +33,6 @@ describe("invokeEdgeFunction CORS transport", () => {
     const result = await invokeEdgeFunction("super-workspace-mutate", {
       method: "POST",
       body: { action: "list_workspaces" },
-      avoidCorsPreflight: true,
     });
 
     expect(result).toMatchObject({ ok: true, requestId: "worker-request" });
@@ -44,6 +43,23 @@ describe("invokeEdgeFunction CORS transport", () => {
     expect(headers["x-request-id"]).toBeUndefined();
     expect(init?.credentials).toBe("include");
     expect(JSON.parse(init?.body as string)).toEqual({ action: "list_workspaces" });
+  });
+
+  it("allows an endpoint to opt back into JSON and a client request id", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(
+      jsonResponse({ data: { ok: true } }) as unknown as Response,
+    );
+
+    await invokeEdgeFunction("offline-checkout", {
+      method: "POST",
+      body: { ok: true },
+      avoidCorsPreflight: false,
+    });
+
+    const [, init] = vi.mocked(fetch).mock.calls[0]!;
+    const headers = init?.headers as Record<string, string>;
+    expect(headers["Content-Type"]).toBe("application/json");
+    expect(headers["x-request-id"]).toEqual(expect.any(String));
   });
 
   it("uses a CORS-simple GET for cookie-authenticated dashboard requests", async () => {

@@ -33,7 +33,13 @@ export const superAdminLogin = async (
   setSecondaryAuth(false);
   const result = await authClient.signIn.email(
     { email: email.trim().toLowerCase(), password },
-    { headers: { "x-captcha-response": turnstileToken } },
+    {
+      headers: { "content-type": "application/x-www-form-urlencoded" },
+      // The edge Worker moves this field to Better Auth's captcha header
+      // before dispatch, keeping the browser request free of a preflight-only
+      // custom header.
+      body: { captchaResponse: turnstileToken },
+    },
   );
   if (result.error) throw new Error(result.error.message || "Invalid credentials.");
 

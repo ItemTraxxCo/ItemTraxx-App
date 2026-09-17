@@ -4,12 +4,12 @@
     "npm:@better-auth/infra@~0.4.6": "0.4.9_@better-auth+core@1.7.5__@better-auth+utils@0.4.3__@better-fetch+fetch@1.3.1__better-call@1.4.0__jose@6.2.12__kysely@0.29.5__nanostores@1.5.3_better-auth@1.7.5_zod@4.6.5_@types+node@26.5.1_@vitest+coverage-v8@5.0.1_jsdom@30.0.1_kysely@0.29.5_nanostores@1.5.3_typescript@6.0.3_vite@8.3.0_vitest@5.0.1_vue@3.5.42",
     "npm:@better-auth/passkey@^1.7.2": "1.7.5_@better-auth+core@1.7.5__@better-auth+utils@0.4.2__@better-fetch+fetch@1.3.2__better-call@1.4.0__jose@6.2.12__kysely@0.29.5__nanostores@1.5.3_@better-auth+utils@0.4.2_@better-fetch+fetch@1.3.2_better-auth@1.7.5_better-call@1.4.0_nanostores@1.5.3_@types+node@26.5.1_@vitest+coverage-v8@5.0.1_jose@6.2.12_jsdom@30.0.1_kysely@0.29.5_typescript@6.0.3_vite@8.3.0_vitest@5.0.1_vue@3.5.42",
     "npm:@better-auth/sso@^1.7.3": "1.7.5_@better-auth+core@1.7.5__@better-auth+utils@0.4.2__@better-fetch+fetch@1.3.2__better-call@1.4.0__jose@6.2.12__kysely@0.29.5__nanostores@1.5.3_@better-auth+utils@0.4.2_@better-fetch+fetch@1.3.2_better-auth@1.7.5_better-call@1.4.0_@types+node@26.5.1_@vitest+coverage-v8@5.0.1_jsdom@30.0.1_kysely@0.29.5_nanostores@1.5.3_typescript@6.0.3_vite@8.3.0_vitest@5.0.1_vue@3.5.42",
-    "npm:@cloudflare/vite-plugin@^1.54.5": "1.54.9_vite@8.3.0_wrangler@4.131.2",
+    "npm:@cloudflare/vite-plugin@^1.54.6": "1.54.11_vite@8.3.0_wrangler@4.133.0",
     "npm:@cyclonedx/cyclonedx-npm@6.0.1": "6.0.1",
     "npm:@intercom/messenger-js-sdk@^0.0.20": "0.0.20",
     "npm:@playwright/test@^1.63.0": "1.63.0",
     "npm:@supabase/supabase-js@^2.116.0": "2.116.0",
-    "npm:@types/node@^26.5.0": "26.5.1",
+    "npm:@types/node@^26.5.1": "26.5.1",
     "npm:@types/qrcode@^1.5.6": "1.5.6",
     "npm:@vercel/analytics@^2.0.1": "2.0.1_vue@3.5.42_vue-router@4.6.4_typescript@6.0.3",
     "npm:@vercel/speed-insights@2": "2.0.0_vue@3.5.42_vue-router@4.6.4_typescript@6.0.3",
@@ -30,12 +30,12 @@
     "npm:qrcode@^1.5.4": "1.5.4",
     "npm:supabase@^2.117.0": "2.117.0",
     "npm:typescript@~6.0.3": "6.0.3",
-    "npm:vite@^8.2.2": "8.3.0_@types+node@26.5.1",
+    "npm:vite@^8.3.0": "8.3.0_@types+node@26.5.1",
     "npm:vitest@5": "5.0.1_@types+node@26.5.1_@vitest+coverage-v8@5.0.1_jsdom@30.0.1_vite@8.3.0_@noble+hashes@2.4.0",
     "npm:vue-router@^4.6.4": "4.6.4_vue@3.5.42_typescript@6.0.3",
     "npm:vue-tsc@^3.3.11": "3.3.11_typescript@6.0.3",
     "npm:vue@^3.5.42": "3.5.42_typescript@6.0.3",
-    "npm:wrangler@^4.124.0": "4.131.2",
+    "npm:wrangler@^4.124.0": "4.133.0",
     "npm:zod@^4.6.0": "4.6.5"
   },
   "npm": {
@@ -257,8 +257,8 @@
         "workerd"
       ]
     },
-    "@cloudflare/vite-plugin@1.54.9_vite@8.3.0_wrangler@4.131.2": {
-      "integrity": "sha512-Xel2LS9BBHWPYUDp+gjIm8MXuf4aimyJajo3VNLtdvRya++NuKHd0ZNpHQTchlulV/hjkS3e7MvVlZxGvJzqDQ==",
+    "@cloudflare/vite-plugin@1.54.11_vite@8.3.0_wrangler@4.133.0": {
+      "integrity": "sha512-TJoTX1MvKXijrLVciUc66xR0Ss199au/9uiTP4H0QDNrUYpTHUU5V+X3opt0IU9f41MXStuy0oPkrZqGM0LRww==",
       "dependencies": [
         "@cloudflare/unenv-preset",
         "miniflare",
@@ -2073,8 +2073,8 @@
     "mimic-response@3.1.0": {
       "integrity": "sha512-z0yWI+4FDrrweS8Zmt4Ej5HdJmky15+L2e6Wgn3+iK5fWzb6T3fhNFq2+MeTRb064c6Wr4N/wv0DzQTjNzHNGQ=="
     },
-    "miniflare@5.20260911.1-alpha": {
-      "integrity": "sha512-7IDj9monoYcCPrS8HfcTt90T3pDwKGvNEAR1Y061KbJhBd5JkStOwOpHMUDFBo9PEbjWVDxPICAnXGNNV2LNfQ==",
+    "miniflare@5.20260916.0-alpha": {
+      "integrity": "sha512-rffIUYE5tPwhvUtVYZ4LEGaQ2XkXdBsq/flJOKODumR3gbBgHFyqPkobQEB7Ocqesz5wSUhpV8C2R57JYOsyhw==",
       "dependencies": [
         "@cspotcode/source-map-support",
         "sharp",
@@ -2852,8 +2852,8 @@
       "scripts": true,
       "bin": true
     },
-    "wrangler@4.131.2": {
-      "integrity": "sha512-jmkGE7monbPKyYQr1FPQN+SARVhddqw2fhXOmTKCw4lroqlFGSS6rit/RTvPi/qzNLKrXxkS8DhWXasJnStplg==",
+    "wrangler@4.133.0": {
+      "integrity": "sha512-Iv+feMJ3CzBvWcJM1OjtRL/0ujr1Oqmg6H/356hJrnqf8AEkazhUVqjgcRer5HGhuc9KhrsyxUpKTRMnMeUmeA==",
       "dependencies": [
         "@cloudflare/kv-asset-handler",
         "@cloudflare/unenv-preset",
@@ -3037,12 +3037,12 @@
         "npm:@better-auth/infra@~0.4.6",
         "npm:@better-auth/passkey@^1.7.2",
         "npm:@better-auth/sso@^1.7.3",
-        "npm:@cloudflare/vite-plugin@^1.54.5",
+        "npm:@cloudflare/vite-plugin@^1.54.6",
         "npm:@cyclonedx/cyclonedx-npm@6.0.1",
         "npm:@intercom/messenger-js-sdk@^0.0.20",
         "npm:@playwright/test@^1.63.0",
         "npm:@supabase/supabase-js@^2.116.0",
-        "npm:@types/node@^26.5.0",
+        "npm:@types/node@^26.5.1",
         "npm:@types/qrcode@^1.5.6",
         "npm:@vercel/analytics@^2.0.1",
         "npm:@vercel/speed-insights@2",
@@ -3062,7 +3062,7 @@
         "npm:qrcode@^1.5.4",
         "npm:supabase@^2.117.0",
         "npm:typescript@~6.0.3",
-        "npm:vite@^8.2.2",
+        "npm:vite@^8.3.0",
         "npm:vitest@5",
         "npm:vue-router@^4.6.4",
         "npm:vue-tsc@^3.3.11",

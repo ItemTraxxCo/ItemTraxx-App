@@ -1,6 +1,6 @@
 <template>
   <main class="page auth-security-page">
-    <RouterLink class="back-link" :to="backTarget">Back to settings</RouterLink>
+    <button type="button" class="back-link" @click="router.back()">Back</button>
     <header>
       <h1>Account security</h1>
       <p>Manage the security methods attached to your ItemTraxx account.</p>
@@ -65,9 +65,9 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
+import { onMounted, ref } from "vue";
 import QRCode from "qrcode";
-import { RouterLink } from "vue-router";
+import { useRouter } from "vue-router";
 import { authClient } from "../auth/client";
 import { revokeAllSuperAdminSessions } from "../services/superOps/sessions";
 import { getAuthState } from "../store/authState";
@@ -84,12 +84,8 @@ const twoFactorEnabled = ref(false);
 const busy = ref(false);
 const message = ref("");
 const error = ref("");
+const router = useRouter();
 const authState = getAuthState();
-const backTarget = computed(() => {
-  if (authState.role === "super_admin") return "/super-admin/settings";
-  if (authState.role === "workspace_admin") return "/admin/settings";
-  return "/settings";
-});
 
 const run = async (action: () => Promise<void>) => {
   busy.value = true; error.value = ""; message.value = "";

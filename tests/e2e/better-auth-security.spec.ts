@@ -34,6 +34,16 @@ test.describe("Better Auth authorization boundaries", () => {
     await expect(page).not.toHaveURL(/\/super-admin$/);
   });
 
+  test("tenant account security back button returns to the previous page", async ({ page }) => {
+    await setTenantAccountSession(page);
+    await navigateApp(page, "/account");
+    await page.getByRole("link", { name: "Account security" }).click();
+    await expect(page).toHaveURL(/\/account\/security$/);
+
+    await page.getByRole("button", { name: "Back" }).click();
+    await expect(page).toHaveURL(/\/account$/);
+  });
+
   test("workspace admins cannot cross into global administration", async ({ page }) => {
     await setWorkspaceAdminSession(page, "workspace-a");
     await navigateApp(page, "/super-admin/settings/sso");

@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   authState: { role: "super_admin" as string | null },
+  router: { back: vi.fn() },
   revokeAllSuperAdminSessions: vi.fn(),
   revokeOtherSessions: vi.fn(),
 }));
@@ -12,7 +13,7 @@ vi.mock("qrcode", () => ({
 }));
 
 vi.mock("vue-router", () => ({
-  RouterLink: { template: "<a><slot /></a>" },
+  useRouter: () => mocks.router,
 }));
 
 vi.mock("../auth/client", () => ({
@@ -60,6 +61,19 @@ describe("AccountSecurity", () => {
     expect(mocks.revokeAllSuperAdminSessions).toHaveBeenCalledWith(false);
     expect(mocks.revokeOtherSessions).not.toHaveBeenCalled();
     expect(wrapper.text()).toContain("Other sessions signed out.");
+    wrapper.unmount();
+  });
+
+  it("returns to the previous page instead of a role-specific settings route", async () => {
+    mocks.authState.role = "tenant_account";
+    const wrapper = mount(AccountSecurity);
+    await settle();
+
+    const backButton = wrapper.get("button.back-link");
+    expect(backButton.text()).toBe("Back");
+    await backButton.trigger("click");
+
+    expect(mocks.router.back).toHaveBeenCalledOnce();
     wrapper.unmount();
   });
 });

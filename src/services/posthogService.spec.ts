@@ -10,6 +10,9 @@ vi.mock("./appErrorRecovery", () => ({
   isRecoverableChunkLoadError: vi.fn(() => false),
   dispatchRecoverableAppError: vi.fn(),
 }));
+vi.mock("./sessionReplayHandoff", () => ({
+  clearReplaySessionHandoff: vi.fn(),
+}));
 
 const posthogMock = {
   init: vi.fn((_token: string, options: { loaded?: () => void }) => {
@@ -29,10 +32,12 @@ const posthogMock = {
 vi.mock("posthog-js", () => ({ default: posthogMock }));
 
 import { allowsAnalytics, allowsDiagnostics, allowsSessionReplay } from "./cookieConsentService";
+import { clearReplaySessionHandoff } from "./sessionReplayHandoff";
 
 const mockedAllows = vi.mocked(allowsAnalytics);
 const mockedDiagnostics = vi.mocked(allowsDiagnostics);
 const mockedSessionReplay = vi.mocked(allowsSessionReplay);
+const mockedClearReplayHandoff = vi.mocked(clearReplaySessionHandoff);
 
 // `initialized`/`posthog` are module-level singletons in posthogService, so each
 // describe block that needs a distinct lifecycle state (never-initialized vs.
@@ -69,10 +74,26 @@ describe("initPostHog", () => {
     expect(posthogMock.init).not.toHaveBeenCalled();
   });
 
-  it("initializes diagnostics-only tracking without enabling analytics", async () => {
+  it("does not initialize or record replay for essential-only consent", async () => {
+    vi.stubEnv("VITE_POSTHOG_PROJECT_TOKEN", "tok_123");
+    mockedAllows.mockReturnValue(false);
+    mockedDiagnostics.mockReturnValue(false);
+    mockedSessionReplay.mockReturnValue(false);
+    const mod = await loadFreshModule();
+
+    await mod.initPostHog();
+
+    expect(posthogMock.init).not.toHaveBeenCalled();
+    expect(posthogMock.startSessionRecording).not.toHaveBeenCalled();
+    expect(posthogMock.stopSessionRecording).not.toHaveBeenCalled();
+    expect(mockedClearReplayHandoff).toHaveBeenCalled();
+  });
+
+  it("initializes diagnostics-only tracking without enabling analytics or replay", async () => {
     vi.stubEnv("VITE_POSTHOG_PROJECT_TOKEN", "tok_123");
     mockedAllows.mockReturnValue(false);
     mockedDiagnostics.mockReturnValue(true);
+    mockedSessionReplay.mockReturnValue(false);
     const mod = await loadFreshModule();
 
     await mod.initPostHog();
@@ -85,8 +106,12 @@ describe("initPostHog", () => {
         capture_pageleave: false,
         persistence: "memory",
         disable_persistence: true,
+        disable_session_recording: true,
+        cross_subdomain_cookie: true,
+        cookieWinsOnConflict: true,
       }),
     );
+    expect(posthogMock.init.mock.calls[0]?.[1]).not.toHaveProperty("bootstrap");
   });
 
   it("initializes posthog-js with the configured token once token + consent are both present", async () => {
@@ -99,6 +124,8 @@ describe("initPostHog", () => {
         capture_exceptions: true,
         autocapture: false,
         capture_pageleave: true,
+        cross_subdomain_cookie: true,
+        cookieWinsOnConflict: true,
         logs: expect.objectContaining({ captureConsoleLogs: false }),
         disable_session_recording: false,
         session_recording: expect.objectContaining({
@@ -348,6 +375,7 @@ describe("resetPostHog", () => {
     mod.resetPostHog();
 
     expect(posthogMock.reset).toHaveBeenCalledOnce();
+    expect(mockedClearReplayHandoff).toHaveBeenCalled();
   });
 
   it("swallows a thrown reset error", async () => {
@@ -702,9 +730,10 @@ describe("syncPostHogConsent", () => {
     expect(posthogMock.stopSessionRecording).not.toHaveBeenCalled();
   });
 
-  it("keeps diagnostics enabled while analytics consent is not granted", async () => {
+  it("keeps diagnostics enabled while analytics consent is not granted, but stops replay", async () => {
     const mod = await initializedModule();
     mockedAllows.mockReturnValue(false);
+    mockedSessionReplay.mockReturnValue(false);
 
     mod.syncPostHogConsent();
 
@@ -715,9 +744,11 @@ describe("syncPostHogConsent", () => {
       capture_pageview: false,
       capture_pageleave: false,
       disable_persistence: true,
+      disable_session_recording: true,
     }));
-    expect(posthogMock.startSessionRecording).toHaveBeenCalledOnce();
-    expect(posthogMock.stopSessionRecording).not.toHaveBeenCalled();
+    expect(posthogMock.startSessionRecording).not.toHaveBeenCalled();
+    expect(posthogMock.stopSessionRecording).toHaveBeenCalledOnce();
+    expect(mockedClearReplayHandoff).toHaveBeenCalled();
   });
 
   it("opts out of every PostHog sink when both optional consents are declined", async () => {
@@ -735,6 +766,7 @@ describe("syncPostHogConsent", () => {
       disable_persistence: true,
     }));
     expect(posthogMock.stopSessionRecording).toHaveBeenCalledOnce();
+    expect(mockedClearReplayHandoff).toHaveBeenCalled();
   });
 
   it("disables PostHog exception autocapture when diagnostics consent is revoked", async () => {

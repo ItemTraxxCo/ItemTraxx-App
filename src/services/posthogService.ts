@@ -22,7 +22,7 @@ const EMAIL_PATTERN = /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/i;
 const EMAIL_REDACTION_PATTERN = /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi;
 const SENSITIVE_PROPERTY_KEY =
   /(email|phone|name|tenant|profile|borrower|user_id|address|token|secret|error_message|error_type|error_stack|error_context|error_cause|exception|message|stack|context|cause)/i;
-const EXCEPTION_CONTEXT_KEY = /^(route|operation|status|latency_ms|duration_ms|request_id|provider|retry_count|error_code|trace_id|span_id|service|environment|method|component|outcome|sampled|slow|attempt|job_type|result|request_area|request_operation|request_method|request_status)$/i;
+const EXCEPTION_CONTEXT_KEY = /^(route|path|operation|status|latency_ms|duration_ms|request_id|provider|retry_count|error_code|trace_id|span_id|service|environment|method|component|outcome|sampled|slow|attempt|job_type|result|request_area|request_operation|request_method|request_status)$/i;
 
 export type PostHogErrorCode =
   | "unauthorized"
@@ -709,6 +709,7 @@ export type HandledRequestFailure = {
   method: string;
   status: number;
   message: string;
+  errorCode?: PostHogErrorCode;
   requestId?: string;
 };
 
@@ -716,6 +717,8 @@ const CRITICAL_EDGE_FUNCTIONS = new Set([
   "super-dashboard",
   "super-workspace-mutate",
   "admin-ops",
+  "offline-checkout",
+  "system-status",
   "workspace-admin-mutate",
   "privileged-step-up",
   "checkoutReturn",
@@ -727,29 +730,70 @@ const CRITICAL_DATA_PATH_PATTERNS = [
   /^\/auth\/session\/(exchange|refresh)(?:\/|$)/i,
 ];
 
+const CRITICAL_AUTH_PATH_PATTERNS = [
+  /^\/api\/auth\//i,
+];
+
+const HANDLED_FAILURE_DEDUP_WINDOW_MS = 60_000;
+const handledFailureSeenAt = new Map<string, number>();
+
 const shouldCaptureHandledRequestFailure = (failure: HandledRequestFailure) => {
   if (failure.status >= 500) return true;
   if (failure.area === "edge_function") {
+    if (failure.status === 0) return CRITICAL_EDGE_FUNCTIONS.has(failure.name);
     return (failure.status === 401 || failure.status === 403 || failure.status === 429) &&
       CRITICAL_EDGE_FUNCTIONS.has(failure.name);
+  }
+  if (failure.area === "http_session") {
+    // Invalid credentials and expired sessions are expected auth outcomes. A
+    // transport failure or a server error is actionable, so only promote those.
+    return failure.status === 0 &&
+      CRITICAL_AUTH_PATH_PATTERNS.some((pattern) => pattern.test(failure.path));
+  }
+  if (failure.status === 0) {
+    return CRITICAL_DATA_PATH_PATTERNS.some((pattern) => pattern.test(failure.path));
   }
   return (failure.status === 401 || failure.status === 403 || failure.status === 429) &&
     CRITICAL_DATA_PATH_PATTERNS.some((pattern) => pattern.test(failure.path));
 };
 
+const getHandledRequestFailureCode = (failure: HandledRequestFailure): PostHogErrorCode => {
+  if (failure.errorCode && isPostHogErrorCode(failure.errorCode)) return failure.errorCode;
+  if (failure.status >= 500) return "server_error";
+  if (failure.status === 0) {
+    return /timed out|timeout/i.test(failure.message) ? "timeout" : "network";
+  }
+  if (failure.status === 429) return "rate_limit";
+  if (failure.status === 401 || failure.status === 403) return "unauthorized";
+  return "request_failed";
+};
+
 /** Capture an expected request failure at a high-value boundary without the raw response body. */
 export const captureHandledRequestFailure = async (failure: HandledRequestFailure) => {
   if (!shouldCaptureHandledRequestFailure(failure)) return;
-  const errorCode = failure.status >= 500
-    ? "server_error"
-    : failure.status === 429
-    ? "rate_limit"
-    : failure.status === 401 || failure.status === 403
-    ? "unauthorized"
-    : "request_failed";
+  if (!initialized || !posthog || !allowsDiagnostics(readCookieConsent())) return;
+  const errorCode = getHandledRequestFailureCode(failure);
+  const path = failure.path.replace(/[?#].*$/, "");
+  const dedupeKey = [
+    failure.area,
+    failure.name,
+    failure.method.toUpperCase(),
+    failure.status,
+    errorCode,
+    path,
+  ].join(":");
+  const now = Date.now();
+  for (const [key, seenAt] of handledFailureSeenAt) {
+    if (now - seenAt >= HANDLED_FAILURE_DEDUP_WINDOW_MS) handledFailureSeenAt.delete(key);
+  }
+  const previous = handledFailureSeenAt.get(dedupeKey);
+  if (previous !== undefined && now - previous < HANDLED_FAILURE_DEDUP_WINDOW_MS) return;
+  handledFailureSeenAt.set(dedupeKey, now);
   capturePostHogException(
     Object.assign(new Error(`Handled request failure: ${errorCode}`), {
       name: "ItemTraxxHandledRequestFailure",
+      code: errorCode.toUpperCase(),
+      status: failure.status,
     }),
     {
       error_code: errorCode,
@@ -758,7 +802,7 @@ export const captureHandledRequestFailure = async (failure: HandledRequestFailur
       request_method: failure.method.toUpperCase(),
       request_status: failure.status,
       request_id: failure.requestId,
-      path: failure.path.replace(/[?#].*$/, ""),
+      path,
     },
   );
 };

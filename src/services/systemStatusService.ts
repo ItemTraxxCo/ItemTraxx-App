@@ -1,5 +1,6 @@
 import { getEdgeFunctionsBaseUrl } from "./edgeUrls";
 import { fetchWithTransientRetry } from "./fetchWithTransientRetry";
+import { captureHandledRequestFailure, capturePostHogLog } from "./posthogDiagnostics";
 
 export type SystemStatusPayload = {
   status?: string;
@@ -30,6 +31,12 @@ type SystemStatusResponse = {
 
 const STATUS_FUNCTION_NAME = import.meta.env.VITE_STATUS_FUNCTION || "system-status";
 const STATUS_CACHE_TTL_MS = 10_000;
+const statusRoute = () => `/functions/${STATUS_FUNCTION_NAME}`;
+
+const isAbortError = (error: unknown) =>
+  typeof DOMException !== "undefined" &&
+  error instanceof DOMException &&
+  error.name === "AbortError";
 
 let cachedResult: SystemStatusResponse | null = null;
 let cachedAtMs = 0;
@@ -47,6 +54,7 @@ const fetchAndCacheSystemStatus = async (timeoutMs: number) => {
   // this one direct fetch.
   const controller = new AbortController();
   const timeoutId = window.setTimeout(() => controller.abort(), timeoutMs);
+  const startedAt = performance.now();
   try {
     const response = await fetchWithTransientRetry(`${functionsBaseUrl}/${STATUS_FUNCTION_NAME}`, {
       method: "GET",
@@ -58,10 +66,54 @@ const fetchAndCacheSystemStatus = async (timeoutMs: number) => {
       status: response.status,
       payload,
     };
+    if (!response.ok) {
+      const route = statusRoute();
+      void captureHandledRequestFailure({
+        area: "edge_function",
+        name: STATUS_FUNCTION_NAME,
+        path: route,
+        method: "GET",
+        status: response.status,
+        message: `System status request failed (${response.status}).`,
+      });
+      capturePostHogLog({
+        body: "system status request completed",
+        level: response.status >= 500 ? "error" : "warn",
+        attributes: {
+          route,
+          operation: `GET ${route}`,
+          status: response.status,
+          latency_ms: Math.round(performance.now() - startedAt),
+          error_code: response.status >= 500 ? "server_error" : "request_failed",
+        },
+      });
+    }
     cachedResult = result;
     cachedAtMs = Date.now();
     return result;
-  } catch {
+  } catch (error) {
+    const errorCode = isAbortError(error) ? "timeout" : "network";
+    const route = statusRoute();
+    void captureHandledRequestFailure({
+      area: "edge_function",
+      name: STATUS_FUNCTION_NAME,
+      path: route,
+      method: "GET",
+      status: 0,
+      message: isAbortError(error) ? "System status request timed out before response." : "System status request failed before response.",
+      errorCode,
+    });
+    capturePostHogLog({
+      body: "system status request failed before response",
+      level: "error",
+      attributes: {
+        route,
+        operation: `GET ${route}`,
+        status: 0,
+        latency_ms: Math.round(performance.now() - startedAt),
+        error_code: errorCode,
+      },
+    });
     return null;
   } finally {
     window.clearTimeout(timeoutId);
@@ -102,7 +154,18 @@ export const probeSystemStatusTransport = async (timeoutMs = 3500) => {
       signal: controller.signal,
     });
     return true;
-  } catch {
+  } catch (error) {
+    const errorCode = isAbortError(error) ? "timeout" : "network";
+    const route = statusRoute();
+    void captureHandledRequestFailure({
+      area: "edge_function",
+      name: STATUS_FUNCTION_NAME,
+      path: route,
+      method: "GET",
+      status: 0,
+      message: isAbortError(error) ? "System status transport probe timed out." : "System status transport probe failed.",
+      errorCode,
+    });
     return false;
   } finally {
     window.clearTimeout(timeoutId);

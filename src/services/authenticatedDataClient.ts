@@ -64,17 +64,31 @@ const request = async (
       },
     });
   } catch (error) {
+    const isAbortError = typeof DOMException !== "undefined" &&
+      error instanceof DOMException &&
+      error.name === "AbortError";
+    const errorCode = isAbortError ? "timeout" : "network";
+    const route = sanitizePathForTelemetry(path);
+    void captureHandledRequestFailure({
+      area: "authenticated_data",
+      name: route,
+      path: route,
+      method,
+      status: 0,
+      message: isAbortError ? "Authenticated data request timed out before response." : "Authenticated data request failed before response.",
+      errorCode,
+    });
     capturePostHogLog({
       body: "authenticated data request failed before response",
       level: "error",
       attributes: {
-        route: sanitizePathForTelemetry(path),
-        operation: `${method} ${sanitizePathForTelemetry(path)}`,
+        route,
+        operation: `${method} ${route}`,
         status: 0,
         latency_ms: Math.round(performance.now() - startedAt),
         retry_count: retryCount,
         attempt: retryCount + 1,
-        error_code: error instanceof DOMException && error.name === "AbortError" ? "timeout" : "network",
+        error_code: errorCode,
       },
     });
     throw error;

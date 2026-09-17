@@ -12,9 +12,11 @@ import {
   scrubSensitiveReplayUrlValue,
   SESSION_REPLAY_MASK_SELECTOR,
 } from "./sessionReplayPrivacy";
+import { clearReplaySessionHandoff } from "./sessionReplayHandoff";
 
 let initialized = false;
 let posthog: typeof import("posthog-js").default | null = null;
+let initializationPromise: Promise<void> | null = null;
 const SERVICE_NAME = "itemtraxx-web";
 const APP_ENVIRONMENT = import.meta.env.VITE_POSTHOG_ENVIRONMENT?.trim() || import.meta.env.MODE || "production";
 const APP_VERSION = import.meta.env.VITE_GIT_COMMIT?.trim() || "n/a";
@@ -467,19 +469,30 @@ const isRecoverableChunkLoadExceptionEvent = (
   );
 };
 
-export const initPostHog = async () => {
+const initializePostHog = async () => {
   if (initialized) return;
   const token = import.meta.env.VITE_POSTHOG_PROJECT_TOKEN?.trim();
   const consent = readCookieConsent();
   const analyticsAllowed = allowsAnalytics(consent);
   const diagnosticsAllowed = allowsDiagnostics(consent);
-  if (!token || (!analyticsAllowed && !diagnosticsAllowed)) return;
+  if (!token || (!analyticsAllowed && !diagnosticsAllowed)) {
+    clearReplaySessionHandoff();
+    return;
+  }
   try {
     posthog = (await import("posthog-js")).default;
     const currentConsent = readCookieConsent();
     const currentAnalyticsAllowed = allowsAnalytics(currentConsent);
     const currentDiagnosticsAllowed = allowsDiagnostics(currentConsent);
-    if (!currentAnalyticsAllowed && !currentDiagnosticsAllowed) return;
+    const currentSessionReplayAllowed = allowsSessionReplay(currentConsent);
+    if (!currentAnalyticsAllowed && !currentDiagnosticsAllowed) {
+      clearReplaySessionHandoff();
+      return;
+    }
+    // Replay is now strictly opt-in to both Analytics and Diagnostics. Any
+    // handoff cookie from an older build must not re-enable it after a
+    // redirect, so discard the bridge before initializing the SDK.
+    clearReplaySessionHandoff();
     if (APP_VERSION !== "n/a" && typeof globalThis !== "undefined") {
       // posthog-cli uses this same runtime hook after source-map injection. Set
       // the build release only when no injected release row is present; the
@@ -491,6 +504,13 @@ export const initPostHog = async () => {
       api_host: import.meta.env.VITE_POSTHOG_HOST?.trim() || "https://j.itemtraxx.com",
       ui_host: "https://us.posthog.com",
       defaults: "2026-01-30",
+      // Keep the identity/session cookie shared across itemtraxx.com and
+      // workspace subdomains. The explicit conflict policy is required while
+      // this app remains pinned to an older PostHog defaults snapshot; it
+      // prevents a stale per-origin localStorage session from winning over
+      // the shared cookie after a full-page workspace redirect.
+      cross_subdomain_cookie: true,
+      cookieWinsOnConflict: true,
       autocapture: false,
       rageclick: false,
       capture_pageview: currentAnalyticsAllowed ? "history_change" : false,
@@ -550,14 +570,10 @@ export const initPostHog = async () => {
       // gated by diagnostics consent below.
       persistence: currentAnalyticsAllowed ? "localStorage+cookie" : "memory",
       disable_persistence: !currentAnalyticsAllowed,
-      // Session replay is a diagnostic sink, so it follows diagnostics consent
-      // like exception autocapture above. Keep input values masked, but redact
-      // only explicitly marked borrower/user data so the rest of the page stays
-      // useful in the replay viewer.
-      // Replay is a diagnostics sink, so diagnostics consent is sufficient.
-      // Diagnostics-only sessions use memory persistence above and therefore
-      // do not create a persistent analytics identity.
-      disable_session_recording: !allowsSessionReplay(currentConsent),
+      // Replay requires both Analytics and Diagnostics consent. Keep input
+      // values masked, but redact only explicitly marked borrower/user data so
+      // the rest of the page stays useful in the replay viewer.
+      disable_session_recording: !currentSessionReplayAllowed,
       session_recording: {
         maskAllInputs: true,
         maskTextSelector: SESSION_REPLAY_MASK_SELECTOR,
@@ -598,6 +614,16 @@ export const initPostHog = async () => {
   }
 };
 
+export const initPostHog = async () => {
+  if (initialized) return;
+  if (!initializationPromise) initializationPromise = initializePostHog();
+  try {
+    await initializationPromise;
+  } finally {
+    initializationPromise = null;
+  }
+};
+
 export const syncPostHogConsent = () => {
   if (!initialized || !posthog) return;
   try {
@@ -612,6 +638,7 @@ export const syncPostHogConsent = () => {
       disable_persistence: !analyticsAllowed,
       disable_session_recording: !sessionReplayAllowed,
     });
+    if (!sessionReplayAllowed) clearReplaySessionHandoff();
     if (analyticsAllowed) {
       posthog.opt_in_capturing();
       if (sessionReplayAllowed) {
@@ -668,6 +695,7 @@ export const identifyPostHogUser = (
 };
 
 export const resetPostHog = () => {
+  clearReplaySessionHandoff();
   if (!initialized || !posthog) return;
   try {
     posthog.reset();

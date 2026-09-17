@@ -142,6 +142,7 @@ import { useTurnstile } from "../composables/useTurnstile";
 import { clearAdminVerification, getAuthState } from "../store/authState";
 import { safeExternalUrl } from "../utils/safeUrl";
 import { authClient } from "../auth/client";
+import { clearReplaySessionHandoff } from "../services/sessionReplayHandoff";
 
 const router = useRouter();
 const email = ref("");
@@ -292,6 +293,8 @@ const getLoginErrorCode = (message: string) => {
 const handleLogin = async () => {
   error.value = "";
   isLoading.value = true;
+  // Clear any legacy replay handoff before a new sign-in attempt.
+  clearReplaySessionHandoff();
   try {
     if (turnstileSiteKey && !turnstileToken.value) {
       error.value = "Complete the security check and try again.";
@@ -393,6 +396,7 @@ const handleLogin = async () => {
 
 const handlePasskeyLogin = async () => {
   error.value = ""; isLoading.value = true;
+  clearReplaySessionHandoff();
   try {
     const result = await authClient.signIn.passkey();
     if (result.error) throw new Error(result.error.message ?? "Passkey sign-in failed.");
@@ -404,6 +408,7 @@ const handlePasskeyLogin = async () => {
 
 const handleSsoLogin = async () => {
   error.value = ""; isLoading.value = true;
+  clearReplaySessionHandoff();
   try {
     const result = await authClient.signIn.sso({ email: email.value.trim().toLowerCase(), callbackURL: `${location.origin}/` });
     if (result.error) throw new Error(result.error.message ?? "SSO sign-in failed.");

@@ -1,3 +1,5 @@
+import { clearReplaySessionHandoff } from "./sessionReplayHandoff";
+
 const COOKIE_CONSENT_STORAGE_KEY = "itemtraxx-cookie-consent";
 export const COOKIE_CONSENT_SYNC_KEY = "itemtraxx-cookie-consent-sync";
 const COOKIE_CONSENT_VERSION = 2;
@@ -149,6 +151,9 @@ export const writeCookieConsent = (preferences: CookieConsentPreferences) => {
     updatedAt: new Date().toISOString(),
   };
   try {
+    // Remove any short-lived bridge cookie left by an older build before the
+    // new consent decision takes effect.
+    clearReplaySessionHandoff();
     writeCookie(COOKIE_CONSENT_STORAGE_KEY, JSON.stringify(next));
     // A cookie is shared across ItemTraxx subdomains, while localStorage is
     // origin-scoped. The pulse is only a same-origin fast path; subscribers
@@ -178,7 +183,11 @@ export const getOrCreateCookieConsentSubject = () => {
 
 export const allowsAnalytics = (state: CookieConsentState | null) => state?.preferences.analytics === true;
 export const allowsDiagnostics = (state: CookieConsentState | null) => state?.preferences.diagnostics === true;
-export const allowsSessionReplay = (state: CookieConsentState | null) => state?.preferences.diagnostics === true;
+// Session replay is available only when both optional consent categories are
+// granted. Analytics-disabled consent must never record a browser replay,
+// even when the user still allows diagnostics such as error reports and logs.
+export const allowsSessionReplay = (state: CookieConsentState | null) =>
+  allowsAnalytics(state) && allowsDiagnostics(state);
 export const hasCookieConsent = (state: CookieConsentState | null) => state !== null;
 
 export const clearAnalyticsPersistence = () => {

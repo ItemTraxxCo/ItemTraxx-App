@@ -12,6 +12,7 @@ import {
   writeCookieConsent,
   type CookieConsentState,
 } from "./cookieConsentService";
+import { SESSION_REPLAY_HANDOFF_COOKIE_NAME } from "./sessionReplayHandoff";
 
 const clearAllCookies = () => {
   document.cookie.split(";").forEach((cookie) => {
@@ -103,6 +104,15 @@ describe("writeCookieConsent", () => {
     expect(received?.preferences).toEqual({ analytics: false, diagnostics: true });
     window.removeEventListener("itemtraxx:cookie-consent", listener);
   });
+
+  it("clears a pending replay handoff whenever consent changes", () => {
+    document.cookie = `${SESSION_REPLAY_HANDOFF_COOKIE_NAME}=legacy; Path=/`;
+    expect(document.cookie).toContain(SESSION_REPLAY_HANDOFF_COOKIE_NAME);
+
+    writeCookieConsent({ analytics: false, diagnostics: true });
+
+    expect(document.cookie).not.toContain(SESSION_REPLAY_HANDOFF_COOKIE_NAME);
+  });
 });
 
 describe("subscribeCookieConsent", () => {
@@ -187,6 +197,22 @@ describe("consent predicate helpers", () => {
     expect(allowsAnalytics(state)).toBe(true);
     expect(allowsDiagnostics(state)).toBe(false);
     expect(allowsSessionReplay(state)).toBe(false);
+
+    const diagnosticsOnlyState: CookieConsentState = {
+      version: 2,
+      preferences: { analytics: false, diagnostics: true },
+      updatedAt: "t",
+    };
+    expect(allowsAnalytics(diagnosticsOnlyState)).toBe(false);
+    expect(allowsDiagnostics(diagnosticsOnlyState)).toBe(true);
+    expect(allowsSessionReplay(diagnosticsOnlyState)).toBe(false);
+
+    const allState: CookieConsentState = {
+      version: 2,
+      preferences: { analytics: true, diagnostics: true },
+      updatedAt: "t",
+    };
+    expect(allowsSessionReplay(allState)).toBe(true);
   });
 
   it("treat a null state as no consent for every category", () => {

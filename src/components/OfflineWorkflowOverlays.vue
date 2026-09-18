@@ -217,7 +217,7 @@ const tryReconnect = async () => {
   warningError.value = "";
   try {
     const result = await syncOfflineCheckoutLedger();
-    if (result.failed > 0) throw new Error("ItemTraxx servers are still unreachable. Your pending transactions remain safely stored.");
+    if (result.failed > 0) throw new Error("ItemTraxx servers are still unreachable. Your pending transactions remain safely stored on your device.");
     await refresh();
   } catch (error) {
     warningError.value = toUserFacingErrorMessage(error, "ItemTraxx servers are still unreachable.");

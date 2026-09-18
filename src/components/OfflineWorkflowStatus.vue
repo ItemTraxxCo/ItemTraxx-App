@@ -106,7 +106,7 @@ const setSyncMessage = (result: CheckoutQueueSyncResult) => {
   const attentionCount = result.remaining + result.review;
   if (result.serverReachable === false) {
     messageKind.value = "error";
-    message.value = "ItemTraxx servers are still unreachable. Pending transactions remain safely stored.";
+    message.value = "ItemTraxx servers are still unreachable. Pending transactions remain safely stored on your device.";
   } else if (result.remaining > 0 || result.review > 0) {
     messageKind.value = "info";
     message.value = `Connected to ItemTraxx servers, but ${attentionCount} offline transaction${attentionCount === 1 ? "" : "s"} still need attention.`;

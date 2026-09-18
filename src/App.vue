@@ -195,7 +195,7 @@ const isLandingRoute = computed(() => route.path === "/" || route.path === "/lan
 const isUnavailableRoute = computed(() => route.path === "/unavailable" || route.name === "public-unavailable");
 const isSuperAdminShellRoute = computed(() => String(route.name || "").startsWith("super-admin-"));
 const isKillSwitchAllowedRoute = computed(() => isUnavailableRoute.value);
-const hiddenMenuRoutes = new Set(["public-home", "public-unavailable", "public-pricing", "public-about", "public-security", "public-report-security-issue", "public-changelog", "public-compliance", "public-privacy", "public-cookies", "public-contact", "public-trust", "public-faq", "public-accessibility", "public-getting-started", "public-itemscanner", "public-legal", "public-forgot-password", "public-reset-password", "public-home-new2", "public-request-demo", "public-contact-sales", "public-contact-support", "public-submit-confirmation"]);
+const hiddenMenuRoutes = new Set(["public-home", "public-unavailable", "public-access-denied", "public-pricing", "public-about", "public-security", "public-report-security-issue", "public-changelog", "public-compliance", "public-privacy", "public-cookies", "public-contact", "public-trust", "public-faq", "public-accessibility", "public-getting-started", "public-itemscanner", "public-legal", "public-forgot-password", "public-reset-password", "public-home-new2", "public-request-demo", "public-contact-sales", "public-contact-support", "public-submit-confirmation"]);
 const showTopMenu = computed(() => !hiddenMenuRoutes.has(String(route.name)) && !String(route.name || "").startsWith("super-admin-"));
 const showLogoutUserAction = computed(() => auth.isAuthenticated && !Boolean(route.meta.public) && route.path !== "/login");
 const isWorkspaceScopedRoute = computed(() =>
@@ -224,7 +224,7 @@ const showMaintenanceBanner = computed(() => maintenanceEnabled.value && !isUnav
 const showMaintenanceOverlay = computed(() => {
   if (isUnavailableBypass.value || !maintenanceEnabled.value) return false;
   const name = String(route.name || "");
-  if (["public-unavailable", "not-found", "super-auth", "internal-auth"].includes(name) || name.startsWith("internal-")) return false;
+  if (["public-unavailable", "public-access-denied", "not-found", "super-auth", "internal-auth"].includes(name) || name.startsWith("internal-")) return false;
   return !name.startsWith("super-admin-");
 });
 const showKillSwitchOverlay = computed(() => !isUnavailableBypass.value && !isKillSwitchAllowedRoute.value && killSwitchEnabled.value);

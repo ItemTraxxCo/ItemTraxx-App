@@ -3,6 +3,7 @@ import type { RouteLocationNormalized, RouteRecordRaw } from "vue-router";
 import { getAuthState, type AuthState } from "../store/authState";
 import { getWorkspaceState } from "../store/workspaceState";
 import { buildWorkspaceAppUrl, lookupWorkspaceById } from "../services/workspaceService";
+import { sanitizeReturnTo } from "./returnTo";
 
 const ADMIN_VERIFICATION_TTL_MS = 15 * 60 * 1000;
 const SUPER_VERIFICATION_TTL_MS = 15 * 60 * 1000;
@@ -37,6 +38,12 @@ const routes: RouteRecordRaw[] = [
     name: "public-login",
     component: () => import("../pages/Login.vue"),
     meta: { public: true, title: "Login | ItemTraxx" },
+  },
+  {
+    path: "/access-denied",
+    name: "public-access-denied",
+    component: () => import("../pages/AccessDenied.vue"),
+    meta: { public: true, title: "Access denied | ItemTraxx" },
   },
   {
     path: "/landing-new",
@@ -625,6 +632,22 @@ const notFoundFor = (path: string) => ({
   },
 });
 
+const loginFor = (to: RouteLocationNormalized) => {
+  const redirect = sanitizeReturnTo(to.fullPath);
+  return redirect
+    ? { name: "public-login", query: { redirect } }
+    : { name: "public-login" };
+};
+
+const accessDeniedRoute = () => ({ name: "public-access-denied" });
+
+const accessDeniedFor = (to: RouteLocationNormalized) => {
+  const redirect = sanitizeReturnTo(to.fullPath);
+  return redirect
+    ? { name: "public-access-denied", query: { redirect } }
+    : accessDeniedRoute();
+};
+
 type AppRouteMeta = {
   public?: boolean;
   requiresSession?: boolean;
@@ -653,6 +676,7 @@ const resolveInternalHostRoute = async (
 };
 
 const resolveWorkspaceMismatchRoute = async (
+  to: RouteLocationNormalized,
   workspace: ReturnType<typeof getWorkspaceState>,
   auth: AuthState,
 ) => {
@@ -663,6 +687,10 @@ const resolveWorkspaceMismatchRoute = async (
   ) {
     return undefined;
   }
+
+  const meta = to.meta as AppRouteMeta;
+  if (meta.public && to.name !== "public-home") return undefined;
+  if (to.name !== "public-home") return accessDeniedFor(to);
 
   const ownWorkspace = await lookupWorkspaceById(auth.workspaceContextId);
   if (ownWorkspace?.slug) {
@@ -679,11 +707,18 @@ const resolveWorkspaceHostRoute = (
   workspace: ReturnType<typeof getWorkspaceState>,
   auth: AuthState,
 ) => {
-  if (!workspace.isWorkspaceHost || to.name === "not-found") return undefined;
+  if (
+    !workspace.isWorkspaceHost ||
+    to.name === "not-found" ||
+    to.name === "public-access-denied"
+  ) return undefined;
   if (!workspace.workspaceId) return notFoundFor(to.path);
   if (!auth.isInitialized) return false;
-  if (!meta.public && (!auth.isAuthenticated || auth.workspaceContextId !== workspace.workspaceId)) {
-    return notFoundFor(to.path);
+  if (!meta.public && !auth.isAuthenticated) {
+    return loginFor(to);
+  }
+  if (!meta.public && auth.workspaceContextId !== workspace.workspaceId) {
+    return accessDeniedFor(to);
   }
   return undefined;
 };
@@ -719,12 +754,14 @@ const resolveProtectedRoute = (
 ) => {
   if (meta.public) return true;
   if (!auth.isInitialized) return true;
-  if (meta.requiresSession && !auth.isAuthenticated) return { name: "public-home" };
-  if (meta.requiresWorkspace && !auth.workspaceContextId) return { name: "public-home" };
+  if (meta.requiresSession && !auth.isAuthenticated) return loginFor(to);
+  if (meta.requiresWorkspace && !auth.workspaceContextId) {
+    return auth.isAuthenticated ? accessDeniedFor(to) : loginFor(to);
+  }
   if (workspace.isWorkspaceHost && meta.requiresSession && !workspace.workspaceId) {
     return notFoundFor(to.path);
   }
-  if (meta.requiresRole && auth.role !== meta.requiresRole) return { name: "public-home" };
+  if (meta.requiresRole && auth.role !== meta.requiresRole) return accessDeniedFor(to);
   if (meta.requiresRole === "workspace_admin" && !hasFreshAdminVerification(auth.adminVerifiedAt)) {
     return { name: "public-login" };
   }
@@ -734,7 +771,7 @@ const resolveProtectedRoute = (
     auth.workspaceContextId &&
     auth.sessionWorkspaceId !== auth.workspaceContextId
   ) {
-    return { name: "public-home" };
+    return accessDeniedFor(to);
   }
   if (
     workspace.isWorkspaceHost &&
@@ -742,7 +779,7 @@ const resolveProtectedRoute = (
     auth.isAuthenticated &&
     auth.workspaceContextId !== workspace.workspaceId
   ) {
-    return notFoundFor(to.path);
+    return accessDeniedFor(to);
   }
   if (meta.requiresSuperAuth && !auth.hasSecondaryAuth) {
     return to.path.startsWith("/internal")
@@ -765,7 +802,7 @@ router.beforeEach(async (to) => {
   const internalRoute = await resolveInternalHostRoute(to, auth, isInternalHostRuntime());
   if (internalRoute !== undefined) return internalRoute;
 
-  const mismatchRoute = await resolveWorkspaceMismatchRoute(workspace, auth);
+  const mismatchRoute = await resolveWorkspaceMismatchRoute(to, workspace, auth);
   if (mismatchRoute !== undefined) return mismatchRoute;
 
   const workspaceRoute = resolveWorkspaceHostRoute(to, meta, workspace, auth);

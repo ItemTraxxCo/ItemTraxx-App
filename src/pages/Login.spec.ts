@@ -7,13 +7,16 @@ const mocks = vi.hoisted(() => ({
   getAuthState: vi.fn(),
   identifyPostHogUser: vi.fn(),
   resetTurnstile: vi.fn(),
+  routerReplace: vi.fn(),
   routerPush: vi.fn(),
+  routeQuery: {} as Record<string, string>,
   workspaceLogin: vi.fn(),
 }));
 
 vi.mock("vue-router", () => ({
   RouterLink: { template: "<a><slot /></a>" },
-  useRouter: () => ({ push: mocks.routerPush }),
+  useRoute: () => ({ query: mocks.routeQuery }),
+  useRouter: () => ({ push: mocks.routerPush, replace: mocks.routerReplace }),
 }));
 
 vi.mock("../composables/useTurnstile", () => ({
@@ -59,6 +62,8 @@ describe("Login", () => {
     vi.clearAllMocks();
     mocks.getAuthState.mockReturnValue({ userId: null, role: null });
     mocks.routerPush.mockResolvedValue(undefined);
+    mocks.routerReplace.mockResolvedValue(undefined);
+    mocks.routeQuery = {};
   });
 
   it("records invalid credentials under the role-neutral login_failed event", async () => {
@@ -97,6 +102,26 @@ describe("Login", () => {
     expect(mocks.capturePostHogEvent).not.toHaveBeenCalledWith(
       "tenant_login_failed",
       expect.anything(),
+    );
+    wrapper.unmount();
+  });
+
+  it("returns to a safe requested path after password sign-in", async () => {
+    mocks.routeQuery = { redirect: "/checkout?source=email" };
+    mocks.getAuthState.mockReturnValue({ userId: "user-1", role: "tenant_account" });
+    mocks.workspaceLogin.mockResolvedValue({
+      role: "tenant_account",
+      workspaceSlug: null,
+    });
+    const wrapper = mountLogin();
+
+    await wrapper.get('input[placeholder="Email address"]').setValue("tenant@example.com");
+    await wrapper.get('input[placeholder="Enter password"]').setValue("correct-password");
+    await wrapper.get("form").trigger("submit");
+    await settle();
+
+    expect(mocks.routerReplace).toHaveBeenCalledWith(
+      "/checkout?source=email&login_ctx=regular_login",
     );
     wrapper.unmount();
   });

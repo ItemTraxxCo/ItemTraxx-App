@@ -167,6 +167,7 @@ import {
   type BorrowerSummary,
 } from "../../services/checkoutService";
 import { sanitizeInput } from "../../utils/inputSanitizer";
+import { preloadImages } from "../../utils/preloadImages";
 import { getAuthState } from "../../store/authState";
 import { AppError, toUserFacingErrorMessage } from "../../services/appErrors";
 import {
@@ -542,6 +543,8 @@ const handleOnline = () => {
 };
 
 onMounted(() => {
+  preloadImages([lightBrandLogoUrl, darkBrandLogoUrl]);
+
   const syncTheme = () => {
     themeMode.value = document.documentElement.getAttribute("data-theme") === "dark" ? "dark" : "light";
   };

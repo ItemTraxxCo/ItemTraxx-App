@@ -21,7 +21,7 @@ test.describe("Better Auth authorization boundaries", () => {
 
   test("unauthenticated users cannot open account security", async ({ page }) => {
     await navigateApp(page, "/account/security");
-    await expect(page).toHaveURL(/\/$/);
+    await expect(page).toHaveURL(/\/login\?redirect=\/account\/security$/);
   });
 
   test("tenant accounts can manage their own security but not admin or SSO", async ({ page }) => {
@@ -29,9 +29,9 @@ test.describe("Better Auth authorization boundaries", () => {
     await navigateApp(page, "/account/security");
     await expect(page.getByRole("heading", { name: "Account security" })).toBeVisible();
     await navigateApp(page, "/admin/settings/sso");
-    await expect(page).not.toHaveURL(/\/admin\/settings\/sso$/);
+    await expect(page).toHaveURL(/\/access-denied\?redirect=\/admin\/settings\/sso$/);
     await navigateApp(page, "/super-admin");
-    await expect(page).not.toHaveURL(/\/super-admin$/);
+    await expect(page).toHaveURL(/\/access-denied\?redirect=\/super-admin$/);
   });
 
   test("tenant account security back button returns to the previous page", async ({ page }) => {
@@ -47,7 +47,7 @@ test.describe("Better Auth authorization boundaries", () => {
   test("workspace admins cannot cross into global administration", async ({ page }) => {
     await setWorkspaceAdminSession(page, "workspace-a");
     await navigateApp(page, "/super-admin/settings/sso");
-    await expect(page).not.toHaveURL(/\/super-admin\/settings\/sso$/);
+    await expect(page).toHaveURL(/\/access-denied\?redirect=\/super-admin\/settings\/sso$/);
   });
 
   test("workspace admin SSO requests cannot target another organization", async ({ page }) => {
@@ -69,7 +69,7 @@ test.describe("Better Auth authorization boundaries", () => {
       sessionStorage.setItem("organizationId", "workspace-b");
     });
     await navigateApp(page, "/super-admin");
-    await expect(page).not.toHaveURL(/\/super-admin$/);
+    await expect(page).toHaveURL(/\/access-denied\?redirect=\/super-admin$/);
   });
 
   test("super admins retain global SSO oversight", async ({ page }) => {

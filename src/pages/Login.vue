@@ -136,15 +136,18 @@
 
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from "vue";
-import { RouterLink, useRouter } from "vue-router";
+import { RouterLink, useRoute, useRouter } from "vue-router";
 import SafeExternalLink from "../components/SafeExternalLink.vue";
 import { useTurnstile } from "../composables/useTurnstile";
 import { clearAdminVerification, getAuthState } from "../store/authState";
 import { safeExternalUrl } from "../utils/safeUrl";
 import { authClient } from "../auth/client";
 import { clearReplaySessionHandoff } from "../services/sessionReplayHandoff";
+import { buildWorkspaceAppUrl, resolveWorkspaceHost } from "../services/workspaceService";
+import { addLoginContext, sanitizeReturnTo } from "../router/returnTo";
 
 const router = useRouter();
+const route = useRoute();
 const email = ref("");
 const password = ref("");
 const showPassword = ref(false);
@@ -218,6 +221,10 @@ const {
   token: turnstileToken,
   reset: resetTurnstile,
 } = useTurnstile(turnstileSiteKey);
+const requestedReturnTo = computed(() => {
+  const raw = route.query.redirect;
+  return sanitizeReturnTo(Array.isArray(raw) ? raw[0] : raw);
+});
 const canSubmit = computed(() => {
   const hasEmail = email.value.trim().length > 0;
   const hasPassword = password.value.length > 0;
@@ -290,6 +297,48 @@ const getLoginErrorCode = (message: string) => {
   return "authentication_failed";
 };
 
+const getDefaultDestination = (role: "workspace_admin" | "tenant_account") =>
+  role === "workspace_admin"
+    ? { path: "/admin", loginContext: "admin_login" as const }
+    : { path: "/checkout", loginContext: "regular_login" as const };
+
+const completePasswordLoginNavigation = async (session: {
+  role: "workspace_admin" | "tenant_account";
+  workspaceSlug: string | null;
+}) => {
+  const destination = getDefaultDestination(session.role);
+  const requested = requestedReturnTo.value;
+  const currentWorkspace = resolveWorkspaceHost(window.location.hostname);
+
+  if (
+    requested &&
+    currentWorkspace.isWorkspaceHost &&
+    currentWorkspace.slug !== session.workspaceSlug
+  ) {
+    await router.replace({ name: "public-access-denied", query: { redirect: requested } });
+    return;
+  }
+
+  const targetPath = requested || destination.path;
+  const targetWithLoginContext = addLoginContext(targetPath, destination.loginContext);
+
+  if (session.workspaceSlug && !currentWorkspace.isWorkspaceHost) {
+    window.location.replace(buildWorkspaceAppUrl(session.workspaceSlug, targetWithLoginContext));
+    return;
+  }
+
+  if (
+    session.workspaceSlug &&
+    currentWorkspace.isWorkspaceHost &&
+    currentWorkspace.slug !== session.workspaceSlug
+  ) {
+    window.location.replace(buildWorkspaceAppUrl(session.workspaceSlug, targetWithLoginContext));
+    return;
+  }
+
+  await router.replace(targetWithLoginContext);
+};
+
 const handleLogin = async () => {
   error.value = "";
   isLoading.value = true;
@@ -314,11 +363,12 @@ const handleLogin = async () => {
       );
     }
 
-    if (session.role === "workspace_admin") {
+    const sessionRole = session.role;
+    if (sessionRole === "workspace_admin") {
       void runPostHog(({ capturePostHogEvent }) =>
-        capturePostHogEvent("admin_login_succeeded", { role: session.role })
+        capturePostHogEvent("admin_login_succeeded", { role: sessionRole })
       );
-    } else if (session.role === "tenant_account") {
+    } else if (sessionRole === "tenant_account") {
       void runPostHog(({ capturePostHogEvent }) =>
         capturePostHogEvent("tenant_login_succeeded", { login_method: "password" })
       );
@@ -326,16 +376,10 @@ const handleLogin = async () => {
       throw new Error("This account cannot sign in here.");
     }
 
-    const destination = session.role === "workspace_admin"
-      ? { path: "/admin", loginContext: "admin_login" as const }
-      : { path: "/checkout", loginContext: "regular_login" as const };
-    if (session.workspaceSlug && window.location.hostname !== `${session.workspaceSlug}.app.itemtraxx.com`) {
-      window.location.replace(
-        `https://${session.workspaceSlug}.app.itemtraxx.com${destination.path}?login_ctx=${destination.loginContext}`
-      );
-      return;
-    }
-    await router.push({ path: destination.path, query: { login_ctx: destination.loginContext } });
+    await completePasswordLoginNavigation({
+      role: sessionRole,
+      workspaceSlug: session.workspaceSlug,
+    });
   } catch (err) {
     if (err instanceof Error && err.message === "LIMITER_UNAVAILABLE") {
       error.value = "";
@@ -400,7 +444,7 @@ const handlePasskeyLogin = async () => {
   try {
     const result = await authClient.signIn.passkey();
     if (result.error) throw new Error(result.error.message ?? "Passkey sign-in failed.");
-    window.location.assign("/");
+    window.location.assign(requestedReturnTo.value || "/");
   } catch (cause) {
     error.value = cause instanceof Error ? cause.message : "Passkey sign-in failed.";
   } finally { isLoading.value = false; }
@@ -410,7 +454,17 @@ const handleSsoLogin = async () => {
   error.value = ""; isLoading.value = true;
   clearReplaySessionHandoff();
   try {
-    const result = await authClient.signIn.sso({ email: email.value.trim().toLowerCase(), callbackURL: `${location.origin}/` });
+    const requested = requestedReturnTo.value;
+    const callbackPath = requested
+      ? addLoginContext(
+          requested,
+          requested.startsWith("/admin") ? "admin_login" : "regular_login",
+        )
+      : "/";
+    const result = await authClient.signIn.sso({
+      email: email.value.trim().toLowerCase(),
+      callbackURL: `${location.origin}${callbackPath}`,
+    });
     if (result.error) throw new Error(result.error.message ?? "SSO sign-in failed.");
   } catch (cause) {
     error.value = cause instanceof Error ? cause.message : "SSO sign-in failed.";

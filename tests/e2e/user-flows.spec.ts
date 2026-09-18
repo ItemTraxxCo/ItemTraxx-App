@@ -33,7 +33,7 @@ const prepareWorkspaceAdminPage = async (page: Page) => {
 };
 
 test.describe("core user flows", () => {
-  test("tenant account sign-in lands on the checkout workflow", async ({ page }) => {
+  test("tenant account sign-in returns to the requested checkout workflow", async ({ page }) => {
     await mockSystemStatus(page);
     await mockUnauthenticatedSession(page);
     await page.goto("/");
@@ -69,14 +69,14 @@ test.describe("core user flows", () => {
       });
     });
 
-    await page.goto("/login");
+    await page.goto("/checkout?source=email");
     await expect(page.getByRole("heading", { name: "Sign in", exact: true })).toBeVisible();
 
     await page.getByPlaceholder("Email address").fill(" Tenant.User@Example.COM ");
     await page.getByPlaceholder("Enter password").fill("correct horse battery staple");
     await page.getByRole("button", { name: "Sign in", exact: true }).click();
 
-    await expect(page).toHaveURL(/\/checkout$/);
+    await expect(page).toHaveURL(/\/checkout\?source=email$/);
     await expect(page.getByText("Checkout and return", { exact: true })).toBeVisible();
     expect(loginRequests).toEqual([
       {

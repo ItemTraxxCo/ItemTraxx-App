@@ -236,7 +236,7 @@ test.describe("Protected route smoke tests", () => {
 
       await page.goto(path);
 
-      await expect(page).toHaveURL(new RegExp(`${path.replaceAll("/", "\\/")}$`));
+      await expect(page).toHaveURL(new RegExp(`/login\\?redirect=${path.replaceAll("/", "\\/")}$`));
       await page.waitForFunction(() => window.__itemtraxxTest !== undefined);
       await page.waitForLoadState("networkidle");
       expect(publicSessionRequests).toBe(0);
@@ -245,6 +245,18 @@ test.describe("Protected route smoke tests", () => {
       ).toBeUndefined();
     });
   }
+
+  test("a signed-in account without the required role sees access denied", async ({ page }) => {
+    await page.goto("/");
+    await setTenantAccountSession(page);
+
+    await navigateApp(page, "/admin");
+
+    await expect(page).toHaveURL(/\/access-denied\?redirect=\/admin$/);
+    await expect(
+      page.getByRole("heading", { name: "You don’t have access to this page." }),
+    ).toBeVisible();
+  });
 
   test("super admin can reach dashboard", async ({ page }) => {
     await page.goto("/");

@@ -105,6 +105,16 @@ const initializePublicAuth = async () => {
 const clientMonitoring = createClientMonitoring(router);
 installAppErrorRecovery(router);
 
+const revalidateCurrentRoute = async () => {
+  const currentRoute = router.currentRoute.value;
+  await router.replace({
+    path: currentRoute.path,
+    query: currentRoute.query,
+    hash: currentRoute.hash,
+    state: { __itemtraxxAuthRecheck: Date.now() },
+  });
+};
+
 const mountApp = async () => {
   markRouteNavigationStart();
   router.beforeEach((_to, _from, next) => {
@@ -130,6 +140,10 @@ const mountApp = async () => {
   };
   app.use(router);
   await router.isReady();
+  // The first history entry may have resolved before auth bootstrap settled.
+  // A history-state-only replace forces the guards to re-evaluate the exact
+  // visible URL without adding a query marker or a browser-history entry.
+  await revalidateCurrentRoute();
   await clientMonitoring.initializeBeforeMount(app);
   app.mount("#app");
   markAgentFallbackMounted();
@@ -174,11 +188,19 @@ const bootstrap = async () => {
     (isE2ETestMode || canMountPublicBootstrap);
   if (canMountFirst) {
     // Avoid flashing the temporary logout screen during normal public-route bootstrap.
-    if (!isE2ETestMode && canMountPublicBootstrap) {
+    if (isE2ETestMode || canMountPublicBootstrap) {
       clearAuthState(true);
     }
     await mountApp();
-    void (canMountPublicBootstrap ? initializePublicAuth() : initializeAuth());
+    if (canMountPublicBootstrap) {
+      void initializePublicAuth();
+    } else {
+      // E2E mode mounts before auth initialization so the test controls can
+      // seed sessions after the app is live. Re-run the current URL once the
+      // signed-out state is settled so protected deep links still redirect.
+      await initializeAuth();
+      await revalidateCurrentRoute();
+    }
     return;
   }
   await initializeAuth();

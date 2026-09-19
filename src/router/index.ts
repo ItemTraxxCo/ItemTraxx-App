@@ -223,7 +223,7 @@ const routes: RouteRecordRaw[] = [
     path: "/checkout",
     name: "workspace-checkout",
     component: () => import("../pages/workspace/Checkout.vue"),
-    meta: { requiresSession: true, requiresWorkspace: true, title: "Checkout | ItemTraxx" },
+    meta: { requiresSession: true, requiresWorkspace: true, requiresRole: "tenant_account", title: "Checkout | ItemTraxx" },
   },
   {
     path: "/admin/login",

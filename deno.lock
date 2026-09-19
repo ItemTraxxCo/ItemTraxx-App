@@ -4,7 +4,7 @@
     "npm:@better-auth/infra@~0.4.6": "0.4.9_@better-auth+core@1.7.5__@better-auth+utils@0.4.3__@better-fetch+fetch@1.3.1__better-call@1.4.0__jose@6.2.12__kysely@0.29.5__nanostores@1.5.3_better-auth@1.7.5_zod@4.6.5_@types+node@26.5.1_@vitest+coverage-v8@5.0.1_jsdom@30.0.1_kysely@0.29.5_nanostores@1.5.3_typescript@6.0.3_vite@8.3.0_vitest@5.0.1_vue@3.5.42",
     "npm:@better-auth/passkey@^1.7.2": "1.7.5_@better-auth+core@1.7.5__@better-auth+utils@0.4.2__@better-fetch+fetch@1.3.2__better-call@1.4.0__jose@6.2.12__kysely@0.29.5__nanostores@1.5.3_@better-auth+utils@0.4.2_@better-fetch+fetch@1.3.2_better-auth@1.7.5_better-call@1.4.0_nanostores@1.5.3_@types+node@26.5.1_@vitest+coverage-v8@5.0.1_jose@6.2.12_jsdom@30.0.1_kysely@0.29.5_typescript@6.0.3_vite@8.3.0_vitest@5.0.1_vue@3.5.42",
     "npm:@better-auth/sso@^1.7.3": "1.7.5_@better-auth+core@1.7.5__@better-auth+utils@0.4.2__@better-fetch+fetch@1.3.2__better-call@1.4.0__jose@6.2.12__kysely@0.29.5__nanostores@1.5.3_@better-auth+utils@0.4.2_@better-fetch+fetch@1.3.2_better-auth@1.7.5_better-call@1.4.0_@types+node@26.5.1_@vitest+coverage-v8@5.0.1_jsdom@30.0.1_kysely@0.29.5_nanostores@1.5.3_typescript@6.0.3_vite@8.3.0_vitest@5.0.1_vue@3.5.42",
-    "npm:@cloudflare/vite-plugin@^1.54.6": "1.54.11_vite@8.3.0_wrangler@4.133.0",
+    "npm:@cloudflare/vite-plugin@^1.54.8": "1.56.0_vite@8.3.0_wrangler@4.135.0",
     "npm:@cyclonedx/cyclonedx-npm@6.0.1": "6.0.1",
     "npm:@intercom/messenger-js-sdk@^0.0.20": "0.0.20",
     "npm:@playwright/test@^1.63.0": "1.63.0",
@@ -26,7 +26,7 @@
     "npm:jsdom@^30.0.1": "30.0.1_@noble+hashes@2.4.0",
     "npm:jspdf-autotable@^5.0.8": "5.0.8_jspdf@4.2.1",
     "npm:jspdf@^4.2.1": "4.2.1",
-    "npm:posthog-js@^1.430.3": "1.433.5",
+    "npm:posthog-js@^1.434.2": "1.434.2",
     "npm:qrcode@^1.5.4": "1.5.4",
     "npm:supabase@^2.117.0": "2.117.0",
     "npm:typescript@~6.0.3": "6.0.3",
@@ -35,7 +35,7 @@
     "npm:vue-router@^4.6.4": "4.6.4_vue@3.5.42_typescript@6.0.3",
     "npm:vue-tsc@^3.3.11": "3.3.11_typescript@6.0.3",
     "npm:vue@^3.5.42": "3.5.42_typescript@6.0.3",
-    "npm:wrangler@^4.124.0": "4.133.0",
+    "npm:wrangler@^4.124.0": "4.135.0",
     "npm:zod@^4.6.0": "4.6.5"
   },
   "npm": {
@@ -257,8 +257,8 @@
         "workerd"
       ]
     },
-    "@cloudflare/vite-plugin@1.54.11_vite@8.3.0_wrangler@4.133.0": {
-      "integrity": "sha512-TJoTX1MvKXijrLVciUc66xR0Ss199au/9uiTP4H0QDNrUYpTHUU5V+X3opt0IU9f41MXStuy0oPkrZqGM0LRww==",
+    "@cloudflare/vite-plugin@1.56.0_vite@8.3.0_wrangler@4.135.0": {
+      "integrity": "sha512-JkVJgSuUM1dlxpl/XMSTcx3oD84hKIAwPtqUs9pjfBXiKcUx8Jez+Tuxg3l2O7nt87AxoArgve0KAeW7hc0Kqw==",
       "dependencies": [
         "@cloudflare/unenv-preset",
         "miniflare",
@@ -932,21 +932,21 @@
     "@poppinss/exception@1.2.3": {
       "integrity": "sha512-dCED+QRChTVatE9ibtoaxc+WkdzOSjYTKi/+uacHWIsfodVfpsueo3+DKpgU5Px8qXjgmXkSvhXvSCz3fnP9lw=="
     },
-    "@posthog/browser-common@0.8.3": {
-      "integrity": "sha512-4Hlbwyn+Hioc2+pjqSGWMTDrA5XsDshssPnGfv34khPKoJaeBe2YvPvsEPoH78jezOS6Wo3LJvCPhqyolg3S8w==",
+    "@posthog/browser-common@0.9.0": {
+      "integrity": "sha512-EWoVzs1vVY7ihpn8yOjj3jyjriHUEEMVSBNL/TW3hk09fTriWRe76vJXrRg0G0yjTYxHmtlSkNn4mOV24ZEzzA==",
       "dependencies": [
         "@posthog/core",
         "@posthog/types"
       ]
     },
-    "@posthog/core@1.54.2": {
-      "integrity": "sha512-p0NuMjiZkploKG/aASj4nw4QDuhF87SIFWkelaFRrr3G0Myb7KWWUZot2hm5qXpPx7zKozVZJrJkGzC2kGBqbg==",
+    "@posthog/core@1.55.0": {
+      "integrity": "sha512-x+0FR+uHsK3uJeofd5X4S2YS7hjaWkzkPN0X1GROHm9SvKw2RJ91kfQ7gT1bPtFwZSHNiRtteB7fX/xEMRN0IQ==",
       "dependencies": [
         "@posthog/types"
       ]
     },
-    "@posthog/types@1.412.1": {
-      "integrity": "sha512-FxXsb9YOOME8bJI5K09qKeSvLjnZQ2dPV7wZpI7a8sERQtXkAuhBcPB/balCnVE7TYwhgtHj5NQss9BgQ5bAfQ=="
+    "@posthog/types@1.412.2": {
+      "integrity": "sha512-taxTh8o6n7ZVlC8qBypZvF+6w7/18yNkS9XDiGCbutGTKqIljfzYi/7pumgwN3mcnl/n0e9A+JhF05+nLd4Xaw=="
     },
     "@rolldown/binding-android-arm-eabi@1.2.8": {
       "integrity": "sha512-tN5aztYkKCte4i5SIrrz5yK/HMjEuCqCSCJa418jOV8tZ1cBY3YF2otxB1ktPxzsLA1BeTqwapK0bfjxNvHJVw==",
@@ -2073,8 +2073,8 @@
     "mimic-response@3.1.0": {
       "integrity": "sha512-z0yWI+4FDrrweS8Zmt4Ej5HdJmky15+L2e6Wgn3+iK5fWzb6T3fhNFq2+MeTRb064c6Wr4N/wv0DzQTjNzHNGQ=="
     },
-    "miniflare@5.20260916.0-alpha": {
-      "integrity": "sha512-rffIUYE5tPwhvUtVYZ4LEGaQ2XkXdBsq/flJOKODumR3gbBgHFyqPkobQEB7Ocqesz5wSUhpV8C2R57JYOsyhw==",
+    "miniflare@5.20260918.0-alpha": {
+      "integrity": "sha512-vyIes7yW/OTzHtz4GhcBCTohZfqk2eQNiIkngZ07VRA5Qu24aNgW/TrFwlPkMLMjWDQ8R4JJBBHR/KX+liSDtg==",
       "dependencies": [
         "@cspotcode/source-map-support",
         "sharp",
@@ -2248,8 +2248,8 @@
         "source-map-js"
       ]
     },
-    "posthog-js@1.433.5": {
-      "integrity": "sha512-fu8UAeXIExR2oCT4U2IOUknp7iJ6k2Sc07oSZQzXD6cSJM6VxMkjT4TgMIsC8emcl9ha6Two+dMUmUOzZ/909w==",
+    "posthog-js@1.434.2": {
+      "integrity": "sha512-xyvjj88U2Cp1JfDzmifLvNbdiY/z+YbTT1DaRRKRZ+qzaF9IKqMLumpv8jTKGh6y3m4vc3xz0ku8h5Tw0XU9zQ==",
       "dependencies": [
         "@posthog/browser-common",
         "@posthog/core",
@@ -2852,8 +2852,8 @@
       "scripts": true,
       "bin": true
     },
-    "wrangler@4.133.0": {
-      "integrity": "sha512-Iv+feMJ3CzBvWcJM1OjtRL/0ujr1Oqmg6H/356hJrnqf8AEkazhUVqjgcRer5HGhuc9KhrsyxUpKTRMnMeUmeA==",
+    "wrangler@4.135.0": {
+      "integrity": "sha512-WrNBQSfIG6YcILJcodYr5ty8vgkzGsV8YX+kfd+uZ5/Bd8cUW0GnUIRKAVfn5kYKqh1m/BPcji9h1d7mE8euFw==",
       "dependencies": [
         "@cloudflare/kv-asset-handler",
         "@cloudflare/unenv-preset",
@@ -3037,7 +3037,7 @@
         "npm:@better-auth/infra@~0.4.6",
         "npm:@better-auth/passkey@^1.7.2",
         "npm:@better-auth/sso@^1.7.3",
-        "npm:@cloudflare/vite-plugin@^1.54.6",
+        "npm:@cloudflare/vite-plugin@^1.54.8",
         "npm:@cyclonedx/cyclonedx-npm@6.0.1",
         "npm:@intercom/messenger-js-sdk@^0.0.20",
         "npm:@playwright/test@^1.63.0",
@@ -3058,7 +3058,7 @@
         "npm:jsdom@^30.0.1",
         "npm:jspdf-autotable@^5.0.8",
         "npm:jspdf@^4.2.1",
-        "npm:posthog-js@^1.430.3",
+        "npm:posthog-js@^1.434.2",
         "npm:qrcode@^1.5.4",
         "npm:supabase@^2.117.0",
         "npm:typescript@~6.0.3",

@@ -1525,8 +1525,8 @@
       ],
       "bin": true
     },
-    "brace-expansion@2.1.4": {
-      "integrity": "sha512-hGfVzPxthbf3+2yjg/RBs60cB0FhqBS/zvdV/4wn4/BmN0bNMMHPc4V/BbFieqf1TKAGGAHnY4eSjajCl0f2Xg==",
+    "brace-expansion@2.1.7": {
+      "integrity": "sha512-uZbew1NqdmPDTMJ8ah1y+b+9QEJrfkXFk3RcTQw3X0jW/xRUvFKsg1CfQdSYGdTbXZWExtU3J3ccxtnfw1Fi0g==",
       "dependencies": [
         "balanced-match"
       ]
@@ -1681,8 +1681,8 @@
     "error-stack-parser-es@1.0.5": {
       "integrity": "sha512-5qucVt2XcuGMcEGgWI7i+yZpmpByQ8J1lHhcL7PwqCwu9FPP3VUXzT4ltHe5i2z9dePwEHcDVOAfSnHsOlCXRA=="
     },
-    "es-module-lexer@2.3.2": {
-      "integrity": "sha512-poHGpORABojJJucnV9KbOavETW8lBVnphkW77ER5/BQ5Fz7oXSoCNek7IH3vR5nRjdsEz926ibFYX8KtLQmdyw=="
+    "es-module-lexer@3.0.2": {
+      "integrity": "sha512-BuIB67FngDSyQ/dpQNOZybwdEBDUGJQvOqwWr4ha/ufYiqzuEwPkKO2zLhRAgay28tStRIHUeWmszZAJo3GCOg=="
     },
     "esbuild@0.28.1": {
       "integrity": "sha512-HrJrvZv5ayxBzPfwphOoNzkzOIIlifzk0KJrGK2c8R4+LKpMtpYLQeUdjnwjWv/LZlkH2laZk+4w78pi99D4Vw==",
@@ -1758,8 +1758,8 @@
         "pako"
       ]
     },
-    "fast-uri@3.1.6": {
-      "integrity": "sha512-7Ical1vFEMr0onbVzEDIreM22I4khW+fzyQPwvAFWBp1iwdshSZRsL4jjRvPG9JP1uiqMHRto+YU6R2/CzDz5Q=="
+    "fast-uri@3.1.8": {
+      "integrity": "sha512-GZMtZUTNRpOVIECoXwLNZS5xUGE+mVNbTB8h/7Rwh2TFWcBQiPzTgyZi05BF9UMZKkLJv8XBRJTlU7zg8+ZfMg=="
     },
     "fast-xml-builder@1.3.1": {
       "integrity": "sha512-pIM/1n3ntFXKYrUZwW7QCK0gAW7XY+wzj1YMIV3tLDvPj/V+zTGJK5e3/4WJfwj0qWw2ElNXiTixda/R+3YSug==",
@@ -3077,12 +3077,13 @@
         "protobufjs@<=8.2.0": "8.2.0",
         "ws": "^8.20.1",
         "dompurify": "3.4.15",
-        "fast-uri": "3.1.6",
+        "es-module-lexer": "3.0.2",
+        "fast-uri": "3.1.8",
         "sharp": "0.35.4",
         "undici": "8.10.2",
         "js-yaml": "4.3.2",
         "node-gyp": "^13.0.1",
-        "brace-expansion": "2.1.4",
+        "brace-expansion": "2.1.7",
         "nanoid": "5.1.16",
         "ip-address": "^10.3.1",
         "workerd": "1.20260811.1",

@@ -3,7 +3,6 @@
     <div class="admin-hero">
       <div class="page-nav-left">
         <RouterLink class="button-link" to="/admin">Return to Admin Panel</RouterLink>
-        <RouterLink class="button-link" to="/checkout">Return to Checkout</RouterLink>
       </div>
 
       <h1>Bulk Barcode Generator</h1>

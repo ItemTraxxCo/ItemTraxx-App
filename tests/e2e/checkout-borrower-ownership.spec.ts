@@ -4,7 +4,7 @@ import {
   mockSystemStatus,
   mockUnauthenticatedSession,
   navigateApp,
-  setWorkspaceAdminSession,
+  setTenantAccountSession,
 } from "./helpers/testHarness";
 
 test.describe("Checkout borrower ownership regression", () => {
@@ -139,7 +139,6 @@ test.describe("Checkout borrower ownership regression", () => {
     await page.goto("/");
     await page.evaluate(() => {
       window.localStorage.setItem("itemtraxx:onboarding:v1:tenant_account", new Date().toISOString());
-      window.localStorage.setItem("itemtraxx:onboarding:v1:workspace_admin", new Date().toISOString());
       window.localStorage.setItem(
         "itemtraxx-cookie-consent",
         JSON.stringify({
@@ -149,7 +148,7 @@ test.describe("Checkout borrower ownership regression", () => {
         })
       );
     });
-    await setWorkspaceAdminSession(page, "tenant-e2e");
+    await setTenantAccountSession(page, "tenant-e2e");
     await navigateApp(page, "/checkout");
     await expect(page).toHaveURL(/\/checkout$/);
 

@@ -72,7 +72,7 @@
     "zod": "^4.6.0"
   },
   "devDependencies": {
-    "@cloudflare/vite-plugin": "^1.54.6",
+    "@cloudflare/vite-plugin": "^1.54.8",
     "@cyclonedx/cyclonedx-npm": "6.0.1",
     "@playwright/test": "^1.63.0",
     "@types/node": "^26.5.1",

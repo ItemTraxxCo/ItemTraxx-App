@@ -5,8 +5,8 @@
       <h2>Still working offline</h2>
       <p>ItemTraxx has not connected to its servers for over {{ warningHours }} hours. You can continue using this device's downloaded offline pack.</p>
       <ul>
-        <li>Item availability may be out of date if another device is also offline.</li>
-        <li>Transactions are pending until they sync successfully.</li>
+        <li>Item availability may be out of date or incorrect if another device or account with access to the same inventory checks items in or out while this device is offline.</li>
+        <li>Transactions are pending on your device until they sync to ItemTraxx servers successfully.</li>
         <li>Do not log out or clear browser data until pending transactions have synced to ItemTraxx servers.</li>
         <li>If you refresh or close this tab, you may need to reconnect before your signed-in session can be restored.</li>
       </ul>
@@ -263,7 +263,9 @@ const discardLegacy = async (item: OfflineQueueReviewItem, startNewTransaction: 
   try {
     await discardOfflineQueueReviewItem(item.id);
     await refresh();
-    if (startNewTransaction) await router.push("/checkout");
+    if (startNewTransaction) {
+      await router.push(auth.role === "workspace_admin" ? "/admin/return" : "/checkout");
+    }
   } catch (error) {
     legacyEntryError.value = {
       ...legacyEntryError.value,

@@ -186,7 +186,7 @@ export const useAdminSessionLifecycle = (options: AdminSessionLifecycleOptions) 
     isIdleLogoutRunning.value = true;
     try {
       clearAdminVerification();
-      await options.router.replace("/checkout");
+      await options.router.replace("/login");
     } finally {
       isIdleLogoutRunning.value = false;
     }

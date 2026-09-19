@@ -170,9 +170,9 @@ test.describe("Protected route smoke tests", () => {
   test("onboarding completion survives reload", async ({ page }) => {
     await page.goto("/");
     await page.evaluate(() => {
-      localStorage.removeItem("itemtraxx:onboarding:v1:workspace_admin");
+      localStorage.removeItem("itemtraxx:onboarding:v1:tenant_account");
     });
-    await setWorkspaceAdminSession(page);
+    await setTenantAccountSession(page);
     await navigateApp(page, "/checkout");
 
     const dialog = page.getByRole("dialog", { name: /ItemTraxx onboarding step/ });
@@ -180,15 +180,15 @@ test.describe("Protected route smoke tests", () => {
     await dialog.getByRole("button", { name: "Close onboarding" }).click();
     await expect(dialog).toHaveCount(0);
     await expect.poll(() =>
-      page.evaluate(() => localStorage.getItem("itemtraxx:onboarding:v1:workspace_admin")),
+      page.evaluate(() => localStorage.getItem("itemtraxx:onboarding:v1:tenant_account")),
     ).not.toBeNull();
 
     await page.reload();
     await expect(page).toHaveURL(/\/checkout$/);
     await page.waitForFunction(
-      () => typeof window.__itemtraxxTest?.setWorkspaceAdminSession === "function",
+      () => typeof window.__itemtraxxTest?.setTenantAccountSession === "function",
     );
-    await page.evaluate(() => window.__itemtraxxTest?.setWorkspaceAdminSession("tenant-e2e"));
+    await page.evaluate(() => window.__itemtraxxTest?.setTenantAccountSession("tenant-e2e"));
     await expect(dialog).toHaveCount(0);
   });
 
@@ -206,7 +206,7 @@ test.describe("Protected route smoke tests", () => {
       });
     });
     await page.goto("/");
-    await setWorkspaceAdminSession(page);
+    await setTenantAccountSession(page);
     await navigateApp(page, "/checkout");
 
     const banner = page.getByRole("status").filter({ hasText: "Checkout latency is elevated" });

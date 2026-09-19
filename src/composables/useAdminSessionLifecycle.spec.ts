@@ -178,7 +178,7 @@ describe("useAdminSessionLifecycle", () => {
 
     await vi.advanceTimersByTimeAsync(ADMIN_IDLE_TIMEOUT_MS);
 
-    expect(router.replace).toHaveBeenCalledWith("/checkout");
+    expect(router.replace).toHaveBeenCalledWith("/login");
     wrapper.unmount();
   });
 
@@ -190,7 +190,7 @@ describe("useAdminSessionLifecycle", () => {
 
     await vi.advanceTimersByTimeAsync(ADMIN_IDLE_TIMEOUT_MS);
 
-    expect(router.replace).not.toHaveBeenCalledWith("/checkout");
+    expect(router.replace).not.toHaveBeenCalledWith("/login");
     wrapper.unmount();
   });
 
@@ -204,7 +204,7 @@ describe("useAdminSessionLifecycle", () => {
     window.dispatchEvent(new Event("mousemove"));
     await vi.advanceTimersByTimeAsync(1000);
 
-    expect(router.replace).not.toHaveBeenCalledWith("/checkout");
+    expect(router.replace).not.toHaveBeenCalledWith("/login");
     wrapper.unmount();
   });
 

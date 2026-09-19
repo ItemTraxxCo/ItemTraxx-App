@@ -46,6 +46,24 @@ describe("protected route redirects", () => {
     expect(router.currentRoute.value.name).toBe("workspace-checkout");
   });
 
+  it("denies workspace admins access to checkout", async () => {
+    setAuthStateFromBackend({
+      isInitialized: true,
+      isAuthenticated: true,
+      userId: "admin-1",
+      email: "admin@example.com",
+      signedInAt: new Date().toISOString(),
+      role: "workspace_admin",
+      sessionWorkspaceId: "workspace-1",
+      workspaceContextId: "workspace-1",
+    });
+
+    await router.push("/checkout");
+
+    expect(router.currentRoute.value.name).toBe("public-access-denied");
+    expect(router.currentRoute.value.query).toEqual({ redirect: "/checkout" });
+  });
+
   it("sends a signed-out visitor on a known workspace host to login", async () => {
     setWorkspaceState({
       host: "itxdemo.app.itemtraxx.com",

@@ -4,6 +4,7 @@ import {
   mockSystemStatus,
   mockUnauthenticatedSession,
   navigateApp,
+  setTenantAccountSession,
   setWorkspaceAdminSession,
 } from "./helpers/testHarness";
 
@@ -887,7 +888,7 @@ test.describe("prepared offline checkout workflow contract", () => {
         }),
       });
     });
-    await setWorkspaceAdminSession(page, "workspace-e2e");
+    await setTenantAccountSession(page, "workspace-e2e");
     await navigateApp(page, "/checkout");
 
     await expect(page.getByText("Ready for offline use in the case of an outage.")).toBeVisible();
@@ -897,7 +898,7 @@ test.describe("prepared offline checkout workflow contract", () => {
           readPack: (scope: { workspaceId: string; profileId: string; deviceId: string }) => Promise<unknown>;
         };
       }).offlineCheckoutWorkflow;
-      return workflow.readPack({ workspaceId: "workspace-e2e", profileId: "user-e2e-admin", deviceId: "device-e2e" });
+      return workflow.readPack({ workspaceId: "workspace-e2e", profileId: "user-e2e-tenant", deviceId: "device-e2e" });
     })).toMatchObject({ pack_version: "automatic-pack-e2e", workspace_id: "workspace-e2e" });
     await expect(page.getByRole("button", { name: /prepare|refresh offline/i })).toHaveCount(0);
     await context.setOffline(true);
@@ -908,15 +909,15 @@ test.describe("prepared offline checkout workflow contract", () => {
     await mockSystemStatus(page);
     await page.evaluate(() => {
       window.localStorage.setItem("itemtraxx-device-id", "device-e2e");
-      window.localStorage.setItem("itemtraxx:onboarding:v1:workspace_admin", new Date().toISOString());
+      window.localStorage.setItem("itemtraxx:onboarding:v1:tenant_account", new Date().toISOString());
     });
-    await setWorkspaceAdminSession(page, "workspace-e2e");
+    await setTenantAccountSession(page, "workspace-e2e");
     await page.evaluate(async (pack) => {
       const workflow = (window.__itemtraxxTest as typeof window.__itemtraxxTest & {
         offlineCheckoutWorkflow: { writePack: (pack: unknown) => Promise<void> };
       }).offlineCheckoutWorkflow;
       await workflow.writePack(pack);
-    }, workflowPack());
+    }, workflowPack({ profileId: "user-e2e-tenant" }));
     await navigateApp(page, "/checkout");
     const consentButton = page.getByRole("button", { name: "Essential only" });
     if (await consentButton.isVisible()) await consentButton.click();
@@ -938,13 +939,13 @@ test.describe("prepared offline checkout workflow contract", () => {
     await mockSystemStatus(page);
     await mockAdminOps(page);
     await page.evaluate(() => window.localStorage.setItem("itemtraxx-device-id", "device-e2e"));
-    await setWorkspaceAdminSession(page, "workspace-e2e");
+    await setTenantAccountSession(page, "workspace-e2e");
     await page.evaluate(async (pack) => {
       const workflow = (window.__itemtraxxTest as typeof window.__itemtraxxTest & {
         offlineCheckoutWorkflow: { writePack: (value: unknown) => Promise<void> };
       }).offlineCheckoutWorkflow;
       await workflow.writePack(pack);
-    }, workflowPack());
+    }, workflowPack({ profileId: "user-e2e-tenant" }));
 
     const legacyItem: BufferedCheckoutItem = {
       ...bufferedItem("op-legacy-review-e2e"),
@@ -1016,14 +1017,14 @@ test.describe("prepared offline checkout workflow contract", () => {
         }),
       });
     });
-    await setWorkspaceAdminSession(page, "workspace-e2e");
+    await setTenantAccountSession(page, "workspace-e2e");
     await navigateApp(page, "/checkout");
 
     await expect(page.getByText("Ready for offline use in the case of an outage.")).toBeVisible();
     expect(prepareAttempts).toBe(2);
     await expect(page.getByText("Offline setup needs attention")).toHaveCount(0);
 
-    await navigateApp(page, "/admin/return");
+    await navigateApp(page, "/items");
     await expect(page.getByText("Preparing this device for offline use in the case of an outage.")).toHaveCount(0);
     expect(prepareAttempts).toBe(2);
   });
@@ -1032,7 +1033,7 @@ test.describe("prepared offline checkout workflow contract", () => {
     await mockSystemStatus(page);
     await page.evaluate(async ({ pack, entry }) => {
       window.localStorage.setItem("itemtraxx-device-id", "device-e2e");
-      window.__itemtraxxTest?.setWorkspaceAdminSession("workspace-e2e");
+      window.__itemtraxxTest?.setTenantAccountSession("workspace-e2e");
       const workflow = (window.__itemtraxxTest as typeof window.__itemtraxxTest & {
         offlineCheckoutWorkflow: {
           writePack: (pack: unknown) => Promise<void>;
@@ -1043,11 +1044,11 @@ test.describe("prepared offline checkout workflow contract", () => {
       await workflow.writeLedger([entry]);
     }, {
       pack: {
-        ...workflowPack(),
+        ...workflowPack({ profileId: "user-e2e-tenant" }),
         prepared_at: new Date().toISOString(),
         expires_at: new Date(Date.now() + 86_400_000).toISOString(),
       },
-      entry: workflowEntry(),
+      entry: workflowEntry("user-e2e-tenant"),
     });
     let syncAttempts = 0;
     await page.route(/\/functions(?:\/v1)?\/offline-checkout(?:\?.*)?$/, async (route) => {
@@ -1056,7 +1057,7 @@ test.describe("prepared offline checkout workflow contract", () => {
         await route.fulfill({
           status: 200,
           contentType: "application/json",
-          body: JSON.stringify({ data: { ...workflowPack(), prepared_at: new Date().toISOString() } }),
+          body: JSON.stringify({ data: { ...workflowPack({ profileId: "user-e2e-tenant" }), prepared_at: new Date().toISOString() } }),
         });
         return;
       }
@@ -1090,10 +1091,10 @@ test.describe("prepared offline checkout workflow contract", () => {
 
   test("lets an operator manually retry a pending sync from the checkout status bar", async ({ page }) => {
     await mockSystemStatus(page);
-    await setWorkspaceAdminSession(page, "workspace-e2e");
+    await setTenantAccountSession(page, "workspace-e2e");
     await page.evaluate(async ({ pack, entry }) => {
       window.localStorage.setItem("itemtraxx-device-id", "device-e2e");
-      window.localStorage.setItem("itemtraxx:onboarding:v1:workspace_admin", new Date().toISOString());
+      window.localStorage.setItem("itemtraxx:onboarding:v1:tenant_account", new Date().toISOString());
       window.localStorage.setItem("itemtraxx:offline-connection:v1", JSON.stringify({
         last_confirmed_at: new Date(Date.now() - 60_000).toISOString(),
         unreachable_since: new Date(Date.now() - 30_000).toISOString(),
@@ -1110,11 +1111,11 @@ test.describe("prepared offline checkout workflow contract", () => {
       await workflow.writeLedger([entry]);
     }, {
       pack: {
-        ...workflowPack(),
+        ...workflowPack({ profileId: "user-e2e-tenant" }),
         prepared_at: new Date().toISOString(),
         expires_at: new Date(Date.now() + 86_400_000).toISOString(),
       },
-      entry: workflowEntry(),
+      entry: workflowEntry("user-e2e-tenant"),
     });
 
     let syncAttempts = 0;
@@ -1185,7 +1186,7 @@ test.describe("prepared offline checkout workflow contract", () => {
           readPack: (scope: { workspaceId: string; profileId: string; deviceId: string }) => Promise<unknown>;
         };
       }).offlineCheckoutWorkflow;
-      return workflow.readPack({ workspaceId: "workspace-e2e", profileId: "user-e2e-admin", deviceId: "device-e2e" });
+      return workflow.readPack({ workspaceId: "workspace-e2e", profileId: "user-e2e-tenant", deviceId: "device-e2e" });
     })).toMatchObject({
       pack_version: "refreshed-pack-workflow-e2e",
       borrowers: expect.arrayContaining([expect.objectContaining({ borrower_id: "STU-200" })]),
@@ -1242,12 +1243,12 @@ test.describe("prepared offline checkout workflow contract", () => {
   });
 });
 
-function workflowPack(options: { itemStatus?: string; checkedOutBy?: string | null } = {}) {
+function workflowPack(options: { itemStatus?: string; checkedOutBy?: string | null; profileId?: string } = {}) {
   return {
     schema_version: 1,
     pack_version: "pack-workflow-e2e",
     workspace_id: "workspace-e2e",
-    profile_id: "user-e2e-admin",
+    profile_id: options.profileId ?? "user-e2e-admin",
     device_id: "device-e2e",
     prepared_at: "2026-07-28T08:00:00.000Z",
     expires_at: "2099-07-29T08:00:00.000Z",
@@ -1259,13 +1260,13 @@ function workflowPack(options: { itemStatus?: string; checkedOutBy?: string | nu
   };
 }
 
-function workflowEntry() {
+function workflowEntry(profileId = "user-e2e-admin") {
   return {
     schema_version: 1,
     id: "entry-workflow-e2e",
     operation_id: "op-workflow-e2e",
     workspace_id: "workspace-e2e",
-    profile_id: "user-e2e-admin",
+    profile_id: profileId,
     device_id: "device-e2e",
     pack_version: "pack-workflow-e2e",
     created_at: "2026-07-28T10:00:00.000Z",

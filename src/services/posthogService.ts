@@ -504,6 +504,9 @@ const initializePostHog = async () => {
       api_host: import.meta.env.VITE_POSTHOG_HOST?.trim() || "https://j.itemtraxx.com",
       ui_host: "https://us.posthog.com",
       defaults: "2026-01-30",
+      // Do not ingest Meta advertising identifiers from first-party _fbp/_fbc
+      // cookies; ItemTraxx does not use campaign attribution.
+      save_campaign_params: false,
       // Keep the identity/session cookie shared across itemtraxx.com and
       // workspace subdomains. The explicit conflict policy is required while
       // this app remains pinned to an older PostHog defaults snapshot; it

@@ -15,6 +15,7 @@ import {
   parsePackVersion,
   parseResolvePayload,
   parseSyncOperations,
+  visibleCheckedOutBy,
 } from "./contracts.ts";
 
 const ACTIONS = new Set(["prepare_pack", "sync", "resolve"] as const);
@@ -263,6 +264,7 @@ serve(async (req) => {
       if (packError || !pack?.id) {
         throw new Error("Unable to register offline pack.");
       }
+      const visibleBorrowerIds = new Set(borrowers.map((borrower) => borrower.id));
 
       for (let offset = 0; offset < items.length; offset += PAGE_SIZE) {
         const snapshotRows = items.slice(offset, offset + PAGE_SIZE).map((
@@ -305,7 +307,7 @@ serve(async (req) => {
             name,
             barcode,
             status,
-            checked_out_by,
+            checked_out_by: visibleCheckedOutBy(checked_out_by, visibleBorrowerIds),
           })),
         },
       });
@@ -507,6 +509,15 @@ serve(async (req) => {
 
       const preparedMs = Date.parse(pack.prepared_at);
       const expiresMs = Date.parse(pack.expires_at);
+      const nowMs = Date.now();
+      if (
+        !Number.isFinite(preparedMs) || !Number.isFinite(expiresMs) ||
+        expiresMs <= preparedMs || nowMs < preparedMs || nowMs >= expiresMs
+      ) {
+        return jsonResponse(403, {
+          error: "Offline pack has expired or is not yet active.",
+        });
+      }
       const operationResults = [];
       for (const operation of operations) {
         const createdMs = Date.parse(operation.created_at);
@@ -655,11 +666,12 @@ serve(async (req) => {
       return jsonResponse(404, { error: "Offline conflict not found." });
     }
     const { data: activePack } = await adminClient
-      .from("offline_checkout_packs").select("id")
+      .from("offline_checkout_packs").select("id,expires_at")
       .eq("id", conflict.pack_id).eq("workspace_id", profile.workspace_id)
       .eq("profile_id", profile.id).eq("device_id", deviceId)
       .is("invalidated_at", null).maybeSingle();
-    if (!activePack) {
+    const activePackExpiresMs = activePack ? Date.parse(activePack.expires_at) : Number.NaN;
+    if (!activePack || !Number.isFinite(activePackExpiresMs) || Date.now() >= activePackExpiresMs) {
       return jsonResponse(403, {
         error: "Offline pack is no longer active for this account and device.",
       });

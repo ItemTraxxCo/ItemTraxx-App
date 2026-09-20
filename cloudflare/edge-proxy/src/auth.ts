@@ -76,6 +76,90 @@ let cachedKey = "";
 let cachedAuth: any = null;
 let cachedDataClient: ReturnType<typeof createBetterAuthDataClient> | null = null;
 
+type BetterAuthSessionLike = {
+  user?: { id?: string };
+  session?: { id?: string };
+};
+
+type SsoActor = {
+  profileId: string;
+  role: string;
+  workspaceId: string | null;
+  organizationId: string | null;
+  workspaceStatus: string | null;
+};
+
+const resolveSsoActor = async (
+  dataClient: ReturnType<typeof createBetterAuthDataClient>,
+  betterAuthUserId: string,
+): Promise<SsoActor | null> => {
+  const { data, error } = await dataClient.schema("public").from("profiles")
+    .select("id,role,workspace_id,workspaces!profiles_workspace_id_fkey(better_auth_organization_id,status)")
+    .eq("better_auth_user_id", betterAuthUserId)
+    .eq("is_active", true)
+    .is("deleted_at", null)
+    .maybeSingle();
+  if (error) throw error;
+  if (!data?.id || typeof data.role !== "string") return null;
+  const workspace = Array.isArray(data.workspaces) ? data.workspaces[0] : data.workspaces;
+  return {
+    profileId: data.id,
+    role: data.role,
+    workspaceId: data.workspace_id ?? null,
+    organizationId: workspace?.better_auth_organization_id ?? null,
+    workspaceStatus: workspace?.status ?? null,
+  };
+};
+
+const hasFreshSsoStepUp = async (
+  dataClient: ReturnType<typeof createBetterAuthDataClient>,
+  actor: SsoActor,
+  sessionId: string,
+) => {
+  const { data, error } = await dataClient.schema("public")
+    .from("privileged_session_stepups")
+    .select("id")
+    .eq("user_id", actor.profileId)
+    .eq("role_scope", actor.role)
+    .eq("binding_key", `session:${sessionId}`)
+    .gt("expires_at", new Date().toISOString())
+    .limit(1)
+    .maybeSingle();
+  if (error) throw error;
+  return !!data?.id;
+};
+
+const hasRevokedSsoSession = async (
+  dataClient: ReturnType<typeof createBetterAuthDataClient>,
+  actor: SsoActor,
+  sessionId: string,
+) => {
+  const table = actor.role === "super_admin" ? "super_admin_sessions" : "account_sessions";
+  let query = dataClient.schema("public").from(table).select("id")
+    .eq("profile_id", actor.profileId)
+    .eq("auth_session_id", sessionId);
+  if (actor.role !== "super_admin" && actor.workspaceId) {
+    query = query.eq("workspace_id", actor.workspaceId);
+  }
+  const { data, error } = await query.not("revoked_at", "is", null).limit(1).maybeSingle();
+  if (error) throw error;
+  return !!data?.id;
+};
+
+const isSsoSessionAuthorized = async (
+  dataClient: ReturnType<typeof createBetterAuthDataClient>,
+  session: BetterAuthSessionLike,
+) => {
+  const betterAuthUserId = session.user?.id?.trim();
+  const sessionId = session.session?.id?.trim();
+  if (!betterAuthUserId || !sessionId) return false;
+  const actor = await resolveSsoActor(dataClient, betterAuthUserId);
+  if (!actor || !["workspace_admin", "super_admin"].includes(actor.role)) return false;
+  if (actor.role === "workspace_admin" && actor.workspaceStatus !== "active") return false;
+  if (await hasRevokedSsoSession(dataClient, actor, sessionId)) return false;
+  return await hasFreshSsoStepUp(dataClient, actor, sessionId);
+};
+
 export const getBetterAuth = (rawEnv: Env) => {
   const env = rawEnv as BetterAuthEnv;
   const serviceRoleKey = env.SUPABASE_SERVICE_ROLE_KEY?.trim();
@@ -130,15 +214,12 @@ export const getBetterAuth = (rawEnv: Env) => {
           if (!["/sso/register", "/sso/update-provider", "/sso/delete-provider", "/sso/verify-domain", "/sso/request-domain-verification"].includes(context.path)) return;
           const session = await getSessionFromCtx(context);
           if (!session) throw new APIError("UNAUTHORIZED");
-          const { data: profileRow, error: profileError } = await dataClient.schema("public").from("profiles")
-            .select("role,workspace_id,workspaces!profiles_workspace_id_fkey(better_auth_organization_id)")
-            .eq("better_auth_user_id", session.user.id).eq("is_active", true).is("deleted_at", null).maybeSingle();
-          if (profileError) throw profileError;
-          const workspace = Array.isArray(profileRow?.workspaces) ? profileRow.workspaces[0] : profileRow?.workspaces;
-          const profile = profileRow ? { role: profileRow.role, organization_id: workspace?.better_auth_organization_id ?? null } : null;
-          if (!profile || !["workspace_admin", "super_admin"].includes(profile.role)) {
+          const authorized = await isSsoSessionAuthorized(dataClient, session as BetterAuthSessionLike);
+          if (!authorized) {
             throw new APIError("FORBIDDEN");
           }
+          const actor = await resolveSsoActor(dataClient, session.user.id);
+          if (!actor) throw new APIError("FORBIDDEN");
           let targetOrganizationId = typeof context.body?.organizationId === "string"
             ? context.body.organizationId
             : null;
@@ -149,7 +230,7 @@ export const getBetterAuth = (rawEnv: Env) => {
             targetOrganizationId = provider?.organizationId ?? null;
           }
           if (!targetOrganizationId) throw new APIError("BAD_REQUEST", { message: "An ItemTraxx workspace organization is required" });
-          if (profile.role === "workspace_admin" && targetOrganizationId !== profile.organization_id) {
+          if (actor.role === "workspace_admin" && targetOrganizationId !== actor.organizationId) {
             throw new APIError("FORBIDDEN");
           }
           if (context.path === "/sso/register") context.body.organizationId = targetOrganizationId;
@@ -279,30 +360,41 @@ const parseStoredJson = (value: string | null) => {
   try { return JSON.parse(value) as Record<string, unknown>; } catch { return null; }
 };
 
+export const sanitizeSsoProvider = (row: {
+  providerId: string;
+  issuer: string;
+  domain: string;
+  domainVerified: boolean;
+  organizationId: string | null;
+  oidcConfig: string | null;
+  samlConfig: string | null;
+}) => ({
+  providerId: row.providerId,
+  issuer: row.issuer,
+  domain: row.domain,
+  domainVerified: row.domainVerified,
+  organizationId: row.organizationId,
+  // The UI only needs protocol presence. Never send client secrets, signing
+  // keys, certificates, or other provider configuration to the browser.
+  oidcConfig: parseStoredJson(row.oidcConfig) ? {} : null,
+  samlConfig: parseStoredJson(row.samlConfig) ? {} : null,
+});
+
 export const handleSsoManagementRequest = async (request: Request, rawEnv: Env) => {
   const auth = getBetterAuth(rawEnv);
   const session = await auth.api.getSession({ headers: request.headers });
   if (!session?.user || !cachedDataClient) return Response.json({ error: "Unauthorized" }, { status: 401 });
-  const { data: actorProfile, error: actorError } = await cachedDataClient.schema("public").from("profiles")
-    .select("role,workspace_id").eq("better_auth_user_id", session.user.id).eq("is_active", true).is("deleted_at", null).maybeSingle();
-  if (actorError) throw actorError;
-  let actorOrganizationId: string | null = null;
-  if (actorProfile?.workspace_id) {
-    const { data: workspace, error } = await cachedDataClient.schema("public").from("workspaces")
-      .select("better_auth_organization_id").eq("id", actorProfile.workspace_id).maybeSingle();
-    if (error) throw error;
-    actorOrganizationId = workspace?.better_auth_organization_id ?? null;
-  }
-  const actor = actorProfile ? { role: actorProfile.role, organization_id: actorOrganizationId } : null;
-  if (!actor || !["workspace_admin", "super_admin"].includes(actor.role)) {
+  const actor = await resolveSsoActor(cachedDataClient, session.user.id);
+  const authorized = actor && await isSsoSessionAuthorized(cachedDataClient, session as BetterAuthSessionLike);
+  if (!actor || !authorized) {
     return Response.json({ error: "Forbidden" }, { status: 403 });
   }
   const url = new URL(request.url);
   const requestedOrganizationId = url.searchParams.get("organizationId");
-  if (actor.role === "workspace_admin" && requestedOrganizationId && requestedOrganizationId !== actor.organization_id) {
+  if (actor.role === "workspace_admin" && requestedOrganizationId && requestedOrganizationId !== actor.organizationId) {
     return Response.json({ error: "Forbidden" }, { status: 403 });
   }
-  const organizationId = actor.role === "workspace_admin" ? actor.organization_id : requestedOrganizationId;
+  const organizationId = actor.role === "workspace_admin" ? actor.organizationId : requestedOrganizationId;
   if (request.method === "GET") {
     let providerQuery = cachedDataClient.schema("better_auth").from("ssoProvider")
       .select("providerId,issuer,domain,domainVerified,organizationId,oidcConfig,samlConfig").order("domain").order("providerId");
@@ -316,11 +408,7 @@ export const handleSsoManagementRequest = async (request: Request, rawEnv: Env) 
       if (error) throw error;
       workspaces = (data ?? []).map((row) => ({ id: row.id, name: row.name, organizationId: row.better_auth_organization_id }));
     }
-    return Response.json({ organizationId: actor.organization_id, workspaces, providers: (providers ?? []).map((row) => {
-      const oidc = parseStoredJson(row.oidcConfig);
-      if (oidc) delete oidc.clientSecret;
-      return { ...row, oidcConfig: oidc, samlConfig: parseStoredJson(row.samlConfig) };
-    }) });
+    return Response.json({ organizationId: actor.organizationId, workspaces, providers: (providers ?? []).map(sanitizeSsoProvider) });
   }
   if (request.method === "DELETE") {
     const providerId = url.searchParams.get("providerId");
@@ -329,7 +417,7 @@ export const handleSsoManagementRequest = async (request: Request, rawEnv: Env) 
       .select("organizationId").eq("providerId", providerId).maybeSingle();
     if (error) throw error;
     if (!target) return Response.json({ error: "Not found" }, { status: 404 });
-    if (actor.role === "workspace_admin" && target.organizationId !== actor.organization_id) {
+    if (actor.role === "workspace_admin" && target.organizationId !== actor.organizationId) {
       return Response.json({ error: "Forbidden" }, { status: 403 });
     }
     const { error: deleteError } = await cachedDataClient.schema("better_auth").from("ssoProvider").delete().eq("providerId", providerId);

@@ -80,7 +80,7 @@ describe("registerPrivilegedAdminStepUp", () => {
     });
 
     await expect(registerPrivilegedAdminStepUp()).rejects.toThrow(
-      "Unable to verify admin session. Please sign out and try again."
+      "Unable to verify account session. Please sign out and try again."
     );
   });
 });

@@ -142,7 +142,11 @@ serve((req) => withRequestSpan(req, "POST /functions/admin-ops", async (span, re
       return jsonResponse(403, { error: "Access denied" });
     }
 
-    if (profile.role !== "workspace_admin" && profile.role !== "tenant_account") {
+    if (
+      profile.role !== "workspace_admin" &&
+      profile.role !== "individual_account" &&
+      profile.role !== "tenant_account"
+    ) {
       return jsonResponse(403, { error: "Access denied" });
     }
     if (profile.is_active === false) {
@@ -152,8 +156,8 @@ serve((req) => withRequestSpan(req, "POST /functions/admin-ops", async (span, re
     const { data: rateLimit, error: rateLimitError } = await userClient.rpc(
       "consume_rate_limit",
       {
-        p_scope: profile.role === "workspace_admin" ? "admin" : "workspace",
-        p_limit: profile.role === "workspace_admin" ? 30 : 25,
+        p_scope: profile.role === "tenant_account" ? "workspace" : "admin",
+        p_limit: profile.role === "tenant_account" ? 25 : 30,
         p_window_seconds: 60,
       },
     );

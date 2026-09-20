@@ -8,6 +8,7 @@ import { validateAccountDeviceSession } from "../_shared/accountSessions.ts";
 import { requireRecentAdminAuth } from "../_shared/adminReauth.ts";
 import { readJsonBody } from "../_shared/requestBody.ts";
 import { resolveWorkspaceAccess } from "../_shared/workspaceAccess.ts";
+import { preflightQuota, quotaLimitResponse, quotaPreflightResponse } from "../_shared/quota.ts";
 import {
   optionalText,
   requireEnum,
@@ -477,7 +478,7 @@ serve(async (req) => {
     if (
       profileError ||
       !profile?.workspace_id ||
-      profile.role !== "workspace_admin" ||
+      !["workspace_admin", "individual_account"].includes(profile.role) ||
       profile.is_active === false
     ) {
       return jsonResponse(403, { error: "Access denied" });
@@ -521,6 +522,12 @@ serve(async (req) => {
     const resolveAccess = async () => {
       const accessMode = requireEnum(payloadRecord.access_mode, ACCESS_MODES);
       const profileIds = Array.isArray(payloadRecord.profile_ids) ? [...new Set(payloadRecord.profile_ids.map((value) => requireUuid(value)))] : [];
+      if (profile.role === "individual_account") {
+        if (accessMode !== "all" || profileIds.length > 0) {
+          throw new ValidationError("Individual Account borrowers must be available to the account owner.");
+        }
+        return { accessMode: "all" as const, profileIds: [] };
+      }
       if (accessMode === "restricted" && !profileIds.length) throw new ValidationError("Select at least one Tenant Account.");
       if (profileIds.length) {
         const { count, error } = await adminClient.from("profiles").select("id", { count: "exact", head: true }).eq("workspace_id", profile.workspace_id).eq("role", "tenant_account").eq("is_active", true).is("deleted_at", null).in("id", profileIds);
@@ -659,6 +666,8 @@ serve(async (req) => {
           : await createGeneratedBorrowerRecord(adminClient, profile.workspace_id, accessMode, profileIds, profile.id);
 
       if (error || !data) {
+        const quotaResponse = quotaLimitResponse(error, jsonResponse);
+        if (quotaResponse) return quotaResponse;
         if (isUniqueIdentityConflict(error)) {
           return jsonResponse(409, { error: "Borrower ID or username already exists." });
         }
@@ -742,6 +751,14 @@ serve(async (req) => {
           row.username.toLowerCase()
         )
       );
+
+      const quotaLimit = await preflightQuota(
+        adminClient,
+        profile.workspace_id,
+        "borrowers",
+        normalizedRows.length,
+      );
+      if (quotaLimit) return quotaPreflightResponse(quotaLimit, jsonResponse);
 
       for (const row of normalizedRows) {
         const hasValidId = BORROWER_ID_PATTERN.test(row.borrowerId);
@@ -915,6 +932,8 @@ serve(async (req) => {
         .single();
 
       if (error || !data) {
+        const quotaResponse = quotaLimitResponse(error, jsonResponse);
+        if (quotaResponse) return quotaResponse;
         return jsonResponse(400, { error: "Unable to restore borrower." });
       }
 

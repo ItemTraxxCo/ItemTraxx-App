@@ -17,6 +17,8 @@ export type TenantFeatureFlags = {
 
 export type TenantPolicyRow = {
   checkout_due_hours: number | null;
+  max_items?: number | null;
+  max_borrowers?: number | null;
   account_category: "workspace" | "education" | "custom" | "individual" | null;
   plan_code:
     | "workspace_core"

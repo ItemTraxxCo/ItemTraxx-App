@@ -11,6 +11,8 @@ export type SuperWorkspace = {
   primary_admin_email: string | null;
   account_category?: "workspace" | "education" | "custom" | "individual";
   plan_code?: string | null;
+  max_items?: number | null;
+  max_borrowers?: number | null;
   checkout_due_hours?: number;
   feature_flags?: Record<string, boolean>;
   contact_name?: string | null;
@@ -23,6 +25,8 @@ export type SuperWorkspace = {
 export type WorkspacePolicyInput = {
   account_category: "workspace" | "education" | "custom" | "individual";
   plan_code?: string | null;
+  max_items?: number | null;
+  max_borrowers?: number | null;
   checkout_due_hours: number;
   feature_flags: Record<string, boolean>;
   contact_name?: string | null;

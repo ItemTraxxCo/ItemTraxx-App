@@ -57,7 +57,7 @@ export const resolveWorkspacePolicyState = async (
 }> => {
   let tenantPolicyResult: TenantPolicyResult = await adminClient
     .from("workspace_policies")
-    .select("checkout_due_hours, account_category, plan_code, feature_flags")
+    .select("checkout_due_hours, max_items, max_borrowers, account_category, plan_code, feature_flags")
     .eq("workspace_id", workspaceId)
     .maybeSingle() as unknown as TenantPolicyResult;
 
@@ -138,9 +138,18 @@ export const handleSettingsAction = async (
   }
 
   if (context.action === "get_workspace_settings") {
+    const { data: usage } = await context.adminClient
+      .from("workspace_usage")
+      .select("active_items,active_borrowers")
+      .eq("workspace_id", context.workspaceId)
+      .maybeSingle();
     return context.jsonResponse(200, {
       data: {
         checkout_due_hours: context.checkoutDueHours,
+        max_items: context.workspacePolicy?.max_items ?? null,
+        max_borrowers: context.workspacePolicy?.max_borrowers ?? null,
+        active_items: typeof usage?.active_items === "number" ? usage.active_items : 0,
+        active_borrowers: typeof usage?.active_borrowers === "number" ? usage.active_borrowers : 0,
         account_category:
           context.workspacePolicy?.account_category === "individual"
             ? "individual"
@@ -173,7 +182,7 @@ export const handleSettingsAction = async (
   let settingsResult: TenantPolicyResult = await context.adminClient
     .from("workspace_policies")
     .upsert(row, { onConflict: "workspace_id" })
-    .select("checkout_due_hours, account_category, plan_code, feature_flags")
+    .select("checkout_due_hours, max_items, max_borrowers, account_category, plan_code, feature_flags")
     .single() as unknown as TenantPolicyResult;
 
   if (isMissingColumn(settingsResult.error, "feature_flags")) {
@@ -196,11 +205,20 @@ export const handleSettingsAction = async (
       error: "Unable to save tenant settings.",
     });
   }
+  const { data: usage } = await context.adminClient
+    .from("workspace_usage")
+    .select("active_items,active_borrowers")
+    .eq("workspace_id", context.workspaceId)
+    .maybeSingle();
   return context.jsonResponse(200, {
     data: {
       checkout_due_hours: typeof data.checkout_due_hours === "number"
         ? data.checkout_due_hours
         : checkoutDueHoursNext,
+      max_items: data.max_items ?? null,
+      max_borrowers: data.max_borrowers ?? null,
+      active_items: typeof usage?.active_items === "number" ? usage.active_items : 0,
+      active_borrowers: typeof usage?.active_borrowers === "number" ? usage.active_borrowers : 0,
       account_category: data.account_category === "individual"
         ? "individual"
         : data.account_category === "education"

@@ -178,7 +178,7 @@ export const useAdminSessionLifecycle = (options: AdminSessionLifecycleOptions) 
     if (isIdleLogoutRunning.value || toValue(options.isDevHost)) return;
     if (
       !options.auth.isAuthenticated ||
-      options.auth.role !== "workspace_admin" ||
+      !["workspace_admin", "individual_account"].includes(options.auth.role ?? "") ||
       !toValue(options.isWorkspaceAdminArea)
     ) {
       return;
@@ -197,7 +197,7 @@ export const useAdminSessionLifecycle = (options: AdminSessionLifecycleOptions) 
     if (toValue(options.isDevHost)) return;
     if (
       !options.auth.isAuthenticated ||
-      options.auth.role !== "workspace_admin" ||
+      !["workspace_admin", "individual_account"].includes(options.auth.role ?? "") ||
       !toValue(options.isWorkspaceAdminArea)
     ) {
       return;

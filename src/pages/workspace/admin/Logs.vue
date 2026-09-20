@@ -2,7 +2,7 @@
   <div class="page admin-shell">
     <div class="admin-hero">
       <div class="page-nav-left">
-        <RouterLink class="button-link" to="/admin">Return to admin panel</RouterLink>
+        <RouterLink class="button-link" :to="managerRoot">Return to manager home</RouterLink>
       </div>
       <h1>Item Logs</h1>
       <p class="admin-hero-copy">Filter checkout and return activity, then export the current view to PDF and CSV.</p>
@@ -114,6 +114,9 @@ import BoneyardSkeleton from "../../../components/BoneyardSkeleton.vue";
 import BoneyardTableFixture from "../../../components/BoneyardTableFixture.vue";
 import { fetchItemLogs, type ItemLog } from "../../../services/itemService";
 import { exportRowsToCsv, exportRowsToPdf } from "../../../services/exportService";
+import { useManagerContext } from "../../../composables/useManagerContext";
+
+const { managerRoot } = useManagerContext();
 
 const logs = ref<ItemLog[]>([]);
 const isLoading = ref(false);

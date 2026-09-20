@@ -347,6 +347,12 @@ export const setWorkspaceAdminSession = async (page: Page, workspaceId = "tenant
   }, workspaceId);
 };
 
+export const setIndividualAccountSession = async (page: Page, workspaceId = "individual-e2e") => {
+  await page.waitForFunction(() => typeof window.__itemtraxxTest?.setIndividualAccountSession === "function");
+  await waitForPublicAuthBootstrap(page);
+  await page.evaluate((id) => window.__itemtraxxTest?.setIndividualAccountSession(id), workspaceId);
+};
+
 export const setTenantAccountSession = async (page: Page, workspaceId = "tenant-e2e") => {
   await page.waitForFunction(() => typeof window.__itemtraxxTest?.setTenantAccountSession === "function");
   await waitForPublicAuthBootstrap(page);

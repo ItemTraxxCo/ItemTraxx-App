@@ -4,7 +4,7 @@
       <div>
         <RouterLink to="/super-admin" class="sa-back-link">&larr; Back to Control Center</RouterLink>
         <h1 class="sa-toolbar-title">Workspaces</h1>
-        <p class="sa-toolbar-sub">Manage workspace identity, billing classification, feature access, lifecycle, and Primary Workspace Admins.</p>
+        <p class="sa-toolbar-sub">Manage workspace and individual account identity, billing, feature access, lifecycle, and account owners.</p>
       </div>
     </div>
 
@@ -39,11 +39,14 @@
 
     <div class="sa-table-wrap">
       <table class="sa-table">
-        <thead><tr><th>Name</th><th>Subdomain</th><th>Classification</th><th>Status</th><th>Primary Workspace Admin</th><th>Actions</th></tr></thead>
+        <thead><tr><th>Name</th><th>App address</th><th>Classification</th><th>Status</th><th>Account owner</th><th>Actions</th></tr></thead>
         <tbody>
           <tr v-for="workspace in workspaces" :key="workspace.id">
             <td>{{ workspace.name }}</td>
-            <td><a :href="workspaceUrl(workspace.slug)" target="_blank" rel="noreferrer">{{ workspace.slug }}.app.itemtraxx.com</a></td>
+            <td>
+              <span v-if="workspace.account_category === 'individual'">Private (root app)</span>
+              <a v-else :href="workspaceUrl(workspace.slug)" target="_blank" rel="noreferrer">{{ workspace.slug }}.app.itemtraxx.com</a>
+            </td>
             <td>{{ workspace.account_category || 'workspace' }} / {{ workspace.plan_code || 'unassigned' }}</td>
             <td>
               <span
@@ -58,7 +61,7 @@
                 <button class="sa-btn" @click="toggle(workspace)">{{ workspace.status === 'active' ? 'Suspend' : 'Activate' }}</button>
                 <button class="sa-btn danger" @click="archiveWorkspace(workspace)">Archive</button>
                 <button class="sa-btn" @click="reset(workspace)">Reset primary password</button>
-                <button class="sa-btn" @click="reassign(workspace)">Reassign primary</button>
+                <button v-if="workspace.account_category !== 'individual'" class="sa-btn" @click="reassign(workspace)">Reassign primary</button>
               </div>
             </td>
           </tr>
@@ -96,7 +99,7 @@ import {
 
 type WorkspaceDraft = WorkspacePolicyInput & { name: string; slug: string; auth_email: string; password: string };
 const defaultFlags = () => ({ enable_notifications: true, enable_bulk_item_import: true, enable_bulk_borrower_tools: true, enable_status_tracking: true, enable_barcode_generator: true });
-const blankDraft = (): WorkspaceDraft => ({ name: "", slug: "", auth_email: "", password: "", account_category: "workspace", plan_code: "workspace_core", checkout_due_hours: 72, feature_flags: defaultFlags(), contact_name: "", support_email: "", billing_email: "", billing_status: "draft", renewal_date: "", invoice_reference: "" });
+const blankDraft = (): WorkspaceDraft => ({ name: "", slug: "", auth_email: "", password: "", account_category: "workspace", plan_code: "workspace_core", max_items: null, max_borrowers: null, checkout_due_hours: 72, feature_flags: defaultFlags(), contact_name: "", support_email: "", billing_email: "", billing_status: "draft", renewal_date: "", invoice_reference: "" });
 
 const WorkspaceFields = defineComponent({
   props: { modelValue: { type: Object as PropType<WorkspaceDraft>, required: true }, includeCredentials: Boolean },
@@ -111,6 +114,8 @@ const WorkspaceFields = defineComponent({
       ...(props.includeCredentials ? [input("Primary admin email", "auth_email", "email"), input("Temporary password", "password", "password")] : []),
       h("label", ["Account category", h("select", { value: props.modelValue.account_category, onChange: (event: Event) => { const account_category = (event.target as HTMLSelectElement).value as WorkspaceDraft["account_category"]; const plan_code = account_category === "individual" ? "individual_yearly" : account_category === "education" ? "education" : account_category === "custom" ? "custom" : "workspace_core"; emit("update:modelValue", { ...props.modelValue, account_category, plan_code }); } }, [h("option", { value: "workspace" }, "Workspace"), h("option", { value: "education" }, "Education"), h("option", { value: "custom" }, "Custom"), h("option", { value: "individual" }, "Individual")])]),
       h("label", ["Plan", h("select", { value: props.modelValue.plan_code ?? "", onChange: (event: Event) => update("plan_code", (event.target as HTMLSelectElement).value) }, plans.value.map(([value, label]) => h("option", { value }, label)))]),
+      h("label", ["Active item limit", h("input", { type: "number", min: 1, value: props.modelValue.max_items ?? "", placeholder: "Unlimited", onInput: (event: Event) => update("max_items", (event.target as HTMLInputElement).value || null) })]),
+      h("label", ["Active borrower limit", h("input", { type: "number", min: 1, value: props.modelValue.max_borrowers ?? "", placeholder: "Unlimited", onInput: (event: Event) => update("max_borrowers", (event.target as HTMLInputElement).value || null) })]),
       h("label", ["Checkout due limit (hours)", h("input", { type: "number", min: 1, max: 720, value: props.modelValue.checkout_due_hours, onInput: (event: Event) => update("checkout_due_hours", Number((event.target as HTMLInputElement).value)) })]),
       input("Contact name", "contact_name"), input("Support email", "support_email", "email"), input("Billing email", "billing_email", "email"),
       h("label", ["Billing status", h("select", { value: props.modelValue.billing_status ?? "", onChange: (event: Event) => update("billing_status", (event.target as HTMLSelectElement).value) }, ["draft", "active", "past_due", "canceled"].map((value) => h("option", { value }, value.replace("_", " "))))]),
@@ -139,7 +144,10 @@ const archivedCount = computed(() => workspaces.value.filter((item) => !!item.ar
 const workspaceUrl = (slug: string) => `https://${slug}.app.itemtraxx.com`;
 const run = async (operation: () => Promise<void>, success: string) => { saving.value = true; error.value = ""; message.value = ""; try { await operation(); message.value = success; } catch (cause) { error.value = cause instanceof Error ? cause.message : "Workspace operation failed."; } finally { saving.value = false; } };
 const load = async () => { loading.value = true; error.value = ""; try { workspaces.value = await listWorkspaces(search.value, status.value); } catch (cause) { error.value = cause instanceof Error ? cause.message : "Unable to load workspaces."; } finally { loading.value = false; } };
-const create = () => run(async () => { await createWorkspace(draft.value); draft.value = blankDraft(); await load(); }, "Workspace created. Add its exact origin to the Cloudflare allowlist before handoff.");
+const create = () => {
+  const isIndividual = draft.value.account_category === "individual";
+  return run(async () => { await createWorkspace(draft.value); draft.value = blankDraft(); await load(); }, isIndividual ? "Individual account created." : "Workspace created. Add its exact origin to the Cloudflare allowlist before handoff.");
+};
 const openEdit = (workspace: SuperWorkspace) => { editing.value = workspace; editDraft.value = { ...blankDraft(), ...workspace, feature_flags: { ...defaultFlags(), ...(workspace.feature_flags ?? {}) } }; };
 const saveEdit = () => editing.value && run(async () => { await updateWorkspace({ id: editing.value!.id, ...editDraft.value }); editing.value = null; await load(); }, "Workspace updated. Redeploy the origin allowlist if its slug changed.");
 const toggle = (workspace: SuperWorkspace) => run(async () => { await setWorkspaceStatus(workspace.id, workspace.status === "active" ? "suspended" : "active"); await load(); }, "Workspace status updated.");

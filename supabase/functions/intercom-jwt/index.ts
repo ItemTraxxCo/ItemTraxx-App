@@ -102,7 +102,7 @@ serve(async (req) => {
       !profile ||
       profile.is_active !== true ||
       profile.deleted_at ||
-      !["tenant_account", "workspace_admin", "district_admin", "super_admin"].includes(profile.role)
+      !["tenant_account", "workspace_admin", "individual_account", "district_admin", "super_admin"].includes(profile.role)
     ) {
       return jsonResponse(403, { error: "Account access denied." });
     }

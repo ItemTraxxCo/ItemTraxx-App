@@ -5,6 +5,7 @@ import {
   requireText,
 } from "../../_shared/validation.ts";
 import type { AdminOpsContext } from "../context.ts";
+import { preflightQuota, quotaLimitResponse, quotaPreflightResponse } from "../../_shared/quota.ts";
 
 const TRACKED_STATUSES = new Set([
   "damaged",
@@ -141,6 +142,14 @@ export const handleBulkItemsAction = async (
     });
   }
 
+  const quotaLimit = await preflightQuota(
+    context.adminClient,
+    context.workspaceId,
+    "items",
+    toInsert.length,
+  );
+  if (quotaLimit) return quotaPreflightResponse(quotaLimit, context.jsonResponse);
+
   const insertPayload = toInsert.map((row) => ({
     workspace_id: context.workspaceId,
     name: row.name,
@@ -154,6 +163,8 @@ export const handleBulkItemsAction = async (
     .insert(insertPayload)
     .select("id, workspace_id, name, barcode, serial_number, status, notes");
   if (insertError) {
+    const quotaResponse = quotaLimitResponse(insertError, context.jsonResponse);
+    if (quotaResponse) return quotaResponse;
     return context.jsonResponse(400, { error: "Unable to import item rows." });
   }
 

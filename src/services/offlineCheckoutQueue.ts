@@ -607,8 +607,15 @@ export const queueCheckoutPayload = async (
     queue.push(item);
     await writeOfflineQueue(queue);
     window.dispatchEvent(new CustomEvent("itemtraxx:offline-queue-changed"));
-    return queue.length;
+    return scope
+      ? queue.filter((queuedItem) => isOfflineQueueItemScopedTo(queuedItem, scope)).length
+      : 0;
   });
 
 export const getBufferedCheckoutCount = async () =>
-  withOfflineQueueLock(async () => (await readOfflineQueue()).length);
+  withOfflineQueueLock(async () => {
+    const scope = getOfflineQueueScope();
+    if (!scope) return 0;
+    const queue = await readOfflineQueue();
+    return queue.filter((item) => isOfflineQueueItemScopedTo(item, scope)).length;
+  });

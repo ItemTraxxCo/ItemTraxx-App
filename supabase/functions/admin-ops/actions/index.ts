@@ -74,7 +74,7 @@ const isAdminOpsAction = (action: string): action is AdminOpsAction =>
 
 export const authorizeAdminOpsAction = async (input: {
   action: string;
-  profileRole: "workspace_admin" | "tenant_account";
+  profileRole: "workspace_admin" | "individual_account" | "tenant_account";
   isWorkspaceSuspended: boolean;
   adminClient: SupabaseClient;
   userId: string;
@@ -84,7 +84,8 @@ export const authorizeAdminOpsAction = async (input: {
   if (!isAdminOpsAction(input.action)) return null;
   if (
     WORKSPACE_ADMIN_ONLY_ACTIONS.has(input.action) &&
-    input.profileRole !== "workspace_admin"
+    input.profileRole !== "workspace_admin" &&
+    input.profileRole !== "individual_account"
   ) {
     return input.jsonResponse(403, { error: "Access denied" });
   }

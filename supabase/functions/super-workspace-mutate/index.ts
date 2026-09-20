@@ -50,6 +50,14 @@ const normalizeFeatureFlags = (value: unknown) => {
     Object.keys(defaultFeatureFlags()).map((key) => [key, input[key] !== false]),
   );
 };
+const optionalPositiveLimit = (value: unknown, label: string) => {
+  if (value === null || value === undefined || value === "") return null;
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed < 1 || parsed > 1_000_000) {
+    throw new ValidationError(`${label} must be a positive whole number.`);
+  }
+  return parsed;
+};
 const policyValues = (p: Record<string, unknown>) => {
   const category = ACCOUNT_CATEGORIES.has(String(p.account_category))
     ? String(p.account_category)
@@ -73,6 +81,8 @@ const policyValues = (p: Record<string, unknown>) => {
   return {
     account_category: category,
     plan_code: plan,
+    max_items: optionalPositiveLimit(p.max_items, "Item limit"),
+    max_borrowers: optionalPositiveLimit(p.max_borrowers, "Borrower limit"),
     checkout_due_hours: checkoutHours,
     feature_flags: normalizeFeatureFlags(p.feature_flags),
     contact_name: optionalText(p.contact_name, { maxLen: 120 }) || null,
@@ -177,7 +187,7 @@ serve(async (req) => {
     };
     const load = async (id?: string) => {
       let q = admin.from("workspaces").select(
-        "id,name,slug,status,primary_admin_profile_id,archived_at,purge_after,purge_state,created_at,workspace_policies(account_category,plan_code,checkout_due_hours,feature_flags,contact_name,support_email,billing_email,billing_status,renewal_date,invoice_reference)",
+        "id,name,slug,status,primary_admin_profile_id,archived_at,purge_after,purge_state,created_at,workspace_policies(account_category,plan_code,max_items,max_borrowers,checkout_due_hours,feature_flags,contact_name,support_email,billing_email,billing_status,renewal_date,invoice_reference)",
       ).order("created_at", { ascending: false });
       if (id) {
         q = q.eq("id", id);
@@ -235,6 +245,25 @@ serve(async (req) => {
         }),
         email = requireEmail(p.auth_email),
         policy = policyValues(p);
+      if (policy.account_category === "individual") {
+        const { data: existingProfile, error: existingError } = await admin
+          .from("profiles")
+          .select("workspace_id")
+          .eq("role", "individual_account")
+          .ilike("auth_email", email)
+          .eq("is_active", true)
+          .is("deleted_at", null)
+          .maybeSingle();
+        if (existingError) {
+          return json(400, { error: "Unable to verify individual account." });
+        }
+        if (existingProfile?.workspace_id) {
+          const existing = (await load(existingProfile.workspace_id))[0];
+          if (existing?.account_category === "individual") {
+            return json(200, { data: existing });
+          }
+        }
+      }
       const { data: w, error } = await admin.from("workspaces").insert({
         name,
         slug,
@@ -243,6 +272,16 @@ serve(async (req) => {
       if (error || !w) {
         return json(400, { error: "Unable to create workspace." });
       }
+      const { error: policyError } = await admin.from("workspace_policies").upsert({
+        workspace_id: w.id,
+        ...policy,
+        updated_by: user.id,
+        updated_at: new Date().toISOString(),
+      });
+      if (policyError) {
+        await admin.from("workspaces").delete().eq("id", w.id);
+        return json(400, { error: "Unable to create workspace settings." });
+      }
       let organization: { organization: { id: string } };
       try { organization = await callBetterAuthAdmin({action:"create_organization",workspaceId:w.id,name,slug}); }
       catch { await admin.from("workspaces").delete().eq("id", w.id); return json(400,{error:"Unable to create workspace identity."}); }
@@ -250,7 +289,7 @@ serve(async (req) => {
       const { error: profileError } = await admin.from("profiles").insert({
         id: profileId,
         workspace_id: w.id,
-        role: "workspace_admin",
+        role: policy.account_category === "individual" ? "individual_account" : "workspace_admin",
         auth_email: email,
         is_active: true,
       });
@@ -260,7 +299,7 @@ serve(async (req) => {
         return json(400, { error: "Unable to create workspace." });
       }
       let created: { user: { betterAuthUserId: string } };
-      try { created = await callBetterAuthAdmin({action:"create_user",profileId,email,password:typeof p.password === "string"&&p.password?p.password:randomPassword(),role:"user",profileRole:"workspace_admin",workspaceId:w.id}); }
+      try { created = await callBetterAuthAdmin({action:"create_user",profileId,email,password:typeof p.password === "string"&&p.password?p.password:randomPassword(),role:"user",profileRole:policy.account_category === "individual" ? "individual_account" : "workspace_admin",workspaceId:w.id}); }
       catch {
         await admin.from("profiles").delete().eq("id", profileId);
         await callBetterAuthAdmin({action:"delete_organization",organizationId:organization.organization.id}).catch(()=>undefined);
@@ -278,18 +317,6 @@ serve(async (req) => {
       await admin.from("workspaces").update({
         primary_admin_profile_id: profileId,
       }).eq("id", w.id);
-      const { error: policyError } = await admin.from("workspace_policies").upsert({
-        workspace_id: w.id,
-        ...policy,
-        updated_by: user.id,
-        updated_at: new Date().toISOString(),
-      });
-      if (policyError) {
-        await admin.from("profiles").delete().eq("id", profileId);
-        await callBetterAuthAdmin({action:"delete_user",profileId,betterAuthUserId:created.user.betterAuthUserId}).catch(()=>undefined);
-        await admin.from("workspaces").delete().eq("id", w.id);
-        return json(400, { error: "Unable to create workspace settings." });
-      }
       await writeAudit("create_workspace", w.id, { name, slug, account_category: policy.account_category });
       return json(200, { data: (await load(w.id))[0] });
     }

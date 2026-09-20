@@ -380,6 +380,66 @@ const routes: RouteRecordRaw[] = [
       title: "Item Import | ItemTraxx",
     },
   },
+  {
+    path: "/personal",
+    name: "personal-home",
+    component: () => import("../pages/workspace/admin/AdminHome.vue"),
+    meta: { requiresSession: true, requiresWorkspace: true, requiresRole: "individual_account", requiresWorkspaceMatch: true, title: "My Inventory | ItemTraxx" },
+  },
+  {
+    path: "/personal/checkout",
+    name: "personal-checkout",
+    component: () => import("../pages/workspace/Checkout.vue"),
+    meta: { requiresSession: true, requiresWorkspace: true, requiresRole: "individual_account", requiresWorkspaceMatch: true, title: "Checkout | ItemTraxx" },
+  },
+  {
+    path: "/personal/items",
+    name: "personal-items",
+    component: () => import("../pages/workspace/admin/Items.vue"),
+    meta: { requiresSession: true, requiresWorkspace: true, requiresRole: "individual_account", requiresWorkspaceMatch: true, title: "My Items | ItemTraxx" },
+  },
+  {
+    path: "/personal/borrowers",
+    name: "personal-borrowers",
+    component: () => import("../pages/workspace/admin/Borrowers.vue"),
+    meta: { requiresSession: true, requiresWorkspace: true, requiresRole: "individual_account", requiresWorkspaceMatch: true, title: "My Borrowers | ItemTraxx" },
+  },
+  {
+    path: "/personal/logs",
+    name: "personal-logs",
+    component: () => import("../pages/workspace/admin/Logs.vue"),
+    meta: { requiresSession: true, requiresWorkspace: true, requiresRole: "individual_account", requiresWorkspaceMatch: true, title: "Activity | ItemTraxx" },
+  },
+  {
+    path: "/personal/return",
+    name: "personal-return",
+    component: () => import("../pages/workspace/admin/QuickReturn.vue"),
+    meta: { requiresSession: true, requiresWorkspace: true, requiresRole: "individual_account", requiresWorkspaceMatch: true, title: "Quick Return | ItemTraxx" },
+  },
+  {
+    path: "/personal/item-status",
+    name: "personal-item-status",
+    component: () => import("../pages/workspace/admin/ItemStatusTracking.vue"),
+    meta: { requiresSession: true, requiresWorkspace: true, requiresRole: "individual_account", requiresWorkspaceMatch: true, title: "Item Status | ItemTraxx" },
+  },
+  {
+    path: "/personal/barcodes",
+    name: "personal-barcodes",
+    component: () => import("../pages/workspace/admin/BarcodeGenerator.vue"),
+    meta: { requiresSession: true, requiresWorkspace: true, requiresRole: "individual_account", requiresWorkspaceMatch: true, title: "Barcode Generator | ItemTraxx" },
+  },
+  {
+    path: "/personal/settings",
+    name: "personal-settings",
+    component: () => import("../pages/workspace/admin/Settings.vue"),
+    meta: { requiresSession: true, requiresWorkspace: true, requiresRole: "individual_account", requiresWorkspaceMatch: true, title: "Personal Settings | ItemTraxx" },
+  },
+  {
+    path: "/personal/item-import",
+    name: "personal-item-import",
+    component: () => import("../pages/workspace/admin/ItemImport.vue"),
+    meta: { requiresSession: true, requiresWorkspace: true, requiresRole: "individual_account", requiresWorkspaceMatch: true, title: "Item Import | ItemTraxx" },
+  },
 
   {
     path: "/super-auth",
@@ -694,7 +754,11 @@ const resolveWorkspaceMismatchRoute = async (
 
   const ownWorkspace = await lookupWorkspaceById(auth.workspaceContextId);
   if (ownWorkspace?.slug) {
-    const destination = auth.role === "workspace_admin" ? "/admin" : "/checkout";
+    const destination = auth.role === "workspace_admin"
+      ? "/admin"
+      : auth.role === "individual_account"
+      ? "/personal"
+      : "/checkout";
     window.location.replace(buildWorkspaceAppUrl(ownWorkspace.slug, destination));
     return false;
   }
@@ -740,6 +804,11 @@ const resolveAuthenticatedHomeRoute = (
       ? { name: "workspace-admin-home" }
       : { name: "public-login" };
   }
+  if (auth.role === "individual_account") {
+    return hasFreshAdminVerification(auth.adminVerifiedAt)
+      ? { name: "personal-home" }
+      : { name: "public-login" };
+  }
   if (auth.role === "tenant_account" && auth.workspaceContextId) {
     return { name: "workspace-checkout" };
   }
@@ -762,7 +831,10 @@ const resolveProtectedRoute = (
     return notFoundFor(to.path);
   }
   if (meta.requiresRole && auth.role !== meta.requiresRole) return accessDeniedFor(to);
-  if (meta.requiresRole === "workspace_admin" && !hasFreshAdminVerification(auth.adminVerifiedAt)) {
+  if (
+    (meta.requiresRole === "workspace_admin" || meta.requiresRole === "individual_account") &&
+    !hasFreshAdminVerification(auth.adminVerifiedAt)
+  ) {
     return { name: "public-login" };
   }
   if (

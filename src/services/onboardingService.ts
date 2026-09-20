@@ -1,4 +1,4 @@
-type WorkspaceOnboardingRole = "tenant_account" | "workspace_admin";
+type WorkspaceOnboardingRole = "tenant_account" | "workspace_admin" | "individual_account";
 
 const ONBOARDING_VERSION = "v1";
 const ONBOARDING_KEY_PREFIX = `itemtraxx:onboarding:${ONBOARDING_VERSION}`;
@@ -46,6 +46,7 @@ export const resetOnboarding = (role?: WorkspaceOnboardingRole): void => {
   }
   safeRemoveItem(getOnboardingKey("tenant_account"));
   safeRemoveItem(getOnboardingKey("workspace_admin"));
+  safeRemoveItem(getOnboardingKey("individual_account"));
 };
 
 export type { WorkspaceOnboardingRole };

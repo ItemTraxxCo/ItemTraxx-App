@@ -201,17 +201,20 @@ const showLogoutUserAction = computed(() => auth.isAuthenticated && !Boolean(rou
 const isWorkspaceScopedRoute = computed(() =>
   auth.isAuthenticated &&
   !!auth.workspaceContextId &&
-  ["/checkout", "/items", "/borrowers", "/settings", "/admin"].some(
+  ["/checkout", "/items", "/borrowers", "/settings", "/admin", "/personal"].some(
     (prefix) => route.path === prefix || route.path.startsWith(`${prefix}/`),
   ),
 );
 const showOfflineQueueToast = computed(() =>
-  isWorkspaceScopedRoute.value && !["/checkout", "/admin/return"].includes(route.path),
+  isWorkspaceScopedRoute.value && !["/checkout", "/admin/return", "/personal/checkout", "/personal/return"].includes(route.path),
 );
-const isWorkspaceAdminArea = computed(() => route.path.startsWith("/admin"));
+const isWorkspaceAdminArea = computed(() =>
+  route.path.startsWith("/admin") || route.path.startsWith("/personal"),
+);
 const shouldTrackAccountSession = computed(() => {
   if (!auth.isAuthenticated) return false;
   if (auth.role === "workspace_admin") return isWorkspaceAdminArea.value;
+  if (auth.role === "individual_account") return route.path.startsWith("/personal");
   if (auth.role === "tenant_account") return isWorkspaceScopedRoute.value;
   return false;
 });
@@ -328,12 +331,13 @@ const maybeRedirectAuthenticatedPublicHome = async () => {
   let targetPath: string | null = null;
   if (auth.role === "super_admin") targetPath = auth.hasSecondaryAuth && hasFreshVerification(auth.superVerifiedAt) ? "/super-admin" : "/super-auth";
   else if (auth.role === "workspace_admin") targetPath = hasFreshVerification(auth.adminVerifiedAt) ? "/admin" : "/login";
+  else if (auth.role === "individual_account") targetPath = hasFreshVerification(auth.adminVerifiedAt) ? "/personal" : "/login";
   else if (auth.role === "tenant_account" && auth.workspaceContextId) targetPath = "/checkout";
   if (!targetPath) return;
   publicHomeRedirectInFlight = true;
   try {
     const currentHost = resolveWorkspaceHost(window.location.hostname);
-    if (!currentHost.isWorkspaceHost && auth.role !== "super_admin" && auth.workspaceContextId) {
+    if (!currentHost.isWorkspaceHost && auth.role !== "super_admin" && auth.role !== "individual_account" && auth.workspaceContextId) {
       const districtSlug = (await lookupWorkspaceById(auth.workspaceContextId))?.slug?.trim().toLowerCase();
       if (districtSlug) window.location.replace(buildWorkspaceAppUrl(districtSlug, targetPath));
     }

@@ -101,6 +101,20 @@ describe("useOnboarding", () => {
     wrapper.unmount();
   });
 
+  it("uses the individual account variant on personal routes", () => {
+    mockedHasCompletedOnboarding.mockReturnValue(false);
+    const { wrapper, get } = mountHost(
+      { isInitialized: true, isAuthenticated: true, role: "individual_account" },
+      "/personal/items",
+    );
+
+    expect(get().visible.value).toBe(true);
+    expect(get().role.value).toBe("individual_account");
+    expect(get().variant.value).toBe("individual_account");
+    expect(get().canReplay.value).toBe(true);
+    wrapper.unmount();
+  });
+
   it("only evaluates whether to auto-show once per session, even if evaluate() re-runs", () => {
     mockedHasCompletedOnboarding.mockReturnValue(false);
     const { wrapper, get } = mountHost({ isInitialized: true, isAuthenticated: true, role: "tenant_account" }, "/checkout");

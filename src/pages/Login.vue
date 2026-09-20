@@ -297,13 +297,15 @@ const getLoginErrorCode = (message: string) => {
   return "authentication_failed";
 };
 
-const getDefaultDestination = (role: "workspace_admin" | "tenant_account") =>
+const getDefaultDestination = (role: "workspace_admin" | "individual_account" | "tenant_account") =>
   role === "workspace_admin"
     ? { path: "/admin", loginContext: "admin_login" as const }
+    : role === "individual_account"
+    ? { path: "/personal", loginContext: "admin_login" as const }
     : { path: "/checkout", loginContext: "regular_login" as const };
 
 const completePasswordLoginNavigation = async (session: {
-  role: "workspace_admin" | "tenant_account";
+  role: "workspace_admin" | "individual_account" | "tenant_account";
   workspaceSlug: string | null;
 }) => {
   const destination = getDefaultDestination(session.role);
@@ -322,13 +324,13 @@ const completePasswordLoginNavigation = async (session: {
   const targetPath = requested || destination.path;
   const targetWithLoginContext = addLoginContext(targetPath, destination.loginContext);
 
-  if (session.workspaceSlug && !currentWorkspace.isWorkspaceHost) {
+  if (session.role !== "individual_account" && session.workspaceSlug && !currentWorkspace.isWorkspaceHost) {
     window.location.replace(buildWorkspaceAppUrl(session.workspaceSlug, targetWithLoginContext));
     return;
   }
 
   if (
-    session.workspaceSlug &&
+    session.role !== "individual_account" && session.workspaceSlug &&
     currentWorkspace.isWorkspaceHost &&
     currentWorkspace.slug !== session.workspaceSlug
   ) {
@@ -367,6 +369,10 @@ const handleLogin = async () => {
     if (sessionRole === "workspace_admin") {
       void runPostHog(({ capturePostHogEvent }) =>
         capturePostHogEvent("admin_login_succeeded", { role: sessionRole })
+      );
+    } else if (sessionRole === "individual_account") {
+      void runPostHog(({ capturePostHogEvent }) =>
+        capturePostHogEvent("individual_login_succeeded", { login_method: "password" })
       );
     } else if (sessionRole === "tenant_account") {
       void runPostHog(({ capturePostHogEvent }) =>

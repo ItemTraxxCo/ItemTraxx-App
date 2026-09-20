@@ -169,7 +169,7 @@ const legacyReviewEnabled = computed(() =>
   props.enabled &&
   auth.isAuthenticated &&
   !!auth.workspaceContextId &&
-  (auth.role === "tenant_account" || auth.role === "workspace_admin"),
+  (auth.role === "tenant_account" || auth.role === "workspace_admin" || auth.role === "individual_account"),
 );
 
 const authScopeKey = () => {
@@ -264,7 +264,13 @@ const discardLegacy = async (item: OfflineQueueReviewItem, startNewTransaction: 
     await discardOfflineQueueReviewItem(item.id);
     await refresh();
     if (startNewTransaction) {
-      await router.push(auth.role === "workspace_admin" ? "/admin/return" : "/checkout");
+      await router.push(
+        auth.role === "workspace_admin"
+          ? "/admin/return"
+          : auth.role === "individual_account"
+          ? "/personal/return"
+          : "/checkout",
+      );
     }
   } catch (error) {
     legacyEntryError.value = {

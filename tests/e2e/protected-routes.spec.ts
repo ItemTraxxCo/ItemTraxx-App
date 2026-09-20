@@ -6,6 +6,7 @@ import {
   mockSystemStatus,
   mockUnauthenticatedSession,
   setSuperAdminSession,
+  setIndividualAccountSession,
   setTenantAccountSession,
   setWorkspaceAdminSession,
 } from "./helpers/testHarness";
@@ -28,6 +29,21 @@ test.describe("Protected route smoke tests", () => {
 
     await navigateApp(page, "/admin/item-status");
     await expect(page.getByRole("heading", { name: "Item Status Tracking" })).toBeVisible();
+  });
+
+  test("Individual account reaches its private manager and cannot open workspace administration", async ({ page }) => {
+    await page.goto("/");
+    await setIndividualAccountSession(page);
+
+    await navigateApp(page, "/personal");
+    await expect(page).toHaveURL(/\/personal$/);
+    await expect(page.getByRole("heading", { name: "My Inventory", exact: true })).toBeVisible();
+    await expect(page.getByRole("link", { name: /Item Management/ })).toHaveAttribute("href", "/personal/items");
+    await expect(page.getByRole("link", { name: /Tenant Accounts/ })).toHaveCount(0);
+    await expect(page.getByRole("link", { name: "Admin Access" })).toHaveCount(0);
+
+    await navigateApp(page, "/admin");
+    await expect(page).toHaveURL(/\/access-denied\?redirect=\/admin$/);
   });
 
   test("Workspace Admin item logs show the tenant account that completed each transaction", async ({ page }) => {

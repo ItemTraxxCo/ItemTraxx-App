@@ -31,7 +31,7 @@ const baseCorsHeaders = {
 type Profile = {
   id: string;
   workspace_id: string;
-  role: "tenant_account" | "workspace_admin";
+  role: "tenant_account" | "workspace_admin" | "individual_account";
 };
 
 type ItemRow = {
@@ -152,7 +152,7 @@ serve(async (req) => {
       profileError || !profileRow?.workspace_id ||
       profileRow.is_active === false ||
       profileRow.deleted_at ||
-      !["tenant_account", "workspace_admin"].includes(profileRow.role)
+      !["tenant_account", "workspace_admin", "individual_account"].includes(profileRow.role)
     ) {
       return jsonResponse(403, { error: "Access denied" });
     }
@@ -312,7 +312,7 @@ serve(async (req) => {
     }
 
     const canAccessItem = async (item: ItemRow) => {
-      if (profile.role === "workspace_admin" || item.access_mode === "all") {
+      if (profile.role === "workspace_admin" || profile.role === "individual_account" || item.access_mode === "all") {
         return true;
       }
       const { data } = await adminClient.from("item_access_grants").select(
@@ -329,7 +329,7 @@ serve(async (req) => {
         .maybeSingle();
       if (!borrower) return false;
       if (
-        profile.role === "workspace_admin" || borrower.access_mode === "all"
+        profile.role === "workspace_admin" || profile.role === "individual_account" || borrower.access_mode === "all"
       ) return true;
       const { data: grant } = await adminClient.from("borrower_access_grants")
         .select("borrower_id").eq("borrower_id", borrowerId)
@@ -488,7 +488,7 @@ serve(async (req) => {
       const packVersion = parsePackVersion(body.pack_version);
       const operations = parseSyncOperations(body.operations);
       if (
-        profile.role !== "workspace_admin" &&
+        profile.role !== "workspace_admin" && profile.role !== "individual_account" &&
         containsQuickReturn(operations)
       ) {
         return jsonResponse(403, {
@@ -681,7 +681,7 @@ serve(async (req) => {
       items: conflict.offline_payload,
     }])[0].items;
     if (
-      profile.role !== "workspace_admin" &&
+      profile.role !== "workspace_admin" && profile.role !== "individual_account" &&
       containsQuickReturn([{
         operation_id: operationId,
         created_at: new Date().toISOString(),

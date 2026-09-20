@@ -71,7 +71,7 @@ jobs:
       - require-trusted-ref
       - kill-switch-preflight
       - slack-notify-start
-    if: ${{ needs.require-trusted-ref.result == 'success' && needs.kill-switch-preflight.outputs.active == 'false' }}
+    if: ${{ always() && needs.require-trusted-ref.result == 'success' && needs.kill-switch-preflight.outputs.active == 'false' && (needs.slack-notify-start.result == 'success' || needs.slack-notify-start.result == 'skipped') }}
     runs-on: ubuntu-latest
     timeout-minutes: 90
 

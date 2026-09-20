@@ -409,7 +409,11 @@ export const handleInternalAuthAdminRequest = async (request: Request, rawEnv: E
       if (!profileId || !email || password.length < 12) return Response.json({ error: "Invalid request" }, { status: 400 });
       const userId = crypto.randomUUID(), accountId = crypto.randomUUID();
       const passwordHash = await hashPassword(password);
-      const memberRole = body?.profileRole === "workspace_admin" ? "workspace_admin" : "tenant_account";
+      const memberRole = body?.profileRole === "workspace_admin"
+        ? "workspace_admin"
+        : body?.profileRole === "individual_account"
+        ? "individual_account"
+        : "tenant_account";
       const { error } = await cachedDataClient.schema("public").rpc("better_auth_create_user", {
         p_profile_id: profileId, p_user_id: userId, p_account_id: accountId,
         p_email: email, p_name: name, p_global_role: role, p_password_hash: passwordHash,

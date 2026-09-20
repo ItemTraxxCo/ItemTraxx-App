@@ -35,9 +35,9 @@ const normalizeEmail = (value: unknown) =>
 
 const isSupportedProfileRole = (
   role: string | null,
-): role is "tenant_account" | "workspace_admin" | "super_admin" =>
+): role is "tenant_account" | "individual_account" | "workspace_admin" | "super_admin" =>
   role === "tenant_account" || role === "workspace_admin" ||
-  role === "super_admin";
+  role === "individual_account" || role === "super_admin";
 
 const expectedGlobalRole = (profileRole: string) =>
   profileRole === "super_admin" ? "super_admin" : "user";
@@ -124,6 +124,8 @@ const ensureMembership = async (
 
   const expectedRole = profile.role === "workspace_admin"
     ? "workspace_admin"
+    : profile.role === "individual_account"
+    ? "individual_account"
     : "tenant_account";
   const membership = rows.find((row) => row.organizationId === organizationId);
   if (membership) {

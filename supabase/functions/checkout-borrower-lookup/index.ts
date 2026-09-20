@@ -90,7 +90,7 @@ serve((req) => withRequestSpan(req, "POST /functions/checkout-borrower-lookup", 
       .single();
     if (
       profileError || !profile?.workspace_id || profile.is_active === false ||
-      !["tenant_account", "workspace_admin"].includes(profile.role)
+      !["tenant_account", "workspace_admin", "individual_account"].includes(profile.role)
     ) {
       return jsonResponse(403, { error: "Access denied" });
     }

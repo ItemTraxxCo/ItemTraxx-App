@@ -2,7 +2,7 @@
   <div class="page admin-shell">
     <div class="admin-hero">
       <div class="page-nav-left">
-        <RouterLink class="button-link" to="/admin">Return to admin panel</RouterLink>
+        <RouterLink class="button-link" :to="managerRoot">Return to manager home</RouterLink>
       </div>
       <h1>Borrower Management</h1>
       <p class="admin-hero-copy">Add borrowers, review details, and manage archived records.</p>
@@ -45,6 +45,7 @@
           />
         </label>
         <TenantAccessPicker
+          v-if="!isIndividualAccount"
           v-model:access-mode="accessMode"
           v-model:selected-ids="selectedProfileIds"
           :accounts="tenantAccounts"
@@ -85,7 +86,7 @@
 
       <div v-if="bulkMode && selectedBorrowerIds.size > 0" class="bulk-action-bar">
         <span>{{ selectedBorrowerIds.size }} selected</span>
-        <button type="button" @click="openBulkAccessModal">Change tenant account access</button>
+        <button v-if="!isIndividualAccount" type="button" @click="openBulkAccessModal">Change tenant account access</button>
         <button type="button" :disabled="isSaving" @click="applyBulkArchive">Archive selected</button>
       </div>
       <div class="form-grid-2">
@@ -137,7 +138,7 @@
                 </th>
                 <th>Username</th>
                 <th>Borrower ID</th>
-                <th>Tenant Accounts</th>
+                <th v-if="!isIndividualAccount">Tenant Accounts</th>
                 <th>Details</th>
               </tr>
             </thead>
@@ -153,7 +154,7 @@
                 </td>
                 <td data-session-replay-mask>{{ item.username }}</td>
                 <td data-session-replay-mask>{{ item.borrower_id }}</td>
-                <td>
+                <td v-if="!isIndividualAccount">
                   <span class="scoped-accounts-cell" data-session-replay-mask :title="scopedAccountsTitle(item)">
                     {{ scopedAccountsLabel(item) }}
                   </span>
@@ -254,7 +255,7 @@
       </p>
     </div>
 
-    <div v-if="showBulkAccessModal" class="modal-backdrop">
+    <div v-if="!isIndividualAccount && showBulkAccessModal" class="modal-backdrop">
       <div class="modal">
         <h2>Change tenant account access</h2>
         <p class="admin-section-copy">Applies to {{ selectedBorrowerIds.size }} selected borrower(s).</p>
@@ -278,7 +279,7 @@
         <p class="muted">View username, borrower ID, and checkout history.</p>
         <h3 data-session-replay-mask>{{ selected?.username }}</h3>
         <p class="muted">Borrower ID: <span data-session-replay-mask>{{ selected?.borrower_id }}</span></p>
-        <p v-if="selected" class="muted">
+        <p v-if="selected && !isIndividualAccount" class="muted">
           Tenant Accounts:
           <span class="scoped-accounts-cell" data-session-replay-mask :title="scopedAccountsTitle(selected)">{{ scopedAccountsLabel(selected) }}</span>
         </p>
@@ -350,6 +351,9 @@ import { logAdminAction } from "../../../services/auditLogService";
 import { exportRowsToCsv, exportRowsToPdf } from "../../../services/exportService";
 import { generateBorrowerIdentity } from "../../../utils/borrowerIdentity";
 import { listTenantAccounts } from "../../../services/workspaceAdminManageService";
+import { useManagerContext } from "../../../composables/useManagerContext";
+
+const { isIndividualAccount, managerRoot } = useManagerContext();
 
 const borrowers = ref<BorrowerItem[]>([]);
 const archivedBorrowers = ref<BorrowerItem[]>([]);
@@ -369,7 +373,7 @@ const toastAction = ref<(() => Promise<void>) | null>(null);
 
 const usernamePreview = ref("");
 const borrowerIdPreview = ref("");
-const accessMode = ref<"" | "all" | "restricted">("");
+const accessMode = ref<"" | "all" | "restricted">(isIndividualAccount.value ? "all" : "");
 const selectedProfileIds = ref<string[]>([]);
 const tenantAccounts = ref<Array<{id:string;auth_email:string}>>([]);
 const searchQuery = ref("");
@@ -690,8 +694,8 @@ const handleCreate = async () => {
       workspace_id: auth.workspaceContextId,
       username: usernamePreview.value,
       borrower_id: borrowerIdPreview.value,
-      access_mode: accessMode.value,
-      profile_ids: selectedProfileIds.value,
+      access_mode: isIndividualAccount.value ? "all" : accessMode.value,
+      profile_ids: isIndividualAccount.value ? [] : selectedProfileIds.value,
     });
     await logAdminAction({
       action_type: "borrower_create",
@@ -703,7 +707,7 @@ const handleCreate = async () => {
     usernamePreview.value = created.username;
     borrowerIdPreview.value = created.borrower_id;
     regenerateIdentity();
-    accessMode.value = "";
+    accessMode.value = isIndividualAccount.value ? "all" : "";
     selectedProfileIds.value = [];
     success.value = "Borrower added.";
   } catch (err) {
@@ -731,11 +735,13 @@ onMounted(() => {
       };
     }
     await loadBorrowers();
-    const accounts = await listTenantAccounts();
-    tenantAccounts.value = accounts
-      .filter((account) => account.is_active)
-      .map(({ id, auth_email }) => ({ id, auth_email }));
-    tenantAccounts.value.sort((left, right) => left.auth_email.localeCompare(right.auth_email));
+    if (!isIndividualAccount.value) {
+      const accounts = await listTenantAccounts();
+      tenantAccounts.value = accounts
+        .filter((account) => account.is_active)
+        .map(({ id, auth_email }) => ({ id, auth_email }));
+      tenantAccounts.value.sort((left, right) => left.auth_email.localeCompare(right.auth_email));
+    }
   })();
 });
 

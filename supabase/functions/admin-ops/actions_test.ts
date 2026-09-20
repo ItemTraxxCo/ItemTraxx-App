@@ -433,7 +433,7 @@ Deno.test("tenant policy resolution retries when feature_flags is missing", asyn
   assertEquals(
     calls.map((call) => call.operations[0]?.args[0]),
     [
-      "checkout_due_hours, account_category, plan_code, feature_flags",
+      "checkout_due_hours, max_items, max_borrowers, account_category, plan_code, feature_flags",
       "checkout_due_hours, account_category, plan_code",
     ],
   );

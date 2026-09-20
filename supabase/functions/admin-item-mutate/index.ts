@@ -9,6 +9,7 @@ import { validateAccountDeviceSession } from "../_shared/accountSessions.ts";
 import { requireRecentAdminAuth } from "../_shared/adminReauth.ts";
 import { readJsonBody } from "../_shared/requestBody.ts";
 import { resolveWorkspaceAccess } from "../_shared/workspaceAccess.ts";
+import { quotaLimitResponse } from "../_shared/quota.ts";
 import {
   BARCODE_PATTERN,
   optionalText,
@@ -134,7 +135,7 @@ serve(async (req) => {
     if (
       profileError ||
       !profile?.workspace_id ||
-      profile.role !== "workspace_admin" ||
+      !["workspace_admin", "individual_account"].includes(profile.role) ||
       profile.is_active === false
     ) {
       return jsonResponse(403, { error: "Access denied" });
@@ -179,6 +180,12 @@ serve(async (req) => {
       const profileIds = Array.isArray(payloadRecord.profile_ids)
         ? [...new Set(payloadRecord.profile_ids.map((value) => requireUuid(value)))]
         : [];
+      if (profile.role === "individual_account") {
+        if (accessMode !== "all" || profileIds.length > 0) {
+          throw new ValidationError("Individual Account items must be available to the account owner.");
+        }
+        return { accessMode: "all" as const, profileIds: [] };
+      }
       if (accessMode === "restricted" && profileIds.length === 0) throw new ValidationError("Select at least one Tenant Account.");
       if (profileIds.length) {
         const { count, error } = await adminClient.from("profiles").select("id", { count: "exact", head: true }).eq("workspace_id", profile.workspace_id).eq("role", "tenant_account").eq("is_active", true).is("deleted_at", null).in("id", profileIds);
@@ -318,6 +325,8 @@ serve(async (req) => {
         .single();
 
       if (error || !data) {
+        const quotaResponse = quotaLimitResponse(error, jsonResponse);
+        if (quotaResponse) return quotaResponse;
         return jsonResponse(400, { error: "Unable to create item." });
       }
       await replaceAccess(data.id, accessMode, profileIds);
@@ -469,6 +478,8 @@ serve(async (req) => {
         .single();
 
       if (error || !data) {
+        const quotaResponse = quotaLimitResponse(error, jsonResponse);
+        if (quotaResponse) return quotaResponse;
         return jsonResponse(400, { error: "Unable to restore item." });
       }
 

@@ -35,7 +35,7 @@ const terminateSuspended=async(profile:ProfileRow|null,isCurrent=()=>true)=>{ if
 // from the current origin or a deliberately persisted verification.
 type AuthenticatedSessionUser = NonNullable<Awaited<ReturnType<typeof fetchHttpSessionSummary>>["user"]>;
 const resolveAdminVerificationAt = (summaryUser:AuthenticatedSessionUser, passwordAuthenticatedAt:string|null|undefined, current:ReturnType<typeof getAuthState>, role:ProfileRow["role"]) => {
-  if (role !== "workspace_admin") return null;
+  if (role !== "workspace_admin" && role !== "individual_account") return null;
   if (current.userId === summaryUser.id && current.adminVerifiedAt) return current.adminVerifiedAt;
   return getPersistedAdminVerification(summaryUser.id) ?? passwordAuthenticatedAt ?? summaryUser.last_sign_in_at ?? null;
 };

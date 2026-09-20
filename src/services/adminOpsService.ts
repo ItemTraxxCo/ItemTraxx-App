@@ -43,6 +43,10 @@ export type TenantNotificationPayload = {
 
 export type WorkspaceSettingsPayload = {
   checkout_due_hours: number;
+  max_items: number | null;
+  max_borrowers: number | null;
+  active_items: number;
+  active_borrowers: number;
   account_category: "workspace" | "education" | "custom" | "individual" | null;
   plan_code:
     | "workspace_core"

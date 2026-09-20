@@ -62,7 +62,7 @@ import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
 import { capturePostHogEvent } from "../services/posthogService";
 
 type OnboardingStep = { title: string; body: string };
-type OnboardingVariant = "tenant_checkout" | "workspace_admin";
+type OnboardingVariant = "tenant_checkout" | "workspace_admin" | "individual_account";
 
 const props = defineProps<{
   visible: boolean;
@@ -124,8 +124,31 @@ const workspaceAdminSteps: OnboardingStep[] = [
   },
 ];
 
+const individualAccountSteps: OnboardingStep[] = [
+  {
+    title: "Welcome to your inventory",
+    body: "Manage your personal items, borrowers, checkouts, and returns from one place.",
+  },
+  {
+    title: "Add items and borrowers",
+    body: "Create records individually or use bulk import when you have a larger collection.",
+  },
+  {
+    title: "Checkout and return",
+    body: "Use Checkout & Return for normal transactions or Quick Return when you only need to scan items back in.",
+  },
+  {
+    title: "Settings and security",
+    body: "Manage checkout defaults, account security, and signed-in devices from your personal settings.",
+  },
+];
+
 const steps = computed(() =>
-  props.variant === "workspace_admin" ? workspaceAdminSteps : tenantUserSteps
+  props.variant === "workspace_admin"
+    ? workspaceAdminSteps
+    : props.variant === "individual_account"
+    ? individualAccountSteps
+    : tenantUserSteps
 );
 
 const currentStep = computed<OnboardingStep>(

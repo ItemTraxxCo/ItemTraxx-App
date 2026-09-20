@@ -2,7 +2,7 @@
   <div class="page admin-shell">
     <div class="admin-hero">
       <div class="page-nav-left">
-        <RouterLink class="button-link" to="/admin">Return to admin panel</RouterLink>
+        <RouterLink class="button-link" :to="managerRoot">Return to manager home</RouterLink>
       </div>
       <h1>Quick Return</h1>
       <p class="admin-hero-copy">Return items by barcode without needing a borrower ID.</p>
@@ -87,6 +87,9 @@ import { logAdminAction } from "../../../services/auditLogService";
 import { sanitizeInput } from "../../../utils/inputSanitizer";
 import { toUserFacingErrorMessage } from "../../../services/appErrors";
 import type { ScannerHistoryItem, ScannerScanEvent } from "../../../types/cameraScanner";
+import { useManagerContext } from "../../../composables/useManagerContext";
+
+const { managerRoot } = useManagerContext();
 import { capturePostHogEvent } from "../../../services/posthogService";
 
 const barcodeInput = ref("");

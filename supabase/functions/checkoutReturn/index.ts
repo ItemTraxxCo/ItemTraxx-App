@@ -145,7 +145,7 @@ serve((req) => withRequestSpan(req, "POST /functions/checkoutReturn", async (spa
       !callerProfile?.workspace_id ||
       callerProfile.is_active === false ||
       !callerRole ||
-      !["tenant_account", "workspace_admin"].includes(callerRole)
+      !["tenant_account", "workspace_admin", "individual_account"].includes(callerRole)
     ) {
       return jsonResponse(403, { error: "Access denied" });
     }
@@ -210,7 +210,7 @@ serve((req) => withRequestSpan(req, "POST /functions/checkoutReturn", async (spa
     const isQuickReturn = actionType === "quick_return";
     if (
       (isAdminReturn || isQuickReturn) &&
-      callerRole !== "workspace_admin"
+      callerRole !== "workspace_admin" && callerRole !== "individual_account"
     ) {
       return jsonResponse(403, { error: "Access denied" });
     }

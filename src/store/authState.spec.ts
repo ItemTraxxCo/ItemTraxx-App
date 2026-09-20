@@ -33,6 +33,14 @@ describe("setAuthStateFromBackend", () => {
     expect(state.isWorkspaceAdmin).toBe(false);
   });
 
+  it("treats an individual account as a manager without granting workspace-admin identity", () => {
+    setAuthStateFromBackend({ role: "individual_account", userId: "u1" });
+    const state = getAuthState();
+    expect(state.isAdmin).toBe(true);
+    expect(state.isWorkspaceAdmin).toBe(false);
+    expect(state.isSuperAdmin).toBe(false);
+  });
+
   it("merges partial updates without clobbering unrelated fields", () => {
     setAuthStateFromBackend({ userId: "u1", email: "a@b.com" });
     setAuthStateFromBackend({ isAuthenticated: true });

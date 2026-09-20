@@ -269,74 +269,8 @@ jobs:
         if: ${{ !cancelled() }}
         uses: github/codeql-action/analyze@cdf488f595d80d6e07e03d4674febd5ab45fa938 # v4
 
-      # Keep failure alerting inside the validation job so a normal run does
-      # not publish a separate skipped incident-notification check.
-      - name: Notify incident.io of CI failure
-        if: ${{ always() && (job.status == 'failure' || (github.event_name != 'pull_request' && job.status == 'cancelled')) }}
-        continue-on-error: true
-        env:
-          INCIDENT_IO_WEBHOOK_URL: ${{ secrets.INCIDENT_IO_WEBHOOK_URL }}
-          INCIDENT_IO_WEBHOOK_TOKEN: ${{ secrets.INCIDENT_IO_WEBHOOK_TOKEN }}
-          STATUS: ${{ job.status }}
-          SEVERITY: high
-          WORKFLOW_NAME: CI
-          JOB_NAME: validate
-          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-          REPOSITORY: ${{ github.repository }}
-          BRANCH: ${{ github.ref_name }}
-          SHA: ${{ github.sha }}
-          ENVIRONMENT: production
-        run: |
-          set -euo pipefail
-
-          if [ -z "${INCIDENT_IO_WEBHOOK_URL:-}" ]; then
-            echo "INCIDENT_IO_WEBHOOK_URL is not configured; skipping incident.io alert."
-            exit 0
-          fi
-
-          if [ -z "${INCIDENT_IO_WEBHOOK_TOKEN:-}" ]; then
-            echo "INCIDENT_IO_WEBHOOK_TOKEN is not configured; skipping incident.io alert."
-            exit 0
-          fi
-
-          SHORT_SHA="$(printf '%s' "$SHA" | cut -c1-7)"
-          DEDUPE_KEY="${REPOSITORY}:${WORKFLOW_NAME}:${JOB_NAME}:${BRANCH}"
-
-          jq -n \
-            --arg title "GitHub Actions workflow ${STATUS}: ${WORKFLOW_NAME} / ${JOB_NAME}" \
-            --arg workflow_status "$STATUS" \
-            --arg severity "$SEVERITY" \
-            --arg workflow "$WORKFLOW_NAME" \
-            --arg job "$JOB_NAME" \
-            --arg repo "$REPOSITORY" \
-            --arg branch "$BRANCH" \
-            --arg sha "$SHA" \
-            --arg short_sha "$SHORT_SHA" \
-            --arg run_url "$RUN_URL" \
-            --arg environment "$ENVIRONMENT" \
-            --arg dedupe_key "$DEDUPE_KEY" \
-            '{
-              title: $title,
-              description: ("GitHub Actions workflow `" + $workflow + "` job `" + $job + "` in `" + $repo + "` is `" + $workflow_status + "` on branch `" + $branch + "`."),
-              deduplication_key: $dedupe_key,
-              status: "firing",
-              metadata: {
-                workflow_status: $workflow_status,
-                severity: $severity,
-                repository: $repo,
-                workflow: $workflow,
-                job: $job,
-                branch: $branch,
-                sha: $sha,
-                short_sha: $short_sha,
-                run_url: $run_url,
-                environment: $environment
-              }
-            }' \
-          | curl -fsSL -X POST "$INCIDENT_IO_WEBHOOK_URL" \
-              -H "Authorization: Bearer ${INCIDENT_IO_WEBHOOK_TOKEN}" \
-              -H "Content-Type: application/json" \
-              --data-binary @-
+      # Failure alerting runs in the trusted workflow_run workflow so this
+      # PR-controlled runner never receives incident.io credentials.
 
   slack-notify-finish:
     needs:

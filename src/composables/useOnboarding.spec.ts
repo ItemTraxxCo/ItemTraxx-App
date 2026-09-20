@@ -105,7 +105,7 @@ describe("useOnboarding", () => {
     mockedHasCompletedOnboarding.mockReturnValue(false);
     const { wrapper, get } = mountHost(
       { isInitialized: true, isAuthenticated: true, role: "individual_account" },
-      "/personal/items",
+      "/account/items",
     );
 
     expect(get().visible.value).toBe(true);

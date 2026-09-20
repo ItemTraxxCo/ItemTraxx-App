@@ -223,7 +223,7 @@ const routes: RouteRecordRaw[] = [
     path: "/checkout",
     name: "workspace-checkout",
     component: () => import("../pages/workspace/Checkout.vue"),
-    meta: { requiresSession: true, requiresWorkspace: true, requiresRole: "tenant_account", title: "Checkout | ItemTraxx" },
+    meta: { requiresSession: true, requiresWorkspace: true, requiresRole: ["tenant_account", "individual_account"], title: "Checkout | ItemTraxx" },
   },
   {
     path: "/admin/login",
@@ -247,7 +247,7 @@ const routes: RouteRecordRaw[] = [
   { path: "/settings", name: "workspace-settings", component: () => import("../pages/workspace/Settings.vue"), meta: { requiresSession: true, requiresWorkspace: true, requiresRole: "tenant_account", title: "Settings | ItemTraxx" } },
   { path: "/account/security", name: "account-security", component: () => import("../pages/AccountSecurity.vue"), meta: { requiresSession: true, title: "Account Security | ItemTraxx" } },
   { path: "/login/two-factor", name: "two-factor-challenge", component: () => import("../pages/TwoFactorChallenge.vue"), meta: { title: "Two-factor verification | ItemTraxx" } },
-  { path: "/account", name: "workspace-account", component: () => import("../pages/workspace/Account.vue"), meta: { requiresSession: true, requiresWorkspace: true, requiresRole: "tenant_account", title: "My Account | ItemTraxx" } },
+  { path: "/account", name: "workspace-account", component: () => import("../pages/workspace/AccountHome.vue"), meta: { requiresSession: true, requiresWorkspace: true, requiresRole: ["tenant_account", "individual_account"], requiresWorkspaceMatch: true, title: "My Account | ItemTraxx" } },
   {
     path: "/admin/students",
     redirect: "/admin/borrowers",
@@ -381,64 +381,65 @@ const routes: RouteRecordRaw[] = [
     },
   },
   {
-    path: "/personal",
-    name: "personal-home",
-    component: () => import("../pages/workspace/admin/AdminHome.vue"),
-    meta: { requiresSession: true, requiresWorkspace: true, requiresRole: "individual_account", requiresWorkspaceMatch: true, title: "My Inventory | ItemTraxx" },
+    path: "/account/checkout",
+    redirect: "/checkout",
   },
   {
-    path: "/personal/checkout",
-    name: "personal-checkout",
-    component: () => import("../pages/workspace/Checkout.vue"),
-    meta: { requiresSession: true, requiresWorkspace: true, requiresRole: "individual_account", requiresWorkspaceMatch: true, title: "Checkout | ItemTraxx" },
-  },
-  {
-    path: "/personal/items",
-    name: "personal-items",
+    path: "/account/items",
+    name: "individual-account-items",
     component: () => import("../pages/workspace/admin/Items.vue"),
     meta: { requiresSession: true, requiresWorkspace: true, requiresRole: "individual_account", requiresWorkspaceMatch: true, title: "My Items | ItemTraxx" },
   },
   {
-    path: "/personal/borrowers",
-    name: "personal-borrowers",
+    path: "/account/borrowers",
+    name: "individual-account-borrowers",
     component: () => import("../pages/workspace/admin/Borrowers.vue"),
     meta: { requiresSession: true, requiresWorkspace: true, requiresRole: "individual_account", requiresWorkspaceMatch: true, title: "My Borrowers | ItemTraxx" },
   },
   {
-    path: "/personal/logs",
-    name: "personal-logs",
+    path: "/account/logs",
+    name: "individual-account-logs",
     component: () => import("../pages/workspace/admin/Logs.vue"),
     meta: { requiresSession: true, requiresWorkspace: true, requiresRole: "individual_account", requiresWorkspaceMatch: true, title: "Activity | ItemTraxx" },
   },
   {
-    path: "/personal/return",
-    name: "personal-return",
+    path: "/account/return",
+    name: "individual-account-return",
     component: () => import("../pages/workspace/admin/QuickReturn.vue"),
     meta: { requiresSession: true, requiresWorkspace: true, requiresRole: "individual_account", requiresWorkspaceMatch: true, title: "Quick Return | ItemTraxx" },
   },
   {
-    path: "/personal/item-status",
-    name: "personal-item-status",
+    path: "/account/item-status",
+    name: "individual-account-item-status",
     component: () => import("../pages/workspace/admin/ItemStatusTracking.vue"),
     meta: { requiresSession: true, requiresWorkspace: true, requiresRole: "individual_account", requiresWorkspaceMatch: true, title: "Item Status | ItemTraxx" },
   },
   {
-    path: "/personal/barcodes",
-    name: "personal-barcodes",
+    path: "/account/barcodes",
+    name: "individual-account-barcodes",
     component: () => import("../pages/workspace/admin/BarcodeGenerator.vue"),
     meta: { requiresSession: true, requiresWorkspace: true, requiresRole: "individual_account", requiresWorkspaceMatch: true, title: "Barcode Generator | ItemTraxx" },
   },
   {
-    path: "/personal/settings",
-    name: "personal-settings",
+    path: "/account/settings",
+    name: "individual-account-settings",
     component: () => import("../pages/workspace/admin/Settings.vue"),
     meta: { requiresSession: true, requiresWorkspace: true, requiresRole: "individual_account", requiresWorkspaceMatch: true, title: "Personal Settings | ItemTraxx" },
   },
   {
-    path: "/personal/item-import",
-    name: "personal-item-import",
+    path: "/account/item-import",
+    name: "individual-account-item-import",
     component: () => import("../pages/workspace/admin/ItemImport.vue"),
     meta: { requiresSession: true, requiresWorkspace: true, requiresRole: "individual_account", requiresWorkspaceMatch: true, title: "Item Import | ItemTraxx" },
+  },
+  {
+    path: "/personal/:pathMatch(.*)*",
+    redirect: (to) => {
+      const suffix = Array.isArray(to.params.pathMatch)
+        ? to.params.pathMatch.join("/")
+        : String(to.params.pathMatch || "");
+      return suffix === "checkout" ? "/checkout" : suffix ? `/account/${suffix}` : "/account";
+    },
   },
 
   {
@@ -712,7 +713,7 @@ type AppRouteMeta = {
   public?: boolean;
   requiresSession?: boolean;
   requiresWorkspace?: boolean;
-  requiresRole?: string;
+  requiresRole?: string | string[];
   requiresWorkspaceMatch?: boolean;
   requiresSuperAuth?: boolean;
   title?: string;
@@ -752,13 +753,14 @@ const resolveWorkspaceMismatchRoute = async (
   if (meta.public && to.name !== "public-home") return undefined;
   if (to.name !== "public-home") return accessDeniedFor(to);
 
+  if (auth.role === "individual_account") {
+    window.location.replace("https://itemtraxx.com/checkout");
+    return false;
+  }
+
   const ownWorkspace = await lookupWorkspaceById(auth.workspaceContextId);
   if (ownWorkspace?.slug) {
-    const destination = auth.role === "workspace_admin"
-      ? "/admin"
-      : auth.role === "individual_account"
-      ? "/personal"
-      : "/checkout";
+    const destination = auth.role === "workspace_admin" ? "/admin" : "/checkout";
     window.location.replace(buildWorkspaceAppUrl(ownWorkspace.slug, destination));
     return false;
   }
@@ -806,7 +808,7 @@ const resolveAuthenticatedHomeRoute = (
   }
   if (auth.role === "individual_account") {
     return hasFreshAdminVerification(auth.adminVerifiedAt)
-      ? { name: "personal-home" }
+      ? { name: "workspace-checkout" }
       : { name: "public-login" };
   }
   if (auth.role === "tenant_account" && auth.workspaceContextId) {
@@ -830,9 +832,15 @@ const resolveProtectedRoute = (
   if (workspace.isWorkspaceHost && meta.requiresSession && !workspace.workspaceId) {
     return notFoundFor(to.path);
   }
-  if (meta.requiresRole && auth.role !== meta.requiresRole) return accessDeniedFor(to);
+  const requiredRoles = Array.isArray(meta.requiresRole)
+    ? meta.requiresRole
+    : meta.requiresRole
+    ? [meta.requiresRole]
+    : [];
+  if (requiredRoles.length && (!auth.role || !requiredRoles.includes(auth.role))) return accessDeniedFor(to);
   if (
-    (meta.requiresRole === "workspace_admin" || meta.requiresRole === "individual_account") &&
+    (auth.role === "workspace_admin" || auth.role === "individual_account") &&
+    requiredRoles.includes(auth.role) &&
     !hasFreshAdminVerification(auth.adminVerifiedAt)
   ) {
     return { name: "public-login" };

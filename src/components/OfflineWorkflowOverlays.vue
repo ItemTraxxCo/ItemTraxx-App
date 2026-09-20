@@ -268,7 +268,7 @@ const discardLegacy = async (item: OfflineQueueReviewItem, startNewTransaction: 
         auth.role === "workspace_admin"
           ? "/admin/return"
           : auth.role === "individual_account"
-          ? "/personal/return"
+          ? "/account/return"
           : "/checkout",
       );
     }

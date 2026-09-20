@@ -31,14 +31,17 @@ test.describe("Protected route smoke tests", () => {
     await expect(page.getByRole("heading", { name: "Item Status Tracking" })).toBeVisible();
   });
 
-  test("Individual account reaches its private manager and cannot open workspace administration", async ({ page }) => {
+  test("Individual account lands on checkout and opens its private manager from My Account", async ({ page }) => {
     await page.goto("/");
     await setIndividualAccountSession(page);
 
-    await navigateApp(page, "/personal");
-    await expect(page).toHaveURL(/\/personal$/);
+    await navigateApp(page, "/checkout");
+    await expect(page).toHaveURL(/\/checkout$/);
+    await page.getByRole("button", { name: "Open menu" }).click();
+    await page.getByRole("menuitem", { name: "My Account" }).click();
+    await expect(page).toHaveURL(/\/account$/);
     await expect(page.getByRole("heading", { name: "My Inventory", exact: true })).toBeVisible();
-    await expect(page.getByRole("link", { name: /Item Management/ })).toHaveAttribute("href", "/personal/items");
+    await expect(page.getByRole("link", { name: /Item Management/ })).toHaveAttribute("href", "/account/items");
     await expect(page.getByRole("link", { name: /Tenant Accounts/ })).toHaveCount(0);
     await expect(page.getByRole("link", { name: "Admin Access" })).toHaveCount(0);
 

@@ -301,7 +301,7 @@ const getDefaultDestination = (role: "workspace_admin" | "individual_account" | 
   role === "workspace_admin"
     ? { path: "/admin", loginContext: "admin_login" as const }
     : role === "individual_account"
-    ? { path: "/personal", loginContext: "admin_login" as const }
+    ? { path: "/checkout", loginContext: "admin_login" as const }
     : { path: "/checkout", loginContext: "regular_login" as const };
 
 const completePasswordLoginNavigation = async (session: {

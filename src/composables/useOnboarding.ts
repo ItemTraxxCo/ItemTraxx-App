@@ -26,7 +26,7 @@ export const useOnboarding = (auth: OnboardingAuthState, route: RouteLocationNor
   const isOnWorkspaceRoute = computed(() =>
     ["/checkout", "/items", "/borrowers", "/settings"].includes(route.path) ||
     route.path === "/admin" || route.path.startsWith("/admin/") ||
-    route.path === "/personal" || route.path.startsWith("/personal/")
+    (auth.role === "individual_account" && (route.path === "/account" || route.path.startsWith("/account/")))
   );
   const canReplay = computed(() => !!currentRole.value && isOnWorkspaceRoute.value);
 

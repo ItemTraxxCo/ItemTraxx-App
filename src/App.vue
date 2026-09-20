@@ -201,20 +201,20 @@ const showLogoutUserAction = computed(() => auth.isAuthenticated && !Boolean(rou
 const isWorkspaceScopedRoute = computed(() =>
   auth.isAuthenticated &&
   !!auth.workspaceContextId &&
-  ["/checkout", "/items", "/borrowers", "/settings", "/admin", "/personal"].some(
+  ["/checkout", "/items", "/borrowers", "/settings", "/account", "/admin"].some(
     (prefix) => route.path === prefix || route.path.startsWith(`${prefix}/`),
   ),
 );
 const showOfflineQueueToast = computed(() =>
-  isWorkspaceScopedRoute.value && !["/checkout", "/admin/return", "/personal/checkout", "/personal/return"].includes(route.path),
+  isWorkspaceScopedRoute.value && !["/checkout", "/admin/return", "/account/return"].includes(route.path),
 );
 const isWorkspaceAdminArea = computed(() =>
-  route.path.startsWith("/admin") || route.path.startsWith("/personal"),
+  route.path.startsWith("/admin") || (auth.role === "individual_account" && route.path.startsWith("/account")),
 );
 const shouldTrackAccountSession = computed(() => {
   if (!auth.isAuthenticated) return false;
   if (auth.role === "workspace_admin") return isWorkspaceAdminArea.value;
-  if (auth.role === "individual_account") return route.path.startsWith("/personal");
+  if (auth.role === "individual_account") return route.path === "/checkout" || route.path.startsWith("/account");
   if (auth.role === "tenant_account") return isWorkspaceScopedRoute.value;
   return false;
 });
@@ -275,7 +275,7 @@ const applyTheme = (next: "light" | "dark") => {
 const toggleTheme = () => { applyTheme(theme.value === "dark" ? "light" : "dark"); menuOpen.value = false; };
 const toggleMenu = () => { menuOpen.value = !menuOpen.value; };
 const reloadApp = () => window.location.assign(`${window.location.origin}/`);
-const showAccountPanel = computed(() => auth.role === "tenant_account");
+const showAccountPanel = computed(() => auth.role === "tenant_account" || auth.role === "individual_account");
 const { logout } = useLogout();
 const logoutTenant = async () => {
   if (await logout()) menuOpen.value = false;
@@ -331,7 +331,7 @@ const maybeRedirectAuthenticatedPublicHome = async () => {
   let targetPath: string | null = null;
   if (auth.role === "super_admin") targetPath = auth.hasSecondaryAuth && hasFreshVerification(auth.superVerifiedAt) ? "/super-admin" : "/super-auth";
   else if (auth.role === "workspace_admin") targetPath = hasFreshVerification(auth.adminVerifiedAt) ? "/admin" : "/login";
-  else if (auth.role === "individual_account") targetPath = hasFreshVerification(auth.adminVerifiedAt) ? "/personal" : "/login";
+  else if (auth.role === "individual_account") targetPath = hasFreshVerification(auth.adminVerifiedAt) ? "/checkout" : "/login";
   else if (auth.role === "tenant_account" && auth.workspaceContextId) targetPath = "/checkout";
   if (!targetPath) return;
   publicHomeRedirectInFlight = true;

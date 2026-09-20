@@ -510,20 +510,24 @@ const toOfflineQueueReviewItem = (item: BufferedCheckoutItem): OfflineQueueRevie
 
 export const getOfflineQueueSummary = async (): Promise<OfflineQueueSummary> =>
   withOfflineQueueLock(async () => {
+    const scope = getOfflineQueueScope();
+    if (!scope) return { totalCount: 0, pendingCount: 0, reviewCount: 0 };
     const queue = await readOfflineQueue();
-    const reviewCount = queue.filter((item) => item && typeof item === "object" && item.review_required === true).length;
+    const scopedQueue = queue.filter((item) => isOfflineQueueItemScopedTo(item, scope));
+    const reviewCount = scopedQueue.filter((item) => item.review_required === true).length;
     return {
-      totalCount: queue.length,
-      pendingCount: queue.length - reviewCount,
+      totalCount: scopedQueue.length,
+      pendingCount: scopedQueue.length - reviewCount,
       reviewCount,
     };
   });
 
 export const listOfflineQueueReviewItems = async () =>
   withOfflineQueueLock(async () => {
-    if (!getOfflineQueueScope()) return [];
+    const scope = getOfflineQueueScope();
+    if (!scope) return [];
     return (await readOfflineQueue())
-      .filter((item) => item && typeof item === "object" && item.review_required === true && typeof item.id === "string" && item.id.trim())
+      .filter((item) => isOfflineQueueItemScopedTo(item, scope) && item.review_required === true && typeof item.id === "string" && item.id.trim())
       .map(toOfflineQueueReviewItem);
   });
 
@@ -531,11 +535,11 @@ export const discardOfflineQueueReviewItem = async (itemId: string) => {
   const normalizedId = typeof itemId === "string" ? itemId.trim() : "";
   if (!normalizedId) throw new Error("A legacy offline transaction id is required.");
   return withOfflineQueueLock(async () => {
-    if (!getOfflineQueueScope()) throw new Error("A workspace session is required to manage legacy offline transactions.");
+    const scope = getOfflineQueueScope();
+    if (!scope) throw new Error("A workspace session is required to manage legacy offline transactions.");
     const queue = await readOfflineQueue();
     const matchingIndex = queue.findIndex((item) =>
-      item &&
-      typeof item === "object" &&
+      isOfflineQueueItemScopedTo(item, scope) &&
       item.review_required === true &&
       typeof item.id === "string" &&
       item.id.trim() === normalizedId

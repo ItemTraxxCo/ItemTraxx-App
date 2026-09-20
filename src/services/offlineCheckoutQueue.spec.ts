@@ -209,6 +209,9 @@ describe("legacy queue identity quarantine", () => {
       attempts: 2,
       last_error: "PRIVATE ERROR DETAILS",
       review_required: true,
+      workspace_id: "workspace-1",
+      profile_id: "profile-1",
+      device_id: "device-1",
     };
     const malformedReview = {
       id: "legacy-invalid-date",
@@ -220,11 +223,10 @@ describe("legacy queue identity quarantine", () => {
     };
     await writeOfflineQueue([null, pending, review, malformedReview] as never);
 
-    await expect(getOfflineQueueSummary()).resolves.toEqual({ totalCount: 4, pendingCount: 2, reviewCount: 2 });
+    await expect(getOfflineQueueSummary()).resolves.toEqual({ totalCount: 1, pendingCount: 0, reviewCount: 1 });
     const reviewItems = await listOfflineQueueReviewItems();
     expect(reviewItems).toEqual([
       { id: "legacy-review", created_at: "2026-01-01T00:00:00Z", action_type: "checkout", item_count: 1 },
-      { id: "legacy-invalid-date", created_at: null, action_type: "legacy", item_count: 1 },
     ]);
     expect(JSON.stringify(reviewItems)).not.toContain("PRIVATE");
 
@@ -234,6 +236,7 @@ describe("legacy queue identity quarantine", () => {
       pending,
       malformedReview,
     ]);
+    await expect(discardOfflineQueueReviewItem("legacy-invalid-date")).rejects.toThrow(/no longer available/i);
     await expect(discardOfflineQueueReviewItem("pending")).rejects.toThrow(/no longer available/i);
 
     clearAuthState(true);

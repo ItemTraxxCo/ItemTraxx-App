@@ -51,6 +51,7 @@ jobs:
     needs:
       - require-trusted-ref
       - kill-switch-preflight
+    if: ${{ github.event_name != 'pull_request' }}
     uses: ./.github/workflows/slack-notify-status.yml
     with:
       mode: start
@@ -59,12 +60,11 @@ jobs:
       run_url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
       ref_name: ${{ github.ref_name }}
       sha: ${{ github.sha }}
+      incident_alerts_enabled: false
     secrets:
       SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
       SLACK_CHANNEL_ID: ${{ secrets.SLACK_CHANNEL_ID }}
       SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
-      INCIDENT_IO_WEBHOOK_URL: ${{ secrets.INCIDENT_IO_WEBHOOK_URL }}
-      INCIDENT_IO_WEBHOOK_TOKEN: ${{ secrets.INCIDENT_IO_WEBHOOK_TOKEN }}
 
   validate:
     needs:
@@ -281,7 +281,7 @@ jobs:
     # Always finish the single CI status message when the start message exists.
     # A kill-switch block is reported in that same message instead of creating
     # a second, normally skipped, notification check.
-    if: ${{ always() && needs.require-trusted-ref.result == 'success' && needs.slack-notify-start.result == 'success' }}
+    if: ${{ always() && github.event_name != 'pull_request' && needs.require-trusted-ref.result == 'success' && needs.slack-notify-start.result == 'success' }}
     uses: ./.github/workflows/slack-notify-status.yml
     with:
       mode: finish
@@ -294,9 +294,8 @@ jobs:
       status_message: ${{ needs.validate.result == 'skipped' && needs.kill-switch-preflight.outputs.active == 'true' && format('Intentionally skipped because the ItemTraxx kill switch is active. {0}', needs.kill-switch-preflight.outputs.message) || needs.validate.result == 'skipped' && format('Validation was blocked because kill-switch preflight returned {0}. {1}', needs.kill-switch-preflight.outputs.active, needs.kill-switch-preflight.outputs.message) || '' }}
       slack_channel_id: ${{ needs.slack-notify-start.outputs.slack_channel_id }}
       slack_message_ts: ${{ needs.slack-notify-start.outputs.slack_message_ts }}
+      incident_alerts_enabled: false
     secrets:
       SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
       SLACK_CHANNEL_ID: ${{ secrets.SLACK_CHANNEL_ID }}
       SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
-      INCIDENT_IO_WEBHOOK_URL: ${{ secrets.INCIDENT_IO_WEBHOOK_URL }}
-      INCIDENT_IO_WEBHOOK_TOKEN: ${{ secrets.INCIDENT_IO_WEBHOOK_TOKEN }}

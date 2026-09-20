@@ -15,6 +15,7 @@ import {
   parsePackVersion,
   parseResolvePayload,
   parseSyncOperations,
+  visibleCheckedOutBy,
 } from "./contracts.ts";
 
 const ACTIONS = new Set(["prepare_pack", "sync", "resolve"] as const);
@@ -263,6 +264,7 @@ serve(async (req) => {
       if (packError || !pack?.id) {
         throw new Error("Unable to register offline pack.");
       }
+      const visibleBorrowerIds = new Set(borrowers.map((borrower) => borrower.id));
 
       for (let offset = 0; offset < items.length; offset += PAGE_SIZE) {
         const snapshotRows = items.slice(offset, offset + PAGE_SIZE).map((
@@ -305,7 +307,7 @@ serve(async (req) => {
             name,
             barcode,
             status,
-            checked_out_by,
+            checked_out_by: visibleCheckedOutBy(checked_out_by, visibleBorrowerIds),
           })),
         },
       });

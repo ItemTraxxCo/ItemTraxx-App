@@ -11,7 +11,24 @@
  *   SLACK_WEBHOOK_URL  - Slack incoming webhook URL
  */
 
+import { pathToFileURL } from "node:url";
+
 const VERCEL_API_BASE = "https://api.vercel.com";
+const ANALYTICS_PERIODS = new Set(["7d", "14d", "30d"]);
+
+export const normalizeAnalyticsPeriod = (value) => {
+  const period = typeof value === "string" ? value.trim() : "";
+  if (!ANALYTICS_PERIODS.has(period)) {
+    throw new Error("ANALYTICS_PERIOD must be one of: 7d, 14d, 30d");
+  }
+  return period;
+};
+
+export const buildAnalyticsEndpoint = (path, projectId, period, limit) => {
+  const params = new URLSearchParams({ projectId, period });
+  if (limit !== undefined) params.set("limit", String(limit));
+  return `${path}?${params.toString()}`;
+};
 
 // Thresholds for Web Vitals (based on Google's Core Web Vitals)
 const WEB_VITALS_THRESHOLDS = {
@@ -46,33 +63,33 @@ async function vercelFetch(endpoint, token, teamId) {
 }
 
 async function fetchWebVitals(token, projectId, teamId, period = "7d") {
-  const endpoint = `/v1/web-analytics/vitals?projectId=${projectId}&period=${period}`;
+  const endpoint = buildAnalyticsEndpoint("/v1/web-analytics/vitals", projectId, period);
   return vercelFetch(endpoint, token, teamId);
 }
 
 async function fetchPageViews(token, projectId, teamId, period = "7d") {
-  const endpoint = `/v1/web-analytics/stats/path?projectId=${projectId}&period=${period}&limit=20`;
+  const endpoint = buildAnalyticsEndpoint("/v1/web-analytics/stats/path", projectId, period, 20);
   return vercelFetch(endpoint, token, teamId);
 }
 
 async function fetchTrafficOverview(token, projectId, teamId, period = "7d") {
-  const endpoint = `/v1/web-analytics/stats/overview?projectId=${projectId}&period=${period}`;
+  const endpoint = buildAnalyticsEndpoint("/v1/web-analytics/stats/overview", projectId, period);
   return vercelFetch(endpoint, token, teamId);
 }
 
 async function fetchGeoDistribution(token, projectId, teamId, period = "7d") {
-  const endpoint = `/v1/web-analytics/stats/country?projectId=${projectId}&period=${period}&limit=10`;
+  const endpoint = buildAnalyticsEndpoint("/v1/web-analytics/stats/country", projectId, period, 10);
   return vercelFetch(endpoint, token, teamId);
 }
 
 async function fetchDeviceBreakdown(token, projectId, teamId, period = "7d") {
-  const endpoint = `/v1/web-analytics/stats/device?projectId=${projectId}&period=${period}`;
+  const endpoint = buildAnalyticsEndpoint("/v1/web-analytics/stats/device", projectId, period);
   return vercelFetch(endpoint, token, teamId);
 }
 
 async function fetchPreviousPeriodVitals(token, projectId, teamId) {
   // Fetch previous 7 days for comparison (14d ago to 7d ago)
-  const endpoint = `/v1/web-analytics/vitals?projectId=${projectId}&period=14d`;
+  const endpoint = buildAnalyticsEndpoint("/v1/web-analytics/vitals", projectId, "14d");
   return vercelFetch(endpoint, token, teamId);
 }
 
@@ -435,7 +452,13 @@ async function main() {
   const projectId = process.env.VERCEL_PROJECT_ID;
   const teamId = process.env.VERCEL_TEAM_ID || null;
   const slackWebhookUrl = process.env.SLACK_WEBHOOK_URL;
-  const period = process.env.ANALYTICS_PERIOD || "7d";
+  let period;
+  try {
+    period = normalizeAnalyticsPeriod(process.env.ANALYTICS_PERIOD || "7d");
+  } catch (error) {
+    console.error(`[analytics-agent] ${error instanceof Error ? error.message : "Invalid analytics period"}`);
+    process.exit(1);
+  }
 
   if (!token) {
     console.error("Error: VERCEL_API_TOKEN is required");
@@ -534,4 +557,6 @@ async function main() {
   }
 }
 
-main();
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  main();
+}

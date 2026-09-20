@@ -7,6 +7,7 @@ import {
 } from "better-auth/plugins/admin/access";
 import {
   organizationStatements as itemTraxxOrganizationStatements,
+  individualAccountRoleStatements,
   regularUserRoleStatements,
   superAdminRoleStatements,
   tenantAccountRoleStatements,
@@ -19,6 +20,7 @@ export const organizationAccess = createAccessControl({
 } as const);
 
 export const tenantAccountRole = organizationAccess.newRole(tenantAccountRoleStatements);
+export const individualAccountRole = organizationAccess.newRole(individualAccountRoleStatements);
 export const workspaceAdminRole = organizationAccess.newRole(workspaceAdminRoleStatements);
 
 export const globalAccess = createAccessControl(adminStatements);
@@ -29,6 +31,7 @@ export const organizationRoles = {
   member: tenantAccountRole,
   admin: workspaceAdminRole,
   tenant_account: tenantAccountRole,
+  individual_account: individualAccountRole,
   workspace_admin: workspaceAdminRole,
 } as const;
 

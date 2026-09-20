@@ -2,8 +2,8 @@
   <div class="page admin-shell">
     <div class="admin-hero">
       <div class="page-nav-left">
-        <RouterLink class="button-link" to="/admin">Return to admin panel</RouterLink>
-        <RouterLink class="button-link" to="/admin/items">Return to items</RouterLink>
+        <RouterLink class="button-link" :to="managerRoot">Return to manager home</RouterLink>
+        <RouterLink class="button-link" :to="managerPath('/items')">Return to items</RouterLink>
       </div>
 
       <h1>Bulk Item Import Wizard</h1>
@@ -128,6 +128,9 @@ import { bulkImportItem, fetchWorkspaceSettings } from "../../../services/adminO
 import { logAdminAction } from "../../../services/auditLogService";
 import { toUserFacingErrorMessage } from "../../../services/appErrors";
 import { capturePostHogEvent } from "../../../services/posthogService";
+import { useManagerContext } from "../../../composables/useManagerContext";
+
+const { managerRoot, managerPath } = useManagerContext();
 
 type ImportRow = {
   name: string;

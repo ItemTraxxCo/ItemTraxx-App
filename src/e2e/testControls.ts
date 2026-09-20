@@ -22,6 +22,7 @@ declare global {
     __itemtraxxTest?: {
       setTenantAccountSession: (workspaceId?: string) => void;
       setWorkspaceAdminSession: (workspaceId?: string, options?: { verified?: boolean }) => void;
+      setIndividualAccountSession: (workspaceId?: string, options?: { verified?: boolean }) => void;
       setSuperAdminSession: (options?: { verified?: boolean }) => void;
       invokeAdminItemCreate: (payload: {
         workspace_id: string;
@@ -107,6 +108,26 @@ export const attachE2EControls = (router: Router): void => {
         email: "tenant.admin@example.com",
         signedInAt: new Date().toISOString(),
         role: "workspace_admin",
+        sessionWorkspaceId: workspaceId,
+        workspaceContextId: null,
+        hasSecondaryAuth: false,
+        superVerifiedAt: null,
+      });
+      setWorkspaceContext(workspaceId);
+      if (options.verified === false) {
+        clearAdminVerification();
+        return;
+      }
+      markAdminVerified();
+    },
+    setIndividualAccountSession(workspaceId = "individual-e2e", options = { verified: true }) {
+      setAuthStateFromBackend({
+        isInitialized: true,
+        isAuthenticated: true,
+        userId: "user-e2e-individual",
+        email: "individual@example.com",
+        signedInAt: new Date().toISOString(),
+        role: "individual_account",
         sessionWorkspaceId: workspaceId,
         workspaceContextId: null,
         hasSecondaryAuth: false,

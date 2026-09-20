@@ -33,7 +33,7 @@ export const workspaceLogin=async(email:string,password:string,turnstileToken?:s
   const summary=await fetchHttpSessionSummary();
   await applyHttpSessionSummary(summary); const current=getAuthState(); setWorkspaceContext(current.sessionWorkspaceId);
   if(current.sessionWorkspaceId) await authClient.organization.setActive({organizationId:current.sessionWorkspaceId});
-  if(current.role==="workspace_admin"){
+  if(current.role==="workspace_admin"||current.role==="individual_account"){
     await registerPrivilegedAdminStepUp();
     markAdminVerified();
     // Do not register an account_sessions row here: workspace_admin logins
@@ -47,6 +47,6 @@ export const workspaceLogin=async(email:string,password:string,turnstileToken?:s
       // Audit logging must not block a successful sign in.
     }
   }
-  sendLoginNotification(null,{loginLocation:current.role==="workspace_admin"?"workspace_admin_login":"account_login"});
+  sendLoginNotification(null,{loginLocation:current.role==="workspace_admin"?"workspace_admin_login":current.role==="individual_account"?"individual_login":"account_login"});
   return {workspaceId:current.workspaceContextId,workspaceSlug:await resolveWorkspaceSlug(current.workspaceContextId),role:current.role};
 };

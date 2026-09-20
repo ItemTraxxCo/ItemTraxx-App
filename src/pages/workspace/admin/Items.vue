@@ -2,8 +2,8 @@
   <div class="page admin-shell">
     <div class="admin-hero">
       <div class="page-nav-left">
-        <RouterLink class="button-link" to="/admin">Return to admin panel</RouterLink>
-        <RouterLink class="button-link" to="/admin/item-import">Bulk item import wizard</RouterLink>
+        <RouterLink class="button-link" :to="managerRoot">Return to manager home</RouterLink>
+        <RouterLink class="button-link" :to="managerPath('/item-import')">Bulk item import wizard</RouterLink>
       </div>
       <h1>Item Management</h1>
       <p class="admin-hero-copy">Add inventory, update item status, and review archived item without jumping between views.</p>
@@ -60,6 +60,7 @@
           </div>
         </label>
         <TenantAccessPicker
+          v-if="!isIndividualAccount"
           v-model:access-mode="accessMode"
           v-model:selected-ids="selectedProfileIds"
           :accounts="tenantAccounts"
@@ -96,7 +97,7 @@
 
       <div v-if="bulkMode && selectedItemIds.size > 0" class="bulk-action-bar">
         <span>{{ selectedItemIds.size }} selected</span>
-        <button type="button" @click="openBulkAccessModal">Change tenant account access</button>
+        <button v-if="!isIndividualAccount" type="button" @click="openBulkAccessModal">Change tenant account access</button>
         <select v-model="bulkStatusValue">
           <option value="">Change status…</option>
           <option v-for="option in editableStatusOptions" :key="option" :value="option">{{ option }}</option>
@@ -142,7 +143,7 @@
             <th>Serial</th>
             <th>Status</th>
             <th>Notes</th>
-            <th>Tenant Accounts</th>
+            <th v-if="!isIndividualAccount">Tenant Accounts</th>
             <th></th>
             <th></th>
           </tr>
@@ -159,7 +160,7 @@
             </td>
             <td>{{ item.name }}</td>
             <td>{{ item.barcode }}</td>
-            <td>
+            <td v-if="!isIndividualAccount">
               <span class="serial-number">
                 {{ item.serial_number || "-" }}
               </span>
@@ -262,7 +263,7 @@
           </div>
         </label>
 
-        <label v-if="!isModalEditing">
+        <label v-if="!isIndividualAccount && !isModalEditing">
           Tenant Accounts
           <input
             :value="scopedAccountsLabel(selectedItem)"
@@ -274,7 +275,7 @@
         </label>
 
         <TenantAccessPicker
-          v-if="isModalEditing"
+          v-if="!isIndividualAccount && isModalEditing"
           v-model:access-mode="editAccessMode"
           v-model:selected-ids="editSelectedProfileIds"
           :accounts="tenantAccounts"
@@ -305,7 +306,7 @@
       </div>
     </div>
 
-    <div v-if="showBulkAccessModal" class="modal-backdrop">
+    <div v-if="!isIndividualAccount && showBulkAccessModal" class="modal-backdrop">
       <div class="modal">
         <h2>Change tenant account access</h2>
         <p class="admin-section-copy">Applies to {{ selectedItemIds.size }} selected item(s).</p>
@@ -395,6 +396,9 @@ import { toUserFacingErrorMessage } from "../../../services/appErrors";
 import type { ScannerMode, ScannerScanEvent } from "../../../types/cameraScanner";
 import { capturePostHogEvent } from "../../../services/posthogService";
 import { listTenantAccounts } from "../../../services/workspaceAdminManageService";
+import { useManagerContext } from "../../../composables/useManagerContext";
+
+const { isIndividualAccount, managerRoot, managerPath } = useManagerContext();
 
 const items = ref<ItemRecord[]>([]);
 const archivedItem = ref<ItemRecord[]>([]);
@@ -415,7 +419,7 @@ const name = ref("");
 const barcode = ref("");
 const serialNumber = ref("");
 const notes = ref("");
-const accessMode = ref<"" | "all" | "restricted">("");
+const accessMode = ref<"" | "all" | "restricted">(isIndividualAccount.value ? "all" : "");
 const selectedProfileIds = ref<string[]>([]);
 const tenantAccounts = ref<Array<{id:string;auth_email:string}>>([]);
 const searchQuery = ref("");
@@ -811,8 +815,8 @@ const handleCreate = async () => {
       serial_number: serialNumber.value.trim(),
       status: "available",
       notes: notes.value.trim(),
-      access_mode: accessMode.value,
-      profile_ids: selectedProfileIds.value,
+      access_mode: isIndividualAccount.value ? "all" : accessMode.value,
+      profile_ids: isIndividualAccount.value ? [] : selectedProfileIds.value,
     });
     await logAdminAction({
       action_type: "item_create",
@@ -826,7 +830,7 @@ const handleCreate = async () => {
     barcode.value = "";
     serialNumber.value = "";
     notes.value = "";
-    accessMode.value = "";
+    accessMode.value = isIndividualAccount.value ? "all" : "";
     selectedProfileIds.value = [];
     success.value = "Item added.";
   } catch (err) {
@@ -848,7 +852,7 @@ const startEdit = async (item: ItemRecord) => {
   editBarcode.value = item.barcode;
   editStatus.value = item.status;
   editNotes.value = item.notes ?? "";
-  editAccessMode.value = item.access_mode ?? "all";
+  editAccessMode.value = isIndividualAccount.value ? "all" : item.access_mode ?? "all";
   editSelectedProfileIds.value = [];
   if (editAccessMode.value === "restricted") {
     const grants = await fetchItemAccessGrantProfiles(item.id);
@@ -887,7 +891,7 @@ const saveEdit = async (id: string) => {
     error.value = "Name and barcode fields cannot be blank.";
     return;
   }
-  const accessMode = editAccessMode.value;
+  const accessMode = isIndividualAccount.value ? "all" : editAccessMode.value;
   if (!accessMode || (accessMode === "restricted" && editSelectedProfileIds.value.length === 0)) {
     error.value = "Choose All Tenant Accounts or select at least one specific account.";
     return;
@@ -902,7 +906,7 @@ const saveEdit = async (id: string) => {
       status: editStatus.value,
       notes: editNotes.value.trim(),
       access_mode: accessMode,
-      profile_ids: editSelectedProfileIds.value,
+      profile_ids: isIndividualAccount.value ? [] : editSelectedProfileIds.value,
     });
     await logAdminAction({
       action_type: "item_update",
@@ -1017,6 +1021,7 @@ const handleScannerScan = (event: ScannerScanEvent) => {
 
 onMounted(() => {
   void loadItem();
+  if (isIndividualAccount.value) return;
   void listTenantAccounts().then((rows) => {
     tenantAccounts.value = rows
       .filter((account) => account.is_active)

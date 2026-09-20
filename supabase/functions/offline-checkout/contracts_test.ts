@@ -3,6 +3,7 @@ import {
   containsQuickReturn,
   intendedState,
   parseSyncOperations,
+  visibleCheckedOutBy,
 } from "./contracts.ts";
 
 const assertEquals = (actual: unknown, expected: unknown) => {
@@ -129,4 +130,14 @@ Deno.test("offline return rejects a snapshot without its original borrower", () 
     rejected = true;
   }
   assertEquals(rejected, true);
+});
+
+Deno.test("offline pack metadata hides borrowers outside the visible grant set", () => {
+  const visible = new Set([BORROWER_ID]);
+  assertEquals(visibleCheckedOutBy(BORROWER_ID, visible), BORROWER_ID);
+  assertEquals(
+    visibleCheckedOutBy("60000000-0000-4000-8000-000000000002", visible),
+    null,
+  );
+  assertEquals(visibleCheckedOutBy(null, visible), null);
 });

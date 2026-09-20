@@ -64,6 +64,7 @@ import { authenticatedSelect } from "./authenticatedDataClient";
 import { ensureAccountSessionReady } from "./accountSessionService";
 import {
   ensureCheckoutOperationId,
+  getBufferedCheckoutCount,
   isOfflineQueueItemScopedTo,
   readOfflineQueue,
   writeOfflineQueue,
@@ -97,6 +98,7 @@ const mockedInvoke = vi.mocked(invokeEdgeFunction);
 const mockedSelect = vi.mocked(authenticatedSelect);
 const mockedEnsureAccountSessionReady = vi.mocked(ensureAccountSessionReady);
 const mockedEnsureOpId = vi.mocked(ensureCheckoutOperationId);
+const mockedGetBufferedCheckoutCount = vi.mocked(getBufferedCheckoutCount);
 const mockedIsQueueItemScoped = vi.mocked(isOfflineQueueItemScopedTo);
 const mockedReadQueue = vi.mocked(readOfflineQueue);
 const mockedWriteQueue = vi.mocked(writeOfflineQueue);
@@ -137,6 +139,7 @@ beforeEach(() => {
   mockedSelect.mockReset();
   mockedEnsureAccountSessionReady.mockReset().mockResolvedValue({ ok: true });
   mockedEnsureOpId.mockImplementation((p) => ({ ...p, operation_id: p.operation_id ?? "op-mock" }));
+  mockedGetBufferedCheckoutCount.mockReset().mockResolvedValue(0);
   mockedIsQueueItemScoped.mockImplementation((item, scope) =>
     item?.workspace_id === scope.workspaceId &&
     item?.profile_id === scope.profileId &&
@@ -177,7 +180,7 @@ describe("submitCheckoutReturn", () => {
   it("submits successfully, applies the offline pack, and reports the buffered queue length", async () => {
     mockedInvoke.mockResolvedValue(okResponse({ success: true, processed: 1 }) as never);
     mockedApplyConfirmed.mockResolvedValue(true);
-    mockedReadQueue.mockResolvedValue([{ id: "q-1" } as never]);
+    mockedGetBufferedCheckoutCount.mockResolvedValue(1);
 
     const result = await submitCheckoutReturn(payload, { borrower: null, items: [] });
 

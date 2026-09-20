@@ -2,7 +2,7 @@
   <div class="page admin-shell">
     <div class="admin-hero">
       <div class="page-nav-left">
-        <RouterLink class="button-link" to="/admin">Return to Admin Panel</RouterLink>
+        <RouterLink class="button-link" :to="managerRoot">Return to manager home</RouterLink>
       </div>
 
       <h1>Bulk Barcode Generator</h1>
@@ -59,6 +59,9 @@ import { RouterLink } from "vue-router";
 import { downloadBarcodePdf } from "../../../services/barcodePdfService";
 import { fetchWorkspaceSettings } from "../../../services/adminOpsService";
 import { toUserFacingErrorMessage } from "../../../services/appErrors";
+import { useManagerContext } from "../../../composables/useManagerContext";
+
+const { managerRoot } = useManagerContext();
 
 const barcodeInput = ref("");
 const messageInput = ref("");

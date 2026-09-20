@@ -2,11 +2,11 @@
   <div class="page admin-shell">
     <div class="admin-hero">
       <div class="page-nav-left">
-        <RouterLink class="button-link" to="/admin">Return to admin panel</RouterLink>
+        <RouterLink class="button-link" :to="managerRoot">Return to manager home</RouterLink>
       </div>
       <h1>Settings</h1>
-      <p class="admin-hero-copy">Configure checkout defaults and manage active admin sessions from one place.</p>
-      <p><RouterLink class="button-link" to="/account/security">Account Security</RouterLink> · <RouterLink class="button-link" to="/admin/settings/sso">Enterprise SSO</RouterLink></p>
+      <p class="admin-hero-copy">Configure checkout defaults and manage active account sessions from one place.</p>
+      <p><RouterLink class="button-link" to="/account/security">Account Security</RouterLink><template v-if="!isIndividualAccount"> · <RouterLink class="button-link" to="/admin/settings/sso">Enterprise SSO</RouterLink></template></p>
       <div class="admin-summary-grid">
         <div class="admin-summary-card">
           <strong>{{ checkoutDueHours }}</strong>
@@ -25,7 +25,7 @@
           <h2>Account Overview</h2>
           <p class="admin-section-copy">Review how this workspace is classified for billing and support.</p>
         </div>
-        <RouterLink class="button-link" to="/admin/admins">Admin Access</RouterLink>
+        <RouterLink v-if="!isIndividualAccount" class="button-link" to="/admin/admins">Admin Access</RouterLink>
       </div>
       <div class="admin-summary-grid">
         <div class="admin-summary-card">
@@ -35,6 +35,14 @@
         <div class="admin-summary-card">
           <strong>{{ planLabel }}</strong>
           <span>Assigned plan</span>
+        </div>
+        <div v-if="isIndividualAccount" class="admin-summary-card">
+          <strong>{{ activeItems }} / {{ maxItems ?? "Unlimited" }}</strong>
+          <span>Active items</span>
+        </div>
+        <div v-if="isIndividualAccount" class="admin-summary-card">
+          <strong>{{ activeBorrowers }} / {{ maxBorrowers ?? "Unlimited" }}</strong>
+          <span>Active borrowers</span>
         </div>
       </div>
       <p class="muted account-overview-copy">
@@ -170,6 +178,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from "vue";
 import { RouterLink } from "vue-router";
+import { useManagerContext } from "../../../composables/useManagerContext";
 import { toUserFacingErrorMessage } from "../../../services/appErrors";
 import {
   fetchWorkspaceSettings,
@@ -181,10 +190,16 @@ import {
   type WorkspaceSettingsPayload,
 } from "../../../services/adminOpsService";
 
+const { isIndividualAccount, managerRoot } = useManagerContext();
+
 const isSaving = ref(false);
 const error = ref("");
 const success = ref("");
 const checkoutDueHours = ref(72);
+const maxItems = ref<number | null>(null);
+const maxBorrowers = ref<number | null>(null);
+const activeItems = ref(0);
+const activeBorrowers = ref(0);
 const accountCategory = ref<"workspace" | "education" | "custom" | "individual" | null>(null);
 const planCode = ref<
   | "workspace_core"
@@ -220,6 +235,10 @@ const showToast = (title: string, message: string) => {
 
 const applySettings = (settings: WorkspaceSettingsPayload) => {
   checkoutDueHours.value = settings.checkout_due_hours;
+  maxItems.value = settings.max_items;
+  maxBorrowers.value = settings.max_borrowers;
+  activeItems.value = settings.active_items;
+  activeBorrowers.value = settings.active_borrowers;
   accountCategory.value =
     settings.account_category === "individual"
       ? "individual"

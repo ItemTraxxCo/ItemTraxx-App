@@ -143,6 +143,11 @@ const coverageCases = [
       '<code v-for="code in backupCodes" :key="code" data-session-replay-mask>{{ code }}</code>',
     ],
   },
+  {
+    name: "enterprise SSO domain verification token",
+    path: "../pages/EnterpriseSsoSettings.vue",
+    snippets: ['<code data-session-replay-mask>{{ domainVerificationToken }}</code>'],
+  },
 ] as const;
 
 describe("session replay sensitive-text coverage", () => {

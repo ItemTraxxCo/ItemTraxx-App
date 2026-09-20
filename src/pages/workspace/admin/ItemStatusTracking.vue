@@ -2,7 +2,7 @@
   <div class="page admin-shell">
     <div class="admin-hero">
       <div class="page-nav-left">
-        <RouterLink class="button-link" to="/admin">Return to admin panel</RouterLink>
+        <RouterLink class="button-link" :to="managerRoot">Return to manager home</RouterLink>
       </div>
       <h1>Item Status Tracking</h1>
       <p v-if="!featureEnabled" class="error">Item status tracking is disabled.</p>
@@ -131,6 +131,9 @@ import {
 } from "../../../services/adminOpsService";
 import { exportRowsToCsv, exportRowsToPdf } from "../../../services/exportService";
 import { toUserFacingErrorMessage } from "../../../services/appErrors";
+import { useManagerContext } from "../../../composables/useManagerContext";
+
+const { managerRoot } = useManagerContext();
 
 const flaggedItems = ref<StatusTrackedItem[]>([]);
 const history = ref<StatusHistoryItem[]>([]);

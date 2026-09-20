@@ -16,16 +16,17 @@ type OnboardingAuthState = {
 export const useOnboarding = (auth: OnboardingAuthState, route: RouteLocationNormalizedLoaded) => {
   const visible = ref(false);
   const role = ref<WorkspaceOnboardingRole>("tenant_account");
-  const variant = ref<"tenant_checkout" | "workspace_admin">("tenant_checkout");
+  const variant = ref<"tenant_checkout" | "workspace_admin" | "individual_account">("tenant_checkout");
   const evaluationDone = ref(false);
 
   const currentRole = computed<WorkspaceOnboardingRole | null>(() => {
     if (!auth.isAuthenticated) return null;
-    return auth.role === "tenant_account" || auth.role === "workspace_admin" ? auth.role : null;
+    return auth.role === "tenant_account" || auth.role === "workspace_admin" || auth.role === "individual_account" ? auth.role : null;
   });
   const isOnWorkspaceRoute = computed(() =>
     ["/checkout", "/items", "/borrowers", "/settings"].includes(route.path) ||
-    route.path === "/admin" || route.path.startsWith("/admin/")
+    route.path === "/admin" || route.path.startsWith("/admin/") ||
+    (auth.role === "individual_account" && (route.path === "/account" || route.path.startsWith("/account/")))
   );
   const canReplay = computed(() => !!currentRole.value && isOnWorkspaceRoute.value);
 
@@ -41,7 +42,7 @@ export const useOnboarding = (auth: OnboardingAuthState, route: RouteLocationNor
       return;
     }
     role.value = nextRole;
-    variant.value = route.path.startsWith("/admin") ? "workspace_admin" : "tenant_checkout";
+    variant.value = nextRole === "individual_account" ? "individual_account" : route.path.startsWith("/admin") ? "workspace_admin" : "tenant_checkout";
     if (evaluationDone.value) return;
     if (!hasCompletedOnboarding(nextRole)) visible.value = true;
     evaluationDone.value = true;
@@ -51,7 +52,7 @@ export const useOnboarding = (auth: OnboardingAuthState, route: RouteLocationNor
     if (!currentRole.value) return;
     resetOnboarding(currentRole.value);
     role.value = currentRole.value;
-    variant.value = route.path.startsWith("/admin") ? "workspace_admin" : "tenant_checkout";
+    variant.value = currentRole.value === "individual_account" ? "individual_account" : route.path.startsWith("/admin") ? "workspace_admin" : "tenant_checkout";
     evaluationDone.value = true;
     visible.value = true;
   };

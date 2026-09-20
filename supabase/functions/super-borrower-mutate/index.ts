@@ -303,22 +303,22 @@ serve(async (req) => {
     );
 
     if (rateLimitError) {
-      console.warn("super-borrower-mutate rate limit unavailable", {
+      console.error("super-borrower-mutate rate limit unavailable", {
         message: rateLimitError.message,
         code: (rateLimitError as { code?: string }).code,
       });
-    } else {
-      const rateLimitResult = Array.isArray(rateLimit)
-        ? ((rateLimit[0] as RateLimitResult | undefined) ?? null)
-        : ((rateLimit as RateLimitResult | null) ?? null);
-      if (!rateLimitResult) {
-        return jsonResponse(500, { error: "Rate limit check failed" });
-      }
-      if (!rateLimitResult.allowed) {
-        return jsonResponse(429, {
-          error: "Rate limit exceeded, please try again in a minute.",
-        });
-      }
+      return jsonResponse(500, { error: "Rate limit check failed" });
+    }
+    const rateLimitResult = Array.isArray(rateLimit)
+      ? ((rateLimit[0] as RateLimitResult | undefined) ?? null)
+      : ((rateLimit as RateLimitResult | null) ?? null);
+    if (!rateLimitResult) {
+      return jsonResponse(500, { error: "Rate limit check failed" });
+    }
+    if (!rateLimitResult.allowed) {
+      return jsonResponse(429, {
+        error: "Rate limit exceeded, please try again in a minute.",
+      });
     }
 
     const { action, payload } = await readJsonBody(req);

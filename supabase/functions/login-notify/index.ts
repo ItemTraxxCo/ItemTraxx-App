@@ -67,6 +67,7 @@ const escapeHtml = (value: string) =>
 
 type LoginLocation =
   | "account_login"
+  | "individual_login"
   | "workspace_admin_login"
   | "super_admin_login"
   | "regular_login"
@@ -77,6 +78,7 @@ const LOGIN_CONTEXTS: Record<
   { label: string; subjectLabel: string }
 > = {
   account_login: { label: "Tenant Account sign in", subjectLabel: "Tenant Account Sign In" },
+  individual_login: { label: "Individual Account sign in", subjectLabel: "Individual Account Sign In" },
   workspace_admin_login: { label: "Workspace Admin sign in", subjectLabel: "Workspace Admin Sign In" },
   super_admin_login: { label: "Super admin sign in", subjectLabel: "Super Admin Sign In" },
   regular_login: { label: "Tenant Account sign in", subjectLabel: "Tenant Account Sign In" },
@@ -302,6 +304,7 @@ serve(async (req) => {
     if (
       profile.role !== "tenant_account" &&
       profile.role !== "workspace_admin" &&
+      profile.role !== "individual_account" &&
       profile.role !== "super_admin"
     ) {
       return jsonResponse(403, { error: "Access denied" });
@@ -311,7 +314,7 @@ serve(async (req) => {
     let accountLabel: string;
     let accountId: string;
 
-    if ((profile.role === "tenant_account" || profile.role === "workspace_admin") && profile.workspace_id) {
+    if ((profile.role === "tenant_account" || profile.role === "workspace_admin" || profile.role === "individual_account") && profile.workspace_id) {
       const { data: tenant, error: tenantError } = await adminClient
         .from("workspaces")
         .select("id, name")

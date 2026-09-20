@@ -8,7 +8,8 @@ import { verifyExternalAuthClaims } from "./externalAuth.ts";
 
 export type PrivilegedRoleScope =
   | "super_admin"
-  | "workspace_admin";
+  | "workspace_admin"
+  | "individual_account";
 
 const DEFAULT_STEP_UP_TTL_MS = 15 * 60 * 1000;
 const ADMIN_STEP_UP_REGISTRATION_WINDOW_MS = 5 * 60 * 1000;
@@ -41,11 +42,15 @@ export type PrivilegedProfileLike = {
 export const isEligiblePrivilegedProfile = (
   profile: PrivilegedProfileLike,
 ) => {
-  if (profile.role !== "workspace_admin" && profile.role !== "super_admin") {
+  if (
+    profile.role !== "workspace_admin" &&
+    profile.role !== "individual_account" &&
+    profile.role !== "super_admin"
+  ) {
     return false;
   }
   if (profile.is_active === false || profile.deleted_at) return false;
-  if (profile.role === "workspace_admin") {
+  if (profile.role === "workspace_admin" || profile.role === "individual_account") {
     return typeof profile.workspace_id === "string" &&
       profile.workspace_id.trim().length > 0;
   }

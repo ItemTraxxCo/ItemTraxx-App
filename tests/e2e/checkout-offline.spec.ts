@@ -426,6 +426,8 @@ test.describe("encrypted checkout offline queue contract", () => {
   });
 
   test("queues payloads, counts them, and preserves an existing operation ID", async ({ page }) => {
+    await page.evaluate(() => window.localStorage.setItem("itemtraxx-device-id", "device-e2e"));
+    await setTenantAccountSession(page, "workspace-e2e");
     const result = await page.evaluate(async (existingPayload) => {
       const control = (
         window.__itemtraxxTest as typeof window.__itemtraxxTest & {
@@ -949,6 +951,9 @@ test.describe("prepared offline checkout workflow contract", () => {
 
     const legacyItem: BufferedCheckoutItem = {
       ...bufferedItem("op-legacy-review-e2e"),
+      workspace_id: "workspace-e2e",
+      profile_id: "user-e2e-tenant",
+      device_id: "device-e2e",
       id: "legacy-review-e2e",
       payload: {
         ...payload("op-legacy-review-e2e"),

@@ -29,7 +29,9 @@ export const signOut = async ({ bestEffort = false }: SignOutOptions = {}): Prom
   shutdownIntercom();
   clearReplaySessionHandoff();
   const current = getAuthState();
-  const shouldRevokeAccountSession = current.role === "workspace_admin" && !!current.adminVerifiedAt;
+  const shouldRevokeAccountSession =
+    (current.role === "workspace_admin" || current.role === "individual_account") &&
+    !!current.adminVerifiedAt;
   let accountSessionRevoked = !shouldRevokeAccountSession;
 
   if (shouldRevokeAccountSession) {

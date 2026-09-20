@@ -1,6 +1,6 @@
 import { reactive } from "vue";
 
-type UserRole = "tenant_account" | "workspace_admin" | "super_admin";
+type UserRole = "tenant_account" | "individual_account" | "workspace_admin" | "super_admin";
 
 export type AuthState = {
   isInitialized: boolean;
@@ -92,7 +92,7 @@ export const setAuthStateFromBackend = (next: AuthStateBackendPatch) => {
   // a role. Partial updates (for example, refreshing a session timestamp) must
   // not infer a missing role as "no role" and silently clear existing access.
   if (Object.prototype.hasOwnProperty.call(next, "role") && next.role !== undefined) {
-    authState.isAdmin = next.role === "workspace_admin";
+    authState.isAdmin = next.role === "workspace_admin" || next.role === "individual_account";
     authState.isWorkspaceAdmin = next.role === "workspace_admin";
     authState.isSuperAdmin = next.role === "super_admin";
   }

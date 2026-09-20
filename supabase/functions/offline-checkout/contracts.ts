@@ -138,6 +138,11 @@ export const intendedState = (item: OfflineSyncItem): OfflineItemState =>
     ? { status: "checked_out", checked_out_by: item.borrower_id }
     : { status: "available", checked_out_by: null };
 
+export const visibleCheckedOutBy = (
+  checkedOutBy: string | null,
+  visibleBorrowerIds: ReadonlySet<string>,
+) => checkedOutBy && visibleBorrowerIds.has(checkedOutBy) ? checkedOutBy : null;
+
 const statesEqual = (left: OfflineItemState, right: OfflineItemState) =>
   left.status.toLowerCase() === right.status.toLowerCase() &&
   left.checked_out_by === right.checked_out_by;

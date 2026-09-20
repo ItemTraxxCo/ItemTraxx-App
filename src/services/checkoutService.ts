@@ -6,6 +6,7 @@ import { AppError, edgeFunctionError, notFoundError } from "./appErrors";
 import { getOrCreateDeviceSession } from "../utils/deviceSession";
 import {
   ensureCheckoutOperationId,
+  getBufferedCheckoutCount,
   isOfflineQueueItemScopedTo,
   readOfflineQueue,
   withOfflineQueueLock,
@@ -203,7 +204,7 @@ export const submitCheckoutReturn = async (
     void refreshOfflineCheckoutPackIfNeeded({ force: true }).catch(() => undefined);
     return {
       buffered: false,
-      queuedCount: await withOfflineQueueLock(async () => (await readOfflineQueue()).length),
+      queuedCount: await getBufferedCheckoutCount(),
     };
   } catch (error) {
     if (isQueueableFailure(error)) {
@@ -214,7 +215,7 @@ export const submitCheckoutReturn = async (
           void refreshOfflineCheckoutPackIfNeeded({ force: true }).catch(() => undefined);
           return {
             buffered: false,
-            queuedCount: await withOfflineQueueLock(async () => (await readOfflineQueue()).length),
+            queuedCount: await getBufferedCheckoutCount(),
           };
         } catch (retryError) {
           if (!isQueueableFailure(retryError)) throw retryError;

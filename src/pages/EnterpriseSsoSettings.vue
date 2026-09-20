@@ -35,7 +35,7 @@
     <section v-if="domainVerificationToken" class="card">
       <h2>Verify the domain</h2>
       <p>Add a DNS TXT record named <code>_better-auth-token-{{ providerId }}.{{ domain }}</code> with this value:</p>
-      <code>{{ domainVerificationToken }}</code>
+      <code data-session-replay-mask>{{ domainVerificationToken }}</code>
       <button :disabled="saving" @click="verifyDomain(providerId)">Verify DNS record</button>
     </section>
 

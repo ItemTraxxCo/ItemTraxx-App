@@ -360,6 +360,26 @@ const parseStoredJson = (value: string | null) => {
   try { return JSON.parse(value) as Record<string, unknown>; } catch { return null; }
 };
 
+export const sanitizeSsoProvider = (row: {
+  providerId: string;
+  issuer: string;
+  domain: string;
+  domainVerified: boolean;
+  organizationId: string | null;
+  oidcConfig: string | null;
+  samlConfig: string | null;
+}) => ({
+  providerId: row.providerId,
+  issuer: row.issuer,
+  domain: row.domain,
+  domainVerified: row.domainVerified,
+  organizationId: row.organizationId,
+  // The UI only needs protocol presence. Never send client secrets, signing
+  // keys, certificates, or other provider configuration to the browser.
+  oidcConfig: parseStoredJson(row.oidcConfig) ? {} : null,
+  samlConfig: parseStoredJson(row.samlConfig) ? {} : null,
+});
+
 export const handleSsoManagementRequest = async (request: Request, rawEnv: Env) => {
   const auth = getBetterAuth(rawEnv);
   const session = await auth.api.getSession({ headers: request.headers });
@@ -388,11 +408,7 @@ export const handleSsoManagementRequest = async (request: Request, rawEnv: Env) 
       if (error) throw error;
       workspaces = (data ?? []).map((row) => ({ id: row.id, name: row.name, organizationId: row.better_auth_organization_id }));
     }
-    return Response.json({ organizationId: actor.organizationId, workspaces, providers: (providers ?? []).map((row) => {
-      const oidc = parseStoredJson(row.oidcConfig);
-      if (oidc) delete oidc.clientSecret;
-      return { ...row, oidcConfig: oidc, samlConfig: parseStoredJson(row.samlConfig) };
-    }) });
+    return Response.json({ organizationId: actor.organizationId, workspaces, providers: (providers ?? []).map(sanitizeSsoProvider) });
   }
   if (request.method === "DELETE") {
     const providerId = url.searchParams.get("providerId");

@@ -156,6 +156,7 @@ const sanitizeExceptionFrame = (frame: unknown) => {
 const sanitizeExceptionList = (
   value: unknown,
   errorCode?: PostHogErrorCode,
+  requestOperation?: string,
 ) => {
   if (!Array.isArray(value)) return [];
   const entries = value.flatMap((entry) => {
@@ -191,9 +192,16 @@ const sanitizeExceptionList = (
 
   if (!errorCode) return entries;
   const first = entries[0] as Record<string, unknown> | undefined;
+  const safeOperation = requestOperation
+    ? safeExceptionString(requestOperation, 160)
+    : undefined;
   return [{
-    type: "ItemTraxxClientError",
-    value: errorCode,
+    // Handled request failures should remain grouped by their safe endpoint
+    // context. The old fixed type/value made every transport failure look like
+    // an artificial JavaScript exception even though the event had useful
+    // request properties attached.
+    type: safeOperation ? "ItemTraxxHandledRequestFailure" : "ItemTraxxClientError",
+    value: safeOperation ? `${safeOperation}:${errorCode}` : errorCode,
     ...(first?.stacktrace ? { stacktrace: first.stacktrace } : {}),
     mechanism: { type: "generic", handled: true, synthetic: false },
   }];
@@ -237,6 +245,7 @@ const sanitizeExceptionEvent = (event: CaptureResult): CaptureResult => {
   safeProperties.$exception_list = sanitizeExceptionList(
     properties?.$exception_list,
     errorCode,
+    typeof properties?.request_operation === "string" ? properties.request_operation : undefined,
   );
   safeProperties.$exception_level = properties?.$exception_level === "warning"
     ? "warning"

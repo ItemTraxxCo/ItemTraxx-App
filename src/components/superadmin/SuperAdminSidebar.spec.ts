@@ -6,6 +6,7 @@ import SuperAdminSidebar from "./SuperAdminSidebar.vue";
 const routes = [
   { path: "/super-admin", name: "super-admin-home", component: { template: "<div />" } },
   { path: "/super-admin/workspaces", name: "super-admin-workspaces", component: { template: "<div />" } },
+  { path: "/super-admin/individual-accounts", name: "super-admin-individual-accounts", component: { template: "<div />" } },
   { path: "/super-admin/admins", name: "super-admin-admins", component: { template: "<div />" } },
   { path: "/super-admin/tenant-accounts", name: "super-admin-tenant-accounts", component: { template: "<div />" } },
   { path: "/super-admin/super-admins", name: "super-admin-super-admins", component: { template: "<div />" } },

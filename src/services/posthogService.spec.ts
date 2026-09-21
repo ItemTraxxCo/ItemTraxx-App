@@ -706,6 +706,42 @@ describe("PostHog exception before_send", () => {
     });
   });
 
+  it("keeps handled request failures grouped by safe operation context", async () => {
+    const mod = await initializedModule();
+    void mod;
+    const options = posthogMock.init.mock.calls[0]?.[1] as {
+      before_send?: (event: unknown) => unknown;
+    } | undefined;
+
+    const result = options?.before_send?.({
+      event: "$exception",
+      properties: {
+        $exception_list: [{
+          type: "ItemTraxxHandledRequestFailure",
+          value: "Handled request failure: network",
+          stacktrace: {
+            type: "raw",
+            frames: [{ platform: "web:javascript", filename: "/assets/app.js" }],
+          },
+        }],
+        error_code: "network",
+        request_area: "edge_function",
+        request_operation: "admin-ops",
+        request_status: 0,
+      },
+    }) as { event: string; properties: Record<string, unknown> } | null;
+
+    expect(result?.properties.$exception_list).toEqual([{
+      type: "ItemTraxxHandledRequestFailure",
+      value: "admin-ops:network",
+      stacktrace: {
+        type: "raw",
+        frames: [{ platform: "web:javascript", filename: "/assets/app.js" }],
+      },
+      mechanism: { type: "generic", handled: true, synthetic: false },
+    }]);
+  });
+
   it("carries the SDK-managed distinct id and library keys through the rebuild", async () => {
     const mod = await initializedModule();
     void mod;

@@ -702,6 +702,34 @@ describe("PostHog exception before_send", () => {
     });
   });
 
+  it("carries the SDK-managed distinct id and library keys through the rebuild", async () => {
+    const mod = await initializedModule();
+    void mod;
+    const options = posthogMock.init.mock.calls[0]?.[1] as {
+      before_send?: (event: unknown) => unknown;
+    } | undefined;
+
+    const result = options?.before_send?.({
+      event: "$exception",
+      properties: {
+        distinct_id: "user-1",
+        $lib: "web",
+        $lib_version: "1.2.3",
+        $session_id: "session-1",
+        $device_id: "device-1",
+        $exception_list: [{ type: "Error", value: "boom" }],
+      },
+    }) as { properties: Record<string, unknown> } | null;
+
+    expect(result?.properties).toMatchObject({
+      distinct_id: "user-1",
+      $lib: "web",
+      $lib_version: "1.2.3",
+      $session_id: "session-1",
+      $device_id: "device-1",
+    });
+  });
+
   it("scrubs recovery query and hash material from URL properties", async () => {
     const mod = await initializedModule();
     void mod;

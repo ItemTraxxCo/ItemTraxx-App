@@ -74,6 +74,12 @@ test.describe("Super admin flows and export actions", () => {
     await expect(page.getByLabel("Billing status").first()).toBeVisible();
     await expect(page.getByRole("group", { name: "Feature flags" }).first()).toBeVisible();
 
+    await navigateApp(page, "/super-admin/individual-accounts");
+    await expect(page.getByRole("heading", { name: "Individual Accounts", exact: true })).toBeVisible();
+    await expect(page.getByLabel("Account name").first()).toBeVisible();
+    await expect(page.getByLabel("Sign-in email").first()).toBeVisible();
+    await expect(page.getByText("Workspace slug", { exact: true })).toHaveCount(0);
+
     await navigateApp(page, "/super-admin/admins");
     await expect(page.getByRole("heading", { name: "Workspace Admins" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Create Workspace Admin" })).toBeVisible();

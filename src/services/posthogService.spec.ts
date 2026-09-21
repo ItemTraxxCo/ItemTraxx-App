@@ -472,6 +472,36 @@ describe("capturePostHogException", () => {
 });
 
 describe("captureHandledRequestFailure", () => {
+  it("waits for the SDK loaded callback before capturing a handled 5xx", async () => {
+    vi.stubEnv("VITE_POSTHOG_PROJECT_TOKEN", "tok_123");
+    mockedAllows.mockReturnValue(true);
+    mockedDiagnostics.mockReturnValue(true);
+    mockedSessionReplay.mockReturnValue(true);
+    let loaded: (() => void) | undefined;
+    posthogMock.init.mockImplementationOnce((_token, options) => {
+      loaded = options.loaded;
+    });
+    const mod = await loadFreshModule();
+    await mod.initPostHog();
+
+    const capturePromise = mod.captureHandledRequestFailure({
+      area: "edge_function",
+      name: "checkoutReturn",
+      path: "/functions/checkoutReturn",
+      method: "POST",
+      status: 500,
+      message: "Request failed.",
+      requestId: "request-5xx",
+    });
+    await Promise.resolve();
+
+    expect(posthogMock.captureException).not.toHaveBeenCalled();
+    loaded?.();
+    await capturePromise;
+
+    expect(posthogMock.captureException).toHaveBeenCalledOnce();
+  });
+
   it("captures a critical transport failure with its endpoint context and deduplicates retries", async () => {
     const mod = await initializedModule();
     const failure = {

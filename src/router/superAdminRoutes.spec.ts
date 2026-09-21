@@ -6,6 +6,7 @@ const EXPECTED = [
   ["/super-admin/settings", "super-admin-settings"],
   ["/super-admin/settings/sso", "super-admin-sso"],
   ["/super-admin/workspaces", "super-admin-workspaces"],
+  ["/super-admin/individual-accounts", "super-admin-individual-accounts"],
   ["/super-admin/admins", "super-admin-admins"],
   ["/super-admin/tenant-accounts", "super-admin-tenant-accounts"],
   ["/super-admin/super-admins", "super-admin-super-admins"],

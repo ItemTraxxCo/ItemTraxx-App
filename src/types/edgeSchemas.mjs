@@ -24,6 +24,7 @@ const superOpsDirectResponseSchema = (responseSchema) =>
 
 const tenantStatusSchema = z.enum(["active", "suspended", "archived"]);
 const accountCategorySchema = z.enum(["workspace", "education", "custom", "individual"]);
+const workspaceAccountCategorySchema = z.enum(["workspace", "education", "custom"]);
 const tenantPlanCodeSchema = z.enum([
   "workspace_core",
   "workspace_growth",
@@ -229,6 +230,20 @@ const superWorkspaceSchema = z.object({
   feature_flags: tenantFeatureFlagsSchema.partial().optional(),
 });
 
+// Individual accounts use the same private workspace boundary internally,
+// but never expose the implementation slug to an admin or customer.
+const superIndividualAccountSchema = superWorkspaceSchema.omit({ slug: true }).extend({
+  account_category: z.literal("individual"),
+  max_items: z.number().int().nonnegative().nullable().optional(),
+  max_borrowers: z.number().int().nonnegative().nullable().optional(),
+  contact_name: z.string().nullable().optional(),
+  support_email: z.string().nullable().optional(),
+  billing_email: z.string().nullable().optional(),
+  billing_status: districtBillingStatusSchema.nullable().optional(),
+  renewal_date: z.string().nullable().optional(),
+  invoice_reference: z.string().nullable().optional(),
+});
+
 const superDistrictSchema = z.object({
   id: z.string(),
   name: z.string(),
@@ -311,6 +326,47 @@ const superDistrictDetailSchema = z.object({
 
 const superWorkspaceRequestSchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("list_workspaces"), payload: z.object({ search: z.string(), status: z.string() }) }),
+  z.object({ action: z.literal("list_individual_accounts"), payload: z.object({ search: z.string(), status: z.string() }) }),
+  z.object({
+    action: z.literal("create_individual_account"),
+    payload: z.object({
+      name: z.string().min(1),
+      auth_email: z.string().email(),
+      password: z.string().min(8).optional(),
+      plan_code: z.enum(["individual_yearly", "individual_monthly"]).optional(),
+      max_items: z.number().int().positive().nullable().optional(),
+      max_borrowers: z.number().int().positive().nullable().optional(),
+      checkout_due_hours: z.number().int().positive().optional(),
+      feature_flags: tenantFeatureFlagsSchema.partial().optional(),
+      contact_name: z.string().nullable().optional(),
+      support_email: z.string().email().nullable().optional(),
+      billing_email: z.string().email().nullable().optional(),
+      billing_status: districtBillingStatusSchema.nullable().optional(),
+      renewal_date: z.string().nullable().optional(),
+      invoice_reference: z.string().nullable().optional(),
+    }),
+  }),
+  z.object({
+    action: z.literal("update_individual_account"),
+    payload: z.object({
+      id: z.string().uuid(),
+      name: z.string().min(1),
+      auth_email: z.string().email(),
+      plan_code: z.enum(["individual_yearly", "individual_monthly"]).optional(),
+      max_items: z.number().int().positive().nullable().optional(),
+      max_borrowers: z.number().int().positive().nullable().optional(),
+      checkout_due_hours: z.number().int().positive().optional(),
+      feature_flags: tenantFeatureFlagsSchema.partial().optional(),
+      contact_name: z.string().nullable().optional(),
+      support_email: z.string().email().nullable().optional(),
+      billing_email: z.string().email().nullable().optional(),
+      billing_status: districtBillingStatusSchema.nullable().optional(),
+      renewal_date: z.string().nullable().optional(),
+      invoice_reference: z.string().nullable().optional(),
+    }),
+  }),
+  z.object({ action: z.literal("set_individual_account_status"), payload: z.object({ id: z.string().uuid(), status: z.enum(["active", "suspended", "archived"]) }) }),
+  z.object({ action: z.literal("send_individual_account_reset"), payload: z.object({ id: z.string().uuid() }) }),
   z.object({
     action: z.literal("create_workspace"),
     payload: z.object({
@@ -318,7 +374,7 @@ const superWorkspaceRequestSchema = z.discriminatedUnion("action", [
       slug: z.string().min(1),
       auth_email: z.string().email(),
       password: z.string().min(8).optional(),
-      account_category: accountCategorySchema.optional(),
+      account_category: workspaceAccountCategorySchema.optional(),
       plan_code: tenantPlanCodeSchema.optional(),
     }),
   }),
@@ -328,7 +384,7 @@ const superWorkspaceRequestSchema = z.discriminatedUnion("action", [
       id: z.string().uuid(),
       name: z.string().min(1),
       slug: z.string().min(1),
-      account_category: accountCategorySchema.optional(),
+      account_category: workspaceAccountCategorySchema.optional(),
       plan_code: tenantPlanCodeSchema.optional(),
     }),
   }),
@@ -345,6 +401,11 @@ const superWorkspaceRequestSchema = z.discriminatedUnion("action", [
 
 const superWorkspaceResponseSchemas = {
   list_workspaces: superTenantEnvelopeSchema(z.array(superWorkspaceSchema)),
+  list_individual_accounts: superTenantEnvelopeSchema(z.array(superIndividualAccountSchema)),
+  create_individual_account: superTenantEnvelopeSchema(superIndividualAccountSchema),
+  update_individual_account: superTenantEnvelopeSchema(superIndividualAccountSchema),
+  set_individual_account_status: superTenantEnvelopeSchema(superIndividualAccountSchema),
+  send_individual_account_reset: superTenantEnvelopeSchema(z.object({ success: z.boolean(), auth_email: z.string().email() })),
   create_workspace: superTenantEnvelopeSchema(superWorkspaceSchema),
   update_workspace: superTenantEnvelopeSchema(superWorkspaceSchema),
   set_workspace_status: superTenantEnvelopeSchema(superWorkspaceSchema),

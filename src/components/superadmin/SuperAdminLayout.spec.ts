@@ -13,6 +13,7 @@ const buildRouter = () =>
         children: [
           { path: "", name: "super-admin-home", component: { template: "<div class='stub'>Home content</div>" } },
           { path: "workspaces", name: "super-admin-workspaces", component: { template: "<div />" } },
+          { path: "individual-accounts", name: "super-admin-individual-accounts", component: { template: "<div />" } },
           { path: "admins", name: "super-admin-admins", component: { template: "<div />" } },
           { path: "tenant-accounts", name: "super-admin-tenant-accounts", component: { template: "<div />" } },
           { path: "super-admins", name: "super-admin-super-admins", component: { template: "<div />" } },

@@ -77,7 +77,7 @@ test.describe("Super admin flows and export actions", () => {
     await navigateApp(page, "/super-admin/individual-accounts");
     await expect(page.getByRole("heading", { name: "Individual Accounts", exact: true })).toBeVisible();
     await expect(page.getByLabel("Account name").first()).toBeVisible();
-    await expect(page.getByLabel("Account email").first()).toBeVisible();
+    await expect(page.getByLabel("Sign-in email").first()).toBeVisible();
     await expect(page.getByText("Workspace slug", { exact: true })).toHaveCount(0);
 
     await navigateApp(page, "/super-admin/admins");

@@ -265,7 +265,9 @@ const formatLoginLocation = (value: AccountSessionItem["login_location"]) =>
   value === "regular_login"
     ? "Regular login"
     : value === "admin_login"
-      ? "Admin sign in"
+      ? isIndividualAccount.value
+        ? "Account sign-in"
+        : "Admin sign in"
       : "Unknown";
 
 const formatGeneralLocation = (value: AccountSessionItem["general_location"]) =>

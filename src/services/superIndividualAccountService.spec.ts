@@ -56,10 +56,15 @@ describe("super individual account service", () => {
       .mockResolvedValueOnce({ ok: true, status: 200, error: "", data: { data: account } })
       .mockResolvedValueOnce({ ok: true, status: 200, error: "", data: { data: account } })
       .mockResolvedValueOnce({ ok: true, status: 200, error: "", data: { data: { success: true, auth_email: "person@example.com" } } });
-    await updateIndividualAccount({ ...policy, id: "account-1", name: "Updated" });
+    await updateIndividualAccount({ ...policy, id: "account-1", name: "Updated", auth_email: "new@example.com" });
     await setIndividualAccountStatus("account-1", "suspended");
     await sendIndividualAccountReset("account-1");
     expect(invokeEdgeFunction).toHaveBeenNthCalledWith(1, "super-workspace-mutate", expect.objectContaining({ body: expect.objectContaining({ action: "update_individual_account" }) }));
+    expect(mockedInvoke.mock.calls[0][1]).toEqual(expect.objectContaining({
+      body: expect.objectContaining({
+        payload: expect.objectContaining({ auth_email: "new@example.com" }),
+      }),
+    }));
     expect(invokeEdgeFunction).toHaveBeenNthCalledWith(2, "super-workspace-mutate", expect.objectContaining({ body: { action: "set_individual_account_status", payload: { id: "account-1", status: "suspended" } } }));
     expect(invokeEdgeFunction).toHaveBeenNthCalledWith(3, "super-workspace-mutate", expect.objectContaining({ body: { action: "send_individual_account_reset", payload: { id: "account-1" } } }));
   });

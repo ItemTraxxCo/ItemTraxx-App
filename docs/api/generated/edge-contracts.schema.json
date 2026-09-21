@@ -1705,6 +1705,11 @@
                   "type": "string",
                   "minLength": 1
                 },
+                "auth_email": {
+                  "type": "string",
+                  "format": "email",
+                  "pattern": "^(?:[A-Za-z0-9_'+\\-]+\\.)*[A-Za-z0-9_'+\\-]*[A-Za-z0-9_+-]@(?:[A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+                },
                 "plan_code": {
                   "type": "string",
                   "enum": [
@@ -1823,7 +1828,8 @@
               },
               "required": [
                 "id",
-                "name"
+                "name",
+                "auth_email"
               ],
               "additionalProperties": false
             }

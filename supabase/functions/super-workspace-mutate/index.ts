@@ -206,18 +206,33 @@ serve(async (req) => {
         r.primary_admin_profile_id
       )
         .filter(Boolean);
+      const fallbackWorkspaceIds = rows
+        .filter((r: any) => !r.primary_admin_profile_id)
+        .map((r: any) => r.id)
+        .filter(Boolean);
       const { data: profiles } = primaryIds.length
         ? await admin.from("profiles").select("id,auth_email").in(
           "id",
           primaryIds,
         )
         : { data: [] };
+      const { data: fallbackProfiles } = fallbackWorkspaceIds.length
+        ? await admin.from("profiles").select("id,workspace_id,auth_email")
+          .eq("role", "individual_account")
+          .eq("is_active", true)
+          .is("deleted_at", null)
+          .in("workspace_id", fallbackWorkspaceIds)
+        : { data: [] };
       const emails = new Map(
         (profiles ?? []).map((x: any) => [x.id, x.auth_email]),
       );
+      const fallbackByWorkspace = new Map(
+        (fallbackProfiles ?? []).map((x: any) => [x.workspace_id, x]),
+      );
       return rows.map((r: any) => ({
         ...r,
-        primary_admin_email: emails.get(r.primary_admin_profile_id) ?? null,
+        primary_admin_profile_id: r.primary_admin_profile_id ?? fallbackByWorkspace.get(r.id)?.id ?? null,
+        primary_admin_email: emails.get(r.primary_admin_profile_id) ?? fallbackByWorkspace.get(r.id)?.auth_email ?? null,
         ...(Array.isArray(r.workspace_policies)
           ? r.workspace_policies[0]
           : r.workspace_policies),
@@ -293,7 +308,7 @@ serve(async (req) => {
         .from("profiles")
         .select("workspace_id")
         .eq("role", "individual_account")
-        .ilike("auth_email", email)
+        .eq("auth_email", email)
         .eq("is_active", true)
         .is("deleted_at", null)
         .maybeSingle();
@@ -367,7 +382,16 @@ serve(async (req) => {
         await admin.from("workspaces").delete().eq("id", w.id);
         return json(400, { error: "Unable to create individual account." });
       }
-      await admin.from("workspaces").update({ primary_admin_profile_id: profileId }).eq("id", w.id);
+      const { error: primaryAdminError } = await admin.from("workspaces")
+        .update({ primary_admin_profile_id: profileId })
+        .eq("id", w.id);
+      if (primaryAdminError) {
+        await admin.from("profiles").delete().eq("id", profileId);
+        await callBetterAuthAdmin({ action: "delete_user", profileId, betterAuthUserId: created.user.betterAuthUserId }).catch(() => undefined);
+        await callBetterAuthAdmin({ action: "delete_organization", organizationId: organization.organization.id }).catch(() => undefined);
+        await admin.from("workspaces").delete().eq("id", w.id);
+        return json(400, { error: "Unable to assign individual account sign-in." });
+      }
       await writeAudit("create_individual_account", w.id, { name, account_category: "individual" });
       return json(200, { data: individualAccountView((await load(w.id))[0]) });
     }
@@ -376,6 +400,7 @@ serve(async (req) => {
         current = await loadIndividualAccount(id);
       if (!current) return json(404, { error: "Individual account not found." });
       const name = requireText(p.name, { maxLen: 120 }),
+        email = requireEmail(p.auth_email),
         policy = policyValues({
           ...p,
           account_category: "individual",
@@ -391,16 +416,74 @@ serve(async (req) => {
           renewal_date: p.renewal_date ?? current.renewal_date,
           invoice_reference: p.invoice_reference ?? current.invoice_reference,
         });
+      const profileQuery = admin.from("profiles")
+        .select("id,auth_email")
+        .eq("role", "individual_account")
+        .eq("workspace_id", id)
+        .eq("is_active", true)
+        .is("deleted_at", null);
+      const { data: primaryProfile, error: primaryProfileError } = current.primary_admin_profile_id
+        ? await profileQuery.eq("id", current.primary_admin_profile_id).maybeSingle()
+        : await profileQuery.maybeSingle();
+      if (primaryProfileError || !primaryProfile) {
+        return json(400, { error: "Unable to locate individual account sign-in." });
+      }
+      const { data: duplicateProfiles, error: duplicateError } = await admin
+        .from("profiles")
+        .select("id")
+        .eq("auth_email", email)
+        .neq("id", primaryProfile.id)
+        .eq("is_active", true)
+        .is("deleted_at", null)
+        .limit(1);
+      if (duplicateError) return json(400, { error: "Unable to verify individual account sign-in." });
+      if (duplicateProfiles?.length) {
+        return json(409, { error: "That sign-in email is already in use." });
+      }
+      const previousEmail = primaryProfile.auth_email?.trim().toLowerCase() ?? "";
+      const emailChanged = email !== previousEmail;
+      if (emailChanged) {
+        try {
+          await callBetterAuthAdmin({ action: "update_email", profileId: primaryProfile.id, email });
+        } catch {
+          return json(400, { error: "Unable to update individual account sign-in email." });
+        }
+        const { error: profileEmailError } = await admin.from("profiles")
+          .update({ auth_email: email })
+          .eq("id", primaryProfile.id);
+        if (profileEmailError) {
+          if (previousEmail) {
+            await callBetterAuthAdmin({ action: "update_email", profileId: primaryProfile.id, email: previousEmail }).catch(() => undefined);
+          }
+          return json(400, { error: "Unable to update individual account sign-in email." });
+        }
+      }
       const { error } = await admin.from("workspaces").update({ name }).eq("id", id);
-      if (error) return json(400, { error: "Unable to update individual account." });
+      if (error) {
+        if (emailChanged) {
+          await admin.from("profiles").update({ auth_email: previousEmail }).eq("id", primaryProfile.id);
+          if (previousEmail) {
+            await callBetterAuthAdmin({ action: "update_email", profileId: primaryProfile.id, email: previousEmail }).catch(() => undefined);
+          }
+        }
+        return json(400, { error: "Unable to update individual account." });
+      }
       const { error: policyError } = await admin.from("workspace_policies").upsert({
         workspace_id: id,
         ...policy,
         updated_by: user.id,
         updated_at: new Date().toISOString(),
       });
-      if (policyError) return json(400, { error: "Unable to update individual account settings." });
-      await writeAudit("update_individual_account", id, { name });
+      if (policyError) {
+        if (emailChanged) {
+          await admin.from("profiles").update({ auth_email: previousEmail }).eq("id", primaryProfile.id);
+          if (previousEmail) {
+            await callBetterAuthAdmin({ action: "update_email", profileId: primaryProfile.id, email: previousEmail }).catch(() => undefined);
+          }
+        }
+        return json(400, { error: "Unable to update individual account settings." });
+      }
+      await writeAudit("update_individual_account", id, { name, auth_email: email });
       return json(200, { data: individualAccountView((await load(id))[0]) });
     }
     if (action === "set_individual_account_status") {

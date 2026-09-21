@@ -146,6 +146,7 @@ Super-admin workspace creation and lifecycle actions.
 
 - `id` (required): string
 - `name` (required): string
+- `auth_email` (required): string
 - `plan_code`: string
 - `max_items`: any
 - `max_borrowers`: any

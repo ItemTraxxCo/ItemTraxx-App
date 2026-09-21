@@ -351,6 +351,7 @@ const superWorkspaceRequestSchema = z.discriminatedUnion("action", [
     payload: z.object({
       id: z.string().uuid(),
       name: z.string().min(1),
+      auth_email: z.string().email(),
       plan_code: z.enum(["individual_yearly", "individual_monthly"]).optional(),
       max_items: z.number().int().positive().nullable().optional(),
       max_borrowers: z.number().int().positive().nullable().optional(),

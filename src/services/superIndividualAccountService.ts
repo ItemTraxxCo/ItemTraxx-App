@@ -46,6 +46,7 @@ export type IndividualAccountCreateInput = IndividualAccountPolicyInput & {
 export type IndividualAccountUpdateInput = IndividualAccountPolicyInput & {
   id: string;
   name: string;
+  auth_email: string;
 };
 
 const call = async <T>(action: string, payload: Record<string, unknown>) => {

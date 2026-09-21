@@ -133,7 +133,7 @@ const AccountFields = defineComponent({
     return () => h("div", { class: "fields" }, [
       input("Account name", "name"),
       ...(props.includeCredentials || props.showEmail
-        ? [input("Account email", "auth_email", "email", { readonly: props.showEmail })]
+        ? [input("Sign-in email", "auth_email", "email")]
         : []),
       ...(props.includeCredentials ? [input("Temporary password (optional)", "password", "password", { autocomplete: "new-password" })] : []),
       h("label", ["Plan", h("select", { value: props.modelValue.plan_code ?? "individual_yearly", onChange: (event: Event) => update("plan_code", (event.target as HTMLSelectElement).value) }, [
@@ -218,8 +218,8 @@ const openEdit = (account: SuperIndividualAccount) => {
   };
 };
 const saveEdit = () => editing.value && run(async () => {
-  const { id, name, plan_code, max_items, max_borrowers, checkout_due_hours, feature_flags, contact_name, support_email, billing_email, billing_status, renewal_date, invoice_reference } = editDraft.value;
-  await updateIndividualAccount({ id: id!, name, plan_code, max_items, max_borrowers, checkout_due_hours, feature_flags, contact_name, support_email, billing_email, billing_status, renewal_date, invoice_reference });
+  const { id, name, auth_email, plan_code, max_items, max_borrowers, checkout_due_hours, feature_flags, contact_name, support_email, billing_email, billing_status, renewal_date, invoice_reference } = editDraft.value;
+  await updateIndividualAccount({ id: id!, name, auth_email, plan_code, max_items, max_borrowers, checkout_due_hours, feature_flags, contact_name, support_email, billing_email, billing_status, renewal_date, invoice_reference });
   editing.value = null;
   await load();
 }, "Individual account updated.");

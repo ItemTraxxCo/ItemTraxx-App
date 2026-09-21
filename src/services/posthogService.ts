@@ -27,6 +27,16 @@ const EMAIL_REDACTION_PATTERN = /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi;
 const SENSITIVE_PROPERTY_KEY =
   /(email|phone|name|tenant|profile|borrower|user_id|address|token|secret|error_message|error_type|error_stack|error_context|error_cause|exception|message|stack|context|cause)/i;
 const EXCEPTION_CONTEXT_KEY = /^(route|path|operation|status|latency_ms|duration_ms|request_id|provider|retry_count|error_code|trace_id|span_id|service|environment|method|component|outcome|sampled|slow|attempt|job_type|result|request_area|request_operation|request_method|request_status)$/i;
+// Keys the browser SDK manages and that capture validation needs to keep the
+// event addressable. Without distinct_id the event is dropped as
+// missing_distinct_id; the rest tie it to the right library, session, device.
+const SDK_MANAGED_PROPERTY_KEYS = [
+  "distinct_id",
+  "$lib",
+  "$lib_version",
+  "$session_id",
+  "$device_id",
+] as const;
 
 export type PostHogErrorCode =
   | "unauthorized"
@@ -130,7 +140,7 @@ const sanitizeExceptionFrame = (frame: unknown) => {
   if (!frame || typeof frame !== "object") return undefined;
   const source = frame as Record<string, unknown>;
   const safe: Record<string, unknown> = {};
-  for (const key of ["filename", "function", "lineno", "colno", "in_app"]) {
+  for (const key of ["platform", "filename", "function", "lineno", "colno", "in_app"]) {
     const value = source[key];
     if (typeof value === "string") {
       safe[key] = key === "filename"
@@ -201,6 +211,13 @@ const sanitizeExceptionEvent = (event: CaptureResult): CaptureResult => {
     // PostHog requires its project token to remain on the event. It is not a
     // user/session bearer and is safe to preserve here.
     safeProperties.token = properties.token;
+  }
+  // The SDK keeps the identifier and its own library/session/device keys in the
+  // property bag. Capture validation rejects an event that arrives without a
+  // distinct id, so carry these through the rebuild instead of the allowlist.
+  for (const key of SDK_MANAGED_PROPERTY_KEYS) {
+    const value = properties?.[key];
+    if (typeof value === "string") safeProperties[key] = value;
   }
   for (const [key, value] of Object.entries(properties ?? {})) {
     if (

@@ -100,6 +100,11 @@ export const SUPER_WORKSPACE_ACTIONS = [
   "set_workspace_status",
   "send_primary_admin_reset",
   "set_primary_admin",
+  "list_individual_accounts",
+  "create_individual_account",
+  "update_individual_account",
+  "set_individual_account_status",
+  "send_individual_account_reset",
 ] as const;
 serve(async (req) => {
   const origin = req.headers.get("origin"),
@@ -218,6 +223,31 @@ serve(async (req) => {
           : r.workspace_policies),
       }));
     };
+    const individualAccountView = (row: any) => {
+      if (!row) return row;
+      const { slug: _internalSlug, ...account } = row;
+      return account;
+    };
+    const loadIndividualAccount = async (id: string) => {
+      const row = (await load(id))[0];
+      return row?.account_category === "individual" ? row : null;
+    };
+    const individualLifecycleValues = (status: string) => {
+      const now = new Date().toISOString();
+      return status === "archived"
+        ? {
+          status: "suspended",
+          archived_at: now,
+          purge_after: new Date(Date.now() + 30 * 86400000).toISOString(),
+          purge_state: "grace",
+        }
+        : {
+          status: status === "active" ? "active" : "suspended",
+          archived_at: null,
+          purge_after: null,
+          purge_state: "none",
+        };
+    };
     if (action === "list_workspaces") {
       const search = optionalText(p.search, { maxLen: 120 }).toLowerCase(),
         status = optionalText(p.status, { maxLen: 20 });
@@ -236,6 +266,174 @@ serve(async (req) => {
       }
       return json(200, { data: rows });
     }
+    if (action === "list_individual_accounts") {
+      const search = optionalText(p.search, { maxLen: 120 }).toLowerCase(),
+        status = optionalText(p.status, { maxLen: 20 });
+      let rows = (await load()).filter((r: any) => r.account_category === "individual");
+      if (search) {
+        rows = rows.filter((r: any) =>
+          r.name.toLowerCase().includes(search) ||
+          (r.primary_admin_email ?? "").toLowerCase().includes(search)
+        );
+      }
+      if (status && status !== "all") {
+        rows = rows.filter((r: any) =>
+          status === "archived"
+            ? !!r.archived_at
+            : r.status === status && !r.archived_at
+        );
+      }
+      return json(200, { data: rows.map(individualAccountView) });
+    }
+    if (action === "create_individual_account") {
+      const name = requireText(p.name, { maxLen: 120 }),
+        email = requireEmail(p.auth_email),
+        policy = policyValues({ ...p, account_category: "individual", plan_code: p.plan_code ?? "individual_yearly" });
+      const { data: existingProfile, error: existingError } = await admin
+        .from("profiles")
+        .select("workspace_id")
+        .eq("role", "individual_account")
+        .ilike("auth_email", email)
+        .eq("is_active", true)
+        .is("deleted_at", null)
+        .maybeSingle();
+      if (existingError) return json(400, { error: "Unable to verify individual account." });
+      if (existingProfile?.workspace_id) {
+        const existing = await loadIndividualAccount(existingProfile.workspace_id);
+        if (existing) return json(200, { data: individualAccountView(existing) });
+      }
+      // The database and Better Auth organization table require a unique slug.
+      // This value is internal only and is never returned to the admin UI.
+      const internalSlug = `individual-${crypto.randomUUID()}`;
+      const { data: w, error } = await admin.from("workspaces").insert({
+        name,
+        slug: internalSlug,
+        status: "active",
+      }).select("id").single();
+      if (error || !w) return json(400, { error: "Unable to create individual account." });
+      const { error: policyError } = await admin.from("workspace_policies").upsert({
+        workspace_id: w.id,
+        ...policy,
+        updated_by: user.id,
+        updated_at: new Date().toISOString(),
+      });
+      if (policyError) {
+        await admin.from("workspaces").delete().eq("id", w.id);
+        return json(400, { error: "Unable to create individual account settings." });
+      }
+      let organization: { organization: { id: string } };
+      try {
+        organization = await callBetterAuthAdmin({ action: "create_organization", workspaceId: w.id, name, slug: internalSlug });
+      } catch {
+        await admin.from("workspaces").delete().eq("id", w.id);
+        return json(400, { error: "Unable to create individual account identity." });
+      }
+      const profileId = crypto.randomUUID();
+      const { error: profileError } = await admin.from("profiles").insert({
+        id: profileId,
+        workspace_id: w.id,
+        role: "individual_account",
+        auth_email: email,
+        is_active: true,
+      });
+      if (profileError) {
+        await callBetterAuthAdmin({ action: "delete_organization", organizationId: organization.organization.id }).catch(() => undefined);
+        await admin.from("workspaces").delete().eq("id", w.id);
+        return json(400, { error: "Unable to create individual account." });
+      }
+      let created: { user: { betterAuthUserId: string } };
+      try {
+        created = await callBetterAuthAdmin({
+          action: "create_user",
+          profileId,
+          email,
+          password: typeof p.password === "string" && p.password ? p.password : randomPassword(),
+          role: "user",
+          profileRole: "individual_account",
+          workspaceId: w.id,
+        });
+      } catch {
+        await admin.from("profiles").delete().eq("id", profileId);
+        await callBetterAuthAdmin({ action: "delete_organization", organizationId: organization.organization.id }).catch(() => undefined);
+        await admin.from("workspaces").delete().eq("id", w.id);
+        return json(400, { error: "Unable to create individual account login." });
+      }
+      const { data: linkedProfile, error: linkedError } = await admin.from("profiles").select("id")
+        .eq("id", profileId).maybeSingle();
+      if (linkedError || !linkedProfile) {
+        await admin.from("profiles").delete().eq("id", profileId);
+        await callBetterAuthAdmin({ action: "delete_user", profileId, betterAuthUserId: created.user.betterAuthUserId }).catch(() => undefined);
+        await callBetterAuthAdmin({ action: "delete_organization", organizationId: organization.organization.id }).catch(() => undefined);
+        await admin.from("workspaces").delete().eq("id", w.id);
+        return json(400, { error: "Unable to create individual account." });
+      }
+      await admin.from("workspaces").update({ primary_admin_profile_id: profileId }).eq("id", w.id);
+      await writeAudit("create_individual_account", w.id, { name, account_category: "individual" });
+      return json(200, { data: individualAccountView((await load(w.id))[0]) });
+    }
+    if (action === "update_individual_account") {
+      const id = requireUuid(p.id),
+        current = await loadIndividualAccount(id);
+      if (!current) return json(404, { error: "Individual account not found." });
+      const name = requireText(p.name, { maxLen: 120 }),
+        policy = policyValues({
+          ...p,
+          account_category: "individual",
+          plan_code: p.plan_code ?? current.plan_code ?? "individual_yearly",
+          max_items: p.max_items ?? current.max_items,
+          max_borrowers: p.max_borrowers ?? current.max_borrowers,
+          checkout_due_hours: p.checkout_due_hours ?? current.checkout_due_hours ?? 72,
+          feature_flags: p.feature_flags ?? current.feature_flags,
+          contact_name: p.contact_name ?? current.contact_name,
+          support_email: p.support_email ?? current.support_email,
+          billing_email: p.billing_email ?? current.billing_email,
+          billing_status: p.billing_status ?? current.billing_status,
+          renewal_date: p.renewal_date ?? current.renewal_date,
+          invoice_reference: p.invoice_reference ?? current.invoice_reference,
+        });
+      const { error } = await admin.from("workspaces").update({ name }).eq("id", id);
+      if (error) return json(400, { error: "Unable to update individual account." });
+      const { error: policyError } = await admin.from("workspace_policies").upsert({
+        workspace_id: id,
+        ...policy,
+        updated_by: user.id,
+        updated_at: new Date().toISOString(),
+      });
+      if (policyError) return json(400, { error: "Unable to update individual account settings." });
+      await writeAudit("update_individual_account", id, { name });
+      return json(200, { data: individualAccountView((await load(id))[0]) });
+    }
+    if (action === "set_individual_account_status") {
+      const id = requireUuid(p.id),
+        status = requireText(p.status, { maxLen: 20 });
+      if (!(status === "active" || status === "suspended" || status === "archived")) {
+        throw new ValidationError("Invalid individual account status.");
+      }
+      if (!(await loadIndividualAccount(id))) return json(404, { error: "Individual account not found." });
+      const { error } = await admin.from("workspaces").update(individualLifecycleValues(status)).eq("id", id);
+      if (error) return json(400, { error: "Unable to update individual account status." });
+      await writeAudit("set_individual_account_status", id, { status });
+      return json(200, { data: individualAccountView((await load(id))[0]) });
+    }
+    if (action === "send_individual_account_reset") {
+      const id = requireUuid(p.id),
+        row = await loadIndividualAccount(id);
+      if (!row?.primary_admin_email) return json(404, { error: "Individual account not found." });
+      const redirect = (Deno.env.get("ITX_PASSWORD_RESET_REDIRECT_URL") ?? "").trim();
+      if (!redirect) return json(500, { error: "Password reset redirect is not configured." });
+      const { data: primary } = await admin.from("profiles").select("id")
+        .eq("workspace_id", id).eq("role", "individual_account")
+        .eq("auth_email", row.primary_admin_email).eq("is_active", true)
+        .is("deleted_at", null).maybeSingle();
+      if (!primary?.id) return json(404, { error: "Individual account not found." });
+      try {
+        await callBetterAuthAdmin({ action: "request_password_reset", profileId: primary.id, redirectTo: redirect });
+      } catch {
+        return json(400, { error: "Unable to send individual account reset." });
+      }
+      await writeAudit("send_individual_account_reset", id, {});
+      return json(200, { data: { success: true, auth_email: row.primary_admin_email } });
+    }
     if (action === "create_workspace") {
       const name = requireText(p.name, { maxLen: 120 }),
         slug = requireText(p.slug, {
@@ -246,23 +444,7 @@ serve(async (req) => {
         email = requireEmail(p.auth_email),
         policy = policyValues(p);
       if (policy.account_category === "individual") {
-        const { data: existingProfile, error: existingError } = await admin
-          .from("profiles")
-          .select("workspace_id")
-          .eq("role", "individual_account")
-          .ilike("auth_email", email)
-          .eq("is_active", true)
-          .is("deleted_at", null)
-          .maybeSingle();
-        if (existingError) {
-          return json(400, { error: "Unable to verify individual account." });
-        }
-        if (existingProfile?.workspace_id) {
-          const existing = (await load(existingProfile.workspace_id))[0];
-          if (existing?.account_category === "individual") {
-            return json(200, { data: existing });
-          }
-        }
+        return json(400, { error: "Use the individual account manager for individual accounts." });
       }
       const { data: w, error } = await admin.from("workspaces").insert({
         name,
@@ -289,7 +471,7 @@ serve(async (req) => {
       const { error: profileError } = await admin.from("profiles").insert({
         id: profileId,
         workspace_id: w.id,
-        role: policy.account_category === "individual" ? "individual_account" : "workspace_admin",
+        role: "workspace_admin",
         auth_email: email,
         is_active: true,
       });
@@ -299,7 +481,7 @@ serve(async (req) => {
         return json(400, { error: "Unable to create workspace." });
       }
       let created: { user: { betterAuthUserId: string } };
-      try { created = await callBetterAuthAdmin({action:"create_user",profileId,email,password:typeof p.password === "string"&&p.password?p.password:randomPassword(),role:"user",profileRole:policy.account_category === "individual" ? "individual_account" : "workspace_admin",workspaceId:w.id}); }
+      try { created = await callBetterAuthAdmin({action:"create_user",profileId,email,password:typeof p.password === "string"&&p.password?p.password:randomPassword(),role:"user",profileRole:"workspace_admin",workspaceId:w.id}); }
       catch {
         await admin.from("profiles").delete().eq("id", profileId);
         await callBetterAuthAdmin({action:"delete_organization",organizationId:organization.organization.id}).catch(()=>undefined);
@@ -327,11 +509,15 @@ serve(async (req) => {
           maxLen: 63,
           pattern: SLUG_PATTERN,
           transform: "lowercase",
-        });
+        }),
+        policy = policyValues(p),
+        current = (await load(id))[0];
+      if (current?.account_category === "individual" || policy.account_category === "individual") {
+        return json(400, { error: "Use the individual account manager for individual accounts." });
+      }
       const { error } = await admin.from("workspaces").update({ name, slug })
         .eq("id", id);
       if (error) return json(400, { error: "Unable to update workspace." });
-      const policy = policyValues(p);
       const { error: policyError } = await admin.from("workspace_policies").upsert({
         workspace_id: id,
         ...policy,

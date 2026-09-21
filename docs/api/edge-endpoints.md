@@ -120,6 +120,53 @@ Super-admin workspace creation and lifecycle actions.
 - `search` (required): string
 - `status` (required): string
 
+#### `list_individual_accounts`
+
+- `search` (required): string
+- `status` (required): string
+
+#### `create_individual_account`
+
+- `name` (required): string
+- `auth_email` (required): string
+- `password`: string
+- `plan_code`: string
+- `max_items`: any
+- `max_borrowers`: any
+- `checkout_due_hours`: integer
+- `feature_flags`: object
+- `contact_name`: string|null
+- `support_email`: any
+- `billing_email`: any
+- `billing_status`: any
+- `renewal_date`: string|null
+- `invoice_reference`: string|null
+
+#### `update_individual_account`
+
+- `id` (required): string
+- `name` (required): string
+- `plan_code`: string
+- `max_items`: any
+- `max_borrowers`: any
+- `checkout_due_hours`: integer
+- `feature_flags`: object
+- `contact_name`: string|null
+- `support_email`: any
+- `billing_email`: any
+- `billing_status`: any
+- `renewal_date`: string|null
+- `invoice_reference`: string|null
+
+#### `set_individual_account_status`
+
+- `id` (required): string
+- `status` (required): string
+
+#### `send_individual_account_reset`
+
+- `id` (required): string
+
 #### `create_workspace`
 
 - `name` (required): string
@@ -154,7 +201,7 @@ Super-admin workspace creation and lifecycle actions.
 ### Response schema
 
 - Schema: `superWorkspaceResponses`
-- Top-level keys: `list_workspaces`, `create_workspace`, `update_workspace`, `set_workspace_status`, `send_primary_admin_reset`, `set_primary_admin`
+- Top-level keys: `list_workspaces`, `list_individual_accounts`, `create_individual_account`, `update_individual_account`, `set_individual_account_status`, `send_individual_account_reset`, `create_workspace`, `update_workspace`, `set_workspace_status`, `send_primary_admin_reset`, `set_primary_admin`
 
 ## `POST /functions/v1/super-admin-mutate`
 

@@ -23,7 +23,7 @@ export type SuperWorkspace = {
   invoice_reference?: string | null;
 };
 export type WorkspacePolicyInput = {
-  account_category: "workspace" | "education" | "custom" | "individual";
+  account_category: "workspace" | "education" | "custom";
   plan_code?: string | null;
   max_items?: number | null;
   max_borrowers?: number | null;

@@ -671,7 +671,11 @@ describe("PostHog exception before_send", () => {
             value: "backend diagnostic token=secret",
             stacktrace: {
               type: "raw",
-              frames: [{ context_line: "email person@example.com", vars: { token: "secret" } }],
+              frames: [{
+                platform: "web:javascript",
+                context_line: "email person@example.com",
+                vars: { token: "secret" },
+              }],
             },
           },
         ],
@@ -690,7 +694,7 @@ describe("PostHog exception before_send", () => {
           {
             type: "Error",
             value: "backend diagnostic token=[REDACTED]",
-            stacktrace: { type: "raw", frames: [{}] },
+            stacktrace: { type: "raw", frames: [{ platform: "web:javascript" }] },
           },
         ],
         $exception_level: "error",

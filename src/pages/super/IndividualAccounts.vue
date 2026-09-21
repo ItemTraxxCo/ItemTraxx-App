@@ -50,7 +50,7 @@
             <td>
               <div class="sa-table-row-actions">
                 <button class="sa-btn" @click="openEdit(account)">Edit</button>
-                <button class="sa-btn" :disabled="!!account.archived_at" @click="toggle(account)">{{ account.status === "active" ? "Suspend" : "Activate" }}</button>
+                <button class="sa-btn" @click="toggle(account)">{{ account.archived_at ? "Reactivate" : account.status === "active" ? "Suspend" : "Activate" }}</button>
                 <button class="sa-btn danger" :disabled="!!account.archived_at" @click="archiveAccount(account)">Archive</button>
                 <button class="sa-btn" @click="reset(account)">Reset password</button>
               </div>

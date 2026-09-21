@@ -13,11 +13,13 @@ import { readJsonBody } from "../_shared/requestBody.ts";
 import { requireTrustedEdgeIngress } from "../_shared/trustedIngress.ts";
 import {
   asRecord,
-  optionalJsonObject,
-  optionalText,
   ValidationError,
 } from "../_shared/validation.ts";
 import { buildPublicRateLimitHeaders } from "../_shared/publicRateLimit.ts";
+import {
+  normalizeClientReportDiagnostics,
+  normalizeClientReportText,
+} from "../_shared/clientReportNormalization.ts";
 
 const baseCorsHeaders = {
   "Access-Control-Allow-Headers":
@@ -68,6 +70,7 @@ type ReportPayload = {
   diagnostics?: {
     console?: ConsoleEntry[];
     network?: NetworkEntry[];
+    diagnostics_truncated?: boolean;
   };
 };
 
@@ -84,7 +87,14 @@ const PUBLIC_GLOBAL_RATE_LIMIT = {
   windowSeconds: PUBLIC_RATE_LIMIT.windowSeconds,
 };
 
-const normalizeText = (value: unknown, max = 5000) => optionalText(value, { maxLen: max });
+const normalizeText = (
+  value: unknown,
+  max = 5000,
+  options: { allowLineBreaks?: boolean } = {},
+) => normalizeClientReportText(value, max, options);
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  !!value && typeof value === "object" && !Array.isArray(value);
 
 const resolveCorsHeaders = (req: Request) => {
   const origin = req.headers.get("Origin");
@@ -207,12 +217,12 @@ serve(async (req) => {
 
     const body = asRecord(await readJsonBody(req, 128 * 1024)) as ReportPayload;
     const title = normalizeText(body.title, 160) || "Unexpected frontend error";
-    const message = normalizeText(body.message, 1200) || "Unknown error";
+    const message = normalizeText(body.message, 1200, { allowLineBreaks: true }) || "Unknown error";
     const reason = normalizeText(body.reason, 400) || "No reason provided.";
     const errorName = normalizeText(body.error_name, 120) || "Error";
-    const stack = normalizeText(body.stack, 5000);
+    const stack = normalizeText(body.stack, 5000, { allowLineBreaks: true });
     const context = normalizeText(body.context, 300);
-    const page = body.page === undefined ? {} : asRecord(body.page);
+    const page = isRecord(body.page) ? body.page : {};
     const pageUrl = normalizeText(page.url, 255);
     const environment = normalizeText(page.environment, 40) || "unknown";
     const release = normalizeText(page.release, 80) || "n/a";
@@ -263,7 +273,7 @@ serve(async (req) => {
         request_id: requestId,
         client_fingerprint_hash: requestHash,
         ip_hash: ipHash,
-        diagnostics: optionalJsonObject(body.diagnostics, 20_000),
+        diagnostics: normalizeClientReportDiagnostics(body.diagnostics),
       })
       .select("id")
       .single<StoredReportRow>();

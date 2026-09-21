@@ -15,8 +15,10 @@ import {
 import { clearReplaySessionHandoff } from "./sessionReplayHandoff";
 
 let initialized = false;
+let posthogReady = false;
 let posthog: typeof import("posthog-js").default | null = null;
 let initializationPromise: Promise<void> | null = null;
+let posthogReadyPromise: Promise<void> | null = null;
 const SERVICE_NAME = "itemtraxx-web";
 const APP_ENVIRONMENT = import.meta.env.VITE_POSTHOG_ENVIRONMENT?.trim() || import.meta.env.MODE || "production";
 const APP_VERSION = import.meta.env.VITE_GIT_COMMIT?.trim() || "n/a";
@@ -601,27 +603,47 @@ const initializePostHog = async () => {
       advanced_disable_feature_flags_on_first_load: true,
     };
 
+    let resolvePostHogReady: (() => void) | null = null;
+    posthogReady = false;
+    posthogReadyPromise = new Promise<void>((resolve) => {
+      resolvePostHogReady = resolve;
+    });
     posthog.init(token, {
       ...posthogConfig,
       loaded: () => {
         initialized = true;
+        posthogReady = true;
+        resolvePostHogReady?.();
+        resolvePostHogReady = null;
+        posthogReadyPromise = null;
       },
     });
     initialized = true;
   } catch (error) {
+    initialized = false;
+    posthogReady = false;
+    posthogReadyPromise = null;
     // Analytics must never break login or core flows.
     console.warn("[posthog] init failed; continuing without analytics.", error);
   }
 };
 
 export const initPostHog = async () => {
-  if (initialized) return;
+  if (initialized || posthogReadyPromise) return;
   if (!initializationPromise) initializationPromise = initializePostHog();
   try {
     await initializationPromise;
   } finally {
     initializationPromise = null;
   }
+};
+
+const waitForPostHogReady = async () => {
+  if (posthogReady) return true;
+  if (initializationPromise) await initializationPromise;
+  if (posthogReady) return true;
+  if (posthogReadyPromise) await posthogReadyPromise;
+  return posthogReady;
 };
 
 export const syncPostHogConsent = () => {
@@ -799,7 +821,9 @@ const getHandledRequestFailureCode = (failure: HandledRequestFailure): PostHogEr
 /** Capture an expected request failure at a high-value boundary without the raw response body. */
 export const captureHandledRequestFailure = async (failure: HandledRequestFailure) => {
   if (!shouldCaptureHandledRequestFailure(failure)) return;
-  if (!initialized || !posthog || !allowsDiagnostics(readCookieConsent())) return;
+  if (!allowsDiagnostics(readCookieConsent())) return;
+  await initPostHog();
+  if (!(await waitForPostHogReady()) || !posthog) return;
   const errorCode = getHandledRequestFailureCode(failure);
   const path = failure.path.replace(/[?#].*$/, "");
   const dedupeKey = [

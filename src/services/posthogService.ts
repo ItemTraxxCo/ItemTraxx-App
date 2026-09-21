@@ -140,7 +140,7 @@ const sanitizeExceptionFrame = (frame: unknown) => {
   if (!frame || typeof frame !== "object") return undefined;
   const source = frame as Record<string, unknown>;
   const safe: Record<string, unknown> = {};
-  for (const key of ["filename", "function", "lineno", "colno", "in_app"]) {
+  for (const key of ["platform", "filename", "function", "lineno", "colno", "in_app"]) {
     const value = source[key];
     if (typeof value === "string") {
       safe[key] = key === "filename"

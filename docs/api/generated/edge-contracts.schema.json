@@ -1509,6 +1509,407 @@
           "properties": {
             "action": {
               "type": "string",
+              "const": "list_individual_accounts"
+            },
+            "payload": {
+              "type": "object",
+              "properties": {
+                "search": {
+                  "type": "string"
+                },
+                "status": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "search",
+                "status"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "action",
+            "payload"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "action": {
+              "type": "string",
+              "const": "create_individual_account"
+            },
+            "payload": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "auth_email": {
+                  "type": "string",
+                  "format": "email",
+                  "pattern": "^(?:[A-Za-z0-9_'+\\-]+\\.)*[A-Za-z0-9_'+\\-]*[A-Za-z0-9_+-]@(?:[A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+                },
+                "password": {
+                  "type": "string",
+                  "minLength": 8
+                },
+                "plan_code": {
+                  "type": "string",
+                  "enum": [
+                    "individual_yearly",
+                    "individual_monthly"
+                  ]
+                },
+                "max_items": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "exclusiveMinimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "max_borrowers": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "exclusiveMinimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "checkout_due_hours": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "feature_flags": {
+                  "type": "object",
+                  "properties": {
+                    "enable_notifications": {
+                      "type": "boolean"
+                    },
+                    "enable_bulk_item_import": {
+                      "type": "boolean"
+                    },
+                    "enable_bulk_borrower_tools": {
+                      "type": "boolean"
+                    },
+                    "enable_status_tracking": {
+                      "type": "boolean"
+                    },
+                    "enable_barcode_generator": {
+                      "type": "boolean"
+                    }
+                  },
+                  "additionalProperties": false
+                },
+                "contact_name": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "support_email": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "format": "email",
+                      "pattern": "^(?:[A-Za-z0-9_'+\\-]+\\.)*[A-Za-z0-9_'+\\-]*[A-Za-z0-9_+-]@(?:[A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "billing_email": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "format": "email",
+                      "pattern": "^(?:[A-Za-z0-9_'+\\-]+\\.)*[A-Za-z0-9_'+\\-]*[A-Za-z0-9_+-]@(?:[A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "billing_status": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "enum": [
+                        "draft",
+                        "active",
+                        "past_due",
+                        "canceled"
+                      ]
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "renewal_date": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "invoice_reference": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "name",
+                "auth_email"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "action",
+            "payload"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "action": {
+              "type": "string",
+              "const": "update_individual_account"
+            },
+            "payload": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "format": "uuid",
+                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                },
+                "name": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "auth_email": {
+                  "type": "string",
+                  "format": "email",
+                  "pattern": "^(?:[A-Za-z0-9_'+\\-]+\\.)*[A-Za-z0-9_'+\\-]*[A-Za-z0-9_+-]@(?:[A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+                },
+                "plan_code": {
+                  "type": "string",
+                  "enum": [
+                    "individual_yearly",
+                    "individual_monthly"
+                  ]
+                },
+                "max_items": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "exclusiveMinimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "max_borrowers": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "exclusiveMinimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "checkout_due_hours": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "feature_flags": {
+                  "type": "object",
+                  "properties": {
+                    "enable_notifications": {
+                      "type": "boolean"
+                    },
+                    "enable_bulk_item_import": {
+                      "type": "boolean"
+                    },
+                    "enable_bulk_borrower_tools": {
+                      "type": "boolean"
+                    },
+                    "enable_status_tracking": {
+                      "type": "boolean"
+                    },
+                    "enable_barcode_generator": {
+                      "type": "boolean"
+                    }
+                  },
+                  "additionalProperties": false
+                },
+                "contact_name": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "support_email": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "format": "email",
+                      "pattern": "^(?:[A-Za-z0-9_'+\\-]+\\.)*[A-Za-z0-9_'+\\-]*[A-Za-z0-9_+-]@(?:[A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "billing_email": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "format": "email",
+                      "pattern": "^(?:[A-Za-z0-9_'+\\-]+\\.)*[A-Za-z0-9_'+\\-]*[A-Za-z0-9_+-]@(?:[A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "billing_status": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "enum": [
+                        "draft",
+                        "active",
+                        "past_due",
+                        "canceled"
+                      ]
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "renewal_date": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "invoice_reference": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "id",
+                "name",
+                "auth_email"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "action",
+            "payload"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "action": {
+              "type": "string",
+              "const": "set_individual_account_status"
+            },
+            "payload": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "format": "uuid",
+                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "active",
+                    "suspended",
+                    "archived"
+                  ]
+                }
+              },
+              "required": [
+                "id",
+                "status"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "action",
+            "payload"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "action": {
+              "type": "string",
+              "const": "send_individual_account_reset"
+            },
+            "payload": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "format": "uuid",
+                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                }
+              },
+              "required": [
+                "id"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "action",
+            "payload"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "action": {
+              "type": "string",
               "const": "create_workspace"
             },
             "payload": {
@@ -1536,8 +1937,7 @@
                   "enum": [
                     "workspace",
                     "education",
-                    "custom",
-                    "individual"
+                    "custom"
                   ]
                 },
                 "plan_code": {
@@ -1595,8 +1995,7 @@
                   "enum": [
                     "workspace",
                     "education",
-                    "custom",
-                    "individual"
+                    "custom"
                   ]
                 },
                 "plan_code": {
@@ -1852,6 +2251,795 @@
                 ],
                 "additionalProperties": false
               }
+            },
+            "ok": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "ok"
+          ],
+          "additionalProperties": false
+        },
+        "list_individual_accounts": {
+          "type": "object",
+          "properties": {
+            "data": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "active",
+                      "suspended",
+                      "archived"
+                    ]
+                  },
+                  "created_at": {
+                    "type": "string"
+                  },
+                  "archived_at": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "purge_after": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "purge_state": {
+                    "type": "string"
+                  },
+                  "primary_admin_profile_id": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "primary_admin_email": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "checkout_due_hours": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "account_category": {
+                    "type": "string",
+                    "const": "individual"
+                  },
+                  "plan_code": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "enum": [
+                          "workspace_core",
+                          "workspace_growth",
+                          "workspace_enterprise",
+                          "education",
+                          "custom",
+                          "individual_yearly",
+                          "individual_monthly"
+                        ]
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "feature_flags": {
+                    "type": "object",
+                    "properties": {
+                      "enable_notifications": {
+                        "type": "boolean"
+                      },
+                      "enable_bulk_item_import": {
+                        "type": "boolean"
+                      },
+                      "enable_bulk_borrower_tools": {
+                        "type": "boolean"
+                      },
+                      "enable_status_tracking": {
+                        "type": "boolean"
+                      },
+                      "enable_barcode_generator": {
+                        "type": "boolean"
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  "max_items": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "max_borrowers": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "contact_name": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "support_email": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "billing_email": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "billing_status": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "enum": [
+                          "draft",
+                          "active",
+                          "past_due",
+                          "canceled"
+                        ]
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "renewal_date": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "invoice_reference": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  }
+                },
+                "required": [
+                  "id",
+                  "name",
+                  "status",
+                  "created_at",
+                  "archived_at",
+                  "account_category"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "ok": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "ok"
+          ],
+          "additionalProperties": false
+        },
+        "create_individual_account": {
+          "type": "object",
+          "properties": {
+            "data": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "active",
+                    "suspended",
+                    "archived"
+                  ]
+                },
+                "created_at": {
+                  "type": "string"
+                },
+                "archived_at": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "purge_after": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "purge_state": {
+                  "type": "string"
+                },
+                "primary_admin_profile_id": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "primary_admin_email": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "checkout_due_hours": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "account_category": {
+                  "type": "string",
+                  "const": "individual"
+                },
+                "plan_code": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "enum": [
+                        "workspace_core",
+                        "workspace_growth",
+                        "workspace_enterprise",
+                        "education",
+                        "custom",
+                        "individual_yearly",
+                        "individual_monthly"
+                      ]
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "feature_flags": {
+                  "type": "object",
+                  "properties": {
+                    "enable_notifications": {
+                      "type": "boolean"
+                    },
+                    "enable_bulk_item_import": {
+                      "type": "boolean"
+                    },
+                    "enable_bulk_borrower_tools": {
+                      "type": "boolean"
+                    },
+                    "enable_status_tracking": {
+                      "type": "boolean"
+                    },
+                    "enable_barcode_generator": {
+                      "type": "boolean"
+                    }
+                  },
+                  "additionalProperties": false
+                },
+                "max_items": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "max_borrowers": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "contact_name": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "support_email": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "billing_email": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "billing_status": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "enum": [
+                        "draft",
+                        "active",
+                        "past_due",
+                        "canceled"
+                      ]
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "renewal_date": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "invoice_reference": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "id",
+                "name",
+                "status",
+                "created_at",
+                "archived_at",
+                "account_category"
+              ],
+              "additionalProperties": false
+            },
+            "ok": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "ok"
+          ],
+          "additionalProperties": false
+        },
+        "update_individual_account": {
+          "type": "object",
+          "properties": {
+            "data": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "active",
+                    "suspended",
+                    "archived"
+                  ]
+                },
+                "created_at": {
+                  "type": "string"
+                },
+                "archived_at": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "purge_after": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "purge_state": {
+                  "type": "string"
+                },
+                "primary_admin_profile_id": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "primary_admin_email": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "checkout_due_hours": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "account_category": {
+                  "type": "string",
+                  "const": "individual"
+                },
+                "plan_code": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "enum": [
+                        "workspace_core",
+                        "workspace_growth",
+                        "workspace_enterprise",
+                        "education",
+                        "custom",
+                        "individual_yearly",
+                        "individual_monthly"
+                      ]
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "feature_flags": {
+                  "type": "object",
+                  "properties": {
+                    "enable_notifications": {
+                      "type": "boolean"
+                    },
+                    "enable_bulk_item_import": {
+                      "type": "boolean"
+                    },
+                    "enable_bulk_borrower_tools": {
+                      "type": "boolean"
+                    },
+                    "enable_status_tracking": {
+                      "type": "boolean"
+                    },
+                    "enable_barcode_generator": {
+                      "type": "boolean"
+                    }
+                  },
+                  "additionalProperties": false
+                },
+                "max_items": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "max_borrowers": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "contact_name": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "support_email": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "billing_email": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "billing_status": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "enum": [
+                        "draft",
+                        "active",
+                        "past_due",
+                        "canceled"
+                      ]
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "renewal_date": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "invoice_reference": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "id",
+                "name",
+                "status",
+                "created_at",
+                "archived_at",
+                "account_category"
+              ],
+              "additionalProperties": false
+            },
+            "ok": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "ok"
+          ],
+          "additionalProperties": false
+        },
+        "set_individual_account_status": {
+          "type": "object",
+          "properties": {
+            "data": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "active",
+                    "suspended",
+                    "archived"
+                  ]
+                },
+                "created_at": {
+                  "type": "string"
+                },
+                "archived_at": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "purge_after": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "purge_state": {
+                  "type": "string"
+                },
+                "primary_admin_profile_id": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "primary_admin_email": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "checkout_due_hours": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "account_category": {
+                  "type": "string",
+                  "const": "individual"
+                },
+                "plan_code": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "enum": [
+                        "workspace_core",
+                        "workspace_growth",
+                        "workspace_enterprise",
+                        "education",
+                        "custom",
+                        "individual_yearly",
+                        "individual_monthly"
+                      ]
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "feature_flags": {
+                  "type": "object",
+                  "properties": {
+                    "enable_notifications": {
+                      "type": "boolean"
+                    },
+                    "enable_bulk_item_import": {
+                      "type": "boolean"
+                    },
+                    "enable_bulk_borrower_tools": {
+                      "type": "boolean"
+                    },
+                    "enable_status_tracking": {
+                      "type": "boolean"
+                    },
+                    "enable_barcode_generator": {
+                      "type": "boolean"
+                    }
+                  },
+                  "additionalProperties": false
+                },
+                "max_items": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "max_borrowers": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "contact_name": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "support_email": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "billing_email": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "billing_status": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "enum": [
+                        "draft",
+                        "active",
+                        "past_due",
+                        "canceled"
+                      ]
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "renewal_date": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "invoice_reference": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "id",
+                "name",
+                "status",
+                "created_at",
+                "archived_at",
+                "account_category"
+              ],
+              "additionalProperties": false
+            },
+            "ok": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "ok"
+          ],
+          "additionalProperties": false
+        },
+        "send_individual_account_reset": {
+          "type": "object",
+          "properties": {
+            "data": {
+              "type": "object",
+              "properties": {
+                "success": {
+                  "type": "boolean"
+                },
+                "auth_email": {
+                  "type": "string",
+                  "format": "email",
+                  "pattern": "^(?:[A-Za-z0-9_'+\\-]+\\.)*[A-Za-z0-9_'+\\-]*[A-Za-z0-9_+-]@(?:[A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+                }
+              },
+              "required": [
+                "success",
+                "auth_email"
+              ],
+              "additionalProperties": false
             },
             "ok": {
               "type": "boolean"
@@ -2403,6 +3591,11 @@
       },
       "required": [
         "list_workspaces",
+        "list_individual_accounts",
+        "create_individual_account",
+        "update_individual_account",
+        "set_individual_account_status",
+        "send_individual_account_reset",
         "create_workspace",
         "update_workspace",
         "set_workspace_status",

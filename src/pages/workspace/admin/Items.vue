@@ -160,14 +160,14 @@
             </td>
             <td>{{ item.name }}</td>
             <td>{{ item.barcode }}</td>
-            <td v-if="!isIndividualAccount">
+            <td>
               <span class="serial-number">
                 {{ item.serial_number || "-" }}
               </span>
             </td>
             <td>{{ item.status }}</td>
             <td class="item-notes-cell" data-session-replay-mask>{{ item.notes || "-" }}</td>
-            <td>
+            <td v-if="!isIndividualAccount">
               <span class="scoped-accounts-cell" data-session-replay-mask :title="scopedAccountsTitle(item)">
                 {{ scopedAccountsLabel(item) }}
               </span>

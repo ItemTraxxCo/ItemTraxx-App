@@ -34,6 +34,7 @@ const NAV_GROUPS: NavGroup[] = [
     name: "Organizations",
     items: [
       { icon: "building", label: "Workspaces", routeName: "super-admin-workspaces" },
+      { icon: "user", label: "Individual Accounts", routeName: "super-admin-individual-accounts" },
       { icon: "user", label: "Workspace Admins", routeName: "super-admin-admins" },
       { icon: "idCard", label: "Tenant Accounts", routeName: "super-admin-tenant-accounts" },
       { icon: "shield", label: "Super Admins", routeName: "super-admin-super-admins" },

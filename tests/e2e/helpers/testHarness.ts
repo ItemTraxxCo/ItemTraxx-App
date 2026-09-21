@@ -183,6 +183,14 @@ export const mockSuperWorkspaceMutate = async (page: Page) => {
       });
       return;
     }
+    if (body.action === "list_individual_accounts") {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ ok: true, data: [] }),
+      });
+      return;
+    }
 
     await route.fulfill({
       status: 200,

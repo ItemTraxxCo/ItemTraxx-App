@@ -43,6 +43,10 @@
         <SuperAdminIcon name="plus" />
         New Workspace
       </RouterLink>
+      <RouterLink class="quick-action" to="/super-admin/individual-accounts">
+        <SuperAdminIcon name="user" />
+        Individual Accounts
+      </RouterLink>
       <RouterLink class="quick-action" to="/super-admin/broadcasts">
         <SuperAdminIcon name="megaphone" />
         New Broadcast

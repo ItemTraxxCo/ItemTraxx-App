@@ -80,6 +80,11 @@ const isRetryableNetworkFailure = (status: number, message: string) => {
 };
 
 class CheckoutRequestError extends Error {
+  // HTTP failures are classified by edgeFunctionClient already. It promotes
+  // 5xx responses with request metadata, so the page catch must not report the
+  // same handled response a second time.
+  readonly reportToErrorTracking = false;
+
   constructor(
     message: string,
     readonly status: number,

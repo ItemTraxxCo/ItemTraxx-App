@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("./cookieConsentService", () => ({
   allowsAnalytics: vi.fn(),
@@ -39,6 +39,23 @@ const mockedDiagnostics = vi.mocked(allowsDiagnostics);
 const mockedSessionReplay = vi.mocked(allowsSessionReplay);
 const mockedClearReplayHandoff = vi.mocked(clearReplaySessionHandoff);
 
+const originalLocation = window.location;
+const setHostname = (hostname: string) => {
+  Object.defineProperty(window, "location", {
+    value: { ...window.location, hostname },
+    writable: true,
+    configurable: true,
+  });
+};
+
+const restoreLocation = () => {
+  Object.defineProperty(window, "location", {
+    value: originalLocation,
+    writable: true,
+    configurable: true,
+  });
+};
+
 // `initialized`/`posthog` are module-level singletons in posthogService, so each
 // describe block that needs a distinct lifecycle state (never-initialized vs.
 // successfully-initialized) loads its own fresh module instance via resetModules,
@@ -58,9 +75,12 @@ const initializedModule = async () => {
   return mod;
 };
 
+beforeEach(() => setHostname("app.itemtraxx.com"));
+
 afterEach(() => {
   vi.unstubAllEnvs();
   vi.clearAllMocks();
+  restoreLocation();
 });
 
 describe("initPostHog", () => {
@@ -112,6 +132,22 @@ describe("initPostHog", () => {
       }),
     );
     expect(posthogMock.init.mock.calls[0]?.[1]).not.toHaveProperty("bootstrap");
+  });
+
+  it("disables exception autocapture on localhost", async () => {
+    setHostname("localhost");
+    vi.stubEnv("VITE_POSTHOG_PROJECT_TOKEN", "tok_123");
+    mockedAllows.mockReturnValue(true);
+    mockedDiagnostics.mockReturnValue(true);
+    mockedSessionReplay.mockReturnValue(false);
+    const mod = await loadFreshModule();
+
+    await mod.initPostHog();
+
+    expect(posthogMock.init).toHaveBeenCalledWith(
+      "tok_123",
+      expect.objectContaining({ capture_exceptions: false }),
+    );
   });
 
   it("initializes posthog-js with the configured token once token + consent are both present", async () => {
@@ -419,6 +455,15 @@ describe("capturePostHogException", () => {
     expect(posthogMock.captureException).not.toHaveBeenCalled();
   });
 
+  it("does not send exception diagnostics from localhost", async () => {
+    setHostname("localhost");
+    const mod = await initializedModule();
+
+    mod.capturePostHogException(new Error("local development failure"));
+
+    expect(posthogMock.captureException).not.toHaveBeenCalled();
+  });
+
   it("maps an unexpected error to an opaque fixed category", async () => {
     const mod = await initializedModule();
 
@@ -547,6 +592,22 @@ describe("captureHandledRequestFailure", () => {
 
     expect(posthogMock.captureException).not.toHaveBeenCalled();
   });
+
+  it("does not send handled request failures from localhost", async () => {
+    setHostname("localhost");
+    const mod = await initializedModule();
+
+    await mod.captureHandledRequestFailure({
+      area: "edge_function",
+      name: "checkoutReturn",
+      path: "/functions/checkoutReturn",
+      method: "POST",
+      status: 500,
+      message: "Local development failure.",
+    });
+
+    expect(posthogMock.captureException).not.toHaveBeenCalled();
+  });
 });
 
 describe("before_send exception filter", () => {
@@ -576,6 +637,14 @@ describe("before_send exception filter", () => {
     void mod;
 
     expect(getBeforeSend()(opaqueScriptEvent)).toBeNull();
+  });
+
+  it("drops all exception events on localhost", async () => {
+    setHostname("localhost");
+    const mod = await initializedModule();
+    void mod;
+
+    expect(getBeforeSend()({ event: "$exception", properties: {} })).toBeNull();
   });
 
   it("keeps a \"Script error.\" event that carries a real stack", async () => {

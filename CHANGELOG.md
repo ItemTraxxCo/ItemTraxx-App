@@ -6,9 +6,15 @@ This changelog highlights major user-facing ItemTraxx updates.
 
 ---
 
+### 9/10/2026 - Platform auth migration
+
+- Migrated the platform to 'Better Auth' for improved security and reliability.
+- Added support for multi-factor authentication (MFA) and improved account recovery.
+- Added support for single sign-on (SSO) and improved enterprise account management.
+
 ### 8/28/2026 - QOL improvements
 
-- Unified workspace admin and tenant sign in into one sign in page
+- Unified workspace admin and tenant sign in into one sign in page.
 
 ### 7/28/2026 - Major offline transaction improvements
 

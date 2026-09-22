@@ -179,8 +179,7 @@
         </div>
 
         <section class="plan-grid plan-grid-two" aria-label="Individual pricing plans">
-          <article class="plan-card plan-card-disabled">
-            <span class="unavailable-badge">Currently unavailable</span>
+          <article class="plan-card">
             <h3>Individual Yearly Plan</h3>
             <p class="plan-meta">Single-user plan</p>
             <p class="price">$70.00<span>/year</span></p>
@@ -192,8 +191,7 @@
             <p class="onboarding">Onboarding not available.</p>
           </article>
 
-          <article class="plan-card plan-card-disabled">
-            <span class="unavailable-badge">Currently unavailable</span>
+          <article class="plan-card">
             <h3>Individual Monthly Plan</h3>
             <p class="plan-meta">Single-user plan</p>
             <p class="price">$7.00<span>/month</span></p>
@@ -580,30 +578,6 @@ import PublicFooter from "../components/PublicFooter.vue";
 
 .plan-highlight {
   border-color: var(--text);
-}
-
-.plan-card-disabled {
-  position: relative;
-  pointer-events: none;
-}
-
-.plan-card-disabled > :not(.unavailable-badge) {
-  opacity: 0.55;
-  filter: grayscale(0.6);
-}
-
-.unavailable-badge {
-  align-self: flex-start;
-  margin-bottom: 0.6rem;
-  padding: 0.25rem 0.7rem;
-  border-radius: 999px;
-  border: 1px solid var(--border);
-  background: var(--surface-2);
-  color: var(--muted);
-  font-size: 0.76rem;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
 }
 
 .plan-card-full {

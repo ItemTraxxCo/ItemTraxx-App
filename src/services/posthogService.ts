@@ -469,13 +469,11 @@ const isCspUnsafeEvalExceptionEvent = (
   );
 };
 
-// A script served cross-origin without CORS strips the error the browser hands
-// to window.onerror down to a bare synthetic "Script error." with no message,
-// source, or stack. These entries carry no information to triage, so drop them
-// here. The crossorigin="anonymous" attribute on the Turnstile script
-// (useTurnstile.ts) lets real errors through with a full stack instead.
-const isOpaqueScriptExceptionEvent = (
-  properties?: Record<string, unknown>,
+// Match a single exception the browser synthesizes for window.onerror with no
+// stack frames. isMatch receives the trimmed exception value.
+const isSyntheticStacklessException = (
+  properties: Record<string, unknown> | undefined,
+  isMatch: (value: string) => boolean,
 ) => {
   const exceptionList = properties?.$exception_list;
   if (!Array.isArray(exceptionList) || exceptionList.length !== 1) return false;
@@ -488,11 +486,19 @@ const isOpaqueScriptExceptionEvent = (
   const frames = entry.stacktrace?.frames;
   return (
     typeof entry.value === "string" &&
-    entry.value.trim() === "Script error." &&
+    isMatch(entry.value.trim()) &&
     entry.mechanism?.synthetic === true &&
     (!Array.isArray(frames) || frames.length === 0)
   );
 };
+
+// A script served cross-origin without CORS strips the error the browser hands
+// to window.onerror down to a bare synthetic "Script error." with no message,
+// source, or stack. These entries carry no information to triage, so drop them
+// here. The crossorigin="anonymous" attribute on the Turnstile script
+// (useTurnstile.ts) lets real errors through with a full stack instead.
+const isOpaqueScriptExceptionEvent = (properties?: Record<string, unknown>) =>
+  isSyntheticStacklessException(properties, (value) => value === "Script error.");
 
 const isRecoverableChunkLoadExceptionEvent = (
   properties?: Record<string, unknown>,
@@ -506,6 +512,16 @@ const isRecoverableChunkLoadExceptionEvent = (
       isRecoverableChunkLoadError((entry as { value?: unknown }).value),
   );
 };
+
+// The browser emits "ResizeObserver loop ..." through window.onerror when a
+// ResizeObserver callback changes layout and the layout does not settle in one
+// frame. The app's only observer (useTopBannerLayout.ts) writes the banner
+// heights that feed --top-banner-offset, so this is expected and the layout
+// settles on the next frame. The event is synthetic and carries no stack, so
+// drop it here to keep the exception feed actionable.
+const isResizeObserverLoopExceptionEvent = (properties?: Record<string, unknown>) =>
+  isSyntheticStacklessException(properties, (value) =>
+    value.startsWith("ResizeObserver loop"));
 
 const initializePostHog = async () => {
   if (initialized) return;
@@ -576,7 +592,8 @@ const initializePostHog = async () => {
           (
             isCspUnsafeEvalExceptionEvent(safeEvent.properties) ||
             isRecoverableChunkLoadExceptionEvent(safeEvent.properties) ||
-            isOpaqueScriptExceptionEvent(safeEvent.properties)
+            isOpaqueScriptExceptionEvent(safeEvent.properties) ||
+            isResizeObserverLoopExceptionEvent(safeEvent.properties)
           )
         ) {
           return null;

@@ -170,6 +170,22 @@ describe("useAdminSessionLifecycle", () => {
     wrapper.unmount();
   });
 
+  it("uses validation as the periodic session keepalive after the initial bootstrap", async () => {
+    const auth = buildAuth({ isAuthenticated: true, role: "workspace_admin", userId: "u1" });
+    const route = buildRoute();
+    const { wrapper } = mountHost({ auth, route });
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(mockedTouchAccountSession).toHaveBeenCalledTimes(1);
+    expect(mockedValidateAccountSession).toHaveBeenCalledTimes(1);
+
+    await vi.advanceTimersByTimeAsync(ADMIN_POLL_INTERVAL_MS);
+
+    expect(mockedTouchAccountSession).toHaveBeenCalledTimes(1);
+    expect(mockedValidateAccountSession).toHaveBeenCalledTimes(2);
+    wrapper.unmount();
+  });
+
   it("logs the workspace admin out after the idle timeout on an admin area", async () => {
     const auth = buildAuth({ isAuthenticated: true, role: "workspace_admin", userId: "u1" });
     const route = buildRoute();

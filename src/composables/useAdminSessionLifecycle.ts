@@ -84,6 +84,7 @@ export const useAdminSessionLifecycle = (options: AdminSessionLifecycleOptions) 
   let validationRetryTimer: number | null = null;
   let resolveValidationRetry: (() => void) | null = null;
   let authSessionEpoch = 0;
+  let bootstrappedSessionEpoch: number | null = null;
   let adminCheckGeneration = 0;
   let runningAdminCheckGeneration: number | null = null;
   let disposed = false;
@@ -296,9 +297,12 @@ export const useAdminSessionLifecycle = (options: AdminSessionLifecycleOptions) 
       }
       try {
         const loginContext = consumeLoginContext();
-        await touchAccountSession(
-          loginContext ? { loginMethod: "password", loginLocation: loginContext } : {}
-        );
+        if (loginContext || bootstrappedSessionEpoch !== epoch) {
+          await touchAccountSession(
+            loginContext ? { loginMethod: "password", loginLocation: loginContext } : {}
+          );
+          bootstrappedSessionEpoch = epoch;
+        }
       } catch {
         // Best-effort keepalive; validation below is authoritative.
       }
@@ -315,6 +319,11 @@ export const useAdminSessionLifecycle = (options: AdminSessionLifecycleOptions) 
         ) {
           handleSessionTermination();
         }
+      } else {
+        // validate_session refreshes last_seen_at on the server, so after the
+        // first successful check the periodic lifecycle poll does not need a
+        // second HTTP request to touch the same session.
+        bootstrappedSessionEpoch = epoch;
       }
     } catch (error) {
       if (
@@ -382,6 +391,7 @@ export const useAdminSessionLifecycle = (options: AdminSessionLifecycleOptions) 
     ] as const,
     () => {
       authSessionEpoch += 1;
+      bootstrappedSessionEpoch = null;
     },
   );
   watch(

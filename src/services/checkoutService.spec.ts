@@ -223,7 +223,11 @@ describe("submitCheckoutReturn", () => {
       okResponse({ success: true, processed: 0, skipped_barcodes: ["BC-1"] }) as never
     );
 
-    await expect(submitCheckoutReturn(payload)).rejects.toThrow(/already checked out.*refresh and try again/i);
+    await expect(submitCheckoutReturn(payload)).rejects.toMatchObject({
+      message: expect.stringMatching(/already checked out.*refresh and try again/i),
+      status: 409,
+      reportToErrorTracking: false,
+    });
   });
 
   it("throws a 409 conflict error using the multi-item message when several barcodes are skipped", async () => {

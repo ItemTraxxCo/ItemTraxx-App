@@ -5,6 +5,7 @@ import {
   parseWorkerTraceparent,
   reportWorkerException,
   reportWorkerHttpFailure,
+  withWorkerRequestTelemetry,
   withTraceHeaders,
 } from "./observability.ts";
 
@@ -66,6 +67,48 @@ Deno.test("Worker trace context continues inbound W3C context and injects a chil
     "false",
     "Worker parent export marker",
   );
+});
+
+Deno.test("simple browser request IDs correlate with Worker telemetry without exporting the query", async () => {
+  const originalInfo = console.info;
+  let output = "";
+  console.info = (value?: unknown) => {
+    output = String(value);
+  };
+  const expectedRequestId = "14aa123a-227e-4cba-b554-0b10abd2a10f";
+  try {
+    await withWorkerRequestTelemetry(
+      new Request(
+        `https://edge.itemtraxx.com/functions/admin-ops?itx_request_id=${expectedRequestId}`,
+      ),
+      env(),
+      { waitUntil: (_promise: Promise<unknown>) => {} } as unknown as ExecutionContext,
+      async ({ requestId }) => {
+        assertEquals(requestId, expectedRequestId, "query request ID is retained");
+        return new Response("ok");
+      },
+    );
+  } finally {
+    console.info = originalInfo;
+  }
+  const parsed = JSON.parse(output) as Record<string, unknown>;
+  assertEquals(parsed.request_id, expectedRequestId, "completion log request ID");
+  assert(!output.includes("itx_request_id"), "request ID query is not exported in the log");
+});
+
+Deno.test("Worker ignores unsafe query request IDs", async () => {
+  let resolvedRequestId = "";
+  await withWorkerRequestTelemetry(
+    new Request("https://edge.itemtraxx.com/functions/admin-ops?itx_request_id=bad%0Aid"),
+    env(),
+    { waitUntil: (_promise: Promise<unknown>) => {} } as unknown as ExecutionContext,
+    async ({ requestId }) => {
+      resolvedRequestId = requestId;
+      return new Response("ok");
+    },
+  );
+  assert(!resolvedRequestId.includes("bad"), "unsafe query ID is replaced");
+  assert(resolvedRequestId.length > 0, "Worker generates a fallback request ID");
 });
 
 Deno.test("worker exception logs redact query secrets and do not send a remote payload", async () => {

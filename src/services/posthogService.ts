@@ -375,7 +375,12 @@ type PostHogLogInput = Omit<CaptureLogOptions, "body" | "attributes"> & {
  * browser console output.
  */
 export const capturePostHogLog = (input: PostHogLogInput) => {
-  if (!initialized || !posthog || !allowsDiagnostics(readCookieConsent())) return;
+  if (
+    isLocalhostRuntime() ||
+    !initialized ||
+    !posthog ||
+    !allowsDiagnostics(readCookieConsent())
+  ) return;
   try {
     const record: CaptureLogOptions = {
       body: redactLogText(input.body),

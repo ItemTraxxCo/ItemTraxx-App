@@ -29,6 +29,7 @@ export type WorkerTelemetryHandler = (context: {
 
 const DEFAULT_SAMPLE_RATE = 0.1;
 const TRACEPARENT_RE = /^([0-9a-f]{2})-([0-9a-f]{32})-([0-9a-f]{16})-([0-9a-f]{2})(-.*)?$/;
+const REQUEST_ID_QUERY_VALUE_RE = /^[A-Za-z0-9_-]{1,96}$/;
 const EMAIL_PATTERN = /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi;
 const TOKEN_PATTERN = /\b(?:eyJ[a-z0-9_-]{10,}|[a-z0-9_-]{24,}\.[a-z0-9_-]{12,}\.[a-z0-9_-]{12,})\b/gi;
 const QUERY_SECRET_PATTERN = /\b(access_token|refresh_token|id_token|token|secret|signature|code)=([^&#\s]+)/gi;
@@ -250,7 +251,13 @@ export const withWorkerRequestTelemetry = async (
   _ctx: ExecutionContext,
   handler: WorkerTelemetryHandler,
 ) => {
-  const requestId = request.headers.get("x-request-id")?.trim() || crypto.randomUUID();
+  const headerRequestId = request.headers.get("x-request-id")?.trim();
+  const queryRequestId = new URL(request.url).searchParams.get("itx_request_id")?.trim();
+  const requestId = headerRequestId ||
+    (queryRequestId && REQUEST_ID_QUERY_VALUE_RE.test(queryRequestId)
+      ? queryRequestId
+      : undefined) ||
+    crypto.randomUUID();
   const trace = createWorkerTraceContext(request, env);
   const startedAt = Date.now();
   let status = 500;

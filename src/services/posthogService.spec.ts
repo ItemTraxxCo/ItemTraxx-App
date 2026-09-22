@@ -556,48 +556,57 @@ describe("captureHandledRequestFailure", () => {
     expect(posthogMock.captureException).toHaveBeenCalledOnce();
   });
 
-  it("captures a critical transport failure with its endpoint context and deduplicates retries", async () => {
+  it("does not promote handled network, timeout, auth, or rate-limit outcomes to error tracking", async () => {
     const mod = await initializedModule();
-    const failure = {
-      area: "edge_function" as const,
-      name: "offline-checkout",
-      path: "/functions/offline-checkout",
-      method: "POST",
-      status: 0,
-      message: "Network request failed before response.",
-      errorCode: "network" as const,
-      requestId: "request-1",
-    };
+    const handledOutcomes = [
+      {
+        area: "edge_function",
+        name: "admin-ops",
+        path: "/functions/admin-ops",
+        method: "POST",
+        status: 0,
+        message: "Network request failed before response.",
+        errorCode: "network",
+      },
+      {
+        area: "edge_function",
+        name: "system-status",
+        path: "/functions/system-status",
+        method: "GET",
+        status: 0,
+        message: "System status request timed out.",
+        errorCode: "timeout",
+      },
+      {
+        area: "http_session",
+        name: "/api/auth/get-session",
+        path: "/api/auth/get-session",
+        method: "GET",
+        status: 0,
+        message: "Authentication request failed before response.",
+        errorCode: "network",
+      },
+      {
+        area: "edge_function",
+        name: "admin-ops",
+        path: "/functions/admin-ops",
+        method: "POST",
+        status: 403,
+        message: "Permission denied.",
+      },
+      {
+        area: "authenticated_data",
+        name: "/rest/v1/items",
+        path: "/rest/v1/items",
+        method: "GET",
+        status: 429,
+        message: "Rate limit exceeded.",
+      },
+    ] as const;
 
-    await mod.captureHandledRequestFailure(failure);
-    await mod.captureHandledRequestFailure(failure);
-
-    expect(posthogMock.captureException).toHaveBeenCalledOnce();
-    const [capturedError, properties] = posthogMock.captureException.mock.calls[0] ?? [];
-    expect(capturedError).toMatchObject({
-      name: "ItemTraxxHandledRequestFailure",
-      message: "Handled request failure: network",
-    });
-    expect(properties).toEqual(expect.objectContaining({
-      error_code: "network",
-      request_area: "edge_function",
-      request_operation: "offline-checkout",
-      request_status: 0,
-      path: "/functions/offline-checkout",
-    }));
-  });
-
-  it("does not promote expected auth responses to error tracking", async () => {
-    const mod = await initializedModule();
-
-    await mod.captureHandledRequestFailure({
-      area: "http_session",
-      name: "/api/auth/sign-in/email",
-      path: "/api/auth/sign-in/email",
-      method: "POST",
-      status: 401,
-      message: "Invalid credentials.",
-    });
+    for (const failure of handledOutcomes) {
+      await mod.captureHandledRequestFailure(failure);
+    }
 
     expect(posthogMock.captureException).not.toHaveBeenCalled();
   });

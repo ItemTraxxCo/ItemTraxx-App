@@ -826,49 +826,16 @@ export type HandledRequestFailure = {
   requestId?: string;
 };
 
-const CRITICAL_EDGE_FUNCTIONS = new Set([
-  "super-dashboard",
-  "super-workspace-mutate",
-  "admin-ops",
-  "offline-checkout",
-  "system-status",
-  "workspace-admin-mutate",
-  "privileged-step-up",
-  "checkoutReturn",
-]);
-
-const CRITICAL_DATA_PATH_PATTERNS = [
-  /^\/rest\/v1\/(profiles|borrowers|items|admin_audit_logs|audit_logs)(?:\/|$)/i,
-  /^\/rest\/v1\/rpc\/consume_rate_limit(?:\/|$)/i,
-  /^\/auth\/session\/(exchange|refresh)(?:\/|$)/i,
-];
-
-const CRITICAL_AUTH_PATH_PATTERNS = [
-  /^\/api\/auth\//i,
-];
-
 const HANDLED_FAILURE_DEDUP_WINDOW_MS = 60_000;
 const handledFailureSeenAt = new Map<string, number>();
 
-const shouldCaptureHandledRequestFailure = (failure: HandledRequestFailure) => {
-  if (failure.status >= 500) return true;
-  if (failure.area === "edge_function") {
-    if (failure.status === 0) return CRITICAL_EDGE_FUNCTIONS.has(failure.name);
-    return (failure.status === 401 || failure.status === 403 || failure.status === 429) &&
-      CRITICAL_EDGE_FUNCTIONS.has(failure.name);
-  }
-  if (failure.area === "http_session") {
-    // Invalid credentials and expired sessions are expected auth outcomes. A
-    // transport failure or a server error is actionable, so only promote those.
-    return failure.status === 0 &&
-      CRITICAL_AUTH_PATH_PATTERNS.some((pattern) => pattern.test(failure.path));
-  }
-  if (failure.status === 0) {
-    return CRITICAL_DATA_PATH_PATTERNS.some((pattern) => pattern.test(failure.path));
-  }
-  return (failure.status === 401 || failure.status === 403 || failure.status === 429) &&
-    CRITICAL_DATA_PATH_PATTERNS.some((pattern) => pattern.test(failure.path));
-};
+// These failures are already handled by the request client and emitted as
+// structured PostHog logs. Promote only server responses to Error Tracking:
+// browser/network timeouts, expected auth/rate-limit responses, and background
+// health-probe failures are not uncaught application errors and create noisy
+// synthetic issues when wrapped in captureException.
+const shouldCaptureHandledRequestFailure = (failure: HandledRequestFailure) =>
+  failure.status >= 500;
 
 const getHandledRequestFailureCode = (failure: HandledRequestFailure): PostHogErrorCode => {
   if (failure.errorCode && isPostHogErrorCode(failure.errorCode)) return failure.errorCode;

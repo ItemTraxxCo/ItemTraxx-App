@@ -26,7 +26,10 @@ import {
   findActiveSession,
   resolveDeviceSessionContext,
 } from "./actions/sessions.ts";
-import { resolveWorkspacePolicyState } from "./actions/settings.ts";
+import {
+  defaultFeatureFlags,
+  resolveWorkspacePolicyState,
+} from "./actions/settings.ts";
 import type { AdminOpsContext } from "./context.ts";
 import { logError, withRequestSpan } from "../_shared/observability.ts";
 
@@ -184,21 +187,28 @@ serve((req) => withRequestSpan(req, "POST /functions/admin-ops", async (span, re
       normalizedAction === "revoke_current_session" ||
       normalizedAction === "revoke_session" ||
       normalizedAction === "revoke_all_sessions";
+    const requiresWorkspaceStatus = !isSessionAction ||
+      normalizedAction === "revoke_current_session" ||
+      normalizedAction === "revoke_session" ||
+      normalizedAction === "revoke_all_sessions";
 
     const workspaceId = profile.workspace_id as string;
-    const { data: workspaceStatus, error: workspaceStatusError } = await adminClient
-      .from("workspaces")
-      .select("status")
-      .eq("id", workspaceId)
-      .maybeSingle();
-    const workspaceAccess = resolveWorkspaceAccess(
-      workspaceStatus,
-      workspaceStatusError,
-    );
-    if (workspaceAccess.reason === "unavailable") {
-      return jsonResponse(503, { error: "Workspace status unavailable" });
+    let isWorkspaceSuspended = false;
+    if (requiresWorkspaceStatus) {
+      const { data: workspaceStatus, error: workspaceStatusError } = await adminClient
+        .from("workspaces")
+        .select("status")
+        .eq("id", workspaceId)
+        .maybeSingle();
+      const workspaceAccess = resolveWorkspaceAccess(
+        workspaceStatus,
+        workspaceStatusError,
+      );
+      if (workspaceAccess.reason === "unavailable") {
+        return jsonResponse(503, { error: "Workspace status unavailable" });
+      }
+      isWorkspaceSuspended = workspaceAccess.reason === "disabled";
     }
-    const isWorkspaceSuspended = workspaceAccess.reason === "disabled";
     const deviceSession = resolveDeviceSessionContext(payloadRecord, req);
 
     const sessionSecurityContext = {
@@ -243,27 +253,44 @@ serve((req) => withRequestSpan(req, "POST /functions/admin-ops", async (span, re
       }
     }
 
-    const [maintenanceRuntimeResult, updateRuntimeResult] = await Promise.all([
-      adminClient
-        .from("app_runtime_config")
-        .select("value")
-        .eq("key", "maintenance_mode")
-        .maybeSingle(),
-      adminClient
-        .from("app_runtime_config")
-        .select("value")
-        .eq("key", "workspace_updates")
-        .maybeSingle(),
-    ]);
-    const maintenance = resolveMaintenance(
-      maintenanceRuntimeResult.data?.value,
-    );
+    // Session lifecycle actions only need the account_sessions tables. The
+    // runtime and workspace-policy values are used by the product actions,
+    // not by touch/validate/list/revoke; loading them here added four more
+    // database round trips to every keepalive request and made a slow config
+    // query look like an unrelated admin-ops timeout in the browser.
+    let workspacePolicy: Awaited<ReturnType<typeof resolveWorkspacePolicyState>>["workspacePolicy"] = null;
+    let checkoutDueHours = 72;
+    let featureFlags = defaultFeatureFlags();
+    let maintenance = resolveMaintenance(undefined);
+    let workspaceUpdates = normalizeWorkspaceUpdates(undefined);
+    if (!isSessionAction) {
+      const [maintenanceRuntimeResult, updateRuntimeResult] = await Promise.all([
+        adminClient
+          .from("app_runtime_config")
+          .select("value")
+          .eq("key", "maintenance_mode")
+          .maybeSingle(),
+        adminClient
+          .from("app_runtime_config")
+          .select("value")
+          .eq("key", "workspace_updates")
+          .maybeSingle(),
+      ]);
+      maintenance = resolveMaintenance(
+        maintenanceRuntimeResult.data?.value,
+      );
 
-    const { workspacePolicy, checkoutDueHours, featureFlags } =
-      await resolveWorkspacePolicyState(adminClient, workspaceId);
+      const resolvedPolicy = await resolveWorkspacePolicyState(
+        adminClient,
+        workspaceId,
+      );
+      workspacePolicy = resolvedPolicy.workspacePolicy;
+      checkoutDueHours = resolvedPolicy.checkoutDueHours;
+      featureFlags = resolvedPolicy.featureFlags;
 
-    const updateRuntimeValue = updateRuntimeResult.data?.value;
-    const workspaceUpdates = normalizeWorkspaceUpdates(updateRuntimeValue);
+      const updateRuntimeValue = updateRuntimeResult.data?.value;
+      workspaceUpdates = normalizeWorkspaceUpdates(updateRuntimeValue);
+    }
 
     const actionAuthorizationFailure = await authorizeAdminOpsAction({
       action: normalizedAction,

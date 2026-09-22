@@ -22,6 +22,7 @@ let posthogReadyPromise: Promise<void> | null = null;
 const SERVICE_NAME = "itemtraxx-web";
 const APP_ENVIRONMENT = import.meta.env.VITE_POSTHOG_ENVIRONMENT?.trim() || import.meta.env.MODE || "production";
 const APP_VERSION = import.meta.env.VITE_GIT_COMMIT?.trim() || "n/a";
+const LOCALHOST_HOSTS = new Set(["localhost", "127.0.0.1", "0.0.0.0", "::1", "[::1]"]);
 const EMAIL_PATTERN = /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/i;
 const EMAIL_REDACTION_PATTERN = /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi;
 const SENSITIVE_PROPERTY_KEY =
@@ -37,6 +38,15 @@ const SDK_MANAGED_PROPERTY_KEYS = [
   "$session_id",
   "$device_id",
 ] as const;
+
+// Local development intentionally exercises failing requests. Those failures
+// must not enter the shared PostHog project, where the exception alerting path
+// would treat them as staging/production incidents.
+const isLocalhostRuntime = () => {
+  if (typeof window === "undefined") return false;
+  const hostname = window.location?.hostname?.trim().toLowerCase() || "";
+  return LOCALHOST_HOSTS.has(hostname) || hostname.endsWith(".localhost");
+};
 
 export type PostHogErrorCode =
   | "unauthorized"
@@ -549,9 +559,10 @@ const initializePostHog = async () => {
       capture_dead_clicks: false,
       // Exception autocapture is diagnostics, not analytics. Keep the SDK's
       // global handlers disabled unless that separate consent is present.
-      capture_exceptions: allowsDiagnostics(currentConsent),
+      capture_exceptions: allowsDiagnostics(currentConsent) && !isLocalhostRuntime(),
       before_send: (event) => {
         if (!event) return null;
+        if (event.event === "$exception" && isLocalhostRuntime()) return null;
         if (event.event === "$exception" && !allowsDiagnostics(readCookieConsent())) {
           return null;
         }
@@ -683,7 +694,7 @@ export const syncPostHogConsent = () => {
     const diagnosticsAllowed = allowsDiagnostics(consent);
     const sessionReplayAllowed = allowsSessionReplay(consent);
     posthog.set_config({
-      capture_exceptions: diagnosticsAllowed,
+      capture_exceptions: diagnosticsAllowed && !isLocalhostRuntime(),
       capture_pageview: analyticsAllowed ? "history_change" : false,
       capture_pageleave: analyticsAllowed,
       disable_persistence: !analyticsAllowed,
@@ -762,6 +773,7 @@ export const capturePostHogException = (
   additionalProperties?: Record<string, string | number | boolean | null | undefined>,
 ) => {
   if (
+    isLocalhostRuntime() ||
     !initialized ||
     !posthog ||
     !allowsDiagnostics(readCookieConsent()) ||
@@ -849,7 +861,7 @@ const getHandledRequestFailureCode = (failure: HandledRequestFailure): PostHogEr
 
 /** Capture an expected request failure at a high-value boundary without the raw response body. */
 export const captureHandledRequestFailure = async (failure: HandledRequestFailure) => {
-  if (!shouldCaptureHandledRequestFailure(failure)) return;
+  if (isLocalhostRuntime() || !shouldCaptureHandledRequestFailure(failure)) return;
   if (!allowsDiagnostics(readCookieConsent())) return;
   await initPostHog();
   if (!(await waitForPostHogReady()) || !posthog) return;

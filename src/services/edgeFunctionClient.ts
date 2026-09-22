@@ -24,6 +24,7 @@ type EdgeFunctionResult<TData> = {
 import { clearAdminVerification, clearAuthState } from "../store/authState";
 import { getEdgeFunctionsBaseUrl } from "./edgeUrls";
 import { captureHandledRequestFailure, capturePostHogLog } from "./posthogDiagnostics";
+import { createRequestId } from "./requestId";
 
 const getDefaultHeaders = (accessToken?: string) => {
   const headers: Record<string, string> = {};
@@ -33,13 +34,6 @@ const getDefaultHeaders = (accessToken?: string) => {
   }
 
   return headers;
-};
-
-const createRequestId = () => {
-  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
-    return crypto.randomUUID();
-  }
-  return `itx-${Date.now()}-${Math.floor(performance.now() * 1000)}`;
 };
 
 const EDGE_FUNCTION_TIMEOUT_MS = 10000;
@@ -75,6 +69,15 @@ const requestEdgeFunction = async <TData = unknown, TBody = unknown>(
   const requestId = createRequestId();
   const startedAt = performance.now();
   if (!useSimpleCorsRequest) headers["x-request-id"] = requestId;
+  const requestUrl = new URL(`${baseUrl}/${functionName}`, window.location.origin);
+  if (useSimpleCorsRequest) {
+    // Query parameters preserve CORS-simple requests while correlating the
+    // browser failure with the edge proxy's request logs.
+    requestUrl.searchParams.set("itx_request_id", requestId);
+  }
+  const fetchUrl = baseUrl.startsWith("/")
+    ? `${requestUrl.pathname}${requestUrl.search}`
+    : requestUrl.toString();
   const init: RequestInit = { method, headers };
 
   if (options.body !== undefined && method !== "GET") {
@@ -92,7 +95,7 @@ const requestEdgeFunction = async <TData = unknown, TBody = unknown>(
     const timeoutId = window.setTimeout(() => controller.abort(), EDGE_FUNCTION_TIMEOUT_MS);
     let response: Response;
     try {
-      response = await fetch(`${baseUrl}/${functionName}`, {
+      response = await fetch(fetchUrl, {
         ...init,
         credentials: "include",
         signal: controller.signal,

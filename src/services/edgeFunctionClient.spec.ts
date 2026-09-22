@@ -39,7 +39,9 @@ describe("invokeEdgeFunction CORS transport", () => {
 
     expect(result).toMatchObject({ ok: true, requestId: "worker-request" });
     const [url, init] = vi.mocked(fetch).mock.calls[0]!;
-    expect(url).toBe("https://edge.example.com/functions/super-workspace-mutate");
+    const parsedUrl = new URL(url as string);
+    expect(parsedUrl.pathname).toBe("/functions/super-workspace-mutate");
+    expect(parsedUrl.searchParams.get("itx_request_id")).toMatch(/^[a-f0-9-]{36}$/i);
     const headers = init?.headers as Record<string, string>;
     expect(headers["Content-Type"]).toBe("text/plain;charset=UTF-8");
     expect(headers["x-request-id"]).toBeUndefined();
@@ -62,6 +64,7 @@ describe("invokeEdgeFunction CORS transport", () => {
     const headers = init?.headers as Record<string, string>;
     expect(headers["Content-Type"]).toBe("application/json");
     expect(headers["x-request-id"]).toEqual(expect.any(String));
+    expect(new URL(vi.mocked(fetch).mock.calls[0]![0] as string).search).toBe("");
   });
 
   it("uses a CORS-simple GET for cookie-authenticated dashboard requests", async () => {
@@ -76,7 +79,9 @@ describe("invokeEdgeFunction CORS transport", () => {
 
     expect(result).toMatchObject({ ok: true, requestId: "worker-request" });
     const [url, init] = vi.mocked(fetch).mock.calls[0]!;
-    expect(url).toBe("https://edge.example.com/functions/super-dashboard");
+    const parsedUrl = new URL(url as string);
+    expect(parsedUrl.pathname).toBe("/functions/super-dashboard");
+    expect(parsedUrl.searchParams.get("itx_request_id")).toMatch(/^[a-f0-9-]{36}$/i);
     const headers = init?.headers as Record<string, string>;
     expect(headers["x-request-id"]).toBeUndefined();
     expect(init?.credentials).toBe("include");

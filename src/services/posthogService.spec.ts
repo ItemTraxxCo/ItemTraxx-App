@@ -382,6 +382,15 @@ describe("capturePostHogLog", () => {
 
     expect(posthogMock.captureLog).not.toHaveBeenCalled();
   });
+
+  it("does not send application diagnostics logs from localhost", async () => {
+    setHostname("localhost");
+    const mod = await initializedModule();
+
+    mod.capturePostHogLog({ body: "local request failure", level: "error" });
+
+    expect(posthogMock.captureLog).not.toHaveBeenCalled();
+  });
 });
 
 describe("identifyPostHogUser", () => {

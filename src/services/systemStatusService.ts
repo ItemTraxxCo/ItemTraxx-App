@@ -1,6 +1,7 @@
 import { getEdgeFunctionsBaseUrl } from "./edgeUrls";
 import { fetchWithTransientRetry } from "./fetchWithTransientRetry";
 import { captureHandledRequestFailure, capturePostHogLog } from "./posthogDiagnostics";
+import { createRequestId } from "./requestId";
 
 export type SystemStatusPayload = {
   status?: string;
@@ -32,6 +33,16 @@ type SystemStatusResponse = {
 const STATUS_FUNCTION_NAME = import.meta.env.VITE_STATUS_FUNCTION || "system-status";
 const STATUS_CACHE_TTL_MS = 10_000;
 const statusRoute = () => `/functions/${STATUS_FUNCTION_NAME}`;
+const withRequestId = (functionsBaseUrl: string, requestId: string) => {
+  const requestUrl = new URL(
+    `${functionsBaseUrl}/${STATUS_FUNCTION_NAME}`,
+    window.location.origin,
+  );
+  requestUrl.searchParams.set("itx_request_id", requestId);
+  return functionsBaseUrl.startsWith("/")
+    ? `${requestUrl.pathname}${requestUrl.search}`
+    : requestUrl.toString();
+};
 
 const isAbortError = (error: unknown) =>
   typeof DOMException !== "undefined" &&
@@ -55,11 +66,14 @@ const fetchAndCacheSystemStatus = async (timeoutMs: number) => {
   const controller = new AbortController();
   const timeoutId = window.setTimeout(() => controller.abort(), timeoutMs);
   const startedAt = performance.now();
+  const requestId = createRequestId();
+  const requestUrl = withRequestId(functionsBaseUrl, requestId);
   try {
-    const response = await fetchWithTransientRetry(`${functionsBaseUrl}/${STATUS_FUNCTION_NAME}`, {
+    const response = await fetchWithTransientRetry(requestUrl, {
       method: "GET",
       signal: controller.signal,
     });
+    const responseRequestId = response.headers.get("x-request-id") ?? requestId;
     const payload = (await response.json().catch(() => ({}))) as SystemStatusPayload;
     const result: SystemStatusResponse = {
       ok: response.ok,
@@ -75,6 +89,7 @@ const fetchAndCacheSystemStatus = async (timeoutMs: number) => {
         method: "GET",
         status: response.status,
         message: `System status request failed (${response.status}).`,
+        requestId: responseRequestId,
       });
       capturePostHogLog({
         body: "system status request completed",
@@ -84,6 +99,7 @@ const fetchAndCacheSystemStatus = async (timeoutMs: number) => {
           operation: `GET ${route}`,
           status: response.status,
           latency_ms: Math.round(performance.now() - startedAt),
+          request_id: responseRequestId,
           error_code: response.status >= 500 ? "server_error" : "request_failed",
         },
       });
@@ -102,6 +118,7 @@ const fetchAndCacheSystemStatus = async (timeoutMs: number) => {
       status: 0,
       message: isAbortError(error) ? "System status request timed out before response." : "System status request failed before response.",
       errorCode,
+      requestId,
     });
     capturePostHogLog({
       body: "system status request failed before response",
@@ -111,6 +128,7 @@ const fetchAndCacheSystemStatus = async (timeoutMs: number) => {
         operation: `GET ${route}`,
         status: 0,
         latency_ms: Math.round(performance.now() - startedAt),
+        request_id: requestId,
         error_code: errorCode,
       },
     });
@@ -146,8 +164,9 @@ export const probeSystemStatusTransport = async (timeoutMs = 3500) => {
 
   const controller = new AbortController();
   const timeoutId = window.setTimeout(() => controller.abort(), timeoutMs);
+  const requestId = createRequestId();
   try {
-    await fetch(`${functionsBaseUrl}/${STATUS_FUNCTION_NAME}`, {
+    await fetch(withRequestId(functionsBaseUrl, requestId), {
       method: "GET",
       mode: "no-cors",
       cache: "no-store",
@@ -165,6 +184,7 @@ export const probeSystemStatusTransport = async (timeoutMs = 3500) => {
       status: 0,
       message: isAbortError(error) ? "System status transport probe timed out." : "System status transport probe failed.",
       errorCode,
+      requestId,
     });
     return false;
   } finally {

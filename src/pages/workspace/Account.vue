@@ -322,6 +322,8 @@ const loadSessions = async () => {
       closeSessionMenu();
     }
   } catch (err) {
+    sessions.value = [];
+    closeSessionMenu();
     sessionError.value = toUserFacingErrorMessage(err, "Unable to load sessions.");
   }
 };

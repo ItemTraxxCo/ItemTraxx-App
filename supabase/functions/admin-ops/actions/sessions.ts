@@ -4,6 +4,10 @@ import {
 } from "../../_shared/postgrestErrors.ts";
 import { resolveTrustedGeneralLocation as resolveGeneralLocation } from "../../_shared/requestMetadata.ts";
 import { isAccountTokenBlockedBySessionRevocation } from "../../_shared/accountSessions.ts";
+import {
+  isBetterAuthSessionActive,
+  listActiveBetterAuthSessionIds,
+} from "../../_shared/betterAuthSessions.ts";
 import { optionalText } from "../../_shared/validation.ts";
 import type {
   AdminOpsContext,
@@ -16,6 +20,7 @@ export type SessionSecurityContext = Pick<
   | "adminClient"
   | "workspaceId"
   | "user"
+  | "betterAuthUserId"
   | "authToken"
   | "authSessionBinding"
   | "authTokenBindingKey"
@@ -96,6 +101,27 @@ export const findActiveSession = async (context: SessionSecurityContext) => {
       relationMissing: false as const,
       revoked: true as const,
     };
+  }
+  if (context.betterAuthUserId) {
+    const betterAuthSession = await isBetterAuthSessionActive(
+      context.adminClient,
+      context.betterAuthUserId,
+      context.authSessionBinding.sessionId,
+    );
+    if (betterAuthSession.relationMissing) {
+      return {
+        exists: false as const,
+        relationMissing: true as const,
+        revoked: false as const,
+      };
+    }
+    if (!betterAuthSession.active) {
+      return {
+        exists: false as const,
+        relationMissing: false as const,
+        revoked: true as const,
+      };
+    }
   }
   const { data, error } = await context.adminClient
     .from("account_sessions")
@@ -477,7 +503,26 @@ export const handleSessionAction = async (
           error: "Unable to load active devices.",
         });
     }
-    const rows = data ?? [];
+    let rows = data ?? [];
+    if (context.betterAuthUserId) {
+      const authSessionIds = rows
+        .map((row) => row.auth_session_id)
+        .filter((sessionId): sessionId is string =>
+          typeof sessionId === "string" && sessionId.trim().length > 0
+        );
+      const activeBetterAuthSessions = await listActiveBetterAuthSessionIds(
+        context.adminClient,
+        context.betterAuthUserId,
+        authSessionIds,
+      );
+      if (activeBetterAuthSessions.relationMissing) {
+        return sessionUnavailable(context, 503);
+      }
+      rows = rows.filter((row) =>
+        typeof row.auth_session_id === "string" &&
+        activeBetterAuthSessions.sessionIds.has(row.auth_session_id)
+      );
+    }
     const dedupedRows = new Map<string, (typeof rows)[number]>();
     for (const row of rows) {
       const dedupeKey = row.device_id || row.id;

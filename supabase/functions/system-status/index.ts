@@ -77,6 +77,10 @@ type IncidentWidgetPayload = {
 // Slack remains the real-time alerting path, so a status payload up to two
 // minutes stale here costs nothing operationally.
 const INCIDENT_CACHE_TTL_MS = 120_000;
+// Keep the optional Incident.io dependency below the browser's 3.5s status
+// probe deadline. A slow widget should degrade the incident check, not make
+// the whole health request look like a client-side network timeout.
+const INCIDENT_FETCH_TIMEOUT_MS = 2_000;
 const STATUS_RATE_LIMIT_PER_MINUTE = 60;
 const STATUS_RATE_LIMIT_WINDOW_SECONDS = 60;
 const STATUS_DIRECT_GLOBAL_LIMIT_PER_MINUTE = 600;
@@ -388,7 +392,7 @@ serve((req) => withRequestSpan(req, "GET /functions/system-status", async (span,
     } else if (incidentWidgetUrl) {
       try {
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 3500);
+        const timeoutId = setTimeout(() => controller.abort(), INCIDENT_FETCH_TIMEOUT_MS);
         let response: Response;
         try {
           response = await fetch(incidentWidgetUrl, {

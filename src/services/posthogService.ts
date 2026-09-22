@@ -507,6 +507,35 @@ const isRecoverableChunkLoadExceptionEvent = (
   );
 };
 
+// The browser emits "ResizeObserver loop ..." through window.onerror when a
+// ResizeObserver callback changes layout and the layout does not settle in one
+// frame. The app's only observer (useTopBannerLayout.ts) writes the banner
+// heights that feed --top-banner-offset, so this is expected and the layout
+// settles on the next frame. The event is synthetic and carries no stack, so
+// drop it here to keep the exception feed actionable.
+const RESIZE_OBSERVER_LOOP_PATTERN =
+  /^ResizeObserver loop (?:completed with undelivered notifications|limit exceeded)/i;
+
+const isResizeObserverLoopExceptionEvent = (
+  properties?: Record<string, unknown>,
+) => {
+  const exceptionList = properties?.$exception_list;
+  if (!Array.isArray(exceptionList) || exceptionList.length !== 1) return false;
+  const entry = exceptionList[0] as {
+    value?: unknown;
+    stacktrace?: { frames?: unknown[] };
+    mechanism?: { synthetic?: unknown };
+  } | null;
+  if (!entry || typeof entry !== "object") return false;
+  const frames = entry.stacktrace?.frames;
+  return (
+    typeof entry.value === "string" &&
+    RESIZE_OBSERVER_LOOP_PATTERN.test(entry.value.trim()) &&
+    entry.mechanism?.synthetic === true &&
+    (!Array.isArray(frames) || frames.length === 0)
+  );
+};
+
 const initializePostHog = async () => {
   if (initialized) return;
   const token = import.meta.env.VITE_POSTHOG_PROJECT_TOKEN?.trim();
@@ -576,7 +605,8 @@ const initializePostHog = async () => {
           (
             isCspUnsafeEvalExceptionEvent(safeEvent.properties) ||
             isRecoverableChunkLoadExceptionEvent(safeEvent.properties) ||
-            isOpaqueScriptExceptionEvent(safeEvent.properties)
+            isOpaqueScriptExceptionEvent(safeEvent.properties) ||
+            isResizeObserverLoopExceptionEvent(safeEvent.properties)
           )
         ) {
           return null;

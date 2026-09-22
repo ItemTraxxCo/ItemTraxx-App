@@ -699,6 +699,55 @@ describe("before_send exception filter", () => {
     });
   });
 
+  it("drops a synthetic ResizeObserver loop notice", async () => {
+    const mod = await initializedModule();
+    void mod;
+
+    const event = {
+      event: "$exception",
+      properties: {
+        $exception_list: [
+          {
+            type: "Error",
+            value: "ResizeObserver loop completed with undelivered notifications.",
+            stacktrace: { frames: [] },
+            mechanism: { synthetic: true, handled: false },
+          },
+        ],
+      },
+    };
+
+    expect(getBeforeSend()(event)).toBeNull();
+  });
+
+  it("keeps a ResizeObserver error that carries a real stack", async () => {
+    const mod = await initializedModule();
+    void mod;
+
+    const event = {
+      event: "$exception",
+      properties: {
+        $exception_list: [
+          {
+            type: "Error",
+            value: "ResizeObserver loop completed with undelivered notifications.",
+            stacktrace: { frames: [{ filename: "app.js" }] },
+            mechanism: { synthetic: false },
+          },
+        ],
+      },
+    };
+
+    expect(getBeforeSend()(event)).toMatchObject({
+      event: "$exception",
+      properties: {
+        $exception_list: [
+          { value: "ResizeObserver loop completed with undelivered notifications." },
+        ],
+      },
+    });
+  });
+
   it("keeps a regular exception event", async () => {
     const mod = await initializedModule();
     void mod;

@@ -8,6 +8,7 @@ import { requireTrustedEdgeIngress } from "../_shared/trustedIngress.ts";
 import { readJsonBody } from "../_shared/requestBody.ts";
 import { sha256Hex } from "../_shared/sha256.ts";
 import { resolveAccountAuthSessionBinding } from "../_shared/accountSessions.ts";
+import { isBetterAuthSessionActive } from "../_shared/betterAuthSessions.ts";
 import { resolveWorkspaceAccess } from "../_shared/workspaceAccess.ts";
 import {
   asRecord,
@@ -137,7 +138,7 @@ serve((req) => withRequestSpan(req, "POST /functions/admin-ops", async (span, re
 
     const { data: profile, error: profileError } = await adminClient
       .from("profiles")
-      .select("workspace_id, role, is_active")
+      .select("workspace_id, role, is_active, better_auth_user_id")
       .eq("id", user.id)
       .single();
 
@@ -154,6 +155,20 @@ serve((req) => withRequestSpan(req, "POST /functions/admin-ops", async (span, re
     }
     if (profile.is_active === false) {
       return jsonResponse(403, { error: "Access denied" });
+    }
+
+    const betterAuthSession = await isBetterAuthSessionActive(
+      adminClient,
+      profile.better_auth_user_id,
+      authSessionBinding.sessionId,
+    );
+    if (betterAuthSession.relationMissing) {
+      return jsonResponse(503, {
+        error: "Session controls unavailable. Run latest SQL setup.",
+      });
+    }
+    if (!betterAuthSession.active) {
+      return jsonResponse(401, { error: "Session revoked" });
     }
 
     const { data: rateLimit, error: rateLimitError } = await userClient.rpc(
@@ -215,6 +230,7 @@ serve((req) => withRequestSpan(req, "POST /functions/admin-ops", async (span, re
       adminClient,
       workspaceId,
       user: { id: user.id },
+      betterAuthUserId: profile.better_auth_user_id,
       authToken,
       authSessionBinding,
       authTokenBindingKey,
@@ -309,6 +325,7 @@ serve((req) => withRequestSpan(req, "POST /functions/admin-ops", async (span, re
       payload: payloadRecord,
       adminClient,
       user: { id: user.id },
+      betterAuthUserId: profile.better_auth_user_id,
       workspaceId,
       authToken,
       authSessionBinding,

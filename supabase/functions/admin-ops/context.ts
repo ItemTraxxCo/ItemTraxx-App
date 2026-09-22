@@ -56,6 +56,8 @@ export type AdminOpsContext = {
   payload: Record<string, unknown>;
   adminClient: SupabaseClient;
   user: { id: string };
+  /** Better Auth user id used to bind every admin operation to its live session. */
+  betterAuthUserId?: string | null;
   workspaceId: string;
   authToken: string;
   authSessionBinding: { sessionId: string | null; issuedAt: string | null };

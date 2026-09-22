@@ -99,9 +99,14 @@ const makeClient = (
     return query;
   };
 
+  const schema = (schemaName: string) => ({
+    from: (table: string) => from(`${schemaName}.${table}`),
+  });
+
   return {
     client: {
       from,
+      schema,
       // Production session validation verifies the Better Auth JWT through the
       // external-auth bridge. Keep the test double on that same boundary so
       // query sequences exercise the intended session logic instead of
@@ -909,6 +914,52 @@ Deno.test("handleSessionAction list_sessions flags a sibling-origin row sharing 
     sessions.every((session) => !("auth_session_id" in session)),
     "expected auth_session_id to never be exposed in the response",
   );
+});
+
+Deno.test("handleSessionAction list_sessions omits registry rows absent from Better Auth", async () => {
+  const rows = [
+    {
+      id: "session-1",
+      device_id: "device-1",
+      device_label: "Front Desk",
+      user_agent: "ua-1",
+      auth_session_id: "auth-session-live",
+      created_at: "2026-07-01T00:00:00.000Z",
+      last_seen_at: "2026-07-02T00:00:00.000Z",
+    },
+    {
+      id: "session-2",
+      device_id: "device-2",
+      device_label: "Revoked dashboard device",
+      user_agent: "ua-2",
+      auth_session_id: "auth-session-revoked",
+      created_at: "2026-07-01T00:00:00.000Z",
+      last_seen_at: "2026-07-01T00:00:00.000Z",
+    },
+  ];
+  const { client, calls } = makeClient(
+    sequence([
+      { data: rows, error: null },
+      {
+        data: [{ id: "auth-session-live", expiresAt: "2099-01-01T00:00:00.000Z" }],
+        error: null,
+      },
+    ]),
+  );
+  const response = await handleSessionAction(
+    adminOpsContextFor("list_sessions", client, {}, {
+      betterAuthUserId: "better-auth-user-1",
+    }),
+  );
+
+  assertEquals(response.status, 200);
+  const body = await responseBody(response);
+  const sessions = (body.data as { sessions: Array<Record<string, unknown>> }).sessions;
+  assertEquals(sessions.map((session) => session.id), ["session-1"]);
+  assertEquals(calls.map((call) => call.table), [
+    "account_sessions",
+    "better_auth.session",
+  ]);
 });
 
 Deno.test("handleSessionAction list_sessions retries without optional metadata columns", async () => {

@@ -498,10 +498,23 @@ describe("capturePostHogException", () => {
     expect(posthogMock.captureException).not.toHaveBeenCalled();
   });
 
-  it("captures non-NOT_FOUND AppErrors as a fixed diagnostic code", async () => {
+  it("suppresses AppErrors explicitly marked as expected", async () => {
     const mod = await initializedModule();
     const { AppError } = await import("./appErrors");
     const error = new AppError("NETWORK", "Network request failed", { reportToErrorTracking: false });
+
+    mod.capturePostHogException(error);
+
+    expect(posthogMock.captureException).not.toHaveBeenCalled();
+  });
+
+  it("captures explicitly reportable operational AppErrors as a fixed diagnostic code", async () => {
+    const mod = await initializedModule();
+    const { AppError } = await import("./appErrors");
+    const error = new AppError("REQUEST_FAILED", "Database request failed", {
+      status: 500,
+      reportToErrorTracking: true,
+    });
 
     mod.capturePostHogException(error);
 
@@ -509,10 +522,10 @@ describe("capturePostHogException", () => {
     expect(capturedError).not.toBe(error);
     expect(capturedError).toMatchObject({
       name: "AppError",
-      message: "Network request failed",
+      message: "Database request failed",
     });
     expect(capturedError).toHaveProperty("stack");
-    expect(properties).toEqual({ error_code: "network" });
+    expect(properties).toEqual({ error_code: "server_error" });
   });
 
   it("swallows a thrown captureException error", async () => {

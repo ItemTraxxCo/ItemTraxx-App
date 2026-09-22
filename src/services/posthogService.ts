@@ -431,10 +431,17 @@ const isCspUnsafeEvalError = (error: unknown) => {
   );
 };
 
-// PostHog's exception feed has its own policy. Keep the expected borrower/item
-// lookup miss out of it without suppressing other operational failures.
-const shouldCapturePostHogException = (error: unknown) =>
-  !(error instanceof AppError && error.code === "NOT_FOUND");
+// Honor explicit classification first. Handled request failures may already be
+// reported by their request client, while unexpected Errors remain reportable
+// by default. Keep the expected borrower/item lookup fallback too.
+const shouldCapturePostHogException = (error: unknown) => {
+  if (error && typeof error === "object") {
+    const reportToErrorTracking = (error as { reportToErrorTracking?: unknown })
+      .reportToErrorTracking;
+    if (typeof reportToErrorTracking === "boolean") return reportToErrorTracking;
+  }
+  return !(error instanceof AppError && error.code === "NOT_FOUND");
+};
 
 const cloneErrorForPostHog = (error: unknown, errorCode: PostHogErrorCode) => {
   if (!(error instanceof Error)) {

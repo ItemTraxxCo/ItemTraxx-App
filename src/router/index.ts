@@ -818,9 +818,7 @@ const resolveAuthenticatedHomeRoute = (
       : { name: "public-login" };
   }
   if (auth.role === "individual_account") {
-    return hasFreshAdminVerification(auth.adminVerifiedAt)
-      ? { name: "workspace-checkout" }
-      : { name: "public-login" };
+    return { name: "workspace-checkout" };
   }
   if (auth.role === "tenant_account" && auth.workspaceContextId) {
     return { name: "workspace-checkout" };
@@ -850,7 +848,8 @@ const resolveProtectedRoute = (
     : [];
   if (requiredRoles.length && (!auth.role || !requiredRoles.includes(auth.role))) return accessDeniedFor(to);
   if (
-    (auth.role === "workspace_admin" || auth.role === "individual_account") &&
+    (auth.role === "workspace_admin" ||
+      (auth.role === "individual_account" && to.name !== "workspace-checkout")) &&
     requiredRoles.includes(auth.role) &&
     !hasFreshAdminVerification(auth.adminVerifiedAt)
   ) {

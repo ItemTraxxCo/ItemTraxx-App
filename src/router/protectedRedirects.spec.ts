@@ -22,6 +22,21 @@ const setTenantSession = (workspaceId = "workspace-1") => {
   });
 };
 
+const setIndividualSession = (minutesOld = 16) => {
+  const signedInAt = new Date(Date.now() - minutesOld * 60 * 1000).toISOString();
+  setAuthStateFromBackend({
+    isInitialized: true,
+    isAuthenticated: true,
+    userId: "individual-1",
+    email: "individual@example.com",
+    signedInAt,
+    role: "individual_account",
+    sessionWorkspaceId: "workspace-1",
+    workspaceContextId: "workspace-1",
+    adminVerifiedAt: signedInAt,
+  });
+};
+
 describe("protected route redirects", () => {
   beforeEach(async () => {
     clearAuthState(true);
@@ -44,6 +59,30 @@ describe("protected route redirects", () => {
     await router.push("/checkout");
 
     expect(router.currentRoute.value.name).toBe("workspace-checkout");
+  });
+
+  it("keeps an individual account on checkout after admin verification expires", async () => {
+    setIndividualSession();
+
+    await router.push("/checkout");
+
+    expect(router.currentRoute.value.name).toBe("workspace-checkout");
+  });
+
+  it("routes an individual account from the public home page to checkout after verification expires", async () => {
+    setIndividualSession();
+
+    await router.push("/");
+
+    expect(router.currentRoute.value.name).toBe("workspace-checkout");
+  });
+
+  it("still requires fresh verification for other individual-account routes", async () => {
+    setIndividualSession();
+
+    await router.push("/account");
+
+    expect(router.currentRoute.value.name).toBe("public-login");
   });
 
   it("denies workspace admins access to checkout", async () => {

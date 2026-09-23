@@ -5,8 +5,6 @@ import { getWorkspaceState } from "../store/workspaceState";
 import { buildWorkspaceAppUrl, lookupWorkspaceById } from "../services/workspaceService";
 import { sanitizeReturnTo } from "./returnTo";
 
-const ADMIN_VERIFICATION_TTL_MS = 15 * 60 * 1000;
-const SUPER_VERIFICATION_TTL_MS = 15 * 60 * 1000;
 const isInternalHostRuntime = () =>
   typeof window !== "undefined" &&
   window.location.hostname === "internal.itemtraxx.com";
@@ -675,28 +673,6 @@ const router = createRouter({
   },
 });
 
-const hasFreshAdminVerification = (adminVerifiedAt: string | null) => {
-  if (!adminVerifiedAt) {
-    return false;
-  }
-  const verifiedAtMs = Date.parse(adminVerifiedAt);
-  if (Number.isNaN(verifiedAtMs)) {
-    return false;
-  }
-  return Date.now() - verifiedAtMs <= ADMIN_VERIFICATION_TTL_MS;
-};
-
-const hasFreshSuperVerification = (superVerifiedAt: string | null) => {
-  if (!superVerifiedAt) {
-    return false;
-  }
-  const verifiedAtMs = Date.parse(superVerifiedAt);
-  if (Number.isNaN(verifiedAtMs)) {
-    return false;
-  }
-  return Date.now() - verifiedAtMs <= SUPER_VERIFICATION_TTL_MS;
-};
-
 const notFoundFor = (path: string) => ({
   name: "not-found",
   params: {
@@ -740,7 +716,7 @@ const resolveInternalHostRoute = async (
   if (!auth.isAuthenticated || auth.role !== "super_admin") {
     return { name: "internal-auth" };
   }
-  if (!auth.hasSecondaryAuth || !hasFreshSuperVerification(auth.superVerifiedAt)) {
+  if (!auth.hasSecondaryAuth) {
     return { name: "internal-auth" };
   }
   await loadAuthenticatedStyles();
@@ -808,14 +784,12 @@ const resolveAuthenticatedHomeRoute = (
 ) => {
   if (!auth.isInitialized || !auth.isAuthenticated || to.name !== "public-home") return undefined;
   if (auth.role === "super_admin") {
-    return auth.hasSecondaryAuth && hasFreshSuperVerification(auth.superVerifiedAt)
+    return auth.hasSecondaryAuth
       ? { name: "super-admin-home" }
       : { name: "super-auth" };
   }
   if (auth.role === "workspace_admin") {
-    return hasFreshAdminVerification(auth.adminVerifiedAt)
-      ? { name: "workspace-admin-home" }
-      : { name: "public-login" };
+    return { name: "workspace-admin-home" };
   }
   if (auth.role === "individual_account") {
     return { name: "workspace-checkout" };
@@ -848,14 +822,6 @@ const resolveProtectedRoute = (
     : [];
   if (requiredRoles.length && (!auth.role || !requiredRoles.includes(auth.role))) return accessDeniedFor(to);
   if (
-    (auth.role === "workspace_admin" ||
-      (auth.role === "individual_account" && to.name !== "workspace-checkout")) &&
-    requiredRoles.includes(auth.role) &&
-    !hasFreshAdminVerification(auth.adminVerifiedAt)
-  ) {
-    return { name: "public-login" };
-  }
-  if (
     meta.requiresWorkspaceMatch &&
     auth.sessionWorkspaceId &&
     auth.workspaceContextId &&
@@ -872,11 +838,6 @@ const resolveProtectedRoute = (
     return accessDeniedFor(to);
   }
   if (meta.requiresSuperAuth && !auth.hasSecondaryAuth) {
-    return to.path.startsWith("/internal")
-      ? { name: "internal-auth" }
-      : { name: "super-auth" };
-  }
-  if (meta.requiresSuperAuth && !hasFreshSuperVerification(auth.superVerifiedAt)) {
     return to.path.startsWith("/internal")
       ? { name: "internal-auth" }
       : { name: "super-auth" };

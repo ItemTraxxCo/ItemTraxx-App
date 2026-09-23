@@ -9,13 +9,14 @@ import {
   setWorkspaceState,
 } from "../store/workspaceState";
 
-const setTenantSession = (workspaceId = "workspace-1") => {
+const setTenantSession = (workspaceId = "workspace-1", minutesOld = 0) => {
+  const signedInAt = new Date(Date.now() - minutesOld * 60 * 1000).toISOString();
   setAuthStateFromBackend({
     isInitialized: true,
     isAuthenticated: true,
     userId: "user-1",
     email: "tenant@example.com",
-    signedInAt: new Date().toISOString(),
+    signedInAt,
     role: "tenant_account",
     sessionWorkspaceId: workspaceId,
     workspaceContextId: workspaceId,
@@ -53,15 +54,15 @@ describe("protected route redirects", () => {
     });
   });
 
-  it("keeps an authenticated account on an allowed workspace route", async () => {
-    setTenantSession();
+  it("keeps a tenant account on an allowed workspace route after an old sign-in", async () => {
+    setTenantSession("workspace-1", 60);
 
     await router.push("/checkout");
 
     expect(router.currentRoute.value.name).toBe("workspace-checkout");
   });
 
-  it("keeps an individual account on checkout after admin verification expires", async () => {
+  it("keeps an individual account on checkout after the old verification timestamp", async () => {
     setIndividualSession();
 
     await router.push("/checkout");
@@ -69,7 +70,7 @@ describe("protected route redirects", () => {
     expect(router.currentRoute.value.name).toBe("workspace-checkout");
   });
 
-  it("routes an individual account from the public home page to checkout after verification expires", async () => {
+  it("routes an individual account from the public home page after the old verification timestamp", async () => {
     setIndividualSession();
 
     await router.push("/");
@@ -77,12 +78,31 @@ describe("protected route redirects", () => {
     expect(router.currentRoute.value.name).toBe("workspace-checkout");
   });
 
-  it("still requires fresh verification for other individual-account routes", async () => {
+  it("keeps individual-account routes available after the old verification timestamp", async () => {
     setIndividualSession();
 
     await router.push("/account");
 
-    expect(router.currentRoute.value.name).toBe("public-login");
+    expect(router.currentRoute.value.name).toBe("workspace-account");
+  });
+
+  it("keeps workspace-admin routes available after the old verification timestamp", async () => {
+    const verifiedAt = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+    setAuthStateFromBackend({
+      isInitialized: true,
+      isAuthenticated: true,
+      userId: "admin-1",
+      email: "admin@example.com",
+      signedInAt: verifiedAt,
+      role: "workspace_admin",
+      sessionWorkspaceId: "workspace-1",
+      workspaceContextId: "workspace-1",
+      adminVerifiedAt: verifiedAt,
+    });
+
+    await router.push("/admin");
+
+    expect(router.currentRoute.value.name).toBe("workspace-admin-home");
   });
 
   it("denies workspace admins access to checkout", async () => {

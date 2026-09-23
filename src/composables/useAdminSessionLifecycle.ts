@@ -25,33 +25,17 @@ type AdminLifecycleAuthState = {
   isAuthenticated: boolean;
   role: string | null;
   userId: string | null;
-  adminVerifiedAt: string | null;
-  superVerifiedAt: string | null;
 };
 type AdminSessionLifecycleOptions = {
   auth: AdminLifecycleAuthState;
   route: RouteLocationNormalizedLoaded;
   router: Router;
   sessionTermination: ReturnType<typeof getSessionTerminationState>;
-  isDevHost: MaybeRefOrGetter<boolean>;
-  isWorkspaceAdminArea: MaybeRefOrGetter<boolean>;
   shouldTrackAccountSession: MaybeRefOrGetter<boolean>;
   closeMenu: () => void;
 };
 
 const IS_E2E_TEST_MODE = import.meta.env.VITE_E2E_TEST_UTILS === "true";
-const DEFAULT_ADMIN_IDLE_TIMEOUT_MINUTES = 20;
-const MIN_ADMIN_IDLE_TIMEOUT_MINUTES = 5;
-const parsedAdminIdleTimeoutMinutes = Number(
-  import.meta.env.VITE_ADMIN_IDLE_TIMEOUT_MINUTES || DEFAULT_ADMIN_IDLE_TIMEOUT_MINUTES,
-);
-const effectiveAdminIdleTimeoutMinutes =
-  Number.isFinite(parsedAdminIdleTimeoutMinutes) && parsedAdminIdleTimeoutMinutes > 0
-    ? IS_E2E_TEST_MODE
-      ? parsedAdminIdleTimeoutMinutes
-      : Math.max(parsedAdminIdleTimeoutMinutes, MIN_ADMIN_IDLE_TIMEOUT_MINUTES)
-    : DEFAULT_ADMIN_IDLE_TIMEOUT_MINUTES;
-const ADMIN_IDLE_TIMEOUT_MS = effectiveAdminIdleTimeoutMinutes * 60 * 1000;
 const DEFAULT_SESSION_HEARTBEAT_INTERVAL_MS = 30_000;
 const parsedE2EHeartbeatIntervalMs = Number(
   import.meta.env.VITE_E2E_SESSION_HEARTBEAT_INTERVAL_MS || DEFAULT_SESSION_HEARTBEAT_INTERVAL_MS,
@@ -65,19 +49,10 @@ const SESSION_HEARTBEAT_INTERVAL_MS =
 const LOGIN_CONTEXT_QUERY_KEY = "login_ctx";
 const LOGIN_CONTEXT_VALUES = new Set(["admin_login", "regular_login"]);
 
-const ADMIN_ACTIVITY_EVENTS: Array<keyof WindowEventMap> = [
-  "mousemove",
-  "mousedown",
-  "keydown",
-  "touchstart",
-  "scroll",
-];
-
 export const useAdminSessionLifecycle = (options: AdminSessionLifecycleOptions) => {
   const heartbeatEnabled =
     !IS_E2E_TEST_MODE ||
     new URLSearchParams(window.location.search).get("e2e-session-heartbeat") === "1";
-  let idleTimer: number | null = null;
   let adminSessionTimer: number | null = null;
   let heartbeatTimer: number | null = null;
   let terminationRedirectTimer: number | null = null;
@@ -88,14 +63,8 @@ export const useAdminSessionLifecycle = (options: AdminSessionLifecycleOptions) 
   let adminCheckGeneration = 0;
   let runningAdminCheckGeneration: number | null = null;
   let disposed = false;
-  const isIdleLogoutRunning = ref(false);
   const isAdminSessionCheckRunning = ref(false);
   const isSessionHeartbeatRunning = ref(false);
-
-  const clearIdleTimer = () => {
-    if (idleTimer) window.clearTimeout(idleTimer);
-    idleTimer = null;
-  };
 
   const stopAdminSessionPolling = () => {
     if (adminSessionTimer) window.clearInterval(adminSessionTimer);
@@ -173,41 +142,6 @@ export const useAdminSessionLifecycle = (options: AdminSessionLifecycleOptions) 
       terminationRedirectTimer = null;
       void signInAgain();
     }, 5000);
-  };
-
-  const runIdleLogout = async () => {
-    if (isIdleLogoutRunning.value || toValue(options.isDevHost)) return;
-    if (
-      !options.auth.isAuthenticated ||
-      !["workspace_admin", "individual_account"].includes(options.auth.role ?? "") ||
-      !toValue(options.isWorkspaceAdminArea)
-    ) {
-      return;
-    }
-    isIdleLogoutRunning.value = true;
-    try {
-      clearAdminVerification();
-      await options.router.replace("/login");
-    } finally {
-      isIdleLogoutRunning.value = false;
-    }
-  };
-
-  const resetIdleTimer = () => {
-    clearIdleTimer();
-    if (toValue(options.isDevHost)) return;
-    if (
-      !options.auth.isAuthenticated ||
-      !["workspace_admin", "individual_account"].includes(options.auth.role ?? "") ||
-      !toValue(options.isWorkspaceAdminArea)
-    ) {
-      return;
-    }
-    idleTimer = window.setTimeout(() => void runIdleLogout(), ADMIN_IDLE_TIMEOUT_MS);
-  };
-
-  const recordActivity = () => {
-    resetIdleTimer();
   };
 
   const runSessionHeartbeat = async () => {
@@ -357,13 +291,11 @@ export const useAdminSessionLifecycle = (options: AdminSessionLifecycleOptions) 
   };
 
   const start = () => {
-    resetIdleTimer();
     startAdminSessionPolling();
     startSessionHeartbeat();
   };
 
   const stop = () => {
-    clearIdleTimer();
     stopAdminSessionPolling();
     stopSessionHeartbeat();
     clearValidationRetry();
@@ -386,8 +318,6 @@ export const useAdminSessionLifecycle = (options: AdminSessionLifecycleOptions) 
     () => [
       options.auth.isAuthenticated,
       options.auth.userId,
-      options.auth.adminVerifiedAt,
-      options.auth.superVerifiedAt,
     ] as const,
     () => {
       authSessionEpoch += 1;
@@ -418,9 +348,6 @@ export const useAdminSessionLifecycle = (options: AdminSessionLifecycleOptions) 
   start();
 
   onMounted(() => {
-    for (const eventName of ADMIN_ACTIVITY_EVENTS) {
-      window.addEventListener(eventName, recordActivity, { passive: true });
-    }
     document.addEventListener("visibilitychange", handleVisibility);
   });
 
@@ -429,14 +356,10 @@ export const useAdminSessionLifecycle = (options: AdminSessionLifecycleOptions) 
     stop();
     if (terminationRedirectTimer) window.clearTimeout(terminationRedirectTimer);
     terminationRedirectTimer = null;
-    for (const eventName of ADMIN_ACTIVITY_EVENTS) {
-      window.removeEventListener(eventName, recordActivity);
-    }
     document.removeEventListener("visibilitychange", handleVisibility);
   });
 
   return {
-    recordActivity,
     runAdminSessionCheck,
     runSessionHeartbeat,
     signInAgain,

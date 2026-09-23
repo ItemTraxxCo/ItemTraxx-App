@@ -208,12 +208,9 @@ const isWorkspaceScopedRoute = computed(() =>
 const showOfflineQueueToast = computed(() =>
   isWorkspaceScopedRoute.value && !["/checkout", "/admin/return", "/account/return"].includes(route.path),
 );
-const isWorkspaceAdminArea = computed(() =>
-  route.path.startsWith("/admin") || (auth.role === "individual_account" && route.path.startsWith("/account")),
-);
 const shouldTrackAccountSession = computed(() => {
   if (!auth.isAuthenticated) return false;
-  if (auth.role === "workspace_admin") return isWorkspaceAdminArea.value;
+  if (auth.role === "workspace_admin") return route.path.startsWith("/admin");
   if (auth.role === "individual_account") return route.path === "/checkout" || route.path.startsWith("/account");
   if (auth.role === "tenant_account") return isWorkspaceScopedRoute.value;
   return false;
@@ -249,7 +246,7 @@ const showVersionOverlay = computed(() => forceUpdateOverlay.value || (!isDevSub
 const offlineQueue = useOfflineQueueCount(isWorkspaceScopedRoute);
 const onboarding = useOnboarding(auth, route);
 const { appShellStyle, setElements: setTopBannerElements } = useTopBannerLayout();
-const adminSession = useAdminSessionLifecycle({ auth, route, router, sessionTermination, isDevHost: isDevSubdomainHost, isWorkspaceAdminArea, shouldTrackAccountSession, closeMenu: () => { menuOpen.value = false; } });
+const adminSession = useAdminSessionLifecycle({ auth, route, router, sessionTermination, shouldTrackAccountSession, closeMenu: () => { menuOpen.value = false; } });
 const { signInAgain } = adminSession;
 const isRouteNavigating = computed(() => routeLoading.isLoading);
 const brandLogoUrl = computed(() => theme.value === "light" ? lightBrandLogoUrl || darkBrandLogoUrl || "" : darkBrandLogoUrl || lightBrandLogoUrl || "");
@@ -323,15 +320,14 @@ const applySystemStatus = () => {
   };
 };
 
-const hasFreshVerification = (verifiedAt: string | null) => !!verifiedAt && !Number.isNaN(Date.parse(verifiedAt)) && Date.now() - Date.parse(verifiedAt) <= 15 * 60 * 1000;
 let publicHomeRedirectInFlight = false;
 const maybeRedirectAuthenticatedPublicHome = async () => {
   if (publicHomeRedirectInFlight || !["/", "/landing-new", "/about"].includes(route.path) || (killSwitchEnabled.value && route.path === "/") || !auth.isInitialized || !auth.isAuthenticated) return;
   if (district.isWorkspaceHost && district.workspaceId && auth.workspaceContextId && auth.workspaceContextId !== district.workspaceId) return;
   let targetPath: string | null = null;
-  if (auth.role === "super_admin") targetPath = auth.hasSecondaryAuth && hasFreshVerification(auth.superVerifiedAt) ? "/super-admin" : "/super-auth";
-  else if (auth.role === "workspace_admin") targetPath = hasFreshVerification(auth.adminVerifiedAt) ? "/admin" : "/login";
-  else if (auth.role === "individual_account") targetPath = hasFreshVerification(auth.adminVerifiedAt) ? "/checkout" : "/login";
+  if (auth.role === "super_admin") targetPath = auth.hasSecondaryAuth ? "/super-admin" : "/super-auth";
+  else if (auth.role === "workspace_admin") targetPath = "/admin";
+  else if (auth.role === "individual_account") targetPath = "/checkout";
   else if (auth.role === "tenant_account" && auth.workspaceContextId) targetPath = "/checkout";
   if (!targetPath) return;
   publicHomeRedirectInFlight = true;
@@ -370,7 +366,7 @@ watch(() => [killSwitchEnabled.value, route.path] as const, ([enabled, path]) =>
 watch(() => [backendUnavailable.value, route.path] as const, ([unavailable, path]) => {
   if (unavailable && !isUnavailableBypass.value && path !== "/unavailable") void router.replace("/unavailable");
 });
-watch(() => [route.name, auth.isInitialized, auth.isAuthenticated, auth.role, auth.workspaceContextId, auth.adminVerifiedAt, auth.hasSecondaryAuth, auth.superVerifiedAt, district.isWorkspaceHost, district.workspaceId] as const, () => void maybeRedirectAuthenticatedPublicHome());
+watch(() => [route.name, auth.isInitialized, auth.isAuthenticated, auth.role, auth.workspaceContextId, auth.hasSecondaryAuth, district.isWorkspaceHost, district.workspaceId] as const, () => void maybeRedirectAuthenticatedPublicHome());
 watch(isLandingRoute, () => {
   document.documentElement.setAttribute("data-theme", isLandingRoute.value ? "dark" : theme.value);
   updateBrowserChromeColor();

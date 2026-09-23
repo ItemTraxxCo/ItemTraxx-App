@@ -1,8 +1,6 @@
-import { requireRecentAdminAuth } from "../../_shared/adminReauth.ts";
 import type {
   AdminOpsContext,
   JsonResponse,
-  SupabaseClient,
 } from "../context.ts";
 import { handleBulkItemsAction } from "./bulkItems.ts";
 import { handleNotificationAction } from "./notifications.ts";
@@ -51,16 +49,6 @@ const WORKSPACE_ADMIN_ONLY_ACTIONS = new Set<AdminOpsAction>([
   "bulk_import_items",
 ]);
 
-// Actions that change workspace state and therefore require the caller to have
-// authenticated interactively within the admin re-auth window. Session
-// lifecycle actions (touch/validate/list/revoke) are deliberately excluded:
-// touch/validate are polled continuously by useAdminSessionLifecycle, and a
-// user must always be able to sign themselves out of a device.
-const ADMIN_REAUTH_ACTIONS = new Set<AdminOpsAction>([
-  "update_workspace_settings",
-  "bulk_import_items",
-]);
-
 const SUSPENDED_TENANT_WRITE_ACTIONS = new Set<AdminOpsAction>([
   "update_workspace_settings",
   "revoke_session",
@@ -72,15 +60,12 @@ const SUSPENDED_TENANT_WRITE_ACTIONS = new Set<AdminOpsAction>([
 const isAdminOpsAction = (action: string): action is AdminOpsAction =>
   (ADMIN_OPS_ACTIONS as readonly string[]).includes(action);
 
-export const authorizeAdminOpsAction = async (input: {
+export const authorizeAdminOpsAction = (input: {
   action: string;
   profileRole: "workspace_admin" | "individual_account" | "tenant_account";
   isWorkspaceSuspended: boolean;
-  adminClient: SupabaseClient;
-  userId: string;
-  authToken: string;
   jsonResponse: JsonResponse;
-}): Promise<Response | null> => {
+}): Response | null => {
   if (!isAdminOpsAction(input.action)) return null;
   if (
     WORKSPACE_ADMIN_ONLY_ACTIONS.has(input.action) &&
@@ -94,14 +79,6 @@ export const authorizeAdminOpsAction = async (input: {
     input.isWorkspaceSuspended
   ) {
     return input.jsonResponse(403, { error: "Workspace disabled" });
-  }
-  if (ADMIN_REAUTH_ACTIONS.has(input.action)) {
-    const reauthFailure = await requireRecentAdminAuth(
-      input.adminClient,
-      input.authToken,
-      input.jsonResponse,
-    );
-    if (reauthFailure) return reauthFailure;
   }
   return null;
 };

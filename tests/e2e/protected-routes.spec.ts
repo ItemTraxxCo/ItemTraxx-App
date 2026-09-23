@@ -286,7 +286,7 @@ test.describe("Protected route smoke tests", () => {
     await expect(page.getByRole("heading", { name: "Control Center" })).toBeVisible();
   });
 
-  test("Workspace Admin verification expires after 15 minutes", async ({ page }) => {
+  test("Workspace Admin remains signed in after the verification timestamp is old", async ({ page }) => {
     await page.goto("/");
     await setWorkspaceAdminSession(page);
     await page.evaluate(async () => {
@@ -299,7 +299,8 @@ test.describe("Protected route smoke tests", () => {
 
     await navigateApp(page, "/admin");
 
-    await expect(page).toHaveURL(/\/login$/);
+    await expect(page).toHaveURL(/\/admin$/);
+    await expect(page.getByRole("heading", { name: "Workspace Overview", exact: true })).toBeVisible();
   });
 
   test("Workspace Admin verification survives a same-session bootstrap", async ({ page }) => {
@@ -329,7 +330,7 @@ test.describe("Protected route smoke tests", () => {
     await expect(page.getByRole("heading", { name: "Workspace Overview", exact: true })).toBeVisible();
   });
 
-  test("super-admin secondary verification expires after 15 minutes", async ({ page }) => {
+  test("super-admin session remains available after the verification timestamp is old", async ({ page }) => {
     await page.goto("/");
     await setSuperAdminSession(page);
     await page.evaluate(async () => {
@@ -343,6 +344,7 @@ test.describe("Protected route smoke tests", () => {
 
     await navigateApp(page, "/super-admin");
 
-    await expect(page).toHaveURL(/\/super-auth$/);
+    await expect(page).toHaveURL(/\/super-admin$/);
+    await expect(page.getByRole("heading", { name: "Super Admin" })).toBeVisible();
   });
 });

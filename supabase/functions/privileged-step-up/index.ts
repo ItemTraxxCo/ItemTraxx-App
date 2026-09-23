@@ -121,7 +121,7 @@ serve(async (req) => {
       auth: { persistSession: false },
     });
 
-    const { expiresAt } = await registerPrivilegedStepUp(adminClient, {
+    await registerPrivilegedStepUp(adminClient, {
       userId: user.id,
       roleScope: profile.role,
       authToken,
@@ -129,7 +129,7 @@ serve(async (req) => {
     });
 
     return jsonResponse(200, {
-      data: { registered: true, expires_at: expiresAt },
+      data: { registered: true, expires_at: null },
     });
   } catch (error) {
     if (

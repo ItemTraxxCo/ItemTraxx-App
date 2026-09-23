@@ -177,13 +177,11 @@ const adminClient = (options: {
         eq: () => ({
           eq: () => ({
             eq: () => ({
-              gt: () => ({
-                limit: () => ({
-                  maybeSingle: () =>
-                    Promise.resolve(
-                      options.selectResponse ?? { data: null, error: null },
-                    ),
-                }),
+              limit: () => ({
+                maybeSingle: () =>
+                  Promise.resolve(
+                    options.selectResponse ?? { data: null, error: null },
+                  ),
               }),
             }),
           }),
@@ -277,7 +275,7 @@ Deno.test("freshness predicate honors the exact skew and age boundaries", () => 
   );
 });
 
-Deno.test("registerPrivilegedStepUp binds to the session id when present", async () => {
+Deno.test("registerPrivilegedStepUp creates a non-expiring grant bound to the session id", async () => {
   const { client, upsertCalls } = adminClient({
     claims: { session_id: "session-42" },
   });
@@ -289,14 +287,15 @@ Deno.test("registerPrivilegedStepUp binds to the session id when present", async
     source: "test",
   });
 
-  assert(
-    new Date(result.expiresAt).getTime() > Date.now(),
-    "expected expiresAt to be in the future",
-  );
+  assert(result.expiresAt === null, "expected the grant to have no expiry");
   assert(upsertCalls.length === 1, "expected a single upsert call");
   assert(
     upsertCalls[0].payload.binding_key === "session:session-42",
     "expected binding key to use the session id",
+  );
+  assert(
+    upsertCalls[0].payload.expires_at === null,
+    "expected the persisted grant to have no expiry",
   );
   assert(
     upsertCalls[0].payload.user_id === "user-1" &&

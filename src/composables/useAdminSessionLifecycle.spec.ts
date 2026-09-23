@@ -345,15 +345,15 @@ describe("useAdminSessionLifecycle", () => {
     }
   });
 
-  it("removes activity/visibility listeners and clears timers on unmount", async () => {
+  it("removes the visibility listener and clears timers on unmount", async () => {
     const auth = buildAuth({ isAuthenticated: true, role: "workspace_admin", userId: "u1" });
     const route = buildRoute();
-    const removeEventListenerSpy = vi.spyOn(window, "removeEventListener");
+    const removeEventListenerSpy = vi.spyOn(document, "removeEventListener");
     const { wrapper } = mountHost({ auth, route });
     await vi.advanceTimersByTimeAsync(0);
 
     wrapper.unmount();
 
-    expect(removeEventListenerSpy).toHaveBeenCalledWith("mousemove", expect.any(Function));
+    expect(removeEventListenerSpy).toHaveBeenCalledWith("visibilitychange", expect.any(Function));
   });
 });

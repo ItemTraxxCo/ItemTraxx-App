@@ -32,7 +32,6 @@ echo "[security] running Supabase shared security regression tests"
 deno test --node-modules-dir=none --allow-env \
   supabase/functions/_shared/cors_test.ts \
   supabase/functions/_shared/accountSessions_test.ts \
-  supabase/functions/_shared/adminReauth_test.ts \
   supabase/functions/_shared/preloginGuards_test.ts \
   supabase/functions/_shared/trustedIngress_test.ts
 

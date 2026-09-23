@@ -73,7 +73,7 @@ describe("protected route redirects", () => {
   it("routes an individual account from the public home page after the old verification timestamp", async () => {
     setIndividualSession();
 
-    await router.push("/");
+    await router.push("/?from=test");
 
     expect(router.currentRoute.value.name).toBe("workspace-checkout");
   });

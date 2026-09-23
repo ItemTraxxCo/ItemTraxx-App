@@ -312,9 +312,6 @@ serve((req) => withRequestSpan(req, "POST /functions/admin-ops", async (span, re
       action: normalizedAction,
       profileRole: profile.role,
       isWorkspaceSuspended,
-      adminClient,
-      userId: user.id,
-      authToken,
       jsonResponse,
     });
     if (actionAuthorizationFailure) return actionAuthorizationFailure;

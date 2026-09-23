@@ -196,7 +196,7 @@ export const getBetterAuth = (rawEnv: Env) => {
     session: {
       expiresIn: 60 * 60 * 24 * 7,
       updateAge: 60 * 60 * 24,
-      freshAge: 60 * 15,
+      freshAge: 0, // An active session should not trigger periodic re-authentication.
     },
     advanced: {
       useSecureCookies: isProductionOrigin,

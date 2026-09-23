@@ -5,7 +5,6 @@ import { isKillSwitchWriteBlocked } from "../_shared/killSwitch.ts";
 import { isAllowedOrigin, parseAllowedOrigins } from "../_shared/cors.ts";
 import { requireTrustedEdgeIngress } from "../_shared/trustedIngress.ts";
 import { validateAccountDeviceSession } from "../_shared/accountSessions.ts";
-import { requireRecentAdminAuth } from "../_shared/adminReauth.ts";
 import { readJsonBody } from "../_shared/requestBody.ts";
 import { resolveWorkspaceAccess } from "../_shared/workspaceAccess.ts";
 import { preflightQuota, quotaLimitResponse, quotaPreflightResponse } from "../_shared/quota.ts";
@@ -581,12 +580,6 @@ serve(async (req) => {
         return jsonResponse(401, { error: "Session revoked" });
       }
 
-      const reauthFailure = await requireRecentAdminAuth(
-        adminClient,
-        authToken,
-        jsonResponse,
-      );
-      if (reauthFailure) return reauthFailure;
     }
 
     const { data: maintenanceRow } = await adminClient

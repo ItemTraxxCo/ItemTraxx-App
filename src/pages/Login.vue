@@ -413,11 +413,6 @@ const handleLogin = async () => {
       return;
     }
     const errorMessage = err instanceof Error ? err.message : "Sign in failed.";
-    if (errorMessage === "Admin verification required.") {
-      error.value = "";
-      showToast("Admin verification required", "Please sign in again to continue.");
-      return;
-    }
     const signInErrorMessage = getSignInErrorMessage(errorMessage);
     if (signInErrorMessage) {
       error.value = "";

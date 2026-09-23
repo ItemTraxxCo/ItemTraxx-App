@@ -193,15 +193,11 @@ Deno.test("admin ops dispatcher preserves the invalid-action response", async ()
 });
 
 Deno.test("tenant users remain denied from workspace-admin-only actions", async () => {
-  const { client } = queryClient(() => ({ data: null, error: null }));
   for (const action of ["get_notifications", "get_status_tracking"]) {
     const response = await authorizeAdminOpsAction({
       action,
       profileRole: "tenant_account",
       isWorkspaceSuspended: false,
-      adminClient: client,
-      userId: "user-1",
-      authToken: "token-1",
       jsonResponse,
     });
 
@@ -212,15 +208,11 @@ Deno.test("tenant users remain denied from workspace-admin-only actions", async 
 });
 
 Deno.test("Tenant Accounts can use their own session-management actions", async () => {
-  const { client } = queryClient(() => ({ data: null, error: null }));
   for (const action of ["touch_session", "validate_session", "list_sessions", "revoke_session", "revoke_current_session", "revoke_all_sessions"]) {
     const response = await authorizeAdminOpsAction({
       action,
       profileRole: "tenant_account",
       isWorkspaceSuspended: false,
-      adminClient: client,
-      userId: "user-1",
-      authToken: "token-1",
       jsonResponse,
     });
     assertEquals(response, null, `${action} should be available to Tenant Accounts`);
@@ -228,20 +220,27 @@ Deno.test("Tenant Accounts can use their own session-management actions", async 
 });
 
 Deno.test("suspended workspaces remain denied from write actions", async () => {
-  const { client } = queryClient(() => ({ data: null, error: null }));
   const response = await authorizeAdminOpsAction({
     action: "bulk_import_items",
     profileRole: "workspace_admin",
     isWorkspaceSuspended: true,
-    adminClient: client,
-    userId: "user-1",
-    authToken: "token-1",
     jsonResponse,
   });
 
   assertExists(response);
   assertEquals(response.status, 403);
   assertEquals(await responseBody(response), { error: "Workspace disabled" });
+});
+
+Deno.test("workspace-admin actions do not require a recent-auth marker", async () => {
+  const response = await authorizeAdminOpsAction({
+    action: "update_workspace_settings",
+    profileRole: "workspace_admin",
+    isWorkspaceSuspended: false,
+    jsonResponse,
+  });
+
+  assertEquals(response, null);
 });
 
 Deno.test("touch_session rejects a blocked auth token", async () => {

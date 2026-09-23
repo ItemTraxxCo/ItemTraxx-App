@@ -16,22 +16,13 @@ export type HttpSessionSummary = {
   password_authenticated_at?: string | null;
 };
 
-/**
- * A session request that never reached the server: the browser is offline, DNS
- * or TLS failed, an extension or corporate proxy blocked the cross-origin call
- * to the edge proxy, or the proxy is simply unreachable from a dev machine.
- *
- * This is deliberately distinct from `Session request failed (<status>).`, which
- * means the server answered and refused. Callers use the distinction to decide
- * whether retrying is worthwhile and whether the failure is worth an error-level
- * log — an unreachable session service is an environment condition, not a bug.
- */
+/** The session endpoint did not provide a trustworthy session result. */
 export class SessionNetworkError extends Error {
   readonly action: string;
   readonly cause?: unknown;
 
   constructor(action: string, cause?: unknown) {
-    super(`Unable to reach the ItemTraxx session service (${action}).`);
+    super(`Unable to read the ItemTraxx session (${action}).`);
     this.name = "SessionNetworkError";
     this.action = action;
     this.cause = cause;
@@ -41,13 +32,36 @@ export class SessionNetworkError extends Error {
 export const isSessionNetworkError = (error: unknown): error is SessionNetworkError =>
   error instanceof SessionNetworkError;
 
+const unauthenticatedSummary = (): HttpSessionSummary => ({
+  authenticated: false,
+  user: null,
+  profile: null,
+  password_authenticated_at: null,
+});
+
 const getAuthClient = async () => (await import("../auth/client")).authClient;
 
-export const fetchHttpSessionSummary = async (_options: Pick<RequestInit, "signal"> = {}): Promise<HttpSessionSummary> => {
+export const fetchHttpSessionSummary = async (options: Pick<RequestInit, "signal"> = {}): Promise<HttpSessionSummary> => {
   const authClient = await getAuthClient();
-  const { data, error } = await authClient.getSession();
-  if (error || !data?.user || !data.session) {
-    return { authenticated: false, user: null, profile: null, password_authenticated_at: null };
+  let response: Awaited<ReturnType<typeof authClient.getSession>>;
+  try {
+    response = options.signal
+      ? await authClient.getSession({ fetchOptions: { signal: options.signal } })
+      : await authClient.getSession();
+  } catch (cause) {
+    if (options.signal?.aborted) throw cause;
+    throw new SessionNetworkError("get-session", cause);
+  }
+
+  const { data, error } = response;
+  if (error) {
+    // Better Auth returns an error-free null session when no valid cookie is
+    // present. Any error response is an unavailable session result, not proof
+    // that a still-valid browser session has expired.
+    throw new SessionNetworkError("get-session", error);
+  }
+  if (!data?.user || !data.session) {
+    return unauthenticatedSummary();
   }
   const profiles = await authenticatedSelect<Array<NonNullable<HttpSessionSummary["profile"]> & { id: string }>>(
     "profiles",

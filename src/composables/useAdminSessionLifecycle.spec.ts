@@ -31,7 +31,6 @@ const mockedValidateAccountSession = vi.mocked(validateAccountSession);
 const mockedGetPostSignOutUrl = vi.mocked(getPostSignOutUrl);
 const mockedSignOut = vi.mocked(signOut);
 
-const ADMIN_IDLE_TIMEOUT_MS = 20 * 60 * 1000;
 const ADMIN_POLL_INTERVAL_MS = 45_000;
 const VALIDATION_RETRY_MS = 250;
 const TERMINATION_REDIRECT_MS = 5000;
@@ -40,8 +39,6 @@ type Auth = {
   isAuthenticated: boolean;
   role: string | null;
   userId: string | null;
-  adminVerifiedAt: string | null;
-  superVerifiedAt: string | null;
 };
 
 const buildAuth = (overrides: Partial<Auth> = {}) =>
@@ -49,8 +46,6 @@ const buildAuth = (overrides: Partial<Auth> = {}) =>
     isAuthenticated: false,
     role: null,
     userId: null,
-    adminVerifiedAt: null,
-    superVerifiedAt: null,
     ...overrides,
   });
 
@@ -60,14 +55,10 @@ const buildRoute = (path = "/admin/items", query: Record<string, string> = {}) =
 const mountHost = (opts: {
   auth: Auth;
   route: ReturnType<typeof buildRoute>;
-  isDevHost?: boolean;
-  isWorkspaceAdminArea?: boolean;
   shouldTrackAccountSession?: boolean;
 }) => {
   const router = { replace: vi.fn().mockResolvedValue(undefined) };
   const closeMenu = vi.fn();
-  const isDevHost = ref(opts.isDevHost ?? false);
-  const isWorkspaceAdminArea = ref(opts.isWorkspaceAdminArea ?? true);
   const shouldTrackAccountSession = ref(opts.shouldTrackAccountSession ?? true);
 
   let exposed!: ReturnType<typeof useAdminSessionLifecycle>;
@@ -78,8 +69,6 @@ const mountHost = (opts: {
         route: opts.route as never,
         router: router as never,
         sessionTermination: getSessionTerminationState(),
-        isDevHost,
-        isWorkspaceAdminArea,
         shouldTrackAccountSession,
         closeMenu,
       });
@@ -92,8 +81,6 @@ const mountHost = (opts: {
     get: () => exposed,
     router,
     closeMenu,
-    isDevHost,
-    isWorkspaceAdminArea,
     shouldTrackAccountSession,
   };
 };
@@ -121,7 +108,7 @@ describe("useAdminSessionLifecycle", () => {
     vi.restoreAllMocks();
   });
 
-  it("registers activity + visibility listeners on mount and starts polling/heartbeat", async () => {
+  it("registers visibility handling on mount and starts session polling/heartbeat", async () => {
     const auth = buildAuth({ isAuthenticated: true, role: "workspace_admin", userId: "u1" });
     const route = buildRoute();
     const { wrapper } = mountHost({ auth, route });
@@ -155,8 +142,6 @@ describe("useAdminSessionLifecycle", () => {
           route: route as never,
           router: router as never,
           sessionTermination: getSessionTerminationState(),
-          isDevHost: ref(false),
-          isWorkspaceAdminArea: ref(true),
           shouldTrackAccountSession: ref(true),
           closeMenu: vi.fn(),
         });
@@ -186,39 +171,13 @@ describe("useAdminSessionLifecycle", () => {
     wrapper.unmount();
   });
 
-  it("logs the workspace admin out after the idle timeout on an admin area", async () => {
+  it("keeps a workspace admin signed in after extended inactivity", async () => {
     const auth = buildAuth({ isAuthenticated: true, role: "workspace_admin", userId: "u1" });
     const route = buildRoute();
     const { wrapper, router } = mountHost({ auth, route });
     await vi.advanceTimersByTimeAsync(0);
 
-    await vi.advanceTimersByTimeAsync(ADMIN_IDLE_TIMEOUT_MS);
-
-    expect(router.replace).toHaveBeenCalledWith("/login");
-    wrapper.unmount();
-  });
-
-  it("does not idle-log-out on a dev host", async () => {
-    const auth = buildAuth({ isAuthenticated: true, role: "workspace_admin", userId: "u1" });
-    const route = buildRoute();
-    const { wrapper, router } = mountHost({ auth, route, isDevHost: true });
-    await vi.advanceTimersByTimeAsync(0);
-
-    await vi.advanceTimersByTimeAsync(ADMIN_IDLE_TIMEOUT_MS);
-
-    expect(router.replace).not.toHaveBeenCalledWith("/login");
-    wrapper.unmount();
-  });
-
-  it("activity events reset the idle timer so logout does not fire early", async () => {
-    const auth = buildAuth({ isAuthenticated: true, role: "workspace_admin", userId: "u1" });
-    const route = buildRoute();
-    const { wrapper, router } = mountHost({ auth, route });
-    await vi.advanceTimersByTimeAsync(0);
-
-    await vi.advanceTimersByTimeAsync(ADMIN_IDLE_TIMEOUT_MS - 1000);
-    window.dispatchEvent(new Event("mousemove"));
-    await vi.advanceTimersByTimeAsync(1000);
+    await vi.advanceTimersByTimeAsync(60 * 60 * 1000);
 
     expect(router.replace).not.toHaveBeenCalledWith("/login");
     wrapper.unmount();
@@ -386,15 +345,15 @@ describe("useAdminSessionLifecycle", () => {
     }
   });
 
-  it("removes activity/visibility listeners and clears timers on unmount", async () => {
+  it("removes the visibility listener and clears timers on unmount", async () => {
     const auth = buildAuth({ isAuthenticated: true, role: "workspace_admin", userId: "u1" });
     const route = buildRoute();
-    const removeEventListenerSpy = vi.spyOn(window, "removeEventListener");
+    const removeEventListenerSpy = vi.spyOn(document, "removeEventListener");
     const { wrapper } = mountHost({ auth, route });
     await vi.advanceTimersByTimeAsync(0);
 
     wrapper.unmount();
 
-    expect(removeEventListenerSpy).toHaveBeenCalledWith("mousemove", expect.any(Function));
+    expect(removeEventListenerSpy).toHaveBeenCalledWith("visibilitychange", expect.any(Function));
   });
 });

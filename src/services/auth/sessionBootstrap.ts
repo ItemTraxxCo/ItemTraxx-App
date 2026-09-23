@@ -25,14 +25,12 @@ export const fetchWorkspaceContext=async(workspaceId:string):Promise<WorkspaceRo
 export const resolveWorkspaceSlug=async(workspaceId:string|null)=>workspaceId?(await lookupWorkspaceById(workspaceId))?.slug?.trim()||null:null;
 export type ApplyHttpSessionSummaryOptions = { isCurrent?: () => boolean };
 const terminateSuspended=async(profile:ProfileRow|null,isCurrent=()=>true)=>{ if(!profile?.workspace_id||profile.role==="super_admin") return false; const workspace=await fetchWorkspaceContext(profile.workspace_id); if(!isCurrent()) return true; if(workspace?.status&&workspace.status!=="active"){await clearHttpSession().catch(()=>undefined);clearAdminVerification();clearAuthState(true);return true;}return false; };
-// The admin verification marker is intentionally kept in browser state so the
-// router can provide a fast UX guard. A full-page login handoff moves from the
-// root app origin to `{workspace}.app.itemtraxx.com`, though, and
-// sessionStorage is isolated between those origins. Better Auth's session
-// `createdAt` is the server-issued authentication timestamp used by the
-// server-side admin re-auth check as well, so use the summary's
-// `last_sign_in_at` as the cross-origin fallback. Never replace a newer marker
-// from the current origin or a deliberately persisted verification.
+// Preserve the existing admin verification marker for device-session
+// lifecycle handling. A full-page login handoff moves from the root app origin
+// to `{workspace}.app.itemtraxx.com`, though, and sessionStorage is isolated
+// between those origins, so use the session summary's authentication timestamp
+// as a cross-origin fallback. The marker is no longer used as a timed access
+// gate.
 type AuthenticatedSessionUser = NonNullable<Awaited<ReturnType<typeof fetchHttpSessionSummary>>["user"]>;
 const resolveAdminVerificationAt = (summaryUser:AuthenticatedSessionUser, passwordAuthenticatedAt:string|null|undefined, current:ReturnType<typeof getAuthState>, role:ProfileRow["role"]) => {
   if (role !== "workspace_admin" && role !== "individual_account") return null;

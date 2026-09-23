@@ -17,7 +17,7 @@ describe("registerPrivilegedAdminStepUp", () => {
       ok: true,
       status: 200,
       error: "",
-      data: { data: { registered: true, expires_at: "2026-08-01T00:00:00Z" } },
+      data: { data: { registered: true, expires_at: null } },
     });
 
     const result = await registerPrivilegedAdminStepUp("token-123");
@@ -27,7 +27,7 @@ describe("registerPrivilegedAdminStepUp", () => {
       body: {},
       accessToken: "token-123",
     });
-    expect(result).toEqual({ registered: true, expires_at: "2026-08-01T00:00:00Z" });
+    expect(result).toEqual({ registered: true, expires_at: null });
   });
 
   it("works without an access token override", async () => {
@@ -35,7 +35,7 @@ describe("registerPrivilegedAdminStepUp", () => {
       ok: true,
       status: 200,
       error: "",
-      data: { data: { registered: true, expires_at: "2026-08-01T00:00:00Z" } },
+      data: { data: { registered: true, expires_at: null } },
     });
 
     await registerPrivilegedAdminStepUp();
@@ -57,7 +57,7 @@ describe("registerPrivilegedAdminStepUp", () => {
 
     const result = await registerPrivilegedAdminStepUp("token-123");
 
-    expect(result).toEqual({ registered: false, expires_at: "" });
+    expect(result).toEqual({ registered: false, expires_at: null });
   });
 
   it("throws a mapped error when the request fails", async () => {

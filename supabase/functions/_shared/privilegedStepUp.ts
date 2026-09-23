@@ -11,7 +11,6 @@ export type PrivilegedRoleScope =
   | "workspace_admin"
   | "individual_account";
 
-const DEFAULT_STEP_UP_TTL_MS = 15 * 60 * 1000;
 const ADMIN_STEP_UP_REGISTRATION_WINDOW_MS = 5 * 60 * 1000;
 const AUTH_TIMESTAMP_CLOCK_SKEW_MS = 30 * 1000;
 const ADMIN_HANDOFF_AUTH_METHODS = new Set([
@@ -148,13 +147,9 @@ export const registerPrivilegedStepUp = async (
     roleScope: PrivilegedRoleScope;
     authToken: string;
     source: string;
-    ttlMs?: number;
   },
 ) => {
   const now = new Date();
-  const expiresAt = new Date(
-    now.getTime() + (options.ttlMs ?? DEFAULT_STEP_UP_TTL_MS),
-  ).toISOString();
   const bindingKey = await resolveBindingKey(adminClient, options.authToken);
 
   const { error } = await adminClient.from("privileged_session_stepups").upsert(
@@ -165,7 +160,7 @@ export const registerPrivilegedStepUp = async (
       issued_by: options.source,
       created_at: now.toISOString(),
       updated_at: now.toISOString(),
-      expires_at: expiresAt,
+      expires_at: null,
     },
     { onConflict: "user_id,role_scope,binding_key" },
   );
@@ -174,7 +169,7 @@ export const registerPrivilegedStepUp = async (
     throw error;
   }
 
-  return { expiresAt };
+  return { expiresAt: null };
 };
 
 export const hasPrivilegedStepUp = async (
@@ -192,7 +187,6 @@ export const hasPrivilegedStepUp = async (
     .eq("user_id", options.userId)
     .eq("role_scope", options.roleScope)
     .eq("binding_key", bindingKey)
-    .gt("expires_at", new Date().toISOString())
     .limit(1)
     .maybeSingle();
 

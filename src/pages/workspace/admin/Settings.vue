@@ -48,10 +48,10 @@
       <p class="muted account-overview-copy">
         {{
           accountCategory === "individual"
-            ? "This account uses the root ItemTraxx url and is not attached to a custom subdomain."
+            ? "Account category: Individual"
             : accountCategory === "workspace" || accountCategory === "education" || accountCategory === "custom"
-              ? "Workspace-linked accounts inherit their routing and billing context from tenant configuration."
-              : "Account plan metadata has not been configured for this tenant yet. If you believe this is an error, please contact support to resolve this."
+              ? "Account category: Workspace"
+              : "Account plan metadata has not been configured for this account. If you believe this is an error, please contact support."
         }}
       </p>
     </div>
@@ -71,7 +71,7 @@
         <p class="muted">This value is used for overdue notifications.</p>
         <div class="form-actions">
           <button type="submit" class="button-primary" :disabled="isSaving">Save settings</button>
-          <button type="button" :disabled="isSaving" @click="loadSettings">Reload</button>
+          <button type="button" :disabled="isSaving" @click="loadSettings">Reload Settings</button>
         </div>
       </form>
       <p v-if="error" class="error">{{ error }}</p>

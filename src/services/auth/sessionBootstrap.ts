@@ -50,5 +50,5 @@ export const applyHttpSessionSummary=async(summary:Awaited<ReturnType<typeof fet
   setAuthStateFromBackend({isInitialized:true,isAuthenticated:true,userId:summary.user.id,email:summary.user.email,signedInAt:summary.user.last_sign_in_at,role,sessionWorkspaceId:workspaceId,workspaceContextId:workspaceId,hasSecondaryAuth:same&&role==="super_admin"?current.hasSecondaryAuth:false,superVerifiedAt:same&&role==="super_admin"?current.superVerifiedAt:null,adminVerifiedAt:resolveAdminVerificationAt(summary.user,summary.password_authenticated_at,current,role)}); clearSessionTermination();
   if(identityChanged){try{await quarantineOfflineCheckoutQueueForCurrentSession();}catch{/* Legacy replay re-checks authoritative identity before every send. */}}
 };
-export const refreshAuthFromSession=async()=>{try{await applyHttpSessionSummary(await timed(fetchHttpSessionSummary(),"Session refresh timed out."));}catch{clearAuthState(true);}};
+export const refreshAuthFromSession=async(options:Pick<RequestInit,"signal">={})=>{await applyHttpSessionSummary(await timed(fetchHttpSessionSummary(options),"Session refresh timed out."));};
 export const initAuthListener=()=>{};

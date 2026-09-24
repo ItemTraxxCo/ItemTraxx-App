@@ -5,6 +5,7 @@ interface ImportMetaEnv {
   readonly VITE_SUPABASE_URL: string;
   readonly VITE_SUPABASE_ANON_KEY: string;
   readonly VITE_EDGE_PROXY_URL?: string;
+  readonly VITE_BETTER_AUTH_IDENTIFY_URL?: string;
   readonly VITE_TENANT_LOGIN_FUNCTION?: string;
   readonly VITE_LOGO_URL?: string;
   readonly VITE_BRAND_LOGO_LIGHT_URL?: string;

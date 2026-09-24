@@ -271,7 +271,7 @@ const applyTheme = (next: "light" | "dark") => {
 };
 const toggleTheme = () => { applyTheme(theme.value === "dark" ? "light" : "dark"); menuOpen.value = false; };
 const toggleMenu = () => { menuOpen.value = !menuOpen.value; };
-const reloadApp = () => window.location.assign(`${window.location.origin}/`);
+const reloadApp = () => window.location.reload();
 const showAccountPanel = computed(() => auth.role === "tenant_account" || auth.role === "individual_account");
 const { logout } = useLogout();
 const logoutTenant = async () => {

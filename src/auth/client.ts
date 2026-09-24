@@ -2,7 +2,7 @@ import { createAuthClient } from "better-auth/client";
 import { adminClient, organizationClient, twoFactorClient } from "better-auth/client/plugins";
 import { passkeyClient } from "@better-auth/passkey/client";
 import { ssoClient } from "@better-auth/sso/client";
-import { dashClient } from "@better-auth/infra/client";
+import { dashClient, sentinelClient } from "@better-auth/infra/client";
 import { globalAccess, globalRoles, organizationAccess, organizationRoles } from "./permissions";
 import { fetchWithTransientRetry } from "../services/fetchWithTransientRetry";
 import { captureHandledRequestFailure, capturePostHogLog } from "../services/posthogDiagnostics";
@@ -10,6 +10,8 @@ import { captureHandledRequestFailure, capturePostHogLog } from "../services/pos
 const trimTrailingSlash = (value: string) => value.replace(/\/+$/, "");
 const configuredOrigin = (import.meta.env.VITE_EDGE_PROXY_URL as string | undefined)?.trim();
 const baseURL = configuredOrigin ? trimTrailingSlash(configuredOrigin) : window.location.origin;
+const sentinelIdentifyUrl = import.meta.env.VITE_BETTER_AUTH_IDENTIFY_URL?.trim() ||
+  "https://kv.better-auth.com/projects/sigITsymX5OlVKCKgvuvKTOnjHJOF6p8";
 
 // Session reads are idempotent and a Cloudflare managed challenge is exposed
 // to browser JavaScript as a rejected CORS fetch. Retry that transport once so
@@ -113,5 +115,6 @@ export const authClient = createAuthClient({
     }),
     ssoClient({ domainVerification: { enabled: true } }),
     dashClient(),
+    sentinelClient({ identifyUrl: sentinelIdentifyUrl }),
   ],
 });

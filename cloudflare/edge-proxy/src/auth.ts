@@ -4,7 +4,7 @@ import { hashPassword, verifyPassword } from "better-auth/crypto";
 import { admin, captcha, jwt, organization, twoFactor } from "better-auth/plugins";
 import { passkey } from "@better-auth/passkey";
 import { sso } from "@better-auth/sso";
-import { dash } from "@better-auth/infra";
+import { dash, sentinel } from "@better-auth/infra";
 import { importJWK, SignJWT, type JWK, type JWTPayload } from "jose";
 import {
   globalAccess,
@@ -265,6 +265,7 @@ export const getBetterAuth = (rawEnv: Env) => {
         },
       }),
       twoFactor({ issuer: "ItemTraxx", skipVerificationOnEnable: false }),
+      sentinel({ apiKey: env.BETTER_AUTH_API_KEY }),
       sso({
         domainVerification: { enabled: true },
         organizationProvisioning: {

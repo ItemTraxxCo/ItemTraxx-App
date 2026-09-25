@@ -1,6 +1,6 @@
 import { assertEquals, assertNotEquals } from "https://deno.land/std@0.224.0/assert/mod.ts";
 import { normalizeBetterAuthCaptchaRequest } from "./authCaptcha.ts";
-import { sanitizeSsoProvider } from "./auth.ts";
+import { resolveSsoActor, sanitizeSsoProvider } from "./auth.ts";
 
 Deno.test("promotes a form captcha field to Better Auth's header", async () => {
   const request = new Request("https://edge.itemtraxx.com/api/auth/sign-in/email", {
@@ -48,4 +48,43 @@ Deno.test("sanitizes SSO provider configuration before returning it to the brows
   assertEquals(sanitized.samlConfig, {});
   assertEquals("private-secret" in sanitized, false);
   assertEquals("private-key" in sanitized, false);
+});
+
+Deno.test("resolves the SSO workspace without relying on a renamed foreign-key constraint", async () => {
+  const queries: Array<{ table: string; selection: string; filters: Array<[string, unknown]> }> = [];
+  const dataClient = {
+    schema: (schema: string) => {
+      assertEquals(schema, "public");
+      return dataClient;
+    },
+    from: (table: string) => {
+      const query = { table, selection: "", filters: [] as Array<[string, unknown]> };
+      queries.push(query);
+      const builder = {
+        select: (selection: string) => { query.selection = selection; return builder; },
+        eq: (column: string, value: unknown) => { query.filters.push([column, value]); return builder; },
+        is: (_column: string, _value: unknown) => builder,
+        maybeSingle: async () => ({
+          data: table === "profiles"
+            ? { id: "profile-1", role: "workspace_admin", workspace_id: "workspace-1" }
+            : { better_auth_organization_id: "organization-1", status: "active" },
+          error: null,
+        }),
+      };
+      return builder;
+    },
+  };
+
+  const actor = await resolveSsoActor(dataClient as never, "better-auth-user-1");
+
+  assertEquals(actor, {
+    profileId: "profile-1",
+    role: "workspace_admin",
+    workspaceId: "workspace-1",
+    organizationId: "organization-1",
+    workspaceStatus: "active",
+  });
+  assertEquals(queries.map(({ table }) => table), ["profiles", "workspaces"]);
+  assertEquals(queries[0].selection, "id,role,workspace_id");
+  assertEquals(queries[1].filters, [["id", "workspace-1"]]);
 });

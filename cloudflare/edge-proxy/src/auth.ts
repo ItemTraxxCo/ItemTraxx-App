@@ -89,19 +89,31 @@ type SsoActor = {
   workspaceStatus: string | null;
 };
 
-const resolveSsoActor = async (
+const getSsoWorkspace = async (
+  dataClient: ReturnType<typeof createBetterAuthDataClient>,
+  workspaceId: string,
+) => {
+  const { data, error } = await dataClient.schema("public").from("workspaces")
+    .select("better_auth_organization_id,status")
+    .eq("id", workspaceId)
+    .maybeSingle();
+  if (error) throw error;
+  return data;
+};
+
+export const resolveSsoActor = async (
   dataClient: ReturnType<typeof createBetterAuthDataClient>,
   betterAuthUserId: string,
 ): Promise<SsoActor | null> => {
   const { data, error } = await dataClient.schema("public").from("profiles")
-    .select("id,role,workspace_id,workspaces!profiles_workspace_id_fkey(better_auth_organization_id,status)")
+    .select("id,role,workspace_id")
     .eq("better_auth_user_id", betterAuthUserId)
     .eq("is_active", true)
     .is("deleted_at", null)
     .maybeSingle();
   if (error) throw error;
   if (!data?.id || typeof data.role !== "string") return null;
-  const workspace = Array.isArray(data.workspaces) ? data.workspaces[0] : data.workspaces;
+  const workspace = data.workspace_id ? await getSsoWorkspace(dataClient, data.workspace_id) : null;
   return {
     profileId: data.id,
     role: data.role,
@@ -318,10 +330,12 @@ export const getBetterAuth = (rawEnv: Env) => {
           getRole: async ({ user, provider }) => {
             if (!provider.organizationId) throw new Error("SSO provider is not linked to an ItemTraxx workspace");
             const { data: existing, error } = await dataClient.schema("public").from("profiles")
-              .select("workspace_id,workspaces!profiles_workspace_id_fkey(better_auth_organization_id)")
+              .select("workspace_id")
               .eq("better_auth_user_id", user.id).maybeSingle();
             if (error) throw error;
-            const existingWorkspace = Array.isArray(existing?.workspaces) ? existing.workspaces[0] : existing?.workspaces;
+            const existingWorkspace = existing?.workspace_id
+              ? await getSsoWorkspace(dataClient, existing.workspace_id)
+              : null;
             if (existing && existingWorkspace?.better_auth_organization_id !== provider.organizationId) {
               throw new Error("SSO identity is already assigned to another ItemTraxx workspace");
             }

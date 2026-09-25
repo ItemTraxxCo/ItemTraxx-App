@@ -111,7 +111,7 @@ const resolveSsoActor = async (
   };
 };
 
-const hasFreshSsoStepUp = async (
+const hasSsoSessionGrant = async (
   dataClient: ReturnType<typeof createBetterAuthDataClient>,
   actor: SsoActor,
   sessionId: string,
@@ -122,7 +122,6 @@ const hasFreshSsoStepUp = async (
     .eq("user_id", actor.profileId)
     .eq("role_scope", actor.role)
     .eq("binding_key", `session:${sessionId}`)
-    .gt("expires_at", new Date().toISOString())
     .limit(1)
     .maybeSingle();
   if (error) throw error;
@@ -157,7 +156,7 @@ const isSsoSessionAuthorized = async (
   if (!actor || !["workspace_admin", "super_admin"].includes(actor.role)) return false;
   if (actor.role === "workspace_admin" && actor.workspaceStatus !== "active") return false;
   if (await hasRevokedSsoSession(dataClient, actor, sessionId)) return false;
-  return await hasFreshSsoStepUp(dataClient, actor, sessionId);
+  return await hasSsoSessionGrant(dataClient, actor, sessionId);
 };
 
 export const getBetterAuth = (rawEnv: Env) => {

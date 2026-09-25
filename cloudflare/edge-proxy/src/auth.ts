@@ -211,6 +211,40 @@ export const getBetterAuth = (rawEnv: Env) => {
     },
     hooks: {
       before: createAuthMiddleware(async (context) => {
+          if (context.path === "/organization/update") {
+            const session = await getSessionFromCtx(context);
+            if (!session) throw new APIError("UNAUTHORIZED");
+            const organizationId = typeof context.body?.organizationId === "string"
+              ? context.body.organizationId
+              : null;
+            if (!organizationId) {
+              throw new APIError("BAD_REQUEST", {
+                message: "An organization ID is required to update organization settings.",
+              });
+            }
+            const { data: member, error: memberError } = await dataClient.schema("better_auth")
+              .from("member")
+              .select("role")
+              .eq("userId", session.user.id)
+              .eq("organizationId", organizationId)
+              .maybeSingle();
+            if (memberError) throw memberError;
+            if (!member || !["workspace_admin", "admin"].includes(member.role)) {
+              throw new APIError("FORBIDDEN");
+            }
+            const { data: workspace, error } = await dataClient.schema("public")
+              .from("workspaces")
+              .select("status,archived_at")
+              .eq("better_auth_organization_id", organizationId)
+              .maybeSingle();
+            if (error) throw error;
+            if (!workspace || workspace.status !== "active" || workspace.archived_at) {
+              throw new APIError("FORBIDDEN", {
+                message: "Organization settings are unavailable for this workspace.",
+              });
+            }
+            return;
+          }
           if (!["/sso/register", "/sso/update-provider", "/sso/delete-provider", "/sso/verify-domain", "/sso/request-domain-verification"].includes(context.path)) return;
           const session = await getSessionFromCtx(context);
           if (!session) throw new APIError("UNAUTHORIZED");
@@ -242,6 +276,17 @@ export const getBetterAuth = (rawEnv: Env) => {
         roles: organizationRoles,
         allowUserToCreateOrganization: false,
         creatorRole: "workspace_admin",
+        organizationHooks: {
+          beforeUpdateOrganization: async ({ organization }) => {
+            // Slugs determine workspace hostnames and stay managed outside
+            // organization settings for every organization member.
+            if ("slug" in organization) {
+              throw new APIError("FORBIDDEN", {
+                message: "Organization slugs are managed separately.",
+              });
+            }
+          },
+        },
       }),
       admin({
         ac: globalAccess,
@@ -455,6 +500,195 @@ const resolvePasswordResetRedirect = (env: BetterAuthEnv, requested: unknown) =>
     throw new Error("Invalid password reset redirect");
   }
   return redirect.toString();
+};
+
+const ORGANIZATION_LOGO_PREFIX = "organization-logos";
+const ORGANIZATION_LOGO_MAX_BYTES = 2 * 1024 * 1024;
+const ORGANIZATION_LOGO_TYPES = {
+  "image/png": { extension: "png" },
+  "image/jpeg": { extension: "jpg" },
+  "image/webp": { extension: "webp" },
+} as const;
+
+const isAllowedOrganizationLogoRequest = (request: Request, allowedOrigins: string[]) => {
+  const origin = request.headers.get("Origin");
+  if (origin) return allowedOrigins.includes(origin);
+
+  // Ordinary <img> requests do not send Origin. Their Referer is limited to
+  // the source origin by the app's strict-origin-when-cross-origin policy.
+  const referer = request.headers.get("Referer");
+  if (!referer) return false;
+  try {
+    return allowedOrigins.includes(new URL(referer).origin);
+  } catch {
+    return false;
+  }
+};
+
+const readRequestBodyWithLimit = async (request: Request, maxBytes: number) => {
+  const reader = request.body?.getReader();
+  if (!reader) return { body: new Uint8Array(), tooLarge: false };
+
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    size += value.byteLength;
+    if (size > maxBytes) {
+      await reader.cancel();
+      return { body: null, tooLarge: true };
+    }
+    chunks.push(value);
+  }
+
+  const body = new Uint8Array(size);
+  let offset = 0;
+  for (const chunk of chunks) {
+    body.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return { body, tooLarge: false };
+};
+
+const hasSupportedImageSignature = (contentType: keyof typeof ORGANIZATION_LOGO_TYPES, bytes: Uint8Array) => {
+  if (contentType === "image/png") {
+    return bytes.length >= 8 &&
+      bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47 &&
+      bytes[4] === 0x0d && bytes[5] === 0x0a && bytes[6] === 0x1a && bytes[7] === 0x0a;
+  }
+  if (contentType === "image/jpeg") {
+    return bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff;
+  }
+  return bytes.length >= 12 &&
+    String.fromCharCode(...bytes.subarray(0, 4)) === "RIFF" &&
+    String.fromCharCode(...bytes.subarray(8, 12)) === "WEBP";
+};
+
+export const handleOrganizationLogoUpload = async (
+  request: Request,
+  rawEnv: Env,
+  organizationId: string,
+) => {
+  if (request.method !== "POST") {
+    return Response.json({ error: "Method not allowed" }, { status: 405 });
+  }
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(organizationId)) {
+    return Response.json({ error: "Invalid organization" }, { status: 400 });
+  }
+
+  const env = rawEnv as BetterAuthEnv;
+  if (!env.ORGANIZATION_LOGOS) {
+    return Response.json({ error: "Logo storage is unavailable" }, { status: 503 });
+  }
+
+  const auth = getBetterAuth(env);
+  const session = await auth.api.getSession({ headers: request.headers });
+  if (!session?.user || !cachedDataClient) {
+    return Response.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const { data: member, error: memberError } = await cachedDataClient
+    .schema("better_auth")
+    .from("member")
+    .select("role")
+    .eq("userId", session.user.id)
+    .eq("organizationId", organizationId)
+    .maybeSingle();
+  if (memberError) throw memberError;
+  if (!member || !["workspace_admin", "admin"].includes(member.role)) {
+    return Response.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  const { data: workspace, error: workspaceError } = await cachedDataClient
+    .schema("public")
+    .from("workspaces")
+    .select("id,status,archived_at")
+    .eq("better_auth_organization_id", organizationId)
+    .maybeSingle();
+  if (workspaceError) throw workspaceError;
+  if (!workspace || workspace.status !== "active" || workspace.archived_at) {
+    return Response.json({ error: "Workspace is unavailable" }, { status: 403 });
+  }
+
+  const contentType = request.headers.get("content-type")?.split(";")[0]?.trim().toLowerCase();
+  if (!contentType || !Object.prototype.hasOwnProperty.call(ORGANIZATION_LOGO_TYPES, contentType)) {
+    return Response.json({ error: "Choose a PNG, JPEG, or WebP image." }, { status: 415 });
+  }
+  const declaredLength = Number(request.headers.get("content-length") ?? 0);
+  if (declaredLength > ORGANIZATION_LOGO_MAX_BYTES) {
+    return Response.json({ error: "Logo images must be 2 MB or smaller." }, { status: 413 });
+  }
+  const { body, tooLarge } = await readRequestBodyWithLimit(request, ORGANIZATION_LOGO_MAX_BYTES);
+  if (tooLarge) {
+    return Response.json({ error: "Logo images must be 2 MB or smaller." }, { status: 413 });
+  }
+  if (!body?.length || !hasSupportedImageSignature(contentType as keyof typeof ORGANIZATION_LOGO_TYPES, body)) {
+    return Response.json({ error: "The selected file is not a supported image." }, { status: 400 });
+  }
+
+  const { extension } = ORGANIZATION_LOGO_TYPES[contentType as keyof typeof ORGANIZATION_LOGO_TYPES];
+  const fileName = `logo-${crypto.randomUUID()}.${extension}`;
+  const objectPath = `${ORGANIZATION_LOGO_PREFIX}/${organizationId}/${fileName}`;
+  try {
+    await env.ORGANIZATION_LOGOS.put(objectPath, body, {
+      httpMetadata: {
+        contentType,
+        contentDisposition: "inline",
+        cacheControl: "private, max-age=300",
+      },
+      customMetadata: { organizationId },
+    });
+  } catch (error) {
+    console.error("Organization logo upload failed", error);
+    return Response.json({ error: "Unable to save the organization logo." }, { status: 502 });
+  }
+
+  const logoUrl = `${trimTrailingSlash(env.BETTER_AUTH_URL)}/api/organization/${organizationId}/logo/${fileName}`;
+  return Response.json({ logoUrl }, { headers: { "Cache-Control": "no-store" } });
+};
+
+export const handleOrganizationLogoRead = async (
+  request: Request,
+  rawEnv: Env,
+  organizationId: string,
+  fileName: string,
+  allowedOrigins: string[],
+) => {
+  if (request.method !== "GET" && request.method !== "HEAD") {
+    return Response.json({ error: "Method not allowed" }, { status: 405 });
+  }
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(organizationId) ||
+    !/^logo-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.(png|jpg|webp)$/i.test(fileName)) {
+    return Response.json({ error: "Invalid organization logo" }, { status: 400 });
+  }
+  if (!isAllowedOrganizationLogoRequest(request, allowedOrigins)) {
+    return Response.json({ error: "Organization logo access is restricted" }, {
+      status: 403,
+      headers: { "Cache-Control": "no-store" },
+    });
+  }
+
+  const bucket = rawEnv.ORGANIZATION_LOGOS;
+  if (!bucket) {
+    return Response.json({ error: "Logo storage is unavailable" }, { status: 503 });
+  }
+
+  const object = await bucket.get(`${ORGANIZATION_LOGO_PREFIX}/${organizationId}/${fileName}`);
+  if (!object) return new Response(null, { status: 404 });
+
+  const headers = new Headers({
+    "Content-Type": object.httpMetadata?.contentType ?? "application/octet-stream",
+    "Content-Disposition": "inline",
+    "Cache-Control": "private, max-age=300",
+    "Cross-Origin-Resource-Policy": "same-site",
+    "X-Content-Type-Options": "nosniff",
+  });
+  if (object.httpEtag) headers.set("ETag", object.httpEtag);
+  return new Response(request.method === "HEAD" ? null : object.body, {
+    status: 200,
+    headers,
+  });
 };
 
 export const handleInternalAuthAdminRequest = async (request: Request, rawEnv: Env) => {

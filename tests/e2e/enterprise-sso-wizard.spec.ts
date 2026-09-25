@@ -43,6 +43,11 @@ const openSsoSetup = async (page: Page) => {
     contentType: "application/json",
     body: JSON.stringify({ data: { recorded: true } }),
   }));
+  await page.route("https://kv.better-auth.com/**", (route) => route.fulfill({
+    status: 200,
+    contentType: "application/json",
+    body: JSON.stringify({}),
+  }));
   await page.route("**/rest/v1/rpc/resolve_public_workspace_by_id**", (route) => route.fulfill({
     status: 200,
     contentType: "application/json",

@@ -59,7 +59,7 @@
               <input type="radio" name="sso-protocol" value="saml" :checked="protocol === 'saml'" @change="setProtocol('saml')" />
               <span class="protocol-option-copy">
                 <strong>SAML 2.0</strong>
-                <span>Use a SAML identity provider such as Cloudflare Zero Trust, Okta, or Microsoft Entra ID.</span>
+                <span>Use any identity provider that supports SAML 2.0, such as Okta or Microsoft Entra ID.</span>
               </span>
             </label>
             <label class="protocol-option" :class="{ selected: protocol === 'oidc' }">
@@ -106,8 +106,8 @@
               ref="currentInput"
               v-model="fieldValue"
               :placeholder="activeStep.placeholder"
-              :aria-describedby="stepError ? `sso-help-${activeStep.key} sso-error-${activeStep.key}` : `sso-help-${activeStep.key}`"
               :aria-invalid="stepError ? 'true' : undefined"
+              :aria-describedby="stepError ? `sso-help-${activeStep.key} sso-error-${activeStep.key}` : `sso-help-${activeStep.key}`"
               autocomplete="off"
               autocapitalize="off"
               spellcheck="false"
@@ -123,8 +123,8 @@
               :type="activeStep.inputType ?? 'text'"
               :placeholder="activeStep.placeholder"
               :pattern="activeStep.pattern"
-              :aria-describedby="stepError ? `sso-help-${activeStep.key} sso-error-${activeStep.key}` : `sso-help-${activeStep.key}`"
               :aria-invalid="stepError ? 'true' : undefined"
+              :aria-describedby="stepError ? `sso-help-${activeStep.key} sso-error-${activeStep.key}` : `sso-help-${activeStep.key}`"
               :autocomplete="activeStep.autocomplete ?? 'off'"
               :spellcheck="false"
               required
@@ -182,7 +182,7 @@
       <button class="secondary-action" :disabled="saving" @click="verifyDomain(domainVerificationProviderId)">Verify DNS record</button>
       <p v-if="metadataUrlForCreatedProvider" class="metadata-next-step">
         <a :href="metadataUrlForCreatedProvider" target="_blank" rel="noopener">Open ItemTraxx SP metadata</a>
-        <span>Use it in Cloudflare’s SAML app to fill the ItemTraxx Entity ID and ACS URL.</span>
+        <span>Use it in your identity provider’s SAML app to fill ItemTraxx’s Entity ID and ACS URL.</span>
       </p>
     </section>
 
@@ -276,7 +276,7 @@ const steps = computed<WizardStep[]>(() => {
       findIt: "Create a unique label for this connection. It does not need to match a value in your identity provider.",
       aliases: "Connection ID, provider slug, or SSO identifier",
       placeholder: "acme-sso",
-      example: "cloudflare-demo",
+      example: "acme-sso",
       pattern: "[a-z0-9\\-]+",
     },
     {
@@ -302,11 +302,11 @@ const steps = computed<WizardStep[]>(() => {
         ? "Copy the IdP’s identifier exactly. This is not ItemTraxx’s Entity ID."
         : "Enter the issuer URL exactly as shown in your provider’s OIDC metadata.",
       findIt: protocol.value === "saml"
-        ? "In Cloudflare Zero Trust, open the SAML app and copy “Access Entity ID or Issuer.” Other providers show this in their SAML metadata or single sign-on settings."
+        ? "Open your identity provider’s SAML app settings or metadata and copy its issuer / Entity ID (sometimes called the IdP identifier)."
         : "Open the OIDC application or its discovery document and copy the issuer value. It is often the base URL before /.well-known/openid-configuration.",
       aliases: protocol.value === "saml" ? "Issuer, Entity ID, IdP Entity ID, or Identifier" : "Issuer, issuer URL, authority, or tenant issuer",
-      placeholder: protocol.value === "saml" ? "https://acme.cloudflareaccess.com/..." : "https://login.example.com/tenant/v2.0",
-      example: protocol.value === "saml" ? "https://acme.cloudflareaccess.com/<team-id>" : "https://login.example.com/tenant/v2.0",
+      placeholder: protocol.value === "saml" ? "https://idp.example.com/issuer" : "https://login.example.com/tenant/v2.0",
+      example: protocol.value === "saml" ? "urn:example:identity-provider" : "https://login.example.com/tenant/v2.0",
       inputType: protocol.value === "oidc" ? "url" : "text",
     },
   ];
@@ -319,10 +319,10 @@ const steps = computed<WizardStep[]>(() => {
         summary: "ItemTraxx sends the browser to this endpoint to sign in with SAML.",
         fieldLabel: "IdP SSO URL",
         fieldHint: "Copy the identity provider’s SAML sign-in endpoint, not the ItemTraxx ACS URL.",
-        findIt: "In Cloudflare Zero Trust, copy the “SSO endpoint” shown for the SAML app. Other providers may show a “Sign-on URL” or “Login URL.”",
+        findIt: "Open your identity provider’s SAML app settings or metadata and copy its single sign-on endpoint. It may be listed as the SSO URL, Sign-on URL, Login URL, or entryPoint.",
         aliases: "SSO endpoint, Single Sign-On URL, Sign-on URL, or Login URL",
-        placeholder: "https://acme.cloudflareaccess.com/cdn-cgi/access/sso/saml/<app-id>",
-        example: "https://login.example.com/saml/sso",
+        placeholder: "https://idp.example.com/saml/sso",
+        example: "https://login.example.com/sso/saml",
         inputType: "url",
       },
       {
@@ -331,10 +331,10 @@ const steps = computed<WizardStep[]>(() => {
         summary: "ItemTraxx uses this public certificate to validate signed SAML responses.",
         fieldLabel: "IdP signing certificate",
         fieldHint: "Paste the full public X.509 certificate text supplied by your IdP. Keep the BEGIN/END lines if it provides PEM format.",
-        findIt: "In Cloudflare Zero Trust, copy the app’s “Public key” / Access public certificate. Other providers call this the SAML signing certificate or X.509 certificate.",
+        findIt: "Open your identity provider’s SAML app settings or download its metadata. Copy the public signing certificate, often labeled X.509 Certificate, Certificate, or Signing Certificate.",
         aliases: "Public key, signing certificate, X.509 certificate, or SAML certificate",
         placeholder: "-----BEGIN CERTIFICATE-----\nMIIC...\n-----END CERTIFICATE-----",
-        example: "A certificate beginning with -----BEGIN CERTIFICATE-----",
+        example: "Paste the complete public certificate; include the BEGIN/END lines when provided.",
         multiline: true,
       },
     ]
@@ -359,7 +359,7 @@ const steps = computed<WizardStep[]>(() => {
         fieldHint: "Copy the public application identifier. It is not the client secret.",
         findIt: "Open the OIDC app registration in your identity provider and copy its application or client identifier.",
         aliases: "Application ID, OAuth client ID, or app ID",
-        placeholder: "your-client-id",
+        placeholder: "7f31a8c2-example-client",
         example: "7f31a8c2-example-client",
       },
       {
@@ -456,14 +456,37 @@ function isValidHttpUrl(value: string) {
   }
 }
 
+function isValidSamlIssuer(value: string) {
+  return /^[a-z][a-z\d+.-]*:\S+$/i.test(value.trim());
+}
+
+function getCertificateIssue(value: string) {
+  const trimmed = value.trim();
+  if (!trimmed) return "Paste the public signing certificate from your identity provider.";
+  if (/-----BEGIN [^-]*PRIVATE KEY-----/i.test(trimmed)) {
+    return "This looks like a private key. Copy the public SAML signing certificate (X.509) from your identity provider instead. Never paste a private key here.";
+  }
+  if (trimmed.includes("<") && trimmed.includes(">")) {
+    return "This looks like full metadata XML. Copy only the public X.509 signing certificate from the metadata or your provider’s SAML settings.";
+  }
+
+  const pem = trimmed.match(/^-----BEGIN CERTIFICATE-----\s*([\s\S]+?)\s*-----END CERTIFICATE-----$/);
+  const body = pem?.[1] ?? (/-----BEGIN|-----END/.test(trimmed) ? "" : trimmed);
+  const base64 = body.replace(/\s+/g, "");
+  if (!/^[A-Za-z0-9+/]+={0,2}$/.test(base64) || base64.length < 100) {
+    return "This doesn’t look like a public X.509 certificate. Paste the full certificate in PEM or base64 format, not the SSO URL or full metadata document.";
+  }
+  return "";
+}
+
 function isStepComplete(key: WizardKey) {
   switch (key) {
     case "protocol": return true;
     case "providerId": return /^[a-z0-9-]+$/.test(providerId.value.trim());
     case "domain": return /^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/i.test(domain.value.trim());
-    case "issuer": return protocol.value === "saml" ? Boolean(issuer.value.trim()) : isValidHttpUrl(issuer.value);
+    case "issuer": return protocol.value === "saml" ? isValidSamlIssuer(issuer.value) : isValidHttpUrl(issuer.value);
     case "entryPoint": return isValidHttpUrl(entryPoint.value);
-    case "certificate": return Boolean(certificate.value.trim());
+    case "certificate": return !getCertificateIssue(certificate.value);
     case "discoveryEndpoint": return isValidHttpUrl(discoveryEndpoint.value);
     case "clientId": return Boolean(clientId.value.trim());
     case "clientSecret": return Boolean(clientSecret.value.trim());
@@ -473,12 +496,14 @@ function isStepComplete(key: WizardKey) {
 
 function getStepError(key: WizardKey) {
   switch (key) {
-    case "providerId": return "Use lowercase letters, numbers, and hyphens for the provider ID.";
-    case "domain": return "Enter a domain such as example.edu, without @ or a URL prefix.";
-    case "issuer": return protocol.value === "saml" ? "Enter the issuer or entity ID exactly as your provider shows it." : "Enter a complete issuer URL beginning with http:// or https://.";
-    case "entryPoint": return "Enter the complete IdP SSO URL beginning with http:// or https://.";
-    case "certificate": return "Paste the public signing certificate provided by your identity provider.";
-    case "discoveryEndpoint": return "Enter the complete OIDC discovery URL beginning with http:// or https://.";
+    case "providerId": return "Use lowercase letters, numbers, and hyphens only (for example, acme-sso). Remove spaces or underscores.";
+    case "domain": return "Enter only the email domain, such as example.edu. Remove the @, https://, or any path.";
+    case "issuer": return protocol.value === "saml"
+      ? "Enter the IdP’s issuer / Entity ID as a URI, such as https://idp.example.com/issuer or urn:example:idp. Don’t use the SSO URL or ItemTraxx’s Entity ID."
+      : "Enter the issuer URL from your provider’s OIDC configuration, not the full discovery URL. It should start with http:// or https://.";
+    case "entryPoint": return "Enter the identity provider’s SAML single sign-on URL, not ItemTraxx’s ACS URL. Copy it from the provider’s SAML app settings.";
+    case "certificate": return getCertificateIssue(certificate.value);
+    case "discoveryEndpoint": return "Enter the full OIDC discovery URL from your provider. It commonly ends in /.well-known/openid-configuration.";
     case "clientId": return "Enter the client ID from your OIDC application.";
     case "clientSecret": return "Enter the client secret value from your OIDC application.";
     default: return "Complete this step to continue.";
@@ -818,15 +843,32 @@ onMounted(() => void loadProviders().catch((cause) => { error.value = true; mess
 }
 
 .field-error {
-  margin: 0.5rem 0 0;
+  margin: 0.6rem 0 0;
+  padding: 0.65rem 0.75rem;
+  border-left: 3px solid var(--danger);
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--danger) 9%, var(--surface));
   color: var(--danger);
   font-size: 0.86rem;
+  line-height: 1.45;
 }
 
 .field-step input,
 .field-step textarea {
   width: 100%;
   max-width: none;
+}
+
+.field-step input[aria-invalid="true"],
+.field-step textarea[aria-invalid="true"] {
+  border-color: var(--danger);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--danger) 28%, transparent);
+}
+
+.field-step input[aria-invalid="true"]:focus,
+.field-step textarea[aria-invalid="true"]:focus {
+  border-color: var(--danger);
+  outline-color: var(--danger);
 }
 
 .field-step textarea {

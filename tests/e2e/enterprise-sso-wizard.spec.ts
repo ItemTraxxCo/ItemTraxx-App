@@ -113,38 +113,45 @@ test.describe("Enterprise SSO guided setup", () => {
     await expect(page.getByRole("heading", { name: "Name this connection" })).toBeVisible();
     const providerIdField = page.getByLabel("Provider ID");
     await expect(providerIdField).toHaveAttribute("pattern", "[a-z0-9\\-]+");
-    await providerIdField.fill("Cloudflare Demo");
+    await providerIdField.fill("Acme Demo");
     await page.getByRole("button", { name: "Continue" }).click();
-    await expect(page.getByRole("alert")).toHaveText("Use lowercase letters, numbers, and hyphens for the provider ID.");
-    await providerIdField.fill("cloudflare-demo");
+    await expect(page.getByRole("alert")).toHaveText("Use lowercase letters, numbers, and hyphens only (for example, acme-sso). Remove spaces or underscores.");
+    await expect(providerIdField).toHaveAttribute("aria-invalid", "true");
+    const errorColors = await Promise.all([
+      providerIdField.evaluate((element) => getComputedStyle(element).borderTopColor),
+      page.getByRole("alert").evaluate((element) => getComputedStyle(element).color),
+    ]);
+    expect(errorColors[0]).toBe(errorColors[1]);
+    await providerIdField.fill("acme-sso");
     await capture(page, "saml-02-provider-id.png");
     await page.getByRole("button", { name: "Continue" }).click();
 
     const emailDomainField = page.getByLabel("Verified email domain");
     await emailDomainField.fill("@example.edu");
     await page.getByRole("button", { name: "Continue" }).click();
-    await expect(page.getByRole("alert")).toHaveText("Enter a domain such as example.edu, without @ or a URL prefix.");
+    await expect(page.getByRole("alert")).toHaveText("Enter only the email domain, such as example.edu. Remove the @, https://, or any path.");
     await emailDomainField.fill("example.edu");
     await capture(page, "saml-03-email-domain.png");
     await page.getByRole("button", { name: "Continue" }).click();
 
-    await page.getByLabel("Identity provider issuer / entity ID").fill("https://acme.cloudflareaccess.com/saml/issuer");
+    await page.getByLabel("Identity provider issuer / entity ID").fill("https://idp.example.com/saml/issuer");
     await capture(page, "saml-04-issuer.png");
     await page.getByRole("button", { name: "Continue" }).click();
 
-    await page.getByLabel("IdP SSO URL").fill("https://acme.cloudflareaccess.com/cdn-cgi/access/sso/saml/demo");
+    await page.getByLabel("IdP SSO URL").fill("https://idp.example.com/saml/sso");
     await capture(page, "saml-05-sso-url.png");
     await page.getByRole("button", { name: "Continue" }).click();
 
-    await page.getByLabel("IdP signing certificate").fill("-----BEGIN CERTIFICATE-----\nFAKE-CERTIFICATE-FOR-E2E\n-----END CERTIFICATE-----");
+    const fakeCertificateBody = "VEVTVENFUlRJRklDQVRF".repeat(8);
+    await page.getByLabel("IdP signing certificate").fill(`-----BEGIN CERTIFICATE-----\n${fakeCertificateBody}\n-----END CERTIFICATE-----`);
     await capture(page, "saml-06-certificate.png");
     await page.getByRole("button", { name: "Review setup" }).click();
 
     await expect(page.getByRole("heading", { name: "Review your connection" })).toBeVisible();
-    await expect(page.getByText("https://acme.cloudflareaccess.com/saml/issuer")).toBeVisible();
+    await expect(page.getByText("https://idp.example.com/saml/issuer")).toBeVisible();
     await expect(page.getByText("example.edu", { exact: true })).toBeVisible();
     await page.getByText("View signing certificate").click();
-    await expect(page.locator(".review-value pre")).toContainText("FAKE-CERTIFICATE-FOR-E2E");
+    await expect(page.locator(".review-value pre")).toContainText(fakeCertificateBody);
     await page.getByText("View signing certificate").click();
     await capture(page, "saml-07-review-desktop.png");
 
@@ -155,27 +162,27 @@ test.describe("Enterprise SSO guided setup", () => {
     await page.setViewportSize({ width: 1440, height: 1000 });
 
     await page.getByRole("button", { name: "Change" }).nth(4).click();
-    await expect(page.getByLabel("IdP SSO URL")).toHaveValue("https://acme.cloudflareaccess.com/cdn-cgi/access/sso/saml/demo");
-    await page.getByLabel("IdP SSO URL").fill("https://acme.cloudflareaccess.com/cdn-cgi/access/sso/saml/demo-updated");
+    await expect(page.getByLabel("IdP SSO URL")).toHaveValue("https://idp.example.com/saml/sso");
+    await page.getByLabel("IdP SSO URL").fill("https://idp.example.com/saml/sso-updated");
     await page.getByRole("button", { name: "Continue" }).click();
     await page.getByRole("button", { name: "Review setup" }).click();
-    await expect(page.getByText("https://acme.cloudflareaccess.com/cdn-cgi/access/sso/saml/demo-updated")).toBeVisible();
+    await expect(page.getByText("https://idp.example.com/saml/sso-updated")).toBeVisible();
     await page.getByRole("button", { name: "Create SSO connection" }).click();
 
     await expect(page.getByText("Connection created", { exact: true })).toBeVisible();
-    await expect(page.getByText("_better-auth-token-cloudflare-demo.example.edu")).toBeVisible();
+    await expect(page.getByText("_better-auth-token-acme-sso.example.edu")).toBeVisible();
     await expect(page.getByText("fake-dns-verification-token")).toBeVisible();
-    await expect(page.getByRole("link", { name: "Open ItemTraxx SP metadata" })).toHaveAttribute("href", /saml2\/sp\/metadata\?providerId=cloudflare-demo/);
+    await expect(page.getByRole("link", { name: "Open ItemTraxx SP metadata" })).toHaveAttribute("href", /saml2\/sp\/metadata\?providerId=acme-sso/);
     await expect(page.getByRole("link", { name: "SP metadata", exact: true })).toBeVisible();
     await capture(page, "saml-09-created-desktop.png");
 
     expect(getRegistration()).toMatchObject({
-      providerId: "cloudflare-demo",
+      providerId: "acme-sso",
       domain: "example.edu",
-      issuer: "https://acme.cloudflareaccess.com/saml/issuer",
-      samlConfig: { entryPoint: "https://acme.cloudflareaccess.com/cdn-cgi/access/sso/saml/demo-updated" },
+      issuer: "https://idp.example.com/saml/issuer",
+      samlConfig: { entryPoint: "https://idp.example.com/saml/sso-updated" },
     });
-    expect(getRegistration()?.samlConfig?.cert).toContain("FAKE-CERTIFICATE-FOR-E2E");
+    expect(getRegistration()?.samlConfig?.cert).toContain(fakeCertificateBody);
     expect(pageErrors).toEqual([]);
     expect({ consoleErrors, failedRequests }).toEqual({ consoleErrors: [], failedRequests: [] });
   });

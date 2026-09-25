@@ -52,8 +52,8 @@
         <p>Check items out to borrowers or process returns.</p>
       </RouterLink>
       <RouterLink v-if="!isIndividualAccount" class="admin-card" to="/settings/organization">
-        <h2>Organization Settings</h2>
-        <p>Manage organization details and checkout defaults.</p>
+        <h2>Workspace Settings</h2>
+        <p>Manage workspace details and checkout defaults.</p>
       </RouterLink>
       <RouterLink v-if="!isIndividualAccount" class="admin-card" to="/settings/account">
         <h2>Account Settings</h2>

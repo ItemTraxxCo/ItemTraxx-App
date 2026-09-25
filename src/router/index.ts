@@ -353,7 +353,7 @@ const routes: RouteRecordRaw[] = [
       requiresWorkspace: true,
       requiresRole: "workspace_admin",
       requiresWorkspaceMatch: true,
-      title: "Organization Settings | ItemTraxx",
+      title: "Workspace Settings | ItemTraxx",
     },
   },
   {

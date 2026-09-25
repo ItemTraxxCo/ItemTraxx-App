@@ -102,6 +102,9 @@ const authFetch = async (input: string | URL | Request, init?: RequestInit) => {
   }
 };
 
+export const authApiBaseURL = baseURL;
+export const authApiFetch = authFetch;
+
 export const authClient = createAuthClient({
   baseURL,
   basePath: "/api/auth",

@@ -4,7 +4,7 @@
       <div class="admin-toolbar">
         <div class="page-nav-left">
           <RouterLink class="button-link" to="/admin">Return to admin panel</RouterLink>
-          <RouterLink class="button-link" to="/admin/settings">Settings</RouterLink>
+          <RouterLink class="button-link" to="/settings/organization">Organization Settings</RouterLink>
         </div>
         <div v-if="canManageAdmins" class="muted">Primary admin controls enabled</div>
         <div v-else class="muted">Read-only access</div>

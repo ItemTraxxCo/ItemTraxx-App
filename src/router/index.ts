@@ -333,17 +333,32 @@ const routes: RouteRecordRaw[] = [
     },
   },
   {
-    path: "/admin/settings",
-    name: "workspace-admin-settings",
-    component: () => import("../pages/workspace/admin/Settings.vue"),
+    path: "/settings/account",
+    name: "workspace-admin-account-settings",
+    component: () => import("../pages/workspace/admin/AccountSettings.vue"),
     meta: {
       requiresSession: true,
       requiresWorkspace: true,
       requiresRole: "workspace_admin",
       requiresWorkspaceMatch: true,
-    
-      title: "Admin Settings | ItemTraxx",
+      title: "Account Settings | ItemTraxx",
     },
+  },
+  {
+    path: "/settings/organization",
+    name: "workspace-organization-settings",
+    component: () => import("../pages/workspace/admin/OrganizationSettings.vue"),
+    meta: {
+      requiresSession: true,
+      requiresWorkspace: true,
+      requiresRole: "workspace_admin",
+      requiresWorkspaceMatch: true,
+      title: "Organization Settings | ItemTraxx",
+    },
+  },
+  {
+    path: "/admin/settings",
+    redirect: "/settings/organization",
   },
   {
     path: "/admin/settings/sso",

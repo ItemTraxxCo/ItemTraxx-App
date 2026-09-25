@@ -51,9 +51,17 @@
         <h2>Checkout & Return</h2>
         <p>Check items out to borrowers or process returns.</p>
       </RouterLink>
-      <RouterLink class="admin-card" :to="managerPath('/settings')">
+      <RouterLink v-if="!isIndividualAccount" class="admin-card" to="/settings/organization">
+        <h2>Organization Settings</h2>
+        <p>Manage organization details and checkout defaults.</p>
+      </RouterLink>
+      <RouterLink v-if="!isIndividualAccount" class="admin-card" to="/settings/account">
+        <h2>Account Settings</h2>
+        <p>Manage account security and signed in devices.</p>
+      </RouterLink>
+      <RouterLink v-if="isIndividualAccount" class="admin-card" :to="managerPath('/settings')">
         <h2>Settings</h2>
-        <p>Manage checkout policy and view signed in devices.</p>
+        <p>Manage your account settings and signed in devices.</p>
       </RouterLink>
     </div>
   </div>

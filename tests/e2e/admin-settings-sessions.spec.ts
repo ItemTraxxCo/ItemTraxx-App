@@ -73,7 +73,7 @@ test.describe("admin settings device sessions repro", () => {
       window.localStorage.setItem("itemtraxx:onboarding:v1:workspace_admin", new Date().toISOString());
     });
     await setWorkspaceAdminSession(page);
-    await navigateApp(page, "/admin/settings");
+    await navigateApp(page, "/settings/account");
     const consent = page.getByRole("dialog", { name: "Cookie preferences" });
     if (await consent.isVisible()) await consent.getByRole("button", { name: "Essential only" }).click();
 
@@ -100,8 +100,8 @@ test.describe("admin settings device sessions repro", () => {
     // Give any polling/heartbeat logic a chance to react before asserting.
     await page.waitForTimeout(1000);
 
-    // Current session must remain: no forced logout / termination banner, still on /admin/settings.
-    await expect(page).toHaveURL(/\/admin\/settings/);
+    // Current session must remain: no forced logout / termination banner, still on account settings.
+    await expect(page).toHaveURL(/\/settings\/account/);
     await expect(page.getByText("Admin laptop")).toBeVisible();
     await expect(page.getByText("This device")).toBeVisible();
   });

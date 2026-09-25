@@ -23,6 +23,8 @@ import { handleMtaStsRequest, isMtaStsRequest } from "./mtaSts.ts";
 import {
   handleBetterAuthRequest,
   handleInternalAuthAdminRequest,
+  handleOrganizationLogoRead,
+  handleOrganizationLogoUpload,
   handleSsoManagementRequest,
 } from "./auth.ts";
 
@@ -108,6 +110,42 @@ export default {
         // only makes the request routable and does not grant any access.
         if (url.pathname === "/api/auth/internal-admin") {
           return handleInternalAuthAdminRequest(tracedRequest, env);
+        }
+
+        const organizationLogoMatch = url.pathname.match(
+          /^\/api\/organization\/([0-9a-f-]{36})\/logo(?:\/(logo-[0-9a-f-]{36}\.(?:png|jpg|webp)))?$/i,
+        );
+        if (organizationLogoMatch) {
+          const logoFileName = organizationLogoMatch[2];
+          const logoResponse = logoFileName
+            ? await handleOrganizationLogoRead(
+              tracedRequest,
+              env,
+              organizationLogoMatch[1] ?? "",
+              logoFileName,
+              parseCsv(env.BETTER_AUTH_TRUSTED_ORIGINS),
+            )
+            : await handleOrganizationLogoUpload(
+              tracedRequest,
+              env,
+              organizationLogoMatch[1] ?? "",
+            );
+          const responseHeaders = new Headers(logoResponse.headers);
+          Object.entries(headers).forEach(([key, value]) =>
+            responseHeaders.set(key, value)
+          );
+          if (logoFileName) {
+            const vary = new Set(
+              (responseHeaders.get("Vary") ?? "").split(",").map((value) => value.trim()).filter(Boolean),
+            );
+            vary.add("Referer");
+            responseHeaders.set("Vary", Array.from(vary).join(", "));
+          }
+          responseHeaders.set("x-request-id", requestId);
+          return new Response(logoResponse.body, {
+            status: logoResponse.status,
+            headers: responseHeaders,
+          });
         }
 
         if (url.pathname.startsWith("/api/auth/")) {

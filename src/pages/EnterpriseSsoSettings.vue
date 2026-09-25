@@ -70,8 +70,8 @@ const saving = ref(false), message = ref(""), error = ref(false);
 const domainVerificationToken = ref("");
 const route = useRoute();
 const isSuperAdminSettings = computed(() => route.path.startsWith("/super-admin"));
-const backTarget = computed(() => isSuperAdminSettings.value ? "/super-admin/settings" : "/admin/settings");
-const backLabel = computed(() => isSuperAdminSettings.value ? "Back to super admin settings" : "Back to admin settings");
+const backTarget = computed(() => isSuperAdminSettings.value ? "/super-admin/settings" : "/settings/organization");
+const backLabel = computed(() => isSuperAdminSettings.value ? "Back to super admin settings" : "Back to organization settings");
 const metadataUrl = (id: string) => `${edgeOrigin}/api/auth/sso/saml2/sp/metadata?providerId=${encodeURIComponent(id)}`;
 const loadProviders = async () => {
   const query = organizationId.value ? `?organizationId=${encodeURIComponent(organizationId.value)}` : "";

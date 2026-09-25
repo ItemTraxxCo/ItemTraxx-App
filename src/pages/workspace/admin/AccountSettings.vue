@@ -1,90 +1,36 @@
 <template>
-  <div class="page admin-shell">
-    <div class="admin-hero">
+  <main class="page admin-shell">
+    <header class="admin-hero">
       <div class="page-nav-left">
-        <RouterLink class="button-link" :to="managerRoot">Return to manager home</RouterLink>
+        <RouterLink class="button-link" to="/admin">Return to workspace home</RouterLink>
       </div>
-      <h1>Personal Settings</h1>
-      <p class="admin-hero-copy">Configure your checkout defaults and manage active account sessions.</p>
-      <p><RouterLink class="button-link" to="/account/security">Account Security</RouterLink><template v-if="!isIndividualAccount"> · <RouterLink class="button-link" to="/admin/settings/sso">Enterprise SSO</RouterLink></template></p>
+      <h1>Account Settings</h1>
+      <p class="admin-hero-copy">Manage security and active sessions for your account.</p>
+      <p>
+        <RouterLink class="button-link" to="/account/security">Account Security</RouterLink>
+        ·
+        <RouterLink class="button-link" to="/settings/organization">Organization Settings</RouterLink>
+      </p>
       <div class="admin-summary-grid">
-        <div class="admin-summary-card">
-          <strong>{{ checkoutDueHours }}</strong>
-          <span>Due window (hours)</span>
-        </div>
         <div class="admin-summary-card">
           <strong>{{ sessions.length }}</strong>
           <span>Active devices</span>
         </div>
       </div>
-    </div>
+    </header>
 
-    <div class="card admin-section-card">
-      <div class="admin-section-header">
-        <div>
-          <h2>Account Overview</h2>
-          <p class="admin-section-copy">Review how this workspace is classified for billing and support.</p>
-        </div>
-        <RouterLink v-if="!isIndividualAccount" class="button-link" to="/admin/admins">Admin Access</RouterLink>
-      </div>
-      <div class="admin-summary-grid">
-        <div class="admin-summary-card">
-          <strong>{{ accountCategoryLabel }}</strong>
-          <span>Account Category</span>
-        </div>
-        <div class="admin-summary-card">
-          <strong>{{ planLabel }}</strong>
-          <span>Assigned plan</span>
-        </div>
-        <div v-if="isIndividualAccount" class="admin-summary-card">
-          <strong>{{ activeItems }} / {{ maxItems ?? "Unlimited" }}</strong>
-          <span>Active items</span>
-        </div>
-        <div v-if="isIndividualAccount" class="admin-summary-card">
-          <strong>{{ activeBorrowers }} / {{ maxBorrowers ?? "Unlimited" }}</strong>
-          <span>Active borrowers</span>
-        </div>
-      </div>
-      <p class="muted account-overview-copy">
-        {{
-          accountCategory === "individual"
-            ? "Account category: Individual"
-            : accountCategory === "workspace" || accountCategory === "education" || accountCategory === "custom"
-              ? "Account category: Workspace"
-              : "Account plan metadata has not been configured for this account. If you believe this is an error, please contact support."
-        }}
-      </p>
-    </div>
-
-    <div class="card admin-section-card">
-      <div class="admin-section-header">
-        <div>
-          <h2>Checkout Policy</h2>
-          <p class="admin-section-copy">Set the default checkout due window.</p>
-        </div>
-      </div>
-      <form class="form" @submit.prevent="handleSave">
-        <label>
-          Checkout due limit (hours)
-          <input v-model.number="checkoutDueHours" type="number" min="1" max="720" step="1" />
-        </label>
-        <p class="muted">This value is used for overdue notifications.</p>
-        <div class="form-actions">
-          <button type="submit" class="button-primary" :disabled="isSaving">Save settings</button>
-          <button type="button" :disabled="isSaving" @click="loadSettings">Reload Settings</button>
-        </div>
-      </form>
-      <p v-if="error" class="error">{{ error }}</p>
-      <p v-if="success" class="success">{{ success }}</p>
-    </div>
-
-    <div class="card admin-section-card">
+    <section class="card admin-section-card">
       <div class="admin-section-header">
         <div>
           <h2>Active Devices</h2>
-          <p class="admin-section-copy">Review active sessions for your account and remotely sign out devices.</p>
+          <p class="admin-section-copy">Review active sessions and sign out devices you no longer use.</p>
         </div>
+        <button type="button" :disabled="isLoading" @click="loadSessions">Reload</button>
       </div>
+
+      <p v-if="sessionError" class="error" role="alert">{{ sessionError }}</p>
+      <p v-if="sessionSuccess" class="success" role="status">{{ sessionSuccess }}</p>
+
       <div class="table-wrap">
         <table class="table">
           <thead>
@@ -117,7 +63,7 @@
                     aria-haspopup="menu"
                     :aria-expanded="openSessionMenuId === session.id"
                     :aria-controls="`session-menu-${session.id}`"
-                    :disabled="isSessionSaving"
+                    :disabled="isSaving"
                     @click.stop="toggleSessionMenu(session.id)"
                     @keydown.esc.stop="closeSessionMenu"
                   >
@@ -138,8 +84,8 @@
                       type="button"
                       class="session-menu-item session-menu-item--danger"
                       role="menuitem"
-                      :disabled="isSessionSaving"
-                      @click="handleRevokeSession(session)"
+                      :disabled="isSaving"
+                      @click="revokeSession(session)"
                     >
                       Revoke device
                     </button>
@@ -154,102 +100,58 @@
           </tbody>
         </table>
       </div>
+
       <div class="form-actions session-bulk-actions">
         <button
           type="button"
           class="session-bulk-revoke"
-          :disabled="isSessionSaving || !removableSessions.length"
-          @click="handleSignOutAllOthers"
+          :disabled="isSaving || !removableSessions.length"
+          @click="revokeOtherSessions"
         >
           Sign out all other devices
         </button>
       </div>
-      <p v-if="sessionError" class="error">{{ sessionError }}</p>
-      <p v-if="sessionSuccess" class="success">{{ sessionSuccess }}</p>
-    </div>
+    </section>
 
     <div v-if="toastMessage" class="toast">
       <div class="toast-title">{{ toastTitle }}</div>
       <div class="toast-body">{{ toastMessage }}</div>
     </div>
-  </div>
+  </main>
 </template>
 
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from "vue";
 import { RouterLink } from "vue-router";
-import { useManagerContext } from "../../../composables/useManagerContext";
 import { toUserFacingErrorMessage } from "../../../services/appErrors";
 import {
-  fetchWorkspaceSettings,
   listAccountSessions,
-  revokeAllAccountSessions,
   revokeAccountSession,
+  revokeAllAccountSessions,
   type AccountSessionItem,
-  updateWorkspaceSettings,
-  type WorkspaceSettingsPayload,
 } from "../../../services/adminOpsService";
 
-const { isIndividualAccount, managerRoot } = useManagerContext();
-
-const isSaving = ref(false);
-const error = ref("");
-const success = ref("");
-const checkoutDueHours = ref(72);
-const maxItems = ref<number | null>(null);
-const maxBorrowers = ref<number | null>(null);
-const activeItems = ref(0);
-const activeBorrowers = ref(0);
-const accountCategory = ref<"workspace" | "education" | "custom" | "individual" | null>(null);
-const planCode = ref<
-  | "workspace_core"
-  | "workspace_growth"
-  | "workspace_enterprise"
-  | "education"
-  | "custom"
-  | "individual_yearly"
-  | "individual_monthly"
-  | null
->(null);
 const sessions = ref<AccountSessionItem[]>([]);
-const openSessionMenuId = ref<string | null>(null);
-const isSessionSaving = ref(false);
+const isLoading = ref(false);
+const isSaving = ref(false);
 const sessionError = ref("");
 const sessionSuccess = ref("");
+const openSessionMenuId = ref<string | null>(null);
 const toastTitle = ref("");
 const toastMessage = ref("");
 let toastTimer: number | null = null;
 
+const removableSessions = computed(() => sessions.value.filter((session) => !session.is_current));
+
 const showToast = (title: string, message: string) => {
   toastTitle.value = title;
   toastMessage.value = message;
-  if (toastTimer) {
-    window.clearTimeout(toastTimer);
-  }
+  if (toastTimer) window.clearTimeout(toastTimer);
   toastTimer = window.setTimeout(() => {
     toastTitle.value = "";
     toastMessage.value = "";
     toastTimer = null;
   }, 4000);
-};
-
-const applySettings = (settings: WorkspaceSettingsPayload) => {
-  checkoutDueHours.value = settings.checkout_due_hours;
-  maxItems.value = settings.max_items;
-  maxBorrowers.value = settings.max_borrowers;
-  activeItems.value = settings.active_items;
-  activeBorrowers.value = settings.active_borrowers;
-  accountCategory.value =
-    settings.account_category === "individual"
-      ? "individual"
-      : settings.account_category === "education"
-        ? "education"
-      : settings.account_category === "custom"
-        ? "custom"
-      : settings.account_category === "workspace"
-        ? "workspace"
-        : null;
-  planCode.value = settings.plan_code ?? null;
 };
 
 const formatLoginMethod = (value: AccountSessionItem["login_method"]) =>
@@ -265,57 +167,23 @@ const formatLoginLocation = (value: AccountSessionItem["login_location"]) =>
   value === "regular_login"
     ? "Regular login"
     : value === "admin_login"
-      ? isIndividualAccount.value
-        ? "Account sign-in"
-        : "Admin sign in"
+      ? "Admin sign in"
       : "Unknown";
 
 const formatGeneralLocation = (value: AccountSessionItem["general_location"]) =>
   value?.trim() ? value : "Unknown";
 
-const accountCategoryLabel = computed(() =>
-  accountCategory.value === "individual"
-    ? "Individual"
-    : accountCategory.value === "education"
-      ? "Education"
-    : accountCategory.value === "custom"
-      ? "Custom"
-    : accountCategory.value === "workspace"
-      ? "Workspace"
-      : "Unavailable"
-);
-
-const planLabel = computed(() => {
-  switch (planCode.value) {
-    case "workspace_core":
-      return "Workspace Core";
-    case "workspace_growth":
-      return "Workspace Growth";
-    case "workspace_enterprise":
-      return "Workspace Enterprise";
-    case "education":
-      return "Education";
-    case "custom":
-      return "Custom";
-    case "individual_yearly":
-      return "Individual Yearly";
-    case "individual_monthly":
-      return "Individual Monthly";
-    default:
-      return "Unavailable";
-  }
-});
-
-const removableSessions = computed(() =>
-  sessions.value.filter((session) => !session.is_current)
-);
+const formatDate = (value: string) => {
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? "Unknown" : date.toLocaleString();
+};
 
 const closeSessionMenu = () => {
   openSessionMenuId.value = null;
 };
 
 const toggleSessionMenu = (sessionId: string) => {
-  if (isSessionSaving.value) return;
+  if (isSaving.value) return;
   openSessionMenuId.value = openSessionMenuId.value === sessionId ? null : sessionId;
 };
 
@@ -323,68 +191,32 @@ const handleSessionMenuKeydown = (event: KeyboardEvent) => {
   if (event.key === "Escape") closeSessionMenu();
 };
 
-const formatDate = (value: string) => {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "Unknown";
-  return date.toLocaleString();
-};
-
 const loadSessions = async () => {
+  if (isLoading.value) return;
+  isLoading.value = true;
   sessionError.value = "";
   sessionSuccess.value = "";
   try {
     const data = await listAccountSessions();
     sessions.value = data.sessions ?? [];
-    if (openSessionMenuId.value && !sessions.value.some((row) => row.id === openSessionMenuId.value)) {
+    if (openSessionMenuId.value && !sessions.value.some((session) => session.id === openSessionMenuId.value)) {
       closeSessionMenu();
     }
-  } catch (err) {
+  } catch (error) {
     sessions.value = [];
     closeSessionMenu();
-    sessionError.value = toUserFacingErrorMessage(err, "Unable to load sessions.");
-  }
-};
-
-const loadSettings = async () => {
-  error.value = "";
-  success.value = "";
-  try {
-    const settings = await fetchWorkspaceSettings();
-    applySettings(settings);
-  } catch (err) {
-    error.value = toUserFacingErrorMessage(err, "Unable to load tenant settings.");
-  }
-};
-
-const handleSave = async () => {
-  error.value = "";
-  success.value = "";
-  const nextHours = Number(checkoutDueHours.value);
-  if (!Number.isFinite(nextHours) || nextHours < 1 || nextHours > 720) {
-    showToast("Invalid input", "Checkout due limit must be between 1 and 720 hours.");
-    return;
-  }
-
-  isSaving.value = true;
-  try {
-    const saved = await updateWorkspaceSettings({ checkout_due_hours: Math.round(nextHours) });
-    applySettings(saved);
-    success.value = "Settings saved.";
-    showToast("Saved", "Tenant settings updated.");
-  } catch (err) {
-    error.value = toUserFacingErrorMessage(err, "Unable to save tenant settings.");
-    showToast("Save failed", error.value);
+    sessionError.value = toUserFacingErrorMessage(error, "Unable to load active sessions.");
   } finally {
-    isSaving.value = false;
+    isLoading.value = false;
   }
 };
 
-const handleRevokeSession = async (session: AccountSessionItem) => {
-  if (isSessionSaving.value) return;
+const revokeSession = async (session: AccountSessionItem) => {
+  if (isSaving.value || session.is_current) return;
   closeSessionMenu();
   const deviceLabel = session.device_label || "this device";
   if (!window.confirm(`Revoke ${deviceLabel}? This device will be signed out.`)) return;
-  isSessionSaving.value = true;
+  isSaving.value = true;
   sessionError.value = "";
   sessionSuccess.value = "";
   try {
@@ -392,17 +224,17 @@ const handleRevokeSession = async (session: AccountSessionItem) => {
     showToast("Session revoked", "Selected device has been signed out.");
     await loadSessions();
     if (!sessionError.value) sessionSuccess.value = "Device revoked.";
-  } catch (err) {
-    sessionError.value = toUserFacingErrorMessage(err, "Unable to revoke device.");
+  } catch (error) {
+    sessionError.value = toUserFacingErrorMessage(error, "Unable to revoke this device.");
   } finally {
-    isSessionSaving.value = false;
+    isSaving.value = false;
   }
 };
 
-const handleSignOutAllOthers = async () => {
-  if (!removableSessions.value.length) return;
+const revokeOtherSessions = async () => {
+  if (isSaving.value || !removableSessions.value.length) return;
   if (!window.confirm("Sign out all other devices? This will end every other active session.")) return;
-  isSessionSaving.value = true;
+  isSaving.value = true;
   sessionError.value = "";
   sessionSuccess.value = "";
   try {
@@ -410,36 +242,27 @@ const handleSignOutAllOthers = async () => {
     showToast("Sessions revoked", "All other devices have been signed out.");
     await loadSessions();
     if (!sessionError.value) sessionSuccess.value = "All other devices signed out.";
-  } catch (err) {
-    sessionError.value = toUserFacingErrorMessage(err, "Unable to sign out all other devices.");
+  } catch (error) {
+    sessionError.value = toUserFacingErrorMessage(error, "Unable to sign out other devices.");
   } finally {
-    isSessionSaving.value = false;
+    isSaving.value = false;
   }
 };
 
 onMounted(() => {
   document.addEventListener("click", closeSessionMenu);
   document.addEventListener("keydown", handleSessionMenuKeydown);
-  void loadSettings();
   void loadSessions();
 });
 
 onUnmounted(() => {
   document.removeEventListener("click", closeSessionMenu);
   document.removeEventListener("keydown", handleSessionMenuKeydown);
-  if (toastTimer) {
-    window.clearTimeout(toastTimer);
-    toastTimer = null;
-  }
+  if (toastTimer) window.clearTimeout(toastTimer);
 });
 </script>
 
 <style scoped>
-.account-overview-copy {
-  font-size: 0.82rem;
-  color: var(--muted);
-}
-
 .session-actions-header,
 .session-actions-cell {
   text-align: right;

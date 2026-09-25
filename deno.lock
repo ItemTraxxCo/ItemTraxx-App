@@ -1,24 +1,24 @@
 {
   "version": "5",
   "specifiers": {
-    "npm:@better-auth/infra@~0.4.11": "0.4.11_better-auth@1.7.5__vitest@5.0.1___@types+node@26.6.2___@vitest+coverage-v8@5.0.1___jsdom@30.1.1___vite@8.3.0___@noble+hashes@2.4.0__vue@3.5.42__jsdom@30.1.1_zod@4.6.5_jsdom@30.1.1",
-    "npm:@better-auth/passkey@^1.7.5": "1.7.5_better-auth@1.7.5__vitest@5.0.1___@types+node@26.6.2___@vitest+coverage-v8@5.0.1___jsdom@30.1.1___vite@8.3.0___@noble+hashes@2.4.0__vue@3.5.42__jsdom@30.1.1_jsdom@30.1.1",
-    "npm:@better-auth/sso@^1.7.5": "1.7.5_better-auth@1.7.5__vitest@5.0.1___@types+node@26.6.2___@vitest+coverage-v8@5.0.1___jsdom@30.1.1___vite@8.3.0___@noble+hashes@2.4.0__vue@3.5.42__jsdom@30.1.1_jsdom@30.1.1",
-    "npm:@cloudflare/vite-plugin@^1.54.10": "1.57.3_vite@8.3.0_wrangler@4.136.3_@types+node@26.6.2",
+    "npm:@better-auth/infra@~0.4.11": "0.4.11_better-auth@1.7.5__vitest@5.0.1__vue@3.5.43__typescript@6.0.3_zod@4.6.5_typescript@6.0.3_vue@3.5.43",
+    "npm:@better-auth/passkey@^1.7.5": "1.7.5_better-auth@1.7.5__vitest@5.0.1__vue@3.5.43__typescript@6.0.3_typescript@6.0.3_vue@3.5.43",
+    "npm:@better-auth/sso@^1.7.5": "1.7.5_better-auth@1.7.5__vitest@5.0.1__vue@3.5.43__typescript@6.0.3_typescript@6.0.3_vue@3.5.43",
+    "npm:@cloudflare/vite-plugin@^1.55.0": "1.60.1_vite@8.3.0_wrangler@4.140.0",
     "npm:@cyclonedx/cyclonedx-npm@6.0.1": "6.0.1",
     "npm:@intercom/messenger-js-sdk@^0.0.20": "0.0.20",
     "npm:@playwright/test@^1.63.0": "1.63.0",
     "npm:@supabase/supabase-js@^2.116.0": "2.116.0",
     "npm:@types/node@^26.6.1": "26.6.2",
     "npm:@types/qrcode@^1.5.6": "1.5.6",
-    "npm:@vercel/analytics@^2.0.1": "2.0.1_vue@3.5.42_vue-router@4.6.4_typescript@6.0.3",
-    "npm:@vercel/speed-insights@2": "2.0.0_vue@3.5.42_vue-router@4.6.4_typescript@6.0.3",
-    "npm:@vitejs/plugin-vue@^6.0.9": "6.0.9_vite@8.3.0_vue@3.5.42_@types+node@26.6.2",
+    "npm:@vercel/analytics@^2.0.1": "2.0.1_vue@3.5.43_vue-router@4.6.4__vue@3.5.43__typescript@6.0.3_typescript@6.0.3",
+    "npm:@vercel/speed-insights@2": "2.0.0_vue@3.5.43_vue-router@4.6.4__vue@3.5.43__typescript@6.0.3_typescript@6.0.3",
+    "npm:@vitejs/plugin-vue@^6.0.9": "6.0.9_vite@8.3.0_vue@3.5.43_typescript@6.0.3",
     "npm:@vitest/coverage-v8@^5.0.1": "5.0.1_vitest@5.0.1_@types+node@26.6.2_jsdom@30.1.1_vite@8.3.0",
-    "npm:@vue/test-utils@^2.5.1": "2.5.1_@vue+compiler-dom@3.5.42_vue@3.5.42",
-    "npm:@vue/tsconfig@~0.9.1": "0.9.1_typescript@6.0.3_vue@3.5.42",
-    "npm:better-auth@^1.7.5": "1.7.5_vitest@5.0.1__@types+node@26.6.2__@vitest+coverage-v8@5.0.1__jsdom@30.1.1__vite@8.3.0__@noble+hashes@2.4.0_vue@3.5.42_jsdom@30.1.1",
-    "npm:boneyard-js@^1.10.0": "1.10.0_vite@8.3.0_vue@3.5.42_@types+node@26.6.2",
+    "npm:@vue/test-utils@^2.5.1": "2.5.1_vue@3.5.43_typescript@6.0.3",
+    "npm:@vue/tsconfig@~0.9.1": "0.9.1_typescript@6.0.3_vue@3.5.43",
+    "npm:better-auth@^1.7.5": "1.7.5_vitest@5.0.1_vue@3.5.43_typescript@6.0.3",
+    "npm:boneyard-js@^1.10.0": "1.10.0_vite@8.3.0_vue@3.5.43_typescript@6.0.3",
     "npm:fake-indexeddb@^6.2.5": "6.2.5",
     "npm:jose@6.1.3": "6.1.3",
     "npm:jose@^6.2.12": "6.2.12",
@@ -32,10 +32,10 @@
     "npm:typescript@~6.0.3": "6.0.3",
     "npm:vite@^8.3.0": "8.3.0_@types+node@26.6.2",
     "npm:vitest@5": "5.0.1_@types+node@26.6.2_@vitest+coverage-v8@5.0.1_jsdom@30.1.1_vite@8.3.0_@noble+hashes@2.4.0",
-    "npm:vue-router@^4.6.4": "4.6.4_vue@3.5.42_typescript@6.0.3",
+    "npm:vue-router@^4.6.4": "4.6.4_vue@3.5.43_typescript@6.0.3",
     "npm:vue-tsc@^3.3.11": "3.3.11_typescript@6.0.3",
-    "npm:vue@^3.5.42": "3.5.42_typescript@6.0.3",
-    "npm:wrangler@^4.124.0": "4.136.3",
+    "npm:vue@^3.5.43": "3.5.43_typescript@6.0.3",
+    "npm:wrangler@^4.124.0": "4.140.0",
     "npm:zod@^4.6.0": "4.6.5"
   },
   "npm": {
@@ -113,7 +113,7 @@
         "@better-auth/utils@0.4.2"
       ]
     },
-    "@better-auth/infra@0.4.11_better-auth@1.7.5__vitest@5.0.1___@types+node@26.6.2___@vitest+coverage-v8@5.0.1___jsdom@30.1.1___vite@8.3.0___@noble+hashes@2.4.0__vue@3.5.42__jsdom@30.1.1_zod@4.6.5_jsdom@30.1.1": {
+    "@better-auth/infra@0.4.11_better-auth@1.7.5__vitest@5.0.1__vue@3.5.43__typescript@6.0.3_zod@4.6.5_typescript@6.0.3_vue@3.5.43": {
       "integrity": "sha512-zVhoFkauVUhyOkSEU4Hob9osLUhpc0DHE34lhXGIxTenlvJRCuQINaOvZ9Boi2BjQJlkUUxSkGYLxlkPaMpyVw==",
       "dependencies": [
         "@better-auth/core",
@@ -153,7 +153,7 @@
         "@better-auth/utils@0.4.2"
       ]
     },
-    "@better-auth/passkey@1.7.5_better-auth@1.7.5__vitest@5.0.1___@types+node@26.6.2___@vitest+coverage-v8@5.0.1___jsdom@30.1.1___vite@8.3.0___@noble+hashes@2.4.0__vue@3.5.42__jsdom@30.1.1_jsdom@30.1.1": {
+    "@better-auth/passkey@1.7.5_better-auth@1.7.5__vitest@5.0.1__vue@3.5.43__typescript@6.0.3_typescript@6.0.3_vue@3.5.43": {
       "integrity": "sha512-7bV1d1+zLGKO3ugH4bxQKG9s2cLuMsDnpxVhQ4QNnEWjSHKmWgpIwoUsFHk3MHz0ntE7au1QLk8HYkcenW5XyQ==",
       "dependencies": [
         "@better-auth/core",
@@ -174,7 +174,7 @@
         "@better-auth/utils@0.4.2"
       ]
     },
-    "@better-auth/sso@1.7.5_better-auth@1.7.5__vitest@5.0.1___@types+node@26.6.2___@vitest+coverage-v8@5.0.1___jsdom@30.1.1___vite@8.3.0___@noble+hashes@2.4.0__vue@3.5.42__jsdom@30.1.1_jsdom@30.1.1": {
+    "@better-auth/sso@1.7.5_better-auth@1.7.5__vitest@5.0.1__vue@3.5.43__typescript@6.0.3_typescript@6.0.3_vue@3.5.43": {
       "integrity": "sha512-sddwWyT4W/0mx/p7P1FmArXsFrKdoSo2BKJBkrc0gCm+HT4znYrwITWkRkwj26kx1Oz6nbNLvYOFc/6VoHcGUw==",
       "dependencies": [
         "@better-auth/core",
@@ -236,8 +236,8 @@
         "workerd"
       ]
     },
-    "@cloudflare/vite-plugin@1.57.3_vite@8.3.0_wrangler@4.136.3_@types+node@26.6.2": {
-      "integrity": "sha512-aXquK3c1RbLVmGbr5Z0tr4dq3aUrMkwaZjBuC5UdZwSTQRqa/aHR5M+SM/WqEZdE3Fs6FkBBscCjvHKR+LXZuA==",
+    "@cloudflare/vite-plugin@1.60.1_vite@8.3.0_wrangler@4.140.0": {
+      "integrity": "sha512-g/MDVLHNYfJwXFGoyShVO68/JefTY3Y8WhMMLfbR/TjK3H7fSdS5JkO9UcI/N0698NAd6MtZtRQ2HGj6tIrSMg==",
       "dependencies": [
         "@cloudflare/unenv-preset",
         "miniflare",
@@ -283,14 +283,14 @@
     "@csstools/color-helpers@6.1.1": {
       "integrity": "sha512-gLNsunvwf3mCi5u5o46/Z/JcJMnhbHSaZ69rkgPzNM3J4s8hWwpPUQB6/tt0EDFyCiWzxANlx+2LJwpYj4zS1w=="
     },
-    "@csstools/css-calc@3.4.0_@csstools+css-parser-algorithms@4.0.0__@csstools+css-tokenizer@4.0.1_@csstools+css-tokenizer@4.0.1": {
+    "@csstools/css-calc@3.4.0_@csstools+css-parser-algorithms@4.0.0_@csstools+css-tokenizer@4.0.1": {
       "integrity": "sha512-XQKj5B7QiZcHiegCOCAzcAOJdhGgWOHbbu62h5e5mkHnn8lWcfiJhllkqWmxu5zWR9jucPHuo1iTB56P033hcg==",
       "dependencies": [
         "@csstools/css-parser-algorithms",
         "@csstools/css-tokenizer"
       ]
     },
-    "@csstools/css-color-parser@4.2.3_@csstools+css-parser-algorithms@4.0.0__@csstools+css-tokenizer@4.0.1_@csstools+css-tokenizer@4.0.1": {
+    "@csstools/css-color-parser@4.2.3_@csstools+css-parser-algorithms@4.0.0_@csstools+css-tokenizer@4.0.1": {
       "integrity": "sha512-y4LpL+lmpuyKDiEFq2PnZUVFdAjsoB/qQJod79yLNokXyW7jewi+/WJ69EfItj8A2unWtxXnGjw6LYXgXu5ZjA==",
       "dependencies": [
         "@csstools/color-helpers",
@@ -1149,7 +1149,7 @@
     "@types/trusted-types@2.0.7": {
       "integrity": "sha512-ScaPdn1dQczgbl0QFTeTOmVHFULt394XJgOQNoyVhZ6r2vLnMLJfBPd53SB52T/3G36VI1/g2MZaX0cwDuXsfw=="
     },
-    "@vercel/analytics@2.0.1_vue@3.5.42_vue-router@4.6.4_typescript@6.0.3": {
+    "@vercel/analytics@2.0.1_vue@3.5.43_vue-router@4.6.4__vue@3.5.43__typescript@6.0.3_typescript@6.0.3": {
       "integrity": "sha512-MTQG6V9qQrt1tsDeF+2Uoo5aPjqbVPys1xvnIftXSJYG2SrwXRHnqEvVoYID7BTruDz4lCd2Z7rM1BdkUehk2g==",
       "dependencies": [
         "vue",
@@ -1160,7 +1160,7 @@
         "vue-router"
       ]
     },
-    "@vercel/speed-insights@2.0.0_vue@3.5.42_vue-router@4.6.4_typescript@6.0.3": {
+    "@vercel/speed-insights@2.0.0_vue@3.5.43_vue-router@4.6.4__vue@3.5.43__typescript@6.0.3_typescript@6.0.3": {
       "integrity": "sha512-jwkNcrTeafWxjmWq4AHBaptSqZiJkYU5adLC9QBSqeim0GcqDMgN5Ievh8OG1rJ6W3A4l1oiP7qr9CWxGuzu3w==",
       "dependencies": [
         "vue",
@@ -1171,7 +1171,7 @@
         "vue-router"
       ]
     },
-    "@vitejs/plugin-vue@6.0.9_vite@8.3.0_vue@3.5.42_@types+node@26.6.2": {
+    "@vitejs/plugin-vue@6.0.9_vite@8.3.0_vue@3.5.43_typescript@6.0.3": {
       "integrity": "sha512-rD/MORlhaZMlXWW0rEn4FB4wMinWC0z/D7Ye160S5+Rs1mC8ZDAdcDp4SjKfUhG5t8q1ktcPVw4xuTkPRlzrSA==",
       "dependencies": [
         "@rolldown/pluginutils",
@@ -1235,8 +1235,8 @@
         "vscode-uri"
       ]
     },
-    "@vue/compiler-core@3.5.42": {
-      "integrity": "sha512-2Ye1ilMtKXxl8qZUrQ5j0CdgenFp/HFQmta6rfRyfEsTG69L6Wk+tWuNoHYHMx9E8tF2Slvdg1FuwDvAXdy1LQ==",
+    "@vue/compiler-core@3.5.43": {
+      "integrity": "sha512-zdiLhnbe1QQqgDT8xZMpNmyqZ3qlI+/Q/FHQco57Kwl/b05HhCzN6eVGN9QU9rbga4CrS0H5SYY8VGHZCt/1Hg==",
       "dependencies": [
         "@babel/parser",
         "@vue/shared",
@@ -1245,15 +1245,15 @@
         "source-map-js"
       ]
     },
-    "@vue/compiler-dom@3.5.42": {
-      "integrity": "sha512-qbhQZEFmycr+ni/qyuccS4sucNN7VAbDfbkvNxWOX2VfgFm90MNs3/UhRNKoPMEIVn0F8gdlYjLPvqxHwHeQOA==",
+    "@vue/compiler-dom@3.5.43": {
+      "integrity": "sha512-PEZoAk3NQmsn/ejMzSOCyTYqwGqczrWm70PuhBKjjv1+TCoQAaO/zOqNwjV+honlNstT5ILxtc+8r8UUfj+iEQ==",
       "dependencies": [
         "@vue/compiler-core",
         "@vue/shared"
       ]
     },
-    "@vue/compiler-sfc@3.5.42": {
-      "integrity": "sha512-fkCAFB4okcAANGMThboWnScp/gzWjU0ZSkVnjTIiplmMDq2uq0tIB3j+xVu4rhv5rvOgBySCysudmbMd6xRRqw==",
+    "@vue/compiler-sfc@3.5.43": {
+      "integrity": "sha512-FCbrG3XNCRl+js3huuKx4IVHBLTvMkJhVepjbxSPu1gn4yWLaYtGNQdjJGZaMytXB6qb76qQDDmDSLy/vkmleQ==",
       "dependencies": [
         "@babel/parser",
         "@vue/compiler-core",
@@ -1266,8 +1266,8 @@
         "source-map-js"
       ]
     },
-    "@vue/compiler-ssr@3.5.42": {
-      "integrity": "sha512-xmLk3wLkbizPAiLyomjgFFosf2ys9b5Ghb+oh/k2tnvipNz8OFrQOiTcWCzyK7MpBp9KkyGtfvgfLUivbmuGYA==",
+    "@vue/compiler-ssr@3.5.43": {
+      "integrity": "sha512-GF62orf7KiJX9RqrHNGrYBudsQGD0OhJ5nDs90O8UiDuS40+YMYomiXu6w6EuvtXuRDc3MSNis3EaaSKAVSWpg==",
       "dependencies": [
         "@vue/compiler-dom",
         "@vue/shared"
@@ -1288,21 +1288,21 @@
         "picomatch"
       ]
     },
-    "@vue/reactivity@3.5.42": {
-      "integrity": "sha512-TzNNfKpb7hDxbQltwAut8VDQA5YP+BuRlxntHUuRjyKwlMvmAPbs3unhCvieijifY6vFfVBwsS7wG/C7uq+bEQ==",
+    "@vue/reactivity@3.5.43": {
+      "integrity": "sha512-G/c9GyOZNI2jVaaS6OX1EF1SSFSv7H0ERqNTl4+DTFMlZmB5eVAB53aLQNam/7NL2NPtaDD7RdVrzf8uJzMuOA==",
       "dependencies": [
         "@vue/shared"
       ]
     },
-    "@vue/runtime-core@3.5.42": {
-      "integrity": "sha512-9uACtuHs7vJGkm5Bp3xu4xRDLFTIYy5DgxpToVjqGIAhAEKwQfsaLvKINhM6nFVp6bZPRFGdDqd1g52MqKsotA==",
+    "@vue/runtime-core@3.5.43": {
+      "integrity": "sha512-hU6U6VnVhBGQDpvlnnDlIB8ZGJBiOcgk2lh/0InltHiz3D8oSkluvuvY+do1G2H3+udeKFsmaBlgVYP7gXQzEw==",
       "dependencies": [
         "@vue/reactivity",
         "@vue/shared"
       ]
     },
-    "@vue/runtime-dom@3.5.42": {
-      "integrity": "sha512-rsCmhiWLaRxGltLwhlCWyYkFn7WAbKRh0q17eZ1A6Dq6eqc2ACQ61IIryxz0LrsvCzHSilLA9JHovVwM8CNE2g==",
+    "@vue/runtime-dom@3.5.43": {
+      "integrity": "sha512-Bb2Jc0YjjJdMt1SJmb9b2L/IWd3I8lIT9x9eS/xvvP9CiVgna0ffua74xKRmt4/uSJ+0r4iN8ex1jrqkhQGWQw==",
       "dependencies": [
         "@vue/reactivity",
         "@vue/runtime-core",
@@ -1310,27 +1310,26 @@
         "csstype"
       ]
     },
-    "@vue/server-renderer@3.5.42": {
-      "integrity": "sha512-2++5dUyYS4gvo7xQXSECUDhB7TS0aOl5SeVfC5qSq1Jgfhjvegw1zqhwTIR3imZ+QYPJQw9gfcFvXGAjGZ7ajQ==",
+    "@vue/server-renderer@3.5.43": {
+      "integrity": "sha512-l2Ygjv9NehV94PSBxNWsAHC0j/eIIKbn92mBuWXAPGLnn6HfJ6MH5ubsd+Nk0YoZ5FRuxWI1P2VSoh+dbPQhCQ==",
       "dependencies": [
         "@vue/compiler-ssr",
         "@vue/runtime-dom",
         "@vue/shared"
       ]
     },
-    "@vue/shared@3.5.42": {
-      "integrity": "sha512-2rPxex1jQf4jvl9MOHl6YaXCPcrNqz/FstMOEh3QWY+/OME9nQTvl9WYeCwhW7AFjaR0SnngZGlp/wkR6rkI6g=="
+    "@vue/shared@3.5.43": {
+      "integrity": "sha512-uksS7YGMR5NZyr4JNq0Rp+QyLns0ueaz20KwzIPW9R0LH1Vnt4E+XUM29PNseEbf1www2gOuhuDi5AKOIXag9Q=="
     },
-    "@vue/test-utils@2.5.1_@vue+compiler-dom@3.5.42_vue@3.5.42": {
+    "@vue/test-utils@2.5.1_vue@3.5.43_typescript@6.0.3": {
       "integrity": "sha512-V/4a99odJ7hapr0bRt35XxljGk8hefq31gSOnlKTcEq2fUeoj2qb+FcpJYfQu4qfYhW9Ug+O2+CZ3QmZ7gXDzA==",
       "dependencies": [
-        "@vue/compiler-dom",
         "js-beautify",
         "vue",
         "vue-component-type-helpers"
       ]
     },
-    "@vue/tsconfig@0.9.1_typescript@6.0.3_vue@3.5.42": {
+    "@vue/tsconfig@0.9.1_typescript@6.0.3_vue@3.5.43": {
       "integrity": "sha512-buvjm+9NzLCJL29KY1j1991YYJ5e6275OiK+G4jtmfIb+z4POywbdm0wXusT9adVWqe0xqg70TbI7+mRx4uU9w==",
       "dependencies": [
         "typescript",
@@ -1424,7 +1423,7 @@
     "base64-js@1.5.1": {
       "integrity": "sha512-AKpaYlHn8t4SVbOHCy+b5+KKgvR4vrsD8vbvrbiQJps7fKDTkjkDry6ji0rUJjC0kzbNePLwzxq8iypo41qeWA=="
     },
-    "better-auth@1.7.5_vitest@5.0.1__@types+node@26.6.2__@vitest+coverage-v8@5.0.1__jsdom@30.1.1__vite@8.3.0__@noble+hashes@2.4.0_vue@3.5.42_jsdom@30.1.1": {
+    "better-auth@1.7.5_vitest@5.0.1_vue@3.5.43_typescript@6.0.3": {
       "integrity": "sha512-aKE0Zt2EPTpFvmq4/oATNyG/mAfc6JUqWkW9pzGlrVnzUb0lso7GJ9BPxD6JPhLqYV1a9zOAb0uAz1Q5fm+eHA==",
       "dependencies": [
         "@better-auth/core",
@@ -1488,7 +1487,7 @@
     "blake3-wasm@2.1.5": {
       "integrity": "sha512-F1+K8EbfOZE49dtoPtmxUQrpXaBIl3ICvasLh+nJta0xkz+9kF/7uet9fLnwKqhDrmj6g+6K3Tw9yQPUg2ka5g=="
     },
-    "boneyard-js@1.10.0_vite@8.3.0_vue@3.5.42_@types+node@26.6.2": {
+    "boneyard-js@1.10.0_vite@8.3.0_vue@3.5.43_typescript@6.0.3": {
       "integrity": "sha512-bHyZFdBHswa6Rt2aP0F1pNpPn4/lRcTMRWAt1d7tbFZLoPnwjztr6cmAVa/vaQwTOH9ETD3Lz4vW1iuvQDJNqg==",
       "dependencies": [
         "playwright",
@@ -2051,8 +2050,8 @@
     "mimic-response@3.1.0": {
       "integrity": "sha512-z0yWI+4FDrrweS8Zmt4Ej5HdJmky15+L2e6Wgn3+iK5fWzb6T3fhNFq2+MeTRb064c6Wr4N/wv0DzQTjNzHNGQ=="
     },
-    "miniflare@5.20260921.0-alpha": {
-      "integrity": "sha512-vHH/unOYvV2jA1Q9SdkmzrQhhMoksdwg5jegu6ZeKaaRzgxZhVbt1NdTpQjHF2VTgiBjgP8SiUlUMfruB3N3SQ==",
+    "miniflare@5.20260923.0-alpha": {
+      "integrity": "sha512-tmICPUd2P+/4WNa2A9kE22SPZexlu+Dw8nZIvaXCzRj2OVu62hc751Xq4S1P4HEscT5viDle3zxyHyxT2XY3Fw==",
       "dependencies": [
         "@cspotcode/source-map-support",
         "sharp",
@@ -2739,7 +2738,7 @@
     "vue-component-type-helpers@3.3.11": {
       "integrity": "sha512-LwcxzeliO9fkQcpJG0PoX8X5kmAhKmH9wkpDLxNabwzkQ9Zeib2YVHwFV4pcWmMLfXVfjr/dSV+DaJ3cIPgSNA=="
     },
-    "vue-router@4.6.4_vue@3.5.42_typescript@6.0.3": {
+    "vue-router@4.6.4_vue@3.5.43_typescript@6.0.3": {
       "integrity": "sha512-Hz9q5sa33Yhduglwz6g9skT8OBPii+4bFn88w6J+J4MfEo4KRRpmiNG/hHHkdbRFlLBOqxN8y8gf2Fb0MTUgVg==",
       "dependencies": [
         "@vue/devtools-api",
@@ -2755,8 +2754,8 @@
       ],
       "bin": true
     },
-    "vue@3.5.42_typescript@6.0.3": {
-      "integrity": "sha512-4RyHQTbQvOPs3MfvUO1Sg0YRrKNnA0mAVtvpd12Tg1fKDN7OHBUl1IqSn8zGJjK9nI3NkNp8cgTpVrSZC5TTcA==",
+    "vue@3.5.43_typescript@6.0.3": {
+      "integrity": "sha512-o5qZoksdnjIKvW1srZ3ab7pcDNYAerBjRe54D0LBLfRdCYFrSgBHVXokMas35czQc0//lmx4/tuY4ZNQ+Rf2Ng==",
       "dependencies": [
         "@vue/compiler-dom",
         "@vue/compiler-sfc",
@@ -2827,8 +2826,8 @@
       "scripts": true,
       "bin": true
     },
-    "wrangler@4.136.3": {
-      "integrity": "sha512-L1bS8BI9xoEk3RRr5XoZn5q5k1jCRo8+37ZEEab/jsUFzE1Ea2sIBAbmP1CdwSeD6mZYmnUtR6xpi9esHIl6GA==",
+    "wrangler@4.140.0": {
+      "integrity": "sha512-XeKeC33B4Nglg0RAJ8F8ecGHOW+cPFeE5+fp4WBzn1c0u+H/96cVQYjto3/0ahilfPurnnGcUslJ1xaZXy+NGQ==",
       "dependencies": [
         "@cloudflare/kv-asset-handler",
         "@cloudflare/unenv-preset",
@@ -3012,7 +3011,7 @@
         "npm:@better-auth/infra@~0.4.11",
         "npm:@better-auth/passkey@^1.7.5",
         "npm:@better-auth/sso@^1.7.5",
-        "npm:@cloudflare/vite-plugin@^1.54.10",
+        "npm:@cloudflare/vite-plugin@^1.55.0",
         "npm:@cyclonedx/cyclonedx-npm@6.0.1",
         "npm:@intercom/messenger-js-sdk@^0.0.20",
         "npm:@playwright/test@^1.63.0",
@@ -3041,7 +3040,7 @@
         "npm:vitest@5",
         "npm:vue-router@^4.6.4",
         "npm:vue-tsc@^3.3.11",
-        "npm:vue@^3.5.42",
+        "npm:vue@^3.5.43",
         "npm:wrangler@^4.124.0",
         "npm:zod@^4.6.0"
       ],

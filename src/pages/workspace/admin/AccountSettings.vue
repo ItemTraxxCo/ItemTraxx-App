@@ -9,7 +9,7 @@
       <p>
         <RouterLink class="button-link" to="/account/security">Account Security</RouterLink>
         ·
-        <RouterLink class="button-link" to="/settings/organization">Organization Settings</RouterLink>
+        <RouterLink class="button-link" to="/settings/organization">Workspace Settings</RouterLink>
       </p>
       <div class="admin-summary-grid">
         <div class="admin-summary-card">

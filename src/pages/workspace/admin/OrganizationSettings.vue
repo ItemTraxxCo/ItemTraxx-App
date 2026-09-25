@@ -4,8 +4,8 @@
       <div class="page-nav-left">
         <RouterLink class="button-link" to="/admin">Return to workspace home</RouterLink>
       </div>
-      <h1>Organization Settings</h1>
-      <p class="admin-hero-copy">Manage organization details and shared checkout defaults.</p>
+      <h1>Workspace Settings</h1>
+      <p class="admin-hero-copy">Manage workspace details and shared checkout defaults.</p>
       <p>
         <RouterLink class="button-link" to="/settings/account">Your Account Settings</RouterLink>
         ·
@@ -28,7 +28,7 @@
     <section class="card admin-section-card">
       <div class="admin-section-header">
         <div>
-          <h2>Organization Profile</h2>
+          <h2>Workspace Profile</h2>
           <p class="admin-section-copy">Update the name and logo shared by this workspace.</p>
         </div>
       </div>
@@ -38,7 +38,7 @@
 
       <form class="form organization-profile-form" @submit.prevent="saveOrganizationProfile">
         <label>
-          Organization name
+          Workspace name
           <input
             v-model.trim="organizationName"
             type="text"
@@ -49,19 +49,19 @@
           />
         </label>
         <label>
-          Organization slug
+          Workspace slug
           <input :value="organizationProfile?.slug || 'Loading'" type="text" readonly aria-describedby="slug-help" />
-          <span id="slug-help" class="muted">The slug is managed separately and determines this organization's app URL.</span>
+          <span id="slug-help" class="muted">Your workspace's unique identifier in the URL.</span>
         </label>
 
         <div class="logo-editor">
           <div class="logo-preview" aria-live="polite">
-            <img v-if="logoPreviewUrl" :src="logoPreviewUrl" :alt="`${organizationName || 'Organization'} logo preview`" />
-            <span v-else class="muted">No organization logo set</span>
+            <img v-if="logoPreviewUrl" :src="logoPreviewUrl" :alt="`${organizationName || 'Workspace'} logo preview`" />
+            <span v-else class="muted">No workspace logo set</span>
           </div>
           <div class="logo-controls">
             <label>
-              Organization logo
+              Workspace logo
               <input
                 ref="logoInput"
                 type="file"
@@ -90,7 +90,7 @@
             class="button-primary"
             :disabled="isOrganizationLoading || isOrganizationSaving || !canSaveOrganization"
           >
-            {{ isOrganizationSaving ? "Saving…" : "Save organization settings" }}
+            {{ isOrganizationSaving ? "Saving…" : "Save workspace settings" }}
           </button>
           <button type="button" :disabled="isOrganizationLoading || isOrganizationSaving" @click="loadOrganization">
             Reload
@@ -103,7 +103,7 @@
       <div class="admin-section-header">
         <div>
           <h2>Account Overview</h2>
-          <p class="admin-section-copy">Review how this organization is classified for billing and support purposes.</p>
+          <p class="admin-section-copy">Review how this workspace is classified for billing and support purposes.</p>
         </div>
       </div>
       <div class="admin-summary-grid">
@@ -129,7 +129,7 @@
       <div class="admin-section-header">
         <div>
           <h2>Default Checkout Policy</h2>
-          <p class="admin-section-copy">Set the default checkout due window for your organization.</p>
+          <p class="admin-section-copy">Set the default checkout due window for your workspace.</p>
         </div>
       </div>
       <form class="form" @submit.prevent="saveCheckoutPolicy">
@@ -252,10 +252,10 @@ const loadOrganization = async () => {
   organizationSuccess.value = "";
   try {
     const id = organizationId.value;
-    if (!id) throw new Error("No active organization was found for this session.");
+    if (!id) throw new Error("No active workspace was found for this session.");
     const result = await authClient.organization.getOrganization({ query: { organizationId: id } });
-    if (result.error) throw new Error(result.error.message || "Unable to load organization details.");
-    if (!result.data) throw new Error("Unable to load organization details.");
+    if (result.error) throw new Error(result.error.message || "Unable to load workspace details.");
+    if (!result.data) throw new Error("Unable to load workspace details.");
 
     organizationProfile.value = {
       id: result.data.id,
@@ -271,7 +271,7 @@ const loadOrganization = async () => {
     selectedLogoPreviewUrl.value = null;
     if (logoInput.value) logoInput.value.value = "";
   } catch (error) {
-    organizationError.value = toUserFacingErrorMessage(error, "Unable to load organization details.");
+    organizationError.value = toUserFacingErrorMessage(error, "Unable to load workspace details.");
   } finally {
     isOrganizationLoading.value = false;
   }
@@ -283,7 +283,7 @@ const loadWorkspaceSettings = async () => {
   try {
     applySettings(await fetchWorkspaceSettings());
   } catch (error) {
-    settingsError.value = toUserFacingErrorMessage(error, "Unable to load organization settings.");
+    settingsError.value = toUserFacingErrorMessage(error, "Unable to load workspace settings.");
   }
 };
 
@@ -323,11 +323,11 @@ const saveOrganizationProfile = async () => {
   const id = organizationId.value;
   const name = organizationName.value.trim();
   if (!id) {
-    organizationError.value = "No active organization was found for this session.";
+    organizationError.value = "No active workspace was found for this session.";
     return;
   }
   if (!name) {
-    organizationError.value = "Enter an organization name.";
+    organizationError.value = "Enter a workspace name.";
     return;
   }
 
@@ -343,8 +343,8 @@ const saveOrganizationProfile = async () => {
     if (!Object.keys(data).length) return;
 
     const result = await authClient.organization.update({ organizationId: id, data });
-    if (result.error) throw new Error(result.error.message || "Unable to save organization details.");
-    if (!result.data) throw new Error("Unable to save organization details.");
+    if (result.error) throw new Error(result.error.message || "Unable to save workspace details.");
+    if (!result.data) throw new Error("Unable to save workspace details.");
 
     organizationProfile.value = {
       id: result.data.id,
@@ -360,9 +360,9 @@ const saveOrganizationProfile = async () => {
     if (selectedLogoPreviewUrl.value) URL.revokeObjectURL(selectedLogoPreviewUrl.value);
     selectedLogoPreviewUrl.value = null;
     if (logoInput.value) logoInput.value.value = "";
-    organizationSuccess.value = "Organization details saved.";
+    organizationSuccess.value = "Workspace details saved.";
   } catch (error) {
-    organizationError.value = toUserFacingErrorMessage(error, "Unable to save organization details.");
+    organizationError.value = toUserFacingErrorMessage(error, "Unable to save workspace details.");
   } finally {
     isOrganizationSaving.value = false;
   }

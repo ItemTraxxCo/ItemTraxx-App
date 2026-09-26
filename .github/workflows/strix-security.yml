@@ -104,7 +104,9 @@ jobs:
           # lightweight endpoint probe. Keep this separate from Strix's
           # configured effort: the probe answers "can this runner/key invoke
           # this model?" without spending capacity on a high-reasoning request.
-          printf '%s\n' "{\"model\":\"${NVIDIA_NIM_MODEL}\",\"messages\":[{\"role\":\"user\",\"content\":\"Reply with exactly: pong\"}],\"reasoning_effort\":\"low\",\"temperature\":1,\"max_tokens\":32,\"stream\":false}" > "$request_body"
+          # Kimi K3 always reasons, so leave room for its reasoning and final
+          # answer. The preflight below also verifies that the answer finished.
+          printf '%s\n' "{\"model\":\"${NVIDIA_NIM_MODEL}\",\"messages\":[{\"role\":\"user\",\"content\":\"Reply with exactly: pong\"}],\"reasoning_effort\":\"low\",\"temperature\":1,\"max_tokens\":1024,\"stream\":false}" > "$request_body"
           printf '%s\n' '{"model":"google/gemma-3-4b-it","messages":[{"role":"user","content":"Reply with exactly: pong"}],"temperature":0,"max_tokens":1,"stream":false}' > "$control_request_body"
 
           status_code=000
@@ -116,6 +118,8 @@ jobs:
           probe_success=false
           success_phase=""
           failure_class=""
+          response_finish_reason=""
+          probe_response_invalid=false
           : > "$response_file"
           : > "$headers_file"
           : > "$route_response_file"
@@ -197,6 +201,13 @@ jobs:
             status_code="${status_code:-000}"
           }
 
+          target_response_is_complete() {
+            local response_content
+            response_finish_reason="$(jq -r '.choices[0].finish_reason // empty' "$response_file" 2>/dev/null || true)"
+            response_content="$(jq -r '.choices[0].message.content // empty' "$response_file" 2>/dev/null || true)"
+            [[ "$response_finish_reason" == "stop" && "$response_content" =~ ^[[:space:]]*pong[[:space:]]*$ ]]
+          }
+
           control_status_code=skipped
           control_curl_exit_code=skipped
           if [[ "$route_unavailable" != "true" ]]; then
@@ -223,12 +234,18 @@ jobs:
               attempt=$((attempt + 1))
               phase=initial
               request_id=""
+              response_finish_reason=""
+              probe_response_invalid=false
               probe_endpoint POST https://integrate.api.nvidia.com/v1/chat/completions
 
               if [[ "$status_code" == "200" && "$curl_exit_code" == "0" ]]; then
-                probe_success=true
-                success_phase=initial
-                break
+                if target_response_is_complete; then
+                  probe_success=true
+                  success_phase=initial
+                  break
+                fi
+                probe_response_invalid=true
+                failure_class="model returned an incomplete or unexpected probe response (finish_reason=${response_finish_reason:-missing})"
               fi
 
               # NIM may accept the invocation asynchronously. Follow its
@@ -246,9 +263,14 @@ jobs:
                     probe_endpoint GET "https://integrate.api.nvidia.com/v1/status/${request_id}" \
                       "$request_body" "$control_request_timeout"
                     if [[ "$status_code" == "200" && "$curl_exit_code" == "0" ]]; then
-                      probe_success=true
-                      success_phase=pending
-                      break 2
+                      if target_response_is_complete; then
+                        probe_success=true
+                        success_phase=pending
+                        break 2
+                      fi
+                      probe_response_invalid=true
+                      failure_class="model returned an incomplete or unexpected probe response (finish_reason=${response_finish_reason:-missing})"
+                      break
                     fi
                     [[ "$status_code" == "202" && "$curl_exit_code" == "0" ]] || break
                   done
@@ -256,10 +278,14 @@ jobs:
                 fi
               fi
 
-              case "$status_code" in
-                000|202|408|425|429|5??) transient=true ;;
-                *) transient=false ;;
-              esac
+              if [[ "$probe_response_invalid" == "true" ]]; then
+                transient=true
+              else
+                case "$status_code" in
+                  000|202|408|425|429|5??) transient=true ;;
+                  *) transient=false ;;
+                esac
+              fi
               if [[ "$transient" != "true" || "$attempt" -ge "$max_attempts" ]]; then
                 break
               fi
@@ -286,6 +312,9 @@ jobs:
             echo "attempts=${attempt}"
             echo "polls=${poll_count}"
             echo "phase=${phase}"
+            if [[ -n "$response_finish_reason" ]]; then
+              echo "finish_reason=${response_finish_reason}"
+            fi
             if [[ -n "$retry_after" ]]; then
               echo "retry_after=${retry_after}"
             fi
@@ -305,10 +334,11 @@ jobs:
             {
               echo "### NVIDIA NIM preflight"
               echo
-              echo "The exact Strix model/API key completed a lightweight non-streaming probe (HTTP 200)."
+              echo "The exact Strix model/API key completed a lightweight non-streaming probe with the expected reply."
               echo
               echo "- Model: \`${NVIDIA_NIM_MODEL}\`"
               echo "- Probe reasoning effort: \`low\`"
+              echo "- Reply: \`pong\`; finish reason: \`${response_finish_reason}\`"
               echo "- Attempts: \`${attempt}\`; status polls: \`${poll_count}\`"
               if [[ "$success_phase" == "pending" ]]; then
                 echo "- The provider accepted the request asynchronously and completed it through the status endpoint."

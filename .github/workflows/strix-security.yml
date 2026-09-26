@@ -100,13 +100,9 @@ jobs:
           max_polls=6
           poll_delay=5
 
-          # Kimi K3 supports low/high/max reasoning effort, so use low for a
-          # lightweight endpoint probe. Keep this separate from Strix's
-          # configured effort: the probe answers "can this runner/key invoke
-          # this model?" without spending capacity on a high-reasoning request.
-          # Kimi K3 always reasons, so leave room for its reasoning and final
-          # answer. The preflight below also verifies that the answer finished.
-          printf '%s\n' "{\"model\":\"${NVIDIA_NIM_MODEL}\",\"messages\":[{\"role\":\"user\",\"content\":\"Reply with exactly: pong\"}],\"reasoning_effort\":\"low\",\"temperature\":1,\"max_tokens\":1024,\"stream\":false}" > "$request_body"
+          # Verify the capability Strix needs, not just ordinary text output.
+          # Kimi K3 always reasons, so leave room for reasoning and the tool call.
+          printf '%s\n' "{\"model\":\"${NVIDIA_NIM_MODEL}\",\"messages\":[{\"role\":\"user\",\"content\":\"Call the strix_preflight function now.\"}],\"tools\":[{\"type\":\"function\",\"function\":{\"name\":\"strix_preflight\",\"description\":\"Preflight tool-call check.\",\"parameters\":{\"type\":\"object\",\"properties\":{},\"additionalProperties\":false}}}],\"tool_choice\":{\"type\":\"function\",\"function\":{\"name\":\"strix_preflight\"}},\"reasoning_effort\":\"low\",\"temperature\":1,\"max_tokens\":1024,\"stream\":false}" > "$request_body"
           printf '%s\n' '{"model":"google/gemma-3-4b-it","messages":[{"role":"user","content":"Reply with exactly: pong"}],"temperature":0,"max_tokens":1,"stream":false}' > "$control_request_body"
 
           status_code=000
@@ -119,6 +115,7 @@ jobs:
           success_phase=""
           failure_class=""
           response_finish_reason=""
+          response_tool_name=""
           probe_response_invalid=false
           : > "$response_file"
           : > "$headers_file"
@@ -202,10 +199,9 @@ jobs:
           }
 
           target_response_is_complete() {
-            local response_content
             response_finish_reason="$(jq -r '.choices[0].finish_reason // empty' "$response_file" 2>/dev/null || true)"
-            response_content="$(jq -r '.choices[0].message.content // empty' "$response_file" 2>/dev/null || true)"
-            [[ "$response_finish_reason" == "stop" && "$response_content" =~ ^[[:space:]]*pong[[:space:]]*$ ]]
+            response_tool_name="$(jq -r '.choices[0].message.tool_calls[0].function.name // empty' "$response_file" 2>/dev/null || true)"
+            [[ "$response_finish_reason" == "tool_calls" && "$response_tool_name" == "strix_preflight" ]]
           }
 
           control_status_code=skipped
@@ -245,7 +241,7 @@ jobs:
                   break
                 fi
                 probe_response_invalid=true
-                failure_class="model returned an incomplete or unexpected probe response (finish_reason=${response_finish_reason:-missing})"
+                failure_class="model returned no expected tool call (finish_reason=${response_finish_reason:-missing}, tool=${response_tool_name:-missing})"
               fi
 
               # NIM may accept the invocation asynchronously. Follow its
@@ -269,7 +265,7 @@ jobs:
                         break 2
                       fi
                       probe_response_invalid=true
-                      failure_class="model returned an incomplete or unexpected probe response (finish_reason=${response_finish_reason:-missing})"
+                      failure_class="model returned no expected tool call (finish_reason=${response_finish_reason:-missing}, tool=${response_tool_name:-missing})"
                       break
                     fi
                     [[ "$status_code" == "202" && "$curl_exit_code" == "0" ]] || break
@@ -315,6 +311,9 @@ jobs:
             if [[ -n "$response_finish_reason" ]]; then
               echo "finish_reason=${response_finish_reason}"
             fi
+            if [[ -n "$response_tool_name" ]]; then
+              echo "tool_call=${response_tool_name}"
+            fi
             if [[ -n "$retry_after" ]]; then
               echo "retry_after=${retry_after}"
             fi
@@ -334,11 +333,11 @@ jobs:
             {
               echo "### NVIDIA NIM preflight"
               echo
-              echo "The exact Strix model/API key completed a lightweight non-streaming probe with the expected reply."
+              echo "The exact Strix model/API key completed a lightweight non-streaming tool-call probe."
               echo
               echo "- Model: \`${NVIDIA_NIM_MODEL}\`"
               echo "- Probe reasoning effort: \`low\`"
-              echo "- Reply: \`pong\`; finish reason: \`${response_finish_reason}\`"
+              echo "- Tool call: \`${response_tool_name}\`; finish reason: \`${response_finish_reason}\`"
               echo "- Attempts: \`${attempt}\`; status polls: \`${poll_count}\`"
               if [[ "$success_phase" == "pending" ]]; then
                 echo "- The provider accepted the request asynchronously and completed it through the status endpoint."
@@ -382,12 +381,13 @@ jobs:
         id: strix-scan
         if: ${{ always() && steps.nim-preflight.outputs.ok == 'true' }}
         env:
-          STRIX_LLM: nvidia_nim/moonshotai/kimi-k3
+          STRIX_LLM: openai/moonshotai/kimi-k3
           LLM_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
-          # Match the mode that passed the endpoint preflight. Kimi K3's
-          # high-effort streaming responses previously produced 32 reasoning
-          # tokens without tool calls until Strix exhausted all 500 turns.
+          LLM_API_BASE: https://integrate.api.nvidia.com/v1
+          # Use NVIDIA's OpenAI-compatible Chat Completions endpoint directly
+          # and require tool calls; avoid routing model turns through LiteLLM.
           STRIX_REASONING_EFFORT: low
+          STRIX_FORCE_REQUIRED_TOOL_CHOICE: "true"
           LLM_DISABLE_STREAMING: "true"
           STRIX_DIFF_BASE: origin/${{ github.base_ref || github.event.repository.default_branch }}
         run: |

@@ -92,7 +92,10 @@
                 <button type="button" class="text-button review-edit" :disabled="connectionCreated" @click="editStep(item.key)">Change</button>
               </div>
             </dl>
-            <p v-if="protocol === 'saml'" class="review-note">After you create the connection, verify your email domain. Then copy ItemTraxx’s SP metadata into your identity provider to fill its Entity ID and ACS URL fields.</p>
+            <p v-if="protocol === 'saml'" class="review-note">
+              ItemTraxx SP Entity ID: <code>{{ samlServiceProviderEntityId }}</code>.
+              After creating the connection, open the SP metadata and copy its Entity ID and ACS URL into your identity provider.
+            </p>
             <p v-else class="review-note">After you create the connection, verify your email domain and add this callback / redirect URI to your OIDC provider:<code>{{ oidcCallbackUrl }}</code></p>
           </div>
 
@@ -144,7 +147,7 @@
               <code>{{ oidcCallbackUrl }}</code>
             </aside>
             <aside v-if="activeStep.key === 'issuer' && protocol === 'saml'" class="callback-hint">
-              <span>This is the IdP’s identifier. ItemTraxx’s Entity ID is provided later in its SP metadata.</span>
+              <span>This is the IdP’s identifier. ItemTraxx’s separate SP Entity ID is shown on the review step and in its SP metadata.</span>
             </aside>
             <aside v-if="activeStep.key === 'certificate'" class="callback-hint">
               <span>Paste the public X.509 signing certificate. Never use a private key.</span>
@@ -241,7 +244,7 @@ type WizardStep = {
 
 const edgeOrigin = ((import.meta.env.VITE_EDGE_PROXY_URL as string | undefined)?.trim() || location.origin).replace(/\/+$/, "");
 const providers = ref<Provider[]>([]), workspaces = ref<Workspace[]>([]), organizationId = ref("");
-const protocol = ref<"saml" | "oidc">("saml"), providerId = ref(""), domain = ref(""), issuer = ref("");
+const protocol = ref<"saml" | "oidc">("saml"), providerId = ref(""), domain = ref(""), providerIssuer = ref("");
 const entryPoint = ref(""), certificate = ref(""), discoveryEndpoint = ref(""), clientId = ref(""), clientSecret = ref("");
 const currentStep = ref(0), currentInput = ref<HTMLInputElement | HTMLTextAreaElement | null>(null);
 const saving = ref(false), message = ref(""), error = ref(false), connectionCreated = ref(false), revealSecret = ref(false), stepError = ref("");
@@ -256,6 +259,9 @@ const protocolLabel = computed(() => protocol.value === "saml" ? "SAML 2.0" : "O
 const metadataUrl = (id: string) => `${edgeOrigin}/api/auth/sso/saml2/sp/metadata?providerId=${encodeURIComponent(id)}`;
 const metadataUrlForCreatedProvider = computed(() => domainVerificationProviderId.value && domainVerificationProtocol.value === "saml"
   ? metadataUrl(domainVerificationProviderId.value)
+  : "");
+const samlServiceProviderEntityId = computed(() => organizationId.value && providerId.value.trim()
+  ? `https://itemtraxx.com/sso/${encodeURIComponent(organizationId.value)}/${encodeURIComponent(providerId.value.trim())}`
   : "");
 const oidcCallbackUrl = computed(() => `${edgeOrigin}/api/auth/sso/callback/${encodeURIComponent(providerId.value.trim())}`);
 
@@ -391,7 +397,7 @@ const fieldValue = computed({
     switch (activeStep.value.key) {
       case "providerId": return providerId.value;
       case "domain": return domain.value;
-      case "issuer": return issuer.value;
+      case "issuer": return providerIssuer.value;
       case "entryPoint": return entryPoint.value;
       case "certificate": return certificate.value;
       case "discoveryEndpoint": return discoveryEndpoint.value;
@@ -404,7 +410,7 @@ const fieldValue = computed({
     switch (activeStep.value.key) {
       case "providerId": providerId.value = value; break;
       case "domain": domain.value = value; break;
-      case "issuer": issuer.value = value; break;
+      case "issuer": providerIssuer.value = value; break;
       case "entryPoint": entryPoint.value = value; break;
       case "certificate": certificate.value = value; break;
       case "discoveryEndpoint": discoveryEndpoint.value = value; break;
@@ -428,7 +434,7 @@ function reviewValue(key: WizardKey): string {
   switch (key) {
     case "providerId": return providerId.value;
     case "domain": return domain.value;
-    case "issuer": return issuer.value;
+    case "issuer": return providerIssuer.value;
     case "entryPoint": return entryPoint.value;
     case "certificate": return "Certificate added";
     case "discoveryEndpoint": return discoveryEndpoint.value;
@@ -484,7 +490,7 @@ function isStepComplete(key: WizardKey) {
     case "protocol": return true;
     case "providerId": return /^[a-z0-9-]+$/.test(providerId.value.trim());
     case "domain": return /^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/i.test(domain.value.trim());
-    case "issuer": return protocol.value === "saml" ? isValidSamlIssuer(issuer.value) : isValidHttpUrl(issuer.value);
+    case "issuer": return protocol.value === "saml" ? isValidSamlIssuer(providerIssuer.value) : isValidHttpUrl(providerIssuer.value);
     case "entryPoint": return isValidHttpUrl(entryPoint.value);
     case "certificate": return !getCertificateIssue(certificate.value);
     case "discoveryEndpoint": return isValidHttpUrl(discoveryEndpoint.value);
@@ -584,12 +590,24 @@ async function submitConnection() {
     const common = {
       providerId: providerId.value.trim(),
       domain: domain.value.trim().toLowerCase(),
-      issuer: issuer.value.trim(),
       organizationId: organizationId.value,
     };
     const configuration = protocol.value === "saml"
-      ? { ...common, samlConfig: { entryPoint: entryPoint.value.trim(), cert: certificate.value.trim(), wantAssertionsSigned: true } }
-      : { ...common, oidcConfig: { discoveryEndpoint: discoveryEndpoint.value.trim(), clientId: clientId.value.trim(), clientSecret: clientSecret.value, pkce: true } };
+      ? {
+        ...common,
+        issuer: samlServiceProviderEntityId.value,
+        samlConfig: {
+          entryPoint: entryPoint.value.trim(),
+          cert: certificate.value.trim(),
+          idpMetadata: { entityID: providerIssuer.value.trim() },
+          wantAssertionsSigned: true,
+        },
+      }
+      : {
+        ...common,
+        issuer: providerIssuer.value.trim(),
+        oidcConfig: { discoveryEndpoint: discoveryEndpoint.value.trim(), clientId: clientId.value.trim(), clientSecret: clientSecret.value, pkce: true },
+      };
     const result = await authClient.sso.register(configuration);
     if (result.error) throw new Error(result.error.message);
 
@@ -619,7 +637,7 @@ function startAnotherConnection() {
   protocol.value = "saml";
   providerId.value = "";
   domain.value = "";
-  issuer.value = "";
+  providerIssuer.value = "";
   entryPoint.value = "";
   certificate.value = "";
   discoveryEndpoint.value = "";

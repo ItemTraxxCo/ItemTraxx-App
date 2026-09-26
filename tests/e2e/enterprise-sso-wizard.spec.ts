@@ -14,7 +14,7 @@ type Registration = {
   providerId: string;
   domain: string;
   issuer: string;
-  samlConfig?: { entryPoint: string; cert: string };
+  samlConfig?: { entryPoint: string; cert: string; idpMetadata: { entityID: string } };
   oidcConfig?: { discoveryEndpoint: string; clientId: string; clientSecret: string };
 };
 
@@ -149,6 +149,7 @@ test.describe("Enterprise SSO guided setup", () => {
 
     await expect(page.getByRole("heading", { name: "Review your connection" })).toBeVisible();
     await expect(page.getByText("https://idp.example.com/saml/issuer")).toBeVisible();
+    await expect(page.getByText("https://itemtraxx.com/sso/workspace-sso-wizard/acme-sso")).toBeVisible();
     await expect(page.getByText("example.edu", { exact: true })).toBeVisible();
     await page.getByText("View signing certificate").click();
     await expect(page.locator(".review-value pre")).toContainText(fakeCertificateBody);
@@ -179,8 +180,11 @@ test.describe("Enterprise SSO guided setup", () => {
     expect(getRegistration()).toMatchObject({
       providerId: "acme-sso",
       domain: "example.edu",
-      issuer: "https://idp.example.com/saml/issuer",
-      samlConfig: { entryPoint: "https://idp.example.com/saml/sso-updated" },
+      issuer: "https://itemtraxx.com/sso/workspace-sso-wizard/acme-sso",
+      samlConfig: {
+        entryPoint: "https://idp.example.com/saml/sso-updated",
+        idpMetadata: { entityID: "https://idp.example.com/saml/issuer" },
+      },
     });
     expect(getRegistration()?.samlConfig?.cert).toContain(fakeCertificateBody);
     expect(pageErrors).toEqual([]);

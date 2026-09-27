@@ -32,12 +32,10 @@
         <label>
           Status
           <select v-model="statusFilter">
-            <option value="all">all statuses</option>
-            <option value="damaged">damaged</option>
-            <option value="lost">lost</option>
-            <option value="in_repair">in_repair</option>
-            <option value="retired">retired</option>
-            <option value="in_studio_only">in_studio_only</option>
+            <option value="all">All statuses</option>
+            <option v-for="status in statusOptions" :key="status" :value="status">
+              {{ formatItemStatus(status) }}
+            </option>
           </select>
         </label>
         <label>
@@ -65,7 +63,7 @@
           <tr v-for="item in filteredFlaggedItems" :key="item.id">
             <td>{{ item.name }}</td>
             <td>{{ item.barcode }}</td>
-            <td>{{ item.status }}</td>
+            <td>{{ formatItemStatus(item.status) }}</td>
             <td>{{ formatDate(item.updated_at) }}</td>
             <td data-session-replay-mask>{{ item.notes || "-" }}</td>
           </tr>
@@ -102,7 +100,7 @@
           <tr v-for="event in filteredHistory" :key="event.id">
             <td>{{ formatDate(event.changed_at) }}</td>
             <td>{{ event.item?.name || "-" }} ({{ event.item?.barcode || "-" }})</td>
-            <td>{{ event.status }}</td>
+            <td>{{ formatItemStatus(event.status) }}</td>
             <td data-session-replay-mask>{{ event.note || "-" }}</td>
           </tr>
           <tr v-if="filteredHistory.length === 0">
@@ -132,6 +130,7 @@ import {
 import { exportRowsToCsv, exportRowsToPdf } from "../../../services/exportService";
 import { toUserFacingErrorMessage } from "../../../services/appErrors";
 import { useManagerContext } from "../../../composables/useManagerContext";
+import { formatItemStatus, ITEM_STATUS_OPTIONS } from "../../../utils/itemStatus";
 
 const { managerRoot } = useManagerContext();
 
@@ -142,6 +141,7 @@ const toastTitle = ref("");
 const toastMessage = ref("");
 const searchQuery = ref("");
 const statusFilter = ref("all");
+const statusOptions = ITEM_STATUS_OPTIONS.filter((status) => status !== "available" && status !== "checked_out");
 const dateFrom = ref("");
 const dateTo = ref("");
 const featureEnabled = ref(true);
@@ -167,7 +167,15 @@ const filteredFlaggedItems = computed(() => {
     if (statusFilter.value !== "all" && item.status !== statusFilter.value) return false;
     if (!withinDateRange(item.updated_at)) return false;
     if (!query) return true;
-    const haystack = `${item.name} ${item.barcode} ${item.status} ${item.notes ?? ""}`.toLowerCase();
+    const haystack = [
+      item.name,
+      item.barcode,
+      item.status,
+      formatItemStatus(item.status),
+      item.notes ?? "",
+    ]
+      .join(" ")
+      .toLowerCase();
     return haystack.includes(query);
   });
 });
@@ -178,7 +186,15 @@ const filteredHistory = computed(() => {
     if (statusFilter.value !== "all" && event.status !== statusFilter.value) return false;
     if (!withinDateRange(event.changed_at)) return false;
     if (!query) return true;
-    const haystack = `${event.item?.name ?? ""} ${event.item?.barcode ?? ""} ${event.status} ${event.note ?? ""}`.toLowerCase();
+    const haystack = [
+      event.item?.name ?? "",
+      event.item?.barcode ?? "",
+      event.status,
+      formatItemStatus(event.status),
+      event.note ?? "",
+    ]
+      .join(" ")
+      .toLowerCase();
     return haystack.includes(query);
   });
 });
@@ -219,7 +235,10 @@ const exportFlaggedCsv = () => {
   exportRowsToCsv(
     `item-status-${new Date().toISOString().slice(0, 10)}.csv`,
     ["name", "barcode", "status", "updated_at", "notes"],
-    filteredFlaggedItems.value
+    filteredFlaggedItems.value.map((item) => ({
+      ...item,
+      status: formatItemStatus(item.status),
+    }))
   );
 };
 
@@ -228,7 +247,10 @@ const exportFlaggedPdf = async () => {
     `item-status-${new Date().toISOString().slice(0, 10)}.pdf`,
     "Item Status Tracking",
     ["name", "barcode", "status", "updated_at", "notes"],
-    filteredFlaggedItems.value
+    filteredFlaggedItems.value.map((item) => ({
+      ...item,
+      status: formatItemStatus(item.status),
+    }))
   );
 };
 
@@ -240,7 +262,7 @@ const exportHistoryCsv = () => {
       changed_at: formatDate(event.changed_at),
       item: event.item?.name || "",
       barcode: event.item?.barcode || "",
-      status: event.status,
+      status: formatItemStatus(event.status),
       note: event.note || "",
     }))
   );
@@ -255,7 +277,7 @@ const exportHistoryPdf = async () => {
       changed_at: formatDate(event.changed_at),
       item: event.item?.name || "",
       barcode: event.item?.barcode || "",
-      status: event.status,
+      status: formatItemStatus(event.status),
       note: event.note || "",
     }))
   );

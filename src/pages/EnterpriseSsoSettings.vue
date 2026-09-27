@@ -208,6 +208,13 @@
         </div>
         <div class="provider-actions">
           <a v-if="provider.samlConfig" :href="metadataUrl(provider.providerId)" target="_blank" rel="noopener">SP metadata</a>
+          <button
+            v-if="provider.samlConfig && !provider.samlConfig.idpInitiatedCallbackUrl"
+            type="button"
+            class="secondary-action"
+            :disabled="saving"
+            @click="setWorkspaceSsoReturnUrl(provider.providerId)"
+          >Set workspace return URL</button>
           <button v-if="!provider.domainVerified" type="button" class="secondary-action" @click="verifyDomain(provider.providerId)">Verify domain</button>
           <button type="button" class="button-danger" @click="removeProvider(provider.providerId)">Remove</button>
         </div>
@@ -224,7 +231,7 @@ import { RouterLink, useRoute } from "vue-router";
 import { authClient } from "../auth/client";
 import { registerPrivilegedAdminStepUp } from "../services/privilegedStepUpService";
 
-type Provider = { providerId: string; domain: string; domainVerified: boolean; organizationId: string | null; samlConfig: object | null; oidcConfig: object | null };
+type Provider = { providerId: string; domain: string; domainVerified: boolean; organizationId: string | null; samlConfig: { idpInitiatedCallbackUrl?: string | null } | null; oidcConfig: object | null };
 type Workspace = { id: string; name: string; organizationId: string | null };
 type WizardKey = "protocol" | "providerId" | "domain" | "issuer" | "entryPoint" | "certificate" | "discoveryEndpoint" | "clientId" | "clientSecret" | "review";
 type WizardStep = {
@@ -631,6 +638,7 @@ async function submitConnection() {
           entryPoint: entryPoint.value.trim(),
           cert: certificate.value.trim(),
           idpMetadata: { entityID: providerIssuer.value.trim() },
+          idpInitiatedCallbackUrl: `${location.origin}/`,
           wantAssertionsSigned: true,
         },
       }
@@ -687,6 +695,22 @@ const removeProvider = async (id: string) => {
   const response = await fetch(`${edgeOrigin}/api/itemtraxx/sso/providers?providerId=${encodeURIComponent(id)}`, { method: "DELETE", credentials: "include" });
   if (!response.ok) { error.value = true; message.value = "Unable to remove SSO connection"; return; }
   await loadProviders();
+};
+
+const setWorkspaceSsoReturnUrl = async (id: string) => {
+  saving.value = true; message.value = ""; error.value = false;
+  try {
+    const result = await authClient.sso.updateProvider({
+      providerId: id,
+      samlConfig: { idpInitiatedCallbackUrl: `${location.origin}/` },
+    });
+    if (result.error) throw new Error(result.error.message);
+    message.value = "Cloudflare and other IdP launches will return to this workspace.";
+    await loadProviders();
+  } catch (cause) {
+    error.value = true;
+    message.value = cause instanceof Error ? cause.message : "Unable to set the workspace return URL";
+  } finally { saving.value = false; }
 };
 
 const verifyDomain = async (id: string) => {

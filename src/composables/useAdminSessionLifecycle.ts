@@ -48,6 +48,25 @@ const SESSION_HEARTBEAT_INTERVAL_MS =
     : DEFAULT_SESSION_HEARTBEAT_INTERVAL_MS;
 const LOGIN_CONTEXT_QUERY_KEY = "login_ctx";
 const LOGIN_CONTEXT_VALUES = new Set(["admin_login", "regular_login"]);
+const SSO_PROVIDER_QUERY_KEY = "itx_sso_provider_id";
+const SSO_PROTOCOL_QUERY_KEY = "itx_sso_protocol";
+const SSO_CONTEXT_MAX_AGE_MS = 10 * 60_000;
+
+type ConsumedLoginContext = {
+  loginContext: "admin_login" | "regular_login" | null;
+  ssoProviderId: string | null;
+  ssoProtocol: "SAML2.0" | "OpenID Connect (OIDC)" | null;
+  ssoContext: PendingSsoLoginContext | null;
+};
+
+type PendingSsoLoginContext = {
+  providerId: string;
+  protocol: "SAML2.0" | "OpenID Connect (OIDC)";
+  capturedAt: number;
+};
+
+const firstQueryString = (value: unknown) =>
+  Array.isArray(value) ? value[0] : value;
 
 export const useAdminSessionLifecycle = (options: AdminSessionLifecycleOptions) => {
   const heartbeatEnabled =
@@ -60,6 +79,7 @@ export const useAdminSessionLifecycle = (options: AdminSessionLifecycleOptions) 
   let resolveValidationRetry: (() => void) | null = null;
   let authSessionEpoch = 0;
   let bootstrappedSessionEpoch: number | null = null;
+  let pendingSsoLoginContext: PendingSsoLoginContext | null = null;
   let adminCheckGeneration = 0;
   let runningAdminCheckGeneration: number | null = null;
   let disposed = false;
@@ -183,13 +203,69 @@ export const useAdminSessionLifecycle = (options: AdminSessionLifecycleOptions) 
     }
   };
 
-  const consumeLoginContext = () => {
+  const captureSsoLoginContext = () => {
+    const providerId = firstQueryString(
+      options.route.query[SSO_PROVIDER_QUERY_KEY],
+    );
+    const protocol = firstQueryString(
+      options.route.query[SSO_PROTOCOL_QUERY_KEY],
+    );
+    if (
+      typeof providerId !== "string" ||
+      !/^[a-z0-9-]{1,128}$/i.test(providerId) ||
+      typeof protocol !== "string" ||
+      (protocol !== "SAML2.0" && protocol !== "OpenID Connect (OIDC)")
+    ) {
+      return;
+    }
+    pendingSsoLoginContext = {
+      providerId,
+      protocol: protocol as PendingSsoLoginContext["protocol"],
+      capturedAt: Date.now(),
+    };
+  };
+
+  watch(
+    () => [
+      options.route.query[SSO_PROVIDER_QUERY_KEY],
+      options.route.query[SSO_PROTOCOL_QUERY_KEY],
+    ],
+    captureSsoLoginContext,
+    { immediate: true },
+  );
+
+  const consumeLoginContext = (): ConsumedLoginContext | null => {
     const raw = options.route.query[LOGIN_CONTEXT_QUERY_KEY];
-    const value = Array.isArray(raw) ? raw[0] : raw;
-    if (typeof value !== "string" || !LOGIN_CONTEXT_VALUES.has(value)) return null;
-    const { [LOGIN_CONTEXT_QUERY_KEY]: _discard, ...restQuery } = options.route.query;
-    void options.router.replace({ path: options.route.path, query: restQuery });
-    return value as "admin_login" | "regular_login";
+    const value = firstQueryString(raw);
+    const loginContext = typeof value === "string" && LOGIN_CONTEXT_VALUES.has(value)
+      ? value as ConsumedLoginContext["loginContext"]
+      : null;
+    const hasSsoQuery =
+      SSO_PROVIDER_QUERY_KEY in options.route.query ||
+      SSO_PROTOCOL_QUERY_KEY in options.route.query;
+
+    let ssoLogin = pendingSsoLoginContext;
+    if (ssoLogin && Date.now() - ssoLogin.capturedAt > SSO_CONTEXT_MAX_AGE_MS) {
+      pendingSsoLoginContext = null;
+      ssoLogin = null;
+    }
+
+    if (!loginContext && !hasSsoQuery && !ssoLogin) return null;
+    if (loginContext || hasSsoQuery) {
+      const {
+        [LOGIN_CONTEXT_QUERY_KEY]: _discardLoginContext,
+        [SSO_PROVIDER_QUERY_KEY]: _discardSsoProvider,
+        [SSO_PROTOCOL_QUERY_KEY]: _discardSsoProtocol,
+        ...restQuery
+      } = options.route.query;
+      void options.router.replace({ path: options.route.path, query: restQuery });
+    }
+    return {
+      loginContext,
+      ssoProviderId: ssoLogin?.providerId ?? null,
+      ssoProtocol: ssoLogin?.protocol ?? null,
+      ssoContext: ssoLogin,
+    };
   };
 
   const identityChanged = (epoch: number, userId: string | null, deviceId: string) =>
@@ -231,9 +307,20 @@ export const useAdminSessionLifecycle = (options: AdminSessionLifecycleOptions) 
       }
       try {
         const loginContext = consumeLoginContext();
-        if (loginContext || bootstrappedSessionEpoch !== epoch) {
+        if (loginContext?.ssoProviderId && loginContext.ssoProtocol) {
+          await touchAccountSession({
+            loginMethod: loginContext.ssoProviderId,
+            loginLocation: loginContext.ssoProtocol,
+          });
+          if (pendingSsoLoginContext === loginContext.ssoContext) {
+            pendingSsoLoginContext = null;
+          }
+          bootstrappedSessionEpoch = epoch;
+        } else if (loginContext?.loginContext || bootstrappedSessionEpoch !== epoch) {
           await touchAccountSession(
-            loginContext ? { loginMethod: "password", loginLocation: loginContext } : {}
+            loginContext?.loginContext
+              ? { loginMethod: "password", loginLocation: loginContext.loginContext }
+              : {},
           );
           bootstrappedSessionEpoch = epoch;
         }

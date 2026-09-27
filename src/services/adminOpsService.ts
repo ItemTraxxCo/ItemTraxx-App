@@ -65,8 +65,8 @@ export type AccountSessionItem = {
   device_id: string;
   device_label: string | null;
   user_agent: string | null;
-  login_method: "password" | "magic_link" | "session_handoff" | null;
-  login_location: "regular_login" | "admin_login" | null;
+  login_method: string | null;
+  login_location: "regular_login" | "admin_login" | "SAML2.0" | "OpenID Connect (OIDC)" | null;
   general_location: string | null;
   created_at: string;
   last_seen_at: string;
@@ -74,7 +74,7 @@ export type AccountSessionItem = {
 };
 
 export type AccountSessionTouchOptions = {
-  loginMethod?: AccountSessionItem["login_method"];
+  loginMethod?: string;
   loginLocation?: AccountSessionItem["login_location"];
 };
 

@@ -45,8 +45,13 @@ export type DeviceSessionContext = {
   deviceId: string | null;
   deviceLabel: string | null;
   userAgent: string | null;
-  loginMethod: "password" | "magic_link" | "session_handoff" | null;
-  loginLocation: "regular_login" | "admin_login" | null;
+  loginMethod: string | null;
+  loginLocation:
+    | "regular_login"
+    | "admin_login"
+    | "SAML2.0"
+    | "OpenID Connect (OIDC)"
+    | null;
   generalLocation: string | null;
 };
 

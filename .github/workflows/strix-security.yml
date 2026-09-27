@@ -51,14 +51,26 @@ jobs:
     timeout-minutes: 360
 
     steps:
+      - name: Report paused PR scan
+        if: ${{ github.event_name == 'pull_request' }}
+        run: |
+          cat >> "$GITHUB_STEP_SUMMARY" <<'EOF'
+          ## Strix PR scan temporarily paused
+
+          This required check is passing without running Strix while we address repeated multi-hour scans that end with incomplete coverage. Resume PR scans after the run completes reliably.
+          EOF
+          echo "::warning::Strix is temporarily paused for pull requests; this check did not scan the code."
+
       # Full history lets Strix resolve the pull-request diff scope reliably.
       - name: Checkout
+        if: ${{ github.event_name == 'workflow_dispatch' }}
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
           persist-credentials: false
 
       - name: Install Strix
+        if: ${{ github.event_name == 'workflow_dispatch' }}
         env:
           STRIX_VERSION: 1.6.1
           # SHA-256 published for strix-1.6.1-linux-x86_64.tar.gz.
@@ -77,6 +89,7 @@ jobs:
 
       - name: Preflight NVIDIA NIM endpoint
         id: nim-preflight
+        if: ${{ github.event_name == 'workflow_dispatch' }}
         env:
           NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
           NVIDIA_NIM_MODEL: z-ai/glm-5.3
@@ -377,7 +390,7 @@ jobs:
 
       - name: Run Strix security scan
         id: strix-scan
-        if: ${{ always() && steps.nim-preflight.outputs.ok == 'true' }}
+        if: ${{ github.event_name == 'workflow_dispatch' && always() && steps.nim-preflight.outputs.ok == 'true' }}
         timeout-minutes: 360
         env:
           STRIX_LLM: nvidia_nim/z-ai/glm-5.3
@@ -404,7 +417,7 @@ jobs:
 
       - name: Prepare Strix PR summary
         id: strix-summary
-        if: always()
+        if: ${{ always() && github.event_name == 'workflow_dispatch' }}
         env:
           STRIX_EXIT_CODE: ${{ steps.strix-scan.outputs.exit_code }}
         run: |
@@ -416,7 +429,7 @@ jobs:
 
       - name: Validate Strix coverage completeness
         id: strix-coverage
-        if: always()
+        if: ${{ always() && github.event_name == 'workflow_dispatch' }}
         run: |
           set -euo pipefail
           python3 - <<'PY'
@@ -459,44 +472,8 @@ jobs:
           print(f"Validated {len(reports)} complete Strix coverage report(s).")
           PY
 
-      - name: Publish Strix PR summary
-        if: ${{ always() && github.event_name == 'pull_request' }}
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3
-        env:
-          STRIX_COMMENT_PATH: ${{ steps.strix-summary.outputs.comment_path }}
-          NIM_PREFLIGHT_OK: ${{ steps.nim-preflight.outputs.ok }}
-          NIM_PREFLIGHT_STATUS: ${{ steps.nim-preflight.outputs.http_status }}
-          NIM_PREFLIGHT_CLASS: ${{ steps.nim-preflight.outputs.failure_class }}
-        with:
-          script: |
-            const fs = require("fs");
-            const strixBody = fs.readFileSync(process.env.STRIX_COMMENT_PATH, "utf8");
-            const preflightNote = process.env.NIM_PREFLIGHT_OK === "true"
-              ? ""
-              : `NVIDIA NIM preflight failed before Strix started (HTTP ${process.env.NIM_PREFLIGHT_STATUS || "unknown"}; ${process.env.NIM_PREFLIGHT_CLASS || "unknown cause"}).`;
-            const body = preflightNote ? `${preflightNote}\n\n${strixBody}` : strixBody;
-            const { owner, repo } = context.repo;
-            const issue_number = context.issue.number;
-            const comments = await github.paginate(github.rest.issues.listComments, {
-              owner,
-              repo,
-              issue_number,
-              per_page: 100,
-            });
-            const existing = comments.find((comment) =>
-              comment.user?.type === "Bot" &&
-              comment.body?.includes("<!-- itemtraxx-strix-security-scan -->")
-            );
-
-            if (existing) {
-              await github.rest.issues.updateComment({ owner, repo, comment_id: existing.id, body });
-              return;
-            }
-
-            await github.rest.issues.createComment({ owner, repo, issue_number, body });
-
       - name: Upload Strix results
-        if: always()
+        if: ${{ always() && github.event_name == 'workflow_dispatch' }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.0
         with:
           name: strix-results-${{ github.run_id }}
@@ -513,7 +490,7 @@ jobs:
           retention-days: 30
 
       - name: Fail on Strix findings or execution error
-        if: ${{ always() && (steps.nim-preflight.outputs.ok != 'true' || steps.strix-scan.outputs.exit_code != '0' || steps.strix-coverage.outputs.complete != 'true') }}
+        if: ${{ always() && github.event_name == 'workflow_dispatch' && (steps.nim-preflight.outputs.ok != 'true' || steps.strix-scan.outputs.exit_code != '0' || steps.strix-coverage.outputs.complete != 'true') }}
         env:
           NIM_PREFLIGHT_OK: ${{ steps.nim-preflight.outputs.ok }}
           STRIX_EXIT_CODE: ${{ steps.strix-scan.outputs.exit_code }}

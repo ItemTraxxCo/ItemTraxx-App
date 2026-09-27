@@ -222,6 +222,7 @@
 import { computed, nextTick, onMounted, ref } from "vue";
 import { RouterLink, useRoute } from "vue-router";
 import { authClient } from "../auth/client";
+import { registerPrivilegedAdminStepUp } from "../services/privilegedStepUpService";
 
 type Provider = { providerId: string; domain: string; domainVerified: boolean; organizationId: string | null; samlConfig: object | null; oidcConfig: object | null };
 type Workspace = { id: string; name: string; organizationId: string | null };
@@ -553,14 +554,44 @@ async function editStep(key: WizardKey) {
   await focusField();
 }
 
-const loadProviders = async () => {
+class SsoManagementRequestError extends Error {
+  constructor(readonly status: number) {
+    super("Unable to load SSO configuration");
+    this.name = "SsoManagementRequestError";
+  }
+}
+
+const fetchProviders = async () => {
   const query = organizationId.value ? `?organizationId=${encodeURIComponent(organizationId.value)}` : "";
   const response = await fetch(`${edgeOrigin}/api/itemtraxx/sso/providers${query}`, { credentials: "include" });
-  if (!response.ok) throw new Error("Unable to load SSO configuration");
+  if (!response.ok) throw new SsoManagementRequestError(response.status);
   const data = await response.json() as { organizationId?: string | null; providers?: Provider[]; workspaces?: Workspace[] };
   providers.value = data.providers ?? [];
   workspaces.value = data.workspaces ?? workspaces.value;
   if (!organizationId.value) organizationId.value = data.organizationId ?? workspaces.value[0]?.organizationId ?? "";
+};
+
+const loadProviders = async () => {
+  try {
+    await fetchProviders();
+  } catch (cause) {
+    if (!(cause instanceof SsoManagementRequestError) || cause.status !== 403) throw cause;
+
+    try {
+      // SAML sign-ins create a new Better Auth session outside the password
+      // and two-factor UI flows. Register its fresh, session-bound admin
+      // verification through the same server-enforced path used at login.
+      await registerPrivilegedAdminStepUp();
+    } catch (stepUpError) {
+      const message = stepUpError instanceof Error ? stepUpError.message : "";
+      if (message.toLowerCase().includes("verification required")) {
+        throw new Error("Your admin sign-in is no longer fresh enough to manage SSO. Sign out and sign in again, completing any two-factor prompt.");
+      }
+      throw stepUpError;
+    }
+
+    await fetchProviders();
+  }
 };
 
 function refreshProviders() {

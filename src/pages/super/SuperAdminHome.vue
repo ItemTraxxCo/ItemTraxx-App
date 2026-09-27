@@ -85,7 +85,7 @@
         <ul v-else class="attention-list">
           <li v-for="item in (dashboard?.recent_actions ?? []).slice(0, 5)" :key="item.id" class="attention-item">
             <span v-if="item.actor_email" data-session-replay-mask>{{ item.actor_email }}</span>
-            <span v-else>{{ item.actor_id }}</span> — {{ formatActionLabel(item.action_type) }}
+            <span v-else>{{ item.actor_id }}</span> — {{ item.action_type }}
           </li>
         </ul>
       </section>
@@ -248,7 +248,7 @@
           <tbody>
             <tr v-for="item in controlCenter?.approvals ?? []" :key="item.id">
               <td>{{ formatDateTime(item.created_at) }}</td>
-              <td>{{ formatActionLabel(item.action_type) }}</td>
+              <td>{{ item.action_type }}</td>
               <td>{{ item.status }}</td>
               <td>{{ item.requested_by }}</td>
               <td>
@@ -322,7 +322,7 @@
           <tbody>
             <tr v-for="item in dashboard?.recent_actions ?? []" :key="item.id">
               <td>{{ formatDateTime(item.created_at) }}</td>
-              <td>{{ formatActionLabel(item.action_type) }}</td>
+              <td>{{ item.action_type }}</td>
               <td>
                 <span v-if="item.actor_email" data-session-replay-mask>{{ item.actor_email }}</span>
                 <span v-else>{{ item.actor_id }}</span>
@@ -380,7 +380,6 @@ import { RouterLink } from "vue-router";
 import SuperAdminIcon from "../../components/superadmin/SuperAdminIcon.vue";
 import { fetchSuperDashboard, type SuperDashboard } from "../../services/superAuditService";
 import { toUserFacingErrorMessage } from "../../services/appErrors";
-import { formatActionLabel } from "../../utils/actionLabel";
 import {
   approveRequest,
   forceWorkspaceReauth,

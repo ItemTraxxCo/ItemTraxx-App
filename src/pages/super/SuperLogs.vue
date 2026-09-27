@@ -13,7 +13,16 @@
         <select v-model="workspaceFilter"><option value="all">all workspaces</option><option v-for="t in workspaces" :key="t.id" :value="t.id">{{ t.name }}</option></select>
       </label>
       <label>Action
-        <select v-model="actionFilter"><option value="all">all actions</option><option value="checkout">checkout</option><option value="return">return</option><option value="admin_return">admin_return</option></select>
+        <select v-model="actionFilter">
+          <option value="all">All actions</option>
+          <option
+            v-for="option in ITEM_LOG_ACTION_OPTIONS"
+            :key="option.value"
+            :value="option.value"
+          >
+            {{ option.label }}
+          </option>
+        </select>
       </label>
       <label>From
         <input v-model="startAt" type="datetime-local" />
@@ -53,7 +62,7 @@
               <tr v-for="row in rows" :key="row.id">
                 <td>{{ formatDateTime(row.action_time) }}</td>
                 <td>{{ row.workspace?.name || row.workspace_id }}</td>
-                <td>{{ row.action_type }}</td>
+                <td>{{ formatActionLabel(row.action_type) }}</td>
                 <td>{{ row.item?.name || "-" }} ({{ row.item?.barcode || "-" }})</td>
                 <td data-session-replay-mask>{{ row.borrower ? `${row.borrower.username} (${row.borrower.borrower_id})` : "-" }}</td>
               </tr>
@@ -86,6 +95,7 @@ import { listSuperLogs, type SuperLogEntry } from "../../services/superLogsServi
 import { listWorkspaces as listWorkspaces, type SuperWorkspace as SuperWorkspace } from "../../services/superWorkspaceService";
 import { exportRowsToCsv, exportRowsToPdf } from "../../services/exportService";
 import { toUserFacingErrorMessage } from "../../services/appErrors";
+import { formatActionLabel, ITEM_LOG_ACTION_OPTIONS } from "../../utils/actionLabel";
 
 const router = useRouter();
 const workspaces = ref<SuperWorkspace[]>([]);
@@ -182,7 +192,7 @@ const exportCsv = () => {
   exportRowsToCsv(`super-logs-page-${page.value}.csv`, ["time", "workspace", "action", "item_name", "item_barcode", "borrower"], rows.value.map((row) => ({
     time: formatDateTime(row.action_time),
     workspace: row.workspace?.name ?? row.workspace_id,
-    action: row.action_type,
+    action: formatActionLabel(row.action_type),
     item_name: row.item?.name ?? "",
     item_barcode: row.item?.barcode ?? "",
     borrower: row.borrower ? `${row.borrower.username} (${row.borrower.borrower_id})` : "",
@@ -197,7 +207,7 @@ const exportPdf = async () => {
   await exportRowsToPdf(`super-logs-page-${page.value}.pdf`, "Super Logs Export", ["time", "workspace", "action", "item_name", "item_barcode", "borrower"], rows.value.map((row) => ({
     time: formatDateTime(row.action_time),
     workspace: row.workspace?.name ?? row.workspace_id,
-    action: row.action_type,
+    action: formatActionLabel(row.action_type),
     item_name: row.item?.name ?? "",
     item_barcode: row.item?.barcode ?? "",
     borrower: row.borrower ? `${row.borrower.username} (${row.borrower.borrower_id})` : "",

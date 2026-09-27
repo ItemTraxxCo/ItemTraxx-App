@@ -48,7 +48,7 @@ jobs:
       pull-requests: write
     runs-on: ubuntu-latest
     # Leave time to summarize and upload results if the bounded scan times out.
-    timeout-minutes: 60
+    timeout-minutes: 360
 
     steps:
       # Full history lets Strix resolve the pull-request diff scope reliably.
@@ -378,7 +378,7 @@ jobs:
       - name: Run Strix security scan
         id: strix-scan
         if: ${{ always() && steps.nim-preflight.outputs.ok == 'true' }}
-        timeout-minutes: 55
+        timeout-minutes: 360
         env:
           STRIX_LLM: nvidia_nim/z-ai/glm-5.3
           LLM_API_KEY: ${{ secrets.NVIDIA_API_KEY }}

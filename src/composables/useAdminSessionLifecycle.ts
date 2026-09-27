@@ -50,7 +50,6 @@ const LOGIN_CONTEXT_QUERY_KEY = "login_ctx";
 const LOGIN_CONTEXT_VALUES = new Set(["admin_login", "regular_login"]);
 const SSO_PROVIDER_QUERY_KEY = "itx_sso_provider_id";
 const SSO_PROTOCOL_QUERY_KEY = "itx_sso_protocol";
-const SSO_LOGIN_PROTOCOLS = new Set(["SAML2.0", "OpenID Connect (OIDC)"]);
 const SSO_CONTEXT_MAX_AGE_MS = 10 * 60_000;
 
 type ConsumedLoginContext = {
@@ -215,7 +214,7 @@ export const useAdminSessionLifecycle = (options: AdminSessionLifecycleOptions) 
       typeof providerId !== "string" ||
       !/^[a-z0-9-]{1,128}$/i.test(providerId) ||
       typeof protocol !== "string" ||
-      !SSO_LOGIN_PROTOCOLS.has(protocol)
+      (protocol !== "SAML2.0" && protocol !== "OpenID Connect (OIDC)")
     ) {
       return;
     }

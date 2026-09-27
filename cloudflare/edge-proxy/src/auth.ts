@@ -123,6 +123,32 @@ export const resolveSsoActor = async (
   };
 };
 
+const ensureBetterAuthOrganizationAdminMembership = async (
+  dataClient: ReturnType<typeof createBetterAuthDataClient>,
+  betterAuthUserId: string,
+  organizationId: string,
+) => {
+  const { data: member, error } = await dataClient.schema("better_auth").from("member")
+    .select("id,role")
+    .eq("userId", betterAuthUserId)
+    .eq("organizationId", organizationId)
+    .maybeSingle();
+  if (error) throw error;
+  if (!member?.id || typeof member.role !== "string") {
+    throw new APIError("FORBIDDEN");
+  }
+
+  // Better Auth's SSO plugin only treats the built-in `owner` and `admin`
+  // membership roles as organization admins. ItemTraxx's `workspace_admin`
+  // profile role is authoritative, and has the same organization permissions.
+  if (member.role.split(",").some((role: string) => ["owner", "admin"].includes(role.trim()))) return;
+  const { error: updateError } = await dataClient.schema("better_auth").from("member")
+    .update({ role: "admin" })
+    .eq("id", member.id)
+    .eq("role", member.role);
+  if (updateError) throw updateError;
+};
+
 const hasSsoSessionGrant = async (
   dataClient: ReturnType<typeof createBetterAuthDataClient>,
   actor: SsoActor,
@@ -278,7 +304,16 @@ export const getBetterAuth = (rawEnv: Env) => {
           if (actor.role === "workspace_admin" && targetOrganizationId !== actor.organizationId) {
             throw new APIError("FORBIDDEN");
           }
-          if (context.path === "/sso/register") context.body.organizationId = targetOrganizationId;
+          if (context.path === "/sso/register") {
+            if (actor.role === "workspace_admin") {
+              await ensureBetterAuthOrganizationAdminMembership(
+                dataClient,
+                session.user.id,
+                targetOrganizationId,
+              );
+            }
+            context.body.organizationId = targetOrganizationId;
+          }
         }),
     },
     plugins: [
@@ -286,7 +321,7 @@ export const getBetterAuth = (rawEnv: Env) => {
         ac: organizationAccess,
         roles: organizationRoles,
         allowUserToCreateOrganization: false,
-        creatorRole: "workspace_admin",
+        creatorRole: "admin",
         organizationHooks: {
           beforeUpdateOrganization: async ({ organization }) => {
             // Slugs determine workspace hostnames and stay managed outside
@@ -757,6 +792,17 @@ export const handleInternalAuthAdminRequest = async (request: Request, rawEnv: E
         p_member_role: workspaceId ? memberRole : null,
       });
       if (error) throw error;
+      if (workspaceId && memberRole === "workspace_admin") {
+        const { data: membership, error: membershipError } = await cachedDataClient.schema("better_auth")
+          .from("member")
+          .update({ role: "admin" })
+          .eq("userId", userId)
+          .eq("role", "workspace_admin")
+          .select("id")
+          .maybeSingle();
+        if (membershipError) throw membershipError;
+        if (!membership?.id) throw new Error("Workspace admin membership could not be synchronized");
+      }
       return Response.json({ user: { id: profileId, betterAuthUserId: userId, email } });
     }
     const explicitBetterAuthUserId = typeof body?.betterAuthUserId === "string" ? body.betterAuthUserId : "";

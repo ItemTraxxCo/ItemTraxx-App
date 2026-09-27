@@ -111,9 +111,12 @@ class FakeClient {
           );
           if (profile) profile.better_auth_user_id = args.p_user_id;
           if (args.p_workspace_id) {
+            const workspace = this.tables.workspaces.find((row) =>
+              row.id === args.p_workspace_id
+            );
             this.tables.member.push({
               id: args.p_member_id,
-              organizationId: args.p_workspace_id,
+              organizationId: workspace?.better_auth_organization_id ?? args.p_workspace_id,
               userId: args.p_user_id,
               role: args.p_member_role,
             });

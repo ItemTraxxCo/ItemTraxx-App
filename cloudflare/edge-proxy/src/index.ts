@@ -76,6 +76,58 @@ const isSamlIdpFormPost = (request: Request, url: URL) => {
     contentType === "application/x-www-form-urlencoded";
 };
 
+const resolveSsoCallbackContext = (pathname: string) => {
+  const samlMatch = pathname.match(
+    /^\/api\/auth\/sso\/saml2\/sp\/acs\/([a-z0-9-]+)$/i,
+  );
+  if (samlMatch?.[1]) {
+    return { providerId: samlMatch[1], protocol: "SAML2.0" } as const;
+  }
+
+  const oidcMatch = pathname.match(
+    /^\/api\/auth\/sso\/callback\/([a-z0-9-]+)$/i,
+  );
+  if (oidcMatch?.[1]) {
+    return { providerId: oidcMatch[1], protocol: "OpenID Connect (OIDC)" } as const;
+  }
+
+  return null;
+};
+
+const attachSsoLoginContext = (
+  response: Response,
+  requestUrl: URL,
+  providerId: string,
+  protocol: string,
+) => {
+  const location = response.headers.get("Location");
+  if (response.status < 300 || response.status >= 400 || !location) {
+    return response;
+  }
+
+  try {
+    const redirectUrl = new URL(location, requestUrl);
+    if (
+      redirectUrl.searchParams.has("error") ||
+      redirectUrl.searchParams.has("error_description")
+    ) {
+      return response;
+    }
+    redirectUrl.searchParams.set("itx_sso_provider_id", providerId);
+    redirectUrl.searchParams.set("itx_sso_protocol", protocol);
+
+    const headers = new Headers(response.headers);
+    headers.set("Location", redirectUrl.toString());
+    return new Response(response.body, {
+      status: response.status,
+      statusText: response.statusText,
+      headers,
+    });
+  } catch {
+    return response;
+  }
+};
+
 export default {
   async fetch(
     request: Request,
@@ -169,10 +221,19 @@ export default {
         }
 
         if (url.pathname.startsWith("/api/auth/")) {
-          const authResponse = await handleBetterAuthRequest(
+          let authResponse = await handleBetterAuthRequest(
             tracedRequest,
             env,
           );
+          const ssoCallback = resolveSsoCallbackContext(url.pathname);
+          if (ssoCallback) {
+            authResponse = attachSsoLoginContext(
+              authResponse,
+              url,
+              ssoCallback.providerId,
+              ssoCallback.protocol,
+            );
+          }
           const responseHeaders = new Headers(authResponse.headers);
           Object.entries(headers).forEach(([key, value]) =>
             responseHeaders.set(key, value)

@@ -43,8 +43,15 @@ const districtSubscriptionPlanSchema = z.enum([
   "organization_enterprise",
 ]);
 const districtBillingStatusSchema = z.enum(["draft", "active", "past_due", "canceled"]);
-const tenantAdminLoginMethodSchema = z.enum(["password", "magic_link", "session_handoff"]);
-const tenantAdminLoginLocationSchema = z.enum(["regular_login", "admin_login"]);
+const tenantAdminLoginMethodSchema = z.string().max(128).regex(
+  /^(?:password|magic_link|session_handoff|[a-z0-9-]+)$/,
+);
+const tenantAdminLoginLocationSchema = z.enum([
+  "regular_login",
+  "admin_login",
+  "SAML2.0",
+  "OpenID Connect (OIDC)",
+]);
 
 const adminOpsDevicePayloadSchema = z.object({
   device_id: z.string().min(1),

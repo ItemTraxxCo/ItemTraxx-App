@@ -36,24 +36,45 @@ const formatRpcError = (error: RpcError | null | undefined) =>
 const sanitizeText = (value: unknown, maxLen: number) =>
   optionalText(value, { maxLen }) || null;
 
+const SSO_LOGIN_PROTOCOLS = new Set([
+  "SAML2.0",
+  "OpenID Connect (OIDC)",
+]);
+
 export const resolveDeviceSessionContext = (
   payload: Record<string, unknown>,
   req: Request,
-): DeviceSessionContext => ({
-  deviceId: sanitizeText(payload.device_id, 128),
-  deviceLabel: sanitizeText(payload.device_label, 160),
-  userAgent: sanitizeText(req.headers.get("user-agent"), 255),
-  loginMethod: payload.login_method === "password" ||
+): DeviceSessionContext => {
+  const ssoProtocol = typeof payload.login_location === "string" &&
+      SSO_LOGIN_PROTOCOLS.has(payload.login_location)
+    ? payload.login_location as DeviceSessionContext["loginLocation"]
+    : null;
+  const ssoProviderId = sanitizeText(payload.login_method, 128);
+  const hasValidSsoMetadata = !!ssoProtocol &&
+    !!ssoProviderId && /^[a-z0-9-]+$/i.test(ssoProviderId);
+  const loginMethod = payload.login_method === "password" ||
       payload.login_method === "magic_link" ||
       payload.login_method === "session_handoff"
     ? payload.login_method
-    : null,
-  loginLocation: payload.login_location === "regular_login" ||
+    : hasValidSsoMetadata
+    ? ssoProviderId
+    : null;
+  const loginLocation = payload.login_location === "regular_login" ||
       payload.login_location === "admin_login"
     ? payload.login_location
-    : null,
-  generalLocation: resolveGeneralLocation(req),
-});
+    : hasValidSsoMetadata
+    ? ssoProtocol
+    : null;
+
+  return {
+    deviceId: sanitizeText(payload.device_id, 128),
+    deviceLabel: sanitizeText(payload.device_label, 160),
+    userAgent: sanitizeText(req.headers.get("user-agent"), 255),
+    loginMethod,
+    loginLocation,
+    generalLocation: resolveGeneralLocation(req),
+  };
+};
 
 const isMissingSessionTable = (error: RpcError | null | undefined) =>
   isMissingRelation(error, "account_sessions");
@@ -461,8 +482,13 @@ export const handleSessionAction = async (
           device_label: string | null;
           user_agent: string | null;
           auth_session_id?: string | null;
-          login_method?: "password" | "magic_link" | "session_handoff" | null;
-          login_location?: "regular_login" | "admin_login" | null;
+          login_method?: string | null;
+          login_location?:
+            | "regular_login"
+            | "admin_login"
+            | "SAML2.0"
+            | "OpenID Connect (OIDC)"
+            | null;
           general_location?: string | null;
           created_at: string;
           last_seen_at: string;

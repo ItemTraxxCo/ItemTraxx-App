@@ -429,7 +429,7 @@ const statusOptions = ITEM_STATUS_OPTIONS;
 const editableStatusOptions = statusOptions.filter((option) => option !== "checked_out");
 const editName = ref("");
 const editBarcode = ref("");
-const editStatus = ref(statusOptions[0] ?? "available");
+const editStatus = ref<string>(statusOptions[0] ?? "available");
 const editNotes = ref("");
 const editAccessMode = ref<"" | "all" | "restricted">("all");
 const editSelectedProfileIds = ref<string[]>([]);

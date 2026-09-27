@@ -100,7 +100,7 @@
         <button v-if="!isIndividualAccount" type="button" @click="openBulkAccessModal">Change tenant account access</button>
         <select v-model="bulkStatusValue">
           <option value="">Change status…</option>
-          <option v-for="option in editableStatusOptions" :key="option" :value="option">{{ option }}</option>
+          <option v-for="option in editableStatusOptions" :key="option" :value="option">{{ formatItemStatus(option) }}</option>
         </select>
         <button type="button" :disabled="!bulkStatusValue || isSaving" @click="applyBulkStatus">Apply status</button>
         <button type="button" :disabled="isSaving" @click="applyBulkArchive">Archive selected</button>
@@ -117,9 +117,9 @@
         <label>
           Filter status
           <select v-model="statusFilter">
-            <option value="all">all statuses</option>
+            <option value="all">All statuses</option>
             <option v-for="option in statusOptions" :key="option" :value="option">
-              {{ option }}
+              {{ formatItemStatus(option) }}
             </option>
           </select>
         </label>
@@ -165,7 +165,7 @@
                 {{ item.serial_number || "-" }}
               </span>
             </td>
-            <td>{{ item.status }}</td>
+            <td>{{ formatItemStatus(item.status) }}</td>
             <td class="item-notes-cell" data-session-replay-mask>{{ item.notes || "-" }}</td>
             <td v-if="!isIndividualAccount">
               <span class="scoped-accounts-cell" data-session-replay-mask :title="scopedAccountsTitle(item)">
@@ -230,13 +230,13 @@
             Status
             <select v-if="isModalEditing" v-model="editStatus">
               <option v-if="editStatus === 'checked_out'" value="checked_out" disabled>
-                checked_out (managed by checkout)
+                Checked out (managed by checkout)
               </option>
               <option v-for="option in editableStatusOptions" :key="option" :value="option">
-                {{ option }}
+                {{ formatItemStatus(option) }}
               </option>
             </select>
-            <input v-else :value="selectedItem.status" type="text" readonly class="field-plain" />
+            <input v-else :value="formatItemStatus(selectedItem.status)" type="text" readonly class="field-plain" />
           </label>
         </div>
 
@@ -346,7 +346,7 @@
           <tr v-for="item in archivedItem" :key="item.id">
             <td>{{ item.name }}</td>
             <td>{{ item.barcode }}</td>
-            <td>{{ item.status }}</td>
+            <td>{{ formatItemStatus(item.status) }}</td>
             <td>
               <button type="button" class="link" :disabled="isSaving" @click="handleRestore(item)">
                 Restore
@@ -378,6 +378,7 @@ import CameraBarcodeScannerModal from "../../../components/CameraBarcodeScannerM
 import SkeletonLoader from "../../../components/SkeletonLoader.vue";
 import TenantAccessPicker from "../../../components/app/TenantAccessPicker.vue";
 import { getAuthState } from "../../../store/authState";
+import { formatItemStatus, ITEM_STATUS_OPTIONS } from "../../../utils/itemStatus";
 import { logAdminAction } from "../../../services/auditLogService";
 import {
   createItem,
@@ -424,15 +425,7 @@ const selectedProfileIds = ref<string[]>([]);
 const tenantAccounts = ref<Array<{id:string;auth_email:string}>>([]);
 const searchQuery = ref("");
 const statusFilter = ref("all");
-const statusOptions = [
-  "available",
-  "checked_out",
-  "damaged",
-  "lost",
-  "in_repair",
-  "retired",
-  "in_studio_only",
-];
+const statusOptions = ITEM_STATUS_OPTIONS;
 const editableStatusOptions = statusOptions.filter((option) => option !== "checked_out");
 const editName = ref("");
 const editBarcode = ref("");
@@ -470,6 +463,7 @@ const filteredItem = computed(() => {
       item.barcode,
       item.serial_number ?? "",
       item.status,
+      formatItemStatus(item.status),
       item.notes ?? "",
     ]
       .join(" ")

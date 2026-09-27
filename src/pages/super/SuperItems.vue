@@ -23,7 +23,7 @@
         <label>Name<input v-model="formName" type="text" /></label>
         <label>Barcode<input v-model="formBarcode" type="text" /></label>
         <label>Serial Number<input v-model="formSerial" type="text" /></label>
-        <label>Status<select v-model="formStatus"><option value="available">available</option><option value="checked_out">checked_out</option><option value="damaged">damaged</option><option value="lost">lost</option><option value="in_repair">in_repair</option><option value="retired">retired</option><option value="in_studio_only">in_studio_only</option></select></label>
+        <label>Status<select v-model="formStatus"><option v-for="status in itemStatusOptions" :key="status" :value="status">{{ formatItemStatus(status) }}</option></select></label>
         <label>Notes<textarea v-model="formNotes" rows="3" /></label>
         <div class="form-actions"><button type="submit" class="sa-btn primary" :disabled="isSaving">Create</button></div>
       </form>
@@ -34,14 +34,8 @@
       <div class="sa-filters">
         <select v-model="workspaceFilter" @change="loadItem"><option value="all">all workspaces</option><option v-for="t in workspaces" :key="t.id" :value="t.id">{{ t.name }}</option></select>
         <select v-model="statusFilter">
-          <option value="all">all statuses</option>
-          <option value="available">available</option>
-          <option value="checked_out">checked_out</option>
-          <option value="damaged">damaged</option>
-          <option value="lost">lost</option>
-          <option value="in_repair">in_repair</option>
-          <option value="retired">retired</option>
-          <option value="in_studio_only">in_studio_only</option>
+          <option value="all">All statuses</option>
+          <option v-for="status in itemStatusOptions" :key="status" :value="status">{{ formatItemStatus(status) }}</option>
         </select>
         <input v-model="search" type="text" placeholder="Search" />
         <button type="button" class="sa-btn" @click="loadItem">Search</button>
@@ -65,7 +59,7 @@
                 <span
                   class="sa-tag"
                   :class="item.status === 'available' ? 'ok' : ['checked_out', 'in_repair'].includes(item.status) ? 'warn' : ['damaged', 'lost'].includes(item.status) ? 'critical' : 'info'"
-                >{{ item.status }}</span>
+                >{{ formatItemStatus(item.status) }}</span>
               </td>
               <td>
                 <div class="sa-table-row-actions">
@@ -84,7 +78,7 @@
       <form class="form" @submit.prevent="saveEdit">
         <label>Name<input v-model="editName" type="text" /></label>
         <label>Barcode<input v-model="editBarcode" type="text" /></label>
-        <label>Status<select v-model="editStatus"><option value="available">available</option><option value="checked_out">checked_out</option><option value="damaged">damaged</option><option value="lost">lost</option><option value="in_repair">in_repair</option><option value="retired">retired</option><option value="in_studio_only">in_studio_only</option></select></label>
+        <label>Status<select v-model="editStatus"><option v-for="status in itemStatusOptions" :key="status" :value="status">{{ formatItemStatus(status) }}</option></select></label>
         <label>Notes<textarea v-model="editNotes" rows="3" /></label>
         <div class="form-actions"><button type="submit" class="sa-btn primary" :disabled="isSaving">Save</button><button type="button" class="sa-btn" @click="cancelEdit">Cancel</button></div>
       </form>
@@ -109,6 +103,7 @@ import { createSuperItem, deleteSuperItem, listSuperItem, updateSuperItem, type 
 import { listWorkspaces as listWorkspaces, type SuperWorkspace as SuperWorkspace } from "../../services/superWorkspaceService";
 import { exportRowsToCsv, exportRowsToPdf } from "../../services/exportService";
 import { toUserFacingErrorMessage } from "../../services/appErrors";
+import { formatItemStatus, ITEM_STATUS_OPTIONS } from "../../utils/itemStatus";
 
 const router = useRouter();
 const workspaces = ref<SuperWorkspace[]>([]);
@@ -138,6 +133,7 @@ const stepUpMessage = ref("");
 const stepUpConfirm = ref("Confirm");
 const stepUpAction = ref<null | { type: "delete"; item: SuperItemRecord } | { type: "status"; item: SuperItemRecord }>(null);
 let toastTimer: number | null = null;
+const itemStatusOptions = ITEM_STATUS_OPTIONS;
 
 const workspaceNameById = computed(() => new Map(workspaces.value.map((t) => [t.id, t.name])));
 const filteredItem = computed(() => {
@@ -195,7 +191,7 @@ const exportCsv = () => {
       name: item.name,
       barcode: item.barcode,
       serial_number: item.serial_number,
-      status: item.status,
+      status: formatItemStatus(item.status),
       notes: item.notes,
     }))
   );
@@ -211,7 +207,7 @@ const exportPdf = async () => {
       name: item.name,
       barcode: item.barcode,
       serial_number: item.serial_number,
-      status: item.status,
+      status: formatItemStatus(item.status),
       notes: item.notes,
     }))
   );

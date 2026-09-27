@@ -43,10 +43,9 @@ const districtSubscriptionPlanSchema = z.enum([
   "organization_enterprise",
 ]);
 const districtBillingStatusSchema = z.enum(["draft", "active", "past_due", "canceled"]);
-const tenantAdminLoginMethodSchema = z.union([
-  z.enum(["password", "magic_link", "session_handoff"]),
-  z.string().max(128).regex(/^[a-z0-9-]+$/i),
-]);
+const tenantAdminLoginMethodSchema = z.string().max(128).regex(
+  /^(?:password|magic_link|session_handoff|[a-z0-9-]+)$/,
+);
 const tenantAdminLoginLocationSchema = z.enum([
   "regular_login",
   "admin_login",

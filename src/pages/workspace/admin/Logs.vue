@@ -31,10 +31,14 @@
         <label>
           Action
           <select v-model="actionFilter">
-            <option value="all">all actions</option>
-            <option value="checkout">checkout</option>
-            <option value="return">return</option>
-            <option value="admin_return">admin_return</option>
+            <option value="all">All actions</option>
+            <option
+              v-for="option in ITEM_LOG_ACTION_OPTIONS"
+              :key="option.value"
+              :value="option.value"
+            >
+              {{ option.label }}
+            </option>
           </select>
         </label>
         <label>
@@ -76,7 +80,7 @@
             <tbody>
               <tr v-for="log in filteredLogs" :key="log.id">
                 <td>{{ formatTime(log.action_time) }}</td>
-                <td>{{ log.action_type }}</td>
+                <td>{{ formatActionLabel(log.action_type) }}</td>
                 <td>
                   <span class="tenant-account-cell" data-session-replay-mask :title="log.tenant_account?.auth_email || 'Unknown account'">
                     {{ log.tenant_account?.auth_email || "Unknown account" }}
@@ -115,6 +119,7 @@ import BoneyardTableFixture from "../../../components/BoneyardTableFixture.vue";
 import { fetchItemLogs, type ItemLog } from "../../../services/itemService";
 import { exportRowsToCsv, exportRowsToPdf } from "../../../services/exportService";
 import { useManagerContext } from "../../../composables/useManagerContext";
+import { formatActionLabel, ITEM_LOG_ACTION_OPTIONS } from "../../../utils/actionLabel";
 
 const { managerRoot } = useManagerContext();
 
@@ -132,10 +137,6 @@ const isBoneyardCapture =
 
 const filteredLogs = computed(() => {
   const query = searchQuery.value.trim().toLowerCase();
-  if (!query) {
-    return logs.value;
-  }
-
   return logs.value.filter((log) => {
     if (actionFilter.value !== "all" && log.action_type !== actionFilter.value) {
       return false;
@@ -155,13 +156,14 @@ const filteredLogs = computed(() => {
       }
     }
 
-    const action = (log.action_type || "").toLowerCase();
+    const rawAction = (log.action_type || "").toLowerCase();
+    const actionLabel = formatActionLabel(log.action_type).toLowerCase();
     const borrower = log.borrower
       ? `${log.borrower.username} ${log.borrower.borrower_id}`.toLowerCase()
       : "";
     const item = log.item ? `${log.item.name} ${log.item.barcode}`.toLowerCase() : "";
     const tenantAccount = log.tenant_account?.auth_email?.toLowerCase() ?? "";
-    return action.includes(query) || borrower.includes(query) || item.includes(query) || tenantAccount.includes(query);
+    return !query || rawAction.includes(query) || actionLabel.includes(query) || borrower.includes(query) || item.includes(query) || tenantAccount.includes(query);
   });
 });
 
@@ -180,7 +182,7 @@ const loadLogs = async () => {
 const exportRows = computed(() =>
   filteredLogs.value.map((log) => ({
     action_time: formatTime(log.action_time),
-    action_type: log.action_type,
+    action_type: formatActionLabel(log.action_type),
     tenant_account: log.tenant_account?.auth_email ?? "",
     borrower: log.borrower
       ? `${log.borrower.username} (${log.borrower.borrower_id})`

@@ -62,6 +62,20 @@ const resolveAllowedFunctions = (env: Env) => {
   return cachedFunctions;
 };
 
+const isSamlIdpFormPost = (request: Request, url: URL) => {
+  const samlCallbackPath =
+    /^\/api\/auth\/sso\/saml2\/sp\/(?:acs|slo)\/[a-z0-9._~-]+$/i;
+  const contentType = request.headers.get("content-type")
+    ?.split(";")[0]
+    ?.trim()
+    .toLowerCase();
+
+  return request.method === "POST" &&
+    Boolean(request.headers.get("Origin")) &&
+    samlCallbackPath.test(url.pathname) &&
+    contentType === "application/x-www-form-urlencoded";
+};
+
 export default {
   async fetch(
     request: Request,
@@ -84,11 +98,17 @@ export default {
     }) => {
       const origin = request.headers.get("Origin");
       const allowedOrigins = resolveAllowedOrigins(env);
-      const { originAllowed, headers } = withCorsHeaders(
+      const { originAllowed: corsOriginAllowed, headers } = withCorsHeaders(
         origin,
         allowedOrigins,
         env,
       );
+      // SAML HTTP-POST binding is cross-origin by design. Better Auth validates
+      // these assertions and skips origin checks on ACS/SLO callbacks. Accept
+      // form posts from any IdP on those exact routes only; external IdPs stay
+      // out of the general credentialed API origin allowlist.
+      const originAllowed = corsOriginAllowed ||
+        isSamlIdpFormPost(request, url);
 
       try {
         if (request.method === "OPTIONS") {

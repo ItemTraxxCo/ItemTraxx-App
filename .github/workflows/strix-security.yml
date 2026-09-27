@@ -378,7 +378,7 @@ jobs:
       - name: Run Strix security scan
         id: strix-scan
         if: ${{ always() && steps.nim-preflight.outputs.ok == 'true' }}
-        timeout-minutes: 45
+        timeout-minutes: 55
         env:
           STRIX_LLM: nvidia_nim/z-ai/glm-5.3
           LLM_API_KEY: ${{ secrets.NVIDIA_API_KEY }}

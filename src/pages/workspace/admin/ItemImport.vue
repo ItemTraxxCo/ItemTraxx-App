@@ -15,7 +15,7 @@
       <div class="admin-section-header">
         <div>
           <h2>Step 1: Paste CSV</h2>
-          <p class="admin-section-copy">Format: <code>name,barcode,serial_number,notes</code>. Header row is optional. Status is set to <code>available</code> automatically.</p>
+          <p class="admin-section-copy">Format: <code>name,barcode,serial_number,notes</code>. Header row is optional. Newly imported items start as Available.</p>
         </div>
       </div>
       <div class="form-actions import-template-actions">

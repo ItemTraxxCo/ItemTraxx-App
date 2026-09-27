@@ -81,7 +81,7 @@ describe("workspace item management table", () => {
       "Sony a7iii",
       "67",
       "SN-1",
-      "available",
+      "Available",
       "Dennis's personal camera.",
       "Details",
     ]);

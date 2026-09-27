@@ -405,6 +405,15 @@ export const getBetterAuth = (rawEnv: Env) => {
           }
         },
         saml: {
+          enableInResponseToValidation: true,
+          // Cloudflare's SaaS App Launcher and some other enterprise portals
+          // send IdP-initiated responses without InResponseTo. Accept those
+          // while continuing to validate correlation whenever it is present.
+          allowIdpInitiated: true,
+          // Existing SAML providers may not have a provider-level callback yet.
+          // Return their successful/error redirects to the frontend, not the
+          // Better Auth Worker origin.
+          idpInitiatedCallbackUrl: "https://itemtraxx.com/",
           clockSkew: 60_000,
           requireTimestamps: true,
           algorithms: { onDeprecated: "reject" },

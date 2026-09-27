@@ -169,7 +169,7 @@ Deno.test("repairs a legacy profile mapping and preserves its workspace-admin bo
       userId: client.tables.member[0].userId,
       role: client.tables.member[0].role,
     },
-    { organizationId: "org-1", userId: "user-1", role: "workspace_admin" },
+    { organizationId: "org-1", userId: "user-1", role: "admin" },
   );
   assertEquals(client.rpcCalls, []);
 });

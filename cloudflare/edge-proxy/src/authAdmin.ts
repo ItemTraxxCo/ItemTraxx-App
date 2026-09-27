@@ -123,7 +123,7 @@ const ensureMembership = async (
   }
 
   const expectedRole = profile.role === "workspace_admin"
-    ? "workspace_admin"
+    ? "admin"
     : profile.role === "individual_account"
     ? "individual_account"
     : "tenant_account";
@@ -220,6 +220,7 @@ const createUserForProfile = async (
     },
   );
   if (error) throw error;
+  if (profile.workspace_id) await ensureMembership(dataClient, profile, userId);
   return { user_id: userId, email };
 };
 

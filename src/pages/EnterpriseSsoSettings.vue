@@ -728,7 +728,7 @@ const setWorkspaceSsoReturnUrl = async (id: string) => {
       samlConfig: { idpInitiatedCallbackUrl: `${location.origin}/` },
     });
     if (result.error) throw new Error(result.error.message);
-    message.value = "Cloudflare and other IdP launches will return to this workspace.";
+    message.value = "Successfully updated the workspace return URL. IdP launches will return to this workspace.";
     await loadProviders();
   } catch (cause) {
     error.value = true;

@@ -174,21 +174,30 @@ export const touchAccountSession = async (
   options: AccountSessionTouchOptions = {}
 ) => {
   const identityKey = getAdminOpIdentityKey();
-  const inflight = sessionTouchInflight.get(identityKey);
-  if (inflight) return inflight;
-
-  const pending = withCachedAdminOp(
-    getAdminOpCacheKey(
-      "touch_session",
-      `${options.loginMethod ?? "none"}:${options.loginLocation ?? "none"}`
-    ),
-    20_000,
-    () =>
-      sendAdminOps<{ ok: boolean }>("touch_session", {
-        login_method: options.loginMethod,
-        login_location: options.loginLocation,
-      }, { avoidCorsPreflight: true })
-  );
+  const previous = sessionTouchInflight.get(identityKey);
+  const pending = (async () => {
+    // Serialize touches for one session so an ordinary bootstrap cannot
+    // coalesce and discard SSO provider/protocol metadata from a login touch.
+    if (previous) {
+      try {
+        await previous;
+      } catch {
+        // A failed keepalive must not prevent the next touch from retrying.
+      }
+    }
+    return withCachedAdminOp(
+      getAdminOpCacheKey(
+        "touch_session",
+        `${options.loginMethod ?? "none"}:${options.loginLocation ?? "none"}`
+      ),
+      20_000,
+      () =>
+        sendAdminOps<{ ok: boolean }>("touch_session", {
+          login_method: options.loginMethod,
+          login_location: options.loginLocation,
+        }, { avoidCorsPreflight: true })
+    );
+  })();
   const tracked = pending.finally(() => {
     if (sessionTouchInflight.get(identityKey) === tracked) {
       sessionTouchInflight.delete(identityKey);

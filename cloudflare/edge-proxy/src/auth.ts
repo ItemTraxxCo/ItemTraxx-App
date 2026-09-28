@@ -471,17 +471,26 @@ export const sanitizeSsoProvider = (row: {
   organizationId: string | null;
   oidcConfig: string | null;
   samlConfig: string | null;
-}) => ({
-  providerId: row.providerId,
-  issuer: row.issuer,
-  domain: row.domain,
-  domainVerified: row.domainVerified,
-  organizationId: row.organizationId,
-  // The UI only needs protocol presence. Never send client secrets, signing
-  // keys, certificates, or other provider configuration to the browser.
-  oidcConfig: parseStoredJson(row.oidcConfig) ? {} : null,
-  samlConfig: parseStoredJson(row.samlConfig) ? {} : null,
-});
+}) => {
+  const samlConfig = parseStoredJson(row.samlConfig);
+  return {
+    providerId: row.providerId,
+    issuer: row.issuer,
+    domain: row.domain,
+    domainVerified: row.domainVerified,
+    organizationId: row.organizationId,
+    // The UI only needs protocol presence. Never send client secrets, signing
+    // keys, certificates, or other provider configuration to the browser.
+    oidcConfig: parseStoredJson(row.oidcConfig) ? {} : null,
+    // The workspace settings page uses this non-secret URL to determine
+    // whether a legacy SAML provider needs its callback initialized.
+    samlConfig: samlConfig ? (
+      typeof samlConfig.idpInitiatedCallbackUrl === "string"
+        ? { idpInitiatedCallbackUrl: samlConfig.idpInitiatedCallbackUrl }
+        : {}
+    ) : null,
+  };
+};
 
 export const handleSsoManagementRequest = async (request: Request, rawEnv: Env) => {
   const auth = getBetterAuth(rawEnv);

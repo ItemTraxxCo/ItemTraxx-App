@@ -578,6 +578,27 @@ const fetchProviders = async () => {
   if (!organizationId.value) organizationId.value = data.organizationId ?? workspaces.value[0]?.organizationId ?? "";
 };
 
+const initializeWorkspaceSsoReturnUrls = async () => {
+  const providersMissingReturnUrl = providers.value.filter(
+    (provider) => provider.samlConfig && !provider.samlConfig.idpInitiatedCallbackUrl,
+  );
+  if (!providersMissingReturnUrl.length) return;
+
+  const results = await Promise.all(providersMissingReturnUrl.map((provider) =>
+    authClient.sso.updateProvider({
+      providerId: provider.providerId,
+      samlConfig: { idpInitiatedCallbackUrl: `${location.origin}/` },
+    }),
+  ));
+  const failedProviderIndex = results.findIndex((result) => result.error);
+  if (failedProviderIndex >= 0) {
+    const failedProvider = providersMissingReturnUrl[failedProviderIndex]!;
+    throw new Error(`Unable to automatically set the workspace return URL for ${failedProvider.providerId}. You can retry it from the connection row.`);
+  }
+
+  await fetchProviders();
+};
+
 const loadProviders = async () => {
   try {
     await fetchProviders();
@@ -599,6 +620,8 @@ const loadProviders = async () => {
 
     await fetchProviders();
   }
+
+  await initializeWorkspaceSsoReturnUrls();
 };
 
 function refreshProviders() {

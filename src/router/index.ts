@@ -791,30 +791,6 @@ const resolveWorkspaceHostRoute = (
   return undefined;
 };
 
-// Redirect authenticated users away from the public home page while leaving
-// the login page available so users can intentionally switch accounts.
-const resolveAuthenticatedHomeRoute = (
-  to: RouteLocationNormalized,
-  auth: AuthState,
-) => {
-  if (!auth.isInitialized || !auth.isAuthenticated || to.name !== "public-home") return undefined;
-  if (auth.role === "super_admin") {
-    return auth.hasSecondaryAuth
-      ? { name: "super-admin-home" }
-      : { name: "super-auth" };
-  }
-  if (auth.role === "workspace_admin") {
-    return { name: "workspace-admin-home" };
-  }
-  if (auth.role === "individual_account") {
-    return { name: "workspace-checkout" };
-  }
-  if (auth.role === "tenant_account" && auth.workspaceContextId) {
-    return { name: "workspace-checkout" };
-  }
-  return undefined;
-};
-
 const resolveProtectedRoute = (
   to: RouteLocationNormalized,
   meta: AppRouteMeta,
@@ -874,8 +850,11 @@ router.beforeEach(async (to) => {
   const workspaceRoute = resolveWorkspaceHostRoute(to, meta, workspace, auth);
   if (workspaceRoute !== undefined) return workspaceRoute;
 
-  const homeRoute = resolveAuthenticatedHomeRoute(to, auth);
-  if (homeRoute !== undefined) return homeRoute;
+  if (to.name === "public-home" && auth.isInitialized && auth.isAuthenticated) {
+    const { resolveAuthenticatedHomeRoute } = await import("./authenticatedHomeRoute");
+    const homeRoute = resolveAuthenticatedHomeRoute(to, auth);
+    if (homeRoute !== undefined) return homeRoute;
+  }
 
   const protectedRoute = resolveProtectedRoute(to, meta, workspace, auth);
   if (protectedRoute !== undefined) return protectedRoute;

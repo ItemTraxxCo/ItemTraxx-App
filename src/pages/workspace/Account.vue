@@ -108,7 +108,7 @@
           <tbody>
             <tr v-for="session in sessions" :key="session.id">
               <td>{{ session.device_label || "Unknown device" }}</td>
-              <td>{{ formatLoginMethod(session.login_method) }}</td>
+              <td>{{ formatLoginMethod(session.login_method, session.login_location) }}</td>
               <td>{{ formatLoginLocation(session.login_location) }}</td>
               <td>{{ formatGeneralLocation(session.general_location) }}</td>
               <td>{{ formatDate(session.last_seen_at) }}</td>
@@ -243,21 +243,28 @@ const handleSessionMenuKeydown = (event: KeyboardEvent) => {
   if (event.key === "Escape") closeSessionMenu();
 };
 
-const formatLoginMethod = (value: AccountSessionItem["login_method"]) =>
-  value === "password"
-    ? "Password"
-    : value === "magic_link"
-      ? "Magic link"
-      : value === "session_handoff"
-        ? "Session handoff"
-        : "Unknown";
+const isSsoLoginFlow = (value: AccountSessionItem["login_location"]) =>
+  value === "SAML2.0" || value === "OpenID Connect (OIDC)";
 
-const formatLoginLocation = (value: AccountSessionItem["login_location"]) =>
-  value === "regular_login"
-    ? "Regular login"
-    : value === "admin_login"
-      ? "Admin sign in"
-      : "Unknown";
+const formatLoginMethod = (
+  value: AccountSessionItem["login_method"],
+  loginFlow: AccountSessionItem["login_location"],
+) => {
+  if (isSsoLoginFlow(loginFlow) && value && /^[a-z0-9-]+$/i.test(value)) {
+    return value;
+  }
+  if (value === "password") return "Password";
+  if (value === "magic_link") return "Magic link";
+  if (value === "session_handoff") return "Session handoff";
+  return "Unknown";
+};
+
+const formatLoginLocation = (value: AccountSessionItem["login_location"]) => {
+  if (isSsoLoginFlow(value)) return value;
+  if (value === "regular_login") return "Regular login";
+  if (value === "admin_login") return "Admin sign in";
+  return "Unknown";
+};
 
 const formatGeneralLocation = (value: AccountSessionItem["general_location"]) =>
   value?.trim() ? value : "Unknown";

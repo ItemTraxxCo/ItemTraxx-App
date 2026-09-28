@@ -28,17 +28,16 @@
                 },
                 "login_method": {
                   "type": "string",
-                  "enum": [
-                    "password",
-                    "magic_link",
-                    "session_handoff"
-                  ]
+                  "maxLength": 128,
+                  "pattern": "^(?:password|magic_link|session_handoff|[a-z0-9-]+)$"
                 },
                 "login_location": {
                   "type": "string",
                   "enum": [
                     "regular_login",
-                    "admin_login"
+                    "admin_login",
+                    "SAML2.0",
+                    "OpenID Connect (OIDC)"
                   ]
                 }
               },
@@ -75,17 +74,16 @@
                 },
                 "login_method": {
                   "type": "string",
-                  "enum": [
-                    "password",
-                    "magic_link",
-                    "session_handoff"
-                  ]
+                  "maxLength": 128,
+                  "pattern": "^(?:password|magic_link|session_handoff|[a-z0-9-]+)$"
                 },
                 "login_location": {
                   "type": "string",
                   "enum": [
                     "regular_login",
-                    "admin_login"
+                    "admin_login",
+                    "SAML2.0",
+                    "OpenID Connect (OIDC)"
                   ]
                 }
               },
@@ -122,17 +120,16 @@
                 },
                 "login_method": {
                   "type": "string",
-                  "enum": [
-                    "password",
-                    "magic_link",
-                    "session_handoff"
-                  ]
+                  "maxLength": 128,
+                  "pattern": "^(?:password|magic_link|session_handoff|[a-z0-9-]+)$"
                 },
                 "login_location": {
                   "type": "string",
                   "enum": [
                     "regular_login",
-                    "admin_login"
+                    "admin_login",
+                    "SAML2.0",
+                    "OpenID Connect (OIDC)"
                   ]
                 }
               },
@@ -169,17 +166,16 @@
                 },
                 "login_method": {
                   "type": "string",
-                  "enum": [
-                    "password",
-                    "magic_link",
-                    "session_handoff"
-                  ]
+                  "maxLength": 128,
+                  "pattern": "^(?:password|magic_link|session_handoff|[a-z0-9-]+)$"
                 },
                 "login_location": {
                   "type": "string",
                   "enum": [
                     "regular_login",
-                    "admin_login"
+                    "admin_login",
+                    "SAML2.0",
+                    "OpenID Connect (OIDC)"
                   ]
                 },
                 "rows": {
@@ -247,17 +243,16 @@
                 },
                 "login_method": {
                   "type": "string",
-                  "enum": [
-                    "password",
-                    "magic_link",
-                    "session_handoff"
-                  ]
+                  "maxLength": 128,
+                  "pattern": "^(?:password|magic_link|session_handoff|[a-z0-9-]+)$"
                 },
                 "login_location": {
                   "type": "string",
                   "enum": [
                     "regular_login",
-                    "admin_login"
+                    "admin_login",
+                    "SAML2.0",
+                    "OpenID Connect (OIDC)"
                   ]
                 }
               },
@@ -294,17 +289,16 @@
                 },
                 "login_method": {
                   "type": "string",
-                  "enum": [
-                    "password",
-                    "magic_link",
-                    "session_handoff"
-                  ]
+                  "maxLength": 128,
+                  "pattern": "^(?:password|magic_link|session_handoff|[a-z0-9-]+)$"
                 },
                 "login_location": {
                   "type": "string",
                   "enum": [
                     "regular_login",
-                    "admin_login"
+                    "admin_login",
+                    "SAML2.0",
+                    "OpenID Connect (OIDC)"
                   ]
                 },
                 "checkout_due_hours": {
@@ -347,17 +341,16 @@
                 },
                 "login_method": {
                   "type": "string",
-                  "enum": [
-                    "password",
-                    "magic_link",
-                    "session_handoff"
-                  ]
+                  "maxLength": 128,
+                  "pattern": "^(?:password|magic_link|session_handoff|[a-z0-9-]+)$"
                 },
                 "login_location": {
                   "type": "string",
                   "enum": [
                     "regular_login",
-                    "admin_login"
+                    "admin_login",
+                    "SAML2.0",
+                    "OpenID Connect (OIDC)"
                   ]
                 }
               },
@@ -394,17 +387,16 @@
                 },
                 "login_method": {
                   "type": "string",
-                  "enum": [
-                    "password",
-                    "magic_link",
-                    "session_handoff"
-                  ]
+                  "maxLength": 128,
+                  "pattern": "^(?:password|magic_link|session_handoff|[a-z0-9-]+)$"
                 },
                 "login_location": {
                   "type": "string",
                   "enum": [
                     "regular_login",
-                    "admin_login"
+                    "admin_login",
+                    "SAML2.0",
+                    "OpenID Connect (OIDC)"
                   ]
                 }
               },
@@ -441,17 +433,16 @@
                 },
                 "login_method": {
                   "type": "string",
-                  "enum": [
-                    "password",
-                    "magic_link",
-                    "session_handoff"
-                  ]
+                  "maxLength": 128,
+                  "pattern": "^(?:password|magic_link|session_handoff|[a-z0-9-]+)$"
                 },
                 "login_location": {
                   "type": "string",
                   "enum": [
                     "regular_login",
-                    "admin_login"
+                    "admin_login",
+                    "SAML2.0",
+                    "OpenID Connect (OIDC)"
                   ]
                 }
               },
@@ -488,17 +479,16 @@
                 },
                 "login_method": {
                   "type": "string",
-                  "enum": [
-                    "password",
-                    "magic_link",
-                    "session_handoff"
-                  ]
+                  "maxLength": 128,
+                  "pattern": "^(?:password|magic_link|session_handoff|[a-z0-9-]+)$"
                 },
                 "login_location": {
                   "type": "string",
                   "enum": [
                     "regular_login",
-                    "admin_login"
+                    "admin_login",
+                    "SAML2.0",
+                    "OpenID Connect (OIDC)"
                   ]
                 }
               },
@@ -535,17 +525,16 @@
                 },
                 "login_method": {
                   "type": "string",
-                  "enum": [
-                    "password",
-                    "magic_link",
-                    "session_handoff"
-                  ]
+                  "maxLength": 128,
+                  "pattern": "^(?:password|magic_link|session_handoff|[a-z0-9-]+)$"
                 },
                 "login_location": {
                   "type": "string",
                   "enum": [
                     "regular_login",
-                    "admin_login"
+                    "admin_login",
+                    "SAML2.0",
+                    "OpenID Connect (OIDC)"
                   ]
                 },
                 "session_id": {
@@ -587,17 +576,16 @@
                 },
                 "login_method": {
                   "type": "string",
-                  "enum": [
-                    "password",
-                    "magic_link",
-                    "session_handoff"
-                  ]
+                  "maxLength": 128,
+                  "pattern": "^(?:password|magic_link|session_handoff|[a-z0-9-]+)$"
                 },
                 "login_location": {
                   "type": "string",
                   "enum": [
                     "regular_login",
-                    "admin_login"
+                    "admin_login",
+                    "SAML2.0",
+                    "OpenID Connect (OIDC)"
                   ]
                 },
                 "sign_out_current": {
@@ -1332,11 +1320,8 @@
                         "anyOf": [
                           {
                             "type": "string",
-                            "enum": [
-                              "password",
-                              "magic_link",
-                              "session_handoff"
-                            ]
+                            "maxLength": 128,
+                            "pattern": "^(?:password|magic_link|session_handoff|[a-z0-9-]+)$"
                           },
                           {
                             "type": "null"
@@ -1349,7 +1334,9 @@
                             "type": "string",
                             "enum": [
                               "regular_login",
-                              "admin_login"
+                              "admin_login",
+                              "SAML2.0",
+                              "OpenID Connect (OIDC)"
                             ]
                           },
                           {
@@ -8352,17 +8339,16 @@
                 },
                 "login_method": {
                   "type": "string",
-                  "enum": [
-                    "password",
-                    "magic_link",
-                    "session_handoff"
-                  ]
+                  "maxLength": 128,
+                  "pattern": "^(?:password|magic_link|session_handoff|[a-z0-9-]+)$"
                 },
                 "login_location": {
                   "type": "string",
                   "enum": [
                     "regular_login",
-                    "admin_login"
+                    "admin_login",
+                    "SAML2.0",
+                    "OpenID Connect (OIDC)"
                   ]
                 }
               },
@@ -8399,17 +8385,16 @@
                 },
                 "login_method": {
                   "type": "string",
-                  "enum": [
-                    "password",
-                    "magic_link",
-                    "session_handoff"
-                  ]
+                  "maxLength": 128,
+                  "pattern": "^(?:password|magic_link|session_handoff|[a-z0-9-]+)$"
                 },
                 "login_location": {
                   "type": "string",
                   "enum": [
                     "regular_login",
-                    "admin_login"
+                    "admin_login",
+                    "SAML2.0",
+                    "OpenID Connect (OIDC)"
                   ]
                 },
                 "auth_email": {
@@ -8452,17 +8437,16 @@
                 },
                 "login_method": {
                   "type": "string",
-                  "enum": [
-                    "password",
-                    "magic_link",
-                    "session_handoff"
-                  ]
+                  "maxLength": 128,
+                  "pattern": "^(?:password|magic_link|session_handoff|[a-z0-9-]+)$"
                 },
                 "login_location": {
                   "type": "string",
                   "enum": [
                     "regular_login",
-                    "admin_login"
+                    "admin_login",
+                    "SAML2.0",
+                    "OpenID Connect (OIDC)"
                   ]
                 },
                 "id": {
@@ -8509,17 +8493,16 @@
                 },
                 "login_method": {
                   "type": "string",
-                  "enum": [
-                    "password",
-                    "magic_link",
-                    "session_handoff"
-                  ]
+                  "maxLength": 128,
+                  "pattern": "^(?:password|magic_link|session_handoff|[a-z0-9-]+)$"
                 },
                 "login_location": {
                   "type": "string",
                   "enum": [
                     "regular_login",
-                    "admin_login"
+                    "admin_login",
+                    "SAML2.0",
+                    "OpenID Connect (OIDC)"
                   ]
                 },
                 "id": {
@@ -8568,17 +8551,16 @@
                 },
                 "login_method": {
                   "type": "string",
-                  "enum": [
-                    "password",
-                    "magic_link",
-                    "session_handoff"
-                  ]
+                  "maxLength": 128,
+                  "pattern": "^(?:password|magic_link|session_handoff|[a-z0-9-]+)$"
                 },
                 "login_location": {
                   "type": "string",
                   "enum": [
                     "regular_login",
-                    "admin_login"
+                    "admin_login",
+                    "SAML2.0",
+                    "OpenID Connect (OIDC)"
                   ]
                 },
                 "id": {
@@ -8621,17 +8603,16 @@
                 },
                 "login_method": {
                   "type": "string",
-                  "enum": [
-                    "password",
-                    "magic_link",
-                    "session_handoff"
-                  ]
+                  "maxLength": 128,
+                  "pattern": "^(?:password|magic_link|session_handoff|[a-z0-9-]+)$"
                 },
                 "login_location": {
                   "type": "string",
                   "enum": [
                     "regular_login",
-                    "admin_login"
+                    "admin_login",
+                    "SAML2.0",
+                    "OpenID Connect (OIDC)"
                   ]
                 },
                 "id": {

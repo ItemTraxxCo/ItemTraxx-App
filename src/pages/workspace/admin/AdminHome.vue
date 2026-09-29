@@ -24,12 +24,8 @@
         <p>View checkout and return activity.</p>
       </RouterLink>
       <RouterLink v-if="!isIndividualAccount" class="admin-card" to="/admin/accounts">
-        <h2>Tenant Accounts</h2>
-        <p>Create, suspend, restore, and remove accounts.</p>
-      </RouterLink>
-      <RouterLink v-if="!isIndividualAccount" class="admin-card" to="/admin/admins">
-        <h2>Admin Access</h2>
-        <p>Manage Workspace Admin accounts and password resets.</p>
+        <h2>Workspace Accounts</h2>
+        <p>Manage account roles, tenant access, and workspace membership.</p>
       </RouterLink>
       <RouterLink class="admin-card" :to="managerPath('/return')">
         <h2>Quick Return</h2>
@@ -53,7 +49,7 @@
       </RouterLink>
       <RouterLink v-if="!isIndividualAccount" class="admin-card" to="/settings/organization">
         <h2>Workspace Settings</h2>
-        <p>Manage workspace details and checkout defaults.</p>
+        <p>Manage workspace details, account access, and checkout defaults.</p>
       </RouterLink>
       <RouterLink v-if="!isIndividualAccount" class="admin-card" to="/settings/account">
         <h2>Account Settings</h2>

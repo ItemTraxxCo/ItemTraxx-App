@@ -172,7 +172,7 @@ serve(async (req) => {
       return jsonResponse(400, { error: "Invalid request" });
     }
 
-    const isMutationAction = action !== "list_workspace_admins";
+    const isMutationAction = !["list_workspace_admins", "list_workspace_accounts"].includes(action);
     if (isMutationAction) {
       const { data: rateLimit, error: rateLimitError } = await userClient.rpc(
         "consume_rate_limit",
@@ -256,6 +256,123 @@ serve(async (req) => {
           })),
           can_manage_admins: canManageAdmins,
           primary_admin_profile_id: tenant.primary_admin_profile_id ?? null,
+        },
+      });
+    }
+
+    if (action === "list_workspace_accounts") {
+      const { data: accounts, error } = await adminClient
+        .from("profiles")
+        .select("id, workspace_id, auth_email, role, is_active, created_at")
+        .eq("workspace_id", requesterProfile.workspace_id)
+        .in("role", ["tenant_account", "workspace_admin"])
+        .is("deleted_at", null)
+        .order("created_at", { ascending: true });
+
+      if (error) {
+        return jsonResponse(400, { error: "Unable to load workspace accounts." });
+      }
+
+      return jsonResponse(200, {
+        data: {
+          accounts: ((accounts ?? []) as Array<{
+            id: string;
+            workspace_id: string;
+            auth_email: string | null;
+            role: "tenant_account" | "workspace_admin";
+            is_active: boolean | null;
+            created_at: string;
+          }>).map((item) => ({
+            ...item,
+            auth_email: item.auth_email ?? "",
+            is_active: item.is_active !== false,
+            is_primary_admin: item.id === tenant.primary_admin_profile_id,
+          })),
+          can_manage_admins: canManageAdmins,
+        },
+      });
+    }
+
+    if (action === "set_workspace_account_role") {
+      const id = requireUuid(next.id);
+      const role = next.role;
+      if (role !== "tenant_account" && role !== "workspace_admin") {
+        return jsonResponse(400, { error: "Invalid account role." });
+      }
+
+      const { data: target, error: targetError } = await adminClient
+        .from("profiles")
+        .select("id, workspace_id, auth_email, role, is_active, created_at, better_auth_user_id")
+        .eq("id", id)
+        .eq("workspace_id", requesterProfile.workspace_id)
+        .is("deleted_at", null)
+        .maybeSingle();
+
+      if (targetError) {
+        return jsonResponse(500, { error: "Unable to load the workspace account." });
+      }
+      if (!target || (target.role !== "tenant_account" && target.role !== "workspace_admin")) {
+        return jsonResponse(404, { error: "Workspace account not found." });
+      }
+      if (id === tenant.primary_admin_profile_id && role !== "workspace_admin") {
+        return jsonResponse(400, { error: "The primary admin role cannot be changed." });
+      }
+      if (id === requesterProfile.id && role !== "workspace_admin") {
+        return jsonResponse(400, { error: "You cannot change your own workspace role." });
+      }
+
+      if (target.role === role) {
+        return jsonResponse(200, {
+          data: {
+            id: target.id,
+            workspace_id: target.workspace_id,
+            auth_email: target.auth_email ?? "",
+            role: target.role,
+            is_active: target.is_active !== false,
+            created_at: target.created_at,
+            is_primary_admin: target.id === tenant.primary_admin_profile_id,
+          },
+        });
+      }
+      if (!target.better_auth_user_id) {
+        return jsonResponse(409, {
+          error: "This account must complete its first sign-in before its role can be changed.",
+        });
+      }
+
+      const { error: roleUpdateError } = await adminClient.rpc(
+        "workspace_admin_set_profile_role",
+        {
+          p_actor_profile_id: requesterProfile.id,
+          p_workspace_id: requesterProfile.workspace_id,
+          p_profile_id: id,
+          p_role: role,
+        },
+      );
+      if (roleUpdateError) {
+        console.error("workspace-admin-mutate role update failed", {
+          message: roleUpdateError.message,
+          code: (roleUpdateError as { code?: string }).code,
+        });
+        return jsonResponse(400, { error: "Unable to update this account's role." });
+      }
+
+      const { data: updated, error: reloadError } = await adminClient
+        .from("profiles")
+        .select("id, workspace_id, auth_email, role, is_active, created_at")
+        .eq("id", id)
+        .eq("workspace_id", requesterProfile.workspace_id)
+        .single();
+      if (reloadError || !updated) {
+        return jsonResponse(500, { error: "Role changed, but the updated account could not be reloaded." });
+      }
+
+      return jsonResponse(200, {
+        data: {
+          ...updated,
+          auth_email: updated.auth_email ?? "",
+          is_active: updated.is_active !== false,
+          is_primary_admin: updated.id === tenant.primary_admin_profile_id,
         },
       });
     }

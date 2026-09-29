@@ -128,7 +128,7 @@ export const toUserFacingErrorMessage = (error: unknown, fallbackMessage: string
     return "Your session has  expired. Please sign in again.";
   }
   if (normalized.includes("network request failed")) {
-    return "Network issue. Unable to reach ItemTraxx servers. Check your connection and try again.";
+    return "Unable to reach ItemTraxx servers. Check your connection and try again. Reloading the page may fix the issue.";
   }
   if (normalized.includes("timed out")) {
     return "Request timed out. Unable to reach ItemTraxx servers. Please try again.";

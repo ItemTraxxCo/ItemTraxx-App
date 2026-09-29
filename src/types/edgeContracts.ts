@@ -33,6 +33,8 @@ export type WorkspaceAdminManageAction =
   | "set_admin_status"
   | "update_admin_email"
   | "send_workspace_admin_reset"
+  | "list_workspace_accounts"
+  | "set_workspace_account_role"
   | "list_tenant_accounts"
   | "create_tenant_account"
   | "set_tenant_account_status"

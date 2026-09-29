@@ -25,7 +25,6 @@
           <h2>Account Overview</h2>
           <p class="admin-section-copy">Review how this workspace is classified for billing and support.</p>
         </div>
-        <RouterLink v-if="!isIndividualAccount" class="button-link" to="/admin/admins">Admin Access</RouterLink>
       </div>
       <div class="admin-summary-grid">
         <div class="admin-summary-card">

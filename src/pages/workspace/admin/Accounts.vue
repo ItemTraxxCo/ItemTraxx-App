@@ -18,27 +18,13 @@
       </form>
     </section>
 
-    <section v-if="canManageAdminDetails" class="card">
-      <h2>Invite Workspace Admin</h2>
-      <p class="muted">Invite a admin to the workspace. If using SSO, have them sign in via your configured SSO provider to provision their account and then promote them to a workspace admin.</p>
-      <form class="add-account-form" @submit.prevent="inviteAdmin">
-        <label>
-          Email address
-          <input v-model.trim="adminInviteEmail" type="email" autocomplete="email" data-session-replay-mask required />
-        </label>
-        <button type="submit" :disabled="isInvitingAdmin">
-          {{ isInvitingAdmin ? "Sending invitation…" : "Invite Workspace Admin" }}
-        </button>
-      </form>
-    </section>
-
     <section class="card">
       <div class="section-heading">
         <div>
           <h2>Accounts</h2>
           <p class="muted">Role changes take effect the next time the account signs in.</p>
         </div>
-        <button type="button" :disabled="isLoading || isCreating || isInvitingAdmin || accountActionId !== null || savingRoleId !== null || isSavingAdminDetails" @click="load">
+        <button type="button" :disabled="isLoading || isCreating || accountActionId !== null || savingRoleId !== null || isSavingAdminDetails" @click="load">
           {{ isLoading ? "Loading…" : "Reload accounts" }}
         </button>
       </div>
@@ -152,7 +138,6 @@ import { getAuthState } from "../../../store/authState";
 import { toUserFacingErrorMessage } from "../../../services/appErrors";
 import {
   createTenantAccount,
-  createTenantManagedAdmin,
   listWorkspaceAccounts,
   removeTenantAccount,
   sendTenantAccountReset,
@@ -168,13 +153,11 @@ import {
 const accounts = ref<WorkspaceAccount[]>([]);
 const pendingRoles = ref<Record<string, WorkspaceAccountRole>>({});
 const email = ref("");
-const adminInviteEmail = ref("");
 const message = ref("");
 const error = ref("");
 const canManageAdminDetails = ref(false);
 const isLoading = ref(false);
 const isCreating = ref(false);
-const isInvitingAdmin = ref(false);
 const isSavingAdminDetails = ref(false);
 const savingRoleId = ref<string | null>(null);
 const accountActionId = ref<string | null>(null);
@@ -227,24 +210,6 @@ const create = async () => {
     error.value = toUserFacingErrorMessage(cause, "Unable to invite the user.");
   } finally {
     isCreating.value = false;
-  }
-};
-
-const inviteAdmin = async () => {
-  isInvitingAdmin.value = true;
-  error.value = "";
-  message.value = "";
-  try {
-    await createTenantManagedAdmin({ auth_email: adminInviteEmail.value });
-    adminInviteEmail.value = "";
-    await load();
-    if (!error.value) {
-      message.value = "If this email is eligible, a Workspace Admin invitation will be sent.";
-    }
-  } catch (cause) {
-    error.value = toUserFacingErrorMessage(cause, "Unable to invite the Workspace Admin.");
-  } finally {
-    isInvitingAdmin.value = false;
   }
 };
 

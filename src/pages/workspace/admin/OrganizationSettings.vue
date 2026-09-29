@@ -5,11 +5,11 @@
         <RouterLink class="button-link" to="/admin">Return to workspace home</RouterLink>
       </div>
       <h1>Workspace Settings</h1>
-      <p class="admin-hero-copy">Manage workspace details and shared checkout defaults.</p>
+      <p class="admin-hero-copy">Manage workspace details, accounts, and shared checkout defaults.</p>
       <p>
         <RouterLink class="button-link" to="/settings/account">Your Account Settings</RouterLink>
         ·
-        <RouterLink class="button-link" to="/admin/admins">Admin Access</RouterLink>
+        <RouterLink class="button-link" to="/admin/accounts">Manage Accounts</RouterLink>
         ·
         <RouterLink class="button-link" to="/admin/settings/sso">Enterprise SSO</RouterLink>
       </p>

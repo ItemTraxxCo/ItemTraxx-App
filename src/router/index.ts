@@ -366,20 +366,8 @@ const routes: RouteRecordRaw[] = [
     component: () => import("../pages/EnterpriseSsoSettings.vue"),
     meta: { requiresSession: true, requiresWorkspace: true, requiresRole: "workspace_admin", requiresWorkspaceMatch: true, title: "Enterprise SSO | ItemTraxx" },
   },
-  {
-    path: "/admin/admins",
-    name: "workspace-admin-admins",
-    component: () => import("../pages/workspace/admin/Admins.vue"),
-    meta: {
-      requiresSession: true,
-      requiresWorkspace: true,
-      requiresRole: "workspace_admin",
-      requiresWorkspaceMatch: true,
-
-      title: "Admin Access | ItemTraxx",
-    },
-  },
-  { path: "/admin/accounts", name: "workspace-admin-accounts", component: () => import("../pages/workspace/admin/Accounts.vue"), meta: { requiresSession: true, requiresWorkspace: true, requiresRole: "workspace_admin", requiresWorkspaceMatch: true, title: "Tenant Accounts | ItemTraxx" } },
+  { path: "/admin/admins", redirect: "/admin/accounts" },
+  { path: "/admin/accounts", name: "workspace-admin-accounts", component: () => import("../pages/workspace/admin/Accounts.vue"), meta: { requiresSession: true, requiresWorkspace: true, requiresRole: "workspace_admin", requiresWorkspaceMatch: true, title: "Workspace Accounts | ItemTraxx" } },
   {
     path: "/admin/item-import",
     name: "workspace-admin-item-import",

@@ -50,14 +50,15 @@ const coverageCases = [
   {
     name: "tenant account roster",
     path: "../pages/workspace/admin/Accounts.vue",
-    snippets: ["data-session-replay-mask>{{ account.auth_email }}"],
+    snippets: ['<span data-session-replay-mask>{{ account.auth_email || "No email on file" }}</span>'],
   },
   {
-    name: "workspace admin roster and primary admin dialog",
-    path: "../pages/workspace/admin/Admins.vue",
+    name: "workspace account invitation and admin email fields",
+    path: "../pages/workspace/admin/Accounts.vue",
     snippets: [
-      "<span data-session-replay-mask>{{ admin.auth_email }}</span>",
-      'class="primary-admin-email-value" data-session-replay-mask',
+      '<input v-model.trim="email" type="email" autocomplete="email" data-session-replay-mask required />',
+      '<input v-model.trim="adminInviteEmail" type="email" autocomplete="email" data-session-replay-mask required />',
+      '<input v-model.trim="adminDetailsEmail" type="email" autocomplete="email" data-session-replay-mask required />',
     ],
   },
   {

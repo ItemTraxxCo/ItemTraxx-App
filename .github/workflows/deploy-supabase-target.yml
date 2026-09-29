@@ -64,7 +64,7 @@ jobs:
               ;;
           esac
           echo "project_ref=$project_ref" >> "$GITHUB_OUTPUT"
-          echo "Deploying checked-in migration and job-worker to $TARGET."
+          echo "Applying checked-in migrations and deploying job-worker to $TARGET."
 
       - name: Apply reporting refresh migration
         env:
@@ -72,6 +72,35 @@ jobs:
           SUPABASE_PROJECT_REF: ${{ steps.target.outputs.project_ref }}
           MIGRATION_PATH: supabase/migrations/20260814010000_fix_reporting_refresh_rpc.sql
           MIGRATION_NAME: 20260814010000_fix_reporting_refresh_rpc
+        run: |
+          set -euo pipefail
+          test -s "$MIGRATION_PATH"
+          payload="$(jq -n \
+            --rawfile query "$MIGRATION_PATH" \
+            --arg name "$MIGRATION_NAME" \
+            '{query: $query, name: $name}')"
+          response_file="$(mktemp)"
+          trap 'rm -f "$response_file"' EXIT
+          http_status="$(curl -sS \
+            -X POST "https://api.supabase.com/v1/projects/${SUPABASE_PROJECT_REF}/database/migrations" \
+            -H "Authorization: Bearer ${SUPABASE_ACCESS_TOKEN}" \
+            -H "Content-Type: application/json" \
+            --data "$payload" \
+            -o "$response_file" \
+            -w '%{http_code}' || true)"
+          printf 'Supabase migration API response (HTTP %s):\n' "$http_status"
+          cut -c1-2000 "$response_file"
+          if [[ ! "$http_status" =~ ^2[0-9][0-9]$ ]]; then
+            echo "Supabase migration API request failed."
+            exit 1
+          fi
+
+      - name: Apply workspace account role migration
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_PROJECT_REF: ${{ steps.target.outputs.project_ref }}
+          MIGRATION_PATH: supabase/migrations/20260929143000_workspace_account_role_management.sql
+          MIGRATION_NAME: 20260929143000_workspace_account_role_management
         run: |
           set -euo pipefail
           test -s "$MIGRATION_PATH"

@@ -10,7 +10,7 @@
       <form class="add-account-form" @submit.prevent="create">
         <label>
           Email address
-          <input v-model.trim="email" type="email" autocomplete="email" required />
+          <input v-model.trim="email" type="email" autocomplete="email" data-session-replay-mask required />
         </label>
         <button type="submit" :disabled="isCreating">
           {{ isCreating ? "Creating…" : "Create and send setup link" }}
@@ -24,7 +24,7 @@
       <form class="add-account-form" @submit.prevent="inviteAdmin">
         <label>
           Email address
-          <input v-model.trim="adminInviteEmail" type="email" autocomplete="email" required />
+          <input v-model.trim="adminInviteEmail" type="email" autocomplete="email" data-session-replay-mask required />
         </label>
         <button type="submit" :disabled="isInvitingAdmin">
           {{ isInvitingAdmin ? "Sending invitation…" : "Invite Workspace Admin" }}
@@ -125,7 +125,7 @@
         <form class="admin-details-form" @submit.prevent="saveAdminEmail">
           <label>
             Email address
-            <input v-model.trim="adminDetailsEmail" type="email" autocomplete="email" required />
+            <input v-model.trim="adminDetailsEmail" type="email" autocomplete="email" data-session-replay-mask required />
           </label>
           <div class="admin-details-actions">
             <button type="submit" :disabled="isSavingAdminDetails">

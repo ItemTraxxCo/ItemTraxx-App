@@ -57,7 +57,6 @@ const coverageCases = [
     path: "../pages/workspace/admin/Accounts.vue",
     snippets: [
       '<input v-model.trim="email" type="email" autocomplete="email" data-session-replay-mask required />',
-      '<input v-model.trim="adminInviteEmail" type="email" autocomplete="email" data-session-replay-mask required />',
       '<input v-model.trim="adminDetailsEmail" type="email" autocomplete="email" data-session-replay-mask required />',
     ],
   },

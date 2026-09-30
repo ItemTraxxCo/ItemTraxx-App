@@ -116,6 +116,11 @@ button:focus-visible {
   margin-bottom: 1rem;
 }
 
+.page-nav-left .button-link {
+  min-height: 2rem;
+  padding-block: 0.2rem;
+}
+
 .button-link {
   display: inline-flex;
   align-items: center;

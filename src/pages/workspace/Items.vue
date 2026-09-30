@@ -31,7 +31,6 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
-import { RouterLink } from "vue-router";
 import { fetchItemPage, type ItemRecord } from "../../services/itemService";
 
 const PAGE_SIZE = 20;

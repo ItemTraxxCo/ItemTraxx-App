@@ -129,7 +129,7 @@ import { toUserFacingErrorMessage } from "../../../services/appErrors";
 import { capturePostHogEvent } from "../../../services/posthogService";
 import { useManagerContext } from "../../../composables/useManagerContext";
 
-const { managerRoot, managerPath } = useManagerContext();
+const { managerRoot } = useManagerContext();
 
 type ImportRow = {
   name: string;

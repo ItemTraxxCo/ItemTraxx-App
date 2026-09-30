@@ -30,7 +30,6 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
-import { RouterLink } from "vue-router";
 import { fetchBorrowerPage, type BorrowerItem } from "../../services/borrowerService";
 
 const PAGE_SIZE = 20;

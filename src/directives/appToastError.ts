@@ -40,6 +40,7 @@ const notifyToast = (element: HTMLElement, message: string, options: AppToastErr
     suppressedMessage.set(element, message);
     return;
   }
+  suppressedMessage.set(element, message);
   showAppToast(options.title ?? "Error", message);
 };
 

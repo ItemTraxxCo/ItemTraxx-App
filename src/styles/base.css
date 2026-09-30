@@ -11,6 +11,7 @@ a:hover {
 html {
   width: 100%;
   max-width: 100%;
+  zoom: 90%;
   background-color: var(--page-bg);
 }
 

@@ -2,7 +2,7 @@
   <div class="page admin-shell">
     <div class="admin-hero">
       <div class="page-nav-left">
-        <RouterLink class="button-link" :to="managerRoot">Return to manager home</RouterLink>
+        <RouterLink class="button-link" :to="managerRoot">Back</RouterLink>
       </div>
       <h1>Quick Return</h1>
       <p class="admin-hero-copy">Return items by barcode without needing a borrower ID.</p>

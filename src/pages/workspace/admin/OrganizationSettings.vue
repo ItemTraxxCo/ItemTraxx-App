@@ -2,7 +2,7 @@
   <main class="page admin-shell">
     <header class="admin-hero">
       <div class="page-nav-left">
-        <RouterLink class="button-link" to="/admin">Return to workspace home</RouterLink>
+        <RouterLink class="button-link" to="/admin">Back</RouterLink>
       </div>
       <h1>Workspace Settings</h1>
       <p class="admin-hero-copy">Manage workspace details, accounts, and shared checkout defaults.</p>

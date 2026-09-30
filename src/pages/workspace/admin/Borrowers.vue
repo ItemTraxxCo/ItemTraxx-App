@@ -2,7 +2,7 @@
   <div class="page admin-shell">
     <div class="admin-hero">
       <div class="page-nav-left">
-        <RouterLink class="button-link" :to="managerRoot">Return to manager home</RouterLink>
+        <RouterLink class="button-link" :to="managerRoot">Back</RouterLink>
       </div>
       <h1>Borrower Management</h1>
       <p class="admin-hero-copy">Add borrowers, review details, and manage archived records.</p>
@@ -242,7 +242,7 @@
       <div class="form-actions">
         <button
           type="button"
-          class="button-primary"
+          class="button-primary bulk-import-button"
           :disabled="isSaving || bulkRows.length === 0"
           @click="runBulkImport"
         >
@@ -900,5 +900,12 @@ onUnmounted(() => {
   border: 1px solid var(--border);
   border-radius: 10px;
   background: var(--surface-2);
+}
+
+.bulk-import-button:disabled {
+  background-color: var(--surface-3);
+  border-color: var(--border);
+  color: var(--muted);
+  cursor: not-allowed;
 }
 </style>

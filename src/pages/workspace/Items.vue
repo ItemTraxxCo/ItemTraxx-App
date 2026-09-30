@@ -2,11 +2,6 @@
   <main class="page">
     <header>
       <h1>Items</h1>
-      <nav>
-        <RouterLink to="/checkout">Checkout</RouterLink> ·
-        <RouterLink to="/borrowers">Borrowers</RouterLink> ·
-        <RouterLink to="/settings">Settings</RouterLink>
-      </nav>
     </header>
 
     <p v-if="loading">Loading…</p>

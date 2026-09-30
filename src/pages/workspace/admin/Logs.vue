@@ -2,7 +2,7 @@
   <div class="page admin-shell">
     <div class="admin-hero">
       <div class="page-nav-left">
-        <RouterLink class="button-link" :to="managerRoot">Return to manager home</RouterLink>
+        <RouterLink class="button-link" :to="managerRoot">Back</RouterLink>
       </div>
       <h1>Item Logs</h1>
       <p class="admin-hero-copy">Filter checkout and return activity, then export the current view to PDF and CSV.</p>

@@ -2,8 +2,8 @@
   <div class="page admin-shell">
     <div class="admin-hero">
       <div class="page-nav-left">
-        <RouterLink class="button-link" :to="managerRoot">Return to manager home</RouterLink>
-        <RouterLink class="button-link" :to="managerPath('/item-import')">Bulk item import wizard</RouterLink>
+        <RouterLink class="button-link items-page-nav-link" :to="managerRoot">Back</RouterLink>
+        <RouterLink class="button-link items-page-nav-link" :to="managerPath('/item-import')">Bulk item import</RouterLink>
       </div>
       <h1>Item Management</h1>
       <p class="admin-hero-copy">Add inventory, update item status, and review archived item without jumping between views.</p>
@@ -1033,6 +1033,11 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
+.items-page-nav-link {
+  min-height: 2rem;
+  padding-block: 0.2rem;
+}
+
 .form-help-row {
   display: flex;
   justify-content: space-between;

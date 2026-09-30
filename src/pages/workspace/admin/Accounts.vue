@@ -1,6 +1,6 @@
 <template>
   <main class="page admin-shell">
-    <RouterLink to="/admin">Return to admin panel</RouterLink>
+    <RouterLink to="/admin">Back</RouterLink>
     <h1>Workspace Accounts</h1>
     <p class="page-intro">View workspace members and manage their tenant or admin role.</p>
 

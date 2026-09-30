@@ -8,8 +8,9 @@
       <p class="access-denied-status">Access denied</p>
       <h1 id="access-denied-title">You don’t have access to this page.</h1>
       <p class="access-denied-message">
-        Your account is signed in, but it is not authorized for this workspace or path.
-        Contact your workspace administrator if you think this is a mistake.
+        You are signed in, but are not authorized for this workspace or path.
+        For workspace associated accounts, contact your workspace administrator if you think this is a mistake.
+        For individual accounts, contact support if you think this is a mistake.
       </p>
 
       <div class="access-denied-actions">

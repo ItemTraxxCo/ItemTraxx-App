@@ -167,7 +167,6 @@
             </div>
           </form>
 
-          <p v-if="error" class="error">{{ error }}</p>
         </div>
 
         <p class="muted legal-note">
@@ -181,7 +180,7 @@
       <div class="toast-title">Loading...</div>
       <div class="toast-body">Signing you in.</div>
     </div>
-    <div v-if="toastMessage" class="toast">
+    <div v-if="toastMessage" class="toast" role="alert" aria-live="assertive">
       <div class="toast-title">{{ toastTitle }}</div>
       <div class="toast-body">{{ toastMessage }}</div>
     </div>
@@ -206,7 +205,6 @@ const email = ref("");
 const password = ref("");
 const isSsoMode = ref(false);
 const showPassword = ref(false);
-const error = ref("");
 const isLoading = ref(false);
 const toastTitle = ref("");
 const toastMessage = ref("");
@@ -292,12 +290,10 @@ const canSubmitSso = computed(() => {
   return hasEmail && hasTurnstile;
 });
 const enterSsoMode = () => {
-  error.value = "";
   password.value = "";
   isSsoMode.value = true;
 };
 const exitSsoMode = () => {
-  error.value = "";
   isSsoMode.value = false;
 };
 const setTurnstileContainerRef = (
@@ -411,13 +407,12 @@ const completePasswordLoginNavigation = async (session: {
 };
 
 const handleLogin = async () => {
-  error.value = "";
   isLoading.value = true;
   // Clear any legacy replay handoff before a new sign-in attempt.
   clearReplaySessionHandoff();
   try {
     if (turnstileSiteKey && !turnstileToken.value) {
-      error.value = "Complete the security check and try again.";
+      showToast("Security check required", "Complete the security check and try again.");
       return;
     }
     const { workspaceLogin } = await import("../services/authService");
@@ -457,7 +452,6 @@ const handleLogin = async () => {
     });
   } catch (err) {
     if (err instanceof Error && err.message === "LIMITER_UNAVAILABLE") {
-      error.value = "";
       showToast(
         "Rate Limit reached. Please try again later.",
         "Login unavailable. Please try again later."
@@ -465,26 +459,23 @@ const handleLogin = async () => {
       return;
     }
     if (err instanceof Error && err.message === "TURNSTILE_FAILED") {
-      error.value = "Security check failed. Please try again.";
+      showToast("Security check failed", "Please try again.");
       return;
     }
     if (
       err instanceof Error &&
       (err.message === "TENANT_DISABLED" || err.message === "WORKSPACE_DISABLED")
     ) {
-      error.value = "";
       showToast("Access blocked", "This account cannot sign in right now. Please contact support.");
       return;
     }
     if (err instanceof Error && err.message === "MAINTENANCE_MODE") {
-      error.value = "";
       showToast("Maintenance mode", "Sign in is temporarily unavailable. Please try again later.");
       return;
     }
     const errorMessage = err instanceof Error ? err.message : "Sign in failed.";
     const signInErrorMessage = getSignInErrorMessage(errorMessage);
     if (signInErrorMessage) {
-      error.value = "";
       showToast("Sign in failed.", signInErrorMessage);
       void runPostHog(({ capturePostHogEvent }) =>
         capturePostHogEvent("login_failed", { error_code: getLoginErrorCode(errorMessage) })
@@ -495,7 +486,7 @@ const handleLogin = async () => {
       // The role is intentionally unknown for failed authentication attempts.
       capturePostHogEvent("login_failed", { error_code: getLoginErrorCode(errorMessage) })
     );
-    error.value = errorMessage;
+    showToast("Sign in failed", errorMessage);
   } finally {
     isLoading.value = false;
     if (turnstileSiteKey) {
@@ -509,19 +500,22 @@ const handleLogin = async () => {
 };
 
 const handlePasskeyLogin = async () => {
-  error.value = ""; isLoading.value = true;
+  isLoading.value = true;
   clearReplaySessionHandoff();
   try {
     const result = await authClient.signIn.passkey();
     if (result.error) throw new Error(result.error.message ?? "Passkey sign-in failed.");
     window.location.assign(requestedReturnTo.value || "/");
   } catch (cause) {
-    error.value = cause instanceof Error ? cause.message : "Passkey sign-in failed.";
+    showToast(
+      "Passkey sign-in failed",
+      cause instanceof Error ? cause.message : "Please try again."
+    );
   } finally { isLoading.value = false; }
 };
 
 const handleSsoLogin = async () => {
-  error.value = ""; isLoading.value = true;
+  isLoading.value = true;
   clearReplaySessionHandoff();
   try {
     const requested = requestedReturnTo.value;
@@ -537,7 +531,14 @@ const handleSsoLogin = async () => {
     });
     if (result.error) throw new Error(result.error.message ?? "SSO sign-in failed.");
   } catch (cause) {
-    error.value = cause instanceof Error ? cause.message : "SSO sign-in failed.";
+    const ssoErrorMessage =
+      cause instanceof Error && cause.message ? cause.message : "Please try again.";
+    const userFacingMessage = ssoErrorMessage
+      .toLowerCase()
+      .includes("no provider found for the issuer")
+      ? "No SSO provider found for the entered email."
+      : ssoErrorMessage;
+    showToast("SSO sign-in failed", userFacingMessage);
     isLoading.value = false;
   }
 };

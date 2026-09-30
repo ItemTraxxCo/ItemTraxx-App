@@ -40,12 +40,19 @@
             alt="ItemTraxx Co"
           />
           <RouterLink class="story-back-link compact-back-link" to="/">Back</RouterLink>
-          <h1>Sign in</h1>
+          <h1>{{ isSsoMode ? "Sign in with SSO" : "Sign in" }}</h1>
           <p class="login-panel-copy">
-            Use your email and password to sign in.
+            {{
+              isSsoMode
+                ? "Enter your email to continue with your organization’s single sign-on."
+                : "Use your email and password to sign in."
+            }}
           </p>
 
-          <form class="form login-form" @submit.prevent="handleLogin">
+          <form
+            class="form login-form"
+            @submit.prevent="isSsoMode ? handleSsoLogin() : handleLogin()"
+          >
             <label>
                
               <input
@@ -59,7 +66,7 @@
               />
             </label>
 
-            <label class="password-field">
+            <label v-if="!isSsoMode" class="password-field">
                
               <span class="password-input-wrap">
                 <input
@@ -100,15 +107,33 @@
               <button
                 type="submit"
                 class="button-primary login-submit-button"
-                :disabled="!canSubmit || isLoading"
+                :disabled="isLoading || (isSsoMode ? !email.trim() : !canSubmit)"
               >
-                Sign in
+                {{ isSsoMode ? "Continue with SSO" : "Sign in" }}
               </button>
-              <button type="button" :disabled="isLoading" @click="handlePasskeyLogin">
+              <button
+                v-if="!isSsoMode"
+                type="button"
+                :disabled="isLoading"
+                @click="handlePasskeyLogin"
+              >
                 Sign in with a passkey
               </button>
-              <button type="button" :disabled="isLoading || !email.trim()" @click="handleSsoLogin">
-                Continue with workspace SSO
+              <button
+                v-if="!isSsoMode"
+                type="button"
+                :disabled="isLoading"
+                @click="enterSsoMode"
+              >
+                Sign in with SSO
+              </button>
+              <button
+                v-else
+                type="button"
+                :disabled="isLoading"
+                @click="exitSsoMode"
+              >
+                Use password instead
               </button>
             </div>
           </form>
@@ -150,6 +175,7 @@ const router = useRouter();
 const route = useRoute();
 const email = ref("");
 const password = ref("");
+const isSsoMode = ref(false);
 const showPassword = ref(false);
 const error = ref("");
 const isLoading = ref(false);
@@ -231,6 +257,15 @@ const canSubmit = computed(() => {
   const hasTurnstile = !turnstileSiteKey || Boolean(turnstileToken.value);
   return hasEmail && hasPassword && hasTurnstile;
 });
+const enterSsoMode = () => {
+  error.value = "";
+  password.value = "";
+  isSsoMode.value = true;
+};
+const exitSsoMode = () => {
+  error.value = "";
+  isSsoMode.value = false;
+};
 const setTurnstileContainerRef = (
   el: Element | { $el?: Element } | null
 ) => {

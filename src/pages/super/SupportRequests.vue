@@ -40,7 +40,7 @@
         </button>
       </div>
 
-      <p v-if="error" class="sa-error">{{ error }}</p>
+      <p v-if="error" class="sa-error" v-app-toast-error>{{ error }}</p>
       <p v-else-if="isLoading" class="muted">Loading support requests...</p>
 
       <div v-else class="sa-table-wrap">
@@ -178,7 +178,7 @@
           </ul>
         </section>
 
-        <p v-if="modalError" class="sa-error">{{ modalError }}</p>
+        <p v-if="modalError" class="sa-error" v-app-toast-error>{{ modalError }}</p>
         <p v-if="success" class="sa-notice">{{ success }}</p>
 
         <div class="panel-actions">

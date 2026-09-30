@@ -55,7 +55,7 @@
           <button type="submit" class="button-primary" :disabled="isSaving">Add borrower</button>
         </div>
       </form>
-      <p v-if="error" class="error">{{ error }}</p>
+      <p v-if="error" class="error" v-app-toast-error="{ suppressMessage: toastMessage }">{{ error }}</p>
       <p v-if="success" class="success">{{ success }}</p>
     </div>
 

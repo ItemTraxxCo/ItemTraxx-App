@@ -60,7 +60,7 @@
     </section>
 
     <p v-if="message" class="success">{{ message }}</p>
-    <p v-if="error" class="error">{{ error }}</p>
+    <p v-if="error" class="error" v-app-toast-error>{{ error }}</p>
   </main>
 </template>
 

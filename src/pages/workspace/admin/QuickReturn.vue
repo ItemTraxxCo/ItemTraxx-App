@@ -58,7 +58,7 @@
         </button>
       </div>
 
-      <p v-if="error" class="error">{{ error }}</p>
+      <p v-if="error" class="error" v-app-toast-error>{{ error }}</p>
       <p v-if="success" class="success">{{ success }}</p>
       <div v-if="lastSummary" class="muted">
         {{ lastSummary }}

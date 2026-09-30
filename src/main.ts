@@ -1,4 +1,5 @@
 import { createApp } from "vue";
+import { appToastErrorDirective } from "./directives/appToastError";
 import "./styles/tokens.css";
 import "./styles/base.css";
 import "./styles/app-shell.css";
@@ -181,6 +182,7 @@ const mountApp = async () => {
   });
 
   const app = createApp(App);
+  app.directive("app-toast-error", appToastErrorDirective);
   const existingErrorHandler = app.config.errorHandler;
   app.config.errorHandler = (error, instance, info) => {
     clientMonitoring.captureException(error);

@@ -28,7 +28,7 @@
         <button type="button" :disabled="isLoading" @click="loadSessions">Reload</button>
       </div>
 
-      <p v-if="sessionError" class="error" role="alert">{{ sessionError }}</p>
+      <p v-if="sessionError" class="error" role="alert" v-app-toast-error="{ suppressMessage: toastMessage }">{{ sessionError }}</p>
       <p v-if="sessionSuccess" class="success" role="status">{{ sessionSuccess }}</p>
 
       <div class="table-wrap">

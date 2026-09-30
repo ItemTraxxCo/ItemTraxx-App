@@ -120,7 +120,7 @@
       </div>
 
       <p v-else class="muted">Enter a borrower ID to begin.</p>
-      <p v-if="error" class="error">{{ error }}</p>
+      <p v-if="error" class="error" v-app-toast-error="{ suppressMessage: toastMessage }">{{ error }}</p>
       <p v-if="success" class="success">{{ success }}</p>
       <div v-if="toastMessage" class="toast" :class="{ 'toast-persist': toastStatus === 'Processing' }">
         <div class="toast-title">{{ toastTitle }}</div>

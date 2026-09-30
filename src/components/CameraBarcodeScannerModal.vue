@@ -38,7 +38,7 @@
               </svg>
             </div>
             <div v-if="isStarting" class="scanner-overlay-message">Loading, please wait...</div>
-            <div v-else-if="errorMessage" class="scanner-overlay-message scanner-overlay-error">
+            <div v-else-if="errorMessage" class="scanner-overlay-message scanner-overlay-error" v-app-toast-error>
               {{ errorMessage }}
             </div>
             <div

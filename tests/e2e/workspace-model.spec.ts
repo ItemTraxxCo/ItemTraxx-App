@@ -152,7 +152,7 @@ test.describe("workspace model role surfaces", () => {
     await page.getByPlaceholder("Item name").fill("Explicit choice item");
     await page.getByPlaceholder("Barcode", { exact: true }).fill("EXPLICIT-1");
     await page.getByRole("button", { name: "Add item" }).click();
-    await expect(page.getByText("Choose All Tenant Accounts or select at least one specific account.")).toBeVisible();
+    await expect(page.getByRole("alert").getByText("Choose All Tenant Accounts or select at least one specific account.", { exact: true })).toBeVisible();
   });
 
   test("Super Admin can manage Tenant Accounts across workspaces", async ({ page }) => {

@@ -88,6 +88,7 @@
       @accept-all="consent.acceptAll"
       @save-preferences="consent.savePreferences"
     />
+    <AppToastOutlet v-if="!fatalErrorToast.visible" />
     <FatalErrorToast v-if="fatalErrorToast.visible" />
     <OfflineQueueToast :enabled="showOfflineQueueToast" :count="offlineQueue.count.value" :syncing-count="offlineQueue.syncingCount.value" :review-count="offlineQueue.reviewCount.value" :tooltip="offlineQueue.tooltip.value" />
     <Analytics v-if="consent.showTelemetry.value" />
@@ -102,6 +103,7 @@ import AppBlockingOverlays from "./components/app/AppBlockingOverlays.vue";
 import AppTopBanners from "./components/app/AppTopBanners.vue";
 import AuthenticatedNavigation from "./components/app/AuthenticatedNavigation.vue";
 import CookieConsentBanner from "./components/CookieConsentBanner.vue";
+import AppToastOutlet from "./components/AppToastOutlet.vue";
 import { useAdminSessionLifecycle } from "./composables/useAdminSessionLifecycle";
 import { useAppVersionStatus } from "./composables/useAppVersionStatus";
 import { isUnavailableBypassHost } from "./utils/unavailableBypass";

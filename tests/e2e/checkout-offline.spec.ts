@@ -1230,7 +1230,7 @@ test.describe("prepared offline checkout workflow contract", () => {
     await page.getByPlaceholder("Scan or enter barcode").fill("ITEM-1");
     await page.getByRole("button", { name: "Add item" }).click();
     await page.getByRole("button", { name: "Complete Quick Return" }).click();
-    await expect(page.getByText(/Return request buffered for auto-sync/)).toBeVisible();
+    await expect(page.getByRole("alert").getByText(/Return request buffered for auto-sync/)).toBeVisible();
     await expect.poll(async () => page.evaluate(async () => {
       const workflow = (window.__itemtraxxTest as typeof window.__itemtraxxTest & {
         offlineCheckoutWorkflow: { readLedger: () => Promise<unknown[]> };

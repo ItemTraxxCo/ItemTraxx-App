@@ -73,7 +73,7 @@
           <button type="button" :disabled="isSaving" @click="loadSettings">Reload Settings</button>
         </div>
       </form>
-      <p v-if="error" class="error">{{ error }}</p>
+      <p v-if="error" class="error" v-app-toast-error="{ suppressMessage: toastMessage }">{{ error }}</p>
       <p v-if="success" class="success">{{ success }}</p>
     </div>
 
@@ -163,7 +163,7 @@
           Sign out all other devices
         </button>
       </div>
-      <p v-if="sessionError" class="error">{{ sessionError }}</p>
+      <p v-if="sessionError" class="error" v-app-toast-error="{ suppressMessage: toastMessage }">{{ sessionError }}</p>
       <p v-if="sessionSuccess" class="success">{{ sessionSuccess }}</p>
     </div>
 

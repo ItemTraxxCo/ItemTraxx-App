@@ -110,7 +110,7 @@
               v-model="fieldValue"
               :placeholder="activeStep.placeholder"
               :aria-invalid="stepError ? 'true' : undefined"
-              :aria-describedby="stepError ? `sso-help-${activeStep.key} sso-error-${activeStep.key}` : `sso-help-${activeStep.key}`"
+              :aria-describedby="`sso-help-${activeStep.key}`"
               autocomplete="off"
               autocapitalize="off"
               spellcheck="false"
@@ -127,14 +127,14 @@
               :placeholder="activeStep.placeholder"
               :pattern="activeStep.pattern"
               :aria-invalid="stepError ? 'true' : undefined"
-              :aria-describedby="stepError ? `sso-help-${activeStep.key} sso-error-${activeStep.key}` : `sso-help-${activeStep.key}`"
+              :aria-describedby="`sso-help-${activeStep.key}`"
               :autocomplete="activeStep.autocomplete ?? 'off'"
               :spellcheck="false"
               required
               :data-session-replay-mask="activeStep.key === 'clientSecret' ? '' : undefined"
             />
 
-            <p v-if="stepError" :id="`sso-error-${activeStep.key}`" class="field-error" role="alert">{{ stepError }}</p>
+            <p v-if="stepError" :id="`sso-error-${activeStep.key}`" class="field-error" role="alert" v-app-toast-error="{ title: 'SSO setup needs attention' }">{{ stepError }}</p>
 
             <p :id="`sso-help-${activeStep.key}`" class="field-guidance">
               <span><strong>Where to find it</strong>{{ activeStep.findIt }}</span>
@@ -221,7 +221,7 @@
       </article>
     </section>
 
-    <p v-if="message" class="form-message" :class="error ? 'error' : 'success-message'" :role="error ? 'alert' : 'status'">{{ message }}</p>
+    <p v-if="message" class="form-message" :class="error ? 'error' : 'success-message'" :role="error ? 'alert' : 'status'" v-app-toast-error="error">{{ message }}</p>
   </main>
 </template>
 

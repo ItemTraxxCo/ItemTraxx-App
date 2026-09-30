@@ -181,7 +181,7 @@ test.describe("Checkout borrower ownership regression", () => {
     await loadBorrower("BRWRB");
     await barcodeInput.fill("ITEM-1");
     await addBarcodeButton.click();
-    await expect(page.locator(".error", { hasText: "Item already checked out." })).toBeVisible();
+    await expect(page.locator(".toast-body", { hasText: "Item already checked out." })).toHaveText("Item already checked out.");
 
     // 3) Borrower A can return their own checked-out item.
     await loadBorrower("BRWRA");

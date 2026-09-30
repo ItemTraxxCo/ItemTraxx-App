@@ -31,7 +31,7 @@
             :aria-invalid="fieldErrors.fullName ? 'true' : undefined"
             @input="clearFieldError('fullName')"
           />
-          <span v-if="fieldErrors.fullName" class="field-error">{{ fieldErrors.fullName }}</span>
+          <span v-if="fieldErrors.fullName" class="field-error" v-app-toast-error="{ title: 'Please review the form' }">{{ fieldErrors.fullName }}</span>
         </label>
 
         <label class="field" :class="{ 'field-invalid': fieldErrors.replyEmail }">
@@ -44,7 +44,7 @@
             :aria-invalid="fieldErrors.replyEmail ? 'true' : undefined"
             @input="clearFieldError('replyEmail')"
           />
-          <span v-if="fieldErrors.replyEmail" class="field-error">{{ fieldErrors.replyEmail }}</span>
+          <span v-if="fieldErrors.replyEmail" class="field-error" v-app-toast-error="{ title: 'Please review the form' }">{{ fieldErrors.replyEmail }}</span>
         </label>
 
         <label class="field">
@@ -71,7 +71,7 @@
             :aria-invalid="fieldErrors.subject ? 'true' : undefined"
             @input="clearFieldError('subject')"
           />
-          <span v-if="fieldErrors.subject" class="field-error">{{ fieldErrors.subject }}</span>
+          <span v-if="fieldErrors.subject" class="field-error" v-app-toast-error="{ title: 'Please review the form' }">{{ fieldErrors.subject }}</span>
         </label>
 
         <label class="field field-full" :class="{ 'field-invalid': fieldErrors.message }">
@@ -84,7 +84,7 @@
             :aria-invalid="fieldErrors.message ? 'true' : undefined"
             @input="clearFieldError('message')"
           ></textarea>
-          <span v-if="fieldErrors.message" class="field-error">{{ fieldErrors.message }}</span>
+          <span v-if="fieldErrors.message" class="field-error" v-app-toast-error="{ title: 'Please review the form' }">{{ fieldErrors.message }}</span>
         </label>
 
         <label class="field field-full">
@@ -112,7 +112,7 @@
           
           <div :ref="setTurnstileContainerRef"></div>
           <p class="muted security-note">Complete the security check and ensure all fields are filled out before sending. If you do not see the security check please reload the page and try again.</p>
-          <span v-if="fieldErrors.turnstile" class="field-error">{{ fieldErrors.turnstile }}</span>
+          <span v-if="fieldErrors.turnstile" class="field-error" v-app-toast-error="{ title: 'Please review the form' }">{{ fieldErrors.turnstile }}</span>
         </label>
 
         <input
@@ -133,7 +133,7 @@
           By clicking Submit Support Request, you agree to our <RouterLink to="/privacy">Privacy Policy</RouterLink> and <RouterLink to="/legal">Terms of Service</RouterLink>.
         </p>
       </form>
-      <p v-if="error" class="error">{{ error }}</p>
+      <p v-if="error" class="error" v-app-toast-error>{{ error }}</p>
     </section>
 
     <PublicFooter />

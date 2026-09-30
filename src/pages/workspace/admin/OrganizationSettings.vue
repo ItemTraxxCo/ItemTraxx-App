@@ -33,7 +33,7 @@
         </div>
       </div>
 
-      <p v-if="organizationError" class="error" role="alert">{{ organizationError }}</p>
+      <p v-if="organizationError" class="error" role="alert" v-app-toast-error>{{ organizationError }}</p>
       <p v-if="organizationSuccess" class="success" role="status">{{ organizationSuccess }}</p>
 
       <form class="form organization-profile-form" @submit.prevent="saveOrganizationProfile">
@@ -144,7 +144,7 @@
         </div>
       </form>
       <p v-if="settingsSuccess" class="success" role="status">{{ settingsSuccess }}</p>
-      <p v-if="settingsError" class="error" role="alert">{{ settingsError }}</p>
+      <p v-if="settingsError" class="error" role="alert" v-app-toast-error>{{ settingsError }}</p>
     </section>
   </main>
 </template>

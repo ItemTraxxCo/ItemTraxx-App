@@ -50,7 +50,7 @@
         </div>
 
         <p v-if="isLoading" class="muted">Loading super admins...</p>
-        <p v-else-if="error" class="sa-error">{{ error }}</p>
+        <p v-else-if="error" class="sa-error" v-app-toast-error="{ suppressMessage: toastMessage }">{{ error }}</p>
         <div v-else class="sa-table-wrap">
           <table class="sa-table">
             <thead>

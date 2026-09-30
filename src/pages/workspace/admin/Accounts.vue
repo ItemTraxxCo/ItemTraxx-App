@@ -29,7 +29,7 @@
         </button>
       </div>
 
-      <p v-if="error" class="error" role="alert">{{ error }}</p>
+      <p v-if="error" class="error" role="alert" v-app-toast-error>{{ error }}</p>
       <p v-if="message" class="success" role="status">{{ message }}</p>
 
       <div class="table-wrap">
@@ -107,7 +107,7 @@
       <section class="modal" role="dialog" aria-modal="true" aria-labelledby="admin-details-title">
         <h2 id="admin-details-title">Manage Workspace Admin</h2>
         <p class="muted">Update this admin’s email, send a reset link, or disable or re-enable access.</p>
-        <p v-if="error" class="error" role="alert">{{ error }}</p>
+        <p v-if="error" class="error" role="alert" v-app-toast-error>{{ error }}</p>
         <form class="admin-details-form" @submit.prevent="saveAdminEmail">
           <label>
             Email address

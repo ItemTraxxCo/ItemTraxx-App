@@ -72,8 +72,8 @@ test.describe("core user flows", () => {
     await page.goto("/checkout?source=email");
     await expect(page.getByRole("heading", { name: "Sign in", exact: true })).toBeVisible();
 
-    await page.getByPlaceholder("Email address").fill(" Tenant.User@Example.COM ");
-    await page.getByPlaceholder("Enter password").fill("correct horse battery staple");
+    await page.getByLabel("Email").fill(" Tenant.User@Example.COM ");
+    await page.getByRole("textbox", { name: /Password/ }).fill("correct horse battery staple");
     await page.getByRole("button", { name: "Sign in", exact: true }).click();
 
     await expect(page).toHaveURL(/\/checkout\?source=email$/);
@@ -137,8 +137,8 @@ test.describe("core user flows", () => {
     await expect(page.getByRole("heading", { name: "Sign in", exact: true })).toBeVisible();
     await expect(page.getByText("Go to admin sign in", { exact: true })).toHaveCount(0);
 
-    await page.getByPlaceholder("Email address").fill("tenant.admin@example.com");
-    await page.getByPlaceholder("Enter password").fill("correct horse battery staple");
+    await page.getByLabel("Email").fill("tenant.admin@example.com");
+    await page.getByRole("textbox", { name: /Password/ }).fill("correct horse battery staple");
     await page.getByRole("button", { name: "Sign in", exact: true }).click();
 
     await expect(page).toHaveURL(/\/admin$/);

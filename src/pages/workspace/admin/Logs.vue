@@ -106,7 +106,7 @@
           </table>
         </div>
       </BoneyardSkeleton>
-      <p v-if="error" class="error">{{ error }}</p>
+      <p v-if="error" class="error" v-app-toast-error>{{ error }}</p>
     </div>
   </div>
 </template>

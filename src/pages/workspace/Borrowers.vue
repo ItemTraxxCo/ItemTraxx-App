@@ -10,7 +10,7 @@
     </header>
 
     <p v-if="loading">Loading…</p>
-    <p v-else-if="error" class="error">{{ error }}</p>
+    <p v-else-if="error" class="error" v-app-toast-error>{{ error }}</p>
     <template v-else>
       <table>
         <thead>

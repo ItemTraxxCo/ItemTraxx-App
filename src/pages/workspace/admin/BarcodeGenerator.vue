@@ -45,7 +45,7 @@
         </div>
       </form>
 
-      <p v-if="error" class="error">{{ error }}</p>
+      <p v-if="error" class="error" v-app-toast-error>{{ error }}</p>
       <p v-else-if="generatedBarcodes.length" class="muted">
         Ready to download: {{ generatedBarcodes.length }} barcode(s).
       </p>

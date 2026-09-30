@@ -127,7 +127,7 @@ const workspaceAdminSteps: OnboardingStep[] = [
 const individualAccountSteps: OnboardingStep[] = [
   {
     title: "Welcome to your inventory",
-    body: "Manage your personal items, borrowers, checkouts, and returns from one place.",
+    body: "Manage your items, borrowers, checkouts, and returns from one place.",
   },
   {
     title: "Add items and borrowers",
@@ -139,7 +139,7 @@ const individualAccountSteps: OnboardingStep[] = [
   },
   {
     title: "Settings and security",
-    body: "Manage checkout defaults, account security, and signed-in devices from your personal settings.",
+    body: "Manage checkout defaults, account security, and signed-in devices from your settings.",
   },
 ];
 

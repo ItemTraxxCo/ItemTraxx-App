@@ -4,7 +4,7 @@
       <div class="page-nav-left">
         <RouterLink class="button-link" :to="managerRoot">Back</RouterLink>
       </div>
-      <h1>Personal Settings</h1>
+      <h1>Account Settings</h1>
       <p class="admin-hero-copy">Configure your checkout defaults and manage active account sessions.</p>
       <p><RouterLink class="button-link" to="/account/security">Account Security</RouterLink><template v-if="!isIndividualAccount"> · <RouterLink class="button-link" to="/admin/settings/sso">Enterprise SSO</RouterLink></template></p>
       <div class="admin-summary-grid">

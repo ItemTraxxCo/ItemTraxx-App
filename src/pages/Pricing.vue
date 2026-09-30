@@ -185,7 +185,7 @@
             <p class="price">$70.00<span>/year</span></p>
             <ul>
               <li>Single-user access to the ItemTraxx app</li>
-              <li>Simple personal inventory tracking workflow</li>
+              <li>Single-user access to the ItemTraxx appw</li>
               <li>Invoice-based billing</li>
             </ul>
             <p class="onboarding">Onboarding not available.</p>

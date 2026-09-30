@@ -526,7 +526,7 @@ onBeforeUnmount(() => {
   background: #ffffff;
   color: #142947;
   border-radius: 8px;
-  padding: 0.5rem 0.92rem;
+  padding: 0.4rem 0.82rem;
   font-size: 0.95rem;
   font-weight: 700;
   text-decoration: none;
@@ -572,7 +572,7 @@ onBeforeUnmount(() => {
   align-items: center;
   justify-content: center;
   border-radius: 10px;
-  padding: 0.72rem 1.2rem;
+  padding: 0.55rem 1.05rem;
   box-sizing: border-box;
   max-width: 100%;
   font-weight: 700;

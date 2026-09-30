@@ -626,8 +626,8 @@ onUnmounted(() => {
 
 .checkout-inline-button {
   min-width: 7rem;
-  min-height: 2.2rem;
-  padding: 0.36rem 0.8rem;
+  min-height: 2rem;
+  padding: 0.3rem 0.7rem;
   border-radius: 12px;
   white-space: nowrap;
 }
@@ -686,8 +686,8 @@ onUnmounted(() => {
 }
 
 .checkout-submit-button {
-  min-height: 2.35rem;
-  padding-inline: 1rem;
+  min-height: 2.2rem;
+  padding-inline: 0.85rem;
   border-radius: 12px;
 }
 

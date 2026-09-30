@@ -240,7 +240,7 @@ onScopeDispose(() => {
 .offline-workflow-status-content { display: grid; gap: 0.15rem; min-width: 0; }
 .offline-workflow-status strong { font-size: 0.9rem; }
 .offline-workflow-status span { color: var(--muted); font-size: 0.8rem; }
-.offline-sync-button { min-height: 2.2rem; padding: 0.35rem 0.8rem; white-space: nowrap; }
+.offline-sync-button { min-height: 2rem; padding: 0.3rem 0.72rem; white-space: nowrap; }
 @media (max-width: 640px) {
   .offline-workflow-status { align-items: flex-start; }
   .offline-sync-button { flex-shrink: 0; }

@@ -491,7 +491,6 @@ onUnmounted(() => {
   align-items: center;
   justify-content: center;
   min-height: 2.15rem;
-  border-radius: 999px;
   border: 1px solid var(--button-border);
   background: var(--button-bg);
   color: var(--text);
@@ -503,8 +502,14 @@ onUnmounted(() => {
 }
 
 .lp-btn {
-  padding: 0.5rem 0.94rem;
+  min-height: 2rem;
+  padding: 0.32rem 0.8rem;
+  border-radius: var(--button-radius);
   transition: transform 0.16s ease, background-color 0.16s ease, border-color 0.16s ease;
+}
+
+.lp-status {
+  border-radius: 999px;
 }
 
 .lp-btn:hover,
@@ -531,8 +536,8 @@ onUnmounted(() => {
 }
 
 .lp-btn--lg {
-  min-height: 2.58rem;
-  padding: 0.62rem 1.2rem;
+  min-height: 2.4rem;
+  padding: 0.5rem 1rem;
   font-size: 1rem;
 }
 
@@ -969,6 +974,11 @@ onUnmounted(() => {
     min-height: 2rem;
     font-size: 0.84rem;
     padding: 0.44rem 0.72rem;
+  }
+
+  .lp-btn {
+    min-height: 1.9rem;
+    padding: 0.28rem 0.62rem;
   }
 }
 </style>

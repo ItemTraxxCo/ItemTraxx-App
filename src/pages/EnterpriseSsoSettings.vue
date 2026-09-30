@@ -1030,8 +1030,8 @@ onMounted(() => void loadProviders().catch((cause) => { error.value = true; mess
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 2.55rem;
-  padding: 0.5rem 0.9rem;
+  min-height: 2.35rem;
+  padding: 0.4rem 0.8rem;
   border: 1px solid var(--button-border);
   border-radius: 8px;
   background: var(--button-bg);
@@ -1041,8 +1041,8 @@ onMounted(() => void loadProviders().catch((cause) => { error.value = true; mess
 }
 
 .wizard-actions .button-primary {
-  min-height: 2.55rem;
-  padding: 0.55rem 1rem;
+  min-height: 2.35rem;
+  padding: 0.4rem 0.85rem;
   border-radius: 8px;
   font-weight: 650;
 }

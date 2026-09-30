@@ -660,7 +660,7 @@ body.super-admin-route-active #app {
 .version-update-button {
   margin-top: 0.95rem;
   width: 100%;
-  min-height: 46px;
+  min-height: 42px;
   font-size: 0.97rem;
   font-weight: 700;
 }
@@ -1086,8 +1086,8 @@ body.super-admin-route-active #app {
   background: rgba(255, 255, 255, 0.55);
   color: #111827;
   border-radius: 10px;
-  min-height: 2rem;
-  padding: 0.3rem 0.65rem;
+  min-height: 1.85rem;
+  padding: 0.25rem 0.55rem;
   font-size: 0.78rem;
   font-weight: 600;
 }

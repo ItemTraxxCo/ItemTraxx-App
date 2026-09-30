@@ -353,7 +353,7 @@ onScopeDispose(() => {
 .offline-warning-card ul { margin: 0.85rem 0 0; padding-left: 1.2rem; color: var(--muted); line-height: 1.5; }
 .offline-warning-card li + li { margin-top: 0.35rem; }
 .offline-overlay-actions { display: flex; flex-wrap: wrap; gap: 0.65rem; margin-top: 1rem; }
-.offline-overlay-actions button { flex: 1 1 12rem; min-height: 44px; }
+.offline-overlay-actions button { flex: 1 1 12rem; min-height: 40px; }
 .offline-review-card { width: min(760px, 100%); max-height: min(760px, calc(100vh - 2rem)); overflow: auto; }
 .offline-review-list { display: grid; gap: 0.65rem; margin-top: 1rem; }
 .offline-review-entry { overflow: hidden; border: 1px solid var(--border); border-radius: 14px; background: var(--surface); }

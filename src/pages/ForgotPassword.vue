@@ -245,7 +245,7 @@ onUnmounted(() => {
 
 .forgot-submit-button {
   width: 100%;
-  min-height: 3rem;
+  min-height: 2.75rem;
   border-radius: 999px;
   background: var(--button-primary-bg);
   border-color: transparent;

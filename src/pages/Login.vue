@@ -1011,7 +1011,7 @@ onMounted(() => {
 
 .login-submit-button {
   width: 100%;
-  min-height: 3.7rem;
+  min-height: 3.4rem;
   margin-top: 1rem;
   border-radius: 999px;
   background: var(--login-button-bg);

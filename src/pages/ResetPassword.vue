@@ -280,8 +280,8 @@ onUnmounted(() => {
   align-items: center;
   justify-content: center;
   width: fit-content;
-  min-height: 2.05rem;
-  padding: 0.42rem 0.72rem;
+  min-height: 1.95rem;
+  padding: 0.32rem 0.65rem;
   border: 1px solid var(--reset-button-bg);
   border-radius: 999px;
   background: var(--reset-button-bg);

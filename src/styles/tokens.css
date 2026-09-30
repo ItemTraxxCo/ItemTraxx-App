@@ -2,6 +2,10 @@
   font-family: "Inter", "Segoe UI", sans-serif;
   line-height: 1.5;
   font-weight: 400;
+  --button-radius: 10px;
+  --button-min-height: 2.35rem;
+  --button-padding-block: 0.35rem;
+  --button-padding-inline: 0.85rem;
   --focus-ring: #7c7c76;
   font-synthesis: none;
   text-rendering: optimizeLegibility;

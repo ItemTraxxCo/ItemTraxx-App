@@ -476,7 +476,7 @@ onUnmounted(() => {
 
 .scanner-controls .button-primary,
 .scanner-controls .button-secondary {
-  min-height: 2.55rem;
+  min-height: 2.35rem;
 }
 
 .scanner-controls .button-secondary {

@@ -40,25 +40,38 @@
             alt="ItemTraxx Co"
           />
           <RouterLink class="story-back-link compact-back-link" to="/">Back</RouterLink>
-          <h1>{{ isSsoMode ? "Sign in with SSO" : "Sign in" }}</h1>
-          <p class="login-panel-copy">
-            {{
-              isSsoMode
-                ? "Enter your email to continue with your workspace's single sign-on."
-                : "Use your email and password to sign in."
-            }}
-          </p>
+          <div class="login-copy-stage" aria-live="polite">
+            <h1>
+              <span>Sign in </span><span class="login-sso-suffix" :aria-hidden="!isSsoMode">
+                <span class="login-sso-suffix-reserve" aria-hidden="true"> with SSO</span>
+                <Transition name="login-copy">
+                  <span v-if="isSsoMode" class="login-sso-suffix-text"> with SSO</span>
+                </Transition>
+              </span>
+            </h1>
+            <div class="login-helper-stage">
+              <Transition name="login-copy">
+                <p :key="isSsoMode ? 'sso' : 'password'" class="login-panel-copy">
+                  {{
+                    isSsoMode
+                      ? "Enter your email to continue with your workspace's single sign-on."
+                      : "Use your email and password to sign in."
+                  }}
+                </p>
+              </Transition>
+            </div>
+          </div>
 
           <form
             class="form login-form"
             @submit.prevent="isSsoMode ? handleSsoLogin() : handleLogin()"
           >
-            <label>
-               
+            <label class="login-email-field">
+              <span>Email</span>
               <input
                 v-model="email"
                 type="email"
-                placeholder="Email address"
+                placeholder=""
                 autocomplete="email"
                 autocapitalize="off"
                 autocorrect="off"
@@ -66,37 +79,44 @@
               />
             </label>
 
-            <label v-if="!isSsoMode" class="password-field">
-               
-              <span class="password-input-wrap">
-                <input
-                  v-model="password"
-                  :type="showPassword ? 'text' : 'password'"
-                  placeholder="Enter password"
-                />
-                <button
-                  type="button"
-                  class="password-visibility-toggle"
-                  :aria-label="showPassword ? 'Hide password' : 'Show password'"
-                  :aria-pressed="showPassword"
-                  @click="showPassword = !showPassword"
-                >
-                  <svg v-if="showPassword" viewBox="0 0 24 24" aria-hidden="true">
-                    <path d="M3 3l18 18" />
-                    <path d="M10.58 10.58a2 2 0 102.84 2.84" />
-                    <path d="M9.88 5.09A10.94 10.94 0 0112 4c5 0 9.27 3.11 11 8-0.69 1.94-1.91 3.61-3.5 4.85" />
-                    <path d="M6.61 6.61C4.62 7.9 3.06 9.76 2 12c1.73 4.89 6 8 10 8a9.88 9.88 0 004.23-.93" />
-                  </svg>
-                  <svg v-else viewBox="0 0 24 24" aria-hidden="true">
-                    <path d="M2 12s3.5-8 10-8 10 8 10 8-3.5 8-10 8-10-8-10-8z" />
-                    <circle cx="12" cy="12" r="3" />
-                  </svg>
-                </button>
-              </span>
-              <RouterLink class="link-button password-help-link" to="/forgot-password">
-                Forgot password?
-              </RouterLink>
-            </label>
+            <div class="credential-field-stage">
+              <Transition name="login-copy">
+                <label v-if="!isSsoMode" key="password-field" class="password-field">
+                  <span>Password</span>
+                  <span class="password-input-wrap">
+                    <input
+                      v-model="password"
+                      :type="showPassword ? 'text' : 'password'"
+                      placeholder=""
+                    />
+                    <button
+                      type="button"
+                      class="password-visibility-toggle"
+                      :aria-label="showPassword ? 'Hide password' : 'Show password'"
+                      :aria-pressed="showPassword"
+                      @click="showPassword = !showPassword"
+                    >
+                      <svg v-if="showPassword" viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M3 3l18 18" />
+                        <path d="M10.58 10.58a2 2 0 102.84 2.84" />
+                        <path d="M9.88 5.09A10.94 10.94 0 0112 4c5 0 9.27 3.11 11 8-0.69 1.94-1.91 3.61-3.5 4.85" />
+                        <path d="M6.61 6.61C4.62 7.9 3.06 9.76 2 12c1.73 4.89 6 8 10 8a9.88 9.88 0 004.23-.93" />
+                      </svg>
+                      <svg v-else viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M2 12s3.5-8 10-8 10 8 10 8-3.5 8-10 8-10-8-10-8z" />
+                        <circle cx="12" cy="12" r="3" />
+                      </svg>
+                    </button>
+                  </span>
+                  <RouterLink class="link-button password-help-link" to="/forgot-password">
+                    Forgot password?
+                  </RouterLink>
+                </label>
+                <div v-else key="sso-info" class="sso-info-field" role="status">
+                  If your email is associated with an SSO-enabled workspace, we’ll redirect you to its sign-in provider.
+                </div>
+              </Transition>
+            </div>
 
             <label v-if="turnstileSiteKey" class="security-check-field">
               
@@ -107,34 +127,43 @@
               <button
                 type="submit"
                 class="button-primary login-submit-button"
-                :disabled="isLoading || (isSsoMode ? !email.trim() : !canSubmit)"
+                :aria-label="isSsoMode ? 'Continue with SSO' : 'Sign in'"
+                :disabled="isLoading || (isSsoMode ? !canSubmitSso : !canSubmit)"
               >
-                {{ isSsoMode ? "Continue with SSO" : "Sign in" }}
+                <span class="login-submit-label-stage">
+                  <Transition name="login-submit-label">
+                    <span
+                      :key="isSsoMode ? 'sso' : 'password'"
+                      class="login-submit-label"
+                    >
+                      {{ isSsoMode ? "Continue with SSO" : "Sign in" }}
+                    </span>
+                  </Transition>
+                </span>
               </button>
               <button
-                v-if="!isSsoMode"
+                class="login-mode-toggle"
                 type="button"
                 :disabled="isLoading"
-                @click="handlePasskeyLogin"
+                @click="isSsoMode ? exitSsoMode() : enterSsoMode()"
               >
-                Sign in with a passkey
+                <span class="login-mode-toggle-label">
+                  {{ isSsoMode ? "Use password" : "Sign in with SSO" }}
+                </span>
+                <span class="login-mode-toggle-reserve" aria-hidden="true">
+                  Sign in with SSO
+                </span>
               </button>
-              <button
-                v-if="!isSsoMode"
-                type="button"
-                :disabled="isLoading"
-                @click="enterSsoMode"
-              >
-                Sign in with SSO
-              </button>
-              <button
-                v-else
-                type="button"
-                :disabled="isLoading"
-                @click="exitSsoMode"
-              >
-                Use password instead
-              </button>
+              <Transition name="passkey-action">
+                <button
+                  v-if="!isSsoMode"
+                  type="button"
+                  :disabled="isLoading"
+                  @click="handlePasskeyLogin"
+                >
+                  Sign in with a passkey
+                </button>
+              </Transition>
             </div>
           </form>
 
@@ -256,6 +285,11 @@ const canSubmit = computed(() => {
   const hasPassword = password.value.length > 0;
   const hasTurnstile = !turnstileSiteKey || Boolean(turnstileToken.value);
   return hasEmail && hasPassword && hasTurnstile;
+});
+const canSubmitSso = computed(() => {
+  const hasEmail = email.value.trim().length > 0;
+  const hasTurnstile = !turnstileSiteKey || Boolean(turnstileToken.value);
+  return hasEmail && hasTurnstile;
 });
 const enterSsoMode = () => {
   error.value = "";
@@ -777,16 +811,64 @@ onMounted(() => {
   margin: 0 0 0.85rem;
 }
 
+.login-copy-stage {
+  min-height: 8rem;
+  margin-bottom: 2rem;
+}
+
+.login-helper-stage {
+  display: grid;
+  min-height: 3rem;
+  margin-top: 1rem;
+}
+
+.login-helper-stage > * {
+  grid-area: 1 / 1;
+}
+
+.login-copy-enter-active,
+.login-copy-leave-active {
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.login-copy-enter-from {
+  opacity: 0;
+  transform: translateY(0.35rem);
+}
+
+.login-copy-leave-to {
+  opacity: 0;
+  transform: translateY(-0.35rem);
+}
+
+.login-sso-suffix {
+  position: relative;
+  display: inline-block;
+}
+
+.login-sso-suffix-reserve {
+  visibility: hidden;
+}
+
+.login-sso-suffix-text {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: inline-block;
+  white-space: nowrap;
+}
+
 .login-form-wrap h1 {
   margin: 0;
   font-size: clamp(2.6rem, 4.5vw, 4rem);
   line-height: 1;
   letter-spacing: -0.06em;
+  white-space: nowrap;
   color: var(--login-heading);
 }
 
 .login-panel-copy {
-  margin: 1rem 0 2rem;
+  margin: 0;
   color: var(--login-copy);
   font-size: 1rem;
 }
@@ -795,25 +877,59 @@ onMounted(() => {
   color: var(--login-label);
 }
 
+.login-email-field,
+.password-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
 .login-form input {
   box-sizing: border-box;
-  min-height: 4rem;
-  border-radius: 999px;
+  min-height: 3.25rem;
+  border-radius: 1rem;
   border: 1px solid var(--login-input-border);
   background: var(--login-input-bg);
   color: var(--login-input-text);
-  padding: 1rem 1.15rem;
-  font-size: 1.08rem;
+  padding: 0.6rem 1.15rem;
+  font-size: 1rem;
   line-height: 1.35;
 }
 
 .login-form input::placeholder {
   color: var(--login-input-placeholder);
-  font-size: 1.02rem;
+  font-size: 0.98rem;
 }
 
 .password-field {
   position: relative;
+  min-height: 5rem;
+}
+
+.credential-field-stage {
+  display: grid;
+  min-height: 5rem;
+  margin-top: 0.8rem;
+}
+
+.credential-field-stage > * {
+  grid-area: 1 / 1;
+}
+
+.credential-field-stage > .password-field {
+  margin-top: 0;
+}
+
+.sso-info-field {
+  display: flex;
+  align-items: center;
+  box-sizing: border-box;
+  min-height: 5rem;
+  margin-top: 0;
+  padding: 0 1.15rem;
+  color: var(--login-copy);
+  font-size: 1rem;
+  line-height: 1.45;
 }
 
 .password-input-wrap {
@@ -901,6 +1017,64 @@ onMounted(() => {
   border-color: var(--login-button-bg);
   color: var(--login-button-text);
   box-shadow: none;
+}
+
+.login-mode-toggle {
+  display: inline-grid;
+  place-items: center;
+}
+
+.login-mode-toggle-label,
+.login-mode-toggle-reserve {
+  grid-area: 1 / 1;
+  white-space: nowrap;
+}
+
+.login-mode-toggle-reserve {
+  visibility: hidden;
+}
+
+.login-submit-label-stage {
+  display: grid;
+  min-height: 1.2em;
+  overflow: hidden;
+  place-items: center;
+}
+
+.login-submit-label {
+  grid-area: 1 / 1;
+  display: block;
+  white-space: nowrap;
+}
+
+.login-submit-label-enter-active,
+.login-submit-label-leave-active {
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.login-submit-label-enter-from {
+  opacity: 0;
+  transform: translateY(100%);
+}
+
+.login-submit-label-leave-to {
+  opacity: 0;
+  transform: translateY(-100%);
+}
+
+.passkey-action-enter-active,
+.passkey-action-leave-active {
+  transition: opacity 0.22s ease, transform 0.22s ease;
+}
+
+.passkey-action-enter-from {
+  opacity: 0;
+  transform: translateX(-0.65rem);
+}
+
+.passkey-action-leave-to {
+  opacity: 0;
+  transform: translateX(-0.65rem);
 }
 
 .login-submit-button:disabled {
@@ -997,11 +1171,43 @@ onMounted(() => {
 
   .password-help-link {
     position: static;
-    margin-top: 0.55rem;
+    margin-top: 0.3rem;
+  }
+
+  .sso-info-field {
+    min-height: 7rem;
+  }
+
+  .password-field {
+    min-height: 7rem;
+  }
+
+  .credential-field-stage {
+    min-height: 7rem;
+  }
+
+  .login-copy-stage {
+    min-height: 6.75rem;
+  }
+
+  .login-form-wrap h1 {
+    font-size: clamp(2rem, 10vw, 2.6rem);
   }
 
   .security-check-field {
     margin-top: 0.75rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .login-sso-suffix,
+  .login-copy-enter-active,
+  .login-copy-leave-active,
+  .login-submit-label-enter-active,
+  .login-submit-label-leave-active,
+  .passkey-action-enter-active,
+  .passkey-action-leave-active {
+    transition-duration: 0.01ms;
   }
 }
 </style>

@@ -273,7 +273,7 @@ const {
   containerRef: turnstileContainerRef,
   token: turnstileToken,
   reset: resetTurnstile,
-} = useTurnstile(turnstileSiteKey);
+} = useTurnstile(turnstileSiteKey, themeMode);
 const requestedReturnTo = computed(() => {
   const raw = route.query.redirect;
   return sanitizeReturnTo(Array.isArray(raw) ? raw[0] : raw);

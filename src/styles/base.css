@@ -166,6 +166,15 @@ textarea {
   resize: vertical;
 }
 
+/* Keep mobile browsers from zooming when editable controls receive focus. */
+@media (any-pointer: coarse) {
+  input:not([type="button"]):not([type="submit"]):not([type="reset"]):not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):not([type="file"]):not([type="image"]):not([type="hidden"]),
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+}
+
 .form-actions {
   margin-top: 1.1rem;
   display: flex;

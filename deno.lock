@@ -1,18 +1,18 @@
 {
   "version": "5",
   "specifiers": {
-    "npm:@better-auth/infra@~0.4.11": "0.4.11_better-auth@1.7.5__vitest@5.0.1__vue@3.5.43__typescript@6.0.3_zod@4.6.5_typescript@6.0.3_vue@3.5.43",
-    "npm:@better-auth/passkey@^1.7.5": "1.7.5_better-auth@1.7.5__vitest@5.0.1__vue@3.5.43__typescript@6.0.3_typescript@6.0.3_vue@3.5.43",
-    "npm:@better-auth/sso@^1.7.5": "1.7.5_better-auth@1.7.5__vitest@5.0.1__vue@3.5.43__typescript@6.0.3_typescript@6.0.3_vue@3.5.43",
-    "npm:@cloudflare/vite-plugin@^1.56.0": "1.60.2_vite@8.3.0_wrangler@4.141.0",
+    "npm:@better-auth/infra@~0.4.11": "0.4.11_better-auth@1.7.5_zod@4.6.5_typescript@6.0.3_vue@3.5.43",
+    "npm:@better-auth/passkey@^1.7.5": "1.7.5_better-auth@1.7.5_typescript@6.0.3_vue@3.5.43",
+    "npm:@better-auth/sso@^1.7.5": "1.7.5_better-auth@1.7.5_typescript@6.0.3_vue@3.5.43",
+    "npm:@cloudflare/vite-plugin@^1.57.2": "1.62.0_vite@8.3.0_wrangler@4.143.0",
     "npm:@cyclonedx/cyclonedx-npm@6.0.1": "6.0.1",
     "npm:@intercom/messenger-js-sdk@^0.0.20": "0.0.20",
     "npm:@playwright/test@^1.63.0": "1.63.0",
-    "npm:@supabase/supabase-js@^2.116.0": "2.116.0",
+    "npm:@supabase/supabase-js@^2.117.0": "2.117.2",
     "npm:@types/node@^26.6.2": "26.6.2",
     "npm:@types/qrcode@^1.5.6": "1.5.6",
-    "npm:@vercel/analytics@^2.0.1": "2.0.1_vue@3.5.43_vue-router@4.6.4__vue@3.5.43__typescript@6.0.3_typescript@6.0.3",
-    "npm:@vercel/speed-insights@2": "2.0.0_vue@3.5.43_vue-router@4.6.4__vue@3.5.43__typescript@6.0.3_typescript@6.0.3",
+    "npm:@vercel/analytics@^2.0.1": "2.0.1_vue@3.5.43_vue-router@4.6.4_typescript@6.0.3",
+    "npm:@vercel/speed-insights@2": "2.0.0_vue@3.5.43_vue-router@4.6.4_typescript@6.0.3",
     "npm:@vitejs/plugin-vue@^6.0.9": "6.0.9_vite@8.3.0_vue@3.5.43_typescript@6.0.3",
     "npm:@vitest/coverage-v8@^5.0.1": "5.0.1_vitest@5.0.1_@types+node@26.6.2_jsdom@30.1.1_vite@8.3.0",
     "npm:@vue/test-utils@^2.5.1": "2.5.1_vue@3.5.43_typescript@6.0.3",
@@ -26,7 +26,7 @@
     "npm:jsdom@^30.1.1": "30.1.1_@noble+hashes@2.4.0",
     "npm:jspdf-autotable@^5.0.8": "5.0.8_jspdf@4.2.1",
     "npm:jspdf@^4.2.1": "4.2.1",
-    "npm:posthog-js@^1.434.2": "1.434.2",
+    "npm:posthog-js@^1.434.7": "1.434.18",
     "npm:qrcode@^1.5.4": "1.5.4",
     "npm:supabase@^2.117.0": "2.117.0",
     "npm:typescript@~6.0.3": "6.0.3",
@@ -35,7 +35,7 @@
     "npm:vue-router@^4.6.4": "4.6.4_vue@3.5.43_typescript@6.0.3",
     "npm:vue-tsc@^3.3.11": "3.3.11_typescript@6.0.3",
     "npm:vue@^3.5.43": "3.5.43_typescript@6.0.3",
-    "npm:wrangler@^4.124.0": "4.141.0",
+    "npm:wrangler@^4.124.0": "4.143.0",
     "npm:zod@^4.6.0": "4.6.5"
   },
   "npm": {
@@ -113,7 +113,7 @@
         "@better-auth/utils@0.4.2"
       ]
     },
-    "@better-auth/infra@0.4.11_better-auth@1.7.5__vitest@5.0.1__vue@3.5.43__typescript@6.0.3_zod@4.6.5_typescript@6.0.3_vue@3.5.43": {
+    "@better-auth/infra@0.4.11_better-auth@1.7.5_zod@4.6.5_typescript@6.0.3_vue@3.5.43": {
       "integrity": "sha512-zVhoFkauVUhyOkSEU4Hob9osLUhpc0DHE34lhXGIxTenlvJRCuQINaOvZ9Boi2BjQJlkUUxSkGYLxlkPaMpyVw==",
       "dependencies": [
         "@better-auth/core",
@@ -153,7 +153,7 @@
         "@better-auth/utils@0.4.2"
       ]
     },
-    "@better-auth/passkey@1.7.5_better-auth@1.7.5__vitest@5.0.1__vue@3.5.43__typescript@6.0.3_typescript@6.0.3_vue@3.5.43": {
+    "@better-auth/passkey@1.7.5_better-auth@1.7.5_typescript@6.0.3_vue@3.5.43": {
       "integrity": "sha512-7bV1d1+zLGKO3ugH4bxQKG9s2cLuMsDnpxVhQ4QNnEWjSHKmWgpIwoUsFHk3MHz0ntE7au1QLk8HYkcenW5XyQ==",
       "dependencies": [
         "@better-auth/core",
@@ -174,7 +174,7 @@
         "@better-auth/utils@0.4.2"
       ]
     },
-    "@better-auth/sso@1.7.5_better-auth@1.7.5__vitest@5.0.1__vue@3.5.43__typescript@6.0.3_typescript@6.0.3_vue@3.5.43": {
+    "@better-auth/sso@1.7.5_better-auth@1.7.5_typescript@6.0.3_vue@3.5.43": {
       "integrity": "sha512-sddwWyT4W/0mx/p7P1FmArXsFrKdoSo2BKJBkrc0gCm+HT4znYrwITWkRkwj26kx1Oz6nbNLvYOFc/6VoHcGUw==",
       "dependencies": [
         "@better-auth/core",
@@ -236,8 +236,8 @@
         "workerd"
       ]
     },
-    "@cloudflare/vite-plugin@1.60.2_vite@8.3.0_wrangler@4.141.0": {
-      "integrity": "sha512-scyKSUBOAXNJDLDD5y1qDUPBgbmGOE8v7zgTHjeYXE1VLxYGTHewhu4rUXXctJg0t2Lsp2ciW5feM858UZ5qTQ==",
+    "@cloudflare/vite-plugin@1.62.0_vite@8.3.0_wrangler@4.143.0": {
+      "integrity": "sha512-ONpwgWLt6fpygils4l2O79nhlEGUDJS6HRJcgzSlirSRsdcbW/TqIUwKa+01UVMvgaGiCh1gkxCW1sjYNFBMCg==",
       "dependencies": [
         "@cloudflare/unenv-preset",
         "miniflare",
@@ -918,14 +918,14 @@
         "@posthog/types"
       ]
     },
-    "@posthog/core@1.55.0": {
-      "integrity": "sha512-x+0FR+uHsK3uJeofd5X4S2YS7hjaWkzkPN0X1GROHm9SvKw2RJ91kfQ7gT1bPtFwZSHNiRtteB7fX/xEMRN0IQ==",
+    "@posthog/core@1.55.2": {
+      "integrity": "sha512-2mYxGbDmTLUs096VbcZqSWo0lrI48/BrX65r54NynxxFq409BOx9w73HxOAtOKZ1vblkdV6/GxQTe7KDcIQidg==",
       "dependencies": [
         "@posthog/types"
       ]
     },
-    "@posthog/types@1.412.2": {
-      "integrity": "sha512-taxTh8o6n7ZVlC8qBypZvF+6w7/18yNkS9XDiGCbutGTKqIljfzYi/7pumgwN3mcnl/n0e9A+JhF05+nLd4Xaw=="
+    "@posthog/types@1.412.4": {
+      "integrity": "sha512-Q7lV9O9TbLngjOYw1ucm3bS3tn48xb1B4ZQdDy8gv7yfKe99hCTeWYG4xZ36nJM80VxpTF9TriiJt5hngDOkBg=="
     },
     "@rolldown/binding-android-arm-eabi@1.2.8": {
       "integrity": "sha512-tN5aztYkKCte4i5SIrrz5yK/HMjEuCqCSCJa418jOV8tZ1cBY3YF2otxB1ktPxzsLA1BeTqwapK0bfjxNvHJVw==",
@@ -1030,8 +1030,8 @@
     "@standard-schema/spec@1.1.0": {
       "integrity": "sha512-l2aFy5jALhniG5HgqrD6jXLi/rUWrKvqN/qJx6yoJsgKhblVd+iqqU4RCXavm/jPityDo5TCvKMnpjKnOriy0w=="
     },
-    "@supabase/auth-js@2.116.0": {
-      "integrity": "sha512-Cmosty12gyKGK9N3bQb+lMmuAFev5nmUzaR1AsmZHqKOAGzqX1VQzmp49CNPwOx/pw0H9Qqk4rs9yhwTlKpfDg==",
+    "@supabase/auth-js@2.117.2": {
+      "integrity": "sha512-Z3WnGwrphYZubrLbxp5Iv0tLA9A5GhvKzJ/ZXglxqwd2QEH2R4dXRltjVJ8sIn4xEW2BSFIGT0yALVJIgZeDYw==",
       "dependencies": [
         "tslib@2.8.1"
       ]
@@ -1076,8 +1076,8 @@
       "os": ["win32"],
       "cpu": ["x64"]
     },
-    "@supabase/functions-js@2.116.0": {
-      "integrity": "sha512-E+VOc2QDcni/fySqkBFiZhnoB3SGydEdZgFI6/dEAGAHx6yEhB46TN9qb2wXs+E+RSzOBV0R6dasiSlw4xlZAA==",
+    "@supabase/functions-js@2.117.2": {
+      "integrity": "sha512-6DT4ZIjmZxa9ANKaBIrjc86AyKrX8M376ynvNeOBBVad3eP7x3UHqWfDR2ynFkHGzCuOpr1A+kObmnahxuwuog==",
       "dependencies": [
         "tslib@2.8.1"
       ]
@@ -1085,28 +1085,28 @@
     "@supabase/phoenix@0.4.5": {
       "integrity": "sha512-aAn9H9ovVyeApKy11OWOrrOGq8DV68yWeH4ud2lN9fzn4aO8Zb5GLL9m1pUg9nLqIcT+ZDfAcsZe0E/nqdv2lw=="
     },
-    "@supabase/postgrest-js@2.116.0": {
-      "integrity": "sha512-kGpVZTDHxFTJS3tu+rU0iTAZ+4U0bcLVjxwCk8f3gRhjw3qdCZjTBlgYvc4kGH2XccmAzbkKwXL/mrNHMGSc+A==",
+    "@supabase/postgrest-js@2.117.2": {
+      "integrity": "sha512-V1Qhn+M8xzJqCasOxHZ2KG19Fj39PxU7weEAmOK65/KTsWCRXboB4hcQwFvxRvM7ZikeP9IZWNvQkfjvSxzYFw==",
       "dependencies": [
         "tslib@2.8.1"
       ]
     },
-    "@supabase/realtime-js@2.116.0": {
-      "integrity": "sha512-MHAnlXxi2s6yiJsZsQMfs2B3RFxeVfQWxerqYhIMqcCQV/FuY3LIeouPEkXw/ah7wUWMLYwempF9MOCUScyddg==",
+    "@supabase/realtime-js@2.117.2": {
+      "integrity": "sha512-lYXSAIg3eAKA58riUED6Vb+TCzF8jtx18uOoiCaVJ7ZMre6FWBpwB1MPeW+B6vykJT/hPdiuqwcSB7ILMS21ew==",
       "dependencies": [
         "@supabase/phoenix",
         "tslib@2.8.1"
       ]
     },
-    "@supabase/storage-js@2.116.0": {
-      "integrity": "sha512-6/3hR6vccBP6oGM5B6RfbwZcTCKmQOodd/ZWQdsw8yJsU5zO/a//oBL6yLnmgxcjnHSrelW8rsO7hL5DPybyUQ==",
+    "@supabase/storage-js@2.117.2": {
+      "integrity": "sha512-8gAJoVaxZa/War2kFRfJMxGk4M190Q7lJ70BofwGlRxU/u9pIodd6XyTvmXkxOKXWuIYtkDaYPZrIAUt1T/7FQ==",
       "dependencies": [
         "iceberg-js",
         "tslib@2.8.1"
       ]
     },
-    "@supabase/supabase-js@2.116.0": {
-      "integrity": "sha512-YyWmKXt2NspV9iO8FPnlswUFJIRnrLd3oTCb+3ZyYRuKZtBH0xCUDgnUqoyA0fGUxpM/UhfwDjYf/dht/9bp7g==",
+    "@supabase/supabase-js@2.117.2": {
+      "integrity": "sha512-eSG2VKnHR+Clp1PmidZ1/weJ8PJwoybjva3L2GgKqFG4YDS1Iqmc61psKGZP5xw6OMT2O7ZorPR42PY6q1BOXg==",
       "dependencies": [
         "@supabase/auth-js",
         "@supabase/functions-js",
@@ -1149,7 +1149,7 @@
     "@types/trusted-types@2.0.7": {
       "integrity": "sha512-ScaPdn1dQczgbl0QFTeTOmVHFULt394XJgOQNoyVhZ6r2vLnMLJfBPd53SB52T/3G36VI1/g2MZaX0cwDuXsfw=="
     },
-    "@vercel/analytics@2.0.1_vue@3.5.43_vue-router@4.6.4__vue@3.5.43__typescript@6.0.3_typescript@6.0.3": {
+    "@vercel/analytics@2.0.1_vue@3.5.43_vue-router@4.6.4_typescript@6.0.3": {
       "integrity": "sha512-MTQG6V9qQrt1tsDeF+2Uoo5aPjqbVPys1xvnIftXSJYG2SrwXRHnqEvVoYID7BTruDz4lCd2Z7rM1BdkUehk2g==",
       "dependencies": [
         "vue",
@@ -1160,7 +1160,7 @@
         "vue-router"
       ]
     },
-    "@vercel/speed-insights@2.0.0_vue@3.5.43_vue-router@4.6.4__vue@3.5.43__typescript@6.0.3_typescript@6.0.3": {
+    "@vercel/speed-insights@2.0.0_vue@3.5.43_vue-router@4.6.4_typescript@6.0.3": {
       "integrity": "sha512-jwkNcrTeafWxjmWq4AHBaptSqZiJkYU5adLC9QBSqeim0GcqDMgN5Ievh8OG1rJ6W3A4l1oiP7qr9CWxGuzu3w==",
       "dependencies": [
         "vue",
@@ -2050,8 +2050,8 @@
     "mimic-response@3.1.0": {
       "integrity": "sha512-z0yWI+4FDrrweS8Zmt4Ej5HdJmky15+L2e6Wgn3+iK5fWzb6T3fhNFq2+MeTRb064c6Wr4N/wv0DzQTjNzHNGQ=="
     },
-    "miniflare@5.20260925.0-alpha": {
-      "integrity": "sha512-ly2ygNOfuouMiPcyTNEUW6f3+zgndfC45e1nQZ2LSciOSFfrih8V7ciaZ01I/64Ccp3F6fWraxh5VuHPsP3AAw==",
+    "miniflare@5.20260926.0-alpha": {
+      "integrity": "sha512-m/M3rpLnaouw6QSoKzylfw6Z1dnOwRM48idnZ7kc5ivRqBXANFQ8XqKCyQ/V+xqQ9Rg1L99j4WkZGVU9uT4L2w==",
       "dependencies": [
         "@cspotcode/source-map-support",
         "sharp",
@@ -2225,8 +2225,8 @@
         "source-map-js"
       ]
     },
-    "posthog-js@1.434.2": {
-      "integrity": "sha512-xyvjj88U2Cp1JfDzmifLvNbdiY/z+YbTT1DaRRKRZ+qzaF9IKqMLumpv8jTKGh6y3m4vc3xz0ku8h5Tw0XU9zQ==",
+    "posthog-js@1.434.18": {
+      "integrity": "sha512-GK2ueRSwD1BBwIBm/HgjJBhHWxL46TRIEwxVJYde5GOk6lq1gaklBSfMBdEBHgqIcFG5BgMmN3M0NqGZ+sDULw==",
       "dependencies": [
         "@posthog/browser-common",
         "@posthog/core",
@@ -2826,8 +2826,8 @@
       "scripts": true,
       "bin": true
     },
-    "wrangler@4.141.0": {
-      "integrity": "sha512-8+LRZEcynBMfVYgO4N378z5XyuajaILt2IzsdWRLCHrRWz7mmGWv4igdVjqbRQMJtE0S5bSmyz0W2XpA6UM/ow==",
+    "wrangler@4.143.0": {
+      "integrity": "sha512-c2lHXVr1uDzqrHLdB07zGloUI+AoCBPa06fk+JMrX5TfoydISdhfVAR1IK1Ry2eu2RJmsMsGJY3vJNykJWik2Q==",
       "dependencies": [
         "@cloudflare/kv-asset-handler",
         "@cloudflare/unenv-preset",
@@ -3011,11 +3011,11 @@
         "npm:@better-auth/infra@~0.4.11",
         "npm:@better-auth/passkey@^1.7.5",
         "npm:@better-auth/sso@^1.7.5",
-        "npm:@cloudflare/vite-plugin@^1.56.0",
+        "npm:@cloudflare/vite-plugin@^1.57.2",
         "npm:@cyclonedx/cyclonedx-npm@6.0.1",
         "npm:@intercom/messenger-js-sdk@^0.0.20",
         "npm:@playwright/test@^1.63.0",
-        "npm:@supabase/supabase-js@^2.116.0",
+        "npm:@supabase/supabase-js@^2.117.0",
         "npm:@types/node@^26.6.2",
         "npm:@types/qrcode@^1.5.6",
         "npm:@vercel/analytics@^2.0.1",
@@ -3032,7 +3032,7 @@
         "npm:jsdom@^30.1.1",
         "npm:jspdf-autotable@^5.0.8",
         "npm:jspdf@^4.2.1",
-        "npm:posthog-js@^1.434.2",
+        "npm:posthog-js@^1.434.7",
         "npm:qrcode@^1.5.4",
         "npm:supabase@^2.117.0",
         "npm:typescript@~6.0.3",

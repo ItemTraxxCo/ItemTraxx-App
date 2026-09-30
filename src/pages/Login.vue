@@ -44,7 +44,7 @@
           <p class="login-panel-copy">
             {{
               isSsoMode
-                ? "Enter your email to continue with your organization’s single sign-on."
+                ? "Enter your email to continue with your workspace's single sign-on."
                 : "Use your email and password to sign in."
             }}
           </p>

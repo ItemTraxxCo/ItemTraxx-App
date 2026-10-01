@@ -22,6 +22,12 @@ body.marketing-route-active #app {
   background: #090d14;
 }
 
+html[data-theme="light"].landing-route-active,
+body.landing-route-active,
+body.landing-route-active #app {
+  background: #fff;
+}
+
 html[data-theme="light"].auth-route-active,
 html[data-theme="light"] body.auth-route-active {
   background: #e8eef3;

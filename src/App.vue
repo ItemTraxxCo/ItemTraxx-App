@@ -262,13 +262,14 @@ const updateBrowserChromeColor = () => {
   if (isFullBleedRoute.value) color = theme.value === "dark" ? "#090c12" : "#f9f9f7";
   else if (isSubmitConfirmationRoute.value) color = theme.value === "dark" ? "#090c12" : "#eef5f8";
   else if (isUnavailableRoute.value) color = theme.value === "dark" ? "#101010" : "#f7f7f5";
+  else if (isLandingRoute.value) { color = "#ffffff"; appleStyle = "default"; }
   else if (isDarkChromeRoute.value) { color = "#090d14"; appleStyle = "black-translucent"; }
   themeColor.setAttribute("content", color);
   appleStatus?.setAttribute("content", appleStyle);
 };
 const applyTheme = (next: "light" | "dark") => {
   setTheme(next);
-  document.documentElement.setAttribute("data-theme", isLandingRoute.value ? "dark" : next);
+  document.documentElement.setAttribute("data-theme", isLandingRoute.value ? "light" : next);
   updateBrowserChromeColor();
 };
 const toggleTheme = () => { applyTheme(theme.value === "dark" ? "light" : "dark"); menuOpen.value = false; };
@@ -347,6 +348,8 @@ watchEffect(() => {
   document.body.classList.toggle("auth-route-active", isFullBleedRoute.value);
   document.documentElement.classList.toggle("marketing-route-active", isDarkChromeRoute.value);
   document.body.classList.toggle("marketing-route-active", isDarkChromeRoute.value);
+  document.documentElement.classList.toggle("landing-route-active", isLandingRoute.value);
+  document.body.classList.toggle("landing-route-active", isLandingRoute.value);
   document.documentElement.classList.toggle("confirmation-route-active", isSubmitConfirmationRoute.value);
   document.body.classList.toggle("confirmation-route-active", isSubmitConfirmationRoute.value);
   document.documentElement.classList.toggle("unavailable-route-active", isUnavailableRoute.value);
@@ -370,7 +373,7 @@ watch(() => [backendUnavailable.value, route.path] as const, ([unavailable, path
 });
 watch(() => [route.name, auth.isInitialized, auth.isAuthenticated, auth.role, auth.workspaceContextId, auth.hasSecondaryAuth, district.isWorkspaceHost, district.workspaceId] as const, () => void maybeRedirectAuthenticatedPublicHome());
 watch(isLandingRoute, () => {
-  document.documentElement.setAttribute("data-theme", isLandingRoute.value ? "dark" : theme.value);
+  document.documentElement.setAttribute("data-theme", isLandingRoute.value ? "light" : theme.value);
   updateBrowserChromeColor();
 });
 onMounted(() => {

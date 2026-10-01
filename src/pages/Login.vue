@@ -1120,7 +1120,7 @@ onMounted(() => {
   }
 }
 
-@media (max-height: 940px) {
+@media (max-height: 760px) {
   .login-split-panel {
     grid-template-columns: 1fr;
   }

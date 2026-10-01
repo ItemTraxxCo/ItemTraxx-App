@@ -5,6 +5,10 @@ body.auth-route-active {
   overflow-y: auto;
 }
 
+html.auth-route-active {
+  zoom: 100%;
+}
+
 html.marketing-route-active,
 body.marketing-route-active {
   background: #090d14;

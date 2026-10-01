@@ -367,7 +367,7 @@ onBeforeUnmount(() => {
   <div id="top" class="itemtraxx-page">
 <header class="site-header wrap">
     <a class="brand" href="#top" aria-label="ItemTraxx home"><img :src="itemtraxxLogo" alt="ItemTraxx Co"></a>
-    <nav class="main-nav" aria-label="Main navigation"><a href="/pricing">Pricing</a><a href="/contact-support">Support</a><a href="/getting-started">Getting Started</a><a href="/security">Security</a><a href="https://status.itemtraxx.com/">Status <span aria-hidden="true">↗</span></a></nav>
+    <nav class="main-nav" aria-label="Main navigation"><a href="/pricing">Pricing</a><a href="/contact-support">Support</a><a href="/getting-started">Getting Started</a><a href="/security">Security</a><a href="https://status.itemtraxx.com/" target="_blank" rel="noopener noreferrer">Status <span aria-hidden="true">↗</span></a></nav>
     <a class="cta" href="/login">Login</a>
   </header>
   <main>

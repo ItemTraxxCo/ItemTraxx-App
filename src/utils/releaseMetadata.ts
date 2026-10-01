@@ -11,17 +11,32 @@ export const getReleaseMetadata = () => {
     typeof window !== "undefined" ? window.location.hostname.trim().toLowerCase() : "";
   const isDevHost =
     runtimeHostname === "dev.itemtraxx.com" || runtimeHostname.endsWith(".dev.itemtraxx.com");
+  const normalizedBranch = appBranch.trim().toLowerCase();
+  const hasBranchMetadata = Boolean(normalizedBranch && normalizedBranch !== "n/a");
+  const isNonMainBranch = hasBranchMetadata && normalizedBranch !== "main";
+  const branchReleaseChannel =
+    normalizedBranch === "main"
+      ? "Production"
+      : normalizedBranch === "staging" || normalizedBranch.startsWith("staging/")
+        ? "Staging"
+        : normalizedBranch === "preview" || normalizedBranch.startsWith("preview/")
+          ? "Preview"
+          : normalizedBranch === "dev" || normalizedBranch.startsWith("dev/")
+            ? "Development"
+            : null;
 
   const releaseChannel =
     isDevHost
       ? "Development"
-      : runtimeEnvironment === "production"
-        ? "Production"
-        : runtimeEnvironment === "preview"
-          ? "Preview"
-          : runtimeEnvironment === "beta"
-            ? "Beta"
-            : "Development";
+      : branchReleaseChannel ??
+        (runtimeEnvironment === "beta"
+          ? "Beta"
+          : runtimeEnvironment === "preview" ||
+              (runtimeEnvironment === "production" && isNonMainBranch)
+            ? "Preview"
+            : runtimeEnvironment === "production"
+              ? "Production"
+              : "Development");
 
   const showBranchName = Boolean(appBranch && appBranch !== "n/a" && appBranch !== "main");
 

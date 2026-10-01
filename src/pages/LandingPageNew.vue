@@ -381,11 +381,11 @@ onBeforeUnmount(() => {
                   <colgroup><col class="row-number"><col class="name"><col class="borrower"><col class="due"><col class="status"></colgroup>
                   <thead><tr><th></th><th>Item</th><th>Borrower</th><th>Due back</th><th>Status</th></tr></thead>
                   <tbody>
-                    <tr><th class="row-number">1</th><td class="head">Camera — Sony A7 iii</td><td>Maya C.</td><td class="stale">????????????</td><td>out</td></tr>
-                    <tr><th class="row-number">2</th><td class="duplicate">Camera — Sony A7 iii</td><td class="blank"></td><td>9/23</td><td>check</td></tr>
+                    <tr><th class="row-number">1</th><td>Camera — Sony A7 iii</td><td>Maya C.</td><td class="stale">9/20</td><td>out</td></tr>
+                    <tr><th class="row-number">2</th><td>Camera — Sony A7 C2</td><td class="blank"></td><td>9/23</td><td>check</td></tr>
                     <tr><th class="row-number">3</th><td>Wireless mic set</td><td>Jordan Lee · p4</td><td class="late">9/17</td><td class="late">late</td></tr>
-                    <tr><th class="row-number">4</th><td>USB-C adapter</td><td>Sam?</td><td>—</td><td class="blank"></td></tr>
-                    <tr><th class="row-number">5</th><td class="head">Tripod, Manfrotto</td><td>—</td><td class="stale">10/2?</td><td>????????????</td></tr>
+                    <tr><th class="row-number">4</th><td>USB-C adapter</td><td>Sam R.</td><td>—</td><td class="blank"></td></tr>
+                    <tr><th class="row-number">5</th><td>Tripod, Manfrotto</td><td>—</td><td class="stale">10/2</td><td>out</td></tr>
                   </tbody>
                 </table>
               </div>

@@ -187,3 +187,4 @@
     .itemtraxx-page .feature-sheet .sheet-grid td.kind-unknown{background:#ffe3df}
 
     @media(min-width:641px){.itemtraxx-page .comparison .media-frame{height:clamp(320px,40vw,460px)}}
+    .itemtraxx-page .comparison .checkout-image img{transform:scale(1.2)}

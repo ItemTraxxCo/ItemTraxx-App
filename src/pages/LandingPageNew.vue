@@ -1,6 +1,6 @@
 <script setup>
 import { onBeforeUnmount, onMounted } from "vue";
-import checkoutReturnUiImage from "../assets/landing/checkout_return_ui_new.png";
+import checkoutReturnUiImage from "../assets/landing/checkout_return_ui.png";
 import { getReleaseMetadata } from "../utils/releaseMetadata";
 const itemtraxxLogo = import.meta.env.VITE_BRAND_LOGO_LIGHT_URL || "/brand/logo-light.png";
 
@@ -210,6 +210,13 @@ onMounted(() => {
         complete: section.querySelector("#demo-complete"),
         announcement: section.querySelector("#demo-announcement")
       };
+      demo.stage.addEventListener("click", (event) => {
+        if (!(event.target instanceof Element)) return;
+        const button = event.target.closest("button");
+        if (!button || button.id === "demo-replay") return;
+        event.preventDefault();
+        event.stopPropagation();
+      }, true);
       let demoRun = 0;
       const demoDelay = (ms) => new Promise((resolve) => window.setTimeout(resolve, ms));
       const demoIsCurrent = (id) => demoRun === id && section.isConnected && section.dataset.state === "solution";
@@ -392,7 +399,7 @@ onBeforeUnmount(() => {
             </article>
             <div class="transform-arrow" aria-hidden="true"><svg viewBox="0 0 40 40" fill="none"><path d="M5 20h27m-10-10 10 10-10 10" stroke="currentColor" stroke-width="1.8" stroke-linecap="square" stroke-linejoin="miter"/></svg></div>
             <article class="compare-panel" id="checkout">
-              <div class="media-frame checkout-image"><img :src="checkoutReturnUiImage" alt="ItemTraxx checkout and return screen showing borrower details, checked-out items and checkout controls" width="2656" height="1584"></div>
+              <div class="media-frame checkout-image"><img :src="checkoutReturnUiImage" alt="ItemTraxx checkout and return screen showing borrower details, checked-out items and checkout controls" width="2780" height="1798"></div>
             </article>
           </div>
         </div>
@@ -444,7 +451,7 @@ onBeforeUnmount(() => {
                   <label class="demo-label" for="demo-borrower-id">Borrower ID</label>
                   <div class="demo-input-row">
                     <input class="demo-input" id="demo-borrower-id" type="text" placeholder="Enter borrower ID" readonly aria-label="Demo borrower ID">
-                    <button class="demo-button" type="button" tabindex="-1">Load borrower</button>
+                    <button class="demo-button" type="button" tabindex="-1" aria-disabled="true">Load borrower</button>
                   </div>
                   <button class="demo-camera" type="button" tabindex="-1" aria-disabled="true">Use device camera to scan barcode</button>
                   <p class="demo-hint" id="demo-initial-hint">Enter a borrower ID to begin.</p>
@@ -453,14 +460,14 @@ onBeforeUnmount(() => {
                     <label class="demo-label" for="demo-barcode">Item barcode</label>
                     <div class="demo-input-row">
                       <input class="demo-input" id="demo-barcode" type="text" placeholder="Scan or enter barcode" readonly aria-label="Demo item barcode">
-                      <button class="demo-button" type="button" tabindex="-1">Add barcode</button>
+                      <button class="demo-button" type="button" tabindex="-1" aria-disabled="true">Add barcode</button>
                     </div>
                     <button class="demo-camera" type="button" tabindex="-1" aria-disabled="true">Use device camera to scan barcode</button>
                     <p class="demo-hint demo-barcode-hint">Press Enter or click “Add barcode” to add.</p>
                     <p class="demo-subhead">Items</p>
-                    <ul class="demo-items"><li id="demo-queued-item" hidden><span class="demo-item-name">Wireless microphone kit <span class="demo-item-code">(IT-2048)</span></span><span class="demo-tag checkout" id="demo-item-action">Checkout</span><button class="demo-remove" type="button" tabindex="-1">Remove</button></li></ul>
+                    <ul class="demo-items"><li id="demo-queued-item" hidden><span class="demo-item-name">Wireless microphone kit <span class="demo-item-code">(IT-2048)</span></span><span class="demo-tag checkout" id="demo-item-action">Checkout</span><button class="demo-remove" type="button" tabindex="-1" aria-disabled="true">Remove</button></li></ul>
                     <div class="demo-actions" id="demo-actions" hidden>
-                      <button class="demo-complete" id="demo-complete" type="button" tabindex="-1">Complete transaction</button>
+                      <button class="demo-complete" id="demo-complete" type="button" tabindex="-1" aria-disabled="true">Complete transaction</button>
                     </div>
                     <p class="demo-success" id="demo-success" aria-live="polite" hidden>Transaction complete.</p>
                   </div>

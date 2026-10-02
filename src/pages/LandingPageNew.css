@@ -152,4 +152,12 @@
 
     .interactive-switch button:hover:not(:disabled),
     .platform-slide-index button:hover:not(:disabled){transform:none}
-    .demo-camera[aria-disabled="true"]{cursor:default;opacity:1;pointer-events:none}
+    .solution-stage button{cursor:default}
+    .solution-stage .demo-replay{cursor:pointer}
+    .solution-stage .demo-button:hover{background-color:#171817}
+    .solution-stage .demo-camera:hover{background-color:#fff}
+    .solution-stage .demo-remove:hover{background-color:#f4f4f2}
+    .solution-stage .demo-complete:hover:not(.is-pressed){background-color:#171817}
+    .solution-stage .demo-complete.is-pressed:hover{background-color:#3d4541}
+    .solution-stage .demo-replay:hover{background-color:#fff}
+    .demo-camera[aria-disabled="true"]{cursor:default;opacity:1}

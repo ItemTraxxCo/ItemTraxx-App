@@ -430,7 +430,7 @@ onBeforeUnmount(() => {
           <button class="comparison-toggle" type="button" data-view="solution" aria-pressed="false">With ItemTraxx</button>
         </div>
         <div class="interactive-copy" aria-live="polite">
-          <div data-copy="problem" class="is-active" aria-hidden="false"><h2 id="compare-title">A spreadsheet leaves too much to guess.</h2><p>Duplicates, blank cells, and question marks make it hard to know what is actually available.</p></div>
+          <div data-copy="problem" class="is-active" aria-hidden="false"><h2 id="compare-title">A spreadsheet leaves too much to guess.</h2><p>Duplicates, blank cells, and unknowns make it hard to know what is actually available.</p></div>
           <div data-copy="solution" aria-hidden="true"><h2>Checkout and returns, without the guesswork.</h2><p>ItemTraxx keeps checkout and returns simple for hassle-free inventory management.</p></div>
         </div>
         <div class="interactive-visual messy-view" aria-label="Inventory management before and after ItemTraxx">

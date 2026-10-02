@@ -170,3 +170,20 @@
     .itemtraxx-page #platform-title,
     .itemtraxx-page .final-cta h2{font-size:var(--section-heading-size)}
     .itemtraxx-page .what-intro h2{font-family:inherit;font-weight:400;line-height:1.04;letter-spacing:-.045em}
+
+    /* Keep the fake spreadsheets white except for their red alert cells. */
+    .itemtraxx-page .spreadsheet-window,
+    .itemtraxx-page .feature-sheet .live-sheet-bar{background:#fff}
+    .itemtraxx-page .sheet-grid thead th,
+    .itemtraxx-page .sheet-grid .row-number,
+    .itemtraxx-page .sheet-grid .head,
+    .itemtraxx-page .sheet-grid .stale,
+    .itemtraxx-page .sheet-grid .blank,
+    .itemtraxx-page .feature-sheet .sheet-grid td.kind-item,
+    .itemtraxx-page .feature-sheet .sheet-grid td.kind-person,
+    .itemtraxx-page .feature-sheet .sheet-grid td.kind-time,
+    .itemtraxx-page .feature-sheet .sheet-grid td.kind-status{background:#fff}
+    .itemtraxx-page .sheet-grid .late{background:#f8e9e5}
+    .itemtraxx-page .feature-sheet .sheet-grid td.kind-unknown{background:#ffe3df}
+
+    @media(min-width:641px){.itemtraxx-page .comparison .media-frame{height:clamp(320px,40vw,460px)}}

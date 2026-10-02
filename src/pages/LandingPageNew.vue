@@ -99,7 +99,7 @@ onMounted(() => {
       let finalCount = 0;
       let finalOrder = null;
       let running = false;
-      const typeSpeed = 280;
+      const typeSpeed = 240;
 
       function active() {
         return visible && section.dataset.state === "problem" && !motionOff;
@@ -281,7 +281,7 @@ onMounted(() => {
         for (const character of value) {
           if (!demoIsCurrent(id)) return false;
           field.value += character;
-          await demoDelay(105);
+          await demoDelay(90);
         }
         return demoIsCurrent(id);
       }
@@ -380,6 +380,11 @@ onBeforeUnmount(() => {
   <main>
     <section class="hero" id="comparison" aria-labelledby="hero-title">
       <div class="wrap">
+        <div class="hero-copy">
+          <h1 id="hero-title">Inventory Tracking Made Simple</h1>
+          <p>Bring your items, borrowers, checkouts and returns into one clear place with ItemTraxx.</p>
+          <div class="hero-actions" aria-label="Get started"><a class="hero-action primary" href="/request-demo">Get a demo</a><a class="hero-action secondary" href="/pricing">Pricing</a></div>
+        </div>
         <div class="comparison-stage">
           <div class="comparison" aria-label="A messy inventory spreadsheet compared with the ItemTraxx checkout and return interface">
             <article class="compare-panel">
@@ -402,11 +407,6 @@ onBeforeUnmount(() => {
               <div class="media-frame checkout-image"><img :src="checkoutReturnUiImage" alt="ItemTraxx checkout and return screen showing borrower details, checked-out items and checkout controls" width="2780" height="1798"></div>
             </article>
           </div>
-        </div>
-        <div class="hero-copy">
-          <h1 id="hero-title">Inventory Tracking Made Simple</h1>
-          <p>Bring your items, borrowers, checkouts and returns into one clear place with ItemTraxx.</p>
-          <div class="hero-actions" aria-label="Get started"><a class="hero-action primary" href="/request-demo">Get a demo</a><a class="hero-action secondary" href="/pricing">Pricing</a></div>
         </div>
       </div>
     </section>

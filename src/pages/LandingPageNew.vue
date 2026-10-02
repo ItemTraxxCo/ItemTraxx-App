@@ -382,7 +382,7 @@ onBeforeUnmount(() => {
       <div class="wrap">
         <div class="hero-copy">
           <h1 id="hero-title">Inventory Tracking Made Simple</h1>
-          <p>Bring your items, borrowers, checkouts and returns into one clear place with ItemTraxx.</p>
+          <h2 style="text-align: center; font-weight: 400;">Just the way it should be.</h2>
           <div class="hero-actions" aria-label="Get started"><a class="hero-action primary" href="/request-demo">Get a demo</a><a class="hero-action secondary" href="/pricing">Pricing</a></div>
         </div>
         <div class="comparison-stage">
@@ -419,7 +419,7 @@ onBeforeUnmount(() => {
         <div class="what-list" aria-label="ItemTraxx workflows">
           <article class="what-row"><span class="number">01</span><h3>Organize inventory</h3><p>Keep shared items and their details in one clear, searchable place.</p></article>
           <article class="what-row"><span class="number">02</span><h3>Track checkouts and returns</h3><p>Record who has an item, when it leaves, and when it comes back.</p></article>
-          <article class="what-row"><span class="number">03</span><h3>Review activity</h3><p>Follow item history and keep each transaction easy to understand.</p></article>
+          <article class="what-row"><span class="number">03</span><h3>Review activity</h3><p>Follow item history and maintain a clear record of all transactions.</p></article>
         </div>
       </div>
     </section>
@@ -523,7 +523,7 @@ onBeforeUnmount(() => {
     </section>
     <section class="platform-section" id="platform" aria-labelledby="platform-title">
       <div class="wrap">
-        <header class="platform-heading"><h2 id="platform-title">Meet the platform keeping your shared inventory organized.</h2></header>
+        <header class="platform-heading"><h2 id="platform-title">The platform that keeps your inventory organized.</h2></header>
         <div class="platform-slide-index" role="group" aria-label="Choose a platform feature">
           <button class="is-active" type="button" data-slide-label="0" aria-pressed="true">Checkout</button>
           <button type="button" data-slide-label="1" aria-pressed="false">Admin</button>
@@ -532,8 +532,8 @@ onBeforeUnmount(() => {
         <div class="platform-progress" aria-hidden="true"><span class="platform-progress-fill"></span></div>
         <div class="platform-features" aria-label="ItemTraxx platform feature slideshow">
           <article class="platform-feature" data-feature="0" role="group" aria-roledescription="slide" aria-label="Checkout and returns"><h3>Checkout and return, all in one clear flow</h3><p>Start by entering a borrower ID. Once the borrower is loaded, scan or type one or more item barcodes; ItemTraxx checks each item's current checkout status to label the action Checkout or Return. Review the item list, remove a mis-scanned item, then complete the transaction. The borrower and each item receive linked activity records, so staff can later check who had an item and when it moved. Admins also have Quick Return for items coming back without a borrower lookup. On prepared devices, eligible transactions can queue locally during a connection loss and sync later.</p></article>
-          <article class="platform-feature" data-feature="1" role="group" aria-roledescription="slide" aria-label="Inventory and borrower management" hidden><h3>Manage inventory, borrowers, and activity</h3><p>Search items by name, barcode, serial number, status, or notes, then open a record to review or update it. Track whether an item is available, checked out, damaged, lost, or being repaired. Manage borrower records, filter checkout and return logs by action, person, item, or date range, and export the current view as CSV or PDF. For setup work, import items from CSV with a preview and validation report, or create printable PDF barcode labels in batches. Bulk actions can update or archive multiple items at once.</p></article>
-          <article class="platform-feature" data-feature="2" role="group" aria-roledescription="slide" aria-label="Workspace for organizations" hidden><h3>One Workspace for shared inventory</h3><p>ItemTraxx Workspaces bring multiple tenant accounts under one organization's management, with shared inventory across teams and/or locations. Item-level access controls let admins make records available to all accounts or limit them to selected accounts. Workspace admins can add, suspend, restore, or remove tenant accounts; manage administrator access; set Workspace details and checkout defaults; and review logs that identify the account tied to each action. This helps an organization coordinate shared equipment while controlling which teams can see specific records.</p></article>
+          <article class="platform-feature" data-feature="1" role="group" aria-roledescription="slide" aria-label="Inventory and borrower management" hidden><h3>Manage inventory, borrowers, and activity</h3><p>Search items by name, barcode, serial number, status, or notes, then open a record to review or update it. Track whether an item is available, checked out, damaged, lost, or being repaired. Manage borrower records, filter checkout and return logs by action, person, item, or date range, and export the current view as CSV or PDF. For setup work, import items from CSV with a preview and validation report, or create printable PDF barcode labels in batches. Bulk actions can update or archive multiple items at once for efficient management.</p></article>
+          <article class="platform-feature" data-feature="2" role="group" aria-roledescription="slide" aria-label="Workspace for organizations" hidden><h3>One Workspace for shared inventory</h3><p>ItemTraxx Workspaces bring multiple tenant accounts under one organization's management, with shared inventory across teams and/or locations. Item-level access controls let admins make records available to all accounts or limit them to selected accounts. Workspace admins can add, suspend, restore, or remove tenant accounts; manage administrator access; set Workspace details and checkout defaults; and review logs that identify the account tied to each action. This helps an organization coordinate shared equipment while controlling which teams can see specific records. Support for SSO via SAML 2.0 and OIDC available.</p></article>
         </div>
         <div class="platform-rule" aria-hidden="true"></div>
       </div>

@@ -523,7 +523,7 @@ onBeforeUnmount(() => {
     </section>
     <section class="platform-section" id="platform" aria-labelledby="platform-title">
       <div class="wrap">
-        <header class="platform-heading"><h2 id="platform-title">Meet the platform keeping your shared inventory organized</h2></header>
+        <header class="platform-heading"><h2 id="platform-title">Meet the platform keeping your shared inventory organized.</h2></header>
         <div class="platform-slide-index" role="group" aria-label="Choose a platform feature">
           <button class="is-active" type="button" data-slide-label="0" aria-pressed="true">Checkout</button>
           <button type="button" data-slide-label="1" aria-pressed="false">Admin</button>

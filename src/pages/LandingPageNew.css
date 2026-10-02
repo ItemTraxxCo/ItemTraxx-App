@@ -161,3 +161,12 @@
     .solution-stage .demo-complete.is-pressed:hover{background-color:#3d4541}
     .solution-stage .demo-replay:hover{background-color:#fff}
     .demo-camera[aria-disabled="true"]{cursor:default;opacity:1}
+
+    /* Keep section headlines on one fluid scale; the hero and demo UI stay independent. */
+    .itemtraxx-page{--section-heading-size:clamp(34px,calc(4.2vw + 12px),58px)}
+    .itemtraxx-page .what-intro h2,
+    .itemtraxx-page .interactive-copy h2,
+    .itemtraxx-page .platform-heading h2,
+    .itemtraxx-page #platform-title,
+    .itemtraxx-page .final-cta h2{font-size:var(--section-heading-size)}
+    .itemtraxx-page .what-intro h2{font-family:inherit;font-weight:400;line-height:1.04;letter-spacing:-.045em}

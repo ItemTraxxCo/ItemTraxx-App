@@ -3,6 +3,7 @@ import { resolveTrustedGeneralLocation } from "../../_shared/requestMetadata.ts"
 import {
   isMissingPrivilegedStepUpTable,
   registerPrivilegedStepUp,
+  SUPER_ADMIN_ACTION_CONFIRMATION_SOURCE,
 } from "../../_shared/privilegedStepUp.ts";
 import { asRecord, optionalText, requireText } from "../../_shared/validation.ts";
 import type { SuperOpsContext } from "../context.ts";
@@ -135,7 +136,7 @@ export const handleSecuritySessionsAction = async (
         userId: user.id,
         roleScope: "super_admin",
         authToken: accessToken,
-        source: "super_admin_settings_password",
+        source: SUPER_ADMIN_ACTION_CONFIRMATION_SOURCE,
       });
     } catch (error) {
       if (isMissingPrivilegedStepUpTable(error as { code?: string; message?: string })) {

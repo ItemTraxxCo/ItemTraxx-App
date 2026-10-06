@@ -48,20 +48,19 @@ const SESSION_HEARTBEAT_INTERVAL_MS =
     : DEFAULT_SESSION_HEARTBEAT_INTERVAL_MS;
 const LOGIN_CONTEXT_QUERY_KEY = "login_ctx";
 const LOGIN_CONTEXT_VALUES = new Set(["admin_login", "regular_login"]);
-const SSO_PROVIDER_QUERY_KEY = "itx_sso_provider_id";
-const SSO_PROTOCOL_QUERY_KEY = "itx_sso_protocol";
-const SSO_CONTEXT_MAX_AGE_MS = 10 * 60_000;
+const SSO_PROOF_QUERY_KEY = "itx_sso_proof";
+const LEGACY_SSO_PROVIDER_QUERY_KEY = "itx_sso_provider_id";
+const LEGACY_SSO_PROTOCOL_QUERY_KEY = "itx_sso_protocol";
+const SSO_CONTEXT_MAX_AGE_MS = 5 * 60_000;
 
 type ConsumedLoginContext = {
   loginContext: "admin_login" | "regular_login" | null;
-  ssoProviderId: string | null;
-  ssoProtocol: "SAML2.0" | "OpenID Connect (OIDC)" | null;
+  ssoLoginProof: string | null;
   ssoContext: PendingSsoLoginContext | null;
 };
 
 type PendingSsoLoginContext = {
-  providerId: string;
-  protocol: "SAML2.0" | "OpenID Connect (OIDC)";
+  proof: string;
   capturedAt: number;
 };
 
@@ -204,31 +203,23 @@ export const useAdminSessionLifecycle = (options: AdminSessionLifecycleOptions) 
   };
 
   const captureSsoLoginContext = () => {
-    const providerId = firstQueryString(
-      options.route.query[SSO_PROVIDER_QUERY_KEY],
+    const proof = firstQueryString(
+      options.route.query[SSO_PROOF_QUERY_KEY],
     );
-    const protocol = firstQueryString(
-      options.route.query[SSO_PROTOCOL_QUERY_KEY],
-    );
-    if (
-      typeof providerId !== "string" ||
-      !/^[a-z0-9-]{1,128}$/i.test(providerId) ||
-      typeof protocol !== "string" ||
-      (protocol !== "SAML2.0" && protocol !== "OpenID Connect (OIDC)")
-    ) {
+    if (typeof proof !== "string" || !/^[a-z0-9_-]{1,1900}\.[a-z0-9_-]{43}$/i.test(proof)) {
       return;
     }
     pendingSsoLoginContext = {
-      providerId,
-      protocol: protocol as PendingSsoLoginContext["protocol"],
+      proof,
       capturedAt: Date.now(),
     };
   };
 
   watch(
     () => [
-      options.route.query[SSO_PROVIDER_QUERY_KEY],
-      options.route.query[SSO_PROTOCOL_QUERY_KEY],
+      options.route.query[SSO_PROOF_QUERY_KEY],
+      options.route.query[LEGACY_SSO_PROVIDER_QUERY_KEY],
+      options.route.query[LEGACY_SSO_PROTOCOL_QUERY_KEY],
     ],
     captureSsoLoginContext,
     { immediate: true },
@@ -240,9 +231,9 @@ export const useAdminSessionLifecycle = (options: AdminSessionLifecycleOptions) 
     const loginContext = typeof value === "string" && LOGIN_CONTEXT_VALUES.has(value)
       ? value as ConsumedLoginContext["loginContext"]
       : null;
-    const hasSsoQuery =
-      SSO_PROVIDER_QUERY_KEY in options.route.query ||
-      SSO_PROTOCOL_QUERY_KEY in options.route.query;
+    const hasSsoQuery = SSO_PROOF_QUERY_KEY in options.route.query ||
+      LEGACY_SSO_PROVIDER_QUERY_KEY in options.route.query ||
+      LEGACY_SSO_PROTOCOL_QUERY_KEY in options.route.query;
 
     let ssoLogin = pendingSsoLoginContext;
     if (ssoLogin && Date.now() - ssoLogin.capturedAt > SSO_CONTEXT_MAX_AGE_MS) {
@@ -254,16 +245,16 @@ export const useAdminSessionLifecycle = (options: AdminSessionLifecycleOptions) 
     if (loginContext || hasSsoQuery) {
       const {
         [LOGIN_CONTEXT_QUERY_KEY]: _discardLoginContext,
-        [SSO_PROVIDER_QUERY_KEY]: _discardSsoProvider,
-        [SSO_PROTOCOL_QUERY_KEY]: _discardSsoProtocol,
+        [SSO_PROOF_QUERY_KEY]: _discardSsoProof,
+        [LEGACY_SSO_PROVIDER_QUERY_KEY]: _discardSsoProvider,
+        [LEGACY_SSO_PROTOCOL_QUERY_KEY]: _discardSsoProtocol,
         ...restQuery
       } = options.route.query;
       void options.router.replace({ path: options.route.path, query: restQuery });
     }
     return {
       loginContext,
-      ssoProviderId: ssoLogin?.providerId ?? null,
-      ssoProtocol: ssoLogin?.protocol ?? null,
+      ssoLoginProof: ssoLogin?.proof ?? null,
       ssoContext: ssoLogin,
     };
   };
@@ -307,10 +298,9 @@ export const useAdminSessionLifecycle = (options: AdminSessionLifecycleOptions) 
       }
       try {
         const loginContext = consumeLoginContext();
-        if (loginContext?.ssoProviderId && loginContext.ssoProtocol) {
+        if (loginContext?.ssoLoginProof) {
           await touchAccountSession({
-            loginMethod: loginContext.ssoProviderId,
-            loginLocation: loginContext.ssoProtocol,
+            ssoLoginProof: loginContext.ssoLoginProof,
           });
           if (pendingSsoLoginContext === loginContext.ssoContext) {
             pendingSsoLoginContext = null;

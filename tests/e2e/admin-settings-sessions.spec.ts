@@ -103,7 +103,7 @@ test.describe("admin settings device sessions repro", () => {
     // Current session must remain: no forced logout / termination banner, still on account settings.
     await expect(page).toHaveURL(/\/settings\/account/);
     await expect(page.getByText("Admin laptop")).toBeVisible();
-    await expect(page.getByText("This device")).toBeVisible();
+    await expect(page.getByText("This device", { exact: true })).toBeVisible();
   });
 
   test("individual account sessions use account sign-in wording", async ({ page }) => {

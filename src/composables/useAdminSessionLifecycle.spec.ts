@@ -199,6 +199,38 @@ describe("useAdminSessionLifecycle", () => {
     wrapper.unmount();
   });
 
+  it("forwards only the callback proof for SSO session metadata", async () => {
+    const auth = buildAuth({ isAuthenticated: true, role: "workspace_admin", userId: "u1" });
+    const proof = `${"a".repeat(24)}.${"b".repeat(43)}`;
+    const route = buildRoute("/admin/items", { itx_sso_proof: proof });
+    const { wrapper, router } = mountHost({ auth, route });
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(router.replace).toHaveBeenCalledWith(
+      expect.objectContaining({ path: "/admin/items", query: {} }),
+    );
+    expect(mockedTouchAccountSession).toHaveBeenCalledWith({
+      ssoLoginProof: proof,
+    });
+    wrapper.unmount();
+  });
+
+  it("strips legacy caller-authored SSO query values without forwarding them", async () => {
+    const auth = buildAuth({ isAuthenticated: true, role: "workspace_admin", userId: "u1" });
+    const route = buildRoute("/admin/items", {
+      itx_sso_provider_id: "invented-provider",
+      itx_sso_protocol: "SAML2.0",
+    });
+    const { wrapper, router } = mountHost({ auth, route });
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(router.replace).toHaveBeenCalledWith(
+      expect.objectContaining({ path: "/admin/items", query: {} }),
+    );
+    expect(mockedTouchAccountSession).toHaveBeenCalledWith({});
+    wrapper.unmount();
+  });
+
   it("retries validation once and shows session termination if it stays invalid", async () => {
     const auth = buildAuth({ isAuthenticated: true, role: "workspace_admin", userId: "u1" });
     const route = buildRoute();

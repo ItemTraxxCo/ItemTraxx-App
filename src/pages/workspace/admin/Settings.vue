@@ -2,9 +2,9 @@
   <div class="page admin-shell">
     <div class="admin-hero">
       <div class="page-nav-left">
-        <RouterLink class="button-link" :to="managerRoot">Return to manager home</RouterLink>
+        <RouterLink class="button-link" :to="managerRoot">Back</RouterLink>
       </div>
-      <h1>Personal Settings</h1>
+      <h1>Account Settings</h1>
       <p class="admin-hero-copy">Configure your checkout defaults and manage active account sessions.</p>
       <p><RouterLink class="button-link" to="/account/security">Account Security</RouterLink><template v-if="!isIndividualAccount"> · <RouterLink class="button-link" to="/admin/settings/sso">Enterprise SSO</RouterLink></template></p>
       <div class="admin-summary-grid">
@@ -18,6 +18,8 @@
         </div>
       </div>
     </div>
+
+    <OfflinePackSettings />
 
     <div class="card admin-section-card">
       <div class="admin-section-header">
@@ -73,7 +75,7 @@
           <button type="button" :disabled="isSaving" @click="loadSettings">Reload Settings</button>
         </div>
       </form>
-      <p v-if="error" class="error">{{ error }}</p>
+      <p v-if="error" class="error" v-app-toast-error="{ suppressMessage: toastMessage }">{{ error }}</p>
       <p v-if="success" class="success">{{ success }}</p>
     </div>
 
@@ -163,7 +165,7 @@
           Sign out all other devices
         </button>
       </div>
-      <p v-if="sessionError" class="error">{{ sessionError }}</p>
+      <p v-if="sessionError" class="error" v-app-toast-error="{ suppressMessage: toastMessage }">{{ sessionError }}</p>
       <p v-if="sessionSuccess" class="success">{{ sessionSuccess }}</p>
     </div>
 
@@ -177,6 +179,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from "vue";
 import { RouterLink } from "vue-router";
+import OfflinePackSettings from "../../../components/OfflinePackSettings.vue";
 import { useManagerContext } from "../../../composables/useManagerContext";
 import { toUserFacingErrorMessage } from "../../../services/appErrors";
 import {

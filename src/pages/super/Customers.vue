@@ -21,7 +21,7 @@
       <button class="sa-btn" type="button" :disabled="isLoading" @click="loadCustomers">Search</button>
     </section>
 
-    <p v-if="error" class="sa-error">{{ error }}</p>
+    <p v-if="error" class="sa-error" v-app-toast-error>{{ error }}</p>
     <p v-else-if="isLoading" class="muted">Loading customers...</p>
 
     <div v-else class="sa-table-wrap">

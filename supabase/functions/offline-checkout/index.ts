@@ -7,7 +7,7 @@ import { isKillSwitchWriteBlocked } from "../_shared/killSwitch.ts";
 import { resolveRateLimitResult } from "../_shared/preloginGuards.ts";
 import { readJsonBody } from "../_shared/requestBody.ts";
 import { requireTrustedEdgeIngress } from "../_shared/trustedIngress.ts";
-import { requireEnum, ValidationError } from "../_shared/validation.ts";
+import { requireEnum, requireUuid, ValidationError } from "../_shared/validation.ts";
 import {
   containsQuickReturn,
   type OfflineSyncItem,
@@ -18,8 +18,19 @@ import {
   visibleCheckedOutBy,
 } from "./contracts.ts";
 
-const ACTIONS = new Set(["prepare_pack", "sync", "resolve"] as const);
-const PAGE_SIZE = 500;
+const ACTIONS = new Set([
+  "prepare_pack",
+  "prepare_pack_chunk",
+  "complete_pack",
+  "activate_pack",
+  "cancel_pack",
+  "sync",
+  "resolve",
+] as const);
+const PACK_CHUNK_SIZE = 100;
+const MAX_OFFLINE_PACK_RECORDS = 10_000;
+const MAX_OFFLINE_PACK_BYTES = 25 * 1024 * 1024;
+const MAX_OFFLINE_PACK_CHUNK_BYTES = 1024 * 1024;
 const PACK_LIFETIME_MS = 24 * 60 * 60 * 1000;
 
 const baseCorsHeaders = {
@@ -65,24 +76,6 @@ const publicItemState = (item: ItemRow | null) =>
       checked_out_by: null,
     }
     : { missing: true };
-
-const fetchAll = async <T>(
-  makeQuery: (from: number, to: number) => PromiseLike<{
-    data: T[] | null;
-    error: { message?: string } | null;
-  }>,
-) => {
-  const rows: T[] = [];
-  for (let from = 0;; from += PAGE_SIZE) {
-    const { data, error } = await makeQuery(from, from + PAGE_SIZE - 1);
-    if (error) {
-      throw new Error(error.message || "Unable to prepare offline pack.");
-    }
-    const page = data ?? [];
-    rows.push(...page);
-    if (page.length < PAGE_SIZE) return rows;
-  }
-};
 
 serve(async (req) => {
   const origin = req.headers.get("Origin");
@@ -211,11 +204,18 @@ serve(async (req) => {
       });
     }
 
+    const rateLimitRequestLimit = action === "prepare_pack"
+      ? 3
+      : action === "prepare_pack_chunk"
+      ? 120
+      : action === "cancel_pack"
+      ? 10
+      : 20;
     const { data: rateLimit, error: rateLimitError } = await userClient.rpc(
       "consume_rate_limit",
       {
         p_scope: `offline_checkout_${action}`,
-        p_limit: action === "prepare_pack" ? 3 : 20,
+        p_limit: rateLimitRequestLimit,
         p_window_seconds: 60,
       },
     );
@@ -236,20 +236,39 @@ serve(async (req) => {
     if (action === "prepare_pack") {
       const preparedAt = new Date();
       const expiresAt = new Date(preparedAt.getTime() + PACK_LIFETIME_MS);
-      const [items, borrowers] = await Promise.all([
-        fetchAll<ItemRow>((from, to) =>
-          userClient.from("items")
-            .select("id,name,barcode,status,checked_out_by,access_mode")
-            .eq("workspace_id", profile.workspace_id).is("deleted_at", null)
-            .not("barcode", "is", null).order("id").range(from, to)
-        ),
-        fetchAll<BorrowerRow>((from, to) =>
-          userClient.from("borrowers")
-            .select("id,username,borrower_id,access_mode")
-            .eq("workspace_id", profile.workspace_id).is("deleted_at", null)
-            .not("borrower_id", "is", null).order("id").range(from, to)
-        ),
+      const [itemsCountResult, borrowersCountResult] = await Promise.all([
+        userClient.from("items")
+          .select("id", { count: "exact", head: true })
+          .eq("workspace_id", profile.workspace_id).is("deleted_at", null)
+          .not("barcode", "is", null),
+        userClient.from("borrowers")
+          .select("id", { count: "exact", head: true })
+          .eq("workspace_id", profile.workspace_id).is("deleted_at", null)
+          .not("borrower_id", "is", null),
       ]);
+      if (itemsCountResult.error || borrowersCountResult.error) {
+        throw new Error("Unable to count offline checkout records.");
+      }
+      const itemCount = itemsCountResult.count ?? 0;
+      const borrowerCount = borrowersCountResult.count ?? 0;
+      if (itemCount + borrowerCount > MAX_OFFLINE_PACK_RECORDS) {
+        return jsonResponse(413, {
+          error:
+            `Offline pack exceeds the server safety limit of ${MAX_OFFLINE_PACK_RECORDS.toLocaleString()} total items and borrowers. Narrow the records available to this account before downloading an offline pack.`,
+          code: "offline_pack_too_large",
+          item_count: itemCount,
+          borrower_count: borrowerCount,
+          max_records: MAX_OFFLINE_PACK_RECORDS,
+        });
+      }
+
+      const { error: stalePreparationError } = await adminClient
+        .from("offline_checkout_packs").delete()
+        .eq("workspace_id", profile.workspace_id).eq("profile_id", profile.id)
+        .eq("device_id", deviceId).eq("download_complete", false);
+      if (stalePreparationError) {
+        throw new Error("Unable to clear an interrupted offline pack preparation.");
+      }
 
       const { data: pack, error: packError } = await adminClient
         .from("offline_checkout_packs").insert({
@@ -258,38 +277,13 @@ serve(async (req) => {
           device_id: deviceId,
           prepared_at: preparedAt.toISOString(),
           expires_at: expiresAt.toISOString(),
-          item_count: items.length,
-          borrower_count: borrowers.length,
+          item_count: itemCount,
+          borrower_count: borrowerCount,
+          download_complete: false,
         }).select("id,prepared_at,expires_at").single();
       if (packError || !pack?.id) {
         throw new Error("Unable to register offline pack.");
       }
-      const visibleBorrowerIds = new Set(borrowers.map((borrower) => borrower.id));
-
-      for (let offset = 0; offset < items.length; offset += PAGE_SIZE) {
-        const snapshotRows = items.slice(offset, offset + PAGE_SIZE).map((
-          item,
-        ) => ({
-          pack_id: pack.id,
-          item_id: item.id,
-          snapshot_status: item.status,
-          snapshot_checked_out_by: item.checked_out_by,
-        }));
-        const { error } = await adminClient.from("offline_checkout_pack_items")
-          .insert(snapshotRows);
-        if (error) {
-          await adminClient.from("offline_checkout_packs").delete().eq(
-            "id",
-            pack.id,
-          );
-          throw new Error("Unable to register offline pack contents.");
-        }
-      }
-
-      await adminClient.from("offline_checkout_packs").update({
-        invalidated_at: preparedAt.toISOString(),
-      }).eq("profile_id", profile.id).eq("device_id", deviceId)
-        .is("invalidated_at", null).neq("id", pack.id);
 
       return jsonResponse(200, {
         data: {
@@ -297,20 +291,178 @@ serve(async (req) => {
           prepared_at: pack.prepared_at,
           expires_at: pack.expires_at,
           workspace_id: profile.workspace_id,
-          borrowers: borrowers.map(({ id, username, borrower_id }) => ({
-            id,
-            username,
-            borrower_id,
-          })),
+          item_count: itemCount,
+          borrower_count: borrowerCount,
+          chunk_size: PACK_CHUNK_SIZE,
+          max_records: MAX_OFFLINE_PACK_RECORDS,
+          max_bytes: MAX_OFFLINE_PACK_BYTES,
+        },
+      });
+    }
+
+    if (
+      action === "prepare_pack_chunk" || action === "complete_pack" ||
+      action === "activate_pack" || action === "cancel_pack"
+    ) {
+      const packVersion = requireUuid(body.pack_version);
+      const { data: pack, error: packError } = await adminClient
+        .from("offline_checkout_packs")
+        .select("id,prepared_at,expires_at,item_count,borrower_count,download_complete,invalidated_at")
+        .eq("id", packVersion)
+        .eq("workspace_id", profile.workspace_id)
+        .eq("profile_id", profile.id)
+        .eq("device_id", deviceId)
+        .maybeSingle();
+      if (packError) throw new Error("Unable to verify offline pack.");
+      if (!pack || pack.invalidated_at) {
+        return jsonResponse(403, {
+          error: "Offline pack is not valid for this account and device.",
+        });
+      }
+
+      if (action === "cancel_pack") {
+        if (!pack.download_complete) {
+          const { error } = await adminClient.from("offline_checkout_packs")
+            .delete().eq("id", pack.id).eq("workspace_id", profile.workspace_id)
+            .eq("profile_id", profile.id).eq("device_id", deviceId)
+            .eq("download_complete", false);
+          if (error) throw new Error("Unable to cancel offline pack preparation.");
+        }
+        return jsonResponse(200, { data: { cancelled: true } });
+      }
+
+      if (Date.parse(pack.expires_at) <= Date.now()) {
+        return jsonResponse(403, { error: "Offline pack preparation has expired." });
+      }
+
+      if (action === "prepare_pack_chunk") {
+        if (pack.download_complete) {
+          return jsonResponse(409, { error: "Offline pack is already complete." });
+        }
+        const afterItemId = body.after_item_id === undefined || body.after_item_id === null || body.after_item_id === ""
+          ? null
+          : requireUuid(body.after_item_id);
+        const afterBorrowerId = body.after_borrower_id === undefined || body.after_borrower_id === null || body.after_borrower_id === ""
+          ? null
+          : requireUuid(body.after_borrower_id);
+        const itemQuery = userClient.from("items")
+          .select("id,name,barcode,status,checked_out_by,access_mode")
+          .eq("workspace_id", profile.workspace_id).is("deleted_at", null)
+          .not("barcode", "is", null);
+        const borrowerQuery = userClient.from("borrowers")
+          .select("id,username,borrower_id,access_mode")
+          .eq("workspace_id", profile.workspace_id).is("deleted_at", null)
+          .not("borrower_id", "is", null);
+        const [itemsResult, borrowersResult] = await Promise.all([
+          (afterItemId ? itemQuery.gt("id", afterItemId) : itemQuery)
+            .order("id").limit(PACK_CHUNK_SIZE),
+          (afterBorrowerId ? borrowerQuery.gt("id", afterBorrowerId) : borrowerQuery)
+            .order("id").limit(PACK_CHUNK_SIZE),
+        ]);
+        if (itemsResult.error || borrowersResult.error) {
+          throw new Error("Unable to load the next offline pack chunk.");
+        }
+        const items = (itemsResult.data ?? []) as ItemRow[];
+        const borrowers = (borrowersResult.data ?? []) as BorrowerRow[];
+        const chunkData = {
           items: items.map(({ id, name, barcode, status, checked_out_by }) => ({
             id,
             name,
             barcode,
             status,
-            checked_out_by: visibleCheckedOutBy(checked_out_by, visibleBorrowerIds),
+            checked_out_by,
           })),
-        },
-      });
+          borrowers: borrowers.map(({ id, username, borrower_id }) => ({
+            id,
+            username,
+            borrower_id,
+          })),
+          next_item_id: items.at(-1)?.id ?? null,
+          next_borrower_id: borrowers.at(-1)?.id ?? null,
+          item_count: pack.item_count,
+          borrower_count: pack.borrower_count,
+        };
+        if (!items.length && !borrowers.length) {
+          return jsonResponse(200, { data: chunkData });
+        }
+        const referencedBorrowerIds = [...new Set(items.flatMap((item) => item.checked_out_by ? [item.checked_out_by] : []))];
+        const visibleBorrowerIds = new Set<string>();
+        if (referencedBorrowerIds.length) {
+          const { data, error } = await userClient.from("borrowers")
+            .select("id").eq("workspace_id", profile.workspace_id)
+            .is("deleted_at", null).in("id", referencedBorrowerIds);
+          if (error) throw new Error("Unable to verify offline borrower access.");
+          for (const row of data ?? []) visibleBorrowerIds.add(row.id);
+        }
+
+        const visibleItems = items.map((item, index) => ({
+          ...chunkData.items[index],
+          checked_out_by: visibleCheckedOutBy(item.checked_out_by, visibleBorrowerIds),
+        }));
+        const responseData = { ...chunkData, items: visibleItems };
+        const chunkBytes = new TextEncoder().encode(
+          JSON.stringify({ data: responseData }),
+        ).byteLength;
+        if (chunkBytes > MAX_OFFLINE_PACK_CHUNK_BYTES) {
+          return jsonResponse(413, {
+            error: "One offline pack chunk exceeds the 1 MiB transfer limit. Shorten unusually large item or borrower details and try again.",
+            code: "offline_pack_chunk_too_large",
+            max_chunk_bytes: MAX_OFFLINE_PACK_CHUNK_BYTES,
+          });
+        }
+
+        const { error: chunkError } = await adminClient.rpc(
+          "store_offline_checkout_pack_chunk",
+          {
+            p_pack_id: pack.id,
+            p_workspace_id: profile.workspace_id,
+            p_profile_id: profile.id,
+            p_device_id: deviceId,
+            p_items: items.map((item) => ({
+              item_id: item.id,
+              snapshot_status: item.status,
+              snapshot_checked_out_by: item.checked_out_by,
+            })),
+            p_borrower_ids: borrowers.map((borrower) => borrower.id),
+            p_chunk_bytes: chunkBytes,
+          },
+        );
+        if (chunkError?.code === "22023") {
+          return jsonResponse(413, {
+            error: "The offline pack exceeds the 25 MiB server safety limit. Reduce the records or details available to this account and try again.",
+            code: "offline_pack_too_large",
+            max_bytes: MAX_OFFLINE_PACK_BYTES,
+          });
+        }
+        if (chunkError) throw new Error("Unable to register offline pack chunk.");
+
+        return jsonResponse(200, {
+          data: responseData,
+        });
+      }
+
+      if (action === "complete_pack") {
+        const { error } = await adminClient.rpc("complete_offline_checkout_pack", {
+          p_pack_id: pack.id,
+          p_workspace_id: profile.workspace_id,
+          p_profile_id: profile.id,
+          p_device_id: deviceId,
+        });
+        if (error) throw new Error("Unable to verify completed offline pack contents.");
+        return jsonResponse(200, { data: { pack_version: pack.id, download_complete: true } });
+      }
+
+      if (!pack.download_complete) {
+        return jsonResponse(409, { error: "Offline pack is not complete." });
+      }
+      const activatedAt = new Date().toISOString();
+      const { error: invalidateError } = await adminClient.from("offline_checkout_packs")
+        .update({ invalidated_at: activatedAt })
+        .eq("workspace_id", profile.workspace_id).eq("profile_id", profile.id)
+        .eq("device_id", deviceId).eq("download_complete", true)
+        .is("invalidated_at", null).neq("id", pack.id);
+      if (invalidateError) throw new Error("Unable to activate offline pack.");
+      return jsonResponse(200, { data: { pack_version: pack.id, activated: true } });
     }
 
     const canAccessItem = async (item: ItemRow) => {
@@ -348,7 +500,7 @@ serve(async (req) => {
     const describeServerState = async (itemId: string) => {
       const current = await loadItem(itemId);
       if (!current) return publicItemState(null);
-      if (!(await canAccessItem(current))) return publicItemState(current);
+      if (!(await canAccessItem(current))) return { unavailable: true };
       if (
         current.checked_out_by &&
         !(await canAccessBorrower(current.checked_out_by))
@@ -386,7 +538,9 @@ serve(async (req) => {
         checked_out_by: current.checked_out_by,
         borrower_username: borrowerResult.data?.username ?? null,
         borrower_display_id: borrowerResult.data?.borrower_id ?? null,
-        performed_by_email: actor?.auth_email ?? null,
+        ...(profile.role === "tenant_account"
+          ? { performed_by_email: null }
+          : { performed_by_email: actor?.auth_email ?? null }),
         action_type: log?.action_type ?? null,
         action_time: log?.action_time ?? null,
       };
@@ -498,10 +652,11 @@ serve(async (req) => {
         });
       }
       const { data: pack } = await adminClient.from("offline_checkout_packs")
-        .select("id,prepared_at,expires_at").eq("id", packVersion)
+        .select("id,prepared_at,expires_at,download_complete").eq("id", packVersion)
         .eq("workspace_id", profile.workspace_id).eq("profile_id", profile.id)
-        .eq("device_id", deviceId).is("invalidated_at", null).maybeSingle();
-      if (!pack) {
+        .eq("device_id", deviceId).eq("download_complete", true)
+        .is("invalidated_at", null).maybeSingle();
+      if (!pack || !pack.download_complete) {
         return jsonResponse(403, {
           error: "Offline pack is not valid for this account and device.",
         });
@@ -666,9 +821,10 @@ serve(async (req) => {
       return jsonResponse(404, { error: "Offline conflict not found." });
     }
     const { data: activePack } = await adminClient
-      .from("offline_checkout_packs").select("id,expires_at")
+      .from("offline_checkout_packs").select("id,expires_at,download_complete")
       .eq("id", conflict.pack_id).eq("workspace_id", profile.workspace_id)
       .eq("profile_id", profile.id).eq("device_id", deviceId)
+      .eq("download_complete", true)
       .is("invalidated_at", null).maybeSingle();
     const activePackExpiresMs = activePack ? Date.parse(activePack.expires_at) : Number.NaN;
     if (!activePack || !Number.isFinite(activePackExpiresMs) || Date.now() >= activePackExpiresMs) {

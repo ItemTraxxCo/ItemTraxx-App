@@ -5,7 +5,11 @@ import { isKillSwitchWriteBlocked } from "../_shared/killSwitch.ts";
 import { isAllowedOrigin, parseAllowedOrigins } from "../_shared/cors.ts";
 import { requireTrustedEdgeIngress } from "../_shared/trustedIngress.ts";
 import { readJsonBody } from "../_shared/requestBody.ts";
-import { hasPrivilegedStepUp } from "../_shared/privilegedStepUp.ts";
+import {
+  hasPrivilegedStepUp,
+  hasRecentPrivilegedStepUp,
+  SUPER_ADMIN_ACTION_CONFIRMATION_SOURCE,
+} from "../_shared/privilegedStepUp.ts";
 import { isSuperAdminTokenBlockedBySessionRevocation } from "../_shared/superAdminSessions.ts";
 import { writeSuperAdminAudit } from "../_shared/superAdminAudit.ts";
 import { callBetterAuthAdmin } from "../_shared/betterAuthAdmin.ts";
@@ -90,18 +94,29 @@ serve(async (req) => {
         error: "Session unavailable",
       });
     }
-    if (
-      !await hasPrivilegedStepUp(admin, {
-        userId: user.id,
-        roleScope: "super_admin",
-        authToken: token,
-      })
-    ) return json(403, { error: "Super admin verification required." });
     const body = await readJsonBody(req),
       action = requireText(body.action, { maxLen: 64 }),
       p = (body.payload && typeof body.payload === "object"
         ? body.payload
         : {}) as Record<string, unknown>;
+    const stepUpOptions = {
+      userId: user.id,
+      roleScope: "super_admin" as const,
+      authToken: token,
+    };
+    const hasRequiredStepUp = action === "create_super_admin"
+      ? await hasRecentPrivilegedStepUp(admin, {
+        ...stepUpOptions,
+        source: SUPER_ADMIN_ACTION_CONFIRMATION_SOURCE,
+      })
+      : await hasPrivilegedStepUp(admin, stepUpOptions);
+    if (!hasRequiredStepUp) {
+      return json(403, {
+        error: action === "create_super_admin"
+          ? "Confirm your current password before creating a Super Admin."
+          : "Super admin verification required.",
+      });
+    }
     const enrich = async (rows: any[]) => {
       const ids = [
         ...new Set(rows.map((r) =>
@@ -309,6 +324,13 @@ serve(async (req) => {
       if (action === "set_super_admin_status") {
         if (id === user.id && p.is_active === false) return json(400, { error: "You cannot suspend your own account." });
         if (typeof p.is_active !== "boolean") return json(400, { error: "Invalid request" });
+        if (p.is_active === false) {
+          try {
+            await callBetterAuthAdmin({ action: "revoke_sessions", profileId: id });
+          } catch {
+            return json(503, { error: "Unable to revoke Super Admin sessions." });
+          }
+        }
         const { data, error } = await admin.from("profiles").update({ is_active: p.is_active }).eq("id", id).eq("role", "super_admin").select("id,auth_email,role,is_active,created_at").single();
         if (error || !data) return json(400, { error: "Unable to update Super Admin." });
         await writeSuperAdminAudit(admin, {
@@ -406,6 +428,13 @@ serve(async (req) => {
       }
       if (typeof p.is_active !== "boolean") {
         return json(400, { error: "Invalid request" });
+      }
+      if (p.is_active === false) {
+        try {
+          await callBetterAuthAdmin({ action: "revoke_sessions", profileId: id });
+        } catch {
+          return json(503, { error: "Unable to revoke Workspace Admin sessions." });
+        }
       }
       const { data, error } = await admin.from("profiles").update({
         is_active: p.is_active,

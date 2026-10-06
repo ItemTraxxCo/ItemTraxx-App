@@ -200,7 +200,7 @@
           </div>
         </div>
         <p v-if="isLoading" class="muted">Loading dashboard...</p>
-        <p v-else-if="error" class="error">{{ error }}</p>
+        <p v-else-if="error" class="error" v-app-toast-error="{ suppressMessage: toastMessage }">{{ error }}</p>
         <table v-else class="table">
           <thead>
             <tr>

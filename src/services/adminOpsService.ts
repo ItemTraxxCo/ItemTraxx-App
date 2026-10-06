@@ -76,6 +76,7 @@ export type AccountSessionItem = {
 export type AccountSessionTouchOptions = {
   loginMethod?: string;
   loginLocation?: AccountSessionItem["login_location"];
+  ssoLoginProof?: string;
 };
 
 type AdminOpsRequestOptions = {
@@ -188,13 +189,14 @@ export const touchAccountSession = async (
     return withCachedAdminOp(
       getAdminOpCacheKey(
         "touch_session",
-        `${options.loginMethod ?? "none"}:${options.loginLocation ?? "none"}`
+        `${options.loginMethod ?? "none"}:${options.loginLocation ?? "none"}:${options.ssoLoginProof ?? "none"}`
       ),
       20_000,
       () =>
         sendAdminOps<{ ok: boolean }>("touch_session", {
           login_method: options.loginMethod,
           login_location: options.loginLocation,
+          sso_login_proof: options.ssoLoginProof,
         }, { avoidCorsPreflight: true })
     );
   })();

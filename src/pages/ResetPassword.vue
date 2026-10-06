@@ -9,7 +9,7 @@
 
       <div v-if="showBlockedState" class="reset-blocked" role="alert">
         <strong>Password reset is unavailable</strong>
-        <p>
+        <p v-app-toast-error="{ title: 'Password reset unavailable' }">
           Link expired or unavailable. Request a new one below. Resetting your password requires a valid reset email link.
         </p>
         <RouterLink class="button-primary reset-blocked-action" to="/forgot-password">
@@ -46,7 +46,7 @@
           </button>
         </div>
       </form>
-      <p v-if="error && !showBlockedState" class="error">{{ error }}</p>
+      <p v-if="error && !showBlockedState" class="error" v-app-toast-error>{{ error }}</p>
       <p v-if="success" class="muted">
         Password successfully updated. Please check your email for confirmation and try signing in again. 
         If you have any issues, please contact our support team.
@@ -280,8 +280,8 @@ onUnmounted(() => {
   align-items: center;
   justify-content: center;
   width: fit-content;
-  min-height: 2.05rem;
-  padding: 0.42rem 0.72rem;
+  min-height: 1.95rem;
+  padding: 0.32rem 0.65rem;
   border: 1px solid var(--reset-button-bg);
   border-radius: 999px;
   background: var(--reset-button-bg);

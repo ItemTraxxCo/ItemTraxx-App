@@ -113,9 +113,9 @@ const emit = defineEmits<{
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 2.15rem;
-  padding: 0.42rem 0.85rem;
-  border-radius: 10px;
+  min-height: 2rem;
+  padding: 0.32rem 0.75rem;
+  border-radius: var(--button-radius);
   text-decoration: none;
   font-weight: 600;
   transition: transform 0.16s ease, box-shadow 0.16s ease, background-color 0.16s ease;
@@ -174,9 +174,9 @@ const emit = defineEmits<{
 
   .cta-secondary,
   .cta-primary {
-    min-height: 1.7rem;
-    padding: 0.26rem 0.58rem;
-    border-radius: 999px;
+    min-height: 1.6rem;
+    padding: 0.2rem 0.5rem;
+    border-radius: var(--button-radius);
   }
 
   .hero-copy h1 {

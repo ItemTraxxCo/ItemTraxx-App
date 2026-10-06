@@ -33,7 +33,7 @@ test.describe("global CSS ownership contracts", () => {
     });
 
     await page.goto("/");
-    await expect(page.getByRole("heading", { name: "ItemTraxx", exact: true })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Inventory Tracking Made Simple", exact: true })).toBeVisible();
     expect(authenticatedCssRequests).toEqual([]);
 
     await setWorkspaceAdminSession(page);

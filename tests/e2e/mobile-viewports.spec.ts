@@ -11,15 +11,18 @@ test.describe("Mobile viewport coverage", () => {
 
   test("landing CTA buttons stay visible on mobile", async ({ page }) => {
     await page.goto("/");
-    await expect(page.getByRole("link", { name: "Pricing" }).first()).toBeVisible();
-    await expect(page.getByRole("link", { name: "Request Demo" }).first()).toBeVisible();
+    const heroActions = page.locator(".hero-actions");
+    await expect(heroActions.getByRole("link", { name: "Pricing", exact: true })).toBeVisible();
+    await expect(heroActions.getByRole("link", { name: "Get a demo", exact: true })).toBeVisible();
   });
 
-  test("hero benefit points remain fully visible on mobile", async ({ page }) => {
+  test("current landing workflow summaries stay visible without horizontal overflow", async ({ page }) => {
     await page.goto("/");
-    const heroPoints = page.locator(".hero-points li");
-    await expect(heroPoints.filter({ hasText: "Secure sign-ins and protected admin access" })).toBeVisible();
-    await expect(heroPoints.filter({ hasText: "Clear transaction history and audit visibility" })).toBeVisible();
-    await expect(heroPoints.filter({ hasText: "Easy item and user management features" })).toBeVisible();
+    await expect(page.locator("#workflow .what-row")).toHaveCount(3);
+    const dimensions = await page.evaluate(() => ({
+      documentWidth: document.documentElement.scrollWidth,
+      viewportWidth: document.documentElement.clientWidth,
+    }));
+    expect(dimensions.documentWidth).toBeLessThanOrEqual(dimensions.viewportWidth);
   });
 });

@@ -19,14 +19,21 @@ import {
   isRpcProxyPath,
 } from "./routing.ts";
 import { proxySupabaseApiRequest } from "./supabaseApiProxy.ts";
+import { isItemTraxxHostname } from "./url.ts";
+import { enforcePublicRequestLimit } from "./publicRequestRateLimit.ts";
 import { handleMtaStsRequest, isMtaStsRequest } from "./mtaSts.ts";
 import {
   handleBetterAuthRequest,
+  getBetterAuth,
   handleInternalAuthAdminRequest,
   handleOrganizationLogoRead,
   handleOrganizationLogoUpload,
   handleSsoManagementRequest,
 } from "./auth.ts";
+import {
+  createSsoLoginProof,
+  isSessionCreatedDuringSsoCallback,
+} from "../../../supabase/functions/_shared/ssoLoginProvenance.ts";
 
 const resolveKillSwitchMessage = (env: Env) =>
   env.ITX_ITEMTRAXX_KILLSWITCH_MESSAGE?.trim() || DEFAULT_KILL_SWITCH_MESSAGE;
@@ -76,30 +83,102 @@ const isSamlIdpFormPost = (request: Request, url: URL) => {
     contentType === "application/x-www-form-urlencoded";
 };
 
-const resolveSsoCallbackContext = (pathname: string) => {
+export const resolveSsoCallbackContext = (request: Request) => {
+  const pathname = new URL(request.url).pathname;
   const samlMatch = pathname.match(
     /^\/api\/auth\/sso\/saml2\/sp\/acs\/([a-z0-9-]+)$/i,
   );
-  if (samlMatch?.[1]) {
+  if (samlMatch?.[1] && request.method === "POST") {
     return { providerId: samlMatch[1], protocol: "SAML2.0" } as const;
   }
 
   const oidcMatch = pathname.match(
     /^\/api\/auth\/sso\/callback\/([a-z0-9-]+)$/i,
   );
-  if (oidcMatch?.[1]) {
-    return { providerId: oidcMatch[1], protocol: "OpenID Connect (OIDC)" } as const;
+  if (
+    oidcMatch?.[1] && (request.method === "GET" || request.method === "POST")
+  ) {
+    return {
+      providerId: oidcMatch[1],
+      protocol: "OpenID Connect (OIDC)",
+    } as const;
   }
 
   return null;
 };
 
-const attachSsoLoginContext = (
+export const getCookieHeaderFromSetCookies = (headers: Headers) => {
+  const maybeExtended = headers as Headers & { getSetCookie?: () => string[] };
+  if (typeof maybeExtended.getSetCookie !== "function") return null;
+
+  const cookies = new Map<string, string>();
+  const setCookies = maybeExtended.getSetCookie();
+  if (setCookies.length > 32) return null;
+  for (const setCookie of setCookies) {
+    const cookiePair = setCookie.split(";", 1)[0]?.trim();
+    const separator = cookiePair?.indexOf("=") ?? -1;
+    if (separator <= 0) continue;
+    const name = cookiePair!.slice(0, separator).trim();
+    if (!name) continue;
+    cookies.set(name, cookiePair!.slice(separator + 1));
+  }
+
+  if (cookies.size === 0) return null;
+  const cookieHeader = Array.from(
+    cookies,
+    ([name, value]) => `${name}=${value}`,
+  ).join("; ");
+  return cookieHeader.length <= 8192 ? cookieHeader : null;
+};
+
+const createSsoCallbackProof = async (
+  response: Response,
+  env: Env,
+  context: {
+    providerId: string;
+    protocol: "SAML2.0" | "OpenID Connect (OIDC)";
+  },
+  callbackStartedAtMs: number,
+  existingSessionId: string | null,
+) => {
+  const cookie = getCookieHeaderFromSetCookies(response.headers);
+  if (!cookie || !env.ITX_INTERNAL_AUTH_SECRET?.trim()) return null;
+
+  try {
+    const session = await getBetterAuth(env).api.getSession({
+      headers: new Headers({ cookie }),
+    });
+    const betterAuthUserId = session?.user?.id?.trim();
+    const sessionId = session?.session?.id?.trim();
+    if (
+      !session || !betterAuthUserId || !sessionId ||
+      !isSessionCreatedDuringSsoCallback(
+        session.session.createdAt,
+        callbackStartedAtMs,
+        Date.now(),
+        existingSessionId,
+        sessionId,
+      )
+    ) return null;
+
+    return await createSsoLoginProof(env.ITX_INTERNAL_AUTH_SECRET, {
+      ...context,
+      betterAuthUserId,
+      sessionId,
+    });
+  } catch {
+    // Provenance is best-effort metadata. A failure here must not interrupt a
+    // successful SSO sign-in, and no unverified provider claim is forwarded.
+    return null;
+  }
+};
+
+export const attachSsoLoginProof = (
   response: Response,
   requestUrl: URL,
-  providerId: string,
-  protocol: string,
+  proof: string | null,
 ) => {
+  if (!proof) return response;
   const location = response.headers.get("Location");
   if (response.status < 300 || response.status >= 400 || !location) {
     return response;
@@ -107,14 +186,19 @@ const attachSsoLoginContext = (
 
   try {
     const redirectUrl = new URL(location, requestUrl);
+    const allowedDestination = (redirectUrl.protocol === "https:" &&
+      isItemTraxxHostname(redirectUrl.hostname)) ||
+      isLocalhostOrigin(redirectUrl.origin);
     if (
+      !allowedDestination ||
       redirectUrl.searchParams.has("error") ||
       redirectUrl.searchParams.has("error_description")
     ) {
       return response;
     }
-    redirectUrl.searchParams.set("itx_sso_provider_id", providerId);
-    redirectUrl.searchParams.set("itx_sso_protocol", protocol);
+    redirectUrl.searchParams.delete("itx_sso_provider_id");
+    redirectUrl.searchParams.delete("itx_sso_protocol");
+    redirectUrl.searchParams.set("itx_sso_proof", proof);
 
     const headers = new Headers(response.headers);
     headers.set("Location", redirectUrl.toString());
@@ -185,7 +269,7 @@ export default {
         }
 
         const organizationLogoMatch = url.pathname.match(
-          /^\/api\/organization\/([0-9a-f-]{36})\/logo(?:\/(logo-[0-9a-f-]{36}\.(?:png|jpg|webp)))?$/i,
+          /^\/api\/organization\/([0-9a-f-]{36})\/logo(?:\/(logo-current|logo-[0-9a-f-]{36}\.(?:png|jpg|webp)))?$/i,
         );
         if (organizationLogoMatch) {
           const logoFileName = organizationLogoMatch[2];
@@ -221,18 +305,53 @@ export default {
         }
 
         if (url.pathname.startsWith("/api/auth/")) {
+          if (
+            request.method === "POST" &&
+            url.pathname === "/api/auth/sign-in/email"
+          ) {
+            const admitted = await enforcePublicRequestLimit(
+              env.PUBLIC_AUTH_RATE_LIMITER,
+              tracedRequest,
+              "better-auth-email-sign-in",
+            );
+            if (!admitted.allowed) {
+              return buildError(
+                admitted.unavailable ? 503 : 429,
+                admitted.unavailable
+                  ? "Authentication admission is unavailable"
+                  : "Too many sign-in attempts",
+                headers,
+                requestId,
+              );
+            }
+          }
+          const ssoCallback = resolveSsoCallbackContext(tracedRequest);
+          let existingSessionId: string | null = null;
+          let existingSessionLookupFailed = false;
+          if (ssoCallback) {
+            try {
+              const existingSession = await getBetterAuth(env).api.getSession({
+                headers: tracedRequest.headers,
+              });
+              existingSessionId = existingSession?.session?.id?.trim() || null;
+            } catch {
+              existingSessionLookupFailed = true;
+            }
+          }
+          const callbackStartedAtMs = Date.now();
           let authResponse = await handleBetterAuthRequest(
             tracedRequest,
             env,
           );
-          const ssoCallback = resolveSsoCallbackContext(url.pathname);
-          if (ssoCallback) {
-            authResponse = attachSsoLoginContext(
+          if (ssoCallback && !existingSessionLookupFailed) {
+            const proof = await createSsoCallbackProof(
               authResponse,
-              url,
-              ssoCallback.providerId,
-              ssoCallback.protocol,
+              env,
+              ssoCallback,
+              callbackStartedAtMs,
+              existingSessionId,
             );
+            authResponse = attachSsoLoginProof(authResponse, url, proof);
           }
           const responseHeaders = new Headers(authResponse.headers);
           Object.entries(headers).forEach(([key, value]) =>

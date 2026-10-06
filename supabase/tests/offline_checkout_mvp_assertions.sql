@@ -54,6 +54,10 @@ begin
     raise exception 'offline Quick Return audit idempotency index missing';
   end if;
 
+  if has_table_privilege('authenticated', 'public.admin_audit_logs', 'INSERT') then
+    raise exception 'authenticated clients still have direct audit insert privilege';
+  end if;
+
   if not exists (
     select 1
     from pg_constraint
@@ -91,7 +95,7 @@ begin
      or position('pack.invalidated_at is null' in lower(pg_get_functiondef(to_regprocedure(unchecked_function)))) = 0
      or position('for update' in lower(pg_get_functiondef(to_regprocedure(unchecked_function)))) = 0
      or position('insert into public.admin_audit_logs' in lower(pg_get_functiondef(to_regprocedure(unchecked_function)))) = 0
-     or position('actor_role <> ''workspace_admin''' in lower(pg_get_functiondef(to_regprocedure(unchecked_function)))) = 0 then
+     or position('actor_role not in (''workspace_admin'', ''individual_account'')' in lower(pg_get_functiondef(to_regprocedure(unchecked_function)))) = 0 then
     raise exception 'atomic replay does not enforce active pack, row locking, admin-only Quick Return, and audit';
   end if;
 end $$;

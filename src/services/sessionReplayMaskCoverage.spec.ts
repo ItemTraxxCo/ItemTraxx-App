@@ -53,11 +53,11 @@ const coverageCases = [
     snippets: ['<span data-session-replay-mask>{{ account.auth_email || "No email on file" }}</span>'],
   },
   {
-    name: "workspace account invitation and admin email fields",
+    name: "workspace account invitation and member email fields",
     path: "../pages/workspace/admin/Accounts.vue",
     snippets: [
       '<input v-model.trim="email" type="email" autocomplete="email" data-session-replay-mask required />',
-      '<input v-model.trim="adminDetailsEmail" type="email" autocomplete="email" data-session-replay-mask required />',
+      '<span data-session-replay-mask>{{ account.auth_email || "No email on file" }}</span>',
     ],
   },
   {

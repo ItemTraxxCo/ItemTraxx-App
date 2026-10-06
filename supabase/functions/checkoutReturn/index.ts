@@ -15,6 +15,8 @@ import { validateAccountDeviceSession } from "../_shared/accountSessions.ts";
 import { readJsonBody } from "../_shared/requestBody.ts";
 import { requireTrustedEdgeIngress } from "../_shared/trustedIngress.ts";
 import { logError, withRequestSpan } from "../_shared/observability.ts";
+import { sha256Hex } from "../_shared/sha256.ts";
+import { buildQuickReturnAuditRecord } from "./adminAudit.ts";
 
 const baseCorsHeaders = {
   "Access-Control-Allow-Headers":
@@ -388,6 +390,32 @@ serve((req) => withRequestSpan(req, "POST /functions/checkoutReturn", async (spa
         processed += 1;
       } else {
         skippedBarcodes.push(barcode);
+      }
+    }
+
+    if (
+      (actionType === "admin_return" || actionType === "quick_return") &&
+      processed > 0
+    ) {
+      const operationFingerprint = await sha256Hex(JSON.stringify({
+        operationId,
+        actionType,
+        itemBarcodes: [...itemBarcodes].sort(),
+      }));
+      const { error: auditError } = await adminClient
+        .from("admin_audit_logs")
+        .insert(
+          buildQuickReturnAuditRecord({
+            workspaceId: callerProfile.workspace_id,
+            actorId: user.id,
+            operationId,
+            operationFingerprint,
+            actionType,
+            processedCount: processed,
+          }),
+        );
+      if (auditError && auditError.code !== "23505") {
+        return internalQueryFailure("write_quick_return_audit", auditError);
       }
     }
 

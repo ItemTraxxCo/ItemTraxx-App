@@ -115,13 +115,9 @@ test.describe("Enterprise SSO guided setup", () => {
     await expect(providerIdField).toHaveAttribute("pattern", "[a-z0-9\\-]+");
     await providerIdField.fill("Acme Demo");
     await page.getByRole("button", { name: "Continue" }).click();
-    await expect(page.getByRole("alert")).toHaveText("Use lowercase letters, numbers, and hyphens only (for example, acme-sso). Remove spaces or underscores.");
+    await expect(page.getByRole("alert").locator(".toast-body")).toHaveText("Use lowercase letters, numbers, and hyphens only (for example, acme-sso). Remove spaces or underscores.");
     await expect(providerIdField).toHaveAttribute("aria-invalid", "true");
-    const errorColors = await Promise.all([
-      providerIdField.evaluate((element) => getComputedStyle(element).borderTopColor),
-      page.getByRole("alert").evaluate((element) => getComputedStyle(element).color),
-    ]);
-    expect(errorColors[0]).toBe(errorColors[1]);
+    await expect(page.getByRole("alert")).toHaveAttribute("aria-live", "assertive");
     await providerIdField.fill("acme-sso");
     await capture(page, "saml-02-provider-id.png");
     await page.getByRole("button", { name: "Continue" }).click();
@@ -129,7 +125,7 @@ test.describe("Enterprise SSO guided setup", () => {
     const emailDomainField = page.getByLabel("Verified email domain");
     await emailDomainField.fill("@example.edu");
     await page.getByRole("button", { name: "Continue" }).click();
-    await expect(page.getByRole("alert")).toHaveText("Enter only the email domain, such as example.edu. Remove the @, https://, or any path.");
+    await expect(page.getByRole("alert").locator(".toast-body")).toHaveText("Enter only the email domain, such as example.edu. Remove the @, https://, or any path.");
     await emailDomainField.fill("example.edu");
     await capture(page, "saml-03-email-domain.png");
     await page.getByRole("button", { name: "Continue" }).click();

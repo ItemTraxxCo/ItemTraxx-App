@@ -2,8 +2,7 @@
   <div class="page admin-shell">
     <div class="admin-hero">
       <div class="page-nav-left">
-        <RouterLink class="button-link" :to="managerRoot">Return to manager home</RouterLink>
-        <RouterLink class="button-link" :to="managerPath('/items')">Return to items</RouterLink>
+        <RouterLink class="button-link" :to="managerRoot">Back</RouterLink>
       </div>
 
       <h1>Bulk Item Import Wizard</h1>
@@ -116,7 +115,7 @@
       </div>
     </div>
 
-    <p v-if="error" class="error">{{ error }}</p>
+    <p v-if="error" class="error" v-app-toast-error>{{ error }}</p>
     <p v-if="success" class="success">{{ success }}</p>
   </div>
 </template>
@@ -125,12 +124,12 @@
 import { onMounted, ref } from "vue";
 import { RouterLink } from "vue-router";
 import { bulkImportItem, fetchWorkspaceSettings } from "../../../services/adminOpsService";
-import { logAdminAction } from "../../../services/auditLogService";
 import { toUserFacingErrorMessage } from "../../../services/appErrors";
 import { capturePostHogEvent } from "../../../services/posthogService";
+import { exportRowsToCsv } from "../../../services/exportService";
 import { useManagerContext } from "../../../composables/useManagerContext";
 
-const { managerRoot, managerPath } = useManagerContext();
+const { managerRoot } = useManagerContext();
 
 type ImportRow = {
   name: string;
@@ -152,11 +151,6 @@ const importResult = ref<{
   skipped: number;
   skipped_rows: Array<{ barcode: string; reason: string }>;
 } | null>(null);
-
-const toCsvCell = (value: string) => {
-  const escaped = value.replace(/"/g, "\"\"");
-  return `"${escaped}"`;
-};
 
 const downloadTextFile = (filename: string, content: string, contentType: string) => {
   const blob = new Blob([content], { type: contentType });
@@ -192,11 +186,7 @@ const downloadValidationReport = (source: "parse" | "import") => {
     source === "parse"
       ? `item-import-parse-validation-${new Date().toISOString().slice(0, 10)}.csv`
       : `item-import-validation-${new Date().toISOString().slice(0, 10)}.csv`;
-  const csvRows = ["barcode,reason"];
-  for (const row of rows) {
-    csvRows.push(`${toCsvCell(row.barcode)},${toCsvCell(row.reason)}`);
-  }
-  downloadTextFile(filename, csvRows.join("\n"), "text/csv;charset=utf-8");
+  exportRowsToCsv(filename, ["barcode", "reason"], rows);
 };
 
 const parseLine = (line: string) => {
@@ -296,15 +286,6 @@ const runImport = async () => {
       skipped: result.skipped,
       skipped_rows: result.skipped_rows,
     };
-
-    await logAdminAction({
-      action_type: "item_bulk_import",
-      entity_type: "items",
-      metadata: {
-        inserted: result.inserted,
-        skipped: result.skipped,
-      },
-    });
 
     capturePostHogEvent("item_bulk_import_completed", {
       inserted: result.inserted,

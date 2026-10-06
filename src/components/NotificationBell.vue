@@ -38,7 +38,7 @@
     >
       <div class="notif-header">Notifications</div>
       <p v-if="isLoading" class="muted">Loading notifications...</p>
-      <p v-else-if="error" class="error">{{ error }}</p>
+      <p v-else-if="error" class="error" v-app-toast-error>{{ error }}</p>
       <template v-else>
         <ul class="notif-list">
           <li v-if="overdueCount > 0" class="notif-item notif-warn">

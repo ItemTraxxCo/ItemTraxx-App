@@ -13,6 +13,7 @@ describe("login return targets", () => {
   it.each([
     "https://evil.example/steal",
     "//evil.example/steal",
+    "/.//evil.example/steal",
     "/login",
     "/login/two-factor",
     "checkout",

@@ -2,7 +2,6 @@ import { authClient } from "../../auth/client";
 import { getWorkspaceState } from "../../store/workspaceState";
 import { getAuthState, markAdminVerified, setWorkspaceContext } from "../../store/authState";
 import { fetchHttpSessionSummary } from "../httpSessionService";
-import { logAdminAction } from "../auditLogService";
 import { applyHttpSessionSummary, resolveWorkspaceSlug } from "./sessionBootstrap";
 import type { LoginNotificationLocation } from "./types";
 import { invokeEdgeFunction } from "../edgeFunctionClient";
@@ -43,9 +42,6 @@ export const workspaceLogin=async(email:string,password:string,turnstileToken?:s
     // this (pre-redirect) origin would create an orphan row that's never
     // touched again, sharing the same auth_session_id as the real device
     // row created on the destination page via its login_ctx handling.
-    try{await logAdminAction({action_type:"admin_login",metadata:{email:email.trim()}});}catch{
-      // Audit logging must not block a successful sign in.
-    }
   }
   sendLoginNotification(null,{loginLocation:current.role==="workspace_admin"?"workspace_admin_login":current.role==="individual_account"?"individual_login":"account_login"});
   return {workspaceId:current.workspaceContextId,workspaceSlug:await resolveWorkspaceSlug(current.workspaceContextId),role:current.role};

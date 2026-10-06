@@ -65,11 +65,11 @@ type IncidentWidgetPayload = {
 // otherwise costs a service-role DB probe, three app_runtime_config reads, and
 // an outbound incident.io fetch.
 //
-// Two bounds, neither of which changes the public contract:
+// Two bounds, neither of which changes the public response body:
 //   1. a short in-memory cache of the derived incident.io verdict, shared by
 //      every request an isolate serves;
-//   2. a per-client rate limit for trusted Worker traffic and server-issued
-//      identities for direct callers, plus a separate direct aggregate budget.
+//   2. a stable per-IP rate limit for trusted Worker traffic and one fixed
+//      aggregate bucket for direct callers, so direct traffic cannot mint rows.
 // The uptime probe polls this endpoint every ~15-20s. At a 20s TTL the cache
 // expired at roughly the probe interval and, being per-isolate, most requests
 // missed it and made a live incident.io call inside the request path. 120s
@@ -142,7 +142,6 @@ const resolveIncidentStatus = (
 
 serve((req) => withRequestSpan(req, "GET /functions/system-status", async (span, requestId) => {
   const { hasOrigin, originAllowed, headers } = resolveCorsHeaders(req);
-  let statusClientCookie: string | null = null;
 
   const jsonResponse = (
     status: number,
@@ -160,9 +159,6 @@ serve((req) => withRequestSpan(req, "GET /functions/system-status", async (span,
       "Content-Type": "application/json",
       "x-request-id": requestId,
     });
-    if (statusClientCookie) {
-      responseHeaders.append("Set-Cookie", statusClientCookie);
-    }
     return new Response(JSON.stringify(body), {
       status,
       headers: responseHeaders,
@@ -225,16 +221,21 @@ serve((req) => withRequestSpan(req, "GET /functions/system-status", async (span,
     ).catch(() => false);
     tIngress = Date.now();
     const statusClient = resolvePublicStatusClient(req, trustedEdgeIngress);
-    statusClientCookie = statusClient.setCookie ?? null;
-
-    // Bound the unauthenticated request cost. A limiter outage must fail closed
-    // so an attacker cannot turn an unavailable guard into an unbounded probe.
+    // Direct requests use the fixed global key as their first and only bucket;
+    // caller-controlled cookies must never create durable per-identity rows.
+    // Trusted Worker traffic keeps a stable edge-IP bucket. Limiter outages
+    // fail closed so an unavailable guard cannot become an unbounded probe.
+    const rateLimitScope = trustedEdgeIngress
+      ? "system-status-edge"
+      : "system-status-direct-global";
     const rateLimit = await enforcePreloginRateLimit(
       adminClient,
       statusClient.key,
-      trustedEdgeIngress ? "system-status-edge" : "system-status-direct",
-      STATUS_RATE_LIMIT_PER_MINUTE,
-      STATUS_RATE_LIMIT_WINDOW_SECONDS
+      rateLimitScope,
+      trustedEdgeIngress
+        ? STATUS_RATE_LIMIT_PER_MINUTE
+        : STATUS_DIRECT_GLOBAL_LIMIT_PER_MINUTE,
+      STATUS_RATE_LIMIT_WINDOW_SECONDS,
     );
     tRateLimit = Date.now();
     if (rateLimit.error) {
@@ -247,37 +248,6 @@ serve((req) => withRequestSpan(req, "GET /functions/system-status", async (span,
       });
     }
 
-    if (!trustedEdgeIngress) {
-      const directGlobalRateLimit = await enforcePreloginRateLimit(
-        adminClient,
-        "global",
-        "system-status-direct-global",
-        STATUS_DIRECT_GLOBAL_LIMIT_PER_MINUTE,
-        STATUS_RATE_LIMIT_WINDOW_SECONDS,
-      );
-      if (directGlobalRateLimit.error) {
-        return jsonResponse(503, {
-          status: "unknown",
-          checks: { config: "ok", db: "unknown", rate_limit: "unavailable" },
-          incident_summary: "rate limiter unavailable",
-          duration_ms: Date.now() - startedAt,
-          checked_at: new Date().toISOString(),
-        });
-      }
-      if (!directGlobalRateLimit.ok) {
-        return jsonResponse(429, {
-          status: "unknown",
-          checks: { config: "ok", db: "unknown" },
-          incident_summary: "rate limited",
-          duration_ms: Date.now() - startedAt,
-          checked_at: new Date().toISOString(),
-        }, {
-          retryAfterSeconds: directGlobalRateLimit.retryAfterSeconds ??
-            STATUS_RATE_LIMIT_WINDOW_SECONDS,
-          remaining: 0,
-        });
-      }
-    }
     if (!rateLimit.ok && !rateLimit.error) {
       return jsonResponse(429, {
         status: "unknown",

@@ -8262,40 +8262,6 @@
           "properties": {
             "action": {
               "type": "string",
-              "const": "update_admin_email"
-            },
-            "payload": {
-              "type": "object",
-              "properties": {
-                "id": {
-                  "type": "string",
-                  "format": "uuid",
-                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-                },
-                "auth_email": {
-                  "type": "string",
-                  "format": "email",
-                  "pattern": "^(?:[A-Za-z0-9_'+\\-]+\\.)*[A-Za-z0-9_'+\\-]*[A-Za-z0-9_+-]@(?:[A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
-                }
-              },
-              "required": [
-                "id",
-                "auth_email"
-              ],
-              "additionalProperties": false
-            }
-          },
-          "required": [
-            "action",
-            "payload"
-          ],
-          "additionalProperties": false
-        },
-        {
-          "type": "object",
-          "properties": {
-            "action": {
-              "type": "string",
               "const": "send_workspace_admin_reset"
             },
             "payload": {
@@ -8463,64 +8429,6 @@
                 "device_label",
                 "id",
                 "is_active"
-              ],
-              "additionalProperties": false
-            }
-          },
-          "required": [
-            "action",
-            "payload"
-          ],
-          "additionalProperties": false
-        },
-        {
-          "type": "object",
-          "properties": {
-            "action": {
-              "type": "string",
-              "const": "update_tenant_account_email"
-            },
-            "payload": {
-              "type": "object",
-              "properties": {
-                "device_id": {
-                  "type": "string",
-                  "minLength": 1
-                },
-                "device_label": {
-                  "type": "string",
-                  "minLength": 1
-                },
-                "login_method": {
-                  "type": "string",
-                  "maxLength": 128,
-                  "pattern": "^(?:password|magic_link|session_handoff|[a-z0-9-]+)$"
-                },
-                "login_location": {
-                  "type": "string",
-                  "enum": [
-                    "regular_login",
-                    "admin_login",
-                    "SAML2.0",
-                    "OpenID Connect (OIDC)"
-                  ]
-                },
-                "id": {
-                  "type": "string",
-                  "format": "uuid",
-                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-                },
-                "auth_email": {
-                  "type": "string",
-                  "format": "email",
-                  "pattern": "^(?:[A-Za-z0-9_'+\\-]+\\.)*[A-Za-z0-9_'+\\-]*[A-Za-z0-9_+-]@(?:[A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
-                }
-              },
-              "required": [
-                "device_id",
-                "device_label",
-                "id",
-                "auth_email"
               ],
               "additionalProperties": false
             }
@@ -8729,18 +8637,13 @@
                 "success": {
                   "type": "boolean"
                 },
-                "auth_email": {
-                  "type": "string",
-                  "format": "email",
-                  "pattern": "^(?:[A-Za-z0-9_'+\\-]+\\.)*[A-Za-z0-9_'+\\-]*[A-Za-z0-9_+-]@(?:[A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
-                },
                 "message": {
                   "type": "string"
                 }
               },
               "required": [
                 "success",
-                "auth_email"
+                "message"
               ],
               "additionalProperties": false
             }
@@ -8748,55 +8651,6 @@
           "additionalProperties": false
         },
         "set_admin_status": {
-          "type": "object",
-          "properties": {
-            "data": {
-              "type": "object",
-              "properties": {
-                "id": {
-                  "type": "string",
-                  "format": "uuid",
-                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-                },
-                "workspace_id": {
-                  "type": "string",
-                  "format": "uuid",
-                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-                },
-                "auth_email": {
-                  "type": "string",
-                  "format": "email",
-                  "pattern": "^(?:[A-Za-z0-9_'+\\-]+\\.)*[A-Za-z0-9_'+\\-]*[A-Za-z0-9_+-]@(?:[A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
-                },
-                "role": {
-                  "type": "string",
-                  "const": "workspace_admin"
-                },
-                "is_active": {
-                  "type": "boolean"
-                },
-                "created_at": {
-                  "type": "string"
-                },
-                "is_primary_admin": {
-                  "type": "boolean"
-                }
-              },
-              "required": [
-                "id",
-                "workspace_id",
-                "auth_email",
-                "role",
-                "is_active",
-                "created_at",
-                "is_primary_admin"
-              ],
-              "additionalProperties": false
-            }
-          },
-          "additionalProperties": false
-        },
-        "update_admin_email": {
           "type": "object",
           "properties": {
             "data": {
@@ -8923,45 +8777,16 @@
             "data": {
               "type": "object",
               "properties": {
-                "id": {
-                  "type": "string",
-                  "format": "uuid",
-                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-                },
-                "workspace_id": {
-                  "type": "string",
-                  "format": "uuid",
-                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-                },
-                "auth_email": {
-                  "type": "string",
-                  "format": "email",
-                  "pattern": "^(?:[A-Za-z0-9_'+\\-]+\\.)*[A-Za-z0-9_'+\\-]*[A-Za-z0-9_+-]@(?:[A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
-                },
-                "role": {
-                  "type": "string",
-                  "const": "tenant_account"
-                },
-                "is_active": {
+                "success": {
                   "type": "boolean"
                 },
-                "deleted_at": {
-                  "type": [
-                    "string",
-                    "null"
-                  ]
-                },
-                "created_at": {
+                "message": {
                   "type": "string"
                 }
               },
               "required": [
-                "id",
-                "workspace_id",
-                "auth_email",
-                "role",
-                "is_active",
-                "created_at"
+                "success",
+                "message"
               ],
               "additionalProperties": false
             }
@@ -8969,57 +8794,6 @@
           "additionalProperties": false
         },
         "set_tenant_account_status": {
-          "type": "object",
-          "properties": {
-            "data": {
-              "type": "object",
-              "properties": {
-                "id": {
-                  "type": "string",
-                  "format": "uuid",
-                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-                },
-                "workspace_id": {
-                  "type": "string",
-                  "format": "uuid",
-                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-                },
-                "auth_email": {
-                  "type": "string",
-                  "format": "email",
-                  "pattern": "^(?:[A-Za-z0-9_'+\\-]+\\.)*[A-Za-z0-9_'+\\-]*[A-Za-z0-9_+-]@(?:[A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
-                },
-                "role": {
-                  "type": "string",
-                  "const": "tenant_account"
-                },
-                "is_active": {
-                  "type": "boolean"
-                },
-                "deleted_at": {
-                  "type": [
-                    "string",
-                    "null"
-                  ]
-                },
-                "created_at": {
-                  "type": "string"
-                }
-              },
-              "required": [
-                "id",
-                "workspace_id",
-                "auth_email",
-                "role",
-                "is_active",
-                "created_at"
-              ],
-              "additionalProperties": false
-            }
-          },
-          "additionalProperties": false
-        },
-        "update_tenant_account_email": {
           "type": "object",
           "properties": {
             "data": {
@@ -9111,12 +8885,10 @@
         "list_workspace_admins",
         "create_workspace_admin",
         "set_admin_status",
-        "update_admin_email",
         "send_workspace_admin_reset",
         "list_tenant_accounts",
         "create_tenant_account",
         "set_tenant_account_status",
-        "update_tenant_account_email",
         "remove_tenant_account",
         "send_tenant_account_reset"
       ],

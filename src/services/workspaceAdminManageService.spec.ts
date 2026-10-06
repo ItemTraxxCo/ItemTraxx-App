@@ -19,7 +19,6 @@ import {
   sendTenantManagedAdminReset,
   setTenantAccountStatus,
   setTenantManagedAdminStatus,
-  updateTenantManagedAdminEmail,
   type TenantManagedAdmin,
 } from "./workspaceAdminManageService";
 
@@ -81,7 +80,7 @@ describe("createTenantManagedAdmin", () => {
       ok: true,
       status: 200,
       error: "",
-      data: { data: { success: true, auth_email: "new@example.com" } },
+      data: { data: { success: true, message: "If the address is eligible, invitation instructions will be sent." } },
     });
 
     const result = await createTenantManagedAdmin({ auth_email: "new@example.com" });
@@ -93,13 +92,21 @@ describe("createTenantManagedAdmin", () => {
         payload: { auth_email: "new@example.com", device_id: "device-1", device_label: "Mac" },
       },
     });
-    expect(result).toEqual({ success: true, auth_email: "new@example.com" });
+    expect(result).toEqual({ success: true, message: "If the address is eligible, invitation instructions will be sent." });
   });
 
-  it("throws when the invite is rejected", async () => {
-    mockedInvoke.mockResolvedValueOnce({ ok: false, status: 409, error: "already invited", data: null });
+  it("returns the same generic success shape for an eligible invitation", async () => {
+    mockedInvoke.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      error: "",
+      data: { data: { success: true, message: "If the address is eligible, invitation instructions will be sent." } },
+    });
 
-    await expect(createTenantManagedAdmin({ auth_email: "new@example.com" })).rejects.toThrow("already invited");
+    await expect(createTenantManagedAdmin({ auth_email: "new@example.com" })).resolves.toEqual({
+      success: true,
+      message: "If the address is eligible, invitation instructions will be sent.",
+    });
   });
 });
 
@@ -114,22 +121,6 @@ describe("setTenantManagedAdminStatus", () => {
       body: {
         action: "set_admin_status",
         payload: { id: "wa-1", is_active: false, device_id: "device-1", device_label: "Mac" },
-      },
-    });
-  });
-});
-
-describe("updateTenantManagedAdminEmail", () => {
-  it("sends the id and new email with the device fields", async () => {
-    mockedInvoke.mockResolvedValueOnce({ ok: true, status: 200, error: "", data: { data: admin } });
-
-    await updateTenantManagedAdminEmail({ id: "wa-1", auth_email: "new@example.com" });
-
-    expect(invokeEdgeFunction).toHaveBeenCalledWith("workspace-admin-mutate", {
-      method: "POST",
-      body: {
-        action: "update_admin_email",
-        payload: { id: "wa-1", auth_email: "new@example.com", device_id: "device-1", device_label: "Mac" },
       },
     });
   });
@@ -165,9 +156,17 @@ describe("tenant account helpers", () => {
   });
 
   it("createTenantAccount sends the auth_email with the device fields", async () => {
-    mockedInvoke.mockResolvedValueOnce({ ok: true, status: 200, error: "", data: { data: {} } });
+    mockedInvoke.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      error: "",
+      data: { data: { success: true, message: "If the address is eligible, invitation instructions will be sent." } },
+    });
 
-    await createTenantAccount("tenant@example.com");
+    await expect(createTenantAccount("tenant@example.com")).resolves.toEqual({
+      success: true,
+      message: "If the address is eligible, invitation instructions will be sent.",
+    });
 
     expect(invokeEdgeFunction).toHaveBeenCalledWith("workspace-admin-mutate", {
       method: "POST",

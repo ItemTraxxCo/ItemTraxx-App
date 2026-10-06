@@ -17,6 +17,7 @@ import {
 } from "../_shared/validation.ts";
 import { buildPublicRateLimitHeaders } from "../_shared/publicRateLimit.ts";
 import {
+  escapeSlackMrkdwnText,
   normalizeClientReportDiagnostics,
   normalizeClientReportText,
 } from "../_shared/clientReportNormalization.ts";
@@ -286,9 +287,9 @@ serve(async (req) => {
     const slackText =
       `Client error report submitted\n` +
       `Report ID: ${reportRow.id}\n` +
-      `Error: ${errorName}\n` +
-      `Environment: ${environment}\n` +
-      `Release: ${release}\n` +
+      `Error: ${escapeSlackMrkdwnText(errorName)}\n` +
+      `Environment: ${escapeSlackMrkdwnText(environment)}\n` +
+      `Release: ${escapeSlackMrkdwnText(release)}\n` +
       `Role: ${authRole}${isVerifiedAuthenticated ? "" : " (unverified)"}\n` +
       `Workspace: ${workspaceId}\n` +
       `Request ID: ${requestId}\n` +

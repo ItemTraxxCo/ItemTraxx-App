@@ -1,7 +1,9 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted } from "vue";
 import { RouterLink } from "vue-router";
-import checkoutReturnUiImage from "../assets/landing/checkout_return_ui.png";
+import checkoutReturnUiImage800 from "../assets/landing/checkout_return_ui-800.webp";
+import checkoutReturnUiImage1200 from "../assets/landing/checkout_return_ui-1200.webp";
+import checkoutReturnUiImage1600 from "../assets/landing/checkout_return_ui-1600.webp";
 import { useSystemStatus } from "../composables/useSystemStatus";
 import { trackProductEvent } from "../services/productEvents";
 import { getReleaseMetadata } from "../utils/releaseMetadata";
@@ -428,7 +430,7 @@ onBeforeUnmount(() => {
             </article>
             <div class="transform-arrow" aria-hidden="true"><svg viewBox="0 0 40 40" fill="none"><path d="M5 20h27m-10-10 10 10-10 10" stroke="currentColor" stroke-width="1.8" stroke-linecap="square" stroke-linejoin="miter"/></svg></div>
             <article class="compare-panel" id="checkout">
-              <div class="media-frame checkout-image"><img :src="checkoutReturnUiImage" alt="ItemTraxx checkout and return screen showing borrower details, checked-out items and checkout controls" width="2780" height="1798"></div>
+              <div class="media-frame checkout-image"><img :src="checkoutReturnUiImage1600" :srcset="`${checkoutReturnUiImage800} 800w, ${checkoutReturnUiImage1200} 1200w, ${checkoutReturnUiImage1600} 1600w`" sizes="(max-width: 700px) 92vw, (max-width: 1300px) 46vw, 600px" alt="ItemTraxx checkout and return screen showing borrower details, checked-out items and checkout controls" width="1600" height="1035"></div>
             </article>
           </div>
         </div>

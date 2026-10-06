@@ -75,7 +75,7 @@ class MockClient {
     if (!response) throw new Error("Unexpected query");
     return new QueryBuilder(response);
   }
-  rpc(name: string, args: Record<string, unknown>) {
+  rpc(name: string, args: Record<string, unknown> = {}) {
     if (name !== "is_better_auth_session_active") throw new Error(`Unexpected RPC ${name}`);
     if (typeof args.p_session_id !== "string") throw new Error("Missing Better Auth session id");
     return Promise.resolve(this.activeBetterAuthSession);

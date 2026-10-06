@@ -106,6 +106,7 @@ const makeClient = (
   return {
     client: {
       from,
+      rpc: () => Promise.resolve({ data: true, error: null }),
       schema,
       // Production session validation verifies the Better Auth JWT through the
       // external-auth bridge. Keep the test double on that same boundary so

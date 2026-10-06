@@ -107,6 +107,7 @@ const queryClient = (
   return {
     client: {
       from,
+      rpc: () => Promise.resolve({ data: true, error: null }),
       __verifyExternalAuthClaimsForTest: () =>
         Promise.resolve(
           options.claimsError || options.claims === null

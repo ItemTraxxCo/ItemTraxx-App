@@ -59,8 +59,9 @@ test.describe("Public surfaces", () => {
 
       const image = page.locator(".comparison .checkout-image img");
       await expect(image).toHaveAttribute("alt", "ItemTraxx checkout and return screen showing borrower details, checked-out items and checkout controls");
-      await expect(image).toHaveAttribute("width", "2780");
-      await expect(image).toHaveAttribute("height", "1798");
+      await expect(image).toHaveAttribute("width", "1600");
+      await expect(image).toHaveAttribute("height", "1035");
+      await expect(image).toHaveAttribute("srcset", /800w/);
 
       const finalCta = page.locator("section.final-cta");
       await expect(finalCta.getByRole("link", { name: "Get a demo", exact: true })).toHaveAttribute("href", "/request-demo");

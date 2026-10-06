@@ -56,6 +56,7 @@
       />
     </AppTopBanners>
     <AuthenticatedNavigation
+      v-if="showTopMenu"
       :visible="showTopMenu"
       :show-notification-bell="showNotificationBell"
       :menu-open="menuOpen"
@@ -102,7 +103,6 @@ import { computed, defineAsyncComponent, onMounted, onScopeDispose, ref, watch, 
 import { useRoute, useRouter } from "vue-router";
 import AppBlockingOverlays from "./components/app/AppBlockingOverlays.vue";
 import AppTopBanners from "./components/app/AppTopBanners.vue";
-import AuthenticatedNavigation from "./components/app/AuthenticatedNavigation.vue";
 import CookieConsentBanner from "./components/CookieConsentBanner.vue";
 import AppToastOutlet from "./components/AppToastOutlet.vue";
 import { useAdminSessionLifecycle } from "./composables/useAdminSessionLifecycle";
@@ -124,6 +124,7 @@ import { getRouteLoadingState } from "./store/routeLoading";
 import { getSessionTerminationState } from "./store/sessionTermination";
 
 const OnboardingModal = defineAsyncComponent(() => import("./components/OnboardingModal.vue"));
+const AuthenticatedNavigation = defineAsyncComponent(() => import("./components/app/AuthenticatedNavigation.vue"));
 const OfflineWorkflowOverlays = defineAsyncComponent(() => import("./components/OfflineWorkflowOverlays.vue"));
 const OfflineWorkflowStatus = defineAsyncComponent(() => import("./components/OfflineWorkflowStatus.vue"));
 const Analytics = defineAsyncComponent(async () => (await import("@vercel/analytics/vue")).Analytics);

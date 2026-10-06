@@ -391,6 +391,16 @@ describe("capturePostHogLog", () => {
 
     expect(posthogMock.captureLog).not.toHaveBeenCalled();
   });
+
+  it("does not send application diagnostics logs from a dev server behind a tunnel", async () => {
+    setHostname("dev-tunnel.trycloudflare.com");
+    vi.stubEnv("MODE", "development");
+    const mod = await initializedModule();
+
+    mod.capturePostHogLog({ body: "local request failure", level: "error" });
+
+    expect(posthogMock.captureLog).not.toHaveBeenCalled();
+  });
 });
 
 describe("identifyPostHogUser", () => {

@@ -1,5 +1,6 @@
 import {
   CLIENT_REPORT_DIAGNOSTICS_MAX_BYTES,
+  escapeSlackMrkdwnText,
   normalizeClientReportDiagnostics,
   normalizeClientReportText,
 } from "./clientReportNormalization.ts";
@@ -23,6 +24,14 @@ Deno.test("normalizes report text without discarding multiline errors", () => {
   assert(
     normalizeClientReportText("x".repeat(20), 5) === "xxxxx",
     "expected text to be truncated to the configured limit",
+  );
+});
+
+Deno.test("escapes attacker-controlled Slack mrkdwn delimiters", () => {
+  assert(
+    escapeSlackMrkdwnText("<!channel> & <https://attacker.example|link>") ===
+      "&lt;!channel&gt; &amp; &lt;https://attacker.example|link&gt;",
+    "expected Slack broadcast and link syntax to be rendered as text",
   );
 });
 

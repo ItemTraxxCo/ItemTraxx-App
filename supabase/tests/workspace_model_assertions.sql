@@ -8,6 +8,13 @@ begin
      or to_regclass('public.account_sessions') is null then
     raise exception 'workspace tables missing';
   end if;
+  if not has_column_privilege('authenticated', 'public.workspace_policies', 'workspace_id', 'SELECT')
+     or not has_column_privilege('authenticated', 'public.workspace_policies', 'checkout_due_hours', 'SELECT')
+     or not has_column_privilege('authenticated', 'public.workspace_policies', 'feature_flags', 'SELECT')
+     or has_column_privilege('authenticated', 'public.workspace_policies', 'billing_email', 'SELECT')
+     or has_column_privilege('authenticated', 'public.workspace_policies', 'billing_status', 'SELECT') then
+    raise exception 'workspace policy select grants expose fields outside the tenant configuration surface';
+  end if;
   if to_regclass('public.tenants') is not null or to_regclass('public.districts') is not null then
     raise exception 'legacy hierarchy remains';
   end if;
@@ -46,6 +53,12 @@ begin
      or not has_function_privilege('service_role', 'public.refresh_super_reporting_views()', 'EXECUTE') then
     raise exception 'reporting refresh RPC grants are not service-role-only';
   end if;
+  if to_regprocedure('public.is_better_auth_session_active(text)') is null
+     or has_function_privilege('anon', 'public.is_better_auth_session_active(text)', 'EXECUTE')
+     or has_function_privilege('authenticated', 'public.is_better_auth_session_active(text)', 'EXECUTE')
+     or not has_function_privilege('service_role', 'public.is_better_auth_session_active(text)', 'EXECUTE') then
+    raise exception 'Better Auth session expiry RPC is missing or has unsafe grants';
+  end if;
   if (select role from public.profiles where id='30000000-0000-0000-0000-000000000001') <> 'workspace_admin'
      or (select role from public.profiles where id='30000000-0000-0000-0000-000000000002') <> 'tenant_account' then
     raise exception 'legacy roles were not mapped';
@@ -67,6 +80,92 @@ insert into auth.users(id,email) values
 insert into public.profiles(id,workspace_id,role,auth_email) values
   ('30000000-0000-0000-0000-000000000003','20000000-0000-0000-0000-000000000002','tenant_account','other-account@example.test'),
   ('30000000-0000-0000-0000-000000000004','20000000-0000-0000-0000-000000000001','tenant_account','late-account@example.test');
+
+begin;
+do $$
+declare
+  v_result jsonb;
+  v_invitation public.workspace_account_invitations%rowtype;
+begin
+  update public.workspace_policies
+  set max_admins = null
+  where workspace_id = '20000000-0000-0000-0000-000000000001';
+
+  v_result := public.create_workspace_account_invitation(
+    '20000000-0000-0000-0000-000000000001',
+    '30000000-0000-0000-0000-000000000001',
+    'invite-role-test@example.test',
+    'workspace_admin',
+    repeat('a', 64),
+    now() + interval '24 hours'
+  );
+  if (v_result ->> 'send_email') is distinct from 'true' then
+    raise exception 'primary admin could not create a workspace-admin invitation';
+  end if;
+
+  update public.profiles
+  set role = 'workspace_admin'
+  where id = '30000000-0000-0000-0000-000000000002';
+
+  v_result := public.create_workspace_account_invitation(
+    '20000000-0000-0000-0000-000000000001',
+    '30000000-0000-0000-0000-000000000002',
+    'invite-role-test@example.test',
+    'tenant_account',
+    repeat('b', 64),
+    now() + interval '24 hours'
+  );
+  if (v_result ->> 'send_email') is distinct from 'false' then
+    raise exception 'non-primary admin replaced a pending workspace-admin invitation';
+  end if;
+
+  select * into v_invitation
+  from public.workspace_account_invitations
+  where workspace_id = '20000000-0000-0000-0000-000000000001'
+    and lower(email) = 'invite-role-test@example.test'
+    and accepted_at is null and revoked_at is null;
+  if not found
+     or v_invitation.account_role is distinct from 'workspace_admin'
+     or v_invitation.token_hash is distinct from repeat('a', 64) then
+    raise exception 'non-primary admin changed the privileged invitation';
+  end if;
+
+  v_result := public.create_workspace_account_invitation(
+    '20000000-0000-0000-0000-000000000001',
+    '30000000-0000-0000-0000-000000000001',
+    'invite-role-test@example.test',
+    'tenant_account',
+    repeat('c', 64),
+    now() + interval '24 hours'
+  );
+  if (v_result ->> 'send_email') is distinct from 'true' then
+    raise exception 'primary admin could not downgrade the pending invitation';
+  end if;
+
+  select * into v_invitation
+  from public.workspace_account_invitations
+  where workspace_id = '20000000-0000-0000-0000-000000000001'
+    and lower(email) = 'invite-role-test@example.test'
+    and accepted_at is null and revoked_at is null;
+  if not found
+     or v_invitation.account_role is distinct from 'tenant_account'
+     or v_invitation.token_hash is distinct from repeat('c', 64) then
+    raise exception 'primary admin downgrade did not replace the pending invitation';
+  end if;
+
+  v_result := public.create_workspace_account_invitation(
+    '20000000-0000-0000-0000-000000000001',
+    '30000000-0000-0000-0000-000000000002',
+    'invite-role-test@example.test',
+    'tenant_account',
+    repeat('d', 64),
+    now() + interval '24 hours'
+  );
+  if (v_result ->> 'send_email') is distinct from 'true' then
+    raise exception 'same-role tenant invitation could not be reissued';
+  end if;
+end $$;
+rollback;
 
 do $$
 begin
@@ -142,6 +241,19 @@ do $$ begin
   if (select count(*) from public.items) <> 3 then raise exception 'workspace admin visibility failed'; end if;
   update public.items set name='cross-workspace-write' where id='50000000-0000-0000-0000-000000000004';
   if found then raise exception 'cross-workspace admin write succeeded'; end if;
+
+  begin
+    insert into public.admin_audit_logs(workspace_id,actor_id,action_type,metadata)
+    values (
+      '20000000-0000-0000-0000-000000000001',
+      '30000000-0000-0000-0000-000000000001',
+      'quick_return',
+      jsonb_build_object('count',1,'barcodes',jsonb_build_array('TEST-QUICK-RETURN'))
+    );
+    raise exception 'workspace admin appended a forged audit event';
+  exception when insufficient_privilege then
+    null;
+  end;
 end $$;
 rollback;
 

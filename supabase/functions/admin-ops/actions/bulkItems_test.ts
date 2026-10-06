@@ -20,6 +20,32 @@ const makeClient = (
   respond: (call: QueryCall) => QueryResult | Promise<QueryResult>,
 ) => {
   const calls: QueryCall[] = [];
+  const rpc = async (functionName: string, parameters: Record<string, unknown>) => {
+    const call: QueryCall = {
+      table: "rpc:" + functionName,
+      operations: [{ method: "rpc", args: [parameters] }],
+    };
+    calls.push(call);
+    const result = await respond(call);
+    if (
+      functionName === "import_items_with_audit" &&
+      !result.error &&
+      result.data === null
+    ) {
+      const items = Array.isArray(parameters.p_items)
+        ? parameters.p_items as Array<Record<string, unknown>>
+        : [];
+      return {
+        ...result,
+        data: items.map((item, index) => ({
+          id: "item-" + String(index + 1),
+          workspace_id: parameters.p_workspace_id,
+          ...item,
+        })),
+      };
+    }
+    return result;
+  };
 
   const from = (table: string) => {
     const operations: QueryCall["operations"] = [];
@@ -70,7 +96,7 @@ const makeClient = (
   };
 
   return {
-    client: { from } as unknown as SupabaseClient,
+    client: { from, rpc } as unknown as SupabaseClient,
     calls,
   };
 };
@@ -132,6 +158,19 @@ Deno.test("bulk_import_items rejects an empty rows array", async () => {
   assert(calls.length === 0, "no db calls should happen for empty rows");
 });
 
+Deno.test("bulk_import_items enforces the workspace feature entitlement", async () => {
+  const { client, calls } = makeClient(() => ({ data: null, error: null }));
+  const context = baseContext(client, {
+    rows: [{ name: "Item A", barcode: "ITEM-1" }],
+  });
+  context.featureFlags.enable_bulk_item_import = false;
+
+  const response = await handleBulkItemsAction(context);
+
+  assert(response.status === 403, "expected disabled feature to reject the bulk import");
+  assert(calls.length === 0, "disabled bulk import must not query or mutate workspace rows");
+});
+
 Deno.test("bulk_import_items rejects a payload with no rows field", async () => {
   const { client } = makeClient(() => ({ data: null, error: null }));
   const response = await handleBulkItemsAction(baseContext(client, {}));
@@ -156,19 +195,8 @@ Deno.test("bulk_import_items skips non-object rows with an '(invalid)' marker", 
     if (call.table === "items" && call.operations.some((op) => op.method === "in")) {
       return { data: [], error: null };
     }
-    if (call.table === "items" && call.operations.some((op) => op.method === "insert")) {
-      return {
-        data: [{
-          id: "item-1",
-          workspace_id: "00000000-0000-4000-8000-000000000002",
-          name: "Item A",
-          barcode: "ITEM-A",
-          serial_number: null,
-          status: "available",
-          notes: null,
-        }],
-        error: null,
-      };
+    if (call.table === "rpc:import_items_with_audit") {
+      return { data: null, error: null };
     }
     return { data: null, error: null };
   });
@@ -293,17 +321,17 @@ Deno.test("bulk_import_items skips rows whose barcode already exists in the work
     "expected the already-exists reason",
   );
   assert(
-    calls.filter((call) => call.operations.some((op) => op.method === "insert")).length === 0,
-    "insert should never be attempted when every row already exists",
+    calls.filter((call) => call.table === "rpc:import_items_with_audit").length === 0,
+    "transactional import should not run when every row already exists",
   );
 });
 
-Deno.test("bulk_import_items returns 400 when the insert fails", async () => {
+Deno.test("bulk_import_items returns 400 when the transaction fails", async () => {
   const { client } = makeClient((call) => {
     if (call.table === "items" && call.operations.some((op) => op.method === "in")) {
       return { data: [], error: null };
     }
-    if (call.table === "items" && call.operations.some((op) => op.method === "insert")) {
+    if (call.table === "rpc:import_items_with_audit") {
       return { data: null, error: { code: "23505", message: "duplicate key" } };
     }
     return { data: null, error: null };
@@ -320,41 +348,14 @@ Deno.test("bulk_import_items returns 400 when the insert fails", async () => {
   );
 });
 
-Deno.test("bulk_import_items records status history only for tracked statuses", async () => {
-  let historyInsertPayload: unknown = null;
+Deno.test("bulk_import_items sends tracked statuses to the atomic database function", async () => {
+  let importParameters: Record<string, unknown> | null = null;
   const { client } = makeClient((call) => {
     if (call.table === "items" && call.operations.some((op) => op.method === "in")) {
       return { data: [], error: null };
     }
-    if (call.table === "items" && call.operations.some((op) => op.method === "insert")) {
-      return {
-        data: [
-          {
-            id: "item-1",
-            workspace_id: "ws-1",
-            name: "Broken Widget",
-            barcode: "ITEM-1",
-            serial_number: null,
-            status: "damaged",
-            notes: "cracked",
-          },
-          {
-            id: "item-2",
-            workspace_id: "ws-1",
-            name: "Fine Widget",
-            barcode: "ITEM-2",
-            serial_number: null,
-            status: "available",
-            notes: null,
-          },
-        ],
-        error: null,
-      };
-    }
-    if (call.table === "item_status_history") {
-      const insertOp = call.operations.find((op) => op.method === "insert");
-      historyInsertPayload = insertOp?.args[0] ?? null;
-      return { data: null, error: null };
+    if (call.table === "rpc:import_items_with_audit") {
+      importParameters = call.operations[0].args[0] as Record<string, unknown>;
     }
     return { data: null, error: null };
   });
@@ -371,40 +372,20 @@ Deno.test("bulk_import_items records status history only for tracked statuses", 
 
   assert(response.status === 200, "expected a 200 response");
   assert(data.inserted === 2, "expected both rows inserted");
-  assert(Array.isArray(historyInsertPayload), "expected history insert to run");
-  assert(
-    (historyInsertPayload as unknown[]).length === 1,
-    "expected only the damaged item to produce a history row",
-  );
-  assert(
-    (historyInsertPayload as Array<{ status: string }>)[0].status === "damaged",
-    "expected the history row status to be damaged",
-  );
+  const items = importParameters?.p_items as Array<{ status: string }>;
+  assert(items.length === 2, "expected both rows to reach the transaction");
+  assert(items[0].status === "damaged", "expected the tracked status to reach the transaction");
+  assert(importParameters?.p_actor_id === "00000000-0000-4000-8000-000000000001", "expected the authenticated actor id");
 });
 
-Deno.test("bulk_import_items skips the history insert when nothing tracked was inserted", async () => {
-  let historyInsertCalled = false;
+Deno.test("bulk_import_items sends ordinary statuses through the atomic database function", async () => {
+  let importParameters: Record<string, unknown> | null = null;
   const { client } = makeClient((call) => {
     if (call.table === "items" && call.operations.some((op) => op.method === "in")) {
       return { data: [], error: null };
     }
-    if (call.table === "items" && call.operations.some((op) => op.method === "insert")) {
-      return {
-        data: [{
-          id: "item-1",
-          workspace_id: "ws-1",
-          name: "Fine Widget",
-          barcode: "ITEM-1",
-          serial_number: null,
-          status: "available",
-          notes: null,
-        }],
-        error: null,
-      };
-    }
-    if (call.table === "item_status_history") {
-      historyInsertCalled = true;
-      return { data: null, error: null };
+    if (call.table === "rpc:import_items_with_audit") {
+      importParameters = call.operations[0].args[0] as Record<string, unknown>;
     }
     return { data: null, error: null };
   });
@@ -412,30 +393,18 @@ Deno.test("bulk_import_items skips the history insert when nothing tracked was i
     baseContext(client, { rows: [{ name: "Fine Widget", barcode: "ITEM-1" }] }),
   );
 
-  assert(!historyInsertCalled, "history insert should not run for untracked statuses");
+  const items = importParameters?.p_items as Array<{ status: string }>;
+  assert(items[0].status === "available", "expected the ordinary status to reach the transaction");
 });
 
 Deno.test("bulk_import_items defaults status to available and nulls empty optional fields", async () => {
-  let insertPayload: unknown = null;
+  let importParameters: Record<string, unknown> | null = null;
   const { client } = makeClient((call) => {
     if (call.table === "items" && call.operations.some((op) => op.method === "in")) {
       return { data: [], error: null };
     }
-    if (call.table === "items" && call.operations.some((op) => op.method === "insert")) {
-      const insertOp = call.operations.find((op) => op.method === "insert");
-      insertPayload = insertOp?.args[0] ?? null;
-      return {
-        data: [{
-          id: "item-1",
-          workspace_id: "ws-1",
-          name: "Bare Item",
-          barcode: "ITEM-1",
-          serial_number: null,
-          status: "available",
-          notes: null,
-        }],
-        error: null,
-      };
+    if (call.table === "rpc:import_items_with_audit") {
+      importParameters = call.operations[0].args[0] as Record<string, unknown>;
     }
     return { data: null, error: null };
   });
@@ -443,8 +412,50 @@ Deno.test("bulk_import_items defaults status to available and nulls empty option
     baseContext(client, { rows: [{ name: "Bare Item", barcode: "ITEM-1" }] }),
   );
 
-  const row = (insertPayload as Array<Record<string, unknown>>)[0];
+  const row = (importParameters?.p_items as Array<Record<string, unknown>>)[0];
   assert(row.status === "available", "expected default status of available");
   assert(row.serial_number === null, "expected serial_number to default to null");
   assert(row.notes === null, "expected notes to default to null");
+});
+
+Deno.test("bulk_import_items sends only bounded rows and trusted summary counts to the atomic function", async () => {
+  let importParameters: Record<string, unknown> | null = null;
+  const { client } = makeClient((call) => {
+    if (call.table === "items" && call.operations.some((op) => op.method === "in")) {
+      return { data: [], error: null };
+    }
+    if (call.table === "rpc:import_items_with_audit") {
+      importParameters = call.operations[0].args[0] as Record<string, unknown>;
+    }
+    return { data: null, error: null };
+  });
+
+  const response = await handleBulkItemsAction(baseContext(client, {
+    rows: [{
+      name: "Item A",
+      barcode: "ITEM-1",
+      metadata: { forged: true },
+    }],
+  }));
+
+  assert(response.status === 200, "expected import to succeed");
+  assert(
+    importParameters?.p_workspace_id === "00000000-0000-4000-8000-000000000002",
+    "workspace must come from the authenticated context",
+  );
+  assert(
+    importParameters?.p_actor_id === "00000000-0000-4000-8000-000000000001",
+    "actor must come from the authenticated context",
+  );
+  assert(
+    JSON.stringify(importParameters?.p_items) === JSON.stringify([{
+      name: "Item A",
+      barcode: "ITEM-1",
+      serial_number: null,
+      status: "available",
+      notes: null,
+    }]),
+    "client metadata must not be copied into the import transaction",
+  );
+  assert(importParameters?.p_skipped_count === 0, "skipped count must be derived by the server");
 });

@@ -1,18 +1,19 @@
 {
   "version": "5",
   "specifiers": {
-    "npm:@better-auth/infra@~0.4.11": "0.4.11_better-auth@1.7.5__vitest@5.0.1__vue@3.5.43__typescript@6.0.3_zod@4.6.5_typescript@6.0.3_vue@3.5.43",
-    "npm:@better-auth/passkey@^1.7.5": "1.7.5_better-auth@1.7.5__vitest@5.0.1__vue@3.5.43__typescript@6.0.3_typescript@6.0.3_vue@3.5.43",
-    "npm:@better-auth/sso@^1.7.5": "1.7.5_better-auth@1.7.5__vitest@5.0.1__vue@3.5.43__typescript@6.0.3_typescript@6.0.3_vue@3.5.43",
+    "npm:@better-auth/infra@~0.4.11": "0.4.11_better-auth@1.7.5_zod@4.6.5_typescript@6.0.3_vue@3.5.43",
+    "npm:@better-auth/passkey@^1.7.5": "1.7.5_better-auth@1.7.5_typescript@6.0.3_vue@3.5.43",
+    "npm:@better-auth/sso@^1.7.5": "1.7.5_better-auth@1.7.5_typescript@6.0.3_vue@3.5.43",
     "npm:@cloudflare/vite-plugin@^1.56.0": "1.60.2_vite@8.3.0_wrangler@4.141.0",
     "npm:@cyclonedx/cyclonedx-npm@6.0.1": "6.0.1",
     "npm:@intercom/messenger-js-sdk@^0.0.20": "0.0.20",
     "npm:@playwright/test@^1.63.0": "1.63.0",
+    "npm:@posthog/cli@0.18.9": "0.18.9",
     "npm:@supabase/supabase-js@^2.116.0": "2.116.0",
     "npm:@types/node@^26.6.2": "26.6.2",
     "npm:@types/qrcode@^1.5.6": "1.5.6",
-    "npm:@vercel/analytics@^2.0.1": "2.0.1_vue@3.5.43_vue-router@4.6.4__vue@3.5.43__typescript@6.0.3_typescript@6.0.3",
-    "npm:@vercel/speed-insights@2": "2.0.0_vue@3.5.43_vue-router@4.6.4__vue@3.5.43__typescript@6.0.3_typescript@6.0.3",
+    "npm:@vercel/analytics@^2.0.1": "2.0.1_vue@3.5.43_vue-router@4.6.4_typescript@6.0.3",
+    "npm:@vercel/speed-insights@2": "2.0.0_vue@3.5.43_vue-router@4.6.4_typescript@6.0.3",
     "npm:@vitejs/plugin-vue@^6.0.9": "6.0.9_vite@8.3.0_vue@3.5.43_typescript@6.0.3",
     "npm:@vitest/coverage-v8@^5.0.1": "5.0.1_vitest@5.0.1_@types+node@26.6.2_jsdom@30.1.1_vite@8.3.0",
     "npm:@vue/test-utils@^2.5.1": "2.5.1_vue@3.5.43_typescript@6.0.3",
@@ -113,7 +114,7 @@
         "@better-auth/utils@0.4.2"
       ]
     },
-    "@better-auth/infra@0.4.11_better-auth@1.7.5__vitest@5.0.1__vue@3.5.43__typescript@6.0.3_zod@4.6.5_typescript@6.0.3_vue@3.5.43": {
+    "@better-auth/infra@0.4.11_better-auth@1.7.5_zod@4.6.5_typescript@6.0.3_vue@3.5.43": {
       "integrity": "sha512-zVhoFkauVUhyOkSEU4Hob9osLUhpc0DHE34lhXGIxTenlvJRCuQINaOvZ9Boi2BjQJlkUUxSkGYLxlkPaMpyVw==",
       "dependencies": [
         "@better-auth/core",
@@ -153,7 +154,7 @@
         "@better-auth/utils@0.4.2"
       ]
     },
-    "@better-auth/passkey@1.7.5_better-auth@1.7.5__vitest@5.0.1__vue@3.5.43__typescript@6.0.3_typescript@6.0.3_vue@3.5.43": {
+    "@better-auth/passkey@1.7.5_better-auth@1.7.5_typescript@6.0.3_vue@3.5.43": {
       "integrity": "sha512-7bV1d1+zLGKO3ugH4bxQKG9s2cLuMsDnpxVhQ4QNnEWjSHKmWgpIwoUsFHk3MHz0ntE7au1QLk8HYkcenW5XyQ==",
       "dependencies": [
         "@better-auth/core",
@@ -174,7 +175,7 @@
         "@better-auth/utils@0.4.2"
       ]
     },
-    "@better-auth/sso@1.7.5_better-auth@1.7.5__vitest@5.0.1__vue@3.5.43__typescript@6.0.3_typescript@6.0.3_vue@3.5.43": {
+    "@better-auth/sso@1.7.5_better-auth@1.7.5_typescript@6.0.3_vue@3.5.43": {
       "integrity": "sha512-sddwWyT4W/0mx/p7P1FmArXsFrKdoSo2BKJBkrc0gCm+HT4znYrwITWkRkwj26kx1Oz6nbNLvYOFc/6VoHcGUw==",
       "dependencies": [
         "@better-auth/core",
@@ -918,6 +919,14 @@
         "@posthog/types"
       ]
     },
+    "@posthog/cli@0.18.9": {
+      "integrity": "sha512-uASaB3MLV5zHIZs9IqeG9d5sgo1lHhxxGh01Ndkmw6RWzLhZaM8ud+pcT0DVbYvpRZvT+eGFookh0/QakeaJ1g==",
+      "dependencies": [
+        "detect-libc"
+      ],
+      "scripts": true,
+      "bin": true
+    },
     "@posthog/core@1.55.0": {
       "integrity": "sha512-x+0FR+uHsK3uJeofd5X4S2YS7hjaWkzkPN0X1GROHm9SvKw2RJ91kfQ7gT1bPtFwZSHNiRtteB7fX/xEMRN0IQ==",
       "dependencies": [
@@ -1149,7 +1158,7 @@
     "@types/trusted-types@2.0.7": {
       "integrity": "sha512-ScaPdn1dQczgbl0QFTeTOmVHFULt394XJgOQNoyVhZ6r2vLnMLJfBPd53SB52T/3G36VI1/g2MZaX0cwDuXsfw=="
     },
-    "@vercel/analytics@2.0.1_vue@3.5.43_vue-router@4.6.4__vue@3.5.43__typescript@6.0.3_typescript@6.0.3": {
+    "@vercel/analytics@2.0.1_vue@3.5.43_vue-router@4.6.4_typescript@6.0.3": {
       "integrity": "sha512-MTQG6V9qQrt1tsDeF+2Uoo5aPjqbVPys1xvnIftXSJYG2SrwXRHnqEvVoYID7BTruDz4lCd2Z7rM1BdkUehk2g==",
       "dependencies": [
         "vue",
@@ -1160,7 +1169,7 @@
         "vue-router"
       ]
     },
-    "@vercel/speed-insights@2.0.0_vue@3.5.43_vue-router@4.6.4__vue@3.5.43__typescript@6.0.3_typescript@6.0.3": {
+    "@vercel/speed-insights@2.0.0_vue@3.5.43_vue-router@4.6.4_typescript@6.0.3": {
       "integrity": "sha512-jwkNcrTeafWxjmWq4AHBaptSqZiJkYU5adLC9QBSqeim0GcqDMgN5Ievh8OG1rJ6W3A4l1oiP7qr9CWxGuzu3w==",
       "dependencies": [
         "vue",
@@ -3015,6 +3024,7 @@
         "npm:@cyclonedx/cyclonedx-npm@6.0.1",
         "npm:@intercom/messenger-js-sdk@^0.0.20",
         "npm:@playwright/test@^1.63.0",
+        "npm:@posthog/cli@0.18.9",
         "npm:@supabase/supabase-js@^2.116.0",
         "npm:@types/node@^26.6.2",
         "npm:@types/qrcode@^1.5.6",
@@ -3050,10 +3060,11 @@
         "tar-fs": "^2.1.5",
         "protobufjs@<=8.2.0": "8.2.0",
         "ws": "^8.20.1",
-        "dompurify": "3.4.15",
+        "dompurify": "3.4.16",
         "es-module-lexer": "3.0.2",
         "fast-uri": "3.1.8",
-        "sharp": "0.35.4",
+        "sharp": "0.35.5",
+        "source-map-js": "1.2.2",
         "undici": "8.10.2",
         "js-yaml": "4.3.2",
         "node-gyp": "^13.0.1",

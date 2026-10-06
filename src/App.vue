@@ -74,6 +74,7 @@
       </div>
     </div>
     <router-view v-else />
+    <OfflineWorkflowStatus />
     <OfflineWorkflowOverlays v-if="isWorkspaceScopedRoute" :enabled="true" />
     <OnboardingModal
       v-if="onboarding.visible.value"
@@ -124,6 +125,7 @@ import { getSessionTerminationState } from "./store/sessionTermination";
 
 const OnboardingModal = defineAsyncComponent(() => import("./components/OnboardingModal.vue"));
 const OfflineWorkflowOverlays = defineAsyncComponent(() => import("./components/OfflineWorkflowOverlays.vue"));
+const OfflineWorkflowStatus = defineAsyncComponent(() => import("./components/OfflineWorkflowStatus.vue"));
 const Analytics = defineAsyncComponent(async () => (await import("@vercel/analytics/vue")).Analytics);
 const FatalErrorToast = defineAsyncComponent(async () => (await import("./components/FatalErrorToast.vue")).default);
 const OfflineQueueToast = defineAsyncComponent(async () => (await import("./components/OfflineQueueToast.vue")).default);

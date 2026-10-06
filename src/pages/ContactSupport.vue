@@ -103,7 +103,7 @@
 
         <ul v-if="attachments.length" class="attachment-list field-full">
           <li v-for="file in attachments" :key="file.filename">
-            <span>{{ file.filename }}</span>
+            <span data-session-replay-mask>{{ file.filename }}</span>
             <span class="muted">{{ formatAttachmentSize(file.size_bytes) }}</span>
           </li>
         </ul>

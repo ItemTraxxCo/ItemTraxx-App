@@ -9,7 +9,6 @@
     </div>
 
     <div class="card admin-section-card">
-      <OfflineWorkflowStatus />
       <div class="admin-section-header">
         <div>
           <h2>Return Queue</h2>
@@ -81,9 +80,7 @@
 import { computed, onMounted, ref } from "vue";
 import { RouterLink } from "vue-router";
 import CameraBarcodeScannerModal from "../../../components/CameraBarcodeScannerModal.vue";
-import OfflineWorkflowStatus from "../../../components/OfflineWorkflowStatus.vue";
 import { fetchItemByBarcode, submitCheckoutReturn, type ItemSummary } from "../../../services/checkoutService";
-import { logAdminAction } from "../../../services/auditLogService";
 import { sanitizeInput } from "../../../utils/inputSanitizer";
 import { toUserFacingErrorMessage } from "../../../services/appErrors";
 import type { ScannerHistoryItem, ScannerScanEvent } from "../../../types/cameraScanner";
@@ -181,13 +178,6 @@ const submitReturn = async () => {
       barcodeInput.value = "";
       return;
     }
-    await logAdminAction({
-      action_type: "quick_return",
-      metadata: {
-        count: barcodes.value.length,
-        barcodes: barcodes.value.map((item) => item.barcode),
-      },
-    });
     capturePostHogEvent("quick_return_completed", { items_returned: barcodes.value.length });
     success.value = "Quick return completed.";
     lastSummary.value = `Processed ${barcodes.value.length} item(s).`;

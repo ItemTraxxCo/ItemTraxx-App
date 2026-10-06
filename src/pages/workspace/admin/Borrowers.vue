@@ -347,7 +347,6 @@ import {
   type BorrowerItem,
 } from "../../../services/borrowerService";
 import { fetchWorkspaceSettings } from "../../../services/adminOpsService";
-import { logAdminAction } from "../../../services/auditLogService";
 import { exportRowsToCsv, exportRowsToPdf } from "../../../services/exportService";
 import { generateBorrowerIdentity } from "../../../utils/borrowerIdentity";
 import { listTenantAccounts } from "../../../services/workspaceAdminManageService";
@@ -697,12 +696,6 @@ const handleCreate = async () => {
       access_mode: isIndividualAccount.value ? "all" : accessMode.value,
       profile_ids: isIndividualAccount.value ? [] : selectedProfileIds.value,
     });
-    await logAdminAction({
-      action_type: "borrower_create",
-      entity_type: "borrower",
-      entity_id: created.id,
-      metadata: { borrower_id: created.borrower_id },
-    });
     borrowers.value = [created, ...borrowers.value];
     usernamePreview.value = created.username;
     borrowerIdPreview.value = created.borrower_id;
@@ -788,12 +781,6 @@ const removeBorrower = async (item: BorrowerItem) => {
   isSaving.value = true;
   try {
     await deleteBorrower(item.id);
-    await logAdminAction({
-      action_type: "borrower_archive",
-      entity_type: "borrower",
-      entity_id: item.id,
-      metadata: { borrower_id: item.borrower_id },
-    });
     borrowers.value = borrowers.value.filter((row) => row.id !== item.id);
     archivedBorrowers.value = [item, ...archivedBorrowers.value];
     success.value = "Borrower archived.";
@@ -826,12 +813,6 @@ const handleRestore = async (item: BorrowerItem) => {
   isSaving.value = true;
   try {
     const restored = await restoreBorrower(item.id);
-    await logAdminAction({
-      action_type: "borrower_restore",
-      entity_type: "borrower",
-      entity_id: item.id,
-      metadata: { borrower_id: item.borrower_id },
-    });
     archivedBorrowers.value = archivedBorrowers.value.filter((row) => row.id !== item.id);
     borrowers.value = [restored, ...borrowers.value];
     success.value = "Borrower restored.";

@@ -7,6 +7,7 @@ class QueryBuilder {
   constructor(private readonly response: QueryResponse) {}
   select() { return this; }
   eq() { return this; }
+  is() { return this; }
   not() { return this; }
   gte() { return this; }
   order() { return this; }
@@ -26,8 +27,8 @@ class MockClient {
   }
 }
 
-Deno.test("super-admin revocation blocks the matching auth session", async () => {
-  const client = new MockClient([{ data: { id: "revoked-row" }, error: null }], {
+Deno.test("super-admin revocation blocks a session without an active registry row", async () => {
+  const client = new MockClient([{ data: null, error: null }], {
     iat: Math.floor(Date.now() / 1000), session_id: "revoked-auth-session",
   });
   const result = await isSuperAdminTokenBlockedBySessionRevocation(client, {
@@ -36,8 +37,8 @@ Deno.test("super-admin revocation blocks the matching auth session", async () =>
   assertEquals(result, { blocked: true, relationMissing: false });
 });
 
-Deno.test("super-admin revocation permits an unrelated active auth session", async () => {
-  const client = new MockClient([{ data: null, error: null }], {
+Deno.test("super-admin session validation permits an active registry row", async () => {
+  const client = new MockClient([{ data: { id: "active-row" }, error: null }], {
     iat: Math.floor(Date.now() / 1000), session_id: "active-auth-session",
   });
   const result = await isSuperAdminTokenBlockedBySessionRevocation(client, {
@@ -46,8 +47,8 @@ Deno.test("super-admin revocation permits an unrelated active auth session", asy
   assertEquals(result, { blocked: false, relationMissing: false });
 });
 
-Deno.test("super-admin revocation uses the timestamp fallback only for legacy tokens", async () => {
-  const client = new MockClient([{ data: { id: "revoked-row" }, error: null }], {
+Deno.test("super-admin session validation rejects legacy tokens without a session binding", async () => {
+  const client = new MockClient([], {
     iat: Math.floor(Date.now() / 1000),
   });
   const result = await isSuperAdminTokenBlockedBySessionRevocation(client, {

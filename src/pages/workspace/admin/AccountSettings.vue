@@ -19,6 +19,8 @@
       </div>
     </header>
 
+    <OfflinePackSettings />
+
     <section class="card admin-section-card">
       <div class="admin-section-header">
         <div>
@@ -123,6 +125,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from "vue";
 import { RouterLink } from "vue-router";
+import OfflinePackSettings from "../../../components/OfflinePackSettings.vue";
 import { toUserFacingErrorMessage } from "../../../services/appErrors";
 import {
   listAccountSessions,

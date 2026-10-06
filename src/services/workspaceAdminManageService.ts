@@ -18,6 +18,11 @@ type WorkspaceAdminManageRequest = {
   payload: Record<string, unknown>;
 };
 
+export type WorkspaceInvitationResponse = {
+  success: true;
+  message: string;
+};
+
 const callWorkspaceAdminManage = async <TData>(payload: WorkspaceAdminManageRequest) => {
   const { deviceId, deviceLabel } = getOrCreateDeviceSession();
   const result = await invokeEdgeFunction<EdgeEnvelope<TData>, WorkspaceAdminManageRequest>(
@@ -53,10 +58,7 @@ export const listTenantManagedAdmins = async () =>
   });
 
 export const createTenantManagedAdmin = async (payload: { auth_email: string }) =>
-  callWorkspaceAdminManage<{
-    success: boolean;
-    auth_email: string;
-  }>({
+  callWorkspaceAdminManage<WorkspaceInvitationResponse>({
     action: "create_workspace_admin",
     payload,
   });
@@ -67,15 +69,6 @@ export const setTenantManagedAdminStatus = async (payload: {
 }) =>
   callWorkspaceAdminManage<TenantManagedAdmin>({
     action: "set_admin_status",
-    payload,
-  });
-
-export const updateTenantManagedAdminEmail = async (payload: {
-  id: string;
-  auth_email: string;
-}) =>
-  callWorkspaceAdminManage<TenantManagedAdmin>({
-    action: "update_admin_email",
     payload,
   });
 
@@ -118,7 +111,7 @@ export const setWorkspaceAccountRole = (payload: {
 
 export const listTenantAccounts = async () =>
   (await callWorkspaceAdminManage<TenantAccount[]>({ action: "list_tenant_accounts", payload: {} })) ?? [];
-export const createTenantAccount=(auth_email:string)=>callWorkspaceAdminManage<TenantAccount>({action:"create_tenant_account",payload:{auth_email}});
+export const createTenantAccount=(auth_email:string)=>callWorkspaceAdminManage<WorkspaceInvitationResponse>({action:"create_tenant_account",payload:{auth_email}});
 export const setTenantAccountStatus=(id:string,is_active:boolean)=>callWorkspaceAdminManage<TenantAccount>({action:"set_tenant_account_status",payload:{id,is_active}});
 export const removeTenantAccount=(id:string)=>callWorkspaceAdminManage<{success:boolean}>({action:"remove_tenant_account",payload:{id}});
 export const sendTenantAccountReset=(id:string)=>callWorkspaceAdminManage<{success:boolean}>({action:"send_tenant_account_reset",payload:{id}});

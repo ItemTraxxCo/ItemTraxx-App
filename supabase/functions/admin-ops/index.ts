@@ -9,6 +9,7 @@ import { readJsonBody } from "../_shared/requestBody.ts";
 import { sha256Hex } from "../_shared/sha256.ts";
 import { resolveAccountAuthSessionBinding } from "../_shared/accountSessions.ts";
 import { isBetterAuthSessionActive } from "../_shared/betterAuthSessions.ts";
+import { verifySsoLoginProof } from "../_shared/ssoLoginProvenance.ts";
 import { resolveWorkspaceAccess } from "../_shared/workspaceAccess.ts";
 import {
   asRecord,
@@ -224,7 +225,23 @@ serve((req) => withRequestSpan(req, "POST /functions/admin-ops", async (span, re
       }
       isWorkspaceSuspended = workspaceAccess.reason === "disabled";
     }
-    const deviceSession = resolveDeviceSessionContext(payloadRecord, req);
+    const ssoLoginProvenance = normalizedAction === "touch_session"
+      ? await verifySsoLoginProof(
+        payloadRecord.sso_login_proof,
+        Deno.env.get("ITX_INTERNAL_AUTH_SECRET"),
+        {
+          betterAuthUserId: typeof profile.better_auth_user_id === "string"
+            ? profile.better_auth_user_id
+            : "",
+          sessionId: authSessionBinding.sessionId ?? "",
+        },
+      )
+      : null;
+    const deviceSession = resolveDeviceSessionContext(
+      payloadRecord,
+      req,
+      ssoLoginProvenance,
+    );
 
     const sessionSecurityContext = {
       adminClient,

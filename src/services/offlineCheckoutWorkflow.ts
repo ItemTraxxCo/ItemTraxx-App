@@ -2,6 +2,8 @@ import { invokeEdgeFunction } from "./edgeFunctionClient";
 import { getOrCreateDeviceSession } from "../utils/deviceSession";
 import { getAuthState } from "../store/authState";
 import { ensureAccountSessionReady } from "./accountSessionService";
+import { isOfflinePackAutomaticDownloadAllowed } from "./offlineCheckoutPreferences";
+import { requestLargeOfflinePackConfirmation } from "./offlinePackConfirmation";
 import {
   markItemTraxxServerConfirmed,
 } from "./offlineConnectionState";
@@ -71,7 +73,33 @@ export type OfflineLedgerEntry = {
 };
 
 type EncryptedRecord = { version: 1; iv: string; cipher: string };
-type PreparedPackResponse = Omit<OfflineCheckoutPack, "schema_version" | "profile_id" | "device_id">;
+type PreparedPackManifest = {
+  pack_version: string;
+  workspace_id: string;
+  prepared_at: string;
+  expires_at: string;
+  item_count: number;
+  borrower_count: number;
+  chunk_size: number;
+  max_records: number;
+  max_bytes: number;
+};
+type OfflinePackChunkResponse = {
+  items: OfflinePackItem[];
+  borrowers: OfflinePackBorrower[];
+  next_item_id: string | null;
+  next_borrower_id: string | null;
+  item_count: number;
+  borrower_count: number;
+};
+export type OfflinePackPreparationProgress = {
+  stage: "starting" | "downloading" | "complete";
+  downloadedRecords: number;
+  totalRecords: number;
+  itemCount: number;
+  borrowerCount: number;
+  chunkNumber: number;
+};
 type SyncItemResult = {
   item_id: string;
   barcode: string;
@@ -88,7 +116,7 @@ type SyncOperationResult = {
 type OfflinePackRefreshResult = {
   refreshed: boolean;
   firstPreparation: boolean;
-  skippedReason?: "offline" | "unauthenticated" | "pending_transactions" | "up_to_date";
+  skippedReason?: "offline" | "unauthenticated" | "download_preference" | "pending_transactions" | "up_to_date";
 };
 
 const DATABASE_NAME = "itemtraxx-offline-workflow";
@@ -102,6 +130,9 @@ const LOCK_NAME = "itemtraxx-offline-workflow";
 const LOCK_STORAGE_KEY = "itemtraxx:offline-workflow:lock:v1";
 const LOCK_TTL_MS = 30_000;
 export const OFFLINE_PACK_REFRESH_INTERVAL_MS = 5 * 60 * 1_000;
+export const OFFLINE_PACK_LARGE_WARNING_RECORDS = 2_000;
+export const OFFLINE_PACK_MAX_RECORDS = 10_000;
+export const OFFLINE_PACK_MAX_BYTES = 25 * 1024 * 1024;
 export const OFFLINE_SESSION_INITIALIZING_ERROR = "Offline session is still initializing. Please retry.";
 
 export const isOfflineSessionInitializingError = (error: unknown) =>
@@ -114,6 +145,7 @@ const ACTIVE_LEDGER_STATES = new Set<OfflineLedgerEntry["status"]>([
 ]);
 let automaticPackRefresh: Promise<OfflinePackRefreshResult> | null = null;
 let automaticPackRefreshWasForced = false;
+let packPreparation: Promise<OfflineCheckoutPack> | null = null;
 
 const isRetryableWorkflowStatus = (status: number) => status === 0 || status === 429 || status >= 500;
 
@@ -321,12 +353,45 @@ const currentScope = (): OfflineWorkflowScope => {
   return { workspaceId: auth.workspaceContextId, profileId: auth.userId };
 };
 
-export const prepareOfflineCheckoutPack = async () => {
+const reportOfflinePackPreparationProgress = (progress: OfflinePackPreparationProgress) => {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new CustomEvent<OfflinePackPreparationProgress>(
+    "itemtraxx:offline-pack-progress",
+    { detail: progress },
+  ));
+};
+
+const invokePackControl = async <T>(
+  body: Record<string, unknown> & { action: string; device_id: string },
+) => {
+  const response = await invokeEdgeFunction<{ data: T }, Record<string, unknown>>(
+    "offline-checkout",
+    { method: "POST", body },
+  );
+  recordWorkflowResponse(response.ok);
+  if (!response.ok || !response.data?.data) {
+    throw new Error(response.error || "Unable to prepare offline checkout.");
+  }
+  return response.data.data;
+};
+
+const assertOfflinePackOwnerIsCurrent = (owner: OfflineWorkflowScope) => {
+  const auth = getAuthState();
+  if (
+    !auth.isAuthenticated || auth.userId !== owner.profileId ||
+    auth.workspaceContextId !== owner.workspaceId
+  ) {
+    throw new Error("The account changed while preparing offline checkout. Please try again.");
+  }
+};
+
+const prepareOfflineCheckoutPackOnce = async () => {
   const auth = getAuthState();
   if (!auth.workspaceContextId || !auth.userId || !auth.isAuthenticated) {
     throw new Error("A workspace session is required to prepare offline checkout.");
   }
-  const existingPack = await readOfflinePack({ workspaceId: auth.workspaceContextId, profileId: auth.userId }, { allowExpired: true });
+  const owner = { workspaceId: auth.workspaceContextId, profileId: auth.userId };
+  const existingPack = await readOfflinePack(owner, { allowExpired: true });
   if (!existingPack && (await readOfflineLedger()).length > 0) await clearOfflineCheckoutWorkflow();
   const activeEntries = (await readOfflineLedger()).filter((entry) => ACTIVE_LEDGER_STATES.has(entry.status));
   if (activeEntries.length > 0) {
@@ -334,23 +399,183 @@ export const prepareOfflineCheckoutPack = async () => {
   }
   await ensureAccountSessionReady();
   const { deviceId } = getOrCreateDeviceSession();
-  const response = await invokeEdgeFunction<{ data: PreparedPackResponse }, { action: "prepare_pack"; device_id: string }>(
-    "offline-checkout",
-    { method: "POST", body: { action: "prepare_pack", device_id: deviceId } },
-  );
-  recordWorkflowResponse(response.ok);
-  if (!response.ok || !response.data?.data) throw new Error(response.error || "Unable to prepare offline checkout.");
-  const pack: OfflineCheckoutPack = {
-    ...response.data.data,
-    schema_version: 1,
-    profile_id: auth.userId,
-    device_id: deviceId,
-  };
-  if (pack.workspace_id !== auth.workspaceContextId) throw new Error("Offline pack workspace does not match this session.");
-  await writeOfflinePack(pack);
-  await updateLedger((entries) => entries.filter((entry) => ACTIVE_LEDGER_STATES.has(entry.status)));
-  return pack;
+  let packVersion: string | null = null;
+  let downloadComplete = false;
+  try {
+    reportOfflinePackPreparationProgress({
+      stage: "starting",
+      downloadedRecords: 0,
+      totalRecords: 0,
+      itemCount: 0,
+      borrowerCount: 0,
+      chunkNumber: 0,
+    });
+    const manifest = await invokePackControl<PreparedPackManifest>({
+      action: "prepare_pack",
+      device_id: deviceId,
+    });
+    packVersion = manifest.pack_version;
+    assertOfflinePackOwnerIsCurrent(owner);
+    if (manifest.workspace_id !== owner.workspaceId) {
+      throw new Error("Offline pack workspace does not match this session.");
+    }
+    if (
+      !Number.isInteger(manifest.item_count) || manifest.item_count < 0 ||
+      !Number.isInteger(manifest.borrower_count) || manifest.borrower_count < 0 ||
+      !Number.isInteger(manifest.max_records) || manifest.max_records < 1 ||
+      !Number.isInteger(manifest.max_bytes) || manifest.max_bytes < 1 ||
+      !Number.isInteger(manifest.chunk_size) || manifest.chunk_size !== 100 ||
+      manifest.item_count + manifest.borrower_count > Math.min(manifest.max_records, OFFLINE_PACK_MAX_RECORDS) ||
+      manifest.max_bytes > OFFLINE_PACK_MAX_BYTES
+    ) {
+      throw new Error("The server returned an invalid offline pack size.");
+    }
+    const totalRecords = manifest.item_count + manifest.borrower_count;
+    reportOfflinePackPreparationProgress({
+      stage: "starting",
+      downloadedRecords: 0,
+      totalRecords,
+      itemCount: manifest.item_count,
+      borrowerCount: manifest.borrower_count,
+      chunkNumber: 0,
+    });
+
+    if (totalRecords > OFFLINE_PACK_LARGE_WARNING_RECORDS) {
+      const confirmed = await requestLargeOfflinePackConfirmation({
+        itemCount: manifest.item_count,
+        borrowerCount: manifest.borrower_count,
+        totalRecords,
+        maxRecords: Math.min(manifest.max_records, OFFLINE_PACK_MAX_RECORDS),
+        maxBytes: Math.min(manifest.max_bytes, OFFLINE_PACK_MAX_BYTES),
+      });
+      if (!confirmed) throw new OfflinePackDownloadCancelledError();
+      assertOfflinePackOwnerIsCurrent(owner);
+    }
+
+    const items: OfflinePackItem[] = [];
+    const borrowers: OfflinePackBorrower[] = [];
+    let afterItemId: string | null = null;
+    let afterBorrowerId: string | null = null;
+    let chunkNumber = 0;
+    while (true) {
+      assertOfflinePackOwnerIsCurrent(owner);
+      const chunk: OfflinePackChunkResponse = await invokePackControl<OfflinePackChunkResponse>({
+        action: "prepare_pack_chunk",
+        device_id: deviceId,
+        pack_version: manifest.pack_version,
+        after_item_id: afterItemId,
+        after_borrower_id: afterBorrowerId,
+      });
+      if (
+        chunk.item_count !== manifest.item_count ||
+        chunk.borrower_count !== manifest.borrower_count ||
+        chunk.items.length > 100 || chunk.borrowers.length > 100
+      ) {
+        throw new Error("Offline pack chunk did not match its size manifest.");
+      }
+      if (
+        (chunk.items.length && (!chunk.next_item_id || chunk.next_item_id === afterItemId)) ||
+        (chunk.borrowers.length && (!chunk.next_borrower_id || chunk.next_borrower_id === afterBorrowerId))
+      ) {
+        throw new Error("Offline pack chunk cursor did not advance.");
+      }
+      if (!chunk.items.length && !chunk.borrowers.length) break;
+
+      items.push(...chunk.items);
+      borrowers.push(...chunk.borrowers);
+      if (items.length > manifest.item_count || borrowers.length > manifest.borrower_count) {
+        throw new Error("Offline pack changed size during download. Please try again.");
+      }
+      afterItemId = chunk.next_item_id ?? afterItemId;
+      afterBorrowerId = chunk.next_borrower_id ?? afterBorrowerId;
+      chunkNumber += 1;
+      reportOfflinePackPreparationProgress({
+        stage: "downloading",
+        downloadedRecords: items.length + borrowers.length,
+        totalRecords,
+        itemCount: manifest.item_count,
+        borrowerCount: manifest.borrower_count,
+        chunkNumber,
+      });
+    }
+
+    if (items.length !== manifest.item_count || borrowers.length !== manifest.borrower_count) {
+      throw new Error("Offline pack changed size during download. Please try again.");
+    }
+    assertOfflinePackOwnerIsCurrent(owner);
+    await invokePackControl<{ pack_version: string; download_complete: boolean }>({
+      action: "complete_pack",
+      device_id: deviceId,
+      pack_version: manifest.pack_version,
+    });
+    downloadComplete = true;
+
+    const pack: OfflineCheckoutPack = {
+      schema_version: 1,
+      pack_version: manifest.pack_version,
+      workspace_id: manifest.workspace_id,
+      profile_id: owner.profileId,
+      device_id: deviceId,
+      prepared_at: manifest.prepared_at,
+      expires_at: manifest.expires_at,
+      borrowers,
+      items,
+    };
+    assertOfflinePackOwnerIsCurrent(owner);
+    await withOfflineWorkflowLock(async () => {
+      const latestLedger = await readOfflineLedger();
+      if (latestLedger.some((entry) => ACTIVE_LEDGER_STATES.has(entry.status))) {
+        throw new Error("Sync or resolve pending offline transactions before refreshing this device's offline pack.");
+      }
+      await writeRecord(PACK_ID, pack);
+      await writeRecord(LEDGER_ID, latestLedger.filter((entry) => ACTIVE_LEDGER_STATES.has(entry.status)));
+      window.dispatchEvent(new CustomEvent("itemtraxx:offline-workflow-changed"));
+    });
+    try {
+      await invokePackControl<{ pack_version: string; activated: boolean }>({
+        action: "activate_pack",
+        device_id: deviceId,
+        pack_version: manifest.pack_version,
+      });
+    } catch {
+      // The completed pack and its predecessor remain valid if activation cannot
+      // retire the previous server snapshot. The local pack is already usable.
+    }
+    reportOfflinePackPreparationProgress({
+      stage: "complete",
+      downloadedRecords: totalRecords,
+      totalRecords,
+      itemCount: manifest.item_count,
+      borrowerCount: manifest.borrower_count,
+      chunkNumber,
+    });
+    return pack;
+  } catch (error) {
+    if (packVersion && !downloadComplete) {
+      void invokePackControl<{ cancelled: boolean }>({
+        action: "cancel_pack",
+        device_id: deviceId,
+        pack_version: packVersion,
+      }).catch(() => undefined);
+    }
+    throw error;
+  }
 };
+
+export const prepareOfflineCheckoutPack = () => {
+  if (packPreparation) return packPreparation;
+  packPreparation = prepareOfflineCheckoutPackOnce().finally(() => {
+    packPreparation = null;
+  });
+  return packPreparation;
+};
+
+export class OfflinePackDownloadCancelledError extends Error {
+  constructor() {
+    super("Offline pack download was cancelled.");
+    this.name = "OfflinePackDownloadCancelledError";
+  }
+}
 
 /**
  * Keeps the encrypted local snapshot recent without replacing a working offline ledger.
@@ -376,6 +601,9 @@ export const refreshOfflineCheckoutPackIfNeeded = (
     const auth = getAuthState();
     if (!auth.isAuthenticated || !auth.workspaceContextId || !auth.userId) {
       return { refreshed: false, firstPreparation: false, skippedReason: "unauthenticated" as const };
+    }
+    if (!isOfflinePackAutomaticDownloadAllowed(auth)) {
+      return { refreshed: false, firstPreparation: false, skippedReason: "download_preference" as const };
     }
 
     const scope = { workspaceId: auth.workspaceContextId, profileId: auth.userId };
@@ -519,34 +747,42 @@ export const queueOfflineOperation = async (draft: {
   items: Array<{ item: OfflinePackItem; intent: "checkout" | "return" | "quick_return" }>;
 }) => {
   const scope = currentScope();
-  const pack = await readOfflinePack(scope);
-  if (!pack) throw new Error("Offline checkout is unavailable. Reconnect and prepare this device for offline use.");
-  const entry: OfflineLedgerEntry = {
-    schema_version: 1,
-    id: createId(),
-    operation_id: draft.operationId,
-    workspace_id: pack.workspace_id,
-    profile_id: pack.profile_id,
-    device_id: pack.device_id,
-    pack_version: pack.pack_version,
-    created_at: new Date().toISOString(),
-    status: "pending",
-    attempts: 0,
-    last_error: null,
-    items: draft.items.map(({ item, intent }) => ({
-      item_id: item.id,
-      barcode: item.barcode,
-      name: item.name,
-      intent,
-      borrower_id: intent === "checkout" ? draft.borrower?.id ?? null : item.checked_out_by,
-      borrower_display_id: draft.borrower?.borrower_id ?? null,
-      borrower_username: draft.borrower?.username ?? null,
-      expected_status: item.status,
-      expected_checked_out_by: item.checked_out_by,
+  const { next } = await withOfflineWorkflowLock(async () => {
+    const pack = await readRecord<OfflineCheckoutPack | null>(PACK_ID, null);
+    if (!pack || !scopeMatches(pack, scope) || Date.parse(pack.expires_at) <= Date.now()) {
+      throw new Error("Offline checkout is unavailable. Reconnect and prepare this device for offline use.");
+    }
+    const entry: OfflineLedgerEntry = {
+      schema_version: 1,
+      id: createId(),
+      operation_id: draft.operationId,
+      workspace_id: pack.workspace_id,
+      profile_id: pack.profile_id,
+      device_id: pack.device_id,
+      pack_version: pack.pack_version,
+      created_at: new Date().toISOString(),
       status: "pending",
-    })),
-  };
-  const next = await updateLedger((entries) => [...entries, entry]);
+      attempts: 0,
+      last_error: null,
+      items: draft.items.map(({ item, intent }) => ({
+        item_id: item.id,
+        barcode: item.barcode,
+        name: item.name,
+        intent,
+        borrower_id: intent === "checkout" ? draft.borrower?.id ?? null : item.checked_out_by,
+        borrower_display_id: draft.borrower?.borrower_id ?? null,
+        borrower_username: draft.borrower?.username ?? null,
+        expected_status: item.status,
+        expected_checked_out_by: item.checked_out_by,
+        status: "pending",
+      })),
+    };
+    const entries = await readOfflineLedger();
+    const next = [...entries, entry];
+    await writeRecord(LEDGER_ID, next);
+    window.dispatchEvent(new CustomEvent("itemtraxx:offline-workflow-changed"));
+    return { entry, next };
+  });
   try {
     await refreshOfflineCheckoutCacheFromLedger(draft.borrower);
   } catch {

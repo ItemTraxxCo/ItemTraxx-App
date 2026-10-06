@@ -23,6 +23,7 @@ import { installAppErrorRecovery } from "./services/appErrorRecovery";
 import { isPublicBootstrapRoute } from "./bootstrap/routeBootstrap";
 import { createClientMonitoring } from "./bootstrap/clientMonitoring";
 import { markAgentFallbackMounted } from "./bootstrap/agentFallback";
+import { captureAccountFlowTokenFromLocation } from "./services/accountFlowToken";
 
 const redirectCanonicalHost = () => {
   if (typeof window === "undefined") return false;
@@ -103,6 +104,7 @@ const initializePublicAuth = async () => {
   }
 };
 
+captureAccountFlowTokenFromLocation();
 const clientMonitoring = createClientMonitoring(router);
 installAppErrorRecovery(router);
 

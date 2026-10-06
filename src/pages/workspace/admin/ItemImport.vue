@@ -124,9 +124,9 @@
 import { onMounted, ref } from "vue";
 import { RouterLink } from "vue-router";
 import { bulkImportItem, fetchWorkspaceSettings } from "../../../services/adminOpsService";
-import { logAdminAction } from "../../../services/auditLogService";
 import { toUserFacingErrorMessage } from "../../../services/appErrors";
 import { capturePostHogEvent } from "../../../services/posthogService";
+import { exportRowsToCsv } from "../../../services/exportService";
 import { useManagerContext } from "../../../composables/useManagerContext";
 
 const { managerRoot } = useManagerContext();
@@ -151,11 +151,6 @@ const importResult = ref<{
   skipped: number;
   skipped_rows: Array<{ barcode: string; reason: string }>;
 } | null>(null);
-
-const toCsvCell = (value: string) => {
-  const escaped = value.replace(/"/g, "\"\"");
-  return `"${escaped}"`;
-};
 
 const downloadTextFile = (filename: string, content: string, contentType: string) => {
   const blob = new Blob([content], { type: contentType });
@@ -191,11 +186,7 @@ const downloadValidationReport = (source: "parse" | "import") => {
     source === "parse"
       ? `item-import-parse-validation-${new Date().toISOString().slice(0, 10)}.csv`
       : `item-import-validation-${new Date().toISOString().slice(0, 10)}.csv`;
-  const csvRows = ["barcode,reason"];
-  for (const row of rows) {
-    csvRows.push(`${toCsvCell(row.barcode)},${toCsvCell(row.reason)}`);
-  }
-  downloadTextFile(filename, csvRows.join("\n"), "text/csv;charset=utf-8");
+  exportRowsToCsv(filename, ["barcode", "reason"], rows);
 };
 
 const parseLine = (line: string) => {
@@ -295,15 +286,6 @@ const runImport = async () => {
       skipped: result.skipped,
       skipped_rows: result.skipped_rows,
     };
-
-    await logAdminAction({
-      action_type: "item_bulk_import",
-      entity_type: "items",
-      metadata: {
-        inserted: result.inserted,
-        skipped: result.skipped,
-      },
-    });
 
     capturePostHogEvent("item_bulk_import_completed", {
       inserted: result.inserted,

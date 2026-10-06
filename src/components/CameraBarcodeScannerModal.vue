@@ -46,7 +46,7 @@
               class="scanner-inline-detection"
             >
               <strong>Scanned borrower</strong>
-              <span>{{ currentDetection.value }}</span>
+              <span data-session-replay-mask>{{ currentDetection.value }}</span>
             </div>
           </div>
 
@@ -95,15 +95,15 @@
 
         <div v-if="props.mode !== 'borrower' && currentDetection" class="scanner-detected-card">
           <strong>Current barcode</strong>
-          <span>{{ currentDetection.value }}</span>
+          <span data-session-replay-mask>{{ currentDetection.value }}</span>
         </div>
 
         <div v-if="scanHistoryItems.length" class="scanner-history-card">
           <p class="checkout-subheading">Items</p>
           <ul class="checkout-inline-list">
             <li v-for="item in scanHistoryItems" :key="item.id" class="checkout-item-row">
-              {{ item.label }}
-              <span class="muted">({{ item.value }})</span>
+              <span data-session-replay-mask>{{ item.label }}</span>
+              <span class="muted">(<span data-session-replay-mask>{{ item.value }}</span>)</span>
               <span v-if="item.tagLabel" class="tag" :class="item.tagClass">
                 {{ item.tagLabel }}
               </span>

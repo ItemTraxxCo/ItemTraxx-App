@@ -2,6 +2,7 @@ name = "itemtraxx-edge-proxy"
 main = "src/index.ts"
 compatibility_date = "2026-02-11"
 compatibility_flags = ["nodejs_compat"]
+keep_vars = true
 workers_dev = false
 preview_urls = false
 
@@ -32,8 +33,7 @@ ALLOWED_ORIGINS = "https://itemtraxx.com,https://www.itemtraxx.com,https://statu
 TRUST_LOCAL_ORIGINS = "false"
 SESSION_COOKIE_SAMESITE = "lax"
 # Optional hard allowlist of function names (comma-separated).
-ALLOWED_FUNCTIONS = "checkoutReturn,checkout-borrower-lookup,offline-checkout,admin-item-mutate,admin-borrower-mutate,admin-ops,system-status,super-workspace-mutate,super-admin-mutate,super-dashboard,super-item-mutate,super-borrower-mutate,super-logs-query,super-ops,contact-sales-submit,contact-support-submit,client-error-report,consent-record,job-worker,login-notify,intercom-jwt,workspace-admin-mutate,privileged-step-up"
-ITX_ITEMTRAXX_KILLSWITCH_ENABLED = "false"
+ALLOWED_FUNCTIONS = "checkoutReturn,checkout-borrower-lookup,offline-checkout,admin-item-mutate,admin-borrower-mutate,admin-ops,system-status,super-workspace-mutate,super-admin-mutate,super-dashboard,super-item-mutate,super-borrower-mutate,super-logs-query,super-ops,contact-sales-submit,contact-support-submit,client-error-report,consent-record,workspace-invitation,account-email-change,job-worker,login-notify,intercom-jwt,workspace-admin-mutate,privileged-step-up"
 # W3C trace context is propagated to Supabase. Direct PostHog trace export is
 # intentionally owned by the Supabase service; Cloudflare Observability sends
 # Worker console records through the existing log bridge.
@@ -71,6 +71,30 @@ name = "SESSION_REFRESH_RATE_LIMITER"
 namespace_id = "2026061102"
   [ratelimits.simple]
   limit = 60
+  period = 60
+
+# These lightweight Worker budgets run before public payload buffering. The
+# scope is part of each key so a noisy public form cannot spend another route's
+# allowance; IP is supplied by Cloudflare rather than browser headers.
+[[ratelimits]]
+name = "PUBLIC_SUBMISSION_RATE_LIMITER"
+namespace_id = "2026100301"
+  [ratelimits.simple]
+  limit = 6
+  period = 60
+
+[[ratelimits]]
+name = "PUBLIC_STATUS_RATE_LIMITER"
+namespace_id = "2026100302"
+  [ratelimits.simple]
+  limit = 60
+  period = 60
+
+[[ratelimits]]
+name = "PUBLIC_AUTH_RATE_LIMITER"
+namespace_id = "2026100303"
+  [ratelimits.simple]
+  limit = 30
   period = 60
 
 [[routes]]

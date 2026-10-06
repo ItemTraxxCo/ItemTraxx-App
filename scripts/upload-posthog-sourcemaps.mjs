@@ -70,23 +70,15 @@ if (!releaseVersion) {
 const releaseName = process.env.POSTHOG_CLI_RELEASE_NAME?.trim() || "itemtraxx-web";
 
 const runCli = (args) => {
-  const command = process.env.POSTHOG_CLI_BIN?.trim() || "posthog-cli";
-  let result = spawnSync(command, args, {
+  const result = spawnSync("posthog-cli", args, {
     cwd: process.cwd(),
     env: process.env,
     stdio: "inherit",
   });
 
-  // CI images may not have the global binary. Use the published package as a
-  // fallback without adding a runtime dependency to the browser bundle.
-  if (result.error?.code === "ENOENT" && command === "posthog-cli") {
-    result = spawnSync("npx", ["--yes", "@posthog/cli", ...args], {
-      cwd: process.cwd(),
-      env: process.env,
-      stdio: "inherit",
-    });
+  if (result.error?.code === "ENOENT") {
+    throw new Error("[posthog] pinned CLI is not installed; run npm ci.");
   }
-
   if (result.error) throw result.error;
   if (result.status !== 0) {
     throw new Error(`[posthog] CLI exited with status ${result.status ?? "unknown"}.`);

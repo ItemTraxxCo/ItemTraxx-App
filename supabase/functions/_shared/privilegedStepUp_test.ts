@@ -4,8 +4,12 @@ import {
   hasFreshAdminStepUpAuthMethod,
   isEligiblePrivilegedProfile,
   hasPrivilegedStepUp,
+  hasRecentPrivilegedStepUp,
+  isPrivilegedStepUpFreshAt,
   isMissingPrivilegedStepUpTable,
+  PRIVILEGED_STEP_UP_FRESHNESS_WINDOW_MS,
   registerPrivilegedStepUp,
+  SUPER_ADMIN_ACTION_CONFIRMATION_SOURCE,
 } from "./privilegedStepUp.ts";
 
 const assert = (condition: boolean, message: string) => {
@@ -396,4 +400,94 @@ Deno.test("hasPrivilegedStepUp throws when the lookup errors", async () => {
     return;
   }
   throw new Error("expected lookup failure to throw");
+});
+
+const recentStepUpClient = (
+  row: Record<string, unknown> | null,
+  nowMs: number,
+) => {
+  const filters: Array<[string, unknown]> = [];
+  const selections: string[] = [];
+  const query = {
+    select: (columns: string) => {
+      selections.push(columns);
+      return query;
+    },
+    eq: (column: string, value: unknown) => {
+      filters.push([column, value]);
+      return query;
+    },
+    maybeSingle: () => Promise.resolve({ data: row, error: null }),
+  };
+  const client = {
+    verifyExternalAuthClaims: () => Promise.resolve({ session_id: "session-current" }),
+    from: (table: string) => {
+      assert(table === "privileged_session_stepups", "expected step-up table lookup");
+      return query;
+    },
+  } as never;
+  return { client, filters, selections, nowMs };
+};
+
+Deno.test("recent super-admin confirmation is bound to the current session and password source", async () => {
+  const nowMs = Date.now();
+  const { client, filters, selections } = recentStepUpClient({
+    updated_at: new Date(nowMs).toISOString(),
+    issued_by: SUPER_ADMIN_ACTION_CONFIRMATION_SOURCE,
+  }, nowMs);
+
+  assert(await hasRecentPrivilegedStepUp(client, {
+    userId: "profile-1",
+    roleScope: "super_admin",
+    authToken: "current-session-token",
+    source: SUPER_ADMIN_ACTION_CONFIRMATION_SOURCE,
+    nowMs,
+  }), "expected recent password confirmation to pass");
+  assert(JSON.stringify(selections) === JSON.stringify(["updated_at,issued_by"]), "expected timestamp and source selection");
+  assert(JSON.stringify(filters) === JSON.stringify([
+    ["user_id", "profile-1"],
+    ["role_scope", "super_admin"],
+    ["binding_key", "session:session-current"],
+    ["issued_by", SUPER_ADMIN_ACTION_CONFIRMATION_SOURCE],
+  ]), "lookup must bind user, role, current session, and confirmation source");
+});
+
+Deno.test("recent super-admin confirmation rejects login grants and expired confirmations", async () => {
+  const nowMs = Date.now();
+  const oldConfirmation = recentStepUpClient({
+    updated_at: new Date(nowMs - PRIVILEGED_STEP_UP_FRESHNESS_WINDOW_MS - 1).toISOString(),
+    issued_by: SUPER_ADMIN_ACTION_CONFIRMATION_SOURCE,
+  }, nowMs);
+  assert(!await hasRecentPrivilegedStepUp(oldConfirmation.client, {
+    userId: "profile-1",
+    roleScope: "super_admin",
+    authToken: "current-session-token",
+    source: SUPER_ADMIN_ACTION_CONFIRMATION_SOURCE,
+    nowMs,
+  }), "confirmation older than five minutes must fail");
+
+  const loginGrant = recentStepUpClient({
+    updated_at: new Date(nowMs).toISOString(),
+    issued_by: "admin_login",
+  }, nowMs);
+  assert(!await hasRecentPrivilegedStepUp(loginGrant.client, {
+    userId: "profile-1",
+    roleScope: "super_admin",
+    authToken: "current-session-token",
+    source: SUPER_ADMIN_ACTION_CONFIRMATION_SOURCE,
+    nowMs,
+  }), "a fresh login alone must not satisfy explicit action confirmation");
+});
+
+Deno.test("step-up timestamp freshness accepts exactly five minutes and rejects invalid timestamps", () => {
+  const nowMs = Date.now();
+  assert(isPrivilegedStepUpFreshAt(
+    new Date(nowMs - PRIVILEGED_STEP_UP_FRESHNESS_WINDOW_MS).toISOString(),
+    nowMs,
+  ), "the five-minute freshness boundary should pass");
+  assert(!isPrivilegedStepUpFreshAt(
+    new Date(nowMs - PRIVILEGED_STEP_UP_FRESHNESS_WINDOW_MS - 1).toISOString(),
+    nowMs,
+  ), "a confirmation older than five minutes should fail");
+  assert(!isPrivilegedStepUpFreshAt("invalid", nowMs), "invalid timestamps should fail");
 });

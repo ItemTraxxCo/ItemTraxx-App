@@ -250,7 +250,7 @@ serve(async (req) => {
 
     const clientIp = normalizeIp(req);
     const rateLimitKey = await hashString(
-      `${user.id}|${clientIp ?? ""}|${req.headers.get("user-agent") ?? ""}`
+      `${user.id}|${clientIp ?? ""}`
     );
     const { data: rateLimit, error: rateLimitError } = await adminClient.rpc(
       "consume_rate_limit_prelogin",

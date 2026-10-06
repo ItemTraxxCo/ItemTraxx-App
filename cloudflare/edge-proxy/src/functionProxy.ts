@@ -16,6 +16,7 @@ import { sanitizeRequestHeaders } from "./requestHeaders.ts";
 import { buildError, buildSessionRateLimitError } from "./responses.ts";
 import { getSupabaseAccessToken } from "./auth.ts";
 import { applyTrustedIngressHeaders } from "./trustedIngress.ts";
+import { enforcePublicRequestLimit } from "./publicRequestRateLimit.ts";
 import { trimTrailingSlash } from "./url.ts";
 
 // The status envelope is small; bound the only upstream response branch that is read.
@@ -27,6 +28,8 @@ const PUBLIC_FUNCTIONS = new Set([
   "contact-support-submit",
   "client-error-report",
   "consent-record",
+  "workspace-invitation",
+  "account-email-change",
   "job-worker",
 ]);
 
@@ -77,6 +80,48 @@ export const proxyFunctionRequest = async (
   }/functions/v1/${functionName}`;
   const isSystemStatusGet = functionName === "system-status" &&
     request.method === "GET";
+  const publicPostRoutes = new Set([
+    "contact-sales-submit",
+    "contact-support-submit",
+    "client-error-report",
+    "consent-record",
+    "workspace-invitation",
+    "account-email-change",
+  ]);
+  if (publicPostRoutes.has(functionName) && request.method === "POST") {
+    const admitted = await enforcePublicRequestLimit(
+      env.PUBLIC_SUBMISSION_RATE_LIMITER,
+      request,
+      functionName,
+    );
+    if (!admitted.allowed) {
+      return buildError(
+        admitted.unavailable ? 503 : 429,
+        admitted.unavailable
+          ? "Public request admission is unavailable"
+          : "Too many requests",
+        headers,
+        requestId,
+      );
+    }
+  }
+  if (isSystemStatusGet) {
+    const admitted = await enforcePublicRequestLimit(
+      env.PUBLIC_STATUS_RATE_LIMITER,
+      request,
+      functionName,
+    );
+    if (!admitted.allowed) {
+      return buildError(
+        admitted.unavailable ? 503 : 429,
+        admitted.unavailable
+          ? "Public request admission is unavailable"
+          : "Too many requests",
+        headers,
+        requestId,
+      );
+    }
+  }
   let requestBody: Uint8Array | null = null;
   if (request.method !== "GET" && request.method !== "HEAD") {
     try {

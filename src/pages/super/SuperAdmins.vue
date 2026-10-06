@@ -30,9 +30,19 @@
             <input v-model="createEmail" type="email" placeholder="superadmin@itemtraxx.com" />
           </label>
           <label>
-            Password
-            <input v-model="createPassword" type="password" placeholder="Temporary password" />
+            Temporary password
+            <input v-model="createPassword" type="password" autocomplete="new-password" placeholder="Temporary password" />
           </label>
+          <label>
+            Confirm with your current password
+            <input
+              v-model="currentPassword"
+              type="password"
+              autocomplete="current-password"
+              data-session-replay-mask
+            />
+          </label>
+          <p class="muted">This confirms the action on your current session; it does not sign you in again.</p>
           <div class="panel-actions">
             <button type="submit" class="sa-btn primary" :disabled="isSaving">Create Super Admin</button>
           </div>
@@ -124,6 +134,7 @@ import {
   updateSuperAdminEmail,
   type SuperAdminAccount,
 } from "../../services/superAdminService";
+import { verifySuperAdminPassword } from "../../services/superOps/sessions";
 
 const router = useRouter();
 const admins = ref<SuperAdminAccount[]>([]);
@@ -133,6 +144,7 @@ const error = ref("");
 const search = ref("");
 const createEmail = ref("");
 const createPassword = ref("");
+const currentPassword = ref("");
 const toastTitle = ref("");
 const toastMessage = ref("");
 const editModalVisible = ref(false);
@@ -179,13 +191,16 @@ const loadAdmins = async () => {
 };
 
 const handleCreate = async () => {
-  if (!createEmail.value.trim() || !createPassword.value.trim()) {
-    showToast("Invalid input", "Enter an email and password.");
+  if (!createEmail.value.trim() || !createPassword.value.trim() || !currentPassword.value) {
+    showToast("Invalid input", "Enter the new account details and confirm with your current password.");
     return;
   }
 
   isSaving.value = true;
+  const confirmationPassword = currentPassword.value;
+  currentPassword.value = "";
   try {
+    await verifySuperAdminPassword(confirmationPassword);
     const created = await createSuperAdmin({
       auth_email: createEmail.value.trim().toLowerCase(),
       password: createPassword.value,

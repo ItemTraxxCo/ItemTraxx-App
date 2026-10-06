@@ -13,8 +13,6 @@
     </div>
 
     <p class="checkout-page-copy">Checkout and return</p>
-    <OfflineWorkflowStatus />
-
     <div class="card checkout-card">
       <label>
         Borrower ID
@@ -155,7 +153,6 @@
 import { computed, nextTick, onMounted, onUnmounted, ref } from "vue";
 import CameraBarcodeScannerModal from "../../components/CameraBarcodeScannerModal.vue";
 import SkeletonLoader from "../../components/SkeletonLoader.vue";
-import OfflineWorkflowStatus from "../../components/OfflineWorkflowStatus.vue";
 import {
   consumeCheckoutOfflineWarning,
   fetchCheckedOutItem,

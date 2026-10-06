@@ -7,14 +7,6 @@ import {
 import type { AdminOpsContext } from "../context.ts";
 import { preflightQuota, quotaLimitResponse, quotaPreflightResponse } from "../../_shared/quota.ts";
 
-const TRACKED_STATUSES = new Set([
-  "damaged",
-  "lost",
-  "in_repair",
-  "retired",
-  "in_studio_only",
-]);
-
 const ALLOWED_ITEM_STATUSES = new Set(
   [
     "available",
@@ -30,6 +22,12 @@ const ALLOWED_ITEM_STATUSES = new Set(
 export const handleBulkItemsAction = async (
   context: AdminOpsContext,
 ): Promise<Response> => {
+  if (!context.featureFlags.enable_bulk_item_import) {
+    return context.jsonResponse(403, {
+      error: "Bulk item import is disabled for this workspace.",
+    });
+  }
+
   const rawRows = Array.isArray(context.payload.rows)
     ? context.payload.rows
     : [];
@@ -150,44 +148,46 @@ export const handleBulkItemsAction = async (
   );
   if (quotaLimit) return quotaPreflightResponse(quotaLimit, context.jsonResponse);
 
-  const insertPayload = toInsert.map((row) => ({
-    workspace_id: context.workspaceId,
-    name: row.name,
-    barcode: row.barcode,
-    serial_number: row.serial_number,
-    status: row.status,
-    notes: row.notes,
-  }));
-  const { data: insertedRows, error: insertError } = await context.adminClient
-    .from("items")
-    .insert(insertPayload)
-    .select("id, workspace_id, name, barcode, serial_number, status, notes");
-  if (insertError) {
-    const quotaResponse = quotaLimitResponse(insertError, context.jsonResponse);
+  const { data: insertedRows, error: importError } = await context.adminClient.rpc(
+    "import_items_with_audit",
+    {
+      p_workspace_id: context.workspaceId,
+      p_actor_id: context.user.id,
+      p_items: toInsert,
+      p_skipped_count: skippedRows.length,
+    },
+  );
+  if (importError) {
+    const quotaResponse = quotaLimitResponse(importError, context.jsonResponse);
     if (quotaResponse) return quotaResponse;
+    console.error("admin-ops transactional bulk import failed", {
+      request_id: context.requestId,
+      workspace_id: context.workspaceId,
+      profile_id: context.user.id,
+      error: importError,
+    });
     return context.jsonResponse(400, { error: "Unable to import item rows." });
   }
-
-  const historyPayload = (insertedRows ?? [])
-    .filter((item) => TRACKED_STATUSES.has((item as { status: string }).status))
-    .map((item) => ({
+  if (!Array.isArray(insertedRows) || insertedRows.length !== toInsert.length) {
+    console.error("admin-ops transactional bulk import returned an invalid row set", {
+      request_id: context.requestId,
       workspace_id: context.workspaceId,
-      item_id: (item as { id: string }).id,
-      status: (item as { status: string }).status,
-      note: (item as { notes?: string | null }).notes ?? null,
-      changed_by: context.user.id,
-    }));
-  if (historyPayload.length) {
-    await context.adminClient.from("item_status_history").insert(
-      historyPayload,
-    );
+      profile_id: context.user.id,
+      expected_rows: toInsert.length,
+      returned_rows: Array.isArray(insertedRows) ? insertedRows.length : null,
+    });
+    return context.jsonResponse(500, {
+      error: "Unable to import item rows.",
+    });
   }
+
+  const insertedCount = insertedRows.length;
 
   return context.jsonResponse(200, {
     data: {
-      inserted: (insertedRows ?? []).length,
+      inserted: insertedCount,
       skipped: skippedRows.length,
-      inserted_items: insertedRows ?? [],
+      inserted_items: insertedRows,
       skipped_rows: skippedRows,
     },
   });

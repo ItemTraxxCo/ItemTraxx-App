@@ -62,6 +62,18 @@ const routes: RouteRecordRaw[] = [
     meta: { public: true, title: "Reset Password | ItemTraxx" },
   },
   {
+    path: "/accept-invitation",
+    name: "public-accept-invitation",
+    component: () => import("../pages/AcceptAccountInvitation.vue"),
+    meta: { public: true, title: "Accept Workspace Invitation | ItemTraxx" },
+  },
+  {
+    path: "/account/email-change",
+    name: "public-account-email-change",
+    component: () => import("../pages/AccountEmailChange.vue"),
+    meta: { public: true, title: "Verify Email Change | ItemTraxx" },
+  },
+  {
     path: "/forgot-password",
     name: "public-forgot-password",
     component: () => import("../pages/ForgotPassword.vue"),

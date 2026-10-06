@@ -699,7 +699,7 @@ onMounted(() => {
   align-items: center;
   justify-content: center;
   padding: 0.65rem 1rem;
-  border-radius: 999px;
+  border-radius: var(--button-radius);
   background: var(--login-back-bg);
   color: var(--login-back-text);
   text-decoration: none;
@@ -1120,7 +1120,7 @@ onMounted(() => {
   }
 }
 
-@media (max-height: 760px) {
+@media (max-height: 760px), (max-width: 640px), (any-pointer: coarse) and (min-width: 641px) {
   .login-split-panel {
     grid-template-columns: 1fr;
   }

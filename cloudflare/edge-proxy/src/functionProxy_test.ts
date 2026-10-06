@@ -76,6 +76,9 @@ Deno.test("support function proxy preserves the attachment payload limit", async
       {
         SUPABASE_URL: "https://example.supabase.co",
         SUPABASE_ANON_KEY: "anon",
+        PUBLIC_SUBMISSION_RATE_LIMITER: {
+          limit: async () => ({ success: true }),
+        },
       } as Env,
       {},
       "request-support-large",
@@ -125,6 +128,9 @@ const cachedMaintenance = {
 const statusEnv = {
   SUPABASE_URL: "https://example.supabase.co",
   SUPABASE_ANON_KEY: "anon",
+  PUBLIC_STATUS_RATE_LIMITER: {
+    limit: async () => ({ success: true }),
+  },
   MAINTENANCE_FALLBACK_KV: {
     get: (_key: string, type?: string) =>
       Promise.resolve(
@@ -132,6 +138,94 @@ const statusEnv = {
       ),
   },
 } as unknown as Env;
+
+Deno.test("rejects a public support request before reading or forwarding its body", async () => {
+  const originalFetch = globalThis.fetch;
+  let upstreamCalled = false;
+  let bodyRead = false;
+  globalThis.fetch = (() => {
+    upstreamCalled = true;
+    return Promise.resolve(new Response("unexpected", { status: 200 }));
+  }) as typeof fetch;
+  const body = new ReadableStream<Uint8Array>({
+    pull(controller) {
+      bodyRead = true;
+      controller.enqueue(new TextEncoder().encode("{}"));
+      controller.close();
+    },
+  }, { highWaterMark: 0 });
+  try {
+    const response = await proxyFunctionRequest(
+      new Request("https://edge.itemtraxx.com/functions/contact-support-submit", {
+        method: "POST",
+        headers: { "cf-connecting-ip": "203.0.113.8" },
+        body,
+        duplex: "half",
+      }),
+      {
+        SUPABASE_URL: "https://example.supabase.co",
+        SUPABASE_ANON_KEY: "anon",
+        PUBLIC_SUBMISSION_RATE_LIMITER: {
+          limit: async ({ key }: { key: string }) => ({
+            success: key === "contact-support-submit:203.0.113.8" ? false : true,
+          }),
+        },
+      } as Env,
+      {},
+      "request-support-throttled",
+      "contact-support-submit",
+    );
+    assertEquals(response.status, 429, "over-budget status");
+    assertEquals(bodyRead, false, "body is rejected before it is read");
+    assertEquals(upstreamCalled, false, "over-budget body is not proxied");
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+Deno.test("invitation and email-change token routes are public but rate limited before proxying", async () => {
+  const originalFetch = globalThis.fetch;
+  const proxied: string[] = [];
+  globalThis.fetch = ((input: RequestInfo | URL) => {
+    proxied.push(String(input));
+    return Promise.resolve(new Response("{\"success\":true}", { status: 200 }));
+  }) as typeof fetch;
+  const rateLimitKeys: string[] = [];
+  const env = {
+    SUPABASE_URL: "https://example.supabase.co",
+    SUPABASE_ANON_KEY: "anon",
+    ITX_EDGE_PROXY_SHARED_SECRET: "trusted-edge-secret",
+    PUBLIC_SUBMISSION_RATE_LIMITER: {
+      limit: async ({ key }: { key: string }) => {
+        rateLimitKeys.push(key);
+        return { success: true };
+      },
+    },
+  } as Env;
+  try {
+    for (const functionName of ["workspace-invitation", "account-email-change"]) {
+      const response = await proxyFunctionRequest(
+        new Request(`https://edge.itemtraxx.com/functions/${functionName}`, {
+          method: "POST",
+          headers: { "cf-connecting-ip": "203.0.113.9" },
+          body: "{}",
+        }),
+        env,
+        {},
+        `request-${functionName}`,
+        functionName,
+      );
+      assertEquals(response.status, 200, `${functionName} public response`);
+    }
+    assertEquals(proxied.length, 2, "both token routes reach the Edge Function without a session");
+    assertEquals(rateLimitKeys, [
+      "workspace-invitation:203.0.113.9",
+      "account-email-change:203.0.113.9",
+    ], "each token route is rate limited under its own IP scope");
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
 
 Deno.test("system-status skips fallback mutation when declared Content-Length exceeds the JSON cap", async () => {
   const originalFetch = globalThis.fetch;

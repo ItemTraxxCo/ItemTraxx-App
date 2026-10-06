@@ -8,6 +8,7 @@ import { verifyExternalAuthClaims } from "./externalAuth.ts";
 
 type SupabaseLikeClient = {
   from: (table: string) => any;
+  rpc: (fn: string, args?: Record<string, unknown>) => any;
   __verifyExternalAuthClaimsForTest?: (token: string) => Promise<Record<string, unknown> | null>;
 };
 
@@ -66,77 +67,80 @@ export const isAccountTokenBlockedBySessionRevocation = async (
     profileId: string;
     authToken: string;
   },
+  options: { allowLegacySessionBinding?: boolean } = {},
 ) => {
   const binding = await resolveAccountAuthSessionBinding(
     client,
     params.authToken,
   );
-  if (!binding.sessionId && !binding.issuedAt) {
+  if (binding.sessionId) {
+    // Supabase JWTs can outlive the backing Better Auth session by a few
+    // minutes. Check the authoritative session row as well as the explicit
+    // revocation overlay before any service-role action accepts the JWT. The
+    // Better Auth schema is deliberately not exposed through PostgREST, so use
+    // the service-role-only RPC instead of querying that schema directly.
+    const { data: sessionIsActive, error: authSessionError } = await client.rpc(
+      "is_better_auth_session_active",
+      { p_session_id: binding.sessionId },
+    );
+
+    if (authSessionError) {
+      const error = authSessionError as PostgrestErrorLike;
+      if (
+        isMissingRelation(error, "is_better_auth_session_active") ||
+        (error.code === "PGRST202" &&
+          (error.message ?? "").includes("is_better_auth_session_active"))
+      ) {
+        return { blocked: true as const, relationMissing: true as const };
+      }
+      throw new Error("Unable to validate Better Auth session expiry.");
+    }
+    if (sessionIsActive !== true) {
+      return { blocked: true as const, relationMissing: false as const };
+    }
+  } else if (
+    !options.allowLegacySessionBinding ||
+    !binding.issuedAt
+  ) {
+    // Tokens without either binding cannot be checked against the revocation
+    // overlay. Current Better Auth JWTs carry session_id; the issued-at path
+    // below exists only for older token formats that lack that claim.
     return { blocked: true as const, relationMissing: false as const };
   }
 
+  let revokedSessionQuery = client
+    .from("account_sessions")
+    .select("id")
+    .eq("workspace_id", params.workspaceId)
+    .eq("profile_id", params.profileId)
+    .not("revoked_at", "is", null)
+    .order("revoked_at", { ascending: false });
   if (binding.sessionId) {
-    const { data, error } = await client
-      .from("account_sessions")
-      .select("id")
-      .eq("workspace_id", params.workspaceId)
-      .eq("profile_id", params.profileId)
-      .eq("auth_session_id", binding.sessionId)
-      .not("revoked_at", "is", null)
-      .order("revoked_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
+    revokedSessionQuery = revokedSessionQuery.eq(
+      "auth_session_id",
+      binding.sessionId,
+    );
+  } else if (binding.issuedAt) {
+    revokedSessionQuery = revokedSessionQuery.gte(
+      "revoked_at",
+      binding.issuedAt,
+    );
+  }
+  const { data, error } = await revokedSessionQuery.limit(1).maybeSingle();
 
-    if (error) {
-      if (
-        isMissingRelation(error as PostgrestErrorLike, "account_sessions")
-      ) {
-        return { blocked: true as const, relationMissing: true as const };
-      }
-      if (isMissingColumn(error as PostgrestErrorLike, "auth_session_id")) {
-        return { blocked: true as const, relationMissing: true as const };
-      }
-      throw new Error("Unable to validate admin session revocation.");
+  if (error) {
+    if (
+      isMissingRelation(error as PostgrestErrorLike, "account_sessions")
+    ) {
+      return { blocked: true as const, relationMissing: true as const };
     }
-
-    if (data?.id) {
-      return { blocked: true as const, relationMissing: false as const };
+    if (isMissingColumn(error as PostgrestErrorLike, "auth_session_id")) {
+      return { blocked: true as const, relationMissing: true as const };
     }
-
-    // A verified session_id is the authoritative binding for modern Supabase
-    // JWTs. Do not fall back to the issued-at timestamp here: that timestamp
-    // is shared by the token's lifetime, so a revocation belonging to another
-    // device would otherwise invalidate this session as well. The issued-at
-    // fallback below is retained only for legacy tokens that have no
-    // session_id claim.
-    return { blocked: false as const, relationMissing: false as const };
+    throw new Error("Unable to validate admin session revocation.");
   }
 
-  if (binding.issuedAt) {
-    const { data, error } = await client
-      .from("account_sessions")
-      .select("id")
-      .eq("workspace_id", params.workspaceId)
-      .eq("profile_id", params.profileId)
-      .not("revoked_at", "is", null)
-      .gte("revoked_at", binding.issuedAt)
-      .order("revoked_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-
-    if (error) {
-      if (
-        isMissingRelation(error as PostgrestErrorLike, "account_sessions")
-      ) {
-        return { blocked: true as const, relationMissing: true as const };
-      }
-      throw new Error("Unable to validate admin session revocation.");
-    }
-
-    return { blocked: !!data?.id, relationMissing: false as const };
-  }
-
-  return { blocked: false as const, relationMissing: false as const };
+  return { blocked: !!data?.id, relationMissing: false as const };
 };
 
 export const validateAccountDeviceSession = async (
@@ -171,6 +175,7 @@ export const validateAccountDeviceSession = async (
   const tokenBlock = await isAccountTokenBlockedBySessionRevocation(
     client,
     params,
+    { allowLegacySessionBinding: true },
   );
   if (tokenBlock.relationMissing) {
     return {

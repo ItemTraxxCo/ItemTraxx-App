@@ -6,14 +6,14 @@
 
     <section class="card">
       <h2>Invite User</h2>
-      <p class="muted">New accounts start as Tenant Accounts. Invite with a setup link, or have the user sign in through SSO to provision the account. Once it appears in Accounts, you can change its role to Workspace Admin; changes take effect at their next sign-in.</p>
+      <p class="muted">New invitations stay pending and do not appear in Accounts until the recipient accepts. Accounts provisioned through workspace SSO appear after the user signs in. New invited accounts start as Tenant Accounts; after acceptance, you can change the role to Workspace Admin.</p>
       <form class="add-account-form" @submit.prevent="create">
         <label>
           Email address
           <input v-model.trim="email" type="email" autocomplete="email" data-session-replay-mask required />
         </label>
         <button type="submit" :disabled="isCreating">
-          {{ isCreating ? "Creating…" : "Create and send setup link" }}
+          {{ isCreating ? "Sending invitation…" : "Send invitation" }}
         </button>
       </form>
     </section>
@@ -106,17 +106,10 @@
     <div v-if="adminDetailsTarget" class="modal-backdrop" @click.self="closeAdminDetails">
       <section class="modal" role="dialog" aria-modal="true" aria-labelledby="admin-details-title">
         <h2 id="admin-details-title">Manage Workspace Admin</h2>
-        <p class="muted">Update this admin’s email, send a reset link, or disable or re-enable access.</p>
+        <p class="muted">The account owner can change their sign-in email in Account Security after approving both the current and new email addresses.</p>
         <p v-if="error" class="error" role="alert" v-app-toast-error>{{ error }}</p>
-        <form class="admin-details-form" @submit.prevent="saveAdminEmail">
-          <label>
-            Email address
-            <input v-model.trim="adminDetailsEmail" type="email" autocomplete="email" data-session-replay-mask required />
-          </label>
+        <div class="admin-details-form">
           <div class="admin-details-actions">
-            <button type="submit" :disabled="isSavingAdminDetails">
-              {{ isSavingAdminDetails ? "Saving…" : "Save email" }}
-            </button>
             <button type="button" :disabled="isSavingAdminDetails" @click="sendAdminReset">
               Send reset link
             </button>
@@ -125,7 +118,7 @@
             </button>
             <button type="button" :disabled="isSavingAdminDetails" @click="closeAdminDetails">Cancel</button>
           </div>
-        </form>
+        </div>
       </section>
     </div>
   </main>
@@ -145,7 +138,6 @@ import {
   setWorkspaceAccountRole,
   sendTenantManagedAdminReset,
   setTenantManagedAdminStatus,
-  updateTenantManagedAdminEmail,
   type WorkspaceAccount,
   type WorkspaceAccountRole,
 } from "../../../services/workspaceAdminManageService";
@@ -163,7 +155,6 @@ const savingRoleId = ref<string | null>(null);
 const accountActionId = ref<string | null>(null);
 const currentProfileId = getAuthState().userId;
 const adminDetailsTarget = ref<WorkspaceAccount | null>(null);
-const adminDetailsEmail = ref("");
 
 const load = async () => {
   isLoading.value = true;
@@ -202,10 +193,9 @@ const create = async () => {
   error.value = "";
   message.value = "";
   try {
-    await createTenantAccount(email.value);
+    const result = await createTenantAccount(email.value);
     email.value = "";
-    await load();
-    if (!error.value) message.value = "User created and setup email requested.";
+    message.value = result.message;
   } catch (cause) {
     error.value = toUserFacingErrorMessage(cause, "Unable to invite the user.");
   } finally {
@@ -239,14 +229,12 @@ const saveRole = async (account: WorkspaceAccount) => {
 const openAdminDetails = (account: WorkspaceAccount) => {
   if (!canManageAdminDetails.value || account.is_primary_admin) return;
   adminDetailsTarget.value = account;
-  adminDetailsEmail.value = account.auth_email;
   error.value = "";
   message.value = "";
 };
 
 const clearAdminDetails = () => {
   adminDetailsTarget.value = null;
-  adminDetailsEmail.value = "";
 };
 
 const closeAdminDetails = () => {
@@ -257,29 +245,6 @@ const closeAdminDetails = () => {
 const replaceAccount = (updated: WorkspaceAccount) => {
   const index = accounts.value.findIndex((account) => account.id === updated.id);
   if (index >= 0) accounts.value[index] = updated;
-};
-
-const saveAdminEmail = async () => {
-  const target = adminDetailsTarget.value;
-  const authEmail = adminDetailsEmail.value.trim();
-  if (!target) return;
-  if (!authEmail) {
-    error.value = "Enter an admin email to continue.";
-    return;
-  }
-
-  isSavingAdminDetails.value = true;
-  error.value = "";
-  try {
-    const updated = await updateTenantManagedAdminEmail({ id: target.id, auth_email: authEmail });
-    replaceAccount(updated);
-    message.value = "Workspace admin email updated.";
-    clearAdminDetails();
-  } catch (cause) {
-    error.value = toUserFacingErrorMessage(cause, "Unable to update workspace admin email.");
-  } finally {
-    isSavingAdminDetails.value = false;
-  }
 };
 
 const toggleAdminStatus = async () => {

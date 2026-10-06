@@ -9,6 +9,7 @@ import {
   listActiveBetterAuthSessionIds,
 } from "../../_shared/betterAuthSessions.ts";
 import { optionalText } from "../../_shared/validation.ts";
+import type { SsoLoginProvenance } from "../../_shared/ssoLoginProvenance.ts";
 import type {
   AdminOpsContext,
   DeviceSessionContext,
@@ -36,35 +37,24 @@ const formatRpcError = (error: RpcError | null | undefined) =>
 const sanitizeText = (value: unknown, maxLen: number) =>
   optionalText(value, { maxLen }) || null;
 
-const SSO_LOGIN_PROTOCOLS = new Set([
-  "SAML2.0",
-  "OpenID Connect (OIDC)",
-]);
-
 export const resolveDeviceSessionContext = (
   payload: Record<string, unknown>,
   req: Request,
+  verifiedSsoProvenance: SsoLoginProvenance | null = null,
 ): DeviceSessionContext => {
-  const ssoProtocol = typeof payload.login_location === "string" &&
-      SSO_LOGIN_PROTOCOLS.has(payload.login_location)
-    ? payload.login_location as DeviceSessionContext["loginLocation"]
-    : null;
-  const ssoProviderId = sanitizeText(payload.login_method, 128);
-  const hasValidSsoMetadata = !!ssoProtocol &&
-    !!ssoProviderId && /^[a-z0-9-]+$/i.test(ssoProviderId);
-  const loginMethod = payload.login_method === "password" ||
+  const loginMethod = verifiedSsoProvenance?.providerId ?? (
+    payload.login_method === "password" ||
       payload.login_method === "magic_link" ||
       payload.login_method === "session_handoff"
-    ? payload.login_method
-    : hasValidSsoMetadata
-    ? ssoProviderId
-    : null;
-  const loginLocation = payload.login_location === "regular_login" ||
+      ? payload.login_method
+      : null
+  );
+  const loginLocation = verifiedSsoProvenance?.protocol ?? (
+    payload.login_location === "regular_login" ||
       payload.login_location === "admin_login"
-    ? payload.login_location
-    : hasValidSsoMetadata
-    ? ssoProtocol
-    : null;
+      ? payload.login_location
+      : null
+  );
 
   return {
     deviceId: sanitizeText(payload.device_id, 128),

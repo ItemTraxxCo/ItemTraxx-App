@@ -187,9 +187,54 @@
     .itemtraxx-page .feature-sheet .sheet-grid td.kind-unknown{background:#ffe3df}
 
     @media(min-width:641px){.itemtraxx-page .comparison .media-frame{height:clamp(320px,40vw,460px)}}
-    .itemtraxx-page .comparison .checkout-image img{transform:scale(1.2)}
+    .itemtraxx-page .comparison .checkout-image img{top:-7%;left:1.8%;transform:scale(1.4)}
     .itemtraxx-page .platform-section{padding:64px 0 68px}
     .itemtraxx-page .platform-section .platform-features{height:400px;padding:36px 28px}
     @media(max-width:700px){.itemtraxx-page .platform-section{padding:48px 0 52px}.itemtraxx-page .platform-section .platform-features{height:620px;padding:32px 18px}}
     .itemtraxx-page .hero-copy{margin-top:30px}
     @media(max-width:640px){.itemtraxx-page .hero-copy{margin-top:32px}}
+
+    /* Keep the hero content centered in the first viewport without clipping it on short screens. */
+    .itemtraxx-page .hero{
+      --hero-vertical-space:clamp(16px,2.5vh,24px);
+      --hero-next-section-clearance:clamp(48px,8svh,96px);
+      display:grid;
+      align-items:center;
+      min-height:calc(100vh - 82px + var(--hero-next-section-clearance));
+      min-height:calc(100svh - 82px + var(--hero-next-section-clearance));
+      padding-block-start:var(--hero-vertical-space);
+      padding-block-end:calc(var(--hero-vertical-space) + var(--hero-next-section-clearance));
+    }
+    .itemtraxx-page .hero-copy{margin:0;padding-bottom:clamp(72px,5vh,84px)}
+    .itemtraxx-page .hero-copy h1{margin:0}
+    .itemtraxx-page .hero-copy h2{margin:8px 0 0;font-size:clamp(16px,1.7vw,21px);line-height:1.35}
+    .itemtraxx-page .hero-copy .hero-actions{margin-top:clamp(12px,2.2vh,18px)}
+    .itemtraxx-page .comparison-stage{padding-bottom:0}
+    .itemtraxx-page .comparison-stage::after{
+      inset:0 auto -120px 50%;
+      width:calc(100% + 48px);
+      background:linear-gradient(180deg,rgba(255,255,255,0) 0%,rgba(255,255,255,0) 30%,rgba(255,255,255,.06) 38%,rgba(255,255,255,.22) 46%,rgba(255,255,255,.46) 54%,rgba(255,255,255,.72) 60%,rgba(255,255,255,.9) calc(100% - 145px),#fff calc(100% - 120px),#fff 100%);
+    }
+    @media(min-width:641px){
+      .itemtraxx-page .hero > .wrap{width:min(1280px,calc(100% - 48px),145svh);transform:translateY(clamp(22px,4svh,48px))}
+    }
+    @media(min-width:900px) and (orientation:landscape){
+      .itemtraxx-page .hero-copy h1{font-size:clamp(44px,min(4.25vw,7svh),64px)}
+      .itemtraxx-page .comparison .media-frame{height:clamp(300px,42vh,480px);height:clamp(300px,42svh,480px)}
+    }
+    @media(max-width:640px){
+      .itemtraxx-page .hero{--hero-vertical-space:18px;--hero-next-section-clearance:clamp(40px,7svh,72px);min-height:calc(100vh - 70px + var(--hero-next-section-clearance));min-height:calc(100svh - 70px + var(--hero-next-section-clearance));padding-block-start:var(--hero-vertical-space);padding-block-end:calc(22px + var(--hero-next-section-clearance))}
+      .itemtraxx-page .hero > .wrap{transform:translateY(clamp(12px,2svh,20px))}
+      .itemtraxx-page .hero-copy{padding-bottom:clamp(64px,4vh,72px)}
+      .itemtraxx-page .hero-copy h1{font-size:clamp(36px,10vw,58px)}
+      .itemtraxx-page .hero-copy h2{font-size:18px}
+      .itemtraxx-page .hero-copy .hero-actions{margin-top:16px}
+      .itemtraxx-page .comparison .media-frame{aspect-ratio:1.3}
+    }
+
+    .platform-slide-index{border-top-width:.5px}
+    .platform-slide-index button+button{border-left-width:.5px}
+    .platform-progress{height:.5px}
+    .platform-progress::before,.platform-progress::after{width:.5px}
+    .platform-progress-fill{inset:0 auto auto 0;height:1px}
+    @media(prefers-reduced-motion:reduce){.platform-progress-fill{height:1px}}

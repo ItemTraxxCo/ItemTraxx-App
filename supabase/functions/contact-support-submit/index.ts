@@ -331,6 +331,18 @@ serve(async (req) => {
         trustProxyHeader: true,
       }),
     );
+    // Verify the challenge before charging the accepted-submission quota or
+    // decoding/storing attachment bytes. Invalid tokens use the Worker-side
+    // per-client admission budget and cannot lock out valid submissions.
+    const verified = await verifyTurnstileToken(
+      turnstileToken,
+      clientIp,
+      "contact-support-submit",
+    );
+    if (!verified) {
+      return jsonResponse(403, { error: "Security check failed." });
+    }
+
     const rateLimit = await enforcePublicRateLimits(
       adminClient,
       fingerprint,
@@ -346,18 +358,6 @@ serve(async (req) => {
       return jsonResponse(429, {
         error: "Too many requests. Please try again later.",
       }, rateLimit);
-    }
-
-    // Verify the challenge before decoding or storing any attachment bytes so
-    // unauthenticated callers cannot turn the public form into an expensive
-    // image-processing primitive.
-    const verified = await verifyTurnstileToken(
-      turnstileToken,
-      clientIp,
-      "contact-support-submit",
-    );
-    if (!verified) {
-      return jsonResponse(403, { error: "Security check failed." });
     }
 
     if (attachmentsRaw.length > 2) {

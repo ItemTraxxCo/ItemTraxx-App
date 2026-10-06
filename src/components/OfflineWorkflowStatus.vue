@@ -15,7 +15,7 @@
   </section>
 
   <div
-    v-if="pendingDownloadPrompt"
+    v-if="pendingDownloadPrompt && isOfflineWorkflowRoute"
     class="toast toast-persist offline-pack-prompt"
     role="alertdialog"
     aria-live="polite"
@@ -31,7 +31,7 @@
     </div>
   </div>
 
-  <div v-else-if="message" class="toast" :class="{ 'toast-persist': messageKind === 'error' }" role="status" aria-live="polite">
+  <div v-else-if="message && isOfflineWorkflowRoute" class="toast" :class="{ 'toast-persist': messageKind === 'error' }" role="status" aria-live="polite">
     <div class="toast-title">{{ messageTitle }}</div>
     <div class="toast-body">{{ message }}</div>
   </div>
@@ -64,7 +64,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, onScopeDispose, ref, watch } from "vue";
+import { computed, nextTick, onMounted, onScopeDispose, ref, watch } from "vue";
 import { useRoute } from "vue-router";
 import { syncCheckoutQueues, type CheckoutQueueSyncResult } from "../services/checkoutService";
 import {
@@ -116,6 +116,7 @@ let initialSummaryLoaded = false;
 let sessionInitializationRetryTimer: number | null = null;
 let sessionInitializationRetryUsed = false;
 let activeSignInKey: string | null = null;
+let automaticPackAttemptedForSignIn: string | null = null;
 
 const isOfflineWorkflowRoute = computed(() => ["/checkout", "/admin/return", "/account/return"].includes(route.path));
 
@@ -227,7 +228,7 @@ const retryAfterSessionInitialization = () => {
 };
 
 const automaticallyRefreshPack = async () => {
-  if (!navigator.onLine || !isOfflinePackAutomaticDownloadAllowed(getAuthState())) return;
+  if (!isOfflineWorkflowRoute.value || !navigator.onLine || !isOfflinePackAutomaticDownloadAllowed(getAuthState())) return;
   try {
     if (!initialSummaryLoaded) await refresh();
     const result = await refreshOfflineCheckoutPackIfNeeded();
@@ -255,11 +256,15 @@ const dismissDownloadPrompt = () => {
 const acceptDownloadPrompt = () => {
   const signInKey = activeSignInKey;
   dismissDownloadPrompt();
-  if (signInKey) approveOfflinePackForSignIn(signInKey);
+  if (signInKey) {
+    approveOfflinePackForSignIn(signInKey);
+    automaticPackAttemptedForSignIn = signInKey;
+  }
   void automaticallyRefreshPack();
 };
 
 const promptForAutomaticDownload = () => {
+  if (!isOfflineWorkflowRoute.value) return;
   const signInKey = getOfflinePackSignInKey(getAuthState());
   if (!signInKey || hasOfflinePackPromptedForSignIn(signInKey)) return;
   markOfflinePackPromptedForSignIn(signInKey);
@@ -277,17 +282,23 @@ const handleSignedInScope = async () => {
   const signInKey = currentAuth.isAuthenticated ? getOfflinePackSignInKey(currentAuth) : null;
   if (!signInKey) {
     activeSignInKey = null;
+    automaticPackAttemptedForSignIn = null;
     dismissDownloadPrompt();
     initialSummaryLoaded = false;
     return;
   }
-  if (signInKey === activeSignInKey) return;
-  activeSignInKey = signInKey;
-  sessionInitializationRetryUsed = false;
-  dismissDownloadPrompt();
-  await refresh().catch(() => undefined);
+  const isNewSignIn = signInKey !== activeSignInKey;
+  if (isNewSignIn) {
+    activeSignInKey = signInKey;
+    automaticPackAttemptedForSignIn = null;
+    sessionInitializationRetryUsed = false;
+    dismissDownloadPrompt();
+  }
+  if (!isOfflineWorkflowRoute.value) return;
+  if (isNewSignIn) await refresh().catch(() => undefined);
   const latestAuth = getAuthState();
   if (
+    !isOfflineWorkflowRoute.value ||
     !latestAuth.isAuthenticated ||
     getOfflinePackSignInKey(latestAuth) !== signInKey ||
     !latestAuth.workspaceContextId ||
@@ -297,8 +308,14 @@ const handleSignedInScope = async () => {
     workspaceId: latestAuth.workspaceContextId,
     profileId: latestAuth.userId,
   });
-  if (preference === "always") void automaticallyRefreshPack();
-  else if (preference === "ask") promptForAutomaticDownload();
+  if (
+    preference === "always" &&
+    navigator.onLine &&
+    automaticPackAttemptedForSignIn !== signInKey
+  ) {
+    automaticPackAttemptedForSignIn = signInKey;
+    void automaticallyRefreshPack();
+  } else if (preference === "ask") promptForAutomaticDownload();
 };
 
 const showOfflineSafetyNoticeIfNeeded = () => {
@@ -317,8 +334,17 @@ const showOfflineSafetyNoticeIfNeeded = () => {
 const handleChange = () => {
   showOfflineSafetyNoticeIfNeeded();
   void refresh();
-  void automaticallyRefreshPack();
   void syncNow();
+};
+
+const handlePackStateChange = () => {
+  handleChange();
+  void automaticallyRefreshPack();
+};
+
+const handleOnline = () => {
+  handleChange();
+  void automaticallyRefreshPack();
 };
 
 const handleBrowserOffline = () => {
@@ -328,7 +354,7 @@ const handleBrowserOffline = () => {
 
 const handlePackProgress = (event: Event) => {
   const progress = (event as CustomEvent<OfflinePackPreparationProgress>).detail;
-  if (!progress) return;
+  if (!progress || !isOfflineWorkflowRoute.value) return;
   clearToastTimer();
   messageKind.value = progress.stage === "complete" ? "success" : "info";
   if (progress.stage === "starting" && progress.totalRecords === 0) {
@@ -361,27 +387,39 @@ const handlePreferenceChange = (event: Event) => {
   const currentAuth = getAuthState();
   if (!detail || detail.workspaceId !== currentAuth.workspaceContextId || detail.profileId !== currentAuth.userId) return;
   const preference = getOfflinePackDownloadPreference(detail);
-  if (preference === "always") void automaticallyRefreshPack();
-  else if (preference === "ask") promptForAutomaticDownload();
+  if (preference === "always") {
+    const signInKey = getOfflinePackSignInKey(currentAuth);
+    if (isOfflineWorkflowRoute.value && navigator.onLine && signInKey) {
+      automaticPackAttemptedForSignIn = signInKey;
+    }
+    void automaticallyRefreshPack();
+  } else if (preference === "ask") promptForAutomaticDownload();
   else dismissDownloadPrompt();
 };
 
 watch(
-  () => [auth.isAuthenticated, auth.workspaceContextId, auth.userId, auth.signedInAt] as const,
-  () => void handleSignedInScope(),
+  () => [auth.isAuthenticated, auth.workspaceContextId, auth.userId, auth.signedInAt, route.path] as const,
+  () => {
+    if (isOfflineWorkflowRoute.value) {
+      void nextTick().then(() => handleSignedInScope());
+    } else if (pendingDownloadPrompt.value) {
+      dismissDownloadPrompt();
+    }
+  },
+  { flush: "post" },
 );
 
 onMounted(() => {
-  window.addEventListener("online", handleChange);
+  window.addEventListener("online", handleOnline);
   window.addEventListener("offline", handleBrowserOffline);
-  window.addEventListener("itemtraxx:offline-queue-changed", handleChange);
-  window.addEventListener("itemtraxx:offline-workflow-changed", handleChange);
+  window.addEventListener("itemtraxx:offline-queue-changed", handlePackStateChange);
+  window.addEventListener("itemtraxx:offline-workflow-changed", handlePackStateChange);
   window.addEventListener("itemtraxx:offline-connection-changed", handleChange);
   window.addEventListener("itemtraxx:offline-pack-progress", handlePackProgress);
   window.addEventListener(OFFLINE_PACK_LARGE_WARNING_EVENT, handleLargePackWarning);
   window.addEventListener("itemtraxx:offline-pack-preference-changed", handlePreferenceChange);
 
-  void handleSignedInScope();
+  if (isOfflineWorkflowRoute.value) void nextTick().then(() => handleSignedInScope());
   pollTimer = window.setInterval(() => void refresh(), 10_000);
   refreshTimer = window.setInterval(() => void automaticallyRefreshPack(), OFFLINE_PACK_REFRESH_INTERVAL_MS);
   syncTimer = window.setInterval(() => void syncNow(), 15_000);
@@ -395,10 +433,10 @@ onScopeDispose(() => {
   if (largeWarningTimer) window.clearTimeout(largeWarningTimer);
   if (sessionInitializationRetryTimer) window.clearTimeout(sessionInitializationRetryTimer);
   resolveLargeOfflinePackConfirmation(false);
-  window.removeEventListener("online", handleChange);
+  window.removeEventListener("online", handleOnline);
   window.removeEventListener("offline", handleBrowserOffline);
-  window.removeEventListener("itemtraxx:offline-queue-changed", handleChange);
-  window.removeEventListener("itemtraxx:offline-workflow-changed", handleChange);
+  window.removeEventListener("itemtraxx:offline-queue-changed", handlePackStateChange);
+  window.removeEventListener("itemtraxx:offline-workflow-changed", handlePackStateChange);
   window.removeEventListener("itemtraxx:offline-connection-changed", handleChange);
   window.removeEventListener("itemtraxx:offline-pack-progress", handlePackProgress);
   window.removeEventListener(OFFLINE_PACK_LARGE_WARNING_EVENT, handleLargePackWarning);

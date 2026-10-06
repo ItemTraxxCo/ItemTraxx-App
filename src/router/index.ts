@@ -26,12 +26,6 @@ const routes: RouteRecordRaw[] = [
     meta: { public: true, title: "ItemTraxx Inventory Tracking" },
   },
   {
-    path: "/landing-old",
-    name: "public-home-old",
-    component: () => import("../pages/PublicHome.vue"),
-    meta: { public: true, title: "Legacy Landing | ItemTraxx" },
-  },
-  {
     path: "/login",
     name: "public-login",
     component: () => import("../pages/Login.vue"),

@@ -201,72 +201,6 @@ test.describe("Public surfaces", () => {
     });
   });
 
-  for (const contract of [
-    {
-      path: "/landing-old",
-      linkName: "Pricing",
-      destination: "/pricing",
-      analytics: {
-        name: "landing_cta_click",
-        properties: { cta: "view_pricing", location: "hero" },
-      },
-      posthog: null,
-    },
-  ] as const) {
-    test(`${contract.path} lazily preserves its provider-specific CTA event contract`, async ({ page }) => {
-      const requestedTelemetryFacades: string[] = [];
-      await page.route(/\/src\/services\/(analyticsService|posthogService)\.ts(?:\?.*)?$/, async (route) => {
-        const service = route.request().url().includes("posthogService") ? "posthog" : "analytics";
-        requestedTelemetryFacades.push(service);
-        await route.fulfill({
-          status: 200,
-          contentType: "application/javascript",
-          body:
-            service === "analytics"
-              ? `export const trackAnalyticsEvent = async (name, properties) => {
-                  window.__productEventDeliveries ??= { analytics: [], posthog: [] };
-                  window.__productEventDeliveries.analytics.push({ name, properties });
-                };`
-              : `export const capturePostHogEvent = (name, properties) => {
-                  window.__productEventDeliveries ??= { analytics: [], posthog: [] };
-                  window.__productEventDeliveries.posthog.push({ name, properties });
-                };`,
-        });
-      });
-      await page.addInitScript(() => {
-        Object.defineProperty(window, "__productEventDeliveries", {
-          configurable: true,
-          value: { analytics: [], posthog: [] },
-          writable: true,
-        });
-      });
-
-      await page.goto(contract.path);
-      const cta = page.locator("main").getByRole("link", { name: contract.linkName, exact: true }).first();
-      await expect(cta).toBeVisible();
-      expect(requestedTelemetryFacades).toEqual([]);
-
-      await cta.click();
-      await expect(page).toHaveURL(new RegExp(`${contract.destination}$`));
-      await expect.poll(() =>
-        page.evaluate(() =>
-          (window as Window & {
-            __productEventDeliveries?: {
-              analytics: Array<{ name: string; properties: Record<string, unknown> }>;
-              posthog: Array<{ name: string; properties: Record<string, unknown> }>;
-            };
-          }).__productEventDeliveries,
-        ),
-      ).toEqual({
-        analytics: [contract.analytics],
-        posthog: contract.posthog ? [contract.posthog] : [],
-      });
-      expect(requestedTelemetryFacades.sort()).toEqual(
-        contract.posthog ? ["analytics", "posthog"] : ["analytics"],
-      );
-    });
-  }
-
   test("loads public status without contacting Supabase directly", async ({ page }) => {
     const requestedUrls: string[] = [];
     const responseUrls: string[] = [];
@@ -502,22 +436,16 @@ test.describe("Public surfaces", () => {
     await expect.poll(statusLifecycleVisibilityListenerCount).toBe(1);
 
     await page.clock.fastForward(100_000);
-    await navigateWithinApp("/landing-old");
+    await navigateWithinApp("/landing-new");
     await expect.poll(activeFiveMinuteIntervalCount).toBe(2);
     await expect.poll(activeVisibilityListenerCount).toBe(7);
     await expect.poll(statusLifecycleVisibilityListenerCount).toBe(1);
     await page.clock.fastForward(300_000);
     await expect.poll(() => statusRequestCount).toBe(3);
 
-    await navigateWithinApp("/landing-new");
-    await expect.poll(activeFiveMinuteIntervalCount).toBe(2);
-    await expect.poll(activeVisibilityListenerCount).toBe(7);
-    await expect.poll(statusLifecycleVisibilityListenerCount).toBe(1);
-    await page.clock.fastForward(300_000);
-    await expect.poll(() => statusRequestCount).toBe(4);
   });
 
-  for (const path of ["/landing-old", "/login"]) {
+  for (const path of ["/login"]) {
     test(`${path} does not prefetch authenticated routes after the delayed idle window`, async ({ page }) => {
       const responseUrls: string[] = [];
       page.on("response", (response) => responseUrls.push(response.url()));

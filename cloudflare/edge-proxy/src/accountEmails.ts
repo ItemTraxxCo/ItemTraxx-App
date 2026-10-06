@@ -60,7 +60,7 @@ const buildBrandedMessage = ({
   const text = [
     title,
     "",
-    body.replace(/<[^>]*>/g, ""),
+    body.replace(/[<>]/g, ""),
     `${buttonLabel}: ${url}`,
     "",
     expiration,

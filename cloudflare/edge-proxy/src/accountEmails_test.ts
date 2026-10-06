@@ -34,6 +34,9 @@ Deno.test("email-change approval escapes the proposed address and requires the s
   if (!email.text.includes("Approve email change")) {
     throw new Error("approval email is missing the user action");
   }
+  if (email.text.includes("<script") || email.text.includes("</script>")) {
+    throw new Error("plain-text approval email contains an HTML script tag");
+  }
 });
 
 Deno.test("new-address verification email uses its dedicated final step", () => {

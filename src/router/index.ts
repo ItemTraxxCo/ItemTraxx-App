@@ -51,9 +51,7 @@ const routes: RouteRecordRaw[] = [
   },
   {
     path: "/landing-new2",
-    name: "public-home-new2",
-    component: () => import("../pages/LandingPageNew2.vue"),
-    meta: { public: true, title: "ItemTraxx Inventory Tracking" },
+    redirect: { name: "public-home-new" },
   },
   {
     path: "/reset-password",

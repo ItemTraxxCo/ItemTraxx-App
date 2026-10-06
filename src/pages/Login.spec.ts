@@ -70,8 +70,8 @@ describe("Login", () => {
     mocks.workspaceLogin.mockRejectedValueOnce(new Error("Invalid email or password."));
     const wrapper = mountLogin();
 
-    await wrapper.get('input[placeholder="Email address"]').setValue("admin@example.com");
-    await wrapper.get('input[placeholder="Enter password"]').setValue("wrong-password");
+    await wrapper.get('input[type="email"]').setValue("admin@example.com");
+    await wrapper.get('input[type="password"]').setValue("wrong-password");
     await wrapper.get("form").trigger("submit");
     await settle();
 
@@ -91,8 +91,8 @@ describe("Login", () => {
     );
     const wrapper = mountLogin();
 
-    await wrapper.get('input[placeholder="Email address"]').setValue("person@example.com");
-    await wrapper.get('input[placeholder="Enter password"]').setValue("wrong-password");
+    await wrapper.get('input[type="email"]').setValue("person@example.com");
+    await wrapper.get('input[type="password"]').setValue("wrong-password");
     await wrapper.get("form").trigger("submit");
     await settle();
 
@@ -115,8 +115,8 @@ describe("Login", () => {
     });
     const wrapper = mountLogin();
 
-    await wrapper.get('input[placeholder="Email address"]').setValue("tenant@example.com");
-    await wrapper.get('input[placeholder="Enter password"]').setValue("correct-password");
+    await wrapper.get('input[type="email"]').setValue("tenant@example.com");
+    await wrapper.get('input[type="password"]').setValue("correct-password");
     await wrapper.get("form").trigger("submit");
     await settle();
 

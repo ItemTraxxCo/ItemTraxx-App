@@ -1,11 +1,35 @@
 <script setup>
-import { onBeforeUnmount, onMounted } from "vue";
+import { computed, onBeforeUnmount, onMounted } from "vue";
+import { RouterLink } from "vue-router";
 import checkoutReturnUiImage from "../assets/landing/checkout_return_ui.png";
+import { useSystemStatus } from "../composables/useSystemStatus";
+import { trackProductEvent } from "../services/productEvents";
 import { getReleaseMetadata } from "../utils/releaseMetadata";
 const itemtraxxLogo = import.meta.env.VITE_BRAND_LOGO_LIGHT_URL || "/brand/logo-light.png";
 
 const { appVersion, appBranch, currentYear, releaseChannel, showBranchName } = getReleaseMetadata();
+const {
+  state: systemStatus,
+  statusLabel: sharedStatusLabel,
+  statusClass,
+} = useSystemStatus();
+const statusLabel = computed(() =>
+  systemStatus.refreshedAt === 0 ? "Checking" : sharedStatusLabel.value,
+);
 const landingObservers = [];
+
+const trackCta = (cta, location) => {
+  trackProductEvent({
+    analytics: {
+      name: "landing_new_cta_click",
+      properties: { cta, location },
+    },
+    posthog: {
+      name: "landing_cta_clicked",
+      properties: { cta, location },
+    },
+  });
+};
 
 onMounted(() => {
     const root = document.querySelector(".itemtraxx-page");
@@ -374,8 +398,8 @@ onBeforeUnmount(() => {
   <div id="top" class="itemtraxx-page">
 <header class="site-header wrap">
     <a class="brand" href="#top" aria-label="ItemTraxx home"><img :src="itemtraxxLogo" alt="ItemTraxx Co"></a>
-    <nav class="main-nav" aria-label="Main navigation"><a href="/pricing">Pricing</a><a href="/contact-support">Support</a><a href="/getting-started">Getting Started</a><a href="/security">Security</a><a href="https://status.itemtraxx.com/" target="_blank" rel="noopener noreferrer">Status <span aria-hidden="true">↗</span></a></nav>
-    <a class="cta" href="/login">Login</a>
+    <nav class="main-nav" aria-label="Main navigation"><a href="/pricing">Pricing</a><a href="/contact-support">Support</a><a href="/getting-started">Getting Started</a><a href="/security">Security</a><a class="status-link" href="https://status.itemtraxx.com/" target="_blank" rel="noreferrer" aria-label="Open system status page"><span class="status-dot" :class="statusClass" aria-hidden="true"></span>{{ statusLabel }}</a></nav>
+    <RouterLink class="cta" to="/login" @click="trackCta('login', 'header')">Login</RouterLink>
   </header>
   <main>
     <section class="hero" id="comparison" aria-labelledby="hero-title">
@@ -383,7 +407,7 @@ onBeforeUnmount(() => {
         <div class="hero-copy">
           <h1 id="hero-title">Inventory Tracking Made Simple</h1>
           <h2 style="text-align: center; font-weight: 400;">Just the way it should be.</h2>
-          <div class="hero-actions" aria-label="Get started"><a class="hero-action primary" href="/request-demo">Get a demo</a><a class="hero-action secondary" href="/pricing">Pricing</a></div>
+          <div class="hero-actions" aria-label="Get started"><RouterLink class="hero-action primary" to="/request-demo" @click="trackCta('demo', 'hero')">Get a demo</RouterLink><RouterLink class="hero-action secondary" to="/pricing" @click="trackCta('pricing', 'hero')">Pricing</RouterLink></div>
         </div>
         <div class="comparison-stage">
           <div class="comparison" aria-label="A messy inventory spreadsheet compared with the ItemTraxx checkout and return interface">
@@ -543,22 +567,22 @@ onBeforeUnmount(() => {
       <div class="final-cta-inner">
         <h2 id="final-cta-title">Built for teams where inventory chaos isn’t an option</h2>
         <p class="final-cta-copy"><span>Ready to integrate ItemTraxx to organize your inventory?</span><span>Request a demo today</span></p>
-        <div class="final-cta-actions"><a class="final-cta-action" href="/request-demo">Get a demo</a><a class="final-cta-action secondary" href="/pricing">Explore pricing</a></div>
+        <div class="final-cta-actions"><RouterLink class="final-cta-action" to="/request-demo" @click="trackCta('demo', 'final')">Get a demo</RouterLink><RouterLink class="final-cta-action secondary" to="/pricing" @click="trackCta('pricing', 'final')">Explore pricing</RouterLink></div>
       </div>
     </section>
   
-  <footer class="site-footer">
+  <footer class="site-footer public-footer">
     <div class="footer-grid">
       <div class="footer-meta">
-        <span>©{{ currentYear }} ItemTraxx Co</span>
+        <span class="footer-brand">©{{ currentYear }} ItemTraxx Co</span>
         <span>{{ releaseChannel }}</span>
         <span>v-{{ appVersion }}</span>
         <span v-if="showBranchName" class="footer-branch">{{ appBranch }}</span>
       </div>
-      <nav class="footer-group" aria-label="Product"><h2>Product</h2><ul><li><a href="/login">Login</a></li><li><a href="/pricing">Pricing</a></li><li><a href="/contact">Contact Sales</a></li><li><a href="/contact">Request Demo</a></li><li><a href="/getting-started">Getting Started</a></li><li><a href="/forgot-password">Forgot Password</a></li></ul></nav>
-      <nav class="footer-group" aria-label="Support"><h2>Support</h2><ul><li><a href="/contact-support">Contact Support</a></li><li><a href="/security">Report Security Issue</a></li><li><a href="/changelog">Changelog</a></li><li><a href="/faq">FAQ</a></li><li><a href="https://status.itemtraxx.com/">Status</a></li></ul></nav>
+      <nav class="footer-group" aria-label="Product"><h2>Product</h2><ul><li><a href="/login">Login</a></li><li><a href="/pricing">Pricing</a></li><li><a href="/contact-sales">Contact Sales</a></li><li><a href="/request-demo">Request Demo</a></li><li><a href="/getting-started">Getting Started</a></li><li><a href="/forgot-password">Forgot Password</a></li></ul></nav>
+      <nav class="footer-group" aria-label="Support"><h2>Support</h2><ul><li><a href="/contact-support">Contact Support</a></li><li><a href="/report-security-issue">Report Security Issue</a></li><li><a href="/changelog">Changelog</a></li><li><a href="/faq">FAQ</a></li><li><a href="https://status.itemtraxx.com/" target="_blank" rel="noreferrer">Status</a></li></ul></nav>
       <nav class="footer-group" aria-label="Legal"><h2>Legal</h2><ul><li><a href="/legal">Legal Home</a></li><li><a href="/privacy">Privacy</a></li><li><a href="/legal/student-privacy">Student Privacy</a></li><li><a href="/legal/dpa">Data Processing Addendum</a></li><li><a href="/privacy-request">Privacy Request</a></li><li><a href="/cookies">Cookies</a></li><li><a href="/accessibility">Accessibility</a></li><li><a href="/security">Security</a></li><li><a href="/trust">Trust</a></li><li><a href="/compliance">Compliance</a></li></ul></nav>
-      <nav class="footer-group" aria-label="Company"><h2>Company</h2><ul><li><a href="/">Home</a></li><li><a href="/contact">Contact</a></li><li><a href="/about">About</a></li><li><a href="https://github.com/ItemTraxxCo/ItemTraxx-App">GitHub</a></li></ul></nav>
+      <nav class="footer-group" aria-label="Company"><h2>Company</h2><ul><li><a href="/">Home</a></li><li><a href="/contact">Contact</a></li><li><a href="/about">About</a></li><li><a href="https://github.com/ItemTraxxCo" target="_blank" rel="noreferrer">GitHub</a></li></ul></nav>
     </div>
   </footer>
     </div>

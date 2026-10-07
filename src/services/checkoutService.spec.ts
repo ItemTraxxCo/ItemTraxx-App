@@ -187,7 +187,7 @@ describe("submitCheckoutReturn", () => {
     expect(result).toEqual({ buffered: false, queuedCount: 1 });
     expect(mockedApplyConfirmed).toHaveBeenCalledWith({ borrower: null, items: [] });
     expect(mockedMarkConfirmed).toHaveBeenCalled();
-    expect(mockedRefreshPack).toHaveBeenCalledWith({ force: true });
+    expect(mockedRefreshPack).toHaveBeenCalledWith({ force: true, reportProgress: false });
   });
 
   it("marks the server unreachable and does not throw when refreshOfflineCheckoutPackIfNeeded rejects in the background", async () => {
@@ -584,7 +584,7 @@ describe("syncCheckoutQueues", () => {
       review: 0,
       serverReachable: true,
     });
-    expect(mockedRefreshPack).toHaveBeenCalledWith({ force: true });
+    expect(mockedRefreshPack).toHaveBeenCalledWith({ force: true, reportProgress: false });
   });
 
   it("does not replace the local pack while replay still has pending or review work", async () => {

@@ -209,7 +209,8 @@ test.describe("core user flows", () => {
     await page.getByRole("button", { name: "All Tenant Accounts", exact: true }).click();
     await page.getByRole("button", { name: "Add item", exact: true }).click();
 
-    await expect(page.getByText("Item added.", { exact: true })).toBeVisible();
+    const statusToast = page.locator(".app-toast-outlet[role=status]");
+    await expect(statusToast.getByText("Item added.", { exact: true })).toBeVisible();
     await expect(page.getByRole("cell", { name: "Camera A", exact: true })).toBeVisible();
     expect(createRequests).toHaveLength(1);
     expect(createRequests[0]).toMatchObject({
@@ -286,7 +287,8 @@ test.describe("core user flows", () => {
     await page.getByRole("button", { name: "All Tenant Accounts", exact: true }).click();
     await page.getByRole("button", { name: "Add borrower", exact: true }).click();
 
-    await expect(page.getByText("Borrower added.", { exact: true })).toBeVisible();
+    const statusToast = page.locator(".app-toast-outlet[role=status]");
+    await expect(statusToast.getByText("Borrower added.", { exact: true })).toBeVisible();
     await expect(page.getByRole("cell", { name: username, exact: true })).toBeVisible();
     expect(createRequests).toHaveLength(1);
     expect(createRequests[0]).toMatchObject({

@@ -160,7 +160,8 @@ test.describe("Super admin flows and export actions", () => {
     await navigateApp(page, "/account/security");
 
     await page.getByRole("button", { name: "Sign out other sessions" }).click();
-    await expect(page.getByText("Other sessions signed out.")).toBeVisible();
+    const statusToast = page.locator(".app-toast-outlet[role=status]");
+    await expect(statusToast.getByText("Other sessions signed out.", { exact: true })).toBeVisible();
     await expect.poll(() => requests.filter(({ action }) => action === "revoke_all_sessions")).toHaveLength(1);
     expect(genericRevokeCalls).toBe(0);
     expect(requests.find(({ action }) => action === "revoke_all_sessions")).toEqual({
@@ -231,7 +232,8 @@ test.describe("Super admin flows and export actions", () => {
     await expect(page.getByRole("heading", { name: "Super Admin Settings" })).toBeVisible();
     await expect(page.getByRole("cell", { name: "Remote device" })).toBeVisible();
     await page.getByRole("button", { name: "Sign out all other sessions" }).click();
-    await expect(page.getByText("1 session(s) revoked.")).toBeVisible();
+    const statusToast = page.locator(".app-toast-outlet[role=status]");
+    await expect(statusToast.getByText("1 session(s) revoked.", { exact: true })).toBeVisible();
     await expect(page.getByRole("cell", { name: "Current device" })).toBeVisible();
     await expect(page.getByRole("cell", { name: "Remote device" })).toHaveCount(0);
 

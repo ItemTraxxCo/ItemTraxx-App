@@ -206,7 +206,7 @@ export const submitCheckoutReturn = async (
   try {
     await executeCheckoutReturn(payloadWithOperationId);
     if (offlineContext) await applyConfirmedTransactionToOfflinePack(offlineContext);
-    void refreshOfflineCheckoutPackIfNeeded({ force: true }).catch(() => undefined);
+    void refreshOfflineCheckoutPackIfNeeded({ force: true, reportProgress: false }).catch(() => undefined);
     return {
       buffered: false,
       queuedCount: await getBufferedCheckoutCount(),
@@ -217,7 +217,7 @@ export const submitCheckoutReturn = async (
         try {
           await executeCheckoutReturn(payloadWithOperationId);
           if (offlineContext) await applyConfirmedTransactionToOfflinePack(offlineContext);
-          void refreshOfflineCheckoutPackIfNeeded({ force: true }).catch(() => undefined);
+          void refreshOfflineCheckoutPackIfNeeded({ force: true, reportProgress: false }).catch(() => undefined);
           return {
             buffered: false,
             queuedCount: await getBufferedCheckoutCount(),
@@ -350,7 +350,7 @@ const refreshOfflinePackAfterQueueSync = async (
   serverReachable: boolean | null = true,
 ) => {
   if (result.processed === 0 || result.remaining > 0 || result.review > 0 || serverReachable === false) return;
-  await refreshOfflineCheckoutPackIfNeeded({ force: true }).catch(() => undefined);
+  await refreshOfflineCheckoutPackIfNeeded({ force: true, reportProgress: false }).catch(() => undefined);
 };
 
 export const probeItemTraxxServer = async () => {

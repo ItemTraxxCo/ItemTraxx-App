@@ -15,7 +15,7 @@
     <section>
       <h2>Password</h2>
       <button @click="resetPassword">Email me a password reset link</button>
-      <p v-if="message">{{ message }}</p>
+      <p v-if="message" v-app-toast-message="{ kind: messageKind }">{{ message }}</p>
     </section>
 
     <section>
@@ -43,6 +43,7 @@ import { listAccountSessions, revokeAccountSession, type AccountSessionItem } fr
 
 const sessions = ref<AccountSessionItem[]>([]);
 const message = ref("");
+const messageKind = ref<"error" | "success">("success");
 const load = async () => {
   sessions.value = (await listAccountSessions()).sessions;
 };
@@ -54,6 +55,7 @@ const resetPassword = async () => {
   const email = getAuthState().email;
   if (!email) return;
   const { error } = await authClient.requestPasswordReset({ email, redirectTo: `${location.origin}/reset-password` });
+  messageKind.value = error ? "error" : "success";
   message.value = error ? "Unable to send reset link." : "Password reset email sent.";
 };
 onMounted(() => void load());

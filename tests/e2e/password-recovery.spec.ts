@@ -18,7 +18,8 @@ test.describe("Better Auth password recovery", () => {
     await navigateApp(page, "/forgot-password");
     await page.getByLabel("Account Email").fill("  Person.Name@Example.COM  ");
     await page.getByRole("button", { name: "Send reset link" }).click();
-    await expect(page.getByText(/Password reset link sent/)).toBeVisible();
+    const statusToast = page.locator(".app-toast-outlet[role=status]");
+    await expect(statusToast.getByText(/Password reset link sent/)).toBeVisible();
     expect(requestBody).toEqual({
       email: "person.name@example.com",
       redirectTo: `${new URL(page.url()).origin}/reset-password`,

@@ -2,8 +2,8 @@
   <div class="page admin-shell">
     <div class="admin-hero">
       <div class="page-nav-left">
-        <RouterLink class="button-link" :to="managerRoot">Return to manager home</RouterLink>
-        <RouterLink class="button-link" :to="managerPath('/item-import')">Bulk item import wizard</RouterLink>
+        <RouterLink class="button-link" :to="managerRoot">Back</RouterLink>
+        <RouterLink class="button-link" :to="managerPath('/item-import')">Bulk item import</RouterLink>
       </div>
       <h1>Item Management</h1>
       <p class="admin-hero-copy">Add inventory, update item status, and review archived item without jumping between views.</p>
@@ -67,7 +67,7 @@
         />
         <button type="submit" class="button-primary" :disabled="isSaving">Add item</button>
       </form>
-      <p v-if="error" class="error">{{ error }}</p>
+      <p v-if="error" class="error" v-app-toast-error="{ suppressMessage: toastMessage }">{{ error }}</p>
       <p v-if="success" class="success">{{ success }}</p>
     </div>
     <div v-if="toastMessage" class="toast">
@@ -379,7 +379,6 @@ import SkeletonLoader from "../../../components/SkeletonLoader.vue";
 import TenantAccessPicker from "../../../components/app/TenantAccessPicker.vue";
 import { getAuthState } from "../../../store/authState";
 import { formatItemStatus, ITEM_STATUS_OPTIONS } from "../../../utils/itemStatus";
-import { logAdminAction } from "../../../services/auditLogService";
 import {
   createItem,
   deleteItem,
@@ -812,12 +811,6 @@ const handleCreate = async () => {
       access_mode: isIndividualAccount.value ? "all" : accessMode.value,
       profile_ids: isIndividualAccount.value ? [] : selectedProfileIds.value,
     });
-    await logAdminAction({
-      action_type: "item_create",
-      entity_type: "items",
-      entity_id: created.id,
-      metadata: { name: created.name, barcode: created.barcode },
-    });
     capturePostHogEvent("item_item_created");
     items.value = [created, ...items.value];
     name.value = "";
@@ -902,12 +895,6 @@ const saveEdit = async (id: string) => {
       access_mode: accessMode,
       profile_ids: isIndividualAccount.value ? [] : editSelectedProfileIds.value,
     });
-    await logAdminAction({
-      action_type: "item_update",
-      entity_type: "items",
-      entity_id: updated.id,
-      metadata: { name: updated.name, barcode: updated.barcode },
-    });
     items.value = items.value.map((item) => (item.id === id ? updated : item));
     selectedItem.value = updated;
     success.value = "Item updated.";
@@ -956,12 +943,6 @@ const removeItem = async (item: ItemRecord) => {
   isSaving.value = true;
   try {
     await deleteItem(item.id);
-    await logAdminAction({
-      action_type: "item_archive",
-      entity_type: "items",
-      entity_id: item.id,
-      metadata: { name: item.name, barcode: item.barcode },
-    });
     items.value = items.value.filter((row) => row.id !== item.id);
     archivedItem.value = [item, ...archivedItem.value];
     success.value = "Item archived.";
@@ -989,12 +970,6 @@ const handleRestore = async (item: ItemRecord) => {
   isSaving.value = true;
   try {
     const restored = await restoreItem(item.id);
-    await logAdminAction({
-      action_type: "item_restore",
-      entity_type: "items",
-      entity_id: item.id,
-      metadata: { name: item.name, barcode: item.barcode },
-    });
     archivedItem.value = archivedItem.value.filter((row) => row.id !== item.id);
     items.value = [restored, ...items.value];
     success.value = "Item restored.";

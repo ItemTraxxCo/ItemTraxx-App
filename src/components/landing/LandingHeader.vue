@@ -102,6 +102,8 @@ const emit = defineEmits<{
   border: 1px solid rgba(77, 97, 122, 0.4);
   color: #f5f7fb;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  min-height: 2rem;
+  padding: 0.3rem 0.75rem;
 }
 
 .nav-cta:hover {
@@ -168,10 +170,15 @@ const emit = defineEmits<{
   .nav-cta {
     min-height: 1.7rem;
     padding: 0.26rem 0.58rem;
-    border-radius: 999px;
+  }
+
+  .nav-cta {
+    min-height: 1.6rem;
+    padding: 0.2rem 0.5rem;
   }
 
   .status-pill {
+    border-radius: 999px;
     gap: 0.38rem;
     padding-inline: 0.52rem 0.62rem;
   }

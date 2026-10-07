@@ -16,7 +16,7 @@
         </div>
       </div>
       <p v-if="borrowersLoading">Loading…</p>
-      <p v-else-if="borrowersError" class="error">{{ borrowersError }}</p>
+      <p v-else-if="borrowersError" class="error" v-app-toast-error>{{ borrowersError }}</p>
       <template v-else>
         <div class="table-wrap">
           <table class="table">
@@ -53,7 +53,7 @@
         </div>
       </div>
       <p v-if="itemsLoading">Loading…</p>
-      <p v-else-if="itemsError" class="error">{{ itemsError }}</p>
+      <p v-else-if="itemsError" class="error" v-app-toast-error>{{ itemsError }}</p>
       <template v-else>
         <div class="table-wrap">
           <table class="table">
@@ -170,7 +170,7 @@
           Sign out all other devices
         </button>
       </div>
-      <p v-if="sessionError" class="error">{{ sessionError }}</p>
+      <p v-if="sessionError" class="error" v-app-toast-error>{{ sessionError }}</p>
       <p v-if="sessionSuccess" class="success">{{ sessionSuccess }}</p>
     </section>
   </main>

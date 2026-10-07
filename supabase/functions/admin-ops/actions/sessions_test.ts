@@ -106,6 +106,7 @@ const makeClient = (
   return {
     client: {
       from,
+      rpc: () => Promise.resolve({ data: true, error: null }),
       schema,
       // Production session validation verifies the Better Auth JWT through the
       // external-auth bridge. Keep the test double on that same boundary so
@@ -282,6 +283,35 @@ Deno.test("resolveDeviceSessionContext rejects invalid enum values and missing d
     loginLocation: null,
     generalLocation: null,
   });
+});
+
+Deno.test("resolveDeviceSessionContext ignores caller-authored SSO provenance", () => {
+  const req = new Request("https://example.test/admin-ops", { method: "POST" });
+  const result = resolveDeviceSessionContext(
+    {
+      login_method: "invented-provider",
+      login_location: "SAML2.0",
+    },
+    req,
+  );
+
+  assertEquals(result.loginMethod, null);
+  assertEquals(result.loginLocation, null);
+});
+
+Deno.test("resolveDeviceSessionContext records only server-verified SSO provenance", () => {
+  const req = new Request("https://example.test/admin-ops", { method: "POST" });
+  const result = resolveDeviceSessionContext(
+    {
+      login_method: "invented-provider",
+      login_location: "SAML2.0",
+    },
+    req,
+    { providerId: "verified-provider", protocol: "OpenID Connect (OIDC)" },
+  );
+
+  assertEquals(result.loginMethod, "verified-provider");
+  assertEquals(result.loginLocation, "OpenID Connect (OIDC)");
 });
 
 // =====================================================================

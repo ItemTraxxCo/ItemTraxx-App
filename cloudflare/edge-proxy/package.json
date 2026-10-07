@@ -26,6 +26,9 @@
     "wrangler": "^4.143.1"
   },
   "overrides": {
+    "miniflare": {
+      "sharp": "0.35.5"
+    },
     "node-rsa": "2.0.0",
     "zod": "4.6.0"
   }

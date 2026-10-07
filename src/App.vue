@@ -56,6 +56,7 @@
       />
     </AppTopBanners>
     <AuthenticatedNavigation
+      v-if="showTopMenu"
       :visible="showTopMenu"
       :show-notification-bell="showNotificationBell"
       :menu-open="menuOpen"
@@ -74,6 +75,7 @@
       </div>
     </div>
     <router-view v-else />
+    <OfflineWorkflowStatus />
     <OfflineWorkflowOverlays v-if="isWorkspaceScopedRoute" :enabled="true" />
     <OnboardingModal
       v-if="onboarding.visible.value"
@@ -88,6 +90,7 @@
       @accept-all="consent.acceptAll"
       @save-preferences="consent.savePreferences"
     />
+    <AppToastOutlet v-if="!fatalErrorToast.visible" />
     <FatalErrorToast v-if="fatalErrorToast.visible" />
     <OfflineQueueToast :enabled="showOfflineQueueToast" :count="offlineQueue.count.value" :syncing-count="offlineQueue.syncingCount.value" :review-count="offlineQueue.reviewCount.value" :tooltip="offlineQueue.tooltip.value" />
     <Analytics v-if="consent.showTelemetry.value" />
@@ -100,8 +103,8 @@ import { computed, defineAsyncComponent, onMounted, onScopeDispose, ref, watch, 
 import { useRoute, useRouter } from "vue-router";
 import AppBlockingOverlays from "./components/app/AppBlockingOverlays.vue";
 import AppTopBanners from "./components/app/AppTopBanners.vue";
-import AuthenticatedNavigation from "./components/app/AuthenticatedNavigation.vue";
 import CookieConsentBanner from "./components/CookieConsentBanner.vue";
+import AppToastOutlet from "./components/AppToastOutlet.vue";
 import { useAdminSessionLifecycle } from "./composables/useAdminSessionLifecycle";
 import { useAppVersionStatus } from "./composables/useAppVersionStatus";
 import { isUnavailableBypassHost } from "./utils/unavailableBypass";
@@ -121,7 +124,9 @@ import { getRouteLoadingState } from "./store/routeLoading";
 import { getSessionTerminationState } from "./store/sessionTermination";
 
 const OnboardingModal = defineAsyncComponent(() => import("./components/OnboardingModal.vue"));
+const AuthenticatedNavigation = defineAsyncComponent(() => import("./components/app/AuthenticatedNavigation.vue"));
 const OfflineWorkflowOverlays = defineAsyncComponent(() => import("./components/OfflineWorkflowOverlays.vue"));
+const OfflineWorkflowStatus = defineAsyncComponent(() => import("./components/OfflineWorkflowStatus.vue"));
 const Analytics = defineAsyncComponent(async () => (await import("@vercel/analytics/vue")).Analytics);
 const FatalErrorToast = defineAsyncComponent(async () => (await import("./components/FatalErrorToast.vue")).default);
 const OfflineQueueToast = defineAsyncComponent(async () => (await import("./components/OfflineQueueToast.vue")).default);
@@ -195,7 +200,7 @@ const isLandingRoute = computed(() => route.path === "/" || route.path === "/lan
 const isUnavailableRoute = computed(() => route.path === "/unavailable" || route.name === "public-unavailable");
 const isSuperAdminShellRoute = computed(() => String(route.name || "").startsWith("super-admin-"));
 const isKillSwitchAllowedRoute = computed(() => isUnavailableRoute.value);
-const hiddenMenuRoutes = new Set(["public-home", "public-unavailable", "public-access-denied", "public-pricing", "public-about", "public-security", "public-report-security-issue", "public-changelog", "public-compliance", "public-privacy", "public-cookies", "public-contact", "public-trust", "public-faq", "public-accessibility", "public-getting-started", "public-itemscanner", "public-legal", "public-forgot-password", "public-reset-password", "public-home-new2", "public-request-demo", "public-contact-sales", "public-contact-support", "public-submit-confirmation"]);
+const hiddenMenuRoutes = new Set(["public-home", "public-unavailable", "public-access-denied", "public-pricing", "public-about", "public-security", "public-report-security-issue", "public-changelog", "public-compliance", "public-privacy", "public-cookies", "public-contact", "public-trust", "public-faq", "public-accessibility", "public-getting-started", "public-itemscanner", "public-legal", "public-forgot-password", "public-reset-password", "public-request-demo", "public-contact-sales", "public-contact-support", "public-submit-confirmation"]);
 const showTopMenu = computed(() => !hiddenMenuRoutes.has(String(route.name)) && !String(route.name || "").startsWith("super-admin-"));
 const showLogoutUserAction = computed(() => auth.isAuthenticated && !Boolean(route.meta.public) && route.path !== "/login");
 const isWorkspaceScopedRoute = computed(() =>
@@ -260,13 +265,14 @@ const updateBrowserChromeColor = () => {
   if (isFullBleedRoute.value) color = theme.value === "dark" ? "#090c12" : "#f9f9f7";
   else if (isSubmitConfirmationRoute.value) color = theme.value === "dark" ? "#090c12" : "#eef5f8";
   else if (isUnavailableRoute.value) color = theme.value === "dark" ? "#101010" : "#f7f7f5";
+  else if (isLandingRoute.value) { color = "#ffffff"; appleStyle = "default"; }
   else if (isDarkChromeRoute.value) { color = "#090d14"; appleStyle = "black-translucent"; }
   themeColor.setAttribute("content", color);
   appleStatus?.setAttribute("content", appleStyle);
 };
 const applyTheme = (next: "light" | "dark") => {
   setTheme(next);
-  document.documentElement.setAttribute("data-theme", isLandingRoute.value ? "dark" : next);
+  document.documentElement.setAttribute("data-theme", isLandingRoute.value ? "light" : next);
   updateBrowserChromeColor();
 };
 const toggleTheme = () => { applyTheme(theme.value === "dark" ? "light" : "dark"); menuOpen.value = false; };
@@ -345,6 +351,8 @@ watchEffect(() => {
   document.body.classList.toggle("auth-route-active", isFullBleedRoute.value);
   document.documentElement.classList.toggle("marketing-route-active", isDarkChromeRoute.value);
   document.body.classList.toggle("marketing-route-active", isDarkChromeRoute.value);
+  document.documentElement.classList.toggle("landing-route-active", isLandingRoute.value);
+  document.body.classList.toggle("landing-route-active", isLandingRoute.value);
   document.documentElement.classList.toggle("confirmation-route-active", isSubmitConfirmationRoute.value);
   document.body.classList.toggle("confirmation-route-active", isSubmitConfirmationRoute.value);
   document.documentElement.classList.toggle("unavailable-route-active", isUnavailableRoute.value);
@@ -368,7 +376,7 @@ watch(() => [backendUnavailable.value, route.path] as const, ([unavailable, path
 });
 watch(() => [route.name, auth.isInitialized, auth.isAuthenticated, auth.role, auth.workspaceContextId, auth.hasSecondaryAuth, district.isWorkspaceHost, district.workspaceId] as const, () => void maybeRedirectAuthenticatedPublicHome());
 watch(isLandingRoute, () => {
-  document.documentElement.setAttribute("data-theme", isLandingRoute.value ? "dark" : theme.value);
+  document.documentElement.setAttribute("data-theme", isLandingRoute.value ? "light" : theme.value);
   updateBrowserChromeColor();
 });
 onMounted(() => {

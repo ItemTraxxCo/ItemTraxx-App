@@ -217,6 +217,15 @@ serve(async (req) => {
         trustProxyHeader: true,
       }),
     );
+    const verified = await verifyTurnstileToken(
+      turnstileToken,
+      clientIp,
+      "contact-sales-submit",
+    );
+    if (!verified) {
+      return jsonResponse(403, { error: "Security check failed." });
+    }
+
     const rateLimit = await enforcePublicRateLimits(
       adminClient,
       fingerprint,
@@ -232,15 +241,6 @@ serve(async (req) => {
       return jsonResponse(429, {
         error: "Too many requests. Please try again later.",
       }, rateLimit);
-    }
-
-    const verified = await verifyTurnstileToken(
-      turnstileToken,
-      clientIp,
-      "contact-sales-submit",
-    );
-    if (!verified) {
-      return jsonResponse(403, { error: "Security check failed." });
     }
 
     const ipHash = clientIp ? await sha256Hex(clientIp) : null;

@@ -2,15 +2,10 @@
   <main class="page">
     <header>
       <h1>Borrowers</h1>
-      <nav>
-        <RouterLink to="/checkout">Checkout</RouterLink> ·
-        <RouterLink to="/items">Items</RouterLink> ·
-        <RouterLink to="/settings">Settings</RouterLink>
-      </nav>
     </header>
 
     <p v-if="loading">Loading…</p>
-    <p v-else-if="error" class="error">{{ error }}</p>
+    <p v-else-if="error" class="error" v-app-toast-error>{{ error }}</p>
     <template v-else>
       <table>
         <thead>
@@ -35,7 +30,6 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
-import { RouterLink } from "vue-router";
 import { fetchBorrowerPage, type BorrowerItem } from "../../services/borrowerService";
 
 const PAGE_SIZE = 20;

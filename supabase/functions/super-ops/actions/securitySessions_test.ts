@@ -322,11 +322,13 @@ Deno.test("verify_password rejects a failed Better Auth verification", async () 
   );
 });
 
-Deno.test("verify_password succeeds and records an audit entry", async () => {
+Deno.test("verify_password confirms the current session without creating another session", async () => {
   await withMockedBetterAuthFetch(
     () => betterAuthAdminResponse({ verified: true }),
     async () => {
-      const { client } = makeAdminClient(sequence([]));
+      const { client, calls } = makeAdminClient(sequence([]), {
+        claims: { session_id: "existing-session-id", iat: 1_700_000_000 },
+      });
       const auditCalls: unknown[][] = [];
       const response = await handleSecuritySessionsAction(
         contextFor("verify_password", { password: "secret" }, client, {
@@ -345,6 +347,11 @@ Deno.test("verify_password succeeds and records an audit entry", async () => {
         "00000000-0000-4000-8000-000000000001",
         {},
       ]]);
+      assertEquals(calls.length, 1, "password confirmation should only update the current step-up record");
+      assertEquals(calls[0].table, "privileged_session_stepups");
+      const upsert = calls[0].operations.find((operation) => operation.method === "upsert");
+      assert(upsert, "expected the current session step-up to be upserted");
+      assertEquals((upsert!.args[0] as Record<string, unknown>).binding_key, "session:existing-session-id");
     },
   );
 });

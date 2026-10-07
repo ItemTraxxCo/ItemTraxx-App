@@ -115,7 +115,7 @@ test.describe("Better Auth two-factor challenge", () => {
     await page.goto("/login/two-factor");
     await page.getByLabel("Code").fill("000000");
     await page.getByRole("button", { name: "Verify authenticator code" }).click();
-    await expect(page.getByText("Invalid code")).toBeVisible();
+    await expect(page.getByRole("alert").getByText("Invalid code", { exact: true })).toBeVisible();
     await expect(page).toHaveURL(/\/login\/two-factor$/);
   });
 
@@ -128,6 +128,6 @@ test.describe("Better Auth two-factor challenge", () => {
     await page.goto("/login/two-factor");
     await page.getByLabel("Code").fill("used-backup-code");
     await page.getByRole("button", { name: "Use backup code" }).click();
-    await expect(page.getByText("Invalid backup code")).toBeVisible();
+    await expect(page.getByRole("alert").getByText("Invalid backup code", { exact: true })).toBeVisible();
   });
 });

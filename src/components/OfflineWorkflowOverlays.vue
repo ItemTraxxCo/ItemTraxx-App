@@ -10,7 +10,7 @@
         <li>Do not log out or clear browser data until pending transactions have synced to ItemTraxx servers.</li>
         <li>If you refresh or close this tab, you may need to reconnect before your signed-in session can be restored.</li>
       </ul>
-      <p v-if="warningError" class="error">{{ warningError }}</p>
+      <p v-if="warningError" class="error" v-app-toast-error>{{ warningError }}</p>
       <div class="offline-overlay-actions">
         <button type="button" class="button-primary" @click="continueOffline">Continue offline</button>
         <button type="button" class="button-secondary" :disabled="retrying" @click="tryReconnect">
@@ -35,7 +35,7 @@
                 <span data-session-replay-mask>{{ entry.items[0]?.borrower_username || entry.items[0]?.borrower_display_id || "Quick Return" }}</span>
                 · {{ entry.items.length }} item{{ entry.items.length === 1 ? "" : "s" }}
               </strong>
-              <small>Needs review — {{ entry.last_error || "server state changed" }}</small>
+              <small v-app-toast-error="{ title: 'Offline sync needs review' }">Needs review — {{ entry.last_error || "server state changed" }}</small>
             </span>
           </button>
           <div v-if="expandedId === entry.id" class="offline-review-detail">
@@ -71,7 +71,7 @@
                 <small>Server update: {{ serverStateTimeLabel(entry.items[0]?.server_state) }}</small>
               </button>
             </div>
-            <p v-if="entryError[entry.id]" class="error">{{ entryError[entry.id] }}</p>
+            <p v-if="entryError[entry.id]" class="error" v-app-toast-error="{ title: 'Unable to resolve transaction' }">{{ entryError[entry.id] }}</p>
             <div class="offline-overlay-actions">
               <button
                 type="button"
@@ -102,7 +102,7 @@
               <small>Legacy record requires manual review{{ item.created_at ? ` · Recorded ${formatTime(item.created_at)}` : "" }}</small>
             </span>
           </div>
-          <p v-if="legacyEntryError[item.id]" class="error">{{ legacyEntryError[item.id] }}</p>
+          <p v-if="legacyEntryError[item.id]" class="error" v-app-toast-error="{ title: 'Unable to update transaction' }">{{ legacyEntryError[item.id] }}</p>
           <div class="offline-overlay-actions offline-legacy-review-actions">
             <button
               type="button"
@@ -353,7 +353,7 @@ onScopeDispose(() => {
 .offline-warning-card ul { margin: 0.85rem 0 0; padding-left: 1.2rem; color: var(--muted); line-height: 1.5; }
 .offline-warning-card li + li { margin-top: 0.35rem; }
 .offline-overlay-actions { display: flex; flex-wrap: wrap; gap: 0.65rem; margin-top: 1rem; }
-.offline-overlay-actions button { flex: 1 1 12rem; min-height: 44px; }
+.offline-overlay-actions button { flex: 1 1 12rem; min-height: 40px; }
 .offline-review-card { width: min(760px, 100%); max-height: min(760px, calc(100vh - 2rem)); overflow: auto; }
 .offline-review-list { display: grid; gap: 0.65rem; margin-top: 1rem; }
 .offline-review-entry { overflow: hidden; border: 1px solid var(--border); border-radius: 14px; background: var(--surface); }

@@ -4,7 +4,7 @@
       <div>
         <RouterLink to="/super-admin" class="sa-back-link">&larr; Back to Control Center</RouterLink>
         <h1 class="sa-toolbar-title">Individual Accounts</h1>
-        <p class="sa-toolbar-sub">Create and manage personal accounts that use the root app. They do not use workspace slugs or customer-facing subdomains.</p>
+        <p class="sa-toolbar-sub">Create and manage individual accounts that use the root app. They do not use workspace slugs or customer-facing subdomains.</p>
       </div>
     </div>
 
@@ -35,7 +35,7 @@
     </section>
 
     <p v-if="message" class="sa-notice" role="status">{{ message }}</p>
-    <p v-if="error" class="sa-error" role="alert">{{ error }}</p>
+    <p v-if="error" class="sa-error" role="alert" v-app-toast-error>{{ error }}</p>
 
     <div class="sa-table-wrap">
       <table class="sa-table">

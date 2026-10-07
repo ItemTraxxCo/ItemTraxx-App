@@ -28,12 +28,8 @@ const READABLE_REST_TABLES = new Set([
   "borrower_access_grants",
   "profiles",
   "workspaces",
+  "admin_audit_logs",
 ]);
-
-// admin_audit_logs is the one relation the browser writes directly
-// (src/services/auditLogService.ts). Its INSERT policy pins actor_id to
-// auth.uid() and the row's workspace, and no UPDATE/DELETE policy exists.
-const WRITABLE_REST_TABLES = new Set(["admin_audit_logs"]);
 
 export const getRestTableName = (pathname: string) =>
   readExactSegment(pathname, "/rest/v1/");
@@ -43,10 +39,7 @@ export const isAllowedRestRequest = (pathname: string, method: string) => {
   if (!table) return false;
   const normalizedMethod = method.toUpperCase();
   if (normalizedMethod === "GET" || normalizedMethod === "HEAD") {
-    return READABLE_REST_TABLES.has(table) || WRITABLE_REST_TABLES.has(table);
-  }
-  if (normalizedMethod === "POST") {
-    return WRITABLE_REST_TABLES.has(table);
+    return READABLE_REST_TABLES.has(table);
   }
   return false;
 };

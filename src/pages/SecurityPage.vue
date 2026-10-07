@@ -450,8 +450,8 @@ onUnmounted(() => {
   justify-content: center;
   box-sizing: border-box;
   max-width: 100%;
-  min-height: 2.5rem;
-  padding: 0.55rem 1rem;
+  min-height: 2.35rem;
+  padding: 0.4rem 0.85rem;
   border-radius: 999px;
   text-decoration: none;
   font-weight: 600;

@@ -3,8 +3,10 @@ import { getExternalAuthUser } from "../_shared/externalAuth.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.108.2";
 import { isKillSwitchWriteBlocked } from "../_shared/killSwitch.ts";
 import {
+  hasRecentPrivilegedStepUp,
   hasPrivilegedStepUp,
   isMissingPrivilegedStepUpTable,
+  SUPER_ADMIN_ACTION_CONFIRMATION_SOURCE,
 } from "../_shared/privilegedStepUp.ts";
 import { isAllowedOrigin, parseAllowedOrigins } from "../_shared/cors.ts";
 import { requireTrustedEdgeIngress } from "../_shared/trustedIngress.ts";
@@ -152,17 +154,29 @@ serve((req) => withRequestSpan(req, "POST /functions/super-ops", async (span, re
       "verify_password",
       "touch_session",
     ]);
+    const freshStepUpActions = new Set([
+      "start_passkey_registration",
+      "verify_passkey_registration",
+    ]);
 
     if (!securitySettingsActions.has(action)) {
       try {
-        const hasStepUp = await hasPrivilegedStepUp(adminClient, {
+        const stepUpOptions = {
           userId: user.id,
           roleScope: "super_admin",
           authToken: accessToken,
-        });
+        } as const;
+        const hasStepUp = freshStepUpActions.has(action)
+          ? await hasRecentPrivilegedStepUp(adminClient, {
+            ...stepUpOptions,
+            source: SUPER_ADMIN_ACTION_CONFIRMATION_SOURCE,
+          })
+          : await hasPrivilegedStepUp(adminClient, stepUpOptions);
         if (!hasStepUp) {
           return jsonResponse(403, {
-            error: "Super admin verification required.",
+            error: freshStepUpActions.has(action)
+              ? "Confirm your current password before registering a passkey."
+              : "Super admin verification required.",
           });
         }
       } catch (error) {

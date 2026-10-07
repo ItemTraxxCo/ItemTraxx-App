@@ -11,7 +11,6 @@ const mocks = vi.hoisted(() => ({
   updateItem: vi.fn(),
   deleteItem: vi.fn(),
   restoreItem: vi.fn(),
-  logAdminAction: vi.fn(),
   listTenantAccounts: vi.fn(),
   exportRowsToCsv: vi.fn(),
   exportRowsToPdf: vi.fn(),
@@ -28,7 +27,6 @@ vi.mock("../../../services/itemService", () => ({
   deleteItem: mocks.deleteItem,
   restoreItem: mocks.restoreItem,
 }));
-vi.mock("../../../services/auditLogService", () => ({ logAdminAction: mocks.logAdminAction }));
 vi.mock("../../../services/workspaceAdminManageService", () => ({ listTenantAccounts: mocks.listTenantAccounts }));
 vi.mock("../../../services/exportService", () => ({
   exportRowsToCsv: mocks.exportRowsToCsv,

@@ -23,8 +23,10 @@ import {
   getPasswordResetDelivery,
   sendPasswordResetEmail,
 } from "./passwordResetDelivery.ts";
+import { sendAccountEmail } from "./accountEmailDelivery.ts";
 import { recordPasskeyUsage } from "./passkeyUsage.ts";
 import { normalizeBetterAuthCaptchaRequest } from "./authCaptcha.ts";
+import { buildAdminLoginAuditRecord } from "./authSessionAudit.ts";
 
 export { normalizeBetterAuthCaptchaRequest } from "./authCaptcha.ts";
 
@@ -78,7 +80,7 @@ let cachedDataClient: ReturnType<typeof createBetterAuthDataClient> | null = nul
 
 type BetterAuthSessionLike = {
   user?: { id?: string };
-  session?: { id?: string };
+  session?: { id?: string; createdAt?: Date | string };
 };
 
 type SsoActor = {
@@ -123,6 +125,18 @@ export const resolveSsoActor = async (
   };
 };
 
+export const isActiveLinkedBetterAuthProfile = async (
+  dataClient: ReturnType<typeof createBetterAuthDataClient>,
+  betterAuthUserId: string,
+) => {
+  const { data, error } = await dataClient.schema("public").from("profiles")
+    .select("id,is_active,deleted_at")
+    .eq("better_auth_user_id", betterAuthUserId)
+    .maybeSingle();
+  if (error) throw error;
+  return data?.is_active === true && data.deleted_at == null;
+};
+
 const ensureBetterAuthOrganizationAdminMembership = async (
   dataClient: ReturnType<typeof createBetterAuthDataClient>,
   betterAuthUserId: string,
@@ -164,6 +178,64 @@ const hasSsoSessionGrant = async (
     .maybeSingle();
   if (error) throw error;
   return !!data?.id;
+};
+
+const SUPER_ADMIN_ACTION_CONFIRMATION_SOURCE = "super_admin_settings_password";
+const SUPER_ADMIN_ACTION_CONFIRMATION_WINDOW_MS = 5 * 60 * 1000;
+const AUTH_TIMESTAMP_CLOCK_SKEW_MS = 30 * 1000;
+const PASSKEY_FRESH_SESSION_WINDOW_MS = 5 * 60 * 1000;
+const PASSKEY_ENROLLMENT_PATHS = new Set([
+  "/passkey/generate-register-options",
+  "/passkey/verify-registration",
+]);
+
+export const isBetterAuthPasskeyEnrollmentPath = (path: string) =>
+  PASSKEY_ENROLLMENT_PATHS.has(path);
+
+export const isFreshActionConfirmationTimestamp = (
+  updatedAt: unknown,
+  nowMs: number = Date.now(),
+) => {
+  if (typeof updatedAt !== "string") return false;
+  const updatedAtMs = Date.parse(updatedAt);
+  if (!Number.isFinite(updatedAtMs)) return false;
+  const ageMs = nowMs - updatedAtMs;
+  return ageMs >= -AUTH_TIMESTAMP_CLOCK_SKEW_MS &&
+    ageMs <= SUPER_ADMIN_ACTION_CONFIRMATION_WINDOW_MS;
+};
+
+export const isFreshPasskeySessionTimestamp = (
+  createdAt: unknown,
+  nowMs: number = Date.now(),
+) => {
+  const createdAtMs = createdAt instanceof Date
+    ? createdAt.getTime()
+    : typeof createdAt === "string"
+    ? Date.parse(createdAt)
+    : Number.NaN;
+  if (!Number.isFinite(createdAtMs)) return false;
+  const ageMs = nowMs - createdAtMs;
+  return ageMs >= -AUTH_TIMESTAMP_CLOCK_SKEW_MS &&
+    ageMs <= PASSKEY_FRESH_SESSION_WINDOW_MS;
+};
+
+export const hasRecentSuperAdminPasswordConfirmation = async (
+  dataClient: ReturnType<typeof createBetterAuthDataClient>,
+  profileId: string,
+  sessionId: string,
+  nowMs: number = Date.now(),
+) => {
+  const { data, error } = await dataClient.schema("public")
+    .from("privileged_session_stepups")
+    .select("updated_at,issued_by")
+    .eq("user_id", profileId)
+    .eq("role_scope", "super_admin")
+    .eq("binding_key", `session:${sessionId}`)
+    .eq("issued_by", SUPER_ADMIN_ACTION_CONFIRMATION_SOURCE)
+    .maybeSingle();
+  if (error) throw error;
+  return data?.issued_by === SUPER_ADMIN_ACTION_CONFIRMATION_SOURCE &&
+    isFreshActionConfirmationTimestamp(data?.updated_at, nowMs);
 };
 
 const hasRevokedSsoSession = async (
@@ -235,12 +307,46 @@ export const getBetterAuth = (rawEnv: Env) => {
       updateAge: 60 * 60 * 24,
       freshAge: 0, // An active session should not trigger periodic re-authentication.
     },
+    databaseHooks: {
+      session: {
+        create: {
+          after: async (session) => {
+            try {
+              const { data: profile, error: profileError } = await dataClient
+                .schema("public")
+                .from("profiles")
+                .select("id,better_auth_user_id,workspace_id,role,is_active,deleted_at")
+                .eq("better_auth_user_id", session.userId)
+                .maybeSingle();
+              if (profileError) throw profileError;
+              if (!profile) return;
+
+              const auditRecord = buildAdminLoginAuditRecord(profile, session);
+              if (!auditRecord) return;
+
+              const { error: auditError } = await dataClient
+                .schema("public")
+                .from("admin_audit_logs")
+                .insert(auditRecord);
+              if (auditError) throw auditError;
+            } catch (error) {
+              console.error("Better Auth admin login audit write failed", {
+                user_id: session.userId,
+                session_id: session.id,
+                error,
+              });
+            }
+          },
+        },
+      },
+    },
     advanced: {
       useSecureCookies: isProductionOrigin,
       ipAddress: { ipAddressHeaders: ["cf-connecting-ip"] },
-      crossSubDomainCookies: isProductionOrigin
-        ? { enabled: true, domain: ".itemtraxx.com" }
-        : { enabled: false },
+      // Authentication requests always target the configured Better Auth
+      // origin; a host-only cookie avoids exposing the bearer session to
+      // unrelated sibling subdomains.
+      crossSubDomainCookies: { enabled: false },
       database: { generateId: () => crypto.randomUUID() },
     },
     onAPIError: {
@@ -248,6 +354,52 @@ export const getBetterAuth = (rawEnv: Env) => {
     },
     hooks: {
       before: createAuthMiddleware(async (context) => {
+          if (isBetterAuthPasskeyEnrollmentPath(context.path)) {
+            const session = await getSessionFromCtx(context);
+            if (!session?.user?.id || !session.session?.id) {
+              throw new APIError("UNAUTHORIZED");
+            }
+            if (!await isActiveLinkedBetterAuthProfile(dataClient, session.user.id)) {
+              throw new APIError("FORBIDDEN");
+            }
+            const actor = await resolveSsoActor(dataClient, session.user.id);
+            if (!actor || await hasRevokedSsoSession(dataClient, actor, session.session.id)) {
+              throw new APIError("FORBIDDEN");
+            }
+            if (actor?.role === "super_admin") {
+              if (!await hasRecentSuperAdminPasswordConfirmation(
+                dataClient,
+                actor.profileId,
+                session.session.id,
+              )) {
+                throw new APIError("FORBIDDEN", {
+                  message: "Confirm your current password before registering a passkey.",
+                });
+              }
+            } else if (!isFreshPasskeySessionTimestamp(session.session.createdAt)) {
+              throw new APIError("FORBIDDEN", {
+                message: "Sign in again before registering a passkey.",
+              });
+            }
+          }
+          // Better Auth's global admin and organization plugins authorize from
+          // Better Auth roles and memberships. Keep those routes bound to the
+          // current ItemTraxx account lifecycle state as well.
+          if (
+            context.path.startsWith("/admin/") ||
+            context.path.startsWith("/organization/")
+          ) {
+            const session = await getSessionFromCtx(context);
+            if (!session?.user?.id) throw new APIError("UNAUTHORIZED");
+            if (!await isActiveLinkedBetterAuthProfile(dataClient, session.user.id)) {
+              throw new APIError("FORBIDDEN");
+            }
+            const actor = await resolveSsoActor(dataClient, session.user.id);
+            if (!actor || !session.session?.id ||
+              await hasRevokedSsoSession(dataClient, actor, session.session.id)) {
+              throw new APIError("FORBIDDEN");
+            }
+          }
           if (context.path === "/organization/update") {
             const session = await getSessionFromCtx(context);
             if (!session) throw new APIError("UNAUTHORIZED");
@@ -568,6 +720,36 @@ const resolvePasswordResetRedirect = (env: BetterAuthEnv, requested: unknown) =>
   return redirect.toString();
 };
 
+const resolveAccountFlowURL = (
+  env: BetterAuthEnv,
+  requested: unknown,
+  path: "/accept-invitation" | "/account/email-change",
+  step?: "approve" | "verify",
+) => {
+  if (typeof requested !== "string") throw new Error("Invalid account email URL");
+  const url = new URL(requested);
+  if (
+    !parseCsv(env.BETTER_AUTH_TRUSTED_ORIGINS).includes(url.origin) ||
+    url.pathname !== path || url.search
+  ) {
+    throw new Error("Invalid account email URL");
+  }
+  const fragment = new URLSearchParams(url.hash.startsWith("#")
+    ? url.hash.slice(1)
+    : url.hash);
+  const expectedKeys = step ? ["step", "token"] : ["token"];
+  const actualKeys = Array.from(fragment.keys()).sort();
+  if (
+    actualKeys.length !== expectedKeys.length ||
+    actualKeys.some((key, index) => key !== [...expectedKeys].sort()[index]) ||
+    !/^[0-9a-f]{64}$/.test(fragment.get("token") ?? "") ||
+    (step && fragment.get("step") !== step)
+  ) {
+    throw new Error("Invalid account email URL");
+  }
+  return url.toString();
+};
+
 const ORGANIZATION_LOGO_PREFIX = "organization-logos";
 const ORGANIZATION_LOGO_MAX_BYTES = 2 * 1024 * 1024;
 const ORGANIZATION_LOGO_TYPES = {
@@ -575,6 +757,9 @@ const ORGANIZATION_LOGO_TYPES = {
   "image/jpeg": { extension: "jpg" },
   "image/webp": { extension: "webp" },
 } as const;
+
+export const organizationLogoObjectPath = (organizationId: string) =>
+  `${ORGANIZATION_LOGO_PREFIX}/${organizationId}/logo-current`;
 
 const isAllowedOrganizationLogoRequest = (request: Request, allowedOrigins: string[]) => {
   const origin = request.headers.get("Origin");
@@ -653,6 +838,9 @@ export const handleOrganizationLogoUpload = async (
   if (!session?.user || !cachedDataClient) {
     return Response.json({ error: "Unauthorized" }, { status: 401 });
   }
+  if (!await isActiveLinkedBetterAuthProfile(cachedDataClient, session.user.id)) {
+    return Response.json({ error: "Forbidden" }, { status: 403 });
+  }
 
   const { data: member, error: memberError } = await cachedDataClient
     .schema("better_auth")
@@ -693,9 +881,10 @@ export const handleOrganizationLogoUpload = async (
     return Response.json({ error: "The selected file is not a supported image." }, { status: 400 });
   }
 
-  const { extension } = ORGANIZATION_LOGO_TYPES[contentType as keyof typeof ORGANIZATION_LOGO_TYPES];
-  const fileName = `logo-${crypto.randomUUID()}.${extension}`;
-  const objectPath = `${ORGANIZATION_LOGO_PREFIX}/${organizationId}/${fileName}`;
+  // One current object per organization prevents each replacement upload from
+  // leaving another uniquely named R2 object behind.
+  const fileName = "logo-current";
+  const objectPath = organizationLogoObjectPath(organizationId);
   try {
     await env.ORGANIZATION_LOGOS.put(objectPath, body, {
       httpMetadata: {
@@ -710,7 +899,7 @@ export const handleOrganizationLogoUpload = async (
     return Response.json({ error: "Unable to save the organization logo." }, { status: 502 });
   }
 
-  const logoUrl = `${trimTrailingSlash(env.BETTER_AUTH_URL)}/api/organization/${organizationId}/logo/${fileName}`;
+  const logoUrl = `${trimTrailingSlash(env.BETTER_AUTH_URL)}/api/organization/${organizationId}/logo/${fileName}?v=${crypto.randomUUID()}`;
   return Response.json({ logoUrl }, { headers: { "Cache-Control": "no-store" } });
 };
 
@@ -725,7 +914,7 @@ export const handleOrganizationLogoRead = async (
     return Response.json({ error: "Method not allowed" }, { status: 405 });
   }
   if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(organizationId) ||
-    !/^logo-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.(png|jpg|webp)$/i.test(fileName)) {
+    !(fileName === "logo-current" || /^logo-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.(png|jpg|webp)$/i.test(fileName))) {
     return Response.json({ error: "Invalid organization logo" }, { status: 400 });
   }
   if (!isAllowedOrganizationLogoRequest(request, allowedOrigins)) {
@@ -740,7 +929,11 @@ export const handleOrganizationLogoRead = async (
     return Response.json({ error: "Logo storage is unavailable" }, { status: 503 });
   }
 
-  const object = await bucket.get(`${ORGANIZATION_LOGO_PREFIX}/${organizationId}/${fileName}`);
+  const object = await bucket.get(
+    fileName === "logo-current"
+      ? organizationLogoObjectPath(organizationId)
+      : `${ORGANIZATION_LOGO_PREFIX}/${organizationId}/${fileName}`,
+  );
   if (!object) return new Response(null, { status: 404 });
 
   const headers = new Headers({
@@ -770,6 +963,75 @@ export const handleInternalAuthAdminRequest = async (request: Request, rawEnv: E
   const action = typeof body?.action === "string" ? body.action : "";
   const profileId = typeof body?.profileId === "string" ? body.profileId : "";
   try {
+    if (action === "send_workspace_account_invitation") {
+      const to = typeof body?.email === "string" ? body.email.trim().toLowerCase() : "";
+      const accountRole = body?.accountRole;
+      if (
+        !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to) ||
+        (accountRole !== "tenant_account" && accountRole !== "workspace_admin")
+      ) {
+        return Response.json({ error: "Invalid request" }, { status: 400 });
+      }
+      await sendAccountEmail(env, {
+        kind: "workspace-account-invitation",
+        to,
+        url: resolveAccountFlowURL(env, body?.url, "/accept-invitation"),
+        accountRole,
+      });
+      return Response.json({ success: true });
+    }
+    if (action === "send_email_change_approval") {
+      const to = typeof body?.email === "string" ? body.email.trim().toLowerCase() : "";
+      const newEmail = typeof body?.newEmail === "string" ? body.newEmail.trim().toLowerCase() : "";
+      if (
+        !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to) ||
+        !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(newEmail)
+      ) return Response.json({ error: "Invalid request" }, { status: 400 });
+      await sendAccountEmail(env, {
+        kind: "email-change-approval",
+        to,
+        newEmail,
+        url: resolveAccountFlowURL(env, body?.url, "/account/email-change", "approve"),
+      });
+      return Response.json({ success: true });
+    }
+    if (action === "send_email_change_verification") {
+      const to = typeof body?.email === "string" ? body.email.trim().toLowerCase() : "";
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) {
+        return Response.json({ error: "Invalid request" }, { status: 400 });
+      }
+      await sendAccountEmail(env, {
+        kind: "email-change-verification",
+        to,
+        url: resolveAccountFlowURL(env, body?.url, "/account/email-change", "verify"),
+      });
+      return Response.json({ success: true });
+    }
+    if (action === "accept_workspace_account_invitation") {
+      const tokenHash = typeof body?.tokenHash === "string" ? body.tokenHash : "";
+      const password = typeof body?.password === "string" ? body.password : "";
+      if (!/^[0-9a-f]{64}$/.test(tokenHash) || password.length < 12) {
+        return Response.json({ error: "Invalid request" }, { status: 400 });
+      }
+      const profileId = crypto.randomUUID();
+      const userId = crypto.randomUUID();
+      const accountId = crypto.randomUUID();
+      const memberId = crypto.randomUUID();
+      const passwordHash = await hashPassword(password);
+      const { error } = await cachedDataClient.schema("public").rpc(
+        "accept_workspace_account_invitation",
+        {
+          p_token_hash: tokenHash,
+          p_profile_id: profileId,
+          p_user_id: userId,
+          p_account_id: accountId,
+          p_member_id: memberId,
+          p_password_hash: passwordHash,
+        },
+      );
+      if (error) throw error;
+      return Response.json({ success: true });
+    }
     if (action === "create_organization") {
       const workspaceId = typeof body?.workspaceId === "string" ? body.workspaceId : "";
       const name = typeof body?.name === "string" ? body.name.trim() : "";
@@ -850,6 +1112,8 @@ export const handleInternalAuthAdminRequest = async (request: Request, rawEnv: E
       return Response.json({ success: true });
     }
     if (action === "verify_password") {
+      // This is an in-session proof check only. Never call Better Auth sign-in
+      // APIs here: they would create another active device session.
       const password = typeof body?.password === "string" ? body.password : "";
       const { data: account, error } = await cachedDataClient.schema("better_auth").from("account")
         .select("password").eq("userId", target.user_id).eq("providerId", "credential").maybeSingle();

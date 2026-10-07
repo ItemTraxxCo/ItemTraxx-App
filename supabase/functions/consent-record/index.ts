@@ -10,6 +10,12 @@ import {
   resolveClientFingerprint,
 } from "../_shared/preloginGuards.ts";
 import { buildPublicRateLimitHeaders } from "../_shared/publicRateLimit.ts";
+import {
+  isAnonymousConsentDailyLimitError,
+  MAX_ANONYMOUS_CONSENT_ROWS_PER_UTC_DAY,
+  SECONDS_PER_UTC_DAY,
+  secondsUntilNextUtcDay,
+} from "./consentRecordLimit.ts";
 
 const corsBase = {
   "Access-Control-Allow-Headers":
@@ -25,6 +31,8 @@ const PUBLIC_RATE_LIMIT = {
 
 type RateLimitResult = {
   retryAfterSeconds?: number | null;
+  limit?: number;
+  windowSeconds?: number;
 };
 
 const jsonResponse = (
@@ -38,7 +46,9 @@ const jsonResponse = (
     headers: {
       ...headers,
       ...buildPublicRateLimitHeaders({
-        ...PUBLIC_RATE_LIMIT,
+        limit: rateLimit?.limit ?? PUBLIC_RATE_LIMIT.limit,
+        windowSeconds: rateLimit?.windowSeconds ??
+          PUBLIC_RATE_LIMIT.windowSeconds,
         retryAfterSeconds: rateLimit?.retryAfterSeconds ??
           (status === 429 ? PUBLIC_RATE_LIMIT.windowSeconds : null),
         remaining: status === 429 ? 0 : null,
@@ -150,6 +160,19 @@ serve(async (req) => {
       { onConflict: "subject_id,consent_version" },
     );
   if (writeError) {
+    if (isAnonymousConsentDailyLimitError(writeError)) {
+      const retryAfterSeconds = secondsUntilNextUtcDay(new Date());
+      return jsonResponse(
+        429,
+        { error: "Anonymous consent record limit reached for today" },
+        headers,
+        {
+          limit: MAX_ANONYMOUS_CONSENT_ROWS_PER_UTC_DAY,
+          windowSeconds: SECONDS_PER_UTC_DAY,
+          retryAfterSeconds,
+        },
+      );
+    }
     console.error("consent-record write failed", {
       message: writeError.message,
     });

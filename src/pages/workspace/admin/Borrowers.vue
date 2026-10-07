@@ -2,7 +2,7 @@
   <div class="page admin-shell">
     <div class="admin-hero">
       <div class="page-nav-left">
-        <RouterLink class="button-link" :to="managerRoot">Return to manager home</RouterLink>
+        <RouterLink class="button-link" :to="managerRoot">Back</RouterLink>
       </div>
       <h1>Borrower Management</h1>
       <p class="admin-hero-copy">Add borrowers, review details, and manage archived records.</p>
@@ -55,7 +55,7 @@
           <button type="submit" class="button-primary" :disabled="isSaving">Add borrower</button>
         </div>
       </form>
-      <p v-if="error" class="error">{{ error }}</p>
+      <p v-if="error" class="error" v-app-toast-error="{ suppressMessage: toastMessage }">{{ error }}</p>
       <p v-if="success" class="success">{{ success }}</p>
     </div>
 
@@ -242,7 +242,7 @@
       <div class="form-actions">
         <button
           type="button"
-          class="button-primary"
+          class="button-primary bulk-import-button"
           :disabled="isSaving || bulkRows.length === 0"
           @click="runBulkImport"
         >
@@ -347,7 +347,6 @@ import {
   type BorrowerItem,
 } from "../../../services/borrowerService";
 import { fetchWorkspaceSettings } from "../../../services/adminOpsService";
-import { logAdminAction } from "../../../services/auditLogService";
 import { exportRowsToCsv, exportRowsToPdf } from "../../../services/exportService";
 import { generateBorrowerIdentity } from "../../../utils/borrowerIdentity";
 import { listTenantAccounts } from "../../../services/workspaceAdminManageService";
@@ -697,12 +696,6 @@ const handleCreate = async () => {
       access_mode: isIndividualAccount.value ? "all" : accessMode.value,
       profile_ids: isIndividualAccount.value ? [] : selectedProfileIds.value,
     });
-    await logAdminAction({
-      action_type: "borrower_create",
-      entity_type: "borrower",
-      entity_id: created.id,
-      metadata: { borrower_id: created.borrower_id },
-    });
     borrowers.value = [created, ...borrowers.value];
     usernamePreview.value = created.username;
     borrowerIdPreview.value = created.borrower_id;
@@ -788,12 +781,6 @@ const removeBorrower = async (item: BorrowerItem) => {
   isSaving.value = true;
   try {
     await deleteBorrower(item.id);
-    await logAdminAction({
-      action_type: "borrower_archive",
-      entity_type: "borrower",
-      entity_id: item.id,
-      metadata: { borrower_id: item.borrower_id },
-    });
     borrowers.value = borrowers.value.filter((row) => row.id !== item.id);
     archivedBorrowers.value = [item, ...archivedBorrowers.value];
     success.value = "Borrower archived.";
@@ -826,12 +813,6 @@ const handleRestore = async (item: BorrowerItem) => {
   isSaving.value = true;
   try {
     const restored = await restoreBorrower(item.id);
-    await logAdminAction({
-      action_type: "borrower_restore",
-      entity_type: "borrower",
-      entity_id: item.id,
-      metadata: { borrower_id: item.borrower_id },
-    });
     archivedBorrowers.value = archivedBorrowers.value.filter((row) => row.id !== item.id);
     borrowers.value = [restored, ...borrowers.value];
     success.value = "Borrower restored.";
@@ -900,5 +881,12 @@ onUnmounted(() => {
   border: 1px solid var(--border);
   border-radius: 10px;
   background: var(--surface-2);
+}
+
+.bulk-import-button:disabled {
+  background-color: var(--surface-3);
+  border-color: var(--border);
+  color: var(--muted);
+  cursor: not-allowed;
 }
 </style>

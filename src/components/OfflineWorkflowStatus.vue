@@ -31,7 +31,28 @@
     </div>
   </div>
 
-  <div v-else-if="message && isOfflineWorkflowRoute" class="toast" :class="{ 'toast-persist': messageKind === 'error' }" role="status" aria-live="polite">
+  <div
+    v-if="packReadyToastDetail && isOfflineWorkflowRoute"
+    class="toast toast-persist offline-pack-ready-toast"
+    role="status"
+    aria-live="polite"
+    aria-atomic="true"
+  >
+    <div class="toast-title">Offline pack ready</div>
+    <div class="toast-body">{{ packReadyToastDetail }}</div>
+    <div class="toast-actions">
+      <button
+        type="button"
+        class="toast-action-button"
+        aria-label="Dismiss offline pack ready notification"
+        @click="dismissPackReadyToast"
+      >
+        Dismiss
+      </button>
+    </div>
+  </div>
+
+  <div v-if="message && isOfflineWorkflowRoute" class="toast" :class="{ 'toast-persist': messageKind === 'error' }" role="status" aria-live="polite">
     <div class="toast-title">{{ messageTitle }}</div>
     <div class="toast-body">{{ message }}</div>
   </div>
@@ -101,6 +122,7 @@ const summary = ref<Summary>({ pack: null, packExpired: false, pendingCount: 0, 
 const connection = ref(readOfflineConnectionState());
 const message = ref("");
 const messageKind = ref<"success" | "error" | "info">("success");
+const packReadyToastDetail = ref("");
 const syncInFlight = ref(false);
 const pendingDownloadPrompt = ref(false);
 const largePackWarning = ref<OfflinePackSize | null>(null);
@@ -149,7 +171,7 @@ const messageTitle = computed(() => {
   if (messageKind.value === "error") return "Offline setup needs attention";
   if (message.value.startsWith("Downloading") || message.value.startsWith("Checking")) return "Preparing for offline use";
   if (messageKind.value === "info") return "Offline checkout active";
-  return "Offline pack ready";
+  return "Offline queue synced";
 });
 
 const statusDetail = computed(() => {
@@ -167,6 +189,22 @@ const clearToastTimer = () => {
   if (toastTimer !== null) window.clearTimeout(toastTimer);
   toastTimer = null;
 };
+
+const dismissPackReadyToast = () => {
+  packReadyToastDetail.value = "";
+};
+
+const showPackReadyToast = (detail: string, preferDetail = false) => {
+  clearToastTimer();
+  message.value = "";
+  if (preferDetail || !packReadyToastDetail.value) {
+    packReadyToastDetail.value = detail;
+  }
+};
+
+watch(message, (nextMessage) => {
+  if (nextMessage) dismissPackReadyToast();
+});
 
 const refresh = async () => {
   const [workflow, legacy] = await Promise.all([
@@ -234,10 +272,7 @@ const automaticallyRefreshPack = async () => {
     const result = await refreshOfflineCheckoutPackIfNeeded();
     if (result.skippedReason === "download_preference") return;
     if (result.refreshed && result.firstPreparation) {
-      messageKind.value = "success";
-      message.value = "Ready for offline use on this device.";
-      clearToastTimer();
-      toastTimer = window.setTimeout(() => { message.value = ""; }, 6_000);
+      showPackReadyToast("This device is ready for offline use.");
     }
     await refresh();
   } catch (error) {
@@ -283,6 +318,7 @@ const handleSignedInScope = async () => {
   if (!signInKey) {
     activeSignInKey = null;
     automaticPackAttemptedForSignIn = null;
+    dismissPackReadyToast();
     dismissDownloadPrompt();
     initialSummaryLoaded = false;
     return;
@@ -292,6 +328,7 @@ const handleSignedInScope = async () => {
     activeSignInKey = signInKey;
     automaticPackAttemptedForSignIn = null;
     sessionInitializationRetryUsed = false;
+    dismissPackReadyToast();
     dismissDownloadPrompt();
   }
   if (!isOfflineWorkflowRoute.value) return;
@@ -356,12 +393,16 @@ const handlePackProgress = (event: Event) => {
   const progress = (event as CustomEvent<OfflinePackPreparationProgress>).detail;
   if (!progress || !isOfflineWorkflowRoute.value) return;
   clearToastTimer();
-  messageKind.value = progress.stage === "complete" ? "success" : "info";
+  if (progress.stage === "complete") {
+    showPackReadyToast(
+      `${progress.downloadedRecords.toLocaleString()} records downloaded for offline use on this device.`,
+      true,
+    );
+    return;
+  }
+  messageKind.value = "info";
   if (progress.stage === "starting" && progress.totalRecords === 0) {
     message.value = "Checking the size of the offline pack…";
-  } else if (progress.stage === "complete") {
-    message.value = `Offline pack ready: ${progress.downloadedRecords.toLocaleString()} records downloaded.`;
-    toastTimer = window.setTimeout(() => { message.value = ""; }, 6_000);
   } else {
     message.value = `Downloading offline pack: ${progress.downloadedRecords.toLocaleString()} of ${progress.totalRecords.toLocaleString()} records (chunk ${progress.chunkNumber}).`;
   }
@@ -402,8 +443,9 @@ watch(
   () => {
     if (isOfflineWorkflowRoute.value) {
       void nextTick().then(() => handleSignedInScope());
-    } else if (pendingDownloadPrompt.value) {
-      dismissDownloadPrompt();
+    } else {
+      dismissPackReadyToast();
+      if (pendingDownloadPrompt.value) dismissDownloadPrompt();
     }
   },
   { flush: "post" },
@@ -460,11 +502,19 @@ onScopeDispose(() => {
 .offline-workflow-status strong { font-size: 0.9rem; }
 .offline-workflow-status span { color: var(--muted); font-size: 0.8rem; }
 .offline-sync-button { min-height: 2rem; padding: 0.3rem 0.72rem; white-space: nowrap; }
+.offline-pack-ready-toast {
+  box-sizing: border-box;
+  width: min(390px, calc(100vw - 3rem));
+  min-width: min(240px, calc(100vw - 2rem));
+}
+.offline-pack-ready-toast .toast-body { line-height: 1.45; }
+.offline-pack-ready-toast .toast-actions { justify-content: flex-end; }
 .offline-pack-prompt-actions,
 .offline-pack-large-actions { display: flex; flex-wrap: wrap; gap: 0.55rem; margin-top: 0.8rem; }
 .offline-pack-large-overlay { z-index: 1400; }
 @media (max-width: 640px) {
   .offline-workflow-status { align-items: flex-start; }
   .offline-sync-button { flex-shrink: 0; }
+  .offline-pack-ready-toast { right: 1rem; width: calc(100vw - 2rem); }
 }
 </style>

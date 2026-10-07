@@ -65,7 +65,7 @@
       </table>
     </div>
 
-    <p v-if="success" class="sa-notice">{{ success }}</p>
+    <p v-if="success" class="sa-notice" v-app-toast-message>{{ success }}</p>
 
     <div v-if="selectedLead" class="sa-modal-backdrop" @click.self="closeLeadModal">
       <section class="sa-modal" role="dialog" aria-modal="true" aria-labelledby="lead-details-title">

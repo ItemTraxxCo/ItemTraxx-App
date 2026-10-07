@@ -953,7 +953,9 @@ test.describe("prepared offline checkout workflow contract", () => {
     await setTenantAccountSession(page, "workspace-e2e");
     await navigateApp(page, "/checkout");
 
-    await expect(page.getByText("Ready for offline use on this device.")).toBeVisible();
+    const readyToast = page.locator(".offline-pack-ready-toast");
+    await expect(readyToast).toBeVisible();
+    await expect(readyToast).toContainText("2 records downloaded for offline use on this device.");
     await expect.poll(async () => page.evaluate(async () => {
       const workflow = (window.__itemtraxxTest as typeof window.__itemtraxxTest & {
         offlineCheckoutWorkflow: {
@@ -1084,7 +1086,9 @@ test.describe("prepared offline checkout workflow contract", () => {
     await setTenantAccountSession(page, "workspace-e2e");
     await navigateApp(page, "/checkout");
 
-    await expect(page.getByText("Ready for offline use on this device.")).toBeVisible();
+    const readyToast = page.locator(".offline-pack-ready-toast");
+    await expect(readyToast).toBeVisible();
+    await expect(readyToast).toContainText("2 records downloaded for offline use on this device.");
     expect(prepareAttempts).toBe(2);
     await expect(page.getByText("Offline setup needs attention")).toHaveCount(0);
 

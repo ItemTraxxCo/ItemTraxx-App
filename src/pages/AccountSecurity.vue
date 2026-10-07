@@ -89,7 +89,7 @@
       <button :disabled="busy" @click="signOutOthers">Sign out other sessions</button>
     </section>
 
-    <p v-if="message" class="success">{{ message }}</p>
+    <p v-if="message" class="success" v-app-toast-message>{{ message }}</p>
     <p v-if="error" class="error" v-app-toast-error>{{ error }}</p>
   </main>
 </template>

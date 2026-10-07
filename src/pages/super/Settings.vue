@@ -25,7 +25,7 @@
           Send reset password email
         </button>
       </div>
-      <p v-if="passwordResetMessage" class="sa-notice">{{ passwordResetMessage }}</p>
+      <p v-if="passwordResetMessage" class="sa-notice" v-app-toast-message>{{ passwordResetMessage }}</p>
       <p v-if="passwordResetError" class="sa-error" v-app-toast-error>{{ passwordResetError }}</p>
     </section>
 
@@ -116,7 +116,7 @@
         <button type="button" class="sa-btn" :disabled="isSessionSaving" @click="loadSessions">Reload sessions</button>
       </div>
       <p v-if="sessionError" class="sa-error" v-app-toast-error>{{ sessionError }}</p>
-      <p v-if="sessionSuccess" class="sa-notice">{{ sessionSuccess }}</p>
+      <p v-if="sessionSuccess" class="sa-notice" v-app-toast-message>{{ sessionSuccess }}</p>
     </section>
 
   </main>

@@ -8,6 +8,10 @@ vi.mock("../services/authService", () => ({
   signOut: vi.fn(async () => ({ ok: true })),
 }));
 
+vi.mock("../store/appToast", () => ({
+  showAppToast: vi.fn(),
+}));
+
 const mountLogout = async (): Promise<{ logout: () => Promise<boolean>; router: Router }> => {
   const router = createRouter({
     history: createMemoryHistory(),
@@ -54,15 +58,15 @@ describe("useLogout", () => {
     expect(confirmed).toBe(true);
   });
 
-  it("alerts and does not redirect when sign-out fails", async () => {
+  it("shows an app toast and does not redirect when sign-out fails", async () => {
     vi.spyOn(window, "confirm").mockReturnValue(true);
-    const alertSpy = vi.spyOn(window, "alert").mockImplementation(() => {});
     const authService = await import("../services/authService");
+    const { showAppToast } = await import("../store/appToast");
     vi.mocked(authService.signOut).mockResolvedValueOnce({ ok: false } as Awaited<ReturnType<typeof authService.signOut>>);
     const { logout, router } = await mountLogout();
     const pushSpy = vi.spyOn(router, "push");
     await logout();
-    expect(alertSpy).toHaveBeenCalled();
+    expect(showAppToast).toHaveBeenCalledWith("Sign out failed", "Unable to complete logout. Please try again.");
     expect(pushSpy).not.toHaveBeenCalled();
   });
 

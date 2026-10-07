@@ -271,7 +271,7 @@ const sanitizeExceptionEvent = (event: CaptureResult): CaptureResult => {
 };
 
 const URL_PROPERTY_KEY = /(url|uri|href|referrer|path)/i;
-const SENSITIVE_URL_PARAMETER = /^(?:access_token|refresh_token|id_token|token|secret|signature|code|api[_-]?key)$/i;
+const SENSITIVE_URL_PARAMETER = /^(?:access_token|refresh_token|id_token|token|secret|signature|code|api[_-]?key|itx_sso_proof)$/i;
 
 const scrubTelemetryUrlValue = (value: string) => {
   const replaySafe = scrubSensitiveReplayUrlValue(value);

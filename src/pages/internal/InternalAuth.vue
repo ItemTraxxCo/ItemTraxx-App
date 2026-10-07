@@ -55,7 +55,7 @@
         </div>
       </form>
 
-      <p v-if="error" class="error">{{ error }}</p>
+      <p v-if="error" class="error" v-app-toast-error="{ suppressMessage: toastMessage }">{{ error }}</p>
     </div>
 
     <div v-if="toastMessage" class="toast">

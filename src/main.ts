@@ -1,4 +1,5 @@
 import { createApp } from "vue";
+import { appToastErrorDirective } from "./directives/appToastError";
 import "./styles/tokens.css";
 import "./styles/base.css";
 import "./styles/app-shell.css";
@@ -22,6 +23,7 @@ import { installAppErrorRecovery } from "./services/appErrorRecovery";
 import { isPublicBootstrapRoute } from "./bootstrap/routeBootstrap";
 import { createClientMonitoring } from "./bootstrap/clientMonitoring";
 import { markAgentFallbackMounted } from "./bootstrap/agentFallback";
+import { captureAccountFlowTokenFromLocation } from "./services/accountFlowToken";
 
 const redirectCanonicalHost = () => {
   if (typeof window === "undefined") return false;
@@ -102,6 +104,7 @@ const initializePublicAuth = async () => {
   }
 };
 
+captureAccountFlowTokenFromLocation();
 const clientMonitoring = createClientMonitoring(router);
 installAppErrorRecovery(router);
 
@@ -181,6 +184,7 @@ const mountApp = async () => {
   });
 
   const app = createApp(App);
+  app.directive("app-toast-error", appToastErrorDirective);
   const existingErrorHandler = app.config.errorHandler;
   app.config.errorHandler = (error, instance, info) => {
     clientMonitoring.captureException(error);

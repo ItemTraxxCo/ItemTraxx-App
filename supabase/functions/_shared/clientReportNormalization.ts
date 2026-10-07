@@ -35,6 +35,9 @@ export const normalizeClientReportText = (
   return normalized.trim().slice(0, maxLength);
 };
 
+export const escapeSlackMrkdwnText = (value: string) =>
+  value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
 const normalizeDiagnosticEntry = (value: unknown): RecordValue | null => {
   const record = asRecord(value);
   if (!record) return null;

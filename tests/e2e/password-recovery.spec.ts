@@ -35,7 +35,7 @@ test.describe("Better Auth password recovery", () => {
     await navigateApp(page, "/forgot-password");
     await page.getByLabel("Account Email").fill("person@example.com");
     await page.getByRole("button", { name: "Send reset link" }).click();
-    await expect(page.getByText("Unable to send reset link. Please try again.")).toBeVisible();
+    await expect(page.getByRole("alert").getByText("Unable to send reset link. Please try again.", { exact: true })).toBeVisible();
   });
 
   test("reset-password submits a valid Better Auth recovery token", async ({ page }) => {
@@ -61,7 +61,7 @@ test.describe("Better Auth password recovery", () => {
     await page.getByLabel("New Password", { exact: true }).fill("alllowercasepassword");
     await page.getByLabel("Confirm Password").fill("alllowercasepassword");
     await page.getByRole("button", { name: "Update Password" }).click();
-    await expect(page.getByText(/Password must be at least 12 characters/)).toBeVisible();
+    await expect(page.getByRole("alert").getByText(/Password must be at least 12 characters/)).toBeVisible();
     expect(requests).toBe(0);
   });
 });

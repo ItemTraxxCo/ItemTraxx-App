@@ -33,9 +33,9 @@ const resolveSuperAdminAuthSessionBinding = async (
 };
 
 /**
- * A revoked row must block the matching Supabase Auth session before any
- * super-admin operation runs. This keeps revocation effective even while an
- * already-issued JWT remains within its normal lifetime.
+ * A privileged JWT is accepted only while its exact Better Auth session has
+ * an active super-admin session-registry row. Missing registry state fails
+ * closed, including during session creation and after revocation.
  */
 export const isSuperAdminTokenBlockedBySessionRevocation = async (
   client: SupabaseLikeClient,
@@ -55,8 +55,7 @@ export const isSuperAdminTokenBlockedBySessionRevocation = async (
       .select("id")
       .eq("profile_id", params.profileId)
       .eq("auth_session_id", binding.sessionId)
-      .not("revoked_at", "is", null)
-      .order("revoked_at", { ascending: false })
+      .is("revoked_at", null)
       .limit(1)
       .maybeSingle();
 
@@ -69,35 +68,10 @@ export const isSuperAdminTokenBlockedBySessionRevocation = async (
       }
       throw new Error("Unable to validate super-admin session revocation.");
     }
-    if (data?.id) {
-      return { blocked: true as const, relationMissing: false as const };
-    }
-
-    // A session id is the authoritative binding for current Better Auth JWTs.
-    // Do not fall back to a timestamp here: revoking another device creates a
-    // newer revoked_at value and would otherwise block this unrelated session.
-    return { blocked: false as const, relationMissing: false as const };
+    return { blocked: !data?.id, relationMissing: false as const };
   }
 
-  if (binding.issuedAt) {
-    const { data, error } = await client
-      .from("super_admin_sessions")
-      .select("id")
-      .eq("profile_id", params.profileId)
-      .not("revoked_at", "is", null)
-      .gte("revoked_at", binding.issuedAt)
-      .order("revoked_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-
-    if (error) {
-      if (isMissingRelation(error as PostgrestErrorLike, "super_admin_sessions")) {
-        return { blocked: true as const, relationMissing: true as const };
-      }
-      throw new Error("Unable to validate super-admin session revocation.");
-    }
-    return { blocked: !!data?.id, relationMissing: false as const };
-  }
-
-  return { blocked: false as const, relationMissing: false as const };
+  // Current Better Auth JWTs always carry a session id. A legacy token without
+  // that binding cannot be tied to an active registry row safely.
+  return { blocked: true as const, relationMissing: false as const };
 };

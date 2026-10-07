@@ -360,6 +360,10 @@ serve(async (req) => {
         .is("deleted_at", null)
         .single();
 
+      if (!existingItem) {
+        return jsonResponse(404, { error: "Item not found." });
+      }
+
       if (
         normalizedStatus !== "checked_out" &&
         (existingItem?.status === "checked_out" ||
@@ -371,7 +375,7 @@ serve(async (req) => {
         });
       }
 
-      const { data, error } = await adminClient
+      let updateQuery = adminClient
         .from("items")
         .update({
           name: normalizedName,
@@ -383,9 +387,20 @@ serve(async (req) => {
         .eq("id", normalizedId)
         .eq("workspace_id", profile.workspace_id)
         .is("deleted_at", null)
+        .eq("status", existingItem.status);
+      updateQuery = existingItem.checked_out_by == null
+        ? updateQuery.is("checked_out_by", null)
+        : updateQuery.eq("checked_out_by", existingItem.checked_out_by);
+      updateQuery = existingItem.checked_out_at == null
+        ? updateQuery.is("checked_out_at", null)
+        : updateQuery.eq("checked_out_at", existingItem.checked_out_at);
+      const { data, error } = await updateQuery
         .select("id, workspace_id, name, barcode, serial_number, status, notes")
-        .single();
+        .maybeSingle();
 
+      if (!data && !error) {
+        return jsonResponse(409, { error: "Item changed while you were editing it. Reload and try again." });
+      }
       if (error || !data) {
         return jsonResponse(400, { error: "Unable to update item." });
       }
@@ -436,7 +451,7 @@ serve(async (req) => {
         });
       }
 
-      const { error } = await adminClient
+      const { data: archivedItem, error: archiveError } = await adminClient
         .from("items")
         .update({
           deleted_at: new Date().toISOString(),
@@ -444,9 +459,17 @@ serve(async (req) => {
         })
         .eq("id", normalizedId)
         .eq("workspace_id", profile.workspace_id)
-        .is("deleted_at", null);
+        .is("deleted_at", null)
+        .eq("status", activeItem.status)
+        .is("checked_out_by", null)
+        .is("checked_out_at", null)
+        .select("id")
+        .maybeSingle();
 
-      if (error) {
+      if (archiveError || !archivedItem) {
+        if (!archiveError) {
+          return jsonResponse(409, { error: "Item changed while you were archiving it. Reload and try again." });
+        }
         return jsonResponse(400, { error: "Unable to archive item." });
       }
 

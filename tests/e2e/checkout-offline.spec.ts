@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Page, type Route } from "@playwright/test";
 import {
   mockAdminOps,
   mockSystemStatus,
@@ -14,6 +14,69 @@ const OFFLINE_QUEUE_LOCK_KEY = "itemtraxx:checkout-offline-buffer:lock:v1";
 const OFFLINE_QUEUE_KEY_DATABASE = "itemtraxx-offline-queue";
 const OFFLINE_WORKFLOW_DATABASE = "itemtraxx-offline-workflow";
 const OFFLINE_WORKFLOW_RECORD_STORE = "records";
+
+type OfflinePackMock = {
+  pack_version: string;
+  workspace_id: string;
+  prepared_at: string;
+  expires_at: string;
+  borrowers: Array<{ id: string; username: string; borrower_id: string }>;
+  items: Array<{ id: string; name: string; barcode: string; status: string; checked_out_by: string | null }>;
+};
+
+const fulfillOfflinePackRequest = async (route: Route, pack: OfflinePackMock) => {
+  const request = route.request().postDataJSON() as {
+    action?: string;
+    after_item_id?: string | null;
+    after_borrower_id?: string | null;
+  };
+  const initialChunk = !request.after_item_id && !request.after_borrower_id;
+  let data: Record<string, unknown>;
+
+  switch (request.action) {
+    case "prepare_pack":
+      data = {
+        pack_version: pack.pack_version,
+        workspace_id: pack.workspace_id,
+        prepared_at: pack.prepared_at,
+        expires_at: pack.expires_at,
+        item_count: pack.items.length,
+        borrower_count: pack.borrowers.length,
+        max_records: 10_000,
+        max_bytes: 25 * 1024 * 1024,
+        chunk_size: 100,
+      };
+      break;
+    case "prepare_pack_chunk":
+      data = {
+        item_count: pack.items.length,
+        borrower_count: pack.borrowers.length,
+        items: initialChunk ? pack.items : [],
+        borrowers: initialChunk ? pack.borrowers : [],
+        next_item_id: initialChunk ? pack.items.at(-1)?.id ?? null : request.after_item_id ?? null,
+        next_borrower_id: initialChunk ? pack.borrowers.at(-1)?.id ?? null : request.after_borrower_id ?? null,
+      };
+      break;
+    case "complete_pack":
+      data = { pack_version: pack.pack_version, download_complete: true };
+      break;
+    case "activate_pack":
+      data = { pack_version: pack.pack_version, activated: true };
+      break;
+    case "cancel_pack":
+      data = { cancelled: true };
+      break;
+    default:
+      return false;
+  }
+
+  await route.fulfill({
+    status: 200,
+    contentType: "application/json",
+    body: JSON.stringify({ data }),
+  });
+  return true;
+};
 
 type CheckoutReturnPayload = {
   borrower_id: string;
@@ -871,29 +934,26 @@ test.describe("prepared offline checkout workflow contract", () => {
 
   test("automatically prepares an offline pack and gives immediate tab-safety guidance during an outage", async ({ page, context }) => {
     await mockSystemStatus(page);
-    await page.evaluate(() => window.localStorage.setItem("itemtraxx-device-id", "device-e2e"));
+    await page.evaluate(() => {
+      window.localStorage.setItem("itemtraxx-device-id", "device-e2e");
+      window.localStorage.setItem("itemtraxx:offline-pack-preference:v1:workspace-e2e:user-e2e-tenant", "always");
+    });
+    const automaticPack = {
+      pack_version: "automatic-pack-e2e",
+      workspace_id: "workspace-e2e",
+      prepared_at: new Date().toISOString(),
+      expires_at: new Date(Date.now() + 86_400_000).toISOString(),
+      borrowers: [{ id: "borrower-1", username: "Maya Chen", borrower_id: "STU-100" }],
+      items: [{ id: "item-1", name: "Camera", barcode: "ITEM-1", status: "available", checked_out_by: null }],
+    };
     await page.route(/\/functions(?:\/v1)?\/offline-checkout(?:\?.*)?$/, async (route) => {
-      const body = route.request().postDataJSON() as { action?: string };
-      expect(body.action).toBe("prepare_pack");
-      await route.fulfill({
-        status: 200,
-        contentType: "application/json",
-        body: JSON.stringify({
-          data: {
-            pack_version: "automatic-pack-e2e",
-            workspace_id: "workspace-e2e",
-            prepared_at: new Date().toISOString(),
-            expires_at: new Date(Date.now() + 86_400_000).toISOString(),
-            borrowers: [{ id: "borrower-1", username: "Maya Chen", borrower_id: "STU-100" }],
-            items: [{ id: "item-1", name: "Camera", barcode: "ITEM-1", status: "available", checked_out_by: null }],
-          },
-        }),
-      });
+      if (await fulfillOfflinePackRequest(route, automaticPack)) return;
+      throw new Error("Unexpected offline checkout request.");
     });
     await setTenantAccountSession(page, "workspace-e2e");
     await navigateApp(page, "/checkout");
 
-    await expect(page.getByText("Ready for offline use in the case of an outage.")).toBeVisible();
+    await expect(page.getByText("Ready for offline use on this device.")).toBeVisible();
     await expect.poll(async () => page.evaluate(async () => {
       const workflow = (window.__itemtraxxTest as typeof window.__itemtraxxTest & {
         offlineCheckoutWorkflow: {
@@ -995,11 +1055,22 @@ test.describe("prepared offline checkout workflow contract", () => {
   test("waits for a new account session without showing a disabled-account error or re-preparing a restored pack", async ({ page }) => {
     await mockSystemStatus(page);
     await mockAdminOps(page);
-    await page.evaluate(() => window.localStorage.setItem("itemtraxx-device-id", "device-e2e"));
+    await page.evaluate(() => {
+      window.localStorage.setItem("itemtraxx-device-id", "device-e2e");
+      window.localStorage.setItem("itemtraxx:offline-pack-preference:v1:workspace-e2e:user-e2e-tenant", "always");
+    });
     let prepareAttempts = 0;
+    const retryPack = {
+      pack_version: "session-retry-pack-e2e",
+      workspace_id: "workspace-e2e",
+      prepared_at: new Date().toISOString(),
+      expires_at: new Date(Date.now() + 86_400_000).toISOString(),
+      borrowers: [{ id: "borrower-1", username: "Maya Chen", borrower_id: "STU-100" }],
+      items: [{ id: "item-1", name: "Camera", barcode: "ITEM-1", status: "available", checked_out_by: null }],
+    };
     await page.route(/\/functions(?:\/v1)?\/offline-checkout(?:\?.*)?$/, async (route) => {
-      prepareAttempts += 1;
-      if (prepareAttempts === 1) {
+      const body = route.request().postDataJSON() as { action?: string };
+      if (body.action === "prepare_pack" && ++prepareAttempts === 1) {
         await route.fulfill({
           status: 409,
           contentType: "application/json",
@@ -1007,30 +1078,18 @@ test.describe("prepared offline checkout workflow contract", () => {
         });
         return;
       }
-      await route.fulfill({
-        status: 200,
-        contentType: "application/json",
-        body: JSON.stringify({
-          data: {
-            pack_version: "session-retry-pack-e2e",
-            workspace_id: "workspace-e2e",
-            prepared_at: new Date().toISOString(),
-            expires_at: new Date(Date.now() + 86_400_000).toISOString(),
-            borrowers: [{ id: "borrower-1", username: "Maya Chen", borrower_id: "STU-100" }],
-            items: [{ id: "item-1", name: "Camera", barcode: "ITEM-1", status: "available", checked_out_by: null }],
-          },
-        }),
-      });
+      if (await fulfillOfflinePackRequest(route, retryPack)) return;
+      throw new Error("Unexpected offline checkout request.");
     });
     await setTenantAccountSession(page, "workspace-e2e");
     await navigateApp(page, "/checkout");
 
-    await expect(page.getByText("Ready for offline use in the case of an outage.")).toBeVisible();
+    await expect(page.getByText("Ready for offline use on this device.")).toBeVisible();
     expect(prepareAttempts).toBe(2);
     await expect(page.getByText("Offline setup needs attention")).toHaveCount(0);
 
     await navigateApp(page, "/items");
-    await expect(page.getByText("Preparing this device for offline use in the case of an outage.")).toHaveCount(0);
+    await expect(page.getByText("Preparing offline checkout")).toHaveCount(0);
     expect(prepareAttempts).toBe(2);
   });
 
@@ -1096,10 +1155,10 @@ test.describe("prepared offline checkout workflow contract", () => {
 
   test("lets an operator manually retry a pending sync from the checkout status bar", async ({ page }) => {
     await mockSystemStatus(page);
-    await setTenantAccountSession(page, "workspace-e2e");
     await page.evaluate(async ({ pack, entry }) => {
       window.localStorage.setItem("itemtraxx-device-id", "device-e2e");
       window.localStorage.setItem("itemtraxx:onboarding:v1:tenant_account", new Date().toISOString());
+      window.localStorage.setItem("itemtraxx:offline-pack-preference:v1:workspace-e2e:user-e2e-tenant", "always");
       window.localStorage.setItem("itemtraxx:offline-connection:v1", JSON.stringify({
         last_confirmed_at: new Date(Date.now() - 60_000).toISOString(),
         unreachable_since: new Date(Date.now() - 30_000).toISOString(),
@@ -1122,35 +1181,28 @@ test.describe("prepared offline checkout workflow contract", () => {
       },
       entry: workflowEntry("user-e2e-tenant"),
     });
+    await setTenantAccountSession(page, "workspace-e2e");
 
     let syncAttempts = 0;
     let preparePackAttempts = 0;
+    const refreshedPack = {
+      pack_version: "refreshed-pack-workflow-e2e",
+      workspace_id: "workspace-e2e",
+      prepared_at: new Date().toISOString(),
+      expires_at: new Date(Date.now() + 86_400_000).toISOString(),
+      borrowers: [
+        { id: "borrower-1", username: "Maya Chen (updated)", borrower_id: "STU-100" },
+        { id: "borrower-2", username: "Jon Bell", borrower_id: "STU-200" },
+      ],
+      items: [
+        { id: "item-1", name: "Camera", barcode: "ITEM-1", status: "checked_out", checked_out_by: "borrower-1" },
+        { id: "item-2", name: "Tripod", barcode: "ITEM-2", status: "available", checked_out_by: null },
+      ],
+    };
     await page.route(/\/functions(?:\/v1)?\/offline-checkout(?:\?.*)?$/, async (route) => {
       const body = route.request().postDataJSON() as { action?: string };
-      if (body.action === "prepare_pack") {
-        preparePackAttempts += 1;
-        await route.fulfill({
-          status: 200,
-          contentType: "application/json",
-          body: JSON.stringify({
-            data: {
-              pack_version: "refreshed-pack-workflow-e2e",
-              workspace_id: "workspace-e2e",
-              prepared_at: new Date().toISOString(),
-              expires_at: new Date(Date.now() + 86_400_000).toISOString(),
-              borrowers: [
-                { id: "borrower-1", username: "Maya Chen (updated)", borrower_id: "STU-100" },
-                { id: "borrower-2", username: "Jon Bell", borrower_id: "STU-200" },
-              ],
-              items: [
-                { id: "item-1", name: "Camera", barcode: "ITEM-1", status: "checked_out", checked_out_by: "borrower-1" },
-                { id: "item-2", name: "Tripod", barcode: "ITEM-2", status: "available", checked_out_by: null },
-              ],
-            },
-          }),
-        });
-        return;
-      }
+      if (body.action === "prepare_pack") preparePackAttempts += 1;
+      if (await fulfillOfflinePackRequest(route, refreshedPack)) return;
       expect(body.action).toBe("sync");
       syncAttempts += 1;
       if (syncAttempts === 1) {
@@ -1230,7 +1282,7 @@ test.describe("prepared offline checkout workflow contract", () => {
     await page.getByPlaceholder("Scan or enter barcode").fill("ITEM-1");
     await page.getByRole("button", { name: "Add item" }).click();
     await page.getByRole("button", { name: "Complete Quick Return" }).click();
-    await expect(page.getByText(/Return request buffered for auto-sync/)).toBeVisible();
+    await expect(page.getByRole("alert").getByText(/Return request buffered for auto-sync/)).toBeVisible();
     await expect.poll(async () => page.evaluate(async () => {
       const workflow = (window.__itemtraxxTest as typeof window.__itemtraxxTest & {
         offlineCheckoutWorkflow: { readLedger: () => Promise<unknown[]> };

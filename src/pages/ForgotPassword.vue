@@ -40,7 +40,7 @@
         </div>
       </form>
 
-      <p v-if="error" class="error">{{ error }}</p>
+      <p v-if="error" class="error" v-app-toast-error>{{ error }}</p>
       <p v-if="success" class="muted forgot-success">
         Password reset link sent. Check your inbox and follow the link to continue. The link will expire in 60 minutes. If you don't receive the email, check your spam folder or try again.
       </p>
@@ -245,7 +245,7 @@ onUnmounted(() => {
 
 .forgot-submit-button {
   width: 100%;
-  min-height: 3rem;
+  min-height: 2.75rem;
   border-radius: 999px;
   background: var(--button-primary-bg);
   border-color: transparent;

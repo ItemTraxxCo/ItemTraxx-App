@@ -269,8 +269,8 @@ Deno.test("REST allowlist admits only the relations and methods the SPA uses", (
   }
 
   assert(
-    isAllowedRestRequest("/rest/v1/admin_audit_logs", "POST"),
-    "browser audit-log insert must stay allowed",
+    !isAllowedRestRequest("/rest/v1/admin_audit_logs", "POST"),
+    "audit-log inserts must go through server-owned mutation handlers",
   );
   assert(
     !isAllowedRestRequest("/rest/v1/items", "POST"),

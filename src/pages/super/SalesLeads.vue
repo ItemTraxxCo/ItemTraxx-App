@@ -32,7 +32,7 @@
       <button type="button" class="sa-btn" @click="loadLeads" :disabled="isLoading">Search</button>
     </section>
 
-    <p v-if="error" class="sa-error">{{ error }}</p>
+    <p v-if="error" class="sa-error" v-app-toast-error>{{ error }}</p>
     <p v-else-if="isLoading" class="muted">Loading leads...</p>
 
     <div v-else class="sa-table-wrap">

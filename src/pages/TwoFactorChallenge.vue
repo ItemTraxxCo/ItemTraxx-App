@@ -1,4 +1,4 @@
-<template><main class="page"><h1>Two-factor verification</h1><p>Enter an authenticator code or a one-time backup code.</p><label>Code <input v-model="code" autocomplete="one-time-code" /></label><button :disabled="busy || !code" @click="verifyTotp">Verify authenticator code</button><button :disabled="busy || !code" @click="verifyBackup">Use backup code</button><p v-if="error" class="error">{{ error }}</p></main></template>
+<template><main class="page"><h1>Two-factor verification</h1><p>Enter an authenticator code or a one-time backup code.</p><label>Code <input v-model="code" autocomplete="one-time-code" /></label><button :disabled="busy || !code" @click="verifyTotp">Verify authenticator code</button><button :disabled="busy || !code" @click="verifyBackup">Use backup code</button><p v-if="error" class="error" v-app-toast-error>{{ error }}</p></main></template>
 <script setup lang="ts">
 import { ref } from "vue";
 import { useRouter } from "vue-router";

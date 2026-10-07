@@ -319,9 +319,9 @@ const createBorrowerRecord = async (
   workspaceId: string,
   username: string,
   borrowerId: string,
+  actorId: string,
   accessMode: "all" | "restricted" = "all",
-  profileIds: string[] = [],
-  grantedBy: string | null = null
+  profileIds: string[] = []
 ) => {
   const { data, error } = await (adminClient as any)
     .rpc("create_borrower_identity", {
@@ -330,7 +330,7 @@ const createBorrowerRecord = async (
       p_borrower_id: borrowerId,
       p_access_mode: accessMode,
       p_profile_ids: profileIds,
-      p_granted_by: grantedBy,
+      p_granted_by: actorId,
     })
     .single();
 
@@ -344,9 +344,9 @@ const createBorrowerRecord = async (
 const createGeneratedBorrowerRecord = async (
   adminClient: SupabaseAdminClient,
   workspaceId: string,
+  actorId: string,
   accessMode: "all" | "restricted" = "all",
-  profileIds: string[] = [],
-  grantedBy: string | null = null
+  profileIds: string[] = []
 ) => {
   for (let attempt = 0; attempt < 12; attempt += 1) {
     const generatedIdentity = await buildUniqueBorrowerIdentity(adminClient, workspaceId);
@@ -355,9 +355,9 @@ const createGeneratedBorrowerRecord = async (
       workspaceId,
       generatedIdentity.username,
       generatedIdentity.borrowerId,
+      actorId,
       accessMode,
-      profileIds,
-      grantedBy
+      profileIds
     );
     if (result.data) {
       return result;
@@ -655,8 +655,8 @@ serve(async (req) => {
 
       const { data, error } =
         borrowerId && username
-          ? await createBorrowerRecord(adminClient, profile.workspace_id, username, borrowerId, accessMode, profileIds, profile.id)
-          : await createGeneratedBorrowerRecord(adminClient, profile.workspace_id, accessMode, profileIds, profile.id);
+          ? await createBorrowerRecord(adminClient, profile.workspace_id, username, borrowerId, profile.id, accessMode, profileIds)
+          : await createGeneratedBorrowerRecord(adminClient, profile.workspace_id, profile.id, accessMode, profileIds);
 
       if (error || !data) {
         const quotaResponse = quotaLimitResponse(error, jsonResponse);
@@ -671,6 +671,23 @@ serve(async (req) => {
     }
 
     if (action === "bulk_create") {
+      const { data: workspacePolicy, error: workspacePolicyError } = await adminClient
+        .from("workspace_policies")
+        .select("feature_flags")
+        .eq("workspace_id", profile.workspace_id)
+        .maybeSingle();
+      if (workspacePolicyError) {
+        return jsonResponse(503, { error: "Unable to verify workspace feature access." });
+      }
+      const featureFlags = workspacePolicy?.feature_flags &&
+          typeof workspacePolicy.feature_flags === "object" &&
+          !Array.isArray(workspacePolicy.feature_flags)
+        ? workspacePolicy.feature_flags as Record<string, unknown>
+        : {};
+      if (featureFlags.enable_bulk_borrower_tools === false) {
+        return jsonResponse(403, { error: "Bulk borrower tools are disabled for this workspace." });
+      }
+
       const payloadRecord = payload as Record<string, unknown>;
       const rows = Array.isArray(payloadRecord.rows)
         ? (payloadRecord.rows as Array<Record<string, unknown>>)
@@ -780,7 +797,8 @@ serve(async (req) => {
         if (!borrowerId || !username) {
           const generated = await createGeneratedBorrowerRecord(
             adminClient,
-            profile.workspace_id
+            profile.workspace_id,
+            profile.id
           );
           if (!generated.data) {
             skipped.push({ row: row.row, reason: "Unable to generate identity." });
@@ -796,7 +814,8 @@ serve(async (req) => {
           adminClient,
           profile.workspace_id,
           username,
-          borrowerId
+          borrowerId,
+          profile.id
         );
 
         if (error || !data) {
@@ -857,18 +876,25 @@ serve(async (req) => {
         });
       }
 
-      const { error } = await adminClient
-        .from("borrowers")
-        .update({
-          deleted_at: new Date().toISOString(),
-          deleted_by: user.id,
-        })
-        .eq("id", normalizedId)
-        .eq("workspace_id", profile.workspace_id)
-        .is("deleted_at", null);
+      const { data: archived, error } = await adminClient.rpc(
+        "archive_borrower_with_audit",
+        {
+          p_workspace_id: profile.workspace_id,
+          p_actor_id: profile.id,
+          p_borrower_id: normalizedId,
+        }
+      );
 
       if (error) {
+        if (error.message?.includes("Return all checked-out items before archiving this borrower.")) {
+          return jsonResponse(400, {
+            error: "Return all checked-out items before archiving this borrower.",
+          });
+        }
         return jsonResponse(400, { error: "Unable to archive borrower." });
+      }
+      if (archived !== true) {
+        return jsonResponse(404, { error: "Borrower not found." });
       }
 
       return jsonResponse(200, { success: true });
@@ -878,55 +904,23 @@ serve(async (req) => {
       const { id } = payloadRecord;
       const normalizedId = requireUuid(id);
 
-      const { data: archivedBorrower, error: archivedBorrowerError } = await adminClient
-        .from("borrowers")
-        .select("id, username, borrower_id")
-        .eq("id", normalizedId)
-        .eq("workspace_id", profile.workspace_id)
-        .not("deleted_at", "is", null)
-        .maybeSingle();
-
-      if (archivedBorrowerError || !archivedBorrower?.id) {
-        return jsonResponse(404, { error: "Borrower not found." });
-      }
-
-      const [idConflictResult, usernameConflictResult] = await Promise.all([
-        adminClient
-          .from("borrowers")
-          .select("id")
-          .eq("workspace_id", profile.workspace_id)
-          .eq("borrower_id", archivedBorrower.borrower_id)
-          .neq("id", normalizedId)
-          .is("deleted_at", null)
-          .limit(1)
-          .maybeSingle(),
-        adminClient
-          .from("borrowers")
-          .select("id")
-          .eq("workspace_id", profile.workspace_id)
-          .eq("username", archivedBorrower.username)
-          .neq("id", normalizedId)
-          .is("deleted_at", null)
-          .limit(1)
-          .maybeSingle(),
-      ]);
-
-      if (idConflictResult.data?.id || usernameConflictResult.data?.id) {
-        return jsonResponse(409, { error: "Borrower ID or username already exists." });
-      }
-
       const { data, error } = await adminClient
-        .from("borrowers")
-        .update({ deleted_at: null, deleted_by: null })
-        .eq("id", normalizedId)
-        .eq("workspace_id", profile.workspace_id)
-        .not("deleted_at", "is", null)
-        .select("id, workspace_id, username, borrower_id")
-        .single();
+        .rpc("restore_borrower_with_audit", {
+          p_workspace_id: profile.workspace_id,
+          p_actor_id: profile.id,
+          p_borrower_id: normalizedId,
+        })
+        .maybeSingle();
 
       if (error || !data) {
         const quotaResponse = quotaLimitResponse(error, jsonResponse);
         if (quotaResponse) return quotaResponse;
+        if (isUniqueIdentityConflict(error)) {
+          return jsonResponse(409, { error: "Borrower ID or username already exists." });
+        }
+        if (!error) {
+          return jsonResponse(404, { error: "Borrower not found." });
+        }
         return jsonResponse(400, { error: "Unable to restore borrower." });
       }
 
@@ -938,44 +932,22 @@ serve(async (req) => {
       const { id } = payloadRecord;
       const normalizedId = requireUuid(id);
 
-      const { data: activeBorrower } = await adminClient
-        .from("borrowers")
-        .select("id")
-        .eq("id", normalizedId)
-        .eq("workspace_id", profile.workspace_id)
-        .is("deleted_at", null)
-        .maybeSingle();
-
-      if (!activeBorrower?.id) {
-        return jsonResponse(404, { error: "Borrower not found." });
-      }
-
-      const { error: updateError } = await adminClient
-        .from("borrowers")
-        .update({ access_mode: accessMode })
-        .eq("id", normalizedId)
-        .eq("workspace_id", profile.workspace_id)
-        .is("deleted_at", null);
-
-      if (updateError) {
-        return jsonResponse(400, { error: "Unable to update tenant account access." });
-      }
-
-      const { error: deleteGrantsError } = await adminClient
-        .from("borrower_access_grants")
-        .delete()
-        .eq("borrower_id", normalizedId);
-      if (deleteGrantsError) {
-        return jsonResponse(400, { error: "Unable to update tenant account access." });
-      }
-
-      if (accessMode === "restricted" && profileIds.length) {
-        const { error: insertGrantsError } = await adminClient
-          .from("borrower_access_grants")
-          .insert(profileIds.map((profileId) => ({ borrower_id: normalizedId, profile_id: profileId, granted_by: user.id })));
-        if (insertGrantsError) {
-          return jsonResponse(400, { error: "Unable to update tenant account access." });
+      const { data: updated, error } = await adminClient.rpc(
+        "update_borrower_access_with_audit",
+        {
+          p_workspace_id: profile.workspace_id,
+          p_actor_id: profile.id,
+          p_borrower_id: normalizedId,
+          p_access_mode: accessMode,
+          p_profile_ids: profileIds,
         }
+      );
+
+      if (error) {
+        return jsonResponse(400, { error: "Unable to update tenant account access." });
+      }
+      if (updated !== true) {
+        return jsonResponse(404, { error: "Borrower not found." });
       }
 
       return jsonResponse(200, { success: true });

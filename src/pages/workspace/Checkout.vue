@@ -13,8 +13,6 @@
     </div>
 
     <p class="checkout-page-copy">Checkout and return</p>
-    <OfflineWorkflowStatus />
-
     <div class="card checkout-card">
       <label>
         Borrower ID
@@ -120,7 +118,7 @@
       </div>
 
       <p v-else class="muted">Enter a borrower ID to begin.</p>
-      <p v-if="error" class="error">{{ error }}</p>
+      <p v-if="error" class="error" v-app-toast-error="{ suppressMessage: toastMessage }">{{ error }}</p>
       <p v-if="success" class="success">{{ success }}</p>
       <div v-if="toastMessage" class="toast" :class="{ 'toast-persist': toastStatus === 'Processing' }">
         <div class="toast-title">{{ toastTitle }}</div>
@@ -155,7 +153,6 @@
 import { computed, nextTick, onMounted, onUnmounted, ref } from "vue";
 import CameraBarcodeScannerModal from "../../components/CameraBarcodeScannerModal.vue";
 import SkeletonLoader from "../../components/SkeletonLoader.vue";
-import OfflineWorkflowStatus from "../../components/OfflineWorkflowStatus.vue";
 import {
   consumeCheckoutOfflineWarning,
   fetchCheckedOutItem,
@@ -626,8 +623,8 @@ onUnmounted(() => {
 
 .checkout-inline-button {
   min-width: 7rem;
-  min-height: 2.2rem;
-  padding: 0.36rem 0.8rem;
+  min-height: 2rem;
+  padding: 0.3rem 0.7rem;
   border-radius: 12px;
   white-space: nowrap;
 }
@@ -686,8 +683,8 @@ onUnmounted(() => {
 }
 
 .checkout-submit-button {
-  min-height: 2.35rem;
-  padding-inline: 1rem;
+  min-height: 2.2rem;
+  padding-inline: 0.85rem;
   border-radius: 12px;
 }
 

@@ -22,6 +22,9 @@ export const sanitizeReturnTo = (value: unknown): string | null => {
   try {
     const parsed = new URL(candidate, INTERNAL_REDIRECT_ORIGIN);
     if (parsed.origin !== INTERNAL_REDIRECT_ORIGIN) return null;
+    // URL normalization can turn a path such as `/.//attacker.example` into a
+    // protocol-relative path before the caller passes it to window.location.
+    if (parsed.pathname.startsWith("//")) return null;
     if (parsed.pathname === "/login" || parsed.pathname.startsWith("/login/")) {
       return null;
     }

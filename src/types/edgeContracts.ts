@@ -31,13 +31,11 @@ export type WorkspaceAdminManageAction =
   | "list_workspace_admins"
   | "create_workspace_admin"
   | "set_admin_status"
-  | "update_admin_email"
   | "send_workspace_admin_reset"
   | "list_workspace_accounts"
   | "set_workspace_account_role"
   | "list_tenant_accounts"
   | "create_tenant_account"
   | "set_tenant_account_status"
-  | "update_tenant_account_email"
   | "remove_tenant_account"
   | "send_tenant_account_reset";

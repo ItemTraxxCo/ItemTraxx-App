@@ -7,14 +7,12 @@ const authenticatedHomeRedirect = (
   to: RouteLocationNormalized,
   name: string,
 ) => {
-  const providerId = to.query.itx_sso_provider_id;
-  const protocol = to.query.itx_sso_protocol;
-  if (providerId && protocol) {
+  const proof = to.query.itx_sso_proof;
+  if (proof) {
     return {
       name,
       query: {
-        itx_sso_provider_id: providerId,
-        itx_sso_protocol: protocol,
+        itx_sso_proof: proof,
       },
     };
   }

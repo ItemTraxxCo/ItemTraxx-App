@@ -2,7 +2,7 @@
   <div class="page admin-shell">
     <div class="admin-hero">
       <div class="page-nav-left">
-        <RouterLink class="button-link" :to="managerRoot">Return to manager home</RouterLink>
+        <RouterLink class="button-link" :to="managerRoot">Back</RouterLink>
       </div>
 
       <h1>Bulk Barcode Generator</h1>
@@ -45,7 +45,7 @@
         </div>
       </form>
 
-      <p v-if="error" class="error">{{ error }}</p>
+      <p v-if="error" class="error" v-app-toast-error>{{ error }}</p>
       <p v-else-if="generatedBarcodes.length" class="muted">
         Ready to download: {{ generatedBarcodes.length }} barcode(s).
       </p>

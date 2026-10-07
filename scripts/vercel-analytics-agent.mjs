@@ -30,6 +30,9 @@ export const buildAnalyticsEndpoint = (path, projectId, period, limit) => {
   return `${path}?${params.toString()}`;
 };
 
+export const sanitizeSlackPlainText = (value, maxLength = 2800) =>
+  String(value ?? "").replace(/[\u0000-\u001f\u007f]/g, " ").slice(0, maxLength);
+
 // Thresholds for Web Vitals (based on Google's Core Web Vitals)
 const WEB_VITALS_THRESHOLDS = {
   LCP: { good: 2500, poor: 4000 }, // ms
@@ -231,8 +234,8 @@ function generateSuggestions(vitals, pageViews, regressions) {
       suggestions.push({
         priority: "medium",
         area: "Page Performance",
-        issue: `${page.path} has poor LCP (${formatMs(page.vitals.LCP)})`,
-        suggestion: `Audit ${page.path} for large images, render-blocking resources, or slow data fetching.`,
+        issue: `${sanitizeSlackPlainText(page.path, 255)} has poor LCP (${formatMs(page.vitals.LCP)})`,
+        suggestion: `Audit ${sanitizeSlackPlainText(page.path, 255)} for large images, render-blocking resources, or slow data fetching.`,
       });
     }
   }
@@ -243,7 +246,7 @@ function generateSuggestions(vitals, pageViews, regressions) {
   });
 }
 
-function buildSlackMessage(data) {
+export function buildSlackMessage(data) {
   const {
     vitals,
     traffic,
@@ -330,14 +333,14 @@ function buildSlackMessage(data) {
   if (topPages?.data?.length > 0) {
     const pagesText = topPages.data
       .slice(0, 5)
-      .map((p, i) => `${i + 1}. \`${p.path}\` — ${formatNumber(p.views)} views`)
+      .map((p, i) => `${i + 1}. ${sanitizeSlackPlainText(p.path, 255)} — ${formatNumber(p.views)} views`)
       .join("\n");
 
     blocks.push({
       type: "section",
       text: {
-        type: "mrkdwn",
-        text: `*📄 Top Pages*\n${pagesText}`,
+        type: "plain_text",
+        text: `📄 Top Pages\n${pagesText}`,
       },
     });
   }
@@ -394,8 +397,8 @@ function buildSlackMessage(data) {
       blocks.push({
         type: "section",
         text: {
-          type: "mrkdwn",
-          text: `${priorityEmoji[suggestion.priority]} *${suggestion.area}*: ${suggestion.issue}\n_${suggestion.suggestion}_`,
+          type: "plain_text",
+          text: `${priorityEmoji[suggestion.priority]} ${sanitizeSlackPlainText(suggestion.area)}: ${sanitizeSlackPlainText(suggestion.issue)}\n${sanitizeSlackPlainText(suggestion.suggestion)}`,
         },
       });
     }

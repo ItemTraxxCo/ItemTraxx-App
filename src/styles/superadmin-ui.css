@@ -102,10 +102,10 @@
   justify-content: center;
   gap: 0.4rem;
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: var(--button-radius);
   background: transparent;
   color: var(--text);
-  padding: 0.45rem 0.85rem;
+  padding: 0.35rem 0.75rem;
   font-size: 0.85rem;
   font-weight: 600;
   font-family: inherit;

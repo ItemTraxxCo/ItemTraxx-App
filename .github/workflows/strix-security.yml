@@ -57,9 +57,10 @@ jobs:
           cat >> "$GITHUB_STEP_SUMMARY" <<'EOF'
           ## Strix PR scan temporarily paused
 
-          This required check is passing without running Strix while we address repeated multi-hour scans that end with incomplete coverage. Resume PR scans after the run completes reliably.
+          This required check cannot pass until Strix has completed a scan. PR scans are temporarily paused while we address repeated multi-hour scans that end with incomplete coverage.
           EOF
-          echo "::warning::Strix is temporarily paused for pull requests; this check did not scan the code."
+          echo "Strix is temporarily paused for pull requests; this check did not scan the code." >&2
+          exit 1
 
       # Full history lets Strix resolve the pull-request diff scope reliably.
       - name: Checkout

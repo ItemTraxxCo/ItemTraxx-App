@@ -954,12 +954,12 @@ describe("PostHog exception before_send", () => {
       event: "$pageview",
       properties: {
         $current_url:
-          "https://www.itemtraxx.com/invite?workspace=demo&code=one-time-code#next=/workspace&token=secret",
+          "https://www.itemtraxx.com/accept-invitation?workspace=demo&code=one-time-code#next=/workspace&token=secret",
       },
     }) as { properties: Record<string, unknown> } | null;
 
     expect(result?.properties).toEqual({
-      $current_url: "https://www.itemtraxx.com/invite?workspace=demo#next=%2Fworkspace",
+      $current_url: "https://www.itemtraxx.com/accept-invitation?workspace=demo#next=%2Fworkspace",
     });
   });
 });

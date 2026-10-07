@@ -1,6 +1,90 @@
 import { assertEquals, assertNotEquals } from "https://deno.land/std@0.224.0/assert/mod.ts";
 import { normalizeBetterAuthCaptchaRequest } from "./authCaptcha.ts";
-import { resolveSsoActor, sanitizeSsoProvider } from "./auth.ts";
+import {
+  hasRecentSuperAdminPasswordConfirmation,
+  isBetterAuthPasskeyEnrollmentPath,
+  isFreshActionConfirmationTimestamp,
+  isActiveLinkedBetterAuthProfile,
+  organizationLogoObjectPath,
+  resolveSsoActor,
+  sanitizeSsoProvider,
+} from "./auth.ts";
+
+Deno.test("organization logo replacements reuse one R2 object per organization", () => {
+  const first = organizationLogoObjectPath("workspace-1");
+  const replacement = organizationLogoObjectPath("workspace-1");
+  assertEquals(first, replacement);
+});
+
+Deno.test("only passkey enrollment endpoints use the fresh-confirmation guard", () => {
+  assertEquals(isBetterAuthPasskeyEnrollmentPath("/passkey/generate-register-options"), true);
+  assertEquals(isBetterAuthPasskeyEnrollmentPath("/passkey/verify-registration"), true);
+  assertEquals(isBetterAuthPasskeyEnrollmentPath("/passkey/generate-authenticate-options"), false);
+});
+
+Deno.test("super-admin password confirmation must be fresh and bound to the existing session", async () => {
+  const nowMs = Date.now();
+  const filters: Array<[string, unknown]> = [];
+  const query = {
+    select: (_columns: string) => query,
+    eq: (column: string, value: unknown) => {
+      filters.push([column, value]);
+      return query;
+    },
+    maybeSingle: async () => ({
+      data: {
+        updated_at: new Date(nowMs).toISOString(),
+        issued_by: "super_admin_settings_password",
+      },
+      error: null,
+    }),
+  };
+  const dataClient = {
+    schema: (schema: string) => {
+      assertEquals(schema, "public");
+      return dataClient;
+    },
+    from: (table: string) => {
+      assertEquals(table, "privileged_session_stepups");
+      return query;
+    },
+  };
+
+  assertEquals(
+    await hasRecentSuperAdminPasswordConfirmation(
+      dataClient as never,
+      "profile-1",
+      "session-current",
+      nowMs,
+    ),
+    true,
+  );
+  assertEquals(filters, [
+    ["user_id", "profile-1"],
+    ["role_scope", "super_admin"],
+    ["binding_key", "session:session-current"],
+    ["issued_by", "super_admin_settings_password"],
+  ]);
+});
+
+Deno.test("super-admin password confirmation rejects stale timestamps", () => {
+  const nowMs = Date.now();
+  assertEquals(
+    isFreshActionConfirmationTimestamp(
+      new Date(nowMs - 5 * 60 * 1000).toISOString(),
+      nowMs,
+    ),
+    true,
+  );
+  assertEquals(
+    isFreshActionConfirmationTimestamp(
+      new Date(nowMs - 5 * 60 * 1000 - 1).toISOString(),
+      nowMs,
+    ),
+    false,
+  );
+  assertEquals(isFreshActionConfirmationTimestamp("invalid", nowMs), false);
+});
 
 Deno.test("promotes a form captcha field to Better Auth's header", async () => {
   const request = new Request("https://edge.itemtraxx.com/api/auth/sign-in/email", {
@@ -48,6 +132,29 @@ Deno.test("sanitizes SSO provider configuration before returning it to the brows
   assertEquals(sanitized.samlConfig, {});
   assertEquals("private-secret" in sanitized, false);
   assertEquals("private-key" in sanitized, false);
+});
+
+Deno.test("linked Better Auth profile gate permits only active, undeleted profiles", async () => {
+  for (const [profile, expected] of [
+    [{ id: "profile-1", is_active: true, deleted_at: null }, true],
+    [{ id: "profile-1", is_active: false, deleted_at: null }, false],
+    [{ id: "profile-1", is_active: true, deleted_at: "2026-10-03T00:00:00Z" }, false],
+    [null, false],
+  ] as const) {
+    const query = {
+      select: (_columns: string) => query,
+      eq: (_column: string, _value: string) => query,
+      maybeSingle: async () => ({ data: profile, error: null }),
+    };
+    const client = {
+      schema: (_schema: string) => client,
+      from: (_table: string) => query,
+    };
+    assertEquals(
+      await isActiveLinkedBetterAuthProfile(client as never, "better-auth-user-1"),
+      expected,
+    );
+  }
 });
 
 Deno.test("resolves the SSO workspace without relying on a renamed foreign-key constraint", async () => {

@@ -35,164 +35,67 @@ test.describe("Public surfaces", () => {
     { label: "desktop", width: 1280, height: 900 },
     { label: "mobile", width: 390, height: 844 },
   ] as const) {
-    test(`canonical landing preserves its semantic, image, and responsive contracts on ${viewport.label}`, async ({ page }) => {
+    test("canonical landing preserves the active design and responsive contracts on " + viewport.label, async ({ page }) => {
       await page.setViewportSize(viewport);
-      await page.addInitScript(() => {
-        Math.random = () => 0;
-      });
       await page.goto("/");
-      await expect(page.getByRole("heading", { name: "ItemTraxx", exact: true })).toBeVisible();
 
-      const headings = await page.getByRole("heading").evaluateAll((elements) =>
-        elements.map((element) => ({
-          level: Number(element.tagName.slice(1)),
-          name: element.textContent?.trim() ?? "",
-        })),
-      );
-      expect(headings).toEqual([
-        { level: 1, name: "ItemTraxx" },
-        { level: 2, name: "Simple inventory tracking without spreadsheet headaches." },
-        { level: 2, name: "Simple UI keeps everything minimal, sleek, and easy to navigate." },
-        { level: 3, name: "Management workflows without the spreadsheet sprawl." },
-        { level: 3, name: "Master your inventory." },
-        { level: 3, name: "Built for teams, organizations, and individual users." },
-        { level: 2, name: "Answers to the common stuff." },
-        { level: 2, name: "Get started with ItemTraxx and advance your inventory management." },
-        { level: 2, name: "Cookie preferences" },
-      ]);
+      const hero = page.locator("section#comparison");
+      await expect(hero.getByRole("heading", { level: 1, name: "Inventory Tracking Made Simple" })).toBeVisible();
+      await expect(hero.getByRole("heading", { level: 2, name: "Just the way it should be." })).toBeVisible();
+      await expect(page.locator("#workflow .what-row")).toHaveCount(3);
+      await expect(page.locator("#before-after")).toBeVisible();
+      await expect(page.locator("#platform")).toBeVisible();
 
-      const primaryNav = page.getByRole("navigation", { name: "Primary" });
-      await expect(primaryNav.getByRole("link", { name: "Pricing", exact: true })).toHaveAttribute("href", "/pricing");
-      await expect(primaryNav.getByRole("link", { name: "Support", exact: true })).toHaveAttribute("href", "/contact-support");
-      await expect(primaryNav.getByRole("link", { name: "Open system status page" })).toHaveAttribute("href", "https://status.itemtraxx.com/");
-      await expect(primaryNav.getByRole("link", { name: "Open system status page" })).toHaveAttribute("target", "_blank");
-      await expect(primaryNav.getByRole("link", { name: "Open system status page" })).toHaveAttribute("rel", "noreferrer");
-      await expect(primaryNav.getByRole("link", { name: "Login", exact: true })).toHaveAttribute("href", "/login");
-
-      const hero = page.locator("section.hero-grid");
+      const primaryNav = page.locator(".main-nav");
+      await expect(primaryNav.locator('a[href="/pricing"]')).toHaveAttribute("href", "/pricing");
+      await expect(primaryNav.locator('a[href="/contact-support"]')).toHaveAttribute("href", "/contact-support");
+      const statusLink = primaryNav.locator(".status-link");
+      await expect(statusLink).toHaveAttribute("href", "https://status.itemtraxx.com/");
+      await expect(statusLink).toHaveAttribute("target", "_blank");
+      await expect(statusLink).toHaveAttribute("rel", "noreferrer");
+      await expect(page.locator("header").getByRole("link", { name: "Login", exact: true })).toHaveAttribute("href", "/login");
+      await expect(hero.getByRole("link", { name: "Get a demo", exact: true })).toHaveAttribute("href", "/request-demo");
       await expect(hero.getByRole("link", { name: "Pricing", exact: true })).toHaveAttribute("href", "/pricing");
-      await expect(hero.getByRole("link", { name: "Request Demo", exact: true })).toHaveAttribute("href", "/request-demo");
-      await expect(hero.getByRole("list", { name: "Key product benefits" }).getByRole("listitem")).toHaveCount(6);
 
-      const images = page.locator("main img");
-      await expect(images).toHaveCount(2);
-      await expect(images.nth(0)).toHaveAttribute("alt", "Checkout and return interface preview");
-      await expect(images.nth(0)).toHaveAttribute("src", /checkout_return_ui\.png$/);
-      await expect(images.nth(0)).toHaveAttribute("loading", "lazy");
-      await expect(images.nth(0)).toHaveAttribute("decoding", "async");
-      await expect(images.nth(0)).toHaveAttribute("width", "1600");
-      await expect(images.nth(0)).toHaveAttribute("height", "810");
-      await expect(images.nth(1)).toHaveAttribute("alt", "Admin interface preview");
-      await expect(images.nth(1)).toHaveAttribute("src", /admin_ui\.png$/);
-      await expect(images.nth(1)).toHaveAttribute("loading", "lazy");
-      await expect(images.nth(1)).toHaveAttribute("decoding", "async");
-      await expect(images.nth(1)).toHaveAttribute("width", "1600");
-      await expect(images.nth(1)).toHaveAttribute("height", "934");
-      const imageSources = page.locator("main picture source");
-      await expect(imageSources.nth(0)).toHaveAttribute("type", "image/webp");
-      await expect(imageSources.nth(0)).toHaveAttribute("sizes", "(max-width: 900px) 92vw, 640px");
-      await expect(imageSources.nth(0)).toHaveAttribute(
-        "srcset",
-        /checkout_return_ui-800\.webp 800w, .*checkout_return_ui-1200\.webp 1200w, .*checkout_return_ui-1600\.webp 1600w/,
-      );
-      await expect(imageSources.nth(1)).toHaveAttribute("type", "image/webp");
-      await expect(imageSources.nth(1)).toHaveAttribute("sizes", "(max-width: 900px) 92vw, 700px");
-      await expect(imageSources.nth(1)).toHaveAttribute(
-        "srcset",
-        /admin_ui-800\.webp 800w, .*admin_ui-1200\.webp 1200w, .*admin_ui-1600\.webp 1600w/,
-      );
+      const image = page.locator(".comparison .checkout-image img");
+      await expect(image).toHaveAttribute("alt", "ItemTraxx checkout and return screen showing borrower details, checked-out items and checkout controls");
+      await expect(image).toHaveAttribute("width", "1600");
+      await expect(image).toHaveAttribute("height", "1035");
+      await expect(image).toHaveAttribute("srcset", /800w/);
 
-      const faqToggle = page.getByRole("button", { name: "How quickly can I get started?" });
-      const faqAnswer = page.locator("#landing-new-faq-answer-0");
-      await expect(faqToggle).toHaveAttribute("id", "landing-new-faq-toggle-0");
-      await expect(faqToggle).toHaveAttribute("aria-controls", "landing-new-faq-answer-0");
-      await expect(faqToggle).toHaveAttribute("aria-expanded", "false");
-      await expect(faqAnswer).toHaveAttribute("role", "region");
-      await expect(faqAnswer).toHaveAttribute("aria-labelledby", "landing-new-faq-toggle-0");
-      await faqToggle.click();
-      await expect(faqToggle).toHaveAttribute("aria-expanded", "true");
-      await expect(faqAnswer).toHaveClass(/is-open/);
-      await expect(faqAnswer).toContainText("You can get started with ItemTraxx fast.");
-      await faqToggle.click();
-      await expect(faqToggle).toHaveAttribute("aria-expanded", "false");
-      await expect(faqAnswer).not.toHaveClass(/is-open/);
-
-      const finalCta = page.locator("section.final-strip");
-      await expect(finalCta.getByRole("link", { name: "Go to Login" })).toHaveAttribute("href", "/login");
-      await expect(finalCta.getByRole("link", { name: "Pricing", exact: true })).toHaveAttribute("href", "/pricing");
+      const finalCta = page.locator("section.final-cta");
+      await expect(finalCta.getByRole("link", { name: "Get a demo", exact: true })).toHaveAttribute("href", "/request-demo");
+      await expect(finalCta.getByRole("link", { name: "Explore pricing", exact: true })).toHaveAttribute("href", "/pricing");
       const footer = page.locator("footer.public-footer");
       await expect(footer.getByRole("link", { name: "Contact Support" })).toHaveAttribute("href", "/contact-support");
       await expect(footer.getByRole("link", { name: "Status", exact: true })).toHaveAttribute("href", "https://status.itemtraxx.com/");
 
-      const responsiveContract = await page.evaluate(() => {
-        const styles = (selector: string) => getComputedStyle(document.querySelector(selector) as HTMLElement);
-        return {
-          heroColumns: styles(".hero-grid").gridTemplateColumns.split(" ").length,
-          opsColumns: styles(".ops-grid").gridTemplateColumns.split(" ").length,
-          heroPadding: styles(".hero-copy").padding,
-          heroRadius: styles(".hero-copy").borderRadius,
-          headerDirection: styles(".landing-header").flexDirection,
-          navOverflow: styles(".landing-nav").overflowX,
-        };
-      });
-      expect(responsiveContract).toEqual(
-        viewport.label === "desktop"
-          ? {
-              heroColumns: 2,
-              opsColumns: 3,
-              heroPadding: "48px",
-              heroRadius: "28px",
-              headerDirection: "row",
-              navOverflow: "visible",
-            }
-          : {
-              heroColumns: 1,
-              opsColumns: 1,
-              heroPadding: "19.2px",
-              heroRadius: "22px",
-              headerDirection: "row",
-              navOverflow: "auto",
-            },
-      );
+      const responsiveContract = await page.evaluate(() => ({
+        comparisonColumns: getComputedStyle(document.querySelector(".comparison") as HTMLElement).gridTemplateColumns.split(" ").length,
+        workflowColumns: getComputedStyle(document.querySelector(".what-row") as HTMLElement).gridTemplateColumns.split(" ").length,
+        documentWidth: document.documentElement.scrollWidth,
+        viewportWidth: document.documentElement.clientWidth,
+      }));
+      expect(responsiveContract.comparisonColumns).toBe(viewport.label === "desktop" ? 3 : 1);
+      expect(responsiveContract.workflowColumns).toBe(viewport.label === "desktop" ? 3 : 2);
+      expect(responsiveContract.documentWidth).toBeLessThanOrEqual(responsiveContract.viewportWidth);
     });
   }
 
-  test("canonical page composes focused landing section boundaries without moving integrations", async () => {
+  test("canonical page keeps status and product analytics behind shared facades", async () => {
     const pageSource = await readFile(
       new URL("../../src/pages/LandingPageNew.vue", import.meta.url),
       "utf8",
     );
-    const sectionNames = [
-      "LandingHeader",
-      "LandingHero",
-      "LandingShowcase",
-      "LandingFeatureSections",
-      "LandingFaq",
-      "LandingFinalCta",
-    ];
-
-    for (const sectionName of sectionNames) {
-      expect(pageSource).toContain(`../components/landing/${sectionName}.vue`);
-    }
+    expect(pageSource).toContain('import { useSystemStatus } from "../composables/useSystemStatus"');
     expect(pageSource).toContain('import { trackProductEvent } from "../services/productEvents"');
-    expect(pageSource).toContain("const openFaqIndex = ref<number | null>(null)");
-    expect(pageSource).not.toContain('<header class="landing-header shell">');
-    expect(pageSource).not.toContain('<section class="feature-band reveal reveal-up">');
-    expect(pageSource).not.toContain('<section class="faq-section reveal reveal-up">');
-    expect(pageSource).not.toContain('<section class="final-strip reveal reveal-up">');
-
-    const sectionSources = await Promise.all(
-      sectionNames.map((sectionName) =>
-        readFile(
-          new URL(`../../src/components/landing/${sectionName}.vue`, import.meta.url),
-          "utf8",
-        ),
-      ),
-    );
-    for (const sectionSource of sectionSources) {
-      expect(sectionSource).not.toMatch(/from ["']vue-router["']/);
-      expect(sectionSource).not.toMatch(/from ["'][^"']*(?:services|stores?|auth)[^"']*["']/);
-    }
+    expect(pageSource).toContain('name: "landing_new_cta_click"');
+    expect(pageSource).toContain('name: "landing_cta_clicked"');
+    expect(pageSource).not.toMatch(/from ["'][^"']*(?:analyticsService|posthogService|systemStatusService)[^"']*["']/);
+    expect(pageSource).toContain('id="comparison"');
+    expect(pageSource).toContain('id="workflow"');
+    expect(pageSource).toContain('id="before-after"');
+    expect(pageSource).toContain('id="platform"');
   });
 
   test("shared public footers render the current year with identical link contracts", async ({ page }) => {
@@ -215,14 +118,20 @@ test.describe("Public surfaces", () => {
     await page.goto("/");
     const canonicalFooter = await footerContract();
 
-    await page.goto("/landing-new2");
+    await page.goto("/landing-new");
     expect(await footerContract()).toEqual(canonicalFooter);
+  });
+
+  test("the removed landing-new2 URL redirects to the active landing page", async ({ page }) => {
+    await page.goto("/landing-new2");
+    await expect(page).toHaveURL(/\/landing-new$/);
+    await expect(page.getByRole("heading", { name: "Inventory Tracking Made Simple" })).toBeVisible();
   });
 
   test("the canonical landing demo CTA navigates to the demo request", async ({ page }) => {
     await page.goto("/");
 
-    await page.locator("main").getByRole("link", { name: "Request Demo", exact: true }).click();
+    await page.locator("main").getByRole("link", { name: "Get a demo", exact: true }).first().click();
 
     await expect(page).toHaveURL(/\/request-demo$/);
     await expect(page.getByRole("heading", { name: "Request a Demo" })).toBeVisible();
@@ -256,15 +165,15 @@ test.describe("Public surfaces", () => {
     const ctas = [
       { locator: page.locator("header").getByRole("link", { name: "Login", exact: true }), destination: "/login" },
       { locator: page.locator(".hero-actions").getByRole("link", { name: "Pricing", exact: true }), destination: "/pricing" },
-      { locator: page.locator(".hero-actions").getByRole("link", { name: "Request Demo", exact: true }), destination: "/request-demo" },
-      { locator: page.locator(".final-actions").getByRole("link", { name: "Go to Login" }), destination: "/login" },
-      { locator: page.locator(".final-actions").getByRole("link", { name: "Pricing", exact: true }), destination: "/pricing" },
+      { locator: page.locator(".hero-actions").getByRole("link", { name: "Get a demo", exact: true }), destination: "/request-demo" },
+      { locator: page.locator(".final-cta-actions").getByRole("link", { name: "Get a demo", exact: true }), destination: "/request-demo" },
+      { locator: page.locator(".final-cta-actions").getByRole("link", { name: "Explore pricing", exact: true }), destination: "/pricing" },
     ];
     for (const { locator, destination } of ctas) {
       await locator.click();
       await expect(page).toHaveURL(new RegExp(`${destination}$`));
       await page.goBack();
-      await expect(page.getByRole("heading", { name: "ItemTraxx", exact: true })).toBeVisible();
+      await expect(page.getByRole("heading", { name: "Inventory Tracking Made Simple", exact: true })).toBeVisible();
     }
 
     await expect.poll(() => page.evaluate(() =>
@@ -279,97 +188,18 @@ test.describe("Public surfaces", () => {
         { name: "landing_new_cta_click", properties: { cta: "login", location: "header" } },
         { name: "landing_new_cta_click", properties: { cta: "pricing", location: "hero" } },
         { name: "landing_new_cta_click", properties: { cta: "demo", location: "hero" } },
-        { name: "landing_new_cta_click", properties: { cta: "login", location: "final" } },
+        { name: "landing_new_cta_click", properties: { cta: "demo", location: "final" } },
         { name: "landing_new_cta_click", properties: { cta: "pricing", location: "final" } },
       ],
       posthog: [
         { name: "landing_cta_clicked", properties: { cta: "login", location: "header" } },
         { name: "landing_cta_clicked", properties: { cta: "pricing", location: "hero" } },
         { name: "landing_cta_clicked", properties: { cta: "demo", location: "hero" } },
-        { name: "landing_cta_clicked", properties: { cta: "login", location: "final" } },
+        { name: "landing_cta_clicked", properties: { cta: "demo", location: "final" } },
         { name: "landing_cta_clicked", properties: { cta: "pricing", location: "final" } },
       ],
     });
   });
-
-  for (const contract of [
-    {
-      path: "/landing-new2",
-      linkName: "Request Demo",
-      destination: "/request-demo",
-      analytics: {
-        name: "landing_new2_cta_click",
-        properties: { cta: "demo", location: "hero" },
-      },
-      posthog: {
-        name: "landing_cta_clicked",
-        properties: { cta: "demo", location: "hero", page: "landing-new2" },
-      },
-    },
-    {
-      path: "/landing-old",
-      linkName: "Pricing",
-      destination: "/pricing",
-      analytics: {
-        name: "landing_cta_click",
-        properties: { cta: "view_pricing", location: "hero" },
-      },
-      posthog: null,
-    },
-  ] as const) {
-    test(`${contract.path} lazily preserves its provider-specific CTA event contract`, async ({ page }) => {
-      const requestedTelemetryFacades: string[] = [];
-      await page.route(/\/src\/services\/(analyticsService|posthogService)\.ts(?:\?.*)?$/, async (route) => {
-        const service = route.request().url().includes("posthogService") ? "posthog" : "analytics";
-        requestedTelemetryFacades.push(service);
-        await route.fulfill({
-          status: 200,
-          contentType: "application/javascript",
-          body:
-            service === "analytics"
-              ? `export const trackAnalyticsEvent = async (name, properties) => {
-                  window.__productEventDeliveries ??= { analytics: [], posthog: [] };
-                  window.__productEventDeliveries.analytics.push({ name, properties });
-                };`
-              : `export const capturePostHogEvent = (name, properties) => {
-                  window.__productEventDeliveries ??= { analytics: [], posthog: [] };
-                  window.__productEventDeliveries.posthog.push({ name, properties });
-                };`,
-        });
-      });
-      await page.addInitScript(() => {
-        Object.defineProperty(window, "__productEventDeliveries", {
-          configurable: true,
-          value: { analytics: [], posthog: [] },
-          writable: true,
-        });
-      });
-
-      await page.goto(contract.path);
-      const cta = page.locator("main").getByRole("link", { name: contract.linkName, exact: true }).first();
-      await expect(cta).toBeVisible();
-      expect(requestedTelemetryFacades).toEqual([]);
-
-      await cta.click();
-      await expect(page).toHaveURL(new RegExp(`${contract.destination}$`));
-      await expect.poll(() =>
-        page.evaluate(() =>
-          (window as Window & {
-            __productEventDeliveries?: {
-              analytics: Array<{ name: string; properties: Record<string, unknown> }>;
-              posthog: Array<{ name: string; properties: Record<string, unknown> }>;
-            };
-          }).__productEventDeliveries,
-        ),
-      ).toEqual({
-        analytics: [contract.analytics],
-        posthog: contract.posthog ? [contract.posthog] : [],
-      });
-      expect(requestedTelemetryFacades.sort()).toEqual(
-        contract.posthog ? ["analytics", "posthog"] : ["analytics"],
-      );
-    });
-  }
 
   test("loads public status without contacting Supabase directly", async ({ page }) => {
     const requestedUrls: string[] = [];
@@ -428,7 +258,7 @@ test.describe("Public surfaces", () => {
     expect(statusRequestCount).toBeLessThanOrEqual(3);
   });
 
-  test("keeps the landing-new2 checking copy until initial status settles", async ({ page }) => {
+  test("keeps the landing status checking copy until initial status settles", async ({ page }) => {
     let releaseInitialRequest = () => {};
     const initialRequestGate = new Promise<void>((resolve) => {
       releaseInitialRequest = resolve;
@@ -442,14 +272,14 @@ test.describe("Public surfaces", () => {
       });
     });
 
-    await page.goto("/landing-new2");
-    const statusLink = page.getByRole("link", { name: "Open ItemTraxx system status" });
+    await page.goto("/");
+    const statusLink = page.getByRole("link", { name: "Open system status page" });
     await expect(statusLink).toContainText("Checking");
-    await expect(statusLink.locator(".lp-status__dot")).toHaveClass(/status-unknown/);
+    await expect(statusLink.locator(".status-dot")).toHaveClass(/status-unknown/);
 
     releaseInitialRequest();
     await expect(statusLink).toContainText("Running");
-    await expect(statusLink.locator(".lp-status__dot")).toHaveClass(/status-ok/);
+    await expect(statusLink.locator(".status-dot")).toHaveClass(/status-ok/);
   });
 
   test("shares one system status lifecycle across retained landing routes", async ({ page }) => {
@@ -548,7 +378,7 @@ test.describe("Public surfaces", () => {
         get: () => statusLifecycleVisibilityListeners.size,
       });
     });
-    const activeStatusIntervalCount = () =>
+    const activeFiveMinuteIntervalCount = () =>
       page.evaluate(
         () =>
           (window as Window & { __activeSystemStatusIntervals?: number })
@@ -587,7 +417,8 @@ test.describe("Public surfaces", () => {
       "Running",
     );
     expect(statusRequestCount).toBe(1);
-    await expect.poll(activeStatusIntervalCount).toBe(1);
+    // App status polling and the offline-pack refresh share the five-minute cadence.
+    await expect.poll(activeFiveMinuteIntervalCount).toBe(2);
     // Version, offline queue, admin session, PostHog, status, and the two
     // consent observers own distinct lifecycles.
     await expect.poll(activeVisibilityListenerCount).toBe(7);
@@ -595,32 +426,26 @@ test.describe("Public surfaces", () => {
     await page.clock.fastForward(10_001);
     await setVisibility("hidden");
     expect(statusRequestCount).toBe(1);
-    await expect.poll(activeStatusIntervalCount).toBe(0);
+    await expect.poll(activeFiveMinuteIntervalCount).toBe(1);
     await expect.poll(activeVisibilityListenerCount).toBe(7);
     await expect.poll(statusLifecycleVisibilityListenerCount).toBe(1);
     await setVisibility("visible");
     await expect.poll(() => statusRequestCount).toBe(2);
-    await expect.poll(activeStatusIntervalCount).toBe(1);
+    await expect.poll(activeFiveMinuteIntervalCount).toBe(2);
     await expect.poll(activeVisibilityListenerCount).toBe(7);
     await expect.poll(statusLifecycleVisibilityListenerCount).toBe(1);
 
     await page.clock.fastForward(100_000);
-    await navigateWithinApp("/landing-old");
-    await expect.poll(activeStatusIntervalCount).toBe(1);
+    await navigateWithinApp("/landing-new");
+    await expect.poll(activeFiveMinuteIntervalCount).toBe(2);
     await expect.poll(activeVisibilityListenerCount).toBe(7);
     await expect.poll(statusLifecycleVisibilityListenerCount).toBe(1);
     await page.clock.fastForward(300_000);
     await expect.poll(() => statusRequestCount).toBe(3);
 
-    await navigateWithinApp("/landing-new2");
-    await expect.poll(activeStatusIntervalCount).toBe(1);
-    await expect.poll(activeVisibilityListenerCount).toBe(7);
-    await expect.poll(statusLifecycleVisibilityListenerCount).toBe(1);
-    await page.clock.fastForward(300_000);
-    await expect.poll(() => statusRequestCount).toBe(4);
   });
 
-  for (const path of ["/landing-old", "/login"]) {
+  for (const path of ["/login"]) {
     test(`${path} does not prefetch authenticated routes after the delayed idle window`, async ({ page }) => {
       const responseUrls: string[] = [];
       page.on("response", (response) => responseUrls.push(response.url()));

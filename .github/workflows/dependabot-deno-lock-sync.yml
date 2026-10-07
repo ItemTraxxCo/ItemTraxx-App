@@ -1,31 +1,10 @@
 name: Deno Lock Sync
 
 # Any npm dependency bump (Dependabot or manual) touches package.json /
-# package-lock.json but never deno.lock, so the `deno check --frozen` steps
-# in CI fail. This workflow regenerates deno.lock to match and commits
-# it back — on Dependabot PRs, human PRs, and direct pushes to any branch.
-#
-# Push uses a fine-grained PAT (secret ITX_DEPENDABOT_PAT, Contents:
-# read/write on this repo). A PAT is required because:
-#   - Dependabot `pull_request` runs only see Dependabot secrets, not Actions secrets.
-#   - Pushes made with the default GITHUB_TOKEN cannot re-trigger CI, so the
-#     final commit would sit with no passing checks. A PAT push re-triggers CI,
-#     which then passes because the lock is in sync.
-#
-# Loop-safe: the bot's own commit only touches deno.lock, never package.json/
-# package-lock.json, so it never re-triggers this workflow's path filter.
-#
-# Safe by construction: `deno install --lockfile-only` resolves registry
-# metadata without running any install/postinstall scripts or executing
-# package code.
-#
-# Fork PRs are excluded (job `if` below): this checks out the PR head with a
-# write-scoped PAT and pushes back to it. For a same-repo branch that's fine
-# (only org members can push branches here). For a fork PR, the head repo is
-# attacker-controlled — checking it out and pushing with our PAT would hand
-# a write-capable credential's actions to that content. Fork PRs still get
-# CI's frozen-lockfile failure as a signal; a maintainer can push the
-# branch or re-run manually to sync it.
+# package-lock.json but may not update deno.lock. This workflow verifies the
+# generated Deno lock and fails with a diff when a maintainer must refresh it.
+# It does not push or commit: repository automation cannot satisfy this
+# project's local SSH-signing policy without the signing key.
 
 permissions:
   contents: read
@@ -46,7 +25,7 @@ concurrency:
 
 jobs:
   sync:
-    # Skip fork PRs — see note above. Same-repo PRs and direct pushes proceed.
+    # Fork branches are not present in the base repository checkout.
     if: ${{ github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -56,8 +35,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.head_ref || github.ref_name }}
-          token: ${{ secrets.ITX_DEPENDABOT_PAT }}
-          persist-credentials: true
+          persist-credentials: false
 
       - name: Setup Deno
         uses: denoland/setup-deno@22d081ff2d3a40755e97629de92e3bcbfa7cf2ed # v2.0.5
@@ -75,20 +53,21 @@ jobs:
         run: deno install --lockfile-only --min-dep-age=0
 
       - name: Verify deno.lock is now in sync
-        # Fail loudly if the lock still does not match package.json (e.g. a resolution
-        # deno could not satisfy), instead of committing an out-of-date lock.
         run: deno install --lockfile-only --frozen --min-dep-age=0
 
-      - name: Commit and push if deno.lock changed
-        env:
-          HEAD_REF: ${{ github.head_ref || github.ref_name }}
+      - name: Require a signed lockfile update
         run: |
           if git diff --quiet -- deno.lock; then
             echo "deno.lock already in sync — nothing to commit."
             exit 0
           fi
-          git config user.name "itemtraxx-deno-lock-sync[bot]"
-          git config user.email "deno-lock-sync@itemtraxx.com"
-          git add deno.lock
-          git commit -m "chore(deps): sync deno.lock with npm bump"
-          git push origin "HEAD:$HEAD_REF"
+          {
+            echo "### Deno lockfile needs a signed update"
+            echo
+            echo "Run `deno install --lockfile-only --min-dep-age=0`, review the resulting `deno.lock`, and commit it with the repository's local SSH signing key."
+            echo
+            echo '```diff'
+            git diff -- deno.lock
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit 1

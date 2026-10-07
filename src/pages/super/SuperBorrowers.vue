@@ -47,7 +47,7 @@
         <button type="button" class="sa-btn" @click="exportPdf">Export PDF</button>
       </div>
       <SkeletonLoader v-if="isLoading" variant="table" :rows="6" :columns="4" label="Loading all borrowers" />
-      <p v-else-if="error" class="sa-error">{{ error }}</p>
+      <p v-else-if="error" class="sa-error" v-app-toast-error>{{ error }}</p>
       <div v-else class="sa-table-wrap">
         <table class="sa-table">
           <thead><tr><th>Username</th><th>Workspace</th><th>Borrower ID</th><th>Actions</th></tr></thead>

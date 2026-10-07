@@ -2,7 +2,7 @@
   <main class="page admin-shell">
     <header class="admin-hero">
       <div class="page-nav-left">
-        <RouterLink class="button-link" to="/admin">Return to workspace home</RouterLink>
+        <RouterLink class="button-link" to="/admin">Back</RouterLink>
       </div>
       <h1>Account Settings</h1>
       <p class="admin-hero-copy">Manage security and active sessions for your account.</p>
@@ -19,6 +19,8 @@
       </div>
     </header>
 
+    <OfflinePackSettings />
+
     <section class="card admin-section-card">
       <div class="admin-section-header">
         <div>
@@ -28,7 +30,7 @@
         <button type="button" :disabled="isLoading" @click="loadSessions">Reload</button>
       </div>
 
-      <p v-if="sessionError" class="error" role="alert">{{ sessionError }}</p>
+      <p v-if="sessionError" class="error" role="alert" v-app-toast-error="{ suppressMessage: toastMessage }">{{ sessionError }}</p>
       <p v-if="sessionSuccess" class="success" role="status">{{ sessionSuccess }}</p>
 
       <div class="table-wrap">
@@ -123,6 +125,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from "vue";
 import { RouterLink } from "vue-router";
+import OfflinePackSettings from "../../../components/OfflinePackSettings.vue";
 import { toUserFacingErrorMessage } from "../../../services/appErrors";
 import {
   listAccountSessions,

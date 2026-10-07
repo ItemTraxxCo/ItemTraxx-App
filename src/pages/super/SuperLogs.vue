@@ -54,7 +54,7 @@
         <BoneyardTableFixture :headers="logFixtureHeaders" :rows="7" />
       </div>
       <template v-else>
-        <p v-if="error" class="sa-error">{{ error }}</p>
+        <p v-if="error" class="sa-error" v-app-toast-error>{{ error }}</p>
         <div v-else class="sa-table-wrap">
           <table class="sa-table">
             <thead><tr><th>Time</th><th>Workspace</th><th>Action</th><th>Item</th><th>Borrower</th></tr></thead>

@@ -1,5 +1,7 @@
 import { useRouter } from "vue-router";
 
+import { showAppToast } from "../store/appToast";
+
 export const useLogout = () => {
   const router = useRouter();
 
@@ -11,7 +13,7 @@ export const useLogout = () => {
     const nextUrl = getPostSignOutUrl();
     const result = await signOut();
     if (!result.ok) {
-      window.alert("Unable to complete logout. Please try again.");
+      showAppToast("Sign out failed", "Unable to complete logout. Please try again.");
       return true;
     }
     if (nextUrl.startsWith("http")) window.location.assign(nextUrl);

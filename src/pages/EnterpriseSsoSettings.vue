@@ -221,7 +221,7 @@
       </article>
     </section>
 
-    <p v-if="message" class="form-message" :class="error ? 'error' : 'success-message'" :role="error ? 'alert' : 'status'" v-app-toast-error="error">{{ message }}</p>
+    <p v-if="message" class="form-message" :class="error ? 'error' : 'success-message'" :role="error ? 'alert' : 'status'" v-app-toast-message="{ kind: error ? 'error' : 'success' }">{{ message }}</p>
   </main>
 </template>
 

@@ -171,7 +171,7 @@
         </button>
       </div>
       <p v-if="sessionError" class="error" v-app-toast-error>{{ sessionError }}</p>
-      <p v-if="sessionSuccess" class="success">{{ sessionSuccess }}</p>
+      <p v-if="sessionSuccess" class="success" v-app-toast-message>{{ sessionSuccess }}</p>
     </section>
   </main>
 </template>

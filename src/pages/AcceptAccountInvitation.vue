@@ -25,7 +25,7 @@
         </button>
       </form>
       <p v-if="error" class="error" role="alert" v-app-toast-error>{{ error }}</p>
-      <p v-if="success" class="success" role="status">
+      <p v-if="success" class="success" role="status" v-app-toast-message>
         Your account is ready. Sign in to continue.
       </p>
       <RouterLink v-if="success || !token" class="button-primary" to="/login">Go to Login</RouterLink>

@@ -30,7 +30,7 @@
       </div>
 
       <p v-if="error" class="error" role="alert" v-app-toast-error>{{ error }}</p>
-      <p v-if="message" class="success" role="status">{{ message }}</p>
+      <p v-if="message" class="success" role="status" v-app-toast-message>{{ message }}</p>
 
       <div class="table-wrap">
         <table class="table accounts-table">

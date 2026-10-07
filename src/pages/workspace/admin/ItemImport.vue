@@ -116,7 +116,7 @@
     </div>
 
     <p v-if="error" class="error" v-app-toast-error>{{ error }}</p>
-    <p v-if="success" class="success">{{ success }}</p>
+    <p v-if="success" class="success" v-app-toast-message="{ kind: success.startsWith('CSV loaded.') ? 'info' : 'success' }">{{ success }}</p>
   </div>
 </template>
 

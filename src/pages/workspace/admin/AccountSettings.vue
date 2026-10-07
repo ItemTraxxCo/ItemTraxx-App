@@ -31,7 +31,7 @@
       </div>
 
       <p v-if="sessionError" class="error" role="alert" v-app-toast-error="{ suppressMessage: toastMessage }">{{ sessionError }}</p>
-      <p v-if="sessionSuccess" class="success" role="status">{{ sessionSuccess }}</p>
+      <p v-if="sessionSuccess" class="success" role="status" v-app-toast-message>{{ sessionSuccess }}</p>
 
       <div class="table-wrap">
         <table class="table">

@@ -179,7 +179,7 @@
         </section>
 
         <p v-if="modalError" class="sa-error" v-app-toast-error>{{ modalError }}</p>
-        <p v-if="success" class="sa-notice">{{ success }}</p>
+        <p v-if="success" class="sa-notice" v-app-toast-message>{{ success }}</p>
 
         <div class="panel-actions">
           <button class="sa-btn primary" type="button" :disabled="isSaving" @click="saveRequest">

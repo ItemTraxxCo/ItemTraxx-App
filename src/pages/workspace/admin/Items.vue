@@ -68,7 +68,7 @@
         <button type="submit" class="button-primary" :disabled="isSaving">Add item</button>
       </form>
       <p v-if="error" class="error" v-app-toast-error="{ suppressMessage: toastMessage }">{{ error }}</p>
-      <p v-if="success" class="success">{{ success }}</p>
+      <p v-if="success" class="success" v-app-toast-message>{{ success }}</p>
     </div>
     <div v-if="toastMessage" class="toast">
       <div class="toast-title">{{ toastTitle }}</div>

@@ -3,7 +3,7 @@
     <section class="flow-panel">
       <p class="flow-kicker">Account Security</p>
       <h1>Email address change</h1>
-      <p v-if="message" class="success" role="status">{{ message }}</p>
+      <p v-if="message" class="success" role="status" v-app-toast-message>{{ message }}</p>
       <p v-if="error" class="error" role="alert" v-app-toast-error>{{ error }}</p>
       <template v-if="pendingFlow && !message">
         <p v-if="pendingFlow.step === 'approve'" class="muted">

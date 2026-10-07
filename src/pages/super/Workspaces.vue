@@ -34,7 +34,7 @@
       <button class="sa-btn" :disabled="loading" @click="load">Search</button>
     </section>
 
-    <p v-if="message" class="sa-notice" role="status">{{ message }}</p>
+    <p v-if="message" class="sa-notice" role="status" v-app-toast-message>{{ message }}</p>
     <p v-if="error" class="sa-error" role="alert" v-app-toast-error>{{ error }}</p>
 
     <div class="sa-table-wrap">

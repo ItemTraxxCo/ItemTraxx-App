@@ -52,7 +52,7 @@
       </table>
     </div>
 
-    <p v-if="success" class="sa-notice">{{ success }}</p>
+    <p v-if="success" class="sa-notice" v-app-toast-message>{{ success }}</p>
 
     <div v-if="selectedCustomer" class="sa-modal-backdrop" @click.self="closeCustomer">
       <section class="sa-modal" role="dialog" aria-modal="true" aria-labelledby="customer-details-title">

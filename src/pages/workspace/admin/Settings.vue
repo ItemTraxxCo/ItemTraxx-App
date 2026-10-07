@@ -76,7 +76,7 @@
         </div>
       </form>
       <p v-if="error" class="error" v-app-toast-error="{ suppressMessage: toastMessage }">{{ error }}</p>
-      <p v-if="success" class="success">{{ success }}</p>
+      <p v-if="success" class="success" v-app-toast-message>{{ success }}</p>
     </div>
 
     <div class="card admin-section-card">
@@ -166,7 +166,7 @@
         </button>
       </div>
       <p v-if="sessionError" class="error" v-app-toast-error="{ suppressMessage: toastMessage }">{{ sessionError }}</p>
-      <p v-if="sessionSuccess" class="success">{{ sessionSuccess }}</p>
+      <p v-if="sessionSuccess" class="success" v-app-toast-message>{{ sessionSuccess }}</p>
     </div>
 
     <div v-if="toastMessage" class="toast">

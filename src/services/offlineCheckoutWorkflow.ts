@@ -145,7 +145,9 @@ const ACTIVE_LEDGER_STATES = new Set<OfflineLedgerEntry["status"]>([
 ]);
 let automaticPackRefresh: Promise<OfflinePackRefreshResult> | null = null;
 let automaticPackRefreshWasForced = false;
+let automaticPackRefreshReportsProgress = true;
 let packPreparation: Promise<OfflineCheckoutPack> | null = null;
+let packPreparationReportsProgress = true;
 
 const isRetryableWorkflowStatus = (status: number) => status === 0 || status === 429 || status >= 500;
 
@@ -354,7 +356,7 @@ const currentScope = (): OfflineWorkflowScope => {
 };
 
 const reportOfflinePackPreparationProgress = (progress: OfflinePackPreparationProgress) => {
-  if (typeof window === "undefined") return;
+  if (typeof window === "undefined" || !packPreparationReportsProgress) return;
   window.dispatchEvent(new CustomEvent<OfflinePackPreparationProgress>(
     "itemtraxx:offline-pack-progress",
     { detail: progress },
@@ -562,10 +564,22 @@ const prepareOfflineCheckoutPackOnce = async () => {
   }
 };
 
-export const prepareOfflineCheckoutPack = () => {
+export const prepareOfflineCheckoutPack = (
+  options: { reportProgress?: boolean } = {},
+) => {
+  if (options.reportProgress !== false) {
+    // If an explicit download joins a quiet background refresh, make the
+    // in-flight preparation visible to the user who requested it.
+    automaticPackRefreshReportsProgress = true;
+    packPreparationReportsProgress = true;
+  }
   if (packPreparation) return packPreparation;
+  packPreparationReportsProgress = automaticPackRefresh
+    ? automaticPackRefreshReportsProgress
+    : options.reportProgress !== false;
   packPreparation = prepareOfflineCheckoutPackOnce().finally(() => {
     packPreparation = null;
+    packPreparationReportsProgress = true;
   });
   return packPreparation;
 };
@@ -582,7 +596,7 @@ export class OfflinePackDownloadCancelledError extends Error {
  * Callers may fire-and-forget this after a confirmed server mutation.
  */
 export const refreshOfflineCheckoutPackIfNeeded = (
-  options: { force?: boolean } = {},
+  options: { force?: boolean; reportProgress?: boolean } = {},
 ): Promise<OfflinePackRefreshResult> => {
   if (automaticPackRefresh) {
     if (!options.force || automaticPackRefreshWasForced) return automaticPackRefresh;
@@ -593,6 +607,7 @@ export const refreshOfflineCheckoutPackIfNeeded = (
   }
 
   automaticPackRefreshWasForced = !!options.force;
+  automaticPackRefreshReportsProgress = options.reportProgress !== false;
 
   automaticPackRefresh = (async () => {
     if (typeof navigator !== "undefined" && !navigator.onLine) {
@@ -622,11 +637,12 @@ export const refreshOfflineCheckoutPackIfNeeded = (
       return { refreshed: false, firstPreparation: false, skippedReason: "up_to_date" as const };
     }
 
-    await prepareOfflineCheckoutPack();
+    await prepareOfflineCheckoutPack({ reportProgress: automaticPackRefreshReportsProgress });
     return { refreshed: true, firstPreparation: !existingPack };
   })().finally(() => {
     automaticPackRefresh = null;
     automaticPackRefreshWasForced = false;
+    automaticPackRefreshReportsProgress = true;
   });
 
   return automaticPackRefresh;

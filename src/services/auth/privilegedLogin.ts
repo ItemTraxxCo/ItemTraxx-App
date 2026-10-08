@@ -45,7 +45,7 @@ export const superAdminLogin = async (
   if (result.error) throw new Error(result.error.message || "Invalid credentials.");
 
   // Better Auth withholds the full session until its TOTP/backup challenge is
-  // complete, so the caller routes that state to /two-factor.
+  // complete, so the caller routes that state to /login/two-factor.
   await refreshAuthFromSession();
   if (!getAuthState().isAuthenticated) return { email, requiresTwoFactor: true };
   const current = await requireSuperAdmin("password");

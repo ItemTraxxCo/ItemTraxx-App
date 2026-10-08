@@ -5,6 +5,7 @@ import { useRouter } from "vue-router";
 import { authClient } from "../auth/client";
 import { refreshAuthFromSession } from "../services/auth/sessionBootstrap";
 import { registerPrivilegedAdminStepUp } from "../services/privilegedStepUpService";
+import { touchSuperAdminSession } from "../services/superOps/sessions";
 import { getAuthState, markAdminVerified, setSecondaryAuth } from "../store/authState";
 
 const router = useRouter();
@@ -32,6 +33,7 @@ const run = async (kind: "totp" | "backup") => {
       await registerPrivilegedAdminStepUp();
       markAdminVerified();
     } else if (auth.role === "super_admin") {
+      await touchSuperAdminSession({ loginLocation: "super_auth" });
       await registerPrivilegedAdminStepUp();
       setSecondaryAuth(true);
     }

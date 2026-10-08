@@ -145,7 +145,7 @@ const handleCredentialSubmit = async () => {
       password.value,
       turnstileToken.value ?? ""
     );
-    await router.push(result.requiresTwoFactor ? "/two-factor" : "/internal");
+    await router.push(result.requiresTwoFactor ? "/login/two-factor" : "/internal");
   } catch (err) {
     const message = err instanceof Error ? err.message : "Sign in failed.";
     if (message === "Invalid credentials.") {

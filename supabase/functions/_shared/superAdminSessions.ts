@@ -4,6 +4,7 @@ import {
   type PostgrestErrorLike,
 } from "./postgrestErrors.ts";
 import { verifyExternalAuthClaims } from "./externalAuth.ts";
+import { hasFreshAdminStepUpAuthMethod } from "./privilegedStepUp.ts";
 
 type SupabaseLikeClient = {
   from: (table: string) => any;
@@ -18,60 +19,94 @@ const resolveSuperAdminAuthSessionBinding = async (
   }).verifyExternalAuthClaims;
   const claims = await (injectedVerifier ?? verifyExternalAuthClaims)(`Bearer ${authToken}`);
   if (!claims) {
-    return { sessionId: null, issuedAt: null };
+    return { sessionId: null, claims: null };
   }
 
   const sessionId = typeof claims.session_id === "string"
     ? claims.session_id.trim()
     : "";
-  const issuedAt =
-    typeof claims.iat === "number" && Number.isFinite(claims.iat)
-      ? new Date(claims.iat * 1000).toISOString()
-      : null;
 
-  return { sessionId: sessionId || null, issuedAt };
+  return { sessionId: sessionId || null, claims };
 };
 
 /**
- * A privileged JWT is accepted only while its exact Better Auth session has
- * an active super-admin session-registry row. Missing registry state fails
- * closed, including during session creation and after revocation.
+ * A privileged JWT needs an active super-admin session-registry row. The
+ * initial touch_session action may create that row for a freshly authenticated
+ * Better Auth session; other unregistered sessions fail closed.
  */
 export const isSuperAdminTokenBlockedBySessionRevocation = async (
   client: SupabaseLikeClient,
-  params: { profileId: string; authToken: string },
+  params: {
+    profileId: string;
+    authToken: string;
+    allowUnregisteredSession?: boolean;
+  },
 ) => {
   const binding = await resolveSuperAdminAuthSessionBinding(
     client,
     params.authToken,
   );
-  if (!binding.sessionId && !binding.issuedAt) {
+  if (!binding.sessionId) {
     return { blocked: true as const, relationMissing: false as const };
   }
 
-  if (binding.sessionId) {
-    const { data, error } = await client
+  const activeSession = await client
+    .from("super_admin_sessions")
+    .select("id")
+    .eq("profile_id", params.profileId)
+    .eq("auth_session_id", binding.sessionId)
+    .is("revoked_at", null)
+    .limit(1)
+    .maybeSingle();
+
+  if (activeSession.error) {
+    if (
+      isMissingRelation(activeSession.error as PostgrestErrorLike, "super_admin_sessions") ||
+      isMissingColumn(activeSession.error as PostgrestErrorLike, "auth_session_id")
+    ) {
+      return { blocked: true as const, relationMissing: true as const };
+    }
+    throw new Error("Unable to validate super-admin session revocation.");
+  }
+
+  if (activeSession.data?.id) {
+    return { blocked: false as const, relationMissing: false as const };
+  }
+
+  // A freshly authenticated session must be allowed to create its first
+  // registry row through touch_session. A revoked row for this exact auth
+  // session still blocks it, and an old unregistered session cannot bootstrap.
+  if (
+    params.allowUnregisteredSession && binding.claims &&
+    hasFreshAdminStepUpAuthMethod(binding.claims)
+  ) {
+    const revokedSession = await client
       .from("super_admin_sessions")
       .select("id")
       .eq("profile_id", params.profileId)
       .eq("auth_session_id", binding.sessionId)
-      .is("revoked_at", null)
+      .not("revoked_at", "is", null)
       .limit(1)
       .maybeSingle();
 
-    if (error) {
+    if (revokedSession.error) {
       if (
-        isMissingRelation(error as PostgrestErrorLike, "super_admin_sessions") ||
-        isMissingColumn(error as PostgrestErrorLike, "auth_session_id")
+        isMissingRelation(revokedSession.error as PostgrestErrorLike, "super_admin_sessions") ||
+        isMissingColumn(revokedSession.error as PostgrestErrorLike, "auth_session_id")
       ) {
         return { blocked: true as const, relationMissing: true as const };
       }
       throw new Error("Unable to validate super-admin session revocation.");
     }
-    return { blocked: !data?.id, relationMissing: false as const };
+
+    return {
+      blocked: !!revokedSession.data?.id,
+      relationMissing: false as const,
+    };
   }
 
-  // Current Better Auth JWTs always carry a session id. A legacy token without
-  // that binding cannot be tied to an active registry row safely.
+  // Current Better Auth JWTs always carry a session id. Missing registry state
+  // is otherwise rejected, including for existing sessions that never completed
+  // the privileged sign-in bootstrap.
   return { blocked: true as const, relationMissing: false as const };
 };

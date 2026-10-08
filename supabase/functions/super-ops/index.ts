@@ -133,9 +133,17 @@ serve((req) => withRequestSpan(req, "POST /functions/super-ops", async (span, re
       return jsonResponse(403, { error: "Access denied" });
     }
 
+    const parsedBody = asRecord(await readJsonBody(req));
+    const action = requireText(parsedBody.action, { maxLen: 64 });
+    const payload = asRecord(parsedBody.payload ?? {});
+
     const revocation = await isSuperAdminTokenBlockedBySessionRevocation(
       adminClient,
-      { profileId: user.id, authToken: accessToken },
+      {
+        profileId: user.id,
+        authToken: accessToken,
+        allowUnregisteredSession: action === "touch_session",
+      },
     );
     if (revocation.relationMissing) {
       return jsonResponse(503, {
@@ -145,10 +153,6 @@ serve((req) => withRequestSpan(req, "POST /functions/super-ops", async (span, re
     if (revocation.blocked) {
       return jsonResponse(401, { error: "Session revoked." });
     }
-
-    const parsedBody = asRecord(await readJsonBody(req));
-    const action = requireText(parsedBody.action, { maxLen: 64 });
-    const payload = asRecord(parsedBody.payload ?? {});
 
     const securitySettingsActions = new Set([
       "verify_password",

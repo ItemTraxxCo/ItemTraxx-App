@@ -180,14 +180,13 @@ serve(async (req) => {
         }
         return rows;
       },
-      create: async (workspaceId, email) => {
+      create: async (workspaceId, email, userId) => {
         // Validate email delivery configuration before creating either record so
         // a configuration error cannot leave an orphaned Auth user/profile.
         const redirectTo = resetRedirect();
         const { data: workspace } = await admin.from("workspaces").select("id")
           .eq("id", workspaceId).maybeSingle();
         if (!workspace) throw new ValidationError("Workspace not found.", 404);
-        const userId = crypto.randomUUID();
         const { error: profileError } = await admin.from("profiles").insert({
           id: userId,
           workspace_id: workspaceId,

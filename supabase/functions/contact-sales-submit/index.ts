@@ -10,7 +10,7 @@ import {
   hashString,
   resolveClientFingerprint,
   resolveClientIp,
-  verifyTurnstileToken,
+  verifyAndConsumeTurnstileToken,
 } from "../_shared/preloginGuards.ts";
 import { buildPublicRateLimitHeaders } from "../_shared/publicRateLimit.ts";
 import { requireTrustedEdgeIngress } from "../_shared/trustedIngress.ts";
@@ -217,7 +217,8 @@ serve(async (req) => {
         trustProxyHeader: true,
       }),
     );
-    const verified = await verifyTurnstileToken(
+    const verified = await verifyAndConsumeTurnstileToken(
+      adminClient,
       turnstileToken,
       clientIp,
       "contact-sales-submit",

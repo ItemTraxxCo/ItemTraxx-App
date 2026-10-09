@@ -8,7 +8,11 @@ import App from "./App.vue";
 import router from "./router";
 import { clearAuthState } from "./store/authState";
 import { getWorkspaceState } from "./store/workspaceState";
-import { refreshPublicAuthFromSession, scrubLegacyAuthFragment } from "./services/publicAuthBootstrap";
+import {
+  refreshPublicAuthFromSession,
+  scrubLegacyAuthFragment,
+  syncRouterHistoryToVisibleLocation,
+} from "./services/publicAuthBootstrap";
 import { isSessionNetworkError } from "./services/httpSessionService";
 import { TimeoutError, withTimeout } from "./services/asyncUtils";
 import {
@@ -239,6 +243,7 @@ const bootstrap = async () => {
   if (redirectCanonicalHost()) {
     return;
   }
+  syncRouterHistoryToVisibleLocation(router.options.history);
   await initializeWorkspaceContext();
   const workspaceContext = getWorkspaceState();
   const isE2ETestMode = import.meta.env.VITE_E2E_TEST_UTILS === "true";

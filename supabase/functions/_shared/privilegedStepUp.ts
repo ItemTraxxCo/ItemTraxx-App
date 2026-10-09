@@ -213,6 +213,39 @@ export const isPrivilegedStepUpFreshAt = (
 };
 
 /**
+ * Require the session-bound privileged grant to have been issued recently.
+ * Unlike hasRecentPrivilegedStepUp, this accepts any trusted step-up source;
+ * callers that require an explicit password confirmation should keep using
+ * the source-bound helper below.
+ */
+export const hasFreshPrivilegedStepUp = async (
+  adminClient: SupabaseClient,
+  options: {
+    userId: string;
+    roleScope: PrivilegedRoleScope;
+    authToken: string;
+    nowMs?: number;
+    maxAgeMs?: number;
+  },
+) => {
+  const bindingKey = await resolveBindingKey(adminClient, options.authToken);
+  const { data, error } = await adminClient
+    .from("privileged_session_stepups")
+    .select("updated_at")
+    .eq("user_id", options.userId)
+    .eq("role_scope", options.roleScope)
+    .eq("binding_key", bindingKey)
+    .maybeSingle();
+
+  if (error) throw error;
+  return isPrivilegedStepUpFreshAt(
+    data?.updated_at,
+    options.nowMs,
+    options.maxAgeMs,
+  );
+};
+
+/**
  * Require a recent, explicit step-up confirmation for narrowly scoped
  * high-impact actions. The lookup stays bound to the caller's existing auth
  * session and the expected verification source.

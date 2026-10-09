@@ -33,8 +33,18 @@
           />
         </label>
 
+        <label v-if="turnstileSiteKey" class="forgot-security-check">
+          <span>Security check</span>
+          <div :ref="setTurnstileContainerRef"></div>
+          <span v-if="turnstileLoadError" class="error">{{ turnstileLoadError }}</span>
+        </label>
+
         <div class="form-actions">
-          <button type="submit" class="button-primary forgot-submit-button" :disabled="isLoading || !email.trim()">
+          <button
+            type="submit"
+            class="button-primary forgot-submit-button"
+            :disabled="isLoading || !email.trim() || Boolean(turnstileSiteKey && !turnstileToken)"
+          >
             {{ isLoading ? "Sending..." : "Send reset link" }}
           </button>
         </div>
@@ -56,6 +66,7 @@ import { computed, onMounted, onUnmounted, ref } from "vue";
 import { RouterLink, useRoute } from "vue-router";
 import PublicFooter from "../components/PublicFooter.vue";
 import { authClient } from "../auth/client";
+import { useTurnstile } from "../composables/useTurnstile";
 import { getPasswordResetRedirectUrl } from "../utils/passwordResetRedirect";
 
 const RESET_ERROR_MESSAGE = "Unable to send reset link. Please try again.";
@@ -79,7 +90,28 @@ const error = ref("");
 const success = ref(false);
 const isLoading = ref(false);
 const themeMode = ref<"light" | "dark">(document.documentElement.getAttribute("data-theme") === "light" ? "light" : "dark");
+const turnstileSiteKey = (import.meta.env.VITE_TURNSTILE_SITE_KEY as string | undefined)?.trim();
+const {
+  containerRef: turnstileContainerRef,
+  token: turnstileToken,
+  loadError: turnstileLoadError,
+  reset: resetTurnstile,
+} = useTurnstile(turnstileSiteKey, themeMode);
 let themeObserver: MutationObserver | null = null;
+
+const setTurnstileContainerRef = (
+  el: Element | { $el?: Element } | null,
+) => {
+  if (el instanceof HTMLElement) {
+    turnstileContainerRef.value = el;
+    return;
+  }
+  if (el && "$el" in el && el.$el instanceof HTMLElement) {
+    turnstileContainerRef.value = el.$el;
+    return;
+  }
+  turnstileContainerRef.value = null;
+};
 
 const routeSource = computed(() =>
   typeof route.query.from === "string" ? route.query.from : ""
@@ -112,14 +144,26 @@ const sendResetEmail = async () => {
     error.value = "Enter a valid account email.";
     return;
   }
+  if (turnstileSiteKey && !turnstileToken.value) {
+    error.value = "Complete the security check and try again.";
+    return;
+  }
 
   isLoading.value = true;
   try {
     const redirectTo = getPasswordResetRedirectUrl();
-    const { error: resetError } = await authClient.requestPasswordReset({
-      email: normalizedEmail,
-      redirectTo,
-    });
+    const { error: resetError } = await authClient.requestPasswordReset(
+      {
+        email: normalizedEmail,
+        redirectTo,
+      },
+      turnstileToken.value
+        ? {
+          headers: { "content-type": "application/x-www-form-urlencoded" },
+          body: { captchaResponse: turnstileToken.value },
+        }
+        : undefined,
+    );
 
     if (resetError) {
       error.value = RESET_ERROR_MESSAGE;
@@ -131,6 +175,13 @@ const sendResetEmail = async () => {
     error.value = RESET_ERROR_MESSAGE;
   } finally {
     isLoading.value = false;
+    if (turnstileSiteKey) {
+      try {
+        resetTurnstile();
+      } catch (turnstileError) {
+        console.error("Failed to reset password reset Turnstile widget:", turnstileError);
+      }
+    }
   }
 };
 
@@ -160,6 +211,11 @@ onUnmounted(() => {
 .forgot-container {
   width: min(100%, 760px);
   margin-bottom: 0;
+}
+
+.forgot-security-check {
+  display: block;
+  margin-top: 1.25rem;
 }
 
 .forgot-shell :deep(.public-footer) {

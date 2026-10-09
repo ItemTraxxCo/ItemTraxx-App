@@ -1,6 +1,11 @@
 export const PASSWORD_RESET_PATH = "/reset-password";
 const PRODUCTION_PASSWORD_RESET_URL = "https://www.itemtraxx.com/reset-password";
-const PRODUCTION_HOSTS = new Set(["itemtraxx.com", "www.itemtraxx.com"]);
+const PRODUCTION_HOSTS = new Set([
+  "itemtraxx.com",
+  "www.itemtraxx.com",
+  "internal.itemtraxx.com",
+  "itxinternal.app.itemtraxx.com",
+]);
 const isPasswordResetPath = (pathname: string) =>
   pathname.toLowerCase().replace(/\/+$/, "") === PASSWORD_RESET_PATH;
 

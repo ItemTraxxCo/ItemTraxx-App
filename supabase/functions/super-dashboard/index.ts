@@ -7,7 +7,7 @@ import {
   isMissingPostgrestRelation as isMissingRelation,
 } from "../_shared/postgrestErrors.ts";
 import {
-  hasPrivilegedStepUp,
+  hasFreshPrivilegedStepUp,
   isMissingPrivilegedStepUpTable,
 } from "../_shared/privilegedStepUp.ts";
 import { isSuperAdminTokenBlockedBySessionRevocation } from "../_shared/superAdminSessions.ts";
@@ -138,7 +138,7 @@ serve((req) => withRequestSpan(req, "GET /functions/super-dashboard", async (spa
     }
 
     try {
-      const hasStepUp = await hasPrivilegedStepUp(adminClient, {
+      const hasStepUp = await hasFreshPrivilegedStepUp(adminClient, {
         userId: user.id,
         roleScope: "super_admin",
         authToken,

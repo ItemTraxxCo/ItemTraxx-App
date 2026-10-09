@@ -5,7 +5,7 @@ import { callBetterAuthAdmin } from "../_shared/betterAuthAdmin.ts";
 import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.108.2";
 import { isKillSwitchWriteBlocked } from "../_shared/killSwitch.ts";
 import {
-  hasPrivilegedStepUp,
+  hasFreshPrivilegedStepUp,
   isMissingPrivilegedStepUpTable,
 } from "../_shared/privilegedStepUp.ts";
 import { isSuperAdminTokenBlockedBySessionRevocation } from "../_shared/superAdminSessions.ts";
@@ -276,7 +276,7 @@ serve(async (req) => {
     }
 
     try {
-      const hasStepUp = await hasPrivilegedStepUp(adminClient, {
+      const hasStepUp = await hasFreshPrivilegedStepUp(adminClient, {
         userId: user.id,
         roleScope: "super_admin",
         authToken,

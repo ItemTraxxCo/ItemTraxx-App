@@ -20,6 +20,7 @@ const posthogMock = {
   }),
   opt_in_capturing: vi.fn(),
   opt_out_capturing: vi.fn(),
+  unregister: vi.fn(),
   capture: vi.fn(),
   identify: vi.fn(),
   reset: vi.fn(),
@@ -162,6 +163,7 @@ describe("initPostHog", () => {
         capture_pageleave: true,
         cross_subdomain_cookie: true,
         cookieWinsOnConflict: true,
+        save_referrer: false,
         logs: expect.objectContaining({ captureConsoleLogs: false }),
         disable_session_recording: false,
         session_recording: expect.objectContaining({
@@ -206,6 +208,11 @@ describe("initPostHog", () => {
       name: "https://www.itemtraxx.com/login?next=/workspace",
     });
     expect(ordinaryRequest).toMatchObject({ name: "https://www.itemtraxx.com/login?next=/workspace" });
+    const ssoRequest = sessionRecording?.session_recording?.maskCapturedNetworkRequestFn?.({
+      name: "https://www.itemtraxx.com/admin?tab=users&itx_sso_proof=signed-proof",
+    });
+    expect(ssoRequest).toMatchObject({ name: "https://www.itemtraxx.com/admin?tab=users" });
+    expect(posthogMock.unregister).toHaveBeenCalledWith("$initial_person_info");
     const options = posthogMock.init.mock.calls[0]?.[1] as {
       logs?: { beforeSend?: (record: { body: string; attributes?: Record<string, unknown> }) => unknown };
     } | undefined;
@@ -789,6 +796,54 @@ describe("before_send exception filter", () => {
     });
   });
 
+  it("drops a Playwright binding error from an automated browser", async () => {
+    const mod = await initializedModule();
+    void mod;
+
+    const event = {
+      event: "$exception",
+      properties: {
+        $exception_list: [
+          {
+            type: "Error",
+            value: 'Function "__pw_cookie_change1" is not exposed',
+            stacktrace: {
+              frames: [
+                { function: "_PageBinding.dispatch" },
+                { function: "_Page.onBindingCalled" },
+                { function: "_FrameSession._onBindingCalled" },
+              ],
+            },
+            mechanism: { synthetic: false, handled: false },
+          },
+        ],
+      },
+    };
+
+    expect(getBeforeSend()(event)).toBeNull();
+  });
+
+  it("drops an exception that a Playwright binding frame dispatched", async () => {
+    const mod = await initializedModule();
+    void mod;
+
+    const event = {
+      event: "$exception",
+      properties: {
+        $exception_list: [
+          {
+            type: "Error",
+            value: "binding failed",
+            stacktrace: { frames: [{ function: "_PageBinding.dispatch" }] },
+            mechanism: { synthetic: false },
+          },
+        ],
+      },
+    };
+
+    expect(getBeforeSend()(event)).toBeNull();
+  });
+
   it("keeps a regular exception event", async () => {
     const mod = await initializedModule();
     void mod;
@@ -964,7 +1019,7 @@ describe("PostHog exception before_send", () => {
       event: "$pageview",
       properties: {
         $current_url:
-          "https://www.itemtraxx.com/accept-invitation?workspace=demo&code=one-time-code#next=/workspace&token=secret",
+          "https://www.itemtraxx.com/accept-invitation?workspace=demo&code=one-time-code&itx_sso_proof=signed-proof#next=/workspace&token=secret",
       },
     }) as { properties: Record<string, unknown> } | null;
 

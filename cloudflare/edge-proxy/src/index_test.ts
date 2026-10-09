@@ -275,6 +275,49 @@ Deno.test("rate limits public email sign-in before reading its form body", async
   }
 });
 
+Deno.test("rate limits public password resets before reading its form body", async () => {
+  let bodyRead = false;
+  let limiterKey = "";
+  const body = new ReadableStream<Uint8Array>({
+    pull(controller) {
+      bodyRead = true;
+      controller.enqueue(new TextEncoder().encode("email=user@example.com"));
+      controller.close();
+    },
+  }, { highWaterMark: 0 });
+  const response = await worker.fetch(
+    new Request("https://edge.itemtraxx.com/api/auth//request-password-reset/", {
+      method: "POST",
+      headers: {
+        "content-type": "application/x-www-form-urlencoded",
+        "cf-connecting-ip": "203.0.113.10",
+      },
+      body,
+      duplex: "half",
+    }),
+    {
+      PUBLIC_AUTH_RATE_LIMITER: {
+        limit: async ({ key }: { key: string }) => {
+          limiterKey = key;
+          return { success: false };
+        },
+      },
+      ITX_ENVIRONMENT: "test",
+    } as Env,
+    executionContext,
+  );
+
+  if (response.status !== 429) {
+    throw new Error(`Expected password reset throttle response, received ${response.status}`);
+  }
+  if (bodyRead) {
+    throw new Error("Expected rejected password reset request body to remain unread");
+  }
+  if (limiterKey !== "better-auth-password-reset:203.0.113.10") {
+    throw new Error(`Unexpected password reset throttle key: ${limiterKey}`);
+  }
+});
+
 Deno.test("edge proxy CORS allows the explicitly configured demo workspace", async () => {
   const demoOrigin = "https://itxdemo.app.itemtraxx.com";
   const response = await worker.fetch(
@@ -444,6 +487,54 @@ Deno.test("dispatcher blocks canonicalized REST RPC variants without upstream fe
   if (upstreamFetches !== 0) {
     throw new Error(
       `Expected zero upstream fetches for blocked RPC paths, received ${upstreamFetches}`,
+    );
+  }
+});
+
+Deno.test("dispatcher blocks non-allowlisted PostgREST embeds before upstream fetch", async () => {
+  const originalFetch = globalThis.fetch;
+  let upstreamFetches = 0;
+  globalThis.fetch = ((_input: string | URL | Request, _init?: RequestInit) => {
+    upstreamFetches += 1;
+    return Promise.resolve(
+      new Response("unexpected upstream fetch", { status: 500 }),
+    );
+  }) as typeof fetch;
+
+  try {
+    for (
+      const path of [
+        "/rest/v1/items?select=id,workspace_policies(*)",
+        "/rest/v1/workspaces?select=id,workspace_usage(*)",
+      ]
+    ) {
+      const response = await worker.fetch(
+        new Request(`https://edge.itemtraxx.com${path}`, {
+          headers: {
+            Authorization: "Bearer fixture-token",
+            origin: "https://itemtraxx.com",
+          },
+        }),
+        {
+          SUPABASE_URL: "https://example.supabase.co",
+          SUPABASE_ANON_KEY: "anon-key",
+        },
+        executionContext,
+      );
+
+      if (response.status !== 403) {
+        throw new Error(
+          `Expected non-allowlisted relation query to return 403: ${path}`,
+        );
+      }
+    }
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+
+  if (upstreamFetches !== 0) {
+    throw new Error(
+      `Expected zero upstream fetches for blocked relation queries, received ${upstreamFetches}`,
     );
   }
 });

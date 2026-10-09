@@ -36,6 +36,15 @@ const sanitizeGeoHeaderValue = (
   return trimmed.slice(0, maxLen);
 };
 
+// Bind proxied requests to the Better Auth session resolved by the Worker.
+const resolveAuthorization = (
+  request: Request,
+  sessionAccessToken?: string | null,
+) =>
+  sessionAccessToken
+    ? `Bearer ${sessionAccessToken}`
+    : request.headers.get("Authorization");
+
 const applyApproxLocationHeaders = (headers: Headers, request: Request) => {
   const cf = (request as RequestWithCf).cf;
   const city = sanitizeGeoHeaderValue(cf?.city, 80);
@@ -61,9 +70,7 @@ export const sanitizeRequestHeaders = (
     "Content-Type",
     request.headers.get("Content-Type") ?? "application/json",
   );
-  const incomingAuth = request.headers.get("Authorization");
-  const resolvedAuth = incomingAuth ??
-    (sessionAccessToken ? `Bearer ${sessionAccessToken}` : null);
+  const resolvedAuth = resolveAuthorization(request, sessionAccessToken);
   if (functionName === "super-ops" && resolvedAuth) {
     headers.set("x-itx-user-jwt", resolvedAuth);
     headers.set("Authorization", resolvedAuth);
@@ -82,7 +89,10 @@ export const sanitizeRequestHeaders = (
   if (traceparent) headers.set("traceparent", traceparent);
   const tracestate = request.headers.get("tracestate");
   if (tracestate) headers.set("tracestate", tracestate);
-  if (request.headers.get(TRACE_PARENT_EXPORTED_HEADER) === TRACE_PARENT_EXPORTED_VALUE) {
+  if (
+    request.headers.get(TRACE_PARENT_EXPORTED_HEADER) ===
+      TRACE_PARENT_EXPORTED_VALUE
+  ) {
     headers.set(TRACE_PARENT_EXPORTED_HEADER, TRACE_PARENT_EXPORTED_VALUE);
   }
   applyApproxLocationHeaders(headers, request);
@@ -100,9 +110,7 @@ export const sanitizeUpstreamHeaders = (
   headers.set("apikey", anonKey);
   const contentType = request.headers.get("Content-Type");
   if (contentType) headers.set("Content-Type", contentType);
-  const incomingAuth = request.headers.get("Authorization");
-  const resolvedAuth = incomingAuth ??
-    (sessionAccessToken ? `Bearer ${sessionAccessToken}` : null);
+  const resolvedAuth = resolveAuthorization(request, sessionAccessToken);
   if (resolvedAuth) headers.set("Authorization", resolvedAuth);
   const accept = request.headers.get("accept");
   if (accept) headers.set("accept", accept);
@@ -114,7 +122,10 @@ export const sanitizeUpstreamHeaders = (
   if (traceparent) headers.set("traceparent", traceparent);
   const tracestate = request.headers.get("tracestate");
   if (tracestate) headers.set("tracestate", tracestate);
-  if (request.headers.get(TRACE_PARENT_EXPORTED_HEADER) === TRACE_PARENT_EXPORTED_VALUE) {
+  if (
+    request.headers.get(TRACE_PARENT_EXPORTED_HEADER) ===
+      TRACE_PARENT_EXPORTED_VALUE
+  ) {
     headers.set(TRACE_PARENT_EXPORTED_HEADER, TRACE_PARENT_EXPORTED_VALUE);
   }
   return headers;

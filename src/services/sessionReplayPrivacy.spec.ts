@@ -28,6 +28,12 @@ describe("session replay URL privacy", () => {
     expect(scrubSensitiveReplayUrlValue(ordinaryUrl)).toBe(ordinaryUrl);
   });
 
+  it("removes SSO proof and credential parameters from URL metadata", () => {
+    expect(scrubSensitiveReplayUrlValue(
+      "https://www.itemtraxx.com/admin?tab=users&itx_sso_proof=signed-proof#access_token=secret",
+    )).toBe("https://www.itemtraxx.com/admin?tab=users");
+  });
+
   it("scrubs signed URLs from replay performance-span descriptions", () => {
     const event = {
       type: 5,

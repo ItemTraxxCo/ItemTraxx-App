@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onBeforeUnmount, onMounted } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 import { RouterLink } from "vue-router";
 import checkoutReturnUiImage800 from "../assets/landing/checkout_return_ui-800.webp";
 import checkoutReturnUiImage1200 from "../assets/landing/checkout_return_ui-1200.webp";
@@ -16,8 +16,9 @@ const {
   statusClass,
 } = useSystemStatus();
 const statusLabel = computed(() =>
-  systemStatus.refreshedAt === 0 ? "Checking" : sharedStatusLabel.value,
+  systemStatus.refreshedAt === 0 || statusClass.value === "status-unknown" ? "Status" : sharedStatusLabel.value,
 );
+const menuOpen = ref(false);
 const landingObservers = [];
 
 const trackCta = (cta, location) => {
@@ -43,7 +44,20 @@ onMounted(() => {
       const fill = section.querySelector(".platform-progress-fill");
       const features = [...section.querySelectorAll(".platform-feature")];
       const labels = [...section.querySelectorAll("[data-slide-label]")];
-      const motionOff = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      const motionQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
+      let motionOff = motionQuery.matches;
+      const onMotionChange = (event) => {
+        motionOff = event.matches;
+        if (motionOff) {
+          section.classList.remove("is-running");
+          fill.classList.remove("is-animating");
+        } else if (section.dataset.inView === "true") {
+          section.classList.add("is-running");
+          restartProgress();
+        }
+      };
+      motionQuery.addEventListener("change", onMotionChange);
+      landingObservers.push({ disconnect: () => motionQuery.removeEventListener("change", onMotionChange) });
       let active = 0;
       let advanceTimer;
       let transitionTimer;
@@ -81,20 +95,38 @@ onMounted(() => {
       }
       labels.forEach((label, index) => label.addEventListener("click", () => changeFeature(index)));
       fill.addEventListener("animationend", advance);
-      if (!motionOff) {
-        const observer = new IntersectionObserver(([entry]) => {
-          const shouldRun = entry.isIntersecting;
-          section.classList.toggle("is-running", shouldRun);
-          if (shouldRun) restartProgress();
-          else {
-            window.clearTimeout(advanceTimer);
-            slideshow.classList.remove("is-transitioning");
-            fill.classList.remove("is-animating");
-          }
-        }, {threshold: 0.25});
-        observer.observe(section);
-        landingObservers.push(observer);
-      }
+
+      // Pause on hover, keyboard focus, or the explicit pause button.
+      const pauseButton = section.querySelector(".platform-pause");
+      let userPaused = false;
+      let hoverPaused = false;
+      const syncPause = () => section.classList.toggle("is-paused", userPaused || hoverPaused);
+      pauseButton?.addEventListener("click", () => {
+        userPaused = !userPaused;
+        pauseButton.setAttribute("aria-pressed", String(userPaused));
+        pauseButton.textContent = userPaused ? "Play slideshow" : "Pause slideshow";
+        syncPause();
+      });
+      [slideshow, section.querySelector(".platform-slide-index")].forEach((el) => {
+        el.addEventListener("mouseenter", () => { hoverPaused = true; syncPause(); });
+        el.addEventListener("mouseleave", () => { hoverPaused = false; syncPause(); });
+        el.addEventListener("focusin", (event) => { if (event.target.matches(":focus-visible")) { hoverPaused = true; syncPause(); } });
+        el.addEventListener("focusout", () => { hoverPaused = false; syncPause(); });
+      });
+
+      const observer = new IntersectionObserver(([entry]) => {
+        section.dataset.inView = String(entry.isIntersecting);
+        const shouldRun = entry.isIntersecting && !motionOff;
+        section.classList.toggle("is-running", shouldRun);
+        if (shouldRun) restartProgress();
+        else {
+          window.clearTimeout(advanceTimer);
+          slideshow.classList.remove("is-transitioning");
+          fill.classList.remove("is-animating");
+        }
+      }, {threshold: 0.25});
+      observer.observe(section);
+      landingObservers.push(observer);
     })();
   
 
@@ -105,7 +137,11 @@ onMounted(() => {
       const copies = [...section.querySelectorAll("[data-copy]")];
       const art = [...section.querySelectorAll("[data-art]")];
       const cells = [...section.querySelectorAll(".feature-sheet tbody td")];
-      const motionOff = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      const motionQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
+      let motionOff = motionQuery.matches;
+      const onMotionChange = (event) => { motionOff = event.matches; };
+      motionQuery.addEventListener("change", onMotionChange);
+      landingObservers.push({ disconnect: () => motionQuery.removeEventListener("change", onMotionChange) });
       const liveValues = [
         ["Camera?", "Sony? camera", "that one", "camera 1??", "the other camera??", "photo thing"],
         ["Maya C?", "Maya?", "Jordan? p4", "Sam?", "who borrowed?", "no clue", "idk", "maybe Lisa"],
@@ -123,6 +159,7 @@ onMounted(() => {
       let visible = false;
       let liveBatches = 0;
       let finalCount = 0;
+      let settledBatches = 0;
       let finalOrder = null;
       let running = false;
       const typeSpeed = 240;
@@ -192,6 +229,8 @@ onMounted(() => {
             finalCount += indices.length;
             options = chaosValues;
           } else {
+            // Stop looping once the sheet has settled so the animation doesn't run forever.
+            if (settledBatches++ >= 6) break;
             indices = selectBatch(pool);
             options = chaosValues;
           }
@@ -398,10 +437,13 @@ onBeforeUnmount(() => {
 
 <template>
   <div id="top" class="itemtraxx-page">
-<header class="site-header wrap">
+<header class="site-header wrap" @keydown.esc="menuOpen = false">
     <a class="brand" href="#top" aria-label="ItemTraxx home"><img :src="itemtraxxLogo" alt="ItemTraxx Co"></a>
-    <nav class="main-nav" aria-label="Main navigation"><a href="/pricing">Pricing</a><a href="/contact-support">Support</a><a href="/getting-started">Getting Started</a><a href="/security">Security</a><a class="status-link" href="https://status.itemtraxx.com/" target="_blank" rel="noreferrer" aria-label="Open system status page"><span class="status-dot" :class="statusClass" aria-hidden="true"></span>{{ statusLabel }}</a></nav>
-    <RouterLink class="cta" to="/login" @click="trackCta('login', 'header')">Login</RouterLink>
+    <nav id="main-nav" class="main-nav" :class="{ 'is-open': menuOpen }" aria-label="Main navigation" @click="menuOpen = false"><a href="/pricing">Pricing</a><a href="/contact-support">Support</a><a href="/getting-started">Getting Started</a><a href="/security">Security</a><a class="status-link" href="https://status.itemtraxx.com/" target="_blank" rel="noreferrer" aria-label="Open system status page"><span class="status-dot" :class="statusClass" aria-hidden="true"></span>{{ statusLabel }}</a></nav>
+    <div class="header-actions">
+      <button class="menu-toggle" type="button" aria-controls="main-nav" :aria-expanded="menuOpen" aria-label="Menu" @click="menuOpen = !menuOpen"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 6h14M3 10h14M3 14h14"/></svg></button>
+      <RouterLink class="cta" to="/login" @click="trackCta('login', 'header')">Login</RouterLink>
+    </div>
   </header>
   <main>
     <section class="hero" id="comparison" aria-labelledby="hero-title">
@@ -552,16 +594,17 @@ onBeforeUnmount(() => {
         <header class="platform-heading"><h2 id="platform-title">The platform that keeps your inventory organized.</h2></header>
         <div class="platform-slide-index" role="group" aria-label="Choose a platform feature">
           <button class="is-active" type="button" data-slide-label="0" aria-pressed="true">Checkout</button>
-          <button type="button" data-slide-label="1" aria-pressed="false">Admin</button>
-          <button type="button" data-slide-label="2" aria-pressed="false">Workspace</button>
+          <button type="button" data-slide-label="1" aria-pressed="false">Inventory</button>
+          <button type="button" data-slide-label="2" aria-pressed="false">Workspaces</button>
         </div>
         <div class="platform-progress" aria-hidden="true"><span class="platform-progress-fill"></span></div>
         <div class="platform-features" aria-label="ItemTraxx platform feature slideshow">
-          <article class="platform-feature" data-feature="0" role="group" aria-roledescription="slide" aria-label="Checkout and returns"><h3>Checkout and return, all in one clear flow</h3><p>Start by entering a borrower ID. Once the borrower is loaded, scan or type one or more item barcodes; ItemTraxx checks each item's current checkout status to label the action Checkout or Return. Review the item list, remove a mis-scanned item, then complete the transaction. The borrower and each item receive linked activity records, so staff can later check who had an item and when it moved. Admins also have Quick Return for items coming back without a borrower lookup. On prepared devices, eligible transactions can queue locally during a connection loss and sync later.</p></article>
-          <article class="platform-feature" data-feature="1" role="group" aria-roledescription="slide" aria-label="Inventory and borrower management" hidden><h3>Manage inventory, borrowers, and activity</h3><p>Search items by name, barcode, serial number, status, or notes, then open a record to review or update it. Track whether an item is available, checked out, damaged, lost, or being repaired. Manage borrower records, filter checkout and return logs by action, person, item, or date range, and export the current view as CSV or PDF. For setup work, import items from CSV with a preview and validation report, or create printable PDF barcode labels in batches. Bulk actions can update or archive multiple items at once for efficient management.</p></article>
-          <article class="platform-feature" data-feature="2" role="group" aria-roledescription="slide" aria-label="Workspace for organizations" hidden><h3>One Workspace for shared inventory</h3><p>ItemTraxx Workspaces bring multiple tenant accounts under one organization's management, with shared inventory across teams and/or locations. Item-level access controls let admins make records available to all accounts or limit them to selected accounts. Workspace admins can add, suspend, restore, or remove tenant accounts; manage administrator access; set Workspace details and checkout defaults; and review logs that identify the account tied to each action. This helps an organization coordinate shared equipment while controlling which teams can see specific records. Support for SSO via SAML 2.0 and OIDC available.</p></article>
+          <article class="platform-feature" data-feature="0" role="group" aria-roledescription="slide" aria-label="Checkout and returns"><h3>Checkout and return, all in one clear flow</h3><p>Enter a borrower ID, then scan or type item barcodes. ItemTraxx checks each item's status and labels the action Checkout or Return. Review the list, remove a mis-scanned item, and complete the transaction. The borrower and each item get linked activity records, and admins can use Quick Return for items coming back without a borrower lookup. Prepared devices can queue eligible transactions offline and sync later.</p></article>
+          <article class="platform-feature" data-feature="1" role="group" aria-roledescription="slide" aria-label="Inventory and borrower management" hidden><h3>Manage inventory, borrowers, and activity</h3><p>Search items by name, barcode, serial number, status, or notes, and track whether each is available, checked out, damaged, lost, or in repair. Manage borrowers, filter checkout logs by action, person, item, or date, and export CSV or PDF. Import items from CSV with a validation preview, print barcode labels in batches, and bulk-update or archive items.</p></article>
+          <article class="platform-feature" data-feature="2" role="group" aria-roledescription="slide" aria-label="Workspace for organizations" hidden><h3>One Workspace for shared inventory</h3><p>Workspaces bring multiple tenant accounts under one organization, with shared inventory across teams and locations. Item-level access controls make records available to all accounts or only selected ones. Workspace admins add, suspend, restore, or remove accounts, manage administrator access, set checkout defaults, and review logs showing which account took each action. SSO via SAML 2.0 and OIDC is available.</p></article>
         </div>
         <div class="platform-rule" aria-hidden="true"></div>
+        <button class="platform-pause" type="button" aria-pressed="false">Pause slideshow</button>
       </div>
     </section>
     <div class="closing-area">
@@ -581,7 +624,7 @@ onBeforeUnmount(() => {
         <span>v-{{ appVersion }}</span>
         <span v-if="showBranchName" class="footer-branch">{{ appBranch }}</span>
       </div>
-      <nav class="footer-group" aria-label="Product"><h2>Product</h2><ul><li><a href="/login">Login</a></li><li><a href="/pricing">Pricing</a></li><li><a href="/contact-sales">Contact Sales</a></li><li><a href="/request-demo">Request Demo</a></li><li><a href="/getting-started">Getting Started</a></li><li><a href="/forgot-password">Forgot Password</a></li></ul></nav>
+      <nav class="footer-group" aria-label="Product"><h2>Product</h2><ul><li><a href="/login">Login</a></li><li><a href="/pricing">Pricing</a></li><li><a href="/contact-sales">Contact Sales</a></li><li><a href="/request-demo">Request Demo</a></li><li><a href="/getting-started">Getting Started</a></li></ul></nav>
       <nav class="footer-group" aria-label="Support"><h2>Support</h2><ul><li><a href="/contact-support">Contact Support</a></li><li><a href="/report-security-issue">Report Security Issue</a></li><li><a href="/changelog">Changelog</a></li><li><a href="/faq">FAQ</a></li><li><a href="https://status.itemtraxx.com/" target="_blank" rel="noreferrer">Status</a></li></ul></nav>
       <nav class="footer-group" aria-label="Legal"><h2>Legal</h2><ul><li><a href="/legal">Legal Home</a></li><li><a href="/privacy">Privacy</a></li><li><a href="/legal/student-privacy">Student Privacy</a></li><li><a href="/legal/dpa">Data Processing Addendum</a></li><li><a href="/privacy-request">Privacy Request</a></li><li><a href="/cookies">Cookies</a></li><li><a href="/accessibility">Accessibility</a></li><li><a href="/security">Security</a></li><li><a href="/trust">Trust</a></li><li><a href="/compliance">Compliance</a></li></ul></nav>
       <nav class="footer-group" aria-label="Company"><h2>Company</h2><ul><li><a href="/">Home</a></li><li><a href="/contact">Contact</a></li><li><a href="/about">About</a></li><li><a href="https://github.com/ItemTraxxCo" target="_blank" rel="noreferrer">GitHub</a></li></ul></nav>

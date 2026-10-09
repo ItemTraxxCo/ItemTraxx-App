@@ -184,19 +184,54 @@ const openDatabase = () =>
     request.onerror = () => reject(request.error ?? new Error("Unable to open offline workflow storage."));
   });
 
+class OfflineWorkflowStorageError extends Error {
+  constructor(operation: string, storeName: string, cause: unknown) {
+    const detail = cause instanceof Error ? cause.message : String(cause ?? "unknown IndexedDB error");
+    super(`Offline workflow IndexedDB ${operation} failed for store "${storeName}": ${detail}`, { cause });
+    this.name = "OfflineWorkflowStorageError";
+  }
+}
+
 const accessStore = async <T>(
   storeName: string,
+  operation: string,
   mode: IDBTransactionMode,
   callback: (store: IDBObjectStore) => IDBRequest<T>,
 ) => {
   const database = await openDatabase();
   try {
     return await new Promise<T>((resolve, reject) => {
-      const transaction = database.transaction(storeName, mode);
-      const request = callback(transaction.objectStore(storeName));
-      request.onsuccess = () => resolve(request.result);
-      request.onerror = () => reject(request.error ?? new Error("Unable to access offline workflow storage."));
-      transaction.onerror = () => reject(transaction.error ?? new Error("Unable to access offline workflow storage."));
+      let settled = false;
+      let result: T | undefined;
+      let hasResult = false;
+      const fail = (cause: unknown) => {
+        if (settled) return;
+        settled = true;
+        reject(new OfflineWorkflowStorageError(operation, storeName, cause));
+      };
+
+      try {
+        const transaction = database.transaction(storeName, mode);
+        const request = callback(transaction.objectStore(storeName));
+        request.onsuccess = () => {
+          result = request.result;
+          hasResult = true;
+        };
+        request.onerror = () => fail(request.error ?? new Error("IndexedDB request failed."));
+        transaction.onerror = () => fail(transaction.error ?? request.error ?? new Error("IndexedDB transaction failed."));
+        transaction.onabort = () => fail(transaction.error ?? request.error ?? new Error("IndexedDB transaction aborted."));
+        transaction.oncomplete = () => {
+          if (!hasResult) {
+            fail(new Error("IndexedDB transaction completed without a request result."));
+            return;
+          }
+          if (settled) return;
+          settled = true;
+          resolve(result as T);
+        };
+      } catch (cause) {
+        fail(cause);
+      }
     });
   } finally {
     database.close();
@@ -204,14 +239,24 @@ const accessStore = async <T>(
 };
 
 const getOrCreateKey = async () => {
-  const existing = await accessStore<CryptoKey | undefined>(KEY_STORE, "readonly", (store) => store.get(KEY_ID));
+  const existing = await accessStore<CryptoKey | undefined>(
+    KEY_STORE,
+    "read encryption key",
+    "readonly",
+    (store) => store.get(KEY_ID),
+  );
   if (existing instanceof CryptoKey) return existing;
   const key = await window.crypto.subtle.generateKey(
     { name: "AES-GCM", length: 256 },
     false,
     ["encrypt", "decrypt"],
   );
-  await accessStore<IDBValidKey>(KEY_STORE, "readwrite", (store) => store.put(key, KEY_ID));
+  await accessStore<IDBValidKey>(
+    KEY_STORE,
+    "store encryption key",
+    "readwrite",
+    (store) => store.put(key, KEY_ID),
+  );
   return key;
 };
 
@@ -241,19 +286,35 @@ const decryptRecord = async <T>(recordId: string, record: EncryptedRecord): Prom
 };
 
 const readRecord = async <T>(recordId: string, fallback: T) => {
-  const encrypted = await accessStore<EncryptedRecord | undefined>(RECORD_STORE, "readonly", (store) => store.get(recordId));
+  const encrypted = await accessStore<EncryptedRecord | undefined>(
+    RECORD_STORE,
+    "read encrypted record",
+    "readonly",
+    (store) => store.get(recordId),
+  );
   if (!encrypted) return fallback;
   try {
     return await decryptRecord<T>(recordId, encrypted);
-  } catch {
-    await accessStore<undefined>(RECORD_STORE, "readwrite", (store) => store.delete(recordId));
+  } catch (cause) {
+    if (cause instanceof OfflineWorkflowStorageError) throw cause;
+    await accessStore<undefined>(
+      RECORD_STORE,
+      "delete invalid encrypted record",
+      "readwrite",
+      (store) => store.delete(recordId),
+    );
     return fallback;
   }
 };
 
 const writeRecord = async (recordId: string, value: unknown) => {
   const encrypted = await encryptRecord(recordId, value);
-  await accessStore<IDBValidKey>(RECORD_STORE, "readwrite", (store) => store.put(encrypted, recordId));
+  await accessStore<IDBValidKey>(
+    RECORD_STORE,
+    "write encrypted record",
+    "readwrite",
+    (store) => store.put(encrypted, recordId),
+  );
 };
 
 const sleep = (ms: number) => new Promise((resolve) => window.setTimeout(resolve, ms));

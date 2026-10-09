@@ -5,7 +5,7 @@ import { isKillSwitchWriteBlocked } from "../_shared/killSwitch.ts";
 import { isAllowedOrigin, parseAllowedOrigins } from "../_shared/cors.ts";
 import { requireTrustedEdgeIngress } from "../_shared/trustedIngress.ts";
 import { readJsonBody } from "../_shared/requestBody.ts";
-import { hasPrivilegedStepUp } from "../_shared/privilegedStepUp.ts";
+import { hasFreshPrivilegedStepUp } from "../_shared/privilegedStepUp.ts";
 import { isSuperAdminTokenBlockedBySessionRevocation } from "../_shared/superAdminSessions.ts";
 import { callBetterAuthAdmin } from "../_shared/betterAuthAdmin.ts";
 import {
@@ -168,7 +168,7 @@ serve(async (req) => {
       });
     }
     if (
-      !await hasPrivilegedStepUp(admin, {
+      !await hasFreshPrivilegedStepUp(admin, {
         userId: user.id,
         roleScope: "super_admin",
         authToken: token,

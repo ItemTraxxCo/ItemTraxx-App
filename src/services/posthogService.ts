@@ -494,6 +494,25 @@ const isResizeObserverLoopExceptionEvent = (properties?: Record<string, unknown>
   isSyntheticStacklessException(properties, (value) =>
     value.startsWith("ResizeObserver loop"));
 
+// The PostHog SDK's native exception hooks run before Vue's app error handler
+// and can report errors that the application deliberately marks as handled.
+// Keep expected transport outcomes out of Error Tracking when those hooks see
+// them as uncaught AppErrors. Server-side AppErrors and unrelated exceptions
+// remain reportable.
+const isExpectedTransportAppErrorExceptionEvent = (
+  properties?: Record<string, unknown>,
+) => {
+  const exceptionList = properties?.$exception_list;
+  if (!Array.isArray(exceptionList) || exceptionList.length === 0) return false;
+  return exceptionList.every((entry) => {
+    if (!entry || typeof entry !== "object") return false;
+    const exception = entry as { type?: unknown; value?: unknown };
+    if (exception.type !== "AppError" || typeof exception.value !== "string") return false;
+    return /^(?:rate limit exceeded|too many requests|network request failed|network issue\b|request timed out\b)/i
+      .test(exception.value.trim());
+  });
+};
+
 const initializePostHog = async () => {
   if (initialized) return;
   const token = import.meta.env.VITE_POSTHOG_PROJECT_TOKEN?.trim();
@@ -568,7 +587,8 @@ const initializePostHog = async () => {
             isCspUnsafeEvalExceptionEvent(safeEvent.properties) ||
             isRecoverableChunkLoadExceptionEvent(safeEvent.properties) ||
             isOpaqueScriptExceptionEvent(safeEvent.properties) ||
-            isResizeObserverLoopExceptionEvent(safeEvent.properties)
+            isResizeObserverLoopExceptionEvent(safeEvent.properties) ||
+            isExpectedTransportAppErrorExceptionEvent(safeEvent.properties)
           )
         ) {
           return null;

@@ -137,6 +137,51 @@ export const isActiveLinkedBetterAuthProfile = async (
   return data?.is_active === true && data.deleted_at == null;
 };
 
+export const isActiveBetterAuthOrganizationMember = async (
+  dataClient: ReturnType<typeof createBetterAuthDataClient>,
+  betterAuthUserId: string,
+  organizationId: string,
+) => {
+  const { data: profile, error: profileError } = await dataClient.schema(
+    "public",
+  )
+    .from("profiles")
+    .select("workspace_id")
+    .eq("better_auth_user_id", betterAuthUserId)
+    .eq("is_active", true)
+    .is("deleted_at", null)
+    .maybeSingle();
+  if (profileError) throw profileError;
+  if (!profile?.workspace_id) return false;
+
+  const { data: workspace, error: workspaceError } = await dataClient.schema(
+    "public",
+  )
+    .from("workspaces")
+    .select("better_auth_organization_id,status,archived_at")
+    .eq("id", profile.workspace_id)
+    .maybeSingle();
+  if (workspaceError) throw workspaceError;
+  if (
+    workspace?.better_auth_organization_id !== organizationId ||
+    workspace.status !== "active" ||
+    workspace.archived_at
+  ) {
+    return false;
+  }
+
+  const { data: member, error: memberError } = await dataClient.schema(
+    "better_auth",
+  )
+    .from("member")
+    .select("id")
+    .eq("userId", betterAuthUserId)
+    .eq("organizationId", organizationId)
+    .maybeSingle();
+  if (memberError) throw memberError;
+  return !!member?.id;
+};
+
 const ensureBetterAuthOrganizationAdminMembership = async (
   dataClient: ReturnType<typeof createBetterAuthDataClient>,
   betterAuthUserId: string,
@@ -761,21 +806,6 @@ const ORGANIZATION_LOGO_TYPES = {
 export const organizationLogoObjectPath = (organizationId: string) =>
   `${ORGANIZATION_LOGO_PREFIX}/${organizationId}/logo-current`;
 
-const isAllowedOrganizationLogoRequest = (request: Request, allowedOrigins: string[]) => {
-  const origin = request.headers.get("Origin");
-  if (origin) return allowedOrigins.includes(origin);
-
-  // Ordinary <img> requests do not send Origin. Their Referer is limited to
-  // the source origin by the app's strict-origin-when-cross-origin policy.
-  const referer = request.headers.get("Referer");
-  if (!referer) return false;
-  try {
-    return allowedOrigins.includes(new URL(referer).origin);
-  } catch {
-    return false;
-  }
-};
-
 const readRequestBodyWithLimit = async (request: Request, maxBytes: number) => {
   const reader = request.body?.getReader();
   if (!reader) return { body: new Uint8Array(), tooLarge: false };
@@ -908,25 +938,49 @@ export const handleOrganizationLogoRead = async (
   rawEnv: Env,
   organizationId: string,
   fileName: string,
-  allowedOrigins: string[],
 ) => {
   if (request.method !== "GET" && request.method !== "HEAD") {
     return Response.json({ error: "Method not allowed" }, { status: 405 });
   }
-  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(organizationId) ||
-    !(fileName === "logo-current" || /^logo-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.(png|jpg|webp)$/i.test(fileName))) {
-    return Response.json({ error: "Invalid organization logo" }, { status: 400 });
+  if (
+    !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+      organizationId,
+    ) ||
+    !(fileName === "logo-current" ||
+      /^logo-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.(png|jpg|webp)$/i
+        .test(fileName))
+  ) {
+    return Response.json({ error: "Invalid organization logo" }, {
+      status: 400,
+    });
   }
-  if (!isAllowedOrganizationLogoRequest(request, allowedOrigins)) {
-    return Response.json({ error: "Organization logo access is restricted" }, {
-      status: 403,
-      headers: { "Cache-Control": "no-store" },
+  const bucket = rawEnv.ORGANIZATION_LOGOS;
+  if (!bucket) {
+    return Response.json({ error: "Logo storage is unavailable" }, {
+      status: 503,
     });
   }
 
-  const bucket = rawEnv.ORGANIZATION_LOGOS;
-  if (!bucket) {
-    return Response.json({ error: "Logo storage is unavailable" }, { status: 503 });
+  const env = rawEnv as BetterAuthEnv;
+  const auth = getBetterAuth(env);
+  const session = await auth.api.getSession({ headers: request.headers });
+  if (!session?.user?.id || !cachedDataClient) {
+    return Response.json({ error: "Unauthorized" }, {
+      status: 401,
+      headers: { "Cache-Control": "no-store" },
+    });
+  }
+  if (
+    !await isActiveBetterAuthOrganizationMember(
+      cachedDataClient,
+      session.user.id,
+      organizationId,
+    )
+  ) {
+    return Response.json({ error: "Forbidden" }, {
+      status: 403,
+      headers: { "Cache-Control": "no-store" },
+    });
   }
 
   const object = await bucket.get(
@@ -937,9 +991,10 @@ export const handleOrganizationLogoRead = async (
   if (!object) return new Response(null, { status: 404 });
 
   const headers = new Headers({
-    "Content-Type": object.httpMetadata?.contentType ?? "application/octet-stream",
+    "Content-Type": object.httpMetadata?.contentType ??
+      "application/octet-stream",
     "Content-Disposition": "inline",
-    "Cache-Control": "private, max-age=300",
+    "Cache-Control": "no-store",
     "Cross-Origin-Resource-Policy": "same-site",
     "X-Content-Type-Options": "nosniff",
   });

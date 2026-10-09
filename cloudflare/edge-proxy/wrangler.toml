@@ -47,8 +47,9 @@ BETTER_AUTH_JWT_AUDIENCE = "itemtraxx-supabase"
 BETTER_AUTH_PASSKEY_RP_ID = "itemtraxx.com"
 BETTER_AUTH_PASSKEY_ORIGIN = "https://itemtraxx.com,https://www.itemtraxx.com,https://internal.itemtraxx.com,https://app.itemtraxx.com,https://dennis-dev.itemtraxx.com,https://leo-dev.itemtraxx.com,https://dev.itemtraxx.com,https://preview.itemtraxx.com,https://staging.itemtraxx.com,https://itxdemo.app.itemtraxx.com,https://itxinternal.app.itemtraxx.com"
 
-# Keep organization logos in a private bucket with no public R2/custom domain;
-# the Worker serves them only to allowlisted ItemTraxx origins.
+# Keep organization logos in a private bucket with no public R2/custom domain.
+# The Worker requires active organization membership and applies the global
+# CORS allowlist.
 [[r2_buckets]]
 binding = "ORGANIZATION_LOGOS"
 bucket_name = "itemtraxx-organization-logos"

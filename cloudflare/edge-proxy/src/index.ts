@@ -279,7 +279,6 @@ export default {
               env,
               organizationLogoMatch[1] ?? "",
               logoFileName,
-              parseCsv(env.BETTER_AUTH_TRUSTED_ORIGINS),
             )
             : await handleOrganizationLogoUpload(
               tracedRequest,
@@ -290,13 +289,6 @@ export default {
           Object.entries(headers).forEach(([key, value]) =>
             responseHeaders.set(key, value)
           );
-          if (logoFileName) {
-            const vary = new Set(
-              (responseHeaders.get("Vary") ?? "").split(",").map((value) => value.trim()).filter(Boolean),
-            );
-            vary.add("Referer");
-            responseHeaders.set("Vary", Array.from(vary).join(", "));
-          }
           responseHeaders.set("x-request-id", requestId);
           return new Response(logoResponse.body, {
             status: logoResponse.status,

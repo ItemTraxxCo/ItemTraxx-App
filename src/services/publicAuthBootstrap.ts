@@ -87,6 +87,22 @@ export const scrubLegacyAuthFragment = () => {
   );
 };
 
+type RouterHistoryLocation = {
+  location: string;
+  replace: (to: string) => void;
+};
+
+// createWebHistory snapshots the initial URL when the router module loads.
+// A later native history.replaceState updates the address bar but not that
+// snapshot, so synchronize it before Vue Router performs its first navigation.
+export const syncRouterHistoryToVisibleLocation = (history: RouterHistoryLocation) => {
+  if (typeof window === "undefined") return false;
+  const visibleLocation = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+  if (history.location === visibleLocation) return false;
+  history.replace(visibleLocation);
+  return true;
+};
+
 // This probe answers "does this visitor already have a session?" while a public
 // page such as /admin/login is booting. It runs once, fire-and-forget, so a
 // single transport blip would otherwise leave an already signed-in admin looking

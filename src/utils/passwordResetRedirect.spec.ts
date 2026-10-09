@@ -61,6 +61,22 @@ describe("getPasswordResetRedirectUrl", () => {
     expect(getPasswordResetRedirectUrl()).toBe("https://www.itemtraxx.com/reset-password");
   });
 
+  it("uses the public reset page from the Cloudflare Access workspace host", () => {
+    stubLocation({
+      hostname: "itxinternal.app.itemtraxx.com",
+      origin: "https://itxinternal.app.itemtraxx.com",
+    });
+    expect(getPasswordResetRedirectUrl()).toBe("https://www.itemtraxx.com/reset-password");
+  });
+
+  it("uses the public reset page from the internal ops host", () => {
+    stubLocation({
+      hostname: "internal.itemtraxx.com",
+      origin: "https://internal.itemtraxx.com",
+    });
+    expect(getPasswordResetRedirectUrl()).toBe("https://www.itemtraxx.com/reset-password");
+  });
+
   it("builds a redirect URL from the current origin for a non-production host", () => {
     stubLocation({ hostname: "staging.itemtraxx.com", origin: "https://staging.itemtraxx.com" });
     expect(getPasswordResetRedirectUrl()).toBe("https://staging.itemtraxx.com/reset-password");

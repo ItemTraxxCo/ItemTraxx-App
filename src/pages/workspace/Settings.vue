@@ -39,6 +39,7 @@ import { RouterLink } from "vue-router";
 import OfflinePackSettings from "../../components/OfflinePackSettings.vue";
 import { getAuthState } from "../../store/authState";
 import { authClient } from "../../auth/client";
+import { getPasswordResetRedirectUrl } from "../../utils/passwordResetRedirect";
 import { listAccountSessions, revokeAccountSession, type AccountSessionItem } from "../../services/adminOpsService";
 
 const sessions = ref<AccountSessionItem[]>([]);
@@ -54,7 +55,7 @@ const revoke = async (id: string) => {
 const resetPassword = async () => {
   const email = getAuthState().email;
   if (!email) return;
-  const { error } = await authClient.requestPasswordReset({ email, redirectTo: `${location.origin}/reset-password` });
+  const { error } = await authClient.requestPasswordReset({ email, redirectTo: getPasswordResetRedirectUrl() });
   messageKind.value = error ? "error" : "success";
   message.value = error ? "Unable to send reset link." : "Password reset email sent.";
 };

@@ -3,8 +3,8 @@ import { getExternalAuthUser } from "../_shared/externalAuth.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.108.2";
 import { isKillSwitchWriteBlocked } from "../_shared/killSwitch.ts";
 import {
+  hasFreshPrivilegedStepUp,
   hasRecentPrivilegedStepUp,
-  hasPrivilegedStepUp,
   isMissingPrivilegedStepUpTable,
   SUPER_ADMIN_ACTION_CONFIRMATION_SOURCE,
 } from "../_shared/privilegedStepUp.ts";
@@ -175,7 +175,7 @@ serve((req) => withRequestSpan(req, "POST /functions/super-ops", async (span, re
             ...stepUpOptions,
             source: SUPER_ADMIN_ACTION_CONFIRMATION_SOURCE,
           })
-          : await hasPrivilegedStepUp(adminClient, stepUpOptions);
+          : await hasFreshPrivilegedStepUp(adminClient, stepUpOptions);
         if (!hasStepUp) {
           return jsonResponse(403, {
             error: freshStepUpActions.has(action)

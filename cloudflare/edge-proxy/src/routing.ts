@@ -31,15 +31,83 @@ const READABLE_REST_TABLES = new Set([
   "admin_audit_logs",
 ]);
 
+// PostgREST relationship embedding is expressed inside `select` and can read
+// a related table without changing the route's first table segment. The SPA
+// currently needs only this item_logs -> items embed for borrower history.
+const ALLOWED_REST_EMBEDS = new Map([
+  ["item_logs", new Set(["action_time,item:item_id(name)"])],
+]);
+
+const hasParenthesesAfterDecoding = (value: string) => {
+  let candidate = value;
+  for (let pass = 0; pass <= MAX_RPC_PATH_DECODE_PASSES; pass += 1) {
+    if (/[()]/.test(candidate)) return true;
+    if (!/%[0-9a-f]{2}/i.test(candidate)) return false;
+    try {
+      const decoded = decodeURIComponent(candidate);
+      if (decoded === candidate) return false;
+      candidate = decoded;
+    } catch {
+      return true;
+    }
+  }
+  // A still-encoded delimiter after the bounded passes fails closed.
+  return /%[0-9a-f]{2}/i.test(candidate);
+};
+
+const hasDottedKeyAfterDecoding = (value: string) => {
+  let candidate = value;
+  for (let pass = 0; pass <= MAX_RPC_PATH_DECODE_PASSES; pass += 1) {
+    if (candidate.includes(".")) return true;
+    if (!/%[0-9a-f]{2}/i.test(candidate)) return false;
+    try {
+      const decoded = decodeURIComponent(candidate);
+      if (decoded === candidate) return false;
+      candidate = decoded;
+    } catch {
+      return true;
+    }
+  }
+  return /%[0-9a-f]{2}/i.test(candidate);
+};
+
+const isAllowedRestQuery = (table: string, search: string) => {
+  let select: string | undefined;
+  const params = new URLSearchParams(search);
+  for (const [key, value] of params) {
+    const normalizedKey = key.toLowerCase();
+    if (normalizedKey === "select") {
+      // Duplicate projections can be interpreted differently by intermediaries.
+      if (select !== undefined) return false;
+      select = value;
+      continue;
+    }
+
+    // PostgREST uses dotted parameter names for embedded-resource filters and
+    // ordering. Relationship ordering also uses parentheses in `order`.
+    if (hasDottedKeyAfterDecoding(key)) return false;
+    if (normalizedKey === "order" && hasParenthesesAfterDecoding(value)) {
+      return false;
+    }
+  }
+
+  if (select === undefined || !hasParenthesesAfterDecoding(select)) return true;
+  return ALLOWED_REST_EMBEDS.get(table)?.has(select) === true;
+};
+
 export const getRestTableName = (pathname: string) =>
   readExactSegment(pathname, "/rest/v1/");
 
-export const isAllowedRestRequest = (pathname: string, method: string) => {
+export const isAllowedRestRequest = (
+  pathname: string,
+  method: string,
+  search = "",
+) => {
   const table = getRestTableName(pathname);
   if (!table) return false;
   const normalizedMethod = method.toUpperCase();
   if (normalizedMethod === "GET" || normalizedMethod === "HEAD") {
-    return READABLE_REST_TABLES.has(table);
+    return READABLE_REST_TABLES.has(table) && isAllowedRestQuery(table, search);
   }
   return false;
 };

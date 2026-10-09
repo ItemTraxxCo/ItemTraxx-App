@@ -314,3 +314,42 @@ Deno.test("REST allowlist rejects unlisted, nested, and encoded relation names",
     "rpc subpaths are not tables",
   );
 });
+
+
+Deno.test("REST allowlist constrains embedded relations and relationship queries", () => {
+  assert(
+    isAllowedRestRequest(
+      "/rest/v1/item_logs",
+      "GET",
+      "?select=action_time%2Citem%3Aitem_id%28name%29&workspace_id=eq.00000000-0000-0000-0000-000000000000&checked_out_by=eq.00000000-0000-0000-0000-000000000000&action_type=eq.checkout&order=action_time.desc&limit=1",
+    ),
+    "the SPA borrower-history item embed must remain allowed",
+  );
+
+  for (
+    const [path, search] of [
+      ["/rest/v1/items", "?select=id,workspace_policies(*)"],
+      ["/rest/v1/workspaces", "?select=id,workspace_usage(*)"],
+      ["/rest/v1/items", "?select=id,secret:workspace_policies(*)"],
+      ["/rest/v1/items", "?select=id,...workspace_policies(*)"],
+      ["/rest/v1/items", "?select=id,workspace_policies%2528*%2529"],
+      ["/rest/v1/items", "?select=id&select=workspace_policies(*)"],
+      ["/rest/v1/items", "?workspace_policies.max_items=gt.0"],
+      ["/rest/v1/items", "?order=workspace_policies(max_items).asc"],
+    ]
+  ) {
+    assert(
+      !isAllowedRestRequest(path, "GET", search),
+      `relationship access must be denied: ${path}${search}`,
+    );
+  }
+
+  assert(
+    !isAllowedRestRequest(
+      "/rest/v1/items",
+      "GET",
+      "?select=action_time%2Citem%3Aitem_id%28name%29",
+    ),
+    "the allowed embed must be limited to its current base relation",
+  );
+});

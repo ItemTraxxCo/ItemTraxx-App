@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { createWebHistory } from "vue-router";
 
 vi.mock("../store/authState", () => ({
   clearAuthState: vi.fn(),
@@ -23,6 +24,7 @@ import {
   hasLegacyAuthFragment,
   refreshPublicAuthFromSession,
   scrubLegacyAuthFragment,
+  syncRouterHistoryToVisibleLocation,
 } from "./publicAuthBootstrap";
 import { clearAuthState, getAuthState } from "../store/authState";
 import { fetchHttpSessionSummary, SessionNetworkError } from "./httpSessionService";
@@ -101,6 +103,27 @@ describe("scrubLegacyAuthFragment", () => {
 
     const [, , url] = replaceStateSpy.mock.calls[0];
     expect(String(url).includes("#")).toBe(false);
+  });
+});
+
+describe("syncRouterHistoryToVisibleLocation", () => {
+  it("updates Vue Router's captured initial URL after the auth fragment is scrubbed", () => {
+    window.history.replaceState(null, document.title, "/login#itx_at=test-token");
+    const history = createWebHistory();
+
+    try {
+      expect(history.location).toBe("/login#itx_at=test-token");
+
+      scrubLegacyAuthFragment();
+
+      expect(window.location.hash).toBe("");
+      expect(history.location).toBe("/login#itx_at=test-token");
+      expect(syncRouterHistoryToVisibleLocation(history)).toBe(true);
+      expect(history.location).toBe("/login");
+    } finally {
+      history.destroy();
+      window.history.replaceState(null, document.title, "/");
+    }
   });
 });
 

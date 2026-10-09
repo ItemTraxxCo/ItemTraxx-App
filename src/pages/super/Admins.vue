@@ -16,7 +16,7 @@
           <option v-for="w in workspaces" :key="w.id" :value="w.id">{{ w.name }}</option>
         </select>
       </label>
-      <button class="sa-btn" :disabled="loading || saving" @click="load">Search</button>
+      <button class="sa-btn" :disabled="loading || saving || stepUpSubmitting" @click="load">Search</button>
     </section>
 
     <section class="sa-panel">
@@ -34,7 +34,7 @@
           </label>
         </div>
         <div class="panel-actions">
-          <button type="submit" class="sa-btn primary" :disabled="saving">Create and send setup</button>
+          <button type="submit" class="sa-btn primary" :disabled="saving || stepUpSubmitting">Create and send setup</button>
         </div>
       </form>
     </section>
@@ -53,21 +53,34 @@
             <td><span class="sa-tag" :class="a.is_active ? 'ok' : 'warn'">{{ a.is_active ? 'Active' : 'Suspended' }}</span></td>
             <td>
               <div class="sa-table-row-actions">
-                <button class="sa-btn" :disabled="saving || a.is_primary_admin" @click="toggle(a)">{{ a.is_active ? 'Suspend' : 'Restore' }}</button>
-                <button class="sa-btn" :disabled="saving" @click="reset(a.id)">Reset password</button>
-                <button class="sa-btn" :disabled="saving" @click="primary(a)">Make primary</button>
+                <button class="sa-btn" :disabled="saving || stepUpSubmitting || a.is_primary_admin" @click="toggle(a)">{{ a.is_active ? 'Suspend' : 'Restore' }}</button>
+                <button class="sa-btn" :disabled="saving || stepUpSubmitting" @click="reset(a)">Reset password</button>
+                <button class="sa-btn" :disabled="saving || stepUpSubmitting" @click="primary(a)">Make primary</button>
               </div>
             </td>
           </tr>
         </tbody>
       </table>
     </div>
+
+    <StepUpModal
+      :visible="stepUpVisible"
+      :title="stepUpTitle"
+      :message="stepUpMessage"
+      :confirm-label="stepUpConfirmLabel"
+      :busy="stepUpSubmitting"
+      :error="stepUpError"
+      @cancel="cancelStepUp"
+      @confirm="confirmStepUp"
+    />
   </main>
 </template>
 
 <script setup lang="ts">
 import { onMounted, ref } from "vue";
 import { RouterLink } from "vue-router";
+import StepUpModal from "../../components/StepUpModal.vue";
+import { useSuperAdminStepUp } from "../../composables/useSuperAdminStepUp";
 import {
   createWorkspaceAdmin,
   listWorkspaceAdmins,
@@ -91,6 +104,20 @@ const loading = ref(false);
 const saving = ref(false);
 const message = ref("");
 const error = ref("");
+
+const {
+  visible: stepUpVisible,
+  title: stepUpTitle,
+  message: stepUpMessage,
+  confirmLabel: stepUpConfirmLabel,
+  error: stepUpError,
+  isSubmitting: stepUpSubmitting,
+  request: requestStepUp,
+  cancel: cancelStepUp,
+  confirm: confirmStepUp,
+} = useSuperAdminStepUp((cause) => {
+  error.value = cause instanceof Error ? cause.message : "Workspace Admin action failed.";
+});
 
 const run = async (operation: () => Promise<void>, success: string) => {
   saving.value = true;
@@ -118,27 +145,42 @@ const load = async () => {
   }
 };
 
-const create = () => run(async () => {
+const create = () => requestStepUp({
+  title: "Create Workspace Admin",
+  message: `Type CONFIRM and enter your super admin password to create an admin for ${workspaces.value.find((workspace) => workspace.id === createWorkspaceId.value)?.name ?? "the selected workspace"} and send the setup email to ${email.value}.`,
+  confirmLabel: "Create Admin",
+}, () => run(async () => {
   await createWorkspaceAdmin(createWorkspaceId.value, email.value);
   email.value = "";
   await load();
-}, "Workspace Admin created and setup email sent.");
+}, "Workspace Admin created and setup email sent."));
 
-const toggle = (admin: SuperWorkspaceAdmin) => run(async () => {
+const toggle = (admin: SuperWorkspaceAdmin) => requestStepUp({
+  title: `${admin.is_active ? "Suspend" : "Restore"} Workspace Admin`,
+  message: `Type CONFIRM and enter your super admin password to ${admin.is_active ? "suspend" : "restore"} ${admin.auth_email}.`,
+  confirmLabel: admin.is_active ? "Suspend" : "Restore",
+}, () => run(async () => {
   await setWorkspaceAdminStatus(admin.id, !admin.is_active);
   await load();
-}, "Workspace Admin status updated.");
+}, "Workspace Admin status updated."));
 
-const reset = (id: string) => run(async () => {
-  await sendWorkspaceAdminReset(id);
-}, "Password reset email sent.");
+const reset = (admin: SuperWorkspaceAdmin) => requestStepUp({
+  title: "Send Workspace Admin Reset",
+  message: `Type CONFIRM and enter your super admin password to send a password reset to ${admin.auth_email}.`,
+  confirmLabel: "Send Reset",
+}, () => run(async () => {
+  await sendWorkspaceAdminReset(admin.id);
+}, "Password reset email sent."));
 
 const primary = (admin: SuperWorkspaceAdmin) => {
-  if (!confirm("Reassign Primary Workspace Admin? This Super Admin-only action changes peer-management authority.")) return;
-  void run(async () => {
+  requestStepUp({
+    title: "Reassign Primary Workspace Admin",
+    message: `Type CONFIRM and enter your super admin password to make ${admin.auth_email} the primary admin for ${admin.workspace_name ?? "this workspace"}.`,
+    confirmLabel: "Make Primary",
+  }, () => run(async () => {
     await setPrimaryWorkspaceAdmin(admin.workspace_id, admin.id);
     await load();
-  }, "Primary Workspace Admin reassigned.");
+  }, "Primary Workspace Admin reassigned."));
 };
 
 onMounted(async () => {

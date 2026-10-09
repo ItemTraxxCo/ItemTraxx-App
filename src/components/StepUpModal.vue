@@ -3,6 +3,7 @@
     <div class="stepup-modal">
       <h3>{{ title }}</h3>
       <p class="muted" data-session-replay-mask>{{ message }}</p>
+      <p v-if="error" class="stepup-error" role="alert">{{ error }}</p>
       <label>
         Confirm phrase
         <input
@@ -29,7 +30,7 @@
           :disabled="!canConfirm"
           @click="submit"
         >
-          {{ confirmLabel }}
+          {{ busy ? "Confirming…" : confirmLabel }}
         </button>
       </div>
     </div>
@@ -44,6 +45,8 @@ const props = defineProps<{
   title: string;
   message: string;
   confirmLabel?: string;
+  busy?: boolean;
+  error?: string;
 }>();
 
 const emit = defineEmits<{
@@ -65,7 +68,7 @@ watch(
 );
 
 const canConfirm = computed(
-  () => confirmPhrase.value.trim() === "CONFIRM" && superPassword.value.trim().length > 0
+  () => !props.busy && confirmPhrase.value.trim() === "CONFIRM" && superPassword.value.trim().length > 0
 );
 
 const submit = () => {
@@ -103,6 +106,11 @@ const submit = () => {
   display: flex;
   gap: 0.5rem;
   justify-content: flex-end;
+}
+
+.stepup-error {
+  margin: 0;
+  color: var(--danger, #b42318);
 }
 
 @media (max-width: 640px) {

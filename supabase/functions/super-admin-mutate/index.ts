@@ -6,7 +6,7 @@ import { isAllowedOrigin, parseAllowedOrigins } from "../_shared/cors.ts";
 import { requireTrustedEdgeIngress } from "../_shared/trustedIngress.ts";
 import { readJsonBody } from "../_shared/requestBody.ts";
 import {
-  hasPrivilegedStepUp,
+  hasFreshPrivilegedStepUp,
   hasRecentPrivilegedStepUp,
   SUPER_ADMIN_ACTION_CONFIRMATION_SOURCE,
 } from "../_shared/privilegedStepUp.ts";
@@ -109,12 +109,12 @@ serve(async (req) => {
         ...stepUpOptions,
         source: SUPER_ADMIN_ACTION_CONFIRMATION_SOURCE,
       })
-      : await hasPrivilegedStepUp(admin, stepUpOptions);
+      : await hasFreshPrivilegedStepUp(admin, stepUpOptions);
     if (!hasRequiredStepUp) {
       return json(403, {
         error: action === "create_super_admin"
           ? "Confirm your current password before creating a Super Admin."
-          : "Super admin verification required.",
+          : "Confirm your current password before performing this Super Admin action.",
       });
     }
     const enrich = async (rows: any[]) => {
@@ -170,14 +170,13 @@ serve(async (req) => {
         }
         return rows;
       },
-      create: async (workspaceId, email) => {
+      create: async (workspaceId, email, userId) => {
         // Validate email delivery configuration before creating either record so
         // a configuration error cannot leave an orphaned Auth user/profile.
         const redirectTo = resetRedirect();
         const { data: workspace } = await admin.from("workspaces").select("id")
           .eq("id", workspaceId).maybeSingle();
         if (!workspace) throw new ValidationError("Workspace not found.", 404);
-        const userId = crypto.randomUUID();
         const { error: profileError } = await admin.from("profiles").insert({
           id: userId,
           workspace_id: workspaceId,

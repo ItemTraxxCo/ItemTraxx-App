@@ -18,7 +18,11 @@ export type TenantAccount = {
 
 export type TenantAccountRepository = {
   list(filters: { workspaceId: string | null; search: string }): Promise<TenantAccount[]>;
-  create(workspaceId: string, email: string): Promise<TenantAccount>;
+  create(
+    workspaceId: string,
+    email: string,
+    id: string,
+  ): Promise<TenantAccount>;
   findActive(id: string): Promise<TenantAccount | null>;
   setStatus(id: string, isActive: boolean): Promise<TenantAccount>;
   updateEmail(id: string, email: string): Promise<TenantAccount>;
@@ -55,6 +59,15 @@ export const handleTenantAccountAction = async (
   if (!actions.has(action)) return { handled: false };
 
   const { repository } = context;
+  const auditAttempt = (
+    auditAction: string,
+    id: string,
+    metadata: Record<string, unknown> = {},
+  ) =>
+    repository.audit(auditAction, id, {
+      ...metadata,
+      event_phase: "requested",
+    });
   if (action === "list_tenant_accounts") {
     const rawWorkspaceId = optionalText(payload.workspace_id, { maxLen: 36 });
     const workspaceId = rawWorkspaceId && rawWorkspaceId !== "all"
@@ -71,11 +84,12 @@ export const handleTenantAccountAction = async (
   if (action === "create_tenant_account") {
     const workspaceId = requireUuid(payload.workspace_id);
     const email = requireEmail(payload.auth_email);
-    const created = await repository.create(workspaceId, email);
-    await repository.audit(action, created.id, {
+    const id = crypto.randomUUID();
+    await auditAttempt(action, id, {
       workspace_id: workspaceId,
       auth_email: email,
     });
+    const created = await repository.create(workspaceId, email, id);
     return { handled: true, status: 200, data: created };
   }
 
@@ -89,8 +103,8 @@ export const handleTenantAccountAction = async (
     if (typeof payload.is_active !== "boolean") {
       throw new ValidationError("Invalid request");
     }
+    await auditAttempt(action, id, { is_active: payload.is_active });
     const updated = await repository.setStatus(id, payload.is_active);
-    await repository.audit(action, id, { is_active: payload.is_active });
     return { handled: true, status: 200, data: updated };
   }
 
@@ -99,20 +113,20 @@ export const handleTenantAccountAction = async (
     if (email === target.auth_email.toLowerCase()) {
       return { handled: true, status: 200, data: target };
     }
+    await auditAttempt(action, id, { auth_email: email });
     const updated = await repository.updateEmail(id, email);
-    await repository.audit(action, id, { auth_email: email });
     return { handled: true, status: 200, data: updated };
   }
 
   if (action === "send_tenant_account_reset") {
+    await auditAttempt(action, id);
     await repository.sendReset(target.auth_email);
-    await repository.audit(action, id, {});
     return { handled: true, status: 200, data: { success: true } };
   }
 
   const at = context.now();
+  await auditAttempt(action, id);
   await repository.softDelete(id, at);
   await repository.revokeSessions(id, context.actorId, at);
-  await repository.audit(action, id, {});
   return { handled: true, status: 200, data: { success: true } };
 };

@@ -278,49 +278,8 @@ const sanitizeExceptionEvent = (event: CaptureResult): CaptureResult => {
 };
 
 const URL_PROPERTY_KEY = /(url|uri|href|referrer|path)/i;
-const SENSITIVE_URL_PARAMETER = /^(?:access_token|refresh_token|id_token|token|secret|signature|code|api[_-]?key|itx_sso_proof)$/i;
 
-const scrubTelemetryUrlValue = (value: string) => {
-  const replaySafe = scrubSensitiveReplayUrlValue(value);
-  const isAbsolute = /^[a-z][a-z0-9+.-]*:\/\//i.test(replaySafe);
-  const isProtocolRelative = replaySafe.startsWith("//");
-  try {
-    const base = typeof window !== "undefined"
-      ? window.location.origin
-      : "https://www.itemtraxx.com";
-    const url = new URL(replaySafe, base);
-    let changed = replaySafe !== value;
-    for (const key of [...url.searchParams.keys()]) {
-      if (!SENSITIVE_URL_PARAMETER.test(key)) continue;
-      url.searchParams.delete(key);
-      changed = true;
-    }
-    if (url.hash.includes("=")) {
-      const hashParams = new URLSearchParams(url.hash.slice(1));
-      let hashChanged = false;
-      for (const key of [...hashParams.keys()]) {
-        if (!SENSITIVE_URL_PARAMETER.test(key)) continue;
-        hashParams.delete(key);
-        hashChanged = true;
-      }
-      if (hashChanged) {
-        url.hash = hashParams.toString();
-        changed = true;
-      }
-    }
-    if (!changed) return value;
-    if (isAbsolute) return url.toString();
-    if (isProtocolRelative) return `//${url.host}${url.pathname}${url.search}${url.hash}`;
-    const pathname = replaySafe.startsWith("/")
-      ? url.pathname
-      : url.pathname.replace(/^\/+/, "");
-    return `${pathname}${url.search}${url.hash}`;
-  } catch {
-    return replaySafe;
-  }
-};
-
-export const sanitizeRecoveryUrlProperties = (
+export const sanitizeTelemetryUrlProperties = (
   properties: Record<string, unknown> | undefined,
 ) => {
   if (!properties) return properties;
@@ -328,7 +287,7 @@ export const sanitizeRecoveryUrlProperties = (
   const safeProperties: Record<string, unknown> = { ...properties };
   for (const [key, value] of Object.entries(properties)) {
     if (!URL_PROPERTY_KEY.test(key) || typeof value !== "string") continue;
-    const safeValue = scrubTelemetryUrlValue(value);
+    const safeValue = scrubSensitiveReplayUrlValue(value);
     if (safeValue !== value) {
       safeProperties[key] = safeValue;
       changed = true;
@@ -542,6 +501,25 @@ const isResizeObserverLoopExceptionEvent = (properties?: Record<string, unknown>
   isSyntheticStacklessException(properties, (value) =>
     value.startsWith("ResizeObserver loop"));
 
+// The PostHog SDK's native exception hooks run before Vue's app error handler
+// and can report errors that the application deliberately marks as handled.
+// Keep expected transport outcomes out of Error Tracking when those hooks see
+// them as uncaught AppErrors. Server-side AppErrors and unrelated exceptions
+// remain reportable.
+const isExpectedTransportAppErrorExceptionEvent = (
+  properties?: Record<string, unknown>,
+) => {
+  const exceptionList = properties?.$exception_list;
+  if (!Array.isArray(exceptionList) || exceptionList.length === 0) return false;
+  return exceptionList.every((entry) => {
+    if (!entry || typeof entry !== "object") return false;
+    const exception = entry as { type?: unknown; value?: unknown };
+    if (exception.type !== "AppError" || typeof exception.value !== "string") return false;
+    return /^(?:rate limit exceeded|too many requests|network request failed|network issue\b|request timed out\b)/i
+      .test(exception.value.trim());
+  });
+};
+
 const initializePostHog = async () => {
   if (initialized) return;
   const token = import.meta.env.VITE_POSTHOG_PROJECT_TOKEN?.trim();
@@ -580,6 +558,10 @@ const initializePostHog = async () => {
       // Do not ingest Meta advertising identifiers from first-party _fbp/_fbc
       // cookies; ItemTraxx does not use campaign attribution.
       save_campaign_params: false,
+      // The SDK persists $initial_person_info when referrer or campaign
+      // capture is enabled. before_send runs after that persistence write, so
+      // do not retain the initial URL/referrer in browser storage.
+      save_referrer: false,
       // Keep the identity/session cookie shared across itemtraxx.com and
       // workspace subdomains. The explicit conflict policy is required while
       // this app remains pinned to an older PostHog defaults snapshot; it
@@ -603,7 +585,7 @@ const initializePostHog = async () => {
         }
         const safeEvent: CaptureResult = {
           ...event,
-          properties: (sanitizeRecoveryUrlProperties(event.properties) ?? {}) as
+          properties: (sanitizeTelemetryUrlProperties(event.properties) ?? {}) as
             CaptureResult["properties"],
         };
         if (
@@ -612,7 +594,8 @@ const initializePostHog = async () => {
             isCspUnsafeEvalExceptionEvent(safeEvent.properties) ||
             isRecoverableChunkLoadExceptionEvent(safeEvent.properties) ||
             isOpaqueScriptExceptionEvent(safeEvent.properties) ||
-            isResizeObserverLoopExceptionEvent(safeEvent.properties)
+            isResizeObserverLoopExceptionEvent(safeEvent.properties) ||
+            isExpectedTransportAppErrorExceptionEvent(safeEvent.properties)
           )
         ) {
           return null;
@@ -663,8 +646,8 @@ const initializePostHog = async () => {
         recordHeaders: false,
         recordBody: false,
         // Replay captures page and request URLs separately from event
-        // properties. Redact reset-link and signed-storage query/hash material
-        // at that boundary while keeping ordinary request URLs intact.
+        // properties. Redact sensitive query/hash parameters at that boundary
+        // while keeping ordinary navigation state in request URLs intact.
         maskCapturedNetworkRequestFn: (request) => {
           const safeName = scrubSensitiveReplayUrlValue(request.name);
           return safeName === request.name ? request : { ...request, name: safeName };
@@ -687,6 +670,9 @@ const initializePostHog = async () => {
     posthog.init(token, {
       ...posthogConfig,
       loaded: () => {
+        // Remove any initial URL/referrer value written by an earlier build
+        // before the SDK's first pageview is captured.
+        posthog?.unregister("$initial_person_info");
         initialized = true;
         posthogReady = true;
         resolvePostHogReady?.();

@@ -16,7 +16,7 @@
           <option v-for="workspace in workspaces" :key="workspace.id" :value="workspace.id">{{ workspace.name }}</option>
         </select>
       </label>
-      <button class="sa-btn" :disabled="loading" @click="load">Search</button>
+      <button class="sa-btn" :disabled="loading || stepUpSubmitting" @click="load">Search</button>
     </section>
 
     <section class="sa-panel">
@@ -28,7 +28,7 @@
         </select>
         <input v-model="createEmail" type="email" placeholder="account@example.com" required />
         <div class="panel-actions">
-          <button class="sa-btn primary" :disabled="saving">Create and send setup</button>
+          <button class="sa-btn primary" :disabled="saving || stepUpSubmitting">Create and send setup</button>
         </div>
       </form>
     </section>
@@ -50,10 +50,10 @@
             </td>
             <td>
               <div class="sa-table-row-actions">
-                <button class="sa-btn" :disabled="saving || emailUnchanged(account)" @click="saveEmail(account)">Save email</button>
-                <button class="sa-btn" @click="toggle(account)">{{ account.is_active ? 'Suspend' : 'Restore' }}</button>
-                <button class="sa-btn" @click="reset(account)">Reset password</button>
-                <button class="sa-btn danger" @click="remove(account)">Remove</button>
+                <button class="sa-btn" :disabled="saving || stepUpSubmitting || emailUnchanged(account)" @click="saveEmail(account)">Save email</button>
+                <button class="sa-btn" :disabled="saving || stepUpSubmitting" @click="toggle(account)">{{ account.is_active ? 'Suspend' : 'Restore' }}</button>
+                <button class="sa-btn" :disabled="saving || stepUpSubmitting" @click="reset(account)">Reset password</button>
+                <button class="sa-btn danger" :disabled="saving || stepUpSubmitting" @click="remove(account)">Remove</button>
               </div>
             </td>
           </tr>
@@ -61,12 +61,25 @@
         </tbody>
       </table>
     </div>
+
+    <StepUpModal
+      :visible="stepUpVisible"
+      :title="stepUpTitle"
+      :message="stepUpMessage"
+      :confirm-label="stepUpConfirmLabel"
+      :busy="stepUpSubmitting"
+      :error="stepUpError"
+      @cancel="cancelStepUp"
+      @confirm="confirmStepUp"
+    />
   </main>
 </template>
 
 <script setup lang="ts">
 import { onMounted, ref } from "vue";
 import { RouterLink } from "vue-router";
+import StepUpModal from "../../components/StepUpModal.vue";
+import { useSuperAdminStepUp } from "../../composables/useSuperAdminStepUp";
 import { listWorkspaces, type SuperWorkspace } from "../../services/superWorkspaceService";
 import {
   createTenantAccount,
@@ -89,6 +102,20 @@ const saving = ref(false);
 const message = ref("");
 const error = ref("");
 const savedEmails = ref<Record<string, string>>({});
+
+const {
+  visible: stepUpVisible,
+  title: stepUpTitle,
+  message: stepUpMessage,
+  confirmLabel: stepUpConfirmLabel,
+  error: stepUpError,
+  isSubmitting: stepUpSubmitting,
+  request: requestStepUp,
+  cancel: cancelStepUp,
+  confirm: confirmStepUp,
+} = useSuperAdminStepUp((cause) => {
+  error.value = cause instanceof Error ? cause.message : "Tenant Account action failed.";
+});
 
 const normalizeEmail = (value: string) => value.trim().toLowerCase();
 const emailUnchanged = (account: SuperTenantAccount) =>
@@ -114,32 +141,51 @@ const load = async () => {
   catch (cause) { error.value = cause instanceof Error ? cause.message : "Unable to load Tenant Accounts."; }
   finally { loading.value = false; }
 };
-const create = () => run(async () => {
+const create = () => requestStepUp({
+  title: "Create Tenant Account",
+  message: `Type CONFIRM and enter your super admin password to create a Tenant Account for ${workspaces.value.find((workspace) => workspace.id === createWorkspaceId.value)?.name ?? "the selected workspace"} and send the setup email to ${createEmail.value}.`,
+  confirmLabel: "Create Account",
+}, () => run(async () => {
   await createTenantAccount(createWorkspaceId.value, createEmail.value);
   createEmail.value = "";
   message.value = "Tenant Account created and setup email sent.";
   await load();
-});
-const saveEmail = (account: SuperTenantAccount) => run(async () => {
+}));
+const saveEmail = (account: SuperTenantAccount) => requestStepUp({
+  title: "Update Tenant Account Email",
+  message: `Type CONFIRM and enter your super admin password to change ${savedEmails.value[account.id]} to ${normalizeEmail(account.auth_email)}.`,
+  confirmLabel: "Save Email",
+}, () => run(async () => {
   await updateTenantAccountEmail(account.id, account.auth_email);
   message.value = "Tenant Account email updated.";
   await load();
-});
-const toggle = (account: SuperTenantAccount) => run(async () => {
+}));
+const toggle = (account: SuperTenantAccount) => requestStepUp({
+  title: `${account.is_active ? "Suspend" : "Restore"} Tenant Account`,
+  message: `Type CONFIRM and enter your super admin password to ${account.is_active ? "suspend" : "restore"} ${account.auth_email}.`,
+  confirmLabel: account.is_active ? "Suspend" : "Restore",
+}, () => run(async () => {
   await setTenantAccountStatus(account.id, !account.is_active);
   await load();
-});
-const reset = (account: SuperTenantAccount) => run(async () => {
+}));
+const reset = (account: SuperTenantAccount) => requestStepUp({
+  title: "Send Tenant Account Reset",
+  message: `Type CONFIRM and enter your super admin password to send a password reset to ${account.auth_email}.`,
+  confirmLabel: "Send Reset",
+}, () => run(async () => {
   await sendTenantAccountReset(account.id);
   message.value = `Password reset sent to ${account.auth_email}.`;
-});
+}));
 const remove = (account: SuperTenantAccount) => {
-  if (!confirm(`Remove ${account.auth_email}? Their active sessions will be revoked.`)) return;
-  void run(async () => {
+  requestStepUp({
+    title: "Remove Tenant Account",
+    message: `Type CONFIRM and enter your super admin password to remove ${account.auth_email}. Their active sessions will be revoked.`,
+    confirmLabel: "Remove Account",
+  }, () => run(async () => {
     await removeTenantAccount(account.id);
     message.value = "Tenant Account removed.";
     await load();
-  });
+  }));
 };
 
 onMounted(async () => {

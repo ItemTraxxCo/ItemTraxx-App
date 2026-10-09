@@ -41,8 +41,15 @@ const SDK_MANAGED_PROPERTY_KEYS = [
 
 // Local development intentionally exercises failing requests. Those failures
 // must not enter the shared PostHog project, where the exception alerting path
-// would treat them as staging/production incidents.
+// would treat them as staging/production incidents. The Vite dev server counts
+// as local development on any host, so a tunnel URL does not bypass the guard.
 const isLocalhostRuntime = () => {
+  // MODE selects env files, while DEV reflects NODE_ENV. Keep the explicit
+  // mode guard for development builds, and catch dev servers using custom modes.
+  const isDevelopmentRuntime =
+    import.meta.env.MODE === "development" ||
+    (import.meta.env.DEV && import.meta.env.MODE !== "test");
+  if (isDevelopmentRuntime) return true;
   if (typeof window === "undefined") return false;
   const hostname = window.location?.hostname?.trim().toLowerCase() || "";
   return LOCALHOST_HOSTS.has(hostname) || hostname.endsWith(".localhost");

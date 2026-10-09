@@ -1,4 +1,8 @@
 <template>
+  <div v-if="refreshError" class="toast toast-persist" role="alert" aria-live="assertive">
+    <div class="toast-title">Offline status unavailable</div>
+    <div class="toast-body">{{ refreshError }}</div>
+  </div>
   <div v-if="warningHours" class="version-update-fullscreen offline-warning-overlay" role="alertdialog" aria-modal="true" aria-live="assertive">
     <div class="version-update-card offline-warning-card">
       <p class="version-update-eyebrow">Offline for {{ warningHours }}+ hours</p>
@@ -152,6 +156,7 @@ const props = defineProps<{ enabled: boolean }>();
 
 const warningHours = ref<3 | 8 | null>(null);
 const warningError = ref("");
+const refreshError = ref("");
 const retrying = ref(false);
 const reviewEntries = ref<OfflineLedgerEntry[]>([]);
 const expandedId = ref<string | null>(null);
@@ -196,6 +201,7 @@ const refresh = async () => {
     listOfflineReviewEntries(),
     legacyReviewEnabled.value ? listOfflineQueueReviewItems() : Promise.resolve([]),
   ]);
+  refreshError.value = "";
   if (scopeAtStart !== authScopeKey()) {
     reviewEntries.value = [];
     legacyReviewItems.value = [];
@@ -205,6 +211,14 @@ const refresh = async () => {
   reviewEntries.value = modernEntries;
   legacyReviewItems.value = legacyEntries;
   if (!expandedId.value && reviewEntries.value[0]) expandedId.value = reviewEntries.value[0].id;
+};
+
+const refreshInBackground = async () => {
+  try {
+    await refresh();
+  } catch (error) {
+    refreshError.value = toUserFacingErrorMessage(error, "Unable to refresh offline checkout status.");
+  }
 };
 
 const continueOffline = () => {
@@ -322,18 +336,18 @@ const serverStateTimeLabel = (value: unknown) => {
   return formatTime(typeof state.action_time === "string" ? state.action_time : typeof state.updated_at === "string" ? state.updated_at : null);
 };
 
-const handleChange = () => void refresh();
-watch(() => props.enabled, () => void refresh());
+const handleChange = () => void refreshInBackground();
+watch(() => props.enabled, () => void refreshInBackground());
 watch(authScopeKey, (next, previous) => {
   if (next === previous) return;
   reviewEntries.value = [];
   legacyReviewItems.value = [];
   expandedId.value = null;
-  void refresh();
+  void refreshInBackground();
 });
 onMounted(() => {
-  void refresh();
-  pollTimer = window.setInterval(() => void refresh(), 30_000);
+  void refreshInBackground();
+  pollTimer = window.setInterval(() => void refreshInBackground(), 30_000);
   window.addEventListener("online", handleChange);
   window.addEventListener("itemtraxx:offline-queue-changed", handleChange);
   window.addEventListener("itemtraxx:offline-workflow-changed", handleChange);

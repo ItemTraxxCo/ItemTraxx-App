@@ -133,7 +133,17 @@ const loadAccountSettings = async () => {
     savedPreference.value = currentPreference;
     preferenceFeedback.value = "";
   }
-  summary.value = await getOfflineWorkflowSummary();
+  try {
+    summary.value = await getOfflineWorkflowSummary();
+    error.value = "";
+  } catch (cause) {
+    error.value = toUserFacingErrorMessage(cause, "Unable to load offline pack settings.");
+    throw cause;
+  }
+};
+
+const refreshAccountSettings = () => {
+  void loadAccountSettings().catch(() => undefined);
 };
 
 const savePreference = () => {
@@ -168,16 +178,16 @@ const downloadNow = async () => {
 
 watch(
   () => [auth.workspaceContextId, auth.userId] as const,
-  () => void loadAccountSettings(),
+  refreshAccountSettings,
 );
 
 onMounted(() => {
-  void loadAccountSettings();
-  window.addEventListener("itemtraxx:offline-workflow-changed", loadAccountSettings);
+  refreshAccountSettings();
+  window.addEventListener("itemtraxx:offline-workflow-changed", refreshAccountSettings);
 });
 
 onScopeDispose(() => {
-  window.removeEventListener("itemtraxx:offline-workflow-changed", loadAccountSettings);
+  window.removeEventListener("itemtraxx:offline-workflow-changed", refreshAccountSettings);
 });
 </script>
 

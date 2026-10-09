@@ -996,6 +996,8 @@ onMounted(() => {
       .filter((account) => account.is_active)
       .map(({ id, auth_email }) => ({ id, auth_email }));
     tenantAccounts.value.sort((left, right) => left.auth_email.localeCompare(right.auth_email));
+  }).catch(() => {
+    tenantAccounts.value = [];
   });
 });
 

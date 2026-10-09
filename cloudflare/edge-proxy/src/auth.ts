@@ -23,6 +23,10 @@ import {
   getPasswordResetDelivery,
   sendPasswordResetEmail,
 } from "./passwordResetDelivery.ts";
+import {
+  normalizeBetterAuthPasswordResetRequest,
+  resolvePasswordResetRedirect,
+} from "./passwordResetRedirect.ts";
 import { sendAccountEmail } from "./accountEmailDelivery.ts";
 import { recordPasskeyUsage } from "./passkeyUsage.ts";
 import {
@@ -751,24 +755,6 @@ const constantTimeSecretMatches = async (provided: string, expected: string) => 
   return a.length === b.length && a.every((value, index) => value === b[index]);
 };
 
-const resolvePasswordResetRedirect = (env: BetterAuthEnv, requested: unknown) => {
-  const configured = typeof requested === "string" && requested.trim()
-    ? requested.trim()
-    : isItemTraxxHostname(new URL(env.BETTER_AUTH_URL).hostname)
-    ? "https://itemtraxx.com/reset-password"
-    : `${trimTrailingSlash(env.BETTER_AUTH_URL)}/reset-password`;
-  const redirect = new URL(configured);
-  const isLocal = ["localhost", "127.0.0.1"].includes(redirect.hostname);
-  if (
-    redirect.pathname !== "/reset-password" || redirect.search || redirect.hash ||
-    (!isItemTraxxHostname(redirect.hostname) && !(isLocal && redirect.protocol === "http:")) ||
-    (isItemTraxxHostname(redirect.hostname) && redirect.protocol !== "https:")
-  ) {
-    throw new Error("Invalid password reset redirect");
-  }
-  return redirect.toString();
-};
-
 const resolveAccountFlowURL = (
   env: BetterAuthEnv,
   requested: unknown,
@@ -1260,7 +1246,14 @@ export const handleBetterAuthRequest = async (request: Request, rawEnv: Env) => 
   // delivery failure cannot be used to enumerate registered accounts. The
   // internal administration bridge above checks the delivery outcome and
   // returns an actionable failure to trusted callers instead.
-  return getBetterAuth(env).handler(await normalizeBetterAuthCaptchaRequest(request));
+  const normalizedResetRequest = await normalizeBetterAuthPasswordResetRequest(
+    request,
+    env,
+  );
+  if (normalizedResetRequest instanceof Response) return normalizedResetRequest;
+  return getBetterAuth(env).handler(
+    await normalizeBetterAuthCaptchaRequest(normalizedResetRequest),
+  );
 };
 
 export const getSupabaseAccessToken = async (request: Request, env: Env) => {

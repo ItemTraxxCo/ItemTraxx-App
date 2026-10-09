@@ -1270,6 +1270,7 @@ test.describe("prepared offline checkout workflow contract", () => {
     await page.evaluate(() => {
       window.localStorage.setItem("itemtraxx-device-id", "device-e2e");
       window.localStorage.setItem("itemtraxx:onboarding:v1:workspace_admin", new Date().toISOString());
+      window.localStorage.setItem("itemtraxx:offline-pack-preference:v1:workspace-e2e:user-e2e-admin", "manual");
     });
     await setWorkspaceAdminSession(page, "workspace-e2e");
     await page.evaluate(async (pack) => {
@@ -1279,15 +1280,12 @@ test.describe("prepared offline checkout workflow contract", () => {
       await workflow.writePack(pack);
     }, workflowPack({ itemStatus: "checked_out", checkedOutBy: "borrower-1" }));
     await navigateApp(page, "/admin/return");
-    const offlinePrompt = page.getByRole("alertdialog", { name: "Download offline pack?" });
-    if (await offlinePrompt.isVisible()) {
-      await offlinePrompt.getByRole("button", { name: "Not now" }).click();
-    }
     await context.setOffline(true);
     await page.getByPlaceholder("Scan or enter barcode").fill("ITEM-1");
     await page.getByRole("button", { name: "Add item" }).click();
+    await expect(page.getByRole("listitem").filter({ hasText: "ITEM-1" })).toBeVisible();
     await page.getByRole("button", { name: "Complete Quick Return" }).click();
-    await expect(page.getByRole("alert").getByText(/Return request buffered for auto-sync/)).toBeVisible();
+    await expect(page.locator(".admin-section-card p.error")).toContainText(/Return request buffered for auto-sync/);
     await expect.poll(async () => page.evaluate(async () => {
       const workflow = (window.__itemtraxxTest as typeof window.__itemtraxxTest & {
         offlineCheckoutWorkflow: { readLedger: () => Promise<unknown[]> };

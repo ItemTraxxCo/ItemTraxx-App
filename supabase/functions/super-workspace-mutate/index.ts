@@ -7,7 +7,6 @@ import { requireTrustedEdgeIngress } from "../_shared/trustedIngress.ts";
 import { readJsonBody } from "../_shared/requestBody.ts";
 import { hasPrivilegedStepUp } from "../_shared/privilegedStepUp.ts";
 import { isSuperAdminTokenBlockedBySessionRevocation } from "../_shared/superAdminSessions.ts";
-import { writeSuperAdminAudit } from "../_shared/superAdminAudit.ts";
 import { callBetterAuthAdmin } from "../_shared/betterAuthAdmin.ts";
 import {
   optionalText,
@@ -180,15 +179,38 @@ serve(async (req) => {
       p = (body.payload && typeof body.payload === "object"
         ? body.payload
         : {}) as Record<string, unknown>;
-    const writeAudit = async (actionType: string, workspaceId: string, metadata: Record<string, unknown> = {}) => {
-      await writeSuperAdminAudit(admin, {
-        actorId: user.id,
-        actorEmail: user.email ?? null,
-        actionType,
-        targetType: "workspace",
-        targetId: workspaceId,
-        metadata,
-      });
+    const startAudit = async (
+      actionType: string,
+      workspaceId: string | null,
+      metadata: Record<string, unknown> = {},
+    ) => {
+      const { data, error } = await admin.from("super_admin_audit_logs").insert({
+        actor_id: user.id,
+        actor_email: user.email ?? null,
+        action_type: actionType,
+        target_type: "workspace",
+        target_id: workspaceId,
+        metadata: { ...metadata, audit_stage: "started" },
+      }).select("id").single();
+      if (error || !data?.id) {
+        throw new Error("Unable to write Super Admin audit log.");
+      }
+      return data.id as string;
+    };
+    const completeAudit = async (
+      auditId: string,
+      workspaceId: string | null,
+      metadata: Record<string, unknown> = {},
+    ) => {
+      const { error } = await admin.from("super_admin_audit_logs").update({
+        target_id: workspaceId,
+        metadata: { ...metadata, audit_stage: "completed" },
+      }).eq("id", auditId);
+      if (error) {
+        // The durable started record remains as evidence of the attempted
+        // mutation. Do not report the already-applied mutation as failed.
+        console.error("super-workspace-mutate audit completion failed", error);
+      }
     };
     const load = async (id?: string) => {
       let q = admin.from("workspaces").select(
@@ -317,6 +339,10 @@ serve(async (req) => {
         const existing = await loadIndividualAccount(existingProfile.workspace_id);
         if (existing) return json(200, { data: individualAccountView(existing) });
       }
+      const auditId = await startAudit("create_individual_account", null, {
+        name,
+        account_category: "individual",
+      });
       // The database and Better Auth organization table require a unique slug.
       // This value is internal only and is never returned to the admin UI.
       const internalSlug = `individual-${crypto.randomUUID()}`;
@@ -392,7 +418,7 @@ serve(async (req) => {
         await admin.from("workspaces").delete().eq("id", w.id);
         return json(400, { error: "Unable to assign individual account sign-in." });
       }
-      await writeAudit("create_individual_account", w.id, { name, account_category: "individual" });
+      await completeAudit(auditId, w.id, { name, account_category: "individual" });
       return json(200, { data: individualAccountView((await load(w.id))[0]) });
     }
     if (action === "update_individual_account") {
@@ -440,6 +466,10 @@ serve(async (req) => {
       if (duplicateProfiles?.length) {
         return json(409, { error: "That sign-in email is already in use." });
       }
+      const auditId = await startAudit("update_individual_account", id, {
+        name,
+        auth_email: email,
+      });
       const previousEmail = primaryProfile.auth_email?.trim().toLowerCase() ?? "";
       const emailChanged = email !== previousEmail;
       if (emailChanged) {
@@ -483,7 +513,7 @@ serve(async (req) => {
         }
         return json(400, { error: "Unable to update individual account settings." });
       }
-      await writeAudit("update_individual_account", id, { name, auth_email: email });
+      await completeAudit(auditId, id, { name, auth_email: email });
       return json(200, { data: individualAccountView((await load(id))[0]) });
     }
     if (action === "set_individual_account_status") {
@@ -493,9 +523,10 @@ serve(async (req) => {
         throw new ValidationError("Invalid individual account status.");
       }
       if (!(await loadIndividualAccount(id))) return json(404, { error: "Individual account not found." });
+      const auditId = await startAudit("set_individual_account_status", id, { status });
       const { error } = await admin.from("workspaces").update(individualLifecycleValues(status)).eq("id", id);
       if (error) return json(400, { error: "Unable to update individual account status." });
-      await writeAudit("set_individual_account_status", id, { status });
+      await completeAudit(auditId, id, { status });
       return json(200, { data: individualAccountView((await load(id))[0]) });
     }
     if (action === "send_individual_account_reset") {
@@ -509,12 +540,13 @@ serve(async (req) => {
         .eq("auth_email", row.primary_admin_email).eq("is_active", true)
         .is("deleted_at", null).maybeSingle();
       if (!primary?.id) return json(404, { error: "Individual account not found." });
+      const auditId = await startAudit("send_individual_account_reset", id);
       try {
         await callBetterAuthAdmin({ action: "request_password_reset", profileId: primary.id, redirectTo: redirect });
       } catch {
         return json(400, { error: "Unable to send individual account reset." });
       }
-      await writeAudit("send_individual_account_reset", id, {});
+      await completeAudit(auditId, id);
       return json(200, { data: { success: true, auth_email: row.primary_admin_email } });
     }
     if (action === "create_workspace") {
@@ -529,6 +561,11 @@ serve(async (req) => {
       if (policy.account_category === "individual") {
         return json(400, { error: "Use the individual account manager for individual accounts." });
       }
+      const auditId = await startAudit("create_workspace", null, {
+        name,
+        slug,
+        account_category: policy.account_category,
+      });
       const { data: w, error } = await admin.from("workspaces").insert({
         name,
         slug,
@@ -582,7 +619,7 @@ serve(async (req) => {
       await admin.from("workspaces").update({
         primary_admin_profile_id: profileId,
       }).eq("id", w.id);
-      await writeAudit("create_workspace", w.id, { name, slug, account_category: policy.account_category });
+      await completeAudit(auditId, w.id, { name, slug, account_category: policy.account_category });
       return json(200, { data: (await load(w.id))[0] });
     }
     if (action === "update_workspace") {
@@ -598,6 +635,11 @@ serve(async (req) => {
       if (current?.account_category === "individual" || policy.account_category === "individual") {
         return json(400, { error: "Use the individual account manager for individual accounts." });
       }
+      const auditId = await startAudit("update_workspace", id, {
+        name,
+        slug,
+        account_category: policy.account_category,
+      });
       const { error } = await admin.from("workspaces").update({ name, slug })
         .eq("id", id);
       if (error) return json(400, { error: "Unable to update workspace." });
@@ -608,7 +650,7 @@ serve(async (req) => {
         updated_at: new Date().toISOString(),
       });
       if (policyError) return json(400, { error: "Unable to update workspace settings." });
-      await writeAudit("update_workspace", id, { name, slug, account_category: policy.account_category });
+      await completeAudit(auditId, id, { name, slug, account_category: policy.account_category });
       return json(200, { data: (await load(id))[0] });
     }
     if (action === "set_workspace_status") {
@@ -628,6 +670,7 @@ serve(async (req) => {
           purge_after: null,
           purge_state: "none",
         };
+      const auditId = await startAudit("set_workspace_status", id, { status });
       const { error } = await admin.from("workspaces").update(values).eq(
         "id",
         id,
@@ -635,7 +678,7 @@ serve(async (req) => {
       if (error) {
         return json(400, { error: "Unable to update workspace status." });
       }
-      await writeAudit("set_workspace_status", id, { status });
+      await completeAudit(auditId, id, { status });
       return json(200, { data: (await load(id))[0] });
     }
     if (action === "set_primary_admin") {
@@ -649,11 +692,12 @@ serve(async (req) => {
         true,
       ).is("deleted_at", null).maybeSingle();
       if (!target) return json(400, { error: "Invalid Workspace Admin." });
+      const auditId = await startAudit("set_primary_admin", workspaceId, { profile_id: profileId });
       const { error } = await admin.from("workspaces").update({
         primary_admin_profile_id: profileId,
       }).eq("id", workspaceId);
       if (error) return json(400, { error: "Unable to reassign Primary Workspace Admin." });
-      await writeAudit("set_primary_admin", workspaceId, { profile_id: profileId });
+      await completeAudit(auditId, workspaceId, { profile_id: profileId });
       return json(200, { data: (await load(workspaceId))[0] });
     }
     if (action === "send_primary_admin_reset") {
@@ -671,8 +715,9 @@ serve(async (req) => {
       }
       const { data: primary } = await admin.from("profiles").select("id").eq("workspace_id",workspaceId).eq("auth_email",row.primary_admin_email).maybeSingle();
       if (!primary?.id) return json(404,{error:"Primary admin not found."});
+      const auditId = await startAudit("send_primary_admin_reset", workspaceId);
       try { await callBetterAuthAdmin({action:"request_password_reset",profileId:primary.id,redirectTo:redirect}); } catch { return json(400,{error:"Unable to send password reset."}); }
-      await writeAudit("send_primary_admin_reset", workspaceId, {});
+      await completeAudit(auditId, workspaceId);
       return json(200, {
         data: { success: true, auth_email: row.primary_admin_email },
       });

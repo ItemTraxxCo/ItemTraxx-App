@@ -100,9 +100,9 @@
             <input v-model="editEmail" type="email" placeholder="superadmin@itemtraxx.com" />
           </label>
           <div class="panel-actions">
-            <button type="submit" class="sa-btn primary" :disabled="isSaving">Save Email</button>
-            <button type="button" class="sa-btn" :disabled="isSaving" @click="sendEditReset">Send Reset Link</button>
-            <button type="button" class="sa-btn" :disabled="isSaving" @click="toggleEditStatus">
+            <button type="submit" class="sa-btn primary" :disabled="isSaving || stepUpSubmitting">Save Email</button>
+            <button type="button" class="sa-btn" :disabled="isSaving || stepUpSubmitting" @click="sendEditReset">Send Reset Link</button>
+            <button type="button" class="sa-btn" :disabled="isSaving || stepUpSubmitting" @click="toggleEditStatus">
               {{ editTarget?.is_active ? "Disable" : "Enable" }}
             </button>
             <button type="button" class="sa-btn" @click="closeEditModal">Cancel</button>
@@ -115,12 +115,25 @@
       <div class="toast-title">{{ toastTitle }}</div>
       <div class="toast-body" data-session-replay-mask>{{ toastMessage }}</div>
     </div>
+
+    <StepUpModal
+      :visible="stepUpVisible"
+      :title="stepUpTitle"
+      :message="stepUpMessage"
+      :confirm-label="stepUpConfirmLabel"
+      :busy="stepUpSubmitting"
+      :error="stepUpError"
+      @cancel="cancelStepUp"
+      @confirm="confirmStepUp"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
 import { RouterLink, useRouter } from "vue-router";
+import StepUpModal from "../../components/StepUpModal.vue";
+import { useSuperAdminStepUp } from "../../composables/useSuperAdminStepUp";
 import {
   handleSuperAdminUnauthorized,
   isUnauthorizedError,
@@ -166,6 +179,20 @@ const showToast = (title: string, message: string) => {
     toastTimer = null;
   }, 4000);
 };
+
+const {
+  visible: stepUpVisible,
+  title: stepUpTitle,
+  message: stepUpMessage,
+  confirmLabel: stepUpConfirmLabel,
+  error: stepUpError,
+  isSubmitting: stepUpSubmitting,
+  request: requestStepUp,
+  cancel: cancelStepUp,
+  confirm: confirmStepUp,
+} = useSuperAdminStepUp((cause) => {
+  showToast("Action failed", toUserFacingErrorMessage(cause, "Unable to verify or complete this Super Admin action."));
+});
 
 const formatDate = (value: string) => {
   const date = new Date(value);
@@ -228,17 +255,15 @@ const closeEditModal = () => {
   editEmail.value = "";
 };
 
-const toggleEditStatus = async () => {
+const toggleEditStatus = () => {
   if (!editTarget.value) return;
   const current = editTarget.value;
   const nextStatus = !current.is_active;
-  const confirmed = window.confirm(
-    `${nextStatus ? "Enable" : "Disable"} super admin ${current.auth_email}?`
-  );
-  if (!confirmed) return;
-
-  isSaving.value = true;
-  try {
+  requestStepUp({
+    title: `${nextStatus ? "Enable" : "Disable"} Super Admin`,
+    message: `Type CONFIRM and enter your super admin password to ${nextStatus ? "enable" : "disable"} ${current.auth_email}.`,
+    confirmLabel: nextStatus ? "Enable" : "Disable",
+  }, async () => {
     const updated = await setSuperAdminStatus({
       id: current.id,
       is_active: nextStatus,
@@ -250,49 +275,44 @@ const toggleEditStatus = async () => {
       nextStatus ? "Super admin enabled" : "Super admin disabled",
       `${updated.auth_email} is now ${nextStatus ? "active" : "disabled"}.`
     );
-  } catch (err) {
-    showToast("Status update failed", toUserFacingErrorMessage(err, "Unable to update super admin status."));
-  } finally {
-    isSaving.value = false;
-  }
+  });
 };
 
-const sendEditReset = async () => {
+const sendEditReset = () => {
   if (!editTarget.value) return;
-  isSaving.value = true;
-  try {
-    await sendSuperAdminReset({ auth_email: editTarget.value.auth_email });
-    showToast("Reset sent", `Password reset flow triggered for ${editTarget.value.auth_email}.`);
-  } catch (err) {
-    showToast("Reset failed", toUserFacingErrorMessage(err, "Unable to send reset."));
-  } finally {
-    isSaving.value = false;
-  }
+  const current = editTarget.value;
+  requestStepUp({
+    title: "Send Super Admin Reset",
+    message: `Type CONFIRM and enter your super admin password to send a password reset to ${current.auth_email}.`,
+    confirmLabel: "Send Reset",
+  }, async () => {
+    await sendSuperAdminReset({ auth_email: current.auth_email });
+    showToast("Reset sent", `Password reset flow triggered for ${current.auth_email}.`);
+  });
 };
 
-const saveEditEmail = async () => {
+const saveEditEmail = () => {
   if (!editTarget.value) return;
   const nextEmail = editEmail.value.trim().toLowerCase();
   if (!nextEmail) {
     showToast("Invalid input", "Enter an email address.");
     return;
   }
-
-  isSaving.value = true;
-  try {
+  const current = editTarget.value;
+  requestStepUp({
+    title: "Update Super Admin Email",
+    message: `Type CONFIRM and enter your super admin password to change ${current.auth_email} to ${nextEmail}.`,
+    confirmLabel: "Save Email",
+  }, async () => {
     const updated = await updateSuperAdminEmail({
-      id: editTarget.value.id,
+      id: current.id,
       auth_email: nextEmail,
     });
     admins.value = admins.value.map((item) => (item.id === updated.id ? updated : item));
     editTarget.value = updated;
     editEmail.value = updated.auth_email;
     showToast("Super admin updated", "Super admin email was updated.");
-  } catch (err) {
-    showToast("Update failed", toUserFacingErrorMessage(err, "Unable to update super admin."));
-  } finally {
-    isSaving.value = false;
-  }
+  });
 };
 
 onMounted(() => {

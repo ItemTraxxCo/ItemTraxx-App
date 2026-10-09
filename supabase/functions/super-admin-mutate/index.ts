@@ -6,6 +6,7 @@ import { isAllowedOrigin, parseAllowedOrigins } from "../_shared/cors.ts";
 import { requireTrustedEdgeIngress } from "../_shared/trustedIngress.ts";
 import { readJsonBody } from "../_shared/requestBody.ts";
 import {
+  hasFreshPrivilegedStepUp,
   hasPrivilegedStepUp,
   hasRecentPrivilegedStepUp,
   SUPER_ADMIN_ACTION_CONFIRMATION_SOURCE,
@@ -32,6 +33,11 @@ const base = {
   Vary: "Origin",
 };
 const password = () => `${crypto.randomUUID()}-Aa1!`;
+const READ_ONLY_ACTIONS = new Set([
+  "list_super_admins",
+  "list_workspace_admins",
+  "list_tenant_accounts",
+]);
 serve(async (req) => {
   const origin = req.headers.get("origin"),
     ok = !origin ||
@@ -109,12 +115,16 @@ serve(async (req) => {
         ...stepUpOptions,
         source: SUPER_ADMIN_ACTION_CONFIRMATION_SOURCE,
       })
-      : await hasPrivilegedStepUp(admin, stepUpOptions);
+      : READ_ONLY_ACTIONS.has(action)
+      ? await hasPrivilegedStepUp(admin, stepUpOptions)
+      : await hasFreshPrivilegedStepUp(admin, stepUpOptions);
     if (!hasRequiredStepUp) {
       return json(403, {
         error: action === "create_super_admin"
           ? "Confirm your current password before creating a Super Admin."
-          : "Super admin verification required.",
+          : READ_ONLY_ACTIONS.has(action)
+          ? "Super admin verification required."
+          : "Confirm your current password before performing this Super Admin action.",
       });
     }
     const enrich = async (rows: any[]) => {

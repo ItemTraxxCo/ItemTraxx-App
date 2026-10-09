@@ -232,9 +232,10 @@ create policy super_admin_all_alert_rules on public.super_alert_rules for all to
 
 -- super_approvals
 drop policy if exists super_admin_all_approvals on public.super_approvals;
-create policy super_admin_all_approvals on public.super_approvals for all to authenticated
-  using ((select current_user_role()) = 'super_admin' and (select has_recent_privileged_step_up('super_admin')))
-  with check ((select current_user_role()) = 'super_admin' and (select has_recent_privileged_step_up('super_admin')));
+drop policy if exists super_admin_select_approvals on public.super_approvals;
+-- Writes stay on the server-side super-ops path so identities cannot be forged.
+create policy super_admin_select_approvals on public.super_approvals for select to authenticated
+  using ((select current_user_role()) = 'super_admin' and (select has_recent_privileged_step_up('super_admin')));
 
 -- super_jobs
 drop policy if exists super_admin_all_jobs on public.super_jobs;

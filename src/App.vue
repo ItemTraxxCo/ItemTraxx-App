@@ -93,7 +93,7 @@
     <AppToastOutlet v-if="!fatalErrorToast.visible" />
     <FatalErrorToast v-if="fatalErrorToast.visible" />
     <OfflineQueueToast :enabled="showOfflineQueueToast" :count="offlineQueue.count.value" :syncing-count="offlineQueue.syncingCount.value" :review-count="offlineQueue.reviewCount.value" :tooltip="offlineQueue.tooltip.value" />
-    <Analytics v-if="consent.showTelemetry.value" />
+    <Analytics v-if="consent.showTelemetry.value" :before-send="sanitizeVercelAnalyticsEvent" />
     <SpeedInsights v-if="consent.showTelemetry.value" />
   </div>
 </template>
@@ -122,6 +122,7 @@ import { getWorkspaceState } from "./store/workspaceState";
 import { getFatalErrorToastState } from "./store/fatalErrorToast";
 import { getRouteLoadingState } from "./store/routeLoading";
 import { getSessionTerminationState } from "./store/sessionTermination";
+import { sanitizeVercelAnalyticsEvent } from "./services/analyticsService";
 
 const OnboardingModal = defineAsyncComponent(() => import("./components/OnboardingModal.vue"));
 const AuthenticatedNavigation = defineAsyncComponent(() => import("./components/app/AuthenticatedNavigation.vue"));

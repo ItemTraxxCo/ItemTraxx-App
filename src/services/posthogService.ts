@@ -501,6 +501,36 @@ const isResizeObserverLoopExceptionEvent = (properties?: Record<string, unknown>
   isSyntheticStacklessException(properties, (value) =>
     value.startsWith("ResizeObserver loop"));
 
+// Playwright injects page bindings named "__pw_*" and dispatches them from its
+// own driver. When an automated crawler visits the site, a binding call that
+// races page navigation rejects with "Function "__pw_..." is not exposed". The
+// error and its frames come from Playwright, not ItemTraxx, so drop them here.
+const PLAYWRIGHT_BINDING_FUNCTIONS = new Set<unknown>([
+  "_FrameSession._onBindingCalled",
+  "_Page.onBindingCalled",
+  "_PageBinding.dispatch",
+]);
+
+const isPlaywrightBindingExceptionEvent = (properties?: Record<string, unknown>) => {
+  const exceptionList = properties?.$exception_list;
+  if (!Array.isArray(exceptionList)) return false;
+  return exceptionList.some((entry) => {
+    if (!entry || typeof entry !== "object") return false;
+    const { value, stacktrace } = entry as {
+      value?: unknown;
+      stacktrace?: { frames?: unknown[] };
+    };
+    if (typeof value === "string" && value.trim().startsWith('Function "__pw_')) return true;
+    const frames = stacktrace?.frames;
+    return Array.isArray(frames) && frames.some(
+      (frame) =>
+        !!frame &&
+        typeof frame === "object" &&
+        PLAYWRIGHT_BINDING_FUNCTIONS.has((frame as { function?: unknown }).function),
+    );
+  });
+};
+
 // The PostHog SDK's native exception hooks run before Vue's app error handler
 // and can report errors that the application deliberately marks as handled.
 // Keep expected transport outcomes out of Error Tracking when those hooks see
@@ -595,6 +625,7 @@ const initializePostHog = async () => {
             isRecoverableChunkLoadExceptionEvent(safeEvent.properties) ||
             isOpaqueScriptExceptionEvent(safeEvent.properties) ||
             isResizeObserverLoopExceptionEvent(safeEvent.properties) ||
+            isPlaywrightBindingExceptionEvent(safeEvent.properties) ||
             isExpectedTransportAppErrorExceptionEvent(safeEvent.properties)
           )
         ) {

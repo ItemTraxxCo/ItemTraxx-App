@@ -1,17 +1,25 @@
-const BETTER_AUTH_EMAIL_SIGN_IN_PATH = "/api/auth/sign-in/email";
+const BETTER_AUTH_CAPTCHA_PATHS = new Set([
+  "/api/auth/sign-in/email",
+  "/api/auth/request-password-reset",
+]);
 const CAPTCHA_FORM_FIELD = "captchaResponse";
 
+export const normalizeBetterAuthPathname = (pathname: string) => {
+  const collapsed = pathname.replace(/\/{2,}/g, "/");
+  return collapsed.length > 1 ? collapsed.replace(/\/+$/, "") : collapsed;
+};
+
 /**
- * Keep password sign-in CORS-simple even when Turnstile is enabled. The
- * browser sends the token as a form field (rather than the non-safelisted
- * x-captcha-response header); promote it back to the header only inside the
- * Worker, immediately before Better Auth's captcha middleware runs.
+ * Keep password sign-in and reset requests CORS-simple even when Turnstile is
+ * enabled. The browser sends the token as a form field (rather than the
+ * non-safelisted x-captcha-response header); promote it back to the header only
+ * inside the Worker, immediately before Better Auth's captcha middleware runs.
  */
 export const normalizeBetterAuthCaptchaRequest = async (request: Request) => {
   const url = new URL(request.url);
   if (
     request.method !== "POST" ||
-    url.pathname !== BETTER_AUTH_EMAIL_SIGN_IN_PATH ||
+    !BETTER_AUTH_CAPTCHA_PATHS.has(normalizeBetterAuthPathname(url.pathname)) ||
     request.headers.has("x-captcha-response")
   ) {
     return request;

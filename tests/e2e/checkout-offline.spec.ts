@@ -1263,14 +1263,13 @@ test.describe("prepared offline checkout workflow contract", () => {
   test("queues Quick Return with an explicit quick_return intent and current borrower", async ({ page, context }) => {
     await mockSystemStatus(page);
     await mockAdminOps(page);
+    const consent = page.getByRole("dialog", { name: "Cookie preferences" });
+    if (await consent.isVisible()) {
+      await consent.getByRole("button", { name: "Essential only" }).click();
+    }
     await page.evaluate(() => {
       window.localStorage.setItem("itemtraxx-device-id", "device-e2e");
       window.localStorage.setItem("itemtraxx:onboarding:v1:workspace_admin", new Date().toISOString());
-      window.localStorage.setItem("itemtraxx-cookie-consent", JSON.stringify({
-        version: 2,
-        preferences: { analytics: false, diagnostics: false },
-        updatedAt: new Date().toISOString(),
-      }));
     });
     await setWorkspaceAdminSession(page, "workspace-e2e");
     await page.evaluate(async (pack) => {
@@ -1280,8 +1279,10 @@ test.describe("prepared offline checkout workflow contract", () => {
       await workflow.writePack(pack);
     }, workflowPack({ itemStatus: "checked_out", checkedOutBy: "borrower-1" }));
     await navigateApp(page, "/admin/return");
-    const consentButton = page.getByRole("button", { name: "Essential only" });
-    if (await consentButton.isVisible()) await consentButton.click();
+    const offlinePrompt = page.getByRole("alertdialog", { name: "Download offline pack?" });
+    if (await offlinePrompt.isVisible()) {
+      await offlinePrompt.getByRole("button", { name: "Not now" }).click();
+    }
     await context.setOffline(true);
     await page.getByPlaceholder("Scan or enter barcode").fill("ITEM-1");
     await page.getByRole("button", { name: "Add item" }).click();

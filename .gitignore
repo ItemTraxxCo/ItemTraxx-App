@@ -73,3 +73,12 @@ AGENTS.md
 .superpowers/
 .codex/environments/environment.toml
 .vercel
+
+# Supabase CLI temp files
+supabase/.temp/storage-version
+supabase/.temp/rest-version
+supabase/.temp/storage-migration
+supabase/.temp/project-ref
+supabase/.temp/postgres-version
+supabase/.temp/pooler-url
+supabase/.temp/gotrue-version

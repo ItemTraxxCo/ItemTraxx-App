@@ -173,7 +173,10 @@ const load = async () => {
 };
 
 const canChangeRole = (account: WorkspaceAccount) =>
-  !account.is_primary_admin && account.id !== currentProfileId && adminDetailsTarget.value === null;
+  canManageAdminDetails.value &&
+  !account.is_primary_admin &&
+  account.id !== currentProfileId &&
+  adminDetailsTarget.value === null;
 
 const hasRoleChange = (account: WorkspaceAccount) =>
   pendingRoles.value[account.id] !== undefined &&

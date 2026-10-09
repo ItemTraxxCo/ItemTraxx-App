@@ -93,7 +93,7 @@
     <AppToastOutlet v-if="!fatalErrorToast.visible" />
     <FatalErrorToast v-if="fatalErrorToast.visible" />
     <OfflineQueueToast :enabled="showOfflineQueueToast" :count="offlineQueue.count.value" :syncing-count="offlineQueue.syncingCount.value" :review-count="offlineQueue.reviewCount.value" :tooltip="offlineQueue.tooltip.value" />
-    <Analytics v-if="consent.showTelemetry.value" />
+    <ConsentAnalytics v-if="consent.showTelemetry.value" />
     <SpeedInsights v-if="consent.showTelemetry.value" />
   </div>
 </template>
@@ -127,7 +127,7 @@ const OnboardingModal = defineAsyncComponent(() => import("./components/Onboardi
 const AuthenticatedNavigation = defineAsyncComponent(() => import("./components/app/AuthenticatedNavigation.vue"));
 const OfflineWorkflowOverlays = defineAsyncComponent(() => import("./components/OfflineWorkflowOverlays.vue"));
 const OfflineWorkflowStatus = defineAsyncComponent(() => import("./components/OfflineWorkflowStatus.vue"));
-const Analytics = defineAsyncComponent(async () => (await import("@vercel/analytics/vue")).Analytics);
+const ConsentAnalytics = defineAsyncComponent(() => import("./components/ConsentAnalytics.vue"));
 const FatalErrorToast = defineAsyncComponent(async () => (await import("./components/FatalErrorToast.vue")).default);
 const OfflineQueueToast = defineAsyncComponent(async () => (await import("./components/OfflineQueueToast.vue")).default);
 const SpeedInsights = defineAsyncComponent(async () => (await import("@vercel/speed-insights/vue")).SpeedInsights);

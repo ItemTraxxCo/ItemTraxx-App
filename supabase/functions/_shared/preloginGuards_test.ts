@@ -5,6 +5,7 @@ import {
   resolveClientIp,
   resolvePublicStatusClient,
   resolveRateLimitResult,
+  verifyAndConsumeTurnstileToken,
   verifyTurnstileToken,
 } from "./preloginGuards.ts";
 
@@ -540,6 +541,92 @@ Deno.test("verifyTurnstileToken treats a non-OK verification response as a failu
       async () => {
         const result = await verifyTurnstileToken("token", "", "ctx");
         assert(!result, "expected a non-OK upstream response to fail closed");
+      },
+    );
+  });
+});
+
+Deno.test("verifyAndConsumeTurnstileToken rejects replay across public endpoints", async () => {
+  await withTurnstileSecret(async () => {
+    const redeemed = new Set<string>();
+    const hashes: string[] = [];
+    const client = {
+      rpc: async (name: string, args: Record<string, unknown>) => {
+        assert(
+          name === "consume_turnstile_token",
+          "expected the one-time redemption RPC",
+        );
+        const tokenHash = String(args.p_token_hash ?? "");
+        assert(
+          /^[a-f0-9]{64}$/.test(tokenHash),
+          "expected a SHA-256 token fingerprint",
+        );
+        hashes.push(tokenHash);
+        if (redeemed.has(tokenHash)) return { data: false, error: null };
+        redeemed.add(tokenHash);
+        return { data: true, error: null };
+      },
+    };
+    let providerCalls = 0;
+
+    await withStubbedFetch(
+      async () => {
+        providerCalls += 1;
+        // Model the runtime behavior in the attack analysis: Siteverify says
+        // success for both requests, so the local atomic gate must stop replay.
+        return new Response(JSON.stringify({ success: true }), { status: 200 });
+      },
+      async () => {
+        const first = await verifyAndConsumeTurnstileToken(
+          client,
+          "reused-token",
+          "203.0.113.1",
+          "contact-support-submit",
+        );
+        const replay = await verifyAndConsumeTurnstileToken(
+          client,
+          "reused-token",
+          "203.0.113.1",
+          "contact-sales-submit",
+        );
+
+        assert(first, "expected first token redemption to pass");
+        assert(!replay, "expected cross-endpoint replay to fail");
+        assert(
+          providerCalls === 2,
+          "expected each request to be verified by Siteverify",
+        );
+        assert(
+          hashes[0] === hashes[1],
+          "expected the same token to produce the same fingerprint",
+        );
+      },
+    );
+  });
+});
+
+Deno.test("verifyAndConsumeTurnstileToken fails closed when the replay store is unavailable", async () => {
+  await withTurnstileSecret(async () => {
+    const client = {
+      rpc: async () => ({
+        data: null,
+        error: { message: "database unavailable" },
+      }),
+    };
+    await withStubbedFetch(
+      async () =>
+        new Response(JSON.stringify({ success: true }), { status: 200 }),
+      async () => {
+        const result = await verifyAndConsumeTurnstileToken(
+          client,
+          "valid-token",
+          "203.0.113.1",
+          "contact-support-submit",
+        );
+        assert(
+          !result,
+          "expected replay-store errors to reject the submission",
+        );
       },
     );
   });

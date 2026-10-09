@@ -10,7 +10,7 @@ vi.mock("@vercel/analytics", () => ({
 
 import { allowsAnalytics } from "./cookieConsentService";
 import { track } from "@vercel/analytics";
-import { trackAnalyticsEvent } from "./analyticsService";
+import { sanitizeVercelAnalyticsEvent, trackAnalyticsEvent } from "./analyticsService";
 
 const mockedAllows = vi.mocked(allowsAnalytics);
 const mockedTrack = vi.mocked(track);
@@ -42,5 +42,17 @@ describe("trackAnalyticsEvent", () => {
     await trackAnalyticsEvent("page_view");
 
     expect(mockedTrack).toHaveBeenCalledWith("page_view", undefined);
+  });
+});
+
+describe("sanitizeVercelAnalyticsEvent", () => {
+  it("removes SSO proof values while preserving ordinary navigation state", () => {
+    expect(sanitizeVercelAnalyticsEvent({
+      type: "pageview",
+      url: "https://www.itemtraxx.com/admin?tab=users&itx_sso_proof=signed-proof",
+    })).toEqual({
+      type: "pageview",
+      url: "https://www.itemtraxx.com/admin?tab=users",
+    });
   });
 });

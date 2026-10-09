@@ -258,7 +258,11 @@ serve(async (req) => {
       return jsonResponse(400, { error: "Invalid action" });
     }
 
-    const isMutationAction = !["list_workspace_admins", "list_workspace_accounts"].includes(action);
+    const isMutationAction = ![
+      "list_workspace_admins",
+      "list_workspace_accounts",
+      "list_tenant_accounts",
+    ].includes(action);
     if (isMutationAction) {
       const { data: rateLimit, error: rateLimitError } = await userClient.rpc(
         "consume_rate_limit",
@@ -425,6 +429,11 @@ serve(async (req) => {
             created_at: target.created_at,
             is_primary_admin: target.id === tenant.primary_admin_profile_id,
           },
+        });
+      }
+      if (!canManageAdmins) {
+        return jsonResponse(403, {
+          error: "Primary admin access is required to change workspace account roles.",
         });
       }
       if (!target.better_auth_user_id) {

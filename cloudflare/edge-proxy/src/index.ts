@@ -451,7 +451,8 @@ export default {
           const isRpcPath = isRpcProxyPath(url.pathname) ||
             isAllowedRpcProxyPath(url.pathname);
           if (
-            !isRpcPath && !isAllowedRestRequest(url.pathname, request.method)
+            !isRpcPath &&
+            !isAllowedRestRequest(url.pathname, request.method, url.search)
           ) {
             return buildError(
               403,

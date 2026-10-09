@@ -491,6 +491,54 @@ Deno.test("dispatcher blocks canonicalized REST RPC variants without upstream fe
   }
 });
 
+Deno.test("dispatcher blocks non-allowlisted PostgREST embeds before upstream fetch", async () => {
+  const originalFetch = globalThis.fetch;
+  let upstreamFetches = 0;
+  globalThis.fetch = ((_input: string | URL | Request, _init?: RequestInit) => {
+    upstreamFetches += 1;
+    return Promise.resolve(
+      new Response("unexpected upstream fetch", { status: 500 }),
+    );
+  }) as typeof fetch;
+
+  try {
+    for (
+      const path of [
+        "/rest/v1/items?select=id,workspace_policies(*)",
+        "/rest/v1/workspaces?select=id,workspace_usage(*)",
+      ]
+    ) {
+      const response = await worker.fetch(
+        new Request(`https://edge.itemtraxx.com${path}`, {
+          headers: {
+            Authorization: "Bearer fixture-token",
+            origin: "https://itemtraxx.com",
+          },
+        }),
+        {
+          SUPABASE_URL: "https://example.supabase.co",
+          SUPABASE_ANON_KEY: "anon-key",
+        },
+        executionContext,
+      );
+
+      if (response.status !== 403) {
+        throw new Error(
+          `Expected non-allowlisted relation query to return 403: ${path}`,
+        );
+      }
+    }
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+
+  if (upstreamFetches !== 0) {
+    throw new Error(
+      `Expected zero upstream fetches for blocked relation queries, received ${upstreamFetches}`,
+    );
+  }
+});
+
 Deno.test("dispatcher rejects allowed data paths without a verified Better Auth session", async () => {
   const originalFetch = globalThis.fetch;
   const upstreamUrls: string[] = [];

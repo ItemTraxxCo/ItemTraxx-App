@@ -25,12 +25,16 @@ import {
 } from "./passwordResetDelivery.ts";
 import { sendAccountEmail } from "./accountEmailDelivery.ts";
 import { recordPasskeyUsage } from "./passkeyUsage.ts";
-import { normalizeBetterAuthCaptchaRequest } from "./authCaptcha.ts";
+import {
+  normalizeBetterAuthCaptchaRequest,
+  normalizeBetterAuthPathname,
+} from "./authCaptcha.ts";
 import { buildAdminLoginAuditRecord } from "./authSessionAudit.ts";
 
 export { normalizeBetterAuthCaptchaRequest } from "./authCaptcha.ts";
 
 type BetterAuthEnv = Env & {
+  ITX_ENVIRONMENT?: string;
   SUPABASE_SERVICE_ROLE_KEY?: string;
   SUPABASE_URL?: string;
   BETTER_AUTH_URL: string;
@@ -1236,6 +1240,18 @@ export const handleInternalAuthAdminRequest = async (request: Request, rawEnv: E
 export const handleBetterAuthRequest = async (request: Request, rawEnv: Env) => {
   const env = rawEnv as BetterAuthEnv;
   const url = new URL(request.url);
+  if (
+    request.method === "POST" &&
+    normalizeBetterAuthPathname(url.pathname) ===
+      "/api/auth/request-password-reset" &&
+    env.ITX_ENVIRONMENT?.trim().toLowerCase() === "production" &&
+    !env.BETTER_AUTH_TURNSTILE_SECRET_KEY?.trim()
+  ) {
+    return Response.json(
+      { message: "Password reset verification is unavailable" },
+      { status: 503 },
+    );
+  }
   if (url.pathname === "/api/auth/.well-known/jwks.json") {
     const publicJwk = parseJwk(env.BETTER_AUTH_JWT_PUBLIC_JWK, "BETTER_AUTH_JWT_PUBLIC_JWK");
     return Response.json({ keys: [{ ...publicJwk, use: "sig", alg: "ES256" }] });

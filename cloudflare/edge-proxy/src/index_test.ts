@@ -275,6 +275,49 @@ Deno.test("rate limits public email sign-in before reading its form body", async
   }
 });
 
+Deno.test("rate limits public password resets before reading its form body", async () => {
+  let bodyRead = false;
+  let limiterKey = "";
+  const body = new ReadableStream<Uint8Array>({
+    pull(controller) {
+      bodyRead = true;
+      controller.enqueue(new TextEncoder().encode("email=user@example.com"));
+      controller.close();
+    },
+  }, { highWaterMark: 0 });
+  const response = await worker.fetch(
+    new Request("https://edge.itemtraxx.com/api/auth//request-password-reset/", {
+      method: "POST",
+      headers: {
+        "content-type": "application/x-www-form-urlencoded",
+        "cf-connecting-ip": "203.0.113.10",
+      },
+      body,
+      duplex: "half",
+    }),
+    {
+      PUBLIC_AUTH_RATE_LIMITER: {
+        limit: async ({ key }: { key: string }) => {
+          limiterKey = key;
+          return { success: false };
+        },
+      },
+      ITX_ENVIRONMENT: "test",
+    } as Env,
+    executionContext,
+  );
+
+  if (response.status !== 429) {
+    throw new Error(`Expected password reset throttle response, received ${response.status}`);
+  }
+  if (bodyRead) {
+    throw new Error("Expected rejected password reset request body to remain unread");
+  }
+  if (limiterKey !== "better-auth-password-reset:203.0.113.10") {
+    throw new Error(`Unexpected password reset throttle key: ${limiterKey}`);
+  }
+});
+
 Deno.test("edge proxy CORS allows the explicitly configured demo workspace", async () => {
   const demoOrigin = "https://itxdemo.app.itemtraxx.com";
   const response = await worker.fetch(

@@ -1,6 +1,7 @@
 import { assertEquals, assertNotEquals } from "https://deno.land/std@0.224.0/assert/mod.ts";
 import { normalizeBetterAuthCaptchaRequest } from "./authCaptcha.ts";
 import {
+  handleBetterAuthRequest,
   isActiveBetterAuthOrganizationMember,
   isActiveLinkedBetterAuthProfile,
   hasRecentSuperAdminPasswordConfirmation,
@@ -245,6 +246,37 @@ Deno.test("leaves requests without a form captcha unchanged", async () => {
 
   assertEquals(normalized, request);
   assertEquals(await normalized.text(), "email=user%40example.com&password=correct-horse");
+});
+
+Deno.test("promotes a form captcha field on password reset requests", async () => {
+  const request = new Request("https://edge.itemtraxx.com/api/auth//request-password-reset/", {
+    method: "POST",
+    headers: { "content-type": "application/x-www-form-urlencoded" },
+    body: "email=user%40example.com&redirectTo=https%3A%2F%2Fitemtraxx.com%2Freset-password&captchaResponse=turnstile-token",
+  });
+
+  const normalized = await normalizeBetterAuthCaptchaRequest(request);
+
+  assertNotEquals(normalized, request);
+  assertEquals(normalized.headers.get("x-captcha-response"), "turnstile-token");
+  assertEquals(
+    await normalized.text(),
+    "email=user%40example.com&redirectTo=https%3A%2F%2Fitemtraxx.com%2Freset-password",
+  );
+});
+
+Deno.test("production password reset fails closed when Turnstile verification is unconfigured", async () => {
+  const response = await handleBetterAuthRequest(
+    new Request("https://edge.itemtraxx.com/api/auth/request-password-reset", {
+      method: "POST",
+    }),
+    { ITX_ENVIRONMENT: "production" } as Env,
+  );
+
+  assertEquals(response.status, 503);
+  assertEquals(await response.json(), {
+    message: "Password reset verification is unavailable",
+  });
 });
 
 Deno.test("sanitizes SSO provider configuration before returning it to the browser", () => {

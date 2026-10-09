@@ -21,6 +21,7 @@ import {
 import { proxySupabaseApiRequest } from "./supabaseApiProxy.ts";
 import { isItemTraxxHostname } from "./url.ts";
 import { enforcePublicRequestLimit } from "./publicRequestRateLimit.ts";
+import { normalizeBetterAuthPathname } from "./authCaptcha.ts";
 import { handleMtaStsRequest, isMtaStsRequest } from "./mtaSts.ts";
 import {
   handleBetterAuthRequest,
@@ -37,6 +38,11 @@ import {
 
 const resolveKillSwitchMessage = (env: Env) =>
   env.ITX_ITEMTRAXX_KILLSWITCH_MESSAGE?.trim() || DEFAULT_KILL_SWITCH_MESSAGE;
+
+const PUBLIC_AUTH_RATE_LIMIT_SCOPES = new Map([
+  ["/api/auth/sign-in/email", "better-auth-email-sign-in"],
+  ["/api/auth/request-password-reset", "better-auth-password-reset"],
+]);
 
 // `env` is fixed for the life of an isolate, but these two allowlists were
 // rebuilt on every request: a CSV split plus a Set union for origins, and a
@@ -297,20 +303,25 @@ export default {
         }
 
         if (url.pathname.startsWith("/api/auth/")) {
-          if (
-            request.method === "POST" &&
-            url.pathname === "/api/auth/sign-in/email"
-          ) {
+          const authPathname = normalizeBetterAuthPathname(url.pathname);
+          const rateLimitScope = request.method === "POST"
+            ? PUBLIC_AUTH_RATE_LIMIT_SCOPES.get(authPathname)
+            : undefined;
+          if (rateLimitScope) {
             const admitted = await enforcePublicRequestLimit(
               env.PUBLIC_AUTH_RATE_LIMITER,
               tracedRequest,
-              "better-auth-email-sign-in",
+              rateLimitScope,
             );
             if (!admitted.allowed) {
+              const isPasswordReset =
+                authPathname === "/api/auth/request-password-reset";
               return buildError(
                 admitted.unavailable ? 503 : 429,
                 admitted.unavailable
                   ? "Authentication admission is unavailable"
+                  : isPasswordReset
+                  ? "Too many password reset attempts"
                   : "Too many sign-in attempts",
                 headers,
                 requestId,

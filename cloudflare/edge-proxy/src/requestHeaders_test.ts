@@ -119,6 +119,67 @@ Deno.test("function request headers preserve the allowlist, geo bounds, and supe
   );
 });
 
+Deno.test("resolved session identity overrides a different incoming bearer", () => {
+  const request = new Request(
+    "https://edge.itemtraxx.com/functions/intercom-jwt",
+    { headers: { authorization: "Bearer account-b-token" } },
+  );
+  const functionHeaders = sanitizeRequestHeaders(
+    request,
+    "anon",
+    "request-intercom",
+    "intercom-jwt",
+    "account-a-session-token",
+  );
+  assertEquals(
+    functionHeaders.get("authorization"),
+    "Bearer account-a-session-token",
+    "function proxy binds auth to the resolved cookie session",
+  );
+
+  const dataHeaders = sanitizeUpstreamHeaders(
+    request,
+    "anon",
+    "request-data",
+    "account-a-session-token",
+  );
+  assertEquals(
+    dataHeaders.get("authorization"),
+    "Bearer account-a-session-token",
+    "data proxy binds auth to the resolved cookie session",
+  );
+});
+
+Deno.test("explicit bearer remains available when no session token resolves", () => {
+  const request = new Request(
+    "https://edge.itemtraxx.com/functions/account-email-change",
+    { headers: { authorization: "Bearer public-endpoint-token" } },
+  );
+  const functionHeaders = sanitizeRequestHeaders(
+    request,
+    "anon",
+    "request-public",
+    "account-email-change",
+    null,
+  );
+  const dataHeaders = sanitizeUpstreamHeaders(
+    request,
+    "anon",
+    "request-public-data",
+    null,
+  );
+  assertEquals(
+    functionHeaders.get("authorization"),
+    "Bearer public-endpoint-token",
+    "public function bearer fallback",
+  );
+  assertEquals(
+    dataHeaders.get("authorization"),
+    "Bearer public-endpoint-token",
+    "data bearer fallback",
+  );
+});
+
 Deno.test("Data API request headers preserve only the supported upstream set", () => {
   const request = new Request("https://edge.itemtraxx.com/rest/v1/items", {
     headers: {

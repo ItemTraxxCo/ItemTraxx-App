@@ -546,7 +546,7 @@ const isResizeObserverLoopExceptionEvent = (properties?: Record<string, unknown>
 // own driver. When an automated crawler visits the site, a binding call that
 // races page navigation rejects with "Function "__pw_..." is not exposed". The
 // error and its frames come from Playwright, not ItemTraxx, so drop them here.
-const PLAYWRIGHT_BINDING_FUNCTIONS = new Set([
+const PLAYWRIGHT_BINDING_FUNCTIONS = new Set<unknown>([
   "_FrameSession._onBindingCalled",
   "_Page.onBindingCalled",
   "_PageBinding.dispatch",
@@ -567,7 +567,7 @@ const isPlaywrightBindingExceptionEvent = (properties?: Record<string, unknown>)
       (frame) =>
         !!frame &&
         typeof frame === "object" &&
-        PLAYWRIGHT_BINDING_FUNCTIONS.has((frame as { function?: unknown }).function as string),
+        PLAYWRIGHT_BINDING_FUNCTIONS.has((frame as { function?: unknown }).function),
     );
   });
 };

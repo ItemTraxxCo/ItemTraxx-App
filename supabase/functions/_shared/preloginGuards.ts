@@ -272,3 +272,37 @@ export const verifyTurnstileToken = async (
   }
   return false;
 };
+
+/**
+ * Verify with Cloudflare, then atomically redeem a server-side token
+ * fingerprint. The shared database claim protects both public forms even if
+ * upstream verification accepts a repeated token.
+ */
+export const verifyAndConsumeTurnstileToken = async (
+  client: any,
+  token: string,
+  remoteIp: string,
+  logContext: string,
+) => {
+  const verified = await verifyTurnstileToken(token, remoteIp, logContext);
+  if (!verified) return false;
+
+  const tokenHash = await sha256Hex(token.trim());
+  try {
+    const { data, error } = await client.rpc("consume_turnstile_token", {
+      p_token_hash: tokenHash,
+    });
+    if (error) {
+      console.error(`${logContext} turnstile replay check failed`);
+      return false;
+    }
+    if (data !== true) {
+      console.warn(`${logContext} turnstile token replay rejected`);
+      return false;
+    }
+    return true;
+  } catch {
+    console.error(`${logContext} turnstile replay check failed`);
+    return false;
+  }
+};

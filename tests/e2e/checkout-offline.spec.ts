@@ -1280,12 +1280,12 @@ test.describe("prepared offline checkout workflow contract", () => {
     }, workflowPack({ itemStatus: "checked_out", checkedOutBy: "borrower-1" }));
     await navigateApp(page, "/admin/return");
     const offlinePrompt = page.getByRole("alertdialog", { name: "Download offline pack?" });
-    if (await offlinePrompt.isVisible()) {
-      await offlinePrompt.getByRole("button", { name: "Not now" }).click();
-    }
+    await expect(offlinePrompt).toBeVisible();
+    await offlinePrompt.getByRole("button", { name: "Not now" }).click();
     await context.setOffline(true);
     await page.getByPlaceholder("Scan or enter barcode").fill("ITEM-1");
     await page.getByRole("button", { name: "Add item" }).click();
+    await expect(page.locator(".list li").filter({ hasText: "ITEM-1" })).toBeVisible();
     await page.getByRole("button", { name: "Complete Quick Return" }).click();
     await expect(page.getByRole("alert").getByText(/Return request buffered for auto-sync/)).toBeVisible();
     await expect.poll(async () => page.evaluate(async () => {

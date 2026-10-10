@@ -315,18 +315,56 @@ const openOfflineQueueKeyDatabase = () =>
     request.onerror = () => reject(request.error ?? new Error("Unable to open secure offline storage."));
   });
 
+class OfflineQueueStorageError extends Error {
+  constructor(operation: string, cause: unknown) {
+    const detail = cause instanceof Error ? cause.message : String(cause ?? "unknown IndexedDB error");
+    super(
+      `Offline queue IndexedDB ${operation} failed for store "${OFFLINE_QUEUE_KEY_STORE}": ${detail}`,
+      { cause },
+    );
+    this.name = "OfflineQueueStorageError";
+  }
+}
+
 const withOfflineQueueKeyStore = async <T>(
   mode: IDBTransactionMode,
+  operation: string,
   callback: (store: IDBObjectStore) => IDBRequest<T>
 ) => {
   const database = await openOfflineQueueKeyDatabase();
   try {
     return await new Promise<T>((resolve, reject) => {
-      const transaction = database.transaction(OFFLINE_QUEUE_KEY_STORE, mode);
-      const request = callback(transaction.objectStore(OFFLINE_QUEUE_KEY_STORE));
-      request.onsuccess = () => resolve(request.result);
-      request.onerror = () => reject(request.error ?? new Error("Unable to access secure offline storage."));
-      transaction.onerror = () => reject(transaction.error ?? new Error("Unable to access secure offline storage."));
+      let settled = false;
+      let result: T | undefined;
+      let hasResult = false;
+      const fail = (cause: unknown) => {
+        if (settled) return;
+        settled = true;
+        reject(new OfflineQueueStorageError(operation, cause));
+      };
+
+      try {
+        const transaction = database.transaction(OFFLINE_QUEUE_KEY_STORE, mode);
+        const request = callback(transaction.objectStore(OFFLINE_QUEUE_KEY_STORE));
+        request.onsuccess = () => {
+          result = request.result;
+          hasResult = true;
+        };
+        request.onerror = () => fail(request.error ?? new Error("IndexedDB request failed."));
+        transaction.onerror = () => fail(transaction.error ?? request.error ?? new Error("IndexedDB transaction failed."));
+        transaction.onabort = () => fail(transaction.error ?? request.error ?? new Error("IndexedDB transaction aborted."));
+        transaction.oncomplete = () => {
+          if (!hasResult) {
+            fail(new Error("IndexedDB transaction completed without a request result."));
+            return;
+          }
+          if (settled) return;
+          settled = true;
+          resolve(result as T);
+        };
+      } catch (cause) {
+        fail(cause);
+      }
     });
   } finally {
     database.close();
@@ -346,8 +384,10 @@ const importLegacyOfflineQueueKey = async () => {
 };
 
 const getOrCreateOfflineQueueKey = async () => {
-  const existing = await withOfflineQueueKeyStore<CryptoKey | undefined>("readonly", (store) =>
-    store.get(OFFLINE_QUEUE_KEY_ID)
+  const existing = await withOfflineQueueKeyStore<CryptoKey | undefined>(
+    "readonly",
+    "read encryption key",
+    (store) => store.get(OFFLINE_QUEUE_KEY_ID),
   );
   if (existing instanceof CryptoKey) return existing;
 
@@ -359,8 +399,10 @@ const getOrCreateOfflineQueueKey = async () => {
       false,
       ["encrypt", "decrypt"]
     ));
-  await withOfflineQueueKeyStore<IDBValidKey>("readwrite", (store) =>
-    store.put(key, OFFLINE_QUEUE_KEY_ID)
+  await withOfflineQueueKeyStore<IDBValidKey>(
+    "readwrite",
+    "store encryption key",
+    (store) => store.put(key, OFFLINE_QUEUE_KEY_ID),
   );
   window.sessionStorage.removeItem(OFFLINE_QUEUE_KEY_VERSION);
   return key;
@@ -421,7 +463,11 @@ export const clearOfflineCheckoutQueue = async () => {
   window.localStorage.removeItem(OFFLINE_QUEUE_LOCK_KEY);
   window.sessionStorage.removeItem(OFFLINE_QUEUE_KEY_VERSION);
   try {
-    await withOfflineQueueKeyStore<undefined>("readwrite", (store) => store.delete(OFFLINE_QUEUE_KEY_ID));
+    await withOfflineQueueKeyStore<undefined>(
+      "readwrite",
+      "delete encryption key",
+      (store) => store.delete(OFFLINE_QUEUE_KEY_ID),
+    );
   } catch {
     // Local queue data is already removed; never block logout on browser storage cleanup.
   }
@@ -464,7 +510,8 @@ export const readOfflineQueue = async () => {
     if (parsed && typeof parsed === "object" && "cipher" in parsed) {
       return await decryptOfflineQueue(raw);
     }
-  } catch {
+  } catch (cause) {
+    if (cause instanceof OfflineQueueStorageError) throw cause;
     markOfflineQueueCorrupted();
   }
 
@@ -475,8 +522,9 @@ export const writeOfflineQueue = async (items: BufferedCheckoutItem[]) => {
   try {
     const encrypted = await encryptOfflineQueue(items);
     window.localStorage.setItem(OFFLINE_QUEUE_KEY, encrypted);
-  } catch {
-    throw new Error("Unable to securely save this offline transaction. Please reconnect and try again.");
+  } catch (cause) {
+    if (cause instanceof OfflineQueueStorageError) throw cause;
+    throw new Error("Unable to securely save this offline transaction. Please reconnect and try again.", { cause });
   }
 };
 

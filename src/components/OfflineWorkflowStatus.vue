@@ -139,6 +139,7 @@ let sessionInitializationRetryTimer: number | null = null;
 let sessionInitializationRetryUsed = false;
 let activeSignInKey: string | null = null;
 let automaticPackAttemptedForSignIn: string | null = null;
+let backgroundRefreshError = "";
 
 const isOfflineWorkflowRoute = computed(() => ["/checkout", "/admin/return", "/account/return"].includes(route.path));
 
@@ -218,6 +219,20 @@ const refresh = async () => {
   };
   connection.value = readOfflineConnectionState();
   initialSummaryLoaded = true;
+};
+
+const refreshInBackground = () => {
+  void refresh().then(() => {
+    if (backgroundRefreshError && message.value === backgroundRefreshError) {
+      message.value = "";
+      messageKind.value = "success";
+    }
+    backgroundRefreshError = "";
+  }).catch((error) => {
+    backgroundRefreshError = toUserFacingErrorMessage(error, "Unable to refresh offline checkout status.");
+    messageKind.value = "error";
+    message.value = backgroundRefreshError;
+  });
 };
 
 const setSyncMessage = (result: CheckoutQueueSyncResult) => {
@@ -370,7 +385,7 @@ const showOfflineSafetyNoticeIfNeeded = () => {
 
 const handleChange = () => {
   showOfflineSafetyNoticeIfNeeded();
-  void refresh();
+  refreshInBackground();
   void syncNow();
 };
 
@@ -462,7 +477,7 @@ onMounted(() => {
   window.addEventListener("itemtraxx:offline-pack-preference-changed", handlePreferenceChange);
 
   if (isOfflineWorkflowRoute.value) void nextTick().then(() => handleSignedInScope());
-  pollTimer = window.setInterval(() => void refresh(), 10_000);
+  pollTimer = window.setInterval(refreshInBackground, 10_000);
   refreshTimer = window.setInterval(() => void automaticallyRefreshPack(), OFFLINE_PACK_REFRESH_INTERVAL_MS);
   syncTimer = window.setInterval(() => void syncNow(), 15_000);
 });

@@ -729,11 +729,15 @@ onMounted(() => {
     }
     await loadBorrowers();
     if (!isIndividualAccount.value) {
-      const accounts = await listTenantAccounts();
-      tenantAccounts.value = accounts
-        .filter((account) => account.is_active)
-        .map(({ id, auth_email }) => ({ id, auth_email }));
-      tenantAccounts.value.sort((left, right) => left.auth_email.localeCompare(right.auth_email));
+      try {
+        const accounts = await listTenantAccounts();
+        tenantAccounts.value = accounts
+          .filter((account) => account.is_active)
+          .map(({ id, auth_email }) => ({ id, auth_email }));
+        tenantAccounts.value.sort((left, right) => left.auth_email.localeCompare(right.auth_email));
+      } catch {
+        tenantAccounts.value = [];
+      }
     }
   })();
 });

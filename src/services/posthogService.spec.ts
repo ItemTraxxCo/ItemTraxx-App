@@ -398,6 +398,16 @@ describe("capturePostHogLog", () => {
 
     expect(posthogMock.captureLog).not.toHaveBeenCalled();
   });
+
+  it("does not send application diagnostics logs from a dev server behind a tunnel", async () => {
+    setHostname("dev-tunnel.trycloudflare.com");
+    vi.stubEnv("MODE", "development");
+    const mod = await initializedModule();
+
+    mod.capturePostHogLog({ body: "local request failure", level: "error" });
+
+    expect(posthogMock.captureLog).not.toHaveBeenCalled();
+  });
 });
 
 describe("identifyPostHogUser", () => {
@@ -784,6 +794,54 @@ describe("before_send exception filter", () => {
         ],
       },
     });
+  });
+
+  it("drops a Playwright binding error from an automated browser", async () => {
+    const mod = await initializedModule();
+    void mod;
+
+    const event = {
+      event: "$exception",
+      properties: {
+        $exception_list: [
+          {
+            type: "Error",
+            value: 'Function "__pw_cookie_change1" is not exposed',
+            stacktrace: {
+              frames: [
+                { function: "_PageBinding.dispatch" },
+                { function: "_Page.onBindingCalled" },
+                { function: "_FrameSession._onBindingCalled" },
+              ],
+            },
+            mechanism: { synthetic: false, handled: false },
+          },
+        ],
+      },
+    };
+
+    expect(getBeforeSend()(event)).toBeNull();
+  });
+
+  it("drops an exception that a Playwright binding frame dispatched", async () => {
+    const mod = await initializedModule();
+    void mod;
+
+    const event = {
+      event: "$exception",
+      properties: {
+        $exception_list: [
+          {
+            type: "Error",
+            value: "binding failed",
+            stacktrace: { frames: [{ function: "_PageBinding.dispatch" }] },
+            mechanism: { synthetic: false },
+          },
+        ],
+      },
+    };
+
+    expect(getBeforeSend()(event)).toBeNull();
   });
 
   it("keeps a regular exception event", async () => {

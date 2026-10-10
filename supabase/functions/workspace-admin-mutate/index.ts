@@ -258,7 +258,11 @@ serve(async (req) => {
       return jsonResponse(400, { error: "Invalid action" });
     }
 
-    const isMutationAction = !["list_workspace_admins", "list_workspace_accounts"].includes(action);
+    const isMutationAction = ![
+      "list_workspace_admins",
+      "list_workspace_accounts",
+      "list_tenant_accounts",
+    ].includes(action);
     if (isMutationAction) {
       const { data: rateLimit, error: rateLimitError } = await userClient.rpc(
         "consume_rate_limit",

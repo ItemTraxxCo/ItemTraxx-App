@@ -218,7 +218,7 @@ test.describe("Public surfaces", () => {
     expect(responseUrls.some((url) => /\.supabase\.(?:co|in)\//.test(url))).toBe(false);
   });
 
-  test("shows unknown after a forced status refresh times out", async ({ page }) => {
+  test("falls back to the neutral status label after a forced status refresh times out", async ({ page }) => {
     let statusRequestCount = 0;
     let releaseFailedRequest = () => {};
     const failedRequestGate = new Promise<void>((resolve) => {
@@ -252,13 +252,14 @@ test.describe("Public surfaces", () => {
     expect(statusRequestCount).toBe(countBeforeVisibility);
     releaseFailedRequest();
 
-    await expect(statusLink).toContainText("Unknown");
+    await expect(statusLink).toContainText("Status");
+    await expect(statusLink).not.toContainText("Running");
     await expect(statusLink.locator(".status-dot")).toHaveClass(/status-unknown/);
     expect(statusRequestCount).toBeGreaterThanOrEqual(2);
     expect(statusRequestCount).toBeLessThanOrEqual(3);
   });
 
-  test("keeps the landing status checking copy until initial status settles", async ({ page }) => {
+  test("keeps the neutral landing status label until initial status settles", async ({ page }) => {
     let releaseInitialRequest = () => {};
     const initialRequestGate = new Promise<void>((resolve) => {
       releaseInitialRequest = resolve;
@@ -274,7 +275,8 @@ test.describe("Public surfaces", () => {
 
     await page.goto("/");
     const statusLink = page.getByRole("link", { name: "Open system status page" });
-    await expect(statusLink).toContainText("Checking");
+    await expect(statusLink).toContainText("Status");
+    await expect(statusLink).not.toContainText("Running");
     await expect(statusLink.locator(".status-dot")).toHaveClass(/status-unknown/);
 
     releaseInitialRequest();

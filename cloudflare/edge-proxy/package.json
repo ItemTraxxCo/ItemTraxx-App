@@ -15,10 +15,10 @@
   },
   "dependencies": {
     "@better-auth/infra": "0.4.11",
-    "@better-auth/passkey": "1.7.5",
-    "@better-auth/sso": "1.7.5",
+    "@better-auth/passkey": "1.7.7",
+    "@better-auth/sso": "1.7.7",
     "@supabase/supabase-js": "2.112.4",
-    "better-auth": "1.7.5",
+    "better-auth": "1.7.7",
     "jose": "^6.1.3"
   },
   "devDependencies": {
@@ -27,6 +27,9 @@
   },
   "overrides": {
     "miniflare": {
+      "sharp": "0.35.5"
+    },
+    "miniflare@>=5.20260926.1-alpha": {
       "sharp": "0.35.5"
     },
     "node-rsa": "2.0.0",

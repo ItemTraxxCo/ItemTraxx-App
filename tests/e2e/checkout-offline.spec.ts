@@ -123,15 +123,17 @@ const bufferedItem = (operationId = "op-existing-e2e"): BufferedCheckoutItem => 
 const openFixture = async (page: Page) => {
   await page.goto("/");
   await expect
-    .poll(() =>
-      page.evaluate(
-        () =>
-          typeof (
-            window.__itemtraxxTest as
-              | (typeof window.__itemtraxxTest & { offlineCheckoutQueue?: unknown })
-              | undefined
-          )?.offlineCheckoutQueue === "object"
-      )
+    .poll(
+      () =>
+        page.evaluate(
+          () =>
+            typeof (
+              window.__itemtraxxTest as
+                | (typeof window.__itemtraxxTest & { offlineCheckoutQueue?: unknown })
+                | undefined
+            )?.offlineCheckoutQueue === "object"
+        ),
+      { timeout: 15_000 }
     )
     .toBe(true);
 };

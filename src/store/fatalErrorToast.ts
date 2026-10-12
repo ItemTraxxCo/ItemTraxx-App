@@ -67,7 +67,7 @@ const deriveReason = (error: unknown) => {
 };
 
 // Never show raw exception strings to users (they may contain sensitive info).
-const deriveUserFacingMessage = () => "Oh no! Something went wrong. Please try again.";
+const deriveUserFacingMessage = () => "Error; Exception.";
 
 const deriveReportMessage = (error: unknown) => {
   if (error instanceof Error && error.message.trim()) {

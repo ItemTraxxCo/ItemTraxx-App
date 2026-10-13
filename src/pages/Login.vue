@@ -4,6 +4,7 @@
       <section class="login-story-panel">
         <header class="story-header">
           <img
+            v-if="brandLogoUrl"
             class="story-brand-logo"
             :src="brandLogoUrl"
             alt="ItemTraxx Co"
@@ -684,6 +685,10 @@ onMounted(() => {
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
+}
+
+.story-back-link:only-child {
+  margin-left: auto;
 }
 
 .story-brand-logo {

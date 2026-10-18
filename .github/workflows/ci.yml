@@ -16,6 +16,16 @@ on:
     # CodeQL still runs weekly; the other suites are skipped on this event.
     - cron: '21 9 * * 1'
   workflow_dispatch:
+    inputs:
+      deno_lock_sync:
+        description: Internal full validation dispatch after a signed Deno lock update.
+        required: false
+        type: boolean
+        default: false
+      deno_lock_sync_pr_number:
+        description: Same-repository Dependabot PR number associated with the updated lockfile.
+        required: false
+        type: string
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -23,19 +33,66 @@ concurrency:
 
 jobs:
   require-trusted-ref:
+    outputs:
+      deno_lock_sync: ${{ steps.guard.outputs.deno_lock_sync }}
+      deno_lock_sync_base_sha: ${{ steps.guard.outputs.deno_lock_sync_base_sha }}
+      deno_lock_sync_head_sha: ${{ steps.guard.outputs.deno_lock_sync_head_sha }}
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
     steps:
-      - name: Require trusted ref for manual runs
+      - name: Validate workflow dispatch ref
+        id: guard
         env:
           RUN_EVENT: ${{ github.event_name }}
           RUN_REF: ${{ github.ref }}
+          RUN_ACTOR: ${{ github.actor }}
+          DENO_LOCK_SYNC: ${{ inputs.deno_lock_sync }}
+          DENO_LOCK_SYNC_PR_NUMBER: ${{ inputs.deno_lock_sync_pr_number }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
           if [ "$RUN_EVENT" = "workflow_dispatch" ]; then
-            test "$RUN_REF" = "refs/heads/main" || {
-              echo "Secret-bearing CI runs must use refs/heads/main (received $RUN_REF)." >&2
+            if [[ "$RUN_REF" == "refs/heads/main" && "$DENO_LOCK_SYNC" != "true" ]]; then
+              exit 0
+            fi
+
+            if [[ "$DENO_LOCK_SYNC" != "true" || "$RUN_ACTOR" != "github-actions[bot]" ]]; then
+              echo "::error::Manual CI runs must use refs/heads/main; automated Deno lock validation must be dispatched by GitHub Actions."
               exit 1
-            }
+            fi
+
+            if [[ ! "$RUN_REF" =~ ^refs/heads/.+ ]] || [[ ! "$DENO_LOCK_SYNC_PR_NUMBER" =~ ^[1-9][0-9]*$ ]]; then
+              echo "::error::The Deno lock validation dispatch did not include a valid base branch and PR number."
+              exit 1
+            fi
+
+            if ! pull_request_json="$(curl --fail-with-body --silent --show-error \
+              --header "Accept: application/vnd.github+json" \
+              --header "Authorization: Bearer $GITHUB_TOKEN" \
+              --header "X-GitHub-Api-Version: 2022-11-28" \
+              "$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/pulls/$DENO_LOCK_SYNC_PR_NUMBER")"; then
+              echo "::error::Could not verify the Dependabot PR for automated CI dispatch."
+              exit 1
+            fi
+
+            base_branch="${RUN_REF#refs/heads/}"
+            if ! jq -e --arg base_branch "$base_branch" --arg repository "$GITHUB_REPOSITORY" '
+              .state == "open" and
+              .user.login == "dependabot[bot]" and
+              .head.repo.full_name == $repository and
+              .base.ref == $base_branch
+            ' <<< "$pull_request_json" >/dev/null; then
+              echo "::error::The workflow dispatch does not match an open same-repository Dependabot PR targeting the dispatched base branch."
+              exit 1
+            fi
+
+            base_sha="$(jq -er '.base.sha | select(test("^[0-9a-f]{40}$"))' <<< "$pull_request_json")"
+            head_sha="$(jq -er '.head.sha | select(test("^[0-9a-f]{40}$"))' <<< "$pull_request_json")"
+            echo "deno_lock_sync=true" >> "$GITHUB_OUTPUT"
+            echo "deno_lock_sync_base_sha=$base_sha" >> "$GITHUB_OUTPUT"
+            echo "deno_lock_sync_head_sha=$head_sha" >> "$GITHUB_OUTPUT"
           fi
 
   kill-switch-preflight:
@@ -51,7 +108,7 @@ jobs:
     needs:
       - require-trusted-ref
       - kill-switch-preflight
-    if: ${{ github.event_name != 'pull_request' }}
+    if: ${{ github.event_name != 'pull_request' && needs.require-trusted-ref.outputs.deno_lock_sync != 'true' }}
     uses: ./.github/workflows/slack-notify-status.yml
     with:
       mode: start
@@ -79,6 +136,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: ${{ needs.require-trusted-ref.outputs.deno_lock_sync_head_sha || github.sha }}
           persist-credentials: false
           fetch-depth: 0
 
@@ -141,8 +199,8 @@ jobs:
       - name: Check SQL and function coupling
         if: ${{ !cancelled() && github.event_name != 'schedule' }}
         env:
-          ITX_DIFF_BASE: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
-          ITX_DIFF_HEAD: ${{ github.sha }}
+          ITX_DIFF_BASE: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || (needs.require-trusted-ref.outputs.deno_lock_sync == 'true' && needs.require-trusted-ref.outputs.deno_lock_sync_base_sha) || github.event.before }}
+          ITX_DIFF_HEAD: ${{ needs.require-trusted-ref.outputs.deno_lock_sync_head_sha || github.sha }}
         run: npm run devops:check:sql-coupling
 
       - name: Clean dist
@@ -281,7 +339,7 @@ jobs:
     # Always finish the single CI status message when the start message exists.
     # A kill-switch block is reported in that same message instead of creating
     # a second, normally skipped, notification check.
-    if: ${{ always() && github.event_name != 'pull_request' && needs.require-trusted-ref.result == 'success' && needs.slack-notify-start.result == 'success' }}
+    if: ${{ always() && github.event_name != 'pull_request' && needs.require-trusted-ref.outputs.deno_lock_sync != 'true' && needs.require-trusted-ref.result == 'success' && needs.slack-notify-start.result == 'success' }}
     uses: ./.github/workflows/slack-notify-status.yml
     with:
       mode: finish

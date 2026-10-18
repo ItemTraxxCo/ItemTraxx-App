@@ -1,23 +1,18 @@
 name: Deno Lock Sync
 
-# Any npm dependency bump (Dependabot or manual) touches package.json /
-# package-lock.json but may not update deno.lock. This workflow verifies the
-# generated Deno lock and fails with a diff when a maintainer must refresh it.
-# It does not push or commit: repository automation cannot satisfy this
-# project's local SSH-signing policy without the signing key.
-
-permissions:
-  contents: read
+# Dependabot PRs may update npm dependencies without refreshing deno.lock.
+# Keep the auto-write path limited to same-repository Dependabot PRs. Direct
+# dependency changes should be made through a PR so the generated lock can be
+# SSH-signed and validated before merge.
 
 on:
   pull_request:
     paths:
       - package.json
       - package-lock.json
-  push:
-    paths:
-      - package.json
-      - package-lock.json
+
+permissions:
+  contents: read
 
 concurrency:
   group: deno-lock-sync-${{ github.head_ref || github.ref_name }}
@@ -25,13 +20,21 @@ concurrency:
 
 jobs:
   sync:
-    # Fork branches are not present in the base repository checkout.
-    if: ${{ github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository }}
+    # The write path is limited to Dependabot PRs from this repository.
+    if: >-
+      ${{
+        (github.event_name == 'pull_request' &&
+          github.event.pull_request.head.repo.full_name == github.repository &&
+          github.event.pull_request.user.login == 'dependabot[bot]')
+      }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    permissions:
+      actions: write
+      contents: write
 
     steps:
-      - name: Checkout branch
+      - name: Checkout PR branch
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.head_ref || github.ref_name }}
@@ -52,22 +55,121 @@ jobs:
         # not a new trust decision.
         run: deno install --lockfile-only --min-dep-age=0
 
-      - name: Verify deno.lock is now in sync
+      - name: Verify deno.lock is valid
         run: deno install --lockfile-only --frozen --min-dep-age=0
 
-      - name: Require a signed lockfile update
+      - name: Detect lockfile changes
+        id: lockfile
         run: |
           if git diff --quiet -- deno.lock; then
-            echo "deno.lock already in sync — nothing to commit."
-            exit 0
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
           fi
+
+      - name: Load SSH signing key
+        if: ${{ github.event_name == 'pull_request' && steps.lockfile.outputs.changed == 'true' }}
+        env:
+          ITX_DENO_LOCK_SYNC_SSH_SIGNING_KEY: ${{ secrets.ITX_DENO_LOCK_SYNC_SSH_SIGNING_KEY }}
+          ITX_DENO_LOCK_SYNC_SSH_SIGNING_KEY_PASSPHRASE: ${{ secrets.ITX_DENO_LOCK_SYNC_SSH_SIGNING_KEY_PASSPHRASE }}
+          EXPECTED_SIGNING_KEY_FINGERPRINT: ${{ vars.ITX_DENO_LOCK_SYNC_SSH_SIGNING_KEY_FINGERPRINT }}
+        run: |
+          set -euo pipefail
+          if [[ -z "$ITX_DENO_LOCK_SYNC_SSH_SIGNING_KEY" ]]; then
+            echo "::error::Configure ITX_DENO_LOCK_SYNC_SSH_SIGNING_KEY as a Dependabot secret. It must be the dedicated signing key registered to the ItemTraxx Deno Lock Sync bot identity. If encrypted, also configure ITX_DENO_LOCK_SYNC_SSH_SIGNING_KEY_PASSPHRASE as a Dependabot secret."
+            exit 1
+          fi
+          if [[ -z "$EXPECTED_SIGNING_KEY_FINGERPRINT" ]]; then
+            echo "::error::Configure the repository Actions variable ITX_DENO_LOCK_SYNC_SSH_SIGNING_KEY_FINGERPRINT with the SHA256 fingerprint of the dedicated bot signing key."
+            exit 1
+          fi
+
+          key_file="$RUNNER_TEMP/itx-git-signing-key"
+          askpass_file="$RUNNER_TEMP/itx-git-signing-askpass"
+          public_key_file="$RUNNER_TEMP/itx-git-signing-key.pub"
+          allowed_signers_file="$RUNNER_TEMP/itx-git-allowed-signers"
+          cleanup() {
+            rm -f "$key_file" "$askpass_file"
+          }
+          trap cleanup EXIT
+
+          umask 077
+          printf '%s\n' "$ITX_DENO_LOCK_SYNC_SSH_SIGNING_KEY" > "$key_file"
+          cat > "$askpass_file" <<'ASKPASS'
+          #!/bin/sh
+          printf '%s\n' "$ITX_DENO_LOCK_SYNC_SSH_SIGNING_KEY_PASSPHRASE"
+          ASKPASS
+          chmod 700 "$askpass_file"
+
+          eval "$(ssh-agent -s)" >/dev/null
+          DISPLAY=:1 SSH_ASKPASS="$askpass_file" SSH_ASKPASS_REQUIRE=force \
+            ssh-add "$key_file" < /dev/null
+
+          if ! ssh-add -l -E sha256 | awk -v expected="$EXPECTED_SIGNING_KEY_FINGERPRINT" '$2 == expected { found = 1 } END { exit !found }'; then
+            echo "::error::The loaded SSH key does not match the configured Deno Lock Sync bot fingerprint."
+            exit 1
+          fi
+
+          mapfile -t loaded_keys < <(ssh-add -L)
+          if [[ "${#loaded_keys[@]}" -ne 1 ]]; then
+            echo "::error::Expected exactly one SSH signing key in the workflow agent."
+            exit 1
+          fi
+          printf '%s\n' "${loaded_keys[0]}" > "$public_key_file"
+          printf '%s %s\n' "noreply@itemtraxx.com" "${loaded_keys[0]}" > "$allowed_signers_file"
+
           {
-            echo "### Deno lockfile needs a signed update"
-            echo
-            echo "Run `deno install --lockfile-only --min-dep-age=0`, review the resulting `deno.lock`, and commit it with the repository's local SSH signing key."
-            echo
-            echo '```diff'
-            git diff -- deno.lock
-            echo '```'
-          } >> "$GITHUB_STEP_SUMMARY"
-          exit 1
+            echo "SSH_AUTH_SOCK=$SSH_AUTH_SOCK"
+            echo "SSH_AGENT_PID=$SSH_AGENT_PID"
+            echo "ITX_GIT_SIGNING_PUBLIC_KEY_FILE=$public_key_file"
+            echo "ITX_GIT_ALLOWED_SIGNERS_FILE=$allowed_signers_file"
+          } >> "$GITHUB_ENV"
+
+      - name: Configure SSH-signed Git commits
+        if: ${{ github.event_name == 'pull_request' && steps.lockfile.outputs.changed == 'true' }}
+        run: |
+          git config --local user.name "ItemTraxx Deno Lock Sync"
+          git config --local user.email "noreply@itemtraxx.com"
+          git config --local gpg.format ssh
+          git config --local user.signingkey "$ITX_GIT_SIGNING_PUBLIC_KEY_FILE"
+          git config --local gpg.ssh.allowedSignersFile "$ITX_GIT_ALLOWED_SIGNERS_FILE"
+          git config --local commit.gpgsign true
+
+      - name: Commit signed Deno lockfile update
+        if: ${{ github.event_name == 'pull_request' && steps.lockfile.outputs.changed == 'true' }}
+        run: |
+          git add -- deno.lock
+          git commit -S -m "chore(deps): sync Deno lockfile" -m "Generated and validated by the Deno Lock Sync workflow."
+          git verify-commit HEAD
+
+      - name: Push signed lockfile update
+        if: ${{ github.event_name == 'pull_request' && steps.lockfile.outputs.changed == 'true' }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SYNC_BRANCH: ${{ github.head_ref }}
+        run: |
+          set -euo pipefail
+          git check-ref-format --branch "$SYNC_BRANCH" >/dev/null
+          auth_header="$(printf 'x-access-token:%s' "$GITHUB_TOKEN" | base64 --wrap=0)"
+          git -c "http.extraheader=AUTHORIZATION: basic $auth_header" \
+            push origin "HEAD:refs/heads/$SYNC_BRANCH"
+
+      - name: Dispatch checks for the updated PR head
+        if: ${{ github.event_name == 'pull_request' && steps.lockfile.outputs.changed == 'true' }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BASE_BRANCH: ${{ github.event.pull_request.base.ref }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+          git check-ref-format --branch "$BASE_BRANCH" >/dev/null
+          [[ "$PR_NUMBER" =~ ^[1-9][0-9]*$ ]]
+
+          ci_payload="$(jq -cn --arg ref "$BASE_BRANCH" --arg pr_number "$PR_NUMBER" '{ref:$ref,inputs:{deno_lock_sync:true,deno_lock_sync_pr_number:$pr_number}}')"
+          curl --fail-with-body --silent --show-error \
+            --request POST \
+            --header "Accept: application/vnd.github+json" \
+            --header "Authorization: Bearer $GITHUB_TOKEN" \
+            --header "X-GitHub-Api-Version: 2022-11-28" \
+            --data "$ci_payload" \
+            "$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/actions/workflows/ci.yml/dispatches"

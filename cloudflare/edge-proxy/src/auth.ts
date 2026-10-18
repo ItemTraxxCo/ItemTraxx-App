@@ -97,6 +97,7 @@ type SsoActor = {
   workspaceId: string | null;
   organizationId: string | null;
   workspaceStatus: string | null;
+  workspaceArchivedAt: string | null;
 };
 
 const getSsoWorkspace = async (
@@ -104,7 +105,7 @@ const getSsoWorkspace = async (
   workspaceId: string,
 ) => {
   const { data, error } = await dataClient.schema("public").from("workspaces")
-    .select("better_auth_organization_id,status")
+    .select("better_auth_organization_id,status,archived_at")
     .eq("id", workspaceId)
     .maybeSingle();
   if (error) throw error;
@@ -130,6 +131,7 @@ export const resolveSsoActor = async (
     workspaceId: data.workspace_id ?? null,
     organizationId: workspace?.better_auth_organization_id ?? null,
     workspaceStatus: workspace?.status ?? null,
+    workspaceArchivedAt: typeof workspace?.archived_at === "string" ? workspace.archived_at : null,
   };
 };
 
@@ -143,6 +145,207 @@ export const isActiveLinkedBetterAuthProfile = async (
     .maybeSingle();
   if (error) throw error;
   return data?.is_active === true && data.deleted_at == null;
+};
+
+const BETTER_AUTH_ORGANIZATION_INVITATION_MUTATION_PATHS = new Set([
+  "/organization/accept-invitation",
+  "/organization/reject-invitation",
+  "/organization/cancel-invitation",
+]);
+
+const BETTER_AUTH_ORGANIZATION_MUTATION_PATHS = new Set([
+  "/organization/delete",
+  "/organization/remove-member",
+  "/organization/update",
+  "/organization/update-member-role",
+  "/organization/leave",
+  "/organization/invite-member",
+  "/organization/set-active",
+  ...BETTER_AUTH_ORGANIZATION_INVITATION_MUTATION_PATHS,
+]);
+
+const BETTER_AUTH_ORGANIZATION_READ_PATHS = new Set([
+  "/organization/get-active-member",
+  "/organization/get-active-member-role",
+  "/organization/get-full-organization",
+  "/organization/get-invitation",
+  "/organization/get-organization",
+  "/organization/has-permission",
+  "/organization/list-invitations",
+  "/organization/list-members",
+]);
+
+export const isBetterAuthOrganizationMutationPath = (path: string) =>
+  BETTER_AUTH_ORGANIZATION_MUTATION_PATHS.has(path);
+
+export const isActiveBetterAuthOrganizationActor = (actor: Pick<SsoActor, "role" | "organizationId" | "workspaceStatus" | "workspaceArchivedAt">) =>
+  actor.role === "super_admin" ||
+  (!!actor.organizationId && actor.workspaceStatus === "active" &&
+    actor.workspaceArchivedAt === null);
+
+const resolveBetterAuthOrganizationId = async (
+  dataClient: ReturnType<typeof createBetterAuthDataClient>,
+  organizationId: unknown,
+  organizationSlug: unknown,
+) => {
+  if (typeof organizationId === "string" && organizationId) return organizationId;
+  if (typeof organizationSlug !== "string" || !organizationSlug) return null;
+  const { data: organization, error } = await dataClient.schema("better_auth")
+    .from("organization")
+    .select("id")
+    .eq("slug", organizationSlug)
+    .maybeSingle();
+  if (error) throw error;
+  return typeof organization?.id === "string" ? organization.id : null;
+};
+
+const isActiveBetterAuthOrganizationTarget = async (
+  dataClient: ReturnType<typeof createBetterAuthDataClient>,
+  organizationId: unknown,
+  actorOrganizationId: string | null | undefined,
+  actorRole: string | undefined,
+) => {
+  if (typeof organizationId !== "string" || !organizationId) return false;
+  // ItemTraxx workspace profiles map to one organization; ignore stale
+  // cross-workspace Better Auth memberships for non-super-admin actors.
+  if (actorRole !== "super_admin" && organizationId !== actorOrganizationId) {
+    return false;
+  }
+
+  const { data: workspace, error } = await dataClient.schema("public").from("workspaces")
+    .select("status,archived_at")
+    .eq("better_auth_organization_id", organizationId)
+    .maybeSingle();
+  if (error) throw error;
+  return workspace?.status === "active" && workspace.archived_at === null;
+};
+
+export const isActiveBetterAuthOrganizationMutation = async (
+  dataClient: ReturnType<typeof createBetterAuthDataClient>,
+  path: string,
+  body: unknown,
+  activeOrganizationId: string | null | undefined,
+  actorOrganizationId?: string | null,
+  actorRole?: string,
+) => {
+  if (!isBetterAuthOrganizationMutationPath(path)) return true;
+
+  const requestBody = body !== null && typeof body === "object" && !Array.isArray(body)
+    ? body as Record<string, unknown>
+    : {};
+  if (path === "/organization/set-active" && requestBody.organizationId === null) {
+    // Clearing an archived workspace's stale active organization remains safe.
+    return true;
+  }
+  let organizationId: unknown;
+  if (BETTER_AUTH_ORGANIZATION_INVITATION_MUTATION_PATHS.has(path)) {
+    const invitationId = requestBody.invitationId;
+    if (typeof invitationId !== "string" || !invitationId) return false;
+    const { data: invitation, error } = await dataClient.schema("better_auth")
+      .from("invitation")
+      .select("organizationId")
+      .eq("id", invitationId)
+      .maybeSingle();
+    if (error) throw error;
+    organizationId = invitation?.organizationId;
+  } else if (path === "/organization/leave") {
+    organizationId = requestBody.organizationId;
+  } else if (path === "/organization/set-active") {
+    organizationId = await resolveBetterAuthOrganizationId(
+      dataClient,
+      requestBody.organizationId || (requestBody.organizationSlug ? null : activeOrganizationId),
+      requestBody.organizationSlug,
+    );
+  } else {
+    organizationId = requestBody.organizationId || activeOrganizationId;
+  }
+
+  return await isActiveBetterAuthOrganizationTarget(
+    dataClient,
+    organizationId,
+    actorOrganizationId,
+    actorRole,
+  );
+};
+
+export const isActiveBetterAuthOrganizationRead = async (
+  dataClient: ReturnType<typeof createBetterAuthDataClient>,
+  path: string,
+  query: unknown,
+  activeOrganizationId: string | null | undefined,
+  actorOrganizationId?: string | null,
+  actorRole?: string,
+  body?: unknown,
+) => {
+  if (!BETTER_AUTH_ORGANIZATION_READ_PATHS.has(path)) return true;
+  const requestData = path === "/organization/has-permission" ? body : query;
+  const requestQuery = requestData !== null && typeof requestData === "object" && !Array.isArray(requestData)
+    ? requestData as Record<string, unknown>
+    : {};
+  if (path === "/organization/get-invitation") {
+    if (typeof requestQuery.id !== "string" || !requestQuery.id) return false;
+    const { data: invitation, error } = await dataClient.schema("better_auth")
+      .from("invitation")
+      .select("organizationId")
+      .eq("id", requestQuery.id)
+      .maybeSingle();
+    if (error) throw error;
+    return await isActiveBetterAuthOrganizationTarget(
+      dataClient,
+      invitation?.organizationId,
+      actorOrganizationId,
+      actorRole,
+    );
+  }
+  const organizationId = await resolveBetterAuthOrganizationId(
+    dataClient,
+    requestQuery.organizationSlug
+      ? null
+      : requestQuery.organizationId || activeOrganizationId,
+    requestQuery.organizationSlug,
+  );
+  // The endpoint itself returns null or a missing-active-organization error
+  // when no organization is selected, so there is no organization data to gate.
+  if (!organizationId) return true;
+  return await isActiveBetterAuthOrganizationTarget(
+    dataClient,
+    organizationId,
+    actorOrganizationId,
+    actorRole,
+  );
+};
+
+export const filterActiveBetterAuthOrganizationRows = async (
+  dataClient: ReturnType<typeof createBetterAuthDataClient>,
+  path: string,
+  rows: unknown[],
+  actorOrganizationId: string | null,
+  actorRole: string,
+) => {
+  const organizationField = path === "/organization/list" ? "id" : "organizationId";
+  const organizationIds = [...new Set(rows.flatMap((row) => {
+    if (row === null || typeof row !== "object") return [];
+    const id = (row as Record<string, unknown>)[organizationField];
+    return typeof id === "string" && id ? [id] : [];
+  }))];
+  if (actorRole !== "super_admin") {
+    return rows.filter((row) => row !== null && typeof row === "object" &&
+      (row as Record<string, unknown>)[organizationField] === actorOrganizationId);
+  }
+  if (organizationIds.length === 0) return [];
+  const { data: workspaces, error } = await dataClient.schema("public").from("workspaces")
+    .select("better_auth_organization_id")
+    .in("better_auth_organization_id", organizationIds)
+    .eq("status", "active")
+    .is("archived_at", null);
+  if (error) throw error;
+  const activeOrganizationIds = new Set(
+    (workspaces ?? []).map((workspace: { better_auth_organization_id?: unknown }) =>
+      workspace.better_auth_organization_id
+    ),
+  );
+  return rows.filter((row) => row !== null && typeof row === "object" &&
+    activeOrganizationIds.has((row as Record<string, unknown>)[organizationField]));
 };
 
 export const isActiveBetterAuthOrganizationMember = async (
@@ -317,7 +520,10 @@ const isSsoSessionAuthorized = async (
   if (!betterAuthUserId || !sessionId) return false;
   const actor = await resolveSsoActor(dataClient, betterAuthUserId);
   if (!actor || !["workspace_admin", "super_admin"].includes(actor.role)) return false;
-  if (actor.role === "workspace_admin" && actor.workspaceStatus !== "active") return false;
+  if (
+    actor.role === "workspace_admin" &&
+    (actor.workspaceStatus !== "active" || actor.workspaceArchivedAt !== null)
+  ) return false;
   if (await hasRevokedSsoSession(dataClient, actor, sessionId)) return false;
   return await hasSsoSessionGrant(dataClient, actor, sessionId);
 };
@@ -452,6 +658,41 @@ export const getBetterAuth = (rawEnv: Env) => {
               await hasRevokedSsoSession(dataClient, actor, session.session.id)) {
               throw new APIError("FORBIDDEN");
             }
+            if (context.path.startsWith("/organization/")) {
+              const clearingActiveOrganization = context.path === "/organization/set-active" &&
+                context.body?.organizationId === null;
+              if (
+                !clearingActiveOrganization &&
+                !isActiveBetterAuthOrganizationActor(actor)
+              ) {
+                throw new APIError("FORBIDDEN", {
+                  message: "Organization operations are unavailable for this workspace.",
+                });
+              }
+              if (
+                !await isActiveBetterAuthOrganizationMutation(
+                  dataClient,
+                  context.path,
+                  context.body,
+                  session.session.activeOrganizationId,
+                  actor.organizationId,
+                  actor.role,
+                ) ||
+                !await isActiveBetterAuthOrganizationRead(
+                  dataClient,
+                  context.path,
+                  context.query,
+                  session.session.activeOrganizationId,
+                  actor.organizationId,
+                  actor.role,
+                  context.body,
+                )
+              ) {
+                throw new APIError("FORBIDDEN", {
+                  message: "Organization operations are unavailable for this workspace.",
+                });
+              }
+            }
           }
           if (context.path === "/organization/update") {
             const session = await getSessionFromCtx(context);
@@ -520,6 +761,26 @@ export const getBetterAuth = (rawEnv: Env) => {
             context.body.organizationId = targetOrganizationId;
           }
         }),
+      after: createAuthMiddleware(async (context) => {
+        if (
+          !["/organization/list", "/organization/list-user-invitations"].includes(context.path) ||
+          !Array.isArray(context.context.returned)
+        ) return;
+        const session = await getSessionFromCtx(context);
+        if (!session?.user?.id) throw new APIError("UNAUTHORIZED");
+        const actor = await resolveSsoActor(dataClient, session.user.id);
+        if (!actor || !isActiveBetterAuthOrganizationActor(actor)) {
+          throw new APIError("FORBIDDEN");
+        }
+        const filteredRows = await filterActiveBetterAuthOrganizationRows(
+          dataClient,
+          context.path,
+          context.context.returned,
+          actor.organizationId,
+          actor.role,
+        );
+        return context.json(filteredRows);
+      }),
     },
     plugins: [
       organization({
@@ -1010,10 +1271,12 @@ export const handleInternalAuthAdminRequest = async (request: Request, rawEnv: E
   try {
     if (action === "send_workspace_account_invitation") {
       const to = typeof body?.email === "string" ? body.email.trim().toLowerCase() : "";
-      const accountRole = body?.accountRole;
+      const organizationName = typeof body?.organizationName === "string"
+        ? body.organizationName.trim()
+        : "";
       if (
         !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to) ||
-        (accountRole !== "tenant_account" && accountRole !== "workspace_admin")
+        !organizationName
       ) {
         return Response.json({ error: "Invalid request" }, { status: 400 });
       }
@@ -1021,7 +1284,7 @@ export const handleInternalAuthAdminRequest = async (request: Request, rawEnv: E
         kind: "workspace-account-invitation",
         to,
         url: resolveAccountFlowURL(env, body?.url, "/accept-invitation"),
-        accountRole,
+        organizationName,
       });
       return Response.json({ success: true });
     }

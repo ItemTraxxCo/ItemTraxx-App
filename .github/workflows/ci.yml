@@ -3,7 +3,7 @@ name: CI
 permissions:
   actions: read
   contents: read
-  security-events: write
+  pull-requests: read
 
 on:
   pull_request:
@@ -12,9 +12,6 @@ on:
       - main
       - preview
       - staging
-  schedule:
-    # CodeQL still runs weekly; the other suites are skipped on this event.
-    - cron: '21 9 * * 1'
   workflow_dispatch:
     inputs:
       deno_lock_sync:
@@ -38,9 +35,6 @@ jobs:
       deno_lock_sync_base_sha: ${{ steps.guard.outputs.deno_lock_sync_base_sha }}
       deno_lock_sync_head_sha: ${{ steps.guard.outputs.deno_lock_sync_head_sha }}
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      pull-requests: read
     steps:
       - name: Validate workflow dispatch ref
         id: guard
@@ -158,73 +152,69 @@ jobs:
         # the Supabase CLI). The shared install serves every suite below.
         run: npm ci --ignore-scripts
 
-      - name: Initialize CodeQL
+      - name: Check CodeQL permission isolation
         if: ${{ !cancelled() }}
-        uses: github/codeql-action/init@24c54180a607b1449ed407dd24f251e4e9147c8d # v4
-        with:
-          languages: actions,javascript-typescript
-          build-mode: none
+        run: node --test scripts/ci-codeql-isolation.test.mjs
 
-      # Core validation runs on pull requests and protected branch pushes.
-      # The scheduled run is reserved for CodeQL so it does not spend a
-      # weekly runner on the full validation suite.
+      # Core validation runs on pull requests, protected branch pushes, and
+      # authorized workflow dispatches.
       - name: Verify env parity
-        if: ${{ !cancelled() && github.event_name != 'schedule' }}
+        if: ${{ !cancelled() }}
         run: bash ./scripts/check-env-parity.sh
 
       - name: Check edge-function coverage
-        if: ${{ !cancelled() && github.event_name != 'schedule' }}
+        if: ${{ !cancelled() }}
         run: npm run devops:check:edge-coverage
 
       - name: Check documented empty catches
-        if: ${{ !cancelled() && github.event_name != 'schedule' }}
+        if: ${{ !cancelled() }}
         run: npm run devops:check:empty-catches
 
       - name: Check edge contract drift
-        if: ${{ !cancelled() && github.event_name != 'schedule' }}
+        if: ${{ !cancelled() }}
         run: npm run devops:check:edge-contract-drift
 
       - name: Check edge action contract parity
-        if: ${{ !cancelled() && github.event_name != 'schedule' }}
+        if: ${{ !cancelled() }}
         run: npm run devops:check:edge-action-parity
 
       - name: Check Supabase function graph with frozen Deno lock
-        if: ${{ !cancelled() && github.event_name != 'schedule' }}
+        if: ${{ !cancelled() }}
         run: deno check --node-modules-dir=none --frozen supabase/functions/super-ops/index.ts supabase/functions/super-workspace-mutate/index.ts supabase/functions/admin-ops/index.ts
 
       - name: Deno test coverage gate (Supabase functions + Cloudflare edge-proxy)
-        if: ${{ !cancelled() && github.event_name != 'schedule' }}
+        if: ${{ !cancelled() }}
         run: npm run devops:check:deno-coverage
 
       - name: Check SQL and function coupling
-        if: ${{ !cancelled() && github.event_name != 'schedule' }}
+        if: ${{ !cancelled() }}
         env:
           ITX_DIFF_BASE: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || (needs.require-trusted-ref.outputs.deno_lock_sync == 'true' && needs.require-trusted-ref.outputs.deno_lock_sync_base_sha) || github.event.before }}
           ITX_DIFF_HEAD: ${{ needs.require-trusted-ref.outputs.deno_lock_sync_head_sha || github.sha }}
         run: npm run devops:check:sql-coupling
 
       - name: Clean dist
-        if: ${{ !cancelled() && github.event_name != 'schedule' }}
+        if: ${{ !cancelled() }}
         run: rm -rf dist artifacts
 
       - name: Build
-        if: ${{ !cancelled() && github.event_name != 'schedule' }}
+        if: ${{ !cancelled() }}
         run: npm run build
 
       - name: Test prerendered public content
-        if: ${{ !cancelled() && github.event_name != 'schedule' }}
+        if: ${{ !cancelled() }}
         run: npm run test:prerender
 
       - name: Check public CSS boundary
-        if: ${{ !cancelled() && github.event_name != 'schedule' }}
+        if: ${{ !cancelled() }}
         run: npm run perf:css-boundary
 
       - name: Typecheck Cloudflare Worker
-        if: ${{ !cancelled() && github.event_name != 'schedule' }}
+        if: ${{ !cancelled() }}
         run: npm run worker:typecheck
 
       - name: Test frontend units (Vitest)
-        if: ${{ !cancelled() && github.event_name != 'schedule' }}
+        if: ${{ !cancelled() }}
         # Unit tests need configuration to import the Supabase client and to
         # exercise authenticated requests. These are non-secret placeholders;
         # the suite mocks network calls and never contacts these origins.
@@ -235,23 +225,23 @@ jobs:
         run: npm run test:unit
 
       - name: Check initial JavaScript budget
-        if: ${{ !cancelled() && github.event_name != 'schedule' }}
+        if: ${{ !cancelled() }}
         run: npm run perf:initial
 
       - name: Check bundle budget
-        if: ${{ !cancelled() && github.event_name != 'schedule' }}
+        if: ${{ !cancelled() }}
         run: npm run perf:budget
 
       - name: Check image budget
-        if: ${{ !cancelled() && github.event_name != 'schedule' }}
+        if: ${{ !cancelled() }}
         run: npm run perf:images
 
       - name: Generate perf report
-        if: ${{ !cancelled() && github.event_name != 'schedule' }}
+        if: ${{ !cancelled() }}
         run: npm run perf:report
 
       - name: Upload perf report artifact
-        if: ${{ always() && github.event_name != 'schedule' }}
+        if: ${{ always() }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: perf-report
@@ -262,15 +252,15 @@ jobs:
       # Security validation shares the already-installed dependency tree but
       # remains a separate, clearly labelled gate in this single CI check.
       - name: Run security gate
-        if: ${{ !cancelled() && github.event_name != 'schedule' }}
+        if: ${{ !cancelled() }}
         run: npm run security:gate
 
       - name: Generate SBOM
-        if: ${{ !cancelled() && github.event_name != 'schedule' }}
+        if: ${{ !cancelled() }}
         run: npm run security:sbom
 
       - name: Upload SBOM artifact
-        if: ${{ always() && github.event_name != 'schedule' }}
+        if: ${{ always() }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: sbom
@@ -278,10 +268,10 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
-      # E2E validation shares the Node install but retains its browser cache
-      # and report artifact. It is skipped only for the weekly CodeQL run.
+      # E2E validation shares the Node install and retains its browser cache
+      # and report artifact.
       - name: Cache Playwright browsers
-        if: ${{ !cancelled() && github.event_name != 'schedule' }}
+        if: ${{ !cancelled() }}
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/.cache/ms-playwright
@@ -290,23 +280,23 @@ jobs:
             playwright-${{ runner.os }}-
 
       - name: Install Playwright Chromium
-        if: ${{ !cancelled() && github.event_name != 'schedule' }}
+        if: ${{ !cancelled() }}
         timeout-minutes: 5
         run: npx playwright install chromium
 
       - name: Install Playwright system dependencies
-        if: ${{ !cancelled() && github.event_name != 'schedule' }}
+        if: ${{ !cancelled() }}
         run: |
           timeout 180s npx playwright install-deps chromium || {
             echo "::warning::Playwright system dependency install failed or timed out; continuing so E2E can verify whether the runner already has the required libraries."
           }
 
       - name: Run E2E tests
-        if: ${{ !cancelled() && github.event_name != 'schedule' }}
+        if: ${{ !cancelled() }}
         run: npm run test:e2e
 
       - name: Upload Playwright report
-        if: ${{ always() && github.event_name != 'schedule' }}
+        if: ${{ always() }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: playwright-report
@@ -315,17 +305,6 @@ jobs:
             test-results
           if-no-files-found: ignore
           retention-days: 7
-
-      # CodeQL runs for every event in this workflow. On the weekly schedule
-      # it needs its own build; PR/push runs already performed the core build
-      # after CodeQL initialization, so no duplicate build is required.
-      - name: Build app for CodeQL-only run
-        if: ${{ !cancelled() && github.event_name == 'schedule' }}
-        run: npm run build
-
-      - name: Perform CodeQL Analysis
-        if: ${{ !cancelled() }}
-        uses: github/codeql-action/analyze@24c54180a607b1449ed407dd24f251e4e9147c8d # v4
 
       # Failure alerting runs in the trusted workflow_run workflow so this
       # PR-controlled runner never receives incident.io credentials.

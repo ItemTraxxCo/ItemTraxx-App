@@ -1,6 +1,7 @@
 import {
   CLIENT_REPORT_DIAGNOSTICS_MAX_BYTES,
   escapeSlackMrkdwnText,
+  formatSlackRequestIdField,
   normalizeClientReportDiagnostics,
   normalizeClientReportText,
 } from "./clientReportNormalization.ts";
@@ -32,6 +33,28 @@ Deno.test("escapes attacker-controlled Slack mrkdwn delimiters", () => {
     escapeSlackMrkdwnText("<!channel> & <https://attacker.example|link>") ===
       "&lt;!channel&gt; &amp; &lt;https://attacker.example|link&gt;",
     "expected Slack broadcast and link syntax to be rendered as text",
+  );
+  assert(
+    escapeSlackMrkdwnText("*bold* _italic_ ~strike~ `code`") ===
+      "?bold? ?italic? ?strike? ?code?",
+    "expected Slack formatting markers to be replaced with plain text",
+  );
+});
+
+Deno.test("escapes caller-controlled request IDs in the Slack report field", () => {
+  assert(
+    formatSlackRequestIdField("<!channel>") === "Request ID: ?channel?",
+    "expected Slack broadcast syntax in request IDs to be inert",
+  );
+  assert(
+    formatSlackRequestIdField("client-request-123") ===
+      "Request ID: client-request-123",
+    "expected ordinary request IDs to retain their visible value",
+  );
+  assert(
+    formatSlackRequestIdField("*bold* _italic_ ~strike~ `code`") ===
+      "Request ID: ?bold? ?italic? ?strike? ?code?",
+    "expected Slack formatting markers in request IDs to be inert",
   );
 });
 

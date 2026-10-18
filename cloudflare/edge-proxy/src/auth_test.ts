@@ -3,6 +3,11 @@ import { normalizeBetterAuthCaptchaRequest } from "./authCaptcha.ts";
 import {
   handleBetterAuthRequest,
   isActiveBetterAuthOrganizationMember,
+  isActiveBetterAuthOrganizationActor,
+  isActiveBetterAuthOrganizationMutation,
+  isActiveBetterAuthOrganizationRead,
+  filterActiveBetterAuthOrganizationRows,
+  isBetterAuthOrganizationMutationPath,
   isActiveLinkedBetterAuthProfile,
   hasRecentSuperAdminPasswordConfirmation,
   isBetterAuthPasskeyEnrollmentPath,
@@ -16,6 +21,432 @@ Deno.test("organization logo replacements reuse one R2 object per organization",
   const first = organizationLogoObjectPath("workspace-1");
   const replacement = organizationLogoObjectPath("workspace-1");
   assertEquals(first, replacement);
+});
+
+Deno.test(
+  "Better Auth member and invitation mutations require an active target workspace",
+  async () => {
+    const activeWorkspace = { status: "active", archived_at: null };
+    const archivedWorkspace = {
+      status: "suspended",
+      archived_at: "2026-10-08T00:00:00Z",
+    };
+    const createDataClient = (
+      workspaces: Record<string, Record<string, unknown> | null>,
+      invitationOrganizationId = "organization-1",
+      organizationsBySlug: Record<string, string> = {
+        "active-workspace": "organization-1",
+        "archived-workspace": "organization-2",
+      },
+    ) => ({
+      schema: (schema: string) => ({
+        from: (table: string) => {
+          const filters = new Map<string, unknown>();
+          const query = {
+            select: (_columns: string) => query,
+            eq: (column: string, value: unknown) => {
+              filters.set(column, value);
+              return query;
+            },
+            is: (column: string, value: unknown) => {
+              filters.set(column, value);
+              return query;
+            },
+            in: (column: string, value: unknown[]) => {
+              filters.set(column, value);
+              return query;
+            },
+            maybeSingle: async () => {
+              if (schema === "better_auth" && table === "invitation") {
+                return {
+                  data: filters.get("id") === "invitation-1"
+                    ? { organizationId: invitationOrganizationId }
+                    : null,
+                  error: null,
+                };
+              }
+              if (schema === "better_auth" && table === "organization") {
+                const id = organizationsBySlug[String(filters.get("slug"))];
+                return { data: id ? { id } : null, error: null };
+              }
+              if (schema === "public" && table === "workspaces") {
+                return {
+                  data: workspaces[String(filters.get("better_auth_organization_id"))] ?? null,
+                  error: null,
+                };
+              }
+              return { data: null, error: null };
+            },
+            then: (resolve: (value: unknown) => unknown, reject: (reason: unknown) => unknown) => {
+              const organizationIds = filters.get("better_auth_organization_id");
+              const data = schema === "public" && table === "workspaces" && Array.isArray(organizationIds)
+                ? organizationIds.flatMap((id) => {
+                  const workspace = workspaces[String(id)];
+                  return workspace?.status === "active" && workspace.archived_at === null
+                    ? [{ better_auth_organization_id: id }]
+                    : [];
+                })
+                : null;
+              return Promise.resolve({ data, error: null }).then(resolve, reject);
+            },
+          };
+          return query;
+        },
+      }),
+    });
+    const mutationCases = [
+      { path: "/organization/delete", body: { organizationId: "organization-1" } },
+      { path: "/organization/update", body: { organizationId: "organization-1" } },
+      { path: "/organization/remove-member", body: { organizationId: "organization-1" } },
+      { path: "/organization/update-member-role", body: { organizationId: "organization-1" } },
+      { path: "/organization/leave", body: { organizationId: "organization-1" } },
+      { path: "/organization/invite-member", body: { organizationId: "organization-1" } },
+      { path: "/organization/set-active", body: { organizationId: "organization-1" } },
+      { path: "/organization/cancel-invitation", body: { invitationId: "invitation-1" } },
+      { path: "/organization/accept-invitation", body: { invitationId: "invitation-1" } },
+      { path: "/organization/reject-invitation", body: { invitationId: "invitation-1" } },
+    ] as const;
+
+    for (const { path, body } of mutationCases) {
+      assertEquals(isBetterAuthOrganizationMutationPath(path), true, `${path} is guarded`);
+      assertEquals(
+        await isActiveBetterAuthOrganizationMutation(
+          createDataClient({ "organization-1": activeWorkspace }) as never,
+          path,
+          body,
+          null,
+          "organization-1",
+          "tenant_admin",
+        ),
+        true,
+        `${path} remains available for an active workspace`,
+      );
+      assertEquals(
+        await isActiveBetterAuthOrganizationMutation(
+          createDataClient({ "organization-1": archivedWorkspace }) as never,
+          path,
+          body,
+          null,
+          "organization-1",
+          "tenant_admin",
+        ),
+        false,
+        `${path} is denied for an archived workspace`,
+      );
+    }
+
+    assertEquals(
+      await isActiveBetterAuthOrganizationMutation(
+        createDataClient({
+          "organization-1": activeWorkspace,
+          "organization-2": archivedWorkspace,
+        }) as never,
+        "/organization/update-member-role",
+        { organizationId: "organization-2" },
+        "organization-1",
+        "organization-1",
+        "tenant_admin",
+      ),
+      false,
+      "an explicit target organization takes precedence over the active organization",
+    );
+    assertEquals(
+      await isActiveBetterAuthOrganizationMutation(
+        createDataClient({ "organization-1": activeWorkspace }) as never,
+        "/organization/remove-member",
+        {},
+        "organization-1",
+        "organization-1",
+        "tenant_admin",
+      ),
+      true,
+      "member routes preserve Better Auth's active-organization fallback",
+    );
+    assertEquals(
+      await isActiveBetterAuthOrganizationMutation(
+        createDataClient({ "organization-1": activeWorkspace }) as never,
+        "/organization/leave",
+        {},
+        "organization-1",
+        "organization-1",
+        "tenant_admin",
+      ),
+      false,
+      "leave requires the explicit organization ID used by Better Auth",
+    );
+    assertEquals(
+      await isActiveBetterAuthOrganizationMutation(
+        createDataClient({
+          "organization-1": activeWorkspace,
+          "organization-2": activeWorkspace,
+        }, "organization-2") as never,
+        "/organization/accept-invitation",
+        { invitationId: "invitation-1" },
+        null,
+        "organization-1",
+        "tenant_admin",
+      ),
+      false,
+      "a workspace user cannot accept an invitation into a different workspace",
+    );
+    assertEquals(
+      await isActiveBetterAuthOrganizationMutation(
+        createDataClient({
+          "organization-1": activeWorkspace,
+          "organization-2": activeWorkspace,
+        }) as never,
+        "/organization/update-member-role",
+        { organizationId: "organization-2" },
+        "organization-1",
+        "organization-1",
+        "tenant_admin",
+      ),
+      false,
+      "a workspace user cannot mutate members in a different active workspace",
+    );
+    assertEquals(isBetterAuthOrganizationMutationPath("/organization/list-members"), false);
+    assertEquals(isBetterAuthOrganizationMutationPath("/organization/set-active"), true);
+    assertEquals(
+      await isActiveBetterAuthOrganizationMutation(
+        createDataClient({ "organization-1": activeWorkspace }) as never,
+        "/organization/set-active",
+        { organizationSlug: "active-workspace" },
+        null,
+        "organization-1",
+        "tenant_admin",
+      ),
+      true,
+      "setting the active organization by slug remains available for the active workspace",
+    );
+    assertEquals(
+      await isActiveBetterAuthOrganizationMutation(
+        createDataClient({ "organization-1": archivedWorkspace }) as never,
+        "/organization/set-active",
+        { organizationId: null },
+        "organization-1",
+        "organization-1",
+        "tenant_admin",
+      ),
+      true,
+      "an archived workspace can clear its stale active organization",
+    );
+  },
+);
+
+Deno.test("Better Auth organization reads and active-organization targets require active workspaces", async () => {
+  const activeWorkspace = { status: "active", archived_at: null };
+  const archivedWorkspace = { status: "suspended", archived_at: "2026-10-08T00:00:00Z" };
+  const createDataClient = (
+    workspaces: Record<string, Record<string, unknown> | null>,
+    invitationOrganizationId = "organization-1",
+    organizationsBySlug: Record<string, string> = { "archived-workspace": "organization-2" },
+  ) => ({
+    schema: (schema: string) => ({
+      from: (table: string) => {
+        const filters = new Map<string, unknown>();
+        const query = {
+          select: (_columns: string) => query,
+          eq: (column: string, value: unknown) => { filters.set(column, value); return query; },
+          maybeSingle: async () => {
+            if (schema === "better_auth" && table === "invitation") {
+              return { data: filters.get("id") === "invitation-1" ? { organizationId: invitationOrganizationId } : null, error: null };
+            }
+            if (schema === "better_auth" && table === "organization") {
+              const id = organizationsBySlug[String(filters.get("slug"))];
+              return { data: id ? { id } : null, error: null };
+            }
+            if (schema === "public" && table === "workspaces") {
+              return { data: workspaces[String(filters.get("better_auth_organization_id"))] ?? null, error: null };
+            }
+            return { data: null, error: null };
+          },
+        };
+        return query;
+      },
+    }),
+  });
+  const client = createDataClient({
+    "organization-1": activeWorkspace,
+    "organization-2": archivedWorkspace,
+  }) as never;
+
+  for (const path of ["/organization/list-members", "/organization/list-invitations", "/organization/get-full-organization"]) {
+    assertEquals(
+      await isActiveBetterAuthOrganizationRead(
+        client,
+        path,
+        { organizationId: "organization-2" },
+        "organization-1",
+        "organization-1",
+        "tenant_account",
+      ),
+      false,
+      `${path} denies reads from an archived target`,
+    );
+  }
+  assertEquals(
+    await isActiveBetterAuthOrganizationRead(
+      client,
+      "/organization/has-permission",
+      {},
+      "organization-1",
+      "organization-1",
+      "tenant_account",
+      { organizationId: "organization-2", permissions: { member: ["read"] } },
+    ),
+    false,
+    "permission checks cannot target an archived organization from the request body",
+  );
+  assertEquals(
+    await isActiveBetterAuthOrganizationRead(
+      client,
+      "/organization/has-permission",
+      {},
+      "organization-1",
+      "organization-1",
+      "tenant_account",
+      { permissions: { member: ["read"] } },
+    ),
+    true,
+    "permission checks can use the active organization when the body omits its ID",
+  );
+  assertEquals(
+    await isActiveBetterAuthOrganizationRead(
+      client,
+      "/organization/get-organization",
+      { organizationSlug: "archived-workspace" },
+      null,
+      "organization-1",
+      "tenant_account",
+    ),
+    false,
+    "organization reads resolve and reject archived slug targets",
+  );
+  assertEquals(
+    await isActiveBetterAuthOrganizationRead(
+      createDataClient({ "organization-1": activeWorkspace }, "organization-2") as never,
+      "/organization/get-invitation",
+      { id: "invitation-1" },
+      null,
+      "organization-1",
+      "tenant_account",
+    ),
+    false,
+    "invitation details cannot reveal an archived organization",
+  );
+  assertEquals(
+    await isActiveBetterAuthOrganizationRead(
+      client,
+      "/organization/get-organization",
+      { organizationId: "organization-1" },
+      null,
+      "organization-1",
+      "tenant_account",
+    ),
+    true,
+    "active workspace organization reads remain available",
+  );
+  assertEquals(
+    await isActiveBetterAuthOrganizationRead(
+      client,
+      "/organization/get-organization",
+      { organizationId: "organization-1" },
+      null,
+      "organization-2",
+      "tenant_account",
+    ),
+    false,
+    "a stale membership cannot read a different workspace organization",
+  );
+  assertEquals(
+    isActiveBetterAuthOrganizationActor({ role: "tenant_account", organizationId: null, workspaceStatus: "active", workspaceArchivedAt: null }),
+    false,
+    "tenant organization routes require a linked active workspace",
+  );
+  assertEquals(
+    isActiveBetterAuthOrganizationActor({
+      role: "tenant_account",
+      organizationId: "organization-1",
+      workspaceStatus: "active",
+      workspaceArchivedAt: "2026-10-08T00:00:00Z",
+    }),
+    false,
+    "a stale active status cannot override the workspace archive timestamp",
+  );
+  assertEquals(
+    isActiveBetterAuthOrganizationActor({ role: "super_admin", organizationId: null, workspaceStatus: null, workspaceArchivedAt: null }),
+    true,
+    "super admins retain organization access without a tenant workspace",
+  );
+});
+
+Deno.test("Better Auth organization lists omit archived organizations", async () => {
+  const activeWorkspace = { status: "active", archived_at: null };
+  const archivedWorkspace = { status: "suspended", archived_at: "2026-10-08T00:00:00Z" };
+  const dataClient = {
+    schema: (schema: string) => ({
+      from: (table: string) => {
+        const filters = new Map<string, unknown>();
+        const query = {
+          select: (_columns: string) => query,
+          in: (column: string, values: unknown[]) => { filters.set(column, values); return query; },
+          eq: (_column: string, _value: unknown) => query,
+          is: (_column: string, _value: unknown) => query,
+          then: (resolve: (value: unknown) => unknown, reject: (reason: unknown) => unknown) => {
+            const data = schema === "public" && table === "workspaces"
+              ? (filters.get("better_auth_organization_id") as unknown[]).flatMap((id) => {
+                const workspace = id === "organization-1" ? activeWorkspace : archivedWorkspace;
+                return workspace.status === "active" && workspace.archived_at === null
+                  ? [{ better_auth_organization_id: id }]
+                  : [];
+              })
+              : null;
+            return Promise.resolve({ data, error: null }).then(resolve, reject);
+          },
+        };
+        return query;
+      },
+    }),
+  };
+  const rows = [
+    { id: "organization-1", name: "Active" },
+    { id: "organization-2", name: "Archived" },
+  ];
+  assertEquals(
+    await filterActiveBetterAuthOrganizationRows(
+      dataClient as never,
+      "/organization/list",
+      rows,
+      null,
+      "super_admin",
+    ),
+    [{ id: "organization-1", name: "Active" }],
+  );
+  assertEquals(
+    await filterActiveBetterAuthOrganizationRows(
+      dataClient as never,
+      "/organization/list",
+      rows,
+      "organization-1",
+      "tenant_account",
+    ),
+    [{ id: "organization-1", name: "Active" }],
+    "non-super-admin results are restricted to their actor organization",
+  );
+  assertEquals(
+    await filterActiveBetterAuthOrganizationRows(
+      dataClient as never,
+      "/organization/list-user-invitations",
+      [
+        { id: "invite-1", organizationId: "organization-1" },
+        { id: "invite-2", organizationId: "organization-2" },
+      ],
+      null,
+      "super_admin",
+    ),
+    [{ id: "invite-1", organizationId: "organization-1" }],
+    "user invitation lists omit invitations belonging to archived organizations",
+  );
 });
 
 Deno.test(
@@ -336,7 +767,7 @@ Deno.test("resolves the SSO workspace without relying on a renamed foreign-key c
         maybeSingle: async () => ({
           data: table === "profiles"
             ? { id: "profile-1", role: "workspace_admin", workspace_id: "workspace-1" }
-            : { better_auth_organization_id: "organization-1", status: "active" },
+            : { better_auth_organization_id: "organization-1", status: "active", archived_at: null },
           error: null,
         }),
       };
@@ -352,8 +783,10 @@ Deno.test("resolves the SSO workspace without relying on a renamed foreign-key c
     workspaceId: "workspace-1",
     organizationId: "organization-1",
     workspaceStatus: "active",
+    workspaceArchivedAt: null,
   });
   assertEquals(queries.map(({ table }) => table), ["profiles", "workspaces"]);
   assertEquals(queries[0].selection, "id,role,workspace_id");
+  assertEquals(queries[1].selection, "better_auth_organization_id,status,archived_at");
   assertEquals(queries[1].filters, [["id", "workspace-1"]]);
 });

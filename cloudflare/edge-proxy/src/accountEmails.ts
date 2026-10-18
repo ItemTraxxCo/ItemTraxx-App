@@ -18,6 +18,7 @@ const buildBrandedMessage = ({
   preheader,
   title,
   body,
+  textBody,
   buttonLabel,
   url,
   expiration,
@@ -25,6 +26,7 @@ const buildBrandedMessage = ({
   preheader: string;
   title: string;
   body: string;
+  textBody?: string;
   buttonLabel: string;
   url: string;
   expiration: string;
@@ -60,7 +62,7 @@ const buildBrandedMessage = ({
   const text = [
     title,
     "",
-    body.replace(/[<>]/g, ""),
+    textBody ?? body.replace(/[<>]/g, ""),
     `${buttonLabel}: ${url}`,
     "",
     expiration,
@@ -78,18 +80,17 @@ const buildBrandedMessage = ({
 
 export const buildWorkspaceAccountInvitationEmail = ({
   url,
-  accountRole,
+  organizationName,
 }: {
   url: string;
-  accountRole: "tenant_account" | "workspace_admin";
+  organizationName: string;
 }) => {
-  const roleLabel = accountRole === "workspace_admin"
-    ? "Workspace Admin"
-    : "Tenant Account";
+  const safeOrganizationName = organizationName.trim();
   return buildBrandedMessage({
     preheader: "You have an ItemTraxx account invitation.",
     title: "You’re invited to ItemTraxx",
-    body: `You have been invited to set up an ItemTraxx ${roleLabel} account. Use the link below to review the invitation and choose a password.`,
+    body: `You have been invited to join ${escapeHtml(safeOrganizationName)} on ItemTraxx. Use the link below to review the invitation and complete your account setup.`,
+    textBody: `You have been invited to join ${safeOrganizationName} on ItemTraxx. Use the link below to review the invitation and complete your account setup.`,
     buttonLabel: "Review invitation",
     url,
     expiration: "This single-use invitation expires in 72 hours.",

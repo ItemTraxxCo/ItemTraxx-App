@@ -18,6 +18,7 @@ import {
 import { buildPublicRateLimitHeaders } from "../_shared/publicRateLimit.ts";
 import {
   escapeSlackMrkdwnText,
+  formatSlackRequestIdField,
   normalizeClientReportDiagnostics,
   normalizeClientReportText,
 } from "../_shared/clientReportNormalization.ts";
@@ -292,7 +293,7 @@ serve(async (req) => {
       `Release: ${escapeSlackMrkdwnText(release)}\n` +
       `Role: ${authRole}${isVerifiedAuthenticated ? "" : " (unverified)"}\n` +
       `Workspace: ${workspaceId}\n` +
-      `Request ID: ${requestId}\n` +
+      `${formatSlackRequestIdField(requestId)}\n` +
       `Diagnostics stored: yes`;
 
     try {

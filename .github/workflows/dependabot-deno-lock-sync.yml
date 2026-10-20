@@ -39,6 +39,7 @@ jobs:
         with:
           ref: ${{ github.head_ref || github.ref_name }}
           persist-credentials: false
+          fetch-depth: 0
 
       - name: Setup Deno
         uses: denoland/setup-deno@22d081ff2d3a40755e97629de92e3bcbfa7cf2ed # v2.0.5
@@ -50,13 +51,18 @@ jobs:
         # --min-dep-age=0 disables Deno's minimum-dependency-age gate, which would
         # otherwise refuse to lock versions published <24h ago and silently no-op —
         # exactly the case that matters, since Dependabot bumps to just-published
-        # versions. Safe here: the target versions are already resolved and pinned by
-        # npm in package-lock.json, so syncing deno.lock to match is format parity,
-        # not a new trust decision.
+        # versions. Deno may resolve a different version within a broad range than
+        # npm did; the parity check below blocks the commit if changed direct packages
+        # do not match package-lock.json.
         run: deno install --lockfile-only --min-dep-age=0
 
       - name: Verify deno.lock is valid
         run: deno install --lockfile-only --frozen --min-dep-age=0
+
+      - name: Verify changed npm and Deno versions match
+        env:
+          DENO_LOCK_SYNC_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: node scripts/check-npm-deno-lock-parity.mjs
 
       - name: Detect lockfile changes
         id: lockfile

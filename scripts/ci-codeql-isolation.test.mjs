@@ -35,8 +35,9 @@ test("PR validation and Dependabot follow-up CI do not receive CodeQL write acce
   assert.match(triage.jobs?.triage?.if ?? "", /pull_request_target/);
 });
 
-test("CodeQL analyzes PR source in a trusted, non-executing privileged job", () => {
-  assert.ok(codeql.on?.pull_request_target);
+test("CodeQL analyzes PR source without a privileged pull_request_target checkout", () => {
+  assert.ok(codeql.on?.pull_request);
+  assert.equal(codeql.on?.pull_request_target, undefined);
   assert.deepEqual(codeql.on?.push?.branches, ["main", "preview", "staging"]);
   assert.equal(codeql.on?.schedule?.[0]?.cron, "21 9 * * 1");
 
@@ -66,14 +67,16 @@ test("CodeQL analyzes PR source in a trusted, non-executing privileged job", () 
   }
   assert.equal((analyze?.steps ?? []).some((step) => Object.hasOwn(step, "run")), false);
   assert.ok(codeql.jobs?.["slack-notify-start"]?.needs?.includes("kill-switch-preflight"));
-  assert.equal(codeql.jobs?.["slack-notify-start"]?.if, "${{ github.event_name != 'pull_request_target' }}");
+  assert.equal(codeql.jobs?.["slack-notify-start"]?.if, "${{ github.event_name != 'pull_request' }}");
+  assert.match(codeql.jobs?.["slack-notify-finish"]?.if ?? "", /github\.event_name != 'pull_request'/);
+  assert.match(codeql.jobs?.["slack-notify-preflight-blocked"]?.if ?? "", /github\.event_name != 'pull_request'/);
   assert.ok(codeql.jobs?.["slack-notify-finish"]?.needs?.includes("analyze"));
   assert.ok(codeql.jobs?.["slack-notify-preflight-blocked"]?.needs?.includes("kill-switch-preflight"));
 
   const checkout = analyze.steps.find((step) => step.uses?.startsWith("actions/checkout@"));
   assert.match(checkout?.with?.ref ?? "", /merge_commit_sha/);
   assert.equal(checkout?.with?.["persist-credentials"], false);
-  assert.equal(checkout?.with?.["allow-unsafe-pr-checkout"], true);
+  assert.equal(checkout?.with?.["allow-unsafe-pr-checkout"], undefined);
 
   const init = analyze.steps.find((step) => step.uses?.startsWith("github/codeql-action/init@"));
   const upload = analyze.steps.find((step) => step.uses?.startsWith("github/codeql-action/analyze@"));

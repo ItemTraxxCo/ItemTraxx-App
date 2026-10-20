@@ -4,13 +4,23 @@ import {
   buildWorkspaceAccountInvitationEmail,
 } from "./accountEmails.ts";
 
-Deno.test("workspace invitations are branded and distinguish the invited account role", () => {
+Deno.test("workspace invitations name the organization and are branded", () => {
+  const organizationName = "Northview & West <Campus>";
   const email = buildWorkspaceAccountInvitationEmail({
     url: `https://itemtraxx.com/accept-invitation#token=${"0123456789abcdef".repeat(4)}`,
-    accountRole: "workspace_admin",
+    organizationName,
   });
-  if (!email.html.includes("Workspace Admin") || !email.html.includes("Review invitation")) {
-    throw new Error("workspace admin invitation does not identify its account role");
+  if (
+    !email.html.includes("You have been invited to join Northview &amp; West &lt;Campus&gt; on ItemTraxx.") ||
+    !email.html.includes("Review invitation")
+  ) {
+    throw new Error("workspace invitation does not identify the organization");
+  }
+  if (!email.text.includes(`You have been invited to join ${organizationName} on ItemTraxx.`)) {
+    throw new Error("plain-text invitation does not preserve the organization name");
+  }
+  if (email.html.includes("Tenant Account") || email.html.includes("Workspace Admin")) {
+    throw new Error("workspace invitation still exposes the account role in its copy");
   }
   if (!email.text.includes(`https://itemtraxx.com/accept-invitation#token=${"0123456789abcdef".repeat(4)}`)) {
     throw new Error("plain-text invitation is missing the single-use link");

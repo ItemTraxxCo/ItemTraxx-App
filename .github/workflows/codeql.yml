@@ -1,0 +1,126 @@
+name: CodeQL
+
+on:
+  pull_request:
+    types:
+      - opened
+      - reopened
+      - synchronize
+      - edited
+      - ready_for_review
+  push:
+    branches:
+      - main
+      - preview
+      - staging
+  schedule:
+    - cron: '21 9 * * 1'
+
+permissions:
+  actions: read
+  contents: read
+  pull-requests: read
+
+jobs:
+  kill-switch-preflight:
+    uses: ./.github/workflows/kill-switch-preflight.yml
+    with:
+      status_source: supabase
+
+  analyze:
+    name: Analyze JavaScript and Actions
+    needs: kill-switch-preflight
+    if: ${{ needs.kill-switch-preflight.outputs.active == 'false' && (github.event_name != 'pull_request' || github.event.pull_request.draft == false) }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    permissions:
+      actions: read
+      contents: read
+      pull-requests: read
+      security-events: write
+
+    steps:
+      # Fork pull_request runs receive a read-only token and no repository
+      # secrets. The merge ref is static-analysis input; never run PR source code.
+      - name: Checkout source for static analysis
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.merge_commit_sha || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@24c54180a607b1449ed407dd24f251e4e9147c8d # v4
+        with:
+          languages: actions,javascript-typescript
+          build-mode: none
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@24c54180a607b1449ed407dd24f251e4e9147c8d # v4
+        with:
+          ref: ${{ github.event_name == 'pull_request' && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.ref }}
+          sha: ${{ github.event_name == 'pull_request' && github.event.pull_request.merge_commit_sha || github.sha }}
+
+
+  slack-notify-start:
+    needs: kill-switch-preflight
+    if: ${{ github.event_name != 'pull_request' }}
+    uses: ./.github/workflows/slack-notify-status.yml
+    with:
+      mode: start
+      workflow_name: CodeQL
+      job_name: analyze
+      run_url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+      ref_name: ${{ github.ref_name }}
+      sha: ${{ github.sha }}
+      incident_alerts_enabled: false
+    secrets:
+      SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+      SLACK_CHANNEL_ID: ${{ secrets.SLACK_CHANNEL_ID }}
+      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+  slack-notify-finish:
+    needs:
+      - analyze
+      - slack-notify-start
+    if: ${{ always() && github.event_name != 'pull_request' && needs.slack-notify-start.result == 'success' && needs.analyze.result != 'skipped' }}
+    uses: ./.github/workflows/slack-notify-status.yml
+    with:
+      mode: finish
+      workflow_name: CodeQL
+      job_name: analyze
+      run_url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+      ref_name: ${{ github.ref_name }}
+      sha: ${{ github.sha }}
+      status: ${{ needs.analyze.result == 'success' && 'success' || needs.analyze.result == 'failure' && 'failure' || needs.analyze.result == 'cancelled' && 'cancelled' || 'failure' }}
+      slack_channel_id: ${{ needs.slack-notify-start.outputs.slack_channel_id }}
+      slack_message_ts: ${{ needs.slack-notify-start.outputs.slack_message_ts }}
+      incident_alerts_enabled: false
+    secrets:
+      SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+      SLACK_CHANNEL_ID: ${{ secrets.SLACK_CHANNEL_ID }}
+      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+  slack-notify-preflight-blocked:
+    needs:
+      - analyze
+      - kill-switch-preflight
+      - slack-notify-start
+    if: ${{ always() && github.event_name != 'pull_request' && needs.slack-notify-start.result == 'success' && needs.analyze.result == 'skipped' && needs.kill-switch-preflight.outputs.active != 'false' }}
+    uses: ./.github/workflows/slack-notify-status.yml
+    with:
+      mode: finish
+      workflow_name: CodeQL
+      job_name: analyze
+      run_url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+      ref_name: ${{ github.ref_name }}
+      sha: ${{ github.sha }}
+      status: ${{ needs.kill-switch-preflight.outputs.active == 'true' && 'skipped' || 'failure' }}
+      status_message: ${{ needs.kill-switch-preflight.outputs.active == 'true' && format('Intentionally skipped because the ItemTraxx kill switch is active. {0}', needs.kill-switch-preflight.outputs.message) || format('CodeQL analysis was blocked because kill-switch preflight returned {0}. {1}', needs.kill-switch-preflight.outputs.active, needs.kill-switch-preflight.outputs.message) }}
+      slack_channel_id: ${{ needs.slack-notify-start.outputs.slack_channel_id }}
+      slack_message_ts: ${{ needs.slack-notify-start.outputs.slack_message_ts }}
+      incident_alerts_enabled: false
+    secrets:
+      SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+      SLACK_CHANNEL_ID: ${{ secrets.SLACK_CHANNEL_ID }}
+      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}

@@ -155,7 +155,7 @@ serve(async (req) => {
 
     const { data: tenant, error: tenantError } = await adminClient
       .from("workspaces")
-      .select("id, status, primary_admin_profile_id")
+      .select("id, name, status, primary_admin_profile_id")
       .eq("id", requesterProfile.workspace_id)
       .single();
 
@@ -234,7 +234,7 @@ serve(async (req) => {
         await callBetterAuthAdmin({
           action: "send_workspace_account_invitation",
           email: authEmail,
-          accountRole,
+          organizationName: tenant.name,
           url: invitationUrl,
         });
       } catch {

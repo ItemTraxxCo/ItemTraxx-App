@@ -1,7 +1,7 @@
 name: CodeQL
 
 on:
-  pull_request_target:
+  pull_request:
     types:
       - opened
       - reopened
@@ -30,7 +30,7 @@ jobs:
   analyze:
     name: Analyze JavaScript and Actions
     needs: kill-switch-preflight
-    if: ${{ needs.kill-switch-preflight.outputs.active == 'false' && (github.event_name != 'pull_request_target' || github.event.pull_request.draft == false) }}
+    if: ${{ needs.kill-switch-preflight.outputs.active == 'false' && (github.event_name != 'pull_request' || github.event.pull_request.draft == false) }}
     runs-on: ubuntu-latest
     timeout-minutes: 90
     permissions:
@@ -40,17 +40,14 @@ jobs:
       security-events: write
 
     steps:
-      # pull_request_target loads this workflow from the base branch. Checkout
-      # the PR merge ref only as static-analysis input; never run PR source code.
+      # Fork pull_request runs receive a read-only token and no repository
+      # secrets. The merge ref is static-analysis input; never run PR source code.
       - name: Checkout source for static analysis
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.event.pull_request.merge_commit_sha || github.sha }}
           fetch-depth: 0
           persist-credentials: false
-          # v7 requires this for fork PRs under pull_request_target. The pinned
-          # CodeQL actions inspect the source as data; no PR code is executed.
-          allow-unsafe-pr-checkout: true
 
       - name: Initialize CodeQL
         uses: github/codeql-action/init@24c54180a607b1449ed407dd24f251e4e9147c8d # v4
@@ -61,13 +58,13 @@ jobs:
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@24c54180a607b1449ed407dd24f251e4e9147c8d # v4
         with:
-          ref: ${{ github.event_name == 'pull_request_target' && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.ref }}
-          sha: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.merge_commit_sha || github.sha }}
+          ref: ${{ github.event_name == 'pull_request' && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.ref }}
+          sha: ${{ github.event_name == 'pull_request' && github.event.pull_request.merge_commit_sha || github.sha }}
 
 
   slack-notify-start:
     needs: kill-switch-preflight
-    if: ${{ github.event_name != 'pull_request_target' }}
+    if: ${{ github.event_name != 'pull_request' }}
     uses: ./.github/workflows/slack-notify-status.yml
     with:
       mode: start
@@ -86,7 +83,7 @@ jobs:
     needs:
       - analyze
       - slack-notify-start
-    if: ${{ always() && github.event_name != 'pull_request_target' && needs.slack-notify-start.result == 'success' && needs.analyze.result != 'skipped' }}
+    if: ${{ always() && github.event_name != 'pull_request' && needs.slack-notify-start.result == 'success' && needs.analyze.result != 'skipped' }}
     uses: ./.github/workflows/slack-notify-status.yml
     with:
       mode: finish
@@ -109,7 +106,7 @@ jobs:
       - analyze
       - kill-switch-preflight
       - slack-notify-start
-    if: ${{ always() && github.event_name != 'pull_request_target' && needs.slack-notify-start.result == 'success' && needs.analyze.result == 'skipped' && needs.kill-switch-preflight.outputs.active != 'false' }}
+    if: ${{ always() && github.event_name != 'pull_request' && needs.slack-notify-start.result == 'success' && needs.analyze.result == 'skipped' && needs.kill-switch-preflight.outputs.active != 'false' }}
     uses: ./.github/workflows/slack-notify-status.yml
     with:
       mode: finish

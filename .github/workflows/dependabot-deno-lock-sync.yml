@@ -41,6 +41,11 @@ jobs:
           persist-credentials: false
           fetch-depth: 0
 
+      - name: Setup Node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24.18.0
+
       - name: Setup Deno
         uses: denoland/setup-deno@22d081ff2d3a40755e97629de92e3bcbfa7cf2ed # v2.0.5
         with:
@@ -51,9 +56,18 @@ jobs:
         # --min-dep-age=0 disables Deno's minimum-dependency-age gate, which would
         # otherwise refuse to lock versions published <24h ago and silently no-op —
         # exactly the case that matters, since Dependabot bumps to just-published
-        # versions. Deno may resolve a different version within a broad range than
-        # npm did; the parity check below blocks the commit if changed direct packages
-        # do not match package-lock.json.
+        # versions. The following steps pin changed direct dependencies to npm's
+        # resolved version only when Deno's initial resolution differs.
+        run: deno install --lockfile-only --min-dep-age=0
+
+      - name: Align mismatched direct versions with npm lock
+        id: npm-parity
+        env:
+          DENO_LOCK_SYNC_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: node scripts/sync-npm-deno-lock-parity.mjs --fix
+
+      - name: Regenerate deno.lock after aligning versions
+        if: ${{ steps.npm-parity.outputs.fixed == 'true' }}
         run: deno install --lockfile-only --min-dep-age=0
 
       - name: Verify deno.lock is valid
@@ -62,12 +76,12 @@ jobs:
       - name: Verify changed npm and Deno versions match
         env:
           DENO_LOCK_SYNC_BASE_SHA: ${{ github.event.pull_request.base.sha }}
-        run: node scripts/check-npm-deno-lock-parity.mjs
+        run: node scripts/sync-npm-deno-lock-parity.mjs
 
       - name: Detect lockfile changes
         id: lockfile
         run: |
-          if git diff --quiet -- deno.lock; then
+          if git diff --quiet -- package.json package-lock.json deno.lock; then
             echo "changed=false" >> "$GITHUB_OUTPUT"
           else
             echo "changed=true" >> "$GITHUB_OUTPUT"
@@ -141,11 +155,11 @@ jobs:
           git config --local gpg.ssh.allowedSignersFile "$ITX_GIT_ALLOWED_SIGNERS_FILE"
           git config --local commit.gpgsign true
 
-      - name: Commit signed Deno lockfile update
+      - name: Commit signed npm and Deno lock sync
         if: ${{ github.event_name == 'pull_request' && steps.lockfile.outputs.changed == 'true' }}
         run: |
-          git add -- deno.lock
-          git commit -S -m "chore(deps): sync Deno lockfile" -m "Generated and validated by the Deno Lock Sync workflow."
+          git add -- package.json package-lock.json deno.lock
+          git commit -S -m "chore(deps): sync npm and Deno lockfiles" -m "Generated and validated by the Deno Lock Sync workflow."
           git verify-commit HEAD
 
       - name: Push signed lockfile update

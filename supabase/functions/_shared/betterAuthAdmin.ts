@@ -9,7 +9,7 @@ export type BetterAuthAdminAction =
   | { action: "delete_organization"; organizationId: string }
   | { action: "create_user"; profileId: string; email: string; password: string; name?: string; role: string; profileRole: string; workspaceId?: string | null }
   | { action: "update_email"; profileId: string; email: string }
-  | { action: "send_workspace_account_invitation"; email: string; accountRole: "tenant_account" | "workspace_admin"; url: string }
+  | { action: "send_workspace_account_invitation"; email: string; organizationName: string; url: string }
   | { action: "send_email_change_approval"; email: string; newEmail: string; url: string }
   | { action: "send_email_change_verification"; email: string; url: string }
   | { action: "accept_workspace_account_invitation"; tokenHash: string; password: string }

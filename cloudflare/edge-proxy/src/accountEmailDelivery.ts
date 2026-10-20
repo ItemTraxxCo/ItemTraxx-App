@@ -18,7 +18,7 @@ export type AccountEmailRequest =
     kind: "workspace-account-invitation";
     to: string;
     url: string;
-    accountRole: "tenant_account" | "workspace_admin";
+    organizationName: string;
   }
   | {
     kind: "email-change-approval";
@@ -42,7 +42,7 @@ const renderMessage = (message: AccountEmailRequest) => {
       subject: "You’re invited to ItemTraxx",
       ...buildWorkspaceAccountInvitationEmail({
         url: message.url,
-        accountRole: message.accountRole,
+        organizationName: message.organizationName,
       }),
     };
   }

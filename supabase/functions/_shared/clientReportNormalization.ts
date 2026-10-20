@@ -36,7 +36,13 @@ export const normalizeClientReportText = (
 };
 
 export const escapeSlackMrkdwnText = (value: string) =>
-  value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+    .replace(/[*_~`]/g, "?");
+
+export const formatSlackRequestIdField = (requestId: string) => {
+  const safeRequestId = requestId.slice(0, 128).replace(/[^A-Za-z0-9 -]+/g, "?");
+  return `Request ID: ${escapeSlackMrkdwnText(safeRequestId)}`;
+};
 
 const normalizeDiagnosticEntry = (value: unknown): RecordValue | null => {
   const record = asRecord(value);

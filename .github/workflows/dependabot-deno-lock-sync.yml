@@ -1,9 +1,9 @@
 name: Deno Lock Sync
 
 # Dependabot PRs may update npm dependencies without refreshing deno.lock.
-# Keep the auto-write path limited to same-repository Dependabot PRs. Direct
-# dependency changes should be made through a PR so the generated lock can be
-# SSH-signed and validated before merge.
+# Keep the auto-write path limited to same-repository Dependabot PRs initiated
+# by Dependabot. GitHub only exposes Dependabot secrets on Dependabot-triggered
+# runs; a human rerun of a Dependabot PR must not enter the signing path.
 
 on:
   pull_request:
@@ -24,6 +24,7 @@ jobs:
     if: >-
       ${{
         (github.event_name == 'pull_request' &&
+          github.actor == 'dependabot[bot]' &&
           github.event.pull_request.head.repo.full_name == github.repository &&
           github.event.pull_request.user.login == 'dependabot[bot]')
       }}

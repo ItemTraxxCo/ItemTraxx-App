@@ -5,6 +5,7 @@ import yaml from "js-yaml";
 
 const workflow = (path) => yaml.load(readFileSync(new URL(path, import.meta.url), "utf8"));
 const ci = workflow("../.github/workflows/ci.yml");
+const ciValidation = workflow("../.github/workflows/ci-validation.yml");
 const codeql = workflow("../.github/workflows/codeql.yml");
 const denoLockSync = workflow("../.github/workflows/dependabot-deno-lock-sync.yml");
 const failureNotification = workflow("../.github/workflows/ci-failure-notify.yml");
@@ -13,7 +14,7 @@ const triage = workflow("../.github/workflows/ci-triage.yml");
 const usesCodeQlAction = (step) =>
   typeof step.uses === "string" && step.uses.startsWith("github/codeql-action/");
 
-test("PR validation and Dependabot follow-up CI do not receive CodeQL write access", () => {
+test("PR validation and Dependabot follow-up stay in pull_request cache scope", () => {
   assert.deepEqual(ci.permissions, {
     actions: "read",
     contents: "read",
@@ -22,12 +23,28 @@ test("PR validation and Dependabot follow-up CI do not receive CodeQL write acce
   for (const [jobName, job] of Object.entries(ci.jobs ?? {})) {
     assert.equal(job.permissions, undefined, `${jobName} must inherit CI’s read-only permissions`);
   }
-  assert.equal((ci.jobs?.validate?.steps ?? []).some(usesCodeQlAction), false);
+  assert.ok(Object.hasOwn(ci.on ?? {}, "pull_request"));
+  assert.equal(ci.jobs?.validate?.uses, "./.github/workflows/ci-validation.yml");
+  assert.deepEqual(Object.keys(ciValidation.on ?? {}), ["workflow_call"]);
+  assert.equal((ciValidation.jobs?.validate?.steps ?? []).some(usesCodeQlAction), false);
+  assert.equal(ci.on?.workflow_dispatch?.inputs, undefined);
+  assert.doesNotMatch(ci.jobs?.["require-trusted-ref"]?.steps?.[0]?.run ?? "", /DENO_LOCK_SYNC|pulls\//);
 
-  const followup = denoLockSync.jobs?.sync?.steps?.find((step) =>
-    step.name === "Dispatch checks for the updated PR head",
+  const checkout = ciValidation.jobs?.validate?.steps?.find((step) => step.name === "Checkout");
+  assert.equal(checkout?.with?.ref, "${{ inputs.ref }}");
+
+  assert.ok(denoLockSync.on?.pull_request);
+  assert.equal(denoLockSync.on?.workflow_dispatch, undefined);
+  assert.equal(denoLockSync.jobs?.sync?.permissions?.actions, "read");
+  assert.equal(denoLockSync.jobs?.sync?.outputs?.updated_head_sha, "${{ steps.updated-head.outputs.sha }}");
+  assert.equal(denoLockSync.jobs?.validate?.uses, "./.github/workflows/ci-validation.yml");
+  assert.deepEqual(denoLockSync.jobs?.validate?.needs, ["sync", "kill-switch-preflight"]);
+  assert.equal(denoLockSync.jobs?.validate?.with?.ref, "${{ needs.sync.outputs.updated_head_sha }}");
+  assert.equal(denoLockSync.jobs?.validate?.with?.diff_head_sha, "${{ needs.sync.outputs.updated_head_sha }}");
+  assert.equal(
+    denoLockSync.jobs?.sync?.steps?.some((step) => /workflow_dispatch|actions\/workflows/.test(step.run ?? "")),
+    false,
   );
-  assert.match(followup?.run ?? "", /actions\/workflows\/ci\.yml\/dispatches/);
 
   assert.ok(failureNotification.on?.workflow_run?.workflows?.includes("CodeQL"));
   assert.ok(triage.on?.workflow_run?.workflows?.includes("CodeQL"));

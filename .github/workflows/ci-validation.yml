@@ -30,7 +30,7 @@ jobs:
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           # package.json requires Node 24.x; jsdom 30 also requires 24.15+.
-          node-version: 24.18.0
+          node-version: 24.22.1
           cache: npm
 
       - name: Setup Deno

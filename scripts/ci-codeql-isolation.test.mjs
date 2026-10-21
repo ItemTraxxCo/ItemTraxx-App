@@ -27,8 +27,8 @@ test("PR validation and Dependabot follow-up stay in pull_request cache scope", 
   assert.equal(ci.jobs?.validate?.uses, "./.github/workflows/ci-validation.yml");
   assert.deepEqual(Object.keys(ciValidation.on ?? {}), ["workflow_call"]);
   assert.equal((ciValidation.jobs?.validate?.steps ?? []).some(usesCodeQlAction), false);
-  assert.equal(ci.on?.workflow_dispatch?.inputs, undefined);
-  assert.doesNotMatch(ci.jobs?.["require-trusted-ref"]?.steps?.[0]?.run ?? "", /DENO_LOCK_SYNC|pulls\//);
+  assert.equal(ci.on?.workflow_dispatch, undefined);
+  assert.equal(ci.jobs?.["require-trusted-ref"], undefined);
 
   const checkout = ciValidation.jobs?.validate?.steps?.find((step) => step.name === "Checkout");
   assert.equal(checkout?.with?.ref, "${{ inputs.ref }}");

@@ -12,40 +12,22 @@ on:
       - main
       - preview
       - staging
-  workflow_dispatch:
 
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  require-trusted-ref:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Validate workflow dispatch ref
-        id: guard
-        env:
-          RUN_EVENT: ${{ github.event_name }}
-          RUN_REF: ${{ github.ref }}
-        run: |
-          set -euo pipefail
-          if [[ "$RUN_EVENT" == "workflow_dispatch" && "$RUN_REF" != "refs/heads/main" ]]; then
-            echo "::error::Manual CI runs must use refs/heads/main."
-            exit 1
-          fi
-
   kill-switch-preflight:
     # GitHub-hosted runners receive a Cloudflare challenge (HTTP 403) from
     # the edge system-status URL. Use the direct Supabase origin while
     # keeping CI fail-closed on an unknown state.
-    needs: require-trusted-ref
     uses: ./.github/workflows/kill-switch-preflight.yml
     with:
       status_source: supabase
 
   slack-notify-start:
     needs:
-      - require-trusted-ref
       - kill-switch-preflight
     if: ${{ github.event_name != 'pull_request' }}
     uses: ./.github/workflows/slack-notify-status.yml
@@ -64,10 +46,9 @@ jobs:
 
   validate:
     needs:
-      - require-trusted-ref
       - kill-switch-preflight
       - slack-notify-start
-    if: ${{ always() && needs.require-trusted-ref.result == 'success' && needs.kill-switch-preflight.outputs.active == 'false' && (needs.slack-notify-start.result == 'success' || needs.slack-notify-start.result == 'skipped') }}
+    if: ${{ always() && needs.kill-switch-preflight.outputs.active == 'false' && (needs.slack-notify-start.result == 'success' || needs.slack-notify-start.result == 'skipped') }}
     uses: ./.github/workflows/ci-validation.yml
     with:
       ref: ${{ github.sha }}
@@ -76,14 +57,13 @@ jobs:
 
   slack-notify-finish:
     needs:
-      - require-trusted-ref
       - kill-switch-preflight
       - slack-notify-start
       - validate
     # Always finish the single CI status message when the start message exists.
     # A kill-switch block is reported in that same message instead of creating
     # a second, normally skipped, notification check.
-    if: ${{ always() && github.event_name != 'pull_request' && needs.require-trusted-ref.result == 'success' && needs.slack-notify-start.result == 'success' }}
+    if: ${{ always() && github.event_name != 'pull_request' && needs.slack-notify-start.result == 'success' }}
     uses: ./.github/workflows/slack-notify-status.yml
     with:
       mode: finish

@@ -48,8 +48,7 @@ jobs:
         if: ${{ !cancelled() }}
         run: node --test scripts/ci-codeql-isolation.test.mjs
 
-      # Core validation runs on pull requests, protected branch pushes, and
-      # manual workflow dispatches from main.
+      # Core validation runs on pull requests and protected branch pushes.
       - name: Verify env parity
         if: ${{ !cancelled() }}
         run: bash ./scripts/check-env-parity.sh

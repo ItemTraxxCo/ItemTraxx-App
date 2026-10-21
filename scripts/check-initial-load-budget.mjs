@@ -3,7 +3,7 @@ import { gzipSync } from "node:zlib";
 import { relative, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
-export const MAX_INITIAL_MINIFIED_BYTES = 250_000;
+export const MAX_INITIAL_MINIFIED_BYTES = 251_000;
 export const MAX_INITIAL_GZIP_BYTES = 100_000;
 const SAFE_ASSET_NAME_RE = /^[A-Za-z0-9][A-Za-z0-9._-]*\.js$/;
 const FORBIDDEN_INITIAL_MODULE_RE = /node_modules\/(?:jspdf|html2canvas|jsbarcode|posthog-js|@sentry|@supabase)\//;

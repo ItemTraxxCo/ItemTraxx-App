@@ -91,7 +91,7 @@ test("CodeQL analyzes PR source without a privileged pull_request_target checkou
   assert.ok(codeql.jobs?.["slack-notify-preflight-blocked"]?.needs?.includes("kill-switch-preflight"));
 
   const checkout = analyze.steps.find((step) => step.uses?.startsWith("actions/checkout@"));
-  assert.match(checkout?.with?.ref ?? "", /merge_commit_sha/);
+  assert.equal(checkout?.with?.ref, "${{ github.sha }}");
   assert.equal(checkout?.with?.["persist-credentials"], false);
   assert.equal(checkout?.with?.["allow-unsafe-pr-checkout"], undefined);
 
@@ -99,5 +99,5 @@ test("CodeQL analyzes PR source without a privileged pull_request_target checkou
   const upload = analyze.steps.find((step) => step.uses?.startsWith("github/codeql-action/analyze@"));
   assert.equal(init?.with?.["build-mode"], "none");
   assert.match(upload?.with?.ref ?? "", /refs\/pull\/\{0\}\/merge/);
-  assert.match(upload?.with?.sha ?? "", /merge_commit_sha/);
+  assert.equal(upload?.with?.sha, "${{ github.sha }}");
 });

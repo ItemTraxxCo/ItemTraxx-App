@@ -41,11 +41,11 @@ jobs:
 
     steps:
       # Fork pull_request runs receive a read-only token and no repository
-      # secrets. The merge ref is static-analysis input; never run PR source code.
+      # secrets. Analyze the exact event revision; never run PR source code.
       - name: Checkout source for static analysis
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ github.event.pull_request.merge_commit_sha || github.sha }}
+          ref: ${{ github.sha }}
           fetch-depth: 0
           persist-credentials: false
 
@@ -59,7 +59,7 @@ jobs:
         uses: github/codeql-action/analyze@24c54180a607b1449ed407dd24f251e4e9147c8d # v4
         with:
           ref: ${{ github.event_name == 'pull_request' && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.ref }}
-          sha: ${{ github.event_name == 'pull_request' && github.event.pull_request.merge_commit_sha || github.sha }}
+          sha: ${{ github.sha }}
 
 
   slack-notify-start:

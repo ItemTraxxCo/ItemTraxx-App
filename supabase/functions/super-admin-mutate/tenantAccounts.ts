@@ -135,7 +135,15 @@ export const handleTenantAccountAction = async (
 
   const at = context.now();
   await auditAttempt(action, id);
+  await setTenantAccountStatusSafely({
+    isActive: false,
+    updateStatus: (isActive) => repository.setStatus(id, isActive),
+    revokeSessions: () => repository.revokeSessions(
+      id,
+      context.actorId,
+      at,
+    ),
+  });
   await repository.softDelete(id, at);
-  await repository.revokeSessions(id, context.actorId, at);
   return { handled: true, status: 200, data: { success: true } };
 };

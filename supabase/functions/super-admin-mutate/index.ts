@@ -235,11 +235,11 @@ serve(async (req) => {
         await callBetterAuthAdmin({action:"request_password_reset",profileId:target.id,redirectTo:resetRedirect()});
       },
       softDelete: async (id, at) => {
-        const { error } = await admin.from("profiles").update({
+        const { data, error } = await admin.from("profiles").update({
           deleted_at: at,
-          is_active: false,
-        }).eq("id", id).eq("role", "tenant_account").is("deleted_at", null);
-        if (error) throw new ValidationError("Unable to remove Tenant Account.");
+        }).eq("id", id).eq("role", "tenant_account").eq("is_active", false)
+          .is("deleted_at", null).select("id").single();
+        if (error || !data) throw new ValidationError("Unable to remove Tenant Account.");
       },
       revokeSessions: async (id, actorId, at) => {
         try {

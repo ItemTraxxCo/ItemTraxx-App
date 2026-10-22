@@ -90,12 +90,43 @@ Deno.test("Super Admin Tenant Account removal soft-deletes and revokes every act
     repository,
   });
   assertEquals(result, { handled: true, status: 200, data: { success: true } });
-  assertEquals(calls.map((entry) => entry.name), ["audit", "softDelete", "revokeSessions"]);
+  assertEquals(calls.map((entry) => entry.name), [
+    "audit",
+    "setStatus",
+    "revokeSessions",
+    "softDelete",
+  ]);
+  assertEquals(calls[1].value, { id: account.id, isActive: false });
   assertEquals(calls[2].value, {
     id: account.id,
     actorId,
     at: "2026-07-25T01:00:00.000Z",
   });
+  assertEquals(calls[3].value, { id: account.id, at: "2026-07-25T01:00:00.000Z" });
+});
+
+Deno.test("failed session revocation prevents Super Admin Tenant Account removal", async () => {
+  const { repository, calls } = makeRepository();
+  repository.revokeSessions = async () => {
+    calls.push({ name: "revokeSessionsFailed" });
+    throw new Error("Unable to revoke Tenant Account sessions.");
+  };
+
+  await assertRejects(
+    () => handleTenantAccountAction("remove_tenant_account", { id: account.id }, {
+      actorId: "30000000-0000-4000-8000-000000000001",
+      now: () => "2026-07-25T01:00:00.000Z",
+      repository,
+    }),
+    Error,
+    "Unable to revoke Tenant Account sessions.",
+  );
+
+  assertEquals(calls.map((entry) => entry.name), [
+    "audit",
+    "setStatus",
+    "revokeSessionsFailed",
+  ]);
 });
 
 Deno.test("non-Tenant-Account actions remain available to the existing Super Admin dispatcher", async () => {

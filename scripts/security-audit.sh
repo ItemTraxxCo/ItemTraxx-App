@@ -1,8 +1,14 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+echo "[security] testing npm audit gate failure handling"
+node --test ./scripts/npm-audit-gate.test.mjs
+
 echo "[security] npm audit (moderate+)"
 node ./scripts/npm-audit-gate.mjs
+
+echo "[security] npm audit signatures"
+npm audit signatures
 
 echo "[security] scanning for unsafe dynamic code execution patterns"
 if command -v rg >/dev/null 2>&1; then

@@ -1,4 +1,4 @@
-import { execSync } from "node:child_process";
+import { spawnSync } from "node:child_process";
 
 const severityRank = {
   info: 0,
@@ -18,21 +18,134 @@ const allowedSources = new Set(
     .filter(Boolean),
 );
 
-const runNpmAuditJson = () => {
+const outputText = (value) => typeof value === "string"
+  ? value
+  : Buffer.isBuffer(value)
+  ? value.toString("utf8")
+  : "";
+
+const containsTransportFailure = (value) =>
+  /ENOTFOUND|EAI_AGAIN|EAI_FAIL|ECONNREFUSED|ECONNRESET|ETIMEDOUT|ESOCKETTIMEDOUT|EHOSTUNREACH|ERR_SOCKET_TIMEOUT|audit endpoint returned an error|audit request.{0,80}(?:failed|error)|(?:registry|audit).{0,80}(?:unavailable|network|transport)/i.test(
+    value,
+  );
+
+const parseAuditReport = (value) => {
   try {
-    return execSync("npm audit --json", { encoding: "utf8" });
-  } catch (error) {
-    // npm audit exits non-zero when vulnerabilities are found; stdout still contains the JSON report.
-    const stdout = error && typeof error === "object" ? error.stdout : "";
-    if (typeof stdout === "string" && stdout.trim()) {
-      return stdout;
+    const report = JSON.parse(value);
+    const metadataVulnerabilities = report?.metadata?.vulnerabilities;
+    if (
+      !report ||
+      typeof report !== "object" ||
+      Array.isArray(report) ||
+      report.auditReportVersion !== 2 ||
+      !report.vulnerabilities ||
+      typeof report.vulnerabilities !== "object" ||
+      Array.isArray(report.vulnerabilities) ||
+      !metadataVulnerabilities ||
+      typeof metadataVulnerabilities !== "object" ||
+      Array.isArray(metadataVulnerabilities) ||
+      report.error
+    ) {
+      return null;
     }
-    throw error;
+
+    const counts = Object.fromEntries(
+      Object.keys(severityRank).map((severity) => [severity, 0]),
+    );
+    for (const severity of [...Object.keys(severityRank), "total"]) {
+      if (
+        !Number.isInteger(metadataVulnerabilities[severity]) ||
+        metadataVulnerabilities[severity] < 0
+      ) {
+        return null;
+      }
+    }
+
+    for (const vulnerability of Object.values(report.vulnerabilities)) {
+      if (
+        !vulnerability ||
+        typeof vulnerability !== "object" ||
+        Array.isArray(vulnerability) ||
+        !Object.hasOwn(severityRank, vulnerability.severity) ||
+        !Array.isArray(vulnerability.via) ||
+        vulnerability.via.length === 0
+      ) {
+        return null;
+      }
+      for (const advisory of vulnerability.via) {
+        if (typeof advisory === "string") {
+          if (!advisory) return null;
+          continue;
+        }
+        if (
+          !advisory ||
+          typeof advisory !== "object" ||
+          Array.isArray(advisory) ||
+          !Object.hasOwn(severityRank, advisory.severity)
+        ) {
+          return null;
+        }
+      }
+      counts[vulnerability.severity] += 1;
+    }
+
+    const total = Object.values(counts).reduce((sum, count) => sum + count, 0);
+    if (
+      metadataVulnerabilities.total !== total ||
+      Object.entries(counts).some(
+        ([severity, count]) => metadataVulnerabilities[severity] !== count,
+      )
+    ) {
+      return null;
+    }
+    return report;
+  } catch {
+    return null;
   }
 };
 
-const reportRaw = runNpmAuditJson();
-const report = JSON.parse(reportRaw);
+const runNpmAuditJson = () => {
+  const result = spawnSync("npm", ["audit", "--json"], {
+    encoding: "utf8",
+    maxBuffer: 10 * 1024 * 1024,
+  });
+  const stdout = outputText(result.stdout);
+  const stderr = outputText(result.stderr);
+  const report = parseAuditReport(stdout);
+  const errorText = `${stderr}\n${outputText(result.error?.message)}`;
+
+  if (containsTransportFailure(errorText)) {
+    throw new Error(
+      "[security] npm audit reported a registry or transport error; failing closed.",
+    );
+  }
+
+  if (result.error || result.status === null) {
+    throw new Error(
+      "[security] npm audit could not be executed successfully; failing closed.",
+    );
+  }
+
+  if (result.status === 0) {
+    if (!report) {
+      throw new Error(
+        "[security] npm audit returned an incomplete or invalid report; failing closed.",
+      );
+    }
+    return report;
+  }
+
+  // npm exits non-zero when vulnerabilities exceed its configured threshold;
+  // stdout still contains a report. Continue only for a complete advisory report.
+  if (report && Object.keys(report.vulnerabilities).length > 0) {
+    return report;
+  }
+  throw new Error(
+    "[security] npm audit failed before a complete report was returned; failing closed.",
+  );
+};
+
+const report = runNpmAuditJson();
 const vulnerabilities = report.vulnerabilities ?? {};
 
 const isIgnoredBySource = (

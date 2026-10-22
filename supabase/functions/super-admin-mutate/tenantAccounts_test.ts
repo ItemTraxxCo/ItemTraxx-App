@@ -172,17 +172,64 @@ Deno.test("Super Admin can toggle a Tenant Account's active status", async () =>
   });
 
   assertEquals(result, { handled: true, status: 200, data: { ...account, is_active: false } });
-  assertEquals(calls, [{
-    name: "audit",
-    value: {
-      action: "set_tenant_account_status",
-      id: account.id,
-      metadata: { is_active: false, event_phase: "requested" },
+  assertEquals(calls, [
+    {
+      name: "audit",
+      value: {
+        action: "set_tenant_account_status",
+        id: account.id,
+        metadata: { is_active: false, event_phase: "requested" },
+      },
     },
+    { name: "setStatus", value: { id: account.id, isActive: false } },
+    {
+      name: "revokeSessions",
+      value: {
+        id: account.id,
+        actorId: "30000000-0000-4000-8000-000000000001",
+        at: "2026-07-25T01:00:00.000Z",
+      },
+    },
+  ]);
+});
+
+Deno.test("restoring a Tenant Account revokes sessions before reactivation", async () => {
+  const { repository, calls } = makeRepository();
+  const result = await handleTenantAccountAction("set_tenant_account_status", {
+    id: account.id,
+    is_active: true,
   }, {
-    name: "setStatus",
-    value: { id: account.id, isActive: false },
-  }]);
+    actorId: "30000000-0000-4000-8000-000000000001",
+    now: () => "2026-07-25T01:00:00.000Z",
+    repository,
+  });
+
+  assertEquals(result, { handled: true, status: 200, data: account });
+  assertEquals(calls.map((entry) => entry.name), ["audit", "revokeSessions", "setStatus"]);
+  assertEquals(calls[2].value, { id: account.id, isActive: true });
+});
+
+Deno.test("failed session revocation leaves restore disabled", async () => {
+  const { repository, calls } = makeRepository();
+  repository.revokeSessions = async () => {
+    calls.push({ name: "revokeSessionsFailed" });
+    throw new Error("Unable to revoke Tenant Account sessions.");
+  };
+
+  await assertRejects(
+    () => handleTenantAccountAction("set_tenant_account_status", {
+      id: account.id,
+      is_active: true,
+    }, {
+      actorId: "30000000-0000-4000-8000-000000000001",
+      now: () => "2026-07-25T01:00:00.000Z",
+      repository,
+    }),
+    Error,
+    "Unable to revoke Tenant Account sessions.",
+  );
+
+  assertEquals(calls.map((entry) => entry.name), ["audit", "revokeSessionsFailed"]);
 });
 
 Deno.test("Setting a Tenant Account's status requires an explicit boolean", async () => {

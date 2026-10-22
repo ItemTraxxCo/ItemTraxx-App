@@ -44,9 +44,19 @@ jobs:
         # the Supabase CLI). The shared install serves every suite below.
         run: npm ci --ignore-scripts
 
+      - name: Install Cloudflare Worker dependencies
+        if: ${{ !cancelled() }}
+        run: npm ci --ignore-scripts --prefix cloudflare/edge-proxy
+
+      - name: Audit Cloudflare Worker dependencies
+        if: ${{ !cancelled() }}
+        run: |
+          npm audit --audit-level=moderate --prefix cloudflare/edge-proxy
+          npm audit signatures --prefix cloudflare/edge-proxy
+
       - name: Check CodeQL permission isolation
         if: ${{ !cancelled() }}
-        run: node --test scripts/ci-codeql-isolation.test.mjs
+        run: node --test scripts/ci-codeql-isolation.test.mjs scripts/edge-proxy-audit-contract.test.mjs
 
       # Core validation runs on pull requests and protected branch pushes.
       - name: Verify env parity

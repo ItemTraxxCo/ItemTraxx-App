@@ -1,0 +1,201 @@
+name: CI Validation
+
+on:
+  workflow_call:
+    inputs:
+      ref:
+        required: true
+        type: string
+      diff_base_sha:
+        required: true
+        type: string
+      diff_head_sha:
+        required: true
+        type: string
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.ref }}
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          # package.json requires Node 24.x; jsdom 30 also requires 24.15+.
+          node-version: 24.22.1
+          cache: npm
+
+      - name: Setup Deno
+        uses: denoland/setup-deno@22d081ff2d3a40755e97629de92e3bcbfa7cf2ed # v2.0.5
+        with:
+          deno-version: 2.x
+          cache: true
+
+      - name: Install dependencies
+        # Avoid flaky native/CLI postinstall downloads during CI (for example
+        # the Supabase CLI). The shared install serves every suite below.
+        run: npm ci --ignore-scripts
+
+      - name: Check CodeQL permission isolation
+        if: ${{ !cancelled() }}
+        run: node --test scripts/ci-codeql-isolation.test.mjs
+
+      # Core validation runs on pull requests and protected branch pushes.
+      - name: Verify env parity
+        if: ${{ !cancelled() }}
+        run: bash ./scripts/check-env-parity.sh
+
+      - name: Check edge-function coverage
+        if: ${{ !cancelled() }}
+        run: npm run devops:check:edge-coverage
+
+      - name: Check documented empty catches
+        if: ${{ !cancelled() }}
+        run: npm run devops:check:empty-catches
+
+      - name: Check edge contract drift
+        if: ${{ !cancelled() }}
+        run: npm run devops:check:edge-contract-drift
+
+      - name: Check edge action contract parity
+        if: ${{ !cancelled() }}
+        run: npm run devops:check:edge-action-parity
+
+      - name: Check Supabase function graph with frozen Deno lock
+        if: ${{ !cancelled() }}
+        run: deno check --node-modules-dir=none --frozen supabase/functions/super-ops/index.ts supabase/functions/super-workspace-mutate/index.ts supabase/functions/admin-ops/index.ts
+
+      - name: Deno test coverage gate (Supabase functions + Cloudflare edge-proxy)
+        if: ${{ !cancelled() }}
+        run: npm run devops:check:deno-coverage
+
+      - name: Check SQL and function coupling
+        if: ${{ !cancelled() }}
+        env:
+          ITX_DIFF_BASE: ${{ inputs.diff_base_sha }}
+          ITX_DIFF_HEAD: ${{ inputs.diff_head_sha }}
+        run: npm run devops:check:sql-coupling
+
+      - name: Clean dist
+        if: ${{ !cancelled() }}
+        run: rm -rf dist artifacts
+
+      - name: Build
+        if: ${{ !cancelled() }}
+        run: npm run build
+
+      - name: Test prerendered public content
+        if: ${{ !cancelled() }}
+        run: npm run test:prerender
+
+      - name: Check public CSS boundary
+        if: ${{ !cancelled() }}
+        run: npm run perf:css-boundary
+
+      - name: Typecheck Cloudflare Worker
+        if: ${{ !cancelled() }}
+        run: npm run worker:typecheck
+
+      - name: Test frontend units (Vitest)
+        if: ${{ !cancelled() }}
+        # Unit tests need configuration to import the Supabase client and to
+        # exercise authenticated requests. These are non-secret placeholders;
+        # the suite mocks network calls and never contacts these origins.
+        env:
+          VITE_SUPABASE_URL: https://example.supabase.co
+          VITE_SUPABASE_ANON_KEY: ci-test-anon-key
+          VITE_EDGE_PROXY_URL: https://proxy.example.com
+        run: npm run test:unit
+
+      - name: Check initial JavaScript budget
+        if: ${{ !cancelled() }}
+        run: npm run perf:initial
+
+      - name: Check bundle budget
+        if: ${{ !cancelled() }}
+        run: npm run perf:budget
+
+      - name: Check image budget
+        if: ${{ !cancelled() }}
+        run: npm run perf:images
+
+      - name: Generate perf report
+        if: ${{ !cancelled() }}
+        run: npm run perf:report
+
+      - name: Upload perf report artifact
+        if: ${{ always() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: perf-report
+          path: artifacts/perf-report.json
+          if-no-files-found: ignore
+          retention-days: 14
+
+      # Security validation shares the already-installed dependency tree but
+      # remains a separate, clearly labelled gate in this single CI check.
+      - name: Run security gate
+        if: ${{ !cancelled() }}
+        run: npm run security:gate
+
+      - name: Generate SBOM
+        if: ${{ !cancelled() }}
+        run: npm run security:sbom
+
+      - name: Upload SBOM artifact
+        if: ${{ always() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: sbom
+          path: artifacts/sbom.cdx.json
+          if-no-files-found: error
+          retention-days: 30
+
+      # E2E validation shares the Node install and retains its browser cache
+      # and report artifact.
+      - name: Cache Playwright browsers
+        if: ${{ !cancelled() }}
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            playwright-${{ runner.os }}-
+
+      - name: Install Playwright Chromium
+        if: ${{ !cancelled() }}
+        timeout-minutes: 5
+        run: npx playwright install chromium
+
+      - name: Install Playwright system dependencies
+        if: ${{ !cancelled() }}
+        run: |
+          timeout 180s npx playwright install-deps chromium || {
+            echo "::warning::Playwright system dependency install failed or timed out; continuing so E2E can verify whether the runner already has the required libraries."
+          }
+
+      - name: Run E2E tests
+        if: ${{ !cancelled() }}
+        run: npm run test:e2e
+
+      - name: Upload Playwright report
+        if: ${{ always() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: playwright-report
+          path: |
+            playwright-report
+            test-results
+          if-no-files-found: ignore
+          retention-days: 7
+
+      # Failure alerting runs in the trusted workflow_run workflow so this
+      # PR-controlled runner never receives incident.io credentials.

@@ -17,10 +17,12 @@ const readMigration = (name) =>
 const RENAME_MIGRATION = "20260725221011_item_borrower_physical_rename.sql";
 const LEAST_PRIVILEGE_MIGRATION = "20260726120000_least_privilege_rest_surface.sql";
 const SERVER_OWNED_AUDIT_MIGRATION = "20261004060000_server_owned_admin_audit.sql";
+const SUPER_APPROVAL_SESSION_MIGRATION = "20261022150000_require_live_session_for_super_approval_reads.sql";
 
 const renameMigration = readMigration(RENAME_MIGRATION);
 const leastPrivilege = readMigration(LEAST_PRIVILEGE_MIGRATION);
 const serverOwnedAudit = readMigration(SERVER_OWNED_AUDIT_MIGRATION);
+const superApprovalSession = readMigration(SUPER_APPROVAL_SESSION_MIGRATION);
 
 const failures = [];
 const check = (condition, message) => {
@@ -239,6 +241,21 @@ check(
 );
 
 // ---------------------------------------------------------------------------
+// 5. Direct reads of super_approvals must reject revoked or expired sessions,
+//    even when the caller still has a fresh step-up grant.
+// ---------------------------------------------------------------------------
+const superApprovalPolicy = superApprovalSession.match(
+  /execute\s+\$policy\$([\s\S]*?)\$policy\$/i,
+)?.[1] ?? "";
+const normalizedSuperApprovalPolicy = normalizeSql(superApprovalPolicy);
+check(
+  normalizedSuperApprovalPolicy.includes(
+    "alter policy super_admin_select_approvals on public.super_approvals using ( public.current_user_role()='super_admin' and public.has_recent_privileged_step_up('super_admin') and (select private.super_admin_session_not_revoked()) )",
+  ),
+  `${SUPER_APPROVAL_SESSION_MIGRATION} must preserve role and step-up checks and require a live super-admin session for approval reads`,
+);
+
+// ---------------------------------------------------------------------------
 
 if (failures.length > 0) {
   console.error("Privileged RLS invariants failed:");
@@ -255,5 +272,6 @@ console.log(
     "- admin_audit_logs is read-only to authenticated clients and writable only by service_role",
     "- access-grant read paths are preserved as FOR SELECT",
     `- all ${SUPER_ADMIN_POLICIES.length} super-admin policies require step-up and a non-revoked session`,
+    "- super_approvals SELECT requires a fresh step-up and non-revoked session",
   ].join("\n"),
 );

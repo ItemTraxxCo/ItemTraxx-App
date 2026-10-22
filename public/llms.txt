@@ -62,6 +62,9 @@ ItemTraxx helps teams manage real-world gear, assets, and inventory workflows wi
 
 - Support: https://itemtraxx.com/contact-support
 - Support email: support@itemtraxx.com
+- Security email: security@itemtraxx.com
+- Legal email: legal@itemtraxx.com
+- Sales email: sales@itemtraxx.com
 
 ## Other fun side note information
 - Team dog is named cheezit

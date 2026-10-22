@@ -29,6 +29,8 @@ jobs:
       ${{
         (github.event_name == 'pull_request' &&
           github.actor == 'dependabot[bot]' &&
+          github.triggering_actor == 'dependabot[bot]' &&
+          github.run_attempt == 1 &&
           github.event.pull_request.head.repo.full_name == github.repository &&
           github.event.pull_request.user.login == 'dependabot[bot]')
       }}
@@ -44,7 +46,7 @@ jobs:
       - name: Checkout PR branch
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ github.head_ref || github.ref_name }}
+          ref: ${{ github.event.pull_request.head.sha }}
           persist-credentials: false
           fetch-depth: 0
 
@@ -60,12 +62,10 @@ jobs:
           cache: true
 
       - name: Regenerate deno.lock from package.json
-        # --min-dep-age=0 disables Deno's minimum-dependency-age gate, which would
-        # otherwise refuse to lock versions published <24h ago and silently no-op —
-        # exactly the case that matters, since Dependabot bumps to just-published
-        # versions. The following steps pin changed direct dependencies to npm's
-        # resolved version only when Deno's initial resolution differs.
-        run: deno install --lockfile-only --min-dep-age=0
+        # Keep Deno's 24-hour minimum dependency age enabled. If a Dependabot
+        # version is too new to resolve within that window, wait for the window
+        # to pass instead of bypassing the age gate.
+        run: deno install --lockfile-only --min-dep-age=P1D
 
       - name: Align mismatched direct versions with npm lock
         id: npm-parity
@@ -75,10 +75,10 @@ jobs:
 
       - name: Regenerate deno.lock after aligning versions
         if: ${{ steps.npm-parity.outputs.fixed == 'true' }}
-        run: deno install --lockfile-only --min-dep-age=0
+        run: deno install --lockfile-only --min-dep-age=P1D
 
       - name: Verify deno.lock is valid
-        run: deno install --lockfile-only --frozen --min-dep-age=0
+        run: deno install --lockfile-only --frozen --min-dep-age=P1D
 
       - name: Verify changed npm and Deno versions match
         env:
@@ -174,9 +174,17 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SYNC_BRANCH: ${{ github.head_ref }}
+          EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
           set -euo pipefail
           git check-ref-format --branch "$SYNC_BRANCH" >/dev/null
+          git fetch --no-tags origin "refs/heads/$SYNC_BRANCH:refs/remotes/origin/$SYNC_BRANCH"
+          remote_head="$(git rev-parse "refs/remotes/origin/$SYNC_BRANCH")"
+          parent_head="$(git rev-parse HEAD^)"
+          if [[ "$remote_head" != "$EXPECTED_HEAD_SHA" || "$parent_head" != "$EXPECTED_HEAD_SHA" ]]; then
+            echo "::error::The Dependabot PR head changed before the lockfile update could be pushed."
+            exit 1
+          fi
           auth_header="$(printf 'x-access-token:%s' "$GITHUB_TOKEN" | base64 --wrap=0)"
           git -c "http.extraheader=AUTHORIZATION: basic $auth_header" \
             push origin "HEAD:refs/heads/$SYNC_BRANCH"

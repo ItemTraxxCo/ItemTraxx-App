@@ -36,7 +36,26 @@ test("PR validation and Dependabot follow-up stay in pull_request cache scope", 
   assert.ok(denoLockSync.on?.pull_request);
   assert.equal(denoLockSync.on?.workflow_dispatch, undefined);
   assert.equal(denoLockSync.jobs?.sync?.permissions?.actions, "read");
+  assert.match(denoLockSync.jobs?.sync?.if ?? "", /github\.triggering_actor == 'dependabot\[bot\]'/);
+  assert.match(denoLockSync.jobs?.sync?.if ?? "", /github\.run_attempt == 1/);
   assert.equal(denoLockSync.jobs?.sync?.outputs?.updated_head_sha, "${{ steps.updated-head.outputs.sha }}");
+  const lockSyncSteps = denoLockSync.jobs?.sync?.steps ?? [];
+  const lockSyncCheckout = lockSyncSteps.find((step) => step.name === "Checkout PR branch");
+  assert.equal(lockSyncCheckout?.with?.ref, "${{ github.event.pull_request.head.sha }}");
+  const denoInstallSteps = lockSyncSteps.filter((step) => /^deno install /.test(step.run ?? ""));
+  assert.equal(denoInstallSteps.length, 3);
+  for (const step of denoInstallSteps) {
+    assert.match(step.run, /--min-dep-age=P1D/);
+    assert.doesNotMatch(step.run, /--min-dep-age=0(?:\s|$)/);
+  }
+  const lockSyncPush = lockSyncSteps.find((step) => step.name === "Push signed lockfile update");
+  assert.equal(lockSyncPush?.env?.EXPECTED_HEAD_SHA, "${{ github.event.pull_request.head.sha }}");
+  assert.ok(lockSyncPush?.run?.includes('git fetch --no-tags origin "refs/heads/$SYNC_BRANCH:refs/remotes/origin/$SYNC_BRANCH"'));
+  assert.ok(lockSyncPush?.run?.includes('git rev-parse "refs/remotes/origin/$SYNC_BRANCH"'));
+  assert.ok(lockSyncPush?.run?.includes('git rev-parse HEAD^'));
+  assert.ok(lockSyncPush?.run?.includes('"$remote_head" != "$EXPECTED_HEAD_SHA"'));
+  assert.ok(lockSyncPush?.run?.includes('push origin "HEAD:refs/heads/$SYNC_BRANCH"'));
+  assert.doesNotMatch(lockSyncPush?.run ?? "", /git push[^\n]*--force/);
   assert.equal(denoLockSync.jobs?.validate?.uses, "./.github/workflows/ci-validation.yml");
   assert.deepEqual(denoLockSync.jobs?.validate?.needs, ["sync", "kill-switch-preflight"]);
   assert.equal(denoLockSync.jobs?.validate?.with?.ref, "${{ needs.sync.outputs.updated_head_sha }}");

@@ -166,7 +166,12 @@ jobs:
         if: ${{ github.event_name == 'pull_request' && steps.lockfile.outputs.changed == 'true' }}
         run: |
           git add -- package.json package-lock.json deno.lock
-          git commit -S -m "chore(deps): sync npm and Deno lockfiles" -m "Generated and validated by the Deno Lock Sync workflow."
+          # Ignore hooks left by earlier PR code; only this workflow creates the signed commit.
+          commit_hooks="$(mktemp -d "$RUNNER_TEMP/itx-deno-lock-sync-commit-hooks.XXXXXX")"
+          trap 'rm -rf "$commit_hooks"' EXIT
+          git -c "core.hooksPath=$commit_hooks" commit -S \
+            -m "chore(deps): sync npm and Deno lockfiles" \
+            -m "Generated and validated by the Deno Lock Sync workflow."
           git verify-commit HEAD
 
       - name: Push signed lockfile update
@@ -175,6 +180,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SYNC_BRANCH: ${{ github.head_ref }}
           EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          EXPECTED_BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: |
           set -euo pipefail
           git check-ref-format --branch "$SYNC_BRANCH" >/dev/null
@@ -186,7 +192,12 @@ jobs:
             exit 1
           fi
           auth_header="$(printf 'x-access-token:%s' "$GITHUB_TOKEN" | base64 --wrap=0)"
+          hook_dir="$(mktemp -d "$RUNNER_TEMP/itx-deno-lock-sync-hooks.XXXXXX")"
+          git cat-file -e "$EXPECTED_BASE_SHA^{commit}"
+          git show "$EXPECTED_BASE_SHA:scripts/deno-lock-sync-pre-push.sh" > "$hook_dir/pre-push"
+          chmod 700 "$hook_dir/pre-push"
           git -c "http.extraheader=AUTHORIZATION: basic $auth_header" \
+            -c "core.hooksPath=$hook_dir" \
             push origin "HEAD:refs/heads/$SYNC_BRANCH"
 
       - name: Record updated PR head SHA

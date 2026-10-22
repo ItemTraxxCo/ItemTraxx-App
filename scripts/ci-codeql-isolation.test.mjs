@@ -54,8 +54,15 @@ test("PR validation and Dependabot follow-up stay in pull_request cache scope", 
   assert.ok(lockSyncPush?.run?.includes('git rev-parse "refs/remotes/origin/$SYNC_BRANCH"'));
   assert.ok(lockSyncPush?.run?.includes('git rev-parse HEAD^'));
   assert.ok(lockSyncPush?.run?.includes('"$remote_head" != "$EXPECTED_HEAD_SHA"'));
+  assert.equal(lockSyncPush?.env?.EXPECTED_BASE_SHA, "${{ github.event.pull_request.base.sha }}");
+  assert.ok(lockSyncPush?.run?.includes('git cat-file -e "$EXPECTED_BASE_SHA^{commit}"'));
+  assert.ok(lockSyncPush?.run?.includes('git show "$EXPECTED_BASE_SHA:scripts/deno-lock-sync-pre-push.sh" > "$hook_dir/pre-push"'));
+  assert.ok(lockSyncPush?.run?.includes('-c "core.hooksPath=$hook_dir"'));
   assert.ok(lockSyncPush?.run?.includes('push origin "HEAD:refs/heads/$SYNC_BRANCH"'));
   assert.doesNotMatch(lockSyncPush?.run ?? "", /git push[^\n]*--force/);
+  assert.doesNotMatch(lockSyncPush?.run ?? "", /--no-verify/);
+  const lockSyncCommit = lockSyncSteps.find((step) => step.name === "Commit signed npm and Deno lock sync");
+  assert.ok(lockSyncCommit?.run?.includes('git -c "core.hooksPath=$commit_hooks" commit -S'));
   assert.equal(denoLockSync.jobs?.validate?.uses, "./.github/workflows/ci-validation.yml");
   assert.deepEqual(denoLockSync.jobs?.validate?.needs, ["sync", "kill-switch-preflight"]);
   assert.equal(denoLockSync.jobs?.validate?.with?.ref, "${{ needs.sync.outputs.updated_head_sha }}");

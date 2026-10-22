@@ -1,4 +1,4 @@
-import { spawnSync } from "node:child_process";
+import { runTrustedNpm } from "./security-exec.mjs";
 
 const severityRank = {
   info: 0,
@@ -105,7 +105,7 @@ const parseAuditReport = (value) => {
 };
 
 const runNpmAuditJson = () => {
-  const result = spawnSync("npm", ["audit", "--json"], {
+  const result = runTrustedNpm(["audit", "--json"], {
     encoding: "utf8",
     maxBuffer: 10 * 1024 * 1024,
   });

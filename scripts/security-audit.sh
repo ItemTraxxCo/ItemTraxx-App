@@ -1,44 +1,9 @@
-#!/usr/bin/env bash
-set -euo pipefail
+#!/bin/sh
+set -eu
 
-echo "[security] testing npm audit gate failure handling"
-node --test ./scripts/npm-audit-gate.test.mjs
-
-echo "[security] npm audit (moderate+)"
-node ./scripts/npm-audit-gate.mjs
-
-echo "[security] npm audit signatures"
-npm audit signatures
-
-echo "[security] scanning for unsafe dynamic code execution patterns"
-if command -v rg >/dev/null 2>&1; then
-  SEARCH=(rg -n)
-else
-  SEARCH=(grep -RInE)
+: "${npm_node_execpath:?Run this through npm so npm_node_execpath is provided}"
+script_dir=${0%/*}
+if [ "$script_dir" = "$0" ]; then
+  script_dir=.
 fi
-if "${SEARCH[@]}" "\\beval\\(|new Function\\(" src supabase cloudflare >/tmp/itemtraxx-security-patterns.txt; then
-  echo "Unsafe pattern(s) detected:"
-  cat /tmp/itemtraxx-security-patterns.txt
-  exit 1
-fi
-echo "No unsafe eval/new Function patterns found."
-
-echo "[security] checking sample env file for committed private keys"
-if "${SEARCH[@]}" "sb_secret_|SUPABASE_SERVICE_ROLE_KEY=.+|CLOUDFLARE_API_TOKEN=.+" .env.example >/tmp/itemtraxx-security-secrets.txt; then
-  echo "Potential private secret assignment found in .env.example:"
-  cat /tmp/itemtraxx-security-secrets.txt
-  exit 1
-fi
-echo "No private secret assignments found in .env.example."
-
-echo "[security] checking privileged RLS policy invariants"
-node ./scripts/check-privileged-rls-policies.mjs
-
-echo "[security] running Supabase shared security regression tests"
-deno test --node-modules-dir=none --allow-env \
-  supabase/functions/_shared/cors_test.ts \
-  supabase/functions/_shared/accountSessions_test.ts \
-  supabase/functions/_shared/preloginGuards_test.ts \
-  supabase/functions/_shared/trustedIngress_test.ts
-
-echo "[security] audit complete"
+exec "$npm_node_execpath" "$script_dir/security-audit.mjs"

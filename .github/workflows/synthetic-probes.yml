@@ -26,9 +26,9 @@ jobs:
 
   probes:
     needs: require-trusted-ref
-    uses: ItemTraxxCo/devops/.github/workflows/reusable-synthetic-probes.yml@d9db3f50310e640874802de9faef9ff3dbd7d545
+    uses: ItemTraxxCo/devops/.github/workflows/reusable-synthetic-probes.yml@18d095f784960afd56e4bc81de59fb922d6b876e
     with:
-      hub_ref: d9db3f50310e640874802de9faef9ff3dbd7d545
+      hub_ref: 18d095f784960afd56e4bc81de59fb922d6b876e
       # GitHub-hosted runners are challenged by Cloudflare's managed firewall
       # before the public edge can return an application response. Keep this
       # required check on the origin health signal; Deployment Health covers

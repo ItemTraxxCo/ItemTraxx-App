@@ -4,6 +4,7 @@ import {
   requireUuid,
   ValidationError,
 } from "../_shared/validation.ts";
+import { setTenantAccountStatusSafely } from "../_shared/tenantAccountStatus.ts";
 
 export type TenantAccount = {
   id: string;
@@ -104,7 +105,15 @@ export const handleTenantAccountAction = async (
       throw new ValidationError("Invalid request");
     }
     await auditAttempt(action, id, { is_active: payload.is_active });
-    const updated = await repository.setStatus(id, payload.is_active);
+    const updated = await setTenantAccountStatusSafely({
+      isActive: payload.is_active,
+      updateStatus: (isActive) => repository.setStatus(id, isActive),
+      revokeSessions: () => repository.revokeSessions(
+        id,
+        context.actorId,
+        context.now(),
+      ),
+    });
     return { handled: true, status: 200, data: updated };
   }
 
@@ -126,7 +135,15 @@ export const handleTenantAccountAction = async (
 
   const at = context.now();
   await auditAttempt(action, id);
+  await setTenantAccountStatusSafely({
+    isActive: false,
+    updateStatus: (isActive) => repository.setStatus(id, isActive),
+    revokeSessions: () => repository.revokeSessions(
+      id,
+      context.actorId,
+      at,
+    ),
+  });
   await repository.softDelete(id, at);
-  await repository.revokeSessions(id, context.actorId, at);
   return { handled: true, status: 200, data: { success: true } };
 };

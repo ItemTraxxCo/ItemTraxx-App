@@ -7,6 +7,7 @@ import { requireTrustedEdgeIngress } from "../_shared/trustedIngress.ts";
 import { readJsonBody } from "../_shared/requestBody.ts";
 import { validateAccountDeviceSession } from "../_shared/accountSessions.ts";
 import { callBetterAuthAdmin } from "../_shared/betterAuthAdmin.ts";
+import { setTenantAccountStatusSafely } from "../_shared/tenantAccountStatus.ts";
 import { sha256Hex } from "../_shared/sha256.ts";
 import { resolveWorkspaceAccess } from "../_shared/workspaceAccess.ts";
 import {
@@ -493,8 +494,78 @@ serve(async (req) => {
     if (["set_tenant_account_status","remove_tenant_account","send_tenant_account_reset"].includes(action)) {
       const id=requireUuid(next.id); const { data: target }=await adminClient.from("profiles").select("id,auth_email").eq("id",id).eq("workspace_id",requesterProfile.workspace_id).eq("role","tenant_account").is("deleted_at",null).maybeSingle(); if(!target)return jsonResponse(404,{error:"Tenant Account not found."});
       if(action==="send_tenant_account_reset"){const redirectTo=resolveResetRedirectTo();if(!redirectTo)return jsonResponse(500,{error:"Password reset redirect is not configured."});await callBetterAuthAdmin({action:"request_password_reset",profileId:id,redirectTo});await writeAudit(action,id,{});return jsonResponse(200,{data:{success:true}});}
-      if(action==="set_tenant_account_status"){if(typeof next.is_active!=="boolean")return jsonResponse(400,{error:"Invalid request"});const{data,error}=await adminClient.from("profiles").update({is_active:next.is_active}).eq("id",id).select("id,workspace_id,auth_email,role,is_active,deleted_at,created_at").single();if(error)return jsonResponse(400,{error:"Unable to update Tenant Account."});await writeAudit(action,id,{is_active:next.is_active});return jsonResponse(200,{data});}
-      const now=new Date().toISOString();const{error}=await adminClient.from("profiles").update({deleted_at:now,is_active:false}).eq("id",id);if(error)return jsonResponse(400,{error:"Unable to remove Tenant Account."});await adminClient.from("account_sessions").update({revoked_at:now,revoked_by:user.id}).eq("profile_id",id).is("revoked_at",null);await writeAudit(action,id,{});return jsonResponse(200,{data:{success:true}});
+      const revokedAt = new Date().toISOString();
+      const revokeTenantAccountSessions = async () => {
+        try {
+          await callBetterAuthAdmin({ action: "revoke_sessions", profileId: id });
+        } catch {
+          throw new ValidationError("Unable to revoke Tenant Account sessions.", 503);
+        }
+        const { error } = await adminClient.from("account_sessions")
+          .update({ revoked_at: revokedAt, revoked_by: user.id })
+          .eq("profile_id", id)
+          .is("revoked_at", null);
+        if (error) {
+          throw new ValidationError("Unable to revoke Tenant Account sessions.", 503);
+        }
+      };
+      if (action === "set_tenant_account_status") {
+        if (typeof next.is_active !== "boolean") {
+          return jsonResponse(400, { error: "Invalid request" });
+        }
+        const updated = await setTenantAccountStatusSafely({
+          isActive: next.is_active,
+          updateStatus: async (isActive) => {
+            const { data, error } = await adminClient.from("profiles")
+              .update({ is_active: isActive })
+              .eq("id", id)
+              .eq("workspace_id", requesterProfile.workspace_id)
+              .eq("role", "tenant_account")
+              .is("deleted_at", null)
+              .select("id,workspace_id,auth_email,role,is_active,deleted_at,created_at")
+              .single();
+            if (error || !data) {
+              throw new ValidationError("Unable to update Tenant Account.");
+            }
+            return data;
+          },
+          revokeSessions: revokeTenantAccountSessions,
+        });
+        await writeAudit(action, id, { is_active: next.is_active });
+        return jsonResponse(200, { data: updated });
+      }
+      await setTenantAccountStatusSafely({
+        isActive: false,
+        updateStatus: async (isActive) => {
+          const { data, error } = await adminClient.from("profiles")
+            .update({ is_active: isActive })
+            .eq("id", id)
+            .eq("workspace_id", requesterProfile.workspace_id)
+            .eq("role", "tenant_account")
+            .is("deleted_at", null)
+            .select("id")
+            .single();
+          if (error || !data) {
+            throw new ValidationError("Unable to update Tenant Account.");
+          }
+          return data;
+        },
+        revokeSessions: revokeTenantAccountSessions,
+      });
+      const { data: removed, error: removeError } = await adminClient.from("profiles")
+        .update({ deleted_at: revokedAt })
+        .eq("id", id)
+        .eq("workspace_id", requesterProfile.workspace_id)
+        .eq("role", "tenant_account")
+        .eq("is_active", false)
+        .is("deleted_at", null)
+        .select("id")
+        .single();
+      if (removeError || !removed) {
+        throw new ValidationError("Unable to remove Tenant Account.");
+      }
+      await writeAudit(action, id, {});
+      return jsonResponse(200, { data: { success: true } });
     }
 
     if (!canManageAdmins) {

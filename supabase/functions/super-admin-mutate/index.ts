@@ -235,18 +235,23 @@ serve(async (req) => {
         await callBetterAuthAdmin({action:"request_password_reset",profileId:target.id,redirectTo:resetRedirect()});
       },
       softDelete: async (id, at) => {
-        const { error } = await admin.from("profiles").update({
+        const { data, error } = await admin.from("profiles").update({
           deleted_at: at,
-          is_active: false,
-        }).eq("id", id).eq("role", "tenant_account").is("deleted_at", null);
-        if (error) throw new ValidationError("Unable to remove Tenant Account.");
+        }).eq("id", id).eq("role", "tenant_account").eq("is_active", false)
+          .is("deleted_at", null).select("id").single();
+        if (error || !data) throw new ValidationError("Unable to remove Tenant Account.");
       },
       revokeSessions: async (id, actorId, at) => {
+        try {
+          await callBetterAuthAdmin({ action: "revoke_sessions", profileId: id });
+        } catch {
+          throw new ValidationError("Unable to revoke Tenant Account sessions.", 503);
+        }
         const { error } = await admin.from("account_sessions").update({
           revoked_at: at,
           revoked_by: actorId,
         }).eq("profile_id", id).is("revoked_at", null);
-        if (error) throw new ValidationError("Unable to revoke Tenant Account sessions.");
+        if (error) throw new ValidationError("Unable to revoke Tenant Account sessions.", 503);
       },
       audit: async (actionType, id, metadata) => {
         await writeSuperAdminAudit(admin, {

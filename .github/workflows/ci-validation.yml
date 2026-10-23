@@ -305,7 +305,33 @@ jobs:
 
       - name: Verify Chrome Stable version
         if: ${{ !cancelled() }}
-        run: google-chrome --version
+        run: |
+          node --input-type=module <<'NODE'
+          import { execFileSync } from 'node:child_process';
+
+          const metadataUrl = 'https://googlechromelabs.github.io/chrome-for-testing/last-known-good-versions.json';
+          const response = await fetch(metadataUrl, { signal: AbortSignal.timeout(15_000) });
+          if (!response.ok) {
+            throw new Error(`Chrome for Testing metadata request failed with HTTP ${response.status}`);
+          }
+
+          const metadata = await response.json();
+          const expected = metadata?.channels?.Stable?.version;
+          if (typeof expected !== 'string' || !/^\d+\.\d+\.\d+\.\d+$/.test(expected)) {
+            throw new Error('Chrome for Testing Stable version was unavailable or invalid');
+          }
+
+          const output = execFileSync('google-chrome', ['--version'], { encoding: 'utf8' }).trim();
+          const actual = output.match(/\d+\.\d+\.\d+\.\d+/)?.[0];
+          if (!actual) {
+            throw new Error(`Could not parse installed Chrome version from: ${output}`);
+          }
+          if (actual !== expected) {
+            throw new Error(`Installed Chrome ${actual} does not match Chrome for Testing Stable ${expected}`);
+          }
+
+          console.log(`Verified installed Chrome ${actual} matches Chrome for Testing Stable.`);
+          NODE
 
       - name: Install Playwright system dependencies
         if: ${{ !cancelled() }}

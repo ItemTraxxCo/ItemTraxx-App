@@ -40,38 +40,21 @@ export const resolveClientIp = (req: Request) => {
   return "";
 };
 
-const STATUS_CLIENT_COOKIE = "itx-status-client";
-const STATUS_CLIENT_COOKIE_MAX_AGE_SECONDS = 15 * 60;
-const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-
-const readCookie = (req: Request, name: string) => {
-  const raw = req.headers.get("cookie") ?? "";
-  for (const part of raw.split(";")) {
-    const separator = part.indexOf("=");
-    if (separator < 0) continue;
-    if (part.slice(0, separator).trim() !== name) continue;
-    return part.slice(separator + 1).trim();
-  }
-  return "";
-};
-
 export type PublicStatusClient = {
   key: string;
-  setCookie?: string;
 };
 
 /**
- * Resolve the public status limiter identity only after the caller's edge
- * proof has been established. Direct callers receive a server-issued,
- * HttpOnly nonce so unrelated browsers do not share the anonymous bucket.
- * A separate direct global budget still bounds callers that rotate cookies.
+ * Trusted Worker requests use the edge-provided client IP. Direct unauthenticated
+ * requests share one fixed key so they cannot create durable limiter rows by
+ * omitting or rotating a client-controlled cookie.
  */
 export const resolvePublicStatusClient = (
-  req: Request,
+  request: Request,
   trustedEdgeIngress: boolean,
 ): PublicStatusClient => {
   if (trustedEdgeIngress) {
-    const ip = resolveClientIp(req);
+    const ip = resolveClientIp(request);
     if (ip) {
       return {
         key: `ip-${normalizeScopePart(ip, "unknown-ip", 24)}`,
@@ -79,17 +62,7 @@ export const resolvePublicStatusClient = (
     }
   }
 
-  const existing = readCookie(req, STATUS_CLIENT_COOKIE);
-  if (UUID_PATTERN.test(existing)) {
-    return { key: `status-${existing.toLowerCase()}` };
-  }
-
-  const nonce = crypto.randomUUID();
-  return {
-    key: `status-${nonce}`,
-    setCookie:
-      `${STATUS_CLIENT_COOKIE}=${nonce}; Max-Age=${STATUS_CLIENT_COOKIE_MAX_AGE_SECONDS}; Path=/; HttpOnly; Secure; SameSite=Lax`,
-  };
+  return { key: "global" };
 };
 
 export const resolveClientFingerprint = (
@@ -298,4 +271,38 @@ export const verifyTurnstileToken = async (
     });
   }
   return false;
+};
+
+/**
+ * Verify with Cloudflare, then atomically redeem a server-side token
+ * fingerprint. The shared database claim protects both public forms even if
+ * upstream verification accepts a repeated token.
+ */
+export const verifyAndConsumeTurnstileToken = async (
+  client: any,
+  token: string,
+  remoteIp: string,
+  logContext: string,
+) => {
+  const verified = await verifyTurnstileToken(token, remoteIp, logContext);
+  if (!verified) return false;
+
+  const tokenHash = await sha256Hex(token.trim());
+  try {
+    const { data, error } = await client.rpc("consume_turnstile_token", {
+      p_token_hash: tokenHash,
+    });
+    if (error) {
+      console.error(`${logContext} turnstile replay check failed`);
+      return false;
+    }
+    if (data !== true) {
+      console.warn(`${logContext} turnstile token replay rejected`);
+      return false;
+    }
+    return true;
+  } catch {
+    console.error(`${logContext} turnstile replay check failed`);
+    return false;
+  }
 };

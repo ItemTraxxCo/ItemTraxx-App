@@ -232,6 +232,28 @@ describe("touchAccountSession", () => {
     expect(result).toEqual({ ok: true });
   });
 
+  it("sends callback provenance proofs without treating URL labels as authoritative", async () => {
+    mockedInvoke.mockResolvedValue(okResponse({ ok: true }) as never);
+    const proof = "signed-sso-proof";
+
+    await touchAccountSession({ ssoLoginProof: proof });
+
+    expect(mockedInvoke).toHaveBeenCalledWith("admin-ops", {
+      method: "POST",
+      body: {
+        action: "touch_session",
+        payload: {
+          login_method: undefined,
+          login_location: undefined,
+          sso_login_proof: proof,
+          device_id: `device-${deviceCounter}`,
+          device_label: "Mac",
+        },
+      },
+      avoidCorsPreflight: true,
+    });
+  });
+
   it("caches repeated calls with identical options within the TTL", async () => {
     mockedInvoke.mockResolvedValue(okResponse({ ok: true }) as never);
     await touchAccountSession({ loginMethod: "magic_link" });

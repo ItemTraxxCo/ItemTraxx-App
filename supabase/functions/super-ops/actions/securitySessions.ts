@@ -3,6 +3,7 @@ import { resolveTrustedGeneralLocation } from "../../_shared/requestMetadata.ts"
 import {
   isMissingPrivilegedStepUpTable,
   registerPrivilegedStepUp,
+  SUPER_ADMIN_ACTION_CONFIRMATION_SOURCE,
 } from "../../_shared/privilegedStepUp.ts";
 import { asRecord, optionalText, requireText } from "../../_shared/validation.ts";
 import type { SuperOpsContext } from "../context.ts";
@@ -32,6 +33,18 @@ const isMissingColumn = (
 
 const sanitizeText = (value: unknown, max = 255) =>
   optionalText(value, { maxLen: max });
+
+const resolveAuthSessionId = async (
+  adminClient: SuperOpsContext["adminClient"],
+  accessToken: string,
+) => {
+  const { data, error } = await adminClient.auth.getClaims(accessToken);
+  if (error || !data?.claims) return null;
+  const sessionId = data.claims.session_id;
+  return typeof sessionId === "string" && sessionId.trim()
+    ? sessionId.trim()
+    : null;
+};
 
 const resolveJwtLoginMethod = (claims: Record<string, unknown>) => {
   const amr = claims.amr;
@@ -123,7 +136,7 @@ export const handleSecuritySessionsAction = async (
         userId: user.id,
         roleScope: "super_admin",
         authToken: accessToken,
-        source: "super_admin_settings_password",
+        source: SUPER_ADMIN_ACTION_CONFIRMATION_SOURCE,
       });
     } catch (error) {
       if (isMissingPrivilegedStepUpTable(error as { code?: string; message?: string })) {
@@ -365,7 +378,14 @@ export const handleSecuritySessionsAction = async (
   }
 
   if (action === "list_passkeys") {
-    let data: { passkeys: Array<{ id: string; created_at: string | null; name: string | null }> };
+    let data: {
+      passkeys: Array<{
+        id: string;
+        created_at: string | null;
+        last_used_at: string | null;
+        name: string | null;
+      }>;
+    };
     try {
       data = await callBetterAuthAdmin({ action: "list_passkeys", profileId: user.id });
     } catch (error) {
@@ -381,7 +401,7 @@ export const handleSecuritySessionsAction = async (
           id: passkey.id,
           name: passkey.name,
           created_at: passkey.created_at,
-          last_used_at: null,
+          last_used_at: passkey.last_used_at,
         })),
       },
     });
@@ -435,15 +455,37 @@ export const handleSecuritySessionsAction = async (
   if (action === "revoke_all_sessions") {
     const signOutCurrent = payload.sign_out_current === true;
     const currentDeviceId = sanitizeText(payload.device_id, 128);
-    let query = adminClient
+    const currentAuthSessionId = signOutCurrent
+      ? null
+      : await resolveAuthSessionId(adminClient, accessToken);
+    const buildQuery = () => adminClient
       .from("super_admin_sessions")
       .update({ revoked_at: new Date().toISOString(), revoked_by: user.id })
       .eq("profile_id", user.id)
       .is("revoked_at", null);
-    if (!signOutCurrent && currentDeviceId) {
-      query = query.neq("device_id", currentDeviceId);
+    let query = buildQuery();
+    if (!signOutCurrent) {
+      // Prefer the auth-session binding. A single Better Auth session can be
+      // represented by multiple device rows across sibling hosts; excluding
+      // only the localStorage device id can revoke the current auth session's
+      // other row and immediately block this browser.
+      if (currentAuthSessionId) {
+        query = query.neq("auth_session_id", currentAuthSessionId);
+      } else if (currentDeviceId) {
+        query = query.neq("device_id", currentDeviceId);
+      }
     }
-    const { data, error } = await query.select("id");
+    let { data, error } = await query.select("id");
+    if (
+      error && currentAuthSessionId && currentDeviceId &&
+      isMissingColumn(error, "auth_session_id")
+    ) {
+      const fallback = await buildQuery()
+        .neq("device_id", currentDeviceId)
+        .select("id");
+      data = fallback.data;
+      error = fallback.error;
+    }
     if (error && isMissingRelation(error, "super_admin_sessions")) {
       return jsonResponse(400, {
         error: "Session controls unavailable. Run latest SQL setup.",

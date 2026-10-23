@@ -322,11 +322,13 @@ Deno.test("verify_password rejects a failed Better Auth verification", async () 
   );
 });
 
-Deno.test("verify_password succeeds and records an audit entry", async () => {
+Deno.test("verify_password confirms the current session without creating another session", async () => {
   await withMockedBetterAuthFetch(
     () => betterAuthAdminResponse({ verified: true }),
     async () => {
-      const { client } = makeAdminClient(sequence([]));
+      const { client, calls } = makeAdminClient(sequence([]), {
+        claims: { session_id: "existing-session-id", iat: 1_700_000_000 },
+      });
       const auditCalls: unknown[][] = [];
       const response = await handleSecuritySessionsAction(
         contextFor("verify_password", { password: "secret" }, client, {
@@ -345,6 +347,11 @@ Deno.test("verify_password succeeds and records an audit entry", async () => {
         "00000000-0000-4000-8000-000000000001",
         {},
       ]]);
+      assertEquals(calls.length, 1, "password confirmation should only update the current step-up record");
+      assertEquals(calls[0].table, "privileged_session_stepups");
+      const upsert = calls[0].operations.find((operation) => operation.method === "upsert");
+      assert(upsert, "expected the current session step-up to be upserted");
+      assertEquals((upsert!.args[0] as Record<string, unknown>).binding_key, "session:existing-session-id");
     },
   );
 });
@@ -698,6 +705,7 @@ Deno.test("list_passkeys returns only the safe passkey fields", async () => {
           id: "passkey-1",
           name: "MacBook",
           created_at: "2026-07-01T00:00:00.000Z",
+          last_used_at: "2026-09-12T12:00:00.000Z",
         }],
       });
     },
@@ -715,7 +723,7 @@ Deno.test("list_passkeys returns only the safe passkey fields", async () => {
             id: "passkey-1",
             name: "MacBook",
             created_at: "2026-07-01T00:00:00.000Z",
-            last_used_at: null,
+            last_used_at: "2026-09-12T12:00:00.000Z",
           }],
         },
       });
@@ -835,7 +843,7 @@ Deno.test("revoke_session succeeds", async () => {
 // revoke_all_sessions
 // =====================================================================
 
-Deno.test("revoke_all_sessions excludes the current device by default", async () => {
+Deno.test("revoke_all_sessions excludes the current auth session by default", async () => {
   const { client, calls } = makeAdminClient(
     sequence([{ data: [{ id: "session-1" }, { id: "session-2" }], error: null }]),
   );
@@ -849,10 +857,31 @@ Deno.test("revoke_all_sessions excludes the current device by default", async ()
   assert(
     calls.some((call) =>
       call.operations.some((op) =>
+        op.method === "neq" && op.args[0] === "auth_session_id" && op.args[1] === "auth-session-1"
+      )
+    ),
+    "expected the current auth session to be excluded",
+  );
+});
+
+Deno.test("revoke_all_sessions falls back to excluding the current device when auth claims are unavailable", async () => {
+  const { client, calls } = makeAdminClient(
+    sequence([{ data: [{ id: "session-1" }], error: null }]),
+    { claims: null },
+  );
+  const response = await handleSecuritySessionsAction(
+    contextFor("revoke_all_sessions", { device_id: "device-1" }, client),
+  );
+
+  assert(response !== null, "expected a response");
+  assertEquals(response!.status, 200);
+  assert(
+    calls.some((call) =>
+      call.operations.some((op) =>
         op.method === "neq" && op.args[0] === "device_id" && op.args[1] === "device-1"
       )
     ),
-    "expected the current device to be excluded",
+    "expected the current device fallback to be excluded",
   );
 });
 

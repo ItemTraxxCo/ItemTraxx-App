@@ -5,4 +5,8 @@ Deno.test("super workspace mutation keeps primary reassignment super-admin scope
   assertStringIncludes(source, 'profile?.role !== "super_admin"');
   assertStringIncludes(source, 'action === "set_primary_admin"');
   assertStringIncludes(source, 'roleScope: "super_admin"');
+  assertStringIncludes(source, 'action === "create_individual_account"');
+  assertStringIncludes(source, 'Use the individual account manager for individual accounts.');
+  assertStringIncludes(source, 'const internalSlug = `individual-${crypto.randomUUID()}`');
+  assertStringIncludes(source, 'const { slug: _internalSlug, ...account } = row');
 });

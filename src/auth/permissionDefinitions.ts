@@ -19,6 +19,14 @@ export const tenantAccountRoleStatements = {
   invitation: [],
 } as const;
 
+export const individualAccountRoleStatements = {
+  itemtraxxWorkspace: ["read", "operate", "administer"],
+  enterpriseSso: [],
+  organization: [],
+  member: [],
+  invitation: [],
+} as const;
+
 export const workspaceAdminRoleStatements = {
   itemtraxxWorkspace: ["read", "operate", "administer"],
   enterpriseSso: ["read", "create", "update", "delete", "verify-domain"],

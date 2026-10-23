@@ -133,7 +133,7 @@ const pushLog = (kind: TerminalEntry["kind"], message: string, timestamp: string
 };
 
 const handleScanned = (event: ScannerScanEvent) => {
-  pushLog("success", `successful barcode scan "${event.value}"`, event.timestamp);
+  pushLog("success", "successful barcode scan", event.timestamp);
 };
 
 const handleStatus = (event: ScannerStatusEvent) => {
@@ -142,7 +142,7 @@ const handleStatus = (event: ScannerStatusEvent) => {
     const key = `${event.status}:${event.value}`;
     if (lastDetectionLogKey.value === key) return;
     lastDetectionLogKey.value = key;
-    pushLog("success", `barcode detected and ready: "${event.value}"`, event.timestamp);
+    pushLog("success", "barcode detected and ready", event.timestamp);
     return;
   }
   lastDetectionLogKey.value = "";

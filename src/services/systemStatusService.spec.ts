@@ -3,15 +3,21 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("./edgeUrls", () => ({
   getEdgeFunctionsBaseUrl: vi.fn(),
 }));
+vi.mock("./posthogDiagnostics", () => ({
+  captureHandledRequestFailure: vi.fn(),
+  capturePostHogLog: vi.fn(),
+}));
 
 import { getEdgeFunctionsBaseUrl } from "./edgeUrls";
 import { fetchSystemStatus, probeSystemStatusTransport } from "./systemStatusService";
+import { captureHandledRequestFailure } from "./posthogDiagnostics";
 
 const mockedBaseUrl = vi.mocked(getEdgeFunctionsBaseUrl);
 
 const jsonResponse = (body: unknown, init: { ok?: boolean; status?: number } = {}) => ({
   ok: init.ok ?? true,
   status: init.status ?? 200,
+  headers: { get: (name: string) => name === "x-request-id" ? "worker-request-id" : null },
   json: async () => body,
 });
 
@@ -44,7 +50,9 @@ describe("fetchSystemStatus", () => {
 
     expect(result).toEqual({ ok: true, status: 200, payload: { status: "operational" } });
     const [url, init] = vi.mocked(fetch).mock.calls[0]!;
-    expect(url).toBe("/functions/system-status");
+    const parsedUrl = new URL(url as string, "https://itemtraxx.test");
+    expect(parsedUrl.pathname).toBe("/functions/system-status");
+    expect(parsedUrl.searchParams.get("itx_request_id")).toMatch(/^[a-zA-Z0-9_-]{1,96}$/);
     expect((init as RequestInit).method).toBe("GET");
   });
 
@@ -56,12 +64,20 @@ describe("fetchSystemStatus", () => {
     const result = await fetchSystemStatus({ force: true });
 
     expect(result).toEqual({ ok: false, status: 503, payload: { status: "down" } });
+    expect(captureHandledRequestFailure).toHaveBeenCalledWith(expect.objectContaining({
+      area: "edge_function",
+      name: "system-status",
+      path: "/functions/system-status",
+      status: 503,
+      requestId: "worker-request-id",
+    }));
   });
 
   it("falls back to an empty payload when the response body is not valid JSON", async () => {
     vi.mocked(fetch).mockResolvedValue({
       ok: true,
       status: 200,
+      headers: { get: () => null },
       json: async () => {
         throw new Error("not json");
       },
@@ -78,6 +94,14 @@ describe("fetchSystemStatus", () => {
     const result = await fetchSystemStatus({ force: true });
 
     expect(result).toBeNull();
+    expect(captureHandledRequestFailure).toHaveBeenCalledWith(expect.objectContaining({
+      area: "edge_function",
+      name: "system-status",
+      path: "/functions/system-status",
+      status: 0,
+      errorCode: "network",
+      requestId: expect.stringMatching(/^[a-zA-Z0-9_-]{1,96}$/),
+    }));
   });
 
   it("serves a cached result without calling fetch again within the TTL window", async () => {
@@ -138,7 +162,7 @@ describe("probeSystemStatusTransport", () => {
 
     await expect(probeSystemStatusTransport()).resolves.toBe(true);
     expect(fetch).toHaveBeenCalledWith(
-      "/functions/system-status",
+      expect.stringMatching(/^\/functions\/system-status\?itx_request_id=/),
       expect.objectContaining({ method: "GET", mode: "no-cors", cache: "no-store" }),
     );
   });
@@ -147,5 +171,9 @@ describe("probeSystemStatusTransport", () => {
     vi.mocked(fetch).mockRejectedValue(new Error("network down"));
 
     await expect(probeSystemStatusTransport()).resolves.toBe(false);
+    expect(captureHandledRequestFailure).toHaveBeenCalledWith(expect.objectContaining({
+      name: "system-status",
+      requestId: expect.stringMatching(/^[a-zA-Z0-9_-]{1,96}$/),
+    }));
   });
 });

@@ -16,7 +16,7 @@
         </div>
       </div>
       <p v-if="borrowersLoading">Loading…</p>
-      <p v-else-if="borrowersError" class="error">{{ borrowersError }}</p>
+      <p v-else-if="borrowersError" class="error" v-app-toast-error>{{ borrowersError }}</p>
       <template v-else>
         <div class="table-wrap">
           <table class="table">
@@ -28,8 +28,8 @@
             </thead>
             <tbody>
               <tr v-for="borrower in pagedBorrowers" :key="borrower.id">
-                <td>{{ borrower.username }}</td>
-                <td>{{ borrower.borrower_id }}</td>
+                <td data-session-replay-mask>{{ borrower.username }}</td>
+                <td data-session-replay-mask>{{ borrower.borrower_id }}</td>
               </tr>
               <tr v-if="!pagedBorrowers.length">
                 <td colspan="2" class="muted">No borrowers found.</td>
@@ -53,7 +53,7 @@
         </div>
       </div>
       <p v-if="itemsLoading">Loading…</p>
-      <p v-else-if="itemsError" class="error">{{ itemsError }}</p>
+      <p v-else-if="itemsError" class="error" v-app-toast-error>{{ itemsError }}</p>
       <template v-else>
         <div class="table-wrap">
           <table class="table">
@@ -108,7 +108,7 @@
           <tbody>
             <tr v-for="session in sessions" :key="session.id">
               <td>{{ session.device_label || "Unknown device" }}</td>
-              <td>{{ formatLoginMethod(session.login_method) }}</td>
+              <td>{{ formatLoginMethod(session.login_method, session.login_location) }}</td>
               <td>{{ formatLoginLocation(session.login_location) }}</td>
               <td>{{ formatGeneralLocation(session.general_location) }}</td>
               <td>{{ formatDate(session.last_seen_at) }}</td>
@@ -154,7 +154,10 @@
                 <span v-else class="session-current-action">This device</span>
               </td>
             </tr>
-            <tr v-if="!sessions.length">
+            <tr v-if="sessionsLoading" role="status">
+              <td colspan="8" class="muted">Loading active devices...</td>
+            </tr>
+            <tr v-if="!sessionsLoading && !sessionError && !sessions.length">
               <td colspan="8" class="muted">No active sessions found.</td>
             </tr>
           </tbody>
@@ -170,8 +173,8 @@
           Sign out all other devices
         </button>
       </div>
-      <p v-if="sessionError" class="error">{{ sessionError }}</p>
-      <p v-if="sessionSuccess" class="success">{{ sessionSuccess }}</p>
+      <p v-if="sessionError" class="error" v-app-toast-error>{{ sessionError }}</p>
+      <p v-if="sessionSuccess" class="success" v-app-toast-message>{{ sessionSuccess }}</p>
     </section>
   </main>
 </template>
@@ -207,6 +210,7 @@ const itemPage = ref(0);
 const hasMoreItems = ref(false);
 
 const sessions = ref<AccountSessionItem[]>([]);
+const sessionsLoading = ref(true);
 const openSessionMenuId = ref<string | null>(null);
 const isSessionSaving = ref(false);
 const sessionError = ref("");
@@ -243,21 +247,28 @@ const handleSessionMenuKeydown = (event: KeyboardEvent) => {
   if (event.key === "Escape") closeSessionMenu();
 };
 
-const formatLoginMethod = (value: AccountSessionItem["login_method"]) =>
-  value === "password"
-    ? "Password"
-    : value === "magic_link"
-      ? "Magic link"
-      : value === "session_handoff"
-        ? "Session handoff"
-        : "Unknown";
+const isSsoLoginFlow = (value: AccountSessionItem["login_location"]) =>
+  value === "SAML2.0" || value === "OpenID Connect (OIDC)";
 
-const formatLoginLocation = (value: AccountSessionItem["login_location"]) =>
-  value === "regular_login"
-    ? "Regular login"
-    : value === "admin_login"
-      ? "Admin sign in"
-      : "Unknown";
+const formatLoginMethod = (
+  value: AccountSessionItem["login_method"],
+  loginFlow: AccountSessionItem["login_location"],
+) => {
+  if (isSsoLoginFlow(loginFlow) && value && /^[a-z0-9-]+$/i.test(value)) {
+    return value;
+  }
+  if (value === "password") return "Password";
+  if (value === "magic_link") return "Magic link";
+  if (value === "session_handoff") return "Session handoff";
+  return "Unknown";
+};
+
+const formatLoginLocation = (value: AccountSessionItem["login_location"]) => {
+  if (isSsoLoginFlow(value)) return value;
+  if (value === "regular_login") return "Regular login";
+  if (value === "admin_login") return "Admin sign in";
+  return "Unknown";
+};
 
 const formatGeneralLocation = (value: AccountSessionItem["general_location"]) =>
   value?.trim() ? value : "Unknown";
@@ -313,6 +324,7 @@ const goToItemPage = (delta: number) => {
 };
 
 const loadSessions = async () => {
+  sessionsLoading.value = true;
   sessionError.value = "";
   sessionSuccess.value = "";
   try {
@@ -322,7 +334,11 @@ const loadSessions = async () => {
       closeSessionMenu();
     }
   } catch (err) {
+    sessions.value = [];
+    closeSessionMenu();
     sessionError.value = toUserFacingErrorMessage(err, "Unable to load sessions.");
+  } finally {
+    sessionsLoading.value = false;
   }
 };
 

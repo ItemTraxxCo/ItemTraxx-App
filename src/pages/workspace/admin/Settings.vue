@@ -2,22 +2,24 @@
   <div class="page admin-shell">
     <div class="admin-hero">
       <div class="page-nav-left">
-        <RouterLink class="button-link" to="/admin">Return to admin panel</RouterLink>
+        <RouterLink class="button-link" :to="managerRoot">Back</RouterLink>
       </div>
-      <h1>Settings</h1>
-      <p class="admin-hero-copy">Configure checkout defaults and manage active admin sessions from one place.</p>
-      <p><RouterLink class="button-link" to="/account/security">Account Security</RouterLink> · <RouterLink class="button-link" to="/admin/settings/sso">Enterprise SSO</RouterLink></p>
+      <h1>Account Settings</h1>
+      <p class="admin-hero-copy">Configure your checkout defaults and manage active account sessions.</p>
+      <p><RouterLink class="button-link" to="/account/security">Account Security</RouterLink><template v-if="!isIndividualAccount"> · <RouterLink class="button-link" to="/admin/settings/sso">Enterprise SSO</RouterLink></template></p>
       <div class="admin-summary-grid">
         <div class="admin-summary-card">
           <strong>{{ checkoutDueHours }}</strong>
           <span>Due window (hours)</span>
         </div>
         <div class="admin-summary-card">
-          <strong>{{ sessions.length }}</strong>
+          <strong>{{ isSessionLoading ? "…" : sessions.length }}</strong>
           <span>Active devices</span>
         </div>
       </div>
     </div>
+
+    <OfflinePackSettings />
 
     <div class="card admin-section-card">
       <div class="admin-section-header">
@@ -25,7 +27,6 @@
           <h2>Account Overview</h2>
           <p class="admin-section-copy">Review how this workspace is classified for billing and support.</p>
         </div>
-        <RouterLink class="button-link" to="/admin/admins">Admin Access</RouterLink>
       </div>
       <div class="admin-summary-grid">
         <div class="admin-summary-card">
@@ -36,14 +37,22 @@
           <strong>{{ planLabel }}</strong>
           <span>Assigned plan</span>
         </div>
+        <div v-if="isIndividualAccount" class="admin-summary-card">
+          <strong>{{ activeItems }} / {{ maxItems ?? "Unlimited" }}</strong>
+          <span>Active items</span>
+        </div>
+        <div v-if="isIndividualAccount" class="admin-summary-card">
+          <strong>{{ activeBorrowers }} / {{ maxBorrowers ?? "Unlimited" }}</strong>
+          <span>Active borrowers</span>
+        </div>
       </div>
       <p class="muted account-overview-copy">
         {{
           accountCategory === "individual"
-            ? "This account uses the root ItemTraxx url and is not attached to a custom subdomain."
+            ? "Account category: Individual"
             : accountCategory === "workspace" || accountCategory === "education" || accountCategory === "custom"
-              ? "Workspace-linked accounts inherit their routing and billing context from tenant configuration."
-              : "Account plan metadata has not been configured for this tenant yet. If you believe this is an error, please contact support to resolve this."
+              ? "Account category: Workspace"
+              : "Account plan metadata has not been configured for this account. If you believe this is an error, please contact support."
         }}
       </p>
     </div>
@@ -63,11 +72,11 @@
         <p class="muted">This value is used for overdue notifications.</p>
         <div class="form-actions">
           <button type="submit" class="button-primary" :disabled="isSaving">Save settings</button>
-          <button type="button" :disabled="isSaving" @click="loadSettings">Reload</button>
+          <button type="button" :disabled="isSaving" @click="loadSettings">Reload Settings</button>
         </div>
       </form>
-      <p v-if="error" class="error">{{ error }}</p>
-      <p v-if="success" class="success">{{ success }}</p>
+      <p v-if="error" class="error" v-app-toast-error="{ suppressMessage: toastMessage }">{{ error }}</p>
+      <p v-if="success" class="success" v-app-toast-message>{{ success }}</p>
     </div>
 
     <div class="card admin-section-card">
@@ -94,7 +103,7 @@
           <tbody>
             <tr v-for="session in sessions" :key="session.id">
               <td>{{ session.device_label || "Unknown device" }}</td>
-              <td>{{ formatLoginMethod(session.login_method) }}</td>
+              <td>{{ formatLoginMethod(session.login_method, session.login_location) }}</td>
               <td>{{ formatLoginLocation(session.login_location) }}</td>
               <td>{{ formatGeneralLocation(session.general_location) }}</td>
               <td>{{ formatDate(session.last_seen_at) }}</td>
@@ -140,7 +149,10 @@
                 <span v-else class="session-current-action">This device</span>
               </td>
             </tr>
-            <tr v-if="!sessions.length">
+            <tr v-if="isSessionLoading" role="status">
+              <td colspan="8" class="muted">Loading active devices...</td>
+            </tr>
+            <tr v-if="!isSessionLoading && !sessionError && !sessions.length">
               <td colspan="8" class="muted">No active sessions found.</td>
             </tr>
           </tbody>
@@ -156,8 +168,8 @@
           Sign out all other devices
         </button>
       </div>
-      <p v-if="sessionError" class="error">{{ sessionError }}</p>
-      <p v-if="sessionSuccess" class="success">{{ sessionSuccess }}</p>
+      <p v-if="sessionError" class="error" v-app-toast-error="{ suppressMessage: toastMessage }">{{ sessionError }}</p>
+      <p v-if="sessionSuccess" class="success" v-app-toast-message>{{ sessionSuccess }}</p>
     </div>
 
     <div v-if="toastMessage" class="toast">
@@ -170,6 +182,8 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from "vue";
 import { RouterLink } from "vue-router";
+import OfflinePackSettings from "../../../components/OfflinePackSettings.vue";
+import { useManagerContext } from "../../../composables/useManagerContext";
 import { toUserFacingErrorMessage } from "../../../services/appErrors";
 import {
   fetchWorkspaceSettings,
@@ -181,10 +195,16 @@ import {
   type WorkspaceSettingsPayload,
 } from "../../../services/adminOpsService";
 
+const { isIndividualAccount, managerRoot } = useManagerContext();
+
 const isSaving = ref(false);
 const error = ref("");
 const success = ref("");
 const checkoutDueHours = ref(72);
+const maxItems = ref<number | null>(null);
+const maxBorrowers = ref<number | null>(null);
+const activeItems = ref(0);
+const activeBorrowers = ref(0);
 const accountCategory = ref<"workspace" | "education" | "custom" | "individual" | null>(null);
 const planCode = ref<
   | "workspace_core"
@@ -197,6 +217,7 @@ const planCode = ref<
   | null
 >(null);
 const sessions = ref<AccountSessionItem[]>([]);
+const isSessionLoading = ref(true);
 const openSessionMenuId = ref<string | null>(null);
 const isSessionSaving = ref(false);
 const sessionError = ref("");
@@ -220,6 +241,10 @@ const showToast = (title: string, message: string) => {
 
 const applySettings = (settings: WorkspaceSettingsPayload) => {
   checkoutDueHours.value = settings.checkout_due_hours;
+  maxItems.value = settings.max_items;
+  maxBorrowers.value = settings.max_borrowers;
+  activeItems.value = settings.active_items;
+  activeBorrowers.value = settings.active_borrowers;
   accountCategory.value =
     settings.account_category === "individual"
       ? "individual"
@@ -233,21 +258,30 @@ const applySettings = (settings: WorkspaceSettingsPayload) => {
   planCode.value = settings.plan_code ?? null;
 };
 
-const formatLoginMethod = (value: AccountSessionItem["login_method"]) =>
-  value === "password"
-    ? "Password"
-    : value === "magic_link"
-      ? "Magic link"
-      : value === "session_handoff"
-        ? "Session handoff"
-        : "Unknown";
+const isSsoLoginFlow = (value: AccountSessionItem["login_location"]) =>
+  value === "SAML2.0" || value === "OpenID Connect (OIDC)";
 
-const formatLoginLocation = (value: AccountSessionItem["login_location"]) =>
-  value === "regular_login"
-    ? "Regular login"
-    : value === "admin_login"
-      ? "Admin sign in"
-      : "Unknown";
+const formatLoginMethod = (
+  value: AccountSessionItem["login_method"],
+  loginFlow: AccountSessionItem["login_location"],
+) => {
+  if (isSsoLoginFlow(loginFlow) && value && /^[a-z0-9-]+$/i.test(value)) {
+    return value;
+  }
+  if (value === "password") return "Password";
+  if (value === "magic_link") return "Magic link";
+  if (value === "session_handoff") return "Session handoff";
+  return "Unknown";
+};
+
+const formatLoginLocation = (value: AccountSessionItem["login_location"]) => {
+  if (isSsoLoginFlow(value)) return value;
+  if (value === "regular_login") return "Regular login";
+  if (value === "admin_login") {
+    return isIndividualAccount.value ? "Account sign-in" : "Admin sign in";
+  }
+  return "Unknown";
+};
 
 const formatGeneralLocation = (value: AccountSessionItem["general_location"]) =>
   value?.trim() ? value : "Unknown";
@@ -309,6 +343,7 @@ const formatDate = (value: string) => {
 };
 
 const loadSessions = async () => {
+  isSessionLoading.value = true;
   sessionError.value = "";
   sessionSuccess.value = "";
   try {
@@ -318,7 +353,11 @@ const loadSessions = async () => {
       closeSessionMenu();
     }
   } catch (err) {
+    sessions.value = [];
+    closeSessionMenu();
     sessionError.value = toUserFacingErrorMessage(err, "Unable to load sessions.");
+  } finally {
+    isSessionLoading.value = false;
   }
 };
 

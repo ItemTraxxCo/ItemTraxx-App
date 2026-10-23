@@ -315,18 +315,56 @@ const openOfflineQueueKeyDatabase = () =>
     request.onerror = () => reject(request.error ?? new Error("Unable to open secure offline storage."));
   });
 
+class OfflineQueueStorageError extends Error {
+  constructor(operation: string, cause: unknown) {
+    const detail = cause instanceof Error ? cause.message : String(cause ?? "unknown IndexedDB error");
+    super(
+      `Offline queue IndexedDB ${operation} failed for store "${OFFLINE_QUEUE_KEY_STORE}": ${detail}`,
+      { cause },
+    );
+    this.name = "OfflineQueueStorageError";
+  }
+}
+
 const withOfflineQueueKeyStore = async <T>(
   mode: IDBTransactionMode,
+  operation: string,
   callback: (store: IDBObjectStore) => IDBRequest<T>
 ) => {
   const database = await openOfflineQueueKeyDatabase();
   try {
     return await new Promise<T>((resolve, reject) => {
-      const transaction = database.transaction(OFFLINE_QUEUE_KEY_STORE, mode);
-      const request = callback(transaction.objectStore(OFFLINE_QUEUE_KEY_STORE));
-      request.onsuccess = () => resolve(request.result);
-      request.onerror = () => reject(request.error ?? new Error("Unable to access secure offline storage."));
-      transaction.onerror = () => reject(transaction.error ?? new Error("Unable to access secure offline storage."));
+      let settled = false;
+      let result: T | undefined;
+      let hasResult = false;
+      const fail = (cause: unknown) => {
+        if (settled) return;
+        settled = true;
+        reject(new OfflineQueueStorageError(operation, cause));
+      };
+
+      try {
+        const transaction = database.transaction(OFFLINE_QUEUE_KEY_STORE, mode);
+        const request = callback(transaction.objectStore(OFFLINE_QUEUE_KEY_STORE));
+        request.onsuccess = () => {
+          result = request.result;
+          hasResult = true;
+        };
+        request.onerror = () => fail(request.error ?? new Error("IndexedDB request failed."));
+        transaction.onerror = () => fail(transaction.error ?? request.error ?? new Error("IndexedDB transaction failed."));
+        transaction.onabort = () => fail(transaction.error ?? request.error ?? new Error("IndexedDB transaction aborted."));
+        transaction.oncomplete = () => {
+          if (!hasResult) {
+            fail(new Error("IndexedDB transaction completed without a request result."));
+            return;
+          }
+          if (settled) return;
+          settled = true;
+          resolve(result as T);
+        };
+      } catch (cause) {
+        fail(cause);
+      }
     });
   } finally {
     database.close();
@@ -346,8 +384,10 @@ const importLegacyOfflineQueueKey = async () => {
 };
 
 const getOrCreateOfflineQueueKey = async () => {
-  const existing = await withOfflineQueueKeyStore<CryptoKey | undefined>("readonly", (store) =>
-    store.get(OFFLINE_QUEUE_KEY_ID)
+  const existing = await withOfflineQueueKeyStore<CryptoKey | undefined>(
+    "readonly",
+    "read encryption key",
+    (store) => store.get(OFFLINE_QUEUE_KEY_ID),
   );
   if (existing instanceof CryptoKey) return existing;
 
@@ -359,8 +399,10 @@ const getOrCreateOfflineQueueKey = async () => {
       false,
       ["encrypt", "decrypt"]
     ));
-  await withOfflineQueueKeyStore<IDBValidKey>("readwrite", (store) =>
-    store.put(key, OFFLINE_QUEUE_KEY_ID)
+  await withOfflineQueueKeyStore<IDBValidKey>(
+    "readwrite",
+    "store encryption key",
+    (store) => store.put(key, OFFLINE_QUEUE_KEY_ID),
   );
   window.sessionStorage.removeItem(OFFLINE_QUEUE_KEY_VERSION);
   return key;
@@ -421,7 +463,11 @@ export const clearOfflineCheckoutQueue = async () => {
   window.localStorage.removeItem(OFFLINE_QUEUE_LOCK_KEY);
   window.sessionStorage.removeItem(OFFLINE_QUEUE_KEY_VERSION);
   try {
-    await withOfflineQueueKeyStore<undefined>("readwrite", (store) => store.delete(OFFLINE_QUEUE_KEY_ID));
+    await withOfflineQueueKeyStore<undefined>(
+      "readwrite",
+      "delete encryption key",
+      (store) => store.delete(OFFLINE_QUEUE_KEY_ID),
+    );
   } catch {
     // Local queue data is already removed; never block logout on browser storage cleanup.
   }
@@ -464,7 +510,8 @@ export const readOfflineQueue = async () => {
     if (parsed && typeof parsed === "object" && "cipher" in parsed) {
       return await decryptOfflineQueue(raw);
     }
-  } catch {
+  } catch (cause) {
+    if (cause instanceof OfflineQueueStorageError) throw cause;
     markOfflineQueueCorrupted();
   }
 
@@ -475,8 +522,9 @@ export const writeOfflineQueue = async (items: BufferedCheckoutItem[]) => {
   try {
     const encrypted = await encryptOfflineQueue(items);
     window.localStorage.setItem(OFFLINE_QUEUE_KEY, encrypted);
-  } catch {
-    throw new Error("Unable to securely save this offline transaction. Please reconnect and try again.");
+  } catch (cause) {
+    if (cause instanceof OfflineQueueStorageError) throw cause;
+    throw new Error("Unable to securely save this offline transaction. Please reconnect and try again.", { cause });
   }
 };
 
@@ -510,20 +558,24 @@ const toOfflineQueueReviewItem = (item: BufferedCheckoutItem): OfflineQueueRevie
 
 export const getOfflineQueueSummary = async (): Promise<OfflineQueueSummary> =>
   withOfflineQueueLock(async () => {
+    const scope = getOfflineQueueScope();
+    if (!scope) return { totalCount: 0, pendingCount: 0, reviewCount: 0 };
     const queue = await readOfflineQueue();
-    const reviewCount = queue.filter((item) => item && typeof item === "object" && item.review_required === true).length;
+    const scopedQueue = queue.filter((item) => isOfflineQueueItemScopedTo(item, scope));
+    const reviewCount = scopedQueue.filter((item) => item.review_required === true).length;
     return {
-      totalCount: queue.length,
-      pendingCount: queue.length - reviewCount,
+      totalCount: scopedQueue.length,
+      pendingCount: scopedQueue.length - reviewCount,
       reviewCount,
     };
   });
 
 export const listOfflineQueueReviewItems = async () =>
   withOfflineQueueLock(async () => {
-    if (!getOfflineQueueScope()) return [];
+    const scope = getOfflineQueueScope();
+    if (!scope) return [];
     return (await readOfflineQueue())
-      .filter((item) => item && typeof item === "object" && item.review_required === true && typeof item.id === "string" && item.id.trim())
+      .filter((item) => isOfflineQueueItemScopedTo(item, scope) && item.review_required === true && typeof item.id === "string" && item.id.trim())
       .map(toOfflineQueueReviewItem);
   });
 
@@ -531,11 +583,11 @@ export const discardOfflineQueueReviewItem = async (itemId: string) => {
   const normalizedId = typeof itemId === "string" ? itemId.trim() : "";
   if (!normalizedId) throw new Error("A legacy offline transaction id is required.");
   return withOfflineQueueLock(async () => {
-    if (!getOfflineQueueScope()) throw new Error("A workspace session is required to manage legacy offline transactions.");
+    const scope = getOfflineQueueScope();
+    if (!scope) throw new Error("A workspace session is required to manage legacy offline transactions.");
     const queue = await readOfflineQueue();
     const matchingIndex = queue.findIndex((item) =>
-      item &&
-      typeof item === "object" &&
+      isOfflineQueueItemScopedTo(item, scope) &&
       item.review_required === true &&
       typeof item.id === "string" &&
       item.id.trim() === normalizedId
@@ -603,8 +655,15 @@ export const queueCheckoutPayload = async (
     queue.push(item);
     await writeOfflineQueue(queue);
     window.dispatchEvent(new CustomEvent("itemtraxx:offline-queue-changed"));
-    return queue.length;
+    return scope
+      ? queue.filter((queuedItem) => isOfflineQueueItemScopedTo(queuedItem, scope)).length
+      : 0;
   });
 
 export const getBufferedCheckoutCount = async () =>
-  withOfflineQueueLock(async () => (await readOfflineQueue()).length);
+  withOfflineQueueLock(async () => {
+    const scope = getOfflineQueueScope();
+    if (!scope) return 0;
+    const queue = await readOfflineQueue();
+    return queue.filter((item) => isOfflineQueueItemScopedTo(item, scope)).length;
+  });

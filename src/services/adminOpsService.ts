@@ -43,6 +43,10 @@ export type TenantNotificationPayload = {
 
 export type WorkspaceSettingsPayload = {
   checkout_due_hours: number;
+  max_items: number | null;
+  max_borrowers: number | null;
+  active_items: number;
+  active_borrowers: number;
   account_category: "workspace" | "education" | "custom" | "individual" | null;
   plan_code:
     | "workspace_core"
@@ -61,8 +65,8 @@ export type AccountSessionItem = {
   device_id: string;
   device_label: string | null;
   user_agent: string | null;
-  login_method: "password" | "magic_link" | "session_handoff" | null;
-  login_location: "regular_login" | "admin_login" | null;
+  login_method: string | null;
+  login_location: "regular_login" | "admin_login" | "SAML2.0" | "OpenID Connect (OIDC)" | null;
   general_location: string | null;
   created_at: string;
   last_seen_at: string;
@@ -70,8 +74,9 @@ export type AccountSessionItem = {
 };
 
 export type AccountSessionTouchOptions = {
-  loginMethod?: AccountSessionItem["login_method"];
+  loginMethod?: string;
   loginLocation?: AccountSessionItem["login_location"];
+  ssoLoginProof?: string;
 };
 
 type AdminOpsRequestOptions = {
@@ -170,21 +175,31 @@ export const touchAccountSession = async (
   options: AccountSessionTouchOptions = {}
 ) => {
   const identityKey = getAdminOpIdentityKey();
-  const inflight = sessionTouchInflight.get(identityKey);
-  if (inflight) return inflight;
-
-  const pending = withCachedAdminOp(
-    getAdminOpCacheKey(
-      "touch_session",
-      `${options.loginMethod ?? "none"}:${options.loginLocation ?? "none"}`
-    ),
-    20_000,
-    () =>
-      sendAdminOps<{ ok: boolean }>("touch_session", {
-        login_method: options.loginMethod,
-        login_location: options.loginLocation,
-      }, { avoidCorsPreflight: true })
-  );
+  const previous = sessionTouchInflight.get(identityKey);
+  const pending = (async () => {
+    // Serialize touches for one session so an ordinary bootstrap cannot
+    // coalesce and discard SSO provider/protocol metadata from a login touch.
+    if (previous) {
+      try {
+        await previous;
+      } catch {
+        // A failed keepalive must not prevent the next touch from retrying.
+      }
+    }
+    return withCachedAdminOp(
+      getAdminOpCacheKey(
+        "touch_session",
+        `${options.loginMethod ?? "none"}:${options.loginLocation ?? "none"}:${options.ssoLoginProof ?? "none"}`
+      ),
+      20_000,
+      () =>
+        sendAdminOps<{ ok: boolean }>("touch_session", {
+          login_method: options.loginMethod,
+          login_location: options.loginLocation,
+          sso_login_proof: options.ssoLoginProof,
+        }, { avoidCorsPreflight: true })
+    );
+  })();
   const tracked = pending.finally(() => {
     if (sessionTouchInflight.get(identityKey) === tracked) {
       sessionTouchInflight.delete(identityKey);

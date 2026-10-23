@@ -2,7 +2,7 @@ import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { getExternalAuthUser } from "../_shared/externalAuth.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.108.2";
 import {
-  hasPrivilegedStepUp,
+  hasFreshPrivilegedStepUp,
   isMissingPrivilegedStepUpTable,
 } from "../_shared/privilegedStepUp.ts";
 import { isSuperAdminTokenBlockedBySessionRevocation } from "../_shared/superAdminSessions.ts";
@@ -126,7 +126,7 @@ serve(async (req) => {
     }
 
     try {
-      const hasStepUp = await hasPrivilegedStepUp(adminClient, {
+      const hasStepUp = await hasFreshPrivilegedStepUp(adminClient, {
         userId: user.id,
         roleScope: "super_admin",
         authToken,

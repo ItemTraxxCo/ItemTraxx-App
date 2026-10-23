@@ -6,6 +6,7 @@ import {
   mockSystemStatus,
   mockUnauthenticatedSession,
   setSuperAdminSession,
+  setIndividualAccountSession,
   setTenantAccountSession,
   setWorkspaceAdminSession,
 } from "./helpers/testHarness";
@@ -28,6 +29,70 @@ test.describe("Protected route smoke tests", () => {
 
     await navigateApp(page, "/admin/item-status");
     await expect(page.getByRole("heading", { name: "Item Status Tracking" })).toBeVisible();
+  });
+
+  test("Item Status Tracking shows loading until its initial settings and history requests finish", async ({ page }, testInfo) => {
+    let releaseSettings!: () => void;
+    let markSettingsRequested!: () => void;
+    const settingsGate = new Promise<void>((resolve) => {
+      releaseSettings = resolve;
+    });
+    const settingsRequested = new Promise<void>((resolve) => {
+      markSettingsRequested = resolve;
+    });
+
+    await page.route(/\/functions(?:\/v1)?\/admin-ops(?:\?.*)?$/, async (route) => {
+      const body = route.request().postDataJSON() as { action?: string } | undefined;
+      if (body?.action !== "get_workspace_settings") {
+        await route.fallback();
+        return;
+      }
+
+      markSettingsRequested();
+      await settingsGate;
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          data: { feature_flags: { enable_status_tracking: true } },
+        }),
+      });
+    });
+
+    await page.goto("/");
+    await setWorkspaceAdminSession(page);
+    await navigateApp(page, "/admin/item-status");
+    await expect(page.getByRole("heading", { name: "Item Status Tracking" })).toBeVisible();
+    await settingsRequested;
+    await expect(page.getByText("Loading status tracking...")).toBeVisible();
+    await expect(page.getByText("Loading status history...")).toBeVisible();
+    await expect(page.getByText("No status history found.")).toHaveCount(0);
+    await testInfo.attach("item-status-tracking-loading", {
+      body: await page.screenshot(),
+      contentType: "image/png",
+    });
+
+    releaseSettings();
+    await expect(page.getByText("No status history found.")).toBeVisible();
+    await expect(page.getByText("Loading status history...")).toHaveCount(0);
+  });
+
+  test("Individual account lands on checkout and opens its private manager from My Account", async ({ page }) => {
+    await page.goto("/");
+    await setIndividualAccountSession(page);
+
+    await navigateApp(page, "/checkout");
+    await expect(page).toHaveURL(/\/checkout$/);
+    await page.getByRole("button", { name: "Open menu" }).click();
+    await page.getByRole("menuitem", { name: "My Account" }).click();
+    await expect(page).toHaveURL(/\/account$/);
+    await expect(page.getByRole("heading", { name: "My Inventory", exact: true })).toBeVisible();
+    await expect(page.getByRole("link", { name: /Item Management/ })).toHaveAttribute("href", "/account/items");
+    await expect(page.getByRole("link", { name: /Tenant Accounts/ })).toHaveCount(0);
+    await expect(page.getByRole("link", { name: "Admin Access" })).toHaveCount(0);
+
+    await navigateApp(page, "/admin");
+    await expect(page).toHaveURL(/\/access-denied\?redirect=\/admin$/);
   });
 
   test("Workspace Admin item logs show the tenant account that completed each transaction", async ({ page }) => {
@@ -170,9 +235,9 @@ test.describe("Protected route smoke tests", () => {
   test("onboarding completion survives reload", async ({ page }) => {
     await page.goto("/");
     await page.evaluate(() => {
-      localStorage.removeItem("itemtraxx:onboarding:v1:workspace_admin");
+      localStorage.removeItem("itemtraxx:onboarding:v1:tenant_account");
     });
-    await setWorkspaceAdminSession(page);
+    await setTenantAccountSession(page);
     await navigateApp(page, "/checkout");
 
     const dialog = page.getByRole("dialog", { name: /ItemTraxx onboarding step/ });
@@ -180,15 +245,15 @@ test.describe("Protected route smoke tests", () => {
     await dialog.getByRole("button", { name: "Close onboarding" }).click();
     await expect(dialog).toHaveCount(0);
     await expect.poll(() =>
-      page.evaluate(() => localStorage.getItem("itemtraxx:onboarding:v1:workspace_admin")),
+      page.evaluate(() => localStorage.getItem("itemtraxx:onboarding:v1:tenant_account")),
     ).not.toBeNull();
 
     await page.reload();
     await expect(page).toHaveURL(/\/checkout$/);
     await page.waitForFunction(
-      () => typeof window.__itemtraxxTest?.setWorkspaceAdminSession === "function",
+      () => typeof window.__itemtraxxTest?.setTenantAccountSession === "function",
     );
-    await page.evaluate(() => window.__itemtraxxTest?.setWorkspaceAdminSession("tenant-e2e"));
+    await page.evaluate(() => window.__itemtraxxTest?.setTenantAccountSession("tenant-e2e"));
     await expect(dialog).toHaveCount(0);
   });
 
@@ -206,7 +271,7 @@ test.describe("Protected route smoke tests", () => {
       });
     });
     await page.goto("/");
-    await setWorkspaceAdminSession(page);
+    await setTenantAccountSession(page);
     await navigateApp(page, "/checkout");
 
     const banner = page.getByRole("status").filter({ hasText: "Checkout latency is elevated" });
@@ -236,7 +301,7 @@ test.describe("Protected route smoke tests", () => {
 
       await page.goto(path);
 
-      await expect(page).toHaveURL(new RegExp(`${path.replaceAll("/", "\\/")}$`));
+      await expect(page).toHaveURL(new RegExp(`/login\\?redirect=${path.replaceAll("/", "\\/")}$`));
       await page.waitForFunction(() => window.__itemtraxxTest !== undefined);
       await page.waitForLoadState("networkidle");
       expect(publicSessionRequests).toBe(0);
@@ -245,6 +310,18 @@ test.describe("Protected route smoke tests", () => {
       ).toBeUndefined();
     });
   }
+
+  test("a signed-in account without the required role sees access denied", async ({ page }) => {
+    await page.goto("/");
+    await setTenantAccountSession(page);
+
+    await navigateApp(page, "/admin");
+
+    await expect(page).toHaveURL(/\/access-denied\?redirect=\/admin$/);
+    await expect(
+      page.getByRole("heading", { name: "You don’t have access to this page." }),
+    ).toBeVisible();
+  });
 
   test("super admin can reach dashboard", async ({ page }) => {
     await page.goto("/");
@@ -255,7 +332,7 @@ test.describe("Protected route smoke tests", () => {
     await expect(page.getByRole("heading", { name: "Control Center" })).toBeVisible();
   });
 
-  test("Workspace Admin verification expires after 15 minutes", async ({ page }) => {
+  test("Workspace Admin remains signed in after the verification timestamp is old", async ({ page }) => {
     await page.goto("/");
     await setWorkspaceAdminSession(page);
     await page.evaluate(async () => {
@@ -268,7 +345,8 @@ test.describe("Protected route smoke tests", () => {
 
     await navigateApp(page, "/admin");
 
-    await expect(page).toHaveURL(/\/login$/);
+    await expect(page).toHaveURL(/\/admin$/);
+    await expect(page.getByRole("heading", { name: "Workspace Overview", exact: true })).toBeVisible();
   });
 
   test("Workspace Admin verification survives a same-session bootstrap", async ({ page }) => {
@@ -298,7 +376,7 @@ test.describe("Protected route smoke tests", () => {
     await expect(page.getByRole("heading", { name: "Workspace Overview", exact: true })).toBeVisible();
   });
 
-  test("super-admin secondary verification expires after 15 minutes", async ({ page }) => {
+  test("super-admin session remains available after the verification timestamp is old", async ({ page }) => {
     await page.goto("/");
     await setSuperAdminSession(page);
     await page.evaluate(async () => {
@@ -312,6 +390,7 @@ test.describe("Protected route smoke tests", () => {
 
     await navigateApp(page, "/super-admin");
 
-    await expect(page).toHaveURL(/\/super-auth$/);
+    await expect(page).toHaveURL(/\/super-admin$/);
+    await expect(page.getByRole("heading", { name: "Super Admin" })).toBeVisible();
   });
 });

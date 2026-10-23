@@ -6,9 +6,9 @@ import { isAllowedOrigin, parseAllowedOrigins } from "../_shared/cors.ts";
 import { requireTrustedEdgeIngress } from "../_shared/trustedIngress.ts";
 import { resolveRateLimitResult } from "../_shared/preloginGuards.ts";
 import { validateAccountDeviceSession } from "../_shared/accountSessions.ts";
-import { requireRecentAdminAuth } from "../_shared/adminReauth.ts";
 import { readJsonBody } from "../_shared/requestBody.ts";
 import { resolveWorkspaceAccess } from "../_shared/workspaceAccess.ts";
+import { quotaLimitResponse } from "../_shared/quota.ts";
 import {
   BARCODE_PATTERN,
   optionalText,
@@ -134,7 +134,7 @@ serve(async (req) => {
     if (
       profileError ||
       !profile?.workspace_id ||
-      profile.role !== "workspace_admin" ||
+      !["workspace_admin", "individual_account"].includes(profile.role) ||
       profile.is_active === false
     ) {
       return jsonResponse(403, { error: "Access denied" });
@@ -179,6 +179,12 @@ serve(async (req) => {
       const profileIds = Array.isArray(payloadRecord.profile_ids)
         ? [...new Set(payloadRecord.profile_ids.map((value) => requireUuid(value)))]
         : [];
+      if (profile.role === "individual_account") {
+        if (accessMode !== "all" || profileIds.length > 0) {
+          throw new ValidationError("Individual Account items must be available to the account owner.");
+        }
+        return { accessMode: "all" as const, profileIds: [] };
+      }
       if (accessMode === "restricted" && profileIds.length === 0) throw new ValidationError("Select at least one Tenant Account.");
       if (profileIds.length) {
         const { count, error } = await adminClient.from("profiles").select("id", { count: "exact", head: true }).eq("workspace_id", profile.workspace_id).eq("role", "tenant_account").eq("is_active", true).is("deleted_at", null).in("id", profileIds);
@@ -252,12 +258,6 @@ serve(async (req) => {
         return jsonResponse(401, { error: "Session revoked" });
       }
 
-      const reauthFailure = await requireRecentAdminAuth(
-        adminClient,
-        authToken,
-        jsonResponse,
-      );
-      if (reauthFailure) return reauthFailure;
     }
 
     const { data: maintenanceRow } = await adminClient
@@ -318,6 +318,8 @@ serve(async (req) => {
         .single();
 
       if (error || !data) {
+        const quotaResponse = quotaLimitResponse(error, jsonResponse);
+        if (quotaResponse) return quotaResponse;
         return jsonResponse(400, { error: "Unable to create item." });
       }
       await replaceAccess(data.id, accessMode, profileIds);
@@ -358,6 +360,10 @@ serve(async (req) => {
         .is("deleted_at", null)
         .single();
 
+      if (!existingItem) {
+        return jsonResponse(404, { error: "Item not found." });
+      }
+
       if (
         normalizedStatus !== "checked_out" &&
         (existingItem?.status === "checked_out" ||
@@ -369,7 +375,7 @@ serve(async (req) => {
         });
       }
 
-      const { data, error } = await adminClient
+      let updateQuery = adminClient
         .from("items")
         .update({
           name: normalizedName,
@@ -381,9 +387,20 @@ serve(async (req) => {
         .eq("id", normalizedId)
         .eq("workspace_id", profile.workspace_id)
         .is("deleted_at", null)
+        .eq("status", existingItem.status);
+      updateQuery = existingItem.checked_out_by == null
+        ? updateQuery.is("checked_out_by", null)
+        : updateQuery.eq("checked_out_by", existingItem.checked_out_by);
+      updateQuery = existingItem.checked_out_at == null
+        ? updateQuery.is("checked_out_at", null)
+        : updateQuery.eq("checked_out_at", existingItem.checked_out_at);
+      const { data, error } = await updateQuery
         .select("id, workspace_id, name, barcode, serial_number, status, notes")
-        .single();
+        .maybeSingle();
 
+      if (!data && !error) {
+        return jsonResponse(409, { error: "Item changed while you were editing it. Reload and try again." });
+      }
       if (error || !data) {
         return jsonResponse(400, { error: "Unable to update item." });
       }
@@ -434,7 +451,7 @@ serve(async (req) => {
         });
       }
 
-      const { error } = await adminClient
+      const { data: archivedItem, error: archiveError } = await adminClient
         .from("items")
         .update({
           deleted_at: new Date().toISOString(),
@@ -442,9 +459,17 @@ serve(async (req) => {
         })
         .eq("id", normalizedId)
         .eq("workspace_id", profile.workspace_id)
-        .is("deleted_at", null);
+        .is("deleted_at", null)
+        .eq("status", activeItem.status)
+        .is("checked_out_by", null)
+        .is("checked_out_at", null)
+        .select("id")
+        .maybeSingle();
 
-      if (error) {
+      if (archiveError || !archivedItem) {
+        if (!archiveError) {
+          return jsonResponse(409, { error: "Item changed while you were archiving it. Reload and try again." });
+        }
         return jsonResponse(400, { error: "Unable to archive item." });
       }
 
@@ -469,6 +494,8 @@ serve(async (req) => {
         .single();
 
       if (error || !data) {
+        const quotaResponse = quotaLimitResponse(error, jsonResponse);
+        if (quotaResponse) return quotaResponse;
         return jsonResponse(400, { error: "Unable to restore item." });
       }
 

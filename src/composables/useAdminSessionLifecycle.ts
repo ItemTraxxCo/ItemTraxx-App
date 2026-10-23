@@ -25,33 +25,17 @@ type AdminLifecycleAuthState = {
   isAuthenticated: boolean;
   role: string | null;
   userId: string | null;
-  adminVerifiedAt: string | null;
-  superVerifiedAt: string | null;
 };
 type AdminSessionLifecycleOptions = {
   auth: AdminLifecycleAuthState;
   route: RouteLocationNormalizedLoaded;
   router: Router;
   sessionTermination: ReturnType<typeof getSessionTerminationState>;
-  isDevHost: MaybeRefOrGetter<boolean>;
-  isWorkspaceAdminArea: MaybeRefOrGetter<boolean>;
   shouldTrackAccountSession: MaybeRefOrGetter<boolean>;
   closeMenu: () => void;
 };
 
 const IS_E2E_TEST_MODE = import.meta.env.VITE_E2E_TEST_UTILS === "true";
-const DEFAULT_ADMIN_IDLE_TIMEOUT_MINUTES = 20;
-const MIN_ADMIN_IDLE_TIMEOUT_MINUTES = 5;
-const parsedAdminIdleTimeoutMinutes = Number(
-  import.meta.env.VITE_ADMIN_IDLE_TIMEOUT_MINUTES || DEFAULT_ADMIN_IDLE_TIMEOUT_MINUTES,
-);
-const effectiveAdminIdleTimeoutMinutes =
-  Number.isFinite(parsedAdminIdleTimeoutMinutes) && parsedAdminIdleTimeoutMinutes > 0
-    ? IS_E2E_TEST_MODE
-      ? parsedAdminIdleTimeoutMinutes
-      : Math.max(parsedAdminIdleTimeoutMinutes, MIN_ADMIN_IDLE_TIMEOUT_MINUTES)
-    : DEFAULT_ADMIN_IDLE_TIMEOUT_MINUTES;
-const ADMIN_IDLE_TIMEOUT_MS = effectiveAdminIdleTimeoutMinutes * 60 * 1000;
 const DEFAULT_SESSION_HEARTBEAT_INTERVAL_MS = 30_000;
 const parsedE2EHeartbeatIntervalMs = Number(
   import.meta.env.VITE_E2E_SESSION_HEARTBEAT_INTERVAL_MS || DEFAULT_SESSION_HEARTBEAT_INTERVAL_MS,
@@ -64,37 +48,42 @@ const SESSION_HEARTBEAT_INTERVAL_MS =
     : DEFAULT_SESSION_HEARTBEAT_INTERVAL_MS;
 const LOGIN_CONTEXT_QUERY_KEY = "login_ctx";
 const LOGIN_CONTEXT_VALUES = new Set(["admin_login", "regular_login"]);
+const SSO_PROOF_QUERY_KEY = "itx_sso_proof";
+const LEGACY_SSO_PROVIDER_QUERY_KEY = "itx_sso_provider_id";
+const LEGACY_SSO_PROTOCOL_QUERY_KEY = "itx_sso_protocol";
+const SSO_CONTEXT_MAX_AGE_MS = 5 * 60_000;
 
-const ADMIN_ACTIVITY_EVENTS: Array<keyof WindowEventMap> = [
-  "mousemove",
-  "mousedown",
-  "keydown",
-  "touchstart",
-  "scroll",
-];
+type ConsumedLoginContext = {
+  loginContext: "admin_login" | "regular_login" | null;
+  ssoLoginProof: string | null;
+  ssoContext: PendingSsoLoginContext | null;
+};
+
+type PendingSsoLoginContext = {
+  proof: string;
+  capturedAt: number;
+};
+
+const firstQueryString = (value: unknown) =>
+  Array.isArray(value) ? value[0] : value;
 
 export const useAdminSessionLifecycle = (options: AdminSessionLifecycleOptions) => {
   const heartbeatEnabled =
     !IS_E2E_TEST_MODE ||
     new URLSearchParams(window.location.search).get("e2e-session-heartbeat") === "1";
-  let idleTimer: number | null = null;
   let adminSessionTimer: number | null = null;
   let heartbeatTimer: number | null = null;
   let terminationRedirectTimer: number | null = null;
   let validationRetryTimer: number | null = null;
   let resolveValidationRetry: (() => void) | null = null;
   let authSessionEpoch = 0;
+  let bootstrappedSessionEpoch: number | null = null;
+  let pendingSsoLoginContext: PendingSsoLoginContext | null = null;
   let adminCheckGeneration = 0;
   let runningAdminCheckGeneration: number | null = null;
   let disposed = false;
-  const isIdleLogoutRunning = ref(false);
   const isAdminSessionCheckRunning = ref(false);
   const isSessionHeartbeatRunning = ref(false);
-
-  const clearIdleTimer = () => {
-    if (idleTimer) window.clearTimeout(idleTimer);
-    idleTimer = null;
-  };
 
   const stopAdminSessionPolling = () => {
     if (adminSessionTimer) window.clearInterval(adminSessionTimer);
@@ -174,41 +163,6 @@ export const useAdminSessionLifecycle = (options: AdminSessionLifecycleOptions) 
     }, 5000);
   };
 
-  const runIdleLogout = async () => {
-    if (isIdleLogoutRunning.value || toValue(options.isDevHost)) return;
-    if (
-      !options.auth.isAuthenticated ||
-      options.auth.role !== "workspace_admin" ||
-      !toValue(options.isWorkspaceAdminArea)
-    ) {
-      return;
-    }
-    isIdleLogoutRunning.value = true;
-    try {
-      clearAdminVerification();
-      await options.router.replace("/checkout");
-    } finally {
-      isIdleLogoutRunning.value = false;
-    }
-  };
-
-  const resetIdleTimer = () => {
-    clearIdleTimer();
-    if (toValue(options.isDevHost)) return;
-    if (
-      !options.auth.isAuthenticated ||
-      options.auth.role !== "workspace_admin" ||
-      !toValue(options.isWorkspaceAdminArea)
-    ) {
-      return;
-    }
-    idleTimer = window.setTimeout(() => void runIdleLogout(), ADMIN_IDLE_TIMEOUT_MS);
-  };
-
-  const recordActivity = () => {
-    resetIdleTimer();
-  };
-
   const runSessionHeartbeat = async () => {
     if (!heartbeatEnabled || isSessionHeartbeatRunning.value || disposed) return;
     if (!options.auth.isAuthenticated) {
@@ -248,13 +202,61 @@ export const useAdminSessionLifecycle = (options: AdminSessionLifecycleOptions) 
     }
   };
 
-  const consumeLoginContext = () => {
+  const captureSsoLoginContext = () => {
+    const proof = firstQueryString(
+      options.route.query[SSO_PROOF_QUERY_KEY],
+    );
+    if (typeof proof !== "string" || !/^[a-z0-9_-]{1,1900}\.[a-z0-9_-]{43}$/i.test(proof)) {
+      return;
+    }
+    pendingSsoLoginContext = {
+      proof,
+      capturedAt: Date.now(),
+    };
+  };
+
+  watch(
+    () => [
+      options.route.query[SSO_PROOF_QUERY_KEY],
+      options.route.query[LEGACY_SSO_PROVIDER_QUERY_KEY],
+      options.route.query[LEGACY_SSO_PROTOCOL_QUERY_KEY],
+    ],
+    captureSsoLoginContext,
+    { immediate: true },
+  );
+
+  const consumeLoginContext = (): ConsumedLoginContext | null => {
     const raw = options.route.query[LOGIN_CONTEXT_QUERY_KEY];
-    const value = Array.isArray(raw) ? raw[0] : raw;
-    if (typeof value !== "string" || !LOGIN_CONTEXT_VALUES.has(value)) return null;
-    const { [LOGIN_CONTEXT_QUERY_KEY]: _discard, ...restQuery } = options.route.query;
-    void options.router.replace({ path: options.route.path, query: restQuery });
-    return value as "admin_login" | "regular_login";
+    const value = firstQueryString(raw);
+    const loginContext = typeof value === "string" && LOGIN_CONTEXT_VALUES.has(value)
+      ? value as ConsumedLoginContext["loginContext"]
+      : null;
+    const hasSsoQuery = SSO_PROOF_QUERY_KEY in options.route.query ||
+      LEGACY_SSO_PROVIDER_QUERY_KEY in options.route.query ||
+      LEGACY_SSO_PROTOCOL_QUERY_KEY in options.route.query;
+
+    let ssoLogin = pendingSsoLoginContext;
+    if (ssoLogin && Date.now() - ssoLogin.capturedAt > SSO_CONTEXT_MAX_AGE_MS) {
+      pendingSsoLoginContext = null;
+      ssoLogin = null;
+    }
+
+    if (!loginContext && !hasSsoQuery && !ssoLogin) return null;
+    if (loginContext || hasSsoQuery) {
+      const {
+        [LOGIN_CONTEXT_QUERY_KEY]: _discardLoginContext,
+        [SSO_PROOF_QUERY_KEY]: _discardSsoProof,
+        [LEGACY_SSO_PROVIDER_QUERY_KEY]: _discardSsoProvider,
+        [LEGACY_SSO_PROTOCOL_QUERY_KEY]: _discardSsoProtocol,
+        ...restQuery
+      } = options.route.query;
+      void options.router.replace({ path: options.route.path, query: restQuery });
+    }
+    return {
+      loginContext,
+      ssoLoginProof: ssoLogin?.proof ?? null,
+      ssoContext: ssoLogin,
+    };
   };
 
   const identityChanged = (epoch: number, userId: string | null, deviceId: string) =>
@@ -296,9 +298,22 @@ export const useAdminSessionLifecycle = (options: AdminSessionLifecycleOptions) 
       }
       try {
         const loginContext = consumeLoginContext();
-        await touchAccountSession(
-          loginContext ? { loginMethod: "password", loginLocation: loginContext } : {}
-        );
+        if (loginContext?.ssoLoginProof) {
+          await touchAccountSession({
+            ssoLoginProof: loginContext.ssoLoginProof,
+          });
+          if (pendingSsoLoginContext === loginContext.ssoContext) {
+            pendingSsoLoginContext = null;
+          }
+          bootstrappedSessionEpoch = epoch;
+        } else if (loginContext?.loginContext || bootstrappedSessionEpoch !== epoch) {
+          await touchAccountSession(
+            loginContext?.loginContext
+              ? { loginMethod: "password", loginLocation: loginContext.loginContext }
+              : {},
+          );
+          bootstrappedSessionEpoch = epoch;
+        }
       } catch {
         // Best-effort keepalive; validation below is authoritative.
       }
@@ -315,6 +330,11 @@ export const useAdminSessionLifecycle = (options: AdminSessionLifecycleOptions) 
         ) {
           handleSessionTermination();
         }
+      } else {
+        // validate_session refreshes last_seen_at on the server, so after the
+        // first successful check the periodic lifecycle poll does not need a
+        // second HTTP request to touch the same session.
+        bootstrappedSessionEpoch = epoch;
       }
     } catch (error) {
       if (
@@ -348,13 +368,11 @@ export const useAdminSessionLifecycle = (options: AdminSessionLifecycleOptions) 
   };
 
   const start = () => {
-    resetIdleTimer();
     startAdminSessionPolling();
     startSessionHeartbeat();
   };
 
   const stop = () => {
-    clearIdleTimer();
     stopAdminSessionPolling();
     stopSessionHeartbeat();
     clearValidationRetry();
@@ -377,11 +395,10 @@ export const useAdminSessionLifecycle = (options: AdminSessionLifecycleOptions) 
     () => [
       options.auth.isAuthenticated,
       options.auth.userId,
-      options.auth.adminVerifiedAt,
-      options.auth.superVerifiedAt,
     ] as const,
     () => {
       authSessionEpoch += 1;
+      bootstrappedSessionEpoch = null;
     },
   );
   watch(
@@ -408,9 +425,6 @@ export const useAdminSessionLifecycle = (options: AdminSessionLifecycleOptions) 
   start();
 
   onMounted(() => {
-    for (const eventName of ADMIN_ACTIVITY_EVENTS) {
-      window.addEventListener(eventName, recordActivity, { passive: true });
-    }
     document.addEventListener("visibilitychange", handleVisibility);
   });
 
@@ -419,14 +433,10 @@ export const useAdminSessionLifecycle = (options: AdminSessionLifecycleOptions) 
     stop();
     if (terminationRedirectTimer) window.clearTimeout(terminationRedirectTimer);
     terminationRedirectTimer = null;
-    for (const eventName of ADMIN_ACTIVITY_EVENTS) {
-      window.removeEventListener(eventName, recordActivity);
-    }
     document.removeEventListener("visibilitychange", handleVisibility);
   });
 
   return {
-    recordActivity,
     runAdminSessionCheck,
     runSessionHeartbeat,
     signInAgain,

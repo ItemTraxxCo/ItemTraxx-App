@@ -1,0 +1,35 @@
+name: CI Failure Notification
+
+permissions:
+  actions: read
+  contents: read
+
+on:
+  workflow_run:
+    workflows:
+      - CI
+      - CodeQL
+    types:
+      - completed
+
+jobs:
+  notify:
+    if: >-
+      ${{
+        (github.event.workflow_run.conclusion == 'failure' && github.event.workflow_run.event != 'pull_request' && github.event.workflow_run.event != 'pull_request_target') ||
+        (github.event.workflow_run.conclusion == 'cancelled' && github.event.workflow_run.event != 'pull_request' && github.event.workflow_run.event != 'pull_request_target')
+      }}
+    uses: ./.github/workflows/incidentio-workflow-alert.yml
+    with:
+      status: ${{ github.event.workflow_run.conclusion }}
+      severity: high
+      workflow_name: ${{ github.event.workflow_run.name }}
+      job_name: ${{ github.event.workflow_run.name == 'CodeQL' && 'Analyze JavaScript and Actions' || 'validate' }}
+      run_url: ${{ github.event.workflow_run.html_url }}
+      repository: ${{ github.repository }}
+      branch: ${{ github.event.workflow_run.head_branch }}
+      sha: ${{ github.event.workflow_run.head_sha }}
+      environment: production
+    secrets:
+      INCIDENT_IO_WEBHOOK_URL: ${{ secrets.INCIDENT_IO_WEBHOOK_URL }}
+      INCIDENT_IO_WEBHOOK_TOKEN: ${{ secrets.INCIDENT_IO_WEBHOOK_TOKEN }}

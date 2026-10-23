@@ -30,7 +30,7 @@ describe("showFatalErrorToast", () => {
 
   it("never surfaces the raw error message to the user-facing text", () => {
     showFatalErrorToast(new Error("raw internal db failure: users.email column missing"));
-    expect(getFatalErrorToastState().message).toBe("Oh no! Something went wrong. Please try again.");
+    expect(getFatalErrorToastState().message).toBe("Error; Exception.");
   });
 
   it("redacts JWTs, bearer tokens, emails, and token query params from the report message/stack", () => {

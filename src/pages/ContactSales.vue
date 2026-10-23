@@ -105,7 +105,7 @@
           By clicking Submit Sales Request, you agree to our <RouterLink to="/privacy">Privacy Policy</RouterLink> and <RouterLink to="/legal">Terms of Service</RouterLink>.
         </p>
       </form>
-      <p v-if="error" class="error">{{ error }}</p>
+      <p v-if="error" class="error" v-app-toast-error>{{ error }}</p>
     </section>
 
     <PublicFooter />

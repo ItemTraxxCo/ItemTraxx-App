@@ -8,6 +8,8 @@ import { requireTrustedEdgeIngress } from "../_shared/trustedIngress.ts";
 import { readJsonBody } from "../_shared/requestBody.ts";
 import { sha256Hex } from "../_shared/sha256.ts";
 import { resolveAccountAuthSessionBinding } from "../_shared/accountSessions.ts";
+import { isBetterAuthSessionActive } from "../_shared/betterAuthSessions.ts";
+import { verifySsoLoginProof } from "../_shared/ssoLoginProvenance.ts";
 import { resolveWorkspaceAccess } from "../_shared/workspaceAccess.ts";
 import {
   asRecord,
@@ -26,12 +28,16 @@ import {
   findActiveSession,
   resolveDeviceSessionContext,
 } from "./actions/sessions.ts";
-import { resolveWorkspacePolicyState } from "./actions/settings.ts";
+import {
+  defaultFeatureFlags,
+  resolveWorkspacePolicyState,
+} from "./actions/settings.ts";
 import type { AdminOpsContext } from "./context.ts";
+import { logError, withRequestSpan } from "../_shared/observability.ts";
 
 const baseCorsHeaders = {
   "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-request-id",
+    "authorization, x-client-info, apikey, content-type, x-request-id, traceparent, tracestate",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
   Vary: "Origin",
 };
@@ -53,9 +59,8 @@ const resolveCorsHeaders = (req: Request) => {
   return { hasOrigin, originAllowed, headers };
 };
 
-serve(async (req) => {
+serve((req) => withRequestSpan(req, "POST /functions/admin-ops", async (span, requestId) => {
   const { hasOrigin, originAllowed, headers } = resolveCorsHeaders(req);
-  const requestId = req.headers.get("x-request-id") ?? crypto.randomUUID();
 
   const jsonResponse = (status: number, body: Record<string, unknown>) =>
     new Response(JSON.stringify(body), {
@@ -107,6 +112,7 @@ serve(async (req) => {
     }
 
     const adminClient = createClient(supabaseUrl, serviceKey, {
+      global: { headers: { traceparent: span.traceparent() } },
       auth: { persistSession: false },
     });
     const authSessionBinding = await resolveAccountAuthSessionBinding(
@@ -118,7 +124,7 @@ serve(async (req) => {
       : `token:${await sha256Hex(authToken)}`;
 
     const userClient = createClient(supabaseUrl, publishableKey, {
-      global: { headers: { Authorization: authHeader } },
+      global: { headers: { Authorization: authHeader, traceparent: span.traceparent() } },
       auth: { persistSession: false },
     });
 
@@ -133,7 +139,7 @@ serve(async (req) => {
 
     const { data: profile, error: profileError } = await adminClient
       .from("profiles")
-      .select("workspace_id, role, is_active")
+      .select("workspace_id, role, is_active, better_auth_user_id")
       .eq("id", user.id)
       .single();
 
@@ -141,18 +147,36 @@ serve(async (req) => {
       return jsonResponse(403, { error: "Access denied" });
     }
 
-    if (profile.role !== "workspace_admin" && profile.role !== "tenant_account") {
+    if (
+      profile.role !== "workspace_admin" &&
+      profile.role !== "individual_account" &&
+      profile.role !== "tenant_account"
+    ) {
       return jsonResponse(403, { error: "Access denied" });
     }
     if (profile.is_active === false) {
       return jsonResponse(403, { error: "Access denied" });
     }
 
+    const betterAuthSession = await isBetterAuthSessionActive(
+      adminClient,
+      profile.better_auth_user_id,
+      authSessionBinding.sessionId,
+    );
+    if (betterAuthSession.relationMissing) {
+      return jsonResponse(503, {
+        error: "Session controls unavailable. Run latest SQL setup.",
+      });
+    }
+    if (!betterAuthSession.active) {
+      return jsonResponse(401, { error: "Session revoked" });
+    }
+
     const { data: rateLimit, error: rateLimitError } = await userClient.rpc(
       "consume_rate_limit",
       {
-        p_scope: profile.role === "workspace_admin" ? "admin" : "workspace",
-        p_limit: profile.role === "workspace_admin" ? 30 : 25,
+        p_scope: profile.role === "tenant_account" ? "workspace" : "admin",
+        p_limit: profile.role === "tenant_account" ? 25 : 30,
         p_window_seconds: 60,
       },
     );
@@ -179,27 +203,51 @@ serve(async (req) => {
       normalizedAction === "revoke_current_session" ||
       normalizedAction === "revoke_session" ||
       normalizedAction === "revoke_all_sessions";
+    const requiresWorkspaceStatus = !isSessionAction ||
+      normalizedAction === "revoke_current_session" ||
+      normalizedAction === "revoke_session" ||
+      normalizedAction === "revoke_all_sessions";
 
     const workspaceId = profile.workspace_id as string;
-    const { data: workspaceStatus, error: workspaceStatusError } = await adminClient
-      .from("workspaces")
-      .select("status")
-      .eq("id", workspaceId)
-      .maybeSingle();
-    const workspaceAccess = resolveWorkspaceAccess(
-      workspaceStatus,
-      workspaceStatusError,
-    );
-    if (workspaceAccess.reason === "unavailable") {
-      return jsonResponse(503, { error: "Workspace status unavailable" });
+    let isWorkspaceSuspended = false;
+    if (requiresWorkspaceStatus) {
+      const { data: workspaceStatus, error: workspaceStatusError } = await adminClient
+        .from("workspaces")
+        .select("status")
+        .eq("id", workspaceId)
+        .maybeSingle();
+      const workspaceAccess = resolveWorkspaceAccess(
+        workspaceStatus,
+        workspaceStatusError,
+      );
+      if (workspaceAccess.reason === "unavailable") {
+        return jsonResponse(503, { error: "Workspace status unavailable" });
+      }
+      isWorkspaceSuspended = workspaceAccess.reason === "disabled";
     }
-    const isWorkspaceSuspended = workspaceAccess.reason === "disabled";
-    const deviceSession = resolveDeviceSessionContext(payloadRecord, req);
+    const ssoLoginProvenance = normalizedAction === "touch_session"
+      ? await verifySsoLoginProof(
+        payloadRecord.sso_login_proof,
+        Deno.env.get("ITX_INTERNAL_AUTH_SECRET"),
+        {
+          betterAuthUserId: typeof profile.better_auth_user_id === "string"
+            ? profile.better_auth_user_id
+            : "",
+          sessionId: authSessionBinding.sessionId ?? "",
+        },
+      )
+      : null;
+    const deviceSession = resolveDeviceSessionContext(
+      payloadRecord,
+      req,
+      ssoLoginProvenance,
+    );
 
     const sessionSecurityContext = {
       adminClient,
       workspaceId,
       user: { id: user.id },
+      betterAuthUserId: profile.better_auth_user_id,
       authToken,
       authSessionBinding,
       authTokenBindingKey,
@@ -238,35 +286,49 @@ serve(async (req) => {
       }
     }
 
-    const [maintenanceRuntimeResult, updateRuntimeResult] = await Promise.all([
-      adminClient
-        .from("app_runtime_config")
-        .select("value")
-        .eq("key", "maintenance_mode")
-        .maybeSingle(),
-      adminClient
-        .from("app_runtime_config")
-        .select("value")
-        .eq("key", "workspace_updates")
-        .maybeSingle(),
-    ]);
-    const maintenance = resolveMaintenance(
-      maintenanceRuntimeResult.data?.value,
-    );
+    // Session lifecycle actions only need the account_sessions tables. The
+    // runtime and workspace-policy values are used by the product actions,
+    // not by touch/validate/list/revoke; loading them here added four more
+    // database round trips to every keepalive request and made a slow config
+    // query look like an unrelated admin-ops timeout in the browser.
+    let workspacePolicy: Awaited<ReturnType<typeof resolveWorkspacePolicyState>>["workspacePolicy"] = null;
+    let checkoutDueHours = 72;
+    let featureFlags = defaultFeatureFlags();
+    let maintenance = resolveMaintenance(undefined);
+    let workspaceUpdates = normalizeWorkspaceUpdates(undefined);
+    if (!isSessionAction) {
+      const [maintenanceRuntimeResult, updateRuntimeResult] = await Promise.all([
+        adminClient
+          .from("app_runtime_config")
+          .select("value")
+          .eq("key", "maintenance_mode")
+          .maybeSingle(),
+        adminClient
+          .from("app_runtime_config")
+          .select("value")
+          .eq("key", "workspace_updates")
+          .maybeSingle(),
+      ]);
+      maintenance = resolveMaintenance(
+        maintenanceRuntimeResult.data?.value,
+      );
 
-    const { workspacePolicy, checkoutDueHours, featureFlags } =
-      await resolveWorkspacePolicyState(adminClient, workspaceId);
+      const resolvedPolicy = await resolveWorkspacePolicyState(
+        adminClient,
+        workspaceId,
+      );
+      workspacePolicy = resolvedPolicy.workspacePolicy;
+      checkoutDueHours = resolvedPolicy.checkoutDueHours;
+      featureFlags = resolvedPolicy.featureFlags;
 
-    const updateRuntimeValue = updateRuntimeResult.data?.value;
-    const workspaceUpdates = normalizeWorkspaceUpdates(updateRuntimeValue);
+      const updateRuntimeValue = updateRuntimeResult.data?.value;
+      workspaceUpdates = normalizeWorkspaceUpdates(updateRuntimeValue);
+    }
 
     const actionAuthorizationFailure = await authorizeAdminOpsAction({
       action: normalizedAction,
       profileRole: profile.role,
       isWorkspaceSuspended,
-      adminClient,
-      userId: user.id,
-      authToken,
       jsonResponse,
     });
     if (actionAuthorizationFailure) return actionAuthorizationFailure;
@@ -277,6 +339,7 @@ serve(async (req) => {
       payload: payloadRecord,
       adminClient,
       user: { id: user.id },
+      betterAuthUserId: profile.better_auth_user_id,
       workspaceId,
       authToken,
       authSessionBinding,
@@ -294,12 +357,7 @@ serve(async (req) => {
     if (error instanceof ValidationError) {
       return jsonResponse(error.status, { error: error.message });
     }
-    const message = error instanceof Error ? error.message : "Unknown error";
-    console.error("admin-ops function error", {
-      request_id: requestId,
-      message,
-      stack: error instanceof Error ? error.stack : undefined,
-    });
+    logError("admin-ops function error", requestId, error, {}, span.context);
     return jsonResponse(500, { error: "Request failed" });
   }
-});
+}));

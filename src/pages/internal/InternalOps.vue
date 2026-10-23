@@ -212,12 +212,12 @@
               <td>{{ event.workspace_name }}</td>
               <td>
                 <span class="status-pill" :class="event.action_type === 'checkout' ? 'status-open' : 'status-closed'">
-                  {{ event.action_type }}
+                  {{ formatActionLabel(event.action_type) }}
                 </span>
               </td>
               <td>{{ event.item_name ?? "-" }}</td>
               <td>{{ event.item_barcode ?? "-" }}</td>
-              <td>{{ event.borrower_username ?? "-" }}</td>
+              <td data-session-replay-mask>{{ event.borrower_username ?? "-" }}</td>
             </tr>
           </tbody>
         </table>
@@ -239,8 +239,8 @@
           <tbody>
             <tr v-for="row in snapshot?.recent_audit ?? []" :key="row.id">
               <td>{{ formatDateTime(row.created_at) }}</td>
-              <td>{{ row.actor_email ?? "-" }}</td>
-              <td>{{ row.action_type }}</td>
+              <td data-session-replay-mask>{{ row.actor_email ?? "-" }}</td>
+              <td>{{ formatActionLabel(row.action_type) }}</td>
               <td>{{ row.target_type ?? "-" }} {{ row.target_id ?? "" }}</td>
             </tr>
           </tbody>
@@ -260,6 +260,7 @@ import { computed, onMounted, onUnmounted, ref } from "vue";
 import { useRouter } from "vue-router";
 import { setRuntimeConfig } from "../../services/superOps/controlCenter";
 import { getInternalOpsSnapshot, type InternalOpsSnapshot } from "../../services/superOps/internalOps";
+import { formatActionLabel } from "../../utils/actionLabel";
 
 const router = useRouter();
 const snapshot = ref<InternalOpsSnapshot | null>(null);

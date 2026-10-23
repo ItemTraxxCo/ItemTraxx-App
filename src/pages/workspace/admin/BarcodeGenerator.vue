@@ -2,8 +2,7 @@
   <div class="page admin-shell">
     <div class="admin-hero">
       <div class="page-nav-left">
-        <RouterLink class="button-link" to="/admin">Return to Admin Panel</RouterLink>
-        <RouterLink class="button-link" to="/checkout">Return to Checkout</RouterLink>
+        <RouterLink class="button-link" :to="managerRoot">Back</RouterLink>
       </div>
 
       <h1>Bulk Barcode Generator</h1>
@@ -46,7 +45,7 @@
         </div>
       </form>
 
-      <p v-if="error" class="error">{{ error }}</p>
+      <p v-if="error" class="error" v-app-toast-error>{{ error }}</p>
       <p v-else-if="generatedBarcodes.length" class="muted">
         Ready to download: {{ generatedBarcodes.length }} barcode(s).
       </p>
@@ -60,6 +59,9 @@ import { RouterLink } from "vue-router";
 import { downloadBarcodePdf } from "../../../services/barcodePdfService";
 import { fetchWorkspaceSettings } from "../../../services/adminOpsService";
 import { toUserFacingErrorMessage } from "../../../services/appErrors";
+import { useManagerContext } from "../../../composables/useManagerContext";
+
+const { managerRoot } = useManagerContext();
 
 const barcodeInput = ref("");
 const messageInput = ref("");

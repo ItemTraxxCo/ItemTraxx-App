@@ -5,6 +5,7 @@ import {
   resolveClientIp,
   resolvePublicStatusClient,
   resolveRateLimitResult,
+  verifyAndConsumeTurnstileToken,
   verifyTurnstileToken,
 } from "./preloginGuards.ts";
 
@@ -187,28 +188,24 @@ Deno.test("resolveClientIp returns empty string when header is absent", () => {
   assert(resolveClientIp(request) === "", "expected empty client IP fallback");
 });
 
-Deno.test("public status identity ignores forged IP headers for direct callers", () => {
-  const client = resolvePublicStatusClient(
+Deno.test("direct status requests share a fixed limiter key despite forged identity inputs", () => {
+  const first = resolvePublicStatusClient(
     new Request("https://example.com", {
-      headers: { "cf-connecting-ip": "203.0.113.42" },
+      headers: {
+        "cf-connecting-ip": "203.0.113.42",
+        cookie: "itx-status-client=8a2d1244-8245-4d33-9cd2-1b04d00a84ab",
+      },
     }),
     false,
   );
-  assert(client.key.startsWith("status-"), "expected a server-issued direct identity");
-  assert(client.setCookie?.includes("itx-status-client=") === true, "expected a client cookie");
-  assert(!client.key.includes("203-0-113-42"), "must not use an untrusted IP");
-});
-
-Deno.test("public status identity remains stable for a valid direct client cookie", () => {
-  const first = resolvePublicStatusClient(new Request("https://example.com"), false);
-  const cookie = first.setCookie?.split(";", 1)[0];
-  if (!cookie) throw new Error("expected a status client cookie");
   const second = resolvePublicStatusClient(
-    new Request("https://example.com", { headers: { cookie } }),
+    new Request("https://example.com", {
+      headers: { cookie: "itx-status-client=0a473fcc-9d35-4c74-a014-f7cb07f189d2" },
+    }),
     false,
   );
-  assert(second.key === first.key, "expected the issued cookie to keep one bucket");
-  assert(!second.setCookie, "must not rotate a valid client cookie");
+  assert(first.key === "global", "expected the direct fixed bucket key");
+  assert(second.key === first.key, "rotating cookies must not create additional buckets");
 });
 
 Deno.test("public status identity uses the Cloudflare IP only after trusted ingress", () => {
@@ -219,7 +216,6 @@ Deno.test("public status identity uses the Cloudflare IP only after trusted ingr
     true,
   );
   assert(client.key === "ip-203-0-113-42", "expected the trusted edge IP bucket");
-  assert(!client.setCookie, "trusted edge callers do not need a nonce cookie");
 });
 
 Deno.test("prelogin rate limit surfaces RPC errors", async () => {
@@ -545,6 +541,92 @@ Deno.test("verifyTurnstileToken treats a non-OK verification response as a failu
       async () => {
         const result = await verifyTurnstileToken("token", "", "ctx");
         assert(!result, "expected a non-OK upstream response to fail closed");
+      },
+    );
+  });
+});
+
+Deno.test("verifyAndConsumeTurnstileToken rejects replay across public endpoints", async () => {
+  await withTurnstileSecret(async () => {
+    const redeemed = new Set<string>();
+    const hashes: string[] = [];
+    const client = {
+      rpc: async (name: string, args: Record<string, unknown>) => {
+        assert(
+          name === "consume_turnstile_token",
+          "expected the one-time redemption RPC",
+        );
+        const tokenHash = String(args.p_token_hash ?? "");
+        assert(
+          /^[a-f0-9]{64}$/.test(tokenHash),
+          "expected a SHA-256 token fingerprint",
+        );
+        hashes.push(tokenHash);
+        if (redeemed.has(tokenHash)) return { data: false, error: null };
+        redeemed.add(tokenHash);
+        return { data: true, error: null };
+      },
+    };
+    let providerCalls = 0;
+
+    await withStubbedFetch(
+      async () => {
+        providerCalls += 1;
+        // Model the runtime behavior in the attack analysis: Siteverify says
+        // success for both requests, so the local atomic gate must stop replay.
+        return new Response(JSON.stringify({ success: true }), { status: 200 });
+      },
+      async () => {
+        const first = await verifyAndConsumeTurnstileToken(
+          client,
+          "reused-token",
+          "203.0.113.1",
+          "contact-support-submit",
+        );
+        const replay = await verifyAndConsumeTurnstileToken(
+          client,
+          "reused-token",
+          "203.0.113.1",
+          "contact-sales-submit",
+        );
+
+        assert(first, "expected first token redemption to pass");
+        assert(!replay, "expected cross-endpoint replay to fail");
+        assert(
+          providerCalls === 2,
+          "expected each request to be verified by Siteverify",
+        );
+        assert(
+          hashes[0] === hashes[1],
+          "expected the same token to produce the same fingerprint",
+        );
+      },
+    );
+  });
+});
+
+Deno.test("verifyAndConsumeTurnstileToken fails closed when the replay store is unavailable", async () => {
+  await withTurnstileSecret(async () => {
+    const client = {
+      rpc: async () => ({
+        data: null,
+        error: { message: "database unavailable" },
+      }),
+    };
+    await withStubbedFetch(
+      async () =>
+        new Response(JSON.stringify({ success: true }), { status: 200 }),
+      async () => {
+        const result = await verifyAndConsumeTurnstileToken(
+          client,
+          "valid-token",
+          "203.0.113.1",
+          "contact-support-submit",
+        );
+        assert(
+          !result,
+          "expected replay-store errors to reject the submission",
+        );
       },
     );
   });

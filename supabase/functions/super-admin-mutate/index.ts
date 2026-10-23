@@ -5,7 +5,11 @@ import { isKillSwitchWriteBlocked } from "../_shared/killSwitch.ts";
 import { isAllowedOrigin, parseAllowedOrigins } from "../_shared/cors.ts";
 import { requireTrustedEdgeIngress } from "../_shared/trustedIngress.ts";
 import { readJsonBody } from "../_shared/requestBody.ts";
-import { hasPrivilegedStepUp } from "../_shared/privilegedStepUp.ts";
+import {
+  hasFreshPrivilegedStepUp,
+  hasRecentPrivilegedStepUp,
+  SUPER_ADMIN_ACTION_CONFIRMATION_SOURCE,
+} from "../_shared/privilegedStepUp.ts";
 import { isSuperAdminTokenBlockedBySessionRevocation } from "../_shared/superAdminSessions.ts";
 import { writeSuperAdminAudit } from "../_shared/superAdminAudit.ts";
 import { callBetterAuthAdmin } from "../_shared/betterAuthAdmin.ts";
@@ -90,18 +94,29 @@ serve(async (req) => {
         error: "Session unavailable",
       });
     }
-    if (
-      !await hasPrivilegedStepUp(admin, {
-        userId: user.id,
-        roleScope: "super_admin",
-        authToken: token,
-      })
-    ) return json(403, { error: "Super admin verification required." });
     const body = await readJsonBody(req),
       action = requireText(body.action, { maxLen: 64 }),
       p = (body.payload && typeof body.payload === "object"
         ? body.payload
         : {}) as Record<string, unknown>;
+    const stepUpOptions = {
+      userId: user.id,
+      roleScope: "super_admin" as const,
+      authToken: token,
+    };
+    const hasRequiredStepUp = action === "create_super_admin"
+      ? await hasRecentPrivilegedStepUp(admin, {
+        ...stepUpOptions,
+        source: SUPER_ADMIN_ACTION_CONFIRMATION_SOURCE,
+      })
+      : await hasFreshPrivilegedStepUp(admin, stepUpOptions);
+    if (!hasRequiredStepUp) {
+      return json(403, {
+        error: action === "create_super_admin"
+          ? "Confirm your current password before creating a Super Admin."
+          : "Confirm your current password before performing this Super Admin action.",
+      });
+    }
     const enrich = async (rows: any[]) => {
       const ids = [
         ...new Set(rows.map((r) =>
@@ -155,14 +170,13 @@ serve(async (req) => {
         }
         return rows;
       },
-      create: async (workspaceId, email) => {
+      create: async (workspaceId, email, userId) => {
         // Validate email delivery configuration before creating either record so
         // a configuration error cannot leave an orphaned Auth user/profile.
         const redirectTo = resetRedirect();
         const { data: workspace } = await admin.from("workspaces").select("id")
           .eq("id", workspaceId).maybeSingle();
         if (!workspace) throw new ValidationError("Workspace not found.", 404);
-        const userId = crypto.randomUUID();
         const { error: profileError } = await admin.from("profiles").insert({
           id: userId,
           workspace_id: workspaceId,
@@ -221,18 +235,23 @@ serve(async (req) => {
         await callBetterAuthAdmin({action:"request_password_reset",profileId:target.id,redirectTo:resetRedirect()});
       },
       softDelete: async (id, at) => {
-        const { error } = await admin.from("profiles").update({
+        const { data, error } = await admin.from("profiles").update({
           deleted_at: at,
-          is_active: false,
-        }).eq("id", id).eq("role", "tenant_account").is("deleted_at", null);
-        if (error) throw new ValidationError("Unable to remove Tenant Account.");
+        }).eq("id", id).eq("role", "tenant_account").eq("is_active", false)
+          .is("deleted_at", null).select("id").single();
+        if (error || !data) throw new ValidationError("Unable to remove Tenant Account.");
       },
       revokeSessions: async (id, actorId, at) => {
+        try {
+          await callBetterAuthAdmin({ action: "revoke_sessions", profileId: id });
+        } catch {
+          throw new ValidationError("Unable to revoke Tenant Account sessions.", 503);
+        }
         const { error } = await admin.from("account_sessions").update({
           revoked_at: at,
           revoked_by: actorId,
         }).eq("profile_id", id).is("revoked_at", null);
-        if (error) throw new ValidationError("Unable to revoke Tenant Account sessions.");
+        if (error) throw new ValidationError("Unable to revoke Tenant Account sessions.", 503);
       },
       audit: async (actionType, id, metadata) => {
         await writeSuperAdminAudit(admin, {
@@ -309,6 +328,13 @@ serve(async (req) => {
       if (action === "set_super_admin_status") {
         if (id === user.id && p.is_active === false) return json(400, { error: "You cannot suspend your own account." });
         if (typeof p.is_active !== "boolean") return json(400, { error: "Invalid request" });
+        if (p.is_active === false) {
+          try {
+            await callBetterAuthAdmin({ action: "revoke_sessions", profileId: id });
+          } catch {
+            return json(503, { error: "Unable to revoke Super Admin sessions." });
+          }
+        }
         const { data, error } = await admin.from("profiles").update({ is_active: p.is_active }).eq("id", id).eq("role", "super_admin").select("id,auth_email,role,is_active,created_at").single();
         if (error || !data) return json(400, { error: "Unable to update Super Admin." });
         await writeSuperAdminAudit(admin, {
@@ -406,6 +432,13 @@ serve(async (req) => {
       }
       if (typeof p.is_active !== "boolean") {
         return json(400, { error: "Invalid request" });
+      }
+      if (p.is_active === false) {
+        try {
+          await callBetterAuthAdmin({ action: "revoke_sessions", profileId: id });
+        } catch {
+          return json(503, { error: "Unable to revoke Workspace Admin sessions." });
+        }
       }
       const { data, error } = await admin.from("profiles").update({
         is_active: p.is_active,

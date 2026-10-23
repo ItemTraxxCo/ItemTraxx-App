@@ -6,7 +6,10 @@ permissions:
   pull-requests: write
 
 on:
-  pull_request:
+  # Run the trusted base-branch workflow because this job receives AI_API_KEY.
+  # The pinned reusable workflow reads PR data through the API and must not
+  # check out or execute the pull request head.
+  pull_request_target:
     types:
       - opened
       - reopened
@@ -16,9 +19,9 @@ on:
 jobs:
   risk-review:
     if: ${{ !github.event.pull_request.draft && github.actor != 'dependabot[bot]' }}
-    uses: ItemTraxxCo/devops/.github/workflows/reusable-pr-risk-review.yml@fc9f2c08e50965b0a5fa2db9b57ff367da75f699
+    uses: ItemTraxxCo/devops/.github/workflows/reusable-pr-risk-review.yml@d9db3f50310e640874802de9faef9ff3dbd7d545
     with:
       pr_number: ${{ format('{0}', github.event.pull_request.number) }}
-      hub_ref: fc9f2c08e50965b0a5fa2db9b57ff367da75f699
+      hub_ref: d9db3f50310e640874802de9faef9ff3dbd7d545
     secrets:
       AI_API_KEY: ${{ secrets.AI_API_KEY }}

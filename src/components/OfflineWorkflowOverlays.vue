@@ -1,16 +1,20 @@
 <template>
+  <div v-if="refreshError" class="toast toast-persist" role="alert" aria-live="assertive">
+    <div class="toast-title">Offline status unavailable</div>
+    <div class="toast-body">{{ refreshError }}</div>
+  </div>
   <div v-if="warningHours" class="version-update-fullscreen offline-warning-overlay" role="alertdialog" aria-modal="true" aria-live="assertive">
     <div class="version-update-card offline-warning-card">
       <p class="version-update-eyebrow">Offline for {{ warningHours }}+ hours</p>
       <h2>Still working offline</h2>
       <p>ItemTraxx has not connected to its servers for over {{ warningHours }} hours. You can continue using this device's downloaded offline pack.</p>
       <ul>
-        <li>Item availability may be out of date if another device is also offline.</li>
-        <li>Transactions are pending until they sync successfully.</li>
+        <li>Item availability may be out of date or incorrect if another device or account with access to the same inventory checks items in or out while this device is offline.</li>
+        <li>Transactions are pending on your device until they sync to ItemTraxx servers successfully.</li>
         <li>Do not log out or clear browser data until pending transactions have synced to ItemTraxx servers.</li>
         <li>If you refresh or close this tab, you may need to reconnect before your signed-in session can be restored.</li>
       </ul>
-      <p v-if="warningError" class="error">{{ warningError }}</p>
+      <p v-if="warningError" class="error" v-app-toast-error>{{ warningError }}</p>
       <div class="offline-overlay-actions">
         <button type="button" class="button-primary" @click="continueOffline">Continue offline</button>
         <button type="button" class="button-secondary" :disabled="retrying" @click="tryReconnect">
@@ -30,8 +34,12 @@
           <button type="button" class="offline-review-row" :aria-expanded="expandedId === entry.id" @click="expandedId = expandedId === entry.id ? null : entry.id">
             <span class="offline-review-chevron" aria-hidden="true">›</span>
             <span>
-              <strong>{{ entry.items[0]?.intent === "checkout" ? "Checkout" : "Return" }} · {{ entry.items[0]?.borrower_username || entry.items[0]?.borrower_display_id || "Quick Return" }} · {{ entry.items.length }} item{{ entry.items.length === 1 ? "" : "s" }}</strong>
-              <small>Needs review — {{ entry.last_error || "server state changed" }}</small>
+              <strong>
+                {{ entry.items[0]?.intent === "checkout" ? "Checkout" : "Return" }} ·
+                <span data-session-replay-mask>{{ entry.items[0]?.borrower_username || entry.items[0]?.borrower_display_id || "Quick Return" }}</span>
+                · {{ entry.items.length }} item{{ entry.items.length === 1 ? "" : "s" }}
+              </strong>
+              <small v-app-toast-error="{ title: 'Offline sync needs review' }">Needs review — {{ entry.last_error || "server state changed" }}</small>
             </span>
           </button>
           <div v-if="expandedId === entry.id" class="offline-review-detail">
@@ -45,7 +53,7 @@
               >
                 <span>Your offline transaction</span>
                 <strong>{{ offlineTransactionLabel(entry) }}</strong>
-                <small>Borrower: {{ offlineBorrowerLabel(entry) }}</small>
+                <small>Borrower: <span data-session-replay-mask>{{ offlineBorrowerLabel(entry) }}</span></small>
                 <small>Recorded: {{ formatTime(entry.created_at) }}</small>
               </button>
               <button
@@ -56,13 +64,18 @@
                 @click="selectResolution(entry.id, 'keep_server')"
               >
                 <span>Current server state</span>
-                <strong>{{ serverStateLabel(entry.items[0]?.server_state) }}</strong>
-                <small>Borrower: {{ serverBorrowerLabel(entry.items[0]?.server_state) }}</small>
-                <small>Tenant account: {{ serverTenantAccountLabel(entry.items[0]?.server_state) }}</small>
+                <strong>
+                  {{ serverStateLabel(entry.items[0]?.server_state) }}
+                  <template v-if="serverBorrowerValue(entry.items[0]?.server_state)">
+                    to <span data-session-replay-mask>{{ serverBorrowerValue(entry.items[0]?.server_state) }}</span>
+                  </template>
+                </strong>
+                <small>Borrower: <span data-session-replay-mask>{{ serverBorrowerLabel(entry.items[0]?.server_state) }}</span></small>
+                <small>Tenant account: <span data-session-replay-mask>{{ serverTenantAccountLabel(entry.items[0]?.server_state) }}</span></small>
                 <small>Server update: {{ serverStateTimeLabel(entry.items[0]?.server_state) }}</small>
               </button>
             </div>
-            <p v-if="entryError[entry.id]" class="error">{{ entryError[entry.id] }}</p>
+            <p v-if="entryError[entry.id]" class="error" v-app-toast-error="{ title: 'Unable to resolve transaction' }">{{ entryError[entry.id] }}</p>
             <div class="offline-overlay-actions">
               <button
                 type="button"
@@ -93,7 +106,7 @@
               <small>Legacy record requires manual review{{ item.created_at ? ` · Recorded ${formatTime(item.created_at)}` : "" }}</small>
             </span>
           </div>
-          <p v-if="legacyEntryError[item.id]" class="error">{{ legacyEntryError[item.id] }}</p>
+          <p v-if="legacyEntryError[item.id]" class="error" v-app-toast-error="{ title: 'Unable to update transaction' }">{{ legacyEntryError[item.id] }}</p>
           <div class="offline-overlay-actions offline-legacy-review-actions">
             <button
               type="button"
@@ -143,6 +156,7 @@ const props = defineProps<{ enabled: boolean }>();
 
 const warningHours = ref<3 | 8 | null>(null);
 const warningError = ref("");
+const refreshError = ref("");
 const retrying = ref(false);
 const reviewEntries = ref<OfflineLedgerEntry[]>([]);
 const expandedId = ref<string | null>(null);
@@ -160,7 +174,7 @@ const legacyReviewEnabled = computed(() =>
   props.enabled &&
   auth.isAuthenticated &&
   !!auth.workspaceContextId &&
-  (auth.role === "tenant_account" || auth.role === "workspace_admin"),
+  (auth.role === "tenant_account" || auth.role === "workspace_admin" || auth.role === "individual_account"),
 );
 
 const authScopeKey = () => {
@@ -187,6 +201,7 @@ const refresh = async () => {
     listOfflineReviewEntries(),
     legacyReviewEnabled.value ? listOfflineQueueReviewItems() : Promise.resolve([]),
   ]);
+  refreshError.value = "";
   if (scopeAtStart !== authScopeKey()) {
     reviewEntries.value = [];
     legacyReviewItems.value = [];
@@ -196,6 +211,14 @@ const refresh = async () => {
   reviewEntries.value = modernEntries;
   legacyReviewItems.value = legacyEntries;
   if (!expandedId.value && reviewEntries.value[0]) expandedId.value = reviewEntries.value[0].id;
+};
+
+const refreshInBackground = async () => {
+  try {
+    await refresh();
+  } catch (error) {
+    refreshError.value = toUserFacingErrorMessage(error, "Unable to refresh offline checkout status.");
+  }
 };
 
 const continueOffline = () => {
@@ -208,7 +231,7 @@ const tryReconnect = async () => {
   warningError.value = "";
   try {
     const result = await syncOfflineCheckoutLedger();
-    if (result.failed > 0) throw new Error("ItemTraxx servers are still unreachable. Your pending transactions remain safely stored.");
+    if (result.failed > 0) throw new Error("ItemTraxx servers are still unreachable. Your pending transactions remain safely stored on your device.");
     await refresh();
   } catch (error) {
     warningError.value = toUserFacingErrorMessage(error, "ItemTraxx servers are still unreachable.");
@@ -254,7 +277,15 @@ const discardLegacy = async (item: OfflineQueueReviewItem, startNewTransaction: 
   try {
     await discardOfflineQueueReviewItem(item.id);
     await refresh();
-    if (startNewTransaction) await router.push("/checkout");
+    if (startNewTransaction) {
+      await router.push(
+        auth.role === "workspace_admin"
+          ? "/admin/return"
+          : auth.role === "individual_account"
+          ? "/account/return"
+          : "/checkout",
+      );
+    }
   } catch (error) {
     legacyEntryError.value = {
       ...legacyEntryError.value,
@@ -280,17 +311,20 @@ const offlineBorrowerLabel = (entry: OfflineLedgerEntry) =>
 const serverStateLabel = (value: unknown) => {
   if (!value || typeof value !== "object") return "Current state could not be summarized.";
   const state = value as { status?: string; borrower_id?: string | null; checked_out_by?: string | null };
-  if (state.status === "checked_out") return `Checked out${state.borrower_id || state.checked_out_by ? ` to ${state.borrower_id || state.checked_out_by}` : ""}`;
+  if (state.status === "checked_out") return "Checked out";
   return state.status ? state.status.replaceAll("_", " ") : "Current state available from the server.";
 };
 
 const serverStateDetails = (value: unknown) =>
   value && typeof value === "object" ? value as Record<string, unknown> : {};
 
-const serverBorrowerLabel = (value: unknown) => {
+const serverBorrowerValue = (value: unknown) => {
   const state = serverStateDetails(value);
-  return String(state.borrower_username || state.borrower_id || state.checked_out_by || "Not available");
+  const borrowerValue = state.borrower_username || state.borrower_id || state.checked_out_by;
+  return typeof borrowerValue === "string" && borrowerValue ? borrowerValue : null;
 };
+
+const serverBorrowerLabel = (value: unknown) => serverBorrowerValue(value) || "Not available";
 
 const serverTenantAccountLabel = (value: unknown) => {
   const state = serverStateDetails(value);
@@ -302,18 +336,18 @@ const serverStateTimeLabel = (value: unknown) => {
   return formatTime(typeof state.action_time === "string" ? state.action_time : typeof state.updated_at === "string" ? state.updated_at : null);
 };
 
-const handleChange = () => void refresh();
-watch(() => props.enabled, () => void refresh());
+const handleChange = () => void refreshInBackground();
+watch(() => props.enabled, () => void refreshInBackground());
 watch(authScopeKey, (next, previous) => {
   if (next === previous) return;
   reviewEntries.value = [];
   legacyReviewItems.value = [];
   expandedId.value = null;
-  void refresh();
+  void refreshInBackground();
 });
 onMounted(() => {
-  void refresh();
-  pollTimer = window.setInterval(() => void refresh(), 30_000);
+  void refreshInBackground();
+  pollTimer = window.setInterval(() => void refreshInBackground(), 30_000);
   window.addEventListener("online", handleChange);
   window.addEventListener("itemtraxx:offline-queue-changed", handleChange);
   window.addEventListener("itemtraxx:offline-workflow-changed", handleChange);
@@ -333,7 +367,7 @@ onScopeDispose(() => {
 .offline-warning-card ul { margin: 0.85rem 0 0; padding-left: 1.2rem; color: var(--muted); line-height: 1.5; }
 .offline-warning-card li + li { margin-top: 0.35rem; }
 .offline-overlay-actions { display: flex; flex-wrap: wrap; gap: 0.65rem; margin-top: 1rem; }
-.offline-overlay-actions button { flex: 1 1 12rem; min-height: 44px; }
+.offline-overlay-actions button { flex: 1 1 12rem; min-height: 40px; }
 .offline-review-card { width: min(760px, 100%); max-height: min(760px, calc(100vh - 2rem)); overflow: auto; }
 .offline-review-list { display: grid; gap: 0.65rem; margin-top: 1rem; }
 .offline-review-entry { overflow: hidden; border: 1px solid var(--border); border-radius: 14px; background: var(--surface); }

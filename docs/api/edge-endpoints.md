@@ -120,6 +120,54 @@ Super-admin workspace creation and lifecycle actions.
 - `search` (required): string
 - `status` (required): string
 
+#### `list_individual_accounts`
+
+- `search` (required): string
+- `status` (required): string
+
+#### `create_individual_account`
+
+- `name` (required): string
+- `auth_email` (required): string
+- `password`: string
+- `plan_code`: string
+- `max_items`: any
+- `max_borrowers`: any
+- `checkout_due_hours`: integer
+- `feature_flags`: object
+- `contact_name`: string|null
+- `support_email`: any
+- `billing_email`: any
+- `billing_status`: any
+- `renewal_date`: string|null
+- `invoice_reference`: string|null
+
+#### `update_individual_account`
+
+- `id` (required): string
+- `name` (required): string
+- `auth_email` (required): string
+- `plan_code`: string
+- `max_items`: any
+- `max_borrowers`: any
+- `checkout_due_hours`: integer
+- `feature_flags`: object
+- `contact_name`: string|null
+- `support_email`: any
+- `billing_email`: any
+- `billing_status`: any
+- `renewal_date`: string|null
+- `invoice_reference`: string|null
+
+#### `set_individual_account_status`
+
+- `id` (required): string
+- `status` (required): string
+
+#### `send_individual_account_reset`
+
+- `id` (required): string
+
 #### `create_workspace`
 
 - `name` (required): string
@@ -154,7 +202,7 @@ Super-admin workspace creation and lifecycle actions.
 ### Response schema
 
 - Schema: `superWorkspaceResponses`
-- Top-level keys: `list_workspaces`, `create_workspace`, `update_workspace`, `set_workspace_status`, `send_primary_admin_reset`, `set_primary_admin`
+- Top-level keys: `list_workspaces`, `list_individual_accounts`, `create_individual_account`, `update_individual_account`, `set_individual_account_status`, `send_individual_account_reset`, `create_workspace`, `update_workspace`, `set_workspace_status`, `send_primary_admin_reset`, `set_primary_admin`
 
 ## `POST /functions/v1/super-admin-mutate`
 
@@ -414,11 +462,6 @@ Primary Workspace Admin-only peer management for the current workspace.
 - `id` (required): string
 - `is_active` (required): boolean
 
-#### `update_admin_email`
-
-- `id` (required): string
-- `auth_email` (required): string
-
 #### `send_workspace_admin_reset`
 
 - `auth_email` (required): string
@@ -447,15 +490,6 @@ Primary Workspace Admin-only peer management for the current workspace.
 - `id` (required): string
 - `is_active` (required): boolean
 
-#### `update_tenant_account_email`
-
-- `device_id` (required): string
-- `device_label` (required): string
-- `login_method`: string
-- `login_location`: string
-- `id` (required): string
-- `auth_email` (required): string
-
 #### `remove_tenant_account`
 
 - `device_id` (required): string
@@ -475,7 +509,7 @@ Primary Workspace Admin-only peer management for the current workspace.
 ### Response schema
 
 - Schema: `workspaceAdminManageResponses`
-- Top-level keys: `list_workspace_admins`, `create_workspace_admin`, `set_admin_status`, `update_admin_email`, `send_workspace_admin_reset`, `list_tenant_accounts`, `create_tenant_account`, `set_tenant_account_status`, `update_tenant_account_email`, `remove_tenant_account`, `send_tenant_account_reset`
+- Top-level keys: `list_workspace_admins`, `create_workspace_admin`, `set_admin_status`, `send_workspace_admin_reset`, `list_tenant_accounts`, `create_tenant_account`, `set_tenant_account_status`, `remove_tenant_account`, `send_tenant_account_reset`
 
 ## `POST /functions/v1/contact-sales-submit`
 

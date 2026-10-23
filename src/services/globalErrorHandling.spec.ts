@@ -61,7 +61,7 @@ describe("installGlobalErrorHandling", () => {
       const app = buildApp();
       installGlobalErrorHandling(app);
 
-      const nonReportable = new AppError("MISSING_CONTEXT", "context missing", { reportToSentry: false });
+      const nonReportable = new AppError("MISSING_CONTEXT", "context missing", { reportToErrorTracking: false });
       app.config.errorHandler?.(nonReportable, null, "setup");
 
       expect(warnSpy).toHaveBeenCalled();
@@ -123,7 +123,7 @@ describe("installGlobalErrorHandling", () => {
       const { getHandler, restore } = captureUnhandledRejectionListener();
       installGlobalErrorHandling(buildApp());
       const preventDefault = vi.fn();
-      const nonReportable = new AppError("MISSING_CONTEXT", "context missing", { reportToSentry: false });
+      const nonReportable = new AppError("MISSING_CONTEXT", "context missing", { reportToErrorTracking: false });
 
       getHandler()?.({ reason: nonReportable, preventDefault });
 

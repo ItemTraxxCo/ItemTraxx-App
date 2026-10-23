@@ -23,6 +23,16 @@
   },
   "devDependencies": {
     "typescript": "~6.0.3",
-    "wrangler": "^4.124.0"
+    "wrangler": "^4.143.1"
+  },
+  "overrides": {
+    "miniflare": {
+      "sharp": "0.35.5"
+    },
+    "miniflare@>=5.20260926.1-alpha": {
+      "sharp": "0.35.5"
+    },
+    "node-rsa": "2.0.0",
+    "zod": "4.6.7"
   }
 }

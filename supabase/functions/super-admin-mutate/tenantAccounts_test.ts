@@ -22,9 +22,15 @@ const makeRepository = () => {
   const calls: Array<{ name: string; value?: unknown }> = [];
   const repository: TenantAccountRepository = {
     list: async () => [account],
-    create: async (workspaceId, email) => ({ ...account, workspace_id: workspaceId, auth_email: email }),
+    create: async (workspaceId, email, id) => {
+      calls.push({ name: "create", value: { workspaceId, email, id } });
+      return { ...account, id, workspace_id: workspaceId, auth_email: email };
+    },
     findActive: async () => account,
-    setStatus: async (_id, isActive) => ({ ...account, is_active: isActive }),
+    setStatus: async (id, isActive) => {
+      calls.push({ name: "setStatus", value: { id, isActive } });
+      return { ...account, is_active: isActive };
+    },
     updateEmail: async (id, email) => {
       calls.push({ name: "updateEmail", value: { id, email } });
       return { ...account, auth_email: email };
@@ -84,12 +90,43 @@ Deno.test("Super Admin Tenant Account removal soft-deletes and revokes every act
     repository,
   });
   assertEquals(result, { handled: true, status: 200, data: { success: true } });
-  assertEquals(calls.map((entry) => entry.name), ["softDelete", "revokeSessions", "audit"]);
-  assertEquals(calls[1].value, {
+  assertEquals(calls.map((entry) => entry.name), [
+    "audit",
+    "setStatus",
+    "revokeSessions",
+    "softDelete",
+  ]);
+  assertEquals(calls[1].value, { id: account.id, isActive: false });
+  assertEquals(calls[2].value, {
     id: account.id,
     actorId,
     at: "2026-07-25T01:00:00.000Z",
   });
+  assertEquals(calls[3].value, { id: account.id, at: "2026-07-25T01:00:00.000Z" });
+});
+
+Deno.test("failed session revocation prevents Super Admin Tenant Account removal", async () => {
+  const { repository, calls } = makeRepository();
+  repository.revokeSessions = async () => {
+    calls.push({ name: "revokeSessionsFailed" });
+    throw new Error("Unable to revoke Tenant Account sessions.");
+  };
+
+  await assertRejects(
+    () => handleTenantAccountAction("remove_tenant_account", { id: account.id }, {
+      actorId: "30000000-0000-4000-8000-000000000001",
+      now: () => "2026-07-25T01:00:00.000Z",
+      repository,
+    }),
+    Error,
+    "Unable to revoke Tenant Account sessions.",
+  );
+
+  assertEquals(calls.map((entry) => entry.name), [
+    "audit",
+    "setStatus",
+    "revokeSessionsFailed",
+  ]);
 });
 
 Deno.test("non-Tenant-Account actions remain available to the existing Super Admin dispatcher", async () => {
@@ -113,13 +150,29 @@ Deno.test("Super Admin can create a Tenant Account and records an audit entry", 
     repository,
   });
 
-  assertEquals(result, { handled: true, status: 200, data: account });
+  assertEquals(result.handled, true);
+  if (!result.handled) throw new Error("Tenant Account creation was not handled.");
+  assertEquals(result.status, 200);
+  const created = result.data as typeof account;
+  assertEquals(created.workspace_id, account.workspace_id);
+  assertEquals(created.auth_email, account.auth_email);
   assertEquals(calls, [{
     name: "audit",
     value: {
       action: "create_tenant_account",
-      id: account.id,
-      metadata: { workspace_id: account.workspace_id, auth_email: account.auth_email },
+      id: created.id,
+      metadata: {
+        workspace_id: account.workspace_id,
+        auth_email: account.auth_email,
+        event_phase: "requested",
+      },
+    },
+  }, {
+    name: "create",
+    value: {
+      workspaceId: account.workspace_id,
+      email: account.auth_email,
+      id: created.id,
     },
   }]);
 });
@@ -150,10 +203,64 @@ Deno.test("Super Admin can toggle a Tenant Account's active status", async () =>
   });
 
   assertEquals(result, { handled: true, status: 200, data: { ...account, is_active: false } });
-  assertEquals(calls, [{
-    name: "audit",
-    value: { action: "set_tenant_account_status", id: account.id, metadata: { is_active: false } },
-  }]);
+  assertEquals(calls, [
+    {
+      name: "audit",
+      value: {
+        action: "set_tenant_account_status",
+        id: account.id,
+        metadata: { is_active: false, event_phase: "requested" },
+      },
+    },
+    { name: "setStatus", value: { id: account.id, isActive: false } },
+    {
+      name: "revokeSessions",
+      value: {
+        id: account.id,
+        actorId: "30000000-0000-4000-8000-000000000001",
+        at: "2026-07-25T01:00:00.000Z",
+      },
+    },
+  ]);
+});
+
+Deno.test("restoring a Tenant Account revokes sessions before reactivation", async () => {
+  const { repository, calls } = makeRepository();
+  const result = await handleTenantAccountAction("set_tenant_account_status", {
+    id: account.id,
+    is_active: true,
+  }, {
+    actorId: "30000000-0000-4000-8000-000000000001",
+    now: () => "2026-07-25T01:00:00.000Z",
+    repository,
+  });
+
+  assertEquals(result, { handled: true, status: 200, data: account });
+  assertEquals(calls.map((entry) => entry.name), ["audit", "revokeSessions", "setStatus"]);
+  assertEquals(calls[2].value, { id: account.id, isActive: true });
+});
+
+Deno.test("failed session revocation leaves restore disabled", async () => {
+  const { repository, calls } = makeRepository();
+  repository.revokeSessions = async () => {
+    calls.push({ name: "revokeSessionsFailed" });
+    throw new Error("Unable to revoke Tenant Account sessions.");
+  };
+
+  await assertRejects(
+    () => handleTenantAccountAction("set_tenant_account_status", {
+      id: account.id,
+      is_active: true,
+    }, {
+      actorId: "30000000-0000-4000-8000-000000000001",
+      now: () => "2026-07-25T01:00:00.000Z",
+      repository,
+    }),
+    Error,
+    "Unable to revoke Tenant Account sessions.",
+  );
+
+  assertEquals(calls.map((entry) => entry.name), ["audit", "revokeSessionsFailed"]);
 });
 
 Deno.test("Setting a Tenant Account's status requires an explicit boolean", async () => {
@@ -183,15 +290,15 @@ Deno.test("Super Admin can change a Tenant Account's email", async () => {
 
   assertEquals(result, { handled: true, status: 200, data: { ...account, auth_email: "new-desk@example.test" } });
   assertEquals(calls, [
-    { name: "updateEmail", value: { id: account.id, email: "new-desk@example.test" } },
     {
       name: "audit",
       value: {
         action: "update_tenant_account_email",
         id: account.id,
-        metadata: { auth_email: "new-desk@example.test" },
+        metadata: { auth_email: "new-desk@example.test", event_phase: "requested" },
       },
     },
+    { name: "updateEmail", value: { id: account.id, email: "new-desk@example.test" } },
   ]);
 });
 
@@ -207,7 +314,54 @@ Deno.test("Super Admin can trigger a Tenant Account password reset email", async
 
   assertEquals(result, { handled: true, status: 200, data: { success: true } });
   assertEquals(calls, [
+    {
+      name: "audit",
+      value: {
+        action: "send_tenant_account_reset",
+        id: account.id,
+        metadata: { event_phase: "requested" },
+      },
+    },
     { name: "sendReset", value: account.auth_email },
-    { name: "audit", value: { action: "send_tenant_account_reset", id: account.id, metadata: {} } },
   ]);
+});
+
+Deno.test("Tenant Account mutations do not proceed when audit logging fails", async () => {
+  const cases = [
+    {
+      action: "create_tenant_account",
+      payload: {
+        workspace_id: account.workspace_id,
+        auth_email: account.auth_email,
+      },
+    },
+    {
+      action: "set_tenant_account_status",
+      payload: { id: account.id, is_active: false },
+    },
+    {
+      action: "update_tenant_account_email",
+      payload: { id: account.id, auth_email: "new-desk@example.test" },
+    },
+    { action: "send_tenant_account_reset", payload: { id: account.id } },
+    { action: "remove_tenant_account", payload: { id: account.id } },
+  ];
+
+  for (const { action, payload } of cases) {
+    const { repository, calls } = makeRepository();
+    repository.audit = async () => {
+      throw new Error("audit unavailable");
+    };
+
+    await assertRejects(
+      () => handleTenantAccountAction(action, payload, {
+        actorId: "30000000-0000-4000-8000-000000000001",
+        now: () => "2026-07-25T01:00:00.000Z",
+        repository,
+      }),
+      Error,
+      "audit unavailable",
+    );
+    assertEquals(calls, [], `${action} must not mutate before audit succeeds`);
+  }
 });

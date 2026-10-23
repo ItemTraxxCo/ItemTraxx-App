@@ -17,7 +17,7 @@ test.describe("Suspended workspace behavior", () => {
   test("suspended Workspace Admin write receives blocked response", async ({ page }) => {
     await page.goto("/");
     await setWorkspaceAdminSession(page);
-    await navigateApp(page, "/admin/settings");
+    await navigateApp(page, "/settings/organization");
 
     const responsePromise = page.waitForResponse((response) =>
       response.url().includes("/functions/admin-ops") &&

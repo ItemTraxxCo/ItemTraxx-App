@@ -152,12 +152,22 @@ test.describe("workspace model role surfaces", () => {
     await page.getByPlaceholder("Item name").fill("Explicit choice item");
     await page.getByPlaceholder("Barcode", { exact: true }).fill("EXPLICIT-1");
     await page.getByRole("button", { name: "Add item" }).click();
-    await expect(page.getByText("Choose All Tenant Accounts or select at least one specific account.")).toBeVisible();
+    await expect(page.getByRole("alert").getByText("Choose All Tenant Accounts or select at least one specific account.", { exact: true })).toBeVisible();
   });
 
   test("Super Admin can manage Tenant Accounts across workspaces", async ({ page }) => {
     const actions: string[] = [];
+    const superOpsActions: string[] = [];
     await mockSuperWorkspaceMutate(page);
+    await page.route(/\/functions(?:\/v1)?\/super-ops(?:\?.*)?$/, async (route) => {
+      const body = route.request().postDataJSON() as { action?: string };
+      superOpsActions.push(body.action ?? "");
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ data: body.action === "verify_password" ? { verified: true } : {} }),
+      });
+    });
     await page.route(/\/functions(?:\/v1)?\/super-admin-mutate(?:\?.*)?$/, async (route) => {
       const body = route.request().postDataJSON() as { action?: string; payload?: Record<string, unknown> };
       actions.push(body.action ?? "");
@@ -200,6 +210,12 @@ test.describe("workspace model role surfaces", () => {
     await emailInput.fill("new-desk@demo.test");
     await expect(saveEmail).toBeEnabled();
     await page.getByRole("button", { name: "Suspend" }).click();
+    const stepUpModal = page.locator(".stepup-modal");
+    await expect(stepUpModal).toBeVisible();
+    await stepUpModal.getByPlaceholder("Type CONFIRM").fill("CONFIRM");
+    await stepUpModal.getByPlaceholder("Enter super admin password").fill("current-password");
+    await stepUpModal.getByRole("button", { name: "Suspend", exact: true }).click();
+    await expect.poll(() => superOpsActions).toContain("verify_password");
     await expect.poll(() => actions).toContain("set_tenant_account_status");
   });
 });

@@ -2,7 +2,7 @@
   <div class="page admin-shell">
     <div class="admin-hero">
       <div class="page-nav-left">
-        <RouterLink class="button-link" to="/admin">Return to admin panel</RouterLink>
+        <RouterLink class="button-link" :to="managerRoot">Back</RouterLink>
       </div>
       <h1>Borrower Management</h1>
       <p class="admin-hero-copy">Add borrowers, review details, and manage archived records.</p>
@@ -45,6 +45,7 @@
           />
         </label>
         <TenantAccessPicker
+          v-if="!isIndividualAccount"
           v-model:access-mode="accessMode"
           v-model:selected-ids="selectedProfileIds"
           :accounts="tenantAccounts"
@@ -54,13 +55,13 @@
           <button type="submit" class="button-primary" :disabled="isSaving">Add borrower</button>
         </div>
       </form>
-      <p v-if="error" class="error">{{ error }}</p>
-      <p v-if="success" class="success">{{ success }}</p>
+      <p v-if="error" class="error" v-app-toast-error="{ suppressMessage: toastMessage }">{{ error }}</p>
+      <p v-if="success" class="success" v-app-toast-message>{{ success }}</p>
     </div>
 
     <div v-if="toastMessage" class="toast">
       <div class="toast-title">{{ toastTitle }}</div>
-      <div class="toast-body">{{ toastMessage }}</div>
+      <div class="toast-body" data-session-replay-mask>{{ toastMessage }}</div>
       <div v-if="toastActionLabel" class="toast-actions">
         <button type="button" class="toast-action-button" @click="runToastAction">
           {{ toastActionLabel }}
@@ -85,7 +86,7 @@
 
       <div v-if="bulkMode && selectedBorrowerIds.size > 0" class="bulk-action-bar">
         <span>{{ selectedBorrowerIds.size }} selected</span>
-        <button type="button" @click="openBulkAccessModal">Change tenant account access</button>
+        <button v-if="!isIndividualAccount" type="button" @click="openBulkAccessModal">Change tenant account access</button>
         <button type="button" :disabled="isSaving" @click="applyBulkArchive">Archive selected</button>
       </div>
       <div class="form-grid-2">
@@ -137,7 +138,7 @@
                 </th>
                 <th>Username</th>
                 <th>Borrower ID</th>
-                <th>Tenant Accounts</th>
+                <th v-if="!isIndividualAccount">Tenant Accounts</th>
                 <th>Details</th>
               </tr>
             </thead>
@@ -151,10 +152,10 @@
                     :aria-label="`Select ${item.username}`"
                   />
                 </td>
-                <td>{{ item.username }}</td>
-                <td>{{ item.borrower_id }}</td>
-                <td>
-                  <span class="scoped-accounts-cell" :title="scopedAccountsTitle(item)">
+                <td data-session-replay-mask>{{ item.username }}</td>
+                <td data-session-replay-mask>{{ item.borrower_id }}</td>
+                <td v-if="!isIndividualAccount">
+                  <span class="scoped-accounts-cell" data-session-replay-mask :title="scopedAccountsTitle(item)">
                     {{ scopedAccountsLabel(item) }}
                   </span>
                 </td>
@@ -204,8 +205,8 @@
             </thead>
             <tbody>
               <tr v-for="item in filteredArchivedBorrowers" :key="item.id">
-                <td>{{ item.username }}</td>
-                <td>{{ item.borrower_id }}</td>
+                <td data-session-replay-mask>{{ item.username }}</td>
+                <td data-session-replay-mask>{{ item.borrower_id }}</td>
                 <td>
                   <button type="button" class="link" :disabled="isSaving" @click="handleRestore(item)">
                     Restore
@@ -241,7 +242,7 @@
       <div class="form-actions">
         <button
           type="button"
-          class="button-primary"
+          class="button-primary bulk-import-button"
           :disabled="isSaving || bulkRows.length === 0"
           @click="runBulkImport"
         >
@@ -254,7 +255,7 @@
       </p>
     </div>
 
-    <div v-if="showBulkAccessModal" class="modal-backdrop">
+    <div v-if="!isIndividualAccount && showBulkAccessModal" class="modal-backdrop">
       <div class="modal">
         <h2>Change tenant account access</h2>
         <p class="admin-section-copy">Applies to {{ selectedBorrowerIds.size }} selected borrower(s).</p>
@@ -276,11 +277,11 @@
       <div class="modal">
         <h2>Borrower details</h2>
         <p class="muted">View username, borrower ID, and checkout history.</p>
-        <h3>{{ selected?.username }}</h3>
-        <p class="muted">Borrower ID: {{ selected?.borrower_id }}</p>
-        <p v-if="selected" class="muted">
+        <h3 data-session-replay-mask>{{ selected?.username }}</h3>
+        <p class="muted">Borrower ID: <span data-session-replay-mask>{{ selected?.borrower_id }}</span></p>
+        <p v-if="selected && !isIndividualAccount" class="muted">
           Tenant Accounts:
-          <span class="scoped-accounts-cell" :title="scopedAccountsTitle(selected)">{{ scopedAccountsLabel(selected) }}</span>
+          <span class="scoped-accounts-cell" data-session-replay-mask :title="scopedAccountsTitle(selected)">{{ scopedAccountsLabel(selected) }}</span>
         </p>
 
         <SkeletonLoader v-if="detailsLoading" variant="lines" :rows="3" label="Loading borrower details" />
@@ -346,15 +347,17 @@ import {
   type BorrowerItem,
 } from "../../../services/borrowerService";
 import { fetchWorkspaceSettings } from "../../../services/adminOpsService";
-import { logAdminAction } from "../../../services/auditLogService";
 import { exportRowsToCsv, exportRowsToPdf } from "../../../services/exportService";
 import { generateBorrowerIdentity } from "../../../utils/borrowerIdentity";
 import { listTenantAccounts } from "../../../services/workspaceAdminManageService";
+import { useManagerContext } from "../../../composables/useManagerContext";
+
+const { isIndividualAccount, managerRoot } = useManagerContext();
 
 const borrowers = ref<BorrowerItem[]>([]);
 const archivedBorrowers = ref<BorrowerItem[]>([]);
-const isLoading = ref(false);
-const isLoadingArchived = ref(false);
+const isLoading = ref(true);
+const isLoadingArchived = ref(true);
 const isSaving = ref(false);
 const error = ref("");
 const success = ref("");
@@ -369,7 +372,7 @@ const toastAction = ref<(() => Promise<void>) | null>(null);
 
 const usernamePreview = ref("");
 const borrowerIdPreview = ref("");
-const accessMode = ref<"" | "all" | "restricted">("");
+const accessMode = ref<"" | "all" | "restricted">(isIndividualAccount.value ? "all" : "");
 const selectedProfileIds = ref<string[]>([]);
 const tenantAccounts = ref<Array<{id:string;auth_email:string}>>([]);
 const searchQuery = ref("");
@@ -690,20 +693,14 @@ const handleCreate = async () => {
       workspace_id: auth.workspaceContextId,
       username: usernamePreview.value,
       borrower_id: borrowerIdPreview.value,
-      access_mode: accessMode.value,
-      profile_ids: selectedProfileIds.value,
-    });
-    await logAdminAction({
-      action_type: "borrower_create",
-      entity_type: "borrower",
-      entity_id: created.id,
-      metadata: { borrower_id: created.borrower_id },
+      access_mode: isIndividualAccount.value ? "all" : accessMode.value,
+      profile_ids: isIndividualAccount.value ? [] : selectedProfileIds.value,
     });
     borrowers.value = [created, ...borrowers.value];
     usernamePreview.value = created.username;
     borrowerIdPreview.value = created.borrower_id;
     regenerateIdentity();
-    accessMode.value = "";
+    accessMode.value = isIndividualAccount.value ? "all" : "";
     selectedProfileIds.value = [];
     success.value = "Borrower added.";
   } catch (err) {
@@ -731,11 +728,17 @@ onMounted(() => {
       };
     }
     await loadBorrowers();
-    const accounts = await listTenantAccounts();
-    tenantAccounts.value = accounts
-      .filter((account) => account.is_active)
-      .map(({ id, auth_email }) => ({ id, auth_email }));
-    tenantAccounts.value.sort((left, right) => left.auth_email.localeCompare(right.auth_email));
+    if (!isIndividualAccount.value) {
+      try {
+        const accounts = await listTenantAccounts();
+        tenantAccounts.value = accounts
+          .filter((account) => account.is_active)
+          .map(({ id, auth_email }) => ({ id, auth_email }));
+        tenantAccounts.value.sort((left, right) => left.auth_email.localeCompare(right.auth_email));
+      } catch {
+        tenantAccounts.value = [];
+      }
+    }
   })();
 });
 
@@ -782,12 +785,6 @@ const removeBorrower = async (item: BorrowerItem) => {
   isSaving.value = true;
   try {
     await deleteBorrower(item.id);
-    await logAdminAction({
-      action_type: "borrower_archive",
-      entity_type: "borrower",
-      entity_id: item.id,
-      metadata: { borrower_id: item.borrower_id },
-    });
     borrowers.value = borrowers.value.filter((row) => row.id !== item.id);
     archivedBorrowers.value = [item, ...archivedBorrowers.value];
     success.value = "Borrower archived.";
@@ -820,12 +817,6 @@ const handleRestore = async (item: BorrowerItem) => {
   isSaving.value = true;
   try {
     const restored = await restoreBorrower(item.id);
-    await logAdminAction({
-      action_type: "borrower_restore",
-      entity_type: "borrower",
-      entity_id: item.id,
-      metadata: { borrower_id: item.borrower_id },
-    });
     archivedBorrowers.value = archivedBorrowers.value.filter((row) => row.id !== item.id);
     borrowers.value = [restored, ...borrowers.value];
     success.value = "Borrower restored.";
@@ -894,5 +885,12 @@ onUnmounted(() => {
   border: 1px solid var(--border);
   border-radius: 10px;
   background: var(--surface-2);
+}
+
+.bulk-import-button:disabled {
+  background-color: var(--surface-3);
+  border-color: var(--border);
+  color: var(--muted);
+  cursor: not-allowed;
 }
 </style>

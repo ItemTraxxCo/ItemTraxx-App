@@ -16,9 +16,13 @@ const readMigration = (name) =>
 
 const RENAME_MIGRATION = "20260725221011_item_borrower_physical_rename.sql";
 const LEAST_PRIVILEGE_MIGRATION = "20260726120000_least_privilege_rest_surface.sql";
+const SERVER_OWNED_AUDIT_MIGRATION = "20261004060000_server_owned_admin_audit.sql";
+const SUPER_APPROVAL_SESSION_MIGRATION = "20261022150000_require_live_session_for_super_approval_reads.sql";
 
 const renameMigration = readMigration(RENAME_MIGRATION);
 const leastPrivilege = readMigration(LEAST_PRIVILEGE_MIGRATION);
+const serverOwnedAudit = readMigration(SERVER_OWNED_AUDIT_MIGRATION);
+const superApprovalSession = readMigration(SUPER_APPROVAL_SESSION_MIGRATION);
 
 const failures = [];
 const check = (condition, message) => {
@@ -116,15 +120,43 @@ for (
 }
 
 check(
-  /revoke\s+update,\s*delete\s+on\s+public\.admin_audit_logs\s+from\s+authenticated/i.test(leastPrivilege),
-  `${LEAST_PRIVILEGE_MIGRATION} must revoke update/delete on admin_audit_logs from authenticated`,
+  /revoke\s+insert,\s*update,\s*delete\s+on\s+public\.admin_audit_logs\s+from\s+anon,\s*authenticated/i.test(serverOwnedAudit),
+  `${SERVER_OWNED_AUDIT_MIGRATION} must revoke browser write privileges on admin_audit_logs`,
+);
+check(
+  /grant\s+select\s+on\s+public\.admin_audit_logs\s+to\s+authenticated/i.test(serverOwnedAudit),
+  `${SERVER_OWNED_AUDIT_MIGRATION} must preserve authenticated audit-history reads`,
+);
+check(
+  /grant\s+insert\s+on\s+public\.admin_audit_logs\s+to\s+service_role/i.test(serverOwnedAudit),
+  `${SERVER_OWNED_AUDIT_MIGRATION} must preserve trusted server audit writes`,
 );
 
-// The browser audit-log insert (src/services/auditLogService.ts) is the one
-// write that must survive. Guard against an over-broad future revoke.
+const transactionalImport = serverOwnedAudit.match(
+  /create\s+or\s+replace\s+function\s+public\.import_items_with_audit[\s\S]*?\$\$;/i,
+)?.[0] ?? "";
 check(
-  !/revoke[^;]*\binsert\b[^;]*on\s+public\.admin_audit_logs\s+from\s+authenticated/i.test(leastPrivilege),
-  `${LEAST_PRIVILEGE_MIGRATION} must not revoke INSERT on admin_audit_logs (breaks auditLogService.ts)`,
+  /language\s+plpgsql\s+security\s+definer/i.test(transactionalImport) &&
+    /set\s+search_path\s*=\s*''/i.test(transactionalImport),
+  SERVER_OWNED_AUDIT_MIGRATION + " must keep bulk imports in a locked-down database function",
+);
+for (const requiredWrite of [
+  "insert into public.items",
+  "insert into public.item_status_history",
+  "insert into public.admin_audit_logs",
+]) {
+  check(
+    transactionalImport.toLowerCase().includes(requiredWrite),
+    SERVER_OWNED_AUDIT_MIGRATION + " must transactionally perform " + requiredWrite,
+  );
+}
+check(
+  /revoke\s+all\s+on\s+function\s+public\.import_items_with_audit\(uuid,\s*uuid,\s*jsonb,\s*integer\)\s+from\s+public,\s*anon,\s*authenticated/i.test(serverOwnedAudit),
+  SERVER_OWNED_AUDIT_MIGRATION + " must keep the transactional import function unavailable to browser roles",
+);
+check(
+  /grant\s+execute\s+on\s+function\s+public\.import_items_with_audit\(uuid,\s*uuid,\s*jsonb,\s*integer\)\s+to\s+service_role/i.test(serverOwnedAudit),
+  SERVER_OWNED_AUDIT_MIGRATION + " must allow the trusted service-role importer",
 );
 
 // ---------------------------------------------------------------------------
@@ -209,6 +241,21 @@ check(
 );
 
 // ---------------------------------------------------------------------------
+// 5. Direct reads of super_approvals must reject revoked or expired sessions,
+//    even when the caller still has a fresh step-up grant.
+// ---------------------------------------------------------------------------
+const superApprovalPolicy = superApprovalSession.match(
+  /execute\s+\$policy\$([\s\S]*?)\$policy\$/i,
+)?.[1] ?? "";
+const normalizedSuperApprovalPolicy = normalizeSql(superApprovalPolicy);
+check(
+  normalizedSuperApprovalPolicy.includes(
+    "alter policy super_admin_select_approvals on public.super_approvals using ( public.current_user_role()='super_admin' and public.has_recent_privileged_step_up('super_admin') and (select private.super_admin_session_not_revoked()) )",
+  ),
+  `${SUPER_APPROVAL_SESSION_MIGRATION} must preserve role and step-up checks and require a live super-admin session for approval reads`,
+);
+
+// ---------------------------------------------------------------------------
 
 if (failures.length > 0) {
   console.error("Privileged RLS invariants failed:");
@@ -222,8 +269,9 @@ console.log(
     "- workspace member SELECT policies enforce workspace scope, active session, and soft-delete filtering",
     "- workspace-admin direct write policies and grants are removed on items, borrowers,",
     "  item_status_history, workspace_policies, and both access-grant tables",
-    "- admin_audit_logs keeps INSERT for the browser audit path and nothing else",
+    "- admin_audit_logs is read-only to authenticated clients and writable only by service_role",
     "- access-grant read paths are preserved as FOR SELECT",
     `- all ${SUPER_ADMIN_POLICIES.length} super-admin policies require step-up and a non-revoked session`,
+    "- super_approvals SELECT requires a fresh step-up and non-revoked session",
   ].join("\n"),
 );

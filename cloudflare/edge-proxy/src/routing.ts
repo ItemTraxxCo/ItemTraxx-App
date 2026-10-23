@@ -28,25 +28,90 @@ const READABLE_REST_TABLES = new Set([
   "borrower_access_grants",
   "profiles",
   "workspaces",
+  "admin_audit_logs",
 ]);
 
-// admin_audit_logs is the one relation the browser writes directly
-// (src/services/auditLogService.ts). Its INSERT policy pins actor_id to
-// auth.uid() and the row's workspace, and no UPDATE/DELETE policy exists.
-const WRITABLE_REST_TABLES = new Set(["admin_audit_logs"]);
+// PostgREST relationship embedding is expressed inside `select` and can read
+// a related table without changing the route's first table segment. Keep only
+// the exact projections used by borrower history and the workspace Item Logs
+// page so callers cannot traverse arbitrary related tables.
+const ALLOWED_REST_EMBEDS = new Map([
+  ["item_logs", new Set([
+    "action_time,item:item_id(name)",
+    "id,workspace_id,item_id,checked_out_by,action_type,action_time,performed_by,item:item_id(name,barcode),borrower:checked_out_by(username,borrower_id)",
+  ])],
+]);
+
+const hasParenthesesAfterDecoding = (value: string) => {
+  let candidate = value;
+  for (let pass = 0; pass <= MAX_RPC_PATH_DECODE_PASSES; pass += 1) {
+    if (/[()]/.test(candidate)) return true;
+    if (!/%[0-9a-f]{2}/i.test(candidate)) return false;
+    try {
+      const decoded = decodeURIComponent(candidate);
+      if (decoded === candidate) return false;
+      candidate = decoded;
+    } catch {
+      return true;
+    }
+  }
+  // A still-encoded delimiter after the bounded passes fails closed.
+  return /%[0-9a-f]{2}/i.test(candidate);
+};
+
+const hasDottedKeyAfterDecoding = (value: string) => {
+  let candidate = value;
+  for (let pass = 0; pass <= MAX_RPC_PATH_DECODE_PASSES; pass += 1) {
+    if (candidate.includes(".")) return true;
+    if (!/%[0-9a-f]{2}/i.test(candidate)) return false;
+    try {
+      const decoded = decodeURIComponent(candidate);
+      if (decoded === candidate) return false;
+      candidate = decoded;
+    } catch {
+      return true;
+    }
+  }
+  return /%[0-9a-f]{2}/i.test(candidate);
+};
+
+const isAllowedRestQuery = (table: string, search: string) => {
+  let select: string | undefined;
+  const params = new URLSearchParams(search);
+  for (const [key, value] of params) {
+    const normalizedKey = key.toLowerCase();
+    if (normalizedKey === "select") {
+      // Duplicate projections can be interpreted differently by intermediaries.
+      if (select !== undefined) return false;
+      select = value;
+      continue;
+    }
+
+    // PostgREST uses dotted parameter names for embedded-resource filters and
+    // ordering. Relationship ordering also uses parentheses in `order`.
+    if (hasDottedKeyAfterDecoding(key)) return false;
+    if (normalizedKey === "order" && hasParenthesesAfterDecoding(value)) {
+      return false;
+    }
+  }
+
+  if (select === undefined || !hasParenthesesAfterDecoding(select)) return true;
+  return ALLOWED_REST_EMBEDS.get(table)?.has(select) === true;
+};
 
 export const getRestTableName = (pathname: string) =>
   readExactSegment(pathname, "/rest/v1/");
 
-export const isAllowedRestRequest = (pathname: string, method: string) => {
+export const isAllowedRestRequest = (
+  pathname: string,
+  method: string,
+  search = "",
+) => {
   const table = getRestTableName(pathname);
   if (!table) return false;
   const normalizedMethod = method.toUpperCase();
   if (normalizedMethod === "GET" || normalizedMethod === "HEAD") {
-    return READABLE_REST_TABLES.has(table) || WRITABLE_REST_TABLES.has(table);
-  }
-  if (normalizedMethod === "POST") {
-    return WRITABLE_REST_TABLES.has(table);
+    return READABLE_REST_TABLES.has(table) && isAllowedRestQuery(table, search);
   }
   return false;
 };

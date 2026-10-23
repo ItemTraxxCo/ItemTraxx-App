@@ -9,16 +9,6 @@
           focused entry points.
         </p>
       </div>
-      <div class="workspace-actions">
-        <RouterLink class="button-link" to="/super-admin/workspaces">Workspaces</RouterLink>
-        <RouterLink class="button-link" to="/super-admin/admins">Workspace Admins</RouterLink>
-        <RouterLink class="button-link" to="/super-admin/tenant-accounts">Tenant Accounts</RouterLink>
-        <RouterLink class="button-link" to="/super-admin/super-admins">Super Admins</RouterLink>
-        <RouterLink class="button-link" to="/super-admin/settings">Settings</RouterLink>
-        <RouterLink class="button-link" to="/super-admin/support-requests">Support Requests</RouterLink>
-        <RouterLink class="button-link" to="/internal">Internal Ops</RouterLink>
-        <button type="button" class="button-link" @click="handleSignOut">Sign out</button>
-      </div>
     </div>
 
     <div class="admin-grid">
@@ -48,101 +38,56 @@
       </div>
     </div>
 
-    <div class="section-grid">
-      <section class="card section-card">
-        <div class="section-header">
-          <h2>Tenant Operations</h2>
-          <p class="muted">Manage workspaces and their delegated admins.</p>
-        </div>
-        <div class="section-links">
-          <RouterLink class="section-link" to="/super-admin/workspaces">
-            <span class="section-link-title">Workspaces</span>
-            <span class="section-link-meta">Subdomains, provisioning, plans, and lifecycle</span>
-          </RouterLink>
-          <RouterLink class="section-link" to="/super-admin/admins">
-            <span class="section-link-title">Admins</span>
-            <span class="section-link-meta">Workspace operators</span>
-          </RouterLink>
-          <RouterLink class="section-link" to="/super-admin/tenant-accounts">
-            <span class="section-link-title">Tenant Accounts</span>
-            <span class="section-link-meta">Checkout-desk accounts across all workspaces</span>
-          </RouterLink>
-          <RouterLink class="section-link" to="/super-admin/super-admins">
-            <span class="section-link-title">Super Admins</span>
-            <span class="section-link-meta">Privileged operator accounts</span>
-          </RouterLink>
-        </div>
+    <div class="quick-actions">
+      <RouterLink class="quick-action" to="/super-admin/workspaces">
+        <SuperAdminIcon name="plus" />
+        New Workspace
+      </RouterLink>
+      <RouterLink class="quick-action" to="/super-admin/individual-accounts">
+        <SuperAdminIcon name="user" />
+        Individual Accounts
+      </RouterLink>
+      <RouterLink class="quick-action" to="/super-admin/broadcasts">
+        <SuperAdminIcon name="megaphone" />
+        New Broadcast
+      </RouterLink>
+      <RouterLink class="quick-action" to="/super-admin/logs">
+        <SuperAdminIcon name="fileText" />
+        View Logs
+      </RouterLink>
+      <RouterLink class="quick-action" to="/super-admin/support-requests">
+        <SuperAdminIcon name="lifeBuoy" />
+        Support Requests
+      </RouterLink>
+    </div>
+
+    <div class="attention-grid">
+      <section class="card attention-card">
+        <h2>Needs attention</h2>
+        <p v-if="attentionItems.length === 0" class="muted">Nothing needs attention right now.</p>
+        <ul v-else class="attention-list">
+          <li v-for="item in attentionItems" :key="item.id" class="attention-item">
+            <span
+              class="attention-dot"
+              :class="`attention-dot-${item.tone}`"
+              role="img"
+              :aria-label="`${item.tone} severity`"
+              :title="item.tone"
+            ></span>
+            {{ item.label }}
+          </li>
+        </ul>
       </section>
 
-      <section class="card section-card">
-        <div class="section-header">
-          <h2>Inventory Data</h2>
-          <p class="muted">Inspect global item, borrower, and transaction data.</p>
-        </div>
-        <div class="section-links">
-          <RouterLink class="section-link" to="/super-admin/items">
-            <span class="section-link-title">All Items</span>
-            <span class="section-link-meta">Global inventory catalogue</span>
-          </RouterLink>
-          <RouterLink class="section-link" to="/super-admin/borrowers">
-            <span class="section-link-title">All Borrowers</span>
-            <span class="section-link-meta">Cross-workspace borrower records</span>
-          </RouterLink>
-          <RouterLink class="section-link" to="/super-admin/logs">
-            <span class="section-link-title">All Logs</span>
-            <span class="section-link-meta">Transactions and audit history</span>
-          </RouterLink>
-          <RouterLink class="section-link" to="/super-admin/broadcasts">
-            <span class="section-link-title">Broadcasts</span>
-            <span class="section-link-meta">Global operator messaging</span>
-          </RouterLink>
-        </div>
-      </section>
-
-      <section class="card section-card">
-        <div class="section-header">
-          <h2>Commercial</h2>
-          <p class="muted">Track pipeline, customers, and account health.</p>
-        </div>
-        <div class="section-links">
-          <RouterLink class="section-link" to="/super-admin/support-requests">
-            <span class="section-link-title">Support Requests</span>
-            <span class="section-link-meta">Inbox, attachments, and operator notes</span>
-          </RouterLink>
-          <RouterLink class="section-link" to="/super-admin/sales-leads">
-            <span class="section-link-title">Sales Leads</span>
-            <span class="section-link-meta">Pipeline and inbound interest</span>
-          </RouterLink>
-          <RouterLink class="section-link" to="/super-admin/customers">
-            <span class="section-link-title">Customers</span>
-            <span class="section-link-meta">Status, health, and renewals</span>
-          </RouterLink>
-        </div>
-      </section>
-
-      <section class="card section-card">
-        <div class="section-header">
-          <h2>Platform Controls</h2>
-          <p class="muted">Runtime overrides, approvals, jobs, and internal ops.</p>
-        </div>
-        <div class="section-links">
-          <a class="section-link" href="#control-center">
-            <span class="section-link-title">Control Center</span>
-            <span class="section-link-meta">Runtime, maintenance, alerts</span>
-          </a>
-          <a class="section-link" href="#recent-jobs">
-            <span class="section-link-title">Recent Jobs</span>
-            <span class="section-link-meta">Queue health and task activity</span>
-          </a>
-          <RouterLink class="section-link" to="/internal">
-            <span class="section-link-title">Internal Ops</span>
-            <span class="section-link-meta">Restricted operator tooling</span>
-          </RouterLink>
-          <RouterLink class="section-link" to="/super-admin/settings">
-            <span class="section-link-title">Settings</span>
-            <span class="section-link-meta">Password, passkey inventory, and sessions</span>
-          </RouterLink>
-        </div>
+      <section class="card attention-card">
+        <h2>Recent privileged actions</h2>
+        <p v-if="(dashboard?.recent_actions?.length ?? 0) === 0" class="muted">No recent actions.</p>
+        <ul v-else class="attention-list">
+          <li v-for="item in (dashboard?.recent_actions ?? []).slice(0, 5)" :key="item.id" class="attention-item">
+            <span v-if="item.actor_email" data-session-replay-mask>{{ item.actor_email }}</span>
+            <span v-else>{{ item.actor_id }}</span> — {{ formatActionLabel(item.action_type) }}
+          </li>
+        </ul>
       </section>
     </div>
 
@@ -255,7 +200,7 @@
           </div>
         </div>
         <p v-if="isLoading" class="muted">Loading dashboard...</p>
-        <p v-else-if="error" class="error">{{ error }}</p>
+        <p v-else-if="error" class="error" v-app-toast-error="{ suppressMessage: toastMessage }">{{ error }}</p>
         <table v-else class="table">
           <thead>
             <tr>
@@ -303,7 +248,7 @@
           <tbody>
             <tr v-for="item in controlCenter?.approvals ?? []" :key="item.id">
               <td>{{ formatDateTime(item.created_at) }}</td>
-              <td>{{ item.action_type }}</td>
+              <td>{{ formatActionLabel(item.action_type) }}</td>
               <td>{{ item.status }}</td>
               <td>{{ item.requested_by }}</td>
               <td>
@@ -317,7 +262,7 @@
                 </button>
               </td>
             </tr>
-            <tr v-if="(controlCenter?.approvals?.length ?? 0) === 0">
+            <tr v-if="!isLoading && !error && (controlCenter?.approvals?.length ?? 0) === 0">
               <td colspan="5" class="muted">No approval requests.</td>
             </tr>
           </tbody>
@@ -351,7 +296,7 @@
               <td>{{ item.overdue_items }}</td>
               <td>{{ item.transactions_7d }}</td>
             </tr>
-            <tr v-if="(dashboard?.workspace_metrics?.length ?? 0) === 0">
+            <tr v-if="!isLoading && !error && (dashboard?.workspace_metrics?.length ?? 0) === 0">
               <td colspan="6" class="muted">No workspace metrics available.</td>
             </tr>
           </tbody>
@@ -377,11 +322,14 @@
           <tbody>
             <tr v-for="item in dashboard?.recent_actions ?? []" :key="item.id">
               <td>{{ formatDateTime(item.created_at) }}</td>
-              <td>{{ item.action_type }}</td>
-              <td>{{ item.actor_email || item.actor_id }}</td>
+              <td>{{ formatActionLabel(item.action_type) }}</td>
+              <td>
+                <span v-if="item.actor_email" data-session-replay-mask>{{ item.actor_email }}</span>
+                <span v-else>{{ item.actor_id }}</span>
+              </td>
               <td>{{ item.target_type || "-" }} {{ item.target_id || "" }}</td>
             </tr>
-            <tr v-if="(dashboard?.recent_actions?.length ?? 0) === 0">
+            <tr v-if="!isLoading && !error && (dashboard?.recent_actions?.length ?? 0) === 0">
               <td colspan="4" class="muted">No recent actions.</td>
             </tr>
           </tbody>
@@ -411,7 +359,7 @@
               <td>{{ item.status }}</td>
               <td class="mono">{{ summarizeDetails(item.details) }}</td>
             </tr>
-            <tr v-if="(controlCenter?.jobs?.length ?? 0) === 0">
+            <tr v-if="!isLoading && !error && (controlCenter?.jobs?.length ?? 0) === 0">
               <td colspan="4" class="muted">No jobs yet.</td>
             </tr>
           </tbody>
@@ -427,11 +375,12 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref } from "vue";
-import { RouterLink, useRouter } from "vue-router";
-import { signOut } from "../../services/authService";
+import { computed, onMounted, onUnmounted, ref } from "vue";
+import { RouterLink } from "vue-router";
+import SuperAdminIcon from "../../components/superadmin/SuperAdminIcon.vue";
 import { fetchSuperDashboard, type SuperDashboard } from "../../services/superAuditService";
 import { toUserFacingErrorMessage } from "../../services/appErrors";
+import { formatActionLabel } from "../../utils/actionLabel";
 import {
   approveRequest,
   forceWorkspaceReauth,
@@ -441,10 +390,9 @@ import {
   type SuperControlCenter,
 } from "../../services/superOps/controlCenter";
 
-const router = useRouter();
 const dashboard = ref<SuperDashboard | null>(null);
 const controlCenter = ref<SuperControlCenter | null>(null);
-const isLoading = ref(false);
+const isLoading = ref(true);
 const isSaving = ref(false);
 const error = ref("");
 const toastTitle = ref("");
@@ -469,6 +417,45 @@ const showToast = (title: string, message: string) => {
     toastTimer = null;
   }, 4000);
 };
+
+type AttentionTone = "critical" | "warning" | "info";
+type AttentionItem = { id: string; label: string; tone: AttentionTone };
+
+const attentionItems = computed<AttentionItem[]>(() => {
+  const items: AttentionItem[] = [];
+  for (const alert of dashboard.value?.alert_events ?? []) {
+    items.push({
+      id: `alert-${alert.id}`,
+      label: `${alert.name}: ${alert.current} (threshold ${alert.threshold})`,
+      tone: alert.severity === "critical" ? "critical" : "warning",
+    });
+  }
+  const suspended = dashboard.value?.suspended_workspaces ?? 0;
+  if (suspended > 0) {
+    items.push({
+      id: "suspended-workspaces",
+      label: `${suspended} workspace${suspended === 1 ? "" : "s"} suspended`,
+      tone: "warning",
+    });
+  }
+  const pendingApprovals = controlCenter.value?.approvals?.filter((item) => item.status === "pending").length ?? 0;
+  if (pendingApprovals > 0) {
+    items.push({
+      id: "pending-approvals",
+      label: `${pendingApprovals} pending approval${pendingApprovals === 1 ? "" : "s"}`,
+      tone: "info",
+    });
+  }
+  const failedJobs = controlCenter.value?.jobs?.filter((job) => job.status === "failed").length ?? 0;
+  if (failedJobs > 0) {
+    items.push({
+      id: "failed-jobs",
+      label: `${failedJobs} job${failedJobs === 1 ? "" : "s"} failed`,
+      tone: "critical",
+    });
+  }
+  return items;
+});
 
 const formatDateTime = (value: string) => {
   const date = new Date(value);
@@ -617,15 +604,6 @@ const approve = async (id: string) => {
   }
 };
 
-const handleSignOut = async () => {
-  const result = await signOut();
-  if (!result.ok) {
-    showToast("Sign out failed", "Unable to complete logout. Please try again.");
-    return;
-  }
-  await router.push("/");
-};
-
 onMounted(() => {
   void loadAll();
 });
@@ -639,11 +617,15 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
+/* The global .form-actions (src/styles/base.css) only adds margin-top, not
+   margin-bottom, so a button row followed directly by another element has
+   zero gap between them. Add the missing space here rather than changing
+   the global rule, which is used by other pages too. */
+.form-actions {
+  margin-bottom: 1rem;
+}
+
 .workspace-hero {
-  display: flex;
-  justify-content: space-between;
-  gap: 1rem;
-  align-items: flex-start;
   margin-bottom: 1rem;
 }
 
@@ -665,18 +647,85 @@ onUnmounted(() => {
   margin: 0;
 }
 
-.workspace-actions {
+.quick-actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.5rem;
-  justify-content: flex-end;
+  gap: 0.6rem;
+  margin: 1rem 0 1.5rem;
 }
 
-.section-grid {
+.quick-action {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 0.55rem 0.9rem;
+  background: var(--surface-2);
+  color: inherit;
+  text-decoration: none;
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.quick-action:hover {
+  border-color: var(--accent);
+  text-decoration: none;
+}
+
+.attention-grid {
   display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
   gap: 1rem;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-  margin: 1rem 0;
+  margin-bottom: 1.5rem;
+}
+
+.attention-card h2 {
+  margin: 0 0 0.75rem;
+  font-size: 1.05rem;
+}
+
+.attention-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.attention-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.attention-item:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.attention-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: var(--muted);
+}
+
+.attention-dot-critical {
+  background: var(--danger);
+}
+
+.attention-dot-warning {
+  background: var(--warning);
+}
+
+.attention-dot-info {
+  background: var(--accent);
 }
 
 .report-grid {
@@ -710,58 +759,6 @@ onUnmounted(() => {
 
 .report-card-header p {
   margin: 0.35rem 0 0;
-}
-
-.section-card {
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-}
-
-.section-header {
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-}
-
-.section-header h2 {
-  margin: 0;
-}
-
-.section-links {
-  display: grid;
-  gap: 0.65rem;
-}
-
-.section-link {
-  display: flex;
-  flex-direction: column;
-  gap: 0.2rem;
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 0.8rem 0.9rem;
-  background: var(--surface-2);
-  color: inherit;
-  text-decoration: none;
-  transition: border-color 0.2s ease, transform 0.15s ease, background 0.2s ease;
-}
-
-.section-link:hover {
-  border-color: var(--accent);
-  background: color-mix(in srgb, var(--surface-2) 85%, var(--accent) 15%);
-  transform: translateY(-1px);
-  text-decoration: none;
-}
-
-.section-link-title {
-  font-weight: 700;
-  line-height: 1.2;
-}
-
-.section-link-meta {
-  font-size: 0.84rem;
-  color: var(--muted);
-  line-height: 1.3;
 }
 
 .control-grid {
@@ -825,14 +822,6 @@ onUnmounted(() => {
 }
 
 @media (max-width: 900px) {
-  .workspace-hero {
-    flex-direction: column;
-  }
-
-  .workspace-actions {
-    justify-content: flex-start;
-  }
-
   .report-grid {
     grid-template-columns: 1fr;
   }

@@ -136,6 +136,41 @@ describe("useTopBannerLayout", () => {
     expect(disconnectSpy).toHaveBeenCalled();
   });
 
+  it("defers the ResizeObserver callback to the next animation frame", async () => {
+    let observerCallback: (() => void) | undefined;
+    ResizeObserverCtor.mockImplementation(function FakeResizeObserver(this: {
+      observe: typeof observeSpy;
+      disconnect: typeof disconnectSpy;
+    }, cb: () => void) {
+      observerCallback = cb;
+      this.observe = observeSpy;
+      this.disconnect = disconnectSpy;
+    });
+    let frameCallback: FrameRequestCallback | undefined;
+    const rafSpy = vi.fn((cb: FrameRequestCallback) => {
+      frameCallback = cb;
+      return 1;
+    });
+    vi.stubGlobal("requestAnimationFrame", rafSpy);
+    vi.stubGlobal("cancelAnimationFrame", vi.fn());
+
+    const { wrapper, get } = mountHost();
+    const maintenance = elementWithHeight(10);
+    get().setElements({ maintenance, broadcast: null, incident: null });
+    await nextTick();
+
+    Object.defineProperty(maintenance, "offsetHeight", { configurable: true, value: 60 });
+    observerCallback?.();
+    // The observer does not write heights synchronously, so no re-entrant layout
+    // write happens inside the observation.
+    expect(get().topOffsetPx.value).toBe("10px");
+    expect(rafSpy).toHaveBeenCalled();
+
+    frameCallback?.(0);
+    expect(get().topOffsetPx.value).toBe("60px");
+    wrapper.unmount();
+  });
+
   it("measures once via nextTick after mount even without setElements", async () => {
     const { wrapper, get } = mountHost();
     await nextTick();

@@ -183,6 +183,14 @@ export const mockSuperWorkspaceMutate = async (page: Page) => {
       });
       return;
     }
+    if (body.action === "list_individual_accounts") {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ ok: true, data: [] }),
+      });
+      return;
+    }
 
     await route.fulfill({
       status: 200,
@@ -345,6 +353,12 @@ export const setWorkspaceAdminSession = async (page: Page, workspaceId = "tenant
   await page.evaluate((id) => {
     window.__itemtraxxTest?.setWorkspaceAdminSession(id);
   }, workspaceId);
+};
+
+export const setIndividualAccountSession = async (page: Page, workspaceId = "individual-e2e") => {
+  await page.waitForFunction(() => typeof window.__itemtraxxTest?.setIndividualAccountSession === "function");
+  await waitForPublicAuthBootstrap(page);
+  await page.evaluate((id) => window.__itemtraxxTest?.setIndividualAccountSession(id), workspaceId);
 };
 
 export const setTenantAccountSession = async (page: Page, workspaceId = "tenant-e2e") => {

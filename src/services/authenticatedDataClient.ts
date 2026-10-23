@@ -1,5 +1,6 @@
 import { AppError, unauthorizedError } from "./appErrors";
-import { captureHandledRequestFailure } from "./sentry";
+import { captureHandledRequestFailure, capturePostHogLog } from "./posthogDiagnostics";
+import { fetchWithTransientRetry } from "./fetchWithTransientRetry";
 
 const trimTrailingSlash = (value: string) => value.replace(/\/+$/, "");
 
@@ -42,7 +43,10 @@ const request = async (
   options: AuthenticatedRequestOptions = {}
 ) => {
   const method = (init.method ?? "GET").toUpperCase();
-  const response = await fetch(`${getBaseUrl()}${path}`, {
+  const startedAt = performance.now();
+  let response: Response;
+  let retryCount = 0;
+  const requestInit: RequestInit = {
     ...init,
     credentials: "include",
     headers: {
@@ -52,7 +56,43 @@ const request = async (
         : {}),
       ...(init.headers ?? {}),
     },
-  });
+  };
+  try {
+    response = await fetchWithTransientRetry(`${getBaseUrl()}${path}`, requestInit, {
+      onRetry: (count) => {
+        retryCount = count;
+      },
+    });
+  } catch (error) {
+    const isAbortError = typeof DOMException !== "undefined" &&
+      error instanceof DOMException &&
+      error.name === "AbortError";
+    const errorCode = isAbortError ? "timeout" : "network";
+    const route = sanitizePathForTelemetry(path);
+    void captureHandledRequestFailure({
+      area: "authenticated_data",
+      name: route,
+      path: route,
+      method,
+      status: 0,
+      message: isAbortError ? "Authenticated data request timed out before response." : "Authenticated data request failed before response.",
+      errorCode,
+    });
+    capturePostHogLog({
+      body: "authenticated data request failed before response",
+      level: "error",
+      attributes: {
+        route,
+        operation: `${method} ${route}`,
+        status: 0,
+        latency_ms: Math.round(performance.now() - startedAt),
+        retry_count: retryCount,
+        attempt: retryCount + 1,
+        error_code: errorCode,
+      },
+    });
+    throw error;
+  }
 
   if (!response.ok) {
     let message = `Whoops! Authenticated data request failed (${response.status}).`;
@@ -74,11 +114,25 @@ const request = async (
       message,
       requestId: response.headers.get("x-request-id") ?? undefined,
     });
+    capturePostHogLog({
+      body: "authenticated data request completed",
+      level: response.status >= 500 ? "error" : "warn",
+      attributes: {
+        route: sanitizePathForTelemetry(path),
+        operation: `${method} ${sanitizePathForTelemetry(path)}`,
+        status: response.status,
+        latency_ms: Math.round(performance.now() - startedAt),
+        request_id: response.headers.get("x-request-id") ?? undefined,
+        retry_count: retryCount,
+        attempt: retryCount + 1,
+        error_code: response.status >= 500 ? "server_error" : "request_failed",
+      },
+    });
     if (response.status === 401) {
       if (options.suppressUnauthorizedRecovery) {
         throw new AppError("UNAUTHORIZED", "Your session has expired. Please sign in again.", {
           status: 401,
-          reportToSentry: false,
+          reportToErrorTracking: false,
         });
       }
       throw unauthorizedError();
@@ -87,14 +141,31 @@ const request = async (
       if (options.suppressUnauthorizedRecovery) {
         throw new AppError("UNAUTHORIZED", "Your session has expired. Please sign in again.", {
           status: 403,
-          reportToSentry: false,
+          reportToErrorTracking: false,
         });
       }
       throw unauthorizedError();
     }
     throw new AppError("REQUEST_FAILED", message, {
       status: response.status,
-      reportToSentry: response.status >= 500,
+      reportToErrorTracking: response.status >= 500,
+    });
+  }
+
+  const latencyMs = Math.round(performance.now() - startedAt);
+  if (latencyMs >= 1500 || Math.random() < 0.01) {
+    capturePostHogLog({
+      body: "authenticated data request completed",
+      level: latencyMs >= 1500 ? "warn" : "info",
+      attributes: {
+        route: sanitizePathForTelemetry(path),
+        operation: `${method} ${sanitizePathForTelemetry(path)}`,
+        status: response.status,
+        latency_ms: latencyMs,
+        request_id: response.headers.get("x-request-id") ?? undefined,
+        retry_count: retryCount,
+        attempt: retryCount + 1,
+      },
     });
   }
 

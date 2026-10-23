@@ -2,15 +2,10 @@
   <main class="page">
     <header>
       <h1>Borrowers</h1>
-      <nav>
-        <RouterLink to="/checkout">Checkout</RouterLink> ·
-        <RouterLink to="/items">Items</RouterLink> ·
-        <RouterLink to="/settings">Settings</RouterLink>
-      </nav>
     </header>
 
     <p v-if="loading">Loading…</p>
-    <p v-else-if="error" class="error">{{ error }}</p>
+    <p v-else-if="error" class="error" v-app-toast-error>{{ error }}</p>
     <template v-else>
       <table>
         <thead>
@@ -18,8 +13,8 @@
         </thead>
         <tbody>
           <tr v-for="borrower in borrowers" :key="borrower.id">
-            <td>{{ borrower.username }}</td>
-            <td>{{ borrower.borrower_id }}</td>
+            <td data-session-replay-mask>{{ borrower.username }}</td>
+            <td data-session-replay-mask>{{ borrower.borrower_id }}</td>
           </tr>
           <tr v-if="!borrowers.length"><td colspan="2">No borrowers found.</td></tr>
         </tbody>
@@ -35,7 +30,6 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
-import { RouterLink } from "vue-router";
 import { fetchBorrowerPage, type BorrowerItem } from "../../services/borrowerService";
 
 const PAGE_SIZE = 20;

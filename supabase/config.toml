@@ -222,6 +222,14 @@ otp_expiry = 900
 [functions.workspace-admin-mutate]
 # Better Auth JWT and profile authorization are validated inside the function.
 verify_jwt = false
+
+[functions.workspace-invitation]
+# The recipient proves mailbox access with a single-use invitation token.
+verify_jwt = false
+
+[functions.account-email-change]
+# Better Auth JWTs authorize requests; single-use mailbox tokens authorize the two verification steps.
+verify_jwt = false
 # pass = "env(SENDGRID_API_KEY)"
 # admin_email = "admin@email.com"
 # sender_name = "Admin"

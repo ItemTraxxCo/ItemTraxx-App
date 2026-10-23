@@ -14,10 +14,13 @@ import {
 import { validateAccountDeviceSession } from "../_shared/accountSessions.ts";
 import { readJsonBody } from "../_shared/requestBody.ts";
 import { requireTrustedEdgeIngress } from "../_shared/trustedIngress.ts";
+import { logError, withRequestSpan } from "../_shared/observability.ts";
+import { sha256Hex } from "../_shared/sha256.ts";
+import { buildQuickReturnAuditRecord } from "./adminAudit.ts";
 
 const baseCorsHeaders = {
   "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-request-id",
+    "authorization, x-client-info, apikey, content-type, x-request-id, traceparent, tracestate",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
   Vary: "Origin",
 };
@@ -71,7 +74,7 @@ const isLocalhostMaintenanceBypassRequest = (req: Request) => {
   }
 };
 
-serve(async (req) => {
+serve((req) => withRequestSpan(req, "POST /functions/checkoutReturn", async (span, requestId) => {
   const { hasOrigin, originAllowed, headers } = resolveCorsHeaders(req);
 
   const jsonResponse = (status: number, body: Record<string, unknown>) =>
@@ -79,6 +82,17 @@ serve(async (req) => {
       status,
       headers: { ...headers, "Content-Type": "application/json" },
     });
+
+  const internalQueryFailure = (operation: string, error: unknown) => {
+    logError(
+      "checkoutReturn database operation failed",
+      requestId,
+      error,
+      { operation },
+      span.context,
+    );
+    return jsonResponse(500, { error: "Request failed" });
+  };
 
   if (req.method === "OPTIONS") {
     if (!originAllowed) {
@@ -119,7 +133,7 @@ serve(async (req) => {
     }
 
     const userClient = createClient(supabaseUrl, publishableKey, {
-      global: { headers: { Authorization: authHeader } },
+      global: { headers: { Authorization: authHeader, traceparent: span.traceparent() } },
       auth: { persistSession: false },
     });
 
@@ -136,24 +150,42 @@ serve(async (req) => {
       .from("profiles")
       .select("workspace_id, role, is_active")
       .eq("id", user.id)
-      .single();
+      .maybeSingle();
+
+    if (profileError) {
+      return internalQueryFailure("load_caller_profile", profileError);
+    }
 
     const callerRole = callerProfile?.role;
     if (
-      profileError ||
       !callerProfile?.workspace_id ||
       callerProfile.is_active === false ||
       !callerRole ||
-      !["tenant_account", "workspace_admin"].includes(callerRole)
+      !["tenant_account", "workspace_admin", "individual_account"].includes(callerRole)
     ) {
       return jsonResponse(403, { error: "Access denied" });
     }
 
-    const { data: workspaceStatusRow } = await userClient
+    const adminClient = createClient(supabaseUrl, serviceKey, {
+      global: { headers: { traceparent: span.traceparent() } },
+      auth: { persistSession: false },
+    });
+
+    const { data: workspaceStatusRow, error: workspaceStatusError } = await adminClient
       .from("workspaces")
       .select("status")
       .eq("id", callerProfile.workspace_id)
-      .single();
+      .maybeSingle();
+
+    if (workspaceStatusError) {
+      return internalQueryFailure("load_workspace_status", workspaceStatusError);
+    }
+    if (!workspaceStatusRow) {
+      return internalQueryFailure(
+        "load_workspace_status_missing_row",
+        new Error("Workspace record missing for authenticated profile"),
+      );
+    }
 
     if (workspaceStatusRow?.status && workspaceStatusRow.status !== "active") {
       return jsonResponse(403, { error: "Workspace disabled" });
@@ -169,14 +201,17 @@ serve(async (req) => {
     );
 
     if (rateLimitError) {
-      return jsonResponse(500, { error: "Rate limit check failed" });
+      return internalQueryFailure("consume_rate_limit", rateLimitError);
     }
 
     const rateLimitResult = Array.isArray(rateLimit)
       ? ((rateLimit[0] as RateLimitResult | undefined) ?? null)
       : ((rateLimit as RateLimitResult | null) ?? null);
     if (!rateLimitResult) {
-      return jsonResponse(500, { error: "Rate limit check failed" });
+      return internalQueryFailure(
+        "consume_rate_limit_missing_result",
+        new Error("Rate limit check returned no result"),
+      );
     }
     if (!rateLimitResult.allowed) {
       return jsonResponse(429, {
@@ -200,15 +235,11 @@ serve(async (req) => {
       requestIdFallback ||
       crypto.randomUUID();
 
-    const adminClient = createClient(supabaseUrl, serviceKey, {
-      auth: { persistSession: false },
-    });
-
     const isAdminReturn = actionType === "admin_return";
     const isQuickReturn = actionType === "quick_return";
     if (
       (isAdminReturn || isQuickReturn) &&
-      callerRole !== "workspace_admin"
+      callerRole !== "workspace_admin" && callerRole !== "individual_account"
     ) {
       return jsonResponse(403, { error: "Access denied" });
     }
@@ -238,11 +269,14 @@ serve(async (req) => {
       }
     }
 
-    const { data: maintenanceRow } = await adminClient
+    const { data: maintenanceRow, error: maintenanceError } = await adminClient
       .from("app_runtime_config")
       .select("value")
       .eq("key", "maintenance_mode")
       .maybeSingle();
+    if (maintenanceError) {
+      return internalQueryFailure("load_maintenance_config", maintenanceError);
+    }
     const maintenanceValue =
       maintenanceRow?.value && typeof maintenanceRow.value === "object"
         ? (maintenanceRow.value as Record<string, unknown>)
@@ -270,14 +304,25 @@ serve(async (req) => {
         .eq("borrower_id", borrowerId)
         .eq("workspace_id", callerProfile.workspace_id)
         .is("deleted_at", null)
-        .single();
+        .maybeSingle();
 
-      if (borrowerError || !borrowerData?.id || !borrowerData.workspace_id) {
+      if (borrowerError) {
+        return internalQueryFailure("load_borrower", borrowerError);
+      }
+      if (!borrowerData?.id || !borrowerData.workspace_id) {
         return jsonResponse(404, { error: "Borrower not found." });
       }
 
       if (callerRole === "tenant_account" && borrowerData.access_mode === "restricted") {
-        const { data: grant } = await adminClient.from("borrower_access_grants").select("borrower_id").eq("borrower_id", borrowerData.id).eq("profile_id", user.id).maybeSingle();
+        const { data: grant, error: grantError } = await adminClient
+          .from("borrower_access_grants")
+          .select("borrower_id")
+          .eq("borrower_id", borrowerData.id)
+          .eq("profile_id", user.id)
+          .maybeSingle();
+        if (grantError) {
+          return internalQueryFailure("load_borrower_access_grant", grantError);
+        }
         // Matches checkout-borrower-lookup: a missing grant returns the same 404 as an
         // unknown borrower so a restricted borrower's existence is not revealed.
         if (!grant) return jsonResponse(404, { error: "Borrower not found." });
@@ -289,13 +334,17 @@ serve(async (req) => {
     const skippedBarcodes: string[] = [];
 
     for (const barcode of itemBarcodes) {
-      const { data: item } = await adminClient
+      const { data: item, error: itemError } = await adminClient
         .from("items")
         .select("id, workspace_id, checked_out_by, status, access_mode")
         .eq("barcode", barcode)
         .eq("workspace_id", callerProfile.workspace_id)
         .is("deleted_at", null)
-        .single();
+        .maybeSingle();
+
+      if (itemError) {
+        return internalQueryFailure("load_item", itemError);
+      }
 
       if (!item) {
         skippedBarcodes.push(barcode);
@@ -303,7 +352,15 @@ serve(async (req) => {
       }
 
       if (callerRole === "tenant_account" && item.access_mode === "restricted") {
-        const { data: grant } = await adminClient.from("item_access_grants").select("item_id").eq("item_id", item.id).eq("profile_id", user.id).maybeSingle();
+        const { data: grant, error: grantError } = await adminClient
+          .from("item_access_grants")
+          .select("item_id")
+          .eq("item_id", item.id)
+          .eq("profile_id", user.id)
+          .maybeSingle();
+        if (grantError) {
+          return internalQueryFailure("load_item_access_grant", grantError);
+        }
         if (!grant) { skippedBarcodes.push(barcode); continue; }
       }
 
@@ -320,12 +377,9 @@ serve(async (req) => {
       );
 
       if (transitionError) {
-        console.error("checkoutReturn atomic transition failed", {
-          itemId: item.id,
-          operationId,
-          actionType,
-          message: transitionError.message,
-        });
+        logError("checkoutReturn atomic transition failed", requestId, transitionError, {
+          action_type: actionType,
+        }, span.context);
         return jsonResponse(500, { error: "Checkout/return operation failed" });
       }
 
@@ -339,6 +393,32 @@ serve(async (req) => {
       }
     }
 
+    if (
+      (actionType === "admin_return" || actionType === "quick_return") &&
+      processed > 0
+    ) {
+      const operationFingerprint = await sha256Hex(JSON.stringify({
+        operationId,
+        actionType,
+        itemBarcodes: [...itemBarcodes].sort(),
+      }));
+      const { error: auditError } = await adminClient
+        .from("admin_audit_logs")
+        .insert(
+          buildQuickReturnAuditRecord({
+            workspaceId: callerProfile.workspace_id,
+            actorId: user.id,
+            operationId,
+            operationFingerprint,
+            actionType,
+            processedCount: processed,
+          }),
+        );
+      if (auditError && auditError.code !== "23505") {
+        return internalQueryFailure("write_quick_return_audit", auditError);
+      }
+    }
+
     return jsonResponse(200, {
       success: true,
       processed,
@@ -348,10 +428,7 @@ serve(async (req) => {
     if (error instanceof ValidationError) {
       return jsonResponse(error.status, { error: error.message });
     }
-    console.error("checkoutReturn function error", {
-      message: error instanceof Error ? error.message : "Unknown error",
-      stack: error instanceof Error ? error.stack : undefined,
-    });
+    logError("checkoutReturn function error", requestId, error, {}, span.context);
     return jsonResponse(500, { error: "Request failed" });
   }
-});
+}));

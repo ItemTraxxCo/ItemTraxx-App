@@ -232,7 +232,7 @@ const operationsControls = [
   {
     title: "Monitoring and error reporting",
     description:
-      "ItemTraxx uses third-party services for error monitoring and tracing (Sentry) and operational analytics (PostHog), plus operational alerts and workflow notifications through internal systems to stay on top of issues. Analytics and diagnostics tooling is only enabled after user consent through the cookie banner. In some environments, session replay sampling (Sentry Replay and/or PostHog Replay) may be enabled after consent for debugging and incident investigation. In addition to internal security reviews, we use tools to scan our code for vulnerabilities including GitHub Code Security, GitHub CodeQL, Aikido Security, GitGuardian, and other internal tools.",
+      "ItemTraxx uses PostHog Error Tracking and Logs for consent-controlled client diagnostics, plus sampled OpenTelemetry traces on selected backend request paths and operational alerts through internal systems to stay on top of issues. Analytics and diagnostics tooling is only enabled after user consent through the cookie banner. In some environments, masked PostHog Replay may be enabled only after both Analytics and Diagnostics consent for debugging and incident investigation; ItemTraxx does not enable broad browser request tracing. In addition to internal security reviews, we use tools to scan our code for vulnerabilities including GitHub Code Security, GitHub CodeQL, Aikido Security, GitGuardian, and other internal tools.",
   },
   {
     title: "Pre release checks and runbooks",
@@ -450,8 +450,8 @@ onUnmounted(() => {
   justify-content: center;
   box-sizing: border-box;
   max-width: 100%;
-  min-height: 2.5rem;
-  padding: 0.55rem 1rem;
+  min-height: 2.35rem;
+  padding: 0.4rem 0.85rem;
   border-radius: 999px;
   text-decoration: none;
   font-weight: 600;

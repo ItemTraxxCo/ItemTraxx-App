@@ -55,7 +55,7 @@
         </div>
       </form>
 
-      <p v-if="error" class="error">{{ error }}</p>
+      <p v-if="error" class="error" v-app-toast-error="{ suppressMessage: toastMessage }">{{ error }}</p>
     </div>
 
     <div v-if="toastMessage" class="toast">
@@ -145,7 +145,7 @@ const handleCredentialSubmit = async () => {
       password.value,
       turnstileToken.value ?? ""
     );
-    await router.push(result.requiresTwoFactor ? "/two-factor" : "/internal");
+    await router.push(result.requiresTwoFactor ? "/login/two-factor" : "/internal");
   } catch (err) {
     const message = err instanceof Error ? err.message : "Sign in failed.";
     if (message === "Invalid credentials.") {

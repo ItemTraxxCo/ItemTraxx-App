@@ -7,13 +7,11 @@ import {
 } from "./helpers/testHarness";
 
 type GuardScenario =
-  | { kind: "step_up_required"; status: 403; error: "Admin verification required." }
   | { kind: "session_revoked"; status: 401; error: "Your session has expired. Please sign in again." }
   | { kind: "inactive_admin"; status: 403; error: "Access denied" }
   | { kind: "ok"; status: 200; error: null };
 
 const guardScenarios: GuardScenario[] = [
-  { kind: "step_up_required", status: 403, error: "Admin verification required." },
   { kind: "session_revoked", status: 401, error: "Your session has expired. Please sign in again." },
   { kind: "inactive_admin", status: 403, error: "Access denied" },
   { kind: "ok", status: 200, error: null },

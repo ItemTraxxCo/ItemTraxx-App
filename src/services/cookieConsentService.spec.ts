@@ -1,15 +1,18 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   allowsAnalytics,
   allowsDiagnostics,
   allowsSessionReplay,
+  COOKIE_CONSENT_SYNC_KEY,
   clearAnalyticsPersistence,
   getOrCreateCookieConsentSubject,
   hasCookieConsent,
   readCookieConsent,
+  subscribeCookieConsent,
   writeCookieConsent,
   type CookieConsentState,
 } from "./cookieConsentService";
+import { SESSION_REPLAY_HANDOFF_COOKIE_NAME } from "./sessionReplayHandoff";
 
 const clearAllCookies = () => {
   document.cookie.split(";").forEach((cookie) => {
@@ -21,6 +24,7 @@ const clearAllCookies = () => {
 };
 
 afterEach(() => {
+  vi.useRealTimers();
   clearAllCookies();
   window.localStorage.clear();
   window.sessionStorage.clear();
@@ -100,6 +104,68 @@ describe("writeCookieConsent", () => {
     expect(received?.preferences).toEqual({ analytics: false, diagnostics: true });
     window.removeEventListener("itemtraxx:cookie-consent", listener);
   });
+
+  it("clears a pending replay handoff whenever consent changes", () => {
+    document.cookie = `${SESSION_REPLAY_HANDOFF_COOKIE_NAME}=legacy; Path=/`;
+    expect(document.cookie).toContain(SESSION_REPLAY_HANDOFF_COOKIE_NAME);
+
+    writeCookieConsent({ analytics: false, diagnostics: true });
+
+    expect(document.cookie).not.toContain(SESSION_REPLAY_HANDOFF_COOKIE_NAME);
+  });
+});
+
+describe("subscribeCookieConsent", () => {
+  it("notifies on a same-window consent write and stops after unsubscribe", () => {
+    const listener = vi.fn();
+    const unsubscribe = subscribeCookieConsent(listener);
+
+    writeCookieConsent({ analytics: true, diagnostics: false });
+
+    expect(listener).toHaveBeenCalledWith(expect.objectContaining({
+      preferences: { analytics: true, diagnostics: false },
+    }));
+    unsubscribe();
+
+    writeCookieConsent({ analytics: false, diagnostics: false });
+    expect(listener).toHaveBeenCalledOnce();
+  });
+
+  it("notifies on the same-origin storage pulse", () => {
+    const listener = vi.fn();
+    const unsubscribe = subscribeCookieConsent(listener);
+    const state: CookieConsentState = {
+      version: 2,
+      preferences: { analytics: false, diagnostics: true },
+      updatedAt: "2026-02-01T00:00:00.000Z",
+    };
+    document.cookie = `itemtraxx-cookie-consent=${encodeURIComponent(JSON.stringify(state))}; Path=/`;
+
+    window.dispatchEvent(new StorageEvent("storage", {
+      key: COOKIE_CONSENT_SYNC_KEY,
+      newValue: state.updatedAt,
+    }));
+
+    expect(listener).toHaveBeenCalledWith(state);
+    unsubscribe();
+  });
+
+  it("polls the shared cookie so a subdomain revocation is observed", () => {
+    vi.useFakeTimers();
+    const listener = vi.fn();
+    const unsubscribe = subscribeCookieConsent(listener);
+    const state: CookieConsentState = {
+      version: 2,
+      preferences: { analytics: false, diagnostics: false },
+      updatedAt: "2026-02-02T00:00:00.000Z",
+    };
+    document.cookie = `itemtraxx-cookie-consent=${encodeURIComponent(JSON.stringify(state))}; Path=/`;
+
+    vi.advanceTimersByTime(2000);
+
+    expect(listener).toHaveBeenCalledWith(state);
+    unsubscribe();
+  });
 });
 
 describe("getOrCreateCookieConsentSubject", () => {
@@ -131,6 +197,22 @@ describe("consent predicate helpers", () => {
     expect(allowsAnalytics(state)).toBe(true);
     expect(allowsDiagnostics(state)).toBe(false);
     expect(allowsSessionReplay(state)).toBe(false);
+
+    const diagnosticsOnlyState: CookieConsentState = {
+      version: 2,
+      preferences: { analytics: false, diagnostics: true },
+      updatedAt: "t",
+    };
+    expect(allowsAnalytics(diagnosticsOnlyState)).toBe(false);
+    expect(allowsDiagnostics(diagnosticsOnlyState)).toBe(true);
+    expect(allowsSessionReplay(diagnosticsOnlyState)).toBe(false);
+
+    const allState: CookieConsentState = {
+      version: 2,
+      preferences: { analytics: true, diagnostics: true },
+      updatedAt: "t",
+    };
+    expect(allowsSessionReplay(allState)).toBe(true);
   });
 
   it("treat a null state as no consent for every category", () => {

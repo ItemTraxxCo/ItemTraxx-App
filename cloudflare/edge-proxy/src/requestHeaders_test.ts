@@ -56,6 +56,9 @@ Deno.test("function request headers preserve the allowlist, geo bounds, and supe
         "user-agent": "fixture-agent",
         "x-client-info": "fixture-client",
         "x-forwarded-for": "198.51.100.10",
+        traceparent: "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01",
+        tracestate: "vendor=value",
+        "x-itx-trace-parent-exported": "false",
         "x-secret": "must-not-forward",
       },
     },
@@ -103,6 +106,78 @@ Deno.test("function request headers preserve the allowlist, geo bounds, and supe
   assertEquals(headers.get("x-itx-geo-region"), "California", "region");
   assertEquals(headers.get("x-itx-geo-country"), "US", "country");
   assertEquals(headers.get("x-secret"), null, "unlisted header");
+  assertEquals(
+    headers.get("traceparent"),
+    "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01",
+    "traceparent",
+  );
+  assertEquals(headers.get("tracestate"), "vendor=value", "tracestate");
+  assertEquals(
+    headers.get("x-itx-trace-parent-exported"),
+    "false",
+    "Worker parent export marker",
+  );
+});
+
+Deno.test("resolved session identity overrides a different incoming bearer", () => {
+  const request = new Request(
+    "https://edge.itemtraxx.com/functions/intercom-jwt",
+    { headers: { authorization: "Bearer account-b-token" } },
+  );
+  const functionHeaders = sanitizeRequestHeaders(
+    request,
+    "anon",
+    "request-intercom",
+    "intercom-jwt",
+    "account-a-session-token",
+  );
+  assertEquals(
+    functionHeaders.get("authorization"),
+    "Bearer account-a-session-token",
+    "function proxy binds auth to the resolved cookie session",
+  );
+
+  const dataHeaders = sanitizeUpstreamHeaders(
+    request,
+    "anon",
+    "request-data",
+    "account-a-session-token",
+  );
+  assertEquals(
+    dataHeaders.get("authorization"),
+    "Bearer account-a-session-token",
+    "data proxy binds auth to the resolved cookie session",
+  );
+});
+
+Deno.test("explicit bearer remains available when no session token resolves", () => {
+  const request = new Request(
+    "https://edge.itemtraxx.com/functions/account-email-change",
+    { headers: { authorization: "Bearer public-endpoint-token" } },
+  );
+  const functionHeaders = sanitizeRequestHeaders(
+    request,
+    "anon",
+    "request-public",
+    "account-email-change",
+    null,
+  );
+  const dataHeaders = sanitizeUpstreamHeaders(
+    request,
+    "anon",
+    "request-public-data",
+    null,
+  );
+  assertEquals(
+    functionHeaders.get("authorization"),
+    "Bearer public-endpoint-token",
+    "public function bearer fallback",
+  );
+  assertEquals(
+    dataHeaders.get("authorization"),
+    "Bearer public-endpoint-token",
+    "data bearer fallback",
+  );
 });
 
 Deno.test("Data API request headers preserve only the supported upstream set", () => {
@@ -112,6 +187,9 @@ Deno.test("Data API request headers preserve only the supported upstream set", (
       prefer: "return=representation",
       range: "0-9",
       "content-type": "application/json",
+      traceparent: "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01",
+      tracestate: "vendor=value",
+      "x-itx-trace-parent-exported": "false",
       "x-secret": "must-not-forward",
     },
   });
@@ -128,6 +206,9 @@ Deno.test("Data API request headers preserve only the supported upstream set", (
     "content-type": "application/json",
     prefer: "return=representation",
     range: "0-9",
+    traceparent: "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01",
+    tracestate: "vendor=value",
+    "x-itx-trace-parent-exported": "false",
     "x-request-id": "request-2",
   }, "Data API headers");
 });

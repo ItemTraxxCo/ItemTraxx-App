@@ -21,7 +21,7 @@ test.describe("Better Auth authorization boundaries", () => {
 
   test("unauthenticated users cannot open account security", async ({ page }) => {
     await navigateApp(page, "/account/security");
-    await expect(page).toHaveURL(/\/$/);
+    await expect(page).toHaveURL(/\/login\?redirect=\/account\/security$/);
   });
 
   test("tenant accounts can manage their own security but not admin or SSO", async ({ page }) => {
@@ -29,15 +29,25 @@ test.describe("Better Auth authorization boundaries", () => {
     await navigateApp(page, "/account/security");
     await expect(page.getByRole("heading", { name: "Account security" })).toBeVisible();
     await navigateApp(page, "/admin/settings/sso");
-    await expect(page).not.toHaveURL(/\/admin\/settings\/sso$/);
+    await expect(page).toHaveURL(/\/access-denied\?redirect=\/admin\/settings\/sso$/);
     await navigateApp(page, "/super-admin");
-    await expect(page).not.toHaveURL(/\/super-admin$/);
+    await expect(page).toHaveURL(/\/access-denied\?redirect=\/super-admin$/);
+  });
+
+  test("tenant account security back button returns to the previous page", async ({ page }) => {
+    await setTenantAccountSession(page);
+    await navigateApp(page, "/account");
+    await page.getByRole("link", { name: "Account security" }).click();
+    await expect(page).toHaveURL(/\/account\/security$/);
+
+    await page.getByRole("button", { name: "Back" }).click();
+    await expect(page).toHaveURL(/\/account$/);
   });
 
   test("workspace admins cannot cross into global administration", async ({ page }) => {
     await setWorkspaceAdminSession(page, "workspace-a");
     await navigateApp(page, "/super-admin/settings/sso");
-    await expect(page).not.toHaveURL(/\/super-admin\/settings\/sso$/);
+    await expect(page).toHaveURL(/\/access-denied\?redirect=\/super-admin\/settings\/sso$/);
   });
 
   test("workspace admin SSO requests cannot target another organization", async ({ page }) => {
@@ -59,7 +69,7 @@ test.describe("Better Auth authorization boundaries", () => {
       sessionStorage.setItem("organizationId", "workspace-b");
     });
     await navigateApp(page, "/super-admin");
-    await expect(page).not.toHaveURL(/\/super-admin$/);
+    await expect(page).toHaveURL(/\/access-denied\?redirect=\/super-admin$/);
   });
 
   test("super admins retain global SSO oversight", async ({ page }) => {
@@ -105,7 +115,7 @@ test.describe("Better Auth two-factor challenge", () => {
     await page.goto("/login/two-factor");
     await page.getByLabel("Code").fill("000000");
     await page.getByRole("button", { name: "Verify authenticator code" }).click();
-    await expect(page.getByText("Invalid code")).toBeVisible();
+    await expect(page.getByRole("alert").getByText("Invalid code", { exact: true })).toBeVisible();
     await expect(page).toHaveURL(/\/login\/two-factor$/);
   });
 
@@ -118,6 +128,6 @@ test.describe("Better Auth two-factor challenge", () => {
     await page.goto("/login/two-factor");
     await page.getByLabel("Code").fill("used-backup-code");
     await page.getByRole("button", { name: "Use backup code" }).click();
-    await expect(page.getByText("Invalid backup code")).toBeVisible();
+    await expect(page.getByRole("alert").getByText("Invalid backup code", { exact: true })).toBeVisible();
   });
 });

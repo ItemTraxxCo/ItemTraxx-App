@@ -11,6 +11,7 @@ a:hover {
 html {
   width: 100%;
   max-width: 100%;
+  zoom: 90%;
   background-color: var(--page-bg);
 }
 
@@ -43,10 +44,10 @@ h1 {
 }
 
 button {
-  border-radius: 999px;
+  border-radius: var(--button-radius);
   border: 1px solid var(--button-border);
-  min-height: 2.5rem;
-  padding: 0.5rem 0.95rem;
+  min-height: var(--button-min-height);
+  padding: var(--button-padding-block) var(--button-padding-inline);
   font-size: 0.93rem;
   font-weight: 600;
   font-family: inherit;
@@ -116,14 +117,19 @@ button:focus-visible {
   margin-bottom: 1rem;
 }
 
+.page-nav-left .button-link {
+  min-height: 2rem;
+  padding-block: 0.2rem;
+}
+
 .button-link {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 2.5rem;
-  border-radius: 999px;
+  min-height: var(--button-min-height);
+  border-radius: var(--button-radius);
   border: 1px solid var(--button-border);
-  padding: 0.5rem 0.95rem;
+  padding: var(--button-padding-block) var(--button-padding-inline);
   font-size: 0.93rem;
   font-weight: 600;
   font-family: inherit;
@@ -159,6 +165,15 @@ input {
 
 textarea {
   resize: vertical;
+}
+
+/* Keep mobile browsers from zooming when editable controls receive focus. */
+@media (any-pointer: coarse) {
+  input:not([type="button"]):not([type="submit"]):not([type="reset"]):not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):not([type="file"]):not([type="image"]):not([type="hidden"]),
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
 }
 
 .form-actions {
@@ -206,9 +221,9 @@ textarea {
 .chip-button {
   display: inline-flex;
   align-items: center;
-  min-height: 1.9rem;
-  padding: 0.28rem 0.68rem;
-  border-radius: 999px;
+  min-height: 1.8rem;
+  padding: 0.22rem 0.6rem;
+  border-radius: var(--button-radius);
   font-size: 0.75rem;
   font-weight: 600;
   margin-left: 0.5rem;
@@ -229,4 +244,49 @@ textarea {
   background-color: revert;
   background: revert;
   box-shadow: none;
+}
+
+/* Keep action controls on the same rounded-rectangle shape, including
+   component-level buttons with their own local radius declarations. */
+:root :is(
+  button:not(
+    [class*="toggle"],
+    [class*="faq"],
+    [class*="close"],
+    [class*="dismiss"],
+    [class*="visibility"],
+    [class*="menu-item"],
+    [class*="menu-button"],
+    [class*="menu-trigger"],
+    [class*="popover-item"],
+    [class*="tile"],
+    [class*="option"],
+    [class*="row"],
+    [class*="text-button"],
+    [class*="icon"],
+    .command-result,
+    .needs-item
+  ),
+  a.button-link,
+  a[class*="button"],
+  a[class*="btn"],
+  a[class*="cta"],
+  a[class*="action"],
+  a[class*="primary-link"],
+  a[class*="secondary-link"],
+  .sa-btn,
+  .chip-button
+) {
+  border-radius: var(--button-radius) !important;
+}
+
+input[type="file"]::file-selector-button {
+  border-radius: var(--button-radius) !important;
+  padding: var(--button-padding-block) var(--button-padding-inline) !important;
+}
+
+input:is([type="button"], [type="submit"], [type="reset"]) {
+  border-radius: var(--button-radius) !important;
+  min-height: var(--button-min-height) !important;
+  padding: var(--button-padding-block) var(--button-padding-inline) !important;
 }

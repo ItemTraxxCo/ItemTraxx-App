@@ -269,8 +269,8 @@ Deno.test("REST allowlist admits only the relations and methods the SPA uses", (
   }
 
   assert(
-    isAllowedRestRequest("/rest/v1/admin_audit_logs", "POST"),
-    "browser audit-log insert must stay allowed",
+    !isAllowedRestRequest("/rest/v1/admin_audit_logs", "POST"),
+    "audit-log inserts must go through server-owned mutation handlers",
   );
   assert(
     !isAllowedRestRequest("/rest/v1/items", "POST"),
@@ -312,5 +312,62 @@ Deno.test("REST allowlist rejects unlisted, nested, and encoded relation names",
     getRestTableName("/rest/v1/rpc/consume_rate_limit"),
     "",
     "rpc subpaths are not tables",
+  );
+});
+
+
+Deno.test("REST allowlist constrains embedded relations and relationship queries", () => {
+  const itemLogsPageSelect =
+    "id,workspace_id,item_id,checked_out_by,action_type,action_time,performed_by,item:item_id(name,barcode),borrower:checked_out_by(username,borrower_id)";
+  const itemLogsPageQuery = new URLSearchParams({
+    select: itemLogsPageSelect,
+    workspace_id: "eq.00000000-0000-0000-0000-000000000000",
+    order: "action_time.desc",
+    limit: "200",
+  }).toString();
+
+  assert(
+    isAllowedRestRequest(
+      "/rest/v1/item_logs",
+      "GET",
+      `?${itemLogsPageQuery}`,
+    ),
+    "the workspace Item Logs page projection must remain allowed",
+  );
+
+  assert(
+    isAllowedRestRequest(
+      "/rest/v1/item_logs",
+      "GET",
+      "?select=action_time%2Citem%3Aitem_id%28name%29&workspace_id=eq.00000000-0000-0000-0000-000000000000&checked_out_by=eq.00000000-0000-0000-0000-000000000000&action_type=eq.checkout&order=action_time.desc&limit=1",
+    ),
+    "the SPA borrower-history item embed must remain allowed",
+  );
+
+  for (
+    const [path, search] of [
+      ["/rest/v1/items", "?select=id,workspace_policies(*)"],
+      ["/rest/v1/workspaces", "?select=id,workspace_usage(*)"],
+      ["/rest/v1/items", "?select=id,secret:workspace_policies(*)"],
+      ["/rest/v1/items", "?select=id,...workspace_policies(*)"],
+      ["/rest/v1/items", "?select=id,workspace_policies%2528*%2529"],
+      ["/rest/v1/items", "?select=id&select=workspace_policies(*)"],
+      ["/rest/v1/items", "?workspace_policies.max_items=gt.0"],
+      ["/rest/v1/items", "?order=workspace_policies(max_items).asc"],
+    ]
+  ) {
+    assert(
+      !isAllowedRestRequest(path, "GET", search),
+      `relationship access must be denied: ${path}${search}`,
+    );
+  }
+
+  assert(
+    !isAllowedRestRequest(
+      "/rest/v1/items",
+      "GET",
+      "?select=action_time%2Citem%3Aitem_id%28name%29",
+    ),
+    "the allowed embed must be limited to its current base relation",
   );
 });

@@ -1,18 +1,59 @@
 import {
   allowsAnalytics,
   allowsDiagnostics,
+  allowsSessionReplay,
   readCookieConsent,
 } from "./cookieConsentService";
 import { isRecoverableChunkLoadError } from "./appErrorRecovery";
-import type { CaptureResult } from "posthog-js";
-import { scrubSensitiveRecoveryUrlValue } from "../utils/passwordResetRedirect";
+import type { CaptureLogOptions, CaptureResult } from "posthog-js";
 import { AppError } from "./appErrors";
+import {
+  maskSessionReplayAttribute,
+  scrubSensitiveReplayUrlValue,
+  SESSION_REPLAY_MASK_SELECTOR,
+} from "./sessionReplayPrivacy";
+import { clearReplaySessionHandoff } from "./sessionReplayHandoff";
 
 let initialized = false;
+let posthogReady = false;
 let posthog: typeof import("posthog-js").default | null = null;
+let initializationPromise: Promise<void> | null = null;
+let posthogReadyPromise: Promise<void> | null = null;
+const SERVICE_NAME = "itemtraxx-web";
+const APP_ENVIRONMENT = import.meta.env.VITE_POSTHOG_ENVIRONMENT?.trim() || import.meta.env.MODE || "production";
+const APP_VERSION = import.meta.env.VITE_GIT_COMMIT?.trim() || "n/a";
+const LOCALHOST_HOSTS = new Set(["localhost", "127.0.0.1", "0.0.0.0", "::1", "[::1]"]);
 const EMAIL_PATTERN = /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/i;
+const EMAIL_REDACTION_PATTERN = /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi;
 const SENSITIVE_PROPERTY_KEY =
   /(email|phone|name|tenant|profile|borrower|user_id|address|token|secret|error_message|error_type|error_stack|error_context|error_cause|exception|message|stack|context|cause)/i;
+const EXCEPTION_CONTEXT_KEY = /^(route|path|operation|status|latency_ms|duration_ms|request_id|provider|retry_count|error_code|trace_id|span_id|service|environment|method|component|outcome|sampled|slow|attempt|job_type|result|request_area|request_operation|request_method|request_status)$/i;
+// Keys the browser SDK manages and that capture validation needs to keep the
+// event addressable. Without distinct_id the event is dropped as
+// missing_distinct_id; the rest tie it to the right library, session, device.
+const SDK_MANAGED_PROPERTY_KEYS = [
+  "distinct_id",
+  "$lib",
+  "$lib_version",
+  "$session_id",
+  "$device_id",
+] as const;
+
+// Local development intentionally exercises failing requests. Those failures
+// must not enter the shared PostHog project, where the exception alerting path
+// would treat them as staging/production incidents. The Vite dev server counts
+// as local development on any host, so a tunnel URL does not bypass the guard.
+const isLocalhostRuntime = () => {
+  // MODE selects env files, while DEV reflects NODE_ENV. Keep the explicit
+  // mode guard for development builds, and catch dev servers using custom modes.
+  const isDevelopmentRuntime =
+    import.meta.env.MODE === "development" ||
+    (import.meta.env.DEV && import.meta.env.MODE !== "test");
+  if (isDevelopmentRuntime) return true;
+  if (typeof window === "undefined") return false;
+  const hostname = window.location?.hostname?.trim().toLowerCase() || "";
+  return LOCALHOST_HOSTS.has(hostname) || hostname.endsWith(".localhost");
+};
 
 export type PostHogErrorCode =
   | "unauthorized"
@@ -101,35 +142,144 @@ export const getPostHogErrorCode = (error: unknown): PostHogErrorCode => {
   return "unknown_error";
 };
 
+const redactLogText = (value: string, maxLength = 512) =>
+  value
+    .replace(EMAIL_REDACTION_PATTERN, "[REDACTED_EMAIL]")
+    .replace(/\b(?:bearer\s+)?[a-z0-9_-]{24,}\.[a-z0-9_-]{12,}\.[a-z0-9_-]{12,}\b/gi, "[REDACTED_TOKEN]")
+    .replace(/\b(access_token|refresh_token|id_token|token|secret|signature|code)=([^&#\s]+)/gi, "$1=[REDACTED]")
+    .replace(/[\u0000-\u001f\u007f]/g, " ")
+    .slice(0, maxLength);
+
+const safeExceptionString = (value: unknown, maxLength = 512) =>
+  typeof value === "string" ? redactLogText(value).slice(0, maxLength) : undefined;
+
+const sanitizeExceptionFrame = (frame: unknown) => {
+  if (!frame || typeof frame !== "object") return undefined;
+  const source = frame as Record<string, unknown>;
+  const safe: Record<string, unknown> = {};
+  for (const key of ["platform", "filename", "function", "lineno", "colno", "in_app"]) {
+    const value = source[key];
+    if (typeof value === "string") {
+      safe[key] = key === "filename"
+        ? safeExceptionString(scrubSensitiveReplayUrlValue(value), 256)
+        : safeExceptionString(value, 256);
+    } else if (typeof value === "number" || typeof value === "boolean") {
+      safe[key] = value;
+    }
+  }
+  return safe;
+};
+
+const sanitizeExceptionList = (
+  value: unknown,
+  errorCode?: PostHogErrorCode,
+  requestOperation?: string,
+) => {
+  if (!Array.isArray(value)) return [];
+  const entries = value.flatMap((entry) => {
+    if (!entry || typeof entry !== "object") return [];
+    const source = entry as Record<string, unknown>;
+    const safe: Record<string, unknown> = {};
+    const type = safeExceptionString(source.type, 120);
+    const exceptionValue = safeExceptionString(source.value, 512);
+    if (type) safe.type = type;
+    if (exceptionValue) safe.value = exceptionValue;
+    const stacktrace = source.stacktrace;
+    if (stacktrace && typeof stacktrace === "object") {
+      const stack = stacktrace as Record<string, unknown>;
+      const frames = Array.isArray(stack.frames)
+        ? stack.frames.flatMap((frame) => {
+            const safeFrame = sanitizeExceptionFrame(frame);
+            return safeFrame ? [safeFrame] : [];
+          }).slice(0, 100)
+        : [];
+      if (frames.length > 0) safe.stacktrace = { type: "raw", frames };
+    }
+    const mechanism = source.mechanism;
+    if (mechanism && typeof mechanism === "object") {
+      const sourceMechanism = mechanism as Record<string, unknown>;
+      safe.mechanism = {
+        ...(typeof sourceMechanism.type === "string" ? { type: safeExceptionString(sourceMechanism.type, 64) } : {}),
+        ...(typeof sourceMechanism.handled === "boolean" ? { handled: sourceMechanism.handled } : {}),
+        ...(typeof sourceMechanism.synthetic === "boolean" ? { synthetic: sourceMechanism.synthetic } : {}),
+      };
+    }
+    return [safe];
+  });
+
+  if (!errorCode) return entries;
+  const first = entries[0] as Record<string, unknown> | undefined;
+  const safeOperation = requestOperation
+    ? safeExceptionString(requestOperation, 160)
+    : undefined;
+  return [{
+    // Handled request failures should remain grouped by their safe endpoint
+    // context. The old fixed type/value made every transport failure look like
+    // an artificial JavaScript exception even though the event had useful
+    // request properties attached.
+    type: safeOperation ? "ItemTraxxHandledRequestFailure" : "ItemTraxxClientError",
+    value: safeOperation ? `${safeOperation}:${errorCode}` : errorCode,
+    ...(first?.stacktrace ? { stacktrace: first.stacktrace } : {}),
+    mechanism: { type: "generic", handled: true, synthetic: false },
+  }];
+};
+
 const sanitizeExceptionEvent = (event: CaptureResult): CaptureResult => {
   if (event.event !== "$exception") return event;
 
   const properties = event.properties;
   const errorCode = isPostHogErrorCode(properties?.error_code)
     ? properties.error_code
-    : "unknown_error";
+    : undefined;
   const safeProperties: CaptureResult["properties"] = {};
   if (typeof properties?.token === "string") {
     // PostHog requires its project token to remain on the event. It is not a
     // user/session bearer and is safe to preserve here.
     safeProperties.token = properties.token;
   }
-  safeProperties.$exception_list = [
-    {
-      type: "ItemTraxxClientError",
-      value: errorCode,
-      mechanism: { type: "generic", handled: true, synthetic: true },
-    },
-  ];
-  safeProperties.$exception_level = "error";
-  safeProperties.error_code = errorCode;
+  // The SDK keeps the identifier and its own library/session/device keys in the
+  // property bag. Capture validation rejects an event that arrives without a
+  // distinct id, so carry these through the rebuild instead of the allowlist.
+  for (const key of SDK_MANAGED_PROPERTY_KEYS) {
+    const value = properties?.[key];
+    if (typeof value === "string") safeProperties[key] = value;
+  }
+  for (const [key, value] of Object.entries(properties ?? {})) {
+    if (
+      !EXCEPTION_CONTEXT_KEY.test(key) ||
+      SENSITIVE_PROPERTY_KEY.test(key) ||
+      key === "error_code"
+    ) continue;
+    if (typeof value === "string") {
+      safeProperties[key] = redactLogText(value, 256);
+    } else if (typeof value === "number" && Number.isFinite(value)) {
+      safeProperties[key] = value;
+    } else if (typeof value === "boolean" || value === null) {
+      safeProperties[key] = value;
+    }
+    if (Object.keys(safeProperties).length >= 32) break;
+  }
+  safeProperties.$exception_list = sanitizeExceptionList(
+    properties?.$exception_list,
+    errorCode,
+    typeof properties?.request_operation === "string" ? properties.request_operation : undefined,
+  );
+  safeProperties.$exception_level = properties?.$exception_level === "warning"
+    ? "warning"
+    : "error";
+  safeProperties.error_code = errorCode ?? "unknown_error";
+  if (typeof properties?.$release_id === "string") {
+    safeProperties.$release_id = properties.$release_id.slice(0, 128);
+  } else if (APP_VERSION !== "n/a") {
+    safeProperties.$release_id = APP_VERSION;
+  }
 
   return { ...event, properties: safeProperties };
 };
 
 const URL_PROPERTY_KEY = /(url|uri|href|referrer|path)/i;
 
-export const sanitizeRecoveryUrlProperties = (
+export const sanitizeTelemetryUrlProperties = (
   properties: Record<string, unknown> | undefined,
 ) => {
   if (!properties) return properties;
@@ -137,7 +287,7 @@ export const sanitizeRecoveryUrlProperties = (
   const safeProperties: Record<string, unknown> = { ...properties };
   for (const [key, value] of Object.entries(properties)) {
     if (!URL_PROPERTY_KEY.test(key) || typeof value !== "string") continue;
-    const safeValue = scrubSensitiveRecoveryUrlValue(value);
+    const safeValue = scrubSensitiveReplayUrlValue(value);
     if (safeValue !== value) {
       safeProperties[key] = safeValue;
       changed = true;
@@ -160,6 +310,64 @@ const scrubProperties = (
         {}
       )
     : undefined;
+
+const LOG_ATTRIBUTE_KEY = /^(route|operation|status|latency_ms|duration_ms|request_id|provider|retry_count|error_code|trace_id|span_id|service|environment|method|component|outcome|sampled|slow|attempt|job_type|result)$/i;
+
+const scrubLogAttributes = (attributes?: Record<string, unknown>) => {
+  if (!attributes) return undefined;
+  const safe: Record<string, string | number | boolean | null> = {};
+  for (const [key, value] of Object.entries(attributes)) {
+    if (!LOG_ATTRIBUTE_KEY.test(key) || SENSITIVE_PROPERTY_KEY.test(key)) continue;
+    if (typeof value === "string") {
+      safe[key] = redactLogText(value);
+    } else if (typeof value === "number" && Number.isFinite(value)) {
+      safe[key] = value;
+    } else if (typeof value === "boolean" || value === null) {
+      safe[key] = value;
+    }
+    if (Object.keys(safe).length >= 32) break;
+  }
+  return safe;
+};
+
+type PostHogLogInput = Omit<CaptureLogOptions, "body" | "attributes"> & {
+  body: string;
+  attributes?: Record<string, unknown>;
+};
+
+/**
+ * Send only explicitly authored, high-signal application logs. PostHog's
+ * console integration remains disabled; this helper never patches or forwards
+ * browser console output.
+ */
+export const capturePostHogLog = (input: PostHogLogInput) => {
+  if (
+    isLocalhostRuntime() ||
+    !initialized ||
+    !posthog ||
+    !allowsDiagnostics(readCookieConsent())
+  ) return;
+  try {
+    const record: CaptureLogOptions = {
+      body: redactLogText(input.body),
+      ...(input.level ? { level: input.level } : {}),
+      ...(typeof input.trace_id === "string" && /^[0-9a-f]{32}$/i.test(input.trace_id)
+        ? { trace_id: input.trace_id }
+        : {}),
+      ...(typeof input.span_id === "string" && /^[0-9a-f]{16}$/i.test(input.span_id)
+        ? { span_id: input.span_id }
+        : {}),
+      ...(typeof input.trace_flags === "number" && Number.isFinite(input.trace_flags)
+        ? { trace_flags: input.trace_flags }
+        : {}),
+      attributes: scrubLogAttributes(input.attributes),
+    };
+    posthog.captureLog(record);
+  } catch (error) {
+    // Observability must never break a user flow.
+    console.warn("[posthog] log capture failed; continuing without logs.", error);
+  }
+};
 
 const CSP_UNSAFE_EVAL_PATTERNS = [
   /unsafe-eval/i,
@@ -189,11 +397,35 @@ const isCspUnsafeEvalError = (error: unknown) => {
   );
 };
 
-// PostHog's exception feed has its own policy. Keep the expected borrower/item
-// lookup miss out of it without inheriting Sentry's broader suppression rules
-// for network, auth, and other operational errors.
-const shouldCapturePostHogException = (error: unknown) =>
-  !(error instanceof AppError && error.code === "NOT_FOUND");
+// Honor explicit classification first. Handled request failures may already be
+// reported by their request client, while unexpected Errors remain reportable
+// by default. Keep the expected borrower/item lookup fallback too.
+const shouldCapturePostHogException = (error: unknown) => {
+  if (error && typeof error === "object") {
+    const reportToErrorTracking = (error as { reportToErrorTracking?: unknown })
+      .reportToErrorTracking;
+    if (typeof reportToErrorTracking === "boolean") return reportToErrorTracking;
+  }
+  return !(error instanceof AppError && error.code === "NOT_FOUND");
+};
+
+const cloneErrorForPostHog = (error: unknown, errorCode: PostHogErrorCode) => {
+  if (!(error instanceof Error)) {
+    const safeError = new Error(errorCode);
+    safeError.name = "ItemTraxxClientError";
+    return safeError;
+  }
+
+  // Keep the original message/stack for PostHog's source-map grouping, but do
+  // not pass the application Error object (and its cause/custom fields) into a
+  // third-party SDK or mutate it while normalizing its grouping name.
+  const safeError = new Error(redactLogText(error.message, 2_000));
+  safeError.name = error.name && error.name !== "Error"
+    ? error.name
+    : "ItemTraxxClientError";
+  if (error.stack) safeError.stack = redactLogText(error.stack, 6_000);
+  return safeError;
+};
 
 // PostHog's exception autocapture installs its own global onerror/onunhandledrejection
 // handlers and reports directly, bypassing the guards in globalErrorHandling.ts and
@@ -215,13 +447,11 @@ const isCspUnsafeEvalExceptionEvent = (
   );
 };
 
-// A script served cross-origin without CORS strips the error the browser hands
-// to window.onerror down to a bare synthetic "Script error." with no message,
-// source, or stack. These entries carry no information to triage, so drop them
-// here. The crossorigin="anonymous" attribute on the Turnstile script
-// (useTurnstile.ts) lets real errors through with a full stack instead.
-const isOpaqueScriptExceptionEvent = (
-  properties?: Record<string, unknown>,
+// Match a single exception the browser synthesizes for window.onerror with no
+// stack frames. isMatch receives the trimmed exception value.
+const isSyntheticStacklessException = (
+  properties: Record<string, unknown> | undefined,
+  isMatch: (value: string) => boolean,
 ) => {
   const exceptionList = properties?.$exception_list;
   if (!Array.isArray(exceptionList) || exceptionList.length !== 1) return false;
@@ -234,11 +464,19 @@ const isOpaqueScriptExceptionEvent = (
   const frames = entry.stacktrace?.frames;
   return (
     typeof entry.value === "string" &&
-    entry.value.trim() === "Script error." &&
+    isMatch(entry.value.trim()) &&
     entry.mechanism?.synthetic === true &&
     (!Array.isArray(frames) || frames.length === 0)
   );
 };
+
+// A script served cross-origin without CORS strips the error the browser hands
+// to window.onerror down to a bare synthetic "Script error." with no message,
+// source, or stack. These entries carry no information to triage, so drop them
+// here. The crossorigin="anonymous" attribute on the Turnstile script
+// (useTurnstile.ts) lets real errors through with a full stack instead.
+const isOpaqueScriptExceptionEvent = (properties?: Record<string, unknown>) =>
+  isSyntheticStacklessException(properties, (value) => value === "Script error.");
 
 const isRecoverableChunkLoadExceptionEvent = (
   properties?: Record<string, unknown>,
@@ -253,29 +491,131 @@ const isRecoverableChunkLoadExceptionEvent = (
   );
 };
 
-export const initPostHog = async () => {
+// The browser emits "ResizeObserver loop ..." through window.onerror when a
+// ResizeObserver callback changes layout and the layout does not settle in one
+// frame. The app's only observer (useTopBannerLayout.ts) writes the banner
+// heights that feed --top-banner-offset, so this is expected and the layout
+// settles on the next frame. The event is synthetic and carries no stack, so
+// drop it here to keep the exception feed actionable.
+const isResizeObserverLoopExceptionEvent = (properties?: Record<string, unknown>) =>
+  isSyntheticStacklessException(properties, (value) =>
+    value.startsWith("ResizeObserver loop"));
+
+// Playwright injects page bindings named "__pw_*" and dispatches them from its
+// own driver. When an automated crawler visits the site, a binding call that
+// races page navigation rejects with "Function "__pw_..." is not exposed". The
+// error and its frames come from Playwright, not ItemTraxx, so drop them here.
+const PLAYWRIGHT_BINDING_FUNCTIONS = new Set<unknown>([
+  "_FrameSession._onBindingCalled",
+  "_Page.onBindingCalled",
+  "_PageBinding.dispatch",
+]);
+
+const isPlaywrightBindingExceptionEvent = (properties?: Record<string, unknown>) => {
+  const exceptionList = properties?.$exception_list;
+  if (!Array.isArray(exceptionList)) return false;
+  return exceptionList.some((entry) => {
+    if (!entry || typeof entry !== "object") return false;
+    const { value, stacktrace } = entry as {
+      value?: unknown;
+      stacktrace?: { frames?: unknown[] };
+    };
+    if (typeof value === "string" && value.trim().startsWith('Function "__pw_')) return true;
+    const frames = stacktrace?.frames;
+    return Array.isArray(frames) && frames.some(
+      (frame) =>
+        !!frame &&
+        typeof frame === "object" &&
+        PLAYWRIGHT_BINDING_FUNCTIONS.has((frame as { function?: unknown }).function),
+    );
+  });
+};
+
+// The PostHog SDK's native exception hooks run before Vue's app error handler
+// and can report errors that the application deliberately marks as handled.
+// Keep expected transport outcomes out of Error Tracking when those hooks see
+// them as uncaught AppErrors. Server-side AppErrors and unrelated exceptions
+// remain reportable.
+const isExpectedTransportAppErrorExceptionEvent = (
+  properties?: Record<string, unknown>,
+) => {
+  const exceptionList = properties?.$exception_list;
+  if (!Array.isArray(exceptionList) || exceptionList.length === 0) return false;
+  return exceptionList.every((entry) => {
+    if (!entry || typeof entry !== "object") return false;
+    const exception = entry as { type?: unknown; value?: unknown };
+    if (exception.type !== "AppError" || typeof exception.value !== "string") return false;
+    return /^(?:rate limit exceeded|too many requests|network request failed|network issue\b|request timed out\b)/i
+      .test(exception.value.trim());
+  });
+};
+
+const initializePostHog = async () => {
   if (initialized) return;
   const token = import.meta.env.VITE_POSTHOG_PROJECT_TOKEN?.trim();
-  if (!token || !allowsAnalytics(readCookieConsent())) return;
+  const consent = readCookieConsent();
+  const analyticsAllowed = allowsAnalytics(consent);
+  const diagnosticsAllowed = allowsDiagnostics(consent);
+  if (!token || (!analyticsAllowed && !diagnosticsAllowed)) {
+    clearReplaySessionHandoff();
+    return;
+  }
   try {
     posthog = (await import("posthog-js")).default;
+    const currentConsent = readCookieConsent();
+    const currentAnalyticsAllowed = allowsAnalytics(currentConsent);
+    const currentDiagnosticsAllowed = allowsDiagnostics(currentConsent);
+    const currentSessionReplayAllowed = allowsSessionReplay(currentConsent);
+    if (!currentAnalyticsAllowed && !currentDiagnosticsAllowed) {
+      clearReplaySessionHandoff();
+      return;
+    }
+    // Replay is now strictly opt-in to both Analytics and Diagnostics. Any
+    // handoff cookie from an older build must not re-enable it after a
+    // redirect, so discard the bridge before initializing the SDK.
+    clearReplaySessionHandoff();
+    if (APP_VERSION !== "n/a" && typeof globalThis !== "undefined") {
+      // posthog-cli uses this same runtime hook after source-map injection. Set
+      // the build release only when no injected release row is present; the
+      // CLI's ID is the authoritative source-map foreign key.
+      const releaseTarget = globalThis as typeof globalThis & { _posthogReleaseId?: string };
+      if (!releaseTarget._posthogReleaseId) releaseTarget._posthogReleaseId = APP_VERSION;
+    }
     const posthogConfig: NonNullable<Parameters<typeof posthog.init>[1]> = {
       api_host: import.meta.env.VITE_POSTHOG_HOST?.trim() || "https://j.itemtraxx.com",
       ui_host: "https://us.posthog.com",
       defaults: "2026-01-30",
+      // Do not ingest Meta advertising identifiers from first-party _fbp/_fbc
+      // cookies; ItemTraxx does not use campaign attribution.
+      save_campaign_params: false,
+      // The SDK persists $initial_person_info when referrer or campaign
+      // capture is enabled. before_send runs after that persistence write, so
+      // do not retain the initial URL/referrer in browser storage.
+      save_referrer: false,
+      // Keep the identity/session cookie shared across itemtraxx.com and
+      // workspace subdomains. The explicit conflict policy is required while
+      // this app remains pinned to an older PostHog defaults snapshot; it
+      // prevents a stale per-origin localStorage session from winning over
+      // the shared cookie after a full-page workspace redirect.
+      cross_subdomain_cookie: true,
+      cookieWinsOnConflict: true,
       autocapture: false,
       rageclick: false,
-      capture_pageview: "history_change",
-      capture_pageleave: true,
+      capture_pageview: currentAnalyticsAllowed ? "history_change" : false,
+      capture_pageleave: currentAnalyticsAllowed,
       capture_dead_clicks: false,
       // Exception autocapture is diagnostics, not analytics. Keep the SDK's
       // global handlers disabled unless that separate consent is present.
-      capture_exceptions: allowsDiagnostics(readCookieConsent()),
+      capture_exceptions: allowsDiagnostics(currentConsent) && !isLocalhostRuntime(),
       before_send: (event) => {
         if (!event) return null;
+        if (event.event === "$exception" && isLocalhostRuntime()) return null;
+        if (event.event === "$exception" && !allowsDiagnostics(readCookieConsent())) {
+          return null;
+        }
         const safeEvent: CaptureResult = {
           ...event,
-          properties: (sanitizeRecoveryUrlProperties(event.properties) ?? {}) as
+          properties: (sanitizeTelemetryUrlProperties(event.properties) ?? {}) as
             CaptureResult["properties"],
         };
         if (
@@ -283,7 +623,10 @@ export const initPostHog = async () => {
           (
             isCspUnsafeEvalExceptionEvent(safeEvent.properties) ||
             isRecoverableChunkLoadExceptionEvent(safeEvent.properties) ||
-            isOpaqueScriptExceptionEvent(safeEvent.properties)
+            isOpaqueScriptExceptionEvent(safeEvent.properties) ||
+            isResizeObserverLoopExceptionEvent(safeEvent.properties) ||
+            isPlaywrightBindingExceptionEvent(safeEvent.properties) ||
+            isExpectedTransportAppErrorExceptionEvent(safeEvent.properties)
           )
         ) {
           return null;
@@ -291,15 +634,56 @@ export const initPostHog = async () => {
         return sanitizeExceptionEvent(safeEvent);
       },
       logs: {
+        serviceName: SERVICE_NAME,
+        environment: APP_ENVIRONMENT,
+        serviceVersion: APP_VERSION,
+        resourceAttributes: {
+          "deployment.environment": APP_ENVIRONMENT,
+        },
         captureConsoleLogs: false,
         // Remote config can opt console capture back in; keep that alternate
-        // sink disabled even if the project setting changes later.
-        beforeSend: () => null,
+        // sink disabled even if the project setting changes later. Explicit
+        // capturePostHogLog calls are scrubbed before they reach the SDK.
+        beforeSend: (record) => {
+          if (!allowsDiagnostics(readCookieConsent())) return null;
+          const rawAttributes = (record.attributes ?? {}) as Record<string, unknown>;
+          if (typeof rawAttributes["log.source"] === "string" && rawAttributes["log.source"].startsWith("console.")) {
+            return null;
+          }
+          return {
+            ...record,
+            body: redactLogText(record.body),
+            attributes: scrubLogAttributes(rawAttributes),
+          };
+        },
       },
-      // Session replay is disabled globally: authenticated/admin DOM text can
-      // contain support requests and other tenant-sensitive data that input
-      // masking does not cover.
-      disable_session_recording: true,
+      // A diagnostics-only session uses an in-memory PostHog identity and has
+      // no automatic analytics events. Explicit exception/log calls remain
+      // gated by diagnostics consent below.
+      persistence: currentAnalyticsAllowed ? "localStorage+cookie" : "memory",
+      disable_persistence: !currentAnalyticsAllowed,
+      // Replay requires both Analytics and Diagnostics consent. Keep input
+      // values masked, but redact only explicitly marked borrower/user data so
+      // the rest of the page stays useful in the replay viewer.
+      disable_session_recording: !currentSessionReplayAllowed,
+      session_recording: {
+        maskAllInputs: true,
+        maskTextSelector: SESSION_REPLAY_MASK_SELECTOR,
+        // Explicitly disable the project-wide blanket attribute setting so it
+        // cannot override the selective callback below and blank images/links.
+        maskAllElementAttributes: false,
+        maskAttributeFn: maskSessionReplayAttribute,
+        // Network capture would put back the content that DOM masking removes.
+        recordHeaders: false,
+        recordBody: false,
+        // Replay captures page and request URLs separately from event
+        // properties. Redact sensitive query/hash parameters at that boundary
+        // while keeping ordinary navigation state in request URLs intact.
+        maskCapturedNetworkRequestFn: (request) => {
+          const safeName = scrubSensitiveReplayUrlValue(request.name);
+          return safeName === request.name ? request : { ...request, name: safeName };
+        },
+      },
       disable_surveys: true,
       disable_surveys_automatic_display: true,
       disable_product_tours: true,
@@ -309,29 +693,92 @@ export const initPostHog = async () => {
       advanced_disable_feature_flags_on_first_load: true,
     };
 
+    let resolvePostHogReady: (() => void) | null = null;
+    posthogReady = false;
+    posthogReadyPromise = new Promise<void>((resolve) => {
+      resolvePostHogReady = resolve;
+    });
     posthog.init(token, {
       ...posthogConfig,
       loaded: () => {
+        // Remove any initial URL/referrer value written by an earlier build
+        // before the SDK's first pageview is captured.
+        posthog?.unregister("$initial_person_info");
         initialized = true;
+        posthogReady = true;
+        resolvePostHogReady?.();
+        resolvePostHogReady = null;
+        posthogReadyPromise = null;
       },
     });
     initialized = true;
   } catch (error) {
+    initialized = false;
+    posthogReady = false;
+    posthogReadyPromise = null;
     // Analytics must never break login or core flows.
     console.warn("[posthog] init failed; continuing without analytics.", error);
   }
 };
 
+export const initPostHog = async () => {
+  if (initialized || posthogReadyPromise) return;
+  if (!initializationPromise) initializationPromise = initializePostHog();
+  try {
+    await initializationPromise;
+  } finally {
+    initializationPromise = null;
+  }
+};
+
+const waitForPostHogReady = async () => {
+  if (posthogReady) return true;
+  if (initializationPromise) await initializationPromise;
+  if (posthogReady) return true;
+  if (posthogReadyPromise) await posthogReadyPromise;
+  return posthogReady;
+};
+
 export const syncPostHogConsent = () => {
   if (!initialized || !posthog) return;
-  posthog.set_config({
-    capture_exceptions: allowsDiagnostics(readCookieConsent()),
-  });
-  if (allowsAnalytics(readCookieConsent())) {
-    posthog.opt_in_capturing();
-    return;
+  try {
+    const consent = readCookieConsent();
+    const analyticsAllowed = allowsAnalytics(consent);
+    const diagnosticsAllowed = allowsDiagnostics(consent);
+    const sessionReplayAllowed = allowsSessionReplay(consent);
+    posthog.set_config({
+      capture_exceptions: diagnosticsAllowed && !isLocalhostRuntime(),
+      capture_pageview: analyticsAllowed ? "history_change" : false,
+      capture_pageleave: analyticsAllowed,
+      disable_persistence: !analyticsAllowed,
+      disable_session_recording: !sessionReplayAllowed,
+    });
+    if (!sessionReplayAllowed) clearReplaySessionHandoff();
+    if (analyticsAllowed) {
+      posthog.opt_in_capturing();
+      if (sessionReplayAllowed) {
+        posthog.startSessionRecording();
+      } else {
+        posthog.stopSessionRecording();
+      }
+      return;
+    }
+    if (diagnosticsAllowed) {
+      // Keep the SDK able to deliver explicitly captured diagnostics without
+      // enabling product analytics or writing a persistent identity.
+      posthog.opt_in_capturing({ captureEventName: false });
+      if (sessionReplayAllowed) {
+        posthog.startSessionRecording();
+      } else {
+        posthog.stopSessionRecording();
+      }
+      return;
+    }
+    posthog.stopSessionRecording();
+    posthog.opt_out_capturing();
+  } catch (error) {
+    console.warn("[posthog] consent sync failed; continuing without analytics.", error);
   }
-  posthog.opt_out_capturing();
 };
 
 export const capturePostHogEvent = (
@@ -363,6 +810,7 @@ export const identifyPostHogUser = (
 };
 
 export const resetPostHog = () => {
+  clearReplaySessionHandoff();
   if (!initialized || !posthog) return;
   try {
     posthog.reset();
@@ -373,22 +821,101 @@ export const resetPostHog = () => {
 
 // A missing borrower/item lookup is an expected operator input outcome, not an
 // exception. Other operational failures still belong in PostHog for diagnosis.
-export const capturePostHogException = (error: unknown) => {
+export const capturePostHogException = (
+  error: unknown,
+  additionalProperties?: Record<string, string | number | boolean | null | undefined>,
+) => {
   if (
+    isLocalhostRuntime() ||
     !initialized ||
     !posthog ||
-    !allowsAnalytics(readCookieConsent()) ||
     !allowsDiagnostics(readCookieConsent()) ||
     isCspUnsafeEvalError(error) ||
     !shouldCapturePostHogException(error)
   ) return;
   try {
     const errorCode = getPostHogErrorCode(error);
-    const safeError = new Error(errorCode);
-    safeError.name = "ItemTraxxClientError";
-    safeError.stack = undefined;
-    posthog.captureException(safeError, { error_code: errorCode });
+    const safeError = cloneErrorForPostHog(error, errorCode);
+    const safeProperties = {
+      ...(scrubProperties(additionalProperties) ?? {}),
+      error_code: errorCode,
+    };
+    posthog.captureException(safeError, safeProperties);
   } catch (captureError) {
     console.warn("[posthog] exception capture failed; continuing without analytics. Please contact support.", captureError);
   }
+};
+
+export type HandledRequestFailure = {
+  area: "edge_function" | "authenticated_data" | "http_session";
+  name: string;
+  path: string;
+  method: string;
+  status: number;
+  message: string;
+  errorCode?: PostHogErrorCode;
+  requestId?: string;
+};
+
+const HANDLED_FAILURE_DEDUP_WINDOW_MS = 60_000;
+const handledFailureSeenAt = new Map<string, number>();
+
+// These failures are already handled by the request client and emitted as
+// structured PostHog logs. Promote only server responses to Error Tracking:
+// browser/network timeouts, expected auth/rate-limit responses, and background
+// health-probe failures are not uncaught application errors and create noisy
+// synthetic issues when wrapped in captureException.
+const shouldCaptureHandledRequestFailure = (failure: HandledRequestFailure) =>
+  failure.status >= 500;
+
+const getHandledRequestFailureCode = (failure: HandledRequestFailure): PostHogErrorCode => {
+  if (failure.errorCode && isPostHogErrorCode(failure.errorCode)) return failure.errorCode;
+  if (failure.status >= 500) return "server_error";
+  if (failure.status === 0) {
+    return /timed out|timeout/i.test(failure.message) ? "timeout" : "network";
+  }
+  if (failure.status === 429) return "rate_limit";
+  if (failure.status === 401 || failure.status === 403) return "unauthorized";
+  return "request_failed";
+};
+
+/** Capture an expected request failure at a high-value boundary without the raw response body. */
+export const captureHandledRequestFailure = async (failure: HandledRequestFailure) => {
+  if (isLocalhostRuntime() || !shouldCaptureHandledRequestFailure(failure)) return;
+  if (!allowsDiagnostics(readCookieConsent())) return;
+  await initPostHog();
+  if (!(await waitForPostHogReady()) || !posthog) return;
+  const errorCode = getHandledRequestFailureCode(failure);
+  const path = failure.path.replace(/[?#].*$/, "");
+  const dedupeKey = [
+    failure.area,
+    failure.name,
+    failure.method.toUpperCase(),
+    failure.status,
+    errorCode,
+    path,
+  ].join(":");
+  const now = Date.now();
+  for (const [key, seenAt] of handledFailureSeenAt) {
+    if (now - seenAt >= HANDLED_FAILURE_DEDUP_WINDOW_MS) handledFailureSeenAt.delete(key);
+  }
+  const previous = handledFailureSeenAt.get(dedupeKey);
+  if (previous !== undefined && now - previous < HANDLED_FAILURE_DEDUP_WINDOW_MS) return;
+  handledFailureSeenAt.set(dedupeKey, now);
+  capturePostHogException(
+    Object.assign(new Error(`Handled request failure: ${errorCode}`), {
+      name: "ItemTraxxHandledRequestFailure",
+      code: errorCode.toUpperCase(),
+      status: failure.status,
+    }),
+    {
+      error_code: errorCode,
+      request_area: failure.area,
+      request_operation: failure.name,
+      request_method: failure.method.toUpperCase(),
+      request_status: failure.status,
+      request_id: failure.requestId,
+      path,
+    },
+  );
 };

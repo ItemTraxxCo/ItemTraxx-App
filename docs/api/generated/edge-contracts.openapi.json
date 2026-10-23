@@ -370,17 +370,16 @@
                   },
                   "login_method": {
                     "type": "string",
-                    "enum": [
-                      "password",
-                      "magic_link",
-                      "session_handoff"
-                    ]
+                    "maxLength": 128,
+                    "pattern": "^(?:password|magic_link|session_handoff|[a-z0-9-]+)$"
                   },
                   "login_location": {
                     "type": "string",
                     "enum": [
                       "regular_login",
-                      "admin_login"
+                      "admin_login",
+                      "SAML2.0",
+                      "OpenID Connect (OIDC)"
                     ]
                   }
                 },
@@ -417,17 +416,16 @@
                   },
                   "login_method": {
                     "type": "string",
-                    "enum": [
-                      "password",
-                      "magic_link",
-                      "session_handoff"
-                    ]
+                    "maxLength": 128,
+                    "pattern": "^(?:password|magic_link|session_handoff|[a-z0-9-]+)$"
                   },
                   "login_location": {
                     "type": "string",
                     "enum": [
                       "regular_login",
-                      "admin_login"
+                      "admin_login",
+                      "SAML2.0",
+                      "OpenID Connect (OIDC)"
                     ]
                   }
                 },
@@ -464,17 +462,16 @@
                   },
                   "login_method": {
                     "type": "string",
-                    "enum": [
-                      "password",
-                      "magic_link",
-                      "session_handoff"
-                    ]
+                    "maxLength": 128,
+                    "pattern": "^(?:password|magic_link|session_handoff|[a-z0-9-]+)$"
                   },
                   "login_location": {
                     "type": "string",
                     "enum": [
                       "regular_login",
-                      "admin_login"
+                      "admin_login",
+                      "SAML2.0",
+                      "OpenID Connect (OIDC)"
                     ]
                   }
                 },
@@ -511,17 +508,16 @@
                   },
                   "login_method": {
                     "type": "string",
-                    "enum": [
-                      "password",
-                      "magic_link",
-                      "session_handoff"
-                    ]
+                    "maxLength": 128,
+                    "pattern": "^(?:password|magic_link|session_handoff|[a-z0-9-]+)$"
                   },
                   "login_location": {
                     "type": "string",
                     "enum": [
                       "regular_login",
-                      "admin_login"
+                      "admin_login",
+                      "SAML2.0",
+                      "OpenID Connect (OIDC)"
                     ]
                   },
                   "rows": {
@@ -589,17 +585,16 @@
                   },
                   "login_method": {
                     "type": "string",
-                    "enum": [
-                      "password",
-                      "magic_link",
-                      "session_handoff"
-                    ]
+                    "maxLength": 128,
+                    "pattern": "^(?:password|magic_link|session_handoff|[a-z0-9-]+)$"
                   },
                   "login_location": {
                     "type": "string",
                     "enum": [
                       "regular_login",
-                      "admin_login"
+                      "admin_login",
+                      "SAML2.0",
+                      "OpenID Connect (OIDC)"
                     ]
                   }
                 },
@@ -636,17 +631,16 @@
                   },
                   "login_method": {
                     "type": "string",
-                    "enum": [
-                      "password",
-                      "magic_link",
-                      "session_handoff"
-                    ]
+                    "maxLength": 128,
+                    "pattern": "^(?:password|magic_link|session_handoff|[a-z0-9-]+)$"
                   },
                   "login_location": {
                     "type": "string",
                     "enum": [
                       "regular_login",
-                      "admin_login"
+                      "admin_login",
+                      "SAML2.0",
+                      "OpenID Connect (OIDC)"
                     ]
                   },
                   "checkout_due_hours": {
@@ -689,17 +683,16 @@
                   },
                   "login_method": {
                     "type": "string",
-                    "enum": [
-                      "password",
-                      "magic_link",
-                      "session_handoff"
-                    ]
+                    "maxLength": 128,
+                    "pattern": "^(?:password|magic_link|session_handoff|[a-z0-9-]+)$"
                   },
                   "login_location": {
                     "type": "string",
                     "enum": [
                       "regular_login",
-                      "admin_login"
+                      "admin_login",
+                      "SAML2.0",
+                      "OpenID Connect (OIDC)"
                     ]
                   }
                 },
@@ -736,17 +729,16 @@
                   },
                   "login_method": {
                     "type": "string",
-                    "enum": [
-                      "password",
-                      "magic_link",
-                      "session_handoff"
-                    ]
+                    "maxLength": 128,
+                    "pattern": "^(?:password|magic_link|session_handoff|[a-z0-9-]+)$"
                   },
                   "login_location": {
                     "type": "string",
                     "enum": [
                       "regular_login",
-                      "admin_login"
+                      "admin_login",
+                      "SAML2.0",
+                      "OpenID Connect (OIDC)"
                     ]
                   }
                 },
@@ -783,17 +775,16 @@
                   },
                   "login_method": {
                     "type": "string",
-                    "enum": [
-                      "password",
-                      "magic_link",
-                      "session_handoff"
-                    ]
+                    "maxLength": 128,
+                    "pattern": "^(?:password|magic_link|session_handoff|[a-z0-9-]+)$"
                   },
                   "login_location": {
                     "type": "string",
                     "enum": [
                       "regular_login",
-                      "admin_login"
+                      "admin_login",
+                      "SAML2.0",
+                      "OpenID Connect (OIDC)"
                     ]
                   }
                 },
@@ -830,17 +821,16 @@
                   },
                   "login_method": {
                     "type": "string",
-                    "enum": [
-                      "password",
-                      "magic_link",
-                      "session_handoff"
-                    ]
+                    "maxLength": 128,
+                    "pattern": "^(?:password|magic_link|session_handoff|[a-z0-9-]+)$"
                   },
                   "login_location": {
                     "type": "string",
                     "enum": [
                       "regular_login",
-                      "admin_login"
+                      "admin_login",
+                      "SAML2.0",
+                      "OpenID Connect (OIDC)"
                     ]
                   }
                 },
@@ -877,17 +867,16 @@
                   },
                   "login_method": {
                     "type": "string",
-                    "enum": [
-                      "password",
-                      "magic_link",
-                      "session_handoff"
-                    ]
+                    "maxLength": 128,
+                    "pattern": "^(?:password|magic_link|session_handoff|[a-z0-9-]+)$"
                   },
                   "login_location": {
                     "type": "string",
                     "enum": [
                       "regular_login",
-                      "admin_login"
+                      "admin_login",
+                      "SAML2.0",
+                      "OpenID Connect (OIDC)"
                     ]
                   },
                   "session_id": {
@@ -929,17 +918,16 @@
                   },
                   "login_method": {
                     "type": "string",
-                    "enum": [
-                      "password",
-                      "magic_link",
-                      "session_handoff"
-                    ]
+                    "maxLength": 128,
+                    "pattern": "^(?:password|magic_link|session_handoff|[a-z0-9-]+)$"
                   },
                   "login_location": {
                     "type": "string",
                     "enum": [
                       "regular_login",
-                      "admin_login"
+                      "admin_login",
+                      "SAML2.0",
+                      "OpenID Connect (OIDC)"
                     ]
                   },
                   "sign_out_current": {
@@ -1304,7 +1292,7 @@
                     "auth_email": {
                       "type": "string",
                       "format": "email",
-                      "pattern": "^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+                      "pattern": "^(?:[A-Za-z0-9_'+\\-]+\\.)*[A-Za-z0-9_'+\\-]*[A-Za-z0-9_+-]@(?:[A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
                     },
                     "item_count": {
                       "type": "integer",
@@ -1674,11 +1662,8 @@
                           "anyOf": [
                             {
                               "type": "string",
-                              "enum": [
-                                "password",
-                                "magic_link",
-                                "session_handoff"
-                              ]
+                              "maxLength": 128,
+                              "pattern": "^(?:password|magic_link|session_handoff|[a-z0-9-]+)$"
                             },
                             {
                               "type": "null"
@@ -1691,7 +1676,9 @@
                               "type": "string",
                               "enum": [
                                 "regular_login",
-                                "admin_login"
+                                "admin_login",
+                                "SAML2.0",
+                                "OpenID Connect (OIDC)"
                               ]
                             },
                             {
@@ -1851,6 +1838,407 @@
             "properties": {
               "action": {
                 "type": "string",
+                "const": "list_individual_accounts"
+              },
+              "payload": {
+                "type": "object",
+                "properties": {
+                  "search": {
+                    "type": "string"
+                  },
+                  "status": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "search",
+                  "status"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "action",
+              "payload"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "action": {
+                "type": "string",
+                "const": "create_individual_account"
+              },
+              "payload": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "auth_email": {
+                    "type": "string",
+                    "format": "email",
+                    "pattern": "^(?:[A-Za-z0-9_'+\\-]+\\.)*[A-Za-z0-9_'+\\-]*[A-Za-z0-9_+-]@(?:[A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+                  },
+                  "password": {
+                    "type": "string",
+                    "minLength": 8
+                  },
+                  "plan_code": {
+                    "type": "string",
+                    "enum": [
+                      "individual_yearly",
+                      "individual_monthly"
+                    ]
+                  },
+                  "max_items": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "exclusiveMinimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "max_borrowers": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "exclusiveMinimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "checkout_due_hours": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "feature_flags": {
+                    "type": "object",
+                    "properties": {
+                      "enable_notifications": {
+                        "type": "boolean"
+                      },
+                      "enable_bulk_item_import": {
+                        "type": "boolean"
+                      },
+                      "enable_bulk_borrower_tools": {
+                        "type": "boolean"
+                      },
+                      "enable_status_tracking": {
+                        "type": "boolean"
+                      },
+                      "enable_barcode_generator": {
+                        "type": "boolean"
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  "contact_name": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "support_email": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "format": "email",
+                        "pattern": "^(?:[A-Za-z0-9_'+\\-]+\\.)*[A-Za-z0-9_'+\\-]*[A-Za-z0-9_+-]@(?:[A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "billing_email": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "format": "email",
+                        "pattern": "^(?:[A-Za-z0-9_'+\\-]+\\.)*[A-Za-z0-9_'+\\-]*[A-Za-z0-9_+-]@(?:[A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "billing_status": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "enum": [
+                          "draft",
+                          "active",
+                          "past_due",
+                          "canceled"
+                        ]
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "renewal_date": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "invoice_reference": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  }
+                },
+                "required": [
+                  "name",
+                  "auth_email"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "action",
+              "payload"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "action": {
+                "type": "string",
+                "const": "update_individual_account"
+              },
+              "payload": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "name": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "auth_email": {
+                    "type": "string",
+                    "format": "email",
+                    "pattern": "^(?:[A-Za-z0-9_'+\\-]+\\.)*[A-Za-z0-9_'+\\-]*[A-Za-z0-9_+-]@(?:[A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+                  },
+                  "plan_code": {
+                    "type": "string",
+                    "enum": [
+                      "individual_yearly",
+                      "individual_monthly"
+                    ]
+                  },
+                  "max_items": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "exclusiveMinimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "max_borrowers": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "exclusiveMinimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "checkout_due_hours": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "feature_flags": {
+                    "type": "object",
+                    "properties": {
+                      "enable_notifications": {
+                        "type": "boolean"
+                      },
+                      "enable_bulk_item_import": {
+                        "type": "boolean"
+                      },
+                      "enable_bulk_borrower_tools": {
+                        "type": "boolean"
+                      },
+                      "enable_status_tracking": {
+                        "type": "boolean"
+                      },
+                      "enable_barcode_generator": {
+                        "type": "boolean"
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  "contact_name": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "support_email": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "format": "email",
+                        "pattern": "^(?:[A-Za-z0-9_'+\\-]+\\.)*[A-Za-z0-9_'+\\-]*[A-Za-z0-9_+-]@(?:[A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "billing_email": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "format": "email",
+                        "pattern": "^(?:[A-Za-z0-9_'+\\-]+\\.)*[A-Za-z0-9_'+\\-]*[A-Za-z0-9_+-]@(?:[A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "billing_status": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "enum": [
+                          "draft",
+                          "active",
+                          "past_due",
+                          "canceled"
+                        ]
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "renewal_date": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "invoice_reference": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  }
+                },
+                "required": [
+                  "id",
+                  "name",
+                  "auth_email"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "action",
+              "payload"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "action": {
+                "type": "string",
+                "const": "set_individual_account_status"
+              },
+              "payload": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "active",
+                      "suspended",
+                      "archived"
+                    ]
+                  }
+                },
+                "required": [
+                  "id",
+                  "status"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "action",
+              "payload"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "action": {
+                "type": "string",
+                "const": "send_individual_account_reset"
+              },
+              "payload": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  }
+                },
+                "required": [
+                  "id"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "action",
+              "payload"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "action": {
+                "type": "string",
                 "const": "create_workspace"
               },
               "payload": {
@@ -1867,7 +2255,7 @@
                   "auth_email": {
                     "type": "string",
                     "format": "email",
-                    "pattern": "^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+                    "pattern": "^(?:[A-Za-z0-9_'+\\-]+\\.)*[A-Za-z0-9_'+\\-]*[A-Za-z0-9_+-]@(?:[A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
                   },
                   "password": {
                     "type": "string",
@@ -1878,8 +2266,7 @@
                     "enum": [
                       "workspace",
                       "education",
-                      "custom",
-                      "individual"
+                      "custom"
                     ]
                   },
                   "plan_code": {
@@ -1937,8 +2324,7 @@
                     "enum": [
                       "workspace",
                       "education",
-                      "custom",
-                      "individual"
+                      "custom"
                     ]
                   },
                   "plan_code": {
@@ -2194,6 +2580,795 @@
                   ],
                   "additionalProperties": false
                 }
+              },
+              "ok": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "ok"
+            ],
+            "additionalProperties": false
+          },
+          "list_individual_accounts": {
+            "type": "object",
+            "properties": {
+              "data": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "active",
+                        "suspended",
+                        "archived"
+                      ]
+                    },
+                    "created_at": {
+                      "type": "string"
+                    },
+                    "archived_at": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "purge_after": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "purge_state": {
+                      "type": "string"
+                    },
+                    "primary_admin_profile_id": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "primary_admin_email": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "checkout_due_hours": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "account_category": {
+                      "type": "string",
+                      "const": "individual"
+                    },
+                    "plan_code": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "enum": [
+                            "workspace_core",
+                            "workspace_growth",
+                            "workspace_enterprise",
+                            "education",
+                            "custom",
+                            "individual_yearly",
+                            "individual_monthly"
+                          ]
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "feature_flags": {
+                      "type": "object",
+                      "properties": {
+                        "enable_notifications": {
+                          "type": "boolean"
+                        },
+                        "enable_bulk_item_import": {
+                          "type": "boolean"
+                        },
+                        "enable_bulk_borrower_tools": {
+                          "type": "boolean"
+                        },
+                        "enable_status_tracking": {
+                          "type": "boolean"
+                        },
+                        "enable_barcode_generator": {
+                          "type": "boolean"
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "max_items": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "max_borrowers": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "contact_name": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "support_email": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "billing_email": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "billing_status": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "enum": [
+                            "draft",
+                            "active",
+                            "past_due",
+                            "canceled"
+                          ]
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "renewal_date": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "invoice_reference": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name",
+                    "status",
+                    "created_at",
+                    "archived_at",
+                    "account_category"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "ok": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "ok"
+            ],
+            "additionalProperties": false
+          },
+          "create_individual_account": {
+            "type": "object",
+            "properties": {
+              "data": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "active",
+                      "suspended",
+                      "archived"
+                    ]
+                  },
+                  "created_at": {
+                    "type": "string"
+                  },
+                  "archived_at": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "purge_after": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "purge_state": {
+                    "type": "string"
+                  },
+                  "primary_admin_profile_id": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "primary_admin_email": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "checkout_due_hours": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "account_category": {
+                    "type": "string",
+                    "const": "individual"
+                  },
+                  "plan_code": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "enum": [
+                          "workspace_core",
+                          "workspace_growth",
+                          "workspace_enterprise",
+                          "education",
+                          "custom",
+                          "individual_yearly",
+                          "individual_monthly"
+                        ]
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "feature_flags": {
+                    "type": "object",
+                    "properties": {
+                      "enable_notifications": {
+                        "type": "boolean"
+                      },
+                      "enable_bulk_item_import": {
+                        "type": "boolean"
+                      },
+                      "enable_bulk_borrower_tools": {
+                        "type": "boolean"
+                      },
+                      "enable_status_tracking": {
+                        "type": "boolean"
+                      },
+                      "enable_barcode_generator": {
+                        "type": "boolean"
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  "max_items": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "max_borrowers": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "contact_name": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "support_email": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "billing_email": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "billing_status": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "enum": [
+                          "draft",
+                          "active",
+                          "past_due",
+                          "canceled"
+                        ]
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "renewal_date": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "invoice_reference": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  }
+                },
+                "required": [
+                  "id",
+                  "name",
+                  "status",
+                  "created_at",
+                  "archived_at",
+                  "account_category"
+                ],
+                "additionalProperties": false
+              },
+              "ok": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "ok"
+            ],
+            "additionalProperties": false
+          },
+          "update_individual_account": {
+            "type": "object",
+            "properties": {
+              "data": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "active",
+                      "suspended",
+                      "archived"
+                    ]
+                  },
+                  "created_at": {
+                    "type": "string"
+                  },
+                  "archived_at": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "purge_after": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "purge_state": {
+                    "type": "string"
+                  },
+                  "primary_admin_profile_id": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "primary_admin_email": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "checkout_due_hours": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "account_category": {
+                    "type": "string",
+                    "const": "individual"
+                  },
+                  "plan_code": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "enum": [
+                          "workspace_core",
+                          "workspace_growth",
+                          "workspace_enterprise",
+                          "education",
+                          "custom",
+                          "individual_yearly",
+                          "individual_monthly"
+                        ]
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "feature_flags": {
+                    "type": "object",
+                    "properties": {
+                      "enable_notifications": {
+                        "type": "boolean"
+                      },
+                      "enable_bulk_item_import": {
+                        "type": "boolean"
+                      },
+                      "enable_bulk_borrower_tools": {
+                        "type": "boolean"
+                      },
+                      "enable_status_tracking": {
+                        "type": "boolean"
+                      },
+                      "enable_barcode_generator": {
+                        "type": "boolean"
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  "max_items": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "max_borrowers": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "contact_name": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "support_email": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "billing_email": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "billing_status": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "enum": [
+                          "draft",
+                          "active",
+                          "past_due",
+                          "canceled"
+                        ]
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "renewal_date": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "invoice_reference": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  }
+                },
+                "required": [
+                  "id",
+                  "name",
+                  "status",
+                  "created_at",
+                  "archived_at",
+                  "account_category"
+                ],
+                "additionalProperties": false
+              },
+              "ok": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "ok"
+            ],
+            "additionalProperties": false
+          },
+          "set_individual_account_status": {
+            "type": "object",
+            "properties": {
+              "data": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "active",
+                      "suspended",
+                      "archived"
+                    ]
+                  },
+                  "created_at": {
+                    "type": "string"
+                  },
+                  "archived_at": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "purge_after": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "purge_state": {
+                    "type": "string"
+                  },
+                  "primary_admin_profile_id": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "primary_admin_email": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "checkout_due_hours": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "account_category": {
+                    "type": "string",
+                    "const": "individual"
+                  },
+                  "plan_code": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "enum": [
+                          "workspace_core",
+                          "workspace_growth",
+                          "workspace_enterprise",
+                          "education",
+                          "custom",
+                          "individual_yearly",
+                          "individual_monthly"
+                        ]
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "feature_flags": {
+                    "type": "object",
+                    "properties": {
+                      "enable_notifications": {
+                        "type": "boolean"
+                      },
+                      "enable_bulk_item_import": {
+                        "type": "boolean"
+                      },
+                      "enable_bulk_borrower_tools": {
+                        "type": "boolean"
+                      },
+                      "enable_status_tracking": {
+                        "type": "boolean"
+                      },
+                      "enable_barcode_generator": {
+                        "type": "boolean"
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  "max_items": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "max_borrowers": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "contact_name": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "support_email": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "billing_email": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "billing_status": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "enum": [
+                          "draft",
+                          "active",
+                          "past_due",
+                          "canceled"
+                        ]
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "renewal_date": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "invoice_reference": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  }
+                },
+                "required": [
+                  "id",
+                  "name",
+                  "status",
+                  "created_at",
+                  "archived_at",
+                  "account_category"
+                ],
+                "additionalProperties": false
+              },
+              "ok": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "ok"
+            ],
+            "additionalProperties": false
+          },
+          "send_individual_account_reset": {
+            "type": "object",
+            "properties": {
+              "data": {
+                "type": "object",
+                "properties": {
+                  "success": {
+                    "type": "boolean"
+                  },
+                  "auth_email": {
+                    "type": "string",
+                    "format": "email",
+                    "pattern": "^(?:[A-Za-z0-9_'+\\-]+\\.)*[A-Za-z0-9_'+\\-]*[A-Za-z0-9_+-]@(?:[A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+                  }
+                },
+                "required": [
+                  "success",
+                  "auth_email"
+                ],
+                "additionalProperties": false
               },
               "ok": {
                 "type": "boolean"
@@ -2597,7 +3772,7 @@
                   "auth_email": {
                     "type": "string",
                     "format": "email",
-                    "pattern": "^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+                    "pattern": "^(?:[A-Za-z0-9_'+\\-]+\\.)*[A-Za-z0-9_'+\\-]*[A-Za-z0-9_+-]@(?:[A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
                   }
                 },
                 "required": [
@@ -2745,6 +3920,11 @@
         },
         "required": [
           "list_workspaces",
+          "list_individual_accounts",
+          "create_individual_account",
+          "update_individual_account",
+          "set_individual_account_status",
+          "send_individual_account_reset",
           "create_workspace",
           "update_workspace",
           "set_workspace_status",
@@ -2803,7 +3983,7 @@
                   "auth_email": {
                     "type": "string",
                     "format": "email",
-                    "pattern": "^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+                    "pattern": "^(?:[A-Za-z0-9_'+\\-]+\\.)*[A-Za-z0-9_'+\\-]*[A-Za-z0-9_+-]@(?:[A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
                   }
                 },
                 "required": [
@@ -2868,7 +4048,7 @@
                   "auth_email": {
                     "type": "string",
                     "format": "email",
-                    "pattern": "^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+                    "pattern": "^(?:[A-Za-z0-9_'+\\-]+\\.)*[A-Za-z0-9_'+\\-]*[A-Za-z0-9_+-]@(?:[A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
                   }
                 },
                 "required": [
@@ -2951,7 +4131,7 @@
                   "auth_email": {
                     "type": "string",
                     "format": "email",
-                    "pattern": "^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+                    "pattern": "^(?:[A-Za-z0-9_'+\\-]+\\.)*[A-Za-z0-9_'+\\-]*[A-Za-z0-9_+-]@(?:[A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
                   },
                   "password": {
                     "type": "string",
@@ -3021,7 +4201,7 @@
                   "auth_email": {
                     "type": "string",
                     "format": "email",
-                    "pattern": "^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+                    "pattern": "^(?:[A-Za-z0-9_'+\\-]+\\.)*[A-Za-z0-9_'+\\-]*[A-Za-z0-9_+-]@(?:[A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
                   }
                 },
                 "required": [
@@ -3050,7 +4230,7 @@
                   "auth_email": {
                     "type": "string",
                     "format": "email",
-                    "pattern": "^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+                    "pattern": "^(?:[A-Za-z0-9_'+\\-]+\\.)*[A-Za-z0-9_'+\\-]*[A-Za-z0-9_+-]@(?:[A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
                   }
                 },
                 "required": [
@@ -3091,7 +4271,7 @@
                     "auth_email": {
                       "type": "string",
                       "format": "email",
-                      "pattern": "^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+                      "pattern": "^(?:[A-Za-z0-9_'+\\-]+\\.)*[A-Za-z0-9_'+\\-]*[A-Za-z0-9_+-]@(?:[A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
                     },
                     "role": {
                       "type": "string",
@@ -3150,7 +4330,7 @@
                   "auth_email": {
                     "type": "string",
                     "format": "email",
-                    "pattern": "^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+                    "pattern": "^(?:[A-Za-z0-9_'+\\-]+\\.)*[A-Za-z0-9_'+\\-]*[A-Za-z0-9_+-]@(?:[A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
                   },
                   "role": {
                     "type": "string",
@@ -3208,7 +4388,7 @@
                   "auth_email": {
                     "type": "string",
                     "format": "email",
-                    "pattern": "^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+                    "pattern": "^(?:[A-Za-z0-9_'+\\-]+\\.)*[A-Za-z0-9_'+\\-]*[A-Za-z0-9_+-]@(?:[A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
                   },
                   "role": {
                     "type": "string",
@@ -3266,7 +4446,7 @@
                   "auth_email": {
                     "type": "string",
                     "format": "email",
-                    "pattern": "^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+                    "pattern": "^(?:[A-Za-z0-9_'+\\-]+\\.)*[A-Za-z0-9_'+\\-]*[A-Za-z0-9_+-]@(?:[A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
                   },
                   "role": {
                     "type": "string",
@@ -3341,7 +4521,7 @@
                     "auth_email": {
                       "type": "string",
                       "format": "email",
-                      "pattern": "^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+                      "pattern": "^(?:[A-Za-z0-9_'+\\-]+\\.)*[A-Za-z0-9_'+\\-]*[A-Za-z0-9_+-]@(?:[A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
                     },
                     "role": {
                       "type": "string",
@@ -3381,7 +4561,7 @@
                   "auth_email": {
                     "type": "string",
                     "format": "email",
-                    "pattern": "^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+                    "pattern": "^(?:[A-Za-z0-9_'+\\-]+\\.)*[A-Za-z0-9_'+\\-]*[A-Za-z0-9_+-]@(?:[A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
                   },
                   "role": {
                     "type": "string",
@@ -3420,7 +4600,7 @@
                   "auth_email": {
                     "type": "string",
                     "format": "email",
-                    "pattern": "^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+                    "pattern": "^(?:[A-Za-z0-9_'+\\-]+\\.)*[A-Za-z0-9_'+\\-]*[A-Za-z0-9_+-]@(?:[A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
                   },
                   "role": {
                     "type": "string",
@@ -3459,7 +4639,7 @@
                   "auth_email": {
                     "type": "string",
                     "format": "email",
-                    "pattern": "^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+                    "pattern": "^(?:[A-Za-z0-9_'+\\-]+\\.)*[A-Za-z0-9_'+\\-]*[A-Za-z0-9_+-]@(?:[A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
                   },
                   "role": {
                     "type": "string",
@@ -7372,7 +8552,7 @@
                   "auth_email": {
                     "type": "string",
                     "format": "email",
-                    "pattern": "^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+                    "pattern": "^(?:[A-Za-z0-9_'+\\-]+\\.)*[A-Za-z0-9_'+\\-]*[A-Za-z0-9_+-]@(?:[A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
                   }
                 },
                 "required": [
@@ -7424,40 +8604,6 @@
             "properties": {
               "action": {
                 "type": "string",
-                "const": "update_admin_email"
-              },
-              "payload": {
-                "type": "object",
-                "properties": {
-                  "id": {
-                    "type": "string",
-                    "format": "uuid",
-                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-                  },
-                  "auth_email": {
-                    "type": "string",
-                    "format": "email",
-                    "pattern": "^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
-                  }
-                },
-                "required": [
-                  "id",
-                  "auth_email"
-                ],
-                "additionalProperties": false
-              }
-            },
-            "required": [
-              "action",
-              "payload"
-            ],
-            "additionalProperties": false
-          },
-          {
-            "type": "object",
-            "properties": {
-              "action": {
-                "type": "string",
                 "const": "send_workspace_admin_reset"
               },
               "payload": {
@@ -7466,7 +8612,7 @@
                   "auth_email": {
                     "type": "string",
                     "format": "email",
-                    "pattern": "^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+                    "pattern": "^(?:[A-Za-z0-9_'+\\-]+\\.)*[A-Za-z0-9_'+\\-]*[A-Za-z0-9_+-]@(?:[A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
                   }
                 },
                 "required": [
@@ -7501,17 +8647,16 @@
                   },
                   "login_method": {
                     "type": "string",
-                    "enum": [
-                      "password",
-                      "magic_link",
-                      "session_handoff"
-                    ]
+                    "maxLength": 128,
+                    "pattern": "^(?:password|magic_link|session_handoff|[a-z0-9-]+)$"
                   },
                   "login_location": {
                     "type": "string",
                     "enum": [
                       "regular_login",
-                      "admin_login"
+                      "admin_login",
+                      "SAML2.0",
+                      "OpenID Connect (OIDC)"
                     ]
                   }
                 },
@@ -7548,23 +8693,22 @@
                   },
                   "login_method": {
                     "type": "string",
-                    "enum": [
-                      "password",
-                      "magic_link",
-                      "session_handoff"
-                    ]
+                    "maxLength": 128,
+                    "pattern": "^(?:password|magic_link|session_handoff|[a-z0-9-]+)$"
                   },
                   "login_location": {
                     "type": "string",
                     "enum": [
                       "regular_login",
-                      "admin_login"
+                      "admin_login",
+                      "SAML2.0",
+                      "OpenID Connect (OIDC)"
                     ]
                   },
                   "auth_email": {
                     "type": "string",
                     "format": "email",
-                    "pattern": "^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+                    "pattern": "^(?:[A-Za-z0-9_'+\\-]+\\.)*[A-Za-z0-9_'+\\-]*[A-Za-z0-9_+-]@(?:[A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
                   }
                 },
                 "required": [
@@ -7601,17 +8745,16 @@
                   },
                   "login_method": {
                     "type": "string",
-                    "enum": [
-                      "password",
-                      "magic_link",
-                      "session_handoff"
-                    ]
+                    "maxLength": 128,
+                    "pattern": "^(?:password|magic_link|session_handoff|[a-z0-9-]+)$"
                   },
                   "login_location": {
                     "type": "string",
                     "enum": [
                       "regular_login",
-                      "admin_login"
+                      "admin_login",
+                      "SAML2.0",
+                      "OpenID Connect (OIDC)"
                     ]
                   },
                   "id": {
@@ -7643,65 +8786,6 @@
             "properties": {
               "action": {
                 "type": "string",
-                "const": "update_tenant_account_email"
-              },
-              "payload": {
-                "type": "object",
-                "properties": {
-                  "device_id": {
-                    "type": "string",
-                    "minLength": 1
-                  },
-                  "device_label": {
-                    "type": "string",
-                    "minLength": 1
-                  },
-                  "login_method": {
-                    "type": "string",
-                    "enum": [
-                      "password",
-                      "magic_link",
-                      "session_handoff"
-                    ]
-                  },
-                  "login_location": {
-                    "type": "string",
-                    "enum": [
-                      "regular_login",
-                      "admin_login"
-                    ]
-                  },
-                  "id": {
-                    "type": "string",
-                    "format": "uuid",
-                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-                  },
-                  "auth_email": {
-                    "type": "string",
-                    "format": "email",
-                    "pattern": "^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
-                  }
-                },
-                "required": [
-                  "device_id",
-                  "device_label",
-                  "id",
-                  "auth_email"
-                ],
-                "additionalProperties": false
-              }
-            },
-            "required": [
-              "action",
-              "payload"
-            ],
-            "additionalProperties": false
-          },
-          {
-            "type": "object",
-            "properties": {
-              "action": {
-                "type": "string",
                 "const": "remove_tenant_account"
               },
               "payload": {
@@ -7717,17 +8801,16 @@
                   },
                   "login_method": {
                     "type": "string",
-                    "enum": [
-                      "password",
-                      "magic_link",
-                      "session_handoff"
-                    ]
+                    "maxLength": 128,
+                    "pattern": "^(?:password|magic_link|session_handoff|[a-z0-9-]+)$"
                   },
                   "login_location": {
                     "type": "string",
                     "enum": [
                       "regular_login",
-                      "admin_login"
+                      "admin_login",
+                      "SAML2.0",
+                      "OpenID Connect (OIDC)"
                     ]
                   },
                   "id": {
@@ -7770,17 +8853,16 @@
                   },
                   "login_method": {
                     "type": "string",
-                    "enum": [
-                      "password",
-                      "magic_link",
-                      "session_handoff"
-                    ]
+                    "maxLength": 128,
+                    "pattern": "^(?:password|magic_link|session_handoff|[a-z0-9-]+)$"
                   },
                   "login_location": {
                     "type": "string",
                     "enum": [
                       "regular_login",
-                      "admin_login"
+                      "admin_login",
+                      "SAML2.0",
+                      "OpenID Connect (OIDC)"
                     ]
                   },
                   "id": {
@@ -7834,7 +8916,7 @@
                         "auth_email": {
                           "type": "string",
                           "format": "email",
-                          "pattern": "^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+                          "pattern": "^(?:[A-Za-z0-9_'+\\-]+\\.)*[A-Za-z0-9_'+\\-]*[A-Za-z0-9_+-]@(?:[A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
                         },
                         "role": {
                           "type": "string",
@@ -7897,18 +8979,13 @@
                   "success": {
                     "type": "boolean"
                   },
-                  "auth_email": {
-                    "type": "string",
-                    "format": "email",
-                    "pattern": "^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
-                  },
                   "message": {
                     "type": "string"
                   }
                 },
                 "required": [
                   "success",
-                  "auth_email"
+                  "message"
                 ],
                 "additionalProperties": false
               }
@@ -7934,56 +9011,7 @@
                   "auth_email": {
                     "type": "string",
                     "format": "email",
-                    "pattern": "^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
-                  },
-                  "role": {
-                    "type": "string",
-                    "const": "workspace_admin"
-                  },
-                  "is_active": {
-                    "type": "boolean"
-                  },
-                  "created_at": {
-                    "type": "string"
-                  },
-                  "is_primary_admin": {
-                    "type": "boolean"
-                  }
-                },
-                "required": [
-                  "id",
-                  "workspace_id",
-                  "auth_email",
-                  "role",
-                  "is_active",
-                  "created_at",
-                  "is_primary_admin"
-                ],
-                "additionalProperties": false
-              }
-            },
-            "additionalProperties": false
-          },
-          "update_admin_email": {
-            "type": "object",
-            "properties": {
-              "data": {
-                "type": "object",
-                "properties": {
-                  "id": {
-                    "type": "string",
-                    "format": "uuid",
-                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-                  },
-                  "workspace_id": {
-                    "type": "string",
-                    "format": "uuid",
-                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-                  },
-                  "auth_email": {
-                    "type": "string",
-                    "format": "email",
-                    "pattern": "^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+                    "pattern": "^(?:[A-Za-z0-9_'+\\-]+\\.)*[A-Za-z0-9_'+\\-]*[A-Za-z0-9_+-]@(?:[A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
                   },
                   "role": {
                     "type": "string",
@@ -8052,7 +9080,7 @@
                     "auth_email": {
                       "type": "string",
                       "format": "email",
-                      "pattern": "^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+                      "pattern": "^(?:[A-Za-z0-9_'+\\-]+\\.)*[A-Za-z0-9_'+\\-]*[A-Za-z0-9_+-]@(?:[A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
                     },
                     "role": {
                       "type": "string",
@@ -8091,45 +9119,16 @@
               "data": {
                 "type": "object",
                 "properties": {
-                  "id": {
-                    "type": "string",
-                    "format": "uuid",
-                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-                  },
-                  "workspace_id": {
-                    "type": "string",
-                    "format": "uuid",
-                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-                  },
-                  "auth_email": {
-                    "type": "string",
-                    "format": "email",
-                    "pattern": "^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
-                  },
-                  "role": {
-                    "type": "string",
-                    "const": "tenant_account"
-                  },
-                  "is_active": {
+                  "success": {
                     "type": "boolean"
                   },
-                  "deleted_at": {
-                    "type": [
-                      "string",
-                      "null"
-                    ]
-                  },
-                  "created_at": {
+                  "message": {
                     "type": "string"
                   }
                 },
                 "required": [
-                  "id",
-                  "workspace_id",
-                  "auth_email",
-                  "role",
-                  "is_active",
-                  "created_at"
+                  "success",
+                  "message"
                 ],
                 "additionalProperties": false
               }
@@ -8155,58 +9154,7 @@
                   "auth_email": {
                     "type": "string",
                     "format": "email",
-                    "pattern": "^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
-                  },
-                  "role": {
-                    "type": "string",
-                    "const": "tenant_account"
-                  },
-                  "is_active": {
-                    "type": "boolean"
-                  },
-                  "deleted_at": {
-                    "type": [
-                      "string",
-                      "null"
-                    ]
-                  },
-                  "created_at": {
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "id",
-                  "workspace_id",
-                  "auth_email",
-                  "role",
-                  "is_active",
-                  "created_at"
-                ],
-                "additionalProperties": false
-              }
-            },
-            "additionalProperties": false
-          },
-          "update_tenant_account_email": {
-            "type": "object",
-            "properties": {
-              "data": {
-                "type": "object",
-                "properties": {
-                  "id": {
-                    "type": "string",
-                    "format": "uuid",
-                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-                  },
-                  "workspace_id": {
-                    "type": "string",
-                    "format": "uuid",
-                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-                  },
-                  "auth_email": {
-                    "type": "string",
-                    "format": "email",
-                    "pattern": "^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+                    "pattern": "^(?:[A-Za-z0-9_'+\\-]+\\.)*[A-Za-z0-9_'+\\-]*[A-Za-z0-9_+-]@(?:[A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
                   },
                   "role": {
                     "type": "string",
@@ -8279,12 +9227,10 @@
           "list_workspace_admins",
           "create_workspace_admin",
           "set_admin_status",
-          "update_admin_email",
           "send_workspace_admin_reset",
           "list_tenant_accounts",
           "create_tenant_account",
           "set_tenant_account_status",
-          "update_tenant_account_email",
           "remove_tenant_account",
           "send_tenant_account_reset"
         ],
@@ -8330,7 +9276,7 @@
           "reply_email": {
             "type": "string",
             "format": "email",
-            "pattern": "^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+            "pattern": "^(?:[A-Za-z0-9_'+\\-]+\\.)*[A-Za-z0-9_'+\\-]*[A-Za-z0-9_+-]@(?:[A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
           },
           "details": {
             "type": "string"
@@ -8399,7 +9345,7 @@
           "reply_email": {
             "type": "string",
             "format": "email",
-            "pattern": "^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+            "pattern": "^(?:[A-Za-z0-9_'+\\-]+\\.)*[A-Za-z0-9_'+\\-]*[A-Za-z0-9_+-]@(?:[A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
           },
           "subject": {
             "type": "string",

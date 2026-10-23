@@ -2,7 +2,7 @@
   <div class="page admin-shell">
     <div class="admin-hero">
       <div class="page-nav-left">
-        <RouterLink class="button-link" to="/admin">Return to admin panel</RouterLink>
+        <RouterLink class="button-link" :to="managerRoot">Back</RouterLink>
       </div>
       <h1>Item Status Tracking</h1>
       <p v-if="!featureEnabled" class="error">Item status tracking is disabled.</p>
@@ -32,12 +32,10 @@
         <label>
           Status
           <select v-model="statusFilter">
-            <option value="all">all statuses</option>
-            <option value="damaged">damaged</option>
-            <option value="lost">lost</option>
-            <option value="in_repair">in_repair</option>
-            <option value="retired">retired</option>
-            <option value="in_studio_only">in_studio_only</option>
+            <option value="all">All statuses</option>
+            <option v-for="status in statusOptions" :key="status" :value="status">
+              {{ formatItemStatus(status) }}
+            </option>
           </select>
         </label>
         <label>
@@ -65,11 +63,11 @@
           <tr v-for="item in filteredFlaggedItems" :key="item.id">
             <td>{{ item.name }}</td>
             <td>{{ item.barcode }}</td>
-            <td>{{ item.status }}</td>
+            <td>{{ formatItemStatus(item.status) }}</td>
             <td>{{ formatDate(item.updated_at) }}</td>
-            <td>{{ item.notes || "-" }}</td>
+            <td data-session-replay-mask>{{ item.notes || "-" }}</td>
           </tr>
-          <tr v-if="filteredFlaggedItems.length === 0">
+          <tr v-if="!isLoading && !loadError && filteredFlaggedItems.length === 0">
             <td colspan="5" class="muted">No flagged items.</td>
           </tr>
         </tbody>
@@ -99,14 +97,17 @@
           </tr>
         </thead>
         <tbody>
+          <tr v-if="isLoading">
+            <td colspan="4" class="muted" role="status">Loading status history...</td>
+          </tr>
           <tr v-for="event in filteredHistory" :key="event.id">
             <td>{{ formatDate(event.changed_at) }}</td>
             <td>{{ event.item?.name || "-" }} ({{ event.item?.barcode || "-" }})</td>
-            <td>{{ event.status }}</td>
-            <td>{{ event.note || "-" }}</td>
+            <td>{{ formatItemStatus(event.status) }}</td>
+            <td data-session-replay-mask>{{ event.note || "-" }}</td>
           </tr>
-          <tr v-if="filteredHistory.length === 0">
-            <td colspan="4" class="muted">No status history found. If you believe this is an error, please contact support.</td>
+          <tr v-if="!isLoading && !loadError && filteredHistory.length === 0">
+            <td colspan="4" class="muted">No status history found.</td>
           </tr>
         </tbody>
       </table>
@@ -131,14 +132,20 @@ import {
 } from "../../../services/adminOpsService";
 import { exportRowsToCsv, exportRowsToPdf } from "../../../services/exportService";
 import { toUserFacingErrorMessage } from "../../../services/appErrors";
+import { useManagerContext } from "../../../composables/useManagerContext";
+import { formatItemStatus, ITEM_STATUS_OPTIONS } from "../../../utils/itemStatus";
+
+const { managerRoot } = useManagerContext();
 
 const flaggedItems = ref<StatusTrackedItem[]>([]);
 const history = ref<StatusHistoryItem[]>([]);
-const isLoading = ref(false);
+const isLoading = ref(true);
+const loadError = ref("");
 const toastTitle = ref("");
 const toastMessage = ref("");
 const searchQuery = ref("");
 const statusFilter = ref("all");
+const statusOptions = ITEM_STATUS_OPTIONS.filter((status) => status !== "available" && status !== "checked_out");
 const dateFrom = ref("");
 const dateTo = ref("");
 const featureEnabled = ref(true);
@@ -164,7 +171,15 @@ const filteredFlaggedItems = computed(() => {
     if (statusFilter.value !== "all" && item.status !== statusFilter.value) return false;
     if (!withinDateRange(item.updated_at)) return false;
     if (!query) return true;
-    const haystack = `${item.name} ${item.barcode} ${item.status} ${item.notes ?? ""}`.toLowerCase();
+    const haystack = [
+      item.name,
+      item.barcode,
+      item.status,
+      formatItemStatus(item.status),
+      item.notes ?? "",
+    ]
+      .join(" ")
+      .toLowerCase();
     return haystack.includes(query);
   });
 });
@@ -175,7 +190,15 @@ const filteredHistory = computed(() => {
     if (statusFilter.value !== "all" && event.status !== statusFilter.value) return false;
     if (!withinDateRange(event.changed_at)) return false;
     if (!query) return true;
-    const haystack = `${event.item?.name ?? ""} ${event.item?.barcode ?? ""} ${event.status} ${event.note ?? ""}`.toLowerCase();
+    const haystack = [
+      event.item?.name ?? "",
+      event.item?.barcode ?? "",
+      event.status,
+      formatItemStatus(event.status),
+      event.note ?? "",
+    ]
+      .join(" ")
+      .toLowerCase();
     return haystack.includes(query);
   });
 });
@@ -201,12 +224,14 @@ const formatDate = (value: string) => {
 
 const loadStatusTracking = async () => {
   isLoading.value = true;
+  loadError.value = "";
   try {
     const payload = await fetchStatusTracking();
     flaggedItems.value = payload.flagged_items;
     history.value = payload.history;
   } catch (err) {
-    showToast("Load failed", toUserFacingErrorMessage(err, "Unable to load status tracking."));
+    loadError.value = toUserFacingErrorMessage(err, "Unable to load status tracking.");
+    showToast("Load failed", loadError.value);
   } finally {
     isLoading.value = false;
   }
@@ -216,7 +241,10 @@ const exportFlaggedCsv = () => {
   exportRowsToCsv(
     `item-status-${new Date().toISOString().slice(0, 10)}.csv`,
     ["name", "barcode", "status", "updated_at", "notes"],
-    filteredFlaggedItems.value
+    filteredFlaggedItems.value.map((item) => ({
+      ...item,
+      status: formatItemStatus(item.status),
+    }))
   );
 };
 
@@ -225,7 +253,10 @@ const exportFlaggedPdf = async () => {
     `item-status-${new Date().toISOString().slice(0, 10)}.pdf`,
     "Item Status Tracking",
     ["name", "barcode", "status", "updated_at", "notes"],
-    filteredFlaggedItems.value
+    filteredFlaggedItems.value.map((item) => ({
+      ...item,
+      status: formatItemStatus(item.status),
+    }))
   );
 };
 
@@ -237,7 +268,7 @@ const exportHistoryCsv = () => {
       changed_at: formatDate(event.changed_at),
       item: event.item?.name || "",
       barcode: event.item?.barcode || "",
-      status: event.status,
+      status: formatItemStatus(event.status),
       note: event.note || "",
     }))
   );
@@ -252,7 +283,7 @@ const exportHistoryPdf = async () => {
       changed_at: formatDate(event.changed_at),
       item: event.item?.name || "",
       barcode: event.item?.barcode || "",
-      status: event.status,
+      status: formatItemStatus(event.status),
       note: event.note || "",
     }))
   );
@@ -268,6 +299,8 @@ onMounted(() => {
     }
     if (featureEnabled.value) {
       await loadStatusTracking();
+    } else {
+      isLoading.value = false;
     }
   })();
 });

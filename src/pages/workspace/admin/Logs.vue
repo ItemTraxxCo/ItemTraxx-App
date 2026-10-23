@@ -2,7 +2,7 @@
   <div class="page admin-shell">
     <div class="admin-hero">
       <div class="page-nav-left">
-        <RouterLink class="button-link" to="/admin">Return to admin panel</RouterLink>
+        <RouterLink class="button-link" :to="managerRoot">Back</RouterLink>
       </div>
       <h1>Item Logs</h1>
       <p class="admin-hero-copy">Filter checkout and return activity, then export the current view to PDF and CSV.</p>
@@ -31,10 +31,14 @@
         <label>
           Action
           <select v-model="actionFilter">
-            <option value="all">all actions</option>
-            <option value="checkout">checkout</option>
-            <option value="return">return</option>
-            <option value="admin_return">admin_return</option>
+            <option value="all">All actions</option>
+            <option
+              v-for="option in ITEM_LOG_ACTION_OPTIONS"
+              :key="option.value"
+              :value="option.value"
+            >
+              {{ option.label }}
+            </option>
           </select>
         </label>
         <label>
@@ -76,14 +80,14 @@
             <tbody>
               <tr v-for="log in filteredLogs" :key="log.id">
                 <td>{{ formatTime(log.action_time) }}</td>
-                <td>{{ log.action_type }}</td>
+                <td>{{ formatActionLabel(log.action_type) }}</td>
                 <td>
-                  <span class="tenant-account-cell" :title="log.tenant_account?.auth_email || 'Unknown account'">
+                  <span class="tenant-account-cell" data-session-replay-mask :title="log.tenant_account?.auth_email || 'Unknown account'">
                     {{ log.tenant_account?.auth_email || "Unknown account" }}
                   </span>
                 </td>
                 <td>
-                  <span v-if="log.borrower">
+                  <span v-if="log.borrower" data-session-replay-mask>
                     {{ log.borrower.username }} ({{ log.borrower.borrower_id }})
                   </span>
                   <span v-else class="muted">-</span>
@@ -95,14 +99,14 @@
                   <span v-else class="muted">-</span>
                 </td>
               </tr>
-              <tr v-if="!filteredLogs.length">
+              <tr v-if="!isLoading && !error && !filteredLogs.length">
                 <td colspan="5" class="muted">No logs match your search. If you believe this is an error, please contact support.</td>
               </tr>
             </tbody>
           </table>
         </div>
       </BoneyardSkeleton>
-      <p v-if="error" class="error">{{ error }}</p>
+      <p v-if="error" class="error" v-app-toast-error>{{ error }}</p>
     </div>
   </div>
 </template>
@@ -114,9 +118,13 @@ import BoneyardSkeleton from "../../../components/BoneyardSkeleton.vue";
 import BoneyardTableFixture from "../../../components/BoneyardTableFixture.vue";
 import { fetchItemLogs, type ItemLog } from "../../../services/itemService";
 import { exportRowsToCsv, exportRowsToPdf } from "../../../services/exportService";
+import { useManagerContext } from "../../../composables/useManagerContext";
+import { formatActionLabel, ITEM_LOG_ACTION_OPTIONS } from "../../../utils/actionLabel";
+
+const { managerRoot } = useManagerContext();
 
 const logs = ref<ItemLog[]>([]);
-const isLoading = ref(false);
+const isLoading = ref(true);
 const error = ref("");
 const searchQuery = ref("");
 const actionFilter = ref("all");
@@ -129,10 +137,6 @@ const isBoneyardCapture =
 
 const filteredLogs = computed(() => {
   const query = searchQuery.value.trim().toLowerCase();
-  if (!query) {
-    return logs.value;
-  }
-
   return logs.value.filter((log) => {
     if (actionFilter.value !== "all" && log.action_type !== actionFilter.value) {
       return false;
@@ -152,13 +156,14 @@ const filteredLogs = computed(() => {
       }
     }
 
-    const action = (log.action_type || "").toLowerCase();
+    const rawAction = (log.action_type || "").toLowerCase();
+    const actionLabel = formatActionLabel(log.action_type).toLowerCase();
     const borrower = log.borrower
       ? `${log.borrower.username} ${log.borrower.borrower_id}`.toLowerCase()
       : "";
     const item = log.item ? `${log.item.name} ${log.item.barcode}`.toLowerCase() : "";
     const tenantAccount = log.tenant_account?.auth_email?.toLowerCase() ?? "";
-    return action.includes(query) || borrower.includes(query) || item.includes(query) || tenantAccount.includes(query);
+    return !query || rawAction.includes(query) || actionLabel.includes(query) || borrower.includes(query) || item.includes(query) || tenantAccount.includes(query);
   });
 });
 
@@ -177,7 +182,7 @@ const loadLogs = async () => {
 const exportRows = computed(() =>
   filteredLogs.value.map((log) => ({
     action_time: formatTime(log.action_time),
-    action_type: log.action_type,
+    action_type: formatActionLabel(log.action_type),
     tenant_account: log.tenant_account?.auth_email ?? "",
     borrower: log.borrower
       ? `${log.borrower.username} (${log.borrower.borrower_id})`

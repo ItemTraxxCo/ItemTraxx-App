@@ -8,6 +8,7 @@ vi.mock("../services/cookieConsentService", () => ({
   clearAnalyticsPersistence: vi.fn(),
   hasCookieConsent: vi.fn(),
   readCookieConsent: vi.fn(),
+  subscribeCookieConsent: vi.fn(),
   writeCookieConsent: vi.fn(),
 }));
 vi.mock("../services/consentRecordService", () => ({
@@ -19,6 +20,7 @@ import {
   clearAnalyticsPersistence,
   hasCookieConsent,
   readCookieConsent,
+  subscribeCookieConsent,
   writeCookieConsent,
   type CookieConsentState,
 } from "../services/cookieConsentService";
@@ -28,6 +30,7 @@ const mockedAllowsAnalytics = vi.mocked(allowsAnalytics);
 const mockedClearAnalyticsPersistence = vi.mocked(clearAnalyticsPersistence);
 const mockedHasCookieConsent = vi.mocked(hasCookieConsent);
 const mockedReadCookieConsent = vi.mocked(readCookieConsent);
+const mockedSubscribeCookieConsent = vi.mocked(subscribeCookieConsent);
 const mockedWriteCookieConsent = vi.mocked(writeCookieConsent);
 const mockedRecordCookieConsent = vi.mocked(recordCookieConsent);
 
@@ -36,6 +39,8 @@ const consentState: CookieConsentState = {
   preferences: { analytics: true, diagnostics: true },
   updatedAt: "2026-01-01T00:00:00.000Z",
 };
+
+let consentListener: ((state: CookieConsentState | null) => void) | null = null;
 
 const mountHost = (role: string | null = null) => {
   const auth = reactive({ role });
@@ -56,12 +61,17 @@ describe("useCookieConsentTelemetry", () => {
     mockedClearAnalyticsPersistence.mockReset();
     mockedHasCookieConsent.mockReset().mockReturnValue(false);
     mockedReadCookieConsent.mockReset().mockReturnValue(null);
+    mockedSubscribeCookieConsent.mockReset().mockImplementation((listener) => {
+      consentListener = listener;
+      return vi.fn();
+    });
     mockedWriteCookieConsent.mockReset();
     mockedRecordCookieConsent.mockReset().mockResolvedValue(undefined);
   });
 
   afterEach(() => {
     vi.restoreAllMocks();
+    consentListener = null;
   });
 
   it("syncs consent state on mount and shows the banner when there is no stored consent", () => {
@@ -156,23 +166,23 @@ describe("useCookieConsentTelemetry", () => {
     wrapper.unmount();
   });
 
-  it("re-syncs on the itemtraxx:cookie-consent window event", () => {
-    mockedReadCookieConsent.mockReturnValueOnce(null).mockReturnValue(consentState);
+  it("re-syncs when the consent subscription observes a change", () => {
     const { wrapper, get } = mountHost();
     expect(get().cookieConsent.value).toBeNull();
 
-    window.dispatchEvent(new CustomEvent("itemtraxx:cookie-consent"));
+    consentListener?.(consentState);
 
     expect(get().cookieConsent.value).toEqual(consentState);
     wrapper.unmount();
   });
 
-  it("removes its window listener on unmount", () => {
-    const removeEventListenerSpy = vi.spyOn(window, "removeEventListener");
+  it("removes its consent subscription on unmount", () => {
+    const unsubscribe = vi.fn();
+    mockedSubscribeCookieConsent.mockReturnValue(unsubscribe);
     const { wrapper } = mountHost();
 
     wrapper.unmount();
 
-    expect(removeEventListenerSpy).toHaveBeenCalledWith("itemtraxx:cookie-consent", expect.any(Function));
+    expect(unsubscribe).toHaveBeenCalledOnce();
   });
 });

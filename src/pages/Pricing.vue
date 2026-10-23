@@ -185,7 +185,7 @@
             <p class="price">$70.00<span>/year</span></p>
             <ul>
               <li>Single-user access to the ItemTraxx app</li>
-              <li>Simple personal inventory tracking workflow</li>
+              <li>Single-user access to the ItemTraxx appw</li>
               <li>Invoice-based billing</li>
             </ul>
             <p class="onboarding">Onboarding not available.</p>
@@ -402,14 +402,14 @@ import PublicFooter from "../components/PublicFooter.vue";
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 2.4rem;
+  min-height: 2.25rem;
   border-radius: 999px;
   border: 1px solid var(--text);
   background: var(--text);
   color: var(--page-bg);
   font-weight: 700;
   text-decoration: none;
-  padding: 0.45rem 0.95rem;
+  padding: 0.35rem 0.8rem;
   transition: transform 0.16s ease, background 0.16s ease, border-color 0.16s ease, box-shadow 0.16s ease;
 }
 

@@ -114,22 +114,22 @@ serve(async (req) => {
     }
 
     if (!await canRegisterAdminStepUpFromTrustedHandoff(userClient, authToken)) {
-      return jsonResponse(403, { error: "Admin verification required." });
+      return jsonResponse(403, { error: "Account verification required." });
     }
 
     const adminClient = createClient(supabaseUrl, serviceKey, {
       auth: { persistSession: false },
     });
 
-    const { expiresAt } = await registerPrivilegedStepUp(adminClient, {
+    await registerPrivilegedStepUp(adminClient, {
       userId: user.id,
       roleScope: profile.role,
       authToken,
-      source: "admin_login",
+      source: profile.role === "individual_account" ? "individual_login" : "admin_login",
     });
 
     return jsonResponse(200, {
-      data: { registered: true, expires_at: expiresAt },
+      data: { registered: true, expires_at: null },
     });
   } catch (error) {
     if (

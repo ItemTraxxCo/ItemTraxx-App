@@ -401,15 +401,14 @@ with check (
 );
 
 drop policy if exists "super_admin_all_approvals" on public.super_approvals;
-create policy "super_admin_all_approvals"
+drop policy if exists "super_admin_select_approvals" on public.super_approvals;
+-- Approval mutations must go through super-ops, which binds requester and
+-- approver identities to the verified server-side user.
+create policy "super_admin_select_approvals"
 on public.super_approvals
-for all
+for select
 to authenticated
 using (
-  public.current_user_role() = 'super_admin'
-  and public.has_recent_privileged_step_up('super_admin')
-)
-with check (
   public.current_user_role() = 'super_admin'
   and public.has_recent_privileged_step_up('super_admin')
 );

@@ -1,34 +1,25 @@
 <template>
   <div class="page">
-    <div class="super-page-header">
+    <div class="sa-toolbar">
       <div>
-        <div class="page-nav-left">
-          <RouterLink class="button-link" to="/super-admin">Control Center</RouterLink>
-          <RouterLink class="button-link" to="/super-admin/support-requests">Support Requests</RouterLink>
-          <RouterLink class="button-link" to="/super-admin/admins">Tenant Admins</RouterLink>
-        </div>
-        <h1>Super Admins</h1>
-        <p>Manage privileged operator accounts with step-up enforcement and last-admin safeguards.</p>
+        <nav class="page-nav-left">
+          <RouterLink class="sa-btn" to="/super-admin">Control Center</RouterLink>
+          <RouterLink class="sa-btn" to="/super-admin/support-requests">Support Requests</RouterLink>
+          <RouterLink class="sa-btn" to="/super-admin/admins">Tenant Admins</RouterLink>
+        </nav>
+        <h1 class="sa-toolbar-title">Super Admins</h1>
+        <p class="sa-toolbar-sub">Manage privileged operator accounts with step-up enforcement and last-admin safeguards.</p>
       </div>
     </div>
 
-    <div class="admin-grid admin-stats">
-      <div class="stat-card">
-        <h3>Total super admins</h3>
-        <p class="stat-value">{{ admins.length }}</p>
-      </div>
-      <div class="stat-card">
-        <h3>Active</h3>
-        <p class="stat-value">{{ activeAdminCount }}</p>
-      </div>
-      <div class="stat-card">
-        <h3>Disabled</h3>
-        <p class="stat-value">{{ disabledAdminCount }}</p>
-      </div>
+    <div class="sa-stat-strip" aria-label="Super admin summary">
+      <div class="sa-stat"><div class="n">{{ admins.length }}</div><div class="l">Total super admins</div></div>
+      <div class="sa-stat"><div class="n">{{ activeAdminCount }}</div><div class="l">Active</div></div>
+      <div class="sa-stat"><div class="n">{{ disabledAdminCount }}</div><div class="l">Disabled</div></div>
     </div>
 
     <div class="section-grid">
-      <div class="card section-card">
+      <section class="sa-panel section-card">
         <div class="section-heading">
           <h2>Create Super Admin</h2>
           <p class="muted">Creates a new privileged operator account with immediate access after super auth.</p>
@@ -39,85 +30,110 @@
             <input v-model="createEmail" type="email" placeholder="superadmin@itemtraxx.com" />
           </label>
           <label>
-            Password
-            <input v-model="createPassword" type="password" placeholder="Temporary password" />
+            Temporary password
+            <input v-model="createPassword" type="password" autocomplete="new-password" placeholder="Temporary password" />
           </label>
-          <div class="form-actions">
-            <button type="submit" class="button-primary" :disabled="isSaving">Create Super Admin</button>
+          <label>
+            Confirm with your current password
+            <input
+              v-model="currentPassword"
+              type="password"
+              autocomplete="current-password"
+              data-session-replay-mask
+            />
+          </label>
+          <p class="muted">This confirms the action on your current session; it does not sign you in again.</p>
+          <div class="panel-actions">
+            <button type="submit" class="sa-btn primary" :disabled="isSaving">Create Super Admin</button>
           </div>
         </form>
-      </div>
+      </section>
 
-      <div class="card section-card">
+      <section class="sa-panel section-card">
         <div class="section-heading">
           <h2>Super Admin List</h2>
           <p class="muted">Every change here is audited and guarded against self-disable and last-admin lockout.</p>
         </div>
-        <div class="filter-toolbar">
-          <div class="input-row">
-            <input v-model="search" type="text" placeholder="Search by email" />
-            <button type="button" @click="loadAdmins">Search</button>
-          </div>
+        <div class="sa-filters">
+          <label>Search <input v-model="search" type="text" placeholder="Search by email" /></label>
+          <button type="button" class="sa-btn" @click="loadAdmins">Search</button>
         </div>
 
         <p v-if="isLoading" class="muted">Loading super admins...</p>
-        <p v-else-if="error" class="error">{{ error }}</p>
-        <table v-else class="table">
-          <thead>
-            <tr>
-              <th>Email</th>
-              <th>Status</th>
-              <th>Created</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="admin in admins" :key="admin.id">
-              <td>{{ admin.auth_email }}</td>
-              <td>{{ admin.is_active ? "active" : "disabled" }}</td>
-              <td>{{ formatDate(admin.created_at) }}</td>
-              <td class="actions-cell">
-                <button type="button" @click="openEditModal(admin)">Edit</button>
-              </td>
-            </tr>
-            <tr v-if="admins.length === 0">
-              <td colspan="4" class="muted">No super admins found.</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
+        <p v-else-if="error" class="sa-error" v-app-toast-error="{ suppressMessage: toastMessage }">{{ error }}</p>
+        <div v-else class="sa-table-wrap">
+          <table class="sa-table">
+            <thead>
+              <tr>
+                <th>Email</th>
+                <th>Status</th>
+                <th>Created</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="admin in admins" :key="admin.id">
+                <td><span data-session-replay-mask>{{ admin.auth_email }}</span></td>
+                <td><span class="sa-tag" :class="admin.is_active ? 'ok' : 'critical'">{{ admin.is_active ? "active" : "disabled" }}</span></td>
+                <td>{{ formatDate(admin.created_at) }}</td>
+                <td>
+                  <div class="sa-table-row-actions">
+                    <button type="button" class="sa-btn" @click="openEditModal(admin)">Edit</button>
+                  </div>
+                </td>
+              </tr>
+              <tr v-if="admins.length === 0">
+                <td colspan="4" class="muted">No super admins found.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
     </div>
 
-    <div v-if="editModalVisible" class="modal-backdrop" @click.self="closeEditModal">
-      <div class="modal">
+    <div v-if="editModalVisible" class="sa-modal-backdrop" @click.self="closeEditModal">
+      <section class="sa-modal">
         <h2>Edit Super Admin</h2>
         <form class="form" @submit.prevent="saveEditEmail">
           <label>
             Email
             <input v-model="editEmail" type="email" placeholder="superadmin@itemtraxx.com" />
           </label>
-          <div class="form-actions">
-            <button type="submit" class="button-primary" :disabled="isSaving">Save Email</button>
-            <button type="button" :disabled="isSaving" @click="sendEditReset">Send Reset Link</button>
-            <button type="button" :disabled="isSaving" @click="toggleEditStatus">
+          <div class="panel-actions">
+            <button type="submit" class="sa-btn primary" :disabled="isSaving || stepUpSubmitting">Save Email</button>
+            <button type="button" class="sa-btn" :disabled="isSaving || stepUpSubmitting" @click="sendEditReset">Send Reset Link</button>
+            <button type="button" class="sa-btn" :disabled="isSaving || stepUpSubmitting" @click="toggleEditStatus">
               {{ editTarget?.is_active ? "Disable" : "Enable" }}
             </button>
-            <button type="button" @click="closeEditModal">Cancel</button>
+            <button type="button" class="sa-btn" @click="closeEditModal">Cancel</button>
           </div>
         </form>
-      </div>
+      </section>
     </div>
 
     <div v-if="toastMessage" class="toast">
       <div class="toast-title">{{ toastTitle }}</div>
-      <div class="toast-body">{{ toastMessage }}</div>
+      <div class="toast-body" data-session-replay-mask>{{ toastMessage }}</div>
     </div>
+
+    <StepUpModal
+      :visible="stepUpVisible"
+      :title="stepUpTitle"
+      :message="stepUpMessage"
+      :confirm-label="stepUpConfirmLabel"
+      :busy="stepUpSubmitting"
+      :error="stepUpError"
+      @cancel="cancelStepUp"
+      @confirm="confirmStepUp"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
 import { RouterLink, useRouter } from "vue-router";
+import StepUpModal from "../../components/StepUpModal.vue";
+import { useSuperAdminStepUp } from "../../composables/useSuperAdminStepUp";
 import {
   handleSuperAdminUnauthorized,
   isUnauthorizedError,
@@ -131,6 +147,7 @@ import {
   updateSuperAdminEmail,
   type SuperAdminAccount,
 } from "../../services/superAdminService";
+import { verifySuperAdminPassword } from "../../services/superOps/sessions";
 
 const router = useRouter();
 const admins = ref<SuperAdminAccount[]>([]);
@@ -140,6 +157,7 @@ const error = ref("");
 const search = ref("");
 const createEmail = ref("");
 const createPassword = ref("");
+const currentPassword = ref("");
 const toastTitle = ref("");
 const toastMessage = ref("");
 const editModalVisible = ref(false);
@@ -161,6 +179,20 @@ const showToast = (title: string, message: string) => {
     toastTimer = null;
   }, 4000);
 };
+
+const {
+  visible: stepUpVisible,
+  title: stepUpTitle,
+  message: stepUpMessage,
+  confirmLabel: stepUpConfirmLabel,
+  error: stepUpError,
+  isSubmitting: stepUpSubmitting,
+  request: requestStepUp,
+  cancel: cancelStepUp,
+  confirm: confirmStepUp,
+} = useSuperAdminStepUp((cause) => {
+  showToast("Action failed", toUserFacingErrorMessage(cause, "Unable to verify or complete this Super Admin action."));
+});
 
 const formatDate = (value: string) => {
   const date = new Date(value);
@@ -186,13 +218,16 @@ const loadAdmins = async () => {
 };
 
 const handleCreate = async () => {
-  if (!createEmail.value.trim() || !createPassword.value.trim()) {
-    showToast("Invalid input", "Enter an email and password.");
+  if (!createEmail.value.trim() || !createPassword.value.trim() || !currentPassword.value) {
+    showToast("Invalid input", "Enter the new account details and confirm with your current password.");
     return;
   }
 
   isSaving.value = true;
+  const confirmationPassword = currentPassword.value;
+  currentPassword.value = "";
   try {
+    await verifySuperAdminPassword(confirmationPassword);
     const created = await createSuperAdmin({
       auth_email: createEmail.value.trim().toLowerCase(),
       password: createPassword.value,
@@ -220,17 +255,15 @@ const closeEditModal = () => {
   editEmail.value = "";
 };
 
-const toggleEditStatus = async () => {
+const toggleEditStatus = () => {
   if (!editTarget.value) return;
   const current = editTarget.value;
   const nextStatus = !current.is_active;
-  const confirmed = window.confirm(
-    `${nextStatus ? "Enable" : "Disable"} super admin ${current.auth_email}?`
-  );
-  if (!confirmed) return;
-
-  isSaving.value = true;
-  try {
+  requestStepUp({
+    title: `${nextStatus ? "Enable" : "Disable"} Super Admin`,
+    message: `Type CONFIRM and enter your super admin password to ${nextStatus ? "enable" : "disable"} ${current.auth_email}.`,
+    confirmLabel: nextStatus ? "Enable" : "Disable",
+  }, async () => {
     const updated = await setSuperAdminStatus({
       id: current.id,
       is_active: nextStatus,
@@ -242,49 +275,44 @@ const toggleEditStatus = async () => {
       nextStatus ? "Super admin enabled" : "Super admin disabled",
       `${updated.auth_email} is now ${nextStatus ? "active" : "disabled"}.`
     );
-  } catch (err) {
-    showToast("Status update failed", toUserFacingErrorMessage(err, "Unable to update super admin status."));
-  } finally {
-    isSaving.value = false;
-  }
+  });
 };
 
-const sendEditReset = async () => {
+const sendEditReset = () => {
   if (!editTarget.value) return;
-  isSaving.value = true;
-  try {
-    await sendSuperAdminReset({ auth_email: editTarget.value.auth_email });
-    showToast("Reset sent", `Password reset flow triggered for ${editTarget.value.auth_email}.`);
-  } catch (err) {
-    showToast("Reset failed", toUserFacingErrorMessage(err, "Unable to send reset."));
-  } finally {
-    isSaving.value = false;
-  }
+  const current = editTarget.value;
+  requestStepUp({
+    title: "Send Super Admin Reset",
+    message: `Type CONFIRM and enter your super admin password to send a password reset to ${current.auth_email}.`,
+    confirmLabel: "Send Reset",
+  }, async () => {
+    await sendSuperAdminReset({ auth_email: current.auth_email });
+    showToast("Reset sent", `Password reset flow triggered for ${current.auth_email}.`);
+  });
 };
 
-const saveEditEmail = async () => {
+const saveEditEmail = () => {
   if (!editTarget.value) return;
   const nextEmail = editEmail.value.trim().toLowerCase();
   if (!nextEmail) {
     showToast("Invalid input", "Enter an email address.");
     return;
   }
-
-  isSaving.value = true;
-  try {
+  const current = editTarget.value;
+  requestStepUp({
+    title: "Update Super Admin Email",
+    message: `Type CONFIRM and enter your super admin password to change ${current.auth_email} to ${nextEmail}.`,
+    confirmLabel: "Save Email",
+  }, async () => {
     const updated = await updateSuperAdminEmail({
-      id: editTarget.value.id,
+      id: current.id,
       auth_email: nextEmail,
     });
     admins.value = admins.value.map((item) => (item.id === updated.id ? updated : item));
     editTarget.value = updated;
     editEmail.value = updated.auth_email;
     showToast("Super admin updated", "Super admin email was updated.");
-  } catch (err) {
-    showToast("Update failed", toUserFacingErrorMessage(err, "Unable to update super admin."));
-  } finally {
-    isSaving.value = false;
-  }
+  });
 };
 
 onMounted(() => {
@@ -293,16 +321,11 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.super-page-header {
+.page-nav-left {
   display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 1rem;
-  margin-bottom: 1rem;
-}
-
-.admin-stats {
-  margin-top: 1rem;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.5rem;
 }
 
 .section-grid {
@@ -326,49 +349,14 @@ onMounted(() => {
   margin: 0.35rem 0 0;
 }
 
-.filter-toolbar {
+.panel-actions {
   display: flex;
-  gap: 1rem;
-  flex-wrap: wrap;
-  align-items: end;
-}
-
-.actions-cell {
-  display: flex;
-  flex-wrap: wrap;
   gap: 0.5rem;
-}
-
-.modal-backdrop {
-  position: fixed;
-  inset: 0;
-  background: rgba(5, 10, 20, 0.52);
-  display: grid;
-  place-items: center;
-  z-index: 80;
-  padding: 1rem;
-}
-
-.modal {
-  width: min(520px, 100%);
-  border-radius: 14px;
-  border: 1px solid var(--border);
-  background: var(--surface);
-  color: var(--text);
-  padding: 1rem;
-}
-
-.modal .form-actions {
-  display: flex;
+  margin-top: 1rem;
   flex-wrap: wrap;
-  gap: 0.5rem;
 }
 
 @media (max-width: 900px) {
-  .super-page-header {
-    flex-direction: column;
-  }
-
   .section-grid {
     grid-template-columns: 1fr;
   }

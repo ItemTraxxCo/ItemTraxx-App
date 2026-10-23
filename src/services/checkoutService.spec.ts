@@ -64,6 +64,7 @@ import { authenticatedSelect } from "./authenticatedDataClient";
 import { ensureAccountSessionReady } from "./accountSessionService";
 import {
   ensureCheckoutOperationId,
+  getBufferedCheckoutCount,
   isOfflineQueueItemScopedTo,
   readOfflineQueue,
   writeOfflineQueue,
@@ -97,6 +98,7 @@ const mockedInvoke = vi.mocked(invokeEdgeFunction);
 const mockedSelect = vi.mocked(authenticatedSelect);
 const mockedEnsureAccountSessionReady = vi.mocked(ensureAccountSessionReady);
 const mockedEnsureOpId = vi.mocked(ensureCheckoutOperationId);
+const mockedGetBufferedCheckoutCount = vi.mocked(getBufferedCheckoutCount);
 const mockedIsQueueItemScoped = vi.mocked(isOfflineQueueItemScopedTo);
 const mockedReadQueue = vi.mocked(readOfflineQueue);
 const mockedWriteQueue = vi.mocked(writeOfflineQueue);
@@ -137,6 +139,7 @@ beforeEach(() => {
   mockedSelect.mockReset();
   mockedEnsureAccountSessionReady.mockReset().mockResolvedValue({ ok: true });
   mockedEnsureOpId.mockImplementation((p) => ({ ...p, operation_id: p.operation_id ?? "op-mock" }));
+  mockedGetBufferedCheckoutCount.mockReset().mockResolvedValue(0);
   mockedIsQueueItemScoped.mockImplementation((item, scope) =>
     item?.workspace_id === scope.workspaceId &&
     item?.profile_id === scope.profileId &&
@@ -177,14 +180,14 @@ describe("submitCheckoutReturn", () => {
   it("submits successfully, applies the offline pack, and reports the buffered queue length", async () => {
     mockedInvoke.mockResolvedValue(okResponse({ success: true, processed: 1 }) as never);
     mockedApplyConfirmed.mockResolvedValue(true);
-    mockedReadQueue.mockResolvedValue([{ id: "q-1" } as never]);
+    mockedGetBufferedCheckoutCount.mockResolvedValue(1);
 
     const result = await submitCheckoutReturn(payload, { borrower: null, items: [] });
 
     expect(result).toEqual({ buffered: false, queuedCount: 1 });
     expect(mockedApplyConfirmed).toHaveBeenCalledWith({ borrower: null, items: [] });
     expect(mockedMarkConfirmed).toHaveBeenCalled();
-    expect(mockedRefreshPack).toHaveBeenCalledWith({ force: true });
+    expect(mockedRefreshPack).toHaveBeenCalledWith({ force: true, reportProgress: false });
   });
 
   it("marks the server unreachable and does not throw when refreshOfflineCheckoutPackIfNeeded rejects in the background", async () => {
@@ -220,7 +223,11 @@ describe("submitCheckoutReturn", () => {
       okResponse({ success: true, processed: 0, skipped_barcodes: ["BC-1"] }) as never
     );
 
-    await expect(submitCheckoutReturn(payload)).rejects.toThrow(/already checked out.*refresh and try again/i);
+    await expect(submitCheckoutReturn(payload)).rejects.toMatchObject({
+      message: expect.stringMatching(/already checked out.*refresh and try again/i),
+      status: 409,
+      reportToErrorTracking: false,
+    });
   });
 
   it("throws a 409 conflict error using the multi-item message when several barcodes are skipped", async () => {
@@ -577,7 +584,7 @@ describe("syncCheckoutQueues", () => {
       review: 0,
       serverReachable: true,
     });
-    expect(mockedRefreshPack).toHaveBeenCalledWith({ force: true });
+    expect(mockedRefreshPack).toHaveBeenCalledWith({ force: true, reportProgress: false });
   });
 
   it("does not replace the local pack while replay still has pending or review work", async () => {
@@ -678,7 +685,7 @@ describe("fetchBorrowerByBorrowerId", () => {
     await expect(fetchBorrowerByBorrowerId("1234AB")).rejects.toMatchObject({
       message: "Borrower not found.",
       code: "NOT_FOUND",
-      reportToSentry: false,
+      reportToErrorTracking: false,
     });
   });
 
@@ -690,7 +697,7 @@ describe("fetchBorrowerByBorrowerId", () => {
 
     await expect(fetchBorrowerByBorrowerId("1234AB")).rejects.toMatchObject({
       code: "NOT_FOUND",
-      reportToSentry: false,
+      reportToErrorTracking: false,
     });
     expect(mockedFindOfflineBorrower).not.toHaveBeenCalled();
   });

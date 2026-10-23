@@ -17,6 +17,8 @@ export type TenantFeatureFlags = {
 
 export type TenantPolicyRow = {
   checkout_due_hours: number | null;
+  max_items?: number | null;
+  max_borrowers?: number | null;
   account_category: "workspace" | "education" | "custom" | "individual" | null;
   plan_code:
     | "workspace_core"
@@ -43,8 +45,13 @@ export type DeviceSessionContext = {
   deviceId: string | null;
   deviceLabel: string | null;
   userAgent: string | null;
-  loginMethod: "password" | "magic_link" | "session_handoff" | null;
-  loginLocation: "regular_login" | "admin_login" | null;
+  loginMethod: string | null;
+  loginLocation:
+    | "regular_login"
+    | "admin_login"
+    | "SAML2.0"
+    | "OpenID Connect (OIDC)"
+    | null;
   generalLocation: string | null;
 };
 
@@ -54,6 +61,8 @@ export type AdminOpsContext = {
   payload: Record<string, unknown>;
   adminClient: SupabaseClient;
   user: { id: string };
+  /** Better Auth user id used to bind every admin operation to its live session. */
+  betterAuthUserId?: string | null;
   workspaceId: string;
   authToken: string;
   authSessionBinding: { sessionId: string | null; issuedAt: string | null };

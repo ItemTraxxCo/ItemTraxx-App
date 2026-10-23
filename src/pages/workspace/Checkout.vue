@@ -13,8 +13,6 @@
     </div>
 
     <p class="checkout-page-copy">Checkout and return</p>
-    <OfflineWorkflowStatus />
-
     <div class="card checkout-card">
       <label>
         Borrower ID
@@ -47,8 +45,8 @@
 
       <div v-if="borrower" class="checkout-borrower-summary">
         <p>
-          <strong>{{ borrower.username }}</strong>
-          <span class="muted"> ID: {{ borrower.borrower_id }}</span>
+          <strong data-session-replay-mask>{{ borrower.username }}</strong>
+          <span class="muted"> ID: <span data-session-replay-mask>{{ borrower.borrower_id }}</span></span>
         </p>
         <div v-if="checkedOutItem.length">
           <p class="checkout-subheading">Currently checked out</p>
@@ -120,7 +118,7 @@
       </div>
 
       <p v-else class="muted">Enter a borrower ID to begin.</p>
-      <p v-if="error" class="error">{{ error }}</p>
+      <p v-if="error" class="error" v-app-toast-error="{ suppressMessage: toastMessage }">{{ error }}</p>
       <p v-if="success" class="success">{{ success }}</p>
       <div v-if="toastMessage" class="toast" :class="{ 'toast-persist': toastStatus === 'Processing' }">
         <div class="toast-title">{{ toastTitle }}</div>
@@ -155,7 +153,6 @@
 import { computed, nextTick, onMounted, onUnmounted, ref } from "vue";
 import CameraBarcodeScannerModal from "../../components/CameraBarcodeScannerModal.vue";
 import SkeletonLoader from "../../components/SkeletonLoader.vue";
-import OfflineWorkflowStatus from "../../components/OfflineWorkflowStatus.vue";
 import {
   consumeCheckoutOfflineWarning,
   fetchCheckedOutItem,
@@ -167,6 +164,7 @@ import {
   type BorrowerSummary,
 } from "../../services/checkoutService";
 import { sanitizeInput } from "../../utils/inputSanitizer";
+import { preloadImages } from "../../utils/preloadImages";
 import { getAuthState } from "../../store/authState";
 import { AppError, toUserFacingErrorMessage } from "../../services/appErrors";
 import {
@@ -542,6 +540,8 @@ const handleOnline = () => {
 };
 
 onMounted(() => {
+  preloadImages([lightBrandLogoUrl, darkBrandLogoUrl]);
+
   const syncTheme = () => {
     themeMode.value = document.documentElement.getAttribute("data-theme") === "dark" ? "dark" : "light";
   };
@@ -623,8 +623,8 @@ onUnmounted(() => {
 
 .checkout-inline-button {
   min-width: 7rem;
-  min-height: 2.2rem;
-  padding: 0.36rem 0.8rem;
+  min-height: 2rem;
+  padding: 0.3rem 0.7rem;
   border-radius: 12px;
   white-space: nowrap;
 }
@@ -683,8 +683,8 @@ onUnmounted(() => {
 }
 
 .checkout-submit-button {
-  min-height: 2.35rem;
-  padding-inline: 1rem;
+  min-height: 2.2rem;
+  padding-inline: 0.85rem;
   border-radius: 12px;
 }
 

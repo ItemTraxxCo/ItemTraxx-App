@@ -128,6 +128,7 @@
               <input
                 ref="attachmentsInput"
                 type="file"
+                class="ph-no-capture"
                 accept="image/*"
                 multiple
                 @change="handleAttachmentChange"
@@ -167,7 +168,7 @@
             </p>
           </form>
 
-          <p v-if="error" class="error">{{ error }}</p>
+          <p v-if="error" class="error" v-app-toast-error>{{ error }}</p>
         </section>
       </section>
 

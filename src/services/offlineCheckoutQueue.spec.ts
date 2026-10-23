@@ -27,6 +27,15 @@ const payload = (barcode: string): CheckoutReturnPayload => ({
   action_type: "checkout",
 });
 
+const setCurrentQueueScope = () => {
+  window.localStorage.setItem("itemtraxx-device-id", "device-1");
+  setAuthStateFromBackend({
+    isAuthenticated: true,
+    userId: "profile-1",
+    workspaceContextId: "workspace-1",
+  });
+};
+
 beforeEach(async () => {
   clearAuthState(true);
   window.localStorage.clear();
@@ -56,6 +65,7 @@ describe("ensureCheckoutOperationId", () => {
 
 describe("encrypted queue round trip", () => {
   it("queues, encrypts, persists, and decrypts a checkout payload", async () => {
+    setCurrentQueueScope();
     const count = await queueCheckoutPayload(payload("ITEM-1"));
     expect(count).toBe(1);
 
@@ -76,12 +86,7 @@ describe("encrypted queue round trip", () => {
   });
 
   it("binds newly queued legacy entries to the current workspace, profile, and device", async () => {
-    window.localStorage.setItem("itemtraxx-device-id", "device-1");
-    setAuthStateFromBackend({
-      isAuthenticated: true,
-      userId: "profile-1",
-      workspaceContextId: "workspace-1",
-    });
+    setCurrentQueueScope();
 
     await queueCheckoutPayload(payload("ITEM-1"));
 
@@ -95,6 +100,7 @@ describe("encrypted queue round trip", () => {
   });
 
   it("appends multiple queued items and reflects the growing count", async () => {
+    setCurrentQueueScope();
     await queueCheckoutPayload(payload("ITEM-1"));
     const secondCount = await queueCheckoutPayload(payload("ITEM-2"), "network error");
 
@@ -109,6 +115,34 @@ describe("encrypted queue round trip", () => {
   it("returns 0 for a fresh queue with nothing persisted", async () => {
     expect(await getBufferedCheckoutCount()).toBe(0);
     expect(await readOfflineQueue()).toEqual([]);
+  });
+
+  it("counts only entries bound to the active workspace, profile, and device", async () => {
+    setCurrentQueueScope();
+    await writeOfflineQueue([
+      {
+        id: "current",
+        payload: payload("CURRENT"),
+        created_at: "2026-01-01T00:00:00Z",
+        attempts: 0,
+        last_error: null,
+        workspace_id: "workspace-1",
+        profile_id: "profile-1",
+        device_id: "device-1",
+      },
+      {
+        id: "other-profile",
+        payload: payload("OTHER"),
+        created_at: "2026-01-01T00:00:00Z",
+        attempts: 0,
+        last_error: null,
+        workspace_id: "workspace-1",
+        profile_id: "profile-2",
+        device_id: "device-1",
+      },
+    ]);
+
+    await expect(getBufferedCheckoutCount()).resolves.toBe(1);
   });
 });
 
@@ -209,6 +243,9 @@ describe("legacy queue identity quarantine", () => {
       attempts: 2,
       last_error: "PRIVATE ERROR DETAILS",
       review_required: true,
+      workspace_id: "workspace-1",
+      profile_id: "profile-1",
+      device_id: "device-1",
     };
     const malformedReview = {
       id: "legacy-invalid-date",
@@ -220,11 +257,10 @@ describe("legacy queue identity quarantine", () => {
     };
     await writeOfflineQueue([null, pending, review, malformedReview] as never);
 
-    await expect(getOfflineQueueSummary()).resolves.toEqual({ totalCount: 4, pendingCount: 2, reviewCount: 2 });
+    await expect(getOfflineQueueSummary()).resolves.toEqual({ totalCount: 1, pendingCount: 0, reviewCount: 1 });
     const reviewItems = await listOfflineQueueReviewItems();
     expect(reviewItems).toEqual([
       { id: "legacy-review", created_at: "2026-01-01T00:00:00Z", action_type: "checkout", item_count: 1 },
-      { id: "legacy-invalid-date", created_at: null, action_type: "legacy", item_count: 1 },
     ]);
     expect(JSON.stringify(reviewItems)).not.toContain("PRIVATE");
 
@@ -234,6 +270,7 @@ describe("legacy queue identity quarantine", () => {
       pending,
       malformedReview,
     ]);
+    await expect(discardOfflineQueueReviewItem("legacy-invalid-date")).rejects.toThrow(/no longer available/i);
     await expect(discardOfflineQueueReviewItem("pending")).rejects.toThrow(/no longer available/i);
 
     clearAuthState(true);
@@ -285,6 +322,7 @@ describe("clearOfflineCheckoutQueue", () => {
 
 describe("lock acquire/release across sequential operations", () => {
   it("releases the lease after each call so a second call does not deadlock", async () => {
+    setCurrentQueueScope();
     await queueCheckoutPayload(payload("ITEM-1"));
     expect(window.localStorage.getItem(LOCK_KEY)).toBeNull();
 

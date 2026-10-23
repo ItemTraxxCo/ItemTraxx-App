@@ -4,7 +4,7 @@ import {
   mockSystemStatus,
   mockUnauthenticatedSession,
   navigateApp,
-  setWorkspaceAdminSession,
+  setTenantAccountSession,
 } from "./helpers/testHarness";
 
 test.describe("Checkout borrower ownership regression", () => {
@@ -136,10 +136,10 @@ test.describe("Checkout borrower ownership regression", () => {
       });
     });
 
+    await page.clock.install();
     await page.goto("/");
     await page.evaluate(() => {
       window.localStorage.setItem("itemtraxx:onboarding:v1:tenant_account", new Date().toISOString());
-      window.localStorage.setItem("itemtraxx:onboarding:v1:workspace_admin", new Date().toISOString());
       window.localStorage.setItem(
         "itemtraxx-cookie-consent",
         JSON.stringify({
@@ -149,7 +149,7 @@ test.describe("Checkout borrower ownership regression", () => {
         })
       );
     });
-    await setWorkspaceAdminSession(page, "tenant-e2e");
+    await setTenantAccountSession(page, "tenant-e2e");
     await navigateApp(page, "/checkout");
     await expect(page).toHaveURL(/\/checkout$/);
 
@@ -161,6 +161,21 @@ test.describe("Checkout borrower ownership regression", () => {
     const barcodeInput = page.getByPlaceholder("Scan or enter barcode");
     const addBarcodeButton = page.getByRole("button", { name: "Add barcode" });
     const completeTransactionButton = page.getByRole("button", { name: "Complete transaction" });
+
+    await borrowerInput.pressSequentially("UNKNOWN");
+    await expect(page.locator(".app-toast-outlet")).toHaveCount(0);
+    await loadBorrowerButton.click();
+    await expect(page.locator(".app-toast-outlet .toast-body")).toHaveText(
+      "Borrower not found. Please check the borrower ID and try again.",
+    );
+    await page.clock.fastForward(4_000);
+    await expect(page.locator(".app-toast-outlet")).toHaveCount(0);
+
+    // Editing after a failed lookup must not replay the same error toast.
+    await borrowerInput.fill("");
+    await borrowerInput.pressSequentially("UNKNOWN");
+    await expect(page.locator(".app-toast-outlet")).toHaveCount(0);
+
     const loadBorrower = async (id: "BRWRA" | "BRWRB") => {
       await borrowerInput.fill(id);
       await loadBorrowerButton.click();
@@ -182,7 +197,7 @@ test.describe("Checkout borrower ownership regression", () => {
     await loadBorrower("BRWRB");
     await barcodeInput.fill("ITEM-1");
     await addBarcodeButton.click();
-    await expect(page.locator(".error", { hasText: "Item already checked out." })).toBeVisible();
+    await expect(page.locator(".toast-body", { hasText: "Item already checked out." })).toHaveText("Item already checked out.");
 
     // 3) Borrower A can return their own checked-out item.
     await loadBorrower("BRWRA");

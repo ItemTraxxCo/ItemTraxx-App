@@ -135,7 +135,12 @@ const withMockedBetterAuthAdmin = async (run: () => Promise<void>) => {
       const request = JSON.parse(String(init?.body)) as Record<string, unknown>;
       return new Response(JSON.stringify({
         passkeys: request.action === "list_passkeys"
-          ? [{ id: "passkey-1", name: "MacBook", created_at: "2026-07-22T00:00:00.000Z" }]
+          ? [{
+            id: "passkey-1",
+            name: "MacBook",
+            created_at: "2026-07-22T00:00:00.000Z",
+            last_used_at: "2026-09-12T12:00:00.000Z",
+          }]
           : [],
       }), { status: 200, headers: { "Content-Type": "application/json" } });
     }
@@ -238,7 +243,7 @@ Deno.test("super ops lists only the current super admin's passkeys", async () =>
           id: "passkey-1",
           name: "MacBook",
           created_at: "2026-07-22T00:00:00.000Z",
-          last_used_at: null,
+          last_used_at: "2026-09-12T12:00:00.000Z",
         }],
       },
     });

@@ -4,6 +4,7 @@ import {
   mockSystemStatus,
   mockUnauthenticatedSession,
   navigateApp,
+  setIndividualAccountSession,
   setWorkspaceAdminSession,
 } from "./helpers/testHarness";
 
@@ -72,7 +73,7 @@ test.describe("admin settings device sessions repro", () => {
       window.localStorage.setItem("itemtraxx:onboarding:v1:workspace_admin", new Date().toISOString());
     });
     await setWorkspaceAdminSession(page);
-    await navigateApp(page, "/admin/settings");
+    await navigateApp(page, "/settings/account");
     const consent = page.getByRole("dialog", { name: "Cookie preferences" });
     if (await consent.isVisible()) await consent.getByRole("button", { name: "Essential only" }).click();
 
@@ -99,9 +100,48 @@ test.describe("admin settings device sessions repro", () => {
     // Give any polling/heartbeat logic a chance to react before asserting.
     await page.waitForTimeout(1000);
 
-    // Current session must remain: no forced logout / termination banner, still on /admin/settings.
-    await expect(page).toHaveURL(/\/admin\/settings/);
+    // Current session must remain: no forced logout / termination banner, still on account settings.
+    await expect(page).toHaveURL(/\/settings\/account/);
     await expect(page.getByText("Admin laptop")).toBeVisible();
-    await expect(page.getByText("This device")).toBeVisible();
+    await expect(page.getByText("This device", { exact: true })).toBeVisible();
+  });
+
+  test("individual account sessions use account sign-in wording", async ({ page }) => {
+    await mockAdminOps(page);
+    await page.route(/\/functions(?:\/v1)?\/admin-ops(?:\?.*)?$/, async (route) => {
+      const body = route.request().postDataJSON() as { action?: string };
+      if (body.action === "list_sessions") {
+        await route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: JSON.stringify({
+            data: {
+              sessions: [{
+                id: "individual-session-1",
+                device_id: "individual-device",
+                device_label: "Personal laptop",
+                user_agent: null,
+                login_method: "password",
+                login_location: "admin_login",
+                general_location: "Portland, OR",
+                created_at: new Date().toISOString(),
+                last_seen_at: new Date().toISOString(),
+                is_current: true,
+              }],
+            },
+          }),
+        });
+        return;
+      }
+      await route.fallback();
+    });
+
+    await page.goto("/");
+    await setIndividualAccountSession(page);
+    await navigateApp(page, "/account/settings");
+
+    const sessionRow = page.getByRole("row").filter({ hasText: "Personal laptop" });
+    await expect(sessionRow).toContainText("Account sign-in");
+    await expect(sessionRow).not.toContainText("Admin sign in");
   });
 });

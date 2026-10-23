@@ -33,7 +33,7 @@ const prepareWorkspaceAdminPage = async (page: Page) => {
 };
 
 test.describe("core user flows", () => {
-  test("tenant account sign-in lands on the checkout workflow", async ({ page }) => {
+  test("tenant account sign-in returns to the requested checkout workflow", async ({ page }) => {
     await mockSystemStatus(page);
     await mockUnauthenticatedSession(page);
     await page.goto("/");
@@ -69,14 +69,14 @@ test.describe("core user flows", () => {
       });
     });
 
-    await page.goto("/login");
+    await page.goto("/checkout?source=email");
     await expect(page.getByRole("heading", { name: "Sign in", exact: true })).toBeVisible();
 
-    await page.getByPlaceholder("Email address").fill(" Tenant.User@Example.COM ");
-    await page.getByPlaceholder("Enter password").fill("correct horse battery staple");
+    await page.getByLabel("Email").fill(" Tenant.User@Example.COM ");
+    await page.getByRole("textbox", { name: /Password/ }).fill("correct horse battery staple");
     await page.getByRole("button", { name: "Sign in", exact: true }).click();
 
-    await expect(page).toHaveURL(/\/checkout$/);
+    await expect(page).toHaveURL(/\/checkout\?source=email$/);
     await expect(page.getByText("Checkout and return", { exact: true })).toBeVisible();
     expect(loginRequests).toEqual([
       {
@@ -137,8 +137,8 @@ test.describe("core user flows", () => {
     await expect(page.getByRole("heading", { name: "Sign in", exact: true })).toBeVisible();
     await expect(page.getByText("Go to admin sign in", { exact: true })).toHaveCount(0);
 
-    await page.getByPlaceholder("Email address").fill("tenant.admin@example.com");
-    await page.getByPlaceholder("Enter password").fill("correct horse battery staple");
+    await page.getByLabel("Email").fill("tenant.admin@example.com");
+    await page.getByRole("textbox", { name: /Password/ }).fill("correct horse battery staple");
     await page.getByRole("button", { name: "Sign in", exact: true }).click();
 
     await expect(page).toHaveURL(/\/admin$/);
@@ -209,7 +209,8 @@ test.describe("core user flows", () => {
     await page.getByRole("button", { name: "All Tenant Accounts", exact: true }).click();
     await page.getByRole("button", { name: "Add item", exact: true }).click();
 
-    await expect(page.getByText("Item added.", { exact: true })).toBeVisible();
+    const statusToast = page.locator(".app-toast-outlet[role=status]");
+    await expect(statusToast.getByText("Item added.", { exact: true })).toBeVisible();
     await expect(page.getByRole("cell", { name: "Camera A", exact: true })).toBeVisible();
     expect(createRequests).toHaveLength(1);
     expect(createRequests[0]).toMatchObject({
@@ -286,7 +287,8 @@ test.describe("core user flows", () => {
     await page.getByRole("button", { name: "All Tenant Accounts", exact: true }).click();
     await page.getByRole("button", { name: "Add borrower", exact: true }).click();
 
-    await expect(page.getByText("Borrower added.", { exact: true })).toBeVisible();
+    const statusToast = page.locator(".app-toast-outlet[role=status]");
+    await expect(statusToast.getByText("Borrower added.", { exact: true })).toBeVisible();
     await expect(page.getByRole("cell", { name: username, exact: true })).toBeVisible();
     expect(createRequests).toHaveLength(1);
     expect(createRequests[0]).toMatchObject({

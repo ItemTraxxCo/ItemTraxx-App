@@ -1,4 +1,4 @@
-import { onMounted, onUnmounted, ref, type Ref } from "vue";
+import { onMounted, onUnmounted, ref, watch, type Ref } from "vue";
 
 type RenderOptions = {
   sitekey: string;
@@ -7,6 +7,8 @@ type RenderOptions = {
   "expired-callback"?: () => void;
   theme?: "auto" | "light" | "dark";
 };
+
+type TurnstileTheme = NonNullable<RenderOptions["theme"]>;
 
 type TurnstileApi = {
   render: (container: string | HTMLElement, options: RenderOptions) => string;
@@ -52,7 +54,10 @@ const ensureTurnstileScript = () => {
   return turnstileScriptPromise;
 };
 
-export const useTurnstile = (siteKey?: string) => {
+export const useTurnstile = (
+  siteKey?: string,
+  theme?: Readonly<Ref<TurnstileTheme>>
+) => {
   const containerRef = ref<HTMLElement | null>(null);
   const token = ref("");
   const isReady = ref(false);
@@ -80,7 +85,7 @@ export const useTurnstile = (siteKey?: string) => {
     try {
       widgetId = api.render(containerRef.value, {
         sitekey: siteKey,
-        theme: "auto",
+        theme: theme?.value ?? "auto",
         callback: (nextToken) => {
           token.value = nextToken;
           loadError.value = "";
@@ -99,6 +104,30 @@ export const useTurnstile = (siteKey?: string) => {
       loadError.value = "Unable to initialize the security check. Refresh and try again.";
     }
   };
+
+  if (theme) {
+    watch(() => theme.value, () => {
+      if (!widgetId) {
+        return;
+      }
+
+      const api = window.turnstile as TurnstileApi | undefined;
+      if (!api) {
+        return;
+      }
+
+      try {
+        api.remove(widgetId);
+      } catch {
+        return;
+      }
+
+      widgetId = null;
+      token.value = "";
+      isReady.value = false;
+      mountWidget();
+    });
+  }
 
   const reset = () => {
     if (!widgetId || !window.turnstile) {

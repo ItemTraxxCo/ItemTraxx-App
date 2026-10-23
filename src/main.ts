@@ -1,13 +1,18 @@
 import { createApp } from "vue";
+import { appToastErrorDirective, appToastMessageDirective } from "./directives/appToastError";
 import "./styles/tokens.css";
 import "./styles/base.css";
 import "./styles/app-shell.css";
 import "./bones/registry";
 import App from "./App.vue";
 import router from "./router";
-import { clearAuthState, getAuthState } from "./store/authState";
+import { clearAuthState } from "./store/authState";
 import { getWorkspaceState } from "./store/workspaceState";
-import { refreshPublicAuthFromSession, scrubLegacyAuthFragment } from "./services/publicAuthBootstrap";
+import {
+  refreshPublicAuthFromSession,
+  scrubLegacyAuthFragment,
+  syncRouterHistoryToVisibleLocation,
+} from "./services/publicAuthBootstrap";
 import { isSessionNetworkError } from "./services/httpSessionService";
 import { TimeoutError, withTimeout } from "./services/asyncUtils";
 import {
@@ -22,6 +27,7 @@ import { installAppErrorRecovery } from "./services/appErrorRecovery";
 import { isPublicBootstrapRoute } from "./bootstrap/routeBootstrap";
 import { createClientMonitoring } from "./bootstrap/clientMonitoring";
 import { markAgentFallbackMounted } from "./bootstrap/agentFallback";
+import { captureAccountFlowTokenFromLocation } from "./services/accountFlowToken";
 
 const redirectCanonicalHost = () => {
   if (typeof window === "undefined") return false;
@@ -41,11 +47,8 @@ const reportAuthInitFailure = (error: unknown) => {
     return;
   }
   if (isSessionNetworkError(error)) {
-    // The session service was never reached — the visitor is offline, something
-    // blocked the call to the edge proxy, or a dev machine has no proxy running.
-    // The app is fine and the visitor is simply treated as signed out, so this
-    // stays out of the error stream that genuine auth failures live in.
-    console.warn("Auth initialization skipped; session service unreachable:", error.message);
+    // A failed session read is not proof that the browser session has expired.
+    console.warn("Auth initialization deferred; session could not be read:", error.message);
     return;
   }
   console.error("Auth initialization failed:", error);
@@ -58,22 +61,25 @@ const initializeAuth = async () => {
     return;
   }
 
+  const authInitController = new AbortController();
   try {
-    const { initAuthListener } = await withTimeout(
+    const authService = await withTimeout(
       import("./services/authService").then(async (authService) => {
-        await authService.refreshAuthFromSession();
+        await authService.refreshAuthFromSession({ signal: authInitController.signal });
         return authService;
       }),
       6000,
       "Authentication initialization timed out."
     );
-    initAuthListener();
+    authService.initAuthListener();
   } catch (error) {
+    authInitController.abort();
     reportAuthInitFailure(error);
-  } finally {
-    if (!getAuthState().isInitialized) {
-      clearAuthState(true);
-    }
+    startSessionRecovery(async () => {
+      const authService = await import("./services/authService");
+      await authService.refreshAuthFromSession();
+      authService.initAuthListener();
+    });
   }
 };
 
@@ -93,17 +99,78 @@ const initializePublicAuth = async () => {
     );
   } catch (error) {
     reportAuthInitFailure(error);
+    startSessionRecovery(async () => {
+      await refreshPublicAuthFromSession();
+    });
   } finally {
     publicAuthController.abort();
-    if (!getAuthState().isInitialized) {
-      clearAuthState(true);
-    }
     document.documentElement.dataset.itemtraxxPublicAuth = "settled";
   }
 };
 
+captureAccountFlowTokenFromLocation();
 const clientMonitoring = createClientMonitoring(router);
 installAppErrorRecovery(router);
+
+const revalidateCurrentRoute = async () => {
+  const currentRoute = router.currentRoute.value;
+  await router.replace({
+    path: currentRoute.path,
+    query: currentRoute.query,
+    hash: currentRoute.hash,
+    state: { __itemtraxxAuthRecheck: Date.now() },
+  });
+};
+
+let appMounted = false;
+let authRecoveryResolvedBeforeMount = false;
+let stopSessionRecovery: (() => void) | null = null;
+
+const startSessionRecovery = (refresh: () => Promise<void>) => {
+  if (stopSessionRecovery) return;
+
+  let inFlight = false;
+  let retryTimeoutId: number | null = null;
+  let retryDelayMs = 5000;
+  let retryNow: () => void;
+  const scheduleRetry = () => {
+    if (retryTimeoutId !== null) window.clearTimeout(retryTimeoutId);
+    retryTimeoutId = window.setTimeout(retryNow, retryDelayMs);
+    retryDelayMs = Math.min(retryDelayMs * 2, 60000);
+  };
+  const retryOnOnline = () => {
+    retryDelayMs = 5000;
+    retryNow();
+  };
+  const stop = () => {
+    window.removeEventListener("online", retryOnOnline);
+    if (retryTimeoutId !== null) window.clearTimeout(retryTimeoutId);
+    if (stopSessionRecovery === stop) stopSessionRecovery = null;
+  };
+  retryNow = () => {
+    if (inFlight) return;
+    if (retryTimeoutId !== null) window.clearTimeout(retryTimeoutId);
+    retryTimeoutId = null;
+    inFlight = true;
+    void refresh()
+      .then(async () => {
+        stop();
+        if (appMounted) await revalidateCurrentRoute();
+        else authRecoveryResolvedBeforeMount = true;
+      })
+      .catch(() => {
+        // Keep the session unresolved and retry with a bounded backoff.
+        scheduleRetry();
+      })
+      .finally(() => {
+        inFlight = false;
+      });
+  };
+
+  stopSessionRecovery = stop;
+  window.addEventListener("online", retryOnOnline);
+  scheduleRetry();
+};
 
 const mountApp = async () => {
   markRouteNavigationStart();
@@ -121,6 +188,8 @@ const mountApp = async () => {
   });
 
   const app = createApp(App);
+  app.directive("app-toast-error", appToastErrorDirective);
+  app.directive("app-toast-message", appToastMessageDirective);
   const existingErrorHandler = app.config.errorHandler;
   app.config.errorHandler = (error, instance, info) => {
     clientMonitoring.captureException(error);
@@ -130,8 +199,17 @@ const mountApp = async () => {
   };
   app.use(router);
   await router.isReady();
+  // The first history entry may have resolved before auth bootstrap settled.
+  // A history-state-only replace forces the guards to re-evaluate the exact
+  // visible URL without adding a query marker or a browser-history entry.
+  await revalidateCurrentRoute();
   await clientMonitoring.initializeBeforeMount(app);
   app.mount("#app");
+  appMounted = true;
+  if (authRecoveryResolvedBeforeMount) {
+    authRecoveryResolvedBeforeMount = false;
+    void revalidateCurrentRoute();
+  }
   markAgentFallbackMounted();
   clientMonitoring.initializeAfterMount(app);
   captureInitialPerfMetrics();
@@ -165,6 +243,7 @@ const bootstrap = async () => {
   if (redirectCanonicalHost()) {
     return;
   }
+  syncRouterHistoryToVisibleLocation(router.options.history);
   await initializeWorkspaceContext();
   const workspaceContext = getWorkspaceState();
   const isE2ETestMode = import.meta.env.VITE_E2E_TEST_UTILS === "true";
@@ -174,11 +253,19 @@ const bootstrap = async () => {
     (isE2ETestMode || canMountPublicBootstrap);
   if (canMountFirst) {
     // Avoid flashing the temporary logout screen during normal public-route bootstrap.
-    if (!isE2ETestMode && canMountPublicBootstrap) {
+    if (isE2ETestMode || canMountPublicBootstrap) {
       clearAuthState(true);
     }
     await mountApp();
-    void (canMountPublicBootstrap ? initializePublicAuth() : initializeAuth());
+    if (canMountPublicBootstrap) {
+      void initializePublicAuth();
+    } else {
+      // E2E mode mounts before auth initialization so the test controls can
+      // seed sessions after the app is live. Re-run the current URL once the
+      // signed-out state is settled so protected deep links still redirect.
+      await initializeAuth();
+      await revalidateCurrentRoute();
+    }
     return;
   }
   await initializeAuth();

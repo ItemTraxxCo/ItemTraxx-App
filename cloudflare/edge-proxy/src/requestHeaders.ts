@@ -1,5 +1,11 @@
 import type { SessionCookies } from "./cookies.ts";
 
+// This private marker is set by withTraceHeaders. It is allowlisted here so
+// the marker survives the Worker -> Supabase hop without forwarding arbitrary
+// client-controlled headers.
+export const TRACE_PARENT_EXPORTED_HEADER = "x-itx-trace-parent-exported";
+export const TRACE_PARENT_EXPORTED_VALUE = "false";
+
 export const hasRpcCallerAuth = (request: Request, cookies: SessionCookies) => {
   const authHeader = request.headers.get("Authorization");
   if (authHeader && authHeader.trim()) {
@@ -30,6 +36,15 @@ const sanitizeGeoHeaderValue = (
   return trimmed.slice(0, maxLen);
 };
 
+// Bind proxied requests to the Better Auth session resolved by the Worker.
+const resolveAuthorization = (
+  request: Request,
+  sessionAccessToken?: string | null,
+) =>
+  sessionAccessToken
+    ? `Bearer ${sessionAccessToken}`
+    : request.headers.get("Authorization");
+
 const applyApproxLocationHeaders = (headers: Headers, request: Request) => {
   const cf = (request as RequestWithCf).cf;
   const city = sanitizeGeoHeaderValue(cf?.city, 80);
@@ -55,9 +70,7 @@ export const sanitizeRequestHeaders = (
     "Content-Type",
     request.headers.get("Content-Type") ?? "application/json",
   );
-  const incomingAuth = request.headers.get("Authorization");
-  const resolvedAuth = incomingAuth ??
-    (sessionAccessToken ? `Bearer ${sessionAccessToken}` : null);
+  const resolvedAuth = resolveAuthorization(request, sessionAccessToken);
   if (functionName === "super-ops" && resolvedAuth) {
     headers.set("x-itx-user-jwt", resolvedAuth);
     headers.set("Authorization", resolvedAuth);
@@ -72,6 +85,16 @@ export const sanitizeRequestHeaders = (
   if (forwardedFor) headers.set("x-forwarded-for", forwardedFor);
   const connectingIp = request.headers.get("cf-connecting-ip");
   if (connectingIp) headers.set("cf-connecting-ip", connectingIp);
+  const traceparent = request.headers.get("traceparent");
+  if (traceparent) headers.set("traceparent", traceparent);
+  const tracestate = request.headers.get("tracestate");
+  if (tracestate) headers.set("tracestate", tracestate);
+  if (
+    request.headers.get(TRACE_PARENT_EXPORTED_HEADER) ===
+      TRACE_PARENT_EXPORTED_VALUE
+  ) {
+    headers.set(TRACE_PARENT_EXPORTED_HEADER, TRACE_PARENT_EXPORTED_VALUE);
+  }
   applyApproxLocationHeaders(headers, request);
   return headers;
 };
@@ -87,9 +110,7 @@ export const sanitizeUpstreamHeaders = (
   headers.set("apikey", anonKey);
   const contentType = request.headers.get("Content-Type");
   if (contentType) headers.set("Content-Type", contentType);
-  const incomingAuth = request.headers.get("Authorization");
-  const resolvedAuth = incomingAuth ??
-    (sessionAccessToken ? `Bearer ${sessionAccessToken}` : null);
+  const resolvedAuth = resolveAuthorization(request, sessionAccessToken);
   if (resolvedAuth) headers.set("Authorization", resolvedAuth);
   const accept = request.headers.get("accept");
   if (accept) headers.set("accept", accept);
@@ -97,5 +118,15 @@ export const sanitizeUpstreamHeaders = (
   if (prefer) headers.set("prefer", prefer);
   const range = request.headers.get("range");
   if (range) headers.set("range", range);
+  const traceparent = request.headers.get("traceparent");
+  if (traceparent) headers.set("traceparent", traceparent);
+  const tracestate = request.headers.get("tracestate");
+  if (tracestate) headers.set("tracestate", tracestate);
+  if (
+    request.headers.get(TRACE_PARENT_EXPORTED_HEADER) ===
+      TRACE_PARENT_EXPORTED_VALUE
+  ) {
+    headers.set(TRACE_PARENT_EXPORTED_HEADER, TRACE_PARENT_EXPORTED_VALUE);
+  }
   return headers;
 };

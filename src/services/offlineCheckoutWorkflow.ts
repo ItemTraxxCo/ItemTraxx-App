@@ -2,6 +2,8 @@ import { invokeEdgeFunction } from "./edgeFunctionClient";
 import { getOrCreateDeviceSession } from "../utils/deviceSession";
 import { getAuthState } from "../store/authState";
 import { ensureAccountSessionReady } from "./accountSessionService";
+import { isOfflinePackAutomaticDownloadAllowed } from "./offlineCheckoutPreferences";
+import { requestLargeOfflinePackConfirmation } from "./offlinePackConfirmation";
 import {
   markItemTraxxServerConfirmed,
 } from "./offlineConnectionState";
@@ -71,7 +73,33 @@ export type OfflineLedgerEntry = {
 };
 
 type EncryptedRecord = { version: 1; iv: string; cipher: string };
-type PreparedPackResponse = Omit<OfflineCheckoutPack, "schema_version" | "profile_id" | "device_id">;
+type PreparedPackManifest = {
+  pack_version: string;
+  workspace_id: string;
+  prepared_at: string;
+  expires_at: string;
+  item_count: number;
+  borrower_count: number;
+  chunk_size: number;
+  max_records: number;
+  max_bytes: number;
+};
+type OfflinePackChunkResponse = {
+  items: OfflinePackItem[];
+  borrowers: OfflinePackBorrower[];
+  next_item_id: string | null;
+  next_borrower_id: string | null;
+  item_count: number;
+  borrower_count: number;
+};
+export type OfflinePackPreparationProgress = {
+  stage: "starting" | "downloading" | "complete";
+  downloadedRecords: number;
+  totalRecords: number;
+  itemCount: number;
+  borrowerCount: number;
+  chunkNumber: number;
+};
 type SyncItemResult = {
   item_id: string;
   barcode: string;
@@ -88,7 +116,7 @@ type SyncOperationResult = {
 type OfflinePackRefreshResult = {
   refreshed: boolean;
   firstPreparation: boolean;
-  skippedReason?: "offline" | "unauthenticated" | "pending_transactions" | "up_to_date";
+  skippedReason?: "offline" | "unauthenticated" | "download_preference" | "pending_transactions" | "up_to_date";
 };
 
 const DATABASE_NAME = "itemtraxx-offline-workflow";
@@ -102,6 +130,9 @@ const LOCK_NAME = "itemtraxx-offline-workflow";
 const LOCK_STORAGE_KEY = "itemtraxx:offline-workflow:lock:v1";
 const LOCK_TTL_MS = 30_000;
 export const OFFLINE_PACK_REFRESH_INTERVAL_MS = 5 * 60 * 1_000;
+export const OFFLINE_PACK_LARGE_WARNING_RECORDS = 2_000;
+export const OFFLINE_PACK_MAX_RECORDS = 10_000;
+export const OFFLINE_PACK_MAX_BYTES = 25 * 1024 * 1024;
 export const OFFLINE_SESSION_INITIALIZING_ERROR = "Offline session is still initializing. Please retry.";
 
 export const isOfflineSessionInitializingError = (error: unknown) =>
@@ -114,6 +145,9 @@ const ACTIVE_LEDGER_STATES = new Set<OfflineLedgerEntry["status"]>([
 ]);
 let automaticPackRefresh: Promise<OfflinePackRefreshResult> | null = null;
 let automaticPackRefreshWasForced = false;
+let automaticPackRefreshReportsProgress = true;
+let packPreparation: Promise<OfflineCheckoutPack> | null = null;
+let packPreparationReportsProgress = true;
 
 const isRetryableWorkflowStatus = (status: number) => status === 0 || status === 429 || status >= 500;
 
@@ -150,19 +184,54 @@ const openDatabase = () =>
     request.onerror = () => reject(request.error ?? new Error("Unable to open offline workflow storage."));
   });
 
+class OfflineWorkflowStorageError extends Error {
+  constructor(operation: string, storeName: string, cause: unknown) {
+    const detail = cause instanceof Error ? cause.message : String(cause ?? "unknown IndexedDB error");
+    super(`Offline workflow IndexedDB ${operation} failed for store "${storeName}": ${detail}`, { cause });
+    this.name = "OfflineWorkflowStorageError";
+  }
+}
+
 const accessStore = async <T>(
   storeName: string,
+  operation: string,
   mode: IDBTransactionMode,
   callback: (store: IDBObjectStore) => IDBRequest<T>,
 ) => {
   const database = await openDatabase();
   try {
     return await new Promise<T>((resolve, reject) => {
-      const transaction = database.transaction(storeName, mode);
-      const request = callback(transaction.objectStore(storeName));
-      request.onsuccess = () => resolve(request.result);
-      request.onerror = () => reject(request.error ?? new Error("Unable to access offline workflow storage."));
-      transaction.onerror = () => reject(transaction.error ?? new Error("Unable to access offline workflow storage."));
+      let settled = false;
+      let result: T | undefined;
+      let hasResult = false;
+      const fail = (cause: unknown) => {
+        if (settled) return;
+        settled = true;
+        reject(new OfflineWorkflowStorageError(operation, storeName, cause));
+      };
+
+      try {
+        const transaction = database.transaction(storeName, mode);
+        const request = callback(transaction.objectStore(storeName));
+        request.onsuccess = () => {
+          result = request.result;
+          hasResult = true;
+        };
+        request.onerror = () => fail(request.error ?? new Error("IndexedDB request failed."));
+        transaction.onerror = () => fail(transaction.error ?? request.error ?? new Error("IndexedDB transaction failed."));
+        transaction.onabort = () => fail(transaction.error ?? request.error ?? new Error("IndexedDB transaction aborted."));
+        transaction.oncomplete = () => {
+          if (!hasResult) {
+            fail(new Error("IndexedDB transaction completed without a request result."));
+            return;
+          }
+          if (settled) return;
+          settled = true;
+          resolve(result as T);
+        };
+      } catch (cause) {
+        fail(cause);
+      }
     });
   } finally {
     database.close();
@@ -170,14 +239,24 @@ const accessStore = async <T>(
 };
 
 const getOrCreateKey = async () => {
-  const existing = await accessStore<CryptoKey | undefined>(KEY_STORE, "readonly", (store) => store.get(KEY_ID));
+  const existing = await accessStore<CryptoKey | undefined>(
+    KEY_STORE,
+    "read encryption key",
+    "readonly",
+    (store) => store.get(KEY_ID),
+  );
   if (existing instanceof CryptoKey) return existing;
   const key = await window.crypto.subtle.generateKey(
     { name: "AES-GCM", length: 256 },
     false,
     ["encrypt", "decrypt"],
   );
-  await accessStore<IDBValidKey>(KEY_STORE, "readwrite", (store) => store.put(key, KEY_ID));
+  await accessStore<IDBValidKey>(
+    KEY_STORE,
+    "store encryption key",
+    "readwrite",
+    (store) => store.put(key, KEY_ID),
+  );
   return key;
 };
 
@@ -207,19 +286,35 @@ const decryptRecord = async <T>(recordId: string, record: EncryptedRecord): Prom
 };
 
 const readRecord = async <T>(recordId: string, fallback: T) => {
-  const encrypted = await accessStore<EncryptedRecord | undefined>(RECORD_STORE, "readonly", (store) => store.get(recordId));
+  const encrypted = await accessStore<EncryptedRecord | undefined>(
+    RECORD_STORE,
+    "read encrypted record",
+    "readonly",
+    (store) => store.get(recordId),
+  );
   if (!encrypted) return fallback;
   try {
     return await decryptRecord<T>(recordId, encrypted);
-  } catch {
-    await accessStore<undefined>(RECORD_STORE, "readwrite", (store) => store.delete(recordId));
+  } catch (cause) {
+    if (cause instanceof OfflineWorkflowStorageError) throw cause;
+    await accessStore<undefined>(
+      RECORD_STORE,
+      "delete invalid encrypted record",
+      "readwrite",
+      (store) => store.delete(recordId),
+    );
     return fallback;
   }
 };
 
 const writeRecord = async (recordId: string, value: unknown) => {
   const encrypted = await encryptRecord(recordId, value);
-  await accessStore<IDBValidKey>(RECORD_STORE, "readwrite", (store) => store.put(encrypted, recordId));
+  await accessStore<IDBValidKey>(
+    RECORD_STORE,
+    "write encrypted record",
+    "readwrite",
+    (store) => store.put(encrypted, recordId),
+  );
 };
 
 const sleep = (ms: number) => new Promise((resolve) => window.setTimeout(resolve, ms));
@@ -321,12 +416,45 @@ const currentScope = (): OfflineWorkflowScope => {
   return { workspaceId: auth.workspaceContextId, profileId: auth.userId };
 };
 
-export const prepareOfflineCheckoutPack = async () => {
+const reportOfflinePackPreparationProgress = (progress: OfflinePackPreparationProgress) => {
+  if (typeof window === "undefined" || !packPreparationReportsProgress) return;
+  window.dispatchEvent(new CustomEvent<OfflinePackPreparationProgress>(
+    "itemtraxx:offline-pack-progress",
+    { detail: progress },
+  ));
+};
+
+const invokePackControl = async <T>(
+  body: Record<string, unknown> & { action: string; device_id: string },
+) => {
+  const response = await invokeEdgeFunction<{ data: T }, Record<string, unknown>>(
+    "offline-checkout",
+    { method: "POST", body },
+  );
+  recordWorkflowResponse(response.ok);
+  if (!response.ok || !response.data?.data) {
+    throw new Error(response.error || "Unable to prepare offline checkout.");
+  }
+  return response.data.data;
+};
+
+const assertOfflinePackOwnerIsCurrent = (owner: OfflineWorkflowScope) => {
+  const auth = getAuthState();
+  if (
+    !auth.isAuthenticated || auth.userId !== owner.profileId ||
+    auth.workspaceContextId !== owner.workspaceId
+  ) {
+    throw new Error("The account changed while preparing offline checkout. Please try again.");
+  }
+};
+
+const prepareOfflineCheckoutPackOnce = async () => {
   const auth = getAuthState();
   if (!auth.workspaceContextId || !auth.userId || !auth.isAuthenticated) {
     throw new Error("A workspace session is required to prepare offline checkout.");
   }
-  const existingPack = await readOfflinePack({ workspaceId: auth.workspaceContextId, profileId: auth.userId }, { allowExpired: true });
+  const owner = { workspaceId: auth.workspaceContextId, profileId: auth.userId };
+  const existingPack = await readOfflinePack(owner, { allowExpired: true });
   if (!existingPack && (await readOfflineLedger()).length > 0) await clearOfflineCheckoutWorkflow();
   const activeEntries = (await readOfflineLedger()).filter((entry) => ACTIVE_LEDGER_STATES.has(entry.status));
   if (activeEntries.length > 0) {
@@ -334,30 +462,202 @@ export const prepareOfflineCheckoutPack = async () => {
   }
   await ensureAccountSessionReady();
   const { deviceId } = getOrCreateDeviceSession();
-  const response = await invokeEdgeFunction<{ data: PreparedPackResponse }, { action: "prepare_pack"; device_id: string }>(
-    "offline-checkout",
-    { method: "POST", body: { action: "prepare_pack", device_id: deviceId } },
-  );
-  recordWorkflowResponse(response.ok);
-  if (!response.ok || !response.data?.data) throw new Error(response.error || "Unable to prepare offline checkout.");
-  const pack: OfflineCheckoutPack = {
-    ...response.data.data,
-    schema_version: 1,
-    profile_id: auth.userId,
-    device_id: deviceId,
-  };
-  if (pack.workspace_id !== auth.workspaceContextId) throw new Error("Offline pack workspace does not match this session.");
-  await writeOfflinePack(pack);
-  await updateLedger((entries) => entries.filter((entry) => ACTIVE_LEDGER_STATES.has(entry.status)));
-  return pack;
+  let packVersion: string | null = null;
+  let downloadComplete = false;
+  try {
+    reportOfflinePackPreparationProgress({
+      stage: "starting",
+      downloadedRecords: 0,
+      totalRecords: 0,
+      itemCount: 0,
+      borrowerCount: 0,
+      chunkNumber: 0,
+    });
+    const manifest = await invokePackControl<PreparedPackManifest>({
+      action: "prepare_pack",
+      device_id: deviceId,
+    });
+    packVersion = manifest.pack_version;
+    assertOfflinePackOwnerIsCurrent(owner);
+    if (manifest.workspace_id !== owner.workspaceId) {
+      throw new Error("Offline pack workspace does not match this session.");
+    }
+    if (
+      !Number.isInteger(manifest.item_count) || manifest.item_count < 0 ||
+      !Number.isInteger(manifest.borrower_count) || manifest.borrower_count < 0 ||
+      !Number.isInteger(manifest.max_records) || manifest.max_records < 1 ||
+      !Number.isInteger(manifest.max_bytes) || manifest.max_bytes < 1 ||
+      !Number.isInteger(manifest.chunk_size) || manifest.chunk_size !== 100 ||
+      manifest.item_count + manifest.borrower_count > Math.min(manifest.max_records, OFFLINE_PACK_MAX_RECORDS) ||
+      manifest.max_bytes > OFFLINE_PACK_MAX_BYTES
+    ) {
+      throw new Error("The server returned an invalid offline pack size.");
+    }
+    const totalRecords = manifest.item_count + manifest.borrower_count;
+    reportOfflinePackPreparationProgress({
+      stage: "starting",
+      downloadedRecords: 0,
+      totalRecords,
+      itemCount: manifest.item_count,
+      borrowerCount: manifest.borrower_count,
+      chunkNumber: 0,
+    });
+
+    if (totalRecords > OFFLINE_PACK_LARGE_WARNING_RECORDS) {
+      const confirmed = await requestLargeOfflinePackConfirmation({
+        itemCount: manifest.item_count,
+        borrowerCount: manifest.borrower_count,
+        totalRecords,
+        maxRecords: Math.min(manifest.max_records, OFFLINE_PACK_MAX_RECORDS),
+        maxBytes: Math.min(manifest.max_bytes, OFFLINE_PACK_MAX_BYTES),
+      });
+      if (!confirmed) throw new OfflinePackDownloadCancelledError();
+      assertOfflinePackOwnerIsCurrent(owner);
+    }
+
+    const items: OfflinePackItem[] = [];
+    const borrowers: OfflinePackBorrower[] = [];
+    let afterItemId: string | null = null;
+    let afterBorrowerId: string | null = null;
+    let chunkNumber = 0;
+    while (true) {
+      assertOfflinePackOwnerIsCurrent(owner);
+      const chunk: OfflinePackChunkResponse = await invokePackControl<OfflinePackChunkResponse>({
+        action: "prepare_pack_chunk",
+        device_id: deviceId,
+        pack_version: manifest.pack_version,
+        after_item_id: afterItemId,
+        after_borrower_id: afterBorrowerId,
+      });
+      if (
+        chunk.item_count !== manifest.item_count ||
+        chunk.borrower_count !== manifest.borrower_count ||
+        chunk.items.length > 100 || chunk.borrowers.length > 100
+      ) {
+        throw new Error("Offline pack chunk did not match its size manifest.");
+      }
+      if (
+        (chunk.items.length && (!chunk.next_item_id || chunk.next_item_id === afterItemId)) ||
+        (chunk.borrowers.length && (!chunk.next_borrower_id || chunk.next_borrower_id === afterBorrowerId))
+      ) {
+        throw new Error("Offline pack chunk cursor did not advance.");
+      }
+      if (!chunk.items.length && !chunk.borrowers.length) break;
+
+      items.push(...chunk.items);
+      borrowers.push(...chunk.borrowers);
+      if (items.length > manifest.item_count || borrowers.length > manifest.borrower_count) {
+        throw new Error("Offline pack changed size during download. Please try again.");
+      }
+      afterItemId = chunk.next_item_id ?? afterItemId;
+      afterBorrowerId = chunk.next_borrower_id ?? afterBorrowerId;
+      chunkNumber += 1;
+      reportOfflinePackPreparationProgress({
+        stage: "downloading",
+        downloadedRecords: items.length + borrowers.length,
+        totalRecords,
+        itemCount: manifest.item_count,
+        borrowerCount: manifest.borrower_count,
+        chunkNumber,
+      });
+    }
+
+    if (items.length !== manifest.item_count || borrowers.length !== manifest.borrower_count) {
+      throw new Error("Offline pack changed size during download. Please try again.");
+    }
+    assertOfflinePackOwnerIsCurrent(owner);
+    await invokePackControl<{ pack_version: string; download_complete: boolean }>({
+      action: "complete_pack",
+      device_id: deviceId,
+      pack_version: manifest.pack_version,
+    });
+    downloadComplete = true;
+
+    const pack: OfflineCheckoutPack = {
+      schema_version: 1,
+      pack_version: manifest.pack_version,
+      workspace_id: manifest.workspace_id,
+      profile_id: owner.profileId,
+      device_id: deviceId,
+      prepared_at: manifest.prepared_at,
+      expires_at: manifest.expires_at,
+      borrowers,
+      items,
+    };
+    assertOfflinePackOwnerIsCurrent(owner);
+    await withOfflineWorkflowLock(async () => {
+      const latestLedger = await readOfflineLedger();
+      if (latestLedger.some((entry) => ACTIVE_LEDGER_STATES.has(entry.status))) {
+        throw new Error("Sync or resolve pending offline transactions before refreshing this device's offline pack.");
+      }
+      await writeRecord(PACK_ID, pack);
+      await writeRecord(LEDGER_ID, latestLedger.filter((entry) => ACTIVE_LEDGER_STATES.has(entry.status)));
+      window.dispatchEvent(new CustomEvent("itemtraxx:offline-workflow-changed"));
+    });
+    try {
+      await invokePackControl<{ pack_version: string; activated: boolean }>({
+        action: "activate_pack",
+        device_id: deviceId,
+        pack_version: manifest.pack_version,
+      });
+    } catch {
+      // The completed pack and its predecessor remain valid if activation cannot
+      // retire the previous server snapshot. The local pack is already usable.
+    }
+    reportOfflinePackPreparationProgress({
+      stage: "complete",
+      downloadedRecords: totalRecords,
+      totalRecords,
+      itemCount: manifest.item_count,
+      borrowerCount: manifest.borrower_count,
+      chunkNumber,
+    });
+    return pack;
+  } catch (error) {
+    if (packVersion && !downloadComplete) {
+      void invokePackControl<{ cancelled: boolean }>({
+        action: "cancel_pack",
+        device_id: deviceId,
+        pack_version: packVersion,
+      }).catch(() => undefined);
+    }
+    throw error;
+  }
 };
+
+export const prepareOfflineCheckoutPack = (
+  options: { reportProgress?: boolean } = {},
+) => {
+  if (options.reportProgress !== false) {
+    // If an explicit download joins a quiet background refresh, make the
+    // in-flight preparation visible to the user who requested it.
+    automaticPackRefreshReportsProgress = true;
+    packPreparationReportsProgress = true;
+  }
+  if (packPreparation) return packPreparation;
+  packPreparationReportsProgress = automaticPackRefresh
+    ? automaticPackRefreshReportsProgress
+    : options.reportProgress !== false;
+  packPreparation = prepareOfflineCheckoutPackOnce().finally(() => {
+    packPreparation = null;
+    packPreparationReportsProgress = true;
+  });
+  return packPreparation;
+};
+
+export class OfflinePackDownloadCancelledError extends Error {
+  constructor() {
+    super("Offline pack download was cancelled.");
+    this.name = "OfflinePackDownloadCancelledError";
+  }
+}
 
 /**
  * Keeps the encrypted local snapshot recent without replacing a working offline ledger.
  * Callers may fire-and-forget this after a confirmed server mutation.
  */
 export const refreshOfflineCheckoutPackIfNeeded = (
-  options: { force?: boolean } = {},
+  options: { force?: boolean; reportProgress?: boolean } = {},
 ): Promise<OfflinePackRefreshResult> => {
   if (automaticPackRefresh) {
     if (!options.force || automaticPackRefreshWasForced) return automaticPackRefresh;
@@ -368,6 +668,7 @@ export const refreshOfflineCheckoutPackIfNeeded = (
   }
 
   automaticPackRefreshWasForced = !!options.force;
+  automaticPackRefreshReportsProgress = options.reportProgress !== false;
 
   automaticPackRefresh = (async () => {
     if (typeof navigator !== "undefined" && !navigator.onLine) {
@@ -376,6 +677,9 @@ export const refreshOfflineCheckoutPackIfNeeded = (
     const auth = getAuthState();
     if (!auth.isAuthenticated || !auth.workspaceContextId || !auth.userId) {
       return { refreshed: false, firstPreparation: false, skippedReason: "unauthenticated" as const };
+    }
+    if (!isOfflinePackAutomaticDownloadAllowed(auth)) {
+      return { refreshed: false, firstPreparation: false, skippedReason: "download_preference" as const };
     }
 
     const scope = { workspaceId: auth.workspaceContextId, profileId: auth.userId };
@@ -394,11 +698,12 @@ export const refreshOfflineCheckoutPackIfNeeded = (
       return { refreshed: false, firstPreparation: false, skippedReason: "up_to_date" as const };
     }
 
-    await prepareOfflineCheckoutPack();
+    await prepareOfflineCheckoutPack({ reportProgress: automaticPackRefreshReportsProgress });
     return { refreshed: true, firstPreparation: !existingPack };
   })().finally(() => {
     automaticPackRefresh = null;
     automaticPackRefreshWasForced = false;
+    automaticPackRefreshReportsProgress = true;
   });
 
   return automaticPackRefresh;
@@ -519,34 +824,42 @@ export const queueOfflineOperation = async (draft: {
   items: Array<{ item: OfflinePackItem; intent: "checkout" | "return" | "quick_return" }>;
 }) => {
   const scope = currentScope();
-  const pack = await readOfflinePack(scope);
-  if (!pack) throw new Error("Offline checkout is unavailable. Reconnect and prepare this device for offline use.");
-  const entry: OfflineLedgerEntry = {
-    schema_version: 1,
-    id: createId(),
-    operation_id: draft.operationId,
-    workspace_id: pack.workspace_id,
-    profile_id: pack.profile_id,
-    device_id: pack.device_id,
-    pack_version: pack.pack_version,
-    created_at: new Date().toISOString(),
-    status: "pending",
-    attempts: 0,
-    last_error: null,
-    items: draft.items.map(({ item, intent }) => ({
-      item_id: item.id,
-      barcode: item.barcode,
-      name: item.name,
-      intent,
-      borrower_id: intent === "checkout" ? draft.borrower?.id ?? null : item.checked_out_by,
-      borrower_display_id: draft.borrower?.borrower_id ?? null,
-      borrower_username: draft.borrower?.username ?? null,
-      expected_status: item.status,
-      expected_checked_out_by: item.checked_out_by,
+  const { next } = await withOfflineWorkflowLock(async () => {
+    const pack = await readRecord<OfflineCheckoutPack | null>(PACK_ID, null);
+    if (!pack || !scopeMatches(pack, scope) || Date.parse(pack.expires_at) <= Date.now()) {
+      throw new Error("Offline checkout is unavailable. Reconnect and prepare this device for offline use.");
+    }
+    const entry: OfflineLedgerEntry = {
+      schema_version: 1,
+      id: createId(),
+      operation_id: draft.operationId,
+      workspace_id: pack.workspace_id,
+      profile_id: pack.profile_id,
+      device_id: pack.device_id,
+      pack_version: pack.pack_version,
+      created_at: new Date().toISOString(),
       status: "pending",
-    })),
-  };
-  const next = await updateLedger((entries) => [...entries, entry]);
+      attempts: 0,
+      last_error: null,
+      items: draft.items.map(({ item, intent }) => ({
+        item_id: item.id,
+        barcode: item.barcode,
+        name: item.name,
+        intent,
+        borrower_id: intent === "checkout" ? draft.borrower?.id ?? null : item.checked_out_by,
+        borrower_display_id: draft.borrower?.borrower_id ?? null,
+        borrower_username: draft.borrower?.username ?? null,
+        expected_status: item.status,
+        expected_checked_out_by: item.checked_out_by,
+        status: "pending",
+      })),
+    };
+    const entries = await readOfflineLedger();
+    const next = [...entries, entry];
+    await writeRecord(LEDGER_ID, next);
+    window.dispatchEvent(new CustomEvent("itemtraxx:offline-workflow-changed"));
+    return { entry, next };
+  });
   try {
     await refreshOfflineCheckoutCacheFromLedger(draft.borrower);
   } catch {

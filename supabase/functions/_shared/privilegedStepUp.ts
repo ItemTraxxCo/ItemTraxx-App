@@ -8,11 +8,14 @@ import { verifyExternalAuthClaims } from "./externalAuth.ts";
 
 export type PrivilegedRoleScope =
   | "super_admin"
-  | "workspace_admin";
+  | "workspace_admin"
+  | "individual_account";
 
-const DEFAULT_STEP_UP_TTL_MS = 15 * 60 * 1000;
 const ADMIN_STEP_UP_REGISTRATION_WINDOW_MS = 5 * 60 * 1000;
 const AUTH_TIMESTAMP_CLOCK_SKEW_MS = 30 * 1000;
+export const PRIVILEGED_STEP_UP_FRESHNESS_WINDOW_MS = 5 * 60 * 1000;
+export const SUPER_ADMIN_ACTION_CONFIRMATION_SOURCE =
+  "super_admin_settings_password";
 const ADMIN_HANDOFF_AUTH_METHODS = new Set([
   "password",
   "magiclink",
@@ -41,11 +44,15 @@ export type PrivilegedProfileLike = {
 export const isEligiblePrivilegedProfile = (
   profile: PrivilegedProfileLike,
 ) => {
-  if (profile.role !== "workspace_admin" && profile.role !== "super_admin") {
+  if (
+    profile.role !== "workspace_admin" &&
+    profile.role !== "individual_account" &&
+    profile.role !== "super_admin"
+  ) {
     return false;
   }
   if (profile.is_active === false || profile.deleted_at) return false;
-  if (profile.role === "workspace_admin") {
+  if (profile.role === "workspace_admin" || profile.role === "individual_account") {
     return typeof profile.workspace_id === "string" &&
       profile.workspace_id.trim().length > 0;
   }
@@ -143,13 +150,9 @@ export const registerPrivilegedStepUp = async (
     roleScope: PrivilegedRoleScope;
     authToken: string;
     source: string;
-    ttlMs?: number;
   },
 ) => {
   const now = new Date();
-  const expiresAt = new Date(
-    now.getTime() + (options.ttlMs ?? DEFAULT_STEP_UP_TTL_MS),
-  ).toISOString();
   const bindingKey = await resolveBindingKey(adminClient, options.authToken);
 
   const { error } = await adminClient.from("privileged_session_stepups").upsert(
@@ -160,7 +163,7 @@ export const registerPrivilegedStepUp = async (
       issued_by: options.source,
       created_at: now.toISOString(),
       updated_at: now.toISOString(),
-      expires_at: expiresAt,
+      expires_at: null,
     },
     { onConflict: "user_id,role_scope,binding_key" },
   );
@@ -169,7 +172,7 @@ export const registerPrivilegedStepUp = async (
     throw error;
   }
 
-  return { expiresAt };
+  return { expiresAt: null };
 };
 
 export const hasPrivilegedStepUp = async (
@@ -187,7 +190,6 @@ export const hasPrivilegedStepUp = async (
     .eq("user_id", options.userId)
     .eq("role_scope", options.roleScope)
     .eq("binding_key", bindingKey)
-    .gt("expires_at", new Date().toISOString())
     .limit(1)
     .maybeSingle();
 
@@ -196,4 +198,83 @@ export const hasPrivilegedStepUp = async (
   }
 
   return !!data?.id;
+};
+
+export const isPrivilegedStepUpFreshAt = (
+  updatedAt: unknown,
+  nowMs: number = Date.now(),
+  maxAgeMs: number = PRIVILEGED_STEP_UP_FRESHNESS_WINDOW_MS,
+) => {
+  if (typeof updatedAt !== "string") return false;
+  const updatedAtMs = Date.parse(updatedAt);
+  if (!Number.isFinite(updatedAtMs)) return false;
+  const ageMs = nowMs - updatedAtMs;
+  return ageMs >= -AUTH_TIMESTAMP_CLOCK_SKEW_MS && ageMs <= maxAgeMs;
+};
+
+/**
+ * Require the session-bound privileged grant to have been issued recently.
+ * Unlike hasRecentPrivilegedStepUp, this accepts any trusted step-up source;
+ * callers that require an explicit password confirmation should keep using
+ * the source-bound helper below.
+ */
+export const hasFreshPrivilegedStepUp = async (
+  adminClient: SupabaseClient,
+  options: {
+    userId: string;
+    roleScope: PrivilegedRoleScope;
+    authToken: string;
+    nowMs?: number;
+    maxAgeMs?: number;
+  },
+) => {
+  const bindingKey = await resolveBindingKey(adminClient, options.authToken);
+  const { data, error } = await adminClient
+    .from("privileged_session_stepups")
+    .select("updated_at")
+    .eq("user_id", options.userId)
+    .eq("role_scope", options.roleScope)
+    .eq("binding_key", bindingKey)
+    .maybeSingle();
+
+  if (error) throw error;
+  return isPrivilegedStepUpFreshAt(
+    data?.updated_at,
+    options.nowMs,
+    options.maxAgeMs,
+  );
+};
+
+/**
+ * Require a recent, explicit step-up confirmation for narrowly scoped
+ * high-impact actions. The lookup stays bound to the caller's existing auth
+ * session and the expected verification source.
+ */
+export const hasRecentPrivilegedStepUp = async (
+  adminClient: SupabaseClient,
+  options: {
+    userId: string;
+    roleScope: PrivilegedRoleScope;
+    authToken: string;
+    source: string;
+    nowMs?: number;
+    maxAgeMs?: number;
+  },
+) => {
+  const bindingKey = await resolveBindingKey(adminClient, options.authToken);
+  const { data, error } = await adminClient
+    .from("privileged_session_stepups")
+    .select("updated_at,issued_by")
+    .eq("user_id", options.userId)
+    .eq("role_scope", options.roleScope)
+    .eq("binding_key", bindingKey)
+    .eq("issued_by", options.source)
+    .maybeSingle();
+
+  if (error) throw error;
+  return data?.issued_by === options.source && isPrivilegedStepUpFreshAt(
+    data?.updated_at,
+    options.nowMs,
+    options.maxAgeMs,
+  );
 };

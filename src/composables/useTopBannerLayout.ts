@@ -16,6 +16,7 @@ export const useTopBannerLayout = () => {
   const broadcastHeight = ref(0);
   const incidentHeight = ref(0);
   let resizeObserver: ResizeObserver | null = null;
+  let measureFrame = 0;
 
   const measure = () => {
     maintenanceHeight.value = elements.value.maintenance?.offsetHeight ?? 0;
@@ -23,10 +24,25 @@ export const useTopBannerLayout = () => {
     incidentHeight.value = elements.value.incident?.offsetHeight ?? 0;
   };
 
+  // The observer callback writes heights that feed --top-banner-offset, which
+  // changes layout. Deferring the write to the next frame lets each observation
+  // settle so the browser does not emit "ResizeObserver loop ..." notices.
+  const scheduleMeasure = () => {
+    if (typeof requestAnimationFrame === "undefined") {
+      measure();
+      return;
+    }
+    if (measureFrame) cancelAnimationFrame(measureFrame);
+    measureFrame = requestAnimationFrame(() => {
+      measureFrame = 0;
+      measure();
+    });
+  };
+
   const observeElements = () => {
     resizeObserver?.disconnect();
     if (typeof ResizeObserver === "undefined") return;
-    resizeObserver = new ResizeObserver(measure);
+    resizeObserver = new ResizeObserver(scheduleMeasure);
     for (const element of Object.values(elements.value)) {
       if (element) resizeObserver.observe(element);
     }
@@ -53,6 +69,7 @@ export const useTopBannerLayout = () => {
 
   onScopeDispose(() => {
     window.removeEventListener("resize", measure);
+    if (measureFrame) cancelAnimationFrame(measureFrame);
     resizeObserver?.disconnect();
     resizeObserver = null;
   });

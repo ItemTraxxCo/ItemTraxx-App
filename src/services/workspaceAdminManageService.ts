@@ -18,6 +18,11 @@ type WorkspaceAdminManageRequest = {
   payload: Record<string, unknown>;
 };
 
+export type WorkspaceInvitationResponse = {
+  success: true;
+  message: string;
+};
+
 const callWorkspaceAdminManage = async <TData>(payload: WorkspaceAdminManageRequest) => {
   const { deviceId, deviceLabel } = getOrCreateDeviceSession();
   const result = await invokeEdgeFunction<EdgeEnvelope<TData>, WorkspaceAdminManageRequest>(
@@ -53,10 +58,7 @@ export const listTenantManagedAdmins = async () =>
   });
 
 export const createTenantManagedAdmin = async (payload: { auth_email: string }) =>
-  callWorkspaceAdminManage<{
-    success: boolean;
-    auth_email: string;
-  }>({
+  callWorkspaceAdminManage<WorkspaceInvitationResponse>({
     action: "create_workspace_admin",
     payload,
   });
@@ -70,15 +72,6 @@ export const setTenantManagedAdminStatus = async (payload: {
     payload,
   });
 
-export const updateTenantManagedAdminEmail = async (payload: {
-  id: string;
-  auth_email: string;
-}) =>
-  callWorkspaceAdminManage<TenantManagedAdmin>({
-    action: "update_admin_email",
-    payload,
-  });
-
 export const sendTenantManagedAdminReset = async (payload: { auth_email: string }) =>
   callWorkspaceAdminManage<{ success: boolean }>({
     action: "send_workspace_admin_reset",
@@ -86,9 +79,39 @@ export const sendTenantManagedAdminReset = async (payload: { auth_email: string 
   });
 
 export type TenantAccount={id:string;workspace_id:string;auth_email:string;role:"tenant_account";is_active:boolean;created_at:string};
+export type WorkspaceAccountRole = "tenant_account" | "workspace_admin";
+export type WorkspaceAccount = {
+  id: string;
+  workspace_id: string;
+  auth_email: string;
+  role: WorkspaceAccountRole;
+  is_active: boolean;
+  created_at: string;
+  is_primary_admin: boolean;
+};
+
+export type WorkspaceAccountsList = {
+  accounts: WorkspaceAccount[];
+  can_manage_admins: boolean;
+};
+
+export const listWorkspaceAccounts = async () =>
+  (await callWorkspaceAdminManage<WorkspaceAccountsList>({
+    action: "list_workspace_accounts",
+    payload: {},
+  })) ?? { accounts: [], can_manage_admins: false };
+
+export const setWorkspaceAccountRole = (payload: {
+  id: string;
+  role: WorkspaceAccountRole;
+}) => callWorkspaceAdminManage<WorkspaceAccount>({
+  action: "set_workspace_account_role",
+  payload,
+});
+
 export const listTenantAccounts = async () =>
   (await callWorkspaceAdminManage<TenantAccount[]>({ action: "list_tenant_accounts", payload: {} })) ?? [];
-export const createTenantAccount=(auth_email:string)=>callWorkspaceAdminManage<TenantAccount>({action:"create_tenant_account",payload:{auth_email}});
+export const createTenantAccount=(auth_email:string)=>callWorkspaceAdminManage<WorkspaceInvitationResponse>({action:"create_tenant_account",payload:{auth_email}});
 export const setTenantAccountStatus=(id:string,is_active:boolean)=>callWorkspaceAdminManage<TenantAccount>({action:"set_tenant_account_status",payload:{id,is_active}});
 export const removeTenantAccount=(id:string)=>callWorkspaceAdminManage<{success:boolean}>({action:"remove_tenant_account",payload:{id}});
 export const sendTenantAccountReset=(id:string)=>callWorkspaceAdminManage<{success:boolean}>({action:"send_tenant_account_reset",payload:{id}});

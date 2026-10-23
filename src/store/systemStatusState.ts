@@ -1,8 +1,5 @@
 import { computed, reactive } from "vue";
-import {
-  fetchSystemStatus,
-  type SystemStatusPayload,
-} from "../services/systemStatusService";
+import type { SystemStatusPayload } from "../services/systemStatusService";
 
 const POLL_INTERVAL_MS = 300_000;
 
@@ -38,6 +35,7 @@ const refresh = async (force = false): Promise<void> => {
   if (state.loading) return;
   state.loading = true;
   try {
+    const { fetchSystemStatus } = await import("../services/systemStatusService");
     const result = await fetchSystemStatus({
       force,
       staleWhileRevalidate: !force,
@@ -52,6 +50,11 @@ const refresh = async (force = false): Promise<void> => {
       state.responseOk = false;
       state.hasResult = false;
     }
+    state.refreshedAt = Date.now();
+  } catch {
+    state.responseStatus = 0;
+    state.responseOk = false;
+    state.hasResult = false;
     state.refreshedAt = Date.now();
   } finally {
     state.loading = false;

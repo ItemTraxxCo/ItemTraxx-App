@@ -31,7 +31,6 @@ const mockedValidateAccountSession = vi.mocked(validateAccountSession);
 const mockedGetPostSignOutUrl = vi.mocked(getPostSignOutUrl);
 const mockedSignOut = vi.mocked(signOut);
 
-const ADMIN_IDLE_TIMEOUT_MS = 20 * 60 * 1000;
 const ADMIN_POLL_INTERVAL_MS = 45_000;
 const VALIDATION_RETRY_MS = 250;
 const TERMINATION_REDIRECT_MS = 5000;
@@ -40,8 +39,6 @@ type Auth = {
   isAuthenticated: boolean;
   role: string | null;
   userId: string | null;
-  adminVerifiedAt: string | null;
-  superVerifiedAt: string | null;
 };
 
 const buildAuth = (overrides: Partial<Auth> = {}) =>
@@ -49,8 +46,6 @@ const buildAuth = (overrides: Partial<Auth> = {}) =>
     isAuthenticated: false,
     role: null,
     userId: null,
-    adminVerifiedAt: null,
-    superVerifiedAt: null,
     ...overrides,
   });
 
@@ -60,14 +55,10 @@ const buildRoute = (path = "/admin/items", query: Record<string, string> = {}) =
 const mountHost = (opts: {
   auth: Auth;
   route: ReturnType<typeof buildRoute>;
-  isDevHost?: boolean;
-  isWorkspaceAdminArea?: boolean;
   shouldTrackAccountSession?: boolean;
 }) => {
   const router = { replace: vi.fn().mockResolvedValue(undefined) };
   const closeMenu = vi.fn();
-  const isDevHost = ref(opts.isDevHost ?? false);
-  const isWorkspaceAdminArea = ref(opts.isWorkspaceAdminArea ?? true);
   const shouldTrackAccountSession = ref(opts.shouldTrackAccountSession ?? true);
 
   let exposed!: ReturnType<typeof useAdminSessionLifecycle>;
@@ -78,8 +69,6 @@ const mountHost = (opts: {
         route: opts.route as never,
         router: router as never,
         sessionTermination: getSessionTerminationState(),
-        isDevHost,
-        isWorkspaceAdminArea,
         shouldTrackAccountSession,
         closeMenu,
       });
@@ -92,8 +81,6 @@ const mountHost = (opts: {
     get: () => exposed,
     router,
     closeMenu,
-    isDevHost,
-    isWorkspaceAdminArea,
     shouldTrackAccountSession,
   };
 };
@@ -121,7 +108,7 @@ describe("useAdminSessionLifecycle", () => {
     vi.restoreAllMocks();
   });
 
-  it("registers activity + visibility listeners on mount and starts polling/heartbeat", async () => {
+  it("registers visibility handling on mount and starts session polling/heartbeat", async () => {
     const auth = buildAuth({ isAuthenticated: true, role: "workspace_admin", userId: "u1" });
     const route = buildRoute();
     const { wrapper } = mountHost({ auth, route });
@@ -155,8 +142,6 @@ describe("useAdminSessionLifecycle", () => {
           route: route as never,
           router: router as never,
           sessionTermination: getSessionTerminationState(),
-          isDevHost: ref(false),
-          isWorkspaceAdminArea: ref(true),
           shouldTrackAccountSession: ref(true),
           closeMenu: vi.fn(),
         });
@@ -170,41 +155,31 @@ describe("useAdminSessionLifecycle", () => {
     wrapper.unmount();
   });
 
-  it("logs the workspace admin out after the idle timeout on an admin area", async () => {
+  it("uses validation as the periodic session keepalive after the initial bootstrap", async () => {
+    const auth = buildAuth({ isAuthenticated: true, role: "workspace_admin", userId: "u1" });
+    const route = buildRoute();
+    const { wrapper } = mountHost({ auth, route });
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(mockedTouchAccountSession).toHaveBeenCalledTimes(1);
+    expect(mockedValidateAccountSession).toHaveBeenCalledTimes(1);
+
+    await vi.advanceTimersByTimeAsync(ADMIN_POLL_INTERVAL_MS);
+
+    expect(mockedTouchAccountSession).toHaveBeenCalledTimes(1);
+    expect(mockedValidateAccountSession).toHaveBeenCalledTimes(2);
+    wrapper.unmount();
+  });
+
+  it("keeps a workspace admin signed in after extended inactivity", async () => {
     const auth = buildAuth({ isAuthenticated: true, role: "workspace_admin", userId: "u1" });
     const route = buildRoute();
     const { wrapper, router } = mountHost({ auth, route });
     await vi.advanceTimersByTimeAsync(0);
 
-    await vi.advanceTimersByTimeAsync(ADMIN_IDLE_TIMEOUT_MS);
+    await vi.advanceTimersByTimeAsync(60 * 60 * 1000);
 
-    expect(router.replace).toHaveBeenCalledWith("/checkout");
-    wrapper.unmount();
-  });
-
-  it("does not idle-log-out on a dev host", async () => {
-    const auth = buildAuth({ isAuthenticated: true, role: "workspace_admin", userId: "u1" });
-    const route = buildRoute();
-    const { wrapper, router } = mountHost({ auth, route, isDevHost: true });
-    await vi.advanceTimersByTimeAsync(0);
-
-    await vi.advanceTimersByTimeAsync(ADMIN_IDLE_TIMEOUT_MS);
-
-    expect(router.replace).not.toHaveBeenCalledWith("/checkout");
-    wrapper.unmount();
-  });
-
-  it("activity events reset the idle timer so logout does not fire early", async () => {
-    const auth = buildAuth({ isAuthenticated: true, role: "workspace_admin", userId: "u1" });
-    const route = buildRoute();
-    const { wrapper, router } = mountHost({ auth, route });
-    await vi.advanceTimersByTimeAsync(0);
-
-    await vi.advanceTimersByTimeAsync(ADMIN_IDLE_TIMEOUT_MS - 1000);
-    window.dispatchEvent(new Event("mousemove"));
-    await vi.advanceTimersByTimeAsync(1000);
-
-    expect(router.replace).not.toHaveBeenCalledWith("/checkout");
+    expect(router.replace).not.toHaveBeenCalledWith("/login");
     wrapper.unmount();
   });
 
@@ -221,6 +196,38 @@ describe("useAdminSessionLifecycle", () => {
       loginMethod: "password",
       loginLocation: "admin_login",
     });
+    wrapper.unmount();
+  });
+
+  it("forwards only the callback proof for SSO session metadata", async () => {
+    const auth = buildAuth({ isAuthenticated: true, role: "workspace_admin", userId: "u1" });
+    const proof = `${"a".repeat(24)}.${"b".repeat(43)}`;
+    const route = buildRoute("/admin/items", { itx_sso_proof: proof });
+    const { wrapper, router } = mountHost({ auth, route });
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(router.replace).toHaveBeenCalledWith(
+      expect.objectContaining({ path: "/admin/items", query: {} }),
+    );
+    expect(mockedTouchAccountSession).toHaveBeenCalledWith({
+      ssoLoginProof: proof,
+    });
+    wrapper.unmount();
+  });
+
+  it("strips legacy caller-authored SSO query values without forwarding them", async () => {
+    const auth = buildAuth({ isAuthenticated: true, role: "workspace_admin", userId: "u1" });
+    const route = buildRoute("/admin/items", {
+      itx_sso_provider_id: "invented-provider",
+      itx_sso_protocol: "SAML2.0",
+    });
+    const { wrapper, router } = mountHost({ auth, route });
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(router.replace).toHaveBeenCalledWith(
+      expect.objectContaining({ path: "/admin/items", query: {} }),
+    );
+    expect(mockedTouchAccountSession).toHaveBeenCalledWith({});
     wrapper.unmount();
   });
 
@@ -370,15 +377,15 @@ describe("useAdminSessionLifecycle", () => {
     }
   });
 
-  it("removes activity/visibility listeners and clears timers on unmount", async () => {
+  it("removes the visibility listener and clears timers on unmount", async () => {
     const auth = buildAuth({ isAuthenticated: true, role: "workspace_admin", userId: "u1" });
     const route = buildRoute();
-    const removeEventListenerSpy = vi.spyOn(window, "removeEventListener");
+    const removeEventListenerSpy = vi.spyOn(document, "removeEventListener");
     const { wrapper } = mountHost({ auth, route });
     await vi.advanceTimersByTimeAsync(0);
 
     wrapper.unmount();
 
-    expect(removeEventListenerSpy).toHaveBeenCalledWith("mousemove", expect.any(Function));
+    expect(removeEventListenerSpy).toHaveBeenCalledWith("visibilitychange", expect.any(Function));
   });
 });

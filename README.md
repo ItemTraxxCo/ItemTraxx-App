@@ -43,7 +43,7 @@ ItemTraxx currently supports multiple operating roles:
 - **Backend:** Supabase (PostgreSQL, Auth, Edge Functions) on AWS + Supabase Edge Runtime, Cloudflare Workers for edge proxying and Security Turnstile
 - **Edge and Security:** Cloudflare Turnstile, Cloudflare Worker edge proxy, CSP/security headers, Cloudflare DNS
 - **Hosting and Delivery:** Vercel, GitHub
-- **Observability:** Vercel Web Analytics, Vercel Speed Insights, Sentry Error Monitoring, Cloudflare Analytics, Supabase Logs and Metrics, PostHog
+- **Observability:** Vercel Web Analytics, Vercel Speed Insights, PostHog Error Tracking and Logs, Cloudflare Analytics, Supabase Logs and Metrics, and OpenTelemetry trace correlation for backend request paths
 
 ---
 
@@ -55,6 +55,33 @@ For public-facing repository context, see:
 - [`README.md`](README.md) — Product overview and repository context
 - [`CHANGELOG.md`](CHANGELOG.md) — Public product and engineering change history
 - [`docs/README.md`](docs/README.md) — Public documentation notice
+
+### Observability delivery
+
+The browser uses consent-gated PostHog Error Tracking for unhandled exceptions,
+rejected promises, and explicitly captured boundary failures. Error events keep
+source-map-relevant stack frames while scrubbing messages, URLs, credentials,
+cookies, request bodies, and unnecessary personal data. PostHog console capture
+is disabled; application logs are emitted only through explicit structured
+helpers.
+
+Production builds emit hidden source maps during the build. Configure `POSTHOG_CLI_HOST`,
+`POSTHOG_CLI_PROJECT_ID`, and a short-lived `POSTHOG_CLI_API_KEY` with Error
+Tracking write scope in the deployment environment, then run
+`npm run observability:upload-sourcemaps` against the same `dist` directory
+before serving it. The helper injects the `itemtraxx-web` release metadata,
+uploads the maps, and removes local map files after upload. Builds without the
+CLI credentials skip the upload and remove generated map files so they are not
+served accidentally; the application build remains successful.
+
+Supabase Edge Functions emit W3C trace context and sampled OTLP spans to the
+configured PostHog traces endpoint. Cloudflare's Worker propagates the trace
+context and emits structured completion logs to the existing Cloudflare log
+bridge, which promotes the JSON trace fields into OTLP log correlation; it does
+not send a second browser-wide tracing stream. Configure the
+server-only `ITX_POSTHOG_PROJECT_TOKEN`, `ITX_POSTHOG_TRACES_ENDPOINT`,
+`ITX_OTEL_SERVICE_NAME`, and sampling variables where backend traces are
+enabled. Keep these values out of `VITE_*` environment variables.
 
 ---
 

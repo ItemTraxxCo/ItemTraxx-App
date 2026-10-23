@@ -6,6 +6,7 @@ import { AppError, edgeFunctionError, notFoundError } from "./appErrors";
 import { getOrCreateDeviceSession } from "../utils/deviceSession";
 import {
   ensureCheckoutOperationId,
+  getBufferedCheckoutCount,
   isOfflineQueueItemScopedTo,
   readOfflineQueue,
   withOfflineQueueLock,
@@ -79,6 +80,11 @@ const isRetryableNetworkFailure = (status: number, message: string) => {
 };
 
 class CheckoutRequestError extends Error {
+  // HTTP failures are classified by edgeFunctionClient already. It promotes
+  // 5xx responses with request metadata, so the page catch must not report the
+  // same handled response a second time.
+  readonly reportToErrorTracking = false;
+
   constructor(
     message: string,
     readonly status: number,
@@ -200,10 +206,10 @@ export const submitCheckoutReturn = async (
   try {
     await executeCheckoutReturn(payloadWithOperationId);
     if (offlineContext) await applyConfirmedTransactionToOfflinePack(offlineContext);
-    void refreshOfflineCheckoutPackIfNeeded({ force: true }).catch(() => undefined);
+    void refreshOfflineCheckoutPackIfNeeded({ force: true, reportProgress: false }).catch(() => undefined);
     return {
       buffered: false,
-      queuedCount: await withOfflineQueueLock(async () => (await readOfflineQueue()).length),
+      queuedCount: await getBufferedCheckoutCount(),
     };
   } catch (error) {
     if (isQueueableFailure(error)) {
@@ -211,10 +217,10 @@ export const submitCheckoutReturn = async (
         try {
           await executeCheckoutReturn(payloadWithOperationId);
           if (offlineContext) await applyConfirmedTransactionToOfflinePack(offlineContext);
-          void refreshOfflineCheckoutPackIfNeeded({ force: true }).catch(() => undefined);
+          void refreshOfflineCheckoutPackIfNeeded({ force: true, reportProgress: false }).catch(() => undefined);
           return {
             buffered: false,
-            queuedCount: await withOfflineQueueLock(async () => (await readOfflineQueue()).length),
+            queuedCount: await getBufferedCheckoutCount(),
           };
         } catch (retryError) {
           if (!isQueueableFailure(retryError)) throw retryError;
@@ -344,7 +350,7 @@ const refreshOfflinePackAfterQueueSync = async (
   serverReachable: boolean | null = true,
 ) => {
   if (result.processed === 0 || result.remaining > 0 || result.review > 0 || serverReachable === false) return;
-  await refreshOfflineCheckoutPackIfNeeded({ force: true }).catch(() => undefined);
+  await refreshOfflineCheckoutPackIfNeeded({ force: true, reportProgress: false }).catch(() => undefined);
 };
 
 export const probeItemTraxxServer = async () => {

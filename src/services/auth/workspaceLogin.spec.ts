@@ -10,7 +10,6 @@ vi.mock("../../store/authState", () => ({
   setWorkspaceContext: vi.fn(),
 }));
 vi.mock("../httpSessionService", () => ({ fetchHttpSessionSummary: vi.fn() }));
-vi.mock("../auditLogService", () => ({ logAdminAction: vi.fn() }));
 vi.mock("./sessionBootstrap", () => ({
   applyHttpSessionSummary: vi.fn(),
   resolveWorkspaceSlug: vi.fn(),

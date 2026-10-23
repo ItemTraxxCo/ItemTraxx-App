@@ -14,6 +14,11 @@ vi.mock("./accountSessionService", () => ({
 import { invokeEdgeFunction } from "./edgeFunctionClient";
 import { getOrCreateDeviceSession } from "../utils/deviceSession";
 import { ensureAccountSessionReady } from "./accountSessionService";
+import { setOfflinePackDownloadPreference } from "./offlineCheckoutPreferences";
+import {
+  OFFLINE_PACK_LARGE_WARNING_EVENT,
+  resolveLargeOfflinePackConfirmation,
+} from "./offlinePackConfirmation";
 import {
   applyConfirmedTransactionToOfflinePack,
   clearOfflineCheckoutWorkflow,
@@ -26,6 +31,7 @@ import {
   listOfflineReviewEntries,
   markOfflineEntryNeedsReview,
   OFFLINE_SESSION_INITIALIZING_ERROR,
+  OfflinePackDownloadCancelledError,
   prepareOfflineCheckoutPack,
   queueOfflineOperation,
   readOfflineLedger,
@@ -91,6 +97,57 @@ const makeLedgerEntry = (overrides: Partial<OfflineLedgerEntry> = {}): OfflineLe
   ],
   ...overrides,
 });
+
+const edgeSuccess = (payload: unknown) => ({
+  ok: true,
+  status: 200,
+  error: "",
+  data: { data: payload },
+});
+
+const configureChunkedPackResponses = (
+  pack: OfflineCheckoutPack,
+  manifestOverrides: Partial<{ item_count: number; borrower_count: number }> = {},
+) => {
+  const actions: string[] = [];
+  mockedInvoke.mockImplementation(async (_functionName, options) => {
+    const body = (options as { body?: Record<string, unknown> } | undefined)?.body ?? {};
+    const action = String(body.action ?? "");
+    actions.push(action);
+    if (action === "prepare_pack") {
+      return edgeSuccess({
+        pack_version: pack.pack_version,
+        workspace_id: pack.workspace_id,
+        prepared_at: pack.prepared_at,
+        expires_at: pack.expires_at,
+        item_count: manifestOverrides.item_count ?? pack.items.length,
+        borrower_count: manifestOverrides.borrower_count ?? pack.borrowers.length,
+        chunk_size: 100,
+        max_records: 10_000,
+        max_bytes: 25 * 1024 * 1024,
+      }) as never;
+    }
+    if (action === "prepare_pack_chunk") {
+      const firstChunk = !body.after_item_id && !body.after_borrower_id;
+      return edgeSuccess({
+        items: firstChunk ? pack.items : [],
+        borrowers: firstChunk ? pack.borrowers : [],
+        next_item_id: firstChunk ? pack.items.at(-1)?.id ?? null : null,
+        next_borrower_id: firstChunk ? pack.borrowers.at(-1)?.id ?? null : null,
+        item_count: manifestOverrides.item_count ?? pack.items.length,
+        borrower_count: manifestOverrides.borrower_count ?? pack.borrowers.length,
+      }) as never;
+    }
+    if (action === "cancel_pack") return edgeSuccess({ cancelled: true }) as never;
+    if (action === "complete_pack") return edgeSuccess({ pack_version: pack.pack_version, download_complete: true }) as never;
+    if (action === "activate_pack") return edgeSuccess({ pack_version: pack.pack_version, activated: true }) as never;
+    return { ok: false, status: 400, error: `Unexpected action: ${action}`, data: null } as never;
+  });
+  return actions;
+};
+
+const allowAutomaticPackDownloads = () =>
+  setOfflinePackDownloadPreference({ workspaceId: WORKSPACE_ID, profileId: PROFILE_ID }, "always");
 
 beforeEach(async () => {
   window.localStorage.clear();
@@ -518,39 +575,121 @@ describe("prepareOfflineCheckoutPack", () => {
     setAuthStateFromBackend({ isAuthenticated: true, userId: PROFILE_ID, workspaceContextId: WORKSPACE_ID });
     await writeOfflineLedger([makeLedgerEntry({ id: "e1", status: "synced" })]);
     const prepared = makePack();
-    mockedInvoke.mockResolvedValue({
-      ok: true,
-      status: 200,
-      error: "",
-      data: {
-        data: {
-          pack_version: prepared.pack_version,
-          workspace_id: WORKSPACE_ID,
-          prepared_at: prepared.prepared_at,
-          expires_at: prepared.expires_at,
-          borrowers: prepared.borrowers,
-          items: prepared.items,
-        },
-      },
-    });
+    const actions = configureChunkedPackResponses(prepared);
+    const progress: Array<{ stage: string; downloadedRecords: number; totalRecords: number }> = [];
+    const captureProgress = (event: Event) => {
+      const detail = (event as CustomEvent<{ stage: string; downloadedRecords: number; totalRecords: number }>).detail;
+      progress.push(detail);
+    };
+    window.addEventListener("itemtraxx:offline-pack-progress", captureProgress);
 
     const pack = await prepareOfflineCheckoutPack();
+    window.removeEventListener("itemtraxx:offline-pack-progress", captureProgress);
     expect(pack.workspace_id).toBe(WORKSPACE_ID);
     expect(pack.device_id).toBe(DEVICE_ID);
+    expect(pack.items).toEqual(prepared.items);
+    expect(pack.borrowers).toEqual(prepared.borrowers);
+    expect(actions).toEqual([
+      "prepare_pack",
+      "prepare_pack_chunk",
+      "prepare_pack_chunk",
+      "complete_pack",
+      "activate_pack",
+    ]);
+    expect(progress.map((entry) => entry.stage)).toEqual(["starting", "starting", "downloading", "complete"]);
+    expect(progress[2]).toMatchObject({ downloadedRecords: 3, totalRecords: 3 });
     expect(mockedEnsureAccountSessionReady).toHaveBeenCalledTimes(1);
     expect(await readOfflineLedger()).toEqual([]);
   });
 
   it("throws when the prepared pack's workspace does not match the current session", async () => {
     setAuthStateFromBackend({ isAuthenticated: true, userId: PROFILE_ID, workspaceContextId: WORKSPACE_ID });
-    mockedInvoke.mockResolvedValue({
-      ok: true,
-      status: 200,
-      error: "",
-      data: { data: { ...makePack(), workspace_id: "wrong-workspace" } },
+    const prepared = makePack();
+    mockedInvoke.mockImplementation(async (_functionName, options) => {
+      const body = (options as { body?: Record<string, unknown> } | undefined)?.body ?? {};
+      if (body.action === "prepare_pack") {
+        return edgeSuccess({
+          pack_version: prepared.pack_version,
+          workspace_id: "wrong-workspace",
+          prepared_at: prepared.prepared_at,
+          expires_at: prepared.expires_at,
+          item_count: prepared.items.length,
+          borrower_count: prepared.borrowers.length,
+          chunk_size: 100,
+          max_records: 10_000,
+          max_bytes: 25 * 1024 * 1024,
+        }) as never;
+      }
+      return edgeSuccess({ cancelled: true }) as never;
     });
 
     await expect(prepareOfflineCheckoutPack()).rejects.toThrow(/does not match this session/i);
+  });
+
+  it("does not store one account's response after the active account changes", async () => {
+    setAuthStateFromBackend({ isAuthenticated: true, userId: PROFILE_ID, workspaceContextId: WORKSPACE_ID });
+    const prepared = makePack();
+    mockedInvoke.mockImplementation(async (_functionName, options) => {
+      const body = (options as { body?: Record<string, unknown> } | undefined)?.body ?? {};
+      if (body.action === "prepare_pack") {
+        setAuthStateFromBackend({ isAuthenticated: true, userId: "profile-2", workspaceContextId: WORKSPACE_ID });
+        return edgeSuccess({
+          pack_version: prepared.pack_version,
+          workspace_id: prepared.workspace_id,
+          prepared_at: prepared.prepared_at,
+          expires_at: prepared.expires_at,
+          item_count: prepared.items.length,
+          borrower_count: prepared.borrowers.length,
+          chunk_size: 100,
+          max_records: 10_000,
+          max_bytes: 25 * 1024 * 1024,
+        }) as never;
+      }
+      return edgeSuccess({ cancelled: true }) as never;
+    });
+
+    await expect(prepareOfflineCheckoutPack()).rejects.toThrow(/account changed/i);
+    expect(await readOfflinePack({ workspaceId: WORKSPACE_ID, profileId: "profile-2" })).toBeNull();
+    expect(await readOfflinePack({ workspaceId: WORKSPACE_ID, profileId: PROFILE_ID })).toBeNull();
+  });
+
+  it("keeps the current pack when a chunk fails", async () => {
+    setAuthStateFromBackend({ isAuthenticated: true, userId: PROFILE_ID, workspaceContextId: WORKSPACE_ID });
+    const current = makePack({ pack_version: "existing" });
+    await writeOfflinePack(current);
+    mockedInvoke.mockImplementation(async (_functionName, options) => {
+      const body = (options as { body?: Record<string, unknown> } | undefined)?.body ?? {};
+      if (body.action === "prepare_pack") {
+        return edgeSuccess({
+          pack_version: "new-pack",
+          workspace_id: WORKSPACE_ID,
+          prepared_at: new Date().toISOString(),
+          expires_at: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+          item_count: 2,
+          borrower_count: 1,
+          chunk_size: 100,
+          max_records: 10_000,
+          max_bytes: 25 * 1024 * 1024,
+        }) as never;
+      }
+      if (body.action === "prepare_pack_chunk") return { ok: false, status: 503, error: "chunk failed", data: null } as never;
+      return edgeSuccess({ cancelled: true }) as never;
+    });
+
+    await expect(prepareOfflineCheckoutPack()).rejects.toThrow("chunk failed");
+    expect(await readOfflinePack({ workspaceId: WORKSPACE_ID, profileId: PROFILE_ID })).toEqual(current);
+  });
+
+  it("requires confirmation for large packs and cancels when no choice is made", async () => {
+    setAuthStateFromBackend({ isAuthenticated: true, userId: PROFILE_ID, workspaceContextId: WORKSPACE_ID });
+    const prepared = makePack({ pack_version: "large-pack" });
+    const actions = configureChunkedPackResponses(prepared, { item_count: 2_001 });
+    const rejectLargePack = () => resolveLargeOfflinePackConfirmation(false);
+    window.addEventListener(OFFLINE_PACK_LARGE_WARNING_EVENT, rejectLargePack, { once: true });
+
+    await expect(prepareOfflineCheckoutPack()).rejects.toBeInstanceOf(OfflinePackDownloadCancelledError);
+    expect(actions).toEqual(["prepare_pack", "cancel_pack"]);
+    expect(await readOfflinePack({ workspaceId: WORKSPACE_ID, profileId: PROFILE_ID })).toBeNull();
   });
 });
 
@@ -570,6 +709,7 @@ describe("refreshOfflineCheckoutPackIfNeeded", () => {
 
   it("skips when there are pending transactions blocking a refresh", async () => {
     setAuthStateFromBackend({ isAuthenticated: true, userId: PROFILE_ID, workspaceContextId: WORKSPACE_ID });
+    allowAutomaticPackDownloads();
     await writeOfflineLedger([makeLedgerEntry({ id: "e1", status: "pending" })]);
 
     const result = await refreshOfflineCheckoutPackIfNeeded();
@@ -578,6 +718,7 @@ describe("refreshOfflineCheckoutPackIfNeeded", () => {
 
   it("skips when an existing pack is already current and force is not set", async () => {
     setAuthStateFromBackend({ isAuthenticated: true, userId: PROFILE_ID, workspaceContextId: WORKSPACE_ID });
+    allowAutomaticPackDownloads();
     await writeOfflinePack(makePack({ prepared_at: new Date().toISOString() }));
 
     const result = await refreshOfflineCheckoutPackIfNeeded();
@@ -587,55 +728,86 @@ describe("refreshOfflineCheckoutPackIfNeeded", () => {
 
   it("prepares a new pack when forced even if the existing one is current", async () => {
     setAuthStateFromBackend({ isAuthenticated: true, userId: PROFILE_ID, workspaceContextId: WORKSPACE_ID });
+    allowAutomaticPackDownloads();
     const existing = makePack({ prepared_at: new Date().toISOString() });
     await writeOfflinePack(existing);
-    mockedInvoke.mockResolvedValue({
-      ok: true,
-      status: 200,
-      error: "",
-      data: { data: { ...existing, pack_version: "v2" } },
-    });
+    configureChunkedPackResponses(makePack({ ...existing, pack_version: "v2" }));
 
     const result = await refreshOfflineCheckoutPackIfNeeded({ force: true });
     expect(result).toEqual({ refreshed: true, firstPreparation: false });
   });
 
+  it("does not automatically download when the account preference is manual or ask has no approval", async () => {
+    setAuthStateFromBackend({ isAuthenticated: true, userId: PROFILE_ID, workspaceContextId: WORKSPACE_ID });
+
+    const manual = await refreshOfflineCheckoutPackIfNeeded({ force: true });
+    expect(manual).toEqual({ refreshed: false, firstPreparation: false, skippedReason: "download_preference" });
+    setOfflinePackDownloadPreference({ workspaceId: WORKSPACE_ID, profileId: PROFILE_ID }, "ask");
+    const askWithoutApproval = await refreshOfflineCheckoutPackIfNeeded({ force: true });
+    expect(askWithoutApproval).toEqual({ refreshed: false, firstPreparation: false, skippedReason: "download_preference" });
+    expect(mockedInvoke).not.toHaveBeenCalled();
+  });
+
   it("dedupes concurrent calls to a single in-flight preparation", async () => {
     setAuthStateFromBackend({ isAuthenticated: true, userId: PROFILE_ID, workspaceContextId: WORKSPACE_ID });
+    allowAutomaticPackDownloads();
     const prepared = makePack();
-    let resolveInvoke: (value: unknown) => void = () => {};
-    mockedInvoke.mockReturnValue(
-      new Promise<unknown>((resolve) => {
-        resolveInvoke = resolve;
-      }) as ReturnType<typeof invokeEdgeFunction>
-    );
+    let resolveManifest: (value: unknown) => void = () => {};
+    const actions: string[] = [];
+    mockedInvoke.mockImplementation(async (_functionName, options) => {
+      const body = (options as { body?: Record<string, unknown> } | undefined)?.body ?? {};
+      const action = String(body.action ?? "");
+      actions.push(action);
+      if (action === "prepare_pack") {
+        return await new Promise<unknown>((resolve) => { resolveManifest = resolve; }) as never;
+      }
+      if (action === "prepare_pack_chunk") {
+        const firstChunk = !body.after_item_id && !body.after_borrower_id;
+        return edgeSuccess({
+          items: firstChunk ? prepared.items : [],
+          borrowers: firstChunk ? prepared.borrowers : [],
+          next_item_id: firstChunk ? prepared.items.at(-1)?.id ?? null : null,
+          next_borrower_id: firstChunk ? prepared.borrowers.at(-1)?.id ?? null : null,
+          item_count: prepared.items.length,
+          borrower_count: prepared.borrowers.length,
+        }) as never;
+      }
+      return edgeSuccess({ pack_version: prepared.pack_version, download_complete: true, activated: true }) as never;
+    });
 
     const first = refreshOfflineCheckoutPackIfNeeded({ force: true });
     const second = refreshOfflineCheckoutPackIfNeeded({ force: true });
     expect(first).toBe(second);
 
-    resolveInvoke({ ok: true, status: 200, error: "", data: { data: prepared } });
+    await vi.waitFor(() => expect(mockedInvoke).toHaveBeenCalled());
+    resolveManifest(edgeSuccess({
+      pack_version: prepared.pack_version,
+      workspace_id: prepared.workspace_id,
+      prepared_at: prepared.prepared_at,
+      expires_at: prepared.expires_at,
+      item_count: prepared.items.length,
+      borrower_count: prepared.borrowers.length,
+      chunk_size: 100,
+      max_records: 10_000,
+      max_bytes: 25 * 1024 * 1024,
+    }));
     await first;
-    expect(mockedInvoke).toHaveBeenCalledTimes(1);
+    expect(actions.filter((action) => action === "prepare_pack")).toHaveLength(1);
   });
 
   it("runs a forced refresh after an in-flight timer check reports the pack is current", async () => {
     setAuthStateFromBackend({ isAuthenticated: true, userId: PROFILE_ID, workspaceContextId: WORKSPACE_ID });
+    allowAutomaticPackDownloads();
     const existing = makePack({ prepared_at: new Date().toISOString() });
     await writeOfflinePack(existing);
-    mockedInvoke.mockResolvedValue({
-      ok: true,
-      status: 200,
-      error: "",
-      data: { data: { ...existing, pack_version: "v2" } },
-    });
+    configureChunkedPackResponses(makePack({ ...existing, pack_version: "v2" }));
 
     const timerRefresh = refreshOfflineCheckoutPackIfNeeded();
     const forcedRefresh = refreshOfflineCheckoutPackIfNeeded({ force: true });
 
     await expect(timerRefresh).resolves.toEqual({ refreshed: false, firstPreparation: false, skippedReason: "up_to_date" });
     await expect(forcedRefresh).resolves.toEqual({ refreshed: true, firstPreparation: false });
-    expect(mockedInvoke).toHaveBeenCalledTimes(1);
+    expect(mockedInvoke).toHaveBeenCalledTimes(5);
   });
 });
 

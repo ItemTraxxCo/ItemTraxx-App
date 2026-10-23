@@ -14,14 +14,15 @@ const requireSuperAdmin = async (loginMethod: "password" | "passkey") => {
     await signOut({ bestEffort: true });
     throw new Error("Access denied.");
   }
-  await registerPrivilegedAdminStepUp();
-  setSecondaryAuth(true);
-  clearPendingSuperAdminVerificationEmail();
   try {
     await touchSuperAdminSession({ loginMethod, loginLocation: "super_auth" });
   } catch {
-    // Session tracking is best-effort and must not weaken successful auth.
+    await signOut({ bestEffort: true });
+    throw new Error("Unable to establish Super Admin session controls.");
   }
+  await registerPrivilegedAdminStepUp();
+  setSecondaryAuth(true);
+  clearPendingSuperAdminVerificationEmail();
   return current;
 };
 
@@ -33,12 +34,18 @@ export const superAdminLogin = async (
   setSecondaryAuth(false);
   const result = await authClient.signIn.email(
     { email: email.trim().toLowerCase(), password },
-    { headers: { "x-captcha-response": turnstileToken } },
+    {
+      headers: { "content-type": "application/x-www-form-urlencoded" },
+      // The edge Worker moves this field to Better Auth's captcha header
+      // before dispatch, keeping the browser request free of a preflight-only
+      // custom header.
+      body: { captchaResponse: turnstileToken },
+    },
   );
   if (result.error) throw new Error(result.error.message || "Invalid credentials.");
 
   // Better Auth withholds the full session until its TOTP/backup challenge is
-  // complete, so the caller routes that state to /two-factor.
+  // complete, so the caller routes that state to /login/two-factor.
   await refreshAuthFromSession();
   if (!getAuthState().isAuthenticated) return { email, requiresTwoFactor: true };
   const current = await requireSuperAdmin("password");
@@ -58,17 +65,18 @@ export const superAdminPasskeyLogin = async (options: {
     await signOut({ bestEffort: true });
     throw new Error("Access denied.");
   }
-  await registerPrivilegedAdminStepUp();
-  setSecondaryAuth(true);
-  clearPendingSuperAdminVerificationEmail();
   try {
     await touchSuperAdminSession({
       loginMethod: "passkey",
       loginLocation: options.loginLocation ?? "super_auth",
     });
   } catch {
-    // Session tracking is best-effort and must not weaken successful auth.
+    await signOut({ bestEffort: true });
+    throw new Error("Unable to establish Super Admin session controls.");
   }
+  await registerPrivilegedAdminStepUp();
+  setSecondaryAuth(true);
+  clearPendingSuperAdminVerificationEmail();
   if (options.sendLoginNotification !== false) {
     sendLoginNotification(null, { loginLocation: "super_admin_login" });
   }

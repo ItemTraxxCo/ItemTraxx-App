@@ -3,9 +3,8 @@ import type { RouteLocationNormalized, RouteRecordRaw } from "vue-router";
 import { getAuthState, type AuthState } from "../store/authState";
 import { getWorkspaceState } from "../store/workspaceState";
 import { buildWorkspaceAppUrl, lookupWorkspaceById } from "../services/workspaceService";
+import { sanitizeReturnTo } from "./returnTo";
 
-const ADMIN_VERIFICATION_TTL_MS = 15 * 60 * 1000;
-const SUPER_VERIFICATION_TTL_MS = 15 * 60 * 1000;
 const isInternalHostRuntime = () =>
   typeof window !== "undefined" &&
   window.location.hostname === "internal.itemtraxx.com";
@@ -27,16 +26,16 @@ const routes: RouteRecordRaw[] = [
     meta: { public: true, title: "ItemTraxx Inventory Tracking" },
   },
   {
-    path: "/landing-old",
-    name: "public-home-old",
-    component: () => import("../pages/PublicHome.vue"),
-    meta: { public: true, title: "Legacy Landing | ItemTraxx" },
-  },
-  {
     path: "/login",
     name: "public-login",
     component: () => import("../pages/Login.vue"),
     meta: { public: true, title: "Login | ItemTraxx" },
+  },
+  {
+    path: "/access-denied",
+    name: "public-access-denied",
+    component: () => import("../pages/AccessDenied.vue"),
+    meta: { public: true, title: "Access denied | ItemTraxx" },
   },
   {
     path: "/landing-new",
@@ -46,15 +45,25 @@ const routes: RouteRecordRaw[] = [
   },
   {
     path: "/landing-new2",
-    name: "public-home-new2",
-    component: () => import("../pages/LandingPageNew2.vue"),
-    meta: { public: true, title: "ItemTraxx Inventory Tracking" },
+    redirect: { name: "public-home-new" },
   },
   {
     path: "/reset-password",
     name: "public-reset-password",
     component: () => import("../pages/ResetPassword.vue"),
     meta: { public: true, title: "Reset Password | ItemTraxx" },
+  },
+  {
+    path: "/accept-invitation",
+    name: "public-accept-invitation",
+    component: () => import("../pages/AcceptAccountInvitation.vue"),
+    meta: { public: true, title: "Accept Workspace Invitation | ItemTraxx" },
+  },
+  {
+    path: "/account/email-change",
+    name: "public-account-email-change",
+    component: () => import("../pages/AccountEmailChange.vue"),
+    meta: { public: true, title: "Verify Email Change | ItemTraxx" },
   },
   {
     path: "/forgot-password",
@@ -216,7 +225,7 @@ const routes: RouteRecordRaw[] = [
     path: "/checkout",
     name: "workspace-checkout",
     component: () => import("../pages/workspace/Checkout.vue"),
-    meta: { requiresSession: true, requiresWorkspace: true, title: "Checkout | ItemTraxx" },
+    meta: { requiresSession: true, requiresWorkspace: true, requiresRole: ["tenant_account", "individual_account"], title: "Checkout | ItemTraxx" },
   },
   {
     path: "/admin/login",
@@ -240,7 +249,7 @@ const routes: RouteRecordRaw[] = [
   { path: "/settings", name: "workspace-settings", component: () => import("../pages/workspace/Settings.vue"), meta: { requiresSession: true, requiresWorkspace: true, requiresRole: "tenant_account", title: "Settings | ItemTraxx" } },
   { path: "/account/security", name: "account-security", component: () => import("../pages/AccountSecurity.vue"), meta: { requiresSession: true, title: "Account Security | ItemTraxx" } },
   { path: "/login/two-factor", name: "two-factor-challenge", component: () => import("../pages/TwoFactorChallenge.vue"), meta: { title: "Two-factor verification | ItemTraxx" } },
-  { path: "/account", name: "workspace-account", component: () => import("../pages/workspace/Account.vue"), meta: { requiresSession: true, requiresWorkspace: true, requiresRole: "tenant_account", title: "My Account | ItemTraxx" } },
+  { path: "/account", name: "workspace-account", component: () => import("../pages/workspace/AccountHome.vue"), meta: { requiresSession: true, requiresWorkspace: true, requiresRole: ["tenant_account", "individual_account"], requiresWorkspaceMatch: true, title: "My Account | ItemTraxx" } },
   {
     path: "/admin/students",
     redirect: "/admin/borrowers",
@@ -328,17 +337,32 @@ const routes: RouteRecordRaw[] = [
     },
   },
   {
-    path: "/admin/settings",
-    name: "workspace-admin-settings",
-    component: () => import("../pages/workspace/admin/Settings.vue"),
+    path: "/settings/account",
+    name: "workspace-admin-account-settings",
+    component: () => import("../pages/workspace/admin/AccountSettings.vue"),
     meta: {
       requiresSession: true,
       requiresWorkspace: true,
       requiresRole: "workspace_admin",
       requiresWorkspaceMatch: true,
-    
-      title: "Admin Settings | ItemTraxx",
+      title: "Account Settings | ItemTraxx",
     },
+  },
+  {
+    path: "/settings/organization",
+    name: "workspace-organization-settings",
+    component: () => import("../pages/workspace/admin/OrganizationSettings.vue"),
+    meta: {
+      requiresSession: true,
+      requiresWorkspace: true,
+      requiresRole: "workspace_admin",
+      requiresWorkspaceMatch: true,
+      title: "Workspace Settings | ItemTraxx",
+    },
+  },
+  {
+    path: "/admin/settings",
+    redirect: "/settings/organization",
   },
   {
     path: "/admin/settings/sso",
@@ -346,20 +370,8 @@ const routes: RouteRecordRaw[] = [
     component: () => import("../pages/EnterpriseSsoSettings.vue"),
     meta: { requiresSession: true, requiresWorkspace: true, requiresRole: "workspace_admin", requiresWorkspaceMatch: true, title: "Enterprise SSO | ItemTraxx" },
   },
-  {
-    path: "/admin/admins",
-    name: "workspace-admin-admins",
-    component: () => import("../pages/workspace/admin/Admins.vue"),
-    meta: {
-      requiresSession: true,
-      requiresWorkspace: true,
-      requiresRole: "workspace_admin",
-      requiresWorkspaceMatch: true,
-
-      title: "Admin Access | ItemTraxx",
-    },
-  },
-  { path: "/admin/accounts", name: "workspace-admin-accounts", component: () => import("../pages/workspace/admin/Accounts.vue"), meta: { requiresSession: true, requiresWorkspace: true, requiresRole: "workspace_admin", requiresWorkspaceMatch: true, title: "Tenant Accounts | ItemTraxx" } },
+  { path: "/admin/admins", redirect: "/admin/accounts" },
+  { path: "/admin/accounts", name: "workspace-admin-accounts", component: () => import("../pages/workspace/admin/Accounts.vue"), meta: { requiresSession: true, requiresWorkspace: true, requiresRole: "workspace_admin", requiresWorkspaceMatch: true, title: "Workspace Accounts | ItemTraxx" } },
   {
     path: "/admin/item-import",
     name: "workspace-admin-item-import",
@@ -371,6 +383,67 @@ const routes: RouteRecordRaw[] = [
       requiresWorkspaceMatch: true,
     
       title: "Item Import | ItemTraxx",
+    },
+  },
+  {
+    path: "/account/checkout",
+    redirect: "/checkout",
+  },
+  {
+    path: "/account/items",
+    name: "individual-account-items",
+    component: () => import("../pages/workspace/admin/Items.vue"),
+    meta: { requiresSession: true, requiresWorkspace: true, requiresRole: "individual_account", requiresWorkspaceMatch: true, title: "My Items | ItemTraxx" },
+  },
+  {
+    path: "/account/borrowers",
+    name: "individual-account-borrowers",
+    component: () => import("../pages/workspace/admin/Borrowers.vue"),
+    meta: { requiresSession: true, requiresWorkspace: true, requiresRole: "individual_account", requiresWorkspaceMatch: true, title: "My Borrowers | ItemTraxx" },
+  },
+  {
+    path: "/account/logs",
+    name: "individual-account-logs",
+    component: () => import("../pages/workspace/admin/Logs.vue"),
+    meta: { requiresSession: true, requiresWorkspace: true, requiresRole: "individual_account", requiresWorkspaceMatch: true, title: "Activity | ItemTraxx" },
+  },
+  {
+    path: "/account/return",
+    name: "individual-account-return",
+    component: () => import("../pages/workspace/admin/QuickReturn.vue"),
+    meta: { requiresSession: true, requiresWorkspace: true, requiresRole: "individual_account", requiresWorkspaceMatch: true, title: "Quick Return | ItemTraxx" },
+  },
+  {
+    path: "/account/item-status",
+    name: "individual-account-item-status",
+    component: () => import("../pages/workspace/admin/ItemStatusTracking.vue"),
+    meta: { requiresSession: true, requiresWorkspace: true, requiresRole: "individual_account", requiresWorkspaceMatch: true, title: "Item Status | ItemTraxx" },
+  },
+  {
+    path: "/account/barcodes",
+    name: "individual-account-barcodes",
+    component: () => import("../pages/workspace/admin/BarcodeGenerator.vue"),
+    meta: { requiresSession: true, requiresWorkspace: true, requiresRole: "individual_account", requiresWorkspaceMatch: true, title: "Barcode Generator | ItemTraxx" },
+  },
+  {
+    path: "/account/settings",
+    name: "individual-account-settings",
+    component: () => import("../pages/workspace/admin/Settings.vue"),
+    meta: { requiresSession: true, requiresWorkspace: true, requiresRole: "individual_account", requiresWorkspaceMatch: true, title: "Personal Settings | ItemTraxx" },
+  },
+  {
+    path: "/account/item-import",
+    name: "individual-account-item-import",
+    component: () => import("../pages/workspace/admin/ItemImport.vue"),
+    meta: { requiresSession: true, requiresWorkspace: true, requiresRole: "individual_account", requiresWorkspaceMatch: true, title: "Item Import | ItemTraxx" },
+  },
+  {
+    path: "/personal/:pathMatch(.*)*",
+    redirect: (to) => {
+      const suffix = Array.isArray(to.params.pathMatch)
+        ? to.params.pathMatch.join("/")
+        : String(to.params.pathMatch || "");
+      return suffix === "checkout" ? "/checkout" : suffix ? `/account/${suffix}` : "/account";
     },
   },
 
@@ -401,168 +474,185 @@ const routes: RouteRecordRaw[] = [
   },
   {
     path: "/super-admin",
-    name: "super-admin-home",
-    component: () => import("../pages/super/SuperAdminHome.vue"),
-    meta: {
-      requiresSession: true,
-      requiresRole: "super_admin",
-      requiresSuperAuth: true,
-    
-      title: "Super Admin | ItemTraxx",
-    },
-  },
-  {
-    path: "/super-admin/settings",
-    name: "super-admin-settings",
-    component: () => import("../pages/super/Settings.vue"),
-    meta: {
-      requiresSession: true,
-      requiresRole: "super_admin",
-      requiresSuperAuth: true,
-      title: "Super Admin Settings | ItemTraxx",
-    },
-  },
-  {
-    path: "/super-admin/settings/sso",
-    name: "super-admin-sso",
-    component: () => import("../pages/EnterpriseSsoSettings.vue"),
-    meta: { requiresSession: true, requiresRole: "super_admin", requiresSuperAuth: true, title: "Enterprise SSO | ItemTraxx" },
-  },
-  {
-    path: "/super-admin/workspaces",
-    name: "super-admin-workspaces",
-    component: () => import("../pages/super/Workspaces.vue"),
-    meta: {
-      requiresSession: true,
-      requiresRole: "super_admin",
-      requiresSuperAuth: true,
-    
-      title: "Super Admin Workspaces | ItemTraxx",
-    },
-  },
-  {
-    path: "/super-admin/admins",
-    name: "super-admin-admins",
-    component: () => import("../pages/super/Admins.vue"),
-    meta: {
-      requiresSession: true,
-      requiresRole: "super_admin",
-      requiresSuperAuth: true,
-    
-      title: "Super Admin Admins | ItemTraxx",
-    },
-  },
-  {
-    path: "/super-admin/tenant-accounts",
-    name: "super-admin-tenant-accounts",
-    component: () => import("../pages/super/TenantAccounts.vue"),
-    meta: {
-      requiresSession: true,
-      requiresRole: "super_admin",
-      title: "Tenant Accounts | ItemTraxx",
-    },
-  },
-  {
-    path: "/super-admin/super-admins",
-    name: "super-admin-super-admins",
-    component: () => import("../pages/super/SuperAdmins.vue"),
-    meta: {
-      requiresSession: true,
-      requiresRole: "super_admin",
-      requiresSuperAuth: true,
-      title: "Super Admins | ItemTraxx",
-    },
-  },
-  {
-    path: "/super-admin/gear",
-    redirect: "/super-admin/items",
-  },
-  {
-    path: "/super-admin/items",
-    name: "super-admin-items",
-    component: () => import("../pages/super/SuperItems.vue"),
-    meta: {
-      requiresSession: true,
-      requiresRole: "super_admin",
-      requiresSuperAuth: true,
-    
-      title: "Super Admin Item | ItemTraxx",
-    },
-  },
-  {
-    path: "/super-admin/borrowers",
-    name: "super-admin-borrowers",
-    component: () => import("../pages/super/SuperBorrowers.vue"),
-    meta: {
-      requiresSession: true,
-      requiresRole: "super_admin",
-      requiresSuperAuth: true,
-    
-      title: "Super Admin Borrowers | ItemTraxx",
-    },
-  },
-  {
-    path: "/super-admin/students",
-    redirect: "/super-admin/borrowers",
-  },
-  {
-    path: "/super-admin/logs",
-    name: "super-admin-logs",
-    component: () => import("../pages/super/SuperLogs.vue"),
-    meta: {
-      requiresSession: true,
-      requiresRole: "super_admin",
-      requiresSuperAuth: true,
-    
-      title: "Super Admin Logs | ItemTraxx",
-    },
-  },
-  {
-    path: "/super-admin/broadcasts",
-    name: "super-admin-broadcasts",
-    component: () => import("../pages/super/Broadcasts.vue"),
-    meta: {
-      requiresSession: true,
-      requiresRole: "super_admin",
-      requiresSuperAuth: true,
-    
-      title: "Broadcasts | ItemTraxx",
-    },
-  },
-  {
-    path: "/super-admin/sales-leads",
-    name: "super-admin-sales-leads",
-    component: () => import("../pages/super/SalesLeads.vue"),
-    meta: {
-      requiresSession: true,
-      requiresRole: "super_admin",
-      requiresSuperAuth: true,
-    
-      title: "Sales Leads | ItemTraxx",
-    },
-  },
-  {
-    path: "/super-admin/customers",
-    name: "super-admin-customers",
-    component: () => import("../pages/super/Customers.vue"),
-    meta: {
-      requiresSession: true,
-      requiresRole: "super_admin",
-      requiresSuperAuth: true,
-    
-      title: "Customers | ItemTraxx",
-    },
-  },
-  {
-    path: "/super-admin/support-requests",
-    name: "super-admin-support-requests",
-    component: () => import("../pages/super/SupportRequests.vue"),
-    meta: {
-      requiresSession: true,
-      requiresRole: "super_admin",
-      requiresSuperAuth: true,
-      title: "Support Requests | ItemTraxx",
-    },
+    component: () => import("../components/superadmin/SuperAdminLayout.vue"),
+    children: [
+      {
+        path: "",
+        name: "super-admin-home",
+        component: () => import("../pages/super/SuperAdminHome.vue"),
+        meta: {
+          requiresSession: true,
+          requiresRole: "super_admin",
+          requiresSuperAuth: true,
+
+          title: "Super Admin | ItemTraxx",
+        },
+      },
+      {
+        path: "settings",
+        name: "super-admin-settings",
+        component: () => import("../pages/super/Settings.vue"),
+        meta: {
+          requiresSession: true,
+          requiresRole: "super_admin",
+          requiresSuperAuth: true,
+          title: "Super Admin Settings | ItemTraxx",
+        },
+      },
+      {
+        path: "settings/sso",
+        name: "super-admin-sso",
+        component: () => import("../pages/EnterpriseSsoSettings.vue"),
+        meta: { requiresSession: true, requiresRole: "super_admin", requiresSuperAuth: true, title: "Enterprise SSO | ItemTraxx" },
+      },
+      {
+        path: "workspaces",
+        name: "super-admin-workspaces",
+        component: () => import("../pages/super/Workspaces.vue"),
+        meta: {
+          requiresSession: true,
+          requiresRole: "super_admin",
+          requiresSuperAuth: true,
+
+          title: "Super Admin Workspaces | ItemTraxx",
+        },
+      },
+      {
+        path: "individual-accounts",
+        name: "super-admin-individual-accounts",
+        component: () => import("../pages/super/IndividualAccounts.vue"),
+        meta: {
+          requiresSession: true,
+          requiresRole: "super_admin",
+          requiresSuperAuth: true,
+          title: "Super Admin Individual Accounts | ItemTraxx",
+        },
+      },
+      {
+        path: "admins",
+        name: "super-admin-admins",
+        component: () => import("../pages/super/Admins.vue"),
+        meta: {
+          requiresSession: true,
+          requiresRole: "super_admin",
+          requiresSuperAuth: true,
+
+          title: "Super Admin Admins | ItemTraxx",
+        },
+      },
+      {
+        path: "tenant-accounts",
+        name: "super-admin-tenant-accounts",
+        component: () => import("../pages/super/TenantAccounts.vue"),
+        meta: {
+          requiresSession: true,
+          requiresRole: "super_admin",
+          title: "Tenant Accounts | ItemTraxx",
+        },
+      },
+      {
+        path: "super-admins",
+        name: "super-admin-super-admins",
+        component: () => import("../pages/super/SuperAdmins.vue"),
+        meta: {
+          requiresSession: true,
+          requiresRole: "super_admin",
+          requiresSuperAuth: true,
+          title: "Super Admins | ItemTraxx",
+        },
+      },
+      {
+        path: "gear",
+        redirect: { name: "super-admin-items" },
+      },
+      {
+        path: "items",
+        name: "super-admin-items",
+        component: () => import("../pages/super/SuperItems.vue"),
+        meta: {
+          requiresSession: true,
+          requiresRole: "super_admin",
+          requiresSuperAuth: true,
+
+          title: "Super Admin Item | ItemTraxx",
+        },
+      },
+      {
+        path: "borrowers",
+        name: "super-admin-borrowers",
+        component: () => import("../pages/super/SuperBorrowers.vue"),
+        meta: {
+          requiresSession: true,
+          requiresRole: "super_admin",
+          requiresSuperAuth: true,
+
+          title: "Super Admin Borrowers | ItemTraxx",
+        },
+      },
+      {
+        path: "students",
+        redirect: { name: "super-admin-borrowers" },
+      },
+      {
+        path: "logs",
+        name: "super-admin-logs",
+        component: () => import("../pages/super/SuperLogs.vue"),
+        meta: {
+          requiresSession: true,
+          requiresRole: "super_admin",
+          requiresSuperAuth: true,
+
+          title: "Super Admin Logs | ItemTraxx",
+        },
+      },
+      {
+        path: "broadcasts",
+        name: "super-admin-broadcasts",
+        component: () => import("../pages/super/Broadcasts.vue"),
+        meta: {
+          requiresSession: true,
+          requiresRole: "super_admin",
+          requiresSuperAuth: true,
+
+          title: "Broadcasts | ItemTraxx",
+        },
+      },
+      {
+        path: "sales-leads",
+        name: "super-admin-sales-leads",
+        component: () => import("../pages/super/SalesLeads.vue"),
+        meta: {
+          requiresSession: true,
+          requiresRole: "super_admin",
+          requiresSuperAuth: true,
+
+          title: "Sales Leads | ItemTraxx",
+        },
+      },
+      {
+        path: "customers",
+        name: "super-admin-customers",
+        component: () => import("../pages/super/Customers.vue"),
+        meta: {
+          requiresSession: true,
+          requiresRole: "super_admin",
+          requiresSuperAuth: true,
+
+          title: "Customers | ItemTraxx",
+        },
+      },
+      {
+        path: "support-requests",
+        name: "super-admin-support-requests",
+        component: () => import("../pages/super/SupportRequests.vue"),
+        meta: {
+          requiresSession: true,
+          requiresRole: "super_admin",
+          requiresSuperAuth: true,
+          title: "Support Requests | ItemTraxx",
+        },
+      },
+    ],
   },
   {
     path: "/:pathMatch(.*)*",
@@ -590,28 +680,6 @@ const router = createRouter({
   },
 });
 
-const hasFreshAdminVerification = (adminVerifiedAt: string | null) => {
-  if (!adminVerifiedAt) {
-    return false;
-  }
-  const verifiedAtMs = Date.parse(adminVerifiedAt);
-  if (Number.isNaN(verifiedAtMs)) {
-    return false;
-  }
-  return Date.now() - verifiedAtMs <= ADMIN_VERIFICATION_TTL_MS;
-};
-
-const hasFreshSuperVerification = (superVerifiedAt: string | null) => {
-  if (!superVerifiedAt) {
-    return false;
-  }
-  const verifiedAtMs = Date.parse(superVerifiedAt);
-  if (Number.isNaN(verifiedAtMs)) {
-    return false;
-  }
-  return Date.now() - verifiedAtMs <= SUPER_VERIFICATION_TTL_MS;
-};
-
 const notFoundFor = (path: string) => ({
   name: "not-found",
   params: {
@@ -619,11 +687,27 @@ const notFoundFor = (path: string) => ({
   },
 });
 
+const loginFor = (to: RouteLocationNormalized) => {
+  const redirect = sanitizeReturnTo(to.fullPath);
+  return redirect
+    ? { name: "public-login", query: { redirect } }
+    : { name: "public-login" };
+};
+
+const accessDeniedRoute = () => ({ name: "public-access-denied" });
+
+const accessDeniedFor = (to: RouteLocationNormalized) => {
+  const redirect = sanitizeReturnTo(to.fullPath);
+  return redirect
+    ? { name: "public-access-denied", query: { redirect } }
+    : accessDeniedRoute();
+};
+
 type AppRouteMeta = {
   public?: boolean;
   requiresSession?: boolean;
   requiresWorkspace?: boolean;
-  requiresRole?: string;
+  requiresRole?: string | string[];
   requiresWorkspaceMatch?: boolean;
   requiresSuperAuth?: boolean;
   title?: string;
@@ -639,7 +723,7 @@ const resolveInternalHostRoute = async (
   if (!auth.isAuthenticated || auth.role !== "super_admin") {
     return { name: "internal-auth" };
   }
-  if (!auth.hasSecondaryAuth || !hasFreshSuperVerification(auth.superVerifiedAt)) {
+  if (!auth.hasSecondaryAuth) {
     return { name: "internal-auth" };
   }
   await loadAuthenticatedStyles();
@@ -647,6 +731,7 @@ const resolveInternalHostRoute = async (
 };
 
 const resolveWorkspaceMismatchRoute = async (
+  to: RouteLocationNormalized,
   workspace: ReturnType<typeof getWorkspaceState>,
   auth: AuthState,
 ) => {
@@ -656,6 +741,15 @@ const resolveWorkspaceMismatchRoute = async (
     auth.workspaceContextId === workspace.workspaceId
   ) {
     return undefined;
+  }
+
+  const meta = to.meta as AppRouteMeta;
+  if (meta.public && to.name !== "public-home") return undefined;
+  if (to.name !== "public-home") return accessDeniedFor(to);
+
+  if (auth.role === "individual_account") {
+    window.location.replace("https://itemtraxx.com/checkout");
+    return false;
   }
 
   const ownWorkspace = await lookupWorkspaceById(auth.workspaceContextId);
@@ -673,34 +767,18 @@ const resolveWorkspaceHostRoute = (
   workspace: ReturnType<typeof getWorkspaceState>,
   auth: AuthState,
 ) => {
-  if (!workspace.isWorkspaceHost || to.name === "not-found") return undefined;
+  if (
+    !workspace.isWorkspaceHost ||
+    to.name === "not-found" ||
+    to.name === "public-access-denied"
+  ) return undefined;
   if (!workspace.workspaceId) return notFoundFor(to.path);
   if (!auth.isInitialized) return false;
-  if (!meta.public && (!auth.isAuthenticated || auth.workspaceContextId !== workspace.workspaceId)) {
-    return notFoundFor(to.path);
+  if (!meta.public && !auth.isAuthenticated) {
+    return loginFor(to);
   }
-  return undefined;
-};
-
-// Redirect authenticated users away from the public home page while leaving
-// the login page available so users can intentionally switch accounts.
-const resolveAuthenticatedHomeRoute = (
-  to: RouteLocationNormalized,
-  auth: AuthState,
-) => {
-  if (!auth.isInitialized || !auth.isAuthenticated || to.name !== "public-home") return undefined;
-  if (auth.role === "super_admin") {
-    return auth.hasSecondaryAuth && hasFreshSuperVerification(auth.superVerifiedAt)
-      ? { name: "super-admin-home" }
-      : { name: "super-auth" };
-  }
-  if (auth.role === "workspace_admin") {
-    return hasFreshAdminVerification(auth.adminVerifiedAt)
-      ? { name: "workspace-admin-home" }
-      : { name: "public-login" };
-  }
-  if (auth.role === "tenant_account" && auth.workspaceContextId) {
-    return { name: "workspace-checkout" };
+  if (!meta.public && auth.workspaceContextId !== workspace.workspaceId) {
+    return accessDeniedFor(to);
   }
   return undefined;
 };
@@ -713,22 +791,26 @@ const resolveProtectedRoute = (
 ) => {
   if (meta.public) return true;
   if (!auth.isInitialized) return true;
-  if (meta.requiresSession && !auth.isAuthenticated) return { name: "public-home" };
-  if (meta.requiresWorkspace && !auth.workspaceContextId) return { name: "public-home" };
+  if (meta.requiresSession && !auth.isAuthenticated) return loginFor(to);
+  if (meta.requiresWorkspace && !auth.workspaceContextId) {
+    return auth.isAuthenticated ? accessDeniedFor(to) : loginFor(to);
+  }
   if (workspace.isWorkspaceHost && meta.requiresSession && !workspace.workspaceId) {
     return notFoundFor(to.path);
   }
-  if (meta.requiresRole && auth.role !== meta.requiresRole) return { name: "public-home" };
-  if (meta.requiresRole === "workspace_admin" && !hasFreshAdminVerification(auth.adminVerifiedAt)) {
-    return { name: "public-login" };
-  }
+  const requiredRoles = Array.isArray(meta.requiresRole)
+    ? meta.requiresRole
+    : meta.requiresRole
+    ? [meta.requiresRole]
+    : [];
+  if (requiredRoles.length && (!auth.role || !requiredRoles.includes(auth.role))) return accessDeniedFor(to);
   if (
     meta.requiresWorkspaceMatch &&
     auth.sessionWorkspaceId &&
     auth.workspaceContextId &&
     auth.sessionWorkspaceId !== auth.workspaceContextId
   ) {
-    return { name: "public-home" };
+    return accessDeniedFor(to);
   }
   if (
     workspace.isWorkspaceHost &&
@@ -736,14 +818,9 @@ const resolveProtectedRoute = (
     auth.isAuthenticated &&
     auth.workspaceContextId !== workspace.workspaceId
   ) {
-    return notFoundFor(to.path);
+    return accessDeniedFor(to);
   }
   if (meta.requiresSuperAuth && !auth.hasSecondaryAuth) {
-    return to.path.startsWith("/internal")
-      ? { name: "internal-auth" }
-      : { name: "super-auth" };
-  }
-  if (meta.requiresSuperAuth && !hasFreshSuperVerification(auth.superVerifiedAt)) {
     return to.path.startsWith("/internal")
       ? { name: "internal-auth" }
       : { name: "super-auth" };
@@ -759,14 +836,17 @@ router.beforeEach(async (to) => {
   const internalRoute = await resolveInternalHostRoute(to, auth, isInternalHostRuntime());
   if (internalRoute !== undefined) return internalRoute;
 
-  const mismatchRoute = await resolveWorkspaceMismatchRoute(workspace, auth);
+  const mismatchRoute = await resolveWorkspaceMismatchRoute(to, workspace, auth);
   if (mismatchRoute !== undefined) return mismatchRoute;
 
   const workspaceRoute = resolveWorkspaceHostRoute(to, meta, workspace, auth);
   if (workspaceRoute !== undefined) return workspaceRoute;
 
-  const homeRoute = resolveAuthenticatedHomeRoute(to, auth);
-  if (homeRoute !== undefined) return homeRoute;
+  if (to.name === "public-home" && auth.isInitialized && auth.isAuthenticated) {
+    const { resolveAuthenticatedHomeRoute } = await import("./authenticatedHomeRoute");
+    const homeRoute = resolveAuthenticatedHomeRoute(to, auth);
+    if (homeRoute !== undefined) return homeRoute;
+  }
 
   const protectedRoute = resolveProtectedRoute(to, meta, workspace, auth);
   if (protectedRoute !== undefined) return protectedRoute;

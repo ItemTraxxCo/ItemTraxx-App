@@ -31,6 +31,52 @@ test.describe("Protected route smoke tests", () => {
     await expect(page.getByRole("heading", { name: "Item Status Tracking" })).toBeVisible();
   });
 
+  test("Item Status Tracking shows loading until its initial settings and history requests finish", async ({ page }, testInfo) => {
+    let releaseSettings!: () => void;
+    let markSettingsRequested!: () => void;
+    const settingsGate = new Promise<void>((resolve) => {
+      releaseSettings = resolve;
+    });
+    const settingsRequested = new Promise<void>((resolve) => {
+      markSettingsRequested = resolve;
+    });
+
+    await page.route(/\/functions(?:\/v1)?\/admin-ops(?:\?.*)?$/, async (route) => {
+      const body = route.request().postDataJSON() as { action?: string } | undefined;
+      if (body?.action !== "get_workspace_settings") {
+        await route.fallback();
+        return;
+      }
+
+      markSettingsRequested();
+      await settingsGate;
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          data: { feature_flags: { enable_status_tracking: true } },
+        }),
+      });
+    });
+
+    await page.goto("/");
+    await setWorkspaceAdminSession(page);
+    await navigateApp(page, "/admin/item-status");
+    await expect(page.getByRole("heading", { name: "Item Status Tracking" })).toBeVisible();
+    await settingsRequested;
+    await expect(page.getByText("Loading status tracking...")).toBeVisible();
+    await expect(page.getByText("Loading status history...")).toBeVisible();
+    await expect(page.getByText("No status history found.")).toHaveCount(0);
+    await testInfo.attach("item-status-tracking-loading", {
+      body: await page.screenshot(),
+      contentType: "image/png",
+    });
+
+    releaseSettings();
+    await expect(page.getByText("No status history found.")).toBeVisible();
+    await expect(page.getByText("Loading status history...")).toHaveCount(0);
+  });
+
   test("Individual account lands on checkout and opens its private manager from My Account", async ({ page }) => {
     await page.goto("/");
     await setIndividualAccountSession(page);

@@ -32,10 +32,14 @@ const READABLE_REST_TABLES = new Set([
 ]);
 
 // PostgREST relationship embedding is expressed inside `select` and can read
-// a related table without changing the route's first table segment. The SPA
-// currently needs only this item_logs -> items embed for borrower history.
+// a related table without changing the route's first table segment. Keep only
+// the exact projections used by borrower history and the workspace Item Logs
+// page so callers cannot traverse arbitrary related tables.
 const ALLOWED_REST_EMBEDS = new Map([
-  ["item_logs", new Set(["action_time,item:item_id(name)"])],
+  ["item_logs", new Set([
+    "action_time,item:item_id(name)",
+    "id,workspace_id,item_id,checked_out_by,action_type,action_time,performed_by,item:item_id(name,barcode),borrower:checked_out_by(username,borrower_id)",
+  ])],
 ]);
 
 const hasParenthesesAfterDecoding = (value: string) => {

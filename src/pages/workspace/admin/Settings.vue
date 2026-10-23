@@ -13,7 +13,7 @@
           <span>Due window (hours)</span>
         </div>
         <div class="admin-summary-card">
-          <strong>{{ sessions.length }}</strong>
+          <strong>{{ isSessionLoading ? "…" : sessions.length }}</strong>
           <span>Active devices</span>
         </div>
       </div>
@@ -149,7 +149,10 @@
                 <span v-else class="session-current-action">This device</span>
               </td>
             </tr>
-            <tr v-if="!sessions.length">
+            <tr v-if="isSessionLoading" role="status">
+              <td colspan="8" class="muted">Loading active devices...</td>
+            </tr>
+            <tr v-if="!isSessionLoading && !sessionError && !sessions.length">
               <td colspan="8" class="muted">No active sessions found.</td>
             </tr>
           </tbody>
@@ -214,6 +217,7 @@ const planCode = ref<
   | null
 >(null);
 const sessions = ref<AccountSessionItem[]>([]);
+const isSessionLoading = ref(true);
 const openSessionMenuId = ref<string | null>(null);
 const isSessionSaving = ref(false);
 const sessionError = ref("");
@@ -339,6 +343,7 @@ const formatDate = (value: string) => {
 };
 
 const loadSessions = async () => {
+  isSessionLoading.value = true;
   sessionError.value = "";
   sessionSuccess.value = "";
   try {
@@ -351,6 +356,8 @@ const loadSessions = async () => {
     sessions.value = [];
     closeSessionMenu();
     sessionError.value = toUserFacingErrorMessage(err, "Unable to load sessions.");
+  } finally {
+    isSessionLoading.value = false;
   }
 };
 

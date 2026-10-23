@@ -317,6 +317,24 @@ Deno.test("REST allowlist rejects unlisted, nested, and encoded relation names",
 
 
 Deno.test("REST allowlist constrains embedded relations and relationship queries", () => {
+  const itemLogsPageSelect =
+    "id,workspace_id,item_id,checked_out_by,action_type,action_time,performed_by,item:item_id(name,barcode),borrower:checked_out_by(username,borrower_id)";
+  const itemLogsPageQuery = new URLSearchParams({
+    select: itemLogsPageSelect,
+    workspace_id: "eq.00000000-0000-0000-0000-000000000000",
+    order: "action_time.desc",
+    limit: "200",
+  }).toString();
+
+  assert(
+    isAllowedRestRequest(
+      "/rest/v1/item_logs",
+      "GET",
+      `?${itemLogsPageQuery}`,
+    ),
+    "the workspace Item Logs page projection must remain allowed",
+  );
+
   assert(
     isAllowedRestRequest(
       "/rest/v1/item_logs",

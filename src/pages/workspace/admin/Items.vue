@@ -402,8 +402,8 @@ const { isIndividualAccount, managerRoot, managerPath } = useManagerContext();
 
 const items = ref<ItemRecord[]>([]);
 const archivedItem = ref<ItemRecord[]>([]);
-const isLoading = ref(false);
-const isLoadingArchived = ref(false);
+const isLoading = ref(true);
+const isLoadingArchived = ref(true);
 const isSaving = ref(false);
 const error = ref("");
 const success = ref("");

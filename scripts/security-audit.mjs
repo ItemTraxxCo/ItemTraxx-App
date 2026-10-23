@@ -1,11 +1,12 @@
-import { readdirSync, readFileSync, statSync } from "node:fs";
-import { dirname, join, relative } from "node:path";
+import { readdirSync, readFileSync, realpathSync, statSync } from "node:fs";
+import { dirname, isAbsolute, join, relative, sep } from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { getTrustedNpmRuntime } from "./security-exec.mjs";
 
 const scriptDirectory = dirname(fileURLToPath(import.meta.url));
 const repositoryRoot = dirname(scriptDirectory);
+const realRepositoryRoot = realpathSync(repositoryRoot);
 const runtime = getTrustedNpmRuntime();
 
 const run = (label, executable, args) => {
@@ -35,32 +36,56 @@ const ignoredDirectories = new Set([
   "target",
 ]);
 
+const maxDirectoryDepth = 1000;
+const resolveInsideRepository = (candidatePath) => {
+  const resolvedPath = realpathSync(candidatePath);
+  const pathFromRoot = relative(realRepositoryRoot, resolvedPath);
+  if (
+    pathFromRoot === ".." ||
+    pathFromRoot.startsWith(`..${sep}`) ||
+    isAbsolute(pathFromRoot)
+  ) {
+    throw new Error("[security] refusing to scan a path outside the repository.");
+  }
+  return resolvedPath;
+};
+
 const findMatches = (rootPath, pattern) => {
   const matches = [];
-  const inspectFile = (path) => {
+  const inspectFile = (candidatePath) => {
+    const path = resolveInsideRepository(candidatePath);
     const content = readFileSync(path, "utf8");
     if (content.includes("\0")) return;
     const lines = content.split(/\r?\n/);
     lines.forEach((line, index) => {
       if (pattern.test(line)) {
-        matches.push(`${relative(repositoryRoot, path)}:${index + 1}`);
+        matches.push(`${relative(realRepositoryRoot, path)}:${index + 1}`);
       }
     });
   };
-  const visit = (directory) => {
-    for (const entry of readdirSync(directory, { withFileTypes: true })) {
-      if (entry.isSymbolicLink()) continue;
-      const path = join(directory, entry.name);
-      if (entry.isDirectory()) {
-        if (!ignoredDirectories.has(entry.name)) visit(path);
-        continue;
+  const visit = (startDirectory) => {
+    const pendingDirectories = [{ path: resolveInsideRepository(startDirectory), depth: 0 }];
+    while (pendingDirectories.length) {
+      const { path: directory, depth } = pendingDirectories.pop();
+      for (const entry of readdirSync(directory, { withFileTypes: true })) {
+        if (entry.isSymbolicLink()) continue;
+        const path = join(directory, entry.name);
+        if (entry.isDirectory()) {
+          if (ignoredDirectories.has(entry.name)) continue;
+          if (depth >= maxDirectoryDepth) {
+            throw new Error(`[security] directory nesting exceeds the ${maxDirectoryDepth}-level scan limit.`);
+          }
+          pendingDirectories.push({ path, depth: depth + 1 });
+          continue;
+        }
+        if (!entry.isFile()) continue;
+        inspectFile(path);
       }
-      if (!entry.isFile()) continue;
-      inspectFile(path);
     }
   };
-  if (statSync(rootPath).isFile()) inspectFile(rootPath);
-  else visit(rootPath);
+  const safeRootPath = resolveInsideRepository(rootPath);
+  if (statSync(safeRootPath).isFile()) inspectFile(safeRootPath);
+  else visit(safeRootPath);
   return matches;
 };
 

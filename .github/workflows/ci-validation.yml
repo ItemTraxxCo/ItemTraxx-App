@@ -233,6 +233,7 @@ jobs:
               .map(([lockPath, pkg]) => ({
                 name: packageNameFromLockPath(lockPath),
                 version: pkg.version,
+                optional: pkg.optional === true,
               }));
           }
 
@@ -242,7 +243,8 @@ jobs:
             rootEntries.map(({ name, version }) => `${name}@${version}`),
           );
           const edgeUnique = edgeEntries.find(
-            ({ name, version }) => !rootEntryKeys.has(`${name}@${version}`),
+            ({ name, version, optional }) =>
+              !optional && !rootEntryKeys.has(`${name}@${version}`),
           );
           if (!edgeUnique) {
             throw new Error('Could not identify an edge-proxy-specific lock entry');

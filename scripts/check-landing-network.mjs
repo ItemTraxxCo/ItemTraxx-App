@@ -312,17 +312,17 @@ const run = async () => {
     await waitForPreview(preview);
     browser = await runWithSafeFailure(
       "BROWSER_LAUNCH_FAILED",
-      "Fresh Chromium could not be launched",
-      () => chromium.launch(),
+      "Google Chrome Stable could not be launched",
+      () => chromium.launch({ channel: "chrome" }),
     );
     context = await runWithSafeFailure(
       "BROWSER_CONTEXT_FAILED",
-      "Fresh Chromium context could not be created",
+      "Chrome Stable context could not be created",
       () => browser.newContext(),
     );
     page = await runWithSafeFailure(
       "BROWSER_PAGE_FAILED",
-      "Fresh Chromium page could not be created",
+      "Chrome Stable page could not be created",
       () => context.newPage(),
     );
     page.on("request", (request) => requestUrls.push(request.url()));

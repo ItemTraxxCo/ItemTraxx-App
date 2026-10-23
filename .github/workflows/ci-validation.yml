@@ -17,6 +17,8 @@ jobs:
   validate:
     runs-on: ubuntu-latest
     timeout-minutes: 90
+    permissions:
+      contents: read
 
     steps:
       - name: Checkout
@@ -166,6 +168,129 @@ jobs:
         with:
           name: sbom
           path: artifacts/sbom.cdx.json
+          if-no-files-found: error
+          retention-days: 30
+
+      # Syft catalogs the complete repository so this artifact covers the
+      # nested edge-proxy npm lock and the Deno lock as well as the app root.
+      - name: Generate multi-ecosystem SBOM
+        if: ${{ !cancelled() }}
+        uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # pinned action commit
+        with:
+          path: .
+          format: cyclonedx-json
+          output-file: artifacts/itemtraxx-app-multiroot-sbom.cdx.json
+          artifact-name: itemtraxx-app-multiroot-sbom.cdx.json
+          syft-version: v1.55.0
+          upload-artifact: false
+          upload-release-assets: false
+          dependency-snapshot: false
+
+      - name: Validate multi-ecosystem SBOM
+        if: ${{ !cancelled() }}
+        run: |
+          node --input-type=module <<'NODE'
+          import { readFileSync, statSync } from 'node:fs';
+
+          const sbomPath = 'artifacts/itemtraxx-app-multiroot-sbom.cdx.json';
+          const sbomBytes = statSync(sbomPath).size;
+          if (sbomBytes === 0) throw new Error('Generated SBOM is empty');
+
+          const sbom = JSON.parse(readFileSync(sbomPath, 'utf8'));
+          if (sbom.bomFormat !== 'CycloneDX') {
+            throw new Error(`Unexpected SBOM format: ${sbom.bomFormat}`);
+          }
+          if (!Array.isArray(sbom.components) || sbom.components.length === 0) {
+            throw new Error('Generated SBOM has no dependency components');
+          }
+          if (!sbom.components.some((component) =>
+            (component.purl ?? '').startsWith('pkg:npm/'))
+          ) {
+            throw new Error('SBOM has no npm package components');
+          }
+          if (!sbom.components.some((component) =>
+            (component.purl ?? '').startsWith('pkg:github/'))
+          ) {
+            throw new Error('SBOM has no GitHub Actions components');
+          }
+
+          const rootLock = JSON.parse(readFileSync('package-lock.json', 'utf8'));
+          const edgeLock = JSON.parse(
+            readFileSync('cloudflare/edge-proxy/package-lock.json', 'utf8'),
+          );
+          const denoLock = JSON.parse(readFileSync('deno.lock', 'utf8'));
+
+          function packageNameFromLockPath(lockPath) {
+            const segments = lockPath.split('node_modules/').at(-1).split('/');
+            return segments[0].startsWith('@')
+              ? segments.slice(0, 2).join('/')
+              : segments[0];
+          }
+
+          function npmLockEntries(lock) {
+            return Object.entries(lock.packages ?? {})
+              .filter(([lockPath]) => lockPath.includes('node_modules/'))
+              .map(([lockPath, pkg]) => ({
+                name: packageNameFromLockPath(lockPath),
+                version: pkg.version,
+              }));
+          }
+
+          const rootEntries = npmLockEntries(rootLock);
+          const edgeEntries = npmLockEntries(edgeLock);
+          const rootEntryKeys = new Set(
+            rootEntries.map(({ name, version }) => `${name}@${version}`),
+          );
+          const edgeUnique = edgeEntries.find(
+            ({ name, version }) => !rootEntryKeys.has(`${name}@${version}`),
+          );
+          if (!edgeUnique) {
+            throw new Error('Could not identify an edge-proxy-specific lock entry');
+          }
+
+          const allNpmLockEntries = new Set(
+            [...rootEntries, ...edgeEntries].map(
+              ({ name, version }) => `${name}@${version}`,
+            ),
+          );
+          const denoUnique = Object.keys(denoLock.npm ?? {})
+            .map((entry) => {
+              const match = entry.match(/^(@[^/]+\/[^@]+|[^@]+)@([^_]+)/);
+              return match ? { name: match[1], version: match[2] } : undefined;
+            })
+            .find(
+              (entry) =>
+                entry &&
+                !allNpmLockEntries.has(`${entry.name}@${entry.version}`),
+            );
+          if (!denoUnique) {
+            throw new Error('Could not identify a Deno-lock-specific npm entry');
+          }
+
+          for (const expected of [edgeUnique, denoUnique]) {
+            const represented = sbom.components.some(
+              (component) =>
+                component.name === expected.name &&
+                component.version === expected.version,
+            );
+            if (!represented) {
+              throw new Error(
+                `SBOM does not represent lock entry ${expected.name}@${expected.version}`,
+              );
+            }
+          }
+
+          console.log(
+            `Validated ${sbom.components.length} components in ${sbomPath}; includes edge-proxy and Deno lock entries.`,
+          );
+          NODE
+
+      - name: Upload multi-ecosystem SBOM artifact
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: itemtraxx-app-multiroot-sbom
+          path: artifacts/itemtraxx-app-multiroot-sbom.cdx.json
           if-no-files-found: error
           retention-days: 30
 

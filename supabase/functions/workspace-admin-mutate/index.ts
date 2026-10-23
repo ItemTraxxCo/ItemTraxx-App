@@ -509,26 +509,27 @@ serve(async (req) => {
           throw new ValidationError("Unable to revoke Tenant Account sessions.", 503);
         }
       };
+      const updateTenantAccountStatus = async (isActive: boolean) => {
+        const { data, error } = await adminClient.from("profiles")
+          .update({ is_active: isActive })
+          .eq("id", id)
+          .eq("workspace_id", requesterProfile.workspace_id)
+          .eq("role", "tenant_account")
+          .is("deleted_at", null)
+          .select("id,workspace_id,auth_email,role,is_active,deleted_at,created_at")
+          .single();
+        if (error || !data) {
+          throw new ValidationError("Unable to update Tenant Account.");
+        }
+        return data;
+      };
       if (action === "set_tenant_account_status") {
         if (typeof next.is_active !== "boolean") {
           return jsonResponse(400, { error: "Invalid request" });
         }
         const updated = await setTenantAccountStatusSafely({
           isActive: next.is_active,
-          updateStatus: async (isActive) => {
-            const { data, error } = await adminClient.from("profiles")
-              .update({ is_active: isActive })
-              .eq("id", id)
-              .eq("workspace_id", requesterProfile.workspace_id)
-              .eq("role", "tenant_account")
-              .is("deleted_at", null)
-              .select("id,workspace_id,auth_email,role,is_active,deleted_at,created_at")
-              .single();
-            if (error || !data) {
-              throw new ValidationError("Unable to update Tenant Account.");
-            }
-            return data;
-          },
+          updateStatus: updateTenantAccountStatus,
           revokeSessions: revokeTenantAccountSessions,
         });
         await writeAudit(action, id, { is_active: next.is_active });

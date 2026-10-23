@@ -20,8 +20,8 @@ on:
 jobs:
   promote:
     if: ${{ github.actor == 'dependabot[bot]' }}
-    uses: ItemTraxxCo/devops/.github/workflows/reusable-dependency-promotion.yml@fc9f2c08e50965b0a5fa2db9b57ff367da75f699
+    uses: ItemTraxxCo/devops/.github/workflows/reusable-dependency-promotion.yml@d9db3f50310e640874802de9faef9ff3dbd7d545
     with:
       pr_number: ${{ format('{0}', github.event.pull_request.number) }}
       enable_automerge: false
-      hub_ref: fc9f2c08e50965b0a5fa2db9b57ff367da75f699
+      hub_ref: d9db3f50310e640874802de9faef9ff3dbd7d545

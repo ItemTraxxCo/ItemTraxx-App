@@ -99,7 +99,7 @@
                   <span v-else class="muted">-</span>
                 </td>
               </tr>
-              <tr v-if="!filteredLogs.length">
+              <tr v-if="!isLoading && !error && !filteredLogs.length">
                 <td colspan="5" class="muted">No logs match your search. If you believe this is an error, please contact support.</td>
               </tr>
             </tbody>
@@ -124,7 +124,7 @@ import { formatActionLabel, ITEM_LOG_ACTION_OPTIONS } from "../../../utils/actio
 const { managerRoot } = useManagerContext();
 
 const logs = ref<ItemLog[]>([]);
-const isLoading = ref(false);
+const isLoading = ref(true);
 const error = ref("");
 const searchQuery = ref("");
 const actionFilter = ref("all");

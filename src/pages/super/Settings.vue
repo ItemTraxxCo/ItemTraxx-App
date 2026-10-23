@@ -12,8 +12,8 @@
     </div>
 
     <div class="sa-stat-strip" aria-label="Settings summary">
-      <div class="sa-stat"><div class="n">{{ passkeys.length }}</div><div class="l">Registered passkeys</div></div>
-      <div class="sa-stat"><div class="n">{{ sessions.length }}</div><div class="l">Active sessions</div></div>
+      <div class="sa-stat"><div class="n">{{ isPasskeyLoading ? "…" : passkeys.length }}</div><div class="l">Registered passkeys</div></div>
+      <div class="sa-stat"><div class="n">{{ isSessionLoading ? "…" : sessions.length }}</div><div class="l">Active sessions</div></div>
     </div>
 
     <section class="sa-panel">
@@ -53,7 +53,10 @@
               <td>{{ formatDate(passkey.created_at) }}</td>
               <td>{{ formatLastUsed(passkey.last_used_at) }}</td>
             </tr>
-            <tr v-if="!passkeys.length">
+            <tr v-if="isPasskeyLoading" role="status">
+              <td colspan="3" class="muted">Loading passkeys...</td>
+            </tr>
+            <tr v-if="!isPasskeyLoading && !passkeyError && !passkeys.length">
               <td colspan="3" class="muted">No passkeys registered.</td>
             </tr>
           </tbody>
@@ -89,7 +92,10 @@
               <td>{{ formatDate(session.last_seen_at) }}</td>
               <td>{{ session.is_current ? "Current" : "Active" }}</td>
             </tr>
-            <tr v-if="!sessions.length">
+            <tr v-if="isSessionLoading" role="status">
+              <td colspan="6" class="muted">Loading active sessions...</td>
+            </tr>
+            <tr v-if="!isSessionLoading && !sessionError && !sessions.length">
               <td colspan="6" class="muted">No active sessions found.</td>
             </tr>
           </tbody>
@@ -146,10 +152,11 @@ const passwordResetMessage = ref("");
 const passwordResetError = ref("");
 
 const passkeys = ref<SuperAdminPasskeyItem[]>([]);
-const isPasskeyLoading = ref(false);
+const isPasskeyLoading = ref(true);
 const passkeyError = ref("");
 
 const sessions = ref<SuperAdminSessionItem[]>([]);
+const isSessionLoading = ref(true);
 const selectedSessionId = ref("");
 const isSessionSaving = ref(false);
 const sessionError = ref("");
@@ -187,6 +194,7 @@ const loadPasskeys = async () => {
 
 const loadSessions = async () => {
   sessionError.value = "";
+  isSessionLoading.value = true;
   try {
     sessions.value = await listSuperAdminSessions();
     if (!sessions.value.some((session) => session.id === selectedSessionId.value)) {
@@ -194,6 +202,8 @@ const loadSessions = async () => {
     }
   } catch (err) {
     sessionError.value = toUserFacingErrorMessage(err, "Unable to load active sessions.");
+  } finally {
+    isSessionLoading.value = false;
   }
 };
 

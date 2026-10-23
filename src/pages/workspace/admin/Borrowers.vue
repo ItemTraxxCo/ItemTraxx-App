@@ -356,8 +356,8 @@ const { isIndividualAccount, managerRoot } = useManagerContext();
 
 const borrowers = ref<BorrowerItem[]>([]);
 const archivedBorrowers = ref<BorrowerItem[]>([]);
-const isLoading = ref(false);
-const isLoadingArchived = ref(false);
+const isLoading = ref(true);
+const isLoadingArchived = ref(true);
 const isSaving = ref(false);
 const error = ref("");
 const success = ref("");

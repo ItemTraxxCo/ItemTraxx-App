@@ -70,15 +70,12 @@ const findMatches = (rootPath, pattern) => {
       for (const entry of readdirSync(directory, { withFileTypes: true })) {
         if (entry.isSymbolicLink()) continue;
         const path = join(directory, entry.name);
-        if (entry.isDirectory() && !ignoredDirectories.has(entry.name)) {
-          if (depth >= maxDirectoryDepth) {
-            throw new Error(`[security] directory nesting exceeds the ${maxDirectoryDepth}-level scan limit.`);
-          }
-          pendingDirectories.push({ path, depth: depth + 1 });
-          continue;
+        if (entry.isFile()) inspectFile(path);
+        if (!entry.isDirectory() || ignoredDirectories.has(entry.name)) continue;
+        if (depth >= maxDirectoryDepth) {
+          throw new Error(`[security] directory nesting exceeds the ${maxDirectoryDepth}-level scan limit.`);
         }
-        if (!entry.isFile()) continue;
-        inspectFile(path);
+        pendingDirectories.push({ path, depth: depth + 1 });
       }
     }
   };

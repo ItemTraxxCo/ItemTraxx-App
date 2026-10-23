@@ -169,21 +169,16 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
-      # E2E validation shares the Node install and retains its browser cache
-      # and report artifact.
-      - name: Cache Playwright browsers
+      # Use Chrome Stable from Google's distribution so browser security fixes
+      # are current even when Playwright's bundled Chromium revision lags.
+      - name: Install Chrome Stable for Playwright
         if: ${{ !cancelled() }}
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: ~/.cache/ms-playwright
-          key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
-          restore-keys: |
-            playwright-${{ runner.os }}-
+        timeout-minutes: 10
+        run: npx playwright install chrome --force
 
-      - name: Install Playwright Chromium
+      - name: Verify Chrome Stable version
         if: ${{ !cancelled() }}
-        timeout-minutes: 5
-        run: npx playwright install chromium
+        run: google-chrome --version
 
       - name: Install Playwright system dependencies
         if: ${{ !cancelled() }}

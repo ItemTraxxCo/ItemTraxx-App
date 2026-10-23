@@ -18,6 +18,7 @@ export default defineConfig({
   workers: 2,
   reporter: isCI ? [["github"], ["html", { open: "never" }]] : [["list"]],
   use: {
+    channel: "chrome",
     baseURL,
     trace: "on-first-retry",
     screenshot: "only-on-failure",

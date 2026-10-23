@@ -6,6 +6,8 @@ project_id = "itemtraxx-code"
 
 [api]
 enabled = true
+# Keep API exposure opt-in when creating or resetting the local database.
+auto_expose_new_tables = false
 # Port to use for the API URL.
 port = 54321
 # Schemas to expose in your API. Tables, views and stored procedures in this schema will get API

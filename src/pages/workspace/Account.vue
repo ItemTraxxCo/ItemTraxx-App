@@ -154,7 +154,10 @@
                 <span v-else class="session-current-action">This device</span>
               </td>
             </tr>
-            <tr v-if="!sessions.length">
+            <tr v-if="sessionsLoading" role="status">
+              <td colspan="8" class="muted">Loading active devices...</td>
+            </tr>
+            <tr v-if="!sessionsLoading && !sessionError && !sessions.length">
               <td colspan="8" class="muted">No active sessions found.</td>
             </tr>
           </tbody>
@@ -207,6 +210,7 @@ const itemPage = ref(0);
 const hasMoreItems = ref(false);
 
 const sessions = ref<AccountSessionItem[]>([]);
+const sessionsLoading = ref(true);
 const openSessionMenuId = ref<string | null>(null);
 const isSessionSaving = ref(false);
 const sessionError = ref("");
@@ -320,6 +324,7 @@ const goToItemPage = (delta: number) => {
 };
 
 const loadSessions = async () => {
+  sessionsLoading.value = true;
   sessionError.value = "";
   sessionSuccess.value = "";
   try {
@@ -332,6 +337,8 @@ const loadSessions = async () => {
     sessions.value = [];
     closeSessionMenu();
     sessionError.value = toUserFacingErrorMessage(err, "Unable to load sessions.");
+  } finally {
+    sessionsLoading.value = false;
   }
 };
 

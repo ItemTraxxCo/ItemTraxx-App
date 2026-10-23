@@ -262,7 +262,7 @@
                 </button>
               </td>
             </tr>
-            <tr v-if="(controlCenter?.approvals?.length ?? 0) === 0">
+            <tr v-if="!isLoading && !error && (controlCenter?.approvals?.length ?? 0) === 0">
               <td colspan="5" class="muted">No approval requests.</td>
             </tr>
           </tbody>
@@ -296,7 +296,7 @@
               <td>{{ item.overdue_items }}</td>
               <td>{{ item.transactions_7d }}</td>
             </tr>
-            <tr v-if="(dashboard?.workspace_metrics?.length ?? 0) === 0">
+            <tr v-if="!isLoading && !error && (dashboard?.workspace_metrics?.length ?? 0) === 0">
               <td colspan="6" class="muted">No workspace metrics available.</td>
             </tr>
           </tbody>
@@ -329,7 +329,7 @@
               </td>
               <td>{{ item.target_type || "-" }} {{ item.target_id || "" }}</td>
             </tr>
-            <tr v-if="(dashboard?.recent_actions?.length ?? 0) === 0">
+            <tr v-if="!isLoading && !error && (dashboard?.recent_actions?.length ?? 0) === 0">
               <td colspan="4" class="muted">No recent actions.</td>
             </tr>
           </tbody>
@@ -359,7 +359,7 @@
               <td>{{ item.status }}</td>
               <td class="mono">{{ summarizeDetails(item.details) }}</td>
             </tr>
-            <tr v-if="(controlCenter?.jobs?.length ?? 0) === 0">
+            <tr v-if="!isLoading && !error && (controlCenter?.jobs?.length ?? 0) === 0">
               <td colspan="4" class="muted">No jobs yet.</td>
             </tr>
           </tbody>
@@ -392,7 +392,7 @@ import {
 
 const dashboard = ref<SuperDashboard | null>(null);
 const controlCenter = ref<SuperControlCenter | null>(null);
-const isLoading = ref(false);
+const isLoading = ref(true);
 const isSaving = ref(false);
 const error = ref("");
 const toastTitle = ref("");

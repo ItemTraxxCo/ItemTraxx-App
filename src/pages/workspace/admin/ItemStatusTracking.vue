@@ -67,7 +67,7 @@
             <td>{{ formatDate(item.updated_at) }}</td>
             <td data-session-replay-mask>{{ item.notes || "-" }}</td>
           </tr>
-          <tr v-if="filteredFlaggedItems.length === 0">
+          <tr v-if="!isLoading && !loadError && filteredFlaggedItems.length === 0">
             <td colspan="5" class="muted">No flagged items.</td>
           </tr>
         </tbody>
@@ -97,14 +97,17 @@
           </tr>
         </thead>
         <tbody>
+          <tr v-if="isLoading">
+            <td colspan="4" class="muted" role="status">Loading status history...</td>
+          </tr>
           <tr v-for="event in filteredHistory" :key="event.id">
             <td>{{ formatDate(event.changed_at) }}</td>
             <td>{{ event.item?.name || "-" }} ({{ event.item?.barcode || "-" }})</td>
             <td>{{ formatItemStatus(event.status) }}</td>
             <td data-session-replay-mask>{{ event.note || "-" }}</td>
           </tr>
-          <tr v-if="filteredHistory.length === 0">
-            <td colspan="4" class="muted">No status history found. If you believe this is an error, please contact support.</td>
+          <tr v-if="!isLoading && !loadError && filteredHistory.length === 0">
+            <td colspan="4" class="muted">No status history found.</td>
           </tr>
         </tbody>
       </table>
@@ -136,7 +139,8 @@ const { managerRoot } = useManagerContext();
 
 const flaggedItems = ref<StatusTrackedItem[]>([]);
 const history = ref<StatusHistoryItem[]>([]);
-const isLoading = ref(false);
+const isLoading = ref(true);
+const loadError = ref("");
 const toastTitle = ref("");
 const toastMessage = ref("");
 const searchQuery = ref("");
@@ -220,12 +224,14 @@ const formatDate = (value: string) => {
 
 const loadStatusTracking = async () => {
   isLoading.value = true;
+  loadError.value = "";
   try {
     const payload = await fetchStatusTracking();
     flaggedItems.value = payload.flagged_items;
     history.value = payload.history;
   } catch (err) {
-    showToast("Load failed", toUserFacingErrorMessage(err, "Unable to load status tracking."));
+    loadError.value = toUserFacingErrorMessage(err, "Unable to load status tracking.");
+    showToast("Load failed", loadError.value);
   } finally {
     isLoading.value = false;
   }
@@ -293,6 +299,8 @@ onMounted(() => {
     }
     if (featureEnabled.value) {
       await loadStatusTracking();
+    } else {
+      isLoading.value = false;
     }
   })();
 });

@@ -8,6 +8,7 @@ import { readJsonBody } from "../_shared/requestBody.ts";
 import { validateAccountDeviceSession } from "../_shared/accountSessions.ts";
 import { callBetterAuthAdmin } from "../_shared/betterAuthAdmin.ts";
 import { setTenantAccountStatusSafely } from "../_shared/tenantAccountStatus.ts";
+import { setWorkspaceAdminStatusSafely } from "../_shared/workspaceAdminStatus.ts";
 import { sha256Hex } from "../_shared/sha256.ts";
 import { resolveWorkspaceAccess } from "../_shared/workspaceAccess.ts";
 import {
@@ -587,26 +588,46 @@ serve(async (req) => {
       if (id === tenant.primary_admin_profile_id) {
         return jsonResponse(400, { error: "Primary admin status cannot be changed here." });
       }
-      if (isActive === false) {
-        try {
-          await callBetterAuthAdmin({ action: "revoke_sessions", profileId: id });
-        } catch {
-          return jsonResponse(503, { error: "Unable to revoke workspace admin sessions." });
-        }
-      }
+      const updated = await setWorkspaceAdminStatusSafely({
+        isActive,
+        validateTarget: async () => {
+          if (!isActive) return;
+          const { data, error } = await adminClient
+            .from("profiles")
+            .select("id, is_active")
+            .eq("id", id)
+            .eq("workspace_id", requesterProfile.workspace_id)
+            .eq("role", "workspace_admin")
+            .maybeSingle();
 
-      const { data: updated, error: updateError } = await adminClient
-        .from("profiles")
-        .update({ is_active: isActive })
-        .eq("id", id)
-        .eq("workspace_id", requesterProfile.workspace_id)
-        .eq("role", "workspace_admin")
-        .select("id, workspace_id, auth_email, role, is_active, created_at")
-        .single();
+          if (error || !data) {
+            throw new ValidationError("Unable to update workspace admin status.");
+          }
+          return data.is_active === true;
+        },
+        updateStatus: async (nextIsActive) => {
+          const { data, error } = await adminClient
+            .from("profiles")
+            .update({ is_active: nextIsActive })
+            .eq("id", id)
+            .eq("workspace_id", requesterProfile.workspace_id)
+            .eq("role", "workspace_admin")
+            .select("id, workspace_id, auth_email, role, is_active, created_at")
+            .single();
 
-      if (updateError || !updated) {
-        return jsonResponse(400, { error: "Unable to update workspace admin status." });
-      }
+          if (error || !data) {
+            throw new ValidationError("Unable to update workspace admin status.");
+          }
+          return data;
+        },
+        revokeSessions: async () => {
+          try {
+            await callBetterAuthAdmin({ action: "revoke_sessions", profileId: id });
+          } catch {
+            throw new ValidationError("Unable to revoke workspace admin sessions.", 503);
+          }
+        },
+      });
 
       await writeAudit(isActive ? "enable_workspace_admin" : "disable_workspace_admin", updated.id, {
         auth_email: updated.auth_email,

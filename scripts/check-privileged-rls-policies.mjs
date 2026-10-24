@@ -18,11 +18,13 @@ const RENAME_MIGRATION = "20260725221011_item_borrower_physical_rename.sql";
 const LEAST_PRIVILEGE_MIGRATION = "20260726120000_least_privilege_rest_surface.sql";
 const SERVER_OWNED_AUDIT_MIGRATION = "20261004060000_server_owned_admin_audit.sql";
 const SUPER_APPROVAL_SESSION_MIGRATION = "20261022150000_require_live_session_for_super_approval_reads.sql";
+const ACCOUNT_SESSION_POLICY_MIGRATION = "20261023100000_require_live_session_for_account_session_reads.sql";
 
 const renameMigration = readMigration(RENAME_MIGRATION);
 const leastPrivilege = readMigration(LEAST_PRIVILEGE_MIGRATION);
 const serverOwnedAudit = readMigration(SERVER_OWNED_AUDIT_MIGRATION);
 const superApprovalSession = readMigration(SUPER_APPROVAL_SESSION_MIGRATION);
+const accountSessionPolicy = readMigration(ACCOUNT_SESSION_POLICY_MIGRATION);
 
 const failures = [];
 const check = (condition, message) => {
@@ -33,6 +35,38 @@ const escapeRegExp = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 const normalizeSql = (value) =>
   value.replace(/\s+/g, " ").replace(/\s*=\s*/g, "=").trim().toLowerCase();
+
+// ---------------------------------------------------------------------------
+// A revoked JWT may not use direct PostgREST access to read its own session
+// registry rows. Keep the session registry policy aligned with the live
+// Better Auth session predicate used by the other tenant tables.
+// ---------------------------------------------------------------------------
+const accountSessionsSelect = accountSessionPolicy.match(
+  new RegExp(
+    `create\\s+policy\\s+(?:"account_sessions_select_own"|account_sessions_select_own)\\s+on\\s+public\\.account_sessions[\\s\\S]*?;`,
+    "i",
+  ),
+)?.[0] ?? null;
+check(
+  /drop\s+policy\s+if\s+exists\s+account_sessions_select_own\s+on\s+public\.account_sessions/i.test(accountSessionPolicy),
+  `${ACCOUNT_SESSION_POLICY_MIGRATION} must replace the existing own-session policy`,
+);
+check(
+  !!accountSessionsSelect && /\bfor\s+select\s+to\s+authenticated\b/i.test(accountSessionsSelect),
+  `${ACCOUNT_SESSION_POLICY_MIGRATION} must create the authenticated own-session SELECT policy`,
+);
+check(
+  !!accountSessionsSelect && /profile_id\s*=\s*\(select\s+auth\.uid\(\)\)/i.test(accountSessionsSelect),
+  "account_sessions_select_own must remain scoped to the current profile",
+);
+check(
+  !!accountSessionsSelect && /workspace_id\s*=\s*\(select\s+public\.current_workspace_id\(\)\)/i.test(accountSessionsSelect),
+  "account_sessions_select_own must remain scoped to the current workspace",
+);
+check(
+  !!accountSessionsSelect && /private\.current_account_session_is_active\(\)/i.test(accountSessionsSelect),
+  "account_sessions_select_own must require a live Better Auth session",
+);
 
 // ---------------------------------------------------------------------------
 // 1. Member SELECT policies must keep enforcing workspace scope and an active

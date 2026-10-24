@@ -545,7 +545,7 @@ serve(async (req) => {
             .eq("workspace_id", requesterProfile.workspace_id)
             .eq("role", "tenant_account")
             .is("deleted_at", null)
-            .select("id, is_active")
+            .select("id")
             .single();
           if (error || !data) {
             throw new ValidationError("Unable to update Tenant Account.");
@@ -594,7 +594,7 @@ serve(async (req) => {
           if (!isActive) return;
           const { data, error } = await adminClient
             .from("profiles")
-            .select("id")
+            .select("id, is_active")
             .eq("id", id)
             .eq("workspace_id", requesterProfile.workspace_id)
             .eq("role", "workspace_admin")

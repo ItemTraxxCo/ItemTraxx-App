@@ -59,6 +59,16 @@ begin
      or not has_function_privilege('service_role', 'public.is_better_auth_session_active(text)', 'EXECUTE') then
     raise exception 'Better Auth session expiry RPC is missing or has unsafe grants';
   end if;
+  if not exists (
+       select 1
+       from pg_policies
+       where schemaname = 'public'
+         and tablename = 'account_sessions'
+         and policyname = 'account_sessions_select_own'
+         and coalesce(qual, '') ilike '%private.current_account_session_is_active%'
+     ) then
+    raise exception 'account session reads must require a live Better Auth session';
+  end if;
   if (select role from public.profiles where id='30000000-0000-0000-0000-000000000001') <> 'workspace_admin'
      or (select role from public.profiles where id='30000000-0000-0000-0000-000000000002') <> 'tenant_account' then
     raise exception 'legacy roles were not mapped';

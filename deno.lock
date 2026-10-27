@@ -2,7 +2,7 @@
   "version": "5",
   "specifiers": {
     "npm:@better-auth/infra@0.4.22": "0.4.22_better-auth@1.7.12_zod@4.6.7_jsdom@30.1.3",
-    "npm:@better-auth/passkey@1.7.12": "1.7.12_better-auth@1.7.12_jsdom@30.1.3",
+    "npm:@better-auth/passkey@1.7.12": "1.7.12_better-auth@1.7.12_jose@6.2.13",
     "npm:@better-auth/sso@1.7.12": "1.7.12_better-auth@1.7.12_jsdom@30.1.3",
     "npm:@cloudflare/vite-plugin@^1.64.0": "1.64.0_vite@8.3.5_wrangler@4.151.0_@types+node@26.6.5",
     "npm:@cyclonedx/cyclonedx-npm@6.0.1": "6.0.1",
@@ -22,7 +22,7 @@
     "npm:boneyard-js@^1.10.0": "1.10.0_vite@8.3.5_vue@3.5.44_@types+node@26.6.5",
     "npm:fake-indexeddb@^6.2.6": "6.2.6",
     "npm:jose@6.1.3": "6.1.3",
-    "npm:jose@^6.2.12": "6.2.12",
+    "npm:jose@^6.2.13": "6.2.13",
     "npm:jsbarcode@^3.12.3": "3.12.3",
     "npm:jsdom@^30.1.3": "30.1.3_@noble+hashes@2.4.0",
     "npm:jspdf-autotable@^5.0.9": "5.0.9_jspdf@4.2.1",
@@ -36,7 +36,7 @@
     "npm:vue-router@^4.6.4": "4.6.4_vue@3.5.44_typescript@6.0.3",
     "npm:vue-tsc@^3.3.13": "3.3.13_typescript@6.0.3",
     "npm:vue@^3.5.44": "3.5.44_typescript@6.0.3",
-    "npm:wrangler@4.151.1": "4.151.1",
+    "npm:wrangler@4.151.3": "4.151.3",
     "npm:zod@^4.6.7": "4.6.7"
   },
   "npm": {
@@ -99,38 +99,50 @@
         "@better-fetch/fetch",
         "@standard-schema/spec",
         "better-call",
-        "jose@6.2.12",
         "kysely",
         "nanostores",
         "zod"
       ]
     },
-    "@better-auth/drizzle-adapter@1.7.12_@better-auth+core@1.7.12_@better-auth+utils@0.5.0_@better-fetch+fetch@1.3.2_better-call@1.4.4_jose@6.2.12_kysely@0.29.7_nanostores@1.5.5": {
+    "@better-auth/core@1.7.12_@better-auth+utils@0.5.0_@better-fetch+fetch@1.3.2_better-call@1.4.4_jose@6.2.13": {
+      "integrity": "sha512-SUStBGHJ13KnSO6+7U/1DSlfuOtln4jtOrFZqzQtxZVHZIrAoMjwHNGitlF+s7hvKbuC3Z14xjnqfLLqIqGfxw==",
+      "dependencies": [
+        "@better-auth/utils",
+        "@better-fetch/fetch",
+        "@standard-schema/spec",
+        "better-call",
+        "jose@6.2.13",
+        "kysely",
+        "nanostores",
+        "zod"
+      ]
+    },
+    "@better-auth/drizzle-adapter@1.7.12_@better-auth+core@1.7.12__@better-auth+utils@0.5.0__@better-fetch+fetch@1.3.2__better-call@1.4.4__jose@6.2.12__kysely@0.29.7__nanostores@1.5.5_@better-auth+utils@0.5.0_@better-fetch+fetch@1.3.2_better-call@1.4.4_jose@6.2.12_kysely@0.29.7_nanostores@1.5.5": {
       "integrity": "sha512-Qzoyuf05aK01Pc0k3EXv8Xj3XCT2m2dCWc5HoB7x+xX6N3Pm2eQsca+UIArsJcbuNEWWP3L51oIebnBoHJ5DTw==",
       "dependencies": [
-        "@better-auth/core",
+        "@better-auth/core@1.7.12_@better-auth+utils@0.5.0_@better-fetch+fetch@1.3.2_better-call@1.4.4_jose@6.2.12_kysely@0.29.7_nanostores@1.5.5",
         "@better-auth/utils"
       ]
     },
     "@better-auth/infra@0.4.22_better-auth@1.7.12_zod@4.6.7_jsdom@30.1.3": {
       "integrity": "sha512-JeAApvP5EOaHjZmY5zpFtHjV26/wgpmduscAF+YtTJ9686icrmm3b3WrFn9BWwFtUIf1ROnOmspYDvsuGU4HYg==",
       "dependencies": [
-        "@better-auth/core",
+        "@better-auth/core@1.7.12_@better-auth+utils@0.5.0_@better-fetch+fetch@1.3.2_better-call@1.4.4_jose@6.2.12_kysely@0.29.7_nanostores@1.5.5",
         "@better-auth/utils",
         "@better-fetch/fetch",
         "@noble/hashes",
         "@xmldom/xmldom@0.9.12",
         "better-auth",
         "better-call",
-        "jose@6.2.12",
+        "jose@6.2.13",
         "libphonenumber-js",
         "zod"
       ]
     },
-    "@better-auth/kysely-adapter@1.7.12_@better-auth+core@1.7.12_@better-auth+utils@0.5.0_kysely@0.29.7_@better-fetch+fetch@1.3.2_better-call@1.4.4_jose@6.2.12_nanostores@1.5.5": {
+    "@better-auth/kysely-adapter@1.7.12_@better-auth+core@1.7.12__@better-auth+utils@0.5.0__@better-fetch+fetch@1.3.2__better-call@1.4.4__jose@6.2.12__kysely@0.29.7__nanostores@1.5.5_@better-auth+utils@0.5.0_kysely@0.29.7_@better-fetch+fetch@1.3.2_better-call@1.4.4_jose@6.2.12_nanostores@1.5.5": {
       "integrity": "sha512-1PaFXktLv4n3DmrGbPaCj5SsvcT40NnWw7NLua5/J1+8/A051N5ZzqOwJifXEIQX5k6NdwvmymwDQxKytduEAQ==",
       "dependencies": [
-        "@better-auth/core",
+        "@better-auth/core@1.7.12_@better-auth+utils@0.5.0_@better-fetch+fetch@1.3.2_better-call@1.4.4_jose@6.2.12_kysely@0.29.7_nanostores@1.5.5",
         "@better-auth/utils",
         "kysely"
       ],
@@ -138,24 +150,24 @@
         "kysely"
       ]
     },
-    "@better-auth/memory-adapter@1.7.12_@better-auth+core@1.7.12_@better-auth+utils@0.5.0_@better-fetch+fetch@1.3.2_better-call@1.4.4_jose@6.2.12_kysely@0.29.7_nanostores@1.5.5": {
+    "@better-auth/memory-adapter@1.7.12_@better-auth+core@1.7.12__@better-auth+utils@0.5.0__@better-fetch+fetch@1.3.2__better-call@1.4.4__jose@6.2.12__kysely@0.29.7__nanostores@1.5.5_@better-auth+utils@0.5.0_@better-fetch+fetch@1.3.2_better-call@1.4.4_jose@6.2.12_kysely@0.29.7_nanostores@1.5.5": {
       "integrity": "sha512-glaDwXzDptnddHqRuu7fj47FAssUcOzLNgdlTGJoEPrspkX69x2vnXwgAzNuApjZI21WLtPH/rQ6CN+DQGybPA==",
       "dependencies": [
-        "@better-auth/core",
+        "@better-auth/core@1.7.12_@better-auth+utils@0.5.0_@better-fetch+fetch@1.3.2_better-call@1.4.4_jose@6.2.12_kysely@0.29.7_nanostores@1.5.5",
         "@better-auth/utils"
       ]
     },
-    "@better-auth/mongo-adapter@1.7.12_@better-auth+core@1.7.12_@better-auth+utils@0.5.0_@better-fetch+fetch@1.3.2_better-call@1.4.4_jose@6.2.12_kysely@0.29.7_nanostores@1.5.5": {
+    "@better-auth/mongo-adapter@1.7.12_@better-auth+core@1.7.12__@better-auth+utils@0.5.0__@better-fetch+fetch@1.3.2__better-call@1.4.4__jose@6.2.12__kysely@0.29.7__nanostores@1.5.5_@better-auth+utils@0.5.0_@better-fetch+fetch@1.3.2_better-call@1.4.4_jose@6.2.12_kysely@0.29.7_nanostores@1.5.5": {
       "integrity": "sha512-HKV4sgYSw/Gdt9AuHlESMkiKL72SWdGweDy1Wsyxoh06BpG7aNu4aSJ7marNpMdKZteyRbxWWqQkA9ediA8qFw==",
       "dependencies": [
-        "@better-auth/core",
+        "@better-auth/core@1.7.12_@better-auth+utils@0.5.0_@better-fetch+fetch@1.3.2_better-call@1.4.4_jose@6.2.12_kysely@0.29.7_nanostores@1.5.5",
         "@better-auth/utils"
       ]
     },
-    "@better-auth/passkey@1.7.12_better-auth@1.7.12_jsdom@30.1.3": {
+    "@better-auth/passkey@1.7.12_better-auth@1.7.12_jose@6.2.13": {
       "integrity": "sha512-DV775/rqg56sxOo13xo6RcFEtVYMXvUBWIhovadzsroZX7JF8VBQC+fLCcYoG1+n5yniI2l5r3PB5+Zt2UNYjg==",
       "dependencies": [
-        "@better-auth/core",
+        "@better-auth/core@1.7.12_@better-auth+utils@0.5.0_@better-fetch+fetch@1.3.2_better-call@1.4.4_jose@6.2.13",
         "@better-auth/utils",
         "@better-fetch/fetch",
         "@simplewebauthn/browser",
@@ -166,33 +178,33 @@
         "zod"
       ]
     },
-    "@better-auth/prisma-adapter@1.7.12_@better-auth+core@1.7.12_@better-auth+utils@0.5.0_@better-fetch+fetch@1.3.2_better-call@1.4.4_jose@6.2.12_kysely@0.29.7_nanostores@1.5.5": {
+    "@better-auth/prisma-adapter@1.7.12_@better-auth+core@1.7.12__@better-auth+utils@0.5.0__@better-fetch+fetch@1.3.2__better-call@1.4.4__jose@6.2.12__kysely@0.29.7__nanostores@1.5.5_@better-auth+utils@0.5.0_@better-fetch+fetch@1.3.2_better-call@1.4.4_jose@6.2.12_kysely@0.29.7_nanostores@1.5.5": {
       "integrity": "sha512-FZRX6ORbwhDmeYE1Tl0IPtUn8v3BlVFgbJxDnm/DCNHxuFRf+0t4HfddUgYeYehHFR8aSDsdYX44fEFWM9877w==",
       "dependencies": [
-        "@better-auth/core",
+        "@better-auth/core@1.7.12_@better-auth+utils@0.5.0_@better-fetch+fetch@1.3.2_better-call@1.4.4_jose@6.2.12_kysely@0.29.7_nanostores@1.5.5",
         "@better-auth/utils"
       ]
     },
     "@better-auth/sso@1.7.12_better-auth@1.7.12_jsdom@30.1.3": {
       "integrity": "sha512-fxUD9+MjNRhuT+nVtFgqPvWAvwWJVacuIijdf4x2nCHqR44xfFgYYWK2iB6vOiin9Qxof9kTPKvRl7ZCJHdwFQ==",
       "dependencies": [
-        "@better-auth/core",
+        "@better-auth/core@1.7.12_@better-auth+utils@0.5.0_@better-fetch+fetch@1.3.2_better-call@1.4.4_jose@6.2.12_kysely@0.29.7_nanostores@1.5.5",
         "@better-auth/utils",
         "@better-fetch/fetch",
         "@xmldom/xmldom@0.9.12",
         "better-auth",
         "better-call",
         "fast-xml-parser",
-        "jose@6.2.12",
+        "jose@6.2.13",
         "samlify",
         "tldts",
         "zod"
       ]
     },
-    "@better-auth/telemetry@1.7.12_@better-auth+core@1.7.12_@better-auth+utils@0.5.0_@better-fetch+fetch@1.3.2_better-call@1.4.4_jose@6.2.12_kysely@0.29.7_nanostores@1.5.5": {
+    "@better-auth/telemetry@1.7.12_@better-auth+core@1.7.12__@better-auth+utils@0.5.0__@better-fetch+fetch@1.3.2__better-call@1.4.4__jose@6.2.12__kysely@0.29.7__nanostores@1.5.5_@better-auth+utils@0.5.0_@better-fetch+fetch@1.3.2_better-call@1.4.4_jose@6.2.12_kysely@0.29.7_nanostores@1.5.5": {
       "integrity": "sha512-DaDkKNnI99vKGGbWq9KJg2uYeaOjsK9nIBw9T2m2KG/RkxpvQRjYkZ00++up2bZQkR5pB1nukGbplza3UJG/Xg==",
       "dependencies": [
-        "@better-auth/core",
+        "@better-auth/core@1.7.12_@better-auth+utils@0.5.0_@better-fetch+fetch@1.3.2_better-call@1.4.4_jose@6.2.12_kysely@0.29.7_nanostores@1.5.5",
         "@better-auth/utils",
         "@better-fetch/fetch"
       ]
@@ -1425,7 +1437,7 @@
     "better-auth@1.7.12_vitest@5.0.5_vue@3.5.44_jsdom@30.1.3": {
       "integrity": "sha512-f1fEG0QdTslzbmFA+vOGFFW/XXCWkG4kBxLeH9n1vp1otTH9+ZzV6EJ6797GStWeiYYgS5Vnt9xqE12KwSyAAw==",
       "dependencies": [
-        "@better-auth/core",
+        "@better-auth/core@1.7.12_@better-auth+utils@0.5.0_@better-fetch+fetch@1.3.2_better-call@1.4.4_jose@6.2.12_kysely@0.29.7_nanostores@1.5.5",
         "@better-auth/drizzle-adapter",
         "@better-auth/kysely-adapter",
         "@better-auth/memory-adapter",
@@ -1438,7 +1450,7 @@
         "@noble/hashes",
         "better-call",
         "defu",
-        "jose@6.2.12",
+        "jose@6.2.13",
         "kysely",
         "nanostores",
         "vitest",
@@ -1849,8 +1861,8 @@
     "jose@6.1.3": {
       "integrity": "sha512-0TpaTfihd4QMNwrz/ob2Bp7X04yuxJkjRGi4aKmOqwhov54i6u79oCv7T+C7lo70MKH6BesI3vscD1yb/yzKXQ=="
     },
-    "jose@6.2.12": {
-      "integrity": "sha512-9NiFmJEex0sy2Dk58j2UGBSHgUs2ypF9eZSu4L6vjOX3Dp96Sw1F3uL+H+D1sx02jZZdzUT0HgvCy59CuvXcWw=="
+    "jose@6.2.13": {
+      "integrity": "sha512-7TIg10ZE1x82YediN+lcrPNvGMKge9yFHQD+Qho/b8y2adfugU3AsvvHfxV0fzyFllT6l9xCjf4RWY9g/Z9PJQ=="
     },
     "js-beautify@2.0.3": {
       "integrity": "sha512-cyFbh3tkPhknnTD/0bLf0T0yy2ZIbqL05mttzbt4y1Zfr7NxqXQZ62dkBLKs3oHH/lpjmDRAnciJiSUyOy8XwQ==",
@@ -2060,8 +2072,8 @@
         "youch"
       ]
     },
-    "miniflare@5.20261012.1-beta": {
-      "integrity": "sha512-8Canhy6g9+vAhqMc0o80YphqYIwpiA3aAp8aX+uDXU7J/qbUeoZzcII9c2V1P4uT/eHD4SB93qet1o1bRY3BuQ==",
+    "miniflare@5.20261019.1-beta": {
+      "integrity": "sha512-1n7MN2UqZnPniyYAqNuV1YEAaja66ozKGVCc5ZTmYQhTubnoAwGLccwb+ZWYLOajuw3pOaJ70u//bZMuURlRew==",
       "dependencies": [
         "@cspotcode/source-map-support",
         "sharp",
@@ -2534,7 +2546,7 @@
       "integrity": "sha512-xffhOgD9rXsXLK+DQ+3Gq8b2KmavMjPHGuJr7lfVlD8vKK1HHFggYlmzdRECqPmOL8g3Yd5PN3URcUR8xWZcWw==",
       "dependencies": [
         "eciesjs",
-        "jose@6.2.12"
+        "jose@6.2.13"
       ],
       "optionalDependencies": [
         "@supabase/cli-darwin-arm64",
@@ -2828,14 +2840,14 @@
       ],
       "bin": true
     },
-    "wrangler@4.151.1": {
-      "integrity": "sha512-OAsa9UAHZshM6mq2PXcVoyxXgWThAanZMBc/IirtqEWd/BauRtmUKzAniOu/pU0pd3pxKuMZ2vsbF4eo6RiNDA==",
+    "wrangler@4.151.3": {
+      "integrity": "sha512-mzPQLmkAhZUV7CdiAhE+hiIAJlS9xPL6vZe1B8oQFuWxFu7nmQnvHAVjcAcabwSGkXFXH9uspzXwHOFrfbQmqQ==",
       "dependencies": [
         "@cloudflare/kv-asset-handler",
         "@cloudflare/unenv-preset",
         "blake3-wasm",
         "esbuild",
-        "miniflare@5.20261012.1-beta",
+        "miniflare@5.20261019.1-beta",
         "path-to-regexp",
         "unenv",
         "workerd"
@@ -3027,7 +3039,7 @@
         "npm:better-auth@1.7.12",
         "npm:boneyard-js@^1.10.0",
         "npm:fake-indexeddb@^6.2.6",
-        "npm:jose@^6.2.12",
+        "npm:jose@^6.2.13",
         "npm:jsbarcode@^3.12.3",
         "npm:jsdom@^30.1.3",
         "npm:jspdf-autotable@^5.0.9",
@@ -3041,7 +3053,7 @@
         "npm:vue-router@^4.6.4",
         "npm:vue-tsc@^3.3.13",
         "npm:vue@^3.5.44",
-        "npm:wrangler@4.151.1",
+        "npm:wrangler@4.151.3",
         "npm:zod@^4.6.7"
       ],
       "overrides": {

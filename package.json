@@ -61,7 +61,7 @@
     "@vercel/speed-insights": "^2.0.0",
     "better-auth": "1.7.12",
     "boneyard-js": "^1.10.0",
-    "jose": "^6.2.12",
+    "jose": "^6.2.13",
     "jsbarcode": "^3.12.3",
     "jspdf": "^4.2.1",
     "jspdf-autotable": "^5.0.9",
@@ -89,7 +89,7 @@
     "vite": "^8.3.5",
     "vitest": "5.0.5",
     "vue-tsc": "^3.3.13",
-    "wrangler": "4.151.1"
+    "wrangler": "4.151.3"
   },
   "overrides": {
     "esbuild": "0.28.1",

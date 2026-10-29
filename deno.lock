@@ -8,7 +8,7 @@
     "npm:@cyclonedx/cyclonedx-npm@6.0.1": "6.0.1",
     "npm:@intercom/messenger-js-sdk@^0.0.20": "0.0.20",
     "npm:@playwright/test@^1.64.1": "1.64.1",
-    "npm:@posthog/cli@0.18.10": "0.18.10",
+    "npm:@posthog/cli@0.18.12": "0.18.12",
     "npm:@supabase/supabase-js@^2.118.0": "2.118.0",
     "npm:@types/node@^26.6.5": "26.6.5",
     "npm:@types/qrcode@^1.5.6": "1.5.6",
@@ -27,7 +27,7 @@
     "npm:jsdom@^30.1.3": "30.1.3_@noble+hashes@2.4.0",
     "npm:jspdf-autotable@^5.0.9": "5.0.9_jspdf@4.2.1",
     "npm:jspdf@^4.2.1": "4.2.1",
-    "npm:posthog-js@1.438.12": "1.438.12",
+    "npm:posthog-js@1.438.15": "1.438.15",
     "npm:qrcode@^1.5.4": "1.5.4",
     "npm:supabase@^2.121.0": "2.121.0",
     "npm:typescript@~6.0.3": "6.0.3",
@@ -913,30 +913,30 @@
     "@poppinss/exception@1.2.3": {
       "integrity": "sha512-dCED+QRChTVatE9ibtoaxc+WkdzOSjYTKi/+uacHWIsfodVfpsueo3+DKpgU5Px8qXjgmXkSvhXvSCz3fnP9lw=="
     },
-    "@posthog/browser-common@0.9.7": {
-      "integrity": "sha512-w/vXohv6OdFa5MFTH3tCS0zXnKWmHGB/hOWjRSYxztL7RpT+DIbqwsqoadKg4iGkmaARlwbNJOLFJumChQfNKw==",
+    "@posthog/browser-common@0.9.12": {
+      "integrity": "sha512-pKYLYgV0o4UK5PAQ3OTlZpQnKvcBpG+UOqWYa+W41Omec8TlI6FXzGMHdYMTmaymxii0vi9R4jLVi7JQSr4vnQ==",
       "dependencies": [
         "@posthog/core",
         "@posthog/types",
         "preact"
       ]
     },
-    "@posthog/cli@0.18.10": {
-      "integrity": "sha512-WFucXcIqUL35NkH4hVlch3TBSGRRAhjqvmh2/2z8sj+HsR7e+NUiG3QT5dy9Qs1C3hVe7uWkdNU6DKyKvONAXw==",
+    "@posthog/cli@0.18.12": {
+      "integrity": "sha512-/eT9riWOkBb9uwsdOxQgW3fan/T3hwT8rvwZCzPl3DAgSBEhzpP59usD0fyFS++X2967E5AQe74nrBw1rywf6A==",
       "dependencies": [
         "detect-libc"
       ],
       "scripts": true,
       "bin": true
     },
-    "@posthog/core@1.59.3": {
-      "integrity": "sha512-XbfpD82YSms/asHU44xQq5vqadi6rHTRg6fyoTqjdGTiC1NiPRCeO8xhtANT682BkvlKJo+JwRDBu3Q8oEqQpw==",
+    "@posthog/core@1.61.1": {
+      "integrity": "sha512-qyMTxPfjeJkHIhpcukOgBN3BWXbCyFRPz8/Voy5qZtVh9NZqj3EhC6LLeYZuJhL3WpqhQTgn2FMIwAo/ag6fmw==",
       "dependencies": [
         "@posthog/types"
       ]
     },
-    "@posthog/types@1.416.0": {
-      "integrity": "sha512-0/9+02s/0uDyrH4G/qUg1yyl6gXUg8Uuxw/PlDad3KLzo9FFS9zS/kAQaEshx/saVGupj1aAy/4EUBxWisBogw=="
+    "@posthog/types@1.418.0": {
+      "integrity": "sha512-WqDXUWH1R8OilBp2PfDpQIRZSCs3QyOnw7H3YK7lvZLCMIsOqSZAKJrrqYWt4f7FvnVCACRuNGCC0HKh3J/HWw=="
     },
     "@rolldown/binding-android-arm-eabi@1.2.15": {
       "integrity": "sha512-aLcgK9gIJ3YRvrrtfSBbRa27F5WrpiTaPulnFpsHPxpUHgFlSgnU4854MHwoRGEBhfRJDWCS2WQ7lIjskE9Olw==",
@@ -2241,8 +2241,8 @@
         "source-map-js"
       ]
     },
-    "posthog-js@1.438.12": {
-      "integrity": "sha512-hjhvrtqbk6pFlbtNEGk0FrWKKFdeXe/WWA/LppN0f+uDoHKR9/SZJOxUHSVCGYbGTJvNRoDjjQvZuTcq4oKSlg==",
+    "posthog-js@1.438.15": {
+      "integrity": "sha512-ZcXp4nF+8X+W5am0W45KIT+l6kGvhrJEzm5U9WD37Dh2PHbWLKc2mZeHI3qvcVXRpi04Z+qFgomWv5Ss7WuuAQ==",
       "dependencies": [
         "@posthog/browser-common",
         "@posthog/core",
@@ -3026,7 +3026,7 @@
         "npm:@cyclonedx/cyclonedx-npm@6.0.1",
         "npm:@intercom/messenger-js-sdk@^0.0.20",
         "npm:@playwright/test@^1.64.1",
-        "npm:@posthog/cli@0.18.10",
+        "npm:@posthog/cli@0.18.12",
         "npm:@supabase/supabase-js@^2.118.0",
         "npm:@types/node@^26.6.5",
         "npm:@types/qrcode@^1.5.6",
@@ -3044,7 +3044,7 @@
         "npm:jsdom@^30.1.3",
         "npm:jspdf-autotable@^5.0.9",
         "npm:jspdf@^4.2.1",
-        "npm:posthog-js@1.438.12",
+        "npm:posthog-js@1.438.15",
         "npm:qrcode@^1.5.4",
         "npm:supabase@^2.121.0",
         "npm:typescript@~6.0.3",

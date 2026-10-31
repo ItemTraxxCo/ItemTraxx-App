@@ -178,6 +178,25 @@ const BETTER_AUTH_ORGANIZATION_READ_PATHS = new Set([
 export const isBetterAuthOrganizationMutationPath = (path: string) =>
   BETTER_AUTH_ORGANIZATION_MUTATION_PATHS.has(path);
 
+// Better Auth authorizes these routes from member:update/delete and
+// creatorRole 'admin' only, so any workspace admin could demote or remove the
+// primary admin or exceed max_admins. Those invariants live in
+// workspace_admin_set_profile_role (and the invitation RPCs), which is the only
+// supported path; the SPA never calls these routes.
+const BETTER_AUTH_ORGANIZATION_MEMBER_MANAGEMENT_PATHS = new Set([
+  "/organization/update-member-role",
+  "/organization/remove-member",
+  "/organization/invite-member",
+  "/organization/leave",
+]);
+
+export const isBlockedBetterAuthOrganizationMemberManagement = (
+  path: string,
+  actorRole: string | undefined,
+) =>
+  actorRole !== "super_admin" &&
+  BETTER_AUTH_ORGANIZATION_MEMBER_MANAGEMENT_PATHS.has(path);
+
 export const isActiveBetterAuthOrganizationActor = (actor: Pick<SsoActor, "role" | "organizationId" | "workspaceStatus" | "workspaceArchivedAt">) =>
   actor.role === "super_admin" ||
   (!!actor.organizationId && actor.workspaceStatus === "active" &&
@@ -659,6 +678,11 @@ export const getBetterAuth = (rawEnv: Env) => {
               throw new APIError("FORBIDDEN");
             }
             if (context.path.startsWith("/organization/")) {
+              if (isBlockedBetterAuthOrganizationMemberManagement(context.path, actor.role)) {
+                throw new APIError("FORBIDDEN", {
+                  message: "Workspace members are managed from the ItemTraxx admin console.",
+                });
+              }
               const clearingActiveOrganization = context.path === "/organization/set-active" &&
                 context.body?.organizationId === null;
               if (

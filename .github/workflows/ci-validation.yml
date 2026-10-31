@@ -296,12 +296,66 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
-      # Use Chrome Stable from Google's distribution so browser security fixes
-      # are current even when Playwright's bundled Chromium revision lags.
-      - name: Install Chrome Stable for Playwright
+      # Resolve once, then install and verify the exact same Chrome for Testing
+      # Stable build. The apt-delivered Chrome package can lag CfT metadata.
+      - name: Resolve Chrome for Testing Stable version
+        id: chrome-stable
+        if: ${{ !cancelled() }}
+        run: |
+          node --input-type=module <<'NODE'
+          import { appendFileSync } from 'node:fs';
+
+          const metadataUrl = 'https://googlechromelabs.github.io/chrome-for-testing/last-known-good-versions-with-downloads.json';
+          const response = await fetch(metadataUrl, { signal: AbortSignal.timeout(15_000) });
+          if (!response.ok) {
+            throw new Error(`Chrome for Testing metadata request failed with HTTP ${response.status}`);
+          }
+
+          const metadata = await response.json();
+          const stable = metadata?.channels?.Stable;
+          if (typeof stable?.version !== 'string' || !/^\d+\.\d+\.\d+\.\d+$/.test(stable.version)) {
+            throw new Error('Chrome for Testing Stable version was unavailable or invalid');
+          }
+
+          const download = stable.downloads?.chrome?.find((entry) => entry.platform === 'linux64');
+          const downloadUrl = typeof download?.url === 'string' ? new URL(download.url) : null;
+          const expectedPath = `/chrome-for-testing-public/${stable.version}/linux64/chrome-linux64.zip`;
+          if (
+            !downloadUrl ||
+            downloadUrl.protocol !== 'https:' ||
+            downloadUrl.hostname !== 'storage.googleapis.com' ||
+            downloadUrl.pathname !== expectedPath
+          ) {
+            throw new Error('Chrome for Testing Stable download URL was unavailable or invalid');
+          }
+
+          const outputFile = process.env.GITHUB_OUTPUT;
+          if (!outputFile) {
+            throw new Error('GitHub Actions output file was unavailable');
+          }
+          appendFileSync(
+            outputFile,
+            `version=${stable.version}\nurl=${downloadUrl.toString()}\n`,
+          );
+          NODE
+
+      - name: Install Chrome for Testing Stable
         if: ${{ !cancelled() }}
         timeout-minutes: 10
-        run: npx playwright install chrome --force
+        env:
+          CHROME_STABLE_VERSION: ${{ steps.chrome-stable.outputs.version }}
+          CHROME_STABLE_URL: ${{ steps.chrome-stable.outputs.url }}
+        run: |
+          archive="$RUNNER_TEMP/chrome-for-testing.zip"
+          browser_dir="$RUNNER_TEMP/chrome-for-testing"
+          executable="$browser_dir/chrome-linux64/chrome"
+          curl --fail --location --retry 3 --retry-all-errors --connect-timeout 15 --max-time 300 \
+            "$CHROME_STABLE_URL" --output "$archive"
+          unzip -q "$archive" -d "$browser_dir"
+          test -x "$executable"
+          echo "CHROME_STABLE_VERSION=$CHROME_STABLE_VERSION" >> "$GITHUB_ENV"
+          echo "PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=$executable" >> "$GITHUB_ENV"
+          echo "Installed Chrome for Testing Stable $CHROME_STABLE_VERSION"
 
       - name: Verify Chrome Stable version
         if: ${{ !cancelled() }}
@@ -309,19 +363,13 @@ jobs:
           node --input-type=module <<'NODE'
           import { execFileSync } from 'node:child_process';
 
-          const metadataUrl = 'https://googlechromelabs.github.io/chrome-for-testing/last-known-good-versions.json';
-          const response = await fetch(metadataUrl, { signal: AbortSignal.timeout(15_000) });
-          if (!response.ok) {
-            throw new Error(`Chrome for Testing metadata request failed with HTTP ${response.status}`);
+          const expected = process.env.CHROME_STABLE_VERSION;
+          const executable = process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH;
+          if (!expected || !executable) {
+            throw new Error('Chrome for Testing Stable installation details were unavailable');
           }
 
-          const metadata = await response.json();
-          const expected = metadata?.channels?.Stable?.version;
-          if (typeof expected !== 'string' || !/^\d+\.\d+\.\d+\.\d+$/.test(expected)) {
-            throw new Error('Chrome for Testing Stable version was unavailable or invalid');
-          }
-
-          const output = execFileSync('google-chrome', ['--version'], { encoding: 'utf8' }).trim();
+          const output = execFileSync(executable, ['--version'], { encoding: 'utf8' }).trim();
           const actual = output.match(/\d+\.\d+\.\d+\.\d+/)?.[0];
           if (!actual) {
             throw new Error(`Could not parse installed Chrome version from: ${output}`);
@@ -330,7 +378,7 @@ jobs:
             throw new Error(`Installed Chrome ${actual} does not match Chrome for Testing Stable ${expected}`);
           }
 
-          console.log(`Verified installed Chrome ${actual} matches Chrome for Testing Stable.`);
+          console.log(`Verified installed Chrome for Testing Stable ${actual}.`);
           NODE
 
       - name: Install Playwright system dependencies

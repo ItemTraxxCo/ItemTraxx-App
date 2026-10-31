@@ -388,6 +388,10 @@ jobs:
             echo "::warning::Playwright system dependency install failed or timed out; continuing so E2E can verify whether the runner already has the required libraries."
           }
 
+      - name: Install Playwright FFmpeg
+        if: ${{ !cancelled() }}
+        run: npx playwright install ffmpeg
+
       - name: Run E2E tests
         if: ${{ !cancelled() }}
         run: npm run test:e2e

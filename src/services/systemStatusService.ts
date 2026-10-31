@@ -82,6 +82,7 @@ const fetchAndCacheSystemStatus = async (timeoutMs: number) => {
     };
     if (!response.ok) {
       const route = statusRoute();
+      const expectedDatabaseUnavailable = response.status === 503 && payload.status === "down";
       void captureHandledRequestFailure({
         area: "edge_function",
         name: STATUS_FUNCTION_NAME,
@@ -90,6 +91,7 @@ const fetchAndCacheSystemStatus = async (timeoutMs: number) => {
         status: response.status,
         message: `System status request failed (${response.status}).`,
         requestId: responseRequestId,
+        captureException: !expectedDatabaseUnavailable,
       });
       capturePostHogLog({
         body: "system status request completed",

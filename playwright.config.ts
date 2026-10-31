@@ -9,6 +9,7 @@ const e2eSupabaseAnonKey =
   process.env.VITE_SUPABASE_ANON_KEY ||
   "sb_publishable_dummy_for_e2e_tests_only";
 const e2eEdgeProxyUrl = process.env.VITE_EDGE_PROXY_URL || baseURL;
+const chromeExecutablePath = process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH;
 
 export default defineConfig({
   testDir: "./tests/e2e",
@@ -18,7 +19,9 @@ export default defineConfig({
   workers: 2,
   reporter: isCI ? [["github"], ["html", { open: "never" }]] : [["list"]],
   use: {
-    channel: "chrome",
+    ...(chromeExecutablePath
+      ? { launchOptions: { executablePath: chromeExecutablePath } }
+      : { channel: "chrome" as const }),
     baseURL,
     trace: "on-first-retry",
     screenshot: "only-on-failure",

@@ -9,6 +9,7 @@ import {
   filterActiveBetterAuthOrganizationRows,
   isBetterAuthOrganizationMutationPath,
   isActiveLinkedBetterAuthProfile,
+  isBlockedBetterAuthOrganizationMemberManagement,
   hasRecentSuperAdminPasswordConfirmation,
   isBetterAuthPasskeyEnrollmentPath,
   isFreshActionConfirmationTimestamp,
@@ -16,6 +17,44 @@ import {
   resolveSsoActor,
   sanitizeSsoProvider,
 } from "./auth.ts";
+
+Deno.test("Better Auth member-management routes are closed to workspace actors", () => {
+  for (
+    const path of [
+      "/organization/update-member-role",
+      "/organization/remove-member",
+      "/organization/invite-member",
+      "/organization/leave",
+    ]
+  ) {
+    for (const role of ["workspace_admin", "tenant_account", "individual_account", undefined]) {
+      assertEquals(
+        isBlockedBetterAuthOrganizationMemberManagement(path, role),
+        true,
+        `${path} is blocked for ${role ?? "an unresolved role"}`,
+      );
+    }
+    assertEquals(
+      isBlockedBetterAuthOrganizationMemberManagement(path, "super_admin"),
+      false,
+      `${path} stays available to super admins`,
+    );
+  }
+  for (
+    const path of [
+      "/organization/set-active",
+      "/organization/update",
+      "/organization/list-members",
+      "/organization/get-full-organization",
+    ]
+  ) {
+    assertEquals(
+      isBlockedBetterAuthOrganizationMemberManagement(path, "workspace_admin"),
+      false,
+      `${path} is not a member-management route`,
+    );
+  }
+});
 
 Deno.test("organization logo replacements reuse one R2 object per organization", () => {
   const first = organizationLogoObjectPath("workspace-1");

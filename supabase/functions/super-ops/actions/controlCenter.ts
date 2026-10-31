@@ -6,7 +6,10 @@ import {
   requireText,
   requireUuid,
 } from "../../_shared/validation.ts";
+import { callBetterAuthAdmin } from "../../_shared/betterAuthAdmin.ts";
 import type { SuperOpsContext } from "../context.ts";
+
+const REAUTH_REVOKE_BATCH_SIZE = 10;
 
 export const CONTROL_CENTER_ACTIONS = [
   "get_control_center",
@@ -226,6 +229,18 @@ export const handleControlCenterAction = async (
     const next = payload;
     const workspaceId = requireUuid(next.workspace_id);
 
+    const { data: profileRows, error: profilesError } = await adminClient
+      .from("profiles")
+      .select("id")
+      .eq("workspace_id", workspaceId)
+      .is("deleted_at", null);
+    if (profilesError) {
+      return jsonResponse(400, { error: "Unable to force tenant re-login." });
+    }
+    const profileIds = ((profileRows ?? []) as Array<{ id: string }>).map((row) =>
+      row.id
+    );
+
     const forceAt = new Date().toISOString();
     const { error } = await adminClient
       .from("workspace_security_controls")
@@ -240,21 +255,60 @@ export const handleControlCenterAction = async (
       return jsonResponse(400, { error: "Unable to force tenant re-login." });
     }
 
+    // The timestamp above is only a record; sessions stay valid until their
+    // Better Auth row is gone, so revoke every workspace profile's sessions and
+    // mirror that in account_sessions (same pair super-admin-mutate uses).
+    const revokeSessions = context.revokeBetterAuthSessions ??
+      (async (profileId: string) => {
+        await callBetterAuthAdmin({ action: "revoke_sessions", profileId });
+      });
+    let failedProfiles = 0;
+    for (let i = 0; i < profileIds.length; i += REAUTH_REVOKE_BATCH_SIZE) {
+      const results = await Promise.allSettled(
+        profileIds.slice(i, i + REAUTH_REVOKE_BATCH_SIZE).map(revokeSessions),
+      );
+      failedProfiles += results.filter((result) => result.status === "rejected")
+        .length;
+    }
+    let overlayFailed = false;
+    if (profileIds.length > 0) {
+      const { error: overlayError } = await adminClient
+        .from("account_sessions")
+        .update({ revoked_at: forceAt, revoked_by: user.id })
+        .in("profile_id", profileIds)
+        .is("revoked_at", null);
+      overlayFailed = Boolean(overlayError);
+    }
+    const enforced = failedProfiles === 0 && !overlayFailed;
+
+    const details = {
+      workspace_id: workspaceId,
+      force_reauth_after: forceAt,
+      revoked_profiles: profileIds.length - failedProfiles,
+      failed_profiles: failedProfiles,
+      account_sessions_revoked: !overlayFailed,
+    };
     const { data: job } = await adminClient
       .from("super_jobs")
       .insert({
         job_type: "force_workspace_reauth",
-        status: "completed",
-        details: { workspace_id: workspaceId, force_reauth_after: forceAt },
+        status: enforced ? "completed" : "failed",
+        details,
         created_by: user.id,
       })
       .select("id, job_type, status, details, created_at, updated_at")
       .single();
 
     await writeAudit("force_workspace_reauth", "workspace", workspaceId, {
-      force_reauth_after: forceAt,
+      ...details,
+      enforced,
     });
 
+    if (!enforced) {
+      return jsonResponse(503, {
+        error: "Unable to revoke every tenant session. Retry to finish.",
+      });
+    }
     return jsonResponse(200, { data: { success: true, job } });
   }
 

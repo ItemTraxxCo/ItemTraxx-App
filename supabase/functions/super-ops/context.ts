@@ -26,4 +26,6 @@ export type SuperOpsContext = {
   publishableKey: string | null;
   jsonResponse: JsonResponse;
   writeAudit: WriteSuperAudit;
+  /** Test seam; defaults to the Better Auth internal-admin `revoke_sessions`. */
+  revokeBetterAuthSessions?: (profileId: string) => Promise<void>;
 };

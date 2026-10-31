@@ -172,8 +172,10 @@ const load = async () => {
   }
 };
 
+// Any workspace admin can promote a Tenant Account; demoting an admin needs the
+// primary admin (enforced by workspace-admin-mutate and the RPC).
 const canChangeRole = (account: WorkspaceAccount) =>
-  canManageAdminDetails.value &&
+  (canManageAdminDetails.value || account.role === "tenant_account") &&
   !account.is_primary_admin &&
   account.id !== currentProfileId &&
   adminDetailsTarget.value === null;

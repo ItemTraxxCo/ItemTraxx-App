@@ -397,15 +397,64 @@ Deno.test("set_workspace_force_reauth reports a generic failure when the update 
   assertEquals(await responseBody(response!), { error: "Unable to force tenant re-login." });
 });
 
-Deno.test("set_workspace_force_reauth succeeds, logs a job, and records an audit entry", async () => {
-  const { calls, writeAudit } = auditRecorder();
+Deno.test("set_workspace_force_reauth reports a generic failure when the control upsert errors", async () => {
+  const revoked: string[] = [];
   const adminClient = sequenceClient([
-    { data: null, error: null },
-    { data: { id: "job-1", job_type: "force_workspace_reauth", status: "completed", details: {}, created_at: "t", updated_at: "t" }, error: null },
+    { data: [{ id: "profile-1" }], error: null },
+    { data: null, error: OTHER_ERROR },
   ]);
   const response = await handleControlCenterAction(
     contextFor("set_workspace_force_reauth", { workspace_id: VALID_WORKSPACE_ID }, adminClient, {
+      revokeBetterAuthSessions: async (id) => {
+        revoked.push(id);
+      },
+    }),
+  );
+
+  assertEquals(response!.status, 400);
+  assertEquals(await responseBody(response!), { error: "Unable to force tenant re-login." });
+  assertEquals(revoked, []);
+});
+
+// Records every table touched (with the chained operations of each call) so
+// tests can assert on what the handler actually wrote, not just the response.
+const recordingClient = (results: Record<string, QueryResult[]>) => {
+  const touched: QueryCall[] = [];
+  const cursor: Record<string, number> = {};
+  const respond = (call: QueryCall): QueryResult => {
+    touched.push(call);
+    const index = cursor[call.table] ?? 0;
+    cursor[call.table] = index + 1;
+    return results[call.table]?.[index] ?? { data: null, error: null };
+  };
+  return {
+    touched,
+    client: { from: buildFrom(respond) } as unknown as SuperOpsContext["adminClient"],
+  };
+};
+
+const jobRow = (status: string) => ({
+  id: "job-1",
+  job_type: "force_workspace_reauth",
+  status,
+  details: {},
+  created_at: "t",
+  updated_at: "t",
+});
+
+Deno.test("set_workspace_force_reauth revokes every workspace session, logs a job, and records an audit entry", async () => {
+  const { calls, writeAudit } = auditRecorder();
+  const revoked: string[] = [];
+  const { client, touched } = recordingClient({
+    profiles: [{ data: [{ id: "profile-1" }, { id: "profile-2" }], error: null }],
+    super_jobs: [{ data: jobRow("completed"), error: null }],
+  });
+  const response = await handleControlCenterAction(
+    contextFor("set_workspace_force_reauth", { workspace_id: VALID_WORKSPACE_ID }, client, {
       writeAudit,
+      revokeBetterAuthSessions: async (id) => {
+        revoked.push(id);
+      },
     }),
   );
 
@@ -414,9 +463,69 @@ Deno.test("set_workspace_force_reauth succeeds, logs a job, and records an audit
   const data = body.data as { success: boolean; job: unknown };
   assertEquals(data.success, true);
   assert(!!data.job, "expected the created job to be returned");
+  assertEquals(revoked.sort(), ["profile-1", "profile-2"]);
+
+  const overlay = touched.find((call) => call.table === "account_sessions");
+  assert(!!overlay, "expected account_sessions to be marked revoked");
+  assertEquals(overlay!.operations.find((op) => op.method === "in")!.args, [
+    "profile_id",
+    ["profile-1", "profile-2"],
+  ]);
+  const jobInsert = touched.find((call) => call.table === "super_jobs")!
+    .operations.find((op) => op.method === "insert")!.args[0] as { status: string };
+  assertEquals(jobInsert.status, "completed");
+
   assertEquals(calls[0][0], "force_workspace_reauth");
   assertEquals(calls[0][1], "workspace");
   assertEquals(calls[0][2], VALID_WORKSPACE_ID);
+  assertEquals((calls[0][3] as { enforced: boolean }).enforced, true);
+});
+
+Deno.test("set_workspace_force_reauth does not report success when a session revocation fails", async () => {
+  const { calls, writeAudit } = auditRecorder();
+  const { client, touched } = recordingClient({
+    profiles: [{ data: [{ id: "profile-1" }, { id: "profile-2" }], error: null }],
+    super_jobs: [{ data: jobRow("failed"), error: null }],
+  });
+  const response = await handleControlCenterAction(
+    contextFor("set_workspace_force_reauth", { workspace_id: VALID_WORKSPACE_ID }, client, {
+      writeAudit,
+      revokeBetterAuthSessions: async (id) => {
+        if (id === "profile-2") throw new Error("Better Auth administration failed");
+      },
+    }),
+  );
+
+  assertEquals(response!.status, 503);
+  assertEquals(await responseBody(response!), {
+    error: "Unable to revoke every tenant session. Retry to finish.",
+  });
+  const jobInsert = touched.find((call) => call.table === "super_jobs")!
+    .operations.find((op) => op.method === "insert")!.args[0] as {
+      status: string;
+      details: { failed_profiles: number };
+    };
+  assertEquals(jobInsert.status, "failed");
+  assertEquals(jobInsert.details.failed_profiles, 1);
+  assertEquals((calls[0][3] as { enforced: boolean }).enforced, false);
+});
+
+Deno.test("set_workspace_force_reauth does not report success when account_sessions cannot be revoked", async () => {
+  const { client, touched } = recordingClient({
+    profiles: [{ data: [{ id: "profile-1" }], error: null }],
+    account_sessions: [{ data: null, error: OTHER_ERROR }],
+    super_jobs: [{ data: jobRow("failed"), error: null }],
+  });
+  const response = await handleControlCenterAction(
+    contextFor("set_workspace_force_reauth", { workspace_id: VALID_WORKSPACE_ID }, client, {
+      revokeBetterAuthSessions: async () => {},
+    }),
+  );
+
+  assertEquals(response!.status, 503);
+  const jobInsert = touched.find((call) => call.table === "super_jobs")!
+    .operations.find((op) => op.method === "insert")!.args[0] as { status: string };
+  assertEquals(jobInsert.status, "failed");
 });
 
 // =====================================================================

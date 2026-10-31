@@ -433,11 +433,9 @@ serve(async (req) => {
           },
         });
       }
-      if (!canManageAdmins) {
-        return jsonResponse(403, {
-          error: "Primary admin access is required to change workspace account roles.",
-        });
-      }
+      // Any active workspace admin may change account roles. Demoting an admin
+      // and changing the primary admin stay restricted by the checks above, and
+      // the RPC re-enforces both plus max_admins.
       if (!target.better_auth_user_id) {
         return jsonResponse(409, {
           error: "This account must complete its first sign-in before its role can be changed.",

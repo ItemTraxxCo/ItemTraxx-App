@@ -855,6 +855,7 @@ export type HandledRequestFailure = {
   message: string;
   errorCode?: PostHogErrorCode;
   requestId?: string;
+  captureException?: boolean;
 };
 
 const HANDLED_FAILURE_DEDUP_WINDOW_MS = 60_000;
@@ -866,7 +867,7 @@ const handledFailureSeenAt = new Map<string, number>();
 // health-probe failures are not uncaught application errors and create noisy
 // synthetic issues when wrapped in captureException.
 const shouldCaptureHandledRequestFailure = (failure: HandledRequestFailure) =>
-  failure.status >= 500;
+  failure.captureException !== false && failure.status >= 500;
 
 const getHandledRequestFailureCode = (failure: HandledRequestFailure): PostHogErrorCode => {
   if (failure.errorCode && isPostHogErrorCode(failure.errorCode)) return failure.errorCode;

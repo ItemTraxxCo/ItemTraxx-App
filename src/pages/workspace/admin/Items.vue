@@ -635,7 +635,7 @@ const runToastAction = async () => {
 const showDuplicateBarcodeToast = () => {
   showToast(
     "Unable to add item.",
-    "Check barcode and make sure it does not match another item's barcode. If you belive this is an error, please contact support."
+    "Check barcode and make sure it does not match another item's barcode. If you believe this is an error, please contact support."
   );
 };
 

@@ -16,6 +16,7 @@
           <p class="admin-section-copy">Filter by status, date range, and free-text search.</p>
         </div>
         <div class="admin-toolbar-actions">
+          <button v-if="loadError" type="button" :disabled="isLoading" @click="loadStatusTracking">Retry</button>
           <button type="button" :disabled="isLoading || Boolean(loadError)" @click="exportFlaggedCsv">Export CSV</button>
           <button type="button" :disabled="isLoading || Boolean(loadError)" @click="exportFlaggedPdf">Export PDF</button>
         </div>

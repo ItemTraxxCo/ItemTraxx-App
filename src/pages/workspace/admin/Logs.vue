@@ -15,6 +15,7 @@
           <p class="admin-section-copy">Search by action, borrower, item, or date range.</p>
         </div>
         <div class="admin-toolbar-actions">
+          <button v-if="error" type="button" :disabled="isLoading" @click="loadLogs">Retry</button>
           <button type="button" :disabled="isLoading || Boolean(error)" @click="exportCsv">Export CSV</button>
           <button type="button" :disabled="isLoading || Boolean(error)" @click="exportPdf">Export PDF</button>
         </div>

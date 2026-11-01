@@ -42,6 +42,18 @@ const captureSuperOpsRequests = async (page: Page) => {
                     last_seen_at: "2026-07-13T00:01:00.000Z",
                     is_current: true,
                   },
+                  {
+                    id: "session-remote-e2e",
+                    device_id: "device-remote-e2e",
+                    device_label: "Remote device",
+                    user_agent: "Playwright",
+                    login_method: "passkey",
+                    login_location: "super_auth",
+                    general_location: "Test Lab",
+                    created_at: "2026-07-12T00:00:00.000Z",
+                    last_seen_at: "2026-07-12T00:01:00.000Z",
+                    is_current: false,
+                  },
                 ],
               }
             : {},

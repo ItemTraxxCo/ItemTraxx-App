@@ -15,8 +15,8 @@
           <p class="admin-section-copy">Search by action, borrower, item, or date range.</p>
         </div>
         <div class="admin-toolbar-actions">
-          <button type="button" @click="exportCsv">Export CSV</button>
-          <button type="button" @click="exportPdf">Export PDF</button>
+          <button type="button" :disabled="isLoading || Boolean(error)" @click="exportCsv">Export CSV</button>
+          <button type="button" :disabled="isLoading || Boolean(error)" @click="exportPdf">Export PDF</button>
         </div>
       </div>
       <div class="form-grid-2">
@@ -150,9 +150,11 @@ const filteredLogs = computed(() => {
       }
     }
     if (dateTo.value) {
-      const toTs = Date.parse(`${dateTo.value}T23:59:59`);
-      if (!Number.isNaN(timestamp) && !Number.isNaN(toTs) && timestamp > toTs) {
-        return false;
+      const toTs = Date.parse(`${dateTo.value}T00:00:00`);
+      if (!Number.isNaN(timestamp) && !Number.isNaN(toTs)) {
+        const endExclusive = new Date(toTs);
+        endExclusive.setDate(endExclusive.getDate() + 1);
+        if (timestamp >= endExclusive.getTime()) return false;
       }
     }
 
@@ -173,7 +175,7 @@ const loadLogs = async () => {
   try {
     logs.value = await fetchItemLogs();
   } catch (err) {
-    error.value = err instanceof Error ? err.message : "Unable to load logs. Please sign out completeley and sign back in.";
+    error.value = err instanceof Error ? err.message : "Unable to load logs. Please sign out completely and sign back in.";
   } finally {
     isLoading.value = false;
   }

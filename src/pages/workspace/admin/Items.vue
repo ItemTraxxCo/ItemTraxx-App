@@ -6,7 +6,7 @@
         <RouterLink class="button-link" :to="managerPath('/item-import')">Bulk item import</RouterLink>
       </div>
       <h1>Item Management</h1>
-      <p class="admin-hero-copy">Add inventory, update item status, and review archived item without jumping between views.</p>
+      <p class="admin-hero-copy">Add inventory, update item status, and review archived items without jumping between views.</p>
       <div class="admin-summary-grid">
         <div class="admin-summary-card">
           <strong>{{ items.length }}</strong>
@@ -84,7 +84,7 @@
       <div class="admin-section-header">
         <div>
           <h2>Item List</h2>
-          <p class="admin-section-copy">Search and filter item, then export or open item details.</p>
+          <p class="admin-section-copy">Search and filter items, then export or open item details.</p>
         </div>
         <div class="admin-toolbar-actions">
           <button type="button" @click="exportCsv">Export CSV</button>
@@ -145,7 +145,6 @@
             <th>Notes</th>
             <th v-if="!isIndividualAccount">Tenant Accounts</th>
             <th></th>
-            <th></th>
           </tr>
         </thead>
         <tbody>
@@ -176,6 +175,11 @@
               <div class="admin-actions">
                 <button type="button" class="link" @click="openDetails(item)">Details</button>
               </div>
+            </td>
+          </tr>
+          <tr v-if="!error && filteredItem.length === 0">
+            <td :colspan="(isIndividualAccount ? 6 : 7) + (bulkMode ? 1 : 0)" class="muted">
+              {{ items.length ? "No items match your current search or filters." : "No items have been added yet." }}
             </td>
           </tr>
         </tbody>
@@ -250,16 +254,10 @@
             maxlength="500"
             placeholder="Notes"
           ></textarea>
-          <textarea
-            v-else
-            :value="selectedItem.notes || '-'"
-            class="item-notes-input field-plain"
-            rows="3"
-            readonly
-          ></textarea>
-          <div class="muted form-help-row">
+          <div v-else class="item-notes-readonly">{{ selectedItem.notes || "-" }}</div>
+          <div v-if="isModalEditing" class="muted form-help-row">
             <span>Character limit 500</span>
-            <span>{{ (isModalEditing ? editNotes : selectedItem.notes || '').length }}/500</span>
+            <span>{{ editNotes.length }}/500</span>
           </div>
         </label>
 
@@ -727,7 +725,7 @@ const loadItem = async () => {
     items.value = await fetchItem();
     await loadItemAccessGrants();
   } catch (err) {
-    error.value = err instanceof Error ? err.message : "Unable to load items. Please sign out completeley and sign back in. If the issue persists, contact support.";
+    error.value = err instanceof Error ? err.message : "Unable to load items. Please sign out completely and sign back in. If the issue persists, contact support.";
   } finally {
     isLoading.value = false;
   }
@@ -1039,6 +1037,13 @@ onUnmounted(() => {
 
 .item-notes-input {
   width: 100%;
+}
+
+.item-notes-readonly {
+  min-height: 1.5rem;
+  padding: 0.35rem 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 
 .modal-backdrop {

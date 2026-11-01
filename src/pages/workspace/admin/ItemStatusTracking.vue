@@ -16,8 +16,8 @@
           <p class="admin-section-copy">Filter by status, date range, and free-text search.</p>
         </div>
         <div class="admin-toolbar-actions">
-          <button type="button" @click="exportFlaggedCsv">Export CSV</button>
-          <button type="button" @click="exportFlaggedPdf">Export PDF</button>
+          <button type="button" :disabled="isLoading || Boolean(loadError)" @click="exportFlaggedCsv">Export CSV</button>
+          <button type="button" :disabled="isLoading || Boolean(loadError)" @click="exportFlaggedPdf">Export PDF</button>
         </div>
       </div>
       <div class="form-grid-2">
@@ -55,7 +55,7 @@
             <th>Name</th>
             <th>Barcode</th>
             <th>Status</th>
-            <th>Updated</th>
+            <th>Last status change</th>
             <th>Notes</th>
           </tr>
         </thead>
@@ -64,11 +64,16 @@
             <td>{{ item.name }}</td>
             <td>{{ item.barcode }}</td>
             <td>{{ formatItemStatus(item.status) }}</td>
-            <td>{{ formatDate(item.updated_at) }}</td>
+            <td :title="latestStatusChangeAt.has(item.id) ? undefined : 'No status history is recorded; showing the item record update date.'">
+              {{ formatDate(statusTimestampFor(item)) }}
+            </td>
             <td data-session-replay-mask>{{ item.notes || "-" }}</td>
           </tr>
           <tr v-if="!isLoading && !loadError && filteredFlaggedItems.length === 0">
             <td colspan="5" class="muted">No flagged items.</td>
+          </tr>
+          <tr v-if="!isLoading && loadError">
+            <td colspan="5" class="error">{{ loadError }}</td>
           </tr>
         </tbody>
       </table>
@@ -82,8 +87,8 @@
           <p class="admin-section-copy">Review chronological status changes for inventory.</p>
         </div>
         <div class="admin-toolbar-actions">
-          <button type="button" @click="exportHistoryCsv">Export CSV</button>
-          <button type="button" @click="exportHistoryPdf">Export PDF</button>
+          <button type="button" :disabled="isLoading || Boolean(loadError)" @click="exportHistoryCsv">Export CSV</button>
+          <button type="button" :disabled="isLoading || Boolean(loadError)" @click="exportHistoryPdf">Export PDF</button>
         </div>
       </div>
       <div class="table-wrap">
@@ -108,6 +113,9 @@
           </tr>
           <tr v-if="!isLoading && !loadError && filteredHistory.length === 0">
             <td colspan="4" class="muted">No status history found.</td>
+          </tr>
+          <tr v-if="!isLoading && loadError">
+            <td colspan="4" class="error">{{ loadError }}</td>
           </tr>
         </tbody>
       </table>
@@ -151,6 +159,20 @@ const dateTo = ref("");
 const featureEnabled = ref(true);
 let toastTimer: number | null = null;
 
+const latestStatusChangeAt = computed(() => {
+  const latestByItem = new Map<string, string>();
+  for (const event of history.value) {
+    const current = latestByItem.get(event.item_id);
+    if (!current || Date.parse(event.changed_at) > Date.parse(current)) {
+      latestByItem.set(event.item_id, event.changed_at);
+    }
+  }
+  return latestByItem;
+});
+
+const statusTimestampFor = (item: StatusTrackedItem) =>
+  latestStatusChangeAt.value.get(item.id) ?? item.updated_at;
+
 const withinDateRange = (value: string) => {
   const timestamp = Date.parse(value);
   if (Number.isNaN(timestamp)) return true;
@@ -159,8 +181,12 @@ const withinDateRange = (value: string) => {
     if (!Number.isNaN(fromTs) && timestamp < fromTs) return false;
   }
   if (dateTo.value) {
-    const toTs = Date.parse(`${dateTo.value}T23:59:59`);
-    if (!Number.isNaN(toTs) && timestamp > toTs) return false;
+    const toTs = Date.parse(`${dateTo.value}T00:00:00`);
+    if (!Number.isNaN(toTs)) {
+      const endExclusive = new Date(toTs);
+      endExclusive.setDate(endExclusive.getDate() + 1);
+      if (timestamp >= endExclusive.getTime()) return false;
+    }
   }
   return true;
 };
@@ -169,7 +195,7 @@ const filteredFlaggedItems = computed(() => {
   const query = searchQuery.value.trim().toLowerCase();
   return flaggedItems.value.filter((item) => {
     if (statusFilter.value !== "all" && item.status !== statusFilter.value) return false;
-    if (!withinDateRange(item.updated_at)) return false;
+    if (!withinDateRange(statusTimestampFor(item))) return false;
     if (!query) return true;
     const haystack = [
       item.name,
@@ -240,10 +266,13 @@ const loadStatusTracking = async () => {
 const exportFlaggedCsv = () => {
   exportRowsToCsv(
     `item-status-${new Date().toISOString().slice(0, 10)}.csv`,
-    ["name", "barcode", "status", "updated_at", "notes"],
+    ["Name", "Barcode", "Status", "Last status change", "Notes"],
     filteredFlaggedItems.value.map((item) => ({
-      ...item,
-      status: formatItemStatus(item.status),
+      Name: item.name,
+      Barcode: item.barcode,
+      Status: formatItemStatus(item.status),
+      "Last status change": statusTimestampFor(item),
+      Notes: item.notes,
     }))
   );
 };
@@ -252,10 +281,13 @@ const exportFlaggedPdf = async () => {
   await exportRowsToPdf(
     `item-status-${new Date().toISOString().slice(0, 10)}.pdf`,
     "Item Status Tracking",
-    ["name", "barcode", "status", "updated_at", "notes"],
+    ["Name", "Barcode", "Status", "Last status change", "Notes"],
     filteredFlaggedItems.value.map((item) => ({
-      ...item,
-      status: formatItemStatus(item.status),
+      Name: item.name,
+      Barcode: item.barcode,
+      Status: formatItemStatus(item.status),
+      "Last status change": statusTimestampFor(item),
+      Notes: item.notes,
     }))
   );
 };

@@ -9,9 +9,9 @@
     :color="color"
     :dark-color="darkColor"
     :class="theme === 'dark' ? 'boneyard-skeleton dark' : 'boneyard-skeleton'"
-    role="status"
-    aria-live="polite"
-    :aria-label="label"
+    :role="loading ? 'status' : undefined"
+    :aria-live="loading ? 'polite' : undefined"
+    :aria-label="loading ? label : undefined"
   >
     <slot />
 

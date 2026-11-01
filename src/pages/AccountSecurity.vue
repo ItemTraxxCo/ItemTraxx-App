@@ -86,7 +86,15 @@
     <section class="card">
       <h2>Sessions</h2>
       <p>Manage your active sessions and sign out of other devices.</p>
-      <button :disabled="busy" @click="signOutOthers">Sign out other sessions</button>
+      <p v-if="isLoadingSessions" class="muted" role="status">Checking active sessions…</p>
+      <p v-else-if="sessionLoadError" class="error" role="alert">{{ sessionLoadError }}</p>
+      <p v-else class="muted">
+        {{ otherSessionCount ? `${otherSessionCount} other active session${otherSessionCount === 1 ? "" : "s"}.` : "No other active sessions." }}
+      </p>
+      <button
+        :disabled="busy || isLoadingSessions || Boolean(sessionLoadError) || otherSessionCount === null || otherSessionCount === 0"
+        @click="signOutOthers"
+      >Sign out other sessions</button>
     </section>
 
     <p v-if="message" class="success" v-app-toast-message>{{ message }}</p>
@@ -101,9 +109,12 @@ import { useRouter } from "vue-router";
 import { authClient } from "../auth/client";
 import { requestAccountEmailChange } from "../services/accountEmailChangeService";
 import {
+  listSuperAdminSessions,
   revokeAllSuperAdminSessions,
   verifySuperAdminPassword,
 } from "../services/superOps/sessions";
+import { listAccountSessions } from "../services/adminOpsService";
+import { toUserFacingErrorMessage } from "../services/appErrors";
 import { getAuthState } from "../store/authState";
 
 type PasskeyItem = { id: string; name?: string | null };
@@ -121,6 +132,9 @@ const busy = ref(false);
 const isRequestingEmailChange = ref(false);
 const message = ref("");
 const error = ref("");
+const isLoadingSessions = ref(true);
+const otherSessionCount = ref<number | null>(null);
+const sessionLoadError = ref("");
 const router = useRouter();
 const authState = getAuthState();
 
@@ -137,6 +151,21 @@ const load = async () => {
   ]);
   passkeys.value = (keys ?? []).map((key) => ({ id: key.id, name: key.name }));
   twoFactorEnabled.value = Boolean((session?.user as { twoFactorEnabled?: boolean } | undefined)?.twoFactorEnabled);
+};
+const loadSessions = async () => {
+  isLoadingSessions.value = true;
+  sessionLoadError.value = "";
+  otherSessionCount.value = null;
+  try {
+    const sessions = authState.role === "super_admin"
+      ? await listSuperAdminSessions()
+      : (await listAccountSessions()).sessions ?? [];
+    otherSessionCount.value = sessions.filter((session) => !session.is_current).length;
+  } catch (cause) {
+    sessionLoadError.value = toUserFacingErrorMessage(cause, "Unable to check active sessions.");
+  } finally {
+    isLoadingSessions.value = false;
+  }
 };
 const addPasskey = () => run(async () => {
   if (authState.role === "super_admin") {
@@ -188,12 +217,14 @@ const disableTwoFactor = () => run(async () => {
   twoFactorEnabled.value = false; backupCodes.value = []; message.value = "Two-factor authentication disabled.";
 });
 const signOutOthers = () => run(async () => {
+  if (isLoadingSessions.value || sessionLoadError.value || !otherSessionCount.value) return;
   if (authState.role === "super_admin") {
     await revokeAllSuperAdminSessions(false);
   } else {
     const result = await authClient.revokeOtherSessions();
     if (result.error) throw new Error(result.error.message ?? "Unable to revoke sessions.");
   }
+  otherSessionCount.value = 0;
   message.value = "Other sessions signed out.";
 });
 const requestEmailChange = async () => {
@@ -211,7 +242,10 @@ const requestEmailChange = async () => {
     busy.value = false;
   }
 };
-onMounted(() => void run(load));
+onMounted(() => {
+  void run(load);
+  void loadSessions();
+});
 </script>
 
 <style scoped>

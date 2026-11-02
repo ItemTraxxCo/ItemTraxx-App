@@ -217,6 +217,9 @@ const hmacHex = async (value: string, secret: string) => {
 const requestPrivacyMetadata = async (env: Env, request: Request) => {
   const url = new URL(request.url);
   const route = normalizeRoute(url.pathname);
+  const isTestSimulation = (env.ITX_ENVIRONMENT ?? "").trim().toLowerCase() ===
+      "test" &&
+    request.headers.get("x-test-simulation")?.trim().toLowerCase() === "true";
   const queryKeys: string[] = [];
   const queryValueLengths: Record<string, number> = {};
   for (const [rawKey, value] of url.searchParams) {
@@ -233,6 +236,7 @@ const requestPrivacyMetadata = async (env: Env, request: Request) => {
   return {
     route,
     method: request.method.toUpperCase().slice(0, 16),
+    ...(isTestSimulation ? { attack_type: "simulation" } : {}),
     query_keys: queryKeys,
     query_value_lengths: queryValueLengths,
     ...(request.headers.get("user-agent")

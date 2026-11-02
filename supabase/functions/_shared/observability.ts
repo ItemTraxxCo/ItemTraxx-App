@@ -179,9 +179,13 @@ const requestPrivacyMetadata = async (req: Request) => {
   const clientIp = req.headers.get("cf-connecting-ip")?.trim() ?? "";
   const credential = bearerOrSessionCredential(req);
   const userAgent = req.headers.get("user-agent") ?? "";
+  const isTestSimulation = envValue("ITX_ENVIRONMENT").trim().toLowerCase() ===
+      "test" &&
+    req.headers.get("x-test-simulation")?.trim().toLowerCase() === "true";
   return {
     route: routeForTelemetry(url.pathname),
     method: req.method.toUpperCase().slice(0, 16),
+    ...(isTestSimulation ? { attack_type: "simulation" } : {}),
     ...safeQuerySummary(url),
     ...(userAgent ? { user_agent: safeText(userAgent, 256) } : {}),
     ...(clientIp && secret ? { client_ip_hash: await hmacHex(clientIp, secret) } : {}),

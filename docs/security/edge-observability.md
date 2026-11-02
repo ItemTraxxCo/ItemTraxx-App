@@ -83,6 +83,8 @@ requires the signed Worker-ingress headers.
 Run the focused tests from the repository root:
 
 ```sh
+npm run security:verify
+
 deno test --allow-env --allow-net \
   supabase/functions/_shared/observability_test.ts \
   supabase/functions/_shared/securityAudit_test.ts \
@@ -94,6 +96,12 @@ deno test --no-check --allow-env --allow-net \
   src/observability_test.ts src/supabaseApiProxy_test.ts
 npm run typecheck
 ```
+
+`security:verify` exercises both wrappers, the Worker rate-limit helper, the
+configured authentication alert threshold, and mocked PostHog/incident.io
+receivers. It has no network permission. The `x-test-simulation: true` marker
+is exported as `attack_type: "simulation"` only when `ITX_ENVIRONMENT=test`;
+it does not change authorization, validation, or rate-limit decisions.
 
 To check the shared Supabase code and targeted handlers independently, run
 `deno check --node-modules-dir=auto` against their `_shared` modules and

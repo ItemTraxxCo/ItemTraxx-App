@@ -13,6 +13,7 @@
         "environment"
       ],
       "optional": [
+        "attack_type",
         "client_ip_hash",
         "session_hash",
         "user_agent",
@@ -36,6 +37,7 @@
         "waf_action"
       ],
       "optional": [
+        "attack_type",
         "client_ip_hash",
         "session_hash",
         "actor_hash",

@@ -101,7 +101,7 @@ Deno.test("successful targeted item reads create signed, actor-scoped audit requ
       "request-audit-1",
       "/rest/v1/items",
       "signed-better-auth-session",
-      Response.json([{ id: "00000000-0000-4000-8000-000000000001" }]),
+      Response.json([{ id: "00000000-0000-4000-8000-000000000002" }]),
     );
   } finally {
     globalThis.fetch = originalFetch;
@@ -113,6 +113,20 @@ Deno.test("successful targeted item reads create signed, actor-scoped audit requ
   }
   if (calls[0]?.body.action !== "read_item_target") {
     throw new Error("An explicit item-ID filter must be classified as a targeted read");
+  }
+  if (JSON.stringify(calls[0]?.body.item_ids) !== JSON.stringify([
+    "00000000-0000-4000-8000-000000000002",
+    "00000000-0000-4000-8000-000000000001",
+  ])) {
+    throw new Error("Audit requests retain both returned and queried resource IDs");
+  }
+  if (JSON.stringify(calls[0]?.body.returned_item_ids) !== JSON.stringify([
+    "00000000-0000-4000-8000-000000000002",
+  ])) {
+    throw new Error("Only IDs read from the upstream response are marked returned");
+  }
+  if (calls[0]?.body.http_status !== 200) {
+    throw new Error("The upstream HTTP status is correlated with the audit request");
   }
   if (!calls[0]?.headers.get("x-itx-edge-proxy-signature")) {
     throw new Error("Audit request must carry a trusted-ingress signature");

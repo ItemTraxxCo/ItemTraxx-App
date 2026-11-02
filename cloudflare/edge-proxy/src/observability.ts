@@ -2,6 +2,11 @@ import {
   TRACE_PARENT_EXPORTED_HEADER,
   TRACE_PARENT_EXPORTED_VALUE,
 } from "./requestHeaders.ts";
+import {
+  classifyIncidentOutcome,
+  type IncidentEvidence,
+  type SecurityIncidentAttackType,
+} from "../../../supabase/functions/_shared/incidentOutcome.ts";
 
 /** Structured Worker telemetry and W3C trace propagation.
  *
@@ -44,13 +49,7 @@ const SUSPICIOUS_QUERY_MARKERS: Array<[string, RegExp, string]> = [
   ["prototype_pollution", /(?:__proto__|prototype\s*\[|constructor\s*\[)/i, "prototype-property"],
 ];
 
-type IncidentSecurityAttackType =
-  | "sqli"
-  | "xss"
-  | "rls_tenant_breach"
-  | "idor_enumeration";
-
-const incidentAttackLabel = (attackType: IncidentSecurityAttackType) => ({
+const incidentAttackLabel = (attackType: SecurityIncidentAttackType) => ({
   sqli: "SQLi",
   xss: "XSS",
   rls_tenant_breach: "RLS/tenant breach attempt",
@@ -61,12 +60,15 @@ const incidentRouteSlug = (route: string) =>
   route.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "")
     .slice(0, 80) || "root";
 
-const dispatchIncidentIoSecurityPage = (
+export const dispatchIncidentIoSecurityPage = (
   env: Env,
   request: Request,
   requestId: string,
-  attackType: IncidentSecurityAttackType,
+  attackType: SecurityIncidentAttackType,
   ctx?: Pick<ExecutionContext, "waitUntil">,
+  httpStatus?: number,
+  evidence: IncidentEvidence = "unknown",
+  alertStatus: "firing" | "resolved" = "firing",
 ) => {
   const endpoint = env.INCIDENT_IO_SECURITY_WEBHOOK_URL?.trim() ?? "";
   const apiKey = env.INCIDENT_IO_SECURITY_API_KEY?.trim() ?? "";
@@ -86,13 +88,40 @@ const dispatchIncidentIoSecurityPage = (
   const pagePromise = (async () => {
     const metadata = await requestPrivacyMetadata(env, request);
     const route = metadata.route;
+    const validHttpStatus = Number.isInteger(httpStatus) && httpStatus! >= 100 &&
+        httpStatus! <= 599
+      ? httpStatus
+      : undefined;
+    const httpStatusValue = validHttpStatus ?? "unknown";
+    const classification = classifyIncidentOutcome(attackType, {
+      ...(validHttpStatus !== undefined ? { httpStatus: validHttpStatus } : {}),
+    });
+    const safeRequestId = SAFE_REQUEST_ID_RE.test(requestId)
+      ? requestId
+      : "unknown";
+    const displayEvidence = evidence;
     const payload = {
       title: "[SECURITY CRITICAL] " + incidentAttackLabel(attackType) + " on " + route,
+      description: [
+        `Exploitation Status: ${classification.exploitationStatus}`,
+        `Security Outcome: ${classification.securityOutcome}`,
+        `HTTP Status: ${httpStatusValue}`,
+        `Request ID: ${safeRequestId}`,
+        `Route: ${route}`,
+        `Attack Type: ${incidentAttackLabel(attackType)}`,
+        `Evidence: ${displayEvidence}`,
+        `Assessment: ${classification.explanation}`,
+      ].join("\n"),
       deduplication_key: "itx-sec-" + attackType + "-" + incidentRouteSlug(route),
-      status: "firing",
+      status: alertStatus,
       severity: "critical",
       metadata: {
         attack_type: attackType,
+        exploitation_status: classification.exploitationStatus,
+        outcome: classification.securityOutcome,
+        request_id: safeRequestId,
+        http_status: httpStatusValue,
+        evidence: displayEvidence,
         route,
         client_ip_hash: metadata.client_ip_hash ?? "unknown",
         actor_id: "anon",
@@ -667,10 +696,26 @@ export const logWorkerRequestCompletion = async (
     events.push({ event: "security_event", properties: suspiciousEvent });
   }
   if (suspicious.markers.includes("sql_injection")) {
-    dispatchIncidentIoSecurityPage(env, request, requestId, "sqli", ctx);
+    dispatchIncidentIoSecurityPage(
+      env,
+      request,
+      requestId,
+      "sqli",
+      ctx,
+      status,
+      "payload_signature",
+    );
   }
   if (suspicious.markers.includes("xss")) {
-    dispatchIncidentIoSecurityPage(env, request, requestId, "xss", ctx);
+    dispatchIncidentIoSecurityPage(
+      env,
+      request,
+      requestId,
+      "xss",
+      ctx,
+      status,
+      "payload_signature",
+    );
   }
   const exportPromise = captureWorkerEvents(env, requestId, events);
   if (ctx) ctx.waitUntil(exportPromise);

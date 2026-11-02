@@ -194,8 +194,20 @@ Deno.test("security verification exercises edge rejection, incident paging, auth
       "incident carries the detected XSS type",
     );
     assert(
+      incidentPosts[0].metadata.request_id === invalidRequestEvent.properties.request_id,
+      "incident carries the request ID used by PostHog events",
+    );
+    assert(incidentPosts[0].metadata.http_status === 422, "incident carries the observed response status");
+    assert(incidentPosts[0].metadata.exploitation_status === "ATTEMPTED EXPLOITATION", "rejected input is classified as an attempt");
+    assert(incidentPosts[0].metadata.outcome === "BLOCKED", "validation rejection is classified as blocked at this layer");
+    assert(
       incidentPosts[0].metadata.route === "/functions/admin-ops",
       "incident carries the route",
+    );
+    assert(
+      typeof incidentPosts[0].description === "string" &&
+        incidentPosts[0].description.includes("Security Outcome: BLOCKED"),
+      "the classification is visible in the incident description",
     );
     assert(
       typeof incidentPosts[0].metadata.client_ip_hash === "string",

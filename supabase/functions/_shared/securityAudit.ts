@@ -13,6 +13,30 @@ export type SecurityAuditEntry = {
 
 export type SecurityAuditWriteOptions = {
   request?: Request;
+  httpStatus?: number;
+};
+
+export const classifySecurityAuditTargets = (
+  itemIds: string[],
+  returnedItemIds: string[],
+  visibleIds: Set<string>,
+  actorWorkspaceId: string,
+  targetWorkspaceById: Map<string, string>,
+) => {
+  const itemIdSet = new Set(itemIds);
+  const returnedIds = new Set(returnedItemIds.filter((id) => itemIdSet.has(id)));
+  const visibleTargetIds = itemIds.filter((id) => visibleIds.has(id));
+  const deniedTargetIds = itemIds.filter((id) => !visibleIds.has(id));
+  const confirmedUnauthorizedTargetIds = [...returnedIds].filter((id) =>
+    !visibleIds.has(id) &&
+    targetWorkspaceById.has(id) &&
+    targetWorkspaceById.get(id) !== actorWorkspaceId
+  );
+  return {
+    visibleTargetIds,
+    deniedTargetIds,
+    confirmedUnauthorizedTargetIds,
+  };
 };
 
 type AuditClient = {
@@ -103,6 +127,7 @@ export const writeSecurityAuditEntries = async (
         route: batch[0].route,
         distinctTargetCount: tripwireCount,
         request: options.request,
+        httpStatus: options.httpStatus,
       });
     }
   }

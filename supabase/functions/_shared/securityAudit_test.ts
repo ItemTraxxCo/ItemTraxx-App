@@ -1,9 +1,44 @@
-import { flushEventExports } from "./observability.ts";
-import { writeSecurityAuditEntries } from "./securityAudit.ts";
+import {
+  emitIncidentIoSecurityPage,
+  flushEventExports,
+} from "./observability.ts";
+import {
+  classifySecurityAuditTargets,
+  writeSecurityAuditEntries,
+} from "./securityAudit.ts";
 
 const assert: (condition: unknown, message: string) => asserts condition = (condition, message) => {
   if (!condition) throw new Error(message);
 };
+
+Deno.test("audit evidence separates requested IDs from unauthorized returned IDs", () => {
+  const ownId = "00000000-0000-4000-8000-000000000001";
+  const requestedForeignId = "00000000-0000-4000-8000-000000000002";
+  const returnedForeignId = "00000000-0000-4000-8000-000000000003";
+  const returnedUnverifiedId = "00000000-0000-4000-8000-000000000004";
+  const returnedMissingId = "00000000-0000-4000-8000-000000000005";
+  const result = classifySecurityAuditTargets(
+    [ownId, requestedForeignId, returnedForeignId, returnedUnverifiedId, returnedMissingId],
+    [ownId, returnedForeignId, returnedUnverifiedId, returnedMissingId],
+    new Set([ownId]),
+    "workspace-a",
+    new Map([
+      [ownId, "workspace-a"],
+      [returnedForeignId, "workspace-b"],
+      [returnedUnverifiedId, "workspace-a"],
+    ]),
+  );
+  assert(
+    JSON.stringify(result.deniedTargetIds) ===
+      JSON.stringify([requestedForeignId, returnedForeignId, returnedUnverifiedId, returnedMissingId]),
+    "both non-visible IDs are retained for denied-target auditing",
+  );
+  assert(
+    JSON.stringify(result.confirmedUnauthorizedTargetIds) ===
+      JSON.stringify([returnedForeignId]),
+    "confirmation requires a returned ID with a verified different workspace",
+  );
+});
 
 Deno.test("security audit writes emit hashed audit events and the enumeration tripwire", async () => {
   const originalFetch = globalThis.fetch;
@@ -81,12 +116,62 @@ Deno.test("security audit writes emit hashed audit events and the enumeration tr
     assert(incidentPage.payload.severity === "critical", "tripwire page is critical");
     const incidentMetadata = incidentPage.payload.metadata as Record<string, unknown>;
     assert(incidentMetadata.attack_type === "idor_enumeration", "tripwire attack type");
+    assert(incidentMetadata.exploitation_status === "UNDETERMINED", "high-volume read alert does not infer malicious intent");
+    assert(incidentMetadata.outcome === "UNKNOWN", "high-volume read alert keeps its outcome unknown");
+    assert(incidentMetadata.http_status === "unknown", "missing status is explicit");
+    assert(incidentMetadata.request_id === "audit-request-1", "incident includes the correlated request ID");
+    assert(typeof incidentPage.payload.description === "string" &&
+      incidentPage.payload.description.includes("Security Outcome: UNKNOWN"),
+      "classification is visible in the incident description");
     assert(typeof incidentMetadata.client_ip_hash === "string", "tripwire IP is keyed");
     assert(typeof incidentMetadata.actor_id === "string" && incidentMetadata.actor_id !== "anon", "tripwire actor is keyed");
     assert(!JSON.stringify(incidentPage.payload).includes("203.0.113.101"), "raw IP is not in the incident payload");
     const serialized = JSON.stringify(captures);
     assert(!serialized.includes("00000000-0000-4000-8000-000000000001"), "actor id is hashed before PostHog");
     assert(!serialized.includes("00000000-0000-4000-8000-000000000002"), "workspace id is hashed before PostHog");
+
+    const tenantProbe = {
+      attackType: "rls_tenant_breach" as const,
+      actorId: "00000000-0000-4000-8000-000000000006",
+      requestId: "audit-request-2",
+      route: "/rest/v1/items",
+      httpStatus: 200,
+      evidence: "cross_workspace_target_requested" as const,
+      request: new Request("https://edge.itemtraxx.com/rest/v1/items", {
+        headers: { "cf-connecting-ip": "203.0.113.102" },
+      }),
+    };
+    emitIncidentIoSecurityPage(tenantProbe);
+    emitIncidentIoSecurityPage({
+      ...tenantProbe,
+      evidence: "cross_workspace_resource_returned",
+      confirmedBy: "cross_workspace_item_in_upstream_response",
+    });
+    await flushEventExports();
+
+    const tenantAttempt = incidentPages.find((page) =>
+      (page.payload.metadata as Record<string, unknown>).outcome === "ATTEMPT DETECTED"
+    );
+    const tenantConfirmed = incidentPages.find((page) =>
+      (page.payload.metadata as Record<string, unknown>).outcome === "CONFIRMED UNAUTHORIZED ACCESS"
+    );
+    assert(tenantAttempt && tenantConfirmed, "tenant attempt and confirmation pages are present");
+    assert(tenantAttempt.payload.metadata && tenantConfirmed.payload.metadata, "tenant incident metadata is present");
+    const attemptMetadata = tenantAttempt.payload.metadata as Record<string, unknown>;
+    const confirmedMetadata = tenantConfirmed.payload.metadata as Record<string, unknown>;
+    assert(attemptMetadata.outcome === "ATTEMPT DETECTED", "a queried foreign target is not a successful breach");
+    assert(attemptMetadata.http_status === 200, "attempt page records the original response status");
+    assert(confirmedMetadata.outcome === "CONFIRMED UNAUTHORIZED ACCESS", "only returned foreign resources confirm unauthorized access");
+    assert(confirmedMetadata.request_id === tenantProbe.requestId, "confirmed page retains the original request ID");
+    assert(typeof tenantConfirmed.payload.description === "string" &&
+      tenantConfirmed.payload.description.includes("CONFIRMED UNAUTHORIZED ACCESS"),
+      "confirmed classification is visible in the description");
+    assert(
+      tenantAttempt.payload.deduplication_key === tenantConfirmed.payload.deduplication_key,
+      "later classification updates retain the same deduplication key",
+    );
+    assert(!JSON.stringify(tenantConfirmed.payload).includes("203.0.113.102"), "tenant page contains no raw IP");
+    assert(!JSON.stringify(tenantConfirmed.payload).includes("00000000-0000-4000-8000-000000006"), "tenant page contains no raw actor ID");
   } finally {
     globalThis.fetch = originalFetch;
     for (const [name, value] of Object.entries({

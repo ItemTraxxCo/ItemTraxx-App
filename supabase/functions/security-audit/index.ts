@@ -9,7 +9,10 @@ import {
 } from "../_shared/observability.ts";
 import { readJsonBody } from "../_shared/requestBody.ts";
 import { requireTrustedEdgeIngress } from "../_shared/trustedIngress.ts";
-import { writeSecurityAuditEntries } from "../_shared/securityAudit.ts";
+import {
+  classifySecurityAuditTargets,
+  writeSecurityAuditEntries,
+} from "../_shared/securityAudit.ts";
 
 const BASE_CORS_HEADERS = {
   "Access-Control-Allow-Headers":
@@ -22,6 +25,8 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-
 type AuditRequest = {
   action?: unknown;
   item_ids?: unknown;
+  returned_item_ids?: unknown;
+  http_status?: unknown;
 };
 
 serve(async (req) => {
@@ -91,12 +96,38 @@ serve(async (req) => {
     ) {
       return jsonResponse(400, { error: "Invalid audit action" });
     }
-    if (!Array.isArray(payload.item_ids) || payload.item_ids.length > 500) {
+    const rawItemIds = payload.item_ids;
+    if (!Array.isArray(rawItemIds) || rawItemIds.length > 500) {
       return jsonResponse(400, { error: "Invalid item id list" });
     }
-    const itemIds = [...new Set(payload.item_ids)];
-    if (itemIds.some((id) => typeof id !== "string" || !UUID_RE.test(id))) {
+    if (rawItemIds.some((id) => typeof id !== "string" || !UUID_RE.test(id))) {
       return jsonResponse(400, { error: "Invalid item id list" });
+    }
+    const itemIds = [...new Set((rawItemIds as string[]).map((id) => id.toLowerCase()))];
+    const rawReturnedItemIds = payload.returned_item_ids === undefined
+      ? []
+      : payload.returned_item_ids;
+    if (!Array.isArray(rawReturnedItemIds) || rawReturnedItemIds.length > 500) {
+      return jsonResponse(400, { error: "Invalid returned item id list" });
+    }
+    if (
+      rawReturnedItemIds.some((id) => typeof id !== "string" || !UUID_RE.test(id))
+    ) {
+      return jsonResponse(400, { error: "Invalid returned item id list" });
+    }
+    const returnedItemIds = [...new Set((rawReturnedItemIds as string[]).map((id) => id.toLowerCase()))];
+    if (returnedItemIds.some((id) => !itemIds.includes(id))) {
+      return jsonResponse(400, { error: "Invalid returned item id list" });
+    }
+    const httpStatus = payload.http_status === undefined
+      ? undefined
+      : payload.http_status;
+    if (
+      httpStatus !== undefined &&
+      (typeof httpStatus !== "number" || !Number.isInteger(httpStatus) ||
+        httpStatus < 100 || httpStatus > 599)
+    ) {
+      return jsonResponse(400, { error: "Invalid upstream status" });
     }
     if (itemIds.length === 0) return jsonResponse(200, { audited: 0 });
 
@@ -109,10 +140,42 @@ serve(async (req) => {
       .in("id", itemIds);
     if (itemError) return jsonResponse(503, { error: "Unable to validate audit targets" });
     const visibleIds = new Set((visibleItems ?? []).map((item: { id: string }) => item.id));
-    const visibleTargetIds = itemIds.filter((id) => visibleIds.has(id));
-    const deniedTargetIds = itemIds.filter((id) => !visibleIds.has(id));
-
     const requestId = getRequestId(req);
+    const returnedDeniedIds = returnedItemIds.filter((id) => !visibleIds.has(id));
+    const targetWorkspaceById = new Map<string, string>();
+    if (returnedDeniedIds.length) {
+      const { data: returnedTargets, error: targetVerificationError } = await adminClient
+        .from("items")
+        .select("id, workspace_id")
+        .in("id", returnedDeniedIds);
+      if (targetVerificationError) {
+        logError(
+          "security_audit.returned_target_verification_failed",
+          requestId,
+          targetVerificationError,
+          { error_code: "target_verification_failed" },
+        );
+      } else {
+        for (const target of returnedTargets ?? []) {
+          if (typeof target.id === "string" && typeof target.workspace_id === "string") {
+            targetWorkspaceById.set(target.id.toLowerCase(), target.workspace_id.toLowerCase());
+          }
+        }
+      }
+    }
+    const {
+      visibleTargetIds,
+      deniedTargetIds,
+      confirmedUnauthorizedTargetIds,
+    } = classifySecurityAuditTargets(
+      itemIds,
+      returnedItemIds,
+      visibleIds,
+      profile.workspace_id.toLowerCase(),
+      targetWorkspaceById,
+    );
+    const confirmedUnauthorizedIds = new Set(confirmedUnauthorizedTargetIds);
+
     const auditAction = payload.action === "read_item_target"
       ? "read_target"
       : payload.action === "read_items"
@@ -148,16 +211,18 @@ serve(async (req) => {
         action: auditAction,
         target_resource_id: id,
       })),
-      { request: req },
+      { request: req, httpStatus },
     );
     const deniedAuditWritten = await writeSecurityAuditEntries(
       adminClient,
       deniedTargetIds.map((id) => ({
         ...auditBase,
-        action: "denied_read_target",
+        action: confirmedUnauthorizedIds.has(id)
+          ? "confirmed_unauthorized_read"
+          : "denied_read_target",
         target_resource_id: id,
       })),
-      { request: req },
+      { request: req, httpStatus },
     );
     if (!visibleAuditWritten || !deniedAuditWritten) {
       logError("security_audit.read_write_failed", requestId, new Error("Audit persistence failed"), {
@@ -172,6 +237,13 @@ serve(async (req) => {
         requestId,
         route: auditRoute,
         request: req,
+        httpStatus,
+        evidence: confirmedUnauthorizedTargetIds.length
+          ? "cross_workspace_resource_returned"
+          : "cross_workspace_target_requested",
+        ...(confirmedUnauthorizedTargetIds.length
+          ? { confirmedBy: "cross_workspace_item_in_upstream_response" as const }
+          : {}),
       });
       return jsonResponse(403, { error: "Access denied" });
     }

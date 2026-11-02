@@ -339,6 +339,10 @@ verify_jwt = false
 # Better Auth JWT and profile authorization are validated inside the function.
 verify_jwt = false
 
+[functions.security-audit]
+# Better Auth JWT, trusted proxy ingress, and item RLS are validated inside the function.
+verify_jwt = false
+
 [functions.admin-borrower-mutate]
 # Better Auth JWT and profile authorization are validated inside the function.
 verify_jwt = false

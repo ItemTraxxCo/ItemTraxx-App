@@ -1,5 +1,6 @@
-import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
+import { serve } from "../_shared/serve.ts";
 import { getExternalAuthUser } from "../_shared/externalAuth.ts";
+import { emitAuditEvent, getRequestId } from "../_shared/observability.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.108.2";
 import { isKillSwitchWriteBlocked } from "../_shared/killSwitch.ts";
 import { isAllowedOrigin, parseAllowedOrigins } from "../_shared/cors.ts";
@@ -7,6 +8,7 @@ import { requireTrustedEdgeIngress } from "../_shared/trustedIngress.ts";
 import { resolveRateLimitResult } from "../_shared/preloginGuards.ts";
 import { validateAccountDeviceSession } from "../_shared/accountSessions.ts";
 import { readJsonBody } from "../_shared/requestBody.ts";
+import { writeSecurityAuditEntries } from "../_shared/securityAudit.ts";
 import { resolveWorkspaceAccess } from "../_shared/workspaceAccess.ts";
 import { quotaLimitResponse } from "../_shared/quota.ts";
 import {
@@ -192,15 +194,6 @@ serve(async (req) => {
       }
       return { accessMode, profileIds };
     };
-    const replaceAccess = async (itemId: string, accessMode: "all" | "restricted", profileIds: string[]) => {
-      const { error: deleteError } = await adminClient.from("item_access_grants").delete().eq("item_id", itemId);
-      if (deleteError) throw new Error("Unable to update item access.");
-      if (accessMode === "restricted") {
-        const { error } = await adminClient.from("item_access_grants").insert(profileIds.map((profileId) => ({ item_id: itemId, profile_id: profileId, granted_by: user.id })));
-        if (error) throw new Error("Unable to update item access.");
-      }
-    };
-
     const writeAudit = async (
       actionType: string,
       entityId: string | null,
@@ -215,6 +208,18 @@ serve(async (req) => {
         metadata,
       });
       if (error) throw new Error("Unable to write security audit log.");
+      if (entityId) {
+        emitAuditEvent({
+          actorId: profile.id,
+          workspaceId: profile.workspace_id,
+          targetResourceId: entityId,
+          targetType: "item",
+          action: actionType,
+          requestId: getRequestId(req),
+          route: "/functions/admin-item-mutate",
+          method: "POST",
+        });
+      }
     };
 
     if (isMutationAction) {
@@ -291,6 +296,17 @@ serve(async (req) => {
         return jsonResponse(400, { error: "Unable to load archived items." });
       }
 
+      await writeSecurityAuditEntries(adminClient, (data ?? []).map((item: { id: string }) => ({
+        actor_id: profile.id,
+        workspace_id: profile.workspace_id,
+        action: "read_archived",
+        target_type: "item",
+        target_resource_id: item.id,
+        route: "/functions/admin-item-mutate",
+        method: "POST",
+        request_id: getRequestId(req),
+      })));
+
       return jsonResponse(200, { data: data ?? [] });
     }
 
@@ -303,43 +319,36 @@ serve(async (req) => {
       const normalizedSerial = optionalText(serial_number, { maxLen: 64 });
       const normalizedNotes = optionalText(notes, { maxLen: 500 });
 
-      const { data, error } = await adminClient
-        .from("items")
-        .insert({
-          workspace_id: profile.workspace_id,
-          name: normalizedName,
-          barcode: normalizedBarcode,
-          serial_number: normalizedSerial || null,
-          status: normalizedStatus,
-          notes: normalizedNotes || null,
-          access_mode: accessMode,
-        })
-        .select("id, workspace_id, name, barcode, serial_number, status, notes")
-        .single();
+      const { data, error } = await adminClient.rpc(
+        "create_item_with_access_and_audit",
+        {
+          p_workspace_id: profile.workspace_id,
+          p_name: normalizedName,
+          p_barcode: normalizedBarcode,
+          p_serial_number: normalizedSerial || null,
+          p_status: normalizedStatus,
+          p_notes: normalizedNotes || null,
+          p_access_mode: accessMode,
+          p_profile_ids: profileIds,
+          p_actor_id: user.id,
+        },
+      ).maybeSingle();
 
       if (error || !data) {
         const quotaResponse = quotaLimitResponse(error, jsonResponse);
         if (quotaResponse) return quotaResponse;
         return jsonResponse(400, { error: "Unable to create item." });
       }
-      await replaceAccess(data.id, accessMode, profileIds);
-
-      if (normalizedStatus !== "available" && normalizedStatus !== "checked_out") {
-        await adminClient.from("item_status_history").insert({
-          workspace_id: profile.workspace_id,
-          item_id: data.id,
-          status: normalizedStatus,
-          note: normalizedNotes || null,
-          changed_by: user.id,
-        });
-      }
-
-      await writeAudit("item_create", data.id, {
-        barcode: normalizedBarcode,
-        status: normalizedStatus,
-        has_serial_number: !!normalizedSerial,
+      emitAuditEvent({
+        actorId: profile.id,
+        workspaceId: profile.workspace_id,
+        targetResourceId: data.id,
+        targetType: "item",
+        action: "item_create",
+        requestId: getRequestId(req),
+        route: "/functions/admin-item-mutate",
+        method: "POST",
       });
-
       return jsonResponse(200, { data });
     }
 
@@ -375,28 +384,23 @@ serve(async (req) => {
         });
       }
 
-      let updateQuery = adminClient
-        .from("items")
-        .update({
-          name: normalizedName,
-          barcode: normalizedBarcode,
-          status: normalizedStatus,
-          notes: normalizedNotes || null,
-          access_mode: accessMode,
-        })
-        .eq("id", normalizedId)
-        .eq("workspace_id", profile.workspace_id)
-        .is("deleted_at", null)
-        .eq("status", existingItem.status);
-      updateQuery = existingItem.checked_out_by == null
-        ? updateQuery.is("checked_out_by", null)
-        : updateQuery.eq("checked_out_by", existingItem.checked_out_by);
-      updateQuery = existingItem.checked_out_at == null
-        ? updateQuery.is("checked_out_at", null)
-        : updateQuery.eq("checked_out_at", existingItem.checked_out_at);
-      const { data, error } = await updateQuery
-        .select("id, workspace_id, name, barcode, serial_number, status, notes")
-        .maybeSingle();
+      const { data, error } = await adminClient.rpc(
+        "update_item_with_access_and_audit",
+        {
+          p_workspace_id: profile.workspace_id,
+          p_item_id: normalizedId,
+          p_name: normalizedName,
+          p_barcode: normalizedBarcode,
+          p_status: normalizedStatus,
+          p_notes: normalizedNotes || null,
+          p_access_mode: accessMode,
+          p_profile_ids: profileIds,
+          p_actor_id: user.id,
+          p_expected_status: existingItem.status,
+          p_expected_checked_out_by: existingItem.checked_out_by,
+          p_expected_checked_out_at: existingItem.checked_out_at,
+        },
+      ).maybeSingle();
 
       if (!data && !error) {
         return jsonResponse(409, { error: "Item changed while you were editing it. Reload and try again." });
@@ -404,28 +408,16 @@ serve(async (req) => {
       if (error || !data) {
         return jsonResponse(400, { error: "Unable to update item." });
       }
-      await replaceAccess(data.id, accessMode, profileIds);
-
-      if (
-        existingItem?.status !== normalizedStatus &&
-        normalizedStatus !== "available" &&
-        normalizedStatus !== "checked_out"
-      ) {
-        await adminClient.from("item_status_history").insert({
-          workspace_id: profile.workspace_id,
-          item_id: data.id,
-          status: normalizedStatus,
-          note: normalizedNotes || null,
-          changed_by: user.id,
-        });
-      }
-
-      await writeAudit("item_update", data.id, {
-        barcode: normalizedBarcode,
-        previous_status: existingItem?.status ?? null,
-        status: normalizedStatus,
+      emitAuditEvent({
+        actorId: profile.id,
+        workspaceId: profile.workspace_id,
+        targetResourceId: data.id,
+        targetType: "item",
+        action: "item_update",
+        requestId: getRequestId(req),
+        route: "/functions/admin-item-mutate",
+        method: "POST",
       });
-
       return jsonResponse(200, { data });
     }
 

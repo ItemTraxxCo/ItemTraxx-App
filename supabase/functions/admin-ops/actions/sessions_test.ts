@@ -8,7 +8,7 @@ import {
 import type { AdminOpsContext, JsonResponse, SupabaseClient } from "../context.ts";
 
 // --- hand-rolled assertion helpers (matches repo convention: no std/assert import) ---
-const assert = (condition: unknown, message: string) => {
+const assert: (condition: unknown, message: string) => asserts condition = (condition, message) => {
   if (!condition) throw new Error(message);
 };
 
@@ -881,7 +881,7 @@ Deno.test("handleSessionAction list_sessions dedupes rows and flags the current 
       last_seen_at: "2026-07-01T00:00:00.000Z",
     },
   ];
-  const { client } = makeClient(sequence([{ data: rows, error: null }]));
+  const { client, calls } = makeClient(sequence([{ data: rows, error: null }]));
   const response = await handleSessionAction(adminOpsContextFor("list_sessions", client));
 
   assertEquals(response.status, 200);
@@ -892,6 +892,24 @@ Deno.test("handleSessionAction list_sessions dedupes rows and flags the current 
   assertEquals(sessions[0].is_current, true);
   assertEquals(sessions[1].id, "session-2");
   assertEquals(sessions[1].is_current, false);
+  const sessionQuery = calls.find((call) => call.table === "account_sessions");
+  assert(sessionQuery, "active sessions query must use the account_sessions table");
+  assert(
+    sessionQuery.operations.some((op) => op.method === "eq" && op.args[0] === "workspace_id" && op.args[1] === "00000000-0000-4000-8000-000000000002"),
+    "active session listing is restricted to the caller workspace",
+  );
+  assert(
+    sessionQuery.operations.some((op) => op.method === "eq" && op.args[0] === "profile_id" && op.args[1] === "00000000-0000-4000-8000-000000000001"),
+    "active session listing is restricted to the caller profile",
+  );
+  assert(
+    sessionQuery.operations.some((op) => op.method === "is" && op.args[0] === "revoked_at" && op.args[1] === null),
+    "revoked sessions are excluded",
+  );
+  assert(
+    sessionQuery.operations.some((op) => op.method === "limit" && op.args[0] === 100),
+    "session enumeration has a bounded page size",
+  );
 });
 
 Deno.test("handleSessionAction list_sessions flags a sibling-origin row sharing the current auth session as current", async () => {

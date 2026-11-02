@@ -56,6 +56,7 @@ export type DeviceSessionContext = {
 };
 
 export type AdminOpsContext = {
+  request?: Request;
   requestId: string;
   action: string;
   payload: Record<string, unknown>;

@@ -6,7 +6,7 @@
 
     <main class="security-container">
       <div class="page-nav-left security-top-nav">
-        <RouterLink class="security-back-link" to="/" aria-label="Return to home" @click.prevent="$router.back()">
+        <RouterLink class="security-back-link" to="/" aria-label="Return to home">
           <svg viewBox="0 0 24 24" aria-hidden="true">
             <path d="M15 5 8 12l7 7" />
           </svg>

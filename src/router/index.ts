@@ -248,7 +248,7 @@ const routes: RouteRecordRaw[] = [
   { path: "/borrowers", name: "workspace-borrowers", component: () => import("../pages/workspace/Borrowers.vue"), meta: { requiresSession: true, requiresWorkspace: true, requiresRole: "tenant_account", title: "Borrowers | ItemTraxx" } },
   { path: "/settings", name: "workspace-settings", component: () => import("../pages/workspace/Settings.vue"), meta: { requiresSession: true, requiresWorkspace: true, requiresRole: "tenant_account", title: "Settings | ItemTraxx" } },
   { path: "/account/security", name: "account-security", component: () => import("../pages/AccountSecurity.vue"), meta: { requiresSession: true, title: "Account Security | ItemTraxx" } },
-  { path: "/login/two-factor", name: "two-factor-challenge", component: () => import("../pages/TwoFactorChallenge.vue"), meta: { title: "Two-factor verification | ItemTraxx" } },
+  { path: "/login/two-factor", name: "two-factor-challenge", component: () => import("../pages/TwoFactorChallenge.vue"), meta: { public: true, title: "Two-factor verification | ItemTraxx" } },
   { path: "/account", name: "workspace-account", component: () => import("../pages/workspace/AccountHome.vue"), meta: { requiresSession: true, requiresWorkspace: true, requiresRole: ["tenant_account", "individual_account"], requiresWorkspaceMatch: true, title: "My Account | ItemTraxx" } },
   {
     path: "/admin/students",
@@ -547,6 +547,7 @@ const routes: RouteRecordRaw[] = [
         meta: {
           requiresSession: true,
           requiresRole: "super_admin",
+          requiresSuperAuth: true,
           title: "Tenant Accounts | ItemTraxx",
         },
       },

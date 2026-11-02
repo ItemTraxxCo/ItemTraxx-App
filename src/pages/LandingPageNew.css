@@ -171,7 +171,7 @@ h1{max-width:none;width:100%;margin:13px 0 13px;text-align:center;font-size:clam
   .comparison-stage::after{inset:0 auto 0 50%;width:100vw;transform:translateX(-50%);background:linear-gradient(180deg,transparent 0%,transparent 24%,rgba(255,255,255,.28) 42%,rgba(255,255,255,.62) 60%,rgba(255,255,255,.8) 75%,rgba(255,255,255,.96) 91%,#fff 100%)}
   .media-frame{height:auto;aspect-ratio:1.42}
   .spreadsheet-window{transform:scale(1.01)}
-  .sheet-grid{font-size:9px}
+  .sheet-grid{font-size:12px}
   .sheet-grid th,.sheet-grid td{height:36px;padding:5px 4px}
   .sheet-grid .row-number{width:24px}
   .checkout-image img{width:100%;height:100%;left:0;top:0;object-position:48% 50%}

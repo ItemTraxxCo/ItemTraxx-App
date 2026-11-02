@@ -1,7 +1,7 @@
 import {
-  isMissingPostgrestColumn as isMissingColumn,
   isMissingPostgrestRelation as isMissingRelation,
 } from "../../_shared/postgrestErrors.ts";
+import { writeSecurityAuditEntries } from "../../_shared/securityAudit.ts";
 import type { AdminOpsContext, RpcError } from "../context.ts";
 
 export const handleStatusTrackingAction = async (
@@ -11,12 +11,12 @@ export const handleStatusTrackingAction = async (
     context.adminClient
       .from("items")
       .select(
-        "id, name, barcode, serial_number, status, notes, updated_at, created_at",
+        "id, name, barcode, serial_number, status, notes, created_at",
       )
       .eq("workspace_id", context.workspaceId)
       .is("deleted_at", null)
       .not("status", "in", "(available,checked_out)")
-      .order("updated_at", { ascending: false })
+      .order("created_at", { ascending: false })
       .limit(400),
     context.adminClient
       .from("item_status_history")
@@ -37,42 +37,13 @@ export const handleStatusTrackingAction = async (
   }> = [];
 
   if (flaggedResult.error) {
-    if (isMissingColumn(flaggedResult.error as RpcError, "updated_at")) {
-      const fallbackFlagged = await context.adminClient
-        .from("items")
-        .select("id, name, barcode, serial_number, status, notes, created_at")
-        .eq("workspace_id", context.workspaceId)
-        .is("deleted_at", null)
-        .not("status", "in", "(available,checked_out)")
-        .order("created_at", { ascending: false })
-        .limit(400);
-      if (fallbackFlagged.error) {
-        console.error("admin-ops get_status_tracking flagged fallback failed", {
-          message: fallbackFlagged.error.message,
-          code: fallbackFlagged.error.code,
-        });
-        return context.jsonResponse(400, {
-          error: "Unable to load status tracking.",
-        });
-      }
-      flaggedItems = ((fallbackFlagged.data ?? []) as Array<{
-        id: string;
-        name: string;
-        barcode: string;
-        serial_number: string | null;
-        status: string;
-        notes: string | null;
-        created_at: string;
-      }>).map((item) => ({ ...item, updated_at: item.created_at }));
-    } else {
-      console.error("admin-ops get_status_tracking flagged query failed", {
-        message: flaggedResult.error.message,
-        code: flaggedResult.error.code,
-      });
-      return context.jsonResponse(400, {
-        error: "Unable to load status tracking.",
-      });
-    }
+    console.error("admin-ops get_status_tracking flagged query failed", {
+      message: flaggedResult.error.message,
+      code: flaggedResult.error.code,
+    });
+    return context.jsonResponse(400, {
+      error: "Unable to load status tracking.",
+    });
   } else {
     flaggedItems = ((flaggedResult.data ?? []) as Array<{
       id: string;
@@ -81,7 +52,6 @@ export const handleStatusTrackingAction = async (
       serial_number: string | null;
       status: string;
       notes: string | null;
-      updated_at?: string | null;
       created_at?: string | null;
     }>).map((item) => ({
       id: item.id,
@@ -90,9 +60,18 @@ export const handleStatusTrackingAction = async (
       serial_number: item.serial_number,
       status: item.status,
       notes: item.notes,
-      updated_at: item.updated_at ?? item.created_at ??
-        new Date().toISOString(),
+      updated_at: item.created_at ?? new Date().toISOString(),
     }));
+    await writeSecurityAuditEntries(context.adminClient, flaggedItems.map((item) => ({
+      actor_id: context.user.id,
+      workspace_id: context.workspaceId,
+      action: "read_list",
+      target_type: "item",
+      target_resource_id: item.id,
+      route: "/functions/admin-ops",
+      method: "POST",
+      request_id: context.requestId,
+    })));
   }
 
   let history: Array<{
@@ -129,11 +108,21 @@ export const handleStatusTrackingAction = async (
       changed_at: string;
       changed_by: string | null;
     }>;
-    const itemIds = Array.from(new Set(historyRows.map((row) => row.item_id)));
-    const { data: itemRows } = itemIds.length
+    const historyItemIds = Array.from(new Set(historyRows.map((row) => row.item_id)));
+    await writeSecurityAuditEntries(context.adminClient, historyItemIds.map((id) => ({
+      actor_id: context.user.id,
+      workspace_id: context.workspaceId,
+      action: "read_status_history",
+      target_type: "item",
+      target_resource_id: id,
+      route: "/functions/admin-ops",
+      method: "POST",
+      request_id: context.requestId,
+    })));
+    const { data: itemRows } = historyItemIds.length
       ? await context.adminClient.from("items").select("id, name, barcode").in(
         "id",
-        itemIds,
+        historyItemIds,
       )
       : { data: [] };
     const itemMap = new Map(

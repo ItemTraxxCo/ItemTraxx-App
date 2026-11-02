@@ -6,7 +6,7 @@
       </RouterLink>
 
       <div class="page-nav-left forgot-top-nav">
-        <RouterLink class="forgot-back-link" :to="backLinkTarget" :aria-label="backLinkLabel" @click.prevent="$router.back()">
+        <RouterLink class="forgot-back-link" :to="backLinkTarget" :aria-label="backLinkLabel">
           <svg viewBox="0 0 24 24" aria-hidden="true">
             <path d="M15 5 8 12l7 7" />
           </svg>

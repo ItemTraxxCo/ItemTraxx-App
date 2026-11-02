@@ -1,0 +1,163 @@
+{
+  "schema_version": 1,
+  "project": "itemtraxx-web",
+  "event_contract": {
+    "edge_request": {
+      "required": [
+        "method",
+        "route",
+        "status",
+        "latency_ms",
+        "request_id",
+        "service",
+        "environment"
+      ],
+      "optional": [
+        "client_ip_hash",
+        "session_hash",
+        "user_agent",
+        "query_keys",
+        "query_value_lengths",
+        "error_code",
+        "rejected_query_keys",
+        "rejected_fields",
+        "rejected_input_snippets",
+        "suspicious_markers",
+        "trace_id",
+        "span_id"
+      ]
+    },
+    "security_event": {
+      "categories": [
+        "validation_failure",
+        "auth_forbidden",
+        "suspicious_payload",
+        "enumeration_tripwire",
+        "waf_action"
+      ],
+      "optional": [
+        "client_ip_hash",
+        "session_hash",
+        "actor_hash",
+        "workspace_hash",
+        "route",
+        "status",
+        "error_code",
+        "rejected_query_keys",
+        "rejected_fields",
+        "suspicious_markers",
+        "distinct_target_count",
+        "request_id",
+        "rejected_input_snippets",
+        "cloudflare_action",
+        "cloudflare_rule_id",
+        "ray_id"
+      ]
+    },
+    "audit_event": {
+      "required": [
+        "action",
+        "target_type",
+        "route",
+        "method",
+        "request_id"
+      ],
+      "optional": [
+        "actor_hash",
+        "workspace_hash",
+        "target_resource_hash"
+      ],
+      "timestamp": "PostHog event timestamp; the durable database row retains actor_id, workspace_id, target_resource_id, action, and created_at"
+    },
+    "privacy": {
+      "never_send": [
+        "raw IP addresses",
+        "raw JWTs or cookies",
+        "passwords",
+        "raw request bodies",
+        "query values",
+        "email addresses"
+      ],
+      "join_key": "HMAC-SHA-256 using the shared ITX_EDGE_PROXY_SHARED_SECRET"
+    }
+  },
+  "alerts": [
+    {
+      "name": "ItemTraxx security probes by IP or session",
+      "insight_type": "hogql",
+      "query": "SELECT principal_type, principal_hash, uniqExact(request_id) AS security_events FROM (SELECT 'ip' AS principal_type, properties.client_ip_hash AS principal_hash, properties.request_id AS request_id FROM events WHERE event = 'security_event' AND timestamp >= now() - INTERVAL 5 MINUTE AND properties.client_ip_hash != '' AND properties.request_id != '' UNION ALL SELECT 'session' AS principal_type, properties.session_hash AS principal_hash, properties.request_id AS request_id FROM events WHERE event = 'security_event' AND timestamp >= now() - INTERVAL 5 MINUTE AND properties.session_hash != '' AND properties.request_id != '') GROUP BY principal_type, principal_hash",
+      "alert": {
+        "evaluation": "any_row",
+        "value_column": "security_events",
+        "operator": ">",
+        "threshold": 20,
+        "query_window_seconds": 300,
+        "check_frequency": "real_time",
+        "notification_destination": "Slack channel selected in the PostHog alert form"
+      }
+    },
+    {
+      "name": "ItemTraxx authentication failures by IP or session",
+      "insight_type": "hogql",
+      "query": "SELECT principal_type, principal_hash, uniqExact(request_id) AS auth_failures FROM (SELECT 'ip' AS principal_type, properties.client_ip_hash AS principal_hash, properties.request_id AS request_id FROM events WHERE event = 'edge_request' AND toInt64(properties.status) IN (401, 403) AND timestamp >= now() - INTERVAL 2 MINUTE AND properties.client_ip_hash != '' AND properties.request_id != '' UNION ALL SELECT 'session' AS principal_type, properties.session_hash AS principal_hash, properties.request_id AS request_id FROM events WHERE event = 'edge_request' AND toInt64(properties.status) IN (401, 403) AND timestamp >= now() - INTERVAL 2 MINUTE AND properties.session_hash != '' AND properties.request_id != '') GROUP BY principal_type, principal_hash",
+      "alert": {
+        "evaluation": "any_row",
+        "value_column": "auth_failures",
+        "operator": ">",
+        "threshold": 10,
+        "query_window_seconds": 120,
+        "check_frequency": "real_time",
+        "notification_destination": "Slack channel selected in the PostHog alert form"
+      }
+    },
+    {
+      "name": "ItemTraxx item enumeration tripwire",
+      "insight_type": "hogql",
+      "query": "SELECT properties.actor_hash AS actor_hash, uniqExact(properties.target_resource_hash) AS distinct_targets FROM events WHERE event = 'audit_event' AND properties.action IN ('read_target', 'denied_read_target') AND timestamp >= now() - INTERVAL 60 SECOND AND properties.actor_hash != '' AND properties.target_resource_hash != '' GROUP BY actor_hash",
+      "alert": {
+        "evaluation": "any_row",
+        "value_column": "distinct_targets",
+        "operator": ">",
+        "threshold": 15,
+        "query_window_seconds": 60,
+        "check_frequency": "real_time",
+        "notification_destination": "Slack channel selected in the PostHog alert form",
+        "reliable_tripwire_query": "SELECT count() AS tripwires FROM events WHERE event = 'security_event' AND properties.category = 'enumeration_tripwire' AND timestamp >= now() - INTERVAL 5 MINUTE",
+        "reliable_tripwire_operator": ">",
+        "reliable_tripwire_threshold": 0
+      }
+    },
+    {
+      "name": "ItemTraxx edge 5xx rate",
+      "insight_type": "hogql",
+      "query": "SELECT 100.0 * uniqExactIf(properties.request_id, toInt64(properties.status) >= 500 AND properties.error_code = 'unhandled_error') / greatest(uniqExact(properties.request_id), 1) AS error_rate_percent FROM events WHERE event = 'edge_request' AND timestamp >= now() - INTERVAL 5 MINUTE AND properties.request_id != ''",
+      "alert": {
+        "evaluation": "single_result",
+        "value_column": "error_rate_percent",
+        "operator": ">",
+        "threshold": 1,
+        "query_window_seconds": 300,
+        "check_frequency": "real_time",
+        "notification_destination": "Slack channel selected in the PostHog alert form"
+      }
+    }
+  ],
+  "notification_setup": {
+    "recommended": "Use PostHog's native Slack destination in each saved HogQL insight alert.",
+    "steps": [
+      "Save each HogQL insight in the itemtraxx-web project.",
+      "Open Monitor > Alerts, select New alert, choose the numeric value column and the evaluation mode listed above.",
+      "Set the threshold, choose Real time, and attach the authorized Slack workspace and security channel.",
+      "Simulate each alert against recent data before enabling it."
+    ],
+    "webhook_alternative": {
+      "destination_type": "Webhook URL in the PostHog alert notification form",
+      "url": "https://<approved-alert-collector>/posthog/itemtraxx-security",
+      "receiver_requirements": [
+        "Require an unguessable, rotated secret in the webhook URL or receiver-side allowlist.",
+        "Validate the PostHog alert payload and rate-limit the receiver.",
+        "Forward only alert name, metric, threshold, observed value, query window, and PostHog insight URL to an edge worker."
+      ]
+    }
+  }
+}

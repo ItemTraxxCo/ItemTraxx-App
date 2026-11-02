@@ -167,28 +167,20 @@ Deno.test("get_status_tracking joins flagged items with history and item metadat
   );
 });
 
-Deno.test("get_status_tracking falls back to created_at when updated_at column is missing", async () => {
-  let fallbackCalled = false;
-  const { client } = makeClient((call) => {
+Deno.test("get_status_tracking queries created_at without probing missing updated_at", async () => {
+  const { client, calls } = makeClient((call) => {
     if (isFlaggedQuery(call)) {
-      if (call.operations.some((op) => op.method === "order" && op.args[0] === "created_at")) {
-        fallbackCalled = true;
-        return {
-          data: [{
-            id: "item-1",
-            name: "Broken Widget",
-            barcode: "ITEM-1",
-            serial_number: null,
-            status: "damaged",
-            notes: null,
-            created_at: "2026-01-01T00:00:00.000Z",
-          }],
-          error: null,
-        };
-      }
       return {
-        data: null,
-        error: { code: "42703", message: 'column "updated_at" does not exist' },
+        data: [{
+          id: "item-1",
+          name: "Broken Widget",
+          barcode: "ITEM-1",
+          serial_number: null,
+          status: "damaged",
+          notes: null,
+          created_at: "2026-01-01T00:00:00.000Z",
+        }],
+        error: null,
       };
     }
     if (call.table === "item_status_history") {
@@ -200,34 +192,17 @@ Deno.test("get_status_tracking falls back to created_at when updated_at column i
   const body = await bodyOf(response);
   const data = body.data as { flagged_items: Array<{ updated_at: string }> };
 
-  assert(response.status === 200, "expected 200 via the fallback path");
-  assert(fallbackCalled, "expected the created_at fallback query to run");
+  assert(response.status === 200, "expected 200");
+  const flaggedCall = calls.find(isFlaggedQuery);
+  const selection = flaggedCall?.operations.find((op) => op.method === "select")?.args[0];
+  assert(typeof selection === "string" && !selection.includes("updated_at"), "must not select updated_at");
+  assert(
+    flaggedCall?.operations.some((op) => op.method === "order" && op.args[0] === "created_at"),
+    "must order on the available created_at column",
+  );
   assert(
     data.flagged_items[0].updated_at === "2026-01-01T00:00:00.000Z",
     "expected updated_at to be backfilled from created_at",
-  );
-});
-
-Deno.test("get_status_tracking returns 400 when the updated_at fallback query also fails", async () => {
-  const { client } = makeClient((call) => {
-    if (isFlaggedQuery(call)) {
-      if (call.operations.some((op) => op.method === "order" && op.args[0] === "created_at")) {
-        return { data: null, error: { code: "500", message: "still broken" } };
-      }
-      return {
-        data: null,
-        error: { code: "42703", message: 'column "updated_at" does not exist' },
-      };
-    }
-    return { data: [], error: null };
-  });
-  const response = await handleStatusTrackingAction(baseContext(client));
-
-  assert(response.status === 400, "expected 400 when the fallback query also fails");
-  assert(
-    JSON.stringify(await bodyOf(response)) ===
-      JSON.stringify({ error: "Unable to load status tracking." }),
-    "expected the load-failure error message",
   );
 });
 

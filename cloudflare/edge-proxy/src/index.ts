@@ -230,7 +230,12 @@ export default {
     // CORS/auth/origin checks. Mail senders do not send a browser Origin, and
     // the policy host must serve a small unauthenticated HTTPS document.
     if (isMtaStsRequest(url)) {
-      return handleMtaStsRequest(request, url);
+      return withWorkerRequestTelemetry(
+        request,
+        env,
+        ctx,
+        async () => handleMtaStsRequest(request, url),
+      );
     }
 
     return withWorkerRequestTelemetry(request, env, ctx, async ({
@@ -467,6 +472,7 @@ export default {
             headers,
             requestId,
             url.pathname,
+            ctx,
           );
           maybeReportWorkerResponse(env, request, requestId, response, ctx, {
             type: "rest",

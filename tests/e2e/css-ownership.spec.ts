@@ -218,6 +218,11 @@ test.describe("global CSS ownership contracts", () => {
     expect(await hasScopedRule("item-notes-cell")).toBe(true);
 
     await page.getByRole("button", { name: "Details" }).click();
+    const notesReadOnly = page.locator(".item-notes-readonly");
+    await expect(notesReadOnly).toHaveText("Route-owned note");
+    expect(await hasScopedRule("item-notes-readonly")).toBe(true);
+
+    await page.getByRole("button", { name: "Edit item" }).click();
     const notesInput = page.locator(".item-notes-input");
     await expect(notesInput).toBeVisible();
     expect(await notesInput.evaluate((element) => getComputedStyle(element).width)).toBe(

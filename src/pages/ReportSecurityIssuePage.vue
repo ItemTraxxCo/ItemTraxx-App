@@ -6,7 +6,7 @@
       </RouterLink>
 
       <div class="page-nav-left security-report-top-nav">
-        <RouterLink class="security-report-back-link" to="/security" aria-label="Return to security page" @click.prevent="$router.back()">
+        <RouterLink class="security-report-back-link" to="/security" aria-label="Return to security page">
           <svg viewBox="0 0 24 24" aria-hidden="true">
             <path d="M15 5 8 12l7 7" />
           </svg>

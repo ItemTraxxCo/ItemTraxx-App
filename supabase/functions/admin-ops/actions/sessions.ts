@@ -9,6 +9,7 @@ import {
   listActiveBetterAuthSessionIds,
 } from "../../_shared/betterAuthSessions.ts";
 import { optionalText } from "../../_shared/validation.ts";
+import { writeSecurityAuditEntries } from "../../_shared/securityAudit.ts";
 import type { SsoLoginProvenance } from "../../_shared/ssoLoginProvenance.ts";
 import type {
   AdminOpsContext,
@@ -18,6 +19,7 @@ import type {
 
 export type SessionSecurityContext = Pick<
   AdminOpsContext,
+  | "request"
   | "adminClient"
   | "workspaceId"
   | "user"
@@ -544,9 +546,20 @@ export const handleSessionAction = async (
       const dedupeKey = row.device_id || row.id;
       if (!dedupedRows.has(dedupeKey)) dedupedRows.set(dedupeKey, row);
     }
+    const visibleRows = Array.from(dedupedRows.values());
+    await writeSecurityAuditEntries(context.adminClient, visibleRows.map((row) => ({
+      actor_id: context.user.id,
+      workspace_id: context.workspaceId,
+      action: "read_target",
+      target_type: "account_session",
+      target_resource_id: row.id,
+      route: "/functions/admin-ops",
+      method: "POST",
+      request_id: context.requestId,
+    })), { request: context.request });
     return context.jsonResponse(200, {
       data: {
-        sessions: Array.from(dedupedRows.values()).map((row) => {
+        sessions: visibleRows.map((row) => {
           // A row counts as "current" if its device_id matches this request's
           // device, or if it shares this request's auth_session_id. The
           // latter covers sibling rows created from a different origin under
@@ -596,6 +609,16 @@ export const handleSessionAction = async (
     if (!revokedRows?.length) {
       return context.jsonResponse(404, { error: "Session not found." });
     }
+    await writeSecurityAuditEntries(context.adminClient, revokedRows.map((row: { id: string }) => ({
+      actor_id: context.user.id,
+      workspace_id: context.workspaceId,
+      action: "revoke",
+      target_type: "account_session",
+      target_resource_id: row.id,
+      route: "/functions/admin-ops",
+      method: "POST",
+      request_id: context.requestId,
+    })));
     return context.jsonResponse(200, { data: { revoked: true } });
   }
 
@@ -622,6 +645,16 @@ export const handleSessionAction = async (
     if (error) {
       return context.jsonResponse(400, { error: "Unable to revoke session." });
     }
+    await writeSecurityAuditEntries(context.adminClient, (data ?? []).map((row: { id: string }) => ({
+      actor_id: context.user.id,
+      workspace_id: context.workspaceId,
+      action: "revoke_current",
+      target_type: "account_session",
+      target_resource_id: row.id,
+      route: "/functions/admin-ops",
+      method: "POST",
+      request_id: context.requestId,
+    })));
     return context.jsonResponse(200, {
       data: { revoked: (data ?? []).length > 0 },
     });
@@ -657,5 +690,15 @@ export const handleSessionAction = async (
       ? sessionUnavailable(context, 400)
       : context.jsonResponse(400, { error: "Unable to revoke sessions." });
   }
+  await writeSecurityAuditEntries(context.adminClient, (data ?? []).map((row: { id: string }) => ({
+    actor_id: context.user.id,
+    workspace_id: context.workspaceId,
+    action: signOutCurrent ? "revoke_all" : "revoke_other_sessions",
+    target_type: "account_session",
+    target_resource_id: row.id,
+    route: "/functions/admin-ops",
+    method: "POST",
+    request_id: context.requestId,
+  })));
   return context.jsonResponse(200, { data: { revoked: (data ?? []).length } });
 };

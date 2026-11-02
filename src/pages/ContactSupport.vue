@@ -5,7 +5,7 @@
     </RouterLink>
 
     <div class="page-nav-left pricing-top-nav">
-      <RouterLink class="pricing-back-link" to="/" aria-label="Return to home" @click.prevent="$router.back()">
+      <RouterLink class="pricing-back-link" to="/" aria-label="Return to home">
         <svg viewBox="0 0 24 24" aria-hidden="true">
           <path d="M15 5 8 12l7 7" />
         </svg>
@@ -163,6 +163,9 @@ const isPrivacyRequest = computed(() => route.name === "public-privacy-request")
 const fullName = ref("");
 const replyEmail = ref("");
 const category = ref<Category | "other">(isPrivacyRequest.value ? "privacy" : "general");
+watch(isPrivacyRequest, (isPrivacy) => {
+  category.value = isPrivacy ? "privacy" : "general";
+});
 const subject = ref("");
 const message = ref("");
 const website = ref("");

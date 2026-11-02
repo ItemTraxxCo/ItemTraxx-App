@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   authState: { role: "super_admin" as string | null, email: "owner@example.com" as string | null },
   router: { back: vi.fn() },
+  listSuperAdminSessions: vi.fn(),
   revokeAllSuperAdminSessions: vi.fn(),
   revokeOtherSessions: vi.fn(),
   addPasskey: vi.fn(),
@@ -31,6 +32,7 @@ vi.mock("../auth/client", () => ({
 }));
 
 vi.mock("../services/superOps/sessions", () => ({
+  listSuperAdminSessions: mocks.listSuperAdminSessions,
   revokeAllSuperAdminSessions: mocks.revokeAllSuperAdminSessions,
   verifySuperAdminPassword: mocks.verifySuperAdminPassword,
 }));
@@ -55,6 +57,7 @@ describe("AccountSecurity", () => {
     vi.clearAllMocks();
     mocks.authState.role = "super_admin";
     mocks.authState.email = "owner@example.com";
+    mocks.listSuperAdminSessions.mockResolvedValue([{ is_current: true }, { is_current: false }]);
     mocks.revokeAllSuperAdminSessions.mockResolvedValue({ revoked: 1 });
     mocks.revokeOtherSessions.mockResolvedValue({ error: null });
     mocks.addPasskey.mockResolvedValue({ error: null });

@@ -9,14 +9,14 @@
     </div>
 
     <section class="sa-panel sa-filters">
-      <label>Search <input v-model="search" placeholder="Email or workspace" @keyup.enter="load" /></label>
+      <label>Search <input v-model="search" placeholder="Email or workspace" @keyup.enter="loadWithStepUp" /></label>
       <label>Workspace
-        <select v-model="workspaceId" @change="load">
+        <select v-model="workspaceId" @change="loadWithStepUp">
           <option value="all">All workspaces</option>
           <option v-for="workspace in workspaces" :key="workspace.id" :value="workspace.id">{{ workspace.name }}</option>
         </select>
       </label>
-      <button class="sa-btn" :disabled="loading || stepUpSubmitting" @click="load">Search</button>
+      <button class="sa-btn" :disabled="loading || stepUpSubmitting" @click="loadWithStepUp">Search</button>
     </section>
 
     <section class="sa-panel">
@@ -57,7 +57,7 @@
               </div>
             </td>
           </tr>
-          <tr v-if="!loading && !accounts.length"><td colspan="4">No Tenant Accounts found.</td></tr>
+          <tr v-if="hasLoaded && !loading && !accounts.length"><td colspan="4">No Tenant Accounts found.</td></tr>
         </tbody>
       </table>
     </div>
@@ -98,6 +98,7 @@ const workspaceId = ref("all");
 const createWorkspaceId = ref("");
 const createEmail = ref("");
 const loading = ref(false);
+const hasLoaded = ref(false);
 const saving = ref(false);
 const message = ref("");
 const error = ref("");
@@ -134,13 +135,24 @@ const load = async () => {
   error.value = "";
   try {
     accounts.value = await listTenantAccounts(search.value, workspaceId.value);
+    hasLoaded.value = true;
     savedEmails.value = Object.fromEntries(
       accounts.value.map((account) => [account.id, normalizeEmail(account.auth_email)]),
     );
   }
-  catch (cause) { error.value = cause instanceof Error ? cause.message : "Unable to load Tenant Accounts."; }
+  catch (cause) {
+    error.value = cause instanceof Error ? cause.message : "Unable to load Tenant Accounts.";
+  }
   finally { loading.value = false; }
 };
+const loadWithStepUp = () => requestStepUp({
+  title: "Load Tenant Accounts",
+  message: "Type CONFIRM and enter your Super Admin password to view tenant account and workspace records.",
+  confirmLabel: "Load Accounts",
+}, async () => {
+  workspaces.value = await listWorkspaces();
+  await load();
+});
 const create = () => requestStepUp({
   title: "Create Tenant Account",
   message: `Type CONFIRM and enter your super admin password to create a Tenant Account for ${workspaces.value.find((workspace) => workspace.id === createWorkspaceId.value)?.name ?? "the selected workspace"} and send the setup email to ${createEmail.value}.`,
@@ -189,8 +201,16 @@ const remove = (account: SuperTenantAccount) => {
 };
 
 onMounted(async () => {
-  workspaces.value = await listWorkspaces();
-  await load();
+  loading.value = true;
+  error.value = "";
+  try {
+    workspaces.value = await listWorkspaces();
+  } catch (cause) {
+    error.value = cause instanceof Error ? cause.message : "Unable to load workspaces.";
+  } finally {
+    loading.value = false;
+  }
+  if (!error.value) await load();
 });
 </script>
 

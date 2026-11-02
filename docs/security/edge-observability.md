@@ -25,10 +25,15 @@ reads and mutations, and deployable alert/WAF specifications.
   actor, workspace, target UUID, action, request ID, and database timestamp.
   PostHog receives only HMAC hashes for actor/workspace/target IDs.
 - Targeted reads, including denied cross-workspace ID probes, are recorded
-  against the authenticated actor's workspace. Denied target UUIDs are kept
-  only in the access-controlled audit table; the sidecar responds with a
-  generic 403 and the wrapper emits `auth_forbidden`. Session enumeration is
-  included in the same distinct-target tripwire.
+  against the authenticated actor's workspace. The signed audit request keeps
+  IDs found in the upstream response separate from IDs present only in query
+  filters. A cross-workspace ID in a filter is an attempted access; an ID
+  found in the successful upstream response and verified by the server to
+  belong to a different workspace is recorded as
+  `confirmed_unauthorized_read`. Denied target UUIDs are kept only in the
+  access-controlled audit table; the audit sidecar's 403 does not rewrite the
+  original API response status. Session enumeration is included in the same
+  distinct-target tripwire.
 - Request bodies, query values, IP addresses, JWTs, cookies, passwords, and
   email addresses are never exported. Rejected-input snippets are fixed
   signatures such as `<script`, `union-select`, and `../`, never attacker text.
@@ -70,11 +75,22 @@ the 16-distinct-target enumeration tripwire. The payload uses the supplied
 incident.io webhook endpoint, a stable route-based deduplication key, a keyed
 client IP hash, and a keyed actor identifier; raw IPs, actor UUIDs, tokens, and
 request bodies are not sent. Missing or unavailable paging configuration
-does not affect the client response. Configure the endpoint to accept the
-`title`, `deduplication_key`, `status`, `severity`, and `metadata` JSON fields.
+does not affect the client response. Each alert includes `request_id`,
+`http_status` (or the literal `unknown`), `outcome`, and
+`exploitation_status` in metadata, with visible `Exploitation Status` and
+`Security Outcome` lines in its description. Suspicious SQLi/XSS signatures
+paired with 2xx are `SUSPECTED SUCCESS`, never confirmed by status alone. A
+400/401/403/422/429 rejection is `BLOCKED` at the observed layer. A cross-workspace target
+merely requested is an attempt; `CONFIRMED UNAUTHORIZED ACCESS` requires the
+target ID to have appeared in the successful upstream response and to fail the
+actor-workspace check. Enumeration-only tripwires remain undetermined. The
+stable deduplication key is preserved for follow-up updates. Configure the
+endpoint to accept `title`, `description`, `deduplication_key`, `status`,
+`severity`, and `metadata` JSON fields.
 
-Run migration `20261102110000_security_audit_logs.sql` before deploying the
-Edge Functions. The Supabase `security-audit` function has platform JWT
+Run migrations `20261102110000_security_audit_logs.sql` and
+`20261102120000_count_confirmed_unauthorized_reads_in_tripwire.sql` before
+deploying the Edge Functions. The Supabase `security-audit` function has platform JWT
 verification disabled because it validates Better Auth JWTs internally and
 requires the signed Worker-ingress headers.
 
@@ -83,6 +99,8 @@ requires the signed Worker-ingress headers.
 Run the focused tests from the repository root:
 
 ```sh
+npm run security:verify
+
 deno test --allow-env --allow-net \
   supabase/functions/_shared/observability_test.ts \
   supabase/functions/_shared/securityAudit_test.ts \
@@ -94,6 +112,12 @@ deno test --no-check --allow-env --allow-net \
   src/observability_test.ts src/supabaseApiProxy_test.ts
 npm run typecheck
 ```
+
+`security:verify` exercises both wrappers, the Worker rate-limit helper, the
+configured authentication alert threshold, and mocked PostHog/incident.io
+receivers. It has no network permission. The `x-test-simulation: true` marker
+is exported as `attack_type: "simulation"` only when `ITX_ENVIRONMENT=test`;
+it does not change authorization, validation, or rate-limit decisions.
 
 To check the shared Supabase code and targeted handlers independently, run
 `deno check --node-modules-dir=auto` against their `_shared` modules and

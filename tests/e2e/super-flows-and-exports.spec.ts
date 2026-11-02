@@ -439,6 +439,7 @@ test.describe("Super admin flows and export actions", () => {
 
     expect(sessions).toEqual([
       expect.objectContaining({ id: "session-e2e", device_id: "device-e2e", is_current: true }),
+      expect.objectContaining({ id: "session-remote-e2e", device_id: "device-remote-e2e", is_current: false }),
     ]);
     expect(requests).toEqual([
       {

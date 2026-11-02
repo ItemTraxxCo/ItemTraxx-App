@@ -16,6 +16,7 @@ const expectedUnreferencedFunctions = new Set([
   'system-status',
   'login-notify',
   'checkout-borrower-lookup',
+  'security-audit',
 ]);
 
 function relativeFromRoot(filePath) {

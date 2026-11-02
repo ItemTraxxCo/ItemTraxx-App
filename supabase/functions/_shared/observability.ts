@@ -5,6 +5,13 @@
  * independent from exporter failures.
  */
 
+import {
+  classifyIncidentOutcome,
+  type IncidentEvidence,
+  type SecurityIncidentAttackType,
+  type TrustedIncidentConfirmation,
+} from "./incidentOutcome.ts";
+
 export type TraceContext = {
   traceId: string;
   spanId: string;
@@ -179,9 +186,13 @@ const requestPrivacyMetadata = async (req: Request) => {
   const clientIp = req.headers.get("cf-connecting-ip")?.trim() ?? "";
   const credential = bearerOrSessionCredential(req);
   const userAgent = req.headers.get("user-agent") ?? "";
+  const isTestSimulation = envValue("ITX_ENVIRONMENT").trim().toLowerCase() ===
+      "test" &&
+    req.headers.get("x-test-simulation")?.trim().toLowerCase() === "true";
   return {
     route: routeForTelemetry(url.pathname),
     method: req.method.toUpperCase().slice(0, 16),
+    ...(isTestSimulation ? { attack_type: "simulation" } : {}),
     ...safeQuerySummary(url),
     ...(userAgent ? { user_agent: safeText(userAgent, 256) } : {}),
     ...(clientIp && secret ? { client_ip_hash: await hmacHex(clientIp, secret) } : {}),
@@ -189,11 +200,7 @@ const requestPrivacyMetadata = async (req: Request) => {
   };
 };
 
-export type IncidentSecurityAttackType =
-  | "sqli"
-  | "xss"
-  | "rls_tenant_breach"
-  | "idor_enumeration";
+export type IncidentSecurityAttackType = SecurityIncidentAttackType;
 
 type IncidentSecurityPageInput = {
   attackType: IncidentSecurityAttackType;
@@ -202,6 +209,10 @@ type IncidentSecurityPageInput = {
   actorId?: string;
   clientIpHash?: string;
   request?: Request;
+  httpStatus?: number;
+  evidence?: IncidentEvidence;
+  confirmedBy?: TrustedIncidentConfirmation;
+  alertStatus?: "firing" | "resolved";
 };
 
 const incidentAttackLabel = (attackType: IncidentSecurityAttackType) => ({
@@ -238,14 +249,41 @@ export const emitIncidentIoSecurityPage = (entry: IncidentSecurityPageInput) => 
       entry.actorId ? hmacHex(entry.actorId, secret) : Promise.resolve(undefined),
     ]);
     const route = routeForTelemetry(entry.route.split("?")[0] || "/");
+    const httpStatus = Number.isInteger(entry.httpStatus) &&
+        (entry.httpStatus ?? 0) >= 100 && (entry.httpStatus ?? 0) <= 599
+      ? entry.httpStatus!
+      : "unknown";
+    const classification = classifyIncidentOutcome(entry.attackType, {
+      ...(typeof httpStatus === "number" ? { httpStatus } : {}),
+      ...(entry.confirmedBy ? { confirmedBy: entry.confirmedBy } : {}),
+    });
+    const requestId = safeRequestId(entry.requestId);
+    const evidence = entry.confirmedBy
+      ? "cross_workspace_resource_returned"
+      : entry.evidence ?? "unknown";
     const payload = {
       title: "[SECURITY CRITICAL] " + incidentAttackLabel(entry.attackType) + " on " + route,
+      description: [
+        `Exploitation Status: ${classification.exploitationStatus}`,
+        `Security Outcome: ${classification.securityOutcome}`,
+        `HTTP Status: ${httpStatus}`,
+        `Request ID: ${requestId}`,
+        `Route: ${route}`,
+        `Attack Type: ${incidentAttackLabel(entry.attackType)}`,
+        `Evidence: ${evidence}`,
+        `Assessment: ${classification.explanation}`,
+      ].join("\n"),
       deduplication_key: "itx-sec-" + entry.attackType + "-" +
         incidentRouteSlug(route),
-      status: "firing",
+      status: entry.alertStatus ?? "firing",
       severity: "critical",
       metadata: {
         attack_type: entry.attackType,
+        exploitation_status: classification.exploitationStatus,
+        outcome: classification.securityOutcome,
+        request_id: requestId,
+        http_status: httpStatus,
+        evidence,
         route,
         client_ip_hash: entry.clientIpHash ??
           requestMetadata?.client_ip_hash ?? "unknown",
@@ -407,6 +445,7 @@ export const emitEnumerationTripwire = (entry: {
   route: string;
   distinctTargetCount: number;
   request?: Request;
+  httpStatus?: number;
 }) => {
   const secret = envValue("ITX_EDGE_PROXY_SHARED_SECRET");
   trackEventExport(Promise.all([
@@ -417,6 +456,9 @@ export const emitEnumerationTripwire = (entry: {
       ...(actorHash ? { actor_hash: actorHash } : {}),
       ...(workspaceHash ? { workspace_hash: workspaceHash } : {}),
       category: "enumeration_tripwire",
+      ...(Number.isInteger(entry.httpStatus) ? { http_status: entry.httpStatus } : {}),
+      exploitation_status: "UNDETERMINED",
+      outcome: "UNKNOWN",
       detection: "distinct_resource_enumeration",
       distinct_target_count: entry.distinctTargetCount,
       route: entry.route,
@@ -432,6 +474,8 @@ export const emitEnumerationTripwire = (entry: {
     requestId: entry.requestId,
     route: entry.route,
     request: entry.request,
+    httpStatus: entry.httpStatus,
+    evidence: "distinct_target_enumeration",
   });
 };
 
@@ -950,6 +994,8 @@ export const withSecurityLogging = (
           request: req,
           requestId,
           route: new URL(req.url).pathname,
+          httpStatus: status,
+          evidence: "payload_signature",
         });
       }
       if (criticalMarkers.has("xss")) {
@@ -958,6 +1004,8 @@ export const withSecurityLogging = (
           request: req,
           requestId,
           route: new URL(req.url).pathname,
+          httpStatus: status,
+          evidence: "payload_signature",
         });
       }
       keepEventExportsAlive();

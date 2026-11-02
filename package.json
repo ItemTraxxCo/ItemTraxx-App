@@ -22,6 +22,7 @@
     "bones:build": "boneyard-js build",
     "security:audit": "\"$npm_node_execpath\" ./scripts/security-audit.mjs",
     "security:gate": "\"$npm_node_execpath\" ./scripts/security-audit.mjs",
+    "security:verify": "deno test --no-check --allow-env --allow-read supabase/functions/_shared/incidentOutcome_test.ts supabase/functions/_shared/securityVerification_test.ts",
     "security:sbom": "bash ./scripts/generate-sbom.sh",
     "perf:budget": "node ./scripts/check-bundle-budget.mjs",
     "perf:css-boundary": "node ./scripts/check-public-css-boundary.mjs",

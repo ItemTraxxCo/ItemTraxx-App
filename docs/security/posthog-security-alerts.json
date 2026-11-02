@@ -13,6 +13,10 @@
         "environment"
       ],
       "optional": [
+        "attack_type",
+        "exploitation_status",
+        "outcome",
+        "http_status",
         "client_ip_hash",
         "session_hash",
         "user_agent",
@@ -36,6 +40,10 @@
         "waf_action"
       ],
       "optional": [
+        "attack_type",
+        "exploitation_status",
+        "outcome",
+        "http_status",
         "client_ip_hash",
         "session_hash",
         "actor_hash",
@@ -113,7 +121,7 @@
     {
       "name": "ItemTraxx item enumeration tripwire",
       "insight_type": "hogql",
-      "query": "SELECT properties.actor_hash AS actor_hash, uniqExact(properties.target_resource_hash) AS distinct_targets FROM events WHERE event = 'audit_event' AND properties.action IN ('read_target', 'denied_read_target') AND timestamp >= now() - INTERVAL 60 SECOND AND properties.actor_hash != '' AND properties.target_resource_hash != '' GROUP BY actor_hash",
+      "query": "SELECT properties.actor_hash AS actor_hash, uniqExact(properties.target_resource_hash) AS distinct_targets FROM events WHERE event = 'audit_event' AND properties.action IN ('read_target', 'denied_read_target', 'confirmed_unauthorized_read') AND timestamp >= now() - INTERVAL 60 SECOND AND properties.actor_hash != '' AND properties.target_resource_hash != '' GROUP BY actor_hash",
       "alert": {
         "evaluation": "any_row",
         "value_column": "distinct_targets",

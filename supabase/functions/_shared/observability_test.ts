@@ -1,4 +1,5 @@
 import {
+  emitIncidentIoSecurityPage,
   flushEventExports,
   flushTraceExports,
   logError,
@@ -201,10 +202,33 @@ Deno.test("request middleware captures safe metadata and emits validation and pa
     assert(page.payload.status === "firing" && page.payload.severity === "critical", "incident pages at critical severity");
     const pageMetadata = page.payload.metadata as Record<string, unknown>;
     assert(pageMetadata.attack_type === "xss", "incident carries its attack type");
+    assert(pageMetadata.exploitation_status === "ATTEMPTED EXPLOITATION", "rejected XSS remains an attempt");
+    assert(pageMetadata.outcome === "BLOCKED", "validation rejection is shown as blocked at the observed layer");
+    assert(pageMetadata.http_status === 422, "incident includes the response status");
+    assert(pageMetadata.request_id === requestRecord?.properties.request_id, "incident request ID matches the PostHog request");
     assert(pageMetadata.actor_id === "anon", "unresolved actors are labeled anon");
     assert(typeof pageMetadata.client_ip_hash === "string", "incident carries a keyed client IP");
+    assert(typeof page.payload.description === "string" &&
+      page.payload.description.includes("Security Outcome: BLOCKED") &&
+      page.payload.description.includes("HTTP Status: 422"),
+      "classification is visible in the incident description");
     assert(!JSON.stringify(page.payload).includes("203.0.113.17"), "incident excludes the raw client IP");
     assert(!JSON.stringify(page.payload).includes("eyJraw-jwt-value"), "incident excludes the bearer token");
+    emitIncidentIoSecurityPage({
+      attackType: "xss",
+      requestId: String(pageMetadata.request_id),
+      route: "/functions/admin-ops",
+      httpStatus: 422,
+      evidence: "payload_signature",
+      alertStatus: "resolved",
+    });
+    await flushEventExports();
+    assert(incidentPages.length === 2, "a later review can update the same alert source");
+    assert(incidentPages[1].payload.status === "resolved", "review can resolve the existing alert");
+    assert(
+      incidentPages[1].payload.deduplication_key === page.payload.deduplication_key,
+      "resolution preserves the original deduplication key",
+    );
   } finally {
     globalThis.fetch = originalFetch;
     console.info = originalInfo;

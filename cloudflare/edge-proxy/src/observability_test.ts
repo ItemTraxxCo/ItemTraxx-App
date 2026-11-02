@@ -1,5 +1,6 @@
 import {
   createWorkerTraceContext,
+  dispatchIncidentIoSecurityPage,
   logWorkerRequestCompletion,
   maybeReportWorkerResponse,
   parseWorkerTraceparent,
@@ -234,7 +235,15 @@ Deno.test("Worker dispatches SQLi pages asynchronously with privacy-safe inciden
     assertEquals(page.payload.severity, "critical", "incident severity");
     const metadata = page.payload.metadata as Record<string, unknown>;
     assertEquals(metadata.attack_type, "sqli", "attack type");
+    assertEquals(metadata.exploitation_status, "SUSPECTED EXPLOITATION", "successful response remains a suspicion");
+    assertEquals(metadata.outcome, "SUSPECTED SUCCESS", "suspicious signature plus 2xx is not confirmed");
+    assertEquals(metadata.http_status, 200, "incident includes the observed response status");
+    assertEquals(metadata.request_id, "14aa123a-227e-4cba-b554-0b10abd2a10f", "incident includes the actual request ID");
     assertEquals(metadata.actor_id, "anon", "unresolved actor label");
+    assert(typeof page.payload.description === "string" &&
+      page.payload.description.includes("Exploitation Status: SUSPECTED EXPLOITATION") &&
+      page.payload.description.includes("Security Outcome: SUSPECTED SUCCESS"),
+      "both classifications are visible in the incident description");
     assert(typeof metadata.client_ip_hash === "string", "IP is represented by its keyed hash");
     assert(!JSON.stringify(page.payload).includes("203.0.113.99"), "raw IP is excluded from incident metadata");
     assert(!JSON.stringify(page.payload).includes("eyJworker-jwt-secret"), "raw JWT is excluded from incident metadata");
@@ -242,6 +251,62 @@ Deno.test("Worker dispatches SQLi pages asynchronously with privacy-safe inciden
     resolveIncidentResponse?.(new Response("accepted", { status: 202 }));
     globalThis.fetch = originalFetch;
   }
+});
+
+Deno.test("Worker can resolve a reclassified incident with the same deduplication key", async () => {
+  const originalFetch = globalThis.fetch;
+  const pending: Promise<unknown>[] = [];
+  const payloads: Array<Record<string, unknown>> = [];
+  globalThis.fetch = ((input: string | URL | Request, init?: RequestInit) => {
+    if (String(input) !== "https://incident.example/security") {
+      return Promise.reject(new Error("unexpected fetch target"));
+    }
+    payloads.push(JSON.parse(String(init?.body)) as Record<string, unknown>);
+    return Promise.resolve(new Response("accepted", { status: 202 }));
+  }) as typeof fetch;
+  const pageEnv = env({
+    INCIDENT_IO_SECURITY_WEBHOOK_URL: "https://incident.example/security",
+    INCIDENT_IO_SECURITY_API_KEY: "incident-worker-key",
+  } as Partial<Env>);
+  const request = new Request("https://edge.itemtraxx.com/rest/v1/items", {
+    headers: { "x-request-id": "14aa123a-227e-4cba-b554-0b10abd2a10f" },
+  });
+  const context = {
+    waitUntil: (promise: Promise<unknown>) => pending.push(promise),
+  } as unknown as ExecutionContext;
+  try {
+    dispatchIncidentIoSecurityPage(
+      pageEnv,
+      request,
+      "14aa123a-227e-4cba-b554-0b10abd2a10f",
+      "sqli",
+      context,
+      403,
+      "payload_signature",
+      "firing",
+    );
+    dispatchIncidentIoSecurityPage(
+      pageEnv,
+      request,
+      "14aa123a-227e-4cba-b554-0b10abd2a10f",
+      "sqli",
+      context,
+      403,
+      "payload_signature",
+      "resolved",
+    );
+    await Promise.all(pending);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+  assertEquals(payloads.length, 2, "both alert lifecycle updates are delivered");
+  assertEquals(payloads[0]?.status, "firing", "first event opens the alert");
+  assertEquals(payloads[1]?.status, "resolved", "review can resolve the alert");
+  assertEquals(
+    payloads[0]?.deduplication_key,
+    payloads[1]?.deduplication_key,
+    "reclassification uses the original stable deduplication key",
+  );
 });
 
 Deno.test("Worker scans rejected JSON for safe input signatures without exporting payload values", async () => {

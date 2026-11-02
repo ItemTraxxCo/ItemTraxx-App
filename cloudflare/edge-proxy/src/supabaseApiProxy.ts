@@ -79,7 +79,7 @@ const idsFromPostgrestFilter = (value: string | null) => {
   return candidates.filter((candidate) => UUID_RE.test(candidate));
 };
 
-/** Persist IDs returned by sensitive PostgREST reads through the signed Edge Function path. */
+/** Audit returned and query-filter target IDs through the signed Edge Function path. */
 export const auditSuccessfulSupabaseRead = async (
   request: Request,
   env: Env,
@@ -101,6 +101,8 @@ export const auditSuccessfulSupabaseRead = async (
   const targetIdFilters = idsFromPostgrestFilter(url.searchParams.get(targetFilter));
   const itemIds = [...new Set([...targetIds, ...targetIdFilters])].slice(0, 5_000);
   if (!itemIds.length) return;
+  const itemIdSet = new Set(itemIds);
+  const returnedItemIdSet = new Set(targetIds.filter((id) => itemIdSet.has(id)));
 
   const action = targetIdFilters.length > 0
     ? "read_item_target"
@@ -122,9 +124,12 @@ export const auditSuccessfulSupabaseRead = async (
   }
 
   for (let offset = 0; offset < itemIds.length; offset += 500) {
+    const itemIdBatch = itemIds.slice(offset, offset + 500);
     const body = new TextEncoder().encode(JSON.stringify({
       action,
-      item_ids: itemIds.slice(offset, offset + 500),
+      item_ids: itemIdBatch,
+      returned_item_ids: itemIdBatch.filter((id) => returnedItemIdSet.has(id)),
+      http_status: upstreamResponse.status,
     }));
     const auditRequestId = requestId;
     const headers = new Headers({

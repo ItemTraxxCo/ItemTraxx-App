@@ -24,6 +24,7 @@
             v-model="barcodeInput"
             rows="10"
             placeholder="EXAMPLE-001&#10;EXAMPLE-002&#10;EXAMPLE-003"
+            @input="invalidateGeneratedBarcodes"
           />
         </label>
 
@@ -75,6 +76,11 @@ const normalizeBarcodes = (raw: string) => {
     .map((line) => line.trim())
     .filter(Boolean);
   return Array.from(new Set(lines));
+};
+
+const invalidateGeneratedBarcodes = () => {
+  generatedBarcodes.value = [];
+  error.value = "";
 };
 
 const generateBarcodes = () => {

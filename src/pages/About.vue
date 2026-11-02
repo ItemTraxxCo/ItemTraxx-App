@@ -6,7 +6,7 @@
 
     <main class="about-container">
       <div class="page-nav-left about-top-nav">
-        <RouterLink class="about-back-link" to="/" aria-label="Return to home" @click.prevent="$router.back()">
+        <RouterLink class="about-back-link" to="/" aria-label="Return to home">
           <svg viewBox="0 0 24 24" aria-hidden="true">
             <path d="M15 5 8 12l7 7" />
           </svg>
@@ -79,7 +79,7 @@
           <article v-for="member in teamMembers" :key="member.name" class="team-card">
             <p class="team-role">{{ member.role }}</p>
             <h3>{{ member.name }}</h3>
-            <p>{{ member.bio }}</p>
+            <p v-if="member.bio">{{ member.bio }}</p>
           </article>
         </div>
       </section>
@@ -172,12 +172,10 @@ const teamMembers = [
   {
     name: 'Dennis Frenkel',
     role: 'Founder and CEO',
-    bio: 'Bio coming soon.',
   },
   {
     name: 'Leo Xing',
     role: 'Co Founder and UI/UX Lead',
-    bio: 'Bio coming soon.',
   },
     {
     name: 'Cheezit',

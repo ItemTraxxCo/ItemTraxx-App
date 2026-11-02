@@ -1,4 +1,4 @@
-import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
+import { serve } from "../_shared/serve.ts";
 import { createClient, type SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.108.2";
 import { sendLoggedResendEmail } from "../_shared/emailDeliveryLog.ts";
 import { applyEmailTheme, buildEmailBrandHeaderHtml, withEmailBrandLogoAttachment } from "../_shared/emailBranding.ts";

@@ -6,7 +6,7 @@
 
     <div class="pricing-page">
       <div class="page-nav-left pricing-top-nav">
-        <RouterLink class="pricing-back-link" to="/" aria-label="Return to home" @click.prevent="$router.back()">
+        <RouterLink class="pricing-back-link" to="/" aria-label="Return to home">
           <svg viewBox="0 0 24 24" aria-hidden="true">
             <path d="M15 5 8 12l7 7" />
           </svg>
@@ -57,11 +57,11 @@
 
           <article class="plan-card plan-highlight">
             <h3>Workspace Growth Plan</h3>
-            <p class="plan-meta">5-10 tenant accounts</p>
+            <p class="plan-meta">6–9 tenant accounts</p>
             <p class="price">$9,000<span>/year</span></p>
             <p class="price-note">Listed price excludes the 1st year onboarding fee.</p>
             <ul>
-              <li>Up to 10 tenant accounts within the workspace</li>
+              <li>6–9 tenant accounts within the workspace</li>
               <li>Unlimited checkout and return transactions</li>
               <li>Item tracking and status visibility</li>
               <li>Checkout and return system</li>
@@ -74,7 +74,7 @@
           <article class="plan-card">
             <h3>Workspace Enterprise Plan</h3>
             <p class="plan-meta">10+ tenant accounts</p>
-            <RouterLink class="price price-link" to="/contact-sales">Contact for pricing</RouterLink>
+            <RouterLink class="price price-link" :to="{ name: 'public-contact-sales', query: { plan: 'workspace_enterprise' } }">Contact for pricing</RouterLink>
             <p class="starting">Starts at $9,500/year.</p>
             <p class="price-note">Listed price excludes the 1st year onboarding fee.</p>
             <ul>
@@ -113,7 +113,7 @@
               <article class="plan-card plan-card-full">
                 <h3>Education Plan</h3>
                 <p class="plan-meta">For educational institutions</p>
-                <RouterLink class="price price-link" to="/contact-sales">Contact for pricing</RouterLink>
+                <RouterLink class="price price-link" :to="{ name: 'public-contact-sales', query: { plan: 'education' } }">Contact for pricing</RouterLink>
                 <p class="starting">Starts at $5,499/year</p>
                 <ul>
                   <li>Customized solutions for educational institutions</li>
@@ -149,7 +149,7 @@
               <article class="plan-card plan-card-full">
                 <h3>Custom ItemTraxx Plan</h3>
                 <p class="plan-meta">Tailored to your requirements</p>
-                <RouterLink class="price price-link" to="/contact-sales">Contact for pricing</RouterLink>
+                <RouterLink class="price price-link" :to="{ name: 'public-contact-sales', query: { plan: 'custom' } }">Contact for pricing</RouterLink>
                 <ul>
                   <li>Customized solutions for your specific requirements</li>
                   <li>Unlimited checkout and return transactions</li>
@@ -185,7 +185,6 @@
             <p class="price">$70.00<span>/year</span></p>
             <ul>
               <li>Single-user access to the ItemTraxx app</li>
-              <li>Single-user access to the ItemTraxx appw</li>
               <li>Invoice-based billing</li>
             </ul>
             <p class="onboarding">Onboarding not available.</p>

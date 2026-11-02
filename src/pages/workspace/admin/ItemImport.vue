@@ -29,6 +29,7 @@
         v-model="rawInput"
         rows="10"
         placeholder="name,barcode,serial_number,notes&#10;Camera A,ITX-001,SN1001,Main checkout camera"
+        @input="invalidatePreview"
       ></textarea>
       <div class="form-actions">
         <button type="button" class="button-primary" @click="parseRows">Parse rows</button>
@@ -152,6 +153,14 @@ const importResult = ref<{
   skipped_rows: Array<{ barcode: string; reason: string }>;
 } | null>(null);
 
+const invalidatePreview = () => {
+  parsedRows.value = [];
+  parseSkipped.value = [];
+  importResult.value = null;
+  error.value = "";
+  success.value = "";
+};
+
 const downloadTextFile = (filename: string, content: string, contentType: string) => {
   const blob = new Blob([content], { type: contentType });
   const url = URL.createObjectURL(blob);
@@ -189,32 +198,60 @@ const downloadValidationReport = (source: "parse" | "import") => {
   exportRowsToCsv(filename, ["barcode", "reason"], rows);
 };
 
-const parseLine = (line: string) => {
-  const parts: string[] = [];
-  let current = "";
+const parseCsv = (raw: string): { rows: string[][]; error?: string } => {
+  const source = raw.replace(/^\uFEFF/, "");
+  const rows: string[][] = [];
+  let fields: string[] = [];
+  let field = "";
   let inQuotes = false;
+  let rowHasContent = false;
 
-  for (let index = 0; index < line.length; index += 1) {
-    const char = line[index];
-    if (char === '"') {
-      inQuotes = !inQuotes;
-      continue;
-    }
-    if (char === "," && !inQuotes) {
-      parts.push(current.trim());
-      current = "";
-      continue;
-    }
-    current += char;
-  }
-  parts.push(current.trim());
-
-  return {
-    name: parts[0] ?? "",
-    barcode: parts[1] ?? "",
-    serial_number: parts[2] ?? "",
-    notes: parts.slice(3).join(",").trim(),
+  const finishRow = () => {
+    fields.push(field.trim());
+    if (rowHasContent || fields.some(Boolean)) rows.push(fields);
+    fields = [];
+    field = "";
+    rowHasContent = false;
   };
+
+  for (let index = 0; index < source.length; index += 1) {
+    const char = source[index];
+
+    if (inQuotes) {
+      if (char === '"' && source[index + 1] === '"') {
+        field += '"';
+        index += 1;
+      } else if (char === '"') {
+        inQuotes = false;
+      } else {
+        field += char;
+      }
+      continue;
+    }
+
+    if (char === '"' && field.trim() === "") {
+      field = "";
+      inQuotes = true;
+      rowHasContent = true;
+    } else if (char === ",") {
+      fields.push(field.trim());
+      field = "";
+      rowHasContent = true;
+    } else if (char === "\n" || char === "\r") {
+      if (char === "\r" && source[index + 1] === "\n") index += 1;
+      finishRow();
+    } else {
+      field += char;
+      if (!/\s/.test(char)) rowHasContent = true;
+    }
+  }
+
+  if (inQuotes) {
+    return { rows: [], error: "CSV contains an unclosed quoted field." };
+  }
+
+  if (field.length || fields.length || rowHasContent) finishRow();
+  return { rows };
 };
 
 const parseRows = () => {
@@ -222,12 +259,17 @@ const parseRows = () => {
   success.value = "";
   importResult.value = null;
 
-  const lines = rawInput.value
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter(Boolean);
+  const result = parseCsv(rawInput.value);
+  if (result.error) {
+    error.value = result.error;
+    parsedRows.value = [];
+    parseSkipped.value = [];
+    return;
+  }
 
-  if (!lines.length) {
+  const rows = result.rows.filter((row) => row.some(Boolean));
+
+  if (!rows.length) {
     error.value = "Paste at least one CSV row.";
     parsedRows.value = [];
     parseSkipped.value = [];
@@ -237,17 +279,16 @@ const parseRows = () => {
   const parsed: ImportRow[] = [];
   const skipped: Array<{ barcode: string; reason: string }> = [];
 
-  const firstRow = parseLine(lines[0] ?? "");
+  const firstRow = rows[0] ?? [];
   const hasHeader =
-    firstRow.name.toLowerCase() === "name" && firstRow.barcode.toLowerCase() === "barcode";
+    firstRow[0]?.toLowerCase() === "name" && firstRow[1]?.toLowerCase() === "barcode";
 
-  for (const [index, line] of lines.entries()) {
+  for (const [index, row] of rows.entries()) {
     if (index === 0 && hasHeader) {
       continue;
     }
-    const row = parseLine(line);
-    const name = row.name.trim();
-    const barcode = row.barcode.trim();
+    const name = row[0]?.trim() ?? "";
+    const barcode = row[1]?.trim() ?? "";
     if (!name || !barcode) {
       skipped.push({ barcode: barcode || "(blank)", reason: "Missing name or barcode." });
       continue;
@@ -255,8 +296,8 @@ const parseRows = () => {
     parsed.push({
       name,
       barcode,
-      serial_number: row.serial_number?.trim() || undefined,
-      notes: row.notes?.trim() || undefined,
+      serial_number: row[2]?.trim() || undefined,
+      notes: row.slice(3).join(",").trim() || undefined,
     });
   }
 
@@ -307,6 +348,7 @@ const handleCsvFileSelect = async (event: Event) => {
   }
   try {
     rawInput.value = await file.text();
+    invalidatePreview();
     error.value = "";
     success.value = "CSV loaded. Click \"Parse rows\" to preview.";
   } catch {

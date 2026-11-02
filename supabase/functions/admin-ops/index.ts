@@ -1,4 +1,4 @@
-import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
+import { serve } from "../_shared/serve.ts";
 import { getExternalAuthUser } from "../_shared/externalAuth.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.108.2";
 import { isKillSwitchWriteBlocked } from "../_shared/killSwitch.ts";
@@ -334,6 +334,7 @@ serve((req) => withRequestSpan(req, "POST /functions/admin-ops", async (span, re
     if (actionAuthorizationFailure) return actionAuthorizationFailure;
 
     const context: AdminOpsContext = {
+      request: req,
       requestId,
       action: normalizedAction,
       payload: payloadRecord,

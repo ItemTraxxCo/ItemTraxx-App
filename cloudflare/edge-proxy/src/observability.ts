@@ -254,68 +254,128 @@ const suspiciousTextSummary = (value: string) => {
 const suspiciousQuerySummary = (request: Request) =>
   suspiciousTextSummary(Array.from(new URL(request.url).searchParams.values()).join("\n"));
 
-const summarizeWorkerRequestBody = async (request: Request): Promise<RequestBodySummary> => {
+const summarizeBodyText = (body: string): RequestBodySummary => {
+  let fields: string[] = [];
+  try {
+    const parsed = JSON.parse(body);
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+      fields = Object.keys(parsed)
+        .filter((key) => !SENSITIVE_KEY.test(key))
+        .map((key) => key.replace(/[^A-Za-z0-9_.-]/g, "_").slice(0, 48))
+        .slice(0, 32);
+    }
+  } catch {
+    // Form and plain text bodies are never retained or parsed into fields.
+  }
+  const suspicious = suspiciousTextSummary(body);
+  return { fields, ...suspicious };
+};
+
+const captureWorkerRequestBody = (request: Request) => {
   const contentType = request.headers.get("content-type") ?? "";
   if (
     request.method === "GET" || request.method === "HEAD" || !request.body ||
     !/^(?:application\/json|application\/[^;]+\+json|application\/x-www-form-urlencoded|text\/plain)(?:\s*;|$)/i.test(contentType)
-  ) return EMPTY_REQUEST_BODY_SUMMARY;
+  ) {
+    return {
+      request,
+      summarize: async () => EMPTY_REQUEST_BODY_SUMMARY,
+    };
+  }
 
+  let sourceReader: ReadableStreamDefaultReader<Uint8Array> | undefined;
   try {
-    const reader = request.clone().body?.getReader();
-    if (!reader) return EMPTY_REQUEST_BODY_SUMMARY;
-    let timeoutId: ReturnType<typeof setTimeout> | undefined;
-    let timedOut = false;
-    const readPromise = (async (): Promise<RequestBodySummary> => {
-      const chunks: Uint8Array[] = [];
-      let size = 0;
-      while (size < 8_192) {
-        const { done, value } = await reader.read();
-        if (done || !value) break;
-        const part = value.subarray(0, 8_192 - size);
-        chunks.push(part);
-        size += part.length;
+    const reader = request.body.getReader();
+    sourceReader = reader;
+    const chunks: Uint8Array[] = [];
+    let size = 0;
+    let finished = false;
+    let cancelled = false;
+    const append = (value: Uint8Array) => {
+      if (size >= 8_192) return;
+      const part = value.subarray(0, 8_192 - size).slice();
+      chunks.push(part);
+      size += part.length;
+    };
+    const summarize = async (drainRemaining = true) => {
+      if (drainRemaining && !finished && !cancelled && size < 8_192) {
+        let timeoutId: ReturnType<typeof setTimeout> | undefined;
+        let timedOut = false;
+        const readPromise = (async () => {
+          while (size < 8_192) {
+            const { done, value } = await reader.read();
+            if (done || !value) {
+              finished = true;
+              break;
+            }
+            append(value);
+          }
+        })().catch(() => {
+          finished = true;
+        });
+        try {
+          await Promise.race([
+            readPromise,
+            new Promise<void>((resolve) => {
+              timeoutId = setTimeout(() => {
+                timedOut = true;
+                resolve();
+              }, 50);
+            }),
+          ]);
+        } finally {
+          if (timeoutId !== undefined) clearTimeout(timeoutId);
+        }
+        if (timedOut || size >= 8_192) {
+          cancelled = true;
+          void reader.cancel().catch(() => undefined);
+        }
       }
-      if (size >= 8_192) void reader.cancel().catch(() => undefined);
       const bytes = new Uint8Array(size);
       let offset = 0;
       for (const chunk of chunks) {
         bytes.set(chunk, offset);
         offset += chunk.length;
       }
-      const body = new TextDecoder().decode(bytes);
-      let fields: string[] = [];
-      try {
-        const parsed = JSON.parse(body);
-        if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
-          fields = Object.keys(parsed)
-            .filter((key) => !SENSITIVE_KEY.test(key))
-            .map((key) => key.replace(/[^A-Za-z0-9_.-]/g, "_").slice(0, 48))
-            .slice(0, 32);
+      return summarizeBodyText(new TextDecoder().decode(bytes));
+    };
+    const body = new ReadableStream<Uint8Array>({
+      async pull(controller) {
+        try {
+          const { done, value } = await reader.read();
+          if (done || !value) {
+            finished = true;
+            controller.close();
+            return;
+          }
+          append(value);
+          controller.enqueue(value);
+        } catch (error) {
+          finished = true;
+          controller.error(error);
         }
-      } catch {
-        // Form and plain text bodies are never retained or parsed into fields.
-      }
-      const suspicious = suspiciousTextSummary(body);
-      return { fields, ...suspicious };
-    })();
-    try {
-      const result = await Promise.race([
-        readPromise,
-        new Promise<RequestBodySummary>((resolve) => {
-          timeoutId = setTimeout(() => {
-            timedOut = true;
-            resolve(EMPTY_REQUEST_BODY_SUMMARY);
-          }, 50);
-        }),
-      ]);
-      if (timedOut) void reader.cancel().catch(() => undefined);
-      return result;
-    } finally {
-      if (timeoutId !== undefined) clearTimeout(timeoutId);
-    }
+      },
+      async cancel(reason) {
+        cancelled = true;
+        finished = true;
+        await reader.cancel(reason);
+      },
+    }, { highWaterMark: 0 });
+    const capturedRequest = new Request(request, {
+      body,
+      duplex: "half",
+    } as RequestInit & { duplex: "half" });
+    return { request: capturedRequest, summarize };
   } catch {
-    return EMPTY_REQUEST_BODY_SUMMARY;
+    try {
+      sourceReader?.releaseLock();
+    } catch {
+      // A failed stream wrapper falls back to the untouched incoming request.
+    }
+    return {
+      request,
+      summarize: async () => EMPTY_REQUEST_BODY_SUMMARY,
+    };
   }
 };
 
@@ -633,9 +693,15 @@ export const withWorkerRequestTelemetry = async (
   let status = 500;
   let responseCode: string | undefined;
   let unhandledError = false;
-  const bodySummaryPromise = summarizeWorkerRequestBody(request);
+  // Observe bytes only as the handler reads them. The wrapper does not pull the
+  // request stream on its own, so early rate-limit responses leave it unread.
+  const bodyCapture = captureWorkerRequestBody(request);
   try {
-    const response = await handler({ requestId, trace, tracedRequest: withTraceHeaders(request, trace) });
+    const response = await handler({
+      requestId,
+      trace,
+      tracedRequest: withTraceHeaders(bodyCapture.request, trace),
+    });
     status = response.status;
     if (status >= 400) responseCode = await responseErrorCode(response);
     return response;
@@ -643,6 +709,7 @@ export const withWorkerRequestTelemetry = async (
     unhandledError = true;
     throw error;
   } finally {
+    const bodySummary = await bodyCapture.summarize(status !== 429);
     await logWorkerRequestCompletion(
       env,
       request,
@@ -654,7 +721,7 @@ export const withWorkerRequestTelemetry = async (
       {},
       ctx,
       unhandledError ? "unhandled_error" : responseCode,
-      await bodySummaryPromise,
+      bodySummary,
     );
   }
 };

@@ -25,6 +25,7 @@ const env = (extra: Partial<Env> = {}) => ({
   ITX_ENVIRONMENT: "test",
   ITX_OTEL_TRACE_SAMPLE_RATE: "1",
   ITX_LOG_SUCCESS_SAMPLE_RATE: "1",
+  ITX_EDGE_PROXY_SHARED_SECRET: "test-secret",
   ...extra,
 } as Env);
 
@@ -113,6 +114,182 @@ Deno.test("Worker ignores unsafe query request IDs", async () => {
   );
 });
 
+Deno.test("Worker exports deduplicable, privacy-safe request and security events", async () => {
+  const originalFetch = globalThis.fetch;
+  const originalWarn = console.warn;
+  const captures: Array<Record<string, unknown>> = [];
+  const pending: Promise<unknown>[] = [];
+  globalThis.fetch = ((input: string | URL | Request, init?: RequestInit) => {
+    if (String(input) !== "https://us.i.posthog.com/batch/") {
+      throw new Error(`Unexpected telemetry URL: ${String(input)}`);
+    }
+    captures.push(JSON.parse(String(init?.body)) as Record<string, unknown>);
+    return Promise.resolve(new Response("{}", { status: 200 }));
+  }) as typeof fetch;
+  console.warn = () => {};
+  try {
+    await withWorkerRequestTelemetry(
+      new Request("https://edge.itemtraxx.com/rest/v1/items?q=%3Cscript%3E", {
+        headers: {
+          "x-request-id": "14aa123a-227e-4cba-b554-0b10abd2a10f",
+          "cf-connecting-ip": "203.0.113.17",
+          authorization: "Bearer eyJraw-jwt-value",
+          "user-agent": "ItemTraxx observability test",
+        },
+      }),
+      env({
+        ITX_POSTHOG_PROJECT_TOKEN: "phc_test",
+        ITX_POSTHOG_CAPTURE_ENDPOINT: "https://us.i.posthog.com/i/v0/e/",
+      } as Partial<Env>),
+      { waitUntil: (promise: Promise<unknown>) => pending.push(promise) } as unknown as ExecutionContext,
+      async () => new Response("forbidden", { status: 403 }),
+    );
+    await Promise.all(pending);
+  } finally {
+    globalThis.fetch = originalFetch;
+    console.warn = originalWarn;
+  }
+  const batch = captures[0]?.batch as Array<Record<string, unknown>> | undefined;
+  assert(batch?.some((event) => event.event === "edge_request"), "request event is captured");
+  assert(batch?.some((event) => event.event === "security_event"), "403 security event is captured");
+  const security = batch?.find((event) => event.event === "security_event")?.properties as Record<string, unknown> | undefined;
+  assert(security?.category === "auth_forbidden", "403 has auth_forbidden category");
+  assert(security?.request_id === "14aa123a-227e-4cba-b554-0b10abd2a10f", "request ID supports cross-layer dedupe");
+  assert(typeof security?.client_ip_hash === "string", "client address is HMAC-hashed");
+  assert(!JSON.stringify(captures).includes("203.0.113.17"), "raw client IP is not captured");
+  assert(!JSON.stringify(captures).includes("eyJraw-jwt-value"), "raw bearer token is not captured");
+  assert(security?.["$process_person_profile"] === false, "service events do not create PostHog person profiles");
+});
+
+Deno.test("Worker dispatches SQLi pages asynchronously with privacy-safe incident metadata", async () => {
+  const originalFetch = globalThis.fetch;
+  const pending: Promise<unknown>[] = [];
+  const captures: Array<Record<string, unknown>> = [];
+  let resolveIncidentResponse: ((response: Response) => void) | undefined;
+  let incidentStarted = false;
+  let incidentStartedResolve: (() => void) | undefined;
+  const incidentStartedPromise = new Promise<void>((resolve) => {
+    incidentStartedResolve = resolve;
+  });
+  let incidentRequest: { headers: Headers; payload: Record<string, unknown> } | undefined;
+  globalThis.fetch = ((input: string | URL | Request, init?: RequestInit) => {
+    if (String(input) === "https://incident.example/security") {
+      incidentStarted = true;
+      incidentStartedResolve?.();
+      incidentRequest = {
+        headers: new Headers(init?.headers),
+        payload: JSON.parse(String(init?.body)) as Record<string, unknown>,
+      };
+      return new Promise<Response>((resolve) => {
+        resolveIncidentResponse = resolve;
+      });
+    }
+    captures.push(JSON.parse(String(init?.body)) as Record<string, unknown>);
+    return Promise.resolve(new Response("{}", { status: 200 }));
+  }) as typeof fetch;
+
+  try {
+    const requestPromise = withWorkerRequestTelemetry(
+      new Request("https://edge.itemtraxx.com/rest/v1/items?q=union%20select", {
+        headers: {
+          "x-request-id": "14aa123a-227e-4cba-b554-0b10abd2a10f",
+          "cf-connecting-ip": "203.0.113.99",
+          authorization: "Bearer eyJworker-jwt-secret",
+        },
+      }),
+      env({
+        ITX_POSTHOG_PROJECT_TOKEN: "phc_test",
+        ITX_POSTHOG_CAPTURE_ENDPOINT: "https://us.i.posthog.com/i/v0/e/",
+        INCIDENT_IO_SECURITY_WEBHOOK_URL: "https://incident.example/security",
+        INCIDENT_IO_SECURITY_API_KEY: "incident-worker-key",
+      } as Partial<Env>),
+      { waitUntil: (promise: Promise<unknown>) => pending.push(promise) } as unknown as ExecutionContext,
+      async () => new Response("ok", { status: 200 }),
+    );
+    const outcome = await Promise.race([
+      requestPromise.then((response) => ({ response })),
+      new Promise<{ response?: Response }>((resolve) =>
+        setTimeout(() => resolve({}), 50)
+      ),
+    ]);
+    if (!outcome.response) {
+      await incidentStartedPromise;
+      resolveIncidentResponse?.(new Response("accepted", { status: 202 }));
+    }
+    const response = await requestPromise;
+    await incidentStartedPromise;
+    resolveIncidentResponse?.(new Response("accepted", { status: 202 }));
+    await Promise.all(pending);
+
+    assert(outcome.response instanceof Response, "client response does not await incident.io");
+    assertEquals(response.status, 200, "original response status is unchanged");
+    assert(incidentStarted, "an SQLi signature starts an immediate incident request");
+    const page = incidentRequest;
+    assert(page, "incident request payload captured");
+    assertEquals(page.headers.get("authorization"), "Bearer incident-worker-key", "incident API key uses bearer auth");
+    assertEquals(page.headers.get("content-type"), "application/json", "incident payload uses JSON");
+    assertEquals(page.payload.title, "[SECURITY CRITICAL] SQLi on /rest/v1/items", "SQLi title includes normalized route");
+    assertEquals(page.payload.deduplication_key, "itx-sec-sqli-rest-v1-items", "incident deduplication key");
+    assertEquals(page.payload.status, "firing", "incident is firing");
+    assertEquals(page.payload.severity, "critical", "incident severity");
+    const metadata = page.payload.metadata as Record<string, unknown>;
+    assertEquals(metadata.attack_type, "sqli", "attack type");
+    assertEquals(metadata.actor_id, "anon", "unresolved actor label");
+    assert(typeof metadata.client_ip_hash === "string", "IP is represented by its keyed hash");
+    assert(!JSON.stringify(page.payload).includes("203.0.113.99"), "raw IP is excluded from incident metadata");
+    assert(!JSON.stringify(page.payload).includes("eyJworker-jwt-secret"), "raw JWT is excluded from incident metadata");
+  } finally {
+    resolveIncidentResponse?.(new Response("accepted", { status: 202 }));
+    globalThis.fetch = originalFetch;
+  }
+});
+
+Deno.test("Worker scans rejected JSON for safe input signatures without exporting payload values", async () => {
+  const originalFetch = globalThis.fetch;
+  const pending: Promise<unknown>[] = [];
+  const captures: Array<Record<string, unknown>> = [];
+  globalThis.fetch = ((input: string | URL | Request, init?: RequestInit) => {
+    if (String(input) !== "https://us.i.posthog.com/batch/") {
+      throw new Error(`Unexpected telemetry URL: ${String(input)}`);
+    }
+    captures.push(JSON.parse(String(init?.body)) as Record<string, unknown>);
+    return Promise.resolve(new Response("{}", { status: 200 }));
+  }) as typeof fetch;
+  try {
+    await withWorkerRequestTelemetry(
+      new Request("https://edge.itemtraxx.com/rest/v1/items", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-request-id": "14aa123a-227e-4cba-b554-0b10abd2a10f",
+        },
+        body: JSON.stringify({
+          name: "<script>alert(1)</script> attacker@example.com",
+          password: "super-secret-password",
+        }),
+      }),
+      env({
+        ITX_POSTHOG_PROJECT_TOKEN: "phc_test",
+        ITX_POSTHOG_CAPTURE_ENDPOINT: "https://us.i.posthog.com/i/v0/e/",
+      } as Partial<Env>),
+      { waitUntil: (promise: Promise<unknown>) => pending.push(promise) } as unknown as ExecutionContext,
+      async () => new Response("invalid", { status: 422 }),
+    );
+    await Promise.all(pending);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+  const batch = captures.flatMap((capture) => capture.batch as Array<Record<string, unknown>>);
+  const requestEvent = batch.find((event) => event.event === "edge_request");
+  const requestProperties = requestEvent?.properties as Record<string, unknown>;
+  assertEquals(requestProperties.rejected_fields, ["name"], "sensitive body fields are omitted");
+  assertEquals(requestProperties.rejected_input_snippets, ["<script"], "only fixed safe snippets are retained");
+  const serialized = JSON.stringify(captures);
+  assert(!serialized.includes("attacker@example.com"), "email values are not exported");
+  assert(!serialized.includes("super-secret-password"), "password values are not exported");
+  assert(!serialized.includes("<script>alert"), "attacker-controlled payload is not exported");
+});
+
 Deno.test("worker exception logs redact query secrets and do not send a remote payload", async () => {
   const originalError = console.error;
   let output = "";
@@ -180,16 +357,22 @@ Deno.test("Worker HTTP failure records carry the request trace correlation", asy
   }
 });
 
-Deno.test("request completion emits a wide structured event with trace correlation", () => {
+Deno.test("request completion records safe request metadata at full sampling", async () => {
   const originalInfo = console.info;
   let output = "";
   console.info = (value?: unknown) => {
     output = String(value);
   };
   try {
-    const request = new Request("https://edge.itemtraxx.com/functions/checkoutReturn?token=secret");
+    const request = new Request("https://edge.itemtraxx.com/functions/checkoutReturn?search=drill&token=secret", {
+      headers: {
+        "cf-connecting-ip": "203.0.113.17",
+        authorization: "Bearer eyJsecret-token-value",
+        "user-agent": "ItemTraxx test agent",
+      },
+    });
     const trace = createWorkerTraceContext(request, env());
-    logWorkerRequestCompletion(env(), request, "request-1", trace, "POST /functions/checkoutReturn", 200, 42, {
+    await logWorkerRequestCompletion(env(), request, "request-1", trace, "POST /functions/checkoutReturn", 200, 42, {
       retry_count: 0,
       error_code: undefined,
     });
@@ -201,6 +384,37 @@ Deno.test("request completion emits a wide structured event with trace correlati
   assertEquals(parsed.route, "/functions/checkoutReturn", "query-free route");
   assertEquals(parsed.status, 200, "status");
   assertEquals(parsed.request_id, "request-1", "request id");
+  assertEquals(parsed.method, "GET", "method");
+  assertEquals(parsed.user_agent, "ItemTraxx test agent", "user agent");
+  assert(typeof parsed.client_ip_hash === "string", "client IP is keyed-hashed");
+  assert(typeof parsed.session_hash === "string", "session credential is keyed-hashed");
+  assertEquals(parsed.query_keys, ["search"], "safe query key is retained");
   assert(typeof parsed.trace_id === "string" && typeof parsed.span_id === "string", "trace fields");
+  assert(!output.includes("203.0.113.17"), "raw client IP must not be logged");
+  assert(!output.includes("eyJsecret-token-value"), "raw session token must not be logged");
   assert(!output.includes("token=secret"), "telemetry must not export query secrets");
+});
+
+Deno.test("Worker emits categorized security events for unauthorized responses", async () => {
+  const originalWarn = console.warn;
+  const output: string[] = [];
+  console.warn = (value?: unknown) => output.push(String(value));
+  try {
+    await withWorkerRequestTelemetry(
+      new Request("https://edge.itemtraxx.com/rest/v1/items", {
+        headers: { "cf-connecting-ip": "203.0.113.17" },
+      }),
+      env(),
+      { waitUntil: (_promise: Promise<unknown>) => {} } as unknown as ExecutionContext,
+      async () => new Response("forbidden", { status: 403 }),
+    );
+  } finally {
+    console.warn = originalWarn;
+  }
+  const security = output.map((line) => JSON.parse(line) as Record<string, unknown>)
+    .find((event) => event.event === "security_event");
+  assert(security, "security event should be emitted");
+  assertEquals(security.category, "auth_forbidden", "security category");
+  assertEquals(security.status, 403, "security status");
+  assert(typeof security.client_ip_hash === "string", "security event has keyed IP hash");
 });

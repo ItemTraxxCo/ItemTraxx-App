@@ -1,4 +1,4 @@
-import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
+import { serve } from "../_shared/serve.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.108.2";
 import { isKillSwitchWriteBlocked } from "../_shared/killSwitch.ts";
 import { getRequestId, logError, logInfo } from "../_shared/observability.ts";
@@ -196,11 +196,11 @@ serve(async (req) => {
         error: "Organization is required for this plan.",
       });
     }
-    if (plan === "workspace_enterprise" && !schoolsCount) {
+    if (plan === "workspace_enterprise" && (!schoolsCount || schoolsCount < 10)) {
       return jsonResponse(
         400,
         {
-          error: "Number of tenant accounts is required for the Workspace Enterprise plan.",
+          error: "Workspace Enterprise requires at least 10 tenant accounts.",
         },
       );
     }

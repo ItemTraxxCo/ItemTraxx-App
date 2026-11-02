@@ -52,7 +52,12 @@
         </ul>
       </div>
       <div class="actions">
-        <button type="button" class="button-primary" :disabled="isSubmitting" @click="submitReturn">
+        <button
+          type="button"
+          class="button-primary"
+          :disabled="isSubmitting || isBarcodeLoading || (!barcodes.length && !barcodeInput.trim())"
+          @click="submitReturn"
+        >
           Complete Quick Return
         </button>
       </div>

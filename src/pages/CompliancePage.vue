@@ -6,7 +6,7 @@
 
     <main class="compliance-container">
       <div class="page-nav-left compliance-top-nav">
-        <RouterLink class="compliance-back-link" to="/trust" aria-label="Return to trust center" @click.prevent="$router.back()">
+        <RouterLink class="compliance-back-link" to="/trust" aria-label="Return to trust center">
           <svg viewBox="0 0 24 24" aria-hidden="true">
             <path d="M15 5 8 12l7 7" />
           </svg>

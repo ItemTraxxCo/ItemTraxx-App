@@ -5,7 +5,7 @@
     </RouterLink>
 
     <div class="page-nav-left pricing-top-nav">
-      <RouterLink class="pricing-back-link" :to="returnPath" aria-label="Return to previous page" @click.prevent="$router.back()">
+      <RouterLink class="pricing-back-link" :to="returnPath" :aria-label="isDemoIntent ? 'Return to home' : 'Return to pricing'">
         <svg viewBox="0 0 24 24" aria-hidden="true">
           <path d="M15 5 8 12l7 7" />
         </svg>
@@ -44,6 +44,7 @@
         <label v-if="!isDemoIntent" class="field field-plan">
           <span class="field-label">Please Select Plan</span>
           <select v-model="plan" required>
+            <option value="" disabled>Select a plan</option>
             <option value="workspace_core">ItemTraxx Workspace Core Plan</option>
             <option value="workspace_growth">ItemTraxx Workspace Growth Plan</option>
             <option value="workspace_enterprise">ItemTraxx Workspace Enterprise Plan</option>
@@ -68,7 +69,7 @@
 
         <label v-if="requiresUnits" class="field field-full">
           {{ unitsLabel }}
-          <input v-model.number="schoolCount" type="number" min="1" step="1" :placeholder="unitsPlaceholder" />
+          <input v-model.number="schoolCount" type="number" min="10" step="1" :required="requiresUnits" :placeholder="unitsPlaceholder" />
         </label>
 
         <label class="field field-full">
@@ -113,7 +114,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from "vue";
+import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import { RouterLink, useRoute, useRouter } from "vue-router";
 import PublicFooter from "../components/PublicFooter.vue";
 import { useTurnstile } from "../composables/useTurnstile";
@@ -134,7 +135,24 @@ type PlanId =
 const route = useRoute();
 const router = useRouter();
 
-const plan = ref<PlanId>("workspace_core");
+const PLAN_IDS: PlanId[] = [
+  "workspace_core",
+  "workspace_growth",
+  "workspace_enterprise",
+  "education",
+  "custom",
+  "individual_yearly",
+  "individual_monthly",
+  "other",
+];
+const parsePlanId = (value: unknown): PlanId | "" =>
+  typeof value === "string" && PLAN_IDS.includes(value as PlanId)
+    ? (value as PlanId)
+    : "";
+const plan = ref<PlanId | "">(parsePlanId(route.query.plan));
+watch(() => route.query.plan, (value) => {
+  plan.value = parsePlanId(value);
+});
 const fullName = ref("");
 const organization = ref("");
 const schoolCount = ref<number | null>(null);
@@ -186,13 +204,14 @@ const setTurnstileContainerRef = (
 
 const canSubmit = computed(() => {
   if (!fullName.value || !replyEmail.value) return false;
+  if (!isDemoIntent.value && !plan.value) return false;
   if (requiresOrganization.value && !organization.value) return false;
-  if (requiresUnits.value && (!schoolCount.value || schoolCount.value < 1)) return false;
+  if (requiresUnits.value && (!schoolCount.value || schoolCount.value < 10)) return false;
   if (turnstileSiteKey && !turnstileToken.value) return false;
   return true;
 });
 
-const effectivePlan = computed<PlanId>(() => (isDemoIntent.value ? "other" : plan.value));
+const effectivePlan = computed<PlanId>(() => (isDemoIntent.value ? "other" : plan.value || "other"));
 
 const requiresOrganization = computed(
   () => !isDemoIntent.value && !["individual_yearly", "individual_monthly", "other"].includes(effectivePlan.value)

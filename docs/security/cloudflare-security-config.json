@@ -1,0 +1,105 @@
+{
+  "schema_version": 1,
+  "zone_host": "edge.itemtraxx.com",
+  "custom_waf_rule": {
+    "phase": "http_request_firewall_custom",
+    "create_ruleset": {
+      "method": "POST",
+      "path": "/zones/$ZONE_ID/rulesets",
+      "body": {
+        "name": "ItemTraxx suspicious query tripwire",
+        "description": "Challenge obvious injection and traversal probes on ItemTraxx edge APIs.",
+        "kind": "custom",
+        "phase": "http_request_firewall_custom",
+        "rules": [
+          {
+            "action": "managed_challenge",
+            "expression": "http.host eq \"edge.itemtraxx.com\" and (starts_with(http.request.uri.path, \"/api/auth/\") or http.request.uri.path in {\"/rest/v1/items\" \"/functions/admin-item-mutate\" \"/functions/admin-ops\"}) and (lower(http.request.uri.query) contains \"<script\" or lower(http.request.uri.query) contains \"%3cscript\" or lower(http.request.uri.query) contains \"union%20select\" or lower(http.request.uri.query) contains \"union+select\" or lower(http.request.uri.query) contains \"../\" or lower(http.request.uri.query) contains \"%2e%2e%2f\" or lower(http.request.uri.query) contains \"%252e%252e%252f\")",
+            "description": "Challenge common injection and path traversal probes on auth, item search, and admin routes."
+          }
+        ]
+      }
+    },
+    "activate_existing_entrypoint": {
+      "method": "POST",
+      "path": "/zones/$ZONE_ID/rulesets/$CUSTOM_PHASE_ENTRYPOINT_ID/rules",
+      "body": {
+        "action": "execute",
+        "expression": "true",
+        "action_parameters": {
+          "id": "$CUSTOM_RULESET_ID"
+        },
+        "description": "Execute ItemTraxx suspicious query tripwire"
+      },
+      "position": {
+        "after": "$LAST_EXISTING_RULE_ID"
+      }
+    }
+  },
+  "rate_limit_rule": {
+    "phase": "http_ratelimit",
+    "append_to_existing_entrypoint": true,
+    "method": "POST",
+    "path": "/zones/$ZONE_ID/rulesets/$RATELIMIT_ENTRYPOINT_ID/rules",
+    "body": {
+      "description": "ItemTraxx sensitive auth and search: 60 requests per client per 60 seconds",
+      "expression": "http.host eq \"edge.itemtraxx.com\" and (starts_with(http.request.uri.path, \"/api/auth/\") or http.request.uri.path in {\"/rest/v1/items\" \"/rest/v1/item_status_history\" \"/rest/v1/item_logs\" \"/rest/v1/item_access_grants\" \"/functions/admin-item-mutate\" \"/functions/admin-ops\" \"/functions/security-audit\"})",
+      "action": "block",
+      "action_parameters": {
+        "response": {
+          "status_code": 429,
+          "content_type": "application/json",
+          "content": "{\"error\":\"rate_limited\",\"message\":\"Too many requests\"}"
+        }
+      },
+      "ratelimit": {
+        "characteristics": [
+          "cf.colo.id",
+          "ip.src"
+        ],
+        "period": 60,
+        "requests_per_period": 60,
+        "mitigation_timeout": 60
+      }
+    },
+    "position": {
+      "after": "$LAST_EXISTING_RATE_LIMIT_RULE_ID"
+    }
+  },
+  "logpush_firewall_events": {
+    "method": "POST",
+    "path": "/zones/$ZONE_ID/logpush/jobs",
+    "body": {
+      "name": "ItemTraxx firewall security events",
+      "dataset": "firewall_events",
+      "enabled": true,
+      "destination_conf": "https://<log-bridge-host>/cloudflare/logpush/firewall?header_X-Cloudflare-Logpush-Token=<URL_ENCODED_CLOUDFLARE_LOGPUSH_TOKEN>",
+      "output_options": {
+        "field_names": [
+          "Action",
+          "ClientIP",
+          "ClientRequestHost",
+          "ClientRequestMethod",
+          "ClientRequestPath",
+          "Datetime",
+          "EdgeResponseStatus",
+          "Kind",
+          "MatchIndex",
+          "RayID",
+          "RuleID",
+          "Source",
+          "ZoneName"
+        ],
+        "timestamp_format": "rfc3339"
+      }
+    },
+    "redaction": "Do not include ClientRequestQuery, Cookie, Authorization, or UserAgent fields. The bridge HMAC-hashes ClientIP before PostHog event capture."
+  },
+  "deployment_notes": [
+    "Read both phase entrypoint rulesets first and append rules; do not replace existing rules.",
+    "Rate-limit rules are appended last in the http_ratelimit entrypoint ruleset.",
+    "The custom ruleset has no effect until an execute rule is added to the http_request_firewall_custom entrypoint.",
+    "Validate expression support and rate-limiting entitlements for the current Cloudflare plan before enabling.",
+    "Start the challenge rule in Log mode on a test hostname, then enable managed_challenge after reviewing false positives."
+  ]
+}

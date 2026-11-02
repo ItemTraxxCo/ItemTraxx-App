@@ -8,11 +8,11 @@
       <p class="admin-hero-copy">Add borrowers, review details, and manage archived records.</p>
       <div class="admin-summary-grid">
         <div class="admin-summary-card">
-          <strong>{{ borrowers.length }}</strong>
+          <strong>{{ isLoading ? "…" : borrowers.length }}</strong>
           <span>Active borrowers</span>
         </div>
         <div class="admin-summary-card">
-          <strong>{{ archivedBorrowers.length }}</strong>
+          <strong>{{ isLoadingArchived ? "…" : archivedBorrowers.length }}</strong>
           <span>Archived borrowers</span>
         </div>
       </div>
@@ -99,7 +99,8 @@
           />
         </label>
       </div>
-      <p class="muted">Showing {{ filteredBorrowers.length }} of {{ borrowers.length }} borrowers.</p>
+      <p v-if="isLoading" class="muted">Loading borrowers…</p>
+      <p v-else class="muted">Showing {{ filteredBorrowers.length }} of {{ borrowers.length }} borrowers.</p>
       <BoneyardSkeleton
         :name="bulkMode ? 'admin-borrowers-table-bulk' : 'admin-borrowers-table'"
         :loading="isLoading"

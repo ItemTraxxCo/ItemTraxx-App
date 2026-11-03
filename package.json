@@ -53,20 +53,20 @@
     "deploy": "npm run build && wrangler deploy"
   },
   "dependencies": {
-    "@better-auth/infra": "0.4.22",
-    "@better-auth/passkey": "1.7.12",
-    "@better-auth/sso": "1.7.12",
+    "@better-auth/infra": "0.4.23",
+    "@better-auth/passkey": "1.7.14",
+    "@better-auth/sso": "1.7.14",
     "@intercom/messenger-js-sdk": "^0.0.20",
     "@supabase/supabase-js": "^2.118.0",
     "@vercel/analytics": "^2.0.1",
     "@vercel/speed-insights": "^2.0.0",
-    "better-auth": "1.7.12",
+    "better-auth": "1.7.14",
     "boneyard-js": "^1.10.0",
     "jose": "^6.2.13",
     "jsbarcode": "^3.12.3",
     "jspdf": "^4.2.1",
     "jspdf-autotable": "^5.0.9",
-    "posthog-js": "1.438.21",
+    "posthog-js": "1.439.1",
     "qrcode": "^1.5.4",
     "vue": "^3.5.44",
     "vue-router": "^4.6.4",
@@ -90,7 +90,7 @@
     "vite": "^8.3.5",
     "vitest": "5.0.5",
     "vue-tsc": "^3.3.13",
-    "wrangler": "4.152.0"
+    "wrangler": "4.153.0"
   },
   "overrides": {
     "esbuild": "0.28.1",

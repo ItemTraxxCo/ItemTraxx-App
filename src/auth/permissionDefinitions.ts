@@ -43,7 +43,7 @@ export const regularUserRoleStatements = {
 export const superAdminRoleStatements = {
   user: [
     "create", "list", "set-role", "ban", "impersonate", "delete",
-    "set-password", "set-email", "get", "update",
+    "set-password", "set-email", "set-phone", "get", "update",
   ],
   session: ["list", "revoke", "delete"],
 } as const;

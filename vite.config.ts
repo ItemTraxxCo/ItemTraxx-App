@@ -45,6 +45,20 @@ const disableRocketLoaderPlugin = (): Plugin => ({
   },
 });
 
+// Emits /version.json so the client can detect a newer deploy from our own
+// origin instead of calling the GitHub API from every visitor's browser.
+const versionManifestPlugin = (commit: string): Plugin => ({
+  name: "itemtraxx-version-manifest",
+  apply: "build" as const,
+  generateBundle() {
+    this.emitFile({
+      type: "asset",
+      fileName: "version.json",
+      source: `${JSON.stringify({ sha: commit, builtAt: new Date().toISOString() })}\n`,
+    });
+  },
+});
+
 const resolveBuildCommit = (env: Record<string, string>) => {
   const vercelCommit = env.VERCEL_GIT_COMMIT_SHA?.trim();
   if (vercelCommit) {
@@ -93,6 +107,7 @@ export default defineConfig(({ mode, command }) => {
       ...(env.VITE_E2E_TEST_UTILS === "true" ? [] : [cloudflare()]),
       initialModuleMapPlugin(),
       disableRocketLoaderPlugin(),
+      versionManifestPlugin(gitCommit),
     ],
     // Keep the registry import and the Vue adapter on the same module graph;
     // pre-bundling the package root separately would create two bone registries

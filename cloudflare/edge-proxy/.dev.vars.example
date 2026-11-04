@@ -12,7 +12,7 @@ ITX_POSTHOG_PROJECT_TOKEN=""
 ITX_POSTHOG_CAPTURE_ENDPOINT="https://us.i.posthog.com/i/v0/e/"
 INCIDENT_IO_SECURITY_WEBHOOK_URL=""
 INCIDENT_IO_SECURITY_API_KEY=""
-ALLOWED_FUNCTIONS="checkoutReturn,checkout-borrower-lookup,offline-checkout,admin-item-mutate,admin-borrower-mutate,admin-ops,system-status,super-workspace-mutate,super-admin-mutate,super-dashboard,super-item-mutate,super-borrower-mutate,super-logs-query,super-ops,contact-sales-submit,contact-support-submit,client-error-report,consent-record,workspace-invitation,account-email-change,job-worker,login-notify,intercom-jwt,workspace-admin-mutate,privileged-step-up,security-audit"
+ALLOWED_FUNCTIONS="checkoutReturn,checkout-borrower-lookup,offline-checkout,admin-item-mutate,admin-borrower-mutate,admin-ops,system-status,super-workspace-mutate,super-admin-mutate,super-dashboard,super-item-mutate,super-borrower-mutate,super-logs-query,super-ops,contact-sales-submit,contact-support-submit,client-error-report,consent-record,workspace-invitation,account-email-change,job-worker,login-notify,intercom-jwt,workspace-admin-mutate,privileged-step-up,security-audit,legal-acceptance"
 # Server-only credential for the Supabase HTTPS Data API.
 SUPABASE_SERVICE_ROLE_KEY=""
 BETTER_AUTH_URL="http://localhost:8787"

@@ -17,12 +17,12 @@
       <section class="cookies-hero">
         <p class="cookies-eyebrow">ItemTraxx cookies notice</p>
         <h1>How ItemTraxx uses cookies and similar browser storage.</h1>
-        <p class="cookies-lead-meta" style="margin:0 0 0.5rem;font-size:0.8rem;color:var(--muted);">Last updated: August 3, 2026</p>
+        <p class="cookies-lead-meta" style="margin:0 0 0.5rem;font-size:0.8rem;color:var(--muted);">Last updated: November 4, 2026</p>
         <p class="cookies-lead">
           ItemTraxx uses cookies and similar browser storage for secure sign-in, anti-abuse controls,
           product telemetry, diagnostics, and support conversations. Essential cookies stay
           on because the app cannot work securely without them; analytics and diagnostics are only enabled
-          after consent. Intercom Messenger may be available to both signed-in and anonymous visitors.
+          after consent. The Intercom support chat is treated as an essential support service and loads automatically for everyone shortly after a page loads.
         </p>
       </section>
 
@@ -208,7 +208,7 @@ const operationalCookies = [
   {
     title: "Intercom support Messenger",
     description:
-      "Intercom may be available to signed-in and anonymous visitors for ItemTraxx support. Signed-in users may share their account ID and email when available; anonymous conversations are associated with an Intercom browser cookie, and Intercom may set support-session cookies.",
+      "We use Intercom to provide live support chat, and it loads automatically for all visitors shortly after a page loads, including before you sign in. We treat it as an essential support service, so it is not controlled by the optional analytics or diagnostics choices. For every visitor Intercom receives your IP address, browser and device details, the page you are on, and its own browser cookies and storage (such as a device identifier and a support-session cookie) so conversations can continue across visits. For signed-in users it also receives your account ID and email through a signed token, and anything you type into a chat. Intercom acts as our service provider and is not used for advertising. To avoid it, you can block intercom.io and intercomcdn.com in your browser, or contact support@itemtraxx.com instead.",
   },
 ];
 

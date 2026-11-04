@@ -1,7 +1,7 @@
 # ItemTraxx Terms of Service
 
-**Effective date:** [[EFFECTIVE_DATE]]
-**Provider:** [[ENTITY_DESCRIPTION]] ("ItemTraxx," "we," "us")
+**Effective date:** [[EFFECTIVE_DATE]]  
+**Provider:** [[ENTITY_DESCRIPTION]] ("ItemTraxx," "we," "us")  
 **Contact:** legal@itemtraxx.com · [[MAILING_ADDRESS]]
 
 These Terms of Service ("Terms") are the agreement between ItemTraxx and the organization or individual that uses the ItemTraxx inventory and checkout service, including itemtraxx.com, its subdomains, and the web application (the "Service"). Please read them carefully.

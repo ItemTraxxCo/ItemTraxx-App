@@ -1,7 +1,7 @@
 # ItemTraxx Privacy Policy
 
-**Effective date:** [[EFFECTIVE_DATE]]
-**Provider:** [[ENTITY_DESCRIPTION]] ("ItemTraxx," "we," "us")
+**Effective date:** [[EFFECTIVE_DATE]]  
+**Provider:** [[ENTITY_DESCRIPTION]] ("ItemTraxx," "we," "us")  
 **Contact:** privacy@itemtraxx.com · [[MAILING_ADDRESS]]
 
 This policy explains what personal information ItemTraxx collects through itemtraxx.com, its subdomains, and the ItemTraxx inventory and checkout application (together, the "Service"), why we collect it, who receives it, how long we keep it, and the choices you have. It is written to match how the Service actually works.

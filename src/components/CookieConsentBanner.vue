@@ -7,7 +7,7 @@
         diagnostics help us fix issues and improve the product.
       </p>
       <p class="cookie-consent-legal">
-        See <RouterLink to="/privacy">Privacy Policy</RouterLink> and <RouterLink to="/cookies">Cookies Notice</RouterLink>.
+        See <RouterLink to="/legal/privacy">Privacy Policy</RouterLink> and <RouterLink to="/legal/cookies">Cookie Notice</RouterLink>.
       </p>
 
       <div class="cookie-consent-actions">

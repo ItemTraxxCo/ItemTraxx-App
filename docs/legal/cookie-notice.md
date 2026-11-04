@@ -1,7 +1,7 @@
 # ItemTraxx Cookie and Tracking Notice
 
-**Effective date:** [[EFFECTIVE_DATE]]
-**Provider:** [[ENTITY_DESCRIPTION]] ("ItemTraxx," "we," "us")
+**Effective date:** [[EFFECTIVE_DATE]]  
+**Provider:** [[ENTITY_DESCRIPTION]] ("ItemTraxx," "we," "us")  
 **Contact:** privacy@itemtraxx.com
 
 This notice explains the cookies and similar browser storage that itemtraxx.com, its subdomains, and the ItemTraxx application use, what each does, how long it lasts, and how you control it. It supplements our [Privacy Policy](privacy-policy.md).
@@ -49,7 +49,7 @@ Older builds set a short-lived replay hand-off cookie (`itemtraxx-replay-session
 
 | Item | Provider | Category | What it does | Duration |
 |---|---|---|---|---|
-| `ph_*` cookie and `ph_*` local/session storage | PostHog (United States cloud, through our own subdomain `j.itemtraxx.com`) | Analytics | Pseudonymous identifier for page views; after you sign in it links your account ID and role to your visits | Up to 1 year; shared across `itemtraxx.com` subdomains |
+| `ph_*` cookie and `ph_*` local/session storage | PostHog (United States cloud) | Analytics | Pseudonymous identifier for page views; after you sign in it links your account ID and role to your visits | Up to 1 year; shared across `itemtraxx.com` subdomains |
 | Vercel Web Analytics and Speed Insights | Vercel | Analytics | Page-view counts and page-speed measurements. Vercel's analytics do not use cookies. | Not applicable |
 | Error reports and diagnostic logs | PostHog | Diagnostics | Report crashes and failures so we can fix them. Diagnostics-only visitors use a temporary in-memory identity with no cookie or storage; reports have emails, tokens, and sensitive URL parameters removed. | Not stored in your browser |
 | Session replay | PostHog | Analytics **and** Diagnostics (both required) | Records a privacy-masked replay of how you used the screen, to find usability and technical problems. **All form inputs are masked**, as are borrower usernames and IDs, email addresses, passwords, one-time codes, and security settings. Request headers and bodies are not recorded. | Not stored in your browser |

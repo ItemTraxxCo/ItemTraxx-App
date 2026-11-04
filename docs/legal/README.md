@@ -41,7 +41,7 @@ Founder and contributor IP assignments, entity and trademark records, open-sourc
 | `[[GOVERNING_COUNTY]]` | County for venue | Terms section 17 |
 | `[[DATA_BREACH_CAP]]` | Multiple of fees for the data-breach liability cap | I recommend 2 (i.e. "2 times"); the clause reads "[N] times the fees in item 2" |
 | `[[DATABASE_REGION]]` | The Supabase project's region, written as "in the United States" or the specific region | Not determinable from the repo |
-| `[[BACKUP_LOCATION]]` | Where backups are stored (for example the Google Cloud region) | Subprocessor Directory, Group A |
+| `[[BACKUP_LOCATION]]` | Where backups are stored (for example the Google Cloud region) | Subprocessor Directory |
 | `[[BACKUP_RETENTION_DAYS]]` | How long backups are kept before overwrite | The backup VM and repo are outside this codebase |
 | `[[ANALYTICS_RETENTION]]` | PostHog data retention you have configured | Check the PostHog project setting; I never read it |
 
@@ -65,7 +65,7 @@ Check that nothing is left: `grep -rn "\[\[" docs/legal/`.
 | Vulnerability response times | VDP 7 | Acknowledge 3 business days, assess 10, update every 14, 90-day disclosure window |
 | No bug bounty | VDP 7 | Credit only |
 | Intercom as "essential" | Privacy 4.3; Cookie Notice 4 | Disclosed; not behind a consent gate |
-| Subprocessor change notice for Group B providers handling customer personal information | Subprocessor Directory 5 | 30 days, same as Group A |
+| Subprocessor change notice for providers handling customer personal information (not only Student Data) | Subprocessor Directory 3 | 30 days |
 | Cookie consent records for signed-out users | Cookie Notice 5 | Kept 730 days (matches the purge job) |
 
 ## 4. Facts to verify (I could not confirm them from the repo)

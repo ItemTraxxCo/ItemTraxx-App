@@ -63,14 +63,14 @@ test.describe("Privacy and legal controls", () => {
     await expect(page.getByLabel("Category")).toHaveValue("privacy");
   });
 
-  test("legal hub exposes student privacy and DPA documents", async ({ page }) => {
+  test("legal center exposes student privacy and DPA documents", async ({ page }) => {
     await page.goto("/legal");
-    await expect(page.getByRole("heading", { name: "Legal and Privacy Documents" })).toBeVisible();
-    await expect(page.getByRole("link", { name: /Student Privacy Notice/ }).first()).toBeVisible();
-    await expect(page.getByRole("link", { name: /Data Processing Addendum/ }).first()).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Legal", level: 1 })).toBeVisible();
+    await expect(page.getByRole("main").getByRole("link", { name: /Student Privacy/ })).toBeVisible();
+    await expect(page.getByRole("main").getByRole("link", { name: /Data Processing Addendum/ })).toBeVisible();
 
     await page.goto("/legal/student-privacy");
-    await expect(page.getByRole("heading", { name: "Student Privacy Notice", level: 1 })).toBeVisible();
+    await expect(page.getByRole("heading", { name: /Student Privacy Notice/, level: 1 })).toBeVisible();
 
     await page.goto("/legal/dpa");
     await expect(page.getByRole("heading", { name: "ItemTraxx Data Processing Addendum", level: 1 })).toBeVisible();

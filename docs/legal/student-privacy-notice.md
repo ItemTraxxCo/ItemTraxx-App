@@ -1,7 +1,7 @@
 # ItemTraxx Student Privacy Notice and FERPA / SOPIPA Compliance Addendum
 
-**Effective date:** [[EFFECTIVE_DATE]]
-**Provider:** [[ENTITY_DESCRIPTION]] ("ItemTraxx," "we," "us")
+**Effective date:** [[EFFECTIVE_DATE]]  
+**Provider:** [[ENTITY_DESCRIPTION]] ("ItemTraxx," "we," "us")  
 **Contact for schools, parents, and students:** privacy@itemtraxx.com
 
 This document has two parts.

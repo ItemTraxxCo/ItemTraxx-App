@@ -12,7 +12,7 @@ If you are a student or the parent of a student, also read the [Student Privacy 
 
 ItemTraxx plays two different roles, and the rules differ for each.
 
-1. **Service provider (processor) for your organization.** A school, district, university, business, or other organization (a "Customer") creates a workspace and decides what to put in it: borrower records, items, checkout history, and staff accounts. For that **Workspace Data**, we act only on the Customer's instructions, under our agreement with the Customer. The Customer decides what is collected and why. If you want to see, correct, or delete Workspace Data about you, contact the Customer first.
+1. **Service provider (processor) for your organization.** A school, district, university, business, or other organization (a "Customer") creates a workspace and decides what to put in it: borrower records, items, checkout history, and staff accounts. For that **Workspace Data** (which our Terms and Data Processing Addendum call Customer Data), we act only on the Customer's instructions, under our agreement with the Customer. The Customer decides what is collected and why. If you want to see, correct, or delete Workspace Data about you, contact the Customer first.
 2. **Business (controller) for the Service itself.** For account security, abuse prevention, support, sales, website analytics you opt into, error diagnostics, and our own business records, we decide how information is used and we are responsible for it.
 
 ## 2. Information we collect
@@ -27,18 +27,18 @@ ItemTraxx plays two different roles, and the rules differ for each.
 | **Workspace settings** | Plan limits, due-date rules, feature settings, and organization name and logo. |
 | **Audit entries** | Records of administrative actions in the workspace. |
 
-Customers decide whether borrower usernames and IDs are real names or student numbers. We recommend that they use the generated codenames. A codename is **pseudonymous, not anonymous**: the Customer keeps the information that links a codename to a person. We therefore treat all borrower data as personal information, and as student information where the Customer is a school.
+Customers decide whether borrower usernames and IDs are real names or student numbers. We recommend that they use the generated codenames. A codename is **pseudonymous, not anonymous**: the Customer keeps the information that links a codename to a person. We therefore treat all borrower data as personal information, and as Student Data (as defined in Part B of the [Student Privacy Notice](student-privacy-notice.md)) where the Customer is a school.
 
 ### 2.2 Account and sign-in information (staff, administrators, individual users)
 
-- Name (where provided), **email address**, role (for example workspace admin or tenant account), and the workspace or organization you belong to.
+- Name (where provided), **email address**, role (for example workspace admin or workspace user account), and the workspace or organization you belong to.
 - Authentication data: a password hash, passkey public keys, and two-factor (TOTP) secrets if you enable them. If your organization uses single sign-on, the identity details its identity provider sends us (typically email and name).
 - Session and device records: a device identifier and label stored in your browser, your browser's user agent, how you signed in, an approximate location derived by Cloudflare from your connection (country or region level), the IP address associated with the session, and timestamps. These let you and your administrators review and revoke sessions.
 - Emails we send you: invitations, email-change approvals, password resets, and sign-in notifications that include the device and browser used.
 
 ### 2.3 Support, sales, and privacy requests
 
-If you contact us through a form or email: your name, email address, organization, the message, the number of schools if you give it, and up to two image attachments (PNG, JPG, WEBP, or GIF) you choose to upload. Please do not include student information in messages or screenshots.
+If you contact us through a form or email: your name, email address, organization, the message, the number of schools if you give it, and up to two image attachments (PNG, JPG, WEBP, or GIF) you choose to upload. Please do not include Student Data in messages or screenshots.
 
 ### 2.4 Cookie preferences
 
@@ -46,7 +46,7 @@ When you make a cookie choice we store it in your browser and keep a record on o
 
 ### 2.5 Optional analytics and diagnostics (only with your consent)
 
-See Section 4. With your consent we collect page views, a pseudonymous identifier (and, once you sign in, your account ID and role), error reports, and, if you enable both options, privacy-masked session replays.
+See Section 4. With your consent we collect page views, a pseudonymous identifier (and, once you sign in, your account ID and role), diagnostic logs, and, if you enable both options, privacy-masked session replays.
 
 ### 2.6 Security and operations data (collected automatically)
 
@@ -54,7 +54,9 @@ To keep the Service secure and running, our infrastructure records: IP address, 
 
 ### 2.7 Error reports
 
-If the app reports an error, the report can include the error message and stack trace, the page URL (with sensitive parameters removed), your browser and release version, your role, the workspace ID, a hashed IP address, and technical diagnostics. Reports are linked to a workspace, not to a borrower.
+When the app hits a failure, it sends an error report to our own servers. We treat this as essential operational reporting, so it is **always on** and is not controlled by the cookie banner. A report can include the error title, message, and reason, the error name, a stack trace, technical context, the page address (origin and path only, without query parameters), your browser's user agent, the environment and release version, your role, the workspace ID, and whether you are on a workspace address. Reports are stored in our database (Supabase), and a short summary (report ID, error name, environment, release, role, workspace ID, and request ID) is posted to our internal Slack channel. Reports are linked to a workspace, not to a borrower, and are designed to exclude borrower data. The free-text fields are length-limited and stripped of control characters but are not otherwise filtered, so if a failure message happened to contain personal information it could be included. We rate-limit submissions to prevent abuse. If you have turned on **Diagnostics** (Section 4.2), console and network diagnostics, with sensitive values redacted, are attached to the report as well. Error reports are not sent to PostHog.
+
+<!-- VERIFY: confirm whether the stored report or rate limiter keeps a hashed network identifier and, if so, state it. -->
 
 ## 3. How we use information
 
@@ -72,15 +74,17 @@ We do not use personal information for advertising, do not build advertising or 
 
 ### 4.1 What we set
 
-This section summarizes our [Cookie and Tracking Notice](cookie-notice.md), which lists every cookie and storage key by name.
+This section summarizes our [Cookie and Tracking Notice](cookie-notice.md), which lists each cookie and each kind of browser storage we use.
 
 | Item | Purpose | Duration | Category |
 |---|---|---|---|
 | `__Host-itx_session` and `__Host-itx_refresh` (first-party, HttpOnly, Secure, host-only, not shared across subdomains) | Keep you signed in: a short-lived access cookie and a refresh cookie that renews it | About 1 hour and up to 14 days; the sign-in session itself ends after at most 7 days of activity unless you sign out sooner | Essential |
-| Security and anti-abuse cookies | Bot protection and request integrity | Session or short-lived | Essential |
-| `itemtraxx-cookie-consent` and `itemtraxx-cookie-consent-subject` | Remember your cookie choice and tie it to the server-side consent record | 1 year, shared across `itemtraxx.com` subdomains | Essential |
-| Browser storage: theme, device ID and label, onboarding and dismissed notices | Interface preferences and session/device management | Until you clear it | Essential |
-| Encrypted offline queue (browser storage) | Holds checkouts made while offline until they sync, encrypted in your browser | Until synced or cleared; server-side offline packs expire within 24 hours | Essential |
+| Short-lived sign-in cookies set by our authentication software for steps such as two-factor verification (host-only) | Complete sign-in steps | Short-lived | Essential |
+| Cloudflare bot-protection cookies (such as `cf_clearance` and `__cf_bm`) | Bot protection and request integrity; set only when a check runs | Session to a few hours | Essential |
+| `itemtraxx-cookie-consent` and `itemtraxx-cookie-consent-subject` (cookies; the Secure attribute applies over https) | Remember your cookie choice and tie it to the server-side consent record | 1 year, shared across `itemtraxx.com` subdomains | Essential |
+| localStorage: display preferences, device ID and label, onboarding and dismissed notices, and a marker that keeps your cookie choice in sync across tabs | Interface preferences, session/device management, and consent sync | Until you clear it | Essential |
+| sessionStorage: temporary state for one tab (recovering from a failed page update, confirming a form submission, short-lived verification state) | Make the app recover and confirm actions within one tab | Until the tab closes | Essential |
+| IndexedDB: encrypted offline checkout queue and offline pack | Holds checkouts made while offline until they sync, encrypted in your browser; an offline pack can be up to 25 MB | Until synced or cleared; server-side offline packs expire within 24 hours | Essential |
 | **Intercom** cookies and storage | Support chat (see 4.3) | Set by Intercom, typically up to 9 months | Essential support service |
 | `ph_*` PostHog cookies and storage | Pseudonymous analytics identity | Up to 1 year; shared across `itemtraxx.com` subdomains | Analytics (consent) |
 | Vercel Web Analytics and Speed Insights | Page-view and performance measurement | No cookies | Analytics (consent) |
@@ -92,20 +96,20 @@ We use **no advertising, remarketing, or social-media tracking cookies or pixels
 A banner offers "Essential only," "Accept all," or custom choices:
 
 - **Analytics** controls PostHog page views and identity, Vercel Analytics, and Speed Insights.
-- **Diagnostics** controls error reporting and diagnostic logs sent to PostHog.
+- **Diagnostics** controls PostHog diagnostic logging, and whether console and network diagnostics are attached to an error report. It does **not** control the core error report described in Section 2.7, which is essential operational reporting.
 - **Session replay** records only when **both** Analytics and Diagnostics are on. Replay masks all form inputs and any element we mark as sensitive, which includes borrower usernames and IDs, email addresses, passwords, one-time codes, and security settings. It does not record request headers or bodies.
 
 Until you opt in, none of these tools load or store identifiers. To change your mind, clear the `itemtraxx.com` cookies in your browser (or email privacy@itemtraxx.com); the banner then appears again. When a choice is withdrawn, recording stops and analytics storage is cleared in that browser, across `itemtraxx.com` subdomains. Your choice is stored for one year, after which we ask again.
 
 ### 4.3 Support chat (Intercom)
 
-We provide live support through Intercom's Messenger. We treat it as an **essential support service**, so it is not switched off by the cookie choices above. It loads for everyone, but lazily, so it does not slow the page: for signed-in users it starts right after sign-in; for visitors who are not signed in it starts a moment after the page finishes loading, once the browser is idle.
+We provide live support through Intercom's Messenger. We treat it as an **essential support service**, so it is not switched off by the cookie choices above. It loads for everyone, but lazily, so it does not slow the page: for signed-in users it starts immediately after sign-in; for visitors who are not signed in it starts shortly after the page has loaded and the browser is idle (typically within a few seconds).
 
 - **Every visitor:** Intercom receives your IP address, browser and device information, the page you are viewing, and its own cookies and storage, including a device identifier, so a conversation can continue on later visits.
 - **Signed-in users:** Intercom also receives your account ID and email address, sent in a token signed by our server, and the content of any chat you start.
 - Intercom is our service provider and does not use this information for advertising.
 
-Do not type student names, student IDs, or other student information into the chat or attach it. If you prefer not to load Intercom, you can block `intercom.io` and `intercomcdn.com` in your browser or ad blocker and email support@itemtraxx.com instead.
+Do not type student names, student IDs, or other Student Data into the chat or attach it. If you prefer not to load Intercom, you can block `intercom.io` and `intercomcdn.com` in your browser or ad blocker and email support@itemtraxx.com instead.
 
 ### 4.4 Fonts and assets
 
@@ -121,7 +125,7 @@ We do not sell personal information. We share it only with service providers tha
 
 ### 5.1 Service providers
 
-Our service providers, what each one does, the data it can receive, and where it operates are listed in the [Subprocessor Directory](subprocessor-directory.md), which also describes how we notify customers of changes. Only the providers marked in that directory process student information. Our source code, build, and security tools do not receive production customer data. Your organization's own identity provider, if it uses single sign-on, is the organization's vendor, not ours.
+Our service providers, what each one does, the data it can receive, and where it operates are listed in the [Subprocessor Directory](subprocessor-directory.md), which also describes how we notify customers of changes (at least 30 days in advance, with a right to object, as set out in the directory and the Data Processing Addendum). Only the providers marked in that directory process Student Data. Our source code, build, and security tools do not receive production customer data. Your organization's own identity provider, if it uses single sign-on, is the organization's vendor, not ours.
 
 ### 5.2 Other disclosures
 
@@ -138,6 +142,7 @@ We will update this table before adding a new service provider that handles Work
 | Items a Customer archives | Permanently deleted after 730 days |
 | Administrative audit entries | 730 days (super-administrator entries 1,095 days) |
 | Archived or cancelled workspaces | A 30-day recovery period, then an automated job permanently deletes the workspace data, its staff accounts, support requests and attachments, email delivery logs, and error reports, and records a deletion certificate (workspace name and counts only). Backups age out on the schedule in the next row. |
+| Error reports | [[ERROR_REPORT_RETENTION_DAYS]] days, or until the workspace is permanently deleted, whichever comes first |
 | Backups | Overwritten on a rolling schedule of [[BACKUP_RETENTION_DAYS]] days |
 | Anonymous cookie-consent records | 730 days |
 | Offline checkout packs | Expire within 24 hours; the server record is deleted 7 days after expiry |
@@ -153,9 +158,9 @@ We may keep information longer when the law requires or when needed to resolve a
 
 ## 7. Security
 
-ItemTraxx protects information with measures including: encryption in transit (HTTPS with HSTS preload); encryption at rest by our hosting providers; tenant isolation enforced in the database with row-level security; service-only access for data changes; passwords of at least 12 characters, passkeys, and optional two-factor authentication; step-up verification for privileged actions; session revocation; bot protection and rate limiting on public forms; a content security policy; encrypted offline storage; continuous automated security testing and periodic third-party assessments; and an internal incident-response process. No online service is perfectly secure.
+ItemTraxx protects information with measures including: encryption in transit (HTTPS with HSTS preload); encryption at rest by our hosting providers; workspace isolation enforced in the database with row-level security; service-only access for data changes; passwords of at least 12 characters, passkeys, and optional two-factor authentication; step-up verification for privileged actions; session revocation; bot protection and rate limiting on public forms; a content security policy; encrypted offline storage; continuous automated security testing and periodic third-party assessments; and an internal incident-response process. No online service is perfectly secure.
 
-If a security incident affects your personal information, we will notify affected Customers and individuals as required by law, including California Civil Code section 1798.82. When we hold data on a Customer's behalf we notify the Customer promptly after we confirm the incident, so it can meet its own obligations.
+If a security incident affects your personal information, we will notify affected Customers and individuals as required by law, including California Civil Code section 1798.82. When we hold data on a Customer's behalf we notify the Customer without undue delay after we confirm the incident, so it can meet its own obligations: within 72 hours of confirmation for Student Data, and within [[OTHER_DATA_INCIDENT_NOTICE]] for other Customer Data, as set out in the Data Processing Addendum and the Student Data Addendum.
 
 To report a vulnerability, see our [Vulnerability Disclosure Policy](vulnerability-disclosure-policy.md).
 
@@ -171,9 +176,9 @@ Depending on where you live, you may have the right to know what personal inform
 
 **Appeals.** If we deny or only partly grant a request, you may appeal within 30 days by emailing privacy@itemtraxx.com with the subject line "Privacy Appeal" and a description of your request. A person who was not involved in the original decision will review it, and we will reply in writing within 45 days with our decision and the reasons. If we deny the appeal, or you are otherwise unhappy with our response, you may contact your state attorney general or privacy regulator, such as the California Privacy Protection Agency or the California Attorney General.
 
-## 9. Children and student information
+## 9. Children and Student Data
 
-The Service is for organizations and adults and is not directed to children under 13. We do not knowingly collect personal information directly from children under 13. Students do not sign in to ItemTraxx; school staff record a borrower's checkouts on their behalf. When a school uses ItemTraxx, the school decides what student information to enter and authorizes us to process it for educational purposes only. Our commitments for student information are in the [Student Privacy Notice](student-privacy-notice.md). If you believe a child has given us personal information directly, contact privacy@itemtraxx.com and we will delete it.
+The Service is for organizations and adults and is not directed to children under 13. We do not knowingly collect personal information directly from children under 13. Students do not sign in to ItemTraxx; school staff record a borrower's checkouts on their behalf. When a school uses ItemTraxx, the school decides what Student Data to enter and authorizes us to process it for educational purposes only. Our commitments for Student Data are in the [Student Privacy Notice](student-privacy-notice.md). If you believe a child has given us personal information directly, contact privacy@itemtraxx.com and we will delete it.
 
 Individual accounts require you to be at least 18.
 
@@ -195,7 +200,7 @@ This table summarizes what we collect, why, and how long we keep it, in the last
 | Commercial information | Plan and order records, sales inquiries | Billing, sales follow-up, record keeping | While needed for business and legal records |
 | Audio, visual, or similar information | Screenshots you upload to support | Handle your support request | As in Section 6 |
 | Professional information | Organization and role | Provide the Service and customer support | While the account is active |
-| Student information | Borrower usernames, borrower IDs, and checkout history entered by a school | Collected on behalf of the school, for educational inventory purposes only | As in Section 6 and the [Student Privacy Notice](student-privacy-notice.md) |
+| Student Data | Borrower usernames, borrower IDs, and checkout history entered by a school | Collected on behalf of the school, for educational inventory purposes only | As in Section 6 and the [Student Privacy Notice](student-privacy-notice.md) |
 
 We collect no biometric, health, or precise-location information and no sensitive personal information as defined by the CCPA/CPRA. We draw no inferences for profiling.
 

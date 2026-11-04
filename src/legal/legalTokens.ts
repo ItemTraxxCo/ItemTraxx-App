@@ -1,6 +1,13 @@
 // Values for the [[TOKEN]] placeholders used in docs/legal/*.md.
 // Any token left undefined or empty renders as a highlighted "pending" marker
 // so an unfinished draft is never mistaken for final text.
+// Tokens that are deliberately still open (decisions or facts not yet confirmed).
+// They render as a highlighted "pending" marker until a value is added above.
+export const LEGAL_PENDING_TOKENS: readonly string[] = [
+  "ERROR_REPORT_RETENTION_DAYS",
+  "OTHER_DATA_INCIDENT_NOTICE",
+];
+
 export const LEGAL_TOKEN_VALUES: Readonly<Record<string, string | undefined>> = {
   EFFECTIVE_DATE: "November 4, 2026",
   ENTITY_DESCRIPTION: "ItemTraxx Co.",

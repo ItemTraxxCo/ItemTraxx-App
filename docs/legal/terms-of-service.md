@@ -10,13 +10,15 @@ These Terms of Service ("Terms") are the agreement between ItemTraxx and the org
 
 - **Customer.** The school, district, university, business, or other organization that has an Order Form with us, or whose workspace we have created for it, is the "Customer." A person who accepts these Terms for an organization confirms they have authority to bind it.
 - **Individual user.** A person with an individual (non-organizational) account, who must be at least 18.
-- **Authorized User.** An employee, contractor, or other person the Customer invites to its workspace (for example workspace administrators and tenant accounts).
+- **Authorized User.** An employee, contractor, or other person the Customer invites to its workspace (for example workspace administrators and workspace user accounts).
 
 You accept these Terms by accepting an invitation, by clicking to accept when we ask, by signing an Order Form that references them, or by using the Service after we have given you notice of them. We keep a record of each acceptance: which document and version, a hash of its text, the time, your IP address, and your browser. If you do not agree, do not use the Service.
 
 ## 2. Documents that make up the agreement
 
-In order of priority if they conflict: (1) the **Order Form** or quote signed or accepted by the Customer; (2) the **Data Processing Addendum** (and, for California school customers, its California rider) where one applies; (3) these **Terms**; (4) the [Privacy Policy](privacy-policy.md), the [Student Privacy Notice and Compliance Addendum](student-privacy-notice.md), and the Acceptable Use rules in Section 5, which are incorporated into these Terms. A signed agreement between ItemTraxx and a Customer that expressly replaces these Terms controls.
+If these documents conflict on a data protection matter, this order applies, with the first item controlling: (1) the executed agreement or **Order Form** (including a signed agreement between ItemTraxx and a Customer that expressly replaces these Terms); (2) a signed Student Data Privacy Agreement or California school rider, if one has been executed with the Customer; (3) the **Student Data Addendum** (Part B of the [Student Privacy Notice and Compliance Addendum](student-privacy-notice.md)), for Customers that submit Student Data; (4) the general [Data Processing Addendum](dpa.md); (5) these **Terms**, including the acceptable-use rules in Section 5; and (6) the [Privacy Policy](privacy-policy.md) and Part A of the Student Privacy Notice.
+
+<!-- VERIFY (counsel): no California school rider or Student Data Privacy Agreement template exists in docs/legal. The reference in item (2) is conditional on one being signed. -->
 
 ## 3. The Service
 
@@ -26,7 +28,7 @@ We may improve, add, change, or remove features. If we make a change that materi
 
 ## 4. Accounts and security
 
-- **Workspaces and roles.** Each workspace has a primary administrator and may have additional workspace administrators and tenant accounts. Workspace administrators can create and archive borrower and item records, manage accounts and their roles, review audit logs and sessions, and configure single sign-on. The Customer is responsible for who holds those roles.
+- **Workspaces and roles.** Each workspace has a primary administrator and may have additional workspace administrators and workspace user accounts. Workspace administrators can create and archive borrower and item records, manage accounts and their roles, review audit logs and sessions, and configure single sign-on. The Customer is responsible for who holds those roles.
 - **Credentials.** Keep credentials, passkeys, and one-time codes confidential and use the security features we offer (two-factor authentication, passkeys, single sign-on). Passwords must be at least 12 characters. You are responsible for activity under your accounts, and must tell us promptly at security@itemtraxx.com if you suspect unauthorized access.
 - **Accurate information.** Provide accurate registration and contact details and keep them up to date.
 - **Sessions and devices.** Sessions last up to 7 days while active. We may require re-authentication for sensitive actions, and administrators can revoke sessions.
@@ -36,7 +38,7 @@ We may improve, add, change, or remove features. If we make a change that materi
 You and your Authorized Users will not, and will not help others to:
 
 1. use the Service in violation of law or anyone's rights, or to track or harass any person;
-2. enter into any field (including notes, usernames, borrower IDs, and file imports) **Social Security or other government ID numbers, payment-card or bank numbers, health or medical information, biometric data, grades or discipline records, precise location data, passwords, or other secrets.** ItemTraxx is not designed for them and does not protect them as such;
+2. enter into any field (including notes, usernames, borrower IDs, and file imports) **Social Security or other government ID numbers, payment-card or bank numbers, health or medical information, biometric data, grades or discipline records, photographs, precise location data, passwords, or other secrets.** ItemTraxx is not designed for them and does not protect them as such;
 3. enter more personal information about borrowers than the Customer needs. We recommend using the generated codenames and IDs instead of real names or student numbers (see Section 7);
 4. attempt to access another workspace's data, bypass access controls, or probe, scan, or test the Service's security except under our [Vulnerability Disclosure Policy](vulnerability-disclosure-policy.md);
 5. interfere with or overload the Service, evade rate limits or plan limits, or use bots or scrapers on it;
@@ -50,18 +52,18 @@ We may investigate suspected violations, remove content, and suspend or terminat
 ## 6. Customer Data: ownership, license, and responsibility
 
 - **Ownership.** As between you and us, the Customer owns all data and content it or its Authorized Users submit to the Service, including borrower records, item records, checkout history, and files ("Customer Data"). We own the Service, its software, designs, and trademarks, and the usage data we generate about the operation of the Service in a form that does not identify the Customer or any individual.
-- **License to us.** The Customer gives us a worldwide, non-exclusive license to host, copy, transmit, display, and process Customer Data only to provide, secure, support, and improve the reliability of the Service for the Customer, and as the Customer instructs or the law requires. We do not sell Customer Data, use it for advertising, or use it to train generalized models.
-- **Lawful basis and authority.** The Customer is responsible for having the rights, notices, and consents (including any required from students or parents) to submit Customer Data, and for the accuracy and legality of what it enters. For school Customers, the Customer confirms that it has authority to authorize ItemTraxx to process student information for educational and school-operations purposes.
+- **License to us.** The Customer gives us a worldwide, non-exclusive license to host, copy, transmit, display, and process Customer Data only to provide, secure, support, and improve the reliability of the Service for the Customer, and as the Customer instructs or the law requires. We do not sell Customer Data, use it for advertising, or use it to train generalized models. <!-- VERIFY: confirm with engineering and vendor terms that no provider trains on Customer Data before keeping this statement. -->
+- **Lawful basis and authority.** The Customer is responsible for having the rights, notices, and consents (including any required from students or parents) to submit Customer Data, and for the accuracy and legality of what it enters. For school Customers, the Customer confirms that it has authority to authorize ItemTraxx to process Student Data for educational and school-operations purposes.
 - **Instructions.** The Customer instructs us to process Customer Data through its use of the Service's features and as further agreed in the Data Processing Addendum.
 - **Exports.** Workspace administrators can export data from the Service at any time (for example, borrower, item, and log exports), and we will help with a complete export on request during the term and the recovery period in Section 14.
 
-## 7. Privacy and student information
+## 7. Privacy and Student Data
 
-Our [Privacy Policy](privacy-policy.md) explains how we handle information. For schools, universities, and student information, the [Student Privacy Notice and Compliance Addendum](student-privacy-notice.md) and the Data Processing Addendum apply, and ItemTraxx acts as a school official / service provider under FERPA and applicable state law, using student information only for the Customer's authorized educational and operational purposes. The Customer decides what borrower information to enter, and is responsible for telling parents, students, and staff how it uses ItemTraxx.
+Our [Privacy Policy](privacy-policy.md) explains how we handle information, and the [Data Processing Addendum](dpa.md) applies to all Customer Data. For Customers that submit Student Data, the [Student Data Addendum](student-privacy-notice.md) (Part B of the Student Privacy Notice and Compliance Addendum) also applies and governs how we handle it. The Customer decides what borrower information to enter, and is responsible for telling parents, students, and staff how it uses ItemTraxx.
 
 ## 8. Support and availability
 
-We provide support through support@itemtraxx.com and in-app chat during our normal business hours. We target high availability, publish service status at status.itemtraxx.com, and give notice of planned maintenance where practical, but unless an Order Form or Service Level Agreement says otherwise we do not guarantee uninterrupted or error-free operation. The Service may be unavailable during maintenance, outages, incidents, or events beyond our reasonable control, and we may take emergency protective measures or perform critical maintenance to protect data or the Service. Offline mode is designed to let checkout continue during a connectivity gap, with each offline pack valid for up to 24 hours, and synchronizes when the connection returns; conflicts are shown to an administrator for review.
+We provide support through support@itemtraxx.com and in-app chat during our normal business hours. We target high availability, publish service status at status.itemtraxx.com, and give notice of planned maintenance where practical, but unless an Order Form or Service Level Agreement says otherwise we do not guarantee uninterrupted or error-free operation. The Service may be unavailable during maintenance, outages, incidents, or events beyond our reasonable control, and we may take emergency protective measures or perform critical maintenance to protect data or the Service. Offline mode is designed to let checkout continue during a connectivity gap, with each offline pack valid for up to 24 hours, and synchronizes when the connection returns; conflicts are flagged for review by authorized staff. <!-- VERIFY: confirm which role can resolve an offline conflict (see resolveOfflineCheckoutConflict) and edit this sentence to match. -->
 
 ## 9. Fees, billing, and taxes
 
@@ -72,7 +74,7 @@ We provide support through support@itemtraxx.com and in-app chat during our norm
 
 ## 10. Third-party services
 
-The Service relies on third-party providers, listed in the Privacy Policy and our subprocessor directory, and may link to or integrate with third-party identity providers that a Customer chooses (for single sign-on). We are responsible for our subprocessors as stated in the Data Processing Addendum. We are not responsible for a Customer's own identity provider or other third-party services.
+The Service relies on third-party providers, listed in the [Subprocessor Directory](subprocessor-directory.md), and may link to or integrate with third-party identity providers that a Customer chooses (for single sign-on). We are responsible for our subprocessors as stated in the Data Processing Addendum. We are not responsible for a Customer's own identity provider or other third-party services.
 
 ## 11. Confidentiality
 
@@ -91,7 +93,7 @@ We warrant that we will provide the Service with reasonable skill and care and i
 - **Term.** These Terms apply from your acceptance until the Order Form term and any renewals end, or until you stop using the Service, or until terminated as below.
 - **Termination by either party.** Either party may terminate for the other's material breach that is not cured within 30 days after written notice. The Customer may terminate for convenience at the end of a term by giving notice under Section 9; we may terminate an individual or trial account for convenience on 30 days' notice.
 - **Suspension.** We may suspend access, immediately and to the extent necessary, if we reasonably believe it is needed to protect the security or integrity of the Service or other customers, to comply with law, or because of a serious violation of Section 5. We will restore access once the issue is resolved and, where practical, give prior notice and a chance to fix it.
-- **Effect and data deletion.** When the Customer's agreement ends or its workspace is archived, we keep the workspace for a **30-day recovery period** (during which the Customer can ask us to restore it or to provide a full export). After that, an automated process **permanently deletes** the workspace data, staff accounts, support requests and attachments, email delivery logs, and error reports, and creates a deletion certificate, as described in the Privacy Policy. Backups are overwritten on their regular schedule. Sections that by their nature should survive (including 6, 11, 12, 13, 15, 16, 17, 18) survive termination.
+- **Effect and data deletion.** When the Customer's agreement ends or its workspace is archived, we keep the workspace for a **30-day recovery period** (during which the Customer can ask us to restore it or to provide a full export). After that, an automated process **permanently deletes** the workspace data, staff accounts, support requests and attachments, email delivery logs, and error reports, and creates a deletion certificate, as described in the Data Processing Addendum (Section 8), the Privacy Policy, and, for Student Data, Section 7 of the Student Data Addendum. Backups are overwritten on their regular schedule. <!-- E-DEPENDENCY: depends on applying the workspace-purge migration and deploying the job-worker function in production. --> Sections that by their nature should survive (including 6, 9 for fees owed, 11, 12, 13, 15, 16, 17, 18, 19, and the data return and deletion terms of this Section 14) survive termination.
 - **Refunds.** If we terminate for convenience or the Customer terminates for our uncured material breach, we will refund prepaid fees for the period after termination.
 
 ## 15. Indemnification
@@ -106,7 +108,7 @@ We warrant that we will provide the Service with reasonable skill and care and i
 
 1. **Neither party will be liable for indirect, incidental, special, consequential, exemplary, or punitive damages, or for lost profits, revenue, goodwill, or data (other than the obligations to return and delete data described in these Terms), even if advised they are possible.**
 2. **Each party's total liability arising out of these Terms is limited to the fees paid or payable by the Customer for the Service during the 12 months before the event giving rise to the claim** (or US$100 if no fees were paid).
-3. These limits do **not** apply to: a party's fraud, gross negligence, or willful misconduct; violation of law; liability that cannot be limited under applicable law (including California Civil Code section 1668); the Customer's payment obligations; or a party's indemnification obligations in Section 15. For a breach of our data protection or confidentiality obligations that results in a security incident affecting Customer Data, our liability is limited to [[DATA_BREACH_CAP]] (or the amount in the Order Form, if it states a different one).
+3. These limits do **not** apply to: a party's fraud, gross negligence, or willful misconduct; violation of law; liability that cannot be limited under applicable law (including California Civil Code section 1668); the Customer's payment obligations; or a party's indemnification obligations in Section 15. For a breach of our data protection or confidentiality obligations that results in a security incident affecting Customer Data, our liability is limited to [[DATA_BREACH_CAP]] (or the amount in the Order Form, if it states a different one). Our duty to notify the Customer of such an incident is in Section 7 of the Data Processing Addendum and, for Student Data, Section 9 of the Student Data Addendum.
 
 The parties agree these limits are an essential part of the bargain and reflect the allocation of risk and the price of the Service.
 

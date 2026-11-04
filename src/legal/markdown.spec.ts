@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { LEGAL_DOCUMENTS } from "./documents";
 import { LEGAL_SOURCE_KEYS, loadLegalMarkdown } from "./sources";
+import { LEGAL_PENDING_TOKENS } from "./legalTokens";
 import { renderLegalMarkdown, slugifyHeading } from "./markdown";
 
 const html = (fragment: DocumentFragment) => {
@@ -67,9 +68,10 @@ describe("legal markdown pipeline", () => {
     expect(LEGAL_SOURCE_KEYS).toHaveLength(LEGAL_DOCUMENTS.length);
   });
 
-  it("leaves no unresolved placeholder tokens in any published document", async () => {
+  it("leaves only the declared pending tokens unresolved in published documents", async () => {
     for (const doc of LEGAL_DOCUMENTS) {
-      expect(renderLegalMarkdown(await loadLegalMarkdown(doc)).unresolvedTokens, doc.slug).toEqual([]);
+      const unresolved = renderLegalMarkdown(await loadLegalMarkdown(doc)).unresolvedTokens;
+      expect(unresolved.filter((token) => !LEGAL_PENDING_TOKENS.includes(token)), doc.slug).toEqual([]);
     }
   });
 

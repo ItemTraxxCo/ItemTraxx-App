@@ -50,7 +50,7 @@ See Section 4. With your consent we collect page views, a pseudonymous identifie
 
 ### 2.6 Security and operations data (collected automatically)
 
-To keep the Service secure and running, our infrastructure records: IP address, request URL path, HTTP method, response status, user agent, request IDs, and rate-limiting signals. In our own telemetry we store **keyed hashes** of IP addresses and session credentials rather than the raw values, but those hashes still identify a device to us. When we detect a likely attack we may send an alert to our paging provider containing the attack type, route, request ID, and the hashed values. Web application firewall and bot-protection services, including Cloudflare Turnstile on sign-in and password-reset forms, process your IP address and browser signals to tell people from automated traffic.
+To keep the Service secure and running, our infrastructure records: IP address, request URL path, HTTP method, response status, user agent, request IDs, and rate-limiting signals. In our own telemetry we store hashed versions of IP addresses and session credentials rather than the raw values, but those hashes still identify a device to us. Bot-protection services process your IP address and browser signals on sign-in and password-reset forms to tell people from automated traffic.
 
 ### 2.7 Error reports
 
@@ -77,10 +77,10 @@ This section summarizes our [Cookie and Tracking Notice](cookie-notice.md), whic
 | Item | Purpose | Duration | Category |
 |---|---|---|---|
 | `__Host-itx_session` and `__Host-itx_refresh` (first-party, HttpOnly, Secure, host-only, not shared across subdomains) | Keep you signed in: a short-lived access cookie and a refresh cookie that renews it | About 1 hour and up to 14 days; the sign-in session itself ends after at most 7 days of activity unless you sign out sooner | Essential |
-| Security and anti-abuse cookies (Cloudflare, Turnstile) | Bot protection and request integrity | Session or short-lived | Essential |
+| Security and anti-abuse cookies | Bot protection and request integrity | Session or short-lived | Essential |
 | `itemtraxx-cookie-consent` and `itemtraxx-cookie-consent-subject` | Remember your cookie choice and tie it to the server-side consent record | 1 year, shared across `itemtraxx.com` subdomains | Essential |
 | Browser storage: theme, device ID and label, onboarding and dismissed notices | Interface preferences and session/device management | Until you clear it | Essential |
-| Encrypted offline queue (browser storage) | Holds checkouts made while offline until they sync; AES-GCM encrypted, with the key in your browser | Until synced or cleared; server-side offline packs expire within 24 hours | Essential |
+| Encrypted offline queue (browser storage) | Holds checkouts made while offline until they sync, encrypted in your browser | Until synced or cleared; server-side offline packs expire within 24 hours | Essential |
 | **Intercom** cookies and storage | Support chat (see 4.3) | Set by Intercom, typically up to 9 months | Essential support service |
 | `ph_*` PostHog cookies and storage | Pseudonymous analytics identity | Up to 1 year; shared across `itemtraxx.com` subdomains | Analytics (consent) |
 | Vercel Web Analytics and Speed Insights | Page-view and performance measurement | No cookies | Analytics (consent) |
@@ -121,22 +121,7 @@ We do not sell personal information. We share it only with service providers tha
 
 ### 5.1 Service providers
 
-The current list, with the information each provider can receive and our change-notice process, is in the [Subprocessor Directory](subprocessor-directory.md).
-
-| Provider | What it does for us | Information involved |
-|---|---|---|
-| **Supabase** | Primary database, server functions, and file storage ([[DATABASE_REGION]]) | All Workspace Data and account data |
-| **Cloudflare** | Network edge, DDoS and bot protection, DNS, Workers (our API gateway and logs), key-value and object storage (organization logos), Turnstile | Request metadata (IP, URL, headers), traffic in transit, logos |
-| **Vercel** | Hosts the web application; Web Analytics and Speed Insights (with consent) | Request metadata; page-view and performance data |
-| **Better Auth, Inc.** | Authentication software we run, plus its hosted abuse-detection and dashboard services | Sign-in event data such as email, IP address, and device signals |
-| **PostHog** (United States cloud, accessed through our own subdomain) | Analytics, error tracking, session replay (consent), and operational telemetry | Consent-based browser data (Section 4); security telemetry with hashed identifiers |
-| **Intercom** | Support chat | Section 4.3 |
-| **Resend** | Sends our transactional and support email | Recipient email, names, message content, delivery status |
-| **Slack** | Internal operations alerts and notifications when someone contacts us or an error report arrives | Contact details and message details of people who contact us; error metadata without borrower information |
-| **incident.io** | Security and uptime paging | Attack type, route, request ID, hashed IP and account identifiers |
-| **Cloud backup storage (Google Cloud)** | Backups of our database for disaster recovery | Copies of the data in Supabase |
-
-Our source code, build, and security-testing tools (GitHub, Aikido Security, and similar) do not receive production customer data. Your organization's own identity provider, if it uses single sign-on, is the organization's vendor, not ours.
+Our service providers, what each one does, the data it can receive, and where it operates are listed in the [Subprocessor Directory](subprocessor-directory.md), which also describes how we notify customers of changes. Only the providers marked in that directory process student information. Our source code, build, and security tools do not receive production customer data. Your organization's own identity provider, if it uses single sign-on, is the organization's vendor, not ours.
 
 ### 5.2 Other disclosures
 
@@ -168,7 +153,7 @@ We may keep information longer when the law requires or when needed to resolve a
 
 ## 7. Security
 
-ItemTraxx protects information with measures including: encryption in transit (HTTPS with HSTS preload); encryption at rest by our hosting providers; tenant isolation enforced in the database with row-level security; service-only access for data changes; passwords of at least 12 characters, passkeys, and optional two-factor authentication; step-up verification for privileged actions; session revocation; bot protection and rate limiting on public forms; a content security policy; encrypted offline storage; automated security scanning and periodic testing; and an internal incident-response process. No online service is perfectly secure.
+ItemTraxx protects information with measures including: encryption in transit (HTTPS with HSTS preload); encryption at rest by our hosting providers; tenant isolation enforced in the database with row-level security; service-only access for data changes; passwords of at least 12 characters, passkeys, and optional two-factor authentication; step-up verification for privileged actions; session revocation; bot protection and rate limiting on public forms; a content security policy; encrypted offline storage; continuous automated security testing and periodic third-party assessments; and an internal incident-response process. No online service is perfectly secure.
 
 If a security incident affects your personal information, we will notify affected Customers and individuals as required by law, including California Civil Code section 1798.82. When we hold data on a Customer's behalf we notify the Customer promptly after we confirm the incident, so it can meet its own obligations.
 
@@ -184,7 +169,7 @@ Depending on where you live, you may have the right to know what personal inform
 - **Cookies:** change your choice any time as described in Section 4.2.
 - **Sales follow-up:** you can ask us to stop contacting you about a sales inquiry at any time.
 
-If you are unhappy with our response you may contact your state attorney general or privacy regulator.
+**Appeals.** If we deny or only partly grant a request, you may appeal within 30 days by emailing privacy@itemtraxx.com with the subject line "Privacy Appeal" and a description of your request. A person who was not involved in the original decision will review it, and we will reply in writing within 45 days with our decision and the reasons. If we deny the appeal, or you are otherwise unhappy with our response, you may contact your state attorney general or privacy regulator, such as the California Privacy Protection Agency or the California Attorney General.
 
 ## 9. Children and student information
 
@@ -198,10 +183,28 @@ ItemTraxx operates from the United States and processes information in the Unite
 
 ## 11. California notices
 
-- **Categories collected in the last 12 months:** identifiers (name, email, IP address, device identifiers, account IDs); internet and network activity (page views, session and device data); geolocation at country or region level (derived from IP); commercial information (plan and order records, sales inquiries); audio, visual, and similar information (support screenshots you upload); professional information (organization and role); inferences (none drawn for profiling). We collect no biometric, health, or precise-location information and no sensitive personal information as defined by the CCPA except account log-in credentials (your password hash and passkeys), used only to sign you in.
+### 11.1 Notice at Collection
+
+This table summarizes what we collect, why, and how long we keep it, in the last 12 months and going forward. We do not sell or share (as those terms are used in the CCPA/CPRA) any of it.
+
+| Category | Examples | Purpose | Retention |
+|---|---|---|---|
+| Identifiers | Name, email, IP address, device identifiers, account IDs | Provide and secure the Service, authenticate users, respond to requests | While the account or workspace is active, then as in Section 6 |
+| Internet and network activity | Page views, session and device records, security logs | Operate, secure, and improve the Service | As in Section 6 |
+| Approximate location | Country or region derived from IP address | Security and fraud prevention | As in Section 6 |
+| Commercial information | Plan and order records, sales inquiries | Billing, sales follow-up, record keeping | While needed for business and legal records |
+| Audio, visual, or similar information | Screenshots you upload to support | Handle your support request | As in Section 6 |
+| Professional information | Organization and role | Provide the Service and customer support | While the account is active |
+| Student information | Borrower usernames, borrower IDs, and checkout history entered by a school | Collected on behalf of the school, for educational inventory purposes only | As in Section 6 and the [Student Privacy Notice](student-privacy-notice.md) |
+
+We collect no biometric, health, or precise-location information and no sensitive personal information as defined by the CCPA/CPRA. We draw no inferences for profiling.
+
+### 11.2 Other California disclosures
+
 - **Sources:** you, your organization, your browser and device, and our service providers.
 - **Purposes and recipients:** Sections 3 and 5.
 - **Sold or shared:** none, in the last 12 months or now.
+- **Your rights and how to appeal:** Section 8.
 - **Shine the Light (Cal. Civ. Code § 1798.83):** we do not disclose personal information to third parties for their direct marketing.
 - **Minors under 16:** we do not sell or share personal information of anyone under 16.
 

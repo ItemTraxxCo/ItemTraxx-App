@@ -118,7 +118,7 @@ ItemTraxx may use **de-identified and aggregated** operational data about the Se
 
 ## 5. Security program
 
-ItemTraxx maintains a written information security program that includes: encryption in transit (HTTPS with HSTS) and at rest by our hosting providers; tenant isolation enforced in the database by row-level security and service-only data-modification paths; role-based access; passwords of at least 12 characters, passkeys, two-factor authentication, and single sign-on; session management and revocation; step-up verification for privileged actions; encrypted offline storage with 24-hour pack expiry; rate limiting and bot protection; logging and audit trails of administrative and security-relevant actions; automated vulnerability scanning and periodic security testing; an incident-response process with automated alerting; backups; and a [Vulnerability Disclosure Policy](vulnerability-disclosure-policy.md). ItemTraxx limits employee access to Student Data to personnel who need it and who are bound by confidentiality obligations.
+ItemTraxx maintains a written information security program that includes: encryption in transit (HTTPS with HSTS) and at rest by our hosting providers; tenant isolation enforced in the database by row-level security and service-only data-modification paths; role-based access; passwords of at least 12 characters, passkeys, two-factor authentication, and single sign-on; session management and revocation; step-up verification for privileged actions; encrypted offline storage with 24-hour pack expiry; rate limiting and bot protection; logging and audit trails of administrative and security-relevant actions; continuous automated security testing and periodic third-party assessments; an incident-response process with automated alerting; backups; and a [Vulnerability Disclosure Policy](vulnerability-disclosure-policy.md). ItemTraxx limits employee access to Student Data to personnel who need it and who are bound by confidentiality obligations.
 
 ## 6. Parent and student access, review, and correction
 
@@ -145,7 +145,7 @@ The Institution will: (a) provide any notices to parents and students and obtain
 
 ## 11. Audits and assistance
 
-ItemTraxx will respond to reasonable written questionnaires and provide copies of its independent security reports (for example its ISO 27001 report) under confidentiality. On a reasonable request, no more than once a year unless there has been an incident, ItemTraxx will help the Institution assess compliance and will cooperate with any regulator's inquiry about Student Data.
+ItemTraxx will respond to reasonable written questionnaires and provide summaries of its security program, and security assessment reports where available, under confidentiality. ItemTraxx performs continuous automated security testing and engages third-party security firms for periodic assessments. On a reasonable request, no more than once a year unless there has been an incident, ItemTraxx will help the Institution assess compliance and will cooperate with any regulator's inquiry about Student Data.
 
 ## 12. Order of precedence and changes
 

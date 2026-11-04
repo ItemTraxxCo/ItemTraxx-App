@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { LEGAL_DOCUMENTS } from "./documents";
-import { loadLegalMarkdown } from "./sources";
+import { LEGAL_SOURCE_KEYS, loadLegalMarkdown } from "./sources";
 import { renderLegalMarkdown, slugifyHeading } from "./markdown";
 
 const html = (fragment: DocumentFragment) => {
@@ -51,8 +51,8 @@ describe("legal markdown pipeline", () => {
   });
 
   it("marks unresolved placeholder tokens and reports them", () => {
-    const out = renderLegalMarkdown("# T\n\n**Effective date:** [[EFFECTIVE_DATE]]\n\nAt [[MAILING_ADDRESS]].\n");
-    expect(out.unresolvedTokens).toEqual(["EFFECTIVE_DATE", "MAILING_ADDRESS"]);
+    const out = renderLegalMarkdown("# T\n\n**Effective date:** [[NOT_A_REAL_TOKEN]]\n\nAt [[ANOTHER_MISSING_ONE]].\n");
+    expect(out.unresolvedTokens).toEqual(["ANOTHER_MISSING_ONE", "NOT_A_REAL_TOKEN"]);
     expect(html(out.body).querySelectorAll("mark.legal-pending")).toHaveLength(2);
   });
 
@@ -60,6 +60,17 @@ describe("legal markdown pipeline", () => {
     const dom = html(renderLegalMarkdown("# Title\n\n# Part A\n\n## Sec\n\n# Part B\n").body);
     expect(dom.querySelectorAll("h1")).toHaveLength(1);
     expect(Array.from(dom.querySelectorAll("h2")).map((el) => el.textContent)).toEqual(["Part A", "Sec", "Part B"]);
+  });
+
+  it("does not bundle the internal docs/legal README", () => {
+    expect(LEGAL_SOURCE_KEYS.some((key) => key.toLowerCase().endsWith("readme.md"))).toBe(false);
+    expect(LEGAL_SOURCE_KEYS).toHaveLength(LEGAL_DOCUMENTS.length);
+  });
+
+  it("leaves no unresolved placeholder tokens in any published document", async () => {
+    for (const doc of LEGAL_DOCUMENTS) {
+      expect(renderLegalMarkdown(await loadLegalMarkdown(doc)).unresolvedTokens, doc.slug).toEqual([]);
+    }
   });
 
   it("slugifies headings", () => {

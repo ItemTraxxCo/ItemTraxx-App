@@ -1,5 +1,5 @@
 // Registry for the public legal pages. The markdown files in docs/legal/
-// (plus the legacy DPA.md) are the source of truth for wording.
+// are the source of truth for wording.
 
 export type LegalDocMeta = {
   slug: string;
@@ -16,7 +16,7 @@ export const LEGAL_DOCUMENTS: readonly LegalDocMeta[] = [
   { slug: "subprocessors", title: "Subprocessor Directory", path: "/legal/subprocessors", sourceFile: "docs/legal/subprocessor-directory.md" },
   { slug: "cookies", title: "Cookie Notice", path: "/legal/cookies", sourceFile: "docs/legal/cookie-notice.md" },
   { slug: "vdp", title: "Vulnerability Disclosure Policy", path: "/legal/vdp", sourceFile: "docs/legal/vulnerability-disclosure-policy.md" },
-  { slug: "dpa", title: "Data Processing Addendum", path: "/legal/dpa", sourceFile: "DPA.md" },
+  { slug: "dpa", title: "Data Processing Addendum", path: "/legal/dpa", sourceFile: "docs/legal/dpa.md" },
 ];
 
 export const getLegalDocument = (slug: string): LegalDocMeta | undefined =>
@@ -30,6 +30,5 @@ export const LEGAL_FILE_TO_PATH: Readonly<Record<string, string>> = Object.freez
   "subprocessor-directory.md": "/legal/subprocessors",
   "cookie-notice.md": "/legal/cookies",
   "vulnerability-disclosure-policy.md": "/legal/vdp",
-  "DPA.md": "/legal/dpa",
   "dpa.md": "/legal/dpa",
 });

@@ -106,7 +106,7 @@ Confidence: **V** verified in code, **P** inferred from vendor behavior / config
 | 10 | **Google (Fonts)** | Font CDN | Visitor IP + UA to Google on every page load | Always (`index.html:15-28`) | V |
 | 11 | **GitHub** | Browser version check (`api.github.com/repos/ItemTraxxCo/ItemTraxx-App/commits/main`); also source + CI | Visitor IP to GitHub | Always when the check runs | V |
 | 12 | **incident.io** | Security/uptime paging (`observability.ts` `emitIncidentIoSecurityPage`) | Attack type, route, request ID, HMAC'd IP, hashed actor ID | Event-driven | V |
-| 13 | **Aikido Security** | SAST/SCA/secrets scanning; ISO 27001 report issuer | Source code + dependency manifests (CI/MCP). No production data intended | CI | V (use), U (data scope) |
+| 13 | **Aikido Security** | SAST/SCA/secrets scanning | Source code + dependency manifests (CI/MCP). No production data intended | CI | V (use), U (data scope) |
 | 14 | **NVIDIA NIM** (Strix AI pentest in CI) | LLM inference for security testing (`.github/workflows/strix-security.yml`) | Source/targets + probe traffic to the app under test. **Must never be pointed at production data** | CI | V |
 | 15 | **GCP VM / itemtraxx-backups** | Backups | Database backups (full customer data) | Scheduled | U (not in this repo; confirm region, encryption, retention) |
 | 16 | **Infisical (self-hosted)** | Secrets | Credentials only | n/a | per AGENTS.md |
@@ -218,7 +218,7 @@ Not code-derived; included because Aikido/ISO auditors, enterprise procurement, 
 | 15 | **Service Level Agreement** | Uptime credits | Base on measured data: status page (`status.itemtraxx.com`), synthetic probes, `system-status`; exclude maintenance mode and kill-switch events; RPO/RTO from backup design |
 | 16 | **Business Continuity / DR summary** | RFP requirement | Supabase PITR + GCP VM backups (confirm), kill switch, maintenance fallback KV |
 | 17 | **HECVAT Lite/Full and SIG-Lite answers; VPAT/ACR (WCAG 2.2)** | Higher-ed and district procurement | VPAT needs an accessibility audit of the Vue app; ISO 27001 report from Aikido supports most security rows |
-| 18 | **SOC 2 / ISO 27001 bridge letter** | Evidence | Reference Aikido-issued report; schedule recertification |
+| 18 | **Security attestation letter (only if and when a certification or audit report exists)** | Evidence | Do not publish certification claims until verified |
 | 19 | **Enterprise SSO addendum** | Customer IdP responsibility | SAML/OIDC, domain verification TXT, IdP-initiated flow caveat (`allowIdpInitiated`), JIT provisioning role (`tenant_account`) |
 | 20 | **Support and Escalation Policy; Professional-services/Data-import terms** | Operational | Intercom + email; CSV import guidance (do not upload unneeded identifiers) |
 | 21 | **International/GDPR addendum + SCCs** (only when a non-US customer appears) | GDPR Ch. V | Triggered by Google Fonts/GitHub/IP flows too; deferred until needed |

@@ -26,24 +26,20 @@ This notice explains the cookies and similar browser storage that itemtraxx.com,
 | `__Host-itx_refresh` | ItemTraxx (first party) | Renews the access cookie without asking you to sign in again | Up to 14 days; the underlying sign-in session ends after at most 7 days of activity or when you or an administrator sign it out | HttpOnly, Secure, SameSite=Lax; host-only |
 | `itemtraxx-cookie-consent` | ItemTraxx | Stores your cookie choices | 1 year | Secure, SameSite=Lax; shared across `itemtraxx.com` subdomains so one choice applies everywhere |
 | `itemtraxx-cookie-consent-subject` | ItemTraxx | A random identifier linking your browser to the server-side record of your choice (Section 5) | 1 year | Secure, SameSite=Lax; shared across `itemtraxx.com` subdomains |
-| Cloudflare security cookies (for example `cf_clearance` or `__cf_bm`) | Cloudflare | Bot protection and challenge pages when Cloudflare needs to verify a visitor | Session to a few hours | Set only when a challenge or bot check runs, including Cloudflare Turnstile on sign-in and password reset |
+| Cloudflare security cookies (for example `cf_clearance` or `__cf_bm`) | Cloudflare | Bot protection and challenge pages when Cloudflare needs to verify a visitor | Session to a few hours | Set only when a challenge or bot check runs, including a bot check on sign-in and password reset |
 
 The authentication software we run may also set host-only sign-in cookies for steps such as two-factor verification. These are used only to sign you in, are host-only (not shared across subdomains), and are short-lived.
 
 ### 2.2 Browser storage
 
-| Key or database | Purpose | Duration |
+| Purpose | What it does | How long |
 |---|---|---|
-| `itemtraxx-theme` | Light or dark display preference | Until cleared |
-| `itemtraxx-device-id`, `itemtraxx-device-label` | Identifies this browser as a "device" in your session list so you and your administrators can review and revoke sessions | Until cleared |
-| `itemtraxx-broadcast-dismissed`, `itemtraxx-incident-dismissed`, `itemtraxx-maintenance-state`, `itemtraxx:tenant-notifications:dismissed-signature:v1` | Remember which notices you dismissed and the last known service status | Until cleared |
-| Onboarding and checkout preference keys (for example `itemtraxx:offline-connection:v1`) | Remember that you finished onboarding and your checkout and offline settings | Until cleared |
-| `itemtraxx:checkout-offline-buffer:v1` and the `itemtraxx-offline-queue` IndexedDB database | Hold checkouts made while offline, **AES-GCM encrypted** with a key kept in your browser, until they sync | Until synced or cleared; server-side offline packs expire within 24 hours |
-| `sessionStorage` entries (a reload marker used to recover from a failed page update, a form-submission confirmation, and short-lived verification state) | Make the app recover and confirm actions within one tab | Until the tab closes |
-
-### 2.3 Legacy cookie cleanup
-
-Older builds set a short-lived replay hand-off cookie (`itemtraxx-replay-session-handoff`). Current builds do not set it and clear it when found.
+| Display preferences | Remembers your light or dark display choice | Until cleared |
+| Device and session management | Identifies this browser as a "device" so you and your administrators can review and revoke sessions | Until cleared |
+| Notices and status | Remembers which notices you dismissed and the last known service status | Until cleared |
+| Onboarding and settings | Remembers that you finished onboarding and your checkout and offline preferences | Until cleared |
+| Offline checkout | Holds checkouts made while offline, **encrypted** in your browser, until they sync | Until synced or cleared; server-side offline packs expire within 24 hours |
+| Temporary in-tab state | Lets the app recover from a failed page update and confirm actions within one tab | Until the tab closes |
 
 ## 3. Optional cookies (off until you opt in)
 
@@ -73,11 +69,11 @@ We provide live support through Intercom's Messenger, and we classify it as an *
 3. **Across subdomains.** Because the choice cookie is shared across `itemtraxx.com` subdomains, your choice applies to our website and every workspace address, and a change made in one tab or subdomain reaches the others within a couple of seconds.
 4. **Changing your mind.** Clear the `itemtraxx.com` cookies in your browser (or email privacy@itemtraxx.com). The banner then appears again. When you withdraw analytics or diagnostics, recording stops and analytics storage is removed from that browser. Withdrawal does not undo data already collected; email us if you want it deleted.
 5. **Renewal.** We ask again after 1 year, or if we change the categories.
-6. **Cloudflare Turnstile and security checks are not optional.** They protect sign-in and password reset and cannot be switched off.
+6. **Security checks are not optional.** Bot protection on sign-in and password reset cannot be switched off.
 
 ## 6. Security logging that does not use cookies
 
-Our servers and network automatically log requests (IP address, URL path, method, status, user agent, request ID) to keep the service secure and running. In our own telemetry we store keyed hashes of IP addresses and sessions, and when we detect an attack we may send an alert containing those hashes to our paging provider. This logging does not rely on cookies or browser storage, so the cookie choices do not control it. Details are in the [Privacy Policy](privacy-policy.md), Section 2.6.
+Our servers and network automatically log requests (IP address, URL path, method, status, user agent, request ID) to keep the service secure and running. In our own telemetry we store hashed versions of IP addresses and session identifiers. This logging does not rely on cookies or browser storage, so the cookie choices do not control it. Details are in the [Privacy Policy](privacy-policy.md), Section 2.6.
 
 ## 7. Managing cookies in your browser
 

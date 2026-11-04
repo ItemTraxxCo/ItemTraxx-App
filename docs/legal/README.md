@@ -25,13 +25,15 @@ Canonical, publication-ready drafts of ItemTraxx's public legal documents. They 
 
 ### Customer-facing (signed or shared with schools)
 
-Customer DPA with the California rider, Security Addendum, MSA / Order Form / quote, SLA, SSO addendum, support and escalation policy, business-continuity summary, HECVAT and VPAT, ISO 27001 letter, and (on demand) a GDPR addendum.
+Customer DPA with the California rider, Security Addendum, MSA / Order Form / quote, SLA, SSO addendum, support and escalation policy, business-continuity summary, HECVAT and VPAT, and (on demand) a GDPR addendum.
 
 ### Internal-only
 
-Founder and contributor IP assignments, entity and trademark records, open-source inventory, NDAs, the Incident Response Plan (its customer breach-notice output is customer-facing), and the internal policy set. `DPA.md` and `LEGAL.md` at the repository root are **not** replaced yet; `LEGAL.md` still points at the replaced files.
+Founder and contributor IP assignments, entity and trademark records, open-source inventory, NDAs, the Incident Response Plan (its customer breach-notice output is customer-facing), and the internal policy set. The DPA now lives at [`dpa.md`](dpa.md) (the root `DPA.md` is a pointer) and still needs a legal rewrite. `LEGAL.md` at the repository root is **not** replaced yet and still points at the replaced files.
 
-## 2. Placeholders to fill before publishing
+## 2. Placeholders
+
+Values now live in `src/legal/legalTokens.ts` (set 2026-11-04). The table below records what each token means and what still needs confirming; a test fails if any published document has an unfilled token.
 
 | Token | Fill with | Notes |
 |---|---|---|
@@ -45,7 +47,6 @@ Founder and contributor IP assignments, entity and trademark records, open-sourc
 | `[[BACKUP_RETENTION_DAYS]]` | How long backups are kept before overwrite | The backup VM and repo are outside this codebase |
 | `[[ANALYTICS_RETENTION]]` | PostHog data retention you have configured | Check the PostHog project setting; I never read it |
 
-Check that nothing is left: `grep -rn "\[\[" docs/legal/`.
 
 ## 3. Decisions I made that you must confirm
 

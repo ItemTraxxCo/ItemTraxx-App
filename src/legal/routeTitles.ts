@@ -5,7 +5,7 @@ export const LEGAL_ROUTE_TITLES: Readonly<Record<string, string>> = {
   terms: "Terms of Service",
   dpa: "Data Processing Addendum",
   privacy: "Privacy Policy",
-  "student-privacy": "Student Privacy Notice",
+  "student-privacy": "Student Privacy Notice and FERPA / SOPIPA Compliance Addendum",
   subprocessors: "Subprocessors",
   cookies: "Cookie Notice",
   vdp: "Vulnerability Disclosure",

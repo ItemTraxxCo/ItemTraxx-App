@@ -8,8 +8,8 @@ export const LEGAL_PENDING_TOKENS: readonly string[] = [];
 
 export const LEGAL_TOKEN_VALUES: Readonly<Record<string, string | undefined>> = {
   EFFECTIVE_DATE: "November 4, 2026",
-  ENTITY_DESCRIPTION: "ItemTraxx Co.",
-  MAILING_ADDRESS: "Palo Alto, CA",
+  ENTITY_DESCRIPTION: "ItemTraxx Co., a California company",
+  MAILING_ADDRESS: "670 San Antonio Rd Apt 16, Palo Alto, CA 94306",
   GOVERNING_COUNTY: "Santa Clara County, California",
   DATABASE_REGION: "US-West",
   BACKUP_LOCATION: "US-West",

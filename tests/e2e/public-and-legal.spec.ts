@@ -707,7 +707,7 @@ test.describe("Public surfaces", () => {
     await expect(page).toHaveURL(/\/privacy$/);
     await expect(page.getByRole("heading", { name: "ItemTraxx Privacy Policy", level: 1 })).toBeVisible();
     await page.goto("/cookies");
-    await expect(page.getByRole("heading", { name: "ItemTraxx Cookie and Tracking Notice", level: 1 })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "ItemTraxx Cookie Notice", level: 1 })).toBeVisible();
     await page.goto("/legal/terms");
     await expect(page.getByRole("heading", { name: "ItemTraxx Terms of Service", level: 1 })).toBeVisible();
   });

@@ -50,7 +50,7 @@ See Section 4. With your consent we collect page views, a pseudonymous identifie
 
 ### 2.6 Security and operations data (collected automatically)
 
-To keep the Service secure and running, our infrastructure records: IP address, request URL path, HTTP method, response status, user agent, request IDs, and rate-limiting signals. In our own telemetry we store hashed versions of IP addresses and session credentials rather than the raw values, but those hashes still identify a device to us. Bot-protection services process your IP address and browser signals on sign-in and password-reset forms to tell people from automated traffic.
+To keep the Service secure and running, our infrastructure records: IP address, request URL path, HTTP method, response status, user agent, request IDs, and rate-limiting signals. Our servers also send operational security telemetry to PostHog, our logging and monitoring provider: the request route, method, status, timing, request ID, and user agent, edge-function logs, keyed one-way hashes of the IP address and session credential (rather than the raw values, although the hashes still identify a device to us), and, for rejected or suspicious requests, field names and short snippets of the rejected input with emails and tokens redacted. This server-side telemetry is strictly necessary for security monitoring and infrastructure integrity, so it is always on and is not controlled by the cookie banner. It is separate from client-side analytics, session replay, and user-behavior tracking in your browser, which stay off unless you consent (Section 4). Bot-protection services process your IP address and browser signals on sign-in and password-reset forms to tell people from automated traffic.
 
 ### 2.7 Error reports
 
@@ -73,7 +73,7 @@ We do not use personal information for advertising, do not build advertising or 
 
 ### 4.1 What we set
 
-This section summarizes our [Cookie and Tracking Notice](cookie-notice.md), which lists each cookie and each kind of browser storage we use.
+This section summarizes our [Cookie Notice](cookie-notice.md), which lists each cookie and each kind of browser storage we use.
 
 | Item | Purpose | Duration | Category |
 |---|---|---|---|
@@ -124,7 +124,7 @@ We do not sell personal information. We share it only with service providers tha
 
 ### 5.1 Service providers
 
-Our service providers, what each one does, the data it can receive, and where it operates are listed in the [Subprocessor Directory](subprocessor-directory.md), which also describes how we notify customers of changes (at least 30 days in advance, with a right to object, as set out in the directory and the Data Processing Addendum). Only Supabase, Cloudflare, Google Cloud, and GitHub (which stores only AES-256 encrypted backup archives of the production database) process Student Data; every other provider is configured not to receive it. Our source code, build pipelines, and general developer tools do not receive production customer data. GitHub is used solely as storage for encrypted database backups, as described in the Subprocessor Directory. Your organization's own identity provider, if it uses single sign-on, is the organization's vendor, not ours.
+Our service providers, what each one does, the data it can receive, and where it operates are listed in the [Subprocessor Directory](subprocessor-directory.md), which also describes how we notify customers of changes (at least 30 days in advance, with a right to object, as set out in the directory and the Data Processing Addendum). Only Supabase, Cloudflare, Google Cloud, and GitHub (which stores only AES-256 encrypted backup archives of the production database) process Student Data; providers not listed there do not receive Student Data from ItemTraxx. Our source code, build pipelines, and general developer tools do not receive production customer data. GitHub is used solely as storage for encrypted database backups, as described in the Subprocessor Directory. Your organization's own identity provider, if it uses single sign-on, is the organization's vendor, not ours.
 
 ### 5.2 Other disclosures
 
@@ -150,7 +150,7 @@ We will update this table before adding a new service provider that handles Work
 | Security audit records | Kept as uuid-only security records after a workspace is deleted, without names or emails |
 | Legal acceptance records | Kept for as long as needed to prove agreement, which may outlast the account; if the account is deleted the link to you is removed |
 | Support and sales messages | Kept while needed to handle your request and for our business records, and deleted on request. Support requests tied to a workspace, with their attachments, are deleted when that workspace is purged. |
-| Analytics, replay, and diagnostics | Per our PostHog project settings, not longer than [[ANALYTICS_RETENTION]] |
+| Analytics, replay, diagnostics, and server-side security telemetry | Per our PostHog project settings, not longer than [[ANALYTICS_RETENTION]] |
 | Intercom conversations | Kept in Intercom while needed to provide support, and deleted on request |
 
 We may keep information longer when the law requires or when needed to resolve a dispute or enforce our agreements.

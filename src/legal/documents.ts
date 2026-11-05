@@ -12,7 +12,7 @@ export type LegalDocMeta = {
 export const LEGAL_DOCUMENTS: readonly LegalDocMeta[] = [
   { slug: "terms", title: "Terms of Service", path: "/legal/terms", sourceFile: "docs/legal/terms-of-service.md" },
   { slug: "privacy", title: "Privacy Policy", path: "/legal/privacy", sourceFile: "docs/legal/privacy-policy.md" },
-  { slug: "student-privacy", title: "Student Privacy Notice and FERPA / SOPIPA Addendum", path: "/legal/student-privacy", sourceFile: "docs/legal/student-privacy-notice.md" },
+  { slug: "student-privacy", title: "Student Privacy Notice and FERPA / SOPIPA Compliance Addendum", path: "/legal/student-privacy", sourceFile: "docs/legal/student-privacy-notice.md" },
   { slug: "subprocessors", title: "Subprocessor Directory", path: "/legal/subprocessors", sourceFile: "docs/legal/subprocessor-directory.md" },
   { slug: "cookies", title: "Cookie Notice", path: "/legal/cookies", sourceFile: "docs/legal/cookie-notice.md" },
   { slug: "vdp", title: "Vulnerability Disclosure Policy", path: "/legal/vdp", sourceFile: "docs/legal/vulnerability-disclosure-policy.md" },

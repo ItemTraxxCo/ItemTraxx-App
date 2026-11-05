@@ -80,9 +80,9 @@ const LEGAL_DOCUMENT_PAGES = [
   }),
   legalDocumentPage({
     slug: "cookies",
-    name: "Cookie and Tracking Notice",
+    name: "Cookie Notice",
     description: "The cookies and browser storage ItemTraxx uses, how long they last, and how cookie choices work.",
-    summary: "The Cookie and Tracking Notice lists the essential and optional cookies and browser storage used by ItemTraxx, how long each lasts, how the cookie banner choices are recorded, and how to change them.",
+    summary: "The Cookie Notice lists the essential and optional cookies and browser storage used by ItemTraxx, how long each lasts, how the cookie banner choices are recorded, and how to change them.",
     audience: "website and application users",
   }),
   legalDocumentPage({

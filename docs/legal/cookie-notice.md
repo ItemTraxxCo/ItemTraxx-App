@@ -1,4 +1,4 @@
-# ItemTraxx Cookie and Tracking Notice
+# ItemTraxx Cookie Notice
 
 **Effective date:** [[EFFECTIVE_DATE]]  
 **Provider:** [[ENTITY_DESCRIPTION]] ("ItemTraxx," "we," "us")  
@@ -60,6 +60,8 @@ When the app hits a failure, it sends an error report to our own servers. We tre
 | Session replay | PostHog | Analytics **and** Diagnostics (both required) | Records a privacy-masked replay of how you used the screen, to find usability and technical problems. **All form inputs are masked**, as are borrower usernames and IDs, email addresses, passwords, one-time codes, and security settings. Request headers and bodies are not recorded. | Not stored in your browser |
 
 We configure PostHog so that it does not autocapture clicks, does not record campaign or referrer data in your browser, and does not load surveys, web experiments, or feature flags.
+
+Separately, our servers send operational security telemetry to PostHog (see Section 2.6 of the [Privacy Policy](privacy-policy.md)). It does not use cookies or storage in your browser and is not controlled by the choices above.
 
 ## 4. Support chat (Intercom): essential, not optional
 

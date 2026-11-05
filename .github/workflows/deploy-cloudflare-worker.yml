@@ -20,7 +20,7 @@ concurrency:
 
 jobs:
   require-trusted-ref:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Require trusted ref for manual deployments
         env:
@@ -69,7 +69,7 @@ jobs:
       - slack-notify-start
     # Publishing a reviewed deployment is independent of the application kill switch.
     if: ${{ !cancelled() && needs.require-trusted-ref.result == 'success' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     environment: production
 

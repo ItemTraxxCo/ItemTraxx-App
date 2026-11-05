@@ -19,7 +19,7 @@ on:
 
 jobs:
   enforce-dev-pr-path:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
       - name: Detect blocked PR path

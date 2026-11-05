@@ -64,7 +64,7 @@ jobs:
   # Keep the mode branches as steps in one job. Separate jobs make GitHub
   # publish skipped checks for every non-selected start/finish/alert branch.
   notify:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     outputs:
       slack_channel_id: ${{ steps.notify_start.outputs.channel_id }}
       slack_message_ts: ${{ steps.notify_start.outputs.message_ts }}

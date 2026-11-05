@@ -21,7 +21,7 @@ concurrency:
 
 jobs:
   require-trusted-ref:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Require trusted ref for manual deployments
         env:
@@ -35,7 +35,7 @@ jobs:
 
   migrate-and-deploy:
     needs: require-trusted-ref
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     environment: ${{ inputs.target }}
 

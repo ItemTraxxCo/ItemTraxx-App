@@ -5,6 +5,8 @@ Preferred-Languages: en
 Canonical: https://itemtraxx.com/.well-known/security.txt
 Policy: https://itemtraxx.com/report-security-issue
 
+# DMCA Designated Agent Registration: DMCA-1085277 (U.S. Copyright Office)
+
 #   ___ _                 _____
 #  |_ _| |_ ___ _ __ ___ |_   _| __ __ ___  __
 #   | || __/ _ \\ '_ ` _ \\  | || '__/ _` \\ \\/ /

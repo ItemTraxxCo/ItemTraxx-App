@@ -15,7 +15,7 @@ concurrency:
 
 jobs:
   require-trusted-ref:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Require trusted ref for manual scans
         if: ${{ github.event_name == 'workflow_dispatch' }}
@@ -46,7 +46,7 @@ jobs:
     permissions:
       contents: read
       pull-requests: write
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     # Leave time to summarize and upload results if the bounded scan times out.
     timeout-minutes: 360
 

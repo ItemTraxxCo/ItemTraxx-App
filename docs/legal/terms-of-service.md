@@ -131,4 +131,11 @@ California law governs these Terms, without regard to conflict-of-law rules, and
 
 ItemTraxx respects intellectual property rights. If you believe content stored in the Service infringes your copyright, send a written notice to our designated copyright agent, identified below, that includes: (a) your physical or electronic signature; (b) identification of the copyrighted work claimed to be infringed; (c) identification of the material claimed to be infringing and information reasonably sufficient for us to locate it; (d) your contact information; (e) a statement that you have a good-faith belief that the use is not authorized by the copyright owner, its agent, or the law; and (f) a statement, under penalty of perjury, that the information in the notice is accurate and that you are the copyright owner or authorized to act for the owner. We may remove or disable access to the material, notify the Customer that posted it, and terminate repeat infringers' access in appropriate circumstances. A Customer who believes material was removed by mistake may send a counter-notice to the same agent with the information required by 17 U.S.C. § 512(g)(3).
 
-**Designated Copyright Agent (17 U.S.C. § 512(c)(2)):** ItemTraxx Co., Attn: Designated Copyright Agent, [[MAILING_ADDRESS]]. Email: legal@itemtraxx.com. Phone: +1 (650) 380-9394.
+**Designated Copyright Agent (17 U.S.C. § 512(c)(2)),** registered with the U.S. Copyright Office:
+
+- Service provider: ItemTraxx Co
+- Designated agent: DMCA Designated Agent
+- Registration number: DMCA-1085277
+- Address: [[MAILING_ADDRESS]]
+- Email: legal@itemtraxx.com
+- Phone: (650) 380-9394

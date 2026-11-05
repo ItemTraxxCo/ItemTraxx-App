@@ -1,7 +1,9 @@
 import { onMounted, onScopeDispose, ref, toValue, type MaybeRefOrGetter } from "vue";
 
-const GITHUB_HEAD_COMMIT_API =
-  "https://api.github.com/repos/ItemTraxxCo/ItemTraxx-App/commits/main";
+// First-party build manifest emitted by the Vite build (see vite.config.ts).
+// Fetching it from our own origin avoids sending visitor/school IP addresses
+// to a third party just to learn whether a newer deploy exists.
+export const VERSION_MANIFEST_PATH = "/version.json";
 
 type AppVersionStatusOptions = {
   appVersion: string;
@@ -34,8 +36,10 @@ export const useAppVersionStatus = (options: AppVersionStatusOptions) => {
     const requestTimeout = window.setTimeout(() => requestController.abort(), 4000);
     requestTimeouts.add(requestTimeout);
     try {
-      const response = await fetch(GITHUB_HEAD_COMMIT_API, {
+      const response = await fetch(VERSION_MANIFEST_PATH, {
         method: "GET",
+        cache: "no-store",
+        credentials: "omit",
         signal: requestController.signal,
       });
       if (!response.ok) return;

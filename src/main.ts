@@ -1,5 +1,11 @@
 import { createApp } from "vue";
 import { appToastErrorDirective, appToastMessageDirective } from "./directives/appToastError";
+// Self-hosted Inter (latin subset); bundled and served from our own origin.
+import "@fontsource/inter/latin-400.css";
+import "@fontsource/inter/latin-500.css";
+import "@fontsource/inter/latin-600.css";
+import "@fontsource/inter/latin-700.css";
+import "@fontsource/inter/latin-800.css";
 import "./styles/tokens.css";
 import "./styles/base.css";
 import "./styles/app-shell.css";

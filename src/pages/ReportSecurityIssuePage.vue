@@ -164,7 +164,7 @@
               </button>
             </div>
             <p class="security-report-legal-note">
-              By clicking Send Security Report, you agree to our <RouterLink to="/privacy">Privacy Policy</RouterLink> and <RouterLink to="/legal">Terms of Service</RouterLink>.
+              By clicking Send Security Report, you agree to our <RouterLink to="/legal/privacy">Privacy Policy</RouterLink> and <RouterLink to="/legal/terms">Terms of Service</RouterLink>.
             </p>
           </form>
 

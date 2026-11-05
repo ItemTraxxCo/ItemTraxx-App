@@ -9,6 +9,8 @@ import { logError, logInfo, withRequestSpan } from "../_shared/observability.ts"
 import { isAllowedOrigin, parseAllowedOrigins } from "../_shared/cors.ts";
 import { readJsonBody } from "../_shared/requestBody.ts";
 import { rpcErrorToError, throwOnRpcError } from "./reportingRefresh.ts";
+import { callBetterAuthAdmin } from "../_shared/betterAuthAdmin.ts";
+import { purgeExpiredWorkspaces, type WorkspacePurgeDeps } from "./workspacePurge.ts";
 import {
   asRecord,
   optionalInteger,
@@ -1144,6 +1146,76 @@ serve((req) => withRequestSpan(req, "POST /functions/job-worker", async (span, r
       }
     }
 
+    // Workspace deletion executor: purges archived workspaces whose grace
+    // period elapsed. Runs on every worker pass unless explicitly disabled.
+    let workspacesPurged = 0;
+    if (body.run_workspace_purge !== false) {
+      const unwrap = <T>(result: { data: T | null; error: { message: string } | null }) => {
+        if (result.error) throw new Error(result.error.message);
+        return result.data as T;
+      };
+      const purgeDeps: WorkspacePurgeDeps = {
+        claim: async (claimLimit) =>
+          unwrap(await adminClient.rpc("claim_workspaces_due_for_purge", { p_limit: claimLimit })) ?? [],
+        listProfiles: async (workspaceId) =>
+          unwrap(
+            await adminClient.from("profiles").select("id, better_auth_user_id").eq("workspace_id", workspaceId),
+          ) ?? [],
+        deleteBetterAuthUser: async (profileId, betterAuthUserId) => {
+          await callBetterAuthAdmin({
+            action: "delete_user",
+            profileId,
+            ...(betterAuthUserId ? { betterAuthUserId } : {}),
+          });
+        },
+        deleteBetterAuthOrganization: async (organizationId) => {
+          await callBetterAuthAdmin({ action: "delete_organization", organizationId });
+        },
+        listSupportAttachmentPaths: async (workspaceId) => {
+          const attachments = unwrap(
+            await adminClient.rpc("list_workspace_support_attachment_paths", {
+              p_workspace_id: workspaceId,
+            }),
+          ) as Array<{ storage_path: string }> | null;
+          return (attachments ?? []).map((attachment) => attachment.storage_path);
+        },
+        removeSupportAttachments: async (paths) => {
+          for (let index = 0; index < paths.length; index += 100) {
+            const { error } = await adminClient.storage.from(SUPPORT_ATTACHMENT_BUCKET).remove(
+              paths.slice(index, index + 100),
+            );
+            if (error) throw new Error(error.message);
+          }
+        },
+        purgeData: async (workspaceId, externalCleanup) => {
+          return unwrap(
+            await adminClient.rpc("purge_workspace_data", {
+              p_workspace_id: workspaceId,
+              p_external_cleanup: externalCleanup,
+            }),
+          ) as { purged_at?: string } | null;
+        },
+        release: async (workspaceId) => {
+          await adminClient.rpc("release_workspace_purge_claim", { p_workspace_id: workspaceId });
+        },
+        log: (message, details) => {
+          if (message.endsWith("failed")) logError(`job-worker ${message}`, requestId, details.error ?? message, details);
+          else logInfo(`job-worker ${message}`, requestId, details, span.context);
+        },
+      };
+      try {
+        const purgeResult = await purgeExpiredWorkspaces(purgeDeps);
+        workspacesPurged = purgeResult.purged;
+        failed += purgeResult.failed;
+      } catch (error) {
+        failed += 1;
+        logError("job-worker workspace purge claim failed", requestId, "workspace_purge_claim_failed", {
+          purge_attempted_at: new Date().toISOString(),
+          error_code: error instanceof Error && error.name === "AbortError" ? "abort" : "rpc_error",
+        });
+      }
+    }
+
     if (body.run_reporting_refresh === true) {
       const { error: refreshError } = await adminClient.rpc("refresh_super_reporting_views");
       if (refreshError) {
@@ -1167,6 +1239,7 @@ serve((req) => withRequestSpan(req, "POST /functions/job-worker", async (span, r
       completed,
       failed,
       reporting_refreshed: reportingRefreshed,
+      workspaces_purged: workspacesPurged,
     }, span.context);
     return jsonResponse(200, {
       data: {
@@ -1174,6 +1247,7 @@ serve((req) => withRequestSpan(req, "POST /functions/job-worker", async (span, r
         completed,
         failed,
         reporting_refreshed: reportingRefreshed,
+        workspaces_purged: workspacesPurged,
       },
     });
   } catch (error) {

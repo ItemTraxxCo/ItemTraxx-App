@@ -1379,6 +1379,11 @@ export const handleInternalAuthAdminRequest = async (request: Request, rawEnv: E
     if (action === "delete_organization") {
       const organizationId = typeof body?.organizationId === "string" ? body.organizationId : "";
       if (!organizationId) return Response.json({ error: "Invalid request" }, { status: 400 });
+      // Remove the workspace logo first so workspace deletion leaves no
+      // customer-supplied files behind. R2 deletes are idempotent.
+      if (rawEnv.ORGANIZATION_LOGOS) {
+        await rawEnv.ORGANIZATION_LOGOS.delete(organizationLogoObjectPath(organizationId));
+      }
       const { error } = await cachedDataClient.schema("better_auth").from("organization").delete().eq("id", organizationId);
       if (error) throw error;
       return Response.json({ success: true });

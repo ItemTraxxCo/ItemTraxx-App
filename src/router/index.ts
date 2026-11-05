@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from "vue-router";
 import type { RouteLocationNormalized, RouteRecordRaw } from "vue-router";
+import { LEGAL_ROUTE_TITLES } from "../legal/routeTitles";
 import { getAuthState, type AuthState } from "../store/authState";
 import { getWorkspaceState } from "../store/workspaceState";
 import { buildWorkspaceAppUrl, lookupWorkspaceById } from "../services/workspaceService";
@@ -75,32 +76,32 @@ const routes: RouteRecordRaw[] = [
     path: "/legal",
     name: "public-legal",
     component: () => import("../pages/Legal.vue"),
-    meta: { public: true, title: "Legal | ItemTraxx" },
+    meta: { public: true, title: "Legal Center | ItemTraxx" },
   },
-  {
-    path: "/legal/student-privacy",
-    name: "public-student-privacy",
+  // One route per legal document, all rendered from docs/legal/*.md.
+  ...Object.entries(LEGAL_ROUTE_TITLES).map(([slug, title]) => ({
+    path: `/legal/${slug}`,
+    name: `public-legal-${slug}`,
     component: () => import("../pages/LegalDocumentPage.vue"),
-    meta: { public: true, title: "Student Privacy Notice | ItemTraxx" },
-  },
-  {
-    path: "/legal/dpa",
-    name: "public-dpa",
-    component: () => import("../pages/LegalDocumentPage.vue"),
-    meta: { public: true, title: "Data Processing Addendum | ItemTraxx" },
-  },
+    props: { docSlug: slug },
+    meta: { public: true, title: `${title} | ItemTraxx` },
+  })),
+  // Backwards-compatible entry points: same document, original URL kept.
   {
     path: "/privacy",
     name: "public-privacy",
-    component: () => import("../pages/PrivacyPage.vue"),
+    component: () => import("../pages/LegalDocumentPage.vue"),
+    props: { docSlug: "privacy" },
     meta: { public: true, title: "Privacy | ItemTraxx" },
   },
   {
     path: "/cookies",
     name: "public-cookies",
-    component: () => import("../pages/CookiesPage.vue"),
+    component: () => import("../pages/LegalDocumentPage.vue"),
+    props: { docSlug: "cookies" },
     meta: { public: true, title: "Cookies | ItemTraxx" },
   },
+  { path: "/terms", redirect: "/legal/terms" },
   {
     path: "/pricing",
     name: "public-pricing",

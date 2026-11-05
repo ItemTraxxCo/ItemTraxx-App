@@ -690,15 +690,26 @@ test.describe("Public surfaces", () => {
     expect(source).toMatch(/import\.meta\.env\.DEV[\s\S]*VITE_E2E_TEST_UTILS[\s\S]*force-update-overlay/);
   });
 
-  test("loads unified legal agreement page", async ({ page }) => {
+  test("legal pages render markdown documents with tables and working navigation", async ({ page }) => {
     await page.goto("/legal");
-    await expect(
-      page.getByRole("heading", {
-        name: "ItemTraxx Subscription Agreement and Policies",
-      }),
-    ).toBeVisible();
-    await expect(page.getByRole("heading", { name: "11. Billing and Subscription Terms" })).toBeVisible();
-    await expect(page.getByRole("heading", { name: "13. Indemnification" })).toBeVisible();
-    await expect(page.getByRole("heading", { name: "14. Force Majeure" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Legal", level: 1 })).toBeVisible();
+
+    await page.getByRole("main").getByRole("link", { name: "Subprocessor Directory" }).click();
+    await expect(page).toHaveURL(/\/legal\/subprocessors$/);
+    await expect(page.getByRole("heading", { name: "ItemTraxx Subprocessor Directory", level: 1 })).toBeVisible();
+    await expect(page.locator(".legal-prose table").first()).toBeVisible();
+    await expect(page.locator(".legal-prose").getByText("**")).toHaveCount(0);
+    await expect(page.getByRole("link", { name: "Privacy Policy" }).first()).toHaveAttribute("href", "/legal/privacy");
   });
+
+  test("legacy /privacy and /cookies URLs keep working", async ({ page }) => {
+    await page.goto("/privacy");
+    await expect(page).toHaveURL(/\/privacy$/);
+    await expect(page.getByRole("heading", { name: "ItemTraxx Privacy Policy", level: 1 })).toBeVisible();
+    await page.goto("/cookies");
+    await expect(page.getByRole("heading", { name: "ItemTraxx Cookie Notice", level: 1 })).toBeVisible();
+    await page.goto("/legal/terms");
+    await expect(page.getByRole("heading", { name: "ItemTraxx Terms of Service", level: 1 })).toBeVisible();
+  });
+
 });

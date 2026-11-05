@@ -16,9 +16,8 @@ You accept these Terms by accepting an invitation, by clicking to accept when we
 
 ## 2. Documents that make up the agreement
 
-If these documents conflict on a data protection matter, this order applies, with the first item controlling: (1) the executed agreement or **Order Form** (including a signed agreement between ItemTraxx and a Customer that expressly replaces these Terms); (2) a signed Student Data Privacy Agreement or California school rider, if one has been executed with the Customer; (3) the **Student Data Addendum** (Part B of the [Student Privacy Notice and Compliance Addendum](student-privacy-notice.md)), for Customers that submit Student Data; (4) the general [Data Processing Addendum](dpa.md); (5) these **Terms**, including the acceptable-use rules in Section 5; and (6) the [Privacy Policy](privacy-policy.md) and Part A of the Student Privacy Notice.
+If these documents conflict on a data protection matter, this order applies, with the first item controlling: (1) the executed agreement or **Order Form** (including a signed agreement between ItemTraxx and a Customer that expressly replaces these Terms); (2) any Student Data Privacy Agreement, school-district rider, or state-specific data protection addendum signed with the Customer, and any term that applicable law requires to govern; (3) the **Student Data Addendum** (Part B of the [Student Privacy Notice and Compliance Addendum](student-privacy-notice.md)), for Customers that submit Student Data; (4) the general [Data Processing Addendum](dpa.md); (5) these **Terms**, including the acceptable-use rules in Section 5; and (6) the [Privacy Policy](privacy-policy.md) and Part A of the Student Privacy Notice.
 
-<!-- VERIFY (counsel): no California school rider or Student Data Privacy Agreement template exists in docs/legal. The reference in item (2) is conditional on one being signed. -->
 
 ## 3. The Service
 

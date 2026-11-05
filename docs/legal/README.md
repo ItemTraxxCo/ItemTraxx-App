@@ -22,7 +22,7 @@ These are drafts for counsel review, not legal advice. Open questions and the fu
 
 - `dpa.md` is the **general business-to-business DPA**. It is complete for any Customer and does not repeat Student Data rules.
 - Part B of `student-privacy-notice.md` is the **Student Data Addendum**. It governs the purposes and limits for Student Data, parent and student access, the 72-hour incident notice, and Student Data deletion. DPA Sections 2, 3, and 5.4 point to it.
-- Precedence when documents conflict on a data protection matter (the same six levels appear in Terms Section 2, DPA Section 11, and Part B): (1) the executed agreement or Order Form; (2) a signed Student Data Privacy Agreement or California school rider, if one has been executed; (3) the Student Data Addendum; (4) the DPA; (5) the Terms of Service; (6) the Privacy Policy and Part A of the Student Privacy Notice.
+- Precedence when documents conflict on a data protection matter (the same six levels appear in Terms Section 2, DPA Section 11, and Part B): (1) the executed agreement or Order Form; (2) any Student Data Privacy Agreement, school-district rider, or state-specific data protection addendum signed with the Customer, and any term that applicable law requires to govern; (3) the Student Data Addendum; (4) the DPA; (5) the Terms of Service; (6) the Privacy Policy and Part A of the Student Privacy Notice.
 - The subprocessor list lives only in `subprocessor-directory.md`. Other documents link to it and do not repeat it.
 - Root `DPA.md` is a short pointer to `dpa.md`.
 
@@ -62,7 +62,7 @@ Current tokens: `EFFECTIVE_DATE`, `ENTITY_DESCRIPTION`, `MAILING_ADDRESS`, `GOVE
 - **Backup pruning is pending.** The backup workflow, script default, and README in `itemtraxx-backups` now say 30 days (checked 2026-11-04), but older releases are deleted only after the next backup run. Until then the 30-day statement is not yet true.
 - **Open tokens:** none. `OTHER_DATA_INCIDENT_NOTICE` is 72 hours and `ERROR_REPORT_RETENTION_DAYS` is 90.
 - **Error-report retention is not enforced in production.** No job deletes `client_error_reports` at 90 days; see the revision log.
-- **For counsel:** the California school rider reference (no template exists in the repo), Civil Code 1798.82 timing against the 72-hour deadline, the SOPIPA / Ed. Code 49073.1 characterization, DMCA agent registration, and the survival clause in Terms Section 14.
+- **For counsel (wording is now conditional; review before publishing):** the "signed agreement, rider, or addendum" precedence level, the SOPIPA / Ed. Code 49073.1 "to the extent they apply" characterization, the Civil Code 1798.82 "outside limit" framing of the notice periods, DMCA agent registration, and the survival clause in Terms Section 14.
 - **Not verified:** subprocessors' own contract terms on model training (ItemTraxx itself uses no AI in production, confirmed 2026-11-04); provider locations for Better Auth, Intercom, Resend, Slack, incident.io, and GitHub (listed as "United States").
 
 ## 6. Where the statements come from

@@ -30,8 +30,6 @@ Our source control, build, and security tools (such as GitHub's code repositorie
 
 ## 3. Changes to this directory
 
-<!-- Same notice and objection terms as Section 5 of the Data Processing Addendum and Section 4 of the Student Data Addendum. -->
-
 1. **Notice.** At least **30 days before** we add or replace a provider that will process Student Data or other customer personal information, we email the customer's workspace administrators and update this directory. Notices go to the administrator email addresses on file; to have notices also sent to another address, email privacy@itemtraxx.com.
 2. **Objection.** A customer may object in writing to privacy@itemtraxx.com within the notice period on reasonable data-protection grounds. We will work with the customer in good faith. If we cannot resolve the objection, the customer may terminate the affected service and receive a refund of prepaid fees for the remaining term.
 3. **Emergency replacement.** If we must replace a provider immediately to protect security or continuity, we will notify customers as soon as practicable and the same objection right applies.

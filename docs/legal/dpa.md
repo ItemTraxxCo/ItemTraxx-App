@@ -42,7 +42,7 @@ ItemTraxx maintains monitoring, escalation, and incident-notification tooling. I
 - for **Student Data**, in any event within **72 hours of confirmation**, as set out in Section 9 of the Student Data Addendum; and
 - for **other Customer Data**, within [[OTHER_DATA_INCIDENT_NOTICE]] of confirmation.
 
-Notification will include a description of the incident, the approximate data affected (to the extent known), and the recommended measures to be taken by affected users (to the extent known). The executed agreement may specify additional notice contacts, required information, or a shorter notification deadline. These notices are in addition to the duty in California Civil Code section 1798.82, under which a business that maintains data it does not own must notify the owner immediately after discovery. If processing is subject to GDPR or similar law, any regulator or supervisory-authority notification obligation remains independently binding and is not limited by this customer-notification timeline. ItemTraxx's notification obligation does not extend to incidents affecting only non-Customer infrastructure or publicly available information.
+Notification will include a description of the incident, the approximate data affected (to the extent known), and the recommended measures to be taken by affected users (to the extent known). The executed agreement may specify additional notice contacts, required information, or a shorter notification deadline. These periods are outside limits: where applicable law, such as California Civil Code section 1798.82, requires ItemTraxx to notify Customer sooner, ItemTraxx will notify Customer within that shorter time. If processing is subject to GDPR or similar law, any regulator or supervisory-authority notification obligation remains independently binding and is not limited by this customer-notification timeline. ItemTraxx's notification obligation does not extend to incidents affecting only non-Customer infrastructure or publicly available information.
 
 ## 8. Retention, Return, and Deletion
 
@@ -64,13 +64,12 @@ ItemTraxx operates from the United States and processes Customer Data in the loc
 If documents conflict on a data protection matter, the following order applies, with the first item controlling:
 
 1. the executed agreement or Order Form;
-2. a signed Student Data Privacy Agreement or California school rider, if one has been executed with Customer;
+2. any Student Data Privacy Agreement, school-district rider, or state-specific data protection addendum signed with the Customer, and any term that applicable law requires to govern;
 3. the Student Data Addendum (Part B);
 4. this DPA;
 5. the Terms of Service; and
 6. the Privacy Policy and Part A of the Student Privacy Notice.
 
-<!-- VERIFY (counsel): no California school rider or Student Data Privacy Agreement template exists in docs/legal. The reference is conditional on one being signed. -->
 
 ## 12. CCPA/CPRA Service Provider Terms
 

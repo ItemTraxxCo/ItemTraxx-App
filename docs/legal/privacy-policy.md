@@ -124,7 +124,7 @@ We do not sell personal information. We share it only with service providers tha
 
 ### 5.1 Service providers
 
-Our service providers, what each one does, the data it can receive, and where it operates are listed in the [Subprocessor Directory](subprocessor-directory.md), which also describes how we notify customers of changes (at least 30 days in advance, with a right to object, as set out in the directory and the Data Processing Addendum). Only the providers marked in that directory process Student Data. Our source code, build, and security tools do not receive production customer data. Your organization's own identity provider, if it uses single sign-on, is the organization's vendor, not ours.
+Our service providers, what each one does, the data it can receive, and where it operates are listed in the [Subprocessor Directory](subprocessor-directory.md), which also describes how we notify customers of changes (at least 30 days in advance, with a right to object, as set out in the directory and the Data Processing Addendum). Only Supabase, Cloudflare, Google Cloud, and GitHub (which stores only AES-256 encrypted backup archives of the production database) process Student Data; every other provider is configured not to receive it. Our source code, build pipelines, and general developer tools do not receive production customer data. GitHub is used solely as storage for encrypted database backups, as described in the Subprocessor Directory. Your organization's own identity provider, if it uses single sign-on, is the organization's vendor, not ours.
 
 ### 5.2 Other disclosures
 

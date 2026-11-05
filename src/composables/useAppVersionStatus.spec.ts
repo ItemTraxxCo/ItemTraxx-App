@@ -78,6 +78,20 @@ describe("useAppVersionStatus", () => {
     wrapper.unmount();
   });
 
+  it("checks a first-party manifest and never calls a third-party host", async () => {
+    vi.mocked(fetch).mockResolvedValue(jsonResponse({ sha: "abc1234ffff" }) as never);
+    const { wrapper } = mountHost({ appVersion: "abc1234" });
+
+    await vi.advanceTimersByTimeAsync(750);
+    await vi.waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+
+    const [url, init] = vi.mocked(fetch).mock.calls[0]!;
+    expect(url).toBe("/version.json");
+    expect(String(url)).not.toMatch(/^https?:\/\//);
+    expect(init).toMatchObject({ cache: "no-store", credentials: "omit" });
+    wrapper.unmount();
+  });
+
   it("is not outdated when the latest sha matches appVersion", async () => {
     vi.mocked(fetch).mockResolvedValue(jsonResponse({ sha: "abc1234ffff" }) as never);
     const { wrapper, get } = mountHost({ appVersion: "abc1234" });

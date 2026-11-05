@@ -194,7 +194,7 @@ const isDevSubdomainHost = computed(() => {
 const isFullBleedRoute = computed(() => ["/login", "/super-auth", "/internal-auth", "/reset-password"].includes(route.path));
 const isMarketingFullBleedRoute = computed(() => ["/", "/landing-new", "/changelog", "/itemscanner"].includes(route.path));
 const isSubmitConfirmationRoute = computed(() => route.path === "/submitconfirmation");
-const isBannerBleedRoute = computed(() => ["/legal", "/security", "/trust", "/compliance", "/faq", "/contact", "/privacy", "/cookies", "/accessibility", "/about", "/pricing", "/forgot-password", "/contact-sales", "/request-demo", "/contact-support", "/report-security-issue", "/getting-started"].includes(route.path));
+const isBannerBleedRoute = computed(() => ["/legal", "/security", "/trust", "/compliance", "/faq", "/contact", "/privacy", "/cookies", "/accessibility", "/about", "/pricing", "/forgot-password", "/contact-sales", "/request-demo", "/contact-support", "/report-security-issue", "/getting-started"].includes(route.path) || route.path.startsWith("/legal/"));
 const isDarkChromeRoute = computed(() => ["/", "/landing-new", "/pricing", "/changelog", "/itemscanner"].includes(route.path));
 const isLandingRoute = computed(() => route.path === "/" || route.path === "/landing-new");
 const isUnavailableRoute = computed(() => route.path === "/unavailable" || route.name === "public-unavailable");

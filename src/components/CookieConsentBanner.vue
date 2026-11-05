@@ -3,11 +3,11 @@
     <div class="cookie-consent-banner" role="dialog" aria-live="polite" aria-label="Cookie preferences">
       <h2 class="cookie-consent-title">Cookie preferences</h2>
       <p class="cookie-consent-body">
-        Essential cookies keep sign-in and security working. Optional analytics and diagnostics help us fix issues
-        and improve the product.
+        Essential cookies keep sign-in, security, and our Intercom support chat working. Optional analytics and
+        diagnostics help us fix issues and improve the product.
       </p>
       <p class="cookie-consent-legal">
-        See <RouterLink to="/privacy">Privacy Policy</RouterLink> and <RouterLink to="/cookies">Cookies Notice</RouterLink>.
+        See <RouterLink to="/legal/privacy">Privacy Policy</RouterLink> and <RouterLink to="/legal/cookies">Cookie Notice</RouterLink>.
       </p>
 
       <div class="cookie-consent-actions">

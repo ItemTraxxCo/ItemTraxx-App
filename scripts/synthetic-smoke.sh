@@ -207,6 +207,8 @@ check_html_route "${BASE_URL}"
 check_html_route "${BASE_URL}/pricing"
 check_html_route "${BASE_URL}/contact-sales"
 check_html_route "${BASE_URL}/legal"
+check_html_route "${BASE_URL}/legal/privacy"
+check_html_route "${BASE_URL}/privacy"
 check_status_endpoint
 check_contact_sales_validation
 

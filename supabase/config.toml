@@ -370,6 +370,11 @@ verify_jwt = false
 # Supports anonymous and authenticated consent audit records; validation is internal.
 verify_jwt = false
 
+[functions.legal-acceptance]
+# Auth, active account/session, and document registry matching are validated
+# inside the function after trusted edge ingress verification.
+verify_jwt = false
+
 [functions.intercom-jwt]
 # Auth is validated inside the function via the Supabase session token.
 # The Intercom signing secret is read only from server-side function secrets.

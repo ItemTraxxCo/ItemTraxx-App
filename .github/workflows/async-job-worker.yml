@@ -71,7 +71,7 @@ jobs:
             -H "Origin: https://itemtraxx.com" \
             -H "Authorization: Bearer ${ITX_JOB_WORKER_SECRET}" \
             -H "Content-Type: application/json" \
-            --data '{"limit": 30, "run_reporting_refresh": true}')"
+            --data '{"limit": 30, "run_reporting_refresh": true, "run_workspace_purge": true}')"
           printf '%s\n' "$RESPONSE" | cut -c1-500
           if ! printf '%s' "$RESPONSE" | jq -e \
             '.ok == true and (.data.failed // 0) == 0 and .data.reporting_refreshed == true' \

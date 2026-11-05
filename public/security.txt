@@ -1,8 +1,9 @@
 Contact: mailto:security@itemtraxx.com
-Canonical: https://itemtraxx.com/.well-known/security.txt
-Policy: https://itemtraxx.com/legal
+Contact: https://itemtraxx.com/report-security-issue
+Expires: 2027-10-31T00:00:00.000Z
 Preferred-Languages: en
-Expires: 2027-03-12T00:00:00.000Z
+Canonical: https://itemtraxx.com/.well-known/security.txt
+Policy: https://itemtraxx.com/report-security-issue
 
 #   ___ _                 _____
 #  |_ _| |_ ___ _ __ ___ |_   _| __ __ ___  __

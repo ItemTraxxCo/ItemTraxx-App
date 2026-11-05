@@ -6,7 +6,10 @@ export type IntercomUser = {
 type IntercomSdk = {
   default: (settings: IntercomSettings) => void;
   shutdown: () => void;
+  show?: () => void;
 };
+
+export { SUPPORT_MESSENGER_OPEN_EVENT, requestSupportMessenger } from "./supportMessengerEvent";
 type IntercomSettings = {
   app_id: string;
   user_id?: string;
@@ -138,6 +141,23 @@ export const initializeIntercom = async (user?: IntercomUser | null) => {
   } catch (error) {
     console.warn("[intercom] initialization failed; continuing without Messenger.", error);
   }
+};
+
+/**
+ * Boots the Messenger on demand (anonymous unless a user is supplied) and
+ * opens it. Returns false when Intercom is not configured or failed to boot.
+ */
+export const openIntercomMessenger = async (user?: IntercomUser | null) => {
+  if (!isIntercomConfigured()) return false;
+  if (!activeIdentity) await initializeIntercom(user ?? null);
+  if (!activeIdentity) return false;
+
+  try {
+    sdk?.show?.();
+  } catch (error) {
+    console.warn("[intercom] open failed; continuing without Messenger.", error);
+  }
+  return true;
 };
 
 export const shutdownIntercom = () => {

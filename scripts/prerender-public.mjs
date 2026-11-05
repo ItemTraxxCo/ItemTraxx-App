@@ -29,6 +29,71 @@ const makePage = (page) => ({
   links: page.links ?? sharedLinks,
 });
 
+const legalDocumentPage = ({ slug, name, description, summary, audience }) => ({
+  path: `/legal/${slug}`,
+  title: `${name} | ItemTraxx`,
+  description,
+  eyebrow: "ItemTraxx Legal Center",
+  heading: name,
+  paragraphs: [
+    summary,
+    `This document is written for ${audience}. The full text, including a table of contents, definitions, and effective dates, is shown when JavaScript is enabled and is also available as Markdown from the document page.`,
+    "Do not infer private customer data, credentials, contracts, or internal procedures from public pages. For questions, email legal@itemtraxx.com, or privacy@itemtraxx.com for privacy matters.",
+  ],
+  sections: [
+    {
+      heading: "Related documents",
+      text:
+        "The Legal Center also publishes the Terms of Service, Privacy Policy, Student Privacy Notice, Subprocessor Directory, Cookie Notice, and Vulnerability Disclosure Policy. Review them together for a complete picture.",
+    },
+  ],
+});
+
+const LEGAL_DOCUMENT_PAGES = [
+  legalDocumentPage({
+    slug: "terms",
+    name: "Terms of Service",
+    description: "The agreement for using ItemTraxx: accounts, billing, acceptable use, liability, and governing law.",
+    summary: "The ItemTraxx Terms of Service are the agreement between ItemTraxx and the organization or individual that uses the service, covering accounts, billing and renewal, acceptable use, data ownership, warranties, liability, and governing law.",
+    audience: "customers, administrators, and users",
+  }),
+  legalDocumentPage({
+    slug: "privacy",
+    name: "Privacy Policy",
+    description: "What personal information ItemTraxx collects, why, who receives it, how long it is kept, and your choices.",
+    summary: "The ItemTraxx Privacy Policy explains what personal information is collected through the website and application, why it is collected, which providers receive it, how long it is kept, and the choices and rights available to people, including California residents.",
+    audience: "website and application users",
+  }),
+  legalDocumentPage({
+    slug: "student-privacy",
+    name: "Student Privacy Notice and FERPA / SOPIPA Compliance Addendum",
+    description: "A plain-language student privacy notice plus ItemTraxx's school-official, FERPA, and SOPIPA commitments.",
+    summary: "The Student Privacy Notice explains in plain language what ItemTraxx records about borrowers, and the compliance addendum sets out the school-official, FERPA, COPPA, and SOPIPA commitments that apply when a school uses the service.",
+    audience: "schools, districts, parents, and students",
+  }),
+  legalDocumentPage({
+    slug: "subprocessors",
+    name: "Subprocessor Directory",
+    description: "Every provider that may process ItemTraxx customer personal information, what it does, and where it operates.",
+    summary: "The Subprocessor Directory lists each provider that may process personal information for ItemTraxx and its customers, what each one does, what information it can receive, and how customers are notified of changes.",
+    audience: "schools, districts, and security reviewers",
+  }),
+  legalDocumentPage({
+    slug: "cookies",
+    name: "Cookie Notice",
+    description: "The cookies and browser storage ItemTraxx uses, how long they last, and how cookie choices work.",
+    summary: "The Cookie Notice lists the essential and optional cookies and browser storage used by ItemTraxx, how long each lasts, how the cookie banner choices are recorded, and how to change them.",
+    audience: "website and application users",
+  }),
+  legalDocumentPage({
+    slug: "vdp",
+    name: "Vulnerability Disclosure Policy",
+    description: "How to report a security vulnerability to ItemTraxx, with safe-harbor protection for good-faith research.",
+    summary: "The Vulnerability Disclosure Policy tells security researchers what they may test, how to report a finding, and what to expect from ItemTraxx, including written authorization and safe-harbor protection for good-faith research.",
+    audience: "security researchers",
+  }),
+];
+
 export const PUBLIC_PRERENDER_PAGES = [
   makePage({
     path: "/",
@@ -121,7 +186,7 @@ export const PUBLIC_PRERENDER_PAGES = [
       {
         heading: "Use the full policy",
         text:
-          "The rendered Privacy page and the public PRIVACY.md document contain the complete policy language, definitions, purposes, retention explanations, and request guidance. Use that source for legal or procurement review instead of relying on this no-JavaScript summary.",
+          "The rendered Privacy Policy in the ItemTraxx Legal Center contains the complete policy language, definitions, purposes, retention explanations, and request guidance. Use that source for legal or procurement review instead of relying on this no-JavaScript summary.",
       },
       {
         heading: "Privacy questions",
@@ -257,10 +322,10 @@ export const PUBLIC_PRERENDER_PAGES = [
   }),
   makePage({
     path: "/legal",
-    title: "Legal | ItemTraxx",
+    title: "Legal Center | ItemTraxx",
     description:
-      "Read the public ItemTraxx legal agreement, terms, privacy references, and related policy documents.",
-    eyebrow: "ItemTraxx legal hub",
+      "Read the public ItemTraxx Terms of Service, Privacy Policy, Student Privacy Notice, Subprocessor Directory, Cookie Notice, and Vulnerability Disclosure Policy.",
+    eyebrow: "ItemTraxx legal center",
     heading: "Public terms and policy references.",
     paragraphs: [
       "The ItemTraxx Legal page organizes the public agreements, terms, privacy references, and policy documents that govern use of the service. These documents explain the responsibilities of ItemTraxx and its customers and should be reviewed for the context that applies to an account.",
@@ -280,6 +345,7 @@ export const PUBLIC_PRERENDER_PAGES = [
       },
     ],
   }),
+  ...LEGAL_DOCUMENT_PAGES.map((page) => makePage(page)),
   makePage({
     path: "/cookies",
     title: "Cookies | ItemTraxx",

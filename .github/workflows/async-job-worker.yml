@@ -11,7 +11,7 @@ on:
 
 jobs:
   require-trusted-ref:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Require trusted ref for manual runs
         env:
@@ -57,7 +57,7 @@ jobs:
       - kill-switch-preflight
       - slack-notify-start
     if: ${{ needs.require-trusted-ref.result == 'success' && needs.kill-switch-preflight.outputs.active == 'false' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
 
     steps:

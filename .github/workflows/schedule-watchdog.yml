@@ -15,7 +15,7 @@ concurrency:
 
 jobs:
   require-trusted-ref:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Require trusted ref for manual runs
         env:
@@ -41,7 +41,7 @@ jobs:
       - require-trusted-ref
       - kill-switch-preflight
     if: ${{ needs.require-trusted-ref.result == 'success' && needs.kill-switch-preflight.outputs.active == 'false' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     env:
       SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
@@ -271,7 +271,7 @@ jobs:
       - kill-switch-preflight
       - check-stale-schedules
     if: ${{ always() && needs.require-trusted-ref.result == 'success' && needs.kill-switch-preflight.outputs.active == 'true' && needs.check-stale-schedules.result == 'skipped' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Send Slack kill-switch skip notification
         env:

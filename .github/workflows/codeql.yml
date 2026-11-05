@@ -31,7 +31,7 @@ jobs:
     name: Analyze JavaScript and Actions
     needs: kill-switch-preflight
     if: ${{ needs.kill-switch-preflight.outputs.active == 'false' && (github.event_name != 'pull_request' || github.event.pull_request.draft == false) }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 90
     permissions:
       actions: read

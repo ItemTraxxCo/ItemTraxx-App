@@ -1,102 +1,95 @@
 <template>
-  <div class="legal-document-page">
-    <main class="legal-document-shell">
-      <RouterLink class="legal-document-back" to="/legal">Back to Legal Hub</RouterLink>
-      <header>
-        <h1>{{ title }}</h1>
-        <p v-if="lastUpdated">Last updated: {{ lastUpdated }}</p>
-      </header>
-
-      <section v-for="section in sections" :key="section.title">
-        <h2>{{ section.title }}</h2>
-        <template v-for="(block, index) in section.blocks" :key="index">
-          <p v-if="block.type === 'paragraph'">{{ block.text }}</p>
-          <ul v-else>
-            <li v-for="item in block.items" :key="item">{{ item }}</li>
-          </ul>
-        </template>
-      </section>
-
-      <PublicFooter />
-    </main>
-  </div>
+  <LegalPageFrame>
+    <p v-if="loadState === 'error'" role="alert">
+      We couldn't load this document. Refresh the page, or email
+      <a href="mailto:legal@itemtraxx.com">legal@itemtraxx.com</a>.
+    </p>
+    <article v-else class="legal-prose" :aria-busy="loadState === 'loading'" @click="handleClick">
+      <LegalHtml :fragment="fragment" />
+    </article>
+  </LegalPageFrame>
 </template>
 
 <script setup lang="ts">
-import { computed } from "vue";
-import { RouterLink, useRoute } from "vue-router";
-import PublicFooter from "../components/PublicFooter.vue";
-import dpaRaw from "../../DPA.md?raw";
-import studentPrivacyRaw from "../../STUDENT_PRIVACY.md?raw";
+import { nextTick, ref, watch } from "vue";
+import { useRouter } from "vue-router";
+import LegalHtml from "../components/legal/LegalHtml.vue";
+import LegalPageFrame from "../components/legal/LegalPageFrame.vue";
+import { getLegalDocument } from "../legal/documents";
+import { loadLegalMarkdown } from "../legal/sources";
 
-type Block = { type: "paragraph"; text: string } | { type: "list"; items: string[] };
-type Section = { title: string; blocks: Block[] };
+const props = defineProps<{ docSlug: string }>();
+const router = useRouter();
 
-const route = useRoute();
-const source = computed(() => route.name === "public-dpa" ? dpaRaw : studentPrivacyRaw);
-const lines = computed(() => source.value.split(/\r?\n/));
-const title = computed(() => lines.value.find((line) => line.startsWith("# "))?.slice(2).trim() ?? "Legal Document");
-const lastUpdated = computed(() => lines.value.find((line) => line.startsWith("Last updated:"))?.replace("Last updated:", "").trim() ?? "");
+const fragment = ref<DocumentFragment | null>(null);
+const loadState = ref<"loading" | "ready" | "error">("loading");
+let loadToken = 0;
 
-const sections = computed<Section[]>(() => {
-  const result: Section[] = [];
-  let current: Section | null = null;
-  let pendingList: string[] = [];
-  let pendingParagraph: string[] = [];
-
-  const flushParagraph = () => {
-    if (!current || !pendingParagraph.length) return;
-    current.blocks.push({
-      type: "paragraph",
-      text: pendingParagraph.join(" ").replace(/\*\*/g, ""),
-    });
-    pendingParagraph = [];
-  };
-
-  const flushList = () => {
-    if (current && pendingList.length) current.blocks.push({ type: "list", items: [...pendingList] });
-    pendingList = [];
-  };
-
-  for (const raw of lines.value) {
-    const line = raw.trim();
-    if (!line || line === "---") {
-      flushParagraph();
-      flushList();
-      continue;
-    }
-    if (line.startsWith("# ") || line.startsWith("Last updated:")) continue;
-    if (line.startsWith("## ")) {
-      flushParagraph();
-      flushList();
-      if (current) result.push(current);
-      current = { title: line.slice(3).trim(), blocks: [] };
-      continue;
-    }
-    if (!current) current = { title: "Overview", blocks: [] };
-    if (line.startsWith("- ")) {
-      flushParagraph();
-      pendingList.push(line.slice(2).trim());
-    }
-    else {
-      flushList();
-      pendingParagraph.push(line);
-    }
+const load = async () => {
+  const token = ++loadToken;
+  const doc = getLegalDocument(props.docSlug);
+  fragment.value = null;
+  if (!doc) {
+    loadState.value = "error";
+    return;
   }
-  flushParagraph();
-  flushList();
-  if (current) result.push(current);
-  return result;
-});
+  loadState.value = "loading";
+  try {
+    // marked and DOMPurify load only with this page, never with the app shell.
+    const [markdown, { renderLegalMarkdown }] = await Promise.all([
+      loadLegalMarkdown(doc),
+      import("../legal/markdown"),
+    ]);
+    if (token !== loadToken) return;
+    const result = renderLegalMarkdown(markdown);
+    if (import.meta.env.DEV && result.unresolvedTokens.length) {
+      console.warn(`[legal] ${doc.slug} has unresolved tokens:`, result.unresolvedTokens.join(", "));
+    }
+    fragment.value = result.body;
+    loadState.value = "ready";
+    await nextTick();
+    const hash = router.currentRoute.value.hash;
+    if (hash) document.getElementById(decodeURIComponent(hash.slice(1)))?.scrollIntoView();
+  } catch {
+    if (token === loadToken) loadState.value = "error";
+  }
+};
+
+watch(() => props.docSlug, load, { immediate: true });
+
+// Internal links go through the router instead of a full page load.
+const handleClick = (event: MouseEvent) => {
+  if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+  const anchor = (event.target as HTMLElement | null)?.closest<HTMLAnchorElement>("a[data-legal-link]");
+  const kind = anchor?.getAttribute("data-legal-link");
+  if (!anchor || (kind !== "route" && kind !== "anchor")) return;
+  event.preventDefault();
+  void router.push(anchor.getAttribute("href") ?? "/legal");
+};
 </script>
 
 <style scoped>
-.legal-document-page { min-height: 100vh; padding: 2rem 1rem 4rem; }
-.legal-document-shell { width: min(880px, 100%); margin: 0 auto; }
-.legal-document-back { display: inline-block; margin-bottom: 2rem; color: var(--accent); }
-header, section { padding: 1.4rem; border: 1px solid var(--border); border-radius: 16px; }
-section { margin-top: 1rem; }
-h1, h2 { margin-top: 0; }
-p, li { line-height: 1.65; }
-header p { color: var(--muted); }
+.legal-prose { font-size: 0.97rem; line-height: 1.7; overflow-wrap: break-word; }
+.legal-prose :deep(h1) { margin: 0 0 1rem; font-size: 2rem; line-height: 1.2; letter-spacing: -0.02em; }
+.legal-prose :deep(h2) { margin: 2.25rem 0 0.5rem; font-size: 1.3rem; line-height: 1.3; scroll-margin-top: 1rem; }
+.legal-prose :deep(h3) { margin: 1.6rem 0 0.4rem; font-size: 1.08rem; scroll-margin-top: 1rem; }
+.legal-prose :deep(h4) { margin: 1.2rem 0 0.3rem; font-size: 1rem; scroll-margin-top: 1rem; }
+.legal-prose :deep(p) { margin: 0.75rem 0; }
+.legal-prose :deep(ul), .legal-prose :deep(ol) { margin: 0.75rem 0; padding-left: 1.4rem; }
+.legal-prose :deep(li) { margin: 0.3rem 0; }
+.legal-prose :deep(a) { color: var(--accent); text-decoration: underline; text-underline-offset: 0.18em; }
+.legal-prose :deep(code) { padding: 0.1em 0.35em; border-radius: 4px; background: var(--surface-3); font-size: 0.88em; }
+.legal-prose :deep(pre) { margin: 1rem 0; padding: 1rem; overflow-x: auto; border: 1px solid var(--border); border-radius: 6px; background: var(--surface-2); }
+.legal-prose :deep(pre code) { padding: 0; background: none; }
+.legal-prose :deep(blockquote) { margin: 1rem 0; padding: 0.1rem 1rem; border-left: 3px solid var(--border); color: var(--muted); }
+.legal-prose :deep(hr) { margin: 2rem 0; border: 0; border-top: 1px solid var(--border); }
+.legal-prose :deep(mark.legal-pending) { padding: 0 0.25em; border-radius: 3px; background: #f5d76e; color: #1a1a1a; }
+.legal-prose :deep(.legal-table-wrap) { margin: 1rem 0; overflow-x: auto; }
+.legal-prose :deep(table) { width: 100%; min-width: 520px; border-collapse: collapse; font-size: 0.88rem; line-height: 1.5; }
+.legal-prose :deep(th), .legal-prose :deep(td) { padding: 0.5rem 0.75rem; text-align: left; vertical-align: top; border: 1px solid var(--border); }
+.legal-prose :deep(th) { background: var(--surface-2); font-weight: 600; }
+@media print {
+  .legal-prose :deep(.legal-table-wrap) { overflow: visible; }
+  .legal-prose :deep(table) { min-width: 0; }
+}
 </style>

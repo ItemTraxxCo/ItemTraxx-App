@@ -96,7 +96,7 @@
           </button>
         </div>
         <p class="submit-legal-note field-full">
-          By clicking Send Demo Request, you agree to our <RouterLink to="/privacy">Privacy Policy</RouterLink> and <RouterLink to="/legal">Terms of Service</RouterLink>.
+          By clicking Send Demo Request, you agree to our <RouterLink to="/legal/privacy">Privacy Policy</RouterLink> and <RouterLink to="/legal/terms">Terms of Service</RouterLink>.
         </p>
       </form>
       <p v-if="error" class="error" v-app-toast-error>{{ error }}</p>

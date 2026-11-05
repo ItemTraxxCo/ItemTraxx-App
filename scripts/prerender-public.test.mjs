@@ -120,3 +120,13 @@ test("keeps the fallback available while preventing a normal-load flash", () => 
   assert.ok(mountIndex >= 0, "main.ts should mount the app");
   assert.ok(markerIndex > mountIndex, "main.ts should settle the fallback after mounting Vue");
 });
+
+test("prerenders every legal center document route", () => {
+  for (const slug of ["terms", "privacy", "student-privacy", "subprocessors", "cookies", "vdp"]) {
+    const page = byPath(`/legal/${slug}`);
+    assert.ok(page, `/legal/${slug} should be prerendered`);
+    const html = renderPublicFallback(page);
+    assert.match(html, /<h1>/);
+    assert.ok(textLength(html) > 400, `/legal/${slug} should contain readable fallback text`);
+  }
+});

@@ -128,8 +128,8 @@ const DOC_LINK_ROUTE_MAP: Record<string, string> = {
   "README.md": "https://github.com/ItemTraxxCo/ItemTraxx-App/blob/main/README.md",
   "LICENSE.md": "https://github.com/ItemTraxxCo/ItemTraxx-App/blob/main/LICENSE.md",
   "LEGAL.md": "/legal",
-  "TERMS.md": "/legal",
-  "PRIVACY.md": "/privacy",
+  "TERMS.md": "/legal/terms",
+  "PRIVACY.md": "/legal/privacy",
   "SECURITY.md": "/security",
 };
 

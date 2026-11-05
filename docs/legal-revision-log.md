@@ -132,3 +132,30 @@ The brief lists 7 checks; "Checks 1-11" in the output instructions has no defini
 4. **VERIFY** Resend and incident.io exclude Student Data; locations of Better Auth, PostHog (US cloud is confirmed), Intercom, Resend, Slack, incident.io; exact sign-in (2FA) cookie names.
 5. **COUNSEL** No California school rider or Student Data Privacy Agreement template exists; references are conditional. 1798.82 "immediately after discovery" versus the 72-hour contract deadline. SOPIPA and Ed. Code 49073.1 characterization. DMCA agent registration. Survival clause additions in Terms 14.
 6. `docs/legal/README.md` was not updated for these changes.
+
+---
+
+## Addendum 2026-11-04: VERIFY resolution against code and infrastructure
+
+| # | VERIFY item | Result | Evidence | Change |
+|---|---|---|---|---|
+| 1 | Sign-in and 2FA cookie names | **Corrected.** The Worker no longer sets `__Host-itx_session` / `__Host-itx_refresh` (it only reads them and clears the old names). Real cookies: `__Secure-better-auth.session_token` (7 days), `.two_factor` (600 s), `.better-auth-passkey` (300 s), `__infra-rid` (600 s). No remember-me, trusted-device, or session-cache cookie is set. | `cloudflare/edge-proxy/src/auth.ts` (`session.expiresIn`, `advanced.useSecureCookies`, `crossSubDomainCookies: false`), `cookies.ts` (no `setSessionCookies` caller), Better Auth `dist` defaults | `cookie-notice.md` 2.1, `privacy-policy.md` 4.1 |
+| 2 | Offline conflict role | Resolved on the account and device that made the checkout (`profile_id` + `device_id` match). Roles allowed: `tenant_account`, `workspace_admin`, `individual_account`. Quick Return needs Workspace Admin (or an individual account). | `supabase/functions/offline-checkout/index.ts` (resolve branch) | `terms-of-service.md` Section 6 sentence |
+| 3 | Resend / incident.io exclude Student Data | Confirmed by templates: no borrower, student, or checkout fields in any Resend sender or incident.io payload. incident.io gets alert type, route, request ID, status, a keyed hash of the network address, and CI workflow status. | See README Section 6 | Directory rows and intro, DPA 5.4, Student notice Part B 4.2 |
+| 4 | No AI training | No AI/LLM integration receives Customer Data in `src`, `supabase/functions`, or the Worker. Founder confirmed 2026-11-04: no AI is used in production. Subprocessor contract terms were not reviewed. | grep; `supabase/config.toml` OpenAI key is for local Studio only | Terms comment updated; statement kept |
+| 5 | Locations | Supabase prod `us-west-1`; backup-job VM `us-west1-b`. Others remain "United States" assumptions. | Supabase project list; `itemtraxx-backups` workflow | Tokens already `US-West`; no change |
+| 6 | Hashed network identifier in error reports | Yes: `ip_hash` (SHA-256 of the IP) and `client_fingerprint_hash` are stored. | `supabase/functions/client-error-report/index.ts` | `privacy-policy.md` 2.7 |
+| 7 | E-DEPENDENCY (workspace purge) | **Not in production.** Prod migrations stop at `20261102015238`; `20261104120000/130000/140000` are not applied; `job-worker` v146 predates them. | Supabase `list_migrations`, `list_edge_functions` | Comments updated in `dpa.md`, `terms-of-service.md` |
+
+### New findings that need a decision
+
+1. **Backup retention conflict. DECIDED 2026-11-04: keep 30 days; the documents stay as written.** The infrastructure must now be changed to match: in `ItemTraxxCo/itemtraxx-backups`, set `SUPABASE_BACKUP_RETENTION_DAYS` from `"365"` to `"30"` (`.github/workflows/supabase-backup.yml` line 106) and update the `Retention` section of that README (default 365). The next successful backup run then permanently deletes every release older than 30 days, so existing older backups are lost. Until that change is merged and has run, the published 30-day statement is not true. Original finding: The documents say backups are overwritten within `[[BACKUP_RETENTION_DAYS]]` = 30 days. The production backup workflow sets `SUPABASE_BACKUP_RETENTION_DAYS: "365"`. Either change the workflow to 30 or change the token to 365 (and the deletion promises). Not changed here.
+2. **Backups are stored on GitHub, not Google Cloud.** The Google Cloud VM runs the dump; the AES-256 encrypted archive is published as release assets of the private `itemtraxx-backups` repository. The directory said Google Cloud stored backups and that GitHub never receives customer data. The directory now lists both (GitHub as encrypted backup storage, location "United States", unverified). Adding GitHub triggers the 30-day subprocessor notice the documents promise; counsel should say whether prior notice is owed because the practice already exists.
+3. DPA Annex A backup location text changed to "created in US-West and stored in encrypted form with GitHub in the United States".
+
+### Final pass 2026-11-04
+
+- Tokens set: `OTHER_DATA_INCIDENT_NOTICE` = "72 hours", `ERROR_REPORT_RETENTION_DAYS` = "90". `LEGAL_PENDING_TOKENS` is now empty, so no pending (yellow) marks remain.
+- Terms: hidden AI note removed (founder confirmed 2026-11-04 that production uses no AI models or APIs).
+- Directory and DPA keep GitHub listed as encrypted backup storage. `itemtraxx-backups` `main` has retention 30 in the workflow, the script default, and the README. Pruning has not happened yet (272 releases, oldest 2026-06-25) and is expected after the next backup run.
+- **Open: error-report retention is not enforced.** Privacy Policy Section 6 says error reports are kept 90 days. Production has no such job: `public.run_data_retention` does not touch `client_error_reports` (or `email_delivery_logs`), `data_retention_policies` has only `audit_logs` and `soft_delete`, and the only cron jobs are audit-log retention and Turnstile token cleanup. Reports are deleted only by the workspace purge, which is itself not yet applied in production. Add a 90-day purge for `client_error_reports`, or change the wording, before publishing.

@@ -6,28 +6,27 @@
 
 ItemTraxx uses the service providers below to deliver the Service. This directory lists every provider that may process personal information on behalf of ItemTraxx and its customers, what it does, and what information it can receive. It supports the commitments in our [Privacy Policy](privacy-policy.md), [Student Privacy Notice and FERPA / SOPIPA Compliance Addendum](student-privacy-notice.md), and customer [Data Processing Addendum](dpa.md).
 
-**Student Data** means borrower usernames, borrower IDs, and checkout history in a customer's workspace, as defined in the Student Privacy Notice. Only Supabase, Cloudflare, and Google Cloud process Student Data; every other provider is configured not to receive it. Each provider is bound by a written agreement that requires protections at least as protective as our commitments to customers, and we remain responsible for the provider's handling of the data it receives from us.
+**Student Data** means borrower usernames, borrower IDs, and checkout history in a customer's workspace, as defined in the Student Privacy Notice. Only Supabase, Cloudflare, Google Cloud, and GitHub (which stores backups only in encrypted form) process Student Data; every other provider is configured not to receive it. Our email and incident-alert messages are built without borrower fields. Each provider is bound by a written agreement that requires protections at least as protective as our commitments to customers, and we remain responsible for the provider's handling of the data it receives from us.
 
 ## 1. Subprocessors
-
-<!-- VERIFY: confirm the Resend and incident.io configurations exclude Student Data, and confirm each provider's location. -->
 
 | Vendor | Purpose | Data transferred | Location |
 |---|---|---|---|
 | **Supabase** | Database, server functions, and file storage | All workspace data, including Student Data, staff and account data, support attachments, and error reports | [[DATABASE_REGION]] |
 | **Cloudflare** | Network delivery, DNS, and security | Request traffic in transit (including Student Data when staff use the app) and request metadata such as IP address, URL, and headers | Global edge network |
-| **Google Cloud** | Backup storage for disaster recovery | Copies of the data held in Supabase, including Student Data | [[BACKUP_LOCATION]] |
+| **Google Cloud** | Runs the scheduled database backup job for disaster recovery | Copies of the data held in Supabase, including Student Data, while a backup is created and encrypted | [[BACKUP_LOCATION]] |
+| **GitHub** | Private storage of encrypted database backups for disaster recovery | Encrypted copies of the production database, including Student Data; GitHub cannot read the contents | United States |
 | **Vercel** | Web application hosting and, with consent, web analytics | Request metadata; page-view and page-speed data | Global edge network |
 | **Better Auth, Inc.** | Sign-in security services | Sign-in event data such as email, IP address, and device signals | United States |
 | **PostHog** | Product analytics, consent-gated diagnostic logs, and session replay (with consent) | Consent-based usage and diagnostic data with form inputs masked | United States |
 | **Intercom** | Support chat | IP address, browser and device details; for signed-in users, account ID, email, and chat content | United States |
-| **Resend** | Transactional and support email | Recipient email addresses, names, message content, delivery status | United States |
+| **Resend** | Transactional and support email | Staff and administrator email addresses and names, the content of sign-in, invitation, password-reset, verification, and notification emails, and delivery status; no borrower data | United States |
 | **Slack** | Internal notifications | Contact and message details of people who contact us; for each error report, a summary with the report ID, error name, environment, release, role, workspace ID, and request ID | United States |
-| **incident.io** | Incident alerting | Alert metadata, with no names, emails, or borrower data | United States |
+| **incident.io** | Incident alerting | Alert metadata such as alert type, page route, request ID, and a one-way hashed network identifier; no names, emails, or borrower data | United States |
 
 ## 2. Tools that do not receive customer data
 
-Our source control, build, and security tools (such as GitHub) receive source code and dependency information, not customer data, and are not subprocessors of customer data. A customer's own identity provider, if it uses single sign-on, is the customer's vendor, not ours.
+Our source control, build, and security tools (such as GitHub's code repositories and build service) receive source code and dependency information, not customer data. GitHub's separate role in storing encrypted backups is listed above. A customer's own identity provider, if it uses single sign-on, is the customer's vendor, not ours.
 
 ## 3. Changes to this directory
 

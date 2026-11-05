@@ -23,13 +23,15 @@ This notice explains the cookies and similar browser storage that itemtraxx.com,
 
 | Name | Set by | Purpose | Duration | Notes |
 |---|---|---|---|---|
-| `__Host-itx_session` | ItemTraxx (first party) | Short-lived access credential that keeps you signed in | About 1 hour, renewed while you are active | HttpOnly, Secure, SameSite=Lax; host-only, so not sent to other `itemtraxx.com` subdomains |
-| `__Host-itx_refresh` | ItemTraxx (first party) | Renews the access cookie without asking you to sign in again | Up to 14 days; the underlying sign-in session ends after at most 7 days of activity or when you or an administrator sign it out | HttpOnly, Secure, SameSite=Lax; host-only |
+| `__Secure-better-auth.session_token` | ItemTraxx (first party, issued by our authentication software) | Keeps you signed in | Up to 7 days, renewed as you use the app; the sign-in session ends sooner when you or an administrator sign it out | HttpOnly, Secure, SameSite=Lax; host-only, so not sent to other `itemtraxx.com` subdomains |
+| `__Secure-better-auth.two_factor` | ItemTraxx (first party, issued by our authentication software) | Carries your sign-in from the password step to the two-factor code step | 10 minutes | HttpOnly, Secure, SameSite=Lax; host-only; set only when two-factor verification is required |
+| `__Secure-better-auth.better-auth-passkey` | ItemTraxx (first party, issued by our authentication software) | Completes a passkey registration or passkey sign-in | 5 minutes | HttpOnly, Secure, SameSite=Lax; host-only; set only while a passkey is being registered or used |
+| `__infra-rid` | Better Auth, Inc. (through our authentication software) | Ties a sign-in request to the sign-in security service so abusive sign-in attempts can be detected | 10 minutes | HttpOnly, SameSite=Lax; set only on some sign-in requests |
 | `itemtraxx-cookie-consent` | ItemTraxx | Stores your cookie choices | 1 year | SameSite=Lax; the Secure attribute is applied whenever you load the site over https; shared across `itemtraxx.com` subdomains so one choice applies everywhere |
 | `itemtraxx-cookie-consent-subject` | ItemTraxx | A random identifier linking your browser to the server-side record of your choice (Section 5). It is created the first time your choice is recorded on our server, not before you choose. | 1 year | SameSite=Lax; Secure over https; shared across `itemtraxx.com` subdomains |
 | Cloudflare security cookies (for example `cf_clearance` or `__cf_bm`) | Cloudflare | Bot protection and challenge pages when Cloudflare needs to verify a visitor | Session to a few hours | Set only when a challenge or bot check runs, including a bot check on sign-in and password reset |
 
-The authentication software we run may also set host-only sign-in cookies for steps such as two-factor verification. These are used only to sign you in, are host-only (not shared across subdomains), and are short-lived. <!-- VERIFY: capture the exact names and lifetimes of these cookies during a sign-in and two-factor flow, and list them. -->
+On a local development build the `__Secure-` prefix is not used; it applies on `itemtraxx.com`. We do not use the optional Better Auth "remember me", "trusted device", or session-cache cookies.
 
 ### 2.2 Browser storage
 

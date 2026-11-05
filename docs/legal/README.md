@@ -1,111 +1,84 @@
 # ItemTraxx legal documents
 
-Canonical, publication-ready drafts of ItemTraxx's public legal documents. They were written from the code, configuration, and production metadata as of 2026-11-04, after the Phase A engineering changes, and they replace the earlier root-level `PRIVACY.md`, `TERMS.md`, `STUDENT_PRIVACY.md`, and `SECURITY.md` (now short pointers to this folder). See [`../legal-architecture-blueprint.md`](../legal-architecture-blueprint.md) for the audit behind them.
+Source of truth for ItemTraxx's public legal documents. Each `*.md` file here is rendered on the website as plain Markdown. Editing a file here changes the live page after the next deploy.
 
-> These are drafts for counsel review, not legal advice. Have California counsel read them before publication. Every number in the "Decisions" table is a default I chose so the documents are complete; each is a commitment you are making, so confirm or change it.
+These are drafts for counsel review, not legal advice. Open questions and the full change history are in [`../legal-revision-log.md`](../legal-revision-log.md). The audit behind the structure is in [`../legal-architecture-blueprint.md`](../legal-architecture-blueprint.md).
 
-## 1. Document map
+## 1. The seven documents
 
-### Drafted (this folder)
-
-| File | Audience | Status |
+| File | Page | What it covers |
 |---|---|---|
-| [`privacy-policy.md`](privacy-policy.md) | Website and app users | Drafted |
-| [`terms-of-service.md`](terms-of-service.md) | Customers and users | Drafted |
-| [`student-privacy-notice.md`](student-privacy-notice.md) (Part A notice; Part B FERPA/SOPIPA addendum) | Schools, parents, students | Drafted |
-| [`vulnerability-disclosure-policy.md`](vulnerability-disclosure-policy.md) (includes `security.txt` spec) | Security researchers | Drafted; `security.txt` files updated |
-| [`cookie-notice.md`](cookie-notice.md) | Website and app users | Drafted |
-| [`subprocessor-directory.md`](subprocessor-directory.md) | Schools and customers | Drafted |
+| [`terms-of-service.md`](terms-of-service.md) | `/legal/terms` (`/terms` redirects) | The contract with every Customer: the service, accounts, acceptable use, fees and renewal, warranties, liability, DMCA, governing law. Section 2 sets the order of precedence. |
+| [`privacy-policy.md`](privacy-policy.md) | `/legal/privacy`, `/privacy` | What personal information we collect and why, for website visitors, staff users, and borrowers; retention; rights (including the California Notice at Collection and the appeal process). |
+| [`dpa.md`](dpa.md) | `/legal/dpa` | The **general** Data Processing Addendum. It applies to every Customer (school or business): roles, security, subprocessors, incidents, deletion, CCPA/CPRA service-provider terms, Annex A (processing description), Annex B (directory link). |
+| [`student-privacy-notice.md`](student-privacy-notice.md) | `/legal/student-privacy` | Part A: plain-language notice for schools, parents, and students. Part B: the **Student Data Addendum** (FERPA, COPPA, SOPIPA, Cal. Ed. Code 49073.1), which adds to the DPA when a Customer submits Student Data. |
+| [`subprocessor-directory.md`](subprocessor-directory.md) | `/legal/subprocessors` | The single current list of subprocessors (vendor, purpose, data, location) and the 30-day change-notice and objection process. |
+| [`cookie-notice.md`](cookie-notice.md) | `/legal/cookies`, `/cookies` | Every cookie and kind of browser storage, essential vs consent-gated, and how consent is recorded. |
+| [`vulnerability-disclosure-policy.md`](vulnerability-disclosure-policy.md) | `/legal/vdp` | Rules and safe harbor for security researchers; the `security.txt` fields. |
 
-### Public-facing, not yet drafted (next, in this order)
+`/legal` is an index page that links to all seven. Old URLs (`/privacy`, `/cookies`, `/terms`) are kept as aliases.
 
-1. Acceptable Use Policy (the Terms section 5 is the first version)
-2. Privacy-request (DSAR) procedure
-3. Parent-notice kit and the public summary of the retention schedule
+### How the DPA and the Student Data Addendum fit together
 
-### Customer-facing (signed or shared with schools)
+- `dpa.md` is the **general business-to-business DPA**. It is complete for any Customer and does not repeat Student Data rules.
+- Part B of `student-privacy-notice.md` is the **Student Data Addendum**. It governs the purposes and limits for Student Data, parent and student access, the 72-hour incident notice, and Student Data deletion. DPA Sections 2, 3, and 5.4 point to it.
+- Precedence when documents conflict on a data protection matter (the same six levels appear in Terms Section 2, DPA Section 11, and Part B): (1) the executed agreement or Order Form; (2) a signed Student Data Privacy Agreement or California school rider, if one has been executed; (3) the Student Data Addendum; (4) the DPA; (5) the Terms of Service; (6) the Privacy Policy and Part A of the Student Privacy Notice.
+- The subprocessor list lives only in `subprocessor-directory.md`. Other documents link to it and do not repeat it.
+- Root `DPA.md` is a short pointer to `dpa.md`.
 
-Customer DPA with the California rider, Security Addendum, MSA / Order Form / quote, SLA, SSO addendum, support and escalation policy, business-continuity summary, HECVAT and VPAT, and (on demand) a GDPR addendum.
+## 2. How the files reach the site
 
-### Internal-only
+- `src/legal/sources.ts` uses `import.meta.glob(["../../docs/legal/*.md", "!../../docs/legal/README.md"], { query: "?raw" })`. Every Markdown file in this folder **except this README** is bundled as a lazy chunk, loaded only when someone opens a legal page. The README is never bundled or routed.
+- `src/legal/documents.ts` is the registry (slug, title, path, source file). A new document must be added there and to the route-title map in `src/legal/routeTitles.ts`, or it will not be routable.
+- `src/legal/markdown.ts` converts Markdown with `marked`, sanitizes with DOMPurify, rewrites links between documents (`other-doc.md` becomes `/legal/<slug>`), and substitutes tokens. HTML comments are stripped, so `<!-- VERIFY ... -->` notes never appear on the site.
+- `src/pages/LegalDocumentPage.vue` renders the result as plain prose and tables. Most `/legal/*` pages are prerendered by `scripts/prerender-public.mjs` and listed in `public/sitemap.xml` (`dpa` is not prerendered yet).
+- The bundle budget is tight (`npm run perf:initial`), so keep the markdown libraries inside the lazy page and out of the router.
 
-Founder and contributor IP assignments, entity and trademark records, open-source inventory, NDAs, the Incident Response Plan (its customer breach-notice output is customer-facing), and the internal policy set. The DPA now lives at [`dpa.md`](dpa.md) (the root `DPA.md` is a pointer) and still needs a legal rewrite. `LEGAL.md` at the repository root is **not** replaced yet and still points at the replaced files.
+### `docs/legal-revision-log.md`
 
-## 2. Placeholders
+[`../legal-revision-log.md`](../legal-revision-log.md) sits **outside** this folder on purpose, so the glob never bundles it and it is never published. It records, per file, what changed and why, the open items, and the cross-document consistency report. Update it whenever a legal document changes.
 
-Values now live in `src/legal/legalTokens.ts` (set 2026-11-04). The table below records what each token means and what still needs confirming; a test fails if any published document has an unfilled token.
+## 3. Placeholder tokens
 
-| Token | Fill with | Notes |
-|---|---|---|
-| `[[EFFECTIVE_DATE]]` | Publication date | Set the same date and version in the legal registry (section 5) |
-| `[[ENTITY_DESCRIPTION]]` | Legal name and form, e.g. "ItemTraxx Co, a ___ corporation/LLC" | Only "ItemTraxx Co" appears in the repo; state and entity type are not recorded anywhere I can see |
-| `[[MAILING_ADDRESS]]` | Postal address for notices | Required for CalOPPA/CCPA contact and the Terms' notice clause |
-| `[[GOVERNING_COUNTY]]` | County for venue | Terms section 17 |
-| `[[DATA_BREACH_CAP]]` | Multiple of fees for the data-breach liability cap | I recommend 2 (i.e. "2 times"); the clause reads "[N] times the fees in item 2" |
-| `[[DATABASE_REGION]]` | The Supabase project's region, written as "in the United States" or the specific region | Not determinable from the repo |
-| `[[BACKUP_LOCATION]]` | Where backups are stored (for example the Google Cloud region) | Subprocessor Directory |
-| `[[BACKUP_RETENTION_DAYS]]` | How long backups are kept before overwrite | The backup VM and repo are outside this codebase |
-| `[[ANALYTICS_RETENTION]]` | PostHog data retention you have configured | Check the PostHog project setting; I never read it |
+Write `[[TOKEN]]` in a document. Values are set in `src/legal/legalTokens.ts`.
 
+- A token with a value renders as that text.
+- A token with no value renders as a yellow "pending" mark on the live page, so unfinished text is never mistaken for final text.
+- `LEGAL_PENDING_TOKENS` lists the tokens that are deliberately still open (currently none). A unit test allows only those to stay unresolved and fails on any other.
 
-## 3. Decisions I made that you must confirm
+Current tokens: `EFFECTIVE_DATE`, `ENTITY_DESCRIPTION`, `MAILING_ADDRESS`, `GOVERNING_COUNTY`, `DATABASE_REGION`, `BACKUP_LOCATION`, `BACKUP_RETENTION_DAYS`, `ANALYTICS_RETENTION`, `DATA_BREACH_CAP`, `OTHER_DATA_INCIDENT_NOTICE`, and `ERROR_REPORT_RETENTION_DAYS`.
 
-| Commitment | Where | Default |
-|---|---|---|
-| Breach notice to schools | Student addendum 9; Privacy 7 | Within 72 hours of confirmation |
-| Deletion on a school's written request | Student addendum 7.2 | Within 30 days |
-| Parent request referral and help | Student addendum 6 | 10 business days |
-| Subprocessor change notice | Student addendum 4.3 | 30 days, with objection and refund right |
-| Notice of material Terms changes | Terms 18 | 30 days, with exit and refund right |
-| Payment terms | Terms 9 | Net 30; suspension after 15 days' notice on undisputed invoices > 30 days late |
-| Renewal | Terms 9 | Auto-renew for the same term unless 30 days' notice |
-| Liability cap | Terms 16 | Fees paid in prior 12 months (US$100 if none), with carve-outs and a higher data-breach cap |
-| IP infringement indemnity by ItemTraxx | Terms 15 | Included, standard |
-| Refund if functionality materially reduced | Terms 3 | Pro-rata, on request within 30 days |
-| Governing law | Terms 17 | California, courts in `[[GOVERNING_COUNTY]]`, public-entity carve-out |
-| Vulnerability response times | VDP 7 | Acknowledge 3 business days, assess 10, update every 14, 90-day disclosure window |
-| No bug bounty | VDP 7 | Credit only |
-| Intercom as "essential" | Privacy 4.3; Cookie Notice 4 | Disclosed; not behind a consent gate |
-| Subprocessor change notice for providers handling customer personal information (not only Student Data) | Subprocessor Directory 3 | 30 days |
-| Cookie consent records for signed-out users | Cookie Notice 5 | Kept 730 days (matches the purge job) |
+## 4. Editing rules
 
-## 4. Facts to verify (I could not confirm them from the repo)
+1. Do not state a fact that is not true of the code or the infrastructure. Check the code first and note the change in the revision log.
+2. Use "workspace" (not "tenant"), "Customer Data", and "Student Data".
+3. Do not publish internal detail: no storage key names beyond what the cookie notice needs, no endpoint or host names, no thresholds, no vendor configuration.
+4. Keep `<!-- VERIFY ... -->` and `<!-- E-DEPENDENCY ... -->` comments for anything unconfirmed. Search for them before publishing: `grep -rn "VERIFY\|E-DEPENDENCY" docs/legal`.
+5. After any edit run `npm run build`, `npx vitest run src/legal`, and `npm run perf:initial`.
 
-1. **Better Auth Infra (`sentinel`, `dash`).** The Privacy Policy lists Better Auth, Inc. as a provider receiving sign-in event data. Confirm what these plugins actually send and whether `BETTER_AUTH_API_KEY` is set in production. If you remove them, delete that row and the Student addendum has no change.
-2. **Supabase region** and whether it is "in the United States."
-3. **Backups on the Google Cloud VM**: retention, location, encryption. The documents promise only that backups roll off on a schedule.
-4. **Slack payloads** for sales and support notifications (the Privacy Policy says contact details and message details).
-5. **Intercom cookie lifetimes** ("typically up to 9 months") and its configured retention.
-6. **Whether individual plans are billed automatically.** Terms 9 assumes invoicing with a renewal reminder.
-7. **PostHog retention** (`[[ANALYTICS_RETENTION]]`).
+## 5. Status of unresolved items (checked 2026-11-04)
 
-## 5. Engineering work that makes the documents true
+- **Workspace deletion is not live in production.** The migrations `20261104120000`, `20261104130000`, and `20261104140000` are not applied to the production database, and the deployed `job-worker` predates them. The 30-day recovery and automated purge described in the Terms, DPA, Privacy Policy, and Student Data Addendum depend on both.
+- **Backup pruning is pending.** The backup workflow, script default, and README in `itemtraxx-backups` now say 30 days (checked 2026-11-04), but older releases are deleted only after the next backup run. Until then the 30-day statement is not yet true.
+- **Open tokens:** none. `OTHER_DATA_INCIDENT_NOTICE` is 72 hours and `ERROR_REPORT_RETENTION_DAYS` is 90.
+- **Error-report retention is not enforced in production.** No job deletes `client_error_reports` at 90 days; see the revision log.
+- **For counsel:** the California school rider reference (no template exists in the repo), Civil Code 1798.82 timing against the 72-hour deadline, the SOPIPA / Ed. Code 49073.1 characterization, DMCA agent registration, and the survival clause in Terms Section 14.
+- **Not verified:** subprocessors' own contract terms on model training (ItemTraxx itself uses no AI in production, confirmed 2026-11-04); provider locations for Better Auth, Intercom, Resend, Slack, incident.io, and GitHub (listed as "United States").
 
-The documents describe the system as it will be once the Phase A changes are deployed. Before publishing:
-
-1. **Apply the three migrations and deploy** `job-worker`, `legal-acceptance`, and the Worker. Until then production still has the borrower-purge bug and no workspace deletion, which the Privacy Policy and Student addendum describe as working.
-2. **Add a "Cookie preferences" link** that reopens the banner (footer and app). Privacy 4.2 currently tells users to clear cookies, which is workable but weak for easy withdrawal.
-3. **Render these documents on the site.** The `/privacy`, `/legal`, `/legal/student-privacy`, `/cookies`, and `/report-security-issue` pages still carry the old text, and there is no page for the Subprocessor Directory yet (the Privacy Policy and Student addendum link to it). `security.txt` now points at `/report-security-issue`, so that page must show the VDP and the report form.
-4. **Seed the legal registry.** Hash each published document (SHA-256 of the exact text), then insert a row for each into `legal_document_versions` with the same version string, so clickwrap acceptance can be recorded. No acceptance prompt is mounted yet.
-5. **Add retention purges** for support requests, sales leads, error reports, and email logs if you want a fixed period instead of "while needed" (Privacy section 6 deliberately promises only what the code does today).
-6. **Publish the `privacy-request` page text** and keep the Privacy Policy and Subprocessor Directory tables in sync.
-
-## 6. How the documents map to the code
+## 6. Where the statements come from
 
 | Statement | Evidence |
 |---|---|
-| Borrower username/ID are generated unless an admin types them (≤40 chars) | `supabase/functions/admin-borrower-mutate/index.ts` |
-| No borrower email/phone/DOB/photo fields | `supabase/migrations/20260725221011_item_borrower_physical_rename.sql` (schema) |
-| Camera never stored | `src/composables/useCameraBarcodeScanner.ts` |
-| Analytics/diagnostics opt-in; replay needs both | `src/services/cookieConsentService.ts`, `src/services/posthogService.ts` |
-| Session cookies `__Host-itx_session` (1 h) and `__Host-itx_refresh` (≤14 d), HttpOnly/Secure/Lax | `cloudflare/edge-proxy/src/cookies.ts` |
-| Consent cookie names, 1-year duration, 2-second cross-tab sync | `src/services/cookieConsentService.ts` |
-| Vercel Analytics and Speed Insights only with analytics consent | `src/App.vue`, `src/composables/useCookieConsentTelemetry.ts` |
-| Intercom lazy, essential, loads for everyone | `src/composables/useIntercom.ts` |
-| Self-hosted fonts, no GitHub version call | `src/main.ts`, `index.html`, `vite.config.ts`, `src/composables/useAppVersionStatus.ts` |
-| Retention periods (365/730/730/1,095, 730, 7+24h, 30) | Production `data_retention_policies` and cron; consent and invitation migrations |
-| Borrower purge keeps history, unlinks borrower | `20261104120000_preserve_item_history_on_borrower_purge.sql` |
-| 30-day workspace purge and certificate | `20261104130000_workspace_purge_executor.sql`, `supabase/functions/job-worker/workspacePurge.ts` |
-| Acceptance record fields | `20261104140000_legal_acceptance_audit_trail.sql` |
-| Sessions up to 7 days; 12-character passwords | `cloudflare/edge-proxy/src/auth.ts` |
+| Sign-in cookies `__Secure-better-auth.session_token` (up to 7 days), `.two_factor` (10 min), `.better-auth-passkey` (5 min), `__infra-rid` (10 min) | `cloudflare/edge-proxy/src/auth.ts` (`session`, `advanced`, `twoFactor`, `passkey` config) and the installed Better Auth defaults |
+| Sessions up to 7 days; passwords of at least 12 characters | `cloudflare/edge-proxy/src/auth.ts` |
+| Offline conflicts resolve only on the creating account and device; Quick Return needs a Workspace Admin | `supabase/functions/offline-checkout/index.ts` |
+| Emails and incident alerts carry no borrower fields | `cloudflare/edge-proxy/src/{passwordResetDelivery,accountEmailDelivery,observability}.ts`, `supabase/functions/{job-worker,login-notify}/index.ts` |
+| Error reports store hashes of a network identifier; always on | `supabase/functions/client-error-report/index.ts`, `src/services/clientErrorReportService.ts` |
+| Production database region | Supabase project `us-west-1`; backup job VM zone `us-west1-b`; encrypted backups stored as GitHub release assets (`itemtraxx-backups` repository) |
+| No AI or machine-learning provider receives Customer Data | No such integration in `src`, `supabase/functions`, or `cloudflare/edge-proxy/src` |
+| Consent cookie names, 1-year duration, cross-tab sync | `src/services/cookieConsentService.ts` |
+| Analytics and diagnostics opt-in; replay needs both | `src/services/cookieConsentService.ts`, `src/services/posthogService.ts` |
+| Offline pack: 24-hour expiry, encrypted queue, 25 MB cap | `src/services/offlineCheckoutWorkflow.ts`, `supabase/functions/offline-checkout/index.ts` |
+| Borrower purge keeps history; 30-day workspace purge and certificate | `supabase/migrations/20261104120000_*.sql`, `20261104130000_*.sql`, `supabase/functions/job-worker/workspacePurge.ts` |
+| Acceptance record fields | `supabase/migrations/20261104140000_legal_acceptance_audit_trail.sql` |
 | Security headers, HSTS preload | `vercel.json` |

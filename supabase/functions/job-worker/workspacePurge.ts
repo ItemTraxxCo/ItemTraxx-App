@@ -1,7 +1,5 @@
 export type WorkspacePurgeClaim = {
   id: string;
-  name: string;
-  slug: string | null;
   better_auth_organization_id: string | null;
 };
 
@@ -18,7 +16,10 @@ export type WorkspacePurgeDeps = {
   deleteBetterAuthOrganization: (organizationId: string) => Promise<void>;
   listSupportAttachmentPaths: (workspaceId: string) => Promise<string[]>;
   removeSupportAttachments: (paths: string[]) => Promise<void>;
-  purgeData: (workspaceId: string, externalCleanup: Record<string, number>) => Promise<unknown>;
+  purgeData: (
+    workspaceId: string,
+    externalCleanup: Record<string, number>,
+  ) => Promise<{ purged_at?: string } | null>;
   release: (workspaceId: string) => Promise<void>;
   log: (message: string, details: Record<string, unknown>) => void;
 };
@@ -31,6 +32,13 @@ export type WorkspacePurgeResult = {
 
 const isNotFound = (error: unknown) =>
   error instanceof Error && /not found/i.test(error.message);
+
+const safeErrorCode = (error: unknown) => {
+  if (error instanceof Error && (error.name === "AbortError" || error.name === "TimeoutError")) {
+    return error.name.toLowerCase();
+  }
+  return "external_cleanup_failed";
+};
 
 /**
  * Purges workspaces whose archive grace period has elapsed. Order matters:
@@ -58,24 +66,34 @@ export const purgeExpiredWorkspaces = async (
         }
       }
       if (workspace.better_auth_organization_id) {
-        await deps.deleteBetterAuthOrganization(workspace.better_auth_organization_id);
+        try {
+          await deps.deleteBetterAuthOrganization(workspace.better_auth_organization_id);
+        } catch (error) {
+          // A previous attempt may have removed the organization before a
+          // later storage/database step failed. Treat its absence as success.
+          if (!isNotFound(error)) throw error;
+        }
       }
 
       const attachmentPaths = await deps.listSupportAttachmentPaths(workspace.id);
       if (attachmentPaths.length > 0) await deps.removeSupportAttachments(attachmentPaths);
 
-      await deps.purgeData(workspace.id, {
+      const receipt = await deps.purgeData(workspace.id, {
         better_auth_users: profiles.length,
         support_attachment_files: attachmentPaths.length,
         organization_logo: workspace.better_auth_organization_id ? 1 : 0,
       });
       purged += 1;
-      deps.log("workspace purged", { workspace_id: workspace.id });
+      deps.log("workspace purged", {
+        workspace_id: workspace.id,
+        purged_at: receipt?.purged_at ?? new Date().toISOString(),
+      });
     } catch (error) {
       failed += 1;
       deps.log("workspace purge failed", {
         workspace_id: workspace.id,
-        error: error instanceof Error ? error.message : String(error),
+        purge_attempted_at: new Date().toISOString(),
+        error_code: safeErrorCode(error),
       });
       await deps.release(workspace.id).catch(() => undefined);
     }

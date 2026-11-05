@@ -1172,18 +1172,12 @@ serve((req) => withRequestSpan(req, "POST /functions/job-worker", async (span, r
           await callBetterAuthAdmin({ action: "delete_organization", organizationId });
         },
         listSupportAttachmentPaths: async (workspaceId) => {
-          const requests = unwrap(
-            await adminClient.from("support_requests").select("id").eq("workspace_id", workspaceId),
-          ) as Array<{ id: string }> | null;
-          const ids = (requests ?? []).map((row) => row.id);
-          if (ids.length === 0) return [];
           const attachments = unwrap(
-            await adminClient.from("support_request_attachments").select("storage_path").in(
-              "support_request_id",
-              ids,
-            ),
+            await adminClient.rpc("list_workspace_support_attachment_paths", {
+              p_workspace_id: workspaceId,
+            }),
           ) as Array<{ storage_path: string }> | null;
-          return (attachments ?? []).map((row) => row.storage_path);
+          return (attachments ?? []).map((attachment) => attachment.storage_path);
         },
         removeSupportAttachments: async (paths) => {
           for (let index = 0; index < paths.length; index += 100) {
@@ -1194,12 +1188,12 @@ serve((req) => withRequestSpan(req, "POST /functions/job-worker", async (span, r
           }
         },
         purgeData: async (workspaceId, externalCleanup) => {
-          unwrap(
+          return unwrap(
             await adminClient.rpc("purge_workspace_data", {
               p_workspace_id: workspaceId,
               p_external_cleanup: externalCleanup,
             }),
-          );
+          ) as { purged_at?: string } | null;
         },
         release: async (workspaceId) => {
           await adminClient.rpc("release_workspace_purge_claim", { p_workspace_id: workspaceId });
@@ -1215,7 +1209,10 @@ serve((req) => withRequestSpan(req, "POST /functions/job-worker", async (span, r
         failed += purgeResult.failed;
       } catch (error) {
         failed += 1;
-        logError("job-worker workspace purge claim failed", requestId, error);
+        logError("job-worker workspace purge claim failed", requestId, "workspace_purge_claim_failed", {
+          purge_attempted_at: new Date().toISOString(),
+          error_code: error instanceof Error && error.name === "AbortError" ? "abort" : "rpc_error",
+        });
       }
     }
 

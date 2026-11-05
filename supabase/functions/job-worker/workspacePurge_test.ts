@@ -12,8 +12,6 @@ const assertEquals = (actual: unknown, expected: unknown) => {
 
 const workspace = (id: string, org: string | null = "org-1"): WorkspacePurgeClaim => ({
   id,
-  name: `Workspace ${id}`,
-  slug: id,
   better_auth_organization_id: org,
 });
 

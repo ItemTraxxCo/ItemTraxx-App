@@ -1797,14 +1797,6 @@
     "github-from-package@0.0.0": {
       "integrity": "sha512-SyHy3T1v2NUXn29OsWdxmK6RwHD+vkj3v8en8AOBZ1wBQ/hCAQ5bAQTD02kW4W9tUp/3Qh6J8r9EvntiyCmOOw=="
     },
-    "glob@13.0.6": {
-      "integrity": "sha512-Wjlyrolmm8uDpm/ogGyXZXb1Z+Ca2B8NbJwqBVg0axK9GbBeoS7yGV6vjXnYdGm6X53iehEuxxbyiKp8QmN4Vw==",
-      "dependencies": [
-        "minimatch",
-        "minipass",
-        "path-scurry"
-      ]
-    },
     "graceful-fs@4.2.11": {
       "integrity": "sha512-RbJ5/jmFcNNCcDV5o9eTnBLJ/HszWV0P73bc+Ff4nS/rJj+YaS6IGyiOL0VoBYX+l1Wrl3k63h/KrH+nhJ0XvQ=="
     },
@@ -2083,12 +2075,6 @@
         "youch"
       ]
     },
-    "minimatch@10.2.6": {
-      "integrity": "sha512-vpLQEs+VLCr1nU0BXS07maYoFwlDAH0gngQuuttxIwutDFEMHq2blX+8vpgxDdK3J1PwjCJiep77OitTZ4Ll1A==",
-      "dependencies": [
-        "brace-expansion"
-      ]
-    },
     "minimist@1.2.8": {
       "integrity": "sha512-2yyAR8qBkN3YuheJanUpWC5U3bb5osDywNB8RzDVlDwDHbocAJveqqj1u8+SVD7jkWT4yvsHCpWqqWqAxb0zCA=="
     },
@@ -2196,13 +2182,6 @@
     },
     "path-expression-matcher@1.6.2": {
       "integrity": "sha512-enSlaiat05iasnzmgNxRj8reFdj3puY2QpNgP1aPIaVfT6nn9ICuPoFlKHk8EN22HcwewshO+mN2DGbkCEOtqQ=="
-    },
-    "path-scurry@2.0.2": {
-      "integrity": "sha512-3O/iVVsJAPsOnpwWIeD+d6z/7PmqApyQePUtCndjatj/9I5LylHvt5qluFaBT3I5h3r1ejfR056c+FCv+NnNXg==",
-      "dependencies": [
-        "lru-cache",
-        "minipass"
-      ]
     },
     "path-to-regexp@6.3.0": {
       "integrity": "sha512-Yhpw4T9C6hPpgPeA28us07OJeqZ5EzQTkbfwuhsUg0c237RomFoETJgmp2sa3F/41gfLE6G5cqcYwznmeEeOlQ=="
@@ -2931,6 +2910,31 @@
     },
     "zod@4.6.7": {
       "integrity": "sha512-g8W2D2kU6a8untc053fX1uVBKzM7yqAxW/3zwk83+6RyF2+SKOuV+c0wBDhUwzV1PaGapmZH+rmcUzPf+3CGwg=="
+    },
+    "@isaacs/nonrecursive-glob-match@1.0.3": {
+      "integrity": "sha512-SI7kyKHq4XXDRozw+r9GlRZkia1ZkFrpLW98r2IC2Bpr8YkFGE3fvjzmxCG0x78A++69HmDNrDvSMYBZmHGpKA=="
+    },
+    "glob@14.0.3": {
+      "integrity": "sha512-A1vjIwC3qpdCso45Iw127gnp7sPhqgY8lUQhDrArIs+GbmfaaVPFuoyy7WyLT9EPZCRZ7j7aLdwUhQmHWesEow==",
+      "dependencies": [
+        "minimatch",
+        "minipass",
+        "path-scurry"
+      ]
+    },
+    "minimatch@11.0.4": {
+      "integrity": "sha512-/UJ1dEoVQTjPNDh6SGlUo+ueLMmoHTas4q+8yaAR/5t6nLAIiBDJtoYUh20IYleix7ehiQkgczb84PE3uzHkxg==",
+      "dependencies": [
+        "@isaacs/nonrecursive-glob-match",
+        "brace-expansion"
+      ]
+    },
+    "path-scurry@3.0.0": {
+      "integrity": "sha512-1pTbQqH1wIwMi/eleQ5leFTTCkzFsPcgXNjwOA8YGGW/W4/kHT3dssE7Z6NH+zuqNLOzOB0uaD61yl7cAcVhgg==",
+      "dependencies": [
+        "lru-cache",
+        "minipass"
+      ]
     }
   },
   "redirects": {

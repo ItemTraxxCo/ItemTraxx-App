@@ -65,11 +65,13 @@ type IncidentWidgetPayload = {
 // otherwise costs a service-role DB probe, three app_runtime_config reads, and
 // an outbound incident.io fetch.
 //
-// Two bounds, neither of which changes the public response body:
+// Two bounds protect the public endpoint:
 //   1. a short in-memory cache of the derived incident.io verdict, shared by
 //      every request an isolate serves;
-//   2. a stable per-IP rate limit for trusted Worker traffic and one fixed
-//      aggregate bucket for direct callers, so direct traffic cannot mint rows.
+//   2. the Cloudflare Worker rate limit for trusted ingress and one fixed
+//      aggregate database bucket for direct callers, so direct traffic cannot
+//      mint rows. Trusted requests must not depend on the database limiter:
+//      this endpoint has to report maintenance while that database is offline.
 // The uptime probe polls this endpoint every ~15-20s. At a 20s TTL the cache
 // expired at roughly the probe interval and, being per-isolate, most requests
 // missed it and made a live incident.io call inside the request path. 120s
@@ -220,46 +222,43 @@ serve((req) => withRequestSpan(req, "GET /functions/system-status", async (span,
       "system-status",
     ).catch(() => false);
     tIngress = Date.now();
-    const statusClient = resolvePublicStatusClient(req, trustedEdgeIngress);
-    // Direct requests use the fixed global key as their first and only bucket;
-    // caller-controlled cookies must never create durable per-identity rows.
-    // Trusted Worker traffic keeps a stable edge-IP bucket. Limiter outages
-    // fail closed so an unavailable guard cannot become an unbounded probe.
-    const rateLimitScope = trustedEdgeIngress
-      ? "system-status-edge"
-      : "system-status-direct-global";
-    const rateLimit = await enforcePreloginRateLimit(
-      adminClient,
-      statusClient.key,
-      rateLimitScope,
-      trustedEdgeIngress
-        ? STATUS_RATE_LIMIT_PER_MINUTE
-        : STATUS_DIRECT_GLOBAL_LIMIT_PER_MINUTE,
-      STATUS_RATE_LIMIT_WINDOW_SECONDS,
-    );
-    tRateLimit = Date.now();
-    if (rateLimit.error) {
-      return jsonResponse(503, {
-        status: "unknown",
-        checks: { config: "ok", db: "unknown", rate_limit: "unavailable" },
-        incident_summary: "rate limiter unavailable",
-        duration_ms: Date.now() - startedAt,
-        checked_at: new Date().toISOString(),
-      });
-    }
+    // The edge proxy already applies PUBLIC_STATUS_RATE_LIMITER before it
+    // forwards trusted requests. Keep direct origin access bounded by the
+    // fixed database bucket, but don't make maintenance reporting depend on a
+    // second rate-limit RPC to the database.
+    if (!trustedEdgeIngress) {
+      const statusClient = resolvePublicStatusClient(req, false);
+      const rateLimit = await enforcePreloginRateLimit(
+        adminClient,
+        statusClient.key,
+        "system-status-direct-global",
+        STATUS_DIRECT_GLOBAL_LIMIT_PER_MINUTE,
+        STATUS_RATE_LIMIT_WINDOW_SECONDS,
+      );
+      if (rateLimit.error) {
+        return jsonResponse(503, {
+          status: "unknown",
+          checks: { config: "ok", db: "unknown", rate_limit: "unavailable" },
+          incident_summary: "rate limiter unavailable",
+          duration_ms: Date.now() - startedAt,
+          checked_at: new Date().toISOString(),
+        });
+      }
 
-    if (!rateLimit.ok && !rateLimit.error) {
-      return jsonResponse(429, {
-        status: "unknown",
-        checks: { config: "ok", db: "unknown" },
-        incident_summary: "rate limited",
-        duration_ms: Date.now() - startedAt,
-        checked_at: new Date().toISOString(),
-      }, {
-        retryAfterSeconds: rateLimit.retryAfterSeconds ?? STATUS_RATE_LIMIT_WINDOW_SECONDS,
-        remaining: 0,
-      });
+      if (!rateLimit.ok) {
+        return jsonResponse(429, {
+          status: "unknown",
+          checks: { config: "ok", db: "unknown" },
+          incident_summary: "rate limited",
+          duration_ms: Date.now() - startedAt,
+          checked_at: new Date().toISOString(),
+        }, {
+          retryAfterSeconds: rateLimit.retryAfterSeconds ?? STATUS_RATE_LIMIT_WINDOW_SECONDS,
+          remaining: 0,
+        });
+      }
     }
+    tRateLimit = Date.now();
 
     let incidentStatus: "operational" | "degraded" | "down" = "operational";
     let incidentSummary = "not configured";
@@ -272,7 +271,70 @@ serve((req) => withRequestSpan(req, "GET /functions/system-status", async (span,
       updated_at: string;
     } | null = null;
 
-    const [broadcastResult, maintenanceResult, systemStatusOverrideResult] = await Promise.all([
+    // Check Incident.io independently of database-backed config. Run both
+    // reads concurrently to stay inside the browser's transport deadline
+    // when either service is slow.
+    const incidentStatusPromise = (async () => {
+      try {
+        const cachedIncident = readCachedIncidentStatus();
+        if (incidentWidgetUrl && cachedIncident) {
+          incidentServedFromCache = true;
+          return cachedIncident;
+        }
+        if (!incidentWidgetUrl) {
+          return {
+            status: "operational" as const,
+            summary: "not configured",
+            check: "unavailable" as const,
+            fetchedAt: Date.now(),
+          };
+        }
+
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), INCIDENT_FETCH_TIMEOUT_MS);
+        let response: Response;
+        try {
+          response = await fetch(incidentWidgetUrl, {
+            method: "GET",
+            headers: { Accept: "application/json" },
+            signal: controller.signal,
+          });
+        } finally {
+          clearTimeout(timeoutId);
+        }
+
+        if (!response.ok) {
+          throw new Error(`Incident widget request failed (${response.status})`);
+        }
+
+        const payload = (await response.json()) as IncidentWidgetPayload;
+        const mapped = resolveIncidentStatus(payload);
+        const result: CachedIncidentStatus = {
+          status: mapped.status,
+          summary: mapped.summary,
+          check: mapped.status === "operational" ? "ok" : "warn",
+          fetchedAt: Date.now(),
+        };
+        cachedIncidentStatus = result;
+        return result;
+      } catch (error) {
+        // Cache the failure too, so an incident.io outage does not turn into a
+        // per-request outbound retry storm.
+        const result: CachedIncidentStatus = {
+          status: "operational",
+          summary: "incident source unavailable",
+          check: "unavailable",
+          fetchedAt: Date.now(),
+        };
+        cachedIncidentStatus = result;
+        console.error("system-status incident.io fetch failed:", error);
+        return result;
+      } finally {
+        tIncident = Date.now();
+      }
+    })();
+
+    const configPromise = Promise.all([
       adminClient
         .from("app_runtime_config")
         .select("key, value, updated_at")
@@ -288,8 +350,19 @@ serve((req) => withRequestSpan(req, "GET /functions/system-status", async (span,
         .select("value")
         .eq("key", "system_status_override")
         .maybeSingle(),
+    ]).then((results) => {
+      tConfig = Date.now();
+      return results;
+    });
+
+    const [incidentResult, configResults] = await Promise.all([
+      incidentStatusPromise,
+      configPromise,
     ]);
-    tConfig = Date.now();
+    const [broadcastResult, maintenanceResult, systemStatusOverrideResult] = configResults;
+    incidentStatus = incidentResult.status;
+    incidentSummary = incidentResult.summary;
+    incidentCheck = incidentResult.check;
     const { data: broadcastRow, error: broadcastError } = broadcastResult;
     const { data: maintenanceRow, error: maintenanceError } = maintenanceResult;
     const { data: systemStatusOverrideRow, error: systemStatusOverrideError } =
@@ -307,6 +380,12 @@ serve((req) => withRequestSpan(req, "GET /functions/system-status", async (span,
         checks: {
           config: "ok",
           db: "failed",
+          incident_io: incidentCheck,
+        },
+        incident_summary: incidentSummary,
+        kill_switch: {
+          enabled: killSwitchActive,
+          message: killSwitchMessage,
         },
         duration_ms: Date.now() - startedAt,
         checked_at: new Date().toISOString(),
@@ -353,60 +432,6 @@ serve((req) => withRequestSpan(req, "GET /functions/system-status", async (span,
       }
     }
 
-    const cachedIncident = readCachedIncidentStatus();
-    if (incidentWidgetUrl && cachedIncident) {
-      incidentServedFromCache = true;
-      incidentStatus = cachedIncident.status;
-      incidentSummary = cachedIncident.summary;
-      incidentCheck = cachedIncident.check;
-    } else if (incidentWidgetUrl) {
-      try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), INCIDENT_FETCH_TIMEOUT_MS);
-        let response: Response;
-        try {
-          response = await fetch(incidentWidgetUrl, {
-            method: "GET",
-            headers: { Accept: "application/json" },
-            signal: controller.signal,
-          });
-        } finally {
-          clearTimeout(timeoutId);
-        }
-
-        if (!response.ok) {
-          throw new Error(`Incident widget request failed (${response.status})`);
-        }
-
-        const payload = (await response.json()) as IncidentWidgetPayload;
-        const mapped = resolveIncidentStatus(payload);
-        incidentStatus = mapped.status;
-        incidentSummary = mapped.summary;
-        incidentCheck = mapped.status === "operational" ? "ok" : "warn";
-        cachedIncidentStatus = {
-          status: incidentStatus,
-          summary: incidentSummary,
-          check: incidentCheck,
-          fetchedAt: Date.now(),
-        };
-      } catch (error) {
-        incidentStatus = "operational";
-        incidentSummary = "incident source unavailable";
-        incidentCheck = "unavailable";
-        // Cache the failure too, so an incident.io outage does not turn into a
-        // per-request outbound retry storm.
-        cachedIncidentStatus = {
-          status: incidentStatus,
-          summary: incidentSummary,
-          check: incidentCheck,
-          fetchedAt: Date.now(),
-        };
-        console.error("system-status incident.io fetch failed:", error);
-      }
-    }
-
-    tIncident = Date.now();
-
     const statusOverride = resolveSystemStatusOverride(systemStatusOverrideRow?.value);
     if (statusOverride) {
       incidentStatus = statusOverride.status;
@@ -424,8 +449,8 @@ serve((req) => withRequestSpan(req, "GET /functions/system-status", async (span,
       evt: "system_status_timing",
       ingress_ms: tIngress - startedAt,
       ratelimit_ms: tRateLimit - tIngress,
-      config_ms: tConfig - tRateLimit,
-      incident_ms: tIncident - tConfig,
+      config_ms: tConfig - tIncident,
+      incident_ms: tIncident - tRateLimit,
       incident_cached: incidentServedFromCache,
       handler_ms: Date.now() - startedAt,
     }));

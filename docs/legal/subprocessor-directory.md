@@ -4,9 +4,9 @@
 **Provider:** [[ENTITY_DESCRIPTION]] ("ItemTraxx," "we," "us")  
 **Contact:** privacy@itemtraxx.com
 
-ItemTraxx uses the service providers below to deliver the Service. This directory lists every provider that may process personal information on behalf of ItemTraxx and its customers, what it does, and what information it can receive. It supports the commitments in our [Privacy Policy](privacy-policy.md), [Student Privacy Notice and FERPA / SOPIPA Compliance Addendum](student-privacy-notice.md), and customer [Data Processing Addendum](dpa.md).
+ItemTraxx uses the service providers below to deliver the Service. This directory lists every provider that may process personal information on behalf of ItemTraxx and its customers, what it does, and what information it can receive. It covers Customer Data across customer workspaces (such as asset records, borrower and checkout history, and account data for administrators and users). It supports the commitments in our [Privacy Policy](privacy-policy.md), [Student Privacy Notice and FERPA / SOPIPA Compliance Addendum](student-privacy-notice.md), and customer [Data Processing Addendum](dpa.md).
 
-Supabase, Cloudflare, Google Cloud, and GitHub (which stores backups solely in encrypted form) are the only subprocessors authorized to store or process Student Data. Operational alerts and error logs do not contain student records. Support and sales communications may process general contact information provided by users, and customers are advised not to submit Student Data through support channels.
+For educational customers subject to FERPA, SOPIPA, or related student privacy standards, our [Student Privacy Notice and FERPA / SOPIPA Compliance Addendum](student-privacy-notice.md) also applies. In those workspaces, Supabase, Cloudflare, Google Cloud, and GitHub (which stores backups solely in encrypted form) are the only subprocessors authorized to store or process Student Data. Operational alerts, telemetry, and error logs do not contain borrower or student records. Customers are advised not to submit borrower or student personal data through support channels
 
 ## 1. Subprocessors
 

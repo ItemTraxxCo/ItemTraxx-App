@@ -6,7 +6,7 @@
 
 ItemTraxx uses the service providers below to deliver the Service. This directory lists every provider that may process personal information on behalf of ItemTraxx and its customers, what it does, and what information it can receive. It supports the commitments in our [Privacy Policy](privacy-policy.md), [Student Privacy Notice and FERPA / SOPIPA Compliance Addendum](student-privacy-notice.md), and customer [Data Processing Addendum](dpa.md).
 
-**Student Data** means borrower usernames, borrower IDs, and checkout history in a customer's workspace, as defined in the Student Privacy Notice and FERPA / SOPIPA Compliance Addendum. Only Supabase, Cloudflare, Google Cloud, and GitHub (which stores backups only in encrypted form) process Student Data; providers not listed here do not receive Student Data from ItemTraxx. Our email and incident-alert messages are built without borrower fields. Each provider is bound by a written agreement that requires protections at least as protective as our commitments to customers, and we remain responsible for the provider's handling of the data it receives from us.
+Supabase, Cloudflare, Google Cloud, and GitHub (which stores backups solely in encrypted form) are the only subprocessors authorized to store or process Student Data. Operational alerts and error logs do not contain student records. Support and sales communications may process general contact information provided by users, and customers are advised not to submit Student Data through support channels.
 
 ## 1. Subprocessors
 
@@ -18,15 +18,15 @@ ItemTraxx uses the service providers below to deliver the Service. This director
 | **GitHub** | Private storage of encrypted database backups for disaster recovery | Encrypted copies of the production database, including Student Data; GitHub cannot read the contents | United States |
 | **Vercel** | Web application hosting and, with consent, web analytics | Request metadata; page-view and page-speed data | Global edge network |
 | **Better Auth, Inc.** | Sign-in security services | Sign-in event data such as email, IP address, and device signals | United States |
-| **PostHog** | Server-side security and operations monitoring and logs (always on); client-side product analytics, diagnostic logs, and session replay (only with consent) | Server-side: request route, method, status, timing, request ID, user agent, edge-function logs, and keyed one-way hashes of IP address and session credential. Client-side, with consent: usage and diagnostic data with form inputs masked | United States |
-| **Intercom** | Support chat | IP address, browser and device details; for signed-in users, account ID, email, and chat content | United States |
+| **PostHog** | Security and operational monitoring; product analytics with consent | Operational and diagnostic information; product usage and session replay data only with consent | United States |
+| **Intercom** | Customer support messaging | IP address, device metadata, cookies; for signed-in users, name, email address, and support messages | United States |
 | **Resend** | Transactional and support email | Staff and administrator email addresses and names, the content of sign-in, invitation, password-reset, verification, and notification emails, and delivery status; no borrower data | United States |
-| **Slack** | Internal notifications | Contact and message details of people who contact us; for each error report, a summary with the report ID, error name, environment, release, role, workspace ID, and request ID | United States |
-| **incident.io** | Incident alerting | Alert metadata such as alert type, page route, request ID, and a one-way hashed network identifier; no names, emails, or borrower data | United States |
+| **Slack** | Internal operational notifications and alert routing | System status notifications, technical error summaries, and inbound support/sales inquiries | United States |
+| **incident.io** | Security and uptime incident alerting | Operational telemetry, system event metadata, and technical diagnostics (no student or borrower data) | United States |
 
 ## 2. Tools that do not receive customer data
 
-Our source control, build, and security tools (such as GitHub's code repositories and build service) receive source code and dependency information, not customer data. GitHub's separate role in storing encrypted backups is listed above. A customer's own identity provider, if it uses single sign-on, is the customer's vendor, not ours.
+Our source control, build, and security tools (such as GitHub's code repositories and build service, and Aikido Security for code analysis, cloud configuration scanning, and penetration testing) receive source code, dependency information, and system metadata, not customer data. GitHub's separate role in storing encrypted backups is listed above. A customer's own identity provider, if it uses single sign-on, is the customer's vendor, not ours
 
 ## 3. Changes to this directory
 
@@ -39,4 +39,4 @@ Our source control, build, and security tools (such as GitHub's code repositorie
 
 | Date | Change |
 |---|---|
-| [[EFFECTIVE_DATE]] | Initial publication of this directory. |
+| November 4, 2026 | Initial publication of this directory. |

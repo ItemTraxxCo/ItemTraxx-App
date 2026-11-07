@@ -311,7 +311,7 @@ const scrubProperties = (
       )
     : undefined;
 
-const LOG_ATTRIBUTE_KEY = /^(route|operation|status|latency_ms|duration_ms|request_id|provider|retry_count|error_code|trace_id|span_id|service|environment|method|component|outcome|sampled|slow|attempt|job_type|result)$/i;
+const LOG_ATTRIBUTE_KEY = /^(route|operation|status|latency_ms|duration_ms|request_id|provider|retry_count|error_code|trace_id|span_id|service|environment|method|component|outcome|sampled|slow|attempt|job_type|result|payload_status|db_check|rate_limit_check)$/i;
 
 const scrubLogAttributes = (attributes?: Record<string, unknown>) => {
   if (!attributes) return undefined;

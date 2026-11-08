@@ -22,7 +22,7 @@ For educational customers subject to FERPA, SOPIPA, or related student privacy s
 | **Intercom** | Customer support messaging | IP address, device metadata, cookies; for signed-in users, name, email address, and support messages | United States |
 | **Resend** | Transactional and support email | Staff and administrator email addresses and names, the content of sign-in, invitation, password-reset, verification, and notification emails, and delivery status; no borrower data | United States |
 | **Slack** | Internal operational notifications and alert routing | System status notifications, technical error summaries, and inbound support/sales inquiries | United States |
-| **incident.io** | Security and uptime incident alerting | Operational telemetry, system event metadata, and technical diagnostics (no student or borrower data) | United States |
+| **incident.io** | Security and uptime incident alerting | Operational telemetry, system event metadata, and technical diagnostics (no student or borrower data) | European Union |
 
 ## 2. Tools that do not receive customer data
 

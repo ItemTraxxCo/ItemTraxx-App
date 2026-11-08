@@ -361,6 +361,7 @@ describe("capturePostHogLog", () => {
         status: 500,
         request_id: "request-1",
         error_code: "server_error",
+        db_check: "failed",
         email: "person@example.com",
         detail: "not in the allowlist",
       },
@@ -376,6 +377,7 @@ describe("capturePostHogLog", () => {
         status: 500,
         request_id: "request-1",
         error_code: "server_error",
+        db_check: "failed",
       },
     });
   });

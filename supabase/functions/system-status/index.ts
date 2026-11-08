@@ -236,6 +236,11 @@ serve((req) => withRequestSpan(req, "GET /functions/system-status", async (span,
         STATUS_RATE_LIMIT_WINDOW_SECONDS,
       );
       if (rateLimit.error) {
+        console.error(JSON.stringify({
+          evt: "system_status_rate_limiter_unavailable",
+          request_id: requestId,
+          error_message: rateLimit.error.message ?? null,
+        }));
         return jsonResponse(503, {
           status: "unknown",
           checks: { config: "ok", db: "unknown", rate_limit: "unavailable" },
@@ -375,6 +380,12 @@ serve((req) => withRequestSpan(req, "GET /functions/system-status", async (span,
     // failure is a per-key problem and is handled by the readers below, which
     // already tolerate a missing row.
     if (broadcastError && maintenanceError && systemStatusOverrideError) {
+      console.error(JSON.stringify({
+        evt: "system_status_db_unavailable",
+        request_id: requestId,
+        error_code: maintenanceError.code ?? null,
+        error_message: maintenanceError.message ?? null,
+      }));
       return jsonResponse(503, {
         status: "down",
         checks: {
@@ -472,7 +483,13 @@ serve((req) => withRequestSpan(req, "GET /functions/system-status", async (span,
       duration_ms: Date.now() - startedAt,
       checked_at: new Date().toISOString(),
     });
-  } catch {
+  } catch (error) {
+    span.recordException(error);
+    console.error(JSON.stringify({
+      evt: "system_status_unhandled_error",
+      request_id: requestId,
+      error_message: error instanceof Error ? error.message : String(error),
+    }));
     return jsonResponse(503, {
       status: "down",
       checks: {

@@ -20,6 +20,10 @@ export type SystemStatusPayload = {
     enabled?: boolean;
     message?: string;
   };
+  checks?: {
+    db?: string;
+    rate_limit?: string;
+  };
   incident_summary?: string;
   checked_at?: string;
 };
@@ -103,6 +107,9 @@ const fetchAndCacheSystemStatus = async (timeoutMs: number) => {
           latency_ms: Math.round(performance.now() - startedAt),
           request_id: responseRequestId,
           error_code: response.status >= 500 ? "server_error" : "request_failed",
+          payload_status: payload.status,
+          db_check: payload.checks?.db,
+          rate_limit_check: payload.checks?.rate_limit,
         },
       });
     }

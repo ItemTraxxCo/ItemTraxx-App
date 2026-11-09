@@ -10,14 +10,9 @@ const assertEquals = (actual: unknown, expected: unknown) => {
   if (left !== right) throw new Error(`Expected ${right} but received ${left}`);
 };
 
-const workspace = (
-  id: string,
-  org: string | null = "org-1",
-  organizationLogoDeleted = false,
-): WorkspacePurgeClaim => ({
+const workspace = (id: string, org: string | null = "org-1"): WorkspacePurgeClaim => ({
   id,
   better_auth_organization_id: org,
-  organization_logo_deleted: organizationLogoDeleted,
 });
 
 const makeDeps = (overrides: Partial<WorkspacePurgeDeps> = {}) => {
@@ -27,8 +22,7 @@ const makeDeps = (overrides: Partial<WorkspacePurgeDeps> = {}) => {
       calls.push(`claim:${limit}`);
       return Promise.resolve([workspace("w1")]);
     },
-    listProfiles: () =>
-      Promise.resolve([{ id: "p1", better_auth_user_id: "u1" }]),
+    listProfiles: () => Promise.resolve([{ id: "p1", better_auth_user_id: "u1" }]),
     deleteBetterAuthUser: (profileId) => {
       calls.push(`user:${profileId}`);
       return Promise.resolve();
@@ -72,11 +66,7 @@ Deno.test("purges external systems before the database transaction", async () =>
 
 Deno.test("does nothing when no workspace is due", async () => {
   const { deps, calls } = makeDeps({ claim: () => Promise.resolve([]) });
-  assertEquals(await purgeExpiredWorkspaces(deps), {
-    claimed: 0,
-    purged: 0,
-    failed: 0,
-  });
+  assertEquals(await purgeExpiredWorkspaces(deps), { claimed: 0, purged: 0, failed: 0 });
   assertEquals(calls, []);
 });
 
@@ -92,64 +82,13 @@ Deno.test("treats an already-removed Better Auth user as success", async () => {
 
 Deno.test("releases the claim and never touches the database when an external step fails", async () => {
   const { deps, calls } = makeDeps({
-    deleteBetterAuthOrganization: () =>
-      Promise.reject(new Error("Better Auth administration failed")),
+    deleteBetterAuthOrganization: () => Promise.reject(new Error("Better Auth administration failed")),
   });
   const result = await purgeExpiredWorkspaces(deps);
 
   assertEquals(result, { claimed: 1, purged: 0, failed: 1 });
   assertEquals(calls.includes("release:w1"), true);
   assertEquals(calls.some((call) => call.startsWith("purge:")), false);
-});
-
-Deno.test("keeps organization cleanup in the certificate after a failed attempt", async () => {
-  let organizationDeleted = false;
-  let organizationDeleteCount = 0;
-  let claimCount = 0;
-  let attachmentListingCount = 0;
-  const { deps, calls } = makeDeps({
-    claim: () => {
-      claimCount += 1;
-      return Promise.resolve([
-        workspace(
-          "w1",
-          organizationDeleted ? null : "org-1",
-          organizationDeleted,
-        ),
-      ]);
-    },
-    deleteBetterAuthOrganization: () => {
-      organizationDeleteCount += 1;
-      organizationDeleted = true;
-      return Promise.resolve();
-    },
-    listSupportAttachmentPaths: () => {
-      attachmentListingCount += 1;
-      return attachmentListingCount === 1
-        ? Promise.reject(new Error("temporary storage listing failure"))
-        : Promise.resolve([]);
-    },
-  });
-
-  assertEquals(await purgeExpiredWorkspaces(deps), {
-    claimed: 1,
-    purged: 0,
-    failed: 1,
-  });
-  assertEquals(await purgeExpiredWorkspaces(deps), {
-    claimed: 1,
-    purged: 1,
-    failed: 0,
-  });
-  assertEquals(claimCount, 2);
-  assertEquals(organizationDeleteCount, 1);
-  assertEquals(
-    calls.some((call) =>
-      call ===
-        'purge:w1:{"better_auth_users":1,"support_attachment_files":0,"organization_logo":1}'
-    ),
-    true,
-  );
 });
 
 Deno.test("one failing workspace does not block the next", async () => {

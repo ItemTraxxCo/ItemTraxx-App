@@ -13,74 +13,17 @@
 begin;
 
 -- The organization link is cleared by ON DELETE SET NULL, but the purge can
--- still fail afterward and be retried. Keep a private, durable receipt so the
--- final deletion certificate can report the logo cleanup on a later attempt.
+-- still fail afterward and be retried. Keep a private receipt until the final
+-- deletion certificate is inserted so retry cleanup is reported accurately.
+-- This table intentionally has no workspace FK: purge_workspace_data deletes
+-- the workspace before it inserts the certificate that consumes this receipt.
 create table if not exists private.workspace_purge_external_cleanup (
-  workspace_id uuid primary key references public.workspaces(id) on delete cascade,
+  workspace_id uuid primary key,
   organization_logo_deleted_at timestamptz not null default pg_catalog.clock_timestamp()
 );
 
+alter table private.workspace_purge_external_cleanup enable row level security;
 revoke all on table private.workspace_purge_external_cleanup from public, anon, authenticated, service_role;
-
--- Add the persisted organization-cleanup result to the claim response. The
--- return shape changes, so drop and recreate the RPC before restoring its
--- service-role-only permissions.
-drop function public.claim_workspaces_due_for_purge(integer);
-create function public.claim_workspaces_due_for_purge(p_limit integer default 3)
-returns table (
-  id uuid,
-  name text,
-  slug text,
-  better_auth_organization_id text,
-  organization_logo_deleted boolean
-)
-language plpgsql
-security definer
-set search_path = ''
-as $$
-begin
-  if current_setting('role', true) is distinct from 'service_role' then
-    raise exception 'Unauthorized' using errcode = '42501';
-  end if;
-
-  return query
-  with due as (
-    select
-      w.id,
-      exists (
-        select 1
-        from private.workspace_purge_external_cleanup as cleanup
-        where cleanup.workspace_id = w.id
-      ) as organization_logo_deleted
-    from public.workspaces as w
-    where w.archived_at is not null
-      and w.purge_after is not null
-      and w.purge_after <= pg_catalog.clock_timestamp()
-      and (
-        w.purge_state = 'grace'
-        or (
-          w.purge_state = 'purging'
-          and (
-            w.purge_claimed_at is null
-            or w.purge_claimed_at < pg_catalog.clock_timestamp() - interval '30 minutes'
-          )
-        )
-      )
-    order by w.purge_after, w.id
-    limit greatest(1, least(coalesce(p_limit, 3), 20))
-    for update of w skip locked
-  )
-  update public.workspaces as w
-  set purge_state = 'purging', purge_claimed_at = pg_catalog.clock_timestamp()
-  from due
-  where w.id = due.id
-  returning w.id, null::text, null::text, w.better_auth_organization_id::text,
-    due.organization_logo_deleted;
-end;
-$$;
-
-revoke all on function public.claim_workspaces_due_for_purge(integer) from public, anon, authenticated;
-grant execute on function public.claim_workspaces_due_for_purge(integer) to service_role;
 
 create or replace function private.guard_linked_better_auth_organization_delete()
 returns trigger
@@ -112,6 +55,35 @@ end;
 $$;
 
 revoke all on function private.guard_linked_better_auth_organization_delete() from public, anon, authenticated;
+
+create or replace function private.apply_workspace_purge_external_cleanup_receipt()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if exists (
+    select 1
+    from private.workspace_purge_external_cleanup as cleanup
+    where cleanup.workspace_id = new.workspace_id
+  ) then
+    new.external_cleanup := coalesce(new.external_cleanup, '{}'::jsonb)
+      || pg_catalog.jsonb_build_object('organization_logo', 1);
+    delete from private.workspace_purge_external_cleanup as cleanup
+    where cleanup.workspace_id = new.workspace_id;
+  end if;
+
+  return new;
+end;
+$$;
+
+revoke all on function private.apply_workspace_purge_external_cleanup_receipt() from public, anon, authenticated;
+
+drop trigger if exists apply_workspace_purge_external_cleanup_receipt on public.workspace_deletion_certificates;
+create trigger apply_workspace_purge_external_cleanup_receipt
+before insert on public.workspace_deletion_certificates
+for each row execute function private.apply_workspace_purge_external_cleanup_receipt();
 
 drop trigger if exists guard_linked_workspace_delete on better_auth.organization;
 create trigger guard_linked_workspace_delete

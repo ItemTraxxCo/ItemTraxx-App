@@ -1,7 +1,6 @@
 export type WorkspacePurgeClaim = {
   id: string;
   better_auth_organization_id: string | null;
-  organization_logo_deleted: boolean;
 };
 
 export type WorkspacePurgeProfile = {
@@ -78,13 +77,10 @@ export const purgeExpiredWorkspaces = async (
       const attachmentPaths = await deps.listSupportAttachmentPaths(workspace.id);
       if (attachmentPaths.length > 0) await deps.removeSupportAttachments(attachmentPaths);
 
-      const organizationLogoWasDeleted = Boolean(workspace.better_auth_organization_id) ||
-        workspace.organization_logo_deleted;
-
       const receipt = await deps.purgeData(workspace.id, {
         better_auth_users: profiles.length,
         support_attachment_files: attachmentPaths.length,
-        organization_logo: organizationLogoWasDeleted ? 1 : 0,
+        organization_logo: workspace.better_auth_organization_id ? 1 : 0,
       });
       purged += 1;
       deps.log("workspace purged", {

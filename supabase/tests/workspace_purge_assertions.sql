@@ -35,14 +35,27 @@ begin
      or has_table_privilege('service_role', 'private.workspace_purge_external_cleanup', 'SELECT') then
     raise exception 'workspace purge cleanup receipt table must stay private';
   end if;
-  if position(
-    'organization_logo_deleted boolean'
-    in pg_get_function_result('public.claim_workspaces_due_for_purge(integer)'::regprocedure)
-  ) = 0 then
-    raise exception 'purge claim must report persisted organization cleanup';
+  if not exists (
+    select 1 from pg_class
+    where oid = 'private.workspace_purge_external_cleanup'::regclass and relrowsecurity
+  ) then
+    raise exception 'workspace purge cleanup receipt table must have row-level security enabled';
   end if;
   if has_table_privilege('authenticated', 'public.workspace_deletion_certificates', 'SELECT') then
     raise exception 'authenticated must not read deletion certificates';
+  end if;
+  if not exists (
+    select 1 from pg_trigger
+    where tgrelid = 'public.workspace_deletion_certificates'::regclass
+      and tgname = 'apply_workspace_purge_external_cleanup_receipt'
+  ) then
+    raise exception 'deletion certificates must include persisted external cleanup';
+  end if;
+  if position(
+    'workspace_purge_external_cleanup'
+    in pg_get_functiondef('private.apply_workspace_purge_external_cleanup_receipt()'::regprocedure)
+  ) = 0 then
+    raise exception 'deletion certificate trigger must consume persisted cleanup receipts';
   end if;
 
   if exists (
@@ -88,5 +101,42 @@ begin
   ) then
     raise exception 'profiles.better_auth_user_id must stay ON DELETE RESTRICT';
   end if;
+end;
+$$;
+
+do $$
+declare
+  v_workspace_id uuid := pg_catalog.gen_random_uuid();
+  cleanup jsonb;
+begin
+  insert into private.workspace_purge_external_cleanup (workspace_id)
+  values (v_workspace_id);
+
+  insert into public.workspace_deletion_certificates (
+    workspace_id, purged_at, deleted_row_counts, external_cleanup
+  ) values (
+    v_workspace_id,
+    pg_catalog.clock_timestamp(),
+    '{}'::jsonb,
+    '{"better_auth_users": 1, "organization_logo": 0}'::jsonb
+  );
+
+  select certificate.external_cleanup into cleanup
+  from public.workspace_deletion_certificates as certificate
+  where certificate.workspace_id = v_workspace_id;
+
+  if coalesce((cleanup ->> 'organization_logo')::integer, 0) <> 1
+     or coalesce((cleanup ->> 'better_auth_users')::integer, 0) <> 1 then
+    raise exception 'deletion certificate did not preserve the cleanup receipt';
+  end if;
+  if exists (
+    select 1 from private.workspace_purge_external_cleanup as receipt
+    where receipt.workspace_id = v_workspace_id
+  ) then
+    raise exception 'deletion certificate trigger did not consume the cleanup receipt';
+  end if;
+
+  delete from public.workspace_deletion_certificates as certificate
+  where certificate.workspace_id = v_workspace_id;
 end;
 $$;

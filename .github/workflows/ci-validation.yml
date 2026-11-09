@@ -523,8 +523,20 @@ jobs:
           console.log(`Verified installed Chrome for Testing Stable ${actual}.`);
           NODE
 
+      # ubuntu-24.04 runners already ship Chrome's shared libraries; install-deps
+      # only adds ~21 MB of optional CJK/Thai/Unicode fonts (no test compares
+      # screenshots). The Azure apt mirror sometimes stalls on those downloads
+      # (one shard hit the 180s timeout), so only call apt when a library is
+      # actually missing.
       - name: Install Playwright system dependencies
         run: |
+          missing="$(ldd "$PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH" | grep 'not found' || true)"
+          if [ -z "$missing" ]; then
+            echo "Chrome shared libraries already present; skipping apt install."
+            exit 0
+          fi
+          echo "Chrome is missing shared libraries:"
+          echo "$missing"
           timeout 180s npx playwright install-deps chromium || {
             echo "::warning::Playwright system dependency install failed or timed out; continuing so E2E can verify whether the runner already has the required libraries."
           }

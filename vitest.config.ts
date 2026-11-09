@@ -70,7 +70,11 @@ export default defineConfig({
     // jsdom has no IndexedDB implementation; fake-indexeddb/auto installs a
     // real (in-memory) one on the global object so offline-storage code that
     // uses window.indexedDB can be tested against actual IDB semantics.
-    setupFiles: ["fake-indexeddb/auto", "./src/test/setupStorage.ts"],
+    setupFiles: [
+      "fake-indexeddb/auto",
+      "./src/test/setupStorage.ts",
+      "./src/test/setupVueDirectives.ts",
+    ],
     include: ["src/**/*.spec.ts"],
     coverage: {
       provider: "v8",

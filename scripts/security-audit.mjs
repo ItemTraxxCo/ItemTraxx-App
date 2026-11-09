@@ -128,18 +128,28 @@ run(
   runtime.nodePath,
   [join(scriptDirectory, "check-privileged-rls-policies.mjs")],
 );
-run(
-  "running Supabase shared security regression tests",
-  "deno",
-  [
-    "test",
-    "--node-modules-dir=none",
-    "--allow-env",
-    "supabase/functions/_shared/cors_test.ts",
-    "supabase/functions/_shared/accountSessions_test.ts",
-    "supabase/functions/_shared/preloginGuards_test.ts",
-    "supabase/functions/_shared/trustedIngress_test.ts",
-  ],
-);
+// CI already executes these files in the Deno coverage gate and type-checks
+// them in the "Check Supabase function graph" step, so the CI security job
+// sets this flag to avoid running them twice (and to skip Deno setup there).
+// Local `npm run security:gate` runs keep the full check.
+if (process.env.ITX_SECURITY_SKIP_DENO_TESTS === "1") {
+  console.log(
+    "[security] skipping Supabase shared security regression tests (ITX_SECURITY_SKIP_DENO_TESTS=1; covered by the Deno coverage gate)",
+  );
+} else {
+  run(
+    "running Supabase shared security regression tests",
+    "deno",
+    [
+      "test",
+      "--node-modules-dir=none",
+      "--allow-env",
+      "supabase/functions/_shared/cors_test.ts",
+      "supabase/functions/_shared/accountSessions_test.ts",
+      "supabase/functions/_shared/preloginGuards_test.ts",
+      "supabase/functions/_shared/trustedIngress_test.ts",
+    ],
+  );
+}
 
 console.log("[security] audit complete");

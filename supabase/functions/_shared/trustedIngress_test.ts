@@ -3,6 +3,7 @@ import {
   hasTrustedEdgeIngress,
   requireTrustedEdgeIngress,
 } from "./trustedIngress.ts";
+import { SECURITY_AUDIT_INGRESS_TARGET } from "./securityAuditIngress.ts";
 
 const SECRET = "trusted-ingress-test-secret";
 
@@ -96,6 +97,55 @@ Deno.test("trusted ingress accepts a fresh matching proxy signature", async () =
     assert(
       !(await hasTrustedEdgeIngress(request, "different-target")),
       "expected target-bound signature rejection",
+    );
+  });
+});
+
+Deno.test("the audit writer rejects signatures the function proxy issues for browser requests", async () => {
+  await withSecret(async () => {
+    const timestamp = Date.now().toString();
+    const requestId = "request-audit-forged";
+    const payload = JSON.stringify({
+      action: "read_item_target",
+      item_ids: ["00000000-0000-4000-8000-000000000001"],
+      returned_item_ids: ["00000000-0000-4000-8000-000000000001"],
+    });
+    const buildRequest = async (signedTarget: string) =>
+      new Request("https://example.test/functions/v1/security-audit", {
+        method: "POST",
+        headers: {
+          "x-itx-edge-proxy": "1",
+          "x-itx-edge-proxy-ts": timestamp,
+          "x-itx-edge-proxy-signature": await sign(
+            `${timestamp}.${requestId}.POST.${signedTarget}.${await bodyHash(payload)}`,
+          ),
+          "x-request-id": requestId,
+          "content-type": "application/json",
+        },
+        body: payload,
+      });
+
+    // The generic proxy signs with the routed function name.
+    assert(
+      !(await hasTrustedEdgeIngress(
+        await buildRequest("security-audit"),
+        SECURITY_AUDIT_INGRESS_TARGET,
+      )),
+      "expected a proxy-relayed audit request to be rejected",
+    );
+    assert(
+      await hasTrustedEdgeIngress(
+        await buildRequest(SECURITY_AUDIT_INGRESS_TARGET),
+        SECURITY_AUDIT_INGRESS_TARGET,
+      ),
+      "expected the Worker's internal audit signature to be accepted",
+    );
+    // Widen the literal type: the constant is compared as a runtime string so
+    // this still guards against it being changed back to the routed name.
+    const internalTarget: string = SECURITY_AUDIT_INGRESS_TARGET;
+    assert(
+      internalTarget !== "security-audit",
+      "the internal target must differ from the routed function name",
     );
   });
 });

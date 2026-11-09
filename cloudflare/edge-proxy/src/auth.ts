@@ -467,6 +467,15 @@ const PASSKEY_ENROLLMENT_PATHS = new Set([
 export const isBetterAuthPasskeyEnrollmentPath = (path: string) =>
   PASSKEY_ENROLLMENT_PATHS.has(path);
 
+// Better Auth's global admin plugin exposes impersonation, password-set,
+// role-set and user-removal routes that authorize from the Better Auth user
+// role alone. ItemTraxx performs every one of those operations through the
+// super-admin edge functions, which require a live registered session, a fresh
+// step-up and an audit record. The SPA never calls the plugin routes, so they
+// are closed to every caller rather than left as an unaudited second path.
+export const isBlockedBetterAuthAdminPath = (path: string) =>
+  path === "/admin" || path.startsWith("/admin/");
+
 export const isFreshActionConfirmationTimestamp = (
   updatedAt: unknown,
   nowMs: number = Date.now(),
@@ -632,6 +641,11 @@ export const getBetterAuth = (rawEnv: Env) => {
     },
     hooks: {
       before: createAuthMiddleware(async (context) => {
+          if (isBlockedBetterAuthAdminPath(context.path)) {
+            throw new APIError("FORBIDDEN", {
+              message: "User administration is managed from the ItemTraxx console.",
+            });
+          }
           if (isBetterAuthPasskeyEnrollmentPath(context.path)) {
             const session = await getSessionFromCtx(context);
             if (!session?.user?.id || !session.session?.id) {
@@ -660,13 +674,11 @@ export const getBetterAuth = (rawEnv: Env) => {
               });
             }
           }
-          // Better Auth's global admin and organization plugins authorize from
-          // Better Auth roles and memberships. Keep those routes bound to the
-          // current ItemTraxx account lifecycle state as well.
-          if (
-            context.path.startsWith("/admin/") ||
-            context.path.startsWith("/organization/")
-          ) {
+          // Better Auth's organization plugin authorizes from Better Auth
+          // memberships. Keep those routes bound to the current ItemTraxx
+          // account lifecycle state as well. (Admin plugin routes are closed
+          // above.)
+          if (context.path.startsWith("/organization/")) {
             const session = await getSessionFromCtx(context);
             if (!session?.user?.id) throw new APIError("UNAUTHORIZED");
             if (!await isActiveLinkedBetterAuthProfile(dataClient, session.user.id)) {

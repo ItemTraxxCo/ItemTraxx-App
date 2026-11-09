@@ -2,6 +2,10 @@ import {
   auditSuccessfulSupabaseRead,
   proxySupabaseApiRequest,
 } from "./supabaseApiProxy.ts";
+import {
+  hashTrustedIngressBody,
+  signTrustedIngress,
+} from "./trustedIngress.ts";
 
 const assertEquals = (actual: unknown, expected: unknown, message: string) => {
   if (JSON.stringify(actual) !== JSON.stringify(expected)) {
@@ -128,8 +132,27 @@ Deno.test("successful targeted item reads create signed, actor-scoped audit requ
   if (calls[0]?.body.http_status !== 200) {
     throw new Error("The upstream HTTP status is correlated with the audit request");
   }
-  if (!calls[0]?.headers.get("x-itx-edge-proxy-signature")) {
+  const signature = calls[0]?.headers.get("x-itx-edge-proxy-signature");
+  if (!signature) {
     throw new Error("Audit request must carry a trusted-ingress signature");
+  }
+  // The audit call must be signed with the internal-only target. A signature
+  // over the routed function name is what the generic function proxy produces
+  // for browser requests, so it must never match.
+  const timestamp = calls[0]?.headers.get("x-itx-edge-proxy-ts") ?? "";
+  const bodyHash = await hashTrustedIngressBody(
+    new TextEncoder().encode(JSON.stringify(calls[0]?.body)),
+  );
+  const signFor = (target: string) =>
+    signTrustedIngress(
+      "shared-test-secret",
+      `${timestamp}.request-audit-1.POST.${target}.${bodyHash}`,
+    );
+  if (signature !== await signFor("security-audit:internal")) {
+    throw new Error("Audit request must be signed for the internal-only target");
+  }
+  if (signature === await signFor("security-audit")) {
+    throw new Error("Audit request must not be signed as a routed function call");
   }
   if (calls[0]?.headers.get("authorization") !== "Bearer signed-better-auth-session") {
     throw new Error("Audit request must retain caller authorization for RLS validation");

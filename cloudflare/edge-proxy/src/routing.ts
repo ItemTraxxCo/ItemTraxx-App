@@ -12,6 +12,15 @@ const readExactSegment = (pathname: string, prefix: string) => {
 export const getFunctionName = (pathname: string) =>
   readExactSegment(pathname, "/functions/");
 
+// Edge Functions the Worker invokes itself and that must never be reachable
+// through the browser-facing function proxy. This is enforced in code as well
+// as by leaving them out of ALLOWED_FUNCTIONS, because that variable can also
+// be set from the Cloudflare dashboard and drift from the checked-in value.
+const INTERNAL_ONLY_FUNCTIONS = new Set(["security-audit"]);
+
+export const isInternalOnlyFunction = (functionName: string) =>
+  INTERNAL_ONLY_FUNCTIONS.has(functionName.trim().toLowerCase());
+
 export const isRestProxyPath = (pathname: string) =>
   pathname.startsWith("/rest/v1/");
 

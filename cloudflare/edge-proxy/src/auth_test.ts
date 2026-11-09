@@ -12,6 +12,7 @@ import {
   isBlockedBetterAuthOrganizationMemberManagement,
   hasRecentSuperAdminPasswordConfirmation,
   isBetterAuthPasskeyEnrollmentPath,
+  isBlockedBetterAuthAdminPath,
   isFreshActionConfirmationTimestamp,
   organizationLogoObjectPath,
   resolveSsoActor,
@@ -616,6 +617,39 @@ Deno.test(
     );
   },
 );
+
+Deno.test("Better Auth admin plugin routes are closed to every caller", () => {
+  for (
+    const path of [
+      "/admin",
+      "/admin/impersonate-user",
+      "/admin/stop-impersonating",
+      "/admin/set-user-password",
+      "/admin/set-role",
+      "/admin/create-user",
+      "/admin/remove-user",
+      "/admin/update-user",
+      "/admin/ban-user",
+      "/admin/list-users",
+      "/admin/list-user-sessions",
+      "/admin/revoke-user-sessions",
+      "/admin/has-permission",
+    ]
+  ) {
+    assertEquals(isBlockedBetterAuthAdminPath(path), true, path);
+  }
+  for (
+    const path of [
+      "/administrator",
+      "/organization/update",
+      "/sign-in/email",
+      "/passkey/verify-registration",
+      "/sso/register",
+    ]
+  ) {
+    assertEquals(isBlockedBetterAuthAdminPath(path), false, path);
+  }
+});
 
 Deno.test("only passkey enrollment endpoints use the fresh-confirmation guard", () => {
   assertEquals(isBetterAuthPasskeyEnrollmentPath("/passkey/generate-register-options"), true);

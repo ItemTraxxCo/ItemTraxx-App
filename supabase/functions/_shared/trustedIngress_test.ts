@@ -140,8 +140,11 @@ Deno.test("the audit writer rejects signatures the function proxy issues for bro
       ),
       "expected the Worker's internal audit signature to be accepted",
     );
+    // Widen the literal type: the constant is compared as a runtime string so
+    // this still guards against it being changed back to the routed name.
+    const internalTarget: string = SECURITY_AUDIT_INGRESS_TARGET;
     assert(
-      SECURITY_AUDIT_INGRESS_TARGET !== "security-audit",
+      internalTarget !== "security-audit",
       "the internal target must differ from the routed function name",
     );
   });

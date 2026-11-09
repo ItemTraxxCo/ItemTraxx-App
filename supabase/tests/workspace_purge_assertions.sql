@@ -27,6 +27,20 @@ begin
   if to_regclass('public.workspace_deletion_certificates') is null then
     raise exception 'deletion certificate table missing';
   end if;
+  if to_regclass('private.workspace_purge_external_cleanup') is null then
+    raise exception 'workspace purge cleanup receipt table missing';
+  end if;
+  if has_table_privilege('authenticated', 'private.workspace_purge_external_cleanup', 'SELECT')
+     or has_table_privilege('anon', 'private.workspace_purge_external_cleanup', 'SELECT')
+     or has_table_privilege('service_role', 'private.workspace_purge_external_cleanup', 'SELECT') then
+    raise exception 'workspace purge cleanup receipt table must stay private';
+  end if;
+  if position(
+    'organization_logo_deleted boolean'
+    in pg_get_function_result('public.claim_workspaces_due_for_purge(integer)'::regprocedure)
+  ) = 0 then
+    raise exception 'purge claim must report persisted organization cleanup';
+  end if;
   if has_table_privilege('authenticated', 'public.workspace_deletion_certificates', 'SELECT') then
     raise exception 'authenticated must not read deletion certificates';
   end if;
@@ -54,6 +68,12 @@ begin
     where tgrelid = 'better_auth.organization'::regclass and tgname = 'guard_linked_workspace_delete'
   ) then
     raise exception 'Better Auth organization deletes must stay blocked outside the purge executor';
+  end if;
+  if position(
+    'workspace_purge_external_cleanup'
+    in pg_get_functiondef('private.guard_linked_better_auth_organization_delete()'::regprocedure)
+  ) = 0 then
+    raise exception 'Better Auth organization deletes must persist cleanup receipts for retries';
   end if;
 
   -- profiles.better_auth_user_id stays RESTRICT: purge_workspace_better_auth_user

@@ -166,6 +166,31 @@ describe("subscribeCookieConsent", () => {
     expect(listener).toHaveBeenCalledWith(state);
     unsubscribe();
   });
+
+  it("persists a legacy localStorage consent it migrates during a poll", () => {
+    vi.useFakeTimers();
+    const listener = vi.fn();
+    const unsubscribe = subscribeCookieConsent(listener);
+    const state: CookieConsentState = {
+      version: 2,
+      preferences: { analytics: true, diagnostics: true },
+      updatedAt: "2026-02-02T00:00:00.000Z",
+    };
+    // Written after subscription, so the non-persisting poll is the first
+    // reader to find (and consume) the legacy entry.
+    window.localStorage.setItem("itemtraxx-cookie-consent", JSON.stringify(state));
+
+    vi.advanceTimersByTime(2000);
+    expect(listener).toHaveBeenCalledWith(state);
+    expect(window.localStorage.getItem("itemtraxx-cookie-consent")).toBeNull();
+
+    // The migrated choice must survive later polls instead of reverting to
+    // "no consent" (which would re-show the banner).
+    vi.advanceTimersByTime(2000);
+    expect(listener).toHaveBeenCalledTimes(1);
+    expect(readCookieConsent()).toEqual(state);
+    unsubscribe();
+  });
 });
 
 describe("getOrCreateCookieConsentSubject", () => {

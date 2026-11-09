@@ -5,14 +5,13 @@ export type WorkspacePurgeClaim = {
 
 export type WorkspacePurgeProfile = {
   id: string;
-  better_auth_user_id: string | null;
 };
 
 /** Side effects the purge needs, injected so the orchestration is unit-testable. */
 export type WorkspacePurgeDeps = {
   claim: (limit: number) => Promise<WorkspacePurgeClaim[]>;
   listProfiles: (workspaceId: string) => Promise<WorkspacePurgeProfile[]>;
-  deleteBetterAuthUser: (profileId: string, betterAuthUserId: string | null) => Promise<void>;
+  deleteBetterAuthUser: (profileId: string, workspaceId: string) => Promise<void>;
   deleteBetterAuthOrganization: (organizationId: string) => Promise<void>;
   listSupportAttachmentPaths: (workspaceId: string) => Promise<string[]>;
   removeSupportAttachments: (paths: string[]) => Promise<void>;
@@ -59,9 +58,9 @@ export const purgeExpiredWorkspaces = async (
       const profiles = await deps.listProfiles(workspace.id);
       for (const profile of profiles) {
         try {
-          await deps.deleteBetterAuthUser(profile.id, profile.better_auth_user_id);
+          await deps.deleteBetterAuthUser(profile.id, workspace.id);
         } catch (error) {
-          // A profile with no Better Auth user (already removed) is fine.
+          // Keep compatibility with a 404 from an already-removed auth user.
           if (!isNotFound(error)) throw error;
         }
       }

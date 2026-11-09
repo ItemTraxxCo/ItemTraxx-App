@@ -16,7 +16,10 @@ export default defineConfig({
   fullyParallel: true,
   forbidOnly: isCI,
   retries: isCI ? 2 : 0,
-  workers: 2,
+  // GitHub-hosted ubuntu-24.04 runners for public repos have 4 vCPUs; E2E now
+  // runs in its own CI job, so use them all. Local runs keep the old default.
+  // E2E_WORKERS overrides both (for example to reproduce CI contention).
+  workers: Number(process.env.E2E_WORKERS) || (isCI ? 4 : 2),
   reporter: isCI ? [["github"], ["html", { open: "never" }]] : [["list"]],
   use: {
     ...(chromeExecutablePath

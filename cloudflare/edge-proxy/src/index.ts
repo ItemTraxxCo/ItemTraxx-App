@@ -15,6 +15,7 @@ import {
   isAllowedRestRequest,
   isAllowedRpcProxyPath,
   isBlockedRpcProxyPath,
+  isInternalOnlyFunction,
   isRestProxyPath,
   isRpcProxyPath,
 } from "./routing.ts";
@@ -484,6 +485,12 @@ export default {
         const functionName = getFunctionName(url.pathname);
         if (!functionName) {
           return buildError(404, "Not found", headers, requestId);
+        }
+
+        // Worker-internal functions are refused before the allowlist is
+        // consulted, so a stale or widened ALLOWED_FUNCTIONS cannot expose them.
+        if (isInternalOnlyFunction(functionName)) {
+          return buildError(403, "Function not allowed", headers, requestId);
         }
 
         if (

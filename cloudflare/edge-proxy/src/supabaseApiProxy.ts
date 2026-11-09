@@ -19,6 +19,7 @@ import { getSupabaseAccessToken } from "./auth.ts";
 import { applyTrustedIngressHeaders } from "./trustedIngress.ts";
 import { getRestTableName } from "./routing.ts";
 import { trimTrailingSlash } from "./url.ts";
+import { SECURITY_AUDIT_INGRESS_TARGET } from "../../../supabase/functions/_shared/securityAuditIngress.ts";
 
 const MAX_AUDIT_RESPONSE_BYTES = 1024 * 1024;
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -142,7 +143,16 @@ export const auditSuccessfulSupabaseRead = async (
     if (origin) headers.set("origin", origin);
     const traceparent = request.headers.get("traceparent");
     if (traceparent) headers.set("traceparent", traceparent);
-    await applyTrustedIngressHeaders(headers, env, auditRequestId, "security-audit", "POST", body);
+    // Signed with the internal-only target, never the routed function name, so
+    // the audit writer rejects anything the generic function proxy could sign.
+    await applyTrustedIngressHeaders(
+      headers,
+      env,
+      auditRequestId,
+      SECURITY_AUDIT_INGRESS_TARGET,
+      "POST",
+      body,
+    );
     try {
       const response = await fetch(`${supabaseUrl}/functions/v1/security-audit`, {
         method: "POST",

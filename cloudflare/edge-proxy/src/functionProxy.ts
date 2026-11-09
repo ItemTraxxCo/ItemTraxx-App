@@ -30,7 +30,6 @@ const PUBLIC_FUNCTIONS = new Set([
   "consent-record",
   "workspace-invitation",
   "account-email-change",
-  "job-worker",
 ]);
 
 const readBoundedSystemStatusText = async (

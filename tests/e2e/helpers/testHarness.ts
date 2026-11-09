@@ -7,6 +7,26 @@ export const readCookieConsentPreferences = (page: Page) =>
     return JSON.parse(decodeURIComponent(match[1]))?.preferences;
   });
 
+/**
+ * Record a consent choice the way the app stores it (a cookie) before the app
+ * boots, so the cookie banner never renders over the UI under test. Writing it
+ * after load is racy: the banner can appear and intercept clicks.
+ */
+export const seedCookieConsent = (
+  page: Page,
+  baseURL: string | undefined,
+  preferences: { analytics: boolean; diagnostics: boolean } = { analytics: true, diagnostics: true },
+) =>
+  page.context().addCookies([
+    {
+      name: "itemtraxx-cookie-consent",
+      value: encodeURIComponent(
+        JSON.stringify({ version: 2, preferences, updatedAt: new Date().toISOString() }),
+      ),
+      url: baseURL ?? "http://127.0.0.1:4173",
+    },
+  ]);
+
 export const clearCookieConsentCookie = (page: Page) =>
   page.evaluate(() => {
     document.cookie = "itemtraxx-cookie-consent=; Max-Age=0; Path=/; SameSite=Lax";

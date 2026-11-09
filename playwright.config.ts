@@ -20,7 +20,9 @@ export default defineConfig({
   // runs in its own CI job, so use them all. Local runs keep the old default.
   // E2E_WORKERS overrides both (for example to reproduce CI contention).
   workers: Number(process.env.E2E_WORKERS) || (isCI ? 4 : 2),
-  reporter: isCI ? [["github"], ["html", { open: "never" }]] : [["list"]],
+  // CI runs E2E as sharded matrix jobs; each shard writes a blob report and
+  // the e2e-report job merges them into a single HTML report.
+  reporter: isCI ? [["github"], ["blob"]] : [["list"]],
   use: {
     ...(chromeExecutablePath
       ? { launchOptions: { executablePath: chromeExecutablePath } }

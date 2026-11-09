@@ -4,6 +4,7 @@ import {
   mockSystemStatus,
   mockUnauthenticatedSession,
   navigateApp,
+  seedCookieConsent,
   setTenantAccountSession,
   setWorkspaceAdminSession,
 } from "./helpers/testHarness";
@@ -1159,7 +1160,8 @@ test.describe("prepared offline checkout workflow contract", () => {
     await expect(offlineStatus).toHaveCount(0);
   });
 
-  test("lets an operator manually retry a pending sync from the checkout status bar", async ({ page }) => {
+  test("lets an operator manually retry a pending sync from the checkout status bar", async ({ page, baseURL }) => {
+    await seedCookieConsent(page, baseURL);
     await mockSystemStatus(page);
     await page.evaluate(async ({ pack, entry }) => {
       window.localStorage.setItem("itemtraxx-device-id", "device-e2e");

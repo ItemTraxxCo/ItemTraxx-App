@@ -1159,14 +1159,14 @@ serve((req) => withRequestSpan(req, "POST /functions/job-worker", async (span, r
           unwrap(await adminClient.rpc("claim_workspaces_due_for_purge", { p_limit: claimLimit })) ?? [],
         listProfiles: async (workspaceId) =>
           unwrap(
-            await adminClient.from("profiles").select("id, better_auth_user_id").eq("workspace_id", workspaceId),
+            await adminClient.from("profiles").select("id").eq("workspace_id", workspaceId),
           ) ?? [],
-        deleteBetterAuthUser: async (profileId, betterAuthUserId) => {
-          await callBetterAuthAdmin({
-            action: "delete_user",
-            profileId,
-            ...(betterAuthUserId ? { betterAuthUserId } : {}),
+        deleteBetterAuthUser: async (profileId, workspaceId) => {
+          const { error } = await adminClient.rpc("purge_workspace_better_auth_user", {
+            p_workspace_id: workspaceId,
+            p_profile_id: profileId,
           });
+          if (error) throw new Error(error.message);
         },
         deleteBetterAuthOrganization: async (organizationId) => {
           await callBetterAuthAdmin({ action: "delete_organization", organizationId });

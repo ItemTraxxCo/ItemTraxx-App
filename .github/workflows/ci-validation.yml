@@ -13,10 +13,20 @@ on:
         required: true
         type: string
 
+# Validation is split into independent parallel jobs so wall time is bounded
+# by the slowest suite (E2E) instead of the sum of every step, and a failure
+# in one suite no longer forces every other step to run serially first.
+# Every job checks out inputs.ref and pays its own `npm ci` (~10s with the
+# shared npm cache); none depends on another job's output.
+#
+# The calling job's result (`needs.validate.result` in ci.yml) is failure if
+# any job here fails, so Slack/incident wiring is unchanged.
+
 jobs:
-  validate:
+  static-checks:
+    name: Static checks and Deno tests
     runs-on: ubuntu-24.04
-    timeout-minutes: 90
+    timeout-minutes: 20
     permissions:
       contents: read
 
@@ -26,6 +36,7 @@ jobs:
         with:
           ref: ${{ inputs.ref }}
           persist-credentials: false
+          # SQL/function coupling diffs diff_base_sha..diff_head_sha.
           fetch-depth: 0
 
       - name: Setup Node
@@ -34,6 +45,9 @@ jobs:
           # package.json requires Node 24.x; jsdom 30 also requires 24.15+.
           node-version: 24.22.1
           cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            cloudflare/edge-proxy/package-lock.json
 
       - name: Setup Deno
         uses: denoland/setup-deno@22d081ff2d3a40755e97629de92e3bcbfa7cf2ed # v2.0.5
@@ -43,24 +57,18 @@ jobs:
 
       - name: Install dependencies
         # Avoid flaky native/CLI postinstall downloads during CI (for example
-        # the Supabase CLI). The shared install serves every suite below.
+        # the Supabase CLI).
         run: npm ci --ignore-scripts
 
       - name: Install Cloudflare Worker dependencies
-        if: ${{ !cancelled() }}
         run: npm ci --ignore-scripts --prefix cloudflare/edge-proxy
 
-      - name: Audit Cloudflare Worker dependencies
-        if: ${{ !cancelled() }}
-        run: |
-          npm audit --audit-level=moderate --prefix cloudflare/edge-proxy
-          npm audit signatures --prefix cloudflare/edge-proxy
-
+      # The checks below are each a few seconds, so they keep running after an
+      # earlier one fails to report every static failure in one pass.
       - name: Check CodeQL permission isolation
         if: ${{ !cancelled() }}
         run: node --test scripts/ci-codeql-isolation.test.mjs scripts/edge-proxy-audit-contract.test.mjs
 
-      # Core validation runs on pull requests and protected branch pushes.
       - name: Verify env parity
         if: ${{ !cancelled() }}
         run: bash ./scripts/check-env-parity.sh
@@ -83,7 +91,18 @@ jobs:
 
       - name: Check Supabase function graph with frozen Deno lock
         if: ${{ !cancelled() }}
-        run: deno check --node-modules-dir=none --frozen supabase/functions/super-ops/index.ts supabase/functions/super-workspace-mutate/index.ts supabase/functions/admin-ops/index.ts
+        # The _shared security regression tests are type-checked here; the
+        # coverage gate below executes them (with --no-check), so the security
+        # job no longer runs them a second time.
+        run: >-
+          deno check --node-modules-dir=none --frozen
+          supabase/functions/super-ops/index.ts
+          supabase/functions/super-workspace-mutate/index.ts
+          supabase/functions/admin-ops/index.ts
+          supabase/functions/_shared/cors_test.ts
+          supabase/functions/_shared/accountSessions_test.ts
+          supabase/functions/_shared/preloginGuards_test.ts
+          supabase/functions/_shared/trustedIngress_test.ts
 
       - name: Deno test coverage gate (Supabase functions + Cloudflare edge-proxy)
         if: ${{ !cancelled() }}
@@ -96,51 +115,58 @@ jobs:
           ITX_DIFF_HEAD: ${{ inputs.diff_head_sha }}
         run: npm run devops:check:sql-coupling
 
-      - name: Clean dist
-        if: ${{ !cancelled() }}
-        run: rm -rf dist artifacts
-
-      - name: Build
-        if: ${{ !cancelled() }}
-        run: npm run build
-
-      - name: Test prerendered public content
-        if: ${{ !cancelled() }}
-        run: npm run test:prerender
-
-      - name: Check public CSS boundary
-        if: ${{ !cancelled() }}
-        run: npm run perf:css-boundary
-
       - name: Typecheck Cloudflare Worker
         if: ${{ !cancelled() }}
         run: npm run worker:typecheck
 
-      - name: Test frontend units (Vitest)
-        if: ${{ !cancelled() }}
-        # Unit tests need configuration to import the Supabase client and to
-        # exercise authenticated requests. These are non-secret placeholders;
-        # the suite mocks network calls and never contacts these origins.
-        env:
-          VITE_SUPABASE_URL: https://example.supabase.co
-          VITE_SUPABASE_ANON_KEY: ci-test-anon-key
-          VITE_EDGE_PROXY_URL: https://proxy.example.com
-        run: npm run test:unit
+  build:
+    name: Build and performance budgets
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.ref }}
+          persist-credentials: false
+
+      - name: Setup Node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24.22.1
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            cloudflare/edge-proxy/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Clean dist
+        run: rm -rf dist artifacts
+
+      - name: Build
+        run: npm run build
+
+      - name: Test prerendered public content
+        run: npm run test:prerender
+
+      - name: Check public CSS boundary
+        run: npm run perf:css-boundary
 
       - name: Check initial JavaScript budget
-        if: ${{ !cancelled() }}
         run: npm run perf:initial
 
       - name: Check bundle budget
-        if: ${{ !cancelled() }}
         run: npm run perf:budget
 
       - name: Check image budget
-        if: ${{ !cancelled() }}
         run: npm run perf:images
 
       - name: Generate perf report
-        if: ${{ !cancelled() }}
         run: npm run perf:report
 
       - name: Upload perf report artifact
@@ -152,18 +178,93 @@ jobs:
           if-no-files-found: ignore
           retention-days: 14
 
-      # Security validation shares the already-installed dependency tree but
-      # remains a separate, clearly labelled gate in this single CI check.
+  unit-tests:
+    name: Frontend unit tests (Vitest)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.ref }}
+          persist-credentials: false
+
+      - name: Setup Node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24.22.1
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            cloudflare/edge-proxy/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Test frontend units (Vitest)
+        # Unit tests need configuration to import the Supabase client and to
+        # exercise authenticated requests. These are non-secret placeholders;
+        # the suite mocks network calls and never contacts these origins.
+        env:
+          VITE_SUPABASE_URL: https://example.supabase.co
+          VITE_SUPABASE_ANON_KEY: ci-test-anon-key
+          VITE_EDGE_PROXY_URL: https://proxy.example.com
+        run: npm run test:unit
+
+  security:
+    name: Security gate and SBOM
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.ref }}
+          persist-credentials: false
+
+      - name: Setup Node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24.22.1
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            cloudflare/edge-proxy/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Install Cloudflare Worker dependencies
+        if: ${{ !cancelled() }}
+        run: npm ci --ignore-scripts --prefix cloudflare/edge-proxy
+
+      - name: Audit Cloudflare Worker dependencies
+        if: ${{ !cancelled() }}
+        run: |
+          npm audit --audit-level=moderate --prefix cloudflare/edge-proxy
+          npm audit signatures --prefix cloudflare/edge-proxy
+
       - name: Run security gate
         if: ${{ !cancelled() }}
+        env:
+          # The Deno _shared security tests already run in static-checks.
+          ITX_SECURITY_SKIP_DENO_TESTS: "1"
         run: npm run security:gate
 
+      # SBOMs are release evidence, not PR gates: nothing consumes the PR
+      # artifacts, so generate them only for pushes to protected branches.
       - name: Generate SBOM
-        if: ${{ !cancelled() }}
+        if: ${{ github.event_name != 'pull_request' }}
         run: npm run security:sbom
 
       - name: Upload SBOM artifact
-        if: ${{ always() }}
+        if: ${{ always() && github.event_name != 'pull_request' }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: sbom
@@ -174,7 +275,7 @@ jobs:
       # Syft catalogs the complete repository so this artifact covers the
       # nested edge-proxy npm lock and the Deno lock as well as the app root.
       - name: Generate multi-ecosystem SBOM
-        if: ${{ !cancelled() }}
+        if: ${{ github.event_name != 'pull_request' }}
         uses: anchore/sbom-action@66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c # pinned action commit
         with:
           path: .
@@ -187,7 +288,7 @@ jobs:
           dependency-snapshot: false
 
       - name: Validate multi-ecosystem SBOM
-        if: ${{ !cancelled() }}
+        if: ${{ github.event_name != 'pull_request' }}
         run: |
           node --input-type=module <<'NODE'
           import { readFileSync, statSync } from 'node:fs';
@@ -288,7 +389,7 @@ jobs:
           NODE
 
       - name: Upload multi-ecosystem SBOM artifact
-        if: ${{ !cancelled() }}
+        if: ${{ github.event_name != 'pull_request' }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: itemtraxx-app-multiroot-sbom
@@ -296,11 +397,36 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
+  e2e:
+    name: End-to-end tests (Playwright)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.ref }}
+          persist-credentials: false
+
+      - name: Setup Node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24.22.1
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            cloudflare/edge-proxy/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+
       # Resolve once, then install and verify the exact same Chrome for Testing
       # Stable build. The apt-delivered Chrome package can lag CfT metadata.
       - name: Resolve Chrome for Testing Stable version
         id: chrome-stable
-        if: ${{ !cancelled() }}
         run: |
           node --input-type=module <<'NODE'
           import { appendFileSync } from 'node:fs';
@@ -340,7 +466,6 @@ jobs:
           NODE
 
       - name: Install Chrome for Testing Stable
-        if: ${{ !cancelled() }}
         timeout-minutes: 10
         env:
           CHROME_STABLE_VERSION: ${{ steps.chrome-stable.outputs.version }}
@@ -358,7 +483,6 @@ jobs:
           echo "Installed Chrome for Testing Stable $CHROME_STABLE_VERSION"
 
       - name: Verify Chrome Stable version
-        if: ${{ !cancelled() }}
         run: |
           node --input-type=module <<'NODE'
           import { execFileSync } from 'node:child_process';
@@ -382,18 +506,15 @@ jobs:
           NODE
 
       - name: Install Playwright system dependencies
-        if: ${{ !cancelled() }}
         run: |
           timeout 180s npx playwright install-deps chromium || {
             echo "::warning::Playwright system dependency install failed or timed out; continuing so E2E can verify whether the runner already has the required libraries."
           }
 
       - name: Install Playwright FFmpeg
-        if: ${{ !cancelled() }}
         run: npx playwright install ffmpeg
 
       - name: Run E2E tests
-        if: ${{ !cancelled() }}
         run: npm run test:e2e
 
       - name: Upload Playwright report

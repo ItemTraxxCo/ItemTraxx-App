@@ -26,12 +26,22 @@ test("PR validation and Dependabot follow-up stay in pull_request cache scope", 
   assert.ok(Object.hasOwn(ci.on ?? {}, "pull_request"));
   assert.equal(ci.jobs?.validate?.uses, "./.github/workflows/ci-validation.yml");
   assert.deepEqual(Object.keys(ciValidation.on ?? {}), ["workflow_call"]);
-  assert.equal((ciValidation.jobs?.validate?.steps ?? []).some(usesCodeQlAction), false);
+  const validationJobs = Object.entries(ciValidation.jobs ?? {});
+  assert.ok(validationJobs.length > 0, "CI Validation must define at least one job");
+  assert.equal(
+    validationJobs.some(([, job]) => (job.steps ?? []).some(usesCodeQlAction)),
+    false,
+  );
   assert.equal(ci.on?.workflow_dispatch, undefined);
   assert.equal(ci.jobs?.["require-trusted-ref"], undefined);
 
-  const checkout = ciValidation.jobs?.validate?.steps?.find((step) => step.name === "Checkout");
-  assert.equal(checkout?.with?.ref, "${{ inputs.ref }}");
+  // Every parallel validation job must test the requested ref, read-only.
+  for (const [jobName, job] of validationJobs) {
+    assert.deepEqual(job.permissions, { contents: "read" }, `${jobName} must be read-only`);
+    const checkout = job.steps?.find((step) => step.name === "Checkout");
+    assert.equal(checkout?.with?.ref, "${{ inputs.ref }}", `${jobName} must check out inputs.ref`);
+    assert.equal(checkout?.with?.["persist-credentials"], false, `${jobName} must not persist credentials`);
+  }
 
   assert.ok(denoLockSync.on?.pull_request);
   assert.equal(denoLockSync.on?.workflow_dispatch, undefined);

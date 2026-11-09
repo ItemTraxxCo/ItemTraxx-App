@@ -83,6 +83,12 @@ const resolveBuildBranch = (env: Record<string, string>) => {
   }
 };
 
+// Absolute URL for the Organization JSON-LD logo in index.html when the
+// deployment does not provide VITE_LOGO_URL (CI builds, Playwright's dev
+// server, fresh checkouts). Without it Vite warns on every index.html
+// transform and ships the literal %VITE_LOGO_URL% placeholder.
+const DEFAULT_LOGO_URL = "https://itemtraxx.com/brand/logo-mark.svg";
+
 // https://vite.dev/config/
 export default defineConfig(({ mode, command }) => {
   const env: Record<string, string> = {
@@ -92,6 +98,7 @@ export default defineConfig(({ mode, command }) => {
   };
   const gitCommit = resolveBuildCommit(env);
   const gitBranch = resolveBuildBranch(env);
+  const logoUrl = env.VITE_LOGO_URL?.trim() || DEFAULT_LOGO_URL;
 
   if (
     command === "build" &&
@@ -127,6 +134,9 @@ export default defineConfig(({ mode, command }) => {
     define: {
       "import.meta.env.VITE_GIT_COMMIT": JSON.stringify(gitCommit),
       "import.meta.env.VITE_GIT_BRANCH": JSON.stringify(gitBranch),
+      // Vite's %VITE_*% HTML replacement also reads import.meta.env defines,
+      // so this one entry feeds both index.html and application code.
+      "import.meta.env.VITE_LOGO_URL": JSON.stringify(logoUrl),
     },
   };
 });

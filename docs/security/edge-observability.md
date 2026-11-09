@@ -94,6 +94,29 @@ deploying the Edge Functions. The Supabase `security-audit` function has platfor
 verification disabled because it validates Better Auth JWTs internally and
 requires the signed Worker-ingress headers.
 
+`security-audit` is Worker-internal. Its payload (item IDs, returned IDs,
+upstream status) is evidence only the Worker can observe, so the function must
+be able to tell a Worker-authored audit from a request a signed-in user relayed
+through the function proxy. Three controls enforce that:
+
+- The Worker signs its audit call with the trusted-ingress target
+  `security-audit:internal` (`SECURITY_AUDIT_INGRESS_TARGET` in
+  `supabase/functions/_shared/securityAuditIngress.ts`, imported by both
+  runtimes). The function accepts only that target. The generic function proxy
+  signs with the routed function name, so a relayed request fails with 403.
+- `security-audit` is not listed in the Worker's `ALLOWED_FUNCTIONS`.
+- `isInternalOnlyFunction` in `cloudflare/edge-proxy/src/routing.ts` refuses the
+  name before the allowlist is read, so a dashboard-side `ALLOWED_FUNCTIONS`
+  value that drifts from `wrangler.toml` cannot re-expose it.
+
+The Worker and the Edge Function deploy through separate pipelines. A change to
+the signing target must land in both; while only one side is deployed, audit
+writes are rejected and logged as `security_audit.proxy_write_failed` (reads are
+unaffected, but audit rows for that window are not written).
+
+`job-worker` is likewise not routed through the Worker. The scheduled workflow
+calls it directly on the Supabase functions host with `ITX_JOB_WORKER_SECRET`.
+
 ## Verification
 
 Run the focused tests from the repository root:

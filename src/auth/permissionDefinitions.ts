@@ -40,10 +40,12 @@ export const regularUserRoleStatements = {
   session: [],
 } as const;
 
+// Super-admin user and session administration runs through the ItemTraxx
+// console edge functions (step-up, live-session and audit enforced there).
+// The Better Auth admin plugin routes are closed in the Worker, so the role
+// carries no plugin permissions that could authorize them if that block were
+// ever removed.
 export const superAdminRoleStatements = {
-  user: [
-    "create", "list", "set-role", "ban", "impersonate", "delete",
-    "set-password", "set-email", "set-phone", "get", "update",
-  ],
-  session: ["list", "revoke", "delete"],
+  user: [],
+  session: [],
 } as const;

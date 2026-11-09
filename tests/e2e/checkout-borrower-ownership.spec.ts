@@ -4,13 +4,16 @@ import {
   mockSystemStatus,
   mockUnauthenticatedSession,
   navigateApp,
+  seedCookieConsent,
   setTenantAccountSession,
 } from "./helpers/testHarness";
 
 test.describe("Checkout borrower ownership regression", () => {
   test("checkout by borrower A, borrower B blocked, return by borrower A allowed", async ({
     page,
+    baseURL,
   }) => {
+    await seedCookieConsent(page, baseURL);
     await mockSystemStatus(page);
     await mockUnauthenticatedSession(page);
     await mockAdminOps(page);
@@ -140,21 +143,11 @@ test.describe("Checkout borrower ownership regression", () => {
     await page.goto("/");
     await page.evaluate(() => {
       window.localStorage.setItem("itemtraxx:onboarding:v1:tenant_account", new Date().toISOString());
-      window.localStorage.setItem(
-        "itemtraxx-cookie-consent",
-        JSON.stringify({
-          version: 2,
-          preferences: { analytics: true, diagnostics: true },
-          updatedAt: new Date().toISOString(),
-        })
-      );
     });
     await setTenantAccountSession(page, "tenant-e2e");
     await navigateApp(page, "/checkout");
     await expect(page).toHaveURL(/\/checkout$/);
-
-    const consentButton = page.getByRole("button", { name: "Essential only" });
-    if (await consentButton.isVisible()) await consentButton.click();
+    await expect(page.getByRole("dialog", { name: "Cookie preferences" })).toHaveCount(0);
 
     const borrowerInput = page.getByPlaceholder("Enter borrower ID");
     const loadBorrowerButton = page.getByRole("button", { name: "Load borrower" });

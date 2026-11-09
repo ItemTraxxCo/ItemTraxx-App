@@ -59,8 +59,14 @@ const migrateFromLocalStorage = (key: string): string | null => {
 const readCookieConsentValue = (persistValidCookie = true): CookieConsentState | null => {
   if (!isBrowser()) return null;
   try {
-    const raw = readCookie(COOKIE_CONSENT_STORAGE_KEY) ?? migrateFromLocalStorage(COOKIE_CONSENT_STORAGE_KEY);
+    const cookieRaw = readCookie(COOKIE_CONSENT_STORAGE_KEY);
+    const raw = cookieRaw ?? migrateFromLocalStorage(COOKIE_CONSENT_STORAGE_KEY);
     if (!raw) return null;
+    // migrateFromLocalStorage deletes the legacy entry, so a migrated value
+    // must be written to the cookie even by non-persisting readers (the
+    // subscription poll); otherwise the user's choice is lost and the next
+    // read falls back to "no consent".
+    const migratedFromLocalStorage = cookieRaw === null;
     const parsed = JSON.parse(raw) as Partial<CookieConsentState>;
     if (parsed.version === 1 && (parsed as { choice?: unknown }).choice) {
       const choice = (parsed as { choice?: unknown }).choice;
@@ -90,7 +96,9 @@ const readCookieConsentValue = (persistValidCookie = true): CookieConsentState |
       preferences: parsed.preferences,
       updatedAt: parsed.updatedAt,
     };
-    if (persistValidCookie) writeCookie(COOKIE_CONSENT_STORAGE_KEY, JSON.stringify(state));
+    if (persistValidCookie || migratedFromLocalStorage) {
+      writeCookie(COOKIE_CONSENT_STORAGE_KEY, JSON.stringify(state));
+    }
     return state;
   } catch {
     return null;

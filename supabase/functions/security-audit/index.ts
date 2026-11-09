@@ -9,6 +9,7 @@ import {
 } from "../_shared/observability.ts";
 import { readJsonBody } from "../_shared/requestBody.ts";
 import { requireTrustedEdgeIngress } from "../_shared/trustedIngress.ts";
+import { SECURITY_AUDIT_INGRESS_TARGET } from "../_shared/securityAuditIngress.ts";
 import {
   classifySecurityAuditTargets,
   writeSecurityAuditEntries,
@@ -50,7 +51,15 @@ serve(async (req) => {
   if (req.method !== "POST") return jsonResponse(405, { error: "Method not allowed" });
   if (!originAllowed) return jsonResponse(403, { error: "Origin not allowed" });
 
-  const ingressError = await requireTrustedEdgeIngress(req, "security-audit", jsonResponse);
+  // The payload is audit evidence authored by the Worker. Accept only the
+  // Worker's internal signing target: a request relayed by the generic function
+  // proxy is signed with the routed function name and fails this check, so a
+  // signed-in user cannot submit their own item IDs or "returned" IDs.
+  const ingressError = await requireTrustedEdgeIngress(
+    req,
+    SECURITY_AUDIT_INGRESS_TARGET,
+    jsonResponse,
+  );
   if (ingressError) return ingressError;
 
   const authorization = req.headers.get("authorization") ?? "";

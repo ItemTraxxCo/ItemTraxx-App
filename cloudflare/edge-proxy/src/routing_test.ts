@@ -5,6 +5,7 @@ import {
   isAllowedRestRequest,
   isAllowedRpcProxyPath,
   isBlockedRpcProxyPath,
+  isInternalOnlyFunction,
   isRestProxyPath,
   isRpcProxyPath,
   isUnauthorizedRpcProxyPath,
@@ -21,6 +22,22 @@ const assertEquals = (actual: unknown, expected: unknown, message: string) => {
     );
   }
 };
+
+Deno.test("Worker-internal functions are never browser-routable", () => {
+  assert(
+    isInternalOnlyFunction("security-audit"),
+    "the audit writer is called only by the Worker",
+  );
+  assert(
+    isInternalOnlyFunction("Security-Audit"),
+    "case variants are refused as well",
+  );
+  for (
+    const name of ["admin-ops", "checkoutReturn", "system-status", "security"]
+  ) {
+    assert(!isInternalOnlyFunction(name), `${name} stays routable`);
+  }
+});
 
 Deno.test("function parser accepts only exact unencoded route shapes", () => {
   assertEquals(

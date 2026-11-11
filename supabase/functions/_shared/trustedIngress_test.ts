@@ -40,6 +40,78 @@ const bodyHash = async (value: string) => {
   return toHex(new Uint8Array(digest));
 };
 
+const makeSignedIngressRequest = async (input: {
+  timestamp?: string;
+  requestId?: string;
+  target?: string;
+  method?: string;
+  body?: string;
+  signedBody?: string;
+} = {}) => {
+  const timestamp = input.timestamp ?? Date.now().toString();
+  const requestId = input.requestId ?? "request-adversarial-1";
+  const target = input.target ?? "workspace-admin-mutate";
+  const method = input.method ?? "POST";
+  const body = input.body ?? "{}";
+  const signatureBody = input.signedBody ?? body;
+  const signature = await sign(
+    `${timestamp}.${requestId}.${method.toUpperCase()}.${target}.${await bodyHash(
+      signatureBody,
+    )}`,
+  );
+
+  return new Request(`https://example.test/functions/${target}`, {
+    method,
+    headers: {
+      "x-itx-edge-proxy": "1",
+      "x-itx-edge-proxy-ts": timestamp,
+      "x-itx-edge-proxy-signature": signature,
+      "x-request-id": requestId,
+      "content-type": "application/json",
+    },
+    body: method === "GET" || method === "HEAD" ? undefined : body,
+  });
+};
+
+const assertIngressDenied = async (
+  request: Request,
+  label: string,
+  expectedStatus = 403,
+  expectedError = "Trusted edge ingress required.",
+) => {
+  const response = await requireTrustedEdgeIngress(
+    request,
+    "workspace-admin-mutate",
+    (status, body) => Response.json(body, { status }),
+  );
+  if (response === null) {
+    throw new Error(
+      `${label}: expected HTTP ${expectedStatus}, request was accepted`,
+    );
+  }
+  assert(
+    response.status === expectedStatus,
+    `${label}: expected HTTP ${expectedStatus}`,
+  );
+  assert(
+    JSON.stringify(await response.json()) ===
+      JSON.stringify({ error: expectedError }),
+    `${label}: expected the stable fail-closed error payload`,
+  );
+};
+
+const assertIngressAccepted = async (request: Request, label: string) => {
+  const response = await requireTrustedEdgeIngress(
+    request,
+    "workspace-admin-mutate",
+    (status, body) => Response.json(body, { status }),
+  );
+  assert(
+    response === null,
+    `${label}: expected the signed request to be accepted`,
+  );
+};
+
 const withSecret = async (run: () => Promise<void>) => {
   const previous = Deno.env.get("ITX_EDGE_PROXY_SHARED_SECRET");
   Deno.env.set("ITX_EDGE_PROXY_SHARED_SECRET", SECRET);
@@ -78,17 +150,20 @@ Deno.test("trusted ingress accepts a fresh matching proxy signature", async () =
     const signature = await sign(
       `${timestamp}.${requestId}.POST.${target}.${await bodyHash(payload)}`,
     );
-    const request = new Request("https://example.test/functions/workspace-login", {
-      method: "POST",
-      headers: {
-        "x-itx-edge-proxy": "1",
-        "x-itx-edge-proxy-ts": timestamp,
-        "x-itx-edge-proxy-signature": signature,
-        "x-request-id": requestId,
-        "content-type": "application/json",
+    const request = new Request(
+      "https://example.test/functions/workspace-login",
+      {
+        method: "POST",
+        headers: {
+          "x-itx-edge-proxy": "1",
+          "x-itx-edge-proxy-ts": timestamp,
+          "x-itx-edge-proxy-signature": signature,
+          "x-request-id": requestId,
+          "content-type": "application/json",
+        },
+        body: payload,
       },
-      body: payload,
-    });
+    );
 
     assert(
       await hasTrustedEdgeIngress(request, target),
@@ -117,7 +192,9 @@ Deno.test("the audit writer rejects signatures the function proxy issues for bro
           "x-itx-edge-proxy": "1",
           "x-itx-edge-proxy-ts": timestamp,
           "x-itx-edge-proxy-signature": await sign(
-            `${timestamp}.${requestId}.POST.${signedTarget}.${await bodyHash(payload)}`,
+            `${timestamp}.${requestId}.POST.${signedTarget}.${await bodyHash(
+              payload,
+            )}`,
           ),
           "x-request-id": requestId,
           "content-type": "application/json",
@@ -150,6 +227,176 @@ Deno.test("the audit writer rejects signatures the function proxy issues for bro
   });
 });
 
+Deno.test("trusted ingress rejects missing, stale, malformed, and body-tampered signatures with HTTP 403", async () => {
+  await withSecret(async () => {
+    await assertIngressDenied(
+      new Request("https://example.test/functions/workspace-admin-mutate", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: "{}",
+      }),
+      "unsigned request",
+    );
+
+    const expiredTimestamp = String(Date.now() - 30_001);
+    await assertIngressDenied(
+      await makeSignedIngressRequest({ timestamp: expiredTimestamp }),
+      "expired request signature",
+    );
+
+    const invalidTimestampRequest = await makeSignedIngressRequest();
+    invalidTimestampRequest.headers.set(
+      "x-itx-edge-proxy-ts",
+      "not-a-timestamp",
+    );
+    await assertIngressDenied(invalidTimestampRequest, "malformed timestamp");
+
+    const bodyTamperedRequest = await makeSignedIngressRequest({
+      body: '{"action":"set_workspace_account_role","role":"super_admin"}',
+      signedBody: '{"action":"get_workspace_settings"}',
+    });
+    await assertIngressDenied(bodyTamperedRequest, "tampered request body");
+  });
+});
+
+Deno.test("trusted ingress rejects a replayed valid request ID within the timestamp window", async () => {
+  await withSecret(async () => {
+    const signedRequest = await makeSignedIngressRequest({
+      requestId: "request-replay-fixture",
+      body:
+        '{"action":"set_workspace_account_role","payload":{"role":"workspace_admin"}}',
+    });
+    await assertIngressAccepted(signedRequest, "first fresh signed request");
+
+    const replay = await makeSignedIngressRequest({
+      timestamp: signedRequest.headers.get("x-itx-edge-proxy-ts") ?? "",
+      requestId: "request-replay-fixture",
+      body:
+        '{"action":"set_workspace_account_role","payload":{"role":"workspace_admin"}}',
+    });
+
+    const originalConsoleError = console.error;
+    let replayLog = "";
+    console.error = (...values: unknown[]) => {
+      replayLog = values.map(String).join(" ");
+    };
+    try {
+      await assertIngressDenied(
+        replay,
+        "replayed signed request",
+        409,
+        "Trusted edge request replay detected.",
+      );
+    } finally {
+      console.error = originalConsoleError;
+    }
+    assert(
+      replayLog.includes("trusted_ingress.replay_detected"),
+      "expected replay detection to be logged explicitly",
+    );
+  });
+});
+
+Deno.test("trusted ingress permits distinct signed batches that reuse a request ID", async () => {
+  await withSecret(async () => {
+    const firstBatch = await makeSignedIngressRequest({
+      requestId: "request-shared-audit-batches",
+      target: SECURITY_AUDIT_INGRESS_TARGET,
+      body: '{"action":"read_items","item_ids":["item-1"]}',
+    });
+    const secondBatch = await makeSignedIngressRequest({
+      requestId: "request-shared-audit-batches",
+      target: SECURITY_AUDIT_INGRESS_TARGET,
+      body: '{"action":"read_items","item_ids":["item-2"]}',
+    });
+    assert(
+      firstBatch.headers.get("x-itx-edge-proxy-signature") !==
+        secondBatch.headers.get("x-itx-edge-proxy-signature"),
+      "each distinct batch must have a distinct signed envelope",
+    );
+
+    const acceptBatch = async (request: Request) =>
+      await requireTrustedEdgeIngress(
+        request,
+        SECURITY_AUDIT_INGRESS_TARGET,
+        (status, body) => Response.json(body, { status }),
+      );
+    assert(
+      await acceptBatch(firstBatch) === null,
+      "first audit batch should pass",
+    );
+    assert(
+      await acceptBatch(secondBatch) === null,
+      "a distinct payload signed under the same request ID must remain valid",
+    );
+  });
+});
+
+Deno.test("trusted ingress classifiers do not treat a replay as trusted", async () => {
+  await withSecret(async () => {
+    const request = await makeSignedIngressRequest({
+      requestId: "request-replayed-classifier-fixture",
+    });
+    assert(
+      await hasTrustedEdgeIngress(request, "workspace-admin-mutate"),
+      "expected the first signed request to be trusted",
+    );
+
+    const originalConsoleError = console.error;
+    let replayLog = "";
+    console.error = (...values: unknown[]) => {
+      replayLog = values.map(String).join(" ");
+    };
+    try {
+      assert(
+        !(await hasTrustedEdgeIngress(request, "workspace-admin-mutate")),
+        "a repeated signed request must not be treated as trusted",
+      );
+    } finally {
+      console.error = originalConsoleError;
+    }
+    assert(
+      replayLog.includes("trusted_ingress.replay_detected"),
+      "expected classifier replay detection to be logged explicitly",
+    );
+  });
+});
+
+Deno.test("trusted ingress atomically accepts only one concurrent exact envelope", async () => {
+  await withSecret(async () => {
+    const request = await makeSignedIngressRequest({
+      requestId: "request-concurrent-replay-fixture",
+    });
+    const originalConsoleError = console.error;
+    console.error = () => {};
+    let responses: Array<Response | null>;
+    try {
+      responses = await Promise.all([
+        requireTrustedEdgeIngress(
+          request.clone(),
+          "workspace-admin-mutate",
+          (status, body) => Response.json(body, { status }),
+        ),
+        requireTrustedEdgeIngress(
+          request.clone(),
+          "workspace-admin-mutate",
+          (status, body) => Response.json(body, { status }),
+        ),
+      ]);
+    } finally {
+      console.error = originalConsoleError;
+    }
+    assert(
+      responses.filter((response) => response === null).length === 1,
+      "exactly one concurrent request should claim the signed envelope",
+    );
+    assert(
+      responses.filter((response) => response?.status === 409).length === 1,
+      "the other concurrent request should receive HTTP 409",
+    );
+  });
+});
+
 Deno.test("trusted ingress preserves the support attachment payload limit", async () => {
   await withSecret(async () => {
     const payload = "x".repeat(1024 * 1024 + 1);
@@ -159,17 +406,20 @@ Deno.test("trusted ingress preserves the support attachment payload limit", asyn
     const signature = await sign(
       `${timestamp}.${requestId}.POST.${target}.${await bodyHash(payload)}`,
     );
-    const request = new Request("https://example.test/functions/contact-support-submit", {
-      method: "POST",
-      headers: {
-        "x-itx-edge-proxy": "1",
-        "x-itx-edge-proxy-ts": timestamp,
-        "x-itx-edge-proxy-signature": signature,
-        "x-request-id": requestId,
-        "content-type": "application/json",
+    const request = new Request(
+      "https://example.test/functions/contact-support-submit",
+      {
+        method: "POST",
+        headers: {
+          "x-itx-edge-proxy": "1",
+          "x-itx-edge-proxy-ts": timestamp,
+          "x-itx-edge-proxy-signature": signature,
+          "x-request-id": requestId,
+          "content-type": "application/json",
+        },
+        body: payload,
       },
-      body: payload,
-    });
+    );
 
     assert(
       getTrustedIngressBodyLimit(target) > 1024 * 1024,
@@ -200,17 +450,20 @@ Deno.test("trusted ingress rejects body replay with modified payload", async () 
         originalPayload,
       )}`,
     );
-    const request = new Request("https://example.test/functions/workspace-login", {
-      method: "POST",
-      headers: {
-        "x-itx-edge-proxy": "1",
-        "x-itx-edge-proxy-ts": timestamp,
-        "x-itx-edge-proxy-signature": signature,
-        "x-request-id": requestId,
-        "content-type": "application/json",
+    const request = new Request(
+      "https://example.test/functions/workspace-login",
+      {
+        method: "POST",
+        headers: {
+          "x-itx-edge-proxy": "1",
+          "x-itx-edge-proxy-ts": timestamp,
+          "x-itx-edge-proxy-signature": signature,
+          "x-request-id": requestId,
+          "content-type": "application/json",
+        },
+        body: tamperedPayload,
       },
-      body: tamperedPayload,
-    });
+    );
 
     assert(
       !(await hasTrustedEdgeIngress(request, target)),
@@ -223,9 +476,12 @@ Deno.test("hasTrustedEdgeIngress throws when the shared secret is not configured
   const previous = Deno.env.get("ITX_EDGE_PROXY_SHARED_SECRET");
   Deno.env.delete("ITX_EDGE_PROXY_SHARED_SECRET");
   try {
-    const request = new Request("https://example.test/functions/workspace-login", {
-      headers: { "x-itx-edge-proxy": "1" },
-    });
+    const request = new Request(
+      "https://example.test/functions/workspace-login",
+      {
+        headers: { "x-itx-edge-proxy": "1" },
+      },
+    );
     try {
       await hasTrustedEdgeIngress(request, "workspace-login");
     } catch (error) {
@@ -253,7 +509,10 @@ Deno.test("requireTrustedEdgeIngress reports server misconfiguration when the se
       "workspace-login",
       (status, body) => Response.json(body, { status }),
     );
-    assert(response?.status === 500, "expected a 500 misconfiguration response");
+    assert(
+      response?.status === 500,
+      "expected a 500 misconfiguration response",
+    );
     const body = await response?.json();
     assert(
       body?.error === "Server misconfiguration.",
@@ -423,7 +682,8 @@ Deno.test("requireTrustedEdgeIngress surfaces oversized-body validation errors w
         headers: {
           "x-itx-edge-proxy": "1",
           "x-itx-edge-proxy-ts": timestamp,
-          "x-itx-edge-proxy-signature": "irrelevant-because-body-check-runs-first",
+          "x-itx-edge-proxy-signature":
+            "irrelevant-because-body-check-runs-first",
           "x-request-id": requestId,
         },
         body: oversizedPayload,
@@ -436,7 +696,10 @@ Deno.test("requireTrustedEdgeIngress surfaces oversized-body validation errors w
       (status, body) => Response.json(body, { status }),
     );
 
-    assert(response?.status === 413, "expected the oversized-body status to propagate");
+    assert(
+      response?.status === 413,
+      "expected the oversized-body status to propagate",
+    );
     const body = await response?.json();
     assert(
       body?.error === "Request body is too large.",

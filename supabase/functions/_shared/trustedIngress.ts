@@ -4,8 +4,54 @@ const EDGE_PROXY_HEADER = "x-itx-edge-proxy";
 const EDGE_PROXY_TIMESTAMP_HEADER = "x-itx-edge-proxy-ts";
 const EDGE_PROXY_SIGNATURE_HEADER = "x-itx-edge-proxy-signature";
 const MAX_CLOCK_SKEW_MS = 30 * 1000;
+const TRUSTED_INGRESS_REPLAY_TTL_MS = 60 * 1000;
+const TRUSTED_INGRESS_REPLAY_SWEEP_INTERVAL_MS = 10 * 1000;
 const MAX_TRUSTED_INGRESS_BODY_BYTES = 1024 * 1024;
 const MAX_SUPPORT_REQUEST_BODY_BYTES = 12 * 1024 * 1024;
+
+const trustedIngressReplayCache = new Map<string, number>();
+let lastTrustedIngressReplaySweepAt = 0;
+
+const sweepExpiredTrustedIngressRequests = (now: number) => {
+  if (
+    now - lastTrustedIngressReplaySweepAt <
+      TRUSTED_INGRESS_REPLAY_SWEEP_INTERVAL_MS
+  ) {
+    return;
+  }
+
+  for (const [key, expiresAt] of trustedIngressReplayCache) {
+    if (expiresAt < now) trustedIngressReplayCache.delete(key);
+  }
+  lastTrustedIngressReplaySweepAt = now;
+};
+
+const claimTrustedIngressRequest = (
+  requestId: string,
+  signature: string,
+  now: number,
+) => {
+  sweepExpiredTrustedIngressRequests(now);
+
+  // One Worker request ID can identify several internal audit batches. The
+  // signed HMAC distinguishes those legitimate payloads while an exact replay
+  // of any signed envelope retains the same request ID and signature.
+  const cacheKey = `${requestId}\u0000${signature}`;
+  const expiresAt = trustedIngressReplayCache.get(cacheKey);
+  if (expiresAt !== undefined && expiresAt >= now) return false;
+
+  // This lookup and write contain no await, so concurrent requests handled by
+  // this isolate cannot both claim the same signed envelope.
+  trustedIngressReplayCache.set(cacheKey, now + TRUSTED_INGRESS_REPLAY_TTL_MS);
+  return true;
+};
+
+type VerifiedTrustedIngress = {
+  requestId: string;
+  signature: string;
+  target: string;
+  verifiedAt: number;
+};
 
 export const getTrustedIngressBodyLimit = (target: string) =>
   target === "contact-support-submit"
@@ -55,37 +101,87 @@ const hashRequestBody = async (req: Request, target: string) => {
   return toHex(new Uint8Array(digest));
 };
 
-export const hasTrustedEdgeIngress = async (req: Request, target: string) => {
+const verifyTrustedEdgeIngress = async (
+  req: Request,
+  target: string,
+): Promise<VerifiedTrustedIngress | null> => {
   const secret = Deno.env.get("ITX_EDGE_PROXY_SHARED_SECRET")?.trim();
   if (!secret) {
     throw new Error("Missing ITX_EDGE_PROXY_SHARED_SECRET");
   }
 
   if (req.headers.get(EDGE_PROXY_HEADER) !== "1") {
-    return false;
+    return null;
   }
 
   const timestamp = req.headers.get(EDGE_PROXY_TIMESTAMP_HEADER)?.trim() ?? "";
   const signature = req.headers.get(EDGE_PROXY_SIGNATURE_HEADER)?.trim() ?? "";
   const timestampMs = Number(timestamp);
   if (!timestamp || !signature || !Number.isFinite(timestampMs)) {
-    return false;
+    return null;
   }
 
   if (Math.abs(Date.now() - timestampMs) > MAX_CLOCK_SKEW_MS) {
-    return false;
+    return null;
   }
 
   const requestId = req.headers.get("x-request-id")?.trim() ?? "";
   if (!requestId) {
-    return false;
+    return null;
   }
   const bodyHash = await hashRequestBody(req, target);
   const expected = await sign(
     secret,
     `${timestamp}.${requestId}.${req.method.toUpperCase()}.${target}.${bodyHash}`,
   );
-  return timingSafeEqual(signature, expected);
+  if (!timingSafeEqual(signature, expected)) return null;
+
+  // Recheck after body hashing and signature verification so a request that
+  // aged out while being verified cannot claim a replay slot.
+  const verifiedAt = Date.now();
+  if (Math.abs(verifiedAt - timestampMs) > MAX_CLOCK_SKEW_MS) return null;
+
+  return { requestId, signature, target, verifiedAt };
+};
+
+export const hasTrustedEdgeIngress = async (req: Request, target: string) => {
+  const verified = await verifyTrustedEdgeIngress(req, target);
+  if (verified === null) return false;
+
+  // Callers use this boolean as a trusted-path gate, so it must consume a
+  // valid envelope too; otherwise a replay could remain trusted on that path.
+  if (
+    claimTrustedIngressRequest(
+      verified.requestId,
+      verified.signature,
+      verified.verifiedAt,
+    )
+  ) return true;
+
+  console.error("trusted_ingress.replay_detected", {
+    request_id: verified.requestId.slice(0, 128),
+    target: verified.target.slice(0, 64),
+  });
+  return false;
+};
+
+const trustedIngressReplayResponse = (
+  verified: VerifiedTrustedIngress,
+  jsonResponse: (status: number, body: Record<string, unknown>) => Response,
+) => {
+  if (
+    claimTrustedIngressRequest(
+      verified.requestId,
+      verified.signature,
+      verified.verifiedAt,
+    )
+  ) return null;
+
+  console.error("trusted_ingress.replay_detected", {
+    request_id: verified.requestId.slice(0, 128),
+    target: verified.target.slice(0, 64),
+  });
+  return jsonResponse(409, { error: "Trusted edge request replay detected." });
 };
 
 export const requireTrustedEdgeIngress = async (
@@ -94,11 +190,11 @@ export const requireTrustedEdgeIngress = async (
   jsonResponse: (status: number, body: Record<string, unknown>) => Response,
 ) => {
   try {
-    const trusted = await hasTrustedEdgeIngress(req, target);
-    if (!trusted) {
+    const verified = await verifyTrustedEdgeIngress(req, target);
+    if (verified === null) {
       return jsonResponse(403, { error: "Trusted edge ingress required." });
     }
-    return null;
+    return trustedIngressReplayResponse(verified, jsonResponse);
   } catch (error) {
     if (
       error instanceof Error &&

@@ -124,7 +124,21 @@ const AUTH_SCOPE = {
 } as ReturnType<typeof getAuthState>;
 
 const okResponse = <T,>(data: T) => ({ ok: true, status: 200, error: "", data });
-const failResponse = (status: number, error = "boom") => ({ ok: false, status, error, data: null });
+const failResponse = (status: number, error = "boom", data: unknown = null) => ({ ok: false, status, error, data });
+
+const offlineContextFor = (barcodes: string[]) => ({
+  borrower: null,
+  items: barcodes.map((barcode, index) => ({
+    item: {
+      id: `item-${index}`,
+      name: `Item ${index}`,
+      barcode,
+      status: "available",
+      checked_out_by: null,
+    },
+    intent: "checkout" as const,
+  })),
+});
 
 const setOnline = (online: boolean) => vi.spyOn(navigator, "onLine", "get").mockReturnValue(online);
 
@@ -173,6 +187,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  vi.useRealTimers();
   vi.restoreAllMocks();
 });
 
@@ -184,7 +199,13 @@ describe("submitCheckoutReturn", () => {
 
     const result = await submitCheckoutReturn(payload, { borrower: null, items: [] });
 
-    expect(result).toEqual({ buffered: false, queuedCount: 1 });
+    expect(result).toEqual({
+      buffered: false,
+      queuedCount: 1,
+      processedItemCount: 1,
+      queuedItemCount: 0,
+      skippedBarcodes: [],
+    });
     expect(mockedApplyConfirmed).toHaveBeenCalledWith({ borrower: null, items: [] });
     expect(mockedMarkConfirmed).toHaveBeenCalled();
     expect(mockedRefreshPack).toHaveBeenCalledWith({ force: true, reportProgress: false });
@@ -194,28 +215,48 @@ describe("submitCheckoutReturn", () => {
     mockedInvoke.mockResolvedValue(okResponse({ success: true, processed: 1 }) as never);
     mockedRefreshPack.mockRejectedValue(new Error("refresh failed"));
 
-    await expect(submitCheckoutReturn(payload)).resolves.toEqual({ buffered: false, queuedCount: 0 });
+    await expect(submitCheckoutReturn(payload)).resolves.toEqual({
+      buffered: false,
+      queuedCount: 0,
+      processedItemCount: 1,
+      queuedItemCount: 0,
+      skippedBarcodes: [],
+    });
   });
 
   it("treats a 429 as queueable without labeling the reachable server offline", async () => {
     setOnline(true);
-    mockedInvoke.mockResolvedValue(failResponse(429) as never);
+    mockedInvoke.mockResolvedValue(
+      failResponse(429, "rate limited", { retry_after_seconds: 1 }) as never,
+    );
 
-    // 429 is a queueable status, so submitCheckoutReturn retries once online and then,
-    // with no offline context to buffer into, surfaces the generic offline-unavailable
-    // error rather than the underlying "rate limit exceeded" message.
-    await expect(submitCheckoutReturn(payload)).rejects.toThrow(/offline checkout is unavailable/i);
+    vi.useFakeTimers();
+    const pending = submitCheckoutReturn(payload);
+    const rejection = expect(pending).rejects.toThrow(/rate limit exceeded/i);
+    await vi.runAllTimersAsync();
+    await rejection;
     expect(mockedMarkUnreachable).not.toHaveBeenCalled();
     expect(mockedInvoke).toHaveBeenCalledTimes(2);
   });
 
   it("buffers a persistent 429 offline when an offline context is available", async () => {
     setOnline(true);
-    mockedInvoke.mockResolvedValue(failResponse(429) as never);
+    mockedInvoke.mockResolvedValue(
+      failResponse(429, "rate limited", { retry_after_seconds: 1 }) as never,
+    );
     mockedQueueOfflineOperation.mockResolvedValue(1);
 
-    const result = await submitCheckoutReturn(payload, { borrower: null, items: [] });
-    expect(result).toEqual({ buffered: true, queuedCount: 1 });
+    vi.useFakeTimers();
+    const pending = submitCheckoutReturn(payload, offlineContextFor(payload.item_barcodes));
+    await vi.runAllTimersAsync();
+    const result = await pending;
+    expect(result).toEqual({
+      buffered: true,
+      queuedCount: 1,
+      processedItemCount: 0,
+      queuedItemCount: 1,
+      skippedBarcodes: [],
+    });
   });
 
   it("throws a 409 conflict error when the server reports skipped barcodes", async () => {
@@ -260,13 +301,82 @@ describe("submitCheckoutReturn", () => {
     mockedInvoke.mockResolvedValue(failResponse(503) as never);
     mockedQueueOfflineOperation.mockResolvedValue(3);
 
-    const result = await submitCheckoutReturn(payload, { borrower: null, items: [] });
+    vi.useFakeTimers();
+    const pending = submitCheckoutReturn(payload, offlineContextFor(payload.item_barcodes));
+    await vi.runAllTimersAsync();
+    const result = await pending;
 
-    expect(result).toEqual({ buffered: true, queuedCount: 3 });
+    expect(result).toEqual({
+      buffered: true,
+      queuedCount: 3,
+      processedItemCount: 0,
+      queuedItemCount: 1,
+      skippedBarcodes: [],
+    });
     expect(mockedQueueOfflineOperation).toHaveBeenCalledWith(
-      expect.objectContaining({ operationId: "op-mock", borrower: null, items: [] })
+      expect.objectContaining({
+        operationId: "op-mock",
+        borrower: null,
+        items: offlineContextFor(payload.item_barcodes).items,
+      })
     );
     expect(mockedMarkUnreachable).not.toHaveBeenCalled();
+  });
+
+  it("reports only the unprocessed tail as queued after earlier chunks succeeded", async () => {
+    const barcodes = Array.from({ length: 150 }, (_, index) => `BC-${index}`);
+    const largePayload: CheckoutReturnPayload = { ...payload, item_barcodes: barcodes };
+    const offlineContext = offlineContextFor(barcodes);
+    setOnline(true);
+    mockedInvoke
+      .mockResolvedValueOnce(okResponse({ success: true, processed: 100 }) as never)
+      .mockResolvedValue(failResponse(503, "server unavailable") as never);
+    mockedQueueOfflineOperation.mockResolvedValue(1);
+
+    vi.useFakeTimers();
+    const pending = submitCheckoutReturn(largePayload, offlineContext);
+    await vi.runAllTimersAsync();
+    const result = await pending;
+
+    expect(result).toMatchObject({
+      buffered: true,
+      processedItemCount: 100,
+      queuedItemCount: 50,
+      skippedBarcodes: [],
+    });
+    expect(mockedQueueOfflineOperation).toHaveBeenCalledWith(
+      expect.objectContaining({ items: offlineContext.items.slice(100) })
+    );
+  });
+
+  it("queues unfinished chunks after an earlier chunk reports item conflicts", async () => {
+    const barcodes = Array.from({ length: 150 }, (_, index) => `BC-${index}`);
+    const largePayload: CheckoutReturnPayload = { ...payload, item_barcodes: barcodes };
+    const offlineContext = offlineContextFor(barcodes);
+    setOnline(true);
+    mockedInvoke
+      .mockResolvedValueOnce(okResponse({
+        success: true,
+        processed: 99,
+        skipped_barcodes: ["BC-99"],
+      }) as never)
+      .mockResolvedValue(failResponse(503, "server unavailable") as never);
+    mockedQueueOfflineOperation.mockResolvedValue(1);
+
+    vi.useFakeTimers();
+    const pending = submitCheckoutReturn(largePayload, offlineContext);
+    await vi.runAllTimersAsync();
+    const result = await pending;
+
+    expect(result).toMatchObject({
+      buffered: true,
+      processedItemCount: 99,
+      queuedItemCount: 50,
+      skippedBarcodes: ["BC-99"],
+    });
+    expect(mockedQueueOfflineOperation).toHaveBeenCalledWith(
+      expect.objectContaining({ items: offlineContext.items.slice(100) })
+    );
   });
 
   it("buffers immediately without retrying when offline", async () => {
@@ -274,9 +384,15 @@ describe("submitCheckoutReturn", () => {
     mockedInvoke.mockResolvedValue(failResponse(0, "Network request failed.") as never);
     mockedQueueOfflineOperation.mockResolvedValue(1);
 
-    const result = await submitCheckoutReturn(payload, { borrower: null, items: [] });
+    const result = await submitCheckoutReturn(payload, offlineContextFor(payload.item_barcodes));
 
-    expect(result).toEqual({ buffered: true, queuedCount: 1 });
+    expect(result).toEqual({
+      buffered: true,
+      queuedCount: 1,
+      processedItemCount: 0,
+      queuedItemCount: 1,
+      skippedBarcodes: [],
+    });
     expect(mockedInvoke).toHaveBeenCalledTimes(1);
   });
 
@@ -295,7 +411,7 @@ describe("submitCheckoutReturn", () => {
     setOnline(false);
     mockedInvoke.mockResolvedValue(failResponse(0, "Network request failed.") as never);
 
-    await expect(submitCheckoutReturn(payload)).rejects.toThrow(/offline checkout is unavailable/i);
+    await expect(submitCheckoutReturn(payload)).rejects.toThrow(/network request failed/i);
   });
 
   it("throws when a queueable failure occurs but the payload has no operation id", async () => {
@@ -303,8 +419,8 @@ describe("submitCheckoutReturn", () => {
     mockedEnsureOpId.mockImplementation((p) => ({ ...p, operation_id: undefined }));
     mockedInvoke.mockResolvedValue(failResponse(0, "Network request failed.") as never);
 
-    await expect(submitCheckoutReturn(payload, { borrower: null, items: [] })).rejects.toThrow(
-      /offline checkout is unavailable/i
+    await expect(submitCheckoutReturn(payload, offlineContextFor(payload.item_barcodes))).rejects.toThrow(
+      /network request failed/i
     );
   });
 
@@ -431,9 +547,14 @@ describe("syncBufferedCheckoutQueue", () => {
     ]);
     mockedInvoke
       .mockResolvedValueOnce(okResponse({ success: true, processed: 1 }) as never)
+      .mockResolvedValueOnce(failResponse(500, "still down") as never)
+      .mockResolvedValueOnce(failResponse(500, "still down") as never)
       .mockResolvedValueOnce(failResponse(500, "still down") as never);
 
-    const result = await syncBufferedCheckoutQueue();
+    vi.useFakeTimers();
+    const pending = syncBufferedCheckoutQueue();
+    await vi.runAllTimersAsync();
+    const result = await pending;
 
     expect(result).toMatchObject({ processed: 1, failed: 1, remaining: 1 });
     expect(mockedWriteQueue).toHaveBeenCalledWith([

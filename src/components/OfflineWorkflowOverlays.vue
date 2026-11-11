@@ -141,6 +141,7 @@ import {
   syncOfflineCheckoutLedger,
   type OfflineLedgerEntry,
 } from "../services/offlineCheckoutWorkflow";
+import { probeItemTraxxServer } from "../services/checkoutService";
 import {
   discardOfflineQueueReviewItem,
   listOfflineQueueReviewItems,
@@ -231,7 +232,12 @@ const tryReconnect = async () => {
   warningError.value = "";
   try {
     const result = await syncOfflineCheckoutLedger();
-    if (result.failed > 0) throw new Error("ItemTraxx servers are still unreachable. Your pending transactions remain safely stored on your device.");
+    if (!await probeItemTraxxServer()) {
+      throw new Error("ItemTraxx servers are still unreachable. Your pending transactions remain safely stored on your device.");
+    }
+    if (result.failed > 0 && result.remaining > 0) {
+      warningError.value = "Connected, but some transactions still need attention. They remain saved on this device.";
+    }
     await refresh();
   } catch (error) {
     warningError.value = toUserFacingErrorMessage(error, "ItemTraxx servers are still unreachable.");

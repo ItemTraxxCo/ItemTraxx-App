@@ -16,6 +16,7 @@ export type BufferedCheckoutItem = {
   created_at: string;
   attempts: number;
   last_error: string | null;
+  next_retry_at?: string | null;
   workspace_id?: string;
   profile_id?: string;
   device_id?: string;

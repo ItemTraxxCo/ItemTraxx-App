@@ -216,6 +216,7 @@ serve((req) => withRequestSpan(req, "POST /functions/checkoutReturn", async (spa
     if (!rateLimitResult.allowed) {
       return jsonResponse(429, {
         error: "Rate limit exceeded, please try again in a minute.",
+        retry_after_seconds: rateLimitResult.retry_after_seconds ?? 60,
       });
     }
 

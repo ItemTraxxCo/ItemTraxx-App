@@ -1,0 +1,6 @@
+{
+  "$comment": "Repo migrations intentionally not executed against long-lived environments. scripts/supabase-migration-drift.mjs treats these as satisfied and, with --apply, records them as no-ops so schema_migrations stays complete. Every entry needs the reason it must not run.",
+  "superseded": {
+    "20260822150000_fix_checkout_return_operation_id_ambiguity": "Superseded by 20260919120000_individual_accounts, which redefines public.apply_checkout_return_item with the same v_operation_id fix plus individual-account support. Executing this file after it would revert that function."
+  }
+}

@@ -158,11 +158,13 @@ import {
   fetchCheckedOutItem,
   fetchItemByBarcode,
   fetchBorrowerByBorrowerId,
+  formatSkippedBarcodeConflictMessage,
   submitCheckoutReturn,
   syncCheckoutQueues,
   type ItemSummary,
   type BorrowerSummary,
 } from "../../services/checkoutService";
+import { readOfflineConnectionState } from "../../services/offlineConnectionState";
 import { sanitizeInput } from "../../utils/inputSanitizer";
 import { preloadImages } from "../../utils/preloadImages";
 import { getAuthState } from "../../store/authState";
@@ -463,14 +465,46 @@ const submit = async () => {
     );
     if (submitResult.buffered) {
       const bufferedCount = submitResult.queuedCount;
-      capturePostHogEvent("checkout_transaction_buffered", { buffered_count: bufferedCount });
-      success.value = "";
+      const skippedBarcodes = [...new Set(submitResult.skippedBarcodes)];
+      const hasSkippedItems = skippedBarcodes.length > 0;
+      const queuedItemCount = submitResult.queuedItemCount;
+      capturePostHogEvent("checkout_transaction_buffered", {
+        buffered_count: bufferedCount,
+        processed_item_count: submitResult.processedItemCount,
+        queued_item_count: queuedItemCount,
+        skipped_item_count: skippedBarcodes.length,
+      });
       receipt.value = null;
-      barcodes.value = [];
       barcodeInput.value = "";
-      borrowerId.value = "";
-      borrower.value = null;
-      checkedOutItem.value = [];
+      const summaryParts = [];
+      if (submitResult.processedItemCount > 0) {
+        summaryParts.push(`${submitResult.processedItemCount} processed`);
+      }
+      summaryParts.push(`${queuedItemCount} saved for sync`);
+      if (hasSkippedItems) summaryParts.push(`${skippedBarcodes.length} need attention`);
+      lastSummary.value = summaryParts.join(" · ");
+      const isOffline = !!readOfflineConnectionState().unreachable_since;
+      success.value = isOffline
+        ? `${queuedItemCount} item(s) are saved and will sync when you reconnect.`
+        : `${queuedItemCount} item(s) are saved for automatic sync.`;
+      error.value = hasSkippedItems
+        ? formatSkippedBarcodeConflictMessage(skippedBarcodes)
+        : "";
+      toastStatus.value = hasSkippedItems ? "Failed" : "Success";
+      toastTitle.value = hasSkippedItems
+        ? "Some items need attention."
+        : "Transaction saved for sync.";
+      toastMessage.value = hasSkippedItems
+        ? error.value
+        : lastSummary.value;
+      barcodes.value = hasSkippedItems
+        ? barcodes.value.filter((item) => skippedBarcodes.includes(item.barcode))
+        : [];
+      if (!hasSkippedItems) {
+        borrowerId.value = "";
+        borrower.value = null;
+        checkedOutItem.value = [];
+      }
       return;
     }
     const borrowerSnapshot = borrower.value;

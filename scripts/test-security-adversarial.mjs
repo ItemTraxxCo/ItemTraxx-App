@@ -167,14 +167,17 @@ const provisionDatabase = async () => {
   }
   if (!KEEP_DB) cleanupSteps.push(() => run("docker", ["network", "rm", network]));
 
+  // Secrets never go on a command line (visible to other local processes via
+  // `ps`, and echoed back in error output). `docker -e NAME` without a value
+  // reads NAME from the Docker CLI's own environment.
   const started = run("docker", [
     "run", "-d", "--name", container, "--network", network,
-    "-e", `POSTGRES_PASSWORD=${password}`,
+    "-e", "POSTGRES_PASSWORD",
     "-p", `127.0.0.1:${port}:5432`,
     POSTGRES_IMAGE,
-  ]);
+  ], { env: { ...process.env, POSTGRES_PASSWORD: password } });
   if (started.status !== 0) {
-    throw new Error(`could not start Postgres: ${started.stderr.trim()}`);
+    throw new Error(`could not start Postgres: ${started.stderr.trim().slice(-800)}`);
   }
   if (!KEEP_DB) cleanupSteps.push(() => run("docker", ["rm", "-f", container]));
 
@@ -195,26 +198,43 @@ const provisionDatabase = async () => {
   if (!ready) throw new Error("Postgres did not become ready in 90 seconds");
   await sleep(2000);
 
-  const setAuthPassword = run("docker", [
-    "exec", container, "psql", "-U", "supabase_admin", "-d", "postgres", "-Xq",
-    "-c", `alter role supabase_auth_admin with password '${authPassword}'`,
-  ]);
-  if (setAuthPassword.status !== 0) {
-    throw new Error(`could not configure the auth admin role: ${setAuthPassword.stderr.trim()}`);
+  // The role password travels over stdin, not argv. psql's output from this
+  // step is never surfaced because it executes secret-bearing SQL.
+  const authRoleUpdate = run("docker", [
+    "exec", "-i", container,
+    "psql", "-U", "supabase_admin", "-d", "postgres", "-Xq", "-v", "ON_ERROR_STOP=1",
+  ], { input: `alter role supabase_auth_admin with password '${authPassword}';\n` });
+  if (authRoleUpdate.status !== 0) {
+    throw new Error(
+      `could not configure the auth admin role (exit ${authRoleUpdate.status}); rerun with ITX_SECURITY_KEEP_DB=1 and inspect \`docker logs ${container}\`.`,
+    );
   }
 
   console.info(`Applying GoTrue auth schema (${GOTRUE_IMAGE})...`);
+  const jwtSecret = randomBytes(32).toString("hex");
   const authMigrate = run("docker", [
     "run", "--rm", "--network", network,
     "-e", "GOTRUE_DB_DRIVER=postgres",
-    "-e", `GOTRUE_DB_DATABASE_URL=postgres://supabase_auth_admin:${authPassword}@${container}:5432/postgres?sslmode=disable`,
+    "-e", "GOTRUE_DB_DATABASE_URL",
     "-e", "GOTRUE_SITE_URL=http://localhost",
-    "-e", `GOTRUE_JWT_SECRET=${randomBytes(32).toString("hex")}`,
+    "-e", "GOTRUE_JWT_SECRET",
     "-e", "API_EXTERNAL_URL=http://localhost",
     GOTRUE_IMAGE, "auth", "migrate",
-  ]);
+  ], {
+    env: {
+      ...process.env,
+      GOTRUE_DB_DATABASE_URL:
+        `postgres://supabase_auth_admin:${authPassword}@${container}:5432/postgres?sslmode=disable`,
+      GOTRUE_JWT_SECRET: jwtSecret,
+    },
+  });
   if (authMigrate.status !== 0) {
-    throw new Error(`GoTrue auth migration failed: ${authMigrate.stderr.trim().slice(-800)}`);
+    // GoTrue may echo its connection settings; scrub secrets before surfacing.
+    const diagnostics = [authPassword, jwtSecret].reduce(
+      (text, secret) => text.split(secret).join("****"),
+      authMigrate.stderr.trim().slice(-800),
+    );
+    throw new Error(`GoTrue auth migration failed: ${diagnostics}`);
   }
 
   console.info("Applying schema baseline...");
@@ -251,7 +271,11 @@ const provisionDatabase = async () => {
   }
 
   if (KEEP_DB) {
-    console.info(`Keeping database for debugging: ${databaseUrl.replace(password, "****")} (container ${container})`);
+    // Built from non-secret parts only; the password stays in the container env.
+    console.info(
+      `Keeping database for debugging: postgres@127.0.0.1:${port}/postgres (container ${container}).\n` +
+        `Password: docker inspect -f '{{range .Config.Env}}{{println .}}{{end}}' ${container} | grep POSTGRES_PASSWORD`,
+    );
   }
   return databaseUrl;
 };

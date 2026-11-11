@@ -6,6 +6,10 @@ import {
   ValidationError,
 } from "../_shared/validation.ts";
 
+// Keep aligned with src/types/offlineCheckoutLimits.ts.
+const MAX_OFFLINE_SYNC_OPERATIONS = 50;
+const MAX_OFFLINE_SYNC_ITEMS = 100;
+
 const OFFLINE_INTENTS = new Set(
   ["checkout", "return", "quick_return"] as const,
 );
@@ -42,7 +46,10 @@ const nullableUuid = (value: unknown) => {
 };
 
 export const parseSyncOperations = (value: unknown) => {
-  if (!Array.isArray(value) || value.length < 1 || value.length > 50) {
+  if (
+    !Array.isArray(value) || value.length < 1 ||
+    value.length > MAX_OFFLINE_SYNC_OPERATIONS
+  ) {
     throw new ValidationError("Invalid offline operations.");
   }
 
@@ -65,7 +72,7 @@ export const parseSyncOperations = (value: unknown) => {
       throw new ValidationError("Offline operation has no items.");
     }
     totalItems += operation.items.length;
-    if (totalItems > 100) {
+    if (totalItems > MAX_OFFLINE_SYNC_ITEMS) {
       throw new ValidationError("Too many offline items.");
     }
 

@@ -4,7 +4,7 @@
     "npm:@better-auth/infra@0.4.25": "0.4.25_@better-auth+core@1.7.16_better-auth@1.7.16_zod@4.6.7_@types+node@26.6.6_kysely@0.29.8_nanostores@1.5.5",
     "npm:@better-auth/passkey@1.7.16": "1.7.16_@better-auth+core@1.7.16_@better-auth+utils@0.5.1_@better-fetch+fetch@1.3.3_better-auth@1.7.16_better-call@1.4.5_nanostores@1.5.5_@types+node@26.6.6_jose@6.2.15_kysely@0.29.8",
     "npm:@better-auth/sso@1.7.16": "1.7.16_@better-auth+core@1.7.16_@better-auth+utils@0.5.1_@better-fetch+fetch@1.3.3_better-auth@1.7.16_better-call@1.4.5_@types+node@26.6.6_kysely@0.29.8_nanostores@1.5.5",
-    "npm:@cloudflare/vite-plugin@1.66.0": "1.66.0_vite@8.3.5_wrangler@4.155.0_@types+node@26.6.6",
+    "npm:@cloudflare/vite-plugin@1.67.0": "1.67.0_vite@8.3.5_wrangler@4.156.1",
     "npm:@cyclonedx/cyclonedx-npm@6.0.1": "6.0.1",
     "npm:@fontsource/inter@^5.3.0": "5.3.0",
     "npm:@intercom/messenger-js-sdk@^0.0.20": "0.0.20",
@@ -24,22 +24,22 @@
     "npm:dompurify@3.4.17": "3.4.17",
     "npm:fake-indexeddb@^6.2.7": "6.2.7",
     "npm:jose@6.1.3": "6.1.3",
-    "npm:jose@6.2.14": "6.2.14",
+    "npm:jose@6.2.15": "6.2.15",
     "npm:jsbarcode@^3.12.3": "3.12.3",
     "npm:jsdom@^30.1.3": "30.1.3_@noble+hashes@2.4.0",
     "npm:jspdf-autotable@^5.0.9": "5.0.9_jspdf@4.2.1",
     "npm:jspdf@^4.2.1": "4.2.1",
     "npm:marked@18.1.3": "18.1.3",
-    "npm:posthog-js@1.444.0": "1.444.0",
+    "npm:posthog-js@1.444.2": "1.444.2",
     "npm:qrcode@^1.5.4": "1.5.4",
-    "npm:supabase@^2.122.0": "2.122.0",
+    "npm:supabase@3": "3.0.0",
     "npm:typescript@~6.0.3": "6.0.3",
     "npm:vite@^8.3.5": "8.3.5_@types+node@26.6.6",
     "npm:vitest@5.0.5": "5.0.5_@types+node@26.6.6_@vitest+coverage-v8@5.0.5_jsdom@30.1.3_vite@8.3.5",
     "npm:vue-router@^4.6.4": "4.6.4_vue@3.5.44_typescript@6.0.3",
     "npm:vue-tsc@^3.3.14": "3.3.14_typescript@6.0.3",
     "npm:vue@^3.5.44": "3.5.44_typescript@6.0.3",
-    "npm:wrangler@4.156.0": "4.156.0",
+    "npm:wrangler@4.156.1": "4.156.1",
     "npm:zod@^4.6.7": "4.6.7"
   },
   "npm": {
@@ -232,14 +232,14 @@
         "workerd"
       ]
     },
-    "@cloudflare/vite-plugin@1.66.0_vite@8.3.5_wrangler@4.155.0_@types+node@26.6.6": {
-      "integrity": "sha512-hlXPbS6SWXHCJVztghkg+iW7dQNrx/wuy00SOLB6V2Ho78agt7RZdzb3iQuksl4XcFrp7cr/4WX4myBTiqitNw==",
+    "@cloudflare/vite-plugin@1.67.0_vite@8.3.5_wrangler@4.156.1": {
+      "integrity": "sha512-DvRCm5zFBOzq7W2wsdCs2CebccC+BBIsQBnSW/S3TAshHF5hqbTrYTcCNTA4J9Fbarbtxd3OT0eMvLnR5ndR3A==",
       "dependencies": [
         "@cloudflare/unenv-preset",
-        "miniflare@5.20261023.1-beta",
+        "miniflare",
         "unenv",
         "vite",
-        "wrangler@4.155.0",
+        "wrangler",
         "ws"
       ]
     },
@@ -1043,43 +1043,43 @@
         "tslib@2.8.1"
       ]
     },
-    "@supabase/cli-darwin-arm64@2.122.0": {
-      "integrity": "sha512-EsEGKIySkCXJZrywL4Q+wELyhD3NHVrpWXIVDtF3GdymTsjtV8FWPpzy2olzAOZlBrT4CmfNChFNtldnVKDtZg==",
+    "@supabase/cli-darwin-arm64@3.0.0": {
+      "integrity": "sha512-6N/clanDjhKWcPsHBqXcSt7HCZ0bBTjkGGrHgM4834zFu/PBIVBS6u9YJVXxOdQnbwyw/rTwumSYvgwwJgoIug==",
       "os": ["darwin"],
       "cpu": ["arm64"]
     },
-    "@supabase/cli-darwin-x64@2.122.0": {
-      "integrity": "sha512-VPaUdcWeWl8AgiUT+f3CqRUqG/Ju/EouBjkMlPYyKVtENkllbs1ovqHezsPuDVcPI2S51PGIugpCinri7AzaOQ==",
+    "@supabase/cli-darwin-x64@3.0.0": {
+      "integrity": "sha512-e2DKOLIqK82XRp/GSmm0oMXx2CLBSTWJGobro1POPhmn3o+NWRQPI1QvjLFYIeI/9ZfSuo5PUJN4KI9OSjzAng==",
       "os": ["darwin"],
       "cpu": ["x64"]
     },
-    "@supabase/cli-linux-arm64-musl@2.122.0": {
-      "integrity": "sha512-4iA2roUY35swqtHJrZtjcuSzohRtJp51IVg9rO+nB6ws2xiSDDXgug4mGTngL4JqIrBLaer+MeAwI2E9zY3k2g==",
+    "@supabase/cli-linux-arm64-musl@3.0.0": {
+      "integrity": "sha512-Bxe2bggo4dLW6tvlA6Qmjzth3VPGNEzjEaxYZohalP+q4jynov6OE6ibeLEdBtalykDMRbUXQ9j7r1p10RI/hQ==",
       "os": ["linux"],
       "cpu": ["arm64"]
     },
-    "@supabase/cli-linux-arm64@2.122.0": {
-      "integrity": "sha512-1YJ8HmI1SqmIdmoWVxWjm+GuRKz6oVTZGRTspQJSIKlKQ3MhTee06fjqu9VOYRIxWiMn0sHZpBFB/JAolm9LrQ==",
+    "@supabase/cli-linux-arm64@3.0.0": {
+      "integrity": "sha512-sjdzBJGa+zfXSxUczRkqAJpuVgE2PFWXJazYxOnrqYWVPiS9Q0e2m06JdUXwZz/GqxKuLuDQN1OyLFu8DLfQDA==",
       "os": ["linux"],
       "cpu": ["arm64"]
     },
-    "@supabase/cli-linux-x64-musl@2.122.0": {
-      "integrity": "sha512-b+xfmbtwp1hPqjkxjwbhjmFFqqcW11bpRbey6fceLfQyUxIHTvrnV4s2jwFt3gbPLL2qbziULma4fVIlQy0GSw==",
+    "@supabase/cli-linux-x64-musl@3.0.0": {
+      "integrity": "sha512-ANyJ6h2X4HgM8f3PAFLGNH1XzYNho2M4kev/z5Ryq6on3ArI9FA+4KrrUqs1SFGji8E5WGyx/H+CHxmcXf5rTg==",
       "os": ["linux"],
       "cpu": ["x64"]
     },
-    "@supabase/cli-linux-x64@2.122.0": {
-      "integrity": "sha512-w1fuRWCry1gfMGGTUCLwBgNpLgVjvNRq6MfnkJa89hYpITWVIjYo/6VcfFFsbiwx1uPFAYXfHNuocF4m6jyPfA==",
+    "@supabase/cli-linux-x64@3.0.0": {
+      "integrity": "sha512-cR4S5e3nygMaBShbbt6FOiMumtrFJjwdKMXMimC1y7FpxITlwLv36BveaifQZ8aY+v1u+w8oYANU2H72Y4ibWA==",
       "os": ["linux"],
       "cpu": ["x64"]
     },
-    "@supabase/cli-windows-arm64@2.122.0": {
-      "integrity": "sha512-QOLPgfYzlDz33qrTM9pw1DToX6DW5BMV/vz+BJEqoZbgPgRMCzRX602+D67+3Tanp9dJAfpTIaDW+NLFbxOdMA==",
+    "@supabase/cli-windows-arm64@3.0.0": {
+      "integrity": "sha512-Xox3X7BXpe+/X9XpAgo5/Qrv5qtJaItc3gLlAwJ2d2AcGrBnfh4/b0MvbNbyO7I2Fj1c7yrPmMI4lEicVvIGGw==",
       "os": ["win32"],
       "cpu": ["arm64"]
     },
-    "@supabase/cli-windows-x64@2.122.0": {
-      "integrity": "sha512-ZqnYR0xUGHSNLYqoJIsQvM5RZCVDcoo3VdTXgHTz1jgdzs1yOvDGZQPtjgPYyxFvPREx9wlrw0/OkC4pfNgiqw==",
+    "@supabase/cli-windows-x64@3.0.0": {
+      "integrity": "sha512-nBfd1Rz8MwstIJXHo5fyIQgjmYgLxDbBIuCmuttYAQwTafc7jUOofIAAUUARkhalHu0kBOEyRuEqe2rfKr/l5w==",
       "os": ["win32"],
       "cpu": ["x64"]
     },
@@ -1875,9 +1875,6 @@
     "jose@6.1.3": {
       "integrity": "sha512-0TpaTfihd4QMNwrz/ob2Bp7X04yuxJkjRGi4aKmOqwhov54i6u79oCv7T+C7lo70MKH6BesI3vscD1yb/yzKXQ=="
     },
-    "jose@6.2.14": {
-      "integrity": "sha512-3JasLuki1NRLQvY4wCoC37KZk4qxoBx2k2aFqLxT84IezqW0bkJKnNtxnZj/Fu1xsQivoc/lytxaRHJoGLjJ1A=="
-    },
     "jose@6.2.15": {
       "integrity": "sha512-qdF6ewcZARtef63fJ9AKKZPgxw+t7USH6HLXYcD4CrdmSvDp79rpJSPFEKc90QBeGS63u1KQtN2MZQHC0yDIzA=="
     },
@@ -2082,30 +2079,8 @@
     "mimic-response@3.1.0": {
       "integrity": "sha512-z0yWI+4FDrrweS8Zmt4Ej5HdJmky15+L2e6Wgn3+iK5fWzb6T3fhNFq2+MeTRb064c6Wr4N/wv0DzQTjNzHNGQ=="
     },
-    "miniflare@5.20261023.1-beta": {
-      "integrity": "sha512-hgm1AJhwC6W+iaRhvMnfs7bPOsxjKa8LXTFR2WVPA5qA9KhpyBd2LddmT+9M9tm65VZ8YWkwQGvB+cKbqJoKeA==",
-      "dependencies": [
-        "@cspotcode/source-map-support",
-        "sharp",
-        "undici",
-        "workerd",
-        "ws",
-        "youch"
-      ]
-    },
-    "miniflare@5.20261023.2-beta": {
-      "integrity": "sha512-sXpZloQnIUe4raXXdwwqd2ioRHox9a/1B4nB2/p4JWKDwGuVgEK4DugCNgIeQf0iVuSgBItdYpodJe4iwY6SrQ==",
-      "dependencies": [
-        "@cspotcode/source-map-support",
-        "sharp",
-        "undici",
-        "workerd",
-        "ws",
-        "youch"
-      ]
-    },
-    "miniflare@5.20261023.3-beta": {
-      "integrity": "sha512-thdXzlktu5GE1o/BlmMAPeJ0Cu6Tu5LpMbRlyfRrpVvMRrhd6p52TMqcITCZZLVzt1UO92VGBkLDhLOpryUAyQ==",
+    "miniflare@5.20261101.0-beta": {
+      "integrity": "sha512-31uZmP8PGue7S3fYMIRXNXxFGh5/SEmd4OGna/80RXcE1nngVub21h9GbcWajQ7625mEYBnexpI2ogGo9NUa6Q==",
       "dependencies": [
         "@cspotcode/source-map-support",
         "sharp",
@@ -2274,8 +2249,8 @@
         "source-map-js"
       ]
     },
-    "posthog-js@1.444.0": {
-      "integrity": "sha512-4m+QsAFi1h5Zt8eFq6ciJGD8bcLMt1P/O1cLlo26RrX5F4oMOIKZsNIlf1SIMZWlRNNCFemSpzn6HhwtkZMrnA==",
+    "posthog-js@1.444.2": {
+      "integrity": "sha512-gsG9GllefB1o0brQNND4shWbyfE4xmp1Yh791yrDxPIi4OgB6qQ96263bajVjfI8tWKM9wlxPTRwkPQZ1gA/Ug==",
       "dependencies": [
         "@posthog/browser-common",
         "@posthog/core",
@@ -2575,8 +2550,8 @@
         "anynum"
       ]
     },
-    "supabase@2.122.0": {
-      "integrity": "sha512-6IQOuHnRFyUgQxi6j6WfxJ6R4sh6vgcyhKxapv/CCDqs3+O/UxMggPxGAPr2eTEt1MhAOpa6xftiNRHIsB7afQ==",
+    "supabase@3.0.0": {
+      "integrity": "sha512-FB+V+RzXYTmCzbchaN3CUdxLPpcKzJd4RSOc/dAE6cAtI7TZE8J5OLJYXjJae9C/fbi2xxzZJLL/Y2N1zbzf9A==",
       "dependencies": [
         "eciesjs",
         "jose@6.2.15"
@@ -2872,31 +2847,14 @@
       "scripts": true,
       "bin": true
     },
-    "wrangler@4.155.0": {
-      "integrity": "sha512-gBKtAg2e0abQDvXPRQu611YMTd/cfAaJTOLAs/89tTxFxEeUyC260MRJRK+m3gLmQjDYWFwJv+ErwuJ/GuALpA==",
+    "wrangler@4.156.1": {
+      "integrity": "sha512-aZngeNRosSVly6wgxpaJAtFPtEoyM3hD8mLMMcHNXTnofMq4ZN+RMXOdHETyttNP+//+mfiD1hb5E8YFtiMMRQ==",
       "dependencies": [
         "@cloudflare/kv-asset-handler",
         "@cloudflare/unenv-preset",
         "blake3-wasm",
         "esbuild",
-        "miniflare@5.20261023.2-beta",
-        "path-to-regexp",
-        "unenv",
-        "workerd"
-      ],
-      "optionalDependencies": [
-        "fsevents"
-      ],
-      "bin": true
-    },
-    "wrangler@4.156.0": {
-      "integrity": "sha512-kVLAShuLiNgE3jcrmXcymDf/iPKDPrSxACe5ueugW/33HeNB9E9CkKYchudCeBwgmsnl4k+1zt4NO7vqb/fRuQ==",
-      "dependencies": [
-        "@cloudflare/kv-asset-handler",
-        "@cloudflare/unenv-preset",
-        "blake3-wasm",
-        "esbuild",
-        "miniflare@5.20261023.3-beta",
+        "miniflare",
         "path-to-regexp",
         "unenv",
         "workerd"
@@ -3071,7 +3029,7 @@
         "npm:@better-auth/infra@0.4.25",
         "npm:@better-auth/passkey@1.7.16",
         "npm:@better-auth/sso@1.7.16",
-        "npm:@cloudflare/vite-plugin@1.66.0",
+        "npm:@cloudflare/vite-plugin@1.67.0",
         "npm:@cyclonedx/cyclonedx-npm@6.0.1",
         "npm:@fontsource/inter@^5.3.0",
         "npm:@intercom/messenger-js-sdk@^0.0.20",
@@ -3090,22 +3048,22 @@
         "npm:boneyard-js@^1.10.0",
         "npm:dompurify@3.4.17",
         "npm:fake-indexeddb@^6.2.7",
-        "npm:jose@6.2.14",
+        "npm:jose@6.2.15",
         "npm:jsbarcode@^3.12.3",
         "npm:jsdom@^30.1.3",
         "npm:jspdf-autotable@^5.0.9",
         "npm:jspdf@^4.2.1",
         "npm:marked@18.1.3",
-        "npm:posthog-js@1.444.0",
+        "npm:posthog-js@1.444.2",
         "npm:qrcode@^1.5.4",
-        "npm:supabase@^2.122.0",
+        "npm:supabase@3",
         "npm:typescript@~6.0.3",
         "npm:vite@^8.3.5",
         "npm:vitest@5.0.5",
         "npm:vue-router@^4.6.4",
         "npm:vue-tsc@^3.3.14",
         "npm:vue@^3.5.44",
-        "npm:wrangler@4.156.0",
+        "npm:wrangler@4.156.1",
         "npm:zod@^4.6.7"
       ],
       "overrides": {

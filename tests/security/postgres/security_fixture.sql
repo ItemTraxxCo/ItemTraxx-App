@@ -59,8 +59,8 @@ insert into public.account_sessions (
   ('70000000-0000-4000-8000-000000000002', '10000000-0000-4000-8000-000000000001', '11000000-0000-4000-8000-000000000002', 'itx-security-a-member-device', 'regular_login', 'Tenant A', 'itx-security-session-a-member'),
   ('70000000-0000-4000-8000-000000000003', '10000000-0000-4000-8000-000000000002', '11000000-0000-4000-8000-000000000003', 'itx-security-b-admin-device', 'admin_login', 'B-SECRET-LOCATION-RECORD', 'itx-security-session-b-admin');
 
--- account_category is explicit: the column default ('organization') violates
--- workspace_policies_account_category_check in staging and production.
+-- account_category is explicit so the fixture does not depend on the column
+-- default, which was invalid ('organization') until 20261111120000.
 insert into public.workspace_policies (
   workspace_id, account_category, billing_email, billing_status,
   invoice_reference, max_admins, max_items

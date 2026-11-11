@@ -16,6 +16,7 @@
     "test:e2e": "playwright test",
     "test:security:adversarial": "node ./scripts/test-security-adversarial.mjs",
     "test:security:baseline": "node ./scripts/generate-security-baseline.mjs",
+    "supabase:migrations:drift": "node ./scripts/supabase-migration-drift.mjs",
     "test:e2e:headed": "playwright test --headed",
     "test:e2e:ui": "playwright test --ui",
     "test:unit": "vitest run",

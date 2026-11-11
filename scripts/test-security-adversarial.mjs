@@ -111,12 +111,18 @@ const pendingMigrations = (baselineSql) => {
     applied.add(match[1]);
     if (match[2]) applied.add(match[2].replace(/^\d{14}_/, ""));
   }
+  // Superseded migrations must never execute (they would revert newer
+  // definitions); see supabase/migration-drift-allowlist.json.
+  const superseded = JSON.parse(
+    readFileSync(resolve(root, "supabase/migration-drift-allowlist.json"), "utf8"),
+  ).superseded ?? {};
   return readdirSync(resolve(root, "supabase/migrations"))
     .filter((file) => file.endsWith(".sql"))
     .sort()
     .filter((file) => {
       const [, version, name] = file.match(/^(\d{14})_(.+)\.sql$/) ?? [];
-      return version && !applied.has(version) && !applied.has(name);
+      return version && !applied.has(version) && !applied.has(name) &&
+        !(`${version}_${name}` in superseded);
     });
 };
 
@@ -270,6 +276,12 @@ try {
     "BETTER_AUTH_JWKS_URL",
     "BETTER_AUTH_JWT_ISSUER",
     "BETTER_AUTH_JWT_AUDIENCE",
+    // Shared replay-store flag and the service-role endpoint it would use.
+    "ITX_TRUSTED_INGRESS_REPLAY_STORE",
+    "ITX_SUPABASE_URL",
+    "SUPABASE_URL",
+    "ITX_SECRET_KEY",
+    "SUPABASE_SERVICE_ROLE_KEY",
   ].join(",");
 
   const commands = [

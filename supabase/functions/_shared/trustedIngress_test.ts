@@ -707,3 +707,110 @@ Deno.test("requireTrustedEdgeIngress surfaces oversized-body validation errors w
     );
   });
 });
+
+// Shared (cross-isolate) replay store, enabled by
+// ITX_TRUSTED_INGRESS_REPLAY_STORE=database.
+const withSharedReplayStore = async (
+  respond: (request: Request) => Promise<Response> | Response,
+  run: (calls: Request[]) => Promise<void>,
+  enabled = true,
+) => {
+  const names = [
+    "ITX_TRUSTED_INGRESS_REPLAY_STORE",
+    "ITX_SUPABASE_URL",
+    "ITX_SECRET_KEY",
+  ];
+  const previous = Object.fromEntries(names.map((name) => [name, Deno.env.get(name)]));
+  const originalFetch = globalThis.fetch;
+  const calls: Request[] = [];
+  if (enabled) Deno.env.set("ITX_TRUSTED_INGRESS_REPLAY_STORE", "database");
+  else Deno.env.delete("ITX_TRUSTED_INGRESS_REPLAY_STORE");
+  Deno.env.set("ITX_SUPABASE_URL", "https://replay-store.supabase.test/");
+  Deno.env.set("ITX_SECRET_KEY", "service-role-test-key");
+  globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit) => {
+    const request = input instanceof Request ? input : new Request(input, init);
+    calls.push(request.clone());
+    return await respond(request);
+  }) as typeof fetch;
+  try {
+    await withSecret(() => run(calls));
+  } finally {
+    globalThis.fetch = originalFetch;
+    for (const name of names) {
+      if (previous[name] === undefined) Deno.env.delete(name);
+      else Deno.env.set(name, previous[name]!);
+    }
+  }
+};
+
+Deno.test("shared replay store is not consulted unless enabled", async () => {
+  await withSharedReplayStore(() => Response.json(true), async (calls) => {
+    const request = await makeSignedIngressRequest({ requestId: "shared-store-disabled" });
+    await assertIngressAccepted(request, "store disabled");
+    assert(calls.length === 0, "expected no shared-store call while the flag is off");
+  }, false);
+});
+
+Deno.test("shared replay store claim admits a first-seen envelope with a hashed key", async () => {
+  await withSharedReplayStore(() => Response.json(true), async (calls) => {
+    const request = await makeSignedIngressRequest({ requestId: "shared-store-first-seen" });
+    await assertIngressAccepted(request, "first-seen envelope");
+    assert(calls.length === 1, "expected exactly one shared-store claim");
+    const [call] = calls;
+    assert(
+      call.url === "https://replay-store.supabase.test/rest/v1/rpc/claim_trusted_ingress_request",
+      `unexpected claim URL ${call.url}`,
+    );
+    assert(
+      call.headers.get("authorization") === "Bearer service-role-test-key" &&
+        call.headers.get("apikey") === "service-role-test-key",
+      "expected the claim to authenticate as service_role",
+    );
+    const body = await call.json() as { p_claim_key: string; p_ttl_seconds: number };
+    assert(/^[0-9a-f]{64}$/.test(body.p_claim_key), "claim key must be a sha256 hex digest");
+    assert(
+      !body.p_claim_key.includes("shared-store-first-seen"),
+      "claim key must not carry the raw request ID",
+    );
+    assert(body.p_ttl_seconds === 60, "claim TTL must match the replay window");
+  });
+});
+
+Deno.test("shared replay store rejects an envelope another isolate already claimed", async () => {
+  // A fresh isolate has never seen this envelope locally; the database claim
+  // returning false is the cross-isolate replay signal.
+  await withSharedReplayStore(() => Response.json(false), async () => {
+    const request = await makeSignedIngressRequest({ requestId: "shared-store-cross-isolate" });
+    await assertIngressDenied(
+      request,
+      "cross-isolate replay",
+      409,
+      "Trusted edge request replay detected.",
+    );
+  });
+});
+
+Deno.test("shared replay store fails closed when the claim cannot be confirmed", async () => {
+  for (
+    const [label, respond] of [
+      ["HTTP error", () => new Response("upstream failure", { status: 500 })],
+      ["network error", () => Promise.reject(new TypeError("connection reset"))],
+      ["non-boolean body", () => Response.json({ claimed: true })],
+    ] as const
+  ) {
+    await withSharedReplayStore(respond, async () => {
+      const required = await makeSignedIngressRequest({ requestId: `shared-store-unavailable-${label}` });
+      await assertIngressDenied(
+        required,
+        `${label} (requireTrustedEdgeIngress)`,
+        503,
+        "Trusted edge replay protection unavailable.",
+      );
+      const gated = await makeSignedIngressRequest({ requestId: `shared-store-gate-${label}` });
+      assert(
+        await hasTrustedEdgeIngress(gated, "workspace-admin-mutate") === false,
+        `${label}: hasTrustedEdgeIngress must not trust an unconfirmed claim`,
+      );
+    });
+  }
+});

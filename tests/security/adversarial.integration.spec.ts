@@ -88,3 +88,9 @@ describe("Security: Privilege Escalation & Mass Assignment", () => {
     runSql("tests/security/postgres/mass_assignment_jsonb.sql");
   });
 });
+
+describe("Security: Trusted Ingress Replay Store", () => {
+  it("claims each signed envelope once across isolates and denies browser roles", () => {
+    runSql("tests/security/postgres/trusted_ingress_replay_store.sql");
+  });
+});

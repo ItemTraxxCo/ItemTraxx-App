@@ -271,9 +271,11 @@ Deno.test("trusted ingress does not let forged signatures poison a valid request
 //   only; the query string and unrelated headers are deliberately unsigned.
 //   That is safe only while no ingress-protected function reads query
 //   parameters, which the static guard test after this one enforces.
-// - The replay cache is in-memory per isolate, so this proves same-isolate
-//   replay rejection. A replay routed to a different Edge isolate within the
-//   timestamp window is not detected by this mechanism.
+// - This proves same-isolate replay rejection via the in-memory cache.
+//   Cross-isolate replays are rejected only when
+//   ITX_TRUSTED_INGRESS_REPLAY_STORE=database (shared claim RPC; covered by
+//   supabase/functions/_shared/trustedIngress_test.ts and
+//   tests/security/postgres/trusted_ingress_replay_store.sql).
 Deno.test("trusted ingress rejects an exact replay despite unrelated transport changes", async () => {
   await withSecret(async () => {
     const signedRequest = await makeSignedIngressRequest({

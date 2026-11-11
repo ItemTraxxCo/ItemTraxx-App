@@ -599,13 +599,12 @@ $$;
 -- future re-grant fails here instead of silently shifting all protection onto
 -- RLS.
 --
--- `anon` still holds Supabase's default INSERT/UPDATE/DELETE grants on these
--- tables (verified on staging and production 2026-11-10); it is denied only
--- because RLS is enabled and no policy reaches anon/PUBLIC. Assert that
--- invariant explicitly. Once anon's write grants are revoked by a migration,
--- add 'anon' to the grantee loop below.
+-- `anon` write grants were revoked by 20261111121000_revoke_anon_data_api_writes;
+-- TRUNCATE is checked for both roles because it bypasses RLS entirely. The RLS
+-- invariant below stays as a second check in case a grant is ever restored.
 do $$
 declare
+  grantee_role text;
   relation_name text;
   privilege_name text;
   anon_policy text;
@@ -613,11 +612,13 @@ begin
   foreach relation_name in array array[
     'public.items', 'public.borrowers', 'public.item_status_history'
   ] loop
-    foreach privilege_name in array array['INSERT', 'UPDATE', 'DELETE'] loop
-      if has_table_privilege('authenticated', relation_name, privilege_name) then
-        raise exception 'layer 1: authenticated unexpectedly holds % on %',
-          privilege_name, relation_name;
-      end if;
+    foreach grantee_role in array array['anon', 'authenticated'] loop
+      foreach privilege_name in array array['INSERT', 'UPDATE', 'DELETE', 'TRUNCATE'] loop
+        if has_table_privilege(grantee_role, relation_name, privilege_name) then
+          raise exception 'layer 1: % unexpectedly holds % on %',
+            grantee_role, privilege_name, relation_name;
+        end if;
+      end loop;
     end loop;
 
     if not (select relrowsecurity from pg_class where oid = relation_name::regclass) then

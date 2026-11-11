@@ -426,7 +426,7 @@ export const submitCheckoutReturn = async (
   }
 };
 
-const syncBufferedCheckoutQueueInternal = async () => {
+const syncBufferedCheckoutQueueInternal = async (options: { force?: boolean } = {}) => {
   const auth = getAuthState();
   if (!auth.isAuthenticated || !auth.workspaceContextId || !auth.userId) {
     // Checkout can mount while auth is still settling (for example after a
@@ -435,7 +435,7 @@ const syncBufferedCheckoutQueueInternal = async () => {
     return { processed: 0, failed: 0, remaining: 0, review: 0 };
   }
 
-  const workflow = await syncOfflineCheckoutLedger();
+  const workflow = await syncOfflineCheckoutLedger({ force: options.force });
   const legacy = await withOfflineQueueLock(async () => {
     const queue = await readOfflineQueue();
     if (queue.length === 0) {
@@ -459,7 +459,7 @@ const syncBufferedCheckoutQueueInternal = async () => {
         continue;
       }
       const nextRetryAt = item.next_retry_at ? Date.parse(item.next_retry_at) : Number.NaN;
-      if (Number.isFinite(nextRetryAt) && nextRetryAt > Date.now()) {
+      if (!options.force && Number.isFinite(nextRetryAt) && nextRetryAt > Date.now()) {
         failed += 1;
         remaining.push(item);
         continue;
@@ -592,8 +592,8 @@ export const syncBufferedCheckoutQueue = () => {
 
 /**
  * Replays both offline queue formats and actively verifies that ItemTraxx is
- * reachable. `force` is used by the manual Sync now control so a stale
- * navigator.onLine value cannot prevent the request.
+ * reachable. `force` is used by the manual Sync now control to bypass browser
+ * connectivity hints and automatic retry backoff.
  */
 export const syncCheckoutQueues = (options: { force?: boolean } = {}) => {
   if (!options.force && typeof navigator !== "undefined" && !navigator.onLine) {
@@ -607,7 +607,7 @@ export const syncCheckoutQueues = (options: { force?: boolean } = {}) => {
   }
   if (!checkoutQueueSyncInFlight) {
     checkoutQueueSyncInFlight = (async () => {
-      const result = await syncBufferedCheckoutQueueInternal();
+      const result = await syncBufferedCheckoutQueueInternal(options);
       const serverReachable = await probeItemTraxxServer();
       await refreshOfflinePackAfterQueueSync(result, serverReachable);
       return { ...result, serverReachable };

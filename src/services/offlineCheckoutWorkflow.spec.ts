@@ -444,6 +444,32 @@ describe("syncOfflineCheckoutLedger", () => {
     expect(entry!.status).toBe("synced");
   });
 
+  it("lets a manual sync retry an entry before its automatic backoff expires", async () => {
+    await writeOfflinePack(makePack());
+    await writeOfflineLedger([
+      makeLedgerEntry({
+        id: "e1",
+        next_retry_at: new Date(Date.now() + 60_000).toISOString(),
+      }),
+    ]);
+    mockedInvoke.mockResolvedValue(edgeSuccess({
+      operations: [{
+        operation_id: "op-1",
+        status: "synced",
+        item_results: [{ item_id: "item-1", barcode: "ITEM-1", status: "synced" }],
+      }],
+    }) as never);
+
+    const deferred = await syncOfflineCheckoutLedger();
+    expect(deferred).toEqual({ processed: 0, failed: 0, remaining: 1, review: 0 });
+    expect(mockedInvoke).not.toHaveBeenCalled();
+
+    const result = await syncOfflineCheckoutLedger({ force: true });
+
+    expect(result).toEqual({ processed: 1, failed: 0, remaining: 0, review: 0 });
+    expect(mockedInvoke).toHaveBeenCalledTimes(1);
+  });
+
   it("marks entries needs_review when the server flags a conflict", async () => {
     await writeOfflinePack(makePack());
     await writeOfflineLedger([makeLedgerEntry({ id: "e1" })]);

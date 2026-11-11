@@ -1059,7 +1059,9 @@ const applyOperationResult = (entry: OfflineLedgerEntry, result: SyncOperationRe
   };
 };
 
-const syncOfflineCheckoutLedgerOnce = async (): Promise<OfflineLedgerSyncResult> => {
+const syncOfflineCheckoutLedgerOnce = async (
+  options: { force?: boolean } = {},
+): Promise<OfflineLedgerSyncResult> => {
   const scope = currentScope();
   const pack = await readOfflinePack(scope, { allowExpired: true });
   if (!pack) return { processed: 0, failed: 0, remaining: 0, review: 0 };
@@ -1072,7 +1074,7 @@ const syncOfflineCheckoutLedgerOnce = async (): Promise<OfflineLedgerSyncResult>
   const now = Date.now();
   const pending = ledger.filter((entry) =>
     belongsToPack(entry) && entry.status === "pending" &&
-    (!entry.next_retry_at || !Number.isFinite(Date.parse(entry.next_retry_at)) || Date.parse(entry.next_retry_at) <= now)
+    (options.force || !entry.next_retry_at || !Number.isFinite(Date.parse(entry.next_retry_at)) || Date.parse(entry.next_retry_at) <= now)
   );
   const pendingIds = new Set(pending.map((entry) => entry.id));
   if (pending.length === 0) {
@@ -1278,9 +1280,9 @@ const syncOfflineCheckoutLedgerOnce = async (): Promise<OfflineLedgerSyncResult>
 
 let offlineLedgerSyncInFlight: Promise<OfflineLedgerSyncResult> | null = null;
 
-export const syncOfflineCheckoutLedger = (): Promise<OfflineLedgerSyncResult> => {
+export const syncOfflineCheckoutLedger = (options: { force?: boolean } = {}): Promise<OfflineLedgerSyncResult> => {
   if (!offlineLedgerSyncInFlight) {
-    offlineLedgerSyncInFlight = syncOfflineCheckoutLedgerOnce().finally(() => {
+    offlineLedgerSyncInFlight = syncOfflineCheckoutLedgerOnce(options).finally(() => {
       offlineLedgerSyncInFlight = null;
     });
   }

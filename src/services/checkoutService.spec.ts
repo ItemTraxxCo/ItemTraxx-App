@@ -547,9 +547,14 @@ describe("syncBufferedCheckoutQueue", () => {
     ]);
     mockedInvoke
       .mockResolvedValueOnce(okResponse({ success: true, processed: 1 }) as never)
+      .mockResolvedValueOnce(failResponse(500, "still down") as never)
+      .mockResolvedValueOnce(failResponse(500, "still down") as never)
       .mockResolvedValueOnce(failResponse(500, "still down") as never);
 
-    const result = await syncBufferedCheckoutQueue();
+    vi.useFakeTimers();
+    const pending = syncBufferedCheckoutQueue();
+    await vi.runAllTimersAsync();
+    const result = await pending;
 
     expect(result).toMatchObject({ processed: 1, failed: 1, remaining: 1 });
     expect(mockedWriteQueue).toHaveBeenCalledWith([

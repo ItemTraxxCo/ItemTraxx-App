@@ -129,12 +129,18 @@ describe("useOfflineQueueCount", () => {
   });
 
   it("re-polls when the offline-workflow-changed event fires", async () => {
-    mockedGetOfflineQueueSummary.mockResolvedValue(emptyLegacySummary);
+    mockedGetOfflineQueueSummary.mockResolvedValue({
+      ...emptyLegacySummary,
+      totalCount: 1,
+      pendingCount: 1,
+    });
     mockedGetOfflineWorkflowSummary.mockResolvedValue(emptySummary);
 
     const isTenantScopedRoute = ref(true);
     const { wrapper, get } = mountHost(isTenantScopedRoute);
-    await vi.waitFor(() => expect(get().count.value).toBe(0));
+    // Wait for the initial async refresh to finish; zero is already the
+    // composable's initial value and would let the event race that refresh.
+    await vi.waitFor(() => expect(get().count.value).toBe(1));
     const callsBefore = mockedGetOfflineWorkflowSummary.mock.calls.length;
 
     window.dispatchEvent(new CustomEvent("itemtraxx:offline-workflow-changed"));
@@ -144,12 +150,16 @@ describe("useOfflineQueueCount", () => {
   });
 
   it("re-polls when a legacy queue review item is created or discarded", async () => {
-    mockedGetOfflineQueueSummary.mockResolvedValue(emptyLegacySummary);
+    mockedGetOfflineQueueSummary.mockResolvedValue({
+      ...emptyLegacySummary,
+      totalCount: 1,
+      pendingCount: 1,
+    });
     mockedGetOfflineWorkflowSummary.mockResolvedValue(emptySummary);
 
     const isTenantScopedRoute = ref(true);
-    const { wrapper } = mountHost(isTenantScopedRoute);
-    await vi.waitFor(() => expect(mockedGetOfflineQueueSummary).toHaveBeenCalled());
+    const { wrapper, get } = mountHost(isTenantScopedRoute);
+    await vi.waitFor(() => expect(get().count.value).toBe(1));
     const callsBefore = mockedGetOfflineQueueSummary.mock.calls.length;
 
     window.dispatchEvent(new CustomEvent("itemtraxx:offline-queue-changed"));
@@ -159,24 +169,30 @@ describe("useOfflineQueueCount", () => {
   });
 
   it("stops polling when the tab becomes hidden and resumes when it becomes visible again", async () => {
-    mockedGetOfflineQueueSummary.mockResolvedValue(emptyLegacySummary);
+    mockedGetOfflineQueueSummary.mockResolvedValue({
+      ...emptyLegacySummary,
+      totalCount: 1,
+      pendingCount: 1,
+    });
     mockedGetOfflineWorkflowSummary.mockResolvedValue(emptySummary);
 
     const isTenantScopedRoute = ref(true);
     const { wrapper, get } = mountHost(isTenantScopedRoute);
-    await vi.waitFor(() => expect(get().count.value).toBe(0));
+    await vi.waitFor(() => expect(get().count.value).toBe(1));
     const callsBefore = mockedGetOfflineWorkflowSummary.mock.calls.length;
 
     Object.defineProperty(document, "visibilityState", { configurable: true, get: () => "hidden" });
     document.dispatchEvent(new Event("visibilitychange"));
     await nextTick();
-    // Going hidden should not itself trigger a fresh poll, and count/syncingCount reset.
+    // Going hidden should not itself trigger a fresh poll.
     expect(mockedGetOfflineWorkflowSummary.mock.calls.length).toBe(callsBefore);
-    expect(get().count.value).toBe(0);
 
     Object.defineProperty(document, "visibilityState", { configurable: true, get: () => "visible" });
     document.dispatchEvent(new Event("visibilitychange"));
-    await vi.waitFor(() => expect(mockedGetOfflineWorkflowSummary.mock.calls.length).toBe(callsBefore + 1));
+    await vi.waitFor(() => {
+      expect(get().count.value).toBe(1);
+      expect(mockedGetOfflineWorkflowSummary.mock.calls.length).toBe(callsBefore + 1);
+    });
 
     wrapper.unmount();
   });

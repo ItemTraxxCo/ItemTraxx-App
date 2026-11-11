@@ -1,0 +1,81 @@
+name: Supabase Migration Drift
+
+# Fails (and pages via incident.io) when a migration merged to main has not
+# been recorded on production. Read-only: uses the Management API query
+# endpoint, never applies anything.
+
+permissions:
+  contents: read
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 14 * * *"
+
+jobs:
+  require-trusted-ref:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Require trusted ref for manual runs
+        env:
+          RUN_EVENT: ${{ github.event_name }}
+          RUN_REF: ${{ github.ref }}
+        run: |
+          set -euo pipefail
+          if [ "$RUN_EVENT" = "workflow_dispatch" ]; then
+            test "$RUN_REF" = "refs/heads/main" || {
+              echo "Secret-bearing migration drift runs must use refs/heads/main (received $RUN_REF)." >&2
+              exit 1
+            }
+          fi
+
+  kill-switch-preflight:
+    needs: require-trusted-ref
+    uses: ./.github/workflows/kill-switch-preflight.yml
+    with:
+      status_source: supabase
+
+  migration-drift:
+    needs:
+      - require-trusted-ref
+      - kill-switch-preflight
+    if: ${{ needs.require-trusted-ref.result == 'success' && needs.kill-switch-preflight.outputs.active == 'false' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Setup Node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24.22.1
+
+      - name: Check production migration drift
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+        run: node scripts/supabase-migration-drift.mjs
+
+  incidentio-notify-failure:
+    needs:
+      - require-trusted-ref
+      - kill-switch-preflight
+      - migration-drift
+    if: ${{ always() && needs.require-trusted-ref.result == 'success' && (needs.kill-switch-preflight.outputs.active == 'false' || needs.kill-switch-preflight.outputs.active == 'unknown') && (needs.migration-drift.result == 'failure' || needs.migration-drift.result == 'cancelled') }}
+    uses: ./.github/workflows/incidentio-workflow-alert.yml
+    with:
+      status: ${{ needs.migration-drift.result }}
+      severity: medium
+      workflow_name: Supabase Migration Drift
+      job_name: migration-drift
+      run_url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+      repository: ${{ github.repository }}
+      branch: ${{ github.ref_name }}
+      sha: ${{ github.sha }}
+      environment: production
+    secrets:
+      INCIDENT_IO_WEBHOOK_URL: ${{ secrets.INCIDENT_IO_WEBHOOK_URL }}
+      INCIDENT_IO_WEBHOOK_TOKEN: ${{ secrets.INCIDENT_IO_WEBHOOK_TOKEN }}

@@ -742,7 +742,7 @@ test.describe("prepared offline checkout workflow contract", () => {
     ]);
   });
 
-  test("moves a permanent sync rejection to review without clearing the outage timer", async ({ page }) => {
+  test("moves a permanent sync rejection to review and clears the stale outage timer", async ({ page }) => {
     await page.route(/\/functions(?:\/v1)?\/offline-checkout(?:\?.*)?$/, async (route) => {
       await route.fulfill({ status: 403, contentType: "application/json", body: JSON.stringify({ error: "Workspace access changed." }) });
     });
@@ -772,7 +772,7 @@ test.describe("prepared offline checkout workflow contract", () => {
     }, { pack: workflowPack(), entry: workflowEntry() });
 
     expect(result.ledger[0]).toMatchObject({ status: "needs_review", last_error: "Workspace access changed." });
-    expect(result.connection.unreachable_since).toBe("2026-07-28T09:00:00.000Z");
+    expect(result.connection.unreachable_since).toBeNull();
   });
 
   test("discards a request-level rejection locally when keeping server state", async ({ page }) => {
@@ -809,7 +809,7 @@ test.describe("prepared offline checkout workflow contract", () => {
     });
   });
 
-  test("keeps retryable server failures pending and preserves the outage timer", async ({ page }) => {
+  test("keeps retryable server failures pending and clears the stale outage timer", async ({ page }) => {
     await page.route(/\/functions(?:\/v1)?\/offline-checkout(?:\?.*)?$/, async (route) => {
       await route.fulfill({ status: 503, contentType: "application/json", body: JSON.stringify({ error: "Service unavailable." }) });
     });
@@ -839,7 +839,7 @@ test.describe("prepared offline checkout workflow contract", () => {
     }, { pack: workflowPack(), entry: workflowEntry() });
 
     expect(result.ledger[0]).toMatchObject({ status: "pending" });
-    expect(result.connection.unreachable_since).toBe("2026-07-28T09:00:00.000Z");
+    expect(result.connection.unreachable_since).toBeNull();
   });
 
   test("keeps synced item overlays when only the conflicting item keeps server state", async ({ page }) => {
@@ -997,7 +997,7 @@ test.describe("prepared offline checkout workflow contract", () => {
     await page.getByRole("button", { name: "Add barcode" }).click();
     await page.getByRole("button", { name: "Complete transaction" }).click();
 
-    await expect(page.getByRole("region", { name: "Offline checkout status" })).toBeVisible();
+    await expect(page.getByRole("region", { name: "Checkout and offline status" })).toBeVisible();
     await expect(page.locator(".toast-bottom-left")).toHaveCount(0);
     await expect(page.getByText("Transaction processing...")).toHaveCount(0);
   });
@@ -1151,7 +1151,7 @@ test.describe("prepared offline checkout workflow contract", () => {
     });
     await navigateApp(page, "/checkout");
 
-    const offlineStatus = page.getByRole("region", { name: "Offline checkout status" });
+    const offlineStatus = page.getByRole("region", { name: "Checkout and offline status" });
     await expect(offlineStatus).toBeVisible();
     await expect(offlineStatus).toContainText(/Offline transactions pending|Syncing offline transactions/);
     await expect(page.locator(".toast-bottom-left")).toHaveCount(0);
@@ -1187,7 +1187,10 @@ test.describe("prepared offline checkout workflow contract", () => {
         prepared_at: new Date().toISOString(),
         expires_at: new Date(Date.now() + 86_400_000).toISOString(),
       },
-      entry: workflowEntry("user-e2e-tenant"),
+      entry: {
+        ...workflowEntry("user-e2e-tenant"),
+        next_retry_at: new Date(Date.now() + 60_000).toISOString(),
+      },
     });
     await setTenantAccountSession(page, "workspace-e2e");
 
@@ -1291,7 +1294,7 @@ test.describe("prepared offline checkout workflow contract", () => {
     await page.getByRole("button", { name: "Add item" }).click();
     await expect(page.getByRole("listitem").filter({ hasText: "ITEM-1" })).toBeVisible();
     await page.getByRole("button", { name: "Complete Quick Return" }).click();
-    await expect(page.locator(".admin-section-card p.error")).toContainText(/Return request buffered for auto-sync/);
+    await expect(page.locator(".admin-section-card p.success")).toContainText(/1 item\(s\) are saved and will sync when you reconnect/);
     await expect.poll(async () => page.evaluate(async () => {
       const workflow = (window.__itemtraxxTest as typeof window.__itemtraxxTest & {
         offlineCheckoutWorkflow: { readLedger: () => Promise<unknown[]> };

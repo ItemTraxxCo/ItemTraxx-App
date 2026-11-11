@@ -85,9 +85,15 @@
 import { computed, onMounted, ref } from "vue";
 import { RouterLink } from "vue-router";
 import CameraBarcodeScannerModal from "../../../components/CameraBarcodeScannerModal.vue";
-import { fetchItemByBarcode, submitCheckoutReturn, type ItemSummary } from "../../../services/checkoutService";
+import {
+  fetchItemByBarcode,
+  formatSkippedBarcodeConflictMessage,
+  submitCheckoutReturn,
+  type ItemSummary,
+} from "../../../services/checkoutService";
 import { sanitizeInput } from "../../../utils/inputSanitizer";
 import { toUserFacingErrorMessage } from "../../../services/appErrors";
+import { readOfflineConnectionState } from "../../../services/offlineConnectionState";
 import type { ScannerHistoryItem, ScannerScanEvent } from "../../../types/cameraScanner";
 import { useManagerContext } from "../../../composables/useManagerContext";
 
@@ -176,10 +182,27 @@ const submitReturn = async () => {
       },
     );
     if (submitResult.buffered) {
-      success.value = "";
-      lastSummary.value = "";
-      error.value = `No connection. Return request buffered for auto-sync. Buffered: ${submitResult.queuedCount}`;
-      barcodes.value = [];
+      const isOffline = !!readOfflineConnectionState().unreachable_since;
+      const skippedBarcodes = new Set(submitResult.skippedBarcodes);
+      const hasSkippedItems = skippedBarcodes.size > 0;
+      const queuedItemCount = submitResult.queuedItemCount;
+      const skippedCount = skippedBarcodes.size;
+      const summaryParts = [];
+      if (submitResult.processedItemCount > 0) summaryParts.push(`${submitResult.processedItemCount} processed`);
+      summaryParts.push(`${queuedItemCount} saved for sync`);
+      if (hasSkippedItems) {
+        summaryParts.push(`${skippedCount} need attention (${[...skippedBarcodes].join(", ")})`);
+      }
+      success.value = isOffline
+        ? `You're offline. ${queuedItemCount} item(s) are saved and will sync when you reconnect.`
+        : `${queuedItemCount} item(s) are saved for automatic sync.`;
+      lastSummary.value = summaryParts.join(" · ");
+      error.value = hasSkippedItems
+        ? formatSkippedBarcodeConflictMessage([...skippedBarcodes])
+        : "";
+      barcodes.value = hasSkippedItems
+        ? barcodes.value.filter((item) => skippedBarcodes.has(item.barcode))
+        : [];
       barcodeInput.value = "";
       return;
     }

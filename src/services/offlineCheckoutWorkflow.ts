@@ -6,7 +6,22 @@ import { isOfflinePackAutomaticDownloadAllowed } from "./offlineCheckoutPreferen
 import { requestLargeOfflinePackConfirmation } from "./offlinePackConfirmation";
 import {
   markItemTraxxServerConfirmed,
+  markItemTraxxServerUnreachable,
 } from "./offlineConnectionState";
+import {
+  clearCheckoutRetryStatus,
+  createCheckoutRetryStatusId,
+  getCheckoutRetryDelayMs,
+  MAX_CHECKOUT_ATTEMPTS,
+  MAX_RATE_LIMIT_RETRIES,
+  setCheckoutRetryStatus,
+  waitForCheckoutRetry,
+  type CheckoutRetryReason,
+} from "./checkoutRetryStatus";
+import {
+  MAX_OFFLINE_SYNC_ITEMS,
+  MAX_OFFLINE_SYNC_OPERATIONS,
+} from "../types/offlineCheckoutLimits";
 
 export type OfflinePackBorrower = {
   id: string;
@@ -67,6 +82,7 @@ export type OfflineLedgerEntry = {
   status: "pending" | "syncing" | "synced" | "needs_review" | "kept_server";
   attempts: number;
   last_error: string | null;
+  next_retry_at?: string | null;
   items: OfflineItemIntent[];
   resolution?: "keep_server" | "apply_offline";
   review_origin?: "server_conflict" | "request_rejection";
@@ -113,6 +129,21 @@ type SyncOperationResult = {
   resolution?: "keep_server" | "apply_offline";
   item_results: SyncItemResult[];
 };
+type OfflineSyncResponse = {
+  ok: boolean;
+  status: number;
+  data: {
+    data?: { operations: SyncOperationResult[] };
+    retry_after_seconds?: number | null;
+  } | null;
+  error: string;
+};
+type OfflineLedgerSyncResult = {
+  processed: number;
+  failed: number;
+  remaining: number;
+  review: number;
+};
 type OfflinePackRefreshResult = {
   refreshed: boolean;
   firstPreparation: boolean;
@@ -151,8 +182,8 @@ let packPreparationReportsProgress = true;
 
 const isRetryableWorkflowStatus = (status: number) => status === 0 || status === 429 || status >= 500;
 
-const recordWorkflowResponse = (ok: boolean) => {
-  if (ok) markItemTraxxServerConfirmed();
+const recordWorkflowResponse = (status: number) => {
+  if (status > 0) markItemTraxxServerConfirmed();
 };
 
 const createId = () =>
@@ -393,6 +424,84 @@ const updateLedger = (update: (entries: OfflineLedgerEntry[]) => OfflineLedgerEn
     return next;
   });
 
+const preparePendingLedgerForSync = (
+  scope: OfflineWorkflowScope,
+  pack: OfflineCheckoutPack,
+) => updateLedger((entries) => {
+  const normalized: OfflineLedgerEntry[] = [];
+  for (const entry of entries) {
+    const belongsToPack = entry.workspace_id === scope.workspaceId &&
+      entry.profile_id === scope.profileId &&
+      entry.device_id === pack.device_id &&
+      entry.pack_version === pack.pack_version;
+    if (!belongsToPack) {
+      normalized.push(entry);
+      continue;
+    }
+
+    // A page can close after persisting "syncing" but before it saves the
+    // response. The server uses operation IDs idempotently, so retry that work
+    // on the next sync attempt.
+    const retryable = entry.status === "syncing"
+      ? {
+        ...entry,
+        status: "pending" as const,
+        last_error: entry.last_error ?? "Previous offline sync was interrupted; retrying.",
+      }
+      : entry;
+
+    // Older clients could queue one transaction larger than the endpoint's
+    // per-request item cap. Persist separate operation IDs before sending any
+    // part so each piece can be replayed and reviewed independently.
+    if (
+      retryable.status === "pending" &&
+      retryable.items.length > MAX_OFFLINE_SYNC_ITEMS
+    ) {
+      for (
+        let offset = 0, part = 0;
+        offset < retryable.items.length;
+        offset += MAX_OFFLINE_SYNC_ITEMS, part += 1
+      ) {
+        normalized.push({
+          ...retryable,
+          id: part === 0 ? retryable.id : createId(),
+          operation_id: part === 0 ? retryable.operation_id : createId(),
+          items: retryable.items.slice(offset, offset + MAX_OFFLINE_SYNC_ITEMS),
+        });
+      }
+      continue;
+    }
+
+    normalized.push(retryable);
+  }
+  return normalized;
+});
+
+const createOfflineSyncBatches = (entries: OfflineLedgerEntry[]) => {
+  const batches: OfflineLedgerEntry[][] = [];
+  let batch: OfflineLedgerEntry[] = [];
+  let batchItemCount = 0;
+
+  for (const entry of entries) {
+    if (entry.items.length > MAX_OFFLINE_SYNC_ITEMS) {
+      throw new Error("Offline transaction exceeds the server sync limit.");
+    }
+    if (
+      batch.length > 0 &&
+      (batch.length >= MAX_OFFLINE_SYNC_OPERATIONS ||
+        batchItemCount + entry.items.length > MAX_OFFLINE_SYNC_ITEMS)
+    ) {
+      batches.push(batch);
+      batch = [];
+      batchItemCount = 0;
+    }
+    batch.push(entry);
+    batchItemCount += entry.items.length;
+  }
+  if (batch.length > 0) batches.push(batch);
+  return batches;
+};
+
 export const clearOfflineCheckoutWorkflow = async () => {
   window.localStorage.removeItem(LOCK_STORAGE_KEY);
   try {
@@ -431,7 +540,7 @@ const invokePackControl = async <T>(
     "offline-checkout",
     { method: "POST", body },
   );
-  recordWorkflowResponse(response.ok);
+  recordWorkflowResponse(response.status);
   if (!response.ok || !response.data?.data) {
     throw new Error(response.error || "Unable to prepare offline checkout.");
   }
@@ -945,78 +1054,237 @@ const applyOperationResult = (entry: OfflineLedgerEntry, result: SyncOperationRe
     review_origin: needsReview ? "server_conflict" : entry.review_origin,
     resolution: result.resolution ?? entry.resolution,
     last_error: needsReview ? items.find((item) => item.status === "needs_review")?.reason ?? "Server state changed." : null,
+    next_retry_at: null,
     items,
   };
 };
 
-export const syncOfflineCheckoutLedger = async () => {
+const syncOfflineCheckoutLedgerOnce = async (): Promise<OfflineLedgerSyncResult> => {
   const scope = currentScope();
   const pack = await readOfflinePack(scope, { allowExpired: true });
   if (!pack) return { processed: 0, failed: 0, remaining: 0, review: 0 };
-  const pending = (await readOfflineLedger()).filter((entry) => entry.status === "pending");
+  const ledger = await preparePendingLedgerForSync(scope, pack);
+  const belongsToPack = (entry: OfflineLedgerEntry) =>
+    entry.workspace_id === scope.workspaceId &&
+    entry.profile_id === scope.profileId &&
+    entry.device_id === pack.device_id &&
+    entry.pack_version === pack.pack_version;
+  const now = Date.now();
+  const pending = ledger.filter((entry) =>
+    belongsToPack(entry) && entry.status === "pending" &&
+    (!entry.next_retry_at || !Number.isFinite(Date.parse(entry.next_retry_at)) || Date.parse(entry.next_retry_at) <= now)
+  );
+  const pendingIds = new Set(pending.map((entry) => entry.id));
   if (pending.length === 0) {
-    const review = (await listOfflineReviewEntries()).length;
-    return { processed: 0, failed: 0, remaining: 0, review };
+    return {
+      processed: 0,
+      failed: 0,
+      remaining: ledger.filter((entry) => belongsToPack(entry) && (entry.status === "pending" || entry.status === "syncing")).length,
+      review: ledger.filter((entry) => belongsToPack(entry) && entry.status === "needs_review").length,
+    };
   }
   // The offline endpoint validates the Better Auth session against this
   // device-bound application session. Bootstrap it before marking entries as
   // syncing so a failed bootstrap leaves durable work retryable as pending.
   await ensureAccountSessionReady();
-  await updateLedger((entries) => entries.map((entry) => pending.some((item) => item.id === entry.id) ? { ...entry, status: "syncing" } : entry));
-  const response = await invokeEdgeFunction<{ data: { operations: SyncOperationResult[] } }>("offline-checkout", {
-    method: "POST",
-    body: {
-      action: "sync",
-      device_id: pack.device_id,
-      pack_version: pack.pack_version,
-      operations: pending.map((entry) => ({
-        operation_id: entry.operation_id,
-        created_at: entry.created_at,
-        items: entry.items.map((item) => ({
-          item_id: item.item_id,
-          barcode: item.barcode,
-          intent: item.intent,
-          borrower_id: item.borrower_id,
-          expected_status: item.expected_status,
-          expected_checked_out_by: item.expected_checked_out_by,
-        })),
-      })),
-    },
-  });
-  recordWorkflowResponse(response.ok);
-  if (!response.ok || !response.data?.data) {
-    const retryable = isRetryableWorkflowStatus(response.status);
-    const reason = response.error || "Unable to sync offline transactions.";
-    const updated = await updateLedger((entries) => entries.map((entry) => pending.some((item) => item.id === entry.id) ? {
-      ...entry,
-      status: retryable ? "pending" : "needs_review",
-      review_origin: retryable ? entry.review_origin : "request_rejection",
-      attempts: entry.attempts + 1,
-      last_error: reason,
-      items: retryable
-        ? entry.items
-        : entry.items.map((item) => ({ ...item, status: "needs_review" as const, reason })),
-    } : entry));
-    return {
-      processed: 0,
-      failed: pending.length,
-      remaining: updated.filter((entry) => entry.status === "pending" || entry.status === "syncing").length,
-      review: updated.filter((entry) => entry.status === "needs_review").length,
-    };
+  for (const batch of createOfflineSyncBatches(pending)) {
+    const batchIds = new Set(batch.map((entry) => entry.id));
+    const marked = await updateLedger((entries) => entries.map((entry) =>
+      batchIds.has(entry.id) && entry.status === "pending"
+        ? { ...entry, status: "syncing", next_retry_at: null }
+        : entry
+    ));
+    const sending = marked.filter((entry) => batchIds.has(entry.id) && entry.status === "syncing");
+    if (sending.length === 0) continue;
+
+    const retryStatusId = createCheckoutRetryStatusId();
+    let response: OfflineSyncResponse;
+    let attempt = 1;
+    let rateLimitRetries = 0;
+    let previousReason: CheckoutRetryReason = "network";
+    let stoppedBecauseOffline = false;
+    try {
+      while (true) {
+        if (attempt > 1) {
+          setCheckoutRetryStatus({
+            id: retryStatusId,
+            phase: "retrying",
+            action: "offline_sync",
+            reason: previousReason,
+            attempt,
+            maxAttempts: previousReason === "rate_limit" ? attempt : MAX_CHECKOUT_ATTEMPTS,
+            secondsRemaining: 0,
+          });
+        }
+        response = await invokeEdgeFunction<OfflineSyncResponse["data"]>("offline-checkout", {
+          method: "POST",
+          preserveErrorData: true,
+          body: {
+            action: "sync",
+            device_id: pack.device_id,
+            pack_version: pack.pack_version,
+            operations: sending.map((entry) => ({
+              operation_id: entry.operation_id,
+              created_at: entry.created_at,
+              items: entry.items.map((item) => ({
+                item_id: item.item_id,
+                barcode: item.barcode,
+                intent: item.intent,
+                borrower_id: item.borrower_id,
+                expected_status: item.expected_status,
+                expected_checked_out_by: item.expected_checked_out_by,
+              })),
+            })),
+          },
+        });
+        recordWorkflowResponse(response.status);
+        if (response.ok && response.data?.data) break;
+
+        const retryable = isRetryableWorkflowStatus(response.status);
+        const reason: CheckoutRetryReason = response.status === 429
+          ? "rate_limit"
+          : response.status >= 500
+          ? "server"
+          : "network";
+        if (!retryable) break;
+        if (typeof navigator !== "undefined" && !navigator.onLine) {
+          markItemTraxxServerUnreachable();
+          stoppedBecauseOffline = true;
+          break;
+        }
+        if (
+          attempt >= MAX_CHECKOUT_ATTEMPTS ||
+          (reason === "rate_limit" && rateLimitRetries >= MAX_RATE_LIMIT_RETRIES)
+        ) break;
+
+        if (reason === "rate_limit") rateLimitRetries += 1;
+        previousReason = reason;
+        const nextAttempt = attempt + 1;
+        const delayMs = getCheckoutRetryDelayMs(
+          nextAttempt,
+          reason,
+          response.data?.retry_after_seconds,
+        );
+        setCheckoutRetryStatus({
+          id: retryStatusId,
+          phase: "waiting",
+          action: "offline_sync",
+          reason,
+          attempt: nextAttempt,
+          maxAttempts: reason === "rate_limit" ? nextAttempt : MAX_CHECKOUT_ATTEMPTS,
+          secondsRemaining: Math.ceil(delayMs / 1_000),
+        });
+        const stayedOnline = await waitForCheckoutRetry(delayMs, (secondsRemaining) => {
+          setCheckoutRetryStatus({
+            id: retryStatusId,
+            phase: "waiting",
+            action: "offline_sync",
+            reason,
+            attempt: nextAttempt,
+            maxAttempts: reason === "rate_limit" ? nextAttempt : MAX_CHECKOUT_ATTEMPTS,
+            secondsRemaining,
+          });
+        });
+        if (!stayedOnline) {
+          markItemTraxxServerUnreachable();
+          stoppedBecauseOffline = true;
+          break;
+        }
+        attempt = nextAttempt;
+      }
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : "Unable to sync offline transactions.";
+      const browserOffline = typeof navigator !== "undefined" && !navigator.onLine;
+      if (browserOffline) markItemTraxxServerUnreachable();
+      await updateLedger((entries) => entries.map((entry) =>
+        batchIds.has(entry.id) && entry.status === "syncing"
+          ? {
+            ...entry,
+            status: "pending",
+            attempts: entry.attempts + 1,
+            last_error: reason,
+            next_retry_at: browserOffline
+              ? null
+              : new Date(Date.now() + getCheckoutRetryDelayMs(MAX_CHECKOUT_ATTEMPTS + 1, "network")).toISOString(),
+          }
+          : entry
+      )).catch(() => undefined);
+      throw error;
+    } finally {
+      clearCheckoutRetryStatus(retryStatusId);
+    }
+
+    if (!response.ok || !response.data?.data) {
+      const retryable = isRetryableWorkflowStatus(response.status);
+      const reason = response.error || "Unable to sync offline transactions.";
+      await updateLedger((entries) => entries.map((entry) => {
+        if (!batchIds.has(entry.id) || entry.status !== "syncing") return entry;
+        return {
+          ...entry,
+          status: retryable ? "pending" : "needs_review",
+          review_origin: retryable ? entry.review_origin : "request_rejection",
+          attempts: entry.attempts + 1,
+          last_error: reason,
+          next_retry_at: retryable && !stoppedBecauseOffline
+            ? new Date(Date.now() + getCheckoutRetryDelayMs(
+              MAX_CHECKOUT_ATTEMPTS + 1,
+              response.status === 429 ? "rate_limit" : response.status >= 500 ? "server" : "network",
+              response.data?.retry_after_seconds,
+            )).toISOString()
+            : null,
+          items: retryable
+            ? entry.items
+            : entry.items.map((item) => ({ ...item, status: "needs_review" as const, reason })),
+        };
+      }));
+      if (!retryable) {
+        for (const entry of sending) clearCheckoutRetryStatus(entry.operation_id, "saved");
+      }
+      // A network or server failure makes later batches unlikely to succeed.
+      // Leave them pending for the next retry instead of sending them blindly.
+      if (retryable) break;
+      continue;
+    }
+
+    const byOperation = new Map(response.data.data.operations.map((result) => [result.operation_id, result]));
+    await updateLedger((entries) => entries.map((entry) => {
+      if (!batchIds.has(entry.id) || entry.status !== "syncing") return entry;
+      const result = byOperation.get(entry.operation_id);
+      if (result) return applyOperationResult(entry, result);
+      return {
+        ...entry,
+        status: "pending",
+        attempts: entry.attempts + 1,
+        last_error: "Server did not return a result for this transaction.",
+        next_retry_at: new Date(Date.now() + getCheckoutRetryDelayMs(MAX_CHECKOUT_ATTEMPTS + 1, "server")).toISOString(),
+      };
+    }));
+    for (const entry of sending) {
+      if (byOperation.has(entry.operation_id)) {
+        clearCheckoutRetryStatus(entry.operation_id, "saved");
+      }
+    }
   }
-  const byOperation = new Map(response.data.data.operations.map((result) => [result.operation_id, result]));
-  const updated = await updateLedger((entries) => entries.map((entry) => {
-    const result = byOperation.get(entry.operation_id);
-    if (result) return applyOperationResult(entry, result);
-    if (entry.status !== "syncing") return entry;
-    return { ...entry, status: "pending", attempts: entry.attempts + 1, last_error: "Server did not return a result for this transaction." };
-  }));
+
+  const updated = await readOfflineLedger();
+  const scoped = updated.filter(belongsToPack);
   return {
-    processed: updated.filter((entry) => pending.some((item) => item.id === entry.id) && entry.status === "synced").length,
-    failed: updated.filter((entry) => pending.some((item) => item.id === entry.id) && entry.status !== "synced").length,
-    remaining: updated.filter((entry) => entry.status === "pending" || entry.status === "syncing").length,
-    review: updated.filter((entry) => entry.status === "needs_review").length,
+    processed: scoped.filter((entry) => pendingIds.has(entry.id) && entry.status === "synced").length,
+    failed: scoped.filter((entry) => pendingIds.has(entry.id) && entry.status !== "synced").length,
+    remaining: scoped.filter((entry) => entry.status === "pending" || entry.status === "syncing").length,
+    review: scoped.filter((entry) => entry.status === "needs_review").length,
   };
+};
+
+let offlineLedgerSyncInFlight: Promise<OfflineLedgerSyncResult> | null = null;
+
+export const syncOfflineCheckoutLedger = (): Promise<OfflineLedgerSyncResult> => {
+  if (!offlineLedgerSyncInFlight) {
+    offlineLedgerSyncInFlight = syncOfflineCheckoutLedgerOnce().finally(() => {
+      offlineLedgerSyncInFlight = null;
+    });
+  }
+  return offlineLedgerSyncInFlight;
 };
 
 export const resolveOfflineCheckoutConflict = async (
@@ -1042,7 +1310,7 @@ export const resolveOfflineCheckoutConflict = async (
     },
     preserveErrorData: true,
   });
-  recordWorkflowResponse(response.ok);
+  recordWorkflowResponse(response.status);
   if (response.data?.data) {
     await updateLedger((entries) => entries.map((item) => item.id === entryId
       ? applyOperationResult({ ...item, resolution }, response.data!.data)

@@ -34,6 +34,19 @@ import {
 } from "./offlineConnectionState";
 import { fetchSystemStatus, probeSystemStatusTransport } from "./systemStatusService";
 import { fetchHttpSessionSummary } from "./httpSessionService";
+import { MAX_CHECKOUT_RETURN_ITEMS } from "../types/offlineCheckoutLimits";
+import {
+  clearCheckoutRetryStatus,
+  createCheckoutRetryStatusId,
+  getCheckoutRetryDelayMs,
+  MAX_CHECKOUT_ATTEMPTS,
+  MAX_RATE_LIMIT_RETRIES,
+  setCheckoutRetryStatus,
+  showCheckoutSavedForSync,
+  waitForCheckoutRetry,
+  type CheckoutRetryAction,
+  type CheckoutRetryReason,
+} from "./checkoutRetryStatus";
 
 export { consumeCheckoutOfflineWarning } from "./offlineCheckoutQueue";
 export type { CheckoutReturnPayload } from "./offlineCheckoutQueue";
@@ -41,6 +54,9 @@ export type { CheckoutReturnPayload } from "./offlineCheckoutQueue";
 type SubmitCheckoutReturnResult = {
   buffered: boolean;
   queuedCount: number;
+  processedItemCount: number;
+  queuedItemCount: number;
+  skippedBarcodes: string[];
 };
 
 export type CheckoutQueueSyncResult = {
@@ -64,6 +80,7 @@ type CheckoutReturnResponse = {
   skipped_barcodes?: string[];
   error?: string;
   message?: string;
+  retry_after_seconds?: number | null;
 };
 
 const LOOKUP_TIMEOUT_MS = 7000;
@@ -94,6 +111,18 @@ class CheckoutRequestError extends Error {
   }
 }
 
+type CheckoutReturnExecutionProgress = {
+  completedChunks: Set<number>;
+  processedItemCount: number;
+  skippedBarcodes: string[];
+};
+
+const createCheckoutReturnExecutionProgress = (): CheckoutReturnExecutionProgress => ({
+  completedChunks: new Set(),
+  processedItemCount: 0,
+  skippedBarcodes: [],
+});
+
 const isQueueableFailure = (error: unknown) => {
   if (error instanceof CheckoutRequestError) {
     return error.status === 0 || error.status === 429 || error.status >= 500;
@@ -102,8 +131,34 @@ const isQueueableFailure = (error: unknown) => {
   return isRetryableNetworkFailure(0, message);
 };
 
-const recordCheckoutResponse = (ok: boolean) => {
-  if (ok) markItemTraxxServerConfirmed();
+const recordCheckoutResponse = (status: number) => {
+  if (status > 0) markItemTraxxServerConfirmed();
+};
+
+const retryReasonForError = (error: unknown): CheckoutRetryReason => {
+  if (error instanceof CheckoutRequestError && error.status === 429) return "rate_limit";
+  if (error instanceof CheckoutRequestError && error.status >= 500) return "server";
+  return "network";
+};
+
+const checkoutRetryAfterSeconds = (error: unknown) =>
+  error instanceof CheckoutRequestError ? error.data?.retry_after_seconds : null;
+
+const checkoutRetryAction = (payload: CheckoutReturnPayload): CheckoutRetryAction => {
+  if (payload.action_type === "return" || payload.action_type === "admin_return" || payload.action_type === "quick_return") {
+    return "return";
+  }
+  if (payload.action_type === "checkout") return "checkout";
+  return "transaction";
+};
+
+export const formatSkippedBarcodeConflictMessage = (skippedBarcodes: string[]) => {
+  const uniqueBarcodes = [...new Set(skippedBarcodes)];
+  if (uniqueBarcodes.length === 0) return "";
+  const label = uniqueBarcodes.length === 1
+    ? `Item ${uniqueBarcodes[0]} is already checked out or no longer available.`
+    : `${uniqueBarcodes.length} item(s) are already checked out or no longer available.`;
+  return `${label} Refresh and try again.`;
 };
 
 const isLookupConnectivityFailure = (error: unknown) => {
@@ -161,11 +216,11 @@ const getAuthoritativeOfflineQueueScope = async (): Promise<AuthoritativeOffline
   }
 };
 
-const executeCheckoutReturn = async (payload: CheckoutReturnPayload) => {
-  await ensureAccountSessionReady();
+const executeCheckoutReturnChunk = async (payload: CheckoutReturnPayload) => {
   const { deviceId, deviceLabel } = getOrCreateDeviceSession();
   const result = await invokeEdgeFunction<CheckoutReturnResponse>("checkoutReturn", {
     method: "POST",
+    preserveErrorData: true,
     body: {
       ...payload,
       device_id: deviceId,
@@ -173,22 +228,13 @@ const executeCheckoutReturn = async (payload: CheckoutReturnPayload) => {
     },
   });
 
-  recordCheckoutResponse(result.ok);
+  recordCheckoutResponse(result.status);
 
   if (!result.ok) {
     const message = result.status === 429
       ? "Rate limit exceeded, please try again in a minute."
       : edgeFunctionError(result, "Request failed. Please contact support.").message;
     throw new CheckoutRequestError(message, result.status, result.data);
-  }
-
-  const skippedBarcodes = result.data?.skipped_barcodes ?? [];
-  if (skippedBarcodes.length > 0) {
-    const label =
-      skippedBarcodes.length === 1
-        ? `Item ${skippedBarcodes[0]} is already checked out or no longer available.`
-        : `${skippedBarcodes.length} item(s) are already checked out or no longer available.`;
-    throw new CheckoutRequestError(`${label} Refresh and try again.`, 409, result.data);
   }
 
   if (result.data && result.data.success === false) {
@@ -198,49 +244,183 @@ const executeCheckoutReturn = async (payload: CheckoutReturnPayload) => {
   return result.data;
 };
 
+const executeCheckoutReturnAttempt = async (
+  payload: CheckoutReturnPayload,
+  progress: CheckoutReturnExecutionProgress,
+) => {
+  const chunks: string[][] = [];
+  if (payload.item_barcodes.length === 0) chunks.push([]);
+  for (let offset = 0; offset < payload.item_barcodes.length; offset += MAX_CHECKOUT_RETURN_ITEMS) {
+    chunks.push(payload.item_barcodes.slice(offset, offset + MAX_CHECKOUT_RETURN_ITEMS));
+  }
+
+  await ensureAccountSessionReady();
+  for (let index = 0; index < chunks.length; index += 1) {
+    if (progress.completedChunks.has(index)) continue;
+    const result = await executeCheckoutReturnChunk({
+      ...payload,
+      item_barcodes: chunks[index]!,
+    });
+    progress.processedItemCount += result?.processed ?? 0;
+    progress.skippedBarcodes.push(...(result?.skipped_barcodes ?? []));
+    progress.completedChunks.add(index);
+  }
+
+  const skippedBarcodes = [...new Set(progress.skippedBarcodes)];
+  if (skippedBarcodes.length > 0) {
+    throw new CheckoutRequestError(formatSkippedBarcodeConflictMessage(skippedBarcodes), 409, {
+      success: true,
+      processed: progress.processedItemCount,
+      skipped_barcodes: skippedBarcodes,
+    });
+  }
+
+  return { success: true, processed: progress.processedItemCount, skipped_barcodes: [] };
+};
+
+const executeCheckoutReturn = async (
+  payload: CheckoutReturnPayload,
+  progress: CheckoutReturnExecutionProgress = createCheckoutReturnExecutionProgress(),
+) => {
+  const retryStatusId = createCheckoutRetryStatusId();
+  const action = checkoutRetryAction(payload);
+  let attempt = 1;
+  let rateLimitRetries = 0;
+  let previousReason: CheckoutRetryReason = "network";
+
+  try {
+    while (true) {
+      try {
+        if (attempt > 1) {
+          setCheckoutRetryStatus({
+            id: retryStatusId,
+            phase: "retrying",
+            action,
+            reason: previousReason,
+            attempt,
+            maxAttempts: previousReason === "rate_limit" ? attempt : MAX_CHECKOUT_ATTEMPTS,
+            secondsRemaining: 0,
+          });
+        }
+        return await executeCheckoutReturnAttempt(payload, progress);
+      } catch (error) {
+        if (!isQueueableFailure(error)) throw error;
+
+        const reason = retryReasonForError(error);
+        if (typeof navigator !== "undefined" && !navigator.onLine) {
+          markItemTraxxServerUnreachable();
+          throw error;
+        }
+        if (
+          attempt >= MAX_CHECKOUT_ATTEMPTS ||
+          (reason === "rate_limit" && rateLimitRetries >= MAX_RATE_LIMIT_RETRIES)
+        ) {
+          throw error;
+        }
+
+        if (reason === "rate_limit") rateLimitRetries += 1;
+        previousReason = reason;
+        const nextAttempt = attempt + 1;
+        const delayMs = getCheckoutRetryDelayMs(
+          nextAttempt,
+          reason,
+          checkoutRetryAfterSeconds(error),
+        );
+        const initialSeconds = Math.ceil(delayMs / 1_000);
+        setCheckoutRetryStatus({
+          id: retryStatusId,
+          phase: "waiting",
+          action,
+          reason,
+          attempt: nextAttempt,
+          maxAttempts: reason === "rate_limit" ? nextAttempt : MAX_CHECKOUT_ATTEMPTS,
+          secondsRemaining: initialSeconds,
+        });
+        const stayedOnline = await waitForCheckoutRetry(delayMs, (secondsRemaining) => {
+          setCheckoutRetryStatus({
+            id: retryStatusId,
+            phase: "waiting",
+            action,
+            reason,
+            attempt: nextAttempt,
+            maxAttempts: reason === "rate_limit" ? nextAttempt : MAX_CHECKOUT_ATTEMPTS,
+            secondsRemaining,
+          });
+        });
+        if (!stayedOnline) {
+          markItemTraxxServerUnreachable();
+          throw error;
+        }
+        attempt = nextAttempt;
+      }
+    }
+  } finally {
+    clearCheckoutRetryStatus(retryStatusId);
+  }
+};
+
+const getUncompletedOfflineItems = (
+  items: OfflineSubmitContext["items"],
+  progress: CheckoutReturnExecutionProgress,
+) => items.filter((_, index) =>
+  !progress.completedChunks.has(Math.floor(index / MAX_CHECKOUT_RETURN_ITEMS))
+);
+
 export const submitCheckoutReturn = async (
   payload: CheckoutReturnPayload,
   offlineContext?: OfflineSubmitContext,
 ): Promise<SubmitCheckoutReturnResult> => {
   const payloadWithOperationId = ensureCheckoutOperationId(payload);
+  const progress = createCheckoutReturnExecutionProgress();
   try {
-    await executeCheckoutReturn(payloadWithOperationId);
+    await executeCheckoutReturn(payloadWithOperationId, progress);
+    if (payloadWithOperationId.operation_id) {
+      clearCheckoutRetryStatus(payloadWithOperationId.operation_id, "saved");
+    }
     if (offlineContext) await applyConfirmedTransactionToOfflinePack(offlineContext);
     void refreshOfflineCheckoutPackIfNeeded({ force: true, reportProgress: false }).catch(() => undefined);
     return {
       buffered: false,
       queuedCount: await getBufferedCheckoutCount(),
+      processedItemCount: progress.processedItemCount,
+      queuedItemCount: 0,
+      skippedBarcodes: [],
     };
   } catch (error) {
     if (isQueueableFailure(error)) {
-      if (navigator.onLine) {
-        try {
-          await executeCheckoutReturn(payloadWithOperationId);
-          if (offlineContext) await applyConfirmedTransactionToOfflinePack(offlineContext);
-          void refreshOfflineCheckoutPackIfNeeded({ force: true, reportProgress: false }).catch(() => undefined);
-          return {
-            buffered: false,
-            queuedCount: await getBufferedCheckoutCount(),
-          };
-        } catch (retryError) {
-          if (!isQueueableFailure(retryError)) throw retryError;
-          if (retryError instanceof CheckoutRequestError && retryError.status === 0 && await probeItemTraxxServer()) {
-            // A CORS/WAF failure can look like a network outage to fetch even
-            // while the edge is reachable. Do not silently turn that request
-            // into an offline transaction; let the operator retry it.
-            throw retryError;
-          }
-        }
+      if (
+        error instanceof CheckoutRequestError && error.status === 0 &&
+        navigator.onLine && await probeItemTraxxServer()
+      ) {
+        // A CORS/WAF failure can look like a network outage to fetch even while
+        // the edge is reachable. Keep that distinct from a real outage.
+        throw error;
       }
       if (!offlineContext || !payloadWithOperationId.operation_id) {
-        throw new Error("Offline checkout is unavailable for this transaction. Reconnect and prepare this device for offline use.");
+        throw error;
+      }
+      const remainingItems = getUncompletedOfflineItems(offlineContext.items, progress);
+      if (remainingItems.length === 0) {
+        throw error;
       }
       const queuedCount = await queueOfflineOperation({
         operationId: payloadWithOperationId.operation_id,
         borrower: offlineContext.borrower,
-        items: offlineContext.items,
+        items: remainingItems,
       });
-      return { buffered: true, queuedCount };
+      showCheckoutSavedForSync({
+        id: payloadWithOperationId.operation_id,
+        phase: "saved",
+        action: checkoutRetryAction(payloadWithOperationId),
+        itemCount: remainingItems.length,
+      });
+      return {
+        buffered: true,
+        queuedCount,
+        processedItemCount: progress.processedItemCount,
+        queuedItemCount: remainingItems.length,
+        skippedBarcodes: [...new Set(progress.skippedBarcodes)],
+      };
     }
     throw error;
   }
@@ -267,7 +447,8 @@ const syncBufferedCheckoutQueueInternal = async () => {
     let review = 0;
     const remaining: BufferedCheckoutItem[] = [];
 
-    for (const item of queue) {
+    for (let index = 0; index < queue.length; index += 1) {
+      const item = queue[index]!;
       if (item.review_required === true) {
         failed += 1;
         review += 1;
@@ -275,6 +456,12 @@ const syncBufferedCheckoutQueueInternal = async () => {
           ...item,
           last_error: item.last_error || LEGACY_QUEUE_REVIEW_MESSAGE,
         });
+        continue;
+      }
+      const nextRetryAt = item.next_retry_at ? Date.parse(item.next_retry_at) : Number.NaN;
+      if (Number.isFinite(nextRetryAt) && nextRetryAt > Date.now()) {
+        failed += 1;
+        remaining.push(item);
         continue;
       }
       const { scope, unavailable } = await getAuthoritativeOfflineQueueScope();
@@ -310,6 +497,7 @@ const syncBufferedCheckoutQueueInternal = async () => {
       }
       try {
         await executeCheckoutReturn(payload);
+        if (payload.operation_id) clearCheckoutRetryStatus(payload.operation_id, "saved");
         processed += 1;
       } catch (error) {
         failed += 1;
@@ -319,7 +507,21 @@ const syncBufferedCheckoutQueueInternal = async () => {
           payload,
           attempts: item.attempts + 1,
           last_error: message,
+          next_retry_at: isQueueableFailure(error)
+            ? new Date(Date.now() + getCheckoutRetryDelayMs(
+              MAX_CHECKOUT_ATTEMPTS + 1,
+              retryReasonForError(error),
+              checkoutRetryAfterSeconds(error),
+            )).toISOString()
+            : null,
         });
+        if (isQueueableFailure(error)) {
+          const unprocessed = queue.slice(index + 1);
+          remaining.push(...unprocessed);
+          failed += unprocessed.length;
+          review += unprocessed.filter((queued) => queued.review_required === true).length;
+          break;
+        }
       }
     }
 

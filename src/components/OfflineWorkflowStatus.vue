@@ -1,10 +1,20 @@
 <template>
-  <section v-if="showStatus" class="offline-workflow-status" aria-label="Offline checkout status">
+  <section
+    v-if="showStatus"
+    class="offline-workflow-status"
+    :class="{ 'is-retrying': isRetrying }"
+    aria-label="Checkout and offline status"
+    :aria-busy="isRetrying"
+  >
     <div class="offline-workflow-status-content">
-      <strong>{{ statusTitle }}</strong>
+      <div class="offline-workflow-status-heading">
+        <span v-if="isRetrying" class="offline-retry-spinner" aria-hidden="true"></span>
+        <strong>{{ statusTitle }}</strong>
+      </div>
       <span>{{ statusDetail }}</span>
     </div>
     <button
+      v-if="!isRetrying"
       type="button"
       class="button-secondary offline-sync-button"
       :disabled="syncInFlight"
@@ -88,6 +98,7 @@
 import { computed, nextTick, onMounted, onScopeDispose, ref, watch } from "vue";
 import { useRoute } from "vue-router";
 import { syncCheckoutQueues, type CheckoutQueueSyncResult } from "../services/checkoutService";
+import { activeCheckoutRetryStatus } from "../services/checkoutRetryStatus";
 import {
   getOfflineWorkflowSummary,
   isOfflineSessionInitializingError,
@@ -128,6 +139,7 @@ const pendingDownloadPrompt = ref(false);
 const largePackWarning = ref<OfflinePackSize | null>(null);
 const auth = getAuthState();
 const route = useRoute();
+const retryStatus = activeCheckoutRetryStatus;
 let pollTimer: number | null = null;
 let refreshTimer: number | null = null;
 let syncTimer: number | null = null;
@@ -151,6 +163,14 @@ const formatTime = (value: string | null | undefined) => {
 
 const statusTitle = computed(() => {
   if (connection.value.unreachable_since) return "Offline checkout active";
+  const retry = retryStatus.value;
+  if (retry?.phase === "saved") return "Saved for sync";
+  if (retry?.phase === "waiting" || retry?.phase === "retrying") {
+    if (retry.action === "offline_sync") return "Retrying offline sync";
+    if (retry.action === "return") return "Retrying return";
+    if (retry.action === "checkout") return "Retrying checkout";
+    return "Retrying transaction";
+  }
   if (summary.value.syncingCount > 0) return "Syncing offline transactions";
   if (summary.value.pendingCount > 0) return "Offline transactions pending";
   if (summary.value.reviewCount > 0) return "Offline sync needs review";
@@ -162,6 +182,7 @@ const statusTitle = computed(() => {
 const showStatus = computed(() =>
   isOfflineWorkflowRoute.value && (
     !!connection.value.unreachable_since ||
+    !!retryStatus.value ||
     summary.value.pendingCount > 0 ||
     summary.value.syncingCount > 0 ||
     summary.value.reviewCount > 0
@@ -180,11 +201,35 @@ const statusDetail = computed(() => {
   const review = summary.value.reviewCount;
   const counts = `${pending} pending${review ? ` · ${review} need${review === 1 ? "s" : ""} review` : ""}`;
   if (connection.value.unreachable_since) return `Last connected ${formatTime(connection.value.last_confirmed_at)} · ${counts}`;
+  const retry = retryStatus.value;
+  if (retry?.phase === "saved") {
+    const itemLabel = retry.itemCount === 1 ? "item is" : "items are";
+    return `${retry.itemCount} ${itemLabel} saved on this device and will sync automatically.`;
+  }
+  if (retry?.phase === "waiting" || retry?.phase === "retrying") {
+    const reason = retry.reason === "rate_limit"
+      ? "The server asked us to slow down."
+      : retry.reason === "server"
+      ? "The server had a temporary error."
+      : "A connection issue occurred.";
+    if (retry.phase === "retrying") {
+      return `${reason} Retrying now (attempt ${retry.attempt} of ${retry.maxAttempts}).`;
+    }
+    const waitLabel = retry.secondsRemaining === 1
+      ? "1 second"
+      : `${retry.secondsRemaining} seconds`;
+    return `${reason} Retrying in ${waitLabel} (attempt ${retry.attempt} of ${retry.maxAttempts}).`;
+  }
   if (summary.value.syncingCount > 0) return `Connected · syncing ${summary.value.syncingCount} transaction${summary.value.syncingCount === 1 ? "" : "s"}`;
   if (pending > 0 || review > 0) return `Connected · ${counts}`;
   if (!summary.value.pack) return "Setting up this device for an outage.";
   return `Updated ${formatTime(summary.value.pack.prepared_at)} · ${counts}`;
 });
+
+const isRetrying = computed(() =>
+  !connection.value.unreachable_since &&
+  (retryStatus.value?.phase === "waiting" || retryStatus.value?.phase === "retrying")
+);
 
 const clearToastTimer = () => {
   if (toastTimer !== null) window.clearTimeout(toastTimer);
@@ -514,8 +559,24 @@ onScopeDispose(() => {
   background: var(--surface);
 }
 .offline-workflow-status-content { display: grid; gap: 0.15rem; min-width: 0; }
+.offline-workflow-status-heading { display: flex; align-items: center; gap: 0.5rem; }
 .offline-workflow-status strong { font-size: 0.9rem; }
 .offline-workflow-status span { color: var(--muted); font-size: 0.8rem; }
+.offline-workflow-status-heading strong { color: var(--text); }
+.offline-retry-spinner {
+  box-sizing: border-box;
+  width: 0.85rem;
+  height: 0.85rem;
+  flex: 0 0 0.85rem;
+  border: 2px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: offline-retry-spin 0.8s linear infinite;
+}
+@keyframes offline-retry-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .offline-retry-spinner { animation-duration: 1.6s; }
+}
 .offline-sync-button { min-height: 2rem; padding: 0.3rem 0.72rem; white-space: nowrap; }
 .offline-pack-ready-toast {
   box-sizing: border-box;

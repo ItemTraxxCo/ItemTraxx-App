@@ -64,3 +64,8 @@ revoke all on function public.claim_trusted_ingress_request(text, integer)
   from public, anon, authenticated;
 grant execute on function public.claim_trusted_ingress_request(text, integer)
   to service_role;
+
+-- Supabase migrations are forward-only. Manual rollback, after disabling
+-- ITX_TRUSTED_INGRESS_REPLAY_STORE=database on every Edge Function:
+-- drop function if exists public.claim_trusted_ingress_request(text, integer);
+-- drop table if exists private.trusted_ingress_replay_claims;

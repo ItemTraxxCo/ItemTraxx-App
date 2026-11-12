@@ -76,6 +76,7 @@ const relatedFiles = changedFiles.filter(
   (file) =>
     file.startsWith('supabase/functions/') ||
     file.startsWith('src/services/') ||
+    file.startsWith('supabase/tests/') ||
     file.startsWith('tests/') ||
     file.startsWith('docs/api/') ||
     file === 'scripts/check-privileged-rls-policies.mjs'

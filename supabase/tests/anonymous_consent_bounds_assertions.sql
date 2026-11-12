@@ -21,11 +21,78 @@ BEGIN
     RAISE EXCEPTION 'cookie consent records must have row-level security enabled';
   END IF;
 
+  IF to_regclass('public.cookie_consent_profile_version_uidx') IS NOT NULL
+     OR NOT EXISTS (
+       SELECT 1
+       FROM pg_index
+       WHERE indexrelid = to_regclass('public.cookie_consent_profile_version_idx')
+         AND indisunique IS FALSE
+     ) THEN
+    RAISE EXCEPTION 'profile consent history must remain non-unique';
+  END IF;
+
   IF has_table_privilege('anon', 'public.cookie_consent_records', 'SELECT')
      OR has_table_privilege('anon', 'public.cookie_consent_records', 'INSERT')
+     OR has_table_privilege('anon', 'public.cookie_consent_records', 'UPDATE')
+     OR has_table_privilege('anon', 'public.cookie_consent_records', 'DELETE')
      OR has_table_privilege('authenticated', 'public.cookie_consent_records', 'SELECT')
      OR has_table_privilege('authenticated', 'public.cookie_consent_records', 'INSERT') THEN
-    RAISE EXCEPTION 'client roles must not access cookie consent records directly';
+    RAISE EXCEPTION 'client roles must not read or mutate cookie consent records broadly';
+  END IF;
+
+  IF has_column_privilege('anon', 'public.cookie_consent_records', 'subject_id', 'INSERT')
+     OR NOT has_column_privilege('anon', 'public.cookie_consent_records', 'consent_version', 'INSERT')
+     OR NOT has_column_privilege('anon', 'public.cookie_consent_records', 'analytics', 'INSERT')
+     OR NOT has_column_privilege('anon', 'public.cookie_consent_records', 'diagnostics', 'INSERT')
+     OR NOT has_column_privilege('anon', 'public.cookie_consent_records', 'consented_at', 'INSERT')
+     OR has_column_privilege('anon', 'public.cookie_consent_records', 'profile_id', 'INSERT')
+     OR has_column_privilege('anon', 'public.cookie_consent_records', 'recorded_at', 'INSERT')
+     OR has_column_privilege('anon', 'public.cookie_consent_records', 'created_at', 'INSERT')
+     OR has_column_privilege('anon', 'public.cookie_consent_records', 'workspace_id', 'INSERT') THEN
+    RAISE EXCEPTION 'anonymous consent inserts must use a server-generated identity and only client-owned consent fields';
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies
+    WHERE schemaname = 'public'
+      AND tablename = 'cookie_consent_records'
+      AND policyname = 'cookie_consent_records_anon_insert'
+      AND cmd = 'INSERT'
+      AND 'anon' = ANY(roles)
+  ) OR NOT EXISTS (
+    SELECT 1 FROM pg_policies
+    WHERE schemaname = 'public'
+      AND tablename = 'cookie_consent_records'
+      AND policyname = 'cookie_consent_records_anon_insert_bound'
+      AND cmd = 'INSERT'
+      AND permissive = 'RESTRICTIVE'
+  ) THEN
+    RAISE EXCEPTION 'anonymous consent insert policy or restrictive row bound is missing';
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_trigger AS trigger_row
+    JOIN pg_proc AS trigger_function
+      ON trigger_function.oid = trigger_row.tgfoid
+    WHERE trigger_row.tgrelid = 'public.cookie_consent_records'::regclass
+      AND trigger_row.tgname = 'cookie_consent_anon_rate_limit'
+      AND NOT trigger_row.tgisinternal
+      AND trigger_row.tgenabled IN ('O', 'A')
+      AND (trigger_row.tgtype & 1) = 1
+      AND (trigger_row.tgtype & 2) = 2
+      AND (trigger_row.tgtype & 4) = 4
+      AND trigger_function.prosecdef
+      AND position('cf-connecting-ip' in pg_get_functiondef(trigger_function.oid)) > 0
+      AND position('rate_scope := ''consent-record-'' || rate_key' in pg_get_functiondef(trigger_function.oid)) > 0
+      AND position('rate_key, rate_scope, 30, 60' in pg_get_functiondef(trigger_function.oid)) > 0
+  ) OR to_regprocedure('private.enforce_cookie_consent_direct_rate_limit()') IS NULL
+    OR has_function_privilege(
+      'anon',
+      'public.consume_rate_limit_prelogin(text,text,integer,integer)',
+      'EXECUTE'
+    ) THEN
+    RAISE EXCEPTION 'direct anonymous consent inserts must use the guarded database limiter';
   END IF;
 
   IF has_function_privilege(
@@ -278,6 +345,59 @@ BEGIN
       AND consent_version = 2
   ) THEN
     RAISE EXCEPTION 'anonymous consent older than 730 days was retained';
+  END IF;
+END;
+$$;
+
+-- Exercise the real anonymous column grants, RLS policies, defaults, and
+-- database rate-limit trigger. The surrounding transaction rolls this row back.
+UPDATE public.cookie_consent_write_budget
+SET budget_day = (pg_catalog.clock_timestamp() AT TIME ZONE 'UTC')::date,
+    anonymous_rows_created = 0,
+    last_retention_day = (pg_catalog.clock_timestamp() AT TIME ZONE 'UTC')::date
+WHERE singleton_id = 1;
+
+SET LOCAL ROLE anon;
+SELECT pg_catalog.set_config(
+  'request.headers',
+  '{"cf-connecting-ip":"192.0.2.123"}',
+  true
+);
+INSERT INTO public.cookie_consent_records (
+  consent_version,
+  analytics,
+  diagnostics,
+  consented_at
+) VALUES (
+  2,
+  TRUE,
+  TRUE,
+  timestamptz '1901-01-01 00:00:00+00'
+);
+RESET ROLE;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM public.cookie_consent_records
+    WHERE consent_version = 2
+      AND profile_id IS NULL
+      AND workspace_id IS NULL
+      AND analytics IS TRUE
+      AND diagnostics IS TRUE
+      AND consented_at = timestamptz '1901-01-01 00:00:00+00'
+      AND subject_id IS NOT NULL
+      AND recorded_at > now() - interval '2 minutes'
+      AND created_at > now() - interval '2 minutes'
+  ) THEN
+    RAISE EXCEPTION 'anonymous v2 insert did not create an unlinked row with server defaults';
+  END IF;
+
+  IF (SELECT anonymous_rows_created
+      FROM public.cookie_consent_write_budget
+      WHERE singleton_id = 1) <> 1 THEN
+    RAISE EXCEPTION 'anonymous v2 insert did not consume exactly one daily budget entry';
   END IF;
 END;
 $$;

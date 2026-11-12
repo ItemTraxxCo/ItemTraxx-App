@@ -5,7 +5,7 @@
   "description": "ItemTraxx Cloudflare edge proxy Worker. Kept as its own manifest so Workers Builds installs only wrangler + typescript instead of the full application dependency tree.",
   "type": "module",
   "engines": {
-    "node": ">=24.22.1 <25"
+    "node": ">=24.22.3 <25"
   },
   "scripts": {
     "typecheck": "tsc -p tsconfig.json",

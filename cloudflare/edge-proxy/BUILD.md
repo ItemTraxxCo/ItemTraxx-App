@@ -10,8 +10,9 @@ the package layout:
 - `SKIP_DEPENDENCY_INSTALL=1`
 
 The repository's `.nvmrc`, `.node-version`, and GitHub Actions workflows use
-Node `24.22.1`. The Cloudflare Workers Builds `NODE_VERSION` setting was updated
-from `24.18.0` to `24.22.1` and read back from the dashboard on 2026-10-22.
+Node `24.22.3`. The Cloudflare Workers Builds `NODE_VERSION` setting was last
+read back as `24.22.1` on 2026-10-22 and needs a separate dashboard update to
+match the repository runtime.
 
 The connected Worker uses `main` as its production branch and has
 non-production branch builds enabled. Its non-production Version command runs

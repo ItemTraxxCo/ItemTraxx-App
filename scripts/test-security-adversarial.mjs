@@ -20,9 +20,9 @@ import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = resolve(fileURLToPath(new URL("..", import.meta.url)));
-if (process.versions.node !== "24.22.1") {
+if (process.versions.node !== "24.22.3") {
   console.error(
-    `This suite requires Node 24.22.1 for repository parity; found ${process.versions.node}.`,
+    `This suite requires Node 24.22.3 for repository parity; found ${process.versions.node}.`,
   );
   process.exit(2);
 }

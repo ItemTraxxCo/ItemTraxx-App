@@ -44,7 +44,7 @@ jobs:
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           # package.json requires Node 24.x; jsdom 30 also requires 24.15+.
-          node-version: 24.22.1
+          node-version: 24.22.3
           cache: npm
           cache-dependency-path: |
             package-lock.json
@@ -137,7 +137,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: 24.22.1
+          node-version: 24.22.3
           cache: npm
           cache-dependency-path: |
             package-lock.json
@@ -203,7 +203,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: 24.22.1
+          node-version: 24.22.3
           cache: npm
           cache-dependency-path: |
             package-lock.json
@@ -240,7 +240,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: 24.22.1
+          node-version: 24.22.3
           cache: npm
           cache-dependency-path: |
             package-lock.json
@@ -432,7 +432,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: 24.22.1
+          node-version: 24.22.3
           cache: npm
           cache-dependency-path: |
             package-lock.json
@@ -582,7 +582,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: 24.22.1
+          node-version: 24.22.3
           cache: npm
           cache-dependency-path: |
             package-lock.json

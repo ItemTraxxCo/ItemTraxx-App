@@ -2,6 +2,7 @@ import { getEdgeFunctionsBaseUrl } from "./edgeUrls";
 import { fetchWithTransientRetry } from "./fetchWithTransientRetry";
 import { captureHandledRequestFailure, capturePostHogLog } from "./posthogDiagnostics";
 import { createRequestId } from "./requestId";
+import { observeSystemStatus, observeSystemStatusUnavailable } from "./serviceAvailabilityState";
 
 export type SystemStatusPayload = {
   status?: string;
@@ -80,6 +81,7 @@ const fetchAndCacheSystemStatus = async (timeoutMs: number) => {
       status: response.status,
       payload,
     };
+    observeSystemStatus(result);
     if (!response.ok) {
       const route = statusRoute();
       const expectedDatabaseUnavailable = response.status === 503 && payload.status === "down";
@@ -110,6 +112,7 @@ const fetchAndCacheSystemStatus = async (timeoutMs: number) => {
     cachedAtMs = Date.now();
     return result;
   } catch (error) {
+    observeSystemStatusUnavailable();
     const errorCode = isAbortError(error) ? "timeout" : "network";
     const route = statusRoute();
     void captureHandledRequestFailure({
@@ -176,6 +179,7 @@ export const probeSystemStatusTransport = async (timeoutMs = 3500) => {
     });
     return true;
   } catch (error) {
+    observeSystemStatusUnavailable();
     const errorCode = isAbortError(error) ? "timeout" : "network";
     const route = statusRoute();
     void captureHandledRequestFailure({

@@ -38,16 +38,8 @@ const routes: RouteRecordRaw[] = [
     component: () => import("../pages/AccessDenied.vue"),
     meta: { public: true, title: "Access denied | ItemTraxx" },
   },
-  {
-    path: "/landing-new",
-    name: "public-home-new",
-    component: () => import("../pages/LandingPageNew.vue"),
-    meta: { public: true, title: "ItemTraxx Inventory Tracking" },
-  },
-  {
-    path: "/landing-new2",
-    redirect: { name: "public-home-new" },
-  },
+  { path: "/landing-new", redirect: "/" },
+  { path: "/landing-new2", redirect: "/" },
   {
     path: "/reset-password",
     name: "public-reset-password",
@@ -86,21 +78,9 @@ const routes: RouteRecordRaw[] = [
     props: { docSlug: slug },
     meta: { public: true, title: `${title} | ItemTraxx` },
   })),
-  // Backwards-compatible entry points: same document, original URL kept.
-  {
-    path: "/privacy",
-    name: "public-privacy",
-    component: () => import("../pages/LegalDocumentPage.vue"),
-    props: { docSlug: "privacy" },
-    meta: { public: true, title: "Privacy | ItemTraxx" },
-  },
-  {
-    path: "/cookies",
-    name: "public-cookies",
-    component: () => import("../pages/LegalDocumentPage.vue"),
-    props: { docSlug: "cookies" },
-    meta: { public: true, title: "Cookies | ItemTraxx" },
-  },
+  // Legacy aliases permanently redirect to their canonical legal documents.
+  { path: "/privacy", redirect: "/legal/privacy" },
+  { path: "/cookies", redirect: "/legal/cookies" },
   { path: "/terms", redirect: "/legal/terms" },
   {
     path: "/pricing",

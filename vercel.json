@@ -1,6 +1,33 @@
 {
   "installCommand": "env -u npm_config_cache_dir -u NPM_CONFIG_CACHE_DIR npm install",
   "buildCommand": "env -u npm_config_cache_dir -u NPM_CONFIG_CACHE_DIR npm run build",
+  "redirects": [
+    {
+      "source": "/privacy",
+      "destination": "https://itemtraxx.com/legal/privacy",
+      "permanent": true
+    },
+    {
+      "source": "/cookies",
+      "destination": "https://itemtraxx.com/legal/cookies",
+      "permanent": true
+    },
+    {
+      "source": "/terms",
+      "destination": "https://itemtraxx.com/legal/terms",
+      "permanent": true
+    },
+    {
+      "source": "/landing-new",
+      "destination": "https://itemtraxx.com/",
+      "permanent": true
+    },
+    {
+      "source": "/landing-new2",
+      "destination": "https://itemtraxx.com/",
+      "permanent": true
+    }
+  ],
   "headers": [
     {
       "source": "/assets/(.*)",

@@ -88,7 +88,7 @@ const trustLinks = [
     category: "Privacy",
     title: "Privacy",
     description: "How ItemTraxx handles data, retention, support workflows, and privacy requests.",
-    to: "/privacy",
+    to: "/legal/privacy",
   },
   {
     category: "Legal",

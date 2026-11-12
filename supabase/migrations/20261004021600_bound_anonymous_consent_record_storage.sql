@@ -35,7 +35,9 @@ CREATE INDEX IF NOT EXISTS cookie_consent_records_anonymous_retention_idx
   ON public.cookie_consent_records (created_at)
   WHERE profile_id IS NULL;
 
-CREATE UNIQUE INDEX IF NOT EXISTS cookie_consent_profile_version_uidx
+-- A profile may have multiple browser subjects and consent changes over time.
+-- Keep lookup support without collapsing distinct acceptance history.
+CREATE INDEX IF NOT EXISTS cookie_consent_profile_version_idx
   ON public.cookie_consent_records (profile_id, consent_version)
   WHERE profile_id IS NOT NULL;
 

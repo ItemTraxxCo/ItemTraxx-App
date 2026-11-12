@@ -17,7 +17,8 @@ const sharedLinks = [
   { label: "Contact", href: "/contact" },
   { label: "Security", href: "/security" },
   { label: "Trust", href: "/trust" },
-  { label: "Privacy", href: "/privacy" },
+  { label: "Privacy", href: "/legal/privacy" },
+  { label: "Data Processing Addendum", href: "/legal/dpa" },
   { label: "FAQ", href: "/faq" },
   { label: "Getting started", href: "/getting-started" },
   { label: "Support", href: "/contact-support" },
@@ -37,14 +38,14 @@ const legalDocumentPage = ({ slug, name, description, summary, audience }) => ({
   heading: name,
   paragraphs: [
     summary,
-    `This document is written for ${audience}. The full text, including a table of contents, definitions, and effective dates, is shown when JavaScript is enabled and is also available as Markdown from the document page.`,
+    `This document is written for ${audience}. The full text, definitions, effective dates, and linked references are shown when JavaScript is enabled and are also available as Markdown from the document page.`,
     "Do not infer private customer data, credentials, contracts, or internal procedures from public pages. For questions, email legal@itemtraxx.com, or privacy@itemtraxx.com for privacy matters.",
   ],
   sections: [
     {
       heading: "Related documents",
       text:
-        "The Legal Center also publishes the Terms of Service, Privacy Policy, Student Privacy Notice, Subprocessor Directory, Cookie Notice, and Vulnerability Disclosure Policy. Review them together for a complete picture.",
+        "The Legal Center also publishes the Terms of Service, Data Processing Addendum, Privacy Policy, Student Privacy Notice, Subprocessor Directory, Cookie Notice, and Vulnerability Disclosure Policy. Review them together for a complete picture.",
     },
   ],
 });
@@ -77,6 +78,13 @@ const LEGAL_DOCUMENT_PAGES = [
     description: "Every provider that may process ItemTraxx customer personal information, what it does, and where it operates.",
     summary: "The Subprocessor Directory lists each provider that may process personal information for ItemTraxx and its customers, what each one does, what information it can receive, and how customers are notified of changes.",
     audience: "schools, districts, and security reviewers",
+  }),
+  legalDocumentPage({
+    slug: "dpa",
+    name: "Data Processing Addendum",
+    description: "How ItemTraxx processes customer data, protects it, uses subprocessors, and handles incidents, requests, and deletion.",
+    summary: "The ItemTraxx Data Processing Addendum describes processing roles and instructions, security safeguards, subprocessors, customer requests, security-incident notices, retention and deletion, international processing, and service-provider terms.",
+    audience: "customers, schools, districts, and organizations",
   }),
   legalDocumentPage({
     slug: "cookies",
@@ -167,6 +175,106 @@ export const PUBLIC_PRERENDER_PAGES = [
         heading: "Response expectations",
         text:
           "The public contact page lists a default response target within active hours. The support team may ask for additional context before discussing account-specific details, and public security and privacy pages explain the appropriate escalation paths.",
+      },
+    ],
+  }),
+  makePage({
+    path: "/contact-sales",
+    title: "Contact Sales | ItemTraxx",
+    description:
+      "Talk with ItemTraxx about inventory tracking plans for schools, districts, organizations, and individual operators.",
+    eyebrow: "ItemTraxx plans and pricing",
+    heading: "Find the right ItemTraxx plan for your team.",
+    paragraphs: [
+      "Contact ItemTraxx Sales to discuss inventory tracking for a school, district, organization, team, or individual operation. The sales request form helps us understand your needs and the plan you want to explore.",
+      "ItemTraxx offers Workspace Core, Workspace Growth, Workspace Enterprise, Education, Custom, and Individual plans. Share the size of your organization and the inventory workflow you want to manage so the team can prepare a useful response.",
+      "The sales team aims to respond within 72 hours during active hours. Use the form to ask about plans, account setup, pricing, or a tailored inventory workflow.",
+    ],
+    sections: [
+      {
+        heading: "What to include",
+        text:
+          "Provide your name, reply email, the plan you are considering, and your school, district, or organization name when applicable. Include the number of schools or units for plans that need that context.",
+      },
+      {
+        heading: "Inventory workflows",
+        text:
+          "ItemTraxx supports item and borrower records, checkout and return workflows, inventory status, reporting, and administrative history for shared equipment and assets.",
+      },
+    ],
+  }),
+  makePage({
+    path: "/request-demo",
+    title: "Request Demo | ItemTraxx",
+    description:
+      "Request a guided ItemTraxx demo of inventory tracking, checkout, return, and administrative workflows.",
+    eyebrow: "See ItemTraxx in a live walkthrough",
+    heading: "Request an ItemTraxx demo.",
+    paragraphs: [
+      "Request a guided walkthrough of ItemTraxx for your school, district, organization, team, or individual operation. See how teams track shared items and record who has each item, when it moved, and when it was returned.",
+      "A demo can cover item and borrower records, barcode-friendly checkout and returns, inventory status, reporting, transaction history, and administrative controls.",
+      "Tell us about your inventory workflow and what you want to see. The ItemTraxx team aims to respond within 72 hours during active hours to schedule next steps.",
+    ],
+    sections: [
+      {
+        heading: "Who the demo is for",
+        text:
+          "ItemTraxx is built for schools, districts, organizations, teams, and individual operators that manage shared equipment, classroom materials, and other assets that move between people or locations.",
+      },
+      {
+        heading: "Plan a useful walkthrough",
+        text:
+          "Share the items you track, who checks them out, and the records or reports your team needs. This helps focus the demonstration on your day-to-day process.",
+      },
+    ],
+  }),
+  makePage({
+    path: "/contact-support",
+    title: "Contact Support | ItemTraxx",
+    description:
+      "Contact ItemTraxx Support for account access, inventory workflow, technical, billing, or feature questions.",
+    eyebrow: "ItemTraxx customer support",
+    heading: "Get help with ItemTraxx.",
+    paragraphs: [
+      "Use the ItemTraxx support form for help with an existing account, inventory workflow, technical issue, billing question, access problem, or feature request.",
+      "Include a clear subject and describe what you were trying to do, what happened, and the relevant workspace or page. You can attach up to two images to help explain the issue.",
+      "The support team aims to respond within 72 hours during active hours. For security concerns, use the dedicated security reporting page so the report reaches the right review process.",
+    ],
+    sections: [
+      {
+        heading: "Support topics",
+        text:
+          "The support form accepts general questions, bug reports, billing questions, account access requests, feature requests, and privacy or data-rights requests.",
+      },
+      {
+        heading: "Help us respond",
+        text:
+          "Provide a reply email, a concise subject, and enough detail to reproduce or understand the question. Do not include passwords, access codes, or other credentials in a support request.",
+      },
+    ],
+  }),
+  makePage({
+    path: "/login",
+    title: "Login | ItemTraxx",
+    description:
+      "Sign in to ItemTraxx with email and password, your workspace single sign-on provider, or a passkey.",
+    eyebrow: "ItemTraxx account access",
+    heading: "Sign in to your ItemTraxx workspace.",
+    paragraphs: [
+      "Use ItemTraxx sign-in to access the inventory workspace for your school, district, organization, or team.",
+      "Sign in with your email and password, continue through your workspace single sign-on provider, or use a passkey when available.",
+      "If you need an account or help with access, contact your workspace administrator or the ItemTraxx Support team. Password recovery is available from the sign-in page.",
+    ],
+    sections: [
+      {
+        heading: "Manage inventory",
+        text:
+          "ItemTraxx helps teams manage item records, borrowers, checkout and return activity, inventory status, reporting, and administrative history.",
+      },
+      {
+        heading: "Workspace sign-in",
+        text:
+          "Workspace access is organized around the account and role assigned by your organization. Choose the sign-in method configured for your workspace.",
       },
     ],
   }),
@@ -324,7 +432,7 @@ export const PUBLIC_PRERENDER_PAGES = [
     path: "/legal",
     title: "Legal Center | ItemTraxx",
     description:
-      "Read the public ItemTraxx Terms of Service, Privacy Policy, Student Privacy Notice, Subprocessor Directory, Cookie Notice, and Vulnerability Disclosure Policy.",
+      "Read the public ItemTraxx Terms of Service, Data Processing Addendum, Privacy Policy, Student Privacy Notice, Subprocessor Directory, Cookie Notice, and Vulnerability Disclosure Policy.",
     eyebrow: "ItemTraxx legal center",
     heading: "Public terms and policy references.",
     paragraphs: [
@@ -336,13 +444,22 @@ export const PUBLIC_PRERENDER_PAGES = [
       {
         heading: "Policy review",
         text:
-          "Use Legal together with Privacy, Security, Compliance, and Trust when reviewing ItemTraxx. Each page has a different purpose: governing terms, data handling, operational controls, public mappings, and review navigation.",
+          "Use Legal together with Privacy, Security, Compliance, and Trust when reviewing ItemTraxx. The Terms of Service and Data Processing Addendum set out customer terms and processing roles; the other pages explain data handling, operational controls, public mappings, and review navigation.",
       },
       {
         heading: "Questions",
         text:
           "For a legal or procurement question, contact ItemTraxx through the public sales or support path and identify the document or topic that needs clarification. Formal advice should come from the appropriate legal or compliance reviewer.",
       },
+    ],
+    links: [
+      { label: "Terms of Service", href: "/legal/terms" },
+      { label: "Data Processing Addendum", href: "/legal/dpa" },
+      { label: "Privacy Policy", href: "/legal/privacy" },
+      { label: "Student Privacy Notice", href: "/legal/student-privacy" },
+      { label: "Subprocessor Directory", href: "/legal/subprocessors" },
+      { label: "Cookie Notice", href: "/legal/cookies" },
+      { label: "Vulnerability Disclosure Policy", href: "/legal/vdp" },
     ],
   }),
   ...LEGAL_DOCUMENT_PAGES.map((page) => makePage(page)),

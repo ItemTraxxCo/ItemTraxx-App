@@ -5,6 +5,7 @@ import {
   readCookieConsent,
 } from "./cookieConsentService";
 import { isRecoverableChunkLoadError } from "./appErrorRecovery";
+import { isExpectedServiceDisruption } from "./serviceAvailabilityState";
 import type { CaptureLogOptions, CaptureResult } from "posthog-js";
 import { AppError } from "./appErrors";
 import {
@@ -862,12 +863,13 @@ const HANDLED_FAILURE_DEDUP_WINDOW_MS = 60_000;
 const handledFailureSeenAt = new Map<string, number>();
 
 // These failures are already handled by the request client and emitted as
-// structured PostHog logs. Promote only server responses to Error Tracking:
-// browser/network timeouts, expected auth/rate-limit responses, and background
-// health-probe failures are not uncaught application errors and create noisy
-// synthetic issues when wrapped in captureException.
+// structured PostHog logs. During a known maintenance/outage state, their 5xx
+// responses are expected symptoms rather than application exceptions. This
+// gate does not affect genuine uncaught exception capture.
 const shouldCaptureHandledRequestFailure = (failure: HandledRequestFailure) =>
-  failure.captureException !== false && failure.status >= 500;
+  failure.captureException !== false &&
+  failure.status >= 500 &&
+  !isExpectedServiceDisruption();
 
 const getHandledRequestFailureCode = (failure: HandledRequestFailure): PostHogErrorCode => {
   if (failure.errorCode && isPostHogErrorCode(failure.errorCode)) return failure.errorCode;
@@ -885,7 +887,7 @@ export const captureHandledRequestFailure = async (failure: HandledRequestFailur
   if (isLocalhostRuntime() || !shouldCaptureHandledRequestFailure(failure)) return;
   if (!allowsDiagnostics(readCookieConsent())) return;
   await initPostHog();
-  if (!(await waitForPostHogReady()) || !posthog) return;
+  if (!(await waitForPostHogReady()) || !posthog || isExpectedServiceDisruption()) return;
   const errorCode = getHandledRequestFailureCode(failure);
   const path = failure.path.replace(/[?#].*$/, "");
   const dedupeKey = [

@@ -38,8 +38,16 @@ const routes: RouteRecordRaw[] = [
     component: () => import("../pages/AccessDenied.vue"),
     meta: { public: true, title: "Access denied | ItemTraxx" },
   },
-  { path: "/landing-new", redirect: "/" },
-  { path: "/landing-new2", redirect: "/" },
+  {
+    path: "/landing-new",
+    name: "public-home-new",
+    component: () => import("../pages/LandingPageNew.vue"),
+    meta: { public: true, title: "ItemTraxx Inventory Tracking" },
+  },
+  {
+    path: "/landing-new2",
+    redirect: { name: "public-home-new" },
+  },
   {
     path: "/reset-password",
     name: "public-reset-password",

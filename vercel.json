@@ -16,16 +16,6 @@
       "source": "/terms",
       "destination": "https://itemtraxx.com/legal/terms",
       "permanent": true
-    },
-    {
-      "source": "/landing-new",
-      "destination": "https://itemtraxx.com/",
-      "permanent": true
-    },
-    {
-      "source": "/landing-new2",
-      "destination": "https://itemtraxx.com/",
-      "permanent": true
     }
   ],
   "headers": [

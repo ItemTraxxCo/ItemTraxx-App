@@ -192,15 +192,16 @@ const isDevSubdomainHost = computed(() => {
   return !!match172 && Number.isFinite(secondOctet) && secondOctet >= 16 && secondOctet <= 31;
 });
 const isFullBleedRoute = computed(() => ["/login", "/super-auth", "/internal-auth", "/reset-password"].includes(route.path));
-const isMarketingFullBleedRoute = computed(() => ["/", "/landing-new", "/changelog", "/itemscanner"].includes(route.path));
+const isIndexRoute = computed(() => route.path === "/index" || route.path.startsWith("/index/"));
+const isMarketingFullBleedRoute = computed(() => ["/", "/landing-new", "/changelog", "/itemscanner"].includes(route.path) || isIndexRoute.value);
 const isSubmitConfirmationRoute = computed(() => route.path === "/submitconfirmation");
 const isBannerBleedRoute = computed(() => ["/legal", "/security", "/trust", "/compliance", "/faq", "/contact", "/privacy", "/cookies", "/accessibility", "/about", "/pricing", "/forgot-password", "/contact-sales", "/request-demo", "/contact-support", "/report-security-issue", "/getting-started"].includes(route.path) || route.path.startsWith("/legal/"));
-const isDarkChromeRoute = computed(() => ["/", "/landing-new", "/pricing", "/changelog", "/itemscanner"].includes(route.path));
+const isDarkChromeRoute = computed(() => ["/", "/landing-new", "/pricing", "/changelog", "/itemscanner"].includes(route.path) || isIndexRoute.value);
 const isLandingRoute = computed(() => route.path === "/" || route.path === "/landing-new");
 const isUnavailableRoute = computed(() => route.path === "/unavailable" || route.name === "public-unavailable");
 const isSuperAdminShellRoute = computed(() => String(route.name || "").startsWith("super-admin-"));
 const isKillSwitchAllowedRoute = computed(() => isUnavailableRoute.value);
-const hiddenMenuRoutes = new Set(["public-home", "public-unavailable", "public-access-denied", "public-pricing", "public-about", "public-security", "public-report-security-issue", "public-changelog", "public-compliance", "public-privacy", "public-cookies", "public-contact", "public-trust", "public-faq", "public-accessibility", "public-getting-started", "public-itemscanner", "public-legal", "public-forgot-password", "public-reset-password", "public-request-demo", "public-contact-sales", "public-contact-support", "public-submit-confirmation"]);
+const hiddenMenuRoutes = new Set(["public-home", "public-unavailable", "public-access-denied", "public-pricing", "public-about", "public-security", "public-report-security-issue", "public-changelog", "public-index", "public-index-about", "public-index-article", "public-compliance", "public-privacy", "public-cookies", "public-contact", "public-trust", "public-faq", "public-accessibility", "public-getting-started", "public-itemscanner", "public-legal", "public-forgot-password", "public-reset-password", "public-request-demo", "public-contact-sales", "public-contact-support", "public-submit-confirmation"]);
 const showTopMenu = computed(() => !hiddenMenuRoutes.has(String(route.name)) && !String(route.name || "").startsWith("super-admin-"));
 const showLogoutUserAction = computed(() => auth.isAuthenticated && !Boolean(route.meta.public) && route.path !== "/login");
 const isWorkspaceScopedRoute = computed(() =>

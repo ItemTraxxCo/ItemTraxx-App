@@ -203,7 +203,18 @@ const verifyTrustedEdgeIngress = async (
   return { requestId, signature, target, verifiedAt };
 };
 
-export const hasTrustedEdgeIngress = async (req: Request, target: string) => {
+type TrustedEdgeIngressOptions = {
+  // Only for read-only GET gates that must keep working while the database is
+  // offline. The isolate-local claim has already passed, so an exact replay to
+  // this isolate is still rejected; only the cross-isolate check is skipped.
+  tolerateReplayStoreOutage?: boolean;
+};
+
+export const hasTrustedEdgeIngress = async (
+  req: Request,
+  target: string,
+  options: TrustedEdgeIngressOptions = {},
+) => {
   const verified = await verifyTrustedEdgeIngress(req, target);
   if (verified === null) return false;
 
@@ -217,7 +228,9 @@ export const hasTrustedEdgeIngress = async (req: Request, target: string) => {
   if (claim === "claimed") return true;
 
   logReplayClaimFailure(claim, verified);
-  return false;
+  return claim === "unavailable" &&
+    options.tolerateReplayStoreOutage === true &&
+    req.method === "GET";
 };
 
 const logReplayClaimFailure = (

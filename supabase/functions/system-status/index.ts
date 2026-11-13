@@ -217,9 +217,14 @@ serve((req) => withRequestSpan(req, "GET /functions/system-status", async (span,
       auth: { persistSession: false },
     });
 
+    // The shared replay store is a database RPC. Without the outage
+    // tolerance, a database outage makes trusted requests look direct, and
+    // the direct rate limiter then fails too, so this endpoint reports
+    // "rate limiter unavailable" in place of "down".
     const trustedEdgeIngress = await hasTrustedEdgeIngress(
       req,
       "system-status",
+      { tolerateReplayStoreOutage: true },
     ).catch(() => false);
     tIngress = Date.now();
     // The edge proxy already applies PUBLIC_STATUS_RATE_LIMITER before it

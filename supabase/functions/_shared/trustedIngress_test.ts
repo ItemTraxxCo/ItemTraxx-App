@@ -814,3 +814,80 @@ Deno.test("shared replay store fails closed when the claim cannot be confirmed",
     });
   }
 });
+
+const makeSignedStatusRequest = async (requestId: string) => {
+  const timestamp = Date.now().toString();
+  const signature = await sign(
+    `${timestamp}.${requestId}.GET.system-status.no-body`,
+  );
+  return new Request("https://example.test/functions/system-status", {
+    method: "GET",
+    headers: {
+      "x-itx-edge-proxy": "1",
+      "x-itx-edge-proxy-ts": timestamp,
+      "x-itx-edge-proxy-signature": signature,
+      "x-request-id": requestId,
+    },
+  });
+};
+
+Deno.test("status gate stays trusted when the shared replay store is down", async () => {
+  // system-status must report a database outage, so its trusted path cannot
+  // depend on the database-backed replay claim.
+  await withSharedReplayStore(
+    () => new Response("upstream failure", { status: 503 }),
+    async (calls) => {
+      const request = await makeSignedStatusRequest("status-store-outage");
+      assert(
+        await hasTrustedEdgeIngress(request, "system-status", {
+          tolerateReplayStoreOutage: true,
+        }),
+        "expected the status gate to trust a verified envelope during a store outage",
+      );
+      assert(calls.length === 1, "expected the shared store to be consulted first");
+    },
+  );
+});
+
+Deno.test("status gate outage tolerance still rejects replays", async () => {
+  await withSharedReplayStore(() => Response.json(false), async () => {
+    const crossIsolate = await makeSignedStatusRequest("status-cross-isolate-replay");
+    assert(
+      await hasTrustedEdgeIngress(crossIsolate, "system-status", {
+        tolerateReplayStoreOutage: true,
+      }) === false,
+      "a replay the shared store detected must not be trusted",
+    );
+  });
+
+  await withSharedReplayStore(
+    () => Promise.reject(new TypeError("connection reset")),
+    async () => {
+      const request = await makeSignedStatusRequest("status-local-replay");
+      const options = { tolerateReplayStoreOutage: true };
+      assert(
+        await hasTrustedEdgeIngress(request.clone(), "system-status", options),
+        "expected the first envelope to be trusted",
+      );
+      assert(
+        await hasTrustedEdgeIngress(request, "system-status", options) === false,
+        "an exact replay to the same isolate must not be trusted",
+      );
+    },
+  );
+});
+
+Deno.test("replay store outage tolerance does not apply to requests with a body", async () => {
+  await withSharedReplayStore(
+    () => new Response("upstream failure", { status: 503 }),
+    async () => {
+      const request = await makeSignedIngressRequest({ requestId: "status-store-outage-post" });
+      assert(
+        await hasTrustedEdgeIngress(request, "workspace-admin-mutate", {
+          tolerateReplayStoreOutage: true,
+        }) === false,
+        "a POST must stay fail-closed when the shared store is down",
+      );
+    },
+  );
+});

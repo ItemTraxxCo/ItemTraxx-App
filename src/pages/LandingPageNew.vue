@@ -451,7 +451,7 @@ onBeforeUnmount(() => {
         <div class="hero-copy">
           <h1 id="hero-title">Inventory Tracking Made Simple</h1>
           <h2 style="text-align: center; font-weight: 400;">Just the way it should be.</h2>
-          <div class="hero-actions" aria-label="Get started"><RouterLink class="hero-action primary" to="/request-demo" @click="trackCta('demo', 'hero')">Get a demo</RouterLink><RouterLink class="hero-action secondary" to="/pricing" @click="trackCta('pricing', 'hero')">Pricing</RouterLink></div>
+          <div class="hero-actions" aria-label="Get started"><RouterLink class="hero-action primary" to="/demo" @click="trackCta('demo', 'hero')">Try demo</RouterLink><RouterLink class="hero-action secondary" to="/pricing" @click="trackCta('pricing', 'hero')">Pricing</RouterLink></div>
         </div>
         <div class="comparison-stage">
           <div class="comparison" aria-label="A messy inventory spreadsheet compared with the ItemTraxx checkout and return interface">
@@ -612,7 +612,7 @@ onBeforeUnmount(() => {
       <div class="final-cta-inner">
         <h2 id="final-cta-title">Built for teams where inventory chaos isn’t an option</h2>
         <p class="final-cta-copy"><span>Ready to integrate ItemTraxx to organize your inventory?</span><span>Request a demo today</span></p>
-        <div class="final-cta-actions"><RouterLink class="final-cta-action" to="/request-demo" @click="trackCta('demo', 'final')">Get a demo</RouterLink><RouterLink class="final-cta-action secondary" to="/pricing" @click="trackCta('pricing', 'final')">Explore pricing</RouterLink></div>
+        <div class="final-cta-actions"><RouterLink class="final-cta-action" to="/demo" @click="trackCta('demo', 'final')">Try demo</RouterLink><RouterLink class="final-cta-action secondary" to="/pricing" @click="trackCta('pricing', 'final')">Explore pricing</RouterLink></div>
       </div>
     </section>
   

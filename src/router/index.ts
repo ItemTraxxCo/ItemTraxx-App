@@ -103,6 +103,12 @@ const routes: RouteRecordRaw[] = [
     meta: { public: true, title: "Contact Sales | ItemTraxx" },
   },
   {
+    path: "/demo",
+    name: "public-demo",
+    component: () => import("../pages/demo/Demo.vue"),
+    meta: { public: true, title: "Interactive Demo | ItemTraxx" },
+  },
+  {
     path: "/request-demo",
     name: "public-request-demo",
     component: () => import("../pages/RequestDemoPage.vue"),

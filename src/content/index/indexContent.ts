@@ -86,11 +86,12 @@ const parseFrontmatter = (source: string) => {
 
 const parseFile = ([path, source]: [string, string]): IndexEntry | null => {
   const fileName = path.split("/").at(-1)?.replace(/\.md$/i, "") ?? "";
-  const title = decodeURIComponent(fileName).replace(/\s+/g, " ").trim();
-  const slug = slugify(title);
+  const { metadata, markdown } = parseFrontmatter(source);
+  const fallbackTitle = decodeURIComponent(fileName).replace(/\s+/g, " ").trim();
+  const title = metadata.title || fallbackTitle;
+  const slug = slugify(metadata.slug || title);
   if (!title || !slug || slug === "about") return null;
 
-  const { metadata, markdown } = parseFrontmatter(source);
   const category = INDEX_CATEGORIES.find(
     (candidate) => candidate.toLowerCase() === metadata.category?.toLowerCase(),
   ) ?? "Company";

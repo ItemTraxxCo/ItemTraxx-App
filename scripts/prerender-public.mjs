@@ -1,4 +1,5 @@
 import {
+  copyFileSync,
   existsSync,
   mkdirSync,
   readdirSync,
@@ -803,6 +804,11 @@ export const writePublicPrerenderedPages = (distDir = DEFAULT_DIST_DIR) => {
     mkdirSync(dirname(outputPath), { recursive: true });
     writeFileSync(outputPath, injectPublicFallback(builtHtml, page), "utf8");
   }
+
+  // Cloudflare maps /index to the root index.html, so provide a collision-free
+  // asset for the /index rewrite while keeping its prerendered page metadata.
+  copyFileSync(join(distDir, "index", "index.html"), join(distDir, "index-home.html"));
+
   writeIndexSitemapEntries(distDir);
 
   console.log(

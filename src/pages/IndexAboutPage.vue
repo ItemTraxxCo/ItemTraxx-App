@@ -10,7 +10,6 @@
       </div>
 
       <article class="index-about-content">
-        <p class="index-about-kicker">A PUBLIC PLACE FOR HOW WE THINK AND WORK</p>
         <h1>We believe transparency helps build trust.</h1>
         <p class="index-about-lead">
           We want people to understand how we approach our work at ItemTraxx, what practices guide us, and how our company and product evolve.

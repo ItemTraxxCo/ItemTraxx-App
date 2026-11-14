@@ -21,6 +21,43 @@ const statusLabel = computed(() =>
 const menuOpen = ref(false);
 const landingObservers = [];
 
+// Top-of-hero announcement banner. 
+const announcementBanner = {
+  enabled: true, // set to true to show the banner
+  id: "demo", // unique identifier for this banner; change for each new announcement:  it keys the per-session "dismissed" state (so a new banner shows again for people who closed the old one) and is the CTA name sent to analytics.
+  title: "Try the ItemTraxx demo", // title for the banner
+  body: "Explore the app right now. No sign-in, no contacting us.", // subtext for the banner
+  buttonLabel: "Try demo", // text for the CTA button
+  to: "/demo", // in-app route
+};
+
+// Demo banner IDs log:
+// "demo" - Try the ItemTraxx demo; link to /demo page
+// 
+
+
+const bannerStorageKey = `itemtraxx_banner_dismissed:${announcementBanner.id}`;
+const demoBannerVisible = ref(announcementBanner.enabled);
+
+onMounted(() => {
+  try {
+    if (window.sessionStorage.getItem(bannerStorageKey) === "1") {
+      demoBannerVisible.value = false;
+    }
+  } catch {
+    // Storage unavailable: keep the banner visible.
+  }
+});
+
+const dismissDemoBanner = () => {
+  demoBannerVisible.value = false;
+  try {
+    window.sessionStorage.setItem(bannerStorageKey, "1");
+  } catch {
+    // Dismissal just won't persist across reloads.
+  }
+};
+
 const trackCta = (cta, location) => {
   trackProductEvent({
     analytics: {
@@ -448,6 +485,16 @@ onBeforeUnmount(() => {
   <main>
     <section class="hero" id="comparison" aria-labelledby="hero-title">
       <div class="wrap">
+      <div v-if="demoBannerVisible" class="demo-banner-row">
+        <div class="demo-banner" role="region" aria-label="Announcement">
+          <div class="demo-banner-text">
+            <div class="demo-banner-title">{{ announcementBanner.title }}</div>
+            <div class="demo-banner-body">{{ announcementBanner.body }}</div>
+          </div>
+          <RouterLink class="demo-banner-action" :to="announcementBanner.to" @click="trackCta(announcementBanner.id, 'banner')">{{ announcementBanner.buttonLabel }}</RouterLink>
+          <button class="demo-banner-dismiss" type="button" aria-label="Dismiss banner" @click="dismissDemoBanner"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 5l10 10M15 5L5 15"/></svg></button>
+        </div>
+      </div>
         <div class="hero-copy">
           <h1 id="hero-title">Inventory Tracking Made Simple</h1>
           <h2 style="text-align: center; font-weight: 400;">Just the way it should be.</h2>

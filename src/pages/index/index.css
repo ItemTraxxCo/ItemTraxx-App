@@ -690,10 +690,10 @@
 }
 
 .index-article-content h1 {
-  max-width: 17ch;
+  max-width: 26ch;
   margin: 0;
   color: var(--index-text);
-  font-size: clamp(2.8rem, 6.7vw, 5.8rem);
+  font-size: clamp(1.9rem, 3.2vw, 2.7rem);
   font-weight: 500;
   letter-spacing: -0.075em;
   line-height: 1.02;
@@ -827,14 +827,6 @@
 .index-about-content {
   width: min(900px, 100%);
   margin: clamp(4rem, 12vh, 9rem) auto 0;
-}
-
-.index-about-kicker {
-  margin: 0 0 1rem;
-  color: var(--index-muted);
-  font-size: 0.72rem;
-  font-weight: 700;
-  letter-spacing: 0.14em;
 }
 
 .index-about-content h1 {
@@ -1082,7 +1074,7 @@
   }
 
   .index-article-content h1 {
-    font-size: clamp(2.65rem, 13vw, 4rem);
+    font-size: clamp(1.7rem, 7vw, 2.15rem);
   }
 
 

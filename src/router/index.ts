@@ -103,6 +103,12 @@ const routes: RouteRecordRaw[] = [
     meta: { public: true, title: "Contact Sales | ItemTraxx" },
   },
   {
+    path: "/demo",
+    name: "public-demo",
+    component: () => import("../pages/demo/Demo.vue"),
+    meta: { public: true, title: "Interactive Demo | ItemTraxx" },
+  },
+  {
     path: "/request-demo",
     name: "public-request-demo",
     component: () => import("../pages/RequestDemoPage.vue"),
@@ -173,6 +179,24 @@ const routes: RouteRecordRaw[] = [
     name: "public-changelog",
     component: () => import("../pages/ChangelogPage.vue"),
     meta: { public: true, title: "Changelog | ItemTraxx" },
+  },
+  {
+    path: "/index",
+    name: "public-index",
+    component: () => import("../pages/IndexPage.vue"),
+    meta: { public: true, title: "All | ItemTraxx Index" },
+  },
+  {
+    path: "/index/about",
+    name: "public-index-about",
+    component: () => import("../pages/IndexAboutPage.vue"),
+    meta: { public: true, title: "About the Index | ItemTraxx" },
+  },
+  {
+    path: "/index/:articleSlug",
+    name: "public-index-article",
+    component: () => import("../pages/IndexArticlePage.vue"),
+    meta: { public: true, title: "ItemTraxx Index" },
   },
   {
     path: "/trust",

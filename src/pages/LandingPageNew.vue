@@ -21,6 +21,43 @@ const statusLabel = computed(() =>
 const menuOpen = ref(false);
 const landingObservers = [];
 
+// Top-of-hero announcement banner. 
+const announcementBanner = {
+  enabled: true, // set to true to show the banner
+  id: "demo", // unique identifier for this banner; change for each new announcement:  it keys the per-session "dismissed" state (so a new banner shows again for people who closed the old one) and is the CTA name sent to analytics.
+  title: "Try the ItemTraxx demo", // title for the banner
+  body: "Explore the app right now. No sign-in, no contacting us.", // subtext for the banner
+  buttonLabel: "Try demo", // text for the CTA button
+  to: "/demo", // in-app route
+};
+
+// Demo banner IDs log:
+// "demo" - Try the ItemTraxx demo; link to /demo page
+// 
+
+
+const bannerStorageKey = `itemtraxx_banner_dismissed:${announcementBanner.id}`;
+const demoBannerVisible = ref(announcementBanner.enabled);
+
+onMounted(() => {
+  try {
+    if (window.sessionStorage.getItem(bannerStorageKey) === "1") {
+      demoBannerVisible.value = false;
+    }
+  } catch {
+    // Storage unavailable: keep the banner visible.
+  }
+});
+
+const dismissDemoBanner = () => {
+  demoBannerVisible.value = false;
+  try {
+    window.sessionStorage.setItem(bannerStorageKey, "1");
+  } catch {
+    // Dismissal just won't persist across reloads.
+  }
+};
+
 const trackCta = (cta, location) => {
   trackProductEvent({
     analytics: {
@@ -448,10 +485,20 @@ onBeforeUnmount(() => {
   <main>
     <section class="hero" id="comparison" aria-labelledby="hero-title">
       <div class="wrap">
+      <div v-if="demoBannerVisible" class="demo-banner-row">
+        <div class="demo-banner" role="region" aria-label="Announcement">
+          <div class="demo-banner-text">
+            <div class="demo-banner-title">{{ announcementBanner.title }}</div>
+            <div class="demo-banner-body">{{ announcementBanner.body }}</div>
+          </div>
+          <RouterLink class="demo-banner-action" :to="announcementBanner.to" @click="trackCta(announcementBanner.id, 'banner')">{{ announcementBanner.buttonLabel }}</RouterLink>
+          <button class="demo-banner-dismiss" type="button" aria-label="Dismiss banner" @click="dismissDemoBanner"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 5l10 10M15 5L5 15"/></svg></button>
+        </div>
+      </div>
         <div class="hero-copy">
           <h1 id="hero-title">Inventory Tracking Made Simple</h1>
           <h2 style="text-align: center; font-weight: 400;">Just the way it should be.</h2>
-          <div class="hero-actions" aria-label="Get started"><RouterLink class="hero-action primary" to="/request-demo" @click="trackCta('demo', 'hero')">Get a demo</RouterLink><RouterLink class="hero-action secondary" to="/pricing" @click="trackCta('pricing', 'hero')">Pricing</RouterLink></div>
+          <div class="hero-actions" aria-label="Get started"><RouterLink class="hero-action primary" to="/demo" @click="trackCta('demo', 'hero')">Try demo</RouterLink><RouterLink class="hero-action secondary" to="/pricing" @click="trackCta('pricing', 'hero')">Pricing</RouterLink></div>
         </div>
         <div class="comparison-stage">
           <div class="comparison" aria-label="A messy inventory spreadsheet compared with the ItemTraxx checkout and return interface">
@@ -612,7 +659,7 @@ onBeforeUnmount(() => {
       <div class="final-cta-inner">
         <h2 id="final-cta-title">Built for teams where inventory chaos isn’t an option</h2>
         <p class="final-cta-copy"><span>Ready to integrate ItemTraxx to organize your inventory?</span><span>Request a demo today</span></p>
-        <div class="final-cta-actions"><RouterLink class="final-cta-action" to="/request-demo" @click="trackCta('demo', 'final')">Get a demo</RouterLink><RouterLink class="final-cta-action secondary" to="/pricing" @click="trackCta('pricing', 'final')">Explore pricing</RouterLink></div>
+        <div class="final-cta-actions"><RouterLink class="final-cta-action" to="/demo" @click="trackCta('demo', 'final')">Try demo</RouterLink><RouterLink class="final-cta-action secondary" to="/pricing" @click="trackCta('pricing', 'final')">Explore pricing</RouterLink></div>
       </div>
     </section>
   
@@ -627,7 +674,7 @@ onBeforeUnmount(() => {
       <nav class="footer-group" aria-label="Product"><h2>Product</h2><ul><li><a href="/login">Login</a></li><li><a href="/pricing">Pricing</a></li><li><a href="/contact-sales">Contact Sales</a></li><li><a href="/request-demo">Request Demo</a></li><li><a href="/getting-started">Getting Started</a></li></ul></nav>
       <nav class="footer-group" aria-label="Support"><h2>Support</h2><ul><li><a href="/contact-support">Contact Support</a></li><li><a href="/report-security-issue">Report Security Issue</a></li><li><a href="/changelog">Changelog</a></li><li><a href="/faq">FAQ</a></li><li><a href="https://status.itemtraxx.com/" target="_blank" rel="noreferrer">Status</a></li></ul></nav>
       <nav class="footer-group" aria-label="Legal"><h2>Legal</h2><ul><li><a href="/legal">Legal Home</a></li><li><a href="/legal/privacy">Privacy</a></li><li><a href="/legal/student-privacy">Student Privacy</a></li><li><a href="/legal/terms">Terms of Service</a></li><li><a href="/legal/subprocessors">Subprocessors</a></li><li><a href="/legal/dpa">Data Processing Addendum</a></li><li><a href="/privacy-request">Privacy Request</a></li><li><a href="/legal/cookies">Cookies</a></li><li><a href="/accessibility">Accessibility</a></li><li><a href="/security">Security</a></li><li><a href="/trust">Trust</a></li><li><a href="/compliance">Compliance</a></li></ul></nav>
-      <nav class="footer-group" aria-label="Company"><h2>Company</h2><ul><li><a href="/">Home</a></li><li><a href="/contact">Contact</a></li><li><a href="/about">About</a></li><li><a href="https://github.com/ItemTraxxCo" target="_blank" rel="noreferrer">GitHub</a></li></ul></nav>
+      <nav class="footer-group" aria-label="Company"><h2>Company</h2><ul><li><RouterLink to="/index">Index</RouterLink></li><li><a href="/">Home</a></li><li><a href="/contact">Contact</a></li><li><a href="/about">About</a></li><li><a href="https://github.com/ItemTraxxCo" target="_blank" rel="noreferrer">GitHub</a></li></ul></nav>
     </div>
   </footer>
     </div>

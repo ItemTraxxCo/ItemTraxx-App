@@ -111,7 +111,13 @@ export default defineConfig(({ mode, command }) => {
   return {
     plugins: [
       vue(),
-      ...(env.VITE_E2E_TEST_UTILS === "true" ? [] : [cloudflare()]),
+      ...(env.VITE_E2E_TEST_UTILS === "true"
+        ? []
+        : [
+            cloudflare({
+              experimental: { headersAndRedirectsDevModeSupport: true },
+            }),
+          ]),
       initialModuleMapPlugin(),
       disableRocketLoaderPlugin(),
       versionManifestPlugin(gitCommit),

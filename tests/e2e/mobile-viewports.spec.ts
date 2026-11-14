@@ -13,7 +13,7 @@ test.describe("Mobile viewport coverage", () => {
     await page.goto("/");
     const heroActions = page.locator(".hero-actions");
     await expect(heroActions.getByRole("link", { name: "Pricing", exact: true })).toBeVisible();
-    await expect(heroActions.getByRole("link", { name: "Get a demo", exact: true })).toBeVisible();
+    await expect(heroActions.getByRole("link", { name: "Try demo", exact: true })).toBeVisible();
   });
 
   test("current landing workflow summaries stay visible without horizontal overflow", async ({ page }) => {

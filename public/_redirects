@@ -1,0 +1,2 @@
+# Avoid the root index.html alias; the prerender step supplies this collision-free HTML asset.
+/index /index-home 200

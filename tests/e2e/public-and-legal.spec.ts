@@ -54,8 +54,8 @@ test.describe("Public surfaces", () => {
       await expect(statusLink).toHaveAttribute("target", "_blank");
       await expect(statusLink).toHaveAttribute("rel", "noreferrer");
       await expect(page.locator("header").getByRole("link", { name: "Login", exact: true })).toHaveAttribute("href", "/login");
-      await expect(hero.getByRole("link", { name: "Get a demo", exact: true })).toHaveAttribute("href", "/request-demo");
-      await expect(hero.getByRole("link", { name: "Pricing", exact: true })).toHaveAttribute("href", "/pricing");
+      await expect(hero.locator(".hero-actions").getByRole("link", { name: "Try demo", exact: true })).toHaveAttribute("href", "/demo");
+      await expect(hero.locator(".hero-actions").getByRole("link", { name: "Pricing", exact: true })).toHaveAttribute("href", "/pricing");
 
       const image = page.locator(".comparison .checkout-image img");
       await expect(image).toHaveAttribute("alt", "ItemTraxx checkout and return screen showing borrower details, checked-out items and checkout controls");
@@ -64,7 +64,7 @@ test.describe("Public surfaces", () => {
       await expect(image).toHaveAttribute("srcset", /800w/);
 
       const finalCta = page.locator("section.final-cta");
-      await expect(finalCta.getByRole("link", { name: "Get a demo", exact: true })).toHaveAttribute("href", "/request-demo");
+      await expect(finalCta.getByRole("link", { name: "Try demo", exact: true })).toHaveAttribute("href", "/demo");
       await expect(finalCta.getByRole("link", { name: "Explore pricing", exact: true })).toHaveAttribute("href", "/pricing");
       const footer = page.locator("footer.public-footer");
       await expect(footer.getByRole("link", { name: "Contact Support" })).toHaveAttribute("href", "/contact-support");
@@ -128,13 +128,13 @@ test.describe("Public surfaces", () => {
     await expect(page.getByRole("heading", { name: "Inventory Tracking Made Simple" })).toBeVisible();
   });
 
-  test("the canonical landing demo CTA navigates to the demo request", async ({ page }) => {
+  test("the canonical landing demo CTA navigates to the interactive demo", async ({ page }) => {
     await page.goto("/");
 
-    await page.locator("main").getByRole("link", { name: "Get a demo", exact: true }).first().click();
+    await page.locator(".hero-actions").getByRole("link", { name: "Try demo", exact: true }).click();
 
-    await expect(page).toHaveURL(/\/request-demo$/);
-    await expect(page.getByRole("heading", { name: "Request a Demo" })).toBeVisible();
+    await expect(page).toHaveURL(/\/demo$/);
+    await expect(page.locator("main.demo")).toBeVisible();
   });
 
   test("canonical landing emits the exact event contract for every CTA location", async ({ page }) => {
@@ -165,8 +165,8 @@ test.describe("Public surfaces", () => {
     const ctas = [
       { locator: page.locator("header").getByRole("link", { name: "Login", exact: true }), destination: "/login" },
       { locator: page.locator(".hero-actions").getByRole("link", { name: "Pricing", exact: true }), destination: "/pricing" },
-      { locator: page.locator(".hero-actions").getByRole("link", { name: "Get a demo", exact: true }), destination: "/request-demo" },
-      { locator: page.locator(".final-cta-actions").getByRole("link", { name: "Get a demo", exact: true }), destination: "/request-demo" },
+      { locator: page.locator(".hero-actions").getByRole("link", { name: "Try demo", exact: true }), destination: "/demo" },
+      { locator: page.locator(".final-cta-actions").getByRole("link", { name: "Try demo", exact: true }), destination: "/demo" },
       { locator: page.locator(".final-cta-actions").getByRole("link", { name: "Explore pricing", exact: true }), destination: "/pricing" },
     ];
     for (const { locator, destination } of ctas) {

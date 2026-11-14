@@ -1,6 +1,8 @@
 import {
+  copyFileSync,
   existsSync,
   mkdirSync,
+  readdirSync,
   readFileSync,
   writeFileSync,
 } from "node:fs";
@@ -565,6 +567,110 @@ export const PUBLIC_PRERENDER_PAGES = [
   }),
 ];
 
+const INDEX_CONTENT_DIR = join(REPO_ROOT, "src", "content", "index");
+const INDEX_CATEGORIES = ["Company", "Product", "Guides", "Security", "Updates"];
+const slugifyIndexTitle = (title) => title
+  .normalize("NFKD")
+  .replace(/[\u0300-\u036f]/g, "")
+  .toLowerCase()
+  .trim()
+  .replace(/[^a-z0-9]+/g, "-")
+  .replace(/^-+|-+$/g, "");
+
+const parseIndexMarkdown = (source) => {
+  const match = source.match(/^---\s*\r?\n([\s\S]*?)\r?\n---\s*(?:\r?\n|$)/);
+  if (!match) return { metadata: {}, markdown: source.trim() };
+
+  const metadata = {};
+  for (const line of match[1].split(/\r?\n/)) {
+    const separator = line.indexOf(":");
+    if (separator < 1) continue;
+    const key = line.slice(0, separator).trim().toLowerCase();
+    let value = line.slice(separator + 1).trim();
+    if (
+      (value.startsWith("\"") && value.endsWith("\"")) ||
+      (value.startsWith("'") && value.endsWith("'"))
+    ) {
+      value = value.slice(1, -1).trim();
+    }
+    metadata[key] = value;
+  }
+  return { metadata, markdown: source.slice(match[0].length).trim() };
+};
+
+const readableIndexParagraphs = (markdown) => markdown
+  .split(/\r?\n\s*\r?\n/)
+  .map((block) => block
+    .replace(/^\s{0,3}#{1,6}\s+/gm, "")
+    .replace(/!?\[([^\]]*)\]\([^)]+\)/g, "$1")
+    .replace(/^\s*(?:[-*+]\s+|\d+\.\s+)/gm, "")
+    .replace(/[>*_~`]/g, "")
+    .replace(/\s+/g, " ")
+    .trim())
+  .filter(Boolean);
+
+const loadPublishedIndexPages = () => {
+  if (!existsSync(INDEX_CONTENT_DIR)) return [];
+  const pages = [];
+  const slugs = new Set();
+
+  for (const fileName of readdirSync(INDEX_CONTENT_DIR).filter((name) => name.toLowerCase().endsWith(".md") && name.toLowerCase() !== "readme.md")) {
+    const title = fileName.replace(/\.md$/i, "").replace(/\s+/g, " ").trim();
+    const slug = slugifyIndexTitle(title);
+    if (!title || !slug || slug === "about") continue;
+
+    const { metadata, markdown } = parseIndexMarkdown(readFileSync(join(INDEX_CONTENT_DIR, fileName), "utf8"));
+    if (metadata.draft?.toLowerCase() !== "false") continue;
+    if (slugs.has(slug)) throw new Error(`Duplicate ItemTraxx Index slug: /index/${slug}`);
+    slugs.add(slug);
+
+    const category = INDEX_CATEGORIES.find((item) => item.toLowerCase() === metadata.category?.toLowerCase()) ?? "Company";
+    const summary = metadata.summary?.trim() || `Read ${title} from the ItemTraxx Index.`;
+    const articleParagraphs = readableIndexParagraphs(markdown);
+    pages.push(makePage({
+      path: `/index/${slug}`,
+      title: `${title} | ItemTraxx Index`,
+      description: summary,
+      eyebrow: `ItemTraxx Index · ${category}`,
+      heading: title,
+      paragraphs: articleParagraphs.length ? articleParagraphs : [summary],
+      sections: [],
+      lastmod: /^\d{4}-\d{2}-\d{2}$/.test(metadata.date ?? "") ? metadata.date : undefined,
+    }));
+  }
+
+  return pages;
+};
+
+PUBLIC_PRERENDER_PAGES.push(
+  makePage({
+    path: "/index",
+    title: "Index | ItemTraxx",
+    description: "Browse articles, guides, security writing, and product updates from ItemTraxx.",
+    eyebrow: "ItemTraxx Index",
+    heading: "All",
+    paragraphs: [
+      "The ItemTraxx Index is a public collection of writing, guides, product updates, and information about how we work.",
+      "Use the categories to browse, or search the Index for a topic.",
+    ],
+    sections: [],
+  }),
+  makePage({
+    path: "/index/about",
+    title: "About the Index | ItemTraxx",
+    description: "Why we created the ItemTraxx Index and what we plan to share here.",
+    eyebrow: "About the ItemTraxx Index",
+    heading: "We believe transparency helps build trust.",
+    paragraphs: [
+      "We want people to understand how we approach our work at ItemTraxx, what practices guide us, and how our company and product evolve.",
+      "The Index gives us a place to share more of that openly through articles, practical guides, product updates, and information about our company practices.",
+      "Our goal is to make it easier for customers, partners, and anyone interested in ItemTraxx to see how we think, what we’re learning, and how our work changes over time.",
+    ],
+    sections: [],
+  }),
+  ...loadPublishedIndexPages(),
+);
+
 const escapeHtml = (value) => String(value)
   .replaceAll("&", "&amp;")
   .replaceAll("<", "&lt;")
@@ -575,6 +681,23 @@ const escapeHtml = (value) => String(value)
 const escapeAttribute = escapeHtml;
 
 const pageUrl = (path) => `${SITE_ORIGIN}${path === "/" ? "/" : path}`;
+
+const writeIndexSitemapEntries = (distDir) => {
+  const sitemapPath = join(distDir, "sitemap.xml");
+  if (!existsSync(sitemapPath)) return;
+  let sitemap = readFileSync(sitemapPath, "utf8");
+  const buildDate = new Date().toISOString().slice(0, 10);
+
+  for (const page of PUBLIC_PRERENDER_PAGES.filter((candidate) => candidate.path === "/index" || candidate.path.startsWith("/index/"))) {
+    const location = pageUrl(page.path);
+    if (sitemap.includes(`<loc>${location}</loc>`)) continue;
+    const lastmod = page.lastmod ?? buildDate;
+    const entry = `  <url>\n    <loc>${escapeHtml(location)}</loc>\n    <lastmod>${escapeHtml(lastmod)}</lastmod>\n  </url>`;
+    sitemap = sitemap.replace("</urlset>", `${entry}\n</urlset>`);
+  }
+
+  writeFileSync(sitemapPath, sitemap, "utf8");
+};
 
 export const renderPublicFallback = (page) => {
   const sections = page.sections.map((section) => `
@@ -681,6 +804,12 @@ export const writePublicPrerenderedPages = (distDir = DEFAULT_DIST_DIR) => {
     mkdirSync(dirname(outputPath), { recursive: true });
     writeFileSync(outputPath, injectPublicFallback(builtHtml, page), "utf8");
   }
+
+  // Cloudflare maps /index to the root index.html, so provide a collision-free
+  // asset for the /index rewrite while keeping its prerendered page metadata.
+  copyFileSync(join(distDir, "index", "index.html"), join(distDir, "index-home.html"));
+
+  writeIndexSitemapEntries(distDir);
 
   console.log(
     `[prerender] wrote ${PUBLIC_PRERENDER_PAGES.length} public route HTML files`,

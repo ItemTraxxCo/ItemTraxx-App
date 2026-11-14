@@ -604,3 +604,29 @@ h1{font-optical-sizing:auto;font-family:ui-sans-serif,system-ui,-apple-system,"S
   .what-row,.what-list,.what-intro,.platform-slide-index,.platform-progress,.platform-rule{border-color:#6b747b}
   .footer-group a,.footer-group h2,.footer-meta{color:#000}
 }
+
+/* Demo banner — styled after the app toast */
+.hero{position:relative}
+.demo-banner-row{position:absolute;top:-86px;left:0;right:0;z-index:3;display:flex;justify-content:center;padding:0 16px}
+.demo-banner{display:flex;align-items:center;gap:18px;max-width:720px;width:100%;padding:.75rem .9rem .75rem 1.3rem;background:#fff;color:#171717;border:1px solid #d8d8d3;border-radius:16px}
+.demo-banner-row{animation:demo-banner-fade .6s ease-out .5s both}
+@keyframes demo-banner-fade{from{opacity:0}to{opacity:1}}
+@media (prefers-reduced-motion:reduce){.demo-banner-row{animation:none}}
+.demo-banner-text{flex:1;min-width:0}
+.demo-banner-title{font-weight:700;font-size:1rem;line-height:1.3}
+.demo-banner-body{font-size:.9375rem;line-height:1.4;color:var(--muted)}
+.demo-banner-action{display:inline-flex;align-items:center;justify-content:center;flex:none;min-height:42px;padding:0 22px;border-radius:999px;background:#171a20;color:#fff;font-size:.9375rem;font-weight:600;text-decoration:none;transition:background .2s}
+.demo-banner-action:hover{background:#30353d}
+.demo-banner-dismiss{display:inline-flex;align-items:center;justify-content:center;flex:none;width:32px;height:32px;padding:0;border:0;border-radius:999px;background:transparent;color:var(--muted);cursor:pointer}
+.demo-banner-dismiss:hover{background:#f1f2f0;color:var(--ink)}
+.demo-banner-dismiss svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round}
+@media (max-width:560px){
+  .demo-banner-row{position:static;padding:10px 16px 20px}
+  .demo-banner{gap:10px;padding:.65rem .55rem .65rem .85rem}
+  .demo-banner-body{display:none}
+  .demo-banner-action{padding:0 14px}
+}
+@media (prefers-contrast:more){
+  .demo-banner,.demo-banner-action{border-color:#000}
+  .demo-banner-body{color:#262c32}
+}

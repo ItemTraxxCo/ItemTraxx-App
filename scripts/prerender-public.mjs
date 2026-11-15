@@ -598,10 +598,21 @@ const parseIndexMarkdown = (source) => {
   return { metadata, markdown: source.slice(match[0].length).trim() };
 };
 
+// Repeat until stable so nested fragments like "<!<!-- x -->-- y -->" cannot
+// reassemble into a comment opener after a single pass.
+const stripHtmlComments = (input) => {
+  let previous;
+  let current = input;
+  do {
+    previous = current;
+    current = current.replace(/<!--[\s\S]*?-->/g, "");
+  } while (current !== previous);
+  return current;
+};
+
 const readableIndexParagraphs = (markdown) => markdown
   .split(/\r?\n\s*\r?\n/)
-  .map((block) => block
-    .replace(/<!--[\s\S]*?-->/g, "")
+  .map((block) => stripHtmlComments(block)
     .replace(/^\s{0,3}#{1,6}\s+/gm, "")
     .replace(/!?\[([^\]]*)\]\([^)]+\)/g, "$1")
     .replace(/^\s*(?:[-*+]\s+|\d+\.\s+)/gm, "")

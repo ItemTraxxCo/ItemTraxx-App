@@ -3,21 +3,21 @@ title: Building & Scaling ItemTraxx
 slug: building-and-scaling
 category: Company
 format: Article
-date: 2026-11-13
-draft: true
+date: 2026-11-14
+draft: false
 ---
 
-## Frontend Architecture (Vue 3, Vite, TypeScript)
+### Frontend Architecture (Vue 3, Vite, TypeScript)
 <!-- Draft placeholder -->
 
-## Global Edge Routing & Cloudflare Workers
+### Global Edge Routing & Cloudflare Workers
 <!-- Draft placeholder -->
 
-## Database Scaling, Query Optimization & Connection Pooling
+### Database Scaling, Query Optimization & Connection Pooling
 <!-- Draft placeholder -->
 
-## Observability, Telemetry & Load Balancing
+### Observability, Telemetry & Load Balancing
 <!-- Draft placeholder -->
 
-## Engineering AI Tooling & Sandboxed Workflows
+### Engineering AI Tooling & Sandboxed Workflows
 <!-- Draft placeholder -->

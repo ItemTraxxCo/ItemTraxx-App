@@ -22,7 +22,7 @@
           <div v-else-if="step < 13" class="page admin-shell">
             <div class="admin-hero"><h1>Borrower Management</h1><p class="admin-hero-copy">Add borrowers, review details, and manage archived records.</p><div class="admin-summary-grid"><div class="admin-summary-card"><strong>{{ borrowerArchived ? 1 : borrowerCreated ? 2 : 1 }}</strong><span>Active borrowers</span></div><div class="admin-summary-card"><strong>{{ borrowerArchived ? 1 : 0 }}</strong><span>Archived borrowers</span></div></div></div>
             <div class="card admin-section-card"><h2>Add Borrower</h2><p class="muted">Generate a new borrower identity and add it to this tenant.</p><div class="form"><label>Username<input value="silver-otter" readonly /></label><label>Borrower ID<input value="BR-2002" readonly /></label><TenantAccessPicker v-if="step === 7 || step === 8" v-model:access-mode="accessMode" v-model:selected-ids="selectedIds" :accounts="accounts" /><button class="button-primary" :disabled="step !== 9" @click="createBorrower">Add borrower</button></div></div>
-            <div class="card admin-section-card"><h2>Borrowers</h2><p class="muted">Search, export, and inspect borrower records from one table.</p><div class="table-wrap"><table class="table"><thead><tr><th>Username</th><th>Borrower ID</th><th>Tenant Accounts</th><th>Details</th></tr></thead><tbody><tr><td>Alex Morgan</td><td>BR-1001</td><td>All</td><td>—</td></tr><tr v-if="borrowerCreated && !borrowerArchived"><td>silver-otter</td><td>BR-2002</td><td>Specific accounts</td><td><button :disabled="step !== 10" @click="step++">Details</button></td></tr></tbody></table></div></div>
+            <div class="card admin-section-card"><h2>Borrowers</h2><p class="muted">Search, export, and inspect borrower records from one table.</p><div class="table-wrap"><table class="table"><thead><tr><th>Username</th><th>Borrower ID</th><th>Tenant Accounts</th><th>Details</th></tr></thead><tbody><tr><td>Alex Morgan</td><td>BR-1001</td><td>All</td><td>—</td></tr><tr v-if="borrowerCreated && !borrowerArchived"><td>silver-otter</td><td>BR-2002</td><td>{{ borrowerAccessLabel }}</td><td><button :disabled="step !== 10" @click="step++">Details</button></td></tr></tbody></table></div></div>
             <Teleport to="body">
               <div v-if="step === 11" class="demo-modal-backdrop" :style="overlayBounds">
                 <div class="demo-modal" role="dialog" aria-labelledby="demo-borrower-details-title">
@@ -62,7 +62,7 @@
         </div>
       </section>
       <aside v-if="freeRoam" class="guide"><h2>Explore on your own</h2><p>Choose a section in the demo workspace to explore sample borrowers, items, transactions, and logs.</p><p>Free roam starts with fresh sample data. Changes are not saved and disappear when you leave free roam or refresh.</p><RouterLink class="guide-next" to="/request-demo">Contact us →</RouterLink><button class="restart" @click="freeRoam = false">Return to completion</button></aside>
-      <aside v-else class="guide" aria-live="polite"><div class="progress-label"><span>Step {{ Math.min(step + 1, steps.length) }} of {{ steps.length }}</span><span>{{ Math.round((Math.min(step, steps.length) / steps.length) * 100) }}%</span></div><div class="progress"><span :style="{ width: `${Math.round((Math.min(step, steps.length) / steps.length) * 100)}%` }"></span></div><button v-if="step > 0" type="button" class="guide-back" :disabled="isSubmitting" @click="goBack">← Back</button><template v-if="step < steps.length"><h2>{{ current.title }}</h2><p>{{ current.description }}</p><div v-if="current.value" class="value-box"><span>Enter this value</span><button class="copy-value" @click="copyValue">{{ current.value }} <small>{{ copied ? 'Copied!' : 'Copy' }}</small></button><button class="insert" @click="insertValue">Insert into field</button></div><p v-if="step === 7 || step === 8" class="hint">Use the access controls in the demo workspace.</p><button v-if="step === 6 || step === 12 || step === 21" class="guide-next" @click="step++">{{ step === 21 ? 'Finish demo' : 'Continue' }} →</button></template><template v-else><h2>You completed the demo!</h2><p>Want to see more of ItemTraxx or talk through how it can work for your team?</p><RouterLink class="guide-next" to="/request-demo">Contact us →</RouterLink><button class="guide-next" @click="freeRoam = true">Explore on your own →</button><button class="restart" @click="restart">Restart demo</button></template><p class="guide-footnote">Your progress and sample data are not saved. Refreshing this page starts the tour over. This demo uses sample data.</p></aside>
+      <aside v-else class="guide" aria-live="polite"><div class="progress-label"><span>Step {{ Math.min(step + 1, steps.length) }} of {{ steps.length }}</span><span>{{ Math.round((Math.min(step, steps.length) / steps.length) * 100) }}%</span></div><div class="progress"><span :style="{ width: `${Math.round((Math.min(step, steps.length) / steps.length) * 100)}%` }"></span></div><button v-if="step > 0" type="button" class="guide-back" :disabled="isSubmitting" @click="goBack">← Back</button><template v-if="step < steps.length"><h2>{{ current.title }}</h2><p>{{ current.description }}</p><div v-if="current.value" class="value-box"><span>Enter this value</span><button class="copy-value" @click="copyValue">{{ current.value }} <small>{{ copied ? 'Copied!' : copyFailed ? 'Copy unavailable' : 'Copy' }}</small></button><button class="insert" @click="insertValue">Insert into field</button></div><p v-if="step === 7 || step === 8" class="hint">Use the access controls in the demo workspace.</p><button v-if="step === 6 || step === 12 || step === 21" class="guide-next" @click="step++">{{ step === 21 ? 'Finish demo' : 'Continue' }} →</button></template><template v-else><h2>You completed the demo!</h2><p>Want to see more of ItemTraxx or talk through how it can work for your team?</p><RouterLink class="guide-next" to="/request-demo">Contact us →</RouterLink><button class="guide-next" @click="freeRoam = true">Explore on your own →</button><button class="restart" @click="restart">Restart demo</button></template><p class="guide-footnote">Your progress and sample data are not saved. Refreshing this page starts the tour over. This demo uses sample data.</p></aside>
     </div>
     <div v-if="toastMessage" :key="toastId" class="toast demo-toast" :class="{ 'toast-persist': isSubmitting }" role="status" aria-live="polite" aria-atomic="true">
       <div class="toast-title">{{ toastTitle }}</div>
@@ -103,7 +103,8 @@ const steps = [
  { title: 'Review item logs', description: 'The history shows the checkout and return you completed earlier.' },
 ];
 const freeRoam = ref(false);
-const step = ref(0), borrowerLoaded = ref(false), borrowerInput = ref(''), barcodeInput = ref(''), queued = ref(false), checkedOut = ref(false), borrowerCreated = ref(false), borrowerArchived = ref(false), itemCreated = ref(false), itemArchived = ref(false), editing = ref(false), itemName = ref(''), itemBarcode = ref(''), itemSerial = ref(''), itemNotes = ref(''), savedName = ref(''), editName = ref(''), copied = ref(false);
+const step = ref(0), borrowerLoaded = ref(false), borrowerInput = ref(''), barcodeInput = ref(''), queued = ref(false), checkedOut = ref(false), borrowerCreated = ref(false), borrowerArchived = ref(false), itemCreated = ref(false), itemArchived = ref(false), editing = ref(false), itemName = ref(''), itemBarcode = ref(''), itemSerial = ref(''), itemNotes = ref(''), savedName = ref(''), editName = ref(''), copied = ref(false), copyFailed = ref(false);
+const borrowerAccessLabel = computed(() => accessMode.value === 'restricted' && selectedIds.value.length ? selectedIds.value.map(id => accounts.find(a => a.id === id)?.auth_email).filter(Boolean).join(', ') : 'All');
 const accessMode = ref<'' | 'all' | 'restricted'>('all'); const selectedIds = ref<string[]>([]); const accounts = [{ id: 'staff', auth_email: 'staff@example.com' }, { id: 'admin', auth_email: 'admin@example.com' }];
 const toastTitle = ref(''), toastMessage = ref(''), toastId = ref(0), isSubmitting = ref(false);
 const toastUndo = ref<null | 'borrower' | 'item'>(null);
@@ -157,7 +158,10 @@ watch(itemName, value => { if (!restoring && step.value === 13 && value === 'Tab
 watch(itemBarcode, value => { if (!restoring && step.value === 14 && value === 'IT-2002') step.value++; }, { flush: 'sync' });
 watch(itemSerial, value => { if (!restoring && step.value === 15 && value === 'SN-2002') step.value++; }, { flush: 'sync' });
 watch(itemNotes, value => { if (!restoring && step.value === 16 && value === 'Includes charging cable') step.value++; }, { flush: 'sync' });
-watch(step, () => { copied.value = false; });
+watch(step, value => {
+  copied.value = false; copyFailed.value = false;
+  if ((toastUndo.value === 'borrower' && value !== 12) || (toastUndo.value === 'item' && value !== 21)) toastUndo.value = null;
+});
 function loadBorrower() { if ((step.value === 0 || step.value === 3) && borrowerInput.value === 'BR-1001') { borrowerLoaded.value = true; step.value++; } }
 function addBarcode() { if ((step.value === 1 || step.value === 4) && barcodeInput.value === 'IT-1001') { queued.value = true; barcodeInput.value = ''; step.value++; } }
 function completeTransaction() {
@@ -180,18 +184,20 @@ function showToast(title: string, message: string, duration = 4000, undo: null |
   toastTitle.value = title; toastMessage.value = message; toastUndo.value = undo; toastId.value++;
   if (duration > 0) toastTimer = window.setTimeout(() => { toastMessage.value = ''; toastUndo.value = null; }, duration);
 }
-function createBorrower() { borrowerCreated.value = true; showToast('Success', 'Borrower added.'); step.value++; }
-function archiveBorrower() { borrowerArchived.value = true; showToast('Borrower archived', 'silver-otter was archived.', 7000, 'borrower'); step.value++; }
+function createBorrower() { if (step.value !== 9) return; borrowerCreated.value = true; showToast('Success', 'Borrower added.'); step.value++; }
+function archiveBorrower() { if (step.value !== 11) return; borrowerArchived.value = true; showToast('Borrower archived', 'silver-otter was archived.', 7000, 'borrower'); step.value++; }
 function createItem() { if (step.value !== 17) return; itemCreated.value = true; savedName.value = itemName.value; editName.value = itemName.value; showToast('Success', 'Item added.'); step.value++; }
-function saveItem() { savedName.value = editName.value; showToast('Success', 'Item updated.'); step.value++; }
-function archiveItem() { itemArchived.value = true; showToast('Item archived', `${savedName.value} was archived.`, 7000, 'item'); step.value++; }
+function saveItem() { if (step.value !== 19 || !editing.value) return; savedName.value = editName.value; showToast('Success', 'Item updated.'); step.value++; }
+function archiveItem() { if (step.value !== 20) return; itemArchived.value = true; showToast('Item archived', `${savedName.value} was archived.`, 7000, 'item'); step.value++; }
 function undoArchive() {
-  if (toastUndo.value === 'borrower') { borrowerArchived.value = false; step.value = 11; showToast('Success', 'Borrower restored.'); }
-  else if (toastUndo.value === 'item') { itemArchived.value = false; step.value = 20; showToast('Success', 'Item restored.'); }
+  // Undo only applies while the matching archive step is still showing; otherwise it would jump the tour backwards.
+  if (toastUndo.value === 'borrower' && step.value === 12) { borrowerArchived.value = false; step.value = 11; showToast('Success', 'Borrower restored.'); }
+  else if (toastUndo.value === 'item' && step.value === 21) { itemArchived.value = false; step.value = 20; showToast('Success', 'Item restored.'); }
+  else toastUndo.value = null;
 }
 onUnmounted(() => { window.clearTimeout(toastTimer); window.clearTimeout(transactionTimer); window.removeEventListener('scroll', updateOverlayBounds); window.removeEventListener('resize', updateOverlayBounds); });
 function insertValue() { const value = current.value.value; if (!value) return; if (step.value === 0 || step.value === 3) borrowerInput.value = value; else if (step.value === 1 || step.value === 4) barcodeInput.value = value; else if (step.value === 13) itemName.value = value; else if (step.value === 14) itemBarcode.value = value; else if (step.value === 15) itemSerial.value = value; else if (step.value === 16) itemNotes.value = value; else if (step.value === 19 && editing.value) editName.value = value; }
-async function copyValue() { try { await navigator.clipboard.writeText(current.value.value || ''); copied.value = true; } catch { copied.value = false; } }
+async function copyValue() { try { await navigator.clipboard.writeText(current.value.value || ''); copied.value = true; copyFailed.value = false; } catch { copied.value = false; copyFailed.value = true; } }
 function restart() { window.location.reload(); }
 </script>
 <style scoped>

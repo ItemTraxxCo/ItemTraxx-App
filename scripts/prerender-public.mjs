@@ -601,6 +601,7 @@ const parseIndexMarkdown = (source) => {
 const readableIndexParagraphs = (markdown) => markdown
   .split(/\r?\n\s*\r?\n/)
   .map((block) => block
+    .replace(/<!--[\s\S]*?-->/g, "")
     .replace(/^\s{0,3}#{1,6}\s+/gm, "")
     .replace(/!?\[([^\]]*)\]\([^)]+\)/g, "$1")
     .replace(/^\s*(?:[-*+]\s+|\d+\.\s+)/gm, "")
@@ -615,11 +616,12 @@ const loadPublishedIndexPages = () => {
   const slugs = new Set();
 
   for (const fileName of readdirSync(INDEX_CONTENT_DIR).filter((name) => name.toLowerCase().endsWith(".md") && name.toLowerCase() !== "readme.md")) {
-    const title = fileName.replace(/\.md$/i, "").replace(/\s+/g, " ").trim();
-    const slug = slugifyIndexTitle(title);
-    if (!title || !slug || slug === "about") continue;
-
+    // Mirror src/content/index/indexContent.ts: frontmatter title/slug win over the filename.
     const { metadata, markdown } = parseIndexMarkdown(readFileSync(join(INDEX_CONTENT_DIR, fileName), "utf8"));
+    const fallbackTitle = fileName.replace(/\.md$/i, "").replace(/\s+/g, " ").trim();
+    const title = metadata.title || fallbackTitle;
+    const slug = slugifyIndexTitle(metadata.slug || title);
+    if (!title || !slug || slug === "about") continue;
     if (metadata.draft?.toLowerCase() !== "false") continue;
     if (slugs.has(slug)) throw new Error(`Duplicate ItemTraxx Index slug: /index/${slug}`);
     slugs.add(slug);

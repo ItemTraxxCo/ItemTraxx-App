@@ -37,17 +37,16 @@ const announcementBanner = {
 
 
 const bannerStorageKey = `itemtraxx_banner_dismissed:${announcementBanner.id}`;
-const demoBannerVisible = ref(announcementBanner.enabled);
-
-onMounted(() => {
+// Read synchronously so a previously dismissed banner never renders for a frame before hiding.
+const readBannerDismissed = () => {
   try {
-    if (window.sessionStorage.getItem(bannerStorageKey) === "1") {
-      demoBannerVisible.value = false;
-    }
+    return window.sessionStorage.getItem(bannerStorageKey) === "1";
   } catch {
     // Storage unavailable: keep the banner visible.
+    return false;
   }
-});
+};
+const demoBannerVisible = ref(announcementBanner.enabled && !readBannerDismissed());
 
 const dismissDemoBanner = () => {
   demoBannerVisible.value = false;

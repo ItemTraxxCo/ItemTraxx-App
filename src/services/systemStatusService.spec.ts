@@ -10,7 +10,7 @@ vi.mock("./posthogDiagnostics", () => ({
 
 import { getEdgeFunctionsBaseUrl } from "./edgeUrls";
 import { fetchSystemStatus, probeSystemStatusTransport } from "./systemStatusService";
-import { captureHandledRequestFailure } from "./posthogDiagnostics";
+import { captureHandledRequestFailure, capturePostHogLog } from "./posthogDiagnostics";
 
 const mockedBaseUrl = vi.mocked(getEdgeFunctionsBaseUrl);
 
@@ -70,6 +70,27 @@ describe("fetchSystemStatus", () => {
       path: "/functions/system-status",
       status: 503,
       requestId: "worker-request-id",
+    }));
+  });
+
+  it("logs which server check failed for a non-2xx response", async () => {
+    vi.mocked(fetch).mockResolvedValue(
+      jsonResponse(
+        { status: "down", checks: { config: "ok", db: "failed" } },
+        { ok: false, status: 503 },
+      ) as unknown as Response
+    );
+
+    await fetchSystemStatus({ force: true });
+
+    expect(capturePostHogLog).toHaveBeenCalledWith(expect.objectContaining({
+      body: "system status request completed",
+      attributes: expect.objectContaining({
+        status: 503,
+        payload_status: "down",
+        db_check: "failed",
+        rate_limit_check: undefined,
+      }),
     }));
   });
 

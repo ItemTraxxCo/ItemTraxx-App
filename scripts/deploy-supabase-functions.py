@@ -108,6 +108,7 @@ def main() -> int:
             cmd.extend(["--project-ref", args.project_ref])
         if verify_jwt_flags.get(function_name, False):
             cmd.append("--no-verify-jwt")
+        cmd.append("--yes")
         if args.dry_run:
             print(f"[dry-run] {' '.join(cmd)}")
             continue

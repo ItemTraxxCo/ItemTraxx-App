@@ -1,0 +1,1 @@
+`inter-latin-700.ttf` is the Inter Bold Latin subset from `@fontsource/inter` 5.3.0, converted from its bundled WOFF to TrueType for the native image renderer. Inter is licensed under the SIL Open Font License in `INTER-LICENSE.txt`.

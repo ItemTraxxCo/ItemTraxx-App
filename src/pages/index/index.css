@@ -460,6 +460,8 @@
   padding: 0;
   border-radius: 0.45rem;
   background-color: var(--cover-base);
+  background-size: cover;
+  background-position: center;
   isolation: isolate;
   transition: transform 220ms ease, filter 220ms ease;
 }
@@ -475,28 +477,32 @@
   mix-blend-mode: overlay;
 }
 
+.index-cover[style*="background-image"]::after {
+  display: none;
+}
+
 .index-cover[data-cover-color="stone"] {
-  --cover-base: #85817a;
+  --cover-base: #55534f;
 }
 
 .index-cover[data-cover-color="sage"] {
-  --cover-base: #748076;
+  --cover-base: #465d50;
 }
 
 .index-cover[data-cover-color="clay"] {
-  --cover-base: #947a70;
+  --cover-base: #654d46;
 }
 
 .index-cover[data-cover-color="sand"] {
-  --cover-base: #9a8c73;
+  --cover-base: #655a49;
 }
 
 .index-cover[data-cover-color="slate"] {
-  --cover-base: #69747b;
+  --cover-base: #424f59;
 }
 
 .index-cover[data-cover-color="mauve"] {
-  --cover-base: #867b82;
+  --cover-base: #594d58;
 }
 
 .index-cover-image {

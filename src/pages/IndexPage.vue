@@ -132,6 +132,7 @@
               class="index-cover"
               :data-category="entry.category"
               :data-cover-color="entry.coverColor"
+              :style="{ backgroundImage: `url('/brand/index-covers/${entry.slug}.png?v=${encodeURIComponent(entry.title)}-${entry.coverColor}-v1')` }"
               aria-hidden="true"
             >
             </div>

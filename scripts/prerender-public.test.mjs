@@ -1,11 +1,15 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import sharp from "sharp";
 import test from "node:test";
 import {
   PUBLIC_PRERENDER_PAGES,
   applyPublicMetadata,
   injectPublicFallback,
   renderPublicFallback,
+  writePublicPrerenderedPages,
 } from "./prerender-public.mjs";
 
 const byPath = (path) => {
@@ -20,6 +24,36 @@ const textLength = (html) =>
 const sourceIndexHtml = readFileSync(new URL("../index.html", import.meta.url), "utf8");
 const sourceMainTs = readFileSync(new URL("../src/main.ts", import.meta.url), "utf8");
 const sourcePrerender = readFileSync(new URL("./prerender-public.mjs", import.meta.url), "utf8");
+
+test("generates published article images and crawler metadata", async () => {
+  const dist = mkdtempSync(join(tmpdir(), "index-social-"));
+  try {
+    writeFileSync(join(dist, "index.html"), sourceIndexHtml);
+    await writePublicPrerenderedPages(dist);
+    const articles = PUBLIC_PRERENDER_PAGES.filter((page) => page.socialImage);
+    assert.ok(articles.length > 0);
+    for (const page of articles) {
+      const html = readFileSync(join(dist, page.path.slice(1), "index.html"), "utf8");
+      assert.ok(html.includes(`content="https://itemtraxx.com${page.socialImage}"`));
+      assert.equal((html.match(new RegExp(page.socialImage, "g")) ?? []).length, 2);
+      const metadata = await sharp(join(dist, page.socialImage.slice(1))).metadata();
+      assert.equal(metadata.format, "png");
+      assert.equal(metadata.width, 1200);
+      assert.equal(metadata.height, 630);
+      const slug = page.path.slice("/index/".length);
+      const cover = sharp(join(dist, "brand", "index-covers", `${slug}.png`));
+      const coverMetadata = await cover.metadata();
+      assert.equal(coverMetadata.width, 1200);
+      assert.equal(coverMetadata.height, 630);
+      const sample = { left: 0, top: 0, width: 50, height: 50 };
+      const socialCorner = await sharp(join(dist, page.socialImage.slice(1))).extract(sample).removeAlpha().raw().toBuffer();
+      const coverCorner = await cover.extract(sample).raw().toBuffer();
+      assert.deepEqual(coverCorner, socialCorner, "cover and social image should share the same background");
+    }
+  } finally {
+    rmSync(dist, { recursive: true, force: true });
+  }
+});
 
 test("defines the public trust and discovery routes", () => {
   assert.deepEqual(

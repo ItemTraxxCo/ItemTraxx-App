@@ -2,7 +2,7 @@ import { serve } from "../_shared/serve.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.108.2";
 import { isKillSwitchWriteBlocked } from "../_shared/killSwitch.ts";
 import { getRequestId, logError, logInfo } from "../_shared/observability.ts";
-import { isAllowedOrigin, parseAllowedOrigins } from "../_shared/cors.ts";
+import { resolveCorsHeaders } from "../_shared/cors.ts";
 import { readJsonBody } from "../_shared/requestBody.ts";
 import {
   enforcePublicRateLimits,
@@ -203,25 +203,8 @@ const buildSafeStoragePath = (
   return storagePath;
 };
 
-const resolveCorsHeaders = (req: Request) => {
-  const origin = req.headers.get("Origin");
-  const allowedOrigins = parseAllowedOrigins(
-    Deno.env.get("ITX_ALLOWED_ORIGINS"),
-  );
-
-  const hasOrigin = !!origin;
-  const originAllowed = !hasOrigin ||
-    (hasOrigin && isAllowedOrigin(origin as string, allowedOrigins));
-
-  const headers = hasOrigin && originAllowed
-    ? { ...baseCorsHeaders, "Access-Control-Allow-Origin": origin as string }
-    : { ...baseCorsHeaders };
-
-  return { hasOrigin, originAllowed, headers };
-};
-
 serve(async (req) => {
-  const { hasOrigin, originAllowed, headers } = resolveCorsHeaders(req);
+  const { hasOrigin, originAllowed, headers } = resolveCorsHeaders(req, baseCorsHeaders);
   const requestId = getRequestId(req);
 
   const jsonResponse = (

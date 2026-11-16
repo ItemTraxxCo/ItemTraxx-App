@@ -8,10 +8,16 @@ import {
 } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { createHash } from "node:crypto";
+import { tmpdir } from "node:os";
+import sharp from "sharp";
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const DEFAULT_DIST_DIR = resolve(REPO_ROOT, "dist");
 const SITE_ORIGIN = "https://itemtraxx.com";
+const SOCIAL_FONT = join(REPO_ROOT, "node_modules", "@fontsource", "inter", "files", "inter-latin-700-normal.woff");
+process.env.FONTCONFIG_FILE = join(REPO_ROOT, "scripts", "social-fonts.conf");
+process.env.XDG_CACHE_HOME = tmpdir();
 
 const sharedLinks = [
   { label: "About", href: "/about" },
@@ -569,6 +575,8 @@ export const PUBLIC_PRERENDER_PAGES = [
 
 const INDEX_CONTENT_DIR = join(REPO_ROOT, "src", "content", "index");
 const INDEX_CATEGORIES = ["Company", "Product", "Guides", "Security", "Updates"];
+const INDEX_COLORS = { stone: "#55534f", sage: "#465d50", clay: "#654d46", sand: "#655a49", slate: "#424f59", mauve: "#594d58" };
+const INDEX_CATEGORY_COLORS = { Company: "clay", Product: "slate", Guides: "sand", Security: "sage", Updates: "mauve" };
 const slugifyIndexTitle = (title) => title
   .normalize("NFKD")
   .replace(/[\u0300-\u036f]/g, "")
@@ -638,6 +646,9 @@ const loadPublishedIndexPages = () => {
     slugs.add(slug);
 
     const category = INDEX_CATEGORIES.find((item) => item.toLowerCase() === metadata.category?.toLowerCase()) ?? "Company";
+    const cover = metadata.cover?.toLowerCase();
+    const color = INDEX_COLORS[cover] ?? INDEX_COLORS[INDEX_CATEGORY_COLORS[category]];
+    const imageVersion = createHash("sha256").update(`v6:${title}:${color}`).digest("hex").slice(0, 12);
     const summary = metadata.summary?.trim() || `Read ${title} from the ItemTraxx Index.`;
     const articleParagraphs = readableIndexParagraphs(markdown);
     pages.push(makePage({
@@ -646,6 +657,8 @@ const loadPublishedIndexPages = () => {
       description: summary,
       eyebrow: `ItemTraxx Index · ${category}`,
       heading: title,
+      socialImage: `/brand/index/${slug}-${imageVersion}.png`,
+      socialColor: color,
       paragraphs: articleParagraphs.length ? articleParagraphs : [summary],
       sections: [],
       lastmod: /^\d{4}-\d{2}-\d{2}$/.test(metadata.date ?? "") ? metadata.date : undefined,
@@ -789,6 +802,11 @@ export const applyPublicMetadata = (html, page) => {
     "content",
     page.description,
   );
+  if (page.socialImage) {
+    result = replaceTagAttribute(result, /<meta\s+property="og:image"[\s\S]*?\/>/, "content", pageUrl(page.socialImage));
+    result = replaceTagAttribute(result, /<meta\s+property="og:image:alt"[\s\S]*?\/>/, "content", page.heading);
+    result = replaceTagAttribute(result, /<meta\s+name="twitter:image"[\s\S]*?\/>/, "content", pageUrl(page.socialImage));
+  }
   return result;
 };
 
@@ -803,14 +821,65 @@ export const injectPublicFallback = (html, page) => {
   );
 };
 
-export const writePublicPrerenderedPages = (distDir = DEFAULT_DIST_DIR) => {
+export const generateIndexSocialImage = async (title, color, { includeTitle = true } = {}) => {
+  const width = 1200;
+  const height = 630;
+  const base = [1, 3, 5].map((offset) => parseInt(color.slice(offset, offset + 2), 16));
+  const pixels = Buffer.alloc(width * height * 3);
+  // A deterministic, low-contrast wave and fine grain keep builds reproducible.
+  let seed = 2166136261;
+  const variation = createHash("sha256").update(title).digest();
+  const phase = variation[0] / 255 * Math.PI * 2;
+  const frequency = 220 + variation[1] / 255 * 200;
+  const tilt = (variation[2] / 255 - 0.5) * 0.24;
+  const position = 0.4 + variation[3] / 255 * 0.2;
+  const amplitude = 0.12 + variation[4] / 255 * 0.08;
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
+      const grain = ((seed >>> 24) / 255 - 0.5) * 3;
+      const waveCenter = height * (position + amplitude * Math.sin(x / frequency + phase) + tilt * (x / width - 0.5));
+      const distance = (y - waveCenter) / 155;
+      const wave = 22 * Math.exp(-distance * distance) - 9 + 5 * (0.5 - x / width);
+      const offset = (y * width + x) * 3;
+      for (let channel = 0; channel < 3; channel++) {
+        pixels[offset + channel] = Math.max(0, Math.min(255, Math.round(base[channel] + wave + grain)));
+      }
+    }
+  }
+  const background = sharp(pixels, { raw: { width, height, channels: 3 } });
+  if (!includeTitle) return background.png().toBuffer();
+  const text = await sharp({ text: {
+    text: `<span foreground="white">${escapeHtml(title)}</span>`,
+    font: "Inter Bold 72", fontfile: SOCIAL_FONT, width: 1000, align: "centre", rgba: true,
+  } }).resize({ width: 1000, height: 400, fit: "inside", withoutEnlargement: true }).png().toBuffer();
+  return background.composite([{ input: text, gravity: "centre" }]).png().toBuffer();
+};
+
+export const writeIndexCovers = async (outputDir) => {
+  const coverDir = join(outputDir, "brand", "index-covers");
+  mkdirSync(coverDir, { recursive: true });
+  for (const page of loadPublishedIndexPages()) {
+    const slug = page.path.slice("/index/".length);
+    writeFileSync(join(coverDir, `${slug}.png`), await generateIndexSocialImage(page.heading, page.socialColor, { includeTitle: false }));
+  }
+};
+
+export const writePublicPrerenderedPages = async (distDir = DEFAULT_DIST_DIR) => {
   const indexPath = join(distDir, "index.html");
   if (!existsSync(indexPath)) {
     throw new Error(`Expected Vite output at ${indexPath}. Run vite build first.`);
   }
   const builtHtml = readFileSync(indexPath, "utf8");
 
+  await writeIndexCovers(distDir);
+
   for (const page of PUBLIC_PRERENDER_PAGES) {
+    if (page.socialImage) {
+      const imagePath = join(distDir, page.socialImage.slice(1));
+      mkdirSync(dirname(imagePath), { recursive: true });
+      writeFileSync(imagePath, await generateIndexSocialImage(page.heading, page.socialColor));
+    }
     const outputPath = page.path === "/"
       ? indexPath
       : join(distDir, page.path.slice(1), "index.html");
@@ -830,5 +899,5 @@ export const writePublicPrerenderedPages = (distDir = DEFAULT_DIST_DIR) => {
 };
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  writePublicPrerenderedPages();
+  await writePublicPrerenderedPages();
 }

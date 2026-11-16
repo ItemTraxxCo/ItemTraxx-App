@@ -8,7 +8,9 @@
     "node": ">=24.22.3 <25"
   },
   "scripts": {
+    "predev": "node ./scripts/generate-index-covers.mjs",
     "dev": "vite",
+    "prebuild": "node ./scripts/generate-index-covers.mjs --clean",
     "build": "vue-tsc -b && vite build",
     "postbuild": "node ./scripts/prerender-public.mjs && node ./scripts/upload-posthog-sourcemaps.mjs",
     "preview": "npm run build && wrangler dev",
@@ -89,6 +91,7 @@
     "@vue/tsconfig": "^0.9.1",
     "fake-indexeddb": "^6.2.7",
     "jsdom": "^31.0.0",
+    "sharp": "0.35.5",
     "supabase": "^3.0.0",
     "typescript": "~6.0.3",
     "vite": "8.3.6",

@@ -12,6 +12,7 @@ posthog-self-driving-report.md
 node_modules
 dist
 dist-ssr
+public/brand/index-covers/
 .vite
 coverage
 *.local

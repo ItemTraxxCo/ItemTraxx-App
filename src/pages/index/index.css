@@ -60,7 +60,7 @@
 .index-heading-row h1 {
   margin: 0;
   color: var(--index-text);
-  font-size: clamp(4.5rem, 7.2vw, 7.5rem);
+  font-size: clamp(3.25rem, 5vw, 5rem);
   font-weight: 500;
   letter-spacing: -0.085em;
   line-height: 0.92;
@@ -81,6 +81,20 @@
 
 .index-about-link {
   margin-bottom: 0.55rem;
+}
+
+.index-history-back {
+  margin-bottom: 2.75rem;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.index-history-back:hover:not(:disabled) {
+  background: transparent;
+  transform: none;
 }
 
 .index-about-link:hover,
@@ -446,6 +460,8 @@
   padding: 0;
   border-radius: 0.45rem;
   background-color: var(--cover-base);
+  background-size: cover;
+  background-position: center;
   isolation: isolate;
   transition: transform 220ms ease, filter 220ms ease;
 }
@@ -461,28 +477,32 @@
   mix-blend-mode: overlay;
 }
 
+.index-cover[style*="background-image"]::after {
+  display: none;
+}
+
 .index-cover[data-cover-color="stone"] {
-  --cover-base: #85817a;
+  --cover-base: #55534f;
 }
 
 .index-cover[data-cover-color="sage"] {
-  --cover-base: #748076;
+  --cover-base: #465d50;
 }
 
 .index-cover[data-cover-color="clay"] {
-  --cover-base: #947a70;
+  --cover-base: #654d46;
 }
 
 .index-cover[data-cover-color="sand"] {
-  --cover-base: #9a8c73;
+  --cover-base: #655a49;
 }
 
 .index-cover[data-cover-color="slate"] {
-  --cover-base: #69747b;
+  --cover-base: #424f59;
 }
 
 .index-cover[data-cover-color="mauve"] {
-  --cover-base: #867b82;
+  --cover-base: #594d58;
 }
 
 .index-cover-image {
@@ -883,6 +903,10 @@
   color: var(--index-muted);
 }
 
+.index-page .public-footer {
+  margin-top: 12rem;
+}
+
 .index-page .footer-brand,
 .index-article-page .footer-brand,
 .index-about-page .footer-brand,
@@ -973,7 +997,7 @@
   }
 
   .index-heading-row h1 {
-    font-size: 4.25rem;
+    font-size: 3rem;
   }
 
   .index-about-link {
@@ -1104,6 +1128,10 @@
   .index-article-page .public-footer,
   .index-about-page .public-footer {
     margin-top: 3.4rem;
+  }
+
+  .index-page .public-footer {
+    margin-top: 9rem;
   }
 }
 

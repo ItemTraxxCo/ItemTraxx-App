@@ -87,7 +87,7 @@ test("npm and Node dependency-bin shims cannot replace the audit executable", ()
 test("security package scripts use npm's absolute Node path without shell or npm recursion", () => {
   const scripts = JSON.parse(readFileSync(packageJsonPath, "utf8")).scripts;
 
-  for (const name of ["security:audit", "security:gate"]) {
+  for (const name of ["security:gate"]) {
     assert.match(scripts[name], /^\"\$npm_node_execpath\" \.\/scripts\//);
     assert.doesNotMatch(scripts[name], /(?:^|\s)(?:node|npm|bash)(?:\s|$)/);
   }

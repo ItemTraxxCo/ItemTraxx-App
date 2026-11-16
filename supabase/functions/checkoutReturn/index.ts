@@ -2,7 +2,7 @@ import { serve } from "../_shared/serve.ts";
 import { getExternalAuthUser } from "../_shared/externalAuth.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.108.2";
 import { isKillSwitchWriteBlocked } from "../_shared/killSwitch.ts";
-import { isAllowedOrigin, parseAllowedOrigins } from "../_shared/cors.ts";
+import { resolveCorsHeaders } from "../_shared/cors.ts";
 import {
   BARCODE_PATTERN,
   optionalText,
@@ -34,23 +34,6 @@ const CHECKOUT_ACTIONS = new Set(
   ["checkout", "return", "auto", "admin_return", "quick_return"] as const,
 );
 
-const resolveCorsHeaders = (req: Request) => {
-  const origin = req.headers.get("Origin");
-  const allowedOrigins = parseAllowedOrigins(
-    Deno.env.get("ITX_ALLOWED_ORIGINS"),
-  );
-
-  const hasOrigin = !!origin;
-  const originAllowed = !hasOrigin ||
-    (hasOrigin && isAllowedOrigin(origin as string, allowedOrigins));
-
-  const headers = hasOrigin && originAllowed
-    ? { ...baseCorsHeaders, "Access-Control-Allow-Origin": origin as string }
-    : { ...baseCorsHeaders };
-
-  return { hasOrigin, originAllowed, headers };
-};
-
 const isLocalhostMaintenanceBypassRequest = (req: Request) => {
   if (
     (Deno.env.get("ITX_ALLOW_LOCALHOST_MAINTENANCE_BYPASS") ?? "")
@@ -75,7 +58,7 @@ const isLocalhostMaintenanceBypassRequest = (req: Request) => {
 };
 
 serve((req) => withRequestSpan(req, "POST /functions/checkoutReturn", async (span, requestId) => {
-  const { hasOrigin, originAllowed, headers } = resolveCorsHeaders(req);
+  const { hasOrigin, originAllowed, headers } = resolveCorsHeaders(req, baseCorsHeaders);
 
   const jsonResponse = (status: number, body: Record<string, unknown>) =>
     new Response(JSON.stringify(body), {

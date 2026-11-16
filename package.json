@@ -8,7 +8,9 @@
     "node": ">=24.22.3 <25"
   },
   "scripts": {
+    "predev": "node ./scripts/generate-index-covers.mjs",
     "dev": "vite",
+    "prebuild": "node ./scripts/generate-index-covers.mjs --clean",
     "build": "vue-tsc -b && vite build",
     "postbuild": "node ./scripts/prerender-public.mjs && node ./scripts/upload-posthog-sourcemaps.mjs",
     "preview": "npm run build && wrangler dev",
@@ -23,7 +25,6 @@
     "test:unit:watch": "vitest",
     "test:unit:coverage": "vitest run --coverage",
     "bones:build": "boneyard-js build",
-    "security:audit": "\"$npm_node_execpath\" ./scripts/security-audit.mjs",
     "security:gate": "\"$npm_node_execpath\" ./scripts/security-audit.mjs",
     "security:verify": "deno test --no-check --allow-env --allow-read supabase/functions/_shared/incidentOutcome_test.ts supabase/functions/_shared/securityVerification_test.ts",
     "security:sbom": "bash ./scripts/generate-sbom.sh",
@@ -39,7 +40,6 @@
     "worker:typecheck": "npm run worker:types:check && tsc -p cloudflare/edge-proxy/tsconfig.json",
     "worker:test": "deno test --node-modules-dir=none --allow-env --no-check --frozen cloudflare/edge-proxy/src/*_test.ts && node --test scripts/worker-kill-switch-config.test.mjs",
     "docs:edge-schemas": "node ./scripts/generate-edge-schemas.mjs",
-    "docs:edge-openapi": "node ./scripts/generate-edge-schemas.mjs",
     "docs:edge-reference": "node ./scripts/generate-edge-reference.mjs",
     "devops:check:edge-coverage": "node ./scripts/check-edge-function-coverage.mjs",
     "devops:check:empty-catches": "node ./scripts/check-empty-catches.mjs",
@@ -91,6 +91,7 @@
     "@vue/tsconfig": "^0.9.1",
     "fake-indexeddb": "^6.2.7",
     "jsdom": "^31.0.0",
+    "sharp": "0.35.5",
     "supabase": "^3.0.0",
     "typescript": "~6.0.3",
     "vite": "8.3.6",

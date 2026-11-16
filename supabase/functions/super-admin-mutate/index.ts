@@ -2,7 +2,7 @@ import { serve } from "../_shared/serve.ts";
 import { getExternalAuthUser } from "../_shared/externalAuth.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.108.2";
 import { isKillSwitchWriteBlocked } from "../_shared/killSwitch.ts";
-import { isAllowedOrigin, parseAllowedOrigins } from "../_shared/cors.ts";
+import { resolveCorsHeaders } from "../_shared/cors.ts";
 import { requireTrustedEdgeIngress } from "../_shared/trustedIngress.ts";
 import { readJsonBody } from "../_shared/requestBody.ts";
 import {
@@ -34,15 +34,7 @@ const base = {
 const password = () => `${crypto.randomUUID()}-Aa1!`;
 serve(async (req) => {
   const origin = req.headers.get("origin"),
-    ok = !origin ||
-      isAllowedOrigin(
-        origin,
-        parseAllowedOrigins(Deno.env.get("ITX_ALLOWED_ORIGINS")),
-      ),
-    headers = {
-      ...base,
-      ...(origin && ok ? { "Access-Control-Allow-Origin": origin } : {}),
-    },
+    { originAllowed: ok, headers } = resolveCorsHeaders(req, base),
     json = (status: number, body: Record<string, unknown>) =>
       new Response(JSON.stringify({ ok: status < 400, ...body }), {
         status,

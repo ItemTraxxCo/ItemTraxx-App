@@ -15,16 +15,8 @@ vi.mock("./auth/sessionBootstrap", () => ({
 }));
 
 vi.mock("./auth/privilegedLogin", () => ({
-  resendSuperAdminEmailChallenge: vi.fn(),
   superAdminLogin: vi.fn(),
   superAdminPasskeyLogin: vi.fn(),
-  verifySuperAdminEmailChallenge: vi.fn(),
-}));
-
-vi.mock("./auth/sessionState", () => ({
-  clearPendingSuperAdminVerificationEmail: vi.fn(),
-  getPendingSuperAdminChallengeToken: vi.fn(),
-  getPendingSuperAdminVerificationEmail: vi.fn(),
 }));
 
 vi.mock("./auth/signOut", () => ({
@@ -39,17 +31,7 @@ import {
   initAuthListener,
   refreshAuthFromSession,
 } from "./auth/sessionBootstrap";
-import {
-  resendSuperAdminEmailChallenge,
-  superAdminLogin,
-  superAdminPasskeyLogin,
-  verifySuperAdminEmailChallenge,
-} from "./auth/privilegedLogin";
-import {
-  clearPendingSuperAdminVerificationEmail,
-  getPendingSuperAdminChallengeToken,
-  getPendingSuperAdminVerificationEmail,
-} from "./auth/sessionState";
+import { superAdminLogin, superAdminPasskeyLogin } from "./auth/privilegedLogin";
 import { getPostSignOutUrl, signOut } from "./auth/signOut";
 
 describe("authService barrel exports", () => {
@@ -64,20 +46,8 @@ describe("authService barrel exports", () => {
   });
 
   it("re-exports privileged login helpers from auth/privilegedLogin", () => {
-    expect(authService.resendSuperAdminEmailChallenge).toBe(resendSuperAdminEmailChallenge);
     expect(authService.superAdminLogin).toBe(superAdminLogin);
     expect(authService.superAdminPasskeyLogin).toBe(superAdminPasskeyLogin);
-    expect(authService.verifySuperAdminEmailChallenge).toBe(verifySuperAdminEmailChallenge);
-  });
-
-  it("re-exports session state helpers from auth/sessionState", () => {
-    expect(authService.clearPendingSuperAdminVerificationEmail).toBe(
-      clearPendingSuperAdminVerificationEmail
-    );
-    expect(authService.getPendingSuperAdminChallengeToken).toBe(getPendingSuperAdminChallengeToken);
-    expect(authService.getPendingSuperAdminVerificationEmail).toBe(
-      getPendingSuperAdminVerificationEmail
-    );
   });
 
   it("re-exports sign-out helpers from auth/signOut", () => {

@@ -12,6 +12,8 @@ import {
   toSafeFailureDiagnostic,
 } from "./check-landing-network.mjs";
 
+import { MAX_INITIAL_MINIFIED_BYTES } from "./check-initial-load-budget.mjs";
+
 const passingInitialLoad = {
   assets: ["index.js"],
   minifiedBytes: 10_000,
@@ -94,7 +96,7 @@ test("rejects direct Supabase, forbidden SDK, and failing static initial load", 
   const sdkUrl = "http://127.0.0.1:4174/assets/posthog.js";
   const initialLoad = {
     ...passingInitialLoad,
-    minifiedBytes: 250_001,
+    minifiedBytes: MAX_INITIAL_MINIFIED_BYTES + 1,
   };
   const result = evaluateLandingNetwork({
     requestUrls: [directUrl, sdkUrl],

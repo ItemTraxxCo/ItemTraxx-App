@@ -5,7 +5,7 @@ import {
   isLocalhostBypassRequest,
   resolveKillSwitchMessage,
 } from "../_shared/killSwitch.ts";
-import { isAllowedOrigin, parseAllowedOrigins } from "../_shared/cors.ts";
+import { resolveCorsHeaders } from "../_shared/cors.ts";
 import {
   enforcePreloginRateLimit,
   resolvePublicStatusClient,
@@ -20,22 +20,6 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-request-id, traceparent, tracestate",
   "Access-Control-Allow-Methods": "GET, OPTIONS",
   Vary: "Origin",
-};
-
-const resolveCorsHeaders = (req: Request) => {
-  const origin = req.headers.get("Origin");
-  const allowedOrigins = parseAllowedOrigins(Deno.env.get("ITX_ALLOWED_ORIGINS"));
-
-  const hasOrigin = !!origin;
-  const originAllowed =
-    !hasOrigin || (hasOrigin && isAllowedOrigin(origin as string, allowedOrigins));
-
-  const headers =
-    hasOrigin && originAllowed
-      ? { ...corsHeaders, "Access-Control-Allow-Origin": origin as string }
-      : { ...corsHeaders };
-
-  return { hasOrigin, originAllowed, headers };
 };
 
 type IncidentImpact =
@@ -143,7 +127,7 @@ const resolveIncidentStatus = (
 };
 
 serve((req) => withRequestSpan(req, "GET /functions/system-status", async (span, requestId) => {
-  const { hasOrigin, originAllowed, headers } = resolveCorsHeaders(req);
+  const { hasOrigin, originAllowed, headers } = resolveCorsHeaders(req, corsHeaders);
 
   const jsonResponse = (
     status: number,
@@ -183,17 +167,6 @@ serve((req) => withRequestSpan(req, "GET /functions/system-status", async (span,
   }
 
   const startedAt = Date.now();
-  // TEMPORARY phase instrumentation. Remove once the latency question is
-  // settled. Wall time here sits around 600ms; removing a sequential query and
-  // widening the incident cache both failed to move it, which means the cost
-  // is somewhere these marks will show and inference has not. Comparing
-  // handler_ms against the platform's own execution_time_ms also reveals how
-  // much is spent before this handler runs at all (isolate boot, client init).
-  let tIngress = startedAt;
-  let tRateLimit = startedAt;
-  let tConfig = startedAt;
-  let tIncident = startedAt;
-  let incidentServedFromCache = false;
   const supabaseUrl = Deno.env.get("ITX_SUPABASE_URL") ?? Deno.env.get("SUPABASE_URL");
   const serviceKey = Deno.env.get("ITX_SECRET_KEY") ?? Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
   const incidentWidgetUrl = Deno.env.get("ITX_INCIDENT_IO_WIDGET_URL");
@@ -221,7 +194,6 @@ serve((req) => withRequestSpan(req, "GET /functions/system-status", async (span,
       req,
       "system-status",
     ).catch(() => false);
-    tIngress = Date.now();
     // The edge proxy already applies PUBLIC_STATUS_RATE_LIMITER before it
     // forwards trusted requests. Keep direct origin access bounded by the
     // fixed database bucket, but don't make maintenance reporting depend on a
@@ -263,7 +235,6 @@ serve((req) => withRequestSpan(req, "GET /functions/system-status", async (span,
         });
       }
     }
-    tRateLimit = Date.now();
 
     let incidentStatus: "operational" | "degraded" | "down" = "operational";
     let incidentSummary = "not configured";
@@ -283,7 +254,6 @@ serve((req) => withRequestSpan(req, "GET /functions/system-status", async (span,
       try {
         const cachedIncident = readCachedIncidentStatus();
         if (incidentWidgetUrl && cachedIncident) {
-          incidentServedFromCache = true;
           return cachedIncident;
         }
         if (!incidentWidgetUrl) {
@@ -334,8 +304,6 @@ serve((req) => withRequestSpan(req, "GET /functions/system-status", async (span,
         cachedIncidentStatus = result;
         console.error("system-status incident.io fetch failed:", error);
         return result;
-      } finally {
-        tIncident = Date.now();
       }
     })();
 
@@ -355,10 +323,7 @@ serve((req) => withRequestSpan(req, "GET /functions/system-status", async (span,
         .select("value")
         .eq("key", "system_status_override")
         .maybeSingle(),
-    ]).then((results) => {
-      tConfig = Date.now();
-      return results;
-    });
+    ]);
 
     const [incidentResult, configResults] = await Promise.all([
       incidentStatusPromise,
@@ -455,16 +420,6 @@ serve((req) => withRequestSpan(req, "GET /functions/system-status", async (span,
       incidentSummary = "global killswitch enabled";
       incidentCheck = "warn";
     }
-
-    console.log(JSON.stringify({
-      evt: "system_status_timing",
-      ingress_ms: tIngress - startedAt,
-      ratelimit_ms: tRateLimit - tIngress,
-      config_ms: tConfig - tIncident,
-      incident_ms: tIncident - tRateLimit,
-      incident_cached: incidentServedFromCache,
-      handler_ms: Date.now() - startedAt,
-    }));
 
     return jsonResponse(200, {
       status: incidentStatus,

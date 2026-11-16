@@ -2,7 +2,7 @@ import { serve } from "../_shared/serve.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.108.2";
 import { validateAccountDeviceSession } from "../_shared/accountSessions.ts";
 import { getExternalAuthUser } from "../_shared/externalAuth.ts";
-import { isAllowedOrigin, parseAllowedOrigins } from "../_shared/cors.ts";
+import { resolveCorsHeaders } from "../_shared/cors.ts";
 import { isKillSwitchWriteBlocked } from "../_shared/killSwitch.ts";
 import { resolveRateLimitResult } from "../_shared/preloginGuards.ts";
 import { readJsonBody } from "../_shared/requestBody.ts";
@@ -79,13 +79,7 @@ const publicItemState = (item: ItemRow | null) =>
 
 serve(async (req) => {
   const origin = req.headers.get("Origin");
-  const allowedOrigins = parseAllowedOrigins(
-    Deno.env.get("ITX_ALLOWED_ORIGINS"),
-  );
-  const originAllowed = !origin || isAllowedOrigin(origin, allowedOrigins);
-  const headers = origin && originAllowed
-    ? { ...baseCorsHeaders, "Access-Control-Allow-Origin": origin }
-    : { ...baseCorsHeaders };
+  const { originAllowed, headers } = resolveCorsHeaders(req, baseCorsHeaders);
   const jsonResponse = (status: number, body: Record<string, unknown>) =>
     new Response(JSON.stringify(body), {
       status,

@@ -1,6 +1,15 @@
 <template>
   <div class="index-page">
     <main class="index-container">
+      <button
+        class="index-back-link index-history-back"
+        type="button"
+        @click="router.back()"
+      >
+        <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M15 10H5m5 5-5-5 5-5" /></svg>
+        Back
+      </button>
+
       <div class="index-heading-row">
         <h1>{{ selectedCategory }}</h1>
         <RouterLink class="index-about-link" to="/index/about">
@@ -123,6 +132,7 @@
               class="index-cover"
               :data-category="entry.category"
               :data-cover-color="entry.coverColor"
+              :style="{ backgroundImage: `url('/brand/index-covers/${entry.slug}.png?v=${encodeURIComponent(entry.title)}-${entry.coverColor}-v1')` }"
               aria-hidden="true"
             >
             </div>
@@ -163,7 +173,7 @@
 
 <script setup lang="ts">
 import { computed, ref } from "vue";
-import { RouterLink } from "vue-router";
+import { RouterLink, useRouter } from "vue-router";
 import PublicFooter from "../components/PublicFooter.vue";
 import {
   INDEX_CATEGORIES,
@@ -173,6 +183,7 @@ import {
 } from "../content/index/indexContent";
 import "./index/index.css";
 
+const router = useRouter();
 const categories = ["All", ...INDEX_CATEGORIES] as const;
 const entries = getIndexEntries();
 const selectedCategory = ref<(typeof categories)[number]>("All");

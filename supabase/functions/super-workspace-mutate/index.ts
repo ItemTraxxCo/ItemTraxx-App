@@ -2,7 +2,7 @@ import { serve } from "../_shared/serve.ts";
 import { getExternalAuthUser } from "../_shared/externalAuth.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.108.2";
 import { isKillSwitchWriteBlocked } from "../_shared/killSwitch.ts";
-import { isAllowedOrigin, parseAllowedOrigins } from "../_shared/cors.ts";
+import { resolveCorsHeaders } from "../_shared/cors.ts";
 import { requireTrustedEdgeIngress } from "../_shared/trustedIngress.ts";
 import { readJsonBody } from "../_shared/requestBody.ts";
 import { hasFreshPrivilegedStepUp } from "../_shared/privilegedStepUp.ts";
@@ -107,14 +107,7 @@ export const SUPER_WORKSPACE_ACTIONS = [
 ] as const;
 serve(async (req) => {
   const origin = req.headers.get("origin"),
-    allowed = parseAllowedOrigins(Deno.env.get("ITX_ALLOWED_ORIGINS")),
-    originAllowed = !origin || isAllowedOrigin(origin, allowed),
-    headers = {
-      ...corsBase,
-      ...(origin && originAllowed
-        ? { "Access-Control-Allow-Origin": origin }
-        : {}),
-    };
+    { originAllowed, headers } = resolveCorsHeaders(req, corsBase);
   const json = (status: number, body: Record<string, unknown>) =>
     new Response(JSON.stringify({ ok: status < 400, ...body }), {
       status,

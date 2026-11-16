@@ -83,6 +83,20 @@
   margin-bottom: 0.55rem;
 }
 
+.index-history-back {
+  margin-bottom: 1.5rem;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.index-history-back:hover:not(:disabled) {
+  background: transparent;
+  transform: none;
+}
+
 .index-about-link:hover,
 .index-back-link:hover,
 .index-return-link:hover {

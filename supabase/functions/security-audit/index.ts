@@ -1,7 +1,7 @@
 import { serve } from "../_shared/serve.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.108.2";
 import { getExternalAuthUser } from "../_shared/externalAuth.ts";
-import { isAllowedOrigin, parseAllowedOrigins } from "../_shared/cors.ts";
+import { resolveCorsHeaders } from "../_shared/cors.ts";
 import {
   emitIncidentIoSecurityPage,
   getRequestId,
@@ -32,11 +32,7 @@ type AuditRequest = {
 
 serve(async (req) => {
   const origin = req.headers.get("Origin");
-  const allowedOrigins = parseAllowedOrigins(Deno.env.get("ITX_ALLOWED_ORIGINS"));
-  const originAllowed = !origin || isAllowedOrigin(origin, allowedOrigins);
-  const headers = origin && originAllowed
-    ? { ...BASE_CORS_HEADERS, "Access-Control-Allow-Origin": origin }
-    : BASE_CORS_HEADERS;
+  const { originAllowed, headers } = resolveCorsHeaders(req, BASE_CORS_HEADERS);
   const jsonResponse = (status: number, body: Record<string, unknown>) =>
     new Response(JSON.stringify(body), {
       status,

@@ -9,7 +9,7 @@ import {
 } from "../_shared/privilegedStepUp.ts";
 import { isSuperAdminTokenBlockedBySessionRevocation } from "../_shared/superAdminSessions.ts";
 import { writeSuperAdminAudit } from "../_shared/superAdminAudit.ts";
-import { isAllowedOrigin, parseAllowedOrigins } from "../_shared/cors.ts";
+import { resolveCorsHeaders } from "../_shared/cors.ts";
 import { readJsonBody } from "../_shared/requestBody.ts";
 import { requireTrustedEdgeIngress } from "../_shared/trustedIngress.ts";
 import {
@@ -44,22 +44,6 @@ const ALLOWED_ITEM_STATUSES = new Set([
   "in_studio_only",
 ] as const);
 
-const resolveCorsHeaders = (req: Request) => {
-  const origin = req.headers.get("Origin");
-  const allowedOrigins = parseAllowedOrigins(Deno.env.get("ITX_ALLOWED_ORIGINS"));
-
-  const hasOrigin = !!origin;
-  const originAllowed =
-    !hasOrigin || (hasOrigin && isAllowedOrigin(origin as string, allowedOrigins));
-
-  const headers =
-    hasOrigin && originAllowed
-      ? { ...baseCorsHeaders, "Access-Control-Allow-Origin": origin as string }
-      : { ...baseCorsHeaders };
-
-  return { hasOrigin, originAllowed, headers };
-};
-
 const verifySuperPassword = async (
   supabaseUrl: string,
   publishableKey: string,
@@ -73,7 +57,7 @@ const verifySuperPassword = async (
 };
 
 serve(async (req) => {
-  const { hasOrigin, originAllowed, headers } = resolveCorsHeaders(req);
+  const { hasOrigin, originAllowed, headers } = resolveCorsHeaders(req, baseCorsHeaders);
 
   const jsonResponse = (status: number, body: Record<string, unknown>) =>
     new Response(JSON.stringify({ ok: status < 400, ...body }), {

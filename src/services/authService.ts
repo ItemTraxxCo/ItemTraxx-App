@@ -4,16 +4,6 @@ export {
   initAuthListener,
   refreshAuthFromSession,
 } from "./auth/sessionBootstrap";
-export {
-  resendSuperAdminEmailChallenge,
-  superAdminLogin,
-  superAdminPasskeyLogin,
-  verifySuperAdminEmailChallenge,
-} from "./auth/privilegedLogin";
-export {
-  clearPendingSuperAdminVerificationEmail,
-  getPendingSuperAdminChallengeToken,
-  getPendingSuperAdminVerificationEmail,
-} from "./auth/sessionState";
+export { superAdminLogin, superAdminPasskeyLogin } from "./auth/privilegedLogin";
 export { getPostSignOutUrl, signOut } from "./auth/signOut";
 export type { LoginNotificationLocation } from "./auth/types";

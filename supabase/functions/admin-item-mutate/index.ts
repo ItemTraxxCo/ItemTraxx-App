@@ -3,7 +3,7 @@ import { getExternalAuthUser } from "../_shared/externalAuth.ts";
 import { emitAuditEvent, getRequestId } from "../_shared/observability.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.108.2";
 import { isKillSwitchWriteBlocked } from "../_shared/killSwitch.ts";
-import { isAllowedOrigin, parseAllowedOrigins } from "../_shared/cors.ts";
+import { resolveCorsHeaders } from "../_shared/cors.ts";
 import { requireTrustedEdgeIngress } from "../_shared/trustedIngress.ts";
 import { resolveRateLimitResult } from "../_shared/preloginGuards.ts";
 import { validateAccountDeviceSession } from "../_shared/accountSessions.ts";
@@ -38,22 +38,6 @@ const ALLOWED_ITEM_STATUSES = new Set([
 ] as const);
 const ACCESS_MODES = new Set(["all", "restricted"] as const);
 
-const resolveCorsHeaders = (req: Request) => {
-  const origin = req.headers.get("Origin");
-  const allowedOrigins = parseAllowedOrigins(Deno.env.get("ITX_ALLOWED_ORIGINS"));
-
-  const hasOrigin = !!origin;
-  const originAllowed =
-    !hasOrigin || (hasOrigin && isAllowedOrigin(origin as string, allowedOrigins));
-
-  const headers =
-    hasOrigin && originAllowed
-      ? { ...baseCorsHeaders, "Access-Control-Allow-Origin": origin as string }
-      : { ...baseCorsHeaders };
-
-  return { hasOrigin, originAllowed, headers };
-};
-
 const isLocalhostMaintenanceBypassRequest = (req: Request) => {
   if ((Deno.env.get("ITX_ALLOW_LOCALHOST_MAINTENANCE_BYPASS") ?? "").toLowerCase() !== "true") {
     return false;
@@ -72,7 +56,7 @@ const isLocalhostMaintenanceBypassRequest = (req: Request) => {
 };
 
 serve(async (req) => {
-  const { hasOrigin, originAllowed, headers } = resolveCorsHeaders(req);
+  const { hasOrigin, originAllowed, headers } = resolveCorsHeaders(req, baseCorsHeaders);
 
   const jsonResponse = (status: number, body: Record<string, unknown>) =>
     new Response(JSON.stringify(body), {

@@ -11,7 +11,7 @@ import {
 } from "../_shared/loginEmailFormat.ts";
 import { isKillSwitchWriteBlocked } from "../_shared/killSwitch.ts";
 import { getRequestId, logError, logInfo } from "../_shared/observability.ts";
-import { isAllowedOrigin, parseAllowedOrigins } from "../_shared/cors.ts";
+import { resolveCorsHeaders } from "../_shared/cors.ts";
 import { hashString, resolveClientIp } from "../_shared/preloginGuards.ts";
 import { requireTrustedEdgeIngress } from "../_shared/trustedIngress.ts";
 import { readJsonBody } from "../_shared/requestBody.ts";
@@ -32,21 +32,6 @@ const baseCorsHeaders = {
 type RateLimitResult = {
   allowed: boolean;
   retry_after_seconds: number | null;
-};
-
-const resolveCorsHeaders = (req: Request) => {
-  const origin = req.headers.get("Origin");
-  const allowedOrigins = parseAllowedOrigins(Deno.env.get("ITX_ALLOWED_ORIGINS"));
-
-  const hasOrigin = !!origin;
-  const originAllowed = !hasOrigin || (hasOrigin && isAllowedOrigin(origin as string, allowedOrigins));
-
-  const headers =
-    hasOrigin && originAllowed
-      ? { ...baseCorsHeaders, "Access-Control-Allow-Origin": origin as string }
-      : { ...baseCorsHeaders };
-
-  return { hasOrigin, originAllowed, headers };
 };
 
 const parseAuthToken = (req: Request) => {
@@ -177,7 +162,7 @@ const buildLoginNotificationHtml = (payload: {
 };
 
 serve(async (req) => {
-  const { hasOrigin, originAllowed, headers } = resolveCorsHeaders(req);
+  const { hasOrigin, originAllowed, headers } = resolveCorsHeaders(req, baseCorsHeaders);
   const requestId = getRequestId(req);
 
   const jsonResponse = (status: number, body: Record<string, unknown>) =>

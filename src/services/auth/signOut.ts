@@ -10,7 +10,6 @@ import { clearHttpSession } from "../httpSessionService";
 import { clearOfflineCheckoutQueue } from "../offlineCheckoutQueue";
 import { clearOfflineCheckoutWorkflow } from "../offlineCheckoutWorkflow";
 import { clearOfflineConnectionState } from "../offlineConnectionState";
-import { clearPendingSuperAdminVerificationEmail } from "./sessionState";
 import { shutdownIntercom } from "../intercomService";
 import { clearReplaySessionHandoff } from "../sessionReplayHandoff";
 
@@ -65,7 +64,6 @@ export const signOut = async ({ bestEffort = false }: SignOutOptions = {}): Prom
   await clearOfflineCheckoutWorkflow();
   clearOfflineConnectionState();
   clearAdminVerification();
-  clearPendingSuperAdminVerificationEmail();
   clearAuthState(true);
   setWorkspaceContext(null);
 

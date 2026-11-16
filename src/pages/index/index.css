@@ -60,7 +60,7 @@
 .index-heading-row h1 {
   margin: 0;
   color: var(--index-text);
-  font-size: clamp(4.5rem, 7.2vw, 7.5rem);
+  font-size: clamp(3.25rem, 5vw, 5rem);
   font-weight: 500;
   letter-spacing: -0.085em;
   line-height: 0.92;
@@ -84,7 +84,7 @@
 }
 
 .index-history-back {
-  margin-bottom: 1.5rem;
+  margin-bottom: 2.75rem;
   min-height: 0;
   padding: 0;
   border: 0;
@@ -897,6 +897,10 @@
   color: var(--index-muted);
 }
 
+.index-page .public-footer {
+  margin-top: 12rem;
+}
+
 .index-page .footer-brand,
 .index-article-page .footer-brand,
 .index-about-page .footer-brand,
@@ -987,7 +991,7 @@
   }
 
   .index-heading-row h1 {
-    font-size: 4.25rem;
+    font-size: 3rem;
   }
 
   .index-about-link {
@@ -1118,6 +1122,10 @@
   .index-article-page .public-footer,
   .index-about-page .public-footer {
     margin-top: 3.4rem;
+  }
+
+  .index-page .public-footer {
+    margin-top: 9rem;
   }
 }
 

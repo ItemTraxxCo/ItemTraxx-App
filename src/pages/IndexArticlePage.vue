@@ -25,7 +25,6 @@
           Back to all writing
         </RouterLink>
       </article>
-      <PublicFooter />
     </main>
 
     <main v-else class="index-article-container index-not-found">
@@ -44,7 +43,6 @@
 <script setup lang="ts">
 import { computed, watchEffect } from "vue";
 import { RouterLink, useRoute } from "vue-router";
-import PublicFooter from "../components/PublicFooter.vue";
 import { formatIndexDate, getIndexEntry, renderIndexMarkdown } from "../content/index/indexContent";
 import "./index/index.css";
 

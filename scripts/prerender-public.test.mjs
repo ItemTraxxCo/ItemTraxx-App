@@ -9,6 +9,7 @@ import {
   applyPublicMetadata,
   injectPublicFallback,
   renderPublicFallback,
+  generateIndexSocialImage,
   writePublicPrerenderedPages,
 } from "./prerender-public.mjs";
 
@@ -24,6 +25,25 @@ const textLength = (html) =>
 const sourceIndexHtml = readFileSync(new URL("../index.html", import.meta.url), "utf8");
 const sourceMainTs = readFileSync(new URL("../src/main.ts", import.meta.url), "utf8");
 const sourcePrerender = readFileSync(new URL("./prerender-public.mjs", import.meta.url), "utf8");
+
+test("renders the article title at a legible size", async () => {
+  const image = await generateIndexSocialImage("Architecture and Defense-in-Depth", "#465d50");
+  const { data, info } = await sharp(image).removeAlpha().raw().toBuffer({ resolveWithObject: true });
+  let whitePixels = 0;
+  let top = info.height;
+  let bottom = 0;
+  for (let y = 0; y < info.height; y++) {
+    for (let x = 0; x < info.width; x++) {
+      const offset = (y * info.width + x) * info.channels;
+      if (data[offset] > 230 && data[offset + 1] > 230 && data[offset + 2] > 230) {
+        whitePixels++;
+        top = Math.min(top, y);
+        bottom = Math.max(bottom, y);
+      }
+    }
+  }
+  assert.ok(whitePixels > 1000 && bottom - top > 35, "title must render as legible text, not tiny missing-glyph boxes");
+});
 
 test("generates published article images and crawler metadata", async () => {
   const dist = mkdtempSync(join(tmpdir(), "index-social-"));

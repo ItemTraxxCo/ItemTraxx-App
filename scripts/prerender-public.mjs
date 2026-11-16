@@ -15,7 +15,7 @@ import sharp from "sharp";
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const DEFAULT_DIST_DIR = resolve(REPO_ROOT, "dist");
 const SITE_ORIGIN = "https://itemtraxx.com";
-const SOCIAL_FONT = join(REPO_ROOT, "node_modules", "@fontsource", "inter", "files", "inter-latin-700-normal.woff");
+const SOCIAL_FONT = join(REPO_ROOT, "scripts", "fonts", "inter-latin-700.ttf");
 process.env.FONTCONFIG_FILE = join(REPO_ROOT, "scripts", "social-fonts.conf");
 process.env.XDG_CACHE_HOME = tmpdir();
 
@@ -648,7 +648,7 @@ const loadPublishedIndexPages = () => {
     const category = INDEX_CATEGORIES.find((item) => item.toLowerCase() === metadata.category?.toLowerCase()) ?? "Company";
     const cover = metadata.cover?.toLowerCase();
     const color = INDEX_COLORS[cover] ?? INDEX_COLORS[INDEX_CATEGORY_COLORS[category]];
-    const imageVersion = createHash("sha256").update(`v6:${title}:${color}`).digest("hex").slice(0, 12);
+    const imageVersion = createHash("sha256").update(`v7:${title}:${color}`).digest("hex").slice(0, 12);
     const summary = metadata.summary?.trim() || `Read ${title} from the ItemTraxx Index.`;
     const articleParagraphs = readableIndexParagraphs(markdown);
     pages.push(makePage({
